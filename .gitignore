@@ -1,0 +1,11 @@
+.vs
+.vscode/*
+buid/*
+*.exe
+*.pdb
+*.obj
+*.asm
+*.txt
+*.ignore
+raylib/*
+*.jar

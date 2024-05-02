@@ -1,0 +1,47 @@
+__logging(false)
+
+fibtab = {}
+fibmem = fun (n) ? {
+	if n < 2 ? leave n
+	fibtab[n] ?= fibmem(n - 1) + fibmem(n - 2)
+	leave fibtab[n]
+}
+
+fibraw = fun (n) ? {
+	if n < 2 ? leave n
+	leave fibraw(n - 1) + fibraw(n - 2)
+}
+
+let fib = fibmem
+
+failed = false
+
+let test = fun (x,y) ? {
+	let k = fib(x)
+	failed ?= k != y
+	pf("fib(", x , ") => ", k)
+	if k != y ? pf("	expected: ", y)
+}
+
+test(0,0)
+test(1,1)
+test(2,1)
+test(3,2)
+test(4,3)
+test(10,55)
+test(25,75025)
+if fib == fibmem ? {
+	test(30,832040)
+	test(35,9227465)
+	test(40,102334155)
+	/* todo: when come back, this number is too large
+	to be represented literally, fix this, add to
+	constant pool */
+	test(65,17167680177565)
+}
+
+if failed ? {
+	fibtab:iter(fun(x,y) ? {
+		pf(x, " = ", y)
+	})
+}

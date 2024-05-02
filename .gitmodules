@@ -1,0 +1,10 @@
+# these submodules are optional
+[submodule "lgi"]
+	path = elf-lgi/lgi
+	url = https://github.com/MicroRJ/lgi
+[submodule "raylib"]
+	path = elf-ray/raylib
+	url = https://github.com/raysan5/raylib
+[submodule "raygui"]
+	path = elf-ray/raygui
+	url = https://github.com/raysan5/raygui

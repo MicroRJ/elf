@@ -1,0 +1,23 @@
+// __logging(true)
+// finally __logging(false)
+
+testfn = fun() ? {
+	// finally pf(".7")
+	// pf(".0")
+	// finally pf(".6")
+	// pf(".1")
+	// finally pf(".5")
+	// pf(".2")
+	// finally pf(".4")
+	// pf(".3")
+
+	finally leave "leave 4"
+	finally leave "leave 3"
+	finally leave "leave 2"
+	finally leave "leave 1"
+	leave "leave 0"
+}
+
+failed = testfn() != "leave 4"
+if (failed) ? pf("failed")
+leave failed
