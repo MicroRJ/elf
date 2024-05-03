@@ -1,11 +1,11 @@
 .vs
 .vscode/*
 buid/*
+*.ilk
 *.exe
 *.pdb
 *.obj
 *.asm
 *.txt
 *.ignore
-raylib/*
 *.jar
