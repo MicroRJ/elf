@@ -6,7 +6,6 @@
 ** example.
 */
 
-
 #define ELF_KEEPWARNINGS
 #include "elf.h"
 
@@ -36,7 +35,6 @@ struct {
 
 
 elf_api void elfweb_ini() {
-	elf_inimem();
 	elf_runini(&elf.R,&elf.M);
 }
 

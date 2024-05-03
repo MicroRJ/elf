@@ -22,9 +22,12 @@ ifeq ($(PLATFORM),PLATFORM_WEB)
 	CC = emcc
 	OUT = build/elf.html
 endif
-all: build/elf.exe
+all: build/elf.exe build/elf-web.exe
 build/elf.exe: elf.h elf.c $(wildcard src/*)
 	$(CC) $(CFLAGS) elf.c -o $(OUT) -I.
+# just to check build status
+build/elf-web.exe: elf.h elf-web.c $(wildcard src/*)
+	$(CC) $(CFLAGS) elf-web.c -o build/elf-web.exe -I.
 clean:
 	rm -f build/*
 	rm -f build/web/*
