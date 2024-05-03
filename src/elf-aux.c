@@ -5,9 +5,6 @@
 */
 
 
-
-
-
 void elf_debugger(char *message) {
 	sys_consolelog(ELF_LOGDBUG,"debugger: ");
 	sys_consolelog(ELF_LOGDBUG,message);
@@ -18,6 +15,11 @@ void elf_debugger(char *message) {
 
 void elf_registerint(elf_ThreadState *R, char *name, int val) {
 	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valint(val));
+}
+
+
+void elf_registerstr(elf_ThreadState *R, char *name, char *val) {
+	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valstr(elf_newlocstr(R,val)));
 }
 
 

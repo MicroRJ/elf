@@ -300,10 +300,10 @@ elf_api int elflib_listdir(elf_ThreadState *R) {
 }
 
 
-/* todo: can we do this from code */
 elf_api void elflib_load(elf_ThreadState *R) {
+	elf_registerint(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
-	elf_registerint(R,"elf.PLATFORM_WEB",1);
+	elf_registerstr(R,"elf.PLATFORM","web");
 #endif
 	/* todo: these shouldn't be here */
 	elf_register(R,"ntoi",elflib_ntoi);
@@ -325,8 +325,8 @@ elf_api void elflib_load(elf_ThreadState *R) {
 	elf_register(R,"elf.libfn",elflib_libfn);
 	elf_register(R,"elf.loadexpr",elflib_loadexpr);
 	elf_register(R,"elf.loadfile",elflib_loadfile);
-	elf_register(R,"elf.sys.clocktime",elflib_clocktime);
-	elf_register(R,"elf.sys.timediffs",elflib_timediffs);
+	elf_register(R,"elf.clocktime",elflib_clocktime);
+	elf_register(R,"elf.timediffs",elflib_timediffs);
 	elf_register(R,"elf.fpf",elflib_fpf);
 	elf_register(R,"elf.lpf",elflib_lpf);
 	elf_register(R,"elf.pf",elflib_pf);

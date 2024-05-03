@@ -46,19 +46,19 @@ void *langM_debugrealloc(void *mem, elf_int contentssize, ldebugloc loca);
 void *langM_debugalloc(elf_int contentssize, ldebugloc loca);
 
 
-elf_api void langM_dealloc_(Alloc *allocator, void const *memory, ldebugloc loca);
-elf_api void *langM_realloc_(Alloc *allocator, elf_int size, void *memory, ldebugloc loca);
-elf_api void *langM_alloc_(Alloc *allocator, elf_int size, ldebugloc loca);
-elf_api void *langM_clearalloc_(Alloc *allocator, elf_int size, ldebugloc loca);
+elf_api void elf_dealloc_(Alloc *allocator, void const *memory, ldebugloc loca);
+elf_api void *elf_realloc_(Alloc *allocator, elf_int size, void *memory, ldebugloc loca);
+elf_api void *elf_alloc_(Alloc *allocator, elf_int size, ldebugloc loca);
+elf_api void *elf_clearalloc_(Alloc *allocator, elf_int size, ldebugloc loca);
 
 
-#define elf_delmem(cator,mem) langM_dealloc_(cator,mem,LHERE)
-#define langM_realloc(cator,sze,mem) langM_realloc_(cator,sze,mem,LHERE)
-#define elf_alloc(cator,sze) langM_alloc_(cator,sze,LHERE)
-#define elf_clearalloc(cator,sze) langM_clearalloc_(cator,sze,LHERE)
+#define elf_delmem(cator,mem) elf_dealloc_(cator,mem,LHERE)
+#define langM_realloc(cator,sze,mem) elf_realloc_(cator,sze,mem,LHERE)
+#define elf_alloc(cator,sze) elf_alloc_(cator,sze,LHERE)
+#define elf_clearalloc(cator,sze) elf_clearalloc_(cator,sze,LHERE)
 
 
-elf_api ALLOCFN(langM_deftlocalallocfn);
+elf_api ALLOCFN(elf_deftlsallocfn);
 elf_api ALLOCFN(elf_defglobalallocfn);
 
 

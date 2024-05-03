@@ -8,7 +8,6 @@ To embed elf simply include elf.h, see elf.c
 (the compiler) for an example.
 
 
-
 ### Please Note The Following:
 This project is unreleased, meaning that
 it is not meant for public consumption,
@@ -19,16 +18,19 @@ and spurious code sprinkled here and there.
 
 
 This page (elf) contains only the files that
-pertain to the elf programming language itself,
-those necessary to build the compiler and
-run elf code.
+pertain to the elf programming language and
+the basic runtime itself which is under the
+elf namespace and those necessary to build
+the compiler and run elf code.
+
 
 There are no dependencies and the code
 is meant to be platform agnostic (eventually).
 
-If you wish to use elf alongside other libraries
-such as raylib, you can head over to their
-independent repos listed here:
+If you wish to use elf alongside other
+libraries or runtimes such as raylib,
+you can head over to their independent
+repos listed here:
 
 https://github.com/MicroRJ/elf-ray
 

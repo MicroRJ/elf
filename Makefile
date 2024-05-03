@@ -2,22 +2,29 @@
 # to use make for windows, get the toolkit from:
 # git @ skeeto/w64devkit/releases
 # this makefile needs working...
+# if you're using clang on windows, ensure you're
+# either using the developer console or you've
+# setup the path properly using vcvarsall or
+# vcvars64 or vcvars32
 MAKE ?= make
-CC = clang-cl
+CC = clang
 PLATFORM ?= PLATFORM_DESKTOP
-CFLAGS = -D$(PLATFORM)
-OUT = build
+OUT = build/elf.exe
+CFLAGS = -D$(PLATFORM) -Wall
+ifeq ($(MODE),RELEASE)
+	CFLAGS += -O3
+else
+	CFLAGS += -g
+	CFLAGS += -O0
+	CFLAGS += -D_DEBUG
+endif
 ifeq ($(PLATFORM),PLATFORM_WEB)
 	CC = emcc
-	OUT = build/web
-	CFLAGS += -O3 -Wall
-else ifeq ($(PLATFORM),PLATFORM_DESKTOP)
-	CFLAGS += -TC -Z7 -W4
-	CFLAGS += -Od -MTd
-	CFLAGS += -D_DEBUG
+	OUT = build/elf.html
 endif
 all: build/elf.exe
 build/elf.exe: elf.h elf.c $(wildcard src/*)
-	$(CC) $(CFLAGS) elf.c -o build/elf.exe -I.
+	$(CC) $(CFLAGS) elf.c -o $(OUT) -I.
 clean:
-	del build/* /s
+	rm -f build/*
+	rm -f build/web/*

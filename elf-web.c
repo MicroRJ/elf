@@ -1,7 +1,9 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf-web.c
-** Web API, For The Web.
+** Same idea as elf.c, but tailored
+** for the web, this is only an
+** example.
 */
 
 
@@ -35,26 +37,14 @@ struct {
 
 elf_api void elfweb_ini() {
 	elf_inimem();
-	elf.R.logging = lfalse;
-	elf.R.stklen = 4096;
-	elf.R.stk = elf.R.top = elf_clearalloc(lHEAP,sizeof(elf_val)*elf.R.stklen);
-
-	elf.C.base = elf.R.top;
-	elf.R.call = &elf.C;
-
-	elf.R.metatable_str = elf_newstrmetatab(&elf.R);
-	elf.R.metatable_tab = elf_newtabmetatab(&elf.R);
-	elf.M.globals = elf_newloctab(&elf.R);
-	netlib_load(&elf.R);
-	elflib_load(&elf.R);
-	tstlib_load(&elf.R);
-	crtlib_load(&elf.R);
+	elf_runini(&elf.R,&elf.M);
 }
 
 
 /* todo: copy the contents */
 elf_api int elfweb_loadcode(char *codename, char *contents) {
-	/* run in a separate call frame */
+	/* run in a separate call frame, this isn't needed
+	though... */
 	elf_CallFrame call = {0};
 	call.caller = elf.R.call;
 	call.base = elf.R.top;

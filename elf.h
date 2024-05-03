@@ -151,7 +151,7 @@ typedef struct elf_Closure elf_Closure;
 
 
 #include "src/elf-sys.c"
-#include "src/lmem.c"
+#include "src/elf-mem.c"
 #include "src/ldebug.c"
 #include "src/llog.c"
 #include "src/elf-obj.c"

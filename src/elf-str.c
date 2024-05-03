@@ -28,7 +28,7 @@ elf_String *elf_newstrlen(elf_ThreadState *R, elf_int length) {
 elf_String *elf_newstr(elf_ThreadState *R, char *junk) {
 	int length = S_length(junk);
 	elf_String *obj = elf_newstrlen(R,length);
-	langM_copy(obj->c,junk,length);
+	elf_memcopy(obj->c,junk,length);
 	obj->hash = elf_tabhashstr((char*)junk);
 	return obj;
 }
@@ -78,7 +78,7 @@ char *S_ncopy(Alloc *allocator, int length, char const *string) {
 		length = S_length(string);
 	}
 	char *result = elf_alloc(allocator,length+1);
-	langM_copy(result,string,length);
+	elf_memcopy(result,string,length);
 	result[length]=0;
 	return result;
 }

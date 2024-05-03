@@ -155,7 +155,7 @@ int elf_loadexpr(elf_ThreadState *R, elf_String *contents, llocalid rxy, int ny)
 
 int elf_loadcode(elf_ThreadState *R, elf_FileState *fs, elf_String *filename, const llocalid rxy, int ny, char *contents) {
 	if (filename == lnil) {
-	/* todo: don't like this */
+		/* todo: don't like this */
 	 	filename = elf_checkstr(R,rxy);
 	}
 	if (contents == lnil) {
@@ -173,14 +173,11 @@ int elf_loadcode(elf_ThreadState *R, elf_FileState *fs, elf_String *filename, co
 	fs->linenumber = 1;
 
 	/* kick start by lexing the first two tokens */
-	elf_lexone(fs);
-	elf_lexone(fs);
-
+	elf_lexone(fs); elf_lexone(fs);
 	elf_FileFunc fn = {0};
 	elfY_beginfn(fs,&fn,fs->tk.line);
 	while (!elf_testtk(fs,0)) elf_fsloadstat(fs);
 	elfY_closefn(fs);
-
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */
 	elf_File fl = {0};
