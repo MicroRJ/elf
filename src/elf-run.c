@@ -425,7 +425,10 @@ int elf_run(elf_ThreadState *R) {
 			eq = elf_valisnil(x) == elf_valisnil(y);
 		} else if ((x.tag == TAG_STR) && (y.tag == TAG_STR)) {
 			eq = elf_streq(x.x_str,y.x_str);
+		} else if (elf_tagisnumeric(x.tag) && elf_tagisnumeric(y.tag)) {
+			eq = x.x_int == y.x_int;
 		} else eq = (x.tag == y.tag) && (x.x_int == y.x_int);
+
 		if (b.k == BC_NEQ) eq = !eq;
 		locals[b.x].tag = TAG_INT;
 		locals[b.x].i   = eq;
