@@ -14,7 +14,7 @@ typedef double elf_num;
 
 typedef unsigned int elf_hashint;
 typedef int llocalid;
-typedef int lbyteid;
+typedef int elf_byteid;
 typedef int lglobalid;
 /* todo: eventually convert this to an offset */
 typedef char *llineid;

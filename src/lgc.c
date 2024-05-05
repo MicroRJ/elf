@@ -93,7 +93,7 @@ void elf_delobj(elf_ThreadState *R, elf_Object *obj) {
 	}
 }
 
-elf_bool elf_markval(elf_val *v);
+elf_bool elf_markval(elf_Value *v);
 elf_int elf_marktab(elf_Table *table);
 
 
@@ -139,14 +139,14 @@ elf_bool elf_markobj(elf_Object *obj) {
 }
 
 
-elf_bool elf_markval(elf_val *v) {
+elf_bool elf_markval(elf_Value *v) {
 	return elf_tagisobj(v->tag) ? elf_markobj(v->x_obj) : lfalse;
 }
 
 
 elf_int elf_markall(elf_ThreadState *R) {
 	elf_int num = elf_markobj((elf_Object*)R->M->g);
-	for (elf_val *val = R->stk; val < R->top; ++ val) {
+	for (elf_Value *val = R->stk; val < R->top; ++ val) {
 		num += elf_markval(val);
 	}
 	return num;

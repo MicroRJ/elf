@@ -1,10 +1,7 @@
 failed = false
-
-let enum test = fun(x,y) ? {
+test = fun(x,y) ? {
 	failed ?= x != y
-	if x != y ? {
-		pf("failed, expected ", y, ", instead got ", x)
-	}
+	if x != y ? elf.pf("failed, expected ", y, ", instead got ", x)
 }
 main = fun(x,y,z) ? {
 	test(stkget(0),"x")

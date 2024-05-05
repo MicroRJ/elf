@@ -1,0 +1,11 @@
+let file = elf.ftemp() finally elf.fclose(file)
+let test = {"x"=1,"y"={
+	"x"=1,
+	"y"=2,
+}}
+test:unload(file)
+elf.pf("size: ",elf.fsize(file));
+let data = elf.fload(file)
+elf.pf("data: ",data);
+let x = elf.loadexpr(data)
+elf.pf(x)

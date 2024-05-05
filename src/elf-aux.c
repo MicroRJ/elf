@@ -13,6 +13,11 @@ void elf_debugger(char *message) {
 }
 
 
+void elf_registersys(elf_ThreadState *R, char *name, elf_Handle val) {
+	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valsys(val));
+}
+
+
 void elf_registerint(elf_ThreadState *R, char *name, int val) {
 	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valint(val));
 }
@@ -44,24 +49,16 @@ elf_num elf_timediffs(elf_int begin) {
 }
 
 
-int elf_fndfilebyline(elf_Module *md, llineid line) {
+int elf_fndfilebybyte(elf_Module *md, elf_byteid byte) {
 	elf_File *files = md->files;
 	int nfiles = elf_varlen(files);
 	for (int x = 0; x < nfiles; ++ x) {
-		elf_File fl = files[x];
-		if ((elf_int)(line - fl.lines) < fl.nlines) {
+		elf_File file = files[x];
+		if ((elf_int)(byte - file.bytes) < file.nbytes) {
 			return x;
 		}
-		// if (line < fl.lines) continue;
-		// if (line > fl.lines+fl.nlines-1) continue;
-		// return x;
 	}
 	return -1;
-}
-
-
-elf_bool elf_chriseol(char x) {
-	return x == '\r' || x == '\n' || x == '\0';
 }
 
 
@@ -70,7 +67,7 @@ void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc) {
 	char *c = q;
 	int n = 0;
 	while (q < loc) {
-		while (!elf_chriseol(*q) && q < loc) q ++;
+		while ((*q != '\r' && *q != '\n' && *q != '\0') && q < loc) q ++;
 		if (*q == 0) break;
 		if ((*q != '\n') || (c = ++ q, n ++, 1)) {
 			if ((*q == '\r') && (c = ++ q, n ++, 1)) {
@@ -127,20 +124,20 @@ void elf_lineerror2(char *filename, char *contents, char *loc, char const *fmt, 
 }
 
 
-void elf_throw(elf_ThreadState *R, lbyteid id, char *error) {
-	elf_Module *md = R->md;
-	if (id == NO_BYTE) id = R->j;
-	llineid line = md->lines[id];
-	int fileid = elf_fndfilebyline(md,line);
+void elf_throw(elf_ThreadState *R, elf_byteid byte, char *error) {
+	elf_Module *M = R->M;
+	if (byte == NO_BYTE) byte = R->byte;
+	llineid line = M->lines[byte];
+	int fileid = elf_fndfilebybyte(M,byte);
 	if (fileid != -1) {
-		elf_File *file = &md->files[fileid];
+		elf_File *file = &M->files[fileid];
 		elf_lineerror2(file->name,file->lines,line,error);
 	}
 	elf_debugger("runtime throw");
 }
 
 
-int elf_tycheck(elf_ThreadState *R, lbyteid id, llocalid loc, elf_valtag x, elf_valtag y) {
+int elf_tycheck(elf_ThreadState *R, elf_byteid id, llocalid loc, elf_valtag x, elf_valtag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

@@ -50,7 +50,7 @@ elf_api int elfweb_loadcode(char *codename, char *contents) {
 	elf.R.call = &call;
 	elf_String *name = elf_newlocstr(&elf.R,codename);
 	elf_FileState fs = {0};
-	int result = elf_loadcode(&elf.R,&fs,name,0,0,contents);
+	int result = elf_loadcodefs(&elf.R,&fs,name,0,0,contents);
 	elf.R.call = call.caller;
 	return result;
 }

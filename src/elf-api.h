@@ -5,19 +5,19 @@
 */
 
 
-elf_num elf_tonum(elf_val v) {
+elf_num elf_tonum(elf_Value v) {
 	return v.tag == TAG_INT ? (elf_num) v.i : v.n;
 }
 
 
-elf_int elf_toint(elf_val v) {
+elf_int elf_toint(elf_Value v) {
 	return v.tag == TAG_NUM ? (elf_int) v.n : v.i;
 }
 
 
 elf_api elf_Object *elf_getthis(elf_ThreadState *R);
 
-elf_api elf_val elf_getval(elf_ThreadState *R, llocalid x);
+elf_api elf_Value elf_getval(elf_ThreadState *R, llocalid x);
 elf_api elf_int elf_getint(elf_ThreadState *R, llocalid x);
 elf_api elf_num elf_getnum(elf_ThreadState *R, llocalid x);
 elf_api elf_String *elf_getstr(elf_ThreadState *R, llocalid x);
@@ -28,31 +28,26 @@ elf_api elf_Closure *elf_getcls(elf_ThreadState *R, llocalid x);
 
 
 /*
-** Loads an expression from source string.
-** The expression is converted to a
-** function and is called as a root
-** function, can only reference global
-** expressions.
-** The expression can be a function itself,
-** in which case you call the function and
-** pass in arguments.
+** The following set of functions are very similar
+** and have the same semantics, the only difference
+** are the paramters.
+** - filename: is the name of the file to load from
+** disk or the label you wish to attach the code.
+** - rxy: is the register from which to read inputs
+** and to which to write outputs.
+**
+**   Loads elf [....] and calls its function.
+** loadcodefs: [code]
+** loadexprfs: [expr]
+** loadfilefs: [file]
 */
-elf_api int elf_loadexpr(elf_ThreadState *, elf_String *contents, llocalid x, llocalid y);
+elf_api int elf_loadcodefs(elf_ThreadState *, elf_FileState *fs, elf_String *filename, llocalid rxy, int ny, char *contents);
+elf_api int elf_loadexprfs(elf_ThreadState *, elf_FileState *fs, elf_String *filename, llocalid rxy, int ny, char *contents);
+elf_api int elf_loadfilefs(elf_ThreadState *, elf_FileState *fs, elf_String *filename, llocalid rxy, int ny);
 
-
-
-/*
-** Loads a file and calls its function,
-** returns the number of results.
-*/
-int elf_loadcode(elf_ThreadState *, elf_FileState *fs, elf_String *filename, llocalid rx, int ny, char *contents);
-
-
-/*
-** Loads a file from disk and calls its function,
-** returns the number of results.
-*/
-int elf_loadfile(elf_ThreadState *, elf_FileState *fs, elf_String *filename, llocalid rx, int ny);
+elf_api int elf_loadcode(elf_ThreadState *, elf_String *filename, llocalid rxy, int ny, char *contents);
+elf_api int elf_loadexpr(elf_ThreadState *, elf_String *filename, llocalid rxy, int ny, char *contents);
+elf_api int elf_loadfile(elf_ThreadState *, elf_String *filename, llocalid rxy, int ny);
 
 
 /*
@@ -89,10 +84,10 @@ elf_api elf_String *elf_checkstr(elf_ThreadState *c, llocalid x);
 
 elf_api llocalid elf_stkput(elf_ThreadState *R, int n);
 elf_api llocalid elf_stklen(elf_ThreadState *c);
-elf_val *elf_gettop(elf_ThreadState *R);
-void elf_settop(elf_ThreadState *R, elf_val *top);
+elf_Value *elf_gettop(elf_ThreadState *R);
+void elf_settop(elf_ThreadState *R, elf_Value *top);
 
-elf_api llocalid elf_locval(elf_ThreadState *, elf_val v);
+elf_api llocalid elf_locval(elf_ThreadState *, elf_Value v);
 elf_api void elf_locnil(elf_ThreadState *);
 elf_api void elf_locint(elf_ThreadState *, elf_int i);
 elf_api void elf_locnum(elf_ThreadState *, elf_num n);

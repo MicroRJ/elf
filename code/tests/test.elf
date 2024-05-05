@@ -1,0 +1,39 @@
+/* test runner */
+PREVDIR = elf.mydir() finally elf.mydir(PREVDIR)
+elf.mydir("code/tests")
+
+let sysfile = elf.fopen("tests.ignore","wb")
+elf.fpf(sysfile,"test scores:\n")
+finally elf.fpf(sysfile,"end of test run");
+
+numfails = 0
+
+elf.enumdir(".",fun(file) ? {
+	iff file.name:match("*.test.lang|*.test.elf") ? {
+		leave false
+	}
+	let time_ = elf.clocktime()
+	finally elf.pf(" => took: ", elf.timediffs(time_))
+	elf.pf("[TEST]: ", file.name)
+	/* -- todo: ensure the test does declare
+	more globals, store the global count
+	beforehand, and then compare with after
+	loading the file */
+	load file.path
+	__logging(false)
+	numfails = numfails + 1
+	/* failed is a global */
+	if failed ? elf.pf("[FAILED]")
+	leave true
+})
+
+
+if numfails == 1 ? {
+	elf.pf(numfails, " test failed")
+} elif numfails > 1 ? {
+	elf.pf(numfails, " tests failed")
+} else {
+	elf.pf("all tests succeeded")
+}
+
+

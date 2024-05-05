@@ -49,6 +49,11 @@ void elf_lineerror(elf_FileState *fs, char *loc, char const *fmt, ...) {
 }
 
 
+elf_bool elf_chriseol(char x) {
+	return x == '\r' || x == '\n' || x == '\0';
+}
+
+
 elf_bool elf_chrisdigit(char x) {
 	return x >= '0' && x <= '9';
 }

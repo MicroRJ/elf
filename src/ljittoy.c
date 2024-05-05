@@ -79,7 +79,7 @@ void jittestall() {
 }
 
 #if 0
-void do_add(elf_val *x, elf_val *y) {
+void do_add(elf_Value *x, elf_Value *y) {
 	if (x->tag == TAG_NUM) {
 		x->n = elf_tonum(* x) + elf_tonum(* y);
 	} else
@@ -150,10 +150,10 @@ lBinding jit(elf_Module *md, elf_Proto fn) {
 
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
-	lBytecode *bytes = md->bytes + fn.bytes;
-	lbyteid nbytes = fn.nbytes;
+	elf_Bytecode *bytes = md->bytes + fn.bytes;
+	elf_byteid nbytes = fn.nbytes;
 
-	for (lbyteid i = 0; i < nbytes; ++i) {
+	for (elf_byteid i = 0; i < nbytes; ++i) {
 		#if 0
 		switch (byte.k) {
 			case BC_INT: {

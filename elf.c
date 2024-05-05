@@ -19,7 +19,7 @@ int main(int n, char **c) {
 	elf_Module M = {0};
 	elf_ThreadState R = {0};
 	elf_runini(&R,&M);
-	if (cli.logging) R.logging = ltrue;
+	if (cli.logging) R.bytelogging = ltrue;
 
 	elf_CallFrame frame = {0};
 	frame.base = R.top;
@@ -29,7 +29,7 @@ int main(int n, char **c) {
 		elf_String *filename = elf_newlocstr(&R,cli.filename);
 		filename->obj.gccolor = GC_PINK;
 		elf_FileState fs = {0};
-		elf_loadfile(&R,&fs,filename,0,0);
+		elf_loadfilefs(&R,&fs,filename,0,0);
 	}
 	if (cli.dump) {
 		FILE *dumpf = stdout;

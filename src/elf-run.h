@@ -5,11 +5,11 @@
 */
 
 
-typedef struct ldelaylist ldelaylist;
-typedef struct ldelaylist {
-	ldelaylist *n;
-	lbyteid j;
-} ldelaylist;
+typedef struct elf_delaylist elf_delaylist;
+typedef struct elf_delaylist {
+	elf_delaylist *n;
+	elf_byteid j;
+} elf_delaylist;
 
 
 typedef struct elf_CallFrame elf_CallFrame;
@@ -28,10 +28,10 @@ typedef struct elf_CallFrame {
 	yield starting at base[-1], should have base[-1..y)
 	registers to write to. */
 	union {
-		elf_val *base,*l,*locals;
+		elf_Value *base,*l,*locals;
 	};
 	/* todo: rename top to regress */
-	elf_val *top;
+	elf_Value *top;
 	/* next instruction index */
 	elf_int j;
 	llocalid rx,ry;
@@ -51,7 +51,7 @@ typedef struct elf_CallFrame {
 	/* list of delayed jumps to be executed
 	on return, 'finally' statements produce
 	these. */
-	ldelaylist *dl;
+	elf_delaylist *dl;
 	elf_bool logging;
 } elf_CallFrame;
 
@@ -60,8 +60,8 @@ typedef struct elf_Runtime {
 	union { elf_Module *M, *md; };
 	/* these should be safe to access
 	multi-threaded */
-	elf_Table *metatable_str;
-	elf_Table *metatable_tab;
+	elf_Table *metatab_str;
+	elf_Table *metatab_tab;
 	struct {
 		elf_String *__add,*__sub,*__mul,*__div;
 		elf_String *__add1,*__sub1,*__mul1,*__div1;
@@ -74,31 +74,34 @@ typedef struct lThread {
 	union { elf_ThreadState *R, *rt; };
 	union { elf_Module  *M, *md; };
 	union { elf_CallFrame *call; };
-	union { elf_val *stk;      };
+	union { elf_Value *stk;      };
 	llocalid stklen;
 	elf_int threadid;
-	lbyteid  curbyte;
+	elf_byteid  curbyte;
 } lThread;
 
 
 typedef struct elf_ThreadState {
 	union { elf_Module *M, *md; };
-	union { elf_val *stk,*s; };
+	union { elf_Value *stk,*s; };
 	llocalid stklen;
-	union { elf_val *top,*v; };
+	union { elf_Value *top,*v; };
 	union { elf_CallFrame *call,*frame,*f; };
-	elf_bool debugbreak;
-	elf_Table *metatable_str;
-	elf_Table *metatable_tab;
+	elf_bool debuggerflag;
+	elf_Table *metatab_str;
+	elf_Table *metatab_tab;
 	struct {
 		elf_String *x,*y,*z,*w;
 		elf_String *width,*height;
 		elf_String *__add,*__sub,*__mul,*__div;
 		elf_String *__add1,*__sub1,*__mul1,*__div1;
 	} cache;
-	/* current byte */
-	elf_int j;
-	elf_bool logging;
+	elf_Bytecode *bytetrace;
+	elf_bool bytetracing;
+	elf_bool bytetracking;
+	/* current byte and whether bytelogging is on */
+	elf_byteid byte;
+	elf_bool bytelogging;
 	elf_Object **gc;
 	elf_bool     gcflags;
 	elf_int      gcmemory;

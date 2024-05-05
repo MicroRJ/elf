@@ -31,7 +31,7 @@ typedef struct elf_fileblock {
 	int level;
 	int xmemory;
 	int xentity;
-	lbyteid entry;
+	elf_byteid entry;
 	elf_bool isloop;
 } elf_fileblock;
 
@@ -59,13 +59,13 @@ typedef struct elf_FileFunc {
 	relative to the current function we're
 	parsing, there's always an active function,
 	even at file level */
-	lbyteid bytes;
+	elf_byteid bytes;
 	elf_fileblock entry;
 	elf_fileblock *block;
 	int nyield;
 	/* todo: deprecated */
 	/* list of yield jumps to be patched */
-	lbyteid *yj;
+	elf_byteid *yj;
 } elf_FileFunc;
 
 
@@ -81,8 +81,8 @@ typedef struct elf_FileState {
 	int linenumber;
 	ltoken lasttk,tk,thentk;
 	/* buffer for nodes */
-	lNode *nodes;
-	lnodeid nnodes;
+	elf_Node *nodes;
+	elf_nodeid nnodes;
 	/* the current level, level is incremented
 	per level, block or statement or whenever
 	it makes sense, represents a visibility
@@ -99,12 +99,12 @@ typedef struct elf_FileState {
 	/* hierarchical list of loading functions,
 	each allocated in C stack by caller function */
 	elf_FileFunc *fn;
-	lbyteid bytes;
+	elf_byteid bytes;
 	int flags;
 	unsigned statbreak: 1;
 } elf_FileState;
 
 
-lnodeid elf_fsloadexpr(elf_FileState *fs);
-lnodeid elf_fsloadunary(elf_FileState *fs);
+elf_nodeid elf_fsloadexpr(elf_FileState *fs);
+elf_nodeid elf_fsloadunary(elf_FileState *fs);
 void elf_fsloadstat(elf_FileState *fs);

@@ -28,13 +28,13 @@ int testlib_logging(elf_ThreadState *R) {
 
 int testlib_globallogging(elf_ThreadState *R) {
 	elf_int logging = elf_getint(R,0);
-	R->logging = logging;
+	R->bytelogging = logging;
 	return 0;
 }
 
 
 int testlib_debugbreak(elf_ThreadState *R) {
-	R->debugbreak = ltrue;
+	elf_debugger("this function is removed");
 	return 0;
 }
 
@@ -63,7 +63,7 @@ int testlib_disasm(elf_ThreadState *c) {
 	int j;
 	for (j = 0; j < p.nbytes; ++j) {
 		if (j != 0) strcatf(file,"\n");
-		lBytecode b = md->bytes[p.bytes+j];
+		elf_Bytecode b = md->bytes[p.bytes+j];
 		switch (b.k) {
 			case BC_LOADFILE:
 			case BC_METACALL:

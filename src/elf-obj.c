@@ -10,7 +10,7 @@ elf_bool elf_tagisnumeric(elf_valtag tag) {
 }
 
 
-int elf_valisnil(elf_val x) {
+int elf_valisnil(elf_Value x) {
 	return (x.tag == TAG_NIL) || (!elf_tagisnumeric(x.tag) && (x.p == lnil));
 }
 
@@ -37,56 +37,56 @@ elf_valtag elf_objtotag(elf_objty type) {
 }
 
 
-elf_api elf_val elf_valtab(elf_Table *tab) {
-	elf_val v = LITC(elf_val){TAG_TAB};
+elf_api elf_Value elf_valtab(elf_Table *tab) {
+	elf_Value v = LITC(elf_Value){TAG_TAB};
 	v.x_tab = tab;
 	return v;
 }
 
 
-elf_api elf_val elf_valbid(lBinding c) {
-	elf_val v = LITC(elf_val){TAG_BID};
+elf_api elf_Value elf_valbid(lBinding c) {
+	elf_Value v = LITC(elf_Value){TAG_BID};
 	v.c = c;
 	return v;
 }
 
 
-elf_api elf_val elf_valsys(elf_Handle h) {
-	elf_val v = LITC(elf_val){TAG_SYS};
+elf_api elf_Value elf_valsys(elf_Handle h) {
+	elf_Value v = LITC(elf_Value){TAG_SYS};
 	v.h = h;
 	return v;
 }
 
 
-elf_api elf_val elf_valstr(elf_String *s) {
-	elf_val v = LITC(elf_val){TAG_STR};
+elf_api elf_Value elf_valstr(elf_String *s) {
+	elf_Value v = LITC(elf_Value){TAG_STR};
 	v.s = s;
 	return v;
 }
 
 
-elf_api elf_val elf_valcls(elf_Closure *f) {
-	elf_val v = LITC(elf_val){TAG_CLS};
+elf_api elf_Value elf_valcls(elf_Closure *f) {
+	elf_Value v = LITC(elf_Value){TAG_CLS};
 	v.f = f;
 	return v;
 }
 
 
-elf_api elf_val elf_valint(elf_int i) {
-	elf_val v = (elf_val){TAG_INT};
+elf_api elf_Value elf_valint(elf_int i) {
+	elf_Value v = (elf_Value){TAG_INT};
 	v.i = i;
 	return v;
 }
 
 
-elf_api elf_val elf_valnum(elf_num n) {
-	elf_val v = (elf_val){TAG_NUM};
+elf_api elf_Value elf_valnum(elf_num n) {
+	elf_Value v = (elf_Value){TAG_NUM};
 	v.n = n;
 	return v;
 }
 
 
-int elf_valfpf(FILE *file, elf_val v, elf_bool quotes) {
+int elf_valfpf(FILE *file, elf_Value v, elf_bool quotes) {
 	switch (v.tag) {
 		case TAG_NIL: return fprintf(file,"nil");
 		case TAG_SYS: return fprintf(file,"h%llX",v.i);

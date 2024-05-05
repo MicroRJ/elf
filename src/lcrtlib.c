@@ -15,54 +15,6 @@
 #endif
 
 
-int crtlib_floor(elf_ThreadState *R) {
-	elf_locnum(R,floor(elf_getnum(R,0)));
-	return 1;
-}
-
-
-int crtlib_sqrt(elf_ThreadState *R) {
-	elf_locnum(R,sqrt(elf_getnum(R,0)));
-	return 1;
-}
-
-
-int crtlib_sin(elf_ThreadState *R) {
-	elf_locnum(R,sin(elf_getnum(R,0)));
-	return 1;
-}
-
-
-int crtlib_cos(elf_ThreadState *R) {
-	elf_locnum(R,cos(elf_getnum(R,0)));
-	return 1;
-}
-
-
-int crtlib_tan(elf_ThreadState *R) {
-	elf_locnum(R,tan(elf_getnum(R,0)));
-	return 1;
-}
-
-
-int crtlib_atan2(elf_ThreadState *R) {
-	elf_locnum(R,atan2(elf_getnum(R,0),elf_getnum(R,1)));
-	return 1;
-}
-
-
-int crtlib_abort(elf_ThreadState *rt) {
-	if(1) abort();
-	return 0;
-}
-
-
-int crtlib_exit(elf_ThreadState *rt) {
-	if(1) exit(elf_getint(rt,0));
-	return 0;
-}
-
-
 int crtlib__chdir(elf_ThreadState *rt) {
 	elf_String *name = elf_getstr(rt,0);
 #if defined(PLATFORM_WEB)
@@ -70,35 +22,6 @@ int crtlib__chdir(elf_ThreadState *rt) {
 #else
 	elf_locint(rt,_chdir(name->c));
 #endif
-	return 1;
-}
-
-
-int crtlib_fopen(elf_ThreadState *c) {
-	elf_String *name = elf_getstr(c,0);
-	elf_String *flags = elf_getstr(c,1);
-	FILE *file = lnil;
-#if defined(PLATFORM_WEB)
-	file = fopen(name->c,flags->c);
-#else
-	fopen_s(&file,name->c,flags->c);
-#endif
-	elf_locsys(c,(elf_Handle) file);
-	return 1;
-}
-
-
-int crtlib_fclose(elf_ThreadState *c) {
-	elf_Handle file = elf_getsys(c,0);
-	fclose(file);
-	return 0;
-}
-
-
-int crtlib_fsize(elf_ThreadState *c) {
-	elf_Handle file = elf_getsys(c,0);
-	fseek(file,0,SEEK_END);
-	elf_locint(c,ftell(file));
 	return 1;
 }
 
@@ -236,19 +159,8 @@ DEFSTUB(crtlib_system)
 elf_api void crtlib_load(elf_ThreadState *rt) {
 	elf_Module *md = rt->md;
 
-	lang_addglobal(md,elf_newlocstr(rt,"floor"),elf_valbid(crtlib_floor));
-	lang_addglobal(md,elf_newlocstr(rt,"sqrt"),elf_valbid(crtlib_sqrt));
-	lang_addglobal(md,elf_newlocstr(rt,"sin"),elf_valbid(crtlib_sin));
-	lang_addglobal(md,elf_newlocstr(rt,"cos"),elf_valbid(crtlib_cos));
-	lang_addglobal(md,elf_newlocstr(rt,"tan"),elf_valbid(crtlib_tan));
-	lang_addglobal(md,elf_newlocstr(rt,"atan2"),elf_valbid(crtlib_atan2));
-
-	lang_addglobal(md,elf_newlocstr(rt,"stderr"),elf_valsys(stderr));
-	lang_addglobal(md,elf_newlocstr(rt,"stdout"),elf_valsys(stdout));
-	lang_addglobal(md,elf_newlocstr(rt,"stdin"),elf_valsys(stdin));
 
 
-	lang_addglobal(md,elf_newlocstr(rt,"abort"),elf_valbid(crtlib_abort));
 	lang_addglobal(md,elf_newlocstr(rt,"_execl"),elf_valbid(crtlib__execl));
 	lang_addglobal(md,elf_newlocstr(rt,"system"),elf_valbid(crtlib_system));
 	lang_addglobal(md,elf_newlocstr(rt,"_getch"),elf_valbid(crtlib__getch));
@@ -257,9 +169,6 @@ elf_api void crtlib_load(elf_ThreadState *rt) {
 	lang_addglobal(md,elf_newlocstr(rt,"_strdate"),elf_valbid(crtlib__strdate));
 	lang_addglobal(md,elf_newlocstr(rt,"_strtime"),elf_valbid(crtlib__strtime));
 
-	lang_addglobal(md,elf_newlocstr(rt,"fopen"),elf_valbid(crtlib_fopen));
-	lang_addglobal(md,elf_newlocstr(rt,"fclose"),elf_valbid(crtlib_fclose));
-	lang_addglobal(md,elf_newlocstr(rt,"fsize"),elf_valbid(crtlib_fsize));
 	lang_addglobal(md,elf_newlocstr(rt,"_unlink"),elf_valbid(crtlib__unlink));
 	lang_addglobal(md,elf_newlocstr(rt,"_unlock_file"),elf_valbid(crtlib__unlock_file));
 	lang_addglobal(md,elf_newlocstr(rt,"_write"),elf_valbid(crtlib__write));

@@ -16,13 +16,13 @@ elf_api llocalid elf_stklen(elf_ThreadState *R) {
 }
 
 
-elf_api elf_val elf_getval(elf_ThreadState *R, llocalid x) {
+elf_api elf_Value elf_getval(elf_ThreadState *R, llocalid x) {
 	return R->call->locals[x];
 }
 
 
 elf_api elf_String *elf_getstr(elf_ThreadState *R, llocalid x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_STR) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
 		LNOBRANCH;
@@ -32,7 +32,7 @@ elf_api elf_String *elf_getstr(elf_ThreadState *R, llocalid x) {
 
 
 elf_api elf_Object *elf_getobj(elf_ThreadState *R, llocalid x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && !elf_tagisobj(v.tag)) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected object at local %i",x));
 		LNOBRANCH;
@@ -42,7 +42,7 @@ elf_api elf_Object *elf_getobj(elf_ThreadState *R, llocalid x) {
 
 
 elf_api elf_Table *elf_gettab(elf_ThreadState *R, llocalid x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_TAB) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected table at local %i",x));
 		LNOBRANCH;
@@ -52,7 +52,7 @@ elf_api elf_Table *elf_gettab(elf_ThreadState *R, llocalid x) {
 
 
 elf_api void elf_checkcl(elf_ThreadState *R, llocalid x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_CLS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected closure at local %i",x));
 		LNOBRANCH;
@@ -67,7 +67,7 @@ elf_api elf_Closure *elf_getcls(elf_ThreadState *R, llocalid x) {
 
 
 elf_api elf_Handle elf_getsys(elf_ThreadState *R, llocalid x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
 		LNOBRANCH;
@@ -83,7 +83,7 @@ elf_api elf_String *elf_checkstr(elf_ThreadState *R, llocalid x) {
 
 
 elf_api elf_int elf_getint(elf_ThreadState *R, int x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag == TAG_NUM) {
 		return (elf_int) v.n;
 	}
@@ -93,7 +93,7 @@ elf_api elf_int elf_getint(elf_ThreadState *R, int x) {
 
 
 elf_api elf_num elf_getnum(elf_ThreadState *R, llocalid x) {
-	elf_val v = R->call->locals[x];
+	elf_Value v = R->call->locals[x];
 	if (v.tag == TAG_INT) return (elf_num) v.i;
 	if (v.tag != TAG_NUM) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected number at local %i",x));
@@ -112,7 +112,7 @@ llocalid elf_stkput(elf_ThreadState *R, int n) {
 }
 
 
-llocalid elf_locval(elf_ThreadState *R, elf_val v) {
+llocalid elf_locval(elf_ThreadState *R, elf_Value v) {
 	*R->top = v;
 	return elf_stkput(R,1);
 }
@@ -157,12 +157,12 @@ void elf_locstr(elf_ThreadState *R, elf_String *s) {
 }
 
 
-elf_val *elf_gettop(elf_ThreadState *R) {
+elf_Value *elf_gettop(elf_ThreadState *R) {
 	return R->top;
 }
 
 
-void elf_settop(elf_ThreadState *R, elf_val *top) {
+void elf_settop(elf_ThreadState *R, elf_Value *top) {
 	R->top = top;
 }
 
@@ -170,7 +170,6 @@ void elf_settop(elf_ThreadState *R, elf_val *top) {
 llocalid elf_loccls(elf_ThreadState *R, elf_Closure *cl) {
 	R->top->tag = TAG_CLS;
 	R->top->f   = cl;
-	// if (cl->obj.gccolor == GC_BLACK) cl->obj.gccolor = GC_WHITE;
 	llocalid id = R->top - R->call->locals;
 	_INC_TOP;
 	return id;

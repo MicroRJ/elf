@@ -1,2 +1,1 @@
-let length = ({1,2,3}):length()
-failed = length != 3
+failed = ({1,2,3}):length() != 3

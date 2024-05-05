@@ -18,10 +18,10 @@ elf_int elf_clocktime();
 elf_num elf_timediffs(elf_int begin);
 
 
-void elf_throw(elf_ThreadState *R, lbyteid id, char *error);
+void elf_throw(elf_ThreadState *R, elf_byteid id, char *error);
 
 
-int elf_fndfilebyline(elf_Module *md, llineid line);
+int elf_fndfilebybyte(elf_Module *md, elf_byteid line);
 void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc);
 
 

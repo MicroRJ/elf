@@ -1,14 +1,11 @@
 /* global */
-
-failed = false
-
 test = fun(x) ? {
 	iff x ? failed = true
+	iff x ? elf.pf("failed")
 }
-
-if __a ? pf("cannot conduct test")
-if __b ? pf("cannot conduct test")
-if __c ? pf("cannot conduct test")
+if __a ? elf.pf("cannot conduct test")
+if __b ? elf.pf("cannot conduct test")
+if __c ? elf.pf("cannot conduct test")
 
 fun () ? {
 	__a = true
@@ -20,13 +17,7 @@ fun () ? {
 		}()
 	}()
 }()
-
-
-call = fun (x) ? {
-	x()
-}
-
-
+call = fun (x) ? (x())
 fun(x,y,z) ? {
 	test(x == 1)
 	test(y == 2)
@@ -37,6 +28,3 @@ fun(x,y,z) ? {
 		test(z == 3)
 	})
 } (1,2,3)
-
-
-leave failed

@@ -16,7 +16,7 @@
 - around */
 lBinding jit(elf_Module *md, elf_Proto fn);
 int jitlib_jit(elf_ThreadState *rt) {
-	elf_val v = elf_loadfile(rt,0);
+	elf_Value v = elf_loadfilefs(rt,0);
 	lBinding b = jit(rt->md,v.f->fn);
 	elf_locbinding(rt,b);
 	// __debugbreak();

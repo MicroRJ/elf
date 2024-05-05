@@ -75,7 +75,7 @@ compact, since this language is meant be
 simple, for teaching, and fast prototyping,
 I'm not worrying too much about it...
 though it would help performance quite a bit... */
-typedef struct lBytecode {
+typedef struct elf_Bytecode {
 	lbyteop k;
 	union {
 		elf_int  i;
@@ -83,7 +83,7 @@ typedef struct lBytecode {
 			int x,y,z;
 		};
 	};
-} lBytecode;
+} elf_Bytecode;
 
 
 lbyteclass lang_byteclass(lbyteop k) {

@@ -59,7 +59,7 @@ elf_globaldecl char const *tag2s[] = {
 #undef TAGENUM
 
 
-typedef struct elf_val {
+typedef struct elf_Value {
 	elf_valtag tag;
 	union {
 		Ptr           p;
@@ -72,7 +72,7 @@ typedef struct elf_val {
 		elf_Table    *t,*x_tab;
 		elf_String   *s,*x_str;
 	};
-} elf_val;
+} elf_Value;
 
 
 typedef struct elf_Closure {
@@ -86,18 +86,18 @@ typedef struct elf_Closure {
    whole prototype here, we can instead store an
    index into the proto table. */
 	elf_Proto   fn;
-	lbyteid     j;
+	elf_byteid     j;
    /* allocated past this point */
-	elf_val caches[1];
+	elf_Value caches[1];
 } elf_Closure;
 
 
-elf_api elf_val elf_valtab(elf_Table *);
-elf_api elf_val elf_valbid(lBinding);
-elf_api elf_val elf_valstr(elf_String *);
-elf_api elf_val elf_valcls(elf_Closure *);
-elf_api elf_val elf_valint(elf_int i);
-elf_api elf_val elf_valnum(elf_num n);
+elf_api elf_Value elf_valtab(elf_Table *);
+elf_api elf_Value elf_valbid(lBinding);
+elf_api elf_Value elf_valstr(elf_String *);
+elf_api elf_Value elf_valcls(elf_Closure *);
+elf_api elf_Value elf_valint(elf_int i);
+elf_api elf_Value elf_valnum(elf_num n);
 
 
 

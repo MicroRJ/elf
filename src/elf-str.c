@@ -17,7 +17,7 @@ elf_Table *elf_newstrmetatab(elf_ThreadState *R) {
 
 elf_String *elf_newstrlen(elf_ThreadState *R, elf_int length) {
 	elf_String *obj = elf_newobj(R,OBJ_STRING,sizeof(elf_String)+length+1);
-	if (R) obj->obj.metatable = R->metatable_str;
+	if (R) obj->obj.metatable = R->metatab_str;
 	obj->length = length;
 	obj->hash = -1;
 	obj->c[length] = 0;
@@ -98,7 +98,7 @@ int langS_length_(elf_ThreadState *c) {
 
 int langS_append_(elf_ThreadState *R) {
 	elf_String *s = (elf_String*) elf_getthis(R);
-	elf_val v = elf_getval(R,0);
+	elf_Value v = elf_getval(R,0);
 	if (v.tag == TAG_INT) {
 		elf_String *r = elf_newstrlen(R,s->length+1);
 		elf_locstr(R,r);

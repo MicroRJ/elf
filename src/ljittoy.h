@@ -93,7 +93,7 @@ typedef struct ljNode {
 	ljNodeOp  op;
 	ljDataTy  ty;
 	ljnodeid x,y;
-	elf_val    lv;
+	elf_Value    lv;
 	elf_int  li;
 } ljNode;
 

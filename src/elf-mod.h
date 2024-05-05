@@ -7,8 +7,8 @@
 
 typedef struct elf_File {
 	char *name;
-	lbyteid bytes;
-	lbyteid nbytes;
+	elf_byteid bytes;
+	elf_byteid nbytes;
 	int **protos;
 	/* todo: eventually remove these */
 	char *pathondisk;
@@ -19,7 +19,7 @@ typedef struct elf_File {
 
 /*
 ** Symbols
-** 	lBytecode and globals can be added dynamically and
+** 	elf_Bytecode and globals can be added dynamically and
 ** safely, in fact, multiple files will reference the
 ** same global by name, no matter the order in which
 ** they were loaded, or the means, runtime/compiletime.
@@ -38,15 +38,15 @@ typedef struct elf_Module {
 	elf_num *kn;
 	elf_int *ki;
 	int *track;
-	lBytecode *bytes;
-	lbyteid nbytes;
+	elf_Bytecode *bytes;
+	elf_byteid nbytes;
 	char **lines;
 	elf_File *files;
 } elf_Module;
 
 
 lglobalid elf_setsym(elf_Module *md, elf_String *name);
-lglobalid lang_addglobal(elf_Module *md, elf_String *name, elf_val v);
+lglobalid lang_addglobal(elf_Module *md, elf_String *name, elf_Value v);
 lglobalid lang_addproto(elf_Module *md, elf_Proto p);
 
 /*

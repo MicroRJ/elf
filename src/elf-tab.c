@@ -24,7 +24,7 @@ elf_Table *elf_newtabmetatab(elf_ThreadState *R) {
 
 elf_Table *elf_newtablen(elf_ThreadState *R, elf_int ntotal) {
 	elf_Table *table = elf_newobj(R,OBJ_TAB,sizeof(elf_Table));
-	if (R) table->obj.metatable = R->metatable_tab;
+	if (R) table->obj.metatable = R->metatab_tab;
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
@@ -60,7 +60,7 @@ void elf_deltab(elf_Table *tab) {
 ** result to modify the slot and value as desired.
 **
 */
-elf_int elf_tabhashin(elf_Table *table, elf_val k) {
+elf_int elf_tabhashin(elf_Table *table, elf_Value k) {
 	/* this particular function uses double hashing,
 	which should allow us to get more resolution out
 	of the hash value, the first hash computes the
@@ -78,7 +78,7 @@ elf_int elf_tabhashin(elf_Table *table, elf_val k) {
 	elf_int tail = head;
 	elf_hashint walk = elf_tabrehash(hash)|1;
 	do {
-		elf_val x = slots[tail].k;
+		elf_Value x = slots[tail].k;
 		if (x.tag == TAG_NIL) return tail;
 		if (elf_tabvaleq(&x,&k)) return tail;
 		tail = (tail+walk) % ntotal;
@@ -93,7 +93,7 @@ elf_int elf_tabslot2index(elf_Table *table, elf_int slot) {
 }
 
 
-elf_val elf_tabslot2value(elf_Table *table, elf_int slot) {
+elf_Value elf_tabslot2value(elf_Table *table, elf_int slot) {
 	return table->v[table->slots[slot].i];
 }
 
@@ -103,7 +103,7 @@ elf_bool elf_tabslotiskey(elf_Table *table, elf_int slot) {
 }
 
 
-void elf_tabslotsetkeyval(elf_Table *table, elf_int slot, elf_val k, elf_int i) {
+void elf_tabslotsetkeyval(elf_Table *table, elf_int slot, elf_Value k, elf_int i) {
 	table->slots[slot].k = k;
 	table->slots[slot].i = i;
 }
@@ -160,7 +160,7 @@ void elf_tabsettabfld(elf_Table *tab, elf_String *key, elf_Table *val) {
 }
 
 
-void elf_tabset(elf_Table *table, elf_val k, elf_val v) {
+void elf_tabset(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_tabcheckthreshold(table);
 	elf_int slot = elf_tabhashin(table,k);
 	/* todo: instead return an error here */
@@ -179,28 +179,28 @@ void elf_tabset(elf_Table *table, elf_val k, elf_val v) {
 }
 
 
-elf_val elf_tablookup(elf_Table *table, elf_val k) {
+elf_Value elf_tablookup(elf_Table *table, elf_Value k) {
 	elf_int slot = elf_tabhashin(table,k);
 	if (elf_tabslotiskey(table,slot)) {
 		return elf_tabslot2value(table,slot);
 	}
-	return (elf_val){TAG_NIL,0};
+	return (elf_Value){TAG_NIL,0};
 }
 
 
-elf_val elf_tabget(elf_Table *tab, elf_String *key) {
+elf_Value elf_tabget(elf_Table *tab, elf_String *key) {
 	return elf_tablookup(tab,elf_valstr(key));
 }
 
 
 elf_num elf_tabgetnum(elf_Table *tab, elf_String *key) {
-	elf_val val = elf_tablookup(tab,elf_valstr(key));
+	elf_Value val = elf_tablookup(tab,elf_valstr(key));
 	return elf_tonum(val);
 }
 
 
 elf_int elf_tabgetint(elf_Table *tab, elf_String *key) {
-	elf_val val = elf_tablookup(tab,elf_valstr(key));
+	elf_Value val = elf_tablookup(tab,elf_valstr(key));
 	return elf_toint(val);
 }
 
@@ -215,7 +215,7 @@ elf_Table *elf_tabgettab(elf_Table *tab, elf_String *key) {
 }
 
 
-elf_int elf_tabtake(elf_Table *table, elf_val k) {
+elf_int elf_tabtake(elf_Table *table, elf_Value k) {
 	elf_ensure((k.tag == TAG_INT || k.tag == TAG_NUM) || k.s != 0);
 
 	elf_tabcheckthreshold(table);
@@ -223,7 +223,7 @@ elf_int elf_tabtake(elf_Table *table, elf_val k) {
 	if (slot == -1) LNOBRANCH;
 	if (!elf_tabslotiskey(table,slot)) {
 		elf_int i = elf_varaddi(table->v,1);
-		table->v[i] = (elf_val){TAG_NIL};
+		table->v[i] = (elf_Value){TAG_NIL};
 
 		table->slots[slot].k = k;
 		table->slots[slot].i = i;
@@ -233,12 +233,12 @@ elf_int elf_tabtake(elf_Table *table, elf_val k) {
 }
 
 
-elf_int elf_tabiadd(elf_Table *table, elf_val v) {
+elf_int elf_tabiadd(elf_Table *table, elf_Value v) {
 	return elf_varaddi(table->v,1);
 }
 
 
-void elf_tabadd(elf_Table *table, elf_val v) {
+void elf_tabadd(elf_Table *table, elf_Value v) {
 	elf_varadd(table->v,v);
 }
 
@@ -263,7 +263,7 @@ int elf_tabtally_(elf_ThreadState *R) {
 int elf_tabhaskey_(elf_ThreadState *c) {
 	elf_ensure(c->f->x == 1);
 	elf_Table *table = (elf_Table*) elf_getthis(c);
-	elf_val k = elf_getval(c,0);
+	elf_Value k = elf_getval(c,0);
 	elf_locint(c,elf_tabslotiskey(table,elf_tabhashin(table,k)));
 	return 1;
 }
@@ -271,7 +271,7 @@ int elf_tabhaskey_(elf_ThreadState *c) {
 
 int elf_tablookup_(elf_ThreadState *c) {
 	elf_ensure(c->f->x == 1);
-	elf_val k = elf_getval(c,0);
+	elf_Value k = elf_getval(c,0);
 	elf_Table *table = (elf_Table*) c->f->obj;
 	elf_locval(c,elf_tablookup(table,k));
 	return 1;
@@ -319,9 +319,9 @@ int elf_tabput_(elf_ThreadState *c) {
 
 	elf_ensure(n >= 1 && n <= 2);
 
-	elf_val k = elf_getval(c,0);
+	elf_Value k = elf_getval(c,0);
 
-	elf_val j = {TAG_NIL};
+	elf_Value j = {TAG_NIL};
 	if (n == 2) j = elf_getval(c,1);
 
 	elf_Table *table = (elf_Table*) c->f->obj;
@@ -363,7 +363,7 @@ void elf_tabunload(FILE *io, elf_Table *tab, int level) {
 			if (nitems ++ != 0) fprintf(io,",");
 			elf_valfpf(io,slot.k,ltrue);
 			fprintf(io," = ");
-			elf_val v = tab->v[slot.i];
+			elf_Value v = tab->v[slot.i];
 			if (v.tag == TAG_TAB) {
 				elf_tabunload(io,v.t,level+1);
 			} else {
@@ -425,7 +425,7 @@ elf_hashint elf_tabhashptr(Ptr *p) {
 }
 
 
-elf_bool elf_tabvaleq(elf_val *x, elf_val *y) {
+elf_bool elf_tabvaleq(elf_Value *x, elf_Value *y) {
 	if (x->tag != y->tag) {
 		return lfalse;
 	}
@@ -443,7 +443,7 @@ elf_bool elf_tabvaleq(elf_val *x, elf_val *y) {
 }
 
 
-elf_int elf_tabhashval(elf_val v) {
+elf_int elf_tabhashval(elf_Value v) {
 	switch (v.tag) {
 		case TAG_STR: {
 			return v.s->hash;

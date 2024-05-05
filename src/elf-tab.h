@@ -6,7 +6,7 @@
 
 
 typedef struct elf_tabslot {
-	elf_val k;
+	elf_Value k;
 	elf_int i;
 } elf_tabslot;
 
@@ -18,7 +18,7 @@ typedef struct elf_Table {
 	elf_int nslots;
 	elf_int ncollisions;
 	/* array object */
-	union {elf_val *v,*array;};
+	union {elf_Value *v,*array;};
 } elf_Table;
 
 
@@ -28,13 +28,13 @@ void elf_deltab(elf_Table *);
 elf_Table *elf_newtablen(elf_ThreadState *, elf_int);
 elf_Table *elf_newtab(elf_ThreadState *);
 
-elf_int elf_tabtake(elf_Table *table, elf_val k);
-void elf_tabset(elf_Table *table, elf_val k, elf_val v);
-elf_int elf_tabhashval(elf_val v);
+elf_int elf_tabtake(elf_Table *table, elf_Value k);
+void elf_tabset(elf_Table *table, elf_Value k, elf_Value v);
+elf_int elf_tabhashval(elf_Value v);
 elf_hashint elf_tabrehash(elf_hashint hash);
 elf_hashint elf_tabhashstr(char *junk);
 elf_hashint elf_tabhashptr(Ptr *ptr);
-elf_bool elf_tabvaleq(elf_val *x, elf_val *y);
+elf_bool elf_tabvaleq(elf_Value *x, elf_Value *y);
 
 
 /* metatable */

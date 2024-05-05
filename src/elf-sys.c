@@ -79,7 +79,8 @@ elf_api elf_bool sys_debugger() {
 
 elf_api void sys_consolelog(int type, char *message) {
 #if defined(PLATFORM_DESKTOP)
-	OutputDebugStringA(message);
+	// OutputDebugStringA(message);
+	elf_log(type,"%s",message);
 #else
 	switch (type) {
 		case ELF_LOGDBUG: case ELF_LOGINFO: {
@@ -106,10 +107,10 @@ elf_api int sys_getlasterror() {
 }
 
 
-elf_api void sys_geterrormsg(int error, char *buff, int len) {
+elf_api void sys_geterrormsg(int error, char *buf, int len) {
 #if defined(PLATFORM_DESKTOP)
 	if (error == 0) error = GetLastError();
-	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,0x00,error,LANG_USER_DEFAULT,buff,len,NULL);
+	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,0x00,error,LANG_USER_DEFAULT,buf,len,NULL);
 #endif
 }
 
@@ -123,14 +124,11 @@ elf_api void *sys_valloc(elf_int length) {
 }
 
 
-/* timing */
-
 elf_api void sys_sleep(elf_int ms) {
 #if defined(PLATFORMPLATFORM_WIN32)
 	Sleep((DWORD) ms);
 #elif defined(PLATFORM_WEB)
 	emscripten_sleep(ms);
-#else
 #endif
 }
 

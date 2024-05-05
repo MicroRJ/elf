@@ -13,7 +13,7 @@ lglobalid elf_setsym(elf_Module *M, elf_String *name) {
 }
 
 
-lglobalid lang_addglobal(elf_Module *M, elf_String *name, elf_val v) {
+lglobalid lang_addglobal(elf_Module *M, elf_String *name, elf_Value v) {
 	lglobalid i = elf_setsym(M,name);
 	M->globals->array[i] = v;
 	return i;
@@ -28,14 +28,14 @@ lglobalid lang_addproto(elf_Module *M, elf_Proto p) {
 
 
 
-int elf_valfpf(FILE *file, elf_val v, elf_bool quotes);
-void elf_bytefpf(FILE *io, elf_Module *md, elf_int fid, lbyteid id, lBytecode b) {
+int elf_valfpf(FILE *file, elf_Value v, elf_bool quotes);
+void elf_bytefpf(FILE *io, elf_Module *md, elf_int fid, elf_byteid id, elf_Bytecode b) {
 
 	if (fid != -1) {
-		elf_File codefile = md->files[fid];
+		elf_File file = md->files[fid];
 		int linenum;
-		elf_getlinelocinfo(codefile.lines,md->lines[id],&linenum,0);
-		fprintf(io,"%s %04i: \t",codefile.name,linenum);
+		elf_getlinelocinfo(file.lines,md->lines[id],&linenum,0);
+		fprintf(io,"%s %04i: \t",file.name,linenum);
 	}
 
 	fprintf(io,"%08i %04i\t%s"
@@ -58,7 +58,7 @@ void elf_bytefpf(FILE *io, elf_Module *md, elf_int fid, lbyteid id, lBytecode b)
 		fprintf(io," #%f",md->kn[b.y]);
 	} else
 	if (b.k == BC_LOADGLOBAL) {
-		elf_val val = md->globals->array[b.y];
+		elf_Value val = md->globals->array[b.y];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
@@ -90,8 +90,8 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		elf_File ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name);
 		fprintf(io,"INDEX INSTRUCTION\n");
-		for (lbyteid j = 0; j < ff.nbytes; ++j) {
-			lBytecode b = md->bytes[ff.bytes+j];
+		for (elf_byteid j = 0; j < ff.nbytes; ++j) {
+			elf_Bytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// elf_getlinelocinfo(md->file,md->lines[j],&linenum,&lineloc);
@@ -103,8 +103,8 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 	elf_arrfori(md->p) {
 		elf_Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
-		for (lbyteid j = 0; j < p.nbytes; ++j) {
-			lBytecode b = md->bytes[p.bytes+j];
+		for (elf_byteid j = 0; j < p.nbytes; ++j) {
+			elf_Bytecode b = md->bytes[p.bytes+j];
 			elf_bytefpf(md,file,j,b);
 		}
 		fprintf(file,"end\n");
