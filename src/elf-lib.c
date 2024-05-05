@@ -115,7 +115,7 @@ int elflib_loadexpr(elf_ThreadState *R) {
 		contents = elf_getstr(R,1);
 	} else if (R->call->nx == 1) {
 		filename = elf_newlocstr(R,"unnamed");
-		contents = elf_getstr(R,1);
+		contents = elf_getstr(R,0);
 	} else LNOBRANCH;
 	elf_loadexpr(R,filename,R->call->ry,R->call->ny,contents->c);
 	/* no need to do hoisting */
@@ -124,9 +124,14 @@ int elflib_loadexpr(elf_ThreadState *R) {
 
 
 int elflib_loadcode(elf_ThreadState *R) {
-	elf_ensure(R->call->nx == 2);
-	elf_String *filename = elf_getstr(R,0);
-	elf_String *contents = elf_getstr(R,1);
+	elf_String *filename = lnil,*contents = lnil;
+	if (R->call->nx == 2) {
+		filename = elf_getstr(R,0);
+		contents = elf_getstr(R,1);
+	} else if (R->call->nx == 1) {
+		filename = elf_newlocstr(R,"unnamed");
+		contents = elf_getstr(R,0);
+	} else LNOBRANCH;
 	elf_loadcode(R,filename,R->call->ry,R->call->ny,contents->c);
 	/* no need to do hoisting */
 	return 0;
@@ -422,6 +427,7 @@ elf_api void elflib_load(elf_ThreadState *R) {
 	#endif
 #endif
 
+	elf_register(R,"elf.debugger",elflib_debugger);
 	elf_register(R,"elf.bytelogging",elflib_bytelogging);
 	elf_register(R,"elf.globalbytelogging",elflib_globalbytelogging);
 
