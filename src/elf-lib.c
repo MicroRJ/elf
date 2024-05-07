@@ -371,18 +371,18 @@ void elflib_enumdir_(elf_ThreadState *R, elf_String *dir, elf_Closure *cls) {
 		elf_settop(R,top);
 	} while (FindNextFileA(h,&f));
 #elif defined(PLATFORM_WEB)
-	DIR *dir = opendir(d->c);
-	if (dir != lnil) {
+	DIR *dirfd = opendir(dir->c);
+	if (dirfd != lnil) {
 		struct dirent *entry;
-		while ((entry = readdir(dir)) != lnil) {
+		while ((entry = readdir(dirfd)) != lnil) {
 			if (isvirtual(entry->d_name)) {
 			 	continue;
 			}
 			elf_bool isdir = (entry->d_type & DT_DIR) != lfalse;
 			elf_Value *top = elf_gettop(R);
 			elf_String *name = elf_newlocstr(R,entry->d_name);
-			elf_String *path = elf_newlocstr(R,elf_tpf("%s/%s",d->c,entry->d_name));
-			llocalid base = elf_loccls(R,cl);
+			elf_String *path = elf_newlocstr(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			llocalid base = elf_loccls(R,cls);
 			elf_Table *file = elf_newloctab(R);
 			elf_tabsetstrfld(file,enumdir_keyname,name);
 			elf_tabsetstrfld(file,enumdir_keypath,path);
@@ -393,7 +393,7 @@ void elflib_enumdir_(elf_ThreadState *R, elf_String *dir, elf_Closure *cls) {
 			}
 			elf_settop(R,top);
 		}
-		closedir(dir);
+		closedir(dirfd);
 	}
 #endif
 }

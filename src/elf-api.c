@@ -27,7 +27,17 @@ elf_api elf_String *elf_getstr(elf_ThreadState *R, llocalid x) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
 		LNOBRANCH;
 	}
-	return v.s;
+	return v.x_str;
+}
+
+
+elf_api char *elf_getcstr(elf_ThreadState *R, llocalid x) {
+	elf_Value v = R->call->locals[x];
+	if (v.tag == TAG_NIL) return 0;
+	else if (v.tag == TAG_STR) return v.x_str->c;
+	elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
+	LNOBRANCH;
+	return 0;
 }
 
 

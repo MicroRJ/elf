@@ -78,7 +78,7 @@ newtk = fun(x,r,s) ? {
 tklist = {
 	newtk("NONE", N, "none"),
 	newtk("ELF", K, "elf"),
-	newtk("USING", K, "using"),
+	newtk("USES", K, "uses"),
 	newtk("TRY", K, "try"),
 	newtk("CATCH", K, "catch"),
 	newtk("NEW", K, "new"),

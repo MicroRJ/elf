@@ -199,10 +199,13 @@ elf_api elf_Handle sys_loadlib(char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (elf_Handle) LoadLibraryA(name);
 #elif defined(PLATFORM_WEB)
+	#if 0
 	em_promise_t promise = emscripten_dlopen_promise(name,RTLD_LAZY);
 	em_settled_result_t result = emscripten_promise_await(promise);
 	emscripten_promise_destroy(promise);
 	return (elf_Handle) result.value;
+	#endif
+	return 0;
 #else
 	void *handle = dlopen(name,RTLD_LAZY);
 	if (handle == lnil) {
