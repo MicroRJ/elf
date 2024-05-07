@@ -472,15 +472,14 @@ int elf_run(elf_ThreadState *R) {
 		}
 	} break;
 	case BC_LT: {
-		elf_Value x = c->l[b.y];
-		elf_Value y = c->l[b.z];
-		if (x.tag == TAG_NUM || y.tag == TAG_NUM) {
-			c->l[b.x].tag = TAG_NUM;
-			c->l[b.x].n   = elf_tonum(x) < elf_tonum(y);
+		elf_Value xx = locals[b.y];
+		elf_Value yy = locals[b.z];
+		if (xx.tag == TAG_NUM || yy.tag == TAG_NUM) {
+			locals[b.x].i = elf_tonum(xx) < elf_tonum(yy);
 		} else {
-			c->l[b.x].tag = TAG_INT;
-			c->l[b.x].i   = elf_toint(x) < elf_toint(y);
+			locals[b.x].i = elf_toint(xx) < elf_toint(yy);
 		}
+		locals[b.x].tag = TAG_NUM;
 	} break;
 	CASE_IBOP(BC_SHL,  <<);
 	CASE_IBOP(BC_SHR,  >>);
