@@ -11,8 +11,6 @@
 #include <dirent.h>
 #elif defined(PLATFORM_DESKTOP)
 #pragma comment(lib,"user32")
-#define _NO_CRT_STDIO_INLINE
-#define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #if !defined(ELF_KEEPWINDOWS)
 /* todo: should probaly just define the functions
