@@ -8,10 +8,8 @@
 void elf_debugger(char *message);
 
 
-
 void elf_register(elf_State *R, char *name, lBinding fn);
-void elf_registerint(elf_State *R, char *name, int val);
-
+void elf_registerint(elf_State *R, char *name, elf_int val);
 
 
 elf_int elf_clocktime();

@@ -18,8 +18,13 @@ void elf_registersys(elf_State *R, char *name, elf_Handle val) {
 }
 
 
-void elf_registerint(elf_State *R, char *name, int val) {
+void elf_registerint(elf_State *R, char *name, elf_int val) {
 	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valint(val));
+}
+
+
+void elf_registertab(elf_State *R, char *name, elf_Table *val) {
+	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valtab(val));
 }
 
 

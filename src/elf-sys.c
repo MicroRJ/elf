@@ -11,8 +11,6 @@
 #include <dirent.h>
 #elif defined(PLATFORM_DESKTOP)
 #pragma comment(lib,"user32")
-#define _NO_CRT_STDIO_INLINE
-#define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #if !defined(ELF_KEEPWINDOWS)
 /* todo: should probaly just define the functions
@@ -199,10 +197,13 @@ elf_api elf_Handle sys_loadlib(char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (elf_Handle) LoadLibraryA(name);
 #elif defined(PLATFORM_WEB)
+	#if 0
 	em_promise_t promise = emscripten_dlopen_promise(name,RTLD_LAZY);
 	em_settled_result_t result = emscripten_promise_await(promise);
 	emscripten_promise_destroy(promise);
 	return (elf_Handle) result.value;
+	#endif
+	return 0;
 #else
 	void *handle = dlopen(name,RTLD_LAZY);
 	if (handle == lnil) {

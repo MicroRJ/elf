@@ -18,11 +18,10 @@ elf_api elf_Value elf_getany(elf_State *R, elf_localid x) {
 
 elf_api elf_String *elf_getstr(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
-	if (v.tag != TAG_NIL && v.tag != TAG_STR) {
-		elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
-		LNOBRANCH;
-	}
-	return v.s;
+	if (v.tag == TAG_NIL) return lnil;
+	if (v.tag == TAG_STR) return v.x_str;
+	elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
+	return lnil;
 }
 
 
@@ -31,7 +30,6 @@ elf_api char *elf_getcstr(elf_State *R, elf_localid x) {
 	if (v.tag == TAG_NIL) return lnil;
 	if (v.tag == TAG_STR) return v.x_str->c;
 	elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
-	LNOBRANCH;
 	return lnil;
 }
 
