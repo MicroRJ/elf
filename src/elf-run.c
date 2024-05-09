@@ -243,6 +243,7 @@ int elf_run(elf_State *R) {
 	while (call->j < fn.nbytes) {
 		elf_int jp = call->j ++;
 		elf_int bc = fn.bytes + jp;
+		R->byte = bc;
 		elf_Bytecode b = md->bytes[bc];
 #if defined(_DEBUG)
 		if (R->bytelogging || call->logging) elf_bytefpf(stdout,md,-1,jp,b);

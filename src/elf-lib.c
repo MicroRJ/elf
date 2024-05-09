@@ -114,10 +114,13 @@ int elflib_err(elf_State *R) {
 symbol table, looking for symbols
 with the given prefix '.', new
 new symbols without the prefix '.'
-are created and are now aliases
-to their previous definition */
+are then created with the value
+of their previous names,
+	* conflicting names are excluded,
+such that existing symbols are
+not replaced */
 int elflib_include(elf_State *R) {
-	elf_checkargs(R,".include",1,"(the prefix) -> void, scans the global symbol table looking for symbols with the given prefix (prefix '.'), aliasing them without the prefix, for instance 'elf.include(elf)' includes all symbols within 'elf.', *conflicting names are excluded, such that existing symbols are not replaced");
+	elf_checkargs(R,".include",1,"(the prefix) -> void, scans the global symbol table looking for symbols with the given prefix '.', creating a new symbol without the prefix, for instance 'elf.include(elf)' includes all symbols within 'elf.'");
 	char *prefix = elf_getcstr(R,0);
 	int plen = elf_cstrlen(prefix);
 	elf_Table *tab = R->M->globals;
@@ -127,9 +130,9 @@ int elflib_include(elf_State *R) {
 	char *str = slot.k.x_str->c;
 	if (elf_cstrhasprefix(str,prefix) && str[plen] == '.') {
 		char name[0x100] = {0};
-		strcopy(name,str+plen+1);
-		elf_tabstralias(R,tab,str,slot.k);
-		elf_logdebug("creting alias: %s -> %s", name, str);
+		strcpy(name,str+plen+1);
+		elf_String *newkey = elf_pushnewstr(R,name);
+		elf_tabset(tab,elf_valstr(newkey),tab->array[slot.i]);
 	}
 		}
 	}
@@ -473,6 +476,7 @@ elf_api void elflib_load(elf_State *R) {
 	elf_register(R,"elf.loadlib",elflib_loadlib);
 	elf_register(R,"elf.libfn",elflib_libfn);
 
+	elf_register(R,"elf.include",elflib_include);
 	elf_register(R,"elf.loadcode",elflib_loadcode);
 	elf_register(R,"elf.loadexpr",elflib_loadexpr);
 	elf_register(R,"elf.loadfile",elflib_loadfile);

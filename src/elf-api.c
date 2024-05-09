@@ -26,6 +26,16 @@ elf_api elf_String *elf_getstr(elf_State *R, elf_localid x) {
 }
 
 
+elf_api char *elf_getcstr(elf_State *R, elf_localid x) {
+	elf_Value v = R->call->locals[x];
+	if (v.tag == TAG_NIL) return lnil;
+	if (v.tag == TAG_STR) return v.x_str->c;
+	elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
+	LNOBRANCH;
+	return lnil;
+}
+
+
 elf_api elf_Object *elf_getobj(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && !elf_tagisobj(v.tag)) {
