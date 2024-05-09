@@ -17,7 +17,7 @@ int main(int n, char **c) {
 	if (parsecli(&cli,n,c)) return 0;
 
 	elf_Module M = {0};
-	elf_ThreadState R = {0};
+	elf_State R = {0};
 	elf_runini(&R,&M);
 	if (cli.logging) R.bytelogging = ltrue;
 
@@ -26,7 +26,7 @@ int main(int n, char **c) {
 	R.frame = &frame;
 
 	if (cli.filename != lnil) {
-		elf_String *filename = elf_newlocstr(&R,cli.filename);
+		elf_String *filename = elf_pushnewstr(&R,cli.filename);
 		filename->obj.gccolor = GC_PINK;
 		elf_FileState fs = {0};
 		elf_loadfilefs(&R,&fs,filename,0,0);

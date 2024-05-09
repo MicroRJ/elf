@@ -7,33 +7,33 @@
 
 
 
-int testlib___of(elf_ThreadState *R) {
+int testlib___of(elf_State *R) {
 	elf_getobj(R,1)->metatable = elf_gettab(R,0);
-	elf_locval(R,elf_getval(R,1));
+	elf_pushany(R,elf_getany(R,1));
 	return 1;
 }
 
 
-void sets(elf_ThreadState *c, elf_Table *table, char *k) {
+void sets(elf_State *c, elf_Table *table, char *k) {
 	elf_tabset(table,elf_valstr(elf_newstr(c,k)),* -- c->v);
 }
 
 
-int testlib_logging(elf_ThreadState *R) {
+int testlib_logging(elf_State *R) {
 	elf_int logging = elf_getint(R,0);
 	R->call->caller->logging = logging;
 	return 0;
 }
 
 
-int testlib_globallogging(elf_ThreadState *R) {
+int testlib_globallogging(elf_State *R) {
 	elf_int logging = elf_getint(R,0);
 	R->bytelogging = logging;
 	return 0;
 }
 
 
-int testlib_debugbreak(elf_ThreadState *R) {
+int testlib_debugbreak(elf_State *R) {
 	elf_debugger("this function is removed");
 	return 0;
 }
@@ -54,7 +54,7 @@ void strcatf(char *buffer, char *fmt, ...) {
 }
 
 
-int testlib_disasm(elf_ThreadState *c) {
+int testlib_disasm(elf_State *c) {
 	elf_Module *md = c->md;
 	elf_Closure *cl = elf_getcls(c,0);
 	elf_Proto p = cl->fn;
@@ -75,43 +75,43 @@ int testlib_disasm(elf_ThreadState *c) {
 			} break;
 		}
 	}
-	elf_newlocstr(c,file);
+	elf_pushnewstr(c,file);
 	return 1;
 }
 
 
-int testlib_absslot(elf_ThreadState *c) {
-	llocalid slot = elf_getint(c,0);
-	elf_locval(c,c->s[slot]);
+int testlib_absslot(elf_State *c) {
+	elf_localid slot = elf_getint(c,0);
+	elf_pushany(c,c->s[slot]);
 	return 1;
 }
 
 
-int testlib_absslotid(elf_ThreadState *c) {
-	elf_locint(c,c->v-c->s);
+int testlib_absslotid(elf_State *c) {
+	elf_pushint(c,c->v-c->s);
 	return 1;
 }
 
 
-int testlib_pc(elf_ThreadState *c) {
-	elf_locint(c,c->f->j);
+int testlib_pc(elf_State *c) {
+	elf_pushint(c,c->f->j);
 	return 1;
 }
 
 
-int testlib_gcpause(elf_ThreadState *c) {
+int testlib_gcpause(elf_State *c) {
 	elf_gcpause(c);
 	return 0;
 }
 
 
-int testlib_gcunpause(elf_ThreadState *c) {
+int testlib_gcunpause(elf_State *c) {
 	elf_gcresume(c);
 	return 0;
 }
 
 
-int testlib_gc(elf_ThreadState *c) {
+int testlib_gc(elf_State *c) {
 	elf_collect(c);
 	return 0;
 }
@@ -127,8 +127,8 @@ int _gidof(elf_Module *fs, elf_Object *j) {
 }
 
 
-int _gtable(elf_ThreadState *c) {
-	elf_loctab(c,c->md->g);
+int _gtable(elf_State *c) {
+	elf_pushtab(c,c->md->g);
 	return 1;
 }
 
@@ -142,21 +142,21 @@ char *gccolor2s(elf_objgc c) {
 }
 
 
-void tstlib_load(elf_ThreadState *rt) {
+void tstlib_load(elf_State *rt) {
 	elf_Module *md = rt->md;
 	/* todo: ugly */
-	lang_addglobal(md,elf_newlocstr(rt,"__of"),elf_valbid(testlib___of));
+	lang_addglobal(md,elf_pushnewstr(rt,"__of"),elf_valbid(testlib___of));
 
-	lang_addglobal(md,elf_newlocstr(rt,"__gc"),elf_valbid(testlib_gc));
-	lang_addglobal(md,elf_newlocstr(rt,"__gcpause"),elf_valbid(testlib_gcpause));
-	lang_addglobal(md,elf_newlocstr(rt,"__gcunpause"),elf_valbid(testlib_gcunpause));
-	lang_addglobal(md,elf_newlocstr(rt,"__disasm"),elf_valbid(testlib_disasm));
-	lang_addglobal(md,elf_newlocstr(rt,"__logging"),elf_valbid(testlib_logging));
-	lang_addglobal(md,elf_newlocstr(rt,"__globallogging"),elf_valbid(testlib_globallogging));
+	lang_addglobal(md,elf_pushnewstr(rt,"__gc"),elf_valbid(testlib_gc));
+	lang_addglobal(md,elf_pushnewstr(rt,"__gcpause"),elf_valbid(testlib_gcpause));
+	lang_addglobal(md,elf_pushnewstr(rt,"__gcunpause"),elf_valbid(testlib_gcunpause));
+	lang_addglobal(md,elf_pushnewstr(rt,"__disasm"),elf_valbid(testlib_disasm));
+	lang_addglobal(md,elf_pushnewstr(rt,"__logging"),elf_valbid(testlib_logging));
+	lang_addglobal(md,elf_pushnewstr(rt,"__globallogging"),elf_valbid(testlib_globallogging));
 
-	lang_addglobal(md,elf_newlocstr(rt,"__debugbreak"),elf_valbid(testlib_debugbreak));
-	lang_addglobal(md,elf_newlocstr(rt,"absslotid"),elf_valbid(testlib_absslotid));
-	lang_addglobal(md,elf_newlocstr(rt,"absslot"),elf_valbid(testlib_absslot));
-	lang_addglobal(md,elf_newlocstr(rt,"pc"),elf_valbid(testlib_pc));
-	lang_addglobal(md,elf_newlocstr(rt,"_gtable"),elf_valbid(_gtable));
+	lang_addglobal(md,elf_pushnewstr(rt,"__debugbreak"),elf_valbid(testlib_debugbreak));
+	lang_addglobal(md,elf_pushnewstr(rt,"absslotid"),elf_valbid(testlib_absslotid));
+	lang_addglobal(md,elf_pushnewstr(rt,"absslot"),elf_valbid(testlib_absslot));
+	lang_addglobal(md,elf_pushnewstr(rt,"pc"),elf_valbid(testlib_pc));
+	lang_addglobal(md,elf_pushnewstr(rt,"_gtable"),elf_valbid(_gtable));
 }

@@ -13,27 +13,27 @@ void elf_debugger(char *message) {
 }
 
 
-void elf_registersys(elf_ThreadState *R, char *name, elf_Handle val) {
-	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valsys(val));
+void elf_registersys(elf_State *R, char *name, elf_Handle val) {
+	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valsys(val));
 }
 
 
-void elf_registerint(elf_ThreadState *R, char *name, int val) {
-	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valint(val));
+void elf_registerint(elf_State *R, char *name, int val) {
+	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valint(val));
 }
 
 
-void elf_registerstr(elf_ThreadState *R, char *name, char *val) {
-	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valstr(elf_newlocstr(R,val)));
+void elf_registerstr(elf_State *R, char *name, char *val) {
+	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valstr(elf_pushnewstr(R,val)));
 }
 
 
-void elf_register(elf_ThreadState *R, char *name, lBinding fn) {
-	lang_addglobal(R->M,elf_newlocstr(R,name),elf_valbid(fn));
+void elf_register(elf_State *R, char *name, lBinding fn) {
+	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valbid(fn));
 }
 
 
-void elf_tabmfld(elf_ThreadState *R, elf_Table *obj, char *name, lBinding b) {
+void elf_tabmfld(elf_State *R, elf_Table *obj, char *name, lBinding b) {
 	elf_tabset(obj,elf_valstr(elf_newstr(R,name)),elf_valbid(b));
 }
 
@@ -124,7 +124,7 @@ void elf_lineerror2(char *filename, char *contents, char *loc, char const *fmt, 
 }
 
 
-void elf_throw(elf_ThreadState *R, elf_byteid byte, char *error) {
+void elf_throw(elf_State *R, elf_byteid byte, char *error) {
 	elf_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	llineid line = M->lines[byte];
@@ -137,7 +137,14 @@ void elf_throw(elf_ThreadState *R, elf_byteid byte, char *error) {
 }
 
 
-int elf_tycheck(elf_ThreadState *R, elf_byteid id, llocalid loc, elf_valtag x, elf_valtag y) {
+void elf_checkargs(elf_State *R, char *fnname, int n, char *usage) {
+	if (R->call->nx != n) {
+		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,R->call->nx,usage));
+	}
+}
+
+
+int elf_tycheck(elf_State *R, elf_byteid id, elf_localid loc, elf_valtag x, elf_valtag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

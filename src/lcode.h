@@ -46,7 +46,7 @@ typedef struct Loop {
 	/* the register to increment, should be same as x.r,
 	this is kept here to ensure x wasn't deallocated or
 	modified. */
-	llocalid r;
+	elf_localid r;
 
 	/* the entry byte */
 	elf_byteid  e;
@@ -56,18 +56,18 @@ typedef struct Loop {
 
 
 void langL_moveto(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y);
-void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid x, llocalid y, elf_nodeid id);
-llocalid langL_localize(elf_FileState *fs, llineid line, elf_nodeid id);
+void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, elf_localid x, elf_localid y, elf_nodeid id);
+elf_localid langL_localize(elf_FileState *fs, llineid line, elf_nodeid id);
 
 
 void langL_begindelayedblock(elf_FileState *fs, llineid line, FileBlock *bl);
 void langL_closedelayedblock(elf_FileState *fs, llineid line, FileBlock *bl);
 
 
-elf_byteid langL_branchiffalse(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id);
-elf_byteid langL_branchiftrue(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id);
-elf_byteid *langL_jumpiftrue(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id);
-elf_byteid *langL_jumpiffalse(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id);
+elf_byteid langL_branchiffalse(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid langL_branchiftrue(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid *langL_jumpiftrue(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid *langL_jumpiffalse(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
 
 
 enum {

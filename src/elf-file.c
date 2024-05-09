@@ -74,7 +74,7 @@ lentityid elfY_allocentity(elf_FileState *fs, llineid line) {
 		elf_varaddi(fs->entities,1);
 	}
 
-	for (llocalid i = id.x; i < fs->nentities; ++i) {
+	for (elf_localid i = id.x; i < fs->nentities; ++i) {
 		fs->entities[i].level = fs->level;
 		fs->entities[i].line  = line;
 		fs->entities[i].name  = 0;
@@ -86,8 +86,8 @@ lentityid elfY_allocentity(elf_FileState *fs, llineid line) {
 }
 
 
-llocalid elfY_numentinlevl(elf_FileState *fs) {
-	lentity *entities = fs->entities;
+elf_localid elf_fsnumentinlev(elf_FileState *fs) {
+	elf_fileentry *entities = fs->entities;
 	int nentities = fs->nentities;
 	int n;
 	for (n = 0; n < nentities; ++ n) {
@@ -99,7 +99,7 @@ llocalid elfY_numentinlevl(elf_FileState *fs) {
 }
 
 
-elf_nodeid elfY_numnodesinlev(elf_FileState *fs) {
+elf_nodeid elf_fsnumnodesinlev(elf_FileState *fs) {
 	elf_Node *nodes = fs->nodes;
 	elf_nodeid nnodes = fs->nnodes;
 	elf_nodeid n;
@@ -131,11 +131,12 @@ int elfY_indexofentityincache(elf_FileFunc *fn, lentityid id) {
 
 
 /*
-** Captures an entitity (if not already) from the enclosing
-** function, storing a copy of the entity id in the function's
-** captures.
+** Captures or traps an entitity (if not already)
+** from the enclosing function, storing
+** a copy of the entity id in the
+** function's captures.
 */
-void elf_fscapent(elf_FileState *fs, elf_FileFunc *fn, lentityid id) {
+void elf_fstrapent(elf_FileState *fs, elf_FileFunc *fn, lentityid id) {
 	/* ensure the entity should actually be captured */
 	elf_ensure(id.x < fn->entities);
 	elf_arrfori(fn->captures) {
@@ -158,7 +159,7 @@ lentityid elf_fsfndent(elf_FileState *fs, llineid line, char *name) {
 		if (S_eq(fs->entities[x].name,name)) {
 			lentityid id = {x};
 	if (x < fn->entities) {
-		elf_fscapent(fs,fn,id);
+		elf_fstrapent(fs,fn,id);
 	}
 			return id;
 		}
@@ -181,14 +182,14 @@ elf_nodeid elf_fsnewlocalentity(elf_FileState *fs, llineid line, char *name, elf
 
 		/* -- todo: for compile time constants,
 		no slot allocation required */
-		llocalid slot = langL_localalloc(fs,1);
+		elf_localid slot = langL_localalloc(fs,1);
 		fs->entities[id.x].slot = slot;
 		fs->entities[id.x].enm  = enm;
 		fs->entities[id.x].name = name;
 
 		return elf_nodelocal(fs,line,slot);
 	} else {
-		lentity entity = fs->entities[id.x];
+		elf_fileentry entity = fs->entities[id.x];
 		/* is this variable name already present in this level? */
 		if (entity.level == fs->level) {
 			elf_lineerror(fs,line,"'%s': already declared",name);
@@ -229,12 +230,15 @@ void elf_enterblock(elf_FileState *fs, elf_fileblock *bl) {
 
 
 void elf_leaveblock(elf_FileState *fs) {
-	fs->nentities -= elfY_numentinlevl(fs); /* close scope */
-	fs->nnodes -= elfY_numnodesinlev(fs);
-	/* ensure that we don't deallocate more than we can */
+	fs->nentities -= elf_fsnumentinlev(fs); /* close scope */
+	fs->nnodes -= elf_fsnumnodesinlev(fs);
 	elf_ensure(fs->nentities >= fs->fn->entities);
 	fs->level = fs->level - 1;
 	elf_fileblock *bl = fs->fn->block;
+	/* every expression and statement
+	should deallocate whatever registers
+	it used, so here we can assert that
+	the memory state is identical, otherwise, bug! */
 	elf_ensure(bl->level == fs->level);
 	fs->fn->block = bl->enclosing;
 	fs->fn->xmemory = bl->xmemory;
@@ -269,7 +273,7 @@ elf_nodeid *elf_fsloadcallargs(elf_FileState *fs) {
 	if (elf_picktk(fs,TK_PAREN_LEFT)) {
 		if (!elf_testtk(fs,TK_PAREN_RIGHT)) do {
 			elf_nodeid x = elf_fsloadexpr(fs);
-			if (x == -1) break;
+			if (x == NO_NODE) break;
 			elf_varadd(z,x);
 		} while (elf_picktk(fs,TK_COMMA));
 		elf_taketk(fs,TK_PAREN_RIGHT);
@@ -387,7 +391,7 @@ elf_nodeid elfY_loadfn(elf_FileState *fs) {
 
 void elfY_maybeassign(elf_FileState *fs, elf_nodeid x) {
 	ltoken tk = fs->tk;
-	llocalid mem = fs->fn->xmemory;
+	elf_localid mem = fs->fn->xmemory;
 	if (elf_picktk(fs,TK_ASSIGN)) {
 		elfY_checkassign(fs,tk.line,x);
 		elf_nodeid y = elf_fsloadexpr(fs);
@@ -414,7 +418,7 @@ void elfY_maybeassign(elf_FileState *fs, elf_nodeid x) {
 		langL_moveto(fs,tk.line,x,y);
 		langL_tieloosejs(fs,js.f);
 	} else {
-		llocalid r = langL_localalloc(fs,1);
+		elf_localid r = langL_localalloc(fs,1);
 		langL_localload(fs,NO_LINE,lfalse,r,0,x);
 		fs->fn->xmemory = mem;
 	}
@@ -490,35 +494,27 @@ elf_nodeid elf_fsloadunary(elf_FileState *fs) {
 			strcat(buf,fs->lasttk.s);
 		}
 
-				lglobalid x = elf_setsym(fs->M,elf_newstr(fs->R,buf));
-				v = elf_nodeglobal(fs,tk.line,x);
+		elf_globalid x = elf_getsymbol(fs->M,elf_newstr(fs->R,buf));
+		v = elf_nodeglobal(fs,tk.line,x);
 
 			/* for all intended purposes, this is an error */
 			} else elf_lineerror(fs,tk.line,"expected '.' after 'elf', incomplete name");
 		} break;
 		case TK_WORD: {
 			elf_lexone(fs);
-			if (~fs->flags & NOTANENTITY) {
-				v = elf_fsfndentitynode(fs,tk.line,tk.s);
+	if (~fs->flags & NOTANENTITY) {
+		v = elf_fsfndentitynode(fs,tk.line,tk.s);
 		if (v == NO_NODE) {
-			/* todo!: gc'd string, all these objects
-			created when parsing should be attached
-			to the file, and the file should be an
-			object of sorts, when the file is done
-			with, we deallocate it, since the file
-			is a closure of sorts, this should be
-			pretty straight forward... */
-			lglobalid x = elf_setsym(fs->M,elf_newstr(fs->R,tk.s));
-			if (x != NO_NODE) {
-				v = elf_nodeglobal(fs,tk.line,x);
-			}
+			// elf_lineerror(fs,tk.line,"warning: '%s' implicit global declaration, did you mean this?",tk.s);
+			elf_globalid x = elf_getsymbol(fs->M,elf_newstr(fs->R,tk.s));
+			elf_ensure(x != -1);
+			v = elf_nodeglobal(fs,tk.line,x);
 		}
 		if (v == NO_NODE) {
 			elf_lineerror(fs,tk.line,"'%s': undeclared identifier",tk.s);
 		}
-			} else {
-				v = elf_nodestr(fs,tk.line,tk.s);
-			}
+	/* otherwise this is a string */
+	} else v = elf_nodestr(fs,tk.line,tk.s);
 		} break;
 		case TK_SUB: {
 			elf_lexone(fs);
@@ -543,11 +539,6 @@ elf_nodeid elf_fsloadunary(elf_FileState *fs) {
 		} break;
 		case TK_FUN: {
 			v = elfY_loadfn(fs);
-		} break;
-		case TK_STKGET: case TK_STKLEN: {
-			elf_lexone(fs);
-			elf_nodeid *z = elf_fsloadcallargs(fs);
-			v = elf_nodebuiltincall(fs,tk.line,tk.type,z);
 		} break;
 		case TK_LOAD: {
 			elf_lexone(fs);
@@ -638,7 +629,7 @@ void elfY_loadenumlist(elf_FileState *fs) {
 
 
 void elf_fsloadstat(elf_FileState *fs) {
-	llocalid mem = fs->fn->xmemory;
+	elf_localid mem = fs->fn->xmemory;
 	ltoken tk = fs->tk;
 	switch (tk.type) {
 		case TK_THEN: case TK_ELSE: case TK_ELIF: {
@@ -680,10 +671,7 @@ void elf_fsloadstat(elf_FileState *fs) {
 			langL_closeif(fs,fs->lasttk.line,&s);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
-		case TK_LET: case TK_LOCAL: { elf_lexone(fs);
-			if (tk.type == TK_LOCAL) {
-				elf_lineerror(fs,tk.line,"consider using 'let' instead");
-			}
+		case TK_LET: { elf_lexone(fs);
 			if (tk.type == TK_ENUM) {
 				elf_lineerror(fs,tk.line,"global enums are not supported yet, this enum will be made local");
 			} else

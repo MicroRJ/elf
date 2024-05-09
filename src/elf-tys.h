@@ -13,9 +13,9 @@ typedef double elf_num;
 
 
 typedef unsigned int elf_hashint;
-typedef int llocalid;
+typedef int elf_localid;
 typedef int elf_byteid;
-typedef int lglobalid;
+typedef int elf_globalid;
 /* todo: eventually convert this to an offset */
 typedef char *llineid;
 
@@ -25,7 +25,7 @@ typedef void *Ptr;
 typedef void *elf_Handle;
 
 
-typedef int (* lBinding)(elf_ThreadState *);
+typedef int (* lBinding)(elf_State *);
 // typedef int (* lJITFunc)(int);
 
 /*

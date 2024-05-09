@@ -12,17 +12,19 @@
 typedef struct { int x; } lentityid;
 
 
-/* for scoping, binds a name to some local
-value such as a label, enum or local variable. */
-typedef struct lentity {
+/* for scoping, binds a name to
+some local value such as a label,
+enum or local variable. */
+typedef struct elf_fileentry {
 	char    *name;
 	llineid  line;
-	llocalid slot;
+	elf_localid slot;
 	elf_bool enm;
 	/* the level in which this name was
 	declared, for scoping */
 	int     level;
-} lentity;
+	/* todo: we could just put the node here */
+} elf_fileentry;
 
 
 typedef struct elf_fileblock elf_fileblock;
@@ -36,6 +38,14 @@ typedef struct elf_fileblock {
 } elf_fileblock;
 
 
+typedef struct elf_usingstack elf_usingstack;
+typedef struct elf_usingstack {
+	elf_usingstack *enclosing;
+	char *name;
+} elf_usingstack;
+
+
+
 typedef struct elf_FileFunc elf_FileFunc;
 typedef struct elf_FileFunc {
 	elf_FileFunc *enclosing;
@@ -46,10 +56,10 @@ typedef struct elf_FileFunc {
 	two counters, nlocals and xmemory */
 	/* maximum number of local register used concurrently
 	at any point for this function */
-	llocalid nlocals;
+	elf_localid nlocals;
 	/* the memory state, in other words, the current number
 	of local registers that are being used at this point. */
-	llocalid xmemory;
+	elf_localid xmemory;
 	/* index to first entity within entity list in file. */
 	int entities;
 	/* array of entities from enclosing function
@@ -62,6 +72,7 @@ typedef struct elf_FileFunc {
 	elf_byteid bytes;
 	elf_fileblock entry;
 	elf_fileblock *block;
+	elf_usingstack *usingstack;
 	int nyield;
 	/* todo: deprecated */
 	/* list of yield jumps to be patched */
@@ -72,7 +83,7 @@ typedef struct elf_FileFunc {
 typedef struct elf_FileState {
 
 	union { elf_Module  *M,*md; };
-	union { elf_ThreadState *R,*rt; };
+	union { elf_State *R,*rt; };
 
 	char *filename;
 	char *linechar;
@@ -92,7 +103,7 @@ typedef struct elf_FileState {
 	- function stack, each function points to a base local
 	- tag defined here by index.
 	-- remaining locals are file locals, at file level. */
-	lentity *entities;
+	elf_fileentry *entities;
 	int nentities;
 
 	elf_fileblock entry;

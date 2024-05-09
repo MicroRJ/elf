@@ -120,7 +120,7 @@ at the same time when using clang-cl */
 #define lnil ((Ptr)(0))
 
 
-typedef struct elf_ThreadState elf_ThreadState;
+typedef struct elf_State elf_State;
 typedef struct elf_Module elf_Module;
 typedef struct elf_FileState elf_FileState;
 typedef struct elf_Table elf_Table;
@@ -136,14 +136,15 @@ typedef struct elf_Closure elf_Closure;
 #include "src/elf-sys.h"
 #include "src/llog.h"
 #include "src/elf-obj.h"
+#include "src/elf-chr.h"
 #include "src/elf-aux.h"
 #include "src/elf-byte.h"
 #include "src/elf-mod.h"
 #include "src/elf-api.h"
-#include "src/ltoken.h"
+#include "src/elf-tkn.h"
 #include "src/elf-run.h"
-#include "src/elf-str.h"
 #include "src/elf-var.h"
+#include "src/elf-str.h"
 #include "src/elf-tab.h"
 #include "src/elf-node.h"
 #include "src/lcode.h"
@@ -157,6 +158,7 @@ typedef struct elf_Closure elf_Closure;
 #include "src/elf-obj.c"
 #include "src/lgc.c"
 #include "src/elf-mod.c"
+#include "src/elf-chr.c"
 #include "src/elf-aux.c"
 #include "src/elf-str.c"
 #include "src/elf-var.c"

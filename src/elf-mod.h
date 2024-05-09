@@ -45,9 +45,9 @@ typedef struct elf_Module {
 } elf_Module;
 
 
-lglobalid elf_setsym(elf_Module *md, elf_String *name);
-lglobalid lang_addglobal(elf_Module *md, elf_String *name, elf_Value v);
-lglobalid lang_addproto(elf_Module *md, elf_Proto p);
+elf_globalid elf_getsymbol(elf_Module *md, elf_String *name);
+elf_globalid lang_addglobal(elf_Module *md, elf_String *name, elf_Value v);
+elf_globalid lang_addproto(elf_Module *md, elf_Proto p);
 
 /*
 	elf_Module\r: runtime is stored here

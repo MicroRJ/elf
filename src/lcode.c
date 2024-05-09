@@ -13,12 +13,12 @@ elf_byteid langL_getlabel(elf_FileState *fs) {
 }
 
 
-llocalid langL_localalloc(elf_FileState *fs, llocalid n) {
+elf_localid langL_localalloc(elf_FileState *fs, elf_localid n) {
 	elf_ensure(n > NO_SLOT);
 
 	elf_FileFunc *fn = fs->fn;
 
-	llocalid id = fn->xmemory;
+	elf_localid id = fn->xmemory;
 	fn->xmemory += n;
 
 	if (fn->nlocals < fn->xmemory) {
@@ -28,7 +28,7 @@ llocalid langL_localalloc(elf_FileState *fs, llocalid n) {
 }
 
 
-void langL_localdealloc(elf_FileState *fs, llocalid x) {
+void langL_localdealloc(elf_FileState *fs, elf_localid x) {
 	elf_ensure(x > NO_SLOT);
 
 	elf_FileFunc *fn = fs->fn;
@@ -140,11 +140,11 @@ void langL_fnepiloge(elf_FileState *fs, llineid line) {
 ** expression, only one register is necessary, if no registers
 ** are given one is allocated and deallocated automatically.
 */
-elf_byteid langL_branchif(elf_FileState *fs, ljlist *js, elf_bool z, llocalid x, elf_nodeid id) {
+elf_byteid langL_branchif(elf_FileState *fs, ljlist *js, elf_bool z, elf_localid x, elf_nodeid id) {
 	elf_Node v = fs->nodes[id];
 	elf_byteid j = NO_BYTE;
 
-	llocalid mem = fs->fn->xmemory;
+	elf_localid mem = fs->fn->xmemory;
 	/* -------------------------------
 	if not provided one, allocate temporary
 	register here, notice how this is done
@@ -191,12 +191,12 @@ elf_byteid langL_branchif(elf_FileState *fs, ljlist *js, elf_bool z, llocalid x,
 }
 
 
-elf_byteid langL_branchiffalse(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id) {
+elf_byteid langL_branchiffalse(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
 	return langL_branchif(fs,js,lfalse,x,id);
 }
 
 
-elf_byteid langL_branchiftrue(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id) {
+elf_byteid langL_branchiftrue(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
 	return langL_branchif(fs,js,ltrue,x,id);
 }
 
@@ -206,7 +206,7 @@ elf_byteid langL_branchiftrue(elf_FileState *fs, ljlist *js, llocalid x, elf_nod
 ** address becomes the false target, thus all false
 ** branches converge here. all true branches are returned.
 */
-elf_byteid *langL_jumpiftrue(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id) {
+elf_byteid *langL_jumpiftrue(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
 	langL_branchiftrue(fs,js,x,id);
 	langL_tieloosejs(fs,js->f);
 	elf_delvar(js->f);
@@ -215,7 +215,7 @@ elf_byteid *langL_jumpiftrue(elf_FileState *fs, ljlist *js, llocalid x, elf_node
 }
 
 
-elf_byteid *langL_jumpiffalse(elf_FileState *fs, ljlist *js, llocalid x, elf_nodeid id) {
+elf_byteid *langL_jumpiffalse(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
 	langL_branchiffalse(fs,js,x,id);
 	langL_tieloosejs(fs,js->t);
 	elf_delvar(js->t);
@@ -232,7 +232,7 @@ elf_byteid *langL_jumpifnotnil(elf_FileState *fs, llineid line, ljlist *js, elf_
 /* todo: add support for multiple results */
 void langL_yield(elf_FileState *fs, llineid line, elf_nodeid id) {
 	int n = 0;
-	llocalid x = 0;
+	elf_localid x = 0;
 	if (id != NO_NODE) {
 		/* todo: determine the number of values in
 		tree, and allocate that many registers? */
@@ -251,7 +251,7 @@ void langL_yield(elf_FileState *fs, llineid line, elf_nodeid id) {
 
 /*
 */
-void elf_Ltestmemory(elf_FileState *fs, llineid line, llocalid r) {
+void elf_Ltestmemory(elf_FileState *fs, llineid line, elf_localid r) {
 	if ((fs->fn->xmemory - r) != 1) {
 		elf_lineerror(fs,line,"invalid memory state");
 	}
@@ -263,7 +263,7 @@ void elf_Ltestmemory(elf_FileState *fs, llineid line, llocalid r) {
 ** given one and loads the node to that
 ** local.
 */
-void langL_localloadin(elf_FileState *fs, llineid line, llocalid r, elf_nodeid id) {
+void langL_localloadin(elf_FileState *fs, llineid line, elf_localid r, elf_nodeid id) {
 	/* the user can provide exactly the next free register,
 	or exactly the last allocated register  */
 	if ((fs->fn->xmemory - r) == 0) {
@@ -276,11 +276,11 @@ void langL_localloadin(elf_FileState *fs, llineid line, llocalid r, elf_nodeid i
 }
 
 
-llocalid langL_localize(elf_FileState *fs, llineid line, elf_nodeid id) {
+elf_localid langL_localize(elf_FileState *fs, llineid line, elf_nodeid id) {
 	elf_Node v = fs->nodes[id];
 	/* todo: this literally contradicts SSA, this system is
 	obsolete, replace with something else... */
-	llocalid r = v.r;
+	elf_localid r = v.r;
 	/* the node is currently allocated */
 	if ((r != NO_SLOT) && (r < fs->fn->xmemory)) {
 		goto leave;
@@ -291,7 +291,7 @@ llocalid langL_localize(elf_FileState *fs, llineid line, elf_nodeid id) {
 
 
 void langL_emit(elf_FileState *fs, llineid line, elf_nodeid id) {
-	llocalid mem = fs->fn->xmemory;
+	elf_localid mem = fs->fn->xmemory;
 	elf_Node v = fs->nodes[id];
 	switch (v.k) {
 		case NODE_LOAD: {
@@ -300,9 +300,9 @@ void langL_emit(elf_FileState *fs, llineid line, elf_nodeid id) {
 				LNOBRANCH;
 			} else
 			if ((x.k == NODE_FIELD) || (x.k == NODE_INDEX)) {
-				llocalid xx = langL_localize(fs,line,x.x);
-				llocalid xy = langL_localize(fs,line,x.y);
-				llocalid yy = langL_localize(fs,line,v.y);
+				elf_localid xx = langL_localize(fs,line,x.x);
+				elf_localid xy = langL_localize(fs,line,x.y);
+				elf_localid yy = langL_localize(fs,line,v.y);
 				if (x.k == NODE_FIELD) {
 					elf_emitbytexyz(fs,line,BC_SETFIELD,xx,xy,yy);
 				} else elf_emitbytexyz(fs,line,BC_SETINDEX,xx,xy,yy);
@@ -319,7 +319,7 @@ void langL_emit(elf_FileState *fs, llineid line, elf_nodeid id) {
 ** if y is 0 the instruction is omitted if
 ** no side effects.
 */
-void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid x, llocalid y, elf_nodeid id) {
+void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, elf_localid x, elf_localid y, elf_nodeid id) {
 	elf_ensure(x > NO_SLOT);
 	elf_ensure(x < fs->fn->xmemory);
 
@@ -332,7 +332,7 @@ void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid 
 	elf_FileFunc *fn = fs->fn;
 
 	/* finally restore memory state */
-	llocalid mem = fs->fn->xmemory;
+	elf_localid mem = fs->fn->xmemory;
 
 	if ((v.r != NO_SLOT) && (reload != ltrue)) {
 		/* node is already allocated, and we're
@@ -402,13 +402,13 @@ void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid 
 		} break;
 		case NODE_FIELD: case NODE_INDEX: {
 			if (y == 0) goto leave;
-			llocalid xx = langL_localize(fs,line,v.x);
-			llocalid yy = langL_localize(fs,line,v.y);
+			elf_localid xx = langL_localize(fs,line,v.x);
+			elf_localid yy = langL_localize(fs,line,v.y);
 			elf_emitbytexyz(fs,line,nodetobyte(v.k),x,xx,yy);
 		} break;
 		case NODE_CLOSURE: {
 			if (y == 0) goto leave;
-			llocalid xx = x;
+			elf_localid xx = x;
 			elf_arrfori(v.z) {
 				if (i != 0) xx = langL_localalloc(fs,1);
 				if ((xx - x) != i) LNOBRANCH;
@@ -431,23 +431,14 @@ void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid 
 			langL_localload(fs,line,ltrue,x,1,v.x);
 			elf_emitbytexy(fs,line,BC_LOADFILE,x,y);
 		} break;
+		/* deprecated */
 		case NODE_BUILTIN: {
-			llocalid xx = x;
-			int n = elf_varlen(v.z);
-			elf_arrfori(v.z) {
-				langL_localloadin(fs,NO_LINE,xx ++,v.z[i]);
-			}
-			if (v.x == TK_STKLEN) {
-				langL_byte(fs,v.line,BC_STKLEN,x);
-			} else
-			if (v.x == TK_STKGET) {
-				elf_emitbytexy(fs,v.line,BC_STKGET,x,x);
-			} else LNOBRANCH;
+			LNOBRANCH;
 		} break;
 		case NODE_METAFIELD: {
 			if (y == 0) goto leave;
-			llocalid rx = langL_localize(fs,line,v.x);
-			llocalid ry = langL_localize(fs,line,v.y);
+			elf_localid rx = langL_localize(fs,line,v.x);
+			elf_localid ry = langL_localize(fs,line,v.y);
 			elf_emitbytexyz(fs,line,nodetobyte(v.k),x,rx,ry);
 		} break;
 		case NODE_CALL: {
@@ -465,7 +456,7 @@ void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid 
 			say b, defined right after a we could overwrite
 			it, so ensure that we allocate a free register
 			then. */
-			llocalid head = x;
+			elf_localid head = x;
 			if ((fs->fn->xmemory - head) != 1) {
 				head = langL_localalloc(fs,1);
 			}
@@ -479,7 +470,7 @@ void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid 
 			allocated and we didn't free it because
 			we're still within the subexpression, it'll
 			reuse that register. */
-			llocalid tail = head;
+			elf_localid tail = head;
 			if (xx.k == NODE_METAFIELD) {
 				langL_localloadin(fs,line,tail ++,xx.x);
 			}
@@ -523,18 +514,18 @@ void langL_localload(elf_FileState *fs, llineid line, elf_bool reload, llocalid 
 		case NODE_BITSHL: case NODE_BITSHR: case NODE_BITXOR: {
 			if (y == 0) goto leave;
 			if ((v.k == NODE_GT) || (v.k == NODE_GTEQ)) {
-				llocalid xx = langL_localize(fs,line,v.y);
-				llocalid yy = langL_localize(fs,line,v.x);
+				elf_localid xx = langL_localize(fs,line,v.y);
+				elf_localid yy = langL_localize(fs,line,v.x);
 				elf_emitbytexyz(fs,line,nodetobyte(v.k^1),x,xx,yy);
 			} else
 			if (v.k == NODE_EQ) {
 				/* todo: enable this */
 				if(1) goto _else;
 				if (fs->nodes[v.y].k == NODE_NIL) {
-					llocalid xx = langL_localize(fs,line,v.y);
+					elf_localid xx = langL_localize(fs,line,v.y);
 					elf_emitbytexy(fs,line,BC_ISNIL,x,xx);
 				} else goto _else;
-			} else { llocalid xx,yy; _else:
+			} else { elf_localid xx,yy; _else:
 				xx = langL_localize(fs,line,v.x);
 				yy = langL_localize(fs,line,v.y);
 				elf_emitbytexyz(fs,line,nodetobyte(v.k),x,xx,yy);
@@ -556,10 +547,10 @@ void langL_moveto(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y) {
 	if (v.line != 0) line = v.line;
 
 	/* keep local state, finally free any temporary locals */
-	llocalid mem = fs->fn->xmemory;
+	elf_localid mem = fs->fn->xmemory;
 	switch (v.k) {
 		case NODE_GLOBAL: {
-			llocalid yy = langL_localize(fs,line,y);
+			elf_localid yy = langL_localize(fs,line,y);
 			elf_emitbytexy(fs,line,BC_SETGLOBAL,v.x,yy);
 		} break;
 		case NODE_CACHE: {
@@ -570,16 +561,16 @@ void langL_moveto(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y) {
 			langL_localload(fs,line,ltrue,v.x,1,y);
 		} break;
 		case NODE_INDEX: case NODE_FIELD: {
-			llocalid xx = langL_localize(fs,line,v.x);
-			llocalid ii = langL_localize(fs,line,v.y);
-			llocalid yy = langL_localize(fs,line,y);
+			elf_localid xx = langL_localize(fs,line,v.x);
+			elf_localid ii = langL_localize(fs,line,v.y);
+			elf_localid yy = langL_localize(fs,line,y);
 			lbyteop op = v.k == NODE_INDEX ? BC_SETINDEX : BC_SETFIELD;
 			elf_emitbytexyz(fs,line,op,xx,ii,yy);
 		} break;
 		case NODE_METAFIELD: {
-			llocalid xx = langL_localize(fs,line,v.x);
-			llocalid ii = langL_localize(fs,line,v.y);
-			llocalid yy = langL_localize(fs,line,y);
+			elf_localid xx = langL_localize(fs,line,v.x);
+			elf_localid ii = langL_localize(fs,line,v.y);
+			elf_localid yy = langL_localize(fs,line,y);
 			elf_emitbytexyz(fs,line,BC_SETMETAFIELD,xx,ii,yy);
 		} break;
 		// {x}[{x}..{x}] = {y}
@@ -587,8 +578,8 @@ void langL_moveto(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y) {
 			elf_nodeid lo = fs->nodes[v.y].x;
 			elf_nodeid hi = fs->nodes[v.y].y;
 			elf_nodeid ii = elf_nodelocal(fs,line,langL_localalloc(fs,1));
-			llocalid xx = langL_localize(fs,line,v.x);
-			llocalid yy = langL_localize(fs,line,y);
+			elf_localid xx = langL_localize(fs,line,v.x);
+			elf_localid yy = langL_localize(fs,line,y);
 			Loop loop = {0};
 			langL_beginrangedloop(fs,line,&loop,ii,lo,hi);
 			elf_emitbytexyz(fs,line,BC_SETINDEX,xx,loop.r,yy);

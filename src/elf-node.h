@@ -81,7 +81,7 @@ typedef struct elf_Node {
 	location, used for register
 	allocation. */
 	struct { elf_nodeid x,y,*z; };
-	llocalid r;
+	elf_localid r;
 	/* todo?: don't quite union these two for debugging? */
 	union {
 		char   *s;

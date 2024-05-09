@@ -49,39 +49,9 @@ void elf_lineerror(elf_FileState *fs, char *loc, char const *fmt, ...) {
 }
 
 
-elf_bool elf_chriseol(char x) {
-	return x == '\r' || x == '\n' || x == '\0';
-}
-
-
-elf_bool elf_chrisdigit(char x) {
-	return x >= '0' && x <= '9';
-}
-
-
-elf_bool elf_chrislowercase(char x) {
-	return x >= 'a' && x <= 'z';
-}
-
-
-elf_bool elf_chrisuppercase(char x) {
-	return x >= 'A' && x <= 'Z';
-}
-
-
-elf_bool elf_chrisletter(char x) {
-	return elf_chrisuppercase(x) || elf_chrislowercase(x);
-}
-
-
-elf_bool elf_chrisalphanum(char x) {
-	return elf_chrisletter(x) || elf_chrisdigit(x) || (x) == '_';
-}
-
-
 ltokentype wordorkeyword(char *name) {
 	/* todo: */
-	for (ltokentype i = FIRST_KEYWORD; i < LAST_KEYWORD; ++ i) {
+	for (ltokentype i = FIRST_KEYWORD; i <= LAST_KEYWORD; ++ i) {
 		ltokenintel intel = elfX_tokenintel[i];
 		if (S_eq(intel.name,name)) {
 			return i;

@@ -28,7 +28,7 @@ int main(int n, char **c) {
 
 
 struct {
-	elf_ThreadState R;
+	elf_State R;
 	elf_Module M;
 	elf_CallFrame C;
 } elf_globaldecl elf = {{&elf.M}};
@@ -48,7 +48,7 @@ elf_api int elfweb_loadcode(char *codename, char *contents) {
 	call.base = elf.R.top;
 	call.top = elf.R.top;
 	elf.R.call = &call;
-	elf_String *name = elf_newlocstr(&elf.R,codename);
+	elf_String *name = elf_pushnewstr(&elf.R,codename);
 	elf_FileState fs = {0};
 	int result = elf_loadcodefs(&elf.R,&fs,name,0,0,contents);
 	elf.R.call = call.caller;

@@ -6,22 +6,22 @@
 
 
 /* todo: ensure that we don't have to replace symbols */
-lglobalid elf_setsym(elf_Module *M, elf_String *name) {
+elf_globalid elf_getsymbol(elf_Module *M, elf_String *name) {
 	if (name != 0) {
 		return elf_tabtake(M->g,elf_valstr(name));
 	} else return elf_varaddi(M->globals->array,1);
 }
 
 
-lglobalid lang_addglobal(elf_Module *M, elf_String *name, elf_Value v) {
-	lglobalid i = elf_setsym(M,name);
+elf_globalid lang_addglobal(elf_Module *M, elf_String *name, elf_Value v) {
+	elf_globalid i = elf_getsymbol(M,name);
 	M->globals->array[i] = v;
 	return i;
 }
 
 
-lglobalid lang_addproto(elf_Module *M, elf_Proto p) {
-	lglobalid i = elf_varaddi(M->p,1);
+elf_globalid lang_addproto(elf_Module *M, elf_Proto p) {
+	elf_globalid i = elf_varaddi(M->p,1);
 	M->p[i] = p;
 	return i;
 }

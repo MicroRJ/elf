@@ -5,17 +5,20 @@
 */
 
 
-elf_Table *elf_newstrmetatab(elf_ThreadState *R) {
-	elf_Table *tab = elf_newloctab(R);
-	elf_tabmfld(R,tab,"length",langS_length_);
-	elf_tabmfld(R,tab,"match",langS_match_);
-	elf_tabmfld(R,tab,"hash",langS_hash_);
-	elf_tabmfld(R,tab,"append",langS_append_);
+elf_Table *elf_newstrmetatab(elf_State *R) {
+	elf_Table *tab = elf_pushnewtab(R);
+	elf_tabmfld(R,tab,"length",elfstr_length_);
+	elf_tabmfld(R,tab,"match",elfstr_match_);
+	elf_tabmfld(R,tab,"gethash",elfstr_gethash_);
+	elf_tabmfld(R,tab,"append",elfstr_append_);
+	elf_tabmfld(R,tab,"touppercase",elfstr_touppercase_);
+	elf_tabmfld(R,tab,"tolowercase",elfstr_tolowercase_);
+	elf_tabmfld(R,tab,"__add",elfstr_append_);
 	return tab;
 }
 
 
-elf_String *elf_newstrlen(elf_ThreadState *R, elf_int length) {
+elf_String *elf_newstrlen(elf_State *R, elf_int length) {
 	elf_String *obj = elf_newobj(R,OBJ_STRING,sizeof(elf_String)+length+1);
 	if (R) obj->obj.metatable = R->metatab_str;
 	obj->length = length;
@@ -25,8 +28,8 @@ elf_String *elf_newstrlen(elf_ThreadState *R, elf_int length) {
 }
 
 
-elf_String *elf_newstr(elf_ThreadState *R, char *junk) {
-	int length = S_length(junk);
+elf_String *elf_newstr(elf_State *R, char *junk) {
+	int length = elf_cstrlen(junk);
 	elf_String *obj = elf_newstrlen(R,length);
 	elf_memcopy(obj->c,junk,length);
 	obj->hash = elf_tabhashstr((char*)junk);
@@ -45,63 +48,18 @@ elf_bool elf_streq(elf_String *x, elf_String *y) {
 }
 
 
-int S_length(char const *s) {
-	int n = 0;
-	if (s != lnil) {
-		while (*s ++ != 0) {
-			n += 1;
-		}
-	}
-	return n;
-}
-
-
-elf_bool S_eql(char const *x, char const *y, int n) {
-	for (int i = 0; i < n; i += 1) {
-		if (x[i] != y[i]) {
-			return lfalse;
-		}
-	}
-	return ltrue;
-}
-
-
-elf_bool S_eq(char const *x, char const *y) {
-	int lx = S_length(x);
-	int ly = S_length(y);
-	return (lx == ly) && S_eql(x,y,lx);
-}
-
-
-char *S_ncopy(Alloc *allocator, int length, char const *string) {
-	if (length <= 0) {
-		length = S_length(string);
-	}
-	char *result = elf_alloc(allocator,length+1);
-	elf_memcopy(result,string,length);
-	result[length]=0;
-	return result;
-}
-
-
-char *S_copy(Alloc *allocator, char const *string) {
-
-	return S_ncopy(allocator,-1,string);
-}
-
-
-int langS_length_(elf_ThreadState *c) {
-	elf_locint(c,((elf_String*)c->f->obj)->length);
+int elfstr_length_(elf_State *c) {
+	elf_pushint(c,((elf_String*)c->f->obj)->length);
 	return 1;
 }
 
 
-int langS_append_(elf_ThreadState *R) {
+int elfstr_append_(elf_State *R) {
 	elf_String *s = (elf_String*) elf_getthis(R);
-	elf_Value v = elf_getval(R,0);
+	elf_Value v = elf_getany(R,0);
 	if (v.tag == TAG_INT) {
 		elf_String *r = elf_newstrlen(R,s->length+1);
-		elf_locstr(R,r);
+		elf_pushstr(R,r);
 		memcpy(r->c,s->c,s->length);
 		r->c[r->length-1] = v.i;
 		r->hash = elf_tabhashstr(r->c);
@@ -110,99 +68,38 @@ int langS_append_(elf_ThreadState *R) {
 }
 
 
-int langS_match_(elf_ThreadState *R) {
+int elfstr_match_(elf_State *R) {
 	elf_String *s = (elf_String*) elf_getthis(R);
 	elf_String *p = elf_getstr(R,0);
-	elf_locint(R,S_match(p->string,s->string));
+	elf_pushint(R,elf_cstrmatch(p->string,s->string));
 	return 1;
 }
 
 
-int langS_hash_(elf_ThreadState *c) {
-	elf_String *s = (elf_String*) c->f->obj;
-	elf_locint(c,s->hash);
+int elfstr_gethash_(elf_State *R) {
+	elf_String *str = (elf_String*) elf_getthis(R);
+	elf_pushint(R,str->hash);
 	return 1;
 }
 
 
-char *S_pfv(Alloc *cator, char const *format, va_list v) {
-	int length = stbsp_vsnprintf(NULL,0,format,v);
-	char *contents = elf_alloc(cator,length+1);
-	stbsp_vsnprintf(contents,length+1,format,v);
-	return contents;
-}
-
-
-char *S_tpfv(char const *format, va_list v) {
-	return S_pfv(lTLOC,format,v);
-}
-
-
-char *S_tpf_(char const *format, ...) {
-	va_list v;
-	va_start(v,format);
-	char *contents = S_tpfv(format,v);
-	va_end(v);
-	return contents;
-}
-
-
-/*
-** Simple pattern matcher utility.
-** Pattern, elf_String
-*/
-elf_bool S_matchsingle(char *p, char *s);
-
-
-elf_bool S_match(char *p, char *s) {
-	char *b = s;
-	while (!S_matchsingle(p,s)) {
-
-		while (*p != 0 && *p != '|') ++p;
-		if (*p == 0) return lfalse;
-
-		++ p, s = b;
+int elfstr_tolowercase_(elf_State *R) {
+	elf_String *str = (elf_String*) elf_getthis(R);
+	elf_String *newstr = elf_pushnewstrlen(R,str->length);
+	for (int i = 0; i < str->length; ++ i) {
+		newstr->c[i] = elf_chrtolowercase(str->c[i]);
 	}
-	return ltrue;
+	return 1;
 }
 
 
-elf_bool S_matchsingle(char *p, char *s) {
-	while (*p != 0 && *p != '|') {
-		if (*p == '?') {
-			/* matches any character except terminator. */
-			if (*s == 0) return lfalse;
-			++ p, ++ s;
-		} else
-		if (*p == '*') {
-			/* unlikely the user will do this. */
-			while (p[1] == '*') ++ p;
-
-			/* got to end of string, do we still
-			have a pattern after epsilon? If so
-			then no match. */
-			if (*s == 0) return p[1] == 0 || p[1] == '|';
-
-			/* '*' operator causes matcher to split branches,
-			we can either match the next pattern after '*' or
-			delay the match by skipping this char and remaining
-			in this pattern char. */
-			if (S_matchsingle(p+1,s)) {
-				return ltrue;
-			}
-			/* no match, move on to next char, remain in
-			this branch and keep checking for matches. */
-			++ s;
-		} else
-		/* otherwise, match literal fail if no match. */
-		if (*p != *s) {
-			return lfalse;
-		} else {
-			++ p, ++ s;
-		}
+int elfstr_touppercase_(elf_State *R) {
+	elf_String *str = (elf_String*) elf_getthis(R);
+	elf_String *newstr = elf_pushnewstrlen(R,str->length);
+	for (int i = 0; i < str->length; ++ i) {
+		newstr->c[i] = elf_chrtouppercase(str->c[i]);
 	}
-	/* did we match the whole string */
-	return *s == 0;
+	return 1;
 }
 
 

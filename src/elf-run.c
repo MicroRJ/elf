@@ -5,7 +5,7 @@
 */
 
 
-void elf_runini(elf_ThreadState *R, elf_Module *M) {
+void elf_runini(elf_State *R, elf_Module *M) {
 	R->M = M;
 	R->bytelogging = lfalse;
 	R->stklen = 4096;
@@ -15,21 +15,21 @@ void elf_runini(elf_ThreadState *R, elf_Module *M) {
 	elf_CallFrame Y = {0};
 	Y.base = R->top;
 	R->frame = &Y;
-	M->globals = elf_newloctab(R);
-	R->cache.x = elf_newlocstr(R,"x");
-	R->cache.y = elf_newlocstr(R,"y");
-	R->cache.z = elf_newlocstr(R,"z");
-	R->cache.w = elf_newlocstr(R,"w");
-	R->cache.width = elf_newlocstr(R,"width");
-	R->cache.height = elf_newlocstr(R,"height");
-	R->cache.__add = elf_newlocstr(R,"__add");
-	R->cache.__sub = elf_newlocstr(R,"__sub");
-	R->cache.__mul = elf_newlocstr(R,"__mul");
-	R->cache.__div = elf_newlocstr(R,"__div");
-	R->cache.__add1 = elf_newlocstr(R,"__add1");
-	R->cache.__sub1 = elf_newlocstr(R,"__sub1");
-	R->cache.__mul1 = elf_newlocstr(R,"__mul1");
-	R->cache.__div1 = elf_newlocstr(R,"__div1");
+	M->globals = elf_pushnewtab(R);
+	R->cache.x = elf_pushnewstr(R,"x");
+	R->cache.y = elf_pushnewstr(R,"y");
+	R->cache.z = elf_pushnewstr(R,"z");
+	R->cache.w = elf_pushnewstr(R,"w");
+	R->cache.width = elf_pushnewstr(R,"width");
+	R->cache.height = elf_pushnewstr(R,"height");
+	R->cache.__add = elf_pushnewstr(R,"__add");
+	R->cache.__sub = elf_pushnewstr(R,"__sub");
+	R->cache.__mul = elf_pushnewstr(R,"__mul");
+	R->cache.__div = elf_pushnewstr(R,"__div");
+	R->cache.__add1 = elf_pushnewstr(R,"__add1");
+	R->cache.__sub1 = elf_pushnewstr(R,"__sub1");
+	R->cache.__mul1 = elf_pushnewstr(R,"__mul1");
+	R->cache.__div1 = elf_pushnewstr(R,"__div1");
 
 	#if !defined(ELF_NOLIBS)
 	/* todo: eventually we'll load these from the
@@ -45,14 +45,14 @@ void elf_runini(elf_ThreadState *R, elf_Module *M) {
 
 
 
-int elf_callfn(elf_ThreadState *R, llocalid rxy, int nx, int ny) {
+int elf_callfn(elf_State *R, elf_localid rxy, int nx, int ny) {
 	return elf_callex(R,lnil,rxy,rxy,nx,ny);
 }
 
 
 /* todo: this should be different, rx should be the destination
 registers, and ry the input registers */
-int elf_callexx(elf_ThreadState *R, elf_Object *obj, elf_Value fn, llocalid rx, llocalid ry, int nx, int ny) {
+int elf_callexx(elf_State *R, elf_Object *obj, elf_Value fn, elf_localid rx, elf_localid ry, int nx, int ny) {
 	elf_CallFrame *caller = R->call;
 	// elf_ensure(R->top - caller->locals+caller->cl->fn.nlocals > -1);
 	elf_Value *locals = caller->locals + rx;
@@ -79,7 +79,7 @@ int elf_callexx(elf_ThreadState *R, elf_Object *obj, elf_Value fn, llocalid rx, 
 	}
 	R->top = top;
 	R->call = &call;
-	llocalid nyield = 0;
+	elf_localid nyield = 0;
 	if (fn.tag == TAG_CLS) {
 		nyield = elf_run(R);
 	} else
@@ -106,13 +106,13 @@ int elf_callexx(elf_ThreadState *R, elf_Object *obj, elf_Value fn, llocalid rx, 
 }
 
 
-int elf_callex(elf_ThreadState *R, elf_Object *obj, llocalid rx, llocalid ry, int nx, int ny) {
+int elf_callex(elf_State *R, elf_Object *obj, elf_localid rx, elf_localid ry, int nx, int ny) {
 	elf_CallFrame *caller = R->call;
 	return elf_callexx(R,obj,caller->locals[rx],rx+1,ry,nx,ny);
 }
 
 
-int elf_loadexprfs(elf_ThreadState *R, elf_FileState *fs, elf_String *filename, llocalid rxy, int ny, char *contents) {
+int elf_loadexprfs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny, char *contents) {
 	elf_Module *M = R->M;
 	fs->R = R;
 	fs->M = M;
@@ -150,7 +150,7 @@ int elf_loadexprfs(elf_ThreadState *R, elf_FileState *fs, elf_String *filename, 
 
 
 
-int elf_loadcodefs(elf_ThreadState *R, elf_FileState *fs, elf_String *filename, llocalid rxy, int ny, char *contents) {
+int elf_loadcodefs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny, char *contents) {
 	if (filename == lnil) return -1;
 	if (contents == lnil) return -1;
 
@@ -191,7 +191,7 @@ int elf_loadcodefs(elf_ThreadState *R, elf_FileState *fs, elf_String *filename, 
 }
 
 
-int elf_loadfilefs(elf_ThreadState *R, elf_FileState *fs, elf_String *name, llocalid x, int y) {
+int elf_loadfilefs(elf_State *R, elf_FileState *fs, elf_String *name, elf_localid x, int y) {
 	char *contents;
 	Error error = sys_loadfilebytes(lHEAP,(void**)&contents,name->c);
 	if (LFAILED(error)) {
@@ -202,19 +202,19 @@ int elf_loadfilefs(elf_ThreadState *R, elf_FileState *fs, elf_String *name, lloc
 }
 
 
-int elf_loadcode(elf_ThreadState *R, elf_String *filename, llocalid rxy, int ny, char *contents) {
+int elf_loadcode(elf_State *R, elf_String *filename, elf_localid rxy, int ny, char *contents) {
 	elf_FileState fs = {0};
 	return elf_loadcodefs(R,&fs,filename,rxy,ny,contents);
 }
 
 
-int elf_loadexpr(elf_ThreadState *R, elf_String *filename, llocalid rxy, int ny, char *contents) {
+int elf_loadexpr(elf_State *R, elf_String *filename, elf_localid rxy, int ny, char *contents) {
 	elf_FileState fs = {0};
 	return elf_loadexprfs(R,&fs,filename,rxy,ny,contents);
 }
 
 
-int elf_loadfile(elf_ThreadState *R, elf_String *filename, llocalid rxy, int ny) {
+int elf_loadfile(elf_State *R, elf_String *filename, elf_localid rxy, int ny) {
 	elf_FileState fs = {0};
 	return elf_loadfilefs(R,&fs,filename,rxy,ny);
 }
@@ -227,7 +227,7 @@ one are skipped?
 For instance, table:add(table:length()), here if
 table is nil or not even a table, you have to skip
 the call instruction and its arguments. */
-int elf_run(elf_ThreadState *R) {
+int elf_run(elf_State *R) {
 	/* todo: these names are deprecated */
 	elf_CallFrame *c = R->f;
 	elf_Module *md = R->md;
@@ -283,7 +283,7 @@ int elf_run(elf_ThreadState *R) {
 		/* check that we don't exceed number of
 		expected outputs */
 		int ny = MIN(b.z,call->ny);
-		for (llocalid y = 0; y < ny; ++y) {
+		for (elf_localid y = 0; y < ny; ++y) {
 			caller->locals[call->ry+y] = locals[b.y+y];
 		}
 		call->ny = ny;
@@ -298,7 +298,8 @@ int elf_run(elf_ThreadState *R) {
 		locals[b.x].i   = R->top - locals;
 	} break;
 	case BC_LOADFILE: {
-		elf_String *fname = elf_checkstr(R,b.x);
+		elf_String *fname = elf_getstr(R,b.x);
+		if (fname == lnil) elf_throw(R,bc,"'load': attempted to call load with nil");
 		elf_loadfile(R,fname,b.x,b.y);
 	} break;
 	case BC_J: {

@@ -1,0 +1,4 @@
+let table = {x=1}
+table:alias("x","y")
+table.x = 22
+failed = table.y != 22
