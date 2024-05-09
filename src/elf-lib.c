@@ -187,6 +187,9 @@ int elflib_err(elf_State *R) {
 ** it's first use, and effectively, it gets
 ** bound by the previous include.
 */
+
+
+
 char *elf_insymdir(char *dir, char *sym) {
 	do {
 		if (*dir ++ != *sym ++) {
@@ -201,13 +204,15 @@ int elflib_include(elf_State *R) {
 	elf_checkargs(R,".include",1,"(the directory to include to add to the global directory)");
 	char *dir = elf_getcstr(R,0);
 	int plen = elf_cstrlen(dir);
-	/* add all symbols here first to avoid
-	faulting under repeating patterns:
+	/* accumulate all symbols here first to
+	avoid faulting under repeating patterns:
 	elf.ray.elf.ray could include the symbol
 	many more times when the new key is added
 	as we traverse the array. the new key is
 	encountered and we keep repeating the
-	process...  todo: */
+	process... this would override the previous
+	value and result in erroneous behavior.
+	todo: */
 
 	elf_Table *tab = R->M->globals;
 	for (int i = 0; i < tab->ntotal; ++ i) {
@@ -217,7 +222,7 @@ int elflib_include(elf_State *R) {
 			if (*sym != '.') continue;
 			elf_String *ref = elf_newstr(R,sym);
 			elf_tabset(tab,elf_valstr(ref),tab->array[slot.i]);
-			elf_logdebug("added %s <- %s",ref->c,slot.k.x_str->c);
+			// elf_logdebug("added %s <- %s",ref->c,slot.k.x_str->c);
 		}
 	}
 	return 0;

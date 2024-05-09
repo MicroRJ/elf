@@ -640,7 +640,11 @@ void elf_fsloadstat(elf_FileState *fs) {
 			langL_yield(fs,tk.line,x);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
-		case TK_FINALLY: { elf_taketk(fs,TK_FINALLY);
+		case TK_FINALLY: case TK_LASTLY: {
+			elf_lexone(fs);
+			if (tk.type == TK_FINALLY) {
+				elf_lineerror(fs,tk.line,"warning: please consider using 'lastly' instead, 'finally' could change semantics in the future");
+			}
 			FileBlock bl = {0};
 			langL_begindelayedblock(fs,tk.line,&bl);
 			elf_fsloadstat(fs);
