@@ -96,12 +96,12 @@ elf_nodeid elf_nodenil(elf_FileState *fs, llineid line) {
 }
 
 
-elf_nodeid elf_nodecache(elf_FileState *fs, llineid line, elf_localid x) {
+elf_nodeid elf_nodecache(elf_FileState *fs, llineid line, elf_pushalid x) {
 	return elf_nodeunary(fs,line,NODE_CACHE,NT_ANY,x);
 }
 
 
-elf_nodeid elf_nodelocal(elf_FileState *fs, llineid line, elf_localid x) {
+elf_nodeid elf_nodelocal(elf_FileState *fs, llineid line, elf_pushalid x) {
 	return elf_nodeunary(fs,line,NODE_LOCAL,NT_ANY,x);
 }
 

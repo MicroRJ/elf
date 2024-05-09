@@ -149,7 +149,7 @@ void elf_checkargs(elf_State *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_tycheck(elf_State *R, elf_byteid id, elf_localid loc, elf_valtag x, elf_valtag y) {
+int elf_tycheck(elf_State *R, elf_byteid id, elf_pushalid loc, elf_valtag x, elf_valtag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

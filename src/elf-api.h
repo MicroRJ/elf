@@ -17,14 +17,14 @@ elf_int elf_toint(elf_Value v) {
 
 elf_api elf_Object *elf_getthis(elf_State *R);
 
-elf_api elf_Value elf_getany(elf_State *R, elf_localid x);
-elf_api elf_int elf_getint(elf_State *R, elf_localid x);
-elf_api elf_num elf_getnum(elf_State *R, elf_localid x);
-elf_api elf_String *elf_getstr(elf_State *R, elf_localid x);
-elf_api elf_Object *elf_getobj(elf_State *R, elf_localid x);
-elf_api elf_Table *elf_gettab(elf_State *R, elf_localid x);
-elf_api elf_Handle elf_getsys(elf_State *R, elf_localid x);
-elf_api elf_Closure *elf_getcls(elf_State *R, elf_localid x);
+elf_api elf_Value elf_getany(elf_State *R, elf_pushalid x);
+elf_api elf_int elf_getint(elf_State *R, elf_pushalid x);
+elf_api elf_num elf_getnum(elf_State *R, elf_pushalid x);
+elf_api elf_String *elf_getstr(elf_State *R, elf_pushalid x);
+elf_api elf_Object *elf_getobj(elf_State *R, elf_pushalid x);
+elf_api elf_Table *elf_gettab(elf_State *R, elf_pushalid x);
+elf_api elf_Handle elf_getsys(elf_State *R, elf_pushalid x);
+elf_api elf_Closure *elf_getcls(elf_State *R, elf_pushalid x);
 
 
 /*
@@ -41,13 +41,13 @@ elf_api elf_Closure *elf_getcls(elf_State *R, elf_localid x);
 ** loadexprfs: [expr]
 ** loadfilefs: [file]
 */
-elf_api int elf_loadcodefs(elf_State *, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadexprfs(elf_State *, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadfilefs(elf_State *, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny);
+elf_api int elf_loadcodefs(elf_State *, elf_FileState *fs, elf_String *filename, elf_pushalid rxy, int ny, char *contents);
+elf_api int elf_loadexprfs(elf_State *, elf_FileState *fs, elf_String *filename, elf_pushalid rxy, int ny, char *contents);
+elf_api int elf_loadfilefs(elf_State *, elf_FileState *fs, elf_String *filename, elf_pushalid rxy, int ny);
 
-elf_api int elf_loadcode(elf_State *, elf_String *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadexpr(elf_State *, elf_String *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadfile(elf_State *, elf_String *filename, elf_localid rxy, int ny);
+elf_api int elf_loadcode(elf_State *, elf_String *filename, elf_pushalid rxy, int ny, char *contents);
+elf_api int elf_loadexpr(elf_State *, elf_String *filename, elf_pushalid rxy, int ny, char *contents);
+elf_api int elf_loadfile(elf_State *, elf_String *filename, elf_pushalid rxy, int ny);
 
 
 /*
@@ -65,28 +65,28 @@ elf_api int elf_loadfile(elf_State *, elf_String *filename, elf_localid rxy, int
 ** the results are written to.
 ** ry can be equal to rx.
 */
-elf_api int elf_callex(elf_State *, elf_Object *obj, elf_localid rx, elf_localid ry, int nx, int ny);
+elf_api int elf_callex(elf_State *, elf_Object *obj, elf_pushalid rx, elf_pushalid ry, int nx, int ny);
 
 
 /*
 ** Performs a root call, where rx and ry are the same
 ** and obj is nil.
 */
-elf_api int elf_callfn(elf_State *, elf_localid rx, int nx, int ny);
+elf_api int elf_callfn(elf_State *, elf_pushalid rx, int nx, int ny);
 
 
 elf_api int elf_run(elf_State *);
 
 
-elf_api void elf_checkcl(elf_State *c, elf_localid x);
-elf_api elf_String *elf_checkstr(elf_State *c, elf_localid x);
+elf_api void elf_checkcl(elf_State *c, elf_pushalid x);
+elf_api elf_String *elf_checkstr(elf_State *c, elf_pushalid x);
 
 
 elf_api elf_Value *elf_gettop(elf_State *R);
 elf_api void elf_settop(elf_State *R, elf_Value *top);
 
-elf_api elf_localid elf_pushmany(elf_State *R, int howmany);
-elf_api elf_localid elf_pushany(elf_State *, elf_Value v);
+elf_api elf_pushalid elf_pushmany(elf_State *R, int howmany);
+elf_api elf_pushalid elf_pushany(elf_State *, elf_Value v);
 elf_api void elf_pushnil(elf_State *);
 elf_api void elf_pushint(elf_State *, elf_int i);
 elf_api void elf_pushnum(elf_State *, elf_num n);
@@ -103,9 +103,9 @@ elf_api elf_Table *elf_pushtab(elf_State *, elf_Table *t);
 elf_api elf_Table *elf_pushnewtab(elf_State *R);
 elf_api elf_Table *elf_pushnewlen(elf_State *R, elf_int len);
 
-elf_api elf_localid elf_pushcls(elf_State *, elf_Closure *f);
-elf_api elf_localid elf_pushnewcls(elf_State *, elf_Proto fn);
+elf_api elf_pushalid elf_pushcls(elf_State *, elf_Closure *f);
+elf_api elf_pushalid elf_pushnewcls(elf_State *, elf_Proto fn);
 
 
-elf_api elf_localid elf_pushbinding(elf_State *, lBinding c);
+elf_api elf_pushalid elf_pushbinding(elf_State *, lBinding c);
 

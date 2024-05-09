@@ -18,7 +18,7 @@ enum or local variable. */
 typedef struct elf_fileentry {
 	char    *name;
 	llineid  line;
-	elf_localid slot;
+	elf_pushalid slot;
 	elf_bool enm;
 	/* the level in which this name was
 	declared, for scoping */
@@ -56,10 +56,10 @@ typedef struct elf_FileFunc {
 	two counters, nlocals and xmemory */
 	/* maximum number of local register used concurrently
 	at any point for this function */
-	elf_localid nlocals;
+	elf_pushalid nlocals;
 	/* the memory state, in other words, the current number
 	of local registers that are being used at this point. */
-	elf_localid xmemory;
+	elf_pushalid xmemory;
 	/* index to first entity within entity list in file. */
 	int entities;
 	/* array of entities from enclosing function

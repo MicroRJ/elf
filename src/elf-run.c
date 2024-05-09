@@ -45,14 +45,14 @@ void elf_runini(elf_State *R, elf_Module *M) {
 
 
 
-int elf_callfn(elf_State *R, elf_localid rxy, int nx, int ny) {
+int elf_callfn(elf_State *R, elf_pushalid rxy, int nx, int ny) {
 	return elf_callex(R,lnil,rxy,rxy,nx,ny);
 }
 
 
 /* todo: this should be different, rx should be the destination
 registers, and ry the input registers */
-int elf_callexx(elf_State *R, elf_Object *obj, elf_Value fn, elf_localid rx, elf_localid ry, int nx, int ny) {
+int elf_callexx(elf_State *R, elf_Object *obj, elf_Value fn, elf_pushalid rx, elf_pushalid ry, int nx, int ny) {
 	elf_CallFrame *caller = R->call;
 	// elf_ensure(R->top - caller->locals+caller->cl->fn.nlocals > -1);
 	elf_Value *locals = caller->locals + rx;
@@ -79,7 +79,7 @@ int elf_callexx(elf_State *R, elf_Object *obj, elf_Value fn, elf_localid rx, elf
 	}
 	R->top = top;
 	R->call = &call;
-	elf_localid nyield = 0;
+	elf_pushalid nyield = 0;
 	if (fn.tag == TAG_CLS) {
 		nyield = elf_run(R);
 	} else
@@ -106,13 +106,13 @@ int elf_callexx(elf_State *R, elf_Object *obj, elf_Value fn, elf_localid rx, elf
 }
 
 
-int elf_callex(elf_State *R, elf_Object *obj, elf_localid rx, elf_localid ry, int nx, int ny) {
+int elf_callex(elf_State *R, elf_Object *obj, elf_pushalid rx, elf_pushalid ry, int nx, int ny) {
 	elf_CallFrame *caller = R->call;
 	return elf_callexx(R,obj,caller->locals[rx],rx+1,ry,nx,ny);
 }
 
 
-int elf_loadexprfs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadexprfs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_pushalid rxy, int ny, char *contents) {
 	elf_Module *M = R->M;
 	fs->R = R;
 	fs->M = M;
@@ -150,7 +150,7 @@ int elf_loadexprfs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_lo
 
 
 
-int elf_loadcodefs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadcodefs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_pushalid rxy, int ny, char *contents) {
 	if (filename == lnil) return -1;
 	if (contents == lnil) return -1;
 
@@ -191,7 +191,7 @@ int elf_loadcodefs(elf_State *R, elf_FileState *fs, elf_String *filename, elf_lo
 }
 
 
-int elf_loadfilefs(elf_State *R, elf_FileState *fs, elf_String *name, elf_localid x, int y) {
+int elf_loadfilefs(elf_State *R, elf_FileState *fs, elf_String *name, elf_pushalid x, int y) {
 	char *contents;
 	Error error = sys_loadfilebytes(lHEAP,(void**)&contents,name->c);
 	if (LFAILED(error)) {
@@ -202,19 +202,19 @@ int elf_loadfilefs(elf_State *R, elf_FileState *fs, elf_String *name, elf_locali
 }
 
 
-int elf_loadcode(elf_State *R, elf_String *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadcode(elf_State *R, elf_String *filename, elf_pushalid rxy, int ny, char *contents) {
 	elf_FileState fs = {0};
 	return elf_loadcodefs(R,&fs,filename,rxy,ny,contents);
 }
 
 
-int elf_loadexpr(elf_State *R, elf_String *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadexpr(elf_State *R, elf_String *filename, elf_pushalid rxy, int ny, char *contents) {
 	elf_FileState fs = {0};
 	return elf_loadexprfs(R,&fs,filename,rxy,ny,contents);
 }
 
 
-int elf_loadfile(elf_State *R, elf_String *filename, elf_localid rxy, int ny) {
+int elf_loadfile(elf_State *R, elf_String *filename, elf_pushalid rxy, int ny) {
 	elf_FileState fs = {0};
 	return elf_loadfilefs(R,&fs,filename,rxy,ny);
 }
@@ -284,7 +284,7 @@ int elf_run(elf_State *R) {
 		/* check that we don't exceed number of
 		expected outputs */
 		int ny = MIN(b.z,call->ny);
-		for (elf_localid y = 0; y < ny; ++y) {
+		for (elf_pushalid y = 0; y < ny; ++y) {
 			caller->locals[call->ry+y] = locals[b.y+y];
 		}
 		call->ny = ny;

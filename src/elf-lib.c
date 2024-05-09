@@ -107,33 +107,117 @@ int elflib_err(elf_State *R) {
 }
 
 
-/* code */
+/* the include function merges or includes
+** the given symbol directory into the
+** global symbol directory.
+**
+** Usage:
+** 	elf.pf("before")
+** 	elf.include("elf")
+** 	.pf("after")
+**
+**
+** REMARKS: useful for when you want to
+** avoid having to access a symbol
+** explicitly each time.
+** - Note that this will not improve
+** performance in any way, if anything
+** it'll augment the number of symbols
+** in the global directory.
+** - Also note that this is done at runtime
+** and you should use especial care when
+** using this function.
+** MORE: the include function finds
+** all the symbols within the given
+** directory and for each target symbol it
+** creates a new one in the root directory
+** that points to the \value of the
+** target symbol.
+** For instance elf.include("elf")
+** finds all symbols within elf.* and
+** adds them to the root directory,
+** now pf is accessible through '.pf'
+** as supposed to 'elf.pf'.
+** Note how there's a '.' before pf,
+** this is for a reason.
+** The dot remains so that the loader
+** knows beforehand that you're
+** explicitly referring to a symbol.
+** If the symbol is a single word there's
+** no need to add the '.' because the
+** loader would know, but there are some
+** drawbacks and edge cases that come
+** with this, for instance:
+** 1) It becomes less clear what you're
+** referring to.
+** 2) It could conflict with a local or
+** an already defined global with the
+** same name.
+** 3) It is not consistent.
+** So include will always keep the '.'
+** to make it explicit to the loader
+** that you're referring to a global
+** symbol.
+** For the elf directory, elf is a
+** reserved keyword, and so the loader
+** already knows you're referring to
+** the elf directory.
+** So in other words, using '.' avoids
+** semantic ambiguities and inconsistencies.
+** Here's one example:
+** The directory elf.ray contains:
+** BlendMode.ADDITIVE, to access ADDITIVE
+** you'd do: elf.ray.BlendMode.ADDITIVE,
+** that's long name, you'd rather have a
+** shortcut, so you do:
+** elf.include("elf.ray")
+** Now, elf.include happens at runtime so
+** the loader has no idea of what you just
+** did, and besides, given the dynamic nature
+** of the language it has no way of knowing
+** what it is you're referring to precisely.
+** However, you can still do:
+** .BlendMode.ADDITIVE,
+** because '.' is a language feature that
+** tells the loader: Hey, this is a symbol
+** not a field reference and not some local.
+** So the loader links to the global as
+** it is '.BlendMode.ADDITIVE', trusting
+** that it'll be bound at runtime before,
+** it's first use, and effectively, it gets
+** bound by the previous include.
+*/
+char *elf_insymdir(char *dir, char *sym) {
+	do {
+		if (*dir ++ != *sym ++) {
+			return *sym == '.' ? dir : sym;
+		}
+	} while (*dir);
+	return sym;
+}
 
 
-/* the include function scans the
-symbol table, looking for symbols
-with the given prefix '.', new
-new symbols without the prefix '.'
-are then created with the value
-of their previous names,
-	* conflicting names are excluded,
-such that existing symbols are
-not replaced */
 int elflib_include(elf_State *R) {
-	elf_checkargs(R,".include",1,"(the prefix) -> void, scans the global symbol table looking for symbols with the given prefix '.', creating a new symbol without the prefix, for instance 'elf.include(elf)' includes all symbols within 'elf.'");
-	char *prefix = elf_getcstr(R,0);
-	int plen = elf_cstrlen(prefix);
+	elf_checkargs(R,".include",1,"(the directory to include to add to the global directory)");
+	char *dir = elf_getcstr(R,0);
+	int plen = elf_cstrlen(dir);
+	/* add all symbols here first to avoid
+	faulting under repeating patterns:
+	elf.ray.elf.ray could include the symbol
+	many more times when the new key is added
+	as we traverse the array. the new key is
+	encountered and we keep repeating the
+	process...  todo: */
+
 	elf_Table *tab = R->M->globals;
 	for (int i = 0; i < tab->ntotal; ++ i) {
 		elf_tabslot slot = tab->slots[i];
 		if (slot.k.tag == TAG_STR) {
-	char *str = slot.k.x_str->c;
-	if (elf_cstrhasprefix(str,prefix) && str[plen] == '.') {
-		char name[0x100] = {0};
-		strcpy(name,str+plen+1);
-		elf_String *newkey = elf_pushnewstr(R,name);
-		elf_tabset(tab,elf_valstr(newkey),tab->array[slot.i]);
-	}
+			char *sym = elf_insymdir(dir,slot.k.x_str->c);
+			if (*sym != '.') continue;
+			elf_String *ref = elf_newstr(R,sym);
+			elf_tabset(tab,elf_valstr(ref),tab->array[slot.i]);
+			elf_logdebug("added %s <- %s",ref->c,slot.k.x_str->c);
 		}
 	}
 	return 0;
@@ -391,7 +475,7 @@ void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
 		elf_Value *top = elf_gettop(R);
 		elf_String *name = elf_pushnewstr(R,f.cFileName);
 		elf_String *path = elf_pushnewstr(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
-		elf_localid base = elf_pushcls(R,cls);
+		elf_pushalid base = elf_pushcls(R,cls);
 		elf_Table *file = elf_pushnewtab(R);
 		elf_tabsetstrfld(file,enumdir_keyname,name);
 		elf_tabsetstrfld(file,enumdir_keypath,path);
@@ -408,14 +492,14 @@ void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
 		struct dirent *entry;
 		while ((entry = readdir(dirfd)) != lnil) {
 			if (isvirtual(entry->d_name)) {
-			 	continue;
+				continue;
 			}
 			elf_bool isdir = (entry->d_type & DT_DIR) != lfalse;
 			elf_Value *top = elf_gettop(R);
 
 			elf_String *name = elf_pushnewstr(R,entry->d_name);
 			elf_String *path = elf_pushnewstr(R,elf_tpf("%s/%s",dir->c,entry->d_name));
-			llocalid base = elf_loccls(R,cls);
+			llocalid base = elf_pushcls(R,cls);
 			elf_Table *file = elf_pushnewtab(R);
 
 			elf_tabsetstrfld(file,enumdir_keyname,name);
@@ -455,9 +539,9 @@ elf_api void elflib_load(elf_State *R) {
 #else
 	elf_registerstr(R,"elf.PLATFORM","DESKTOP");
 	#if defined(_WIN32)
-		elf_registerstr(R,"elf.OS","WINDOWS");
+	elf_registerstr(R,"elf.OS","WINDOWS");
 	#else
-		elf_registerstr(R,"elf.OS","UNKNOWN");
+	elf_registerstr(R,"elf.OS","UNKNOWN");
 	#endif
 #endif
 

@@ -343,8 +343,8 @@ int elf_tabforeach_(elf_State *R) {
 	elf_ensure(R->frame->x == 1);
 	elf_Table *table = (elf_Table *) R->frame->obj;
 	elf_checkcl(R,0);
-	elf_localid k = elf_pushmany(R,1);
-	elf_localid v = elf_pushmany(R,1);
+	elf_pushalid k = elf_pushmany(R,1);
+	elf_pushalid v = elf_pushmany(R,1);
 	for (int i = 0; i < table->ntotal; ++ i) {
 		elf_tabslot slot = table->slots[i];
 		if (slot.k.tag != TAG_NIL) {

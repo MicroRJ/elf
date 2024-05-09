@@ -13,7 +13,7 @@ typedef double elf_num;
 
 
 typedef unsigned int elf_hashint;
-typedef int elf_localid;
+typedef int elf_pushalid;
 typedef int elf_byteid;
 typedef int elf_globalid;
 /* todo: eventually convert this to an offset */

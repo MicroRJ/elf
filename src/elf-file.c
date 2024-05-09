@@ -74,7 +74,7 @@ lentityid elfY_allocentity(elf_FileState *fs, llineid line) {
 		elf_varaddi(fs->entities,1);
 	}
 
-	for (elf_localid i = id.x; i < fs->nentities; ++i) {
+	for (elf_pushalid i = id.x; i < fs->nentities; ++i) {
 		fs->entities[i].level = fs->level;
 		fs->entities[i].line  = line;
 		fs->entities[i].name  = 0;
@@ -86,7 +86,7 @@ lentityid elfY_allocentity(elf_FileState *fs, llineid line) {
 }
 
 
-elf_localid elf_fsnumentinlev(elf_FileState *fs) {
+elf_pushalid elf_fsnumentinlev(elf_FileState *fs) {
 	elf_fileentry *entities = fs->entities;
 	int nentities = fs->nentities;
 	int n;
@@ -182,7 +182,7 @@ elf_nodeid elf_fsnewlocalentity(elf_FileState *fs, llineid line, char *name, elf
 
 		/* -- todo: for compile time constants,
 		no slot allocation required */
-		elf_localid slot = langL_localalloc(fs,1);
+		elf_pushalid slot = langL_localalloc(fs,1);
 		fs->entities[id.x].slot = slot;
 		fs->entities[id.x].enm  = enm;
 		fs->entities[id.x].name = name;
@@ -391,7 +391,7 @@ elf_nodeid elfY_loadfn(elf_FileState *fs) {
 
 void elfY_maybeassign(elf_FileState *fs, elf_nodeid x) {
 	ltoken tk = fs->tk;
-	elf_localid mem = fs->fn->xmemory;
+	elf_pushalid mem = fs->fn->xmemory;
 	if (elf_picktk(fs,TK_ASSIGN)) {
 		elfY_checkassign(fs,tk.line,x);
 		elf_nodeid y = elf_fsloadexpr(fs);
@@ -418,7 +418,7 @@ void elfY_maybeassign(elf_FileState *fs, elf_nodeid x) {
 		langL_moveto(fs,tk.line,x,y);
 		langL_tieloosejs(fs,js.f);
 	} else {
-		elf_localid r = langL_localalloc(fs,1);
+		elf_pushalid r = langL_localalloc(fs,1);
 		langL_localload(fs,NO_LINE,lfalse,r,0,x);
 		fs->fn->xmemory = mem;
 	}
@@ -482,23 +482,24 @@ elf_nodeid elf_fsloadunary(elf_FileState *fs) {
 	ltoken tk = fs->tk;
 	switch (tk.type) {
 		/* elf is a reserved keyword used
-		for the core namespace */
-		case TK_ELF: {
-			elf_lexone(fs);
-			char buf[MAX_PATH] = {"elf"};
-			if (elf_testtk(fs,TK_DOT)) {
+		for the elf directory. */
+		case TK_DOT: case TK_ELF: {
+			char dir[MAX_PATH] = {};
+			if (tk.type == TK_ELF) {
+				elf_lexone(fs);
+				strcat(dir,"elf");
+			}
+			if (!elf_testtk(fs,TK_DOT)) {
+				elf_lineerror(fs,tk.line,"expected '.', incomplete symbol. Did you mean to use 'elf'? This is a reserved keyword and it refers to the elf directory.");
+			}
 
-		while (elf_picktk(fs,TK_DOT)) {
-			elf_taketk(fs,TK_WORD);
-			strcat(buf,".");
-			strcat(buf,fs->lasttk.s);
-		}
-
-		elf_globalid x = elf_getsymbol(fs->M,elf_newstr(fs->R,buf));
-		v = elf_nodeglobal(fs,tk.line,x);
-
-			/* for all intended purposes, this is an error */
-			} else elf_lineerror(fs,tk.line,"expected '.' after 'elf', incomplete name");
+			while (elf_picktk(fs,TK_DOT)) {
+				elf_taketk(fs,TK_WORD);
+				strcat(dir,".");
+				strcat(dir,fs->lasttk.s);
+			}
+			elf_globalid x = elf_getsymbol(fs->M,elf_newstr(fs->R,dir));
+			v = elf_nodeglobal(fs,tk.line,x);
 		} break;
 		case TK_WORD: {
 			elf_lexone(fs);
@@ -629,7 +630,7 @@ void elfY_loadenumlist(elf_FileState *fs) {
 
 
 void elf_fsloadstat(elf_FileState *fs) {
-	elf_localid mem = fs->fn->xmemory;
+	elf_pushalid mem = fs->fn->xmemory;
 	ltoken tk = fs->tk;
 	switch (tk.type) {
 		case TK_THEN: case TK_ELSE: case TK_ELIF: {
