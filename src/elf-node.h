@@ -35,7 +35,7 @@ typedef enum elf_nodeop {
 	NODE_LT, NODE_GT,
 	NODE_LTEQ, NODE_GTEQ,
 	/* end */
-	NODE_BITXOR, NODE_MOD,
+	NODE_BITXOR, NODE_MOD, NODE_BITOR,
 
 	NODE_TYPEGUARD,
 
@@ -70,7 +70,7 @@ typedef enum elf_nodeop {
 typedef struct elf_Node {
 	elf_nodeop k;
 	elf_nodety t;
-	llineid line;
+	elf_lineid line;
 	/* todo: eventually remove this */
 	int level;
 	/* ---------------------------
@@ -81,7 +81,7 @@ typedef struct elf_Node {
 	location, used for register
 	allocation. */
 	struct { elf_nodeid x,y,*z; };
-	elf_pushalid r;
+	elf_localid r;
 	/* todo?: don't quite union these two for debugging? */
 	union {
 		char   *s;
@@ -91,37 +91,37 @@ typedef struct elf_Node {
 } elf_Node;
 
 
-elf_nodeid elf_nodexyz(elf_FileState *fs, llineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y, elf_nodeid *z);
-elf_nodeid elf_nodebinary(elf_FileState *fs, llineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y);
-elf_nodeid elf_nodeunary(elf_FileState *fs, llineid, elf_nodeop k, elf_nodety t, elf_nodeid x);
-elf_nodeid elf_nodenullary(elf_FileState *fs, llineid, elf_nodeop k, elf_nodety t);
+elf_nodeid elf_nodexyz(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y, elf_nodeid *z);
+elf_nodeid elf_nodebinary(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodeunary(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x);
+elf_nodeid elf_nodenullary(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t);
 
-elf_nodeid elf_nodegroup(elf_FileState *fs, llineid, elf_nodeid x);
+elf_nodeid elf_nodegroup(elf_FileState *fs, elf_lineid, elf_nodeid x);
 
-elf_nodeid elf_nodenil(elf_FileState *fs, llineid);
-elf_nodeid elf_nodeint(elf_FileState *fs, llineid, elf_int i);
-elf_nodeid elf_nodenum(elf_FileState *fs, llineid, elf_num n);
-elf_nodeid elf_nodestr(elf_FileState *fs, llineid, char *);
-elf_nodeid elf_nodetab(elf_FileState *fs, llineid, elf_nodeid *z);
-elf_nodeid elf_nodecls(elf_FileState *fs, llineid, elf_nodeid x, elf_nodeid *z);
+elf_nodeid elf_nodenil(elf_FileState *fs, elf_lineid);
+elf_nodeid elf_nodeint(elf_FileState *fs, elf_lineid, elf_int i);
+elf_nodeid elf_nodenum(elf_FileState *fs, elf_lineid, elf_num n);
+elf_nodeid elf_nodestr(elf_FileState *fs, elf_lineid, char *);
+elf_nodeid elf_nodetab(elf_FileState *fs, elf_lineid, elf_nodeid *z);
+elf_nodeid elf_nodecls(elf_FileState *fs, elf_lineid, elf_nodeid x, elf_nodeid *z);
 
-elf_nodeid elf_nodeload(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodeload(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
-elf_nodeid elf_nodelocal(elf_FileState *fs, llineid line, elf_nodeid i);
-elf_nodeid elf_nodecache(elf_FileState *fs, llineid line, elf_nodeid i);
-elf_nodeid elf_nodeglobal(elf_FileState *fs, llineid line, elf_nodeid i);
+elf_nodeid elf_nodelocal(elf_FileState *fs, elf_lineid line, elf_nodeid i);
+elf_nodeid elf_nodecache(elf_FileState *fs, elf_lineid line, elf_nodeid i);
+elf_nodeid elf_nodeglobal(elf_FileState *fs, elf_lineid line, elf_nodeid i);
 
-elf_nodeid elf_nodetypeguard(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodety y);
-elf_nodeid elf_nodemetafield(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y);
-elf_nodeid elf_nodefield(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y);
-elf_nodeid elf_nodeindex(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodetypeguard(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodety y);
+elf_nodeid elf_nodemetafield(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodefield(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodeindex(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
-elf_nodeid elf_nodeloadfile(elf_FileState *fs, llineid line, elf_nodeid x);
+elf_nodeid elf_nodeloadfile(elf_FileState *fs, elf_lineid line, elf_nodeid x);
 
-elf_nodeid elf_noderangedindex(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_noderangedindex(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
-elf_nodeid elf_nodebuiltincall(elf_FileState *fs, llineid line, ltokentype k, elf_nodeid *z);
-elf_nodeid elf_nodecall(elf_FileState *fs, llineid line, elf_nodeid x, elf_nodeid *z);
+elf_nodeid elf_nodebuiltincall(elf_FileState *fs, elf_lineid line, ltokentype k, elf_nodeid *z);
+elf_nodeid elf_nodecall(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid *z);
 
 
 elf_valtag elf_nodettotag(elf_nodety ty) {
@@ -129,7 +129,7 @@ elf_valtag elf_nodettotag(elf_nodety ty) {
 		case NT_SYS: return TAG_SYS;
 		case NT_NUM: return TAG_NUM;
 		case NT_INT: return TAG_INT;
-		default: LNOBRANCH;
+		default: elf_unreachable;
 	}
 	return TAG_NIL;
 }

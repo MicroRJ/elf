@@ -81,7 +81,7 @@ int testlib_disasm(elf_State *c) {
 
 
 int testlib_absslot(elf_State *c) {
-	elf_pushalid slot = elf_getint(c,0);
+	elf_localid slot = elf_getint(c,0);
 	elf_pushany(c,c->s[slot]);
 	return 1;
 }

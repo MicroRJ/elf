@@ -11,7 +11,7 @@
 
 typedef struct ltoken {
 	unsigned char type;
-	llineid line;
+	elf_lineid line;
 	unsigned int eol: 1;
 	union {
 		char *s;

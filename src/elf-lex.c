@@ -6,7 +6,7 @@
 
 
 
-void elf_lineerror(elf_FileState *fs, char *loc, char const *fmt, ...) {
+void elf_filediag(elf_FileState *fs, char *loc, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_getlinelocinfo(fs->contents,loc,&linenum,&lineloc);
@@ -108,8 +108,8 @@ ltoken elf_lexone(elf_FileState *file) {
 
 				tk.type = wordorkeyword(buffer);
 				if (tk.type == TK_WORD) {
-					if (S_eq(buffer,"__STATBREAK__")) {
-						file->statbreak = ltrue;
+					if (S_eq(buffer,"__ELF_FILE_BREAK__")) {
+						file->debuggerflag = ltrue;
 						goto retry;
 					}
 					/* todo: string interner, or arena? */
@@ -177,7 +177,7 @@ ltoken elf_lexone(elf_FileState *file) {
 			} while(0);
 
 			if (!elf_cmovchr('\'')) {
-				elf_lineerror(file,tk.line,"invalid character constant, expected \"'\"");
+				elf_filediag(file,tk.line,"invalid character constant, expected \"'\"");
 			}
 		} break;
 		case '"': {
@@ -188,7 +188,7 @@ ltoken elf_lexone(elf_FileState *file) {
 			}
 			buffer[length] = 0;
 			if (!elf_cmovchr('"')) {
-				elf_lineerror(file,tk.line,"invalid string");
+				elf_filediag(file,tk.line,"invalid string");
 			}
 			tk.type = TK_STRING;
 			tk.s = S_ncopy(lHEAP,length,buffer);
@@ -365,6 +365,6 @@ file->lasttk = file->tk;
 file->tk = file->thentk;
 file->thentk = tk;
 
-	// elf_lineerror(files,tk.line,"token %s",elfX_tokenintel[tk.type].name);
+	// elf_filediag(files,tk.line,"token %s",elfX_tokenintel[tk.type].name);
 return file->lasttk;
 }

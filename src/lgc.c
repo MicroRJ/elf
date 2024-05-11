@@ -12,12 +12,12 @@ of objects, so that's something we have to
 take into account, and most of the time you
 make small allocations tightly, so that's where
 most of the spikes occur */
-#define L_GC_THRESHOLD_MIN (elf_int) MEGABYTES(1)
-#define L_GC_THRESHOLD_MAX (elf_int) MEGABYTES(512)
+#define L_GC_THRESHOLD_MIN (elf_int) MEGABYTES(4)
+#define L_GC_THRESHOLD_MAX (elf_int) MEGABYTES(16)
 
 
 #define L_GC_OBJNUM_THRESHOLD_MIN (elf_int) (8192*1)
-#define L_GC_OBJNUM_THRESHOLD_MAX (elf_int) (8192*512)
+#define L_GC_OBJNUM_THRESHOLD_MAX (elf_int) (8192*32)
 
 
 void elf_collect(elf_State *fs);
@@ -65,8 +65,8 @@ void *elf_newobj(elf_State *R, elf_objty type, elf_int tell) {
 	if (R != 0) {
 		elf_varadd(R->gc,obj);
 		// LDODEBUG(elf_arrfori(R->gc) {
-		// 	if (R->gc[i]->headtrap != FLYTRAP) LNOBRANCH;
-		// 	if (R->gc[i]->tailtrap != FLYTRAP) LNOBRANCH;
+		// 	if (R->gc[i]->headtrap != FLYTRAP) elf_unreachable;
+		// 	if (R->gc[i]->tailtrap != FLYTRAP) elf_unreachable;
 		// });
 	}
 	return obj;
@@ -166,8 +166,8 @@ void elf_collect(elf_State *R) {
 	for (int i = 0; i < elf_varlen(R->gc); i ++) {
 		elf_Object *it = R->gc[i];
 		LDODEBUG(
-			if (it->headtrap != FLYTRAP) LNOBRANCH;
-			if (it->tailtrap != FLYTRAP) LNOBRANCH;
+			if (it->headtrap != FLYTRAP) elf_unreachable;
+			if (it->tailtrap != FLYTRAP) elf_unreachable;
 		);
 
 		if (it == lnil) continue;

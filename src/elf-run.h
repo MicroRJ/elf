@@ -34,7 +34,7 @@ typedef struct elf_CallFrame {
 	elf_Value *top;
 	/* next instruction index */
 	elf_int j;
-	elf_pushalid rx,ry;
+	elf_localid rx,ry;
 	/* x and y names are deprecated */
 	/* -- The number of inputs (nx) and
 	- the number of expected outputs (ny).
@@ -65,6 +65,7 @@ typedef struct elf_Runtime {
 	struct {
 		elf_String *__add,*__sub,*__mul,*__div;
 		elf_String *__add1,*__sub1,*__mul1,*__div1;
+		elf_String *__getfield,*__setfield;
 	} cache;
 } elf_Runtime;
 
@@ -75,7 +76,7 @@ typedef struct lThread {
 	union { elf_Module  *M, *md; };
 	union { elf_CallFrame *call; };
 	union { elf_Value *stk;      };
-	elf_pushalid stklen;
+	elf_localid stklen;
 	elf_int threadid;
 	elf_byteid  curbyte;
 } lThread;
@@ -84,7 +85,7 @@ typedef struct lThread {
 typedef struct elf_State {
 	union { elf_Module *M, *md; };
 	union { elf_Value *stk,*s; };
-	elf_pushalid stklen;
+	elf_localid stklen;
 	union { elf_Value *top,*v; };
 	union { elf_CallFrame *call,*frame,*f; };
 	elf_bool debuggerflag;
@@ -95,6 +96,7 @@ typedef struct elf_State {
 		elf_String *width,*height;
 		elf_String *__add,*__sub,*__mul,*__div;
 		elf_String *__add1,*__sub1,*__mul1,*__div1;
+		elf_String *__getfield,*__setfield;
 	} cache;
 	elf_Bytecode *bytetrace;
 	elf_bool bytetracing;

@@ -11,12 +11,12 @@ elf_api elf_Object *elf_getthis(elf_State *R) {
 }
 
 
-elf_api elf_Value elf_getany(elf_State *R, elf_pushalid x) {
+elf_api elf_Value elf_getany(elf_State *R, elf_localid x) {
 	return R->call->locals[x];
 }
 
 
-elf_api elf_String *elf_getstr(elf_State *R, elf_pushalid x) {
+elf_api elf_String *elf_getstr(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return lnil;
 	if (v.tag == TAG_STR) return v.x_str;
@@ -25,7 +25,7 @@ elf_api elf_String *elf_getstr(elf_State *R, elf_pushalid x) {
 }
 
 
-elf_api char *elf_getcstr(elf_State *R, elf_pushalid x) {
+elf_api char *elf_getcstr(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return lnil;
 	if (v.tag == TAG_STR) return v.x_str->c;
@@ -34,52 +34,52 @@ elf_api char *elf_getcstr(elf_State *R, elf_pushalid x) {
 }
 
 
-elf_api elf_Object *elf_getobj(elf_State *R, elf_pushalid x) {
+elf_api elf_Object *elf_getobj(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && !elf_tagisobj(v.tag)) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected object at local %i",x));
-		LNOBRANCH;
+		elf_unreachable;
 	}
 	return v.x_obj;
 }
 
 
-elf_api elf_Table *elf_gettab(elf_State *R, elf_pushalid x) {
+elf_api elf_Table *elf_gettab(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_TAB) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected table at local %i",x));
-		LNOBRANCH;
+		elf_unreachable;
 	}
 	return v.x_tab;
 }
 
 
-elf_api void elf_checkcl(elf_State *R, elf_pushalid x) {
+elf_api void elf_checkcl(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_CLS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected closure at local %i",x));
-		LNOBRANCH;
+		elf_unreachable;
 	}
 }
 
 
-elf_api elf_Closure *elf_getcls(elf_State *R, elf_pushalid x) {
+elf_api elf_Closure *elf_getcls(elf_State *R, elf_localid x) {
 	elf_checkcl(R,x);
 	return R->call->locals[x].f;
 }
 
 
-elf_api elf_Handle elf_getsys(elf_State *R, elf_pushalid x) {
+elf_api elf_Handle elf_getsys(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
-		LNOBRANCH;
+		elf_unreachable;
 	}
 	return v.h;
 }
 
 
-elf_api elf_String *elf_checkstr(elf_State *R, elf_pushalid x) {
+elf_api elf_String *elf_checkstr(elf_State *R, elf_localid x) {
 	elf_ensure(R->call->locals[x].tag == TAG_STR);
 	return R->call->locals[x].s;
 }
@@ -97,7 +97,7 @@ elf_api elf_int elf_getint(elf_State *R, int x) {
 }
 
 
-elf_api elf_num elf_getnum(elf_State *R, elf_pushalid x) {
+elf_api elf_num elf_getnum(elf_State *R, elf_localid x) {
 	elf_Value v = R->call->locals[x];
 	if (v.tag == TAG_INT) return (elf_num) v.i;
 	if (v.tag != TAG_NUM) {
@@ -107,22 +107,22 @@ elf_api elf_num elf_getnum(elf_State *R, elf_pushalid x) {
 }
 
 
-elf_pushalid elf_pushmany(elf_State *R, int n) {
-	elf_pushalid stkptr = R->top - R->stk;
+elf_localid elf_pushmany(elf_State *R, int n) {
+	elf_localid stkptr = R->top - R->stk;
 	if (stkptr <= R->stklen) {
 		R->top += n;
-	} else LNOBRANCH;
+	} else elf_unreachable;
 	return stkptr;
 }
 
 
-elf_pushalid elf_pushany(elf_State *R, elf_Value v) {
+elf_localid elf_pushany(elf_State *R, elf_Value v) {
 	*R->top = v;
 	return elf_pushmany(R,1);
 }
 
 #define _INC_TOP do {\
-	elf_pushalid __i = R->top ++ - R->stk;\
+	elf_localid __i = R->top ++ - R->stk;\
 	elf_ensure(__i < R->stklen);\
 } while(0)
 
@@ -182,10 +182,10 @@ void elf_settop(elf_State *R, elf_Value *top) {
 }
 
 
-elf_pushalid elf_pushcls(elf_State *R, elf_Closure *cl) {
+elf_localid elf_pushcls(elf_State *R, elf_Closure *cl) {
 	R->top->tag = TAG_CLS;
 	R->top->f   = cl;
-	elf_pushalid id = R->top - R->call->locals;
+	elf_localid id = R->top - R->call->locals;
 	_INC_TOP;
 	return id;
 }
@@ -217,16 +217,16 @@ elf_Table *elf_pushnewtab(elf_State *R) {
 }
 
 
-elf_pushalid elf_pushbinding(elf_State *R, lBinding b) {
+elf_localid elf_pushbinding(elf_State *R, lBinding b) {
 	R->top->tag = TAG_BID;
 	R->top->c = b;
-	elf_pushalid id = R->top - R->call->locals;
+	elf_localid id = R->top - R->call->locals;
 	_INC_TOP;
 	return id;
 }
 
 
-elf_pushalid elf_pushnewcls(elf_State *R, elf_Proto fn) {
+elf_localid elf_pushnewcls(elf_State *R, elf_Proto fn) {
 	elf_Closure *cl = elf_newcls(R,fn);
 	R->top -= fn.ncaches;
 	int i;

@@ -38,8 +38,8 @@ void lang_assertfn(ldebugloc ind, char const *name, elf_bool expr);
 #endif
 
 
-#if !defined(LNOBRANCH)
-	#define LNOBRANCH elf_debugger("internal error: unexpected code branch")
+#if !defined(elf_unreachable)
+	#define elf_unreachable elf_debugger("internal error: unexpected code branch")
 #endif
 
 

@@ -9,6 +9,12 @@
 
 #define NOTANENTITY 0x01
 
+#define BLOCK_LOOP 0x01
+
+/* added when a break, leave or continue
+statement is found */
+#define BLOCK_ENDED  0x02
+
 typedef struct { int x; } lentityid;
 
 
@@ -17,8 +23,8 @@ some local value such as a label,
 enum or local variable. */
 typedef struct elf_fileentry {
 	char    *name;
-	llineid  line;
-	elf_pushalid slot;
+	elf_lineid  line;
+	elf_localid slot;
 	elf_bool enm;
 	/* the level in which this name was
 	declared, for scoping */
@@ -26,16 +32,6 @@ typedef struct elf_fileentry {
 	/* todo: we could just put the node here */
 } elf_fileentry;
 
-
-typedef struct elf_fileblock elf_fileblock;
-typedef struct elf_fileblock {
-	elf_fileblock *enclosing;
-	int level;
-	int xmemory;
-	int xentity;
-	elf_byteid entry;
-	elf_bool isloop;
-} elf_fileblock;
 
 
 typedef struct elf_usingstack elf_usingstack;
@@ -49,17 +45,17 @@ typedef struct elf_usingstack {
 typedef struct elf_FileFunc elf_FileFunc;
 typedef struct elf_FileFunc {
 	elf_FileFunc *enclosing;
-	llineid line;
+	elf_lineid line;
 	/* for the basic register allocation system, where we have
 	an infinite number of register, but we still want to keep
 	the number of registers at a minimum, we resort to using
 	two counters, nlocals and xmemory */
 	/* maximum number of local register used concurrently
 	at any point for this function */
-	elf_pushalid nlocals;
+	elf_localid nlocals;
 	/* the memory state, in other words, the current number
 	of local registers that are being used at this point. */
-	elf_pushalid xmemory;
+	elf_localid xmemory;
 	/* index to first entity within entity list in file. */
 	int entities;
 	/* array of entities from enclosing function
@@ -73,6 +69,8 @@ typedef struct elf_FileFunc {
 	elf_fileblock entry;
 	elf_fileblock *block;
 	elf_usingstack *usingstack;
+	int nloops;
+	int nblocks;
 	int nyield;
 	/* todo: deprecated */
 	/* list of yield jumps to be patched */
@@ -112,7 +110,7 @@ typedef struct elf_FileState {
 	elf_FileFunc *fn;
 	elf_byteid bytes;
 	int flags;
-	unsigned statbreak: 1;
+	elf_bool debuggerflag;
 } elf_FileState;
 
 

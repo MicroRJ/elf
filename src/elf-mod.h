@@ -12,7 +12,7 @@ typedef struct elf_File {
 	int **protos;
 	/* todo: eventually remove these */
 	char *pathondisk;
-	llineid lines;
+	elf_lineid lines;
 	int nlines;
 } elf_File;
 

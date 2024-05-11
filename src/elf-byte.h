@@ -66,7 +66,7 @@ typedef enum lbyteop {
 	BC_LT, BC_LTEQ,
 	BC_MUL, BC_DIV, BC_MOD,
 	BC_ADD, BC_SUB,
-	BC_SHL, BC_SHR, BC_XOR,
+	BC_SHL, BC_SHR, BC_XOR, BC_BITOR
 } lbyteop;
 
 

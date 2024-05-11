@@ -62,7 +62,7 @@ elf_globaldecl char const *tag2s[] = {
 typedef struct elf_Value {
 	elf_valtag tag;
 	union {
-		Ptr           p;
+		Ptr           p,x_ptr;
 		elf_Handle    h;
 		lBinding      c;
 		elf_int   	  i,x_int;

@@ -31,7 +31,7 @@ elf_valtag elf_objtotag(elf_objty type) {
 		case OBJ_CLOSURE: return TAG_CLS;
 		case OBJ_TAB: return TAG_TAB;
 		case OBJ_STRING: return TAG_STR;
-		default: LNOBRANCH;
+		default: elf_unreachable;
 	}
 	return -1;
 }

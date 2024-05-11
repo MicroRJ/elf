@@ -60,7 +60,8 @@ void elf_deltab(elf_Table *tab) {
 ** result to modify the slot and value as desired.
 **
 */
-elf_int elf_tabhashin(elf_Table *table, elf_Value k) {
+elf_int elf_tabhashin(elf_Table *tab, elf_Value k) {
+	elf_ensure(tab != lnil);
 	/* this particular function uses double hashing,
 	which should allow us to get more resolution out
 	of the hash value, the first hash computes the
@@ -71,8 +72,8 @@ elf_int elf_tabhashin(elf_Table *table, elf_Value k) {
 	has proven to be drastically more efficient
 	than linear probing.
 	Of course, this is already well known... */
-	elf_tabslot *slots = table->slots;
-	elf_int ntotal = table->ntotal;
+	elf_tabslot *slots = tab->slots;
+	elf_int ntotal = tab->ntotal;
 	elf_int hash = elf_tabhashval(k);
 	elf_int head = hash % ntotal;
 	elf_int tail = head;
@@ -82,7 +83,7 @@ elf_int elf_tabhashin(elf_Table *table, elf_Value k) {
 		if (x.tag == TAG_NIL) return tail;
 		if (elf_tabvaleq(&x,&k)) return tail;
 		tail = (tail+walk) % ntotal;
-		LDODEBUG( table->ncollisions ++ );
+		LDODEBUG( tab->ncollisions ++ );
 	} while(head != tail);
 	return -1;
 }
@@ -117,7 +118,7 @@ void elf_tabcheck(elf_Table *table) {
 		the table size >> 1 << 2 */
 		elf_Table newtable = * table;
 		newtable.ntotal = table->ntotal << 2;
-		if (newtable.ntotal < table->ntotal) LNOBRANCH;
+		if (newtable.ntotal < table->ntotal) elf_unreachable;
 		newtable.slots = elf_clearalloc(lHEAP,newtable.ntotal * sizeof(elf_tabslot));
 
 		for (int i = 0; i < table->ntotal; ++ i) {
@@ -126,7 +127,7 @@ void elf_tabcheck(elf_Table *table) {
 
 			elf_int newslot = elf_tabhashin(&newtable,slot.k);
 
-			if (newslot == -1) LNOBRANCH;
+			if (newslot == -1) elf_unreachable;
 
 			newtable.slots[newslot] = slot;
 		}
@@ -143,7 +144,7 @@ void elf_tabset(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_tabcheck(table);
 	elf_int slot = elf_tabhashin(table,k);
 	/* todo: instead return an error here */
-	if (slot == -1) LNOBRANCH;
+	if (slot == -1) elf_unreachable;
 	elf_tabslot *entry = table->slots + slot;
 	if (!elf_tabslotiskey(table,slot)) {
 		elf_int i = elf_varaddi(table->v,1);
@@ -158,10 +159,10 @@ void elf_tabset(elf_Table *table, elf_Value k, elf_Value v) {
 }
 
 
-elf_Value elf_tablookup(elf_Table *table, elf_Value k) {
-	elf_int slot = elf_tabhashin(table,k);
-	if (elf_tabslotiskey(table,slot)) {
-		return elf_tabslot2value(table,slot);
+elf_Value elf_tablookup(elf_Table *tab, elf_Value k) {
+	elf_int slot = elf_tabhashin(tab,k);
+	if (elf_tabslotiskey(tab,slot)) {
+		return elf_tabslot2value(tab,slot);
 	}
 	return (elf_Value){TAG_NIL,0};
 }
@@ -172,7 +173,7 @@ elf_int elf_tabtake(elf_Table *table, elf_Value k) {
 
 	elf_tabcheck(table);
 	elf_int slot = elf_tabhashin(table,k);
-	if (slot == -1) LNOBRANCH;
+	if (slot == -1) elf_unreachable;
 	if (!elf_tabslotiskey(table,slot)) {
 		elf_int i = elf_varaddi(table->v,1);
 		table->v[i] = (elf_Value){TAG_NIL};
@@ -202,7 +203,7 @@ void elf_tabstralias(elf_State *S, elf_Table *tab, char *key, elf_Value alias) {
 }
 
 
-elf_Value elf_tabget(elf_Table *tab, elf_String *key) {
+elf_Value elf_tabgetfld(elf_Table *tab, elf_String *key) {
 	return elf_tablookup(tab,elf_valstr(key));
 }
 
@@ -310,10 +311,11 @@ int elf_tabadd_(elf_State *R) {
 
 
 int elf_tabidx_(elf_State *R) {
-	elf_ensure(R->call->x >= 1);
-	elf_Table *tab = (elf_Table *)elf_getthis(R);
-	elf_int idx = elf_getint(R,0);
-	elf_pushany(R,tab->v[idx]);
+	elf_ensure(R->call->nx >= 1);
+	elf_Table *tab = (elf_Table *) elf_getthis(R);
+	elf_int len = elf_varlen(tab->array);
+	elf_int idx = elf_getint(R,0) % len;
+	elf_pushany(R,tab->array[idx]);
 	return 1;
 }
 
@@ -343,8 +345,8 @@ int elf_tabforeach_(elf_State *R) {
 	elf_ensure(R->frame->x == 1);
 	elf_Table *table = (elf_Table *) R->frame->obj;
 	elf_checkcl(R,0);
-	elf_pushalid k = elf_pushmany(R,1);
-	elf_pushalid v = elf_pushmany(R,1);
+	elf_localid k = elf_pushmany(R,1);
+	elf_localid v = elf_pushmany(R,1);
 	for (int i = 0; i < table->ntotal; ++ i) {
 		elf_tabslot slot = table->slots[i];
 		if (slot.k.tag != TAG_NIL) {
@@ -446,7 +448,7 @@ elf_bool elf_tabvaleq(elf_Value *x, elf_Value *y) {
 		case TAG_TAB: case TAG_CLS: case TAG_BID: {
 			return x->i == y->i;
 		}
-		default: LNOBRANCH;
+		default: elf_unreachable;
 	}
 	return lfalse;
 }
@@ -462,7 +464,7 @@ elf_int elf_tabhashval(elf_Value v) {
 		case TAG_INT: case TAG_NUM: case TAG_BID: {
 			return elf_tabhashptr(v.p);
 		}
-		default: LNOBRANCH;
+		default: elf_unreachable;
 	}
 	return lfalse;
 }

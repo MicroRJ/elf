@@ -237,7 +237,7 @@ int elflib_loadexpr(elf_State *R) {
 	} else if (R->call->nx == 1) {
 		filename = elf_pushnewstr(R,"unnamed");
 		contents = elf_getstr(R,0);
-	} else LNOBRANCH;
+	} else elf_unreachable;
 	elf_loadexpr(R,filename,R->call->ry,R->call->ny,contents->c);
 	/* no need to do hoisting */
 	return 0;
@@ -252,7 +252,7 @@ int elflib_loadcode(elf_State *R) {
 	} else if (R->call->nx == 1) {
 		filename = elf_pushnewstr(R,"unnamed");
 		contents = elf_getstr(R,0);
-	} else LNOBRANCH;
+	} else elf_unreachable;
 	elf_loadcode(R,filename,R->call->ry,R->call->ny,contents->c);
 	/* no need to do hoisting */
 	return 0;
@@ -480,7 +480,7 @@ void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
 		elf_Value *top = elf_gettop(R);
 		elf_String *name = elf_pushnewstr(R,f.cFileName);
 		elf_String *path = elf_pushnewstr(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
-		elf_pushalid base = elf_pushcls(R,cls);
+		elf_localid base = elf_pushcls(R,cls);
 		elf_Table *file = elf_pushnewtab(R);
 		elf_tabsetstrfld(file,enumdir_keyname,name);
 		elf_tabsetstrfld(file,enumdir_keypath,path);

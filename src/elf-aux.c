@@ -132,7 +132,7 @@ void elf_lineerror2(char *filename, char *contents, char *loc, char const *fmt, 
 void elf_throw(elf_State *R, elf_byteid byte, char *error) {
 	elf_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
-	llineid line = M->lines[byte];
+	elf_lineid line = M->lines[byte];
 	int fileid = elf_fndfilebybyte(M,byte);
 	if (fileid != -1) {
 		elf_File *file = &M->files[fileid];
@@ -149,7 +149,7 @@ void elf_checkargs(elf_State *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_tycheck(elf_State *R, elf_byteid id, elf_pushalid loc, elf_valtag x, elf_valtag y) {
+int elf_tycheck(elf_State *R, elf_byteid id, elf_localid loc, elf_valtag x, elf_valtag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

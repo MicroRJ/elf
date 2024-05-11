@@ -65,7 +65,7 @@ I want to use instead! */
 elf_api elf_bool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
 	DebugBreak();
-	return 1;
+		return 1;
 #elif defined(PLATFORM_WEB)
 	emscripten_debugger();
 	return 1;
@@ -77,7 +77,7 @@ elf_api elf_bool sys_debugger() {
 
 elf_api void sys_consolelog(int type, char *message) {
 #if defined(PLATFORM_DESKTOP)
-	// OutputDebugStringA(message);
+	/* bruh */
 	elf_log(type,"%s",message);
 #else
 	switch (type) {

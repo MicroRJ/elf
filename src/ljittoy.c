@@ -102,7 +102,7 @@ void emit86_mov(ljValue x, ljValue y) {
 			DO_MOV64_REG_MEM_8DISP(x.base,y.base,y.disp);
 		} else if (y.type == JIT_IMM) {
 			DO_MOV64_REG_IMM(x.base,y.immediate);
-		} else LNOBRANCH;
+		} else elf_unreachable;
 	} else
 	if (x.type == JIT_MEM) {
 		if (y.type == JIT_MEM) {
@@ -110,7 +110,7 @@ void emit86_mov(ljValue x, ljValue y) {
 			y = REG(RAX);
 		} else elf_ensure(y.type == JIT_GPR);
 		DO_MOV64_MEM_REG_8DISP(x.base,x.disp,y.base);
-	} else LNOBRANCH;
+	} else elf_unreachable;
 }
 
 
@@ -123,7 +123,7 @@ void emit86_logxor(ljValue x, ljValue y) {
 	} else
 	if (x.type == JIT_MEM && y.type == JIT_GPR) {
 		LINE((p2(0x31,MODRM_8DISP(x.base,y.base)), NEXT, p1(x.disp)));
-	} else LNOBRANCH;
+	} else elf_unreachable;
 
 	if (yy.type == JIT_MEM) emit86_mov(yy,y);
 }
@@ -135,7 +135,7 @@ void emit86_shift(lbyteop type, ljValue x, ljValue y) {
 	if (x.type == JIT_GPR && y.type == JIT_IMM) {
 		int v = type == BC_SHL ? 4 : 5;
 		LINE((p2(0xC1,MODRM_RR(x.base,v)), NEXT, p1(y.immediate)));
-	} else LNOBRANCH;
+	} else elf_unreachable;
 	if (xx.type == JIT_MEM) emit86_mov(xx,x);
 }
 
@@ -200,7 +200,7 @@ lBinding jit(elf_Module *md, elf_Proto fn) {
 			} break;
 			case BC_LEAVE:
 			break;
-			default: LNOBRANCH;
+			default: elf_unreachable;
 		}
 		(void) byte;
 		#endif

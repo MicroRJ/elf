@@ -63,7 +63,7 @@ int elfstr_append_(elf_State *R) {
 		memcpy(r->c,s->c,s->length);
 		r->c[r->length-1] = v.i;
 		r->hash = elf_tabhashstr(r->c);
-	} else LNOBRANCH;
+	} else elf_unreachable;
 	return 1;
 }
 
