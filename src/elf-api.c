@@ -1,13 +1,17 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf-api.c
-** Main user API
+** Main API
 */
-
 
 
 elf_api elf_Object *elf_getthis(elf_State *R) {
 	return R->call->obj;
+}
+
+
+elf_api elf_tag elf_gettag(elf_State *R, elf_localid x) {
+	return R->call->locals[x].tag;
 }
 
 

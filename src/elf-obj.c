@@ -5,7 +5,7 @@
 */
 
 
-elf_bool elf_tagisnumeric(elf_valtag tag) {
+elf_bool elf_tagisnumeric(elf_tag tag) {
 	return (tag == TAG_NUM) || (tag == TAG_INT);
 }
 
@@ -15,7 +15,7 @@ int elf_valisnil(elf_Value x) {
 }
 
 
-elf_bool elf_tagisobj(elf_valtag tag) {
+elf_bool elf_tagisobj(elf_tag tag) {
 	switch (tag) {
 		case TAG_STR: case TAG_TAB:
 		case TAG_OBJ: case TAG_CLS: {
@@ -26,7 +26,7 @@ elf_bool elf_tagisobj(elf_valtag tag) {
 }
 
 
-elf_valtag elf_objtotag(elf_objty type) {
+elf_tag elf_objtotag(elf_objty type) {
 	switch(type) {
 		case OBJ_CLOSURE: return TAG_CLS;
 		case OBJ_TAB: return TAG_TAB;

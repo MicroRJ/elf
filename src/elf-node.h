@@ -124,7 +124,7 @@ elf_nodeid elf_nodebuiltincall(elf_FileState *fs, elf_lineid line, ltokentype k,
 elf_nodeid elf_nodecall(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid *z);
 
 
-elf_valtag elf_nodettotag(elf_nodety ty) {
+elf_tag elf_nodettotag(elf_nodety ty) {
 	switch (ty) {
 		case NT_SYS: return TAG_SYS;
 		case NT_NUM: return TAG_NUM;

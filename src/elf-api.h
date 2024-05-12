@@ -17,6 +17,7 @@ elf_int elf_toint(elf_Value v) {
 
 elf_api elf_Object *elf_getthis(elf_State *R);
 
+elf_api elf_tag elf_gettag(elf_State *R, elf_localid x);
 elf_api elf_Value elf_getany(elf_State *R, elf_localid x);
 elf_api elf_int elf_getint(elf_State *R, elf_localid x);
 elf_api elf_num elf_getnum(elf_State *R, elf_localid x);

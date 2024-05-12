@@ -46,9 +46,9 @@ typedef struct elf_Object {
 
 
 #define TAGENUM(NAME) XFUSE(TAG_,NAME),
-typedef enum elf_valtag {
+typedef enum elf_tag {
 	TAGLIST(TAGENUM)
-} elf_valtag;
+} elf_tag;
 #undef TAGENUM
 
 
@@ -60,7 +60,7 @@ elf_globaldecl char const *tag2s[] = {
 
 
 typedef struct elf_Value {
-	elf_valtag tag;
+	elf_tag tag;
 	union {
 		Ptr           p,x_ptr;
 		elf_Handle    h;
