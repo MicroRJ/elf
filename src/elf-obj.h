@@ -31,13 +31,16 @@ typedef enum elf_objty {
 
 
 typedef struct elf_Object {
+	// TODO: REMOVE THIS
 #if defined(_DEBUG)
 	int headtrap;
 #endif
 	elf_objty type;
 	elf_objgc gccolor;
+	// TODO: REMOVE THIS
 	elf_int tell;
 	elf_Table *metatable;
+	// TODO: REMOVE THIS
 #if defined(_DEBUG)
 	int tailtrap;
 #endif

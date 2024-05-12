@@ -1,8 +1,9 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf.c
-** Compiles and runs .elf files
-** using the core runtime.
+** this is the builtin loader
+** that comes elf, and it provides
+** the core runtime library
 */
 
 
