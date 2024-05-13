@@ -314,8 +314,10 @@ int elf_tabidx_(elf_State *R) {
 	elf_ensure(R->call->nx >= 1);
 	elf_Table *tab = (elf_Table *) elf_getthis(R);
 	elf_int len = elf_varlen(tab->array);
-	elf_int idx = elf_getint(R,0) % len;
-	elf_pushany(R,tab->array[idx]);
+	if (len != 0) {
+		elf_int idx = elf_getint(R,0) % len;
+		elf_pushany(R,tab->array[idx]);
+	} else elf_pushnil(R);
 	return 1;
 }
 
