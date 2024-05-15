@@ -6,18 +6,20 @@
 */
 
 
-typedef struct cli_t {
+typedef struct elf_cliopts {
 	char *filename;
-	int dump;
-	int logging;
+	int 	logging;
+	int 	dump;
 	char *dumpfilename;
-} cli_t;
-
-int parsecli(cli_t *cl, int n, char **c);
+} elf_cliopts;
 
 
 
-int parsecli(cli_t *cli, int n, char **c) {
+int elf_loadcliopts(elf_cliopts *cl, int n, char **c);
+
+
+
+int elf_loadcliopts(elf_cliopts *cli, int n, char **c) {
 	int i = 1;
 	int NOP = 0; (void) NOP;
 	#define HAS() (i < n)

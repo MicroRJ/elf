@@ -5,13 +5,15 @@
 */
 
 
+
 /* we have to factor in additional heuristics
 for this, sometimes memory usage isn't what
 boggles the GC, instead is the sheer quantity
 of objects, so that's something we have to
 take into account, and most of the time you
-make small allocations tightly, so that's where
-most of the spikes occur */
+make small allocations tightly, so that's
+where most of the spikes occur, of course this
+allocator is too trivial as of now... */
 #define L_GC_THRESHOLD_MIN (elf_int) MEGABYTES(4)
 #define L_GC_THRESHOLD_MAX (elf_int) MEGABYTES(16)
 

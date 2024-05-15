@@ -14,8 +14,8 @@
 
 int main(int n, char **c) {
 	(void) n;
-	cli_t cli = {0};
-	if (parsecli(&cli,n,c)) return 0;
+	elf_cliopts cli = {0};
+	if (elf_loadcliopts(&cli,n,c)) return 0;
 
 	elf_Module M = {0};
 	elf_State R = {0};

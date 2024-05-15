@@ -185,10 +185,10 @@ elf_api int sys_pwd(int length, char *buffer) {
 
 
 elf_api int sys_setpwd(char *buffer) {
-#if defined(PLATFORM_DESKTOP)
+#if defined(PLATFORM_DESKTOP) && defined(_WIN32)
 	return SetCurrentDirectory(buffer);
 #else
-	return 0;
+	return chdir(buffer);
 #endif
 }
 

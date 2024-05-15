@@ -214,14 +214,14 @@ int elflib_include(elf_State *R) {
 	value and result in erroneous behavior.
 	todo: */
 
-	elf_Table *tab = R->M->globals;
-	for (int i = 0; i < tab->ntotal; ++ i) {
-		elf_tabslot slot = tab->slots[i];
+	elf_Table *globals = R->M->globals;
+	for (int i = 0; i < globals->ntotal; ++ i) {
+		elf_tabslot slot = globals->slots[i];
 		if (slot.k.tag == TAG_STR) {
 			char *sym = elf_insymdir(dir,slot.k.x_str->c);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_newstr(R,sym);
-			elf_tabset(tab,elf_valstr(ref),tab->array[slot.i]);
+			elf_tabset(globals,elf_valstr(ref),globals->array[slot.i]);
 			// elf_logdebug("added %s <- %s",ref->c,slot.k.x_str->c);
 		}
 	}
@@ -402,7 +402,7 @@ int elflib_mydir(elf_State *R) {
 	sys_pwd(sizeof(buf),buf);
 	elf_pushnewstr(R,buf);
 	if (R->call->nx == 1) {
-		sys_setpwd(elf_getstr(R,0)->c);
+		sys_setpwd(elf_getcstr(R,0));
 	}
 	return 1;
 }
@@ -504,7 +504,7 @@ void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
 
 			elf_String *name = elf_pushnewstr(R,entry->d_name);
 			elf_String *path = elf_pushnewstr(R,elf_tpf("%s/%s",dir->c,entry->d_name));
-			llocalid base = elf_pushcls(R,cls);
+			elf_localid base = elf_pushcls(R,cls);
 			elf_Table *file = elf_pushnewtab(R);
 
 			elf_tabsetstrfld(file,enumdir_keyname,name);

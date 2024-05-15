@@ -6,7 +6,7 @@
 
 
 /* todo: can we do this some other way? */
-elf_globaldecl Alloc langM_tlocalalloc = {"default-temp-allocator",elf_deftlsallocfn};
+elf_globaldecl Alloc elf_tlsalloc = {"default-temp-allocator",elf_deftlsallocfn};
 elf_globaldecl Alloc langM_globalalloc = {"default-heap-allocator",elf_defglobalallocfn};
 
 
@@ -49,31 +49,19 @@ void *elf_clearalloc_(Alloc *c, elf_int size, ldebugloc loca) {
 }
 
 
-ALLOCFN(elf_defglobalallocfn) {
-	if (oldAndNewMemory == 0) {
+Error elf_defglobalallocfn(Alloc *allocator, int flags, elf_int oldSize, elf_int newSize, void **io, ldebugloc loca) {
+	if (io == 0) {
 		return Error_InvalidArguments;
 	}
 	if (newSize == 0) {
-#if defined(_MSC_VER)
-		_aligned_free(*oldAndNewMemory);
-#else
-		free(*oldAndNewMemory);
-#endif
+		free(*io);
 	} else {
-		if (*oldAndNewMemory == 0) {
-#if defined(_MSC_VER)
-			*oldAndNewMemory = _aligned_malloc(newSize,0x10);
-#else
-			*oldAndNewMemory = malloc(newSize);
-#endif
+		if (*io == 0) {
+			*io = stb_leakcheck_malloc(newSize,loca.fileName,loca.lineNumber);
 		} else {
-#if defined(_MSC_VER)
-			*oldAndNewMemory = _aligned_realloc(*oldAndNewMemory,newSize,0x10);
-#else
-			*oldAndNewMemory = realloc(*oldAndNewMemory,newSize);
-#endif
+			*io = stb_leakcheck_realloc(*io,newSize,loca.fileName,loca.lineNumber);
 		}
-		if (*oldAndNewMemory == 0) {
+		if (*io == 0) {
 			elf_debugger("fatal error: out of memory");
 			return Error_OutOfMemory;
 		}
@@ -82,15 +70,15 @@ ALLOCFN(elf_defglobalallocfn) {
 }
 
 
-ALLOCFN(elf_deftlsallocfn) {
-	if (oldAndNewMemory == 0) {
+Error elf_deftlsallocfn(Alloc *allocator, int flags, elf_int oldSize, elf_int newSize, void **io, ldebugloc loca) {
+	if (io == 0) {
 		return Error_InvalidArguments;
 	}
 	if (newSize == 0) {
 		return Error_InvalidArguments;
 	} else {
 		/* reallocation is not permitted */
-		if (*oldAndNewMemory != 0) {
+		if (*io != 0) {
 			return Error_InvalidArguments;
 		}
 
@@ -107,7 +95,7 @@ ALLOCFN(elf_deftlsallocfn) {
 			cursor = memory;
 		}
 
-		*oldAndNewMemory = cursor;
+		*io = cursor;
 		cursor += newSize;
 	}
 	return Error_None;

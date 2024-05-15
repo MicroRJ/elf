@@ -13,6 +13,30 @@
 #endif
 
 
+#ifndef STB_SPRINTF_IMPLEMENTATION
+#define STB_SPRINTF_IMPLEMENTATION
+	#include "stb/stb_sprintf.h"
+#endif
+#ifndef STB_LEAKCHECK_IMPLEMENTATION
+#define STB_LEAKCHECK_IMPLEMENTATION
+	#include "stb/stb_leakcheck.h"
+#endif
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <math.h>
+#include <string.h>
+
+
+/* em knows where this is at */
+#if defined(PLATFORM_WEB)
+#include <emscripten.h>
+#include <unistd.h>
+#endif
+
+
 #if defined(_MSC_VER)
 # if !defined(ELF_KEEPWARNINGS)
 #  pragma warning(push)
@@ -58,31 +82,6 @@ at the same time when using clang-cl */
 
 
 #define elf_globaldecl static
-
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <math.h>
-#include <string.h>
-
-
-#if defined(_MSC_VER)
-#include <crtdbg.h>
-#endif
-
-
-/* em knows where this is at */
-#if defined(PLATFORM_WEB)
-#include <emscripten.h>
-#include <unistd.h>
-#endif
-
-
-#ifndef STB_SPRINTF_IMPLEMENTATION
-#define STB_SPRINTF_IMPLEMENTATION
-	#include "stb/stb_sprintf.h"
-#endif
 
 
 /* ... */
