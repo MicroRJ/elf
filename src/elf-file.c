@@ -5,6 +5,10 @@
 */
 
 
+// TODO: PENDING BUG
+// var = foo(var,1,2)
+// ^^^^^^^^^^^^^^^^^^
+
 
 elf_bool elf_fscheckexpr(elf_FileState *fs, elf_lineid line, elf_nodeid id) {
 	if (id != NO_NODE) return lfalse;
