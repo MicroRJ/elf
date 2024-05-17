@@ -361,7 +361,7 @@ void langL_localload(elf_FileState *fs, elf_lineid line, elf_bool reload, elf_lo
 			if (y == 0) goto leave;
 			langL_byte(fs,line,BC_LOADTHIS,x);
 		} break;
-		case NODE_CACHE: {
+		case NODE_CLSVAL: {
 			if (y == 0) goto leave;
 			elf_emitbytexy(fs,line,BC_LOADCACHED,x,v.x);
 		} break;
@@ -554,7 +554,7 @@ void langL_moveto(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y
 			elf_localid yy = langL_localize(fs,line,y);
 			elf_emitbytexy(fs,line,BC_SETGLOBAL,v.x,yy);
 		} break;
-		case NODE_CACHE: {
+		case NODE_CLSVAL: {
 			elf_filediag(fs,line,"assignment to cache value is not supported yet");
 		} break;
 		case NODE_LOCAL: {

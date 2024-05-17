@@ -9,7 +9,7 @@
 #define  LAST_KEYWORD 28
 
 
-typedef struct ltoken {
+typedef struct elf_token {
 	unsigned char type;
 	elf_lineid line;
 	unsigned int eol: 1;
@@ -18,7 +18,7 @@ typedef struct ltoken {
 		elf_int i;
 		elf_num n;
 	};
-} ltoken;
+} elf_token;
 
 
 typedef enum ltokentype {
@@ -99,7 +99,7 @@ typedef struct ltokenintel {
 } ltokenintel;
 
 
-elf_globaldecl ltokenintel elfX_tokenintel[] = {
+elf_globaldecl ltokenintel elf_tkintel[] = {
 	{"none",                 -2, 0},
 	{"elf",                  -1, 1485326630},
 	{"load",                 -1, 3859241449},

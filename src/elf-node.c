@@ -96,8 +96,8 @@ elf_nodeid elf_nodenil(elf_FileState *fs, elf_lineid line) {
 }
 
 
-elf_nodeid elf_nodecache(elf_FileState *fs, elf_lineid line, elf_localid x) {
-	return elf_nodeunary(fs,line,NODE_CACHE,NT_ANY,x);
+elf_nodeid elf_nodeclsval(elf_FileState *fs, elf_lineid line, elf_localid x) {
+	return elf_nodeunary(fs,line,NODE_CLSVAL,NT_ANY,x);
 }
 
 

@@ -47,9 +47,8 @@ typedef enum elf_nodeop {
 	how to emit the instruction. */
 	NODE_CLOSURE, NODE_STRING, NODE_TABLE,
 	NODE_INTEGER, NODE_NUMBER, NODE_NIL,
-	/* l-values, represent some address,
-	source is x */
-	NODE_GLOBAL, NODE_LOCAL, NODE_CACHE,
+	// Global, Function and Closure values...
+	NODE_GLOBAL, NODE_LOCAL, NODE_CLSVAL,
 	NODE_THIS,// this
 	NODE_INDEX,// {x}[{x}]
 	NODE_FIELD,// {x}.{x}
@@ -108,8 +107,8 @@ elf_nodeid elf_nodecls(elf_FileState *fs, elf_lineid, elf_nodeid x, elf_nodeid *
 elf_nodeid elf_nodeload(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
 elf_nodeid elf_nodelocal(elf_FileState *fs, elf_lineid line, elf_nodeid i);
-elf_nodeid elf_nodecache(elf_FileState *fs, elf_lineid line, elf_nodeid i);
 elf_nodeid elf_nodeglobal(elf_FileState *fs, elf_lineid line, elf_nodeid i);
+elf_nodeid elf_nodeclsval(elf_FileState *fs, elf_lineid line, elf_nodeid i);
 
 elf_nodeid elf_nodetypeguard(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodety y);
 elf_nodeid elf_nodemetafield(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);

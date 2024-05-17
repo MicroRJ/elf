@@ -52,7 +52,7 @@ void elf_filediag(elf_FileState *fs, char *loc, char const *fmt, ...) {
 ltokentype wordorkeyword(char *name) {
 	/* todo: */
 	for (ltokentype i = FIRST_KEYWORD; i <= LAST_KEYWORD; ++ i) {
-		ltokenintel intel = elfX_tokenintel[i];
+		ltokenintel intel = elf_tkintel[i];
 		if (S_eq(intel.name,name)) {
 			return i;
 		}
@@ -85,15 +85,15 @@ int elf_lexescchr(elf_FileState *file) {
 
 
 /* not the fastest thing out there */
-ltoken elf_lexone(elf_FileState *file) {
+elf_token elf_lexone(elf_FileState *file) {
 
 	/* remove, not needed #todo */
 	elf_globaldecl char buffer[0x100];
 
-	ltoken tk;
+	elf_token tk;
 
 	retry:
-	tk = (ltoken){TK_NONE,file->thischar};
+	tk = (elf_token){TK_NONE,file->thischar};
 
 	/* we could put all of the ascii codes in the switch
 	statement, but that just makes it look incredibly silly  */
@@ -365,6 +365,6 @@ file->lasttk = file->tk;
 file->tk = file->thentk;
 file->thentk = tk;
 
-	// elf_filediag(files,tk.line,"token %s",elfX_tokenintel[tk.type].name);
+	// elf_filediag(files,tk.line,"token %s",elf_tkintel[tk.type].name);
 return file->lasttk;
 }

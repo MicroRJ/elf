@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** token.elf
-** Metaprogram to generate ltoken.h
+** Metaprogram to generate elf_token.h
 */
 
 pf = elf.pf
@@ -149,7 +149,7 @@ fpf(file,"*/\n\n\n")
 fpf(file,"#define FIRST_KEYWORD ", FstKeyword, "\n")
 fpf(file,"#define  LAST_KEYWORD ", LstKeyword, "\n\n\n")
 
-fpf(file,"typedef struct ltoken {\n")
+fpf(file,"typedef struct elf_token {\n")
 fpf(file,"\tunsigned char type;\n")
 fpf(file,"\tllineid line;\n")
 fpf(file,"\tunsigned int eol: 1;\n")
@@ -158,7 +158,7 @@ fpf(file,"\t\tchar *s;\n")
 fpf(file,"\t\telf_int i;\n")
 fpf(file,"\t\telf_num n;\n")
 fpf(file,"\t};\n")
-fpf(file,"} ltoken;\n\n\n")
+fpf(file,"} elf_token;\n\n\n")
 
 
 fpf(file,"typedef enum ltokentype {\n")
@@ -177,7 +177,7 @@ fpf(file,"\tchar prec;\n")
 fpf(file,"\telf_hashint hash;\n")
 fpf(file,"} ltokenintel;\n\n\n")
 
-fpf(file,"elf_globaldecl ltokenintel elfX_tokenintel[] = {\n")
+fpf(file,"elf_globaldecl ltokenintel elf_tkintel[] = {\n")
 
 for i in 0..Tokens:length() ? {
 	let tk = Tokens:idx(i)

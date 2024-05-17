@@ -6,14 +6,6 @@
 
 
 
-
-int testlib___of(elf_State *R) {
-	elf_getobj(R,1)->metatable = elf_gettab(R,0);
-	elf_pushany(R,elf_getany(R,1));
-	return 1;
-}
-
-
 void sets(elf_State *c, elf_Table *table, char *k) {
 	elf_tabset(table,elf_valstr(elf_newstr(c,k)),* -- c->v);
 }
@@ -144,9 +136,6 @@ char *gccolor2s(elf_objgc c) {
 
 void tstlib_load(elf_State *rt) {
 	elf_Module *md = rt->md;
-	/* todo: ugly */
-	lang_addglobal(md,elf_pushnewstr(rt,"__of"),elf_valbid(testlib___of));
-
 	lang_addglobal(md,elf_pushnewstr(rt,"__gc"),elf_valbid(testlib_gc));
 	lang_addglobal(md,elf_pushnewstr(rt,"__gcpause"),elf_valbid(testlib_gcpause));
 	lang_addglobal(md,elf_pushnewstr(rt,"__gcunpause"),elf_valbid(testlib_gcunpause));

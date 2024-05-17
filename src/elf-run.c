@@ -493,7 +493,8 @@ int elf_run(elf_State *R) {
 	case OPCODE : {\
 		elf_Value xx = locals[b.y];\
 		elf_Value yy = locals[b.z];\
-		if (elf_tagisobj(xx.tag)) {\
+		if (elf_tagisobj(xx.tag) || elf_tagisobj(yy.tag)) {\
+			if (!elf_tagisobj(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first");\
 			elf_String *mfname = FN;\
 			if (!elf_tagisobj(yy.tag)) mfname = FN1;\
 			elf_Value mfield = elf_tabgetfld(xx.x_obj->metatable,mfname);\
@@ -503,9 +504,11 @@ int elf_run(elf_State *R) {
 				if (ny < 1) elf_throw(R,bc,"function must return atleast one value");\
 			} else elf_throw(R,bc,elf_tpf("'%s': overload is %s, not a function",mfname->c,tag2s[mfield.tag]));\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
+			if (!elf_tagisnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			locals[b.x].tag = TAG_NUM;\
 			locals[b.x].x_num = elf_tonum(xx) OP elf_tonum(yy);\
 		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {\
+			if (!elf_tagisnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			locals[b.x].tag = TAG_INT;\
 			locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\
 		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));\

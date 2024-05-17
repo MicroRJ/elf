@@ -5,6 +5,13 @@
 */
 
 
+int elflib_setmetatable(elf_State *R) {
+	elf_getobj(R,0)->metatable = elf_gettab(R,1);
+	elf_pushany(R,elf_getany(R,0));
+	return 1;
+}
+
+
 /* math */
 int elflib_floor(elf_State *R) {
 	elf_pushnum(R,floor(elf_getnum(R,0)));
@@ -553,6 +560,8 @@ elf_api void elflib_load(elf_State *R) {
 	elf_register(R,"elf.debugger",elflib_debugger);
 	elf_register(R,"elf.bytelogging",elflib_bytelogging);
 	elf_register(R,"elf.globalbytelogging",elflib_globalbytelogging);
+
+	elf_register(R,"elf.setmetatable",elflib_setmetatable);
 
 	elf_register(R,"elf.log",elflib_log);
 	elf_register(R,"elf.err",elflib_err);
