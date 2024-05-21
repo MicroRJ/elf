@@ -21,20 +21,20 @@ typedef struct LMSG {
 
 
 
-elf_api int netlib_init(elf_State *R) {
+elf_api int netlib_init(elState *R) {
 	WSADATA data;
 	WSAStartup(MAKEWORD(2,2),&data);
 	return 0;
 }
 
 
-elf_api int netlib_close(elf_State *R) {
+elf_api int netlib_close(elState *R) {
 	WSACleanup();
 	return 0;
 }
 
 
-elf_api int netlib_listen(elf_State *R) {
+elf_api int netlib_listen(elState *R) {
 	SOCKET handle = (SOCKET) elf_getsys(R,0);
 	int error = listen(handle,SOMAXCONN);
 	elf_pushint(R,error!=SOCKET_ERROR);
@@ -42,15 +42,15 @@ elf_api int netlib_listen(elf_State *R) {
 }
 
 
-elf_api int netlib_accept(elf_State *R) {
+elf_api int netlib_accept(elState *R) {
 	SOCKET handle = (SOCKET) elf_getsys(R,0);
 	SOCKET client = accept(handle,NULL,NULL);
-	elf_pushsys(R,(elf_Handle)client);
+	elf_pushsys(R,(elHandle)client);
 	return 1;
 }
 
 
-elf_api int netlib_pollclient(elf_State *R) {
+elf_api int netlib_pollclient(elState *R) {
 	SOCKET handle = (SOCKET) elf_getsys(R,0);
 	fd_set ready;
 	FD_ZERO(&ready);
@@ -60,15 +60,15 @@ elf_api int netlib_pollclient(elf_State *R) {
    if (FD_ISSET(handle,&ready)) {
       SOCKET client = accept(handle,NULL,NULL);
       elf_ensure(client != INVALID_SOCKET);
-		elf_pushsys(R,(elf_Handle)client);
+		elf_pushsys(R,(elHandle)client);
    } else elf_pushnil(R);
 	return 1;
 }
 
 
-elf_api int netlib_tcpserver(elf_State *R) {
-	elf_String *addrnameS = elf_getstr(R,0);
-	elf_String *addrportS = elf_getstr(R,1);
+elf_api int netlib_tcpserver(elState *R) {
+	elString *addrnameS = elf_getstr(R,0);
+	elString *addrportS = elf_getstr(R,1);
 	char *addrname = addrnameS ? addrnameS->c : 0;
 	char *addrport = addrportS ? addrportS->c : 0;
 	ADDRINFOA idealaddr = {0};
@@ -82,16 +82,16 @@ elf_api int netlib_tcpserver(elf_State *R) {
 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 	if(error != SOCKET_ERROR) {
-		elf_pushsys(R,(elf_Handle)thesocket);
+		elf_pushsys(R,(elHandle)thesocket);
 	} else elf_pushnil(R);
 
 	return 1;
 }
 
 
-elf_api int netlib_tcpclient(elf_State *R) {
-	elf_String *addrnameS = elf_getstr(R,0);
-	elf_String *addrportS = elf_getstr(R,1);
+elf_api int netlib_tcpclient(elState *R) {
+	elString *addrnameS = elf_getstr(R,0);
+	elString *addrportS = elf_getstr(R,1);
 	char *addrname = addrnameS ? addrnameS->c : 0;
 	char *addrport = addrportS ? addrportS->c : 0;
 	ADDRINFOA idealaddr = {0};
@@ -106,18 +106,18 @@ elf_api int netlib_tcpclient(elf_State *R) {
 
 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 	if(error != SOCKET_ERROR) {
-		elf_pushsys(R,(elf_Handle)thesocket);
+		elf_pushsys(R,(elHandle)thesocket);
 	} else elf_pushnil(R);
 	return 1;
 }
 
 
-elf_api int netlib_send(elf_State *R) {
+elf_api int netlib_send(elState *R) {
 	/* todo: make this a class? */
 	SOCKET socket = (SOCKET) elf_getsys(R,0);
-	elf_String *payload = elf_getstr(R,1);
+	elString *payload = elf_getstr(R,1);
 	LMSG message = { payload->length };
-	elf_int sent = 0;
+	elInteger sent = 0;
 	sent += send(socket,(char*)&message,sizeof(message),0);
 	sent += send(socket,payload->c,payload->length,0);
 	elf_pushint(R,sent);
@@ -125,7 +125,7 @@ elf_api int netlib_send(elf_State *R) {
 }
 
 
-elf_api int netlib_ioctl(elf_State *R) {
+elf_api int netlib_ioctl(elState *R) {
 	SOCKET socket = (SOCKET) elf_getsys(R,0);
 	long mode = 1;
 	int error = ioctlsocket(socket,FIONBIO,&mode);
@@ -134,17 +134,17 @@ elf_api int netlib_ioctl(elf_State *R) {
 }
 
 
-elf_api int netlib_recv(elf_State *R) {
+elf_api int netlib_recv(elState *R) {
 	SOCKET socket = (SOCKET) elf_getsys(R,0);
 	LMSG message = {0};
 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 		if (message.length != 0) {
-			elf_int length = message.length;
-			elf_String *obj = elf_newstrlen(R,length);
+			elInteger length = message.length;
+			elString *obj = elf_newstrlen(R,length);
 			elf_pushstr(R,obj);
 			char *cursor = obj->c;
 			do {
-				elf_int result = recv(socket,cursor,length,0);
+				elInteger result = recv(socket,cursor,length,0);
 				if (result == SOCKET_ERROR) {
 					int error = WSAGetLastError();
 					if (error == WSAEWOULDBLOCK) {
@@ -170,21 +170,21 @@ elf_api int netlib_recv(elf_State *R) {
 	return 1;
 }
 #else
-elf_api int netlib_init(elf_State *R) { return 0; };
-elf_api int netlib_close(elf_State *R) { return 0; };
-elf_api int netlib_listen(elf_State *R) { return 0; };
-elf_api int netlib_accept(elf_State *R) { return 0; };
-elf_api int netlib_pollclient(elf_State *R) { return 0; };
-elf_api int netlib_tcpserver(elf_State *R) { return 0; };
-elf_api int netlib_tcpclient(elf_State *R) { return 0; };
-elf_api int netlib_send(elf_State *R) { return 0; };
-elf_api int netlib_ioctl(elf_State *R) { return 0; };
-elf_api int netlib_recv(elf_State *R) { return 0; };
+elf_api int netlib_init(elState *R) { return 0; };
+elf_api int netlib_close(elState *R) { return 0; };
+elf_api int netlib_listen(elState *R) { return 0; };
+elf_api int netlib_accept(elState *R) { return 0; };
+elf_api int netlib_pollclient(elState *R) { return 0; };
+elf_api int netlib_tcpserver(elState *R) { return 0; };
+elf_api int netlib_tcpclient(elState *R) { return 0; };
+elf_api int netlib_send(elState *R) { return 0; };
+elf_api int netlib_ioctl(elState *R) { return 0; };
+elf_api int netlib_recv(elState *R) { return 0; };
 #endif
 
 
-elf_api void netlib_load(elf_State *R) {
-	elf_Module *md = R->md;
+elf_api void netlib_load(elState *R) {
+	elModule *md = R->md;
 	lang_addglobal(md,elf_pushnewstr(R,"listen"),elf_valbid(netlib_listen));
 	lang_addglobal(md,elf_pushnewstr(R,"accept"),elf_valbid(netlib_accept));
 	lang_addglobal(md,elf_pushnewstr(R,"pollclient"),elf_valbid(netlib_pollclient));

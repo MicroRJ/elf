@@ -7,32 +7,32 @@
 
 
 
-elf_bool elf_chriseol(char x) {
+elBool elf_chriseol(char x) {
 	return x == '\r' || x == '\n' || x == '\0';
 }
 
 
-elf_bool elf_chrisdigit(char x) {
+elBool elf_chrisdigit(char x) {
 	return x >= '0' && x <= '9';
 }
 
 
-elf_bool elf_chrislowercase(char x) {
+elBool elf_chrislowercase(char x) {
 	return x >= 'a' && x <= 'z';
 }
 
 
-elf_bool elf_chrisuppercase(char x) {
+elBool elf_chrisuppercase(char x) {
 	return x >= 'A' && x <= 'Z';
 }
 
 
-elf_bool elf_chrisletter(char x) {
+elBool elf_chrisletter(char x) {
 	return elf_chrisuppercase(x) || elf_chrislowercase(x);
 }
 
 
-elf_bool elf_chrisalphanum(char x) {
+elBool elf_chrisalphanum(char x) {
 	return elf_chrisletter(x) || elf_chrisdigit(x) || (x) == '_';
 }
 
@@ -55,7 +55,7 @@ char elf_chrtouppercase(char x) {
 
 int elf_cstrlen(char const *s) {
 	int n = 0;
-	if (s != lnil) {
+	if (s != elNIL) {
 		while (*s ++ != 0) {
 			n += 1;
 		}
@@ -65,7 +65,7 @@ int elf_cstrlen(char const *s) {
 
 
 
-elf_bool elf_cstrhasprefix(char *str, char *prefix) {
+elBool elf_cstrhasprefix(char *str, char *prefix) {
 	if (prefix == 0 || *prefix == 0 || *str == 0 || *str == 0) {
 		return lfalse;
 	}
@@ -78,7 +78,7 @@ elf_bool elf_cstrhasprefix(char *str, char *prefix) {
 }
 
 
-elf_bool S_eql(char const *x, char const *y, int n) {
+elBool S_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
 			return lfalse;
@@ -88,7 +88,7 @@ elf_bool S_eql(char const *x, char const *y, int n) {
 }
 
 
-elf_bool S_eq(char const *x, char const *y) {
+elBool S_eq(char const *x, char const *y) {
 	int lx = elf_cstrlen(x);
 	int ly = elf_cstrlen(y);
 	return (lx == ly) && S_eql(x,y,lx);
@@ -136,13 +136,14 @@ char *S_tpf_(char const *format, ...) {
 
 /*
 ** Simple pattern matcher utility.
-** Pattern, elf_String
+** Pattern, elString
 */
-elf_bool elf_cstrmatchsingle(char *p, char *s);
+elBool elf_cstrmatchsingle(char *p, char *s);
 
 
-/* todo: support for () */
-elf_bool elf_cstrmatch(char *p, char *s) {
+/* todo: support for ()
+todo: this has a flaw!! */
+elBool elf_cstrmatch(char *p, char *s) {
 	char *b = s;
 	while (!elf_cstrmatchsingle(p,s)) {
 		while (*p != 0 && *p != '|') ++p;
@@ -153,7 +154,7 @@ elf_bool elf_cstrmatch(char *p, char *s) {
 }
 
 
-elf_bool elf_cstrmatchsingle(char *p, char *s) {
+elBool elf_cstrmatchsingle(char *p, char *s) {
 	while (*p != 0 && *p != '|') {
 		if (*p == '?') {
 			/* matches any character except terminator. */

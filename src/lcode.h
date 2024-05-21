@@ -11,9 +11,14 @@
 #define NO_LINE (-0)
 
 
-typedef struct FileBlock {
-	elf_byteid j,e;
-} FileBlock;
+#define BLOCK_LOOP 0x01
+
+/* added when a break, leave or continue
+statement is found */
+#define BLOCK_ENDED  0x02
+
+/* added when a piece of block is delayed */
+#define BLOCK_DELAYED 0x04
 
 
 typedef struct elf_fileloop {
@@ -30,11 +35,12 @@ typedef struct elf_fileloop {
 typedef struct elf_fileblock elf_fileblock;
 typedef struct elf_fileblock {
 	elf_fileblock *enclosing;
-	elf_bool flags;
+	elBool flags;
 	int level;
 	int xmemory;
 	int xentity;
 	elf_byteid entry;
+	elf_byteid jumpover;
 	elf_byteid *leavejumps;
 	elf_fileloop loop;
 } elf_fileblock;
@@ -61,19 +67,19 @@ typedef struct Select {
 } Select;
 
 
-void langL_moveto(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
-void langL_localload(elf_FileState *fs, elf_lineid line, elf_bool reload, elf_localid x, elf_localid y, elf_nodeid id);
-elf_localid langL_localize(elf_FileState *fs, elf_lineid line, elf_nodeid id);
+void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_localid x, elf_localid y, elf_nodeid id);
+elf_localid langL_localize(elFileState *fs, elf_lineid line, elf_nodeid id);
 
 
-void langL_begindelayedblock(elf_FileState *fs, elf_lineid line, FileBlock *bl);
-void langL_closedelayedblock(elf_FileState *fs, elf_lineid line, FileBlock *bl);
+void elf_enterlastlyblock(elFileState *fs, elf_lineid line, elf_fileblock *bl);
+void elf_closelastlyblock(elFileState *fs, elf_lineid line, elf_fileblock *bl);
 
 
-elf_byteid langL_branchiffalse(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
-elf_byteid langL_branchiftrue(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
-elf_byteid *langL_jumpiftrue(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
-elf_byteid *langL_jumpiffalse(elf_FileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid langL_branchiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid *langL_jumpiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid *langL_jumpiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
 
 
 enum {
@@ -82,22 +88,22 @@ enum {
 };
 
 
-void langL_beginif(elf_FileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z);
-void langL_addelif(elf_FileState *fs, elf_lineid line, Select *s, elf_nodeid x);
-void langL_addelse(elf_FileState *fs, elf_lineid line, Select *s);
-void langL_addthen(elf_FileState *fs, elf_lineid line, Select *s);
-void langL_closeif(elf_FileState *fs, elf_lineid line, Select *s);
+void langL_beginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z);
+void langL_addelif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x);
+void langL_addelse(elFileState *fs, elf_lineid line, Select *s);
+void langL_addthen(elFileState *fs, elf_lineid line, Select *s);
+void langL_closeif(elFileState *fs, elf_lineid line, Select *s);
 
 
-void elf_beginrangedloop(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid lo, elf_nodeid hi);
-void elf_closerangedloop(elf_FileState *fs, elf_lineid line);
+void elf_beginrangedloop(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid lo, elf_nodeid hi);
+void elf_closerangedloop(elFileState *fs, elf_lineid line);
 
-void langL_begindowhile(elf_FileState *fs, elf_lineid line);
-void langL_closedowhile(elf_FileState *fs, elf_lineid line, elf_nodeid x);
+void langL_begindowhile(elFileState *fs, elf_lineid line);
+void langL_closedowhile(elFileState *fs, elf_lineid line, elf_nodeid x);
 
-void langL_beginwhile(elf_FileState *fs, elf_lineid line, elf_nodeid x);
-void langL_closewhile(elf_FileState *fs, elf_lineid line);
+void langL_beginwhile(elFileState *fs, elf_lineid line, elf_nodeid x);
+void langL_closewhile(elFileState *fs, elf_lineid line);
 
 
-void elf_enterblock(elf_FileState *fs, elf_fileblock *bl, elf_bool flags);
-void elf_leaveblock(elf_FileState *fs);
+void elf_enterblock(elFileState *fs, elf_fileblock *bl, elBool flags);
+void elf_leaveblock(elFileState *fs);

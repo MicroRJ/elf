@@ -28,7 +28,7 @@ int elf_loadcliopts(elf_cliopts *cli, int n, char **c) {
 	#define GETOP(N) (ISOP(N) ? NEXT() : NOP)
 	#define ISARG() (strncmp(c[i],"--",2))
 	#define GETARG(E) (ISARG() ? c[NEXT()] : E)
-	#define FAIL(S) (printf("error: "S),lnil)
+	#define FAIL(S) (printf("error: "S),elNIL)
 	#define SETFIELD(N,V) (cli->N = V)
 
 

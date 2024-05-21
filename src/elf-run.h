@@ -23,17 +23,17 @@ typedef struct elf_CallFrame {
 	/* the closure this call frame belongs to */
 	elf_Closure *cl;
 	/* the object for meta fields, meta calls and the likes */
-	elf_Object *obj;
+	elObject *obj;
 	/* pointer to base stack address, the callee should
 	yield starting at base[-1], should have base[-1..y)
 	registers to write to. */
 	union {
-		elf_Value *base,*l,*locals;
+		elValue *base,*l,*locals;
 	};
 	/* todo: rename top to regress */
-	elf_Value *top;
+	elValue *top;
 	/* next instruction index */
-	elf_int j;
+	elInteger j;
 	elf_localid rx,ry;
 	/* x and y names are deprecated */
 	/* -- The number of inputs (nx) and
@@ -52,62 +52,62 @@ typedef struct elf_CallFrame {
 	on return, 'finally' statements produce
 	these. */
 	elf_delaylist *dl;
-	elf_bool logging;
+	elBool logging;
 } elf_CallFrame;
 
 
 typedef struct elf_Runtime {
-	union { elf_Module *M, *md; };
+	union { elModule *M, *md; };
 	/* these should be safe to access
 	multi-threaded */
-	elf_Table *metatab_str;
-	elf_Table *metatab_tab;
+	elTable *metatab_str;
+	elTable *metatab_tab;
 	struct {
-		elf_String *__add,*__sub,*__mul,*__div;
-		elf_String *__add1,*__sub1,*__mul1,*__div1;
-		elf_String *__getfield,*__setfield;
+		elString *__add,*__sub,*__mul,*__div;
+		elString *__add1,*__sub1,*__mul1,*__div1;
+		elString *__getfield,*__setfield;
 	} cache;
 } elf_Runtime;
 
 
 /* todo: implement */
 typedef struct lThread {
-	union { elf_State *R, *rt; };
-	union { elf_Module  *M, *md; };
+	union { elState *R, *rt; };
+	union { elModule  *M, *md; };
 	union { elf_CallFrame *call; };
-	union { elf_Value *stk;      };
+	union { elValue *stk;      };
 	elf_localid stklen;
-	elf_int threadid;
+	elInteger threadid;
 	elf_byteid  curbyte;
 } lThread;
 
 
-typedef struct elf_State {
-	union { elf_Module *M, *md; };
-	union { elf_Value *stk,*s; };
+typedef struct elState {
+	union { elModule *M, *md; };
+	union { elValue *stk,*s; };
 	elf_localid stklen;
-	union { elf_Value *top,*v; };
+	union { elValue *top,*v; };
 	union { elf_CallFrame *call,*frame,*f; };
-	elf_bool debuggerflag;
-	elf_Table *metatab_str;
-	elf_Table *metatab_tab;
+	elBool debuggerflag;
+	elTable *metatab_str;
+	elTable *metatab_tab;
 	struct {
-		elf_String *x,*y,*z,*w;
-		elf_String *width,*height;
-		elf_String *__add,*__sub,*__mul,*__div;
-		elf_String *__add1,*__sub1,*__mul1,*__div1;
-		elf_String *__getfield,*__setfield;
+		elString *x,*y,*z,*w;
+		elString *width,*height;
+		elString *__add,*__sub,*__mul,*__div;
+		elString *__add1,*__sub1,*__mul1,*__div1;
+		elString *__getfield,*__setfield;
 	} cache;
 	elf_Bytecode *bytetrace;
-	elf_bool bytetracing;
-	elf_bool bytetracking;
+	elBool bytetracing;
+	elBool bytetracking;
 	/* current byte and whether bytelogging is on */
 	elf_byteid byte;
-	elf_bool bytelogging;
-	elf_Object **gc;
-	elf_bool     gcflags;
-	elf_int      gcmemory;
-	elf_int      gcthreshold;
-} elf_State;
+	elBool bytelogging;
+	elObject **gc;
+	elBool     gcflags;
+	elInteger      gcmemory;
+	elInteger      gcthreshold;
+} elState;
 
 

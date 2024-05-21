@@ -6,7 +6,7 @@
 
 
 
-void elf_filediag(elf_FileState *fs, char *loc, char const *fmt, ...) {
+void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_getlinelocinfo(fs->contents,loc,&linenum,&lineloc);
@@ -42,7 +42,7 @@ void elf_filediag(elf_FileState *fs, char *loc, char const *fmt, ...) {
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli]: %s\n",fs->filename,linenum,(elf_int)(1+loc-lineloc),b);
+		printf("%s [%i:%lli]: %s\n",fs->filename,linenum,(elInteger)(1+loc-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -68,7 +68,7 @@ ltokentype wordorkeyword(char *name) {
 #define elf_cmovchr(xx) ((elf_thischr() == (xx)) ? elf_movechr(), 1 : 0)
 
 
-int elf_lexescchr(elf_FileState *file) {
+int elf_lexescchr(elFileState *file) {
 	int tk = elf_movechr();
 	if (tk != '\\') return tk;
 
@@ -85,7 +85,7 @@ int elf_lexescchr(elf_FileState *file) {
 
 
 /* not the fastest thing out there */
-elf_token elf_lexone(elf_FileState *file) {
+elf_token elf_lexone(elFileState *file) {
 
 	/* remove, not needed #todo */
 	elf_globaldecl char buffer[0x100];
@@ -121,7 +121,7 @@ elf_token elf_lexone(elf_FileState *file) {
 		case '5':case '6':case '7':case '8':case '9': {
 			tk.type = TK_INTEGER;
 
-			elf_int base = 10;
+			elInteger base = 10;
 			if (elf_thischr() == '0') {
 				if (elf_thenchr() == 'x') {
 					elf_movxchr(2);
@@ -129,7 +129,7 @@ elf_token elf_lexone(elf_FileState *file) {
 				}
 			}
 
-			elf_int i = 0;
+			elInteger i = 0;
 			if (base == 10) {
 				do {
 					i = i * 10 + (elf_movechr() - '0');
@@ -153,8 +153,8 @@ elf_token elf_lexone(elf_FileState *file) {
 					elf_movechr();
 					tk.type = TK_NUMBER;
 
-					elf_num p = 1;
-					elf_num n = 0;
+					elNumber p = 1;
+					elNumber n = 0;
 					if (elf_chrisdigit(elf_thischr())) {
 						do  {
 							n = n * 10 + (elf_movechr() - '0');
@@ -203,8 +203,8 @@ elf_token elf_lexone(elf_FileState *file) {
 			} else
 			if (elf_chrisdigit(elf_thischr())) {
 				tk.type = TK_NUMBER;
-				elf_num n = 0;
-				elf_num p = 1;
+				elNumber n = 0;
+				elNumber p = 1;
 				do {
 					n = n * 10 + (elf_movechr() - '0');
 					p *= 10;

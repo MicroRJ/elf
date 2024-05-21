@@ -62,7 +62,7 @@ I want to use instead! */
 
 
 
-elf_api elf_bool sys_debugger() {
+elf_api elBool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
 	DebugBreak();
 		return 1;
@@ -113,16 +113,16 @@ elf_api void sys_geterrormsg(int error, char *buf, int len) {
 }
 
 
-elf_api void *sys_valloc(elf_int length) {
+elf_api void *sys_valloc(elInteger length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
-	return lnil;
+	return elNIL;
 #endif
 }
 
 
-elf_api void sys_sleep(elf_int ms) {
+elf_api void sys_sleep(elInteger ms) {
 #if defined(PLATFORMPLATFORM_WIN32)
 	Sleep((DWORD) ms);
 #elif defined(PLATFORM_WEB)
@@ -131,7 +131,7 @@ elf_api void sys_sleep(elf_int ms) {
 }
 
 
-elf_api elf_int sys_clockhz() {
+elf_api elInteger sys_clockhz() {
 #if defined(PLATFORM_WEB)
 	return 1000;
 #elif defined(PLATFORM_DESKTOP)
@@ -144,7 +144,7 @@ elf_api elf_int sys_clockhz() {
 }
 
 
-elf_api elf_int sys_clocktime() {
+elf_api elInteger sys_clocktime() {
 #if defined(PLATFORM_DESKTOP)
 	LARGE_INTEGER largeInt;
 	QueryPerformanceCounter(&largeInt);
@@ -193,30 +193,30 @@ elf_api int sys_setpwd(char *buffer) {
 }
 
 
-elf_api elf_Handle sys_loadlib(char const *name) {
+elf_api elHandle sys_loadlib(char const *name) {
 #if defined(PLATFORM_DESKTOP)
-	return (elf_Handle) LoadLibraryA(name);
+	return (elHandle) LoadLibraryA(name);
 #elif defined(PLATFORM_WEB)
 	#if 0
 	em_promise_t promise = emscripten_dlopen_promise(name,RTLD_LAZY);
 	em_settled_result_t result = emscripten_promise_await(promise);
 	emscripten_promise_destroy(promise);
-	return (elf_Handle) result.value;
+	return (elHandle) result.value;
 	#endif
 	return 0;
 #else
 	void *handle = dlopen(name,RTLD_LAZY);
-	if (handle == lnil) {
+	if (handle == elNIL) {
 		sys_consolelog(ELF_LOGERROR,"the following is a system error:");
 		sys_consolelog(ELF_LOGERROR,dlerror());
 		sys_consolelog(ELF_LOGERROR,"end");
 	}
-	return (elf_Handle) handle;
+	return (elHandle) handle;
 #endif
 }
 
 
-elf_api void *sys_libfn(elf_Handle dll, char const *name) {
+elf_api void *sys_libfn(elHandle dll, char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (void *) GetProcAddress(dll,name);
 #else
@@ -229,16 +229,16 @@ elf_api Error sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
 
 	Error error = Error_None;
 
-	if (name == lnil) {
+	if (name == elNIL) {
 		error = Error_FileNameIsInvalid;
 		goto leave;
 	}
-	if (data == lnil) {
+	if (data == elNIL) {
 		error = Error_InvalidArguments;
 		goto leave;
 	}
 
-	*data = lnil;
+	*data = elNIL;
 #if defined(PLATFORM_DESKTOP)
 	HANDLE hfile = CreateFileA(name,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
 	if (hfile != INVALID_HANDLE_VALUE) {
@@ -268,7 +268,7 @@ elf_api Error sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
 	}
 #else
 	FILE *file = fopen(name,"rb");
-	if (file == lnil) {
+	if (file == elNIL) {
 		error = Error_FileNotFound;
 		goto leave;
 	}
@@ -292,7 +292,7 @@ elf_api Error sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
 }
 
 
-elf_api Error sys_savefilebytes(char const *buffer, elf_int length, char const *fileName) {
+elf_api Error sys_savefilebytes(char const *buffer, elInteger length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");
@@ -300,12 +300,12 @@ elf_api Error sys_savefilebytes(char const *buffer, elf_int length, char const *
 	file = fopen(fileName,"wb");
 #endif
 
-	if (file == lnil) {
+	if (file == elNIL) {
 		return Error_CouldNotOpenFile;
 	}
 
 	Error error = Error_None;
-	elf_int lengthWritten = fwrite(buffer, 1, length, file);
+	elInteger lengthWritten = fwrite(buffer, 1, length, file);
 
 	if (lengthWritten != length) {
 		error = Error_CouldNotWriteEntireFile;

@@ -5,11 +5,12 @@
 */
 
 
-
-typedef long long int elf_int;
-typedef signed int elf_bool;
-typedef double elf_num;
-
+typedef long long int elInteger;
+typedef signed int elBool;
+typedef double elNumber;
+typedef void *elHandle;
+typedef void *elAddr;
+typedef int (* elBinding)(elState *);
 
 
 typedef unsigned int elf_hashint;
@@ -20,28 +21,19 @@ typedef int elf_globalid;
 typedef char *elf_lineid;
 
 
-typedef char lchar;
-typedef void *Ptr;
-typedef void *elf_Handle;
-
-
-typedef int (* lBinding)(elf_State *);
-// typedef int (* lJITFunc)(int);
-
 /*
 ** Function Prototype
 */
-typedef struct elf_Proto {
-	/* xin, yield */
+typedef struct elProto {
+	/* x-in, y-yield */
 	short x,y;
-	/* number of cached values */
 	short ncaches;
 	/* stack size required allocated by runtime
 	at call time. */
 	short nlocals;
 	int nbytes;
 	int bytes;
-} elf_Proto;
+} elProto;
 
 
 

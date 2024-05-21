@@ -8,22 +8,22 @@
 void elf_debugger(char *message);
 
 
-void elf_register(elf_State *R, char *name, lBinding fn);
-void elf_registerint(elf_State *R, char *name, elf_int val);
+void elf_register(elState *R, char *name, elBinding fn);
+void elf_registerint(elState *R, char *name, elInteger val);
 
 
-elf_int elf_clocktime();
-elf_num elf_timediffs(elf_int begin);
+elInteger elf_clocktime();
+elNumber elf_timediffs(elInteger begin);
 
 
-void elf_throw(elf_State *R, elf_byteid id, char *error);
+void elf_throw(elState *R, elf_byteid id, char *error);
 
 
-int elf_fndfilebybyte(elf_Module *md, elf_byteid line);
+int elf_fndfilebybyte(elModule *md, elf_byteid line);
 void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc);
 
 
-void elf_tabmfld(elf_State *R, elf_Table *obj, char *name, lBinding b);
+void elf_tabmfld(elState *R, elTable *obj, char *name, elBinding b);
 
 
 

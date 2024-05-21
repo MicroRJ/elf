@@ -5,10 +5,10 @@
 */
 
 
-elf_api elf_Closure *elf_newcls(elf_State *rt, elf_Proto fn) {
+elf_api elf_Closure *elf_newcls(elState *rt, elProto fn) {
 	elf_ensure(fn.ncaches >= 0);
 
-	elf_int length = sizeof(elf_Closure) + sizeof(elf_Value) * (fn.ncaches-1);
+	elInteger length = sizeof(elf_Closure) + sizeof(elValue) * (fn.ncaches-1);
 
 	elf_Closure *cl = elf_newobj(rt,OBJ_CLOSURE,length);
 	cl->fn = fn;

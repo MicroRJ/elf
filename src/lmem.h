@@ -16,7 +16,7 @@ typedef struct Alloc Alloc;
 
 
 
-typedef Error (* elf_AllocFn)(Alloc *allocator, int flags, elf_int oldSize, elf_int newSize, void **oldAndNewMemory, ldebugloc loca);
+typedef Error (* elf_AllocFn)(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca);
 
 
 typedef struct Alloc {
@@ -32,21 +32,21 @@ typedef struct MemBlock {
 	MemBlock *then;
 	ldebugloc loca;
 	ldebugloc freeloca;
-	elf_int contentssize;
+	elInteger contentssize;
 	unsigned int foottrap;
 } MemBlock;
 #endif
 
 
 void langM_debugdealloc(void *mem, ldebugloc loca);
-void *langM_debugrealloc(void *mem, elf_int contentssize, ldebugloc loca);
-void *langM_debugalloc(elf_int contentssize, ldebugloc loca);
+void *langM_debugrealloc(void *mem, elInteger contentssize, ldebugloc loca);
+void *langM_debugalloc(elInteger contentssize, ldebugloc loca);
 
 
 elf_api void elf_dealloc_(Alloc *allocator, void const *memory, ldebugloc loca);
-elf_api void *elf_realloc_(Alloc *allocator, elf_int size, void *memory, ldebugloc loca);
-elf_api void *elf_alloc_(Alloc *allocator, elf_int size, ldebugloc loca);
-elf_api void *elf_clearalloc_(Alloc *allocator, elf_int size, ldebugloc loca);
+elf_api void *elf_realloc_(Alloc *allocator, elInteger size, void *memory, ldebugloc loca);
+elf_api void *elf_alloc_(Alloc *allocator, elInteger size, ldebugloc loca);
+elf_api void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
 
 
 #define elf_delmem(cator,mem) elf_dealloc_(cator,mem,LHERE)
@@ -55,7 +55,7 @@ elf_api void *elf_clearalloc_(Alloc *allocator, elf_int size, ldebugloc loca);
 #define elf_clearalloc(cator,sze) elf_clearalloc_(cator,sze,LHERE)
 
 
-#define ALLOCFN(NAME) Error NAME (Alloc *allocator, int flags, elf_int oldSize, elf_int newSize, void **oldAndNewMemory, ldebugloc loca)
+#define ALLOCFN(NAME) Error NAME (Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca)
 elf_api ALLOCFN(elf_deftlsallocfn);
 elf_api ALLOCFN(elf_defglobalallocfn);
 

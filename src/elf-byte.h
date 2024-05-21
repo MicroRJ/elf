@@ -78,7 +78,7 @@ though it would help performance quite a bit... */
 typedef struct elf_Bytecode {
 	lbyteop k;
 	union {
-		elf_int  i;
+		elInteger  i;
 		struct {
 			int x,y,z;
 		};

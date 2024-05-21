@@ -15,8 +15,8 @@
 #endif
 
 
-int crtlib__chdir(elf_State *rt) {
-	elf_String *name = elf_getstr(rt,0);
+int crtlib__chdir(elState *rt) {
+	elString *name = elf_getstr(rt,0);
 #if defined(PLATFORM_WEB)
 	elf_pushint(rt,chdir(name->c));
 #else
@@ -28,31 +28,31 @@ int crtlib__chdir(elf_State *rt) {
 
 #if defined(_MSC_VER)
 
-int crtlib__getch(elf_State *rt) {
+int crtlib__getch(elState *rt) {
 	elf_pushint(rt,_getch());
 	return 1;
 }
 
 
-int crtlib__getpid(elf_State *rt) {
+int crtlib__getpid(elState *rt) {
 	elf_pushint(rt,_getpid());
 	return 1;
 }
 
 
-int crtlib_time(elf_State *rt) {
+int crtlib_time(elState *rt) {
 	elf_pushint(rt,time(0));
 	return 1;
 }
 
 
-int crtlib_clock(elf_State *rt) {
+int crtlib_clock(elState *rt) {
 	elf_pushint(rt,clock());
 	return 1;
 }
 
 
-int crtlib__strdate(elf_State *rt) {
+int crtlib__strdate(elState *rt) {
 	char buf[128];
 	_strdate_s(buf,sizeof(buf));
 	elf_pushnewstr(rt,buf);
@@ -60,7 +60,7 @@ int crtlib__strdate(elf_State *rt) {
 }
 
 
-int crtlib__strtime(elf_State *rt) {
+int crtlib__strtime(elState *rt) {
 	char buf[128];
 	_strtime_s(buf,sizeof(buf));
 	elf_pushnewstr(rt,buf);
@@ -68,73 +68,73 @@ int crtlib__strtime(elf_State *rt) {
 }
 
 
-int crtlib__unlink(elf_State *rt) {
-	elf_String *name = elf_getstr(rt,0);
+int crtlib__unlink(elState *rt) {
+	elString *name = elf_getstr(rt,0);
 	elf_pushint(rt,_unlink(name->c));
 	return 1;
 }
 
 
-int crtlib__unlock_file(elf_State *rt) {
-	elf_Handle file = elf_getsys(rt,0);
+int crtlib__unlock_file(elState *rt) {
+	elHandle file = elf_getsys(rt,0);
 	_unlock_file(file);
 	return 0;
 }
 
 
-int crtlib__write(elf_State *rt) {
-	elf_Handle file = elf_getsys(rt,0);
-	elf_String *buf = elf_getstr(rt,1);
-	elf_pushint(rt,_write((elf_int)file,buf->c,buf->length));
+int crtlib__write(elState *rt) {
+	elHandle file = elf_getsys(rt,0);
+	elString *buf = elf_getstr(rt,1);
+	elf_pushint(rt,_write((elInteger)file,buf->c,buf->length));
 	return 1;
 }
 
 
-int crtlib__close(elf_State *rt) {
-	elf_Handle file = elf_getsys(rt,0);
-	elf_pushint(rt,_close((int)(elf_int)file));
+int crtlib__close(elState *rt) {
+	elHandle file = elf_getsys(rt,0);
+	elf_pushint(rt,_close((int)(elInteger)file));
 	return 1;
 }
 
 
-int crtlib__commit(elf_State *rt) {
-	elf_Handle file = elf_getsys(rt,0);
-	elf_pushint(rt,_commit((int)(elf_int)file));
+int crtlib__commit(elState *rt) {
+	elHandle file = elf_getsys(rt,0);
+	elf_pushint(rt,_commit((int)(elInteger)file));
 	return 1;
 }
 
 
-int crtlib__chdrive(elf_State *rt) {
-	elf_int letter = elf_getint(rt,0);
+int crtlib__chdrive(elState *rt) {
+	elInteger letter = elf_getint(rt,0);
 	elf_pushint(rt,_chdrive(letter));
 	return 1;
 }
 
 
-int crtlib__chmode(elf_State *rt) {
-	elf_String *name = elf_getstr(rt,0);
-	elf_int mode = elf_getint(rt,1);
+int crtlib__chmode(elState *rt) {
+	elString *name = elf_getstr(rt,0);
+	elInteger mode = elf_getint(rt,1);
 	elf_pushint(rt,_chmod(name->c,mode));
 	return 1;
 }
 
 
-int crtlib__execl(elf_State *rt) {
-	elf_String *cl = elf_getstr(rt,0);
+int crtlib__execl(elState *rt) {
+	elString *cl = elf_getstr(rt,0);
 	elf_pushint(rt,_execl(cl->c,0,0));
 	return 1;
 }
 
 
-int crtlib_system(elf_State *rt) {
-	elf_String *cl = elf_getstr(rt,0);
+int crtlib_system(elState *rt) {
+	elString *cl = elf_getstr(rt,0);
 	elf_pushint(rt,system(cl->c));
 	return 1;
 }
 #else
 
 #define DEFSTUB(NAME) \
-int NAME(elf_State *R) {\
+int NAME(elState *R) {\
 	elf_logerror(XSTRINGIFY(NAME)"(): not implemented for this platform");\
 	return 0;\
 }
@@ -156,8 +156,8 @@ DEFSTUB(crtlib__execl)
 DEFSTUB(crtlib_system)
 #endif
 
-elf_api void crtlib_load(elf_State *rt) {
-	elf_Module *md = rt->md;
+elf_api void crtlib_load(elState *rt) {
+	elModule *md = rt->md;
 
 
 

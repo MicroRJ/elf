@@ -5,7 +5,7 @@
 */
 
 
-typedef struct elf_File {
+typedef struct elFileInfo {
 	char *name;
 	elf_byteid bytes;
 	elf_byteid nbytes;
@@ -14,7 +14,7 @@ typedef struct elf_File {
 	char *pathondisk;
 	elf_lineid lines;
 	int nlines;
-} elf_File;
+} elFileInfo;
 
 
 /*
@@ -31,41 +31,41 @@ typedef struct elf_File {
 ** time.
 **
 */
-typedef struct elf_Module {
-	union { elf_Table *g, *globals; };
+typedef struct elModule {
+	union { elTable *g, *globals; };
 
-	elf_Proto *p;
-	elf_num *kn;
-	elf_int *ki;
+	elProto *p;
+	elNumber *kn;
+	elInteger *ki;
 	int *track;
 	elf_Bytecode *bytes;
 	elf_byteid nbytes;
 	char **lines;
-	elf_File *files;
-} elf_Module;
+	elFileInfo *files;
+} elModule;
 
 
-elf_globalid elf_getsymbol(elf_Module *md, elf_String *name);
-elf_globalid lang_addglobal(elf_Module *md, elf_String *name, elf_Value v);
-elf_globalid lang_addproto(elf_Module *md, elf_Proto p);
+elf_globalid elf_getsymbol(elModule *md, elString *name);
+elf_globalid lang_addglobal(elModule *md, elString *name, elValue v);
+elf_globalid lang_addproto(elModule *md, elProto p);
 
 /*
-	elf_Module\r: runtime is stored here
+	elModule\r: runtime is stored here
 for garbage collection.
-	elf_Module\gc: all objects to be automatically
+	elModule\gc: all objects to be automatically
 managed, or garbage collected, are listed here.
 By default all objects are added here, you
 can however remove them from this array.
 
-elf_Module\gf: buffer for functions definitions,
+elModule\gf: buffer for functions definitions,
 essentially a type table, anonymous functions
 are also added here.
 
-elf_Module\g: global symbol table which
+elModule\g: global symbol table which
 maps names to values, indexed
 at runtime by index.
 
-elf_Module\bytes: buffer for bytes, all the bytes
+elModule\bytes: buffer for bytes, all the bytes
 are stored here, functions index into this
 buffer.
 

@@ -11,13 +11,13 @@ elf_globaldecl Alloc langM_globalalloc = {"default-heap-allocator",elf_defglobal
 
 
 /* todo: should prob be using something like stb leak */
-void *elf_memclear(void *target, elf_int length) {
+void *elf_memclear(void *target, elInteger length) {
 	memset(target,0,length);
 	return target;
 }
 
 
-void *elf_memcopy(void *target, void const *source, elf_int length) {
+void *elf_memcopy(void *target, void const *source, elInteger length) {
 	memcpy(target,source,length);
 	return target;
 }
@@ -29,7 +29,7 @@ void elf_dealloc_(Alloc *c, const void *memory, ldebugloc loca) {
 }
 
 
-void *elf_alloc_(Alloc *c, elf_int length, ldebugloc loca) {
+void *elf_alloc_(Alloc *c, elInteger length, ldebugloc loca) {
 	void *memory = 0;
 	Error error = c->fn(c,0,0,length,&memory,loca);
 	elf_ensure(LPASSED(error));
@@ -37,19 +37,19 @@ void *elf_alloc_(Alloc *c, elf_int length, ldebugloc loca) {
 }
 
 
-void *elf_realloc_(Alloc *c, elf_int length, void *memory, ldebugloc loca) {
+void *elf_realloc_(Alloc *c, elInteger length, void *memory, ldebugloc loca) {
 	Error error = c->fn(c,0,0,length,&memory,loca);
 	elf_ensure(LPASSED(error));
 	return memory;
 }
 
 
-void *elf_clearalloc_(Alloc *c, elf_int size, ldebugloc loca) {
+void *elf_clearalloc_(Alloc *c, elInteger size, ldebugloc loca) {
 	return elf_memclear(elf_alloc_(c,size,loca),size);
 }
 
 
-Error elf_defglobalallocfn(Alloc *allocator, int flags, elf_int oldSize, elf_int newSize, void **io, ldebugloc loca) {
+Error elf_defglobalallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
 	if (io == 0) {
 		return Error_InvalidArguments;
 	}
@@ -70,7 +70,7 @@ Error elf_defglobalallocfn(Alloc *allocator, int flags, elf_int oldSize, elf_int
 }
 
 
-Error elf_deftlsallocfn(Alloc *allocator, int flags, elf_int oldSize, elf_int newSize, void **io, ldebugloc loca) {
+Error elf_deftlsallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
 	if (io == 0) {
 		return Error_InvalidArguments;
 	}

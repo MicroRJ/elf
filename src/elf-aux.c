@@ -13,53 +13,53 @@ void elf_debugger(char *message) {
 }
 
 
-void elf_registersys(elf_State *R, char *name, elf_Handle val) {
+void elf_registersys(elState *R, char *name, elHandle val) {
 	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valsys(val));
 }
 
 
-void elf_registerint(elf_State *R, char *name, elf_int val) {
+void elf_registerint(elState *R, char *name, elInteger val) {
 	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valint(val));
 }
 
 
-void elf_registertab(elf_State *R, char *name, elf_Table *val) {
+void elf_registertab(elState *R, char *name, elTable *val) {
 	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valtab(val));
 }
 
 
-void elf_registerstr(elf_State *R, char *name, char *val) {
+void elf_registerstr(elState *R, char *name, char *val) {
 	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valstr(elf_pushnewstr(R,val)));
 }
 
 
-void elf_register(elf_State *R, char *name, lBinding fn) {
+void elf_register(elState *R, char *name, elBinding fn) {
 	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valbid(fn));
 }
 
 
-void elf_tabmfld(elf_State *R, elf_Table *obj, char *name, lBinding b) {
+void elf_tabmfld(elState *R, elTable *obj, char *name, elBinding b) {
 	elf_tabset(obj,elf_valstr(elf_newstr(R,name)),elf_valbid(b));
 }
 
 
-elf_int elf_clocktime() {
+elInteger elf_clocktime() {
 	return sys_clocktime();
 }
 
 
 /* todo: clockhz can be cached */
-elf_num elf_timediffs(elf_int begin) {
-	return (sys_clocktime() - begin) / (elf_num) sys_clockhz();
+elNumber elf_timediffs(elInteger begin) {
+	return (sys_clocktime() - begin) / (elNumber) sys_clockhz();
 }
 
 
-int elf_fndfilebybyte(elf_Module *md, elf_byteid byte) {
-	elf_File *files = md->files;
+int elf_fndfilebybyte(elModule *md, elf_byteid byte) {
+	elFileInfo *files = md->files;
 	int nfiles = elf_varlen(files);
 	for (int x = 0; x < nfiles; ++ x) {
-		elf_File file = files[x];
-		if ((elf_int)(byte - file.bytes) < file.nbytes) {
+		elFileInfo file = files[x];
+		if ((elInteger)(byte - file.bytes) < file.nbytes) {
 			return x;
 		}
 	}
@@ -122,34 +122,34 @@ void elf_lineerror2(char *filename, char *contents, char *loc, char const *fmt, 
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_int)(1+loc-lineloc),b);
+		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+loc-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
 }
 
 
-void elf_throw(elf_State *R, elf_byteid byte, char *error) {
-	elf_Module *M = R->M;
+void elf_throw(elState *R, elf_byteid byte, char *error) {
+	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	elf_lineid line = M->lines[byte];
 	int fileid = elf_fndfilebybyte(M,byte);
 	if (fileid != -1) {
-		elf_File *file = &M->files[fileid];
+		elFileInfo *file = &M->files[fileid];
 		elf_lineerror2(file->name,file->lines,line,error);
 	}
 	elf_debugger("runtime throw");
 }
 
 
-void elf_checkargs(elf_State *R, char *fnname, int n, char *usage) {
+void elf_checkargs(elState *R, char *fnname, int n, char *usage) {
 	if (R->call->nx != n) {
 		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,R->call->nx,usage));
 	}
 }
 
 
-int elf_tycheck(elf_State *R, elf_byteid id, elf_localid loc, elf_tag x, elf_tag y) {
+int elf_tycheck(elState *R, elf_byteid id, elf_localid loc, elf_tag x, elf_tag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

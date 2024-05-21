@@ -1,0 +1,20 @@
+testfn = fun() ? {
+	// lastly pf(".7")
+	// pf(".0")
+	// lastly pf(".6")
+	// pf(".1")
+	// lastly pf(".5")
+	// pf(".2")
+	// lastly pf(".4")
+	// pf(".3")
+
+	lastly leave "leave 4"
+	lastly leave "leave 3"
+	lastly leave "leave 2"
+	lastly leave "leave 1"
+	leave "leave 0"
+}
+
+failed = testfn() != "leave 4"
+if (failed) ? pf("failed")
+leave failed

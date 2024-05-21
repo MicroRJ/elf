@@ -9,11 +9,6 @@
 
 #define NOTANENTITY 0x01
 
-#define BLOCK_LOOP 0x01
-
-/* added when a break, leave or continue
-statement is found */
-#define BLOCK_ENDED  0x02
 
 typedef struct { int x; } lentityid;
 
@@ -25,7 +20,7 @@ typedef struct elf_fileentry {
 	char    *name;
 	elf_lineid  line;
 	elf_localid slot;
-	elf_bool enm;
+	elBool enm;
 	/* the level in which this name was
 	declared, for scoping */
 	int     level;
@@ -42,9 +37,9 @@ typedef struct elf_usingstack {
 
 
 
-typedef struct elf_FileFunc elf_FileFunc;
-typedef struct elf_FileFunc {
-	elf_FileFunc *enclosing;
+typedef struct elFileFnState elFileFnState;
+typedef struct elFileFnState {
+	elFileFnState *enclosing;
 	elf_lineid line;
 	/* for the basic register allocation system, where we have
 	an infinite number of register, but we still want to keep
@@ -75,13 +70,13 @@ typedef struct elf_FileFunc {
 	/* todo: deprecated */
 	/* list of yield jumps to be patched */
 	elf_byteid *yj;
-} elf_FileFunc;
+} elFileFnState;
 
 
-typedef struct elf_FileState {
+typedef struct elFileState {
 
-	union { elf_Module  *M,*md; };
-	union { elf_State *R,*rt; };
+	union { elModule  *M,*md; };
+	union { elState *R,*rt; };
 
 	char *filename;
 	char *linechar;
@@ -107,13 +102,13 @@ typedef struct elf_FileState {
 	elf_fileblock entry;
 	/* hierarchical list of loading functions,
 	each allocated in C stack by caller function */
-	elf_FileFunc *fn;
+	elFileFnState *fn;
 	elf_byteid bytes;
 	int flags;
-	elf_bool debuggerflag;
-} elf_FileState;
+	elBool debuggerflag;
+} elFileState;
 
 
-elf_nodeid elf_fsloadexpr(elf_FileState *fs);
-elf_nodeid elf_fsloadunary(elf_FileState *fs);
-void elf_fsloadstat(elf_FileState *fs);
+elf_nodeid elf_fsloadexpr(elFileState *fs);
+elf_nodeid elf_fsloadunary(elFileState *fs);
+void elf_fsloadstat(elFileState *fs);

@@ -5,7 +5,7 @@
 */
 
 
-int elflib_setmetatable(elf_State *R) {
+int elflib_setmetatable(elState *R) {
 	elf_getobj(R,0)->metatable = elf_gettab(R,1);
 	elf_pushany(R,elf_getany(R,0));
 	return 1;
@@ -13,77 +13,77 @@ int elflib_setmetatable(elf_State *R) {
 
 
 /* math */
-int elflib_floor(elf_State *R) {
+int elflib_floor(elState *R) {
 	elf_pushnum(R,floor(elf_getnum(R,0)));
 	return 1;
 }
 
 
-int elflib_sqrt(elf_State *R) {
+int elflib_sqrt(elState *R) {
 	elf_pushnum(R,sqrt(elf_getnum(R,0)));
 	return 1;
 }
 
 
-int elflib_sin(elf_State *R) {
+int elflib_sin(elState *R) {
 	elf_pushnum(R,sin(elf_getnum(R,0)));
 	return 1;
 }
 
 
-int elflib_cos(elf_State *R) {
+int elflib_cos(elState *R) {
 	elf_pushnum(R,cos(elf_getnum(R,0)));
 	return 1;
 }
 
 
-int elflib_acos(elf_State *R) {
+int elflib_acos(elState *R) {
 	elf_pushnum(R,acos(elf_getnum(R,0)));
 	return 1;
 }
 
 
-int elflib_tan(elf_State *R) {
+int elflib_tan(elState *R) {
 	elf_pushnum(R,tan(elf_getnum(R,0)));
 	return 1;
 }
 
 
-int elflib_atan2(elf_State *R) {
+int elflib_atan2(elState *R) {
 	elf_pushnum(R,atan2(elf_getnum(R,0),elf_getnum(R,1)));
 	return 1;
 }
 
 
 /*  */
-int elflib_abort(elf_State *R) {
+int elflib_abort(elState *R) {
 	if(1) abort();
 	return 0;
 }
 
 
-int elflib_exit(elf_State *R) {
+int elflib_exit(elState *R) {
 	if(1) exit(elf_getint(R,0));
 	return 0;
 }
 
 
 /* debugging */
-int elflib_bytelogging(elf_State *R) {
+int elflib_bytelogging(elState *R) {
 	elf_pushint(R,R->call->caller->logging);
 	R->call->caller->logging = elf_getint(R,0);
 	return 0;
 }
 
 
-int elflib_globalbytelogging(elf_State *R) {
+int elflib_globalbytelogging(elState *R) {
 	elf_pushint(R,R->bytelogging);
 	R->bytelogging = elf_getint(R,0);
 	return 0;
 }
 
 
-int elflib_debugger(elf_State *R) {
+int elflib_debugger(elState *R) {
 #if defined(_DEBUG)
 	R->debuggerflag = ltrue;
 #else
@@ -98,7 +98,7 @@ int elflib_debugger(elf_State *R) {
 
 
 /* logging */
-int elflib_log(elf_State *R) {
+int elflib_log(elState *R) {
 	for (int i = 0; i < R->call->nx; i ++) {
 		elf_valfpf(stdout,elf_getany(R,i),lfalse);
 	} printf("\n");
@@ -106,7 +106,7 @@ int elflib_log(elf_State *R) {
 }
 
 
-int elflib_err(elf_State *R) {
+int elflib_err(elState *R) {
 	for (int i = 0; i < R->call->nx; i ++) {
 		elf_valfpf(stdout,elf_getany(R,i),lfalse);
 	} printf("\n");
@@ -207,7 +207,7 @@ char *elf_insymdir(char *dir, char *sym) {
 }
 
 
-int elflib_include(elf_State *R) {
+int elflib_include(elState *R) {
 	elf_checkargs(R,".include",1,"(the directory to include to add to the global directory)");
 	char *dir = elf_getcstr(R,0);
 	int plen = elf_cstrlen(dir);
@@ -221,13 +221,13 @@ int elflib_include(elf_State *R) {
 	value and result in erroneous behavior.
 	todo: */
 
-	elf_Table *globals = R->M->globals;
+	elTable *globals = R->M->globals;
 	for (int i = 0; i < globals->ntotal; ++ i) {
 		elf_tabslot slot = globals->slots[i];
 		if (slot.k.tag == TAG_STR) {
 			char *sym = elf_insymdir(dir,slot.k.x_str->c);
 			if (*sym != '.') continue;
-			elf_String *ref = elf_newstr(R,sym);
+			elString *ref = elf_newstr(R,sym);
 			elf_tabset(globals,elf_valstr(ref),globals->array[slot.i]);
 			// elf_logdebug("added %s <- %s",ref->c,slot.k.x_str->c);
 		}
@@ -236,8 +236,8 @@ int elflib_include(elf_State *R) {
 }
 
 
-int elflib_loadexpr(elf_State *R) {
-	elf_String *filename = lnil,*contents = lnil;
+int elflib_loadexpr(elState *R) {
+	elString *filename = elNIL,*contents = elNIL;
 	if (R->call->nx == 2) {
 		filename = elf_getstr(R,0);
 		contents = elf_getstr(R,1);
@@ -251,8 +251,8 @@ int elflib_loadexpr(elf_State *R) {
 }
 
 
-int elflib_loadcode(elf_State *R) {
-	elf_String *filename = lnil,*contents = lnil;
+int elflib_loadcode(elState *R) {
+	elString *filename = elNIL,*contents = elNIL;
 	if (R->call->nx == 2) {
 		filename = elf_getstr(R,0);
 		contents = elf_getstr(R,1);
@@ -266,8 +266,8 @@ int elflib_loadcode(elf_State *R) {
 }
 
 
-int elflib_loadfile(elf_State *R) {
-	elf_String *filename = elf_getstr(R,0);
+int elflib_loadfile(elState *R) {
+	elString *filename = elf_getstr(R,0);
 	elf_loadfile(R,filename,R->call->ry,R->call->ny);
 	/* no need to do hoisting */
 	return 0;
@@ -275,37 +275,37 @@ int elflib_loadfile(elf_State *R) {
 
 
 
-int elflib_GCM(elf_State *R) {
+int elflib_GCM(elState *R) {
 	elf_pushint(R,R->gcmemory);
 	return 1;
 }
 
 
-int elflib_GCT(elf_State *R) {
+int elflib_GCT(elState *R) {
 	elf_pushint(R,R->gcthreshold);
 	return 1;
 }
 
 
-int elflib_GCN(elf_State *R) {
+int elflib_GCN(elState *R) {
 	elf_pushint(R,elf_varlen(R->gc));
 	return 1;
 }
 
 
-int elflib_iton(elf_State *R) {
-	elf_Value v = elf_getany(R,0);
+int elflib_iton(elState *R) {
+	elValue v = elf_getany(R,0);
 	if (v.tag == TAG_INT) {
-		elf_pushnum(R,(elf_num)v.i);
+		elf_pushnum(R,(elNumber)v.i);
 	} else elf_pushnum(R,v.n);
 	return 1;
 }
 
 
-int elflib_ntoi(elf_State *R) {
-	elf_Value v = elf_getany(R,0);
+int elflib_ntoi(elState *R) {
+	elValue v = elf_getany(R,0);
 	if (v.tag == TAG_NUM) {
-		elf_pushint(R,(elf_int)v.n);
+		elf_pushint(R,(elInteger)v.n);
 	} else elf_pushint(R,v.i);
 	return 1;
 }
@@ -313,11 +313,11 @@ int elflib_ntoi(elf_State *R) {
 
 // typedef void (*em_dlopen_callback)(void* handle, void* user_data);
 // void emscripten_dlopen(const char *filename, int flags, void* user_data, em_dlopen_callback onsuccess, em_arg_callback_func onerror);
-int elflib_libfn(elf_State *rt) {
-	elf_Handle lib = elf_getsys(rt,0);
-	elf_String *name = elf_getstr(rt,1);
-	lBinding fn = (lBinding) sys_libfn(lib,name->c);
-	if (fn != lnil) {
+int elflib_libfn(elState *rt) {
+	elHandle lib = elf_getsys(rt,0);
+	elString *name = elf_getstr(rt,1);
+	elBinding fn = (elBinding) sys_libfn(lib,name->c);
+	if (fn != elNIL) {
 		elf_pushbinding(rt,fn);
 	} else {
 		elf_pushnil(rt);
@@ -326,19 +326,19 @@ int elflib_libfn(elf_State *rt) {
 }
 
 
-int elflib_loadlib(elf_State *R) {
-	elf_String *name = elf_getstr(R,0);
+int elflib_loadlib(elState *R) {
+	elString *name = elf_getstr(R,0);
 	elf_Closure *callback = elf_getcls(R,1);
-	elf_Handle lib = sys_loadlib(name->c);
-	if (lib != lnil) elf_pushsys(R,lib);
+	elHandle lib = sys_loadlib(name->c);
+	if (lib != elNIL) elf_pushsys(R,lib);
 	else elf_pushnil(R);
 	return 1;
 }
 
 
-int elflib_exec(elf_State *R) {
+int elflib_exec(elState *R) {
 #if defined(_WIN32)
-	elf_String *cmd = elf_getstr(R,0);
+	elString *cmd = elf_getstr(R,0);
 	STARTUPINFO si = {sizeof(si)};
 	PROCESS_INFORMATION pi = {0};
 	int result = CreateProcess(NULL,cmd->c,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
@@ -352,39 +352,39 @@ int elflib_exec(elf_State *R) {
 }
 
 
-int elflib_fopen(elf_State *R) {
+int elflib_fopen(elState *R) {
 	elf_ensure(R->call->nx == 2);
-	elf_String *name = elf_getstr(R,0);
-	elf_String *flags = elf_getstr(R,1);
+	elString *name = elf_getstr(R,0);
+	elString *flags = elf_getstr(R,1);
 	FILE *file = fopen(name->c,flags->c);
-	elf_pushsys(R,(elf_Handle)file);
+	elf_pushsys(R,(elHandle)file);
 	return 1;
 }
 
 
-int elflib_fclose(elf_State *R) {
+int elflib_fclose(elState *R) {
 	elf_ensure(R->call->nx == 1);
-	elf_Handle file = elf_getsys(R,0);
+	elHandle file = elf_getsys(R,0);
 	fclose(file);
 	return 0;
 }
 
 
-int elflib_fsize(elf_State *R) {
-	elf_Handle file = (FILE*) elf_getsys(R,0);
+int elflib_fsize(elState *R) {
+	elHandle file = (FILE*) elf_getsys(R,0);
 	fseek(file,0,SEEK_END);
 	elf_pushint(R,ftell(file));
 	return 1;
 }
 
 
-int elflib_fload(elf_State *R) {
+int elflib_fload(elState *R) {
 	FILE *file = (FILE*) elf_getsys(R,0);
 	if (file != 0) {
 		fseek(file,0,SEEK_END);
 		long size = ftell(file);
 		fseek(file,0,SEEK_SET);
-		elf_String *buf = elf_newstrlen(R,size);
+		elString *buf = elf_newstrlen(R,size);
 		fread(buf->c,1,size,file);
 		elf_pushstr(R,buf);
 	} else elf_pushnil(R);
@@ -392,19 +392,19 @@ int elflib_fload(elf_State *R) {
 }
 
 
-int elflib_ftemp(elf_State *R) {
+int elflib_ftemp(elState *R) {
 	FILE *file = {0};
 #if defined(PLATFORM_WEB)
 	file = tmpfile();
 #else
 	tmpfile_s(&file);
 #endif
-	elf_pushsys(R,(elf_Handle)file);
+	elf_pushsys(R,(elHandle)file);
 	return 1;
 }
 
 
-int elflib_mydir(elf_State *R) {
+int elflib_mydir(elState *R) {
 	char buf[MAX_PATH];
 	sys_pwd(sizeof(buf),buf);
 	elf_pushnewstr(R,buf);
@@ -415,8 +415,8 @@ int elflib_mydir(elf_State *R) {
 }
 
 
-int elflib_fpf(elf_State *rt) {
-	elf_Handle file = elf_getsys(rt,0);
+int elflib_fpf(elState *rt) {
+	elHandle file = elf_getsys(rt,0);
 	int wrote = 0;
 	for (int i = 1; i < rt->f->x; i ++) {
 		wrote += elf_valfpf(file,elf_getany(rt,i),lfalse);
@@ -426,7 +426,7 @@ int elflib_fpf(elf_State *rt) {
 }
 
 
-int elflib_lpf(elf_State *rt) {
+int elflib_lpf(elState *rt) {
 	for (int i = 0; i < rt->f->x; i ++) {
 		if (i != 0) fprintf(stdout,"\n");
 		elf_valfpf(stdout,elf_getany(rt,i),lfalse);
@@ -436,7 +436,7 @@ int elflib_lpf(elf_State *rt) {
 }
 
 
-int elflib_pf(elf_State *rt) {
+int elflib_pf(elState *rt) {
 	for (int i = 0; i < rt->f->x; i ++) {
 		elf_valfpf(stdout,elf_getany(rt,i),lfalse);
 	}
@@ -445,50 +445,50 @@ int elflib_pf(elf_State *rt) {
 }
 
 
-elf_api int elflib_sleep(elf_State *rt) {
+elf_api int elflib_sleep(elState *rt) {
 	elf_ensure(rt->f->x == 1);
 	sys_sleep(elf_getint(rt,0));
 	return 0;
 }
 
 
-elf_api int elflib_clocktime(elf_State *rt) {
+elf_api int elflib_clocktime(elState *rt) {
 	elf_pushint(rt,sys_clocktime());
 	return 1;
 }
 
 
-elf_api int elflib_timediffs(elf_State *rt) {
+elf_api int elflib_timediffs(elState *rt) {
 	elf_ensure(rt->f->x == 1);
-	elf_int i = elf_getint(rt,0);
-	elf_pushnum(rt,(sys_clocktime() - i) / (elf_num) sys_clockhz());
+	elInteger i = elf_getint(rt,0);
+	elf_pushnum(rt,(sys_clocktime() - i) / (elNumber) sys_clockhz());
 	return 1;
 }
 
 
-elf_bool isvirtual(char const *fn) {
+elBool isvirtual(char const *fn) {
 	while (*fn == '.') ++ fn;
 	return *fn == 0;
 }
 
 
-elf_globaldecl elf_String *enumdir_keyname;
-elf_globaldecl elf_String *enumdir_keypath;
-elf_globaldecl elf_String *enumdir_isdir;
+elf_globaldecl elString *enumdir_keyname;
+elf_globaldecl elString *enumdir_keypath;
+elf_globaldecl elString *enumdir_isdir;
 
 
-void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
+void elflib_enumdir_(elState *R, elString *dir, elf_Closure *cls) {
 #if defined(PLATFORM_DESKTOP)
 	WIN32_FIND_DATAA f;
 	HANDLE h = FindFirstFileA(elf_tpf("%s\\*",dir->c),&f);
 	if (h != INVALID_HANDLE_VALUE) do {
 		if (isvirtual(f.cFileName)) continue;
 		int isdir = 0 != (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-		elf_Value *top = elf_gettop(R);
-		elf_String *name = elf_pushnewstr(R,f.cFileName);
-		elf_String *path = elf_pushnewstr(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
+		elValue *top = elf_gettop(R);
+		elString *name = elf_pushnewstr(R,f.cFileName);
+		elString *path = elf_pushnewstr(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
 		elf_localid base = elf_pushcls(R,cls);
-		elf_Table *file = elf_pushnewtab(R);
+		elTable *file = elf_pushnewtab(R);
 		elf_tabsetstrfld(file,enumdir_keyname,name);
 		elf_tabsetstrfld(file,enumdir_keypath,path);
 		elf_tabsetintfld(file,enumdir_isdir,isdir);
@@ -500,19 +500,19 @@ void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
 	} while (FindNextFileA(h,&f));
 #elif defined(PLATFORM_WEB)
 	DIR *dirfd = opendir(dir->c);
-	if (dirfd != lnil) {
+	if (dirfd != elNIL) {
 		struct dirent *entry;
-		while ((entry = readdir(dirfd)) != lnil) {
+		while ((entry = readdir(dirfd)) != elNIL) {
 			if (isvirtual(entry->d_name)) {
 				continue;
 			}
-			elf_bool isdir = (entry->d_type & DT_DIR) != lfalse;
-			elf_Value *top = elf_gettop(R);
+			elBool isdir = (entry->d_type & DT_DIR) != lfalse;
+			elValue *top = elf_gettop(R);
 
-			elf_String *name = elf_pushnewstr(R,entry->d_name);
-			elf_String *path = elf_pushnewstr(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			elString *name = elf_pushnewstr(R,entry->d_name);
+			elString *path = elf_pushnewstr(R,elf_tpf("%s/%s",dir->c,entry->d_name));
 			elf_localid base = elf_pushcls(R,cls);
-			elf_Table *file = elf_pushnewtab(R);
+			elTable *file = elf_pushnewtab(R);
 
 			elf_tabsetstrfld(file,enumdir_keyname,name);
 			elf_tabsetstrfld(file,enumdir_keypath,path);
@@ -529,21 +529,21 @@ void elflib_enumdir_(elf_State *R, elf_String *dir, elf_Closure *cls) {
 }
 
 
-elf_api int elflib_enumdir(elf_State *R) {
+elf_api int elflib_enumdir(elState *R) {
 	elf_ensure(R->frame->x == 2);
 	/* push these keys temporarily so they won't
 	be gc'd and also to to avoid creating them so often  */
 	enumdir_keyname = elf_pushnewstr(R,"name");
 	enumdir_keypath = elf_pushnewstr(R,"path");
 	enumdir_isdir = elf_pushnewstr(R,"isdir");
-	elf_String *dir = elf_getstr(R,0);
+	elString *dir = elf_getstr(R,0);
 	elf_Closure *cls = elf_getcls(R,1);
 	elflib_enumdir_(R,dir,cls);
 	return 1;
 }
 
 
-elf_api void elflib_load(elf_State *R) {
+elf_api void elflib_load(elState *R) {
 	elf_registerint(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
 	elf_registerstr(R,"elf.PLATFORM","WEB");

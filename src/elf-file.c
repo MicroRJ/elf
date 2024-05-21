@@ -10,23 +10,23 @@
 // ^^^^^^^^^^^^^^^^^^
 
 
-elf_bool elf_fscheckexpr(elf_FileState *fs, elf_lineid line, elf_nodeid id) {
+elBool elf_fscheckexpr(elFileState *fs, elf_lineid line, elf_nodeid id) {
 	if (id != NO_NODE) return lfalse;
 	elf_filediag(fs,line,"invalid expression");
 	return ltrue;
 }
 
 
-elf_bool elf_linetesttk(elf_FileState *fs, ltokentype k) {
+elBool elf_linetesttk(elFileState *fs, ltokentype k) {
 	return fs->tk.type == k && fs->lasttk.eol != ltrue;
 }
 
 
-elf_bool elf_testtk(elf_FileState *fs, ltokentype k) {
+elBool elf_testtk(elFileState *fs, ltokentype k) {
 	return fs->tk.type == k;
 }
 
-elf_bool elf_testthentk(elf_FileState *fs, ltokentype k) {
+elBool elf_testthentk(elFileState *fs, ltokentype k) {
 	return fs->thentk.type == k;
 }
 
@@ -35,17 +35,17 @@ elf_bool elf_testthentk(elf_FileState *fs, ltokentype k) {
 ** Returns true whether there are no more tokens
 ** or whehter the current token is a match.
 */
-elf_bool elf_termtk(elf_FileState *fs, ltokentype k) {
+elBool elf_termtk(elFileState *fs, ltokentype k) {
 	return fs->tk.type == TK_NONE || fs->tk.type == k;
 }
 
 
-elf_bool elf_iseolalready(elf_FileState *fs) {
+elBool elf_iseolalready(elFileState *fs) {
 	return fs->lasttk.eol;
 }
 
 
-elf_bool elf_termeoltk(elf_FileState *fs) {
+elBool elf_termeoltk(elFileState *fs) {
 	return fs->tk.type == TK_NONE || fs->lasttk.eol == ltrue;
 }
 
@@ -54,12 +54,12 @@ elf_bool elf_termeoltk(elf_FileState *fs) {
 ** Consumes the current token only if it is a match,
 ** returning whether it was a match or not.
 */
-elf_bool elf_picktk(elf_FileState *fs, ltokentype k) {
+elBool elf_picktk(elFileState *fs, ltokentype k) {
 	return elf_testtk(fs,k) && (elf_lexone(fs), ltrue);
 }
 
 
-elf_bool elf_linepicktk(elf_FileState *fs, ltokentype k) {
+elBool elf_linepicktk(elFileState *fs, ltokentype k) {
 	return elf_linetesttk(fs,k) && (elf_lexone(fs), ltrue);
 }
 
@@ -67,7 +67,7 @@ elf_bool elf_linepicktk(elf_FileState *fs, ltokentype k) {
 /*
 ** Same as pick, only this time there are two possibilities.
 */
-elf_bool elf_choosetk(elf_FileState *fs, ltokentype x, ltokentype y) {
+elBool elf_choosetk(elFileState *fs, ltokentype x, ltokentype y) {
 	return (elf_testtk(fs,x) || elf_testtk(fs,y)) && (elf_lexone(fs), ltrue);
 }
 
@@ -76,7 +76,7 @@ elf_bool elf_choosetk(elf_FileState *fs, ltokentype x, ltokentype y) {
 ** Check whether the current token is a match,
 ** if so pick it, otherwise error.
 */
-elf_token elf_taketk(elf_FileState *fs, int k) {
+elf_token elf_taketk(elFileState *fs, int k) {
 	elf_token tk = fs->tk;
 	if (!elf_picktk(fs,k)) {
 		elf_filediag(fs,fs->tk.line,"expected '%s'\n",elf_tkintel[k].name);
@@ -85,7 +85,7 @@ elf_token elf_taketk(elf_FileState *fs, int k) {
 }
 
 
-elf_token elf_linetaketk(elf_FileState *fs, int k) {
+elf_token elf_linetaketk(elFileState *fs, int k) {
 	elf_token tk = fs->tk;
 	if (!elf_linepicktk(fs,k)) {
 		elf_filediag(fs,fs->tk.line,"expected '%s'\n",elf_tkintel[k].name);
@@ -94,8 +94,8 @@ elf_token elf_linetaketk(elf_FileState *fs, int k) {
 }
 
 
-lentityid elfY_allocentity(elf_FileState *fs, elf_lineid line) {
-	elf_FileFunc *ff = fs->fn;
+lentityid elfY_allocentity(elFileState *fs, elf_lineid line) {
+	elFileFnState *ff = fs->fn;
 	lentityid id = {fs->nentities ++};
 	if (elf_varlen(fs->entities) < fs->nentities) {
 		elf_varaddi(fs->entities,1);
@@ -113,7 +113,7 @@ lentityid elfY_allocentity(elf_FileState *fs, elf_lineid line) {
 }
 
 
-elf_localid elf_fsnumentinlev(elf_FileState *fs) {
+elf_localid elf_fsnumentinlev(elFileState *fs) {
 	elf_fileentry *entities = fs->entities;
 	int nentities = fs->nentities;
 	int n;
@@ -126,7 +126,7 @@ elf_localid elf_fsnumentinlev(elf_FileState *fs) {
 }
 
 
-elf_nodeid elf_fsnumnodesinlev(elf_FileState *fs) {
+elf_nodeid elf_fsnumnodesinlev(elFileState *fs) {
 	elf_Node *nodes = fs->nodes;
 	elf_nodeid nnodes = fs->nnodes;
 	elf_nodeid n;
@@ -139,7 +139,7 @@ elf_nodeid elf_fsnumnodesinlev(elf_FileState *fs) {
 }
 
 
-void elf_fscheckassign(elf_FileState *fs, elf_lineid line, elf_nodeid x) {
+void elf_fscheckassign(elFileState *fs, elf_lineid line, elf_nodeid x) {
 }
 
 
@@ -149,7 +149,7 @@ void elf_fscheckassign(elf_FileState *fs, elf_lineid line, elf_nodeid x) {
 ** the index is then used to emit instructions targeting
 ** captures, the first capture corresponds to index 0.
 */
-int elfY_indexofentityincache(elf_FileFunc *fn, lentityid id) {
+int elfY_indexofentityincache(elFileFnState *fn, lentityid id) {
 	elf_arrfori(fn->captures) {
 		if (fn->captures[i].x == id.x) return i;
 	}
@@ -163,7 +163,7 @@ int elfY_indexofentityincache(elf_FileFunc *fn, lentityid id) {
 ** a copy of the entity id in the
 ** function's captures.
 */
-void elf_fstrapent(elf_FileState *fs, elf_FileFunc *fn, lentityid id) {
+void elf_fstrapent(elFileState *fs, elFileFnState *fn, lentityid id) {
 	/* ensure the entity should actually be captured */
 	elf_ensure(id.x < fn->entities);
 	elf_arrfori(fn->captures) {
@@ -180,8 +180,8 @@ void elf_fstrapent(elf_FileState *fs, elf_FileFunc *fn, lentityid id) {
 ** you should make it relative to the current function.
 ** If the entity is outside of this function, then it caches it.
 */
-lentityid elf_fsfndent(elf_FileState *fs, elf_lineid line, char *name) {
-	elf_FileFunc *fn = fs->fn;
+lentityid elf_fsfndent(elFileState *fs, elf_lineid line, char *name) {
+	elFileFnState *fn = fs->fn;
 	for (int x = fs->nentities-1; x >= 0; --x) {
 		if (S_eq(fs->entities[x].name,name)) {
 			lentityid id = {x};
@@ -201,8 +201,8 @@ lentityid elf_fsfndent(elf_FileState *fs, elf_lineid line, char *name) {
 ** whether is shadows or redeclares and existing entity, however,
 ** still returns a valid id.
 */
-elf_nodeid elf_fsnewlocalentity(elf_FileState *fs, elf_lineid line, char *name, elf_bool enm) {
-	elf_FileFunc *fn = fs->fn;
+elf_nodeid elf_fsnewlocalentity(elFileState *fs, elf_lineid line, char *name, elBool enm) {
+	elFileFnState *fn = fs->fn;
 	lentityid id = elf_fsfndent(fs,line,name);
 	if (id.x == NO_ENTITY.x) {
 		id = elfY_allocentity(fs,line);
@@ -228,10 +228,10 @@ elf_nodeid elf_fsnewlocalentity(elf_FileState *fs, elf_lineid line, char *name, 
 }
 
 
-elf_nodeid elf_fsfndentitynode(elf_FileState *fs, elf_lineid line, char *name) {
+elf_nodeid elf_fsfndentitynode(elFileState *fs, elf_lineid line, char *name) {
 	lentityid id = elf_fsfndent(fs,line,name);
 	if (id.x == NO_ENTITY.x) return NO_NODE;
-	elf_FileFunc *fn = fs->fn;
+	elFileFnState *fn = fs->fn;
 	/* to figure out whether this is capture, simply
 	check whether the entity id is higher than that
 	of the first entity id within this function, in
@@ -247,7 +247,7 @@ elf_nodeid elf_fsfndentitynode(elf_FileState *fs, elf_lineid line, char *name) {
 }
 
 
-void elf_enterblock(elf_FileState *fs, elf_fileblock *bl, elf_bool flags) {
+void elf_enterblock(elFileState *fs, elf_fileblock *bl, elBool flags) {
 	bl->enclosing = fs->fn->block;
 	fs->fn->block = bl;
 	bl->xmemory = fs->fn->xmemory;
@@ -255,12 +255,13 @@ void elf_enterblock(elf_FileState *fs, elf_fileblock *bl, elf_bool flags) {
 	bl->flags = flags;
 	bl->level = fs->level ++;
 	bl->entry = elf_getlastbyteid(fs);
+	bl->jumpover = bl->entry;
 	fs->fn->nloops += (flags & BLOCK_LOOP) != 0;
 	fs->fn->nblocks += 1;
 }
 
 
-void elf_leaveblock(elf_FileState *fs) {
+void elf_leaveblock(elFileState *fs) {
 	fs->nentities -= elf_fsnumentinlev(fs); /* close scope */
 	fs->nnodes -= elf_fsnumnodesinlev(fs);
 	elf_ensure(fs->nentities >= fs->fn->entities);
@@ -282,18 +283,18 @@ void elf_leaveblock(elf_FileState *fs) {
 }
 
 
-void elf_beginfsfn(elf_FileState *fs, elf_FileFunc *fn, char *line) {
+void elf_beginfsfn(elFileState *fs, elFileFnState *fn, char *line) {
 	fn->enclosing = fs->fn;
 	fn->entities = fs->nentities;
 	fn->bytes = fs->md->nbytes;
 	fn->line = line;
-	fn->yj = lnil;
+	fn->yj = elNIL;
 	fs->fn = fn;
 	elf_enterblock(fs,&fn->entry,0);
 }
 
 
-void elf_closefsfn(elf_FileState *fs) {
+void elf_closefsfn(elFileState *fs) {
 	langL_fnepiloge(fs,fs->lasttk.line);
 	elf_ensure(fs->fn->block == &fs->fn->entry);
 	elf_leaveblock(fs);
@@ -304,7 +305,7 @@ void elf_closefsfn(elf_FileState *fs) {
 }
 
 
-elf_nodeid *elf_fsloadcallargs(elf_FileState *fs) {
+elf_nodeid *elf_fsloadcallargs(elFileState *fs) {
 	/* ( x { , x } ) */
 	elf_nodeid *z = 0;
 	if (elf_picktk(fs,TK_PAREN_LEFT)) {
@@ -347,7 +348,7 @@ elf_nodeop tktonode(ltokentype tk) {
 }
 
 
-elf_nodeid elfY_loadsubexpr(elf_FileState *fs, int rank) {
+elf_nodeid elfY_loadsubexpr(elFileState *fs, int rank) {
 	elf_nodeid x = elf_fsloadunary(fs);
 	if (x == NO_NODE) return x;
 	for (;;) {
@@ -372,7 +373,7 @@ elf_nodeid elfY_loadsubexpr(elf_FileState *fs, int rank) {
 }
 
 
-elf_nodeid elfY_loadfn(elf_FileState *fs) {
+elf_nodeid elfY_loadfn(elFileState *fs) {
 
 	elf_token tk = elf_taketk(fs,TK_FUN);
 
@@ -383,7 +384,7 @@ elf_nodeid elfY_loadfn(elf_FileState *fs) {
 	skip this function's code. */
 	int fj = elf_emitjump(fs,tk.line,-1);
 
-	elf_FileFunc fn = {0};
+	elFileFnState fn = {0};
 	elf_beginfsfn(fs,&fn,tk.line);
 
 	int arity = 0;
@@ -414,7 +415,7 @@ elf_nodeid elfY_loadfn(elf_FileState *fs) {
 	elf_closefsfn(fs);
 
 	/* add this function to the type table */
-	elf_Proto p = {0};
+	elProto p = {0};
 	p.x = arity;
 	p.y = fn.nyield;
 	p.nlocals = fn.nlocals;
@@ -427,7 +428,7 @@ elf_nodeid elfY_loadfn(elf_FileState *fs) {
 	langL_tieloosej(fs,fj);
 
 	/* todo: */
-	elf_nodeid *z = lnil;
+	elf_nodeid *z = elNIL;
 	elf_arrfori(fn.captures) {
 		elf_varadd(z,elf_nodelocal(fs,tk.line,fs->entities[fn.captures[i].x].slot));
 	}
@@ -436,7 +437,7 @@ elf_nodeid elfY_loadfn(elf_FileState *fs) {
 }
 
 
-void elf_fsmayassign(elf_FileState *fs, elf_nodeid x) {
+void elf_fsmayassign(elFileState *fs, elf_nodeid x) {
 	elf_token tk = fs->tk;
 	elf_localid mem = fs->fn->xmemory;
 	if (elf_picktk(fs,TK_ASSIGN)) {
@@ -488,11 +489,11 @@ void elf_fsmayassign(elf_FileState *fs, elf_nodeid x) {
 }
 
 
-elf_nodeid elf_fsloadtable(elf_FileState *fs) {
+elf_nodeid elf_fsloadtable(elFileState *fs) {
 	elf_token tk = fs->tk;
 	elf_taketk(fs,TK_CURLY_LEFT);
-	elf_nodeid *z = lnil;
-	elf_nodeid table = elf_nodetab(fs,tk.line,lnil);
+	elf_nodeid *z = elNIL;
+	elf_nodeid table = elf_nodetab(fs,tk.line,elNIL);
 	int index = 0;
 	while (!elf_termtk(fs,TK_CURLY_RIGHT)) {
 		if (elf_testthentk(fs,TK_ASSIGN)) {
@@ -525,7 +526,7 @@ elf_nodeid elf_fsloadtable(elf_FileState *fs) {
 }
 
 
-elf_nodeid elf_fsloadexpr(elf_FileState *fs) {
+elf_nodeid elf_fsloadexpr(elFileState *fs) {
 	/* todo?: do this in else where? */
 	switch (fs->tk.type) {
 		case TK_NONE:
@@ -539,7 +540,7 @@ elf_nodeid elf_fsloadexpr(elf_FileState *fs) {
 }
 
 
-elf_nodeid elf_fsloadunary(elf_FileState *fs) {
+elf_nodeid elf_fsloadunary(elFileState *fs) {
 	LDODEBUG(
 		if (fs->debuggerflag) {
 			elf_debugger("__ELF_FILE_BREAK__");
@@ -690,7 +691,7 @@ elf_nodeid elf_fsloadunary(elf_FileState *fs) {
 
 
 /* todo: make this legit */
-void elfY_loadenumlist(elf_FileState *fs) {
+void elfY_loadenumlist(elFileState *fs) {
 	if (!elf_testtk(fs,TK_CURLY_RIGHT)) {
 		do {
 			/* , } */
@@ -708,10 +709,10 @@ void elfY_loadenumlist(elf_FileState *fs) {
 }
 
 
-void elf_fsloadstat(elf_FileState *fs) {
+void elf_fsloadstat(elFileState *fs) {
 	elf_localid mem = fs->fn->xmemory;
 	elf_token tk = fs->tk;
-	elf_FileFunc *fn = fs->fn;
+	elFileFnState *fn = fs->fn;
 	elf_fileblock *bl = fn->block;
 	if (bl->flags & BLOCK_ENDED) {
 		elf_filediag(fs,tk.line,"warning: unreachable statement");
@@ -724,10 +725,10 @@ void elf_fsloadstat(elf_FileState *fs) {
 			if (tk.type == TK_FINALLY) {
 				elf_filediag(fs,tk.line,"warning: please consider using 'lastly' instead, 'finally' could change semantics in the future");
 			}
-			FileBlock bl = {0};
-			langL_begindelayedblock(fs,tk.line,&bl);
+			elf_fileblock bl = {0};
+			elf_enterlastlyblock(fs,tk.line,&bl);
 			elf_fsloadstat(fs);
-			langL_closedelayedblock(fs,tk.line,&bl);
+			elf_closelastlyblock(fs,tk.line,&bl);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
 		case TK_IF: case TK_IFF: { elf_lexone(fs);
@@ -775,7 +776,7 @@ void elf_fsloadstat(elf_FileState *fs) {
 					tk = elf_lexone(fs);
 				}
 			}
-			elf_bool enm = tk.type == TK_ENUM;
+			elBool enm = tk.type == TK_ENUM;
 			if (elf_picktk(fs,TK_CURLY_LEFT)) {
 				elfY_loadenumlist(fs);
 				elf_taketk(fs,TK_CURLY_RIGHT);

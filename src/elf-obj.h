@@ -30,7 +30,7 @@ typedef enum elf_objty {
 } elf_objty;
 
 
-typedef struct elf_Object {
+typedef struct elObject {
 	// TODO: REMOVE THIS
 #if defined(_DEBUG)
 	int headtrap;
@@ -38,13 +38,13 @@ typedef struct elf_Object {
 	elf_objty type;
 	elf_objgc gccolor;
 	// TODO: REMOVE THIS
-	elf_int tell;
-	elf_Table *metatable;
+	elInteger tell;
+	elTable *metatable;
 	// TODO: REMOVE THIS
 #if defined(_DEBUG)
 	int tailtrap;
 #endif
-} elf_Object;
+} elObject;
 
 
 
@@ -62,24 +62,24 @@ elf_globaldecl char const *tag2s[] = {
 #undef TAGENUM
 
 
-typedef struct elf_Value {
+typedef struct elValue {
 	elf_tag tag;
 	union {
-		Ptr           p,x_ptr;
-		elf_Handle    h;
-		lBinding      c;
-		elf_int   	  i,x_int;
-		elf_num   	  n,x_num;
+		elAddr           p,x_ptr;
+		elHandle    h;
+		elBinding      c;
+		elInteger   	  i,x_int;
+		elNumber   	  n,x_num;
 		elf_Closure  *f,*x_cls;
-		elf_Object   *j,*x_obj;
-		elf_Table    *t,*x_tab;
-		elf_String   *s,*x_str;
+		elObject   *j,*x_obj;
+		elTable    *t,*x_tab;
+		elString   *s,*x_str;
 	};
-} elf_Value;
+} elValue;
 
 
 typedef struct elf_Closure {
-	elf_Object obj;
+	elObject obj;
    /* I guess one of the things we could do
    if we ever get to having multi-byte encoding,
    is encode the entire prototype in the
@@ -88,19 +88,19 @@ typedef struct elf_Closure {
    If not, then there's no need to store the
    whole prototype here, we can instead store an
    index into the proto table. */
-	elf_Proto   fn;
+	elProto   fn;
 	elf_byteid     j;
    /* allocated past this point */
-	elf_Value caches[1];
+	elValue caches[1];
 } elf_Closure;
 
 
-elf_api elf_Value elf_valtab(elf_Table *);
-elf_api elf_Value elf_valbid(lBinding);
-elf_api elf_Value elf_valstr(elf_String *);
-elf_api elf_Value elf_valcls(elf_Closure *);
-elf_api elf_Value elf_valint(elf_int i);
-elf_api elf_Value elf_valnum(elf_num n);
+elf_api elValue elf_valtab(elTable *);
+elf_api elValue elf_valbid(elBinding);
+elf_api elValue elf_valstr(elString *);
+elf_api elValue elf_valcls(elf_Closure *);
+elf_api elValue elf_valint(elInteger i);
+elf_api elValue elf_valnum(elNumber n);
 
 
 

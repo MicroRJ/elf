@@ -29,7 +29,7 @@ if 0 ? {
 
 
 // let fn = fun(x) ? {
-// 	if x == lnil ? x = 1
+// 	if x == elNIL ? x = 1
 // 	for i in 0..12 ? pf("welcome")
 // }
 

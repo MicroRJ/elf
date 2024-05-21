@@ -1,0 +1,8 @@
+inc = fun(x,y) ? {
+	elf.pf(x)
+	leave x + y
+}
+elf.bytelogging(true)
+let val = 1
+val = inc(val,2)
+elf.pf(val)

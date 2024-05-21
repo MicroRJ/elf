@@ -114,17 +114,17 @@ at the same time when using clang-cl */
 #endif
 
 
-#define lfalse ((elf_bool)(0))
-#define ltrue ((elf_bool)(1))
-#define lnil ((Ptr)(0))
+#define lfalse ((elBool)(0))
+#define ltrue ((elBool)(1))
+#define elNIL ((elAddr)(0))
 
 
-typedef struct elf_State elf_State;
-typedef struct elf_Module elf_Module;
-typedef struct elf_FileState elf_FileState;
-typedef struct elf_Table elf_Table;
-typedef struct elf_String elf_String;
-typedef struct elf_Object elf_Object;
+typedef struct elState elState;
+typedef struct elModule elModule;
+typedef struct elFileState elFileState;
+typedef struct elTable elTable;
+typedef struct elString elString;
+typedef struct elObject elObject;
 typedef struct elf_Closure elf_Closure;
 
 

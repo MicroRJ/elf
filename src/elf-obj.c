@@ -5,17 +5,17 @@
 */
 
 
-elf_bool elf_tagisnumeric(elf_tag tag) {
+elBool elf_tagisnumeric(elf_tag tag) {
 	return (tag == TAG_NUM) || (tag == TAG_INT);
 }
 
 
-int elf_valisnil(elf_Value x) {
-	return (x.tag == TAG_NIL) || (!elf_tagisnumeric(x.tag) && (x.p == lnil));
+int elf_valisnil(elValue x) {
+	return (x.tag == TAG_NIL) || (!elf_tagisnumeric(x.tag) && (x.p == elNIL));
 }
 
 
-elf_bool elf_tagisobj(elf_tag tag) {
+elBool elf_tagisobj(elf_tag tag) {
 	switch (tag) {
 		case TAG_STR: case TAG_TAB:
 		case TAG_OBJ: case TAG_CLS: {
@@ -37,56 +37,56 @@ elf_tag elf_objtotag(elf_objty type) {
 }
 
 
-elf_api elf_Value elf_valtab(elf_Table *tab) {
-	elf_Value v = LITC(elf_Value){TAG_TAB};
+elf_api elValue elf_valtab(elTable *tab) {
+	elValue v = LITC(elValue){TAG_TAB};
 	v.x_tab = tab;
 	return v;
 }
 
 
-elf_api elf_Value elf_valbid(lBinding c) {
-	elf_Value v = LITC(elf_Value){TAG_BID};
+elf_api elValue elf_valbid(elBinding c) {
+	elValue v = LITC(elValue){TAG_BID};
 	v.c = c;
 	return v;
 }
 
 
-elf_api elf_Value elf_valsys(elf_Handle h) {
-	elf_Value v = LITC(elf_Value){TAG_SYS};
+elf_api elValue elf_valsys(elHandle h) {
+	elValue v = LITC(elValue){TAG_SYS};
 	v.h = h;
 	return v;
 }
 
 
-elf_api elf_Value elf_valstr(elf_String *s) {
-	elf_Value v = LITC(elf_Value){TAG_STR};
+elf_api elValue elf_valstr(elString *s) {
+	elValue v = LITC(elValue){TAG_STR};
 	v.s = s;
 	return v;
 }
 
 
-elf_api elf_Value elf_valcls(elf_Closure *f) {
-	elf_Value v = LITC(elf_Value){TAG_CLS};
+elf_api elValue elf_valcls(elf_Closure *f) {
+	elValue v = LITC(elValue){TAG_CLS};
 	v.f = f;
 	return v;
 }
 
 
-elf_api elf_Value elf_valint(elf_int i) {
-	elf_Value v = (elf_Value){TAG_INT};
+elf_api elValue elf_valint(elInteger i) {
+	elValue v = (elValue){TAG_INT};
 	v.i = i;
 	return v;
 }
 
 
-elf_api elf_Value elf_valnum(elf_num n) {
-	elf_Value v = (elf_Value){TAG_NUM};
+elf_api elValue elf_valnum(elNumber n) {
+	elValue v = (elValue){TAG_NUM};
 	v.n = n;
 	return v;
 }
 
 
-int elf_valfpf(FILE *file, elf_Value v, elf_bool quotes) {
+int elf_valfpf(FILE *file, elValue v, elBool quotes) {
 	switch (v.tag) {
 		case TAG_NIL: return fprintf(file,"nil");
 		case TAG_SYS: return fprintf(file,"h%llX",v.i);
@@ -96,7 +96,7 @@ int elf_valfpf(FILE *file, elf_Value v, elf_bool quotes) {
 		case TAG_BID: return fprintf(file,"C()");
 		case TAG_TAB: {
 			int wrote = 0;
-			elf_Table *t = v.t;
+			elTable *t = v.t;
 			wrote += fprintf(file,"{");
 			elf_arrfori(t->v) {
 				if (i != 0) wrote += fprintf(file,", ");

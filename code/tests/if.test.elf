@@ -1,4 +1,4 @@
-if 0 == lnil ? failed = true
+if 0 == elNIL ? failed = true
 if false ? failed = true
 iff true ? failed = true
 let test = fun(x,y) ? {

@@ -15,8 +15,8 @@ typedef struct elf_token {
 	unsigned int eol: 1;
 	union {
 		char *s;
-		elf_int i;
-		elf_num n;
+		elInteger i;
+		elNumber n;
 	};
 } elf_token;
 

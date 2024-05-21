@@ -84,43 +84,43 @@ typedef struct elf_Node {
 	/* todo?: don't quite union these two for debugging? */
 	union {
 		char   *s;
-		elf_int i;
-		elf_num n;
+		elInteger i;
+		elNumber n;
 	} lit;
 } elf_Node;
 
 
-elf_nodeid elf_nodexyz(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y, elf_nodeid *z);
-elf_nodeid elf_nodebinary(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y);
-elf_nodeid elf_nodeunary(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x);
-elf_nodeid elf_nodenullary(elf_FileState *fs, elf_lineid, elf_nodeop k, elf_nodety t);
+elf_nodeid elf_nodexyz(elFileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y, elf_nodeid *z);
+elf_nodeid elf_nodebinary(elFileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodeunary(elFileState *fs, elf_lineid, elf_nodeop k, elf_nodety t, elf_nodeid x);
+elf_nodeid elf_nodenullary(elFileState *fs, elf_lineid, elf_nodeop k, elf_nodety t);
 
-elf_nodeid elf_nodegroup(elf_FileState *fs, elf_lineid, elf_nodeid x);
+elf_nodeid elf_nodegroup(elFileState *fs, elf_lineid, elf_nodeid x);
 
-elf_nodeid elf_nodenil(elf_FileState *fs, elf_lineid);
-elf_nodeid elf_nodeint(elf_FileState *fs, elf_lineid, elf_int i);
-elf_nodeid elf_nodenum(elf_FileState *fs, elf_lineid, elf_num n);
-elf_nodeid elf_nodestr(elf_FileState *fs, elf_lineid, char *);
-elf_nodeid elf_nodetab(elf_FileState *fs, elf_lineid, elf_nodeid *z);
-elf_nodeid elf_nodecls(elf_FileState *fs, elf_lineid, elf_nodeid x, elf_nodeid *z);
+elf_nodeid elf_nodenil(elFileState *fs, elf_lineid);
+elf_nodeid elf_nodeint(elFileState *fs, elf_lineid, elInteger i);
+elf_nodeid elf_nodenum(elFileState *fs, elf_lineid, elNumber n);
+elf_nodeid elf_nodestr(elFileState *fs, elf_lineid, char *);
+elf_nodeid elf_nodetab(elFileState *fs, elf_lineid, elf_nodeid *z);
+elf_nodeid elf_nodecls(elFileState *fs, elf_lineid, elf_nodeid x, elf_nodeid *z);
 
-elf_nodeid elf_nodeload(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodeload(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
-elf_nodeid elf_nodelocal(elf_FileState *fs, elf_lineid line, elf_nodeid i);
-elf_nodeid elf_nodeglobal(elf_FileState *fs, elf_lineid line, elf_nodeid i);
-elf_nodeid elf_nodeclsval(elf_FileState *fs, elf_lineid line, elf_nodeid i);
+elf_nodeid elf_nodelocal(elFileState *fs, elf_lineid line, elf_nodeid i);
+elf_nodeid elf_nodeglobal(elFileState *fs, elf_lineid line, elf_nodeid i);
+elf_nodeid elf_nodeclsval(elFileState *fs, elf_lineid line, elf_nodeid i);
 
-elf_nodeid elf_nodetypeguard(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodety y);
-elf_nodeid elf_nodemetafield(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
-elf_nodeid elf_nodefield(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
-elf_nodeid elf_nodeindex(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodetypeguard(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodety y);
+elf_nodeid elf_nodemetafield(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodefield(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_nodeindex(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
-elf_nodeid elf_nodeloadfile(elf_FileState *fs, elf_lineid line, elf_nodeid x);
+elf_nodeid elf_nodeloadfile(elFileState *fs, elf_lineid line, elf_nodeid x);
 
-elf_nodeid elf_noderangedindex(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
+elf_nodeid elf_noderangedindex(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 
-elf_nodeid elf_nodebuiltincall(elf_FileState *fs, elf_lineid line, ltokentype k, elf_nodeid *z);
-elf_nodeid elf_nodecall(elf_FileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid *z);
+elf_nodeid elf_nodebuiltincall(elFileState *fs, elf_lineid line, ltokentype k, elf_nodeid *z);
+elf_nodeid elf_nodecall(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid *z);
 
 
 elf_tag elf_nodettotag(elf_nodety ty) {

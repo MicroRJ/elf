@@ -15,7 +15,7 @@ typedef struct ldebugloc {
 
 
 void lang_setasserthook(int (*hook)(ldebugloc));
-void lang_assertfn(ldebugloc ind, char const *name, elf_bool expr);
+void lang_assertfn(ldebugloc ind, char const *name, elBool expr);
 
 
 #define LHERE (ldebugloc){__FILE__,__LINE__,__func__}
@@ -44,7 +44,7 @@ void lang_assertfn(ldebugloc ind, char const *name, elf_bool expr);
 
 
 #if defined(_DEBUG)
-	#define LCHECKPRINTF(FORMAT,...) ((lfalse)?(snprintf(lnil,0,FORMAT,##__VA_ARGS__),lnil):lnil)
+	#define LCHECKPRINTF(FORMAT,...) ((lfalse)?(snprintf(elNIL,0,FORMAT,##__VA_ARGS__),elNIL):elNIL)
 #else
 	#define LCHECKPRINTF(FORMAT,...) 0
 #endif

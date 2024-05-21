@@ -5,9 +5,9 @@
 */
 
 
-elf_int elf_varaddxx(void **var, elf_int per, elf_int res, elf_int com) {
-	elf_int max = 0;
-	elf_int min = 0;
+elInteger elf_varaddxx(void **var, elInteger per, elInteger res, elInteger com) {
+	elInteger max = 0;
+	elInteger min = 0;
 	elf_var *arr = 0;
 	if (*var != 0) {
 		arr = ((elf_var*)(*var)) - 1;

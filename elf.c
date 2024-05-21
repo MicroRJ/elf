@@ -17,8 +17,8 @@ int main(int n, char **c) {
 	elf_cliopts cli = {0};
 	if (elf_loadcliopts(&cli,n,c)) return 0;
 
-	elf_Module M = {0};
-	elf_State R = {0};
+	elModule M = {0};
+	elState R = {0};
 	elf_runini(&R,&M);
 	if (cli.logging) R.bytelogging = ltrue;
 
@@ -26,10 +26,10 @@ int main(int n, char **c) {
 	frame.base = R.top;
 	R.frame = &frame;
 
-	if (cli.filename != lnil) {
-		elf_String *filename = elf_pushnewstr(&R,cli.filename);
+	if (cli.filename != elNIL) {
+		elString *filename = elf_pushnewstr(&R,cli.filename);
 		filename->obj.gccolor = GC_PINK;
-		elf_FileState fs = {0};
+		elFileState fs = {0};
 		elf_loadfilefs(&R,&fs,filename,0,0);
 	}
 	if (cli.dump) {
@@ -37,7 +37,7 @@ int main(int n, char **c) {
 		if (strcmp(cli.dumpfilename,"stdout")) {
 			dumpf = fopen(elf_tpf("%s.module.ignore",cli.dumpfilename),"wb");
 		}
-		if (dumpf == lnil) {
+		if (dumpf == elNIL) {
 			printf("error: could open specified dump file for writting");
 		} else {
 			lang_dumpmodule(&M,dumpf);
