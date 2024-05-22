@@ -146,7 +146,7 @@ typedef struct elf_Closure elf_Closure;
 #include "src/elf-str.h"
 #include "src/elf-tab.h"
 #include "src/elf-node.h"
-#include "src/lcode.h"
+#include "src/elf-gen.h"
 #include "src/elf-file.h"
 
 
@@ -165,7 +165,7 @@ typedef struct elf_Closure elf_Closure;
 #include "src/lfunc.c"
 #include "src/elf-lex.c"
 #include "src/elf-node.c"
-#include "src/lcode.c"
+#include "src/elf-gen.c"
 #include "src/elf-file.c"
 #include "src/elf-api.c"
 

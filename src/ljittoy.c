@@ -129,7 +129,7 @@ void emit86_logxor(ljValue x, ljValue y) {
 }
 
 
-void emit86_shift(lbyteop type, ljValue x, ljValue y) {
+void emit86_shift(elf_byteop type, ljValue x, ljValue y) {
 	ljValue xx = x;
 	if (xx.type == JIT_MEM) emit86_mov(x = REG(RAX),xx);
 	if (x.type == JIT_GPR && y.type == JIT_IMM) {

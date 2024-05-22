@@ -34,10 +34,6 @@ void elf_runini(elState *R, elModule *M) {
 	R->cache.__div1 = elf_pushnewstr(R,"__div1");
 
 	#if !defined(ELF_NOLIBS)
-	/* todo: eventually we'll load these from the
-	source code, each lib will be built independently,
-	or maybe we can add a flag so that we don't load
-	these libraries. */
 	netlib_load(R);
 	tstlib_load(R);
 	crtlib_load(R);
@@ -223,6 +219,32 @@ int elf_loadfile(elState *R, elString *filename, elf_localid rxy, int ny) {
 }
 
 
+void elf_checkdivbyzro(elState *S, elValue xx, elValue yy) {
+	if ((yy.tag == TAG_NUM) && (yy.n == 0.)) elf_throw(S,NO_BYTE,"division by zero");
+	else if ((yy.tag == TAG_INT) && (yy.i == 0)) elf_throw(S,NO_BYTE,"integer division by zero");
+}
+
+
+int elf_calloverload(elState *S, elObject *obj, elf_localid rx, elValue in, elString *name) {
+	elValue field = elf_tabgetfld(obj->metatable,name);
+
+	if (field.tag != TAG_CLS) {
+		elf_throw(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
+	}
+
+	/* So overloads are only for objects so is fine to
+	override rx */
+	S->call->locals[rx] = in;
+	int ny = elf_callexx(S,obj,field,rx,rx,1,1);
+
+	if (ny < 1) {
+		elf_throw(S,NO_BYTE,"overload function must return at least one value");
+	}
+	return ny;
+}
+
+
+
 /* todo: Can we add a failsafe system that attempts
 to recover from failed instructions?
 So any instructions that depend on a previous
@@ -377,6 +399,7 @@ int elf_run(elState *R) {
 		if (xx.tag == TAG_TAB) {
 			locals[b.x] = elf_tablookup(xx.x_tab,yy);
 		} else if (xx.tag == TAG_OBJ) {
+
 	elValue overload = elf_tabgetfld(xx.x_obj->metatable,R->cache.__getfield);
 	if (overload.tag != TAG_NIL) {
 		if (overload.tag == TAG_CLS || overload.tag == TAG_BID) {
@@ -387,6 +410,7 @@ int elf_run(elState *R) {
 			}
 		} else elf_throw(R,NO_BYTE,"__getfield operator must be a function");
 	} else elf_throw(R,NO_BYTE,"__getfield operator is not implemented for this object");
+
 		} else if (xx.tag == TAG_STR) {
 			elf_tycheck(R,bc,0,TAG_INT,yy.tag);
 			locals[b.x].tag = TAG_INT;
@@ -489,13 +513,11 @@ int elf_run(elState *R) {
 		elValue xx = locals[b.y];\
 		elValue yy = locals[b.z];\
 		if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-			if ((yy.tag == TAG_NUM) && (yy.n == 0.)) elf_throw(R,NO_BYTE,"division by zero");\
-			else if ((yy.tag == TAG_INT) && (yy.i == 0)) elf_throw(R,NO_BYTE,"integer division by zero");\
+			elf_checkdivbyzro(R,xx,yy);\
 		}\
 		locals[b.x].tag = TAG_INT;\
 		locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\
 	} break
-	/* FN1 is actually so silly */
 	#define CASE_BOP(OPCODE,OP,FN,FN1) \
 	case OPCODE : {\
 		elValue xx = locals[b.y];\
@@ -503,21 +525,12 @@ int elf_run(elState *R) {
 		if (elf_tagisobj(xx.tag) || elf_tagisobj(yy.tag)) {\
 			if (!elf_tagisobj(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first");\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				if ((yy.tag == TAG_NUM) && (yy.n == 0.)) elf_throw(R,NO_BYTE,"division by zero");\
-				else if ((yy.tag == TAG_INT) && (yy.i == 0)) elf_throw(R,NO_BYTE,"integer division by zero");\
+				elf_checkdivbyzro(R,xx,yy);\
 			}\
-			elString *mfname = FN;\
-			if (!elf_tagisobj(yy.tag)) mfname = FN1;\
-			elValue mfield = elf_tabgetfld(xx.x_obj->metatable,mfname);\
-			if (mfield.tag == TAG_CLS) {\
-				locals[b.x] = yy;\
-				int ny = elf_callexx(R,xx.x_obj,mfield,b.x,b.x,1,1);\
-				if (ny < 1) elf_throw(R,bc,"function must return atleast one value");\
-			} else elf_throw(R,bc,elf_tpf("'%s': overload is %s, not a function",mfname->c,tag2s[mfield.tag]));\
+			elf_calloverload(R,xx.x_obj,b.x,yy,elf_tagisobj(yy.tag)?FN:FN1);\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				if ((yy.tag == TAG_NUM) && (yy.n == 0.)) elf_throw(R,NO_BYTE,"division by zero");\
-				else if ((yy.tag == TAG_INT) && (yy.i == 0)) elf_throw(R,NO_BYTE,"integer division by zero");\
+				elf_checkdivbyzro(R,xx,yy);\
 			}\
 			if (!elf_tagisnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			locals[b.x].tag = TAG_NUM;\
@@ -525,8 +538,7 @@ int elf_run(elState *R) {
 		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {\
 			if (!elf_tagisnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				if ((yy.tag == TAG_NUM) && (yy.n == 0.)) elf_throw(R,NO_BYTE,"division by zero");\
-				else if ((yy.tag == TAG_INT) && (yy.i == 0)) elf_throw(R,NO_BYTE,"integer division by zero");\
+				elf_checkdivbyzro(R,xx,yy);\
 			}\
 			locals[b.x].tag = TAG_INT;\
 			locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\

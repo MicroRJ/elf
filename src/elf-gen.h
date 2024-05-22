@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** (L) lcode.h
+** elf-gen.h
 ** Bytecode Generator (node -> bytecode)
 */
 
@@ -69,7 +69,7 @@ typedef struct Select {
 
 void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
 void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_localid x, elf_localid y, elf_nodeid id);
-elf_localid langL_localize(elFileState *fs, elf_lineid line, elf_nodeid id);
+elf_localid elf_genlocalize(elFileState *fs, elf_lineid line, elf_nodeid id);
 
 
 void elf_enterlastlyblock(elFileState *fs, elf_lineid line, elf_fileblock *bl);

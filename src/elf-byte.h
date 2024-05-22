@@ -12,7 +12,7 @@ typedef enum lbyteclass {
 } lbyteclass;
 
 
-typedef enum lbyteop {
+typedef enum elf_byteop {
 	BC_HALT = 0,
 	BC_J,
 	/* counter pairs, must start at even value, ^1 to get opposite */
@@ -67,7 +67,7 @@ typedef enum lbyteop {
 	BC_MUL, BC_DIV, BC_MOD,
 	BC_ADD, BC_SUB,
 	BC_SHL, BC_SHR, BC_XOR, BC_BITOR
-} lbyteop;
+} elf_byteop;
 
 
 /* -- todo: eventually this will be made more
@@ -76,7 +76,7 @@ simple, for teaching, and fast prototyping,
 I'm not worrying too much about it...
 though it would help performance quite a bit... */
 typedef struct elf_Bytecode {
-	lbyteop k;
+	elf_byteop k;
 	union {
 		elInteger  i;
 		struct {
@@ -86,7 +86,7 @@ typedef struct elf_Bytecode {
 } elf_Bytecode;
 
 
-lbyteclass lang_byteclass(lbyteop k) {
+lbyteclass lang_byteclass(elf_byteop k) {
 	switch (k) {
 		case BC_JZ:
 		case BC_JNZ:
@@ -125,7 +125,7 @@ lbyteclass lang_byteclass(lbyteop k) {
 }
 
 
-char const *lang_bytename(lbyteop k) {
+char const *lang_bytename(elf_byteop k) {
 	switch (k) {
 		case BC_LOADNUM: return "loadnum";
 		case BC_LOADINT: return "loadint";

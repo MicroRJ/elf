@@ -209,7 +209,7 @@ elf_nodeid elf_fsnewlocalentity(elFileState *fs, elf_lineid line, char *name, el
 
 		/* -- todo: for compile time constants,
 		no slot allocation required */
-		elf_localid slot = langL_localalloc(fs,1);
+		elf_localid slot = elf_genlocalalloc(fs,1);
 		fs->entities[id.x].slot = slot;
 		fs->entities[id.x].enm  = enm;
 		fs->entities[id.x].name = name;
@@ -480,7 +480,7 @@ void elf_fsmayassign(elFileState *fs, elf_nodeid x) {
 			y = elf_nodebinary(fs,op.line,tktonode(op.type),fs->nodes[x].t,x,y);
 			langL_moveto(fs,op.line,x,y);
 		} else {
-			elf_localid r = langL_localalloc(fs,1);
+			elf_localid r = elf_genlocalalloc(fs,1);
 			langL_localload(fs,NO_LINE,lfalse,r,0,x);
 		}
 		fs->fn->xmemory = mem;
@@ -850,7 +850,7 @@ void elf_fsloadstat(elFileState *fs) {
 					lo = elf_nodeint(fs,tk.line,0);
 					/* todo: add type guard */
 					hi = elf_nodemetafield(fs,tk.line,y,elf_nodestr(fs,tk.line,"length"));
-					i = elf_nodelocal(fs,tk.line,langL_localalloc(fs,1));
+					i = elf_nodelocal(fs,tk.line,elf_genlocalalloc(fs,1));
 				}
 			}
 			elf_beginrangedloop(fs,tk.line,i,lo,hi);
