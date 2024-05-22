@@ -18,6 +18,7 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"idx",elf_tabidx_);
 	elf_tabmfld(R,tab,"xrem",elf_tabxrem_);
 	elf_tabmfld(R,tab,"alias",elf_tabalias_);
+	elf_tabmfld(R,tab,"bubblesort",elf_tabbubblesort_);
 	return tab;
 }
 
@@ -39,7 +40,7 @@ elTable *elf_newtab(elState *R) {
 
 
 void elf_deltab(elTable *tab) {
-	elf_delmem(lHEAP,tab->slots);
+	elf_dealloc(lHEAP,tab->slots);
 	elf_delvar(tab->array);
 	tab->array = 0;
 	tab->slots = 0;
@@ -132,7 +133,7 @@ void elf_tabcheck(elTable *table) {
 			newtable.slots[newslot] = slot;
 		}
 
-		elf_delmem(lHEAP,table->slots);
+		elf_dealloc(lHEAP,table->slots);
 
 		table->ntotal = newtable.ntotal;
 		table->slots = newtable.slots;
@@ -344,6 +345,68 @@ int elf_tabalias_(elState *R) {
 	elf_checkargs(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
 	elTable *tab = (elTable *) elf_getthis(R);
 	elf_tabalias(R,tab,elf_getany(R,0),elf_getany(R,1));
+	return 0;
+}
+
+
+int elf_tabbubblesort_(elState *R) {
+	elf_checkargs(R,":bubblesort",1,"comparator function");
+	elTable *tab = (elTable *) elf_getthis(R);
+	elValue *arr = tab->array;
+	elClosure *cls = elf_getcls(R,0);
+	elBool sorted = lfalse;
+	do {
+		sorted = ltrue;
+		for (elInteger i = 0; i < elf_varlen(arr)-1; ++ i) {
+			elValue *top = elf_gettop(R);
+			elf_localid base = elf_pushcls(R,cls);
+			elf_pushany(R,arr[i+0]);
+			elf_pushany(R,arr[i+1]);
+			int r = elf_callfn(R,base,2,1);
+			elf_ensure(r == 1);
+			if (elf_getint(R,base)) {
+				elValue tmp = arr[i+0];
+				arr[i+0] = arr[i+1];
+				arr[i+1] = tmp;
+				sorted = lfalse;
+			}
+			elf_settop(R,top);
+		}
+	} while(sorted != ltrue);
+
+	#if 0
+	typedef struct kitem { elInteger k,i; } kitem;
+	elInteger nlist = tab->nslots;
+	kitem *klist = elf_alloc(lHEAP,sizeof(kitem)*nlist);
+	for (elInteger i = 0; i < tab->ntotal; ++ i) {
+		elf_tabslot slot = tab->slots[i];
+		if (slot.k.tag==TAG_NIL) continue;
+		klist[i].k = i;
+		klist[i].i = slot.i;
+	}
+
+	elClosure *cls = elf_getcls(R,0);
+	elBool sorted = lfalse;
+	do {
+		sorted = ltrue;
+		for (elInteger i = 0; i < nlist-1; ++ i) {
+			kitem item = klist[i];
+			elValue *top = elf_gettop(R);
+			elf_localid base = elf_pushcls(R,cls);
+			elf_pushany(R,tab->array[item.i]);
+			int r = elf_callfn(R,base,1,1);
+			elf_ensure(r == 1);
+			if (elf_getint(R,base)) {
+				klist[i+0] = klist[i+1];
+				klist[i+1] = item;
+				sorted = lfalse;
+			}
+			elf_settop(R,top);
+		}
+	} while(sorted != ltrue);
+
+	elf_dealloc(lHEAP,klist);
+#endif
 	return 0;
 }
 

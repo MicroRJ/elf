@@ -21,7 +21,7 @@ typedef struct elf_CallFrame {
 	could be relative to this.locals */
 	elf_CallFrame *caller;
 	/* the closure this call frame belongs to */
-	elf_Closure *cl;
+	elClosure *cl;
 	/* the object for meta fields, meta calls and the likes */
 	elObject *obj;
 	/* pointer to base stack address, the callee should

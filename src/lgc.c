@@ -91,7 +91,7 @@ void elf_delobj(elState *R, elObject *obj) {
 		if (obj->type == OBJ_TAB) {
 			elf_deltab((elTable*)obj);
 		}
-		elf_delmem(lHEAP,obj);
+		elf_dealloc(lHEAP,obj);
 	}
 }
 
@@ -100,7 +100,7 @@ elInteger elf_marktab(elTable *table);
 
 
 /* todo: remove this function */
-elInteger elf_markcl(elf_Closure *cl) {
+elInteger elf_markcl(elClosure *cl) {
 	elInteger n = 0, k;
 	for (k=0; k<cl->fn.ncaches; ++k) {
 		n += elf_markval(&cl->caches[k]);
@@ -132,7 +132,7 @@ elBool elf_markobj(elObject *obj) {
 	}
 	obj->gccolor = GC_BLACK;
 	if (obj->type == OBJ_CLOSURE) {
-		return 1 + elf_markcl((elf_Closure*)obj);
+		return 1 + elf_markcl((elClosure*)obj);
 	}
 	if (obj->type == OBJ_TAB) {
 		return 1 + elf_marktab((elTable*)obj);

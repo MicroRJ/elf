@@ -253,7 +253,7 @@ elf_api Error sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
 				goto leave;
 			}
 		} else {
-			elf_delmem(allocfn,buf);
+			elf_dealloc(allocfn,buf);
 			error = Error_CouldNotReadFile;
 			goto leave;
 		}

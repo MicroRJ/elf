@@ -48,7 +48,7 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 int testlib_disasm(elState *c) {
 	elModule *md = c->md;
-	elf_Closure *cl = elf_getcls(c,0);
+	elClosure *cl = elf_getcls(c,0);
 	elProto p = cl->fn;
 	char file[BUFFER];
 	elf_memclear(file,sizeof(file));

@@ -37,7 +37,7 @@ typedef struct elf_var {
 #define elf_varfor(T,N,A) for (T N = A; N < A + elf_varlen(A); N += 1)
 #define elf_varjfor(A) for (elInteger j = 0; j < elf_varlen(A); ++ j)
 #define elf_arrfori(A) for (elInteger i = 0; i < elf_varlen(A); ++ i)
-#define elf_delvar(var) ((var != 0) ? elf_delmem(lHEAP,(elf_var*)(var)-1),0 : 0)
+#define elf_delvar(var) ((var != 0) ? elf_dealloc(lHEAP,(elf_var*)(var)-1),0 : 0)
 #define elf_varmax(var) ((var != 0) ? ((elf_var*)(var))[-1].max : 0)
 #define elf_varmin(var) ((var != 0) ? ((elf_var*)(var))[-1].min : 0)
 

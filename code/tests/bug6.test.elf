@@ -1,1 +1,37 @@
+vec2_ = {
+	__add = fun(that) ? vec2(this.x + that.x, this.y + that.y)
+	__add1 = fun(that) ? vec2(this.x + that, this.y + that)
+	__mul1 = fun(that) ? vec2(this.x * that, this.y * that)
+}
+vec2 = fun(x,y) ? {
+	leave elf.setmetatable({ x = x, y = y }, vec2_)
+}
+
+GetMoveController = fun() ? vec2(0,0)
+
 elf.bytelogging(true)
+let POSITION = vec2(0,0)
+// 00000000 0084   loadglobal(x=1,y=81)  // CLS
+// 00000000 0085   loadint(x=2,y=3) #0
+// 00000000 0086   loadint(x=3,y=4) #0
+// 00000000 0087   call(x=1,y=2,z=1)
+// 00000000 0088   reload(x=0,y=1)
+let SPEED = 300.
+//00000000 0089   loadnum(x=1,y=0) #300.000000
+vec_add = fun (a,b) ? {
+	leave vec2(a.x+b.x,a.y+b.y)
+}
+for i in 2 ? {
+	let MOVE = vec2(0,0)
+// 00000000 0094   loadglobal(x=5,y=81)  // CLS
+// 00000000 0095   loadint(x=6,y=7) #0
+// 00000000 0096   loadint(x=7,y=8) #0
+// 00000000 0097   call(x=5,y=2,z=1)
+// 00000000 0098   reload(x=4,y=5)
+	POSITION = POSITION + MOVE
+	 // * SPEED
+// 00000000 0099   mul(x=5,y=4,z=1)
+// 00000000 0100   add(x=0,y=0,z=5)
+	elf.pf("SPEED: ", SPEED)
+	elf.pf("INDEX: ", i)
+}

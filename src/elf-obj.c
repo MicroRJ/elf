@@ -65,7 +65,7 @@ elf_api elValue elf_valstr(elString *s) {
 }
 
 
-elf_api elValue elf_valcls(elf_Closure *f) {
+elf_api elValue elf_valcls(elClosure *f) {
 	elValue v = LITC(elValue){TAG_CLS};
 	v.f = f;
 	return v;

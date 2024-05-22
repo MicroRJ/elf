@@ -5,11 +5,6 @@
 */
 
 
-// TODO: PENDING BUG
-// var = foo(var,1,2)
-// ^^^^^^^^^^^^^^^^^^
-
-
 elBool elf_fscheckexpr(elFileState *fs, elf_lineid line, elf_nodeid id) {
 	if (id != NO_NODE) return lfalse;
 	elf_filediag(fs,line,"invalid expression");
@@ -731,13 +726,14 @@ void elf_fsloadstat(elFileState *fs) {
 			elf_closelastlyblock(fs,tk.line,&bl);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
-		case TK_IF: case TK_IFF: { elf_lexone(fs);
+		case TK_IF: case TK_IFF: {
+			elf_lexone(fs);
 			elf_nodeid x = elf_fsloadexpr(fs);
 			elf_taketk(fs,TK_QMARK);
 			elf_fileblock block = {0};
 			elf_enterblock(fs,&block,0);
 			Select s = {0};
-			langL_beginif(fs,tk.line,&s,x,tk.type==TK_IFF?L_IFF:L_IF);
+			elf_genbeginif(fs,tk.line,&s,x,tk.type==TK_IFF?L_IFF:L_IF);
 			elf_fsloadstat(fs);
 			while (!elf_testtk(fs,TK_NONE)) {
 				elf_fileblock block = {0};

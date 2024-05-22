@@ -143,7 +143,7 @@ void langL_fnepiloge(elFileState *fs, elf_lineid line) {
 ** expression, only one register is necessary, if no registers
 ** are given one is allocated and deallocated automatically.
 */
-elf_byteid langL_branchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, elf_nodeid id) {
+elf_byteid elf_genbranchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, elf_nodeid id) {
 	elf_Node v = fs->nodes[id];
 	elf_byteid j = NO_BYTE;
 
@@ -152,7 +152,7 @@ elf_byteid langL_branchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, 
 	if not provided one, allocate temporary
 	register here, notice how this is done
 	before we keep splitting, this will make
-	is so subsequent recursive calls to this
+	it so subsequent recursive calls to this
 	function won't keep allocating registers,
 	we get away with using only one register
 	due to the transitive nature of short
@@ -161,7 +161,7 @@ elf_byteid langL_branchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, 
 
 	switch (v.k) {
 		case NODE_GROUP: {
-			j = langL_branchif(fs,js,z,x,v.x);
+			j = elf_genbranchif(fs,js,z,x,v.x);
 		} break;
 		/* '&&' expressions short-circuits to a false
 		jump as early as possible and the opposite
@@ -169,11 +169,11 @@ elf_byteid langL_branchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, 
 		whatever the user specified */
 		case NODE_AND: {
 			langL_jumpiffalse(fs,js,x,v.x);
-			j = langL_branchif(fs,js,z,x,v.y);
+			j = elf_genbranchif(fs,js,z,x,v.y);
 		} break;
 		case NODE_OR: {
 			langL_jumpiftrue(fs,js,x,v.x);
-			j = langL_branchif(fs,js,z,x,v.y);
+			j = elf_genbranchif(fs,js,z,x,v.y);
 		} break;
 		default: {
 			langL_localload(fs,NO_LINE,lfalse,x,1,id);
@@ -195,12 +195,12 @@ elf_byteid langL_branchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, 
 
 
 elf_byteid langL_branchiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
-	return langL_branchif(fs,js,lfalse,x,id);
+	return elf_genbranchif(fs,js,lfalse,x,id);
 }
 
 
 elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
-	return langL_branchif(fs,js,ltrue,x,id);
+	return elf_genbranchif(fs,js,ltrue,x,id);
 }
 
 
@@ -349,68 +349,75 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 
 	fs->nodes[id].r = x;
 
+
+	#define UNUSED_CHECK \
+		if (y == 0) {\
+			elf_filediag(fs,line,"warning: unused expression");\
+			goto leave;\
+		}
+
 	/* some instructions have no side effects,
 	in which case, if the yield count is 0, the
 	instruction is not emitted */
 	switch (v.k) {
 		/* todo: remove this? */
 		case NODE_LOCAL: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			if (reload) {
 				elf_emitbytexy(fs,line,BC_RELOAD,x,v.x);
 			} else goto leave;
 		} break;
 		case NODE_THIS: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			elf_emitbyteop(fs,line,BC_LOADTHIS,x);
 		} break;
 		case NODE_CLSVAL: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			elf_emitbytexy(fs,line,BC_LOADCACHED,x,v.x);
 		} break;
 		case NODE_GLOBAL: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			elf_emitbytexy(fs,line,BC_LOADGLOBAL,x,v.x);
 		} break;
 		case NODE_NIL: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			/* -- todo: coalesce */
 			elf_emitbytexy(fs,line,BC_LOADNIL,x,y);
 		} break;
 		case NODE_INTEGER: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			/* todo: interning */
 			int yy = elf_varaddi(fs->md->ki,1);
 			fs->md->ki[yy] = v.lit.i;
 			elf_emitbytexy(fs,line,BC_LOADINT,x,yy);
 		} break;
 		case NODE_NUMBER: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			/* todo: interning */
 			int yy = elf_varaddi(fs->md->kn,1);
 			fs->md->kn[yy] = v.lit.n;
 			elf_emitbytexy(fs,line,BC_LOADNUM,x,yy);
 		} break;
 		case NODE_STRING: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			/* -- todo: allocate this in constant pool */
 			int g = lang_addglobal(fs->md,0,elf_valstr(elf_newstr(fs->rt,v.lit.s)));
 			elf_emitbytexy(fs,line,BC_LOADGLOBAL,x,g);
 		} break;
 		case NODE_TABLE: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			elf_ensure(v.line != 0);
 			elf_emitbytexy(fs,line,BC_TABLE,x,0);
 			elf_arrfori(v.z) langL_emit(fs,line,v.z[i]);
 		} break;
 		case NODE_FIELD: case NODE_INDEX: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			elf_localid xx = elf_genlocalize(fs,line,v.x);
 			elf_localid yy = elf_genlocalize(fs,line,v.y);
 			elf_emitbytexyz(fs,line,nodetobyte(v.k),x,xx,yy);
 		} break;
 		case NODE_CLOSURE: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			elf_localid xx = x;
 			elf_arrfori(v.z) {
 				if (i != 0) xx = elf_genlocalalloc(fs,1);
@@ -420,13 +427,13 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 			elf_emitbytexy(fs,line,BC_CLOSURE,x,v.x);
 		} break;
 		case NODE_TYPEGUARD: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			langL_localload(fs,line,reload,x,y,v.x);
 			fs->nodes[id].r = x = fs->nodes[v.x].r;
 			elf_emitbytexy(fs,v.line,BC_TYPEGUARD,x,elf_nodettotag(v.y));
 		} break;
 		case NODE_GROUP: {
-			if (y == 0) goto leave;
+			UNUSED_CHECK;
 			langL_localload(fs,line,reload,x,y,v.x);
 		} break;
 		/* -- todo: could do through libfn? */
@@ -586,9 +593,9 @@ void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y) 
 }
 
 
-void langL_beginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z) {
+void elf_genbeginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z) {
 	ljlist js = {0};
-	langL_branchif(fs,&js,z,NO_SLOT,x);
+	elf_genbranchif(fs,&js,z,NO_SLOT,x);
 	// if  0 = jz
 	// iff 1 = jnz
 	if (z == L_IF) {
@@ -625,7 +632,7 @@ void langL_addelse(elFileState *fs, elf_lineid line, Select *s) {
 
 void langL_addelif(elFileState *fs, elf_lineid line, Select *s, int x) {
 	langL_addelse(fs,line,s);
-	langL_beginif(fs,line,s,x,L_IF);
+	elf_genbeginif(fs,line,s,x,L_IF);
 }
 
 

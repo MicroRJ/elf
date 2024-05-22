@@ -125,7 +125,7 @@ typedef struct elFileState elFileState;
 typedef struct elTable elTable;
 typedef struct elString elString;
 typedef struct elObject elObject;
-typedef struct elf_Closure elf_Closure;
+typedef struct elClosure elClosure;
 
 
 #include "src/elf-tys.h"

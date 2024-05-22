@@ -25,7 +25,7 @@ elf_api elString *elf_getstr(elState *R, elf_localid x);
 elf_api elObject *elf_getobj(elState *R, elf_localid x);
 elf_api elTable *elf_gettab(elState *R, elf_localid x);
 elf_api elHandle elf_getsys(elState *R, elf_localid x);
-elf_api elf_Closure *elf_getcls(elState *R, elf_localid x);
+elf_api elClosure *elf_getcls(elState *R, elf_localid x);
 
 
 /*
@@ -104,7 +104,7 @@ elf_api elTable *elf_pushtab(elState *, elTable *t);
 elf_api elTable *elf_pushnewtab(elState *R);
 elf_api elTable *elf_pushnewlen(elState *R, elInteger len);
 
-elf_api elf_localid elf_pushcls(elState *, elf_Closure *f);
+elf_api elf_localid elf_pushcls(elState *, elClosure *f);
 elf_api elf_localid elf_pushnewcls(elState *, elProto fn);
 
 

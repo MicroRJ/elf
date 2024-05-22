@@ -88,7 +88,7 @@ enum {
 };
 
 
-void langL_beginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z);
+void elf_genbeginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z);
 void langL_addelif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x);
 void langL_addelse(elFileState *fs, elf_lineid line, Select *s);
 void langL_addthen(elFileState *fs, elf_lineid line, Select *s);

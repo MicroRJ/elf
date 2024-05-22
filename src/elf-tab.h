@@ -50,3 +50,4 @@ int elf_tabhaskey_(elState *);
 int elf_tablookup_(elState *);
 int elf_tabforeach_(elState *);
 int elf_tabcollisions_(elState *);
+int elf_tabbubblesort_(elState *R);

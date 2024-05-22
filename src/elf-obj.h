@@ -70,7 +70,7 @@ typedef struct elValue {
 		elBinding      c;
 		elInteger   	  i,x_int;
 		elNumber   	  n,x_num;
-		elf_Closure  *f,*x_cls;
+		elClosure  *f,*x_cls;
 		elObject   *j,*x_obj;
 		elTable    *t,*x_tab;
 		elString   *s,*x_str;
@@ -78,7 +78,7 @@ typedef struct elValue {
 } elValue;
 
 
-typedef struct elf_Closure {
+typedef struct elClosure {
 	elObject obj;
    /* I guess one of the things we could do
    if we ever get to having multi-byte encoding,
@@ -92,13 +92,13 @@ typedef struct elf_Closure {
 	elf_byteid     j;
    /* allocated past this point */
 	elValue caches[1];
-} elf_Closure;
+} elClosure;
 
 
 elf_api elValue elf_valtab(elTable *);
 elf_api elValue elf_valbid(elBinding);
 elf_api elValue elf_valstr(elString *);
-elf_api elValue elf_valcls(elf_Closure *);
+elf_api elValue elf_valcls(elClosure *);
 elf_api elValue elf_valint(elInteger i);
 elf_api elValue elf_valnum(elNumber n);
 

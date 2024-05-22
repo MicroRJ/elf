@@ -67,7 +67,7 @@ elf_api void elf_checkcl(elState *R, elf_localid x) {
 }
 
 
-elf_api elf_Closure *elf_getcls(elState *R, elf_localid x) {
+elf_api elClosure *elf_getcls(elState *R, elf_localid x) {
 	elf_checkcl(R,x);
 	return R->call->locals[x].f;
 }
@@ -186,7 +186,7 @@ void elf_settop(elState *R, elValue *top) {
 }
 
 
-elf_localid elf_pushcls(elState *R, elf_Closure *cl) {
+elf_localid elf_pushcls(elState *R, elClosure *cl) {
 	R->top->tag = TAG_CLS;
 	R->top->f   = cl;
 	elf_localid id = R->top - R->call->locals;
@@ -231,7 +231,7 @@ elf_localid elf_pushbinding(elState *R, elBinding b) {
 
 
 elf_localid elf_pushnewcls(elState *R, elProto fn) {
-	elf_Closure *cl = elf_newcls(R,fn);
+	elClosure *cl = elf_newcls(R,fn);
 	R->top -= fn.ncaches;
 	int i;
 	for (i=0; i<fn.ncaches; ++i) {

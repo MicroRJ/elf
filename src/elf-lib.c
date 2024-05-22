@@ -328,7 +328,7 @@ int elflib_libfn(elState *rt) {
 
 int elflib_loadlib(elState *R) {
 	elString *name = elf_getstr(R,0);
-	elf_Closure *callback = elf_getcls(R,1);
+	elClosure *callback = elf_getcls(R,1);
 	elHandle lib = sys_loadlib(name->c);
 	if (lib != elNIL) elf_pushsys(R,lib);
 	else elf_pushnil(R);
@@ -477,7 +477,7 @@ elf_globaldecl elString *enumdir_keypath;
 elf_globaldecl elString *enumdir_isdir;
 
 
-void elflib_enumdir_(elState *R, elString *dir, elf_Closure *cls) {
+void elflib_enumdir_(elState *R, elString *dir, elClosure *cls) {
 #if defined(PLATFORM_DESKTOP)
 	WIN32_FIND_DATAA f;
 	HANDLE h = FindFirstFileA(elf_tpf("%s\\*",dir->c),&f);
@@ -537,7 +537,7 @@ elf_api int elflib_enumdir(elState *R) {
 	enumdir_keypath = elf_pushnewstr(R,"path");
 	enumdir_isdir = elf_pushnewstr(R,"isdir");
 	elString *dir = elf_getstr(R,0);
-	elf_Closure *cls = elf_getcls(R,1);
+	elClosure *cls = elf_getcls(R,1);
 	elflib_enumdir_(R,dir,cls);
 	return 1;
 }

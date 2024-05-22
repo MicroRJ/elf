@@ -47,11 +47,11 @@ int elf_callfn(elState *R, elf_localid rxy, int nx, int ny) {
 }
 
 
-/* todo: this should be different, rx should be the destination
-registers, and ry the input registers */
+/* todo: this should be different, rx should be the
+destination registers, and ry the input registers */
 int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_localid ry, int nx, int ny) {
 	elf_CallFrame *caller = R->call;
-	// elf_ensure(R->top - caller->locals+caller->cl->fn.nlocals > -1);
+	// elf_ensure((R->top-caller->locals)+caller->cl->fn.nlocals-1 > rx);
 	elValue *locals = caller->locals + rx;
 	/* top always points to one past locals,
 	so far we only have nx argument locals,
@@ -225,18 +225,14 @@ void elf_checkdivbyzro(elState *S, elValue xx, elValue yy) {
 }
 
 
-int elf_calloverload(elState *S, elObject *obj, elf_localid rx, elValue in, elString *name) {
+int elf_calloverload(elState *S, elObject *obj, elString *name, elf_localid io, elValue in) {
 	elValue field = elf_tabgetfld(obj->metatable,name);
-
-	if (field.tag != TAG_CLS) {
+	if (field.tag != TAG_CLS && field.tag != TAG_BID) {
 		elf_throw(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
 	}
-
-	/* So overloads are only for objects so is fine to
-	override rx */
-	S->call->locals[rx] = in;
-	int ny = elf_callexx(S,obj,field,rx,rx,1,1);
-
+	elf_localid base = S->top - S->call->locals;
+	S->call->locals[base] = in;
+	int ny = elf_callexx(S,obj,field,base,io,1,1);
 	if (ny < 1) {
 		elf_throw(S,NO_BYTE,"overload function must return at least one value");
 	}
@@ -259,7 +255,7 @@ int elf_run(elState *R) {
 	//
 	elModule *M = R->M;
 	elf_CallFrame *call = R->call;
-	elf_Closure *cl = call->cl;
+	elClosure *cl = call->cl;
 	elProto fn = cl->fn;
 	elf_CallFrame *caller = call->caller;
 	elValue *locals = call->locals;
@@ -333,10 +329,10 @@ int elf_run(elState *R) {
 		c->j = jp + b.i;
 	} break;
 	case BC_JZ: {
-		if (locals[b.y].i == 0) call->j = jp + b.x;
+		if (locals[b.y].x_int == 0) call->j = jp + b.x;
 	} break;
 	case BC_JNZ: {
-		if (locals[b.y].i != 0) call->j = jp + b.x;
+		if (locals[b.y].x_int != 0) call->j = jp + b.x;
 	} break;
 	case BC_LOADTHIS: {
 		locals[b.x].tag = elf_objtotag(call->obj->type);
@@ -370,7 +366,7 @@ int elf_run(elState *R) {
 	case BC_CLOSURE: {
 		elf_ensure(b.y >= 0 && b.y < elf_varlen(md->p));
 		elProto p = md->p[b.y];
-		elf_Closure *ncl = elf_newcls(R,p);
+		elClosure *ncl = elf_newcls(R,p);
 		for (int i = 0; i < p.ncaches; ++i) {
 			ncl->caches[i] = locals[b.x+i];
 		}
@@ -400,6 +396,7 @@ int elf_run(elState *R) {
 			locals[b.x] = elf_tablookup(xx.x_tab,yy);
 		} else if (xx.tag == TAG_OBJ) {
 
+			// elf_calloverload(R,xx.x_obj->metatable,R->cache.__getfield,b.x,yy);
 	elValue overload = elf_tabgetfld(xx.x_obj->metatable,R->cache.__getfield);
 	if (overload.tag != TAG_NIL) {
 		if (overload.tag == TAG_CLS || overload.tag == TAG_BID) {
@@ -527,7 +524,7 @@ int elf_run(elState *R) {
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
 				elf_checkdivbyzro(R,xx,yy);\
 			}\
-			elf_calloverload(R,xx.x_obj,b.x,yy,elf_tagisobj(yy.tag)?FN:FN1);\
+			elf_calloverload(R,xx.x_obj,elf_tagisobj(yy.tag)?FN:FN1,b.x,yy);\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
 				elf_checkdivbyzro(R,xx,yy);\
@@ -549,21 +546,22 @@ int elf_run(elState *R) {
 		elValue yy = locals[b.z];
 		if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {
 			locals[b.x].tag = TAG_INT;
-			locals[b.x].i   = elf_tonum(xx) <= elf_tonum(yy);
+			locals[b.x].x_int = elf_tonum(xx) <= elf_tonum(yy);
 		} else {
 			locals[b.x].tag = TAG_INT;
-			locals[b.x].i   = elf_toint(xx) <= elf_toint(yy);
+			locals[b.x].x_int = elf_toint(xx) <= elf_toint(yy);
 		}
 	} break;
 	case BC_LT: {
 		elValue xx = locals[b.y];
 		elValue yy = locals[b.z];
 		if (xx.tag == TAG_NUM || yy.tag == TAG_NUM) {
-			locals[b.x].i = elf_tonum(xx) < elf_tonum(yy);
+			locals[b.x].tag = TAG_INT;
+			locals[b.x].x_int = elf_tonum(xx) < elf_tonum(yy);
 		} else {
-			locals[b.x].i = elf_toint(xx) < elf_toint(yy);
+			locals[b.x].tag = TAG_INT;
+			locals[b.x].x_int = elf_toint(xx) < elf_toint(yy);
 		}
-		locals[b.x].tag = TAG_NUM;
 	} break;
 	CASE_IBOP(BC_SHL,  <<);
 	CASE_IBOP(BC_SHR,  >>);
