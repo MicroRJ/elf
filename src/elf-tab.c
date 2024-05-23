@@ -9,6 +9,7 @@ elTable *elf_newtabmetatab(elState *R) {
 	elTable *tab = elf_pushnewtab(R);
 	elf_tabmfld(R,tab,"length",elf_tablength_);
 	elf_tabmfld(R,tab,"tally",elf_tabtally_);
+	elf_tabmfld(R,tab,"delete",elf_tabdelete_);
 	elf_tabmfld(R,tab,"haskey",elf_tabhaskey_);
 	elf_tabmfld(R,tab,"lookup",elf_tablookup_);
 	elf_tabmfld(R,tab,"iter",elf_tabforeach_);
@@ -29,7 +30,7 @@ elTable *elf_newtablen(elState *R, elInteger ntotal) {
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
-	table->slots = elf_clearalloc(lHEAP,ntotal*sizeof(elf_tabslot));
+	table->slots = elf_clearalloc(lHEAP,ntotal*sizeof(elEntry));
 	return table;
 }
 
@@ -62,6 +63,7 @@ void elf_deltab(elTable *tab) {
 **
 */
 elInteger elf_tabhashin(elTable *tab, elValue k) {
+	// if (tab == elNIL) elf_throw(&elf,NO_BYTE,"table is nil");
 	elf_ensure(tab != elNIL);
 	/* this particular function uses double hashing,
 	which should allow us to get more resolution out
@@ -73,7 +75,7 @@ elInteger elf_tabhashin(elTable *tab, elValue k) {
 	has proven to be drastically more efficient
 	than linear probing.
 	Of course, this is already well known... */
-	elf_tabslot *slots = tab->slots;
+	elEntry *slots = tab->slots;
 	elInteger ntotal = tab->ntotal;
 	elInteger hash = elf_tabhashval(k);
 	elInteger head = hash % ntotal;
@@ -101,7 +103,7 @@ elValue elf_tabslot2value(elTable *table, elInteger slot) {
 
 
 elBool elf_tabslotiskey(elTable *table, elInteger slot) {
-	return slot >= 0 && table->slots[slot].k.tag != TAG_NIL;
+	return slot > -1 && table->slots[slot].k.tag != TAG_NIL;
 }
 
 
@@ -120,10 +122,10 @@ void elf_tabcheck(elTable *table) {
 		elTable newtable = * table;
 		newtable.ntotal = table->ntotal << 2;
 		if (newtable.ntotal < table->ntotal) elf_unreachable;
-		newtable.slots = elf_clearalloc(lHEAP,newtable.ntotal * sizeof(elf_tabslot));
+		newtable.slots = elf_clearalloc(lHEAP,newtable.ntotal * sizeof(elEntry));
 
 		for (int i = 0; i < table->ntotal; ++ i) {
-			elf_tabslot slot = table->slots[i];
+			elEntry slot = table->slots[i];
 			if (slot.k.tag == TAG_NIL) continue;
 
 			elInteger newslot = elf_tabhashin(&newtable,slot.k);
@@ -146,7 +148,7 @@ void elf_tabset(elTable *table, elValue k, elValue v) {
 	elInteger slot = elf_tabhashin(table,k);
 	/* todo: instead return an error here */
 	if (slot == -1) elf_unreachable;
-	elf_tabslot *entry = table->slots + slot;
+	elEntry *entry = table->slots + slot;
 	if (!elf_tabslotiskey(table,slot)) {
 		elInteger i = elf_varaddi(table->v,1);
 		table->v[i] = v;
@@ -266,14 +268,14 @@ void elf_tabsettabfld(elTable *tab, elString *key, elTable *val) {
 
 int elf_tablength_(elState *R) {
 	elTable *tab = (elTable*) elf_getthis(R);
-	elf_pushint(R,elf_varlen(tab->v));
+	elf_pushint(R,elf_varlen(tab->array));
 	return 1;
 }
 
 
 int elf_tabtally_(elState *R) {
 	elTable *tab = (elTable*) elf_getthis(R);
-	elf_pushint(R,elf_varlen(tab->v));
+	elf_pushint(R,elf_varlen(tab->array));
 	return 1;
 }
 
@@ -319,6 +321,46 @@ int elf_tabidx_(elState *R) {
 		elInteger idx = elf_getint(R,0) % len;
 		elf_pushany(R,tab->array[idx]);
 	} else elf_pushnil(R);
+	return 1;
+}
+
+
+/*
+** Deletes a key and its corresponding
+** value from a table.
+** The algorithm is pretty slow...
+*/
+int elf_tabdelete_(elState *R) {
+	elf_ensure(R->call->x >= 1);
+	elTable *tab = (elTable *) elf_getthis(R);
+	elValue key = elf_getany(R,0);
+	elInteger slot = elf_tabhashin(tab,key);
+	elEntry *slots = tab->slots;
+	elValue *array = tab->array;
+	if ((slot < 0) || (slots[slot].k.tag == TAG_NIL)) goto leave_;
+	elInteger idx = slots[slot].i;
+	slots[slot].k = (elValue){TAG_NIL};
+	slots[slot].i = -777;
+	elInteger len = elf_varlen(array);
+	if ((idx < 0) || (idx > len-1)) {
+		elf_throw(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
+		goto leave_;
+	}
+	elf_pushany(R,array[idx]);
+	elInteger min = elf_vardec(array);
+	// if (idx != min) {
+		//NOTE: Swap the items, then iterate to
+		//find references and update them...
+		array[idx] = array[min];
+		for (elInteger i = 0; i < tab->ntotal; ++ i) {
+			if (slots[i].k.tag != TAG_NIL && slots[i].i == min) {
+				slots[i].i = idx;
+			}
+		}
+	// }
+
+	return 1;
+	leave_: elf_pushnil(R);
 	return 1;
 }
 
@@ -379,7 +421,7 @@ int elf_tabbubblesort_(elState *R) {
 	elInteger nlist = tab->nslots;
 	kitem *klist = elf_alloc(lHEAP,sizeof(kitem)*nlist);
 	for (elInteger i = 0; i < tab->ntotal; ++ i) {
-		elf_tabslot slot = tab->slots[i];
+		elEntry slot = tab->slots[i];
 		if (slot.k.tag==TAG_NIL) continue;
 		klist[i].k = i;
 		klist[i].i = slot.i;
@@ -419,7 +461,7 @@ int elf_tabforeach_(elState *R) {
 	elf_localid k = elf_pushmany(R,1);
 	elf_localid v = elf_pushmany(R,1);
 	for (int i = 0; i < table->ntotal; ++ i) {
-		elf_tabslot slot = table->slots[i];
+		elEntry slot = table->slots[i];
 		if (slot.k.tag != TAG_NIL) {
 			R->stk[k] = slot.k;
 			R->stk[v] = table->v[slot.i];
@@ -440,12 +482,12 @@ void elf_tabunload(FILE *io, elTable *tab, int level) {
 	fprintf(io,"{");
 	int nitems = 0;
 	for (int i = 0; i < tab->ntotal; ++ i) {
-		elf_tabslot slot = tab->slots[i];
+		elEntry slot = tab->slots[i];
 		if (slot.k.tag != TAG_NIL) {
 			if (nitems ++ != 0) fprintf(io,",");
 			elf_valfpf(io,slot.k,ltrue);
 			fprintf(io," = ");
-			elValue v = tab->v[slot.i];
+			elValue v = tab->array[slot.i];
 			if (v.tag == TAG_TAB) {
 				elf_tabunload(io,v.t,level+1);
 			} else {

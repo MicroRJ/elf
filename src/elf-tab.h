@@ -5,15 +5,15 @@
 */
 
 
-typedef struct elf_tabslot {
+typedef struct elEntry {
 	elValue k;
 	elInteger i;
-} elf_tabslot;
+} elEntry;
 
 
 typedef struct elTable {
 	elObject obj;
-	elf_tabslot *slots;
+	elEntry *slots;
 	elInteger ntotal;
 	elInteger nslots;
 	elInteger ncollisions;
@@ -40,7 +40,9 @@ elBool elf_tabvaleq(elValue *x, elValue *y);
 
 /* metatable */
 int elf_tabadd_(elState *);
+int elf_tabdel_(elState *);
 int elf_tabidx_(elState *);
+int elf_tabdelete_(elState *);
 int elf_tabxrem_(elState *);
 int elf_tabalias_(elState *);
 int elf_tabtally_(elState *);

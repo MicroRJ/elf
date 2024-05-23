@@ -65,15 +65,15 @@ elf_globaldecl char const *tag2s[] = {
 typedef struct elValue {
 	elf_tag tag;
 	union {
-		elAddr           p,x_ptr;
-		elHandle    h;
-		elBinding      c;
-		elInteger   	  i,x_int;
-		elNumber   	  n,x_num;
-		elClosure  *f,*x_cls;
-		elObject   *j,*x_obj;
-		elTable    *t,*x_tab;
-		elString   *s,*x_str;
+		elAddr p,x_ptr;
+		elHandle h;
+		elBinding c;
+		elInteger i,x_int;
+		elNumber n,x_num;
+		elClosure *f,*x_cls;
+		elObject *j,*x_obj;
+		elTable *t,*x_tab;
+		elString *s,*x_str;
 	};
 } elValue;
 

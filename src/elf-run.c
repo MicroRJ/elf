@@ -32,6 +32,7 @@ void elf_runini(elState *R, elModule *M) {
 	R->cache.__sub1 = elf_pushnewstr(R,"__sub1");
 	R->cache.__mul1 = elf_pushnewstr(R,"__mul1");
 	R->cache.__div1 = elf_pushnewstr(R,"__div1");
+	R->cache.__hash = elf_pushnewstr(R,"__hash");
 
 	#if !defined(ELF_NOLIBS)
 	netlib_load(R);
@@ -420,8 +421,28 @@ int elf_run(elState *R) {
 		yy = locals[b.y];
 		zz = locals[b.z];
 		if (xx.tag == TAG_TAB) {
-			elf_tabset(xx.x_tab,yy,zz);
-
+#if defined(ELF_EXPERIMENTAL_FEATURES)
+			if (elf_tagisobj(yy.tag)) {
+				if (yy.x_obj->metatable == elNIL) {
+					goto else_;
+				}
+				elValue overload = elf_tabgetfld(yy.x_obj->metatable,R->cache.__hash);
+				if (overload.tag == TAG_NIL) {
+					goto else_;
+				}
+				if ((overload.tag == TAG_CLS) || (overload.tag == TAG_BID)) {
+					elf_localid base = R->top - R->call->locals;
+					int ny = elf_callexx(R,yy.x_obj,overload,base,b.x,0,1);
+					if (ny < 1) {
+						elf_throw(R,NO_BYTE,"overload function must return at least one value");
+					}
+				} else elf_throw(R,NO_BYTE,"'__hash': overload must be a function");
+			}
+			else else_:
+#endif
+			{
+				elf_tabset(xx.x_tab,yy,zz);
+			}
 		} else if (xx.tag == TAG_OBJ) {
 
 	elValue overload = elf_tabgetfld(xx.x_obj->metatable,R->cache.__setfield);
@@ -441,9 +462,9 @@ int elf_run(elState *R) {
 
 			R->top = home;
 
-		} else elf_throw(R,NO_BYTE,"'__setfield': operator must be a function");
+		} else elf_throw(R,NO_BYTE,"'__setfield': overload must be a function");
 
-	} else elf_throw(R,NO_BYTE,"'__setfield': operator is not implemented for this object");
+	} else elf_throw(R,NO_BYTE,"'__setfield': overload is not implemented for this object");
 
 		} else elf_throw(R,NO_BYTE,elf_tpf("attempted to set field of '%s' value", tag2s[xx.tag]));
 

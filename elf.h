@@ -7,6 +7,9 @@
 #ifndef _elf_
 #define _elf_
 
+#if !defined(ELF_NO_EXPERIMENTAL_FEATURES)
+	// #define ELF_EXPERIMENTAL_FEATURES
+#endif
 
 #if !defined(PLATFORM_DESKTOP) && !defined(PLATFORM_WEB)
 #error elf-lang: No Platform Defined

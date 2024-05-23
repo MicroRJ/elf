@@ -97,6 +97,7 @@ typedef struct elState {
 		elString *__add,*__sub,*__mul,*__div;
 		elString *__add1,*__sub1,*__mul1,*__div1;
 		elString *__getfield,*__setfield;
+		elString *__hash;
 	} cache;
 	elf_Bytecode *bytetrace;
 	elBool bytetracing;

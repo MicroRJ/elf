@@ -223,7 +223,7 @@ int elflib_include(elState *R) {
 
 	elTable *globals = R->M->globals;
 	for (int i = 0; i < globals->ntotal; ++ i) {
-		elf_tabslot slot = globals->slots[i];
+		elEntry slot = globals->slots[i];
 		if (slot.k.tag == TAG_STR) {
 			char *sym = elf_insymdir(dir,slot.k.x_str->c);
 			if (*sym != '.') continue;
