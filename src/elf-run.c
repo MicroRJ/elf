@@ -38,7 +38,7 @@ void elf_runini(elState *R, elModule *M) {
 	netlib_load(R);
 	tstlib_load(R);
 	crtlib_load(R);
-	elflib_load(R);
+	elflib_registerall(R);
 	#endif
 }
 

@@ -14,7 +14,6 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"lookup",elf_tablookup_);
 	elf_tabmfld(R,tab,"iter",elf_tabforeach_);
 	elf_tabmfld(R,tab,"collisions",elf_tabcollisions_);
-	elf_tabmfld(R,tab,"unload",elf_tabunload_);
 	elf_tabmfld(R,tab,"add",elf_tabadd_);
 	elf_tabmfld(R,tab,"idx",elf_tabidx_);
 	elf_tabmfld(R,tab,"xrem",elf_tabxrem_);
@@ -471,37 +470,6 @@ int elf_tabforeach_(elState *R) {
 			elf_callex(R,R->frame->obj,0,0,2,0);
 		}
 	}
-	return 0;
-}
-
-
-void ftabs(FILE *io, int level) {
-	while (level --) fprintf(io,"\t");
-}
-void elf_tabunload(FILE *io, elTable *tab, int level) {
-	fprintf(io,"{");
-	int nitems = 0;
-	for (int i = 0; i < tab->ntotal; ++ i) {
-		elEntry slot = tab->slots[i];
-		if (slot.k.tag != TAG_NIL) {
-			if (nitems ++ != 0) fprintf(io,",");
-			elf_valfpf(io,slot.k,ltrue);
-			fprintf(io," = ");
-			elValue v = tab->array[slot.i];
-			if (v.tag == TAG_TAB) {
-				elf_tabunload(io,v.t,level+1);
-			} else {
-				elf_valfpf(io,v,ltrue);
-			}
-		}
-	}
-	fprintf(io,"}");
-}
-
-
-int elf_tabunload_(elState *R) {
-	elHandle io = elf_getsys(R,0);
-	elf_tabunload(io,(elTable*)elf_getthis(R),0);
 	return 0;
 }
 

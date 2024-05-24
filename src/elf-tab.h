@@ -47,7 +47,6 @@ int elf_tabxrem_(elState *);
 int elf_tabalias_(elState *);
 int elf_tabtally_(elState *);
 int elf_tablength_(elState *);
-int elf_tabunload_(elState *);
 int elf_tabhaskey_(elState *);
 int elf_tablookup_(elState *);
 int elf_tabforeach_(elState *);

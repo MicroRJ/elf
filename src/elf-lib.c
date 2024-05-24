@@ -115,8 +115,8 @@ int elflib_err(elState *R) {
 
 
 /* the include function merges or includes
-** the given symbol directory into the
-** global symbol directory.
+** the given symbol tree into the
+** global symbol tree.
 **
 ** Usage:
 ** 	elf.pf("before")
@@ -354,9 +354,9 @@ int elflib_exec(elState *R) {
 
 int elflib_fopen(elState *R) {
 	elf_ensure(R->call->nx == 2);
-	elString *name = elf_getstr(R,0);
-	elString *flags = elf_getstr(R,1);
-	FILE *file = fopen(name->c,flags->c);
+	char *name = elf_getcstr(R,0);
+	char *flags = elf_getcstr(R,1);
+	FILE *file = fopen(name,flags);
 	elf_pushsys(R,(elHandle)file);
 	return 1;
 }
@@ -543,7 +543,41 @@ elf_api int elflib_enumdir(elState *R) {
 }
 
 
-elf_api void elflib_load(elState *R) {
+void ftabs(FILE *io, int level) {
+	while (level --) fprintf(io,"\t");
+}
+
+
+void elf_unload(FILE *io, elTable *tab, int level) {
+	fprintf(io,"{");
+	int nitems = 0;
+	for (elInteger i = 0; i < tab->ntotal; ++ i) {
+		elEntry slot = tab->slots[i];
+		if (slot.k.tag != TAG_NIL) {
+			if (nitems ++ != 0) fprintf(io,",");
+			elf_valfpf(io,slot.k,ltrue);
+			fprintf(io," = ");
+			elValue v = tab->array[slot.i];
+			if (v.tag == TAG_TAB) {
+				elf_unload(io,v.t,level+1);
+			} else {
+				elf_valfpf(io,v,ltrue);
+			}
+		}
+	}
+	fprintf(io,"}");
+}
+
+
+int elflib_unload(elState *S) {
+	elHandle io = elf_getsys(S,0);
+	elTable *tab = elf_gettab(S,1);
+	elf_unload(io,tab,0);
+	return 0;
+}
+
+
+elf_api void elflib_registerall(elState *R) {
 	elf_registerint(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
 	elf_registerstr(R,"elf.PLATFORM","WEB");
@@ -580,6 +614,7 @@ elf_api void elflib_load(elState *R) {
 	elf_register(R,"elf.loadcode",elflib_loadcode);
 	elf_register(R,"elf.loadexpr",elflib_loadexpr);
 	elf_register(R,"elf.loadfile",elflib_loadfile);
+	elf_register(R,"elf.unload",elflib_unload);
 
 	elf_register(R,"elf.GCN",elflib_GCN);
 	elf_register(R,"elf.GCT",elflib_GCT);
