@@ -61,9 +61,10 @@ void elf_deltab(elTable *tab) {
 ** result to modify the slot and value as desired.
 **
 */
-elInteger elf_tabhashin(elTable *tab, elValue k) {
+elInteger elf_tabhashin(elTable *tab, elValue key) {
 	// if (tab == elNIL) elf_throw(&elf,NO_BYTE,"table is nil");
 	elf_ensure(tab != elNIL);
+	elf_ensure(key.tag != TAG_NIL);
 	/* this particular function uses double hashing,
 	which should allow us to get more resolution out
 	of the hash value, the first hash computes the
@@ -72,18 +73,17 @@ elInteger elf_tabhashin(elTable *tab, elValue k) {
 	Since the increment depends on the data, it
 	should reduce clustering, and in practice it
 	has proven to be drastically more efficient
-	than linear probing.
-	Of course, this is already well known... */
+	than linear probing. */
 	elEntry *slots = tab->slots;
 	elInteger ntotal = tab->ntotal;
-	elInteger hash = elf_tabhashval(k);
+	elInteger hash = elf_tabhashval(key);
 	elInteger head = hash % ntotal;
 	elInteger tail = head;
 	elf_hashint walk = elf_tabrehash(hash)|1;
 	do {
 		elValue x = slots[tail].k;
 		if (x.tag == TAG_NIL) return tail;
-		if (elf_tabvaleq(&x,&k)) return tail;
+		if (elf_tabvaleq(&x,&key)) return tail;
 		tail = (tail+walk) % ntotal;
 		LDODEBUG( tab->ncollisions ++ );
 	} while(head != tail);

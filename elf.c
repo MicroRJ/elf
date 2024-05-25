@@ -22,7 +22,7 @@ int main(int n, char **c) {
 	elf_runini(&R,&M);
 	if (cli.logging) R.bytelogging = ltrue;
 
-	elf_CallFrame frame = {0};
+	elCallFrame frame = {0};
 	frame.base = R.top;
 	R.frame = &frame;
 

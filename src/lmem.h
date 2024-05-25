@@ -16,7 +16,7 @@ typedef struct Alloc Alloc;
 
 
 
-typedef Error (* elf_AllocFn)(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca);
+typedef elError (* elf_AllocFn)(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca);
 
 
 typedef struct Alloc {
@@ -55,7 +55,7 @@ elf_api void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
 #define elf_clearalloc(cator,sze) elf_clearalloc_(cator,sze,LHERE)
 
 
-#define ALLOCFN(NAME) Error NAME (Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca)
+#define ALLOCFN(NAME) elError NAME (Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca)
 elf_api ALLOCFN(elf_deftlsallocfn);
 elf_api ALLOCFN(elf_defglobalallocfn);
 

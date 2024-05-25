@@ -12,9 +12,16 @@ void elf_runini(elState *R, elModule *M) {
 	R->stk = R->top = elf_clearalloc(lHEAP,sizeof(elValue)*R->stklen);
 	R->metatab_str = elf_newstrmetatab(R);
 	R->metatab_tab = elf_newtabmetatab(R);
-	elf_CallFrame Y = {0};
-	Y.base = R->top;
-	R->frame = &Y;
+	R->call_level = 0;
+
+	//TODO: So when you call a function,
+	//using 0 for rx, 0 is relative to locals,
+	//and it will override values that have
+	//been pushed... I added a temporary fix...
+	R->root_call = (elCallFrame){0};
+	R->root_call.locals = R->top;
+	R->call = &R->root_call;
+
 	M->globals = elf_pushnewtab(R);
 	R->cache.x = elf_pushnewstr(R,"x");
 	R->cache.y = elf_pushnewstr(R,"y");
@@ -34,12 +41,16 @@ void elf_runini(elState *R, elModule *M) {
 	R->cache.__div1 = elf_pushnewstr(R,"__div1");
 	R->cache.__hash = elf_pushnewstr(R,"__hash");
 
+	//TODO: temporary fix
+	R->call->locals = R->top;
 	#if !defined(ELF_NOLIBS)
 	netlib_load(R);
 	tstlib_load(R);
 	crtlib_load(R);
 	elflib_registerall(R);
 	#endif
+	//TODO: temporary fix
+	R->call->locals = R->top;
 }
 
 
@@ -51,15 +62,21 @@ int elf_callfn(elState *R, elf_localid rxy, int nx, int ny) {
 /* todo: this should be different, rx should be the
 destination registers, and ry the input registers */
 int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_localid ry, int nx, int ny) {
-	elf_CallFrame *caller = R->call;
+	elCallFrame *caller = R->call;
 	// elf_ensure((R->top-caller->locals)+caller->cl->fn.nlocals-1 > rx);
 	elValue *locals = caller->locals + rx;
 	/* top always points to one past locals,
 	so far we only have nx argument locals,
 	top is later incremented to match nlocals */
 	elValue *top  = locals + nx;
-	elf_CallFrame call = {0};
+	elCallFrame call = {0};
 	call.caller = caller;
+
+	// elFileInfo fi = elf_getrunningfile(R);
+	// elf_linediag(fi.name,fi.lines,elf_getrunningline(R),"new_call");
+
+	call.head = R->byte;
+	call.tail = 0;
 	call.top = R->top;
 	call.obj = obj;
 	call.locals = locals;
@@ -77,6 +94,8 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 	}
 	R->top = top;
 	R->call = &call;
+	R->call_level ++;
+
 	elf_localid nyield = 0;
 	if (fn.tag == TAG_CLS) {
 		nyield = elf_run(R);
@@ -85,14 +104,17 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 		if (fn.c != elNIL) {
 			nyield = fn.c(R);
 			/* ensure that the results were pushed to the stack */
-			elf_ensure(nyield <= (R->top - call.locals));
+			elf_localid nstack = R->top - call.locals;
+			if (nstack < nyield) {
+				elf_throw(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",nstack,nyield));
+			}
 			/* todo: we only do this to not have to make
 			the user write to rx directly? */
 			/* hoist results */
 			for (int p = 0; p < MIN(nyield,ny); ++ p) {
 				caller->locals[ry] = R->top[p-nyield];
 			}
-		}
+		} else elf_throw(R,NO_BYTE,"binding function is nil!");
 	} else {
 		nyield = -1;
 		elf_throw(R,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[fn.tag]));
@@ -100,12 +122,14 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 	/* finally restore stack */
 	R->call = caller;
 	R->top = call.top;
+	R->call_level --;
+	elf_ensure(R->call_level > -1);
 	return nyield;
 }
 
 
 int elf_callex(elState *R, elObject *obj, elf_localid rx, elf_localid ry, int nx, int ny) {
-	elf_CallFrame *caller = R->call;
+	elCallFrame *caller = R->call;
 	return elf_callexx(R,obj,caller->locals[rx],rx+1,ry,nx,ny);
 }
 
@@ -193,8 +217,8 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elf_localid 
 
 int elf_loadfilefs(elState *R, elFileState *fs, elString *name, elf_localid x, int y) {
 	char *contents;
-	Error error = sys_loadfilebytes(lHEAP,(void**)&contents,name->c);
-	if (LFAILED(error)) {
+	elError error = sys_loadfilebytes(lHEAP,(void**)&contents,name->c);
+	if (elFAILED(error)) {
 		elf_logerror("'%s': could not load file",name->c);
 		return -1;
 	}
@@ -231,6 +255,17 @@ int elf_calloverload(elState *S, elObject *obj, elString *name, elf_localid io, 
 	if (field.tag != TAG_CLS && field.tag != TAG_BID) {
 		elf_throw(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
 	}
+	/* So we do it this way, because when the call frame
+	for a function is created at rx it could override
+	other values past rx, so we always call a function
+	at stack top which is always free.
+	todo: the question is whether the bytecode generator
+	should take this into account, because so far we've
+	relied on the order of execution, so technically we
+	only override values that haven't been set yet, and
+	also, even for calling overloads, the order of
+	execution still applies, and we should only override
+	values that haven't been set yet! */
 	elf_localid base = S->top - S->call->locals;
 	S->call->locals[base] = in;
 	int ny = elf_callexx(S,obj,field,base,io,1,1);
@@ -250,28 +285,31 @@ For instance, table:add(table:length()), here if
 table is nil or not even a table, you have to skip
 the call instruction and its arguments. */
 int elf_run(elState *R) {
-	/* todo: these names are deprecated */
-	elf_CallFrame *c = R->f;
 	elModule *md = R->md;
 	//
 	elModule *M = R->M;
-	elf_CallFrame *call = R->call;
+	elCallFrame *call = R->call;
 	elClosure *cl = call->cl;
 	elProto fn = cl->fn;
-	elf_CallFrame *caller = call->caller;
+	elCallFrame *caller = call->caller;
 	elValue *locals = call->locals;
 	elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
 
-	while (call->j < fn.nbytes) {
-		elInteger jp = call->j ++;
+	while (call->tail < fn.nbytes) {
+		/* todo: call->tail is redundant ... */
+		elInteger jp = call->tail ++;
 		elInteger bc = fn.bytes + jp;
 		R->byte = bc;
+
 		elf_Bytecode b = md->bytes[bc];
 		elf_Bytecode byte = b;
+
 #if defined(_DEBUG)
 		if (R->bytelogging || call->logging) elf_bytefpf(stdout,md,-1,jp,b);
 		if (R->debuggerflag) elf_debugger("elf-run: debugger break");
+#endif
 
+#if defined(ELF_EXPERIMENTAL_FEATURES)
 		if (R->bytetracking) {
 			elInteger track = ++ M->track[bc];
 			if (track == 64) {
@@ -288,19 +326,19 @@ int elf_run(elState *R) {
 		switch (b.k) {
 	case BC_LEAVE: {
 		if (call->dl != elNIL) {
-			call-> j = call->dl->j;
+			call->tail = call->dl->j;
 			call->dl = call->dl->n;
 		} else goto leave;
 	} break;
 	case BC_DELAY: {
 		/* todo: can we make this better */
 		elf_delaylist *dl = elf_alloc(lHEAP,sizeof(elf_delaylist));
-		dl->n = c->dl;
-		dl->j = c->j;
-		c->dl = dl;
+		dl->n = call->dl;
+		dl->j = call->tail;
+		call->dl = dl;
 
 		elf_ensure(b.i >= 0);
-		c->j = jp + b.i;
+		call->tail = jp + b.i;
 	} break;
 	case BC_YIELD: {
 		elf_ensure(b.x >= 0);
@@ -311,7 +349,7 @@ int elf_run(elState *R) {
 			caller->locals[call->ry+y] = locals[b.y+y];
 		}
 		call->ny = ny;
-		call->j = jp + b.x;
+		call->tail = jp + b.x;
 	} break;
 	case BC_STKGET: {
 		elf_tycheck(R,bc,0,TAG_INT,locals[b.y].tag);
@@ -327,15 +365,45 @@ int elf_run(elState *R) {
 		elf_loadfile(R,fname,b.x,b.y);
 	} break;
 	case BC_J: {
-		c->j = jp + b.i;
+		call->tail = jp + b.i;
 	} break;
 	case BC_JZ: {
-		if (locals[b.y].x_int == 0) call->j = jp + b.x;
+		if (locals[b.y].x_int == 0) call->tail = jp + b.x;
 	} break;
 	case BC_JNZ: {
-		if (locals[b.y].x_int != 0) call->j = jp + b.x;
+		if (locals[b.y].x_int != 0) call->tail = jp + b.x;
 	} break;
 	case BC_LOADTHIS: {
+		if (call->obj == elNIL) {
+			/* todo: we gotta rework this logic, first of all,
+			not passing the object in the argument list makes
+			it impossible to cache the meta-function because
+			you have to follow the x:x() pattern to let the
+			loader know you're calling a meta-function that takes
+			the additional 'this' argument.
+			The simplest way I can think of to allow for caching
+			of meta-function and invoking them properly is to
+			add a separate way to call a function which makes it
+			so that it is possible to cache the meta-function and
+			then call it.
+			This involves creating new language semantics which
+			would allow for further optimizations.
+
+			let x = SOME_OBJECT
+			let _fn = x:getmetatable():idxof("fn")
+			for i in 0..10000 ? {
+				x:(fn,1,2,3)
+			// ^ this new syntax essentially allows you
+			// to pass in the function that you'd like to
+			// invoke on x
+
+			literal VEC_X = 0
+			literal VEC_Y = 0
+			literal VEC_Z = 0
+			x[VEC_X]
+			*/
+			elf_throw(R,NO_BYTE,"'this' is invalid for this function, not a meta-call");
+		}
 		locals[b.x].tag = elf_objtotag(call->obj->type);
 		locals[b.x].x_obj = call->obj;
 	} break;
@@ -388,11 +456,14 @@ int elf_run(elState *R) {
 		elf_tycheck(R,bc,b.x,b.y,locals[b.x].tag);
 	} break;
 	case BC_INDEX: case BC_FIELD: {
-		if (locals[b.y].tag == TAG_NIL) {
-			elf_throw(R,bc,"attempted to get field of nil value");
-		}
 		elValue xx = locals[b.y];
 		elValue yy = locals[b.z];
+		if (xx.tag == TAG_NIL) {
+			elf_throw(R,bc,"attempted to get field of nil value");
+		}
+		if (yy.tag == TAG_NIL) {
+			elf_throw(R,bc,"attempted to get field of with nil key");
+		}
 		if (xx.tag == TAG_TAB) {
 			locals[b.x] = elf_tablookup(xx.x_tab,yy);
 		} else if (xx.tag == TAG_OBJ) {
@@ -494,12 +565,10 @@ int elf_run(elState *R) {
 		}
 	} break;
 	case BC_METACALL: {
-		R->byte = bc;
 		elf_callex(R,locals[b.x].x_obj,b.x+1,b.x,b.y,b.z);
 		elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
 	} break;
 	case BC_CALL: {
-		R->byte = bc;
 		elf_callfn(R,b.x,b.y,b.z);
 		elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
 	} break;
@@ -599,12 +668,9 @@ int elf_run(elState *R) {
 		elf_unreachable;
 	} break;
 		}
-		elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
-		int BREAKPOINT;
-		BREAKPOINT = 0; (void) BREAKPOINT;
 	}
 
 	leave:
-	return c->y;
+	return call->ny;
 }
 

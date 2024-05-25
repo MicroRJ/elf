@@ -28,8 +28,8 @@ elf_api int sys_setpwd(char *buffer);
 elf_api elHandle sys_loadlib(char const *name);
 elf_api void *sys_libfn(elHandle lib, char const *name);
 
-elf_api Error sys_loadfilebytes(Alloc *allocator, void **lppOut, char const *fileName);
-elf_api Error sys_savefilebytes(char const *buffer, elInteger length, char const *fileName);
+elf_api elError sys_loadfilebytes(Alloc *allocator, void **lppOut, char const *fileName);
+elf_api elError sys_savefilebytes(char const *buffer, elInteger length, char const *fileName);
 
 elf_api int sys_getlasterror();
 elf_api void sys_geterrormsg(int error, char *buff, int len);

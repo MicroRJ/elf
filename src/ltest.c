@@ -85,12 +85,6 @@ int testlib_absslotid(elState *c) {
 }
 
 
-int testlib_pc(elState *c) {
-	elf_pushint(c,c->f->j);
-	return 1;
-}
-
-
 int testlib_gcpause(elState *c) {
 	elf_gcpause(c);
 	return 0;
@@ -146,6 +140,5 @@ void tstlib_load(elState *rt) {
 	lang_addglobal(md,elf_pushnewstr(rt,"__debugbreak"),elf_valbid(testlib_debugbreak));
 	lang_addglobal(md,elf_pushnewstr(rt,"absslotid"),elf_valbid(testlib_absslotid));
 	lang_addglobal(md,elf_pushnewstr(rt,"absslot"),elf_valbid(testlib_absslot));
-	lang_addglobal(md,elf_pushnewstr(rt,"pc"),elf_valbid(testlib_pc));
 	lang_addglobal(md,elf_pushnewstr(rt,"_gtable"),elf_valbid(_gtable));
 }

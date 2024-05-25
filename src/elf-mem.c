@@ -24,21 +24,21 @@ void *elf_memcopy(void *target, void const *source, elInteger length) {
 
 
 void elf_dealloc_(Alloc *c, const void *memory, ldebugloc loca) {
-	Error error = c->fn(c,0,0,0,(void **)&memory,loca);
+	elError error = c->fn(c,0,0,0,(void **)&memory,loca);
 	elf_ensure(LPASSED(error));
 }
 
 
 void *elf_alloc_(Alloc *c, elInteger length, ldebugloc loca) {
 	void *memory = 0;
-	Error error = c->fn(c,0,0,length,&memory,loca);
+	elError error = c->fn(c,0,0,length,&memory,loca);
 	elf_ensure(LPASSED(error));
 	return memory;
 }
 
 
 void *elf_realloc_(Alloc *c, elInteger length, void *memory, ldebugloc loca) {
-	Error error = c->fn(c,0,0,length,&memory,loca);
+	elError error = c->fn(c,0,0,length,&memory,loca);
 	elf_ensure(LPASSED(error));
 	return memory;
 }
@@ -49,7 +49,7 @@ void *elf_clearalloc_(Alloc *c, elInteger size, ldebugloc loca) {
 }
 
 
-Error elf_defglobalallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
+elError elf_defglobalallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
 	if (io == 0) {
 		return Error_InvalidArguments;
 	}
@@ -70,7 +70,7 @@ Error elf_defglobalallocfn(Alloc *allocator, int flags, elInteger oldSize, elInt
 }
 
 
-Error elf_deftlsallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
+elError elf_deftlsallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
 	if (io == 0) {
 		return Error_InvalidArguments;
 	}

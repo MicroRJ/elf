@@ -85,8 +85,21 @@ void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc) {
 }
 
 
+elFileInfo elf_getrunningfile(elState *S) {
+	elFileInfo fi = {0};
+	int id = elf_fndfilebybyte(S->M,S->byte);
+	if (id != -1) fi = S->M->files[id];
+	return fi;
+}
+
+
+elf_lineid elf_getrunningline(elState *S) {
+	return S->M->lines[S->byte];
+}
+
+
 /* diagnostics function for syntax errors */
-void elf_lineerror2(char *filename, char *contents, char *loc, char const *fmt, ...) {
+void elf_linediag(char *filename, char *contents, char *loc, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_getlinelocinfo(contents,loc,&linenum,&lineloc);
@@ -129,6 +142,30 @@ void elf_lineerror2(char *filename, char *contents, char *loc, char const *fmt, 
 }
 
 
+void elf_printcalltrace(elState *S, elCallFrame *call, int level) {
+
+	elf_ensure(level > -1);
+
+	/* Don't show the first root call frame
+	(which is the one without a caller) because that'll
+	just be the first instruction that executed for that
+	function/file, which is irrelevant */
+	if (call->caller == elNIL) return;
+
+	elf_ensure(level > 0);
+
+	elf_printcalltrace(S,call->caller,level-1);
+
+	elModule *M = S->M;
+	int fileid = elf_fndfilebybyte(M,call->head);
+	if (fileid != -1) {
+		elFileInfo *file = &M->files[fileid];
+		elf_lineid line = M->lines[call->head];
+		elf_linediag(file->name,file->lines,line, call->cl != elNIL ? "(bytecode function)" : "(binding)");
+	}
+}
+
+
 void elf_throw(elState *R, elf_byteid byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
@@ -136,8 +173,11 @@ void elf_throw(elState *R, elf_byteid byte, char *error) {
 	int fileid = elf_fndfilebybyte(M,byte);
 	if (fileid != -1) {
 		elFileInfo *file = &M->files[fileid];
-		elf_lineerror2(file->name,file->lines,line,error);
+		elf_linediag(file->name,file->lines,line,error);
 	}
+
+	printf(" [+] CALL TRACE:\n");
+	elf_printcalltrace(R,R->call,R->call_level);
 	elf_debugger("runtime throw");
 }
 

@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** lerror.h
-** Error Codes
+** elError Codes
 */
 
 
@@ -10,23 +10,23 @@
 
 #if !defined(ERROR_XITEM)
 
-#define LFAILED(err) ((err) != Error_None)
+#define elFAILED(err) ((err) != Error_None)
 #define LPASSED(err) ((err) == Error_None)
 
 #define ERNAME(xx) (lErrorNames[xx])
 
-typedef enum Error {
+typedef enum elError {
 	Error_None = 0,
 
 #define ERROR_XITEM(NAME,DESC) Error_##NAME,
 	#include LERROR
 #undef ERROR_XITEM
 
-} Error;
+} elError;
 
 
 elf_globaldecl char const *lErrorNames[] = {
-	"No Error",
+	"No elError",
 
 #define ERROR_XITEM(NAME,DESC) DESC,
 	#include LERROR
@@ -36,7 +36,7 @@ elf_globaldecl char const *lErrorNames[] = {
 
 #else
 ERROR_XITEM(AsssertionTriggered,            "Assertion Triggered")
-ERROR_XITEM(InternalError,                  "Internal Error")
+ERROR_XITEM(InternalError,                  "Internal elError")
 ERROR_XITEM(OutOfMemory,                    "Out of Memory")
 ERROR_XITEM(InvalidArguments,               "Invalid Arguments")
 ERROR_XITEM(FileNameIsInvalid,              "File Name is Invalid")

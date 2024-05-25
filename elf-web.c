@@ -30,7 +30,7 @@ int main(int n, char **c) {
 struct {
 	elState R;
 	elModule M;
-	elf_CallFrame C;
+	elCallFrame C;
 } elf_globaldecl elf = {{&elf.M}};
 
 
@@ -39,18 +39,11 @@ elf_api void elfweb_ini() {
 }
 
 
-/* todo: copy the contents */
 elf_api int elfweb_loadcode(char *codename, char *contents) {
-	/* run in a separate call frame, this isn't needed
-	though... */
-	elf_CallFrame call = {0};
-	call.caller = elf.R.call;
-	call.base = elf.R.top;
-	call.top = elf.R.top;
-	elf.R.call = &call;
+	elValue *top = elf.R.top;
 	elString *name = elf_pushnewstr(&elf.R,codename);
 	elFileState fs = {0};
-	int result = elf_loadcodefs(&elf.R,&fs,name,0,0,contents);
-	elf.R.call = call.caller;
-	return result;
+	int nyield = elf_loadcodefs(&elf.R,&fs,name,0,0,contents);
+	elf.R.top = top;
+	return nyield;
 }

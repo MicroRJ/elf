@@ -225,9 +225,9 @@ elf_api void *sys_libfn(elHandle dll, char const *name) {
 }
 
 
-elf_api Error sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
+elf_api elError sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
 
-	Error error = Error_None;
+	elError error = Error_None;
 
 	if (name == elNIL) {
 		error = Error_FileNameIsInvalid;
@@ -292,7 +292,7 @@ elf_api Error sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
 }
 
 
-elf_api Error sys_savefilebytes(char const *buffer, elInteger length, char const *fileName) {
+elf_api elError sys_savefilebytes(char const *buffer, elInteger length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");
@@ -304,7 +304,7 @@ elf_api Error sys_savefilebytes(char const *buffer, elInteger length, char const
 		return Error_CouldNotOpenFile;
 	}
 
-	Error error = Error_None;
+	elError error = Error_None;
 	elInteger lengthWritten = fwrite(buffer, 1, length, file);
 
 	if (lengthWritten != length) {
