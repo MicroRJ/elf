@@ -83,7 +83,7 @@ typedef struct elFileState {
 	char *contents;
 	char *thischar;
 	int linenumber;
-	elf_token lasttk,tk,thentk;
+	elToken lasttk,tk,thentk;
 	/* buffer for nodes */
 	elf_Node *nodes;
 	elf_nodeid nnodes;

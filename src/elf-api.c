@@ -20,11 +20,16 @@ elf_api elValue elf_getany(elState *R, elf_localid x) {
 }
 
 
+void elf_expected(elState *S, elf_tag tag, elf_tag got, elf_localid x) {
+	elf_throw(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
+}
+
+
 elf_api elString *elf_getstr(elState *R, elf_localid x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNIL;
 	if (v.tag == TAG_STR) return v.x_str;
-	elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
+	elf_expected(R,TAG_STR,v.tag,x);
 	return elNIL;
 }
 
@@ -33,18 +38,17 @@ elf_api char *elf_getcstr(elState *R, elf_localid x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNIL;
 	if (v.tag == TAG_STR) return v.x_str->c;
-	elf_throw(R,NO_BYTE,elf_tpf("expected string at local %i",x));
+	elf_expected(R,TAG_STR,v.tag,x);
 	return elNIL;
 }
 
 
 elf_api elObject *elf_getobj(elState *R, elf_localid x) {
 	elValue v = R->call->locals[x];
-	if (v.tag != TAG_NIL && !elf_tagisobj(v.tag)) {
-		elf_throw(R,NO_BYTE,elf_tpf("expected object at local %i",x));
-		elf_unreachable;
-	}
-	return v.x_obj;
+	if (v.tag == TAG_NIL) return elNIL;
+	if (elf_tagisobj(v.tag)) return v.x_obj;
+	elf_expected(R,TAG_OBJ,v.tag,x);
+	return elNIL;
 }
 
 
@@ -83,31 +87,21 @@ elf_api elHandle elf_getsys(elState *R, elf_localid x) {
 }
 
 
-elf_api elString *elf_checkstr(elState *R, elf_localid x) {
-	elf_ensure(R->call->locals[x].tag == TAG_STR);
-	return R->call->locals[x].s;
-}
-
-
 elf_api elInteger elf_getint(elState *R, int x) {
 	elValue v = R->call->locals[x];
-	if (v.tag == TAG_NUM) {
-		return (elInteger) v.x_num;
-	}
-	if (v.tag != TAG_INT) {
-		elf_throw(R,NO_BYTE,elf_tpf("expected integer at local %i",x));
-	}
-	return v.x_int;
+	if (v.tag == TAG_NUM) return (elInteger) v.x_num;
+	if (v.tag == TAG_INT) return v.x_int;
+	elf_expected(R,TAG_INT,v.tag,x);
+	return 0;
 }
 
 
 elf_api elNumber elf_getnum(elState *R, elf_localid x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_INT) return (elNumber) v.i;
-	if (v.tag != TAG_NUM) {
-		elf_throw(R,NO_BYTE,elf_tpf("expected number at local %i, instead got %s",x,tag2s[v.tag]));
-	}
-	return v.n;
+	if (v.tag == TAG_NUM) return v.x_num;
+	elf_expected(R,TAG_NUM,v.tag,x);
+	return 0;
 }
 
 

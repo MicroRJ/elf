@@ -24,24 +24,24 @@
 **
 */
 
-typedef struct elf_var {
+typedef struct elArray {
 	elObject obj;
 	elInteger max;
 	elInteger min;
    /* contents are allocated past this point */
-} elf_var;
+} elArray;
 
 
 
-#define elf_vararr(var) ((elf_var*)(var))[-1]
+#define elf_vararr(var) ((elArray*)(var))[-1]
 #define elf_varfor(T,N,A) for (T N = A; N < A + elf_varlen(A); N += 1)
 #define elf_varjfor(A) for (elInteger j = 0; j < elf_varlen(A); ++ j)
 #define elf_arrfori(A) for (elInteger i = 0; i < elf_varlen(A); ++ i)
-#define elf_delvar(var) ((var != 0) ? elf_dealloc(lHEAP,(elf_var*)(var)-1),0 : 0)
-#define elf_varmax(var) ((var != 0) ? ((elf_var*)(var))[-1].max : 0)
-#define elf_varmin(var) ((var != 0) ? ((elf_var*)(var))[-1].min : 0)
+#define elf_delvar(var) ((var != 0) ? elf_dealloc(lHEAP,(elArray*)(var)-1),0 : 0)
+#define elf_varmax(var) ((var != 0) ? ((elArray*)(var))[-1].max : 0)
+#define elf_varmin(var) ((var != 0) ? ((elArray*)(var))[-1].min : 0)
 
-#define elf_vardec(var) ( (var) != elNIL ? (-- ((elf_var*)(var))[-1].min) : 0 )
+#define elf_vardec(var) ( (var) != elNIL ? (-- ((elArray*)(var))[-1].min) : 0 )
 
 #define elf_varaddx(var,res,com) ((var) + elf_varaddxx((void**)&(var),sizeof(*var),res,com))
 #define elf_varaddi(var,num) (elf_varaddxx((void**)&(var),sizeof(*var),num,num))

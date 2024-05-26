@@ -8,9 +8,9 @@
 elInteger elf_varaddxx(void **var, elInteger per, elInteger res, elInteger com) {
 	elInteger max = 0;
 	elInteger min = 0;
-	elf_var *arr = 0;
+	elArray *arr = 0;
 	if (*var != 0) {
-		arr = ((elf_var*)(*var)) - 1;
+		arr = ((elArray*)(*var)) - 1;
 		max = arr->max;
 		min = arr->min;
 	}
@@ -24,7 +24,7 @@ elInteger elf_varaddxx(void **var, elInteger per, elInteger res, elInteger com) 
 		if(min + res > max) {
 			max = min + res;
 		}
-		arr = langM_realloc(lHEAP,sizeof(elf_var)+per*max,arr);
+		arr = langM_realloc(lHEAP,sizeof(elArray)+per*max,arr);
 	}
 	if (arr != 0) {
 		arr->max = max;

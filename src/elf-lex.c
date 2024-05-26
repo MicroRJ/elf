@@ -85,15 +85,15 @@ int elf_lexescchr(elFileState *file) {
 
 
 /* not the fastest thing out there */
-elf_token elf_lexone(elFileState *file) {
+elToken elf_lexone(elFileState *file) {
 
 	/* remove, not needed #todo */
 	elf_globaldecl char buffer[0x100];
 
-	elf_token tk;
+	elToken tk;
 
 	retry:
-	tk = (elf_token){TK_NONE,file->thischar};
+	tk = (elToken){TK_NONE,file->thischar};
 
 	/* we could put all of the ascii codes in the switch
 	statement, but that just makes it look incredibly silly  */
@@ -277,7 +277,7 @@ elf_token elf_lexone(elFileState *file) {
 		TK_XCASE2('&',TK_BIT_AND,'&',TK_LOG_AND);
 		TK_XCASE2('!',TK_NEGATE,'=',TK_NOT_EQUALS);
 		TK_XCASE2('=',TK_ASSIGN,'=',TK_EQUALS);
-		TK_XCASE2('?',TK_QMARK,'=',TK_ASSIGN_QUESTION);
+		TK_XCASE2('?',TK_QUESTION_MARK,'=',TK_ASSIGN_QUESTION);
 
 		#undef TK_XCASE2
 

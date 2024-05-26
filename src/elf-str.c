@@ -54,16 +54,37 @@ int elfstr_length_(elState *c) {
 }
 
 
+#define BUFFER 0x10000
+
+
+/* todo: this is so unsafe is crazy */
+void strcatf(char *buffer, char *fmt, ...) {
+	char *cursor = buffer;
+	while (*cursor != 0) ++ cursor;
+	va_list v;
+	va_start(v,fmt);
+	stbsp_vsnprintf(cursor,BUFFER-(cursor-buffer),fmt,v);
+	va_end(v);
+}
+
+
 int elfstr_append_(elState *R) {
-	elString *s = (elString*) elf_getthis(R);
-	elValue v = elf_getany(R,0);
-	if (v.tag == TAG_INT) {
-		elString *r = elf_newstrlen(R,s->length+1);
-		elf_pushstr(R,r);
-		memcpy(r->c,s->c,s->length);
-		r->c[r->length-1] = v.i;
-		r->hash = elf_tabhashstr(r->c);
-	} else elf_unreachable;
+	elString *str = (elString*) elf_getthis(R);
+	char buffer[0x100] = {0};
+	strcatf(buffer,"%s",str->c);
+	for (int i = 0; i < R->call->nx; ++ i) {
+		elValue v = elf_getany(R,i);
+		if (v.tag == TAG_STR) {
+			strcatf(buffer,"%s",v.x_str->c);
+		} else if (v.tag == TAG_NIL) {
+			strcatf(buffer,"nil");
+		} else if (v.tag == TAG_NUM) {
+			strcatf(buffer,"%.2f",v.x_num);
+		} else if (v.tag == TAG_INT) {
+			strcatf(buffer,"%lli",v.x_int);
+		} else elf_unreachable;
+	}
+	elf_pushnewstr(R,buffer);
 	return 1;
 }
 

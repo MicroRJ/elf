@@ -32,18 +32,6 @@ int testlib_debugbreak(elState *R) {
 
 
 
-#define BUFFER 0x10000
-
-
-/* todo: this is so unsafe is crazy */
-void strcatf(char *buffer, char *fmt, ...) {
-	char *cursor = buffer;
-	while (*cursor != 0) ++ cursor;
-	va_list v;
-	va_start(v,fmt);
-	stbsp_vsnprintf(cursor,BUFFER-(cursor-buffer),fmt,v);
-	va_end(v);
-}
 
 
 int testlib_disasm(elState *c) {

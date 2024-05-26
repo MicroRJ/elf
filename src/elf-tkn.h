@@ -9,7 +9,7 @@
 #define  LAST_KEYWORD 28
 
 
-typedef struct elf_token {
+typedef struct elToken {
 	unsigned char type;
 	elf_lineid line;
 	unsigned int eol: 1;
@@ -18,7 +18,7 @@ typedef struct elf_token {
 		elInteger i;
 		elNumber n;
 	};
-} elf_token;
+} elToken;
 
 
 typedef enum ltokentype {
@@ -56,39 +56,40 @@ typedef enum ltokentype {
 	TK_STRING               = 31,
 	TK_LETTER               = 32,
 	TK_WORD                 = 33,
-	TK_QMARK                = 34,
-	TK_NEGATE               = 35,
-	TK_ASSIGN_QUESTION      = 36,
-	TK_ASSIGN               = 37,
-	TK_COLON                = 38,
-	TK_SEMI_COLON           = 39,
-	TK_DOT                  = 40,
-	TK_COMMA                = 41,
-	TK_SQUARE_LEFT          = 42,
-	TK_SQUARE_RIGHT         = 43,
-	TK_CURLY_LEFT           = 44,
-	TK_CURLY_RIGHT          = 45,
-	TK_PAREN_LEFT           = 46,
-	TK_PAREN_RIGHT          = 47,
-	TK_MUL                  = 48,
-	TK_DIV                  = 49,
-	TK_MODULUS              = 50,
-	TK_ADD                  = 51,
-	TK_SUB                  = 52,
-	TK_RIGHT_SHIFT          = 53,
-	TK_LEFT_SHIFT           = 54,
-	TK_LESS_THAN            = 55,
-	TK_LESS_THAN_EQUAL      = 56,
-	TK_GREATER_THAN         = 57,
-	TK_GREATER_THAN_EQUAL   = 58,
-	TK_EQUALS               = 59,
-	TK_NOT_EQUALS           = 60,
-	TK_BIT_AND              = 61,
-	TK_BIT_OR               = 62,
-	TK_BIT_XOR              = 63,
-	TK_LOG_AND              = 64,
-	TK_LOG_OR               = 65,
-	TK_DOT_DOT              = 66,
+	TK_QUESTION_MARK        = 34,
+	TK_EXCLAMATION_MARK     = 35,
+	TK_NEGATE               = 36,
+	TK_ASSIGN_QUESTION      = 37,
+	TK_ASSIGN               = 38,
+	TK_COLON                = 39,
+	TK_SEMI_COLON           = 40,
+	TK_DOT                  = 41,
+	TK_COMMA                = 42,
+	TK_SQUARE_LEFT          = 43,
+	TK_SQUARE_RIGHT         = 44,
+	TK_CURLY_LEFT           = 45,
+	TK_CURLY_RIGHT          = 46,
+	TK_PAREN_LEFT           = 47,
+	TK_PAREN_RIGHT          = 48,
+	TK_MUL                  = 49,
+	TK_DIV                  = 50,
+	TK_MODULUS              = 51,
+	TK_ADD                  = 52,
+	TK_SUB                  = 53,
+	TK_RIGHT_SHIFT          = 54,
+	TK_LEFT_SHIFT           = 55,
+	TK_LESS_THAN            = 56,
+	TK_LESS_THAN_EQUAL      = 57,
+	TK_GREATER_THAN         = 58,
+	TK_GREATER_THAN_EQUAL   = 59,
+	TK_EQUALS               = 60,
+	TK_NOT_EQUALS           = 61,
+	TK_BIT_AND              = 62,
+	TK_BIT_OR               = 63,
+	TK_BIT_XOR              = 64,
+	TK_LOG_AND              = 65,
+	TK_LOG_OR               = 66,
+	TK_DOT_DOT              = 67,
 } ltokentype;
 
 
@@ -135,6 +136,7 @@ elf_globaldecl ltokenintel elf_tkintel[] = {
 	{"literal-letter",       -2, 0},
 	{"identifier",           -2, 0},
 	{"?",                    -2, 0},
+	{"!",                    -2, 0},
 	{"!",                    -2, 0},
 	{"?=",                   -2, 0},
 	{"=",                    -2, 0},

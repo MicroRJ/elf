@@ -71,8 +71,8 @@ elBool elf_choosetk(elFileState *fs, ltokentype x, ltokentype y) {
 ** Check whether the current token is a match,
 ** if so pick it, otherwise error.
 */
-elf_token elf_taketk(elFileState *fs, int k) {
-	elf_token tk = fs->tk;
+elToken elf_taketk(elFileState *fs, int k) {
+	elToken tk = fs->tk;
 	if (!elf_picktk(fs,k)) {
 		elf_filediag(fs,fs->tk.line,"expected '%s'\n",elf_tkintel[k].name);
 	}
@@ -80,8 +80,8 @@ elf_token elf_taketk(elFileState *fs, int k) {
 }
 
 
-elf_token elf_linetaketk(elFileState *fs, int k) {
-	elf_token tk = fs->tk;
+elToken elf_linetaketk(elFileState *fs, int k) {
+	elToken tk = fs->tk;
 	if (!elf_linepicktk(fs,k)) {
 		elf_filediag(fs,fs->tk.line,"expected '%s'\n",elf_tkintel[k].name);
 	}
@@ -359,7 +359,7 @@ elf_nodeid elfY_loadsubexpr(elFileState *fs, int rank) {
 			this and turn it into a statement... */
 			break;
 		}
-		elf_token tk = elf_lexone(fs);
+		elToken tk = elf_lexone(fs);
 		elf_nodeid y = elfY_loadsubexpr(fs,thisrank);
 		if (y == NO_NODE) break;
 		x = elf_nodebinary(fs,tk.line,tktonode(tk.type),NT_ANY,x,y);
@@ -368,9 +368,9 @@ elf_nodeid elfY_loadsubexpr(elFileState *fs, int rank) {
 }
 
 
-elf_nodeid elfY_loadfn(elFileState *fs) {
+elf_nodeid elf_fsloadfun(elFileState *fs) {
 
-	elf_token tk = elf_taketk(fs,TK_FUN);
+	elToken tk = elf_taketk(fs,TK_FUN);
 
 	/* All bytecode is outputted to the same
 	module, the way this language works is
@@ -387,14 +387,14 @@ elf_nodeid elfY_loadfn(elFileState *fs) {
 	elf_taketk(fs,TK_PAREN_LEFT);
 	if (!elf_testtk(fs,TK_PAREN_RIGHT)) do {
 
-		elf_token n = elf_taketk(fs,TK_WORD);
+		elToken n = elf_taketk(fs,TK_WORD);
 		elf_fsnewlocalentity(fs,n.line,n.s,lfalse);
 
 		arity ++;
 	} while (elf_picktk(fs,TK_COMMA));
 	elf_taketk(fs,TK_PAREN_RIGHT);
 
-	elf_taketk(fs,TK_QMARK);
+	elf_taketk(fs,TK_QUESTION_MARK);
 
 	// ? { .. }
 	if (elf_testtk(fs,TK_CURLY_LEFT)) {
@@ -433,7 +433,7 @@ elf_nodeid elfY_loadfn(elFileState *fs) {
 
 
 void elf_fsmayassign(elFileState *fs, elf_nodeid x) {
-	elf_token tk = fs->tk;
+	elToken tk = fs->tk;
 	elf_localid mem = fs->fn->xmemory;
 	if (elf_picktk(fs,TK_ASSIGN)) {
 		elf_fscheckassign(fs,tk.line,x);
@@ -468,7 +468,7 @@ void elf_fsmayassign(elFileState *fs, elf_nodeid x) {
 		so if we get here and we see an operator it's
 		guaranteed to be a '{x}=' assignment. */
 		if (elf_tkintel[tk.type].prec > 0) {
-			elf_token op = elf_lexone(fs);
+			elToken op = elf_lexone(fs);
 			elf_taketk(fs,TK_ASSIGN);
 			elf_fscheckassign(fs,fs->lasttk.line,x);
 			elf_nodeid y = elf_fsloadexpr(fs);
@@ -485,7 +485,7 @@ void elf_fsmayassign(elFileState *fs, elf_nodeid x) {
 
 
 elf_nodeid elf_fsloadtable(elFileState *fs) {
-	elf_token tk = fs->tk;
+	elToken tk = fs->tk;
 	elf_taketk(fs,TK_CURLY_LEFT);
 	elf_nodeid *z = elNIL;
 	elf_nodeid table = elf_nodetab(fs,tk.line,elNIL);
@@ -542,7 +542,7 @@ elf_nodeid elf_fsloadunary(elFileState *fs) {
 		}
 	);
 	elf_nodeid v = NO_NODE;
-	elf_token tk = fs->tk;
+	elToken tk = fs->tk;
 	switch (tk.type) {
 		/* elf is a reserved keyword used
 		for the elf directory. */
@@ -603,7 +603,7 @@ elf_nodeid elf_fsloadunary(elFileState *fs) {
 			}
 		} break;
 		case TK_FUN: {
-			v = elfY_loadfn(fs);
+			v = elf_fsloadfun(fs);
 		} break;
 		case TK_LOAD: {
 			elf_lexone(fs);
@@ -650,7 +650,7 @@ elf_nodeid elf_fsloadunary(elFileState *fs) {
 
 		switch (tk.type) {
 			case TK_DOT: { elf_lexone(fs);
-				elf_token n = elf_taketk(fs,TK_WORD);
+				elToken n = elf_taketk(fs,TK_WORD);
 				elf_nodeid i = elf_nodestr(fs,n.line,n.s);
 				v = elf_nodefield(fs,tk.line,v,i);
 			} break;
@@ -668,7 +668,7 @@ elf_nodeid elf_fsloadunary(elFileState *fs) {
 				}
 			} break;
 			case TK_COLON: { elf_lexone(fs);
-				elf_token n = elf_taketk(fs,TK_WORD);
+				elToken n = elf_taketk(fs,TK_WORD);
 				elf_nodeid y = elf_nodestr(fs,n.line,n.s);
 				v = elf_nodemetafield(fs,tk.line,v,y);
 			} break;
@@ -693,8 +693,8 @@ void elfY_loadenumlist(elFileState *fs) {
 			if (elf_testtk(fs,TK_CURLY_RIGHT)) {
 				break;
 			}
-			elf_token tk = fs->tk;
-			elf_token n = elf_taketk(fs,TK_WORD);
+			elToken tk = fs->tk;
+			elToken n = elf_taketk(fs,TK_WORD);
 			elf_nodeid x = elf_fsnewlocalentity(fs,n.line,n.s,ltrue);
 			elf_taketk(fs,TK_ASSIGN);
 			elf_nodeid y = elf_fsloadexpr(fs);
@@ -706,7 +706,7 @@ void elfY_loadenumlist(elFileState *fs) {
 
 void elf_fsloadstat(elFileState *fs) {
 	elf_localid mem = fs->fn->xmemory;
-	elf_token tk = fs->tk;
+	elToken tk = fs->tk;
 	elFileFnState *fn = fs->fn;
 	elf_fileblock *bl = fn->block;
 	if (bl->flags & BLOCK_ENDED) {
@@ -729,7 +729,7 @@ void elf_fsloadstat(elFileState *fs) {
 		case TK_IF: case TK_IFF: {
 			elf_lexone(fs);
 			elf_nodeid x = elf_fsloadexpr(fs);
-			elf_taketk(fs,TK_QMARK);
+			elf_taketk(fs,TK_QUESTION_MARK);
 			elf_fileblock block = {0};
 			elf_enterblock(fs,&block,0);
 			Select s = {0};
@@ -740,7 +740,7 @@ void elf_fsloadstat(elFileState *fs) {
 				if (elf_picktk(fs,TK_ELIF)) {
 					elf_enterblock(fs,&block,0);
 					x = elf_fsloadexpr(fs);
-					elf_taketk(fs,TK_QMARK);
+					elf_taketk(fs,TK_QUESTION_MARK);
 					langL_addelif(fs,fs->lasttk.line,&s,x);
 					elf_fsloadstat(fs);
 					elf_leaveblock(fs);
@@ -778,7 +778,7 @@ void elf_fsloadstat(elFileState *fs) {
 				elf_taketk(fs,TK_CURLY_RIGHT);
 			} else {
 				do {
-					elf_token n = elf_taketk(fs,TK_WORD);
+					elToken n = elf_taketk(fs,TK_WORD);
 					elf_nodeid x = elf_fsnewlocalentity(fs,n.line,n.s,enm);
 					elf_fsmayassign(fs,x);
 				} while (elf_picktk(fs,TK_COMMA));
@@ -800,7 +800,7 @@ void elf_fsloadstat(elFileState *fs) {
 			elf_fileblock block = {0};
 			elf_enterblock(fs,&block,BLOCK_LOOP);
 			elf_nodeid x = elf_fsloadexpr(fs);
-			elf_taketk(fs,TK_QMARK);
+			elf_taketk(fs,TK_QUESTION_MARK);
 			langL_beginwhile(fs,tk.line,x);
 			elf_fsloadstat(fs);
 			langL_closewhile(fs,tk.line);
@@ -822,12 +822,12 @@ void elf_fsloadstat(elFileState *fs) {
 			elf_lexone(fs);
 			elf_fileblock block = {0};
 			elf_enterblock(fs,&block,BLOCK_LOOP);
-			elf_token n = elf_taketk(fs,TK_WORD);
+			elToken n = elf_taketk(fs,TK_WORD);
 			elf_nodeid i, x, y, lo, hi;
 			x = elf_fsnewlocalentity(fs,n.line,n.s,lfalse);
 			elf_taketk(fs,TK_IN);
 			y = elf_fsloadexpr(fs);
-			elf_taketk(fs,TK_QMARK);
+			elf_taketk(fs,TK_QUESTION_MARK);
 			i = x; lo = NO_NODE; hi = NO_NODE;
 			if (tk.type == TK_FOR) {
 				if (fs->nodes[y].k == NODE_RANGE) {

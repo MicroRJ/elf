@@ -12,13 +12,14 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"delete",elf_tabdelete_);
 	elf_tabmfld(R,tab,"haskey",elf_tabhaskey_);
 	elf_tabmfld(R,tab,"lookup",elf_tablookup_);
-	elf_tabmfld(R,tab,"iter",elf_tabforeach_);
+	elf_tabmfld(R,tab,"iter",elf_tabiter_);
 	elf_tabmfld(R,tab,"collisions",elf_tabcollisions_);
 	elf_tabmfld(R,tab,"add",elf_tabadd_);
 	elf_tabmfld(R,tab,"idx",elf_tabidx_);
 	elf_tabmfld(R,tab,"xrem",elf_tabxrem_);
 	elf_tabmfld(R,tab,"alias",elf_tabalias_);
 	elf_tabmfld(R,tab,"bubblesort",elf_tabbubblesort_);
+	elf_tabmfld(R,tab,"fndaliases",elf_tabfndaliases_);
 	return tab;
 }
 
@@ -336,7 +337,10 @@ int elf_tabdelete_(elState *R) {
 	elInteger slot = elf_tabhashin(tab,key);
 	elEntry *slots = tab->slots;
 	elValue *array = tab->array;
-	if ((slot < 0) || (slots[slot].k.tag == TAG_NIL)) goto leave_;
+	if ((slot < 0) || (slots[slot].k.tag == TAG_NIL)) {
+		elf_throw(R,NO_BYTE,"invalid key");
+		goto leave_;
+	}
 	elInteger idx = slots[slot].i;
 	slots[slot].k = (elValue){TAG_NIL};
 	slots[slot].i = -777;
@@ -351,7 +355,8 @@ int elf_tabdelete_(elState *R) {
 		//NOTE: Swap the items, then iterate to
 		//find references and update them...
 		array[idx] = array[min];
-		for (elInteger i = 0; i < tab->ntotal; ++ i) {
+		elInteger i;
+		for (i=0;i<tab->ntotal;++i) {
 			if (slots[i].k.tag != TAG_NIL && slots[i].i == min) {
 				slots[i].i = idx;
 			}
@@ -390,6 +395,29 @@ int elf_tabalias_(elState *R) {
 }
 
 
+int elf_tabfndaliases_(elState *R) {
+	elf_checkargs(R,":fndaliases",1,"the key to find aliases for");
+	elTable *tab = (elTable *) elf_getthis(R);
+	elValue key = elf_getany(R,0);
+	elTable *list = elf_pushnewtab(R);
+	if (key.tag != TAG_NIL) {
+		elInteger slot = elf_tabhashin(tab,key);
+		if (elf_tabslotiskey(tab,slot)) {
+			elEntry entry = tab->slots[slot];
+			elInteger i;
+			for (i=0;i<tab->nslots;++i) {
+				/* we also include ourselves */
+				elEntry it = tab->slots[i];
+				if (it.i != entry.i) continue;
+				if (it.k.tag == TAG_NIL) continue;
+				elf_tabadd(list,it.k);
+			}
+		}
+	}
+	return 1;
+}
+
+
 int elf_tabbubblesort_(elState *R) {
 	elf_checkargs(R,":bubblesort",1,"comparator function");
 	elTable *tab = (elTable *) elf_getthis(R);
@@ -398,7 +426,8 @@ int elf_tabbubblesort_(elState *R) {
 	elBool sorted = lfalse;
 	do {
 		sorted = ltrue;
-		for (elInteger i = 0; i < elf_varlen(arr)-1; ++ i) {
+		elInteger i;
+		for (i=0;i<elf_varlen(arr)-1;++i) {
 			elValue *top = elf_gettop(R);
 			elf_localid base = elf_pushcls(R,cls);
 			elf_pushany(R,arr[i+0]);
@@ -414,61 +443,30 @@ int elf_tabbubblesort_(elState *R) {
 			elf_settop(R,top);
 		}
 	} while(sorted != ltrue);
-
-	#if 0
-	typedef struct kitem { elInteger k,i; } kitem;
-	elInteger nlist = tab->nslots;
-	kitem *klist = elf_alloc(lHEAP,sizeof(kitem)*nlist);
-	for (elInteger i = 0; i < tab->ntotal; ++ i) {
-		elEntry slot = tab->slots[i];
-		if (slot.k.tag==TAG_NIL) continue;
-		klist[i].k = i;
-		klist[i].i = slot.i;
-	}
-
-	elClosure *cls = elf_getcls(R,0);
-	elBool sorted = lfalse;
-	do {
-		sorted = ltrue;
-		for (elInteger i = 0; i < nlist-1; ++ i) {
-			kitem item = klist[i];
-			elValue *top = elf_gettop(R);
-			elf_localid base = elf_pushcls(R,cls);
-			elf_pushany(R,tab->array[item.i]);
-			int r = elf_callfn(R,base,1,1);
-			elf_ensure(r == 1);
-			if (elf_getint(R,base)) {
-				klist[i+0] = klist[i+1];
-				klist[i+1] = item;
-				sorted = lfalse;
-			}
-			elf_settop(R,top);
-		}
-	} while(sorted != ltrue);
-
-	elf_dealloc(lHEAP,klist);
-#endif
 	return 0;
 }
 
 
+// void mergesortutil(elState *R, elValue *array, elInteger tally, elValue fn) {
+// }
 
-int elf_tabforeach_(elState *R) {
-	elf_ensure(R->frame->x == 1);
-	elTable *table = (elTable *) R->frame->obj;
-	elf_checkcl(R,0);
+
+int elf_tabiter_(elState *R) {
+	elf_ensure(R->frame->nx == 1);
+	elTable *tab = (elTable *) elf_getthis(R);
+	elClosure *cls = elf_getcls(R,0);
 	elf_localid k = elf_pushmany(R,1);
 	elf_localid v = elf_pushmany(R,1);
-	for (int i = 0; i < table->ntotal; ++ i) {
-		elEntry slot = table->slots[i];
-		if (slot.k.tag != TAG_NIL) {
-			R->stk[k] = slot.k;
-			R->stk[v] = table->v[slot.i];
-			/* call the iterator function with two arguments */
-			/* todo: should yield boolean to signal whether to
-			stop or not */
-			elf_callex(R,R->frame->obj,0,0,2,0);
-		}
+	elInteger i;
+	for (i=0;i<tab->ntotal;++i) {
+		elEntry it = tab->slots[i];
+		if (it.k.tag == TAG_NIL) continue;
+		R->stk[k] = it.k;
+		R->stk[v] = tab->array[it.i];
+		/* todo: should yield boolean to signal whether to
+		stop or not */
+		int ny = elf_callex(R,R->frame->obj,0,0,2,0);
+		if (ny != 0) if (elf_getint(R,0) != ltrue) break;
 	}
 	return 0;
 }
@@ -527,7 +525,7 @@ elBool elf_tabvaleq(elValue *x, elValue *y) {
 		}
 		case TAG_SYS: case TAG_INT: case TAG_NUM:
 		case TAG_TAB: case TAG_CLS: case TAG_BID: {
-			return x->i == y->i;
+			return x->x_int == y->x_int;
 		}
 		default: elf_unreachable;
 	}

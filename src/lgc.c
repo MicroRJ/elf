@@ -81,7 +81,7 @@ void elf_remobj(elState *fs, elInteger i) {
 	elInteger n = elf_varlen(gc);
 	elf_ensure(i >= 0 && i < n);
 	gc[i] = gc[n-1];
-	((elf_var*)(gc))[-1].min --;
+	((elArray*)(gc))[-1].min --;
 }
 
 

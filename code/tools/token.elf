@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** token.elf
-** Metaprogram to generate elf_token.h
+** Metaprogram to generate elToken.h
 */
 
 pf = elf.pf
@@ -19,9 +19,9 @@ elf.mydir("code/tools")
 
 pf("generating tokens file...")
 let file = elf.fopen("elf-tkn-x.h","wb")
-finally elf.fclose(file)
+lastly elf.fclose(file)
 let _time = elf.clocktime()
-finally pf(" => took ", elf.timediffs(_time))
+lastly pf(" => took ", elf.timediffs(_time))
 
 
 
@@ -102,7 +102,8 @@ Tk("NUMBER", N, "literal-number")
 Tk("STRING", N, "literal-string")
 Tk("LETTER", N, "literal-letter")
 Tk("WORD", N, "identifier")
-Tk("QMARK", N, "?")
+Tk("QUESTION_MARK", N, "?")
+Tk("EXCLAMATION_MARK", N, "!")
 Tk("NEGATE", N, "!")
 Tk("ASSIGN_QUESTION", N, "?=")
 Tk("ASSIGN", N, "=")
@@ -149,16 +150,16 @@ fpf(file,"*/\n\n\n")
 fpf(file,"#define FIRST_KEYWORD ", FstKeyword, "\n")
 fpf(file,"#define  LAST_KEYWORD ", LstKeyword, "\n\n\n")
 
-fpf(file,"typedef struct elf_token {\n")
+fpf(file,"typedef struct elToken {\n")
 fpf(file,"\tunsigned char type;\n")
-fpf(file,"\tllineid line;\n")
+fpf(file,"\telf_lineid line;\n")
 fpf(file,"\tunsigned int eol: 1;\n")
 fpf(file,"\tunion {\n")
 fpf(file,"\t\tchar *s;\n")
-fpf(file,"\t\telf_int i;\n")
-fpf(file,"\t\telf_num n;\n")
+fpf(file,"\t\telInteger i;\n")
+fpf(file,"\t\telNumber n;\n")
 fpf(file,"\t};\n")
-fpf(file,"} elf_token;\n\n\n")
+fpf(file,"} elToken;\n\n\n")
 
 
 fpf(file,"typedef enum ltokentype {\n")

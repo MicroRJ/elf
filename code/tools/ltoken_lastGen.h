@@ -9,7 +9,7 @@
 #define  LAST_KEYWORD 28
 
 
-typedef struct elf_token {
+typedef struct elToken {
 	unsigned char type;
 	elf_lineid line;
 	unsigned int eol: 1;
@@ -18,7 +18,7 @@ typedef struct elf_token {
 		elInteger i;
 		elNumber n;
 	};
-} elf_token;
+} elToken;
 
 
 typedef enum ltokentype {

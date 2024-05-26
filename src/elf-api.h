@@ -80,8 +80,6 @@ elf_api int elf_run(elState *);
 
 
 elf_api void elf_checkcl(elState *c, elf_localid x);
-elf_api elString *elf_checkstr(elState *c, elf_localid x);
-
 
 elf_api elValue *elf_gettop(elState *R);
 elf_api void elf_settop(elState *R, elValue *top);

@@ -39,7 +39,7 @@ void lang_assertfn(ldebugloc ind, char const *name, elBool expr);
 
 
 #if !defined(elf_unreachable)
-	#define elf_unreachable elf_debugger("internal error: unexpected code branch")
+	#define elf_unreachable elf_debugger(__FILE__" ["XSTRINGIFY(__LINE__)"]: internal error: unexpected code branch")
 #endif
 
 
