@@ -5,7 +5,7 @@
 */
 
 
-elf_byteop nodetobyte(elf_nodeop tt);
+elf_byteop nodetobyte(elNodeOP tt);
 
 
 elf_byteid elf_getlastbyteid(elFileState *fs) {
@@ -143,8 +143,8 @@ void langL_fnepiloge(elFileState *fs, elf_lineid line) {
 ** expression, only one register is necessary, if no registers
 ** are given one is allocated and deallocated automatically.
 */
-elf_byteid elf_genbranchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, elf_nodeid id) {
-	elf_Node v = fs->nodes[id];
+elf_byteid elf_genbranchif(elFileState *fs, ljlist *js, elBool z, elf_localid x, elNodeID id) {
+	elNode v = fs->nodes[id];
 	elf_byteid j = NO_BYTE;
 
 	elf_localid mem = fs->fn->xmemory;
@@ -194,12 +194,12 @@ elf_byteid elf_genbranchif(elFileState *fs, ljlist *js, elBool z, elf_localid x,
 }
 
 
-elf_byteid langL_branchiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
+elf_byteid langL_branchiffalse(elFileState *fs, ljlist *js, elf_localid x, elNodeID id) {
 	return elf_genbranchif(fs,js,lfalse,x,id);
 }
 
 
-elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
+elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elNodeID id) {
 	return elf_genbranchif(fs,js,ltrue,x,id);
 }
 
@@ -209,7 +209,7 @@ elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_no
 ** address becomes the false target, thus all false
 ** branches converge here. all true branches are returned.
 */
-elf_byteid *langL_jumpiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
+elf_byteid *langL_jumpiftrue(elFileState *fs, ljlist *js, elf_localid x, elNodeID id) {
 	langL_branchiftrue(fs,js,x,id);
 	langL_tieloosejs(fs,js->f);
 	elf_delvar(js->f);
@@ -218,7 +218,7 @@ elf_byteid *langL_jumpiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nod
 }
 
 
-elf_byteid *langL_jumpiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id) {
+elf_byteid *langL_jumpiffalse(elFileState *fs, ljlist *js, elf_localid x, elNodeID id) {
 	langL_branchiffalse(fs,js,x,id);
 	langL_tieloosejs(fs,js->t);
 	elf_delvar(js->t);
@@ -227,13 +227,13 @@ elf_byteid *langL_jumpiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_no
 }
 
 
-elf_byteid *langL_jumpifnotnil(elFileState *fs, elf_lineid line, ljlist *js, elf_nodeid id) {
+elf_byteid *langL_jumpifnotnil(elFileState *fs, elf_lineid line, ljlist *js, elNodeID id) {
 	return langL_jumpiffalse(fs,js,NO_SLOT,elf_nodebinary(fs,line,NODE_EQ,NT_BOL,id,elf_nodenil(fs,line)));
 }
 
 
 /* todo: add support for multiple results */
-void elf_emityield(elFileState *fs, elf_lineid line, elf_nodeid id) {
+void elf_emityield(elFileState *fs, elf_lineid line, elNodeID id) {
 	int n = 0;
 	elf_localid x = 0;
 	if (id != NO_NODE) {
@@ -266,7 +266,7 @@ void elf_gentestmem(elFileState *fs, elf_lineid line, elf_localid r) {
 ** given one and loads the node to that
 ** local.
 */
-void langL_localloadin(elFileState *fs, elf_lineid line, elf_localid r, elf_nodeid id) {
+void langL_localloadin(elFileState *fs, elf_lineid line, elf_localid r, elNodeID id) {
 	/* the user can provide exactly the next free register,
 	or exactly the last allocated register  */
 	if ((fs->fn->xmemory - r) == 0) {
@@ -279,11 +279,11 @@ void langL_localloadin(elFileState *fs, elf_lineid line, elf_localid r, elf_node
 }
 
 
-elf_localid elf_genlocalize(elFileState *fs, elf_lineid line, elf_nodeid id) {
-	elf_Node v = fs->nodes[id];
+elf_localid elf_genlocalize(elFileState *fs, elf_lineid line, elNodeID id) {
+	elNode v = fs->nodes[id];
 	/* todo: this literally contradicts SSA, this system is
 	obsolete, replace with something else... */
-	elf_localid r = v.r;
+	elf_localid r = v._r;
 	/* the node is currently allocated */
 	if ((r != NO_SLOT) && (r < fs->fn->xmemory)) {
 		goto leave;
@@ -293,12 +293,12 @@ elf_localid elf_genlocalize(elFileState *fs, elf_lineid line, elf_nodeid id) {
 }
 
 
-void langL_emit(elFileState *fs, elf_lineid line, elf_nodeid id) {
+void langL_emit(elFileState *fs, elf_lineid line, elNodeID id) {
 	elf_localid mem = fs->fn->xmemory;
-	elf_Node v = fs->nodes[id];
+	elNode v = fs->nodes[id];
 	switch (v.k) {
 		case NODE_LOAD: {
-			elf_Node x = fs->nodes[v.x];
+			elNode x = fs->nodes[v.x];
 			if ((x.k == NODE_LOCAL)) {
 				elf_unreachable;
 			} else
@@ -322,11 +322,11 @@ void langL_emit(elFileState *fs, elf_lineid line, elf_nodeid id) {
 ** if y is 0 the instruction is omitted if
 ** no side effects.
 */
-void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_localid x, elf_localid y, elf_nodeid id) {
+void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_localid x, elf_localid y, elNodeID id) {
 	elf_ensure(x > NO_SLOT);
 	elf_ensure(x < fs->fn->xmemory);
 
-	elf_Node v = fs->nodes[id];
+	elNode v = fs->nodes[id];
 	elf_ensure(v.level <= fs->level);
 
 	if (v.line != 0) line = v.line;
@@ -337,17 +337,18 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 	/* finally restore memory state */
 	elf_localid mem = fs->fn->xmemory;
 
-	if ((v.r != NO_SLOT) && (reload != ltrue)) {
+	if ((v._r != NO_SLOT) && (reload != ltrue)) {
 		/* node is already allocated, and we're
 		not asked to reload it */
-		if (v.r <= mem) goto leave;
-		v.r = NO_SLOT;
+		if (v._r <= mem) goto leave;
+		elf_nodesetr(fs,line,id,NO_SLOT); (v._r = NO_SLOT);
 	}
-	elf_ensure((v.r < mem));
-	elf_ensure((v.k != NODE_LOCAL) || (v.r == v.x));
+	elf_ensure((v._r < mem));
+	elf_ensure((v.k != NODE_LOCAL) || (v._r == v.x));
 
 
-	fs->nodes[id].r = x;
+	elf_nodesetr(fs,line,id,x);
+	// fs->nodes[id].r = x;
 
 
 	#define UNUSED_CHECK \
@@ -429,14 +430,15 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 		case NODE_TYPEGUARD: {
 			UNUSED_CHECK;
 			langL_localload(fs,line,reload,x,y,v.x);
-			fs->nodes[id].r = x = fs->nodes[v.x].r;
+			elf_nodesetr(fs,line,id,fs->nodes[v.x]._r);
+			x = fs->nodes[v.x]._r;
+			// fs->nodes[id].r = x = fs->nodes[v.x].r;
 			elf_emitbytexy(fs,v.line,BC_TYPEGUARD,x,elf_nodettotag(v.y));
 		} break;
 		case NODE_GROUP: {
 			UNUSED_CHECK;
 			langL_localload(fs,line,reload,x,y,v.x);
 		} break;
-		/* -- todo: could do through libfn? */
 		case NODE_FILE: {
 			langL_localload(fs,line,ltrue,x,1,v.x);
 			elf_emitbytexy(fs,line,BC_LOADFILE,x,y);
@@ -458,7 +460,7 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 			elf_localid head = elf_genlocalalloc(fs,1);
 			elf_ensure((head - x) != 0);
 			elf_gentestmem(fs,line,head);
-			elf_Node xx = fs->nodes[v.x];
+			elNode xx = fs->nodes[v.x];
 			/* allocate v.x.x (the object) here because
 			obviously if we just load v.x it'll reset
 			its memory state and we'll loose v.x, so
@@ -477,12 +479,10 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 			}
 			int n = elf_varlen(v.z);
 			elf_emitbytexyz(fs,line,xx.k == NODE_METAFIELD ? BC_METACALL : BC_CALL,head,n,y);
-
-			/* also, ensure that we don't expect
-			more than one result if this is case,
-			because we don't support that */
-			if (y > 1) elf_filediag(fs,line,"unsupported");
 			if (y != 0) {
+				/* ensure that we don't expect because
+				we don't support that */
+				if (y > 1) elf_filediag(fs,line,"unsupported");
 				elf_emitbytexy(fs,line,BC_RELOAD,x,head);
 			}
 		} break;
@@ -535,8 +535,8 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 }
 
 
-void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y) {
-	elf_Node v = fs->nodes[x];
+void langL_moveto(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
+	elNode v = fs->nodes[x];
 	elf_ensure(v.level <= fs->level);
 	elf_ensure(x >= 0);
 	elf_ensure(y >= 0);
@@ -571,9 +571,9 @@ void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y) 
 		} break;
 		// {x}[{x}..{x}] = {y}
 		case NODE_RANGE_INDEX: {
-			elf_nodeid lo = fs->nodes[v.y].x;
-			elf_nodeid hi = fs->nodes[v.y].y;
-			elf_nodeid ii = elf_nodelocal(fs,line,elf_genlocalalloc(fs,1));
+			elNodeID lo = fs->nodes[v.y].x;
+			elNodeID hi = fs->nodes[v.y].y;
+			elNodeID ii = elf_nodelocal(fs,line,elf_genlocalalloc(fs,1));
 			elf_localid xx = elf_genlocalize(fs,line,v.x);
 			elf_localid yy = elf_genlocalize(fs,line,y);
 			elf_fileblock block = {0};
@@ -593,7 +593,7 @@ void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y) 
 }
 
 
-void elf_genbeginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z) {
+void elf_genbeginif(elFileState *fs, elf_lineid line, Select *s, elNodeID x, int z) {
 	ljlist js = {0};
 	elf_genbranchif(fs,&js,z,NO_SLOT,x);
 	// if  0 = jz
@@ -709,7 +709,7 @@ void langL_begindowhile(elFileState *fs, elf_lineid line) {
 }
 
 
-void langL_closedowhile(elFileState *fs, elf_lineid line, elf_nodeid x) {
+void langL_closedowhile(elFileState *fs, elf_lineid line, elNodeID x) {
 	elf_fileblock *bl = fs->fn->block;
 	elf_ensure(bl->flags & BLOCK_LOOP);
 
@@ -726,7 +726,7 @@ void langL_closedowhile(elFileState *fs, elf_lineid line, elf_nodeid x) {
 }
 
 
-void langL_beginwhile(elFileState *fs, elf_lineid line, elf_nodeid x) {
+void langL_beginwhile(elFileState *fs, elf_lineid line, elNodeID x) {
 	elf_fileblock *bl = fs->fn->block;
 	elf_ensure(bl->flags & BLOCK_LOOP);
 
@@ -754,14 +754,14 @@ void langL_closewhile(elFileState *fs, elf_lineid line) {
 }
 
 
-elf_nodeid elf_nodeilessthan(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y) {
+elNodeID elf_nodeilessthan(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
 	x = elf_nodetypeguard(fs,fs->nodes[x].line,x,NT_INT);
 	y = elf_nodetypeguard(fs,fs->nodes[y].line,y,NT_INT);
 	return elf_nodebinary(fs,line,NODE_LT,NT_BOL,x,y);
 }
 
 
-void elf_beginrangedloop(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid lo, elf_nodeid hi) {
+void elf_beginrangedloop(elFileState *fs, elf_lineid line, elNodeID x, elNodeID lo, elNodeID hi) {
 	elf_fileblock *bl = fs->fn->block;
 	elf_ensure(bl->flags & BLOCK_LOOP);
 
@@ -773,7 +773,7 @@ void elf_beginrangedloop(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nod
 	bl->loop.entry = elf_getlastbyteid(fs);
 
 	elf_genlocalize(fs,line,hi);
-	elf_nodeid c = elf_nodeilessthan(fs,line,bl->loop.x,hi);
+	elNodeID c = elf_nodeilessthan(fs,line,bl->loop.x,hi);
 
 	elf_ensure(bl->loop.falsejumps == 0);
 
@@ -789,7 +789,7 @@ void elf_closerangedloop(elFileState *fs, elf_lineid line) {
 	langL_tieloosejs(fs,bl->loop.truejumps);
 	elf_delvar(bl->loop.truejumps);
 	bl->loop.truejumps = elNIL;
-	elf_ensure(bl->loop.r == fs->nodes[bl->loop.x].r);
+	elf_ensure(bl->loop.r == fs->nodes[bl->loop.x]._r);
 	int x = bl->loop.x;
 	int k = elf_nodebinary(fs,NO_LINE,NODE_ADD,NT_INT,x,elf_nodeint(fs,NO_LINE,1));
 	langL_moveto(fs,line,x,k);
@@ -820,7 +820,7 @@ void elf_closelastlyblock(elFileState *fs, elf_lineid line, elf_fileblock *bl) {
 }
 
 
-elf_byteop nodetobyte(elf_nodeop tt) {
+elf_byteop nodetobyte(elNodeOP tt) {
 	switch (tt) {
 		case NODE_FIELD: 	  	return BC_FIELD;
 		case NODE_INDEX: 	  	return BC_INDEX;

@@ -11,14 +11,12 @@
 #define NO_LINE (-0)
 
 
-#define BLOCK_LOOP 0x01
-
+#define BLOCK_LOOP 		0x01
+#define BLOCK_ENDED  	0x02
+#define BLOCK_DELAYED 	0x04
 /* added when a break, leave or continue
 statement is found */
-#define BLOCK_ENDED  0x02
-
 /* added when a piece of block is delayed */
-#define BLOCK_DELAYED 0x04
 
 
 typedef struct elf_fileloop {
@@ -27,7 +25,7 @@ typedef struct elf_fileloop {
 	elf_byteid *truejumps;
 	/* the node and register associated
 	with the loop increment */
-	elf_nodeid  x;
+	elNodeID  x;
 	elf_localid r;
 } elf_fileloop;
 
@@ -67,19 +65,19 @@ typedef struct Select {
 } Select;
 
 
-void langL_moveto(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid y);
-void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_localid x, elf_localid y, elf_nodeid id);
-elf_localid elf_genlocalize(elFileState *fs, elf_lineid line, elf_nodeid id);
+void langL_moveto(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
+void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_localid x, elf_localid y, elNodeID id);
+elf_localid elf_genlocalize(elFileState *fs, elf_lineid line, elNodeID id);
 
 
 void elf_enterlastlyblock(elFileState *fs, elf_lineid line, elf_fileblock *bl);
 void elf_closelastlyblock(elFileState *fs, elf_lineid line, elf_fileblock *bl);
 
 
-elf_byteid langL_branchiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
-elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
-elf_byteid *langL_jumpiftrue(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
-elf_byteid *langL_jumpiffalse(elFileState *fs, ljlist *js, elf_localid x, elf_nodeid id);
+elf_byteid langL_branchiffalse(elFileState *fs, ljlist *js, elf_localid x, elNodeID id);
+elf_byteid langL_branchiftrue(elFileState *fs, ljlist *js, elf_localid x, elNodeID id);
+elf_byteid *langL_jumpiftrue(elFileState *fs, ljlist *js, elf_localid x, elNodeID id);
+elf_byteid *langL_jumpiffalse(elFileState *fs, ljlist *js, elf_localid x, elNodeID id);
 
 
 enum {
@@ -88,20 +86,20 @@ enum {
 };
 
 
-void elf_genbeginif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x, int z);
-void langL_addelif(elFileState *fs, elf_lineid line, Select *s, elf_nodeid x);
+void elf_genbeginif(elFileState *fs, elf_lineid line, Select *s, elNodeID x, int z);
+void langL_addelif(elFileState *fs, elf_lineid line, Select *s, elNodeID x);
 void langL_addelse(elFileState *fs, elf_lineid line, Select *s);
 void langL_addthen(elFileState *fs, elf_lineid line, Select *s);
 void langL_closeif(elFileState *fs, elf_lineid line, Select *s);
 
 
-void elf_beginrangedloop(elFileState *fs, elf_lineid line, elf_nodeid x, elf_nodeid lo, elf_nodeid hi);
+void elf_beginrangedloop(elFileState *fs, elf_lineid line, elNodeID x, elNodeID lo, elNodeID hi);
 void elf_closerangedloop(elFileState *fs, elf_lineid line);
 
 void langL_begindowhile(elFileState *fs, elf_lineid line);
-void langL_closedowhile(elFileState *fs, elf_lineid line, elf_nodeid x);
+void langL_closedowhile(elFileState *fs, elf_lineid line, elNodeID x);
 
-void langL_beginwhile(elFileState *fs, elf_lineid line, elf_nodeid x);
+void langL_beginwhile(elFileState *fs, elf_lineid line, elNodeID x);
 void langL_closewhile(elFileState *fs, elf_lineid line);
 
 

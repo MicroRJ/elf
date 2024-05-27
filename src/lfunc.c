@@ -6,9 +6,9 @@
 
 
 elf_api elClosure *elf_newcls(elState *rt, elProto fn) {
-	elf_ensure(fn.ncaches >= 0);
+	elf_ensure(fn.zcache >= 0);
 
-	elInteger length = sizeof(elClosure) + sizeof(elValue) * (fn.ncaches-1);
+	elInteger length = sizeof(elClosure) + sizeof(elValue) * (fn.zcache-1);
 
 	elClosure *cl = elf_newobj(rt,OBJ_CLOSURE,length);
 	cl->fn = fn;

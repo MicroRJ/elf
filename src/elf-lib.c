@@ -275,19 +275,19 @@ int elflib_loadfile(elState *R) {
 
 
 
-int elflib_GCM(elState *R) {
+int elflib_gc_memory(elState *R) {
 	elf_pushint(R,R->gcmemory);
 	return 1;
 }
 
 
-int elflib_GCT(elState *R) {
+int elflib_gc_threshold(elState *R) {
 	elf_pushint(R,R->gcthreshold);
 	return 1;
 }
 
 
-int elflib_GCN(elState *R) {
+int elflib_gc_objects(elState *R) {
 	elf_pushint(R,elf_varlen(R->gc));
 	return 1;
 }
@@ -616,9 +616,9 @@ elf_api void elflib_registerall(elState *R) {
 	elf_register(R,"elf.loadfile",elflib_loadfile);
 	elf_register(R,"elf.unload",elflib_unload);
 
-	elf_register(R,"elf.GCN",elflib_GCN);
-	elf_register(R,"elf.GCT",elflib_GCT);
-	elf_register(R,"elf.GCM",elflib_GCM);
+	elf_register(R,"elf.gc_objects",elflib_gc_objects);
+	elf_register(R,"elf.gc_threshold",elflib_gc_threshold);
+	elf_register(R,"elf.gc_memory",elflib_gc_memory);
 
 
 	elf_register(R,"elf.pf",elflib_pf);

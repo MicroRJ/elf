@@ -1,5 +1,5 @@
 let file = elf.ftemp() lastly elf.fclose(file)
-({x=1,y={x=1,y=2}}):unload(file)
+elf.unload(file,{x=1,y={x=1,y=2}})
 elf.pf("size: ",elf.fsize(file));
 let data = elf.fload(file)
 elf.pf("data: ",data);

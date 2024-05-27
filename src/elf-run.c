@@ -63,7 +63,7 @@ int elf_callfn(elState *R, elf_localid rxy, int nx, int ny) {
 destination registers, and ry the input registers */
 int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_localid ry, int nx, int ny) {
 	elCallFrame *caller = R->call;
-	// elf_ensure((R->top-caller->locals)+caller->cl->fn.nlocals-1 > rx);
+	// elf_ensure((R->top-caller->locals)+caller->cl->fn.zstack-1 > rx);
 	elValue *locals = caller->locals + rx;
 	/* top always points to one past locals,
 	so far we only have nx argument locals,
@@ -86,7 +86,7 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 		call.cl = fn.f;
 		/* increment top to fill the function's locals */
 		/* todo: replace with faster memset? */
-		for (; nx < call.cl->fn.nlocals; ++ nx) {
+		for (; nx < call.cl->fn.zstack; ++ nx) {
 			top->tag = TAG_NIL;
 			top->i   = 0;
 			top ++;
@@ -151,7 +151,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elf_localid 
 
 	elFileFnState fn = {0};
 	elf_beginfsfn(fs,&fn,fs->tk.line);
-	elf_nodeid id = elf_fsloadexpr(fs);
+	elNodeID id = elf_fsloadexpr(fs);
 	elf_emityield(fs,fs->tk.line,id);
 	elf_closefsfn(fs);
 
@@ -163,7 +163,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	elf_varadd(M->files,file);
 
 	elProto p = {0};
-	p.nlocals = fn.nlocals;
+	p.zstack = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
@@ -206,7 +206,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	elf_varadd(M->files,fl);
 
 	elProto p = {0};
-	p.nlocals = fn.nlocals;
+	p.zstack = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
@@ -293,7 +293,7 @@ int elf_run(elState *R) {
 	elProto fn = cl->fn;
 	elCallFrame *caller = call->caller;
 	elValue *locals = call->locals;
-	elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
+	elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
 
 	while (call->tail < fn.nbytes) {
 		/* todo: call->tail is redundant ... */
@@ -429,14 +429,14 @@ int elf_run(elState *R) {
 		locals[b.x].n   = md->kn[b.y];
 	} break;
 	case BC_LOADCACHED: {
-		elf_ensure(b.y >= 0 && b.y < fn.ncaches);
+		elf_ensure(b.y >= 0 && b.y < fn.zcache);
 		locals[b.x] = cl->caches[b.y];
 	} break;
 	case BC_CLOSURE: {
 		elf_ensure(b.y >= 0 && b.y < elf_varlen(md->p));
 		elProto p = md->p[b.y];
 		elClosure *ncl = elf_newcls(R,p);
-		for (int i = 0; i < p.ncaches; ++i) {
+		for (int i = 0; i < p.zcache; ++i) {
 			ncl->caches[i] = locals[b.x+i];
 		}
 		locals[b.x].tag = TAG_CLS;
@@ -566,11 +566,11 @@ int elf_run(elState *R) {
 	} break;
 	case BC_METACALL: {
 		elf_callex(R,locals[b.x].x_obj,b.x+1,b.x,b.y,b.z);
-		elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
+		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
 	} break;
 	case BC_CALL: {
 		elf_callfn(R,b.x,b.y,b.z);
-		elf_ensure((elInteger)(R->top - locals) >= fn.nlocals);
+		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
 	} break;
 	case BC_ISNIL: {
 		elValue x = locals[b.y];

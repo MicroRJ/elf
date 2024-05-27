@@ -226,9 +226,9 @@ elf_localid elf_pushbinding(elState *R, elBinding b) {
 
 elf_localid elf_pushnewcls(elState *R, elProto fn) {
 	elClosure *cl = elf_newcls(R,fn);
-	R->top -= fn.ncaches;
+	R->top -= fn.zcache;
 	int i;
-	for (i=0; i<fn.ncaches; ++i) {
+	for (i=0; i<fn.zcache; ++i) {
 		cl->caches[i] = R->top[i];
 	}
 	return elf_pushcls(R,cl);

@@ -102,7 +102,7 @@ elInteger elf_marktab(elTable *table);
 /* todo: remove this function */
 elInteger elf_markcl(elClosure *cl) {
 	elInteger n = 0, k;
-	for (k=0; k<cl->fn.ncaches; ++k) {
+	for (k=0; k<cl->fn.zcache; ++k) {
 		n += elf_markval(&cl->caches[k]);
 	}
 	return n;

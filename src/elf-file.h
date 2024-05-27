@@ -85,8 +85,8 @@ typedef struct elFileState {
 	int linenumber;
 	elToken lasttk,tk,thentk;
 	/* buffer for nodes */
-	elf_Node *nodes;
-	elf_nodeid nnodes;
+	elNode *nodes;
+	elNodeID nnodes;
 	/* the current level, level is incremented
 	per level, block or statement or whenever
 	it makes sense, represents a visibility
@@ -109,6 +109,6 @@ typedef struct elFileState {
 } elFileState;
 
 
-elf_nodeid elf_fsloadexpr(elFileState *fs);
-elf_nodeid elf_fsloadunary(elFileState *fs);
+elNodeID elf_fsloadexpr(elFileState *fs);
+elNodeID elf_fsloadunary(elFileState *fs);
 void elf_fsloadstat(elFileState *fs);

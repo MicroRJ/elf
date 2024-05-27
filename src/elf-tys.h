@@ -25,12 +25,9 @@ typedef char *elf_lineid;
 ** Function Prototype
 */
 typedef struct elProto {
-	/* x-in, y-yield */
 	short x,y;
-	short ncaches;
-	/* stack size required allocated by runtime
-	at call time. */
-	short nlocals;
+	short zcache;
+	short zstack;
 	int nbytes;
 	int bytes;
 } elProto;
