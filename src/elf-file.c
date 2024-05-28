@@ -89,25 +89,6 @@ elToken elf_linetaketk(elFileState *fs, int k) {
 }
 
 
-lentityid elfY_allocentity(elFileState *fs, elf_lineid line) {
-	elFileFnState *ff = fs->fn;
-	lentityid id = {fs->nentities ++};
-	if (elf_varlen(fs->entities) < fs->nentities) {
-		elf_varaddi(fs->entities,1);
-	}
-
-	for (elf_localid i = id.x; i < fs->nentities; ++i) {
-		fs->entities[i].level = fs->level;
-		fs->entities[i].line  = line;
-		fs->entities[i].name  = 0;
-		fs->entities[i].slot  = 0;
-		fs->entities[i].enm   = lfalse;
-	}
-	// elf_filediag(fs,line,"%i, fs=%i, ff=%i",id,fs->nentities,nentities);
-	return id;
-}
-
-
 elf_localid elf_fsnumentinlev(elFileState *fs) {
 	elf_fileentry *entities = fs->entities;
 	int nentities = fs->nentities;
@@ -175,14 +156,14 @@ void elf_fstrapent(elFileState *fs, elFileFnState *fn, lentityid id) {
 ** you should make it relative to the current function.
 ** If the entity is outside of this function, then it caches it.
 */
-lentityid elf_fsfndent(elFileState *fs, elf_lineid line, char *name) {
+lentityid elf_findlocalentity(elFileState *fs, elf_lineid line, char *name, elBool trap) {
 	elFileFnState *fn = fs->fn;
-	for (int x = fs->nentities-1; x >= 0; --x) {
+	for (int x = fs->nentities-1; x > -1; --x) {
 		if (S_eq(fs->entities[x].name,name)) {
 			lentityid id = {x};
-	if (x < fn->entities) {
-		elf_fstrapent(fs,fn,id);
-	}
+			if (x < fn->entities) {
+				if (trap) elf_fstrapent(fs,fn,id);
+			}
 			return id;
 		}
 	}
@@ -198,33 +179,41 @@ lentityid elf_fsfndent(elFileState *fs, elf_lineid line, char *name) {
 */
 elNodeID elf_fsnewlocalentity(elFileState *fs, elf_lineid line, char *name, elBool enm) {
 	elFileFnState *fn = fs->fn;
-	lentityid id = elf_fsfndent(fs,line,name);
-	if (id.x == NO_ENTITY.x) {
-		id = elfY_allocentity(fs,line);
-
-		/* -- todo: for compile time constants,
-		no slot allocation required */
-		elf_localid slot = elf_genlocalalloc(fs,1);
-		fs->entities[id.x].slot = slot;
-		fs->entities[id.x].enm  = enm;
-		fs->entities[id.x].name = name;
-
-		return elf_nodelocal(fs,line,slot);
-	} else {
-		elf_fileentry entity = fs->entities[id.x];
-		/* is this variable name already present in this level? */
+	lentityid already = elf_findlocalentity(fs,line,name,lfalse);
+	if (already.x != NO_ENTITY.x) {
+		elf_fileentry entity = fs->entities[already.x];
 		if (entity.level == fs->level) {
-			elf_filediag(fs,line,"'%s': already declared",name);
+			elf_filediag(fs,line,"'%s': is already declared",name);
 		} else {
+			/* todo: only issue this warning if the entity is within the
+			same function */
 			elf_filediag(fs,line,"'%s': this declaration shadows another one",name);
 		}
-		return elf_nodelocal(fs,line,entity.slot);
 	}
+
+	lentityid id = {fs->nentities ++};
+	if (elf_varlen(fs->entities) < fs->nentities) {
+		elf_varaddi(fs->entities,1);
+	}
+
+	fs->entities[id.x].level = fs->level;
+	fs->entities[id.x].line  = line;
+	fs->entities[id.x].name  = 0;
+	fs->entities[id.x].slot  = 0;
+	fs->entities[id.x].enm   = lfalse;
+
+	/* -- todo: for compile time constants,
+	no slot allocation required */
+	elf_localid slot = elf_genlocalalloc(fs,1);
+	fs->entities[id.x].slot = slot;
+	fs->entities[id.x].enm  = enm;
+	fs->entities[id.x].name = name;
+	return elf_nodelocal(fs,line,slot);
 }
 
 
-elNodeID elf_fsfndentitynode(elFileState *fs, elf_lineid line, char *name) {
-	lentityid id = elf_fsfndent(fs,line,name);
+elNodeID elf_findentitynode(elFileState *fs, elf_lineid line, char *name) {
+	lentityid id = elf_findlocalentity(fs,line,name,ltrue);
 	if (id.x == NO_ENTITY.x) return NO_NODE;
 	elFileFnState *fn = fs->fn;
 	/* to figure out whether this is capture, simply
@@ -568,7 +557,7 @@ elNodeID elf_fsloadunary(elFileState *fs) {
 		case TK_WORD: {
 			elf_lexone(fs);
 	if (~fs->flags & NOTANENTITY) {
-		v = elf_fsfndentitynode(fs,tk.line,tk.s);
+		v = elf_findentitynode(fs,tk.line,tk.s);
 		if (v == NO_NODE) {
 			// elf_filediag(fs,tk.line,"warning: '%s' implicit global declaration, did you mean this?",tk.s);
 			elf_globalid x = elf_getsymbol(fs->M,elf_newstr(fs->R,tk.s));
