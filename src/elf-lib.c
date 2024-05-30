@@ -83,6 +83,12 @@ int elflib_globalbytelogging(elState *R) {
 }
 
 
+int elflib_oncalldebugger(elState *R) {
+	R->oncalldebuggerflag = elf_getint(R,0);
+	return 0;
+}
+
+
 int elflib_debugger(elState *R) {
 #if defined(_DEBUG)
 	R->debuggerflag = ltrue;
@@ -592,6 +598,7 @@ elf_api void elflib_registerall(elState *R) {
 #endif
 
 	elf_register(R,"elf.debugger",elflib_debugger);
+	elf_register(R,"elf.oncalldebugger",elflib_oncalldebugger);
 	elf_register(R,"elf.bytelogging",elflib_bytelogging);
 	elf_register(R,"elf.globalbytelogging",elflib_globalbytelogging);
 

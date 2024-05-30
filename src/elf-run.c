@@ -72,9 +72,6 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 	elCallFrame call = {0};
 	call.caller = caller;
 
-	// elFileInfo fi = elf_getrunningfile(R);
-	// elf_linediag(fi.name,fi.lines,elf_getrunningline(R),"new_call");
-
 	call.head = R->byte;
 	call.tail = 0;
 	call.top = R->top;
@@ -96,6 +93,9 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 	R->call = &call;
 	R->call_level ++;
 
+	if (R->oncalldebuggerflag) {
+		elf_debugger("on-call-debugger");
+	}
 	elf_localid nyield = 0;
 	if (fn.tag == TAG_CLS) {
 		nyield = elf_run(R);

@@ -102,8 +102,13 @@ typedef struct elState {
 	union { elCallFrame *call,*frame,*f; };
 	int call_level;
 	elBool debuggerflag;
+	elBool oncalldebuggerflag;
 	elTable *metatab_str;
 	elTable *metatab_tab;
+	struct {
+		elValue oncall;
+		elValue ongc;
+	} hooks;
 	struct {
 		elString *x,*y,*z,*w;
 		elString *width,*height;
