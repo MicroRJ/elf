@@ -17,10 +17,11 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"add",elf_tabadd_);
 	elf_tabmfld(R,tab,"idx",elf_tabidx_);
 	elf_tabmfld(R,tab,"xrem",elf_tabxrem_);
-	elf_tabmfld(R,tab,"alias",elf_tabalias_);
 	elf_tabmfld(R,tab,"bubblesort",elf_tabbubblesort_);
 	elf_tabmfld(R,tab,"fndaliases",elf_tabfndaliases_);
+	elf_tabmfld(R,tab,"alias",elf_tabalias_);
 	elf_tabmfld(R,tab,"merge",elf_tabmerge_);
+	elf_tabmfld(R,tab,"clone",elf_tabclone_);
 	return tab;
 }
 
@@ -406,7 +407,7 @@ int elf_tabfndaliases_(elState *R) {
 		if (elf_tabslotiskey(tab,slot)) {
 			elEntry entry = tab->slots[slot];
 			elInteger i;
-			for (i=0;i<tab->nslots;++i) {
+			for (i=0;i<tab->ntotal;++i) {
 				/* we also include ourselves */
 				elEntry it = tab->slots[i];
 				if (it.i != entry.i) continue;
@@ -473,17 +474,61 @@ int elf_tabiter_(elState *R) {
 }
 
 
-int elf_tabmerge_(elState *R) {
-	elf_checkargs(R,":merge",1,"the table to merge");
-	elTable *tab = (elTable *) elf_getthis(R);
-	elTable *merger = elf_gettab(R,0);
+/* todo: account for keyless values */
+elTable *elf_tabcopy(elState *S, elTable *tab) {
+
+	elf_debugger("not impl");
+
+	elTable *copy = elf_newtab(S);
 	elInteger i;
-	for (i=0;i<merger->nslots;++i) {
+	for (i=0;i<tab->ntotal;++i) {
+		elEntry it = tab->slots[i];
+		if (it.k.tag == TAG_NIL) continue;
+		elValue item = tab->array[it.i];
+		elf_tabset(copy,it.k,item);
+	}
+	return copy;
+}
+
+
+/* todo: account for keyless values */
+elTable *elf_tabclone(elState *S, elTable *tab) {
+	elTable *clone = elf_newtab(S);
+	elInteger i;
+	for (i=0;i<tab->ntotal;++i) {
+		elEntry it = tab->slots[i];
+		if (it.k.tag == TAG_NIL) continue;
+		elf_tabset(clone,it.k,tab->array[it.i]);
+	}
+	return clone;
+}
+
+
+int elf_tabclone_(elState *R) {
+	elf_checkargs(R,":clone",0,"the table to clone");
+	elTable *tab = (elTable *) elf_getthis(R);
+	elf_pushtab(R,elf_tabclone(R,tab));
+	return 1;
+}
+
+
+void elf_tabmerge(elTable *tab, elTable *merger) {
+	elInteger i;
+	for (i=0;i<merger->ntotal;++i) {
 		elEntry it = merger->slots[i];
 		if (it.k.tag == TAG_NIL) continue;
 		elf_tabset(tab,it.k,merger->array[it.i]);
 	}
-	return 0;
+}
+
+
+int elf_tabmerge_(elState *R) {
+	elf_checkargs(R,":merge",1,"the table to merge");
+	elTable *tab = (elTable *) elf_getthis(R);
+	elTable *merger = elf_gettab(R,0);
+	elf_tabmerge(tab,merger);
+	elf_pushtab(R,tab);
+	return 1;
 }
 
 

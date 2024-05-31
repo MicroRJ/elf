@@ -5,6 +5,12 @@
 */
 
 
+int elflib_merge(elState *R) {
+	elf_tabmerge(elf_gettab(R,0),elf_gettab(R,1));
+	elf_pushtab(R,elf_gettab(R,0));
+	return 1;
+}
+
 
 int elflib_setmetatable(elState *R) {
 	elf_getobj(R,0)->metatable = elf_gettab(R,1);
@@ -656,6 +662,7 @@ elf_api void elflib_registerall(elState *R) {
 	elf_register(R,"elf.globalbytelogging",elflib_globalbytelogging);
 
 	elf_register(R,"elf.setmetatable",elflib_setmetatable);
+	elf_register(R,"elf.merge",elflib_merge);
 
 	elf_register(R,"elf.log",elflib_log);
 	elf_register(R,"elf.err",elflib_err);
