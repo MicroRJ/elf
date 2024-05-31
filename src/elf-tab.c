@@ -20,6 +20,7 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"alias",elf_tabalias_);
 	elf_tabmfld(R,tab,"bubblesort",elf_tabbubblesort_);
 	elf_tabmfld(R,tab,"fndaliases",elf_tabfndaliases_);
+	elf_tabmfld(R,tab,"merge",elf_tabmerge_);
 	return tab;
 }
 
@@ -467,6 +468,20 @@ int elf_tabiter_(elState *R) {
 		stop or not */
 		int ny = elf_callex(R,R->frame->obj,0,0,2,0);
 		if (ny != 0) if (elf_getint(R,0) != ltrue) break;
+	}
+	return 0;
+}
+
+
+int elf_tabmerge_(elState *R) {
+	elf_checkargs(R,":merge",1,"the table to merge");
+	elTable *tab = (elTable *) elf_getthis(R);
+	elTable *merger = elf_gettab(R,0);
+	elInteger i;
+	for (i=0;i<merger->nslots;++i) {
+		elEntry it = merger->slots[i];
+		if (it.k.tag == TAG_NIL) continue;
+		elf_tabset(tab,it.k,merger->array[it.i]);
 	}
 	return 0;
 }

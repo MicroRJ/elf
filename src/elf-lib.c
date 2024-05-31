@@ -5,6 +5,7 @@
 */
 
 
+
 int elflib_setmetatable(elState *R) {
 	elf_getobj(R,0)->metatable = elf_gettab(R,1);
 	elf_pushany(R,elf_getany(R,0));
@@ -418,6 +419,58 @@ int elflib_mydir(elState *R) {
 		sys_setpwd(elf_getcstr(R,0));
 	}
 	return 1;
+}
+
+
+int elf_valfpf(FILE *file, elValue v, elBool quotes) {
+	switch (v.tag) {
+		case TAG_NIL: return fprintf(file,"nil");
+		case TAG_SYS: return fprintf(file,"h%llX",v.i);
+		case TAG_INT: return fprintf(file,"%lli",v.i);
+		case TAG_NUM: return fprintf(file,"%f",v.n);
+		case TAG_CLS: return fprintf(file,"F()");
+		case TAG_BID: return fprintf(file,"C()");
+		case TAG_TAB: {
+			int wrote = 0;
+			elTable *tab = v.x_tab;
+			wrote += fprintf(file,"{");
+			elInteger i,j,n;
+			for (i=0;i<elf_varlen(tab->array);++i) {
+				if (i != 0) wrote += fprintf(file,", ");
+				for (j=0,n=0;j<tab->ntotal;++j) {
+					elEntry it = tab->slots[j];
+					if (it.k.tag == TAG_NIL) continue;
+					if (it.i != i) continue;
+					if (n ++ != 0) wrote += fprintf(file,", ");
+					wrote += elf_valfpf(file,it.k,ltrue);
+				}
+				if (n != 0) wrote += fprintf(file," = ");
+				wrote += elf_valfpf(file,tab->array[i],ltrue);
+			}
+			// for (i=0,n=0;i<tab->nslots;++i) {
+			// 	elEntry it = tab->slots[i];
+			// 	if (it.k.tag == TAG_NIL) continue;
+			// 	if (n ++ != 0) wrote += fprintf(file,", ");
+			// 	wrote += elf_valfpf(file,it.k,ltrue);
+			// 	wrote += fprintf(file," = ");
+			// 	wrote += elf_valfpf(file,tab->array[it.i],ltrue);
+			// }
+			// elf_arrfori(t->v) {
+			// 	if (i != 0) wrote += fprintf(file,", ");
+			// 	wrote += elf_valfpf(file,t->v[i],ltrue);
+			// }
+			wrote += fprintf(file,"}");
+			return wrote;
+		} break;
+		case TAG_STR: {
+			if (quotes) {
+				return fprintf(file,"\"%s\"",v.s->string);
+			} else {
+				return fprintf(file,"%s",v.s->string);
+			}
+		} break;
+		default: return fprintf(file,"(?)");
+	}
 }
 
 

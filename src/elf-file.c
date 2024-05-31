@@ -381,6 +381,9 @@ elNodeID elf_fsloadfun(elFileState *fs) {
 
 		arity ++;
 	} while (elf_picktk(fs,TK_COMMA));
+	if (!elf_testtk(fs,TK_PAREN_RIGHT)) {
+		elf_filediag(fs,fs->tk.line,"did you miss a ','?");
+	}
 	elf_taketk(fs,TK_PAREN_RIGHT);
 
 	elf_taketk(fs,TK_QUESTION_MARK);

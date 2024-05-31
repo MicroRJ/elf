@@ -53,3 +53,4 @@ int elf_tabiter_(elState *);
 int elf_tabcollisions_(elState *);
 int elf_tabbubblesort_(elState *);
 int elf_tabfndaliases_(elState *);
+int elf_tabmerge_(elState *);

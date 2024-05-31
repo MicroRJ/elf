@@ -85,33 +85,3 @@ elf_api elValue elf_valnum(elNumber n) {
 	return v;
 }
 
-
-int elf_valfpf(FILE *file, elValue v, elBool quotes) {
-	switch (v.tag) {
-		case TAG_NIL: return fprintf(file,"nil");
-		case TAG_SYS: return fprintf(file,"h%llX",v.i);
-		case TAG_INT: return fprintf(file,"%lli",v.i);
-		case TAG_NUM: return fprintf(file,"%f",v.n);
-		case TAG_CLS: return fprintf(file,"F()");
-		case TAG_BID: return fprintf(file,"C()");
-		case TAG_TAB: {
-			int wrote = 0;
-			elTable *t = v.t;
-			wrote += fprintf(file,"{");
-			elf_arrfori(t->v) {
-				if (i != 0) wrote += fprintf(file,", ");
-				wrote += elf_valfpf(file,t->v[i],ltrue);
-			}
-			wrote += fprintf(file,"}");
-			return wrote;
-		} break;
-		case TAG_STR: {
-			if (quotes) {
-				return fprintf(file,"\"%s\"",v.s->string);
-			} else {
-				return fprintf(file,"%s",v.s->string);
-			}
-		} break;
-		default: return fprintf(file,"(?)");
-	}
-}
