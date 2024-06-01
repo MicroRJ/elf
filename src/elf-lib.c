@@ -618,16 +618,20 @@ void elf_unload(FILE *io, elTable *tab, int level) {
 	int nitems = 0;
 	for (elInteger i = 0; i < tab->ntotal; ++ i) {
 		elEntry slot = tab->slots[i];
-		if (slot.k.tag != TAG_NIL) {
-			if (nitems ++ != 0) fprintf(io,",");
-			elf_valfpf(io,slot.k,ltrue);
-			fprintf(io," = ");
-			elValue v = tab->array[slot.i];
-			if (v.tag == TAG_TAB) {
-				elf_unload(io,v.t,level+1);
-			} else {
-				elf_valfpf(io,v,ltrue);
-			}
+		if (slot.k.tag == TAG_NIL) {
+			continue;
+		}
+		elValue v = tab->array[slot.i];
+		if ((v.tag == TAG_CLS) || (v.tag == TAG_BID)) {
+			continue;
+		}
+		if (nitems ++ != 0) fprintf(io,",");
+		elf_valfpf(io,slot.k,ltrue);
+		fprintf(io," = ");
+		if (v.tag == TAG_TAB) {
+			elf_unload(io,v.t,level+1);
+		} else {
+			elf_valfpf(io,v,ltrue);
 		}
 	}
 	fprintf(io,"}");

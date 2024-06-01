@@ -118,7 +118,7 @@ void elf_linediag(char *filename, char *contents, char *loc, char const *fmt, ..
 	}
 
 	int linelen = 0;
-	for (;; ++ linelen) {
+	for (; linelen < underline+32; ++ linelen) {
 		if (lineloc[linelen] == '\0') break;
 		if (lineloc[linelen] == '\r') break;
 		if (lineloc[linelen] == '\n') break;

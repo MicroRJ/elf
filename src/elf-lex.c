@@ -16,7 +16,7 @@ void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
 		lineloc += 1;
 	}
 
-	char u[0x40];
+	char u[0x20];
 
 	int underline = loc - lineloc;
 	if (underline >= sizeof(u)) {
@@ -25,7 +25,7 @@ void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
 	}
 
 	int linelen = 0;
-	for (;; ++ linelen) {
+	for (; linelen < underline; ++ linelen) {
 		if (lineloc[linelen] == '\0') break;
 		if (lineloc[linelen] == '\r') break;
 		if (lineloc[linelen] == '\n') break;
@@ -86,7 +86,6 @@ int elf_lexescchr(elFileState *file) {
 
 /* not the fastest thing out there */
 elToken elf_lexone(elFileState *file) {
-
 	/* remove, not needed #todo */
 	elf_globaldecl char buffer[0x100];
 
@@ -349,22 +348,21 @@ elToken elf_lexone(elFileState *file) {
 	where the parser sees fit (contextually)
 	it'll consult the flag to determine
 	whether to end the expression or not. */
-	while (elf_thischr() == ' '
-	|| 	 elf_thischr() == '\t') elf_movechr();
+	while (elf_thischr() == ' ' || elf_thischr() == '\t') {
+		elf_movechr();
+	}
 
-	if ( elf_thischr() == '/'
-	&& ( elf_thenchr() == '/' || elf_thenchr() == '*') ) {
+	if (elf_thischr() == '/' && (elf_thenchr()=='/' || elf_thenchr()=='*')) {
 		tk.eol = ltrue;
-}
-if ( elf_thischr() == ';'
-|| ( elf_thischr() == '\n' || elf_thischr() == '\r') ) {
-	tk.eol = ltrue;
-}
+	}
+	if (elf_thischr() == ';' || (elf_thischr() == '\n' || elf_thischr() == '\r')) {
+		tk.eol = ltrue;
+	}
 
-file->lasttk = file->tk;
-file->tk = file->thentk;
-file->thentk = tk;
+	file->lasttk = file->tk;
+	file->tk = file->thentk;
+	file->thentk = tk;
 
 	// elf_filediag(files,tk.line,"token %s",elf_tkintel[tk.type].name);
-return file->lasttk;
+	return file->lasttk;
 }
