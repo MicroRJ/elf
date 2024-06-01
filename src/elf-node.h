@@ -93,13 +93,13 @@ elNodeID elf_nodenullary(elFileState *fs, elf_lineid, elNodeOP k, elNodeTy t);
 elNodeID elf_nodegroup(elFileState *fs, elf_lineid, elNodeID x);
 
 elNodeID elf_nodenil(elFileState *fs, elf_lineid);
-elNodeID elf_nodeint(elFileState *fs, elf_lineid, elInteger i);
+elNodeID elf_make_integer_node(elFileState *fs, elf_lineid, elInteger i);
 elNodeID elf_nodenum(elFileState *fs, elf_lineid, elNumber n);
-elNodeID elf_nodestr(elFileState *fs, elf_lineid, char *);
-elNodeID elf_nodetab(elFileState *fs, elf_lineid, elNodeID *z);
+elNodeID elf_make_string_node(elFileState *fs, elf_lineid, char *);
+elNodeID elf_make_table_node(elFileState *fs, elf_lineid, elNodeID *z);
 elNodeID elf_nodecls(elFileState *fs, elf_lineid, elNodeID x, elNodeID *z);
 
-elNodeID elf_nodeload(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
+elNodeID elf_make_load_node(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
 
 elNodeID elf_nodelocal(elFileState *fs, elf_lineid line, elNodeID i);
 elNodeID elf_nodeglobal(elFileState *fs, elf_lineid line, elNodeID i);
@@ -107,7 +107,7 @@ elNodeID elf_nodeclsval(elFileState *fs, elf_lineid line, elNodeID i);
 
 elNodeID elf_nodetypeguard(elFileState *fs, elf_lineid line, elNodeID x, elNodeTy y);
 elNodeID elf_nodemetafield(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
-elNodeID elf_nodefield(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
+elNodeID elf_make_field_node(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
 elNodeID elf_nodeindex(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y);
 
 elNodeID elf_nodeloadfile(elFileState *fs, elf_lineid line, elNodeID x);

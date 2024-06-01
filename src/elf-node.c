@@ -46,7 +46,7 @@ elNodeID elf_nodenullary(elFileState *fs, elf_lineid line, elNodeOP k, elNodeTy 
 }
 
 
-elNodeID elf_nodeload(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
+elNodeID elf_make_load_node(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
 	return elf_nodebinary(fs,line,NODE_LOAD,NT_ANY,x,y);
 }
 
@@ -70,7 +70,7 @@ elNodeID elf_nodegroup(elFileState *fs, elf_lineid line, elNodeID x) {
 }
 
 
-elNodeID elf_nodeint(elFileState *fs, elf_lineid line, elInteger i) {
+elNodeID elf_make_integer_node(elFileState *fs, elf_lineid line, elInteger i) {
 	elNodeID v = elf_nodenullary(fs,line,NODE_INTEGER,NT_INT);
 	fs->nodes[v].lit.i = i;
 	return v;
@@ -84,14 +84,14 @@ elNodeID elf_nodenum(elFileState *fs, elf_lineid line, elNumber n) {
 }
 
 
-elNodeID elf_nodestr(elFileState *fs, elf_lineid line, char *s) {
+elNodeID elf_make_string_node(elFileState *fs, elf_lineid line, char *s) {
 	elNodeID v = elf_nodenullary(fs,line,NODE_STRING,NT_STR);
 	fs->nodes[v].lit.s = s;
 	return v;
 }
 
 
-elNodeID elf_nodetab(elFileState *fs, elf_lineid line, elNodeID *z) {
+elNodeID elf_make_table_node(elFileState *fs, elf_lineid line, elNodeID *z) {
 	return elf_nodexyz(fs,line,NODE_TABLE,NT_TAB,NO_NODE,NO_NODE,z);
 }
 
@@ -121,7 +121,7 @@ elNodeID elf_nodeglobal(elFileState *fs, elf_lineid line, elf_globalid x) {
 }
 
 
-elNodeID elf_nodefield(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
+elNodeID elf_make_field_node(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
 	return elf_nodebinary(fs,line,NODE_FIELD,NT_ANY,x,y);
 }
 

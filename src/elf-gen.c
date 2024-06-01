@@ -492,12 +492,12 @@ void langL_localload(elFileState *fs, elf_lineid line, elBool reload, elf_locali
 			boolean expressions */
 			ljlist js = {0};
 			langL_jumpiffalse(fs,&js,NO_SLOT,id);
-			langL_localload(fs,line,ltrue,x,1,elf_nodeint(fs,line,ltrue));
+			langL_localload(fs,line,ltrue,x,1,elf_make_integer_node(fs,line,ltrue));
 			int j = elf_emitjump(fs,line,-1);
 			langL_tieloosejs(fs,js.f);
 			elf_delvar(js.f);
 			js.f = elNIL;
-			langL_localload(fs,line,ltrue,x,1,elf_nodeint(fs,line,lfalse));
+			langL_localload(fs,line,ltrue,x,1,elf_make_integer_node(fs,line,lfalse));
 			langL_tieloosej(fs,j);
 		} break;
 		case NODE_NEQ: case NODE_EQ:
@@ -791,7 +791,7 @@ void elf_closerangedloop(elFileState *fs, elf_lineid line) {
 	bl->loop.truejumps = elNIL;
 	elf_ensure(bl->loop.r == fs->nodes[bl->loop.x]._r);
 	int x = bl->loop.x;
-	int k = elf_nodebinary(fs,NO_LINE,NODE_ADD,NT_INT,x,elf_nodeint(fs,NO_LINE,1));
+	int k = elf_nodebinary(fs,NO_LINE,NODE_ADD,NT_INT,x,elf_make_integer_node(fs,NO_LINE,1));
 	langL_moveto(fs,line,x,k);
 	elf_emitjump(fs,line,bl->loop.entry);
 	langL_tieloosejs(fs,bl->loop.falsejumps);

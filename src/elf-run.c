@@ -151,7 +151,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elf_localid 
 
 	elFileFnState fn = {0};
 	elf_beginfsfn(fs,&fn,fs->tk.line);
-	elNodeID id = elf_fsloadexpr(fs);
+	elNodeID id = elf_load_file_expr(fs);
 	elf_emityield(fs,fs->tk.line,id);
 	elf_closefsfn(fs);
 
@@ -192,7 +192,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	elf_lexone(fs); elf_lexone(fs);
 	elFileFnState fn = {0};
 	elf_beginfsfn(fs,&fn,fs->tk.line);
-	while (!elf_testtk(fs,0)) elf_fsloadstat(fs);
+	while (!elf_test_token(fs,0)) elf_fsloadstat(fs);
 	elf_closefsfn(fs);
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */

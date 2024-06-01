@@ -109,6 +109,6 @@ typedef struct elFileState {
 } elFileState;
 
 
-elNodeID elf_fsloadexpr(elFileState *fs);
+elNodeID elf_load_file_expr(elFileState *fs);
 elNodeID elf_fsloadunary(elFileState *fs);
 void elf_fsloadstat(elFileState *fs);
