@@ -26,16 +26,16 @@ void elf_collect(elState *fs);
 
 
 void elf_gcpause(elState *fs) {
-	fs->gcflags = ltrue;
+	fs->gcflags = elTrue;
 }
 
 
 void elf_gcresume(elState *fs) {
-	fs->gcflags = lfalse;
+	fs->gcflags = false;
 }
 
 
-void *elf_newobj(elState *R, elf_objty type, elInteger tell) {
+void *elf_newobj(elState *R, elObjType type, elInteger tell) {
 	/* this is temporary! */
 	if (R != 0) {
 		R->gcmemory += tell;
@@ -86,7 +86,7 @@ void elf_remobj(elState *fs, elInteger i) {
 
 
 void elf_delobj(elState *R, elObject *obj) {
-	if (obj != elNIL) {
+	if (obj != elNil) {
 		R->gcmemory -= obj->tell;
 		if (obj->type == OBJ_TAB) {
 			elf_deltab((elTable*)obj);
@@ -127,7 +127,7 @@ elInteger elf_marktab(elTable *table) {
 
 
 elBool elf_markobj(elObject *obj) {
-	if (obj == elNIL || obj->gccolor != GC_WHITE) {
+	if (obj == elNil || obj->gccolor != GC_WHITE) {
 		return obj->gccolor == GC_BLACK;
 	}
 	obj->gccolor = GC_BLACK;
@@ -142,7 +142,7 @@ elBool elf_markobj(elObject *obj) {
 
 
 elBool elf_markval(elValue *v) {
-	return elf_tagisobj(v->tag) ? elf_markobj(v->x_obj) : lfalse;
+	return elf_tagisobj(v->tag) ? elf_markobj(v->x_obj) : false;
 }
 
 
@@ -172,7 +172,7 @@ void elf_collect(elState *R) {
 			if (it->tailtrap != FLYTRAP) elf_unreachable;
 		);
 
-		if (it == elNIL) continue;
+		if (it == elNil) continue;
 		if (it->gccolor == GC_RED) {
 			elf_debugger("internal error: gc failed");
 		}

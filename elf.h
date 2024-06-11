@@ -117,9 +117,11 @@ at the same time when using clang-cl */
 #endif
 
 
-#define lfalse ((elBool)(0))
-#define ltrue ((elBool)(1))
-#define elNIL ((elAddr)(0))
+#define false ((elBool)(0))
+#define elFalse ((elBool)(0))
+#define elTrue ((elBool)(1))
+
+#define elNil ((elAddr)(0))
 
 
 typedef struct elState elState;

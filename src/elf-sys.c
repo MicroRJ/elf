@@ -11,6 +11,7 @@
 #include <dirent.h>
 #elif defined(PLATFORM_DESKTOP)
 #pragma comment(lib,"user32")
+#pragma comment(lib,"Ws2_32")
 #define WIN32_LEAN_AND_MEAN
 #if !defined(ELF_KEEPWINDOWS)
 /* todo: should probaly just define the functions
@@ -57,6 +58,9 @@ I want to use instead! */
 #endif
 #include <windows.h>
 #include <Windowsx.h>
+#include <Winsock2.h>
+#include <ws2tcpip.h>
+#include   <ws2def.h>
 #else
 #endif
 
@@ -117,7 +121,7 @@ elf_api void *sys_valloc(elInteger length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
-	return elNIL;
+	return elNil;
 #endif
 }
 
@@ -175,7 +179,7 @@ elf_api int sys_getmypid() {
 }
 
 
-elf_api int sys_pwd(int length, char *buffer) {
+elf_api int sys_getworkdir(int length, char *buffer) {
 #if defined(PLATFORM_DESKTOP)
 	return GetCurrentDirectory(length,buffer);
 #else
@@ -184,7 +188,7 @@ elf_api int sys_pwd(int length, char *buffer) {
 }
 
 
-elf_api int sys_setpwd(char *buffer) {
+elf_api int sys_changeworkdir(char *buffer) {
 #if defined(PLATFORM_DESKTOP) && defined(_WIN32)
 	return SetCurrentDirectory(buffer);
 #else
@@ -206,7 +210,7 @@ elf_api elHandle sys_loadlib(char const *name) {
 	return 0;
 #else
 	void *handle = dlopen(name,RTLD_LAZY);
-	if (handle == elNIL) {
+	if (handle == elNil) {
 		sys_consolelog(ELF_LOGERROR,"the following is a system error:");
 		sys_consolelog(ELF_LOGERROR,dlerror());
 		sys_consolelog(ELF_LOGERROR,"end");
@@ -229,16 +233,16 @@ elf_api elError sys_loadfilebytes(Alloc *allocfn, void **data, char const *name)
 
 	elError error = Error_None;
 
-	if (name == elNIL) {
+	if (name == elNil) {
 		error = Error_FileNameIsInvalid;
 		goto leave;
 	}
-	if (data == elNIL) {
+	if (data == elNil) {
 		error = Error_InvalidArguments;
 		goto leave;
 	}
 
-	*data = elNIL;
+	*data = elNil;
 #if defined(PLATFORM_DESKTOP)
 	HANDLE hfile = CreateFileA(name,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
 	if (hfile != INVALID_HANDLE_VALUE) {
@@ -268,7 +272,7 @@ elf_api elError sys_loadfilebytes(Alloc *allocfn, void **data, char const *name)
 	}
 #else
 	FILE *file = fopen(name,"rb");
-	if (file == elNIL) {
+	if (file == elNil) {
 		error = Error_FileNotFound;
 		goto leave;
 	}
@@ -300,7 +304,7 @@ elf_api elError sys_savefilebytes(char const *buffer, elInteger length, char con
 	file = fopen(fileName,"wb");
 #endif
 
-	if (file == elNIL) {
+	if (file == elNil) {
 		return Error_CouldNotOpenFile;
 	}
 

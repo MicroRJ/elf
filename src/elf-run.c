@@ -7,7 +7,7 @@
 
 void elf_runini(elState *R, elModule *M) {
 	R->M = M;
-	R->bytelogging = lfalse;
+	R->bytelogging = false;
 	R->stklen = 4096;
 	R->stk = R->top = elf_clearalloc(lHEAP,sizeof(elValue)*R->stklen);
 	R->metatab_str = elf_newstrmetatab(R);
@@ -44,24 +44,24 @@ void elf_runini(elState *R, elModule *M) {
 	//TODO: temporary fix
 	R->call->locals = R->top;
 	#if !defined(ELF_NOLIBS)
-	netlib_load(R);
 	tstlib_load(R);
 	crtlib_load(R);
-	elflib_registerall(R);
+	netlib_load(R);
+	elflib_loadall(R);
 	#endif
 	//TODO: temporary fix
 	R->call->locals = R->top;
 }
 
 
-int elf_callfn(elState *R, elf_localid rxy, int nx, int ny) {
-	return elf_callex(R,elNIL,rxy,rxy,nx,ny);
+int elf_callfn(elState *R, elRegId rxy, int nx, int ny) {
+	return elf_callex(R,elNil,rxy,rxy,nx,ny);
 }
 
 
 /* todo: this should be different, rx should be the
 destination registers, and ry the input registers */
-int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_localid ry, int nx, int ny) {
+int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, int nx, int ny) {
 	elCallFrame *caller = R->call;
 	// elf_ensure((R->top-caller->locals)+caller->cl->fn.zstack-1 > rx);
 	elValue *locals = caller->locals + rx;
@@ -96,15 +96,15 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 	if (R->oncalldebuggerflag) {
 		elf_debugger("on-call-debugger");
 	}
-	elf_localid nyield = 0;
+	elRegId nyield = 0;
 	if (fn.tag == TAG_CLS) {
 		nyield = elf_run(R);
 	} else
 	if (fn.tag == TAG_BID) {
-		if (fn.c != elNIL) {
+		if (fn.c != elNil) {
 			nyield = fn.c(R);
 			/* ensure that the results were pushed to the stack */
-			elf_localid nstack = R->top - call.locals;
+			elRegId nstack = R->top - call.locals;
 			if (nstack < nyield) {
 				elf_throw(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",nstack,nyield));
 			}
@@ -128,13 +128,13 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elf_localid rx, elf_local
 }
 
 
-int elf_callex(elState *R, elObject *obj, elf_localid rx, elf_localid ry, int nx, int ny) {
+int elf_callex(elState *R, elObject *obj, elRegId rx, elRegId ry, int nx, int ny) {
 	elCallFrame *caller = R->call;
 	return elf_callexx(R,obj,caller->locals[rx],rx+1,ry,nx,ny);
 }
 
 
-int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents) {
 	elModule *M = R->M;
 	fs->R = R;
 	fs->M = M;
@@ -150,10 +150,10 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	elf_lexone(fs);
 
 	elFileFnState fn = {0};
-	elf_beginfsfn(fs,&fn,fs->tk.line);
-	elNodeID id = elf_load_file_expr(fs);
-	elf_emityield(fs,fs->tk.line,id);
-	elf_closefsfn(fs);
+	elf_begin_file_function(fs,&fn,fs->tk.line);
+	elNodeId id = elf_load_file_expr(fs);
+	elf_emit_yield(fs,fs->tk.line,id);
+	elf_close_file_function(fs);
 
 	elFileInfo file = {0};
 	file.bytes = fn.bytes;
@@ -167,14 +167,14 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
-	return elf_callexx(R,elNIL,elf_valcls(elf_newcls(R,p)),rxy,rxy,0,ny);
+	return elf_callexx(R,elNil,elf_valcls(elf_new_closure(R,p)),rxy,rxy,0,ny);
 }
 
 
-int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elf_localid rxy, int ny, char *contents) {
-	if (filename == elNIL || contents == elNIL) {
+int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents) {
+	if (filename == elNil || contents == elNil) {
 		// xxx - could this break something else?
-		elf_pushint(R,lfalse);
+		elf_pushint(R,false);
 		return -1;
 	}
 
@@ -191,9 +191,9 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	/* kick start by lexing the first two tokens */
 	elf_lexone(fs); elf_lexone(fs);
 	elFileFnState fn = {0};
-	elf_beginfsfn(fs,&fn,fs->tk.line);
-	while (!elf_test_token(fs,0)) elf_fsloadstat(fs);
-	elf_closefsfn(fs);
+	elf_begin_file_function(fs,&fn,fs->tk.line);
+	while (!elf_test_token(fs,0)) elf_load_file_stat(fs);
+	elf_close_file_function(fs);
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */
 	elFileInfo fl = {0};
@@ -210,12 +210,12 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elf_localid 
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
-	elValue cls = elf_valcls(elf_newcls(R,p));
-	return elf_callexx(R,elNIL,cls,rxy,rxy,0,ny);
+	elValue cls = elf_valcls(elf_new_closure(R,p));
+	return elf_callexx(R,elNil,cls,rxy,rxy,0,ny);
 }
 
 
-int elf_loadfilefs(elState *R, elFileState *fs, elString *name, elf_localid x, int y) {
+int elf_loadfilefs(elState *R, elFileState *fs, elString *name, elRegId x, int y) {
 	char *contents;
 	elError error = sys_loadfilebytes(lHEAP,(void**)&contents,name->c);
 	if (elFAILED(error)) {
@@ -226,19 +226,19 @@ int elf_loadfilefs(elState *R, elFileState *fs, elString *name, elf_localid x, i
 }
 
 
-int elf_loadcode(elState *R, elString *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadcode(elState *R, elString *filename, elRegId rxy, int ny, char *contents) {
 	elFileState fs = {0};
 	return elf_loadcodefs(R,&fs,filename,rxy,ny,contents);
 }
 
 
-int elf_loadexpr(elState *R, elString *filename, elf_localid rxy, int ny, char *contents) {
+int elf_loadexpr(elState *R, elString *filename, elRegId rxy, int ny, char *contents) {
 	elFileState fs = {0};
 	return elf_loadexprfs(R,&fs,filename,rxy,ny,contents);
 }
 
 
-int elf_loadfile(elState *R, elString *filename, elf_localid rxy, int ny) {
+int elf_loadfile(elState *R, elString *filename, elRegId rxy, int ny) {
 	elFileState fs = {0};
 	return elf_loadfilefs(R,&fs,filename,rxy,ny);
 }
@@ -250,7 +250,7 @@ void elf_checkdivbyzro(elState *S, elValue xx, elValue yy) {
 }
 
 
-int elf_calloverload(elState *S, elObject *obj, elString *name, elf_localid io, elValue in) {
+int elf_calloverload(elState *S, elObject *obj, elString *name, elRegId io, elValue in) {
 	elValue field = elf_tabgetfld(obj->metatable,name);
 	if (field.tag != TAG_CLS && field.tag != TAG_BID) {
 		elf_throw(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
@@ -266,7 +266,7 @@ int elf_calloverload(elState *S, elObject *obj, elString *name, elf_localid io, 
 	also, even for calling overloads, the order of
 	execution still applies, and we should only override
 	values that haven't been set yet! */
-	elf_localid base = S->top - S->call->locals;
+	elRegId base = S->top - S->call->locals;
 	S->call->locals[base] = in;
 	int ny = elf_callexx(S,obj,field,base,io,1,1);
 	if (ny < 1) {
@@ -325,7 +325,7 @@ int elf_run(elState *R) {
 
 		switch (b.k) {
 	case BC_LEAVE: {
-		if (call->dl != elNIL) {
+		if (call->dl != elNil) {
 			call->tail = call->dl->j;
 			call->dl = call->dl->n;
 		} else goto leave;
@@ -345,7 +345,7 @@ int elf_run(elState *R) {
 		/* check that we don't exceed number of
 		expected outputs */
 		int ny = MIN(b.z,call->ny);
-		for (elf_localid y = 0; y < ny; ++y) {
+		for (elRegId y = 0; y < ny; ++y) {
 			caller->locals[call->ry+y] = locals[b.y+y];
 		}
 		call->ny = ny;
@@ -361,7 +361,7 @@ int elf_run(elState *R) {
 	} break;
 	case BC_LOADFILE: {
 		elString *fname = elf_getstr(R,b.x);
-		if (fname == elNIL) elf_throw(R,bc,"'load': attempted to call load with nil");
+		if (fname == elNil) elf_throw(R,bc,"'load': attempted to call load with nil");
 		elf_loadfile(R,fname,b.x,b.y);
 	} break;
 	case BC_J: {
@@ -374,7 +374,7 @@ int elf_run(elState *R) {
 		if (locals[b.y].x_int != 0) call->tail = jp + b.x;
 	} break;
 	case BC_LOADTHIS: {
-		if (call->obj == elNIL) {
+		if (call->obj == elNil) {
 			/* todo: we gotta rework this logic, first of all,
 			not passing the object in the argument list makes
 			it impossible to cache the meta-function because
@@ -434,13 +434,13 @@ int elf_run(elState *R) {
 	} break;
 	case BC_CLOSURE: {
 		elf_ensure(b.y >= 0 && b.y < elf_varlen(md->p));
-		elProto p = md->p[b.y];
-		elClosure *ncl = elf_newcls(R,p);
-		for (int i = 0; i < p.zcache; ++i) {
-			ncl->caches[i] = locals[b.x+i];
+		elProto proto = md->p[b.y];
+		elClosure *new_closure = elf_new_closure(R,proto);
+		for (int i = 0; i < proto.zcache; ++i) {
+			new_closure->caches[i] = locals[b.x+i];
 		}
 		locals[b.x].tag = TAG_CLS;
-		locals[b.x].f   = ncl;
+		locals[b.x].x_cls = new_closure;
 		// ncl->obj.gccolor = GC_WHITE;
 	} break;
 	case BC_TABLE: {
@@ -494,7 +494,7 @@ int elf_run(elState *R) {
 		if (xx.tag == TAG_TAB) {
 #if defined(ELF_EXPERIMENTAL_FEATURES)
 			if (elf_tagisobj(yy.tag)) {
-				if (yy.x_obj->metatable == elNIL) {
+				if (yy.x_obj->metatable == elNil) {
 					goto else_;
 				}
 				elValue overload = elf_tabgetfld(yy.x_obj->metatable,R->cache.__hash);
@@ -502,7 +502,7 @@ int elf_run(elState *R) {
 					goto else_;
 				}
 				if ((overload.tag == TAG_CLS) || (overload.tag == TAG_BID)) {
-					elf_localid base = R->top - R->call->locals;
+					elRegId base = R->top - R->call->locals;
 					int ny = elf_callexx(R,yy.x_obj,overload,base,b.x,0,1);
 					if (ny < 1) {
 						elf_throw(R,NO_BYTE,"overload function must return at least one value");
@@ -524,7 +524,7 @@ int elf_run(elState *R) {
 			arguments are already next to each other in
 			order. */
 			elValue *home = R->top;
-			elf_localid base = home-locals;
+			elRegId base = home-locals;
 
 			R->top += 2;
 			home[0] = yy; home[1] = zz;
@@ -581,7 +581,7 @@ int elf_run(elState *R) {
 	case BC_EQ: case BC_NEQ: {
 		elValue x = locals[b.y];
 		elValue y = locals[b.z];
-		elBool eq = lfalse;
+		elBool eq = false;
 		if ((x.tag == TAG_NIL) || (y.tag == TAG_NIL)) {
 			eq = elf_valisnil(x) == elf_valisnil(y);
 		} else if ((x.tag == TAG_STR) && (y.tag == TAG_STR)) {

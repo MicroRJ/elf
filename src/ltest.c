@@ -61,7 +61,7 @@ int testlib_disasm(elState *c) {
 
 
 int testlib_absslot(elState *c) {
-	elf_localid slot = elf_getint(c,0);
+	elRegId slot = elf_getint(c,0);
 	elf_pushany(c,c->s[slot]);
 	return 1;
 }
@@ -107,7 +107,7 @@ int _gtable(elState *c) {
 }
 
 
-char *gccolor2s(elf_objgc c) {
+char *gccolor2s(elGCColor c) {
 	return
 	c == GC_BLACK ? "black" :
 	c == GC_WHITE ? "white" :

@@ -22,8 +22,8 @@ elf_api elInteger sys_clocktime();
 elf_api int sys_getmyname(int length, char *buffer);
 elf_api int sys_getmypid();
 
-elf_api int sys_pwd(int length, char *buffer);
-elf_api int sys_setpwd(char *buffer);
+elf_api int sys_getworkdir(int length, char *buffer);
+elf_api int sys_changeworkdir(char *buffer);
 
 elf_api elHandle sys_loadlib(char const *name);
 elf_api void *sys_libfn(elHandle lib, char const *name);

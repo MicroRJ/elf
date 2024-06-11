@@ -44,7 +44,7 @@ void lang_assertfn(ldebugloc ind, char const *name, elBool expr);
 
 
 #if defined(_DEBUG)
-	#define LCHECKPRINTF(FORMAT,...) ((lfalse)?(snprintf(elNIL,0,FORMAT,##__VA_ARGS__),elNIL):elNIL)
+	#define LCHECKPRINTF(FORMAT,...) ((false)?(snprintf(elNil,0,FORMAT,##__VA_ARGS__),elNil):elNil)
 #else
 	#define LCHECKPRINTF(FORMAT,...) 0
 #endif

@@ -38,11 +38,6 @@ void elf_register(elState *R, char *name, elBinding fn) {
 }
 
 
-void elf_tabmfld(elState *R, elTable *obj, char *name, elBinding b) {
-	elf_tabset(obj,elf_valstr(elf_newstr(R,name)),elf_valbid(b));
-}
-
-
 elInteger elf_clocktime() {
 	return sys_clocktime();
 }
@@ -54,7 +49,7 @@ elNumber elf_timediffs(elInteger begin) {
 }
 
 
-int elf_fndfilebybyte(elModule *md, elf_byteid byte) {
+int elf_fndfilebybyte(elModule *md, elByteId byte) {
 	elFileInfo *files = md->files;
 	int nfiles = elf_varlen(files);
 	for (int x = 0; x < nfiles; ++ x) {
@@ -150,7 +145,7 @@ void elf_printcalltrace(elState *S, elCallFrame *call, int level) {
 	(which is the one without a caller) because that'll
 	just be the first instruction that executed for that
 	function/file, which is irrelevant */
-	if (call->caller == elNIL) return;
+	if (call->caller == elNil) return;
 
 	elf_ensure(level > 0);
 
@@ -161,12 +156,12 @@ void elf_printcalltrace(elState *S, elCallFrame *call, int level) {
 	if (fileid != -1) {
 		elFileInfo *file = &M->files[fileid];
 		elf_lineid line = M->lines[call->head];
-		elf_linediag(file->name,file->lines,line, call->cl != elNIL ? "(bytecode function)" : "(binding)");
+		elf_linediag(file->name,file->lines,line, call->cl != elNil ? "(bytecode function)" : "(binding)");
 	}
 }
 
 
-void elf_throw(elState *R, elf_byteid byte, char *error) {
+void elf_throw(elState *R, elByteId byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	elf_lineid line = M->lines[byte];
@@ -189,7 +184,7 @@ void elf_checkargs(elState *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_tycheck(elState *R, elf_byteid id, elf_localid loc, elf_tag x, elf_tag y) {
+int elf_tycheck(elState *R, elByteId id, elRegId loc, elf_tag x, elf_tag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

@@ -38,11 +38,11 @@ elString *elf_newstr(elState *R, char *junk) {
 
 
 elBool elf_streq(elString *x, elString *y) {
-	if (x == y) return ltrue;
+	if (x == y) return elTrue;
 	/* assuming we use the same hash function */
-	if (x->hash != y->hash) return lfalse;
+	if (x->hash != y->hash) return false;
 
-	if (x->length != y->length) return lfalse;
+	if (x->length != y->length) return false;
 
 	return S_eq(x->string,y->string);
 }

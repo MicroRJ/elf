@@ -14,9 +14,9 @@ typedef int (* elBinding)(elState *);
 
 
 typedef unsigned int elf_hashint;
-typedef int elf_localid;
-typedef int elf_byteid;
-typedef int elf_globalid;
+typedef int elRegId;
+typedef int elByteId;
+typedef int elSymbolID;
 /* todo: eventually convert this to an offset */
 typedef char *elf_lineid;
 

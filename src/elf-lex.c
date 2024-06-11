@@ -6,7 +6,7 @@
 
 
 
-void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
+void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_getlinelocinfo(fs->contents,loc,&linenum,&lineloc);
@@ -16,7 +16,7 @@ void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
 		lineloc += 1;
 	}
 
-	char u[0x20];
+	char u[0x40];
 
 	int underline = loc - lineloc;
 	if (underline >= sizeof(u)) {
@@ -25,7 +25,7 @@ void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
 	}
 
 	int linelen = 0;
-	for (; linelen < underline; ++ linelen) {
+	for (; linelen < underline+32; ++ linelen) {
 		if (lineloc[linelen] == '\0') break;
 		if (lineloc[linelen] == '\r') break;
 		if (lineloc[linelen] == '\n') break;
@@ -49,9 +49,26 @@ void elf_filediag(elFileState *fs, char *loc, char const *fmt, ...) {
 }
 
 
-ltokentype wordorkeyword(char *name) {
+elBool elf_token_is_operator(elToken tk) {
+	return elf_tkintel[tk.type].prec > 0;
+}
+
+
+ltokentype elf_is_word_or_keyword(char *name) {
 	/* todo: */
 	for (ltokentype i = FIRST_KEYWORD; i <= LAST_KEYWORD; ++ i) {
+		ltokenintel intel = elf_tkintel[i];
+		if (S_eq(intel.name,name)) {
+			return i;
+		}
+	}
+	return TK_WORD;
+}
+
+
+ltokentype elf_is_macro(char *name) {
+	/* todo: */
+	for (ltokentype i = FIRST_MACRO; i <= LAST_MACRO; ++ i) {
 		ltokenintel intel = elf_tkintel[i];
 		if (S_eq(intel.name,name)) {
 			return i;
@@ -84,6 +101,16 @@ int elf_lexescchr(elFileState *file) {
 }
 
 
+int elf_read_identifier_characters(elFileState *file, char *buffer) {
+	int length = 0;
+	do {
+		buffer[length++] = elf_movechr();
+	} while (elf_is_letter_or_digit_char(elf_thischr()) || (elf_thischr() == '_'));
+	buffer[length] = 0;
+	return length;
+}
+
+
 /* not the fastest thing out there */
 elToken elf_lexone(elFileState *file) {
 	/* remove, not needed #todo */
@@ -95,20 +122,16 @@ elToken elf_lexone(elFileState *file) {
 	tk = (elToken){TK_NONE,file->thischar};
 
 	/* we could put all of the ascii codes in the switch
-	statement, but that just makes it look incredibly silly  */
+	statement...  */
 	switch (elf_thischr()) {
 		default: {
-			if (elf_chrisletter(elf_thischr()) || (elf_thischr() == '_')) {
-				int length = 0;
-				do {
-					buffer[length++] = elf_movechr();
-				} while (elf_chrisalphanum(elf_thischr()));
-				buffer[length] = 0;
+			if (elf_is_letter_char(elf_thischr()) || (elf_thischr() == '_')) {
+				int length = elf_read_identifier_characters(file,buffer);
 
-				tk.type = wordorkeyword(buffer);
+				tk.type = elf_is_word_or_keyword(buffer);
 				if (tk.type == TK_WORD) {
 					if (S_eq(buffer,"__ELF_FILE_BREAK__")) {
-						file->debuggerflag = ltrue;
+						file->debuggerflag = elTrue;
 						goto retry;
 					}
 					/* todo: string interner, or arena? */
@@ -116,6 +139,7 @@ elToken elf_lexone(elFileState *file) {
 				}
 			}
 		} break;
+
 		case '0':case '1':case '2':case '3':case '4':
 		case '5':case '6':case '7':case '8':case '9': {
 			tk.type = TK_INTEGER;
@@ -132,7 +156,7 @@ elToken elf_lexone(elFileState *file) {
 			if (base == 10) {
 				do {
 					i = i * 10 + (elf_movechr() - '0');
-				} while (elf_chrisdigit(elf_thischr()));
+				} while (elf_is_digit_char(elf_thischr()));
 			} else {
 				for (;;) {
 					if (elf_thischr() >= 'A' && elf_thischr() <= 'Z') {
@@ -154,11 +178,11 @@ elToken elf_lexone(elFileState *file) {
 
 					elNumber p = 1;
 					elNumber n = 0;
-					if (elf_chrisdigit(elf_thischr())) {
+					if (elf_is_digit_char(elf_thischr())) {
 						do  {
 							n = n * 10 + (elf_movechr() - '0');
 							p *= 10;
-						} while (elf_chrisdigit(elf_thischr()));
+						} while (elf_is_digit_char(elf_thischr()));
 					}
 					tk.n = i + n / p;
 					// elf_loginfo("[%lli] = num(%f)",tk.value,n);
@@ -176,7 +200,7 @@ elToken elf_lexone(elFileState *file) {
 			} while(0);
 
 			if (!elf_cmovchr('\'')) {
-				elf_filediag(file,tk.line,"invalid character constant, expected \"'\"");
+				elf_file_dialog(file,tk.line,"invalid character constant, expected \"'\"");
 			}
 		} break;
 		case '"': {
@@ -187,7 +211,7 @@ elToken elf_lexone(elFileState *file) {
 			}
 			buffer[length] = 0;
 			if (!elf_cmovchr('"')) {
-				elf_filediag(file,tk.line,"invalid string");
+				elf_file_dialog(file,tk.line,"invalid string");
 			}
 			tk.type = TK_STRING;
 			tk.s = S_ncopy(lHEAP,length,buffer);
@@ -200,21 +224,32 @@ elToken elf_lexone(elFileState *file) {
 			if (elf_cmovchr('.')) {
 				tk.type = TK_DOT_DOT;
 			} else
-			if (elf_chrisdigit(elf_thischr())) {
+			if (elf_is_digit_char(elf_thischr())) {
 				tk.type = TK_NUMBER;
 				elNumber n = 0;
 				elNumber p = 1;
 				do {
 					n = n * 10 + (elf_movechr() - '0');
 					p *= 10;
-				} while (elf_chrisdigit(elf_thischr()));
+				} while (elf_is_digit_char(elf_thischr()));
 				tk.n = n / p;
 				// elf_loginfo("[%lli] = num(%f)",tk.value,n);
 			}
 		} break;
 		case '#': {
 			elf_movechr();
-		} goto retry;
+			int length = elf_read_identifier_characters(file,buffer);
+			tk.type = elf_is_macro(buffer);
+			if (tk.type == TK_M_FILE_NAME) {
+				tk.type = TK_STRING;
+				tk.s = file->filename;
+			} else if (tk.type == TK_M_LINE_NUMBER) {
+				tk.type = TK_INTEGER;
+				tk.i = file->linenumber;
+			} else if (tk.type == TK_WORD) {
+				elf_file_dialog(file,tk.line,"unrecognized macro");
+			}
+		} break;
 		case '\0': {
 			tk.type = TK_NONE;
 		} break;
@@ -353,16 +388,16 @@ elToken elf_lexone(elFileState *file) {
 	}
 
 	if (elf_thischr() == '/' && (elf_thenchr()=='/' || elf_thenchr()=='*')) {
-		tk.eol = ltrue;
+		tk.eol = elTrue;
 	}
 	if (elf_thischr() == ';' || (elf_thischr() == '\n' || elf_thischr() == '\r')) {
-		tk.eol = ltrue;
+		tk.eol = elTrue;
 	}
 
 	file->lasttk = file->tk;
 	file->tk = file->thentk;
 	file->thentk = tk;
 
-	// elf_filediag(files,tk.line,"token %s",elf_tkintel[tk.type].name);
+	// elf_file_dialog(files,tk.line,"token %s",elf_tkintel[tk.type].name);
 	return file->lasttk;
 }

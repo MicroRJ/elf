@@ -5,7 +5,7 @@
 */
 
 
-elf_api elClosure *elf_newcls(elState *rt, elProto fn) {
+elf_api elClosure *elf_new_closure(elState *rt, elProto fn) {
 	elf_ensure(fn.zcache >= 0);
 
 	elInteger length = sizeof(elClosure) + sizeof(elValue) * (fn.zcache-1);

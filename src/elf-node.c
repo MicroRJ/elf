@@ -5,161 +5,204 @@
 */
 
 
-
-void elf_nodesetr(elFileState *fs, elf_lineid line, elNodeID id, int r) {
-	// if (fs->nodes[id]._r != -1) {
-		// elf_filediag(fs,line,"resetting register to %i",r);
-	// }
-	fs->nodes[id]._r = r;
+elNode elf_get_node(elFileState *fs, elNodeId id) {
+	return fs->nodes[id];
 }
 
 
-elNodeID elf_nodexyz(elFileState *fs, elf_lineid line, elNodeOP k, elNodeTy t, elNodeID x, elNodeID y, elNodeID *z) {
+elNodeKi elf_get_node_kind(elFileState *fs, elNodeId id) {
+	elf_ensure(id != NO_SLOT);
+	return fs->nodes[id].kind;
+}
+
+
+elNodeTy elf_get_node_type(elFileState *fs, elNodeId id) {
+	elf_ensure(id != NO_SLOT);
+	return fs->nodes[id].type;
+}
+
+
+elBool elf_is_binary_node(elNodeKi kind) {
+	return kind >= NODE_AND && kind <= NODE_BITOR;
+}
+
+
+elRegId elf_get_node_register(elFileState *fs, elNodeIdTypeGuard id_type);
+
+void elf_node_fpf(elFileState *fs, FILE *io, elNodeId id) {
+	elNode node = elf_get_node(fs,id);
+	if (elf_is_binary_node(node.kind)) {
+		fprintf(io, "(%s ", elNodeToStr[node.kind]);
+		elf_node_fpf(fs,io,node.x);
+		fprintf(io, ", ");
+		elf_node_fpf(fs,io,node.y);
+		fprintf(io, ")");
+	} else switch (node.kind) {
+		case NODE_INTEGER: fprintf(io,"int(%lli)",node.lit.i); break;
+		case NODE_NUMBER: fprintf(io,"num(%f)",node.lit.n); break;
+		case NODE_NIL: fprintf(io,"nil"); break;
+		case NODE_GROUP: {
+			fprintf(io,"(");
+			elf_node_fpf(fs,io,node.x);
+			fprintf(io,")");
+		} break;
+		default: fprintf(io,"%s",elNodeToStr[node.kind]);
+	}
+	if (elf_get_node_register(fs,MAKE_NODE_ID(id)) != NO_SLOT) {
+		fprintf(io,"@r%i",elf_get_node_register(fs,MAKE_NODE_ID(id)));
+	}
+}
+
+
+elNodeId elf_make_node_xyz(elFileState *fs, elf_lineid line, elNodeKi k, elNodeTy t, elNodeId x, elNodeId y, elNodeId *z) {
 	if (elf_varmin(fs->nodes) <= fs->nnodes) {
 		elf_varaddi(fs->nodes,1);
 	}
 	elNode *nd = fs->nodes + fs->nnodes;
 	nd->level = fs->level;
 	nd->line = line;
-	nd->t = t; nd->k = k;
+	nd->t = t, nd->k = k;
 	/* todo: temporary */
-	nd->_r = NO_SLOT;
-	if (k == NODE_LOCAL) nd->_r = x;
+	// nd->x_r = NO_SLOT;
+	// if (k == NODE_LOCAL) nd->x_r = x;
 
-	nd->x = x; nd->y = y; nd->z = z;
+	nd->x = x, nd->y = y, nd->z = z;
 	return fs->nnodes ++;
 }
 
 
-elNodeID elf_nodebinary(elFileState *fs, elf_lineid line, elNodeOP k, elNodeTy t, elNodeID x, elNodeID y) {
-	return elf_nodexyz(fs,line,k,t,x,y,elNIL);
+elNodeId elf_make_binary_node(elFileState *fs, elf_lineid line, elNodeKi k, elNodeTy t, elNodeId x, elNodeId y) {
+	return elf_make_node_xyz(fs,line,k,t,x,y,elNil);
 }
 
 
-elNodeID elf_nodeunary(elFileState *fs, elf_lineid line, elNodeOP k, elNodeTy t, elNodeID x) {
-	return elf_nodebinary(fs,line,k,t,x,NO_NODE);
+elNodeId elf_nodeunary(elFileState *fs, elf_lineid line, elNodeKi k, elNodeTy t, elNodeId x) {
+	return elf_make_binary_node(fs,line,k,t,x,NO_NODE);
 }
 
 
-elNodeID elf_nodenullary(elFileState *fs, elf_lineid line, elNodeOP k, elNodeTy t) {
+elNodeId elf_nodenullary(elFileState *fs, elf_lineid line, elNodeKi k, elNodeTy t) {
 	return elf_nodeunary(fs,line,k,t,NO_NODE);
 }
 
 
-elNodeID elf_make_load_node(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
-	return elf_nodebinary(fs,line,NODE_LOAD,NT_ANY,x,y);
+elNodeId elf_make_load_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+	return elf_make_binary_node(fs,line,NODE_LOAD,NT_ANY,x,y);
 }
 
 
-elNodeID elf_nodetypeguard(elFileState *fs, elf_lineid line, elNodeID x, elNodeTy y) {
-	elNodeID id = elf_nodebinary(fs,line,NODE_TYPEGUARD,y,x,y);
+elNodeId elf_nodetypeguard(elFileState *fs, elf_lineid line, elNodeId x, elNodeTy y) {
+	elNodeId id = elf_make_binary_node(fs,line,NODE_TYPEGUARD,y,x,y);
 	/* todo: could we do this better! maybe we have
 	a specific function that checks for these sort
 	of nodes, like groups or typeguards,
 	additionally, it can be an extra safety layer? */
-	elf_nodesetr(fs,line,id,fs->nodes[x]._r);
+	// elf_set_node_register(fs,line,id,elf_get_node_register(fs,x));
 	// fs->nodes[id].r = fs->nodes[x].r;
 	return id;
 }
 
 
-elNodeID elf_nodegroup(elFileState *fs, elf_lineid line, elNodeID x) {
-	elNodeID id = elf_nodeunary(fs,line,NODE_GROUP,fs->nodes[x].t,x);
-	elf_nodesetr(fs,line,id,fs->nodes[x]._r);
+elNodeId elf_make_region_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z) {
+	elNodeId id = elf_make_node_xyz(fs,line,NODE_REGION,fs->nodes[x].ty,x,NO_NODE,z);
+	// elf_set_node_register(fs,line,id,elf_get_node_register(fs,x));
 	return id;
 }
 
 
-elNodeID elf_make_integer_node(elFileState *fs, elf_lineid line, elInteger i) {
-	elNodeID v = elf_nodenullary(fs,line,NODE_INTEGER,NT_INT);
+elNodeId elf_make_group_node(elFileState *fs, elf_lineid line, elNodeId x) {
+	elNodeId id = elf_nodeunary(fs,line,NODE_GROUP,fs->nodes[x].t,x);
+	// elf_set_node_register(fs,line,id,elf_get_node_register(fs,x));
+	return id;
+}
+
+
+elNodeId elf_make_integer_node(elFileState *fs, elf_lineid line, elInteger i) {
+	elNodeId v = elf_nodenullary(fs,line,NODE_INTEGER,NT_INT);
 	fs->nodes[v].lit.i = i;
 	return v;
 }
 
 
-elNodeID elf_nodenum(elFileState *fs, elf_lineid line, elNumber n) {
-	elNodeID v = elf_nodenullary(fs,line,NODE_NUMBER,NT_NUM);
+elNodeId elf_nodenum(elFileState *fs, elf_lineid line, elNumber n) {
+	elNodeId v = elf_nodenullary(fs,line,NODE_NUMBER,NT_NUM);
 	fs->nodes[v].lit.n = n;
 	return v;
 }
 
 
-elNodeID elf_make_string_node(elFileState *fs, elf_lineid line, char *s) {
-	elNodeID v = elf_nodenullary(fs,line,NODE_STRING,NT_STR);
+elNodeId elf_make_string_node(elFileState *fs, elf_lineid line, char *s) {
+	elNodeId v = elf_nodenullary(fs,line,NODE_STRING,NT_STR);
 	fs->nodes[v].lit.s = s;
 	return v;
 }
 
 
-elNodeID elf_make_table_node(elFileState *fs, elf_lineid line, elNodeID *z) {
-	return elf_nodexyz(fs,line,NODE_TABLE,NT_TAB,NO_NODE,NO_NODE,z);
+elNodeId elf_make_table_node(elFileState *fs, elf_lineid line, elNodeId *z) {
+	return elf_make_node_xyz(fs,line,NODE_TABLE,NT_TAB,NO_NODE,NO_NODE,z);
 }
 
 
-elNodeID elf_nodecls(elFileState *fs, elf_lineid line, elNodeID x, elNodeID *z) {
-	return elf_nodexyz(fs,line,NODE_CLOSURE,NT_FUN,x,NO_NODE,z);
+elNodeId elf_make_closure_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z) {
+	return elf_make_node_xyz(fs,line,NODE_CLOSURE,NT_FUN,x,NO_NODE,z);
 }
 
 
-elNodeID elf_nodenil(elFileState *fs, elf_lineid line) {
+elNodeId elf_nodenil(elFileState *fs, elf_lineid line) {
 	return elf_nodenullary(fs,line,NODE_NIL,NT_NIL);
 }
 
 
-elNodeID elf_nodeclsval(elFileState *fs, elf_lineid line, elf_localid x) {
+elNodeId elf_make_closure_value_node(elFileState *fs, elf_lineid line, elRegId x) {
 	return elf_nodeunary(fs,line,NODE_CLSVAL,NT_ANY,x);
 }
 
 
-elNodeID elf_nodelocal(elFileState *fs, elf_lineid line, elf_localid x) {
+elNodeId elf_make_local_value_node(elFileState *fs, elf_lineid line, elRegId x) {
 	return elf_nodeunary(fs,line,NODE_LOCAL,NT_ANY,x);
 }
 
 
-elNodeID elf_nodeglobal(elFileState *fs, elf_lineid line, elf_globalid x) {
+elNodeId elf_make_global_value_node(elFileState *fs, elf_lineid line, elSymbolID x) {
 	return elf_nodeunary(fs,line,NODE_GLOBAL,NT_ANY,x);
 }
 
 
-elNodeID elf_make_field_node(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
-	return elf_nodebinary(fs,line,NODE_FIELD,NT_ANY,x,y);
+elNodeId elf_make_field_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+	return elf_make_binary_node(fs,line,NODE_FIELD,NT_ANY,x,y);
 }
 
 
-elNodeID elf_nodeindex(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
-	return elf_nodebinary(fs,line,NODE_INDEX,NT_ANY,x,y);
+elNodeId elf_nodeindex(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+	return elf_make_binary_node(fs,line,NODE_INDEX,NT_ANY,x,y);
 }
 
 
-elNodeID elf_noderangedindex(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
-	return elf_nodebinary(fs,line,NODE_RANGE_INDEX,NT_ANY,x,y);
+elNodeId elf_noderangedindex(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+	return elf_make_binary_node(fs,line,NODE_RANGE_INDEX,NT_ANY,x,y);
 }
 
 
-elNodeID elf_nodemetafield(elFileState *fs, elf_lineid line, elNodeID x, elNodeID y) {
-	return elf_nodebinary(fs,line,NODE_METAFIELD,NT_ANY,x,y);
+elNodeId elf_make_meta_field_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+	return elf_make_binary_node(fs,line,NODE_METAFIELD,NT_ANY,x,y);
 }
 
 
-elNodeID elf_nodecall(elFileState *fs, elf_lineid line, elNodeID x, elNodeID *z) {
-	return elf_nodexyz(fs,line,NODE_CALL,NT_ANY,x,NO_NODE,z);
+elNodeId elf_make_call_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z) {
+	// elf_file_dialog(fs,line,"make call node: %i", x);
+	return elf_make_node_xyz(fs,line,NODE_CALL,NT_ANY,x,NO_NODE,z);
 }
 
 
-elNodeID elf_nodeloadfile(elFileState *fs, elf_lineid line, elNodeID x) {
+elNodeId elf_nodeloadfile(elFileState *fs, elf_lineid line, elNodeId x) {
 	return elf_nodeunary(fs,line,NODE_FILE,NT_ANY,x);
 }
 
 
-elNodeID elf_nodebuiltincall(elFileState *fs, elf_lineid line, ltokentype k, elNodeID *z) {
-	return elf_nodexyz(fs,line,NODE_BUILTIN,NT_ANY,k,NO_NODE,z);
-}
+elValue elf_nodetolitval(elFileState *fs, elNodeId id);
 
 
-elValue elf_nodetolitval(elFileState *fs, elNodeID id);
-
-
-void elf_nodelitapply(elFileState *fs, elTable *tab, elNodeID id) {
+void elf_nodelitapply(elFileState *fs, elTable *tab, elNodeId id) {
 	elNode v = fs->nodes[id];
 	switch (v.k) {
 		case NODE_LOAD: {
@@ -178,7 +221,7 @@ void elf_nodelitapply(elFileState *fs, elTable *tab, elNodeID id) {
 }
 
 
-elValue elf_nodetolitval(elFileState *fs, elNodeID id) {
+elValue elf_nodetolitval(elFileState *fs, elNodeId id) {
 	elNode nd = fs->nodes[id];
 	switch (nd.k) {
 		case NODE_INTEGER: {

@@ -11,7 +11,7 @@ elBool elf_tagisnumeric(elf_tag tag) {
 
 
 int elf_valisnil(elValue x) {
-	return (x.tag == TAG_NIL) || (!elf_tagisnumeric(x.tag) && (x.p == elNIL));
+	return (x.tag == TAG_NIL) || (!elf_tagisnumeric(x.tag) && (x.p == elNil));
 }
 
 
@@ -19,14 +19,14 @@ elBool elf_tagisobj(elf_tag tag) {
 	switch (tag) {
 		case TAG_STR: case TAG_TAB:
 		case TAG_OBJ: case TAG_CLS: {
-			return ltrue;
+			return elTrue;
 		}
-		default: return lfalse;
+		default: return false;
 	}
 }
 
 
-elf_tag elf_objtotag(elf_objty type) {
+elf_tag elf_objtotag(elObjType type) {
 	switch(type) {
 		case OBJ_CLOSURE: return TAG_CLS;
 		case OBJ_TAB: return TAG_TAB;

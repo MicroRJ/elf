@@ -1,0 +1,93 @@
+// for i in 0..10 ? {
+// 	elf.pf(i, ", HELLO!")
+// }
+// let two = fun (a, b) {
+// 	elf.pf(a,", ",b)
+// }
+// two({},{})
+// let add = fun (a,b) ? {
+// 	let c = a + b
+// 	elf.pf(a)
+// 	elf.pf(b)
+// 	elf.pf(c)
+// 	leave c
+// }
+// let a = add(0,2)
+// elf.pf(a)
+// range = fun(x,y) ?{
+// 	leave new {
+// 		__loop_get = fun(i) ? i
+// 		__loop_min = fun()  ? x
+// 		__loop_max = fun()  ? y
+// 	} {}
+// }
+// for i in range(0,200) ? {
+// }
+
+Vector2 = {
+	// __loop_get = fun(n) ? {
+	// }
+	// __loop_min = fun() ? {
+	// }
+	// __loop_max = fun() ? {
+	// }
+	__new = fun(x,y) ? {
+		elf.pf("__new(",x,", ",y,")")
+		this.x = x
+		this.y = y
+	}
+	__add = fun(that) ? {
+		leave vec2(this.x+that.x,this.y+that.y)
+	}
+}
+vec2 = fun(x,y) ? {
+	let v = new Vector2(x,y)
+	leave v
+}
+elf.pf(vec2(2,2)+vec2(2,2))
+vec2(2,2):__add(vec2(2,2))
+// Vector2.__add(vec2(2,2),vec2(2,2))
+// elf.pf(Vector2.__add({},1,2))
+// let a = 1 + 2 + 3
+// if 1 ? elf.pf("true")
+// let a = 0
+// let b = 1
+// let c = 2
+// elf.pf(#register a)
+// elf.pf(#register b)
+// elf.pf(#register c)
+// elf.pf(#register a, #register b, #register c)
+// let pf = elf.pf
+// let j = 10
+// if j == 10 ? elf.pf("HELLO")
+// for i in j ? {
+// 	elf.pf(i)
+// }
+// pf(i)
+// for i in 10 ? {
+// 	pf(pf, " HERE"," ARE"," THOU")
+// }
+// pf(pf, " HERE"," ARE"," THOU")
+// pf(1 + 2 + 3, ", ", 1 + 2 + 3)
+// me = "me"
+// elf.pf("I am ", me)
+
+// let a = {"welcome","dude"}
+// elf.pf(a)
+
+// Vector2 = {
+// 	__new = fun(x,y) ? {
+// 		this.x = x
+// 		this.y = y
+// 	}
+// 	// __add = fun(that) ? vec2(this.x + that.x, this.y + that.y)
+// 	// __add1 = fun(that) ? vec2(this.x + that, this.y + that)
+// 	// __mul1 = fun(that) ? vec2(this.x * that, this.y * that)
+// }
+
+// elf.bytelogging(true)
+// new Vector2()
+// //(x,y)
+// elf.bytelogging(false)
+
+// // failed = ({1,2,3}):length() != 3

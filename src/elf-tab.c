@@ -15,6 +15,8 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"iter",elf_tabiter_);
 	elf_tabmfld(R,tab,"collisions",elf_tabcollisions_);
 	elf_tabmfld(R,tab,"add",elf_tabadd_);
+	elf_tabmfld(R,tab,"itemize",elf_itemize_);
+	elf_tabmfld(R,tab,"inject",elf_inject_);
 	elf_tabmfld(R,tab,"idx",elf_tabidx_);
 	elf_tabmfld(R,tab,"xrem",elf_tabxrem_);
 	elf_tabmfld(R,tab,"bubblesort",elf_tabbubblesort_);
@@ -65,8 +67,8 @@ void elf_deltab(elTable *tab) {
 **
 */
 elInteger elf_tabhashin(elTable *tab, elValue key) {
-	// if (tab == elNIL) elf_throw(&elf,NO_BYTE,"table is nil");
-	elf_ensure(tab != elNIL);
+	// if (tab == elNil) elf_throw(&elf,NO_BYTE,"table is nil");
+	elf_ensure(tab != elNil);
 	elf_ensure(key.tag != TAG_NIL);
 	/* this particular function uses double hashing,
 	which should allow us to get more resolution out
@@ -203,6 +205,11 @@ void elf_tabalias(elState *S, elTable *tab, elValue key, elValue alias) {
 }
 
 
+void elf_tabmfld(elState *R, elTable *obj, char *name, elBinding b) {
+	elf_tabset(obj,elf_valstr(elf_newstr(R,name)),elf_valbid(b));
+}
+
+
 void elf_tabstralias(elState *S, elTable *tab, char *key, elValue alias) {
 	return elf_tabalias(S,tab,elf_valstr(elf_newstr(S,key)),alias);
 }
@@ -308,10 +315,47 @@ int elf_tabcollisions_(elState *c) {
 
 
 int elf_tabadd_(elState *R) {
-	elf_ensure(R->call->x >= 1);
-	elTable *tab = (elTable *) R->call->obj;
-	elf_tabadd(tab,elf_getany(R,0));
+	elTable *tab = (elTable *) elf_getthis(R);
+	int i;
+	for (i=0;i<R->call->nx;++i) {
+		elf_tabadd(tab,elf_getany(R,i));
+	}
 	return 0;
+}
+
+
+int elf_inject_(elState *R) {
+	elTable *tab = (elTable *) elf_getthis(R);
+	if (elf_gettag(R,0) == TAG_TAB) {
+		elTable *that = elf_gettab(R,0);
+		elf_varforj(that->array) {
+			elf_tabadd(tab,that->array[j]);
+		}
+	} else {
+		elf_tabadd(tab,elf_getany(R,0));
+	}
+	return 0;
+}
+
+
+int elf_itemize_(elState *R) {
+	elTable *tab = (elTable *) elf_getthis(R);
+	elTable *result = elf_pushnewtab(R);
+	elf_varforj(tab->array) {
+		elf_tabadd(result,tab->array[j]);
+	}
+	int i;
+	for (i=0;i<R->call->nx;++i) {
+		if (elf_gettag(R,0) == TAG_TAB) {
+			elTable *that = elf_gettab(R,0);
+			elf_varforj(that->array) {
+				elf_tabadd(result,that->array[j]);
+			}
+		} else {
+			elf_tabadd(result,elf_getany(R,i));
+		}
+	}
+	return 1;
 }
 
 
@@ -425,13 +469,13 @@ int elf_tabbubblesort_(elState *R) {
 	elTable *tab = (elTable *) elf_getthis(R);
 	elValue *arr = tab->array;
 	elClosure *cls = elf_getcls(R,0);
-	elBool sorted = lfalse;
+	elBool sorted = false;
 	do {
-		sorted = ltrue;
+		sorted = elTrue;
 		elInteger i;
 		for (i=0;i<elf_varlen(arr)-1;++i) {
 			elValue *top = elf_gettop(R);
-			elf_localid base = elf_pushcls(R,cls);
+			elRegId base = elf_pushcls(R,cls);
 			elf_pushany(R,arr[i+0]);
 			elf_pushany(R,arr[i+1]);
 			int r = elf_callfn(R,base,2,1);
@@ -440,11 +484,11 @@ int elf_tabbubblesort_(elState *R) {
 				elValue tmp = arr[i+0];
 				arr[i+0] = arr[i+1];
 				arr[i+1] = tmp;
-				sorted = lfalse;
+				sorted = false;
 			}
 			elf_settop(R,top);
 		}
-	} while(sorted != ltrue);
+	} while(sorted != elTrue);
 	return 0;
 }
 
@@ -457,8 +501,8 @@ int elf_tabiter_(elState *R) {
 	elf_ensure(R->frame->nx == 1);
 	elTable *tab = (elTable *) elf_getthis(R);
 	elClosure *cls = elf_getcls(R,0);
-	elf_localid k = elf_pushmany(R,1);
-	elf_localid v = elf_pushmany(R,1);
+	elRegId k = elf_pushmany(R,1);
+	elRegId v = elf_pushmany(R,1);
 	elInteger i;
 	for (i=0;i<tab->ntotal;++i) {
 		elEntry it = tab->slots[i];
@@ -468,7 +512,7 @@ int elf_tabiter_(elState *R) {
 		/* todo: should yield boolean to signal whether to
 		stop or not */
 		int ny = elf_callex(R,R->frame->obj,0,0,2,0);
-		if (ny != 0) if (elf_getint(R,0) != ltrue) break;
+		if (ny != 0) if (elf_getint(R,0) != elTrue) break;
 	}
 	return 0;
 }
@@ -577,7 +621,7 @@ elf_hashint elf_tabhashptr(elAddr *p) {
 
 elBool elf_tabvaleq(elValue *x, elValue *y) {
 	if (x->tag != y->tag) {
-		return lfalse;
+		return false;
 	}
 	switch (x->tag) {
 		case TAG_STR: {
@@ -589,14 +633,14 @@ elBool elf_tabvaleq(elValue *x, elValue *y) {
 		}
 		default: elf_unreachable;
 	}
-	return lfalse;
+	return false;
 }
 
 
 elInteger elf_tabhashval(elValue v) {
 	switch (v.tag) {
 		case TAG_STR: {
-			elf_ensure(v.x_str != elNIL);
+			elf_ensure(v.x_str != elNil);
 			return v.x_str->hash;
 		}
 		case TAG_TAB: case TAG_CLS: case TAG_SYS:
@@ -605,6 +649,6 @@ elInteger elf_tabhashval(elValue v) {
 		}
 		default: elf_unreachable;
 	}
-	return lfalse;
+	return false;
 }
 

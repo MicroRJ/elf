@@ -5,9 +5,9 @@
 */
 
 
-typedef enum elf_objgc {
+typedef enum elGCColor {
 	GC_BLACK = 0, GC_WHITE, GC_PINK, GC_RED,
-} elf_objgc;
+} elGCColor;
 
 
 
@@ -20,14 +20,14 @@ _(OBJ) _(CLS) _(STR) _(TAB) /* end */
 
 
 
-typedef enum elf_objty {
+typedef enum elObjType {
 	OBJ_NONE = 0,
 	OBJ_CLOSURE,
 	OBJ_STRING,
 	OBJ_ARRAY,
 	OBJ_TAB,
 	OBJ_CUSTOM,
-} elf_objty;
+} elObjType;
 
 
 typedef struct elObject {
@@ -35,8 +35,8 @@ typedef struct elObject {
 #if defined(_DEBUG)
 	int headtrap;
 #endif
-	elf_objty type;
-	elf_objgc gccolor;
+	elObjType type;
+	elGCColor gccolor;
 	// TODO: REMOVE THIS
 	elInteger tell;
 	elTable *metatable;
@@ -89,7 +89,7 @@ typedef struct elClosure {
    whole prototype here, we can instead store an
    index into the proto table. */
 	elProto   fn;
-	elf_byteid     j;
+	elByteId     j;
    /* allocated past this point */
 	elValue caches[1];
 } elClosure;

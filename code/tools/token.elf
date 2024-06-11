@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** token.elf
-** Metaprogram to generate elToken.h
+** Metaprogram to generate elf-tkn.h
 */
 
 pf = elf.pf
@@ -25,8 +25,9 @@ lastly pf(" => took ", elf.timediffs(_time))
 
 
 
-TK_CLASS_NONE     = -2
-TK_CLASS_KEYWORD  = -1
+TK_CLASS_NONE     = -3
+TK_CLASS_KEYWORD  = -2
+TK_CLASS_MACRO    = -1
 TK_CLASS_RANGE    =  1
 TK_CLASS_OR       =  2
 TK_CLASS_AND      =  3
@@ -42,6 +43,7 @@ TK_CLASS_MUL      = 11
 
 K = TK_CLASS_KEYWORD
 N = TK_CLASS_NONE
+M = TK_CLASS_MACRO
 MUL = TK_CLASS_MUL
 MUL = TK_CLASS_MUL
 MUL = TK_CLASS_MUL
@@ -63,14 +65,20 @@ OR = TK_CLASS_OR
 RANGE = TK_CLASS_RANGE
 
 
+Macros = {
+	"line_number", "line_char_number", "file_name",
+	"register", "level"
+}
+
 Keywords = {
 	"elf",
 	"load", "using",
 	"try", "catch", "finally",
-	"new", "this",
+	"new",
+	"this",
 	"enum", "fun",
 	"let",
-	"for", "foreach", "in",
+	"for", "over", "in",
 	"do", "while",
 	"break", "continue", "leave",
 	"lastly"
@@ -85,7 +93,7 @@ Tk = fun(x,r,s) ? {
 	let myid = Id
 	Id = Id + 1
 	let h = 0
-	if r == K ? h = s:gethash()
+	if (r == K || r == M) ? h = s:gethash()
 	Tokens:add ({"n"=x,"r"=r,"s"=s,"v"=myid,"h"=h})
 }
 
@@ -96,6 +104,12 @@ for i in Keywords:tally() ? {
 	Tk(Keywords:idx(i):touppercase(),K,Keywords:idx(i))
 }
 LstKeyword = Id-1
+
+FstMacro = Id
+for i in Macros:tally() ? {
+	Tk("M_":append(Macros:idx(i):touppercase()),M,Macros:idx(i))
+}
+LstMacro = Id
 
 Tk("INTEGER", N, "literal-integer")
 Tk("NUMBER", N, "literal-number")
@@ -149,6 +163,9 @@ fpf(file,"*/\n\n\n")
 // my ocdness
 fpf(file,"#define FIRST_KEYWORD ", FstKeyword, "\n")
 fpf(file,"#define  LAST_KEYWORD ", LstKeyword, "\n\n\n")
+
+fpf(file,"#define FIRST_MACRO ", FstMacro, "\n")
+fpf(file,"#define  LAST_MACRO ", LstMacro, "\n\n\n")
 
 fpf(file,"typedef struct elToken {\n")
 fpf(file,"\tunsigned char type;\n")

@@ -12,7 +12,7 @@ elBool elf_chriseol(char x) {
 }
 
 
-elBool elf_chrisdigit(char x) {
+elBool elf_is_digit_char(char x) {
 	return x >= '0' && x <= '9';
 }
 
@@ -27,13 +27,13 @@ elBool elf_chrisuppercase(char x) {
 }
 
 
-elBool elf_chrisletter(char x) {
+elBool elf_is_letter_char(char x) {
 	return elf_chrisuppercase(x) || elf_chrislowercase(x);
 }
 
 
-elBool elf_chrisalphanum(char x) {
-	return elf_chrisletter(x) || elf_chrisdigit(x) || (x) == '_';
+elBool elf_is_letter_or_digit_char(char x) {
+	return elf_is_letter_char(x) || elf_is_digit_char(x);
 }
 
 
@@ -55,7 +55,7 @@ char elf_chrtouppercase(char x) {
 
 int elf_cstrlen(char const *s) {
 	int n = 0;
-	if (s != elNIL) {
+	if (s != elNil) {
 		while (*s ++ != 0) {
 			n += 1;
 		}
@@ -67,24 +67,24 @@ int elf_cstrlen(char const *s) {
 
 elBool elf_cstrhasprefix(char *str, char *prefix) {
 	if (prefix == 0 || *prefix == 0 || *str == 0 || *str == 0) {
-		return lfalse;
+		return false;
 	}
 	do {
 		if (*prefix ++ != *str ++) {
-			return lfalse;
+			return false;
 		}
 	} while (*prefix);
-	return ltrue;
+	return elTrue;
 }
 
 
 elBool S_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
-			return lfalse;
+			return false;
 		}
 	}
-	return ltrue;
+	return elTrue;
 }
 
 
@@ -147,10 +147,10 @@ elBool elf_cstrmatch(char *p, char *s) {
 	char *b = s;
 	while (!elf_cstrmatchsingle(p,s)) {
 		while (*p != 0 && *p != '|') ++p;
-		if (*p == 0) return lfalse;
+		if (*p == 0) return false;
 		++ p, s = b;
 	}
-	return ltrue;
+	return elTrue;
 }
 
 
@@ -158,7 +158,7 @@ elBool elf_cstrmatchsingle(char *p, char *s) {
 	while (*p != 0 && *p != '|') {
 		if (*p == '?') {
 			/* matches any character except terminator. */
-			if (*s != 0) return lfalse;
+			if (*s != 0) return false;
 			++ p, ++ s;
 		} else
 		if (*p == '*') {
@@ -174,7 +174,7 @@ elBool elf_cstrmatchsingle(char *p, char *s) {
 			delay the match by skipping this char and remaining
 			in this pattern char. */
 			if (elf_cstrmatchsingle(p+1,s)) {
-				return ltrue;
+				return elTrue;
 			}
 			/* no match, move on to next char, remain in
 			this branch and keep checking for matches. */
@@ -182,7 +182,7 @@ elBool elf_cstrmatchsingle(char *p, char *s) {
 		} else
 		/* otherwise, match literal fail if no match. */
 		if (*p != *s) {
-			return lfalse;
+			return false;
 		} else {
 			++ p, ++ s;
 		}

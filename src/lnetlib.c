@@ -5,20 +5,17 @@
 */
 
 
-/* this is just to get some basic games going on */
+/* ------------------------------------
+	Very Simple Sockets Library
+	Just to get some basic games
+	going on.
+--------------------------------*/
 
 #if !defined(PLATFORM_WEB)
-
-# pragma comment(lib,"Ws2_32")
-
-#include "Winsock2.h"
-#include "ws2tcpip.h"
-#include   "ws2def.h"
 
 typedef struct LMSG {
 	unsigned int length;
 } LMSG;
-
 
 
 elf_api int netlib_init(elState *R) {
@@ -185,16 +182,16 @@ elf_api int netlib_recv(elState *R) { return 0; };
 
 elf_api void netlib_load(elState *R) {
 	elModule *md = R->md;
-	lang_addglobal(md,elf_pushnewstr(R,"listen"),elf_valbid(netlib_listen));
-	lang_addglobal(md,elf_pushnewstr(R,"accept"),elf_valbid(netlib_accept));
-	lang_addglobal(md,elf_pushnewstr(R,"pollclient"),elf_valbid(netlib_pollclient));
-	lang_addglobal(md,elf_pushnewstr(R,"tcpserver"),elf_valbid(netlib_tcpserver));
-	lang_addglobal(md,elf_pushnewstr(R,"tcpclient"),elf_valbid(netlib_tcpclient));
-	lang_addglobal(md,elf_pushnewstr(R,"netlib_init"),elf_valbid(netlib_init));
-	lang_addglobal(md,elf_pushnewstr(R,"netlib_close"),elf_valbid(netlib_close));
-	lang_addglobal(md,elf_pushnewstr(R,"send"),elf_valbid(netlib_send));
-	lang_addglobal(md,elf_pushnewstr(R,"recv"),elf_valbid(netlib_recv));
-	lang_addglobal(md,elf_pushnewstr(R,"ioctl"),elf_valbid(netlib_ioctl));
-}
 
+	elf_register(R,"elf.sockets.init",netlib_init);
+	elf_register(R,"elf.sockets.close",netlib_close);
+	elf_register(R,"elf.sockets.listen",netlib_listen);
+	elf_register(R,"elf.sockets.accept",netlib_accept);
+	elf_register(R,"elf.sockets.pollclient",netlib_pollclient);
+	elf_register(R,"elf.sockets.tcpserver",netlib_tcpserver);
+	elf_register(R,"elf.sockets.tcpclient",netlib_tcpclient);
+	elf_register(R,"elf.sockets.send",netlib_send);
+	elf_register(R,"elf.sockets.recv",netlib_recv);
+	elf_register(R,"elf.sockets.ioctl",netlib_ioctl);
+}
 

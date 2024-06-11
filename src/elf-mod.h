@@ -7,8 +7,8 @@
 
 typedef struct elFileInfo {
 	char *name;
-	elf_byteid bytes;
-	elf_byteid nbytes;
+	elByteId bytes;
+	elByteId nbytes;
 	int **protos;
 	/* todo: eventually remove these */
 	char *pathondisk;
@@ -39,15 +39,15 @@ typedef struct elModule {
 	elInteger *ki;
 	int *track;
 	elf_Bytecode *bytes;
-	elf_byteid nbytes;
+	elByteId nbytes;
 	char **lines;
 	elFileInfo *files;
 } elModule;
 
 
-elf_globalid elf_getsymbol(elModule *md, elString *name);
-elf_globalid lang_addglobal(elModule *md, elString *name, elValue v);
-elf_globalid lang_addproto(elModule *md, elProto p);
+elSymbolID elf_get_global_symbol(elModule *md, elString *name);
+elSymbolID lang_addglobal(elModule *md, elString *name, elValue v);
+elSymbolID elf_add_proto(elModule *md, elProto p);
 
 /*
 	elModule\r: runtime is stored here

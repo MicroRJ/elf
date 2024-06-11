@@ -127,7 +127,7 @@ elf_globaldecl ltokenintel elf_tkintel[] = {
 	{"then",                 -1, 3844270454},
 	{"else",                 -1, 3183434736},
 	{"nil",                  -1, 228849900},
-	{"true",                 -1, 1303515621},
+	{"elTrue",                 -1, 1303515621},
 	{"false",                -1, 184981848},
 	{"literal-integer",      -2, 0},
 	{"literal-number",       -2, 0},

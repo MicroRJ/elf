@@ -28,15 +28,15 @@ int elf_loadcliopts(elf_cliopts *cli, int n, char **c) {
 	#define GETOP(N) (ISOP(N) ? NEXT() : NOP)
 	#define ISARG() (strncmp(c[i],"--",2))
 	#define GETARG(E) (ISARG() ? c[NEXT()] : E)
-	#define FAIL(S) (printf("error: "S),elNIL)
+	#define FAIL(S) (printf("error: "S),elNil)
 	#define SETFIELD(N,V) (cli->N = V)
 
 
 #define OPLIST(_) \
 	_("help", "displays command line interface help",{})\
-	_("logging", "log bytecode instructions as they execute (only in debug mode)",{SETFIELD(logging,ltrue);})\
+	_("logging", "log bytecode instructions as they execute (only in debug mode)",{SETFIELD(logging,elTrue);})\
 	_("dump", "[filename] whether to dump the resulting module (when program exits)",\
-	{	SETFIELD(dump,ltrue);\
+	{	SETFIELD(dump,elTrue);\
 		SETFIELD(dumpfilename,GETARG(FAIL("dump: missing filename, tip: you can use [stdout]"))); })
 
 	if (!HAS()) goto help;

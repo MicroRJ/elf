@@ -16,10 +16,10 @@ elInteger elf_clocktime();
 elNumber elf_timediffs(elInteger begin);
 
 
-void elf_throw(elState *R, elf_byteid id, char *error);
+void elf_throw(elState *R, elByteId id, char *error);
 
 
-int elf_fndfilebybyte(elModule *md, elf_byteid line);
+int elf_fndfilebybyte(elModule *md, elByteId line);
 void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc);
 
 

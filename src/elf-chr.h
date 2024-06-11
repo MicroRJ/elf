@@ -6,11 +6,11 @@
 
 
 elBool elf_chriseol(char x);
-elBool elf_chrisdigit(char x);
+elBool elf_is_digit_char(char x);
 elBool elf_chrislowercase(char x);
 elBool elf_chrisuppercase(char x);
-elBool elf_chrisletter(char x);
-elBool elf_chrisalphanum(char x);
+elBool elf_is_letter_char(char x);
+elBool elf_is_letter_or_digit_char(char x);
 char elf_chrtouppercase(char x);
 char elf_chrtolowercase(char x);
 

@@ -17,15 +17,15 @@ elInteger elf_toint(elValue v) {
 
 elf_api elObject *elf_getthis(elState *R);
 
-elf_api elf_tag elf_gettag(elState *R, elf_localid x);
-elf_api elValue elf_getany(elState *R, elf_localid x);
-elf_api elInteger elf_getint(elState *R, elf_localid x);
-elf_api elNumber elf_getnum(elState *R, elf_localid x);
-elf_api elString *elf_getstr(elState *R, elf_localid x);
-elf_api elObject *elf_getobj(elState *R, elf_localid x);
-elf_api elTable *elf_gettab(elState *R, elf_localid x);
-elf_api elHandle elf_getsys(elState *R, elf_localid x);
-elf_api elClosure *elf_getcls(elState *R, elf_localid x);
+elf_api elf_tag elf_gettag(elState *R, elRegId x);
+elf_api elValue elf_getany(elState *R, elRegId x);
+elf_api elInteger elf_getint(elState *R, elRegId x);
+elf_api elNumber elf_getnum(elState *R, elRegId x);
+elf_api elString *elf_getstr(elState *R, elRegId x);
+elf_api elObject *elf_getobj(elState *R, elRegId x);
+elf_api elTable *elf_gettab(elState *R, elRegId x);
+elf_api elHandle elf_getsys(elState *R, elRegId x);
+elf_api elClosure *elf_getcls(elState *R, elRegId x);
 
 
 /*
@@ -42,13 +42,13 @@ elf_api elClosure *elf_getcls(elState *R, elf_localid x);
 ** loadexprfs: [expr]
 ** loadfilefs: [file]
 */
-elf_api int elf_loadcodefs(elState *, elFileState *fs, elString *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadexprfs(elState *, elFileState *fs, elString *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadfilefs(elState *, elFileState *fs, elString *filename, elf_localid rxy, int ny);
+elf_api int elf_loadcodefs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents);
+elf_api int elf_loadexprfs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents);
+elf_api int elf_loadfilefs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny);
 
-elf_api int elf_loadcode(elState *, elString *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadexpr(elState *, elString *filename, elf_localid rxy, int ny, char *contents);
-elf_api int elf_loadfile(elState *, elString *filename, elf_localid rxy, int ny);
+elf_api int elf_loadcode(elState *, elString *filename, elRegId rxy, int ny, char *contents);
+elf_api int elf_loadexpr(elState *, elString *filename, elRegId rxy, int ny, char *contents);
+elf_api int elf_loadfile(elState *, elString *filename, elRegId rxy, int ny);
 
 
 /*
@@ -66,26 +66,26 @@ elf_api int elf_loadfile(elState *, elString *filename, elf_localid rxy, int ny)
 ** the results are written to.
 ** ry can be equal to rx.
 */
-elf_api int elf_callex(elState *, elObject *obj, elf_localid rx, elf_localid ry, int nx, int ny);
+elf_api int elf_callex(elState *, elObject *obj, elRegId rx, elRegId ry, int nx, int ny);
 
 
 /*
 ** Performs a root call, where rx and ry are the same
 ** and obj is nil.
 */
-elf_api int elf_callfn(elState *, elf_localid rx, int nx, int ny);
+elf_api int elf_callfn(elState *, elRegId rx, int nx, int ny);
 
 
 elf_api int elf_run(elState *);
 
 
-elf_api void elf_checkcl(elState *c, elf_localid x);
+elf_api void elf_checkcl(elState *c, elRegId x);
 
 elf_api elValue *elf_gettop(elState *R);
 elf_api void elf_settop(elState *R, elValue *top);
 
-elf_api elf_localid elf_pushmany(elState *R, int howmany);
-elf_api elf_localid elf_pushany(elState *, elValue v);
+elf_api elRegId elf_pushmany(elState *R, int howmany);
+elf_api elRegId elf_pushany(elState *, elValue v);
 elf_api void elf_pushnil(elState *);
 elf_api void elf_pushint(elState *, elInteger i);
 elf_api void elf_pushnum(elState *, elNumber n);
@@ -102,9 +102,9 @@ elf_api elTable *elf_pushtab(elState *, elTable *t);
 elf_api elTable *elf_pushnewtab(elState *R);
 elf_api elTable *elf_pushnewlen(elState *R, elInteger len);
 
-elf_api elf_localid elf_pushcls(elState *, elClosure *f);
-elf_api elf_localid elf_pushnewcls(elState *, elProto fn);
+elf_api elRegId elf_pushcls(elState *, elClosure *f);
+elf_api elRegId elf_pushnewcls(elState *, elProto fn);
 
 
-elf_api elf_localid elf_pushbinding(elState *, elBinding c);
+elf_api elRegId elf_pushbinding(elState *, elBinding c);
 

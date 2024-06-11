@@ -1,3 +1,5 @@
+// [FIXED]
+
 vec2_ = {
 	__add = fun(that) ? vec2(this.x + that.x, this.y + that.y)
 	__add1 = fun(that) ? vec2(this.x + that, this.y + that)

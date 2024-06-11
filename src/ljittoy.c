@@ -151,9 +151,9 @@ elBinding jit(elModule *md, elProto fn) {
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
 	elf_Bytecode *bytes = md->bytes + fn.bytes;
-	elf_byteid nbytes = fn.nbytes;
+	elByteId nbytes = fn.nbytes;
 
-	for (elf_byteid i = 0; i < nbytes; ++i) {
+	for (elByteId i = 0; i < nbytes; ++i) {
 		#if 0
 		switch (byte.k) {
 			case BC_INT: {

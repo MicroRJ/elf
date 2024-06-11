@@ -8,7 +8,7 @@
 typedef struct elf_delaylist elf_delaylist;
 typedef struct elf_delaylist {
 	elf_delaylist *n;
-	elf_byteid j;
+	elByteId j;
 } elf_delaylist;
 
 
@@ -28,10 +28,10 @@ typedef struct elCallFrame {
 	'head' is mainly used for debugging, we store the
 	byte directly as supposed to the line because this
 	way we can find both the file and the line. */
-	elf_byteid head;
+	elByteId head;
 	/* note that tail is local so it's head + tail to
 	get the byte relative to the module */
-	elf_byteid tail;
+	elByteId tail;
 	/* the closure for this call frame */
 	elClosure *cl;
 	/* the object for meta fields, meta calls and the likes */
@@ -45,7 +45,7 @@ typedef struct elCallFrame {
 	/* todo: rename top to regress */
 	elValue *top;
 
-	elf_localid rx,ry;
+	elRegId rx,ry;
 	/* x and y names are deprecated */
 	/* the number of inputs (nx) and
 	the number of expected outputs (ny).
@@ -87,16 +87,16 @@ typedef struct lThread {
 	union { elModule  *M, *md; };
 	union { elCallFrame *call; };
 	union { elValue *stk;      };
-	elf_localid stklen;
+	elRegId stklen;
 	elInteger threadid;
-	elf_byteid  curbyte;
+	elByteId  curbyte;
 } lThread;
 
 
 typedef struct elState {
 	union { elModule *M, *md; };
 	union { elValue *stk,*s; };
-	elf_localid stklen;
+	elRegId stklen;
 	elCallFrame root_call;
 	union { elValue *top,*v; };
 	union { elCallFrame *call,*frame,*f; };
@@ -121,7 +121,7 @@ typedef struct elState {
 	elBool bytetracing;
 	elBool bytetracking;
 	/* current byte and whether bytelogging is on */
-	elf_byteid byte;
+	elByteId byte;
 	elBool bytelogging;
 	elObject **gc;
 	elBool     gcflags;
