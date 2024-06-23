@@ -91,7 +91,7 @@ typedef struct elClosure {
 	elProto   fn;
 	elByteId     j;
    /* allocated past this point */
-	elValue caches[1];
+	elValue enclosure[1];
 } elClosure;
 
 

@@ -229,7 +229,7 @@ elf_api void *sys_libfn(elHandle dll, char const *name) {
 }
 
 
-elf_api elError sys_loadfilebytes(Alloc *allocfn, void **data, char const *name) {
+elf_api elError sys_load_file_contents(Alloc *allocfn, void **data, char const *name) {
 
 	elError error = Error_None;
 

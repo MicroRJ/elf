@@ -14,6 +14,7 @@ void elf_registerint(elState *R, char *name, elInteger val);
 
 elInteger elf_clocktime();
 elNumber elf_timediffs(elInteger begin);
+elNumber elf_timediffms(elInteger begin);
 
 
 void elf_throw(elState *R, elByteId id, char *error);

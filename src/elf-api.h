@@ -15,8 +15,8 @@ elInteger elf_toint(elValue v) {
 }
 
 
+elf_api int elf_ncallargs(elState *R);
 elf_api elObject *elf_getthis(elState *R);
-
 elf_api elf_tag elf_gettag(elState *R, elRegId x);
 elf_api elValue elf_getany(elState *R, elRegId x);
 elf_api elInteger elf_getint(elState *R, elRegId x);
@@ -73,7 +73,7 @@ elf_api int elf_callex(elState *, elObject *obj, elRegId rx, elRegId ry, int nx,
 ** Performs a root call, where rx and ry are the same
 ** and obj is nil.
 */
-elf_api int elf_callfn(elState *, elRegId rx, int nx, int ny);
+elf_api int elf_call_function(elState *, elRegId rx, int nx, int ny);
 
 
 elf_api int elf_run(elState *);

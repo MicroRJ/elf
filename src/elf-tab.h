@@ -41,7 +41,7 @@ elBool elf_tabvaleq(elValue *x, elValue *y);
 /* metatable */
 int elf_tabadd_(elState *);
 int elf_itemize_(elState *);
-int elf_inject_(elState *);
+int elf_tabinject_(elState *);
 int elf_tabdel_(elState *);
 int elf_tabidx_(elState *);
 int elf_tabdelete_(elState *);

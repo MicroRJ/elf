@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** lnetlib.c
+** socketslib.c
 ** Very Simple Sockets Lib
 */
 

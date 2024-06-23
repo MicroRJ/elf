@@ -16,7 +16,7 @@ elTable *elf_newtabmetatab(elState *R) {
 	elf_tabmfld(R,tab,"collisions",elf_tabcollisions_);
 	elf_tabmfld(R,tab,"add",elf_tabadd_);
 	elf_tabmfld(R,tab,"itemize",elf_itemize_);
-	elf_tabmfld(R,tab,"inject",elf_inject_);
+	elf_tabmfld(R,tab,"inject",elf_tabinject_);
 	elf_tabmfld(R,tab,"idx",elf_tabidx_);
 	elf_tabmfld(R,tab,"xrem",elf_tabxrem_);
 	elf_tabmfld(R,tab,"bubblesort",elf_tabbubblesort_);
@@ -29,7 +29,7 @@ elTable *elf_newtabmetatab(elState *R) {
 
 
 elTable *elf_newtablen(elState *R, elInteger ntotal) {
-	elTable *table = elf_newobj(R,OBJ_TAB,sizeof(elTable));
+	elTable *table = elf_allocate_new_object(R,OBJ_TAB,sizeof(elTable));
 	if (R) table->obj.metatable = R->metatab_tab;
 
 	table->ntotal = ntotal;
@@ -46,7 +46,7 @@ elTable *elf_newtab(elState *R) {
 
 void elf_deltab(elTable *tab) {
 	elf_dealloc(lHEAP,tab->slots);
-	elf_delvar(tab->array);
+	elf_xarray_delete(tab->array);
 	tab->array = 0;
 	tab->slots = 0;
 }
@@ -154,7 +154,7 @@ void elf_tabset(elTable *table, elValue k, elValue v) {
 	if (slot == -1) elf_unreachable;
 	elEntry *entry = table->slots + slot;
 	if (!elf_tabslotiskey(table,slot)) {
-		elInteger i = elf_varaddi(table->v,1);
+		elInteger i = elf_xarray_growby(table->v,1);
 		table->v[i] = v;
 
 		table->slots[slot].k = k;
@@ -182,7 +182,7 @@ elInteger elf_tabtake(elTable *table, elValue k) {
 	elInteger slot = elf_tabhashin(table,k);
 	if (slot == -1) elf_unreachable;
 	if (!elf_tabslotiskey(table,slot)) {
-		elInteger i = elf_varaddi(table->v,1);
+		elInteger i = elf_xarray_growby(table->v,1);
 		table->v[i] = (elValue){TAG_NIL};
 
 		table->slots[slot].k = k;
@@ -243,12 +243,12 @@ elTable *elf_tabgettab(elTable *tab, elString *key) {
 
 
 elInteger elf_tabiadd(elTable *table, elValue v) {
-	return elf_varaddi(table->v,1);
+	return elf_xarray_growby(table->v,1);
 }
 
 
 void elf_tabadd(elTable *table, elValue v) {
-	elf_varadd(table->v,v);
+	elf_xarray_add(table->v,v);
 }
 
 
@@ -277,14 +277,14 @@ void elf_tabsettabfld(elTable *tab, elString *key, elTable *val) {
 
 int elf_tablength_(elState *R) {
 	elTable *tab = (elTable*) elf_getthis(R);
-	elf_pushint(R,elf_varlen(tab->array));
+	elf_pushint(R,elf_xarray_length(tab->array));
 	return 1;
 }
 
 
 int elf_tabtally_(elState *R) {
 	elTable *tab = (elTable*) elf_getthis(R);
-	elf_pushint(R,elf_varlen(tab->array));
+	elf_pushint(R,elf_xarray_length(tab->array));
 	return 1;
 }
 
@@ -324,13 +324,20 @@ int elf_tabadd_(elState *R) {
 }
 
 
-int elf_inject_(elState *R) {
+void elf_tabmerge(elTable *tab, elTable *merger) {
+	elInteger i;
+	for (i=0;i<merger->ntotal;++i) {
+		elEntry it = merger->slots[i];
+		if (it.k.tag == TAG_NIL) continue;
+		elf_tabset(tab,it.k,merger->array[it.i]);
+	}
+}
+
+
+int elf_tabinject_(elState *R) {
 	elTable *tab = (elTable *) elf_getthis(R);
 	if (elf_gettag(R,0) == TAG_TAB) {
-		elTable *that = elf_gettab(R,0);
-		elf_varforj(that->array) {
-			elf_tabadd(tab,that->array[j]);
-		}
+		elf_tabmerge(tab,elf_gettab(R,0));
 	} else {
 		elf_tabadd(tab,elf_getany(R,0));
 	}
@@ -362,7 +369,7 @@ int elf_itemize_(elState *R) {
 int elf_tabidx_(elState *R) {
 	elf_ensure(R->call->nx >= 1);
 	elTable *tab = (elTable *) elf_getthis(R);
-	elInteger len = elf_varlen(tab->array);
+	elInteger len = elf_xarray_length(tab->array);
 	if (len != 0) {
 		elInteger idx = elf_getint(R,0) % len;
 		elf_pushany(R,tab->array[idx]);
@@ -390,7 +397,7 @@ int elf_tabdelete_(elState *R) {
 	elInteger idx = slots[slot].i;
 	slots[slot].k = (elValue){TAG_NIL};
 	slots[slot].i = -777;
-	elInteger len = elf_varlen(array);
+	elInteger len = elf_xarray_length(array);
 	if ((idx < 0) || (idx > len-1)) {
 		elf_throw(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
 		goto leave_;
@@ -418,7 +425,7 @@ int elf_tabdelete_(elState *R) {
 int elf_tabxrem_(elState *R) {
 	elf_ensure(R->call->x >= 1);
 	elTable *tab = (elTable *) elf_getthis(R);
-	elInteger len = elf_varlen(tab->array);
+	elInteger len = elf_xarray_length(tab->array);
 	if (len != 0) {
 		elInteger idx = elf_getint(R,0);
 		if (idx < 0) idx = len*(idx/-len);
@@ -473,12 +480,12 @@ int elf_tabbubblesort_(elState *R) {
 	do {
 		sorted = elTrue;
 		elInteger i;
-		for (i=0;i<elf_varlen(arr)-1;++i) {
+		for (i=0;i<elf_xarray_length(arr)-1;++i) {
 			elValue *top = elf_gettop(R);
 			elRegId base = elf_pushcls(R,cls);
 			elf_pushany(R,arr[i+0]);
 			elf_pushany(R,arr[i+1]);
-			int r = elf_callfn(R,base,2,1);
+			int r = elf_call_function(R,base,2,1);
 			elf_ensure(r == 1);
 			if (elf_getint(R,base)) {
 				elValue tmp = arr[i+0];
@@ -553,16 +560,6 @@ int elf_tabclone_(elState *R) {
 	elTable *tab = (elTable *) elf_getthis(R);
 	elf_pushtab(R,elf_tabclone(R,tab));
 	return 1;
-}
-
-
-void elf_tabmerge(elTable *tab, elTable *merger) {
-	elInteger i;
-	for (i=0;i<merger->ntotal;++i) {
-		elEntry it = merger->slots[i];
-		if (it.k.tag == TAG_NIL) continue;
-		elf_tabset(tab,it.k,merger->array[it.i]);
-	}
 }
 
 

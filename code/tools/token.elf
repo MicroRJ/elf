@@ -76,7 +76,7 @@ Keywords = {
 	"try", "catch", "finally",
 	"new",
 	"this",
-	"enum", "fun",
+	"fun",
 	"let",
 	"for", "over", "in",
 	"do", "while",
@@ -118,7 +118,6 @@ Tk("LETTER", N, "literal-letter")
 Tk("WORD", N, "identifier")
 Tk("QUESTION_MARK", N, "?")
 Tk("EXCLAMATION_MARK", N, "!")
-Tk("NEGATE", N, "!")
 Tk("ASSIGN_QUESTION", N, "?=")
 Tk("ASSIGN", N, "=")
 Tk("COLON", N, ":")
@@ -147,9 +146,13 @@ Tk("NOT_EQUALS", EQL, "!=")
 Tk("BIT_AND", BAND, "&")
 Tk("BIT_OR", BOR, "|")
 Tk("BIT_XOR", BXOR, "^")
-Tk("LOG_AND", AND, "&&")
-Tk("LOG_OR", OR, "||")
 Tk("DOT_DOT", RANGE, "..")
+
+
+FstKeywordOperator = Id
+Tk("LOG_AND", AND, "and", {is_keyword=true})
+Tk("LOG_OR", OR, "or", {is_keyword=true})
+LstKeywordOperator = Id-1
 
 
 fpf(file,"/*\n")
@@ -179,7 +182,7 @@ fpf(file,"\t};\n")
 fpf(file,"} elToken;\n\n\n")
 
 
-fpf(file,"typedef enum ltokentype {\n")
+fpf(file,"typedef enum elTokenType {\n")
 for i in 0..Tokens:length() ? {
 	let tk = Tokens:idx(i)
 
@@ -187,15 +190,15 @@ for i in 0..Tokens:length() ? {
 	for _ in x..24 ? fpf(file," ")
 	fpf(file," = ",tk.v,",\n")
 }
-fpf(file,"} ltokentype;\n\n\n")
+fpf(file,"} elTokenType;\n\n\n")
 
-fpf(file,"typedef struct ltokenintel {\n")
+fpf(file,"typedef struct elTokenIntel {\n")
 fpf(file,"\tchar *name;\n")
 fpf(file,"\tchar prec;\n")
 fpf(file,"\telf_hashint hash;\n")
-fpf(file,"} ltokenintel;\n\n\n")
+fpf(file,"} elTokenIntel;\n\n\n")
 
-fpf(file,"elf_globaldecl ltokenintel elf_tkintel[] = {\n")
+fpf(file,"elf_globaldecl elTokenIntel elTokenIntelTable[] = {\n")
 
 for i in 0..Tokens:length() ? {
 	let tk = Tokens:idx(i)
@@ -203,7 +206,6 @@ for i in 0..Tokens:length() ? {
 	fpf(file,"\t{")
 	let x = fpf(file,"\"",tk.s,"\", ")
 	for _ in x..24 ? fpf(file," ")
-
 	fpf(file,tk.r,", ",tk.h,"},\n")
 	// fpf(file,"\t{\"",tk.s,"\", ",tk.r,", ",tk.h,"},\n")
 	// fpf(file,"\t{\"",tk.s,"\", ",tk.r,", ",tk.h,"},\n")

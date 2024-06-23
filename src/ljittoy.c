@@ -129,7 +129,7 @@ void emit86_logxor(ljValue x, ljValue y) {
 }
 
 
-void emit86_shift(elf_byteop type, ljValue x, ljValue y) {
+void emit86_shift(elByteOP type, ljValue x, ljValue y) {
 	ljValue xx = x;
 	if (xx.type == JIT_MEM) emit86_mov(x = REG(RAX),xx);
 	if (x.type == JIT_GPR && y.type == JIT_IMM) {
@@ -150,7 +150,7 @@ elBinding jit(elModule *md, elProto fn) {
 
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
-	elf_Bytecode *bytes = md->bytes + fn.bytes;
+	elBytecode *bytes = md->bytes + fn.bytes;
 	elByteId nbytes = fn.nbytes;
 
 	for (elByteId i = 0; i < nbytes; ++i) {

@@ -19,7 +19,7 @@ elTable *elf_newstrmetatab(elState *R) {
 
 
 elString *elf_newstrlen(elState *R, elInteger length) {
-	elString *obj = elf_newobj(R,OBJ_STRING,sizeof(elString)+length+1);
+	elString *obj = elf_allocate_new_object(R,OBJ_STRING,sizeof(elString)+length+1);
 	if (R) obj->obj.metatable = R->metatab_str;
 	obj->length = length;
 	obj->hash = -1;

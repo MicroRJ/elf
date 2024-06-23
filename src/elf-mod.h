@@ -19,7 +19,7 @@ typedef struct elFileInfo {
 
 /*
 ** Symbols
-** 	elf_Bytecode and globals can be added dynamically and
+** 	elBytecode and globals can be added dynamically and
 ** safely, in fact, multiple files will reference the
 ** same global by name, no matter the order in which
 ** they were loaded, or the means, runtime/compiletime.
@@ -33,21 +33,20 @@ typedef struct elFileInfo {
 */
 typedef struct elModule {
 	union { elTable *g, *globals; };
-
-	elProto *p;
+	union { elProto *p, *prototypes; };
 	elNumber *kn;
 	elInteger *ki;
 	int *track;
-	elf_Bytecode *bytes;
+	elBytecode *bytes;
 	elByteId nbytes;
 	char **lines;
 	elFileInfo *files;
 } elModule;
 
 
-elSymbolID elf_get_global_symbol(elModule *md, elString *name);
-elSymbolID lang_addglobal(elModule *md, elString *name, elValue v);
-elSymbolID elf_add_proto(elModule *md, elProto p);
+elSymbolId elf_get_global_symbol(elModule *md, elString *name);
+elSymbolId lang_addglobal(elModule *md, elString *name, elValue v);
+elSymbolId elf_add_proto(elModule *md, elProto p);
 
 /*
 	elModule\r: runtime is stored here

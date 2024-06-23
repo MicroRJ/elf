@@ -5,32 +5,32 @@
 */
 
 
-elBool elf_fscheckexpr(elFileState *fs, elf_lineid line, elNodeId id) {
+elBool elf_check_expr(elFileState *fs, elf_lineid line, elNodeId id) {
 	if (id != NO_NODE) return false;
 	elf_file_dialog(fs,line,"invalid expression");
 	return elTrue;
 }
 
 
-elBool elf_linetesttk(elFileState *fs, ltokentype k) {
+elBool elf_test_token_inline(elFileState *fs, elTokenType k) {
 	return fs->tk.type == k && fs->lasttk.eol != elTrue;
 }
 
 
-elBool elf_test_token(elFileState *fs, ltokentype k) {
+elBool elf_test_token(elFileState *fs, elTokenType k) {
 	return fs->tk.type == k;
 }
 
-elBool elf_test_then_token(elFileState *fs, ltokentype k) {
+elBool elf_test_then_token(elFileState *fs, elTokenType k) {
 	return fs->thentk.type == k;
 }
 
 
 /*
 ** Returns elTrue whether there are no more tokens
-** or whehter the current token is a match.
+** or whether the current token is a match.
 */
-elBool elf_term_token(elFileState *fs, ltokentype k) {
+elBool elf_term_token(elFileState *fs, elTokenType k) {
 	return fs->tk.type == TK_NONE || fs->tk.type == k;
 }
 
@@ -44,20 +44,21 @@ elBool elf_term_eol_token(elFileState *fs) {
 ** Consumes the current token only if it is a match,
 ** returning whether it was a match or not.
 */
-elBool elf_pick_token(elFileState *fs, ltokentype k) {
+elBool elf_pick_token(elFileState *fs, elTokenType k) {
 	return elf_test_token(fs,k) && (elf_lexone(fs), elTrue);
 }
 
 
-elBool elf_pick_token_inline(elFileState *fs, ltokentype k) {
-	return elf_linetesttk(fs,k) && (elf_lexone(fs), elTrue);
+elBool elf_pick_token_inline(elFileState *fs, elTokenType k) {
+	return elf_test_token_inline(fs,k) && (elf_lexone(fs), elTrue);
 }
 
 
 /*
-** Same as pick, only this time there are two possibilities.
+** Same as pick, only this time there
+** are two possibilities.
 */
-elBool elf_choosetk(elFileState *fs, ltokentype x, ltokentype y) {
+elBool elf_choose_token(elFileState *fs, elTokenType x, elTokenType y) {
 	return (elf_test_token(fs,x) || elf_test_token(fs,y)) && (elf_lexone(fs), elTrue);
 }
 
@@ -84,33 +85,10 @@ elToken elf_take_token_inline(elFileState *fs, int k) {
 }
 
 
-elRegId elf_fsnumentinlev(elFileState *fs) {
-	elFileEntity *entities = fs->entities;
-	int nentities = fs->nentities;
-	int n;
-	for (n = 0; n < nentities; ++ n) {
-		if (entities[nentities-1-n].level < fs->level) {
-			break;
-		}
-	}
-	return n;
-}
-
-
-elNodeId elf_fsnumnodesinlev(elFileState *fs) {
-	elNode *nodes = fs->nodes;
-	elNodeId nnodes = fs->nnodes;
-	elNodeId n;
-	for (n = 0; n < nnodes; ++n) {
-		if (nodes[nnodes-1-n].level < fs->level) {
-			break;
-		}
-	}
-	return n;
-}
-
-
 void elf_check_store(elFileState *fs, elf_lineid line, elNodeId x) {
+	if (!elf_is_load_target_node(fs,MAKE_NODE_ID(x))) {
+		elf_file_dialog(fs,fs->tk.line,"invalid store (%s)",elNodeToStr[elf_get_node_kind(fs,x)]);
+	}
 }
 
 
@@ -122,10 +100,12 @@ void elf_check_store(elFileState *fs, elf_lineid line, elNodeId x) {
 ** instructions targeting closure values.
 */
 int elf_find_index_of_closure_entity(elFileFnState *fn, elEntityIdTypeGuard id) {
-	elf_arrfori(fn->enclosure) {
-		if (fn->enclosure[i].x == id.x) return i;
+	elf_xarray_foreachi(fn->enclosure) {
+		if (fn->enclosure[i] == id.id) {
+			return i;
+		}
 	}
-	return -1;
+	return NO_SLOT;
 }
 
 
@@ -134,11 +114,13 @@ int elf_find_index_of_closure_entity(elFileFnState *fn, elEntityIdTypeGuard id) 
 */
 void elf_enclose_entity(elFileState *fs, elFileFnState *fn, elEntityIdTypeGuard id) {
 	/* ensure the entity should actually be captured */
-	elf_ensure(id.x < fn->entities);
-	elf_arrfori(fn->enclosure) {
-		if (fn->enclosure[i].x == id.x) return;
+	elf_ensure(id.id < fn->entities);
+
+	elf_xarray_foreachi(fn->enclosure) {
+		if (fn->enclosure[i] == id.id) return;
 	}
-	elf_varadd(fn->enclosure,id);
+
+	elf_xarray_add(fn->enclosure,id.id);
 }
 
 
@@ -151,13 +133,12 @@ void elf_enclose_entity(elFileState *fs, elFileFnState *fn, elEntityIdTypeGuard 
 ** to the function's enclosure if it resides
 ** outside of its scope.
 */
-elEntityIdTypeGuard elf_find_local_entity(elFileState *fs, elf_lineid line, char *name, elBool enclose) {
+elEntityId elf_find_local_entity(elFileState *fs, elf_lineid line, char *name, elBool enclose) {
 	elFileFnState *fn = fs->fn;
-	for (int x = fs->nentities-1; x > -1; --x) {
-		if (S_eq(fs->entities[x].name,name)) {
-			elEntityIdTypeGuard id = {x};
-			if ((x < fn->entities) && (enclose)) {
-				elf_enclose_entity(fs,fn,id);
+	for (elEntityId id = fs->nentities-1; id > -1; -- id) {
+		if (S_eq(fs->entities[id].name,name)) {
+			if ((id < fn->entities) && (enclose)) {
+				elf_enclose_entity(fs,fn,(elEntityIdTypeGuard){id});
 			}
 			return id;
 		}
@@ -172,11 +153,11 @@ elEntityIdTypeGuard elf_find_local_entity(elFileState *fs, elf_lineid line, char
 ** whether is shadows or redeclares and existing entity, however,
 ** still returns a valid id.
 */
-elNodeId elf_new_local_entity(elFileState *fs, elf_lineid line, char *name, elBool enm) {
+elNodeId elf_new_local_entity(elFileState *fs, elf_lineid line, char *name, elBool flags) {
 	elFileFnState *fn = fs->fn;
-	elEntityIdTypeGuard already = elf_find_local_entity(fs,line,name,false);
-	if (already.x != NO_ENTITY.x) {
-		elFileEntity entity = fs->entities[already.x];
+	elEntityId already = elf_find_local_entity(fs,line,name,false);
+	if (already != NO_ENTITY) {
+		elFileEntity entity = fs->entities[already];
 		if (entity.level == fs->level) {
 			elf_file_dialog(fs,line,"'%s': is already declared",name);
 		} else {
@@ -186,43 +167,41 @@ elNodeId elf_new_local_entity(elFileState *fs, elf_lineid line, char *name, elBo
 		}
 	}
 
-	elEntityIdTypeGuard id = {fs->nentities ++};
-	if (elf_varlen(fs->entities) < fs->nentities) {
-		elf_varaddi(fs->entities,1);
+	elEntityId id = fs->nentities ++;
+	if (elf_xarray_length(fs->entities) < fs->nentities) {
+		elf_xarray_growby(fs->entities,1);
 	}
 
-	fs->entities[id.x].level = fs->level;
-	fs->entities[id.x].line  = line;
-	fs->entities[id.x].name  = 0;
-	fs->entities[id.x].slot  = 0;
-	fs->entities[id.x].enm   = false;
 
 	elRegId slot = elf_alloc_register(fs,line,NO_SLOT,NO_NODE);
-	elNodeId local = elf_make_local_value_node(fs,line,slot);
+	elNodeId node = elf_make_local_value_node(fs,line,slot);
 	// elf_file_dialog(fs,line,"new local entity, %s, n%i, r%i",name,local,slot);
-	fs->entities[id.x].slot = slot;
-	fs->entities[id.x].enm  = enm;
-	fs->entities[id.x].name = name;
-	return local;
+	fs->entities[id].line = line;
+	fs->entities[id].name = name;
+	fs->entities[id].node = node;
+	fs->entities[id].slot = slot;
+	fs->entities[id].level = fs->level;
+	fs->entities[id].flags = flags;
+	return node;
 }
 
 
 elNodeId elf_find_entity_node(elFileState *fs, elf_lineid line, char *name) {
-	elEntityIdTypeGuard id = elf_find_local_entity(fs,line,name,elTrue);
-	if (id.x == NO_ENTITY.x) return NO_NODE;
+	elEntityId id = elf_find_local_entity(fs,line,name,elTrue);
+	if (id == NO_ENTITY) return NO_NODE;
 	elFileFnState *fn = fs->fn;
 	/* to figure out whether this is capture, simply
 	check whether the entity id is higher than that
 	of the first entity id within this function, in
 	other words, if this entity is outside of this
 	function's scope */
-	if (id.x < fn->entities) {
+	if (id < fn->entities) {
 		/* -- todo: implement multilayer caching */
-		if (id.x < fn->enclosing->entities) {
+		if (id < fn->enclosing->entities) {
 			elf_file_dialog(fs,line,"too many layers for caching");
 		}
-		return elf_make_closure_value_node(fs,line,elf_find_index_of_closure_entity(fn,id));
-	} else return elf_make_local_value_node(fs,line,fs->entities[id.x].slot);
+		return elf_make_closure_value_node(fs,line,elf_find_index_of_closure_entity(fn,(elEntityIdTypeGuard){id}));
+	} else return elf_make_local_value_node(fs,line,fs->entities[id].slot);
 }
 
 
@@ -231,6 +210,7 @@ void elf_enter_file_block(elFileState *fs, elFileBlockState *bl, elBool flags) {
 	fs->fn->block = bl;
 	bl->xmemory = fs->fn->xmemory;
 	bl->xentity = fs->nentities;
+	bl->xnode = fs->nnodes;
 	bl->flags = flags;
 	bl->level = fs->level ++;
 	bl->entry = elf_getlastbyteid(fs);
@@ -241,11 +221,11 @@ void elf_enter_file_block(elFileState *fs, elFileBlockState *bl, elBool flags) {
 
 
 void elf_leave_file_block(elFileState *fs) {
-	fs->nentities -= elf_fsnumentinlev(fs); /* close scope */
-	fs->nnodes -= elf_fsnumnodesinlev(fs);
 	elf_ensure(fs->nentities >= fs->fn->entities);
 	fs->level = fs->level - 1;
 	elFileBlockState *bl = fs->fn->block;
+	fs->nentities = bl->xentity;
+	fs->nnodes = bl->xnode;
 	/* every expression and statement
 	should deallocate whatever registers
 	it used, so here we can assert that
@@ -255,7 +235,7 @@ void elf_leave_file_block(elFileState *fs) {
 	fs->fn->xmemory = bl->xmemory;
 	if (bl->leavejumps != 0) {
 		elf_tie_loose_jump_list(fs,bl->leavejumps);
-		elf_delvar(bl->leavejumps);
+		elf_xarray_delete(bl->leavejumps);
 		bl->leavejumps = 0;
 	}
 	fs->fn->nloops -= (bl->flags & BLOCK_LOOP) != 0;
@@ -289,9 +269,9 @@ elNodeId *elf_load_call_args(elFileState *fs) {
 	elNodeId *z = 0;
 	if (elf_pick_token(fs,TK_PAREN_LEFT)) {
 		if (!elf_test_token(fs,TK_PAREN_RIGHT)) do {
-			elNodeId x = elf_load_file_expr(fs);
+			elNodeId x = elf_fs_load_expr(fs);
 			if (x == NO_NODE) break;
-			elf_varadd(z,x);
+			elf_xarray_add(z,x);
 		} while (elf_pick_token(fs,TK_COMMA));
 		elf_take_token(fs,TK_PAREN_RIGHT);
 	}
@@ -299,7 +279,40 @@ elNodeId *elf_load_call_args(elFileState *fs) {
 }
 
 
-elNodeKi tktonode(ltokentype tk) {
+elNodeId *elf_load_call_args_or_expr(elFileState *fs) {
+	/* x or ( x { , x } ) */
+	elNodeId *z = 0;
+	if (elf_pick_token(fs,TK_PAREN_LEFT)) {
+		if (!elf_test_token(fs,TK_PAREN_RIGHT)) do {
+			elNodeId x = elf_fs_load_expr(fs);
+			if (x != NO_NODE) elf_xarray_add(z,x);
+			else break;
+		} while (elf_pick_token(fs,TK_COMMA));
+		elf_take_token(fs,TK_PAREN_RIGHT);
+	} else {
+		elNodeId x = elf_fs_load_expr(fs);
+		if (x != NO_NODE) elf_xarray_add(z,x);
+	}
+	return z;
+}
+
+
+elTokenType elf_is_operator_token(elToken tk) {
+	/* could be done in the lexer */
+	if (tk.type != TK_WORD) return tk.type;
+   if (!strcmp(tk.s,"and")) return TK_LOG_AND;
+	if (!strcmp(tk.s,"or")) return TK_LOG_OR;
+	if (!strcmp(tk.s,"is")) return TK_EQUALS;
+	return TK_WORD;
+}
+
+
+int elf_get_token_binding_priority(elTokenType type) {
+	return elf_tkintel[type].prec;
+}
+
+
+elNodeKi elf_token_to_node(elTokenType tk) {
 	switch (tk) {
 		case TK_DOT_DOT:            return NODE_RANGE;
 		case TK_LOG_AND:            return NODE_AND;
@@ -324,32 +337,36 @@ elNodeKi tktonode(ltokentype tk) {
 }
 
 
-elNodeId elf_load_file_subexpr(elFileState *fs, int rank) {
+/* todo: simple constant folding for known types */
+elNodeId elf_fs_load_subexpr(elFileState *fs, int rank) {
 	elNodeId x = elf_load_unary_expr(fs,elTrue);
 	if (x == NO_NODE) return x;
 	for (;;) {
-		int thisrank = elf_tkintel[fs->tk.type].prec;
+		elTokenType op = elf_is_operator_token(fs->this_token);
+		int prio = elf_get_token_binding_priority(op);
 		/* auto breaks when not a binary operator */
-		if (thisrank <= rank) break;
+		if (prio <= rank) break;
 		// *= += ...
 		if (elf_test_then_token(fs,TK_ASSIGN))  {
 			/* todo: check subexpression level
 			to ensure the user knows this is
-			not an expression, if we're at level
-			0, the statement parser will handle
-			this and turn it into a statement... */
+			not an expression, for instance,
+			'(i = 1)' 'i = 1' is at level 1,
+			if we're at level 0, the statement
+			parser will handle this and turn it
+			into a statement... */
 			break;
 		}
 		elToken tk = elf_lexone(fs);
-		elNodeId y = elf_load_file_subexpr(fs,thisrank);
+		elNodeId y = elf_fs_load_subexpr(fs,prio);
 		if (y == NO_NODE) break;
-		x = elf_make_binary_node(fs,tk.line,tktonode(tk.type),NT_ANY,x,y);
+		x = elf_make_binary_node(fs,tk.line,elf_token_to_node(op),NT_ANY,x,y);
 	}
 	return x;
 }
 
 
-elNodeId elf_load_file_function(elFileState *fs) {
+elNodeId elf_fs_load_function(elFileState *fs) {
 
 	elToken tk = elf_take_token(fs,TK_FUN);
 
@@ -386,11 +403,11 @@ elNodeId elf_load_file_function(elFileState *fs) {
 	if (elf_test_token(fs,TK_CURLY_LEFT)) {
 		elf_take_token(fs,TK_CURLY_LEFT);
 		while (!elf_term_token(fs,TK_CURLY_RIGHT)) {
-			elf_load_file_stat(fs);
+			elf_fs_load_stat(fs);
 		}
 		elf_take_token(fs,TK_CURLY_RIGHT);
 	} else {
-		elf_emit_yield(fs,tk.line,elf_load_file_expr(fs));
+		elf_emit_yield(fs,tk.line,elf_fs_load_expr(fs));
 	}
 
 	elf_close_file_function(fs);
@@ -402,15 +419,15 @@ elNodeId elf_load_file_function(elFileState *fs) {
 	p.zstack = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes  = fs->md->nbytes - fn.bytes;
-	p.zcache = elf_varlen(fn.enclosure);
+	p.zcache = elf_xarray_length(fn.enclosure);
 	int f = elf_add_proto(fs->M,p);
 
 	elf_tie_loose_jump(fs,fj);
 
 	/* todo: */
 	elNodeId *z = elNil;
-	elf_arrfori(fn.enclosure) {
-		elf_varadd(z,elf_make_local_value_node(fs,tk.line,fs->entities[fn.enclosure[i].x].slot));
+	elf_xarray_foreachi(fn.enclosure) {
+		elf_xarray_add(z,fs->entities[fn.enclosure[i]].node);
 	}
 
 	return elf_make_closure_node(fs,tk.line,f,z);
@@ -434,32 +451,32 @@ void elf_complete_expr_line(elFileState *fs, elNodeId x) {
 
 	if (elf_pick_token(fs,TK_ASSIGN)) {
 		elf_check_store(fs,tk.line,x);
-		elNodeId y = elf_load_file_expr(fs);
-		elf_gen_store(fs,tk.line,x,y);
+		elNodeId y = elf_fs_load_expr(fs);
+		elf_emit_load_to_target(fs,tk.line,x,y);
 	} else if (elf_pick_token(fs,TK_ASSIGN_QUESTION)) {
 		elf_check_store(fs,tk.line,x);
-		elNodeId y = elf_load_file_expr(fs);
+		elNodeId y = elf_fs_load_expr(fs);
 		elFileJumplist js = {0};
 		/* todo: this will evaluate the expression twice, we don't
-		want that, isntead we can reuse the previous registers by
-		deffering deallocation of those registers until statement
+		want that, instead we can reuse the previous registers by
+		deferring deallocation of those registers until statement
 		end, for instance:
 		x.y ?= 0
-		here x.y will be evaluated twice, once to check whether
-		it is nil, and once more to actually assign 0 to it.
+		here {x}.y will be evaluated twice, once to check whether {y}
+		is nil, and once more to actually assign 0 to it.
 		to do this we have to split this function into its components,
-		allocate a register for getting x.y and letting jumpifxx
+		allocate a register for getting x.y and letting jump if xx
 		allocate whatever temporary registers it needs and freeing
 		them automatically, the only remaining register will be where
 		x.y is at, at which point once the assignment is done it can be
 		deallocated. */
 		elf_emit_jump_if_not_nil(fs,tk.line,&js,x);
-		elf_gen_store(fs,tk.line,x,y);
+		elf_emit_load_to_target(fs,tk.line,x,y);
 		elf_tie_loose_jump_list(fs,js.f);
 	} else {
 		/* the lhs of an assignment is an expression,
-		and thus it is parsed by the expression parser.
-		the expression parsers checks whether there's
+		and it is parser by the expression parser.
+		the expression parser checks whether there's
 		an operator to make a binary expression however,
 		if the operator is followed by '=' then it quits,
 		so if we get here and we see an operator it's
@@ -468,15 +485,15 @@ void elf_complete_expr_line(elFileState *fs, elNodeId x) {
 			elToken op = elf_lexone(fs);
 			elf_take_token(fs,TK_ASSIGN);
 			elf_check_store(fs,fs->lasttk.line,x);
-			elNodeId y = elf_load_file_expr(fs);
-			y = elf_make_binary_node(fs,op.line,tktonode(op.type),fs->nodes[x].t,x,y);
-			elf_gen_store(fs,op.line,x,y);
+			elNodeId y = elf_fs_load_expr(fs);
+			y = elf_make_binary_node(fs,op.line,elf_token_to_node(op.type),fs->nodes[x].t,x,y);
+			elf_emit_load_to_target(fs,op.line,x,y);
 		} else {
 			elf_gen_local_load(fs,NO_LINE,0,NO_SLOT,0,x);
 		}
 		elf_set_memory_state(fs,mem);
 	}
-	elf_ensure(fs->fn->xmemory == mem);
+	elf_ensure(elf_get_memory_state(fs) == mem);
 }
 
 
@@ -493,20 +510,20 @@ elNodeId elf_load_file_table(elFileState *fs) {
 			elf_lexone(fs);
 			key = elf_make_string_node(fs,tk.line,tk.s);
 		} else {
-			key = elf_load_file_expr(fs);
+			key = elf_fs_load_expr(fs);
 		}
 		if (elf_pick_token(fs,TK_ASSIGN)) {
-			elNodeId val = elf_load_file_expr(fs);
+			elNodeId val = elf_fs_load_expr(fs);
 			elNodeId fld = elf_make_field_node(fs,fs->lasttk.line,table,key);
 			elNodeId f = elf_make_load_node(fs,fs->lasttk.line,fld,val);
-			elf_varadd(z,f);
+			elf_xarray_add(z,f);
 		} else {
 			elNodeId val = key;
-			//elf_load_file_expr(fs);
-			if (elf_fscheckexpr(fs,fs->tk.line,val)) break;
+			//elf_fs_load_expr(fs);
+			if (elf_check_expr(fs,fs->tk.line,val)) break;
 			elNodeId ii = elf_make_integer_node(fs,fs->lasttk.line,index ++);
-			elNodeId f = elf_make_load_node(fs,fs->lasttk.line,elf_nodeindex(fs,fs->lasttk.line,table,ii),val);
-			elf_varadd(z,f);
+			elNodeId f = elf_make_load_node(fs,fs->lasttk.line,elf_make_index_node(fs,fs->lasttk.line,table,ii),val);
+			elf_xarray_add(z,f);
 		}
 		if (elf_pick_token(fs,TK_COMMA)) {
 			continue;
@@ -518,7 +535,7 @@ elNodeId elf_load_file_table(elFileState *fs) {
 }
 
 
-elNodeId elf_load_file_expr(elFileState *fs) {
+elNodeId elf_fs_load_expr(elFileState *fs) {
 	/* todo?: do this in else where? */
 	switch (fs->tk.type) {
 		case TK_NONE:
@@ -528,12 +545,12 @@ elNodeId elf_load_file_expr(elFileState *fs) {
 			return NO_NODE;
 		}
 	}
-	return elf_load_file_subexpr(fs,0);
+	return elf_fs_load_subexpr(fs,0);
 }
 
 
 elNodeId elf_get_global_entity_node(elFileState *fs, elf_lineid line, char *name) {
-	elSymbolID x = elf_get_global_symbol(fs->M,elf_newstr(fs->R,name));
+	elSymbolId x = elf_get_global_symbol(fs->M,elf_newstr(fs->R,name));
 	elf_ensure(x != -1);
 	return elf_make_global_value_node(fs,line,x);
 }
@@ -567,8 +584,8 @@ elNodeId elf_make_set_meta_table_node(elFileState *fs, elf_lineid line, elNodeId
 	elNodeId fn = elf_get_global_entity_node(fs,line,"elf.setmetatable");
 
 	elNodeId *z = elNil;
-	elf_varadd(z,table);
-	elf_varadd(z,meta_table);
+	elf_xarray_add(z,table);
+	elf_xarray_add(z,meta_table);
 
 	return elf_make_call_node(fs,line,fn,z);
 }
@@ -586,11 +603,24 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 		case TK_M_REGISTER: {
 			elf_lexone(fs);
 			tk = elf_take_token(fs,TK_WORD);
-			elEntityIdTypeGuard entity = elf_find_local_entity(fs,tk.line,tk.s,elFalse);
-			if (entity.x == NO_ENTITY.x) {
+			elEntityId entity = elf_find_local_entity(fs,tk.line,tk.s,elFalse);
+			if (entity == NO_ENTITY) {
 				elf_file_dialog(fs,tk.line,"'%s': invalid entity (must be a local)",tk.s);
 			}
-			v = elf_make_integer_node(fs,tk.line,fs->entities[entity.x].slot);
+			v = elf_make_integer_node(fs,tk.line,fs->entities[entity].slot);
+		} break;
+		//
+		// 'load' ( <file-name> )
+		//
+		//  leave elf.loadfile(<file-name>)
+		//
+		case TK_LOAD: {
+			elf_lexone(fs);
+			elNodeId *call_args = elf_load_call_args_or_expr(fs);
+
+			elNodeId load_file_func = elf_get_global_entity_node(fs,tk.line,"elf.loadfile");
+			elNodeId call_load_file = elf_make_call_node(fs,tk.line,load_file_func,call_args);
+			v = call_load_file;
 		} break;
 		//
 		// 'new' <meta-table> ( <argument-list> )
@@ -599,8 +629,6 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 		//
 		case TK_NEW: {
 			elf_lexone(fs);
-			elNodeId *control = elNil;
-
 			elNodeId meta_table = elf_load_unary_expr(fs,elFalse);
 			elNodeId table = elf_make_table_node(fs,tk.line,elNil);
 			table = elf_make_set_meta_table_node(fs,tk.line,table,meta_table);
@@ -620,7 +648,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 			if (elf_pick_token(fs,TK_ELF)) {
 				strcat(dir,"elf");
 				/* remind the user elf is a reserved keyword */
-				if (!elf_linetesttk(fs,TK_DOT)) {
+				if (!elf_test_token_inline(fs,TK_DOT)) {
 					elf_file_dialog(fs,tk.line,"incomplete symbol, expected '.' on the same line as 'elf'. Did you mean to use 'elf'? This is a reserved keyword and it refers to the elf directory.");
 				}
 			}
@@ -631,7 +659,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 				strcat(dir,fs->lasttk.s);
 			} while (elf_pick_token_inline(fs,TK_DOT));
 
-			elSymbolID x = elf_get_global_symbol(fs->M,elf_newstr(fs->R,dir));
+			elSymbolId x = elf_get_global_symbol(fs->M,elf_newstr(fs->R,dir));
 			v = elf_make_global_value_node(fs,tk.line,x);
 		} break;
 		case TK_WORD: {
@@ -640,19 +668,19 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 		} break;
 		case TK_SUB: {
 			elf_lexone(fs);
-			v = elf_load_file_subexpr(fs,10000);
+			v = elf_fs_load_subexpr(fs,10000);
 			v = elf_make_binary_node(fs,tk.line,NODE_SUB,NT_INT,elf_make_integer_node(fs,tk.line,0),v);
 		} break;
 		case TK_ADD: {
 			elf_lexone(fs);
-			v = elf_load_file_subexpr(fs,10000);
+			v = elf_fs_load_subexpr(fs,10000);
 		} break;
 		case TK_CURLY_LEFT: {
 			v = elf_load_file_table(fs);
 		} break;
 		case TK_PAREN_LEFT: {
 			elf_lexone(fs);
-			v = elf_load_file_expr(fs);
+			v = elf_fs_load_expr(fs);
 			elf_take_token(fs,TK_PAREN_RIGHT);
 			/* allow for empty () */
 			if (v != NO_NODE) {
@@ -660,18 +688,13 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 			}
 		} break;
 		case TK_FUN: {
-			v = elf_load_file_function(fs);
-		} break;
-		case TK_LOAD: {
-			elf_lexone(fs);
-			v = elf_load_unary_expr(fs,elTrue);
-			v = elf_nodeloadfile(fs,tk.line,v);
+			v = elf_fs_load_function(fs);
 		} break;
 		case TK_THIS: { elf_lexone(fs);
-			v = elf_nodenullary(fs,tk.line,NODE_THIS,NT_ANY);
+			v = elf_make_nullary_node(fs,tk.line,NODE_THIS,NT_ANY);
 		} break;
 		case TK_NIL: { elf_lexone(fs);
-			v = elf_nodenil(fs,tk.line);
+			v = elf_make_nil_node(fs,tk.line);
 		} break;
 		/* todo: maybe use proper boolean node? */
 		case TK_TRUE: case TK_FALSE: { elf_lexone(fs);
@@ -681,7 +704,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 			v = elf_make_integer_node(fs,tk.line,tk.i);
 		} break;
 		case TK_NUMBER: { elf_lexone(fs);
-			v = elf_nodenum(fs,tk.line,tk.n);
+			v = elf_make_number_node(fs,tk.line,tk.n);
 		} break;
 		case TK_STRING: { elf_lexone(fs);
 			v = elf_make_string_node(fs,tk.line,tk.s);
@@ -705,7 +728,9 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 	.DrawCircle(...)
 	If it wasn't for this it would think it was:
 	.RED.DrawCircle(...) */
-	if (allow_postfix) while (!elf_term_eol_token(fs)) {
+	if (!allow_postfix) goto leave;
+
+	while (!elf_term_eol_token(fs)) {
 		tk = fs->tk;
 
 		switch (tk.type) {
@@ -716,15 +741,18 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 			} break;
 			case TK_SQUARE_LEFT: {
 				elf_take_token(fs,TK_SQUARE_LEFT);
-				elNodeId i = elf_load_file_expr(fs);
+				elNodeId i = elf_fs_load_expr(fs);
 				elf_take_token(fs,TK_SQUARE_RIGHT);
-				if (fs->nodes[i].k == NODE_RANGE_INDEX) {
-					elf_unreachable;
-				} else
-				if (fs->nodes[i].k == NODE_RANGE) {
-					v = elf_noderangedindex(fs,tk.line,v,i);
-				} else {
-					v = elf_nodeindex(fs,tk.line,v,i);
+				switch (elf_get_node_kind(fs,i)) {
+					case NODE_RANGE_INDEX: {
+						elf_unreachable;
+					} break;
+					case NODE_RANGE: {
+						v = elf_make_ranged_index_node(fs,tk.line,v,i);
+					} break;
+					default: {
+						v = elf_make_index_node(fs,tk.line,v,i);
+					} break;
 				}
 			} break;
 			case TK_COLON: { elf_lexone(fs);
@@ -745,26 +773,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 }
 
 
-/* todo: make this legit */
-void elfY_loadenumlist(elFileState *fs) {
-	if (!elf_test_token(fs,TK_CURLY_RIGHT)) {
-		do {
-			/* , } */
-			if (elf_test_token(fs,TK_CURLY_RIGHT)) {
-				break;
-			}
-			elToken tk = fs->tk;
-			elToken n = elf_take_token(fs,TK_WORD);
-			elNodeId x = elf_new_local_entity(fs,n.line,n.s,elTrue);
-			elf_take_token(fs,TK_ASSIGN);
-			elNodeId y = elf_load_file_expr(fs);
-			elf_gen_store(fs,tk.line,x,y);
-		} while(elf_pick_token(fs,TK_COMMA));
-	}
-}
-
-
-void elf_load_file_stat(elFileState *fs) {
+void elf_fs_load_stat(elFileState *fs) {
 	elRegId mem = fs->fn->xmemory;
 	elToken tk = fs->tk;
 	elFileFnState *fn = fs->fn;
@@ -782,39 +791,39 @@ void elf_load_file_stat(elFileState *fs) {
 			}
 			elFileBlockState bl = {0};
 			elf_enter_delayed_block(fs,tk.line,&bl);
-			elf_load_file_stat(fs);
+			elf_fs_load_stat(fs);
 			elf_leave_delayed_block(fs,tk.line,&bl);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
 		case TK_IF: case TK_IFF: {
 			elf_lexone(fs);
-			elNodeId x = elf_load_file_expr(fs);
+			elNodeId x = elf_fs_load_expr(fs);
 			elf_take_token(fs,TK_QUESTION_MARK);
 			elFileBlockState block = {0};
 			elf_enter_file_block(fs,&block,0);
 			elSelectState s = {0};
 			elf_gen_begin_if(fs,tk.line,&s,x,tk.type==TK_IFF?L_IFF:L_IF);
-			elf_load_file_stat(fs);
+			elf_fs_load_stat(fs);
 			while (!elf_test_token(fs,TK_NONE)) {
 				elFileBlockState block = {0};
 				if (elf_pick_token(fs,TK_ELIF)) {
 					elf_enter_file_block(fs,&block,0);
-					x = elf_load_file_expr(fs);
+					x = elf_fs_load_expr(fs);
 					elf_take_token(fs,TK_QUESTION_MARK);
 					elf_gen_add_elif(fs,fs->lasttk.line,&s,x);
-					elf_load_file_stat(fs);
+					elf_fs_load_stat(fs);
 					elf_leave_file_block(fs);
 				} else
 				if (elf_pick_token(fs,TK_THEN)) {
 					elf_enter_file_block(fs,&block,0);
 					elf_gen_add_then(fs,fs->lasttk.line,&s);
-					elf_load_file_stat(fs);
+					elf_fs_load_stat(fs);
 					elf_leave_file_block(fs);
 				} else
 				if (elf_pick_token(fs,TK_ELSE)) {
 					elf_enter_file_block(fs,&block,0);
 					elf_gen_add_else(fs,fs->lasttk.line,&s);
-					elf_load_file_stat(fs);
+					elf_fs_load_stat(fs);
 					elf_leave_file_block(fs);
 				} else break;
 			}
@@ -822,47 +831,33 @@ void elf_load_file_stat(elFileState *fs) {
 			elf_leave_file_block(fs);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
-		case TK_LET: { elf_lexone(fs);
-			if (tk.type == TK_ENUM) {
-				elf_file_dialog(fs,tk.line,"global enums are not supported yet, this enum will be made local");
-			} else
-			/* allows for 'let enum' */
-			if (tk.type == TK_LET) {
-				if (elf_test_token(fs,TK_ENUM)) {
-					tk = elf_lexone(fs);
-				}
-			}
-			elBool enm = tk.type == TK_ENUM;
-			if (elf_pick_token(fs,TK_CURLY_LEFT)) {
-				elfY_loadenumlist(fs);
-				elf_take_token(fs,TK_CURLY_RIGHT);
-			} else {
-				do {
-					elToken n = elf_take_token(fs,TK_WORD);
-					elNodeId x = elf_new_local_entity(fs,n.line,n.s,enm);
-					elf_complete_expr_line(fs,x);
-				} while (elf_pick_token(fs,TK_COMMA));
-			}
+		case TK_LET: {
+			elf_lexone(fs);
+			do {
+				elToken n = elf_take_token(fs,TK_WORD);
+				elNodeId x = elf_new_local_entity(fs,n.line,n.s,elFalse);
+				elf_complete_expr_line(fs,x);
+			} while (elf_pick_token(fs,TK_COMMA));
 		} break;
 		case TK_LEAVE: { elf_lexone(fs);
 			bl->flags |= BLOCK_ENDED;
-			elNodeId x = elf_load_file_expr(fs);
+			elNodeId x = elf_fs_load_expr(fs);
 			elf_emit_yield(fs,tk.line,x);
 			elf_ensure(fs->fn->xmemory == mem);
 		} break;
 		case TK_CONTINUE: { elf_lexone(fs);
-			elf_emitcontinue(fs,tk.line);
+			elf_emit_continue(fs,tk.line);
 		} break;
 		case TK_BREAK: { elf_lexone(fs);
-			elf_emitbreak(fs,tk.line);
+			elf_emit_break(fs,tk.line);
 		} break;
 		case TK_WHILE: { elf_lexone(fs);
 			elFileBlockState block = {0};
 			elf_enter_file_block(fs,&block,BLOCK_LOOP);
-			elNodeId x = elf_load_file_expr(fs);
+			elNodeId x = elf_fs_load_expr(fs);
 			elf_take_token(fs,TK_QUESTION_MARK);
 			elf_begin_while_loop(fs,tk.line,x);
-			elf_load_file_stat(fs);
+			elf_fs_load_stat(fs);
 			elf_close_while_loop(fs,tk.line);
 			elf_ensure(fs->fn->xmemory == mem);
 			elf_leave_file_block(fs);
@@ -871,9 +866,9 @@ void elf_load_file_stat(elFileState *fs) {
 			elFileBlockState block = {0};
 			elf_enter_file_block(fs,&block,BLOCK_LOOP);
 			elf_begin_do_while_loop(fs,tk.line);
-			elf_load_file_stat(fs);
+			elf_fs_load_stat(fs);
 			elf_take_token(fs,TK_WHILE);
-			elNodeId x = elf_load_file_expr(fs);
+			elNodeId x = elf_fs_load_expr(fs);
 			elf_close_do_while_loop(fs,tk.line,x);
 			elf_ensure(fs->fn->xmemory == mem);
 			elf_leave_file_block(fs);
@@ -886,7 +881,12 @@ void elf_load_file_stat(elFileState *fs) {
 			elNodeId x = elf_new_local_entity(fs,n.line,n.s,false);
 			// elf_take_token(fs,TK_IN);
 			if (elf_pick_token(fs,TK_IN)) {
-				elNodeId y = elf_load_file_expr(fs);
+				elf_file_dialog(fs,fs->last_token.line,"please consider using 'over' for integer ranges");
+				goto over_;
+			}
+			if (elf_pick_token(fs,TK_OVER)) {
+				over_:
+				elNodeId y = elf_fs_load_expr(fs);
 				elf_take_token(fs,TK_QUESTION_MARK);
 				elNodeId lo = NO_NODE;
 				elNodeId hi = NO_NODE;
@@ -898,7 +898,7 @@ void elf_load_file_stat(elFileState *fs) {
 					hi = y;
 				}
 				elf_begin_ranged_loop(fs,tk.line,x,lo,hi);
-				elf_load_file_stat(fs);
+				elf_fs_load_stat(fs);
 				elf_close_ranged_loop(fs,tk.line);
 			} else elf_unreachable;
 			elf_leave_file_block(fs);
@@ -920,13 +920,13 @@ void elf_load_file_stat(elFileState *fs) {
 			elFileBlockState block = {0};
 			elf_enter_file_block(fs,&block,0);
 			while (!elf_term_token(fs,TK_CURLY_RIGHT)) {
-				elf_load_file_stat(fs);
+				elf_fs_load_stat(fs);
 			}
 			elf_take_token(fs,TK_CURLY_RIGHT);
 			elf_leave_file_block(fs);
 		} break;
 		default: {
-			elNodeId x = elf_load_file_expr(fs);
+			elNodeId x = elf_fs_load_expr(fs);
 			elf_complete_expr_line(fs,x);
 			elf_ensure(fs->fn->xmemory == mem);
 			elf_ensure(x != NO_NODE);

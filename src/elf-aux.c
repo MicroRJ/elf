@@ -49,9 +49,14 @@ elNumber elf_timediffs(elInteger begin) {
 }
 
 
+elNumber elf_timediffms(elInteger begin) {
+	return elf_timediffs(begin) * 1000.;
+}
+
+
 int elf_fndfilebybyte(elModule *md, elByteId byte) {
 	elFileInfo *files = md->files;
-	int nfiles = elf_varlen(files);
+	int nfiles = elf_xarray_length(files);
 	for (int x = 0; x < nfiles; ++ x) {
 		elFileInfo file = files[x];
 		if ((elInteger)(byte - file.bytes) < file.nbytes) {
@@ -171,7 +176,7 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 		elf_linediag(file->name,file->lines,line,error);
 	}
 
-	printf(" [+] CALL TRACE:\n");
+	printf(" -- CODE TRACE:\n");
 	elf_printcalltrace(R,R->call,R->call_level);
 	elf_debugger("runtime throw");
 }

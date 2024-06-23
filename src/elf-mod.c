@@ -6,22 +6,22 @@
 
 
 /* todo: ensure that we don't have to replace symbols */
-elSymbolID elf_get_global_symbol(elModule *M, elString *name) {
+elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
 	if (name != 0) {
 		return elf_tabtake(M->g,elf_valstr(name));
-	} else return elf_varaddi(M->globals->array,1);
+	} else return elf_xarray_growby(M->globals->array,1);
 }
 
 
-elSymbolID lang_addglobal(elModule *M, elString *name, elValue v) {
-	elSymbolID i = elf_get_global_symbol(M,name);
+elSymbolId lang_addglobal(elModule *M, elString *name, elValue v) {
+	elSymbolId i = elf_get_global_symbol(M,name);
 	M->globals->array[i] = v;
 	return i;
 }
 
 
-elSymbolID elf_add_proto(elModule *M, elProto p) {
-	elSymbolID i = elf_varaddi(M->p,1);
+elSymbolId elf_add_proto(elModule *M, elProto p) {
+	elSymbolId i = elf_xarray_growby(M->p,1);
 	M->p[i] = p;
 	return i;
 }
@@ -29,7 +29,7 @@ elSymbolID elf_add_proto(elModule *M, elProto p) {
 
 
 int elf_valfpf(FILE *file, elValue v, elBool quotes);
-void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elf_Bytecode b) {
+void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode b) {
 
 	if (fid != -1) {
 		elFileInfo file = md->files[fid];
@@ -39,11 +39,11 @@ void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elf_Bytecod
 	}
 
 	fprintf(io,"%08i %04i\t%s"
-	, md->track[id],	id, lang_bytename(b.k));
-	if (lang_byteclass(b.k) == BC_CLASS_XYZ) {
+	, md->track[id],	id, elf_get_byte_label(b.k));
+	if (elf_get_byte_class(b.k) == BC_CLASS_XYZ) {
 		fprintf(io,"(x=%i,y=%i,z=%i)",b.x,b.y,b.z);
 	} else
-	if (lang_byteclass(b.k) == BC_CLASS_XY) {
+	if (elf_get_byte_class(b.k) == BC_CLASS_XY) {
 		fprintf(io,"(x=%i,y=%i)",b.x,b.y);
 	} else {
 		fprintf(io,"(x=%lli)",b.i);
@@ -77,7 +77,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 #if 0
 	fprintf(file,"elModule:\n");
 	fprintf(file,"Globals:\n");
-	elf_arrfori(md->g->v) {
+	elf_xarray_foreachi(md->g->v) {
 		fprintf(file,"%04llX: ", i);
 		elf_valfpf(file,md->g->v[i],elTrue);
 		fprintf(file,"\n");
@@ -86,12 +86,12 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	fprintf(io,"-- BYTECODE --\n");
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_getmypid());
-	elf_arrfori(md->files) {
+	elf_xarray_foreachi(md->files) {
 		elFileInfo ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (elByteId j = 0; j < ff.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[ff.bytes+j];
+			elBytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// elf_getlinelocinfo(md->file,md->lines[j],&linenum,&lineloc);
@@ -100,11 +100,11 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 		}
 	}
 #if 0
-	elf_arrfori(md->p) {
+	elf_xarray_foreachi(md->p) {
 		elProto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (elByteId j = 0; j < p.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[p.bytes+j];
+			elBytecode b = md->bytes[p.bytes+j];
 			elf_bytefpf(md,file,j,b);
 		}
 		fprintf(file,"end\n");

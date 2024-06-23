@@ -13,7 +13,10 @@ of objects, so that's something we have to
 take into account, and most of the time you
 make small allocations tightly, so that's
 where most of the spikes occur, of course this
-allocator is too trivial as of now... */
+allocator is too trivial as of now... we're
+counting on future SMC optimizations that'll
+be capable of removing redundant intermediate
+heap allocations... */
 #define L_GC_THRESHOLD_MIN (elInteger) MEGABYTES(4)
 #define L_GC_THRESHOLD_MAX (elInteger) MEGABYTES(16)
 
@@ -31,11 +34,11 @@ void elf_gcpause(elState *fs) {
 
 
 void elf_gcresume(elState *fs) {
-	fs->gcflags = false;
+	fs->gcflags = elFalse;
 }
 
 
-void *elf_newobj(elState *R, elObjType type, elInteger tell) {
+void *elf_allocate_new_object(elState *R, elObjType type, elInteger tell) {
 	/* this is temporary! */
 	if (R != 0) {
 		R->gcmemory += tell;
@@ -43,7 +46,7 @@ void *elf_newobj(elState *R, elObjType type, elInteger tell) {
 	if (R->gcthreshold <= 0) {
 		R->gcthreshold = L_GC_THRESHOLD_MIN;
 	}
-	if (elf_varlen(R->gc) > L_GC_OBJNUM_THRESHOLD_MAX) {
+	if (elf_xarray_length(R->gc) > L_GC_OBJNUM_THRESHOLD_MAX) {
 		elf_collect(R);
 	} else
 	if (R->gcmemory >= R->gcthreshold) {
@@ -65,8 +68,8 @@ void *elf_newobj(elState *R, elObjType type, elInteger tell) {
 		obj->tailtrap = FLYTRAP;
 	);
 	if (R != 0) {
-		elf_varadd(R->gc,obj);
-		// LDODEBUG(elf_arrfori(R->gc) {
+		elf_xarray_add(R->gc,obj);
+		// LDODEBUG(elf_xarray_foreachi(R->gc) {
 		// 	if (R->gc[i]->headtrap != FLYTRAP) elf_unreachable;
 		// 	if (R->gc[i]->tailtrap != FLYTRAP) elf_unreachable;
 		// });
@@ -78,7 +81,7 @@ void *elf_newobj(elState *R, elObjType type, elInteger tell) {
 void elf_remobj(elState *fs, elInteger i) {
 	elObject **gc = fs->gc;
 	if (gc == 0) return;
-	elInteger n = elf_varlen(gc);
+	elInteger n = elf_xarray_length(gc);
 	elf_ensure(i >= 0 && i < n);
 	gc[i] = gc[n-1];
 	((elArray*)(gc))[-1].min --;
@@ -103,7 +106,7 @@ elInteger elf_marktab(elTable *table);
 elInteger elf_markcl(elClosure *cl) {
 	elInteger n = 0, k;
 	for (k=0; k<cl->fn.zcache; ++k) {
-		n += elf_markval(&cl->caches[k]);
+		n += elf_markval(&cl->enclosure[k]);
 	}
 	return n;
 }
@@ -119,7 +122,7 @@ elInteger elf_marktab(elTable *table) {
 	for (k=0; k<table->ntotal; ++k) {
 		n += elf_markval(&table->slots[k].k);
 	}
-	elf_arrfori(table->v) {
+	elf_xarray_foreachi(table->v) {
 		n += elf_markval(&table->v[i]);
 	}
 	return n;
@@ -142,7 +145,7 @@ elBool elf_markobj(elObject *obj) {
 
 
 elBool elf_markval(elValue *v) {
-	return elf_tagisobj(v->tag) ? elf_markobj(v->x_obj) : false;
+	return elf_is_object_tag(v->tag) ? elf_markobj(v->x_obj) : elFalse;
 }
 
 
@@ -155,17 +158,18 @@ elInteger elf_markall(elState *R) {
 }
 
 
+/* todo: iterate backwards instead */
 void elf_collect(elState *R) {
 	elInteger num = elf_markall(R);
 #if defined(LLOGGING)
 	elInteger time_ = elf_clocktime();
-	elInteger ngc = elf_varlen(R->gc);
+	elInteger ngc = elf_xarray_length(R->gc);
 	elInteger tbf = ngc-num;
 	elInteger nwo = 0;
 	elf_logdebug("tbf: %lli/%lli -> %lli",tbf,ngc,num);
 #endif
 
-	for (int i = 0; i < elf_varlen(R->gc); i ++) {
+	for (int i = 0; i < elf_xarray_length(R->gc); i ++) {
 		elObject *it = R->gc[i];
 		LDODEBUG(
 			if (it->headtrap != FLYTRAP) elf_unreachable;
@@ -183,6 +187,15 @@ void elf_collect(elState *R) {
 			it->gccolor = GC_WHITE;
 		} else
 		if (it->gccolor == GC_WHITE) {
+			#if 0
+			int j;
+			for (j = i; j < elf_xarray_length(R->objects); ++ j) {
+				if (R->objects[j].gccolor != GC_WHITE) {
+					break;
+				}
+			}
+			#endif
+
 	if (it == (elObject*) R->M->globals) {
 		elf_debugger("internal error: gc failed");
 	}
@@ -202,5 +215,5 @@ void elf_collect(elState *R) {
 	}
 
 	elf_logdebug("	(%f) => leaked: %lli, %lli, %lli"
-	, elf_timediffs(time_),tbf,nwo,num);
+	, elf_timediffms(time_),tbf,nwo,num);
 }

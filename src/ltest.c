@@ -43,15 +43,14 @@ int testlib_disasm(elState *c) {
 	int j;
 	for (j = 0; j < p.nbytes; ++j) {
 		if (j != 0) strcatf(file,"\n");
-		elf_Bytecode b = md->bytes[p.bytes+j];
+		elBytecode b = md->bytes[p.bytes+j];
 		switch (b.k) {
-			case BC_LOADFILE:
 			case BC_METACALL:
 			case BC_CALL: {
-				strcatf(file,"%s(%i,%i)", lang_bytename(b.k), b.x,b.y);
+				strcatf(file,"%s(%i,%i)", elf_get_byte_label(b.k), b.x,b.y);
 			} break;
 			default: {
-				strcatf(file,"%s(%lli)", lang_bytename(b.k), b.i);
+				strcatf(file,"%s(%lli)", elf_get_byte_label(b.k), b.i);
 			} break;
 		}
 	}
@@ -92,7 +91,7 @@ int testlib_gc(elState *c) {
 
 
 int _gidof(elModule *fs, elObject *j) {
-	elf_arrfori(fs->g->v) {
+	elf_xarray_foreachi(fs->g->v) {
 		if (fs->g->v[i].j == j) {
 			return i;
 		}

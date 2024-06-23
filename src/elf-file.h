@@ -7,26 +7,24 @@
 
 /* Entity: high-level data structure used for
 lexical scoping, binds a name to some
-value. */
+value or compile time thing. */
 
-#define NO_ENTITY (elEntityIdTypeGuard){-1}
+#define NO_ENTITY -1
 
 typedef int elEntityId;
 
 typedef struct {
-	elEntityId x;
+	elEntityId id;
 } elEntityIdTypeGuard;
 
 
 typedef struct elFileEntity {
 	char *name;
-	elf_lineid  line;
+	elf_lineid line;
+	elNodeId node;
 	elRegId slot;
-	elBool enm;
-	/* the level in which this name was
-	declared, for scoping */
 	int level;
-	/* todo: we could just put the node here */
+	elBool flags;
 } elFileEntity;
 
 
@@ -62,6 +60,7 @@ typedef struct elFileBlockState {
 	int level;
 	int xmemory;
 	int xentity;
+	int xnode;
 	elByteId entry;
 	elByteId jumpover;
 	elByteId *leavejumps;
@@ -98,8 +97,8 @@ typedef struct elFileFnState {
 	elRegId nlocals;
 	elRegId xmemory;
 	/* array of entities from enclosing function,
-	use for closure values */
-	elEntityIdTypeGuard *enclosure;
+	use for closure values... */
+	elEntityId *enclosure;
 	/* this is needed to emit instructions
 	relative to the current function we're
 	loading, there's always an active function,
@@ -107,7 +106,7 @@ typedef struct elFileFnState {
 	/* todo: 'entities' and 'bytes' do we need this now
 	that we have blocks ? */
 	/* index to first entity within entity list in file. */
-	int entities;
+	elEntityId entities;
 	elByteId bytes;
 	elFileBlockState entry;
 	elFileBlockState *block;
@@ -151,7 +150,14 @@ typedef struct elFileState {
 	char *contents;
 	char *thischar;
 	int linenumber;
-	elToken lasttk,tk,thentk;
+	union {
+		struct {
+			elToken lasttk,tk,thentk;
+		};
+		struct {
+			elToken last_token,this_token,then_token;
+		};
+	};
 	/* buffer for nodes */
 	elNode *nodes;
 	elNodeId nnodes;
@@ -186,15 +192,15 @@ typedef struct elFileState {
 } elFileState;
 
 
-elNodeId elf_load_file_expr(elFileState *fs);
+elNodeId elf_fs_load_expr(elFileState *fs);
 elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix);
-void elf_load_file_stat(elFileState *fs);
+void elf_fs_load_stat(elFileState *fs);
 
 
 
-void elf_gen_store(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
+void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 elRegId elf_gen_local_load(elFileState *fs, elf_lineid line, elBool reload, elRegId x, elRegId y, elNodeId id);
-elRegId elf_gen_localize(elFileState *fs, elf_lineid line, elNodeId id);
+elRegId elf_emit_localizer(elFileState *fs, elf_lineid line, elNodeId id);
 elRegId elf_gen_relocalize(elFileState *fs, elf_lineid line, elRegId target_register, elNodeIdTypeGuard id);
 
 

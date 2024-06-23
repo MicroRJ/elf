@@ -54,13 +54,11 @@ void elf_runini(elState *R, elModule *M) {
 }
 
 
-int elf_callfn(elState *R, elRegId rxy, int nx, int ny) {
+int elf_call_function(elState *R, elRegId rxy, int nx, int ny) {
 	return elf_callex(R,elNil,rxy,rxy,nx,ny);
 }
 
 
-/* todo: this should be different, rx should be the
-destination registers, and ry the input registers */
 int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, int nx, int ny) {
 	elCallFrame *caller = R->call;
 	// elf_ensure((R->top-caller->locals)+caller->cl->fn.zstack-1 > rx);
@@ -151,7 +149,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 
 	elFileFnState fn = {0};
 	elf_begin_file_function(fs,&fn,fs->tk.line);
-	elNodeId id = elf_load_file_expr(fs);
+	elNodeId id = elf_fs_load_expr(fs);
 	elf_emit_yield(fs,fs->tk.line,id);
 	elf_close_file_function(fs);
 
@@ -160,7 +158,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	file.nbytes = M->nbytes - fn.bytes;
 	file.lines = contents;
 	file.nlines = strlen(contents);
-	elf_varadd(M->files,file);
+	elf_xarray_add(M->files,file);
 
 	elProto p = {0};
 	p.zstack = fn.nlocals;
@@ -173,8 +171,6 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 
 int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents) {
 	if (filename == elNil || contents == elNil) {
-		// xxx - could this break something else?
-		elf_pushint(R,false);
 		return -1;
 	}
 
@@ -192,7 +188,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	elf_lexone(fs); elf_lexone(fs);
 	elFileFnState fn = {0};
 	elf_begin_file_function(fs,&fn,fs->tk.line);
-	while (!elf_test_token(fs,0)) elf_load_file_stat(fs);
+	while (!elf_test_token(fs,0)) elf_fs_load_stat(fs);
 	elf_close_file_function(fs);
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */
@@ -203,7 +199,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	fl.lines = contents;
 	fl.nlines = strlen(contents);
 	fl.pathondisk = filename->c;
-	elf_varadd(M->files,fl);
+	elf_xarray_add(M->files,fl);
 
 	elProto p = {0};
 	p.zstack = fn.nlocals;
@@ -217,7 +213,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 
 int elf_loadfilefs(elState *R, elFileState *fs, elString *name, elRegId x, int y) {
 	char *contents;
-	elError error = sys_loadfilebytes(lHEAP,(void**)&contents,name->c);
+	elError error = sys_load_file_contents(lHEAP,(void**)&contents,name->c);
 	if (elFAILED(error)) {
 		elf_logerror("'%s': could not load file",name->c);
 		return -1;
@@ -244,7 +240,7 @@ int elf_loadfile(elState *R, elString *filename, elRegId rxy, int ny) {
 }
 
 
-void elf_checkdivbyzro(elState *S, elValue xx, elValue yy) {
+void elf_check_division_by_zero(elState *S, elValue xx, elValue yy) {
 	if ((yy.tag == TAG_NUM) && (yy.n == 0.)) elf_throw(S,NO_BYTE,"division by zero");
 	else if ((yy.tag == TAG_INT) && (yy.i == 0)) elf_throw(S,NO_BYTE,"integer division by zero");
 }
@@ -276,14 +272,6 @@ int elf_calloverload(elState *S, elObject *obj, elString *name, elRegId io, elVa
 }
 
 
-
-/* todo: Can we add a failsafe system that attempts
-to recover from failed instructions?
-So any instructions that depend on a previous
-one are skipped?
-For instance, table:add(table:length()), here if
-table is nil or not even a table, you have to skip
-the call instruction and its arguments. */
 int elf_run(elState *R) {
 	elModule *md = R->md;
 	//
@@ -301,8 +289,8 @@ int elf_run(elState *R) {
 		elInteger bc = fn.bytes + jp;
 		R->byte = bc;
 
-		elf_Bytecode b = md->bytes[bc];
-		elf_Bytecode byte = b;
+		elBytecode b = md->bytes[bc];
+		elBytecode byte = b;
 
 #if defined(_DEBUG)
 		if (R->bytelogging || call->logging) elf_bytefpf(stdout,md,-1,jp,b);
@@ -325,17 +313,17 @@ int elf_run(elState *R) {
 
 		switch (b.k) {
 	case BC_LEAVE: {
-		if (call->dl != elNil) {
-			call->tail = call->dl->j;
-			call->dl = call->dl->n;
+		if (call->delay_list != elNil) {
+			call->tail = call->delay_list->j;
+			call->delay_list = call->delay_list->n;
 		} else goto leave;
 	} break;
 	case BC_DELAY: {
 		/* todo: can we make this better */
-		elf_delaylist *dl = elf_alloc(lHEAP,sizeof(elf_delaylist));
-		dl->n = call->dl;
-		dl->j = call->tail;
-		call->dl = dl;
+		elf_delaylist *delay = elf_alloc(lHEAP,sizeof(elf_delaylist));
+		delay->n = call->delay_list;
+		delay->j = call->tail;
+		call->delay_list = delay;
 
 		elf_ensure(b.i >= 0);
 		call->tail = jp + b.i;
@@ -351,19 +339,15 @@ int elf_run(elState *R) {
 		call->ny = ny;
 		call->tail = jp + b.x;
 	} break;
-	case BC_STKGET: {
-		elf_tycheck(R,bc,0,TAG_INT,locals[b.y].tag);
-		locals[b.x] = locals[locals[b.y].i];
-	} break;
-	case BC_STKLEN: {
-		locals[b.x].tag = TAG_INT;
-		locals[b.x].i   = R->top - locals;
-	} break;
-	case BC_LOADFILE: {
-		elString *fname = elf_getstr(R,b.x);
-		if (fname == elNil) elf_throw(R,bc,"'load': attempted to call load with nil");
-		elf_loadfile(R,fname,b.x,b.y);
-	} break;
+	// case BC_LOADFILE: {
+	// 	elString *fname = elf_getstr(R,b.x);
+	// 	if (fname == elNil) elf_throw(R,bc,"'load': attempted to call load with nil");
+	// 	int result = elf_loadfile(R,fname,b.x,b.y);
+	// 	if (result == -1) {
+	// 		locals[b.x].tag = TAG_NIL;
+	// 		locals[b.x].i   = 0;
+	// 	}
+	// } break;
 	case BC_J: {
 		call->tail = jp + b.i;
 	} break;
@@ -428,16 +412,16 @@ int elf_run(elState *R) {
 		locals[b.x].tag = TAG_NUM;
 		locals[b.x].n   = md->kn[b.y];
 	} break;
-	case BC_LOADCACHED: {
+	case BC_LOAD_CLOSURE_VALUE: {
 		elf_ensure(b.y >= 0 && b.y < fn.zcache);
-		locals[b.x] = cl->caches[b.y];
+		locals[b.x] = cl->enclosure[b.y];
 	} break;
 	case BC_CLOSURE: {
-		elf_ensure(b.y >= 0 && b.y < elf_varlen(md->p));
-		elProto proto = md->p[b.y];
+		elf_ensure(b.y >= 0 && b.y < elf_xarray_length(md->prototypes));
+		elProto proto = md->prototypes[b.y];
 		elClosure *new_closure = elf_new_closure(R,proto);
 		for (int i = 0; i < proto.zcache; ++i) {
-			new_closure->caches[i] = locals[b.x+i];
+			new_closure->enclosure[i] = locals[b.x+i];
 		}
 		locals[b.x].tag = TAG_CLS;
 		locals[b.x].x_cls = new_closure;
@@ -493,7 +477,7 @@ int elf_run(elState *R) {
 		zz = locals[b.z];
 		if (xx.tag == TAG_TAB) {
 #if defined(ELF_EXPERIMENTAL_FEATURES)
-			if (elf_tagisobj(yy.tag)) {
+			if (elf_is_object_tag(yy.tag)) {
 				if (yy.x_obj->metatable == elNil) {
 					goto else_;
 				}
@@ -540,24 +524,26 @@ int elf_run(elState *R) {
 		} else elf_throw(R,NO_BYTE,elf_tpf("attempted to set field of '%s' value", tag2s[xx.tag]));
 
 	} break;
+	#if 0
 	case BC_SETMETATABLE: {
 		elValue xx = locals[b.x];
 		elValue yy = locals[b.y];
-		if (elf_tagisobj(xx.tag) && yy.tag == TAG_TAB) {
+		if (elf_is_object_tag(xx.tag) && yy.tag == TAG_TAB) {
 			xx.x_obj->metatable = yy.x_tab;
 		} else elf_unreachable;
 	} break;
 	case BC_SETMETAFIELD: {
 		elValue xx = locals[b.x];
-		if (elf_tagisobj(xx.tag)) {
+		if (elf_is_object_tag(xx.tag)) {
 			elValue yy = locals[b.y];
 			elValue zz = locals[b.z];
 			elf_tabset(xx.x_obj->metatable,yy,zz);
 		} else elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[xx.tag]));
 	} break;
+	#endif
 	case BC_METAFIELD: {
 		elValue *yy = &locals[b.y];
-		if (elf_tagisobj(yy->tag)) {
+		if (elf_is_object_tag(yy->tag)) {
 			locals[b.x] = elf_tablookup(yy->j->metatable,locals[b.z]);
 		} else {
 			locals[b.x] = (elValue){TAG_NIL};
@@ -569,7 +555,7 @@ int elf_run(elState *R) {
 		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
 	} break;
 	case BC_CALL: {
-		elf_callfn(R,b.x,b.y,b.z);
+		elf_call_function(R,b.x,b.y,b.z);
 		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
 	} break;
 	case BC_ISNIL: {
@@ -583,10 +569,10 @@ int elf_run(elState *R) {
 		elValue y = locals[b.z];
 		elBool eq = false;
 		if ((x.tag == TAG_NIL) || (y.tag == TAG_NIL)) {
-			eq = elf_valisnil(x) == elf_valisnil(y);
+			eq = elf_is_value_nil(x) == elf_is_value_nil(y);
 		} else if ((x.tag == TAG_STR) && (y.tag == TAG_STR)) {
 			eq = elf_streq(x.x_str,y.x_str);
-		} else if (elf_tagisnumeric(x.tag) && elf_tagisnumeric(y.tag)) {
+		} else if (elf_value_tag_is_numeric(x.tag) && elf_value_tag_is_numeric(y.tag)) {
 			eq = x.x_int == y.x_int;
 		} else eq = (x.tag == y.tag) && (x.x_int == y.x_int);
 
@@ -600,7 +586,7 @@ int elf_run(elState *R) {
 		elValue xx = locals[b.y];\
 		elValue yy = locals[b.z];\
 		if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-			elf_checkdivbyzro(R,xx,yy);\
+			elf_check_division_by_zero(R,xx,yy);\
 		}\
 		locals[b.x].tag = TAG_INT;\
 		locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\
@@ -609,23 +595,23 @@ int elf_run(elState *R) {
 	case OPCODE : {\
 		elValue xx = locals[b.y];\
 		elValue yy = locals[b.z];\
-		if (elf_tagisobj(xx.tag) || elf_tagisobj(yy.tag)) {\
-			if (!elf_tagisobj(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first");\
+		if (elf_is_object_tag(xx.tag) || elf_is_object_tag(yy.tag)) {\
+			if (!elf_is_object_tag(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first");\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				elf_checkdivbyzro(R,xx,yy);\
+				elf_check_division_by_zero(R,xx,yy);\
 			}\
-			elf_calloverload(R,xx.x_obj,elf_tagisobj(yy.tag)?FN:FN1,b.x,yy);\
+			elf_calloverload(R,xx.x_obj,elf_is_object_tag(yy.tag)?FN:FN1,b.x,yy);\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				elf_checkdivbyzro(R,xx,yy);\
+				elf_check_division_by_zero(R,xx,yy);\
 			}\
-			if (!elf_tagisnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			locals[b.x].tag = TAG_NUM;\
 			locals[b.x].x_num = elf_tonum(xx) OP elf_tonum(yy);\
 		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {\
-			if (!elf_tagisnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				elf_checkdivbyzro(R,xx,yy);\
+				elf_check_division_by_zero(R,xx,yy);\
 			}\
 			locals[b.x].tag = TAG_INT;\
 			locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\

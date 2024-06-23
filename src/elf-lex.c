@@ -54,9 +54,9 @@ elBool elf_token_is_operator(elToken tk) {
 }
 
 
-ltokentype elf_is_word_or_keyword(char *name) {
+elTokenType elf_is_word_or_keyword(char *name) {
 	/* todo: */
-	for (ltokentype i = FIRST_KEYWORD; i <= LAST_KEYWORD; ++ i) {
+	for (elTokenType i = FIRST_KEYWORD; i <= LAST_KEYWORD; ++ i) {
 		ltokenintel intel = elf_tkintel[i];
 		if (S_eq(intel.name,name)) {
 			return i;
@@ -66,9 +66,9 @@ ltokentype elf_is_word_or_keyword(char *name) {
 }
 
 
-ltokentype elf_is_macro(char *name) {
+elTokenType elf_is_macro(char *name) {
 	/* todo: */
-	for (ltokentype i = FIRST_MACRO; i <= LAST_MACRO; ++ i) {
+	for (elTokenType i = FIRST_MACRO; i <= LAST_MACRO; ++ i) {
 		ltokenintel intel = elf_tkintel[i];
 		if (S_eq(intel.name,name)) {
 			return i;

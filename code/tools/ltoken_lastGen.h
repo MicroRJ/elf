@@ -21,7 +21,7 @@ typedef struct elToken {
 } elToken;
 
 
-typedef enum ltokentype {
+typedef enum elTokenType {
 	TK_NONE                 = 0,
 	TK_ELF                  = 1,
 	TK_LOAD                 = 2,
@@ -89,7 +89,7 @@ typedef enum ltokentype {
 	TK_LOG_AND              = 64,
 	TK_LOG_OR               = 65,
 	TK_DOT_DOT              = 66,
-} ltokentype;
+} elTokenType;
 
 
 typedef struct ltokenintel {

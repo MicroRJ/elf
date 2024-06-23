@@ -17,9 +17,9 @@ int main(int n, char **c) {
 	#if defined(_DEBUG)
 	sys_consolelog(ELF_LOGDBUG,"COMPILER CHECK:");
 	int *var = {0};
-	elf_varadd(var,1);
+	elf_xarray_add(var,1);
 	if (var[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: var.add!\n");
-	if (elf_varlen(var) != 1) sys_consolelog(ELF_LOGERROR,"FAILED: 'var.len!\n");
+	if (elf_xarray_length(var) != 1) sys_consolelog(ELF_LOGERROR,"FAILED: 'var.len!\n");
 	int arr[1] = {1};
 	if (arr[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: arr!\n");
 	#endif

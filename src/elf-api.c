@@ -5,6 +5,11 @@
 */
 
 
+elf_api int elf_ncallargs(elState *R) {
+	return R->call->nx;
+}
+
+
 elf_api elObject *elf_getthis(elState *R) {
 	return R->call->obj;
 }
@@ -46,7 +51,7 @@ elf_api char *elf_getcstr(elState *R, elRegId x) {
 elf_api elObject *elf_getobj(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
-	if (elf_tagisobj(v.tag)) return v.x_obj;
+	if (elf_is_object_tag(v.tag)) return v.x_obj;
 	elf_expected(R,TAG_OBJ,v.tag,x);
 	return elNil;
 }
@@ -198,7 +203,7 @@ elObject *elf_pushobj(elState *R, elObject *obj) {
 
 
 elObject *elf_pushnewobj(elState *R, elInteger tell) {
-	return elf_pushobj(R,elf_newobj(R,OBJ_CUSTOM,tell));
+	return elf_pushobj(R,elf_allocate_new_object(R,OBJ_CUSTOM,tell));
 }
 
 
@@ -229,7 +234,7 @@ elRegId elf_pushnewcls(elState *R, elProto fn) {
 	R->top -= fn.zcache;
 	int i;
 	for (i=0; i<fn.zcache; ++i) {
-		cl->caches[i] = R->top[i];
+		cl->enclosure[i] = R->top[i];
 	}
 	return elf_pushcls(R,cl);
 }

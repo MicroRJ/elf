@@ -62,7 +62,7 @@ typedef struct elCallFrame {
 	/* list of delayed jumps to be executed
 	on return, 'finally' statements produce
 	these. */
-	elf_delaylist *dl;
+	elf_delaylist *delay_list;
 	elBool logging;
 } elCallFrame;
 
@@ -117,13 +117,13 @@ typedef struct elState {
 		elString *__getfield,*__setfield;
 		elString *__hash;
 	} cache;
-	elf_Bytecode *bytetrace;
+	elBytecode *bytetrace;
 	elBool bytetracing;
 	elBool bytetracking;
 	/* current byte and whether bytelogging is on */
 	elByteId byte;
 	elBool bytelogging;
-	elObject **gc;
+	union { elObject **gc, **objects; };
 	elBool     gcflags;
 	elInteger      gcmemory;
 	elInteger      gcthreshold;

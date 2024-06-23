@@ -114,8 +114,8 @@ int elflib_debugger(elState *R) {
 	R->debuggerflag = elTrue;
 #else
 	char *message = "no message";
-	if (R->call->nx != 0) {
-		message = elf_getstr(R,0)->c;
+	if (elf_ncallargs(R) != 0) {
+		message = elf_getcstr(R,0);
 	}
 	elf_debugger(message);
 #endif
@@ -314,7 +314,7 @@ int elflib_gc_threshold(elState *R) {
 
 
 int elflib_gc_objects(elState *R) {
-	elf_pushint(R,elf_varlen(R->gc));
+	elf_pushint(R,elf_xarray_length(R->gc));
 	return 1;
 }
 
@@ -457,7 +457,7 @@ int elf_valfpf(FILE *file, elValue v, elBool quotes) {
 			elTable *tab = v.x_tab;
 			wrote += fprintf(file,"{");
 			elInteger i,j,n;
-			for (i=0;i<elf_varlen(tab->array);++i) {
+			for (i=0;i<elf_xarray_length(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elEntry it = tab->slots[j];
@@ -477,7 +477,7 @@ int elf_valfpf(FILE *file, elValue v, elBool quotes) {
 			// 	wrote += fprintf(file," = ");
 			// 	wrote += elf_valfpf(file,tab->array[it.i],elTrue);
 			// }
-			// elf_arrfori(t->v) {
+			// elf_xarray_foreachi(t->v) {
 			// 	if (i != 0) wrote += fprintf(file,", ");
 			// 	wrote += elf_valfpf(file,t->v[i],elTrue);
 			// }
@@ -573,7 +573,7 @@ void elflib_enumdir_(elState *R, elString *dir, elClosure *cls) {
 		elf_tabsetstrfld(file,enumdir_keyname,name);
 		elf_tabsetstrfld(file,enumdir_keypath,path);
 		elf_tabsetintfld(file,enumdir_isdir,isdir);
-		int r = elf_callfn(R,base,1,1);
+		int r = elf_call_function(R,base,1,1);
 		if ((r > 0) && isdir && elf_getint(R,base)) {
 			elflib_enumdir_(R,path,cls);
 		}
@@ -598,7 +598,7 @@ void elflib_enumdir_(elState *R, elString *dir, elClosure *cls) {
 			elf_tabsetstrfld(file,enumdir_keyname,name);
 			elf_tabsetstrfld(file,enumdir_keypath,path);
 			elf_tabsetintfld(file,enumdir_isdir,isdir);
-			int r = elf_callfn(R,base,1,1);
+			int r = elf_call_function(R,base,1,1);
 			if ((r > 0) && isdir && elf_getint(R,base)) {
 				elflib_enumdir_(R,path,cls);
 			}

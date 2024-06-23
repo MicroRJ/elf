@@ -5,17 +5,17 @@
 */
 
 
-elBool elf_tagisnumeric(elf_tag tag) {
+elBool elf_value_tag_is_numeric(elf_tag tag) {
 	return (tag == TAG_NUM) || (tag == TAG_INT);
 }
 
 
-int elf_valisnil(elValue x) {
-	return (x.tag == TAG_NIL) || (!elf_tagisnumeric(x.tag) && (x.p == elNil));
+int elf_is_value_nil(elValue x) {
+	return (x.tag == TAG_NIL) || (!elf_value_tag_is_numeric(x.tag) && (x.p == elNil));
 }
 
 
-elBool elf_tagisobj(elf_tag tag) {
+elBool elf_is_object_tag(elf_tag tag) {
 	switch (tag) {
 		case TAG_STR: case TAG_TAB:
 		case TAG_OBJ: case TAG_CLS: {

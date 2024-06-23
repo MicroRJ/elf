@@ -180,7 +180,7 @@ typedef struct elClosure elClosure;
 # include "src/elf-lib.c"
 # include "src/elf-web.c"
 # include "src/lcrtlib.c"
-# include "src/lnetlib.c"
+# include "src/socketslib.c"
 #endif
 
 
