@@ -52,7 +52,7 @@ elf_api void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
 #define elf_dealloc(cator,mem) elf_dealloc_(cator,mem,LHERE)
 #define langM_realloc(cator,sze,mem) elf_realloc_(cator,sze,mem,LHERE)
 #define elf_alloc(cator,sze) elf_alloc_(cator,sze,LHERE)
-#define elf_clearalloc(cator,sze) elf_clearalloc_(cator,sze,LHERE)
+#define elf_clear_alloc(cator,sze) elf_clearalloc_(cator,sze,LHERE)
 
 
 #define ALLOCFN(NAME) elError NAME (Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca)

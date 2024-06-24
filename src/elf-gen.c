@@ -641,6 +641,98 @@ elRegId elf_gen_local_load(elFileState *fs, elf_lineid line
 }
 
 
+/*
+
+	What type of statement is:
+
+	array[0..256][0] = 1
+
+	Which gets translated into:
+
+	for i over 0..256 ? {
+		array[i][0] = 1
+	}
+
+	Where the inner most lhs is actually the parent,
+	contrary to the typical hierarchical ordering
+	of expressions.
+*/
+#if 0
+typedef struct elFileLHS elFileLHS;
+typedef struct elFileLHS {
+	elNodeId lhs;
+	elRegId target_register;
+} elFileLHS;
+
+
+elFileLHS elf_begin_assignment_lhs(elFileState *fs, elf_lineid line, elNodeId id) {
+	elNode node = elf_get_node(fs,id);
+	elFileLHS lhs = {0};
+	switch (node.kind) {
+		case NODE_GLOBAL: {
+			lhs.target_register = elf_emit_localizer(fs,line,y);
+		} break;
+		case NODE_LOCAL: {
+			lhs.target_register = v.x;
+		} break;
+		case NODE_INDEX: case NODE_FIELD: {
+			elRegId vx = elf_emit_localizer(fs,line,v.x);
+			elRegId vy = elf_emit_localizer(fs,line,v.y);
+			elRegId yy = elf_emit_localizer(fs,line,y);
+
+			elFileLHS lhs = {0};
+			elf_begin_assignment_lhs(fs,&lhs,line,v.x);
+
+			elByteOP op = v.k == NODE_INDEX ? BC_SETINDEX : BC_SETFIELD;
+			elf_emit_bytexyz(fs,line,op,vx,vy,yy);
+
+			elf_close_assignment_lhs(fs,&lhs);
+		} break;
+
+		// {x}[{x}..{x}] = {y}
+		case NODE_RANGE_INDEX: {
+			elNodeId lo = fs->nodes[v.y].x;
+			elNodeId hi = fs->nodes[v.y].y;
+
+			elNodeId ii = elf_make_local_value_node(fs,line,elf_alloc_register(fs,line,NO_SLOT,NO_NODE));
+
+			elRegId xx = elf_emit_localizer(fs,line,v.x);
+			elRegId yy = elf_emit_localizer(fs,line,y);
+			elFileBlockState block = {0};
+			elf_enter_file_block(fs,&block,BLOCK_LOOP);
+			elf_begin_ranged_loop(fs,line,ii,lo,hi);
+			elf_emit_bytexyz(fs,line,BC_SETINDEX,xx,block.loop.r,yy);
+			elf_close_ranged_loop(fs,line);
+			elf_leave_file_block(fs);
+		} break;
+		case NODE_RANGE_INDEX: {
+			elNodeId lo = elf_get_node(node.y).x;
+			elNodeId hi = elf_get_node(node.y).y;
+
+			elRegId regi = elf_alloc_register(fs,line,NO_SLOT,NO_NODE);
+			elNodeId ii = elf_make_local_value_node(fs,line,regi);
+			elRegId xx = elf_emit_localizer(fs,line,node.x);
+			elRegId yy = elf_emit_localizer(fs,line,y);
+			elFileBlockState block = {0};
+			elf_enter_file_block(fs,&block,BLOCK_LOOP);
+			elf_begin_ranged_loop(fs,line,ii,lo,hi);
+
+			elf_emit_bytexyz(fs,line,BC_SETINDEX,xx,block.loop.r,yy);
+			elf_close_ranged_loop(fs,line);
+			elf_leave_file_block(fs);
+		} break;
+		case NODE_CLOSURE_VALUE: {
+			elf_file_dialog(fs,line,"assignment to closure value is not supported yet");
+		} break;
+		case NODE_METAFIELD: {
+			elf_file_dialog(fs,line,"meta fields are constant");
+		} break;
+	}
+}
+
+elRegId elf_close_assignment_lhs(elFileState *fs, elf_lineid line, elNodeId id)
+#endif
+
 void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
 	elNode v = elf_get_target_node(fs,MAKE_NODE_ID(x));
 	elf_ensure(elf_is_load_target_node_kind(v.kind));
@@ -649,7 +741,7 @@ void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNod
 	elf_ensure(y >= 0);
 	if (v.line != 0) line = v.line;
 
-	/* keep local state, finally free any temporary locals */
+	/* keep local state, lastly free any temporary locals */
 	elRegId mem = elf_get_memory_state(fs);
 	switch (v.k) {
 		case NODE_GLOBAL: {
@@ -663,11 +755,11 @@ void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNod
 			elf_gen_local_load(fs,line,LOAD_RELOAD,v.x,1,y);
 		} break;
 		case NODE_INDEX: case NODE_FIELD: {
-			elRegId xx = elf_emit_localizer(fs,line,v.x);
-			elRegId ii = elf_emit_localizer(fs,line,v.y);
+			elRegId vx = elf_emit_localizer(fs,line,v.x);
+			elRegId vy = elf_emit_localizer(fs,line,v.y);
 			elRegId yy = elf_emit_localizer(fs,line,y);
 			elByteOP op = v.k == NODE_INDEX ? BC_SETINDEX : BC_SETFIELD;
-			elf_emit_bytexyz(fs,line,op,xx,ii,yy);
+			elf_emit_bytexyz(fs,line,op,vx,vy,yy);
 		} break;
 		case NODE_METAFIELD: {
 			elf_file_dialog(fs,line,"meta fields are constant");

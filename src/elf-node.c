@@ -44,6 +44,12 @@ void elf_node_fpf(elFileState *fs, FILE *io, elNodeId id) {
 		elf_node_fpf(fs,io,node.y);
 		fprintf(io, ")");
 	} else switch (node.kind) {
+		case NODE_INDEX: {
+			elf_node_fpf(fs,io,node.x);
+			fprintf(io, "[");
+			elf_node_fpf(fs,io,node.y);
+			fprintf(io, "]");
+		} break;
 		case NODE_INTEGER: fprintf(io,"int(%lli)",node.lit.i); break;
 		case NODE_NUMBER: fprintf(io,"num(%f)",node.lit.n); break;
 		case NODE_NIL: fprintf(io,"nil"); break;

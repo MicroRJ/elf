@@ -142,7 +142,7 @@ void elf_linediag(char *filename, char *contents, char *loc, char const *fmt, ..
 }
 
 
-void elf_printcalltrace(elState *S, elCallFrame *call, int level) {
+void elf_printcalltrace(elState *S, elCallState *call, int level) {
 
 	elf_ensure(level > -1);
 
@@ -189,7 +189,7 @@ void elf_checkargs(elState *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_tycheck(elState *R, elByteId id, elRegId loc, elf_tag x, elf_tag y) {
+int elf_tycheck(elState *R, elByteId id, elRegId loc, elObjectTag x, elObjectTag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

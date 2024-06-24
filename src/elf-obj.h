@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf-obj.h
-** Objects And Values
+** ...
 */
 
 
@@ -31,27 +31,22 @@ typedef enum elObjType {
 
 
 typedef struct elObject {
-	// TODO: REMOVE THIS
-#if defined(_DEBUG)
-	int headtrap;
-#endif
 	elObjType type;
-	elGCColor gccolor;
-	// TODO: REMOVE THIS
+	elGCColor color;
 	elInteger tell;
 	elTable *metatable;
-	// TODO: REMOVE THIS
-#if defined(_DEBUG)
-	int tailtrap;
-#endif
 } elObject;
 
 
 
 #define TAGENUM(NAME) XFUSE(TAG_,NAME),
-typedef enum elf_tag {
+
+typedef enum elObjectTag {
+
 	TAGLIST(TAGENUM)
-} elf_tag;
+
+} elObjectTag;
+
 #undef TAGENUM
 
 
@@ -63,7 +58,7 @@ elf_globaldecl char const *tag2s[] = {
 
 
 typedef struct elValue {
-	elf_tag tag;
+	elObjectTag tag;
 	union {
 		elAddr p,x_ptr;
 		elHandle h;
@@ -80,17 +75,9 @@ typedef struct elValue {
 
 typedef struct elClosure {
 	elObject obj;
-   /* I guess one of the things we could do
-   if we ever get to having multi-byte encoding,
-   is encode the entire prototype in the
-   instruction stream since most closures are
-   anonymous, given how the language works.
-   If not, then there's no need to store the
-   whole prototype here, we can instead store an
-   index into the proto table. */
+   /* todo: encode prototye in the instruction stream? */
 	elProto   fn;
-	elByteId     j;
-   /* allocated past this point */
+	elByteId  j;
 	elValue enclosure[1];
 } elClosure;
 

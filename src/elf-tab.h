@@ -25,7 +25,7 @@ typedef struct elTable {
 elTable *elf_newtabmetatab(elState *);
 void elf_tabstralias(elState *S, elTable *tab, char *key, elValue alias);
 
-void elf_deltab(elTable *);
+void elf_dealloc_table(elTable *);
 elTable *elf_newtablen(elState *, elInteger);
 elTable *elf_newtab(elState *);
 

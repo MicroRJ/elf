@@ -12,14 +12,14 @@ typedef struct elf_delaylist {
 } elf_delaylist;
 
 
-typedef struct elCallFrame elCallFrame;
+typedef struct elCallState elCallState;
 
 
-typedef struct elCallFrame {
+typedef struct elCallState {
 	/* todo: this is only here so that we can write
 	to caller->locals[rx/ry] directly, rx and ry
 	could be relative to this.locals */
-	elCallFrame *caller;
+	elCallState *caller;
 	/* 'head' is the first instruction (in the module)
 	that initiated the call.
 	This isn't limited to call instructions as the
@@ -64,42 +64,28 @@ typedef struct elCallFrame {
 	these. */
 	elf_delaylist *delay_list;
 	elBool logging;
-} elCallFrame;
-
-
-typedef struct elf_Runtime {
-	union { elModule *M, *md; };
-	/* these should be safe to access
-	multi-threaded */
-	elTable *metatab_str;
-	elTable *metatab_tab;
-	struct {
-		elString *__add,*__sub,*__mul,*__div;
-		elString *__add1,*__sub1,*__mul1,*__div1;
-		elString *__getfield,*__setfield;
-	} cache;
-} elf_Runtime;
+} elCallState;
 
 
 /* todo: implement */
-typedef struct lThread {
+typedef struct elThreadState {
 	union { elState *R, *rt; };
 	union { elModule  *M, *md; };
-	union { elCallFrame *call; };
+	union { elCallState *call; };
 	union { elValue *stk;      };
 	elRegId stklen;
 	elInteger threadid;
 	elByteId  curbyte;
-} lThread;
+} elThreadState;
 
 
 typedef struct elState {
 	union { elModule *M, *md; };
 	union { elValue *stk,*s; };
 	elRegId stklen;
-	elCallFrame root_call;
+	elCallState root_call;
 	union { elValue *top,*v; };
-	union { elCallFrame *call,*frame,*f; };
+	union { elCallState *call,*frame,*f; };
 	int call_level;
 	elBool debuggerflag;
 	elBool oncalldebuggerflag;
@@ -117,16 +103,17 @@ typedef struct elState {
 		elString *__getfield,*__setfield;
 		elString *__hash;
 	} cache;
+	elByteId byte;
 	elBytecode *bytetrace;
 	elBool bytetracing;
 	elBool bytetracking;
-	/* current byte and whether bytelogging is on */
-	elByteId byte;
 	elBool bytelogging;
-	union { elObject **gc, **objects; };
-	elBool     gcflags;
-	elInteger      gcmemory;
-	elInteger      gcthreshold;
+	struct {
+		elBool flags;
+		union { elObject **objects, **articles; };
+		elInteger allocated;
+		elInteger threshold;
+	} memory;
 } elState;
 
 

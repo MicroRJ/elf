@@ -739,21 +739,42 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 				elNodeId i = elf_make_string_node(fs,n.line,n.s);
 				v = elf_make_field_node(fs,tk.line,v,i);
 			} break;
+			/* todo: make this nil safe, so [0,0] shouldn't
+			fail if item at 0 is nil */
 			case TK_SQUARE_LEFT: {
+				//
+				// {x}[0..(0..2)] = 0
+				//
+				// {x}[0] = 0
+				// {x}[1] = 0
+				//
+				//
+				// conditional_array_access = fun(array) ? {
+				// 	if array != nil ? leave array[index]
+				//    leave nil
+				// }
+				//
+				//
+				// {x}[0..N, 1] = 0
+				//
+				// {x}[0][1] = 0
+				// {x}[1][1] = 0
+				// {x}[2][1] = 0
+				// {x}[N][1] = 0
+				//
 				elf_take_token(fs,TK_SQUARE_LEFT);
-				elNodeId i = elf_fs_load_expr(fs);
+				do {
+					elNodeId index = elf_fs_load_expr(fs);
+					if (index == NO_NODE) break;
+					if (elf_get_node_kind(fs,index) == NODE_RANGE_INDEX) {
+						elf_file_dialog(fs,elf_get_node_line(fs,index),"invalid array access expression");
+					}
+					if (elf_get_node_kind(fs,index) == NODE_RANGE) {
+						v = elf_make_ranged_index_node(fs,tk.line,v,index);
+					} else v = elf_make_index_node(fs,tk.line,v,index);
+
+				} while(elf_pick_token(fs,TK_COMMA));
 				elf_take_token(fs,TK_SQUARE_RIGHT);
-				switch (elf_get_node_kind(fs,i)) {
-					case NODE_RANGE_INDEX: {
-						elf_unreachable;
-					} break;
-					case NODE_RANGE: {
-						v = elf_make_ranged_index_node(fs,tk.line,v,i);
-					} break;
-					default: {
-						v = elf_make_index_node(fs,tk.line,v,i);
-					} break;
-				}
 			} break;
 			case TK_COLON: { elf_lexone(fs);
 				elToken n = elf_take_token(fs,TK_WORD);

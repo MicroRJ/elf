@@ -302,19 +302,19 @@ int elflib_loadfile(elState *R) {
 
 
 int elflib_gc_memory(elState *R) {
-	elf_pushint(R,R->gcmemory);
+	elf_pushint(R,R->memory.allocated);
 	return 1;
 }
 
 
 int elflib_gc_threshold(elState *R) {
-	elf_pushint(R,R->gcthreshold);
+	elf_pushint(R,R->memory.threshold);
 	return 1;
 }
 
 
 int elflib_gc_objects(elState *R) {
-	elf_pushint(R,elf_xarray_length(R->gc));
+	elf_pushint(R,elf_xarray_length(R->memory.articles));
 	return 1;
 }
 

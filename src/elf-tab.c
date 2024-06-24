@@ -34,7 +34,7 @@ elTable *elf_newtablen(elState *R, elInteger ntotal) {
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
-	table->slots = elf_clearalloc(lHEAP,ntotal*sizeof(elEntry));
+	table->slots = elf_clear_alloc(lHEAP,ntotal*sizeof(elEntry));
 	return table;
 }
 
@@ -44,7 +44,7 @@ elTable *elf_newtab(elState *R) {
 }
 
 
-void elf_deltab(elTable *tab) {
+void elf_dealloc_table(elTable *tab) {
 	elf_dealloc(lHEAP,tab->slots);
 	elf_xarray_delete(tab->array);
 	tab->array = 0;
@@ -120,29 +120,27 @@ void elf_tabslotsetkeyval(elTable *table, elInteger slot, elValue k, elInteger i
 void elf_tabcheck(elTable *table) {
 	if (table->ntotal * 3 < table->nslots * 4) {
 		// LDODEBUG( table->ncollisions = 0 );
-		/* todo:
-		Find a better strategy for incrementing
-		the table size >> 1 << 2 */
-		elTable newtable = * table;
-		newtable.ntotal = table->ntotal << 2;
-		if (newtable.ntotal < table->ntotal) elf_unreachable;
-		newtable.slots = elf_clearalloc(lHEAP,newtable.ntotal * sizeof(elEntry));
+		/* todo: better strat */
+		elTable new_table = * table;
+		new_table.ntotal = table->ntotal << 2;
+		if (new_table.ntotal < table->ntotal) elf_unreachable;
+		new_table.slots = elf_clear_alloc(lHEAP,new_table.ntotal * sizeof(elEntry));
 
 		for (int i = 0; i < table->ntotal; ++ i) {
 			elEntry slot = table->slots[i];
 			if (slot.k.tag == TAG_NIL) continue;
 
-			elInteger newslot = elf_tabhashin(&newtable,slot.k);
+			elInteger newslot = elf_tabhashin(&new_table,slot.k);
 
 			if (newslot == -1) elf_unreachable;
 
-			newtable.slots[newslot] = slot;
+			new_table.slots[newslot] = slot;
 		}
 
 		elf_dealloc(lHEAP,table->slots);
 
-		table->ntotal = newtable.ntotal;
-		table->slots = newtable.slots;
+		table->ntotal = new_table.ntotal;
+		table->slots = new_table.slots;
 	}
 }
 

@@ -15,7 +15,7 @@ elf_api elObject *elf_getthis(elState *R) {
 }
 
 
-elf_api elf_tag elf_gettag(elState *R, elRegId x) {
+elf_api elObjectTag elf_gettag(elState *R, elRegId x) {
 	return R->call->locals[x].tag;
 }
 
@@ -25,7 +25,7 @@ elf_api elValue elf_getany(elState *R, elRegId x) {
 }
 
 
-void elf_expected(elState *S, elf_tag tag, elf_tag got, elRegId x) {
+void elf_expected(elState *S, elObjectTag tag, elObjectTag got, elRegId x) {
 	elf_throw(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 

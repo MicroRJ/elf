@@ -128,7 +128,7 @@ elNodeId elf_make_ranged_index_node(elFileState *fs, elf_lineid line, elNodeId x
 elNodeId elf_make_call_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z);
 
 
-elf_tag elf_nodettotag(elNodeTy ty) {
+elObjectTag elf_nodettotag(elNodeTy ty) {
 	switch (ty) {
 		case NT_SYS: return TAG_SYS;
 		case NT_NUM: return TAG_NUM;

@@ -160,7 +160,6 @@ typedef struct elClosure elClosure;
 #include "src/ldebug.c"
 #include "src/llog.c"
 #include "src/elf-obj.c"
-#include "src/lgc.c"
 #include "src/elf-mod.c"
 #include "src/elf-chr.c"
 #include "src/elf-aux.c"
@@ -176,7 +175,6 @@ typedef struct elClosure elClosure;
 
 
 #if !defined(ELF_NOLIBS)
-# include "src/ltest.c"
 # include "src/elf-lib.c"
 # include "src/elf-web.c"
 # include "src/lcrtlib.c"

@@ -22,13 +22,13 @@ int main(int n, char **c) {
 	elf_runini(&R,&M);
 	if (cli.logging) R.bytelogging = elTrue;
 
-	elCallFrame frame = {0};
+	elCallState frame = {0};
 	frame.base = R.top;
 	R.frame = &frame;
 
 	if (cli.filename != elNil) {
 		elString *filename = elf_pushnewstr(&R,cli.filename);
-		filename->obj.gccolor = GC_PINK;
+		filename->obj.color = GC_PINK;
 		elFileState fs = {0};
 		elf_loadfilefs(&R,&fs,filename,0,0);
 	}

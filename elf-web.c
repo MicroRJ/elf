@@ -30,7 +30,7 @@ int main(int n, char **c) {
 struct {
 	elState R;
 	elModule M;
-	elCallFrame C;
+	elCallState C;
 } elf_globaldecl elf = {{&elf.M}};
 
 

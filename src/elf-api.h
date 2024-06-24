@@ -17,7 +17,7 @@ elInteger elf_toint(elValue v) {
 
 elf_api int elf_ncallargs(elState *R);
 elf_api elObject *elf_getthis(elState *R);
-elf_api elf_tag elf_gettag(elState *R, elRegId x);
+elf_api elObjectTag elf_gettag(elState *R, elRegId x);
 elf_api elValue elf_getany(elState *R, elRegId x);
 elf_api elInteger elf_getint(elState *R, elRegId x);
 elf_api elNumber elf_getnum(elState *R, elRegId x);

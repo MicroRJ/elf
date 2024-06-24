@@ -9,7 +9,7 @@ void elf_runini(elState *R, elModule *M) {
 	R->M = M;
 	R->bytelogging = false;
 	R->stklen = 4096;
-	R->stk = R->top = elf_clearalloc(lHEAP,sizeof(elValue)*R->stklen);
+	R->stk = R->top = elf_clear_alloc(lHEAP,sizeof(elValue)*R->stklen);
 	R->metatab_str = elf_newstrmetatab(R);
 	R->metatab_tab = elf_newtabmetatab(R);
 	R->call_level = 0;
@@ -18,7 +18,7 @@ void elf_runini(elState *R, elModule *M) {
 	//using 0 for rx, 0 is relative to locals,
 	//and it will override values that have
 	//been pushed... I added a temporary fix...
-	R->root_call = (elCallFrame){0};
+	R->root_call = (elCallState){0};
 	R->root_call.locals = R->top;
 	R->call = &R->root_call;
 
@@ -44,7 +44,6 @@ void elf_runini(elState *R, elModule *M) {
 	//TODO: temporary fix
 	R->call->locals = R->top;
 	#if !defined(ELF_NOLIBS)
-	tstlib_load(R);
 	crtlib_load(R);
 	netlib_load(R);
 	elflib_loadall(R);
@@ -60,14 +59,14 @@ int elf_call_function(elState *R, elRegId rxy, int nx, int ny) {
 
 
 int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, int nx, int ny) {
-	elCallFrame *caller = R->call;
+	elCallState *caller = R->call;
 	// elf_ensure((R->top-caller->locals)+caller->cl->fn.zstack-1 > rx);
 	elValue *locals = caller->locals + rx;
 	/* top always points to one past locals,
 	so far we only have nx argument locals,
 	top is later incremented to match nlocals */
 	elValue *top  = locals + nx;
-	elCallFrame call = {0};
+	elCallState call = {0};
 	call.caller = caller;
 
 	call.head = R->byte;
@@ -127,7 +126,7 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, i
 
 
 int elf_callex(elState *R, elObject *obj, elRegId rx, elRegId ry, int nx, int ny) {
-	elCallFrame *caller = R->call;
+	elCallState *caller = R->call;
 	return elf_callexx(R,obj,caller->locals[rx],rx+1,ry,nx,ny);
 }
 
@@ -276,10 +275,10 @@ int elf_run(elState *R) {
 	elModule *md = R->md;
 	//
 	elModule *M = R->M;
-	elCallFrame *call = R->call;
+	elCallState *call = R->call;
 	elClosure *cl = call->cl;
 	elProto fn = cl->fn;
-	elCallFrame *caller = call->caller;
+	elCallState *caller = call->caller;
 	elValue *locals = call->locals;
 	elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
 
