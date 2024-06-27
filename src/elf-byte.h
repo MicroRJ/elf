@@ -36,6 +36,10 @@ BC_LEAVE,
 registers, jumps to x
 BC_YIELD (x,y,z),
 */
+/* todo: add support for different conditional jump
+instructions, additionally a dedicated loop
+instruction which increments a register would be
+real nice */
 #define BCLIST(_) \
 	_(HALT, I) \
 	_(J, XY) _(JZ, XY) _(JNZ, XY) _(JE, XY) _(JNE, XY) \

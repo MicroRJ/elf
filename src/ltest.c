@@ -39,7 +39,7 @@
 // 	elClosure *cl = elf_getcls(c,0);
 // 	elProto p = cl->fn;
 // 	char file[BUFFER];
-// 	elf_memclear(file,sizeof(file));
+// 	elf_clear_memory(file,sizeof(file));
 // 	int j;
 // 	for (j = 0; j < p.nbytes; ++j) {
 // 		if (j != 0) strcatf(file,"\n");
@@ -117,15 +117,15 @@
 
 // void tstlib_load(elState *rt) {
 // 	elModule *md = rt->md;
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__gc"),elf_valbid(testlib_gc));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__gcpause"),elf_valbid(testlib_gcpause));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__gcunpause"),elf_valbid(testlib_gcunpause));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__disasm"),elf_valbid(testlib_disasm));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__logging"),elf_valbid(testlib_logging));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__globallogging"),elf_valbid(testlib_globallogging));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__gc"),elf_valbid(testlib_gc));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__gcpause"),elf_valbid(testlib_gcpause));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__gcunpause"),elf_valbid(testlib_gcunpause));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__disasm"),elf_valbid(testlib_disasm));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__logging"),elf_valbid(testlib_logging));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__globallogging"),elf_valbid(testlib_globallogging));
 
-// 	lang_addglobal(md,elf_pushnewstr(rt,"__debugbreak"),elf_valbid(testlib_debugbreak));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"absslotid"),elf_valbid(testlib_absslotid));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"absslot"),elf_valbid(testlib_absslot));
-// 	lang_addglobal(md,elf_pushnewstr(rt,"_gtable"),elf_valbid(_gtable));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"__debugbreak"),elf_valbid(testlib_debugbreak));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"absslotid"),elf_valbid(testlib_absslotid));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"absslot"),elf_valbid(testlib_absslot));
+// 	elf_add_global_value(md,elf_pushnewstr(rt,"_gtable"),elf_valbid(_gtable));
 // }

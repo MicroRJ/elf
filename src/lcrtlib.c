@@ -161,20 +161,20 @@ elf_api void crtlib_load(elState *rt) {
 
 
 
-	lang_addglobal(md,elf_pushnewstr(rt,"_execl"),elf_valbid(crtlib__execl));
-	lang_addglobal(md,elf_pushnewstr(rt,"system"),elf_valbid(crtlib_system));
-	lang_addglobal(md,elf_pushnewstr(rt,"_getch"),elf_valbid(crtlib__getch));
-	lang_addglobal(md,elf_pushnewstr(rt,"time"),elf_valbid(crtlib_time));
-	lang_addglobal(md,elf_pushnewstr(rt,"_getpid"),elf_valbid(crtlib__getpid));
-	lang_addglobal(md,elf_pushnewstr(rt,"_strdate"),elf_valbid(crtlib__strdate));
-	lang_addglobal(md,elf_pushnewstr(rt,"_strtime"),elf_valbid(crtlib__strtime));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_execl"),elf_valbid(crtlib__execl));
+	elf_add_global_value(md,elf_pushnewstr(rt,"system"),elf_valbid(crtlib_system));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_getch"),elf_valbid(crtlib__getch));
+	elf_add_global_value(md,elf_pushnewstr(rt,"time"),elf_valbid(crtlib_time));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_getpid"),elf_valbid(crtlib__getpid));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_strdate"),elf_valbid(crtlib__strdate));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_strtime"),elf_valbid(crtlib__strtime));
 
-	lang_addglobal(md,elf_pushnewstr(rt,"_unlink"),elf_valbid(crtlib__unlink));
-	lang_addglobal(md,elf_pushnewstr(rt,"_unlock_file"),elf_valbid(crtlib__unlock_file));
-	lang_addglobal(md,elf_pushnewstr(rt,"_write"),elf_valbid(crtlib__write));
-	lang_addglobal(md,elf_pushnewstr(rt,"_commit"),elf_valbid(crtlib__commit));
-	lang_addglobal(md,elf_pushnewstr(rt,"_close"),elf_valbid(crtlib__close));
-	lang_addglobal(md,elf_pushnewstr(rt,"_chdir"),elf_valbid(crtlib__chdir));
-	lang_addglobal(md,elf_pushnewstr(rt,"_chdrive"),elf_valbid(crtlib__chdrive));
-	lang_addglobal(md,elf_pushnewstr(rt,"clock"),elf_valbid(crtlib_clock));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_unlink"),elf_valbid(crtlib__unlink));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_unlock_file"),elf_valbid(crtlib__unlock_file));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_write"),elf_valbid(crtlib__write));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_commit"),elf_valbid(crtlib__commit));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_close"),elf_valbid(crtlib__close));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_chdir"),elf_valbid(crtlib__chdir));
+	elf_add_global_value(md,elf_pushnewstr(rt,"_chdrive"),elf_valbid(crtlib__chdrive));
+	elf_add_global_value(md,elf_pushnewstr(rt,"clock"),elf_valbid(crtlib_clock));
 }

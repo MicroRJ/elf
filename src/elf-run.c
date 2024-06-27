@@ -147,10 +147,10 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	elf_lexone(fs);
 
 	elFileFnState fn = {0};
-	elf_begin_file_function(fs,&fn,fs->tk.line);
+	elf_emitter_enter_function(fs,&fn,fs->tk.line);
 	elNodeId id = elf_fs_load_expr(fs);
 	elf_emit_yield(fs,fs->tk.line,id);
-	elf_close_file_function(fs);
+	elf_emitter_leave_function(fs);
 
 	elFileInfo file = {0};
 	file.bytes = fn.bytes;
@@ -186,9 +186,9 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	/* kick start by lexing the first two tokens */
 	elf_lexone(fs); elf_lexone(fs);
 	elFileFnState fn = {0};
-	elf_begin_file_function(fs,&fn,fs->tk.line);
+	elf_emitter_enter_function(fs,&fn,fs->tk.line);
 	while (!elf_test_token(fs,0)) elf_fs_load_stat(fs);
-	elf_close_file_function(fs);
+	elf_emitter_leave_function(fs);
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */
 	elFileInfo fl = {0};

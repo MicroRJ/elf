@@ -5,11 +5,17 @@
 */
 
 
+int elf_lib_get_object_address(elState *R) {
+	elf_pushint(R,(elInteger) (void *) elf_getobj(R,0));
+	return 1;
+}
+
+
 /*
 ** Merges one or several tables together into
 ** a new table, which is then returned.
 */
-int elflib_merge(elState *R) {
+int elf_lib_merge(elState *R) {
 	elTable *tab = elf_pushnewtab(R);
 	int i;
 	for (i=0;i<R->call->nx;++i) {
@@ -19,13 +25,13 @@ int elflib_merge(elState *R) {
 }
 
 
-int elflib_getmetatable(elState *R) {
+int elf_lib_get_metatable(elState *R) {
 	elf_pushtab(R,elf_getobj(R,0)->metatable);
 	return 1;
 }
 
 
-int elflib_setmetatable(elState *R) {
+int elf_lib_set_metatable(elState *R) {
 	elf_getobj(R,0)->metatable = elf_gettab(R,1);
 	elf_pushany(R,elf_getany(R,0));
 	return 1;
@@ -681,9 +687,10 @@ elf_api void elflib_loadall(elState *R) {
 	elf_register(R,"elf.bytelogging",elflib_bytelogging);
 	elf_register(R,"elf.globalbytelogging",elflib_globalbytelogging);
 
-	elf_register(R,"elf.setmetatable",elflib_setmetatable);
-	elf_register(R,"elf.getmetatable",elflib_getmetatable);
-	elf_register(R,"elf.merge",elflib_merge);
+	elf_register(R,"elf.merge",elf_lib_merge);
+	elf_register(R,"elf.setmetatable",elf_lib_set_metatable);
+	elf_register(R,"elf.getmetatable",elf_lib_get_metatable);
+	elf_register(R,"elf.get_object_address",elf_lib_get_object_address);
 
 	elf_register(R,"elf.log",elflib_log);
 	elf_register(R,"elf.err",elflib_err);

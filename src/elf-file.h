@@ -12,6 +12,7 @@ value or compile time thing. */
 #define NO_ENTITY -1
 
 typedef int elEntityId;
+typedef int elBlockId;
 
 typedef struct {
 	elEntityId id;
@@ -29,6 +30,7 @@ typedef struct elFileEntity {
 
 
 #define LOAD_RELOAD 		0x1
+#define LOAD_KEEPALIVE	0x2
 #define LOAD_ALLOCATE 	0x4
 
 #define NO_SLOT (-1)
@@ -38,13 +40,10 @@ typedef struct elFileEntity {
 
 
 typedef struct elFileLoopState {
-	elByteId  entry;
-	elByteId *falsejumps;
-	elByteId *truejumps;
-	/* the node and register associated
-	with the loop increment */
-	elNodeId  x;
-	elRegId r;
+	elByteId entry;
+	union { elNodeId index_node, x; };
+	elRegId index_register;
+	elByteId *false_jumps,*true_jumps;
 } elFileLoopState;
 
 
@@ -53,11 +52,11 @@ typedef struct elFileLoopState {
 #define BLOCK_DELAYED 	0x04
 
 
-typedef struct elFileBlockState elFileBlockState;
-typedef struct elFileBlockState {
-	elFileBlockState *enclosing;
+typedef struct elFileBlock elFileBlock;
+typedef struct elFileBlock {
 	elBool flags;
-	int level;
+	// elFileBlock *enclosing;
+	// int level;
 	int xmemory;
 	int xentity;
 	int xnode;
@@ -65,7 +64,7 @@ typedef struct elFileBlockState {
 	elByteId jumpover;
 	elByteId *leavejumps;
 	elFileLoopState loop;
-} elFileBlockState;
+} elFileBlock;
 
 
 /* Contains list of false and true jumps
@@ -88,6 +87,20 @@ typedef struct elSelectState {
 } elSelectState;
 
 
+typedef struct elMemorySlot elMemorySlot;
+typedef struct elMemorySlot {
+	elNodeId node;
+	elRegId reg;
+} elMemorySlot;
+
+
+typedef struct elMemoryRegion elMemoryRegion;
+typedef struct elMemoryRegion {
+	elMemorySlot *registry;
+	int length;
+} elMemoryRegion;
+
+
 typedef struct elFileFnState elFileFnState;
 typedef struct elFileFnState {
 	elFileFnState *enclosing;
@@ -103,15 +116,12 @@ typedef struct elFileFnState {
 	relative to the current function we're
 	loading, there's always an active function,
 	even at file level */
-	/* todo: 'entities' and 'bytes' do we need this now
-	that we have blocks ? */
 	/* index to first entity within entity list in file. */
 	elEntityId entities;
+	elBlockId entry_block;
+	// elBlockId block;
 	elByteId bytes;
-	elFileBlockState entry;
-	elFileBlockState *block;
 	int nloops;
-	int nblocks;
 	int nyield;
 	/* todo: deprecated */
 	/* list of yield jumps to be patched */
@@ -119,29 +129,7 @@ typedef struct elFileFnState {
 } elFileFnState;
 
 
-/* Memory Region:
-	Memory regions are used to make otherwise
-	divergent controls flow paths to converge
-	by means of reusing a previously allocated
-	registers for a particular node.
-*/
-
-typedef struct elMemorySlot elMemorySlot;
-typedef struct elMemorySlot {
-	elNodeId node;
-	elRegId reg;
-} elMemorySlot;
-
-
-typedef struct elMemoryRegion elMemoryRegion;
-typedef struct elMemoryRegion {
-	elMemorySlot *registry;
-	int length;
-} elMemoryRegion;
-
-
 typedef struct elFileState {
-
 	union { elModule *M,*md; };
 	union { elState *R,*rt; };
 	int file_id;
@@ -170,19 +158,14 @@ typedef struct elFileState {
 	int memory_region_level;
 	/* the current memory region  */
 	elMemoryRegion memory_region;
-	/* the current level, level is incremented
-	per level, block or statement or whenever
-	it makes sense, represents a visibility
-	layer, 0 is for file. */
-	int level;
-	/* -- hierarchical list of local tags for the current
-	- function stack, each function points to a base local
-	- tag defined here by index.
-	-- remaining locals are file locals, at file level. */
+	/* hierarchical list of entities */
 	elFileEntity *entities;
 	int nentities;
 
-	elFileBlockState entry;
+	elFileBlock *blocks;
+	union { elBlockId nblocks, level; };
+
+	elFileBlock entry;
 	/* hierarchical list of loading functions,
 	each allocated in C stack by caller function */
 	elFileFnState *fn;
@@ -199,13 +182,13 @@ void elf_fs_load_stat(elFileState *fs);
 
 
 void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
-elRegId elf_gen_local_load(elFileState *fs, elf_lineid line, elBool reload, elRegId x, elRegId y, elNodeId id);
-elRegId elf_emit_localizer(elFileState *fs, elf_lineid line, elNodeId id);
-elRegId elf_gen_relocalize(elFileState *fs, elf_lineid line, elRegId target_register, elNodeIdTypeGuard id);
+elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line, elBool reload, elRegId x, elRegId y, elNodeId id);
+elRegId elf_emitter_localize(elFileState *fs, elf_lineid line, elNodeId id);
+elRegId elf_emitter_relocalize(elFileState *fs, elf_lineid line, elRegId target_register, elNodeIdTypeGuard id);
 
 
-void elf_enter_delayed_block(elFileState *fs, elf_lineid line, elFileBlockState *bl);
-void elf_leave_delayed_block(elFileState *fs, elf_lineid line, elFileBlockState *bl);
+void elf_emitter_enter_delayed_block(elFileState *fs, elf_lineid line);
+void elf_emitter_leave_delayed_block(elFileState *fs, elf_lineid line);
 
 
 elByteId elf_branch_if_false(elFileState *fs, elFileJumplist *js, elRegId x, elNodeId id);
@@ -220,23 +203,23 @@ enum {
 };
 
 
-void elf_gen_begin_if(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x, int z);
-void elf_gen_add_elif(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x);
-void elf_gen_add_else(elFileState *fs, elf_lineid line, elSelectState *s);
-void elf_gen_add_then(elFileState *fs, elf_lineid line, elSelectState *s);
-void elf_close_if(elFileState *fs, elf_lineid line, elSelectState *s);
+void elf_emitter_begin_if(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x, int z);
+void elf_emitter_add_elif_clause(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x);
+void elf_emitter_add_else_clause(elFileState *fs, elf_lineid line, elSelectState *s);
+void elf_emitter_add_then_clause(elFileState *fs, elf_lineid line, elSelectState *s);
+void elf_emitter_add_if_clause(elFileState *fs, elf_lineid line, elSelectState *s);
 
 
-void elf_begin_ranged_loop(elFileState *fs, elf_lineid line, elNodeId x, elNodeId lo, elNodeId hi);
-void elf_close_ranged_loop(elFileState *fs, elf_lineid line);
+void elf_emitter_begin_ranged_loop(elFileState *fs, elf_lineid line, elNodeId x, elNodeId lo, elNodeId hi);
+void elf_emitter_close_ranged_loop(elFileState *fs, elf_lineid line);
 
-void elf_begin_do_while_loop(elFileState *fs, elf_lineid line);
-void elf_close_do_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
+void elf_emitter_begin_do_while_loop(elFileState *fs, elf_lineid line);
+void elf_emitter_close_do_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
 
-void elf_begin_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
-void elf_close_while_loop(elFileState *fs, elf_lineid line);
+void elf_emitter_begin_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
+void elf_emitter_close_while_loop(elFileState *fs, elf_lineid line);
 
 
-void elf_enter_file_block(elFileState *fs, elFileBlockState *bl, elBool flags);
-void elf_leave_file_block(elFileState *fs);
+elBlockId elf_emitter_enter_block(elFileState *fs, elBool flags);
+void elf_emitter_leave_block(elFileState *fs);
 

@@ -14,27 +14,27 @@ void elf_debugger(char *message) {
 
 
 void elf_registersys(elState *R, char *name, elHandle val) {
-	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valsys(val));
+	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valsys(val));
 }
 
 
 void elf_registerint(elState *R, char *name, elInteger val) {
-	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valint(val));
+	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valint(val));
 }
 
 
 void elf_registertab(elState *R, char *name, elTable *val) {
-	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valtab(val));
+	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valtab(val));
 }
 
 
 void elf_registerstr(elState *R, char *name, char *val) {
-	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valstr(elf_pushnewstr(R,val)));
+	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valstr(elf_pushnewstr(R,val)));
 }
 
 
 void elf_register(elState *R, char *name, elBinding fn) {
-	lang_addglobal(R->M,elf_pushnewstr(R,name),elf_valbid(fn));
+	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valbid(fn));
 }
 
 

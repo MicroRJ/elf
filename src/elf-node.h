@@ -33,6 +33,8 @@ typedef enum elNodeTy {
 // RANGE_INDEX: [{x}..{x}]
 // RANGE: {x}..{x}
 // GROUP: ({x})
+/* todo: RANGE_INDEX is a redundant node and it requires
+additional checks everywhere which is annoying */
 #define NODE_DEF(_) \
 	_(NONE)\
 	_(NOP)\
@@ -97,14 +99,14 @@ typedef struct elNode {
 
 elNodeId elf_make_node_xyz(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y, elNodeId *z);
 elNodeId elf_make_binary_node(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y);
-elNodeId elf_nodeunary(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x);
-elNodeId elf_make_nullary_node(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy t);
+elNodeId elf_make_node_unary(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x);
+elNodeId elf_make_node_nullary(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy t);
 
 elNodeId elf_make_group_node(elFileState *fs, elf_lineid, elNodeId x);
 elNodeId elf_make_region_node(elFileState *fs, elf_lineid, elNodeId x, elNodeId *z);
 
 elNodeId elf_make_nil_node(elFileState *fs, elf_lineid);
-elNodeId elf_make_integer_node(elFileState *fs, elf_lineid, elInteger i);
+elNodeId elf_make_node_integer(elFileState *fs, elf_lineid, elInteger i);
 elNodeId elf_make_number_node(elFileState *fs, elf_lineid, elNumber n);
 elNodeId elf_make_string_node(elFileState *fs, elf_lineid, char *);
 elNodeId elf_make_table_node(elFileState *fs, elf_lineid, elNodeId *z);
@@ -112,7 +114,7 @@ elNodeId elf_make_closure_node(elFileState *fs, elf_lineid, elNodeId x, elNodeId
 
 elNodeId elf_make_load_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 
-elNodeId elf_make_local_value_node(elFileState *fs, elf_lineid line, elNodeId i);
+elNodeId elf_make_node_local_register(elFileState *fs, elf_lineid line, elNodeId i);
 elNodeId elf_make_global_value_node(elFileState *fs, elf_lineid line, elNodeId i);
 elNodeId elf_make_closure_value_node(elFileState *fs, elf_lineid line, elNodeId i);
 

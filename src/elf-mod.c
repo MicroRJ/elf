@@ -13,7 +13,7 @@ elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
 }
 
 
-elSymbolId lang_addglobal(elModule *M, elString *name, elValue v) {
+elSymbolId elf_add_global_value(elModule *M, elString *name, elValue v) {
 	elSymbolId i = elf_get_global_symbol(M,name);
 	M->globals->array[i] = v;
 	return i;
