@@ -49,7 +49,7 @@ elBool elf_streq(elString *x, elString *y) {
 
 
 int elfstr_length_(elState *c) {
-	elf_pushint(c,((elString*)c->f->obj)->length);
+	elf_push_integer(c,((elString*)c->f->obj)->length);
 	return 1;
 }
 
@@ -84,7 +84,7 @@ int elfstr_append_(elState *R) {
 			strcatf(buffer,"%lli",v.x_int);
 		} else elf_unreachable;
 	}
-	elf_pushnewstr(R,buffer);
+	elf_push_new_string(R,buffer);
 	return 1;
 }
 
@@ -92,14 +92,14 @@ int elfstr_append_(elState *R) {
 int elfstr_match_(elState *R) {
 	elString *s = (elString*) elf_getthis(R);
 	elString *p = elf_getstr(R,0);
-	elf_pushint(R,elf_cstrmatch(p->string,s->string));
+	elf_push_integer(R,elf_cstrmatch(p->string,s->string));
 	return 1;
 }
 
 
 int elfstr_gethash_(elState *R) {
 	elString *str = (elString*) elf_getthis(R);
-	elf_pushint(R,str->hash);
+	elf_push_integer(R,str->hash);
 	return 1;
 }
 

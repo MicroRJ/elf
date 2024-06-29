@@ -18,9 +18,9 @@
 int crtlib__chdir(elState *rt) {
 	elString *name = elf_getstr(rt,0);
 #if defined(PLATFORM_WEB)
-	elf_pushint(rt,chdir(name->c));
+	elf_push_integer(rt,chdir(name->c));
 #else
-	elf_pushint(rt,_chdir(name->c));
+	elf_push_integer(rt,_chdir(name->c));
 #endif
 	return 1;
 }
@@ -29,25 +29,25 @@ int crtlib__chdir(elState *rt) {
 #if defined(_MSC_VER)
 
 int crtlib__getch(elState *rt) {
-	elf_pushint(rt,_getch());
+	elf_push_integer(rt,_getch());
 	return 1;
 }
 
 
 int crtlib__getpid(elState *rt) {
-	elf_pushint(rt,_getpid());
+	elf_push_integer(rt,_getpid());
 	return 1;
 }
 
 
 int crtlib_time(elState *rt) {
-	elf_pushint(rt,time(0));
+	elf_push_integer(rt,time(0));
 	return 1;
 }
 
 
 int crtlib_clock(elState *rt) {
-	elf_pushint(rt,clock());
+	elf_push_integer(rt,clock());
 	return 1;
 }
 
@@ -55,7 +55,7 @@ int crtlib_clock(elState *rt) {
 int crtlib__strdate(elState *rt) {
 	char buf[128];
 	_strdate_s(buf,sizeof(buf));
-	elf_pushnewstr(rt,buf);
+	elf_push_new_string(rt,buf);
 	return 1;
 }
 
@@ -63,14 +63,14 @@ int crtlib__strdate(elState *rt) {
 int crtlib__strtime(elState *rt) {
 	char buf[128];
 	_strtime_s(buf,sizeof(buf));
-	elf_pushnewstr(rt,buf);
+	elf_push_new_string(rt,buf);
 	return 1;
 }
 
 
 int crtlib__unlink(elState *rt) {
 	elString *name = elf_getstr(rt,0);
-	elf_pushint(rt,_unlink(name->c));
+	elf_push_integer(rt,_unlink(name->c));
 	return 1;
 }
 
@@ -85,28 +85,28 @@ int crtlib__unlock_file(elState *rt) {
 int crtlib__write(elState *rt) {
 	elHandle file = elf_getsys(rt,0);
 	elString *buf = elf_getstr(rt,1);
-	elf_pushint(rt,_write((elInteger)file,buf->c,buf->length));
+	elf_push_integer(rt,_write((elInteger)file,buf->c,buf->length));
 	return 1;
 }
 
 
 int crtlib__close(elState *rt) {
 	elHandle file = elf_getsys(rt,0);
-	elf_pushint(rt,_close((int)(elInteger)file));
+	elf_push_integer(rt,_close((int)(elInteger)file));
 	return 1;
 }
 
 
 int crtlib__commit(elState *rt) {
 	elHandle file = elf_getsys(rt,0);
-	elf_pushint(rt,_commit((int)(elInteger)file));
+	elf_push_integer(rt,_commit((int)(elInteger)file));
 	return 1;
 }
 
 
 int crtlib__chdrive(elState *rt) {
 	elInteger letter = elf_getint(rt,0);
-	elf_pushint(rt,_chdrive(letter));
+	elf_push_integer(rt,_chdrive(letter));
 	return 1;
 }
 
@@ -114,21 +114,21 @@ int crtlib__chdrive(elState *rt) {
 int crtlib__chmode(elState *rt) {
 	elString *name = elf_getstr(rt,0);
 	elInteger mode = elf_getint(rt,1);
-	elf_pushint(rt,_chmod(name->c,mode));
+	elf_push_integer(rt,_chmod(name->c,mode));
 	return 1;
 }
 
 
 int crtlib__execl(elState *rt) {
 	elString *cl = elf_getstr(rt,0);
-	elf_pushint(rt,_execl(cl->c,0,0));
+	elf_push_integer(rt,_execl(cl->c,0,0));
 	return 1;
 }
 
 
 int crtlib_system(elState *rt) {
 	elString *cl = elf_getstr(rt,0);
-	elf_pushint(rt,system(cl->c));
+	elf_push_integer(rt,system(cl->c));
 	return 1;
 }
 #else
@@ -161,20 +161,20 @@ elf_api void crtlib_load(elState *rt) {
 
 
 
-	elf_add_global_value(md,elf_pushnewstr(rt,"_execl"),elf_valbid(crtlib__execl));
-	elf_add_global_value(md,elf_pushnewstr(rt,"system"),elf_valbid(crtlib_system));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_getch"),elf_valbid(crtlib__getch));
-	elf_add_global_value(md,elf_pushnewstr(rt,"time"),elf_valbid(crtlib_time));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_getpid"),elf_valbid(crtlib__getpid));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_strdate"),elf_valbid(crtlib__strdate));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_strtime"),elf_valbid(crtlib__strtime));
+	elf_add_global_value(md,elf_push_new_string(rt,"_execl"),elf_valbid(crtlib__execl));
+	elf_add_global_value(md,elf_push_new_string(rt,"system"),elf_valbid(crtlib_system));
+	elf_add_global_value(md,elf_push_new_string(rt,"_getch"),elf_valbid(crtlib__getch));
+	elf_add_global_value(md,elf_push_new_string(rt,"time"),elf_valbid(crtlib_time));
+	elf_add_global_value(md,elf_push_new_string(rt,"_getpid"),elf_valbid(crtlib__getpid));
+	elf_add_global_value(md,elf_push_new_string(rt,"_strdate"),elf_valbid(crtlib__strdate));
+	elf_add_global_value(md,elf_push_new_string(rt,"_strtime"),elf_valbid(crtlib__strtime));
 
-	elf_add_global_value(md,elf_pushnewstr(rt,"_unlink"),elf_valbid(crtlib__unlink));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_unlock_file"),elf_valbid(crtlib__unlock_file));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_write"),elf_valbid(crtlib__write));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_commit"),elf_valbid(crtlib__commit));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_close"),elf_valbid(crtlib__close));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_chdir"),elf_valbid(crtlib__chdir));
-	elf_add_global_value(md,elf_pushnewstr(rt,"_chdrive"),elf_valbid(crtlib__chdrive));
-	elf_add_global_value(md,elf_pushnewstr(rt,"clock"),elf_valbid(crtlib_clock));
+	elf_add_global_value(md,elf_push_new_string(rt,"_unlink"),elf_valbid(crtlib__unlink));
+	elf_add_global_value(md,elf_push_new_string(rt,"_unlock_file"),elf_valbid(crtlib__unlock_file));
+	elf_add_global_value(md,elf_push_new_string(rt,"_write"),elf_valbid(crtlib__write));
+	elf_add_global_value(md,elf_push_new_string(rt,"_commit"),elf_valbid(crtlib__commit));
+	elf_add_global_value(md,elf_push_new_string(rt,"_close"),elf_valbid(crtlib__close));
+	elf_add_global_value(md,elf_push_new_string(rt,"_chdir"),elf_valbid(crtlib__chdir));
+	elf_add_global_value(md,elf_push_new_string(rt,"_chdrive"),elf_valbid(crtlib__chdrive));
+	elf_add_global_value(md,elf_push_new_string(rt,"clock"),elf_valbid(crtlib_clock));
 }

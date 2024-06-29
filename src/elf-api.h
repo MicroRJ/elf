@@ -17,7 +17,7 @@ elInteger elf_toint(elValue v) {
 
 elf_api int elf_ncallargs(elState *R);
 elf_api elObject *elf_getthis(elState *R);
-elf_api elObjectTag elf_gettag(elState *R, elRegId x);
+elf_api elObjectTag elf_get_tag(elState *R, elRegId x);
 elf_api elValue elf_getany(elState *R, elRegId x);
 elf_api elInteger elf_getint(elState *R, elRegId x);
 elf_api elNumber elf_getnum(elState *R, elRegId x);
@@ -87,12 +87,12 @@ elf_api void elf_settop(elState *R, elValue *top);
 elf_api elRegId elf_pushmany(elState *R, int howmany);
 elf_api elRegId elf_pushany(elState *, elValue v);
 elf_api void elf_pushnil(elState *);
-elf_api void elf_pushint(elState *, elInteger i);
+elf_api void elf_push_integer(elState *, elInteger i);
 elf_api void elf_pushnum(elState *, elNumber n);
 elf_api void elf_pushsys(elState *c, elHandle h);
 
 elf_api elString *elf_pushstr(elState *, elString *s);
-elf_api elString *elf_pushnewstr(elState *, char *c);
+elf_api elString *elf_push_new_string(elState *, char *c);
 elf_api elString *elf_pushnewstrlen(elState *, elInteger len);
 
 elf_api elObject *elf_pushobj(elState *, elObject *t);

@@ -34,7 +34,7 @@ elf_api int netlib_close(elState *R) {
 elf_api int netlib_listen(elState *R) {
 	SOCKET handle = (SOCKET) elf_getsys(R,0);
 	int error = listen(handle,SOMAXCONN);
-	elf_pushint(R,error!=SOCKET_ERROR);
+	elf_push_integer(R,error!=SOCKET_ERROR);
 	return 1;
 }
 
@@ -117,7 +117,7 @@ elf_api int netlib_send(elState *R) {
 	elInteger sent = 0;
 	sent += send(socket,(char*)&message,sizeof(message),0);
 	sent += send(socket,payload->c,payload->length,0);
-	elf_pushint(R,sent);
+	elf_push_integer(R,sent);
 	return 1;
 }
 
@@ -126,7 +126,7 @@ elf_api int netlib_ioctl(elState *R) {
 	SOCKET socket = (SOCKET) elf_getsys(R,0);
 	long mode = 1;
 	int error = ioctlsocket(socket,FIONBIO,&mode);
-	elf_pushint(R,error == 0);
+	elf_push_integer(R,error == 0);
 	return 1;
 }
 
@@ -183,15 +183,15 @@ elf_api int netlib_recv(elState *R) { return 0; };
 elf_api void netlib_load(elState *R) {
 	elModule *md = R->md;
 
-	elf_register(R,"elf.sockets.init",netlib_init);
-	elf_register(R,"elf.sockets.close",netlib_close);
-	elf_register(R,"elf.sockets.listen",netlib_listen);
-	elf_register(R,"elf.sockets.accept",netlib_accept);
-	elf_register(R,"elf.sockets.pollclient",netlib_pollclient);
-	elf_register(R,"elf.sockets.tcpserver",netlib_tcpserver);
-	elf_register(R,"elf.sockets.tcpclient",netlib_tcpclient);
-	elf_register(R,"elf.sockets.send",netlib_send);
-	elf_register(R,"elf.sockets.recv",netlib_recv);
-	elf_register(R,"elf.sockets.ioctl",netlib_ioctl);
+	elf_register_binding(R,"elf.sockets.init",netlib_init);
+	elf_register_binding(R,"elf.sockets.close",netlib_close);
+	elf_register_binding(R,"elf.sockets.listen",netlib_listen);
+	elf_register_binding(R,"elf.sockets.accept",netlib_accept);
+	elf_register_binding(R,"elf.sockets.pollclient",netlib_pollclient);
+	elf_register_binding(R,"elf.sockets.tcpserver",netlib_tcpserver);
+	elf_register_binding(R,"elf.sockets.tcpclient",netlib_tcpclient);
+	elf_register_binding(R,"elf.sockets.send",netlib_send);
+	elf_register_binding(R,"elf.sockets.recv",netlib_recv);
+	elf_register_binding(R,"elf.sockets.ioctl",netlib_ioctl);
 }
 

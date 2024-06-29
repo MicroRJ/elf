@@ -104,27 +104,17 @@ elNodeId elf_make_load_node(elFileState *fs, elf_lineid line, elNodeId x, elNode
 
 
 elNodeId elf_make_type_guard_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeTy y) {
-	elNodeId id = elf_make_binary_node(fs,line,NODE_TYPEGUARD,y,x,y);
-	/* todo: could we do this better! maybe we have
-	a specific function that checks for these sort
-	of nodes, like groups or typeguards,
-	additionally, it can be an extra safety layer? */
-	// elf_set_node_register(fs,line,id,elf_get_node_register(fs,x));
-	// fs->nodes[id].r = fs->nodes[x].r;
-	return id;
+	return elf_make_binary_node(fs,line,NODE_TYPEGUARD,y,x,y);
 }
 
 
 elNodeId elf_make_region_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z) {
-	elNodeId id = elf_make_node_xyz(fs,line,NODE_REGION,fs->nodes[x].ty,x,NO_NODE,z);
-	// elf_set_node_register(fs,line,id,elf_get_node_register(fs,x));
-	return id;
+	return elf_make_node_xyz(fs,line,NODE_REGION,elf_get_node_type(fs,x),x,NO_NODE,z);
 }
 
 
 elNodeId elf_make_group_node(elFileState *fs, elf_lineid line, elNodeId x) {
-	elNodeId id = elf_make_node_unary(fs,line,NODE_GROUP,fs->nodes[x].t,x);
-	// elf_set_node_register(fs,line,id,elf_get_node_register(fs,x));
+	elNodeId id = elf_make_node_unary(fs,line,NODE_GROUP,elf_get_node_type(fs,x),x);
 	return id;
 }
 
@@ -170,7 +160,7 @@ elNodeId elf_make_closure_value_node(elFileState *fs, elf_lineid line, elRegId x
 }
 
 
-elNodeId elf_make_node_local_register(elFileState *fs, elf_lineid line, elRegId x) {
+elNodeId elf_make_local_target_node(elFileState *fs, elf_lineid line, elRegId x) {
 	return elf_make_node_unary(fs,line,NODE_LOCAL,NT_ANY,x);
 }
 
@@ -195,7 +185,7 @@ elNodeId elf_make_ranged_index_node(elFileState *fs, elf_lineid line, elNodeId x
 }
 
 
-elNodeId elf_make_meta_field_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+elNodeId elf_make_metafield_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
 	return elf_make_binary_node(fs,line,NODE_METAFIELD,NT_ANY,x,y);
 }
 
@@ -206,15 +196,9 @@ elNodeId elf_make_call_node(elFileState *fs, elf_lineid line, elNodeId x, elNode
 
 
 elNodeId elf_make_node_less_than(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
-#if 0
-	/* todo: this isn't really necessary, and it will get
-	in the way as we introduce operator overloading */
-	if (elf_get_node_type(fs,x) != NT_INT) {
-		x = elf_make_type_guard_node(fs,elf_get_node_line(fs,x),x,NT_INT);
-	}
-	if (elf_get_node_type(fs,y) != NT_INT) {
-		y = elf_make_type_guard_node(fs,elf_get_node_line(fs,y),y,NT_INT);
-	}
-#endif
 	return elf_make_binary_node(fs,line,NODE_LT,NT_BOL,x,y);
+}
+
+elNodeId elf_make_node_is_nil(elFileState *fs, elf_lineid line, elNodeId x) {
+	return elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,x,elf_make_nil_node(fs,line));
 }

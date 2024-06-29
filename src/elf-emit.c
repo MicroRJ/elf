@@ -361,9 +361,11 @@ elRegId elf_emitter_localize(elFileState *fs, elf_lineid line, elNodeId id) {
 	elRegId target_register = elf_get_node_register(fs,MAKE_NODE_ID(id));
 	if (target_register == NO_SLOT) {
 		target_register = elf_emitter_local_alloc(fs,line,NO_SLOT,id);
-		elRegId final_register = elf_emitter_local_load(fs,line,0,target_register,1,id);
-		elf_ensure(final_register == target_register);
+		// elRegId final_register = elf_emitter_local_load(fs,line,0,target_register,1,id);
+		// elf_ensure(final_register == target_register);
 	}
+	elRegId final_register = elf_emitter_local_load(fs,line,0,target_register,1,id);
+	elf_ensure(final_register == target_register);
 	return target_register;
 }
 
@@ -439,6 +441,13 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 	variables */
 	elRegId mem = elf_get_memory_state(fs);
 
+	/* todo: this is flawed, if we have some node like a
+	type-guard wrapping a local, 'get_register' will find
+	the register of the node local within, which will
+	cause the type-guard not to be emitted, one solution
+	would be to avoid doing this sort of logic here or
+	checking only whether the node itself has a register
+	and not some target node within... */
 	elRegId already_register = elf_get_node_register(fs,MAKE_NODE_ID(id));
 	/* if node is already local and no reloading is necessary */
 	if ((target_register != NO_SLOT) && (already_register != NO_SLOT) && (already_register != target_register)) {
@@ -527,29 +536,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 			elf_emitter_unload(fs,v.x);
 			elf_emitter_unload(fs,v.y);
 		} break;
-		//
-		// expressions on the left hand side of an
-		// assignment statement, of the form:
-		//
-		// {x}[{x}..{x}]
-		//
-		// e.g: A[B..C][D..E][F..G]
-		//
-		// take the following semantic meaning:
-		//
-		// for __0 over B..C ? {
-		// 	for __1 over D..E ? {
-		//			for __2 over F..G ? {
-		//				A[__0][__1][__2] = H
-		//			}
-		//		}
-		// }
-		//
-		// this case handles converting range
-		// expressions B..C and D..E into
-		// registers, call unload with the
-		// node id to emit epiloge.
-		//
+		// prepositional expressions?
 		case NODE_RANGE_INDEX: {
 			if (elf_get_node_kind(fs,target_node.x) == NODE_RANGE_INDEX) elf_debugger("test-break");
 			if (elf_get_node_kind(fs,target_node.y) == NODE_RANGE_INDEX) elf_debugger("test-break");
@@ -559,7 +546,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 			elRegId xx = elf_emitter_localize(fs,line,target_node.x);
 			elRegId yy = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 			elf_emitter_begin_ranged_loop(fs,line
-			,	elf_make_node_local_register(fs,line,yy)
+			,	elf_make_local_target_node(fs,line,yy)
 			,	elf_get_node(fs,target_node.y).x
 			, 	elf_get_node(fs,target_node.y).y);
 			elf_emitter_add_bytexyz(fs,line,BC_INDEX,target_register,xx,yy);
@@ -734,7 +721,7 @@ void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNod
 			elRegId xx = elf_emitter_localize(fs,line,v.x);
 			elf_emitter_enter_block(fs,BLOCK_LOOP);
 			elf_emitter_begin_ranged_loop(fs,line
-			,	elf_make_node_local_register(fs,line,ii)
+			,	elf_make_local_target_node(fs,line,ii)
 			,	elf_get_node(fs,v.y).x
 			,	elf_get_node(fs,v.y).y);
 			elf_emitter_add_bytexyz(fs,line,BC_SETINDEX,xx,ii,yy);
@@ -807,7 +794,7 @@ void elf_emitter_add_then_clause(elFileState *fs, elf_lineid line, elSelectState
 }
 
 
-void elf_emitter_add_if_clause(elFileState *fs, elf_lineid line, elSelectState *s) {
+void elf_emitter_close_if(elFileState *fs, elf_lineid line, elSelectState *s) {
 	/* collect missing else branch */
 	if (s->jz != elNil) {
 		elf_tie_loose_jump_list(fs,s->jz);
@@ -1020,16 +1007,16 @@ void elf_emitter_begin_ranged_loop(elFileState *fs, elf_lineid line, elNodeId in
 	elf_ensure(index_node != NO_NODE);
 
 	elRegId index_register = elf_emitter_localize(fs,line,index_node);
-	index_node = elf_make_node_local_register(fs,line,index_register);
+	index_node = elf_make_local_target_node(fs,line,index_register);
 
 	bl->loop.index_register = index_register;
 	bl->loop.x = index_node;
-	elf_emitter_local_load(fs,line,elTrue,index_register,1,lo);
+	elf_emitter_local_load(fs,line,elTrue,index_register,1,elf_make_type_guard_node(fs,elf_get_node_line(fs,lo),lo,NT_INT));
 
 	bl->loop.entry = elf_get_last_byteid(fs);
 
-	elRegId hi_register = elf_emitter_localize(fs,line,hi);
-	hi = elf_make_node_local_register(fs,line,hi_register);
+	elRegId hi_register = elf_emitter_localize(fs,line,elf_make_type_guard_node(fs,elf_get_node_line(fs,hi),hi,NT_INT));
+	hi = elf_make_local_target_node(fs,line,hi_register);
 	elNodeId c = elf_make_node_less_than(fs,line,index_node,hi);
 
 	elf_ensure(bl->loop.false_jumps == elNil);

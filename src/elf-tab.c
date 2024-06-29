@@ -164,7 +164,7 @@ void elf_tabset(elTable *table, elValue k, elValue v) {
 }
 
 
-elValue elf_tablookup(elTable *tab, elValue k) {
+elValue elf_table_lookup(elTable *tab, elValue k) {
 	elInteger slot = elf_tabhashin(tab,k);
 	if (elf_tabslotiskey(tab,slot)) {
 		return elf_tabslot2value(tab,slot);
@@ -214,29 +214,29 @@ void elf_tabstralias(elState *S, elTable *tab, char *key, elValue alias) {
 
 
 elValue elf_tabgetfld(elTable *tab, elString *key) {
-	return elf_tablookup(tab,elf_valstr(key));
+	return elf_table_lookup(tab,elf_valstr(key));
 }
 
 
 elNumber elf_tabgetnum(elTable *tab, elString *key) {
-	elValue val = elf_tablookup(tab,elf_valstr(key));
+	elValue val = elf_table_lookup(tab,elf_valstr(key));
 	return elf_tonum(val);
 }
 
 
 elInteger elf_tabgetint(elTable *tab, elString *key) {
-	elValue val = elf_tablookup(tab,elf_valstr(key));
+	elValue val = elf_table_lookup(tab,elf_valstr(key));
 	return elf_toint(val);
 }
 
 
 elString *elf_tabgetstr(elTable *tab, elString *key) {
-	return elf_tablookup(tab,elf_valstr(key)).x_str;
+	return elf_table_lookup(tab,elf_valstr(key)).x_str;
 }
 
 
 elTable *elf_tabgettab(elTable *tab, elString *key) {
-	return elf_tablookup(tab,elf_valstr(key)).x_tab;
+	return elf_table_lookup(tab,elf_valstr(key)).x_tab;
 }
 
 
@@ -275,14 +275,14 @@ void elf_tabsettabfld(elTable *tab, elString *key, elTable *val) {
 
 int elf_tablength_(elState *R) {
 	elTable *tab = (elTable*) elf_getthis(R);
-	elf_pushint(R,elf_xarray_length(tab->array));
+	elf_push_integer(R,elf_xarray_length(tab->array));
 	return 1;
 }
 
 
 int elf_tabtally_(elState *R) {
 	elTable *tab = (elTable*) elf_getthis(R);
-	elf_pushint(R,elf_xarray_length(tab->array));
+	elf_push_integer(R,elf_xarray_length(tab->array));
 	return 1;
 }
 
@@ -291,7 +291,7 @@ int elf_tabhaskey_(elState *c) {
 	elf_ensure(c->f->x == 1);
 	elTable *table = (elTable*) elf_getthis(c);
 	elValue k = elf_getany(c,0);
-	elf_pushint(c,elf_tabslotiskey(table,elf_tabhashin(table,k)));
+	elf_push_integer(c,elf_tabslotiskey(table,elf_tabhashin(table,k)));
 	return 1;
 }
 
@@ -300,14 +300,14 @@ int elf_tablookup_(elState *c) {
 	elf_ensure(c->f->x == 1);
 	elValue k = elf_getany(c,0);
 	elTable *table = (elTable*) c->f->obj;
-	elf_pushany(c,elf_tablookup(table,k));
+	elf_pushany(c,elf_table_lookup(table,k));
 	return 1;
 }
 
 
 int elf_tabcollisions_(elState *c) {
 	elTable *table = (elTable*) c->f->obj;
-	elf_pushint(c,table->ncollisions);
+	elf_push_integer(c,table->ncollisions);
 	return 1;
 }
 
@@ -334,7 +334,7 @@ void elf_tabmerge(elTable *tab, elTable *merger) {
 
 int elf_tabinject_(elState *R) {
 	elTable *tab = (elTable *) elf_getthis(R);
-	if (elf_gettag(R,0) == TAG_TAB) {
+	if (elf_get_tag(R,0) == TAG_TAB) {
 		elf_tabmerge(tab,elf_gettab(R,0));
 	} else {
 		elf_tabadd(tab,elf_getany(R,0));
@@ -351,7 +351,7 @@ int elf_itemize_(elState *R) {
 	}
 	int i;
 	for (i=0;i<R->call->nx;++i) {
-		if (elf_gettag(R,0) == TAG_TAB) {
+		if (elf_get_tag(R,0) == TAG_TAB) {
 			elTable *that = elf_gettab(R,0);
 			elf_varforj(that->array) {
 				elf_tabadd(result,that->array[j]);

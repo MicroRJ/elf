@@ -27,5 +27,5 @@ int jitlib_jit(elState *rt) {
 
 elf_api void jitlib_load(elState *rt) {
 	elModule *md = rt->md;
-	elf_add_global_value(md,elf_pushnewstr(rt,"jit"),elf_valbid(jitlib_jit));
+	elf_add_global_value(md,elf_push_new_string(rt,"jit"),elf_valbid(jitlib_jit));
 }

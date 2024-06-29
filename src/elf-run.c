@@ -23,23 +23,23 @@ void elf_runini(elState *R, elModule *M) {
 	R->call = &R->root_call;
 
 	M->globals = elf_pushnewtab(R);
-	R->cache.x = elf_pushnewstr(R,"x");
-	R->cache.y = elf_pushnewstr(R,"y");
-	R->cache.z = elf_pushnewstr(R,"z");
-	R->cache.w = elf_pushnewstr(R,"w");
-	R->cache.width = elf_pushnewstr(R,"width");
-	R->cache.height = elf_pushnewstr(R,"height");
-	R->cache.__getfield = elf_pushnewstr(R,"__getfield");
-	R->cache.__setfield = elf_pushnewstr(R,"__setfield");
-	R->cache.__add = elf_pushnewstr(R,"__add");
-	R->cache.__sub = elf_pushnewstr(R,"__sub");
-	R->cache.__mul = elf_pushnewstr(R,"__mul");
-	R->cache.__div = elf_pushnewstr(R,"__div");
-	R->cache.__add1 = elf_pushnewstr(R,"__add1");
-	R->cache.__sub1 = elf_pushnewstr(R,"__sub1");
-	R->cache.__mul1 = elf_pushnewstr(R,"__mul1");
-	R->cache.__div1 = elf_pushnewstr(R,"__div1");
-	R->cache.__hash = elf_pushnewstr(R,"__hash");
+	R->cache.x = elf_push_new_string(R,"x");
+	R->cache.y = elf_push_new_string(R,"y");
+	R->cache.z = elf_push_new_string(R,"z");
+	R->cache.w = elf_push_new_string(R,"w");
+	R->cache.width = elf_push_new_string(R,"width");
+	R->cache.height = elf_push_new_string(R,"height");
+	R->cache.__getfield = elf_push_new_string(R,"__getfield");
+	R->cache.__setfield = elf_push_new_string(R,"__setfield");
+	R->cache.__add = elf_push_new_string(R,"__add");
+	R->cache.__sub = elf_push_new_string(R,"__sub");
+	R->cache.__mul = elf_push_new_string(R,"__mul");
+	R->cache.__div = elf_push_new_string(R,"__div");
+	R->cache.__add1 = elf_push_new_string(R,"__add1");
+	R->cache.__sub1 = elf_push_new_string(R,"__sub1");
+	R->cache.__mul1 = elf_push_new_string(R,"__mul1");
+	R->cache.__div1 = elf_push_new_string(R,"__div1");
+	R->cache.__hash = elf_push_new_string(R,"__hash");
 
 	//TODO: temporary fix
 	R->call->locals = R->top;
@@ -148,7 +148,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 
 	elFileFnState fn = {0};
 	elf_emitter_enter_function(fs,&fn,fs->tk.line);
-	elNodeId id = elf_fs_load_expr(fs);
+	elNodeId id = elf_load_file_expr(fs);
 	elf_emit_yield(fs,fs->tk.line,id);
 	elf_emitter_leave_function(fs);
 
@@ -187,7 +187,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	elf_lexone(fs); elf_lexone(fs);
 	elFileFnState fn = {0};
 	elf_emitter_enter_function(fs,&fn,fs->tk.line);
-	while (!elf_test_token(fs,0)) elf_fs_load_stat(fs);
+	while (!elf_test_token(fs,0)) elf_load_file_stat(fs);
 	elf_emitter_leave_function(fs);
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */
@@ -443,14 +443,12 @@ int elf_run(elState *R) {
 		elValue yy = locals[b.z];
 		if (xx.tag == TAG_NIL) {
 			elf_throw(R,bc,"attempted to get field of nil value");
-		}
-		if (yy.tag == TAG_NIL) {
-			elf_throw(R,bc,"attempted to get field of with nil key");
+		} else if (yy.tag == TAG_NIL) {
+			elf_throw(R,bc,"attempted to get nil field");
 		}
 		if (xx.tag == TAG_TAB) {
-			locals[b.x] = elf_tablookup(xx.x_tab,yy);
+			locals[b.x] = elf_table_lookup(xx.x_tab,yy);
 		} else if (xx.tag == TAG_OBJ) {
-
 			// elf_calloverload(R,xx.x_obj->metatable,R->cache.__getfield,b.x,yy);
 	elValue overload = elf_tabgetfld(xx.x_obj->metatable,R->cache.__getfield);
 	if (overload.tag != TAG_NIL) {
@@ -543,7 +541,11 @@ int elf_run(elState *R) {
 	case BC_METAFIELD: {
 		elValue *yy = &locals[b.y];
 		if (elf_is_object_tag(yy->tag)) {
-			locals[b.x] = elf_tablookup(yy->j->metatable,locals[b.z]);
+			if (yy->x_obj->metatable != elNil) {
+				locals[b.x] = elf_table_lookup(yy->x_obj->metatable,locals[b.z]);
+			} else {
+				elf_throw(R,bc,"object does not have a metatable");
+			}
 		} else {
 			locals[b.x] = (elValue){TAG_NIL};
 			elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy->tag]));

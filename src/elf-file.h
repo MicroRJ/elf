@@ -175,9 +175,9 @@ typedef struct elFileState {
 } elFileState;
 
 
-elNodeId elf_fs_load_expr(elFileState *fs);
+elNodeId elf_load_file_expr(elFileState *fs);
 elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix);
-void elf_fs_load_stat(elFileState *fs);
+void elf_load_file_stat(elFileState *fs);
 
 
 
@@ -207,7 +207,7 @@ void elf_emitter_begin_if(elFileState *fs, elf_lineid line, elSelectState *s, el
 void elf_emitter_add_elif_clause(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x);
 void elf_emitter_add_else_clause(elFileState *fs, elf_lineid line, elSelectState *s);
 void elf_emitter_add_then_clause(elFileState *fs, elf_lineid line, elSelectState *s);
-void elf_emitter_add_if_clause(elFileState *fs, elf_lineid line, elSelectState *s);
+void elf_emitter_close_if(elFileState *fs, elf_lineid line, elSelectState *s);
 
 
 void elf_emitter_begin_ranged_loop(elFileState *fs, elf_lineid line, elNodeId x, elNodeId lo, elNodeId hi);

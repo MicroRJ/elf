@@ -50,6 +50,7 @@ additional checks everywhere which is annoying */
 	_(INTEGER) _(NUMBER) _(NIL)\
 	_(GLOBAL) _(LOCAL) _(CLOSURE_VALUE) _(FILE_VALUE)\
 	_(THIS)\
+	_(MULTI)\
 	_(INDEX)\
 	_(FIELD) _(METAFIELD)\
 	_(CALL)\
@@ -114,12 +115,12 @@ elNodeId elf_make_closure_node(elFileState *fs, elf_lineid, elNodeId x, elNodeId
 
 elNodeId elf_make_load_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 
-elNodeId elf_make_node_local_register(elFileState *fs, elf_lineid line, elNodeId i);
+elNodeId elf_make_local_target_node(elFileState *fs, elf_lineid line, elNodeId i);
 elNodeId elf_make_global_value_node(elFileState *fs, elf_lineid line, elNodeId i);
 elNodeId elf_make_closure_value_node(elFileState *fs, elf_lineid line, elNodeId i);
 
 elNodeId elf_make_type_guard_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeTy y);
-elNodeId elf_make_meta_field_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
+elNodeId elf_make_metafield_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 elNodeId elf_make_field_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 elNodeId elf_make_index_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 

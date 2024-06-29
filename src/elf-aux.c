@@ -13,28 +13,28 @@ void elf_debugger(char *message) {
 }
 
 
-void elf_registersys(elState *R, char *name, elHandle val) {
-	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valsys(val));
+void elf_register_handle(elState *R, char *name, elHandle val) {
+	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valsys(val));
 }
 
 
-void elf_registerint(elState *R, char *name, elInteger val) {
-	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valint(val));
+void elf_register_integer(elState *R, char *name, elInteger val) {
+	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valint(val));
 }
 
 
 void elf_registertab(elState *R, char *name, elTable *val) {
-	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valtab(val));
+	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valtab(val));
 }
 
 
-void elf_registerstr(elState *R, char *name, char *val) {
-	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valstr(elf_pushnewstr(R,val)));
+void elf_register_string(elState *R, char *name, char *val) {
+	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valstr(elf_push_new_string(R,val)));
 }
 
 
-void elf_register(elState *R, char *name, elBinding fn) {
-	elf_add_global_value(R->M,elf_pushnewstr(R,name),elf_valbid(fn));
+void elf_register_binding(elState *R, char *name, elBinding fn) {
+	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valbid(fn));
 }
 
 

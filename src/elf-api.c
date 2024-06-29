@@ -15,7 +15,7 @@ elf_api elObject *elf_getthis(elState *R) {
 }
 
 
-elf_api elObjectTag elf_gettag(elState *R, elRegId x) {
+elf_api elObjectTag elf_get_tag(elState *R, elRegId x) {
 	return R->call->locals[x].tag;
 }
 
@@ -136,7 +136,7 @@ void elf_pushnil(elState *R) {
 }
 
 
-void elf_pushint(elState *R, elInteger i) {
+void elf_push_integer(elState *R, elInteger i) {
 	R->top->tag = TAG_INT;
 	R->top->i = i;
 	_INC_TOP;
@@ -165,7 +165,7 @@ elString *elf_pushstr(elState *R, elString *str) {
 }
 
 
-elString *elf_pushnewstr(elState *R, char *chr) {
+elString *elf_push_new_string(elState *R, char *chr) {
 	return elf_pushstr(R,elf_newstr(R,chr));
 }
 
