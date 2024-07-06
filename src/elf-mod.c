@@ -8,7 +8,7 @@
 /* todo: ensure that we don't have to replace symbols */
 elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
 	if (name != 0) {
-		return elf_tabtake(M->g,elf_valstr(name));
+		return elf_table_take(M->globals,elf_string_value(name));
 	} else return elf_xarray_growby(M->globals->array,1);
 }
 
@@ -34,7 +34,7 @@ void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode 
 	if (fid != -1) {
 		elFileInfo file = md->files[fid];
 		int linenum;
-		elf_getlinelocinfo(file.lines,md->lines[id],&linenum,0);
+		elf_get_line_location_info(file.lines,md->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name,linenum);
 	}
 
@@ -70,7 +70,7 @@ void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode 
 }
 
 
-void elf_getlinelocinfo(char *q, char *p, int *linenum, char **lineloc);
+void elf_get_line_location_info(char *q, char *p, int *linenum, char **lineloc);
 
 
 void lang_dumpmodule(elModule *md, elHandle io) {
@@ -94,7 +94,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 			elBytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
-			// elf_getlinelocinfo(md->file,md->lines[j],&linenum,&lineloc);
+			// elf_get_line_location_info(md->file,md->lines[j],&linenum,&lineloc);
 			// fprintf(file,"%-3i:%-3i",linenum,(int)(md->lines[j]-lineloc));
 			elf_bytefpf(io,md,i,j,b);
 		}

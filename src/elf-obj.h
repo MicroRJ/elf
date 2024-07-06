@@ -33,8 +33,8 @@ typedef enum elObjType {
 typedef struct elObject {
 	elObjType type;
 	elGCColor color;
-	elInteger tell;
 	elTable *metatable;
+	short tell;
 } elObject;
 
 
@@ -61,7 +61,7 @@ typedef struct elValue {
 	elObjectTag tag;
 	union {
 		elAddr p,x_ptr;
-		elHandle h;
+		elHandle h,x_sys;
 		elBinding c;
 		elInteger i,x_int;
 		elNumber n,x_num;
@@ -82,12 +82,12 @@ typedef struct elClosure {
 } elClosure;
 
 
-elf_api elValue elf_valtab(elTable *);
-elf_api elValue elf_valbid(elBinding);
-elf_api elValue elf_valstr(elString *);
-elf_api elValue elf_valcls(elClosure *);
-elf_api elValue elf_valint(elInteger i);
-elf_api elValue elf_valnum(elNumber n);
+elf_api elValue elf_table_value(elTable *);
+elf_api elValue elf_binding_value(elBinding);
+elf_api elValue elf_string_value(elString *);
+elf_api elValue elf_closure_value(elClosure *);
+elf_api elValue elf_integer_value(elInteger i);
+elf_api elValue elf_number_value(elNumber n);
 
 
 

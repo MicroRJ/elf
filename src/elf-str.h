@@ -16,8 +16,8 @@ typedef struct elString {
 } elString;
 
 
-elString *elf_newstrlen(elState *R, elInteger length);
-elString *elf_newstr(elState *R, char *contents);
+elString *elf_new_string_of_length(elState *R, elInteger length);
+elString *elf_new_string(elState *R, char *contents);
 elTable *elf_newstrmetatab(elState *R);
 
 

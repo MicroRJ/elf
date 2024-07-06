@@ -68,8 +68,9 @@ I want to use instead! */
 
 elf_api elBool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
+	fclose(_logging_io);
 	DebugBreak();
-		return 1;
+	return 1;
 #elif defined(PLATFORM_WEB)
 	emscripten_debugger();
 	return 1;

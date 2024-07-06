@@ -5,21 +5,21 @@
 */
 
 
-elTable *elf_newstrmetatab(elState *R) {
-	elTable *tab = elf_pushnewtab(R);
-	elf_tabmfld(R,tab,"length",elfstr_length_);
-	elf_tabmfld(R,tab,"match",elfstr_match_);
-	elf_tabmfld(R,tab,"gethash",elfstr_gethash_);
-	elf_tabmfld(R,tab,"append",elfstr_append_);
-	elf_tabmfld(R,tab,"touppercase",elfstr_touppercase_);
-	elf_tabmfld(R,tab,"tolowercase",elfstr_tolowercase_);
-	elf_tabmfld(R,tab,"__add",elfstr_append_);
+elTable *elf_new_string_metatable(elState *R) {
+	elTable *tab = elf_add_new_table(R);
+	elf_table_set_binding_field(R,tab,"length",elfstr_length_);
+	elf_table_set_binding_field(R,tab,"match",elfstr_match_);
+	elf_table_set_binding_field(R,tab,"gethash",elfstr_gethash_);
+	elf_table_set_binding_field(R,tab,"append",elfstr_append_);
+	elf_table_set_binding_field(R,tab,"touppercase",elfstr_touppercase_);
+	elf_table_set_binding_field(R,tab,"tolowercase",elfstr_tolowercase_);
+	elf_table_set_binding_field(R,tab,"__add",elfstr_append_);
 	return tab;
 }
 
 
-elString *elf_newstrlen(elState *R, elInteger length) {
-	elString *obj = elf_allocate_new_object(R,OBJ_STRING,sizeof(elString)+length+1);
+elString *elf_new_string_of_length(elState *R, elInteger length) {
+	elString *obj = elf_new_object(R,OBJ_STRING,sizeof(elString)+length+1);
 	if (R) obj->obj.metatable = R->metatab_str;
 	obj->length = length;
 	obj->hash = -1;
@@ -28,9 +28,9 @@ elString *elf_newstrlen(elState *R, elInteger length) {
 }
 
 
-elString *elf_newstr(elState *R, char *junk) {
+elString *elf_new_string(elState *R, char *junk) {
 	int length = elf_cstrlen(junk);
-	elString *obj = elf_newstrlen(R,length);
+	elString *obj = elf_new_string_of_length(R,length);
 	elf_memcopy(obj->c,junk,length);
 	obj->hash = elf_tabhashstr((char*)junk);
 	return obj;
@@ -49,7 +49,7 @@ elBool elf_streq(elString *x, elString *y) {
 
 
 int elfstr_length_(elState *c) {
-	elf_push_integer(c,((elString*)c->f->obj)->length);
+	elf_add_integer(c,((elString*)c->f->obj)->length);
 	return 1;
 }
 
@@ -69,11 +69,11 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 
 int elfstr_append_(elState *R) {
-	elString *str = (elString*) elf_getthis(R);
+	elString *str = (elString*) elf_get_this(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->c);
 	for (int i = 0; i < R->call->nx; ++ i) {
-		elValue v = elf_getany(R,i);
+		elValue v = elf_get_value(R,i);
 		if (v.tag == TAG_STR) {
 			strcatf(buffer,"%s",v.x_str->c);
 		} else if (v.tag == TAG_NIL) {
@@ -84,28 +84,28 @@ int elfstr_append_(elState *R) {
 			strcatf(buffer,"%lli",v.x_int);
 		} else elf_unreachable;
 	}
-	elf_push_new_string(R,buffer);
+	elf_add_new_string(R,buffer);
 	return 1;
 }
 
 
 int elfstr_match_(elState *R) {
-	elString *s = (elString*) elf_getthis(R);
-	elString *p = elf_getstr(R,0);
-	elf_push_integer(R,elf_cstrmatch(p->string,s->string));
+	elString *s = (elString*) elf_get_this(R);
+	elString *p = elf_get_string(R,0);
+	elf_add_integer(R,elf_cstrmatch(p->string,s->string));
 	return 1;
 }
 
 
 int elfstr_gethash_(elState *R) {
-	elString *str = (elString*) elf_getthis(R);
-	elf_push_integer(R,str->hash);
+	elString *str = (elString*) elf_get_this(R);
+	elf_add_integer(R,str->hash);
 	return 1;
 }
 
 
 int elfstr_tolowercase_(elState *R) {
-	elString *str = (elString*) elf_getthis(R);
+	elString *str = (elString*) elf_get_this(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtolowercase(str->c[i]);
@@ -115,7 +115,7 @@ int elfstr_tolowercase_(elState *R) {
 
 
 int elfstr_touppercase_(elState *R) {
-	elString *str = (elString*) elf_getthis(R);
+	elString *str = (elString*) elf_get_this(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtouppercase(str->c[i]);

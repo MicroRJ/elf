@@ -6,12 +6,16 @@
 
 
 void elf_runini(elState *R, elModule *M) {
+	#if 0
+	_logging_io = fopen("elf.logs.txt","wb");
+	#endif
+
 	R->M = M;
 	R->bytelogging = false;
 	R->stklen = 4096;
 	R->stk = R->top = elf_clear_alloc(lHEAP,sizeof(elValue)*R->stklen);
-	R->metatab_str = elf_newstrmetatab(R);
-	R->metatab_tab = elf_newtabmetatab(R);
+	R->metatab_str = elf_new_string_metatable(R);
+	R->metatab_tab = elf_new_table_metatable(R);
 	R->call_level = 0;
 
 	//TODO: So when you call a function,
@@ -22,24 +26,24 @@ void elf_runini(elState *R, elModule *M) {
 	R->root_call.locals = R->top;
 	R->call = &R->root_call;
 
-	M->globals = elf_pushnewtab(R);
-	R->cache.x = elf_push_new_string(R,"x");
-	R->cache.y = elf_push_new_string(R,"y");
-	R->cache.z = elf_push_new_string(R,"z");
-	R->cache.w = elf_push_new_string(R,"w");
-	R->cache.width = elf_push_new_string(R,"width");
-	R->cache.height = elf_push_new_string(R,"height");
-	R->cache.__getfield = elf_push_new_string(R,"__getfield");
-	R->cache.__setfield = elf_push_new_string(R,"__setfield");
-	R->cache.__add = elf_push_new_string(R,"__add");
-	R->cache.__sub = elf_push_new_string(R,"__sub");
-	R->cache.__mul = elf_push_new_string(R,"__mul");
-	R->cache.__div = elf_push_new_string(R,"__div");
-	R->cache.__add1 = elf_push_new_string(R,"__add1");
-	R->cache.__sub1 = elf_push_new_string(R,"__sub1");
-	R->cache.__mul1 = elf_push_new_string(R,"__mul1");
-	R->cache.__div1 = elf_push_new_string(R,"__div1");
-	R->cache.__hash = elf_push_new_string(R,"__hash");
+	M->globals = elf_add_new_table(R);
+	R->cache.x = elf_add_new_string(R,"x");
+	R->cache.y = elf_add_new_string(R,"y");
+	R->cache.z = elf_add_new_string(R,"z");
+	R->cache.w = elf_add_new_string(R,"w");
+	R->cache.width = elf_add_new_string(R,"width");
+	R->cache.height = elf_add_new_string(R,"height");
+	R->cache.__getfield = elf_add_new_string(R,"__getfield");
+	R->cache.__setfield = elf_add_new_string(R,"__setfield");
+	R->cache.__add = elf_add_new_string(R,"__add");
+	R->cache.__sub = elf_add_new_string(R,"__sub");
+	R->cache.__mul = elf_add_new_string(R,"__mul");
+	R->cache.__div = elf_add_new_string(R,"__div");
+	R->cache.__add1 = elf_add_new_string(R,"__add1");
+	R->cache.__sub1 = elf_add_new_string(R,"__sub1");
+	R->cache.__mul1 = elf_add_new_string(R,"__mul1");
+	R->cache.__div1 = elf_add_new_string(R,"__div1");
+	R->cache.__hash = elf_add_new_string(R,"__hash");
 
 	//TODO: temporary fix
 	R->call->locals = R->top;
@@ -164,7 +168,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
-	return elf_callexx(R,elNil,elf_valcls(elf_new_closure(R,p)),rxy,rxy,0,ny);
+	return elf_callexx(R,elNil,elf_closure_value(elf_new_closure(R,p)),rxy,rxy,0,ny);
 }
 
 
@@ -205,7 +209,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
-	elValue cls = elf_valcls(elf_new_closure(R,p));
+	elValue cls = elf_closure_value(elf_new_closure(R,p));
 	return elf_callexx(R,elNil,cls,rxy,rxy,0,ny);
 }
 
@@ -245,8 +249,8 @@ void elf_check_division_by_zero(elState *S, elValue xx, elValue yy) {
 }
 
 
-int elf_calloverload(elState *S, elObject *obj, elString *name, elRegId io, elValue in) {
-	elValue field = elf_tabgetfld(obj->metatable,name);
+int elf_call_overload(elState *S, elObject *obj, elString *name, elRegId io, elValue in) {
+	elValue field = elf_table_get_field(obj->metatable,name);
 	if (field.tag != TAG_CLS && field.tag != TAG_BID) {
 		elf_throw(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
 	}
@@ -300,16 +304,14 @@ int elf_run(elState *R) {
 		if (R->bytetracking) {
 			elInteger track = ++ M->track[bc];
 			if (track == 64) {
-				elFileInfo file = M->files[elf_fndfilebybyte(M,bc)];
+				elFileInfo file = M->files[elf_find_file_info_by_byte(M,bc)];
 				elf_lineid line = M->lines[bc];
 				int linenum;
-				elf_getlinelocinfo(file.lines,line,&linenum,0);
-				elf_logdebug("%s %i: %lli: %lli detected hot path",file.name,linenum,bc,track);
+				elf_get_line_location_info(file.lines,line,&linenum,0);
+				elf_debug_log("%s %i: %lli: %lli detected hot path",file.name,linenum,bc,track);
 			}
 		}
 #endif
-
-
 		switch (b.k) {
 	case BC_LEAVE: {
 		if (call->delay_list != elNil) {
@@ -339,7 +341,7 @@ int elf_run(elState *R) {
 		call->tail = jp + b.x;
 	} break;
 	// case BC_LOADFILE: {
-	// 	elString *fname = elf_getstr(R,b.x);
+	// 	elString *fname = elf_get_string(R,b.x);
 	// 	if (fname == elNil) elf_throw(R,bc,"'load': attempted to call load with nil");
 	// 	int result = elf_loadfile(R,fname,b.x,b.y);
 	// 	if (result == -1) {
@@ -387,7 +389,7 @@ int elf_run(elState *R) {
 			*/
 			elf_throw(R,NO_BYTE,"'this' is invalid for this function, not a meta-call");
 		}
-		locals[b.x].tag = elf_objtotag(call->obj->type);
+		locals[b.x].tag = elf_object_type_to_value_tag(call->obj->type);
 		locals[b.x].x_obj = call->obj;
 	} break;
 	case BC_RELOAD: {
@@ -431,41 +433,67 @@ int elf_run(elState *R) {
 		local is renamed atomically, otherwise
 		gc could trigger in between think the
 		local is some other type */
-		elTable *tab = elf_newtab(R);
+		elTable *tab = elf_new_table(R);
 		locals[b.x].tag = TAG_TAB;
 		locals[b.x].x_tab = tab;
 	} break;
 	case BC_TYPEGUARD: {
-		elf_tycheck(R,bc,b.x,b.y,locals[b.x].tag);
+		elf_type_check(R,bc,b.x,b.y,locals[b.x].tag);
 	} break;
+	case BC_METAFIELD: {
+		elValue yy = locals[b.y];
+		if (elf_is_object_tag(yy.tag)) {
+			if (yy.x_obj->color == GC_RED) {
+				elf_throw(R,bc,elf_tpf("Invalid object '%p', GC'd.",yy.x_obj));
+			}
+			if (yy.x_obj->metatable != elNil) {
+				locals[b.x] = elf_table_lookup(yy.x_obj->metatable,locals[b.z]);
+			} else {
+				elf_throw(R,bc,"Invalid object, no metatable.");
+			}
+		} else {
+			locals[b.x] = (elValue){TAG_NIL};
+			elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy.tag]));
+		}
+	} break;
+	/* todo: why are these two so similar ... */
 	case BC_INDEX: case BC_FIELD: {
 		elValue xx = locals[b.y];
 		elValue yy = locals[b.z];
-		if (xx.tag == TAG_NIL) {
-			elf_throw(R,bc,"attempted to get field of nil value");
-		} else if (yy.tag == TAG_NIL) {
+		if (yy.tag == TAG_NIL) {
+			/* todo: this isn't a big deal... */
 			elf_throw(R,bc,"attempted to get nil field");
-		}
-		if (xx.tag == TAG_TAB) {
+		} else if (xx.tag == TAG_TAB) {
+			if (xx.x_obj->color == GC_RED) {
+				elf_throw(R,bc,"Invalid object, GC'd.");
+			}
 			locals[b.x] = elf_table_lookup(xx.x_tab,yy);
 		} else if (xx.tag == TAG_OBJ) {
-			// elf_calloverload(R,xx.x_obj->metatable,R->cache.__getfield,b.x,yy);
-	elValue overload = elf_tabgetfld(xx.x_obj->metatable,R->cache.__getfield);
-	if (overload.tag != TAG_NIL) {
-		if (overload.tag == TAG_CLS || overload.tag == TAG_BID) {
-			locals[b.x] = yy;
-			int ny = elf_callexx(R,xx.x_obj,overload,b.x,b.x,1,1);
-			if (ny < 1) {
-				elf_throw(R,NO_BYTE,"__getfield operator must return atleast one value");
+			if (xx.x_obj->color == GC_RED) {
+				elf_throw(R,bc,"Invalid object, GC'd.");
 			}
-		} else elf_throw(R,NO_BYTE,"__getfield operator must be a function");
-	} else elf_throw(R,NO_BYTE,"__getfield operator is not implemented for this object");
+			// elf_call_overload(R,xx.x_obj->metatable,R->cache.__getfield,b.x,yy);
+			elValue overload = elf_table_get_field(xx.x_obj->metatable,R->cache.__getfield);
+			if (overload.tag != TAG_NIL) {
+				if (overload.tag == TAG_CLS || overload.tag == TAG_BID) {
+					locals[b.x] = yy;
+					int ny = elf_callexx(R,xx.x_obj,overload,b.x,b.x,1,1);
+					if (ny < 1) {
+						elf_throw(R,NO_BYTE,"__getfield operator must return atleast one value");
+					}
+				} else elf_throw(R,NO_BYTE,"__getfield operator must be a function");
+			} else elf_throw(R,NO_BYTE,"__getfield operator is not implemented for this object");
 
 		} else if (xx.tag == TAG_STR) {
-			elf_tycheck(R,bc,0,TAG_INT,yy.tag);
+			// todo: allow for strings to find substrings,
+			// and return the index of the substring!
+			// for instance, "my name is"["name"].
+			elf_type_check(R,bc,0,TAG_INT,yy.tag);
 			locals[b.x].tag = TAG_INT;
-			locals[b.x].i   = locals[b.y].s->c[locals[b.z].i];
-		} else locals[b.x] = (elValue){TAG_NIL};
+			locals[b.x].i   = locals[b.y].x_str->c[locals[b.z].i];
+		} else if (xx.tag == TAG_NIL) {
+			elf_throw(R,bc,"attempted to get field of nil value");
+		} else elf_throw(R,bc,"invalid object to perform this operator on");
 	} break;
 	case BC_SETINDEX: case BC_SETFIELD: {
 		elValue xx,yy,zz;
@@ -478,7 +506,7 @@ int elf_run(elState *R) {
 				if (yy.x_obj->metatable == elNil) {
 					goto else_;
 				}
-				elValue overload = elf_tabgetfld(yy.x_obj->metatable,R->cache.__hash);
+				elValue overload = elf_table_get_field(yy.x_obj->metatable,R->cache.__hash);
 				if (overload.tag == TAG_NIL) {
 					goto else_;
 				}
@@ -489,15 +517,14 @@ int elf_run(elState *R) {
 						elf_throw(R,NO_BYTE,"overload function must return at least one value");
 					}
 				} else elf_throw(R,NO_BYTE,"'__hash': overload must be a function");
-			}
-			else else_:
+			} else else_:
 #endif
 			{
-				elf_tabset(xx.x_tab,yy,zz);
+				elf_table_insert(xx.x_tab,yy,zz);
 			}
 		} else if (xx.tag == TAG_OBJ) {
 
-	elValue overload = elf_tabgetfld(xx.x_obj->metatable,R->cache.__setfield);
+	elValue overload = elf_table_get_field(xx.x_obj->metatable,R->cache.__setfield);
 	if (overload.tag != TAG_NIL) {
 		if (overload.tag == TAG_CLS || overload.tag == TAG_BID) {
 			/* Here we use temporary stack space to put
@@ -534,23 +561,11 @@ int elf_run(elState *R) {
 		if (elf_is_object_tag(xx.tag)) {
 			elValue yy = locals[b.y];
 			elValue zz = locals[b.z];
-			elf_tabset(xx.x_obj->metatable,yy,zz);
+			elf_table_insert(xx.x_obj->metatable,yy,zz);
 		} else elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[xx.tag]));
 	} break;
 	#endif
-	case BC_METAFIELD: {
-		elValue *yy = &locals[b.y];
-		if (elf_is_object_tag(yy->tag)) {
-			if (yy->x_obj->metatable != elNil) {
-				locals[b.x] = elf_table_lookup(yy->x_obj->metatable,locals[b.z]);
-			} else {
-				elf_throw(R,bc,"object does not have a metatable");
-			}
-		} else {
-			locals[b.x] = (elValue){TAG_NIL};
-			elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy->tag]));
-		}
-	} break;
+
 	case BC_METACALL: {
 		elf_callex(R,locals[b.x].x_obj,b.x+1,b.x,b.y,b.z);
 		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
@@ -601,7 +616,7 @@ int elf_run(elState *R) {
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
 				elf_check_division_by_zero(R,xx,yy);\
 			}\
-			elf_calloverload(R,xx.x_obj,elf_is_object_tag(yy.tag)?FN:FN1,b.x,yy);\
+			elf_call_overload(R,xx.x_obj,elf_is_object_tag(yy.tag)?FN:FN1,b.x,yy);\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
 			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
 				elf_check_division_by_zero(R,xx,yy);\

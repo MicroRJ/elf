@@ -32,15 +32,15 @@ elf_api int netlib_close(elState *R) {
 
 
 elf_api int netlib_listen(elState *R) {
-	SOCKET handle = (SOCKET) elf_getsys(R,0);
+	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 	int error = listen(handle,SOMAXCONN);
-	elf_push_integer(R,error!=SOCKET_ERROR);
+	elf_add_integer(R,error!=SOCKET_ERROR);
 	return 1;
 }
 
 
 elf_api int netlib_accept(elState *R) {
-	SOCKET handle = (SOCKET) elf_getsys(R,0);
+	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 	SOCKET client = accept(handle,NULL,NULL);
 	elf_pushsys(R,(elHandle)client);
 	return 1;
@@ -48,7 +48,7 @@ elf_api int netlib_accept(elState *R) {
 
 
 elf_api int netlib_pollclient(elState *R) {
-	SOCKET handle = (SOCKET) elf_getsys(R,0);
+	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 	fd_set ready;
 	FD_ZERO(&ready);
 	FD_SET(handle,&ready);
@@ -64,8 +64,8 @@ elf_api int netlib_pollclient(elState *R) {
 
 
 elf_api int netlib_tcpserver(elState *R) {
-	elString *addrnameS = elf_getstr(R,0);
-	elString *addrportS = elf_getstr(R,1);
+	elString *addrnameS = elf_get_string(R,0);
+	elString *addrportS = elf_get_string(R,1);
 	char *addrname = addrnameS ? addrnameS->c : 0;
 	char *addrport = addrportS ? addrportS->c : 0;
 	ADDRINFOA idealaddr = {0};
@@ -87,8 +87,8 @@ elf_api int netlib_tcpserver(elState *R) {
 
 
 elf_api int netlib_tcpclient(elState *R) {
-	elString *addrnameS = elf_getstr(R,0);
-	elString *addrportS = elf_getstr(R,1);
+	elString *addrnameS = elf_get_string(R,0);
+	elString *addrportS = elf_get_string(R,1);
 	char *addrname = addrnameS ? addrnameS->c : 0;
 	char *addrport = addrportS ? addrportS->c : 0;
 	ADDRINFOA idealaddr = {0};
@@ -111,33 +111,33 @@ elf_api int netlib_tcpclient(elState *R) {
 
 elf_api int netlib_send(elState *R) {
 	/* todo: make this a class? */
-	SOCKET socket = (SOCKET) elf_getsys(R,0);
-	elString *payload = elf_getstr(R,1);
+	SOCKET socket = (SOCKET) elf_get_handle(R,0);
+	elString *payload = elf_get_string(R,1);
 	LMSG message = { payload->length };
 	elInteger sent = 0;
 	sent += send(socket,(char*)&message,sizeof(message),0);
 	sent += send(socket,payload->c,payload->length,0);
-	elf_push_integer(R,sent);
+	elf_add_integer(R,sent);
 	return 1;
 }
 
 
 elf_api int netlib_ioctl(elState *R) {
-	SOCKET socket = (SOCKET) elf_getsys(R,0);
+	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 	long mode = 1;
 	int error = ioctlsocket(socket,FIONBIO,&mode);
-	elf_push_integer(R,error == 0);
+	elf_add_integer(R,error == 0);
 	return 1;
 }
 
 
 elf_api int netlib_recv(elState *R) {
-	SOCKET socket = (SOCKET) elf_getsys(R,0);
+	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 	LMSG message = {0};
 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 		if (message.length != 0) {
 			elInteger length = message.length;
-			elString *obj = elf_newstrlen(R,length);
+			elString *obj = elf_new_string_of_length(R,length);
 			elf_pushstr(R,obj);
 			char *cursor = obj->c;
 			do {

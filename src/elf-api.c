@@ -5,12 +5,12 @@
 */
 
 
-elf_api int elf_ncallargs(elState *R) {
+elf_api int elf_get_num_args(elState *R) {
 	return R->call->nx;
 }
 
 
-elf_api elObject *elf_getthis(elState *R) {
+elf_api elObject *elf_get_this(elState *R) {
 	return R->call->obj;
 }
 
@@ -20,7 +20,7 @@ elf_api elObjectTag elf_get_tag(elState *R, elRegId x) {
 }
 
 
-elf_api elValue elf_getany(elState *R, elRegId x) {
+elf_api elValue elf_get_value(elState *R, elRegId x) {
 	return R->call->locals[x];
 }
 
@@ -30,7 +30,7 @@ void elf_expected(elState *S, elObjectTag tag, elObjectTag got, elRegId x) {
 }
 
 
-elf_api elString *elf_getstr(elState *R, elRegId x) {
+elf_api elString *elf_get_string(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
 	if (v.tag == TAG_STR) return v.x_str;
@@ -39,7 +39,7 @@ elf_api elString *elf_getstr(elState *R, elRegId x) {
 }
 
 
-elf_api char *elf_getcstr(elState *R, elRegId x) {
+elf_api char *elf_get_cstring(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
 	if (v.tag == TAG_STR) return v.x_str->c;
@@ -48,7 +48,7 @@ elf_api char *elf_getcstr(elState *R, elRegId x) {
 }
 
 
-elf_api elObject *elf_getobj(elState *R, elRegId x) {
+elf_api elObject *elf_get_object(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
 	if (elf_is_object_tag(v.tag)) return v.x_obj;
@@ -57,13 +57,12 @@ elf_api elObject *elf_getobj(elState *R, elRegId x) {
 }
 
 
-elf_api elTable *elf_gettab(elState *R, elRegId x) {
+elf_api elTable *elf_get_table(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
-	if (v.tag != TAG_NIL && v.tag != TAG_TAB) {
-		elf_throw(R,NO_BYTE,elf_tpf("expected table at local %i",x));
-		elf_unreachable;
-	}
-	return v.x_tab;
+	if (v.tag == TAG_TAB) {
+		return v.x_tab;
+	} else if (v.tag != TAG_NIL) elf_expected(R,TAG_TAB,v.tag,x);
+	return elNil;
 }
 
 
@@ -76,13 +75,13 @@ elf_api void elf_checkcl(elState *R, elRegId x) {
 }
 
 
-elf_api elClosure *elf_getcls(elState *R, elRegId x) {
+elf_api elClosure *elf_get_closure(elState *R, elRegId x) {
 	elf_checkcl(R,x);
 	return R->call->locals[x].f;
 }
 
 
-elf_api elHandle elf_getsys(elState *R, elRegId x) {
+elf_api elHandle elf_get_handle(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
@@ -92,7 +91,7 @@ elf_api elHandle elf_getsys(elState *R, elRegId x) {
 }
 
 
-elf_api elInteger elf_getint(elState *R, int x) {
+elf_api elInteger elf_get_integer(elState *R, int x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NUM) return (elInteger) v.x_num;
 	if (v.tag == TAG_INT) return v.x_int;
@@ -101,7 +100,7 @@ elf_api elInteger elf_getint(elState *R, int x) {
 }
 
 
-elf_api elNumber elf_getnum(elState *R, elRegId x) {
+elf_api elNumber elf_get_number(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_INT) return (elNumber) v.i;
 	if (v.tag == TAG_NUM) return v.x_num;
@@ -119,7 +118,7 @@ elRegId elf_pushmany(elState *R, int n) {
 }
 
 
-elRegId elf_pushany(elState *R, elValue v) {
+elRegId elf_add_value(elState *R, elValue v) {
 	*R->top = v;
 	return elf_pushmany(R,1);
 }
@@ -136,7 +135,7 @@ void elf_pushnil(elState *R) {
 }
 
 
-void elf_push_integer(elState *R, elInteger i) {
+void elf_add_integer(elState *R, elInteger i) {
 	R->top->tag = TAG_INT;
 	R->top->i = i;
 	_INC_TOP;
@@ -165,13 +164,13 @@ elString *elf_pushstr(elState *R, elString *str) {
 }
 
 
-elString *elf_push_new_string(elState *R, char *chr) {
-	return elf_pushstr(R,elf_newstr(R,chr));
+elString *elf_add_new_string(elState *R, char *chr) {
+	return elf_pushstr(R,elf_new_string(R,chr));
 }
 
 
 elString *elf_pushnewstrlen(elState *R, elInteger len) {
-	return elf_pushstr(R,elf_newstrlen(R,len));
+	return elf_pushstr(R,elf_new_string_of_length(R,len));
 }
 
 
@@ -185,7 +184,7 @@ void elf_settop(elState *R, elValue *top) {
 }
 
 
-elRegId elf_pushcls(elState *R, elClosure *cl) {
+elRegId elf_add_closure(elState *R, elClosure *cl) {
 	R->top->tag = TAG_CLS;
 	R->top->f   = cl;
 	elRegId id = R->top - R->call->locals;
@@ -194,7 +193,7 @@ elRegId elf_pushcls(elState *R, elClosure *cl) {
 }
 
 
-elObject *elf_pushobj(elState *R, elObject *obj) {
+elObject *elf_add_object(elState *R, elObject *obj) {
 	R->top->tag = TAG_OBJ;
 	R->top->x_obj = obj;
 	_INC_TOP;
@@ -203,7 +202,7 @@ elObject *elf_pushobj(elState *R, elObject *obj) {
 
 
 elObject *elf_pushnewobj(elState *R, elInteger tell) {
-	return elf_pushobj(R,elf_allocate_new_object(R,OBJ_CUSTOM,tell));
+	return elf_add_object(R,elf_new_object(R,OBJ_CUSTOM,tell));
 }
 
 
@@ -215,8 +214,8 @@ elTable *elf_pushtab(elState *R, elTable *tab) {
 }
 
 
-elTable *elf_pushnewtab(elState *R) {
-	return elf_pushtab(R,elf_newtab(R));
+elTable *elf_add_new_table(elState *R) {
+	return elf_pushtab(R,elf_new_table(R));
 }
 
 
@@ -236,5 +235,5 @@ elRegId elf_pushnewcls(elState *R, elProto fn) {
 	for (i=0; i<fn.zcache; ++i) {
 		cl->enclosure[i] = R->top[i];
 	}
-	return elf_pushcls(R,cl);
+	return elf_add_closure(R,cl);
 }

@@ -27,7 +27,7 @@ int main(int n, char **c) {
 	R.frame = &frame;
 
 	if (cli.filename != elNil) {
-		elString *filename = elf_push_new_string(&R,cli.filename);
+		elString *filename = elf_add_new_string(&R,cli.filename);
 		filename->obj.color = GC_PINK;
 		elFileState fs = {0};
 		elf_loadfilefs(&R,&fs,filename,0,0);

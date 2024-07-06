@@ -40,7 +40,7 @@ typedef struct elArray {
 #define elf_varmax(var) ((var != 0) ? ((elArray*)(var))[-1].max : 0)
 #define elf_varmin(var) ((var != 0) ? ((elArray*)(var))[-1].min : 0)
 
-#define elf_vardec(var) ( (var) != elNil ? (-- ((elArray*)(var))[-1].min) : 0 )
+#define elf_xarray_pop(var) ( (var) != elNil ? (-- ((elArray*)(var))[-1].min) : 0 )
 
 #define elf_varaddx(var,res,com) ((var) + elf_varaddxx((void**)&(var),sizeof(*var),res,com))
 #define elf_xarray_growby(var,num) (elf_varaddxx((void**)&(var),sizeof(*var),num,num))

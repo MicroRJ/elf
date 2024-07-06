@@ -41,7 +41,7 @@ elf_api void elfweb_ini() {
 
 elf_api int elfweb_loadcode(char *codename, char *contents) {
 	elValue *top = elf.R.top;
-	elString *name = elf_push_new_string(&elf.R,codename);
+	elString *name = elf_add_new_string(&elf.R,codename);
 	elFileState fs = {0};
 	int nyield = elf_loadcodefs(&elf.R,&fs,name,0,0,contents);
 	elf.R.top = top;

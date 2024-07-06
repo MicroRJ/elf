@@ -9,7 +9,7 @@
 void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
-	elf_getlinelocinfo(fs->contents,loc,&linenum,&lineloc);
+	elf_get_line_location_info(fs->contents,loc,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -46,11 +46,6 @@ void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
-}
-
-
-elBool elf_token_is_operator(elToken tk) {
-	return elf_tkintel[tk.type].prec > 0;
 }
 
 

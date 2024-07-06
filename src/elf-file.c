@@ -161,9 +161,12 @@ elNodeId elf_new_local_entity(elFileState *fs, elf_lineid line, char *name, elBo
 		if (entity.level == fs->level) {
 			elf_file_dialog(fs,line,"'%s': is already declared",name);
 		} else {
-			/* todo: only issue this warning if the entity is within the
-			same function? */
-			elf_file_dialog(fs,line,"'%s': this declaration shadows another one",name);
+			/* only issue this warning if the entity we found
+			is within this function... this could still cause
+			problems though... */
+			if (already > fn->entities) {
+				elf_file_dialog(fs,line,"'%s': this declaration shadows another one",name);
+			}
 		}
 	}
 
@@ -238,7 +241,7 @@ elNodeId *elf_load_call_args_or_expr(elFileState *fs) {
 }
 
 
-elTokenType elf_is_operator_token(elToken tk) {
+elTokenType elf_is_operator_token_contextually(elToken tk) {
 	/* could be done in the lexer */
 	if (tk.type != TK_WORD) return tk.type;
    if (!strcmp(tk.s,"and")) return TK_LOG_AND;
@@ -283,7 +286,7 @@ elNodeId elf_fs_load_subexpr(elFileState *fs, int rank) {
 	elNodeId x = elf_load_unary_expr(fs,elTrue);
 	if (x == NO_NODE) return x;
 	for (;;) {
-		elTokenType op = elf_is_operator_token(fs->this_token);
+		elTokenType op = elf_is_operator_token_contextually(fs->this_token);
 		int prio = elf_get_token_binding_priority(op);
 		/* auto breaks when not a binary operator */
 		if (prio <= rank) break;
@@ -422,7 +425,7 @@ void elf_complete_expr_line(elFileState *fs, elNodeId x) {
 		if the operator is followed by '=' then it quits,
 		so if we get here and we see an operator it's
 		guaranteed to be a '{x}=' assignment. */
-		if (elf_token_is_operator(tk)) {
+		if (elf_tkintel[tk.type].prec > 0) {
 			elToken op = elf_lexone(fs);
 			elf_take_token(fs,TK_ASSIGN);
 			elf_check_store(fs,fs->lasttk.line,x);
@@ -491,7 +494,7 @@ elNodeId elf_load_file_expr(elFileState *fs) {
 
 
 elNodeId elf_get_global_entity_node(elFileState *fs, elf_lineid line, char *name) {
-	elSymbolId x = elf_get_global_symbol(fs->M,elf_newstr(fs->R,name));
+	elSymbolId x = elf_get_global_symbol(fs->M,elf_new_string(fs->R,name));
 	elf_ensure(x != -1);
 	return elf_make_global_value_node(fs,line,x);
 }
@@ -600,7 +603,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 				strcat(dir,fs->lasttk.s);
 			} while (elf_pick_token_inline(fs,TK_DOT));
 
-			elSymbolId x = elf_get_global_symbol(fs->M,elf_newstr(fs->R,dir));
+			elSymbolId x = elf_get_global_symbol(fs->M,elf_new_string(fs->R,dir));
 			v = elf_make_global_value_node(fs,tk.line,x);
 		} break;
 		case TK_WORD: {
@@ -694,6 +697,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 						elf_file_dialog(fs,elf_get_node_line(fs,index),"invalid array access expression");
 					}
 					*/
+					/* todo: remove this node conversion thing */
 					if (elf_get_node_kind(fs,index) == NODE_RANGE) {
 						v = elf_make_ranged_index_node(fs,tk.line,v,index);
 					} else v = elf_make_index_node(fs,tk.line,v,index);
@@ -701,11 +705,20 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 				} while(elf_pick_token(fs,TK_COMMA));
 				elf_take_token(fs,TK_SQUARE_RIGHT);
 			} break;
-			case TK_COLON: { elf_lexone(fs);
+
+			case TK_COLON: {
+				elf_lexone(fs);
 				elToken n = elf_take_token(fs,TK_WORD);
 				elNodeId y = elf_make_string_node(fs,n.line,n.s);
 				v = elf_make_metafield_node(fs,tk.line,v,y);
 			} break;
+			#if 0
+			case TK_WORD: {
+				elToken n = elf_take_token(fs,TK_WORD);
+				elNodeId y = elf_make_string_node(fs,n.line,n.s);
+				v = elf_make_metafield_node(fs,tk.line,v,y);
+			} break;
+			#endif
 			case TK_PAREN_LEFT: {
 				elNodeId *z = elf_load_call_args(fs);
 				v = elf_make_call_node(fs,tk.line,v,z);

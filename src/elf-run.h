@@ -103,13 +103,13 @@ typedef struct elState {
 		elString *__getfield,*__setfield;
 		elString *__hash;
 	} cache;
+	/* the current instruction */
 	elByteId byte;
-	elBytecode *bytetrace;
 	elBool bytetracing;
 	elBool bytetracking;
 	elBool bytelogging;
 	struct {
-		elBool flags;
+		elBool paused;
 		union { elObject **objects, **articles; };
 		elInteger allocated;
 		elInteger threshold;

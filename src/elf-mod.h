@@ -12,8 +12,8 @@ typedef struct elFileInfo {
 	int **protos;
 	/* todo: eventually remove these */
 	char *pathondisk;
-	elf_lineid lines;
-	int nlines;
+	union { char *contents, *lines; };
+	union { elInteger length, nlines; };
 } elFileInfo;
 
 

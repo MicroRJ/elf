@@ -15,17 +15,17 @@ elInteger elf_toint(elValue v) {
 }
 
 
-elf_api int elf_ncallargs(elState *R);
-elf_api elObject *elf_getthis(elState *R);
+elf_api int elf_get_num_args(elState *R);
+elf_api elObject *elf_get_this(elState *R);
 elf_api elObjectTag elf_get_tag(elState *R, elRegId x);
-elf_api elValue elf_getany(elState *R, elRegId x);
-elf_api elInteger elf_getint(elState *R, elRegId x);
-elf_api elNumber elf_getnum(elState *R, elRegId x);
-elf_api elString *elf_getstr(elState *R, elRegId x);
-elf_api elObject *elf_getobj(elState *R, elRegId x);
-elf_api elTable *elf_gettab(elState *R, elRegId x);
-elf_api elHandle elf_getsys(elState *R, elRegId x);
-elf_api elClosure *elf_getcls(elState *R, elRegId x);
+elf_api elValue elf_get_value(elState *R, elRegId x);
+elf_api elInteger elf_get_integer(elState *R, elRegId x);
+elf_api elNumber elf_get_number(elState *R, elRegId x);
+elf_api elString *elf_get_string(elState *R, elRegId x);
+elf_api elObject *elf_get_object(elState *R, elRegId x);
+elf_api elTable *elf_get_table(elState *R, elRegId x);
+elf_api elHandle elf_get_handle(elState *R, elRegId x);
+elf_api elClosure *elf_get_closure(elState *R, elRegId x);
 
 
 /*
@@ -85,24 +85,24 @@ elf_api elValue *elf_gettop(elState *R);
 elf_api void elf_settop(elState *R, elValue *top);
 
 elf_api elRegId elf_pushmany(elState *R, int howmany);
-elf_api elRegId elf_pushany(elState *, elValue v);
+elf_api elRegId elf_add_value(elState *, elValue v);
 elf_api void elf_pushnil(elState *);
-elf_api void elf_push_integer(elState *, elInteger i);
+elf_api void elf_add_integer(elState *, elInteger i);
 elf_api void elf_pushnum(elState *, elNumber n);
 elf_api void elf_pushsys(elState *c, elHandle h);
 
 elf_api elString *elf_pushstr(elState *, elString *s);
-elf_api elString *elf_push_new_string(elState *, char *c);
+elf_api elString *elf_add_new_string(elState *, char *c);
 elf_api elString *elf_pushnewstrlen(elState *, elInteger len);
 
-elf_api elObject *elf_pushobj(elState *, elObject *t);
+elf_api elObject *elf_add_object(elState *, elObject *t);
 elf_api elObject *elf_pushnewobj(elState *, elInteger tell);
 
 elf_api elTable *elf_pushtab(elState *, elTable *t);
-elf_api elTable *elf_pushnewtab(elState *R);
+elf_api elTable *elf_add_new_table(elState *R);
 elf_api elTable *elf_pushnewlen(elState *R, elInteger len);
 
-elf_api elRegId elf_pushcls(elState *, elClosure *f);
+elf_api elRegId elf_add_closure(elState *, elClosure *f);
 elf_api elRegId elf_pushnewcls(elState *, elProto fn);
 
 

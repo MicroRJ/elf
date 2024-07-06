@@ -14,27 +14,27 @@ void elf_debugger(char *message) {
 
 
 void elf_register_handle(elState *R, char *name, elHandle val) {
-	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valsys(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_handle_value(val));
 }
 
 
 void elf_register_integer(elState *R, char *name, elInteger val) {
-	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valint(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_integer_value(val));
 }
 
 
 void elf_registertab(elState *R, char *name, elTable *val) {
-	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valtab(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_table_value(val));
 }
 
 
 void elf_register_string(elState *R, char *name, char *val) {
-	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valstr(elf_push_new_string(R,val)));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_string_value(elf_add_new_string(R,val)));
 }
 
 
 void elf_register_binding(elState *R, char *name, elBinding fn) {
-	elf_add_global_value(R->M,elf_push_new_string(R,name),elf_valbid(fn));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_binding_value(fn));
 }
 
 
@@ -54,7 +54,7 @@ elNumber elf_timediffms(elInteger begin) {
 }
 
 
-int elf_fndfilebybyte(elModule *md, elByteId byte) {
+int elf_find_file_info_by_byte(elModule *md, elByteId byte) {
 	elFileInfo *files = md->files;
 	int nfiles = elf_xarray_length(files);
 	for (int x = 0; x < nfiles; ++ x) {
@@ -67,8 +67,13 @@ int elf_fndfilebybyte(elModule *md, elByteId byte) {
 }
 
 
+elf_lineid elf_get_line_for_byte(elModule *M, elByteId byte) {
+	return M->lines[byte];
+}
+
+
 /* finds line number and line loc from single source location */
-void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc) {
+void elf_get_line_location_info(char *q, char *loc, int *linenum, char **lineloc) {
 	char *c = q;
 	int n = 0;
 	while (q < loc) {
@@ -87,7 +92,7 @@ void elf_getlinelocinfo(char *q, char *loc, int *linenum, char **lineloc) {
 
 elFileInfo elf_getrunningfile(elState *S) {
 	elFileInfo fi = {0};
-	int id = elf_fndfilebybyte(S->M,S->byte);
+	int id = elf_find_file_info_by_byte(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
 }
@@ -98,11 +103,10 @@ elf_lineid elf_getrunningline(elState *S) {
 }
 
 
-/* diagnostics function for syntax errors */
-void elf_linediag(char *filename, char *contents, char *loc, char const *fmt, ...) {
+void elf_line_dialog(char *filename, char *contents, char *loc, elByteId byte_loc, elBytecode byte, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
-	elf_getlinelocinfo(contents,loc,&linenum,&lineloc);
+	elf_get_line_location_info(contents,loc,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -135,14 +139,14 @@ void elf_linediag(char *filename, char *contents, char *loc, char const *fmt, ..
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+loc-lineloc),b);
+		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elInteger)(1+loc-lineloc),byte_loc,elf_get_byte_label(byte.k),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
 }
 
 
-void elf_printcalltrace(elState *S, elCallState *call, int level) {
+void elf_dump_byte_trace(elState *S, elCallState *call, int level) {
 
 	elf_ensure(level > -1);
 
@@ -154,14 +158,15 @@ void elf_printcalltrace(elState *S, elCallState *call, int level) {
 
 	elf_ensure(level > 0);
 
-	elf_printcalltrace(S,call->caller,level-1);
+	elf_dump_byte_trace(S,call->caller,level-1);
 
 	elModule *M = S->M;
-	int fileid = elf_fndfilebybyte(M,call->head);
+	int fileid = elf_find_file_info_by_byte(M,call->head);
 	if (fileid != -1) {
 		elFileInfo *file = &M->files[fileid];
 		elf_lineid line = M->lines[call->head];
-		elf_linediag(file->name,file->lines,line, call->cl != elNil ? "(bytecode function)" : "(binding)");
+		elf_line_dialog(file->name,file->lines,line,
+		call->head,M->bytes[call->head],call->cl != elNil ? "(bytecode function)" : "(binding)");
 	}
 }
 
@@ -170,14 +175,15 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	elf_lineid line = M->lines[byte];
-	int fileid = elf_fndfilebybyte(M,byte);
+	int fileid = elf_find_file_info_by_byte(M,byte);
 	if (fileid != -1) {
 		elFileInfo *file = &M->files[fileid];
-		elf_linediag(file->name,file->lines,line,error);
+		elf_line_dialog(file->name,file->lines,line,R->byte,
+		M->bytes[R->byte],error);
 	}
 
-	printf(" -- CODE TRACE:\n");
-	elf_printcalltrace(R,R->call,R->call_level);
+	printf(" -- BYTE TRACE:\n");
+	elf_dump_byte_trace(R,R->call,R->call_level);
 	elf_debugger("runtime throw");
 }
 
@@ -189,7 +195,7 @@ void elf_checkargs(elState *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_tycheck(elState *R, elByteId id, elRegId loc, elObjectTag x, elObjectTag y) {
+int elf_type_check(elState *R, elByteId id, elRegId loc, elObjectTag x, elObjectTag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

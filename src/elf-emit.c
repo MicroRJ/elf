@@ -37,7 +37,7 @@ elRegId elf_get_memory_state(elFileState *fs) {
 void elf_set_memory_state(elFileState *fs, elRegId memory) {
 	// int dif = memory - fs->fn->xmemory;
 	// if (dif != 0) {
-	// 	elf_logdebug("restore memory %i -> %i (%i)",fs->fn->xmemory,memory,dif);
+	// 	elf_debug_log("restore memory %i -> %i (%i)",fs->fn->xmemory,memory,dif);
 	// }
 	fs->fn->xmemory = memory;
 }
@@ -458,7 +458,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 		} else {
 			__debugbreak();
 			elf_emitter_add_bytexy(fs,line,BC_RELOAD,target_register,already_register);
-			// elf_logdebug("node is already localized and no reloading is necessary, node: %i, target_register: %i, already_register: %i, (reload: %s)"
+			// elf_debug_log("node is already localized and no reloading is necessary, node: %i, target_register: %i, already_register: %i, (reload: %s)"
 			// , id, target_register, already_register, (flags & LOAD_RELOAD) ? "true" : "false");
 			target_register = already_register;
 			goto leave;
@@ -517,7 +517,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 		case NODE_STRING: {
 			UNUSED_CHECK;
 			/* -- todo: allocate this in constant pool */
-			int g = elf_add_global_value(fs->M,0,elf_valstr(elf_newstr(fs->rt,v.lit.s)));
+			int g = elf_add_global_value(fs->M,0,elf_string_value(elf_new_string(fs->rt,v.lit.s)));
 			elf_emitter_add_bytexy(fs,line,BC_LOADGLOBAL,target_register,g);
 		} break;
 		case NODE_TABLE: {
