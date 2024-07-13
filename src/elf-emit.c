@@ -308,25 +308,6 @@ elByteId *elf_emit_jump_if_not_nil(elFileState *fs, elf_lineid line, elFileJumpl
 }
 
 
-/* todo: add support for multiple results */
-void elf_emit_yield(elFileState *fs, elf_lineid line, elNodeId id) {
-	elRegId regress = elf_get_memory_state(fs);
-	if (id != NO_NODE) {
-		/* todo: determine the number of values in
-		tree, and allocate that many registers? */
-		int n = 1;
-		/* todo: if we only return one value we don't have
-		to reload */
-		elRegId x = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(id));
-		if (fs->fn->nyield < n) fs->fn->nyield = n;
-		elByteId j = elf_emitter_add_bytexyz(fs,line,BC_YIELD,NO_JUMP,x,n);
-		elf_xarray_add(fs->fn->yj,j);
-		/* if there are no results then simply leave directly */
-	} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
-	elf_set_memory_state(fs,regress);
-}
-
-
 void elf_emit_initializer(elFileState *fs, elf_lineid line, elRegId target_register, elNodeId id) {
 	elRegId mem = elf_get_memory_state(fs);
 	elNode v = fs->nodes[id];
@@ -400,7 +381,7 @@ void elf_emitter_unload(elFileState *fs, elNodeId id) {
 		} break;
 		case NODE_RANGE_INDEX: {
 			elf_emitter_close_ranged_loop(fs,line);
-			elf_emitter_leave_block(fs);
+			elf_emitter_close_block(fs);
 			elf_emitter_unload(fs,node.x);
 		} break;
 		default: ; // elf_ensure(elf_is_targetable_node(node.kind));
@@ -542,7 +523,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 			if (elf_get_node_kind(fs,target_node.y) == NODE_RANGE_INDEX) elf_debugger("test-break");
 			elf_ensure(target_register != NO_SLOT);
 			flags |= LOAD_KEEPALIVE;
-			elf_emitter_enter_block(fs,BLOCK_LOOP);
+			elf_emitter_begin_block(fs,BLOCK_LOOP);
 			elRegId xx = elf_emitter_localize(fs,line,target_node.x);
 			elRegId yy = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 			elf_emitter_begin_ranged_loop(fs,line
@@ -719,14 +700,14 @@ void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNod
 			elRegId yy = elf_emitter_localize(fs,line,y);
 			elRegId ii = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 			elRegId xx = elf_emitter_localize(fs,line,v.x);
-			elf_emitter_enter_block(fs,BLOCK_LOOP);
+			elf_emitter_begin_block(fs,BLOCK_LOOP);
 			elf_emitter_begin_ranged_loop(fs,line
 			,	elf_make_local_target_node(fs,line,ii)
 			,	elf_get_node(fs,v.y).x
 			,	elf_get_node(fs,v.y).y);
 			elf_emitter_add_bytexyz(fs,line,BC_SETINDEX,xx,ii,yy);
 			elf_emitter_close_ranged_loop(fs,line);
-			elf_emitter_leave_block(fs);
+			elf_emitter_close_block(fs);
 			elf_emitter_unload(fs,v.x);
 		} break;
 		default: {
@@ -810,7 +791,7 @@ void elf_emitter_close_if(elFileState *fs, elf_lineid line, elSelectState *s) {
 }
 
 
-void elf_emitter_enter_function(elFileState *fs, elFileFnState *fn, char *line) {
+void elf_emitter_begin_function(elFileState *fs, elFileFnState *fn, char *line) {
 	fn->enclosing = fs->fn;
 	fn->entities = fs->nentities;
 	fn->bytes = fs->md->nbytes;
@@ -820,13 +801,13 @@ void elf_emitter_enter_function(elFileState *fs, elFileFnState *fn, char *line) 
 	/* todo: this other function requires fn to be set
 	for xmemory, can xmemory simply be in the file state
 	instead? */
-	fn->entry_block = elf_emitter_enter_block(fs,0);//&fn->entry,
+	fn->entry_block = elf_emitter_begin_block(fs,0);//&fn->entry,
 }
 
 
-void elf_emitter_leave_function(elFileState *fs) {
+void elf_emitter_close_function(elFileState *fs) {
 	elf_emitter_add_function_epiloge(fs,fs->last_token.line);
-	elf_emitter_leave_block(fs);
+	elf_emitter_close_block(fs);
 	elf_ensure(fs->fn->entry_block == fs->level);
 	/* ensure all locals were deallocated
 	properly */
@@ -847,7 +828,7 @@ void elf_emitter_add_block_flags(elFileState *fs, int flags) {
 }
 
 
-elBlockId elf_emitter_enter_block(elFileState *fs, elBool flags) {
+elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags) {
 	elBlockId id = fs->nblocks ++;
 	if (elf_xarray_length(fs->blocks) < fs->nblocks) {
 		elf_xarray_growby(fs->blocks,1);
@@ -872,9 +853,16 @@ elBlockId elf_emitter_enter_block(elFileState *fs, elBool flags) {
 }
 
 
-void elf_emitter_leave_block(elFileState *fs) {
+void elf_emitter_close_block(elFileState *fs) {
 	elf_ensure(fs->nentities >= fs->fn->entities);
 	elFileBlock *bl = elf_emitter_get_block(fs,-1);
+	elEntityId id;
+	/* xentity is the first entity within a block, if any. */
+	for (id = bl->xentity; id < fs->nentities; ++ id) {
+		if (~fs->entities[id].flags & ENTITY_REFERENCED) {
+			elf_file_dialog(fs,fs->entities[id].line,"unreferenced entity");
+		}
+	}
 	fs->nentities = bl->xentity;
 	fs->nnodes = bl->xnode;
 	fs->level -= 1;
@@ -905,7 +893,7 @@ elFileBlock *elf_emitter_get_loop_block(elFileState *fs) {
 would change the order of execution, leave as is? */
 void elf_emitter_enter_delayed_block(elFileState *fs, elf_lineid line) {//, elFileBlock *bl
 	elByteId jo = elf_emitter_add_byteop(fs,line,BC_DELAY,NO_JUMP);
-	elBlockId id = elf_emitter_enter_block(fs,BLOCK_DELAYED);//bl,
+	elBlockId id = elf_emitter_begin_block(fs,BLOCK_DELAYED);//bl,
 	fs->blocks[id].jumpover = jo;
 }
 
@@ -916,7 +904,7 @@ void elf_emitter_leave_delayed_block(elFileState *fs, elf_lineid line) {//, elFi
 
 	elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
-	elf_emitter_leave_block(fs);
+	elf_emitter_close_block(fs);
 
 	elf_ensure(bl->entry != bl->jumpover);
 	elf_emitter_patch_jump(fs,bl->jumpover);
@@ -942,6 +930,27 @@ void elf_emit_break(elFileState *fs, elf_lineid line) {
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
 	elByteId j = elf_emit_jump(fs,line,elf_get_last_byteid(fs));
 	elf_xarray_add(bl->leavejumps,j);
+}
+
+
+/* todo: add support for multiple results */
+void elf_emit_yield(elFileState *fs, elf_lineid line, elNodeId id) {
+	elRegId regress = elf_get_memory_state(fs);
+	if (id != NO_NODE) {
+		/* todo: determine the number of values in
+		tree, and allocate that many registers? */
+		int n = 1;
+		/* todo: if we only return one value we don't have
+		to reload */
+		elRegId x = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(id));
+		if (fs->fn->nyield < n) fs->fn->nyield = n;
+		elByteId j = elf_emitter_add_bytexyz(fs,line,BC_YIELD,NO_JUMP,x,n);
+		elf_xarray_add(fs->fn->yj,j);
+		/* if there are no results then simply leave directly */
+	} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
+	elf_set_memory_state(fs,regress);
+
+	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
 }
 
 

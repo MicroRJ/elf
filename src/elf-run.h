@@ -89,8 +89,16 @@ typedef struct elState {
 	int call_level;
 	elBool debuggerflag;
 	elBool oncalldebuggerflag;
-	elTable *metatab_str;
-	elTable *metatab_tab;
+	struct {
+		elTable *integer;
+		elTable *number;
+		elTable *string;
+		elTable *table;
+	} metatables;
+	struct {
+		int pf_indent;
+		int pf_char;
+	} lib;
 	struct {
 		elValue oncall;
 		elValue ongc;

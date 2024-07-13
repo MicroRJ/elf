@@ -111,6 +111,13 @@ for i in Macros:tally() ? {
 }
 LstMacro = Id
 
+// 1.:to_integer()
+// 2:to_number()
+// 2:floor()
+// 2:ceil()
+// 2:to_string()
+// 2degrees:to_radians()
+
 Tk("INTEGER", N, "literal-integer")
 Tk("NUMBER", N, "literal-number")
 Tk("STRING", N, "literal-string")

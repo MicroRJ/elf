@@ -19,13 +19,26 @@ typedef struct {
 } elEntityIdTypeGuard;
 
 
+#define ENTITY_REFERENCED 0x1
+#define ENTITY_CONSTANT   0x2
+#define ENTITY_ASSIGNED   0x4
+
+
+typedef enum elEntityKind {
+	ENTITY_INVALID = 0,
+	ENTITY_DIRECTORY,
+	ENTITY_LOCAL,
+	ENTITY_GLOBAL,
+} elEntityKind;
+
 typedef struct elFileEntity {
-	char *name;
-	elf_lineid line;
-	elNodeId node;
-	elRegId slot;
-	int level;
-	elBool flags;
+	elEntityKind kind;
+	elBool      flags;
+	char        *name;
+	elf_lineid   line;
+	// elNodeId     node;
+	elRegId      slot;
+	int         level;
 } elFileEntity;
 
 
@@ -55,8 +68,6 @@ typedef struct elFileLoopState {
 typedef struct elFileBlock elFileBlock;
 typedef struct elFileBlock {
 	elBool flags;
-	// elFileBlock *enclosing;
-	// int level;
 	int xmemory;
 	int xentity;
 	int xnode;
@@ -152,7 +163,7 @@ typedef struct elFileState {
 	/* associates a node to a register
 	with the currently active memory
 	region, causes nodes with divergent
-	evaluation paths to merge and thus
+	evaluation paths to merge and
 	only be evaluated only once. */
 	elMemorySlot memory_region_registry[0x100];
 	int memory_region_level;
@@ -220,6 +231,6 @@ void elf_emitter_begin_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
 void elf_emitter_close_while_loop(elFileState *fs, elf_lineid line);
 
 
-elBlockId elf_emitter_enter_block(elFileState *fs, elBool flags);
-void elf_emitter_leave_block(elFileState *fs);
+elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags);
+void elf_emitter_close_block(elFileState *fs);
 

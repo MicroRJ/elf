@@ -101,7 +101,7 @@
 
 
 // int _gtable(elState *c) {
-// 	elf_pushtab(c,c->md->g);
+// 	elf_add_table(c,c->md->g);
 // 	return 1;
 // }
 

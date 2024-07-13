@@ -142,7 +142,7 @@ void elf_add_integer(elState *R, elInteger i) {
 }
 
 
-void elf_pushnum(elState *R, elNumber n) {
+void elf_add_number(elState *R, elNumber n) {
 	R->top->tag = TAG_NUM;
 	R->top->n = n;
 	_INC_TOP;
@@ -156,7 +156,7 @@ void elf_pushsys(elState *R, elHandle h) {
 }
 
 
-elString *elf_pushstr(elState *R, elString *str) {
+elString *elf_add_string(elState *R, elString *str) {
 	R->top->tag = TAG_STR;
 	R->top->x_str = str;
 	_INC_TOP;
@@ -165,21 +165,21 @@ elString *elf_pushstr(elState *R, elString *str) {
 
 
 elString *elf_add_new_string(elState *R, char *chr) {
-	return elf_pushstr(R,elf_new_string(R,chr));
+	return elf_add_string(R,elf_new_string(R,chr));
 }
 
 
 elString *elf_pushnewstrlen(elState *R, elInteger len) {
-	return elf_pushstr(R,elf_new_string_of_length(R,len));
+	return elf_add_string(R,elf_new_string_of_length(R,len));
 }
 
 
-elValue *elf_gettop(elState *R) {
+elValue *elf_get_stack_top(elState *R) {
 	return R->top;
 }
 
 
-void elf_settop(elState *R, elValue *top) {
+void elf_set_stack_top(elState *R, elValue *top) {
 	R->top = top;
 }
 
@@ -206,7 +206,7 @@ elObject *elf_pushnewobj(elState *R, elInteger tell) {
 }
 
 
-elTable *elf_pushtab(elState *R, elTable *tab) {
+elTable *elf_add_table(elState *R, elTable *tab) {
 	R->top->tag = TAG_TAB;
 	R->top->x_tab = tab;
 	_INC_TOP;
@@ -215,7 +215,7 @@ elTable *elf_pushtab(elState *R, elTable *tab) {
 
 
 elTable *elf_add_new_table(elState *R) {
-	return elf_pushtab(R,elf_new_table(R));
+	return elf_add_table(R,elf_new_table(R));
 }
 
 

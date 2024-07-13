@@ -14,13 +14,14 @@ elTable *elf_new_string_metatable(elState *R) {
 	elf_table_set_binding_field(R,tab,"touppercase",elfstr_touppercase_);
 	elf_table_set_binding_field(R,tab,"tolowercase",elfstr_tolowercase_);
 	elf_table_set_binding_field(R,tab,"__add",elfstr_append_);
+	elf_table_set_binding_field(R,tab,"__add1",elfstr_append_);
 	return tab;
 }
 
 
 elString *elf_new_string_of_length(elState *R, elInteger length) {
 	elString *obj = elf_new_object(R,OBJ_STRING,sizeof(elString)+length+1);
-	if (R) obj->obj.metatable = R->metatab_str;
+	if (R) obj->obj.metatable = R->metatables.string;
 	obj->length = length;
 	obj->hash = -1;
 	obj->c[length] = 0;

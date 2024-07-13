@@ -188,7 +188,7 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 }
 
 
-void elf_checkargs(elState *R, char *fnname, int n, char *usage) {
+void elf_check_args(elState *R, char *fnname, int n, char *usage) {
 	if (R->call->nx != n) {
 		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,R->call->nx,usage));
 	}

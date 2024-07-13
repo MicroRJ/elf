@@ -111,6 +111,13 @@ elf_api elValue elf_number_value(elNumber n) {
 }
 
 
+elf_api elValue elf_nil_value() {
+	elValue v = (elValue){TAG_NIL};
+	v.x_int = 0;
+	return v;
+}
+
+
 void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 	/* this is temporary! */
 	if (R != 0) {
@@ -225,25 +232,25 @@ elInteger elf_mark_table(elTable *table) {
 	return n;
 }
 
-
-elBool elf_mark_object(elObject *obj) {
+/* todo: are pink objects being handled properly here? */
+elInteger elf_mark_object(elObject *obj) {
 	elf_ensure(obj != 0);
 	elInteger result = 0;
-	/* todo: put this clause -> */
-	if (obj->metatable != 0) {
-		elf_mark_object((elObject*) obj->metatable);
-	}
-	if (obj->color == GC_WHITE) {
-		/* here? <- */
+	if (obj->color == GC_BLACK) {
+		return 1;
+	} else if (obj->color == GC_WHITE) {
 		obj->color = GC_BLACK;
-		if (obj->type == OBJ_CLOSURE) {
-			result += 1 + elf_mark_closure((elClosure*)obj);
-		} else if (obj->type == OBJ_TAB) {
-			result += 1 + elf_mark_table((elTable*)obj);
-		}
-	} else {
-		result += obj->color == GC_BLACK;
+		result = 1;
 	}
+	if (obj->metatable != 0) {
+		elf_mark_object((elObject*)obj->metatable);
+	}
+	if (obj->type == OBJ_CLOSURE) {
+		result += elf_mark_closure((elClosure*)obj);
+	} else if (obj->type == OBJ_TAB) {
+		result += elf_mark_table((elTable*)obj);
+	}
+
 	return result;
 }
 
@@ -255,11 +262,33 @@ elBool elf_mark_value(elValue *v) {
 
 elInteger elf_mark_everything(elState *R) {
 	elInteger num = elf_mark_object((elObject*)R->M->globals);
+	elf_ensure(R->top >= R->call->base + (R->call->cl != 0 ? R->call->cl->fn.zstack : 0));
 	elValue *val;
 	for (val = R->stk; val < R->top; ++ val) {
 		num += elf_mark_value(val);
 	}
 	return num;
+}
+
+
+elInteger elf_unmark_objects(elState *R) {
+	elInteger result = 0;
+	elInteger i;
+	elObject **objects = R->memory.objects;
+	for (i = 0; i < elf_xarray_length(objects); i ++) {
+		elObject *it = objects[i];
+		switch (it->color) {
+			case GC_RED:
+				elf_debugger("internal error: gc failed");
+			break;
+			case GC_BLACK: {
+				it->color = GC_WHITE;
+				result += 1;
+			} break;
+			default: break;
+		}
+	}
+	return result;
 }
 
 

@@ -14,8 +14,8 @@ void elf_runini(elState *R, elModule *M) {
 	R->bytelogging = false;
 	R->stklen = 4096;
 	R->stk = R->top = elf_clear_alloc(lHEAP,sizeof(elValue)*R->stklen);
-	R->metatab_str = elf_new_string_metatable(R);
-	R->metatab_tab = elf_new_table_metatable(R);
+	R->metatables.string = elf_new_string_metatable(R);
+	R->metatables.table = elf_new_table_metatable(R);
 	R->call_level = 0;
 
 	//TODO: So when you call a function,
@@ -151,16 +151,16 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	elf_lexone(fs);
 
 	elFileFnState fn = {0};
-	elf_emitter_enter_function(fs,&fn,fs->tk.line);
+	elf_emitter_begin_function(fs,&fn,fs->tk.line);
 	elNodeId id = elf_load_file_expr(fs);
 	elf_emit_yield(fs,fs->tk.line,id);
-	elf_emitter_leave_function(fs);
+	elf_emitter_close_function(fs);
 
 	elFileInfo file = {0};
 	file.bytes = fn.bytes;
 	file.nbytes = M->nbytes - fn.bytes;
-	file.lines = contents;
-	file.nlines = strlen(contents);
+	file.contents = contents;
+	file.length = strlen(contents);
 	elf_xarray_add(M->files,file);
 
 	elProto p = {0};
@@ -190,17 +190,17 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	/* kick start by lexing the first two tokens */
 	elf_lexone(fs); elf_lexone(fs);
 	elFileFnState fn = {0};
-	elf_emitter_enter_function(fs,&fn,fs->tk.line);
+	elf_emitter_begin_function(fs,&fn,fs->tk.line);
 	while (!elf_test_token(fs,0)) elf_load_file_stat(fs);
-	elf_emitter_leave_function(fs);
+	elf_emitter_close_function(fs);
 	/* todo: this is temporary, please remove this or make
 	some sort of object out of it... */
 	elFileInfo fl = {0};
 	fl.bytes = fn.bytes;
 	fl.nbytes = M->nbytes - fn.bytes;
 	fl.name = filename->c;
-	fl.lines = contents;
-	fl.nlines = strlen(contents);
+	fl.contents = contents;
+	fl.length = strlen(contents);
 	fl.pathondisk = filename->c;
 	elf_xarray_add(M->files,fl);
 
@@ -442,19 +442,28 @@ int elf_run(elState *R) {
 	} break;
 	case BC_METAFIELD: {
 		elValue yy = locals[b.y];
-		if (elf_is_object_tag(yy.tag)) {
-			if (yy.x_obj->color == GC_RED) {
-				elf_throw(R,bc,elf_tpf("Invalid object '%p', GC'd.",yy.x_obj));
-			}
-			if (yy.x_obj->metatable != elNil) {
-				locals[b.x] = elf_table_lookup(yy.x_obj->metatable,locals[b.z]);
-			} else {
-				elf_throw(R,bc,"Invalid object, no metatable.");
-			}
-		} else {
-			locals[b.x] = (elValue){TAG_NIL};
-			elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy.tag]));
+		elTable *metatable = {0};
+		switch (yy.tag) {
+			case TAG_STR: case TAG_TAB:
+			case TAG_OBJ: case TAG_CLS: {
+				metatable = yy.x_obj->metatable;
+			} goto _lookup;
+			case TAG_NUM: {
+				metatable = R->metatables.number;
+			} goto _lookup;
+			case TAG_INT: {
+				metatable = R->metatables.integer;
+			} goto _lookup;
+			default: {
+				elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy.tag]));
+			} break;
 		}
+		if (metatable != 0) {
+
+			_lookup:
+			locals[b.x] = elf_table_lookup(metatable,locals[b.z]);
+
+		} else elf_throw(R,bc,"Invalid object, no metatable.");
 	} break;
 	/* todo: why are these two so similar ... */
 	case BC_INDEX: case BC_FIELD: {

@@ -81,24 +81,24 @@ elf_api int elf_run(elState *);
 
 elf_api void elf_checkcl(elState *c, elRegId x);
 
-elf_api elValue *elf_gettop(elState *R);
-elf_api void elf_settop(elState *R, elValue *top);
+elf_api elValue *elf_get_stack_top(elState *R);
+elf_api void elf_set_stack_top(elState *R, elValue *top);
 
 elf_api elRegId elf_pushmany(elState *R, int howmany);
 elf_api elRegId elf_add_value(elState *, elValue v);
 elf_api void elf_pushnil(elState *);
 elf_api void elf_add_integer(elState *, elInteger i);
-elf_api void elf_pushnum(elState *, elNumber n);
+elf_api void elf_add_number(elState *, elNumber n);
 elf_api void elf_pushsys(elState *c, elHandle h);
 
-elf_api elString *elf_pushstr(elState *, elString *s);
+elf_api elString *elf_add_string(elState *, elString *s);
 elf_api elString *elf_add_new_string(elState *, char *c);
 elf_api elString *elf_pushnewstrlen(elState *, elInteger len);
 
 elf_api elObject *elf_add_object(elState *, elObject *t);
 elf_api elObject *elf_pushnewobj(elState *, elInteger tell);
 
-elf_api elTable *elf_pushtab(elState *, elTable *t);
+elf_api elTable *elf_add_table(elState *, elTable *t);
 elf_api elTable *elf_add_new_table(elState *R);
 elf_api elTable *elf_pushnewlen(elState *R, elInteger len);
 

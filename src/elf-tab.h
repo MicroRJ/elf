@@ -43,10 +43,12 @@ void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias);
 
 /* metatable */
 int elf_table_metatable_add(elState *);
+int elf_table_metatable_xadd(elState *);
+int elf_table_metatable_xremove(elState *);
+int elf_table_metatable_xdelete(elState *);
 int elf_table_metatable_index(elState *);
 int elf_table_metatable_tally(elState *);
 int elf_table_metatable_length(elState *);
-int elf_table_metatable_xremove(elState *);
 int elf_table_metatable_delete(elState *);
 int elf_table_metatable_itemize(elState *);
 int elf_table_metatable_inject(elState *);
@@ -57,5 +59,9 @@ int elf_table_metatable_foreach(elState *);
 int elf_table_metatable_get_collisions(elState *);
 int elf_table_metatable_bubble_sort(elState *);
 int elf_table_metatable_find_aliases(elState *);
+int elf_table_metatable_array(elState *R);
+int elf_table_metatable_place(elState *R);
 int elf_table_metatable_merge(elState *);
 int elf_table_metatable_clone(elState *);
+int elf_table_metatable_slice(elState *R);
+int elf_table_metatable_swap(elState *R);

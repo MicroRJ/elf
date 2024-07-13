@@ -88,6 +88,7 @@ elf_api elValue elf_string_value(elString *);
 elf_api elValue elf_closure_value(elClosure *);
 elf_api elValue elf_integer_value(elInteger i);
 elf_api elValue elf_number_value(elNumber n);
+elf_api elValue elf_nil_value();
 
 
 

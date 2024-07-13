@@ -28,7 +28,7 @@ elSymbolId elf_add_proto(elModule *M, elProto p) {
 
 
 
-int elf_valfpf(FILE *file, elValue v, elBool quotes);
+int elf_fpf_value(FILE *file, elValue v, elBool quotes);
 void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode b) {
 
 	if (fid != -1) {
@@ -63,7 +63,7 @@ void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode 
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
 		if ((val.tag == TAG_STR) || (val.tag == TAG_NUM) || (val.tag == TAG_INT)) {
-			elf_valfpf(io,val,elTrue);
+			elf_fpf_value(io,val,elTrue);
 		}
 	}
 	fprintf(io,"\n");
@@ -79,7 +79,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	fprintf(file,"Globals:\n");
 	elf_xarray_foreachi(md->g->v) {
 		fprintf(file,"%04llX: ", i);
-		elf_valfpf(file,md->g->v[i],elTrue);
+		elf_fpf_value(file,md->g->v[i],elTrue);
 		fprintf(file,"\n");
 	}
 #endif

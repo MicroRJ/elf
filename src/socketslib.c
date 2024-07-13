@@ -138,7 +138,7 @@ elf_api int netlib_recv(elState *R) {
 		if (message.length != 0) {
 			elInteger length = message.length;
 			elString *obj = elf_new_string_of_length(R,length);
-			elf_pushstr(R,obj);
+			elf_add_string(R,obj);
 			char *cursor = obj->c;
 			do {
 				elInteger result = recv(socket,cursor,length,0);
