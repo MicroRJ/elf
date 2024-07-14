@@ -701,7 +701,13 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 				elf_lexone(fs);
 				// table.(x,y)
 				if (elf_pick_token(fs,TK_PAREN_LEFT)) {
-					elf_unreachable;
+					// do {
+					// 	elToken field = elf_take_token(fs,TK_WORD);
+					// 	elNodeId field_node = elf_make_string_node(fs,field.line,field.s);
+					// 	v = elf_make_field_node(fs,tk.line,v,field_node);
+					// }
+
+					elf_take_token(fs,TK_PAREN_RIGHT);
 				} else
 				// table.{x,y}
 				if (elf_pick_token(fs,TK_CURLY_LEFT)) {

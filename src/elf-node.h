@@ -52,7 +52,8 @@ additional checks everywhere which is annoying */
 	_(THIS)\
 	_(MULTI)\
 	_(INDEX)\
-	_(FIELD) _(METAFIELD)\
+	_(FIELD)\
+	_(METAFIELD)\
 	_(CALL)\
 	_(RANGE_INDEX)\
 	_(RANGE)\
