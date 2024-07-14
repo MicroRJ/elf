@@ -450,9 +450,11 @@ int elf_run(elState *R) {
 			} goto _lookup;
 			case TAG_NUM: {
 				metatable = R->metatables.number;
+				elf_throw(R,bc,"this feature is not implemented yet, metatables for numeric types");
 			} goto _lookup;
 			case TAG_INT: {
 				metatable = R->metatables.integer;
+				elf_throw(R,bc,"this feature is not implemented yet, metatables for numeric types");
 			} goto _lookup;
 			default: {
 				elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy.tag]));

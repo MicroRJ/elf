@@ -248,12 +248,15 @@ elNodeId *elf_load_call_args(elFileState *fs) {
 	if (elf_pick_token(fs,TK_PAREN_LEFT)) {
 		if (!elf_test_token(fs,TK_PAREN_RIGHT)) do {
 			elNodeId x = elf_load_file_expr(fs);
-			/* todo: instead add the node to the
-			array and then break, to catch the
-			error later? The error should be
-			reported immediately though. */
 			if (x == NO_NODE) break;
-			elf_xarray_add(z,x);
+			if (elf_get_node_kind(fs,x) == NODE_MULTI) {
+				elNodeId *n = elf_get_node(fs,x).z;
+				elf_xarray_foreachi(n) {
+					elf_xarray_add(z,n[i]);
+				}
+			} else {
+				elf_xarray_add(z,x);
+			}
 		} while (elf_pick_token(fs,TK_COMMA));
 		elf_take_token(fs,TK_PAREN_RIGHT);
 	}
@@ -699,14 +702,16 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 		switch (tk.type) {
 			case TK_DOT: {
 				elf_lexone(fs);
-				// table.(x,y)
+				// table.(x,y) -> (table.x, table.y)
 				if (elf_pick_token(fs,TK_PAREN_LEFT)) {
-					// do {
-					// 	elToken field = elf_take_token(fs,TK_WORD);
-					// 	elNodeId field_node = elf_make_string_node(fs,field.line,field.s);
-					// 	v = elf_make_field_node(fs,tk.line,v,field_node);
-					// }
-
+					elNodeId *z = {0};
+					do {
+						elToken n = elf_take_token(fs,TK_WORD);
+						elNodeId y = elf_make_string_node(fs,n.line,n.s);
+						elNodeId x = elf_make_field_node(fs,tk.line,v,y);
+						elf_xarray_add(z,x);
+					} while (elf_pick_token(fs,TK_COMMA));
+					v = elf_make_multi_node(fs,tk.line,z);
 					elf_take_token(fs,TK_PAREN_RIGHT);
 				} else
 				// table.{x,y}
@@ -726,12 +731,14 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 				do {
 					elNodeId index = elf_load_file_expr(fs);
 					if (index == NO_NODE) break;
-					/* this is proper grammar now!
-					if (elf_get_node_kind(fs,index) == NODE_RANGE_INDEX) {
-						elf_file_dialog(fs,elf_get_node_line(fs,index),"invalid array access expression");
-					}
-					*/
-					/* todo: remove this node conversion thing */
+					/* registry[location.(y,x)] ->
+					registry[location.y,location.x] */
+					if (elf_get_node_kind(fs,index) == NODE_MULTI) {
+						elNodeId *z = elf_get_node(fs,index).z;
+						elf_xarray_foreachi(z) {
+							v = elf_make_index_node(fs,tk.line,v,z[i]);
+						}
+					} else
 					if (elf_get_node_kind(fs,index) == NODE_RANGE) {
 						v = elf_make_ranged_index_node(fs,tk.line,v,index);
 					} else v = elf_make_index_node(fs,tk.line,v,index);

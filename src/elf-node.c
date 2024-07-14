@@ -194,6 +194,9 @@ elNodeId elf_make_call_node(elFileState *fs, elf_lineid line, elNodeId x, elNode
 	return elf_make_node_xyz(fs,line,NODE_CALL,NT_ANY,x,NO_NODE,z);
 }
 
+elNodeId elf_make_multi_node(elFileState *fs, elf_lineid line, elNodeId *z) {
+	return elf_make_node_xyz(fs,line,NODE_MULTI,NT_ANY,NO_NODE,NO_NODE,z);
+}
 
 elNodeId elf_make_node_less_than(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
 	return elf_make_binary_node(fs,line,NODE_LT,NT_BOL,x,y);

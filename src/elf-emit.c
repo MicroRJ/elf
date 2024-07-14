@@ -518,6 +518,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 			elf_emitter_unload(fs,v.y);
 		} break;
 		// prepositional expressions?
+		// todo: this is really wacky!
 		case NODE_RANGE_INDEX: {
 			if (elf_get_node_kind(fs,target_node.x) == NODE_RANGE_INDEX) elf_debugger("test-break");
 			if (elf_get_node_kind(fs,target_node.y) == NODE_RANGE_INDEX) elf_debugger("test-break");
