@@ -743,6 +743,10 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix) {
 						v = elf_make_ranged_index_node(fs,tk.line,v,index);
 					} else v = elf_make_index_node(fs,tk.line,v,index);
 
+					/* todo: this is silly, this is just an
+					inner multi expressions, make multi
+					expressions be regular 'comma' expressions
+					instead */
 				} while(elf_pick_token(fs,TK_COMMA));
 				elf_take_token(fs,TK_SQUARE_RIGHT);
 			} break;
