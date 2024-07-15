@@ -747,6 +747,9 @@ void elf_emitter_begin_if(elFileState *fs, elf_lineid line, elSelectState *s, el
 ** list to enter this block.
 */
 void elf_emitter_add_else_clause(elFileState *fs, elf_lineid line, elSelectState *s) {
+	if (s->jz == 0) {
+		elf_file_dialog(fs,line,"invalid else clause");
+	}
 	elf_ensure(s->jz != 0);
 	int j = elf_emit_jump(fs,line,-1);
 	elf_xarray_add(s->j,j);

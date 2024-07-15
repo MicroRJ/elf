@@ -113,7 +113,7 @@ elRegId elf_pushmany(elState *R, int n) {
 	elRegId stkptr = R->top - R->stk;
 	if (stkptr <= R->stklen) {
 		R->top += n;
-	} else elf_unreachable;
+	} else elf_throw(R,NO_BYTE,"stack overflow");
 	return stkptr;
 }
 
