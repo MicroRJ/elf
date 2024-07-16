@@ -95,7 +95,7 @@ int elf_lib_get_object_address(elState *R) {
 int elf_lib_merge_tables(elState *R) {
 	elTable *tab = elf_add_new_table(R);
 	int i;
-	for (i=0;i<R->call->nx;++i) {
+	for (i=1;i<elf_get_num_args(R);++i) {
 		elf_merge_tables(tab,elf_get_table(R,i));
 	}
 	return 1;
