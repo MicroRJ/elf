@@ -250,6 +250,9 @@ void elf_check_division_by_zero(elState *S, elValue xx, elValue yy) {
 
 
 int elf_call_overload(elState *S, elObject *obj, elString *name, elRegId io, elValue in) {
+	if (obj->metatable == elNil) {
+		elf_throw(S,NO_BYTE,"object does not have a metatable, cannot use overload");
+	}
 	elValue field = elf_table_get_field(obj->metatable,name);
 	if (field.tag != TAG_CLS && field.tag != TAG_BID) {
 		elf_throw(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));

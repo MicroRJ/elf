@@ -122,37 +122,43 @@ int elflib_floor(elState *R) {
 }
 
 
-int elflib_sqrt(elState *R) {
+int elf_lib_sqrt(elState *R) {
 	elf_add_number(R,sqrt(elf_get_number(R,0)));
 	return 1;
 }
 
 
-int elflib_sin(elState *R) {
+int elf_lib_pow(elState *R) {
+	elf_add_number(R,pow(elf_get_number(R,0),elf_get_number(R,1)));
+	return 1;
+}
+
+
+int elf_lib_sin(elState *R) {
 	elf_add_number(R,sin(elf_get_number(R,0)));
 	return 1;
 }
 
 
-int elflib_cos(elState *R) {
+int elf_lib_cos(elState *R) {
 	elf_add_number(R,cos(elf_get_number(R,0)));
 	return 1;
 }
 
 
-int elflib_acos(elState *R) {
+int elf_lib_acos(elState *R) {
 	elf_add_number(R,acos(elf_get_number(R,0)));
 	return 1;
 }
 
 
-int elflib_tan(elState *R) {
+int elf_lib_tan(elState *R) {
 	elf_add_number(R,tan(elf_get_number(R,0)));
 	return 1;
 }
 
 
-int elflib_atan2(elState *R) {
+int elf_lib_atan2(elState *R) {
 	elf_add_number(R,atan2(elf_get_number(R,0),elf_get_number(R,1)));
 	return 1;
 }
@@ -877,12 +883,13 @@ elf_api void elflib_loadall(elState *R) {
 	elf_register_binding(R,"elf.fsize",elf_lib_fsize);
 
 	elf_register_binding(R,"floor",elflib_floor);
-	elf_register_binding(R,"sqrt",elflib_sqrt);
-	elf_register_binding(R,"sin",elflib_sin);
-	elf_register_binding(R,"cos",elflib_cos);
-	elf_register_binding(R,"acos",elflib_acos);
-	elf_register_binding(R,"tan",elflib_tan);
-	elf_register_binding(R,"atan2",elflib_atan2);
+	elf_register_binding(R,"sqrt",elf_lib_sqrt);
+	elf_register_binding(R,"pow",elf_lib_pow);
+	elf_register_binding(R,"sin",elf_lib_sin);
+	elf_register_binding(R,"cos",elf_lib_cos);
+	elf_register_binding(R,"acos",elf_lib_acos);
+	elf_register_binding(R,"tan",elf_lib_tan);
+	elf_register_binding(R,"atan2",elf_lib_atan2);
 
 	elf_register_binding(R,"elf.sleep",elflib_sleep);
 	elf_register_binding(R,"elf.exec",elflib_exec);
