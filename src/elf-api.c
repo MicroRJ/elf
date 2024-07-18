@@ -129,7 +129,7 @@ elRegId elf_add_value(elState *R, elValue v) {
 } while(0)
 
 
-void elf_pushnil(elState *R) {
+void eld_add_nil(elState *R) {
 	R->top->tag = TAG_NIL;
 	_INC_TOP;
 }

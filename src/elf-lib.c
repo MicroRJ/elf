@@ -418,7 +418,7 @@ int elflib_libfn(elState *rt) {
 	if (fn != elNil) {
 		elf_pushbinding(rt,fn);
 	} else {
-		elf_pushnil(rt);
+		eld_add_nil(rt);
 	}
 	return 1;
 }
@@ -429,7 +429,7 @@ int elflib_loadlib(elState *R) {
 	elClosure *callback = elf_get_closure(R,1);
 	elHandle lib = sys_loadlib(name->c);
 	if (lib != elNil) elf_pushsys(R,lib);
-	else elf_pushnil(R);
+	else eld_add_nil(R);
 	return 1;
 }
 
@@ -487,7 +487,7 @@ int elflib_fload(elState *R) {
 		elString *buf = elf_new_string_of_length(R,size);
 		fread(buf->c,1,size,file);
 		elf_add_string(R,buf);
-	} else elf_pushnil(R);
+	} else eld_add_nil(R);
 	return 1;
 }
 

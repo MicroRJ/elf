@@ -388,17 +388,33 @@ int elf_table_metatable_itemize(elState *R) {
 
 
 int elf_table_metatable_index(elState *R) {
-	elf_ensure(R->call->nx >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = elf_xarray_length(tab->array);
+	elValue value = elf_nil_value();
 	if (len != 0) {
-
-		elInteger idx = elf_get_integer(R,0);
-		if (idx < 0) idx = len*(idx/-len);
-		idx %= len;
-
-		elf_add_value(R,tab->array[idx]);
-	} else elf_pushnil(R);
+		for (int i = 0; i < elf_get_num_args(R); ++ i) {
+			if (i != 0) {
+				if (value.tag == TAG_NIL) {
+					elf_throw(R,NO_BYTE,"nil object");
+				}
+				if (value.tag != TAG_TAB) {
+					elf_throw(R,NO_BYTE,"not a table");
+				}
+				if (tab == 0) {
+					elf_throw(R,NO_BYTE,"nil object");
+				}
+			}
+			elInteger idx = elf_get_integer(R,i);
+			/* todo: */
+			if (idx < 0) {
+				idx = len*(idx/-len);
+			}
+			idx %= len;
+			value = tab->array[idx];
+			tab = value.x_tab;
+		}
+	}
+	elf_add_value(R,value);
 	return 1;
 }
 
@@ -442,7 +458,7 @@ int elf_table_metatable_delete(elState *R) {
 	// }
 
 	return 1;
-	leave_: elf_pushnil(R);
+	leave_: eld_add_nil(R);
 	return 1;
 }
 
@@ -490,7 +506,7 @@ int elf_table_metatable_xdelete(elState *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		}
-	} else elf_pushnil(R);
+	} else eld_add_nil(R);
 	return 1;
 }
 
@@ -536,7 +552,7 @@ int elf_table_metatable_xremove(elState *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		}
-	} else elf_pushnil(R);
+	} else eld_add_nil(R);
 	return 1;
 }
 

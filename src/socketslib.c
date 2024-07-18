@@ -58,7 +58,7 @@ elf_api int netlib_pollclient(elState *R) {
       SOCKET client = accept(handle,NULL,NULL);
       elf_ensure(client != INVALID_SOCKET);
 		elf_pushsys(R,(elHandle)client);
-   } else elf_pushnil(R);
+   } else eld_add_nil(R);
 	return 1;
 }
 
@@ -80,7 +80,7 @@ elf_api int netlib_tcpserver(elState *R) {
 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 	if(error != SOCKET_ERROR) {
 		elf_pushsys(R,(elHandle)thesocket);
-	} else elf_pushnil(R);
+	} else eld_add_nil(R);
 
 	return 1;
 }
@@ -104,7 +104,7 @@ elf_api int netlib_tcpclient(elState *R) {
 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 	if(error != SOCKET_ERROR) {
 		elf_pushsys(R,(elHandle)thesocket);
-	} else elf_pushnil(R);
+	} else eld_add_nil(R);
 	return 1;
 }
 
@@ -162,8 +162,8 @@ elf_api int netlib_recv(elState *R) {
 				}
 			} while (length != 0);
 			*cursor = 0;
-		} else elf_pushnil(R);
-	} else elf_pushnil(R);
+		} else eld_add_nil(R);
+	} else eld_add_nil(R);
 	return 1;
 }
 #else

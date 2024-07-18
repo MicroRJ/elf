@@ -86,7 +86,7 @@ elf_api void elf_set_stack_top(elState *R, elValue *top);
 
 elf_api elRegId elf_pushmany(elState *R, int howmany);
 elf_api elRegId elf_add_value(elState *, elValue v);
-elf_api void elf_pushnil(elState *);
+elf_api void eld_add_nil(elState *);
 elf_api void elf_add_integer(elState *, elInteger i);
 elf_api void elf_add_number(elState *, elNumber n);
 elf_api void elf_pushsys(elState *c, elHandle h);
