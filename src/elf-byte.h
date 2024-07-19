@@ -60,9 +60,11 @@ real nice */
 	_(SETFIELD, XYZ) \
 	_(TABLE, I) _(CLOSURE, XY) \
 	_(ISNIL, XY) \
-	_(EQ, XYZ) _(NEQ, XYZ) \
-	_(LT, XYZ) _(LTEQ, XYZ) \
-	_(MUL, XYZ) _(DIV, XYZ) _(MOD, XYZ) \
+	_(EQ, XYZ) _(NEQ, XYZ)   \
+	_(LT, XYZ) _(LTEQ, XYZ)  \
+	_(MUL, XYZ) _(DIV, XYZ)  \
+	_(MOD, XYZ) \
+	_(POW, XYZ) \
 	_(ADD, XYZ) _(SUB, XYZ) \
 	_(SHL, XYZ) _(SHR, XYZ) _(XOR, XYZ) _(BITOR, XYZ)
 

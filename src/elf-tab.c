@@ -240,7 +240,7 @@ elNumber elf_tabgetnum(elTable *tab, elString *key) {
 }
 
 
-elInteger elf_tabgetint(elTable *tab, elString *key) {
+elInteger elf_table_get_integer(elTable *tab, elString *key) {
 	elValue val = elf_table_lookup(tab,elf_string_value(key));
 	return elf_toint(val);
 }
