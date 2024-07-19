@@ -4,6 +4,8 @@
 ** Table
 */
 
+/* todo: these functions are to be refactored,
+a bunch of them are rather useless and or misnamed */
 struct { char *n; elBinding b; } elf_table_metatable[] = {
 	{"length",elf_table_metatable_length},
 	{"tally",elf_table_metatable_tally},
@@ -23,7 +25,10 @@ struct { char *n; elBinding b; } elf_table_metatable[] = {
 	{"fndaliases",elf_table_metatable_find_aliases},
 	{"alias",elf_table_metatable_alias},
 	{"merge",elf_table_metatable_merge},
+	{"xmerge",elf_table_metatable_xmerge},
+	{"reverse",elf_table_metatable_reverse},
 	{"clone",elf_table_metatable_clone},
+	{"xclone",elf_table_metatable_xclone},
 	{"slice",elf_table_metatable_slice},
 	{"place",elf_table_metatable_place},
 	{"swap",elf_table_metatable_swap},
@@ -407,7 +412,8 @@ int elf_table_metatable_index(elState *R) {
 			elInteger idx = elf_get_integer(R,i);
 			/* todo: */
 			if (idx < 0) {
-				idx = len*(idx/-len);
+				// idx = len*(idx/-len);
+				idx += len; // *(idx/-len);
 			}
 			idx %= len;
 			value = tab->array[idx];
@@ -735,8 +741,47 @@ int elf_table_metatable_merge(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *merger = elf_get_table(R,0);
 	elf_merge_tables(tab,merger);
-	elf_add_table(R,tab);
+	return 0;
+}
+
+
+int elf_table_metatable_xclone(elState *R) {
+	elf_check_args(R,":xclone",0,"");
+	elTable *tab = (elTable *) elf_get_this(R);
+	elTable *clone = elf_new_table(R);
+	elInteger i;
+	for ( i = 0; i < elf_xarray_length(tab->array); i += 1 ) {
+		elf_xarray_add(clone->array,tab->array[i]);
+	}
+	elf_add_table(R,clone);
 	return 1;
+}
+
+
+int elf_table_metatable_xmerge(elState *R) {
+	elf_check_args(R,":xmerge",1,"the table to merge");
+	elTable *tab = (elTable *) elf_get_this(R);
+	elTable *merger = elf_get_table(R,0);
+	elInteger i;
+	for (i=0;i<elf_xarray_length(merger->array);++i) {
+		elf_xarray_add(tab->array,merger->array[i]);
+	}
+	return 0;
+}
+
+
+int elf_table_metatable_reverse(elState *R) {
+	elf_check_args(R,":reverse",0,"");
+	elTable *tab = (elTable *) elf_get_this(R);
+	elInteger n = elf_xarray_length(tab->array);
+	elInteger i;
+	elValue *array = tab->array;
+	for (i = 0; i < n >> 1; i += 1) {
+		elValue value = array[i];
+		array[i] = array[n-1-i];
+		array[n-1-i] = value;
+	}
+	return 0;
 }
 
 
