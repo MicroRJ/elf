@@ -4,42 +4,42 @@
 ** Table
 */
 
-/* todo: these functions are to be refactored,
-a bunch of them are rather useless and or misnamed */
-struct { char *n; elBinding b; } elf_table_metatable[] = {
-	{"length",elf_table_metatable_length},
-	{"tally",elf_table_metatable_tally},
-	{"delete",elf_table_metatable_delete},
-	{"haskey",elf_table_metatable_contains},
-	{"lookup",elf_table_metatable_lookup},
-	{"iter",elf_table_metatable_foreach},
-	{"collisions",elf_table_metatable_get_collisions},
-	{"add",elf_table_metatable_add},
-	{"xadd",elf_table_metatable_xadd},
-	{"itemize",elf_table_metatable_itemize},
-	{"inject",elf_table_metatable_inject},
-	{"idx",elf_table_metatable_index},
-	{"xrem",elf_table_metatable_xremove},
-	{"xdelete",elf_table_metatable_xdelete},
-	{"bubblesort",elf_table_metatable_bubble_sort},
-	{"fndaliases",elf_table_metatable_find_aliases},
-	{"alias",elf_table_metatable_alias},
-	{"merge",elf_table_metatable_merge},
-	{"xmerge",elf_table_metatable_xmerge},
-	{"reverse",elf_table_metatable_reverse},
-	{"clone",elf_table_metatable_clone},
-	{"xclone",elf_table_metatable_xclone},
-	{"slice",elf_table_metatable_slice},
-	{"place",elf_table_metatable_place},
-	{"swap",elf_table_metatable_swap},
-	{0},
-};
-
 
 elTable *elf_new_table_metatable(elState *R) {
+	/* todo: these functions are to be refactored,
+	a bunch of them are rather useless and or misnamed */
+	struct { char *n; elBinding b; } elf_table_lib[] = {
+		{"length",elf_table_libfn_length},
+		{"tally",elf_table_libfn_tally},
+		{"delete",elf_table_libfn_delete},
+		{"haskey",elf_table_libfn_contains},
+		{"lookup",elf_table_libfn_lookup},
+		{"iter",elf_table_libfn_foreach},
+		{"collisions",elf_table_libfn_get_collisions},
+		{"add",elf_table_libfn_add},
+		{"xadd",elf_table_libfn_xadd},
+		{"itemize",elf_table_libfn_itemize},
+		{"inject",elf_table_libfn_inject},
+		{"idx",elf_table_libfn_index},
+		{"xrem",elf_table_libfn_xremove},
+		{"xdelete",elf_table_libfn_xdelete},
+		{"bubblesort",elf_table_libfn_bubble_sort},
+		{"fndaliases",elf_table_libfn_find_aliases},
+		{"alias",elf_table_libfn_alias},
+		{"merge",elf_table_libfn_merge},
+		{"xmerge",elf_table_libfn_xmerge},
+		{"reverse",elf_table_libfn_reverse},
+		{"clone",elf_table_libfn_clone},
+		{"xclone",elf_table_libfn_xclone},
+		{"slice",elf_table_libfn_slice},
+		{"xset",elf_table_libfn_xset},
+		{"swap",elf_table_libfn_swap},
+		{0},
+	};
+
 	elTable *tab = elf_add_new_table(R);
-	for (int i = 0; elf_table_metatable[i].n != 0; ++ i) {
-		elf_table_set_binding_field(R,tab,elf_table_metatable[i].n,elf_table_metatable[i].b);
+	for (int i = 0; elf_table_lib[i].n != 0; ++ i) {
+		elf_table_set_binding_field(R,tab,elf_table_lib[i].n,elf_table_lib[i].b);
 	}
 	return tab;
 }
@@ -81,6 +81,10 @@ void elf_dealloc_table(elTable *tab) {
 ** 	Then you have to check whether the slot
 ** is nil, which means no match, use the
 ** result to modify the slot and value as desired.
+**
+** todo: have a dedicated function for looking up
+** by string and another one by integers... since
+** they are the most common...
 **
 */
 elInteger elf_table_hashin(elTable *tab, elValue key) {
@@ -289,21 +293,21 @@ void elf_tabsettabfld(elTable *tab, elString *key, elTable *val) {
 /* metatable */
 
 
-int elf_table_metatable_length(elState *R) {
+int elf_table_libfn_length(elState *R) {
 	elTable *tab = (elTable*) elf_get_this(R);
 	elf_add_integer(R,elf_xarray_length(tab->array));
 	return 1;
 }
 
 
-int elf_table_metatable_tally(elState *R) {
+int elf_table_libfn_tally(elState *R) {
 	elTable *tab = (elTable*) elf_get_this(R);
 	elf_add_integer(R,elf_xarray_length(tab->array));
 	return 1;
 }
 
 
-int elf_table_metatable_contains(elState *c) {
+int elf_table_libfn_contains(elState *c) {
 	elf_ensure(c->f->x == 1);
 	elTable *table = (elTable*) elf_get_this(c);
 	elValue k = elf_get_value(c,0);
@@ -312,7 +316,7 @@ int elf_table_metatable_contains(elState *c) {
 }
 
 
-int elf_table_metatable_lookup(elState *c) {
+int elf_table_libfn_lookup(elState *c) {
 	elf_ensure(c->f->x == 1);
 	elValue k = elf_get_value(c,0);
 	elTable *table = (elTable*) c->f->obj;
@@ -321,7 +325,7 @@ int elf_table_metatable_lookup(elState *c) {
 }
 
 
-int elf_table_metatable_get_collisions(elState *c) {
+int elf_table_libfn_get_collisions(elState *c) {
 	elTable *table = (elTable*) c->f->obj;
 	elf_add_integer(c,table->ncollisions);
 	return 1;
@@ -329,7 +333,7 @@ int elf_table_metatable_get_collisions(elState *c) {
 
 
 /* todo: ensure that [i] == :idx(i) */
-int elf_table_metatable_xadd(elState *R) {
+int elf_table_libfn_xadd(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger i;
 	elInteger length = elf_xarray_length(tab->array);
@@ -340,7 +344,7 @@ int elf_table_metatable_xadd(elState *R) {
 }
 
 
-int elf_table_metatable_add(elState *R) {
+int elf_table_libfn_add(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	int i;
 	for (i=0;i<R->call->nx;++i) {
@@ -360,7 +364,7 @@ void elf_merge_tables(elTable *tab, elTable *merger) {
 }
 
 
-int elf_table_metatable_inject(elState *R) {
+int elf_table_libfn_inject(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	if (elf_get_tag(R,0) == TAG_TAB) {
 		elf_merge_tables(tab,elf_get_table(R,0));
@@ -371,7 +375,7 @@ int elf_table_metatable_inject(elState *R) {
 }
 
 
-int elf_table_metatable_itemize(elState *R) {
+int elf_table_libfn_itemize(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *result = elf_add_new_table(R);
 	elf_varforj(tab->array) {
@@ -392,7 +396,7 @@ int elf_table_metatable_itemize(elState *R) {
 }
 
 
-int elf_table_metatable_index(elState *R) {
+int elf_table_libfn_index(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = elf_xarray_length(tab->array);
 	elValue value = elf_nil_value();
@@ -409,13 +413,10 @@ int elf_table_metatable_index(elState *R) {
 					elf_throw(R,NO_BYTE,"nil object");
 				}
 			}
+
 			elInteger idx = elf_get_integer(R,i);
-			/* todo: */
-			if (idx < 0) {
-				// idx = len*(idx/-len);
-				idx += len; // *(idx/-len);
-			}
-			idx %= len;
+			if ((idx %= len) < 0) idx += len;
+
 			value = tab->array[idx];
 			tab = value.x_tab;
 		}
@@ -430,7 +431,7 @@ int elf_table_metatable_index(elState *R) {
 ** value from a table.
 ** The algorithm is pretty slow...
 */
-int elf_table_metatable_delete(elState *R) {
+int elf_table_libfn_delete(elState *R) {
 	elf_ensure(R->call->x >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elValue key = elf_get_value(R,0);
@@ -469,43 +470,36 @@ int elf_table_metatable_delete(elState *R) {
 }
 
 
-int elf_table_metatable_xdelete(elState *R) {
+int elf_table_libfn_xdelete(elState *R) {
 	elf_ensure(elf_get_num_args(R) >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = elf_xarray_length(tab->array);
 	if (len != 0) {
 		if (elf_is_object_tag(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
-			/* todo: lookup can be removed if tag came
-			after the data instead so that obj addr was
-			the same as value addr! Otherwise this is expensive!  */
+			/* todo: Speed */
 			elValue *item = elNil;
 			elInteger idx;
-			for (idx=0;idx<len;++idx) {
+			for ( idx = 0; idx < len; idx += 1 ) {
 				if (tab->array[idx].x_obj == object) {
 					item = &tab->array[idx];
 					break;
 				}
 			}
-			elf_ensure((item - tab->array) == idx);
-			// elInteger idx = item - tab->array;
-			// if (item < tab->array || item > tab->array + len - 1) {
-			// 	elf_throw(R,NO_BYTE,"item does not belong");
-			// }
-			if (item == elNil) {
+			if (item == 0) {
+				/* todo: maybe not crash here */
 				elf_throw(R,NO_BYTE,"item does not belong");
 			}
+			elf_ensure((item - tab->array) == idx);
 			elf_add_value(R,*item);
 			elInteger min = elf_xarray_pop(tab->array);
 			if (idx != min) {
 				tab->array[idx] = tab->array[min];
 			}
-
-			// elf_table_insert(tab,elf_integer_value(idx),elf_nil_value());
 		} else {
 			elInteger idx = elf_get_integer(R,0);
-			if (idx < 0) idx = len*(idx/-len);
-			idx %= len;
+			if ((idx %= len) < 0) idx += len;
+
 			elInteger min = elf_xarray_pop(tab->array);
 			elf_add_value(R,tab->array[idx]);
 			if (idx != min) {
@@ -517,10 +511,11 @@ int elf_table_metatable_xdelete(elState *R) {
 }
 
 
-int elf_table_metatable_xremove(elState *R) {
+int elf_table_libfn_xremove(elState *R) {
 	elf_ensure(elf_get_num_args(R) >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = elf_xarray_length(tab->array);
+
 	if (len != 0) {
 		if (elf_is_object_tag(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
@@ -549,9 +544,10 @@ int elf_table_metatable_xremove(elState *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		} else {
+
 			elInteger idx = elf_get_integer(R,0);
-			if (idx < 0) idx = len*(idx/-len);
-			idx %= len;
+			if ((idx %= len) < 0) idx += len;
+
 			elInteger min = elf_xarray_pop(tab->array);
 			elf_add_value(R,tab->array[idx]);
 			if (idx != min) {
@@ -563,7 +559,7 @@ int elf_table_metatable_xremove(elState *R) {
 }
 
 
-int elf_table_metatable_alias(elState *R) {
+int elf_table_libfn_alias(elState *R) {
 	elf_check_args(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elf_table_alias(R,tab,elf_get_value(R,0),elf_get_value(R,1));
@@ -571,7 +567,7 @@ int elf_table_metatable_alias(elState *R) {
 }
 
 
-int elf_table_metatable_find_aliases(elState *R) {
+int elf_table_libfn_find_aliases(elState *R) {
 	elf_check_args(R,":fndaliases",1,"the key to find aliases for");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elValue key = elf_get_value(R,0);
@@ -594,7 +590,7 @@ int elf_table_metatable_find_aliases(elState *R) {
 }
 
 
-int elf_table_metatable_bubble_sort(elState *R) {
+int elf_table_libfn_bubble_sort(elState *R) {
 	elf_check_args(R,":bubblesort",1,"comparator function");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elValue *arr = tab->array;
@@ -627,7 +623,7 @@ int elf_table_metatable_bubble_sort(elState *R) {
 // }
 
 
-int elf_table_metatable_foreach(elState *R) {
+int elf_table_libfn_foreach(elState *R) {
 	elf_ensure(R->frame->nx == 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elClosure *cls = elf_get_closure(R,0);
@@ -679,7 +675,7 @@ elTable *elf_clone_table(elState *S, elTable *tab) {
 }
 
 
-int elf_table_metatable_array(elState *S) {
+int elf_table_libfn_array(elState *S) {
 	elf_check_args(S,":array",0,"the table to get a copy of as an array");
 	elTable *tab = (elTable *) elf_get_this(S);
 
@@ -692,7 +688,7 @@ int elf_table_metatable_array(elState *S) {
 }
 
 
-int elf_table_metatable_clone(elState *R) {
+int elf_table_libfn_clone(elState *R) {
 	elf_check_args(R,":clone",0,"the table to clone");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elf_add_table(R,elf_clone_table(R,tab));
@@ -700,7 +696,7 @@ int elf_table_metatable_clone(elState *R) {
 }
 
 
-int elf_table_metatable_slice(elState *R) {
+int elf_table_libfn_slice(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger x = 0;
 	elInteger y = elf_xarray_length(tab->array);
@@ -714,17 +710,22 @@ int elf_table_metatable_slice(elState *R) {
 }
 
 
-int elf_table_metatable_place(elState *R) {
-	elf_check_args(R,":place",2,"the value, and the index where to place the value");
+int elf_table_libfn_xset(elState *R) {
+	elf_check_args(R,":xset",2,"the value, and the index where to place the value");
+
 	elTable *tab = (elTable *) elf_get_this(R);
 	elValue value = elf_get_value(R,0);
-	elInteger index = elf_get_integer(R,1) % elf_xarray_length(tab);
-	tab->array[index] = value;
+
+	elInteger len = elf_xarray_length(tab);
+	elInteger idx = elf_get_integer(R,1);
+	if ((idx %= len) < 0) idx += len;
+
+	tab->array[idx] = value;
 	return 0;
 }
 
 
-int elf_table_metatable_swap(elState *R) {
+int elf_table_libfn_swap(elState *R) {
 	elf_check_args(R,":swap",2,"the two indexes to swap");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger x = elf_get_integer(R,0);
@@ -736,7 +737,7 @@ int elf_table_metatable_swap(elState *R) {
 }
 
 
-int elf_table_metatable_merge(elState *R) {
+int elf_table_libfn_merge(elState *R) {
 	elf_check_args(R,":merge",1,"the table to merge");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *merger = elf_get_table(R,0);
@@ -745,7 +746,7 @@ int elf_table_metatable_merge(elState *R) {
 }
 
 
-int elf_table_metatable_xclone(elState *R) {
+int elf_table_libfn_xclone(elState *R) {
 	elf_check_args(R,":xclone",0,"");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *clone = elf_new_table(R);
@@ -758,7 +759,7 @@ int elf_table_metatable_xclone(elState *R) {
 }
 
 
-int elf_table_metatable_xmerge(elState *R) {
+int elf_table_libfn_xmerge(elState *R) {
 	elf_check_args(R,":xmerge",1,"the table to merge");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *merger = elf_get_table(R,0);
@@ -770,7 +771,7 @@ int elf_table_metatable_xmerge(elState *R) {
 }
 
 
-int elf_table_metatable_reverse(elState *R) {
+int elf_table_libfn_reverse(elState *R) {
 	elf_check_args(R,":reverse",0,"");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger n = elf_xarray_length(tab->array);

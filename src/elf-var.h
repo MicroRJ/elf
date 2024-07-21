@@ -32,11 +32,9 @@ typedef struct elArray {
 } elArray;
 
 
-#define elf_vararr(var) ((elArray*)(var))[-1]
-#define elf_varfor(T,N,A) for (T N = A; N < A + elf_xarray_length(A); N += 1)
-#define elf_varforj(A) for (elInteger j = 0; j < elf_xarray_length(A); ++ j)
-#define elf_xarray_foreachi(A) for (elInteger i = 0; i < elf_xarray_length(A); ++ i)
 #define elf_xarray_delete(var) ((var != 0) ? elf_dealloc(lHEAP,(elArray*)(var)-1),0 : 0)
+
+#define elf_vararr(var) ((elArray*)(var))[-1]
 #define elf_varmax(var) ((var != 0) ? ((elArray*)(var))[-1].max : 0)
 #define elf_varmin(var) ((var != 0) ? ((elArray*)(var))[-1].min : 0)
 
@@ -66,3 +64,10 @@ am I trippin' ? */
 */
 elInteger elf_varaddxx(void **var
 , elInteger per, elInteger res, elInteger com);
+
+
+
+/* todo: these are deprecated */
+#define elf_varfor(T,N,A) for (T N = A; N < A + elf_xarray_length(A); N += 1)
+#define elf_varforj(A) for (elInteger j = 0; j < elf_xarray_length(A); ++ j)
+#define elf_xarray_foreachi(A) for (elInteger i = 0; i < elf_xarray_length(A); ++ i)

@@ -610,6 +610,32 @@ int elf_run(elState *R) {
 		locals[b.x].tag = TAG_INT;
 		locals[b.x].i   = eq;
 	} break;
+	case BC_MOD: {
+		elValue xx = locals[b.y];
+		elValue yy = locals[b.z];
+		if (elf_is_object_tag(xx.tag) || elf_is_object_tag(yy.tag)) {
+			elf_unreachable;
+		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {
+
+			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+			elf_check_division_by_zero(R,xx,yy);
+
+			elNumber x = elf_tonum(xx);
+			elNumber y = elf_tonum(yy);
+			elNumber z = x - (elInteger)(x / y) * y;
+
+			locals[b.x].tag   = TAG_NUM;
+			locals[b.x].x_num = z;
+		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {
+
+			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+			elf_check_division_by_zero(R,xx,yy);
+
+			locals[b.x].tag   = TAG_INT;
+			locals[b.x].x_int = elf_toint(xx) % elf_toint(yy);
+
+		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));
+	} break;
 	/* todo: make this better */
 	#define CASE_IBOP(OPNAME,OP) \
 	case OPNAME : {\
@@ -626,23 +652,20 @@ int elf_run(elState *R) {
 		elValue xx = locals[b.y];\
 		elValue yy = locals[b.z];\
 		if (elf_is_object_tag(xx.tag) || elf_is_object_tag(yy.tag)) {\
-			if (!elf_is_object_tag(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first");\
-			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				elf_check_division_by_zero(R,xx,yy);\
-			}\
+			if (!elf_is_object_tag(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
+			/* Could we redefine this? */ \
+			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 			elf_call_overload(R,xx.x_obj,elf_is_object_tag(yy.tag)?FN:FN1,b.x,yy);\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
-			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				elf_check_division_by_zero(R,xx,yy);\
-			}\
 			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+			/* Could we redefine this? */ \
+			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 			locals[b.x].tag = TAG_NUM;\
 			locals[b.x].x_num = elf_tonum(xx) OP elf_tonum(yy);\
 		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {\
 			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
-			if (((b.k == BC_DIV) || (b.k == BC_MOD))) {\
-				elf_check_division_by_zero(R,xx,yy);\
-			}\
+			/* Could we redefine this? */ \
+			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 			locals[b.x].tag = TAG_INT;\
 			locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\
 		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));\
@@ -672,7 +695,7 @@ int elf_run(elState *R) {
 	CASE_IBOP(BC_SHL,  <<);
 	CASE_IBOP(BC_SHR,  >>);
 	CASE_IBOP(BC_XOR,   ^);
-	CASE_IBOP(BC_MOD,   %);
+	// CASE_IBOP(BC_MOD,   %);
 	CASE_IBOP(BC_BITOR, |);
 	/* todo: could we cache these strings */
 	CASE_BOP(BC_ADD, +, R->cache.__add, R->cache.__add1);
