@@ -108,7 +108,7 @@ elNodeId elf_make_group_node(elFileState *fs, elf_lineid, elNodeId x);
 elNodeId elf_make_region_node(elFileState *fs, elf_lineid, elNodeId x, elNodeId *z);
 
 elNodeId elf_make_nil_node(elFileState *fs, elf_lineid);
-elNodeId elf_make_node_integer(elFileState *fs, elf_lineid, elInteger i);
+elNodeId elf_make_integer_node(elFileState *fs, elf_lineid, elInteger i);
 elNodeId elf_make_number_node(elFileState *fs, elf_lineid, elNumber n);
 elNodeId elf_make_string_node(elFileState *fs, elf_lineid, char *);
 elNodeId elf_make_table_node(elFileState *fs, elf_lineid, elNodeId *z);

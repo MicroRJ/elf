@@ -192,7 +192,7 @@ void elf_load_file_stat(elFileState *fs);
 
 
 
-void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
+void elf_emitter_emit_store(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
 elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line, elBool reload, elRegId x, elRegId y, elNodeId id);
 elRegId elf_emitter_localize(elFileState *fs, elf_lineid line, elNodeId id);
 elRegId elf_emitter_relocalize(elFileState *fs, elf_lineid line, elRegId target_register, elNodeIdTypeGuard id);

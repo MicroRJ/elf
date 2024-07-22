@@ -129,35 +129,44 @@ elRegId elf_emitter_local_alloc(elFileState *fs, elf_lineid line, elRegId target
 }
 
 
-/* we just associate each byte with a line,
-this is simple and is pretty great for debugging... */
-elByteId elf_emit_byte(elFileState *fs, elf_lineid line, elBytecode byte) {
-	elFileFnState *fn = fs->fn;
-	elModule *md = fs->M;
-	elf_xarray_add(md->lines,line);
-	elf_xarray_add(md->bytes,byte);
-	elf_xarray_add(md->track,0);
-	// elf_bytefpf(stdout,md,-1,md->nbytes-fn->bytes,byte);
-	return md->nbytes ++;
+elf_lineid elf_emitter_get_line(elFileState *fs, elByteId id) {
+	return fs->M->lines[id];
+}
+
+
+elBytecode elf_emitter_get_byte(elFileState *fs, elByteId id) {
+	return fs->M->bytes[id];
+}
+
+
+elByteId elf_emitter_add_byte(elFileState *fs, elf_lineid line, elBytecode byte) {
+	/* we just associate each byte with a line,
+	this is simple and is pretty great for debugging... */
+	elf_xarray_add(fs->M->lines,line);
+	elf_xarray_add(fs->M->bytes,byte);
+	elf_xarray_add(fs->M->track,0);
+	// elFileFnState *fn = fs->fn;
+	// elf_bytefpf(stdout,fs->M,-1,fs->M->nbytes-fn->bytes,byte);
+	return fs->M->nbytes ++;
 }
 
 
 elByteId elf_emitter_add_byteop(elFileState *fs, elf_lineid line, elByteOP k, elInteger i) {
-	return elf_emit_byte(fs,line,(elBytecode){k,i});
+	return elf_emitter_add_byte(fs,line,(elBytecode){k,i});
 }
 
 
 elByteId elf_emitter_add_bytexy(elFileState *fs, elf_lineid line, elByteOP k, int x, int y) {
 	elBytecode b = (elBytecode){k};
 	b.x = x, b.y = y;
-	return elf_emit_byte(fs,line,b);
+	return elf_emitter_add_byte(fs,line,b);
 }
 
 
 elByteId elf_emitter_add_bytexyz(elFileState *fs, elf_lineid line, elByteOP k, int x, int y, int z) {
 	elBytecode b = (elBytecode){k};
 	b.x = x, b.y = y, b.z = z;
-	return elf_emit_byte(fs,line,b);
+	return elf_emitter_add_byte(fs,line,b);
 }
 
 
@@ -603,12 +612,12 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 			boolean expressions */
 			elFileJumplist js = {0};
 			elf_emit_jump_if_false(fs,&js,NO_SLOT,id);
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_node_integer(fs,line,elTrue));
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,elTrue));
 			int j = elf_emit_jump(fs,line,-1);
 			elf_tie_loose_jump_list(fs,js.f);
 			elf_xarray_delete(js.f);
 			js.f = elNil;
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_node_integer(fs,line,false));
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,false));
 			elf_emitter_patch_jump(fs,j);
 		} break;
 		case NODE_NEQ: case NODE_EQ:
@@ -655,7 +664,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line
 }
 
 
-void elf_emit_load_to_target(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
+void elf_emitter_emit_store(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y) {
 	elNode v = elf_get_targetable_node(fs,MAKE_NODE_ID(x));
 	elf_ensure(elf_is_targetable_node(v.kind));
 	elf_ensure(v.level <= fs->level);
@@ -1048,9 +1057,10 @@ void elf_emitter_close_ranged_loop(elFileState *fs, elf_lineid line) {
 	bl->loop.true_jumps = elNil;
 	// elf_ensure(bl->loop.index_register == elf_get_node_register(fs,MAKE_NODE_ID(bl->loop.x)));
 	elNodeId index_node = bl->loop.index_node;
-	elNodeId k = elf_make_binary_node(fs,NO_LINE,NODE_ADD,NT_INT,index_node,elf_make_node_integer(fs,NO_LINE,1));
-	elf_emit_load_to_target(fs,line,index_node,k);
+	elNodeId k = elf_make_binary_node(fs,NO_LINE,NODE_ADD,NT_INT,index_node,elf_make_integer_node(fs,NO_LINE,1));
+	elf_emitter_emit_store(fs,line,index_node,k);
 	elf_emit_jump(fs,line,bl->loop.entry);
+
 	elf_tie_loose_jump_list(fs,bl->loop.false_jumps);
 	elf_xarray_delete(bl->loop.false_jumps);
 	bl->loop.false_jumps = 0;

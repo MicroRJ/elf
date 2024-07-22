@@ -119,7 +119,7 @@ elNodeId elf_make_group_node(elFileState *fs, elf_lineid line, elNodeId x) {
 }
 
 
-elNodeId elf_make_node_integer(elFileState *fs, elf_lineid line, elInteger i) {
+elNodeId elf_make_integer_node(elFileState *fs, elf_lineid line, elInteger i) {
 	elNodeId v = elf_make_node_nullary(fs,line,NODE_INTEGER,NT_INT);
 	fs->nodes[v].lit.i = i;
 	return v;
@@ -204,4 +204,9 @@ elNodeId elf_make_node_less_than(elFileState *fs, elf_lineid line, elNodeId x, e
 
 elNodeId elf_make_node_is_nil(elFileState *fs, elf_lineid line, elNodeId x) {
 	return elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,x,elf_make_nil_node(fs,line));
+}
+
+elNodeId elf_make_call_metafield_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z, char *name) {
+	elNodeId field = elf_make_metafield_node(fs,line,x,elf_make_string_node(fs,line,name));
+	return elf_make_call_node(fs,line,field,z);
 }
