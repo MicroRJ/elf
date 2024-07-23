@@ -83,7 +83,7 @@ char *elNodeToStr[] = {
 typedef struct elNode {
 	union { elNodeKi kind, k; };
 	union { elNodeTy type, ty, t; };
-	elf_lineid line;
+	elFileLine line;
 	/* todo: eventually remove this */
 	int level;
 	struct { elNodeId x,y,*z; };
@@ -99,37 +99,37 @@ typedef struct elNode {
 
 
 
-elNodeId elf_make_node_xyz(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y, elNodeId *z);
-elNodeId elf_make_binary_node(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y);
-elNodeId elf_make_node_unary(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy ty, elNodeId x);
-elNodeId elf_make_node_nullary(elFileState *fs, elf_lineid, elNodeKi k, elNodeTy t);
+elNodeId elf_make_node_xyz(elFileState *fs, elFileLine, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y, elNodeId *z);
+elNodeId elf_make_binary_node(elFileState *fs, elFileLine, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y);
+elNodeId elf_make_node_unary(elFileState *fs, elFileLine, elNodeKi k, elNodeTy ty, elNodeId x);
+elNodeId elf_make_node_nullary(elFileState *fs, elFileLine, elNodeKi k, elNodeTy t);
 
-elNodeId elf_make_group_node(elFileState *fs, elf_lineid, elNodeId x);
-elNodeId elf_make_region_node(elFileState *fs, elf_lineid, elNodeId x, elNodeId *z);
+elNodeId elf_make_group_node(elFileState *fs, elFileLine, elNodeId x);
+elNodeId elf_make_region_node(elFileState *fs, elFileLine, elNodeId x, elNodeId *z);
 
-elNodeId elf_make_nil_node(elFileState *fs, elf_lineid);
-elNodeId elf_make_integer_node(elFileState *fs, elf_lineid, elInteger i);
-elNodeId elf_make_number_node(elFileState *fs, elf_lineid, elNumber n);
-elNodeId elf_make_string_node(elFileState *fs, elf_lineid, char *);
-elNodeId elf_make_table_node(elFileState *fs, elf_lineid, elNodeId *z);
-elNodeId elf_make_closure_node(elFileState *fs, elf_lineid, elNodeId x, elNodeId *z);
+elNodeId elf_make_nil_node(elFileState *fs, elFileLine);
+elNodeId elf_make_integer_node(elFileState *fs, elFileLine, elInteger i);
+elNodeId elf_make_number_node(elFileState *fs, elFileLine, elNumber n);
+elNodeId elf_make_string_node(elFileState *fs, elFileLine, char *);
+elNodeId elf_make_table_node(elFileState *fs, elFileLine, elNodeId *z);
+elNodeId elf_make_closure_node(elFileState *fs, elFileLine, elNodeId x, elNodeId *z);
 
-elNodeId elf_make_load_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
+elNodeId elf_make_load_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
 
-elNodeId elf_make_local_target_node(elFileState *fs, elf_lineid line, elNodeId i);
-elNodeId elf_make_global_value_node(elFileState *fs, elf_lineid line, elNodeId i);
-elNodeId elf_make_closure_value_node(elFileState *fs, elf_lineid line, elNodeId i);
+elNodeId elf_make_register_node(elFileState *fs, elFileLine line, elNodeId i);
+elNodeId elf_make_global_value_node(elFileState *fs, elFileLine line, elNodeId i);
+elNodeId elf_make_closure_value_node(elFileState *fs, elFileLine line, elNodeId i);
 
-elNodeId elf_make_type_guard_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeTy y);
-elNodeId elf_make_metafield_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
-elNodeId elf_make_field_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
-elNodeId elf_make_index_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
+elNodeId elf_make_type_guard_node(elFileState *fs, elFileLine line, elNodeId x, elNodeTy y);
+elNodeId elf_make_metafield_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
+elNodeId elf_make_field_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
+elNodeId elf_make_index_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
 
-elNodeId elf_nodeloadfile(elFileState *fs, elf_lineid line, elNodeId x);
+elNodeId elf_nodeloadfile(elFileState *fs, elFileLine line, elNodeId x);
 
-elNodeId elf_make_ranged_index_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
+elNodeId elf_make_ranged_index_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
 
-elNodeId elf_make_call_node(elFileState *fs, elf_lineid line, elNodeId x, elNodeId *z);
+elNodeId elf_make_call_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId *z);
 
 
 elObjectTag elf_nodettotag(elNodeTy ty) {

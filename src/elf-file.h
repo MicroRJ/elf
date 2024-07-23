@@ -35,7 +35,7 @@ typedef struct elFileEntity {
 	elEntityKind kind;
 	elBool      flags;
 	char        *name;
-	elf_lineid   line;
+	elFileLine   line;
 	// elNodeId     node;
 	elRegId      slot;
 	int         level;
@@ -54,9 +54,15 @@ typedef struct elFileEntity {
 
 typedef struct elFileLoopState {
 	elByteId entry;
-	union { elNodeId index_node, x; };
-	elRegId index_register;
 	elByteId *false_jumps,*true_jumps;
+	/* this can be directly accessed
+	using #array, #index, and #value */
+	elRegId array_register;
+	elRegId index_register;
+	elRegId value_register;
+	/* todo: why do we need this, please
+	remove? */
+	union { elNodeId x; };
 } elFileLoopState;
 
 
@@ -115,7 +121,7 @@ typedef struct elMemoryRegion {
 typedef struct elFileFnState elFileFnState;
 typedef struct elFileFnState {
 	elFileFnState *enclosing;
-	elf_lineid line;
+	elFileLine line;
 	/* maximum number of local register used concurrently
 	at any point for this function */
 	elRegId nlocals;
@@ -192,14 +198,14 @@ void elf_load_file_stat(elFileState *fs);
 
 
 
-void elf_emitter_emit_store(elFileState *fs, elf_lineid line, elNodeId x, elNodeId y);
-elRegId elf_emitter_local_load(elFileState *fs, elf_lineid line, elBool reload, elRegId x, elRegId y, elNodeId id);
-elRegId elf_emitter_localize(elFileState *fs, elf_lineid line, elNodeId id);
-elRegId elf_emitter_relocalize(elFileState *fs, elf_lineid line, elRegId target_register, elNodeIdTypeGuard id);
+void elf_emitter_emit_store(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
+elRegId elf_emitter_local_load(elFileState *fs, elFileLine line, elBool reload, elRegId x, elRegId y, elNodeId id);
+elRegId elf_emitter_localize(elFileState *fs, elFileLine line, elNodeId id);
+elRegId elf_emitter_relocalize(elFileState *fs, elFileLine line, elRegId target_register, elNodeIdTypeGuard id);
 
 
-void elf_emitter_enter_delayed_block(elFileState *fs, elf_lineid line);
-void elf_emitter_leave_delayed_block(elFileState *fs, elf_lineid line);
+void elf_emitter_enter_delayed_block(elFileState *fs, elFileLine line);
+void elf_emitter_leave_delayed_block(elFileState *fs, elFileLine line);
 
 
 elByteId elf_branch_if_false(elFileState *fs, elFileJumplist *js, elRegId x, elNodeId id);
@@ -214,21 +220,21 @@ enum {
 };
 
 
-void elf_emitter_begin_if(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x, int z);
-void elf_emitter_add_elif_clause(elFileState *fs, elf_lineid line, elSelectState *s, elNodeId x);
-void elf_emitter_add_else_clause(elFileState *fs, elf_lineid line, elSelectState *s);
-void elf_emitter_add_then_clause(elFileState *fs, elf_lineid line, elSelectState *s);
-void elf_emitter_close_if(elFileState *fs, elf_lineid line, elSelectState *s);
+void elf_emitter_begin_if(elFileState *fs, elFileLine line, elSelectState *s, elNodeId x, int z);
+void elf_emitter_add_elif_clause(elFileState *fs, elFileLine line, elSelectState *s, elNodeId x);
+void elf_emitter_add_else_clause(elFileState *fs, elFileLine line, elSelectState *s);
+void elf_emitter_add_then_clause(elFileState *fs, elFileLine line, elSelectState *s);
+void elf_emitter_close_if(elFileState *fs, elFileLine line, elSelectState *s);
 
 
-void elf_emitter_begin_ranged_loop(elFileState *fs, elf_lineid line, elNodeId x, elNodeId lo, elNodeId hi);
-void elf_emitter_close_ranged_loop(elFileState *fs, elf_lineid line);
+void elf_emitter_begin_ranged_loop(elFileState *fs, elFileLine line, elNodeId x, elNodeId lo, elNodeId hi);
+void elf_emitter_close_ranged_loop(elFileState *fs, elFileLine line);
 
-void elf_emitter_begin_do_while_loop(elFileState *fs, elf_lineid line);
-void elf_emitter_close_do_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
+void elf_emitter_begin_do_while_loop(elFileState *fs, elFileLine line);
+void elf_emitter_close_do_while_loop(elFileState *fs, elFileLine line, elNodeId x);
 
-void elf_emitter_begin_while_loop(elFileState *fs, elf_lineid line, elNodeId x);
-void elf_emitter_close_while_loop(elFileState *fs, elf_lineid line);
+void elf_emitter_begin_while_loop(elFileState *fs, elFileLine line, elNodeId x);
+void elf_emitter_close_while_loop(elFileState *fs, elFileLine line);
 
 
 elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags);

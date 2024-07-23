@@ -67,7 +67,7 @@ int elf_find_file_info_by_byte(elModule *md, elByteId byte) {
 }
 
 
-elf_lineid elf_get_line_for_byte(elModule *M, elByteId byte) {
+elFileLine elf_get_line_for_byte(elModule *M, elByteId byte) {
 	return M->lines[byte];
 }
 
@@ -98,7 +98,7 @@ elFileInfo elf_getrunningfile(elState *S) {
 }
 
 
-elf_lineid elf_getrunningline(elState *S) {
+elFileLine elf_getrunningline(elState *S) {
 	return S->M->lines[S->byte];
 }
 
@@ -164,7 +164,7 @@ void elf_dump_byte_trace(elState *S, elCallState *call, int level) {
 	int fileid = elf_find_file_info_by_byte(M,call->head);
 	if (fileid != -1) {
 		elFileInfo *file = &M->files[fileid];
-		elf_lineid line = M->lines[call->head];
+		elFileLine line = M->lines[call->head];
 		elf_line_dialog(file->name,file->lines,line,
 		call->head,M->bytes[call->head],call->cl != elNil ? "(bytecode function)" : "(binding)");
 	}
@@ -174,7 +174,7 @@ void elf_dump_byte_trace(elState *S, elCallState *call, int level) {
 void elf_throw(elState *R, elByteId byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
-	elf_lineid line = M->lines[byte];
+	elFileLine line = M->lines[byte];
 	int fileid = elf_find_file_info_by_byte(M,byte);
 	if (fileid != -1) {
 		elFileInfo *file = &M->files[fileid];

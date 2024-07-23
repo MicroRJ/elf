@@ -91,11 +91,12 @@ int elf_lib_get_object_address(elState *R) {
 /*
 ** Merges one or several tables together into
 ** a new table, which is then returned.
+** todo: introduce merge keyword!
 */
 int elf_lib_merge_tables(elState *R) {
 	elTable *tab = elf_add_new_table(R);
 	int i;
-	for (i=1;i<elf_get_num_args(R);++i) {
+	for ( i = 0; i < elf_get_num_args(R); i += 1 ) {
 		elf_merge_tables(tab,elf_get_table(R,i));
 	}
 	return 1;

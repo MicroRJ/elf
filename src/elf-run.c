@@ -308,7 +308,7 @@ int elf_run(elState *R) {
 			elInteger track = ++ M->track[bc];
 			if (track == 64) {
 				elFileInfo file = M->files[elf_find_file_info_by_byte(M,bc)];
-				elf_lineid line = M->lines[bc];
+				elFileLine line = M->lines[bc];
 				int linenum;
 				elf_get_line_location_info(file.lines,line,&linenum,0);
 				elf_debug_log("%s %i: %lli: %lli detected hot path",file.name,linenum,bc,track);

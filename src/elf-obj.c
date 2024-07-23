@@ -158,7 +158,7 @@ void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 		int fileid = elf_find_file_info_by_byte(R->M,R->byte);
 		if (fileid != -1) {
 			elFileInfo *file = &R->M->files[fileid];
-			elf_lineid line = elf_get_line_for_byte(R->M,R->byte);
+			elFileLine line = elf_get_line_for_byte(R->M,R->byte);
 			int linenum;
 			char *lineloc;
 			elf_get_line_location_info(file->contents,line,&linenum,&lineloc);
@@ -193,7 +193,7 @@ void elf_collect_object(elState *R, elObject *obj) {
 		if (fileid != -1) {
 			// __debugbreak();
 			elFileInfo *file = &R->M->files[fileid];
-			elf_lineid line = elf_get_line_for_byte(R->M,R->byte);
+			elFileLine line = elf_get_line_for_byte(R->M,R->byte);
 			int linenum;
 			char *lineloc;
 			elf_get_line_location_info(file->contents,line,&linenum,&lineloc);

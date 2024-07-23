@@ -18,7 +18,7 @@ typedef int elRegId;
 typedef int elByteId;
 typedef int elSymbolId;
 /* todo: eventually convert this to an offset */
-typedef char *elf_lineid;
+typedef char *elFileLine;
 
 
 /*

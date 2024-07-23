@@ -11,7 +11,7 @@
 
 typedef struct elToken {
 	unsigned char type;
-	elf_lineid line;
+	elFileLine line;
 	unsigned int eol: 1;
 	union {
 		char *s;
