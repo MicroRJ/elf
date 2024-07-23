@@ -58,7 +58,7 @@ typedef enum elTokenType {
 	TK_WORD                 = 33,
 	TK_QMARK                = 34,
 	TK_NEGATE               = 35,
-	TK_ASSIGN_QUESTION      = 36,
+	TK_NIL_ASSIGN      = 36,
 	TK_ASSIGN               = 37,
 	TK_COLON                = 38,
 	TK_SEMI_COLON           = 39,

@@ -50,15 +50,14 @@ _(RIGHT_SHIFT,">>",9) _(LEFT_SHIFT,"<<",9) \
 _(LESS_THAN,"<",8) _(LESS_THAN_EQUAL,"<=",8) _(GREATER_THAN,">",8) _(GREATER_THAN_EQUAL,">=",8) \
 _(EQUALS,"==",7) _(NOT_EQUALS,"!=",7) \
 _(BIT_AND,"&",6) _(BIT_OR,"|",5) _(BIT_XOR,"^",4) \
-_(LOG_AND,"&&",3) _(LOG_OR,"||",2) \
+_(LOG_AND,"&&",3) _(LOG_OR,"||",2) _(NIL_OR,"??",2) \
 _(DOT_DOT,"..",1)
 
 #define TKLIST(_) \
 _(NEGATE,"!") \
 _(INTEGER,"integer") _(NUMBER,"number") _(STRING,"string") _(LETTER,"letter") _(WORD,"word") \
 _(QUESTION_MARK,"?") _(EXCLAMATION_MARK,"!") \
-_(ASSIGN_QUESTION,"?=") \
-_(ASSIGN,"=") \
+_(ASSIGN,"=") _(NIL_ASSIGN,"?=") \
 _(COLON,":") _(SEMI_COLON,";") \
 _(COMMA,",") _(DOT,".") \
 _(SQUARE_LEFT,"[") _(SQUARE_RIGHT,"]") _(CURLY_LEFT,"{") _(CURLY_RIGHT,"}") \

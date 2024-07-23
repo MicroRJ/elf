@@ -293,6 +293,13 @@ elToken elf_lexone(elFileState *file) {
 			}
 		} break;
 
+		// TK_XCASE2('?',TK_QUESTION_MARK,'=',TK_NIL_ASSIGN);
+		case '?': {
+			elf_movechr(); tk.type = TK_QUESTION_MARK;
+			if (elf_cmovchr('?')) tk.type = TK_NIL_OR;
+			else if (elf_cmovchr('=')) tk.type = TK_NIL_ASSIGN;
+		} break;
+
 		#define TK_XCASE2(C0,T0,C1,T1) \
 		case C0: {                     \
 			elf_movechr();                  \
@@ -306,7 +313,6 @@ elToken elf_lexone(elFileState *file) {
 		TK_XCASE2('&',TK_BIT_AND,'&',TK_LOG_AND);
 		TK_XCASE2('!',TK_NEGATE,'=',TK_NOT_EQUALS);
 		TK_XCASE2('=',TK_ASSIGN,'=',TK_EQUALS);
-		TK_XCASE2('?',TK_QUESTION_MARK,'=',TK_ASSIGN_QUESTION);
 
 		#undef TK_XCASE2
 

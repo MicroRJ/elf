@@ -38,7 +38,7 @@ additional checks everywhere which is annoying */
 #define NODE_DEF(_) \
 	_(NONE)\
 	_(NOP)\
-	_(AND) _(OR)\
+	_(AND) _(OR) _(NIL_OR)\
 	_(EQ) _(NEQ)\
 	_(BITSHL) _(BITSHR)\
 	_(ADD) _(SUB) _(MUL) _(DIV)\

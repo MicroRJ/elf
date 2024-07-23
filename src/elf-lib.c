@@ -123,6 +123,12 @@ int elflib_floor(elState *R) {
 }
 
 
+int elflib_ceil(elState *R) {
+	elf_add_number(R,ceil(elf_get_number(R,0)));
+	return 1;
+}
+
+
 int elf_lib_sqrt(elState *R) {
 	elf_add_number(R,sqrt(elf_get_number(R,0)));
 	return 1;
@@ -884,6 +890,7 @@ elf_api void elflib_loadall(elState *R) {
 	elf_register_binding(R,"elf.fsize",elf_lib_fsize);
 
 	elf_register_binding(R,"floor",elflib_floor);
+	elf_register_binding(R,"ceil",elflib_ceil);
 	elf_register_binding(R,"sqrt",elf_lib_sqrt);
 	elf_register_binding(R,"pow",elf_lib_pow);
 	elf_register_binding(R,"sin",elf_lib_sin);

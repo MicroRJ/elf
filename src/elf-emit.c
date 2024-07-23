@@ -4,34 +4,6 @@
 ** Bytecode Generator (node -> bytecode)
 */
 
-/* todo: the bytecode generator is largely
-unfinished and it needs testing, I'm sure
-there are plenty of bugs, somehow it has
-worked this far...
-My main concern is the way we do register
-allocation for nodes, there are some really
-complex expressions that do some weird
-register stuff that I'm just not so confident
-in...
-
-Namely:
-
-	array[0..2] = 1
-
-Which translates into:
-
-	for i = 0..2 ? {
-		array[i] = 1
-	}
-
-Normally registers are deallocated
-as soon as an expression is
-finished with them, but for this
-case the registers must be kept
-alive for the whole statement...
-
-*/
-
 
 elMemoryRegion elf_enter_memory_region(elFileState *fs) {
 	elMemoryRegion restore = fs->memory_region;
@@ -264,7 +236,7 @@ void elf_emitter_add_function_epiloge(elFileState *fs, elFileLine line) {
 ** expression, only one register is necessary, if no registers
 ** are given one is allocated and deallocated automatically.
 */
-elByteId elf_emit_branch_if(elFileState *fs, elFileJumplist *js, elBool z, elRegId x, elNodeId id) {
+elByteId elf_emit_branch_if(elFileState *fs, elFileBoolExpr *js, elBool z, elRegId x, elNodeId id) {
 	elByteId j = NO_BYTE;
 
 	elRegId mem = elf_get_memory_state(fs);
@@ -307,12 +279,12 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileJumplist *js, elBool z, elReg
 }
 
 
-elByteId elf_branch_if_false(elFileState *fs, elFileJumplist *js, elRegId x, elNodeId id) {
+elByteId elf_branch_if_false(elFileState *fs, elFileBoolExpr *js, elRegId x, elNodeId id) {
 	return elf_emit_branch_if(fs,js,elFalse,x,id);
 }
 
 
-elByteId elf_branch_if_true(elFileState *fs, elFileJumplist *js, elRegId x, elNodeId id) {
+elByteId elf_branch_if_true(elFileState *fs, elFileBoolExpr *js, elRegId x, elNodeId id) {
 	return elf_emit_branch_if(fs,js,elTrue,x,id);
 }
 
@@ -322,7 +294,7 @@ elByteId elf_branch_if_true(elFileState *fs, elFileJumplist *js, elRegId x, elNo
 ** address becomes the false target, thus all false
 ** branches converge here. All true branches are returned.
 */
-elByteId *elf_emit_jump_if_true(elFileState *fs, elFileJumplist *js, elRegId x, elNodeId id) {
+elByteId *elf_emit_jump_if_true(elFileState *fs, elFileBoolExpr *js, elRegId x, elNodeId id) {
 	elf_branch_if_true(fs,js,x,id);
 	elf_tie_loose_jump_list(fs,js->f);
 	elf_xarray_delete(js->f);
@@ -331,7 +303,7 @@ elByteId *elf_emit_jump_if_true(elFileState *fs, elFileJumplist *js, elRegId x, 
 }
 
 
-elByteId *elf_emit_jump_if_false(elFileState *fs, elFileJumplist *js, elRegId x, elNodeId id) {
+elByteId *elf_emit_jump_if_false(elFileState *fs, elFileBoolExpr *js, elRegId x, elNodeId id) {
 	elf_branch_if_false(fs,js,x,id);
 	elf_tie_loose_jump_list(fs,js->t);
 	elf_xarray_delete(js->t);
@@ -340,7 +312,7 @@ elByteId *elf_emit_jump_if_false(elFileState *fs, elFileJumplist *js, elRegId x,
 }
 
 
-elByteId *elf_emit_jump_if_not_nil(elFileState *fs, elFileLine line, elFileJumplist *js, elNodeId id) {
+elByteId *elf_emit_jump_if_not_nil(elFileState *fs, elFileLine line, elFileBoolExpr *js, elNodeId id) {
 	return elf_emit_jump_if_false(fs,js,NO_SLOT,elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,id,elf_make_nil_node(fs,line)));
 }
 
@@ -534,22 +506,6 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elRegId yy = elf_emitter_localize(fs,line,v.y);
 			elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k),target_register,xx,yy);
 		} break;
-		// prepositional expressions?
-		// todo: this is really wacky!
-		case NODE_RANGE_INDEX: {
-			if (elf_get_node_kind(fs,node.x) == NODE_RANGE_INDEX) elf_debugger("test-break");
-			if (elf_get_node_kind(fs,node.y) == NODE_RANGE_INDEX) elf_debugger("test-break");
-			elf_ensure(target_register != NO_SLOT);
-			flags |= LOAD_KEEPALIVE;
-			elf_emitter_begin_block(fs,BLOCK_LOOP);
-			elRegId xx = elf_emitter_localize(fs,line,node.x);
-			elRegId yy = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
-			elf_emitter_begin_ranged_loop(fs,line
-			,	elf_make_register_node(fs,line,yy)
-			,	elf_get_node(fs,node.y).x
-			, 	elf_get_node(fs,node.y).y);
-			elf_emitter_add_bytexyz(fs,line,BC_INDEX,target_register,xx,yy);
-		} break;
 		case NODE_CLOSURE: {
 			UNUSED_CHECK;
 			elRegId head = fn->xmemory;
@@ -614,19 +570,29 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 				elf_emitter_add_bytexy(fs,line,BC_RELOAD,target_register,head);
 			}
 		} break;
+		case NODE_NIL_OR: {
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,node.x);
+
+			elFileBoolExpr bool_expr = {0};
+			elByteId *js = elf_emit_jump_if_not_nil(fs,NO_LINE,&bool_expr,elf_make_register_node(fs,NO_LINE,target_register));
+
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,node.y);
+
+			elf_tie_loose_jump_list(fs,js);
+			elf_xarray_delete(js);
+		} break;
 		case NODE_AND: case NODE_OR: {
 			if (y == 0) goto leave;
-			/* todo: we need to optimize this, better support for
-			boolean expressions */
-			elFileJumplist js = {0};
-			elf_emit_jump_if_false(fs,&js,NO_SLOT,id);
+
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,elFalse));
+
+			elFileBoolExpr bool_expr = {0};
+			elByteId *js = elf_emit_jump_if_false(fs,&bool_expr,NO_SLOT,id);
+
 			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,elTrue));
-			int j = elf_emit_jump(fs,line,-1);
-			elf_tie_loose_jump_list(fs,js.f);
-			elf_xarray_delete(js.f);
-			js.f = elNil;
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,false));
-			elf_emitter_patch_jump(fs,j);
+
+			elf_tie_loose_jump_list(fs,js);
+			elf_xarray_delete(js);
 		} break;
 		case NODE_NEQ: case NODE_EQ:
 		case NODE_GT: case NODE_LT:
@@ -665,9 +631,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 	}
 
 	leave:
-	if (~flags & LOAD_KEEPALIVE) {
-		elf_set_memory_state(fs,mem);
-	}
+	elf_set_memory_state(fs,mem);
 	return target_register;
 }
 
@@ -705,12 +669,6 @@ void elf_emitter_emit_store(elFileState *fs, elFileLine line, elNodeId x, elNode
 		} break;
 		case NODE_METAFIELD: {
 			elf_file_dialog(fs,line,"meta fields are constant");
-#if 0
-			elRegId xx = elf_emitter_localize(fs,line,v.x);
-			elRegId ii = elf_emitter_localize(fs,line,v.y);
-			elRegId yy = elf_emitter_localize(fs,line,y);
-			elf_emitter_add_bytexyz(fs,line,BC_SETMETAFIELD,xx,ii,yy);
-#endif
 		} break;
 		default: {
 			elf_unreachable;
@@ -722,7 +680,7 @@ void elf_emitter_emit_store(elFileState *fs, elFileLine line, elNodeId x, elNode
 
 
 void elf_emitter_begin_if(elFileState *fs, elFileLine line, elSelectState *s, elNodeId x, int z) {
-	elFileJumplist js = {0};
+	elFileBoolExpr js = {0};
 	elf_emit_branch_if(fs,&js,z,NO_SLOT,x);
 	// if  0 = jz
 	// iff 1 = jnz
@@ -976,7 +934,7 @@ void elf_emitter_close_do_while_loop(elFileState *fs, elFileLine line, elNodeId 
 	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fs->fn->block;
 	elf_ensure(bl->flags & BLOCK_LOOP);
 
-	elFileJumplist js = {elNil};
+	elFileBoolExpr js = {elNil};
 	elf_emit_jump_if_true(fs,&js,NO_SLOT,x);
 
 	elf_tie_loose_jump_list_to(fs,js.t,bl->loop.entry);
@@ -998,7 +956,7 @@ void elf_emitter_begin_while_loop(elFileState *fs, elFileLine line, elNodeId x) 
 
 	elf_ensure(bl->loop.false_jumps == 0);
 
-	elFileJumplist js = {elNil};
+	elFileBoolExpr js = {elNil};
 	bl->loop.false_jumps = elf_emit_jump_if_false(fs,&js,NO_SLOT,x);
 }
 
@@ -1014,12 +972,6 @@ void elf_emitter_close_while_loop(elFileState *fs, elFileLine line) {
 	elf_tie_loose_jump_list(fs,bl->loop.false_jumps);
 	elf_xarray_delete(bl->loop.false_jumps);
 	bl->loop.false_jumps = elNil;
-}
-
-void elf_emitter_set_loop_value_register(elFileState *fs) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1);
-	elf_ensure(bl->flags & BLOCK_LOOP);
-
 }
 
 
@@ -1044,7 +996,7 @@ void elf_emitter_begin_ranged_loop(elFileState *fs, elFileLine line, elNodeId in
 
 	elf_ensure(bl->loop.false_jumps == elNil);
 
-	elFileJumplist js = {elNil};
+	elFileBoolExpr js = {elNil};
 	bl->loop.false_jumps = elf_emit_jump_if_false(fs,&js,NO_SLOT,c);
 }
 

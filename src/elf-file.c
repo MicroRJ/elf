@@ -320,6 +320,7 @@ elNodeKi elf_token_to_node(elTokenType tk) {
 		case TK_DOT_DOT:            return NODE_RANGE;
 		case TK_LOG_AND:            return NODE_AND;
 		case TK_LOG_OR:             return NODE_OR;
+		case TK_NIL_OR:             return NODE_NIL_OR;
 		case TK_ADD:                return NODE_ADD;
 		case TK_SUB:                return NODE_SUB;
 		case TK_DIV:                return NODE_DIV;
@@ -493,10 +494,10 @@ void elf_complete_expr_line(elFileState *fs, elNodeId x) {
 		elf_check_store(fs,tk.line,x);
 		elNodeId y = elf_load_file_expr(fs);
 		elf_emitter_emit_store(fs,tk.line,x,y);
-	} else if (elf_pick_token(fs,TK_ASSIGN_QUESTION)) {
+	} else if (elf_pick_token(fs,TK_NIL_ASSIGN)) {
 		elf_check_store(fs,tk.line,x);
 		elNodeId y = elf_load_file_expr(fs);
-		elFileJumplist js = {0};
+		elFileBoolExpr js = {0};
 		/* todo: this will evaluate the expression twice, we don't
 		want that, instead we can reuse the previous registers by
 		deferring deallocation of those registers until statement
@@ -968,12 +969,10 @@ void elf_load_file_stat(elFileState *fs) {
 		for i = {x}.({x},{x})
 		for i = {x}[{x}..{x}]
 		for i = {x} , {x} ?
+		for i = 0..1, 1 == for i = 0..,1
 		*/
 		case TK_FOR: {
 			elf_lexone(fs);
-			/* todo: allow for for 0..24 ?
-			where the variable is unnamed, no
-			need for '=' */
 			elToken name = elf_take_token(fs,TK_WORD);
 
 			elf_take_token(fs,TK_ASSIGN);
@@ -996,12 +995,16 @@ void elf_load_file_stat(elFileState *fs) {
 			elByteId block_head = NO_BYTE;
 			elByteId block_tail = NO_BYTE;
 
+			/* todo: why not create this per
+			expression instead */
 			elBlockId block = elf_emitter_begin_block(fs,BLOCK_LOOP);
 
 			/* the value here refers to the thing that
 			gets assigned to whatever we're iterating
 			over, so for instance, for i = 0..24, here
 			'i' is both the value and the index.
+			But in principle, index is always the current
+			loop iteration we're on.
 			However, because loops can expand to multiple
 			loops, the value register may alternate between
 			index and actual value.
@@ -1011,6 +1014,14 @@ void elf_load_file_stat(elFileState *fs) {
 			const elNodeId value = elf_new_local_entity(fs,name.line,name.s,elFalse);
 			const elRegId value_register = elf_get_node(fs,value).x;
 
+
+			/* todo: we should always have an index
+			register, for instance:
+			for i = 0..1,24,45 ? {
+				// #index Should be 0,1,2
+				// #value Should be 0,24,25
+			}
+			*/
 			int i;
 			for (i = 0; i < elf_xarray_length(z); i += 1) {
 				elNodeId y = z[i];
