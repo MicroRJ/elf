@@ -5,42 +5,36 @@
 */
 
 
+/* this collector is dog ... */
+#define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
+#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(64)
 
-/* we have to factor in additional heuristics
-for this, sometimes memory usage isn't what
-boggles the GC, instead is the sheer quantity
-of objects, so that's something we have to
-take into account, and most of the time you
-make small allocations tightly, so that's
-where most of the spikes occur, of course this
-allocator is too trivial as of now... we're
-counting on future SMC optimizations that'll
-be capable of removing redundant intermediate
-heap allocations... */
-#define L_GC_THRESHOLD_MIN (elInteger) MEGABYTES(4)
-#define L_GC_THRESHOLD_MAX (elInteger) MEGABYTES(16)
-
-
-#define L_GC_OBJNUM_THRESHOLD_MIN (elInteger) (8192*1)
-#define L_GC_OBJNUM_THRESHOLD_MAX (elInteger) (8192*32)
-
+#define elGC_OBJ_THRESHOLD_MIN (elInteger) (8192*1)
+#define elGC_OBJ_THRESHOLD_MAX (elInteger) (8192*32)
 
 void elf_collect(elState *fs);
 elBool elf_mark_value(elValue *v);
 elInteger elf_mark_table(elTable *table);
 
-
-elBool elf_value_tag_is_numeric(elObjectTag tag) {
+elBool elf_isnumeric(elValueTag tag) {
 	return (tag == TAG_NUM) || (tag == TAG_INT);
 }
 
+elNumber elf_tonum(elValue v) {
+	return v.tag == TAG_INT ? (elNumber) v.x_int : v.x_num;
+}
 
-int elf_is_value_nil(elValue x) {
-	return (x.tag == TAG_NIL) || (!elf_value_tag_is_numeric(x.tag) && (x.p == elNil));
+elInteger elf_toint(elValue v) {
+	return v.tag == TAG_NUM ? (elInteger) v.x_num : v.x_int;
 }
 
 
-elBool elf_is_object_tag(elObjectTag tag) {
+int elf_isnil(elValue x) {
+	return (x.tag == TAG_NIL) || (!elf_isnumeric(x.tag) && (x.p == elNil));
+}
+
+
+elBool elf_isobj(elValueTag tag) {
 	switch (tag) {
 		case TAG_STR: case TAG_TAB:
 		case TAG_OBJ: case TAG_CLS: {
@@ -51,12 +45,12 @@ elBool elf_is_object_tag(elObjectTag tag) {
 }
 
 
-elObjectTag elf_object_type_to_value_tag(elObjType type) {
+elValueTag elf_object_type_to_value_tag(elObjType type) {
 	switch(type) {
 		case OBJ_STRING:  return TAG_STR;
 		case OBJ_CLOSURE: return TAG_CLS;
 		case OBJ_TAB:     return TAG_TAB;
-		default: elf_unreachable;
+		default: elNOCODE;
 	}
 	return -1;
 }
@@ -126,17 +120,22 @@ void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 			goto allocate;
 		}
 		if (R->memory.threshold <= 0) {
-			R->memory.threshold = L_GC_THRESHOLD_MIN;
+			R->memory.threshold = elGC_MEM_THRESHOLD_MIN;
 		}
-		if (elf_xarray_length(R->memory.objects) > L_GC_OBJNUM_THRESHOLD_MAX) {
+		if (elf_xarray_length(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
 			elf_collect(R);
-		} else
-		if (R->memory.allocated >= R->memory.threshold) {
+			if (elf_xarray_length(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
+				elf_throw(R,NO_BYTE,"out of memory");
+			}
+		} else if (R->memory.allocated > R->memory.threshold) {
 			R->memory.threshold *= 2;
-			if (R->memory.threshold > L_GC_THRESHOLD_MAX) {
-				R->memory.threshold = L_GC_THRESHOLD_MAX;
+			if (R->memory.threshold > elGC_MEM_THRESHOLD_MAX) {
+				R->memory.threshold = elGC_MEM_THRESHOLD_MAX;
 			}
 			elf_collect(R);
+			if (R->memory.allocated > R->memory.threshold) {
+				elf_throw(R,NO_BYTE,"out of memory");
+			}
 		}
 	}
 
@@ -154,6 +153,7 @@ void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 	// fprintf(_logging_io,"++ object: %p %s\n"
 	// , obj, tag2s[elf_object_type_to_value_tag(type)]);
 
+	#if defined(elMEMORY_DEBUGGING)
 	if (R != 0) {
 		int fileid = elf_find_file_info_by_byte(R->M,R->byte);
 		if (fileid != -1) {
@@ -162,9 +162,11 @@ void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 			int linenum;
 			char *lineloc;
 			elf_get_line_location_info(file->contents,line,&linenum,&lineloc);
-			// fprintf(_logging_io," - %i:%i", linenum,(int) (line-lineloc));
+			fprintf(_logging_io," - %i:%i", linenum,(int) (line-lineloc));
 		}
 	}
+	#endif
+
 	return obj;
 }
 
@@ -238,7 +240,8 @@ elInteger elf_mark_object(elObject *obj) {
 	elInteger result = 0;
 	if (obj->color == GC_BLACK) {
 		return 1;
-	} else if (obj->color == GC_WHITE) {
+	}
+	if (obj->color == GC_WHITE) {
 		obj->color = GC_BLACK;
 		result = 1;
 	}
@@ -256,7 +259,7 @@ elInteger elf_mark_object(elObject *obj) {
 
 
 elBool elf_mark_value(elValue *v) {
-	return elf_is_object_tag(v->tag) ? elf_mark_object(v->x_obj) : elFalse;
+	return elf_isobj(v->tag) ? elf_mark_object(v->x_obj) : elFalse;
 }
 
 

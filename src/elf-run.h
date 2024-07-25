@@ -96,10 +96,6 @@ typedef struct elState {
 		elTable *table;
 	} metatables;
 	struct {
-		int pf_indent;
-		int pf_char;
-	} lib;
-	struct {
 		elValue oncall;
 		elValue ongc;
 	} hooks;

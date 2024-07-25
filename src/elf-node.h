@@ -7,7 +7,6 @@
 
 #define NO_NODE (-1)
 
-
 typedef int elNodeId;
 
 typedef struct {
@@ -16,14 +15,12 @@ typedef struct {
 
 #define MAKE_NODE_ID(id) (elNodeIdTypeGuard){id}
 
-
 typedef enum elNodeTy {
 	NT_NON = 0,
 	NT_ANY, NT_SYS,
 	NT_NIL, NT_BOL, NT_INT, NT_NUM,
 	NT_OBJ, NT_TAB, NT_FUN, NT_STR
 } elNodeTy;
-
 
 // THIS: this
 // INDEX: {x}[{x}]
@@ -33,16 +30,17 @@ typedef enum elNodeTy {
 // RANGE_INDEX: [{x}..{x}]
 // RANGE: {x}..{x}
 // GROUP: ({x})
-/* todo: RANGE_INDEX is a redundant node and it requires
-additional checks everywhere which is annoying */
 #define NODE_DEF(_) \
-	_(NONE)\
 	_(NOP)\
-	_(AND) _(OR) _(NIL_OR)\
+	/* these are even odd pairs, use ^ to get the counter */\
+	_(AND) _(OR)\
+	_(NIL_AND) _(NIL_OR)\
 	_(EQ) _(NEQ)\
 	_(BITSHL) _(BITSHR)\
 	_(ADD) _(SUB) _(MUL) _(DIV)\
 	_(LT) _(GT) _(LTEQ) _(GTEQ)\
+	/* end */\
+	_(POW)\
 	_(BITXOR) _(MOD) _(BITOR)\
 	_(TYPEGUARD)\
 	_(LOAD)\
@@ -62,19 +60,17 @@ additional checks everywhere which is annoying */
 
 
 typedef enum elNodeKi {
+	NODE_NONE = 0,
 #define NODE_ENUM(NAME) NODE_##NAME,
-
 	NODE_DEF(NODE_ENUM)
-
 #undef NODE_ENUM
 } elNodeKi;
 
 
 char *elNodeToStr[] = {
+	"NONE",
 #define NODE_ENUM(NAME) #NAME,
-
 	NODE_DEF(NODE_ENUM)
-
 #undef NODE_ENUM
 };
 
@@ -132,12 +128,12 @@ elNodeId elf_make_ranged_index_node(elFileState *fs, elFileLine line, elNodeId x
 elNodeId elf_make_call_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId *z);
 
 
-elObjectTag elf_nodettotag(elNodeTy ty) {
+elValueTag elf_nodettotag(elNodeTy ty) {
 	switch (ty) {
 		case NT_SYS: return TAG_SYS;
 		case NT_NUM: return TAG_NUM;
 		case NT_INT: return TAG_INT;
-		default: elf_unreachable;
+		default: elNOCODE;
 	}
 	return TAG_NIL;
 }

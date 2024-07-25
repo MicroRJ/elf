@@ -152,7 +152,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 
 	elFileFnState fn = {0};
 	elf_emitter_begin_function(fs,&fn,fs->tk.line);
-	elNodeId id = elf_load_file_expr(fs);
+	elNodeId id = elf_load_file_expr(fs,0);
 	elf_emit_yield(fs,fs->tk.line,id);
 	elf_emitter_close_function(fs);
 
@@ -506,7 +506,7 @@ int elf_run(elState *R) {
 			locals[b.x].tag = TAG_INT;
 			locals[b.x].i   = locals[b.y].x_str->c[locals[b.z].i];
 		} else if (xx.tag == TAG_NIL) {
-			elf_throw(R,bc,"attempted to get field of nil value");
+			elf_throw(R,bc,"attempted to get field of 'nil' value");
 		} else elf_throw(R,bc,"invalid object to perform this operator on");
 	} break;
 	case BC_SETINDEX: case BC_SETFIELD: {
@@ -514,9 +514,12 @@ int elf_run(elState *R) {
 		xx = locals[b.x];
 		yy = locals[b.y];
 		zz = locals[b.z];
+		if (yy.tag == TAG_NIL) {
+			elf_throw(R,bc,"attempted to set 'nil' field");
+		}
 		if (xx.tag == TAG_TAB) {
 #if defined(ELF_EXPERIMENTAL_FEATURES)
-			if (elf_is_object_tag(yy.tag)) {
+			if (elf_isobj(yy.tag)) {
 				if (yy.x_obj->metatable == elNil) {
 					goto else_;
 				}
@@ -566,13 +569,13 @@ int elf_run(elState *R) {
 	case BC_SETMETATABLE: {
 		elValue xx = locals[b.x];
 		elValue yy = locals[b.y];
-		if (elf_is_object_tag(xx.tag) && yy.tag == TAG_TAB) {
+		if (elf_isobj(xx.tag) && yy.tag == TAG_TAB) {
 			xx.x_obj->metatable = yy.x_tab;
-		} else elf_unreachable;
+		} else elNOCODE;
 	} break;
 	case BC_SETMETAFIELD: {
 		elValue xx = locals[b.x];
-		if (elf_is_object_tag(xx.tag)) {
+		if (elf_isobj(xx.tag)) {
 			elValue yy = locals[b.y];
 			elValue zz = locals[b.z];
 			elf_table_insert(xx.x_obj->metatable,yy,zz);
@@ -599,10 +602,10 @@ int elf_run(elState *R) {
 		elValue y = locals[b.z];
 		elBool eq = false;
 		if ((x.tag == TAG_NIL) || (y.tag == TAG_NIL)) {
-			eq = elf_is_value_nil(x) == elf_is_value_nil(y);
+			eq = elf_isnil(x) == elf_isnil(y);
 		} else if ((x.tag == TAG_STR) && (y.tag == TAG_STR)) {
 			eq = elf_streq(x.x_str,y.x_str);
-		} else if (elf_value_tag_is_numeric(x.tag) && elf_value_tag_is_numeric(y.tag)) {
+		} else if (elf_isnumeric(x.tag) && elf_isnumeric(y.tag)) {
 			eq = x.x_int == y.x_int;
 		} else eq = (x.tag == y.tag) && (x.x_int == y.x_int);
 
@@ -610,14 +613,29 @@ int elf_run(elState *R) {
 		locals[b.x].tag = TAG_INT;
 		locals[b.x].i   = eq;
 	} break;
+	case BC_POW: {
+		elValue xx = locals[b.y];
+		elValue yy = locals[b.z];
+		if (elf_isobj(xx.tag) || elf_isobj(yy.tag)) {
+			elNOCODE;
+		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {
+			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+			locals[b.x].tag   = TAG_NUM;
+			locals[b.x].x_num = pow(elf_tonum(xx),elf_tonum(yy));
+		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {
+			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+			locals[b.x].tag   = TAG_INT;
+			locals[b.x].x_int = pow(elf_toint(xx),elf_toint(yy));
+		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));
+	} break;
 	case BC_MOD: {
 		elValue xx = locals[b.y];
 		elValue yy = locals[b.z];
-		if (elf_is_object_tag(xx.tag) || elf_is_object_tag(yy.tag)) {
-			elf_unreachable;
+		if (elf_isobj(xx.tag) || elf_isobj(yy.tag)) {
+			elNOCODE;
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {
 
-			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 			elf_check_division_by_zero(R,xx,yy);
 
 			elNumber x = elf_tonum(xx);
@@ -628,7 +646,7 @@ int elf_run(elState *R) {
 			locals[b.x].x_num = z;
 		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {
 
-			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 			elf_check_division_by_zero(R,xx,yy);
 
 			locals[b.x].tag   = TAG_INT;
@@ -651,19 +669,19 @@ int elf_run(elState *R) {
 	case OPCODE : {\
 		elValue xx = locals[b.y];\
 		elValue yy = locals[b.z];\
-		if (elf_is_object_tag(xx.tag) || elf_is_object_tag(yy.tag)) {\
-			if (!elf_is_object_tag(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
+		if (elf_isobj(xx.tag) || elf_isobj(yy.tag)) {\
+			if (!elf_isobj(xx.tag)) elf_throw(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
 			/* Could we redefine this? */ \
 			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
-			elf_call_overload(R,xx.x_obj,elf_is_object_tag(yy.tag)?FN:FN1,b.x,yy);\
+			elf_call_overload(R,xx.x_obj,elf_isobj(yy.tag)?FN:FN1,b.x,yy);\
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {\
-			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			/* Could we redefine this? */ \
 			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 			locals[b.x].tag = TAG_NUM;\
 			locals[b.x].x_num = elf_tonum(xx) OP elf_tonum(yy);\
 		} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {\
-			if (!elf_value_tag_is_numeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 			/* Could we redefine this? */ \
 			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 			locals[b.x].tag = TAG_INT;\
@@ -704,7 +722,7 @@ int elf_run(elState *R) {
 	CASE_BOP(BC_DIV, /, R->cache.__div, R->cache.__div1);
 	#undef CASE_BOP
 	default: {
-		elf_unreachable;
+		elNOCODE;
 	} break;
 		}
 	}

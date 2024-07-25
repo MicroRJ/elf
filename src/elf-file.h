@@ -18,10 +18,11 @@ typedef struct {
 	elEntityId id;
 } elEntityIdTypeGuard;
 
-
-#define ENTITY_REFERENCED 0x1
-#define ENTITY_CONSTANT   0x2
-#define ENTITY_ASSIGNED   0x4
+#define ENTITY_REFERENCED (1 << 0)
+#define ENTITY_CONSTANT   (1 << 1)
+#define ENTITY_ASSIGNED   (1 << 2)
+#define ENTITY_PARAMETER  (1 << 3)
+#define ENTITY_FORLOOP    (1 << 4)
 
 
 typedef enum elEntityKind {
@@ -74,6 +75,7 @@ typedef struct elFileLoopState {
 typedef struct elFileBlock elFileBlock;
 typedef struct elFileBlock {
 	elBool flags;
+	int level;
 	int xmemory;
 	int xentity;
 	int xnode;
@@ -192,8 +194,8 @@ typedef struct elFileState {
 } elFileState;
 
 
-elNodeId elf_load_file_expr(elFileState *fs);
-elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix);
+elNodeId elf_load_file_expr(elFileState *fs, elBool flags);
+elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags);
 void elf_load_file_stat(elFileState *fs);
 
 

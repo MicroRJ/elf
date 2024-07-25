@@ -83,7 +83,7 @@ int elfstr_append_(elState *R) {
 			strcatf(buffer,"%.2f",v.x_num);
 		} else if (v.tag == TAG_INT) {
 			strcatf(buffer,"%lli",v.x_int);
-		} else elf_unreachable;
+		} else elNOCODE;
 	}
 	elf_add_new_string(R,buffer);
 	return 1;

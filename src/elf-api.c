@@ -15,7 +15,7 @@ elf_api elObject *elf_get_this(elState *R) {
 }
 
 
-elf_api elObjectTag elf_get_tag(elState *R, elRegId x) {
+elf_api elValueTag elf_get_tag(elState *R, elRegId x) {
 	return R->call->locals[x].tag;
 }
 
@@ -25,7 +25,7 @@ elf_api elValue elf_get_value(elState *R, elRegId x) {
 }
 
 
-void elf_expected(elState *S, elObjectTag tag, elObjectTag got, elRegId x) {
+void elf_expected(elState *S, elValueTag tag, elValueTag got, elRegId x) {
 	elf_throw(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 
@@ -51,7 +51,7 @@ elf_api char *elf_get_cstring(elState *R, elRegId x) {
 elf_api elObject *elf_get_object(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
-	if (elf_is_object_tag(v.tag)) return v.x_obj;
+	if (elf_isobj(v.tag)) return v.x_obj;
 	elf_expected(R,TAG_OBJ,v.tag,x);
 	return elNil;
 }
@@ -70,7 +70,7 @@ elf_api void elf_checkcl(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_CLS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected closure at local %i",x));
-		elf_unreachable;
+		elNOCODE;
 	}
 }
 
@@ -85,7 +85,7 @@ elf_api elHandle elf_get_handle(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
-		elf_unreachable;
+		elNOCODE;
 	}
 	return v.h;
 }

@@ -61,6 +61,7 @@ I want to use instead! */
 #include <Winsock2.h>
 #include <ws2tcpip.h>
 #include   <ws2def.h>
+#include <shellapi.h>
 #else
 #endif
 
@@ -68,7 +69,7 @@ I want to use instead! */
 
 elf_api elBool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
-	fclose(_logging_io);
+	// fclose(_logging_io);
 	DebugBreak();
 	return 1;
 #elif defined(PLATFORM_WEB)
@@ -320,3 +321,4 @@ elf_api elError sys_savefilebytes(char const *buffer, elInteger length, char con
 
 	return error;
 }
+

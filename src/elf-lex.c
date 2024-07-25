@@ -48,31 +48,6 @@ void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 	printf("| %.*s\n",underline+1,u);
 }
 
-
-elTokenType elf_is_word_or_keyword(char *name) {
-	/* todo: */
-	for (elTokenType i = FIRST_KEYWORD; i <= LAST_KEYWORD; ++ i) {
-		ltokenintel intel = elf_tkintel[i];
-		if (S_eq(intel.name,name)) {
-			return i;
-		}
-	}
-	return TK_WORD;
-}
-
-
-elTokenType elf_is_macro(char *name) {
-	/* todo: */
-	for (elTokenType i = FIRST_MACRO; i <= LAST_MACRO; ++ i) {
-		ltokenintel intel = elf_tkintel[i];
-		if (S_eq(intel.name,name)) {
-			return i;
-		}
-	}
-	return TK_WORD;
-}
-
-
 #define elf_thischr() (file->thischar[0])
 #define elf_thenchr() (file->thischar[1])
 #define elf_movechr() (*(file->thischar++))
@@ -213,13 +188,11 @@ elToken elf_lexone(elFileState *file) {
 			// tk.string = S_ncopy(lHEAP,length,buffer);
 			// elf_loginfo("string %s",tk.string);
 		} break;
-		case '.': {
-			elf_movechr();
-			tk.type = TK_DOT;
-			if (elf_cmovchr('.')) {
-				tk.type = TK_DOT_DOT;
-			} else
-			if (elf_is_digit_char(elf_thischr())) {
+		case '.': { elf_movechr(); tk.type = TK_DOT;
+			if (elf_cmovchr('.')) { tk.type = TK_DOT_DOT;
+				/* todo: eventually rename use TK_ELLIPSIS */
+			if (elf_cmovchr('.'))   tk.type = TK_DOT_DOT;
+			} else if (elf_is_digit_char(elf_thischr())) {
 				tk.type = TK_NUMBER;
 				elNumber n = 0;
 				elNumber p = 1;
@@ -234,7 +207,7 @@ elToken elf_lexone(elFileState *file) {
 		case '#': {
 			elf_movechr();
 			int length = elf_read_identifier_characters(file,buffer);
-			tk.type = elf_is_macro(buffer);
+			tk.type = elf_is_word_or_macro(buffer);
 			if (tk.type == TK_M_FILE_NAME) {
 				tk.type = TK_STRING;
 				tk.s = file->filename;
@@ -282,22 +255,20 @@ elToken elf_lexone(elFileState *file) {
 				tk.type = TK_LEFT_SHIFT;
 			}
 		} break;
-		case '>': {
-			elf_movechr();
-			tk.type = TK_GREATER_THAN;
-			if (elf_cmovchr('=')) {
-				tk.type = TK_GREATER_THAN_EQUAL;
-			} else
-			if (elf_cmovchr('>')) {
-				tk.type = TK_RIGHT_SHIFT;
-			}
+		case '>': { elf_movechr(); tk.type = TK_GREATER_THAN;
+			if (elf_cmovchr('=')) tk.type = TK_GREATER_THAN_EQUAL;
+			else if (elf_cmovchr('>')) tk.type = TK_RIGHT_SHIFT;
 		} break;
-
-		// TK_XCASE2('?',TK_QUESTION_MARK,'=',TK_NIL_ASSIGN);
-		case '?': {
-			elf_movechr(); tk.type = TK_QUESTION_MARK;
+		case '?': { elf_movechr(); tk.type = TK_QUESTION_MARK;
 			if (elf_cmovchr('?')) tk.type = TK_NIL_OR;
 			else if (elf_cmovchr('=')) tk.type = TK_NIL_ASSIGN;
+		} break;
+		case '!': { elf_movechr(); tk.type = TK_EXCLAMATION_MARK;
+			if (elf_cmovchr('!')) tk.type = TK_NIL_AND;
+			else if (elf_cmovchr('=')) tk.type = TK_NOT_EQUALS;
+		} break;
+		case '*': { elf_movechr(); tk.type = TK_MUL;
+			if (elf_cmovchr('*')) tk.type = TK_POW;
 		} break;
 
 		#define TK_XCASE2(C0,T0,C1,T1) \
@@ -311,7 +282,6 @@ elToken elf_lexone(elFileState *file) {
 
 		TK_XCASE2('|',TK_BIT_OR,'|',TK_LOG_OR);
 		TK_XCASE2('&',TK_BIT_AND,'&',TK_LOG_AND);
-		TK_XCASE2('!',TK_NEGATE,'=',TK_NOT_EQUALS);
 		TK_XCASE2('=',TK_ASSIGN,'=',TK_EQUALS);
 
 		#undef TK_XCASE2
@@ -329,7 +299,6 @@ elToken elf_lexone(elFileState *file) {
 		TK_XCASE1('{',TK_CURLY_LEFT);
 		TK_XCASE1('}',TK_CURLY_RIGHT);
 		TK_XCASE1(',',TK_COMMA);
-		TK_XCASE1('*',TK_MUL);
 		TK_XCASE1('%',TK_MODULUS);
 		TK_XCASE1(':',TK_COLON);
 		TK_XCASE1('^',TK_BIT_XOR);

@@ -368,7 +368,7 @@ int elflib_loadexpr(elState *R) {
 	} else if (R->call->nx == 1) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
-	} else elf_unreachable;
+	} else elNOCODE;
 	elf_loadexpr(R,filename,R->call->ry,R->call->ny,contents->c);
 	/* no need to do hoisting */
 	return 0;
@@ -383,7 +383,7 @@ int elflib_loadcode(elState *R) {
 	} else if (R->call->nx == 1) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
-	} else elf_unreachable;
+	} else elNOCODE;
 	elf_loadcode(R,filename,R->call->ry,R->call->ny,contents->c);
 	/* no need to do hoisting */
 	return 0;
@@ -440,6 +440,18 @@ int elflib_loadlib(elState *R) {
 	return 1;
 }
 
+/* todo: move to windows layer */
+int elf_lib_shell(elState *R) {
+#if defined(_WIN32)
+	char *verb = elf_get_cstring(R,0);
+	char *file = elf_get_cstring(R,1);
+	char *args = elf_get_cstring(R,2);
+	if ((INT_PTR)ShellExecute(NULL,verb,file,args,NULL,10) > 32) {
+		elf_add_integer(R,elTrue);
+	} else elf_add_integer(R,elFalse);
+#endif
+	return 1;
+}
 
 int elflib_exec(elState *R) {
 #if defined(_WIN32)
@@ -480,7 +492,7 @@ int elf_lib_fsize(elState *R) {
 		elHandle file = (FILE*) elf_get_handle(R,0);
 		fseek(file,0,SEEK_END);
 		elf_add_integer(R,ftell(file));
-	} else elf_unreachable;
+	} else elNOCODE;
 	return 1;
 }
 
@@ -588,9 +600,11 @@ int elflib_fpf(elState *S) {
 }
 
 
+elf_globaldecl int pf_indent;
+elf_globaldecl int pf_char;
 int elf_lib_pf_indent(elState *S) {
-	S->lib.pf_indent = elf_get_integer(S,0);
-	elf_add_integer(S,S->lib.pf_indent);
+	pf_indent = elf_get_integer(S,0);
+	elf_add_integer(S,pf_indent);
 	return 1;
 }
 
@@ -598,7 +612,7 @@ int elf_lib_pf_indent(elState *S) {
 int elf_lib_lpf(elState *S) {
 	for (int i = 0; i < elf_get_num_args(S); i ++) {
 		if (i != 0) fprintf(stdout,"\n");
-		for (int j = 0; j < S->lib.pf_indent; ++ j) {
+		for (int j = 0; j < pf_indent; ++ j) {
 			fprintf(stdout, "  ");
 		}
 		elf_fpf_value(stdout,elf_get_value(S,i),false);
@@ -609,7 +623,7 @@ int elf_lib_lpf(elState *S) {
 
 
 int elf_lib_pf(elState *S) {
-	for (int j = 0; j < S->lib.pf_indent; ++ j) {
+	for (int j = 0; j < pf_indent; ++ j) {
 		fprintf(stdout,"  ");
 	}
 	for (int i = 0; i < elf_get_num_args(S); i ++) {
@@ -645,6 +659,20 @@ elf_api int elf_lib_timediffms(elState *S) {
 	elf_ensure(elf_get_num_args(S) == 1);
 	elInteger time = elf_get_integer(S,0);
 	elf_add_number(S,elf_timediffms(time));
+	return 1;
+}
+
+
+int elf_lib_get_file_size(elState *S) {
+	char *path = elf_get_cstring(S,0);
+	elInteger size = -1;
+	#if defined(_WIN32)
+	WIN32_FILE_ATTRIBUTE_DATA attrs;
+	if (GetFileAttributesEx(path,GetFileExInfoStandard,&attrs)) {
+		size = (attrs.nFileSizeHigh * (MAXDWORD + 1)) + attrs.nFileSizeLow;
+	}
+ 	#endif
+	elf_add_integer(S,size);
 	return 1;
 }
 
@@ -888,6 +916,7 @@ elf_api void elflib_loadall(elState *R) {
 	elf_register_binding(R,"elf.fopen",elf_lib_fopen);
 	elf_register_binding(R,"elf.fclose",elf_lib_fclose);
 	elf_register_binding(R,"elf.fsize",elf_lib_fsize);
+	elf_register_binding(R,"elf.get_file_size",elf_lib_get_file_size);
 
 	elf_register_binding(R,"floor",elflib_floor);
 	elf_register_binding(R,"ceil",elflib_ceil);
@@ -901,4 +930,5 @@ elf_api void elflib_loadall(elState *R) {
 
 	elf_register_binding(R,"elf.sleep",elflib_sleep);
 	elf_register_binding(R,"elf.exec",elflib_exec);
+	elf_register_binding(R,"elf.shell",elf_lib_shell);
 }

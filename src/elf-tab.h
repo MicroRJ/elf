@@ -6,7 +6,7 @@
 
 
 typedef struct elEntry {
-	elValue k;
+	union { elValue key, k; };
 	elInteger i;
 } elEntry;
 
@@ -63,6 +63,7 @@ int elf_table_libfn_array(elState *R);
 int elf_table_libfn_xset(elState *R);
 int elf_table_libfn_merge(elState *);
 int elf_table_libfn_xmerge(elState *);
+int elf_table_libfn_diff(elState *R);
 int elf_table_libfn_xclone(elState *);
 int elf_table_libfn_reverse(elState *);
 int elf_table_libfn_clone(elState *);

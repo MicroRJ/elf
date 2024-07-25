@@ -195,7 +195,7 @@ void elf_check_args(elState *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_type_check(elState *R, elByteId id, elRegId loc, elObjectTag x, elObjectTag y) {
+int elf_type_check(elState *R, elByteId id, elRegId loc, elValueTag x, elValueTag y) {
 	if (x != y) {
 		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}

@@ -4,20 +4,9 @@
 ** Main user API
 */
 
-
-elNumber elf_tonum(elValue v) {
-	return v.tag == TAG_INT ? (elNumber) v.i : v.n;
-}
-
-
-elInteger elf_toint(elValue v) {
-	return v.tag == TAG_NUM ? (elInteger) v.n : v.i;
-}
-
-
 elf_api int elf_get_num_args(elState *R);
 elf_api elObject *elf_get_this(elState *R);
-elf_api elObjectTag elf_get_tag(elState *R, elRegId x);
+elf_api elValueTag elf_get_tag(elState *R, elRegId x);
 elf_api elValue elf_get_value(elState *R, elRegId x);
 elf_api elInteger elf_get_integer(elState *R, elRegId x);
 elf_api elNumber elf_get_number(elState *R, elRegId x);

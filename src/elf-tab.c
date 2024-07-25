@@ -34,6 +34,7 @@ elTable *elf_new_table_metatable(elState *R) {
 		{"slice",elf_table_libfn_slice},
 		{"xset",elf_table_libfn_xset},
 		{"swap",elf_table_libfn_swap},
+		{"diff",elf_table_libfn_diff},
 		{0},
 	};
 
@@ -87,8 +88,9 @@ void elf_dealloc_table(elTable *tab) {
 ** they are the most common...
 **
 */
-elInteger elf_table_hashin(elTable *tab, elValue key) {
+elInteger elf_table_try(elTable *tab, elValue key) {
 	if ((tab == 0 || tab->obj.color == GC_RED) || (key.tag == TAG_NIL)) {
+		elf_debugger("test-break");
 		return -2;
 	}
 	/* this particular function uses double hashing,
@@ -127,7 +129,7 @@ elValue elf_tabslot2value(elTable *table, elInteger slot) {
 }
 
 
-elBool elf_table_is_key_slot(elTable *table, elInteger slot) {
+elBool elf_table_is_key(elTable *table, elInteger slot) {
 	return slot >- 1 && table->slots[slot].k.tag != TAG_NIL;
 }
 
@@ -144,15 +146,15 @@ void elf_check_table(elTable *table) {
 		/* todo: better strat */
 		elTable new_table = * table;
 		new_table.ntotal = table->ntotal << 2;
-		if (new_table.ntotal < table->ntotal) elf_unreachable;
+		if (new_table.ntotal < table->ntotal) elNOCODE;
 		new_table.slots = elf_clear_alloc(lHEAP,new_table.ntotal * sizeof(elEntry));
 
 		for (int i = 0; i < table->ntotal; ++ i) {
 			elEntry slot = table->slots[i];
 			if (slot.k.tag == TAG_NIL) continue;
 
-			elInteger newslot = elf_table_hashin(&new_table,slot.k);
-			if (newslot < 0) elf_unreachable;
+			elInteger newslot = elf_table_try(&new_table,slot.k);
+			if (newslot < 0) elNOCODE;
 
 			new_table.slots[newslot] = slot;
 		}
@@ -167,11 +169,11 @@ void elf_check_table(elTable *table) {
 
 void elf_table_insert(elTable *table, elValue k, elValue v) {
 	elf_check_table(table);
-	elInteger slot = elf_table_hashin(table,k);
+	elInteger slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
-	if (slot < 0) elf_unreachable;
+	if (slot < 0) elNOCODE;
 	elEntry *entry = table->slots + slot;
-	if (!elf_table_is_key_slot(table,slot)) {
+	if (!elf_table_is_key(table,slot)) {
 		elInteger i = elf_xarray_growby(table->array,1);
 		table->array[i] = v;
 
@@ -185,9 +187,9 @@ void elf_table_insert(elTable *table, elValue k, elValue v) {
 
 
 elValue elf_table_lookup(elTable *tab, elValue k) {
-	elInteger slot = elf_table_hashin(tab,k);
-	if (slot == -2) elf_unreachable;
-	if (elf_table_is_key_slot(tab,slot)) {
+	elInteger slot = elf_table_try(tab,k);
+	if (slot == -2) elNOCODE;
+	if (elf_table_is_key(tab,slot)) {
 		return elf_tabslot2value(tab,slot);
 	}
 	return (elValue){TAG_NIL,0};
@@ -198,9 +200,9 @@ elInteger elf_table_take(elTable *table, elValue k) {
 	elf_ensure((k.tag == TAG_INT || k.tag == TAG_NUM) || k.s != 0);
 
 	elf_check_table(table);
-	elInteger slot = elf_table_hashin(table,k);
-	if (slot < 0) elf_unreachable;
-	if (!elf_table_is_key_slot(table,slot)) {
+	elInteger slot = elf_table_try(table,k);
+	if (slot < 0) elNOCODE;
+	if (!elf_table_is_key(table,slot)) {
 		elInteger i = elf_xarray_growby(table->array,1);
 		table->array[i] = (elValue){TAG_NIL};
 		table->slots[slot].k = k;
@@ -214,9 +216,9 @@ elInteger elf_table_take(elTable *table, elValue k) {
 
 void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias) {
 	elf_check_table(tab);
-	elInteger key_slot = elf_table_hashin(tab,key);
-	if (elf_table_is_key_slot(tab,key_slot)) {
-		elInteger alias_slot = elf_table_hashin(tab,alias);
+	elInteger key_slot = elf_table_try(tab,key);
+	if (elf_table_is_key(tab,key_slot)) {
+		elInteger alias_slot = elf_table_try(tab,alias);
 		tab->slots[alias_slot].k = alias;
 		tab->slots[alias_slot].i = tab->slots[key_slot].i;
 	} else elf_throw(S,NO_BYTE,"attempted to alias a key that was never added");
@@ -311,7 +313,7 @@ int elf_table_libfn_contains(elState *c) {
 	elf_ensure(c->f->x == 1);
 	elTable *table = (elTable*) elf_get_this(c);
 	elValue k = elf_get_value(c,0);
-	elf_add_integer(c,elf_table_is_key_slot(table,elf_table_hashin(table,k)));
+	elf_add_integer(c,elf_table_is_key(table,elf_table_try(table,k)));
 	return 1;
 }
 
@@ -332,7 +334,10 @@ int elf_table_libfn_get_collisions(elState *c) {
 }
 
 
-/* todo: ensure that [i] == :idx(i) */
+/* todo: ensure that [i] == :idx(i)
+also xadd should be add instead, since
+names with 'x' prefix work only for
+arrays */
 int elf_table_libfn_xadd(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger i;
@@ -347,7 +352,7 @@ int elf_table_libfn_xadd(elState *R) {
 int elf_table_libfn_add(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	int i;
-	for (i=0;i<R->call->nx;++i) {
+	for ( i = 0; i < elf_get_num_args(R); ++i ) {
 		elf_table_add(tab,elf_get_value(R,i));
 	}
 	return 0;
@@ -437,7 +442,7 @@ int elf_table_libfn_delete(elState *R) {
 	elValue key = elf_get_value(R,0);
 	elEntry *slots = tab->slots;
 	elValue *array = tab->array;
-	elInteger slot = elf_table_hashin(tab,key);
+	elInteger slot = elf_table_try(tab,key);
 	if ((slot < 0) || (slots[slot].k.tag == TAG_NIL)) {
 		elf_throw(R,NO_BYTE,"invalid key");
 		goto leave_;
@@ -455,13 +460,13 @@ int elf_table_libfn_delete(elState *R) {
 	// if (idx != min) {
 		//NOTE: Swap the items, then iterate to
 		//find references and update them...
-		array[idx] = array[min];
-		elInteger i;
-		for (i=0;i<tab->ntotal;++i) {
-			if (slots[i].k.tag != TAG_NIL && slots[i].i == min) {
-				slots[i].i = idx;
-			}
+	array[idx] = array[min];
+	elInteger i;
+	for (i=0;i<tab->ntotal;++i) {
+		if (slots[i].k.tag != TAG_NIL && slots[i].i == min) {
+			slots[i].i = idx;
 		}
+	}
 	// }
 
 	return 1;
@@ -475,7 +480,7 @@ int elf_table_libfn_xdelete(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = elf_xarray_length(tab->array);
 	if (len != 0) {
-		if (elf_is_object_tag(elf_get_tag(R,0))) {
+		if (elf_isobj(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
 			/* todo: Speed */
 			elValue *item = elNil;
@@ -517,7 +522,7 @@ int elf_table_libfn_xremove(elState *R) {
 	elInteger len = elf_xarray_length(tab->array);
 
 	if (len != 0) {
-		if (elf_is_object_tag(elf_get_tag(R,0))) {
+		if (elf_isobj(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
@@ -573,8 +578,8 @@ int elf_table_libfn_find_aliases(elState *R) {
 	elValue key = elf_get_value(R,0);
 	elTable *list = elf_add_new_table(R);
 	if (key.tag != TAG_NIL) {
-		elInteger slot = elf_table_hashin(tab,key);
-		if (elf_table_is_key_slot(tab,slot)) {
+		elInteger slot = elf_table_try(tab,key);
+		if (elf_table_is_key(tab,slot)) {
 			elEntry entry = tab->slots[slot];
 			elInteger i;
 			for (i=0;i<tab->ntotal;++i) {
@@ -661,12 +666,11 @@ elTable *elf_tabcopy(elState *S, elTable *tab) {
 }
 
 
-/* todo: account for key-less values and also, create
-the table with the proper size already */
+/* this function only clones keyed values... */
 elTable *elf_clone_table(elState *S, elTable *tab) {
 	elTable *clone = elf_new_table(S);
 	elInteger i;
-	for (i=0;i<tab->ntotal;++i) {
+	for ( i = 0; i < tab->ntotal; ++i ) {
 		elEntry it = tab->slots[i];
 		if (it.k.tag == TAG_NIL) continue;
 		elf_table_insert(clone,it.k,tab->array[it.i]);
@@ -785,6 +789,26 @@ int elf_table_libfn_reverse(elState *R) {
 	return 0;
 }
 
+elBool elf_table_contains(elTable *tab, elValue key) {
+	return elf_table_is_key(tab,elf_table_try(tab,key));
+}
+
+int elf_table_libfn_diff(elState *R) {
+	elf_check_args(R,":diff",1,"the subtrahend, the result contains all the values of this table that are not present in the subtrahend");
+	elTable *tab = (elTable *) elf_get_this(R);
+	elTable *sub = elf_get_table(R,0);
+	elTable *dif = elf_new_table(R);
+	elInteger i;
+	for ( i = 0; i < tab->ntotal; ++i ) {
+		elEntry it = tab->slots[i];
+		if (it.key.tag == TAG_NIL) continue;
+		if (elf_table_contains(sub,it.key)) continue;
+		elf_table_insert(dif,it.key,tab->array[it.i]);
+	}
+	elf_add_table(R,dif);
+	return 1;
+}
+
 
 /* Some of the hash functions and comments
 were borrowed from the great Sean Barrett (stb) */
@@ -841,7 +865,7 @@ elBool elf_tabvaleq(elValue *x, elValue *y) {
 		case TAG_TAB: case TAG_CLS: case TAG_BID: {
 			return x->x_int == y->x_int;
 		}
-		default: elf_unreachable;
+		default: elNOCODE;
 	}
 	return false;
 }
@@ -858,7 +882,7 @@ elInteger elf_table_get_value_hash(elValue v) {
 		case TAG_INT: case TAG_NUM: case TAG_BID: {
 			return elf_tabhashptr(v.p);
 		}
-		default: elf_unreachable;
+		default: elNOCODE;
 	}
 	return false;
 }
