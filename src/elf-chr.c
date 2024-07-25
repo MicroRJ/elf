@@ -143,7 +143,7 @@ elBool elf_cstrmatchsingle(char *p, char *s);
 
 /* todo: support for ()
 todo: this has a flaw!! */
-elBool elf_cstrmatch(char *p, char *s) {
+elBool elf_match_strings(char *p, char *s) {
 	char *b = s;
 	while (!elf_cstrmatchsingle(p,s)) {
 		while (*p != 0 && *p != '|') ++p;

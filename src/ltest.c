@@ -7,7 +7,7 @@
 
 
 // void sets(elState *c, elTable *table, char *k) {
-// 	elf_table_insert(table,elf_string_value(elf_new_string(c,k)),* -- c->v);
+// 	elf_table_set(table,elf_string_value(elf_new_string(c,k)),* -- c->v);
 // }
 
 

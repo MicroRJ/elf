@@ -7,31 +7,33 @@
 
 elTable *elf_new_string_metatable(elState *R) {
 	elTable *tab = elf_add_new_table(R);
-	elf_table_set_binding_field(R,tab,"length",elfstr_length_);
-	elf_table_set_binding_field(R,tab,"match",elfstr_match_);
-	elf_table_set_binding_field(R,tab,"gethash",elfstr_gethash_);
-	elf_table_set_binding_field(R,tab,"append",elfstr_append_);
-	elf_table_set_binding_field(R,tab,"touppercase",elfstr_touppercase_);
-	elf_table_set_binding_field(R,tab,"tolowercase",elfstr_tolowercase_);
-	elf_table_set_binding_field(R,tab,"__add",elfstr_append_);
-	elf_table_set_binding_field(R,tab,"__add1",elfstr_append_);
+	elf_table_set_binding_field(R,tab,"length",elf_string_lib_length);
+	elf_table_set_binding_field(R,tab,"match",elf_string_lib_match);
+	elf_table_set_binding_field(R,tab,"uppercase",elf_string_lib_uppercase);
+	elf_table_set_binding_field(R,tab,"lowercase",elf_string_lib_lowercase);
+	elf_table_set_binding_field(R,tab,"__add",elf_string_lib_append);
+	elf_table_set_binding_field(R,tab,"__add1",elf_string_lib_append);
+	elf_table_set_binding_field(R,tab,"append",elf_string_lib_append);
+	elf_table_set_binding_field(R,tab,"append_char",elf_string_lib_append_char);
+	elf_table_set_binding_field(R,tab,"pop",elf_string_lib_pop);
+	elf_table_set_binding_field(R,tab,"get_hash",elf_string_lib_get_hash);
 	return tab;
 }
 
 
-elString *elf_new_string_of_length(elState *R, elInteger length) {
+elString *elf_new_lstring(elState *R, elInteger length) {
 	elString *obj = elf_new_object(R,OBJ_STRING,sizeof(elString)+length+1);
 	if (R) obj->obj.metatable = R->metatables.string;
 	obj->length = length;
 	obj->hash = -1;
-	obj->c[length] = 0;
+	obj->contents[length] = 0;
 	return obj;
 }
 
 
 elString *elf_new_string(elState *R, char *junk) {
 	int length = elf_cstrlen(junk);
-	elString *obj = elf_new_string_of_length(R,length);
+	elString *obj = elf_new_lstring(R,length);
 	elf_memcopy(obj->c,junk,length);
 	obj->hash = elf_tabhashstr((char*)junk);
 	return obj;
@@ -49,7 +51,7 @@ elBool elf_streq(elString *x, elString *y) {
 }
 
 
-int elfstr_length_(elState *c) {
+int elf_string_lib_length(elState *c) {
 	elf_add_integer(c,((elString*)c->f->obj)->length);
 	return 1;
 }
@@ -69,7 +71,28 @@ void strcatf(char *buffer, char *fmt, ...) {
 }
 
 
-int elfstr_append_(elState *R) {
+int elf_string_lib_pop(elState *R) {
+	elString *yo = (elString*) elf_get_this(R);
+	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
+	elf_memcopy(el->contents,yo->contents,MAX(0,yo->length-1));
+	elf_add_string(R,el);
+	return 1;
+}
+
+
+int elf_string_lib_append_char(elState *R) {
+	elString *yo = (elString*) elf_get_this(R);
+	elString *el = elf_new_lstring(R,yo->length + elf_get_num_args(R));
+	elf_memcopy(el->contents,yo->contents,yo->length);
+	for ( int i = 0; i < elf_get_num_args(R); i += 1 ) {
+		el->contents[yo->length + i] = elf_get_integer(R,i);
+	}
+	elf_add_string(R,el);
+	return 1;
+}
+
+
+int elf_string_lib_append(elState *R) {
 	elString *str = (elString*) elf_get_this(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->c);
@@ -90,22 +113,22 @@ int elfstr_append_(elState *R) {
 }
 
 
-int elfstr_match_(elState *R) {
+int elf_string_lib_match(elState *R) {
 	elString *s = (elString*) elf_get_this(R);
 	elString *p = elf_get_string(R,0);
-	elf_add_integer(R,elf_cstrmatch(p->string,s->string));
+	elf_add_integer(R,elf_match_strings(p->string,s->string));
 	return 1;
 }
 
 
-int elfstr_gethash_(elState *R) {
+int elf_string_lib_get_hash(elState *R) {
 	elString *str = (elString*) elf_get_this(R);
 	elf_add_integer(R,str->hash);
 	return 1;
 }
 
 
-int elfstr_tolowercase_(elState *R) {
+int elf_string_lib_lowercase(elState *R) {
 	elString *str = (elString*) elf_get_this(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
@@ -115,7 +138,7 @@ int elfstr_tolowercase_(elState *R) {
 }
 
 
-int elfstr_touppercase_(elState *R) {
+int elf_string_lib_uppercase(elState *R) {
 	elString *str = (elString*) elf_get_this(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {

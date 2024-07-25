@@ -137,7 +137,7 @@ elf_api int netlib_recv(elState *R) {
 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 		if (message.length != 0) {
 			elInteger length = message.length;
-			elString *obj = elf_new_string_of_length(R,length);
+			elString *obj = elf_new_lstring(R,length);
 			elf_add_string(R,obj);
 			char *cursor = obj->c;
 			do {

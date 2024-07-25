@@ -25,11 +25,11 @@ char *S_pfv(Alloc *cator, char const *format, va_list v);
 char *S_tpfv(char const *format, va_list v);
 char *S_tpf_(char const *format, ...);
 elBool elf_cstrmatchsingle(char *p, char *s);
-elBool elf_cstrmatch(char *p, char *s);
+elBool elf_match_strings(char *p, char *s);
 
 
 
-elBool elf_cstrmatch(char *p, char *s);
+elBool elf_match_strings(char *p, char *s);
 char *S_copy(Alloc *cator, char const *contents);
 int elf_cstrlen(char const *contents);
 elBool S_eq(char const *x, char const *y);

@@ -167,7 +167,7 @@ void elf_check_table(elTable *table) {
 }
 
 
-void elf_table_insert(elTable *table, elValue k, elValue v) {
+elBool elf_table_set(elTable *table, elValue k, elValue v) {
 	elf_check_table(table);
 	elInteger slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
@@ -180,8 +180,10 @@ void elf_table_insert(elTable *table, elValue k, elValue v) {
 		table->slots[slot].k = k;
 		table->slots[slot].i = i;
 		table->nslots ++;
+		return elFalse;
 	} else {
 		table->array[entry->i] = v;
+		return elTrue;
 	}
 }
 
@@ -196,9 +198,9 @@ elValue elf_table_lookup(elTable *tab, elValue k) {
 }
 
 
-elInteger elf_table_take(elTable *table, elValue k) {
-	elf_ensure((k.tag == TAG_INT || k.tag == TAG_NUM) || k.s != 0);
-
+elInteger elf_table_lookup_index(elTable *table, elValue k) {
+	elf_ensure((k.tag == TAG_INT || k.tag == TAG_NUM) || k.x_obj != 0);
+	/* todo: why do we check the table here? */
 	elf_check_table(table);
 	elInteger slot = elf_table_try(table,k);
 	if (slot < 0) elNOCODE;
@@ -226,7 +228,7 @@ void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias) {
 
 
 void elf_table_set_binding_field(elState *R, elTable *obj, char *name, elBinding b) {
-	elf_table_insert(obj,elf_string_value(elf_new_string(R,name)),elf_binding_value(b));
+	elf_table_set(obj,elf_string_value(elf_new_string(R,name)),elf_binding_value(b));
 }
 
 
@@ -273,22 +275,22 @@ void elf_table_add(elTable *table, elValue v) {
 
 
 void elf_table_set_string_field(elTable *tab, elString *key, elString *val) {
-	elf_table_insert(tab,elf_string_value(key),elf_string_value(val));
+	elf_table_set(tab,elf_string_value(key),elf_string_value(val));
 }
 
 
 void elf_table_set_integer_field(elTable *tab, elString *key, elInteger val) {
-	elf_table_insert(tab,elf_string_value(key),elf_integer_value(val));
+	elf_table_set(tab,elf_string_value(key),elf_integer_value(val));
 }
 
 
 void elf_tabsetnumfld(elTable *tab, elString *key, elNumber val) {
-	elf_table_insert(tab,elf_string_value(key),elf_number_value(val));
+	elf_table_set(tab,elf_string_value(key),elf_number_value(val));
 }
 
 
 void elf_tabsettabfld(elTable *tab, elString *key, elTable *val) {
-	elf_table_insert(tab,elf_string_value(key),elf_table_value(val));
+	elf_table_set(tab,elf_string_value(key),elf_table_value(val));
 }
 
 
@@ -343,7 +345,7 @@ int elf_table_libfn_xadd(elState *R) {
 	elInteger i;
 	elInteger length = elf_xarray_length(tab->array);
 	for (i = 0; i < elf_get_num_args(R); ++ i) {
-		elf_table_insert(tab,elf_integer_value(length+i),elf_get_value(R,i));
+		elf_table_set(tab,elf_integer_value(length+i),elf_get_value(R,i));
 	}
 	return 0;
 }
@@ -364,7 +366,7 @@ void elf_merge_tables(elTable *tab, elTable *merger) {
 	for (i=0;i<merger->ntotal;++i) {
 		elEntry it = merger->slots[i];
 		if (it.k.tag == TAG_NIL) continue;
-		elf_table_insert(tab,it.k,merger->array[it.i]);
+		elf_table_set(tab,it.k,merger->array[it.i]);
 	}
 }
 
@@ -660,7 +662,7 @@ elTable *elf_tabcopy(elState *S, elTable *tab) {
 		elEntry it = tab->slots[i];
 		if (it.k.tag == TAG_NIL) continue;
 		elValue item = tab->array[it.i];
-		elf_table_insert(copy,it.k,item);
+		elf_table_set(copy,it.k,item);
 	}
 	return copy;
 }
@@ -673,7 +675,7 @@ elTable *elf_clone_table(elState *S, elTable *tab) {
 	for ( i = 0; i < tab->ntotal; ++i ) {
 		elEntry it = tab->slots[i];
 		if (it.k.tag == TAG_NIL) continue;
-		elf_table_insert(clone,it.k,tab->array[it.i]);
+		elf_table_set(clone,it.k,tab->array[it.i]);
 	}
 	return clone;
 }
@@ -803,7 +805,7 @@ int elf_table_libfn_diff(elState *R) {
 		elEntry it = tab->slots[i];
 		if (it.key.tag == TAG_NIL) continue;
 		if (elf_table_contains(sub,it.key)) continue;
-		elf_table_insert(dif,it.key,tab->array[it.i]);
+		elf_table_set(dif,it.key,tab->array[it.i]);
 	}
 	elf_add_table(R,dif);
 	return 1;
@@ -861,6 +863,7 @@ elBool elf_tabvaleq(elValue *x, elValue *y) {
 		case TAG_STR: {
 			return elf_streq(x->s,y->s);
 		}
+		case TAG_OBJ:
 		case TAG_SYS: case TAG_INT: case TAG_NUM:
 		case TAG_TAB: case TAG_CLS: case TAG_BID: {
 			return x->x_int == y->x_int;
@@ -878,6 +881,7 @@ elInteger elf_table_get_value_hash(elValue v) {
 			elf_ensure(v.x_str->hash != 0);
 			return v.x_str->hash;
 		}
+		case TAG_OBJ:
 		case TAG_TAB: case TAG_CLS: case TAG_SYS:
 		case TAG_INT: case TAG_NUM: case TAG_BID: {
 			return elf_tabhashptr(v.p);

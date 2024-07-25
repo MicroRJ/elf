@@ -13,7 +13,7 @@ typedef struct elEntry {
 
 typedef struct elTable {
 	elObject obj;
-	elEntry *slots;
+	union { elEntry *entries, *slots; };
 	elInteger ntotal;
 	elInteger nslots;
 	elInteger ncollisions;
@@ -28,8 +28,8 @@ elTable *elf_new_table_of_length(elState *, elInteger);
 elTable *elf_new_table(elState *);
 void elf_dealloc_table(elTable *);
 
-elInteger elf_table_take(elTable *table, elValue k);
-void elf_table_insert(elTable *table, elValue k, elValue v);
+elBool elf_table_set(elTable *table, elValue k, elValue v);
+elInteger elf_table_lookup_index(elTable *table, elValue k);
 elInteger elf_table_get_value_hash(elValue v);
 elHashId elf_table_rehash(elHashId hash);
 elHashId elf_tabhashstr(char *junk);

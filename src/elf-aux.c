@@ -146,7 +146,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, elByteId byte_lo
 }
 
 
-void elf_dump_byte_trace(elState *S, elCallState *call, int level) {
+void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 
 	elf_ensure(level > -1);
 

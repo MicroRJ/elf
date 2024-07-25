@@ -32,13 +32,14 @@ typedef enum elNodeTy {
 // GROUP: ({x})
 #define NODE_DEF(_) \
 	_(NOP)\
-	/* these are even odd pairs, use ^ to get the counter */\
+	/* these come in pairs, use ^ to get the counter */\
 	_(AND) _(OR)\
 	_(NIL_AND) _(NIL_OR)\
 	_(EQ) _(NEQ)\
 	_(BITSHL) _(BITSHR)\
 	_(ADD) _(SUB) _(MUL) _(DIV)\
 	_(LT) _(GT) _(LTEQ) _(GTEQ)\
+	_(INDEX) _(FIELD)\
 	/* end */\
 	_(POW)\
 	_(BITXOR) _(MOD) _(BITOR)\
@@ -49,8 +50,6 @@ typedef enum elNodeTy {
 	_(GLOBAL) _(LOCAL) _(CLOSURE_VALUE) _(FILE_VALUE)\
 	_(THIS)\
 	_(MULTI)\
-	_(INDEX)\
-	_(FIELD)\
 	_(METAFIELD)\
 	_(CALL)\
 	_(RANGE_INDEX)\

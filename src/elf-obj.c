@@ -63,6 +63,13 @@ elf_api elValue elf_table_value(elTable *tab) {
 }
 
 
+elf_api elValue elf_object_value(elObject *obj) {
+	elValue v = LITC(elValue){TAG_OBJ};
+	v.x_obj = obj;
+	return v;
+}
+
+
 elf_api elValue elf_binding_value(elBinding c) {
 	elValue v = LITC(elValue){TAG_BID};
 	v.c = c;

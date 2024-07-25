@@ -75,8 +75,8 @@ typedef struct elValue {
 
 typedef struct elClosure {
 	elObject obj;
-   /* todo: encode prototye in the instruction stream? */
-	elProto   fn;
+	union { elProto prototype, fn; };
+
 	elByteId  j;
 	elValue enclosure[1];
 } elClosure;

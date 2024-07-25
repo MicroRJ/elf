@@ -170,7 +170,7 @@ elString *elf_add_new_string(elState *R, char *chr) {
 
 
 elString *elf_pushnewstrlen(elState *R, elInteger len) {
-	return elf_add_string(R,elf_new_string_of_length(R,len));
+	return elf_add_string(R,elf_new_lstring(R,len));
 }
 
 
@@ -207,6 +207,7 @@ elObject *elf_pushnewobj(elState *R, elInteger tell) {
 
 
 elTable *elf_add_table(elState *R, elTable *tab) {
+	elf_ensure(tab->obj.color != GC_RED);
 	R->top->tag = TAG_TAB;
 	R->top->x_tab = tab;
 	_INC_TOP;

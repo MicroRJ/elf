@@ -14,6 +14,57 @@ int elf_lib_pause_collector(elState *R) {
 }
 
 
+elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *thru) {
+
+	if (elf_table_set(visited,elf_object_value(thru),elf_object_value(thru))) {
+		return 1;
+	}
+
+	elInteger traces = 0;
+	if (thru == obj) {
+		traces = 1;
+	} else if (thru->type == OBJ_CLOSURE) {
+		elClosure *cls = (elClosure *) thru;
+		elInteger k;
+		for (k = 0; k < cls->prototype.zcache; k += 1) {
+			if (elf_isobj(cls->enclosure[k].tag)) {
+				traces += elf_trace_object(S,visited,obj,cls->enclosure[k].x_obj);
+			}
+		}
+	} else if (thru->type == OBJ_TAB) {
+		elTable *tab = (elTable *) thru;
+		elEntry *entry;
+		for (entry = tab->entries; entry < tab->entries + tab->ntotal; entry += 1) {
+			if (elf_isobj(entry->key.tag)) {
+				traces += elf_trace_object(S,visited,obj,entry->key.x_obj);
+			}
+		}
+		elValue *value;
+		for (value = tab->array; value < tab->array + elf_xarray_length(tab->array); value += 1) {
+			if (elf_isobj(value->tag)) {
+				traces += elf_trace_object(S,visited,obj,value->x_obj);
+			}
+		}
+	}
+	return traces;
+}
+
+
+int elf_lib_trace_object(elState *R) {
+	elObject *obj = elf_get_object(R,0);
+	elTable *visited = elf_add_new_table(R);
+	elInteger traces = elf_trace_object(R,visited,obj,(elObject*)R->M->globals);
+	elValue *val;
+	for (val = R->stack; val < R->stack_top; ++ val) {
+		if (elf_isobj(val->tag)) {
+			traces += elf_trace_object(R,visited,obj,val->x_obj);
+		}
+	}
+	elf_add_integer(R,traces);
+	return 1;
+}
+
+
 int elf_lib_get_allocated_objects(elState *R) {
 	elf_add_integer(R,elf_xarray_length(R->memory.objects));
 	return 1;
@@ -352,7 +403,7 @@ int elflib_include(elState *R) {
 			char *sym = elf_insymdir(dir,slot.k.x_str->c);
 			if (*sym != '.') continue;
 			elString *ref = elf_new_string(R,sym);
-			elf_table_insert(globals,elf_string_value(ref),globals->array[slot.i]);
+			elf_table_set(globals,elf_string_value(ref),globals->array[slot.i]);
 			// elf_debug_log("added %s <- %s",ref->c,slot.k.x_str->c);
 		}
 	}
@@ -503,7 +554,7 @@ int elflib_fload(elState *R) {
 		fseek(file,0,SEEK_END);
 		long size = ftell(file);
 		fseek(file,0,SEEK_SET);
-		elString *buf = elf_new_string_of_length(R,size);
+		elString *buf = elf_new_lstring(R,size);
 		fread(buf->c,1,size,file);
 		elf_add_string(R,buf);
 	} else eld_add_nil(R);
@@ -685,6 +736,7 @@ elBool elf_is_virtual_file_name(char const *fn) {
 
 void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir);
 
+
 elf_api int elf_lib_list_folder(elState *R) {
 	elf_ensure(elf_get_num_args(R) > 0);
 	elString *dir = elf_get_string(R,0);
@@ -856,6 +908,7 @@ elf_api void elflib_loadall(elState *R) {
 	elf_register_binding(R,"elf.merge_tables",elf_lib_merge_tables);
 
 	elf_register_binding(R,"elf.pause_collector",elf_lib_pause_collector);
+	elf_register_binding(R,"elf.trace_object",elf_lib_trace_object);
 	elf_register_binding(R,"elf.mark_object",elf_lib_mark_object);
 	elf_register_binding(R,"elf.mark_everything",elf_lib_mark_everything);
 	elf_register_binding(R,"elf.unmark_objects",elf_lib_unmark_objects);

@@ -8,7 +8,7 @@
 /* todo: ensure that we don't have to replace symbols */
 elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
 	if (name != 0) {
-		return elf_table_take(M->globals,elf_string_value(name));
+		return elf_table_lookup_index(M->globals,elf_string_value(name));
 	} else return elf_xarray_growby(M->globals->array,1);
 }
 

@@ -12,14 +12,14 @@ typedef struct elf_delaylist {
 } elf_delaylist;
 
 
-typedef struct elCallState elCallState;
+typedef struct elStackFrame elStackFrame;
 
 
-typedef struct elCallState {
+typedef struct elStackFrame {
 	/* todo: this is only here so that we can write
 	to caller->locals[rx/ry] directly, rx and ry
 	could be relative to this.locals */
-	elCallState *caller;
+	elStackFrame *caller;
 	/* 'head' is the first instruction (in the module)
 	that initiated the call.
 	This isn't limited to call instructions as the
@@ -64,14 +64,14 @@ typedef struct elCallState {
 	these. */
 	elf_delaylist *delay_list;
 	elBool logging;
-} elCallState;
+} elStackFrame;
 
 
 /* todo: implement */
 typedef struct elThreadState {
 	union { elState *R, *rt; };
 	union { elModule  *M, *md; };
-	union { elCallState *call; };
+	union { elStackFrame *call; };
 	union { elValue *stk;      };
 	elRegId stklen;
 	elInteger threadid;
@@ -80,12 +80,12 @@ typedef struct elThreadState {
 
 
 typedef struct elState {
-	union { elModule *M, *md; };
-	union { elValue *stk,*s; };
-	elRegId stklen;
-	elCallState root_call;
-	union { elValue *top,*v; };
-	union { elCallState *call,*frame,*f; };
+	union { elModule *M, /* DEPRECATED: */ *md; };
+	union { elValue *stack, /* DEPRECATED: */ *stk,*s; };
+	union { elRegId stack_length, /* DEPRECATED: */stklen; };
+	union { elValue *stack_top,/* DEPRECATED: */*top,*v; };
+	union { elStackFrame *stack_frame,/* DEPRECATED: */*call,*frame,*f; };
+	elStackFrame root_call;
 	int call_level;
 	elBool debuggerflag;
 	elBool oncalldebuggerflag;
