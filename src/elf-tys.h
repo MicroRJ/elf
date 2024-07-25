@@ -13,11 +13,12 @@ typedef void *elAddr;
 typedef int (* elBinding)(elState *);
 
 
-typedef unsigned int elf_hashint;
+typedef unsigned int elHashId;
 typedef int elRegId;
 typedef int elByteId;
 typedef int elSymbolId;
-/* todo: eventually convert this to an offset */
+/* todo: eventually convert this to an offset,
+but this is great for debugging... */
 typedef char *elFileLine;
 
 

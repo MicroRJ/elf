@@ -107,7 +107,7 @@ elInteger elf_table_try(elTable *tab, elValue key) {
 	elInteger hash = elf_table_get_value_hash(key);
 	elInteger head = hash % ntotal;
 	elInteger tail = head;
-	elf_hashint walk = elf_table_rehash(hash)|1;
+	elHashId walk = elf_table_rehash(hash)|1;
 	do {
 		elValue x = slots[tail].k;
 		if (x.tag == TAG_NIL) return tail;
@@ -812,15 +812,15 @@ int elf_table_libfn_diff(elState *R) {
 
 /* Some of the hash functions and comments
 were borrowed from the great Sean Barrett (stb) */
-elf_hashint elf_table_rehash(elf_hashint hash) {
+elHashId elf_table_rehash(elHashId hash) {
 	return ((hash) + ((hash) >> 6) + ((hash) >> 19));
 }
 
 
 #if 1
 // FNV-1a
-elf_hashint elf_tabhashstr (char *bytes) {
-	elf_hashint hash = 2166136261u;
+elHashId elf_tabhashstr (char *bytes) {
+	elHashId hash = 2166136261u;
 	while (*bytes) {
 		hash ^= *bytes++;
 		hash *= 16777619;
@@ -828,8 +828,8 @@ elf_hashint elf_tabhashstr (char *bytes) {
 	return hash;
 }
 #else
-elf_hashint elf_tabhashstr(char *bytes) {
-	elf_hashint hash = 0;
+elHashId elf_tabhashstr(char *bytes) {
+	elHashId hash = 0;
 	while (*bytes) {
 		hash = (hash << 7) + (hash >> 25) + *bytes++;
 	}
@@ -838,9 +838,9 @@ elf_hashint elf_tabhashstr(char *bytes) {
 #endif
 
 
-elf_hashint elf_tabhashptr(elAddr *p) {
+elHashId elf_tabhashptr(elAddr *p) {
    // typically lacking in low bits and high bits
-	elf_hashint hash = elf_table_rehash((elf_hashint)(elInteger)p);
+	elHashId hash = elf_table_rehash((elHashId)(elInteger)p);
 	hash += hash << 16;
 
    // pearson's shuffle

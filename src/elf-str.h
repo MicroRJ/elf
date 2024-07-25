@@ -7,7 +7,7 @@
 
 typedef struct elString {
 	elObject  obj;
-	elf_hashint hash;
+	elHashId hash;
 	int     		length;
 	union {
 		char   string[1];

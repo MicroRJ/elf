@@ -474,7 +474,7 @@ void elf_desugar_expr_epilogue(elFileState *fs, elNodeId x) {
 ** todo: finish this article...
 **
 ** The idea here is to take an expression that
-** is rather complicate it and break it down into
+** is rather complicated and break it down into
 ** more assimilable parts, for the most part
 ** these are the projection expressions, which
 ** take a value and "project" it over a range of
@@ -530,7 +530,7 @@ void elf_desugar_expr_epilogue(elFileState *fs, elNodeId x) {
 ** }
 **
 */
-elNodeId elf_desugar_expr(elFileState *fs, elNodeId x) {
+elNodeId elf_desugar_expr(elFileState *fs, elNodeId x, elBool flags) {
 	elNode node = elf_get_node(fs,x);
 	switch (node.kind) {
 		//
@@ -558,7 +558,7 @@ elNodeId elf_desugar_expr(elFileState *fs, elNodeId x) {
 		case NODE_RANGE_INDEX: {
 			elf_ensure(elf_get_node_kind(fs,node.y) == NODE_RANGE);
 
-			elNodeId array = elf_desugar_expr(fs,node.x);
+			elNodeId array = elf_desugar_expr(fs,node.x,flags & ~FILE_LHS);
 			elf_emitter_begin_block(fs,BLOCK_LOOP);
 
 			elFileLine line = node.line;
@@ -567,16 +567,21 @@ elNodeId elf_desugar_expr(elFileState *fs, elNodeId x) {
 			array = elf_make_register_node(fs,line,array_register);
 
 			elRegId index = elf_make_register_node(fs,line,elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE));
-			elf_emitter_begin_ranged_loop(fs, line, index
-			,	elf_get_node(fs,node.y).x, elf_get_node(fs,node.y).y);
+
+			elNodeId lo = elf_get_node(fs,node.y).x;
+			elNodeId hi = elf_get_node(fs,node.y).y;
+			if (lo == NO_NODE) lo = elf_make_integer_node(fs,line,0);
+			if (hi == NO_NODE) hi = elf_make_call_metafield_node(fs,line,array,0,"length");
+
+			elf_emitter_begin_ranged_loop(fs,line,index,lo,hi);
 
 			return elf_make_index_node(fs,line,array,index);
 		} break;
-		/* todo: here we have to make sure the node.y is
-		not projective... ? Because then, the expression
-		to bytecode pipeline doesn't apply any desugaring,
-		but it could if it wanted too... */
 		case NODE_EQ: {
+			/* todo: instead have a function that
+			checks whether the node is projective,
+			and if so emit .y code outside of the
+			loop */
 			if (elf_get_node_kind(fs,node.x) == NODE_RANGE_INDEX) {
 				/* Outside of the loop, allocate a temporary register
 				for the result, and set default value of it to false,
@@ -593,7 +598,7 @@ elNodeId elf_desugar_expr(elFileState *fs, elNodeId x) {
 
 				/* ensure desugaring actually took place since
 				we know node.x is a projection */
-				elNodeId xx = elf_desugar_expr(fs,node.x);
+				elNodeId xx = elf_desugar_expr(fs,node.x,flags);
 				if (xx == node.x) {
 					elf_throw(fs->R,NO_BYTE,"internal error");
 				}
@@ -623,11 +628,11 @@ elNodeId elf_desugar_expr(elFileState *fs, elNodeId x) {
 				elf_patch_jump_list(fs,js);
 				/* finally, close emit any necessary epilogue for
 				the desugaring process */
-				elf_desugar_expr_epilogue(fs,xx);
+				elf_desugar_expr_epilogue(fs,node.x);
 				/* return the register were the value is... */
 				x = tar;
 			} else {
-				elNodeId xx = elf_desugar_expr(fs,node.x);
+				elNodeId xx = elf_desugar_expr(fs,node.x,flags);
 				if (xx == node.x) {
 					elf_throw(fs->R,NO_BYTE,"internal error");
 				}
@@ -657,7 +662,7 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 	elNode node = elf_get_node(fs,lhs);
 	elFileLine line = node.line;
 
-	elNodeId x = elf_desugar_expr(fs,lhs);
+	elNodeId x = elf_desugar_expr(fs,lhs,0);
 
 	if (elf_pick_token(fs,TK_ASSIGN)) {
 		elNodeId y = elf_load_file_expr(fs,0);
@@ -711,8 +716,6 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 		elf_set_memory_state(fs,mem);
 	}
 
-	elf_desugar_expr_epilogue(fs,lhs);
-
 	elf_ensure(elf_get_memory_state(fs) == mem);
 }
 
@@ -757,8 +760,7 @@ elNodeId elf_load_file_table(elFileState *fs) {
 
 
 elNodeId elf_load_file_expr(elFileState *fs, int flags) {
-	/* todo?: do this in else where? */
-	switch (fs->tk.type) {
+	switch (fs->this_token.type) {
 		case TK_NONE:
 		case TK_PAREN_RIGHT:
 		case TK_CURLY_RIGHT:
@@ -766,7 +768,17 @@ elNodeId elf_load_file_expr(elFileState *fs, int flags) {
 			return NO_NODE;
 		}
 	}
-	return elf_fs_load_subexpr(fs,0,flags);
+	/* todo: should desugaring be applied here */
+	elNodeId x = elf_fs_load_subexpr(fs,0,flags);
+	if (flags & FILE_DESUGAR) {
+		/* don't do desugaring at all
+		if this is an lvalue, only apply
+		desugaring for binary values which
+		are contained within the expression */
+		elf_ensure(~flags & FILE_LHS);
+		x = elf_desugar_expr(fs,x,flags);
+	}
+	return x;
 }
 
 elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags) {
@@ -1318,8 +1330,10 @@ void elf_load_file_stat(elFileState *fs) {
 			elf_emitter_close_block(fs);
 		} break;
 		default: {
+
 			elNodeId x = elf_load_file_expr(fs,1);
 			elf_complete_stat(fs,x);
+
 			elf_ensure(fs->fn->xmemory == mem);
 			if (x == NO_NODE) {
 				elf_file_dialog(fs,tk.line,"invalid statement");

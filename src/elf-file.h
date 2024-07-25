@@ -5,6 +5,11 @@
 */
 
 
+#define FILE_LHS     0x01
+#define FILE_DESUGAR 0x02
+
+
+
 /* Entity: high-level data structure used for
 lexical scoping, binds a name to some
 value or compile time thing. */
@@ -43,9 +48,9 @@ typedef struct elFileEntity {
 } elFileEntity;
 
 
+/* todo: remove this */
 #define LOAD_RELOAD 		0x1
-#define LOAD_KEEPALIVE	0x2
-#define LOAD_ALLOCATE 	0x4
+#define LOAD_ALLOCATE 	0x2
 
 #define NO_SLOT (-1)
 #define NO_BYTE (-1)

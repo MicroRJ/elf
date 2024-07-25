@@ -31,9 +31,9 @@ void elf_dealloc_table(elTable *);
 elInteger elf_table_take(elTable *table, elValue k);
 void elf_table_insert(elTable *table, elValue k, elValue v);
 elInteger elf_table_get_value_hash(elValue v);
-elf_hashint elf_table_rehash(elf_hashint hash);
-elf_hashint elf_tabhashstr(char *junk);
-elf_hashint elf_tabhashptr(elAddr *ptr);
+elHashId elf_table_rehash(elHashId hash);
+elHashId elf_tabhashstr(char *junk);
+elHashId elf_tabhashptr(elAddr *ptr);
 elBool elf_tabvaleq(elValue *x, elValue *y);
 
 
