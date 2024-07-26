@@ -12,7 +12,7 @@
 ** Usage is as follows:
 **
 ** T *items = 0;
-** elf_xarray_add(items,(T){});
+** elf_varadd(items,(T){});
 **
 ** int i = elf_xarray_growby(items,5);
 ** items[i..i+5] == (T){}
@@ -43,14 +43,14 @@ typedef struct elArray {
 #define elf_varaddx(var,res,com) ((var) + elf_varaddxx((void**)&(var),sizeof(*var),res,com))
 #define elf_xarray_growby(var,num) (elf_varaddxx((void**)&(var),sizeof(*var),num,num))
 #define elf_varaddn(var,num) ((var) + elf_xarray_growby(var,num))
-#define elf_xarray_length elf_varmin
+#define elf_varlen elf_varmin
 
 /* Seems that only msvc compiles this properly or
 am I trippin' ? */
 #if 0
-#define elf_xarray_add(var,t) ((void)(elf_varaddn(var,1)[0] = t))
+#define elf_varadd(var,t) ((void)(elf_varaddn(var,1)[0] = t))
 #else
-#define elf_xarray_add(var,val) do {\
+#define elf_varadd(var,val) do {\
 	elInteger ___i___ = elf_xarray_growby(var,1);\
 	var[___i___] = val;\
 } while(0)
@@ -68,6 +68,6 @@ elInteger elf_varaddxx(void **var
 
 
 /* todo: these are deprecated */
-#define elf_varfor(T,N,A) for (T N = A; N < A + elf_xarray_length(A); N += 1)
-#define elf_varforj(A) for (elInteger j = 0; j < elf_xarray_length(A); ++ j)
-#define elf_xarray_foreachi(A) for (elInteger i = 0; i < elf_xarray_length(A); ++ i)
+#define elf_varfor(T,N,A) for (T N = A; N < A + elf_varlen(A); N += 1)
+#define elf_varforj(A) for (elInteger j = 0; j < elf_varlen(A); ++ j)
+#define elf_xarray_foreachi(A) for (elInteger i = 0; i < elf_varlen(A); ++ i)

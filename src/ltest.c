@@ -85,7 +85,7 @@
 
 
 // int testlib_gc(elState *c) {
-// 	elf_collect(c);
+// 	elf_trigger_collection_cycle(c);
 // 	return 0;
 // }
 

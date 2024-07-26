@@ -79,6 +79,12 @@ typedef struct elThreadState {
 } elThreadState;
 
 
+typedef enum elGCPhase {
+	elGC_PHASE_HOLD = GC_WHITE,
+	elGC_PHASE_FREE = GC_BLACK,
+} elGCPhase;
+
+
 typedef struct elState {
 	union { elModule *M, /* DEPRECATED: */ *md; };
 	union { elValue *stack, /* DEPRECATED: */ *stk,*s; };
@@ -114,7 +120,9 @@ typedef struct elState {
 	elBool bytelogging;
 	struct {
 		elBool paused;
-		union { elObject **objects, **articles; };
+		elGCPhase phase;
+		elObject **new_objects;
+		elObject **objects;
 		elInteger allocated;
 		elInteger threshold;
 	} memory;

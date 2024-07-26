@@ -163,7 +163,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	file.nbytes = M->nbytes - fn.bytes;
 	file.contents = contents;
 	file.length = strlen(contents);
-	elf_xarray_add(M->files,file);
+	elf_varadd(M->files,file);
 
 	elProto p = {0};
 	p.zstack = fn.nlocals;
@@ -204,7 +204,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	fl.contents = contents;
 	fl.length = strlen(contents);
 	fl.pathondisk = filename->c;
-	elf_xarray_add(M->files,fl);
+	elf_varadd(M->files,fl);
 
 	elProto p = {0};
 	p.zstack = fn.nlocals;
@@ -423,7 +423,7 @@ int elf_run(elState *R) {
 		locals[b.x] = cl->enclosure[b.y];
 	} break;
 	case BC_CLOSURE: {
-		elf_ensure(b.y >= 0 && b.y < elf_xarray_length(md->prototypes));
+		elf_ensure(b.y >= 0 && b.y < elf_varlen(md->prototypes));
 		elProto proto = md->prototypes[b.y];
 		elClosure *new_closure = elf_new_closure(R,proto);
 		for (int i = 0; i < proto.zcache; ++i) {

@@ -132,11 +132,11 @@ void elf_enclose_entity(elFileState *fs, elFileFnState *fn, elEntityIdTypeGuard 
 	/* ensure the entity should actually be captured */
 	elf_ensure(id.id < fn->entities);
 
-	for (int i = 0; i < elf_xarray_length(fn->enclosure); i += 1) {
+	for (int i = 0; i < elf_varlen(fn->enclosure); i += 1) {
 		if (fn->enclosure[i] == id.id) return;
 	}
 
-	elf_xarray_add(fn->enclosure,id.id);
+	elf_varadd(fn->enclosure,id.id);
 }
 
 
@@ -190,7 +190,7 @@ elNodeId elf_new_local_entity(elFileState *fs, elFileLine line, char *name, elBo
 	}
 
 	elEntityId id = fs->nentities ++;
-	elf_xarray_growby(fs->entities,fs->nentities-elf_xarray_length(fs->entities));
+	elf_xarray_growby(fs->entities,fs->nentities-elf_varlen(fs->entities));
 
 	elRegId slot = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 	elNodeId node = elf_make_register_node(fs,line,slot);
@@ -269,8 +269,8 @@ elNodeId elf_make_set_metatable_node(elFileState *fs, elFileLine line, elNodeId 
 	elNodeId fn = elf_get_global_entity_node(fs,line,"elf.set_object_metatable");
 
 	elNodeId *z = elNil;
-	elf_xarray_add(z,table);
-	elf_xarray_add(z,meta_table);
+	elf_varadd(z,table);
+	elf_varadd(z,meta_table);
 
 	return elf_make_call_node(fs,line,fn,z);
 }
@@ -282,7 +282,7 @@ elNodeId *elf_load_call_args(elFileState *fs) {
 	elNodeId *z = 0;
 	if (elf_test_token(fs,TK_CURLY_LEFT)) {
 		elNodeId x = elf_load_file_table(fs);
-		elf_xarray_add(z,x);
+		elf_varadd(z,x);
 	} else
 	if (elf_pick_token(fs,TK_PAREN_LEFT)) {
 		if (!elf_test_token(fs,TK_PAREN_RIGHT)) do {
@@ -291,10 +291,10 @@ elNodeId *elf_load_call_args(elFileState *fs) {
 			if (elf_get_node_kind(fs,x) == NODE_MULTI) {
 	elNodeId *n = elf_get_node(fs,x).z;
 	elf_xarray_foreachi(n) {
-		elf_xarray_add(z,n[i]);
+		elf_varadd(z,n[i]);
 	}
 } else {
-	elf_xarray_add(z,x);
+	elf_varadd(z,x);
 }
 } while (elf_pick_token(fs,TK_COMMA));
 elf_take_token(fs,TK_PAREN_RIGHT);
@@ -309,13 +309,13 @@ elNodeId *elf_load_call_args_or_expr(elFileState *fs) {
 	if (elf_pick_token(fs,TK_PAREN_LEFT)) {
 		if (!elf_test_token(fs,TK_PAREN_RIGHT)) do {
 			elNodeId x = elf_load_file_expr(fs,0);
-			if (x != NO_NODE) elf_xarray_add(z,x);
+			if (x != NO_NODE) elf_varadd(z,x);
 			else break;
 		} while (elf_pick_token(fs,TK_COMMA));
 		elf_take_token(fs,TK_PAREN_RIGHT);
 	} else {
 		elNodeId x = elf_load_file_expr(fs,0);
-		if (x != NO_NODE) elf_xarray_add(z,x);
+		if (x != NO_NODE) elf_varadd(z,x);
 	}
 	return z;
 }
@@ -442,7 +442,7 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 	p.zstack = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes  = fs->md->nbytes - fn.bytes;
-	p.zcache = elf_xarray_length(fn.enclosure);
+	p.zcache = elf_varlen(fn.enclosure);
 	int f = elf_add_proto(fs->M,p);
 
 	elf_emitter_patch_jump(fs,fj);
@@ -451,7 +451,7 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 	elNodeId *z = elNil;
 	elf_xarray_foreachi(fn.enclosure) {
 		elFileEntity entity = fs->entities[fn.enclosure[i]];
-		elf_xarray_add(z,elf_make_register_node(fs,entity.line,entity.slot));
+		elf_varadd(z,elf_make_register_node(fs,entity.line,entity.slot));
 	}
 
 	return elf_make_closure_node(fs,tk.line,f,z);
@@ -541,12 +541,12 @@ elNodeId elf_load_file_table(elFileState *fs) {
 			elNodeId val = elf_load_file_expr(fs,0);
 			elNodeId fld = elf_make_field_node(fs,fs->lasttk.line,table,key);
 			elNodeId f = elf_make_load_node(fs,fs->lasttk.line,fld,val);
-			elf_xarray_add(z,f);
+			elf_varadd(z,f);
 		} else {
 			elNodeId val = key;
 			elNodeId ii = elf_make_integer_node(fs,fs->lasttk.line,index ++);
 			elNodeId f = elf_make_load_node(fs,fs->lasttk.line,elf_make_index_node(fs,fs->lasttk.line,table,ii),val);
-			elf_xarray_add(z,f);
+			elf_varadd(z,f);
 		}
 		if (elf_pick_token(fs,TK_COMMA)) {
 			continue;
@@ -742,7 +742,7 @@ while (!elf_term_eol_token(fs)) {
 					elToken n = elf_take_token(fs,TK_WORD);
 					elNodeId y = elf_make_string_node(fs,n.line,n.s);
 					elNodeId x = elf_make_field_node(fs,tk.line,v,y);
-					elf_xarray_add(z,x);
+					elf_varadd(z,x);
 				} while (elf_pick_token(fs,TK_COMMA));
 				v = elf_make_multi_node(fs,tk.line,z);
 				elf_take_token(fs,TK_PAREN_RIGHT);
@@ -973,11 +973,11 @@ case TK_FOR: {
 		elNodeId y = elf_load_file_expr(fs,0);
 		if (elf_get_node_kind(fs,y) == NODE_MULTI) {
 			elNodeId *yz = elf_get_node(fs,y).z;
-			for (int i = 0; i < elf_xarray_length(yz); i += 1) {
-				elf_xarray_add(z,yz[i]);
+			for (int i = 0; i < elf_varlen(yz); i += 1) {
+				elf_varadd(z,yz[i]);
 			}
 		} else {
-			elf_xarray_add(z,y);
+			elf_varadd(z,y);
 		}
 	} while (elf_pick_token(fs,TK_COMMA));
 
@@ -1014,7 +1014,7 @@ const elRegId value_register = elf_get_node(fs,value).x;
 			}
 			*/
 int i;
-for (i = 0; i < elf_xarray_length(z); i += 1) {
+for (i = 0; i < elf_varlen(z); i += 1) {
 	elNodeId y = z[i];
 
 	elNodeId array = NO_NODE;
@@ -1057,7 +1057,7 @@ for (i = 0; i < elf_xarray_length(z); i += 1) {
 
 		if (array != NO_NODE) {
 			elNodeId *z = {0};
-			elf_xarray_add(z,index);
+			elf_varadd(z,index);
 
 						/* todo: make this neater */
 			elf_emitter_emit_store(fs,name.line,value,

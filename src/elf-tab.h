@@ -7,7 +7,7 @@
 
 typedef struct elEntry {
 	union { elValue key, k; };
-	elInteger i;
+	union { elInteger index, i; };
 } elEntry;
 
 

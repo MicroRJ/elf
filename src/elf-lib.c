@@ -14,35 +14,89 @@ int elf_lib_pause_collector(elState *R) {
 }
 
 
-elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *thru) {
+typedef struct elObjectTracePath elObjectTracePath;
+typedef struct elObjectTracePath {
+	elObjectTracePath *trace;
+	char *name;
+} elObjectTracePath;
+
+void print_object_trace(elObjectTracePath path) {
+	if (path.trace) {
+		print_object_trace(*path.trace);
+		printf(".");
+	}
+	printf("%s",path.name);
+}
+
+elInteger get_index_entry(elTable *tab, elInteger index) {
+	elEntry *entry;
+	for (entry = tab->entries; entry < tab->entries + tab->ntotal; entry += 1) {
+		if (entry->key.tag != TAG_NIL) {
+			if (entry->index == index) {
+				return entry - tab->entries;
+			}
+		}
+	}
+	return -1;
+}
+
+elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *thru, elObjectTracePath path) {
 
 	if (elf_table_set(visited,elf_object_value(thru),elf_object_value(thru))) {
-		return 1;
+		return 0;
 	}
 
 	elInteger traces = 0;
 	if (thru == obj) {
+		elf_debug_log("object found through: ");
+		print_object_trace(path); printf("\n");
 		traces = 1;
 	} else if (thru->type == OBJ_CLOSURE) {
+		elObjectTracePath child = { &path, "closure.enclosure" };
+
 		elClosure *cls = (elClosure *) thru;
 		elInteger k;
 		for (k = 0; k < cls->prototype.zcache; k += 1) {
 			if (elf_isobj(cls->enclosure[k].tag)) {
-				traces += elf_trace_object(S,visited,obj,cls->enclosure[k].x_obj);
+				traces += elf_trace_object(S,visited,obj,cls->enclosure[k].x_obj,child);
 			}
 		}
 	} else if (thru->type == OBJ_TAB) {
 		elTable *tab = (elTable *) thru;
-		elEntry *entry;
-		for (entry = tab->entries; entry < tab->entries + tab->ntotal; entry += 1) {
-			if (elf_isobj(entry->key.tag)) {
-				traces += elf_trace_object(S,visited,obj,entry->key.x_obj);
+
+		{
+			elObjectTracePath child = { &path, elf_tpf("(table.entry)") };
+			elEntry *entry;
+			for (entry = tab->entries; entry < tab->entries + tab->ntotal; entry += 1) {
+				if (elf_isobj(entry->key.tag)) {
+					elInteger found = elf_trace_object(S,visited,obj,entry->key.x_obj,child);
+					traces += found;
+				}
 			}
 		}
-		elValue *value;
-		for (value = tab->array; value < tab->array + elf_xarray_length(tab->array); value += 1) {
-			if (elf_isobj(value->tag)) {
-				traces += elf_trace_object(S,visited,obj,value->x_obj);
+
+		{
+			elObjectTracePath child = { &path, "(table.value)" };
+
+			elValue *value;
+			for (value = tab->array; value < tab->array + elf_varlen(tab->array); value += 1) {
+				if (elf_isobj(value->tag)) {
+					elInteger found = elf_trace_object(S,visited,obj,value->x_obj,child);
+					traces += found;
+					if (found) {
+						elInteger id = get_index_entry(tab,value-tab->array);
+						if (id != -1) {
+							elEntry entry = tab->entries[id];
+							if (entry.key.tag == TAG_STR) {
+								printf("(%i) by key: %s\n", tab->obj.color, entry.key.x_str->contents);
+							} else {
+								printf("(%i) by key: (not a string)\n", tab->obj.color);
+							}
+						} else {
+							printf("(%i) by index: %lli\n", tab->obj.color, value-tab->array);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -53,11 +107,17 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 int elf_lib_trace_object(elState *R) {
 	elObject *obj = elf_get_object(R,0);
 	elTable *visited = elf_add_new_table(R);
-	elInteger traces = elf_trace_object(R,visited,obj,(elObject*)R->M->globals);
+
+	elObjectTracePath child = { 0 };
+	child.name = "global";
+
+	elInteger traces = elf_trace_object(R,visited,obj,(elObject*)R->M->globals,child);
+
+	child.name = "stack";
 	elValue *val;
 	for (val = R->stack; val < R->stack_top; ++ val) {
 		if (elf_isobj(val->tag)) {
-			traces += elf_trace_object(R,visited,obj,val->x_obj);
+			traces += elf_trace_object(R,visited,obj,val->x_obj,child);
 		}
 	}
 	elf_add_integer(R,traces);
@@ -66,7 +126,7 @@ int elf_lib_trace_object(elState *R) {
 
 
 int elf_lib_get_allocated_objects(elState *R) {
-	elf_add_integer(R,elf_xarray_length(R->memory.objects));
+	elf_add_integer(R,elf_varlen(R->memory.objects));
 	return 1;
 }
 
@@ -84,7 +144,7 @@ int elf_lib_get_collector_threshold(elState *R) {
 
 
 int elf_lib_mark_everything(elState *R) {
-	elInteger num = elf_mark_everything(R);
+	elInteger num = elf_hold_phase(R);
 	elf_add_integer(R,num);
 	return 1;
 }
@@ -105,7 +165,7 @@ int elf_lib_unmark_objects(elState *R) {
 
 
 int elf_lib_collect(elState *R) {
-	elf_collect(R);
+	elf_trigger_collection_cycle(R);
 	return 0;
 }
 
@@ -601,7 +661,7 @@ int elf_fpf_value(FILE *file, elValue v, elBool quotes) {
 			elTable *tab = v.x_tab;
 			wrote += fprintf(file,"{");
 			elInteger i,j,n;
-			for (i=0;i<elf_xarray_length(tab->array);++i) {
+			for (i=0;i<elf_varlen(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elEntry it = tab->slots[j];

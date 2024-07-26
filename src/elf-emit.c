@@ -115,16 +115,6 @@ elRegId elf_emitter_local_alloc(elFileState *fs, elFileLine line, elRegId target
 	reg = fn->xmemory ++;
 	fn->nlocals = MAX(fn->nlocals,fn->xmemory);
 	elf_ensure((target == NO_SLOT) || (target == reg));
-
-#if 0
- 	if (id != NO_SLOT && fs->memory_region_level > 0) {
-		elf_file_dialog(fs,line,"added to memory region %s", elNodeToStr[elf_get_node_kind(fs,id)]);
-		elMemoryRegion mr = fs->memory_region;
-		mr.registry[mr.length].node = id;
-		mr.registry[mr.length].reg = reg;
-		fs->memory_region.length ++;
-	}
-#endif
 	return reg;
 }
 
@@ -142,9 +132,9 @@ elBytecode elf_emitter_get_byte(elFileState *fs, elByteId id) {
 elByteId elf_emitter_add_byte(elFileState *fs, elFileLine line, elBytecode byte) {
 	/* we just associate each byte with a line,
 	this is simple and is pretty great for debugging... */
-	elf_xarray_add(fs->M->lines,line);
-	elf_xarray_add(fs->M->bytes,byte);
-	elf_xarray_add(fs->M->track,0);
+	elf_varadd(fs->M->lines,line);
+	elf_varadd(fs->M->bytes,byte);
+	elf_varadd(fs->M->track,0);
 	// elFileFnState *fn = fs->fn;
 	// elf_bytefpf(stdout,fs->M,-1,fs->M->nbytes-fn->bytes,byte);
 	return fs->M->nbytes ++;
@@ -232,7 +222,7 @@ void elf_emitter_add_block_flags(elFileState *fs, int flags) {
 
 elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags) {
 	elBlockId level = fs->nblocks ++;
-	if (elf_xarray_length(fs->blocks) < fs->nblocks) {
+	if (elf_varlen(fs->blocks) < fs->nblocks) {
 		elf_xarray_growby(fs->blocks,1);
 	}
 
@@ -356,10 +346,10 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileBoolExpr *js, elBool z, elReg
 
 			if (z != 0) {
 				j = elf_emitter_add_bytexy(fs,node.line,BC_JNZ,NO_JUMP,x);
-				elf_xarray_add(js->t,j);
+				elf_varadd(js->t,j);
 			} else {
 				j = elf_emitter_add_bytexy(fs,node.line,BC_JZ,NO_JUMP,x);
-				elf_xarray_add(js->f,j);
+				elf_varadd(js->f,j);
 			}
 		} break;
 	}
@@ -417,7 +407,7 @@ void elf_emit_continue(elFileState *fs, elFileLine line, elRegId with_value_regi
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
 
 	elByteId j = elf_emit_jump(fs,line,elf_get_last_byteid(fs));
-	elf_xarray_add(bl->loop.true_jumps,j);
+	elf_varadd(bl->loop.true_jumps,j);
 }
 
 
@@ -430,7 +420,7 @@ void elf_emit_break(elFileState *fs, elFileLine line, elRegId with_value_registe
 		elf_emitter_add_block_flags(fs,BLOCK_ENDED);
 	}
 	elByteId j = elf_emit_jump(fs,line,elf_get_last_byteid(fs));
-	elf_xarray_add(bl->leavejumps,j);
+	elf_varadd(bl->leavejumps,j);
 }
 
 /* Functions */
@@ -863,7 +853,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(v.z[i]));
 				elf_ensure(last == tail ++);
 			}
-			int n = elf_xarray_length(v.z);
+			int n = elf_varlen(v.z);
 			elf_emitter_add_bytexyz(fs,line,vx.k == NODE_METAFIELD ? BC_METACALL : BC_CALL,head,n,y);
 			if (target_register != NO_SLOT && y != 0) {
 				if (y > 1) elf_file_dialog(fs,line,"unsupported");
@@ -924,7 +914,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elf_ensure(elf_get_node_kind(fs,xx) == NODE_INDEX);
 
 			elNodeId *z = {0};
-			elf_xarray_add(z,elf_get_node(fs,xx).y);
+			elf_varadd(z,elf_get_node(fs,xx).y);
 
 			xx = elf_make_call_metafield_node(fs,line,elf_get_node(fs,xx).x,z,"idx");
 
@@ -1069,7 +1059,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 		}
 		elf_ensure(s->jz != 0);
 		int j = elf_emit_jump(fs,line,-1);
-		elf_xarray_add(s->j,j);
+		elf_varadd(s->j,j);
 
 		elf_emitter_patch_jumplist(fs,s->jz);
 		elf_xarray_delete(s->jz);
@@ -1125,7 +1115,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elRegId x = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(id));
 			if (fs->fn->nyield < n) fs->fn->nyield = n;
 			elByteId j = elf_emitter_add_bytexyz(fs,line,BC_YIELD,NO_JUMP,x,n);
-			elf_xarray_add(fs->fn->yj,j);
+			elf_varadd(fs->fn->yj,j);
 		/* if there are no results then simply leave directly */
 		} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
 		elf_set_memory_state(fs,regress);
