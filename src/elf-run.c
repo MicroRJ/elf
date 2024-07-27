@@ -466,12 +466,11 @@ int elf_run(elState *R) {
 				elf_throw(R,bc,elf_tpf("'%s': not an object", tag2s[yy.tag]));
 			} break;
 		}
-		if (metatable != 0) {
-
-			_lookup:
-			locals[b.x] = elf_table_lookup(metatable,locals[b.z]);
-
-		} else elf_throw(R,bc,"Invalid object, no metatable.");
+		_lookup:
+		if (metatable == 0) {
+			elf_throw(R,bc,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
+		}
+		locals[b.x] = elf_table_lookup(metatable,locals[b.z]);
 	} break;
 	/* todo: why are these two so similar ... */
 	case BC_INDEX: case BC_FIELD: {
@@ -637,7 +636,6 @@ int elf_run(elState *R) {
 		if (elf_isobj(xx.tag) || elf_isobj(yy.tag)) {
 			elNOCODE;
 		} else if ((xx.tag == TAG_NUM) || (yy.tag == TAG_NUM)) {
-
 			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 			elf_check_division_by_zero(R,xx,yy);
 

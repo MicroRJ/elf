@@ -794,9 +794,57 @@ elBool elf_is_virtual_file_name(char const *fn) {
 }
 
 
+elf_api int elf_lib_get_disk_info(elState *R) {
+	DWORD SectorsPerCluster;
+	DWORD BytesPerSector;
+	DWORD NumberOfFreeClusters;
+	DWORD TotalNumberOfClusters;
+	GetDiskFreeSpaceA(elf_get_cstring(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
+	elTable *info = elf_add_new_table(R);
+	elf_table_set_integer_field(info,elf_new_string(R,"SectorsPerCluster"),SectorsPerCluster);
+	elf_table_set_integer_field(info,elf_new_string(R,"BytesPerSector"),BytesPerSector);
+	elf_table_set_integer_field(info,elf_new_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
+	elf_table_set_integer_field(info,elf_new_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+	return 1;
+}
+
+
+elf_api int elf_lib_list_volumes(elState *R) {
+
+	elTable *list = elf_add_new_table(R); /* <- */
+
+	char buffer[MAX_PATH];
+	HANDLE handle = FindFirstVolumeA(buffer,MAX_PATH);
+
+	elString *name = 0;
+	if (handle != INVALID_HANDLE_VALUE) do {
+
+		elTable *volume = elf_add_new_table(R);
+		name = elf_add_new_string(R,buffer);
+
+		elf_table_set_table_field(list,name,volume);
+
+		elf_table_set_string_field(volume,elf_new_string(R,"name"),name);
+
+		elTable *path_names = elf_add_new_table(R);
+		elf_table_set_table_field(volume,elf_new_string(R,"path_names"),path_names);
+
+		if (GetVolumePathNamesForVolumeNameA(name->contents,buffer,MAX_PATH,NULL)) {
+			char *cursor = buffer;
+			while (*cursor != '\0') {
+				elf_table_add(path_names,elf_string_value(elf_new_string(R,buffer)));
+				cursor += strlen(cursor) + 1;
+			}
+		}
+	} while(FindNextVolumeA(handle,buffer,MAX_PATH));
+	FindVolumeClose(handle);
+
+	elf_add_table(R,list); /* <- */
+	return 1;
+}
+
+
 void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir);
-
-
 elf_api int elf_lib_list_folder(elState *R) {
 	elf_ensure(elf_get_num_args(R) > 0);
 	elString *dir = elf_get_string(R,0);
@@ -1017,6 +1065,8 @@ elf_api void elflib_loadall(elState *R) {
 	elf_register_binding(R,"elf.enumerate_directory",elf_lib_enumerate_directory);
 	elf_register_binding(R,"elf.enumerate_folder",elf_lib_enumerate_directory);
 	elf_register_binding(R,"elf.list_folder",elf_lib_list_folder);
+	elf_register_binding(R,"elf.list_volumes",elf_lib_list_volumes);
+	elf_register_binding(R,"elf.get_disk_info",elf_lib_get_disk_info);
 
 	elf_register_handle(R,"elf.ferr",stderr);
 	elf_register_handle(R,"elf.fout",stdout);

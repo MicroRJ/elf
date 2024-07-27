@@ -10,8 +10,8 @@
 #define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
 #define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(64)
 
-#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((8192/4)*1)
-#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((8192/4)*4)
+#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
+#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*512)
 
 
 /* 7/25/24 10:50 PM

@@ -264,9 +264,9 @@ void elf_collect(elState *R) {
 	}
 	if (elf_varlen(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
 		elf_trigger_collection_cycle(R);
-		if (elf_varlen(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
-			elf_throw(R,NO_BYTE,elf_tpf("out of memory, %lli objects",elf_varlen(R->memory.objects)));
-		}
+		// if (elf_varlen(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
+		// 	elf_throw(R,NO_BYTE,elf_tpf("out of memory, %lli objects",elf_varlen(R->memory.objects)));
+		// }
 	} else if (R->memory.allocated > R->memory.threshold) {
 		R->memory.threshold *= 2;
 		if (R->memory.threshold > elGC_MEM_THRESHOLD_MAX) {

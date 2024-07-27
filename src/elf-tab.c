@@ -48,7 +48,9 @@ elTable *elf_new_table_metatable(elState *R) {
 
 elTable *elf_new_table_of_length(elState *R, elInteger ntotal) {
 	elTable *table = elf_new_object(R,OBJ_TAB,sizeof(elTable));
-	if (R) table->obj.metatable = R->metatables.table;
+	table->obj.metatable = R->metatables.table;
+	/* What if this is the first table... */
+	// elf_ensure(!! table->obj.metatable);
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
@@ -289,7 +291,7 @@ void elf_tabsetnumfld(elTable *tab, elString *key, elNumber val) {
 }
 
 
-void elf_tabsettabfld(elTable *tab, elString *key, elTable *val) {
+void elf_table_set_table_field(elTable *tab, elString *key, elTable *val) {
 	elf_table_set(tab,elf_string_value(key),elf_table_value(val));
 }
 
@@ -744,10 +746,26 @@ int elf_table_libfn_swap(elState *R) {
 
 
 int elf_table_libfn_merge(elState *R) {
-	elf_check_args(R,":merge",1,"the table to merge");
+	elf_check_args(R,":merge",1,"the tables to merge into a new table (keys only), if no arguments are passed in, this acts like a clone");
+	elTable *tab = (elTable *) elf_get_this(R);
+	elTable *sum = elf_add_new_table(R); /* <- */
+	elf_merge_tables(sum,tab);
+	for ( int i = 0; i < elf_get_num_args(R); ++ i ) {
+		elf_merge_tables(sum,elf_get_table(R,i));
+	}
+	sum->obj.metatable = tab->obj.metatable;
+	return 1;
+}
+
+/* todo: could this be renamed to make more clear? */
+int elf_table_libfn_xmerge(elState *R) {
+	elf_check_args(R,":xmerge",1,"the table to merge, all values are of the table are added to a new one, unline :merge, :xmerge will not check for duplicates");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *merger = elf_get_table(R,0);
-	elf_merge_tables(tab,merger);
+	elInteger i;
+	for (i=0;i<elf_varlen(merger->array);++i) {
+		elf_varadd(tab->array,merger->array[i]);
+	}
 	return 0;
 }
 
@@ -765,16 +783,6 @@ int elf_table_libfn_xclone(elState *R) {
 }
 
 
-int elf_table_libfn_xmerge(elState *R) {
-	elf_check_args(R,":xmerge",1,"the table to merge");
-	elTable *tab = (elTable *) elf_get_this(R);
-	elTable *merger = elf_get_table(R,0);
-	elInteger i;
-	for (i=0;i<elf_varlen(merger->array);++i) {
-		elf_varadd(tab->array,merger->array[i]);
-	}
-	return 0;
-}
 
 
 int elf_table_libfn_reverse(elState *R) {
