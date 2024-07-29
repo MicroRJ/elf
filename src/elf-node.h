@@ -36,13 +36,13 @@ typedef enum elNodeTy {
 	_(AND) _(OR)\
 	_(NIL_AND) _(NIL_OR)\
 	_(EQ) _(NEQ)\
-	_(BITSHL) _(BITSHR)\
+	_(BIT_SHL) _(BIT_SHR)\
 	_(ADD) _(SUB) _(MUL) _(DIV)\
 	_(LT) _(GT) _(LTEQ) _(GTEQ)\
 	_(INDEX) _(FIELD)\
 	/* end */\
-	_(POW)\
-	_(BITXOR) _(MOD) _(BITOR)\
+	_(BIT_AND) _(BIT_OR) _(BIT_XOR)\
+	_(MOD) _(POW)\
 	_(TYPEGUARD)\
 	_(LOAD)\
 	_(CLOSURE) _(STRING) _(TABLE)\

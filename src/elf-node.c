@@ -29,7 +29,7 @@ elFileLine elf_get_node_line(elFileState *fs, elNodeId id) {
 
 
 elBool elf_is_binary_node(elNodeKi kind) {
-	return kind >= NODE_AND && kind <= NODE_BITOR;
+	return kind >= NODE_AND && kind <= NODE_BIT_OR;
 }
 
 

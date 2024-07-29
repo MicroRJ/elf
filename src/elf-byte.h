@@ -41,40 +41,50 @@ instructions, additionally a dedicated loop
 instruction which increments a register would be
 real nice */
 #define BCLIST(_) \
-	_(HALT, I) \
-	_(J, XY) _(JZ, XY) _(JNZ, XY) _(JE, XY) _(JNE, XY) \
-	_(DELAY, I) _(LEAVE, I) _(YIELD, I) \
-	_(TYPEGUARD, XY) \
-	_(LOADGLOBAL, XY) \
-	_(LOADNUM, XY) _(LOADINT, XY) _(LOADNIL, I) \
-	_(LOADTHIS, I) \
-	_(RELOAD, XY) \
-	_(CALL, XYZ) \
-	_(METACALL, XYZ) \
-	_(LOAD_CLOSURE_VALUE, XY) \
-	_(INDEX, XYZ) \
-	_(FIELD, XYZ) \
-	_(METAFIELD, XYZ) \
-	_(SETGLOBAL, XY) \
-	_(SETINDEX, XYZ) \
-	_(SETFIELD, XYZ) \
-	_(TABLE, I) _(CLOSURE, XY) \
-	_(ISNIL, XY) \
-	_(EQ, XYZ) _(NEQ, XYZ)   \
-	_(LT, XYZ) _(LTEQ, XYZ)  \
-	_(MUL, XYZ) _(DIV, XYZ)  \
-	_(MOD, XYZ) \
-	_(POW, XYZ) \
-	_(ADD, XYZ) _(SUB, XYZ) \
-	_(SHL, XYZ) _(SHR, XYZ) _(XOR, XYZ) _(BITOR, XYZ)
+_(HALT, I, "halt") \
+_(J, XY, "jump") \
+_(JZ, XY, "jz") \
+_(JNZ, XY, "jnz") \
+_(JE, XY, "je") \
+_(JNE, XY, "jne") \
+_(DELAY, I, "delay") \
+_(LEAVE, I, "leave") \
+_(YIELD, I, "yield") \
+_(TYPEGUARD, XY, "typeguard") \
+_(LOADGLOBAL, XY, "load_global") \
+_(LOADNUM, XY, "load_num") \
+_(LOADINT, XY, "load_int") \
+_(LOADNIL, I, "load_nil") \
+_(LOADTHIS, I, "load_this") \
+_(LOADCACHE, XY, "load_cache") \
+_(INDEX, XYZ, "load_index") \
+_(FIELD, XYZ, "load_field") \
+_(METAFIELD, XYZ, "load_metafield") \
+_(RELOAD, XY, "reload") \
+_(SETGLOBAL, XY, "set_global") \
+_(SETINDEX, XYZ, "set_global") \
+_(SETFIELD, XYZ, "set_global") \
+_(CALL, XYZ, "call") \
+_(METACALL, XYZ, "metacall") \
+_(TABLE, I, "new_table") \
+_(CLOSURE, XY, "new_closure") \
+_(ISNIL, XY, "is_nil") \
+_(EQ, XYZ, "eq") _(NEQ, XYZ, "neq")   \
+_(LT, XYZ, "lt") _(LTEQ, XYZ, "lteq")  \
+_(MUL, XYZ, "mul") _(DIV, XYZ, "div")  \
+_(ADD, XYZ, "add") _(SUB, XYZ, "sub") \
+_(SHL, XYZ, "shl") _(SHR, XYZ, "shr") \
+_(BIT_XOR, XYZ, "xor") _(BIT_OR, XYZ, "or") \
+_(BIT_AND, XYZ, "and") \
+_(MOD, XYZ, "mod") _(POW, XYZ, "pow")
+
+#define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),
 
 typedef enum elByteOP {
-
-#define BCITEM(NAME,MODE) XFUSE(BC_,NAME),
 	BCLIST(BCITEM)
-#undef BCITEM
-
 } elByteOP;
+
+#undef BCITEM
 
 
 /* todo: make this much more compact! */
@@ -90,84 +100,23 @@ typedef struct elBytecode {
 
 
 elByteClass elf_get_byte_class(elByteOP k) {
+#define BCITEM(NAME,FMT,__) case XFUSE(BC_,NAME): return XFUSE(BC_CLASS_,FMT);
 	switch (k) {
-		case BC_JZ:
-		case BC_JNZ:
-		case BC_TYPEGUARD:
-		case BC_SETGLOBAL:
-		case BC_LOADNUM:
-		case BC_LOADINT:
-		case BC_LOADNIL:
-		case BC_LOADGLOBAL:
-		case BC_LOAD_CLOSURE_VALUE:
-		case BC_RELOAD: {
-			return BC_CLASS_XY;
-		}
-		case BC_CLOSURE:
-		case BC_FIELD:
-		// case BC_SETMETAFIELD:
-		case BC_SETFIELD: case BC_SETINDEX:
-		case BC_INDEX:
-		case BC_ISNIL:
-		case BC_NEQ: case BC_EQ:
-		case BC_LT: case BC_LTEQ:
-		case BC_ADD: case BC_SUB:
-		case BC_DIV: case BC_MUL: case BC_MOD:
-		case BC_SHL: case BC_SHR:
-		case BC_XOR:
-		case BC_CALL:
-		case BC_YIELD:
-		case BC_METAFIELD:
-		case BC_METACALL: {
-			return BC_CLASS_XYZ;
-		}
-		default: return BC_CLASS_I;
+		BCLIST(BCITEM)
+		default: elNOCODE;
 	}
+#undef BCITEM
+	return -1;
 }
 
 
 char const *elf_get_byte_label(elByteOP k) {
+#define BCITEM(NAME,_,SYM) case XFUSE(BC_,NAME): return SYM;
 	switch (k) {
-		case BC_LOADNUM: return "loadnum";
-		case BC_LOADINT: return "loadint";
-		case BC_LOADNIL: return "loadnil";
-		case BC_LEAVE: return "leave";
-		case BC_YIELD: return "yield";
-		case BC_J: return "j";
-		case BC_JZ: return "jz";
-		case BC_JNZ: return "jnz";
-		case BC_ISNIL: return "isnil";
-		case BC_CALL: return "call";
-		case BC_LOADTHIS: return "this";
-		case BC_METAFIELD: return "metafield";
-		// case BC_SETMETAFIELD: return "setmetafield";
-		case BC_METACALL: return "metacall";
-		case BC_LOAD_CLOSURE_VALUE: return "loadcached";
-		case BC_LOADGLOBAL: return "loadglobal";
-		case BC_RELOAD: return "reload";
-		case BC_SETGLOBAL: return "setglobal";
-		case BC_CLOSURE: return "newclosure";
-		case BC_TABLE: return "newtable";
-		case BC_INDEX: return "getindex";
-		case BC_FIELD: return "getfield";
-		case BC_SETFIELD: return "setfield";
-		case BC_SETINDEX: return "setindex";
-		case BC_TYPEGUARD: return "typeguard";
-		case BC_ADD: return "add";
-		case BC_SUB: return "sub";
-		case BC_DIV: return "dib";
-		case BC_MUL: return "mul";
-		case BC_MOD: return "mod";
-		case BC_LT: return "lt";
-		case BC_LTEQ: return "lteq";
-		case BC_NEQ: return "neq";
-		case BC_EQ: return "eq";
-		case BC_DELAY: return "delay";
-		case BC_SHL: return "shl";
-		case BC_SHR: return "shr";
-		case BC_XOR: return "xor";
-
-		default: return "???";
+		BCLIST(BCITEM)
+		default: elNOCODE;
 	}
+#undef BCITEM
+	return 0;
 }
 

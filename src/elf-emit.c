@@ -733,7 +733,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 		} break;
 		case NODE_CLOSURE_VALUE: {
 			UNUSED_CHECK;
-			elf_emitter_add_bytexy(fs,line,BC_LOAD_CLOSURE_VALUE,target_register,v.x);
+			elf_emitter_add_bytexy(fs,line,BC_LOADCACHE,target_register,v.x);
 		} break;
 		case NODE_THIS: {
 			UNUSED_CHECK;
@@ -939,8 +939,9 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 		} else ; /* fallthrough */
 			case NODE_DIV: case NODE_MUL: case NODE_MOD:
 			case NODE_SUB: case NODE_ADD: case NODE_POW:
-			case NODE_BITSHL: case NODE_BITSHR:
-			case NODE_BITXOR: case NODE_BITOR: {
+			case NODE_BIT_SHL: case NODE_BIT_SHR:
+			case NODE_BIT_XOR:
+			case NODE_BIT_AND: case NODE_BIT_OR: {
 			/* todo: do this properly */
 			// if (y == 0) goto leave;
 				if ((v.k == NODE_GT) || (v.k == NODE_GTEQ)) {
@@ -1214,25 +1215,26 @@ void elf_emitter_close_ranged_loop(elFileState *fs, elFileLine line) {
 
 elByteOP elf_node_to_byte(elNodeKi tt) {
 	switch (tt) {
-		case NODE_FIELD: 	  	return BC_FIELD;
-		case NODE_INDEX: 	  	return BC_INDEX;
-		case NODE_CALL:     	return BC_CALL;
-		case NODE_METAFIELD:	return BC_METAFIELD;
-		case NODE_ADD:     	return BC_ADD;
-		case NODE_SUB:     	return BC_SUB;
-		case NODE_DIV:     	return BC_DIV;
-		case NODE_MUL:     	return BC_MUL;
-		case NODE_POW:     	return BC_POW;
-		case NODE_MOD:     	return BC_MOD;
-		case NODE_NEQ:     	return BC_NEQ;
-		case NODE_EQ:      	return BC_EQ;
-		case NODE_LT:      	return BC_LT;
-		case NODE_LTEQ:    	return BC_LTEQ;
-		case NODE_BITOR:    	return BC_BITOR;
-		case NODE_BITSHL: return BC_SHL;
-		case NODE_BITSHR: return BC_SHR;
-		case NODE_BITXOR: return BC_XOR;
-		/* for the intended use cases, this is an error */
+		case NODE_FIELD: return BC_FIELD;
+		case NODE_INDEX: return BC_INDEX;
+		case NODE_CALL: return BC_CALL;
+		case NODE_METAFIELD: return BC_METAFIELD;
+		case NODE_ADD: return BC_ADD;
+		case NODE_SUB: return BC_SUB;
+		case NODE_DIV: return BC_DIV;
+		case NODE_MUL: return BC_MUL;
+		case NODE_POW: return BC_POW;
+		case NODE_MOD: return BC_MOD;
+		case NODE_NEQ: return BC_NEQ;
+		case NODE_EQ: return BC_EQ;
+		case NODE_LT: return BC_LT;
+		case NODE_LTEQ: return BC_LTEQ;
+		case NODE_BIT_OR: return BC_BIT_OR;
+		case NODE_BIT_AND: return BC_BIT_AND;
+		case NODE_BIT_SHL: return BC_SHL;
+		case NODE_BIT_SHR: return BC_SHR;
+		case NODE_BIT_XOR: return BC_BIT_XOR;
+		/* given the intended use cases, this is an error */
 		default: elNOCODE;
 	}
 	return BC_HALT;

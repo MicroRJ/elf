@@ -418,7 +418,7 @@ int elf_run(elState *R) {
 		locals[b.x].tag = TAG_NUM;
 		locals[b.x].n   = md->kn[b.y];
 	} break;
-	case BC_LOAD_CLOSURE_VALUE: {
+	case BC_LOADCACHE: {
 		elf_ensure(b.y >= 0 && b.y < fn.zcache);
 		locals[b.x] = cl->enclosure[b.y];
 	} break;
@@ -713,9 +713,9 @@ int elf_run(elState *R) {
 	} break;
 	CASE_IBOP(BC_SHL,  <<);
 	CASE_IBOP(BC_SHR,  >>);
-	CASE_IBOP(BC_XOR,   ^);
-	// CASE_IBOP(BC_MOD,   %);
-	CASE_IBOP(BC_BITOR, |);
+	CASE_IBOP(BC_BIT_XOR, ^);
+	CASE_IBOP(BC_BIT_AND, &);
+	CASE_IBOP(BC_BIT_OR,  |);
 	/* todo: could we cache these strings */
 	CASE_BOP(BC_ADD, +, R->cache.__add, R->cache.__add1);
 	CASE_BOP(BC_SUB, -, R->cache.__sub, R->cache.__sub1);

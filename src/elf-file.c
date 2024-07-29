@@ -355,10 +355,11 @@ elNodeKi elf_token_to_node(elTokenType tk) {
 		case TK_GREATER_THAN_EQUAL: return NODE_GTEQ;
 		case TK_LESS_THAN:          return NODE_LT;
 		case TK_LESS_THAN_EQUAL:    return NODE_LTEQ;
-		case TK_LEFT_SHIFT:         return NODE_BITSHL;
-		case TK_RIGHT_SHIFT:        return NODE_BITSHR;
-		case TK_BIT_XOR:            return NODE_BITXOR;
-		case TK_BIT_OR:             return NODE_BITOR;
+		case TK_LEFT_SHIFT:         return NODE_BIT_SHL;
+		case TK_RIGHT_SHIFT:        return NODE_BIT_SHR;
+		case TK_BIT_XOR:            return NODE_BIT_XOR;
+		case TK_BIT_OR:             return NODE_BIT_OR;
+		case TK_BIT_AND:            return NODE_BIT_AND;
 		default: 						 return NODE_NONE;
 	}
 }
