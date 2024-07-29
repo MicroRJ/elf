@@ -73,7 +73,7 @@ elf_api void elf_checkcl(elState *c, elRegId x);
 elf_api elValue *elf_get_stack_top(elState *R);
 elf_api void elf_set_stack_top(elState *R, elValue *top);
 
-elf_api elRegId elf_pushmany(elState *R, int howmany);
+elf_api elRegId elf_local_alloc(elState *R, int howmany);
 elf_api elRegId elf_add_value(elState *, elValue v);
 elf_api void eld_add_nil(elState *);
 elf_api void elf_add_integer(elState *, elInteger i);

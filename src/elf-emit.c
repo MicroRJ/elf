@@ -95,26 +95,12 @@ elRegId elf_get_node_register(elFileState *fs, elNodeIdTypeGuard id) {
 }
 
 
-elRegId elf_emitter_local_alloc(elFileState *fs, elFileLine line, elRegId target, elNodeId id) {
+elRegId elf_emitter_local_alloc(elFileState *fs, elFileLine line, int _, int __) {
+	(void) _;
+	(void) __;
 	elFileFnState *fn = fs->fn;
-	elRegId reg;
-#if 0
-	if (id != NO_NODE) {
-		line = fs->nodes[id].line;
-		elf_ensure(!elf_is_target_node(elf_get_node_kind(fs,id)));
-		reg = elf_get_node_register(fs,MAKE_NODE_ID(id));
-		if (reg != NO_SLOT && elf_get_node_kind(fs,id) != NODE_LOCAL) {
-			elf_file_dialog(fs,line,"node already allocated");
-		}
-	}
-#endif
-
-	// if ((reg != NO_SLOT) && (reg == target_register)) {
-	//  	return reg;
-	// }
-	reg = fn->xmemory ++;
+	elRegId reg = fn->xmemory ++;
 	fn->nlocals = MAX(fn->nlocals,fn->xmemory);
-	elf_ensure((target == NO_SLOT) || (target == reg));
 	return reg;
 }
 
@@ -222,7 +208,7 @@ void elf_emitter_add_block_flags(elFileState *fs, int flags) {
 
 elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags) {
 	elBlockId level = fs->nblocks ++;
-	if (elf_varlen(fs->blocks) < fs->nblocks) {
+	if (array_length(fs->blocks) < fs->nblocks) {
 		elf_xarray_growby(fs->blocks,1);
 	}
 
@@ -849,11 +835,13 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(v.x));
 				elf_ensure(last == tail ++);
 			}
-			elf_xarray_foreachi(v.z) {
+
+
+			ARRAY_FOR(i, v.z) {
 				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(v.z[i]));
 				elf_ensure(last == tail ++);
 			}
-			int n = elf_varlen(v.z);
+			int n = array_length(v.z);
 			elf_emitter_add_bytexyz(fs,line,vx.k == NODE_METAFIELD ? BC_METACALL : BC_CALL,head,n,y);
 			if (target_register != NO_SLOT && y != 0) {
 				if (y > 1) elf_file_dialog(fs,line,"unsupported");

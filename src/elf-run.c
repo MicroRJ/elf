@@ -423,7 +423,7 @@ int elf_run(elState *R) {
 		locals[b.x] = cl->enclosure[b.y];
 	} break;
 	case BC_CLOSURE: {
-		elf_ensure(b.y >= 0 && b.y < elf_varlen(md->prototypes));
+		elf_ensure(b.y >= 0 && b.y < array_length(md->prototypes));
 		elProto proto = md->prototypes[b.y];
 		elClosure *new_closure = elf_new_closure(R,proto);
 		for (int i = 0; i < proto.zcache; ++i) {

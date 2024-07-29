@@ -208,7 +208,9 @@ elToken elf_lexone(elFileState *file) {
 			elf_movechr();
 			int length = elf_read_identifier_characters(file,buffer);
 			tk.type = elf_is_word_or_macro(buffer);
-			if (tk.type == TK_M_FILE_NAME) {
+			if (tk.type == TK_M_ENDOFFILE) {
+				tk.type = TK_NONE;
+			} else if (tk.type == TK_M_FILE_NAME) {
 				tk.type = TK_STRING;
 				tk.s = file->filename;
 			} else if (tk.type == TK_M_LINE_NUMBER) {

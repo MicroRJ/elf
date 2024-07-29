@@ -16,8 +16,8 @@ typedef struct elToken {
 } elToken;
 
 #define KWLIST(_) \
+_(ELF,"elf") /* <- most likely to be removed */ \
 _(ENUM,"enum") \
-_(ELF,"elf") \
 _(LOAD,"load") \
 _(TRY,"try") _(CATCH,"catch") _(FINALLY,"finally") \
 _(NEW,"new") _(THIS,"this") \
@@ -34,7 +34,8 @@ _(NIL,"nil") _(TRUE,"true") _(FALSE,"false")
 #define MCLIST(_) \
 _(LINE_NUMBER,"line_number") _(LINE_CHAR,"line_char") _(FILE_NAME,"file_name") \
 _(LEVEL,"level") _(REGISTER,"register") \
-_(INDEX,"index") _(VALUE,"value") _(ARRAY,"array") _(FIELD,"field")
+_(INDEX,"index") _(VALUE,"value") _(ARRAY,"array") _(FIELD,"field") _(ENDOFFILE,"eof")
+
 
 //
 // --------------------------------------

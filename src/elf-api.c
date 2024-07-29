@@ -109,18 +109,18 @@ elf_api elNumber elf_get_number(elState *R, elRegId x) {
 }
 
 
-elRegId elf_pushmany(elState *R, int n) {
-	elRegId stkptr = R->top - R->stk;
-	if (stkptr <= R->stklen) {
-		R->top += n;
+elRegId elf_local_alloc(elState *R, int n) {
+	elRegId id = R->stack_top - R->stack;
+	if (id + n <= R->stack_length) {
+		R->stack_top += n;
 	} else elf_throw(R,NO_BYTE,"stack overflow");
-	return stkptr;
+	return id;
 }
 
 
 elRegId elf_add_value(elState *R, elValue v) {
 	*R->top = v;
-	return elf_pushmany(R,1);
+	return elf_local_alloc(R,1);
 }
 
 #define _INC_TOP do {\

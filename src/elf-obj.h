@@ -5,13 +5,12 @@
 */
 
 
-
 /* this collector is dog ... */
 #define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
-#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(64)
+#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(512)
 
 #define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
-#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*512)
+#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*2048)
 
 
 /* 7/25/24 10:50 PM
@@ -230,7 +229,7 @@ typedef struct elClosure {
 } elClosure;
 
 
-elf_api elValue elf_table_value(elTable *);
+elf_api elValue elf_tab(elTable *);
 elf_api elValue elf_binding_value(elBinding);
 elf_api elValue elf_string_value(elString *);
 elf_api elValue elf_closure_value(elClosure *);

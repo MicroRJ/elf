@@ -24,7 +24,7 @@ void elf_register_integer(elState *R, char *name, elInteger val) {
 
 
 void elf_registertab(elState *R, char *name, elTable *val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_table_value(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_tab(val));
 }
 
 
@@ -56,7 +56,7 @@ elNumber elf_timediffms(elInteger begin) {
 
 int elf_find_file_info_by_byte(elModule *md, elByteId byte) {
 	elFileInfo *files = md->files;
-	int nfiles = elf_varlen(files);
+	int nfiles = array_length(files);
 	for (int x = 0; x < nfiles; ++ x) {
 		elFileInfo file = files[x];
 		if ((elInteger)(byte - file.bytes) < file.nbytes) {

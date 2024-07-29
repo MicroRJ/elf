@@ -42,7 +42,7 @@ elInteger get_index_entry(elTable *tab, elInteger index) {
 
 elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *thru, elObjectTracePath path) {
 
-	if (elf_table_set(visited,elf_object_value(thru),elf_object_value(thru))) {
+	if (elf_table_set(visited,elf_obj(thru),elf_obj(thru))) {
 		return 0;
 	}
 
@@ -79,7 +79,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 			elObjectTracePath child = { &path, "(table.value)" };
 
 			elValue *value;
-			for (value = tab->array; value < tab->array + elf_varlen(tab->array); value += 1) {
+			for (value = tab->array; value < tab->array + array_length(tab->array); value += 1) {
 				if (elf_isobj(value->tag)) {
 					elInteger found = elf_trace_object(S,visited,obj,value->x_obj,child);
 					traces += found;
@@ -126,7 +126,7 @@ int elf_lib_trace_object(elState *R) {
 
 
 int elf_lib_get_allocated_objects(elState *R) {
-	elf_add_integer(R,elf_varlen(R->memory.objects));
+	elf_add_integer(R,array_length(R->memory.objects));
 	return 1;
 }
 
@@ -144,8 +144,9 @@ int elf_lib_get_collector_threshold(elState *R) {
 
 
 int elf_lib_mark_everything(elState *R) {
-	elInteger num = elf_hold_phase(R);
-	elf_add_integer(R,num);
+	elNOCODE;
+	// elInteger num = elf_hold_phase(R);
+	// elf_add_integer(R,num);
 	return 1;
 }
 
@@ -661,7 +662,7 @@ int elf_fpf_value(FILE *file, elValue v, elBool quotes) {
 			elTable *tab = v.x_tab;
 			wrote += fprintf(file,"{");
 			elInteger i,j,n;
-			for (i=0;i<elf_varlen(tab->array);++i) {
+			for (i=0;i<array_length(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elEntry it = tab->slots[j];
@@ -875,7 +876,7 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
 		elf_table_set_integer_field(file,elf_add_new_string(R,"is_directory"),is_directory);
 		elf_table_set_integer_field(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
-		elf_table_add(list,elf_table_value(file));
+		elf_table_add(list,elf_tab(file));
 		if (level != 0) {
 			if (is_directory) {
 				elf_lib_list_folder_(R,list,level-1,path);

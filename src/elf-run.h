@@ -69,20 +69,24 @@ typedef struct elStackFrame {
 
 /* todo: implement */
 typedef struct elThreadState {
-	union { elState *R, *rt; };
-	union { elModule  *M, *md; };
-	union { elStackFrame *call; };
-	union { elValue *stk;      };
-	elRegId stklen;
-	elInteger threadid;
-	elByteId  curbyte;
+	elByteId pip;
 } elThreadState;
-
 
 typedef enum elGCPhase {
 	elGC_PHASE_HOLD = GC_WHITE,
 	elGC_PHASE_FREE = GC_BLACK,
 } elGCPhase;
+
+
+typedef struct elCollector {
+	elBool     paused;
+	elGCPhase  phase;
+	elObject **new_objects;
+	elTable   *parents;
+	elObject **objects;
+	elInteger  allocated;
+	elInteger  threshold;
+} elCollector;
 
 
 typedef struct elState {
@@ -106,6 +110,7 @@ typedef struct elState {
 		elValue ongc;
 	} hooks;
 	struct {
+		elTable *transient;
 		elString *x,*y,*z,*w;
 		elString *width,*height;
 		elString *__add,*__sub,*__mul,*__div;
@@ -118,14 +123,7 @@ typedef struct elState {
 	elBool bytetracing;
 	elBool bytetracking;
 	elBool bytelogging;
-	struct {
-		elBool paused;
-		elGCPhase phase;
-		elObject **new_objects;
-		elObject **objects;
-		elInteger allocated;
-		elInteger threshold;
-	} memory;
+	union { elCollector collector, memory; };
 } elState;
 
 

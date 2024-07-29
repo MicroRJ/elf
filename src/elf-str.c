@@ -31,11 +31,12 @@ elString *elf_new_lstring(elState *R, elInteger length) {
 }
 
 
-elString *elf_new_string(elState *R, char *junk) {
-	int length = elf_cstrlen(junk);
+elString *elf_new_string(elState *R, char *contents) {
+	elHashId hash = elf_tabhashstr(contents);
+	int length = elf_cstrlen(contents);
 	elString *obj = elf_new_lstring(R,length);
-	elf_memcopy(obj->c,junk,length);
-	obj->hash = elf_tabhashstr((char*)junk);
+	elf_memcopy(obj->c,contents,length);
+	obj->hash = hash;
 	return obj;
 }
 
@@ -44,9 +45,7 @@ elBool elf_streq(elString *x, elString *y) {
 	if (x == y) return elTrue;
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return false;
-
 	if (x->length != y->length) return false;
-
 	return S_eq(x->string,y->string);
 }
 

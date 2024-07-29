@@ -132,7 +132,7 @@ void elf_enclose_entity(elFileState *fs, elFileFnState *fn, elEntityIdTypeGuard 
 	/* ensure the entity should actually be captured */
 	elf_ensure(id.id < fn->entities);
 
-	for (int i = 0; i < elf_varlen(fn->enclosure); i += 1) {
+	for (int i = 0; i < array_length(fn->enclosure); i += 1) {
 		if (fn->enclosure[i] == id.id) return;
 	}
 
@@ -190,7 +190,7 @@ elNodeId elf_new_local_entity(elFileState *fs, elFileLine line, char *name, elBo
 	}
 
 	elEntityId id = fs->nentities ++;
-	elf_xarray_growby(fs->entities,fs->nentities-elf_varlen(fs->entities));
+	elf_xarray_growby(fs->entities,fs->nentities-array_length(fs->entities));
 
 	elRegId slot = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 	elNodeId node = elf_make_register_node(fs,line,slot);
@@ -442,7 +442,7 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 	p.zstack = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes  = fs->md->nbytes - fn.bytes;
-	p.zcache = elf_varlen(fn.enclosure);
+	p.zcache = array_length(fn.enclosure);
 	int f = elf_add_proto(fs->M,p);
 
 	elf_emitter_patch_jump(fs,fj);
@@ -627,17 +627,24 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		case TK_NEW: {
 			elf_lexone(fs);
 			elNodeId meta_table = elf_load_unary_expr(fs,elFalse,elTrue);
-			elNodeId table = elf_make_table_node(fs,tk.line,elNil);
+			elNodeId *call_args = elf_load_call_args(fs);
+
+			elNodeId table;
+			/* So if the user does something like new Thing {}
+			or new Thing({}) the table that was passed in can
+			be used as supposed to creating a new one */
+			if ((array_length(call_args) == 1) && (elf_get_node_kind(fs,call_args[0]) == NODE_TABLE)) {
+				table = call_args[0];
+			} else {
+				/* If the user however, doesn't do this, then we
+				create a new table for him */
+				table = elf_make_table_node(fs,tk.line,elNil);
+			}
+
 			table = elf_make_set_metatable_node(fs,tk.line,table,meta_table);
 
 			elNodeId meta_field_name = elf_make_string_node(fs,tk.line,"__new");
 			elNodeId get_meta_field = elf_make_metafield_node(fs,tk.line,table,meta_field_name);
-
-			/* todo: optimize this, instead of creating a new table
-			when one is already passed in, use the one already given
-			to you, so for instance if you do `new Dude({name = "Dude" })`
-			or `new Dude { name = "Dude" }` */
-			elNodeId *call_args = elf_load_call_args(fs);
 			elNodeId call_new = elf_make_call_node(fs,tk.line,get_meta_field,call_args);
 
 			v = call_new;
@@ -973,7 +980,7 @@ case TK_FOR: {
 		elNodeId y = elf_load_file_expr(fs,0);
 		if (elf_get_node_kind(fs,y) == NODE_MULTI) {
 			elNodeId *yz = elf_get_node(fs,y).z;
-			for (int i = 0; i < elf_varlen(yz); i += 1) {
+			for (int i = 0; i < array_length(yz); i += 1) {
 				elf_varadd(z,yz[i]);
 			}
 		} else {
@@ -1014,7 +1021,7 @@ const elRegId value_register = elf_get_node(fs,value).x;
 			}
 			*/
 int i;
-for (i = 0; i < elf_varlen(z); i += 1) {
+for (i = 0; i < array_length(z); i += 1) {
 	elNodeId y = z[i];
 
 	elNodeId array = NO_NODE;
