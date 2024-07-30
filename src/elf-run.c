@@ -163,7 +163,7 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	file.nbytes = M->nbytes - fn.bytes;
 	file.contents = contents;
 	file.length = strlen(contents);
-	elf_varadd(M->files,file);
+	ARRAY_ADD(M->files,file);
 
 	elProto p = {0};
 	p.zstack = fn.nlocals;
@@ -204,7 +204,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	fl.contents = contents;
 	fl.length = strlen(contents);
 	fl.pathondisk = filename->c;
-	elf_varadd(M->files,fl);
+	ARRAY_ADD(M->files,fl);
 
 	elProto p = {0};
 	p.zstack = fn.nlocals;
@@ -326,7 +326,7 @@ int elf_run(elState *R) {
 	} break;
 	case BC_DELAY: {
 		/* todo: can we make this better */
-		elf_delaylist *delay = elf_alloc(lHEAP,sizeof(elf_delaylist));
+		elDelaylist *delay = elf_alloc(lHEAP,sizeof(elDelaylist));
 		delay->n = call->delay_list;
 		delay->j = call->tail;
 		call->delay_list = delay;

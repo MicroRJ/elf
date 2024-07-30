@@ -43,10 +43,10 @@ void *langM_debugrealloc(void *mem, elInteger contentssize, ldebugloc loca);
 void *langM_debugalloc(elInteger contentssize, ldebugloc loca);
 
 
-elf_api void elf_dealloc_(Alloc *allocator, void const *memory, ldebugloc loca);
-elf_api void *elf_realloc_(Alloc *allocator, elInteger size, void *memory, ldebugloc loca);
-elf_api void *elf_alloc_(Alloc *allocator, elInteger size, ldebugloc loca);
-elf_api void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
+elAPI void elf_dealloc_(Alloc *allocator, void const *memory, ldebugloc loca);
+elAPI void *elf_realloc_(Alloc *allocator, elInteger size, void *memory, ldebugloc loca);
+elAPI void *elf_alloc_(Alloc *allocator, elInteger size, ldebugloc loca);
+elAPI void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
 
 
 #define elf_dealloc(cator,mem) elf_dealloc_(cator,mem,LHERE)
@@ -56,8 +56,8 @@ elf_api void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
 
 
 #define ALLOCFN(NAME) elError NAME (Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca)
-elf_api ALLOCFN(elf_deftlsallocfn);
-elf_api ALLOCFN(elf_defglobalallocfn);
+elAPI ALLOCFN(elf_deftlsallocfn);
+elAPI ALLOCFN(elf_defglobalallocfn);
 
 
 /* todo: better names */

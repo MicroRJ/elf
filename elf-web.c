@@ -17,7 +17,7 @@ int main(int n, char **c) {
 	#if defined(_DEBUG)
 	sys_consolelog(ELF_LOGDBUG,"COMPILER CHECK:");
 	int *var = {0};
-	elf_varadd(var,1);
+	ARRAY_ADD(var,1);
 	if (var[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: var.add!\n");
 	if (array_length(var) != 1) sys_consolelog(ELF_LOGERROR,"FAILED: 'var.len!\n");
 	int arr[1] = {1};
@@ -34,12 +34,12 @@ struct {
 } elf_globaldecl elf = {{&elf.M}};
 
 
-elf_api void elf_global_initialize() {
+elAPI void elf_global_initialize() {
 	elf_runini(&elf.R,&elf.M);
 }
 
 
-elf_api int elf_global_loadcode(char *codename, char *contents) {
+elAPI int elf_global_loadcode(char *codename, char *contents) {
 	elValue *top = elf.R.top;
 	elString *name = elf_add_new_string(&elf.R,codename);
 	elFileState fs = {0};

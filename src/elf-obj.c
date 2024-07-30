@@ -46,63 +46,63 @@ elValueTag elf_object_type_to_value_tag(elObjType type) {
 }
 
 
-elf_api elValue elf_tab(elTable *tab) {
+elAPI elValue elf_tab(elTable *tab) {
 	elValue v = LITC(elValue){TAG_TAB};
 	v.x_tab = tab;
 	return v;
 }
 
 
-elf_api elValue elf_obj(elObject *obj) {
+elAPI elValue elf_obj(elObject *obj) {
 	elValue v = LITC(elValue){TAG_OBJ};
 	v.x_obj = obj;
 	return v;
 }
 
 
-elf_api elValue elf_binding_value(elBinding c) {
+elAPI elValue elf_binding_value(elBinding c) {
 	elValue v = LITC(elValue){TAG_BID};
 	v.c = c;
 	return v;
 }
 
 
-elf_api elValue elf_handle_value(elHandle h) {
+elAPI elValue elf_handle_value(elHandle h) {
 	elValue v = LITC(elValue){TAG_SYS};
 	v.x_sys = h;
 	return v;
 }
 
 
-elf_api elValue elf_string_value(elString *s) {
+elAPI elValue elf_string_value(elString *s) {
 	elValue v = LITC(elValue){TAG_STR};
 	v.x_str = s;
 	return v;
 }
 
 
-elf_api elValue elf_closure_value(elClosure *f) {
+elAPI elValue elf_closure_value(elClosure *f) {
 	elValue v = LITC(elValue){TAG_CLS};
 	v.x_cls = f;
 	return v;
 }
 
 
-elf_api elValue elf_integer_value(elInteger i) {
+elAPI elValue elf_integer_value(elInteger i) {
 	elValue v = (elValue){TAG_INT};
 	v.x_int = i;
 	return v;
 }
 
 
-elf_api elValue elf_number_value(elNumber n) {
+elAPI elValue elf_number_value(elNumber n) {
 	elValue v = (elValue){TAG_NUM};
 	v.x_num = n;
 	return v;
 }
 
 
-elf_api elValue elf_nil_value() {
+elAPI elValue elf_nil_value() {
 	elValue v = (elValue){TAG_NIL};
 	v.x_int = 0;
 	return v;
@@ -222,7 +222,7 @@ elInteger elf_free_phase(elState *R) {
 		if (it->color == GC_BLACK) {
 			it->color = GC_WHITE;
 			/* todo: instead simply ensure 'new_objects' is big enough */
-			elf_varadd(new_objects,it);
+			ARRAY_ADD(new_objects,it);
 		} else if (it->color == GC_WHITE) {
 			n += 1;
 			it->color = GC_RED;
@@ -288,6 +288,6 @@ void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 	obj->type  = type;
 	obj->tell  = tell;
 
-	elf_varadd(R->memory.objects,obj);
+	ARRAY_ADD(R->memory.objects,obj);
 	return obj;
 }

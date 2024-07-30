@@ -156,7 +156,7 @@ DEFSTUB(crtlib__execl)
 DEFSTUB(crtlib_system)
 #endif
 
-elf_api void crtlib_load(elState *rt) {
+elAPI void crtlib_load(elState *rt) {
 	elModule *md = rt->md;
 
 

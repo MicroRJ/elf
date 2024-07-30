@@ -12,7 +12,7 @@
 ** Usage is as follows:
 **
 ** T *items = 0;
-** elf_varadd(items,(T){});
+** ARRAY_ADD(items,(T){});
 **
 ** int i = elf_xarray_growby(items,5);
 ** items[i..i+5] == (T){}
@@ -48,9 +48,9 @@ typedef struct elArray {
 /* Seems that only msvc compiles this properly or
 am I trippin' ? */
 #if 0
-#define elf_varadd(var,t) ((void)(elf_varaddn(var,1)[0] = t))
+#define ARRAY_ADD(var,t) ((void)(elf_varaddn(var,1)[0] = t))
 #else
-#define elf_varadd(var,val) do {\
+#define ARRAY_ADD(var,val) do {\
 	elInteger ___i___ = elf_xarray_growby(var,1);\
 	var[___i___] = val;\
 } while(0)

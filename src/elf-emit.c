@@ -5,21 +5,6 @@
 */
 
 
-elMemoryRegion elf_enter_memory_region(elFileState *fs) {
-	elMemoryRegion restore = fs->memory_region;
-	if (restore.registry == elNil) restore.registry = fs->memory_region_registry;
-	fs->memory_region.registry = restore.registry + restore.length;
-	fs->memory_region.length = 0;
-	fs->memory_region_level ++;
-	return restore;
-}
-
-
-void elf_leave_memory_region(elFileState *fs, elMemoryRegion restore) {
-	fs->memory_region = restore;
-	fs->memory_region_level --;
-}
-
 
 elByteOP elf_node_to_byte(elNodeKi tt);
 
@@ -75,21 +60,9 @@ elNode elf_get_targetable_node(elFileState *fs, elNodeIdTypeGuard id) {
 
 elRegId elf_get_node_register(elFileState *fs, elNodeIdTypeGuard id) {
 	if (id.id == NO_NODE) return NO_SLOT;
-	// elf_ensure(id.id != NO_NODE);
 	elNode node = elf_get_targetable_node(fs,id);
-
-	/* unaffected by memory regions */
-	if ((node.kind == NODE_LOCAL)) {
+	if (node.kind == NODE_LOCAL) {
 		return node.x;
-	}
-
-	if (fs->memory_region_level > 0) {
-		elMemoryRegion mr = fs->memory_region;
-		for (int i = 0; i < mr.length; ++ i) {
-			if (mr.registry[i].node == id.id) {
-				return mr.registry[i].reg;
-			}
-		}
 	}
 	return NO_SLOT;
 }
@@ -118,9 +91,9 @@ elBytecode elf_emitter_get_byte(elFileState *fs, elByteId id) {
 elByteId elf_emitter_add_byte(elFileState *fs, elFileLine line, elBytecode byte) {
 	/* we just associate each byte with a line,
 	this is simple and is pretty great for debugging... */
-	elf_varadd(fs->M->lines,line);
-	elf_varadd(fs->M->bytes,byte);
-	elf_varadd(fs->M->track,0);
+	ARRAY_ADD(fs->M->lines,line);
+	ARRAY_ADD(fs->M->bytes,byte);
+	ARRAY_ADD(fs->M->track,0);
 	// elFileFnState *fn = fs->fn;
 	// elf_bytefpf(stdout,fs->M,-1,fs->M->nbytes-fn->bytes,byte);
 	return fs->M->nbytes ++;
@@ -332,10 +305,10 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileBoolExpr *js, elBool z, elReg
 
 			if (z != 0) {
 				j = elf_emitter_add_bytexy(fs,node.line,BC_JNZ,NO_JUMP,x);
-				elf_varadd(js->t,j);
+				ARRAY_ADD(js->t,j);
 			} else {
 				j = elf_emitter_add_bytexy(fs,node.line,BC_JZ,NO_JUMP,x);
-				elf_varadd(js->f,j);
+				ARRAY_ADD(js->f,j);
 			}
 		} break;
 	}
@@ -393,7 +366,7 @@ void elf_emit_continue(elFileState *fs, elFileLine line, elRegId with_value_regi
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
 
 	elByteId j = elf_emit_jump(fs,line,elf_get_last_byteid(fs));
-	elf_varadd(bl->loop.true_jumps,j);
+	ARRAY_ADD(bl->loop.true_jumps,j);
 }
 
 
@@ -406,7 +379,7 @@ void elf_emit_break(elFileState *fs, elFileLine line, elRegId with_value_registe
 		elf_emitter_add_block_flags(fs,BLOCK_ENDED);
 	}
 	elByteId j = elf_emit_jump(fs,line,elf_get_last_byteid(fs));
-	elf_varadd(bl->leavejumps,j);
+	ARRAY_ADD(bl->leavejumps,j);
 }
 
 /* Functions */
@@ -806,13 +779,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elf_emitter_local_load(fs,line,flags,target_register,y,v.x);
 		} break;
 		case NODE_REGION: {
-			elMemoryRegion restore = elf_enter_memory_region(fs);
-			elf_xarray_foreachi(v.z) {
-				elf_emitter_localize(fs,line,v.z[i]);
-			}
-			elf_ensure((y == 0) || (elf_get_node_kind(fs,v.x) != NODE_NONE));
-			elf_emitter_local_load(fs,line,flags,target_register,1,v.x);
-			elf_leave_memory_region(fs,restore);
+			elNOCODE;
 		} break;
 		case NODE_METAFIELD: {
 			UNUSED_CHECK;
@@ -902,7 +869,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elf_ensure(elf_get_node_kind(fs,xx) == NODE_INDEX);
 
 			elNodeId *z = {0};
-			elf_varadd(z,elf_get_node(fs,xx).y);
+			ARRAY_ADD(z,elf_get_node(fs,xx).y);
 
 			xx = elf_make_call_metafield_node(fs,line,elf_get_node(fs,xx).x,z,"idx");
 
@@ -1048,7 +1015,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 		}
 		elf_ensure(s->jz != 0);
 		int j = elf_emit_jump(fs,line,-1);
-		elf_varadd(s->j,j);
+		ARRAY_ADD(s->j,j);
 
 		elf_emitter_patch_jumplist(fs,s->jz);
 		elf_xarray_delete(s->jz);
@@ -1104,7 +1071,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elRegId x = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(id));
 			if (fs->fn->nyield < n) fs->fn->nyield = n;
 			elByteId j = elf_emitter_add_bytexyz(fs,line,BC_YIELD,NO_JUMP,x,n);
-			elf_varadd(fs->fn->yj,j);
+			ARRAY_ADD(fs->fn->yj,j);
 		/* if there are no results then simply leave directly */
 		} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
 		elf_set_memory_state(fs,regress);

@@ -249,17 +249,17 @@ elToken elf_lexone(elFileState *file) {
 
 		case '<': {
 			elf_movechr();
-			tk.type = TK_LESS_THAN;
+			tk.type = TK_LT;
 			if (elf_cmovchr('=')) {
-				tk.type = TK_LESS_THAN_EQUAL;
+				tk.type = TK_LTEQ;
 			} else
 			if (elf_cmovchr('<')) {
-				tk.type = TK_LEFT_SHIFT;
+				tk.type = TK_SHL;
 			}
 		} break;
-		case '>': { elf_movechr(); tk.type = TK_GREATER_THAN;
-			if (elf_cmovchr('=')) tk.type = TK_GREATER_THAN_EQUAL;
-			else if (elf_cmovchr('>')) tk.type = TK_RIGHT_SHIFT;
+		case '>': { elf_movechr(); tk.type = TK_GT;
+			if (elf_cmovchr('=')) tk.type = TK_GTEQ;
+			else if (elf_cmovchr('>')) tk.type = TK_SHR;
 		} break;
 		case '?': { elf_movechr(); tk.type = TK_QUESTION_MARK;
 			if (elf_cmovchr('?')) tk.type = TK_NIL_OR;
@@ -267,7 +267,7 @@ elToken elf_lexone(elFileState *file) {
 		} break;
 		case '!': { elf_movechr(); tk.type = TK_EXCLAMATION_MARK;
 			if (elf_cmovchr('!')) tk.type = TK_NIL_AND;
-			else if (elf_cmovchr('=')) tk.type = TK_NOT_EQUALS;
+			else if (elf_cmovchr('=')) tk.type = TK_NEQ;
 		} break;
 		case '*': { elf_movechr(); tk.type = TK_MUL;
 			if (elf_cmovchr('*')) tk.type = TK_POW;
@@ -284,7 +284,7 @@ elToken elf_lexone(elFileState *file) {
 
 		TK_XCASE2('|',TK_BIT_OR,'|',TK_LOG_OR);
 		TK_XCASE2('&',TK_BIT_AND,'&',TK_LOG_AND);
-		TK_XCASE2('=',TK_ASSIGN,'=',TK_EQUALS);
+		TK_XCASE2('=',TK_ASSIGN,'=',TK_EQ);
 
 		#undef TK_XCASE2
 
@@ -301,7 +301,7 @@ elToken elf_lexone(elFileState *file) {
 		TK_XCASE1('{',TK_CURLY_LEFT);
 		TK_XCASE1('}',TK_CURLY_RIGHT);
 		TK_XCASE1(',',TK_COMMA);
-		TK_XCASE1('%',TK_MODULUS);
+		TK_XCASE1('%',TK_MOD);
 		TK_XCASE1(':',TK_COLON);
 		TK_XCASE1('^',TK_BIT_XOR);
 		TK_XCASE1('-',TK_SUB);

@@ -5,22 +5,22 @@
 */
 
 
-elf_api int elf_get_num_args(elState *R) {
+elAPI int elf_get_num_args(elState *R) {
 	return R->call->nx;
 }
 
 
-elf_api elObject *elf_get_this(elState *R) {
+elAPI elObject *elf_get_this(elState *R) {
 	return R->call->obj;
 }
 
 
-elf_api elValueTag elf_get_tag(elState *R, elRegId x) {
+elAPI elValueTag elf_get_tag(elState *R, elRegId x) {
 	return R->call->locals[x].tag;
 }
 
 
-elf_api elValue elf_get_value(elState *R, elRegId x) {
+elAPI elValue elf_get_value(elState *R, elRegId x) {
 	return R->call->locals[x];
 }
 
@@ -30,7 +30,7 @@ void elf_expected(elState *S, elValueTag tag, elValueTag got, elRegId x) {
 }
 
 
-elf_api elString *elf_get_string(elState *R, elRegId x) {
+elAPI elString *elf_get_string(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
 	if (v.tag == TAG_STR) return v.x_str;
@@ -39,7 +39,7 @@ elf_api elString *elf_get_string(elState *R, elRegId x) {
 }
 
 
-elf_api char *elf_get_cstring(elState *R, elRegId x) {
+elAPI char *elf_get_cstring(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
 	if (v.tag == TAG_STR) return v.x_str->c;
@@ -48,7 +48,7 @@ elf_api char *elf_get_cstring(elState *R, elRegId x) {
 }
 
 
-elf_api elObject *elf_get_object(elState *R, elRegId x) {
+elAPI elObject *elf_get_object(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNil;
 	if (elf_isobj(v.tag)) return v.x_obj;
@@ -57,7 +57,7 @@ elf_api elObject *elf_get_object(elState *R, elRegId x) {
 }
 
 
-elf_api elTable *elf_get_table(elState *R, elRegId x) {
+elAPI elTable *elf_get_table(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_TAB) {
 		return v.x_tab;
@@ -66,7 +66,7 @@ elf_api elTable *elf_get_table(elState *R, elRegId x) {
 }
 
 
-elf_api void elf_checkcl(elState *R, elRegId x) {
+elAPI void elf_checkcl(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_CLS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected closure at local %i",x));
@@ -75,13 +75,13 @@ elf_api void elf_checkcl(elState *R, elRegId x) {
 }
 
 
-elf_api elClosure *elf_get_closure(elState *R, elRegId x) {
+elAPI elClosure *elf_get_closure(elState *R, elRegId x) {
 	elf_checkcl(R,x);
-	return R->call->locals[x].f;
+	return R->call->locals[x].x_cls;
 }
 
 
-elf_api elHandle elf_get_handle(elState *R, elRegId x) {
+elAPI elHandle elf_get_handle(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
 		elf_throw(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
@@ -91,7 +91,7 @@ elf_api elHandle elf_get_handle(elState *R, elRegId x) {
 }
 
 
-elf_api elInteger elf_get_integer(elState *R, int x) {
+elAPI elInteger elf_get_integer(elState *R, int x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NUM) return (elInteger) v.x_num;
 	if (v.tag == TAG_INT) return v.x_int;
@@ -100,7 +100,7 @@ elf_api elInteger elf_get_integer(elState *R, int x) {
 }
 
 
-elf_api elNumber elf_get_number(elState *R, elRegId x) {
+elAPI elNumber elf_get_number(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_INT) return (elNumber) v.i;
 	if (v.tag == TAG_NUM) return v.x_num;

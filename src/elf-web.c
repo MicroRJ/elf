@@ -4,7 +4,7 @@
 ** web lib
 */
 
-// elf_libfundecl elfem_()
+// elLIB elfem_()
 // run_script
 // run_script_int
 // run_script_string

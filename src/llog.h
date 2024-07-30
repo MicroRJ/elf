@@ -21,7 +21,7 @@ char *elf_logtostr(int);
 
 
 
-elf_api void elf_log_(int type, ldebugloc loc, char const *fmt, ...);
+elAPI void elf_log_(int type, ldebugloc loc, char const *fmt, ...);
 
 
 #define elf_log(TYPE,FORMAT,...) (LCHECKPRINTF(FORMAT,##__VA_ARGS__),elf_log_(TYPE,LHERE,FORMAT,##__VA_ARGS__))

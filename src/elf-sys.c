@@ -67,7 +67,7 @@ I want to use instead! */
 
 
 
-elf_api elBool sys_debugger() {
+elAPI elBool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
 	// fclose(_logging_io);
 	DebugBreak();
@@ -81,7 +81,7 @@ elf_api elBool sys_debugger() {
 }
 
 
-elf_api void sys_consolelog(int type, char *message) {
+elAPI void sys_consolelog(int type, char *message) {
 #if defined(PLATFORM_DESKTOP)
 	/* bruh */
 	elf_log(type,"%s",message);
@@ -102,7 +102,7 @@ elf_api void sys_consolelog(int type, char *message) {
 }
 
 
-elf_api int sys_getlasterror() {
+elAPI int sys_getlasterror() {
 #if defined(PLATFORM_DESKTOP)
 	return GetLastError();
 #else
@@ -111,7 +111,7 @@ elf_api int sys_getlasterror() {
 }
 
 
-elf_api void sys_geterrormsg(int error, char *buf, int len) {
+elAPI void sys_geterrormsg(int error, char *buf, int len) {
 #if defined(PLATFORM_DESKTOP)
 	if (error == 0) error = GetLastError();
 	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,0x00,error,LANG_USER_DEFAULT,buf,len,NULL);
@@ -119,7 +119,7 @@ elf_api void sys_geterrormsg(int error, char *buf, int len) {
 }
 
 
-elf_api void *sys_valloc(elInteger length) {
+elAPI void *sys_valloc(elInteger length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
@@ -128,7 +128,7 @@ elf_api void *sys_valloc(elInteger length) {
 }
 
 
-elf_api void sys_sleep(elInteger ms) {
+elAPI void sys_sleep(elInteger ms) {
 #if defined(PLATFORMPLATFORM_WIN32)
 	Sleep((DWORD) ms);
 #elif defined(PLATFORM_WEB)
@@ -137,7 +137,7 @@ elf_api void sys_sleep(elInteger ms) {
 }
 
 
-elf_api elInteger sys_clockhz() {
+elAPI elInteger sys_clockhz() {
 #if defined(PLATFORM_WEB)
 	return 1000;
 #elif defined(PLATFORM_DESKTOP)
@@ -150,7 +150,7 @@ elf_api elInteger sys_clockhz() {
 }
 
 
-elf_api elInteger sys_clocktime() {
+elAPI elInteger sys_clocktime() {
 #if defined(PLATFORM_DESKTOP)
 	LARGE_INTEGER largeInt;
 	QueryPerformanceCounter(&largeInt);
@@ -163,7 +163,7 @@ elf_api elInteger sys_clocktime() {
 }
 
 
-elf_api int sys_getmyname(int length, char *buffer) {
+elAPI int sys_getmyname(int length, char *buffer) {
 #if defined(PLATFORM_DESKTOP)
 	return GetModuleFileName(NULL,buffer,length);
 #else
@@ -172,7 +172,7 @@ elf_api int sys_getmyname(int length, char *buffer) {
 }
 
 
-elf_api int sys_getmypid() {
+elAPI int sys_getmypid() {
 #if defined(PLATFORM_DESKTOP)
 	return GetCurrentProcessId();
 #else
@@ -181,7 +181,7 @@ elf_api int sys_getmypid() {
 }
 
 
-elf_api int sys_getworkdir(int length, char *buffer) {
+elAPI int sys_getworkdir(int length, char *buffer) {
 #if defined(PLATFORM_DESKTOP)
 	return GetCurrentDirectory(length,buffer);
 #else
@@ -190,7 +190,7 @@ elf_api int sys_getworkdir(int length, char *buffer) {
 }
 
 
-elf_api int sys_changeworkdir(char *buffer) {
+elAPI int sys_changeworkdir(char *buffer) {
 #if defined(PLATFORM_DESKTOP) && defined(_WIN32)
 	return SetCurrentDirectory(buffer);
 #else
@@ -199,7 +199,7 @@ elf_api int sys_changeworkdir(char *buffer) {
 }
 
 
-elf_api elHandle sys_loadlib(char const *name) {
+elAPI elHandle sys_loadlib(char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (elHandle) LoadLibraryA(name);
 #elif defined(PLATFORM_WEB)
@@ -222,7 +222,7 @@ elf_api elHandle sys_loadlib(char const *name) {
 }
 
 
-elf_api void *sys_libfn(elHandle dll, char const *name) {
+elAPI void *sys_libfn(elHandle dll, char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (void *) GetProcAddress(dll,name);
 #else
@@ -231,7 +231,7 @@ elf_api void *sys_libfn(elHandle dll, char const *name) {
 }
 
 
-elf_api elError sys_load_file_contents(Alloc *allocfn, void **data, char const *name) {
+elAPI elError sys_load_file_contents(Alloc *allocfn, void **data, char const *name) {
 
 	elError error = Error_None;
 
@@ -298,7 +298,7 @@ elf_api elError sys_load_file_contents(Alloc *allocfn, void **data, char const *
 }
 
 
-elf_api elError sys_savefilebytes(char const *buffer, elInteger length, char const *fileName) {
+elAPI elError sys_savefilebytes(char const *buffer, elInteger length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");

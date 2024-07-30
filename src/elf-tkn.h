@@ -45,11 +45,11 @@ _(INDEX,"index") _(VALUE,"value") _(ARRAY,"array") _(FIELD,"field") _(ENDOFFILE,
 // leave GRID[ny,nx]
 //
 #define OPLIST(_) \
-_(POW,"**",12) _(MUL,"*",11) _(DIV,"/",11) _(MODULUS,"%",11) \
+_(POW,"**",12) _(MUL,"*",11) _(DIV,"/",11) _(MOD,"%",11) \
 _(ADD,"+",10) _(SUB,"-",10) \
-_(RIGHT_SHIFT,">>",9) _(LEFT_SHIFT,"<<",9) \
-_(LESS_THAN,"<",8) _(LESS_THAN_EQUAL,"<=",8) _(GREATER_THAN,">",8) _(GREATER_THAN_EQUAL,">=",8) \
-_(EQUALS,"==",7) _(NOT_EQUALS,"!=",7) \
+_(SHR,">>",9) _(SHL,"<<",9) \
+_(LT,"<",8) _(LTEQ,"<=",8) _(GT,">",8) _(GTEQ,">=",8) \
+_(EQ,"==",7) _(NEQ,"!=",7) \
 _(BIT_AND,"&",6) _(BIT_OR,"|",5) _(BIT_XOR,"^",4) \
 _(LOG_AND,"&&",3) _(LOG_OR,"||",2) \
 _(NIL_AND,"!!",3) _(NIL_OR,"??",2) \

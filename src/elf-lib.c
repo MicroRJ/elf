@@ -746,20 +746,20 @@ int elf_lib_pf(elState *S) {
 }
 
 
-elf_api int elflib_sleep(elState *rt) {
+elAPI int elflib_sleep(elState *rt) {
 	elf_ensure(rt->f->x == 1);
 	sys_sleep(elf_get_integer(rt,0));
 	return 0;
 }
 
 
-elf_api int elflib_clocktime(elState *rt) {
+elAPI int elflib_clocktime(elState *rt) {
 	elf_add_integer(rt,sys_clocktime());
 	return 1;
 }
 
 
-elf_api int elf_lib_timediffs(elState *S) {
+elAPI int elf_lib_timediffs(elState *S) {
 	elf_ensure(elf_get_num_args(S) == 1);
 	elInteger time = elf_get_integer(S,0);
 	elf_add_number(S,elf_timediffs(time));
@@ -767,7 +767,7 @@ elf_api int elf_lib_timediffs(elState *S) {
 }
 
 
-elf_api int elf_lib_timediffms(elState *S) {
+elAPI int elf_lib_timediffms(elState *S) {
 	elf_ensure(elf_get_num_args(S) == 1);
 	elInteger time = elf_get_integer(S,0);
 	elf_add_number(S,elf_timediffms(time));
@@ -795,7 +795,7 @@ elBool elf_is_virtual_file_name(char const *fn) {
 }
 
 
-elf_api int elf_lib_get_disk_info(elState *R) {
+elAPI int elf_lib_get_disk_info(elState *R) {
 	DWORD SectorsPerCluster;
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
@@ -810,7 +810,7 @@ elf_api int elf_lib_get_disk_info(elState *R) {
 }
 
 
-elf_api int elf_lib_list_volumes(elState *R) {
+elAPI int elf_lib_list_volumes(elState *R) {
 
 	elTable *list = elf_add_new_table(R); /* <- */
 
@@ -846,7 +846,7 @@ elf_api int elf_lib_list_volumes(elState *R) {
 
 
 void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir);
-elf_api int elf_lib_list_folder(elState *R) {
+elAPI int elf_lib_list_folder(elState *R) {
 	elf_ensure(elf_get_num_args(R) > 0);
 	elString *dir = elf_get_string(R,0);
 	elInteger level = 0;
@@ -945,7 +945,7 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 }
 
 
-elf_api int elf_lib_enumerate_directory(elState *R) {
+elAPI int elf_lib_enumerate_directory(elState *R) {
 	elf_ensure(R->frame->x == 2);
 	/* push these keys temporarily so they won't
 	be gc'd and also to to avoid creating them so often  */
@@ -995,7 +995,7 @@ int elflib_unload(elState *S) {
 }
 
 
-elf_api void elflib_loadall(elState *R) {
+elAPI void elflib_loadall(elState *R) {
 	elf_register_integer(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
 	elf_register_string(R,"elf.PLATFORM","WEB");

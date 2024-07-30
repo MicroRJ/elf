@@ -302,7 +302,7 @@ elInteger elf_tabiadd(elTable *table, elValue v) {
 
 
 void elf_table_add(elTable *table, elValue v) {
-	elf_varadd(table->array,v);
+	ARRAY_ADD(table->array,v);
 }
 
 
@@ -791,7 +791,7 @@ int elf_table_libfn_xmerge(elState *R) {
 	elTable *merger = elf_get_table(R,0);
 	elInteger i;
 	for (i=0;i<array_length(merger->array);++i) {
-		elf_varadd(tab->array,merger->array[i]);
+		ARRAY_ADD(tab->array,merger->array[i]);
 	}
 	return 0;
 }
@@ -803,7 +803,7 @@ int elf_table_libfn_xclone(elState *R) {
 	elTable *clone = elf_new_table(R);
 	elInteger i;
 	for ( i = 0; i < array_length(tab->array); i += 1 ) {
-		elf_varadd(clone->array,tab->array[i]);
+		ARRAY_ADD(clone->array,tab->array[i]);
 	}
 	elf_add_table(R,clone);
 	return 1;
