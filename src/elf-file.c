@@ -507,7 +507,7 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 			elNodeId y = elf_load_file_expr(fs,0);
 			y = elf_make_binary_node(fs,op.line,elf_token_to_node(op.type),elf_get_node_type(fs,x),x,y);
 
-			elf_check_store(fs,fs->lasttk.line,x,y);
+			elf_check_store(fs,fs->last_token.line,x,y);
 			elf_emitter_emit_store(fs,op.line,x,y);
 		} else {
 			elf_emitter_local_load(fs,NO_LINE,0,NO_SLOT,0,lhs);
