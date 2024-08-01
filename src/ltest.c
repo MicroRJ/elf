@@ -37,7 +37,7 @@
 // int testlib_disasm(elState *c) {
 // 	elModule *md = c->md;
 // 	elClosure *cl = elf_get_closure(c,0);
-// 	elProto p = cl->fn;
+// 	elFileProto p = cl->fn;
 // 	char file[BUFFER];
 // 	elf_clear_memory(file,sizeof(file));
 // 	int j;

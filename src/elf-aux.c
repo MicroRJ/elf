@@ -148,7 +148,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, elByteId byte_lo
 
 void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 
-	elf_ensure(level > -1);
+	elASSERT(level > -1);
 
 	/* Don't show the first root call frame
 	(which is the one without a caller) because that'll
@@ -156,7 +156,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	function/file, which is irrelevant */
 	if (call->caller == elNil) return;
 
-	elf_ensure(level > 0);
+	elASSERT(level > 0);
 
 	elf_dump_byte_trace(S,call->caller,level-1);
 

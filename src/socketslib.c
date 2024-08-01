@@ -56,7 +56,7 @@ elAPI int netlib_pollclient(elState *R) {
 	int result = select(0,&ready,NULL,NULL,&timeout);
    if (FD_ISSET(handle,&ready)) {
       SOCKET client = accept(handle,NULL,NULL);
-      elf_ensure(client != INVALID_SOCKET);
+      elASSERT(client != INVALID_SOCKET);
 		elf_pushsys(R,(elHandle)client);
    } else eld_add_nil(R);
 	return 1;
@@ -156,7 +156,7 @@ elAPI int netlib_recv(elState *R) {
 					/* connection closed gracefully, simply break */
 					break;
 				} else {
-					elf_ensure(result > 0);
+					elASSERT(result > 0);
 					length -= result;
 					cursor += result;
 				}

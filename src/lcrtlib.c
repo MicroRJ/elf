@@ -135,7 +135,7 @@ int crtlib_system(elState *rt) {
 
 #define DEFSTUB(NAME) \
 int NAME(elState *R) {\
-	elf_logerror(XSTRINGIFY(NAME)"(): not implemented for this platform");\
+	elf_logerror(elTOTEXT(NAME)"(): not implemented for this platform");\
 	return 0;\
 }
 

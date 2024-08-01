@@ -125,7 +125,7 @@ elRegId elf_add_value(elState *R, elValue v) {
 
 #define _INC_TOP do {\
 	elRegId __i = R->top ++ - R->stk;\
-	elf_ensure(__i < R->stklen);\
+	elASSERT(__i < R->stklen);\
 } while(0)
 
 
@@ -201,13 +201,13 @@ elObject *elf_add_object(elState *R, elObject *obj) {
 }
 
 
-elObject *elf_pushnewobj(elState *R, elInteger tell) {
+elObject *elf_add_new_object(elState *R, elInteger tell) {
 	return elf_add_object(R,elf_new_object(R,OBJ_CUSTOM,tell));
 }
 
 
 elTable *elf_add_table(elState *R, elTable *tab) {
-	elf_ensure(tab->obj.color != GC_RED);
+	elASSERT(tab->obj.color != GC_RED);
 	R->top->tag = TAG_TAB;
 	R->top->x_tab = tab;
 	_INC_TOP;
@@ -228,13 +228,3 @@ elRegId elf_pushbinding(elState *R, elBinding b) {
 	return id;
 }
 
-
-elRegId elf_pushnewcls(elState *R, elProto fn) {
-	elClosure *cl = elf_new_closure(R,fn);
-	R->top -= fn.zcache;
-	int i;
-	for (i=0; i<fn.zcache; ++i) {
-		cl->enclosure[i] = R->top[i];
-	}
-	return elf_add_closure(R,cl);
-}

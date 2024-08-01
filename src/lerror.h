@@ -15,17 +15,17 @@
 
 #define ERNAME(xx) (lErrorNames[xx])
 
-typedef enum elError {
+enum {
 	Error_None = 0,
 
 #define ERROR_XITEM(NAME,DESC) Error_##NAME,
 	#include LERROR
 #undef ERROR_XITEM
 
-} elError;
+};
 
 
-elf_globaldecl char const *lErrorNames[] = {
+elGLOBAL char const *lErrorNames[] = {
 	"No elError",
 
 #define ERROR_XITEM(NAME,DESC) DESC,

@@ -13,7 +13,7 @@ void elf_runini(elState *R, elModule *M) {
 	R->M = M;
 	R->bytelogging = false;
 	R->stack_length = 4096;
-	R->stack = elf_clear_alloc(lHEAP,sizeof(elValue)*R->stack_length);
+	R->stack = elf_clear_alloc(elHEAP_ALLOCATOR,sizeof(elValue)*R->stack_length);
 	R->stack_top = R->stack;
 	R->metatables.string = elf_new_string_metatable(R);
 	R->metatables.table = elf_new_table_metatable(R);
@@ -66,7 +66,7 @@ int elf_call_function(elState *R, elRegId rxy, int nx, int ny) {
 
 int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, int nx, int ny) {
 	elStackFrame *caller = R->call;
-	// elf_ensure((R->top-caller->locals)+caller->cl->fn.zstack-1 > rx);
+	// elASSERT((R->top-caller->locals)+caller->cl->fn.nlocals-1 > rx);
 	elValue *locals = caller->locals + rx;
 	/* top always points to one past locals,
 	so far we only have nx argument locals,
@@ -86,7 +86,7 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, i
 		call.cl = fn.f;
 		/* increment top to fill the function's locals */
 		/* todo: replace with faster memset? */
-		for (; nx < call.cl->fn.zstack; ++ nx) {
+		for (; nx < call.cl->nlocals; ++ nx) {
 			top->tag = TAG_NIL;
 			top->i   = 0;
 			top ++;
@@ -126,7 +126,7 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, i
 	R->call = caller;
 	R->top = call.top;
 	R->call_level --;
-	elf_ensure(R->call_level > -1);
+	elASSERT(R->call_level > -1);
 	return nyield;
 }
 
@@ -165,8 +165,8 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	file.length = strlen(contents);
 	ARRAY_ADD(M->files,file);
 
-	elProto p = {0};
-	p.zstack = fn.nlocals;
+	elFileProto p = {0};
+	p.nlocals = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
@@ -206,8 +206,8 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	fl.pathondisk = filename->c;
 	ARRAY_ADD(M->files,fl);
 
-	elProto p = {0};
-	p.zstack = fn.nlocals;
+	elFileProto p = {0};
+	p.nlocals = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
@@ -218,7 +218,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 
 int elf_loadfilefs(elState *R, elFileState *fs, elString *name, elRegId x, int y) {
 	char *contents;
-	elError error = sys_load_file_contents(lHEAP,(void**)&contents,name->c);
+	elError error = sys_load_file_contents(elHEAP_ALLOCATOR,(void**)&contents,name->c);
 	if (elFAILED(error)) {
 		elf_logerror("'%s': could not load file",name->c);
 		return -1;
@@ -285,16 +285,16 @@ int elf_run(elState *R) {
 	//
 	elModule *M = R->M;
 	elStackFrame *call = R->call;
-	elClosure *cl = call->cl;
-	elProto fn = cl->fn;
 	elStackFrame *caller = call->caller;
 	elValue *locals = call->locals;
-	elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
+	elValue *values = call->cls->values;
+	elFileProto proto = call->cls->proto;
+	elASSERT(elINRANGE((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); //  1024 is some arbitrary to detect extraneous errors
 
-	while (call->tail < fn.nbytes) {
+	while (call->tail < proto.nbytes) {
 		/* todo: call->tail is redundant ... */
 		elInteger jp = call->tail ++;
-		elInteger bc = fn.bytes + jp;
+		elInteger bc = proto.bytes + jp;
 		R->byte = bc;
 
 		elBytecode b = md->bytes[bc];
@@ -326,16 +326,16 @@ int elf_run(elState *R) {
 	} break;
 	case BC_DELAY: {
 		/* todo: can we make this better */
-		elDelaylist *delay = elf_alloc(lHEAP,sizeof(elDelaylist));
+		elDelaylist *delay = elf_alloc(elHEAP_ALLOCATOR,sizeof(elDelaylist));
 		delay->n = call->delay_list;
 		delay->j = call->tail;
 		call->delay_list = delay;
 
-		elf_ensure(b.i >= 0);
+		elASSERT(b.i >= 0);
 		call->tail = jp + b.i;
 	} break;
 	case BC_YIELD: {
-		elf_ensure(b.x >= 0);
+		elASSERT(b.x >= 0);
 		/* check that we don't exceed number of
 		expected outputs */
 		int ny = MIN(b.z,call->ny);
@@ -419,19 +419,19 @@ int elf_run(elState *R) {
 		locals[b.x].n   = md->kn[b.y];
 	} break;
 	case BC_LOADCACHE: {
-		elf_ensure(b.y >= 0 && b.y < fn.zcache);
-		locals[b.x] = cl->enclosure[b.y];
+		elASSERT(elINRANGE(b.y,0,proto.nvalues));
+		locals[b.x] = values[b.y];
 	} break;
 	case BC_CLOSURE: {
-		elf_ensure(b.y >= 0 && b.y < array_length(md->prototypes));
-		elProto proto = md->prototypes[b.y];
+		elASSERT(elINRANGE(b.y,0,array_length(M->prototypes)));
+		elFileProto proto = M->prototypes[b.y];
 		elClosure *new_closure = elf_new_closure(R,proto);
-		for (int i = 0; i < proto.zcache; ++i) {
-			new_closure->enclosure[i] = locals[b.x+i];
+		// elf_memcopy(new_closure->values,locals + b.x, sizeof(elValue) * proto.nvalues);
+		for (int i = 0; i < proto.nvalues; ++i) {
+			new_closure->values[i] = locals[b.x+i];
 		}
-		locals[b.x].tag = TAG_CLS;
+		locals[b.x].tag   = TAG_CLS;
 		locals[b.x].x_cls = new_closure;
-		// ncl->obj.gccolor = GC_WHITE;
 	} break;
 	case BC_TABLE: {
 		/* ensure objects are created, then the
@@ -439,7 +439,7 @@ int elf_run(elState *R) {
 		gc could trigger in between and think the
 		local is some other type */
 		elTable *tab = elf_new_table(R);
-		elf_ensure(tab->obj.color != GC_RED);
+		elASSERT(tab->obj.color != GC_RED);
 		locals[b.x].tag = TAG_TAB;
 		locals[b.x].x_tab = tab;
 	} break;
@@ -587,11 +587,11 @@ int elf_run(elState *R) {
 
 	case BC_METACALL: {
 		elf_callex(R,locals[b.x].x_obj,b.x+1,b.x,b.y,b.z);
-		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
+		elASSERT(elINRANGE((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); // 1024 is just some arbitrary value to detect extraneous errors...
 	} break;
 	case BC_CALL: {
 		elf_call_function(R,b.x,b.y,b.z);
-		elf_ensure((elInteger)(R->top - locals) >= fn.zstack);
+		elASSERT(elINRANGE((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); // 1024 is just some arbitrary value to detect extraneous errors...
 	} break;
 	case BC_ISNIL: {
 		elValue x = locals[b.y];
@@ -628,7 +628,7 @@ int elf_run(elState *R) {
 			if (!elf_isnumeric(yy.tag)) elf_throw(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 			locals[b.x].tag   = TAG_INT;
 			locals[b.x].x_int = pow(elf_toint(xx),elf_toint(yy));
-		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));
+		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));
 	} break;
 	case BC_MOD: {
 		elValue xx = locals[b.y];
@@ -653,7 +653,7 @@ int elf_run(elState *R) {
 			locals[b.x].tag   = TAG_INT;
 			locals[b.x].x_int = elf_toint(xx) % elf_toint(yy);
 
-		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));
+		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));
 	} break;
 	/* todo: make this better */
 	#define CASE_IBOP(OPNAME,OP) \
@@ -687,7 +687,7 @@ int elf_run(elState *R) {
 			if (b.k == BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 			locals[b.x].tag = TAG_INT;\
 			locals[b.x].x_int = elf_toint(xx) OP elf_toint(yy);\
-		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XSTRINGIFY(OP)));\
+		} else elf_throw(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));\
 	} break
 	case BC_LTEQ: {
 		elValue xx = locals[b.y];

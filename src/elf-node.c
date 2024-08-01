@@ -11,19 +11,19 @@ elNode elf_get_node(elFileState *fs, elNodeId id) {
 
 
 elNodeKi elf_get_node_kind(elFileState *fs, elNodeId id) {
-	elf_ensure(id != NO_SLOT);
+	elASSERT(id != NO_SLOT);
 	return fs->nodes[id].kind;
 }
 
 
 elNodeTy elf_get_node_type(elFileState *fs, elNodeId id) {
-	elf_ensure(id != NO_SLOT);
+	elASSERT(id != NO_SLOT);
 	return fs->nodes[id].type;
 }
 
 
 elFileLine elf_get_node_line(elFileState *fs, elNodeId id) {
-	elf_ensure(id != NO_SLOT);
+	elASSERT(id != NO_SLOT);
 	return fs->nodes[id].line;
 }
 
@@ -162,6 +162,11 @@ elNodeId elf_make_closure_value_node(elFileState *fs, elFileLine line, elRegId x
 
 elNodeId elf_make_register_node(elFileState *fs, elFileLine line, elRegId x) {
 	return elf_make_node_unary(fs,line,NODE_LOCAL,NT_ANY,x);
+}
+
+
+elNodeId elf_make_special_register_node(elFileState *fs, elFileLine line, elRegId x) {
+	return elf_make_node_unary(fs,line,NODE_SPECIAL_REGISTER,NT_ANY,x);
 }
 
 

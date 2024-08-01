@@ -41,24 +41,20 @@ elInteger get_index_entry(elTable *tab, elInteger index) {
 }
 
 elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *thru, elObjectTracePath path) {
-
 	if (elf_table_set(visited,elf_obj(thru),elf_obj(thru))) {
 		return 0;
 	}
-
 	elInteger traces = 0;
 	if (thru == obj) {
 		elf_debug_log("object found through: ");
 		print_object_trace(path); printf("\n");
 		traces = 1;
 	} else if (thru->type == OBJ_CLOSURE) {
-		elObjectTracePath child = { &path, "closure.enclosure" };
-
+		elObjectTracePath child = { &path, "closure.values" };
 		elClosure *cls = (elClosure *) thru;
-		elInteger k;
-		for (k = 0; k < cls->prototype.zcache; k += 1) {
-			if (elf_isobj(cls->enclosure[k].tag)) {
-				traces += elf_trace_object(S,visited,obj,cls->enclosure[k].x_obj,child);
+		FOR_RANGE(k,0,cls->nlocals) {
+			if (elf_isobj(cls->values[k].tag)) {
+				traces += elf_trace_object(S,visited,obj,cls->values[k].x_obj,child);
 			}
 		}
 	} else if (thru->type == OBJ_TAB) {
@@ -582,7 +578,7 @@ int elflib_exec(elState *R) {
 
 
 int elf_lib_fopen(elState *R) {
-	elf_ensure(R->call->nx == 2);
+	elASSERT(R->call->nx == 2);
 	char *name = elf_get_cstring(R,0);
 	char *flags = elf_get_cstring(R,1);
 	FILE *file = fopen(name,flags);
@@ -592,7 +588,7 @@ int elf_lib_fopen(elState *R) {
 
 
 int elf_lib_fclose(elState *R) {
-	elf_ensure(R->call->nx == 1);
+	elASSERT(R->call->nx == 1);
 	elHandle file = elf_get_handle(R,0);
 	fclose(file);
 	return 0;
@@ -712,8 +708,8 @@ int elflib_fpf(elState *S) {
 }
 
 
-elf_globaldecl int pf_indent;
-elf_globaldecl int pf_char;
+elGLOBAL int pf_indent;
+elGLOBAL int pf_char;
 int elf_lib_pf_indent(elState *S) {
 	pf_indent = elf_get_integer(S,0);
 	elf_add_integer(S,pf_indent);
@@ -747,7 +743,7 @@ int elf_lib_pf(elState *S) {
 
 
 elAPI int elflib_sleep(elState *rt) {
-	elf_ensure(rt->f->x == 1);
+	elASSERT(rt->f->x == 1);
 	sys_sleep(elf_get_integer(rt,0));
 	return 0;
 }
@@ -760,7 +756,7 @@ elAPI int elflib_clocktime(elState *rt) {
 
 
 elAPI int elf_lib_timediffs(elState *S) {
-	elf_ensure(elf_get_num_args(S) == 1);
+	elASSERT(elf_get_num_args(S) == 1);
 	elInteger time = elf_get_integer(S,0);
 	elf_add_number(S,elf_timediffs(time));
 	return 1;
@@ -768,7 +764,7 @@ elAPI int elf_lib_timediffs(elState *S) {
 
 
 elAPI int elf_lib_timediffms(elState *S) {
-	elf_ensure(elf_get_num_args(S) == 1);
+	elASSERT(elf_get_num_args(S) == 1);
 	elInteger time = elf_get_integer(S,0);
 	elf_add_number(S,elf_timediffms(time));
 	return 1;
@@ -847,7 +843,7 @@ elAPI int elf_lib_list_volumes(elState *R) {
 
 void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir);
 elAPI int elf_lib_list_folder(elState *R) {
-	elf_ensure(elf_get_num_args(R) > 0);
+	elASSERT(elf_get_num_args(R) > 0);
 	elString *dir = elf_get_string(R,0);
 	elInteger level = 0;
 	if (elf_get_num_args(R) > 1) {
@@ -946,7 +942,7 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 
 
 elAPI int elf_lib_enumerate_directory(elState *R) {
-	elf_ensure(R->frame->x == 2);
+	elASSERT(R->frame->x == 2);
 	/* push these keys temporarily so they won't
 	be gc'd and also to to avoid creating them so often  */
 

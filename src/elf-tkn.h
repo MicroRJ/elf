@@ -66,9 +66,9 @@ _(PAREN_LEFT,"(") _(PAREN_RIGHT,")") \
 
 typedef enum elTokenType {
 	TK_NONE = 0,
-#define TKITEM(NAME,_) XFUSE(TK_,NAME),
-#define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
-#define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
+#define TKITEM(NAME,_) elFUSE(TK_,NAME),
+#define OPITEM(NAME,_,__) elFUSE(TK_,NAME),
+#define MCITEM(NAME,_) elFUSE(TK_M_,NAME),
 	KWLIST(TKITEM)
 	MCLIST(MCITEM)
 	TKLIST(TKITEM)
@@ -80,7 +80,7 @@ typedef enum elTokenType {
 
 
 elTokenType elf_is_word_or_macro(char *name) {
-	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return XFUSE(TK_M_,NAME);
+	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_M_,NAME);
 		MCLIST(MCITEM)
 	#undef MCITEM
 	return TK_WORD;
@@ -88,7 +88,7 @@ elTokenType elf_is_word_or_macro(char *name) {
 
 
 elTokenType elf_is_word_or_keyword(char *name) {
-	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return XFUSE(TK_,NAME);
+	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_,NAME);
 		KWLIST(KWITEM)
 	#undef KWITEM
 	return TK_WORD;
@@ -100,7 +100,7 @@ typedef struct ltokenintel {
 	char prec;
 } ltokenintel;
 
-elf_globaldecl ltokenintel elf_tkintel[] = {
+elGLOBAL ltokenintel elf_tkintel[] = {
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},

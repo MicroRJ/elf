@@ -78,7 +78,7 @@ _(BIT_XOR, XYZ, "xor") _(BIT_OR, XYZ, "or") \
 _(BIT_AND, XYZ, "and") \
 _(MOD, XYZ, "mod") _(POW, XYZ, "pow")
 
-#define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),
+#define BCITEM(NAME,MODE,SYM) elFUSE(BC_,NAME),
 
 typedef enum elByteOP {
 	BCLIST(BCITEM)
@@ -100,7 +100,7 @@ typedef struct elBytecode {
 
 
 elByteClass elf_get_byte_class(elByteOP k) {
-#define BCITEM(NAME,FMT,__) case XFUSE(BC_,NAME): return XFUSE(BC_CLASS_,FMT);
+#define BCITEM(NAME,FMT,__) case elFUSE(BC_,NAME): return elFUSE(BC_CLASS_,FMT);
 	switch (k) {
 		BCLIST(BCITEM)
 		default: elNOCODE;
@@ -111,7 +111,7 @@ elByteClass elf_get_byte_class(elByteOP k) {
 
 
 char const *elf_get_byte_label(elByteOP k) {
-#define BCITEM(NAME,_,SYM) case XFUSE(BC_,NAME): return SYM;
+#define BCITEM(NAME,_,SYM) case elFUSE(BC_,NAME): return SYM;
 	switch (k) {
 		BCLIST(BCITEM)
 		default: elNOCODE;

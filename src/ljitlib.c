@@ -14,7 +14,7 @@
 /* -- Clearly, this isn't how you
 - do jitting, this is just me playing
 - around */
-elBinding jit(elModule *md, elProto fn);
+elBinding jit(elModule *md, elFileProto fn);
 int jitlib_jit(elState *rt) {
 	elValue v = elf_loadfilefs(rt,0);
 	elBinding b = jit(rt->md,v.f->fn);

@@ -31,7 +31,7 @@ struct {
 	elState R;
 	elModule M;
 	elStackFrame C;
-} elf_globaldecl elf = {{&elf.M}};
+} elGLOBAL elf = {{&elf.M}};
 
 
 elAPI void elf_global_initialize() {

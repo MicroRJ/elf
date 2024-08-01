@@ -47,42 +47,42 @@ elValueTag elf_object_type_to_value_tag(elObjType type) {
 
 
 elAPI elValue elf_tab(elTable *tab) {
-	elValue v = LITC(elValue){TAG_TAB};
+	elValue v = elLITERAL(elValue){TAG_TAB};
 	v.x_tab = tab;
 	return v;
 }
 
 
 elAPI elValue elf_obj(elObject *obj) {
-	elValue v = LITC(elValue){TAG_OBJ};
+	elValue v = elLITERAL(elValue){TAG_OBJ};
 	v.x_obj = obj;
 	return v;
 }
 
 
 elAPI elValue elf_binding_value(elBinding c) {
-	elValue v = LITC(elValue){TAG_BID};
+	elValue v = elLITERAL(elValue){TAG_BID};
 	v.c = c;
 	return v;
 }
 
 
 elAPI elValue elf_handle_value(elHandle h) {
-	elValue v = LITC(elValue){TAG_SYS};
+	elValue v = elLITERAL(elValue){TAG_SYS};
 	v.x_sys = h;
 	return v;
 }
 
 
 elAPI elValue elf_string_value(elString *s) {
-	elValue v = LITC(elValue){TAG_STR};
+	elValue v = elLITERAL(elValue){TAG_STR};
 	v.x_str = s;
 	return v;
 }
 
 
 elAPI elValue elf_closure_value(elClosure *f) {
-	elValue v = LITC(elValue){TAG_CLS};
+	elValue v = elLITERAL(elValue){TAG_CLS};
 	v.x_cls = f;
 	return v;
 }
@@ -109,6 +109,15 @@ elAPI elValue elf_nil_value() {
 }
 
 
+elAPI elClosure *elf_new_closure(elState *S, elFileProto proto) {
+	elClosure *cls = (elClosure *) elf_new_object(S,OBJ_CLOSURE,sizeof(elClosure) + sizeof(elValue) * (proto.nlocals-1));
+	cls->proto = proto;
+	elASSERT(cls->nlocals == proto.nlocals); // future-proofing
+	elASSERT(cls->nvalues == proto.nvalues); // future-proofing
+	return cls;
+}
+
+
 /*
 ** If an object is white it marks it black
 ** and marks its references.
@@ -117,8 +126,8 @@ elAPI elValue elf_nil_value() {
 ** If white, 1 + references.
 */
 elInteger elf_mark_object(elObject *obj) {
-	elf_ensure(obj != 0);
-	elf_ensure(obj->color != GC_RED);
+	elASSERT(obj != 0);
+	elASSERT(obj->color != GC_RED);
 	/* black object simply means it was
 	already marked and we found another
 	path to it, since the object was
@@ -130,7 +139,12 @@ elInteger elf_mark_object(elObject *obj) {
 	/* Here we check whether the object
 	is explicitly white, because there
 	are other colors that we don't want
-	to get rid of */
+	to get rid of, I suppose we don't
+	propagate pink because if the object
+	were to not become pink anymore we'd
+	have to also propagate those changes
+	latter... Pink objecs are rare though...
+	I think we only use them for debugging... */
 	if (obj->color == GC_WHITE) {
 		obj->color = GC_BLACK;
 	}
@@ -139,10 +153,9 @@ elInteger elf_mark_object(elObject *obj) {
 	}
 	if (obj->type == OBJ_CLOSURE) {
 		elClosure *cls = (elClosure*) obj;
-		elInteger k;
-		for (k=0; k<cls->prototype.zcache; ++k) {
-			if (elf_isobj(cls->enclosure[k].tag)) {
-				num += elf_mark_object(cls->enclosure[k].x_obj);
+		FOR_RANGE(i, 0, cls->nlocals) {
+			if (elf_isobj(cls->values[i].tag)) {
+				num += elf_mark_object(cls->values[i].x_obj);
 			}
 		}
 	} else if (obj->type == OBJ_TAB) {
@@ -188,7 +201,7 @@ elInteger elf_unmark_objects(elState *R) {
 
 
 elInteger elf_hold_phase(elState *R) {
-	elf_ensure(R->memory.phase == elGC_PHASE_HOLD);
+	elASSERT(R->memory.phase == elGC_PHASE_HOLD);
 	R->memory.phase ^= 1;
 
 	elInteger num = elf_mark_object((elObject*)R->M->globals);
@@ -203,7 +216,7 @@ elInteger elf_hold_phase(elState *R) {
 
 
 elInteger elf_free_phase(elState *R) {
-	elf_ensure(R->memory.phase == elGC_PHASE_FREE);
+	elASSERT(R->memory.phase == elGC_PHASE_FREE);
 	R->memory.phase ^= 1;
 
 
@@ -230,7 +243,7 @@ elInteger elf_free_phase(elState *R) {
 			if (it->type == OBJ_TAB) {
 				elf_dealloc_table((elTable*)it);
 			}
-			elf_dealloc(lHEAP,it);
+			elf_dealloc(elHEAP_ALLOCATOR,it);
 		} else n += 1;
 	}
 	R->memory.objects = new_objects;
@@ -280,7 +293,7 @@ void *elf_new_object(elState *R, elObjType type, elInteger tell) {
 	R->memory.allocated += tell;
 	elf_collect(R);
 
-	elObject *obj = elf_clear_alloc(lHEAP,tell);
+	elObject *obj = elf_clear_alloc(elHEAP_ALLOCATOR,tell);
 	obj->color = (elGCColor) R->memory.phase;
 	if (obj->color != GC_WHITE) {
 		elf_throw(R,NO_BYTE,"object allocation out of phase");

@@ -50,11 +50,11 @@ elTable *elf_new_table_of_length(elState *R, elInteger ntotal) {
 	elTable *table = elf_new_object(R,OBJ_TAB,sizeof(elTable));
 	table->obj.metatable = R->metatables.table;
 	/* What if this is the first table... */
-	// elf_ensure(!! table->obj.metatable);
+	// elASSERT(!! table->obj.metatable);
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
-	table->slots = elf_clear_alloc(lHEAP,ntotal*sizeof(elEntry));
+	table->slots = elf_clear_alloc(elHEAP_ALLOCATOR,ntotal*sizeof(elEntry));
 	return table;
 }
 
@@ -65,7 +65,7 @@ elTable *elf_new_table(elState *R) {
 
 
 void elf_dealloc_table(elTable *tab) {
-	elf_dealloc(lHEAP,tab->slots);
+	elf_dealloc(elHEAP_ALLOCATOR,tab->slots);
 	elf_xarray_delete(tab->array);
 	tab->array = 0;
 	tab->slots = 0;
@@ -179,7 +179,7 @@ void elf_check_table(elTable *table) {
 		elTable new_table = * table;
 		new_table.ntotal = table->ntotal << 2;
 		if (new_table.ntotal < table->ntotal) elNOCODE;
-		new_table.slots = elf_clear_alloc(lHEAP,new_table.ntotal * sizeof(elEntry));
+		new_table.slots = elf_clear_alloc(elHEAP_ALLOCATOR,new_table.ntotal * sizeof(elEntry));
 
 		for (int i = 0; i < table->ntotal; ++ i) {
 			elEntry slot = table->slots[i];
@@ -191,7 +191,7 @@ void elf_check_table(elTable *table) {
 			new_table.slots[newslot] = slot;
 		}
 
-		elf_dealloc(lHEAP,table->slots);
+		elf_dealloc(elHEAP_ALLOCATOR,table->slots);
 
 		table->ntotal = new_table.ntotal;
 		table->slots = new_table.slots;
@@ -231,7 +231,7 @@ elValue elf_table_lookup(elTable *tab, elValue k) {
 
 
 elInteger elf_table_lookup_index(elTable *table, elValue k) {
-	elf_ensure((k.tag == TAG_INT || k.tag == TAG_NUM) || k.x_obj != 0);
+	elASSERT((k.tag == TAG_INT || k.tag == TAG_NUM) || k.x_obj != 0);
 	/* todo: why do we check the table here? */
 	elf_check_table(table);
 	elInteger slot = elf_table_try(table,k);
@@ -344,7 +344,7 @@ int elf_table_libfn_tally(elState *R) {
 
 
 int elf_table_libfn_contains(elState *c) {
-	elf_ensure(c->f->x == 1);
+	elASSERT(c->f->x == 1);
 	elTable *table = (elTable*) elf_get_this(c);
 	elValue k = elf_get_value(c,0);
 	elf_add_integer(c,elf_table_is_key(table,elf_table_try(table,k)));
@@ -353,7 +353,7 @@ int elf_table_libfn_contains(elState *c) {
 
 
 int elf_table_libfn_lookup(elState *c) {
-	elf_ensure(c->f->x == 1);
+	elASSERT(c->f->x == 1);
 	elValue k = elf_get_value(c,0);
 	elTable *table = (elTable*) c->f->obj;
 	elf_add_value(c,elf_table_lookup(table,k));
@@ -468,7 +468,7 @@ int elf_table_libfn_index(elState *R) {
 ** The algorithm is pretty slow...
 */
 int elf_table_libfn_delete(elState *R) {
-	elf_ensure(R->call->x >= 1);
+	elASSERT(R->call->x >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elValue key = elf_get_value(R,0);
 	elEntry *slots = tab->slots;
@@ -507,7 +507,7 @@ int elf_table_libfn_delete(elState *R) {
 
 
 int elf_table_libfn_xdelete(elState *R) {
-	elf_ensure(elf_get_num_args(R) >= 1);
+	elASSERT(elf_get_num_args(R) >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = array_length(tab->array);
 	if (len != 0) {
@@ -526,7 +526,7 @@ int elf_table_libfn_xdelete(elState *R) {
 				/* todo: maybe not crash here */
 				elf_throw(R,NO_BYTE,"item does not belong");
 			}
-			elf_ensure((item - tab->array) == idx);
+			elASSERT((item - tab->array) == idx);
 			elf_add_value(R,*item);
 			elInteger min = elf_xarray_pop(tab->array);
 			if (idx != min) {
@@ -548,7 +548,7 @@ int elf_table_libfn_xdelete(elState *R) {
 
 
 int elf_table_libfn_xremove(elState *R) {
-	elf_ensure(elf_get_num_args(R) >= 1);
+	elASSERT(elf_get_num_args(R) >= 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = array_length(tab->array);
 
@@ -566,7 +566,7 @@ int elf_table_libfn_xremove(elState *R) {
 					break;
 				}
 			}
-			elf_ensure((item - tab->array) == idx);
+			elASSERT((item - tab->array) == idx);
 			// elInteger idx = item - tab->array;
 			// if (item < tab->array || item > tab->array + len - 1) {
 			// 	elf_throw(R,NO_BYTE,"item does not belong");
@@ -641,7 +641,7 @@ int elf_table_libfn_bubble_sort(elState *R) {
 			elf_add_value(R,arr[i+0]);
 			elf_add_value(R,arr[i+1]);
 			int r = elf_call_function(R,base,2,1);
-			elf_ensure(r == 1);
+			elASSERT(r == 1);
 			if (elf_get_integer(R,base)) {
 				elValue tmp = arr[i+0];
 				arr[i+0] = arr[i+1];
@@ -660,7 +660,7 @@ int elf_table_libfn_bubble_sort(elState *R) {
 
 
 int elf_table_libfn_foreach(elState *R) {
-	elf_ensure(R->frame->nx == 1);
+	elASSERT(R->frame->nx == 1);
 	elTable *tab = (elTable *) elf_get_this(R);
 	elClosure *cls = elf_get_closure(R,0);
 	elRegId k = elf_local_alloc(R,1);
@@ -912,8 +912,8 @@ elBool elf_tabvaleq(elValue *x, elValue *y) {
 elInteger elf_table_get_value_hash(elValue v) {
 	switch (v.tag) {
 		case TAG_STR: {
-			elf_ensure(v.x_str != 0);
-			elf_ensure(v.x_str->hash != 0);
+			elASSERT(v.x_str != 0);
+			elASSERT(v.x_str->hash != 0);
 			return v.x_str->hash;
 		}
 		case TAG_OBJ:

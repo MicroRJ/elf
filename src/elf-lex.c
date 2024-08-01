@@ -84,7 +84,7 @@ int elf_read_identifier_characters(elFileState *file, char *buffer) {
 /* not the fastest thing out there */
 elToken elf_lexone(elFileState *file) {
 	/* remove, not needed #todo */
-	elf_globaldecl char buffer[0x100];
+	elGLOBAL char buffer[0x100];
 
 	elToken tk;
 
@@ -105,7 +105,7 @@ elToken elf_lexone(elFileState *file) {
 						goto retry;
 					}
 					/* todo: string interner, or arena? */
-					tk.s = S_ncopy(lHEAP,length,buffer);
+					tk.s = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
 				}
 			}
 		} break;
@@ -184,8 +184,8 @@ elToken elf_lexone(elFileState *file) {
 				elf_file_dialog(file,tk.line,"invalid string");
 			}
 			tk.type = TK_STRING;
-			tk.s = S_ncopy(lHEAP,length,buffer);
-			// tk.string = S_ncopy(lHEAP,length,buffer);
+			tk.s = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
+			// tk.string = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
 			// elf_loginfo("string %s",tk.string);
 		} break;
 		case '.': { elf_movechr(); tk.type = TK_DOT;

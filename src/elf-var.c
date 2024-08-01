@@ -24,7 +24,7 @@ elInteger elf_varaddxx(void **var, elInteger per, elInteger res, elInteger com) 
 		if(min + res > max) {
 			max = min + res;
 		}
-		arr = langM_realloc(lHEAP,sizeof(elArray)+per*max,arr);
+		arr = langM_realloc(elHEAP_ALLOCATOR,sizeof(elArray)+per*max,arr);
 	}
 	if (arr != 0) {
 		arr->max = max;

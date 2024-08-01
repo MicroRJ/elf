@@ -95,7 +95,7 @@ elBool S_eq(char const *x, char const *y) {
 }
 
 
-char *S_ncopy(Alloc *allocator, int length, char const *string) {
+char *S_ncopy(elAllocator *allocator, int length, char const *string) {
 	if (length <= 0) {
 		length = elf_cstrlen(string);
 	}
@@ -106,13 +106,13 @@ char *S_ncopy(Alloc *allocator, int length, char const *string) {
 }
 
 
-char *S_copy(Alloc *allocator, char const *string) {
+char *S_copy(elAllocator *allocator, char const *string) {
 
 	return S_ncopy(allocator,-1,string);
 }
 
 
-char *S_pfv(Alloc *cator, char const *format, va_list v) {
+char *S_pfv(elAllocator *cator, char const *format, va_list v) {
 	int length = stbsp_vsnprintf(NULL,0,format,v);
 	char *contents = elf_alloc(cator,length+1);
 	stbsp_vsnprintf(contents,length+1,format,v);
@@ -121,7 +121,7 @@ char *S_pfv(Alloc *cator, char const *format, va_list v) {
 
 
 char *S_tpfv(char const *format, va_list v) {
-	return S_pfv(lTLOC,format,v);
+	return S_pfv(elTLS_ALLOCATOR,format,v);
 }
 
 

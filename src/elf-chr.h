@@ -19,9 +19,9 @@ char elf_chrtolowercase(char x);
 int elf_cstrlen(char const *s);
 elBool S_eql(char const *x, char const *y, int n);
 elBool S_eq(char const *x, char const *y);
-char *S_ncopy(Alloc *allocator, int length, char const *string);
-char *S_copy(Alloc *allocator, char const *string);
-char *S_pfv(Alloc *cator, char const *format, va_list v);
+char *S_ncopy(elAllocator *allocator, int length, char const *string);
+char *S_copy(elAllocator *allocator, char const *string);
+char *S_pfv(elAllocator *cator, char const *format, va_list v);
 char *S_tpfv(char const *format, va_list v);
 char *S_tpf_(char const *format, ...);
 elBool elf_cstrmatchsingle(char *p, char *s);
@@ -30,7 +30,7 @@ elBool elf_match_strings(char *p, char *s);
 
 
 elBool elf_match_strings(char *p, char *s);
-char *S_copy(Alloc *cator, char const *contents);
+char *S_copy(elAllocator *cator, char const *contents);
 int elf_cstrlen(char const *contents);
 elBool S_eq(char const *x, char const *y);
 unsigned int S_hashcontents (char const *contents, unsigned int length);

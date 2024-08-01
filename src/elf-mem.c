@@ -6,8 +6,8 @@
 
 
 /* todo: can we do this some other way? */
-elf_globaldecl Alloc elf_tlsalloc = {"default-temp-allocator",elf_deftlsallocfn};
-elf_globaldecl Alloc langM_globalalloc = {"default-heap-allocator",elf_defglobalallocfn};
+elGLOBAL elAllocator elf_tlsalloc = {"default-temp-allocator",elf_deftlsallocfn};
+elGLOBAL elAllocator langM_globalalloc = {"default-heap-allocator",elf_defglobalallocfn};
 
 
 /* todo: should prob be using something like stb leak */
@@ -23,33 +23,33 @@ void *elf_memcopy(void *target, void const *source, elInteger length) {
 }
 
 
-void elf_dealloc_(Alloc *c, const void *memory, ldebugloc loca) {
+void elf_dealloc_(elAllocator *c, const void *memory, elSourceInfo loca) {
 	elError error = c->fn(c,0,0,0,(void **)&memory,loca);
-	elf_ensure(LPASSED(error));
+	elASSERT(LPASSED(error));
 }
 
 
-void *elf_alloc_(Alloc *c, elInteger length, ldebugloc loca) {
+void *elf_alloc_(elAllocator *c, elInteger length, elSourceInfo loca) {
 	void *memory = 0;
 	elError error = c->fn(c,0,0,length,&memory,loca);
-	elf_ensure(LPASSED(error));
+	elASSERT(LPASSED(error));
 	return memory;
 }
 
 
-void *elf_realloc_(Alloc *c, elInteger length, void *memory, ldebugloc loca) {
+void *elf_realloc_(elAllocator *c, elInteger length, void *memory, elSourceInfo loca) {
 	elError error = c->fn(c,0,0,length,&memory,loca);
-	elf_ensure(LPASSED(error));
+	elASSERT(LPASSED(error));
 	return memory;
 }
 
 
-void *elf_clearalloc_(Alloc *c, elInteger size, ldebugloc loca) {
+void *elf_clearalloc_(elAllocator *c, elInteger size, elSourceInfo loca) {
 	return elf_clear_memory(elf_alloc_(c,size,loca),size);
 }
 
 
-elError elf_defglobalallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
+elError elf_defglobalallocfn(elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, elSourceInfo loca) {
 	if (io == 0) {
 		return Error_InvalidArguments;
 	}
@@ -70,7 +70,7 @@ elError elf_defglobalallocfn(Alloc *allocator, int flags, elInteger oldSize, elI
 }
 
 
-elError elf_deftlsallocfn(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, ldebugloc loca) {
+elError elf_deftlsallocfn(elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **io, elSourceInfo loca) {
 	if (io == 0) {
 		return Error_InvalidArguments;
 	}
@@ -83,8 +83,8 @@ elError elf_deftlsallocfn(Alloc *allocator, int flags, elInteger oldSize, elInte
 		}
 
 		// TODO:
-		elf_threaddecl char memory[0x10000];
-		elf_threaddecl char *cursor = 0;
+		elTHREAD char memory[0x10000];
+		elTHREAD char *cursor = 0;
 		if (cursor == 0) cursor = memory;
 
 		if (newSize > sizeof(memory)) {

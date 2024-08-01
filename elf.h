@@ -4,13 +4,24 @@
 ** The λ elf language.
 */
 
+
 #ifndef _elf_lang_
 #define _elf_lang_
 
 
-#if !defined(PLATFORM_DESKTOP) && !defined(PLATFORM_WEB)
-	#error No Platform Defined
-#endif
+/*
+** Configuration Macros (mostly temporary)
+*/
+#define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(1)
+#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(8)
+
+#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
+#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*4)
+
+// #define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
+// #define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(512)
+// #define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
+// #define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*2048)
 
 
 #ifndef STB_SPRINTF_IMPLEMENTATION
@@ -23,49 +34,46 @@
 #endif
 
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <math.h>
 #include <string.h>
 
 
-/* em knows where this is at */
 #if defined(PLATFORM_WEB)
 #include <emscripten.h>
 #include <unistd.h>
 #endif
 
-
-
 /*
 ** Auxiliary Macros
 */
 
+
 #if defined(__EMSCRIPTEN__)
-	#define elAPI EMSCRIPTEN_KEEPALIVE
-	#define elLIB EMSCRIPTEN_KEEPALIVE
-	#define elf_threaddecl static
+	#define elAPI 		EMSCRIPTEN_KEEPALIVE
+	#define elEXPORT 	EMSCRIPTEN_KEEPALIVE
+	#define elTHREAD 	static
+	#define elGLOBAL  static
 #else
-	#define elAPI static
-	#define elLIB __declspec(dllexport)
-	#define elf_threaddecl static __declspec(thread)
+	#define elAPI 		static
+	#define elEXPORT 	__declspec(dllexport)
+	#define elTHREAD 	static __declspec(thread)
+	#define elGLOBAL  static
 #endif
 
+#if !defined(__cplusplus)
+	#define elLITERAL(X) (X)
+#else
+	#define elLITERAL(X) X
+#endif
 
-#define elf_globaldecl static
+#define elTOTEXT_(X) #X
+#define elTOTEXT(X) elTOTEXT_(X)
 
-
-#define LITC(xx) (xx)
-
-
-#define XSTRINGIFY_(xx) #xx
-#define XSTRINGIFY(xx) XSTRINGIFY_(xx)
-
-
-#define XFUSE_(xx,yy) xx##yy
-#define XFUSE(xx,yy) XFUSE_(xx,yy)
-
+#define elFUSE_(X,Y) X##Y
+#define elFUSE(X,Y) elFUSE_(X,Y)
 
 #if !defined(MAX)
 	#define MAX(x,y) ((x) > (y) ? (x) : (y))
@@ -73,6 +81,7 @@
 #if !defined(MIN)
 	#define MIN(x,y) ((x) < (y) ? (x) : (y))
 #endif
+
 #if !defined(MEGABYTES)
 	#define MEGABYTES(x) ((x)*1024llu*1024llu)
 #endif
@@ -85,16 +94,18 @@
 #endif
 
 
-/* todo: why are these macros */
-#define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
-#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(512)
-
-#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
-#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*2048)
+/* Some Forward Declarations */
+typedef struct elModule 	elModule;
+typedef struct elFileState elFileState;
+typedef struct elState 		elState;
+typedef struct elTable 		elTable;
+typedef struct elString 	elString;
+typedef struct elObject 	elObject;
+typedef struct elClosure 	elClosure;
 
 
 /*
-** Type Definitions
+** Basic Type Definitions
 */
 
 typedef long long int 	   elInteger;
@@ -106,25 +117,28 @@ typedef unsigned int 	   elHashId;
 typedef int 				   elRegId;
 typedef int 				   elByteId;
 typedef int 				   elSymbolId;
-typedef struct elModule 	elModule;
-typedef struct elFileState elFileState;
-typedef struct elState 		elState;
-typedef struct elTable 		elTable;
-typedef struct elString 	elString;
-typedef struct elObject 	elObject;
-typedef struct elClosure 	elClosure;
-typedef int (* elBinding)(elState *);
+typedef int   				   elError;
 /* todo: eventually convert this to an offset,
 but this is great for debugging... */
 typedef char 		        *elFileLine;
+typedef int (* elBinding)(elState *);
 
-typedef struct elProto {
-	short x,y;
-	short zcache;
-	short zstack;
-	int 	nbytes;
-	int 	bytes;
-} elProto;
+
+typedef struct elSourceInfo {
+	char const *fileName;
+	int lineNumber;
+	char const *func;
+	char const *lineStart;
+	char const *fileStart;
+} elSourceInfo;
+
+
+typedef struct elAllocator elAllocator;
+typedef elError (* elf_AllocFn)(elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, elSourceInfo loca);
+typedef struct elAllocator {
+	char const *label;
+	elf_AllocFn fn;
+} elAllocator;
 
 
 typedef enum elGCColor {
@@ -153,15 +167,15 @@ _(INT) _(NUM) _(BID) \
 _(OBJ) _(CLS) _(STR) _(TAB) /* end */
 
 
-#define TAGENUM(NAME) XFUSE(TAG_,NAME),
+#define TAGENUM(NAME) elFUSE(TAG_,NAME),
 typedef enum elValueTag {
 	TAGLIST(TAGENUM)
 } elValueTag;
 #undef TAGENUM
 
 
-#define TAGENUM(NAME) XSTRINGIFY(NAME),
-elf_globaldecl char const *tag2s[] = {
+#define TAGENUM(NAME) elTOTEXT(NAME),
+elGLOBAL char const *tag2s[] = {
 	TAGLIST(TAGENUM)
 };
 #undef TAGENUM
@@ -183,12 +197,28 @@ typedef struct elValue {
 } elValue;
 
 
+typedef struct elFileProto {
+	short x,y;
+	union { short nvalues, /* @DEPRECATED */ zcache; };
+	union { short nlocals, /* @DEPRECATED */ zstack; };
+	int 	nbytes;
+	int 	bytes;
+} elFileProto;
+
+
 typedef struct elClosure {
 	elObject obj;
-	union { elProto prototype, fn; };
-
-	elByteId  j;
-	elValue enclosure[1];
+	union {
+		elFileProto proto;
+		struct {
+			short x,y;
+			short nvalues;
+			short nlocals;
+			int 	nbytes;
+			int 	bytes;
+		};
+	};
+	elValue values[1];
 } elClosure;
 
 
@@ -216,6 +246,9 @@ elAPI elValue elf_closure_value(elClosure *);
 elAPI elValue elf_integer_value(elInteger i);
 elAPI elValue elf_number_value(elNumber n);
 elAPI elValue elf_nil_value();
+
+
+void *elf_new_object(elState *R, elObjType type, elInteger length);
 
 
 /*
@@ -276,11 +309,10 @@ elAPI elString *elf_add_string(elState *, elString *s);
 elAPI elString *elf_add_new_string(elState *, char *c);
 elAPI elString *elf_pushnewstrlen(elState *, elInteger len);
 elAPI elObject *elf_add_object(elState *, elObject *t);
-elAPI elObject *elf_pushnewobj(elState *, elInteger tell);
+elAPI elObject *elf_add_new_object(elState *, elInteger tell);
 elAPI elTable *elf_add_table(elState *, elTable *t);
 elAPI elTable *elf_add_new_table(elState *R);
 elAPI elRegId elf_add_closure(elState *, elClosure *f);
-elAPI elRegId elf_pushnewcls(elState *, elProto fn);
 elAPI elRegId elf_pushbinding(elState *, elBinding c);
 
 
@@ -371,7 +403,7 @@ typedef struct elStackFrame {
 	get the byte relative to the module */
 	elByteId tail;
 	/* the closure for this call frame */
-	elClosure *cl;
+	union { elClosure *cls, *cl; };
 	/* the object for meta fields, meta calls and the likes */
 	elObject *obj;
 	/* pointer to base stack address, the callee should
@@ -522,9 +554,9 @@ _(PAREN_LEFT,"(") _(PAREN_RIGHT,")") \
 typedef enum elTokenType {
 	TK_NONE = 0,
 
-#define TKITEM(NAME,_) XFUSE(TK_,NAME),
-#define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
-#define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
+#define TKITEM(NAME,_) elFUSE(TK_,NAME),
+#define OPITEM(NAME,_,__) elFUSE(TK_,NAME),
+#define MCITEM(NAME,_) elFUSE(TK_M_,NAME),
 
 	KWLIST(TKITEM)
 	MCLIST(MCITEM)
@@ -538,7 +570,7 @@ typedef enum elTokenType {
 
 
 elTokenType elf_is_word_or_macro(char *name) {
-	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return XFUSE(TK_M_,NAME);
+	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_M_,NAME);
 	MCLIST(MCITEM)
 	#undef MCITEM
 	return TK_WORD;
@@ -546,7 +578,7 @@ elTokenType elf_is_word_or_macro(char *name) {
 
 
 elTokenType elf_is_word_or_keyword(char *name) {
-	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return XFUSE(TK_,NAME);
+	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_,NAME);
 	KWLIST(KWITEM)
 	#undef KWITEM
 	return TK_WORD;
@@ -559,7 +591,7 @@ typedef struct ltokenintel {
 } ltokenintel;
 
 
-elf_globaldecl ltokenintel elf_tkintel[] = {
+elGLOBAL ltokenintel elf_tkintel[] = {
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},
@@ -578,6 +610,11 @@ elf_globaldecl ltokenintel elf_tkintel[] = {
 ** are "desugarized" in the parsing stage before being
 ** evaluated...
 */
+
+
+#define SPECIAL_REGISTER_INDEX 0 // #index
+#define SPECIAL_REGISTER_VALUE 1 // #value
+#define SPECIAL_REGISTER_ARRAY 2 // #array
 
 #define NO_NODE (-1)
 
@@ -605,31 +642,32 @@ typedef enum elNodeTy {
 // RANGE: {x}..{x}
 // GROUP: ({x})
 #define NODE_DEF(_) \
-	_(NOP)\
+_(NOP)\
 	/* these come in pairs, use ^ to get the counter */\
-	_(AND) _(OR)\
-	_(NIL_AND) _(NIL_OR)\
-	_(EQ) _(NEQ)\
-	_(BIT_SHL) _(BIT_SHR)\
-	_(ADD) _(SUB) _(MUL) _(DIV)\
-	_(LT) _(GT) _(LTEQ) _(GTEQ)\
-	_(INDEX) _(FIELD)\
+_(AND) _(OR)\
+_(NIL_AND) _(NIL_OR)\
+_(EQ) _(NEQ)\
+_(BIT_SHL) _(BIT_SHR)\
+_(ADD) _(SUB) _(MUL) _(DIV)\
+_(LT) _(GT) _(LTEQ) _(GTEQ)\
+_(INDEX) _(FIELD)\
 	/* end */\
-	_(BIT_AND) _(BIT_OR) _(BIT_XOR)\
-	_(MOD) _(POW)\
-	_(TYPEGUARD)\
-	_(LOAD)\
-	_(CLOSURE) _(STRING) _(TABLE)\
-	_(INTEGER) _(NUMBER) _(NIL)\
-	_(GLOBAL) _(LOCAL) _(CLOSURE_VALUE) _(FILE_VALUE)\
-	_(THIS)\
-	_(MULTI)\
-	_(METAFIELD)\
-	_(CALL)\
-	_(RANGE_INDEX)\
-	_(RANGE)\
-	_(GROUP)\
-	_(REGION)
+_(BIT_AND) _(BIT_OR) _(BIT_XOR)\
+_(MOD) _(POW)\
+_(TYPEGUARD)\
+_(LOAD)\
+_(CLOSURE) _(STRING) _(TABLE) \
+_(INTEGER) _(NUMBER) _(NIL) \
+_(SPECIAL_REGISTER) \
+_(GLOBAL) _(LOCAL) _(CLOSURE_VALUE) _(FILE_VALUE) \
+_(THIS)\
+_(MULTI)\
+_(METAFIELD)\
+_(CALL)\
+_(RANGE_INDEX)\
+_(RANGE)\
+_(GROUP)\
+_(REGION)
 
 
 #define NODE_ENUM(NAME) NODE_##NAME,
@@ -681,6 +719,7 @@ elNodeId elf_make_table_node(elFileState *fs, elFileLine, elNodeId *z);
 elNodeId elf_make_closure_node(elFileState *fs, elFileLine, elNodeId x, elNodeId *z);
 elNodeId elf_make_load_node(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
 elNodeId elf_make_register_node(elFileState *fs, elFileLine line, elNodeId i);
+elNodeId elf_make_special_register_node(elFileState *fs, elFileLine line, elNodeId i);
 elNodeId elf_make_global_value_node(elFileState *fs, elFileLine line, elNodeId i);
 elNodeId elf_make_closure_value_node(elFileState *fs, elFileLine line, elNodeId i);
 elNodeId elf_make_type_guard_node(elFileState *fs, elFileLine line, elNodeId x, elNodeTy y);
@@ -754,11 +793,14 @@ typedef struct elFileEntity {
 typedef struct elFileLoopState {
 	elByteId entry;
 	elByteId *false_jumps,*true_jumps;
-	/* this can be directly accessed
-	using #array, #index, and #value */
-	elRegId array_register;
-	elRegId index_register;
-	elRegId value_register;
+	/* these can be directly accessed using #array, #index,
+	and #value.
+	#array and #index are guaranteed to be register nodes,
+	and #value is an (index node), which translates to
+	#array[#index] */
+	elNodeId array_register; // _register;
+	elNodeId index_register; // _register;
+	elNodeId value_register;
 	/* todo: why do we need this, please
 	remove? */
 	union { elNodeId x; };
@@ -873,6 +915,8 @@ elNodeId elf_load_file_expr(elFileState *fs, elBool flags);
 elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags);
 void elf_load_file_stat(elFileState *fs);
 void elf_emitter_emit_store(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
+
+elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register);
 elRegId elf_emitter_local_load(elFileState *fs, elFileLine line, elBool reload, elRegId x, elRegId y, elNodeId id);
 elRegId elf_emitter_localize(elFileState *fs, elFileLine line, elNodeId id);
 elRegId elf_emitter_relocalize(elFileState *fs, elFileLine line, elRegId target_register, elNodeIdTypeGuard id);

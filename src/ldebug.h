@@ -5,29 +5,25 @@
 */
 
 
-typedef struct ldebugloc {
-	char const *fileName;
-	int lineNumber;
-	char const *func;
-	char const *lineStart;
-	char const *fileStart;
-} ldebugloc;
 
 
-void lang_setasserthook(int (*hook)(ldebugloc));
-void lang_assertfn(ldebugloc ind, char const *name, elBool expr);
+void lang_setasserthook(int (*hook)(elSourceInfo));
+void lang_assertfn(elSourceInfo ind, char const *name, elBool expr);
 
 
-#define LHERE (ldebugloc){__FILE__,__LINE__,__func__}
+#define LHERE (elSourceInfo){__FILE__,__LINE__,__func__}
 
 
-#define LASSERTALWAYS(xx) lang_assertfn(LHERE,XSTRINGIFY(xx),xx)
+#define elINRANGE(X,XMIN,XMAX) (XMIN <= X < XMAX)
+
+
+#define LASSERTALWAYS(xx) lang_assertfn(LHERE,elTOTEXT(xx),xx)
 
 
 #if defined(_DEBUG)
-	#define elf_ensure(xx) LASSERTALWAYS(xx)
+	#define elASSERT(xx) LASSERTALWAYS(xx)
 #else
-	#define elf_ensure(xx)
+	#define elASSERT(xx)
 #endif
 
 
@@ -39,7 +35,7 @@ void lang_assertfn(ldebugloc ind, char const *name, elBool expr);
 
 
 #if !defined(elNOCODE)
-	#define elNOCODE elf_debugger(__FILE__" ["XSTRINGIFY(__LINE__)"]: internal error: unexpected code branch")
+	#define elNOCODE elf_debugger(__FILE__" ["elTOTEXT(__LINE__)"]: internal error: unexpected code branch")
 #endif
 
 

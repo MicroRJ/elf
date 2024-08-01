@@ -5,9 +5,7 @@
 */
 
 
-typedef struct Alloc Alloc;
-
-
+typedef struct elAllocator elAllocator;
 #define FLYTRAP 0x55555555
 
 #define CHUNKSIZE 1024
@@ -16,50 +14,26 @@ typedef struct Alloc Alloc;
 
 
 
-typedef elError (* elf_AllocFn)(Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca);
+void langM_debugdealloc(void *mem, elSourceInfo loca);
+void *langM_debugrealloc(void *mem, elInteger contentssize, elSourceInfo loca);
+void *langM_debugalloc(elInteger contentssize, elSourceInfo loca);
 
 
-typedef struct Alloc {
-	char const *label;
-	elf_AllocFn fn;
-} Alloc;
-
-
-#if 0
-typedef struct MemBlock MemBlock;
-typedef struct MemBlock {
-	unsigned int headtrap;
-	MemBlock *then;
-	ldebugloc loca;
-	ldebugloc freeloca;
-	elInteger contentssize;
-	unsigned int foottrap;
-} MemBlock;
-#endif
-
-
-void langM_debugdealloc(void *mem, ldebugloc loca);
-void *langM_debugrealloc(void *mem, elInteger contentssize, ldebugloc loca);
-void *langM_debugalloc(elInteger contentssize, ldebugloc loca);
-
-
-elAPI void elf_dealloc_(Alloc *allocator, void const *memory, ldebugloc loca);
-elAPI void *elf_realloc_(Alloc *allocator, elInteger size, void *memory, ldebugloc loca);
-elAPI void *elf_alloc_(Alloc *allocator, elInteger size, ldebugloc loca);
-elAPI void *elf_clearalloc_(Alloc *allocator, elInteger size, ldebugloc loca);
-
+elAPI void elf_dealloc_(elAllocator *allocator, void const *memory, elSourceInfo loca);
+elAPI void *elf_realloc_(elAllocator *allocator, elInteger size, void *memory, elSourceInfo loca);
+elAPI void *elf_alloc_(elAllocator *allocator, elInteger size, elSourceInfo loca);
+elAPI void *elf_clearalloc_(elAllocator *allocator, elInteger size, elSourceInfo loca);
 
 #define elf_dealloc(cator,mem) elf_dealloc_(cator,mem,LHERE)
 #define langM_realloc(cator,sze,mem) elf_realloc_(cator,sze,mem,LHERE)
 #define elf_alloc(cator,sze) elf_alloc_(cator,sze,LHERE)
 #define elf_clear_alloc(cator,sze) elf_clearalloc_(cator,sze,LHERE)
 
-
-#define ALLOCFN(NAME) elError NAME (Alloc *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, ldebugloc loca)
+#define ALLOCFN(NAME) elError NAME (elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, elSourceInfo loca)
 elAPI ALLOCFN(elf_deftlsallocfn);
 elAPI ALLOCFN(elf_defglobalallocfn);
 
 
 /* todo: better names */
-#define lTLOC (&elf_tlsalloc)
-#define lHEAP (&langM_globalalloc)
+#define elTLS_ALLOCATOR (&elf_tlsalloc)
+#define elHEAP_ALLOCATOR (&langM_globalalloc)

@@ -4,7 +4,7 @@
 ** web lib
 */
 
-// elLIB elfem_()
+// elEXPORT elfem_()
 // run_script
 // run_script_int
 // run_script_string

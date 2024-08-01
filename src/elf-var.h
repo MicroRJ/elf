@@ -32,7 +32,7 @@ typedef struct elArray {
 } elArray;
 
 
-#define elf_xarray_delete(var) ((var != 0) ? elf_dealloc(lHEAP,(elArray*)(var)-1),0 : 0)
+#define elf_xarray_delete(var) ((var != 0) ? elf_dealloc(elHEAP_ALLOCATOR,(elArray*)(var)-1),0 : 0)
 
 #define elf_vararr(var) ((elArray*)(var))[-1]
 #define elf_varmax(var) ((var != 0) ? ((elArray*)(var))[-1].max : 0)
@@ -65,6 +65,7 @@ am I trippin' ? */
 elInteger elf_varaddxx(void **var
 , elInteger per, elInteger res, elInteger com);
 
+#define FOR_RANGE(N,RMIN,RMAX) for (elInteger N = RMIN; N < RMAX; N += 1)
 
 #define ARRAY_FOR(N,A) for (elInteger N = 0; N < array_length(A); N += 1)
 #define ARRAY_PER(T,N,A) for (T N = A; N < A + array_length(A); N += 1)

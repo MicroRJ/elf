@@ -33,7 +33,7 @@ typedef struct elFileInfo {
 */
 typedef struct elModule {
 	union { elTable *g, *globals; };
-	union { elProto *p, *prototypes; };
+	union { elFileProto *p, *prototypes; };
 	elNumber *kn;
 	elInteger *ki;
 	int *track;
@@ -46,7 +46,7 @@ typedef struct elModule {
 
 elSymbolId elf_get_global_symbol(elModule *md, elString *name);
 elSymbolId elf_add_global_value(elModule *md, elString *name, elValue v);
-elSymbolId elf_add_proto(elModule *md, elProto p);
+elSymbolId elf_add_proto(elModule *md, elFileProto p);
 
 /*
 	elModule\r: runtime is stored here

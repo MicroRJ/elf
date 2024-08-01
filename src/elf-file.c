@@ -89,8 +89,8 @@ void elf_check_store(elFileState *fs, elFileLine line, elNodeId x, elNodeId y) {
 	if (y < 0) {
 		elf_file_dialog(fs,line,"invalid statement, expected a value for assignment");
 	}
-	elf_ensure(x > NO_SLOT);
-	elf_ensure(y > NO_SLOT);
+	elASSERT(x > NO_SLOT);
+	elASSERT(y > NO_SLOT);
 	elNode node = elf_get_targetable_node(fs,MAKE_NODE_ID(x));
 	if (elf_is_targetable_node(node.kind)) {
 	} else elf_file_dialog(fs,line,"invalid store (%s)",elNodeToStr[node.kind]);
@@ -130,7 +130,7 @@ int elf_find_index_of_closure_entity(elFileFnState *fn, elEntityIdTypeGuard id) 
 */
 void elf_enclose_entity(elFileState *fs, elFileFnState *fn, elEntityIdTypeGuard id) {
 	/* ensure the entity should actually be captured */
-	elf_ensure(id.id < fn->entities);
+	elASSERT(id.id < fn->entities);
 
 	for (int i = 0; i < array_length(fn->enclosure); i += 1) {
 		if (fn->enclosure[i] == id.id) return;
@@ -235,7 +235,7 @@ elNodeId elf_find_entity_node(elFileState *fs, elFileLine line, char *name, int 
 
 elNodeId elf_get_global_entity_node(elFileState *fs, elFileLine line, char *name) {
 	elSymbolId x = elf_get_global_symbol(fs->M,elf_new_string(fs->R,name));
-	elf_ensure(x != -1);
+	elASSERT(x != -1);
 	return elf_make_global_value_node(fs,line,x);
 }
 
@@ -437,7 +437,7 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 	elf_emitter_close_function(fs);
 
 	/* add this function to the type table */
-	elProto p = {0};
+	elFileProto p = {0};
 	p.x = arity;
 	p.y = fn.nyield;
 	p.zstack = fn.nlocals;
@@ -516,7 +516,7 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 	}
 
 	elf_emit_desugar_range_expr_epilogue(fs,lhs);
-	elf_ensure(elf_get_memory_state(fs) == mem);
+	elASSERT(elf_get_memory_state(fs) == mem);
 }
 
 
@@ -578,9 +578,11 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 	switch (tk.type) {
 		case TK_M_INDEX: case TK_M_ARRAY: case TK_M_VALUE: {
 			elf_lexone(fs);
+			/* todo: add support for this again, where you
+			can specify which for loop you're reffering to. */
+			#if 0
 			elRegId target_value_register = NO_SLOT;
-			elBool eol = !elf_term_eol_token(fs);
-			if (eol) {
+			if (!elf_term_eol_token(fs)) {
 				elNodeId value = elf_load_file_expr(fs,0);
 				if (value != NO_NODE) {
 					target_value_register = elf_get_node_register(fs,MAKE_NODE_ID(value));
@@ -590,13 +592,20 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 				}
 			}
 			elFileBlock *bl = elf_emitter_get_loop_block(fs,target_value_register);
-			elf_ensure(bl != 0);
-			elf_ensure(bl->flags & BLOCK_LOOP);
+			elASSERT(bl != 0);
+			elASSERT(bl->flags & BLOCK_LOOP);
 			elRegId reg =
 			tk.type == TK_M_ARRAY ? bl->loop.array_register :
 			tk.type == TK_M_VALUE ? bl->loop.value_register : bl->loop.index_register;
 			if (reg < 0) elf_file_dialog(fs,tk.line,"invalid loop for this");
 			v = elf_make_register_node(fs,NO_LINE,reg);
+			#endif
+			// TODO: instead use regular register node but with
+			// negative values?
+			elRegId reg =
+			tk.type == TK_M_ARRAY ? SPECIAL_REGISTER_ARRAY :
+			tk.type == TK_M_VALUE ? SPECIAL_REGISTER_VALUE : SPECIAL_REGISTER_INDEX;
+			v = elf_make_special_register_node(fs,tk.line,reg);
 		} break;
 		case TK_M_INT: case TK_M_NUM: { elf_lexone(fs);
 			/* todo: make this an intrinsic instruction! */
@@ -840,7 +849,7 @@ void elf_load_file_stat(elFileState *fs) {
 			elf_emitter_enter_delayed_block(fs,tk.line);//,&bl
 			elf_load_file_stat(fs);
 			elf_emitter_leave_delayed_block(fs,tk.line);//,&bl
-			elf_ensure(fs->fn->xmemory == mem);
+			elASSERT(fs->fn->xmemory == mem);
 		} break;
 		case TK_IF: case TK_IFF: {
 			elf_lexone(fs);
@@ -876,7 +885,7 @@ void elf_load_file_stat(elFileState *fs) {
 			}
 			elf_emitter_close_if(fs,fs->lasttk.line,&s);
 			elf_emitter_close_block(fs);
-			elf_ensure(fs->fn->xmemory == mem);
+			elASSERT(fs->fn->xmemory == mem);
 		} break;
 		case TK_LET: {
 			elf_lexone(fs);
@@ -889,7 +898,7 @@ void elf_load_file_stat(elFileState *fs) {
 case TK_LEAVE: { elf_lexone(fs);
 	elNodeId x = elf_load_file_expr(fs,0);
 	elf_emit_yield(fs,tk.line,x);
-	elf_ensure(fs->fn->xmemory == mem);
+	elASSERT(fs->fn->xmemory == mem);
 } break;
 case TK_BREAK: case TK_CONTINUE: { elf_lexone(fs);
 	elRegId target_value_register = NO_SLOT;
@@ -912,7 +921,7 @@ case TK_WHILE: { elf_lexone(fs);
 	elf_emitter_begin_while_loop(fs,tk.line,x);
 	elf_load_file_stat(fs);
 	elf_emitter_close_while_loop(fs,tk.line);
-	elf_ensure(fs->fn->xmemory == mem);
+	elASSERT(fs->fn->xmemory == mem);
 	elf_emitter_close_block(fs);
 } break;
 case TK_DO: { elf_lexone(fs);
@@ -922,7 +931,7 @@ case TK_DO: { elf_lexone(fs);
 	elf_take_token(fs,TK_WHILE);
 	elNodeId x = elf_load_file_expr(fs,0);
 	elf_emitter_close_do_while_loop(fs,tk.line,x);
-	elf_ensure(fs->fn->xmemory == mem);
+	elASSERT(fs->fn->xmemory == mem);
 	elf_emitter_close_block(fs);
 } break;
 		/*
@@ -1044,7 +1053,7 @@ for (i = 0; i < array_length(z); i += 1) {
 		array_register = elf_emitter_localize(fs,NO_LINE,array);
 
 		y = elf_get_node(fs,y).y;
-		elf_ensure(elf_get_node_kind(fs,y) == NODE_RANGE);
+		elASSERT(elf_get_node_kind(fs,y) == NODE_RANGE);
 	}
 	if (elf_get_node_kind(fs,y) == NODE_RANGE) {
 		elNodeId lo = elf_get_node(fs,y).x;
@@ -1141,12 +1150,12 @@ default: {
 	elNodeId x = elf_load_file_expr(fs,1);
 	elf_complete_stat(fs,x);
 
-	elf_ensure(fs->fn->xmemory == mem);
+	elASSERT(fs->fn->xmemory == mem);
 	if (x == NO_NODE) {
 		elf_file_dialog(fs,tk.line,"invalid statement");
 	}
 			/* todo: better error handling */
-	elf_ensure(x != NO_NODE);
+	elASSERT(x != NO_NODE);
 } break;
 }
 }

@@ -108,7 +108,7 @@ void emit86_mov(ljValue x, ljValue y) {
 		if (y.type == JIT_MEM) {
 			emit86_mov(REG(RAX),y);
 			y = REG(RAX);
-		} else elf_ensure(y.type == JIT_GPR);
+		} else elASSERT(y.type == JIT_GPR);
 		DO_MOV64_MEM_REG_8DISP(x.base,x.disp,y.base);
 	} else elNOCODE;
 }
@@ -140,7 +140,7 @@ void emit86_shift(elByteOP type, ljValue x, ljValue y) {
 }
 
 
-elBinding jit(elModule *md, elProto fn) {
+elBinding jit(elModule *md, elFileProto fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();

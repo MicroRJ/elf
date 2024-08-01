@@ -20,7 +20,7 @@ elSymbolId elf_add_global_value(elModule *M, elString *name, elValue v) {
 }
 
 
-elSymbolId elf_add_proto(elModule *M, elProto p) {
+elSymbolId elf_add_proto(elModule *M, elFileProto p) {
 	elSymbolId i = elf_xarray_growby(M->p,1);
 	M->p[i] = p;
 	return i;
@@ -101,7 +101,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	}
 #if 0
 	elf_xarray_foreachi(md->p) {
-		elProto p = md->p[i];
+		elFileProto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (elByteId j = 0; j < p.nbytes; ++j) {
 			elBytecode b = md->bytes[p.bytes+j];
