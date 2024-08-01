@@ -32,28 +32,28 @@ void elf_expected(elState *S, elValueTag tag, elValueTag got, elRegId x) {
 
 elAPI elString *elf_get_string(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
-	if (v.tag == TAG_NIL) return elNil;
+	if (v.tag == TAG_NIL) return elNIL;
 	if (v.tag == TAG_STR) return v.x_str;
 	elf_expected(R,TAG_STR,v.tag,x);
-	return elNil;
+	return elNIL;
 }
 
 
 elAPI char *elf_get_cstring(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
-	if (v.tag == TAG_NIL) return elNil;
+	if (v.tag == TAG_NIL) return elNIL;
 	if (v.tag == TAG_STR) return v.x_str->c;
 	elf_expected(R,TAG_STR,v.tag,x);
-	return elNil;
+	return elNIL;
 }
 
 
 elAPI elObject *elf_get_object(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
-	if (v.tag == TAG_NIL) return elNil;
+	if (v.tag == TAG_NIL) return elNIL;
 	if (elf_isobj(v.tag)) return v.x_obj;
 	elf_expected(R,TAG_OBJ,v.tag,x);
-	return elNil;
+	return elNIL;
 }
 
 
@@ -62,7 +62,7 @@ elAPI elTable *elf_get_table(elState *R, elRegId x) {
 	if (v.tag == TAG_TAB) {
 		return v.x_tab;
 	} else if (v.tag != TAG_NIL) elf_expected(R,TAG_TAB,v.tag,x);
-	return elNil;
+	return elNIL;
 }
 
 

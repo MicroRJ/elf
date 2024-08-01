@@ -114,20 +114,41 @@ elToken elf_lexone(elFileState *file) {
 		case '5':case '6':case '7':case '8':case '9': {
 			tk.type = TK_INTEGER;
 
-			elInteger base = 10;
+			elInteger B = 10;
 			if (elf_thischr() == '0') {
+				if (elf_thenchr() == 'b') {
+					elf_movxchr(2);
+					B = 2;
+				} else
 				if (elf_thenchr() == 'x') {
 					elf_movxchr(2);
-					base = 16;
+					B = 16;
 				}
 			}
 
-			elInteger i = 0;
-			if (base == 10) {
+			elInteger I,C;
+			for (I = 0, C = -1; ; I = I * B + C) {
+				if (elWITHIN(elf_thischr(),'A','Z'+1)) {
+					C = 10 + elf_movechr() - 'A';
+					if (B != 16) goto _error;
+				} else if (elWITHIN(elf_thischr(),'a','z'+1)) {
+					C = 10 + elf_movechr() - 'A';
+					if (B != 16) goto _error;
+				} else if (elWITHIN(elf_thischr(),'0','9'+1)) {
+					C = elf_movechr() - '0';
+					if (B == 2 && C > 1) goto _error;
+				} else {
+					break;
+					_error:
+					elf_file_dialog(file, file->thischar, "invalid base '%i' for digit", B);
+				}
+			}
+#if 0
+			else if (base == 10) {
 				do {
-					i = i * 10 + (elf_movechr() - '0');
+					i = i * base + (elf_movechr() - '0');
 				} while (elf_is_digit_char(elf_thischr()));
-			} else {
+			} else if (base == 16) {
 				for (;;) {
 					if (elf_thischr() >= 'A' && elf_thischr() <= 'Z') {
 						i = i * base + 10 + (elf_movechr() - 'A');
@@ -140,6 +161,7 @@ elToken elf_lexone(elFileState *file) {
 					} else break;
 				}
 			}
+			#endif
 			if (elf_thischr() == '.') {
 				// x{..}
 				if (elf_thenchr() != '.') {
@@ -154,12 +176,12 @@ elToken elf_lexone(elFileState *file) {
 							p *= 10;
 						} while (elf_is_digit_char(elf_thischr()));
 					}
-					tk.n = i + n / p;
+					tk.n = I + n / p;
 					// elf_loginfo("[%lli] = num(%f)",tk.value,n);
 					goto leave;
 				}
 			}
-			tk.i = i;
+			tk.i = I;
 			// elf_loginfo("[%lli] = int(%lli)",tk.value,integer);
 		} break;
 		case '\'': {
@@ -191,7 +213,7 @@ elToken elf_lexone(elFileState *file) {
 		case '.': { elf_movechr(); tk.type = TK_DOT;
 			if (elf_cmovchr('.')) { tk.type = TK_DOT_DOT;
 				/* todo: eventually rename use TK_ELLIPSIS */
-			if (elf_cmovchr('.'))   tk.type = TK_DOT_DOT;
+				if (elf_cmovchr('.'))   tk.type = TK_DOT_DOT;
 			} else if (elf_is_digit_char(elf_thischr())) {
 				tk.type = TK_NUMBER;
 				elNumber n = 0;

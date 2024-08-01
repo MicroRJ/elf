@@ -26,7 +26,7 @@ int main(int n, char **c) {
 	frame.base = R.top;
 	R.frame = &frame;
 
-	if (cli.filename != elNil) {
+	if (cli.filename != elNIL) {
 		elString *filename = elf_add_new_string(&R,cli.filename);
 		filename->obj.color = GC_PINK;
 		elFileState fs = {0};
@@ -37,7 +37,7 @@ int main(int n, char **c) {
 		if (strcmp(cli.dumpfilename,"stdout")) {
 			dumpf = fopen(elf_tpf("%s.module.ignore",cli.dumpfilename),"wb");
 		}
-		if (dumpf == elNil) {
+		if (dumpf == elNIL) {
 			printf("error: could open specified dump file for writting");
 		} else {
 			lang_dumpmodule(&M,dumpf);

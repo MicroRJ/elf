@@ -469,7 +469,7 @@ int elflib_include(elState *R) {
 
 
 int elflib_loadexpr(elState *R) {
-	elString *filename = elNil,*contents = elNil;
+	elString *filename = elNIL,*contents = elNIL;
 	if (R->call->nx == 2) {
 		filename = elf_get_string(R,0);
 		contents = elf_get_string(R,1);
@@ -484,7 +484,7 @@ int elflib_loadexpr(elState *R) {
 
 
 int elflib_loadcode(elState *R) {
-	elString *filename = elNil,*contents = elNil;
+	elString *filename = elNIL,*contents = elNIL;
 	if (R->call->nx == 2) {
 		filename = elf_get_string(R,0);
 		contents = elf_get_string(R,1);
@@ -530,7 +530,7 @@ int elflib_libfn(elState *rt) {
 	elHandle lib = elf_get_handle(rt,0);
 	elString *name = elf_get_string(rt,1);
 	elBinding fn = (elBinding) sys_libfn(lib,name->c);
-	if (fn != elNil) {
+	if (fn != elNIL) {
 		elf_pushbinding(rt,fn);
 	} else {
 		eld_add_nil(rt);
@@ -543,7 +543,7 @@ int elflib_loadlib(elState *R) {
 	elString *name = elf_get_string(R,0);
 	elClosure *callback = elf_get_closure(R,1);
 	elHandle lib = sys_loadlib(name->c);
-	if (lib != elNil) elf_pushsys(R,lib);
+	if (lib != elNIL) elf_pushsys(R,lib);
 	else eld_add_nil(R);
 	return 1;
 }
@@ -912,9 +912,9 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 	} while (FindNextFileA(h,&f));
 #elif defined(PLATFORM_WEB)
 	DIR *dirfd = opendir(dir->c);
-	if (dirfd != elNil) {
+	if (dirfd != elNIL) {
 		struct dirent *entry;
-		while ((entry = readdir(dirfd)) != elNil) {
+		while ((entry = readdir(dirfd)) != elNIL) {
 			if (elf_is_virtual_file_name(entry->d_name)) {
 				continue;
 			}

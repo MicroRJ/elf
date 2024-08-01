@@ -55,7 +55,7 @@ char elf_chrtouppercase(char x) {
 
 int elf_cstrlen(char const *s) {
 	int n = 0;
-	if (s != elNil) {
+	if (s != elNIL) {
 		while (*s ++ != 0) {
 			n += 1;
 		}

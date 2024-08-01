@@ -60,7 +60,7 @@ void elf_runini(elState *R, elModule *M) {
 
 
 int elf_call_function(elState *R, elRegId rxy, int nx, int ny) {
-	return elf_callex(R,elNil,rxy,rxy,nx,ny);
+	return elf_callex(R,elNIL,rxy,rxy,nx,ny);
 }
 
 
@@ -104,7 +104,7 @@ int elf_callexx(elState *R, elObject *obj, elValue fn, elRegId rx, elRegId ry, i
 		nyield = elf_run(R);
 	} else
 	if (fn.tag == TAG_BID) {
-		if (fn.c != elNil) {
+		if (fn.c != elNIL) {
 			nyield = fn.c(R);
 			/* ensure that the results were pushed to the stack */
 			elRegId nstack = R->top - call.locals;
@@ -170,12 +170,12 @@ int elf_loadexprfs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	p.bytes = fn.bytes;
 	p.nbytes = M->nbytes - fn.bytes;
 
-	return elf_callexx(R,elNil,elf_closure_value(elf_new_closure(R,p)),rxy,rxy,0,ny);
+	return elf_callexx(R,elNIL,elf_closure_value(elf_new_closure(R,p)),rxy,rxy,0,ny);
 }
 
 
 int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents) {
-	if (filename == elNil || contents == elNil) {
+	if (filename == elNIL || contents == elNIL) {
 		return -1;
 	}
 
@@ -212,7 +212,7 @@ int elf_loadcodefs(elState *R, elFileState *fs, elString *filename, elRegId rxy,
 	p.nbytes = M->nbytes - fn.bytes;
 
 	elValue cls = elf_closure_value(elf_new_closure(R,p));
-	return elf_callexx(R,elNil,cls,rxy,rxy,0,ny);
+	return elf_callexx(R,elNIL,cls,rxy,rxy,0,ny);
 }
 
 
@@ -252,7 +252,7 @@ void elf_check_division_by_zero(elState *S, elValue xx, elValue yy) {
 
 
 int elf_call_overload(elState *S, elObject *obj, elString *name, elRegId io, elValue in) {
-	if (obj->metatable == elNil) {
+	if (obj->metatable == elNIL) {
 		elf_throw(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elValue field = elf_table_get_field(obj->metatable,name);
@@ -289,7 +289,7 @@ int elf_run(elState *R) {
 	elValue *locals = call->locals;
 	elValue *values = call->cls->values;
 	elFileProto proto = call->cls->proto;
-	elASSERT(elINRANGE((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); //  1024 is some arbitrary to detect extraneous errors
+	elASSERT(elWITHIN((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); //  1024 is some arbitrary to detect extraneous errors
 
 	while (call->tail < proto.nbytes) {
 		/* todo: call->tail is redundant ... */
@@ -319,7 +319,7 @@ int elf_run(elState *R) {
 #endif
 		switch (b.k) {
 	case BC_LEAVE: {
-		if (call->delay_list != elNil) {
+		if (call->delay_list != elNIL) {
 			call->tail = call->delay_list->j;
 			call->delay_list = call->delay_list->n;
 		} else goto leave;
@@ -347,7 +347,7 @@ int elf_run(elState *R) {
 	} break;
 	// case BC_LOADFILE: {
 	// 	elString *fname = elf_get_string(R,b.x);
-	// 	if (fname == elNil) elf_throw(R,bc,"'load': attempted to call load with nil");
+	// 	if (fname == elNIL) elf_throw(R,bc,"'load': attempted to call load with nil");
 	// 	int result = elf_loadfile(R,fname,b.x,b.y);
 	// 	if (result == -1) {
 	// 		locals[b.x].tag = TAG_NIL;
@@ -364,7 +364,7 @@ int elf_run(elState *R) {
 		if (locals[b.y].x_int != 0) call->tail = jp + b.x;
 	} break;
 	case BC_LOADTHIS: {
-		if (call->obj == elNil) {
+		if (call->obj == elNIL) {
 			/* todo: we gotta rework this logic, first of all,
 			not passing the object in the argument list makes
 			it impossible to cache the meta-function because
@@ -419,11 +419,11 @@ int elf_run(elState *R) {
 		locals[b.x].n   = md->kn[b.y];
 	} break;
 	case BC_LOADCACHE: {
-		elASSERT(elINRANGE(b.y,0,proto.nvalues));
+		elASSERT(elWITHIN(b.y,0,proto.nvalues));
 		locals[b.x] = values[b.y];
 	} break;
 	case BC_CLOSURE: {
-		elASSERT(elINRANGE(b.y,0,array_length(M->prototypes)));
+		elASSERT(elWITHIN(b.y,0,array_length(M->prototypes)));
 		elFileProto proto = M->prototypes[b.y];
 		elClosure *new_closure = elf_new_closure(R,proto);
 		// elf_memcopy(new_closure->values,locals + b.x, sizeof(elValue) * proto.nvalues);
@@ -522,7 +522,7 @@ int elf_run(elState *R) {
 		if (xx.tag == TAG_TAB) {
 #if defined(ELF_EXPERIMENTAL_FEATURES)
 			if (elf_isobj(yy.tag)) {
-				if (yy.x_obj->metatable == elNil) {
+				if (yy.x_obj->metatable == elNIL) {
 					goto else_;
 				}
 				elValue overload = elf_table_get_field(yy.x_obj->metatable,R->cache.__hash);
@@ -587,11 +587,11 @@ int elf_run(elState *R) {
 
 	case BC_METACALL: {
 		elf_callex(R,locals[b.x].x_obj,b.x+1,b.x,b.y,b.z);
-		elASSERT(elINRANGE((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); // 1024 is just some arbitrary value to detect extraneous errors...
+		elASSERT(elWITHIN((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); // 1024 is just some arbitrary value to detect extraneous errors...
 	} break;
 	case BC_CALL: {
 		elf_call_function(R,b.x,b.y,b.z);
-		elASSERT(elINRANGE((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); // 1024 is just some arbitrary value to detect extraneous errors...
+		elASSERT(elWITHIN((elInteger)(R->top - locals), proto.nlocals, proto.nlocals + 1024)); // 1024 is just some arbitrary value to detect extraneous errors...
 	} break;
 	case BC_ISNIL: {
 		elValue x = locals[b.y];

@@ -154,7 +154,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	(which is the one without a caller) because that'll
 	just be the first instruction that executed for that
 	function/file, which is irrelevant */
-	if (call->caller == elNil) return;
+	if (call->caller == elNIL) return;
 
 	elASSERT(level > 0);
 
@@ -166,7 +166,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 		elFileInfo *file = &M->files[fileid];
 		elFileLine line = M->lines[call->head];
 		elf_line_dialog(file->name,file->lines,line,
-		call->head,M->bytes[call->head],call->cl != elNil ? "(bytecode function)" : "(binding)");
+		call->head,M->bytes[call->head],call->cl != elNIL ? "(bytecode function)" : "(binding)");
 	}
 }
 

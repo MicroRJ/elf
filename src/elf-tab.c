@@ -442,6 +442,8 @@ int elf_table_libfn_index(elState *R) {
 				if (value.tag == TAG_NIL) {
 					elf_throw(R,NO_BYTE,"nil object");
 				}
+				/* todo: please do much better error reporting
+				here, this can be hard to figure out */
 				if (value.tag != TAG_TAB) {
 					elf_throw(R,NO_BYTE,"not a table");
 				}
@@ -514,7 +516,7 @@ int elf_table_libfn_xdelete(elState *R) {
 		if (elf_isobj(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
 			/* todo: Speed */
-			elValue *item = elNil;
+			elValue *item = elNIL;
 			elInteger idx;
 			for ( idx = 0; idx < len; idx += 1 ) {
 				if (tab->array[idx].x_obj == object) {
@@ -558,7 +560,7 @@ int elf_table_libfn_xremove(elState *R) {
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */
-			elValue *item = elNil;
+			elValue *item = elNIL;
 			elInteger idx;
 			for (idx=0;idx<len;++idx) {
 				if (tab->array[idx].x_obj == object) {
@@ -571,7 +573,7 @@ int elf_table_libfn_xremove(elState *R) {
 			// if (item < tab->array || item > tab->array + len - 1) {
 			// 	elf_throw(R,NO_BYTE,"item does not belong");
 			// }
-			if (item == elNil) {
+			if (item == elNIL) {
 				elf_throw(R,NO_BYTE,"item does not belong");
 			}
 			elf_add_value(R,*item);
@@ -834,6 +836,9 @@ int elf_table_libfn_diff(elState *R) {
 	elf_check_args(R,":diff",1,"the subtrahend, the result contains all the values of this table that are not present in the subtrahend");
 	elTable *tab = (elTable *) elf_get_this(R);
 	elTable *sub = elf_get_table(R,0);
+	if (sub == elNIL) {
+		elf_throw(R,NO_BYTE,"argument is nil");
+	}
 	elTable *dif = elf_new_table(R);
 	elInteger i;
 	for ( i = 0; i < tab->ntotal; ++i ) {

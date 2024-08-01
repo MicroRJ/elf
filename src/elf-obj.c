@@ -19,7 +19,7 @@ elInteger elf_toint(elValue v) {
 
 
 int elf_isnil(elValue x) {
-	return (x.tag == TAG_NIL) || (!elf_isnumeric(x.tag) && (x.p == elNil));
+	return (x.tag == TAG_NIL) || (!elf_isnumeric(x.tag) && (x.p == elNIL));
 }
 
 

@@ -84,7 +84,7 @@ elNodeId elf_make_node_xyz(elFileState *fs, elFileLine line, elNodeKi k, elNodeT
 
 
 elNodeId elf_make_binary_node(elFileState *fs, elFileLine line, elNodeKi k, elNodeTy t, elNodeId x, elNodeId y) {
-	return elf_make_node_xyz(fs,line,k,t,x,y,elNil);
+	return elf_make_node_xyz(fs,line,k,t,x,y,elNIL);
 }
 
 

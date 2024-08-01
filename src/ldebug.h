@@ -14,7 +14,7 @@ void lang_assertfn(elSourceInfo ind, char const *name, elBool expr);
 #define LHERE (elSourceInfo){__FILE__,__LINE__,__func__}
 
 
-#define elINRANGE(X,XMIN,XMAX) (XMIN <= X < XMAX)
+#define elWITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
 
 
 #define LASSERTALWAYS(xx) lang_assertfn(LHERE,elTOTEXT(xx),xx)
@@ -40,7 +40,7 @@ void lang_assertfn(elSourceInfo ind, char const *name, elBool expr);
 
 
 #if defined(_DEBUG)
-	#define LCHECKPRINTF(FORMAT,...) ((false)?(snprintf(elNil,0,FORMAT,##__VA_ARGS__),elNil):elNil)
+	#define LCHECKPRINTF(FORMAT,...) ((false)?(snprintf(elNIL,0,FORMAT,##__VA_ARGS__),elNIL):elNIL)
 #else
 	#define LCHECKPRINTF(FORMAT,...) 0
 #endif

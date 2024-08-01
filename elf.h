@@ -357,7 +357,7 @@ at the same time when using clang-cl */
 #define false   ((elBool)(0))
 #define elFalse ((elBool)(0))
 #define elTrue  ((elBool)(1))
-#define elNil   ((elAddr)(0))
+#define elNIL   ((elAddr)(0))
 
 
 
