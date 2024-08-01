@@ -24,7 +24,7 @@ int elf_isnil(elValue x) {
 
 
 elBool elf_isobj(elValueTag tag) {
-	return tag > TAG_OBJ;
+	return tag >= TAG_OBJ;
 	// switch (tag) {
 	// 	case TAG_STR: case TAG_TAB:
 	// 	case TAG_OBJ: case TAG_CLS: {
