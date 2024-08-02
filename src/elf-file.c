@@ -132,7 +132,7 @@ void elf_enclose_entity(elFileState *fs, elFileFnState *fn, elEntityIdTypeGuard 
 	/* ensure the entity should actually be captured */
 	elASSERT(id.id < fn->entities);
 
-	for (int i = 0; i < array_length(fn->enclosure); i += 1) {
+	for (int i = 0; i < ARRAY_LENGTH(fn->enclosure); i += 1) {
 		if (fn->enclosure[i] == id.id) return;
 	}
 
@@ -190,7 +190,7 @@ elNodeId elf_new_local_entity(elFileState *fs, elFileLine line, char *name, elBo
 	}
 
 	elEntityId id = fs->nentities ++;
-	elf_xarray_growby(fs->entities,fs->nentities-array_length(fs->entities));
+	elf_xarray_growby(fs->entities,fs->nentities-ARRAY_LENGTH(fs->entities));
 
 	elRegId slot = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 	elNodeId node = elf_make_register_node(fs,line,slot);
@@ -443,7 +443,7 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 	p.zstack = fn.nlocals;
 	p.bytes = fn.bytes;
 	p.nbytes  = fs->md->nbytes - fn.bytes;
-	p.zcache = array_length(fn.enclosure);
+	p.zcache = ARRAY_LENGTH(fn.enclosure);
 	int f = elf_add_proto(fs->M,p);
 
 	elf_emitter_patch_jump(fs,fj);
@@ -651,7 +651,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 			/* So if the user does something like new Thing {}
 			or new Thing({}) the table that was passed in can
 			be used as supposed to creating a new one */
-			if ((array_length(call_args) == 1) && (elf_get_node_kind(fs,call_args[0]) == NODE_TABLE)) {
+			if ((ARRAY_LENGTH(call_args) == 1) && (elf_get_node_kind(fs,call_args[0]) == NODE_TABLE)) {
 				table = call_args[0];
 			} else {
 				/* If the user however, doesn't do this, then we
@@ -998,7 +998,7 @@ case TK_FOR: {
 		elNodeId y = elf_load_file_expr(fs,0);
 		if (elf_get_node_kind(fs,y) == NODE_MULTI) {
 			elNodeId *yz = elf_get_node(fs,y).z;
-			for (int i = 0; i < array_length(yz); i += 1) {
+			for (int i = 0; i < ARRAY_LENGTH(yz); i += 1) {
 				ARRAY_ADD(z,yz[i]);
 			}
 		} else {
@@ -1039,7 +1039,7 @@ const elRegId value_register = elf_get_node(fs,value).x;
 			}
 			*/
 int i;
-for (i = 0; i < array_length(z); i += 1) {
+for (i = 0; i < ARRAY_LENGTH(z); i += 1) {
 	elNodeId y = z[i];
 
 	elNodeId array = NO_NODE;

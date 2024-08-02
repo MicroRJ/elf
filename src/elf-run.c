@@ -423,7 +423,7 @@ int elf_run(elState *R) {
 		locals[b.x] = values[b.y];
 	} break;
 	case BC_CLOSURE: {
-		elASSERT(elWITHIN(b.y,0,array_length(M->prototypes)));
+		elASSERT(elWITHIN(b.y,0,ARRAY_LENGTH(M->prototypes)));
 		elFileProto proto = M->prototypes[b.y];
 		elClosure *new_closure = elf_new_closure(R,proto);
 		// elf_memcopy(new_closure->values,locals + b.x, sizeof(elValue) * proto.nvalues);

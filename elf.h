@@ -12,10 +12,11 @@
 /*
 ** Configuration Macros (mostly temporary)
 */
-#define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(1)
-#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(8)
 
-#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
+#define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(1)
+#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(1024)
+
+#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((1024)*2)
 #define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*4)
 
 // #define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
@@ -445,10 +446,18 @@ typedef enum elGCPhase {
 typedef struct elCollector {
 	elBool     paused;
 	elGCPhase  phase;
+	elInteger  memory_allocated;
+	elInteger  memory_threshold;
 	elObject **new_objects;
 	elObject **objects;
-	elInteger  allocated;
-	elInteger  threshold;
+	/* This changes dynamically based on usage patterns,
+	the idea is to collect more when it is worth collecting,
+	and to refrain from collecting when previous culls
+	weren't fortuitous. This is based on the assumption that
+	it is better to make small and quick collections. However,
+	there's very high likelihood that we won't be successful,
+	so we remember that through this threshold */
+	elInteger  object_trigger_threshold;
 } elCollector;
 
 

@@ -19,7 +19,7 @@ int main(int n, char **c) {
 	int *var = {0};
 	ARRAY_ADD(var,1);
 	if (var[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: var.add!\n");
-	if (array_length(var) != 1) sys_consolelog(ELF_LOGERROR,"FAILED: 'var.len!\n");
+	if (ARRAY_LENGTH(var) != 1) sys_consolelog(ELF_LOGERROR,"FAILED: 'var.len!\n");
 	int arr[1] = {1};
 	if (arr[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: arr!\n");
 	#endif

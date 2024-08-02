@@ -43,7 +43,7 @@ typedef struct elArray {
 #define elf_varaddx(var,res,com) ((var) + elf_varaddxx((void**)&(var),sizeof(*var),res,com))
 #define elf_xarray_growby(var,num) (elf_varaddxx((void**)&(var),sizeof(*var),num,num))
 #define elf_varaddn(var,num) ((var) + elf_xarray_growby(var,num))
-#define array_length elf_varmin
+#define ARRAY_LENGTH elf_varmin
 
 /* Seems that only msvc compiles this properly or
 am I trippin' ? */
@@ -67,9 +67,9 @@ elInteger elf_varaddxx(void **var
 
 #define FOR_RANGE(N,RMIN,RMAX) for (elInteger N = RMIN; N < RMAX; N += 1)
 
-#define ARRAY_FOR(N,A) for (elInteger N = 0; N < array_length(A); N += 1)
-#define ARRAY_PER(T,N,A) for (T N = A; N < A + array_length(A); N += 1)
+#define ARRAY_FOR(N,A) for (elInteger N = 0; N < ARRAY_LENGTH(A); N += 1)
+#define ARRAY_PER(T,N,A) for (T N = A; N < A + ARRAY_LENGTH(A); N += 1)
 
 /* todo: these are deprecated */
-#define elf_varforj(A) for (elInteger j = 0; j < array_length(A); ++ j)
-#define elf_xarray_foreachi(A) for (elInteger i = 0; i < array_length(A); ++ i)
+#define elf_varforj(A) for (elInteger j = 0; j < ARRAY_LENGTH(A); ++ j)
+#define elf_xarray_foreachi(A) for (elInteger i = 0; i < ARRAY_LENGTH(A); ++ i)

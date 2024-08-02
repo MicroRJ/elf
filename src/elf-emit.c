@@ -213,7 +213,7 @@ void elf_emitter_add_block_flags(elFileState *fs, int flags) {
 
 elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags) {
 	elBlockId level = fs->nblocks ++;
-	if (array_length(fs->blocks) < fs->nblocks) {
+	if (ARRAY_LENGTH(fs->blocks) < fs->nblocks) {
 		elf_xarray_growby(fs->blocks,1);
 	}
 
@@ -857,7 +857,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(v.z[i]));
 				elASSERT(last == tail ++);
 			}
-			int n = array_length(v.z);
+			int n = ARRAY_LENGTH(v.z);
 			elf_emitter_add_bytexyz(fs,line,vx.k == NODE_METAFIELD ? BC_METACALL : BC_CALL,head,n,y);
 			if (target_register != NO_SLOT && y != 0) {
 				if (y > 1) elf_file_dialog(fs,line,"unsupported");

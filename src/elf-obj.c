@@ -168,7 +168,7 @@ elInteger elf_mark_object(elObject *obj) {
 				num += elf_mark_object(slots[k].key.x_obj);
 			}
 		}
-		for (k=0; k<array_length(array); ++k) {
+		for (k=0; k<ARRAY_LENGTH(array); ++k) {
 			if (elf_isobj(array[k].tag)) {
 				num += elf_mark_object(array[k].x_obj);
 			}
@@ -183,7 +183,7 @@ elInteger elf_unmark_objects(elState *R) {
 	elInteger result = 0;
 	elInteger i;
 	elObject **objects = R->memory.objects;
-	for (i = 0; i < array_length(objects); i ++) {
+	for (i = 0; i < ARRAY_LENGTH(objects); i ++) {
 		elObject *it = objects[i];
 		switch (it->color) {
 			case GC_RED:
@@ -227,7 +227,7 @@ elInteger elf_free_phase(elState *R) {
 	}
 	elInteger n = 0;
 	elInteger k;
-	for (k=0; k<array_length(objects); ++ k) {
+	for (k=0; k<ARRAY_LENGTH(objects); ++ k) {
 		elObject *it = objects[k];
 		if (it == 0 || it->color == GC_RED) {
 			elf_throw(R,NO_BYTE,"internal error, GC failed");
@@ -239,7 +239,7 @@ elInteger elf_free_phase(elState *R) {
 		} else if (it->color == GC_WHITE) {
 			n += 1;
 			it->color = GC_RED;
-			R->memory.allocated -= it->tell;
+			R->memory.memory_allocated -= it->tell;
 			if (it->type == OBJ_TAB) {
 				elf_dealloc_table((elTable*)it);
 			}
@@ -252,15 +252,17 @@ elInteger elf_free_phase(elState *R) {
 }
 
 
-void elf_trigger_collection_cycle(elState *R) {
+elInteger elf_trigger_collection_cycle(elState *R) {
 	elInteger time_ = elf_clocktime();
 	elInteger num_marked = elf_hold_phase(R);
-	elInteger num_objects = array_length(R->memory.objects);
+	elInteger num_objects = ARRAY_LENGTH(R->memory.objects);
 	elInteger num_to_collect = num_objects - num_marked;
 	elf_debug_log("GC: %lli - %lli -> %lli, (total - marked = expected)",num_objects,num_to_collect,num_marked);
-	num_to_collect -= elf_free_phase(R);
+	elInteger num_collected = elf_free_phase(R);
+	num_to_collect -= num_collected;
 	elf_debug_log("	(%f) => leaked: %lli"
 	, elf_timediffms(time_),num_to_collect);
+	return num_collected;
 }
 
 
@@ -268,29 +270,33 @@ void elf_collect(elState *R) {
 	if (R->memory.paused) {
 		return;
 	}
-	if (R->memory.threshold <= 0) {
-		R->memory.threshold = elGC_MEM_THRESHOLD_MIN;
+	if (R->memory.memory_threshold <= 0) {
+		R->memory.memory_threshold = elGC_MEM_THRESHOLD_MIN;
 	}
-	if (array_length(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
-		elf_trigger_collection_cycle(R);
-		// if (array_length(R->memory.objects) > elGC_OBJ_THRESHOLD_MAX) {
-		// 	elf_throw(R,NO_BYTE,elf_tpf("out of memory, %lli objects",array_length(R->memory.objects)));
-		// }
-	} else if (R->memory.allocated > R->memory.threshold) {
-		R->memory.threshold *= 2;
-		if (R->memory.threshold > elGC_MEM_THRESHOLD_MAX) {
-			R->memory.threshold = elGC_MEM_THRESHOLD_MAX;
+	if (R->memory.object_trigger_threshold <= 0) {
+		R->memory.object_trigger_threshold = elGC_OBJ_THRESHOLD_MIN;
+	}
+	elInteger num_objects = ARRAY_LENGTH(R->memory.objects);
+	elInteger obj_threshold = R->collector.object_trigger_threshold;
+	if (num_objects > obj_threshold) {
+		elInteger num_collected = elf_trigger_collection_cycle(R);
+		elASSERT(num_collected <= num_objects);
+		R->collector.object_trigger_threshold += elGC_OBJ_THRESHOLD_MIN - num_collected;
+	} else if (R->memory.memory_allocated > R->memory.memory_threshold) {
+		R->memory.memory_threshold *= 2;
+		if (R->memory.memory_threshold > elGC_MEM_THRESHOLD_MAX) {
+			R->memory.memory_threshold = elGC_MEM_THRESHOLD_MAX;
 		}
 		elf_trigger_collection_cycle(R);
-		if (R->memory.allocated > R->memory.threshold) {
-			elf_throw(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated",R->memory.allocated / MEGABYTES(1)));
+		if (R->memory.memory_allocated > R->memory.memory_threshold) {
+			elf_throw(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated",R->memory.memory_allocated / MEGABYTES(1)));
 		}
 	}
 }
 
 
 void *elf_new_object(elState *R, elObjType type, elInteger tell) {
-	R->memory.allocated += tell;
+	R->memory.memory_allocated += tell;
 	elf_collect(R);
 
 	elObject *obj = elf_clear_alloc(elHEAP_ALLOCATOR,tell);

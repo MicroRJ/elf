@@ -56,7 +56,7 @@ elNumber elf_timediffms(elInteger begin) {
 
 int elf_find_file_info_by_byte(elModule *md, elByteId byte) {
 	elFileInfo *files = md->files;
-	int nfiles = array_length(files);
+	int nfiles = ARRAY_LENGTH(files);
 	for (int x = 0; x < nfiles; ++ x) {
 		elFileInfo file = files[x];
 		if ((elInteger)(byte - file.bytes) < file.nbytes) {

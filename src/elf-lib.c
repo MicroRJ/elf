@@ -75,7 +75,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 			elObjectTracePath child = { &path, "(table.value)" };
 
 			elValue *value;
-			for (value = tab->array; value < tab->array + array_length(tab->array); value += 1) {
+			for (value = tab->array; value < tab->array + ARRAY_LENGTH(tab->array); value += 1) {
 				if (elf_isobj(value->tag)) {
 					elInteger found = elf_trace_object(S,visited,obj,value->x_obj,child);
 					traces += found;
@@ -122,19 +122,19 @@ int elf_lib_trace_object(elState *R) {
 
 
 int elf_lib_get_allocated_objects(elState *R) {
-	elf_add_integer(R,array_length(R->memory.objects));
+	elf_add_integer(R,ARRAY_LENGTH(R->memory.objects));
 	return 1;
 }
 
 
 int elf_lib_get_allocated_memory(elState *R) {
-	elf_add_integer(R,R->memory.allocated);
+	elf_add_integer(R,R->memory.memory_allocated);
 	return 1;
 }
 
 
 int elf_lib_get_collector_threshold(elState *R) {
-	elf_add_integer(R,R->memory.threshold);
+	elf_add_integer(R,R->memory.memory_threshold);
 	return 1;
 }
 
@@ -658,7 +658,7 @@ int elf_fpf_value(FILE *file, elValue v, elBool quotes) {
 			elTable *tab = v.x_tab;
 			wrote += fprintf(file,"{");
 			elInteger i,j,n;
-			for (i=0;i<array_length(tab->array);++i) {
+			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elEntry it = tab->slots[j];
