@@ -538,6 +538,9 @@ _(LEVEL,"level") _(REGISTER,"register") \
 _(INDEX,"index") _(VALUE,"value") _(ARRAY,"array") _(FIELD,"field") _(ENDOFFILE,"eof")
 
 
+/* todo: why would !! and ?? have lower precedence
+than relational operators, when !! and ?? work on
+values */
 #define OPLIST(_) \
 _(POW,"**",12) \
 _(MUL,"*",11) _(DIV,"/",11) _(MOD,"%",11) \

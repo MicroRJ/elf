@@ -786,16 +786,24 @@ int elf_table_libfn_merge(elState *R) {
 	return 1;
 }
 
-/* todo: could this be renamed to make more clear? */
+/*
+** CHANGELOG 8/22/24: Now xmerge properly returns a new
+** table, like merge does...
+** todo: could this be renamed to make more clear?
+*/
 int elf_table_libfn_xmerge(elState *R) {
 	elf_check_args(R,":xmerge",1,"the table to merge, all values are of the table are added to a new one, unline :merge, :xmerge will not check for duplicates");
 	elTable *tab = (elTable *) elf_get_this(R);
-	elTable *merger = elf_get_table(R,0);
+	elTable *add = elf_get_table(R,0);
+	elTable *sum = elf_add_new_table(R); /* <- */
 	elInteger i;
-	for (i=0;i<ARRAY_LENGTH(merger->array);++i) {
-		ARRAY_ADD(tab->array,merger->array[i]);
+	for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
+		ARRAY_ADD(sum->array,tab->array[i]);
 	}
-	return 0;
+	for (i=0;i<ARRAY_LENGTH(add->array);++i) {
+		ARRAY_ADD(sum->array,add->array[i]);
+	}
+	return 1;
 }
 
 
