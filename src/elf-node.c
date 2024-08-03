@@ -67,7 +67,7 @@ void elf_node_fpf(elFileState *fs, FILE *io, elNodeId id) {
 
 
 elNodeId elf_make_node_xyz(elFileState *fs, elFileLine line, elNodeKi k, elNodeTy t, elNodeId x, elNodeId y, elNodeId *z) {
-	if (elf_varmin(fs->nodes) <= fs->nnodes) {
+	if (ARRAY_MIN(fs->nodes) <= fs->nnodes) {
 		elf_xarray_growby(fs->nodes,1);
 	}
 	elNode *nd = fs->nodes + fs->nnodes;

@@ -81,10 +81,10 @@ void jittestall() {
 #if 0
 void do_add(elValue *x, elValue *y) {
 	if (x->tag == TAG_NUM) {
-		x->n = elf_tonum(* x) + elf_tonum(* y);
+		x->n = elTONUM(* x) + elTONUM(* y);
 	} else
 	if (x->tag == TAG_INT) {
-		x->i = elf_toint(* x) + elf_toint(* y);
+		x->i = elTOINT(* x) + elTOINT(* y);
 	}
 }
 #endif

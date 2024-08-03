@@ -16,7 +16,7 @@
 - around */
 elBinding jit(elModule *md, elFileProto fn);
 int jitlib_jit(elState *rt) {
-	elValue v = elf_loadfilefs(rt,0);
+	elValue v = elf_load_file_fs(rt,0);
 	elBinding b = jit(rt->md,v.f->fn);
 	elf_pushbinding(rt,b);
 	// __debugbreak();

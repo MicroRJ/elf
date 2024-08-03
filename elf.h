@@ -48,7 +48,7 @@
 #endif
 
 /*
-** Auxiliary Macros
+** Auxiliary Macros (all macros are auxilary...)
 */
 
 
@@ -95,14 +95,10 @@
 #endif
 
 
-/* Some Forward Declarations */
-typedef struct elModule 	elModule;
-typedef struct elFileState elFileState;
-typedef struct elState 		elState;
-typedef struct elTable 		elTable;
-typedef struct elString 	elString;
-typedef struct elObject 	elObject;
-typedef struct elClosure 	elClosure;
+#define false   ((elBool)(0)) /* todo: @DEPRECATED */
+#define elFALSE ((elBool)(0))
+#define elTRUE  ((elBool)(1))
+#define elNIL   ((elAddr)(0))
 
 
 /*
@@ -114,14 +110,64 @@ typedef signed int 		   elBool;
 typedef double 			   elNumber;
 typedef void 			     *elHandle;
 typedef void 			     *elAddr;
+
+
 typedef unsigned int 	   elHashId;
 typedef int 				   elRegId;
 typedef int 				   elByteId;
 typedef int 				   elSymbolId;
 typedef int   				   elError;
+
+
+/*
+** Arrays are not exposed directly through elf,
+** we use them internally as a core data type,
+** they work the same as STB's stretchy buffer.
+**
+**
+** Usage is as follows:
+**
+** T *array = 0; // ensure it is initialized to 0
+**
+** ARRAY_ADD(array,T-thing)
+**
+** Take special care with array add, as it will
+** evaluate the array twice, so if you plug
+** in some very expensive expression, or something
+** that is state sensitive, it could lead to
+** hard to find bugs...
+** Generally, I try to make it so that macros only evaluate
+** things once, but unfortunately, I couldn't find a way to
+** make it work the same for this one.
+**
+*/
+typedef struct elArray {
+	elInteger max;
+	elInteger min;
+   /* contents are allocated past this point */
+} elArray;
+
+
+#define ARRAY(var) ((elArray*)(var))[-1]
+#define ARRAY_MAX(var) ((var != 0) ? ARRAY(var).max : 0)
+#define ARRAY_MIN(var) ((var != 0) ? ARRAY(var).min : 0)
+#define ARRAY_POP(var) ((var != 0) ? ARRAY(var).min -= 1 : 0)
+#define ARRAY_LENGTH ARRAY_MIN
+
+
+
+/* Some Forward Declarations */
+typedef struct elModule 	elModule;
+typedef struct elFileState elFileState;
+typedef struct elState 		elState;
+typedef struct elTable 		elTable;
+typedef struct elString 	elString;
+typedef struct elObject 	elObject;
+typedef struct elClosure 	elClosure;
+
 /* todo: eventually convert this to an offset,
 but this is great for debugging... */
-typedef char 		        *elFileLine;
+typedef char 		       *elFileLine;
 typedef int (* elBinding)(elState *);
 
 
@@ -135,11 +181,25 @@ typedef struct elSourceInfo {
 
 
 typedef struct elAllocator elAllocator;
-typedef elError (* elf_AllocFn)(elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, elSourceInfo loca);
+typedef elError (* elAllocFn)(elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, elSourceInfo loca);
+
 typedef struct elAllocator {
 	char const *label;
-	elf_AllocFn fn;
+	elAllocFn fn;
 } elAllocator;
+
+
+typedef enum elObjType {
+	OBJ_OBJ = 0, OBJ_CLS, OBJ_STR, OBJ_TAB
+} elObjType;
+
+
+/* first object tag must be OBJECT, all other
+objects come after it, this should be same
+order as object types... */
+#define TAGLIST(_) \
+_(NIL) _(NUM) _(INT) _(SYS) _(BID) \
+_(OBJ) _(CLS) _(STR) _(TAB) /* end */
 
 
 typedef enum elGCColor {
@@ -147,25 +207,29 @@ typedef enum elGCColor {
 } elGCColor;
 
 
-typedef enum elObjType {
-	OBJ_NONE = 0, OBJ_CLOSURE, OBJ_STRING, OBJ_ARRAY, OBJ_TAB, OBJ_CUSTOM,
-} elObjType;
-
-
 typedef struct elObject {
-	elObjType type;
-	elGCColor color;
+	elObjType      type;
+	elGCColor     color;
 	elTable  *metatable;
 	/* todo: please remove this... */
 	short tell;
 } elObject;
 
-/* first object tag must be OBJECT, all other
-objects come after it */
-#define TAGLIST(_) \
-_(NIL) _(GCD) _(SYS) \
-_(INT) _(NUM) _(BID) \
-_(OBJ) _(CLS) _(STR) _(TAB) /* end */
+
+#define elOBJTOTAG(typ) ((typ) + TAG_OBJ)
+
+#define elISOBJTAG(tag) ((tag) >= TAG_OBJ)
+#define elISNUMTAG(tag) ((tag) == TAG_NUM || (tag) == TAG_INT)
+
+
+#define elISNILOBJ(val) (elISOBJTAG((val).tag) && (val).x_obj == elNIL)
+/* todo: I wonder what the point is of having nil be a type if
+you can just do obj with nil ptr */
+#define elISNIL(val) ((val).tag == TAG_NIL || elISNILOBJ(val))
+
+/* these are only soft conversions */
+#define elTONUM(val) ((val).tag == TAG_INT ? (elNumber)  (val).x_int : (val).x_num)
+#define elTOINT(val) ((val).tag == TAG_NUM ? (elInteger) (val).x_num : (val).x_int)
 
 
 #define TAGENUM(NAME) elFUSE(TAG_,NAME),
@@ -198,29 +262,153 @@ typedef struct elValue {
 } elValue;
 
 
+// #define STATIC_ASSERT(C) typedef char __thing__[(C)*2-1]
+// STATIC_ASSERT(elISOBJTAG(TAG_OBJ));
+// STATIC_ASSERT(elISNUMTAG(TAG_NUM));
+// STATIC_ASSERT(elISNUMTAG(TAG_INT));
+
+/*
+** A file prototype describes a function,
+** files themselves are also functions and
+** are treated no differently.
+** A function may have other functions within,
+** we keep an additional array here, **protos,
+** which stores the id's of each within the
+** module.
+** source and length are for storing primarily
+** the contents of a file.
+*/
 typedef struct elFileProto {
-	short x,y;
+	short   x,y;
 	union { short nvalues, /* @DEPRECATED */ zcache; };
 	union { short nlocals, /* @DEPRECATED */ zstack; };
-	int 	nbytes;
-	int 	bytes;
+	/* Use objects here so that this memory
+	is managed automatically, this also means that
+	loaded files have to be kept in memory
+	otherwise they get collected, 'load' will
+	load a file and keep it in the stack, where
+	it is reachable.  */
+	elString     *name;
+	elString *contents;
+	int 	      nbytes;
+	int 	       bytes;
+	int       **protos;
 } elFileProto;
 
-
+/* closures are both for files and functions,
+a file is a function so I don't know why keep
+saying files and functions... */
 typedef struct elClosure {
-	elObject obj;
-	union {
-		elFileProto proto;
-		struct {
-			short x,y;
-			short nvalues;
-			short nlocals;
-			int 	nbytes;
-			int 	bytes;
-		};
-	};
-	elValue values[1];
+	elObject       obj;
+	elFileProto  proto;
+	/* both files and functions can have
+	values, for files these are variables
+	that are the declared at level 0 (file)
+	and are stored here. */
+	elValue  values[1];
 } elClosure;
+
+
+/* String Object */
+typedef struct elString {
+	elObject    obj;
+	elHashId   hash;
+	/* Hear me out... do you even	use the length of
+	the string that often, and when you do use it,
+	you cache it somewhere, if you really want to
+	compute the length of a string without using
+	strlen (like when you're looking up a string),
+	you can use the size of the object minus the
+	size of the string header... */
+	int     	length;
+	union {
+		char   contents[1];
+		char   string[1];
+		char   c[1];
+	};
+} elString;
+
+
+elString *elf_new_lstring(elState *R, elInteger length);
+elString *elf_new_string(elState *R, char *contents);
+
+int elf_string_lib_length(elState *R);
+int elf_string_lib_match(elState *R);
+int elf_string_lib_pop(elState *R);
+int elf_string_lib_append(elState *R);
+int elf_string_lib_append_char(elState *R);
+int elf_string_lib_get_hash(elState *R);
+int elf_string_lib_uppercase(elState *R);
+int elf_string_lib_lowercase(elState *R);
+int elf_string_lib_split_by_lines(elState *R);
+int elf_string_lib_get_index(elState *R);
+int elf_string_lib_find(elState *R);
+int elf_string_lib_split(elState *R);
+
+
+
+typedef struct elEntry {
+	union { elValue key, k; };
+	union { elInteger index, i; };
+} elEntry;
+
+
+typedef struct elTable {
+	elObject obj;
+	elInteger ntotal;
+	elInteger nslots;
+	elInteger ncollisions;
+	union { elEntry *entries, *slots; };
+	union {elValue *values, /* @DEPRECATED */ *array;};
+} elTable;
+
+
+elTable *elf_new_table_metatable(elState *);
+elTable *elf_new_ltable(elState *, elInteger);
+elTable *elf_new_table(elState *);
+
+elInteger elf_table_tryS(elTable *tab, char *contents, elInteger length, elHashId hash);
+void elf_check_table(elTable *table);
+
+void elf_dealloc_table(elTable *);
+void elf_table_add(elTable *table, elValue v);
+elBool elf_table_set(elTable *table, elValue k, elValue v);
+elInteger elf_table_lookup_index(elTable *table, elValue k);
+elInteger elf_table_get_value_hash(elValue v);
+elHashId elf_table_rehash(elHashId hash);
+elHashId elf_tabhashstr(char *junk);
+elHashId elf_tabhashptr(elAddr *ptr);
+elBool elf_tabvaleq(elValue *x, elValue *y);
+void elf_table_field_alias(elState *S, elTable *tab, char *key, elValue alias);
+void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias);
+
+int elf_table_libfn_add(elState *);
+int elf_table_libfn_xadd(elState *);
+int elf_table_libfn_xremove(elState *);
+int elf_table_libfn_xdelete(elState *);
+int elf_table_libfn_index(elState *);
+int elf_table_libfn_tally(elState *);
+int elf_table_libfn_length(elState *);
+int elf_table_libfn_delete(elState *);
+int elf_table_libfn_itemize(elState *);
+int elf_table_libfn_inject(elState *);
+int elf_table_libfn_alias(elState *);
+int elf_table_libfn_contains(elState *);
+int elf_table_libfn_lookup(elState *);
+int elf_table_libfn_foreach(elState *);
+int elf_table_libfn_get_collisions(elState *);
+int elf_table_libfn_bubble_sort(elState *);
+int elf_table_libfn_find_aliases(elState *);
+int elf_table_libfn_array(elState *R);
+int elf_table_libfn_xset(elState *R);
+int elf_table_libfn_merge(elState *);
+int elf_table_libfn_xmerge(elState *);
+int elf_table_libfn_diff(elState *R);
+int elf_table_libfn_xclone(elState *);
+int elf_table_libfn_reverse(elState *);
+int elf_table_libfn_clone(elState *);
+int elf_table_libfn_slice(elState *R);
+int elf_table_libfn_swap(elState *R);
 
 
 /*
@@ -233,6 +421,7 @@ elAPI elValueTag elf_get_tag(elState *R, elRegId x);
 elAPI elInteger elf_get_integer(elState *R, elRegId x);
 elAPI elNumber elf_get_number(elState *R, elRegId x);
 elAPI elString *elf_get_string(elState *R, elRegId x);
+elAPI char *elf_get_cstring(elState *R, elRegId x);
 elAPI elObject *elf_get_object(elState *R, elRegId x);
 elAPI elTable *elf_get_table(elState *R, elRegId x);
 elAPI elHandle elf_get_handle(elState *R, elRegId x);
@@ -248,31 +437,16 @@ elAPI elValue elf_integer_value(elInteger i);
 elAPI elValue elf_number_value(elNumber n);
 elAPI elValue elf_nil_value();
 
-
 void *elf_new_object(elState *R, elObjType type, elInteger length);
 
+elAPI int elf_load_code(elState *, elString *filename, elRegId rxy, int ny, elString *contents);
+elAPI int elf_load_expr(elState *, elString *filename, elRegId rxy, int ny, elString *contents);
+elAPI int elf_load_file(elState *, elString *filename, elRegId rxy, int ny);
 
-/*
-** The following set of functions are very similar
-** and have the same semantics, the only difference
-** are the parameters.
-** - filename: is the name of the file to load from
-** disk or the label you wish to attach the code.
-** - rxy: is the register from which to read inputs
-** and to which to write outputs.
-**
-**   Loads elf [....] and calls its function.
-** loadcodefs: [code]
-** loadexprfs: [expr]
-** loadfilefs: [file]
-*/
-elAPI int elf_loadcodefs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents);
-elAPI int elf_loadexprfs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, char *contents);
-elAPI int elf_loadfilefs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny);
+elAPI int elf_load_code_fs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents);
+elAPI int elf_load_expr_fs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents);
+elAPI int elf_load_file_fs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny);
 
-elAPI int elf_loadcode(elState *, elString *filename, elRegId rxy, int ny, char *contents);
-elAPI int elf_loadexpr(elState *, elString *filename, elRegId rxy, int ny, char *contents);
-elAPI int elf_loadfile(elState *, elString *filename, elRegId rxy, int ny);
 
 
 /*
@@ -290,7 +464,7 @@ elAPI int elf_loadfile(elState *, elString *filename, elRegId rxy, int ny);
 ** the results are written to.
 ** ry can be equal to rx.
 */
-elAPI int elf_callex(elState *, elObject *obj, elRegId rx, elRegId ry, int nx, int ny);
+elAPI int elf_call_function2(elState *, elObject *obj, elRegId rx, elRegId ry, int nx, int ny);
 /*
 ** Performs a root call, where rx and ry are the same
 ** and obj is nil.
@@ -315,6 +489,10 @@ elAPI elTable *elf_add_table(elState *, elTable *t);
 elAPI elTable *elf_add_new_table(elState *R);
 elAPI elRegId elf_add_closure(elState *, elClosure *f);
 elAPI elRegId elf_pushbinding(elState *, elBinding c);
+
+elInteger elf_trigger_collection_cycle(elState *R);
+elInteger elf_unmark_objects(elState *R);
+elInteger elf_mark_object(elObject *obj);
 
 
 #if defined(_MSC_VER)
@@ -351,14 +529,6 @@ at the same time when using clang-cl */
 
 
 
-/*
-** Constant Macros
-*/
-
-#define false   ((elBool)(0))
-#define elFalse ((elBool)(0))
-#define elTrue  ((elBool)(1))
-#define elNIL   ((elAddr)(0))
 
 
 
@@ -372,11 +542,67 @@ at the same time when using clang-cl */
 #include "src/elf-chr.h"
 #include "src/elf-aux.h"
 #include "src/elf-byte.h"
-#include "src/elf-mod.h"
-#include "src/elf-api.h"
+// #include "src/elf-mod.h"
+// #include "src/elf-api.h"
 
 
 /* Core Structures */
+
+
+/*
+** Symbols
+** 	elBytecode and globals can be added dynamically and
+** safely, in fact, multiple files will reference the
+** same global by name, no matter the order in which
+** they were loaded, or the means, runtime/compiletime.
+** This is because we use a symbol table that maps a
+** name at compile time to an index in the global values.
+** Even if a file is loaded at runtime, the compilation
+** process finds the global symbol and maps it to the
+** target index. Lookups are effectively done at compile
+** time.
+**
+*/
+typedef struct elModule {
+	union { elTable *globals, /* todo: @DEPRECATED */ *g; };
+	/* todo: rename */
+	elTable *strings;
+	int *track;
+	elBytecode *bytes;
+	elByteId nbytes;
+	char **lines;
+	elFileProto *files;
+	union { elNumber *numbers,      /* @DEPRECATED */ *kn; };
+	union { elInteger *integers,    /* @DEPRECATED */ *ki; };
+	union { elFileProto *functions, /* @DEPRECATED */ *prototypes, *p; };
+} elModule;
+
+
+elSymbolId elf_get_global_symbol(elModule *md, elString *name);
+elSymbolId elf_add_global_value(elModule *md, elString *name, elValue v);
+elSymbolId elf_add_proto(elModule *md, elFileProto p);
+
+/*
+	elModule\r: runtime is stored here
+for garbage collection.
+	elModule\gc: all objects to be automatically
+managed, or garbage collected, are listed here.
+By default all objects are added here, you
+can however remove them from this array.
+
+elModule\gf: buffer for functions definitions,
+essentially a type table, anonymous functions
+are also added here.
+
+elModule\g: global symbol table which
+maps names to values, indexed
+at runtime by index.
+
+elModule\bytes: buffer for bytes, all the bytes
+are stored here, functions index into this
+buffer.
+
+*/
 
 typedef struct elDelaylist elDelaylist;
 typedef struct elDelaylist {
@@ -482,7 +708,6 @@ typedef struct elState {
 		elValue ongc;
 	} hooks;
 	struct {
-		elTable *transient;
 		elString *x,*y,*z,*w;
 		elString *width,*height;
 		elString *__add,*__sub,*__mul,*__div;
@@ -893,14 +1118,32 @@ typedef struct elFileFnState {
 
 
 typedef struct elFileState {
-	union { elModule *M,*md; };
-	union { elState *R,*rt; };
-	int file_id;
-	char *filename;
-	char *linechar;
-	char *contents;
-	char *thischar;
-	int linenumber;
+	union { elModule *M, /* @DEPRECATED */ *md; };
+	union { elState  *R, /* @DEPRECATED */ *rt; };
+	/*
+	We keep the file name and contents string here
+	as a c string for ease of use, the strings most
+	likely come from a GCString, but it should
+	remain alive.
+	I can't think of a reason why it wouldn't, and
+	so far we haven't had any problems...
+	I'm saying this because you'd think that since
+	we haven't created the prototype nor the closure
+	object for that prototype yet, there's no one
+	guaranteeing the lifetime of these objects,
+	so it could get GC'd.
+	It could theoretically happen, but since the
+	string is more than likely on the stack (and this
+	is the intended usage), not really...
+	Either way, the file state shouldn't have to concern
+	itself lifetime of contents and filename here, tis
+	the reason why they are c strings and not objects.
+	*/
+	char     *filename;
+	char     *contents;
+	char     *linechar;
+	char     *thischar;
+	int     linenumber;
 	union {
 		struct {
 			elToken lasttk,tk,thentk;
@@ -922,12 +1165,13 @@ typedef struct elFileState {
 	elBool debuggerflag;
 } elFileState;
 
+char *elf_get_file_name(elFileState *fs);
 
 elNodeId elf_load_file_expr(elFileState *fs, elBool flags);
 elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags);
 void elf_load_file_stat(elFileState *fs);
-void elf_emitter_emit_store(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
 
+void elf_emitter_emit_store(elFileState *fs, elFileLine line, elNodeId x, elNodeId y);
 elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register);
 elRegId elf_emitter_local_load(elFileState *fs, elFileLine line, elBool reload, elRegId x, elRegId y, elNodeId id);
 elRegId elf_emitter_localize(elFileState *fs, elFileLine line, elNodeId id);

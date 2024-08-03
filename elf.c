@@ -19,8 +19,8 @@ int main(int n, char **c) {
 
 	elModule M = {0};
 	elState R = {0};
-	elf_runini(&R,&M);
-	if (cli.logging) R.bytelogging = elTrue;
+	elf_begin(&R,&M);
+	if (cli.logging) R.bytelogging = elTRUE;
 
 	elStackFrame frame = {0};
 	frame.base = R.top;
@@ -30,7 +30,7 @@ int main(int n, char **c) {
 		elString *filename = elf_add_new_string(&R,cli.filename);
 		filename->obj.color = GC_PINK;
 		elFileState fs = {0};
-		elf_loadfilefs(&R,&fs,filename,0,0);
+		elf_load_file_fs(&R,&fs,filename,0,0);
 	}
 	if (cli.dump) {
 		FILE *dumpf = stdout;

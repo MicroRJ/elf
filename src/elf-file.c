@@ -5,15 +5,20 @@
 */
 
 
+char *elf_get_file_name(elFileState *fs) {
+	return fs->filename;
+}
+
+
 elBool elf_check_expr(elFileState *fs, elFileLine line, elNodeId id) {
 	if (id != NO_NODE) return false;
 	elf_file_dialog(fs,line,"invalid expression");
-	return elTrue;
+	return elTRUE;
 }
 
 
 elBool elf_test_token_inline(elFileState *fs, elTokenType k) {
-	return fs->tk.type == k && fs->lasttk.eol != elTrue;
+	return fs->tk.type == k && fs->lasttk.eol != elTRUE;
 }
 
 
@@ -27,7 +32,7 @@ elBool elf_test_then_token(elFileState *fs, elTokenType k) {
 
 
 /*
-** Returns elTrue whether there are no more tokens
+** Returns elTRUE whether there are no more tokens
 ** or whether the current token is a match.
 */
 elBool elf_term_token(elFileState *fs, elTokenType k) {
@@ -36,7 +41,7 @@ elBool elf_term_token(elFileState *fs, elTokenType k) {
 
 
 elBool elf_term_eol_token(elFileState *fs) {
-	return fs->tk.type == TK_NONE || fs->last_token.eol == elTrue;
+	return fs->tk.type == TK_NONE || fs->last_token.eol == elTRUE;
 }
 
 
@@ -45,12 +50,12 @@ elBool elf_term_eol_token(elFileState *fs) {
 ** returning whether it was a match or not.
 */
 elBool elf_pick_token(elFileState *fs, elTokenType k) {
-	return elf_test_token(fs,k) && (elf_lexone(fs), elTrue);
+	return elf_test_token(fs,k) && (elf_lexone(fs), elTRUE);
 }
 
 
 elBool elf_pick_token_inline(elFileState *fs, elTokenType k) {
-	return elf_test_token_inline(fs,k) && (elf_lexone(fs), elTrue);
+	return elf_test_token_inline(fs,k) && (elf_lexone(fs), elTRUE);
 }
 
 
@@ -59,7 +64,7 @@ elBool elf_pick_token_inline(elFileState *fs, elTokenType k) {
 ** are two possibilities.
 */
 elBool elf_choose_token(elFileState *fs, elTokenType x, elTokenType y) {
-	return (elf_test_token(fs,x) || elf_test_token(fs,y)) && (elf_lexone(fs), elTrue);
+	return (elf_test_token(fs,x) || elf_test_token(fs,y)) && (elf_lexone(fs), elTRUE);
 }
 
 
@@ -207,7 +212,7 @@ elNodeId elf_new_local_entity(elFileState *fs, elFileLine line, char *name, elBo
 
 
 elNodeId elf_find_entity_node(elFileState *fs, elFileLine line, char *name, int flags) {
-	elEntityId id = elf_find_entity(fs,line,name,elTrue);
+	elEntityId id = elf_find_entity(fs,line,name,elTRUE);
 
 	if (id == NO_ENTITY) return NO_NODE;
 
@@ -338,35 +343,35 @@ int elf_get_token_binding_priority(elTokenType type) {
 
 elNodeKi elf_token_to_node(elTokenType tk) {
 	switch (tk) {
-		case TK_DOT_DOT:            return NODE_RANGE;
-		case TK_LOG_AND:            return NODE_AND;
-		case TK_LOG_OR:             return NODE_OR;
-		case TK_NIL_OR:             return NODE_NIL_OR;
-		case TK_NIL_AND:            return NODE_NIL_AND;
-		case TK_ADD:                return NODE_ADD;
-		case TK_SUB:                return NODE_SUB;
-		case TK_DIV:                return NODE_DIV;
-		case TK_MUL:                return NODE_MUL;
-		case TK_POW:                return NODE_POW;
-		case TK_MOD:            return NODE_MOD;
-		case TK_NEQ:         return NODE_NEQ;
-		case TK_EQ:             return NODE_EQ;
-		case TK_GT:       return NODE_GT;
+		case TK_DOT_DOT: return NODE_RANGE;
+		case TK_LOG_AND: return NODE_AND;
+		case TK_LOG_OR: return NODE_OR;
+		case TK_NIL_OR: return NODE_NIL_OR;
+		case TK_NIL_AND: return NODE_NIL_AND;
+		case TK_ADD: return NODE_ADD;
+		case TK_SUB: return NODE_SUB;
+		case TK_DIV: return NODE_DIV;
+		case TK_MUL: return NODE_MUL;
+		case TK_POW: return NODE_POW;
+		case TK_MOD: return NODE_MOD;
+		case TK_NEQ: return NODE_NEQ;
+		case TK_EQ: return NODE_EQ;
+		case TK_GT: return NODE_GT;
 		case TK_GTEQ: return NODE_GTEQ;
-		case TK_LT:          return NODE_LT;
-		case TK_LTEQ:    return NODE_LTEQ;
-		case TK_SHL:         return NODE_BIT_SHL;
-		case TK_SHR:        return NODE_BIT_SHR;
-		case TK_BIT_XOR:            return NODE_BIT_XOR;
-		case TK_BIT_OR:             return NODE_BIT_OR;
-		case TK_BIT_AND:            return NODE_BIT_AND;
-		default: 						 return NODE_NONE;
+		case TK_LT: return NODE_LT;
+		case TK_LTEQ: return NODE_LTEQ;
+		case TK_SHL: return NODE_BIT_SHL;
+		case TK_SHR: return NODE_BIT_SHR;
+		case TK_BIT_XOR: return NODE_BIT_XOR;
+		case TK_BIT_OR: return NODE_BIT_OR;
+		case TK_BIT_AND: return NODE_BIT_AND;
+		default: return NODE_NONE;
 	}
 }
 
 
 elNodeId elf_load_file_subexpr(elFileState *fs, int rank, int flags) {
-	elNodeId x = elf_load_unary_expr(fs,elTrue,flags);
+	elNodeId x = elf_load_unary_expr(fs,elTRUE,flags);
 	if (x == NO_NODE) return x;
 	for (;;) {
 		elTokenType op = elf_is_operator_token_contextually(fs->this_token);
@@ -609,7 +614,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		} break;
 		case TK_M_INT: case TK_M_NUM: { elf_lexone(fs);
 			/* todo: make this an intrinsic instruction! */
-			elNodeId x = elf_load_unary_expr(fs,elTrue,0);
+			elNodeId x = elf_load_unary_expr(fs,elTRUE,0);
 			char *name = tk.type == TK_M_INT ? "ntoi" : "iton";
 			elNodeId fn = elf_get_global_entity_node(fs,tk.line,name);
 			elNodeId *z = {0};
@@ -618,7 +623,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		} break;
 		case TK_M_REGISTER: { elf_lexone(fs);
 			tk = elf_take_token(fs,TK_WORD);
-			elEntityId entity = elf_find_entity(fs,tk.line,tk.s,elFalse);
+			elEntityId entity = elf_find_entity(fs,tk.line,tk.s,elFALSE);
 			if (entity == NO_ENTITY) {
 				elf_file_dialog(fs,tk.line,"'%s': invalid entity (must be a local)",tk.s);
 			}
@@ -644,7 +649,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		//
 		case TK_NEW: {
 			elf_lexone(fs);
-			elNodeId meta_table = elf_load_unary_expr(fs,elFalse,elTrue);
+			elNodeId meta_table = elf_load_unary_expr(fs,elFALSE,elTRUE);
 			elNodeId *call_args = elf_load_call_args(fs);
 
 			elNodeId table;
@@ -891,7 +896,7 @@ void elf_load_file_stat(elFileState *fs) {
 			elf_lexone(fs);
 			do {
 				elToken n = elf_take_token(fs,TK_WORD);
-				elNodeId x = elf_new_local_entity(fs,n.line,n.s,elFalse);
+				elNodeId x = elf_new_local_entity(fs,n.line,n.s,elFALSE);
 				elf_complete_stat(fs,x);
 			} while (elf_pick_token(fs,TK_COMMA));
 		} break;

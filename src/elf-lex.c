@@ -42,7 +42,8 @@ void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli]: %s\n",fs->filename,linenum,(elInteger)(1+loc-lineloc),b);
+		char *filename = elf_get_file_name(fs);
+		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+loc-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -58,7 +59,6 @@ void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 int elf_lexescchr(elFileState *file) {
 	int tk = elf_movechr();
 	if (tk != '\\') return tk;
-
 	tk = elf_movechr();
 	switch (tk) {
 		case '\\': return '\\';
@@ -81,9 +81,38 @@ int elf_read_identifier_characters(elFileState *file, char *buffer) {
 }
 
 
+void elf_lexer_notify_newline(elFileState *fs) {
+	fs->linechar = fs->thischar;
+	fs->linenumber += 1;
+}
+
+
+void elf_lexer_get_emptychr(elFileState *file) {
+	retry:
+	switch (elf_thischr()) {
+		case ' ': case '\t': {
+			elf_movechr();
+		} goto retry;
+		case '\n': {
+			elf_movechr();
+			elf_lexer_notify_newline(file);
+		} goto retry;
+		case '\r': {
+			elf_movechr();
+			elf_cmovchr('\n');
+			elf_lexer_notify_newline(file);
+		} goto retry;
+	}
+}
+
 /* not the fastest thing out there */
 elToken elf_lexone(elFileState *file) {
-	/* remove, not needed #todo */
+
+	/* identifiers can only be 255 characters long (256 - 1 null terminator),
+	on the other hand, longer strings are allocated
+	from a heap buffer, there's no reason for this other than I just
+	like imposing limits for no reason... Makes me feel like I have
+	control... */
 	elGLOBAL char buffer[0x100];
 
 	elToken tk;
@@ -96,12 +125,17 @@ elToken elf_lexone(elFileState *file) {
 	switch (elf_thischr()) {
 		default: {
 			if (elf_is_letter_char(elf_thischr()) || (elf_thischr() == '_')) {
-				int length = elf_read_identifier_characters(file,buffer);
+				int length = 0;
+				do {
+					elASSERT(length < 0xff);
+					buffer[length++] = elf_movechr();
+				} while (elf_is_letter_or_digit_char(elf_thischr()) || (elf_thischr() == '_'));
+				buffer[length] = 0;
 
 				tk.type = elf_is_word_or_keyword(buffer);
 				if (tk.type == TK_WORD) {
 					if (S_eq(buffer,"__ELF_FILE_BREAK__")) {
-						file->debuggerflag = elTrue;
+						file->debuggerflag = elTRUE;
 						goto retry;
 					}
 					/* todo: string interner, or arena? */
@@ -138,30 +172,12 @@ elToken elf_lexone(elFileState *file) {
 					C = elf_movechr() - '0';
 					if (B == 2 && C > 1) goto _error;
 				} else {
+					if (0) _error: {
+						elf_file_dialog(file, file->thischar, "invalid base '%i' for digit", B);
+					}
 					break;
-					_error:
-					elf_file_dialog(file, file->thischar, "invalid base '%i' for digit", B);
 				}
 			}
-#if 0
-			else if (base == 10) {
-				do {
-					i = i * base + (elf_movechr() - '0');
-				} while (elf_is_digit_char(elf_thischr()));
-			} else if (base == 16) {
-				for (;;) {
-					if (elf_thischr() >= 'A' && elf_thischr() <= 'Z') {
-						i = i * base + 10 + (elf_movechr() - 'A');
-					} else
-					if (elf_thischr() >= 'a' && elf_thischr() <= 'z') {
-						i = i * base + 10 + (elf_movechr() - 'a');
-					} else
-					if (elf_thischr() >= '0' && elf_thischr() <= '9') {
-						i = i * base + (elf_movechr() - '0');
-					} else break;
-				}
-			}
-			#endif
 			if (elf_thischr() == '.') {
 				// x{..}
 				if (elf_thenchr() != '.') {
@@ -197,18 +213,36 @@ elToken elf_lexone(elFileState *file) {
 		} break;
 		case '"': {
 			elf_movechr();
-			int length = 0;
-			while (elf_thischr() != 0 && elf_thischr() != '"') {
-				buffer[length ++] = elf_lexescchr(file);
+			/* todo: use static buffer first */
+			char *buffer = 0;
+			int   length = 0;
+			while (elf_thischr() != 0) {
+				while (elf_thischr() != 0 && elf_thischr() != '"') {
+					/* are we making a grave mistake here by allowing lines to
+					naturally span multiple lines? */
+					if (elf_cmovchr('\n') || (elf_cmovchr('\r') && (elf_cmovchr('\n'),elTRUE))) {
+						elf_lexer_notify_newline(file);
+						ARRAY_ADD(buffer,'\n');
+					} else {
+						char chr = elf_lexescchr(file);
+						ARRAY_ADD(buffer,chr);
+					}
+				}
+
+				if (!elf_cmovchr('"')) {
+					elf_file_dialog(file,tk.line,"invalid string");
+				}
+				elf_lexer_get_emptychr(file);
+				if (!elf_cmovchr('"')) {
+					break;
+				}
+				ARRAY_ADD(buffer,'\n');
 			}
-			buffer[length] = 0;
-			if (!elf_cmovchr('"')) {
-				elf_file_dialog(file,tk.line,"invalid string");
-			}
+
+			ARRAY_ADD(buffer,0);
+
 			tk.type = TK_STRING;
 			tk.s = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
-			// tk.string = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
-			// elf_loginfo("string %s",tk.string);
 		} break;
 		case '.': { elf_movechr(); tk.type = TK_DOT;
 			if (elf_cmovchr('.')) { tk.type = TK_DOT_DOT;
@@ -234,7 +268,7 @@ elToken elf_lexone(elFileState *file) {
 				tk.type = TK_NONE;
 			} else if (tk.type == TK_M_FILE_NAME) {
 				tk.type = TK_STRING;
-				tk.s = file->filename;
+				tk.s = elf_get_file_name(file);
 			} else if (tk.type == TK_M_LINE_NUMBER) {
 				tk.type = TK_INTEGER;
 				tk.i = file->linenumber;
@@ -245,8 +279,7 @@ elToken elf_lexone(elFileState *file) {
 		case '\0': {
 			tk.type = TK_NONE;
 		} break;
-		case ' ':
-		case '\t': {
+		case ' ': case '\t': {
 			elf_movechr();
 		} goto retry;
 		case '\n': {
@@ -382,10 +415,10 @@ elToken elf_lexone(elFileState *file) {
 	}
 
 	if (elf_thischr() == '/' && (elf_thenchr()=='/' || elf_thenchr()=='*')) {
-		tk.eol = elTrue;
+		tk.eol = elTRUE;
 	}
 	if (elf_thischr() == ';' || (elf_thischr() == '\n' || elf_thischr() == '\r')) {
-		tk.eol = elTrue;
+		tk.eol = elTRUE;
 	}
 
 	file->lasttk = file->tk;

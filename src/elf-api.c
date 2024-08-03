@@ -51,7 +51,7 @@ elAPI char *elf_get_cstring(elState *R, elRegId x) {
 elAPI elObject *elf_get_object(elState *R, elRegId x) {
 	elValue v = R->call->locals[x];
 	if (v.tag == TAG_NIL) return elNIL;
-	if (elf_isobj(v.tag)) return v.x_obj;
+	if (elISOBJTAG(v.tag)) return v.x_obj;
 	elf_expected(R,TAG_OBJ,v.tag,x);
 	return elNIL;
 }
@@ -202,7 +202,7 @@ elObject *elf_add_object(elState *R, elObject *obj) {
 
 
 elObject *elf_add_new_object(elState *R, elInteger tell) {
-	return elf_add_object(R,elf_new_object(R,OBJ_CUSTOM,tell));
+	return elf_add_object(R,elf_new_object(R,OBJ_OBJ,tell));
 }
 
 

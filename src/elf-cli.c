@@ -34,9 +34,9 @@ int elf_loadcliopts(elf_cliopts *cli, int n, char **c) {
 
 #define OPLIST(_) \
 	_("help", "displays command line interface help",{})\
-	_("logging", "log bytecode instructions as they execute (only in debug mode)",{SETFIELD(logging,elTrue);})\
+	_("logging", "log bytecode instructions as they execute (only in debug mode)",{SETFIELD(logging,elTRUE);})\
 	_("dump", "[filename] whether to dump the resulting module (when program exits)",\
-	{	SETFIELD(dump,elTrue);\
+	{	SETFIELD(dump,elTRUE);\
 		SETFIELD(dumpfilename,GETARG(FAIL("dump: missing filename, tip: you can use [stdout]"))); })
 
 	if (!HAS()) goto help;

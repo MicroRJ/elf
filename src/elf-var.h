@@ -24,26 +24,13 @@
 **
 */
 
-typedef struct elArray {
-	elObject obj;
-	elInteger max;
-	elInteger min;
-   /* contents are allocated past this point */
-} elArray;
-
 
 #define elf_xarray_delete(var) ((var != 0) ? elf_dealloc(elHEAP_ALLOCATOR,(elArray*)(var)-1),0 : 0)
 
-#define elf_vararr(var) ((elArray*)(var))[-1]
-#define elf_varmax(var) ((var != 0) ? ((elArray*)(var))[-1].max : 0)
-#define elf_varmin(var) ((var != 0) ? ((elArray*)(var))[-1].min : 0)
-
-#define elf_xarray_pop(var) ( (var) != elNIL ? (-- ((elArray*)(var))[-1].min) : 0 )
 
 #define elf_varaddx(var,res,com) ((var) + elf_varaddxx((void**)&(var),sizeof(*var),res,com))
 #define elf_xarray_growby(var,num) (elf_varaddxx((void**)&(var),sizeof(*var),num,num))
 #define elf_varaddn(var,num) ((var) + elf_xarray_growby(var,num))
-#define ARRAY_LENGTH elf_varmin
 
 /* Seems that only msvc compiles this properly or
 am I trippin' ? */

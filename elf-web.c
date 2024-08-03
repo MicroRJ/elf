@@ -35,15 +35,16 @@ struct {
 
 
 elAPI void elf_global_initialize() {
-	elf_runini(&elf.R,&elf.M);
+	elf_begin(&elf.R,&elf.M);
 }
 
 
-elAPI int elf_global_loadcode(char *codename, char *contents) {
+elAPI int elf_global_loadcode(char *filename, char *contents) {
 	elValue *top = elf.R.top;
-	elString *name = elf_add_new_string(&elf.R,codename);
+	elString *name = elf_add_new_string(&elf.R,filename);
+	elString *string = elf_add_new_string(&elf.R,contents);
 	elFileState fs = {0};
-	int nyield = elf_loadcodefs(&elf.R,&fs,name,0,0,contents);
+	int nyield = elf_load_code_fs(&elf.R,&fs,name,0,0,string);
 	elf.R.top = top;
 	return nyield;
 }

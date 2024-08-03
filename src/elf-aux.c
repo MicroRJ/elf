@@ -55,10 +55,10 @@ elNumber elf_timediffms(elInteger begin) {
 
 
 int elf_find_file_info_by_byte(elModule *md, elByteId byte) {
-	elFileInfo *files = md->files;
+	elFileProto *files = md->files;
 	int nfiles = ARRAY_LENGTH(files);
 	for (int x = 0; x < nfiles; ++ x) {
-		elFileInfo file = files[x];
+		elFileProto file = files[x];
 		if ((elInteger)(byte - file.bytes) < file.nbytes) {
 			return x;
 		}
@@ -90,8 +90,8 @@ void elf_get_line_location_info(char *q, char *loc, int *linenum, char **lineloc
 }
 
 
-elFileInfo elf_getrunningfile(elState *S) {
-	elFileInfo fi = {0};
+elFileProto elf_getrunningfile(elState *S) {
+	elFileProto fi = {0};
 	int id = elf_find_file_info_by_byte(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
@@ -163,9 +163,9 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	elModule *M = S->M;
 	int fileid = elf_find_file_info_by_byte(M,call->head);
 	if (fileid != -1) {
-		elFileInfo *file = &M->files[fileid];
+		elFileProto *file = &M->files[fileid];
 		elFileLine line = M->lines[call->head];
-		elf_line_dialog(file->name,file->lines,line,
+		elf_line_dialog(file->name->contents,file->contents->contents,line,
 		call->head,M->bytes[call->head],call->cl != elNIL ? "(bytecode function)" : "(binding)");
 	}
 }
@@ -177,8 +177,8 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 	elFileLine line = M->lines[byte];
 	int fileid = elf_find_file_info_by_byte(M,byte);
 	if (fileid != -1) {
-		elFileInfo *file = &M->files[fileid];
-		elf_line_dialog(file->name,file->lines,line,R->byte,
+		elFileProto *file = &M->files[fileid];
+		elf_line_dialog(file->name->contents,file->contents->contents,line,R->byte,
 		M->bytes[R->byte],error);
 	}
 

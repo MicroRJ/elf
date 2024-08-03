@@ -6,7 +6,7 @@
 
 
 int elf_lib_pause_collector(elState *R) {
-	R->memory.paused = elTrue;
+	R->memory.paused = elTRUE;
 	if (elf_get_num_args(R) == 1) {
 		R->memory.paused = elf_get_integer(R,0) != 0;
 	}
@@ -49,11 +49,11 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 		elf_debug_log("object found through: ");
 		print_object_trace(path); printf("\n");
 		traces = 1;
-	} else if (thru->type == OBJ_CLOSURE) {
+	} else if (thru->type == OBJ_CLS) {
 		elObjectTracePath child = { &path, "closure.values" };
 		elClosure *cls = (elClosure *) thru;
-		FOR_RANGE(k,0,cls->nlocals) {
-			if (elf_isobj(cls->values[k].tag)) {
+		FOR_RANGE(k,0,cls->proto.nlocals) {
+			if (elISOBJTAG(cls->values[k].tag)) {
 				traces += elf_trace_object(S,visited,obj,cls->values[k].x_obj,child);
 			}
 		}
@@ -64,7 +64,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 			elObjectTracePath child = { &path, elf_tpf("(table.entry)") };
 			elEntry *entry;
 			for (entry = tab->entries; entry < tab->entries + tab->ntotal; entry += 1) {
-				if (elf_isobj(entry->key.tag)) {
+				if (elISOBJTAG(entry->key.tag)) {
 					elInteger found = elf_trace_object(S,visited,obj,entry->key.x_obj,child);
 					traces += found;
 				}
@@ -76,7 +76,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 
 			elValue *value;
 			for (value = tab->array; value < tab->array + ARRAY_LENGTH(tab->array); value += 1) {
-				if (elf_isobj(value->tag)) {
+				if (elISOBJTAG(value->tag)) {
 					elInteger found = elf_trace_object(S,visited,obj,value->x_obj,child);
 					traces += found;
 					if (found) {
@@ -112,7 +112,7 @@ int elf_lib_trace_object(elState *R) {
 	child.name = "stack";
 	elValue *val;
 	for (val = R->stack; val < R->stack_top; ++ val) {
-		if (elf_isobj(val->tag)) {
+		if (elISOBJTAG(val->tag)) {
 			traces += elf_trace_object(R,visited,obj,val->x_obj,child);
 		}
 	}
@@ -315,7 +315,7 @@ int elflib_oncalldebugger(elState *R) {
 
 int elflib_debugger(elState *R) {
 #if defined(_DEBUG)
-	R->debuggerflag = elTrue;
+	R->debuggerflag = elTRUE;
 #else
 	char *message = "no message";
 	if (elf_get_num_args(R) != 0) {
@@ -468,39 +468,41 @@ int elflib_include(elState *R) {
 }
 
 
-int elflib_loadexpr(elState *R) {
-	elString *filename = elNIL,*contents = elNIL;
-	if (R->call->nx == 2) {
+int elf_lib_load_expr(elState *R) {
+	elString *filename = elNIL;
+	elString *contents = elNIL;
+	if (elf_get_num_args(R) == 2) {
 		filename = elf_get_string(R,0);
 		contents = elf_get_string(R,1);
-	} else if (R->call->nx == 1) {
+	} else if (elf_get_num_args(R) == 1) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_loadexpr(R,filename,R->call->ry,R->call->ny,contents->c);
+	elf_load_expr(R,filename,R->call->ry,R->call->ny,contents);
 	/* no need to do hoisting */
 	return 0;
 }
 
 
-int elflib_loadcode(elState *R) {
-	elString *filename = elNIL,*contents = elNIL;
-	if (R->call->nx == 2) {
+int elf_lib_load_code(elState *R) {
+	elString *filename = elNIL;
+	elString *contents = elNIL;
+	if (elf_get_num_args(R) == 2) {
 		filename = elf_get_string(R,0);
 		contents = elf_get_string(R,1);
-	} else if (R->call->nx == 1) {
+	} else if (elf_get_num_args(R) == 1) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_loadcode(R,filename,R->call->ry,R->call->ny,contents->c);
+	elf_load_code(R,filename,R->call->ry,R->call->ny,contents);
 	/* no need to do hoisting */
 	return 0;
 }
 
 
-int elflib_loadfile(elState *R) {
+int elf_lib_load_file(elState *R) {
 	elString *filename = elf_get_string(R,0);
-	elf_loadfile(R,filename,R->call->ry,R->call->ny);
+	elf_load_file(R,filename,R->call->ry,R->call->ny);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -555,8 +557,8 @@ int elf_lib_shell(elState *R) {
 	char *file = elf_get_cstring(R,1);
 	char *args = elf_get_cstring(R,2);
 	if ((INT_PTR)ShellExecute(NULL,verb,file,args,NULL,10) > 32) {
-		elf_add_integer(R,elTrue);
-	} else elf_add_integer(R,elFalse);
+		elf_add_integer(R,elTRUE);
+	} else elf_add_integer(R,elFALSE);
 #endif
 	return 1;
 }
@@ -665,22 +667,22 @@ int elf_fpf_value(FILE *file, elValue v, elBool quotes) {
 					if (it.k.tag == TAG_NIL) continue;
 					if (it.i != i) continue;
 					if (n ++ != 0) wrote += fprintf(file,", ");
-					wrote += elf_fpf_value(file,it.k,elTrue);
+					wrote += elf_fpf_value(file,it.k,elTRUE);
 				}
 				if (n != 0) wrote += fprintf(file," = ");
-				wrote += elf_fpf_value(file,tab->array[i],elTrue);
+				wrote += elf_fpf_value(file,tab->array[i],elTRUE);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
 			// 	elEntry it = tab->slots[i];
 			// 	if (it.k.tag == TAG_NIL) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
-			// 	wrote += elf_fpf_value(file,it.k,elTrue);
+			// 	wrote += elf_fpf_value(file,it.k,elTRUE);
 			// 	wrote += fprintf(file," = ");
-			// 	wrote += elf_fpf_value(file,tab->array[it.i],elTrue);
+			// 	wrote += elf_fpf_value(file,tab->array[it.i],elTRUE);
 			// }
 			// elf_xarray_foreachi(t->v) {
 			// 	if (i != 0) wrote += fprintf(file,", ");
-			// 	wrote += elf_fpf_value(file,t->v[i],elTrue);
+			// 	wrote += elf_fpf_value(file,t->v[i],elTRUE);
 			// }
 			wrote += fprintf(file,"}");
 			return wrote;
@@ -971,12 +973,12 @@ void elf_unload(FILE *io, elTable *tab, int level) {
 			continue;
 		}
 		if (nitems ++ != 0) fprintf(io,",");
-		elf_fpf_value(io,slot.k,elTrue);
+		elf_fpf_value(io,slot.k,elTRUE);
 		fprintf(io," = ");
 		if (v.tag == TAG_TAB) {
 			elf_unload(io,v.t,level+1);
 		} else {
-			elf_fpf_value(io,v,elTrue);
+			elf_fpf_value(io,v,elTRUE);
 		}
 	}
 	fprintf(io,"}");
@@ -1046,9 +1048,9 @@ elAPI void elflib_loadall(elState *R) {
 	elf_register_binding(R,"elf.libfn",elflib_libfn);
 
 	elf_register_binding(R,"elf.include",elflib_include);
-	elf_register_binding(R,"elf.loadcode",elflib_loadcode);
-	elf_register_binding(R,"elf.loadexpr",elflib_loadexpr);
-	elf_register_binding(R,"elf.loadfile",elflib_loadfile);
+	elf_register_binding(R,"elf.loadcode",elf_lib_load_code);
+	elf_register_binding(R,"elf.loadexpr",elf_lib_load_expr);
+	elf_register_binding(R,"elf.loadfile",elf_lib_load_file);
 	elf_register_binding(R,"elf.unload",elflib_unload);
 
 	elf_register_binding(R,"elf.pf_indent",elf_lib_pf_indent);

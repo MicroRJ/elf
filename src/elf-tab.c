@@ -46,7 +46,7 @@ elTable *elf_new_table_metatable(elState *R) {
 }
 
 
-elTable *elf_new_table_of_length(elState *R, elInteger ntotal) {
+elTable *elf_new_ltable(elState *R, elInteger ntotal) {
 	elTable *table = elf_new_object(R,OBJ_TAB,sizeof(elTable));
 	table->obj.metatable = R->metatables.table;
 	/* What if this is the first table... */
@@ -60,7 +60,7 @@ elTable *elf_new_table_of_length(elState *R, elInteger ntotal) {
 
 
 elTable *elf_new_table(elState *R) {
-	return elf_new_table_of_length(R,4);
+	return elf_new_ltable(R,4);
 }
 
 
@@ -121,15 +121,13 @@ elInteger elf_table_try(elTable *tab, elValue key) {
 }
 
 
-elInteger elf_table_tryS(elTable *tab, char *contents) {
+elInteger elf_table_tryS(elTable *tab, char *contents, elInteger length, elHashId hash) {
 	if ((tab == 0 || tab->obj.color == GC_RED) || (contents == 0)) {
 		elf_debugger("invalid-table");
 		return -2;
 	}
-	elInteger length = strlen(contents);
 	elEntry *slots = tab->slots;
 	elInteger ntotal = tab->ntotal;
-	elInteger hash = elf_tabhashstr(contents);
 	elInteger head = hash % ntotal;
 	elInteger tail = head;
 	elHashId walk = elf_table_rehash(hash)|1;
@@ -212,10 +210,10 @@ elBool elf_table_set(elTable *table, elValue k, elValue v) {
 		table->slots[slot].k = k;
 		table->slots[slot].i = i;
 		table->nslots ++;
-		return elFalse;
+		return elFALSE;
 	} else {
 		table->array[entry->i] = v;
-		return elTrue;
+		return elTRUE;
 	}
 }
 
@@ -276,13 +274,13 @@ elValue elf_table_get_field(elTable *tab, elString *key) {
 
 elNumber elf_tabgetnum(elTable *tab, elString *key) {
 	elValue val = elf_table_lookup(tab,elf_string_value(key));
-	return elf_tonum(val);
+	return elTONUM(val);
 }
 
 
 elInteger elf_table_get_integer(elTable *tab, elString *key) {
 	elValue val = elf_table_lookup(tab,elf_string_value(key));
-	return elf_toint(val);
+	return elTOINT(val);
 }
 
 
@@ -489,7 +487,7 @@ int elf_table_libfn_delete(elState *R) {
 		goto leave_;
 	}
 	elf_add_value(R,array[idx]);
-	elInteger min = elf_xarray_pop(array);
+	elInteger min = ARRAY_POP(array);
 	// if (idx != min) {
 		//NOTE: Swap the items, then iterate to
 		//find references and update them...
@@ -513,7 +511,7 @@ int elf_table_libfn_xdelete(elState *R) {
 	elTable *tab = (elTable *) elf_get_this(R);
 	elInteger len = ARRAY_LENGTH(tab->array);
 	if (len != 0) {
-		if (elf_isobj(elf_get_tag(R,0))) {
+		if (elISOBJTAG(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
 			/* todo: Speed */
 			elValue *item = elNIL;
@@ -530,7 +528,7 @@ int elf_table_libfn_xdelete(elState *R) {
 			}
 			elASSERT((item - tab->array) == idx);
 			elf_add_value(R,*item);
-			elInteger min = elf_xarray_pop(tab->array);
+			elInteger min = ARRAY_POP(tab->array);
 			if (idx != min) {
 				tab->array[idx] = tab->array[min];
 			}
@@ -538,7 +536,7 @@ int elf_table_libfn_xdelete(elState *R) {
 			elInteger idx = elf_get_integer(R,0);
 			if ((idx %= len) < 0) idx += len;
 
-			elInteger min = elf_xarray_pop(tab->array);
+			elInteger min = ARRAY_POP(tab->array);
 			elf_add_value(R,tab->array[idx]);
 			if (idx != min) {
 				tab->array[idx] = tab->array[min];
@@ -555,7 +553,7 @@ int elf_table_libfn_xremove(elState *R) {
 	elInteger len = ARRAY_LENGTH(tab->array);
 
 	if (len != 0) {
-		if (elf_isobj(elf_get_tag(R,0))) {
+		if (elISOBJTAG(elf_get_tag(R,0))) {
 			elObject *object = elf_get_object(R,0);
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
@@ -577,7 +575,7 @@ int elf_table_libfn_xremove(elState *R) {
 				elf_throw(R,NO_BYTE,"item does not belong");
 			}
 			elf_add_value(R,*item);
-			elInteger min = elf_xarray_pop(tab->array);
+			elInteger min = ARRAY_POP(tab->array);
 			if (idx != min) {
 				tab->array[idx] = tab->array[min];
 			}
@@ -586,7 +584,7 @@ int elf_table_libfn_xremove(elState *R) {
 			elInteger idx = elf_get_integer(R,0);
 			if ((idx %= len) < 0) idx += len;
 
-			elInteger min = elf_xarray_pop(tab->array);
+			elInteger min = ARRAY_POP(tab->array);
 			elf_add_value(R,tab->array[idx]);
 			if (idx != min) {
 				tab->array[idx] = tab->array[min];
@@ -635,7 +633,7 @@ int elf_table_libfn_bubble_sort(elState *R) {
 	elClosure *cls = elf_get_closure(R,0);
 	elBool sorted = false;
 	do {
-		sorted = elTrue;
+		sorted = elTRUE;
 		elInteger i;
 		for (i=0;i<ARRAY_LENGTH(arr)-1;++i) {
 			elValue *top = elf_get_stack_top(R);
@@ -652,7 +650,7 @@ int elf_table_libfn_bubble_sort(elState *R) {
 			}
 			elf_set_stack_top(R,top);
 		}
-	} while(sorted != elTrue);
+	} while(sorted != elTRUE);
 	return 0;
 }
 
@@ -675,8 +673,8 @@ int elf_table_libfn_foreach(elState *R) {
 		R->stack[v] = tab->array[it.i];
 		/* todo: should yield boolean to signal whether to
 		stop or not */
-		int ny = elf_callex(R,R->frame->obj,0,0,2,0);
-		if (ny != 0) if (elf_get_integer(R,0) != elTrue) break;
+		int ny = elf_call_function2(R,R->frame->obj,0,0,2,0);
+		if (ny != 0) if (elf_get_integer(R,0) != elTRUE) break;
 	}
 	return 0;
 }

@@ -32,10 +32,10 @@ int elf_fpf_value(FILE *file, elValue v, elBool quotes);
 void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode b) {
 
 	if (fid != -1) {
-		elFileInfo file = md->files[fid];
+		elFileProto file = md->files[fid];
 		int linenum;
-		elf_get_line_location_info(file.lines,md->lines[id],&linenum,0);
-		fprintf(io,"%s %04i: \t",file.name,linenum);
+		elf_get_line_location_info(file.contents->contents,md->lines[id],&linenum,0);
+		fprintf(io,"%s %04i: \t",file.name->contents,linenum);
 	}
 
 	fprintf(io,"%08i %04i\t%s"
@@ -63,7 +63,7 @@ void elf_bytefpf(FILE *io, elModule *md, elInteger fid, elByteId id, elBytecode 
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
 		if ((val.tag == TAG_STR) || (val.tag == TAG_NUM) || (val.tag == TAG_INT)) {
-			elf_fpf_value(io,val,elTrue);
+			elf_fpf_value(io,val,elTRUE);
 		}
 	}
 	fprintf(io,"\n");
@@ -79,16 +79,16 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	fprintf(file,"Globals:\n");
 	elf_xarray_foreachi(md->g->v) {
 		fprintf(file,"%04llX: ", i);
-		elf_fpf_value(file,md->g->v[i],elTrue);
+		elf_fpf_value(file,md->g->v[i],elTRUE);
 		fprintf(file,"\n");
 	}
 #endif
 	fprintf(io,"-- BYTECODE --\n");
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_getmypid());
-	elf_xarray_foreachi(md->files) {
-		elFileInfo ff = md->files[i];
-		fprintf(io,"- FILE (%s):\n",ff.name);
+	ARRAY_FOR(i,md->files) {
+		elFileProto ff = md->files[i];
+		fprintf(io,"- FILE (%s):\n",ff.name->contents);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (elByteId j = 0; j < ff.nbytes; ++j) {
 			elBytecode b = md->bytes[ff.bytes+j];

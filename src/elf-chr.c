@@ -67,24 +67,24 @@ int elf_cstrlen(char const *s) {
 
 elBool elf_cstrhasprefix(char *str, char *prefix) {
 	if (prefix == 0 || *prefix == 0 || *str == 0 || *str == 0) {
-		return false;
+		return elFALSE;
 	}
 	do {
 		if (*prefix ++ != *str ++) {
-			return false;
+			return elFALSE;
 		}
 	} while (*prefix);
-	return elTrue;
+	return elTRUE;
 }
 
 
 elBool S_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
-			return false;
+			return elFALSE;
 		}
 	}
-	return elTrue;
+	return elTRUE;
 }
 
 
@@ -100,7 +100,7 @@ char *S_ncopy(elAllocator *allocator, int length, char const *string) {
 		length = elf_cstrlen(string);
 	}
 	char *result = elf_alloc(allocator,length+1);
-	elf_memcopy(result,string,length);
+	elf_copy_memory(result,string,length);
 	result[length]=0;
 	return result;
 }
@@ -136,29 +136,34 @@ char *S_tpf_(char const *format, ...) {
 
 /*
 ** Simple pattern matcher utility.
-** Pattern, elString
 */
-elBool elf_cstrmatchsingle(char *p, char *s);
+elBool elf_match_entire_string_noclause(char *p, char *s);
 
 
-/* todo: support for ()
-todo: this has a flaw!! */
-elBool elf_match_strings(char *p, char *s) {
+/* Younger me wrote:
+	" todo: support for ()
+	  todo: this has a flaw!! "
+
+  Now, I don't remember what the flaw is!
+*/
+elBool elf_match_entire_string(char *p, char *s) {
 	char *b = s;
-	while (!elf_cstrmatchsingle(p,s)) {
+	while (!elf_match_entire_string_noclause(p,s)) {
 		while (*p != 0 && *p != '|') ++p;
-		if (*p == 0) return false;
+		if (*p == 0) return elFALSE;
 		++ p, s = b;
 	}
-	return elTrue;
+	return elTRUE;
 }
 
 
-elBool elf_cstrmatchsingle(char *p, char *s) {
+elBool elf_match_entire_string_noclause(char *p, char *s) {
 	while (*p != 0 && *p != '|') {
 		if (*p == '?') {
 			/* matches any character except terminator. */
-			if (*s != 0) return false;
+			if (*s != 0) {
+				return elFALSE;
+			}
 			++ p, ++ s;
 		} else
 		if (*p == '*') {
@@ -173,20 +178,66 @@ elBool elf_cstrmatchsingle(char *p, char *s) {
 			we can either match the next pattern after '*' or
 			delay the match by skipping this char and remaining
 			in this pattern char. */
-			if (elf_cstrmatchsingle(p+1,s)) {
-				return elTrue;
+			if (elf_match_entire_string_noclause(p+1,s)) {
+				return elTRUE;
 			}
 			/* no match, move on to next char, remain in
 			this branch and keep checking for matches. */
 			++ s;
-		} else
-		/* otherwise, match literal fail if no match. */
-		if (*p != *s) {
-			return false;
+		/* otherwise, match literal, fail if no match. */
+		} else if (*p != *s) {
+			return elFALSE;
 		} else {
 			++ p, ++ s;
 		}
 	}
 	/* did we match the whole string */
 	return *s == 0;
+}
+
+
+char *elf_match_strings_single_clause_ex(char *p, char *s) {
+	while (*p != 0 && *p != '|') {
+		if (*p == '?') {
+			/* matches any character except terminator. */
+			if (*s != 0) {
+				return 0;
+			}
+			++ p, ++ s;
+		} else
+		if (*p == '*') {
+			/* unlikely the user will do this. */
+			while (p[1] == '*') ++ p;
+
+			/* got to end of string, do we still
+			have a pattern? If so then no match. */
+			if (*s == 0) {
+				/* todo: if we remove the match multiple clauses
+				version we can't simply return here without first
+				scanning the entire string for '|' */
+				if (p[1] == 0 || p[1] == '|') {
+					return s;
+				} else {
+					return 0;
+				}
+			}
+
+			/* '*' operator causes matcher to split branches,
+			we can either match the next pattern after '*' or
+			delay the match by skipping this char and remaining
+			in this pattern char. */
+			char *g = elf_match_strings_single_clause_ex(p+1,s);
+			if (g) return g;
+			/* no match, move on to next char, remain in
+			this branch and keep checking for matches. */
+			++ s;
+		/* otherwise, match literal, fail if no match. */
+		} else if (*p != *s) {
+			return 0;
+		} else {
+			++ p, ++ s;
+		}
+	}
+	/* did we match the whole string */
+	return s;
 }
