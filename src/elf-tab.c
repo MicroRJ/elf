@@ -8,33 +8,33 @@
 elTable *elf_new_table_metatable(elState *R) {
 	/* todo: these functions are to be refactored,
 	a bunch of them are rather useless and or misnamed */
-	struct { char *n; elBinding b; } elf_table_lib[] = {
-		{"length",elf_table_libfn_length},
-		{"tally",elf_table_libfn_tally},
-		{"delete",elf_table_libfn_delete},
-		{"haskey",elf_table_libfn_contains},
-		{"lookup",elf_table_libfn_lookup},
-		{"iter",elf_table_libfn_foreach},
-		{"collisions",elf_table_libfn_get_collisions},
-		{"add",elf_table_libfn_add},
-		{"xadd",elf_table_libfn_xadd},
-		{"itemize",elf_table_libfn_itemize},
-		{"inject",elf_table_libfn_inject},
-		{"idx",elf_table_libfn_index},
-		{"xrem",elf_table_libfn_xremove},
-		{"xdelete",elf_table_libfn_xdelete},
-		{"bubblesort",elf_table_libfn_bubble_sort},
-		{"fndaliases",elf_table_libfn_find_aliases},
-		{"alias",elf_table_libfn_alias},
-		{"merge",elf_table_libfn_merge},
-		{"xmerge",elf_table_libfn_xmerge},
-		{"reverse",elf_table_libfn_reverse},
-		{"clone",elf_table_libfn_clone},
-		{"xclone",elf_table_libfn_xclone},
-		{"slice",elf_table_libfn_slice},
-		{"xset",elf_table_libfn_xset},
-		{"swap",elf_table_libfn_swap},
-		{"diff",elf_table_libfn_diff},
+	struct { char *n; elCFunction b; } elf_table_lib[] = {
+		{"length",elf_libH_length},
+		{"tally",elf_libH_tally},
+		{"delete",elf_libH_delete},
+		{"haskey",elf_libH_contains},
+		{"lookup",elf_libH_lookup},
+		{"iter",elf_libH_foreach},
+		{"collisions",elf_libH_get_collisions},
+		{"add",elf_libH_add},
+		{"xadd",elf_libH_xadd},
+		{"itemize",elf_libH_itemize},
+		{"inject",elf_libH_inject},
+		{"idx",elf_libH_index},
+		{"xrem",elf_libH_xremove},
+		{"xdelete",elf_libH_xdelete},
+		{"bubblesort",elf_libH_bubble_sort},
+		{"fndaliases",elf_libH_find_aliases},
+		{"alias",elf_libH_alias},
+		{"merge",elf_libH_merge},
+		{"xmerge",elf_libH_xmerge},
+		{"reverse",elf_libH_reverse},
+		{"clone",elf_libH_clone},
+		{"xclone",elf_libH_xclone},
+		{"slice",elf_libH_slice},
+		{"xset",elf_libH_xset},
+		{"swap",elf_libH_swap},
+		{"diff",elf_libH_diff},
 		{0},
 	};
 
@@ -47,14 +47,14 @@ elTable *elf_new_table_metatable(elState *R) {
 
 
 elTable *elf_new_ltable(elState *R, elInteger ntotal) {
-	elTable *table = elf_new_object(R,OBJ_TAB,sizeof(elTable));
+	elTable *table = elf_new_object(R,GC_TAB,sizeof(elTable));
 	table->obj.metatable = R->metatables.table;
 	/* What if this is the first table... */
 	// elASSERT(!! table->obj.metatable);
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
-	table->slots = elf_clear_alloc(elHEAP_ALLOCATOR,ntotal*sizeof(elEntry));
+	table->slots = elf_calloc(elHEAP_ALLOCATOR,ntotal*sizeof(elEntry));
 	return table;
 }
 
@@ -177,7 +177,7 @@ void elf_check_table(elTable *table) {
 		elTable new_table = * table;
 		new_table.ntotal = table->ntotal << 2;
 		if (new_table.ntotal < table->ntotal) elNOCODE;
-		new_table.slots = elf_clear_alloc(elHEAP_ALLOCATOR,new_table.ntotal * sizeof(elEntry));
+		new_table.slots = elf_calloc(elHEAP_ALLOCATOR,new_table.ntotal * sizeof(elEntry));
 
 		for (int i = 0; i < table->ntotal; ++ i) {
 			elEntry slot = table->slots[i];
@@ -257,7 +257,7 @@ void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias) {
 }
 
 
-void elf_table_set_binding_field(elState *R, elTable *obj, char *name, elBinding b) {
+void elf_table_set_binding_field(elState *R, elTable *obj, char *name, elCFunction b) {
 	elf_table_set(obj,elf_string_value(elf_new_string(R,name)),elf_binding_value(b));
 }
 
@@ -327,21 +327,21 @@ void elf_table_set_table_field(elTable *tab, elString *key, elTable *val) {
 /* metatable */
 
 
-int elf_table_libfn_length(elState *R) {
+int elf_libH_length(elState *R) {
 	elTable *tab = (elTable*) elGETTHIS(R);
 	elf_add_integer(R,ARRAY_LENGTH(tab->array));
 	return 1;
 }
 
 
-int elf_table_libfn_tally(elState *R) {
+int elf_libH_tally(elState *R) {
 	elTable *tab = (elTable*) elGETTHIS(R);
 	elf_add_integer(R,ARRAY_LENGTH(tab->array));
 	return 1;
 }
 
 
-int elf_table_libfn_contains(elState *c) {
+int elf_libH_contains(elState *c) {
 	elASSERT(c->f->x == 1);
 	elTable *table = (elTable*) elGETTHIS(c);
 	elValue k = elf_get_value(c,0);
@@ -350,7 +350,7 @@ int elf_table_libfn_contains(elState *c) {
 }
 
 
-int elf_table_libfn_lookup(elState *S) {
+int elf_libH_lookup(elState *S) {
 	elASSERT(elGETNARGS(S) == 1);
 	elTable *table = (elTable*) elGETTHIS(S);
 	elValue value = elf_table_lookup(table,elf_get_value(S,0));
@@ -359,7 +359,7 @@ int elf_table_libfn_lookup(elState *S) {
 }
 
 
-int elf_table_libfn_get_collisions(elState *c) {
+int elf_libH_get_collisions(elState *c) {
 	elTable *table = (elTable*) c->f->obj;
 	elf_add_integer(c,table->ncollisions);
 	return 1;
@@ -370,7 +370,7 @@ int elf_table_libfn_get_collisions(elState *c) {
 also xadd should be add instead, since
 names with 'x' prefix work only for
 arrays */
-int elf_table_libfn_xadd(elState *R) {
+int elf_libH_xadd(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger i;
 	elInteger length = ARRAY_LENGTH(tab->array);
@@ -381,7 +381,7 @@ int elf_table_libfn_xadd(elState *R) {
 }
 
 
-int elf_table_libfn_add(elState *R) {
+int elf_libH_add(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	int i;
 	for ( i = 0; i < elGETNARGS(R); ++i ) {
@@ -401,7 +401,7 @@ void elf_merge_tables(elTable *tab, elTable *merger) {
 }
 
 
-int elf_table_libfn_inject(elState *R) {
+int elf_libH_inject(elState *R) {
 	elf_check_args(R,":inject",1,"the table, all the fields of the table are injected onto this one");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elf_merge_tables(tab,elf_get_table(R,0));
@@ -409,7 +409,7 @@ int elf_table_libfn_inject(elState *R) {
 }
 
 
-int elf_table_libfn_itemize(elState *R) {
+int elf_libH_itemize(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *result = elf_add_new_table(R);
 	elf_varforj(tab->array) {
@@ -430,7 +430,7 @@ int elf_table_libfn_itemize(elState *R) {
 }
 
 
-int elf_table_libfn_index(elState *R) {
+int elf_libH_index(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger len = ARRAY_LENGTH(tab->array);
 	elValue value = elf_nil_value();
@@ -467,7 +467,7 @@ int elf_table_libfn_index(elState *R) {
 ** value from a table.
 ** The algorithm is pretty slow...
 */
-int elf_table_libfn_delete(elState *R) {
+int elf_libH_delete(elState *R) {
 	elASSERT(R->call->x >= 1);
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elValue key = elf_get_value(R,0);
@@ -506,7 +506,7 @@ int elf_table_libfn_delete(elState *R) {
 }
 
 
-int elf_table_libfn_xdelete(elState *R) {
+int elf_libH_xdelete(elState *R) {
 	elASSERT(elGETNARGS(R) >= 1);
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger len = ARRAY_LENGTH(tab->array);
@@ -547,7 +547,7 @@ int elf_table_libfn_xdelete(elState *R) {
 }
 
 
-int elf_table_libfn_xremove(elState *R) {
+int elf_libH_xremove(elState *R) {
 	elASSERT(elGETNARGS(R) >= 1);
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger len = ARRAY_LENGTH(tab->array);
@@ -595,7 +595,7 @@ int elf_table_libfn_xremove(elState *R) {
 }
 
 
-int elf_table_libfn_alias(elState *R) {
+int elf_libH_alias(elState *R) {
 	elf_check_args(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elf_table_alias(R,tab,elf_get_value(R,0),elf_get_value(R,1));
@@ -603,7 +603,7 @@ int elf_table_libfn_alias(elState *R) {
 }
 
 
-int elf_table_libfn_find_aliases(elState *R) {
+int elf_libH_find_aliases(elState *R) {
 	elf_check_args(R,":fndaliases",1,"the key to find aliases for");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elValue key = elf_get_value(R,0);
@@ -626,7 +626,7 @@ int elf_table_libfn_find_aliases(elState *R) {
 }
 
 
-int elf_table_libfn_bubble_sort(elState *R) {
+int elf_libH_bubble_sort(elState *R) {
 	elf_check_args(R,":bubblesort",1,"comparator function");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elValue *arr = tab->array;
@@ -661,7 +661,7 @@ int elf_table_libfn_bubble_sort(elState *R) {
 // }
 
 
-int elf_table_libfn_foreach(elState *R) {
+int elf_libH_foreach(elState *R) {
 	elNOCODE;
 	// elASSERT(R->frame->nx == 1);
 	// elTable *tab = (elTable *) elGETTHIS(R);
@@ -713,7 +713,7 @@ elTable *elf_clone_table(elState *S, elTable *tab) {
 }
 
 
-int elf_table_libfn_array(elState *S) {
+int elf_libH_array(elState *S) {
 	elf_check_args(S,":array",0,"the table to get a copy of as an array");
 	elTable *tab = (elTable *) elGETTHIS(S);
 
@@ -726,7 +726,7 @@ int elf_table_libfn_array(elState *S) {
 }
 
 
-int elf_table_libfn_clone(elState *R) {
+int elf_libH_clone(elState *R) {
 	elf_check_args(R,":clone",0,"the table to clone");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elf_add_table(R,elf_clone_table(R,tab));
@@ -734,7 +734,7 @@ int elf_table_libfn_clone(elState *R) {
 }
 
 
-int elf_table_libfn_slice(elState *R) {
+int elf_libH_slice(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger x = 0;
 	elInteger y = ARRAY_LENGTH(tab->array);
@@ -748,7 +748,7 @@ int elf_table_libfn_slice(elState *R) {
 }
 
 
-int elf_table_libfn_xset(elState *R) {
+int elf_libH_xset(elState *R) {
 	elf_check_args(R,":xset",2,"the value, and the index where to place the value");
 
 	elTable *tab = (elTable *) elGETTHIS(R);
@@ -763,7 +763,7 @@ int elf_table_libfn_xset(elState *R) {
 }
 
 
-int elf_table_libfn_swap(elState *R) {
+int elf_libH_swap(elState *R) {
 	elf_check_args(R,":swap",2,"the two indexes to swap");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger x = elf_get_integer(R,0);
@@ -775,7 +775,7 @@ int elf_table_libfn_swap(elState *R) {
 }
 
 
-int elf_table_libfn_merge(elState *R) {
+int elf_libH_merge(elState *R) {
 	elf_check_args(R,":merge",1,"the tables to merge into a new table (keys only), if no arguments are passed in, this acts like a clone");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *sum = elf_add_new_table(R); /* <- */
@@ -792,7 +792,7 @@ int elf_table_libfn_merge(elState *R) {
 ** table, like merge does...
 ** todo: could this be renamed to make more clear?
 */
-int elf_table_libfn_xmerge(elState *R) {
+int elf_libH_xmerge(elState *R) {
 	elf_check_args(R,":xmerge",1,"the table to merge, all values are of the table are added to a new one, unline :merge, :xmerge will not check for duplicates");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *add = elf_get_table(R,0);
@@ -808,7 +808,7 @@ int elf_table_libfn_xmerge(elState *R) {
 }
 
 
-int elf_table_libfn_xclone(elState *R) {
+int elf_libH_xclone(elState *R) {
 	elf_check_args(R,":xclone",0,"");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *clone = elf_new_table(R);
@@ -823,7 +823,7 @@ int elf_table_libfn_xclone(elState *R) {
 
 
 
-int elf_table_libfn_reverse(elState *R) {
+int elf_libH_reverse(elState *R) {
 	elf_check_args(R,":reverse",0,"");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elInteger n = ARRAY_LENGTH(tab->array);
@@ -841,7 +841,7 @@ elBool elf_table_contains(elTable *tab, elValue key) {
 	return elf_table_is_key(tab,elf_table_try(tab,key));
 }
 
-int elf_table_libfn_diff(elState *R) {
+int elf_libH_diff(elState *R) {
 	elf_check_args(R,":diff",1,"the subtrahend, the result contains all the values of this table that are not present in the subtrahend");
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *sub = elf_get_table(R,0);

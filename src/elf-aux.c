@@ -1,8 +1,43 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf-run.c
-** Auxiliary Functions
+** Auxiliary Functions / Tools
 */
+
+
+/* res is how much to reserve,
+and com is how much to commit */
+elInteger elf_stretchy_buffer_alloc(void **var, elInteger per, elInteger res, elInteger com) {
+	elArray *arr = 0;
+	elInteger max = 0, min = 0;
+	if (*var != 0) {
+		arr = &ARRAY(*var);
+		max = arr->max;
+		min = arr->min;
+	}
+   /* increment reserve if we attempt to commit
+   more than we've got reserved */
+	if (max + res < com) {
+		res += (com - (max + res));
+	}
+	if (min + res > max) {
+		max <<= 1;
+		if(min + res > max) {
+			max = min + res;
+		}
+		arr = elf_realloc(elHEAP_ALLOCATOR,sizeof(elArray)+per*max,arr);
+	}
+	if (arr != 0) {
+		arr->max = max;
+		arr->min = min + com;
+	}
+	*var = arr + 1;
+	return min;
+}
+
+
+
+
 
 
 void elf_debugger(char *message) {
@@ -33,7 +68,7 @@ void elf_register_string(elState *R, char *name, char *val) {
 }
 
 
-void elf_register_binding(elState *R, char *name, elBinding fn) {
+void elf_register_binding(elState *R, char *name, elCFunction fn) {
 	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_binding_value(fn));
 }
 

@@ -19,6 +19,12 @@
 #define elGC_OBJ_THRESHOLD_MIN (elInteger) ((1024)*2)
 #define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*4)
 
+
+/* todo?: the stack isn't allocated dynamically... */
+#define elDEFAULT_STACK_SIZE 4096
+
+
+
 // #define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(4)
 // #define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(512)
 // #define elGC_OBJ_THRESHOLD_MIN (elInteger) ((2048)*1)
@@ -95,9 +101,22 @@
 #endif
 
 
+
 #define false   ((elBool)(0)) /* todo: @DEPRECATED */
 #define elFALSE ((elBool)(0))
 #define elTRUE  ((elBool)(1))
+
+
+
+/* Some Forward Declarations */
+typedef struct elModule 	elModule;
+typedef struct elFileState elFileState;
+typedef struct elState 		elState;
+typedef struct elObject 	elObject;
+typedef struct elTable 		elTable;
+typedef struct elString 	elString;
+typedef struct elClosure 	elClosure;
+
 
 
 /*
@@ -109,13 +128,22 @@ typedef signed int 		   elBool;
 typedef double 			   elNumber;
 typedef void 			     *elHandle;
 typedef void 			     *elAddr;
+/* todo: I didn't know enum forward
+declarations were a MS specific
+extension */
+typedef int 					elError;
 
 
 typedef unsigned int 	   elHashId;
 typedef int 				   elRegId;
 typedef int 				   elByteId;
 typedef int 				   elSymbolId;
-typedef int   				   elError;
+
+
+/* todo: eventually convert this to an offset,
+but this is great for debugging... */
+typedef char 		       *elFileLine;
+typedef int (* elCFunction)(elState *);
 
 
 /*
@@ -155,20 +183,9 @@ typedef struct elArray {
 
 
 
-/* Some Forward Declarations */
-typedef struct elModule 	elModule;
-typedef struct elFileState elFileState;
-typedef struct elState 		elState;
-typedef struct elTable 		elTable;
-typedef struct elString 	elString;
-typedef struct elObject 	elObject;
-typedef struct elClosure 	elClosure;
+/* Some debug utilities */
 
-/* todo: eventually convert this to an offset,
-but this is great for debugging... */
-typedef char 		       *elFileLine;
-typedef int (* elBinding)(elState *);
-
+#define elHERE (elSourceInfo){__FILE__,__LINE__,__func__}
 
 typedef struct elSourceInfo {
 	char const *fileName;
@@ -179,8 +196,13 @@ typedef struct elSourceInfo {
 } elSourceInfo;
 
 
+
+/* Memory Stuff, Allocators */
+
+
 typedef struct elAllocator elAllocator;
 typedef elError (* elAllocFn)(elAllocator *allocator, int flags, elInteger oldSize, elInteger newSize, void **oldAndNewMemory, elSourceInfo loca);
+
 
 typedef struct elAllocator {
 	char const *label;
@@ -188,27 +210,46 @@ typedef struct elAllocator {
 } elAllocator;
 
 
-typedef enum elObjType {
-	OBJ_OBJ = 0, OBJ_CLS, OBJ_STR, OBJ_TAB
-} elObjType;
+
+elAPI void elf_dealloc_(elAllocator *allocator, void const *memory, elSourceInfo loca);
+elAPI void *elf_realloc_(elAllocator *allocator, elInteger size, void *memory, elSourceInfo loca);
+elAPI void *elf_alloc_(elAllocator *allocator, elInteger size, elSourceInfo loca);
+elAPI void *elf_calloc_(elAllocator *allocator, elInteger size, elSourceInfo loca);
 
 
-/* first object tag must be OBJECT, all other
-objects come after it, this should be same
-order as object types... */
+#define elf_dealloc(cator,mem) elf_dealloc_(cator,mem,elHERE)
+#define elf_realloc(cator,sze,mem) elf_realloc_(cator,sze,mem,elHERE)
+#define elf_alloc(cator,sze) elf_alloc_(cator,sze,elHERE)
+#define elf_calloc(cator,sze) elf_calloc_(cator,sze,elHERE)
+
+
+
+/* Objects and Values */
+
+
+typedef enum elGCColor {
+	GC_WHITE = 0, GC_BLACK, GC_RED, GC_PINK,
+} elGCColor;
+
+
+typedef enum elGCTy {
+	GC_OBJ = 0, GC_CLS, GC_STR, GC_TAB
+} elGCTy;
+
+
+/* first object tag must be OBJ, all other
+objects come after it, same order as object
+types... */
 #define TAGLIST(_) \
 _(NIL) _(NUM) _(INT) _(SYS) _(CFN) \
 _(OBJ) _(CLS) _(STR) _(TAB) /* end */
 
 
-typedef enum elGCColor {
-	GC_WHITE = 0, GC_BLACK, GC_PINK, GC_RED,
-} elGCColor;
-
 
 typedef struct elObject {
-	elObjType      type;
-	elGCColor     color;
+	/* todo: compact this */
+	elGCTy    type;
+	elGCColor color;
 	elTable  *metatable;
 	/* todo: please remove this... */
 	short tell;
@@ -249,6 +290,7 @@ elGLOBAL char const *tag2s[] = {
 #undef TAGENUM
 
 
+
 typedef struct elValue {
 	elValueTag tag;
 	union {
@@ -260,15 +302,11 @@ typedef struct elValue {
 		elObject  *j,*x_obj;
 		elTable   *t,*x_tab;
 		elString  *s,*x_str;
-		elBinding c,  x_cfn;
+		elCFunction c,  x_cfn;
 	};
 } elValue;
 
 
-// #define STATIC_ASSERT(C) typedef char __thing__[(C)*2-1]
-// STATIC_ASSERT(elISOBJTAG(TAG_OBJ));
-// STATIC_ASSERT(elISNUMTAG(TAG_NUM));
-// STATIC_ASSERT(elISNUMTAG(TAG_INT));
 
 /*
 ** A file prototype describes a function,
@@ -282,21 +320,25 @@ typedef struct elValue {
 ** the contents of a file.
 */
 typedef struct elFileProto {
-	short   x,y;
-	union { short nvalues, /* @DEPRECATED */ zcache; };
-	union { short nlocals, /* @DEPRECATED */ zstack; };
-	/* Use objects here so that this memory
-	is managed automatically, this also means that
-	loaded files have to be kept in memory
-	otherwise they get collected, 'load' should
-	load a file and keep it in the stack, where
-	it is reachable.  */
+	short x,y;
+	short nvalues;
+	short nlocals;
+	/* this memory is managed automatically,
+	which means that loaded files (to be closures)
+	have to be kept in memory or referenced by
+	other closures, otherwise they get collected.
+	*/
 	elString     *name;
 	elString *contents;
 	int 	      nbytes;
 	int 	       bytes;
 	int       **protos;
+	/* to keep parents alive, as you should
+	after all they've done for you? */
+	int         parent;
 } elFileProto;
+
+
 
 /* closures are both for files and functions,
 a file is a function so I don't know why keep
@@ -304,10 +346,6 @@ saying files and functions... */
 typedef struct elClosure {
 	elObject       obj;
 	elFileProto  proto;
-	/* both files and functions can have
-	values, for files these are variables
-	that are the declared at level 0 (file)
-	and are stored here. */
 	elValue  values[1];
 } elClosure;
 
@@ -335,18 +373,24 @@ typedef struct elString {
 elString *elf_new_lstring(elState *R, elInteger length);
 elString *elf_new_string(elState *R, char *contents);
 
-int elf_string_lib_length(elState *R);
-int elf_string_lib_match(elState *R);
-int elf_string_lib_pop(elState *R);
-int elf_string_lib_append(elState *R);
-int elf_string_lib_append_char(elState *R);
-int elf_string_lib_get_hash(elState *R);
-int elf_string_lib_uppercase(elState *R);
-int elf_string_lib_lowercase(elState *R);
-int elf_string_lib_split_by_lines(elState *R);
-int elf_string_lib_get_index(elState *R);
-int elf_string_lib_find(elState *R);
-int elf_string_lib_split(elState *R);
+int elf_libS_length(elState *R);
+int elf_libS_match(elState *R);
+int elf_libS_pop(elState *R);
+int elf_libS_append(elState *R);
+int elf_libS_append_char(elState *R);
+int elf_libS_get_hash(elState *R);
+int elf_libS_uppercase(elState *R);
+int elf_libS_lowercase(elState *R);
+int elf_libS_split_by_lines(elState *R);
+int elf_libS_get_index(elState *R);
+int elf_libS_find(elState *R);
+int elf_libS_split(elState *R);
+
+
+
+/* ---------------------------------
+	Table
+--------------------------------- */
 
 
 
@@ -361,8 +405,8 @@ typedef struct elTable {
 	elInteger ntotal;
 	elInteger nslots;
 	elInteger ncollisions;
-	union { elEntry *entries, *slots; };
-	union {elValue *values, /* @DEPRECATED */ *array;};
+	union { elEntry *entries, /* @DEPRECATED */ *slots;};
+	union { elValue *values, /* @DEPRECATED */ *array;};
 } elTable;
 
 
@@ -385,33 +429,37 @@ elBool elf_tabvaleq(elValue *x, elValue *y);
 void elf_table_field_alias(elState *S, elTable *tab, char *key, elValue alias);
 void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias);
 
-int elf_table_libfn_add(elState *);
-int elf_table_libfn_xadd(elState *);
-int elf_table_libfn_xremove(elState *);
-int elf_table_libfn_xdelete(elState *);
-int elf_table_libfn_index(elState *);
-int elf_table_libfn_tally(elState *);
-int elf_table_libfn_length(elState *);
-int elf_table_libfn_delete(elState *);
-int elf_table_libfn_itemize(elState *);
-int elf_table_libfn_inject(elState *);
-int elf_table_libfn_alias(elState *);
-int elf_table_libfn_contains(elState *);
-int elf_table_libfn_lookup(elState *);
-int elf_table_libfn_foreach(elState *);
-int elf_table_libfn_get_collisions(elState *);
-int elf_table_libfn_bubble_sort(elState *);
-int elf_table_libfn_find_aliases(elState *);
-int elf_table_libfn_array(elState *R);
-int elf_table_libfn_xset(elState *R);
-int elf_table_libfn_merge(elState *);
-int elf_table_libfn_xmerge(elState *);
-int elf_table_libfn_diff(elState *R);
-int elf_table_libfn_xclone(elState *);
-int elf_table_libfn_reverse(elState *);
-int elf_table_libfn_clone(elState *);
-int elf_table_libfn_slice(elState *R);
-int elf_table_libfn_swap(elState *R);
+
+/* todo: all of these have to reviewed,
+there are a bunch of inconsistencies and
+incoherences with this API. */
+int elf_libH_add(elState *);
+int elf_libH_xadd(elState *);
+int elf_libH_xremove(elState *);
+int elf_libH_xdelete(elState *);
+int elf_libH_index(elState *);
+int elf_libH_tally(elState *);
+int elf_libH_length(elState *);
+int elf_libH_delete(elState *);
+int elf_libH_itemize(elState *);
+int elf_libH_inject(elState *);
+int elf_libH_alias(elState *);
+int elf_libH_contains(elState *);
+int elf_libH_lookup(elState *);
+int elf_libH_foreach(elState *);
+int elf_libH_get_collisions(elState *);
+int elf_libH_bubble_sort(elState *);
+int elf_libH_find_aliases(elState *);
+int elf_libH_array(elState *R);
+int elf_libH_xset(elState *R);
+int elf_libH_merge(elState *);
+int elf_libH_xmerge(elState *);
+int elf_libH_diff(elState *R);
+int elf_libH_xclone(elState *);
+int elf_libH_reverse(elState *);
+int elf_libH_clone(elState *);
+int elf_libH_slice(elState *R);
+int elf_libH_swap(elState *R);
 
 
 /*
@@ -430,15 +478,26 @@ elAPI elClosure *elf_get_closure(elState *R, elRegId x);
 elAPI elValue elf_get_value(elState *R, elRegId x);
 
 
-elAPI elValue elf_tab(elTable *);
-elAPI elValue elf_binding_value(elBinding);
+// elAPI elValue elf_tab(elTable *tab) {
+// 	elValue v = elLITERAL(elValue){TAG_TAB};
+// 	v.x_tab = tab;
+// 	return v;
+// }
+
+// elAPI elValue elf_tab(elTable *);
+
+
+#define elf_tab(thing) elLITERAL(elValue){TAG_TAB,thing}
+
+
+elAPI elValue elf_binding_value(elCFunction);
 elAPI elValue elf_string_value(elString *);
 elAPI elValue elf_closure_value(elClosure *);
 elAPI elValue elf_integer_value(elInteger i);
 elAPI elValue elf_number_value(elNumber n);
 elAPI elValue elf_nil_value();
 
-void *elf_new_object(elState *R, elObjType type, elInteger length);
+void *elf_new_object(elState *R, elGCTy type, elInteger length);
 
 /* todo: these are all deprecated, they should instead return the closure
 object, and you use that however you want... */
@@ -1048,27 +1107,11 @@ typedef struct elFileFnState {
 
 
 typedef struct elFileState {
-	union { elModule *M, /* @DEPRECATED */ *md; };
-	union { elState  *R, /* @DEPRECATED */ *rt; };
+	elModule *M;
+	elState  *R;
 	/*
-	We keep the file name and contents string here
-	as a c string for ease of use, the strings most
-	likely come from a GCString, but it should
-	remain alive.
-	I can't think of a reason why it wouldn't, and
-	so far we haven't had any problems...
-	I'm saying this because you'd think that since
-	we haven't created the prototype nor the closure
-	object for that prototype yet, there's no one
-	guaranteeing the lifetime of these objects,
-	so it could get GC'd.
-	It could theoretically happen, but since the
-	string is more than likely on the stack (and this
-	is the intended usage), not really...
-	Either way, the file state shouldn't have to concern
-	itself lifetime of contents and filename here, tis
-	the reason why they are c strings and not objects.
-	*/
+	these probably came from GCStrings,
+	they should remain alive... I think. */
 	char     *filename;
 	char     *contents;
 	char     *linechar;
@@ -1153,7 +1196,6 @@ void elf_emitter_close_block(elFileState *fs);
 #include "src/elf-str.c"
 #include "src/elf-var.c"
 #include "src/elf-tab.c"
-#include "src/lfunc.c"
 #include "src/elf-lex.c"
 #include "src/elf-node.c"
 #include "src/elf-emit.c"
@@ -1350,4 +1392,3 @@ reachable, like the stack or globals.
 ** LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 ** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ** SOFTWARE.
-*/

@@ -140,7 +140,7 @@ void emit86_shift(elByteOP type, ljValue x, ljValue y) {
 }
 
 
-elBinding jit(elModule *md, elFileProto fn) {
+elCFunction jit(elModule *md, elFileProto fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();
@@ -213,7 +213,7 @@ elBinding jit(elModule *md, elFileProto fn) {
 	typedef int (*xorfn)(int);
 	int result = ((xorfn)jit_mem)(5282);
 	pf("result: %i\n",result);
-	return (elBinding) jit_mem;
+	return (elCFunction) jit_mem;
 }
 
 

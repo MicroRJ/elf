@@ -7,25 +7,25 @@
 
 elTable *elf_new_string_metatable(elState *R) {
 	elTable *tab = elf_add_new_table(R);
-	elf_table_set_binding_field(R,tab,"length",elf_string_lib_length);
-	elf_table_set_binding_field(R,tab,"match",elf_string_lib_match);
-	elf_table_set_binding_field(R,tab,"uppercase",elf_string_lib_uppercase);
-	elf_table_set_binding_field(R,tab,"lowercase",elf_string_lib_lowercase);
-	elf_table_set_binding_field(R,tab,"__add",elf_string_lib_append);
-	elf_table_set_binding_field(R,tab,"__add1",elf_string_lib_append);
-	elf_table_set_binding_field(R,tab,"append",elf_string_lib_append);
-	elf_table_set_binding_field(R,tab,"append_char",elf_string_lib_append_char);
-	elf_table_set_binding_field(R,tab,"pop",elf_string_lib_pop);
-	elf_table_set_binding_field(R,tab,"get_hash",elf_string_lib_get_hash);
-	elf_table_set_binding_field(R,tab,"split_by_lines",elf_string_lib_split_by_lines);
-	elf_table_set_binding_field(R,tab,"idx",elf_string_lib_get_index);
-	elf_table_set_binding_field(R,tab,"find",elf_string_lib_find);
+	elf_table_set_binding_field(R,tab,"length",elf_libS_length);
+	elf_table_set_binding_field(R,tab,"match",elf_libS_match);
+	elf_table_set_binding_field(R,tab,"uppercase",elf_libS_uppercase);
+	elf_table_set_binding_field(R,tab,"lowercase",elf_libS_lowercase);
+	elf_table_set_binding_field(R,tab,"__add",elf_libS_append);
+	elf_table_set_binding_field(R,tab,"__add1",elf_libS_append);
+	elf_table_set_binding_field(R,tab,"append",elf_libS_append);
+	elf_table_set_binding_field(R,tab,"append_char",elf_libS_append_char);
+	elf_table_set_binding_field(R,tab,"pop",elf_libS_pop);
+	elf_table_set_binding_field(R,tab,"get_hash",elf_libS_get_hash);
+	elf_table_set_binding_field(R,tab,"split_by_lines",elf_libS_split_by_lines);
+	elf_table_set_binding_field(R,tab,"idx",elf_libS_get_index);
+	elf_table_set_binding_field(R,tab,"find",elf_libS_find);
 	return tab;
 }
 
 
 elString *elf_new_lstring(elState *R, elInteger length) {
-	elString *obj = elf_new_object(R,OBJ_STR,sizeof(elString)+length+1);
+	elString *obj = elf_new_object(R,GC_STR,sizeof(elString)+length+1);
 	if (R) obj->obj.metatable = R->metatables.string;
 	obj->length = length;
 	obj->hash = -1;
@@ -75,7 +75,7 @@ elBool elf_streq(elString *x, elString *y) {
 }
 
 
-int elf_string_lib_length(elState *c) {
+int elf_libS_length(elState *c) {
 	elf_add_integer(c,((elString*)c->f->obj)->length);
 	return 1;
 }
@@ -95,14 +95,14 @@ void strcatf(char *buffer, char *fmt, ...) {
 }
 
 
-int elf_string_lib_get_index(elState *R) {
+int elf_libS_get_index(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	elf_add_integer(R,str->contents[elf_get_integer(R,0)]);
 	return 1;
 }
 
 
-int elf_string_lib_pop(elState *R) {
+int elf_libS_pop(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
 	elf_copy_memory(el->contents,yo->contents,MAX(0,yo->length-1));
@@ -111,7 +111,7 @@ int elf_string_lib_pop(elState *R) {
 }
 
 
-int elf_string_lib_append_char(elState *R) {
+int elf_libS_append_char(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,yo->length + elGETNARGS(R));
 	elf_copy_memory(el->contents,yo->contents,yo->length);
@@ -123,7 +123,7 @@ int elf_string_lib_append_char(elState *R) {
 }
 
 
-int elf_string_lib_append(elState *R) {
+int elf_libS_append(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->c);
@@ -144,7 +144,7 @@ int elf_string_lib_append(elState *R) {
 }
 
 
-int elf_string_lib_match(elState *R) {
+int elf_libS_match(elState *R) {
 	elString *s = (elString*) elGETTHIS(R);
 	elString *p = elf_get_string(R,0);
 	elf_add_integer(R,elf_match_entire_string(p->string,s->string));
@@ -152,7 +152,7 @@ int elf_string_lib_match(elState *R) {
 }
 
 
-int elf_string_lib_find(elState *R) {
+int elf_libS_find(elState *R) {
 	elString *string = (elString*) elGETTHIS(R);
 	char *pattern = elf_get_charstring(R,0);
 	char *buffer = 0;
@@ -175,7 +175,7 @@ int elf_string_lib_find(elState *R) {
 }
 
 
-int elf_string_lib_split_by_lines(elState *R) {
+int elf_libS_split_by_lines(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char *buffer = 0;
 	char *cursor = str->contents;
@@ -195,14 +195,14 @@ int elf_string_lib_split_by_lines(elState *R) {
 }
 
 
-int elf_string_lib_get_hash(elState *R) {
+int elf_libS_get_hash(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	elf_add_integer(R,str->hash);
 	return 1;
 }
 
 
-int elf_string_lib_lowercase(elState *R) {
+int elf_libS_lowercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
@@ -212,7 +212,7 @@ int elf_string_lib_lowercase(elState *R) {
 }
 
 
-int elf_string_lib_uppercase(elState *R) {
+int elf_libS_uppercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {

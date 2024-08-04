@@ -157,7 +157,7 @@ elObject *elf_add_object(elState *R, elObject *obj) {
 
 
 elObject *elf_add_new_object(elState *R, elInteger tell) {
-	return elf_add_object(R,elf_new_object(R,OBJ_OBJ,tell));
+	return elf_add_object(R,elf_new_object(R,GC_OBJ,tell));
 }
 
 
@@ -174,7 +174,7 @@ elTable *elf_add_new_table(elState *R) {
 }
 
 
-void elf_pushbinding(elState *R, elBinding b) {
+void elf_pushbinding(elState *R, elCFunction b) {
 	elValue *T = elGETTOP(R) ++;
 	T->tag   = TAG_CFN;
 	T->x_cfn = b;

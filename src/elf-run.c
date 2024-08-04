@@ -7,8 +7,8 @@
 
 void elf_begin(elState *R, elModule *M) {
 	R->M = M;
-	R->Z = 4096;
-	R->K = elf_clear_alloc(elHEAP_ALLOCATOR,sizeof(elValue)*R->Z);
+	R->Z = elDEFAULT_STACK_SIZE;
+	R->K = elf_calloc(elHEAP_ALLOCATOR,sizeof(elValue)*R->Z);
 	R->T = R->K;
 	R->call_level = 0;
 
@@ -308,7 +308,7 @@ elInteger elf_mark_object(elObject *obj) {
 	if (obj->metatable) {
 		num += elf_mark_object((elObject*)obj->metatable);
 	}
-	if (obj->type == OBJ_CLS) {
+	if (obj->type == GC_CLS) {
 		elClosure *cls = (elClosure*) obj;
 		if (cls->proto.name != 0) {
 			elf_mark_object(elTOOBJ(cls->proto.name));
@@ -316,12 +316,15 @@ elInteger elf_mark_object(elObject *obj) {
 		if (cls->proto.contents != 0) {
 			elf_mark_object(elTOOBJ(cls->proto.contents));
 		}
+		if (cls->proto.parent != -1) {
+			/* todo: implement this */
+		}
 		FOR_RANGE(i, 0, cls->proto.nlocals) {
 			if (elISOBJTAG(cls->values[i].tag)) {
 				num += elf_mark_object(cls->values[i].x_obj);
 			}
 		}
-	} else if (obj->type == OBJ_TAB) {
+	} else if (obj->type == GC_TAB) {
 		elTable *table = (elTable*) obj;
 		elValue *values = table->values;
 		elEntry *entries = table->entries;
@@ -380,10 +383,10 @@ elInteger elf_free_phase(elState *R) {
 			n += 1;
 			it->color = GC_RED;
 			R->memory.memory_allocated -= it->tell;
-			if (it->type == OBJ_STR && ((elString*)(it))->length > 512) {
+			if (it->type == GC_STR && ((elString*)(it))->length > 512) {
 				elf_debug_log("deallocated fairly large string: %p, %i", it, ((elString*)(it))->length);
 			}
-			if (it->type == OBJ_TAB) {
+			if (it->type == GC_TAB) {
 				elf_dealloc_table((elTable*)it);
 			}
 			elf_dealloc(elHEAP_ALLOCATOR,it);
@@ -438,11 +441,11 @@ void elf_collect(elState *R) {
 }
 
 
-void *elf_new_object(elState *R, elObjType type, elInteger tell) {
+void *elf_new_object(elState *R, elGCTy type, elInteger tell) {
 	R->memory.memory_allocated += tell;
 	elf_collect(R);
 
-	elObject *obj = elf_clear_alloc(elHEAP_ALLOCATOR,tell);
+	elObject *obj = elf_calloc(elHEAP_ALLOCATOR,tell);
 	obj->color = (elGCColor) R->memory.phase;
 	if (obj->color != GC_WHITE) {
 		elf_throw(R,NO_BYTE,"object allocation out of phase");

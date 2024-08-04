@@ -44,7 +44,7 @@ void *elf_realloc_(elAllocator *c, elInteger length, void *memory, elSourceInfo 
 }
 
 
-void *elf_clearalloc_(elAllocator *c, elInteger size, elSourceInfo loca) {
+void *elf_calloc_(elAllocator *c, elInteger size, elSourceInfo loca) {
 	return elf_clear_memory(elf_alloc_(c,size,loca),size);
 }
 

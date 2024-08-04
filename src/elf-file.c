@@ -400,7 +400,7 @@ elNodeId elf_load_file_subexpr(elFileState *fs, int rank, int flags) {
 
 /* Named functions aren't a thing for this
 language... at least for now... */
-elNodeId elf_fs_load_function(elFileState *fs) {
+elNodeId elf_load_file_function(elFileState *fs) {
 	elToken tk = elf_take_token(fs,TK_FUN);
 
 	int fj = elf_emit_jump(fs,tk.line,-1);
@@ -441,15 +441,17 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 
 	elf_emitter_close_function(fs);
 
-	/* add this function to the type table */
-	elFileProto p = {0};
-	p.x = arity;
-	p.y = fn.nyield;
-	p.zstack = fn.nlocals;
-	p.bytes = fn.bytes;
-	p.nbytes  = fs->md->nbytes - fn.bytes;
-	p.zcache = ARRAY_LENGTH(fn.enclosure);
-	int f = elf_add_proto(fs->M,p);
+	/* add this function to the prototype table... */
+	elFileProto fp = {0};
+	/* todo: implement this */
+	// fp.parent  = fn.enclosing
+	fp.x 		  = arity;
+	fp.y 		  = fn.nyield;
+	fp.nlocals = fn.nlocals;
+	fp.nvalues = ARRAY_LENGTH(fn.enclosure);
+	fp.bytes   = fn.bytes;
+	fp.nbytes  = fs->M->nbytes - fn.bytes;
+	int f = elf_add_proto(fs->M,fp);
 
 	elf_emitter_patch_jump(fs,fj);
 
@@ -724,7 +726,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 			}
 		} break;
 		case TK_FUN: {
-			v = elf_fs_load_function(fs);
+			v = elf_load_file_function(fs);
 		} break;
 		case TK_THIS: { elf_lexone(fs);
 			v = elf_make_node_nullary(fs,tk.line,NODE_THIS,NT_ANY);

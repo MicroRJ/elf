@@ -24,7 +24,7 @@ char *elf_logtostr(int);
 elAPI void elf_log_(int type, elSourceInfo loc, char const *fmt, ...);
 
 
-#define elf_log(TYPE,FORMAT,...) (LCHECKPRINTF(FORMAT,##__VA_ARGS__),elf_log_(TYPE,LHERE,FORMAT,##__VA_ARGS__))
+#define elf_log(TYPE,FORMAT,...) (LCHECKPRINTF(FORMAT,##__VA_ARGS__),elf_log_(TYPE,elHERE,FORMAT,##__VA_ARGS__))
 #define elf_loginfo(yyy,...)    elf_log(ELF_LOGINFO,yyy,##__VA_ARGS__)
 #define elf_debug_log(yyy,...)   elf_log(ELF_LOGDBUG,yyy,##__VA_ARGS__)
 #define elf_logwarning(yyy,...) elf_log(ELF_LOGWARN,yyy,##__VA_ARGS__)

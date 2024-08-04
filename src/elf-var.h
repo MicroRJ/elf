@@ -28,8 +28,8 @@
 #define elf_xarray_delete(var) ((var != 0) ? elf_dealloc(elHEAP_ALLOCATOR,(elArray*)(var)-1),0 : 0)
 
 
-#define elf_varaddx(var,res,com) ((var) + elf_varaddxx((void**)&(var),sizeof(*var),res,com))
-#define elf_xarray_growby(var,num) (elf_varaddxx((void**)&(var),sizeof(*var),num,num))
+#define elf_varaddx(var,res,com) ((var) + elf_stretchy_buffer_alloc((void**)&(var),sizeof(*var),res,com))
+#define elf_xarray_growby(var,num) (elf_stretchy_buffer_alloc((void**)&(var),sizeof(*var),num,num))
 #define elf_varaddn(var,num) ((var) + elf_xarray_growby(var,num))
 
 /* Seems that only msvc compiles this properly or
@@ -49,7 +49,7 @@ am I trippin' ? */
 ** Returns the last index of the array
 ** that can be written to
 */
-elInteger elf_varaddxx(void **var
+elInteger elf_stretchy_buffer_alloc(void **var
 , elInteger per, elInteger res, elInteger com);
 
 #define FOR_RANGE(N,RMIN,RMAX) for (elInteger N = RMIN; N < RMAX; N += 1)

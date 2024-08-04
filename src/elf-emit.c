@@ -434,7 +434,7 @@ void elf_emit_function_epilogue(elFileState *fs, elFileLine line) {
 void elf_emitter_begin_function(elFileState *fs, elFileFnState *fn, char *line) {
 	fn->enclosing = fs->fn;
 	fn->entities = fs->nentities;
-	fn->bytes = fs->md->nbytes;
+	fn->bytes = fs->M->nbytes;
 	fn->line = line;
 	fn->yj = 0;
 	/* todo: "begin_block" requires fn to be set

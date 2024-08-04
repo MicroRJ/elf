@@ -11,13 +11,11 @@ void lang_setasserthook(int (*hook)(elSourceInfo));
 void lang_assertfn(elSourceInfo ind, char const *name, elBool expr);
 
 
-#define LHERE (elSourceInfo){__FILE__,__LINE__,__func__}
-
 
 #define elWITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
 
 
-#define LASSERTALWAYS(xx) lang_assertfn(LHERE,elTOTEXT(xx),xx)
+#define LASSERTALWAYS(xx) lang_assertfn(elHERE,elTOTEXT(xx),xx)
 
 
 #if defined(_DEBUG)

@@ -50,7 +50,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 		elf_debug_log("object found through: ");
 		print_object_trace(path); printf("\n");
 		traces = 1;
-	} else if (thru->type == OBJ_CLS) {
+	} else if (thru->type == GC_CLS) {
 		elObjectTracePath child = { &path, "closure.values" };
 		elClosure *cls = (elClosure *) thru;
 		FOR_RANGE(k,0,cls->proto.nlocals) {
@@ -58,7 +58,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 				traces += elf_trace_object(S,visited,obj,cls->values[k].x_obj,child);
 			}
 		}
-	} else if (thru->type == OBJ_TAB) {
+	} else if (thru->type == GC_TAB) {
 		elTable *tab = (elTable *) thru;
 
 		{
@@ -518,7 +518,7 @@ int elflib_ntoi(elState *R) {
 int elflib_libfn(elState *rt) {
 	elHandle lib = elf_get_handle(rt,0);
 	elString *name = elf_get_string(rt,1);
-	elBinding fn = (elBinding) sys_libfn(lib,name->c);
+	elCFunction fn = (elCFunction) sys_libfn(lib,name->c);
 	if (fn != 0) {
 		elf_pushbinding(rt,fn);
 	} else {

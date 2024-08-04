@@ -10,13 +10,6 @@
 
 
 
-elAPI elValue elf_tab(elTable *tab) {
-	elValue v = elLITERAL(elValue){TAG_TAB};
-	v.x_tab = tab;
-	return v;
-}
-
-
 elAPI elValue elf_obj(elObject *obj) {
 	elValue v = elLITERAL(elValue){TAG_OBJ};
 	v.x_obj = obj;
@@ -24,7 +17,7 @@ elAPI elValue elf_obj(elObject *obj) {
 }
 
 
-elAPI elValue elf_binding_value(elBinding c) {
+elAPI elValue elf_binding_value(elCFunction c) {
 	elValue v = elLITERAL(elValue){TAG_CFN};
 	v.c = c;
 	return v;
@@ -74,7 +67,7 @@ elAPI elValue elf_nil_value() {
 
 
 elAPI elClosure *elf_new_closure(elState *S, elFileProto proto) {
-	elClosure *cls = (elClosure *) elf_new_object(S,OBJ_CLS,sizeof(elClosure) + sizeof(elValue) * (proto.nlocals-1));
+	elClosure *cls = (elClosure *) elf_new_object(S,GC_CLS,sizeof(elClosure) + sizeof(elValue) * (proto.nlocals-1));
 	cls->proto = proto;
 	return cls;
 }
