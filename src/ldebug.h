@@ -40,7 +40,7 @@ void lang_assertfn(elSourceInfo ind, char const *name, elBool expr);
 
 
 #if defined(_DEBUG)
-	#define LCHECKPRINTF(FORMAT,...) ((false)?(snprintf(elNIL,0,FORMAT,##__VA_ARGS__),elNIL):elNIL)
+	#define LCHECKPRINTF(FORMAT,...) ((false)?(snprintf(0,0,FORMAT,##__VA_ARGS__),0):0)
 #else
 	#define LCHECKPRINTF(FORMAT,...) 0
 #endif

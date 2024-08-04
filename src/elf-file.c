@@ -273,7 +273,7 @@ elNodeId elf_make_set_metatable_node(elFileState *fs, elFileLine line, elNodeId 
 
 	elNodeId fn = elf_get_global_entity_node(fs,line,"elf.set_object_metatable");
 
-	elNodeId *z = elNIL;
+	elNodeId *z = 0;
 	ARRAY_ADD(z,table);
 	ARRAY_ADD(z,meta_table);
 
@@ -454,7 +454,7 @@ elNodeId elf_fs_load_function(elFileState *fs) {
 	elf_emitter_patch_jump(fs,fj);
 
 	/* todo: */
-	elNodeId *z = elNIL;
+	elNodeId *z = 0;
 	elf_xarray_foreachi(fn.enclosure) {
 		elFileEntity entity = fs->entities[fn.enclosure[i]];
 		ARRAY_ADD(z,elf_make_register_node(fs,entity.line,entity.slot));
@@ -528,8 +528,8 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 elNodeId elf_load_file_table(elFileState *fs) {
 	elToken tk = fs->tk;
 	elf_take_token(fs,TK_CURLY_LEFT);
-	elNodeId *z = elNIL;
-	elNodeId table = elf_make_table_node(fs,tk.line,elNIL);
+	elNodeId *z = 0;
+	elNodeId table = elf_make_table_node(fs,tk.line,0);
 	int index = 0;
 	while (!elf_term_token(fs,TK_CURLY_RIGHT)) {
 		tk = fs->tk;
@@ -661,7 +661,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 			} else {
 				/* If the user however, doesn't do this, then we
 				create a new table for him */
-				table = elf_make_table_node(fs,tk.line,elNIL);
+				table = elf_make_table_node(fs,tk.line,0);
 			}
 
 			table = elf_make_set_metatable_node(fs,tk.line,table,meta_table);

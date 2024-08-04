@@ -123,7 +123,7 @@ elAPI void *sys_valloc(elInteger length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
-	return elNIL;
+	return 0;
 #endif
 }
 
@@ -194,7 +194,7 @@ elAPI int sys_changeworkdir(char *buffer) {
 #if defined(PLATFORM_DESKTOP) && defined(_WIN32)
 	return SetCurrentDirectory(buffer);
 #else
-	return chdir(buffer);
+	return !chdir(buffer);
 #endif
 }
 
@@ -212,7 +212,7 @@ elAPI elHandle sys_loadlib(char const *name) {
 	return 0;
 #else
 	void *handle = dlopen(name,RTLD_LAZY);
-	if (handle == elNIL) {
+	if (handle == 0) {
 		sys_consolelog(ELF_LOGERROR,"the following is a system error:");
 		sys_consolelog(ELF_LOGERROR,dlerror());
 		sys_consolelog(ELF_LOGERROR,"end");
@@ -235,16 +235,16 @@ elAPI elError sys_load_file_contents(elAllocator *allocfn, void **data, char con
 
 	elError error = Error_None;
 
-	if (name == elNIL) {
+	if (name == 0) {
 		error = Error_FileNameIsInvalid;
 		goto leave;
 	}
-	if (data == elNIL) {
+	if (data == 0) {
 		error = Error_InvalidArguments;
 		goto leave;
 	}
 
-	*data = elNIL;
+	*data = 0;
 #if defined(PLATFORM_DESKTOP)
 	HANDLE hfile = CreateFileA(name,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
 	if (hfile != INVALID_HANDLE_VALUE) {
@@ -274,7 +274,7 @@ elAPI elError sys_load_file_contents(elAllocator *allocfn, void **data, char con
 	}
 #else
 	FILE *file = fopen(name,"rb");
-	if (file == elNIL) {
+	if (file == 0) {
 		error = Error_FileNotFound;
 		goto leave;
 	}
@@ -306,7 +306,7 @@ elAPI elError sys_savefilebytes(char const *buffer, elInteger length, char const
 	file = fopen(fileName,"wb");
 #endif
 
-	if (file == elNIL) {
+	if (file == 0) {
 		return Error_CouldNotOpenFile;
 	}
 

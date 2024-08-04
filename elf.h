@@ -98,7 +98,6 @@
 #define false   ((elBool)(0)) /* todo: @DEPRECATED */
 #define elFALSE ((elBool)(0))
 #define elTRUE  ((elBool)(1))
-#define elNIL   ((elAddr)(0))
 
 
 /*
@@ -198,7 +197,7 @@ typedef enum elObjType {
 objects come after it, this should be same
 order as object types... */
 #define TAGLIST(_) \
-_(NIL) _(NUM) _(INT) _(SYS) _(BID) \
+_(NIL) _(NUM) _(INT) _(SYS) _(CFN) \
 _(OBJ) _(CLS) _(STR) _(TAB) /* end */
 
 
@@ -216,13 +215,17 @@ typedef struct elObject {
 } elObject;
 
 
+#define elTOOBJ(thing) ((elObject*)(thing))
+#define elOBJCOLOR(thing) (elTOOBJ(thing)->color)
+
 #define elOBJTOTAG(typ) ((typ) + TAG_OBJ)
 
 #define elISOBJTAG(tag) ((tag) >= TAG_OBJ)
 #define elISNUMTAG(tag) ((tag) == TAG_NUM || (tag) == TAG_INT)
+#define elISFUNTAG(tag) ((tag) == TAG_CLS || (tag) == TAG_CFN)
 
 
-#define elISNILOBJ(val) (elISOBJTAG((val).tag) && (val).x_obj == elNIL)
+#define elISNILOBJ(val) (elISOBJTAG((val).tag) && (val).x_obj == 0)
 /* todo: I wonder what the point is of having nil be a type if
 you can just do obj with nil ptr */
 #define elISNIL(val) ((val).tag == TAG_NIL || elISNILOBJ(val))
@@ -257,7 +260,7 @@ typedef struct elValue {
 		elObject  *j,*x_obj;
 		elTable   *t,*x_tab;
 		elString  *s,*x_str;
-		elBinding c;
+		elBinding c,  x_cfn;
 	};
 } elValue;
 
@@ -285,7 +288,7 @@ typedef struct elFileProto {
 	/* Use objects here so that this memory
 	is managed automatically, this also means that
 	loaded files have to be kept in memory
-	otherwise they get collected, 'load' will
+	otherwise they get collected, 'load' should
 	load a file and keep it in the stack, where
 	it is reachable.  */
 	elString     *name;
@@ -415,13 +418,11 @@ int elf_table_libfn_swap(elState *R);
 ** Main user API
 */
 
-elAPI int elf_get_num_args(elState *R);
-elAPI elObject *elf_get_this(elState *R);
 elAPI elValueTag elf_get_tag(elState *R, elRegId x);
 elAPI elInteger elf_get_integer(elState *R, elRegId x);
 elAPI elNumber elf_get_number(elState *R, elRegId x);
 elAPI elString *elf_get_string(elState *R, elRegId x);
-elAPI char *elf_get_cstring(elState *R, elRegId x);
+elAPI char *elf_get_charstring(elState *R, elRegId x);
 elAPI elObject *elf_get_object(elState *R, elRegId x);
 elAPI elTable *elf_get_table(elState *R, elRegId x);
 elAPI elHandle elf_get_handle(elState *R, elRegId x);
@@ -439,43 +440,20 @@ elAPI elValue elf_nil_value();
 
 void *elf_new_object(elState *R, elObjType type, elInteger length);
 
-elAPI int elf_load_code(elState *, elString *filename, elRegId rxy, int ny, elString *contents);
-elAPI int elf_load_expr(elState *, elString *filename, elRegId rxy, int ny, elString *contents);
-elAPI int elf_load_file(elState *, elString *filename, elRegId rxy, int ny);
+/* todo: these are all deprecated, they should instead return the closure
+object, and you use that however you want... */
+/* todo: add support for arguments */
+elAPI int elf_load_code3(elState *, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_load_expr3(elState *, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_load_file3(elState *, elString *name, elRegId ry, int ny);
 
-elAPI int elf_load_code_fs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents);
-elAPI int elf_load_expr_fs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents);
-elAPI int elf_load_file_fs(elState *, elFileState *fs, elString *filename, elRegId rxy, int ny);
+elAPI int elf_load_code3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_load_expr3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_load_file3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny);
 
+int elf_call_function3(elState *R, elObject *obj, int nx, int ny, elRegId ry);
 
-
-/*
-** Ultimately, calls a function of any kind.
-** Takes an optional object for meta calls,
-** nx and ny are the number of in and out
-** values respectively.
-** nx does not include the function nor the
-** optional object.
-** rx is the frame register, the function
-** should reside in that register at call
-** time. arguments should come after that
-** register.
-** ry is the first yield register, where
-** the results are written to.
-** ry can be equal to rx.
-*/
-elAPI int elf_call_function2(elState *, elObject *obj, elRegId rx, elRegId ry, int nx, int ny);
-/*
-** Performs a root call, where rx and ry are the same
-** and obj is nil.
-*/
-elAPI int elf_call_function(elState *, elRegId rx, int nx, int ny);
 elAPI int elf_run(elState *);
-elAPI void elf_checkcl(elState *c, elRegId x);
-elAPI elValue *elf_get_stack_top(elState *R);
-elAPI void elf_set_stack_top(elState *R, elValue *top);
-elAPI elRegId elf_local_alloc(elState *R, int howmany);
-elAPI elRegId elf_add_value(elState *, elValue v);
 elAPI void eld_add_nil(elState *);
 elAPI void elf_add_integer(elState *, elInteger i);
 elAPI void elf_add_number(elState *, elNumber n);
@@ -487,8 +465,7 @@ elAPI elObject *elf_add_object(elState *, elObject *t);
 elAPI elObject *elf_add_new_object(elState *, elInteger tell);
 elAPI elTable *elf_add_table(elState *, elTable *t);
 elAPI elTable *elf_add_new_table(elState *R);
-elAPI elRegId elf_add_closure(elState *, elClosure *f);
-elAPI elRegId elf_pushbinding(elState *, elBinding c);
+elAPI void elf_add_closure(elState *, elClosure *f);
 
 elInteger elf_trigger_collection_cycle(elState *R);
 elInteger elf_unmark_objects(elState *R);
@@ -528,11 +505,6 @@ at the same time when using clang-cl */
 #endif
 
 
-
-
-
-
-
 #include "src/lerror.h"
 #include "src/ldebug.h"
 #include "src/lmem.h"
@@ -550,28 +522,18 @@ at the same time when using clang-cl */
 
 
 /*
-** Symbols
-** 	elBytecode and globals can be added dynamically and
-** safely, in fact, multiple files will reference the
-** same global by name, no matter the order in which
-** they were loaded, or the means, runtime/compiletime.
-** This is because we use a symbol table that maps a
-** name at compile time to an index in the global values.
-** Even if a file is loaded at runtime, the compilation
-** process finds the global symbol and maps it to the
-** target index. Lookups are effectively done at compile
-** time.
-**
+** Symbols are mapped at load time, so the code generator
+** references globals by index...
 */
 typedef struct elModule {
 	union { elTable *globals, /* todo: @DEPRECATED */ *g; };
 	/* todo: rename */
-	elTable *strings;
 	int *track;
 	elBytecode *bytes;
 	elByteId nbytes;
 	char **lines;
 	elFileProto *files;
+	elTable *strings;
 	union { elNumber *numbers,      /* @DEPRECATED */ *kn; };
 	union { elInteger *integers,    /* @DEPRECATED */ *ki; };
 	union { elFileProto *functions, /* @DEPRECATED */ *prototypes, *p; };
@@ -582,27 +544,6 @@ elSymbolId elf_get_global_symbol(elModule *md, elString *name);
 elSymbolId elf_add_global_value(elModule *md, elString *name, elValue v);
 elSymbolId elf_add_proto(elModule *md, elFileProto p);
 
-/*
-	elModule\r: runtime is stored here
-for garbage collection.
-	elModule\gc: all objects to be automatically
-managed, or garbage collected, are listed here.
-By default all objects are added here, you
-can however remove them from this array.
-
-elModule\gf: buffer for functions definitions,
-essentially a type table, anonymous functions
-are also added here.
-
-elModule\g: global symbol table which
-maps names to values, indexed
-at runtime by index.
-
-elModule\bytes: buffer for bytes, all the bytes
-are stored here, functions index into this
-buffer.
-
-*/
 
 typedef struct elDelaylist elDelaylist;
 typedef struct elDelaylist {
@@ -613,36 +554,16 @@ typedef struct elDelaylist {
 
 typedef struct elStackFrame elStackFrame;
 typedef struct elStackFrame {
-	/* todo: this is only here so that we can write
-	to caller->locals[rx/ry] directly, rx and ry
-	could be relative to this.locals */
 	elStackFrame *caller;
-	/* 'head' is the first instruction (in the module)
-	that initiated the call.
-	This isn't limited to call instructions as the
-	runtime may issue calls synthetically for
-	things like operator overloading.
-	'head' is mainly used for debugging, we store the
-	byte directly as supposed to the line because this
-	way we can find both the file and the line. */
-	elByteId head;
-	/* note that tail is local so it's head + tail to
-	get the byte relative to the module */
-	elByteId tail;
+	/* this is the instruction (in the module)
+	that initiated the call, mainly used for debugging. */
+	elByteId   call_instr;
 	/* the closure for this call frame */
-	union { elClosure *cls, *cl; };
+	elClosure *cls;
 	/* the object for meta fields, meta calls and the likes */
-	elObject *obj;
-	/* pointer to base stack address, the callee should
-	yield starting at base[-1], should have base[-1..y)
-	registers to write to. */
-	union {
-		elValue *base,*l,*locals;
-	};
-	/* todo: rename top to regress */
-	elValue *top;
-	elRegId rx,ry;
-	/* x and y names are deprecated */
+	elObject  *obj;
+	elValue   *locals;
+	elRegId    ry;
 	/* the number of inputs (nx) and
 	the number of expected outputs (ny).
 	Output registers are allocated by the
@@ -654,7 +575,7 @@ typedef struct elStackFrame {
 	of actual values yielded so that runtime
 	can hoist the return values. */
 	union { int nx,x; };
-	union { int ny,y; };
+	union { int ny; };
 	/* list of delayed jumps to be executed
 	on return, 'finally' statements produce
 	these. */
@@ -687,16 +608,28 @@ typedef struct elCollector {
 } elCollector;
 
 
+#define elGETTOP(S) ((S)->T)
+#define elSETTOP(S,X) (elGETTOP(S) = (X))
+#define elPUSH(S,X) (* elGETTOP(S) ++ = (X))
+
+#define elGETTHIS(S)  ((S)->C->obj)
+#define elGETNARGS(S) ((S)->C->nx)
+
+
+#define FLAG_DEBUGGER 			(1 << 0)
+#define FLAG_DEBUGGER_ONCALL 	(1 << 1)
+#define FLAG_BYTETRACKING 		(1 << 2)
+#define FLAG_BYTELOGGING 		(1 << 3)
+
+
 typedef struct elState {
-	union { elModule *M, /* DEPRECATED: */ *md; };
-	union { elValue *stack, /* DEPRECATED: */ *stk,*s; };
-	union { elRegId stack_length, /* DEPRECATED: */stklen; };
-	union { elValue *stack_top,/* DEPRECATED: */*top,*v; };
-	union { elStackFrame *stack_frame,/* DEPRECATED: */*call,*frame,*f; };
-	elStackFrame root_call;
+	elModule *M;
+	elValue  *K;
+	elValue  *T;
+	elRegId   Z;
+	union { elStackFrame *C, /* DEPRECATED: */*stack_frame,*call,*frame,*f; };
 	int call_level;
-	elBool debuggerflag;
-	elBool oncalldebuggerflag;
+	int flags;
 	struct {
 		elTable *integer;
 		elTable *number;
@@ -717,9 +650,6 @@ typedef struct elState {
 	} cache;
 	/* the current instruction */
 	elByteId byte;
-	elBool bytetracing;
-	elBool bytetracking;
-	elBool bytelogging;
 	union { elCollector collector, memory; };
 } elState;
 

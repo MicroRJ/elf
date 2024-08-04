@@ -96,14 +96,14 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 
 int elf_string_lib_get_index(elState *R) {
-	elString *str = (elString*) elf_get_this(R);
+	elString *str = (elString*) elGETTHIS(R);
 	elf_add_integer(R,str->contents[elf_get_integer(R,0)]);
 	return 1;
 }
 
 
 int elf_string_lib_pop(elState *R) {
-	elString *yo = (elString*) elf_get_this(R);
+	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
 	elf_copy_memory(el->contents,yo->contents,MAX(0,yo->length-1));
 	elf_add_string(R,el);
@@ -112,10 +112,10 @@ int elf_string_lib_pop(elState *R) {
 
 
 int elf_string_lib_append_char(elState *R) {
-	elString *yo = (elString*) elf_get_this(R);
-	elString *el = elf_new_lstring(R,yo->length + elf_get_num_args(R));
+	elString *yo = (elString*) elGETTHIS(R);
+	elString *el = elf_new_lstring(R,yo->length + elGETNARGS(R));
 	elf_copy_memory(el->contents,yo->contents,yo->length);
-	for ( int i = 0; i < elf_get_num_args(R); i += 1 ) {
+	for ( int i = 0; i < elGETNARGS(R); i += 1 ) {
 		el->contents[yo->length + i] = elf_get_integer(R,i);
 	}
 	elf_add_string(R,el);
@@ -124,7 +124,7 @@ int elf_string_lib_append_char(elState *R) {
 
 
 int elf_string_lib_append(elState *R) {
-	elString *str = (elString*) elf_get_this(R);
+	elString *str = (elString*) elGETTHIS(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->c);
 	for (int i = 0; i < R->call->nx; ++ i) {
@@ -145,7 +145,7 @@ int elf_string_lib_append(elState *R) {
 
 
 int elf_string_lib_match(elState *R) {
-	elString *s = (elString*) elf_get_this(R);
+	elString *s = (elString*) elGETTHIS(R);
 	elString *p = elf_get_string(R,0);
 	elf_add_integer(R,elf_match_entire_string(p->string,s->string));
 	return 1;
@@ -153,8 +153,8 @@ int elf_string_lib_match(elState *R) {
 
 
 int elf_string_lib_find(elState *R) {
-	elString *string = (elString*) elf_get_this(R);
-	char *pattern = elf_get_cstring(R,0);
+	elString *string = (elString*) elGETTHIS(R);
+	char *pattern = elf_get_charstring(R,0);
 	char *buffer = 0;
 	char *cursor = string->contents;
 	elTable *list = elf_add_new_table(R);
@@ -176,7 +176,7 @@ int elf_string_lib_find(elState *R) {
 
 
 int elf_string_lib_split_by_lines(elState *R) {
-	elString *str = (elString*) elf_get_this(R);
+	elString *str = (elString*) elGETTHIS(R);
 	char *buffer = 0;
 	char *cursor = str->contents;
 	elTable *list = elf_add_new_table(R);
@@ -196,14 +196,14 @@ int elf_string_lib_split_by_lines(elState *R) {
 
 
 int elf_string_lib_get_hash(elState *R) {
-	elString *str = (elString*) elf_get_this(R);
+	elString *str = (elString*) elGETTHIS(R);
 	elf_add_integer(R,str->hash);
 	return 1;
 }
 
 
 int elf_string_lib_lowercase(elState *R) {
-	elString *str = (elString*) elf_get_this(R);
+	elString *str = (elString*) elGETTHIS(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtolowercase(str->c[i]);
@@ -213,7 +213,7 @@ int elf_string_lib_lowercase(elState *R) {
 
 
 int elf_string_lib_uppercase(elState *R) {
-	elString *str = (elString*) elf_get_this(R);
+	elString *str = (elString*) elGETTHIS(R);
 	elString *newstr = elf_pushnewstrlen(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtouppercase(str->c[i]);

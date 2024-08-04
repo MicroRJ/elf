@@ -25,7 +25,7 @@ elAPI elValue elf_obj(elObject *obj) {
 
 
 elAPI elValue elf_binding_value(elBinding c) {
-	elValue v = elLITERAL(elValue){TAG_BID};
+	elValue v = elLITERAL(elValue){TAG_CFN};
 	v.c = c;
 	return v;
 }

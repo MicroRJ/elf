@@ -16,7 +16,7 @@ void lang_setasserthook(int (*hook)(elSourceInfo)) {
 void lang_assertfn(elSourceInfo ind, char const *name, elBool expr) {
 	if (!expr) {
 		printf("%s[%i] %s(): '%s' triggered assertion\n",ind.fileName,ind.lineNumber,ind.func,name);
-		if (lang_globalassertionhook != elNIL) {
+		if (lang_globalassertionhook != 0) {
 			lang_globalassertionhook(ind);
 		} else elf_debugger("assertion triggered");
 	}

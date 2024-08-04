@@ -369,7 +369,7 @@ elByteId *elf_emit_jump_if_true(elFileState *fs, elFileBoolExpr *js, elRegId x, 
 	elf_branch_if_true(fs,js,x,id);
 	elf_emitter_patch_jumplist(fs,js->f);
 	elf_xarray_delete(js->f);
-	js->f = elNIL;
+	js->f = 0;
 	return js->t;
 }
 
@@ -378,7 +378,7 @@ elByteId *elf_emit_jump_if_false(elFileState *fs, elFileBoolExpr *js, elRegId x,
 	elf_branch_if_false(fs,js,x,id);
 	elf_emitter_patch_jumplist(fs,js->t);
 	elf_xarray_delete(js->t);
-	js->t = elNIL;
+	js->t = 0;
 	return js->f;
 }
 
@@ -424,7 +424,7 @@ void elf_emit_function_epilogue(elFileState *fs, elFileLine line) {
 	/* todo: rename this to be clearer. */
 	elf_emitter_patch_jumplist(fs,fn->yj);
 	elf_xarray_delete(fn->yj);
-	fn->yj = elNIL;
+	fn->yj = 0;
 
 	/* finally, return control flow... */
 	elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
@@ -436,7 +436,7 @@ void elf_emitter_begin_function(elFileState *fs, elFileFnState *fn, char *line) 
 	fn->entities = fs->nentities;
 	fn->bytes = fs->md->nbytes;
 	fn->line = line;
-	fn->yj = elNIL;
+	fn->yj = 0;
 	/* todo: "begin_block" requires fn to be set
 	for xmemory, can xmemory simply be in the
 	file state instead? */
@@ -1071,7 +1071,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 
 		elf_emitter_patch_jumplist(fs,s->jz);
 		elf_xarray_delete(s->jz);
-		s->jz = elNIL;
+		s->jz = 0;
 	}
 
 
@@ -1090,22 +1090,22 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 	naturally. */
 		elf_emitter_patch_jumplist(fs,s->j);
 		elf_xarray_delete(s->j);
-		s->j = elNIL;
+		s->j = 0;
 	}
 
 
 	void elf_emitter_close_if(elFileState *fs, elFileLine line, elSelectState *s) {
 	/* collect missing else branch */
-		if (s->jz != elNIL) {
+		if (s->jz != 0) {
 			elf_emitter_patch_jumplist(fs,s->jz);
 			elf_xarray_delete(s->jz);
-			s->jz = elNIL;
+			s->jz = 0;
 		}
 	/* collect missing then branch */
-		if (s->j != elNIL) {
+		if (s->j != 0) {
 			elf_emitter_patch_jumplist(fs,s->j);
 			elf_xarray_delete(s->j);
-			s->j = elNIL;
+			s->j = 0;
 		}
 	}
 
@@ -1136,7 +1136,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fs->fn->block
 	elASSERT(bl->flags & BLOCK_LOOP);
 	bl->loop.entry = elf_get_last_byteid(fs);
-	bl->loop.false_jumps = elNIL;
+	bl->loop.false_jumps = 0;
 	bl->loop.x = NO_NODE;
 	bl->loop.index_register = NO_SLOT;
 }
@@ -1146,16 +1146,16 @@ void elf_emitter_close_do_while_loop(elFileState *fs, elFileLine line, elNodeId 
 	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fs->fn->block;
 	elASSERT(bl->flags & BLOCK_LOOP);
 
-	elFileBoolExpr js = {elNIL};
+	elFileBoolExpr js = {0};
 	elf_emit_jump_if_true(fs,&js,NO_SLOT,x);
 
 	elf_emitter_patch_jumplist_to(fs,js.t,bl->loop.entry);
 	elf_xarray_delete(js.t);
-	js.t = elNIL;
+	js.t = 0;
 
 	elf_emitter_patch_jumplist_to(fs,bl->loop.true_jumps,bl->loop.entry);
 	elf_xarray_delete(bl->loop.true_jumps);
-	bl->loop.true_jumps = elNIL;
+	bl->loop.true_jumps = 0;
 }
 
 
@@ -1168,7 +1168,7 @@ void elf_emitter_begin_while_loop(elFileState *fs, elFileLine line, elNodeId x) 
 
 	elASSERT(bl->loop.false_jumps == 0);
 
-	elFileBoolExpr js = {elNIL};
+	elFileBoolExpr js = {0};
 	bl->loop.false_jumps = elf_emit_jump_if_false(fs,&js,NO_SLOT,x);
 }
 
@@ -1179,11 +1179,11 @@ void elf_emitter_close_while_loop(elFileState *fs, elFileLine line) {
 
 	elf_emitter_patch_jumplist(fs,bl->loop.true_jumps);
 	elf_xarray_delete(bl->loop.true_jumps);
-	bl->loop.true_jumps = elNIL;
+	bl->loop.true_jumps = 0;
 	elf_emit_jump(fs,line,bl->loop.entry);
 	elf_emitter_patch_jumplist(fs,bl->loop.false_jumps);
 	elf_xarray_delete(bl->loop.false_jumps);
-	bl->loop.false_jumps = elNIL;
+	bl->loop.false_jumps = 0;
 }
 
 
@@ -1206,9 +1206,9 @@ void elf_emitter_begin_ranged_loop(elFileState *fs, elFileLine line, elNodeId in
 	hi = elf_make_register_node(fs,line,hi_register);
 	elNodeId c = elf_make_node_less_than(fs,line,index_node,hi);
 
-	elASSERT(bl->loop.false_jumps == elNIL);
+	elASSERT(bl->loop.false_jumps == 0);
 
-	elFileBoolExpr js = {elNIL};
+	elFileBoolExpr js = {0};
 	bl->loop.false_jumps = elf_emit_jump_if_false(fs,&js,NO_SLOT,c);
 }
 
@@ -1219,7 +1219,7 @@ void elf_emitter_close_ranged_loop(elFileState *fs, elFileLine line) {
 
 	elf_emitter_patch_jumplist(fs,bl->loop.true_jumps);
 	elf_xarray_delete(bl->loop.true_jumps);
-	bl->loop.true_jumps = elNIL;
+	bl->loop.true_jumps = 0;
 	// elNodeId index_node = bl->loop.index_node;
 	elNodeId index_node = elf_make_register_node(fs,NO_LINE,bl->loop.index_register);
 	elNodeId k = elf_make_binary_node(fs,NO_LINE,NODE_ADD,NT_INT,index_node,elf_make_integer_node(fs,NO_LINE,1));

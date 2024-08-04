@@ -40,11 +40,11 @@ elAPI void elf_global_initialize() {
 
 
 elAPI int elf_global_loadcode(char *filename, char *contents) {
-	elValue *top = elf.R.top;
+	elValue *top = elGETTOP(&elf.R);
 	elString *name = elf_add_new_string(&elf.R,filename);
 	elString *string = elf_add_new_string(&elf.R,contents);
 	elFileState fs = {0};
-	int nyield = elf_load_code_fs(&elf.R,&fs,name,0,0,string);
-	elf.R.top = top;
+	int nyield = elf_load_code3_fs(&elf.R,&fs,name,0,0,string);
+	elSETTOP(&elf.R,top);
 	return nyield;
 }

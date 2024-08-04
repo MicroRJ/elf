@@ -61,7 +61,7 @@
 
 // int testlib_absslot(elState *c) {
 // 	elRegId slot = elf_get_integer(c,0);
-// 	elf_add_value(c,c->s[slot]);
+// 	elPUSH(c,c->s[slot]);
 // 	return 1;
 // }
 
