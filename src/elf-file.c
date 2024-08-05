@@ -11,14 +11,14 @@ char *elf_get_file_name(elFileState *fs) {
 
 
 elBool elf_check_expr(elFileState *fs, elFileLine line, elNodeId id) {
-	if (id != NO_NODE) return false;
+	if (id != NO_NODE) return 0;
 	elf_file_dialog(fs,line,"invalid expression");
-	return elTRUE;
+	return 1;
 }
 
 
 elBool elf_test_token_inline(elFileState *fs, elTokenType k) {
-	return fs->tk.type == k && fs->lasttk.eol != elTRUE;
+	return fs->tk.type == k && fs->lasttk.eol != 1;
 }
 
 
@@ -32,7 +32,7 @@ elBool elf_test_then_token(elFileState *fs, elTokenType k) {
 
 
 /*
-** Returns elTRUE whether there are no more tokens
+** Returns 1 whether there are no more tokens
 ** or whether the current token is a match.
 */
 elBool elf_term_token(elFileState *fs, elTokenType k) {
@@ -41,7 +41,7 @@ elBool elf_term_token(elFileState *fs, elTokenType k) {
 
 
 elBool elf_term_eol_token(elFileState *fs) {
-	return fs->tk.type == TK_NONE || fs->last_token.eol == elTRUE;
+	return fs->tk.type == TK_NONE || fs->last_token.eol == 1;
 }
 
 
@@ -50,12 +50,12 @@ elBool elf_term_eol_token(elFileState *fs) {
 ** returning whether it was a match or not.
 */
 elBool elf_pick_token(elFileState *fs, elTokenType k) {
-	return elf_test_token(fs,k) && (elf_lexone(fs), elTRUE);
+	return elf_test_token(fs,k) && (elf_lexone(fs), 1);
 }
 
 
 elBool elf_pick_token_inline(elFileState *fs, elTokenType k) {
-	return elf_test_token_inline(fs,k) && (elf_lexone(fs), elTRUE);
+	return elf_test_token_inline(fs,k) && (elf_lexone(fs), 1);
 }
 
 
@@ -64,7 +64,7 @@ elBool elf_pick_token_inline(elFileState *fs, elTokenType k) {
 ** are two possibilities.
 */
 elBool elf_choose_token(elFileState *fs, elTokenType x, elTokenType y) {
-	return (elf_test_token(fs,x) || elf_test_token(fs,y)) && (elf_lexone(fs), elTRUE);
+	return (elf_test_token(fs,x) || elf_test_token(fs,y)) && (elf_lexone(fs), 1);
 }
 
 
@@ -177,7 +177,7 @@ elEntityId elf_find_entity(elFileState *fs, elFileLine line, char *name, elBool 
 */
 elNodeId elf_new_local_entity(elFileState *fs, elFileLine line, char *name, elBool flags) {
 	elFileFnState *fn = fs->fn;
-	elEntityId already = elf_find_entity(fs,line,name,false);
+	elEntityId already = elf_find_entity(fs,line,name,0);
 	if (already != NO_ENTITY) {
 		elFileEntity entity = fs->entities[already];
 		if (entity.kind == ENTITY_DIRECTORY)  {
@@ -212,7 +212,7 @@ elNodeId elf_new_local_entity(elFileState *fs, elFileLine line, char *name, elBo
 
 
 elNodeId elf_find_entity_node(elFileState *fs, elFileLine line, char *name, int flags) {
-	elEntityId id = elf_find_entity(fs,line,name,elTRUE);
+	elEntityId id = elf_find_entity(fs,line,name,1);
 
 	if (id == NO_ENTITY) return NO_NODE;
 
@@ -371,7 +371,7 @@ elNodeKi elf_token_to_node(elTokenType tk) {
 
 
 elNodeId elf_load_file_subexpr(elFileState *fs, int rank, int flags) {
-	elNodeId x = elf_load_unary_expr(fs,elTRUE,flags);
+	elNodeId x = elf_load_unary_expr(fs,1,flags);
 	if (x == NO_NODE) return x;
 	for (;;) {
 		elTokenType op = elf_is_operator_token_contextually(fs->this_token);
@@ -616,7 +616,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		} break;
 		case TK_M_INT: case TK_M_NUM: { elf_lexone(fs);
 			/* todo: make this an intrinsic instruction! */
-			elNodeId x = elf_load_unary_expr(fs,elTRUE,0);
+			elNodeId x = elf_load_unary_expr(fs,1,0);
 			char *name = tk.type == TK_M_INT ? "ntoi" : "iton";
 			elNodeId fn = elf_get_global_entity_node(fs,tk.line,name);
 			elNodeId *z = {0};
@@ -625,7 +625,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		} break;
 		case TK_M_REGISTER: { elf_lexone(fs);
 			tk = elf_take_token(fs,TK_WORD);
-			elEntityId entity = elf_find_entity(fs,tk.line,tk.s,elFALSE);
+			elEntityId entity = elf_find_entity(fs,tk.line,tk.s,0);
 			if (entity == NO_ENTITY) {
 				elf_file_dialog(fs,tk.line,"'%s': invalid entity (must be a local)",tk.s);
 			}
@@ -651,7 +651,7 @@ elNodeId elf_load_unary_expr(elFileState *fs, elBool allow_postfix, elBool flags
 		//
 		case TK_NEW: {
 			elf_lexone(fs);
-			elNodeId meta_table = elf_load_unary_expr(fs,elFALSE,elTRUE);
+			elNodeId meta_table = elf_load_unary_expr(fs,0,1);
 			elNodeId *call_args = elf_load_call_args(fs);
 
 			elNodeId table;
@@ -897,8 +897,13 @@ void elf_load_file_stat(elFileState *fs) {
 		case TK_LET: {
 			elf_lexone(fs);
 			do {
+				if (elf_test_token(fs,TK_LET)) {
+					elf_file_dialog(fs,fs->last_token.line,"invalid declaration, expected next declarator's name after ',' instead got 'let'");
+					elf_file_dialog(fs,fs->this_token.line,"invalid declaration, 'let' after comma");
+					elf_throw(fs->R,0,"syntax error: invalid declaration");
+				}
 				elToken n = elf_take_token(fs,TK_WORD);
-				elNodeId x = elf_new_local_entity(fs,n.line,n.s,elFALSE);
+				elNodeId x = elf_new_local_entity(fs,n.line,n.s,0);
 				elf_complete_stat(fs,x);
 			} while (elf_pick_token(fs,TK_COMMA));
 		} break;

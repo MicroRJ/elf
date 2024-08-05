@@ -70,17 +70,20 @@
 	#define elGLOBAL  static
 #endif
 
+
 #if !defined(__cplusplus)
 	#define elLITERAL(X) (X)
 #else
 	#define elLITERAL(X) X
 #endif
 
+
 #define elTOTEXT_(X) #X
 #define elTOTEXT(X) elTOTEXT_(X)
 
 #define elFUSE_(X,Y) X##Y
 #define elFUSE(X,Y) elFUSE_(X,Y)
+
 
 #if !defined(MAX)
 	#define MAX(x,y) ((x) > (y) ? (x) : (y))
@@ -89,26 +92,31 @@
 	#define MIN(x,y) ((x) < (y) ? (x) : (y))
 #endif
 
+
 #if !defined(MEGABYTES)
 	#define MEGABYTES(x) ((x)*1024llu*1024llu)
 #endif
 #if !defined(GIGABYTES)
 	#define GIGABYTES(x) ((x)*1024llu*1024llu*1024llu)
 #endif
+
+
 /* todo: */
 #if !defined(_WIN32)
 	#define MAX_PATH 0xff
 #endif
 
 
-
-#define false   ((elBool)(0)) /* todo: @DEPRECATED */
-#define elFALSE ((elBool)(0))
-#define elTRUE  ((elBool)(1))
-
+#if !defined(COUNTOF)
+	#define COUNTOF _countof
+#endif
 
 
-/* Some Forward Declarations */
+
+
+/* ---------------------------------
+	Forward Declarations
+--------------------------------- */
 typedef struct elModule 	elModule;
 typedef struct elFileState elFileState;
 typedef struct elState 		elState;
@@ -116,12 +124,15 @@ typedef struct elObject 	elObject;
 typedef struct elTable 		elTable;
 typedef struct elString 	elString;
 typedef struct elClosure 	elClosure;
+typedef struct elValue     elValue;
 
 
 
-/*
-** Basic Type Definitions
-*/
+/* ---------------------------------
+	Basic Types
+--------------------------------- */
+
+
 
 typedef long long int 	   elInteger;
 typedef signed int 		   elBool;
@@ -132,22 +143,52 @@ typedef void 			     *elAddr;
 declarations were a MS specific
 extension */
 typedef int 					elError;
-
-
 typedef unsigned int 	   elHashId;
 typedef int 				   elRegId;
 typedef int 				   elByteId;
 typedef int 				   elSymbolId;
 
+typedef int (* elCFunction)(elState *);
 
 /* todo: eventually convert this to an offset,
 but this is great for debugging... */
-typedef char 		       *elFileLine;
-typedef int (* elCFunction)(elState *);
+typedef char 		        *elFileLine;
+
+
+typedef struct elBinding {
+	char *name;
+	elCFunction fn;
+} elBinding;
+
+
+
+/* ---------------------------------
+	Common User API
+--------------------------------- */
+
+
+
+elAPI elInteger elf_get_integer(elState *R, elRegId x);
+elAPI elNumber elf_get_number(elState *R, elRegId x);
+elAPI elString *elf_get_string(elState *R, elRegId x);
+elAPI char *elf_get_charstring(elState *R, elRegId x);
+elAPI elObject *elf_get_object(elState *R, elRegId x);
+elAPI elTable *elf_get_table(elState *R, elRegId x);
+elAPI elHandle elf_get_handle(elState *R, elRegId x);
+elAPI elClosure *elf_get_closure(elState *R, elRegId x);
+
+elAPI elString *elf_add_new_string(elState *, char *c);
+elAPI elObject *elf_add_new_object(elState *, elInteger tell);
+elAPI elTable *elf_add_new_table(elState *);
+elAPI elString *elf_pushnewstrlen(elState *, elInteger len);
+
+
+elAPI void elf_register_bindings(elState *, elTable *, elBinding *list, int num);
+
 
 
 /*
-** Arrays are not exposed directly through elf,
+** Arrays are not exposed directly to elf, instead,
 ** we use them internally as a core data type,
 ** they work the same as STB's stretchy buffer.
 **
@@ -224,17 +265,31 @@ elAPI void *elf_calloc_(elAllocator *allocator, elInteger size, elSourceInfo loc
 
 
 
-/* Objects and Values */
+/* ---------------------------------
+	Objects
+--------------------------------- */
+
 
 
 typedef enum elGCColor {
-	GC_WHITE = 0, GC_BLACK, GC_RED, GC_PINK,
+	GC_WHITE = 0, GC_BLACK, GC_RED, GC_PINK, GC_TRAP,
 } elGCColor;
 
 
 typedef enum elGCTy {
 	GC_OBJ = 0, GC_CLS, GC_STR, GC_TAB
 } elGCTy;
+
+
+typedef struct elObject {
+	/* todo: compact this */
+	elGCTy    type;
+	elGCColor color;
+	elTable  *metatable;
+	/* todo: please remove this... */
+	elByteId  byte;
+	short     tell;
+} elObject;
 
 
 /* first object tag must be OBJ, all other
@@ -245,67 +300,25 @@ _(NIL) _(NUM) _(INT) _(SYS) _(CFN) \
 _(OBJ) _(CLS) _(STR) _(TAB) /* end */
 
 
-
-typedef struct elObject {
-	/* todo: compact this */
-	elGCTy    type;
-	elGCColor color;
-	elTable  *metatable;
-	/* todo: please remove this... */
-	short tell;
-} elObject;
-
-
-#define elTOOBJ(thing) ((elObject*)(thing))
-#define elOBJCOLOR(thing) (elTOOBJ(thing)->color)
-
-#define elOBJTOTAG(typ) ((typ) + TAG_OBJ)
-
-#define elISOBJTAG(tag) ((tag) >= TAG_OBJ)
-#define elISNUMTAG(tag) ((tag) == TAG_NUM || (tag) == TAG_INT)
-#define elISFUNTAG(tag) ((tag) == TAG_CLS || (tag) == TAG_CFN)
-
-
-#define elISNILOBJ(val) (elISOBJTAG((val).tag) && (val).x_obj == 0)
-/* todo: I wonder what the point is of having nil be a type if
-you can just do obj with nil ptr */
-#define elISNIL(val) ((val).tag == TAG_NIL || elISNILOBJ(val))
-
-/* these are only soft conversions */
-#define elTONUM(val) ((val).tag == TAG_INT ? (elNumber)  (val).x_int : (val).x_num)
-#define elTOINT(val) ((val).tag == TAG_NUM ? (elInteger) (val).x_num : (val).x_int)
-
-
 #define TAGENUM(NAME) elFUSE(TAG_,NAME),
-typedef enum elValueTag {
-	TAGLIST(TAGENUM)
-} elValueTag;
+typedef enum { TAGLIST(TAGENUM) } elValueTag;
 #undef TAGENUM
-
-
-#define TAGENUM(NAME) elTOTEXT(NAME),
-elGLOBAL char const *tag2s[] = {
-	TAGLIST(TAGENUM)
-};
-#undef TAGENUM
-
 
 
 typedef struct elValue {
 	elValueTag tag;
 	union {
-		elAddr    p,  x_ptr;
-		elHandle  h,  x_sys;
 		elInteger i,  x_int;
 		elNumber  n,  x_num;
+		elAddr    p,  x_ptr;
+		elHandle  h,  x_sys;
 		elClosure *f,*x_cls;
 		elObject  *j,*x_obj;
 		elTable   *t,*x_tab;
 		elString  *s,*x_str;
-		elCFunction c,  x_cfn;
+		elCFunction c,x_cfn;
 	};
 } elValue;
-
 
 
 /*
@@ -340,6 +353,12 @@ typedef struct elFileProto {
 
 
 
+/* ---------------------------------
+	Closure
+--------------------------------- */
+
+
+
 /* closures are both for files and functions,
 a file is a function so I don't know why keep
 saying files and functions... */
@@ -350,7 +369,13 @@ typedef struct elClosure {
 } elClosure;
 
 
-/* String Object */
+
+/* ---------------------------------
+	String
+--------------------------------- */
+
+
+
 typedef struct elString {
 	elObject    obj;
 	elHashId   hash;
@@ -373,6 +398,7 @@ typedef struct elString {
 elString *elf_new_lstring(elState *R, elInteger length);
 elString *elf_new_string(elState *R, char *contents);
 
+
 int elf_libS_length(elState *R);
 int elf_libS_match(elState *R);
 int elf_libS_pop(elState *R);
@@ -385,6 +411,23 @@ int elf_libS_split_by_lines(elState *R);
 int elf_libS_get_index(elState *R);
 int elf_libS_find(elState *R);
 int elf_libS_split(elState *R);
+
+
+elGLOBAL elBinding elf_libS_[] = {
+	{"length",elf_libS_length},
+	{"match",elf_libS_match},
+	{"uppercase",elf_libS_uppercase},
+	{"lowercase",elf_libS_lowercase},
+	{"__add",elf_libS_append},
+	{"__add1",elf_libS_append},
+	{"append",elf_libS_append},
+	{"append_char",elf_libS_append_char},
+	{"pop",elf_libS_pop},
+	{"get_hash",elf_libS_get_hash},
+	{"split_by_lines",elf_libS_split_by_lines},
+	{"idx",elf_libS_get_index},
+	{"find",elf_libS_find},
+};
 
 
 
@@ -414,23 +457,8 @@ elTable *elf_new_table_metatable(elState *);
 elTable *elf_new_ltable(elState *, elInteger);
 elTable *elf_new_table(elState *);
 
-elInteger elf_table_tryS(elTable *tab, char *contents, elInteger length, elHashId hash);
-void elf_check_table(elTable *table);
 
-void elf_dealloc_table(elTable *);
-void elf_table_add(elTable *table, elValue v);
-elBool elf_table_set(elTable *table, elValue k, elValue v);
-elInteger elf_table_lookup_index(elTable *table, elValue k);
-elInteger elf_table_get_value_hash(elValue v);
-elHashId elf_table_rehash(elHashId hash);
-elHashId elf_tabhashstr(char *junk);
-elHashId elf_tabhashptr(elAddr *ptr);
-elBool elf_tabvaleq(elValue *x, elValue *y);
-void elf_table_field_alias(elState *S, elTable *tab, char *key, elValue alias);
-void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias);
-
-
-/* todo: all of these have to reviewed,
+/* todo: all of these have to revised,
 there are a bunch of inconsistencies and
 incoherences with this API. */
 int elf_libH_add(elState *);
@@ -450,54 +478,128 @@ int elf_libH_foreach(elState *);
 int elf_libH_get_collisions(elState *);
 int elf_libH_bubble_sort(elState *);
 int elf_libH_find_aliases(elState *);
-int elf_libH_array(elState *R);
-int elf_libH_xset(elState *R);
+int elf_libH_array(elState *);
+int elf_libH_xset(elState *);
 int elf_libH_merge(elState *);
 int elf_libH_xmerge(elState *);
-int elf_libH_diff(elState *R);
+int elf_libH_diff(elState *);
 int elf_libH_xclone(elState *);
 int elf_libH_reverse(elState *);
 int elf_libH_clone(elState *);
-int elf_libH_slice(elState *R);
-int elf_libH_swap(elState *R);
+int elf_libH_slice(elState *);
+int elf_libH_swap(elState *);
 
 
-/*
-** Main user API
+elGLOBAL elBinding elf_libH_[] = {
+	{"length",elf_libH_length},
+	{"tally",elf_libH_tally},
+	{"delete",elf_libH_delete},
+	{"haskey",elf_libH_contains},
+	{"lookup",elf_libH_lookup},
+	{"foreach",elf_libH_foreach},
+	{"collisions",elf_libH_get_collisions},
+	{"add",elf_libH_add},
+	{"xadd",elf_libH_xadd},
+	{"itemize",elf_libH_itemize},
+	{"inject",elf_libH_inject},
+	{"idx",elf_libH_index},
+	{"xrem",elf_libH_xremove},
+	{"xdelete",elf_libH_xdelete},
+	{"bubblesort",elf_libH_bubble_sort},
+	{"fndaliases",elf_libH_find_aliases},
+	{"alias",elf_libH_alias},
+	{"merge",elf_libH_merge},
+	{"xmerge",elf_libH_xmerge},
+	{"reverse",elf_libH_reverse},
+	{"clone",elf_libH_clone},
+	{"xclone",elf_libH_xclone},
+	{"slice",elf_libH_slice},
+	{"xset",elf_libH_xset},
+	{"swap",elf_libH_swap},
+	{"diff",elf_libH_diff},
+};
+
+
+elInteger elf_table_tryS(elTable *tab, char *contents, elInteger length, elHashId hash);
+void elf_check_table(elTable *table);
+void elf_dealloc_table(elTable *);
+void elf_table_add(elTable *table, elValue v);
+elBool elf_table_set(elTable *table, elValue k, elValue v);
+elInteger elf_table_lookup_index(elTable *table, elValue k);
+elInteger elf_table_get_value_hash(elValue v);
+elHashId elf_table_rehash(elHashId hash);
+elHashId elf_tabhashstr(char *junk);
+elHashId elf_tabhashptr(elAddr *ptr);
+elBool elf_tabvaleq(elValue *x, elValue *y);
+void elf_table_field_alias(elState *S, elTable *tab, char *key, elValue alias);
+void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias);
+
+
+
+
+
+
+
+/* This isn't portable to CPP, the idea is to
+use C's "cast to union types" for typechecking:
+	https://gcc.gnu.org/onlinedocs/gcc/Cast-to-Union.html#Cast-to-a-Union-Type
 */
-
-elAPI elValueTag elf_get_tag(elState *R, elRegId x);
-elAPI elInteger elf_get_integer(elState *R, elRegId x);
-elAPI elNumber elf_get_number(elState *R, elRegId x);
-elAPI elString *elf_get_string(elState *R, elRegId x);
-elAPI char *elf_get_charstring(elState *R, elRegId x);
-elAPI elObject *elf_get_object(elState *R, elRegId x);
-elAPI elTable *elf_get_table(elState *R, elRegId x);
-elAPI elHandle elf_get_handle(elState *R, elRegId x);
-elAPI elClosure *elf_get_closure(elState *R, elRegId x);
-elAPI elValue elf_get_value(elState *R, elRegId x);
+#define UCAST(D,T) ( ((union { T _; }){D})._ )
 
 
-// elAPI elValue elf_tab(elTable *tab) {
-// 	elValue v = elLITERAL(elValue){TAG_TAB};
-// 	v.x_tab = tab;
-// 	return v;
-// }
 
-// elAPI elValue elf_tab(elTable *);
+#define elGETTOP(S)   ((S)->T)
+#define elSETTOP(S,X) (elGETTOP(S) = UCAST(X, elValue *))
+#define elPUSH(S,X)   (* elGETTOP(S) ++ = (X))
+
+#define elGETFRAME(S) ((S)->F)
+#define elGETTHIS(S) (elGETFRAME(S)->Q)
+#define elGETNARGS(S) (elGETFRAME(S)->nx)
+
+#define elNUM(thing) (elLITERAL(elValue){ TAG_NUM, ((union { elNumber _; float __; elInteger I; }){thing}).I })
+#define elINT(thing) (elLITERAL(elValue){ TAG_INT, (elInteger) UCAST(thing, elInteger) })
+#define elSYS(thing) (elLITERAL(elValue){ TAG_SYS, (elInteger) UCAST(thing, elHandle) })
+#define elTAB(thing) (elLITERAL(elValue){ TAG_TAB, (elInteger) UCAST(thing, elTable *) })
+#define elOBJ(thing) (elLITERAL(elValue){ TAG_OBJ, (elInteger) UCAST(thing, elObject *) })
+#define elSTR(thing) (elLITERAL(elValue){ TAG_STR, (elInteger) UCAST(thing, elString *) })
+#define elCLS(thing) (elLITERAL(elValue){ TAG_CLS, (elInteger) UCAST(thing, elClosure *) })
+#define elCFN(thing) (elLITERAL(elValue){ TAG_CFN, (elInteger) UCAST(thing, elCFunction) })
+#define elNIL() (elLITERAL(elValue){TAG_NIL})
 
 
-#define elf_tab(thing) elLITERAL(elValue){TAG_TAB,thing}
+#define elGETL(S,X) (elGETFRAME(S)->L[X])
+
+#define elGETTAG(S,X) elGETL(S,X).tag
 
 
-elAPI elValue elf_binding_value(elCFunction);
-elAPI elValue elf_string_value(elString *);
-elAPI elValue elf_closure_value(elClosure *);
-elAPI elValue elf_integer_value(elInteger i);
-elAPI elValue elf_number_value(elNumber n);
-elAPI elValue elf_nil_value();
+#define elPUSHNIL(S) elPUSH(S,elNIL())
+#define elPUSHCLS(S,V) elPUSH(S,elCLS(V))
+#define elPUSHOBJ(S,V) elPUSH(S,elOBJ(V))
+#define elPUSHTAB(S,V) elPUSH(S,elTAB(V))
+#define elPUSHINT(S,V) elPUSH(S,elINT(V))
+#define elPUSHNUM(S,V) elPUSH(S,elNUM(V))
+#define elPUSHSTR(S,V) elPUSH(S,elSTR(V))
+#define elPUSHSYS(S,V) elPUSH(S,elSYS(V))
 
-void *elf_new_object(elState *R, elGCTy type, elInteger length);
+
+#define elISOBJTAG(tag) ((tag) >= TAG_OBJ)
+#define elISNUMTAG(tag) ((tag) == TAG_NUM || (tag) == TAG_INT)
+#define elISFUNTAG(tag) ((tag) == TAG_CLS || (tag) == TAG_CFN)
+
+
+#define elISNILOBJ(val) (elISOBJTAG((val).tag) && (val).x_obj == 0)
+
+
+#define elISNIL(val) ((val).tag == TAG_NIL || elISNILOBJ(val))
+#define elTONUM(val) ((val).tag == TAG_INT ? (elNumber)  (val).x_int : (val).x_num)
+#define elTOINT(val) ((val).tag == TAG_NUM ? (elInteger) (val).x_num : (val).x_int)
+
+
+#define elTOOBJ(thing) ((elObject*)(thing))
+#define elOBJCOLOR(thing) (elTOOBJ(thing)->color)
+#define elOBJTOTAG(typ) ((typ) + TAG_OBJ)
+
+
 
 /* todo: these are all deprecated, they should instead return the closure
 object, and you use that however you want... */
@@ -513,55 +615,19 @@ elAPI int elf_load_file3_fs(elState *, elFileState *fs, elString *name, elRegId 
 int elf_call_function3(elState *R, elObject *obj, int nx, int ny, elRegId ry);
 
 elAPI int elf_run(elState *);
-elAPI void eld_add_nil(elState *);
-elAPI void elf_add_integer(elState *, elInteger i);
-elAPI void elf_add_number(elState *, elNumber n);
-elAPI void elf_pushsys(elState *c, elHandle h);
-elAPI elString *elf_add_string(elState *, elString *s);
-elAPI elString *elf_add_new_string(elState *, char *c);
-elAPI elString *elf_pushnewstrlen(elState *, elInteger len);
-elAPI elObject *elf_add_object(elState *, elObject *t);
-elAPI elObject *elf_add_new_object(elState *, elInteger tell);
-elAPI elTable *elf_add_table(elState *, elTable *t);
-elAPI elTable *elf_add_new_table(elState *R);
-elAPI void elf_add_closure(elState *, elClosure *f);
 
 elInteger elf_trigger_collection_cycle(elState *R);
 elInteger elf_unmark_objects(elState *R);
 elInteger elf_mark_object(elObject *obj);
+void *elf_new_object(elState *R, elGCTy type, elInteger length);
 
 
-#if defined(_MSC_VER)
-# if !defined(ELF_KEEPWARNINGS)
-#  pragma warning(push)
-# endif
-# pragma warning(disable:4100)
-# pragma warning(disable:4245)
-# pragma warning(disable:4057)
-# pragma warning(disable:4189)
-# pragma warning(disable:4201)
-# pragma warning(disable:4244)
-# pragma warning(disable:4267)
-# pragma warning(disable:4389)
-# pragma warning(disable:4996)
-#endif
-/* both __clang__ and _MSC_VER can be defined
-at the same time when using clang-cl */
-#if defined(__clang__)
-# if !defined(ELF_KEEPWARNINGS)
-#  pragma clang diagnostic push
-# endif
-# pragma clang diagnostic ignored "-Wparentheses-equality"
-# pragma clang diagnostic ignored "-Wnon-literal-null-conversion"
-# pragma clang diagnostic ignored "-Wmissing-braces"
-# pragma clang diagnostic ignored "-Wunused-variable"
-# pragma clang diagnostic ignored "-Wmissing-braces"
-# pragma clang diagnostic ignored "-Wunused-function"
-# pragma clang diagnostic ignored "-Wmissing-field-initializers"
-# pragma clang diagnostic ignored "-Wsign-compare"
-# pragma clang diagnostic ignored "-Wpointer-sign"
-# pragma clang diagnostic ignored "-Wunused-function"
-#endif
+
+#define TAGENUM(NAME) elTOTEXT(NAME),
+elGLOBAL char const *tag2s[] = {
+	TAGLIST(TAGENUM)
+};
+#undef TAGENUM
 
 
 #include "src/lerror.h"
@@ -577,7 +643,13 @@ at the same time when using clang-cl */
 // #include "src/elf-api.h"
 
 
-/* Core Structures */
+
+
+/* ---------------------------------------------------------------------
+** Interpreter State, Runtime, Garbage Collection...
+** ---------------------------------------------------------------------
+*/
+
 
 
 /*
@@ -614,15 +686,19 @@ typedef struct elDelaylist {
 typedef struct elStackFrame elStackFrame;
 typedef struct elStackFrame {
 	elStackFrame *caller;
+	/* the closure for this frame, if applicable */
+	elClosure *C;
+	/* context object, 'this' */
+	elObject  *Q;
+	/* the 'locals' or register where the locals
+	for this frame start... */
+	elValue   *L;
+
 	/* this is the instruction (in the module)
 	that initiated the call, mainly used for debugging. */
 	elByteId   call_instr;
-	/* the closure for this call frame */
-	elClosure *cls;
-	/* the object for meta fields, meta calls and the likes */
-	elObject  *obj;
-	elValue   *locals;
 	elRegId    ry;
+
 	/* the number of inputs (nx) and
 	the number of expected outputs (ny).
 	Output registers are allocated by the
@@ -643,10 +719,13 @@ typedef struct elStackFrame {
 } elStackFrame;
 
 
-typedef enum elGCPhase {
-	elGC_PHASE_HOLD = GC_WHITE,
-	elGC_PHASE_FREE = GC_BLACK,
-} elGCPhase;
+
+typedef enum elGCColor elGCPhase;
+
+
+#define elGC_PHASE_HOLD GC_WHITE
+#define elGC_PHASE_FREE GC_BLACK
+
 
 
 typedef struct elCollector {
@@ -667,14 +746,6 @@ typedef struct elCollector {
 } elCollector;
 
 
-#define elGETTOP(S) ((S)->T)
-#define elSETTOP(S,X) (elGETTOP(S) = (X))
-#define elPUSH(S,X) (* elGETTOP(S) ++ = (X))
-
-#define elGETTHIS(S)  ((S)->C->obj)
-#define elGETNARGS(S) ((S)->C->nx)
-
-
 #define FLAG_DEBUGGER 			(1 << 0)
 #define FLAG_DEBUGGER_ONCALL 	(1 << 1)
 #define FLAG_BYTETRACKING 		(1 << 2)
@@ -682,11 +753,143 @@ typedef struct elCollector {
 
 
 typedef struct elState {
+	/* The module, must be first member field */
 	elModule *M;
+	/* The stack */
 	elValue  *K;
-	elValue  *T;
+	/* The stack size */
 	elRegId   Z;
-	union { elStackFrame *C, /* DEPRECATED: */*stack_frame,*call,*frame,*f; };
+	elValue  *T;
+	/*
+	T: Stack top pointer, (one past last live value).
+	This pointer has 2 main purposes, namely:
+
+	1) Serves for passing in arguments to other functions,
+	by acting as the reference pointer.
+
+	2) Marks the end of the live value range, so values
+	BEFORE top are live and kept.
+
+	Consequently, there are a few points which are
+	crucial to keep in mind.
+
+	Let's begin with stack frames, and the idea
+	of coverage and frame coverage.
+
+	First, a stack frame is a portion of the stack reserved
+	for a function call, when you call a function a new
+	stack frame is created of appropriate size.
+
+		- The stack frame structure itself
+	contains additional information about the call, such
+	as the number of arguments, the closure (if any)
+	and more...
+
+	Only one stack frame is active at once, since we can
+	only be in one function at any given time.
+
+	When the function returns control, the stack frame
+	is removed, and the previous stack frame is restored.
+
+	Every function prototype states how many locals (nlocals)
+	are active at any given time.
+
+	For instance if a function has three variables say
+	'let a, b, c' then (nlocals) must be at least 3 plus any other
+	temporary registers or locals which the code emitter might have
+	used for some intermediate computations.
+
+	The process of determining how many register or locals a
+	function might necessitate depends on the code generator.
+
+	But one thing must be guaranteed, values MUST remain alive
+	for as long as they are used.
+
+	Keep in mind that when a local or register is overwritten
+	or not 'covered' (explained later)  anymore it could get
+	deallocated (if it is an object).
+
+	So (nlocals) effectively tells us the space on the stack
+	that must 'fully-covered' (explained later) at all times.
+
+	Therefore (nlocals) is then used to determine the size of
+	the stack frame for that function.
+
+
+	* Second, coverage.
+	One of the purposes of 'T' is to denote all the values
+	which are visible, reachable, or alive to the GC.
+	When the GC runs, it only sees values before T, and those
+	values are consequently kept.
+	So all values before T are said to be 'covered'.
+
+	When a new call frame is created, 'T' is incremented
+	to match the length of the call frame.
+
+	Therefore, the frame is 'fully covered', this is what I
+	refer to as 'full frame coverage'.
+
+	However, 'T' may not always cover the entire frame
+	(explained later), which is what I refer to
+	as 'partial frame coverage'.
+
+
+	The call instruction specifies which 'register' or local
+	contains the first call-argument in operand (x), and the
+	'number' of user-arguments in operand (y).
+	By call arguments I'm referring to the arguments of the
+	bytecode instruction itself, which include the
+	'user-arguments'.
+
+
+	call(function,context,user-arguments...)
+
+
+	Now, the function that actually performs the call
+	which is 'call_function' assumes 'T' points
+	to (closure + object + user-arguments), such
+	that 'T - 1' is the last user-argument.
+
+	[closure] <- instruction (x) operand
+	[context]
+	[user-arg-0]
+	[user-arg-1]
+	[unknown-value] <- 'T' (new location)
+	[unknown-value]
+	[unknown-value]
+	[unknown-value]
+	[unknown-value]
+	[unknown-value]
+	[unknown-value] <- 'T' (old location) (end of frame)
+
+	For this reason, 'T' at (new location) will no longer
+	fully cover our frame anymore as it was at (old location),
+	because we had to regress 'T' to (new location).
+
+	Given that the GC could trigger whilst our current
+	frame is only partially covered, you might ask
+	yourself, what if we collect objects from our
+	current frame?
+
+	The answer is this, the GC can't collect any
+	values that haven't come to be yet, technically...
+
+	The code generator emits instruction in order
+	of execution, therefore, even though our frame is only
+	partially covered, we don't have any values from 'T'
+	at (new-location) that need coverage because we haven't
+	even gotten to the instructions that will populate
+	those registers.
+
+	This means that no instruction should ever be able to
+	reference a register that is past or at 'T'. If it does
+	this is strictly an error.
+
+	After the call is completed, we must 'recover', ensure
+	'T' offers full coverage of our frame once more.
+ 	*/
+
+	union { elStackFrame *F; };
 	int call_level;
 	int flags;
 	struct {
@@ -713,9 +916,11 @@ typedef struct elState {
 } elState;
 
 
-/*
+/* ---------------------------------------------------------------------
 ** Parsing And Code Generation...
+** ---------------------------------------------------------------------
 */
+
 
 typedef struct elToken {
 	unsigned char 	type;
@@ -768,6 +973,7 @@ _(LOG_AND,"&&",3) _(LOG_OR,"||",2) \
 _(NIL_AND,"!!",3) _(NIL_OR,"??",2) \
 _(ELLIPSIS,"...",1) _(DOT_DOT,"..",1)
 
+
 #define TKLIST(_) \
 _(INTEGER,"integer") _(NUMBER,"number") _(STRING,"string") _(LETTER,"letter") _(WORD,"word") \
 _(QUESTION_MARK,"?") _(EXCLAMATION_MARK,"!") \
@@ -776,6 +982,7 @@ _(COLON,":") _(SEMI_COLON,";") \
 _(COMMA,",") _(DOT,".") \
 _(SQUARE_LEFT,"[") _(SQUARE_RIGHT,"]") _(CURLY_LEFT,"{") _(CURLY_RIGHT,"}") \
 _(PAREN_LEFT,"(") _(PAREN_RIGHT,")") \
+
 
 typedef enum elTokenType {
 	TK_NONE = 0,
@@ -793,39 +1000,6 @@ typedef enum elTokenType {
 #undef MCITEM
 #undef OPITEM
 } elTokenType;
-
-
-elTokenType elf_is_word_or_macro(char *name) {
-	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_M_,NAME);
-	MCLIST(MCITEM)
-	#undef MCITEM
-	return TK_WORD;
-}
-
-
-elTokenType elf_is_word_or_keyword(char *name) {
-	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_,NAME);
-	KWLIST(KWITEM)
-	#undef KWITEM
-	return TK_WORD;
-}
-
-
-typedef struct ltokenintel {
-	char *name;
-	char prec;
-} ltokenintel;
-
-
-elGLOBAL ltokenintel elf_tkintel[] = {
-	{"none",-2},
-#define TKITEM(_,SYM) {SYM,-2},
-#define OPITEM(_,SYM,PRC) {SYM,PRC},
-	KWLIST(TKITEM)
-	MCLIST(TKITEM)
-	TKLIST(TKITEM)
-	OPLIST(OPITEM)
-};
 
 
 /*
@@ -1175,6 +1349,40 @@ elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags);
 void elf_emitter_close_block(elFileState *fs);
 
 
+#if defined(_MSC_VER)
+# if !defined(ELF_KEEPWARNINGS)
+#  pragma warning(push)
+# endif
+# pragma warning(disable:4100)
+# pragma warning(disable:4245)
+# pragma warning(disable:4057)
+# pragma warning(disable:4189)
+# pragma warning(disable:4201)
+# pragma warning(disable:4244)
+# pragma warning(disable:4267)
+# pragma warning(disable:4389)
+# pragma warning(disable:4996)
+#endif
+/* both __clang__ and _MSC_VER can be defined
+at the same time when using clang-cl */
+#if defined(__clang__)
+# if !defined(ELF_KEEPWARNINGS)
+#  pragma clang diagnostic push
+# endif
+# pragma clang diagnostic ignored "-Wparentheses-equality"
+# pragma clang diagnostic ignored "-Wnon-literal-null-conversion"
+# pragma clang diagnostic ignored "-Wmissing-braces"
+# pragma clang diagnostic ignored "-Wunused-variable"
+# pragma clang diagnostic ignored "-Wmissing-braces"
+# pragma clang diagnostic ignored "-Wunused-function"
+# pragma clang diagnostic ignored "-Wmissing-field-initializers"
+# pragma clang diagnostic ignored "-Wsign-compare"
+# pragma clang diagnostic ignored "-Wpointer-sign"
+# pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
+
+
 
 // #include "src/elf-tkn.h"
 // #include "src/elf-run.h"
@@ -1392,3 +1600,5 @@ reachable, like the stack or globals.
 ** LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 ** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ** SOFTWARE.
+*/
+

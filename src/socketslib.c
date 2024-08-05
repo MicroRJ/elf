@@ -34,7 +34,7 @@
 // elAPI int netlib_listen(elState *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elf_add_integer(R,error!=SOCKET_ERROR);
+// 	elPUSHINT(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
@@ -42,7 +42,7 @@
 // elAPI int netlib_accept(elState *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
-// 	elf_pushsys(R,(elHandle)client);
+// 	elPUSHSYS(R,(elHandle)client);
 // 	return 1;
 // }
 
@@ -57,8 +57,8 @@
 //    if (FD_ISSET(handle,&ready)) {
 //       SOCKET client = accept(handle,NULL,NULL);
 //       elASSERT(client != INVALID_SOCKET);
-// 		elf_pushsys(R,(elHandle)client);
-//    } else eld_add_nil(R);
+// 		elPUSHSYS(R,(elHandle)client);
+//    } else elPUSHNIL(R);
 // 	return 1;
 // }
 
@@ -79,8 +79,8 @@
 // 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 // 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_pushsys(R,(elHandle)thesocket);
-// 	} else eld_add_nil(R);
+// 		elPUSHSYS(R,(elHandle)thesocket);
+// 	} else elPUSHNIL(R);
 
 // 	return 1;
 // }
@@ -103,8 +103,8 @@
 
 // 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_pushsys(R,(elHandle)thesocket);
-// 	} else eld_add_nil(R);
+// 		elPUSHSYS(R,(elHandle)thesocket);
+// 	} else elPUSHNIL(R);
 // 	return 1;
 // }
 
@@ -117,7 +117,7 @@
 // 	elInteger sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elf_add_integer(R,sent);
+// 	elPUSHINT(R,sent);
 // 	return 1;
 // }
 
@@ -126,7 +126,7 @@
 // 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elf_add_integer(R,error == 0);
+// 	elPUSHINT(R,error == 0);
 // 	return 1;
 // }
 
@@ -138,7 +138,7 @@
 // 		if (message.length != 0) {
 // 			elInteger length = message.length;
 // 			elString *obj = elf_new_lstring(R,length);
-// 			elf_add_string(R,obj);
+// 			elPUSHSTR(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
 // 				elInteger result = recv(socket,cursor,length,0);
@@ -162,8 +162,8 @@
 // 				}
 // 			} while (length != 0);
 // 			*cursor = 0;
-// 		} else eld_add_nil(R);
-// 	} else eld_add_nil(R);
+// 		} else elPUSHNIL(R);
+// 	} else elPUSHNIL(R);
 // 	return 1;
 // }
 // #else

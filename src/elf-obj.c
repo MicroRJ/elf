@@ -8,62 +8,39 @@
 
 
 
+// elAPI elValue elSTR(elString *s) {
+// 	elValue v = elLITERAL(elValue){TAG_STR};
+// 	v.x_str = s;
+// 	return v;
+// }
 
 
-elAPI elValue elf_obj(elObject *obj) {
-	elValue v = elLITERAL(elValue){TAG_OBJ};
-	v.x_obj = obj;
-	return v;
-}
+// elAPI elValue elCLS(elClosure *f) {
+// 	elValue v = elLITERAL(elValue){TAG_CLS};
+// 	v.x_cls = f;
+// 	return v;
+// }
 
 
-elAPI elValue elf_binding_value(elCFunction c) {
-	elValue v = elLITERAL(elValue){TAG_CFN};
-	v.c = c;
-	return v;
-}
+// elAPI elValue elINT(elInteger i) {
+// 	elValue v = (elValue){TAG_INT};
+// 	v.x_int = i;
+// 	return v;
+// }
 
 
-elAPI elValue elf_handle_value(elHandle h) {
-	elValue v = elLITERAL(elValue){TAG_SYS};
-	v.x_sys = h;
-	return v;
-}
+// elAPI elValue elNUM(elNumber n) {
+// 	elValue v = (elValue){TAG_NUM};
+// 	v.x_num = n;
+// 	return v;
+// }
 
 
-elAPI elValue elf_string_value(elString *s) {
-	elValue v = elLITERAL(elValue){TAG_STR};
-	v.x_str = s;
-	return v;
-}
-
-
-elAPI elValue elf_closure_value(elClosure *f) {
-	elValue v = elLITERAL(elValue){TAG_CLS};
-	v.x_cls = f;
-	return v;
-}
-
-
-elAPI elValue elf_integer_value(elInteger i) {
-	elValue v = (elValue){TAG_INT};
-	v.x_int = i;
-	return v;
-}
-
-
-elAPI elValue elf_number_value(elNumber n) {
-	elValue v = (elValue){TAG_NUM};
-	v.x_num = n;
-	return v;
-}
-
-
-elAPI elValue elf_nil_value() {
-	elValue v = (elValue){TAG_NIL};
-	v.x_int = 0;
-	return v;
-}
+// elAPI elValue elNIL() {
+// 	elValue v = (elValue){TAG_NIL};
+// 	v.x_int = 0;
+// 	return v;
+// }
 
 
 elAPI elClosure *elf_new_closure(elState *S, elFileProto proto) {

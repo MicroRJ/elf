@@ -4,6 +4,48 @@
 ** Lexical Analyzer
 */
 
+#undef TRUE
+#undef FALSE
+
+elTokenType elf_is_word_or_macro(char *name) {
+	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_M_,NAME);
+	MCLIST(MCITEM)
+	#undef MCITEM
+	return TK_WORD;
+}
+
+
+elTokenType elf_is_word_or_keyword(char *name) {
+	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_,NAME);
+	KWLIST(KWITEM)
+	#undef KWITEM
+	return TK_WORD;
+}
+
+
+#define TRUE  1
+#define FALSE 0
+
+
+
+typedef struct ltokenintel {
+	char *name;
+	char prec;
+} ltokenintel;
+
+
+elGLOBAL ltokenintel elf_tkintel[] = {
+	{"none",-2},
+#define TKITEM(_,SYM) {SYM,-2},
+#define OPITEM(_,SYM,PRC) {SYM,PRC},
+	KWLIST(TKITEM)
+	MCLIST(TKITEM)
+	TKLIST(TKITEM)
+	OPLIST(OPITEM)
+};
+
+
+
 
 
 void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
@@ -123,7 +165,7 @@ elToken elf_lexone(elFileState *file) {
 	/* we could put all of the ascii codes in the switch
 	statement...  */
 	switch (elf_thischr()) {
-		default: {
+		case 'A'...'Z': case 'a'...'z': case '_': {
 			if (elf_is_letter_char(elf_thischr()) || (elf_thischr() == '_')) {
 				int length = 0;
 				do {
@@ -135,7 +177,7 @@ elToken elf_lexone(elFileState *file) {
 				tk.type = elf_is_word_or_keyword(buffer);
 				if (tk.type == TK_WORD) {
 					if (S_eq(buffer,"__ELF_FILE_BREAK__")) {
-						file->debuggerflag = elTRUE;
+						file->debuggerflag = 1;
 						goto retry;
 					}
 					/* todo: string interner, or arena? */
@@ -220,7 +262,7 @@ elToken elf_lexone(elFileState *file) {
 				while (elf_thischr() != 0 && elf_thischr() != '"') {
 					/* are we making a grave mistake here by allowing lines to
 					naturally span multiple lines? */
-					if (elf_cmovchr('\n') || (elf_cmovchr('\r') && (elf_cmovchr('\n'),elTRUE))) {
+					if (elf_cmovchr('\n') || (elf_cmovchr('\r') && (elf_cmovchr('\n'),1))) {
 						elf_lexer_notify_newline(file);
 						ARRAY_ADD(buffer,'\n');
 					} else {
@@ -415,10 +457,10 @@ elToken elf_lexone(elFileState *file) {
 	}
 
 	if (elf_thischr() == '/' && (elf_thenchr()=='/' || elf_thenchr()=='*')) {
-		tk.eol = elTRUE;
+		tk.eol = 1;
 	}
 	if (elf_thischr() == ';' || (elf_thischr() == '\n' || elf_thischr() == '\r')) {
-		tk.eol = elTRUE;
+		tk.eol = 1;
 	}
 
 	file->lasttk = file->tk;

@@ -34,10 +34,10 @@ elBool elf_is_targetable_node(elNodeKi kind) {
 		case NODE_LOCAL:
 		case NODE_RANGE_INDEX:
 		case NODE_INDEX: case NODE_FIELD: {
-			return elTRUE;
+			return 1;
 		}
 		default: {
-			return elFALSE;
+			return 0;
 		}
 	}
 }
@@ -351,12 +351,12 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileBoolExpr *js, elBool z, elReg
 
 
 elByteId elf_branch_if_false(elFileState *fs, elFileBoolExpr *js, elRegId x, elNodeId id) {
-	return elf_emit_branch_if(fs,js,elFALSE,x,id);
+	return elf_emit_branch_if(fs,js,0,x,id);
 }
 
 
 elByteId elf_branch_if_true(elFileState *fs, elFileBoolExpr *js, elRegId x, elNodeId id) {
-	return elf_emit_branch_if(fs,js,elTRUE,x,id);
+	return elf_emit_branch_if(fs,js,1,x,id);
 }
 
 
@@ -787,14 +787,14 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 		case NODE_STRING: {
 			UNUSED_CHECK;
 			/* todo: interning */
-			elSymbolId global = elf_add_global_value(fs->M,0,elf_string_value(elf_new_string(fs->R,node.lit.s)));
+			elSymbolId global = elf_add_global_value(fs->M,0,elSTR(elf_new_string(fs->R,node.lit.s)));
 			elf_emitter_add_bytexy(fs,line,BC_LOADGLOBAL,target_register,global);
 		} break;
 		case NODE_TABLE: {
 			UNUSED_CHECK;
 			elf_emitter_add_bytexy(fs,line,BC_TABLE,target_register,0);
 			/* todo: could this be turned into sugar */
-			ARRAY_FOR(i,v.z) {
+			FOR_ARRAY(i,v.z) {
 				elf_emit_initializer(fs,line,target_register,v.z[i]);
 			}
 		} break;
@@ -856,7 +856,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			}
 
 
-			ARRAY_FOR(i, v.z) {
+			FOR_ARRAY(i, v.z) {
 				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(v.z[i]));
 				elASSERT(last == tail ++);
 			}
@@ -891,12 +891,12 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 		case NODE_AND: case NODE_OR: {
 			if (y == 0) goto leave;
 
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,elFALSE));
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,0));
 
 			elFileBoolExpr bool_expr = {0};
 			elByteId *js = elf_emit_jump_if_false(fs,&bool_expr,NO_SLOT,id);
 
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,elTRUE));
+			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,1));
 
 			elf_emitter_patch_jumplist(fs,js);
 			elf_xarray_delete(js);
@@ -909,7 +909,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			elASSERT(target_register > NO_SLOT);
 			/* Set default value to false */
 			elNodeId tar = elf_make_register_node(fs,node.line,target_register);
-			elf_emitter_emit_store(fs,node.line,tar,elf_make_integer_node(fs,NO_LINE,elFALSE));
+			elf_emitter_emit_store(fs,node.line,tar,elf_make_integer_node(fs,NO_LINE,0));
 
 			/* ensure desugaring actually took place since
 			we know node.x is a projection */
@@ -947,7 +947,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileLine line
 			/* if true we can exit the loop */
 			elByteId *js = elf_emit_jump_if_false(fs,&expr,NO_SLOT,elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,xx,node.y));
 
-			elf_emitter_emit_store(fs,NO_LINE,tar,elf_make_integer_node(fs,NO_LINE,elTRUE));
+			elf_emitter_emit_store(fs,NO_LINE,tar,elf_make_integer_node(fs,NO_LINE,1));
 			elf_emit_break(fs,NO_LINE,NO_SLOT);
 			/* otherwise continue checking */
 			elf_emitter_patch_jumplist(fs,js);
@@ -1198,7 +1198,7 @@ void elf_emitter_begin_ranged_loop(elFileState *fs, elFileLine line, elNodeId in
 
 	bl->loop.index_register = index_register;
 	bl->loop.x = index_node;
-	elf_emitter_local_load(fs,line,elTRUE,index_register,1,elf_make_type_guard_node(fs,elf_get_node_line(fs,lo),lo,NT_INT));
+	elf_emitter_local_load(fs,line,1,index_register,1,elf_make_type_guard_node(fs,elf_get_node_line(fs,lo),lo,NT_INT));
 
 	bl->loop.entry = elf_get_last_byteid(fs);
 

@@ -67,24 +67,24 @@ int elf_cstrlen(char const *s) {
 
 elBool elf_cstrhasprefix(char *str, char *prefix) {
 	if (prefix == 0 || *prefix == 0 || *str == 0 || *str == 0) {
-		return elFALSE;
+		return 0;
 	}
 	do {
 		if (*prefix ++ != *str ++) {
-			return elFALSE;
+			return 0;
 		}
 	} while (*prefix);
-	return elTRUE;
+	return 1;
 }
 
 
 elBool S_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
-			return elFALSE;
+			return 0;
 		}
 	}
-	return elTRUE;
+	return 1;
 }
 
 
@@ -150,10 +150,10 @@ elBool elf_match_entire_string(char *p, char *s) {
 	char *b = s;
 	while (!elf_match_entire_string_noclause(p,s)) {
 		while (*p != 0 && *p != '|') ++p;
-		if (*p == 0) return elFALSE;
+		if (*p == 0) return 0;
 		++ p, s = b;
 	}
-	return elTRUE;
+	return 1;
 }
 
 
@@ -162,7 +162,7 @@ elBool elf_match_entire_string_noclause(char *p, char *s) {
 		if (*p == '?') {
 			/* matches any character except terminator. */
 			if (*s != 0) {
-				return elFALSE;
+				return 0;
 			}
 			++ p, ++ s;
 		} else
@@ -179,14 +179,14 @@ elBool elf_match_entire_string_noclause(char *p, char *s) {
 			delay the match by skipping this char and remaining
 			in this pattern char. */
 			if (elf_match_entire_string_noclause(p+1,s)) {
-				return elTRUE;
+				return 1;
 			}
 			/* no match, move on to next char, remain in
 			this branch and keep checking for matches. */
 			++ s;
 		/* otherwise, match literal, fail if no match. */
 		} else if (*p != *s) {
-			return elFALSE;
+			return 0;
 		} else {
 			++ p, ++ s;
 		}

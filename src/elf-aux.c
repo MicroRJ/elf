@@ -7,7 +7,7 @@
 
 /* res is how much to reserve,
 and com is how much to commit */
-elInteger elf_stretchy_buffer_alloc(void **var, elInteger per, elInteger res, elInteger com) {
+elInteger elf_array_allocate(void **var, elInteger per, elInteger res, elInteger com) {
 	elArray *arr = 0;
 	elInteger max = 0, min = 0;
 	if (*var != 0) {
@@ -36,10 +36,6 @@ elInteger elf_stretchy_buffer_alloc(void **var, elInteger per, elInteger res, el
 }
 
 
-
-
-
-
 void elf_debugger(char *message) {
 	sys_consolelog(ELF_LOGDBUG,"debugger: ");
 	sys_consolelog(ELF_LOGDBUG,message);
@@ -48,28 +44,35 @@ void elf_debugger(char *message) {
 }
 
 
+void elf_register_bindings(elState *R, elTable *tab, elBinding *list, int num) {
+	for (int i = 0; i < num; i += 1) {
+		elf_table_set(tab,elSTR(elf_new_string(R,list[i].name)),elCFN(list[i].fn));
+	}
+}
+
+
 void elf_register_handle(elState *R, char *name, elHandle val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_handle_value(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elSYS(val));
 }
 
 
 void elf_register_integer(elState *R, char *name, elInteger val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_integer_value(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elINT(val));
 }
 
 
 void elf_registertab(elState *R, char *name, elTable *val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_tab(val));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elTAB(val));
 }
 
 
 void elf_register_string(elState *R, char *name, char *val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_string_value(elf_add_new_string(R,val)));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elSTR(elf_add_new_string(R,val)));
 }
 
 
 void elf_register_binding(elState *R, char *name, elCFunction fn) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elf_binding_value(fn));
+	elf_add_global_value(R->M,elf_add_new_string(R,name),elCFN(fn));
 }
 
 
@@ -91,7 +94,7 @@ elNumber elf_timediffms(elInteger begin) {
 
 int elf_get_file_for_byte(elModule *M, elByteId byte) {
 	elFileProto *files = M->files;
-	ARRAY_FOR(i,files) {
+	FOR_ARRAY(i,files) {
 		elFileProto file = files[i];
 		if (elWITHIN(byte,file.bytes,file.bytes+file.nbytes)) {
 			return i;
@@ -195,7 +198,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	if (fileid != -1) {
 		elFileProto *file = &M->files[fileid];
 		elFileLine line = elf_get_line_for_byte(M,call->call_instr);
-		elf_line_dialog(file->name->contents,file->contents->contents,line,call->call_instr,M->bytes[call->call_instr],call->cls != 0 ? "(bytecode function)" : "(binding)");
+		elf_line_dialog(file->name->contents,file->contents->contents,line,call->call_instr,M->bytes[call->call_instr],call->C != 0 ? "(bytecode function)" : "(binding)");
 	}
 }
 
@@ -211,14 +214,14 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 	}
 
 	printf(" -- BYTE TRACE:\n");
-	elf_dump_byte_trace(R,R->call,R->call_level);
+	elf_dump_byte_trace(R,elGETFRAME(R),R->call_level);
 	elf_debugger("runtime throw");
 }
 
 
 void elf_check_args(elState *R, char *fnname, int n, char *usage) {
-	if (R->call->nx != n) {
-		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,R->call->nx,usage));
+	if (elGETNARGS(R) != n) {
+		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
 	}
 }
 

@@ -25,8 +25,6 @@ void elf_get_line_location_info(char *q, char *loc, int *linenum, char **lineloc
 elFileLine elf_get_line_for_byte(elModule *M, elByteId byte);
 
 
-void elf_table_set_binding_field(elState *R, elTable *obj, char *name, elCFunction b);
-
 
 
 

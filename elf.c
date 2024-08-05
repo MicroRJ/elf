@@ -20,7 +20,7 @@ int main(int n, char **c) {
 	elModule M = {0};
 	elState R = {0};
 	elf_begin(&R,&M);
-	if (cli.logging) R.bytelogging = elTRUE;
+	if (cli.logging) R.bytelogging = 1;
 
 	elStackFrame frame = {0};
 	frame.base = R.top;

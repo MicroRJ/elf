@@ -7,7 +7,7 @@
 
 
 // void sets(elState *c, elTable *table, char *k) {
-// 	elf_table_set(table,elf_string_value(elf_new_string(c,k)),* -- c->v);
+// 	elf_table_set(table,elSTR(elf_new_string(c,k)),* -- c->v);
 // }
 
 
@@ -67,7 +67,7 @@
 
 
 // int testlib_absslotid(elState *c) {
-// 	elf_add_integer(c,c->v-c->s);
+// 	elPUSHINT(c,c->v-c->s);
 // 	return 1;
 // }
 
@@ -101,7 +101,7 @@
 
 
 // int _gtable(elState *c) {
-// 	elf_add_table(c,c->md->g);
+// 	elPUSHTAB(c,c->md->g);
 // 	return 1;
 // }
 
@@ -117,15 +117,15 @@
 
 // void tstlib_load(elState *rt) {
 // 	elModule *md = rt->md;
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__gc"),elf_binding_value(testlib_gc));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__gcpause"),elf_binding_value(testlib_gcpause));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__gcunpause"),elf_binding_value(testlib_gcunpause));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__disasm"),elf_binding_value(testlib_disasm));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__logging"),elf_binding_value(testlib_logging));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__globallogging"),elf_binding_value(testlib_globallogging));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__gc"),elCFN(testlib_gc));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__gcpause"),elCFN(testlib_gcpause));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__gcunpause"),elCFN(testlib_gcunpause));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__disasm"),elCFN(testlib_disasm));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__logging"),elCFN(testlib_logging));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__globallogging"),elCFN(testlib_globallogging));
 
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__debugbreak"),elf_binding_value(testlib_debugbreak));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"absslotid"),elf_binding_value(testlib_absslotid));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"absslot"),elf_binding_value(testlib_absslot));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_gtable"),elf_binding_value(_gtable));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"__debugbreak"),elCFN(testlib_debugbreak));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"absslotid"),elCFN(testlib_absslotid));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"absslot"),elCFN(testlib_absslot));
+// 	elf_add_global_value(md,elf_add_new_string(rt,"_gtable"),elCFN(_gtable));
 // }

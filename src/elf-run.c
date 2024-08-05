@@ -46,28 +46,25 @@ void elf_begin(elState *R, elModule *M) {
 
 /* todo: instead remove the object */
 int elf_call_function3(elState *R, elObject *obj, int nx, int ny, elRegId ry) {
-	elStackFrame call = {0};
-	call.caller 		= R->call;
-	call.call_instr 	= R->byte;
-	call.locals 		= elGETTOP(R) - nx;
-	call.ry           = ry;
-	call.nx           = nx;
-	call.ny           = ny;
-	/* todo: remove */
-	call.obj 			= obj;
+	elStackFrame F = {0};
+	F.caller 		= elGETFRAME(R);
+	F.call_instr 	= R->byte;
+	F.L 				= elGETTOP(R) - nx;
+	F.Q 				= obj;
+	F.ry           = ry;
+	F.nx           = nx;
+	F.ny           = ny;
 
-	elValue fn = call.locals[-1];
+	elValue fn = F.L[-1];
 	elASSERT(elISFUNTAG(fn.tag) && !elISNIL(fn));
 
-	elValue *top = call.locals + nx;
 	if (fn.tag == TAG_CLS) {
-		call.cls = fn.x_cls;
-		elf_clear_memory(call.locals + nx,call.cls->proto.nlocals*sizeof(elValue));
-		top = call.locals + call.cls->proto.nlocals;
-	}
+		F.C = fn.x_cls;
+		elf_clear_memory(F.L + nx,F.C->proto.nlocals*sizeof(elValue));
+		elSETTOP(R,F.L + F.C->proto.nlocals);
+	} else elSETTOP(R,F.L + nx);
 
-	elSETTOP(R,top);
-	R->call = &call;
+	elGETFRAME(R) = &F;
 	R->call_level ++;
 
 	if (R->flags & FLAG_DEBUGGER_ONCALL) {
@@ -78,30 +75,31 @@ int elf_call_function3(elState *R, elObject *obj, int nx, int ny, elRegId ry) {
 		nyield = elf_run(R);
 	} else
 	if (fn.tag == TAG_CFN) {
+		elValue *T = elGETTOP(R);
 		nyield = fn.x_cfn(R);
 		/* ensure that the results were pushed to the stack */
-		if ((elGETTOP(R) - top) < nyield) {
-			elf_throw(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(elGETTOP(R) - top),nyield));
+		if ((elGETTOP(R) - T) < nyield) {
+			elf_throw(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(elGETTOP(R) - T),nyield));
 		}
 		/* todo: replace with memcpy? */
 		for (int i = 0; i < MIN(nyield,ny); ++ i) {
 			/* todo: ry will be removed once we unify the calling
 			convention, since object will no longer interfere with
 			where we want to put the results */
-			call.locals[ry+i] = elGETTOP(R)[i-nyield];
+			F.L[ry+i] = elGETTOP(R)[i-nyield];
 		}
 	} else {
 		nyield = -1;
 		elf_throw(R,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[fn.tag]));
 	}
-	R->call 	= call.caller;
+
+	elGETFRAME(R) = F.caller;
+
 	R->call_level -= 1;
 	elASSERT(R->call_level > -1);
-	elValue *T = elGETTOP(R);
-	elSETTOP(R,call.locals+ry+nyield);
-	// elf_debug_log("at instruction: %i, ry: %i, ny: %i, nlocals: %i, T-: %lli, V: %s, %s"
-	// , R->byte, ry, nyield, call.cls ? call.cls->proto.nlocals : 0
-	// , (elInteger) (T - R->T), tag2s[(R->T-2)->tag], tag2s[(R->T-1)->tag]);
+
+	// elSETTOP(R,F.L+ry+nyield);
+	// elf_debug_log("@stack_top: %i, (%i)", (int) (R->T - R->K), call.call_instr);
 	return nyield;
 }
 
@@ -152,7 +150,7 @@ int elf_load_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 	themselves, though this would be slower since
 	we don't have any form of hierarchical benefits... */
 
-	// elValue cls = elf_closure_value(elf_new_closure(R,fp));
+	// elValue cls = elCLS(elf_new_closure(R,fp));
 	// return elf_call_function(R,0,cls,rxy,rxy,0,ny);
 	elNOCODE;
 	return -1;
@@ -163,6 +161,9 @@ int elf_load_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 	if ((filename == 0) || (contents == 0)) {
 		return -1;
 	}
+
+	elASSERT(elOBJCOLOR(filename) != GC_RED);
+	elASSERT(elOBJCOLOR(contents) != GC_RED);
 
 	elModule *M = R->M;
 	fs->R = R;
@@ -181,6 +182,10 @@ int elf_load_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 	elFileFnState fn = {0};
 	elf_emitter_begin_function(fs,&fn,fs->tk.line);
 	while (!elf_test_token(fs,0)) {
+
+		elASSERT(elOBJCOLOR(filename) != GC_RED);
+		elASSERT(elOBJCOLOR(contents) != GC_RED);
+
 		elf_load_file_stat(fs);
 	}
 	elf_emitter_close_function(fs);
@@ -203,14 +208,15 @@ int elf_load_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 	closures and objects, so they should keep the file
 	alive, but we don't have that system in place yet... */
 	elClosure *cls = elf_new_closure(R,fp);
-	elf_add_closure(R,cls);
-	elf_table_add(M->globals,elf_closure_value(cls));
+	elPUSHCLS(R,cls);
+	elf_table_add(M->globals,elCLS(cls));
 
 	return elf_call_function3(R,0,0,ny,ry);
 }
 
 
-/* todo: add support for arguments */
+/* todo: add support for arguments and this should
+instead return the closure instead! */
 int elf_load_file3_fs(elState *R, elFileState *fs, elString *name, elRegId ry, int ny) {
 
 	char *contents;
@@ -293,17 +299,17 @@ elInteger elf_mark_object(elObject *obj) {
 		return 0;
 	}
 	elInteger num = 1;
-	/* Here we check whether the object
-	is explicitly white, because there
-	are other colors that we don't want
-	to get rid of, I suppose we don't
-	propagate pink because if the object
-	were to not become pink anymore we'd
-	have to also propagate those changes
-	latter... Pink objects are rare though...
-	I think we only use them for debugging... */
-	if (obj->color == GC_WHITE) {
-		obj->color = GC_BLACK;
+	/* Here we check whether the object is explicitly white,
+	because there are other colors that we don't want to get
+	rid of.
+	I suppose we don't propagate pink because if
+	the object were to ever change color we'd have to also
+	propagate those changes... Pink objects are rare
+	though... And I think they are soon to be deprecated...
+	Trap objects are for debugging only, they are meant to
+	trigger a GC fault if not reached... */
+	if ((elOBJCOLOR(obj) == GC_WHITE) || (elOBJCOLOR(obj) == GC_TRAP)) {
+		elOBJCOLOR(obj) = GC_BLACK;
 	}
 	if (obj->metatable) {
 		num += elf_mark_object((elObject*)obj->metatable);
@@ -369,19 +375,24 @@ elInteger elf_free_phase(elState *R) {
 		ARRAY(new_objects).min = 0;
 	}
 	elInteger n = 0;
-	elInteger k;
-	for (k=0; k<ARRAY_LENGTH(objects); ++ k) {
-		elObject *it = objects[k];
-		if (it == 0 || it->color == GC_RED) {
-			elf_throw(R,NO_BYTE,"internal error, GC failed");
+	FOR_ARRAY(i,objects) {
+		elObject *it = objects[i];
+		elASSERT(it != 0);
+		if ((elOBJCOLOR(it) == GC_RED) || (elOBJCOLOR(it) == GC_TRAP)) {
+			for(elValue *Ki = R->K; Ki < R->T; Ki += 1) {
+				if (Ki->x_obj == it) {
+					elf_debug_log("Object '%p' found in stack at: '%p'. From top '%p' -> %lli", it, Ki, R->T, (R->T - Ki));
+				}
+			}
+			elf_throw(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
 		}
-		if (it->color == GC_BLACK) {
-			it->color = GC_WHITE;
+		if (elOBJCOLOR(it) == GC_BLACK) {
+			elOBJCOLOR(it) = GC_WHITE;
 			/* todo: instead simply ensure 'new_objects' is big enough */
 			ARRAY_ADD(new_objects,it);
-		} else if (it->color == GC_WHITE) {
+		} else if (elOBJCOLOR(it) == GC_WHITE) {
 			n += 1;
-			it->color = GC_RED;
+			elOBJCOLOR(it) = GC_RED;
 			R->memory.memory_allocated -= it->tell;
 			if (it->type == GC_STR && ((elString*)(it))->length > 512) {
 				elf_debug_log("deallocated fairly large string: %p, %i", it, ((elString*)(it))->length);
@@ -452,6 +463,7 @@ void *elf_new_object(elState *R, elGCTy type, elInteger tell) {
 	}
 	obj->type  = type;
 	obj->tell  = tell;
+	obj->byte  = R->byte;
 
 	ARRAY_ADD(R->memory.objects,obj);
 	return obj;
@@ -460,11 +472,11 @@ void *elf_new_object(elState *R, elGCTy type, elInteger tell) {
 
 int elf_run(elState *R) {
 	elModule *M = R->M;
-	elStackFrame *call = R->call;
-	elValue *locals = call->locals;
-	elValue *values = call->cls->values;
+	elStackFrame *call = R->F;
+	elValue *locals = call->L;
+	elValue *values = call->C->values;
 	elTable *globals = M->globals;
-	elFileProto proto = call->cls->proto;
+	elFileProto proto = call->C->proto;
 
 	elByteId next_instr = 0;
 	while (next_instr < proto.nbytes) {
@@ -570,11 +582,11 @@ int elf_run(elState *R) {
 
 			*/
 			case BC_LOADTHIS: {
-				if (call->obj == 0) {
+				if (call->Q == 0) {
 					elf_throw(R,NO_BYTE,"'this' is invalid for this function, not a meta-call");
 				}
-				locals[byte.x].tag   = elOBJTOTAG(call->obj->type);
-				locals[byte.x].x_obj = call->obj;
+				locals[byte.x].tag   = elOBJTOTAG(call->Q->type);
+				locals[byte.x].x_obj = call->Q;
 			} break;
 			case BC_RELOAD: {
 				locals[byte.x] = locals[byte.y];
@@ -705,15 +717,21 @@ int elf_run(elState *R) {
 			} break;
 			// obj -> cls -> args -> top
 			case BC_METACALL: {
+				elValue *T = elGETTOP(R);
+				elASSERT(T >= locals+call->C->proto.nlocals);
 				R->byte = module_instr;
 				elSETTOP(R,locals+byte.x+byte.y+2);
 				elf_call_function3(R,locals[byte.x].x_obj,byte.y,byte.z,-2);
+				elSETTOP(R,locals+call->C->proto.nlocals);
 			} break;
 			// cls -> args -> top
 			case BC_CALL: {
+				elValue *T = elGETTOP(R);
+				elASSERT(T >= locals+call->C->proto.nlocals);
 				R->byte = module_instr;
 				elSETTOP(R,locals+byte.x+byte.y+1);
 				elf_call_function3(R,0,byte.y,byte.z,-1);
+				elSETTOP(R,locals+call->C->proto.nlocals);
 			} break;
 			case BC_ISNIL: {
 				elValue x = locals[byte.y];
@@ -724,7 +742,7 @@ int elf_run(elState *R) {
 			case BC_EQ: case BC_NEQ: {
 				elValue x = locals[byte.y];
 				elValue y = locals[byte.z];
-				elBool eq = false;
+				elBool eq = 0;
 				if ((x.tag == TAG_NIL) || (y.tag == TAG_NIL)) {
 					eq = elISNIL(x) == elISNIL(y);
 				} else if ((x.tag == TAG_STR) && (y.tag == TAG_STR)) {
