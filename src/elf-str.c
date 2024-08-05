@@ -116,7 +116,7 @@ int elf_libS_append(elState *R) {
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->contents);
 	for (int i = 0; i < elGETNARGS(R); ++ i) {
-		elValue v = elGETL(R,i);
+		elValue v = elGET(R,i);
 		if (v.tag == TAG_STR) {
 			strcatf(buffer,"%s",v.x_str->contents);
 		} else if (v.tag == TAG_NIL) {

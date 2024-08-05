@@ -62,7 +62,7 @@ elBool elf_trace_object(elState *S, elTable *visited, elObject *obj, elObject *t
 		elTable *tab = (elTable *) thru;
 
 		{
-			elObjectTracePath child = { &path, elf_tpf("(table.entry)") };
+			elObjectTracePath child = { &path, elTPF("(table.entry)") };
 			elEntry *entry;
 			for (entry = tab->entries; entry < tab->entries + tab->ntotal; entry += 1) {
 				if (elISOBJTAG(entry->key.tag)) {
@@ -205,7 +205,7 @@ int elf_lib_get_stack_top(elState *R) {
 
 
 int elf_lib_get_local_addr(elState *R) {
-	elPUSHINT(R,(elInteger) (&elGETL(R, elf_get_integer(R,0)) - R->K));
+	elPUSHINT(R,(elInteger) (&elGET(R, elf_get_integer(R,0)) - R->K));
 	return 1;
 }
 
@@ -233,7 +233,7 @@ int elf_lib_get_metatable(elState *R) {
 
 int elf_lib_set_metatable(elState *R) {
 	elf_get_object(R,0)->metatable = elf_get_table(R,1);
-	elPUSH(R,elGETL(R,0));
+	elPUSH(R,elGET(R,0));
 	return 1;
 }
 
@@ -332,7 +332,7 @@ int elf_lib_debugger(elState *R) {
 /* logging */
 int elflib_log(elState *R) {
 	for (int i = 0; i < elGETNARGS(R); i ++) {
-		elf_fpf_value(stdout,elGETL(R,i),0);
+		elf_fpf_value(stdout,elGET(R,i),0);
 	} printf("\n");
 	return 0;
 }
@@ -340,7 +340,7 @@ int elflib_log(elState *R) {
 
 int elflib_err(elState *R) {
 	for (int i = 0; i < elGETNARGS(R); i ++) {
-		elf_fpf_value(stderr,elGETL(R,i),0);
+		elf_fpf_value(stderr,elGET(R,i),0);
 	} printf("\n");
 	return 0;
 }
@@ -480,7 +480,7 @@ int elf_lib_load_expr(elState *R) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_load_expr3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ny,contents);
+	elf_load_expr3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -496,7 +496,7 @@ int elf_lib_load_code(elState *R) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_load_code3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ny,contents);
+	elf_load_code3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -504,14 +504,14 @@ int elf_lib_load_code(elState *R) {
 
 int elf_lib_load_file(elState *R) {
 	elString *filename = elf_get_string(R,0);
-	elf_load_file3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ny);
+	elf_load_file3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield);
 	/* no need to do hoisting */
 	return 0;
 }
 
 
 int elflib_iton(elState *R) {
-	elValue v = elGETL(R,0);
+	elValue v = elGET(R,0);
 	if (v.tag == TAG_INT) {
 		elPUSHNUM(R,(elNumber)v.i);
 	} else elPUSHNUM(R,v.n);
@@ -520,7 +520,7 @@ int elflib_iton(elState *R) {
 
 
 int elflib_ntoi(elState *R) {
-	elValue v = elGETL(R,0);
+	elValue v = elGET(R,0);
 	if (v.tag == TAG_NUM) {
 		elPUSHINT(R,(elInteger)v.n);
 	} else elPUSHINT(R,v.i);
@@ -706,7 +706,7 @@ int elflib_fpf(elState *S) {
 	elHandle file = elf_get_handle(S,0);
 	int wrote = 0;
 	for (int i = 1; i < elGETNARGS(S); i ++) {
-		wrote += elf_fpf_value(file,elGETL(S,i),0);
+		wrote += elf_fpf_value(file,elGET(S,i),0);
 	}
 	elPUSHINT(S,wrote);
 	return 1;
@@ -728,7 +728,7 @@ int elf_lib_lpf(elState *S) {
 		for (int j = 0; j < pf_indent; ++ j) {
 			fprintf(stdout, "  ");
 		}
-		elf_fpf_value(stdout,elGETL(S,i),0);
+		elf_fpf_value(stdout,elGET(S,i),0);
 	}
 	fprintf(stdout,"\n");
 	return 0;
@@ -740,7 +740,7 @@ int elf_lib_pf(elState *S) {
 		fprintf(stdout,"  ");
 	}
 	for (int i = 0; i < elGETNARGS(S); i ++) {
-		elf_fpf_value(stdout,elGETL(S,i),0);
+		elf_fpf_value(stdout,elGET(S,i),0);
 	}
 	fprintf(stdout,"\n");
 	return 0;
@@ -865,13 +865,13 @@ elAPI int elf_lib_list_folder(elState *R) {
 void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 #if defined(PLATFORM_DESKTOP)
 	WIN32_FIND_DATAA f;
-	HANDLE h = FindFirstFileA(elf_tpf("%s\\*",dir->c),&f);
+	HANDLE h = FindFirstFileA(elTPF("%s\\*",dir->c),&f);
 	if (h != INVALID_HANDLE_VALUE) do {
 		if (elf_is_virtual_file_name(f.cFileName)) continue;
 		int is_directory = 0 != (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 		elValue *top = elGETTOP(R);
 		elString *name = elf_add_new_string(R,f.cFileName);
-		elString *path = elf_add_new_string(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
+		elString *path = elf_add_new_string(R,elTPF("%s\\%s",dir->c,f.cFileName));
 		elTable *file = elf_add_new_table(R);
 		elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
 		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
@@ -894,13 +894,13 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 #if defined(PLATFORM_DESKTOP)
 	WIN32_FIND_DATAA f;
-	HANDLE h = FindFirstFileA(elf_tpf("%s\\*",dir->c),&f);
+	HANDLE h = FindFirstFileA(elTPF("%s\\*",dir->c),&f);
 	if (h != INVALID_HANDLE_VALUE) do {
 		if (elf_is_virtual_file_name(f.cFileName)) continue;
 		int is_directory = 0 != (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 		elValue *top = elGETTOP(R);
 		elString *name = elf_add_new_string(R,f.cFileName);
-		elString *path = elf_add_new_string(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
+		elString *path = elf_add_new_string(R,elTPF("%s\\%s",dir->c,f.cFileName));
 		elTable *file = elf_add_new_table(R);
 		elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
 		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
@@ -927,7 +927,7 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 			elValue *top = elGETTOP(R);
 
 			elString *name = elf_add_new_string(R,entry->d_name);
-			elString *path = elf_add_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			elString *path = elf_add_new_string(R,elTPF("%s/%s",dir->c,entry->d_name));
 			elRegId base = elPUSHCLS(R,cls);
 			elTable *file = elf_add_new_table(R);
 

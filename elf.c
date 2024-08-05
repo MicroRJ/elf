@@ -36,7 +36,7 @@ int main(int n, char **c) {
 	if (cli.dump) {
 		FILE *dumpf = stdout;
 		if (strcmp(cli.dumpfilename,"stdout")) {
-			dumpf = fopen(elf_tpf("%s.module.ignore",cli.dumpfilename),"wb");
+			dumpf = fopen(elTPF("%s.module.ignore",cli.dumpfilename),"wb");
 		}
 		if (dumpf == 0) {
 			printf("error: could open specified dump file for writting");

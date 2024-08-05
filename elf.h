@@ -552,9 +552,9 @@ use C's "cast to union types" for typechecking:
 #define elSETTOP(S,X) (elGETTOP(S) = UCAST(X, elValue *))
 #define elPUSH(S,X)   (* elGETTOP(S) ++ = (X))
 
-#define elGETFRAME(S) ((S)->F)
-#define elGETTHIS(S) (elGETFRAME(S)->Q)
-#define elGETNARGS(S) (elGETFRAME(S)->nx)
+#define elGETFRAME(S) ((S)->frame)
+#define elGETTHIS(S) (elGETFRAME(S)->_this)
+#define elGETNARGS(S) (elGETFRAME(S)->nargs)
 
 #define elNUM(thing) (elLITERAL(elValue){ TAG_NUM, ((union { elNumber _; float __; elInteger I; }){thing}).I })
 #define elINT(thing) (elLITERAL(elValue){ TAG_INT, (elInteger) UCAST(thing, elInteger) })
@@ -567,9 +567,8 @@ use C's "cast to union types" for typechecking:
 #define elNIL() (elLITERAL(elValue){TAG_NIL})
 
 
-#define elGETL(S,X) (elGETFRAME(S)->L[X])
-
-#define elGETTAG(S,X) elGETL(S,X).tag
+#define elGET(S,X) (elGETFRAME(S)->locals[X])
+#define elGETTAG(S,X) elGET(S,X).tag
 
 
 #define elPUSHNIL(S) elPUSH(S,elNIL())
@@ -686,18 +685,16 @@ typedef struct elDelaylist {
 typedef struct elStackFrame elStackFrame;
 typedef struct elStackFrame {
 	elStackFrame *caller;
-	/* the closure for this frame, if applicable */
-	elClosure *C;
-	/* context object, 'this' */
-	elObject  *Q;
-	/* the 'locals' or register where the locals
-	for this frame start... */
-	elValue   *L;
+	elClosure   *closure;
+	elObject      *_this;
+	elValue      *locals;
+	int          nlocals;
+	char			   nargs;
+	char			ntoyield;
+	elByteId      origin;
 
-	/* this is the instruction (in the module)
-	that initiated the call, mainly used for debugging. */
-	elByteId   call_instr;
-	elRegId    ry;
+	// todo: to remove
+	elRegId           ry;
 
 	/* the number of inputs (nx) and
 	the number of expected outputs (ny).
@@ -709,8 +706,6 @@ typedef struct elStackFrame {
 	For bindings you must return the number
 	of actual values yielded so that runtime
 	can hoist the return values. */
-	union { int nx,x; };
-	union { int ny; };
 	/* list of delayed jumps to be executed
 	on return, 'finally' statements produce
 	these. */
@@ -888,10 +883,10 @@ typedef struct elState {
 	After the call is completed, we must 'recover', ensure
 	'T' offers full coverage of our frame once more.
  	*/
+	elStackFrame *frame;
+	int          nframe;
+	int           flags;
 
-	union { elStackFrame *F; };
-	int call_level;
-	int flags;
 	struct {
 		elTable *integer;
 		elTable *number;
