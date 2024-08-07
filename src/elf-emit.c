@@ -839,6 +839,12 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 			elRegId tail = head;
 			elRegId last = tail;
 			/*
+			todo: There's a slight intricacy with this, and that
+			is that we're not checking for the target node,
+			and so something like: ({x}).{y}(...) will not be
+			recognized as a meta-call, this could actually be
+			a feature since the user could actually intend for this...
+
 			For these cases:
 
 			{x}.{y}(...)

@@ -332,6 +332,21 @@ int elf_libH_get_collisions(elState *S) {
 }
 
 
+int elf_libH_get_metatable(elState *R) {
+	elTable *tab = (elTable *) elGETTHIS(R);
+	elPUSHTAB(R,elTOOBJ(tab)->metatable);
+	return 1;
+}
+
+
+int elf_libH_set_metatable(elState *R) {
+	elTable *tab = (elTable *) elGETTHIS(R);
+	elPUSHTAB(R,elTOOBJ(tab)->metatable);
+	elTOOBJ(tab)->metatable = elf_get_table(R,0);
+	return 1;
+}
+
+
 /* todo: ensure that [i] == :idx(i)
 also xadd should be add instead, since
 names with 'x' prefix work only for
