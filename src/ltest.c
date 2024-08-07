@@ -91,7 +91,7 @@
 
 
 // int _gidof(elModule *fs, elObject *j) {
-// 	elf_xarray_foreachi(fs->g->v) {
+// 	FOR_ARRAY(fs->g->v) {
 // 		if (fs->g->v[i].j == j) {
 // 			return i;
 // 		}

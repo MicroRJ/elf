@@ -65,7 +65,6 @@ _(SETGLOBAL, XY, "set_global") \
 _(SETINDEX, XYZ, "set_global") \
 _(SETFIELD, XYZ, "set_global") \
 _(CALL, XYZ, "call") \
-_(METACALL, XYZ, "metacall") \
 _(TABLE, I, "new_table") \
 _(CLOSURE, XY, "new_closure") \
 _(ISNIL, XY, "is_nil") \

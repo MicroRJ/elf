@@ -22,7 +22,7 @@ void elf_throw(elState *R, elByteId id, char *error);
 
 int elf_get_file_for_byte(elModule *md, elByteId line);
 void elf_get_line_location_info(char *q, char *loc, int *linenum, char **lineloc);
-elFileLine elf_get_line_for_byte(elModule *M, elByteId byte);
+elFileline elf_get_line_for_byte(elModule *M, elByteId byte);
 
 
 

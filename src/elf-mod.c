@@ -9,7 +9,7 @@
 elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
 	if (name != 0) {
 		return elf_table_lookup_index(M->globals,elSTR(name));
-	} else return elf_xarray_growby(M->globals->array,1);
+	} else return ARRAY_GROW(M->globals->array,1);
 }
 
 
@@ -21,7 +21,7 @@ elSymbolId elf_add_global_value(elModule *M, elString *name, elValue v) {
 
 
 elSymbolId elf_add_proto(elModule *M, elFileProto p) {
-	elSymbolId i = elf_xarray_growby(M->p,1);
+	elSymbolId i = ARRAY_GROW(M->p,1);
 	M->p[i] = p;
 	return i;
 }
@@ -78,7 +78,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 #if 0
 	fprintf(file,"elModule:\n");
 	fprintf(file,"Globals:\n");
-	elf_xarray_foreachi(md->g->v) {
+	FOR_ARRAY(md->g->v) {
 		fprintf(file,"%04llX: ", i);
 		elf_fpf_value(file,md->g->v[i],1);
 		fprintf(file,"\n");
@@ -101,7 +101,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 		}
 	}
 #if 0
-	elf_xarray_foreachi(md->p) {
+	FOR_ARRAY(md->p) {
 		elFileProto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (elByteId j = 0; j < p.nbytes; ++j) {

@@ -34,7 +34,7 @@ elTable *elf_new_table(elState *R) {
 
 void elf_dealloc_table(elTable *tab) {
 	elf_dealloc(elHEAP_ALLOCATOR,tab->slots);
-	elf_xarray_delete(tab->array);
+	ARRAY_DELETE(tab->array);
 	tab->array = 0;
 	tab->slots = 0;
 }
@@ -172,7 +172,7 @@ elBool elf_table_set(elTable *table, elValue k, elValue v) {
 	if (slot < 0) elNOCODE;
 	elEntry *entry = table->slots + slot;
 	if (!elf_table_is_key(table,slot)) {
-		elInteger i = elf_xarray_growby(table->array,1);
+		elInteger i = ARRAY_GROW(table->array,1);
 		table->array[i] = v;
 
 		table->slots[slot].k = k;
@@ -203,7 +203,7 @@ elInteger elf_table_lookup_index(elTable *table, elValue k) {
 	elInteger slot = elf_table_try(table,k);
 	if (slot < 0) elNOCODE;
 	if (!elf_table_is_key(table,slot)) {
-		elInteger i = elf_xarray_growby(table->array,1);
+		elInteger i = ARRAY_GROW(table->array,1);
 		table->array[i] = (elValue){TAG_NIL};
 		table->slots[slot].k = k;
 		table->slots[slot].i = i;
@@ -261,7 +261,7 @@ elTable *elf_get_table_table(elTable *tab, elString *key) {
 
 
 elInteger elf_tabiadd(elTable *table, elValue v) {
-	return elf_xarray_growby(table->array,1);
+	return ARRAY_GROW(table->array,1);
 }
 
 
@@ -310,7 +310,7 @@ int elf_libH_tally(elState *R) {
 int elf_libH_contains(elState *S) {
 	elASSERT(elGETNARGS(S) == 1);
 	elTable *table = (elTable*) elGETTHIS(S);
-	elValue k = elGET(S,0);
+	elValue k = elGETARG(S,0);
 	elPUSHINT(S,elf_table_is_key(table,elf_table_try(table,k)));
 	return 1;
 }
@@ -319,7 +319,7 @@ int elf_libH_contains(elState *S) {
 int elf_libH_lookup(elState *S) {
 	elASSERT(elGETNARGS(S) == 1);
 	elTable *table = (elTable*) elGETTHIS(S);
-	elValue value = elf_table_lookup(table,elGET(S,0));
+	elValue value = elf_table_lookup(table,elGETARG(S,0));
 	elPUSH(S,value);
 	return 1;
 }
@@ -341,7 +341,7 @@ int elf_libH_xadd(elState *R) {
 	elInteger i;
 	elInteger length = ARRAY_LENGTH(tab->array);
 	for (i = 0; i < elGETNARGS(R); ++ i) {
-		elf_table_set(tab,elINT(length+i),elGET(R,i));
+		elf_table_set(tab,elINT(length+i),elGETARG(R,i));
 	}
 	return 0;
 }
@@ -351,7 +351,7 @@ int elf_libH_add(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	int i;
 	for ( i = 0; i < elGETNARGS(R); ++i ) {
-		elf_table_add(tab,elGET(R,i));
+		elf_table_add(tab,elGETARG(R,i));
 	}
 	return 0;
 }
@@ -388,7 +388,7 @@ int elf_libH_itemize(elState *R) {
 				elf_table_add(result,that->array[j]);
 			}
 		} else {
-			elf_table_add(result,elGET(R,i));
+			elf_table_add(result,elGETARG(R,i));
 		}
 	}
 	return 1;
@@ -435,7 +435,7 @@ int elf_libH_index(elState *R) {
 int elf_libH_delete(elState *R) {
 	elASSERT(elGETNARGS(R) >= 1);
 	elTable *tab = (elTable *) elGETTHIS(R);
-	elValue key = elGET(R,0);
+	elValue key = elGETARG(R,0);
 	elEntry *slots = tab->slots;
 	elValue *array = tab->array;
 	elInteger slot = elf_table_try(tab,key);
@@ -448,7 +448,7 @@ int elf_libH_delete(elState *R) {
 	slots[slot].i = 0;
 	elInteger len = ARRAY_LENGTH(array);
 	if ((idx < 0) || (idx > len-1)) {
-		elf_throw(R,NO_BYTE,elTPF("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
+		elf_throw(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
 		goto leave_;
 	}
 	elPUSH(R,array[idx]);
@@ -563,7 +563,7 @@ int elf_libH_xremove(elState *R) {
 int elf_libH_alias(elState *R) {
 	elf_check_args(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
 	elTable *tab = (elTable *) elGETTHIS(R);
-	elf_table_alias(R,tab,elGET(R,0),elGET(R,1));
+	elf_table_alias(R,tab,elGETARG(R,0),elGETARG(R,1));
 	return 0;
 }
 
@@ -571,7 +571,7 @@ int elf_libH_alias(elState *R) {
 int elf_libH_find_aliases(elState *R) {
 	elf_check_args(R,":fndaliases",1,"the key to find aliases for");
 	elTable *tab = (elTable *) elGETTHIS(R);
-	elValue key = elGET(R,0);
+	elValue key = elGETARG(R,0);
 	elTable *list = elf_add_new_table(R);
 	if (key.tag != TAG_NIL) {
 		elInteger slot = elf_table_try(tab,key);
@@ -717,7 +717,7 @@ int elf_libH_xset(elState *R) {
 	elf_check_args(R,":xset",2,"the value, and the index where to place the value");
 
 	elTable *tab = (elTable *) elGETTHIS(R);
-	elValue value = elGET(R,0);
+	elValue value = elGETARG(R,0);
 
 	elInteger len = ARRAY_LENGTH(tab);
 	elInteger idx = elf_get_integer(R,1);

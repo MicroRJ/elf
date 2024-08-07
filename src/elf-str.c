@@ -39,7 +39,7 @@ elString *elf_new_string(elState *R, char *contents) {
 			elf_copy_memory(string->contents,contents,length);
 			string->hash = hash;
 
-			elInteger i = elf_xarray_growby(registry->array,1);
+			elInteger i = ARRAY_GROW(registry->array,1);
 			registry->array[i] = elSTR(string);
 			registry->entries[slot].key = elSTR(string);
 			registry->entries[slot].index = i;
@@ -116,7 +116,7 @@ int elf_libS_append(elState *R) {
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->contents);
 	for (int i = 0; i < elGETNARGS(R); ++ i) {
-		elValue v = elGET(R,i);
+		elValue v = elGETARG(R,i);
 		if (v.tag == TAG_STR) {
 			strcatf(buffer,"%s",v.x_str->contents);
 		} else if (v.tag == TAG_NIL) {

@@ -48,10 +48,12 @@ elGLOBAL ltokenintel elf_tkintel[] = {
 
 
 
-void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
+void elf_file_dialog(elFileState *fs, char *line, char const *fmt, ...) {
+	line = line ? line : fs->this_token.line;
+
 	int linenum;
 	char *lineloc;
-	elf_get_line_location_info(fs->contents,loc,&linenum,&lineloc);
+	elf_get_line_location_info(fs->contents,line,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -60,10 +62,10 @@ void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 
 	char u[0x40];
 
-	int underline = loc - lineloc;
+	int underline = line - lineloc;
 	if (underline >= sizeof(u)) {
-		underline = sizeof(u)-1;
-		lineloc = loc - underline;
+		underline = sizeof(u) - 1;
+		lineloc = line - underline;
 	}
 
 	int linelen = 0;
@@ -85,7 +87,7 @@ void elf_file_dialog(elFileState *fs, char *loc, char const *fmt, ...) {
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
 		char *filename = elf_get_file_name(fs);
-		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+loc-lineloc),b);
+		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+line-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -358,7 +360,7 @@ elToken elf_lexone(elFileState *file) {
 			if (elf_cmovchr('=')) tk.type = TK_GTEQ;
 			else if (elf_cmovchr('>')) tk.type = TK_SHR;
 		} break;
-		case '?': { elf_movechr(); tk.type = TK_QUESTION_MARK;
+		case '?': { elf_movechr(); tk.type = TK_QMARK;
 			if (elf_cmovchr('?')) tk.type = TK_NIL_OR;
 			else if (elf_cmovchr('=')) tk.type = TK_NIL_ASSIGN;
 		} break;
