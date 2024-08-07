@@ -471,13 +471,13 @@ use C's "cast to union types" for typechecking:
 /* todo: these are all deprecated, they should instead return the closure
 object, and you use that however you want... */
 /* todo: add support for arguments */
-elAPI int elf_load_code3(elState *, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_load_expr3(elState *, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_load_file3(elState *, elString *name, elRegId ry, int ny);
+elAPI int elf_parse_code3(elState *, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_parse_expr3(elState *, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_parse_file3(elState *, elString *name, elRegId ry, int ny);
 
-elAPI int elf_load_code3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_load_expr3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_load_file3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny);
+elAPI int elf_parse_code3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_parse_expr3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_parse_file3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny);
 
 /*
 	Find somewhere else to put this information...

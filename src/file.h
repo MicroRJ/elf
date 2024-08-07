@@ -476,9 +476,9 @@ typedef struct elFileState {
 
 char *elf_get_file_name(elFileState *fs);
 
-elNodeId elf_file_load_expr(elFileState *fs, elFileExpr *expr, elBool flags);
-elNodeId elf_file_load_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags);
-void elf_load_file_stat(elFileState *fs);
+elNodeId elf_parse_expr(elFileState *fs, elFileExpr *expr, elBool flags);
+elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags);
+void elf_parse_file_stat(elFileState *fs);
 
 void elf_emitter_emit_store(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register);

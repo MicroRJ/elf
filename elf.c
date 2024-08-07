@@ -31,7 +31,7 @@ int main(int n, char **c) {
 		/* todo: remove this?? */
 		filename->obj.color = GC_PINK;
 		elFileState fs = {0};
-		elf_load_file_fs(&R,&fs,filename,0,0);
+		elf_parse_file_fs(&R,&fs,filename,0,0);
 	}
 	if (cli.dump) {
 		FILE *dumpf = stdout;
