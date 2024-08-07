@@ -111,7 +111,7 @@ int elf_call_function3(elState *R, elObject *obj, int nargs, int ny, elRegId ry)
 
 
 
-int elf_load_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents) {
+int elf_parse_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents) {
 
 	elModule *M = R->M;
 
@@ -135,7 +135,7 @@ int elf_load_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 	elf_emitter_begin_function(fs,&fn,fs->this_token.line);
 
 	elFileExpr expr = {0};
-	elNodeId id = elf_file_load_expr(fs,&expr,0);
+	elNodeId id = elf_parse_expr(fs,&expr,0);
 
 	elf_emit_yield(fs,fs->this_token.line,id);
 	elf_emitter_close_function(fs);
@@ -167,7 +167,7 @@ int elf_load_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 }
 
 
-int elf_load_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId ry, int ny, elString *contents) {
+int elf_parse_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId ry, int ny, elString *contents) {
 	if ((filename == 0) || (contents == 0)) {
 		return -1;
 	}
@@ -197,7 +197,7 @@ int elf_load_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 		elASSERT(elOBJCOLOR(filename) != GC_RED);
 		elASSERT(elOBJCOLOR(contents) != GC_RED);
 
-		elf_load_file_stat(fs);
+		elf_parse_file_stat(fs);
 	}
 	elf_emitter_close_function(fs);
 
@@ -228,7 +228,7 @@ int elf_load_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId r
 
 /* todo: add support for arguments and this should
 instead return the closure instead! */
-int elf_load_file3_fs(elState *R, elFileState *fs, elString *name, elRegId ry, int ny) {
+int elf_parse_file3_fs(elState *R, elFileState *fs, elString *name, elRegId ry, int ny) {
 
 	char *contents;
 	elError error = sys_load_file_contents(elHEAP_ALLOCATOR,(void**)&contents,name->contents);
@@ -241,25 +241,25 @@ int elf_load_file3_fs(elState *R, elFileState *fs, elString *name, elRegId ry, i
 	and read the file into it, like by passing in a string
 	allocator... */
 	elString *string = elf_add_new_string(R,contents);
-	int nyield = elf_load_code3_fs(R,fs,name,ry,ny,string);
+	int nyield = elf_parse_code3_fs(R,fs,name,ry,ny,string);
 	return nyield;
 }
 
 
-int elf_load_code3(elState *R, elString *filename, elRegId ry, int ny, elString *contents) {
+int elf_parse_code3(elState *R, elString *filename, elRegId ry, int ny, elString *contents) {
 	elFileState fs = {0};
-	return elf_load_code3_fs(R,&fs,filename,ry,ny,contents);
+	return elf_parse_code3_fs(R,&fs,filename,ry,ny,contents);
 }
 
 
-int elf_load_expr3(elState *R, elString *filename, elRegId ry, int ny, elString *contents) {
+int elf_parse_expr3(elState *R, elString *filename, elRegId ry, int ny, elString *contents) {
 	elFileState fs = {0};
-	return elf_load_expr3_fs(R,&fs,filename,ry,ny,contents);
+	return elf_parse_expr3_fs(R,&fs,filename,ry,ny,contents);
 }
 
-int elf_load_file3(elState *R, elString *name, elRegId ry, int ny) {
+int elf_parse_file3(elState *R, elString *name, elRegId ry, int ny) {
 	elFileState fs = {0};
-	return elf_load_file3_fs(R,&fs,name,ry,ny);
+	return elf_parse_file3_fs(R,&fs,name,ry,ny);
 }
 
 

@@ -44,7 +44,7 @@ elAPI int elf_global_loadcode(char *filename, char *contents) {
 	elString *name = elf_add_new_string(&elf.R,filename);
 	elString *string = elf_add_new_string(&elf.R,contents);
 	elFileState fs = {0};
-	int nyield = elf_load_code3_fs(&elf.R,&fs,name,-1,0,string);
+	int nyield = elf_parse_code3_fs(&elf.R,&fs,name,-1,0,string);
 	elSETTOP(&elf.R,top);
 	return nyield;
 }

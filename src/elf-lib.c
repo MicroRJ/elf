@@ -480,7 +480,7 @@ int elf_lib_load_expr(elState *R) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_load_expr3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
+	elf_parse_expr3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -496,7 +496,7 @@ int elf_lib_load_code(elState *R) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_load_code3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
+	elf_parse_code3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -504,7 +504,7 @@ int elf_lib_load_code(elState *R) {
 
 int elf_lib_load_file(elState *R) {
 	elString *filename = elf_get_string(R,0);
-	elf_load_file3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield);
+	elf_parse_file3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield);
 	/* no need to do hoisting */
 	return 0;
 }
