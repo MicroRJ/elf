@@ -252,7 +252,7 @@ elNodeId elf_make_node_unary(elFileState *fs, elFileline, elNodeKi k, elNodeTy t
 elNodeId elf_make_nil_node(elFileState *fs, elFileline);
 elNodeId elf_make_integer_node(elFileState *fs, elFileline, elInteger i);
 elNodeId elf_make_number_node(elFileState *fs, elFileline, elNumber n);
-elNodeId elf_make_string_node(elFileState *fs, elFileline, char *);
+elNodeId elf_string_node(elFileState *fs, elFileline, char *);
 
 elNodeId elf_make_nullary_node(elFileState *fs, elFileline, elNodeKi k, elNodeTy t);
 elNodeId elf_make_group_node(elFileState *fs, elFileline, elNodeId x);
@@ -267,7 +267,7 @@ elNodeId elf_make_global_value_node(elFileState *fs, elFileline line, elNodeId i
 elNodeId elf_closure_node(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_make_type_guard_node(elFileState *fs, elFileline line, elNodeId x, elNodeTy y);
 elNodeId elf_make_metafield_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_make_field_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_get_field_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_make_index_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_make_ranged_index_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_make_call_node(elFileState *fs, elFileline line, elNodeId x, elNodeId *z);
@@ -477,7 +477,7 @@ typedef struct elFileState {
 char *elf_get_file_name(elFileState *fs);
 
 elNodeId elf_parse_expr(elFileState *fs, elFileExpr *expr, elBool flags);
-elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags);
+elNodeId elf_file_load_postfix(elFileState *fs, elFileExpr *expr, elBool flags);
 void elf_parse_file_stat(elFileState *fs);
 
 void elf_emitter_emit_store(elFileState *fs, elFileline line, elNodeId x, elNodeId y);

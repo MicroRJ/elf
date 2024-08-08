@@ -128,7 +128,7 @@ elNodeId elf_make_number_node(elFileState *fs, elFileline line, elNumber n) {
 }
 
 
-elNodeId elf_make_string_node(elFileState *fs, elFileline line, char *s) {
+elNodeId elf_string_node(elFileState *fs, elFileline line, char *s) {
 	elNodeId v = elf_make_nullary_node(fs,line,NODE_STRING,NT_STR);
 	fs->nodes[v].lit.s = s;
 	return v;
@@ -170,7 +170,7 @@ elNodeId elf_make_global_value_node(elFileState *fs, elFileline line, elSymbolId
 }
 
 
-elNodeId elf_make_field_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y) {
+elNodeId elf_get_field_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y) {
 	return elf_make_binary_node(fs,line,NODE_FIELD,NT_ANY,x,y);
 }
 
@@ -194,7 +194,7 @@ elNodeId elf_make_call_node(elFileState *fs, elFileline line, elNodeId x, elNode
 	return elf_make_node_xyz(fs,line,NODE_CALL,NT_ANY,x,NO_NODE,z);
 }
 
-elNodeId elf_make_multi_node(elFileState *fs, elFileline line, elNodeId *z) {
+elNodeId elf_multi_node(elFileState *fs, elFileline line, elNodeId *z) {
 	return elf_make_node_xyz(fs,line,NODE_MULTI,NT_ANY,NO_NODE,NO_NODE,z);
 }
 
@@ -207,7 +207,7 @@ elNodeId elf_make_node_is_nil(elFileState *fs, elFileline line, elNodeId x) {
 }
 
 elNodeId elf_make_call_metafield_node(elFileState *fs, elFileline line, elNodeId x, elNodeId *z, char *name) {
-	elNodeId field = elf_make_metafield_node(fs,line,x,elf_make_string_node(fs,line,name));
+	elNodeId field = elf_make_metafield_node(fs,line,x,elf_string_node(fs,line,name));
 	return elf_make_call_node(fs,line,field,z);
 }
 

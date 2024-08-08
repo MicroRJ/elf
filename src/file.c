@@ -5,6 +5,19 @@
 */
 
 
+/* todo: this function is temporary as I rework
+the parser and code generator */
+elNodeId elf_to_local(elFileState *fs, elNodeId x) {
+	if (x == NO_NODE) return x;
+
+	elf_file_dialog(fs,elf_get_node_line(fs,x),"to local");
+
+	elFileline line = elf_get_node_line(fs,x);
+	return elf_local_node(fs,line,elf_emitter_localize(fs,line,x));
+}
+
+
+
 char *elf_get_file_name(elFileState *fs) {
 	return fs->filename;
 }
@@ -316,28 +329,44 @@ elNodeId elf_make_set_metatable_node(elFileState *fs, elFileline line, elNodeId 
 }
 
 
-elNodeId elf_parse_table(elFileState *fs);
-elNodeId *elf_parse_call_args(elFileState *fs) {
-	/* ( x { , x } ) | { <table-initializer-list> } */
+elNodeId elf_file_load_table(elFileState *fs);
+
+
+/* A call expression is of the form:
+	'x()' or 'x{}'
+
+	Where '{x}{}' is translated to 'x({})'
+*/
+elNodeId *elf_file_load_call_args(elFileState *fs) {
+
 	elNodeId *z = 0;
+
 	if (elf_test_token(fs,TK_CURLY_LEFT)) {
-		elNodeId x = elf_parse_table(fs);
+		elNodeId x = elf_to_local(fs,elf_file_load_table(fs));
 		ARRAY_ADD(z,x);
 	} else
 	if (elf_pick_token(fs,TK_PAREN_LEFT)) {
+		/* todo: here we should actually ensure we
+		load the arguments in the proper call order,
+		to avoid having to do double work */
 		if (!elf_test_token(fs,TK_PAREN_RIGHT)) do {
 
 			elFileExpr expr = {0};
 			elNodeId x = elf_parse_expr(fs,&expr,0);
 
 			if (x == NO_NODE) break;
+
+			/* Handle multi nodes, simply unpack them
+			such that:
+				x((1,2,3)) ::= x(1,2,3)
+			*/
 			if (elf_get_node_kind(fs,x) == NODE_MULTI) {
 				elNodeId *n = elf_get_node(fs,x).z;
 				FOR_ARRAY(i,n) {
-					ARRAY_ADD(z,n[i]);
+					ARRAY_ADD(z,elf_to_local(fs,n[i]));
 				}
 			} else {
-				ARRAY_ADD(z,x);
+				ARRAY_ADD(z,elf_to_local(fs,x));
 			}
 		} while (elf_pick_token(fs,TK_COMMA));
 		elf_take_token(fs,TK_PAREN_RIGHT);
@@ -415,7 +444,7 @@ elNodeKi elf_token_to_node(elTokenType tk) {
 
 
 elNodeId elf_parse_subexpr(elFileState *fs, elFileExpr *expr, int rank, int flags) {
-	elNodeId x = elf_parse_unary_expr(fs,expr,flags|EXPR_ALLOW_POSTFIX);
+	elNodeId x = elf_file_load_postfix(fs,expr,flags|EXPR_ALLOW_POSTFIX);
 
 	if (x == NO_NODE) {
 		return x;
@@ -611,13 +640,10 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 
 	if (elf_pick_token(fs,TK_ASSIGN)) {
 		elNodeId y;
-		// elRegId xmemory = elf_get_memory_state(fs);
-		// if (elf_test_token(fs,TK_DEFAULT)) {
-		// 	y = elf_parse_default_expr(fs);
-		// } else {
+
 		elFileExpr expr = {0};
 		y = elf_parse_expr(fs,&expr,0);
-		// }
+
 		elf_check_assign(fs,tk.line,x,y);
 		elf_emitter_emit_store(fs,tk.line,x,y);
 		// elf_set_memory_state(fs,xmemory);
@@ -652,8 +678,11 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 			elf_check_assign(fs,fs->last_token.line,x,y);
 			elf_emitter_emit_store(fs,op.line,x,y);
 		} else {
-			elf_emitter_local_load(fs,NO_LINE,0,NO_SLOT,0,lhs);
+			// elRegId memory = elf_get_memory_state(fs);
+			elf_emitter_localize(fs,NO_LINE,lhs);
+			// elf_set_memory_state(fs,memory);
 		}
+
 		elf_set_memory_state(fs,mem);
 	}
 
@@ -662,18 +691,22 @@ void elf_complete_stat(elFileState *fs, elNodeId lhs) {
 }
 
 
-elNodeId elf_parse_table(elFileState *fs) {
+elNodeId elf_file_load_table(elFileState *fs) {
+	/* todo: remove the "table-node" this is
+	all a bunch of sugar coating */
 	elToken tk = fs->tk;
 	elf_take_token(fs,TK_CURLY_LEFT);
-	elNodeId *z = 0;
 	elNodeId table = elf_make_table_node(fs,tk.line,0);
+
+	#if 0
+	elNodeId *z = 0;
 	int index = 0;
 	while (!elf_term_token(fs,TK_CURLY_RIGHT)) {
 		tk = fs->tk;
 		elNodeId key;
 		if (elf_test_token(fs,TK_WORD) && elf_test_then_token(fs,TK_ASSIGN)) {
 			elf_lexone(fs);
-			key = elf_make_string_node(fs,tk.line,tk.s);
+			key = elf_string_node(fs,tk.line,tk.text);
 		} else {
 			elFileExpr expr = {0};
 			key = elf_parse_expr(fs,&expr,0);
@@ -684,7 +717,7 @@ elNodeId elf_parse_table(elFileState *fs) {
 		if (elf_pick_token(fs,TK_ASSIGN)) {
 			elFileExpr expr = {0};
 			elNodeId val = elf_parse_expr(fs,&expr,0);
-			elNodeId fld = elf_make_field_node(fs,fs->last_token.line,table,key);
+			elNodeId fld = elf_get_field_node(fs,fs->last_token.line,table,key);
 			elNodeId f = elf_make_load_node(fs,fs->last_token.line,fld,val);
 			ARRAY_ADD(z,f);
 		} else {
@@ -697,8 +730,10 @@ elNodeId elf_parse_table(elFileState *fs) {
 			continue;
 		}
 	}
-	elf_take_token(fs,TK_CURLY_RIGHT);
 	fs->nodes[table].z = z;
+	#endif
+
+	elf_take_token(fs,TK_CURLY_RIGHT);
 	return table;
 }
 
@@ -760,7 +795,10 @@ if (!elf_term_eol_token(fs)) {
 	}
 }
 #endif
-elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
+
+
+
+elNodeId elf_file_load_unaryexpr(elFileState *fs, elFileExpr *expr, elBool flags) {
 	elNodeId v = NO_NODE;
 	elToken tk = fs->this_token;
 	switch (tk.type) {
@@ -773,14 +811,12 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 			tk.type == TK_M_VALUE ? SPECIAL_REGISTER_VALUE : SPECIAL_REGISTER_INDEX;
 			v = elf_make_special_register_node(fs,tk.line,reg);
 
-	#define _XXX_
-	#if defined(_XXX_)
 			expr->kind = NODE_LOCAL;
 			expr->x    = elf_get_loop_register(fs,tk.line,reg);
-	#endif
+
 		} break;
 		case TK_M_INT: case TK_M_NUM: { elf_lexone(fs);
-			elNodeId x = elf_parse_unary_expr(fs,expr,flags|EXPR_ALLOW_POSTFIX);
+			elNodeId x = elf_file_load_postfix(fs,expr,flags|EXPR_ALLOW_POSTFIX);
 			/* todo: make this an intrinsic instruction! */
 			char *name = tk.type == TK_M_INT ? "ntoi" : "iton";
 			elNodeId fn = elf_get_global_entity_node(fs,tk.line,name);
@@ -816,8 +852,8 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 		//
 		case TK_NEW: {
 			elf_lexone(fs);
-			elNodeId meta_table = elf_parse_unary_expr(fs,expr,0);
-			elNodeId *call_args = elf_parse_call_args(fs);
+			elNodeId meta_table = elf_file_load_postfix(fs,expr,0);
+			elNodeId *call_args = elf_file_load_call_args(fs);
 
 			elNodeId table;
 			/* So if the user does something like new Thing {}
@@ -833,7 +869,7 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 
 			table = elf_make_set_metatable_node(fs,tk.line,table,meta_table);
 
-			elNodeId meta_field_name = elf_make_string_node(fs,tk.line,"__new");
+			elNodeId meta_field_name = elf_string_node(fs,tk.line,"__new");
 			elNodeId get_meta_field = elf_make_metafield_node(fs,tk.line,table,meta_field_name);
 			elNodeId call_new = elf_make_call_node(fs,tk.line,get_meta_field,call_args);
 
@@ -886,7 +922,7 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 			v = elf_parse_subexpr(fs,expr,10000,flags);
 		} break;
 		case TK_CURLY_LEFT: {
-			v = elf_parse_table(fs);
+			v = elf_file_load_table(fs);
 		} break;
 		case TK_PAREN_LEFT: {
 			elf_lexone(fs);
@@ -931,7 +967,7 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 		case TK_STRING: { elf_lexone(fs);
 			expr->kind = NODE_STRING;
 			expr->string = tk.string;
-			v = elf_make_string_node(fs,tk.line,tk.s);
+			v = elf_string_node(fs,tk.line,tk.s);
 		} break;
 		default: {
 			elf_file_dialog(fs,tk.line,"'%s': unexpected token", elf_tkintel[tk.type].name);
@@ -939,42 +975,75 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 		} break;
 	}
 
-	if (~flags & EXPR_ALLOW_POSTFIX) {
-		// elf_file_dialog(fs,tk.line,"do not allow postfix");
-		goto leave;
-	}
+	return v;
+}
 
-	/* ensure we don't parse a postfix past a line */
-	while (!elf_term_eol_token(fs)) {
-		tk = fs->tk;
 
+/*
+	Postfix expressions are of the forms:
+	x{...}, x(...), x[...], x.(...), x:(...), x.[...], x:[...], x...
+*/
+elNodeId elf_file_load_postfix(elFileState *fs, elFileExpr *expr, elBool flags) {
+	elASSERT(flags & EXPR_ALLOW_POSTFIX);
+
+	elNodeId v = elf_file_load_unaryexpr(fs,expr,flags);
+
+
+	elToken tk = fs->this_token;
+
+	elRegId memory = elf_get_memory_state(fs);
+
+	/* restore memory state because each postfix
+	is independent of each other, and transient
+	a.b.c
+	load register 0, a
+	load register 1, b
+	load register 0, get_field(register 0, register 1)
+	*/
+	for (;!elf_term_eol_token(fs); elf_set_memory_state(fs,memory)) {
+		tk = fs->this_token;
+		/* ensure we don't parse a postfix past a line */
 		switch (tk.type) {
 			case TK_DOT: {
 				elf_lexone(fs);
-				// table.(x,y) -> (table.x, table.y)
+
+				v = elf_to_local(fs,v);
+
 				if (elf_pick_token(fs,TK_PAREN_LEFT)) {
 					elNodeId *z = {0};
+
+				/* Convert: table.(x,y) -> (table.x, table.y) */
 					do {
-						elToken n = elf_take_token(fs,TK_WORD);
-						elNodeId y = elf_make_string_node(fs,n.line,n.s);
-						elNodeId x = elf_make_field_node(fs,tk.line,v,y);
+						elToken name = elf_take_token(fs,TK_WORD);
+						elNodeId y = elf_to_local(fs,elf_string_node(fs,name.line,name.text));
+
+					/* restore memory to release 'name' */
+						elf_set_memory_state(fs,memory);
+
+						elNodeId x = elf_get_field_node(fs,tk.line,v,y);
 						ARRAY_ADD(z,x);
 					} while (elf_pick_token(fs,TK_COMMA));
-					v = elf_make_multi_node(fs,tk.line,z);
+
+					v = elf_multi_node(fs,tk.line,z);
+
 					elf_take_token(fs,TK_PAREN_RIGHT);
 				} else
-				// table.{x,y}
 				if (elf_pick_token(fs,TK_CURLY_LEFT)) {
+				// table.{x,y}
 					elNOCODE;
 				} else {
-					elToken field = elf_take_token(fs,TK_WORD);
-					elNodeId field_node = elf_make_string_node(fs,field.line,field.s);
-					v = elf_make_field_node(fs,tk.line,v,field_node);
+					elToken name = elf_take_token(fs,TK_WORD);
+					elNodeId y = elf_string_node(fs,name.line,name.text);
+
+				/* restore memory to release 'name' */
+					elf_set_memory_state(fs,memory);
+
+					v = elf_get_field_node(fs,tk.line,v,y);
 				}
 			} break;
-			/* todo: make this nil safe, so [0,0] shouldn't
-			fail if item at 0 is nil, should this be done
-			here or at code generation?  */
+		/* todo: Should we make this nil safe, so [0,0] shouldn't
+		fail if item at 0 is nil, should this be done
+		here or at code generation?  */
 			case TK_SQUARE_LEFT: {
 				elf_take_token(fs,TK_SQUARE_LEFT);
 				do {
@@ -982,8 +1051,10 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 					elNodeId index = elf_parse_expr(fs,&expr,0);
 
 					if (index == NO_NODE) break;
-					/* registry[location.(y,x)] ->
-					registry[location.y,location.x] */
+
+
+					/* Unwrap multi-nodes, so that:
+					registry[location.(y,x)] -> registry[location.y,location.x] */
 					if (elf_get_node_kind(fs,index) == NODE_MULTI) {
 						elNodeId *z = elf_get_node(fs,index).z;
 						FOR_ARRAY(i,z) {
@@ -1005,19 +1076,18 @@ elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags) {
 			case TK_COLON: {
 				elf_lexone(fs);
 				elToken n = elf_take_token(fs,TK_WORD);
-				elNodeId y = elf_make_string_node(fs,n.line,n.s);
+				elNodeId y = elf_string_node(fs,n.line,n.s);
 				v = elf_make_metafield_node(fs,tk.line,v,y);
 			} break;
-			case TK_CURLY_LEFT:
-			case TK_PAREN_LEFT: {
-				elNodeId *z = elf_parse_call_args(fs);
+			case TK_CURLY_LEFT: case TK_PAREN_LEFT: {
+				v = elf_to_local(fs,v);
+				elNodeId *z = elf_file_load_call_args(fs);
 				v = elf_make_call_node(fs,tk.line,v,z);
 			} break;
-			default: goto leave;
+			default: goto esc;
 		}
 	}
-
-	leave:
+	esc:
 	return v;
 }
 
@@ -1157,7 +1227,6 @@ void elf_parse_file_stat(elFileState *fs) {
 			elf_emitter_close_block(fs);
 		} break;
 		/*
-
 		The for loop syntax justification:
 
 		The main idea is variable "projections".
@@ -1322,7 +1391,7 @@ void elf_parse_file_stat(elFileState *fs) {
 						elf_make_call_metafield_node(fs,tk.line,array,z,"idx"));
 						// elf_make_call_node(fs,tk.line,
 						// elf_make_metafield_node(fs,tk.line,array,
-						// elf_make_string_node(fs,tk.line,"idx")),z));
+						// elf_string_node(fs,tk.line,"idx")),z));
 					}
 
 						/* todo: could be neater */
@@ -1379,12 +1448,12 @@ void elf_parse_file_stat(elFileState *fs) {
 			elf_emitter_close_block(fs);
 		} break;
 		default: {
-
 			elFileExpr expr = {0};
 			elNodeId x = elf_parse_expr(fs,&expr,0);
-
 			elf_complete_stat(fs,x);
-
+			if (fs->fn->xmemory != mem) {
+				elf_file_dialog(fs,tk.line,"internal error: invalid memory state!");
+			}
 			elASSERT(fs->fn->xmemory == mem);
 			if (x == NO_NODE) {
 				elf_file_dialog(fs,tk.line,"invalid statement");

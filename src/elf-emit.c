@@ -20,10 +20,6 @@ elRegId elf_get_memory_state(elFileState *fs) {
 
 
 void elf_set_memory_state(elFileState *fs, elRegId memory) {
-	// int dif = memory - fs->fn->xmemory;
-	// if (dif != 0) {
-	// 	elf_debug_log("restore memory %i -> %i (%i)",fs->fn->xmemory,memory,dif);
-	// }
 	fs->fn->xmemory = memory;
 }
 
@@ -126,8 +122,8 @@ elByteId elf_emitter_add_byte(elFileState *fs, elFileline line, elBytecode byte)
 	ARRAY_ADD(fs->M->lines,line);
 	ARRAY_ADD(fs->M->bytes,byte);
 	ARRAY_ADD(fs->M->track,0);
-	// elFileFnState *fn = fs->fn;
-	// elf_bytefpf(stdout,fs->M,-1,fs->M->nbytes-fn->bytes,byte);
+	elFileFnState *fn = fs->fn;
+	elf_bytefpf(stdout,fs->M,-1,fs->M->nbytes-fn->bytes,byte);
 	return fs->M->nbytes ++;
 }
 
