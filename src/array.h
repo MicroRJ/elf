@@ -4,10 +4,14 @@
 ** Dynamic array tool
 **
 **
-** Arrays are not exposed directly to elf, instead,
-** we use them internally as a core data type,
-** they work the same as STB's stretchy buffer.
+** The idea is to allocate a buffer of memory
+** along with a header. This header contains
+** information about the array itself.
 **
+** I think it was STB who I got this from.
+**
+** Arrays are not exposed directly to elf, instead,
+** we use them internally as a core data type.
 **
 ** Usage is as follows:
 **
@@ -20,7 +24,7 @@
 ** l-values strictly...
 **
 ** Needless to say, all of the API functions require
-** a compatible memory layout, otherwise they will fail...
+** compatible memory...
 **
 ** [ARRAY-HEADER][....]
 **
