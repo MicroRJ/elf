@@ -14,12 +14,12 @@ elByteId elf_get_last_byteid(elFileState *fs) {
 }
 
 
-elRegId elf_get_memory_state(elFileState *fs) {
+elRegId elf_Fgetmemstate(elFileState *fs) {
 	return fs->fn->xmemory;
 }
 
 
-void elf_set_memory_state(elFileState *fs, elRegId memory) {
+void elf_Fsetmemstate(elFileState *fs, elRegId memory) {
 	fs->fn->xmemory = memory;
 }
 
@@ -40,7 +40,7 @@ elBool elf_is_targetable_node(elNodeKi kind) {
 
 
 elNode elf_get_targetable_node(elFileState *fs, elNodeIdTypeGuard id) {
-	elNode node = elf_get_node(fs,id.id);
+	elNode node = elf_Nget(fs,id.id);
 	switch (node.kind) {
 		case NODE_TYPEGUARD:
 		case NODE_GROUP:
@@ -73,19 +73,19 @@ elRegId elf_get_node_register(elFileState *fs, elNodeIdTypeGuard id) {
 			case SPECIAL_REGISTER_ARRAY: {
 				reg = bl->loop.array_register;
 				if (reg == NO_SLOT) {
-					elf_file_dialog(fs,node.line,"#array register is not provided by this loop");
+					elf_Fdialog(fs,node.line,"#array register is not provided by this loop");
 				}
 			} break;
 			case SPECIAL_REGISTER_VALUE: {
 				reg = bl->loop.value_register;
 				if (reg == NO_SLOT) {
-					elf_file_dialog(fs,node.line,"#value register is not provided by this loop");
+					elf_Fdialog(fs,node.line,"#value register is not provided by this loop");
 				}
 			} break;
 			case SPECIAL_REGISTER_INDEX: {
 				reg = bl->loop.index_register;
 				if (reg == NO_SLOT) {
-					elf_file_dialog(fs,node.line,"#index register is not provided by this loop");
+					elf_Fdialog(fs,node.line,"#index register is not provided by this loop");
 				}
 			} break;
 			default: elNOCODE;
@@ -156,7 +156,7 @@ void elf_emitter_patch_jump_to(elFileState *fs, elByteId to, elByteId j) {
 
 	elByteId l = j - to;
 	// if (l == NO_JUMP) {
-	// 	elf_file_dialog(fs,M->lines[to],"opt, no jump");
+	// 	elf_Fdialog(fs,M->lines[to],"opt, no jump");
 	// }
 	switch (b.k) {
 		case BC_J: case BC_DELAY: {
@@ -195,7 +195,7 @@ elByteId elf_emit_jump(elFileState *fs, elFileline line, elByteId j) {
 
 
 
-elFileBlock *elf_emitter_get_block(elFileState *fs, elBlockId id) {
+elFileBlock *elf_Fgetblock(elFileState *fs, elBlockId id) {
 	return &fs->blocks[id > -1 ? id : fs->nblocks + id];
 }
 
@@ -203,11 +203,11 @@ elFileBlock *elf_emitter_get_block(elFileState *fs, elBlockId id) {
 /* todo: the block ended flag could be added automatically when
 we add a terminating byte to the current block */
 void elf_emitter_add_block_flags(elFileState *fs, int flags) {
-	elf_emitter_get_block(fs,-1)->flags |= flags;
+	elf_Fgetblock(fs,-1)->flags |= flags;
 }
 
 
-elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags) {
+elBlockId elf_Fbeginblock(elFileState *fs, elBool flags) {
 	elBlockId level = fs->nblocks ++;
 	if (ARRAY_LENGTH(fs->blocks) < fs->nblocks) {
 		ARRAY_GROW(fs->blocks,1);
@@ -236,14 +236,14 @@ elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags) {
 }
 
 
-void elf_emitter_close_block(elFileState *fs) {
+void elf_Fcloseblock(elFileState *fs) {
 	elASSERT(fs->nentities >= fs->fn->entities);
-	elFileBlock *bl = elf_emitter_get_block(fs,-1);
+	elFileBlock *bl = elf_Fgetblock(fs,-1);
 	elEntityId id;
 	/* xentity is the first entity within a block, if any. */
 	for (id = bl->xentity; id < fs->nentities; ++ id) {
 		if (~fs->entities[id].flags & ENTITY_REFERENCED) {
-			elf_file_dialog(fs,fs->entities[id].line,"'%s': unreferenced entity", fs->entities[id].name);
+			elf_Fdialog(fs,fs->entities[id].line,"'%s': unreferenced entity", fs->entities[id].name);
 		}
 	}
 	fs->nentities = bl->xentity;
@@ -264,7 +264,7 @@ void elf_emitter_close_block(elFileState *fs) {
 elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register) {
 	int level;
 	for (level = fs->level-1; level > -1; -- level) {
-		elFileBlock *bl = elf_emitter_get_block(fs,level);
+		elFileBlock *bl = elf_Fgetblock(fs,level);
 		if (bl->flags & BLOCK_LOOP) {
 			if (with_value_register < 0) return bl; else
 			if (bl->loop.value_register == with_value_register) return bl;
@@ -276,20 +276,20 @@ elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_regi
 
 /* we could merge with adjacent blocks, but this
 would change the order of execution, leave as is? */
-void elf_emitter_enter_delayed_block(elFileState *fs, elFileline line) {//, elFileBlock *bl
+void elf_Fbegindelayblock(elFileState *fs, elFileline line) {//, elFileBlock *bl
 	elByteId jo = elf_emitter_add_byteop(fs,line,BC_DELAY,NO_JUMP);
-	elBlockId id = elf_emitter_begin_block(fs,BLOCK_DELAYED);//bl,
+	elBlockId id = elf_Fbeginblock(fs,BLOCK_DELAYED);//bl,
 	fs->blocks[id].jumpover = jo;
 }
 
 
-void elf_emitter_leave_delayed_block(elFileState *fs, elFileline line) {//, elFileBlock *bl
-	// elf_file_dialog(fs,line,"closed block, %i",langL_getlocallabel(fs));
-	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fn = fs->fn;
+void elf_Fclosedelayblock(elFileState *fs, elFileline line) {//, elFileBlock *bl
+	// elf_Fdialog(fs,line,"closed block, %i",langL_getlocallabel(fs));
+	elFileBlock *bl = elf_Fgetblock(fs,-1); // fn = fs->fn;
 
 	elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
-	elf_emitter_close_block(fs);
+	elf_Fcloseblock(fs);
 
 	elASSERT(bl->entry != bl->jumpover);
 	elf_emitter_patch_jump(fs,bl->jumpover);
@@ -306,13 +306,13 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileExpr *js, elBool z, elRegId x
 	elByteId j = NO_BYTE;
 
 	elASSERT(x == NO_SLOT);
-	elRegId mem = elf_get_memory_state(fs);
+	elRegId mem = elf_Fgetmemstate(fs);
 	// /* allocate temporary register before diverging. */
 	// if (x == NO_SLOT) {
 	// 	x = elf_emitter_local_alloc(fs,NO_LINE,NO_SLOT,id);
 	// }
 
-	elNode node = elf_get_node(fs,id);
+	elNode node = elf_Nget(fs,id);
 
 	switch (node.kind) {
 		case NODE_GROUP: {
@@ -327,9 +327,9 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileExpr *js, elBool z, elRegId x
 			j = elf_emit_branch_if(fs,js,z,x,node.y);
 		} break;
 		default: {
-			// elf_emitter_local_load(fs,NO_LINE,false,x,1,id);
+			// elf_emitter_evaluate(fs,NO_LINE,false,x,1,id);
 			elASSERT(x == NO_SLOT);
-			x = elf_emitter_localize(fs,NO_LINE,id);
+			x = elf_Zlocalize2reg(fs,NO_LINE,id);
 
 			if (z != 0) {
 				j = elf_emitter_add_bytexy(fs,node.line,BC_JNZ,NO_JUMP,x);
@@ -341,7 +341,7 @@ elByteId elf_emit_branch_if(elFileState *fs, elFileExpr *js, elBool z, elRegId x
 		} break;
 	}
 
-	elf_set_memory_state(fs,mem);
+	elf_Fsetmemstate(fs,mem);
 	return j;
 }
 
@@ -379,12 +379,12 @@ elByteId *elf_emit_jump_if_false(elFileState *fs, elFileExpr *js, elRegId x, elN
 }
 
 elByteId *elf_emit_jump_if_not_nil(elFileState *fs, elFileline line, elFileExpr *js, elNodeId id) {
-	return elf_emit_jump_if_false(fs,js,NO_SLOT,elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,id,elf_make_nil_node(fs,line)));
+	return elf_emit_jump_if_false(fs,js,NO_SLOT,elf_binary_node(fs,line,NODE_EQ,NT_BOL,id,elf_make_nil_node(fs,line)));
 }
 
 
 elByteId *elf_emit_jump_if_nil(elFileState *fs, elFileline line, elFileExpr *js, elNodeId id) {
-	return elf_emit_jump_if_true(fs,js,NO_SLOT,elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,id,elf_make_nil_node(fs,line)));
+	return elf_emit_jump_if_true(fs,js,NO_SLOT,elf_binary_node(fs,line,NODE_EQ,NT_BOL,id,elf_make_nil_node(fs,line)));
 }
 
 
@@ -411,57 +411,17 @@ void elf_emit_break(elFileState *fs, elFileline line, elRegId with_value_registe
 	ARRAY_ADD(bl->leavejumps,j);
 }
 
-/* Functions */
-
-
-void elf_emitter_begin_function(elFileState *fs, elFileFnState *fn, char *line) {
-	fn->enclosing = fs->fn;
-	fn->entities = fs->nentities;
-	fn->bytes = fs->M->nbytes;
-	fn->line = line;
-	fn->yj = 0;
-	/* todo: "begin_block" requires fn to be set
-	for xmemory, can xmemory simply be in the
-	file state instead? */
-	fs->fn = fn;
-	fn->entry_block = elf_emitter_begin_block(fs,0);
-}
-
-
-void elf_emitter_close_function(elFileState *fs) {
-	elModule *M = fs->M;
-	elFileFnState *fn = fs->fn;
-	elFileline line = fs->this_token.line;
-	/* patch all the yield jumps to end of
-	function (the leave instruction)
-	todo: rename 'yj' to be clearer */
-	elf_emitter_patch_jumplist(fs,fn->yj);
-	ARRAY_DELETE(fn->yj);
-	fn->yj = 0;
-	/* finally, return control flow... */
-	elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
-	/* close the block for this function */
-	elf_emitter_close_block(fs);
-	/* ensure the block was the right one... */
-	elASSERT(fn->entry_block == fs->level);
-	/* ensure all the entities were closed
-	properly */
-	elASSERT(fs->nentities == fn->entities);
-	/* enclosing function becomes active
-	now */
-	fs->fn = fn->enclosing;
-}
 
 /* Range Expressions Desugaring */
 void elf_emit_desugar_range_expr_epilogue(elFileState *fs, elNodeId x) {
-	elNode node = elf_get_node(fs,x);
+	elNode node = elf_Nget(fs,x);
 	switch (node.kind) {
 		case NODE_INDEX: case NODE_FIELD: {
 			elf_emit_desugar_range_expr_epilogue(fs,node.x);
 		} break;
 		case NODE_RANGE_INDEX: {
 			elf_emitter_close_ranged_loop(fs,NO_LINE);
-			elf_emitter_close_block(fs);
+			elf_Fcloseblock(fs);
 			elf_emit_desugar_range_expr_epilogue(fs,node.x);
 		} break;
 		default: ;
@@ -556,24 +516,24 @@ void elf_emit_desugar_range_expr_epilogue(elFileState *fs, elNodeId x) {
 //
 //
 elNodeId elf_emit_desugar_range_expr(elFileState *fs, elNodeId x, elBool flags) {
-	elNode node = elf_get_node(fs,x);
+	elNode node = elf_Nget(fs,x);
 	switch (node.kind) {
 		case NODE_INDEX: case NODE_FIELD: {
 			elNodeId xx = elf_emit_desugar_range_expr(fs,node.x,flags & ~EXPR_LHS);
-			return elf_make_binary_node(fs,node.line,node.kind,NT_ANY,xx,node.y);
+			return elf_binary_node(fs,node.line,node.kind,NT_ANY,xx,node.y);
 		}
 		case NODE_RANGE_INDEX: {
-			elASSERT(elf_get_node_kind(fs,node.y) == NODE_RANGE);
+			elASSERT(elf_Ngetkind(fs,node.y) == NODE_RANGE);
 
 			elFileline line = node.line;
 
 			elNodeId array,index,value;
 			array = elf_emit_desugar_range_expr(fs,node.x,flags & ~EXPR_LHS);
 
-			elBlockId block = elf_emitter_begin_block(fs,BLOCK_LOOP);
+			elBlockId block = elf_Fbeginblock(fs,BLOCK_LOOP);
 
 			/*  */
-			elRegId array_register = elf_emitter_localize(fs,line,array);
+			elRegId array_register = elf_Zlocalize2reg(fs,line,array);
 			elRegId index_register = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 			/* todo: this is really wasteful, but we can't know whether
 			the user will use the #value register or not, can we do this
@@ -585,22 +545,22 @@ elNodeId elf_emit_desugar_range_expr(elFileState *fs, elNodeId x, elBool flags) 
 			expensive... */
 			elRegId value_register = elf_emitter_local_alloc(fs,line,NO_SLOT,NO_NODE);
 
-			array = elf_local_node(fs,line,array_register);
-			index = elf_local_node(fs,line,index_register);
+			array = elf_Nlocal(fs,line,array_register);
+			index = elf_Nlocal(fs,line,index_register);
 
 			value = elf_make_index_node(fs,line,array,index);
 
 			/* todo: could we make this more efficient by caching
 			the result */
-			elNodeId lo = elf_get_node(fs,node.y).x;
-			elNodeId hi = elf_get_node(fs,node.y).y;
+			elNodeId lo = elf_Nget(fs,node.y).x;
+			elNodeId hi = elf_Nget(fs,node.y).y;
 			if (lo == NO_NODE) lo = elf_make_integer_node(fs,line,0);
 			if (hi == NO_NODE) hi = elf_make_call_metafield_node(fs,line,array,0,"length");
 
 			elf_emitter_begin_ranged_loop(fs,line,index,lo,hi);
 
-			elf_emitter_get_block(fs,block)->loop.array_register = array_register;
-			elf_emitter_get_block(fs,block)->loop.value_register = elf_emitter_localize(fs,line,value);
+			elf_Fgetblock(fs,block)->loop.array_register = array_register;
+			elf_Fgetblock(fs,block)->loop.value_register = elf_Zlocalize2reg(fs,line,value);
 
 			return value;
 		}
@@ -612,7 +572,7 @@ elNodeId elf_emit_desugar_range_expr(elFileState *fs, elNodeId x, elBool flags) 
 
 
 void elf_emit_initializer(elFileState *fs, elFileline line, elRegId target_register, elNodeId id) {
-	elRegId mem = elf_get_memory_state(fs);
+	elRegId mem = elf_Fgetmemstate(fs);
 	elNode v = fs->nodes[id];
 	switch (v.k) {
 		case NODE_LOAD: {
@@ -621,10 +581,10 @@ void elf_emit_initializer(elFileState *fs, elFileline line, elRegId target_regis
 				elNOCODE;
 			} else
 			if ((x.kind == NODE_FIELD) || (x.k == NODE_INDEX)) {
-				// elRegId xx = elf_emitter_localize(fs,line,x.x);
+				// elRegId xx = elf_Zlocalize2reg(fs,line,x.x);
 				elRegId xx = target_register;
-				elRegId xy = elf_emitter_localize(fs,line,x.y);
-				elRegId yy = elf_emitter_localize(fs,line,v.y);
+				elRegId xy = elf_Zlocalize2reg(fs,line,x.y);
+				elRegId yy = elf_Zlocalize2reg(fs,line,v.y);
 				if (x.k == NODE_FIELD) {
 					elf_emitter_add_bytexyz(fs,line,BC_SETFIELD,xx,xy,yy);
 				} else elf_emitter_add_bytexyz(fs,line,BC_SETINDEX,xx,xy,yy);
@@ -632,7 +592,7 @@ void elf_emit_initializer(elFileState *fs, elFileline line, elRegId target_regis
 		} break;
 		default: elNOCODE;
 	}
-	elf_set_memory_state(fs,mem);
+	elf_Fsetmemstate(fs,mem);
 }
 
 
@@ -641,16 +601,14 @@ void elf_emit_initializer(elFileState *fs, elFileline line, elRegId target_regis
 ** Emits code to evaluate the node into any register, if the
 ** node already has a register no code is emitted.
 */
-elRegId elf_emitter_localize(elFileState *fs, elFileline line, elNodeId id) {
-	elRegId target_register = elf_get_node_register(fs,MAKE_NODE_ID(id));
-	if (target_register == NO_SLOT) {
-		target_register = elf_emitter_local_alloc(fs,line,NO_SLOT,id);
-		// elRegId final_register = elf_emitter_local_load(fs,line,0,target_register,1,id);
-		// elASSERT(final_register == target_register);
+elRegId elf_Zlocalize2reg(elFileState *fs, elFileline line, elNodeId id) {
+	elRegId reg = elf_get_node_register(fs,MAKE_NODE_ID(id));
+	if (reg == NO_SLOT) {
+		reg = elf_emitter_local_alloc(fs,line,NO_SLOT,id);
+		elRegId reg_final = elf_emitter_evaluate(fs,line,0,reg,1,id);
+		elASSERT(reg_final == reg);
 	}
-	elRegId final_register = elf_emitter_local_load(fs,line,0,target_register,1,id);
-	elASSERT(final_register == target_register);
-	return target_register;
+	return reg;
 }
 
 
@@ -658,83 +616,41 @@ elRegId elf_emitter_localize(elFileState *fs, elFileline line, elNodeId id) {
 ** Reloads the expression a to newly allocated register or
 ** the given register.
 */
-elRegId elf_emitter_relocalize(elFileState *fs, elFileline line, elRegId target_register, elNodeIdTypeGuard id) {
-	elRegId source_register = elf_get_node_register(fs,id);
-	if (target_register == NO_SLOT) {
-		target_register = elf_emitter_local_alloc(fs,line,NO_SLOT,id.id);
-	}
-	/* whenever you call this function is becuase you want to
-	move some node but also, it's always to a new register */
-	elASSERT(target_register != source_register);
-	// if (target_register != source_register) {
-	elRegId final_register = elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,id.id);
-	elASSERT(final_register == target_register);
-	// }
-	return target_register;
+elRegId elf_emitter_relocalize(elFileState *fs, elFileline line, int flags, elNodeIdTypeGuard id) {
+	elRegId src = elf_get_node_register(fs,id);
+	elRegId dst = elf_emitter_local_alloc(fs,line,NO_SLOT,id.id);
+	elASSERT(dst != src);
+	elRegId fnl = elf_emitter_evaluate(fs,line,0,dst,1,id.id);
+	elASSERT(fnl == dst);
+	return dst;
 }
+
 
 /*
 ** emits bytecode to evaluate given node into
-** the target register.
+** the target register, if the target node is
+** a local, then it is reloaded.
 */
-elRegId elf_emitter_local_load(elFileState *fs, elFileline line
-, 	elBool flags, elRegId target_register
-, 	elRegId y, elNodeId id) {
+elRegId elf_emitter_evaluate(elFileState *fs, elFileline line, elBool flags, elRegId target_register, elRegId y, elNodeId id) {
+	elASSERT(flags == 0);
 
 	elModule *md = fs->M;
 	elFileFnState *fn = fs->fn;
-
 	const elNode v = fs->nodes[id];
 	const elNode node = v;
-
 	elASSERT(v.level <= fs->level);
 
 	if (v.line != 0) line = v.line;
 
-	// elASSERT(target_register > NO_SLOT);
 	elASSERT(target_register < fs->fn->xmemory);
 
-	if (target_register == NO_SLOT) {
-		if (flags & LOAD_ALLOCATE) {
-			elf_file_dialog(fs,line,"here!");
-			__debugbreak();
-			target_register = elf_emitter_local_alloc(fs,line,NO_SLOT,id);
-		}
-	}
-
 	/* keep track of memory state for allocating temporary
-	variables */
-	elRegId mem = elf_get_memory_state(fs);
-
-	/* todo: this is flawed, if we have some node like a
-	type-guard wrapping a local, 'get_register' will find
-	the register of the node local within, which will
-	cause the type-guard not to be emitted, one solution
-	would be to avoid doing this sort of logic here or
-	checking only whether the node itself has a register
-	and not some target node within... */
-	elRegId already_register = elf_get_node_register(fs,MAKE_NODE_ID(id));
-	/* if node is already local and no reloading is necessary */
-	if ((target_register != NO_SLOT) && (already_register != NO_SLOT) && (already_register != target_register)) {
-		if (flags & LOAD_RELOAD) {
-			elf_emitter_add_bytexy(fs,line,BC_RELOAD,target_register,already_register);
-			// target_register = already_register;
-			goto leave;
-		} else {
-			__debugbreak();
-			elf_emitter_add_bytexy(fs,line,BC_RELOAD,target_register,already_register);
-			// elf_debug_log("node is already localized and no reloading is necessary, node: %i, target_register: %i, already_register: %i, (reload: %s)"
-			// , id, target_register, already_register, (flags & LOAD_RELOAD) ? "true" : "false");
-			target_register = already_register;
-			goto leave;
-		}
-	}
-	// elf_node_fpf(fs,stdout,id);
-	// printf("\n");
+	registers */
+	elRegId mem = elf_Fgetmemstate(fs);
 
 	#define UNUSED_CHECK \
 	if ((y == 0)) {\
-		elf_file_dialog(fs,line,"warning: unused expression");\
+		elf_Fdialog(fs,line,"warning: unused expression");\
 		goto leave;\
 	}
 
@@ -743,9 +659,6 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 		case NODE_LOCAL: case NODE_SPECIAL_REGISTER: {
 			UNUSED_CHECK;
 			elRegId reg = elf_get_node_register(fs,MAKE_NODE_ID(id));
-			/* The compiler knows this node doesn't have to be reloaded,
-			so if we got here it means it wants us to reload to some
-			other register */
 			elf_emitter_add_bytexy(fs,line,BC_RELOAD,target_register,reg);
 		} break;
 		case NODE_CLOSURE_VALUE: {
@@ -792,10 +705,10 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 		// {x}[{x}]
 		case NODE_FIELD: case NODE_INDEX: {
 			UNUSED_CHECK;
-			if (elf_get_node_kind(fs,v.x) == NODE_RANGE_INDEX) elf_debugger("test-break");
-			if (elf_get_node_kind(fs,v.y) == NODE_RANGE_INDEX) elf_debugger("test-break");
-			elRegId xx = elf_emitter_localize(fs,line,v.x);
-			elRegId yy = elf_emitter_localize(fs,line,v.y);
+			if (elf_Ngetkind(fs,v.x) == NODE_RANGE_INDEX) elf_debugger("test-break");
+			if (elf_Ngetkind(fs,v.y) == NODE_RANGE_INDEX) elf_debugger("test-break");
+			elRegId xx = elf_Zlocalize2reg(fs,line,v.x);
+			elRegId yy = elf_Zlocalize2reg(fs,line,v.y);
 			elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k),target_register,xx,yy);
 		} break;
 		case NODE_CLOSURE: {
@@ -814,20 +727,20 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 		} break;
 		case NODE_TYPEGUARD: {
 			UNUSED_CHECK;
-			elf_emitter_local_load(fs,line,flags,target_register,y,v.x);
+			elf_emitter_evaluate(fs,line,flags,target_register,y,v.x);
 			elf_emitter_add_bytexy(fs,v.line,BC_TYPEGUARD,target_register,elf_nodettotag(v.y));
 		} break;
 		case NODE_GROUP: {
 			UNUSED_CHECK;
-			elf_emitter_local_load(fs,line,flags,target_register,y,v.x);
+			elf_emitter_evaluate(fs,line,flags,target_register,y,v.x);
 		} break;
 		case NODE_REGION: {
 			elNOCODE;
 		} break;
 		case NODE_METAFIELD: {
 			UNUSED_CHECK;
-			elRegId rx = elf_emitter_localize(fs,line,v.x);
-			elRegId ry = elf_emitter_localize(fs,line,v.y);
+			elRegId rx = elf_Zlocalize2reg(fs,line,v.x);
+			elRegId ry = elf_Zlocalize2reg(fs,line,v.y);
 			elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k),target_register,rx,ry);
 		} break;
 		case NODE_CALL: {
@@ -882,7 +795,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 				/* Since we are not calling a field or meta field,
 				the this argument is implictly the current 'this',
 				'this' is always register 0. */
-				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(elf_local_node(fs,line,0)));
+				last = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(elf_Nlocal(fs,line,0)));
 				elASSERT(last == tail ++);
 			}
 
@@ -901,7 +814,7 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 			we have one... */
 			if (target_register != NO_SLOT && y != 0) {
 				if (y > 1) {
-					elf_file_dialog(fs,line,"unsupported");
+					elf_Fdialog(fs,line,"unsupported");
 				}
 				elf_emitter_add_bytexy(fs,line,BC_RELOAD,target_register,head);
 			}
@@ -912,30 +825,30 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 			leave b
 		} */
 		case NODE_NIL_AND: {
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,node.x);
+			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,node.x);
 			elFileExpr bool_expr = {0};
-			elByteId *js = elf_emit_jump_if_nil(fs,NO_LINE,&bool_expr,elf_local_node(fs,NO_LINE,target_register));
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,node.y);
+			elByteId *js = elf_emit_jump_if_nil(fs,NO_LINE,&bool_expr,elf_Nlocal(fs,NO_LINE,target_register));
+			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,node.y);
 			elf_emitter_patch_jumplist(fs,js);
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_NIL_OR: {
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,node.x);
+			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,node.x);
 			elFileExpr bool_expr = {0};
-			elByteId *js = elf_emit_jump_if_not_nil(fs,NO_LINE,&bool_expr,elf_local_node(fs,NO_LINE,target_register));
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,node.y);
+			elByteId *js = elf_emit_jump_if_not_nil(fs,NO_LINE,&bool_expr,elf_Nlocal(fs,NO_LINE,target_register));
+			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,node.y);
 			elf_emitter_patch_jumplist(fs,js);
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_AND: case NODE_OR: {
 			if (y == 0) goto leave;
 
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,0));
+			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,0));
 
 			elFileExpr bool_expr = {0};
 			elByteId *js = elf_emit_jump_if_false(fs,&bool_expr,NO_SLOT,id);
 
-			elf_emitter_local_load(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,1));
+			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,1));
 
 			elf_emitter_patch_jumplist(fs,js);
 			ARRAY_DELETE(js);
@@ -944,32 +857,32 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 		case NODE_GT: case NODE_GTEQ: case NODE_LT: case NODE_LTEQ:
 		/* In the case of relational operators we have some
 		we could have sugar */
-		if (elf_get_node_kind(fs,node.x) == NODE_RANGE_INDEX) {
+		if (elf_Ngetkind(fs,node.x) == NODE_RANGE_INDEX) {
 			elASSERT(target_register > NO_SLOT);
 			/* Set default value to false */
-			elNodeId tar = elf_local_node(fs,node.line,target_register);
-			elf_emitter_emit_store(fs,node.line,tar,elf_make_integer_node(fs,NO_LINE,0));
+			elNodeId tar = elf_Nlocal(fs,node.line,target_register);
+			elf_Zstore(fs,node.line,tar,elf_make_integer_node(fs,NO_LINE,0));
 
 			/* ensure desugaring actually took place since
 			we know node.x is a projection */
 			elNodeId xx = elf_emit_desugar_range_expr(fs,node.x,flags);
 			if (xx == node.x) {
-				elf_throw(fs->R,NO_BYTE,"internal error");
+				elf_Rthrow(fs->R,NO_BYTE,"internal error");
 			}
 
-			elASSERT(elf_get_node_kind(fs,xx) == NODE_INDEX);
+			elASSERT(elf_Ngetkind(fs,xx) == NODE_INDEX);
 
 			elNodeId *z = {0};
-			ARRAY_ADD(z,elf_get_node(fs,xx).y);
+			ARRAY_ADD(z,elf_Nget(fs,xx).y);
 
-			xx = elf_make_call_metafield_node(fs,line,elf_get_node(fs,xx).x,z,"idx");
+			xx = elf_make_call_metafield_node(fs,line,elf_Nget(fs,xx).x,z,"idx");
 
 			/* convert node which operates on a projection
 			to operate on an actual item */
 			/* todo: here we can make some optimizations, we can
 			hoist value evaluation (node.y) outside of the loop and
 			keep in a register. */
-			elNodeId per = elf_make_binary_node(fs,node.line,NODE_EQ,NT_ANY,xx,node.y);
+			elNodeId per = elf_binary_node(fs,node.line,NODE_EQ,NT_ANY,xx,node.y);
 			/* todo: Could we massively simplify things
 			by passing in the register directly to jump
 			emitters? I could just emit code to localize
@@ -984,9 +897,9 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 			or false... */
 			elFileExpr expr = {0};
 			/* if true we can exit the loop */
-			elByteId *js = elf_emit_jump_if_false(fs,&expr,NO_SLOT,elf_make_binary_node(fs,line,NODE_EQ,NT_BOL,xx,node.y));
+			elByteId *js = elf_emit_jump_if_false(fs,&expr,NO_SLOT,elf_binary_node(fs,line,NODE_EQ,NT_BOL,xx,node.y));
 
-			elf_emitter_emit_store(fs,NO_LINE,tar,elf_make_integer_node(fs,NO_LINE,1));
+			elf_Zstore(fs,NO_LINE,tar,elf_make_integer_node(fs,NO_LINE,1));
 			elf_emit_break(fs,NO_LINE,NO_SLOT);
 			/* otherwise continue checking */
 			elf_emitter_patch_jumplist(fs,js);
@@ -994,105 +907,115 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 			the desugaring process */
 			elf_emit_desugar_range_expr_epilogue(fs,node.x);
 			break;
-		} else ; /* fallthrough */
-			case NODE_DIV: case NODE_MUL: case NODE_MOD:
-			case NODE_SUB: case NODE_ADD: case NODE_POW:
-			case NODE_BIT_SHL: case NODE_BIT_SHR:
-			case NODE_BIT_XOR:
-			case NODE_BIT_AND: case NODE_BIT_OR: {
+		 /* fallthrough */
+		} else;
+		case NODE_DIV: case NODE_MUL: case NODE_MOD:
+		case NODE_SUB: case NODE_ADD: case NODE_POW:
+		case NODE_BIT_SHL: case NODE_BIT_SHR:
+		case NODE_BIT_XOR:
+		case NODE_BIT_AND: case NODE_BIT_OR: {
 			/* todo: do this properly */
 			// if (y == 0) goto leave;
-				if ((v.k == NODE_GT) || (v.k == NODE_GTEQ)) {
-					elRegId xx = elf_emitter_localize(fs,line,v.y);
-					elRegId yy = elf_emitter_localize(fs,line,v.x);
-					elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k^1),target_register,xx,yy);
-				} else if (v.k == NODE_EQ) {
+			if ((v.k == NODE_GT) || (v.k == NODE_GTEQ)) {
+				elRegId xx = elf_Zlocalize2reg(fs,line,v.y);
+				elRegId yy = elf_Zlocalize2reg(fs,line,v.x);
+				elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k^1),target_register,xx,yy);
+			} else if (v.k == NODE_EQ) {
 				/* todo: enable this */
-					if(1) goto _else;
-					if (elf_get_node_kind(fs,v.y) == NODE_NIL) {
-						elRegId xx = elf_emitter_localize(fs,line,v.y);
-						elf_emitter_add_bytexy(fs,line,BC_ISNIL,target_register,xx);
-					} else goto _else;
-				} else { _else:
-					elRegId rx = elf_emitter_localize(fs,line,v.x);
-					elRegId ry = elf_emitter_localize(fs,line,v.y);
-					elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k),target_register,rx,ry);
-				}
-			} break;
-			default: {
-				elf_file_dialog(fs,line,"invalid node (%s)",node2s[node.kind]);
-				elNOCODE;
+				if(1) goto _else;
+				if (elf_Ngetkind(fs,v.y) == NODE_NIL) {
+					elRegId xx = elf_Zlocalize2reg(fs,line,v.y);
+					elf_emitter_add_bytexy(fs,line,BC_ISNIL,target_register,xx);
+				} else goto _else;
+			} else { _else:
+				elRegId rx = elf_Zlocalize2reg(fs,line,v.x);
+				elRegId ry = elf_Zlocalize2reg(fs,line,v.y);
+				elf_emitter_add_bytexyz(fs,line,elf_node_to_byte(v.k),target_register,rx,ry);
 			}
+		} break;
+		default: {
+			elf_Fdialog(fs,line,"invalid node (%s)",node2s[node.kind]);
+			elNOCODE;
 		}
-
-		leave:
-		elf_set_memory_state(fs,mem);
-		return target_register;
 	}
 
+	leave:
+	elf_Fsetmemstate(fs,mem);
+	return target_register;
+}
 
-	void elf_emitter_emit_store(elFileState *fs, elFileline line, elNodeId x, elNodeId y) {
-		elNode v = elf_get_targetable_node(fs,MAKE_NODE_ID(x));
-		elASSERT(elf_is_targetable_node(v.kind));
-		elASSERT(v.level <= fs->level);
-		elASSERT(x >= 0);
-		elASSERT(y >= 0);
-		if (v.line != 0) line = v.line;
 
-	/* keep local state, lastly free any temporary locals */
-		elRegId mem = elf_get_memory_state(fs);
-		switch (v.k) {
-			case NODE_GLOBAL: {
-				elRegId yy = elf_emitter_localize(fs,line,y);
-				elf_emitter_add_bytexy(fs,line,BC_SETGLOBAL,v.x,yy);
-			} break;
-			case NODE_CLOSURE_VALUE: {
-				elf_file_dialog(fs,line,"assignment to closure value is not supported yet");
-			} break;
-			case NODE_LOCAL: {
-				elf_emitter_local_load(fs,line,LOAD_RELOAD,v.x,1,y);
-			} break;
-			case NODE_INDEX: case NODE_FIELD: {
-				elNodeId table_node = v.x;
-				elNodeId field_node = v.y;
-				elNodeId value_node = y;
-				elRegId table_register = elf_emitter_localize(fs,line,table_node);
-				elRegId field_register = elf_emitter_localize(fs,line,field_node);
-				elRegId value_register = elf_emitter_localize(fs,line,value_node);
-				elByteOP op = v.k == NODE_INDEX ? BC_SETINDEX : BC_SETFIELD;
-				elf_emitter_add_bytexyz(fs,line,op,table_register,field_register,value_register);
-			} break;
-			case NODE_METAFIELD: {
-				elf_file_dialog(fs,line,"meta fields are constant");
-			} break;
-			default: {
-				elNOCODE;
-			} break;
-		}
+void elf_Zstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y) {
+	elNode v = elf_get_targetable_node(fs,MAKE_NODE_ID(x));
+	elASSERT(elf_is_targetable_node(v.kind));
+	elASSERT(v.level <= fs->level);
+	elASSERT(x >= 0);
+	elASSERT(y >= 0);
+	if (v.line != 0) line = v.line;
 
-		elf_set_memory_state(fs,mem);
+	elRegId mem = elf_Fgetmemstate(fs);
+	switch (v.k) {
+		case NODE_GLOBAL: {
+			elRegId yy = elf_Zlocalize2reg(fs,line,y);
+			elf_emitter_add_bytexy(fs,line,BC_SETGLOBAL,v.x,yy);
+		} break;
+		case NODE_LOCAL: {
+			elf_emitter_evaluate(fs,line,0,v.x,1,y);
+		} break;
+		case NODE_CLOSURE_VALUE: {
+			elf_Fdialog(fs,line,"assignment to closure value is not possible");
+		} break;
+		// {x}.a.z
+		// get_field(register 0, get_global({x}), get_string("a"))
+		// get_string(register 1, "b")
+		// get_field(register 0, 0, 1)
+		// get_global(register 0, {x})
+		// get_string(register 1, "a")
+		// get_field(register 0, 0, 1)
+		// get_string(register 1, "b")
+		// get_field(register 0, 0, 1)
+		case NODE_INDEX: case NODE_FIELD: {
+			elNodeId table_node = v.x;
+			elNodeId field_node = v.y;
+			elNodeId value_node = y;
+			elRegId table_register = elf_Zlocalize2reg(fs,line,table_node);
+			elRegId field_register = elf_Zlocalize2reg(fs,line,field_node);
+			elRegId value_register = elf_Zlocalize2reg(fs,line,value_node);
+			elByteOP op = v.k == NODE_INDEX ? BC_SETINDEX : BC_SETFIELD;
+			elf_emitter_add_bytexyz(fs,line,op,table_register,field_register,value_register);
+		} break;
+		case NODE_METAFIELD: {
+			elf_Fdialog(fs,line,"meta fields are constant");
+		} break;
+		default: {
+			elNOCODE;
+		} break;
 	}
 
+	elf_Fsetmemstate(fs,mem);
+}
 
-	void elf_emitter_begin_if(elFileState *fs, elFileline line, elSelectState *s, elNodeId x, int z) {
-		elFileExpr js = {0};
-		elf_emit_branch_if(fs,&js,z,NO_SLOT,x);
+
+/* todo: this can be removed */
+void elf_Fbeginif(elFileState *fs, elFileline line, elSelectState *s, elNodeId x, int z) {
+	elFileExpr js = {0};
+	elf_emit_branch_if(fs,&js,z,NO_SLOT,x);
 	// if  0 = jz
 	// iff 1 = jnz
-		if (z == L_IF) {
-			elASSERT(js.f != 0);
-			elf_emitter_patch_jumplist(fs,js.t);
-			ARRAY_DELETE(js.t);
-			js.t = 0;
-			s->jz = js.f;
-		} else {
-			elASSERT(js.t != 0);
-			elf_emitter_patch_jumplist(fs,js.f);
-			ARRAY_DELETE(js.f);
-			js.f = 0;
-			s->jz = js.t;
-		}
+	if (z == L_IF) {
+		elASSERT(js.f != 0);
+		elf_emitter_patch_jumplist(fs,js.t);
+		ARRAY_DELETE(js.t);
+		js.t = 0;
+		s->jz = js.f;
+	} else {
+		elASSERT(js.t != 0);
+		elf_emitter_patch_jumplist(fs,js.f);
+		ARRAY_DELETE(js.f);
+		js.f = 0;
+		s->jz = js.t;
 	}
+}
 
 
 /*
@@ -1100,79 +1023,79 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 ** escape jump, patches previous jz (jump if false)
 ** list to enter this block.
 */
-	void elf_emitter_add_else_clause(elFileState *fs, elFileline line, elSelectState *s) {
-		if (s->jz == 0) {
-			elf_file_dialog(fs,line,"invalid else clause");
-		}
-		elASSERT(s->jz != 0);
-		int j = elf_emit_jump(fs,line,-1);
-		ARRAY_ADD(s->j,j);
-
-		elf_emitter_patch_jumplist(fs,s->jz);
-		ARRAY_DELETE(s->jz);
-		s->jz = 0;
+void elf_Faddelseclause(elFileState *fs, elFileline line, elSelectState *s) {
+	if (s->jz == 0) {
+		elf_Fdialog(fs,line,"invalid else clause");
 	}
+	elASSERT(s->jz != 0);
+	int j = elf_emit_jump(fs,line,-1);
+	ARRAY_ADD(s->j,j);
+
+	elf_emitter_patch_jumplist(fs,s->jz);
+	ARRAY_DELETE(s->jz);
+	s->jz = 0;
+}
 
 
-	void elf_emitter_add_elif_clause(elFileState *fs, elFileline line, elSelectState *s, int x) {
-		elf_emitter_add_else_clause(fs,line,s);
-		elf_emitter_begin_if(fs,line,s,x,L_IF);
-	}
+void elf_Faddelifclause(elFileState *fs, elFileline line, elSelectState *s, int x) {
+	elf_Faddelseclause(fs,line,s);
+	elf_Fbeginif(fs,line,s,x,L_IF);
+}
 
 
-	void elf_emitter_add_then_clause(elFileState *fs, elFileline line, elSelectState *s) {
+void elf_Faddthenclause(elFileState *fs, elFileline line, elSelectState *s) {
 	/* we don't need to close the previous block, it can just fall
 	through to our branch, do collect all the other exit jumps and
 	tie them to this branch block, naturally we don't need to add
 	an exit jump since else and elif or closeif will terminate
 	this block, multiple then blocks are simply chained together
 	naturally. */
+	elf_emitter_patch_jumplist(fs,s->j);
+	ARRAY_DELETE(s->j);
+	s->j = 0;
+}
+
+
+void elf_Fcloseif(elFileState *fs, elFileline line, elSelectState *s) {
+	/* collect missing else branch */
+	if (s->jz != 0) {
+		elf_emitter_patch_jumplist(fs,s->jz);
+		ARRAY_DELETE(s->jz);
+		s->jz = 0;
+	}
+	/* collect missing then branch */
+	if (s->j != 0) {
 		elf_emitter_patch_jumplist(fs,s->j);
 		ARRAY_DELETE(s->j);
 		s->j = 0;
 	}
-
-
-	void elf_emitter_close_if(elFileState *fs, elFileline line, elSelectState *s) {
-	/* collect missing else branch */
-		if (s->jz != 0) {
-			elf_emitter_patch_jumplist(fs,s->jz);
-			ARRAY_DELETE(s->jz);
-			s->jz = 0;
-		}
-	/* collect missing then branch */
-		if (s->j != 0) {
-			elf_emitter_patch_jumplist(fs,s->j);
-			ARRAY_DELETE(s->j);
-			s->j = 0;
-		}
-	}
+}
 
 
 
 /* todo: add support for multiple results */
-	void elf_emit_yield(elFileState *fs, elFileline line, elNodeId id) {
-		elRegId regress = elf_get_memory_state(fs);
-		if (id != NO_NODE) {
+void elf_Zyield(elFileState *fs, elFileline line, elNodeId id) {
+	elRegId regress = elf_Fgetmemstate(fs);
+	if (id != NO_NODE) {
 		/* todo: determine the number of values in
 		tree, and allocate that many registers? */
-			int n = 1;
+		int n = 1;
 		/* todo: if we only return one value we don't have
 		to reload */
-			elRegId x = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(id));
-			if (fs->fn->nyield < n) fs->fn->nyield = n;
-			elByteId j = elf_emitter_add_bytexyz(fs,line,BC_YIELD,NO_JUMP,x,n);
-			ARRAY_ADD(fs->fn->yj,j);
+		elRegId x = elf_emitter_relocalize(fs,line,NO_SLOT,MAKE_NODE_ID(id));
+		if (fs->fn->nyield < n) fs->fn->nyield = n;
+		elByteId j = elf_emitter_add_bytexyz(fs,line,BC_YIELD,NO_JUMP,x,n);
+		ARRAY_ADD(fs->fn->yj,j);
 		/* if there are no results then simply leave directly */
-		} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
-		elf_set_memory_state(fs,regress);
+	} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
+	elf_Fsetmemstate(fs,regress);
 
-		elf_emitter_add_block_flags(fs,BLOCK_ENDED);
-	}
+	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
+}
 
 
-	void elf_emitter_begin_do_while_loop(elFileState *fs, elFileline line) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fs->fn->block
+void elf_Fbegindowhileloop(elFileState *fs, elFileline line) {
+	elFileBlock *bl = elf_Fgetblock(fs,-1); // fs->fn->block
 	elASSERT(bl->flags & BLOCK_LOOP);
 	bl->loop.entry = elf_get_last_byteid(fs);
 	bl->loop.false_jumps = 0;
@@ -1181,8 +1104,8 @@ elRegId elf_emitter_local_load(elFileState *fs, elFileline line
 }
 
 
-void elf_emitter_close_do_while_loop(elFileState *fs, elFileline line, elNodeId x) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fs->fn->block;
+void elf_Fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x) {
+	elFileBlock *bl = elf_Fgetblock(fs,-1); // fs->fn->block;
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	elFileExpr js = {0};
@@ -1198,8 +1121,8 @@ void elf_emitter_close_do_while_loop(elFileState *fs, elFileline line, elNodeId 
 }
 
 
-void elf_emitter_begin_while_loop(elFileState *fs, elFileline line, elNodeId x) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1);
+void elf_Fbeginwhileloop(elFileState *fs, elFileline line, elNodeId x) {
+	elFileBlock *bl = elf_Fgetblock(fs,-1);
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	bl->loop.entry = elf_get_last_byteid(fs);
@@ -1212,8 +1135,8 @@ void elf_emitter_begin_while_loop(elFileState *fs, elFileline line, elNodeId x) 
 }
 
 
-void elf_emitter_close_while_loop(elFileState *fs, elFileline line) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1);
+void elf_Fclosewhileloop(elFileState *fs, elFileline line) {
+	elFileBlock *bl = elf_Fgetblock(fs,-1);
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	elf_emitter_patch_jumplist(fs,bl->loop.true_jumps);
@@ -1227,22 +1150,22 @@ void elf_emitter_close_while_loop(elFileState *fs, elFileline line) {
 
 
 void elf_emitter_begin_ranged_loop(elFileState *fs, elFileline line, elNodeId index_node, elNodeId lo, elNodeId hi) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1);
+	elFileBlock *bl = elf_Fgetblock(fs,-1);
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	elASSERT(index_node != NO_NODE);
 
-	elRegId index_register = elf_emitter_localize(fs,line,index_node);
-	index_node = elf_local_node(fs,line,index_register);
+	elRegId index_register = elf_Zlocalize2reg(fs,line,index_node);
+	index_node = elf_Nlocal(fs,line,index_register);
 
 	bl->loop.index_register = index_register;
 	bl->loop.x = index_node;
-	elf_emitter_local_load(fs,line,1,index_register,1,elf_make_type_guard_node(fs,elf_get_node_line(fs,lo),lo,NT_INT));
+	elf_emitter_evaluate(fs,line,1,index_register,1,elf_make_type_guard_node(fs,elf_get_node_line(fs,lo),lo,NT_INT));
 
 	bl->loop.entry = elf_get_last_byteid(fs);
 
-	elRegId hi_register = elf_emitter_localize(fs,line,elf_make_type_guard_node(fs,elf_get_node_line(fs,hi),hi,NT_INT));
-	hi = elf_local_node(fs,line,hi_register);
+	elRegId hi_register = elf_Zlocalize2reg(fs,line,elf_make_type_guard_node(fs,elf_get_node_line(fs,hi),hi,NT_INT));
+	hi = elf_Nlocal(fs,line,hi_register);
 	elNodeId c = elf_make_node_less_than(fs,line,index_node,hi);
 
 	elASSERT(bl->loop.false_jumps == 0);
@@ -1253,16 +1176,16 @@ void elf_emitter_begin_ranged_loop(elFileState *fs, elFileline line, elNodeId in
 
 
 void elf_emitter_close_ranged_loop(elFileState *fs, elFileline line) {
-	elFileBlock *bl = elf_emitter_get_block(fs,-1); // fs->fn->block;
+	elFileBlock *bl = elf_Fgetblock(fs,-1); // fs->fn->block;
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	elf_emitter_patch_jumplist(fs,bl->loop.true_jumps);
 	ARRAY_DELETE(bl->loop.true_jumps);
 	bl->loop.true_jumps = 0;
 	// elNodeId index_node = bl->loop.index_node;
-	elNodeId index_node = elf_local_node(fs,NO_LINE,bl->loop.index_register);
-	elNodeId k = elf_make_binary_node(fs,NO_LINE,NODE_ADD,NT_INT,index_node,elf_make_integer_node(fs,NO_LINE,1));
-	elf_emitter_emit_store(fs,line,index_node,k);
+	elNodeId index_node = elf_Nlocal(fs,NO_LINE,bl->loop.index_register);
+	elNodeId k = elf_binary_node(fs,NO_LINE,NODE_ADD,NT_INT,index_node,elf_make_integer_node(fs,NO_LINE,1));
+	elf_Zstore(fs,line,index_node,k);
 	elf_emit_jump(fs,line,bl->loop.entry);
 
 	elf_emitter_patch_jumplist(fs,bl->loop.false_jumps);

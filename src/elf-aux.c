@@ -202,7 +202,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 }
 
 
-void elf_throw(elState *R, elByteId byte, char *error) {
+void elf_Rthrow(elState *R, elByteId byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_line_for_byte(M,byte);
@@ -220,14 +220,14 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 
 void elf_check_args(elState *R, char *fnname, int n, char *usage) {
 	if (elGETNARGS(R) != n) {
-		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
+		elf_Rthrow(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
 	}
 }
 
 
 int elf_type_check(elState *R, elByteId id, elRegId loc, elValueTag x, elValueTag y) {
 	if (x != y) {
-		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
+		elf_Rthrow(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
 	return x == y;
 }
