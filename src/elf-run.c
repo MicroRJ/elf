@@ -128,17 +128,17 @@ int elf_parse_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId 
 	fs->bytes      = M->nbytes;
 
 	/* kick start by lexing the first two tokens */
-	elf_Flextok(fs);
-	elf_Flextok(fs);
+	elf_flextok(fs);
+	elf_flextok(fs);
 
 	elFileFnState fn = {0};
-	elf_Fbeginfunction(fs,&fn,fs->this_token.line);
+	elf_fbeginfunction(fs,&fn,fs->this_token.line);
 
 	elFileExpr expr = {0};
-	elNodeId id = elf_Fexpr(fs,&expr,0);
+	elNodeId id = -1; elNOCODE; // elf_fexpr(fs,&expr,0);
 
 	elf_Zyield(fs,fs->this_token.line,id);
-	elf_Fclosefunction(fs);
+	elf_fclosefunction(fs);
 
 	elFileProto fp = {0};
 	fp.bytes    = fn.bytes;
@@ -187,19 +187,19 @@ int elf_parse_code3_fs(elState *R, elFileState *fs, elString *filename, elRegId 
 	fs->default_register = NO_SLOT;
 
 	/* kick start by lexing the first two tokens */
-	elf_Flextok(fs);
-	elf_Flextok(fs);
+	elf_flextok(fs);
+	elf_flextok(fs);
 
 	elFileFnState fn = {0};
-	elf_Fbeginfunction(fs,&fn,fs->tk.line);
-	while (!elf_testtk(fs,0)) {
+	elf_fbeginfunction(fs,&fn,fs->tk.line);
+	while (!elf_ftesttok(fs,0)) {
 
 		elASSERT(elOBJCOLOR(filename) != GC_RED);
 		elASSERT(elOBJCOLOR(contents) != GC_RED);
 
 		elf_Fstat(fs);
 	}
-	elf_Fclosefunction(fs);
+	elf_fclosefunction(fs);
 
 	elASSERT(elOBJCOLOR(filename) != GC_RED);
 	elASSERT(elOBJCOLOR(contents) != GC_RED);

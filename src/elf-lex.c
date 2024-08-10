@@ -51,7 +51,7 @@ void elf_Fthrow(elFileState *fs, char *line, char const *fmt, ...) {
 }
 
 
-void elf_Fdialog(elFileState *fs, char *line, char const *fmt, ...) {
+void elf_fdialog(elFileState *fs, char *line, char const *fmt, ...) {
 	line = line ? line : fs->this_token.line;
 
 	int linenum;
@@ -153,7 +153,7 @@ void elf_lexer_get_emptychr(elFileState *file) {
 }
 
 /* not the fastest thing out there */
-elToken elf_Flextok(elFileState *file) {
+elToken elf_flextok(elFileState *file) {
 
 	/* identifiers can only be 255 characters long (256 - 1 null terminator),
 	on the other hand, longer strings are allocated
@@ -220,7 +220,7 @@ elToken elf_Flextok(elFileState *file) {
 					if (B == 2 && C > 1) goto _error;
 				} else {
 					if (0) _error: {
-						elf_Fdialog(file, file->thischar, "invalid base '%i' for digit", B);
+						elf_fdialog(file, file->thischar, "invalid base '%i' for digit", B);
 					}
 					break;
 				}
@@ -255,7 +255,7 @@ elToken elf_Flextok(elFileState *file) {
 			} while(0);
 
 			if (!elf_cmovchr('\'')) {
-				elf_Fdialog(file,tk.line,"invalid character constant, expected \"'\"");
+				elf_fdialog(file,tk.line,"invalid character constant, expected \"'\"");
 			}
 		} break;
 		case '"': {
@@ -277,7 +277,7 @@ elToken elf_Flextok(elFileState *file) {
 				}
 
 				if (!elf_cmovchr('"')) {
-					elf_Fdialog(file,tk.line,"invalid string");
+					elf_fdialog(file,tk.line,"invalid string");
 				}
 				elf_lexer_get_emptychr(file);
 				if (!elf_cmovchr('"')) {
@@ -320,7 +320,7 @@ elToken elf_Flextok(elFileState *file) {
 				tk.type = TK_INTEGER;
 				tk.i = file->linenumber;
 			} else if (tk.type == TK_WORD) {
-				elf_Fdialog(file,tk.line,"unrecognized macro");
+				elf_fdialog(file,tk.line,"unrecognized macro");
 			}
 		} break;
 		case '\0': {
@@ -472,6 +472,6 @@ elToken elf_Flextok(elFileState *file) {
 	file->tk = file->thentk;
 	file->thentk = tk;
 
-	// elf_Fdialog(files,tk.line,"token %s",elf_tkintel[tk.type].name);
+	// elf_fdialog(files,tk.line,"token %s",elf_tkintel[tk.type].name);
 	return file->lasttk;
 }

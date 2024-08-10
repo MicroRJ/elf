@@ -376,6 +376,7 @@ typedef struct elFileBlock {
 
 typedef struct elFileExpr {
 	int kind;
+	elFileline line;
 	union {
 		struct {
 			elByteId *t,*f;
@@ -476,8 +477,7 @@ typedef struct elFileState {
 
 char *elf_get_file_name(elFileState *fs);
 
-elNodeId elf_Fexpr(elFileState *fs, elFileExpr *expr, elBool flags);
-elNodeId elf_Fpostfix(elFileState *fs, elFileExpr *expr, elBool flags);
+void elf_fexpr(elFileState *fs, elFileExpr *expr, int flags, int reg);
 void elf_Fstat(elFileState *fs);
 
 void elf_Zstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
