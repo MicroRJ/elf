@@ -17,7 +17,7 @@ elNumber elf_timediffs(elInteger begin);
 elNumber elf_timediffms(elInteger begin);
 
 
-void elf_Rthrow(elState *R, elByteId id, char *error);
+void elf_rthrow(elState *R, elByteId id, char *error);
 
 
 int elf_get_file_for_byte(elModule *md, elByteId line);

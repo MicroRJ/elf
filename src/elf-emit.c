@@ -14,6 +14,15 @@ elByteId elf_get_last_byteid(elFileState *fs) {
 }
 
 
+elBytecode elf_fgetbyte(elFileState *F) {
+	return F->M->bytes[F->M->nbytes-1];
+}
+
+elBytecode elf_fpopbyte(elFileState *F) {
+	return F->M->bytes[-- F->M->nbytes];
+}
+
+
 elRegId elf_fgetmem(elFileState *fs) {
 	return fs->fn->xmemory;
 }
@@ -96,7 +105,7 @@ elRegId elf_get_node_register(elFileState *fs, elNodeIdTypeGuard id) {
 }
 
 
-int elf_fregalloc(elFileState *F) {
+int elf_fnewreg(elFileState *F) {
 	elFileFnState *fn = F->fn;
 	int reg = fn->xmemory ++;
 	fn->nlocals = MAX(fn->nlocals,fn->xmemory);
@@ -127,18 +136,20 @@ elBytecode elf_emitter_get_byte(elFileState *fs, elByteId id) {
 
 
 elByteId elf_emitter_add_byte(elFileState *fs, elFileline line, elBytecode byte) {
-	/* we just associate each byte with a line,
-	this is simple and is pretty great for debugging... */
-	ARRAY_ADD(fs->M->lines,line);
-	ARRAY_ADD(fs->M->bytes,byte);
-	ARRAY_ADD(fs->M->track,0);
+	elModule *M=fs->M;
+	if (ARRAY_LENGTH(M->bytes)<=M->nbytes) {
+		ARRAY_GROW(M->bytes,1);
+	}
+	ARRAY_ADD(M->lines,line);
+	ARRAY_ADD(M->track,0);
+	M->bytes[M->nbytes]=byte;
 	elFileFnState *fn = fs->fn;
-	elf_bytefpf(stdout,fs->M,-1,fs->M->nbytes-fn->bytes,byte);
-	return fs->M->nbytes ++;
+	elf_bytefpf(stdout,M,-1,M->nbytes-fn->bytes,byte);
+	return M->nbytes ++;
 }
 
 
-elByteId elf_emitter_add_byteop(elFileState *fs, elFileline line, elByteOP k, elInteger i) {
+elByteId elf_femitx(elFileState *fs, elFileline line, elByteOP k, elInteger i) {
 	return elf_emitter_add_byte(fs,line,(elBytecode){k,i});
 }
 
@@ -192,7 +203,7 @@ void elf_emitter_patch_jump(elFileState *fs, elByteId i) {
 }
 
 
-void elf_emitter_patch_jumplist(elFileState *fs, elByteId *js) {
+void elf_fpatchjs(elFileState *fs, elByteId *js) {
 	FOR_ARRAY(i,js) {
 		elf_emitter_patch_jump(fs,js[i]);
 	}
@@ -200,12 +211,12 @@ void elf_emitter_patch_jumplist(elFileState *fs, elByteId *js) {
 
 
 elByteId elf_emit_jump(elFileState *fs, elFileline line, elByteId j) {
-	return elf_emitter_add_byteop(fs,line,BC_J,j - fs->M->nbytes);
+	return elf_femitx(fs,line,BC_J,j - fs->M->nbytes);
 }
 
 
 
-elFileBlock *elf_Fgetblock(elFileState *fs, elBlockId id) {
+elFileBlock *elf_fgetblock(elFileState *fs, elBlockId id) {
 	return &fs->blocks[id > -1 ? id : fs->nblocks + id];
 }
 
@@ -213,11 +224,11 @@ elFileBlock *elf_Fgetblock(elFileState *fs, elBlockId id) {
 /* todo: the block ended flag could be added automatically when
 we add a terminating byte to the current block */
 void elf_emitter_add_block_flags(elFileState *fs, int flags) {
-	elf_Fgetblock(fs,-1)->flags |= flags;
+	elf_fgetblock(fs,-1)->flags |= flags;
 }
 
 
-elBlockId elf_Fbeginblock(elFileState *fs, elBool flags) {
+elBlockId elf_fbeginblock(elFileState *fs, elBool flags) {
 	elBlockId level = fs->nblocks ++;
 	if (ARRAY_LENGTH(fs->blocks) < fs->nblocks) {
 		ARRAY_GROW(fs->blocks,1);
@@ -246,9 +257,9 @@ elBlockId elf_Fbeginblock(elFileState *fs, elBool flags) {
 }
 
 
-void elf_Fcloseblock(elFileState *fs) {
+void elf_fcloseblock(elFileState *fs) {
 	elASSERT(fs->nentities >= fs->fn->entities);
-	elFileBlock *bl = elf_Fgetblock(fs,-1);
+	elFileBlock *bl = elf_fgetblock(fs,-1);
 	elEntityId id;
 	/* xentity is the first entity within a block, if any. */
 	for (id = bl->xentity; id < fs->nentities; ++ id) {
@@ -263,7 +274,7 @@ void elf_Fcloseblock(elFileState *fs) {
 	// fs->fn->block = bl->enclosing;
 	fs->fn->xmemory = bl->xmemory;
 	if (bl->leavejumps != 0) {
-		elf_emitter_patch_jumplist(fs,bl->leavejumps);
+		elf_fpatchjs(fs,bl->leavejumps);
 		ARRAY_DELETE(bl->leavejumps);
 		bl->leavejumps = 0;
 	}
@@ -274,7 +285,7 @@ void elf_Fcloseblock(elFileState *fs) {
 elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register) {
 	int level;
 	for (level = fs->level-1; level > -1; -- level) {
-		elFileBlock *bl = elf_Fgetblock(fs,level);
+		elFileBlock *bl = elf_fgetblock(fs,level);
 		if (bl->flags & BLOCK_LOOP) {
 			if (with_value_register < 0) return bl; else
 			if (bl->loop.value_register == with_value_register) return bl;
@@ -287,19 +298,19 @@ elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_regi
 /* we could merge with adjacent blocks, but this
 would change the order of execution, leave as is? */
 void elf_Fbegindelayblock(elFileState *fs, elFileline line) {//, elFileBlock *bl
-	elByteId jo = elf_emitter_add_byteop(fs,line,BC_DELAY,NO_JUMP);
-	elBlockId id = elf_Fbeginblock(fs,BLOCK_DELAYED);//bl,
+	elByteId jo = elf_femitx(fs,line,BC_DELAY,NO_JUMP);
+	elBlockId id = elf_fbeginblock(fs,BLOCK_DELAYED);//bl,
 	fs->blocks[id].jumpover = jo;
 }
 
 
 void elf_Fclosedelayblock(elFileState *fs, elFileline line) {//, elFileBlock *bl
 	// elf_fdialog(fs,line,"closed block, %i",langL_getlocallabel(fs));
-	elFileBlock *bl = elf_Fgetblock(fs,-1); // fn = fs->fn;
+	elFileBlock *bl = elf_fgetblock(fs,-1); // fn = fs->fn;
 
-	elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
+	elf_femitx(fs,line,BC_LEAVE,0);
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
-	elf_Fcloseblock(fs);
+	elf_fcloseblock(fs);
 
 	elASSERT(bl->entry != bl->jumpover);
 	elf_emitter_patch_jump(fs,bl->jumpover);
@@ -373,7 +384,7 @@ elByteId elf_branch_if_true(elFileState *fs, elFileExpr *js, elRegId x, elNodeId
 */
 elByteId *elf_emit_jump_if_true(elFileState *fs, elFileExpr *js, elRegId x, elNodeId id) {
 	elf_branch_if_true(fs,js,x,id);
-	elf_emitter_patch_jumplist(fs,js->f);
+	elf_fpatchjs(fs,js->f);
 	ARRAY_DELETE(js->f);
 	js->f = 0;
 	return js->t;
@@ -382,7 +393,7 @@ elByteId *elf_emit_jump_if_true(elFileState *fs, elFileExpr *js, elRegId x, elNo
 
 elByteId *elf_emit_jump_if_false(elFileState *fs, elFileExpr *js, elRegId x, elNodeId id) {
 	elf_branch_if_false(fs,js,x,id);
-	elf_emitter_patch_jumplist(fs,js->t);
+	elf_fpatchjs(fs,js->t);
 	ARRAY_DELETE(js->t);
 	js->t = 0;
 	return js->f;
@@ -431,7 +442,7 @@ void elf_emit_desugar_range_expr_epilogue(elFileState *fs, elNodeId x) {
 		} break;
 		case NODE_RANGE_INDEX: {
 			elf_emitter_close_ranged_loop(fs,NO_LINE);
-			elf_Fcloseblock(fs);
+			elf_fcloseblock(fs);
 			elf_emit_desugar_range_expr_epilogue(fs,node.x);
 		} break;
 		default: ;
@@ -540,7 +551,7 @@ elNodeId elf_emit_desugar_range_expr(elFileState *fs, elNodeId x, elBool flags) 
 			elNodeId array,index,value;
 			array = elf_emit_desugar_range_expr(fs,node.x,flags & ~EXPR_LHS);
 
-			elBlockId block = elf_Fbeginblock(fs,BLOCK_LOOP);
+			elBlockId block = elf_fbeginblock(fs,BLOCK_LOOP);
 
 			/*  */
 			elRegId array_register = elf_Zlocalize2reg(fs,line,array);
@@ -569,8 +580,8 @@ elNodeId elf_emit_desugar_range_expr(elFileState *fs, elNodeId x, elBool flags) 
 
 			elf_emitter_begin_ranged_loop(fs,line,index,lo,hi);
 
-			elf_Fgetblock(fs,block)->loop.array_register = array_register;
-			elf_Fgetblock(fs,block)->loop.value_register = elf_Zlocalize2reg(fs,line,value);
+			elf_fgetblock(fs,block)->loop.array_register = array_register;
+			elf_fgetblock(fs,block)->loop.value_register = elf_Zlocalize2reg(fs,line,value);
 
 			return value;
 		}
@@ -839,7 +850,7 @@ elRegId elf_emitter_evaluate(elFileState *fs, elFileline line, elBool flags, elR
 			elFileExpr bool_expr = {0};
 			elByteId *js = elf_emit_jump_if_nil(fs,NO_LINE,&bool_expr,elf_Nlocal(fs,NO_LINE,target_register));
 			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,node.y);
-			elf_emitter_patch_jumplist(fs,js);
+			elf_fpatchjs(fs,js);
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_NIL_OR: {
@@ -847,7 +858,7 @@ elRegId elf_emitter_evaluate(elFileState *fs, elFileline line, elBool flags, elR
 			elFileExpr bool_expr = {0};
 			elByteId *js = elf_emit_jump_if_not_nil(fs,NO_LINE,&bool_expr,elf_Nlocal(fs,NO_LINE,target_register));
 			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,node.y);
-			elf_emitter_patch_jumplist(fs,js);
+			elf_fpatchjs(fs,js);
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_AND: case NODE_OR: {
@@ -860,7 +871,7 @@ elRegId elf_emitter_evaluate(elFileState *fs, elFileline line, elBool flags, elR
 
 			elf_emitter_evaluate(fs,line,LOAD_RELOAD,target_register,1,elf_make_integer_node(fs,line,1));
 
-			elf_emitter_patch_jumplist(fs,js);
+			elf_fpatchjs(fs,js);
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_EQ: case NODE_NEQ:
@@ -877,7 +888,7 @@ elRegId elf_emitter_evaluate(elFileState *fs, elFileline line, elBool flags, elR
 			we know node.x is a projection */
 			elNodeId xx = elf_emit_desugar_range_expr(fs,node.x,flags);
 			if (xx == node.x) {
-				elf_Rthrow(fs->R,NO_BYTE,"internal error");
+				elf_rthrow(fs->R,NO_BYTE,"internal error");
 			}
 
 			elASSERT(elf_Ngetkind(fs,xx) == NODE_INDEX);
@@ -912,7 +923,7 @@ elRegId elf_emitter_evaluate(elFileState *fs, elFileline line, elBool flags, elR
 			elf_Zstore(fs,NO_LINE,tar,elf_make_integer_node(fs,NO_LINE,1));
 			elf_emit_break(fs,NO_LINE,NO_SLOT);
 			/* otherwise continue checking */
-			elf_emitter_patch_jumplist(fs,js);
+			elf_fpatchjs(fs,js);
 			/* finally, emit any necessary epilogue for
 			the desugaring process */
 			elf_emit_desugar_range_expr_epilogue(fs,node.x);
@@ -1014,13 +1025,13 @@ void elf_Fbeginif(elFileState *fs, elFileline line, elSelectState *s, elNodeId x
 	// iff 1 = jnz
 	if (z == L_IF) {
 		elASSERT(js.f != 0);
-		elf_emitter_patch_jumplist(fs,js.t);
+		elf_fpatchjs(fs,js.t);
 		ARRAY_DELETE(js.t);
 		js.t = 0;
 		s->jz = js.f;
 	} else {
 		elASSERT(js.t != 0);
-		elf_emitter_patch_jumplist(fs,js.f);
+		elf_fpatchjs(fs,js.f);
 		ARRAY_DELETE(js.f);
 		js.f = 0;
 		s->jz = js.t;
@@ -1041,7 +1052,7 @@ void elf_Faddelseclause(elFileState *fs, elFileline line, elSelectState *s) {
 	int j = elf_emit_jump(fs,line,-1);
 	ARRAY_ADD(s->j,j);
 
-	elf_emitter_patch_jumplist(fs,s->jz);
+	elf_fpatchjs(fs,s->jz);
 	ARRAY_DELETE(s->jz);
 	s->jz = 0;
 }
@@ -1060,7 +1071,7 @@ void elf_Faddthenclause(elFileState *fs, elFileline line, elSelectState *s) {
 	an exit jump since else and elif or closeif will terminate
 	this block, multiple then blocks are simply chained together
 	naturally. */
-	elf_emitter_patch_jumplist(fs,s->j);
+	elf_fpatchjs(fs,s->j);
 	ARRAY_DELETE(s->j);
 	s->j = 0;
 }
@@ -1069,13 +1080,13 @@ void elf_Faddthenclause(elFileState *fs, elFileline line, elSelectState *s) {
 void elf_Fcloseif(elFileState *fs, elFileline line, elSelectState *s) {
 	/* collect missing else branch */
 	if (s->jz != 0) {
-		elf_emitter_patch_jumplist(fs,s->jz);
+		elf_fpatchjs(fs,s->jz);
 		ARRAY_DELETE(s->jz);
 		s->jz = 0;
 	}
 	/* collect missing then branch */
 	if (s->j != 0) {
-		elf_emitter_patch_jumplist(fs,s->j);
+		elf_fpatchjs(fs,s->j);
 		ARRAY_DELETE(s->j);
 		s->j = 0;
 	}
@@ -1097,7 +1108,7 @@ void elf_Zyield(elFileState *fs, elFileline line, elNodeId id) {
 		elByteId j = elf_femitxyz(fs,line,BC_YIELD,NO_JUMP,x,n);
 		ARRAY_ADD(fs->fn->yj,j);
 		/* if there are no results then simply leave directly */
-	} else elf_emitter_add_byteop(fs,line,BC_LEAVE,0);
+	} else elf_femitx(fs,line,BC_LEAVE,0);
 	elf_fsetmem(fs,regress);
 
 	elf_emitter_add_block_flags(fs,BLOCK_ENDED);
@@ -1105,7 +1116,7 @@ void elf_Zyield(elFileState *fs, elFileline line, elNodeId id) {
 
 
 void elf_Fbegindowhileloop(elFileState *fs, elFileline line) {
-	elFileBlock *bl = elf_Fgetblock(fs,-1); // fs->fn->block
+	elFileBlock *bl = elf_fgetblock(fs,-1); // fs->fn->block
 	elASSERT(bl->flags & BLOCK_LOOP);
 	bl->loop.entry = elf_get_last_byteid(fs);
 	bl->loop.false_jumps = 0;
@@ -1115,7 +1126,7 @@ void elf_Fbegindowhileloop(elFileState *fs, elFileline line) {
 
 
 void elf_Fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x) {
-	elFileBlock *bl = elf_Fgetblock(fs,-1); // fs->fn->block;
+	elFileBlock *bl = elf_fgetblock(fs,-1); // fs->fn->block;
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	elFileExpr js = {0};
@@ -1132,7 +1143,7 @@ void elf_Fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x) {
 
 
 void elf_Fbeginwhileloop(elFileState *fs, elFileline line, elNodeId x) {
-	elFileBlock *bl = elf_Fgetblock(fs,-1);
+	elFileBlock *bl = elf_fgetblock(fs,-1);
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	bl->loop.entry = elf_get_last_byteid(fs);
@@ -1146,21 +1157,21 @@ void elf_Fbeginwhileloop(elFileState *fs, elFileline line, elNodeId x) {
 
 
 void elf_Fclosewhileloop(elFileState *fs, elFileline line) {
-	elFileBlock *bl = elf_Fgetblock(fs,-1);
+	elFileBlock *bl = elf_fgetblock(fs,-1);
 	elASSERT(bl->flags & BLOCK_LOOP);
 
-	elf_emitter_patch_jumplist(fs,bl->loop.true_jumps);
+	elf_fpatchjs(fs,bl->loop.true_jumps);
 	ARRAY_DELETE(bl->loop.true_jumps);
 	bl->loop.true_jumps = 0;
 	elf_emit_jump(fs,line,bl->loop.entry);
-	elf_emitter_patch_jumplist(fs,bl->loop.false_jumps);
+	elf_fpatchjs(fs,bl->loop.false_jumps);
 	ARRAY_DELETE(bl->loop.false_jumps);
 	bl->loop.false_jumps = 0;
 }
 
 
 void elf_emitter_begin_ranged_loop(elFileState *fs, elFileline line, elNodeId index_node, elNodeId lo, elNodeId hi) {
-	elFileBlock *bl = elf_Fgetblock(fs,-1);
+	elFileBlock *bl = elf_fgetblock(fs,-1);
 	elASSERT(bl->flags & BLOCK_LOOP);
 
 	elASSERT(index_node != NO_NODE);
@@ -1186,10 +1197,10 @@ void elf_emitter_begin_ranged_loop(elFileState *fs, elFileline line, elNodeId in
 
 
 void elf_emitter_close_ranged_loop(elFileState *fs, elFileline line) {
-	elFileBlock *bl = elf_Fgetblock(fs,-1); // fs->fn->block;
+	elFileBlock *bl = elf_fgetblock(fs,-1); // fs->fn->block;
 	elASSERT(bl->flags & BLOCK_LOOP);
 
-	elf_emitter_patch_jumplist(fs,bl->loop.true_jumps);
+	elf_fpatchjs(fs,bl->loop.true_jumps);
 	ARRAY_DELETE(bl->loop.true_jumps);
 	bl->loop.true_jumps = 0;
 	// elNodeId index_node = bl->loop.index_node;
@@ -1198,7 +1209,7 @@ void elf_emitter_close_ranged_loop(elFileState *fs, elFileline line) {
 	elf_Zstore(fs,line,index_node,k);
 	elf_emit_jump(fs,line,bl->loop.entry);
 
-	elf_emitter_patch_jumplist(fs,bl->loop.false_jumps);
+	elf_fpatchjs(fs,bl->loop.false_jumps);
 	ARRAY_DELETE(bl->loop.false_jumps);
 	bl->loop.false_jumps = 0;
 }

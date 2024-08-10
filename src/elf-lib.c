@@ -886,7 +886,7 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 		elSETTOP(R,top);
 	} while (FindNextFileA(h,&f));
 #else
-	elf_Rthrow(R,NO_BYTE,"unsupported platform");
+	elf_rthrow(R,NO_BYTE,"unsupported platform");
 #endif
 }
 

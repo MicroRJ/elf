@@ -328,7 +328,7 @@ typedef struct elFileEntity {
 	elBool      flags;
 	char        *name;
 	elFileline   line;
-	union { elRegId local, slot; };
+	union { elRegId reg, /* @DEPRECATED */ local, slot; };
 	int         level;
 } elFileEntity;
 
@@ -477,8 +477,8 @@ typedef struct elFileState {
 
 char *elf_get_file_name(elFileState *fs);
 
-void elf_fexpr(elFileState *fs, elFileExpr *expr, int flags, int reg);
-void elf_Fstat(elFileState *fs);
+void elf_fexpr(elFileState *fs, int flags, int reg, int nreg);
+void elf_fstat(elFileState *fs);
 
 void elf_Zstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register);
@@ -507,6 +507,6 @@ void elf_Fbegindowhileloop(elFileState *fs, elFileline line);
 void elf_Fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x);
 void elf_Fbeginwhileloop(elFileState *fs, elFileline line, elNodeId x);
 void elf_Fclosewhileloop(elFileState *fs, elFileline line);
-elBlockId elf_Fbeginblock(elFileState *fs, elBool flags);
-void elf_Fcloseblock(elFileState *fs);
+elBlockId elf_fbeginblock(elFileState *fs, elBool flags);
+void elf_fcloseblock(elFileState *fs);
 

@@ -221,7 +221,7 @@ void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias) {
 		elInteger alias_slot = elf_table_try(tab,alias);
 		tab->slots[alias_slot].k = alias;
 		tab->slots[alias_slot].i = tab->slots[key_slot].i;
-	} else elf_Rthrow(S,NO_BYTE,"attempted to alias a key that was never added");
+	} else elf_rthrow(S,NO_BYTE,"attempted to alias a key that was never added");
 }
 
 
@@ -418,15 +418,15 @@ int elf_libH_index(elState *R) {
 		for (int i = 0; i < elGETNARGS(R); ++ i) {
 			if (i != 0) {
 				if (value.tag == TAG_NIL) {
-					elf_Rthrow(R,NO_BYTE,"nil object");
+					elf_rthrow(R,NO_BYTE,"nil object");
 				}
 				/* todo: please do much better error reporting
 				here, this can be hard to figure out */
 				if (value.tag != TAG_TAB) {
-					elf_Rthrow(R,NO_BYTE,"not a table");
+					elf_rthrow(R,NO_BYTE,"not a table");
 				}
 				if (tab == 0) {
-					elf_Rthrow(R,NO_BYTE,"nil object");
+					elf_rthrow(R,NO_BYTE,"nil object");
 				}
 			}
 
@@ -455,7 +455,7 @@ int elf_libH_delete(elState *R) {
 	elValue *array = tab->array;
 	elInteger slot = elf_table_try(tab,key);
 	if ((slot < 0) || (slots[slot].k.tag == TAG_NIL)) {
-		elf_Rthrow(R,NO_BYTE,"invalid key");
+		elf_rthrow(R,NO_BYTE,"invalid key");
 		goto leave_;
 	}
 	elInteger idx = slots[slot].i;
@@ -463,7 +463,7 @@ int elf_libH_delete(elState *R) {
 	slots[slot].i = 0;
 	elInteger len = ARRAY_LENGTH(array);
 	if ((idx < 0) || (idx > len-1)) {
-		elf_Rthrow(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
+		elf_rthrow(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
 		goto leave_;
 	}
 	elPUSH(R,array[idx]);
@@ -504,7 +504,7 @@ int elf_libH_xdelete(elState *R) {
 			}
 			if (item == 0) {
 				/* todo: maybe not crash here */
-				elf_Rthrow(R,NO_BYTE,"item does not belong");
+				elf_rthrow(R,NO_BYTE,"item does not belong");
 			}
 			elASSERT((item - tab->array) == idx);
 			elPUSH(R,*item);
@@ -549,10 +549,10 @@ int elf_libH_xremove(elState *R) {
 			elASSERT((item - tab->array) == idx);
 			// elInteger idx = item - tab->array;
 			// if (item < tab->array || item > tab->array + len - 1) {
-			// 	elf_Rthrow(R,NO_BYTE,"item does not belong");
+			// 	elf_rthrow(R,NO_BYTE,"item does not belong");
 			// }
 			if (item == 0) {
-				elf_Rthrow(R,NO_BYTE,"item does not belong");
+				elf_rthrow(R,NO_BYTE,"item does not belong");
 			}
 			elPUSH(R,*item);
 			elInteger min = ARRAY_POP(tab->array);
@@ -826,7 +826,7 @@ int elf_libH_diff(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *sub = elf_get_table(R,0);
 	if (sub == 0) {
-		elf_Rthrow(R,NO_BYTE,"argument is nil");
+		elf_rthrow(R,NO_BYTE,"argument is nil");
 	}
 	elTable *dif = elf_new_table(R);
 	elInteger i;
