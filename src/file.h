@@ -7,14 +7,12 @@
 
 typedef struct elToken {
 	unsigned char 	type;
-	elFileline 		line;
-	/* whether this token was terminated by an
-	end of line character */
-	unsigned int 	 eol: 1;
+	char *line;
+	unsigned int eol: 1;
 	union {
-		elInteger integer, /* @DEPRECATED */  i;
-		elNumber   number, /* @DEPRECATED */  n;
-		char 		 *string,	*text, /* @DEPRECATED */ *s;
+		elInteger integer;
+		elNumber   number;
+		char 		   *text;
 	};
 } elToken;
 
@@ -147,17 +145,17 @@ typedef enum elTokenType {
 */
 
 
-/* todo: make these negative values and just use regular
-register node... */
-#define SPECIAL_REGISTER_INDEX 0 // #index
-#define SPECIAL_REGISTER_VALUE 1 // #value
-#define SPECIAL_REGISTER_ARRAY 2 // #array
-
 #define NO_NODE (-1)
+
+#define SPECIAL_REGISTER_THIS   (     0) // #this
+#define SPECIAL_REGISTER_INDEX  (0xff+1) // #index
+#define SPECIAL_REGISTER_VALUE  (0xff+2) // #value
+#define SPECIAL_REGISTER_ARRAY  (0xff+3) // #array
+
 
 typedef int elNodeId;
 
-
+/* this is silly */
 typedef struct {
 	elNodeId id;
 } elNodeIdTypeGuard;
@@ -199,8 +197,7 @@ _(TYPEGUARD)\
 _(LOAD)\
 _(CLOSURE) _(STRING) _(TABLE) \
 _(INTEGER) _(NUMBER) _(NIL) \
-_(SPECIAL_REGISTER) \
-_(GLOBAL) _(LOCAL) _(CLOSURE_VALUE) _(FILE_VALUE) \
+_(GLOBAL) _(LOCAL) _(CLSVAL) _(FILE_VALUE) \
 _(MULTI)\
 _(METAFIELD)\
 _(CALL)\
@@ -245,43 +242,33 @@ typedef struct elNode {
 } elNode;
 
 
-elNodeId elf_make_node_xyz(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y, elNodeId *z);
-elNodeId elf_make_binary_node(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y);
-elNodeId elf_make_node_unary(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x);
+elNodeId elf_fnodexyz(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y, elNodeId *z);
+elNodeId elf_nodexy(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x, elNodeId y);
+elNodeId elf_nodex(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x);
 
-elNodeId elf_make_nil_node(elFileState *fs, elFileline);
-elNodeId elf_make_integer_node(elFileState *fs, elFileline, elInteger i);
-elNodeId elf_make_number_node(elFileState *fs, elFileline, elNumber n);
-elNodeId elf_make_string_node(elFileState *fs, elFileline, char *);
+elNodeId elf_nnil(elFileState *fs, elFileline);
+elNodeId elf_fnodeint(elFileState *fs, elFileline, elInteger i);
+elNodeId elf_nnumber(elFileState *fs, elFileline, elNumber n);
+elNodeId elf_fnodestr(elFileState *fs, elFileline, char *);
 
 elNodeId elf_make_nullary_node(elFileState *fs, elFileline, elNodeKi k, elNodeTy t);
 elNodeId elf_make_group_node(elFileState *fs, elFileline, elNodeId x);
 
 
-elNodeId elf_make_table_node(elFileState *fs, elFileline, elNodeId *z);
+elNodeId elf_nnewtable(elFileState *fs, elFileline, elNodeId *z);
 elNodeId elf_make_closure_node(elFileState *fs, elFileline, elNodeId x, elNodeId *z);
 elNodeId elf_make_load_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_local_node(elFileState *fs, elFileline line, elNodeId i);
-elNodeId elf_make_special_register_node(elFileState *fs, elFileline line, elNodeId i);
-elNodeId elf_make_global_value_node(elFileState *fs, elFileline line, elNodeId i);
-elNodeId elf_closure_node(elFileState *fs, elFileline line, elNodeId i);
-elNodeId elf_make_type_guard_node(elFileState *fs, elFileline line, elNodeId x, elNodeTy y);
-elNodeId elf_make_metafield_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_make_field_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_make_index_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_fnodelocal(elFileState *fs, elFileline line, elNodeId i);
+elNodeId elf_fnodeglobal(elFileState *fs, elFileline line, elNodeId i);
+elNodeId elf_nclosevalue(elFileState *fs, elFileline line, elNodeId i);
+elNodeId elf_ntypeguard(elFileState *fs, elFileline line, elNodeId x, elNodeTy y);
+elNodeId elf_fnodemetafield(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_nfieldaccess(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_nindexaccess(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_make_ranged_index_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_make_call_node(elFileState *fs, elFileline line, elNodeId x, elNodeId *z);
-
-
-elValueTag elf_nodettotag(elNodeTy ty) {
-	switch (ty) {
-		case NT_SYS: return TAG_SYS;
-		case NT_NUM: return TAG_NUM;
-		case NT_INT: return TAG_INT;
-		default: elNOCODE;
-	}
-	return TAG_NIL;
-}
+elNodeId elf_fnodecall(elFileState *fs, elFileline line, elNodeId x, elNodeId *z);
+elNodeId elf_ncallmetafield(elFileState *fs, elFileline line, elNodeId x, elNodeId *z, char *name);
+elNodeId elf_make_node_less_than(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 
 
 
@@ -325,11 +312,11 @@ typedef enum elEntityKind {
 
 typedef struct elFileEntity {
 	elEntityKind kind;
-	elBool      flags;
-	char        *name;
-	elFileline   line;
-	union { elRegId local, slot; };
-	int         level;
+	int   flags;
+	char  *name;
+	char  *line;
+	int     reg;
+	int   level;
 } elFileEntity;
 
 
@@ -474,39 +461,41 @@ typedef struct elFileState {
 	elRegId default_register;
 } elFileState;
 
-char *elf_get_file_name(elFileState *fs);
+char *elf_fgetfilename(elFileState *fs);
 
-elNodeId elf_parse_expr(elFileState *fs, elFileExpr *expr, elBool flags);
-elNodeId elf_parse_unary_expr(elFileState *fs, elFileExpr *expr, elBool flags);
-void elf_parse_file_stat(elFileState *fs);
+elNodeId elf_fexpr(elFileState *fs, elFileExpr *expr, elBool flags);
+elNodeId elf_funary(elFileState *fs, elFileExpr *expr, elBool flags);
+void elf_fstat(elFileState *fs);
+void elf_fforloop(elFileState *fs);
 
-void elf_emitter_emit_store(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elFileBlock *elf_emitter_get_loop_block(elFileState *fs, elRegId with_value_register);
-elRegId elf_emitter_local_load(elFileState *fs, elFileline line, elBool reload, elRegId x, elRegId y, elNodeId id);
-elRegId elf_emitter_localize(elFileState *fs, elFileline line, elNodeId id);
-elRegId elf_emitter_relocalize(elFileState *fs, elFileline line, elRegId target_register, elNodeIdTypeGuard id);
-void elf_emitter_enter_delayed_block(elFileState *fs, elFileline line);
-void elf_emitter_leave_delayed_block(elFileState *fs, elFileline line);
-elByteId elf_branch_if_false(elFileState *fs, elFileExpr *js, elRegId x, elNodeId id);
-elByteId elf_branch_if_true(elFileState *fs, elFileExpr *js, elRegId x, elNodeId id);
-elByteId *elf_emit_jump_if_true(elFileState *fs, elFileExpr *js, elRegId x, elNodeId id);
-elByteId *elf_emit_jump_if_false(elFileState *fs, elFileExpr *js, elRegId x, elNodeId id);
+void elf_femitstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elFileBlock *elf_fgetloopblock(elFileState *fs, elRegId with_value_register);
+
+int elf_femittereval(elFileState *fs, int flags, int reg, int nreg, elNodeId id);
+int elf_femitterload(elFileState *fs, elNodeId id);
+
+void elf_fbeginlastlyblock(elFileState *fs, elFileline line);
+void elf_fcloselastlyblock(elFileState *fs, elFileline line);
+int elf_femitbranchiffalse(elFileState *fs, elFileExpr *js, elNodeId id);
+int elf_femitbranchiftrue(elFileState *fs, elFileExpr *js, elNodeId id);
+int *elf_femitjumpiftrue(elFileState *fs, elFileExpr *js, elNodeId id);
+int *elf_femitjumpiffalse(elFileState *fs, elFileExpr *js, elNodeId id);
 
 // JZ
 // JNZ
 enum { L_IF  = 0, L_IFF = 1, };
 
-void elf_emitter_begin_if(elFileState *fs, elFileline line, elSelectState *s, elNodeId x, int z);
-void elf_emitter_add_elif_clause(elFileState *fs, elFileline line, elSelectState *s, elNodeId x);
-void elf_emitter_add_else_clause(elFileState *fs, elFileline line, elSelectState *s);
-void elf_emitter_add_then_clause(elFileState *fs, elFileline line, elSelectState *s);
-void elf_emitter_close_if(elFileState *fs, elFileline line, elSelectState *s);
-void elf_emitter_begin_ranged_loop(elFileState *fs, elFileline line, elNodeId x, elNodeId lo, elNodeId hi);
-void elf_emitter_close_ranged_loop(elFileState *fs, elFileline line);
-void elf_emitter_begin_do_while_loop(elFileState *fs, elFileline line);
-void elf_emitter_close_do_while_loop(elFileState *fs, elFileline line, elNodeId x);
-void elf_emitter_begin_while_loop(elFileState *fs, elFileline line, elNodeId x);
-void elf_emitter_close_while_loop(elFileState *fs, elFileline line);
-elBlockId elf_emitter_begin_block(elFileState *fs, elBool flags);
-void elf_emitter_close_block(elFileState *fs);
+void elf_fbeginif(elFileState *fs, elFileline line, elSelectState *s, elNodeId x, int z);
+void elf_fifaddelifclause(elFileState *fs, elFileline line, elSelectState *s, elNodeId x);
+void elf_fifaddelseclause(elFileState *fs, elFileline line, elSelectState *s);
+void elf_fifaddthenclause(elFileState *fs, elFileline line, elSelectState *s);
+void elf_fcloseif(elFileState *fs, elFileline line, elSelectState *s);
+void elf_fbeginrangeloop(elFileState *fs, elFileline line, elNodeId x, elNodeId lo, elNodeId hi);
+void elf_fcloserangeloop(elFileState *fs, elFileline line);
+void elf_fbegindowhileloop(elFileState *fs, elFileline line);
+void elf_fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x);
+void elf_fbeginwhileloop(elFileState *fs, elFileline line, elNodeId x);
+void elf_fclosewhileloop(elFileState *fs, elFileline line);
+elBlockId elf_fbeginblock(elFileState *fs, elBool flags);
+void elf_fcloseblock(elFileState *fs);
 

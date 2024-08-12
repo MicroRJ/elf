@@ -321,7 +321,7 @@ int elf_lib_debugger(elState *R) {
 #else
 	char *message = "no message";
 	if (elGETNARGS(R) != 0) {
-		message = elf_get_charstring(R,0);
+		message = elf_get_text(R,0);
 	}
 	elf_debugger(message);
 #endif
@@ -346,91 +346,6 @@ int elflib_err(elState *R) {
 }
 
 
-/* the include function merges or includes
-** the given symbol tree into the
-** global symbol tree.
-**
-** Usage:
-** 	elf.pf("before")
-** 	elf.include("elf")
-** 	.pf("after")
-**
-**
-** REMARKS: useful for when you want to
-** avoid having to access a symbol
-** explicitly each time.
-** - Note that this will not improve
-** performance in any way, if anything
-** it'll augment the number of symbols
-** in the global directory.
-** - Also note that this is done at runtime
-** and you should use especial for this function.
-**
-** The include function finds all the symbols
-** within the given directory and for each
-** target symbol it creates a new one in the
-** root directory that points to the \value
-** of the target symbol.
-**
-** For instance elf.include("elf")
-** finds all symbols within elf.* and
-** adds them to the root directory,
-** now pf is accessible through '.pf'
-** as supposed to 'elf.pf'.
-** Note how there's a '.' before pf,
-** this is for a reason.
-** The dot remains so that the loader
-** knows beforehand that you're
-** explicitly referring to a symbol.
-**
-** If the symbol is a single word there's
-** no need to add the '.' because the
-** loader would know, but there are some
-** drawbacks and edge cases that come
-** with this, for instance:
-**
-** 1) It becomes less clear what you're
-** referring to.
-** 2) It could conflict with a local or
-** an already defined global with the
-** same name.
-** 3) It is not consistent.
-** So include will always keep the '.'
-** to make it explicit to the loader
-** that you're referring to a global
-** symbol.
-** For the elf directory, elf is a
-** reserved keyword, and so the loader
-** already knows you're referring to
-** the elf directory.
-** So in other words, using '.' avoids
-** semantic ambiguities and inconsistencies.
-** Here's one example:
-** The directory elf.ray contains:
-** BlendMode.ADDITIVE, to access ADDITIVE
-** you'd do: elf.ray.BlendMode.ADDITIVE,
-** that's long name, you'd rather have a
-** shortcut, so you do:
-** elf.include("elf.ray")
-** Now, elf.include happens at runtime so
-** the loader has no idea of what you just
-** did, and besides, given the dynamic nature
-** of the language it has no way of knowing
-** what it is you're referring to precisely.
-** However, you can still do:
-** .BlendMode.ADDITIVE,
-** because '.' is a language feature that
-** tells the loader: Hey, this is a symbol
-** not a field reference and not some local.
-** So the loader links to the global as
-** it is '.BlendMode.ADDITIVE', trusting
-** that it'll be bound at runtime before,
-** it's first use, and effectively, it gets
-** bound by the previous include.
-*/
-
-
-
 char *elf_insymdir(char *dir, char *sym) {
 	do {
 		if (*dir ++ != *sym ++) {
@@ -441,10 +356,12 @@ char *elf_insymdir(char *dir, char *sym) {
 }
 
 
-int elflib_include(elState *R) {
+/* the dot is added so that symbols like elf.math.floor
+are not mistaken with table accesses when shortened, math.floor != .math.floor */
+int elf_lib_include(elState *R) {
 	elf_check_args(R,".include",1,"(the directory to include to add to the global directory)");
-	char *dir = elf_get_charstring(R,0);
-	int plen = elf_cstrlen(dir);
+	char *dir = elf_get_text(R,0);
+	int plen = elf_textlength(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:
 	elf.ray.elf.ray could include the symbol
@@ -480,7 +397,10 @@ int elf_lib_load_expr(elState *R) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_parse_expr3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
+	elNOCODE;
+	(void) filename;
+	(void) contents;
+	// elf_parse_expr3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -496,7 +416,10 @@ int elf_lib_load_code(elState *R) {
 		filename = elf_add_new_string(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
-	elf_parse_code3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
+	elNOCODE;
+	(void) filename;
+	(void) contents;
+	// elf_parse_code3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield,contents);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -504,7 +427,7 @@ int elf_lib_load_code(elState *R) {
 
 int elf_lib_load_file(elState *R) {
 	elString *filename = elf_get_string(R,0);
-	elf_parse_file3(R,filename,elGETFRAME(R)->ry,elGETFRAME(R)->ntoyield);
+	elf_Sloadfile(R,filename,elGETFRAME(R)->nregs);
 	/* no need to do hoisting */
 	return 0;
 }
@@ -555,9 +478,9 @@ int elflib_loadlib(elState *R) {
 /* todo: move to windows layer */
 int elf_lib_shell(elState *R) {
 #if defined(_WIN32)
-	char *verb = elf_get_charstring(R,0);
-	char *file = elf_get_charstring(R,1);
-	char *args = elf_get_charstring(R,2);
+	char *verb = elf_get_text(R,0);
+	char *file = elf_get_text(R,1);
+	char *args = elf_get_text(R,2);
 	if ((INT_PTR)ShellExecute(NULL,verb,file,args,NULL,10) > 32) {
 		elPUSHINT(R,1);
 	} else elPUSHINT(R,0);
@@ -583,8 +506,8 @@ int elflib_exec(elState *R) {
 
 int elf_lib_fopen(elState *R) {
 	elASSERT(elGETNARGS(R) == 2);
-	char *name = elf_get_charstring(R,0);
-	char *flags = elf_get_charstring(R,1);
+	char *name = elf_get_text(R,0);
+	char *flags = elf_get_text(R,1);
 	FILE *file = fopen(name,flags);
 	elPUSHSYS(R,(elHandle)file);
 	return 1;
@@ -636,7 +559,7 @@ int elflib_ftemp(elState *R) {
 
 
 int elf_lib_change_work_dir(elState *R) {
-	int ok = sys_changeworkdir(elf_get_charstring(R,0));
+	int ok = sys_changeworkdir(elf_get_text(R,0));
 	elPUSHINT(R,ok);
 	return 1;
 }
@@ -777,7 +700,7 @@ elAPI int elf_lib_timediffms(elState *S) {
 
 
 int elf_lib_get_file_size(elState *S) {
-	char *path = elf_get_charstring(S,0);
+	char *path = elf_get_text(S,0);
 	elInteger size = -1;
 	#if defined(_WIN32)
 	WIN32_FILE_ATTRIBUTE_DATA attrs;
@@ -801,7 +724,7 @@ elAPI int elf_lib_get_disk_info(elState *R) {
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
-	GetDiskFreeSpaceA(elf_get_charstring(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
+	GetDiskFreeSpaceA(elf_get_text(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
 	elTable *info = elf_add_new_table(R);
 	elf_table_set_integer_field(info,elf_new_string(R,"SectorsPerCluster"),SectorsPerCluster);
 	elf_table_set_integer_field(info,elf_new_string(R,"BytesPerSector"),BytesPerSector);
@@ -886,7 +809,7 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 		elSETTOP(R,top);
 	} while (FindNextFileA(h,&f));
 #else
-	elf_throw(R,NO_BYTE,"unsupported platform");
+	elf_Sthrow(R,NO_BYTE,"unsupported platform");
 #endif
 }
 
@@ -1049,7 +972,7 @@ elAPI void elf_lib_loadfunctions(elState *R) {
 	elf_register_binding(R,"elf.loadlib",elflib_loadlib);
 	elf_register_binding(R,"elf.libfn",elflib_libfn);
 
-	elf_register_binding(R,"elf.include",elflib_include);
+	elf_register_binding(R,"elf.include",elf_lib_include);
 	elf_register_binding(R,"elf.loadcode",elf_lib_load_code);
 	elf_register_binding(R,"elf.loadexpr",elf_lib_load_expr);
 	elf_register_binding(R,"elf.loadfile",elf_lib_load_file);

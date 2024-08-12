@@ -79,8 +79,8 @@
 // } elTokenType;
 
 
-// elTokenType elf_is_word_or_macro(char *name) {
-// 	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_M_,NAME);
+// elTokenType elf_textiswordormacro(char *name) {
+// 	#define MCITEM(NAME,SYM) if (elf_texteq(SYM,name)) return elFUSE(TK_M_,NAME);
 // 		MCLIST(MCITEM)
 // 	#undef MCITEM
 // 	return TK_WORD;
@@ -88,7 +88,7 @@
 
 
 // elTokenType elf_is_word_or_keyword(char *name) {
-// 	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_,NAME);
+// 	#define KWITEM(NAME,SYM) if (elf_texteq(SYM,name)) return elFUSE(TK_,NAME);
 // 		KWLIST(KWITEM)
 // 	#undef KWITEM
 // 	return TK_WORD;

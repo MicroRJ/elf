@@ -39,7 +39,7 @@
 // 	elClosure *cl = elf_get_closure(c,0);
 // 	elFileProto p = cl->fn;
 // 	char file[BUFFER];
-// 	elf_clear_memory(file,sizeof(file));
+// 	elf_clearmemory(file,sizeof(file));
 // 	int j;
 // 	for (j = 0; j < p.nbytes; ++j) {
 // 		if (j != 0) strcatf(file,"\n");

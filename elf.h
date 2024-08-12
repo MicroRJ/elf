@@ -171,7 +171,7 @@ typedef struct elBinding {
 elAPI elInteger elf_get_integer(elState *R, elRegId x);
 elAPI elNumber elf_get_number(elState *R, elRegId x);
 elAPI elString *elf_get_string(elState *R, elRegId x);
-elAPI char *elf_get_charstring(elState *R, elRegId x);
+elAPI char *elf_get_text(elState *R, elRegId x);
 elAPI elObject *elf_get_object(elState *R, elRegId x);
 elAPI elTable *elf_get_table(elState *R, elRegId x);
 elAPI elHandle elf_get_handle(elState *R, elRegId x);
@@ -433,10 +433,11 @@ use C's "cast to union types" for typechecking:
 #define elNIL() (elLITERAL(elValue){TAG_NIL})
 
 
-#define elGETTHIS(S)  (elGETFRAME(S)->locals[0].x_obj)
-#define elGETARG(S,X) (elGETFRAME(S)->locals[1+X])
-#define elGETTAG(S,X) (elGETARG(S,X).tag)
-#define elGETNARGS(S) (elGETFRAME(S)->nargs-1)
+#define elGETNARGS(S)   (elGETFRAME(S)->nargs-1)
+#define elGETLOCAL(S,X) (elGETFRAME(S)->locals[X])
+#define elGETTHIS(S)    (elGETLOCAL(S,0).x_obj)
+#define elGETARG(S,X)   (elGETLOCAL(S,X+1))
+#define elGETTAG(S,X)   (elGETARG(S,X).tag)
 
 
 #define elPUSHNIL(S) elPUSH(S,elNIL())
@@ -473,49 +474,15 @@ object, and you use that however you want... */
 /* todo: add support for arguments */
 elAPI int elf_parse_code3(elState *, elString *name, elRegId ry, int ny, elString *contents);
 elAPI int elf_parse_expr3(elState *, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_parse_file3(elState *, elString *name, elRegId ry, int ny);
 
-elAPI int elf_parse_code3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_Sfloadcode(elState *R, elFileState *fs, elString *filename, int nargs, elString *contents);
 elAPI int elf_parse_expr3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_parse_file3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny);
 
-/*
-	Find somewhere else to put this information...
 
-	When you call a function 'this' will always be passed,
-	if you call a field or metafield, this will be the object,
-	if you call a function not from a field or metafield
-	you have to pass in 'this' manually using special syntax,
-	otherwise 'this' defaults to the current 'this'...
+elAPI int elf_Sloadfile(elState *, elString *name, int nargs);
+elAPI int elf_Sfloadfile(elState *, elFileState *fs, elString *name, int nargs);
 
-	For instance,
-
-	my_table:mymetafield(1,2,3)
-	my_table.myregularfield(1,2,3)
-
-	'this' is implicit here as 'my_table',
-
-	let field = my_table.myregularfield
-
-	field(1,2,3)
-
-	'this' is implicit here as 'this' (from the current context),
-
-	field<my_table>(1,2,3)
-
-	'this' is explicit here as 'my_table',
-
-	The default 'this' is the current closure object...
-
-	To get the current closure object, always, you can
-	do '#this'.
-
-	The closure object is above 'this', so '#this'
-	translates could translate to
-	elf.get_local(#register this - 1)
-*/
-int elf_call_function3(elState *R, elObject *obj, int nx, int ny, elRegId ry);
-
+elAPI int elf_Scallfunction(elState *R, int nargs, int nregs);
 elAPI int elf_run(elState *);
 
 elInteger elf_trigger_collection_cycle(elState *R);
@@ -589,16 +556,11 @@ typedef struct elStackFrame elStackFrame;
 typedef struct elStackFrame {
 	elStackFrame *caller;
 	elClosure   *closure;
-	elObject      *_this;
 	elValue      *locals;
 	int          nlocals;
 	char			   nargs;
-	char			ntoyield;
+	char			   nregs;
 	elByteId      origin;
-
-	// todo: to remove
-	elRegId           ry;
-
 	/* the number of inputs (nx) and
 	the number of expected outputs (ny).
 	Output registers are allocated by the
@@ -871,7 +833,7 @@ at the same time when using clang-cl */
 #include "src/elf-tab.c"
 #include "src/elf-lex.c"
 #include "src/elf-node.c"
-#include "src/elf-emit.c"
+#include "src/emit.c"
 #include "src/file.c"
 #include "src/elf-api.c"
 

@@ -11,13 +11,13 @@ elGLOBAL elAllocator langM_globalalloc = {"default-heap-allocator",elf_defglobal
 
 
 /* todo: should prob be using something like stb leak */
-void *elf_clear_memory(void *target, elInteger length) {
+void *elf_clearmemory(void *target, elInteger length) {
 	memset(target,0,length);
 	return target;
 }
 
 
-void *elf_copy_memory(void *target, void const *source, elInteger length) {
+void *elf_copymemory(void *target, void const *source, elInteger length) {
 	memcpy(target,source,length);
 	return target;
 }
@@ -45,7 +45,7 @@ void *elf_realloc_(elAllocator *c, elInteger length, void *memory, elSourceInfo 
 
 
 void *elf_calloc_(elAllocator *c, elInteger size, elSourceInfo loca) {
-	return elf_clear_memory(elf_alloc_(c,size,loca),size);
+	return elf_clearmemory(elf_alloc_(c,size,loca),size);
 }
 
 

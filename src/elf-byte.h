@@ -49,21 +49,20 @@ _(JE, XY, "je") \
 _(JNE, XY, "jne") \
 _(DELAY, I, "delay") \
 _(LEAVE, I, "leave") \
-_(YIELD, I, "yield") \
+_(YIELD, XYZ, "yield") \
 _(TYPEGUARD, XY, "typeguard") \
-_(LOADGLOBAL, XY, "load_global") \
-_(LOADNUM, XY, "load_num") \
-_(LOADINT, XY, "load_int") \
-_(LOADNIL, I, "load_nil") \
-_(LOADTHIS, I, "load_this") \
-_(LOADCACHE, XY, "load_cache") \
-_(INDEX, XYZ, "load_index") \
-_(FIELD, XYZ, "load_field") \
-_(METAFIELD, XYZ, "load_metafield") \
+_(LOADGLOBAL, XY, "getglobal")\
+_(SETGLOBAL, XY, "setglobal")\
+_(LOADNUM, XY, "getnum") \
+_(LOADINT, XY, "getint") \
+_(LOADNIL, I, "getnil") \
+_(GETCLSVAL, XY, "getcache") \
+_(INDEX, XYZ, "getindex") \
+_(SETINDEX, XYZ, "setindex")\
+_(FIELD, XYZ, "getfield") \
+_(SETFIELD, XYZ, "setfield")\
+_(METAFIELD, XYZ, "getmetafield") \
 _(RELOAD, XY, "reload") \
-_(SETGLOBAL, XY, "set_global") \
-_(SETINDEX, XYZ, "set_global") \
-_(SETFIELD, XYZ, "set_global") \
 _(CALL, XYZ, "call") \
 _(TABLE, I, "new_table") \
 _(CLOSURE, XY, "new_closure") \

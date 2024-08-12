@@ -22,7 +22,7 @@ elString *elf_new_lstring(elState *R, elInteger length) {
 }
 
 elString *elf_new_string(elState *R, char *contents) {
-	int length = elf_cstrlen(contents);
+	int length = elf_textlength(contents);
 	elHashId hash = elf_tabhashstr(contents);
 	elString *string = 0;
 	elTable *registry = R->M->strings;
@@ -36,7 +36,7 @@ elString *elf_new_string(elState *R, char *contents) {
 			string = target.x_str;
 		} else {
 			string = elf_new_lstring(R,length);
-			elf_copy_memory(string->contents,contents,length);
+			elf_copymemory(string->contents,contents,length);
 			string->hash = hash;
 
 			elInteger i = ARRAY_GROW(registry->array,1);
@@ -47,7 +47,7 @@ elString *elf_new_string(elState *R, char *contents) {
 		}
 	} else {
 		string = elf_new_lstring(R,length);
-		elf_copy_memory(string->contents,contents,length);
+		elf_copymemory(string->contents,contents,length);
 		string->hash = hash;
 	}
 	return string;
@@ -59,7 +59,7 @@ elBool elf_streq(elString *x, elString *y) {
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;
 	if (x->length != y->length) return 0;
-	return S_eq(x->string,y->string);
+	return elf_texteq(x->string,y->string);
 }
 
 
@@ -93,7 +93,7 @@ int elf_libS_get_index(elState *R) {
 int elf_libS_pop(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
-	elf_copy_memory(el->contents,yo->contents,MAX(0,yo->length-1));
+	elf_copymemory(el->contents,yo->contents,MAX(0,yo->length-1));
 	elPUSHSTR(R,el);
 	return 1;
 }
@@ -102,7 +102,7 @@ int elf_libS_pop(elState *R) {
 int elf_libS_append_char(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,yo->length + elGETNARGS(R));
-	elf_copy_memory(el->contents,yo->contents,yo->length);
+	elf_copymemory(el->contents,yo->contents,yo->length);
 	for ( int i = 0; i < elGETNARGS(R); i += 1 ) {
 		el->contents[yo->length + i] = elf_get_integer(R,i);
 	}
@@ -142,7 +142,7 @@ int elf_libS_match(elState *R) {
 
 int elf_libS_find(elState *R) {
 	elString *string = (elString*) elGETTHIS(R);
-	char *pattern = elf_get_charstring(R,0);
+	char *pattern = elf_get_text(R,0);
 	char *buffer = 0;
 	char *cursor = string->contents;
 	elTable *list = elf_add_new_table(R);

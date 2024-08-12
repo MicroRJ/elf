@@ -53,7 +53,7 @@ char elf_chrtouppercase(char x) {
 }
 
 
-int elf_cstrlen(char const *s) {
+int elf_textlength(char const *s) {
 	int n = 0;
 	if (s != 0) {
 		while (*s ++ != 0) {
@@ -78,7 +78,7 @@ elBool elf_cstrhasprefix(char *str, char *prefix) {
 }
 
 
-elBool S_eql(char const *x, char const *y, int n) {
+elBool elf_texteql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
 			return 0;
@@ -88,27 +88,30 @@ elBool S_eql(char const *x, char const *y, int n) {
 }
 
 
-elBool S_eq(char const *x, char const *y) {
-	int lx = elf_cstrlen(x);
-	int ly = elf_cstrlen(y);
-	return (lx == ly) && S_eql(x,y,lx);
+elBool elf_texteq(char const *x, char const *y) {
+	if (x == y) {
+		return 1;
+	}
+	int lx = elf_textlength(x);
+	int ly = elf_textlength(y);
+	return (lx == ly) && elf_texteql(x,y,lx);
 }
 
 
-char *S_ncopy(elAllocator *allocator, int length, char const *string) {
+char *elf_copyltext(elAllocator *allocator, int length, char const *string) {
 	if (length <= 0) {
-		length = elf_cstrlen(string);
+		length = elf_textlength(string);
 	}
 	char *result = elf_alloc(allocator,length+1);
-	elf_copy_memory(result,string,length);
+	elf_copymemory(result,string,length);
 	result[length]=0;
 	return result;
 }
 
 
-char *S_copy(elAllocator *allocator, char const *string) {
+char *elf_copytext(elAllocator *allocator, char const *string) {
 
-	return S_ncopy(allocator,-1,string);
+	return elf_copyltext(allocator,-1,string);
 }
 
 

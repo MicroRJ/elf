@@ -7,8 +7,8 @@
 #undef TRUE
 #undef FALSE
 
-elTokenType elf_is_word_or_macro(char *name) {
-	#define MCITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_M_,NAME);
+elTokenType elf_textiswordormacro(char *name) {
+	#define MCITEM(NAME,SYM) if (elf_texteq(SYM,name)) return elFUSE(TK_M_,NAME);
 	MCLIST(MCITEM)
 	#undef MCITEM
 	return TK_WORD;
@@ -16,7 +16,7 @@ elTokenType elf_is_word_or_macro(char *name) {
 
 
 elTokenType elf_is_word_or_keyword(char *name) {
-	#define KWITEM(NAME,SYM) if (S_eq(SYM,name)) return elFUSE(TK_,NAME);
+	#define KWITEM(NAME,SYM) if (elf_texteq(SYM,name)) return elFUSE(TK_,NAME);
 	KWLIST(KWITEM)
 	#undef KWITEM
 	return TK_WORD;
@@ -48,7 +48,7 @@ elGLOBAL ltokenintel elf_tkintel[] = {
 
 
 
-void elf_file_dialog(elFileState *fs, char *line, char const *fmt, ...) {
+void elf_fdialog(elFileState *fs, char *line, char const *fmt, ...) {
 	line = line ? line : fs->this_token.line;
 
 	int linenum;
@@ -86,18 +86,20 @@ void elf_file_dialog(elFileState *fs, char *line, char const *fmt, ...) {
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		char *filename = elf_get_file_name(fs);
+		char *filename = elf_fgetfilename(fs);
 		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+line-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
 }
 
+
 #define elf_thischr() (file->thischar[0])
 #define elf_thenchr() (file->thischar[1])
-#define elf_movechr() (*(file->thischar++))
+#define elf_movechr() (*(file->thischar ++))
 #define elf_movxchr(n) ((file->thischar += n))
 #define elf_cmovchr(xx) ((elf_thischr() == (xx)) ? elf_movechr(), 1 : 0)
+
 
 
 int elf_lexescchr(elFileState *file) {
@@ -115,7 +117,7 @@ int elf_lexescchr(elFileState *file) {
 }
 
 
-int elf_read_identifier_characters(elFileState *file, char *buffer) {
+int elf_lextext(elFileState *file, char *buffer) {
 	int length = 0;
 	do {
 		buffer[length++] = elf_movechr();
@@ -125,7 +127,7 @@ int elf_read_identifier_characters(elFileState *file, char *buffer) {
 }
 
 
-void elf_lexer_notify_newline(elFileState *fs) {
+void elf_flexnewline(elFileState *fs) {
 	fs->linechar = fs->thischar;
 	fs->linenumber += 1;
 }
@@ -139,72 +141,55 @@ void elf_lexer_get_emptychr(elFileState *file) {
 		} goto retry;
 		case '\n': {
 			elf_movechr();
-			elf_lexer_notify_newline(file);
+			elf_flexnewline(file);
 		} goto retry;
 		case '\r': {
 			elf_movechr();
 			elf_cmovchr('\n');
-			elf_lexer_notify_newline(file);
+			elf_flexnewline(file);
 		} goto retry;
 	}
 }
 
-/* not the fastest thing out there */
-elToken elf_lexone(elFileState *file) {
 
-	/* identifiers can only be 255 characters long (256 - 1 null terminator),
-	on the other hand, longer strings are allocated
-	from a heap buffer, there's no reason for this other than I just
-	like imposing limits for no reason... Makes me feel like I have
-	control... */
+/* not the fastest thing out there */
+elToken elf_flextok(elFileState *file) {
+	/* identifiers can only be 255 characters long
+	(256 - 1 null terminator), for no reason... */
 	elGLOBAL char buffer[0x100];
 
 	elToken tk;
 
 	retry:
-	tk = (elToken){TK_NONE,file->thischar};
+	elf_clearmemory(&tk,sizeof(tk));
+	tk.type=TK_NONE;
+	tk.line=file->thischar;
 
-	/* we could put all of the ascii codes in the switch
-	statement...  */
 	switch (elf_thischr()) {
+		/* not sure how portable this is */
 		case 'A'...'Z': case 'a'...'z': case '_': {
-			if (elf_is_letter_char(elf_thischr()) || (elf_thischr() == '_')) {
-				int length = 0;
-				do {
-					elASSERT(length < 0xff);
-					buffer[length++] = elf_movechr();
-				} while (elf_is_letter_or_digit_char(elf_thischr()) || (elf_thischr() == '_'));
-				buffer[length] = 0;
-
-				tk.type = elf_is_word_or_keyword(buffer);
-				if (tk.type == TK_WORD) {
-					if (S_eq(buffer,"__ELF_FILE_BREAK__")) {
-						file->debuggerflag = 1;
-						goto retry;
-					}
-					/* todo: string interner, or arena? */
-					tk.s = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
-				}
+			int length = 0;
+			do {
+				elASSERT(length < 0xff);
+				buffer[length++] = elf_movechr();
+			} while (elf_is_letter_or_digit_char(elf_thischr()) || (elf_thischr() == '_'));
+			buffer[length] = 0;
+			/* todo: string interner please */
+			tk.type=elf_is_word_or_keyword(buffer);
+			if (tk.type==TK_WORD) {
+				tk.text=elf_copyltext(elHEAP_ALLOCATOR,length,buffer);
 			}
 		} break;
-
-		case '0':case '1':case '2':case '3':case '4':
-		case '5':case '6':case '7':case '8':case '9': {
+		case '0'...'9': {
 			tk.type = TK_INTEGER;
+			elInteger B,I,C;
 
-			elInteger B = 10;
-			if (elf_thischr() == '0') {
-				if (elf_thenchr() == 'b') {
-					elf_movxchr(2);
-					B = 2;
-				} else
-				if (elf_thenchr() == 'x') {
-					elf_movxchr(2);
-					B = 16;
-				}
+			B=10;
+			if (elf_thischr()=='0') {
+				if (elf_thenchr()=='b') elf_movxchr(2),B=2; else
+				if (elf_thenchr()=='x') elf_movxchr(2),B=16;
 			}
 
-			elInteger I,C;
 			for (I = 0, C = -1; ; I = I * B + C) {
 				if (elWITHIN(elf_thischr(),'A','Z'+1)) {
 					C = 10 + elf_movechr() - 'A';
@@ -217,42 +202,33 @@ elToken elf_lexone(elFileState *file) {
 					if (B == 2 && C > 1) goto _error;
 				} else {
 					if (0) _error: {
-						elf_file_dialog(file, file->thischar, "invalid base '%i' for digit", B);
+						elf_fdialog(file, file->thischar, "invalid base '%i' for digit", B);
 					}
 					break;
 				}
 			}
-			if (elf_thischr() == '.') {
-				// x{..}
-				if (elf_thenchr() != '.') {
-					elf_movechr();
-					tk.type = TK_NUMBER;
-
-					elNumber p = 1;
-					elNumber n = 0;
-					if (elf_is_digit_char(elf_thischr())) {
-						do  {
-							n = n * 10 + (elf_movechr() - '0');
-							p *= 10;
-						} while (elf_is_digit_char(elf_thischr()));
-					}
-					tk.n = I + n / p;
-					// elf_loginfo("[%lli] = num(%f)",tk.value,n);
-					goto leave;
+			tk.integer=I;
+			/* lex decimal part */
+			elNumber P,N;
+			if ((elf_thischr()=='.')&&(elf_thenchr()!='.')) {
+				elf_movechr();
+				tk.type=TK_NUMBER;
+				P=1,N=0;
+				while (elf_is_digit_char(elf_thischr())) {
+					N=N*10+(elf_movechr()-'0');
+					P=N*10;
 				}
+				tk.number = I + N / P;
+				goto esc;
 			}
-			tk.i = I;
-			// elf_loginfo("[%lli] = int(%lli)",tk.value,integer);
 		} break;
 		case '\'': {
 			elf_movechr();
 			tk.type = TK_LETTER;
-			do {
-				tk.i = elf_movechr();
+			do { tk.integer = elf_movechr();
 			} while(0);
-
 			if (!elf_cmovchr('\'')) {
-				elf_file_dialog(file,tk.line,"invalid character constant, expected \"'\"");
+				elf_fdialog(file,tk.line,"invalid character constant, expected \"'\"");
 			}
 		} break;
 		case '"': {
@@ -262,21 +238,20 @@ elToken elf_lexone(elFileState *file) {
 			int   length = 0;
 			while (elf_thischr() != 0) {
 				while (elf_thischr() != 0 && elf_thischr() != '"') {
-					/* are we making a grave mistake here by allowing lines to
-					naturally span multiple lines? */
+					/* are multi-line strings illegal? */
 					if (elf_cmovchr('\n') || (elf_cmovchr('\r') && (elf_cmovchr('\n'),1))) {
-						elf_lexer_notify_newline(file);
+						elf_flexnewline(file);
 						ARRAY_ADD(buffer,'\n');
 					} else {
 						char chr = elf_lexescchr(file);
 						ARRAY_ADD(buffer,chr);
 					}
 				}
-
 				if (!elf_cmovchr('"')) {
-					elf_file_dialog(file,tk.line,"invalid string");
+					elf_fdialog(file,tk.line,"invalid string");
 				}
 				elf_lexer_get_emptychr(file);
+				tk.eol=1;
 				if (!elf_cmovchr('"')) {
 					break;
 				}
@@ -286,7 +261,7 @@ elToken elf_lexone(elFileState *file) {
 			ARRAY_ADD(buffer,0);
 
 			tk.type = TK_STRING;
-			tk.s = S_ncopy(elHEAP_ALLOCATOR,length,buffer);
+			tk.text = elf_copyltext(elHEAP_ALLOCATOR,length,buffer);
 		} break;
 		case '.': { elf_movechr(); tk.type = TK_DOT;
 			if (elf_cmovchr('.')) { tk.type = TK_DOT_DOT;
@@ -300,24 +275,25 @@ elToken elf_lexone(elFileState *file) {
 					n = n * 10 + (elf_movechr() - '0');
 					p *= 10;
 				} while (elf_is_digit_char(elf_thischr()));
-				tk.n = n / p;
-				// elf_loginfo("[%lli] = num(%f)",tk.value,n);
+				tk.number = n / p;
 			}
 		} break;
 		case '#': {
 			elf_movechr();
-			int length = elf_read_identifier_characters(file,buffer);
-			tk.type = elf_is_word_or_macro(buffer);
-			if (tk.type == TK_M_ENDOFFILE) {
-				tk.type = TK_NONE;
-			} else if (tk.type == TK_M_FILE_NAME) {
-				tk.type = TK_STRING;
-				tk.s = elf_get_file_name(file);
-			} else if (tk.type == TK_M_LINE_NUMBER) {
-				tk.type = TK_INTEGER;
-				tk.i = file->linenumber;
-			} else if (tk.type == TK_WORD) {
-				elf_file_dialog(file,tk.line,"unrecognized macro");
+			elf_lextext(file,buffer);
+			tk.type=elf_textiswordormacro(buffer);
+			if (tk.type==TK_M_ENDOFFILE) {
+				tk.type=TK_NONE;
+			} else if (tk.type==TK_M_FILE_NAME) {
+				tk.type=TK_STRING;
+				tk.text=elf_fgetfilename(file);
+			} else if (tk.type==TK_M_LINE_NUMBER) {
+				tk.type=TK_INTEGER;
+				tk.integer=file->linenumber;
+			} else if (tk.type==TK_WORD) {
+				elf_fdialog(file,tk.line,"unrecognized macro");
+			} else {
+				/* let parser handle this */
 			}
 		} break;
 		case '\0': {
@@ -444,31 +420,20 @@ elToken elf_lexone(elFileState *file) {
 		} break;
 	}
 
-	leave: ;
+	esc: ;
 
-	/* for this language, we do context
-	sensitive statement/expression
-	termination, this is one passive way
-	of doing so, we hint the parser that
-	the token is succeed by a eol, and
-	where the parser sees fit (contextually)
-	it'll consult the flag to determine
-	whether to end the expression or not. */
-	while (elf_thischr() == ' ' || elf_thischr() == '\t') {
+	/* passive hinting */
+	while ((elf_thischr()==' ')||(elf_thischr()=='\t')) {
 		elf_movechr();
 	}
-
-	if (elf_thischr() == '/' && (elf_thenchr()=='/' || elf_thenchr()=='*')) {
+	if ((elf_thischr()==';')||((elf_thischr()=='/')&&((elf_thenchr()=='/')||(elf_thenchr()=='*')))) {
+		tk.eol = 1;
+	} else if ((elf_thischr()=='\n')||(elf_thischr()=='\r')) {
 		tk.eol = 1;
 	}
-	if (elf_thischr() == ';' || (elf_thischr() == '\n' || elf_thischr() == '\r')) {
-		tk.eol = 1;
-	}
 
-	file->lasttk = file->tk;
-	file->tk = file->thentk;
-	file->thentk = tk;
-
-	// elf_file_dialog(files,tk.line,"token %s",elf_tkintel[tk.type].name);
-	return file->lasttk;
+	file->last_token = file->this_token;
+	file->this_token = file->then_token;
+	file->then_token = tk;
+	return file->last_token;
 }
