@@ -17,7 +17,6 @@ typedef struct elToken {
 } elToken;
 
 
-/* elf is likely to be removed and so is iff */
 #define KWLIST(_) \
 _(ELF,"elf") _(DEFAULT,"default") _(LOAD,"load") _(NEW,"new") _(FUN,"fun") \
 _(NIL,"nil") _(TRUE,"true") _(FALSE,"false") \
@@ -78,71 +77,6 @@ typedef enum elTokenType {
 #undef MCITEM
 #undef OPITEM
 } elTokenType;
-
-
-/*
-
-
-
-	The following is all crap, I'll keep it here just because:
-
-	Nodes are a minimal 'intermediate' language between
- 	source code and bytecode...
-
- 	Conceptually they are identical, the only difference
- 	is the nodes allow for a greater degree of
- 	expressibility, something that bytecode lacks.
-
- 	For instance, there are a few pseudo instructions
- 	which are either only understood by the parser or
- 	code generator. One of them is the '(' {x} ')' operator,
- 	which doesn't really do anything other than affect
- 	the grouping of expressions. Other pseudo instructions,
- 	must be converted into more basic instructions.
-
-
- 	Another aspect is that nodes can freely reference other
- 	nodes, in other words, nodes can take other nodes as
- 	operands unlike bytecode can only take registers.
-
-
-	For instance:
-
-	Take this expression: '1 + 2 + 3 + 4'
-
-	At a lower level, suppose '+' could only take registers,
-	you'd represent it as:
-
-	load register 0, constant 1
-	load register 1, constant 2
-	add register 0, register 0 and 1
-	load register 1, constant 3
-	add register 0, register 0 and 1
-	load register 1, constant 4
-	add register 0, register 0 and 1
-
-	Whereas a node can represent it as: '(((1 + 2) + 3) + 4)'
-
-	* Here I used '()' but it doesn't imply a group
-	node, it's only for emphasis on the hierarchical
-	structure.
-
-	This means the parser just has to worry about generating
-	the semantically correct nodes and let the emitter worry
-	about the process of converting those nodes into code
-	which is more straightforwards.
-
-	That being said, nodes are still fairly low level and
-	the parser has to still do some desugaring, because
-	nodes, like bytecode, cannot represent every feature
-	the language offers, and in my experience, sugar
-	coating tends to simply things heavily.
-
-	So in my opinion, though it not strictly necessary,
- 	it makes for a very clean parser and emitter, and
- 	it is not as redundant as having 3 different graphs
- 	to do the same thing.
-*/
 
 
 #define NO_NODE (-1)
@@ -258,15 +192,15 @@ elNodeId elf_make_group_node(elFileState *fs, elFileline, elNodeId x);
 elNodeId elf_node_newtable(elFileState *fs, elFileline, elNodeId *z);
 elNodeId elf_make_closure_node(elFileState *fs, elFileline, elNodeId x, elNodeId *z);
 elNodeId elf_node_store(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_fnodelocal(elFileState *fs, elFileline line, elNodeId i);
+elNodeId elf_node_local(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_fnodeglobal(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_nclosevalue(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_ntypeguard(elFileState *fs, elFileline line, elNodeId x, elNodeTy y);
-elNodeId elf_fnodemetafield(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_node_metafield(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_node_field(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_node_index(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_make_ranged_index_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_fnodecall(elFileState *fs, elFileline line, elNodeId x, elNodeId *z);
+elNodeId elf_node_call(elFileState *fs, elFileline line, elNodeId x, elNodeId *z);
 elNodeId elf_ncallmetafield(elFileState *fs, elFileline line, elNodeId x, elNodeId *z, char *name);
 elNodeId elf_make_node_less_than(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 
@@ -351,6 +285,7 @@ typedef struct elFileBlock {
 	elBool flags;
 	int level;
 	int xmemory;
+	int nlocals;
 	int xentity;
 	int xnode;
 	elByteId entry;
@@ -442,26 +377,26 @@ typedef struct elFileState {
 } elFileState;
 
 
-void elf_fopen_function(elFileState *fs, elFileFnState *fn, char *line);
+void elf_begin_function(elFileState *fs, elFileFnState *fn, char *line);
 char *elf_fget_name(elFileState *fs);
 
-elNodeId elf_fexpr(elFileState *fs, elFileExpr *expr, elBool flags);
-elNodeId elf_funary(elFileState *fs, elFileExpr *expr, elBool flags);
-void elf_fstat(elFileState *fs);
+elNodeId elf_parse_unary(elFileState *fs, elFileExpr *expr, elBool flags);
+elNodeId elf_parse_expr(elFileState *fs, elFileExpr *expr, elBool flags);
+int elf_parse_stat(elFileState *fs);
 void elf_fforloop(elFileState *fs);
 
-void elf_femitstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elFileBlock *elf_fgetloopblock(elFileState *fs, elRegId with_value_register);
+void elf_emitstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elFileBlock *elf_get_loop_block(elFileState *fs, elRegId with_value_register);
 
-int elf_femittereval(elFileState *fs, int flags, int reg, int nreg, elNodeId id);
-int elf_femitter_load(elFileState *fs, elNodeId id);
+int elf_emittereval(elFileState *fs, int flags, int reg, int nreg, elNodeId id);
+int elf_emitter_load(elFileState *fs, elNodeId id);
 
-void elf_fbeginlastlyblock(elFileState *fs, elFileline line);
-void elf_fcloselastlyblock(elFileState *fs, elFileline line);
-int elf_femitbranchiffalse(elFileState *fs, elFileExpr *js, elNodeId id);
-int elf_femitbranchiftrue(elFileState *fs, elFileExpr *js, elNodeId id);
-int *elf_femitjumpiftrue(elFileState *fs, elFileExpr *js, elNodeId id);
-int *elf_femitjumpiffalse(elFileState *fs, elFileExpr *js, elNodeId id);
+void elf_begin_lastly_block(elFileState *fs, elFileline line);
+void elf_close_lastly_block(elFileState *fs, elFileline line);
+int elf_emitbranchiffalse(elFileState *fs, elFileExpr *js, elNodeId id);
+int elf_emitbranchiftrue(elFileState *fs, elFileExpr *js, elNodeId id);
+int *elf_emitjumpiftrue(elFileState *fs, elFileExpr *js, elNodeId id);
+int *elf_emitjumpiffalse(elFileState *fs, elFileExpr *js, elNodeId id);
 
 // JZ
 // JNZ
@@ -476,8 +411,8 @@ void elf_fbeginrangeloop(elFileState *fs, elFileline line, elNodeId x, elNodeId 
 void elf_fcloserangeloop(elFileState *fs, elFileline line);
 void elf_fbegindowhileloop(elFileState *fs, elFileline line);
 void elf_fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x);
-void elf_femit_begin_while_loop(elFileState *fs, elNodeId x);
-void elf_femit_close_while_loop(elFileState *fs);
-elBlockId elf_fbeginblock(elFileState *fs, elBool flags);
-void elf_fclose_block(elFileState *fs);
+void elf_emit_begin_while_loop(elFileState *fs, elNodeId x);
+void elf_emit_close_while_loop(elFileState *fs);
+elBlockId elf_begin_block(elFileState *fs, elBool flags);
+void elf_close_block(elFileState *fs);
 

@@ -63,7 +63,7 @@ int elf_call_function(elState *R, int nargs, int nregs) {
 	if (fn.tag==TAG_CLS) {
 		F.closure=fn.x_cls;
 		F.nlocals=fn.x_cls->proto.nlocals;
-		elf_clearmemory(F.locals+F.nargs,(F.nlocals-F.nargs)*sizeof(elValue));
+		elf_clear_memory(F.locals+F.nargs,(F.nlocals-F.nargs)*sizeof(elValue));
 		elSETTOP(R,F.locals+F.nlocals);
 	} else {
 		elSETTOP(R,F.locals+F.nargs);
@@ -102,8 +102,8 @@ int elf_call_function(elState *R, int nargs, int nregs) {
 int elf_parse_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId rxy, int ny, elString *contents) {
 #if 0
 	elNodeId id;
-	id=elf_fexpr(fs,0,0);
-	elf_femit_yield(fs,fs->this_token.line,id);
+	id=elf_parse_expr(fs,0,0);
+	elf_emit_yield(fs,fs->this_token.line,id);
 #endif
 	elNOCODE;
 	return -1;
@@ -118,8 +118,8 @@ int elf_Sfloadcode(elState *R, elFileState *fs, elString *filename, int nargs, e
 	fs->R = R;
 	fs->M = M;
 	elf_fopen_file(fs,filename->text,contents->text);
-	while (!elf_ftest(fs,0)) {
-		elf_fstat(fs);
+	while (!elf_test_token(fs,0)) {
+		elf_parse_stat(fs);
 	}
 	elf_fclose_file(fs);
 

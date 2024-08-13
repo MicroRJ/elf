@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** elf-str.c
+** string.c
 ** String
 */
 

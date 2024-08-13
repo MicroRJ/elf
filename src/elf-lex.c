@@ -34,7 +34,7 @@ typedef struct ltokenintel {
 } ltokenintel;
 
 
-elGLOBAL ltokenintel elf_tkintel[] = {
+elGLOBAL ltokenintel elf_token_intel[] = {
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},
@@ -153,7 +153,7 @@ void elf_lexer_get_emptychr(elFileState *file) {
 
 
 /* not the fastest thing out there */
-elToken elf_ftoken(elFileState *file) {
+elToken elf_poll_token(elFileState *file) {
 	/* identifiers can only be 255 characters long
 	(256 - 1 null terminator), for no reason... */
 	elGLOBAL char buffer[0x100];
@@ -161,7 +161,7 @@ elToken elf_ftoken(elFileState *file) {
 	elToken tk;
 
 	retry:
-	elf_clearmemory(&tk,sizeof(tk));
+	elf_clear_memory(&tk,sizeof(tk));
 	tk.type=TK_NONE;
 	tk.line=file->thischar;
 
