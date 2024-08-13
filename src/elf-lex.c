@@ -53,7 +53,7 @@ void elf_fdialog(elFileState *fs, char *line, char const *fmt, ...) {
 
 	int linenum;
 	char *lineloc;
-	elf_get_line_location_info(fs->contents,line,&linenum,&lineloc);
+	elf_get_line_location_info(fs->filetext,line,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -86,7 +86,7 @@ void elf_fdialog(elFileState *fs, char *line, char const *fmt, ...) {
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		char *filename = elf_fgetfilename(fs);
+		char *filename = elf_fget_name(fs);
 		printf("%s [%i:%lli]: %s\n",filename,linenum,(elInteger)(1+line-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
@@ -153,7 +153,7 @@ void elf_lexer_get_emptychr(elFileState *file) {
 
 
 /* not the fastest thing out there */
-elToken elf_flextok(elFileState *file) {
+elToken elf_ftoken(elFileState *file) {
 	/* identifiers can only be 255 characters long
 	(256 - 1 null terminator), for no reason... */
 	elGLOBAL char buffer[0x100];
@@ -286,7 +286,7 @@ elToken elf_flextok(elFileState *file) {
 				tk.type=TK_NONE;
 			} else if (tk.type==TK_M_FILE_NAME) {
 				tk.type=TK_STRING;
-				tk.text=elf_fgetfilename(file);
+				tk.text=elf_fget_name(file);
 			} else if (tk.type==TK_M_LINE_NUMBER) {
 				tk.type=TK_INTEGER;
 				tk.integer=file->linenumber;

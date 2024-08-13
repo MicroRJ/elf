@@ -197,7 +197,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	if (fileid != -1) {
 		elFileProto *file = &M->files[fileid];
 		elFileline line = elf_get_line_for_byte(M,call->origin);
-		elf_line_dialog(file->name->contents,file->contents->contents,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
+		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
 	}
 }
 
@@ -209,7 +209,7 @@ void elf_Sthrow(elState *R, elByteId byte, char *error) {
 	int fileid = elf_get_file_for_byte(M,byte);
 	if (fileid != -1) {
 		elFileProto *file = &M->files[fileid];
-		elf_line_dialog(file->name->contents,file->contents->contents,line,byte,M->bytes[byte],error);
+		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	}
 
 	printf(" -- BYTE TRACE:\n");

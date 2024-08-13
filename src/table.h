@@ -6,10 +6,6 @@
 
 
 
-/* ---------------------------------
-	Table
---------------------------------- */
-
 typedef struct elEntry {
 	union { elValue key, k; };
 	union { elInteger index, i; };
@@ -34,67 +30,67 @@ elTable *elf_new_table(elState *);
 /* todo: all of these have to revised,
 there are a bunch of inconsistencies and
 incoherences with this API. */
-int elf_libH_get_metatable(elState *);
-int elf_libH_set_metatable(elState *);
+int elf_libT_get_metatable(elState *);
+int elf_libT_set_metatable(elState *);
 
-int elf_libH_add(elState *);
-int elf_libH_xadd(elState *);
-int elf_libH_xremove(elState *);
-int elf_libH_xdelete(elState *);
-int elf_libH_index(elState *);
-int elf_libH_tally(elState *);
-int elf_libH_length(elState *);
-int elf_libH_delete(elState *);
-int elf_libH_itemize(elState *);
-int elf_libH_inject(elState *);
-int elf_libH_alias(elState *);
-int elf_libH_contains(elState *);
-int elf_libH_lookup(elState *);
-int elf_libH_foreach(elState *);
-int elf_libH_get_collisions(elState *);
-int elf_libH_bubble_sort(elState *);
-int elf_libH_find_aliases(elState *);
-int elf_libH_array(elState *);
-int elf_libH_xset(elState *);
-int elf_libH_merge(elState *);
-int elf_libH_xmerge(elState *);
-int elf_libH_diff(elState *);
-int elf_libH_xclone(elState *);
-int elf_libH_reverse(elState *);
-int elf_libH_clone(elState *);
-int elf_libH_slice(elState *);
-int elf_libH_swap(elState *);
+int elf_libT_add(elState *);
+int elf_libT_xadd(elState *);
+int elf_libT_xremove(elState *);
+int elf_libT_xdelete(elState *);
+int elf_libT_index(elState *);
+int elf_libT_tally(elState *);
+int elf_libT_length(elState *);
+int elf_libT_delete(elState *);
+int elf_libT_itemize(elState *);
+int elf_libT_inject(elState *);
+int elf_libT_alias(elState *);
+int elf_libT_contains(elState *);
+int elf_libT_lookup(elState *);
+int elf_libT_foreach(elState *);
+int elf_libT_get_collisions(elState *);
+int elf_libT_bubble_sort(elState *);
+int elf_libT_find_aliases(elState *);
+int elf_libT_array(elState *);
+int elf_libT_xset(elState *);
+int elf_libT_merge(elState *);
+int elf_libT_xmerge(elState *);
+int elf_libT_diff(elState *);
+int elf_libT_xclone(elState *);
+int elf_libT_reverse(elState *);
+int elf_libT_clone(elState *);
+int elf_libT_slice(elState *);
+int elf_libT_swap(elState *);
 
 
-elGLOBAL elBinding elf_libH_[] = {
-	{"get_metatable",elf_libH_get_metatable},
-	{"set_metatable",elf_libH_set_metatable},
-	{"length",elf_libH_length},
-	{"tally",elf_libH_tally},
-	{"delete",elf_libH_delete},
-	{"haskey",elf_libH_contains},
-	{"lookup",elf_libH_lookup},
-	{"foreach",elf_libH_foreach},
-	{"collisions",elf_libH_get_collisions},
-	{"add",elf_libH_add},
-	{"xadd",elf_libH_xadd},
-	{"itemize",elf_libH_itemize},
-	{"inject",elf_libH_inject},
-	{"idx",elf_libH_index},
-	{"xrem",elf_libH_xremove},
-	{"xdelete",elf_libH_xdelete},
-	{"bubblesort",elf_libH_bubble_sort},
-	{"fndaliases",elf_libH_find_aliases},
-	{"alias",elf_libH_alias},
-	{"merge",elf_libH_merge},
-	{"xmerge",elf_libH_xmerge},
-	{"reverse",elf_libH_reverse},
-	{"clone",elf_libH_clone},
-	{"xclone",elf_libH_xclone},
-	{"slice",elf_libH_slice},
-	{"xset",elf_libH_xset},
-	{"swap",elf_libH_swap},
-	{"diff",elf_libH_diff},
+elGLOBAL elBinding elf_libT_[] = {
+	{"get_metatable",elf_libT_get_metatable},
+	{"set_metatable",elf_libT_set_metatable},
+	{"length",elf_libT_length},
+	{"tally",elf_libT_tally},
+	{"delete",elf_libT_delete},
+	{"haskey",elf_libT_contains},
+	{"lookup",elf_libT_lookup},
+	{"foreach",elf_libT_foreach},
+	{"collisions",elf_libT_get_collisions},
+	{"add",elf_libT_add},
+	{"xadd",elf_libT_xadd},
+	{"itemize",elf_libT_itemize},
+	{"inject",elf_libT_inject},
+	{"idx",elf_libT_index},
+	{"xrem",elf_libT_xremove},
+	{"xdelete",elf_libT_xdelete},
+	{"bubblesort",elf_libT_bubble_sort},
+	{"fndaliases",elf_libT_find_aliases},
+	{"alias",elf_libT_alias},
+	{"merge",elf_libT_merge},
+	{"xmerge",elf_libT_xmerge},
+	{"reverse",elf_libT_reverse},
+	{"clone",elf_libT_clone},
+	{"xclone",elf_libT_xclone},
+	{"slice",elf_libT_slice},
+	{"xset",elf_libT_xset},
+	{"swap",elf_libT_swap},
+	{"diff",elf_libT_diff},
 };
 
 

@@ -231,7 +231,7 @@ elAPI void *sys_libfn(elHandle dll, char const *name) {
 }
 
 
-elAPI elError sys_load_file_contents(elAllocator *allocfn, void **data, char const *name) {
+elAPI elError sys_load_file_text(elAllocator *allocfn, void **data, char const *name) {
 
 	elError error = Error_None;
 

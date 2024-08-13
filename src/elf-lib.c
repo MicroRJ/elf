@@ -198,14 +198,10 @@ int elf_lib_get_object_address(elState *R) {
 }
 
 
-int elf_lib_get_stack_top(elState *R) {
-	elPUSHINT(R,(elInteger) (elGETTOP(R) - R->K));
-	return 1;
-}
-
-
 int elf_lib_get_local_addr(elState *R) {
-	elPUSHINT(R,(elInteger) (&elGETARG(R, elf_get_integer(R,0)) - R->K));
+	elValue *local;
+	local=&elGETARG(R,elf_get_integer(R,0));
+	elPUSHINT(R,(elInteger)(local-R->stack));
 	return 1;
 }
 
@@ -435,18 +431,18 @@ int elf_lib_load_file(elState *R) {
 
 int elflib_iton(elState *R) {
 	elValue v = elGETARG(R,0);
-	if (v.tag == TAG_INT) {
-		elPUSHNUM(R,(elNumber)v.i);
-	} else elPUSHNUM(R,v.n);
+	if (v.tag==TAG_INT) {
+		elPUSHNUM(R,(elNumber)v.x_int);
+	} else elPUSHNUM(R,v.x_num);
 	return 1;
 }
 
 
 int elflib_ntoi(elState *R) {
 	elValue v = elGETARG(R,0);
-	if (v.tag == TAG_NUM) {
-		elPUSHINT(R,(elInteger)v.n);
-	} else elPUSHINT(R,v.i);
+	if (v.tag==TAG_NUM) {
+		elPUSHINT(R,(elInteger)v.x_num);
+	} else elPUSHINT(R,v.x_int);
 	return 1;
 }
 
@@ -576,9 +572,9 @@ int elflib_get_work_dir(elState *R) {
 int elf_fpf_value(FILE *file, elValue v, elBool quotes) {
 	switch (v.tag) {
 		case TAG_NIL: return fprintf(file,"nil");
-		case TAG_SYS: return fprintf(file,"h%llX",v.i);
-		case TAG_INT: return fprintf(file,"%lli",v.i);
-		case TAG_NUM: return fprintf(file,"%f",v.n);
+		case TAG_SYS: return fprintf(file,"h%llX",v.x_int);
+		case TAG_INT: return fprintf(file,"%lli",v.x_int);
+		case TAG_NUM: return fprintf(file,"%f",v.x_num);
 		case TAG_CLS: return fprintf(file,"F()");
 		case TAG_CFN: return fprintf(file,"C()");
 		case TAG_TAB: {
@@ -754,7 +750,7 @@ elAPI int elf_lib_list_volumes(elState *R) {
 		elTable *path_names = elf_add_new_table(R);
 		elf_table_set_table_field(volume,elf_new_string(R,"path_names"),path_names);
 
-		if (GetVolumePathNamesForVolumeNameA(name->contents,buffer,MAX_PATH,NULL)) {
+		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
 				elf_table_add(path_names,elSTR(elf_new_string(R,buffer)));
@@ -919,7 +915,7 @@ int elflib_unload(elState *S) {
 }
 
 
-elAPI void elf_lib_loadfunctions(elState *R) {
+elAPI void elf_lib_load_functions(elState *R) {
 	elf_register_integer(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
 	elf_register_string(R,"elf.PLATFORM","WEB");
@@ -954,7 +950,6 @@ elAPI void elf_lib_loadfunctions(elState *R) {
 	elf_register_binding(R,"elf.get_object_address",elf_lib_get_object_address);
 	elf_register_binding(R,"elf.get_object_color",elf_lib_get_object_color);
 	elf_register_binding(R,"elf.set_object_trap",elf_lib_set_object_trap);
-	elf_register_binding(R,"elf.get_stack_top",elf_lib_get_stack_top);
 	elf_register_binding(R,"elf.get_local_addr",elf_lib_get_local_addr);
 
 

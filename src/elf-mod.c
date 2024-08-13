@@ -35,8 +35,8 @@ void elf_bytefpf(FILE *io, elModule *M, elInteger fid, elByteId id, elBytecode b
 	if (fid != -1) {
 		elFileProto file = M->files[fid];
 		int linenum;
-		elf_get_line_location_info(file.contents->contents,M->lines[id],&linenum,0);
-		fprintf(io,"%s %04i: \t",file.name->contents,linenum);
+		elf_get_line_location_info(file.contents->text,M->lines[id],&linenum,0);
+		fprintf(io,"%s %04i: \t",file.name->text,linenum);
 	}
 
 	fprintf(io,"%08i %04i\t%s"
@@ -52,13 +52,13 @@ void elf_bytefpf(FILE *io, elModule *M, elInteger fid, elByteId id, elBytecode b
 	if (b.k == BC_TYPEGUARD) {
 		fprintf(io," #%s",tag2s[b.y]);
 	} else
-	if (b.k == BC_LOADINT) {
+	if (b.k == BC_GETKINT) {
 		fprintf(io," #%lli",M->ki[b.y]);
 	} else
-	if (b.k == BC_LOADNUM) {
+	if (b.k == BC_GETKNUM) {
 		fprintf(io," #%f",M->kn[b.y]);
 	} else
-	if (b.k == BC_LOADGLOBAL) {
+	if (b.k == BC_GETGLOBAL) {
 		elValue val = M->globals->array[b.y];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
@@ -89,7 +89,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	fprintf(io,"- PID: %i\n",sys_getmypid());
 	FOR_ARRAY(i,md->files) {
 		elFileProto ff = md->files[i];
-		fprintf(io,"- FILE (%s):\n",ff.name->contents);
+		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (elByteId j = 0; j < ff.nbytes; ++j) {
 			elBytecode b = md->bytes[ff.bytes+j];

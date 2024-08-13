@@ -35,33 +35,31 @@ BC_LEAVE,
  copies z values starting at y to corresponding return
 registers, jumps to x
 BC_YIELD (x,y,z),
+
+LOOP is just for experiments...
 */
-/* todo: add support for different conditional jump
-instructions, additionally a dedicated loop
-instruction which increments a register would be
-real nice */
 #define BCLIST(_) \
 _(HALT, I, "halt") \
-_(J, XY, "jump") \
+_(NOP, I, "nop") \
+_(J, I, "jump") \
 _(JZ, XY, "jz") \
 _(JNZ, XY, "jnz") \
 _(JE, XY, "je") \
 _(JNE, XY, "jne") \
+_(LOOP, I, "loop") \
 _(DELAY, I, "delay") \
 _(LEAVE, I, "leave") \
 _(YIELD, XYZ, "yield") \
 _(TYPEGUARD, XY, "typeguard") \
-_(LOADGLOBAL, XY, "getglobal")\
+_(GETCLOSED, XY, "getclosed") \
+_(GETGLOBAL, XY, "getglobal")\
 _(SETGLOBAL, XY, "setglobal")\
-_(LOADNUM, XY, "getnum") \
-_(LOADINT, XY, "getint") \
+_(GETKNUM, XY, "getnum") \
+_(GETKINT, XY, "getint") \
 _(LOADNIL, I, "getnil") \
-_(GETCLSVAL, XY, "getcache") \
-_(INDEX, XYZ, "getindex") \
-_(SETINDEX, XYZ, "setindex")\
-_(FIELD, XYZ, "getfield") \
-_(SETFIELD, XYZ, "setfield")\
-_(METAFIELD, XYZ, "getmetafield") \
+_(GETINDEX, XYZ, "getindex") _(SETINDEX, XYZ, "setindex")\
+_(GETFIELD, XYZ, "getfield") _(SETFIELD, XYZ, "setfield")\
+_(GETMETAFIELD, XYZ, "getmetafield") \
 _(RELOAD, XY, "reload") \
 _(CALL, XYZ, "call") \
 _(TABLE, I, "new_table") \

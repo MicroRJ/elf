@@ -6,12 +6,6 @@
 
 
 
-
-
-
-
-
-
 void elf_expected(elState *S, elValueTag tag, elValueTag got, elRegId x) {
 	elf_Sthrow(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
@@ -77,15 +71,13 @@ elAPI elInteger elf_get_integer(elState *R, int x) {
 }
 
 
-elAPI elNumber elf_get_number(elState *R, elRegId x) {
+elNumber elf_get_number(elState *R, elRegId x) {
 	elValue v = elGETARG(R,x);
-	if (v.tag == TAG_INT) return (elNumber) v.i;
+	if (v.tag == TAG_INT) return (elNumber) v.x_int;
 	if (v.tag == TAG_NUM) return v.x_num;
 	elf_expected(R,TAG_NUM,v.tag,x);
 	return 0;
 }
-
-
 
 
 elString *elf_add_new_string(elState *R, char *chr) {
@@ -95,7 +87,7 @@ elString *elf_add_new_string(elState *R, char *chr) {
 }
 
 
-elString *elf_pushnewstrlen(elState *R, elInteger len) {
+elString *elf_add_new_lstring(elState *R, elInteger len) {
 	elString *string = elf_new_lstring(R,len);
 	elPUSHSTR(R,string);
 	return string;

@@ -247,24 +247,24 @@ elNodeId elf_nodexy(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNode
 elNodeId elf_nodex(elFileState *fs, elFileline, elNodeKi k, elNodeTy ty, elNodeId x);
 
 elNodeId elf_nnil(elFileState *fs, elFileline);
-elNodeId elf_fnodeint(elFileState *fs, elFileline, elInteger i);
+elNodeId elf_node_integer(elFileState *fs, elFileline, elInteger i);
 elNodeId elf_nnumber(elFileState *fs, elFileline, elNumber n);
-elNodeId elf_fnodestr(elFileState *fs, elFileline, char *);
+elNodeId elf_node_string(elFileState *fs, elFileline, char *);
 
 elNodeId elf_make_nullary_node(elFileState *fs, elFileline, elNodeKi k, elNodeTy t);
 elNodeId elf_make_group_node(elFileState *fs, elFileline, elNodeId x);
 
 
-elNodeId elf_nnewtable(elFileState *fs, elFileline, elNodeId *z);
+elNodeId elf_node_newtable(elFileState *fs, elFileline, elNodeId *z);
 elNodeId elf_make_closure_node(elFileState *fs, elFileline, elNodeId x, elNodeId *z);
-elNodeId elf_make_load_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_node_store(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_fnodelocal(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_fnodeglobal(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_nclosevalue(elFileState *fs, elFileline line, elNodeId i);
 elNodeId elf_ntypeguard(elFileState *fs, elFileline line, elNodeId x, elNodeTy y);
 elNodeId elf_fnodemetafield(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_nfieldaccess(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
-elNodeId elf_nindexaccess(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_node_field(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
+elNodeId elf_node_index(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_make_ranged_index_node(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elNodeId elf_fnodecall(elFileState *fs, elFileline line, elNodeId x, elNodeId *z);
 elNodeId elf_ncallmetafield(elFileState *fs, elFileline line, elNodeId x, elNodeId *z, char *name);
@@ -388,32 +388,6 @@ typedef struct elSelectState {
 } elSelectState;
 
 
-typedef struct elFileFnState elFileFnState;
-typedef struct elFileFnState {
-	elFileFnState *enclosing;
-	elFileline line;
-	/* maximum number of local register used concurrently
-	at any point for this function */
-	elRegId nlocals;
-	elRegId xmemory;
-	/* array of entities from enclosing function,
-	use for closure values... */
-	elEntityId *enclosure;
-	/* this is needed to emit instructions
-	relative to the current function we're
-	loading, there's always an active function,
-	even at file level */
-	/* index to first entity within entity list in file. */
-	elEntityId entities;
-	elBlockId entry_block;
-	// elBlockId block;
-	elByteId bytes;
-	int nyield;
-	/* todo: deprecated */
-	/* list of yield jumps to be patched */
-	elByteId *yj;
-} elFileFnState;
-
 
 #define NO_SLOT (-1)
 #define NO_BYTE (-1)
@@ -421,14 +395,28 @@ typedef struct elFileFnState {
 #define NO_LINE (-0)
 
 
+typedef struct elFileFnState elFileFnState;
+typedef struct elFileFnState {
+	elFileFnState *enclosing;
+	char               *line;
+	int              nlocals;
+	int              xmemory;
+	elEntityId    *enclosure;
+	elEntityId      entities;
+	elBlockId    entry_block;
+	elByteId           bytes;
+	elByteId          nbytes;
+	int               nyield;
+	elByteId             *yj;
+} elFileFnState;
+
+
 typedef struct elFileState {
-	elModule *M;
-	elState  *R;
-	/*
-	these probably came from GCStrings,
-	they should remain alive... I think. */
+	elFileFnState state;
+	elModule         *M;
+	elState          *R;
 	char     *filename;
-	char     *contents;
+	char     *filetext;
 	char     *linechar;
 	char     *thischar;
 	int     linenumber;
@@ -440,28 +428,22 @@ typedef struct elFileState {
 			elToken last_token,this_token,then_token;
 		};
 	};
-	elNode *nodes;
-	elNodeId nnodes;
+	elNode 	       *nodes;
+	elNodeId        nnodes;
 	elFileEntity *entities;
-	elEntityId nentities;
-	elFileBlock *blocks;
-	union { elBlockId nblocks, level; };
-	/* the current function */
-	elFileFnState *fn;
-	elByteId bytes;
-	int flags;
-	elBool debuggerflag;
-	/* How many loops are we in */
-	int nloops;
-	/* The semantics of a leave instruction
-	change within a default expression,
-	so if this isn't set to '-1' it means
-	that a leave instruction should instead
-	be a store to this register */
-	elRegId default_register;
+	elEntityId   nentities;
+	elFileBlock    *blocks;
+	elBlockId      nblocks;
+	int             nloops;
+	elFileFnState      *fn;
+	int              flags;
+	elBool    debuggerflag;
+	int   default_register;
 } elFileState;
 
-char *elf_fgetfilename(elFileState *fs);
+
+void elf_fopen_function(elFileState *fs, elFileFnState *fn, char *line);
+char *elf_fget_name(elFileState *fs);
 
 elNodeId elf_fexpr(elFileState *fs, elFileExpr *expr, elBool flags);
 elNodeId elf_funary(elFileState *fs, elFileExpr *expr, elBool flags);
@@ -472,7 +454,7 @@ void elf_femitstore(elFileState *fs, elFileline line, elNodeId x, elNodeId y);
 elFileBlock *elf_fgetloopblock(elFileState *fs, elRegId with_value_register);
 
 int elf_femittereval(elFileState *fs, int flags, int reg, int nreg, elNodeId id);
-int elf_femitterload(elFileState *fs, elNodeId id);
+int elf_femitter_load(elFileState *fs, elNodeId id);
 
 void elf_fbeginlastlyblock(elFileState *fs, elFileline line);
 void elf_fcloselastlyblock(elFileState *fs, elFileline line);
@@ -494,8 +476,8 @@ void elf_fbeginrangeloop(elFileState *fs, elFileline line, elNodeId x, elNodeId 
 void elf_fcloserangeloop(elFileState *fs, elFileline line);
 void elf_fbegindowhileloop(elFileState *fs, elFileline line);
 void elf_fclosedowhileloop(elFileState *fs, elFileline line, elNodeId x);
-void elf_fbeginwhileloop(elFileState *fs, elFileline line, elNodeId x);
-void elf_fclosewhileloop(elFileState *fs, elFileline line);
+void elf_femit_begin_while_loop(elFileState *fs, elNodeId x);
+void elf_femit_close_while_loop(elFileState *fs);
 elBlockId elf_fbeginblock(elFileState *fs, elBool flags);
-void elf_fcloseblock(elFileState *fs);
+void elf_fclose_block(elFileState *fs);
 
