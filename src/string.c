@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** elf-str.c
+** string.c
 ** String
 */
 
@@ -17,12 +17,12 @@ elString *elf_new_lstring(elState *R, elInteger length) {
 	if (R) obj->obj.metatable = R->metatables.string;
 	obj->length = length;
 	obj->hash = -1;
-	obj->contents[length] = 0;
+	obj->text[length] = 0;
 	return obj;
 }
 
 elString *elf_new_string(elState *R, char *contents) {
-	int length = elf_cstrlen(contents);
+	int length = elf_textlength(contents);
 	elHashId hash = elf_tabhashstr(contents);
 	elString *string = 0;
 	elTable *registry = R->M->strings;
@@ -36,7 +36,7 @@ elString *elf_new_string(elState *R, char *contents) {
 			string = target.x_str;
 		} else {
 			string = elf_new_lstring(R,length);
-			elf_copy_memory(string->contents,contents,length);
+			elf_copymemory(string->text,contents,length);
 			string->hash = hash;
 
 			elInteger i = ARRAY_GROW(registry->array,1);
@@ -47,7 +47,7 @@ elString *elf_new_string(elState *R, char *contents) {
 		}
 	} else {
 		string = elf_new_lstring(R,length);
-		elf_copy_memory(string->contents,contents,length);
+		elf_copymemory(string->text,contents,length);
 		string->hash = hash;
 	}
 	return string;
@@ -59,7 +59,7 @@ elBool elf_streq(elString *x, elString *y) {
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;
 	if (x->length != y->length) return 0;
-	return S_eq(x->string,y->string);
+	return elf_texteq(x->string,y->string);
 }
 
 
@@ -85,7 +85,7 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 int elf_libS_get_index(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elPUSHINT(R,str->contents[elf_get_integer(R,0)]);
+	elPUSHINT(R,str->text[elf_get_integer(R,0)]);
 	return 1;
 }
 
@@ -93,7 +93,7 @@ int elf_libS_get_index(elState *R) {
 int elf_libS_pop(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
-	elf_copy_memory(el->contents,yo->contents,MAX(0,yo->length-1));
+	elf_copymemory(el->text,yo->text,MAX(0,yo->length-1));
 	elPUSHSTR(R,el);
 	return 1;
 }
@@ -102,9 +102,9 @@ int elf_libS_pop(elState *R) {
 int elf_libS_append_char(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,yo->length + elGETNARGS(R));
-	elf_copy_memory(el->contents,yo->contents,yo->length);
+	elf_copymemory(el->text,yo->text,yo->length);
 	for ( int i = 0; i < elGETNARGS(R); i += 1 ) {
-		el->contents[yo->length + i] = elf_get_integer(R,i);
+		el->text[yo->length + i] = elf_get_integer(R,i);
 	}
 	elPUSHSTR(R,el);
 	return 1;
@@ -114,11 +114,11 @@ int elf_libS_append_char(elState *R) {
 int elf_libS_append(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char buffer[0x100] = {0};
-	strcatf(buffer,"%s",str->contents);
+	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elGETNARGS(R); ++ i) {
 		elValue v = elGETARG(R,i);
 		if (v.tag == TAG_STR) {
-			strcatf(buffer,"%s",v.x_str->contents);
+			strcatf(buffer,"%s",v.x_str->text);
 		} else if (v.tag == TAG_NIL) {
 			strcatf(buffer,"nil");
 		} else if (v.tag == TAG_NUM) {
@@ -142,9 +142,9 @@ int elf_libS_match(elState *R) {
 
 int elf_libS_find(elState *R) {
 	elString *string = (elString*) elGETTHIS(R);
-	char *pattern = elf_get_charstring(R,0);
+	char *pattern = elf_get_text(R,0);
 	char *buffer = 0;
-	char *cursor = string->contents;
+	char *cursor = string->text;
 	elTable *list = elf_add_new_table(R);
 	while (*cursor) {
 		char *match = elf_match_strings_single_clause_ex(cursor,pattern);
@@ -166,7 +166,7 @@ int elf_libS_find(elState *R) {
 int elf_libS_split_by_lines(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char *buffer = 0;
-	char *cursor = str->contents;
+	char *cursor = str->text;
 	elTable *list = elf_add_new_table(R);
 	while (*cursor) {
 		while (*cursor && *cursor != '\n' && *cursor != '\r') {
@@ -192,7 +192,7 @@ int elf_libS_get_hash(elState *R) {
 
 int elf_libS_lowercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elString *newstr = elf_pushnewstrlen(R,str->length);
+	elString *newstr = elf_add_new_lstring(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtolowercase(str->c[i]);
 	}
@@ -202,7 +202,7 @@ int elf_libS_lowercase(elState *R) {
 
 int elf_libS_uppercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elString *newstr = elf_pushnewstrlen(R,str->length);
+	elString *newstr = elf_add_new_lstring(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtouppercase(str->c[i]);
 	}

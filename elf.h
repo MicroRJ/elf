@@ -53,10 +53,6 @@
 #include <unistd.h>
 #endif
 
-/*
-** Auxiliary Macros (all macros are auxilary...)
-*/
-
 
 #if defined(__EMSCRIPTEN__)
 	#define elAPI 		EMSCRIPTEN_KEEPALIVE
@@ -108,7 +104,7 @@
 
 
 #if !defined(COUNTOF)
-	#define COUNTOF _countof
+	#define COUNTOF(X) (sizeof(X)/sizeof(X[0]))
 #endif
 
 
@@ -161,26 +157,20 @@ typedef struct elBinding {
 } elBinding;
 
 
-
-/* ---------------------------------
-	Common User API
---------------------------------- */
-
-
-
 elAPI elInteger elf_get_integer(elState *R, elRegId x);
 elAPI elNumber elf_get_number(elState *R, elRegId x);
 elAPI elString *elf_get_string(elState *R, elRegId x);
-elAPI char *elf_get_charstring(elState *R, elRegId x);
+elAPI char *elf_get_text(elState *R, elRegId x);
 elAPI elObject *elf_get_object(elState *R, elRegId x);
 elAPI elTable *elf_get_table(elState *R, elRegId x);
 elAPI elHandle elf_get_handle(elState *R, elRegId x);
 elAPI elClosure *elf_get_closure(elState *R, elRegId x);
 
+
 elAPI elString *elf_add_new_string(elState *, char *c);
 elAPI elObject *elf_add_new_object(elState *, elInteger tell);
 elAPI elTable *elf_add_new_table(elState *);
-elAPI elString *elf_pushnewstrlen(elState *, elInteger len);
+elAPI elString *elf_add_new_lstring(elState *, elInteger len);
 
 
 elAPI void elf_register_bindings(elState *, elTable *, elBinding *list, int num);
@@ -188,9 +178,6 @@ elAPI void elf_register_bindings(elState *, elTable *, elBinding *list, int num)
 
 #include "src/array.h"
 
-
-
-/* Some debug utilities */
 
 #define elHERE (elSourceInfo){__FILE__,__LINE__,__func__}
 
@@ -274,7 +261,7 @@ typedef enum { TAGLIST(TAGENUM) } elValueTag;
 typedef struct elValue {
 	elValueTag tag;
 	union {
-		elInteger i,  x_int;
+		elInteger x_int;
 		elNumber  n,  x_num;
 		elAddr    p,  x_ptr;
 		elHandle  h,  x_sys;
@@ -287,20 +274,11 @@ typedef struct elValue {
 } elValue;
 
 
-/*
-** A file prototype describes a function,
-** files themselves are also functions and
-** are treated no differently.
-** A function may have other functions within,
-** we keep an additional array here, **protos,
-** which stores the id's of each within the
-** module.
-** source and length are for storing primarily
-** the contents of a file.
-*/
+/* function prototypes are also for files, since files
+are functions, nvalues refers to number of closure
+values */
 typedef struct elFileProto {
-	union { short arity, /* @DEPRECATED */ x; };
-	short y;
+	short arity;
 	short nvalues;
 	short nlocals;
 	/* this memory is managed automatically,
@@ -336,86 +314,21 @@ typedef struct elClosure {
 } elClosure;
 
 
-
-/* ---------------------------------
-	String
---------------------------------- */
-
-
-
-typedef struct elString {
-	elObject    obj;
-	elHashId   hash;
-	/* Hear me out... do you even	use the length of
-	the string that often, and when you do use it,
-	you cache it somewhere, if you really want to
-	compute the length of a string without using
-	strlen (like when you're looking up a string),
-	you can use the size of the object minus the
-	size of the string header... */
-	int     	length;
-	union {
-		char   text[1];
-		/* TODO: DEPRECATED */
-		char   contents[1];
-		char   string[1];
-		char   c[1];
-	};
-} elString;
-
-
-elString *elf_new_lstring(elState *R, elInteger length);
-elString *elf_new_string(elState *R, char *contents);
-
-
-int elf_libS_length(elState *R);
-int elf_libS_match(elState *R);
-int elf_libS_pop(elState *R);
-int elf_libS_append(elState *R);
-int elf_libS_append_char(elState *R);
-int elf_libS_get_hash(elState *R);
-int elf_libS_uppercase(elState *R);
-int elf_libS_lowercase(elState *R);
-int elf_libS_split_by_lines(elState *R);
-int elf_libS_get_index(elState *R);
-int elf_libS_find(elState *R);
-int elf_libS_split(elState *R);
-
-
-elGLOBAL elBinding elf_libS_[] = {
-	{"length",elf_libS_length},
-	{"match",elf_libS_match},
-	{"uppercase",elf_libS_uppercase},
-	{"lowercase",elf_libS_lowercase},
-	{"__add",elf_libS_append},
-	{"__add1",elf_libS_append},
-	{"append",elf_libS_append},
-	{"append_char",elf_libS_append_char},
-	{"pop",elf_libS_pop},
-	{"get_hash",elf_libS_get_hash},
-	{"split_by_lines",elf_libS_split_by_lines},
-	{"idx",elf_libS_get_index},
-	{"find",elf_libS_find},
-};
-
-
-
+#include "src/string.h"
 #include "src/table.h"
 
 
-
-
-
-
-/* This isn't portable to CPP, the idea is to
+/* I don't think this is portable to CPP as is, the idea is to
 use C's "cast to union types" for typechecking:
 	https://gcc.gnu.org/onlinedocs/gcc/Cast-to-Union.html#Cast-to-a-Union-Type
+
+	I suppose CPP people can use templates or something...
 */
 #define UCAST(D,T) ( ((union { T _; }){D})._ )
 
 
 
-#define elGETTOP(S)   ((S)->T)
+#define elGETTOP(S)   ((S)->stack_ptr)
 #define elSETTOP(S,X) (elGETTOP(S) = UCAST(X, elValue *))
 #define elPUSH(S,X)   (* elGETTOP(S) ++ = (X))
 
@@ -433,10 +346,11 @@ use C's "cast to union types" for typechecking:
 #define elNIL() (elLITERAL(elValue){TAG_NIL})
 
 
-#define elGETTHIS(S)  (elGETFRAME(S)->locals[0].x_obj)
-#define elGETARG(S,X) (elGETFRAME(S)->locals[1+X])
-#define elGETTAG(S,X) (elGETARG(S,X).tag)
-#define elGETNARGS(S) (elGETFRAME(S)->nargs-1)
+#define elGETNARGS(S)   (elGETFRAME(S)->nargs-1)
+#define elGETLOCAL(S,X) (elGETFRAME(S)->locals[X])
+#define elGETTHIS(S)    (elGETLOCAL(S,0).x_obj)
+#define elGETARG(S,X)   (elGETLOCAL(S,X+1))
+#define elGETTAG(S,X)   (elGETARG(S,X).tag)
 
 
 #define elPUSHNIL(S) elPUSH(S,elNIL())
@@ -473,49 +387,15 @@ object, and you use that however you want... */
 /* todo: add support for arguments */
 elAPI int elf_parse_code3(elState *, elString *name, elRegId ry, int ny, elString *contents);
 elAPI int elf_parse_expr3(elState *, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_parse_file3(elState *, elString *name, elRegId ry, int ny);
 
-elAPI int elf_parse_code3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI int elf_Sfloadcode(elState *R, elFileState *fs, elString *filename, int nargs, elString *contents);
 elAPI int elf_parse_expr3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_parse_file3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny);
 
-/*
-	Find somewhere else to put this information...
 
-	When you call a function 'this' will always be passed,
-	if you call a field or metafield, this will be the object,
-	if you call a function not from a field or metafield
-	you have to pass in 'this' manually using special syntax,
-	otherwise 'this' defaults to the current 'this'...
+elAPI int elf_Sloadfile(elState *, elString *name, int nargs);
+elAPI int elf_Sfloadfile(elState *, elFileState *fs, elString *name, int nargs);
 
-	For instance,
-
-	my_table:mymetafield(1,2,3)
-	my_table.myregularfield(1,2,3)
-
-	'this' is implicit here as 'my_table',
-
-	let field = my_table.myregularfield
-
-	field(1,2,3)
-
-	'this' is implicit here as 'this' (from the current context),
-
-	field<my_table>(1,2,3)
-
-	'this' is explicit here as 'my_table',
-
-	The default 'this' is the current closure object...
-
-	To get the current closure object, always, you can
-	do '#this'.
-
-	The closure object is above 'this', so '#this'
-	translates could translate to
-	elf.get_local(#register this - 1)
-*/
-int elf_call_function3(elState *R, elObject *obj, int nx, int ny, elRegId ry);
-
+elAPI int elf_call_function(elState *R, int nargs, int nregs);
 elAPI int elf_run(elState *);
 
 elInteger elf_trigger_collection_cycle(elState *R);
@@ -578,53 +458,30 @@ elSymbolId elf_add_global_value(elModule *md, elString *name, elValue v);
 elSymbolId elf_add_proto(elModule *md, elFileProto p);
 
 
-typedef struct elDelaylist elDelaylist;
-typedef struct elDelaylist {
-	elDelaylist *n;
+typedef struct elf_delaylist elf_delaylist;
+typedef struct elf_delaylist {
+	elf_delaylist *n;
 	elByteId j;
-} elDelaylist;
+} elf_delaylist;
 
 
 typedef struct elStackFrame elStackFrame;
 typedef struct elStackFrame {
-	elStackFrame *caller;
-	elClosure   *closure;
-	elObject      *_this;
-	elValue      *locals;
-	int          nlocals;
-	char			   nargs;
-	char			ntoyield;
-	elByteId      origin;
-
-	// todo: to remove
-	elRegId           ry;
-
-	/* the number of inputs (nx) and
-	the number of expected outputs (ny).
-	Output registers are allocated by the
-	caller and runtime writes to them when
-	the callee \yields.
-	A function or binding can yield many more
-	or less values, it does not matter.
-	For bindings you must return the number
-	of actual values yielded so that runtime
-	can hoist the return values. */
-	/* list of delayed jumps to be executed
-	on return, 'finally' statements produce
-	these. */
-	elDelaylist *delay_list;
-	elBool logging;
+	elStackFrame   *caller;
+	elClosure      *closure;
+	elValue        *locals;
+	int            nlocals;
+	char			    nargs;
+	char			    nregs;
+	elByteId        origin;
+	elf_delaylist * delay_list;
+	elBool 			 logging;
 } elStackFrame;
-
-
 
 typedef enum elGCColor elGCPhase;
 
-
 #define elGC_PHASE_HOLD GC_WHITE
 #define elGC_PHASE_FREE GC_BLACK
-
-
 
 typedef struct elCollector {
 	elBool     paused;
@@ -633,13 +490,9 @@ typedef struct elCollector {
 	elInteger  memory_threshold;
 	elObject **new_objects;
 	elObject **objects;
-	/* This changes dynamically based on usage patterns,
-	the idea is to collect more when it is worth collecting,
-	and to refrain from collecting when previous culls
-	weren't fortuitous. This is based on the assumption that
-	it is better to make small and quick collections. However,
-	there's very high likelihood that we won't be successful,
-	so we remember that through this threshold */
+	/* this changes dynamically based on
+	object min threshold, it tends to
+	be around there... */
 	elInteger  object_trigger_threshold;
 } elCollector;
 
@@ -651,141 +504,11 @@ typedef struct elCollector {
 
 
 typedef struct elState {
-	/* The module, must be first member field */
 	elModule *M;
-	/* The stack */
-	elValue  *K;
-	/* The stack size */
-	elRegId   Z;
-	elValue  *T;
-	/*
-	T: Stack top pointer, (one past last live value).
-	This pointer has 2 main purposes, namely:
+	elValue  *stack;
+	int 		 stack_max;
+	elValue  *stack_ptr;
 
-	1) Serves for passing in arguments to other functions,
-	by acting as the reference pointer.
-
-	2) Marks the end of the live value range, so values
-	BEFORE top are live and kept.
-
-	Consequently, there are a few points which are
-	crucial to keep in mind.
-
-	Let's begin with stack frames, and the idea
-	of coverage and frame coverage.
-
-	First, a stack frame is a portion of the stack reserved
-	for a function call, when you call a function a new
-	stack frame is created of appropriate size.
-
-		- The stack frame structure itself
-	contains additional information about the call, such
-	as the number of arguments, the closure (if any)
-	and more...
-
-	Only one stack frame is active at once, since we can
-	only be in one function at any given time.
-
-	When the function returns control, the stack frame
-	is removed, and the previous stack frame is restored.
-
-	Every function prototype states how many locals (nlocals)
-	are active at any given time.
-
-	For instance if a function has three variables say
-	'let a, b, c' then (nlocals) must be at least 3 plus any other
-	temporary registers or locals which the code emitter might have
-	used for some intermediate computations.
-
-	The process of determining how many register or locals a
-	function might necessitate depends on the code generator.
-
-	But one thing must be guaranteed, values MUST remain alive
-	for as long as they are used.
-
-	Keep in mind that when a local or register is overwritten
-	or not 'covered' (explained later)  anymore it could get
-	deallocated (if it is an object).
-
-	So (nlocals) effectively tells us the space on the stack
-	that must 'fully-covered' (explained later) at all times.
-
-	Therefore (nlocals) is then used to determine the size of
-	the stack frame for that function.
-
-
-	* Second, coverage.
-	One of the purposes of 'T' is to denote all the values
-	which are visible, reachable, or alive to the GC.
-	When the GC runs, it only sees values before T, and those
-	values are consequently kept.
-	So all values before T are said to be 'covered'.
-
-	When a new call frame is created, 'T' is incremented
-	to match the length of the call frame.
-
-	Therefore, the frame is 'fully covered', this is what I
-	refer to as 'full frame coverage'.
-
-	However, 'T' may not always cover the entire frame
-	(explained later), which is what I refer to
-	as 'partial frame coverage'.
-
-
-	The call instruction specifies which 'register' or local
-	contains the first call-argument in operand (x), and the
-	'number' of user-arguments in operand (y).
-	By call arguments I'm referring to the arguments of the
-	bytecode instruction itself, which include the
-	'user-arguments'.
-
-
-	call(function,context,user-arguments...)
-
-
-	Now, the function that actually performs the call
-	which is 'call_function' assumes 'T' points
-	to (closure + object + user-arguments), such
-	that 'T - 1' is the last user-argument.
-
-	[closure] <- instruction (x) operand
-	[context]
-	[user-arg-0]
-	[user-arg-1]
-	[unknown-value] <- 'T' (new location)
-	[unknown-value]
-	[unknown-value]
-	[unknown-value]
-	[unknown-value]
-	[unknown-value]
-	[unknown-value] <- 'T' (old location) (end of frame)
-
-	For this reason, 'T' at (new location) will no longer
-	fully cover our frame anymore as it was at (old location),
-	because we had to regress 'T' to (new location).
-
-	Given that the GC could trigger whilst our current
-	frame is only partially covered, you might ask
-	yourself, what if we collect objects from our
-	current frame?
-
-	The answer is this, the GC can't collect any
-	values that haven't come to be yet, technically...
-
-	The code generator emits instruction in order
-	of execution, therefore, even though our frame is only
-	partially covered, we don't have any values from 'T'
-	at (new-location) that need coverage because we haven't
-	even gotten to the instructions that will populate
-	those registers.
-
-	This means that no instruction should ever be able to
-	reference a register that is past or at 'T'. If it does
-	this is strictly an error.
-
-	After the call is completed, we must 'recover', ensure
-	'T' offers full coverage of our frame once more.
- 	*/
 	elStackFrame *frame;
 	int          nframe;
 	int           flags;
@@ -848,16 +571,6 @@ at the same time when using clang-cl */
 #endif
 
 
-
-
-// #include "src/elf-tkn.h"
-// #include "src/elf-run.h"
-#include "src/elf-str.h"
-// #include "src/elf-tab.h"
-// #include "src/elf-node.h"
-// #include "src/elf-file.h"
-
-
 #include "src/elf-sys.c"
 #include "src/elf-mem.c"
 #include "src/ldebug.c"
@@ -866,12 +579,11 @@ at the same time when using clang-cl */
 #include "src/elf-mod.c"
 #include "src/elf-chr.c"
 #include "src/elf-aux.c"
-#include "src/elf-str.c"
-#include "src/elf-var.c"
+#include "src/string.c"
 #include "src/elf-tab.c"
 #include "src/elf-lex.c"
 #include "src/elf-node.c"
-#include "src/elf-emit.c"
+#include "src/emit.c"
 #include "src/file.c"
 #include "src/elf-api.c"
 
@@ -897,6 +609,137 @@ at the same time when using clang-cl */
 
 #endif
 
+
+
+/* Notes on T: Stack top pointer...
+
+T: Stack top pointer, (one past last live value).
+This pointer has 2 main purposes, namely:
+
+1) Serves for passing in arguments to other functions,
+by acting as the reference pointer.
+
+2) Marks the end of the live value range, so values
+BEFORE top are live and kept.
+
+Consequently, there are a few points which are
+crucial to keep in mind.
+
+Let's begin with stack frames, and the idea
+of coverage and frame coverage.
+
+First, a stack frame is a portion of the stack reserved
+for a function call, when you call a function a new
+stack frame is created of appropriate size.
+
+	- The stack frame structure itself
+contains additional information about the call, such
+as the number of arguments, the closure (if any)
+and more...
+
+Only one stack frame is active at once, since we can
+only be in one function at any given time.
+
+When the function returns control, the stack frame
+is removed, and the previous stack frame is restored.
+
+Every function prototype states how many locals (nlocals)
+are active at any given time.
+
+For instance if a function has three variables say
+'let a, b, c' then (nlocals) must be at least 3 plus any other
+temporary registers or locals which the code emitter might have
+used for some intermediate computations.
+
+The process of determining how many register or locals a
+function might necessitate depends on the code generator.
+
+But one thing must be guaranteed, values MUST remain alive
+for as long as they are used.
+
+Keep in mind that when a local or register is overwritten
+or not 'covered' (explained later)  anymore it could get
+deallocated (if it is an object).
+
+So (nlocals) effectively tells us the space on the stack
+that must 'fully-covered' (explained later) at all times.
+
+Therefore (nlocals) is then used to determine the size of
+the stack frame for that function.
+
+
+* Second, coverage.
+One of the purposes of 'T' is to denote all the values
+which are visible, reachable, or alive to the GC.
+When the GC runs, it only sees values before T, and those
+values are consequently kept.
+So all values before T are said to be 'covered'.
+
+When a new call frame is created, 'T' is incremented
+to match the length of the call frame.
+
+Therefore, the frame is 'fully covered', this is what I
+refer to as 'full frame coverage'.
+
+However, 'T' may not always cover the entire frame
+(explained later), which is what I refer to
+as 'partial frame coverage'.
+
+
+The call instruction specifies which 'register' or local
+contains the first call-argument in operand (x), and the
+'number' of user-arguments in operand (y).
+By call arguments I'm referring to the arguments of the
+bytecode instruction itself, which include the
+'user-arguments'.
+
+
+call(function,context,user-arguments...)
+
+
+Now, the function that actually performs the call
+which is 'call_function' assumes 'T' points
+to (closure + object + user-arguments), such
+that 'T - 1' is the last user-argument.
+
+[closure] <- instruction (x) operand
+[context]
+[user-arg-0]
+[user-arg-1]
+[unknown-value] <- 'T' (new location)
+[unknown-value]
+[unknown-value]
+[unknown-value]
+[unknown-value]
+[unknown-value]
+[unknown-value] <- 'T' (old location) (end of frame)
+
+For this reason, 'T' at (new location) will no longer
+fully cover our frame anymore as it was at (old location),
+because we had to regress 'T' to (new location).
+
+Given that the GC could trigger whilst our current
+frame is only partially covered, you might ask
+yourself, what if we collect objects from our
+current frame?
+
+The answer is this, the GC can't collect any
+values that haven't come to be yet, technically...
+
+The code generator emits instruction in order
+of execution, therefore, even though our frame is only
+partially covered, we don't have any values from 'T'
+at (new-location) that need coverage because we haven't
+even gotten to the instructions that will populate
+those registers.
+
+This means that no instruction should ever be able to
+reference a register that is past or at 'T'. If it does
+this is strictly an error.
+
+After the call is completed, we must 'recover', ensure
+'T' offers full coverage of our frame once more.
+	*/
 
 /* 7/25/24 10:50 PM
 

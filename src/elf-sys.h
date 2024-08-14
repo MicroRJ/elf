@@ -28,7 +28,7 @@ elAPI int sys_changeworkdir(char *buffer);
 elAPI elHandle sys_loadlib(char const *name);
 elAPI void *sys_libfn(elHandle lib, char const *name);
 
-elAPI elError sys_load_file_contents(elAllocator *allocator, void **lppOut, char const *fileName);
+elAPI elError sys_load_file_text(elAllocator *allocator, void **lppOut, char const *fileName);
 elAPI elError sys_savefilebytes(char const *buffer, elInteger length, char const *fileName);
 
 elAPI int sys_getlasterror();

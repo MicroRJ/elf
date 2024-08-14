@@ -197,19 +197,19 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	if (fileid != -1) {
 		elFileProto *file = &M->files[fileid];
 		elFileline line = elf_get_line_for_byte(M,call->origin);
-		elf_line_dialog(file->name->contents,file->contents->contents,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
+		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
 	}
 }
 
 
-void elf_throw(elState *R, elByteId byte, char *error) {
+void elf_Sthrow(elState *R, elByteId byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_line_for_byte(M,byte);
 	int fileid = elf_get_file_for_byte(M,byte);
 	if (fileid != -1) {
 		elFileProto *file = &M->files[fileid];
-		elf_line_dialog(file->name->contents,file->contents->contents,line,byte,M->bytes[byte],error);
+		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	}
 
 	printf(" -- BYTE TRACE:\n");
@@ -220,14 +220,14 @@ void elf_throw(elState *R, elByteId byte, char *error) {
 
 void elf_check_args(elState *R, char *fnname, int n, char *usage) {
 	if (elGETNARGS(R) != n) {
-		elf_throw(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
+		elf_Sthrow(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
 	}
 }
 
 
 int elf_type_check(elState *R, elByteId id, elRegId loc, elValueTag x, elValueTag y) {
 	if (x != y) {
-		elf_throw(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
+		elf_Sthrow(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
 	return x == y;
 }
