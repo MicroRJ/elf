@@ -244,7 +244,7 @@ elNumber elf_tabgetnum(elTable *tab, elString *key) {
 }
 
 
-elInteger elf_table_get_integer(elTable *tab, elString *key) {
+elInteger elf_tget_int(elTable *tab, elString *key) {
 	elValue val = elf_table_lookup(tab,elSTR(key));
 	return elTOINT(val);
 }
@@ -275,7 +275,7 @@ void elf_table_set_string_field(elTable *tab, elString *key, elString *val) {
 }
 
 
-void elf_table_set_integer_field(elTable *tab, elString *key, elInteger val) {
+void elf_tset_int(elTable *tab, elString *key, elInteger val) {
 	elf_table_set(tab,elSTR(key),elINT(val));
 }
 

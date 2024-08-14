@@ -716,16 +716,20 @@ elBool elf_is_virtual_file_name(char const *fn) {
 
 
 elAPI int elf_lib_get_disk_info(elState *R) {
+	elTable *info = elf_add_new_table(R);
+#if defined(_WIN32)
 	DWORD SectorsPerCluster;
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
 	GetDiskFreeSpaceA(elf_get_text(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	elTable *info = elf_add_new_table(R);
-	elf_table_set_integer_field(info,elf_new_string(R,"SectorsPerCluster"),SectorsPerCluster);
-	elf_table_set_integer_field(info,elf_new_string(R,"BytesPerSector"),BytesPerSector);
-	elf_table_set_integer_field(info,elf_new_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
-	elf_table_set_integer_field(info,elf_new_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+	elf_tset_int(info,elf_new_string(R,"SectorsPerCluster"),SectorsPerCluster);
+	elf_tset_int(info,elf_new_string(R,"BytesPerSector"),BytesPerSector);
+	elf_tset_int(info,elf_new_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
+	elf_tset_int(info,elf_new_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+#else
+	elf_debug_log("this function is not implemented for this platform");
+#endif
 	return 1;
 }
 
@@ -734,6 +738,7 @@ elAPI int elf_lib_list_volumes(elState *R) {
 
 	elTable *list = elf_add_new_table(R); /* <- */
 
+#if defined(_WIN32)
 	char buffer[MAX_PATH];
 	HANDLE handle = FindFirstVolumeA(buffer,MAX_PATH);
 
@@ -759,6 +764,7 @@ elAPI int elf_lib_list_volumes(elState *R) {
 		}
 	} while(FindNextVolumeA(handle,buffer,MAX_PATH));
 	FindVolumeClose(handle);
+#endif
 
 	elPUSHTAB(R,list); /* <- */
 	return 1;
@@ -794,8 +800,8 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 		elTable *file = elf_add_new_table(R);
 		elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
 		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
-		elf_table_set_integer_field(file,elf_add_new_string(R,"is_directory"),is_directory);
-		elf_table_set_integer_field(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
+		elf_tset_int(file,elf_add_new_string(R,"is_directory"),is_directory);
+		elf_tset_int(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
 		elf_table_add(list,elTAB(file));
 		if (level != 0) {
 			if (is_directory) {
@@ -823,8 +829,8 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 		elTable *file = elf_add_new_table(R);
 		elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
 		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
-		elf_table_set_integer_field(file,elf_add_new_string(R,"is_directory"),is_directory);
-		elf_table_set_integer_field(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
+		elf_tset_int(file,elf_add_new_string(R,"is_directory"),is_directory);
+		elf_tset_int(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
 		elPUSHCLS(R,cls);
 		int results = 0; elNOCODE; // elf_call_function(R,base,1,1);
 		// if (is_directory) {
@@ -834,7 +840,9 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 		// }
 		elSETTOP(R,top);
 	} while (FindNextFileA(h,&f));
-#elif defined(PLATFORM_WEB)
+#endif
+#if 0
+	// defined(PLATFORM_WEB)
 	DIR *dirfd = opendir(dir->c);
 	if (dirfd != 0) {
 		struct dirent *entry;
@@ -852,7 +860,7 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 
 			elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
 			elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
-			elf_table_set_integer_field(file,elf_add_new_string(R,"isdir"),isdir);
+			elf_tset_int(file,elf_add_new_string(R,"isdir"),isdir);
 			int r = elf_call_function(R,base,1,1);
 			if ((r > 0) && isdir && elf_get_integer(R,base)) {
 				elf_lib_enumerate_directory_(R,path,cls);
