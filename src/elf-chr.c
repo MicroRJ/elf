@@ -53,7 +53,7 @@ char elf_chrtouppercase(char x) {
 }
 
 
-int elf_textlength(char const *s) {
+int elf_text_length(char const *s) {
 	int n = 0;
 	if (s != 0) {
 		while (*s ++ != 0) {
@@ -92,15 +92,15 @@ elBool elf_texteq(char const *x, char const *y) {
 	if (x == y) {
 		return 1;
 	}
-	int lx = elf_textlength(x);
-	int ly = elf_textlength(y);
+	int lx = elf_text_length(x);
+	int ly = elf_text_length(y);
 	return (lx == ly) && elf_texteql(x,y,lx);
 }
 
 
 char *elf_copyltext(elAllocator *allocator, int length, char const *string) {
 	if (length <= 0) {
-		length = elf_textlength(string);
+		length = elf_text_length(string);
 	}
 	char *result = elf_alloc(allocator,length+1);
 	elf_copy_memory(result,string,length);

@@ -16,7 +16,7 @@ char elf_chrtolowercase(char x);
 
 
 
-int elf_textlength(char const *s);
+int elf_text_length(char const *s);
 elBool elf_texteql(char const *x, char const *y, int n);
 elBool elf_texteq(char const *x, char const *y);
 char *elf_copyltext(elAllocator *allocator, int length, char const *string);
@@ -31,7 +31,7 @@ elBool elf_match_entire_string(char *p, char *s);
 
 elBool elf_match_entire_string(char *p, char *s);
 char *elf_copytext(elAllocator *cator, char const *contents);
-int elf_textlength(char const *contents);
+int elf_text_length(char const *contents);
 elBool elf_texteq(char const *x, char const *y);
 unsigned int S_hashcontents (char const *contents, unsigned int length);
 char *S_tpf_(char const *format, ...);

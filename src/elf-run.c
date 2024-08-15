@@ -183,7 +183,7 @@ int elf_Scalloverload(elState *S, elObject *obj, elString *name, int reg, int na
 		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elValue field;
-	field=elf_tgetfield(obj->metatable,name);
+	field=elf_tget_any(obj->metatable,name);
 	if (!elISFUNTAG(field.tag)) {
 		elf_fail(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
 	}
@@ -672,7 +672,7 @@ int elf_run(elState *R) {
 				if ((x.tag == TAG_NIL) || (y.tag == TAG_NIL)) {
 					eq = elISNIL(x) == elISNIL(y);
 				} else if ((x.tag == TAG_STR) && (y.tag == TAG_STR)) {
-					eq = elf_streq(x.x_str,y.x_str);
+					eq = elf_string_eq(x.x_str,y.x_str);
 				} else if (elISNUMTAG(x.tag) && elISNUMTAG(y.tag)) {
 					eq = x.x_int == y.x_int;
 				} else {

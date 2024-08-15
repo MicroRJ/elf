@@ -357,7 +357,7 @@ are not mistaken with table accesses when shortened, math.floor != .math.floor *
 int elf_lib_include(elState *R) {
 	elf_check_args(R,".include",1,"(the directory to include to add to the global directory)");
 	char *dir = elf_get_text(R,0);
-	int plen = elf_textlength(dir);
+	int plen = elf_text_length(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:
 	elf.ray.elf.ray could include the symbol
@@ -754,12 +754,12 @@ elAPI int elf_lib_list_volumes(elState *R) {
 		elTable *volume = elf_add_new_table(R);
 		name = elf_xstr(R,buffer);
 
-		elf_table_set_table_field(list,name,volume);
+		elf_tset_tab(list,name,volume);
 
 		elf_tset_str(volume,elf_new_string(R,"name"),name);
 
 		elTable *path_names = elf_add_new_table(R);
-		elf_table_set_table_field(volume,elf_new_string(R,"path_names"),path_names);
+		elf_tset_tab(volume,elf_new_string(R,"path_names"),path_names);
 
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
@@ -794,7 +794,7 @@ elAPI int elf_lib_list_folder(elState *R) {
 
 /* Use -1 for recursive always, 0 for just this layer */
 void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
-#if defined(PLATFORM_DESKTOP)
+#if defined(_WIN32)
 	WIN32_FIND_DATAA f;
 	HANDLE h = FindFirstFileA(elf_tpf("%s\\*",dir->c),&f);
 	if (h != INVALID_HANDLE_VALUE) do {

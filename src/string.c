@@ -22,13 +22,13 @@ elString *elf_new_lstring(elState *R, elInteger length) {
 }
 
 elString *elf_new_string(elState *R, char *contents) {
-	int length = elf_textlength(contents);
-	elHashId hash = elf_tabhashstr(contents);
+	int length = elf_text_length(contents);
+	elHashId hash = elf_hash_text(contents);
 	elString *string = 0;
 	elTable *registry = R->M->strings;
 	if (length < 64 && registry != 0) {
 		elf_check_table(registry);
-		elInteger slot = elf_table_tryS(registry,contents,length,hash);
+		elInteger slot = elf_ttry_text(registry,contents,length,hash);
 		elASSERT(slot != -1);
 		elEntry entry = registry->entries[slot];
 		if (entry.key.tag != TAG_NIL) {
@@ -54,7 +54,7 @@ elString *elf_new_string(elState *R, char *contents) {
 }
 
 
-elBool elf_streq(elString *x, elString *y) {
+elBool elf_string_eq(elString *x, elString *y) {
 	if (x == y) return 1;
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;
