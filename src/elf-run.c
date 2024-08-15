@@ -22,23 +22,23 @@ void elf_begin(elState *R, elModule *M) {
 
 
 	/* this will be replaced, todo: */
-	R->cache.x = elf_add_new_string(R,"x");
-	R->cache.y = elf_add_new_string(R,"y");
-	R->cache.z = elf_add_new_string(R,"z");
-	R->cache.w = elf_add_new_string(R,"w");
-	R->cache.width = elf_add_new_string(R,"width");
-	R->cache.height = elf_add_new_string(R,"height");
-	R->cache.__getfield = elf_add_new_string(R,"__getfield");
-	R->cache.__setfield = elf_add_new_string(R,"__setfield");
-	R->cache.__add = elf_add_new_string(R,"__add");
-	R->cache.__sub = elf_add_new_string(R,"__sub");
-	R->cache.__mul = elf_add_new_string(R,"__mul");
-	R->cache.__div = elf_add_new_string(R,"__div");
-	R->cache.__add1 = elf_add_new_string(R,"__add1");
-	R->cache.__sub1 = elf_add_new_string(R,"__sub1");
-	R->cache.__mul1 = elf_add_new_string(R,"__mul1");
-	R->cache.__div1 = elf_add_new_string(R,"__div1");
-	R->cache.__hash = elf_add_new_string(R,"__hash");
+	R->cache.x = elf_xstr(R,"x");
+	R->cache.y = elf_xstr(R,"y");
+	R->cache.z = elf_xstr(R,"z");
+	R->cache.w = elf_xstr(R,"w");
+	R->cache.width = elf_xstr(R,"width");
+	R->cache.height = elf_xstr(R,"height");
+	R->cache.__getfield = elf_xstr(R,"__getfield");
+	R->cache.__setfield = elf_xstr(R,"__setfield");
+	R->cache.__add = elf_xstr(R,"__add");
+	R->cache.__sub = elf_xstr(R,"__sub");
+	R->cache.__mul = elf_xstr(R,"__mul");
+	R->cache.__div = elf_xstr(R,"__div");
+	R->cache.__add1 = elf_xstr(R,"__add1");
+	R->cache.__sub1 = elf_xstr(R,"__sub1");
+	R->cache.__mul1 = elf_xstr(R,"__mul1");
+	R->cache.__div1 = elf_xstr(R,"__div1");
+	R->cache.__hash = elf_xstr(R,"__hash");
 
 	elf_lib_load_functions(R);
 	// crtlib_load(R);
@@ -46,20 +46,21 @@ void elf_begin(elState *R, elModule *M) {
 }
 
 
-/* nargs includes 'this' */
 int elf_call_function(elState *R, int nargs, int nregs) {
 	int nyield=0;
 	/* todo: do not make this recursive dude! */
 	elStackFrame F = {0};
-	F.caller = elGETFRAME(R);
+	F.caller = R->frame;
 	F.origin	= R->byte;
-	F.locals = elGETTOP(R) - nargs;
+	F.locals = R->stack_ptr - nargs;
 	F.nargs = nargs;
 	F.nregs = nregs;
 	elValue fn = F.locals[-1];
+
 	if (!elISFUNTAG(fn.tag)) {
-		elf_Sthrow(R,NO_BYTE,elf_tpf("cannot call '%s'", tag2s[fn.tag]));
+		elf_fail(R,NO_BYTE,elf_tpf("cannot call '%s'", tag2s[fn.tag]));
 	}
+
 	if (fn.tag==TAG_CLS) {
 		F.closure=fn.x_cls;
 		F.nlocals=fn.x_cls->proto.nlocals;
@@ -75,22 +76,25 @@ int elf_call_function(elState *R, int nargs, int nregs) {
 	if (R->flags & FLAG_DEBUGGER_ONCALL) {
 		elf_debugger("debugger 'FLAG_DEBUGGER_ONCALL'");
 	}
+	elValue *results,*ptr;
 	if (fn.tag == TAG_CLS) {
-		nyield = elf_run(R);
-	} else
-	if (fn.tag == TAG_CFN) {
-		elValue *T = elGETTOP(R);
-		nyield = fn.x_cfn(R);
-		if ((elGETTOP(R) - T) < nyield) {
-			elf_Sthrow(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(elGETTOP(R) - T),nyield));
+		nyield=elf_run(R);
+	} else if (fn.tag == TAG_CFN) {
+		results=R->stack_ptr;
+		nyield=fn.x_cfn(R);
+		ptr=R->stack_ptr;
+		if ((ptr-results) < nyield) {
+			elf_fail(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - results),nyield));
 		}
-		int i;
-		for (i = 0; i < MIN(nyield,nregs); ++ i) {
-			F.locals[i-1] = elGETTOP(R)[i-nyield];
-		}
+		// if ((nyield==0)&&(nregs>0)){
+		// 	elf_debug_log("seems like this function does not return anything");
+		// }
+		/* todo: clear only the part we didn't write */
+		elf_clear_memory(F.locals-1,nregs*sizeof(elValue));
+		elf_copy_memory(F.locals-1,results,MIN(nyield,nregs)*sizeof(elValue));
 	} else {
 		nyield = -1;
-		elf_Sthrow(R,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[fn.tag]));
+		elf_fail(R,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[fn.tag]));
 	}
 	elGETFRAME(R) = F.caller;
 	R->nframe -= 1;
@@ -110,18 +114,16 @@ int elf_parse_expr3_fs(elState *R, elFileState *fs, elString *filename, elRegId 
 }
 
 
-int elf_Sfloadcode(elState *R, elFileState *fs, elString *filename, int nargs, elString *contents) {
+elClosure *elf_fs_load_code(elState *R, elFileState *fs, elString *filename, int nargs, elString *contents) {
 	if ((filename == 0) || (contents == 0)) {
-		return -1;
+		return 0;
 	}
 	elModule *M = R->M;
 	fs->R = R;
 	fs->M = M;
-	elf_fopen_file(fs,filename->text,contents->text);
-	while (!elf_test_token(fs,0)) {
-		elf_parse_stat(fs);
-	}
-	elf_fclose_file(fs);
+	elf_fs_begin_file(fs,filename->text,contents->text);
+	while (elf_parse_stat(fs));
+	elf_fs_close_file(fs);
 
 	elFileProto fp = {0};
 	fp.name     = filename;
@@ -130,29 +132,20 @@ int elf_Sfloadcode(elState *R, elFileState *fs, elString *filename, int nargs, e
 	fp.nbytes   = M->nbytes - fs->state.bytes;
 	fp.nlocals  = fs->state.nlocals;
 	ARRAY_ADD(M->files,fp);
-	/* todo: this is such a hack!
-	This is to prevent the closure from getting collected,
-	if the closure gets collected then we can't do error
-	reporting...
-	Although, if we load a file, we also load a bunch of
-	closures and objects, so they should keep the file
-	alive, but we don't have that system in place yet... */
-	elClosure *cls = elf_newclosure(R,fp);
-	elPUSHCLS(R,cls);
-	elf_table_add(M->globals,elCLS(cls));
-	/* why are we calling the function here @todo */
-	return elf_call_function(R,0,nargs);
+	elClosure *cls = elf_new_closure(R,fp);
+	/* todo: hack! */
+	elf_tadd(M->globals,elCLS(cls));
+	return cls;
 }
 
 
-/* todo: add support for arguments and this should
-instead return the closure instead! */
-int elf_Sfloadfile(elState *R, elFileState *fs, elString *name, int nargs) {
+/* todo: rename to call file or something... */
+int elf_fs_load_file(elState *R, elFileState *fs, elString *name, int nargs, int nregs) {
 
-	char *text;
 	elError error;
 	elString *string;
-	int nyield;
+	elClosure *cls;
+	char *text;
 
 	/* todo: please instead allocate the string and read
 	the file into it... */
@@ -162,34 +155,24 @@ int elf_Sfloadfile(elState *R, elFileState *fs, elString *name, int nargs) {
 		return -1;
 	}
 
-	string=elf_add_new_string(R,text);
-	nyield=elf_Sfloadcode(R,fs,name,nargs,string);
-
+	string=elf_xstr(R,text);
 	elf_dealloc(elHEAP_ALLOCATOR,text);
-	return nyield;
+
+	cls=elf_fs_load_code(R,fs,name,nargs,string);
+	elf_pcls(R,cls);
+	return elf_call_function(R,0,nregs);
 }
 
 
-int elf_parse_code3(elState *R, elString *filename, elRegId ry, int nargs, elString *contents) {
+int elf_load_file(elState *R, elString *name, int nargs, int nregs) {
 	elFileState fs = {0};
-	return elf_Sfloadcode(R,&fs,filename,nargs,contents);
-}
-
-
-int elf_parse_expr3(elState *R, elString *filename, elRegId ry, int ny, elString *contents) {
-	elFileState fs = {0};
-	return elf_parse_expr3_fs(R,&fs,filename,ry,ny,contents);
-}
-
-int elf_Sloadfile(elState *R, elString *name, int nargs) {
-	elFileState fs = {0};
-	return elf_Sfloadfile(R,&fs,name,nargs);
+	return elf_fs_load_file(R,&fs,name,nargs,nregs);
 }
 
 
 void elf_check_division_by_zero(elState *S, elValue xx, elValue yy) {
-	if ((yy.tag == TAG_NUM) && (yy.x_num == 0.)) elf_Sthrow(S,NO_BYTE,"division by zero"); else
-	if ((yy.tag == TAG_INT) && (yy.x_int == 0)) elf_Sthrow(S,NO_BYTE,"integer division by zero");
+	if ((yy.tag == TAG_NUM) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
+	if ((yy.tag == TAG_INT) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
 }
 
 
@@ -197,12 +180,12 @@ void elf_check_division_by_zero(elState *S, elValue xx, elValue yy) {
 and checks that is is a function... */
 int elf_Scalloverload(elState *S, elObject *obj, elString *name, int reg, int nargs, elValue *args) {
 	if (obj->metatable == 0) {
-		elf_Sthrow(S,NO_BYTE,"object does not have a metatable, cannot use overload");
+		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elValue field;
 	field=elf_tgetfield(obj->metatable,name);
 	if (!elISFUNTAG(field.tag)) {
-		elf_Sthrow(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
+		elf_fail(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
 	}
 
 	/* the function, the object, and the arguments */
@@ -210,7 +193,7 @@ int elf_Scalloverload(elState *S, elObject *obj, elString *name, int reg, int na
 	top=elGETTOP(S);
 	elPUSH(S,field);
 	elPUSH(S,elOBJ(obj));
-	elf_copymemory(elGETTOP(S),args,sizeof(elValue)*nargs);
+	elf_copy_memory(elGETTOP(S),args,sizeof(elValue)*nargs);
 	elGETTOP(S) += nargs;
 	int ny = elf_call_function(S,nargs+1,1);
 	elGETLOCAL(S,reg)=*top;
@@ -325,7 +308,7 @@ elInteger elf_free_phase(elState *R) {
 				}
 			}
 #endif
-			elf_Sthrow(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
+			elf_fail(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
 		}
 		if (elOBJCOLOR(it) == GC_BLACK) {
 			elOBJCOLOR(it) = GC_WHITE;
@@ -396,7 +379,7 @@ void elf_collect(elState *R) {
 		}
 		elf_trigger_collection_cycle(R);
 		if (R->collector.memory_allocated > R->collector.memory_threshold) {
-			elf_Sthrow(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated",R->collector.memory_allocated / MEGABYTES(1)));
+			elf_fail(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated",R->collector.memory_allocated / MEGABYTES(1)));
 		}
 	}
 }
@@ -404,7 +387,7 @@ void elf_collect(elState *R) {
 
 void *elf_new_object(elState *R, elGCTy type, elInteger tell) {
 	if (R->collector.phase!=GC_WHITE) {
-		elf_Sthrow(R,NO_BYTE,"object allocation out of phase");
+		elf_fail(R,NO_BYTE,"object allocation out of phase");
 	}
 
 	R->collector.memory_allocated += tell;
@@ -557,8 +540,8 @@ int elf_run(elState *R) {
 			case BC_CLOSURE: {
 				elASSERT(elWITHIN(byte.y,0,ARRAY_LENGTH(M->functions)));
 				elFileProto proto = M->functions[byte.y];
-				elClosure *new_cls = elf_newclosure(R,proto);
-				elf_copymemory(new_cls->values,locals+byte.x,proto.nvalues*sizeof(elValue));
+				elClosure *new_cls = elf_new_closure(R,proto);
+				elf_copy_memory(new_cls->values,locals+byte.x,proto.nvalues*sizeof(elValue));
 				locals[byte.x].tag   = TAG_CLS;
 				locals[byte.x].x_cls = new_cls;
 			} break;
@@ -600,19 +583,19 @@ int elf_run(elState *R) {
 					} goto _lookup;
 					case TAG_NUM: {
 						metatable = R->metatables.number;
-						elf_Sthrow(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
+						elf_fail(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
 					case TAG_INT: {
 						metatable = R->metatables.integer;
-						elf_Sthrow(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
+						elf_fail(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
 					default: {
-						elf_Sthrow(R,module_instr,elf_tpf("'%s': not an object", tag2s[yy.tag]));
+						elf_fail(R,module_instr,elf_tpf("'%s': not an object", tag2s[yy.tag]));
 					} break;
 				}
 				_lookup:
 				if (metatable == 0) {
-					elf_Sthrow(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
+					elf_fail(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
 				}
 				locals[byte.x] = elf_table_lookup(metatable,locals[byte.z]);
 			} break;
@@ -634,7 +617,7 @@ int elf_run(elState *R) {
 					over, it's just my preference and use cases, maybe
 					tables can have a default field which gets returned
 					when the value is nil?  */
-					elf_Sthrow(R,module_instr,"attempted to get nil field");
+					elf_fail(R,module_instr,"attempted to get nil field");
 				} else if (xx.tag==TAG_TAB) {
 					locals[byte.x]=elf_table_lookup(xx.x_tab,yy);
 				} else if (xx.tag==TAG_OBJ) {
@@ -650,9 +633,9 @@ int elf_run(elState *R) {
 					locals[byte.x].tag   = TAG_INT;
 					locals[byte.x].x_int = string->text[index];
 				} else if (xx.tag==TAG_NIL) {
-					elf_Sthrow(R,module_instr,"attempted to get field of 'nil' value");
+					elf_fail(R,module_instr,"attempted to get field of 'nil' value");
 				} else {
-					elf_Sthrow(R,module_instr,elf_tpf("invalid object '%s' to perform this operator on", tag2s[yy.tag]));
+					elf_fail(R,module_instr,elf_tpf("invalid object '%s' to perform this operator on", tag2s[yy.tag]));
 				}
 			} break;
 			case BC_SETINDEX: case BC_SETFIELD: {
@@ -665,7 +648,7 @@ int elf_run(elState *R) {
 					elValue args[] = { yy, zz };
 					elf_Scalloverload(R,xx.x_obj,R->cache.__setfield,byte.x,2,args);
 				} else {
-					elf_Sthrow(R,module_instr,elf_tpf("attempted to set field of '%s' value", tag2s[xx.tag]));
+					elf_fail(R,module_instr,elf_tpf("attempted to set field of '%s' value", tag2s[xx.tag]));
 				}
 			} break;
 			case BC_CALL: {
@@ -708,18 +691,18 @@ int elf_run(elState *R) {
 					elNOCODE;
 				} else if ((xx.tag==TAG_NUM)||(yy.tag==TAG_NUM)) {
 					if (!elISNUMTAG(yy.tag)) {
-						elf_Sthrow(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					locals[byte.x].tag   = TAG_NUM;
 					locals[byte.x].x_num = pow(elTONUM(xx),elTONUM(yy));
 				} else if ((xx.tag==TAG_INT)||(yy.tag==TAG_INT)) {
 					if (!elISNUMTAG(yy.tag)) {
-						elf_Sthrow(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					locals[byte.x].tag   = TAG_INT;
 					locals[byte.x].x_int = pow(elTOINT(xx),elTOINT(yy));
 				} else {
-					elf_Sthrow(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));
+					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));
 				}
 			} break;
 			case BC_MOD: {
@@ -729,7 +712,7 @@ int elf_run(elState *R) {
 					elNOCODE;
 				} else if ((xx.tag == TAG_NUM)||(yy.tag == TAG_NUM)) {
 					if (!elISNUMTAG(yy.tag)) {
-						elf_Sthrow(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					elf_check_division_by_zero(R,xx,yy);
 					elNumber x,y;
@@ -739,13 +722,13 @@ int elf_run(elState *R) {
 					locals[byte.x].x_num = x - (elInteger)(x / y) * y;
 				} else if ((xx.tag == TAG_INT) || (yy.tag == TAG_INT)) {
 					if (!elISNUMTAG(yy.tag)) {
-						elf_Sthrow(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					elf_check_division_by_zero(R,xx,yy);
 					locals[byte.x].tag   = TAG_INT;
 					locals[byte.x].x_int = elTOINT(xx) % elTOINT(yy);
 				} else {
-					elf_Sthrow(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));
+					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));
 				}
 			} break;
 	/* todo: make this better */
@@ -764,23 +747,23 @@ int elf_run(elState *R) {
 				xx=locals[byte.y];\
 				yy=locals[byte.z];\
 				if (elISOBJTAG(xx.tag)||elISOBJTAG(yy.tag)) {\
-					if (!elISOBJTAG(xx.tag)) elf_Sthrow(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
+					if (!elISOBJTAG(xx.tag)) elf_fail(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
 					/* Could we redefine this? */ \
 					if (byte.k==BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 					elf_Scalloverload(R,xx.x_obj,elISOBJTAG(yy.tag)?FN:FN1,byte.x,1,&yy);\
 				} else if ((xx.tag==TAG_NUM) || (yy.tag==TAG_NUM)) {\
-					if (!elISNUMTAG(yy.tag)) elf_Sthrow(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+					if (!elISNUMTAG(yy.tag)) elf_fail(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 					/* Could we redefine this? */ \
 					if (byte.k==BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 					locals[byte.x].tag   = TAG_NUM;\
 					locals[byte.x].x_num = elTONUM(xx) OP elTONUM(yy);\
 				} else if ((xx.tag==TAG_INT)||(yy.tag==TAG_INT)) {\
-					if (!elISNUMTAG(yy.tag)) elf_Sthrow(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
+					if (!elISNUMTAG(yy.tag)) elf_fail(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
 					/* Could we redefine this? */ \
 					if (byte.k==BC_DIV) elf_check_division_by_zero(R,xx,yy);\
 					locals[byte.x].tag   = TAG_INT;\
 					locals[byte.x].x_int = elTOINT(xx) OP elTOINT(yy);\
-				} else elf_Sthrow(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));\
+				} else elf_fail(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],elTOTEXT(OP)));\
 			} break
 			case BC_LTEQ: {
 				xx=locals[byte.y];

@@ -43,7 +43,7 @@
 // }
 
 
-elAPI elClosure *elf_newclosure(elState *S, elFileProto proto) {
+elAPI elClosure *elf_new_closure(elState *S, elFileProto proto) {
 	elClosure *cls = (elClosure *) elf_new_object(S,GC_CLS,sizeof(elClosure) + sizeof(elValue) * (proto.nlocals-1));
 	cls->proto = proto;
 	return cls;

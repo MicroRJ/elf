@@ -97,7 +97,7 @@ elGLOBAL elBinding elf_libT_[] = {
 elInteger elf_table_tryS(elTable *tab, char *contents, elInteger length, elHashId hash);
 void elf_check_table(elTable *table);
 void elf_dealloc_table(elTable *);
-void elf_table_add(elTable *table, elValue v);
+void elf_tadd(elTable *table, elValue v);
 elBool elf_table_set(elTable *table, elValue k, elValue v);
 elInteger elf_table_lookup_index(elTable *table, elValue k);
 elInteger elf_table_get_value_hash(elValue v);

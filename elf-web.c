@@ -38,13 +38,14 @@ elAPI void elf_global_initialize() {
 	elf_begin(&elf.R,&elf.M);
 }
 
-
+#if 0
 elAPI int elf_global_loadcode(char *filename, char *contents) {
 	elValue *top = elGETTOP(&elf.R);
-	elString *name = elf_add_new_string(&elf.R,filename);
-	elString *string = elf_add_new_string(&elf.R,contents);
+	elString *name = elf_xstr(&elf.R,filename);
+	elString *string = elf_xstr(&elf.R,contents);
 	elFileState fs = {0};
-	int nyield = elf_Sfloadcode(&elf.R,&fs,name,0,string);
+	int nyield = elf_fs_load_code(&elf.R,&fs,name,0,string);
 	elSETTOP(&elf.R,top);
 	return nyield;
 }
+#endif

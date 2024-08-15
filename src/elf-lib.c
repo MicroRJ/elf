@@ -167,7 +167,7 @@ int elf_lib_collect(elState *R) {
 
 
 int elf_lib_tagof(elState *R) {
-	elf_add_new_string(R,(char*)tag2s[elGETTAG(R,0)]);
+	elf_xstr(R,(char*)tag2s[elGETTAG(R,0)]);
 	return 1;
 }
 
@@ -175,7 +175,7 @@ int elf_lib_tagof(elState *R) {
 int elf_lib_get_object_color(elState *R) {
 	elObject *obj = elf_get_object(R,0);
 	int color = obj->color;
-	elf_add_new_string(R,
+	elf_xstr(R,
 	color == GC_BLACK ? "black" :
 	color == GC_WHITE ? "white" :
 	color == GC_PINK  ? "pink"  :
@@ -390,7 +390,7 @@ int elf_lib_load_expr(elState *R) {
 		filename = elf_get_string(R,0);
 		contents = elf_get_string(R,1);
 	} else if (elGETNARGS(R) == 1) {
-		filename = elf_add_new_string(R,"unnamed");
+		filename = elf_xstr(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
 	elNOCODE;
@@ -409,7 +409,7 @@ int elf_lib_load_code(elState *R) {
 		filename = elf_get_string(R,0);
 		contents = elf_get_string(R,1);
 	} else if (elGETNARGS(R) == 1) {
-		filename = elf_add_new_string(R,"unnamed");
+		filename = elf_xstr(R,"unnamed");
 		contents = elf_get_string(R,0);
 	} else elNOCODE;
 	elNOCODE;
@@ -422,10 +422,16 @@ int elf_lib_load_code(elState *R) {
 
 
 int elf_lib_load_file(elState *R) {
-	elString *filename = elf_get_string(R,0);
-	elf_Sloadfile(R,filename,elGETFRAME(R)->nregs);
-	/* no need to do hoisting */
-	return 0;
+	elString *filename;
+	int nresults;
+
+	filename=elf_get_string(R,0);
+	nresults=elf_load_file(R,filename,elGETFRAME(R)->nargs,elGETFRAME(R)->nregs);
+	// if (nresults != -1 && !strcmp(filename->text,"patterns.elf")){
+	// 	__debugbreak();
+	// }
+	// elf_copy_memory(R->frame->locals-1,R->stack_ptr-nresults,nresults*sizeof(elValue));
+	return nresults;
 }
 
 
@@ -456,7 +462,7 @@ int elflib_libfn(elState *rt) {
 	if (fn != 0) {
 		elf_pushbinding(rt,fn);
 	} else {
-		elPUSHNIL(rt);
+		elf_pnil(rt);
 	}
 	return 1;
 }
@@ -467,7 +473,7 @@ int elflib_loadlib(elState *R) {
 	elClosure *callback = elf_get_closure(R,1);
 	elHandle lib = sys_loadlib(name->c);
 	if (lib != 0) elPUSHSYS(R,lib);
-	else elPUSHNIL(R);
+	else elf_pnil(R);
 	return 1;
 }
 
@@ -536,8 +542,8 @@ int elflib_fload(elState *R) {
 		fseek(file,0,SEEK_SET);
 		elString *buf = elf_new_lstring(R,size);
 		fread(buf->c,1,size,file);
-		elPUSHSTR(R,buf);
-	} else elPUSHNIL(R);
+		elf_pstr(R,buf);
+	} else elf_pnil(R);
 	return 1;
 }
 
@@ -564,7 +570,7 @@ int elf_lib_change_work_dir(elState *R) {
 int elflib_get_work_dir(elState *R) {
 	char buf[MAX_PATH];
 	sys_getworkdir(sizeof(buf),buf);
-	elf_add_new_string(R,buf);
+	elf_xstr(R,buf);
 	return 1;
 }
 
@@ -746,11 +752,11 @@ elAPI int elf_lib_list_volumes(elState *R) {
 	if (handle != INVALID_HANDLE_VALUE) do {
 
 		elTable *volume = elf_add_new_table(R);
-		name = elf_add_new_string(R,buffer);
+		name = elf_xstr(R,buffer);
 
 		elf_table_set_table_field(list,name,volume);
 
-		elf_table_set_string_field(volume,elf_new_string(R,"name"),name);
+		elf_tset_str(volume,elf_new_string(R,"name"),name);
 
 		elTable *path_names = elf_add_new_table(R);
 		elf_table_set_table_field(volume,elf_new_string(R,"path_names"),path_names);
@@ -758,7 +764,7 @@ elAPI int elf_lib_list_volumes(elState *R) {
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				elf_table_add(path_names,elSTR(elf_new_string(R,buffer)));
+				elf_tadd(path_names,elSTR(elf_new_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -795,14 +801,14 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 		if (elf_is_virtual_file_name(f.cFileName)) continue;
 		int is_directory = 0 != (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 		elValue *top = elGETTOP(R);
-		elString *name = elf_add_new_string(R,f.cFileName);
-		elString *path = elf_add_new_string(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
+		elString *name = elf_xstr(R,f.cFileName);
+		elString *path = elf_xstr(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
 		elTable *file = elf_add_new_table(R);
-		elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
-		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
-		elf_tset_int(file,elf_add_new_string(R,"is_directory"),is_directory);
-		elf_tset_int(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
-		elf_table_add(list,elTAB(file));
+		elf_tset_str(file,elf_xstr(R,"name"),name);
+		elf_tset_str(file,elf_xstr(R,"path"),path);
+		elf_tset_int(file,elf_xstr(R,"is_directory"),is_directory);
+		elf_tset_int(file,elf_xstr(R,"size"),f.nFileSizeLow);
+		elf_tadd(list,elTAB(file));
 		if (level != 0) {
 			if (is_directory) {
 				elf_lib_list_folder_(R,list,level-1,path);
@@ -811,7 +817,7 @@ void elf_lib_list_folder_(elState *R, elTable *list, int level, elString *dir) {
 		elSETTOP(R,top);
 	} while (FindNextFileA(h,&f));
 #else
-	elf_Sthrow(R,NO_BYTE,"unsupported platform");
+	elf_fail(R,NO_BYTE,"unsupported platform");
 #endif
 }
 
@@ -824,14 +830,14 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 		if (elf_is_virtual_file_name(f.cFileName)) continue;
 		int is_directory = 0 != (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 		elValue *top = elGETTOP(R);
-		elString *name = elf_add_new_string(R,f.cFileName);
-		elString *path = elf_add_new_string(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
+		elString *name = elf_xstr(R,f.cFileName);
+		elString *path = elf_xstr(R,elf_tpf("%s\\%s",dir->c,f.cFileName));
 		elTable *file = elf_add_new_table(R);
-		elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
-		elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
-		elf_tset_int(file,elf_add_new_string(R,"is_directory"),is_directory);
-		elf_tset_int(file,elf_add_new_string(R,"size"),f.nFileSizeLow);
-		elPUSHCLS(R,cls);
+		elf_tset_str(file,elf_xstr(R,"name"),name);
+		elf_tset_str(file,elf_xstr(R,"path"),path);
+		elf_tset_int(file,elf_xstr(R,"is_directory"),is_directory);
+		elf_tset_int(file,elf_xstr(R,"size"),f.nFileSizeLow);
+		elf_pcls(R,cls);
 		int results = 0; elNOCODE; // elf_call_function(R,base,1,1);
 		// if (is_directory) {
 		// 	if ((results > 0) && elf_get_integer(R,base) != 0) {
@@ -853,14 +859,14 @@ void elf_lib_enumerate_directory_(elState *R, elString *dir, elClosure *cls) {
 			elBool isdir = (entry->d_type & DT_DIR) != 0;
 			elValue *top = elGETTOP(R);
 
-			elString *name = elf_add_new_string(R,entry->d_name);
-			elString *path = elf_add_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
-			elRegId base = elPUSHCLS(R,cls);
+			elString *name = elf_xstr(R,entry->d_name);
+			elString *path = elf_xstr(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			elRegId base = elf_pcls(R,cls);
 			elTable *file = elf_add_new_table(R);
 
-			elf_table_set_string_field(file,elf_add_new_string(R,"name"),name);
-			elf_table_set_string_field(file,elf_add_new_string(R,"path"),path);
-			elf_tset_int(file,elf_add_new_string(R,"isdir"),isdir);
+			elf_tset_str(file,elf_xstr(R,"name"),name);
+			elf_tset_str(file,elf_xstr(R,"path"),path);
+			elf_tset_int(file,elf_xstr(R,"isdir"),isdir);
 			int r = elf_call_function(R,base,1,1);
 			if ((r > 0) && isdir && elf_get_integer(R,base)) {
 				elf_lib_enumerate_directory_(R,path,cls);
@@ -915,7 +921,7 @@ void elf_unload(FILE *io, elTable *tab, int level) {
 }
 
 
-int elflib_unload(elState *S) {
+int elf_lib_unload(elState *S) {
 	elHandle io = elf_get_handle(S,0);
 	elTable *tab = elf_get_table(S,1);
 	elf_unload(io,tab,0);
@@ -979,7 +985,7 @@ elAPI void elf_lib_load_functions(elState *R) {
 	elf_register_binding(R,"elf.loadcode",elf_lib_load_code);
 	elf_register_binding(R,"elf.loadexpr",elf_lib_load_expr);
 	elf_register_binding(R,"elf.loadfile",elf_lib_load_file);
-	elf_register_binding(R,"elf.unload",elflib_unload);
+	elf_register_binding(R,"elf.unload",elf_lib_unload);
 
 	elf_register_binding(R,"elf.pf_indent",elf_lib_pf_indent);
 	elf_register_binding(R,"elf.pf",elf_lib_pf);

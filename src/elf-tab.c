@@ -221,7 +221,7 @@ void elf_table_alias(elState *S, elTable *tab, elValue key, elValue alias) {
 		elInteger alias_slot = elf_table_try(tab,alias);
 		tab->slots[alias_slot].k = alias;
 		tab->slots[alias_slot].i = tab->slots[key_slot].i;
-	} else elf_Sthrow(S,NO_BYTE,"attempted to alias a key that was never added");
+	} else elf_fail(S,NO_BYTE,"attempted to alias a key that was never added");
 }
 
 
@@ -265,12 +265,12 @@ elInteger elf_tabiadd(elTable *table, elValue v) {
 }
 
 
-void elf_table_add(elTable *table, elValue v) {
+void elf_tadd(elTable *table, elValue v) {
 	ARRAY_ADD(table->array,v);
 }
 
 
-void elf_table_set_string_field(elTable *tab, elString *key, elString *val) {
+void elf_tset_str(elTable *tab, elString *key, elString *val) {
 	elf_table_set(tab,elSTR(key),elSTR(val));
 }
 
@@ -366,7 +366,7 @@ int elf_libT_add(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	int i;
 	for ( i = 0; i < elGETNARGS(R); ++i ) {
-		elf_table_add(tab,elGETARG(R,i));
+		elf_tadd(tab,elGETARG(R,i));
 	}
 	return 0;
 }
@@ -394,16 +394,16 @@ int elf_libT_itemize(elState *R) {
 	elTable *_this = (elTable *) elGETTHIS(R);
 	elTable *result = elf_add_new_table(R);
 	FOR_ARRAY(i,_this->array) {
-		elf_table_add(result,_this->array[i]);
+		elf_tadd(result,_this->array[i]);
 	}
 	FOR_RANGE(i,0,elGETNARGS(R)) {
 		if (elGETTAG(R,0) == TAG_TAB) {
 			elTable *that = elf_get_table(R,0);
 			FOR_ARRAY(j,that->array) {
-				elf_table_add(result,that->array[j]);
+				elf_tadd(result,that->array[j]);
 			}
 		} else {
-			elf_table_add(result,elGETARG(R,i));
+			elf_tadd(result,elGETARG(R,i));
 		}
 	}
 	return 1;
@@ -418,15 +418,15 @@ int elf_libT_index(elState *R) {
 		for (int i = 0; i < elGETNARGS(R); ++ i) {
 			if (i != 0) {
 				if (value.tag == TAG_NIL) {
-					elf_Sthrow(R,NO_BYTE,"nil object");
+					elf_fail(R,NO_BYTE,"nil object");
 				}
 				/* todo: please do much better error reporting
 				here, this can be hard to figure out */
 				if (value.tag != TAG_TAB) {
-					elf_Sthrow(R,NO_BYTE,"not a table");
+					elf_fail(R,NO_BYTE,"not a table");
 				}
 				if (tab == 0) {
-					elf_Sthrow(R,NO_BYTE,"nil object");
+					elf_fail(R,NO_BYTE,"nil object");
 				}
 			}
 
@@ -455,7 +455,7 @@ int elf_libT_delete(elState *R) {
 	elValue *array = tab->array;
 	elInteger slot = elf_table_try(tab,key);
 	if ((slot < 0) || (slots[slot].k.tag == TAG_NIL)) {
-		elf_Sthrow(R,NO_BYTE,"invalid key");
+		elf_fail(R,NO_BYTE,"invalid key");
 		goto leave_;
 	}
 	elInteger idx = slots[slot].i;
@@ -463,7 +463,7 @@ int elf_libT_delete(elState *R) {
 	slots[slot].i = 0;
 	elInteger len = ARRAY_LENGTH(array);
 	if ((idx < 0) || (idx > len-1)) {
-		elf_Sthrow(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
+		elf_fail(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
 		goto leave_;
 	}
 	elPUSH(R,array[idx]);
@@ -481,7 +481,7 @@ int elf_libT_delete(elState *R) {
 	// }
 
 	return 1;
-	leave_: elPUSHNIL(R);
+	leave_: elf_pnil(R);
 	return 1;
 }
 
@@ -504,7 +504,7 @@ int elf_libT_xdelete(elState *R) {
 			}
 			if (item == 0) {
 				/* todo: maybe not crash here */
-				elf_Sthrow(R,NO_BYTE,"item does not belong");
+				elf_fail(R,NO_BYTE,"item does not belong");
 			}
 			elASSERT((item - tab->array) == idx);
 			elPUSH(R,*item);
@@ -522,7 +522,7 @@ int elf_libT_xdelete(elState *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		}
-	} else elPUSHNIL(R);
+	} else elf_pnil(R);
 	return 1;
 }
 
@@ -549,10 +549,10 @@ int elf_libT_xremove(elState *R) {
 			elASSERT((item - tab->array) == idx);
 			// elInteger idx = item - tab->array;
 			// if (item < tab->array || item > tab->array + len - 1) {
-			// 	elf_Sthrow(R,NO_BYTE,"item does not belong");
+			// 	elf_fail(R,NO_BYTE,"item does not belong");
 			// }
 			if (item == 0) {
-				elf_Sthrow(R,NO_BYTE,"item does not belong");
+				elf_fail(R,NO_BYTE,"item does not belong");
 			}
 			elPUSH(R,*item);
 			elInteger min = ARRAY_POP(tab->array);
@@ -570,7 +570,7 @@ int elf_libT_xremove(elState *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		}
-	} else elPUSHNIL(R);
+	} else elf_pnil(R);
 	return 1;
 }
 
@@ -598,7 +598,7 @@ int elf_libT_find_aliases(elState *R) {
 				elEntry it = tab->slots[i];
 				if (it.i != entry.i) continue;
 				if (it.k.tag == TAG_NIL) continue;
-				elf_table_add(list,it.k);
+				elf_tadd(list,it.k);
 			}
 		}
 	}
@@ -617,7 +617,7 @@ int elf_libT_bubble_sort(elState *R) {
 		elInteger i;
 		for (i=0;i<ARRAY_LENGTH(arr)-1;++i) {
 			elValue *top = elGETTOP(R);
-			elPUSHCLS(R,cls);
+			elf_pcls(R,cls);
 			elPUSH(R,arr[i+0]);
 			elPUSH(R,arr[i+1]);
 			elNOCODE;
@@ -700,7 +700,7 @@ int elf_libT_array(elState *S) {
 	elTable *array = elf_add_new_table(S);
 	elInteger i;
 	for (i = 0; i < ARRAY_LENGTH(tab->array); ++i) {
-		elf_table_add(array,tab->array[i]);
+		elf_tadd(array,tab->array[i]);
 	}
 	return 1;
 }
@@ -722,7 +722,7 @@ int elf_libT_slice(elState *R) {
 	if (elGETNARGS(R) >= 2) y = elf_get_integer(R,1);
 	elTable *slice = elf_add_new_table(R);
 	while (x < y) {
-		elf_table_add(slice,tab->array[x ++]);
+		elf_tadd(slice,tab->array[x ++]);
 	}
 	return 1;
 }
@@ -826,7 +826,7 @@ int elf_libT_diff(elState *R) {
 	elTable *tab = (elTable *) elGETTHIS(R);
 	elTable *sub = elf_get_table(R,0);
 	if (sub == 0) {
-		elf_Sthrow(R,NO_BYTE,"argument is nil");
+		elf_fail(R,NO_BYTE,"argument is nil");
 	}
 	elTable *dif = elf_new_table(R);
 	elInteger i;

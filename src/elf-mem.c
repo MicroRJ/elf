@@ -17,9 +17,9 @@ void *elf_clear_memory(void *target, elInteger length) {
 }
 
 
-void *elf_copymemory(void *target, void const *source, elInteger length) {
-	memcpy(target,source,length);
-	return target;
+void *elf_copy_memory(void *dst, void const *src, elInteger length) {
+	memcpy(dst,src,length);
+	return dst;
 }
 
 

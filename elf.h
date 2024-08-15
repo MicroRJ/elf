@@ -167,7 +167,7 @@ elAPI elHandle elf_get_handle(elState *R, elRegId x);
 elAPI elClosure *elf_get_closure(elState *R, elRegId x);
 
 
-elAPI elString *elf_add_new_string(elState *, char *c);
+elAPI elString *elf_xstr(elState *, char *c);
 elAPI elObject *elf_add_new_object(elState *, elInteger tell);
 elAPI elTable *elf_add_new_table(elState *);
 elAPI elString *elf_add_new_lstring(elState *, elInteger len);
@@ -353,13 +353,14 @@ use C's "cast to union types" for typechecking:
 #define elGETTAG(S,X)   (elGETARG(S,X).tag)
 
 
-#define elPUSHNIL(S) elPUSH(S,elNIL())
-#define elPUSHCLS(S,V) elPUSH(S,elCLS(V))
+#define elf_pnil(S) elPUSH(S,elNIL())
+#define elf_pcls(S,V) elPUSH(S,elCLS(V))
 #define elPUSHOBJ(S,V) elPUSH(S,elOBJ(V))
+#define elf_pcfn(S,V) elPUSH(S,elCFN(V))
 #define elPUSHTAB(S,V) elPUSH(S,elTAB(V))
 #define elPUSHINT(S,V) elPUSH(S,elINT(V))
 #define elPUSHNUM(S,V) elPUSH(S,elNUM(V))
-#define elPUSHSTR(S,V) elPUSH(S,elSTR(V))
+#define elf_pstr(S,V) elPUSH(S,elSTR(V))
 #define elPUSHSYS(S,V) elPUSH(S,elSYS(V))
 
 
@@ -381,19 +382,11 @@ use C's "cast to union types" for typechecking:
 #define elOBJTOTAG(typ) ((typ) + TAG_OBJ)
 
 
-
-/* todo: these are all deprecated, they should instead return the closure
-object, and you use that however you want... */
-/* todo: add support for arguments */
-elAPI int elf_parse_code3(elState *, elString *name, elRegId ry, int ny, elString *contents);
-elAPI int elf_parse_expr3(elState *, elString *name, elRegId ry, int ny, elString *contents);
-
-elAPI int elf_Sfloadcode(elState *R, elFileState *fs, elString *filename, int nargs, elString *contents);
-elAPI int elf_parse_expr3_fs(elState *, elFileState *fs, elString *name, elRegId ry, int ny, elString *contents);
+elAPI elClosure *elf_fs_load_code(elState *R, elFileState *fs, elString *filename, int nargs, elString *contents);
 
 
-elAPI int elf_Sloadfile(elState *, elString *name, int nargs);
-elAPI int elf_Sfloadfile(elState *, elFileState *fs, elString *name, int nargs);
+elAPI int elf_load_file(elState *, elString *name, int nargs, int nregs);
+elAPI int elf_fs_load_file(elState *R, elFileState *fs, elString *name, int nargs, int nregs);
 
 elAPI int elf_call_function(elState *R, int nargs, int nregs);
 elAPI int elf_run(elState *);

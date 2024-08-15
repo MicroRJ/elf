@@ -54,7 +54,7 @@
 // 			} break;
 // 		}
 // 	}
-// 	elf_add_new_string(c,file);
+// 	elf_xstr(c,file);
 // 	return 1;
 // }
 
@@ -117,15 +117,15 @@
 
 // void tstlib_load(elState *rt) {
 // 	elModule *md = rt->md;
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__gc"),elCFN(testlib_gc));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__gcpause"),elCFN(testlib_gcpause));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__gcunpause"),elCFN(testlib_gcunpause));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__disasm"),elCFN(testlib_disasm));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__logging"),elCFN(testlib_logging));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__globallogging"),elCFN(testlib_globallogging));
+// 	elf_add_global_value(md,elf_xstr(rt,"__gc"),elCFN(testlib_gc));
+// 	elf_add_global_value(md,elf_xstr(rt,"__gcpause"),elCFN(testlib_gcpause));
+// 	elf_add_global_value(md,elf_xstr(rt,"__gcunpause"),elCFN(testlib_gcunpause));
+// 	elf_add_global_value(md,elf_xstr(rt,"__disasm"),elCFN(testlib_disasm));
+// 	elf_add_global_value(md,elf_xstr(rt,"__logging"),elCFN(testlib_logging));
+// 	elf_add_global_value(md,elf_xstr(rt,"__globallogging"),elCFN(testlib_globallogging));
 
-// 	elf_add_global_value(md,elf_add_new_string(rt,"__debugbreak"),elCFN(testlib_debugbreak));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"absslotid"),elCFN(testlib_absslotid));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"absslot"),elCFN(testlib_absslot));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_gtable"),elCFN(_gtable));
+// 	elf_add_global_value(md,elf_xstr(rt,"__debugbreak"),elCFN(testlib_debugbreak));
+// 	elf_add_global_value(md,elf_xstr(rt,"absslotid"),elCFN(testlib_absslotid));
+// 	elf_add_global_value(md,elf_xstr(rt,"absslot"),elCFN(testlib_absslot));
+// 	elf_add_global_value(md,elf_xstr(rt,"_gtable"),elCFN(_gtable));
 // }

@@ -58,7 +58,7 @@
 //       SOCKET client = accept(handle,NULL,NULL);
 //       elASSERT(client != INVALID_SOCKET);
 // 		elPUSHSYS(R,(elHandle)client);
-//    } else elPUSHNIL(R);
+//    } else elf_pnil(R);
 // 	return 1;
 // }
 
@@ -80,7 +80,7 @@
 // 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
 // 		elPUSHSYS(R,(elHandle)thesocket);
-// 	} else elPUSHNIL(R);
+// 	} else elf_pnil(R);
 
 // 	return 1;
 // }
@@ -104,7 +104,7 @@
 // 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
 // 		elPUSHSYS(R,(elHandle)thesocket);
-// 	} else elPUSHNIL(R);
+// 	} else elf_pnil(R);
 // 	return 1;
 // }
 
@@ -138,7 +138,7 @@
 // 		if (message.length != 0) {
 // 			elInteger length = message.length;
 // 			elString *obj = elf_new_lstring(R,length);
-// 			elPUSHSTR(R,obj);
+// 			elf_pstr(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
 // 				elInteger result = recv(socket,cursor,length,0);
@@ -162,8 +162,8 @@
 // 				}
 // 			} while (length != 0);
 // 			*cursor = 0;
-// 		} else elPUSHNIL(R);
-// 	} else elPUSHNIL(R);
+// 		} else elf_pnil(R);
+// 	} else elf_pnil(R);
 // 	return 1;
 // }
 // #else

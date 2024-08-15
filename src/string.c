@@ -36,7 +36,7 @@ elString *elf_new_string(elState *R, char *contents) {
 			string = target.x_str;
 		} else {
 			string = elf_new_lstring(R,length);
-			elf_copymemory(string->text,contents,length);
+			elf_copy_memory(string->text,contents,length);
 			string->hash = hash;
 
 			elInteger i = ARRAY_GROW(registry->array,1);
@@ -47,7 +47,7 @@ elString *elf_new_string(elState *R, char *contents) {
 		}
 	} else {
 		string = elf_new_lstring(R,length);
-		elf_copymemory(string->text,contents,length);
+		elf_copy_memory(string->text,contents,length);
 		string->hash = hash;
 	}
 	return string;
@@ -93,8 +93,8 @@ int elf_libS_get_index(elState *R) {
 int elf_libS_pop(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
-	elf_copymemory(el->text,yo->text,MAX(0,yo->length-1));
-	elPUSHSTR(R,el);
+	elf_copy_memory(el->text,yo->text,MAX(0,yo->length-1));
+	elf_pstr(R,el);
 	return 1;
 }
 
@@ -102,11 +102,11 @@ int elf_libS_pop(elState *R) {
 int elf_libS_append_char(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,yo->length + elGETNARGS(R));
-	elf_copymemory(el->text,yo->text,yo->length);
+	elf_copy_memory(el->text,yo->text,yo->length);
 	for ( int i = 0; i < elGETNARGS(R); i += 1 ) {
 		el->text[yo->length + i] = elf_get_integer(R,i);
 	}
-	elPUSHSTR(R,el);
+	elf_pstr(R,el);
 	return 1;
 }
 
@@ -127,7 +127,7 @@ int elf_libS_append(elState *R) {
 			strcatf(buffer,"%lli",v.x_int);
 		} else elNOCODE;
 	}
-	elf_add_new_string(R,buffer);
+	elf_xstr(R,buffer);
 	return 1;
 }
 

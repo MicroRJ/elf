@@ -55,7 +55,7 @@
 // int crtlib__strdate(elState *rt) {
 // 	char buf[128];
 // 	_strdate_s(buf,sizeof(buf));
-// 	elf_add_new_string(rt,buf);
+// 	elf_xstr(rt,buf);
 // 	return 1;
 // }
 
@@ -63,7 +63,7 @@
 // int crtlib__strtime(elState *rt) {
 // 	char buf[128];
 // 	_strtime_s(buf,sizeof(buf));
-// 	elf_add_new_string(rt,buf);
+// 	elf_xstr(rt,buf);
 // 	return 1;
 // }
 
@@ -161,20 +161,20 @@
 
 
 
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_execl"),elCFN(crtlib__execl));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"system"),elCFN(crtlib_system));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_getch"),elCFN(crtlib__getch));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"time"),elCFN(crtlib_time));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_getpid"),elCFN(crtlib__getpid));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_strdate"),elCFN(crtlib__strdate));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_strtime"),elCFN(crtlib__strtime));
+// 	elf_add_global_value(md,elf_xstr(rt,"_execl"),elCFN(crtlib__execl));
+// 	elf_add_global_value(md,elf_xstr(rt,"system"),elCFN(crtlib_system));
+// 	elf_add_global_value(md,elf_xstr(rt,"_getch"),elCFN(crtlib__getch));
+// 	elf_add_global_value(md,elf_xstr(rt,"time"),elCFN(crtlib_time));
+// 	elf_add_global_value(md,elf_xstr(rt,"_getpid"),elCFN(crtlib__getpid));
+// 	elf_add_global_value(md,elf_xstr(rt,"_strdate"),elCFN(crtlib__strdate));
+// 	elf_add_global_value(md,elf_xstr(rt,"_strtime"),elCFN(crtlib__strtime));
 
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_unlink"),elCFN(crtlib__unlink));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_unlock_file"),elCFN(crtlib__unlock_file));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_write"),elCFN(crtlib__write));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_commit"),elCFN(crtlib__commit));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_close"),elCFN(crtlib__close));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_chdir"),elCFN(crtlib__chdir));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"_chdrive"),elCFN(crtlib__chdrive));
-// 	elf_add_global_value(md,elf_add_new_string(rt,"clock"),elCFN(crtlib_clock));
+// 	elf_add_global_value(md,elf_xstr(rt,"_unlink"),elCFN(crtlib__unlink));
+// 	elf_add_global_value(md,elf_xstr(rt,"_unlock_file"),elCFN(crtlib__unlock_file));
+// 	elf_add_global_value(md,elf_xstr(rt,"_write"),elCFN(crtlib__write));
+// 	elf_add_global_value(md,elf_xstr(rt,"_commit"),elCFN(crtlib__commit));
+// 	elf_add_global_value(md,elf_xstr(rt,"_close"),elCFN(crtlib__close));
+// 	elf_add_global_value(md,elf_xstr(rt,"_chdir"),elCFN(crtlib__chdir));
+// 	elf_add_global_value(md,elf_xstr(rt,"_chdrive"),elCFN(crtlib__chdrive));
+// 	elf_add_global_value(md,elf_xstr(rt,"clock"),elCFN(crtlib_clock));
 // }

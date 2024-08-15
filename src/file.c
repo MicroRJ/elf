@@ -9,12 +9,12 @@
 void elf_fclose_function(elFileState *fs);
 
 
-void elf_fclose_file(elFileState *fs) {
+void elf_fs_close_file(elFileState *fs) {
 	elf_fclose_function(fs);
 }
 
 
-int elf_fopen_file(elFileState *fs, char *filename, char *filetext) {
+int elf_fs_begin_file(elFileState *fs, char *filename, char *filetext) {
 	if ((filename == 0) || (filetext == 0)) {
 		return -1;
 	}
@@ -290,7 +290,7 @@ void elf_fcheckassign(elFileState *fs, elFileline line, elNodeId x, elNodeId y) 
 
 	if (!elf_is_node_lvalue(node.kind)) {
 		elf_fdialog(fs,line,"invalid assignment to (%s)",node2s[node.kind]);
-		elf_Sthrow(fs->R,0,"syntax error: invalid assignment");
+		elf_fail(fs->R,0,"syntax error: invalid assignment");
 	}
 
 	if (node.kind == NODE_LOCAL) {
@@ -299,7 +299,7 @@ void elf_fcheckassign(elFileState *fs, elFileline line, elNodeId x, elNodeId y) 
 
 		if (fs->entities[id].flags & ENTITY_CONSTANT) {
 			elf_fdialog(fs,line,"invalid assignment to constant entity");
-			elf_Sthrow(fs->R,0,"syntax error: invalid assignment to constant entity");
+			elf_fail(fs->R,0,"syntax error: invalid assignment to constant entity");
 		}
 
 		fs->entities[id].flags |= ENTITY_ASSIGNED;
@@ -668,7 +668,7 @@ elRegId elf_get_loop_register(elFileState *F, elFileline line, int type) {
 	}
 	if (reg == NO_SLOT) {
 		elf_fdialog(F,line,"invalid context for loop register macro");
-		elf_Sthrow(F->R,0,"syntax error: invalid context for loop register macro");
+		elf_fail(F->R,0,"syntax error: invalid context for loop register macro");
 	}
 	return reg;
 }
@@ -823,7 +823,7 @@ elNodeId elf_parse_unary(elFileState *fs, elFileExpr *expr, elBool flags) {
 		} break;
 		case TK_DEFAULT: {
 			elf_fdialog(fs,tk.line,"syntax error: default expressions can only be top level");
-			elf_Sthrow(fs->R,0,"syntax error: default expressions can only be top level");
+			elf_fail(fs->R,0,"syntax error: default expressions can only be top level");
 		} break;
 		case TK_NIL: {
 			elf_poll_token(fs);
@@ -847,7 +847,7 @@ elNodeId elf_parse_unary(elFileState *fs, elFileExpr *expr, elBool flags) {
 		} break;
 		default: {
 			elf_fdialog(fs,tk.line,"'%s': unexpected token", elf_token_intel[tk.type].name);
-			elf_Sthrow(fs->R,0,"syntax error: unexpected token");
+			elf_fail(fs->R,0,"syntax error: unexpected token");
 		} break;
 	}
 
@@ -1007,7 +1007,7 @@ int elf_parse_stat(elFileState *fs) {
 				if (elf_test_token(fs,TK_LET)) {
 					elf_fdialog(fs,fs->last_token.line,"invalid declaration, expected next declarator's name after ',' instead got 'let'");
 					elf_fdialog(fs,fs->this_token.line,"invalid declaration, 'let' after comma");
-					elf_Sthrow(fs->R,0,"syntax error: invalid declaration");
+					elf_fail(fs->R,0,"syntax error: invalid declaration");
 				}
 
 				elToken name;

@@ -52,27 +52,27 @@ void elf_register_bindings(elState *R, elTable *tab, elBinding *list, int num) {
 
 
 void elf_register_handle(elState *R, char *name, elHandle val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elSYS(val));
+	elf_add_global_value(R->M,elf_xstr(R,name),elSYS(val));
 }
 
 
 void elf_register_integer(elState *R, char *name, elInteger val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elINT(val));
+	elf_add_global_value(R->M,elf_xstr(R,name),elINT(val));
 }
 
 
 void elf_registertab(elState *R, char *name, elTable *val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elTAB(val));
+	elf_add_global_value(R->M,elf_xstr(R,name),elTAB(val));
 }
 
 
 void elf_register_string(elState *R, char *name, char *val) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elSTR(elf_add_new_string(R,val)));
+	elf_add_global_value(R->M,elf_xstr(R,name),elSTR(elf_xstr(R,val)));
 }
 
 
 void elf_register_binding(elState *R, char *name, elCFunction fn) {
-	elf_add_global_value(R->M,elf_add_new_string(R,name),elCFN(fn));
+	elf_add_global_value(R->M,elf_xstr(R,name),elCFN(fn));
 }
 
 
@@ -202,7 +202,7 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 }
 
 
-void elf_Sthrow(elState *R, elByteId byte, char *error) {
+void elf_fail(elState *R, elByteId byte, char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_line_for_byte(M,byte);
@@ -220,14 +220,14 @@ void elf_Sthrow(elState *R, elByteId byte, char *error) {
 
 void elf_check_args(elState *R, char *fnname, int n, char *usage) {
 	if (elGETNARGS(R) != n) {
-		elf_Sthrow(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
+		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
 	}
 }
 
 
 int elf_type_check(elState *R, elByteId id, elRegId loc, elValueTag x, elValueTag y) {
 	if (x != y) {
-		elf_Sthrow(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
+		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
 	return x == y;
 }

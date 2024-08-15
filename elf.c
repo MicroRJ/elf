@@ -27,7 +27,7 @@ int main(int n, char **c) {
 	R.frame = &frame;
 
 	if (cli.filename != 0) {
-		elString *filename = elf_add_new_string(&R,cli.filename);
+		elString *filename = elf_xstr(&R,cli.filename);
 		/* todo: remove this?? */
 		filename->obj.color = GC_PINK;
 		elFileState fs = {0};

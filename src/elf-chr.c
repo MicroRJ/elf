@@ -103,7 +103,7 @@ char *elf_copyltext(elAllocator *allocator, int length, char const *string) {
 		length = elf_textlength(string);
 	}
 	char *result = elf_alloc(allocator,length+1);
-	elf_copymemory(result,string,length);
+	elf_copy_memory(result,string,length);
 	result[length]=0;
 	return result;
 }

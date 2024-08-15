@@ -7,7 +7,7 @@
 
 
 void elf_expected(elState *S, elValueTag tag, elValueTag got, elRegId x) {
-	elf_Sthrow(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
+	elf_fail(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 
 
@@ -55,7 +55,7 @@ elAPI elClosure *elf_get_closure(elState *R, elRegId x) {
 elAPI elHandle elf_get_handle(elState *R, elRegId x) {
 	elValue v = elGETARG(R,x);
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
-		elf_Sthrow(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
+		elf_fail(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
 		elNOCODE;
 	}
 	return v.h;
@@ -80,16 +80,16 @@ elNumber elf_get_number(elState *R, elRegId x) {
 }
 
 
-elString *elf_add_new_string(elState *R, char *chr) {
+elString *elf_xstr(elState *R, char *chr) {
 	elString *string = elf_new_string(R,chr);
-	elPUSHSTR(R,string);
+	elf_pstr(R,string);
 	return string;
 }
 
 
 elString *elf_add_new_lstring(elState *R, elInteger len) {
 	elString *string = elf_new_lstring(R,len);
-	elPUSHSTR(R,string);
+	elf_pstr(R,string);
 	return string;
 }
 
