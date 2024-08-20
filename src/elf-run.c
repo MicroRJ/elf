@@ -17,8 +17,8 @@ void elf_begin(elState *R, elModule *M) {
 
 	/* global table is on the stack, so we don't really
 	to need treat it independently when GC'ing... */
-	M->globals = elf_add_new_table(R);
-	M->strings = elf_add_new_table(R);
+	M->globals = elf_xtab(R);
+	M->strings = elf_xtab(R);
 
 
 	/* this will be replaced, todo: */
@@ -151,7 +151,7 @@ int elf_fs_load_file(elState *R, elFileState *fs, elString *name, int nargs, int
 	the file into it... */
 	error=sys_load_file_text(elHEAP_ALLOCATOR,(void**)&text,name->text);
 	if (elFAILED(error)) {
-		elf_logerror("'%s': could not load file",name->text);
+		elf_error_log("'%s': could not load file",name->text);
 		return -1;
 	}
 
@@ -183,7 +183,7 @@ int elf_Scalloverload(elState *S, elObject *obj, elString *name, int reg, int na
 		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elValue field;
-	field=elf_tget_any(obj->metatable,name);
+	field=elf_tgets_any(obj->metatable,name);
 	if (!elISFUNTAG(field.tag)) {
 		elf_fail(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name->c,tag2s[field.tag]));
 	}
@@ -643,7 +643,7 @@ int elf_run(elState *R) {
 				elValue yy = locals[byte.y];
 				elValue zz = locals[byte.z];
 				if (xx.tag == TAG_TAB) {
-					elf_table_set(xx.x_tab,yy,zz);
+					elf_tset(xx.x_tab,yy,zz);
 				} else if (xx.tag == TAG_OBJ) {
 					elValue args[] = { yy, zz };
 					elf_Scalloverload(R,xx.x_obj,R->cache.__setfield,byte.x,2,args);

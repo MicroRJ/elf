@@ -87,7 +87,7 @@ elString *elf_xstr(elState *R, char *chr) {
 }
 
 
-elString *elf_add_new_lstring(elState *R, elInteger len) {
+elString *elf_xlstr(elState *R, elInteger len) {
 	elString *string = elf_new_lstring(R,len);
 	elf_pstr(R,string);
 	return string;
@@ -95,14 +95,14 @@ elString *elf_add_new_lstring(elState *R, elInteger len) {
 
 
 
-elObject *elf_add_new_object(elState *R, elInteger tell) {
+elObject *elf_xobj(elState *R, elInteger tell) {
 	elObject *obj = elf_new_object(R,GC_OBJ,tell);
 	elPUSHOBJ(R,obj);
 	return obj;
 }
 
 
-elTable *elf_add_new_table(elState *R) {
+elTable *elf_xtab(elState *R) {
 	elTable *tab = elf_new_table(R);
 	elPUSHTAB(R,tab);
 	return tab;

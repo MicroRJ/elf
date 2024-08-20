@@ -167,10 +167,10 @@ elAPI elHandle elf_get_handle(elState *R, elRegId x);
 elAPI elClosure *elf_get_closure(elState *R, elRegId x);
 
 
-elAPI elString *elf_xstr(elState *, char *c);
-elAPI elObject *elf_add_new_object(elState *, elInteger tell);
-elAPI elTable *elf_add_new_table(elState *);
-elAPI elString *elf_add_new_lstring(elState *, elInteger len);
+elAPI elString *elf_xstr(elState *, char *text);
+elAPI elObject *elf_xobj(elState *, elInteger size);
+elAPI elTable *elf_xtab(elState *);
+elAPI elString *elf_xlstr(elState *, elInteger length);
 
 
 elAPI void elf_register_bindings(elState *, elTable *, elBinding *list, int num);
@@ -261,7 +261,7 @@ typedef enum { TAGLIST(TAGENUM) } elValueTag;
 typedef struct elValue {
 	elValueTag tag;
 	union {
-		elInteger x_int;
+		elInteger     x_int;
 		elNumber  n,  x_num;
 		elAddr    p,  x_ptr;
 		elHandle  h,  x_sys;
@@ -291,22 +291,11 @@ typedef struct elFileProto {
 	int 	      nbytes;
 	int 	       bytes;
 	int       **protos;
-	/* to keep parents alive, as you should
-	after all they've done for you? */
+	/* to keep parents alive... as you should? */
 	int         parent;
 } elFileProto;
 
 
-
-/* ---------------------------------
-	Closure
---------------------------------- */
-
-
-
-/* closures are both for files and functions,
-a file is a function so I don't know why keep
-saying files and functions... */
 typedef struct elClosure {
 	elObject       obj;
 	elFileProto  proto;
@@ -358,8 +347,8 @@ use C's "cast to union types" for typechecking:
 #define elPUSHOBJ(S,V) elPUSH(S,elOBJ(V))
 #define elf_pcfn(S,V) elPUSH(S,elCFN(V))
 #define elPUSHTAB(S,V) elPUSH(S,elTAB(V))
-#define elPUSHINT(S,V) elPUSH(S,elINT(V))
-#define elPUSHNUM(S,V) elPUSH(S,elNUM(V))
+#define elf_pint(S,V) elPUSH(S,elINT(V))
+#define elf_pnum(S,V) elPUSH(S,elNUM(V))
 #define elf_pstr(S,V) elPUSH(S,elSTR(V))
 #define elPUSHSYS(S,V) elPUSH(S,elSYS(V))
 
@@ -464,14 +453,16 @@ typedef struct elStackFrame {
 	elClosure      *closure;
 	elValue        *locals;
 	int            nlocals;
-	char			    nargs;
-	char			    nregs;
-	elByteId        origin;
+	char			     nargs;
+	char			     nregs;
+	int             origin;
 	elf_delaylist * delay_list;
 	elBool 			 logging;
 } elStackFrame;
 
+
 typedef enum elGCColor elGCPhase;
+
 
 #define elGC_PHASE_HOLD GC_WHITE
 #define elGC_PHASE_FREE GC_BLACK

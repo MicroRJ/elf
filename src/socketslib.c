@@ -34,7 +34,7 @@
 // elAPI int netlib_listen(elState *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elPUSHINT(R,error!=SOCKET_ERROR);
+// 	elf_pint(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
@@ -117,7 +117,7 @@
 // 	elInteger sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elPUSHINT(R,sent);
+// 	elf_pint(R,sent);
 // 	return 1;
 // }
 
@@ -126,7 +126,7 @@
 // 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elPUSHINT(R,error == 0);
+// 	elf_pint(R,error == 0);
 // 	return 1;
 // }
 
@@ -149,7 +149,7 @@
 // 					} else {
 // 						char erbuf[0x100];
 // 						sys_geterrormsg(error,erbuf,sizeof(erbuf));
-// 						elf_logerror("netlib sys error '%i': %s",error,erbuf);
+// 						elf_error_log("netlib sys error '%i': %s",error,erbuf);
 // 						break;
 // 					}
 // 				} else if (result == 0) {

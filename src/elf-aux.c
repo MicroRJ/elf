@@ -46,7 +46,7 @@ void elf_debugger(char *message) {
 
 void elf_register_bindings(elState *R, elTable *tab, elBinding *list, int num) {
 	for (int i = 0; i < num; i += 1) {
-		elf_table_set(tab,elSTR(elf_new_string(R,list[i].name)),elCFN(list[i].fn));
+		elf_tset(tab,elSTR(elf_new_string(R,list[i].name)),elCFN(list[i].fn));
 	}
 }
 

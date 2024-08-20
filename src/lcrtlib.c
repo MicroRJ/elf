@@ -18,9 +18,9 @@
 // int crtlib__chdir(elState *rt) {
 // 	elString *name = elf_get_string(rt,0);
 // #if defined(PLATFORM_WEB)
-// 	elPUSHINT(rt,chdir(name->c));
+// 	elf_pint(rt,chdir(name->c));
 // #else
-// 	elPUSHINT(rt,_chdir(name->c));
+// 	elf_pint(rt,_chdir(name->c));
 // #endif
 // 	return 1;
 // }
@@ -29,25 +29,25 @@
 // #if defined(_MSC_VER)
 
 // int crtlib__getch(elState *rt) {
-// 	elPUSHINT(rt,_getch());
+// 	elf_pint(rt,_getch());
 // 	return 1;
 // }
 
 
 // int crtlib__getpid(elState *rt) {
-// 	elPUSHINT(rt,_getpid());
+// 	elf_pint(rt,_getpid());
 // 	return 1;
 // }
 
 
 // int crtlib_time(elState *rt) {
-// 	elPUSHINT(rt,time(0));
+// 	elf_pint(rt,time(0));
 // 	return 1;
 // }
 
 
 // int crtlib_clock(elState *rt) {
-// 	elPUSHINT(rt,clock());
+// 	elf_pint(rt,clock());
 // 	return 1;
 // }
 
@@ -70,7 +70,7 @@
 
 // int crtlib__unlink(elState *rt) {
 // 	elString *name = elf_get_string(rt,0);
-// 	elPUSHINT(rt,_unlink(name->c));
+// 	elf_pint(rt,_unlink(name->c));
 // 	return 1;
 // }
 
@@ -85,28 +85,28 @@
 // int crtlib__write(elState *rt) {
 // 	elHandle file = elf_get_handle(rt,0);
 // 	elString *buf = elf_get_string(rt,1);
-// 	elPUSHINT(rt,_write((elInteger)file,buf->c,buf->length));
+// 	elf_pint(rt,_write((elInteger)file,buf->c,buf->length));
 // 	return 1;
 // }
 
 
 // int crtlib__close(elState *rt) {
 // 	elHandle file = elf_get_handle(rt,0);
-// 	elPUSHINT(rt,_close((int)(elInteger)file));
+// 	elf_pint(rt,_close((int)(elInteger)file));
 // 	return 1;
 // }
 
 
 // int crtlib__commit(elState *rt) {
 // 	elHandle file = elf_get_handle(rt,0);
-// 	elPUSHINT(rt,_commit((int)(elInteger)file));
+// 	elf_pint(rt,_commit((int)(elInteger)file));
 // 	return 1;
 // }
 
 
 // int crtlib__chdrive(elState *rt) {
 // 	elInteger letter = elf_get_integer(rt,0);
-// 	elPUSHINT(rt,_chdrive(letter));
+// 	elf_pint(rt,_chdrive(letter));
 // 	return 1;
 // }
 
@@ -114,28 +114,28 @@
 // int crtlib__chmode(elState *rt) {
 // 	elString *name = elf_get_string(rt,0);
 // 	elInteger mode = elf_get_integer(rt,1);
-// 	elPUSHINT(rt,_chmod(name->c,mode));
+// 	elf_pint(rt,_chmod(name->c,mode));
 // 	return 1;
 // }
 
 
 // int crtlib__execl(elState *rt) {
 // 	elString *cl = elf_get_string(rt,0);
-// 	elPUSHINT(rt,_execl(cl->c,0,0));
+// 	elf_pint(rt,_execl(cl->c,0,0));
 // 	return 1;
 // }
 
 
 // int crtlib_system(elState *rt) {
 // 	elString *cl = elf_get_string(rt,0);
-// 	elPUSHINT(rt,system(cl->c));
+// 	elf_pint(rt,system(cl->c));
 // 	return 1;
 // }
 // #else
 
 // #define DEFSTUB(NAME) \
 // int NAME(elState *R) {\
-// 	elf_logerror(elTOTEXT(NAME)"(): not implemented for this platform");\
+// 	elf_error_log(elTOTEXT(NAME)"(): not implemented for this platform");\
 // 	return 0;\
 // }
 

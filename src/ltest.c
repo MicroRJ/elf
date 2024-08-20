@@ -7,7 +7,7 @@
 
 
 // void sets(elState *c, elTable *table, char *k) {
-// 	elf_table_set(table,elSTR(elf_new_string(c,k)),* -- c->v);
+// 	elf_tset(table,elSTR(elf_new_string(c,k)),* -- c->v);
 // }
 
 
@@ -67,7 +67,7 @@
 
 
 // int testlib_absslotid(elState *c) {
-// 	elPUSHINT(c,c->v-c->s);
+// 	elf_pint(c,c->v-c->s);
 // 	return 1;
 // }
 

@@ -6,7 +6,7 @@
 
 
 elTable *elf_new_string_metatable(elState *R) {
-	elTable *tab = elf_add_new_table(R);
+	elTable *tab = elf_xtab(R);
 	elf_register_bindings(R,tab,elf_libS_,COUNTOF(elf_libS_));
 	return tab;
 }
@@ -28,7 +28,7 @@ elString *elf_new_string(elState *R, char *contents) {
 	elTable *registry = R->M->strings;
 	if (length < 64 && registry != 0) {
 		elf_check_table(registry);
-		elInteger slot = elf_ttry_text(registry,contents,length,hash);
+		elInteger slot = elf_ttrys(registry,contents,length,hash);
 		elASSERT(slot != -1);
 		elEntry entry = registry->entries[slot];
 		if (entry.key.tag != TAG_NIL) {
@@ -64,7 +64,7 @@ elBool elf_string_eq(elString *x, elString *y) {
 
 
 int elf_libS_length(elState *S) {
-	elPUSHINT(S,((elString*)elGETTHIS(S))->length);
+	elf_pint(S,((elString*)elGETTHIS(S))->length);
 	return 1;
 }
 
@@ -85,7 +85,7 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 int elf_libS_get_index(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elPUSHINT(R,str->text[elf_get_integer(R,0)]);
+	elf_pint(R,str->text[elf_get_integer(R,0)]);
 	return 1;
 }
 
@@ -135,7 +135,7 @@ int elf_libS_append(elState *R) {
 int elf_libS_match(elState *R) {
 	elString *s = (elString*) elGETTHIS(R);
 	elString *p = elf_get_string(R,0);
-	elPUSHINT(R,elf_match_entire_string(p->string,s->string));
+	elf_pint(R,elf_match_entire_string(p->string,s->string));
 	return 1;
 }
 
@@ -145,7 +145,7 @@ int elf_libS_find(elState *R) {
 	char *pattern = elf_get_text(R,0);
 	char *buffer = 0;
 	char *cursor = string->text;
-	elTable *list = elf_add_new_table(R);
+	elTable *list = elf_xtab(R);
 	while (*cursor) {
 		char *match = elf_match_strings_single_clause_ex(cursor,pattern);
 		if (match != 0) {
@@ -155,7 +155,7 @@ int elf_libS_find(elState *R) {
 			/* todo: there's no need for the buffer! */
 			ARRAY_ADD(buffer,0);
 			elInteger narray = ARRAY_LENGTH(list->array);
-			elf_table_set(list,elINT(narray),elSTR(elf_new_string(R,buffer)));
+			elf_tset(list,elINT(narray),elSTR(elf_new_string(R,buffer)));
 			ARRAY(buffer).min = 0;
 		} else cursor += 1;
 	}
@@ -167,7 +167,7 @@ int elf_libS_split_by_lines(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char *buffer = 0;
 	char *cursor = str->text;
-	elTable *list = elf_add_new_table(R);
+	elTable *list = elf_xtab(R);
 	while (*cursor) {
 		while (*cursor && *cursor != '\n' && *cursor != '\r') {
 			ARRAY_ADD(buffer,*cursor ++);
@@ -176,7 +176,7 @@ int elf_libS_split_by_lines(elState *R) {
 			cursor += 1 + (cursor[0] == '\r' && cursor[1] == '\n');
 		}
 		ARRAY_ADD(buffer,0);
-		elf_table_set(list,elINT(ARRAY_LENGTH(list->array)),elSTR(elf_new_string(R,buffer)));
+		elf_tset(list,elINT(ARRAY_LENGTH(list->array)),elSTR(elf_new_string(R,buffer)));
 		ARRAY(buffer).min = 0;
 	}
 	return 1;
@@ -185,14 +185,14 @@ int elf_libS_split_by_lines(elState *R) {
 
 int elf_libS_get_hash(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elPUSHINT(R,str->hash);
+	elf_pint(R,str->hash);
 	return 1;
 }
 
 
 int elf_libS_lowercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elString *newstr = elf_add_new_lstring(R,str->length);
+	elString *newstr = elf_xlstr(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtolowercase(str->c[i]);
 	}
@@ -202,7 +202,7 @@ int elf_libS_lowercase(elState *R) {
 
 int elf_libS_uppercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elString *newstr = elf_add_new_lstring(R,str->length);
+	elString *newstr = elf_xlstr(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
 		newstr->c[i] = elf_chrtouppercase(str->c[i]);
 	}
