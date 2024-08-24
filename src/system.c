@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
-** elf-sys.c
-** System
+** system.c
+** Basic system layer
 */
 
 
@@ -67,7 +67,7 @@ I want to use instead! */
 
 
 
-elAPI elBool sys_debugger() {
+elBool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
 	// fclose(_logging_io);
 	DebugBreak();
@@ -81,19 +81,19 @@ elAPI elBool sys_debugger() {
 }
 
 
-elAPI void sys_consolelog(int type, char *message) {
+void sys_console_print(int type, char *message) {
 #if defined(PLATFORM_DESKTOP)
 	/* bruh */
 	elf_log(type,"%s",message);
 #else
 	switch (type) {
-		case ELF_LOGDBUG: case ELF_LOGINFO: {
+		case LOG_KDEBUG: case LOG_KINFO: {
 			type = EM_LOG_CONSOLE;
 		} break;
-		case ELF_LOGERROR: case ELF_LOGFATAL: {
+		case LOG_KERROR: case LOG_KFATAL: {
 			type = EM_LOG_ERROR;
 		} break;
-		case ELF_LOGWARN: {
+		case LOG_KWARNING: {
 		 	type = EM_LOG_WARN;
 		} break;
 	}
@@ -102,7 +102,7 @@ elAPI void sys_consolelog(int type, char *message) {
 }
 
 
-elAPI int sys_getlasterror() {
+int sys_get_last_error() {
 #if defined(PLATFORM_DESKTOP)
 	return GetLastError();
 #else
@@ -111,7 +111,7 @@ elAPI int sys_getlasterror() {
 }
 
 
-elAPI void sys_geterrormsg(int error, char *buf, int len) {
+void sys_get_error_msg(int error, char *buf, int len) {
 #if defined(PLATFORM_DESKTOP)
 	if (error == 0) error = GetLastError();
 	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,0x00,error,LANG_USER_DEFAULT,buf,len,NULL);
@@ -119,7 +119,7 @@ elAPI void sys_geterrormsg(int error, char *buf, int len) {
 }
 
 
-elAPI void *sys_valloc(elInteger length) {
+void *sys_valloc(elInteger length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
@@ -128,7 +128,7 @@ elAPI void *sys_valloc(elInteger length) {
 }
 
 
-elAPI void sys_sleep(elInteger ms) {
+void sys_sleep(elInteger ms) {
 #if defined(PLATFORMPLATFORM_WIN32)
 	Sleep((DWORD) ms);
 #elif defined(PLATFORM_WEB)
@@ -137,24 +137,24 @@ elAPI void sys_sleep(elInteger ms) {
 }
 
 
-elAPI elInteger sys_clockhz() {
+elInteger sys_get_clock_freq() {
 #if defined(PLATFORM_WEB)
 	return 1000;
 #elif defined(PLATFORM_DESKTOP)
-	LARGE_INTEGER largeInt;
-	QueryPerformanceFrequency(&largeInt);
-	return largeInt.QuadPart;
+	LARGE_INTEGER large_integer;
+	QueryPerformanceFrequency(&large_integer);
+	return large_integer.QuadPart;
 #else
 	return 0;
 #endif
 }
 
 
-elAPI elInteger sys_clocktime() {
+elInteger sys_get_clock_time() {
 #if defined(PLATFORM_DESKTOP)
-	LARGE_INTEGER largeInt;
-	QueryPerformanceCounter(&largeInt);
-	return largeInt.QuadPart;
+	LARGE_INTEGER large_integer;
+	QueryPerformanceCounter(&large_integer);
+	return large_integer.QuadPart;
 #elif defined(PLATFORM_WEB)
 	return emscripten_get_now();
 #else
@@ -163,7 +163,7 @@ elAPI elInteger sys_clocktime() {
 }
 
 
-elAPI int sys_getmyname(int length, char *buffer) {
+int sys_get_my_name(int length, char *buffer) {
 #if defined(PLATFORM_DESKTOP)
 	return GetModuleFileName(NULL,buffer,length);
 #else
@@ -172,7 +172,7 @@ elAPI int sys_getmyname(int length, char *buffer) {
 }
 
 
-elAPI int sys_getmypid() {
+int sys_get_my_pid() {
 #if defined(PLATFORM_DESKTOP)
 	return GetCurrentProcessId();
 #else
@@ -181,7 +181,7 @@ elAPI int sys_getmypid() {
 }
 
 
-elAPI int sys_getworkdir(int length, char *buffer) {
+int sys_get_work_dir(int length, char *buffer) {
 #if defined(PLATFORM_DESKTOP)
 	return GetCurrentDirectory(length,buffer);
 #else
@@ -190,7 +190,7 @@ elAPI int sys_getworkdir(int length, char *buffer) {
 }
 
 
-elAPI int sys_changeworkdir(char *buffer) {
+int sys_set_work_dir(char *buffer) {
 #if defined(PLATFORM_DESKTOP) && defined(_WIN32)
 	return SetCurrentDirectory(buffer);
 #else
@@ -199,7 +199,7 @@ elAPI int sys_changeworkdir(char *buffer) {
 }
 
 
-elAPI elHandle sys_loadlib(char const *name) {
+elHandle sys_load_dll(char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (elHandle) LoadLibraryA(name);
 #elif defined(PLATFORM_WEB)
@@ -213,16 +213,16 @@ elAPI elHandle sys_loadlib(char const *name) {
 #else
 	void *handle = dlopen(name,RTLD_LAZY);
 	if (handle == 0) {
-		sys_consolelog(ELF_LOGERROR,"the following is a system error:");
-		sys_consolelog(ELF_LOGERROR,dlerror());
-		sys_consolelog(ELF_LOGERROR,"end");
+		sys_console_print(LOG_KERROR,"the following is a system error:");
+		sys_console_print(LOG_KERROR,dlerror());
+		sys_console_print(LOG_KERROR,"end");
 	}
 	return (elHandle) handle;
 #endif
 }
 
 
-elAPI void *sys_libfn(elHandle dll, char const *name) {
+void *sys_get_dll_fn(elHandle dll, char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (void *) GetProcAddress(dll,name);
 #else
@@ -231,17 +231,17 @@ elAPI void *sys_libfn(elHandle dll, char const *name) {
 }
 
 
-elAPI elError sys_load_file_text(elAllocator *allocfn, void **data, char const *name) {
+elError sys_load_file_data(elAllocator fn, void **data, char const *name) {
 
 	elError error = Error_None;
 
 	if (name == 0) {
 		error = Error_FileNameIsInvalid;
-		goto leave;
+		goto esc;
 	}
 	if (data == 0) {
 		error = Error_InvalidArguments;
-		goto leave;
+		goto esc;
 	}
 
 	*data = 0;
@@ -249,19 +249,19 @@ elAPI elError sys_load_file_text(elAllocator *allocfn, void **data, char const *
 	HANDLE hfile = CreateFileA(name,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
 	if (hfile != INVALID_HANDLE_VALUE) {
 		DWORD hi,lo = GetFileSize(hfile,&hi);
-		char *buf = elf_alloc(allocfn,lo+1);
+		char *buf = elf_alloc(fn,lo+1);
 		DWORD bytes;
 		if (ReadFile(hfile,buf,lo,&bytes,NULL)) {
 			buf[bytes] = 0;
 			*data = buf;
 			if (bytes != lo) {
 				error = Error_CouldNotReadEntireFile;
-				goto leave;
+				goto esc;
 			}
 		} else {
-			elf_dealloc(allocfn,buf);
+			elf_dealloc(fn,buf);
 			error = Error_CouldNotReadFile;
-			goto leave;
+			goto esc;
 		}
 		CloseHandle(hfile);
 	} else {
@@ -276,29 +276,29 @@ elAPI elError sys_load_file_text(elAllocator *allocfn, void **data, char const *
 	FILE *file = fopen(name,"rb");
 	if (file == 0) {
 		error = Error_FileNotFound;
-		goto leave;
+		goto esc;
 	}
 	fseek(file,0,SEEK_END);
 	long fileSize = ftell(file);
 	fseek(file,0,SEEK_SET);
-	char *buf = (char *) elf_alloc(allocfn,fileSize+1);
+	char *buf = (char *) elf_alloc(fn,fileSize+1);
 	fread(buf,1,fileSize,file);
 	fclose(file);
 	buf[fileSize] = 0;
 	*data = buf;
 #endif
-	leave:
-	// if LPASSED(error) {
-	// 	elf_loginfo("'%s': file loaded",name);
+	esc:
+	// if PASSED(error) {
+	// 	elf_info_log("'%s': file loaded",name);
 	// } else {
-	// 	elf_loginfo("'%s': failed to load file, %s",name,ERNAME(error));
+	// 	elf_info_log("'%s': failed to load file, %s",name,ERNAME(error));
 	// }
 	return error;
 
 }
 
 
-elAPI elError sys_savefilebytes(char const *buffer, elInteger length, char const *fileName) {
+elError sys_save_file_data(char const *buffer, elInteger length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");
@@ -322,3 +322,23 @@ elAPI elError sys_savefilebytes(char const *buffer, elInteger length, char const
 	return error;
 }
 
+
+int sys_shell(char const *verb, char const *file, char const *args) {
+#if defined(PLATFORM_DESKTOP)
+	return (INT_PTR)ShellExecute(NULL,verb,file,args,NULL,10) > 32;
+#endif
+	return 0;
+}
+
+
+int sys_exec(char const *file, char const *args) {
+#if defined(PLATFORM_DESKTOP)
+	STARTUPINFO si = {sizeof(si)};
+	PROCESS_INFORMATION pi = {0};
+	int result = CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	return result;
+#endif
+	return -1;
+}

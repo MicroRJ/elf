@@ -1,27 +1,24 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf-web.c
-** Same idea as elf.c, but tailored
-** for the web, this is only an
-** example.
 */
 
 #define ELF_KEEPWARNINGS
-#include "elf.h"
+#include "elf.c"
 
 
-#if !defined(ELF_NOMAIN)
+#if 0
 int main(int n, char **c) {
-	sys_consolelog(ELF_LOGDBUG,"WEB!");
+	sys_console_print(LOG_KDEBUG,"WEB!");
 
 	#if defined(_DEBUG)
-	sys_consolelog(ELF_LOGDBUG,"COMPILER CHECK:");
+	sys_console_print(LOG_KDEBUG,"COMPILER CHECK:");
 	int *var = {0};
 	ARRAY_ADD(var,1);
-	if (var[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: var.add!\n");
-	if (ARRAY_LENGTH(var) != 1) sys_consolelog(ELF_LOGERROR,"FAILED: 'var.len!\n");
+	if (var[0] != 1) sys_console_print(LOG_KERROR,"FAILED: var.add!\n");
+	if (ARRAY_LENGTH(var) != 1) sys_console_print(LOG_KERROR,"FAILED: 'var.len!\n");
 	int arr[1] = {1};
-	if (arr[0] != 1) sys_consolelog(ELF_LOGERROR,"FAILED: arr!\n");
+	if (arr[0] != 1) sys_console_print(LOG_KERROR,"FAILED: arr!\n");
 	#endif
 }
 #endif
@@ -41,9 +38,9 @@ elAPI void elf_global_initialize() {
 #if 0
 elAPI int elf_global_loadcode(char *filename, char *contents) {
 	elValue *top = elGETTOP(&elf.R);
-	elString *name = elf_xstr(&elf.R,filename);
-	elString *string = elf_xstr(&elf.R,contents);
-	elFileState fs = {0};
+	elString *name = elf_put_new_string(&elf.R,filename);
+	elString *string = elf_put_new_string(&elf.R,contents);
+	FileState fs = {0};
 	int nyield = elf_fs_load_code(&elf.R,&fs,name,0,string);
 	elSETTOP(&elf.R,top);
 	return nyield;

@@ -1,17 +1,17 @@
 /*
 ** See Copyright Notice In elf.h
-** lerror.h
-** elError Codes
+** error.h
+** Error Codes
 */
 
 
-#define LERROR "lerror.h"
+#define LERROR "error.h"
 
 
 #if !defined(ERROR_XITEM)
 
-#define elFAILED(err) ((err) != Error_None)
-#define LPASSED(err) ((err) == Error_None)
+#define FAILED(err) ((err) != Error_None)
+#define PASSED(err) ((err) == Error_None)
 
 #define ERNAME(xx) (lErrorNames[xx])
 

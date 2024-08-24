@@ -157,7 +157,7 @@ can be compiled into a dll.
 
 Then you can call 'elf.loadlib' to
 load this dll and either call the
-'RayLoad' function which links in
+'elf_raylib_lib_load_functions' function which links in
 all the symbols, or import what you
 need manually.
 

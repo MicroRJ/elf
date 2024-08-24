@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** llog.c
+** log.c
 ** Simple Logging Tools
 */
 
@@ -17,19 +17,19 @@ char *S_filename(char *s) {
 }
 
 
-char *elf_logtostr(int type) {
+char *log2s(int type) {
 	switch (type) {
-		case ELF_LOGDBUG: return "DEBUG";
-		case ELF_LOGINFO: return "INFO";
-		case ELF_LOGWARN: return "WARN";
-		case ELF_LOGERROR: return "ERROR";
-		case ELF_LOGFATAL: return "FATAL";
+		case LOG_KDEBUG: return "DEBUG";
+		case LOG_KINFO: return "INFO";
+		case LOG_KWARNING: return "WARN";
+		case LOG_KERROR: return "ERROR";
+		case LOG_KFATAL: return "FATAL";
 		default: return "OTHER";
 	}
 }
 
 
-elAPI void elf_log_(int type, elSourceInfo source, const char *fmt, ...) {
+elAPI void elf_log_(int type, SourceInfo source, const char *fmt, ...) {
 
 	char b[0x1000];
 
@@ -44,7 +44,7 @@ elAPI void elf_log_(int type, elSourceInfo source, const char *fmt, ...) {
 	char *file = (char*) source.fileName;
 	char *func = (char*) source.func;
 
-	printf("%s %s[%i] %s(): %s\n",elf_logtostr(type),S_filename(file),line,func,b);
+	printf("%s %s[%i] %s(): %s\n",log2s(type),S_filename(file),line,func,b);
 }
 
 

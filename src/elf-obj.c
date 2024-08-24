@@ -9,14 +9,14 @@
 
 
 // elAPI elValue elSTR(elString *s) {
-// 	elValue v = elLITERAL(elValue){TAG_STR};
+// 	elValue v = LITERAL(elValue){TAG_STR};
 // 	v.x_str = s;
 // 	return v;
 // }
 
 
 // elAPI elValue elCLS(elClosure *f) {
-// 	elValue v = elLITERAL(elValue){TAG_CLS};
+// 	elValue v = LITERAL(elValue){TAG_CLS};
 // 	v.x_cls = f;
 // 	return v;
 // }
@@ -43,7 +43,7 @@
 // }
 
 
-elAPI elClosure *elf_new_closure(elState *S, elFileProto proto) {
+elAPI elClosure *elf_new_closure(elState *S, elFunction proto) {
 	elClosure *cls = (elClosure *) elf_new_object(S,GC_CLS,sizeof(elClosure) + sizeof(elValue) * (proto.nlocals-1));
 	cls->proto = proto;
 	return cls;

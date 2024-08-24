@@ -5,9 +5,29 @@
 */
 
 
+
+
+
+elGLOBAL elCBinding elf_slib_[] = {
+	{"length",elf_slib_length},
+	{"match",elf_slib_match},
+	{"uppercase",elf_slib_uppercase},
+	{"lowercase",elf_slib_lowercase},
+	{"__add",elf_slib_append},
+	{"__add1",elf_slib_append},
+	{"append",elf_slib_append},
+	{"append_char",elf_slib_append_char},
+	{"pop",elf_slib_pop},
+	{"get_hash",elf_slib_get_hash},
+	{"split_by_lines",elf_slib_split_by_lines},
+	{"idx",elf_slib_get_index},
+	{"find",elf_slib_find},
+};
+
+
 elTable *elf_new_string_metatable(elState *R) {
-	elTable *tab = elf_xtab(R);
-	elf_register_bindings(R,tab,elf_libS_,COUNTOF(elf_libS_));
+	elTable *tab = elf_put_new_table(R);
+	elf_tsetx_bindings(R,tab,elf_slib_,COUNTOF(elf_slib_));
 	return tab;
 }
 
@@ -21,22 +41,23 @@ elString *elf_new_lstring(elState *R, elInteger length) {
 	return obj;
 }
 
-elString *elf_new_string(elState *R, char *contents) {
-	int length = elf_text_length(contents);
-	elHashId hash = elf_hash_text(contents);
+
+elString *elf_new_string(elState *R, const char *text) {
+	int length = text_length(text);
+	elHashId hash = elf_hash_text(text);
 	elString *string = 0;
 	elTable *registry = R->M->strings;
 	if (length < 64 && registry != 0) {
 		elf_check_table(registry);
-		elInteger slot = elf_ttrys(registry,contents,length,hash);
-		elASSERT(slot != -1);
+		elInteger slot = elf_ttry_text(registry,text,length,hash);
+		ASSERT(slot != -1);
 		elEntry entry = registry->entries[slot];
 		if (entry.key.tag != TAG_NIL) {
 			elValue target = registry->array[registry->entries[slot].i];
 			string = target.x_str;
 		} else {
 			string = elf_new_lstring(R,length);
-			elf_copy_memory(string->text,contents,length);
+			elf_copy_memory(string->text,text,length);
 			string->hash = hash;
 
 			elInteger i = ARRAY_GROW(registry->array,1);
@@ -47,7 +68,7 @@ elString *elf_new_string(elState *R, char *contents) {
 		}
 	} else {
 		string = elf_new_lstring(R,length);
-		elf_copy_memory(string->text,contents,length);
+		elf_copy_memory(string->text,text,length);
 		string->hash = hash;
 	}
 	return string;
@@ -59,12 +80,12 @@ elBool elf_string_eq(elString *x, elString *y) {
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;
 	if (x->length != y->length) return 0;
-	return elf_texteq(x->string,y->string);
+	return text_eq(x->string,y->string);
 }
 
 
-int elf_libS_length(elState *S) {
-	elf_pint(S,((elString*)elGETTHIS(S))->length);
+int elf_slib_length(elState *S) {
+	elf_put_integer(S,((elString*)elGETTHIS(S))->length);
 	return 1;
 }
 
@@ -83,35 +104,35 @@ void strcatf(char *buffer, char *fmt, ...) {
 }
 
 
-int elf_libS_get_index(elState *R) {
+int elf_slib_get_index(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elf_pint(R,str->text[elf_get_integer(R,0)]);
+	elf_put_integer(R,str->text[elf_get_integer(R,0)]);
 	return 1;
 }
 
 
-int elf_libS_pop(elState *R) {
+int elf_slib_pop(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,MAX(0,yo->length-1));
 	elf_copy_memory(el->text,yo->text,MAX(0,yo->length-1));
-	elf_pstr(R,el);
+	elf_put_string(R,el);
 	return 1;
 }
 
 
-int elf_libS_append_char(elState *R) {
+int elf_slib_append_char(elState *R) {
 	elString *yo = (elString*) elGETTHIS(R);
 	elString *el = elf_new_lstring(R,yo->length + elGETNARGS(R));
 	elf_copy_memory(el->text,yo->text,yo->length);
 	for ( int i = 0; i < elGETNARGS(R); i += 1 ) {
 		el->text[yo->length + i] = elf_get_integer(R,i);
 	}
-	elf_pstr(R,el);
+	elf_put_string(R,el);
 	return 1;
 }
 
 
-int elf_libS_append(elState *R) {
+int elf_slib_append(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->text);
@@ -125,29 +146,29 @@ int elf_libS_append(elState *R) {
 			strcatf(buffer,"%.2f",v.x_num);
 		} else if (v.tag == TAG_INT) {
 			strcatf(buffer,"%lli",v.x_int);
-		} else elNOCODE;
+		} else NO_CODE;
 	}
-	elf_xstr(R,buffer);
+	elf_put_new_string(R,buffer);
 	return 1;
 }
 
 
-int elf_libS_match(elState *R) {
+int elf_slib_match(elState *R) {
 	elString *s = (elString*) elGETTHIS(R);
 	elString *p = elf_get_string(R,0);
-	elf_pint(R,elf_match_entire_string(p->string,s->string));
+	elf_put_integer(R,match_entire_text(p->string,s->string));
 	return 1;
 }
 
 
-int elf_libS_find(elState *R) {
+int elf_slib_find(elState *R) {
 	elString *string = (elString*) elGETTHIS(R);
 	char *pattern = elf_get_text(R,0);
 	char *buffer = 0;
 	char *cursor = string->text;
-	elTable *list = elf_xtab(R);
+	elTable *list = elf_put_new_table(R);
 	while (*cursor) {
-		char *match = elf_match_strings_single_clause_ex(cursor,pattern);
+		char *match = match_text_single_clause_ex(cursor,pattern);
 		if (match != 0) {
 			while (cursor < match) {
 				ARRAY_ADD(buffer,*cursor ++);
@@ -163,11 +184,11 @@ int elf_libS_find(elState *R) {
 }
 
 
-int elf_libS_split_by_lines(elState *R) {
+int elf_slib_split_by_lines(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
 	char *buffer = 0;
 	char *cursor = str->text;
-	elTable *list = elf_xtab(R);
+	elTable *list = elf_put_new_table(R);
 	while (*cursor) {
 		while (*cursor && *cursor != '\n' && *cursor != '\r') {
 			ARRAY_ADD(buffer,*cursor ++);
@@ -183,28 +204,28 @@ int elf_libS_split_by_lines(elState *R) {
 }
 
 
-int elf_libS_get_hash(elState *R) {
+int elf_slib_get_hash(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elf_pint(R,str->hash);
+	elf_put_integer(R,str->hash);
 	return 1;
 }
 
 
-int elf_libS_lowercase(elState *R) {
+int elf_slib_lowercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elString *newstr = elf_xlstr(R,str->length);
+	elString *newstr = elf_put_new_string2(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
-		newstr->c[i] = elf_chrtolowercase(str->c[i]);
+		newstr->text[i] = chr_to_lowercase(str->text[i]);
 	}
 	return 1;
 }
 
 
-int elf_libS_uppercase(elState *R) {
+int elf_slib_uppercase(elState *R) {
 	elString *str = (elString*) elGETTHIS(R);
-	elString *newstr = elf_xlstr(R,str->length);
+	elString *newstr = elf_put_new_string2(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
-		newstr->c[i] = elf_chrtouppercase(str->c[i]);
+		newstr->text[i] = chr_to_uppercase(str->text[i]);
 	}
 	return 1;
 }

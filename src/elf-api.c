@@ -6,7 +6,7 @@
 
 
 
-void elf_expected(elState *S, elValueTag tag, elValueTag got, elRegId x) {
+void elf_expected(elState *S, ValueTag tag, ValueTag got, elRegId x) {
 	elf_fail(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 
@@ -23,7 +23,7 @@ elAPI elString *elf_get_string(elState *R, elRegId x) {
 elAPI char *elf_get_text(elState *R, elRegId x) {
 	elValue v = elGETARG(R,x);
 	if (v.tag == TAG_NIL) return 0;
-	if (v.tag == TAG_STR) return v.x_str->c;
+	if (v.tag == TAG_STR) return v.x_str->text;
 	elf_expected(R,TAG_STR,v.tag,x);
 	return 0;
 }
@@ -56,9 +56,9 @@ elAPI elHandle elf_get_handle(elState *R, elRegId x) {
 	elValue v = elGETARG(R,x);
 	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
 		elf_fail(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
-		elNOCODE;
+		NO_CODE;
 	}
-	return v.h;
+	return v.x_sys;
 }
 
 
@@ -80,38 +80,31 @@ elNumber elf_get_number(elState *R, elRegId x) {
 }
 
 
-elString *elf_xstr(elState *R, char *chr) {
-	elString *string = elf_new_string(R,chr);
-	elf_pstr(R,string);
+elString *elf_put_new_string(elState *R, const char *text) {
+	elString *string = elf_new_string(R,text);
+	elf_put_string(R,string);
 	return string;
 }
 
 
-elString *elf_xlstr(elState *R, elInteger len) {
+elString *elf_put_new_string2(elState *R, elInteger len) {
 	elString *string = elf_new_lstring(R,len);
-	elf_pstr(R,string);
+	elf_put_string(R,string);
 	return string;
 }
 
 
 
-elObject *elf_xobj(elState *R, elInteger tell) {
+elObject *elf_put_new_object(elState *R, elInteger tell) {
 	elObject *obj = elf_new_object(R,GC_OBJ,tell);
-	elPUSHOBJ(R,obj);
+	elf_put_object(R,obj);
 	return obj;
 }
 
 
-elTable *elf_xtab(elState *R) {
+elTable *elf_put_new_table(elState *R) {
 	elTable *tab = elf_new_table(R);
-	elPUSHTAB(R,tab);
+	elf_put_table(R,tab);
 	return tab;
-}
-
-
-void elf_pushbinding(elState *R, elCFunction b) {
-	elValue *T = elGETTOP(R) ++;
-	T->tag   = TAG_CFN;
-	T->x_cfn = b;
 }
 

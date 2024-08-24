@@ -6,19 +6,18 @@
 **
 ** The idea is to allocate a buffer of memory
 ** along with a header. This header contains
-** information about the array itself.
+** information about the array.
 **
-** I think it was STB who I got this from.
+** I got this from STB, pretty much.
 **
 ** Arrays are not exposed directly to elf, instead,
 ** we use them internally as a core data type.
 **
 ** Usage is as follows:
 **
-** T *array = 0; // ensure it is initialized to 0
-** // otherwise it thinks it has already been initialized...
+** T *array = 0; // 0 is initialized
 **
-** ARRAY_ADD(array,T-thing)
+** ARRAY_ADD(array,(T) thing)
 **
 ** ARRAY_ADD and all the other functions take
 ** l-values strictly...
@@ -26,7 +25,7 @@
 ** Needless to say, all of the API functions require
 ** compatible memory...
 **
-** [ARRAY-HEADER][....]
+** [ARRAY-HEADER][PAYLOAD]
 **
 */
 
@@ -52,15 +51,17 @@ of it has been used already, in bytes...
 
 - max is the maximum size of the array, or how much
 has been reserved for if already, must always be
-greater than or equal to min, otherwise the array is invalid... */
+greater than or equal to min, otherwise the array
+is invalid... */
 #define ARRAY_MAX(D) ((D != 0) ? ARRAY(D).max : 0)
 #define ARRAY_MIN(D) ((D != 0) ? ARRAY(D).min : 0)
+
 
 #define ARRAY_LENGTH ARRAY_MIN
 
 
 /* delete the array */
-#define ARRAY_DELETE(D) ((D != 0) ? elf_dealloc(elHEAP_ALLOCATOR,&ARRAY(D)), 0 : 0)
+#define ARRAY_DELETE(D) ((D != 0) ? elf_dealloc(HEAP_ALLOCATOR,&ARRAY(D)), 0 : 0)
 
 
 #define FOR_RANGE(N,X,Y) for (elInteger N = X; N < Y; N += 1)
@@ -71,7 +72,7 @@ greater than or equal to min, otherwise the array is invalid... */
 #define ARRAY_POP(D) ((D != 0) ? ARRAY(D).min -= 1 : 0)
 
 
-#define ARRAY_GROW(D,N) (elf_array_allocate((void**)&(D),sizeof(*D),N,N))
+#define ARRAY_GROW(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
 
 
 
@@ -83,8 +84,7 @@ I can't be bothered... */
 
 
 
-/*
-** Returns the last index of the array
-** that can be written to
-*/
-elInteger elf_array_allocate(void **var, elInteger per, elInteger res, elInteger com);
+/* returns the newly allocated starting index of the array,
+res is how much to reserve which increments (max) if
+necessary, and com is how much to commit, which increments (min) */
+static elInteger array_allocate(void **var, elInteger per, elInteger res, elInteger com);

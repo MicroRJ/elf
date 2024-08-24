@@ -34,7 +34,7 @@
 // elAPI int netlib_listen(elState *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elf_pint(R,error!=SOCKET_ERROR);
+// 	elf_put_integer(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
@@ -42,7 +42,7 @@
 // elAPI int netlib_accept(elState *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
-// 	elPUSHSYS(R,(elHandle)client);
+// 	elf_put_handle(R,(elHandle)client);
 // 	return 1;
 // }
 
@@ -56,9 +56,9 @@
 // 	int result = select(0,&ready,NULL,NULL,&timeout);
 //    if (FD_ISSET(handle,&ready)) {
 //       SOCKET client = accept(handle,NULL,NULL);
-//       elASSERT(client != INVALID_SOCKET);
-// 		elPUSHSYS(R,(elHandle)client);
-//    } else elf_pnil(R);
+//       ASSERT(client != INVALID_SOCKET);
+// 		elf_put_handle(R,(elHandle)client);
+//    } else elf_put_nil(R);
 // 	return 1;
 // }
 
@@ -79,8 +79,8 @@
 // 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 // 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elPUSHSYS(R,(elHandle)thesocket);
-// 	} else elf_pnil(R);
+// 		elf_put_handle(R,(elHandle)thesocket);
+// 	} else elf_put_nil(R);
 
 // 	return 1;
 // }
@@ -103,8 +103,8 @@
 
 // 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elPUSHSYS(R,(elHandle)thesocket);
-// 	} else elf_pnil(R);
+// 		elf_put_handle(R,(elHandle)thesocket);
+// 	} else elf_put_nil(R);
 // 	return 1;
 // }
 
@@ -117,7 +117,7 @@
 // 	elInteger sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elf_pint(R,sent);
+// 	elf_put_integer(R,sent);
 // 	return 1;
 // }
 
@@ -126,7 +126,7 @@
 // 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elf_pint(R,error == 0);
+// 	elf_put_integer(R,error == 0);
 // 	return 1;
 // }
 
@@ -138,7 +138,7 @@
 // 		if (message.length != 0) {
 // 			elInteger length = message.length;
 // 			elString *obj = elf_new_lstring(R,length);
-// 			elf_pstr(R,obj);
+// 			elf_put_string(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
 // 				elInteger result = recv(socket,cursor,length,0);
@@ -148,7 +148,7 @@
 // 						/* todo: retry until a certain timeout? */
 // 					} else {
 // 						char erbuf[0x100];
-// 						sys_geterrormsg(error,erbuf,sizeof(erbuf));
+// 						sys_get_error_msg(error,erbuf,sizeof(erbuf));
 // 						elf_error_log("netlib sys error '%i': %s",error,erbuf);
 // 						break;
 // 					}
@@ -156,14 +156,14 @@
 // 					/* connection closed gracefully, simply break */
 // 					break;
 // 				} else {
-// 					elASSERT(result > 0);
+// 					ASSERT(result > 0);
 // 					length -= result;
 // 					cursor += result;
 // 				}
 // 			} while (length != 0);
 // 			*cursor = 0;
-// 		} else elf_pnil(R);
-// 	} else elf_pnil(R);
+// 		} else elf_put_nil(R);
+// 	} else elf_put_nil(R);
 // 	return 1;
 // }
 // #else
@@ -183,15 +183,15 @@
 // elAPI void elf_netlib_loadfunctions(elState *R) {
 // 	elModule *md = R->md;
 
-// 	elf_register_binding(R,"elf.sockets.init",netlib_init);
-// 	elf_register_binding(R,"elf.sockets.close",netlib_close);
-// 	elf_register_binding(R,"elf.sockets.listen",netlib_listen);
-// 	elf_register_binding(R,"elf.sockets.accept",netlib_accept);
-// 	elf_register_binding(R,"elf.sockets.pollclient",netlib_pollclient);
-// 	elf_register_binding(R,"elf.sockets.tcpserver",netlib_tcpserver);
-// 	elf_register_binding(R,"elf.sockets.tcpclient",netlib_tcpclient);
-// 	elf_register_binding(R,"elf.sockets.send",netlib_send);
-// 	elf_register_binding(R,"elf.sockets.recv",netlib_recv);
-// 	elf_register_binding(R,"elf.sockets.ioctl",netlib_ioctl);
+// 	elf_gsetx_cfn(R,"elf.sockets.init",netlib_init);
+// 	elf_gsetx_cfn(R,"elf.sockets.close",netlib_close);
+// 	elf_gsetx_cfn(R,"elf.sockets.listen",netlib_listen);
+// 	elf_gsetx_cfn(R,"elf.sockets.accept",netlib_accept);
+// 	elf_gsetx_cfn(R,"elf.sockets.pollclient",netlib_pollclient);
+// 	elf_gsetx_cfn(R,"elf.sockets.tcpserver",netlib_tcpserver);
+// 	elf_gsetx_cfn(R,"elf.sockets.tcpclient",netlib_tcpclient);
+// 	elf_gsetx_cfn(R,"elf.sockets.send",netlib_send);
+// 	elf_gsetx_cfn(R,"elf.sockets.recv",netlib_recv);
+// 	elf_gsetx_cfn(R,"elf.sockets.ioctl",netlib_ioctl);
 // }
 

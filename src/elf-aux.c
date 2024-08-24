@@ -1,102 +1,96 @@
 /*
 ** See Copyright Notice In elf.h
 ** elf-run.c
-** Auxiliary Functions / Tools
+** Auxiliary Stuff
 */
 
 
-/* res is how much to reserve,
-and com is how much to commit */
-elInteger elf_array_allocate(void **var, elInteger per, elInteger res, elInteger com) {
-	elArray *arr = 0;
-	elInteger max = 0, min = 0;
-	if (*var != 0) {
-		arr = &ARRAY(*var);
-		max = arr->max;
-		min = arr->min;
-	}
-   /* increment reserve if we attempt to commit
-   more than we've got reserved */
-	if (max + res < com) {
-		res += (com - (max + res));
-	}
-	if (min + res > max) {
-		max <<= 1;
-		if(min + res > max) {
-			max = min + res;
-		}
-		arr = elf_realloc(elHEAP_ALLOCATOR,sizeof(elArray)+per*max,arr);
-	}
-	if (arr != 0) {
-		arr->max = max;
-		arr->min = min + com;
-	}
-	*var = arr + 1;
-	return min;
-}
+static char const *elf_get_byte_label(int op);
+static int elf_get_byte_class(int op);
 
 
 void elf_debugger(char *message) {
-	sys_consolelog(ELF_LOGDBUG,"debugger: ");
-	sys_consolelog(ELF_LOGDBUG,message);
-	sys_consolelog(ELF_LOGDBUG,"end");
+	sys_console_print(LOG_KDEBUG,"debugger: ");
+	sys_console_print(LOG_KDEBUG,message);
+	sys_console_print(LOG_KDEBUG,"end");
 	sys_debugger();
 }
 
 
-void elf_register_bindings(elState *R, elTable *tab, elBinding *list, int num) {
-	for (int i = 0; i < num; i += 1) {
-		elf_tset(tab,elSTR(elf_new_string(R,list[i].name)),elCFN(list[i].fn));
-	}
+elInteger elf_get_clock_time() {
+	return sys_get_clock_time();
 }
 
 
-void elf_register_handle(elState *R, char *name, elHandle val) {
-	elf_add_global_value(R->M,elf_xstr(R,name),elSYS(val));
+elNumber elf_time_diff_s(elInteger begin) {
+	return (sys_get_clock_time() - begin) / (elNumber) sys_get_clock_freq();
 }
 
 
-void elf_register_integer(elState *R, char *name, elInteger val) {
-	elf_add_global_value(R->M,elf_xstr(R,name),elINT(val));
+elNumber elf_time_diff_ms(elInteger begin) {
+	return elf_time_diff_s(begin) * 1000.;
 }
 
 
-void elf_registertab(elState *R, char *name, elTable *val) {
-	elf_add_global_value(R->M,elf_xstr(R,name),elTAB(val));
+int elf_add_function(elModule *M, elFunction fn) {
+	int i = ARRAY_GROW(M->functions,1);
+	M->functions[i] = fn;
+	return i;
 }
 
 
-void elf_register_string(elState *R, char *name, char *val) {
-	elf_add_global_value(R->M,elf_xstr(R,name),elSTR(elf_xstr(R,val)));
+elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
+	if (name != 0) return elf_tgeti(M->globals,elSTR(name));
+	return ARRAY_GROW(M->globals->array,1);
 }
 
 
-void elf_register_binding(elState *R, char *name, elCFunction fn) {
-	elf_add_global_value(R->M,elf_xstr(R,name),elCFN(fn));
+elSymbolId elf_gset(elModule *M, elString *name, elValue value) {
+	elSymbolId id;
+	id=elf_get_global_symbol(M,name);
+	M->globals->array[id]=value;
+	return id;
 }
 
 
-elInteger elf_clocktime() {
-	return sys_clocktime();
+void elf_gsetx_sys(elState *R, char *name, elHandle val) {
+	elf_gset(R->M,elf_put_new_string(R,name),elSYS(val));
 }
 
 
-/* todo: clockhz can be cached */
-elNumber elf_timediffs(elInteger begin) {
-	return (sys_clocktime() - begin) / (elNumber) sys_clockhz();
+void elf_gsetx_int(elState *R, char *name, elInteger val) {
+	elf_gset(R->M,elf_put_new_string(R,name),elINT(val));
 }
 
 
-elNumber elf_timediffms(elInteger begin) {
-	return elf_timediffs(begin) * 1000.;
+void elf_gsetx_tab(elState *R, char *name, elTable *val) {
+	elf_gset(R->M,elf_put_new_string(R,name),elTAB(val));
 }
 
 
-int elf_get_file_for_byte(elModule *M, elByteId byte) {
-	elFileProto *files = M->files;
+void elf_gsetx_str(elState *R, char *name, char *val) {
+	elf_gset(R->M,elf_put_new_string(R,name),elSTR(elf_put_new_string(R,val)));
+}
+
+
+void elf_gsetx_cfn(elState *R, char *name, elCFunction fn) {
+	elf_gset(R->M,elf_put_new_string(R,name),elCFN(fn));
+}
+
+
+void elf_gset_bindings(elState *R, elCBinding *list, int num) {
+	elf_tsetx_bindings(R,R->M->globals,list,num);
+}
+
+
+int elf_get_instr_file(elModule *M, Instr byte) {
+	elFunction *files;
+	elFunction file;
+
+	files=M->files;
 	FOR_ARRAY(i,files) {
-		elFileProto file = files[i];
-		if (elWITHIN(byte,file.bytes,file.bytes+file.nbytes)) {
+		file=files[i];
+		if (WITHIN(byte,file.bytes,file.bytes+file.nbytes)) {
 			return i;
 		}
 	}
@@ -104,14 +98,15 @@ int elf_get_file_for_byte(elModule *M, elByteId byte) {
 }
 
 
-elFileline elf_get_line_for_byte(elModule *M, elByteId byte) {
-	elASSERT(elWITHIN(byte,0,ARRAY_LENGTH(M->lines)));
+char *elf_get_instr_line(elModule *M, Instr byte) {
+	ASSERT(WITHIN(byte,0,ARRAY_LENGTH(M->lines)));
 	return M->lines[byte];
 }
 
 
-/* finds line number and line loc from single source location */
-void elf_get_line_location_info(char *q, char *loc, int *linenum, char **lineloc) {
+/* todo: this is so generic, it could just be part of
+the text api */
+void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) {
 	char *c = q;
 	int n = 0;
 	while (q < loc) {
@@ -128,18 +123,18 @@ void elf_get_line_location_info(char *q, char *loc, int *linenum, char **lineloc
 }
 
 
-elFileProto elf_getrunningfile(elState *S) {
-	elFileProto fi = {0};
-	int id = elf_get_file_for_byte(S->M,S->byte);
+elFunction elf_get_running_file(elState *S) {
+	elFunction fi = {0};
+	int id = elf_get_instr_file(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
 }
 
 
-void elf_line_dialog(char *filename, char *contents, char *loc, elByteId byte_loc, elBytecode byte, char const *fmt, ...) {
+void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, Bytecode byte, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
-	elf_get_line_location_info(contents,loc,&linenum,&lineloc);
+	elf_get_line_source_info(contents,loc,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -172,7 +167,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, elByteId byte_lo
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elInteger)(1+loc-lineloc),byte_loc,elf_get_byte_label(byte.k),b);
+		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elInteger)(1+loc-lineloc),byte_loc,elf_get_byte_label(BC_OP(byte)),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -180,7 +175,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, elByteId byte_lo
 
 
 void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
-	elASSERT(level > -1);
+	ASSERT(level > -1);
 
 	/* Don't show the first root call frame
 	(which is the one without a caller) because that'll
@@ -188,27 +183,27 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 	function/file, which is irrelevant */
 	if (call->caller == 0) return;
 
-	elASSERT(level > 0);
+	ASSERT(level > 0);
 
 	elf_dump_byte_trace(S,call->caller,level-1);
 
 	elModule *M = S->M;
-	int fileid = elf_get_file_for_byte(M,call->origin);
+	int fileid = elf_get_instr_file(M,call->origin);
 	if (fileid != -1) {
-		elFileProto *file = &M->files[fileid];
-		elFileline line = elf_get_line_for_byte(M,call->origin);
+		elFunction *file = &M->files[fileid];
+		Source line = elf_get_instr_line(M,call->origin);
 		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
 	}
 }
 
 
-void elf_fail(elState *R, elByteId byte, char *error) {
+void elf_fail(elState *R, int byte, const char *error) {
 	elModule *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
-	char *line = elf_get_line_for_byte(M,byte);
-	int fileid = elf_get_file_for_byte(M,byte);
+	char *line = elf_get_instr_line(M,byte);
+	int fileid = elf_get_instr_file(M,byte);
 	if (fileid != -1) {
-		elFileProto *file = &M->files[fileid];
+		elFunction *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	}
 
@@ -218,16 +213,125 @@ void elf_fail(elState *R, elByteId byte, char *error) {
 }
 
 
-void elf_check_args(elState *R, char *fnname, int n, char *usage) {
+elAPI void elf_check_args(elState *R, char *fnname, int n, char *usage) {
 	if (elGETNARGS(R) != n) {
 		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
 	}
 }
 
 
-int elf_type_check(elState *R, elByteId id, elRegId loc, elValueTag x, elValueTag y) {
+int elf_type_check(elState *R, Instr id, elRegId loc, ValueTag x, ValueTag y) {
 	if (x != y) {
 		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
 	return x == y;
+}
+
+
+int elf_fpf_value(FILE *file, elValue v, elBool quotes);
+
+
+static void fpf_byte(FILE *io, elModule *M, elInteger fid, Instr id, Bytecode b) {
+	if (fid != -1) {
+		elFunction file = M->files[fid];
+		int linenum;
+		elf_get_line_source_info(file.contents->text,M->lines[id],&linenum,0);
+		fprintf(io,"%s %04i: \t",file.name->text,linenum);
+	}
+
+	fprintf(io,"%08i %04i\t%s"
+	, M->track[id],id,elf_get_byte_label(BC_OP(b)));
+
+	if (elf_get_byte_class(BC_OP(b)) == BC_CLASS_XYZ) {
+		fprintf(io,"(x=%i,y=%i,z=%i)",BC_ARGX(b),BC_ARGY(b),BC_ARGZ(b));
+	} else if (elf_get_byte_class(BC_OP(b)) == BC_CLASS_XY) {
+		fprintf(io,"(x=%i,y=%i)",BC_ARGX(b),BC_ARGY(b));
+	} else {
+		fprintf(io,"(x=%i)",BC_ARGX(b));
+	}
+
+	if (BC_OP(b) == BC_TYPEGUARD) {
+		fprintf(io," #%s",tag2s[BC_ARGY(b)]);
+	} else
+	if (BC_OP(b) == BC_GETKINT) {
+		fprintf(io," #%lli",M->integers[BC_ARGY(b)]);
+	} else
+	if (BC_OP(b) == BC_GETKNUM) {
+		fprintf(io," #%f",M->numbers[BC_ARGY(b)]);
+	} else
+	if (BC_OP(b) == BC_GETGLOBAL) {
+		elValue val = M->globals->array[BC_ARGY(b)];
+		fprintf(io,"  // %s ",tag2s[val.tag]);
+		/* todo: just pass in a flag to val fpf that tells
+		it to shorten the thing for printing purposes */
+		if ((val.tag == TAG_STR) || (val.tag == TAG_NUM) || (val.tag == TAG_INT)) {
+			elf_fpf_value(io,val,1);
+		}
+	}
+	fprintf(io,"\n");
+}
+
+
+void elf_get_line_source_info(char *q, char *p, int *linenum, char **lineloc);
+
+
+#if 0
+void lang_dumpmodule(elModule *md, elHandle io) {
+	fprintf(file,"elModule:\n");
+	fprintf(file,"Globals:\n");
+	FOR_ARRAY(md->g->v) {
+		fprintf(file,"%04llX: ", i);
+		elf_fpf_value(file,md->g->v[i],1);
+		fprintf(file,"\n");
+	}
+	fprintf(io,"-- BYTECODE --\n");
+	fprintf(io,"- INSTR: %i\n",md->nbytes);
+	fprintf(io,"- PID: %i\n",sys_get_my_pid());
+	FOR_ARRAY(i,md->files) {
+		elFunction ff = md->files[i];
+		fprintf(io,"- FILE (%s):\n",ff.name->text);
+		fprintf(io,"INDEX INSTRUCTION\n");
+		for (Instr j = 0; j < ff.nbytes; ++j) {
+			Bytecode b = md->bytes[ff.bytes+j];
+			// int linenum;
+			// char *lineloc;
+			// elf_get_line_source_info(md->file,md->lines[j],&linenum,&lineloc);
+			// fprintf(file,"%-3i:%-3i",linenum,(int)(md->lines[j]-lineloc));
+			fpf_byte(io,md,i,j,b);
+		}
+	}
+#if 0
+	FOR_ARRAY(md->p) {
+		elFunction p = md->p[i];
+		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
+		for (Instr j = 0; j < p.nbytes; ++j) {
+			Bytecode b = md->bytes[p.bytes+j];
+			fpf_byte(md,file,j,b);
+		}
+		fprintf(file,"end\n");
+	}
+#endif
+}
+#endif
+
+
+int elf_get_byte_class(int k) {
+#define BCITEM(NAME,FMT,__) case FUSE(BC_,NAME): return FUSE(BC_CLASS_,FMT);
+	switch (k) {
+		BCLIST(BCITEM)
+		default: NO_CODE;
+	}
+#undef BCITEM
+	return -1;
+}
+
+
+char const *elf_get_byte_label(int k) {
+#define BCITEM(NAME,_,SYM) case FUSE(BC_,NAME): return SYM;
+	switch (k) {
+		BCLIST(BCITEM)
+		default: NO_CODE;
+	}
+#undef BCITEM
+	return 0;
 }

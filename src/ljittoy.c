@@ -102,15 +102,15 @@ void emit86_mov(ljValue x, ljValue y) {
 			DO_MOV64_REG_MEM_8DISP(x.base,y.base,y.disp);
 		} else if (y.type == JIT_IMM) {
 			DO_MOV64_REG_IMM(x.base,y.immediate);
-		} else elNOCODE;
+		} else NO_CODE;
 	} else
 	if (x.type == JIT_MEM) {
 		if (y.type == JIT_MEM) {
 			emit86_mov(REG(RAX),y);
 			y = REG(RAX);
-		} else elASSERT(y.type == JIT_GPR);
+		} else ASSERT(y.type == JIT_GPR);
 		DO_MOV64_MEM_REG_8DISP(x.base,x.disp,y.base);
-	} else elNOCODE;
+	} else NO_CODE;
 }
 
 
@@ -123,24 +123,24 @@ void emit86_logxor(ljValue x, ljValue y) {
 	} else
 	if (x.type == JIT_MEM && y.type == JIT_GPR) {
 		LINE((p2(0x31,MODRM_8DISP(x.base,y.base)), NEXT, p1(x.disp)));
-	} else elNOCODE;
+	} else NO_CODE;
 
 	if (yy.type == JIT_MEM) emit86_mov(yy,y);
 }
 
 
-void emit86_shift(elByteOP type, ljValue x, ljValue y) {
+void emit86_shift(ByteOP type, ljValue x, ljValue y) {
 	ljValue xx = x;
 	if (xx.type == JIT_MEM) emit86_mov(x = REG(RAX),xx);
 	if (x.type == JIT_GPR && y.type == JIT_IMM) {
 		int v = type == BC_SHL ? 4 : 5;
 		LINE((p2(0xC1,MODRM_RR(x.base,v)), NEXT, p1(y.immediate)));
-	} else elNOCODE;
+	} else NO_CODE;
 	if (xx.type == JIT_MEM) emit86_mov(xx,x);
 }
 
 
-elCFunction jit(elModule *md, elFileProto fn) {
+elCFunction jit(elModule *md, elFunction fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();
@@ -150,10 +150,10 @@ elCFunction jit(elModule *md, elFileProto fn) {
 
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
-	elBytecode *bytes = md->bytes + fn.bytes;
-	elByteId nbytes = fn.nbytes;
+	Bytecode *bytes = md->bytes + fn.bytes;
+	Instr nbytes = fn.nbytes;
 
-	for (elByteId i = 0; i < nbytes; ++i) {
+	for (Instr i = 0; i < nbytes; ++i) {
 		#if 0
 		switch (byte.k) {
 			case BC_INT: {
@@ -200,7 +200,7 @@ elCFunction jit(elModule *md, elFileProto fn) {
 			} break;
 			case BC_LEAVE:
 			break;
-			default: elNOCODE;
+			default: NO_CODE;
 		}
 		(void) byte;
 		#endif

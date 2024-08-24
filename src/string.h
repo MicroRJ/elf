@@ -5,60 +5,41 @@
 */
 
 
+/* length can probably go away or be much smaller,
+we only really use length for smaller strings, same
+for hash... */
 typedef struct elString {
 	elObject    obj;
 	elHashId   hash;
-	/* Hear me out... do you even	use the length of
-	the string that often, and when you do use it,
-	you cache it somewhere, if you really want to
-	compute the length of a string without using
-	strlen (like when you're looking up a string),
-	you can use the size of the object minus the
-	size of the string header... */
 	int     	length;
 	union {
 		char   text[1];
-		/* TODO: DEPRECATED */
-		// char   contents[1];
 		char   string[1];
-		char   c[1];
 	};
 } elString;
 
 
-elString *elf_new_lstring(elState *R, elInteger length);
-elString *elf_new_string(elState *R, char *contents);
+elAPI elString *elf_new_lstring(elState *R, elInteger length);
+elAPI elString *elf_new_string(elState *R, const char *text);
+
+elAPI int elf_str_get_length(elString *);
+elAPI elHashId elf_str_get_hash(elString *);
+elAPI char *elf_str_get_text(elString *);
 
 
-int elf_libS_length(elState *R);
-int elf_libS_match(elState *R);
-int elf_libS_pop(elState *R);
-int elf_libS_append(elState *R);
-int elf_libS_append_char(elState *R);
-int elf_libS_get_hash(elState *R);
-int elf_libS_uppercase(elState *R);
-int elf_libS_lowercase(elState *R);
-int elf_libS_split_by_lines(elState *R);
-int elf_libS_get_index(elState *R);
-int elf_libS_find(elState *R);
-int elf_libS_split(elState *R);
+elBool elf_string_eq(elString *x, elString *y);
 
 
-elGLOBAL elBinding elf_libS_[] = {
-	{"length",elf_libS_length},
-	{"match",elf_libS_match},
-	{"uppercase",elf_libS_uppercase},
-	{"lowercase",elf_libS_lowercase},
-	{"__add",elf_libS_append},
-	{"__add1",elf_libS_append},
-	{"append",elf_libS_append},
-	{"append_char",elf_libS_append_char},
-	{"pop",elf_libS_pop},
-	{"get_hash",elf_libS_get_hash},
-	{"split_by_lines",elf_libS_split_by_lines},
-	{"idx",elf_libS_get_index},
-	{"find",elf_libS_find},
-};
-
-
+elAPI int elf_slib_length(elState *R);
+elAPI int elf_slib_match(elState *R);
+elAPI int elf_slib_pop(elState *R);
+elAPI int elf_slib_append(elState *R);
+elAPI int elf_slib_append_char(elState *R);
+elAPI int elf_slib_get_hash(elState *R);
+elAPI int elf_slib_uppercase(elState *R);
+elAPI int elf_slib_lowercase(elState *R);
+elAPI int elf_slib_split_by_lines(elState *R);
+elAPI int elf_slib_get_index(elState *R);
+elAPI int elf_slib_find(elState *R);
+elAPI int elf_slib_split(elState *R);
 
