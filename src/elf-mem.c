@@ -6,57 +6,57 @@
 
 
 
-void *elf_clear_memory(void *target, elInteger length) {
+void *clear_memory(void *target, elf_Int length) {
 	memset(target,0,length);
 	return target;
 }
 
 
-void *elf_copy_memory(void *dst, void const *src, elInteger length) {
+void *copy_memory(void *dst, void const *src, elf_Int length) {
 	memcpy(dst,src,length);
 	return dst;
 }
 
 
-void elf_dealloc_(elAllocator fn, const void *memory, SourceInfo loca) {
-	elError error = fn(0,0,0,(void **)&memory,loca);
+void elf_dealloc_(elAllocator fn, const void *memory, DBGSource loca) {
+	elf_Error error = fn(0,0,0,0,(void **)&memory,loca);
 	ASSERT(PASSED(error));
 }
 
 
-void *elf_alloc_(elAllocator fn, elInteger length, SourceInfo loca) {
+void *elf_alloc_(elAllocator fn, elf_Int length, DBGSource loca) {
 	void *memory = 0;
-	elError error = fn(0,0,length,&memory,loca);
+	elf_Error error = fn(0,0,0,length,&memory,loca);
 	ASSERT(PASSED(error));
 	return memory;
 }
 
 
-void *elf_realloc_(elAllocator fn, elInteger length, void *memory, SourceInfo loca) {
-	elError error = fn(0,0,length,&memory,loca);
+void *elf_realloc_(elAllocator fn, elf_Int length, void *memory, DBGSource loca) {
+	elf_Error error = fn(0,0,0,length,&memory,loca);
 	ASSERT(PASSED(error));
 	return memory;
 }
 
 
-void *elf_calloc_(elAllocator fn, elInteger size, SourceInfo loca) {
-	return elf_clear_memory(elf_alloc_(fn,size,loca),size);
+void *elf_calloc_(elAllocator fn, elf_Int size, DBGSource loca) {
+	return clear_memory(elf_alloc_(fn,size,loca),size);
 }
 
 
-elError heap_allocfn(int flags, elInteger old_size, elInteger new_size, void **io, SourceInfo loca) {
-	if (io == 0) {
+ALLOCATOR_FN(heap_allocfn) {
+	if (memory==0) {
 		return Error_InvalidArguments;
 	}
 	if (new_size == 0) {
-		free(*io);
+		free(*memory);
 	} else {
-		if (*io == 0) {
-			*io = stb_leakcheck_malloc(new_size,loca.fileName,loca.lineNumber);
+		if (*memory == 0) {
+			*memory = stb_leakcheck_malloc(new_size,debug.fileName,debug.lineNumber);
 		} else {
-			*io = stb_leakcheck_realloc(*io,new_size,loca.fileName,loca.lineNumber);
+			*memory = stb_leakcheck_realloc(*memory,new_size,debug.fileName,debug.lineNumber);
 		}
-		if (*io == 0) {
+		if (*memory == 0) {
 			elf_debugger("fatal error: out of memory");
 			return Error_OutOfMemory;
 		}
@@ -65,32 +65,31 @@ elError heap_allocfn(int flags, elInteger old_size, elInteger new_size, void **i
 }
 
 
-elError tls_allocfn(int flags, elInteger old_size, elInteger new_size, void **io, SourceInfo loca) {
-	if (io == 0) {
+ALLOCATOR_FN(tls_allocfn) {
+	if (memory==0) {
 		return Error_InvalidArguments;
 	}
-	if (new_size == 0) {
+	if (new_size==0) {
 		return Error_InvalidArguments;
 	} else {
-		/* reallocation is not permitted */
-		if (*io != 0) {
+		if (*memory != 0) {
 			return Error_InvalidArguments;
 		}
 
 		// TODO:
-		elTHREAD char memory[0x10000];
-		elTHREAD char *cursor = 0;
-		if (cursor == 0) cursor = memory;
+		THREAD char buffer[0x10000];
+		THREAD char *cursor = 0;
+		if (cursor == 0) cursor = buffer;
 
-		if (new_size > sizeof(memory)) {
+		if (new_size > sizeof(buffer)) {
 			return Error_OutOfMemory;
 		}
 
-		if((cursor - memory) + new_size > sizeof(memory)) {
-			cursor = memory;
+		if((cursor - buffer) + new_size > sizeof(buffer)) {
+			cursor = buffer;
 		}
 
-		*io = cursor;
+		*memory = cursor;
 		cursor += new_size;
 	}
 	return Error_None;

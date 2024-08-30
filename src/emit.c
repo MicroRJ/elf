@@ -1,12 +1,12 @@
 /*
 ** See Copyright Notice In elf.h
 ** emit.c
-** Bytecode Generation
+** elf_Bytecode Generation
 */
 
 
 
-static Bytecode get_byte(FileState *fs, int instr) {
+static elf_Bytecode get_byte(FileState *fs, int instr) {
 	return fs->M->bytes[instr];
 }
 
@@ -26,18 +26,18 @@ static void set_mem_state(FileState *fs, int memory) {
 }
 
 
-static int emit_byte(FileState *fs, Source line, Bytecode byte) {
-	elModule *M=fs->M;
+static int emit_byte(FileState *fs, Source line, elf_Bytecode byte) {
+	elf_Module *M=fs->M;
 	ARRAY_ADD(M->lines,line);
 	ARRAY_ADD(M->bytes,byte);
 	ARRAY_ADD(M->track,0);
-	fpf_byte(stdout,M,-1,M->nbytes-fs->fn->bytes,byte);
+	// fpf_byte(stdout,M,-1,M->nbytes-fs->fn->bytes,byte);
 	return M->nbytes ++;
 }
 
 
 static int emit_bytex(FileState *fs, Source line, int k, int x) {
-	Bytecode byte=BC_XXX(k,x);
+	elf_Bytecode byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	return emit_byte(fs,line,byte);
@@ -45,7 +45,7 @@ static int emit_bytex(FileState *fs, Source line, int k, int x) {
 
 
 static int emit_bytexy(FileState *fs, Source line, int k, int x, int y) {
-	Bytecode byte=BC_XYY(k,x,y);
+	elf_Bytecode byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -54,7 +54,7 @@ static int emit_bytexy(FileState *fs, Source line, int k, int x, int y) {
 
 
 static int emit_bytexyz(FileState *fs, Source line, int k, int x, int y, int z) {
-	Bytecode byte=BC_XYZ(k,x,y,z);
+	elf_Bytecode byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -128,7 +128,7 @@ static int get_node_register(FileState *fs, NodeIdGuard id) {
 
 
 static void patch_jump2(FileState *fs, int src, int dst) {
-	Bytecode byte,*bytes;
+	elf_Bytecode byte,*bytes;
 	bytes=fs->M->bytes;
 	byte=bytes[src];
 	int j = dst - src;
@@ -170,14 +170,14 @@ static Instr emit_jump(FileState *fs, Source line, Instr j) {
 }
 
 
-int begin_block(FileState *fs, elBool flags) {
+int begin_block(FileState *fs, elf_Bool flags) {
 	int level = fs->nblocks ++;
 	if (ARRAY_LENGTH(fs->blocks) < fs->nblocks) {
 		ARRAY_GROW(fs->blocks,1);
 	}
 
 	FileBlock *bl = &fs->blocks[level];
-	elf_clear_memory(bl,sizeof(*bl));
+	clear_memory(bl,sizeof(*bl));
 
 	bl->loop.array_register = NO_SLOT;
 	bl->loop.index_register = NO_SLOT;
@@ -221,7 +221,7 @@ void close_block(FileState *fs) {
 }
 
 
-FileBlock *get_loop_block(FileState *fs, elRegId reg) {
+FileBlock *get_loop_block(FileState *fs, elf_StackId reg) {
 	int level;
 	for (level = fs->nblocks-1; level > -1; -- level) {
 		FileBlock *bl = get_block(fs,level);
@@ -251,7 +251,7 @@ void close_delay_block(FileState *fs, Source line) {
 }
 
 
-int emit_branch_if(FileState *fs, BooleanJumps *js, elBool if_true, NodeId id) {
+int emit_branch_if(FileState *fs, BooleanJumps *js, elf_Bool if_true, NodeId id) {
 	Node node;
 
 	node=get_node(fs,id);
@@ -320,7 +320,7 @@ int *emit_jump_if_not_nil(FileState *fs, Source line, BooleanJumps *js, NodeId i
 }
 
 
-int *elf_emitjumpifnil(FileState *fs, Source line, BooleanJumps *js, NodeId id) {
+int *emit_jump_if_nil(FileState *fs, Source line, BooleanJumps *js, NodeId id) {
 	return emit_jump_if_true(fs,js,node_xy(fs,line,NODE_EQ,NT_BOL,id,node_nil(fs,line)));
 }
 
@@ -339,7 +339,7 @@ void emit_continue(FileState *fs, Source line, int reg) {
 }
 
 
-void emit_break(FileState *fs, Source line, elRegId with_value_register) {
+void emit_break(FileState *fs, Source line, elf_StackId with_value_register) {
 	ASSERT(fs->nloops > 0);
 	Instr jmp;
 	FileBlock *bl;
@@ -369,7 +369,7 @@ void desugar_range_expr_epilogue(FileState *fs, NodeId x) {
 }
 
 
-NodeId desugar_range_expr(FileState *fs, NodeId x, elBool flags) {
+NodeId desugar_range_expr(FileState *fs, NodeId x, elf_Bool flags) {
 	Node node;
 	Source line;
 	NodeId xx;
@@ -387,11 +387,13 @@ NodeId desugar_range_expr(FileState *fs, NodeId x, elBool flags) {
 			line=node.line;
 			array=desugar_range_expr(fs,node.x,flags&~EXPR_LHS);
 
-			int block = begin_block(fs,BLOCK_LOOP);
-
 			int array_reg,index_reg,value_reg;
-			array_reg = emit_load(fs,array);
-			index_reg = reg_alloc(fs);
+			int block;
+
+			block=begin_block(fs,BLOCK_LOOP);
+
+			array_reg=emit_load(fs,array);
+			index_reg=reg_alloc(fs);
 
 			array = node_local(fs,line,array_reg);
 			index = node_local(fs,line,index_reg);
@@ -419,21 +421,25 @@ NodeId desugar_range_expr(FileState *fs, NodeId x, elBool flags) {
 
 
 void emit_field_initer(FileState *fs, Source line, int reg, NodeId id) {
-	int mem = get_mem_state(fs);
-	Node node = get_node(fs,id);
+	Node node;
+	int mem,xx,xy,yy;
+
+	node=get_node(fs,id);
+	mem=get_mem_state(fs);
 	switch (node.k) {
 		case NODE_STORE: {
 			Node x = get_node(fs,node.x);
 			if ((x.kind == NODE_LOCAL)) {
 				NO_CODE;
 			} else if ((x.kind == NODE_FIELD) || (x.k == NODE_INDEX)) {
-				// elRegId xx = emit_load(fs,x.x);
-				elRegId xx = reg;
-				elRegId xy = emit_load(fs,x.y);
-				elRegId yy = emit_load(fs,node.y);
-				if (x.k == NODE_FIELD) {
+				xx=reg;
+				xy=emit_load(fs,x.y);
+				yy=emit_load(fs,node.y);
+				if (x.kind==NODE_FIELD) {
 					emit_bytexyz(fs,line,BC_SETFIELD,xx,xy,yy);
-				} else emit_bytexyz(fs,line,BC_SETINDEX,xx,xy,yy);
+				} else {
+					emit_bytexyz(fs,line,BC_SETINDEX,xx,xy,yy);
+				}
 			} else NO_CODE;
 		} break;
 		default: NO_CODE;
@@ -459,7 +465,7 @@ static int find_local_const_store(FileState *fs, int reg) {
 	if (fs->nloops > 0) {
 		return -1;
 	}
-	Bytecode byte, *bytes;
+	elf_Bytecode byte, *bytes;
 	int nbytes;
 
 	bytes=fs->M->bytes;
@@ -497,8 +503,14 @@ void opt_const_fold(FileState *fs, Node node) {
 }
 
 
+/* if no register is given, a new one is allocated,
+registers are allocated in depth first order, which
+results in minimal register usage.
+This function will always allocate a new register,
+even if the node is a local, in which case it will
+emit a reload instruction. */
 int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
-	elModule *M;
+	elf_Module *M;
 	Node node;
 	Source line;
 	int mem, rx,ry;
@@ -560,7 +572,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			if (reg<0) reg=reg_alloc(fs);
 
 			/* todo: interning */
-			int xx = elf_gset(M,0,elSTR(elf_new_string(fs->R,node.lit.s)));
+			int xx = elf_gset(M,0,elSTR(elf_alloc_string(fs->R,node.lit.s)));
 			emit_bytexy(fs,line,BC_GETGLOBAL,reg,xx);
 		} break;
 		case NODE_TABLE: {
@@ -572,14 +584,15 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 				emit_field_initer(fs,line,reg,node.z[i]);
 			}
 		} break;
-		case NODE_METAFIELD: case NODE_FIELD: case NODE_INDEX: {
+		case NODE_METAFIELD:
+		case NODE_FIELD: case NODE_INDEX: {
 			if (nreg<1) goto esc;
 			mem=get_mem_state(fs); {
 				rx=emit_load(fs,node.x);
 				ry=emit_load(fs,node.y);
 			} set_mem_state(fs,mem);
 			if (reg<0) reg=reg_alloc(fs);
-			emit_bytexyz(fs,line,node2byte(node.k),reg,rx,ry);
+			emit_bytexyz(fs,line,node2byte(node.kind),reg,rx,ry);
 		} break;
 		case NODE_CLOSURE: {
 			if (nreg<1) goto esc;
@@ -615,7 +628,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 
 			mem=get_mem_state(fs); {
 				ASSERT(reg<mem);
-				if ((xx.k == NODE_FIELD) || (xx.k == NODE_METAFIELD)) {
+				if ((xx.k==NODE_FIELD)||(xx.k==NODE_METAFIELD)) {
 					ry=emit_eval(fs,0,-1,1,xx.y);
 					rx=emit_eval(fs,0,-1,1,xx.x);
 					emit_bytexyz(fs,line,node2byte(xx.k),ry,rx,ry);
@@ -628,8 +641,6 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 				FOR_ARRAY(i,node.z) {
 					emit_eval(fs,0,-1,1,node.z[i]);
 				}
-				/* +2 the closure and object */
-				ASSERT(ARRAY_LENGTH(node.z)+2==(get_mem_state(fs)-mem));
 			} set_mem_state(fs,mem);
 
 			nargs=ARRAY_LENGTH(node.z)+1;
@@ -643,19 +654,20 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 		} break;
 		/* (a !! b) = (a == nil ? a : b) */
 		case NODE_NIL_AND: {
+			BooleanJumps e = {0};
 			Instr *js;
-			BooleanJumps _ = {0};
+
 			if (reg<0)reg=reg_alloc(fs);
 			emit_eval(fs,0,reg,1,node.x);
-			js=elf_emitjumpifnil(fs,NO_LINE,&_,node_local(fs,NO_LINE,reg));
+			js=emit_jump_if_nil(fs,NO_LINE,&e,node_local(fs,NO_LINE,reg));
 			emit_eval(fs,0,reg,1,node.y);
 			patch_jumps(fs,js);
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_NIL_OR: {
 			BooleanJumps e={0};
-
 			Instr *js;
+
 			if (reg<0)reg=reg_alloc(fs);
 			emit_eval(fs,0,reg,1,node.x);
 			js=emit_jump_if_not_nil(fs,NO_LINE,&e,node_local(fs,get_node_line(fs,node.x),reg));
@@ -664,8 +676,9 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			ARRAY_DELETE(js);
 		} break;
 		case NODE_AND: case NODE_OR: {
-			Instr *js;
 			BooleanJumps e={0};
+			Instr *js;
+
 			if (reg<0)reg=reg_alloc(fs);
 			emit_eval(fs,0,reg,1,node_integer(fs,line,0));
 			js=emit_jump_if_false(fs,&e,id);
@@ -680,7 +693,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 		case NODE_BIT_SHL: case NODE_BIT_SHR:
 		case NODE_BIT_XOR:
 		case NODE_BIT_AND: case NODE_BIT_OR: {
-			if ((node.k==NODE_GT) || (node.k==NODE_GTEQ)) {
+			if ((node.kind==NODE_GT)||(node.kind==NODE_GTEQ)) {
 				mem=get_mem_state(fs); {
 					rx=emit_load(fs,node.y);
 					ry=emit_load(fs,node.x);
@@ -708,9 +721,50 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 }
 
 
+/*
+Emits auxilary code for a particular compound expression.
+
+More specifically, it loads the dependencies of said
+expression into a register, and then returns a new node
+which points to the register where the dependencies
+where evaluated.
+
+For instance, the expression:
+a.b.c.d ?= 1 ::= (if a.b.c.d nil ? a.b.c.d = 1)
+
+Which uses emits a bunch of loads and stores, gets
+translated to:
+
+tmp=a.b.c
+if tmp.d nil ? tmp.d=1
+
+*/
+NodeId emit_preload(FileState *fs, NodeId x) {
+	ASSERT(x>=0);
+
+	Node   node;
+	int     reg;
+
+	node=get_target_node(fs,NODE(x));
+
+	switch (node.kind) {
+		case NODE_FIELD: {
+			reg=emit_load(fs,node.x);
+			x=node_field(fs,node.line,node_local(fs,node.line,reg),node.y);
+		} break;
+		case NODE_INDEX: {
+			reg=emit_load(fs,node.x);
+			x=node_index(fs,node.line,node_local(fs,node.line,reg),node.y);
+		} break;
+		default:;
+	}
+
+	return x;
+}
+
+
 void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 	Node node;
-
 	node=get_target_node(fs,NODE(x));
 	if (y<0) {
 		file_dialog(fs,line,"invalid statement, expected a value for assignment");
@@ -735,12 +789,8 @@ void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 	ASSERT(node.level<fs->nblocks);
 	ASSERT(x>=0);
 	ASSERT(y>=0);
-
 	if (node.line!=0) line=node.line;
 
-	int mem;
-
-	mem=get_mem_state(fs);
 	int rx,ry,rz;
 
 	rx=node.x;
@@ -754,9 +804,9 @@ void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 		} break;
 		ByteOP op;
 		case NODE_INDEX: case NODE_FIELD: {
+			rz=emit_load(fs,y);
 			rx=emit_load(fs,node.x);
 			ry=emit_load(fs,node.y);
-			rz=emit_load(fs,y);
 			op=node.kind==NODE_INDEX?BC_SETINDEX:BC_SETFIELD;
 			emit_bytexyz(fs,line,op,rx,ry,rz);
 		} break;
@@ -770,8 +820,6 @@ void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 			NO_CODE;
 		} break;
 	}
-
-	set_mem_state(fs,mem);
 }
 
 
@@ -938,7 +986,7 @@ void begin_range_loop(FileState *fs, Source line, NodeId index_node, NodeId lo, 
 
 	ASSERT(index_node != NO_NODE);
 
-	elRegId index_register = emit_load(fs,index_node);
+	elf_StackId index_register = emit_load(fs,index_node);
 	index_node = node_local(fs,line,index_register);
 
 	bl->loop.index_register = index_register;
@@ -947,7 +995,7 @@ void begin_range_loop(FileState *fs, Source line, NodeId index_node, NodeId lo, 
 
 	bl->loop.entry = get_instr_cursor(fs);
 
-	elRegId hi_register = emit_load(fs,node_type_guard(fs,get_node_line(fs,hi),hi,NT_INT));
+	elf_StackId hi_register = emit_load(fs,node_type_guard(fs,get_node_line(fs,hi),hi,NT_INT));
 	hi = node_local(fs,line,hi_register);
 	NodeId c = node_less_than(fs,line,index_node,hi);
 

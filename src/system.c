@@ -67,7 +67,7 @@ I want to use instead! */
 
 
 
-elBool sys_debugger() {
+elf_Bool sys_debugger() {
 #if defined(PLATFORM_DESKTOP)
 	// fclose(_logging_io);
 	DebugBreak();
@@ -94,7 +94,7 @@ void sys_console_print(int type, char *message) {
 			type = EM_LOG_ERROR;
 		} break;
 		case LOG_KWARNING: {
-		 	type = EM_LOG_WARN;
+			type = EM_LOG_WARN;
 		} break;
 	}
 	emscripten_log(type,message);
@@ -119,7 +119,7 @@ void sys_get_error_msg(int error, char *buf, int len) {
 }
 
 
-void *sys_valloc(elInteger length) {
+void *sys_valloc(elf_Int length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
@@ -128,7 +128,7 @@ void *sys_valloc(elInteger length) {
 }
 
 
-void sys_sleep(elInteger ms) {
+void sys_sleep(elf_Int ms) {
 #if defined(PLATFORMPLATFORM_WIN32)
 	Sleep((DWORD) ms);
 #elif defined(PLATFORM_WEB)
@@ -137,7 +137,7 @@ void sys_sleep(elInteger ms) {
 }
 
 
-elInteger sys_get_clock_freq() {
+elf_Int sys_get_clock_freq() {
 #if defined(PLATFORM_WEB)
 	return 1000;
 #elif defined(PLATFORM_DESKTOP)
@@ -150,7 +150,7 @@ elInteger sys_get_clock_freq() {
 }
 
 
-elInteger sys_get_clock_time() {
+elf_Int sys_get_clock_time() {
 #if defined(PLATFORM_DESKTOP)
 	LARGE_INTEGER large_integer;
 	QueryPerformanceCounter(&large_integer);
@@ -199,15 +199,15 @@ int sys_set_work_dir(char *buffer) {
 }
 
 
-elHandle sys_load_dll(char const *name) {
+elf_Handle sys_load_dll(char const *name) {
 #if defined(PLATFORM_DESKTOP)
-	return (elHandle) LoadLibraryA(name);
+	return (elf_Handle) LoadLibraryA(name);
 #elif defined(PLATFORM_WEB)
 	#if 0
 	em_promise_t promise = emscripten_dlopen_promise(name,RTLD_LAZY);
 	em_settled_result_t result = emscripten_promise_await(promise);
 	emscripten_promise_destroy(promise);
-	return (elHandle) result.value;
+	return (elf_Handle) result.value;
 	#endif
 	return 0;
 #else
@@ -217,12 +217,12 @@ elHandle sys_load_dll(char const *name) {
 		sys_console_print(LOG_KERROR,dlerror());
 		sys_console_print(LOG_KERROR,"end");
 	}
-	return (elHandle) handle;
+	return (elf_Handle) handle;
 #endif
 }
 
 
-void *sys_get_dll_fn(elHandle dll, char const *name) {
+void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 #if defined(PLATFORM_DESKTOP)
 	return (void *) GetProcAddress(dll,name);
 #else
@@ -231,9 +231,9 @@ void *sys_get_dll_fn(elHandle dll, char const *name) {
 }
 
 
-elError sys_load_file_data(elAllocator fn, void **data, char const *name) {
+elf_Error sys_load_file_data(elAllocator fn, void **data, char const *name) {
 
-	elError error = Error_None;
+	elf_Error error = Error_None;
 
 	if (name == 0) {
 		error = Error_FileNameIsInvalid;
@@ -298,7 +298,7 @@ elError sys_load_file_data(elAllocator fn, void **data, char const *name) {
 }
 
 
-elError sys_save_file_data(char const *buffer, elInteger length, char const *fileName) {
+elf_Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");
@@ -310,8 +310,8 @@ elError sys_save_file_data(char const *buffer, elInteger length, char const *fil
 		return Error_CouldNotOpenFile;
 	}
 
-	elError error = Error_None;
-	elInteger lengthWritten = fwrite(buffer, 1, length, file);
+	elf_Error error = Error_None;
+	elf_Int lengthWritten = fwrite(buffer, 1, length, file);
 
 	if (lengthWritten != length) {
 		error = Error_CouldNotWriteEntireFile;
@@ -342,3 +342,46 @@ int sys_exec(char const *file, char const *args) {
 #endif
 	return -1;
 }
+
+
+static int issymlink(char const *fn) {
+	while (*fn == '.') ++ fn;
+	return *fn == 0;
+}
+
+
+#if defined(_WIN32)
+static int sys_enumerate_folder(elAllocator alloc, char const *folder, void *user, enumerate_folder_callback callback) {
+	HANDLE handle;
+	WIN32_FIND_DATAA data;
+	int flags;
+	char *name,*path;
+
+	handle=FindFirstFileA(elf_tpf("%s\\*",folder),&data);
+	if (handle!=INVALID_HANDLE_VALUE) do {
+		if (issymlink(data.cFileName)) continue;
+
+		name=data.cFileName;
+		flags=data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY;
+		path=elf_xpf(alloc,"%s\\%s",folder,data.cFileName);
+		callback(user,flags,name,path);
+
+		// elf_Value *top = GET_TOP(R);
+		// elf_Table *file = elf_put_new_table(R);
+		// elf_tsets_str(file,elf_new_string(R,"name"),name);
+		// elf_tsets_str(file,elf_new_string(R,"path"),path);
+		// elf_tsets_int(file,elf_new_string(R,"is_directory"),is_directory);
+		// elf_tsets_int(file,elf_new_string(R,"size"),f.nFileSizeLow);
+		// elf_put_closure(R,cls);
+		// int results = 0; NO_CODE; // elf_call_function(R,base,1,1);
+		// if (is_directory) {
+		// 	if ((results > 0) && elf_get_integer(R,base) != 0) {
+		// 		core_lib_enumerate_folder_(R,path,cls);
+		// 	}
+		// }
+		// SET_TOP(R,top);
+	} while (FindNextFileA(handle,&data));
+	return 0;
+}
+#else
+#endif

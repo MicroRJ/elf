@@ -34,7 +34,7 @@ static int begin_file_state(FileState *fs, char *filename, char *filetext) {
 }
 
 
-static elBool check_expr(FileState *fs, Source line, NodeId id) {
+static elf_Bool check_expr(FileState *fs, Source line, NodeId id) {
 	if (id != NO_NODE) return 0;
 	file_dialog(fs,line,"invalid expression");
 	return 1;
@@ -43,34 +43,34 @@ static elBool check_expr(FileState *fs, Source line, NodeId id) {
 
 /* test the current token if on the same line as the previous
 token */
-static elBool test_token_inline(FileState *fs, elTokenType k) {
+static elf_Bool test_token_inline(FileState *fs, elTokenType k) {
 	return fs->this_token.type == k && fs->last_token.eol != 1;
 }
 
 
-static elBool test_token(FileState *fs, elTokenType k) {
+static elf_Bool test_token(FileState *fs, elTokenType k) {
 	return fs->this_token.type == k;
 }
 
 
 /* whether there are no more tokens or whether the
 current token is a match. */
-static elBool term_token(FileState *fs, elTokenType k) {
+static elf_Bool term_token(FileState *fs, elTokenType k) {
 	return fs->this_token.type == TK_NONE || fs->this_token.type == k;
 }
 
 
-static elBool term_eol_token(FileState *fs) {
+static elf_Bool term_eol_token(FileState *fs) {
 	return fs->this_token.type == TK_NONE || fs->last_token.eol == 1;
 }
 
 
-static elBool pick_token(FileState *fs, elTokenType k) {
+static elf_Bool pick_token(FileState *fs, elTokenType k) {
 	return test_token(fs,k) && (poll_token(fs), 1);
 }
 
 
-static elBool pick_token_inline(FileState *fs, elTokenType k) {
+static elf_Bool pick_token_inline(FileState *fs, elTokenType k) {
 	return test_token_inline(fs,k) && (poll_token(fs), 1);
 }
 
@@ -133,7 +133,7 @@ static int find_local_entity(FileState *fs, int args) {
 
 /* finds the last declared entity with the given
 name. the id is absolute. */
-static EntityId get_entity(FileState *fs, Source line, char *name, elBool enclose) {
+static EntityId get_entity(FileState *fs, char *name, elf_Bool enclose) {
 	FileFunction *fn = fs->fn;
 	/* we're using a linear search method here, but I can guarantee
 	that this is actually fast enough, introducing table will not
@@ -152,26 +152,27 @@ static EntityId get_entity(FileState *fs, Source line, char *name, elBool enclos
 }
 
 
-/* register a local entity within the current function and level,
-if it shadows or redeclared some other entity, issue warnings,
-a valid entity id is always returned regardless.  */
+/* register a local entity within the current function and level. */
 static NodeId new_entity(FileState *fs, Source line, int flags, char *name, int args) {
-	FileFunction *fn = fs->fn;
+	FileFunction *fn;
 	EntityId already;
 	FileEntity entity;
 
-	already = get_entity(fs,line,name,0);
-	if (already != NO_ENTITY) {
-		entity = fs->entities[already];
-		if (entity.kind == ENTITY_DIRECTORY)  {
+	fn=fs->fn;
+
+	already=get_entity(fs,name,0);
+	if (already!=NO_ENTITY) {
+		entity=fs->entities[already];
+		if (entity.kind==ENTITY_DIRECTORY)  {
 			file_dialog(fs,line,"'%s': name is reserved for symbol directory",name);
 		}
-		if (entity.level == fs->nblocks) {
-			file_dialog(fs,line,"'%s': is already declared",name);
+		if (entity.level==fs->nblocks) {
+			/* reassignment */
+			// file_dialog(fs,line,"'%s': is already declared",name);
 		} else {
 			/* only issue this warning if the entity we found
 			is within this function... */
-			if (already >= fn->entities) {
+			if (already>=fn->entities) {
 				file_dialog(fs,line,"'%s': this declaration shadows another one",name);
 			}
 		}
@@ -191,7 +192,7 @@ static NodeId new_entity(FileState *fs, Source line, int flags, char *name, int 
 
 
 static NodeId find_name(FileState *F, Source line, int flags, char *name) {
-	EntityId id = get_entity(F,line,name,1);
+	EntityId id = get_entity(F,name,1);
 	if (id != NO_ENTITY) {
 		if (flags) {
 			if (~F->entities[id].flags & ENTITY_ASSIGNED) {
@@ -405,7 +406,7 @@ NodeId parse_function(FileState *fs) {
 
 	/* create a new prototype and add this function
 	to the list of prototypes */
-	elFunction fp = {0};
+	elf_Function fp = {0};
 	/* todo: implement this */
 	// fp.parent  = fn.enclosing
 	fp.arity	  = arity;
@@ -430,46 +431,42 @@ NodeId parse_function(FileState *fs) {
 }
 
 
-void parse_assign(FileState *fs, NodeId lvalue) {
-	if (lvalue == NO_NODE) {
+void parse_assign(FileState *fs, NodeId lexpr) {
+	if (lexpr==NO_NODE) {
 		return;
 	}
 
-	FileToken tk = fs->tk;
-	int mem = get_mem_state(fs);
-
-	Node node = get_node(fs,lvalue);
-	Source line = node.line;
-
 	NodeId x,y;
+	int mem;
+	FileToken tk,op;
 
-	x=desugar_range_expr(fs,lvalue,0);
+	tk=fs->tk;
+	mem=get_mem_state(fs);
+	x=desugar_range_expr(fs,lexpr,0);
+	x=emit_preload(fs,x);
 	if (pick_token(fs,TK_ASSIGN)) {
 		y=parse_expr(fs,0,0);
 		emit_store(fs,tk.line,x,y);
 	} else if (pick_token(fs,TK_NIL_ASSIGN)) {
 		BooleanJumps js = {0};
-		/* todo: todo could we optimize this... */
 		y=parse_expr(fs,0,0);
 		emit_jump_if_not_nil(fs,tk.line,&js,x);
 		emit_store(fs,tk.line,x,y);
 		patch_jumps(fs,js.f);
 	} else {
 		if (get_token_prec(tk.type) > 0) {
-			x=desugar_range_expr(fs,lvalue,0);
-			FileToken op = poll_token(fs);
+			op=poll_token(fs);
 			take_token(fs,TK_ASSIGN);
 			/* todo: optimization! */
 			y=parse_expr(fs,0,0);
 			y=node_xy(fs,op.line,tok2node(op.type),get_node_type(fs,x),x,y);
 			emit_store(fs,op.line,x,y);
 		} else {
-			emit_eval(fs,0,-1,0,lvalue);
+			emit_eval(fs,0,-1,0,lexpr);
 		}
-		set_mem_state(fs,mem);
 	}
-	desugar_range_expr_epilogue(fs,lvalue);
-	ASSERT(get_mem_state(fs) == mem);
+	desugar_range_expr_epilogue(fs,lexpr);
+	set_mem_state(fs,mem);
 }
 
 
@@ -515,9 +512,8 @@ NodeId parse_table(FileState *fs) {
 }
 
 
-NodeId parse_expr(FileState *F, BooleanJumps *expr, int flags) {
-	/* todo: I think it's easier to check whether the token is an expression */
-	switch (F->this_token.type) {
+NodeId parse_expr(FileState *fs, BooleanJumps *expr, int flags) {
+	switch (fs->this_token.type) {
 		case TK_NONE:
 		case TK_FOR: case TK_WHILE: case TK_LASTLY:
 		case TK_COMMA:
@@ -525,14 +521,14 @@ NodeId parse_expr(FileState *F, BooleanJumps *expr, int flags) {
 			return NO_NODE;
 		}
 	}
-	return parse_subexpr(F,expr,0,flags);
+	return parse_subexpr(fs,expr,0,flags);
 }
 
 
 /* todo: add support for:
 specifing which for loop you're reffering to. */
 #if 0
-elRegId target_value_register = NO_SLOT;
+elf_StackId target_value_register = NO_SLOT;
 if (!term_eol_token(fs)) {
 	NodeId value = parse_expr(fs,0);
 	if (value != NO_NODE) {
@@ -545,22 +541,26 @@ if (!term_eol_token(fs)) {
 #endif
 
 
-NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags) {
+NodeId parse_unary(FileState *fs, BooleanJumps *expr, elf_Bool flags) {
 	NodeId v = NO_NODE;
 	FileToken tk = fs->this_token;
 	NodeId x;
 	switch (tk.type) {
 		case TK_M_INDEX: case TK_M_ARRAY: case TK_M_VALUE: {
 			poll_token(fs);
-			elRegId reg =
-			tk.type == TK_M_ARRAY ? SPECIAL_REGISTER_ARRAY :
-			tk.type == TK_M_VALUE ? SPECIAL_REGISTER_VALUE : SPECIAL_REGISTER_INDEX;
-			v = node_local(fs,tk.line,reg);
+			int reg;
+
+			if (tk.type==TK_M_ARRAY) reg=SPECIAL_REGISTER_ARRAY; else
+			if (tk.type==TK_M_VALUE) reg=SPECIAL_REGISTER_VALUE; else reg=SPECIAL_REGISTER_INDEX;
+
+			v=node_local(fs,tk.line,reg);
 		} break;
 		/* todo: make this an intrinsic instruction! */
-		case TK_M_INT: case TK_M_NUM: { poll_token(fs);
+		case TK_M_INT: case TK_M_NUM: {
 			char *name;
 			NodeId fn, *z=0;
+
+			poll_token(fs);
 			x=parse_unary(fs,0,flags|EXPR_ALLOW_POSTFIX);
 			name=tk.type==TK_M_INT?"ntoi":"iton";
 			fn=node_global_name(fs,tk.line,name);
@@ -570,9 +570,9 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags) {
 		case TK_M_REGISTER: {
 			poll_token(fs);
 			tk=take_token(fs,TK_WORD);
-			x=get_entity(fs,tk.line,tk.text,0);
+			x=get_entity(fs,tk.text,0);
 			if (x!=NO_ENTITY) {
-				x=node_integer(fs,tk.line,fs->entities[x].args);
+				v=node_integer(fs,tk.line,fs->entities[x].args);
 			} else file_dialog(fs,tk.line,"'%s': invalid entity (must be a local)",tk.text);
 		} break;
 		//
@@ -624,7 +624,7 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags) {
 		of whatever expression. */
 		case TK_DOT_DOT: {
 			poll_token(fs);
-			v = node_xy(fs,tk.line,NODE_RANGE,NT_ANY,NO_NODE,NO_NODE);
+			v=node_xy(fs,tk.line,NODE_RANGE,NT_ANY,NO_NODE,NO_NODE);
 		} break;
 		/* todo: this is temporary */
 		case TK_DOT: case TK_ELF: {
@@ -644,7 +644,7 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags) {
 				strcat(dir,fs->last_token.text);
 			} while (pick_token_inline(fs,TK_DOT));
 			int x;
-			x=elf_get_global_symbol(fs->M,elf_new_string(fs->R,dir));
+			x=elf_get_global_symbol(fs->M,elf_alloc_string(fs->R,dir));
 			v=node_global(fs,tk.line,x);
 		} break;
 		case TK_WORD: {
@@ -742,26 +742,26 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags) {
 				}
 			} break;
 			/* todo: make this nil safe, so [0,0] shouldn't
-			fail if item at 0 is nil, should this be done
-			here or at code generation?  */
+			fail if item at 0 is nil  */
 			case TK_SQUARE_LEFT: {
 				take_token(fs,TK_SQUARE_LEFT);
+				NodeId *z;
+				NodeId index;
 				do {
-					BooleanJumps expr = {0};
-					NodeId index = parse_expr(fs,&expr,0);
-
-					if (index == NO_NODE) break;
+					index=parse_expr(fs,0,0);
+					if (index==NO_NODE) break;
 					/* registry[location.(y,x)] ->
 					registry[location.y,location.x] */
-					if (get_node_kind(fs,index) == NODE_MULTI) {
-						NodeId *z = get_node(fs,index).z;
+					if (get_node_kind(fs,index)==NODE_MULTI) {
+						z=get_node(fs,index).z;
 						FOR_ARRAY(i,z) {
-							v = node_index(fs,tk.line,v,z[i]);
+							v=node_index(fs,tk.line,v,z[i]);
 						}
-					} else
-					if (get_node_kind(fs,index) == NODE_RANGE) {
-						v = node_ranged_index(fs,tk.line,v,index);
-					} else v = node_index(fs,tk.line,v,index);
+					} else if (get_node_kind(fs,index)==NODE_RANGE) {
+						v=node_ranged_index(fs,tk.line,v,index);
+					} else {
+						v=node_index(fs,tk.line,v,index);
+					}
 
 					/* todo: this is silly, this is just an
 					inner multi expressions, make multi
@@ -781,8 +781,8 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags) {
 			} break;
 			case TK_CURLY_LEFT:
 			case TK_PAREN_LEFT: {
-				NodeId *z = parse_call_args(fs);
-				v = node_call(fs,tk.line,v,z);
+				NodeId *z=parse_call_args(fs);
+				v=node_call(fs,tk.line,v,z);
 			} break;
 			default: goto esc;
 		}
@@ -798,7 +798,6 @@ int parse_stat(FileState *fs) {
 	FileToken tk;
 	FileBlock *bl;
 	NodeId x;
-
 
 	bl=get_block(fs,-1);
 	mem=get_mem_state(fs);
@@ -940,16 +939,31 @@ int parse_stat(FileState *fs) {
 			parse_for_loop(fs);
 		} break;
 		default: {
-			NodeId x;
+			#if 0
+			EntityId entity;
+			int reg;
+			if (fs->nblocks>1 && fs->then_token.type==TK_ASSIGN){
+				poll_token(fs);
+				entity=get_entity(fs,tk.text,0);
+				if (entity==-1){
+					file_dialog(fs,tk.line,"new implicit entity: %s", tk.text);
+					reg=reg_alloc(fs);
+					entity=new_entity(fs,tk.line,0,tk.text,reg);
+				} else {
+					reg=fs->entities[entity].args;
+				}
+				x=node_local(fs,tk.line,reg);
+			} else {
+				x=parse_expr(fs,0,0);
+			}
+#endif
 			x=parse_expr(fs,0,0);
-			parse_assign(fs,x);
 			if (x==NO_NODE) {
 				file_dialog(fs,tk.line,"invalid statement");
 			}
-			ASSERT(get_mem_state(fs)==mem);
+			parse_assign(fs,x);
 		} break;
 	}
-	// ASSERT(fs->nnodes==0);
 	return 1;
 }
 

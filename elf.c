@@ -12,8 +12,8 @@
 
 
 #if defined(__EMSCRIPTEN__)
-	#include <emscripten.h>
-	#include <unistd.h>
+   #include <emscripten.h>
+   #include <unistd.h>
 #endif
 
 
@@ -50,51 +50,57 @@ at the same time when using clang-cl */
 /* Configuration Macros (mostly temporary)
 */
 
-#define elGC_MEM_THRESHOLD_MIN (elInteger) MEGABYTES(1)
-#define elGC_MEM_THRESHOLD_MAX (elInteger) MEGABYTES(1024)
+#define elGC_MEM_THRESHOLD_MIN (elf_Int) MEGABYTES(1)
+#define elGC_MEM_THRESHOLD_MAX (elf_Int) MEGABYTES(1024)
 
-#define elGC_OBJ_THRESHOLD_MIN (elInteger) ((1024)*2)
-#define elGC_OBJ_THRESHOLD_MAX (elInteger) ((2048)*4)
+#define elGC_OBJ_THRESHOLD_MIN (elf_Int) ((1024)*2)
+#define elGC_OBJ_THRESHOLD_MAX (elf_Int) ((2048)*4)
 
 
 #define elDEFAULT_STACK_SIZE 4096
 
 
-#ifndef STB_SPRINTF_IMPLEMENTATION
-#define STB_SPRINTF_IMPLEMENTATION
-#define STB_SPRINTF_STATIC
-	#include "stb/stb_sprintf.h"
+#if defined(__EMSCRIPTEN__)
+   #define THREAD static
+   #define GLOBAL static
+#else
+   #define THREAD static __declspec(thread)
+   #define GLOBAL static
 #endif
-#ifndef STB_LEAKCHECK_IMPLEMENTATION
-#define STB_LEAKCHECK_IMPLEMENTATION
-	#include "stb/stb_leakcheck.h"
-#endif
-
-#include "elf.h"
 
 
 /* few utility macros */
 #if !defined(MAX)
-	#define MAX(x,y) ((x) > (y) ? (x) : (y))
+   #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #endif
 #if !defined(MIN)
-	#define MIN(x,y) ((x) < (y) ? (x) : (y))
+   #define MIN(x,y) ((x) < (y) ? (x) : (y))
 #endif
 
 #if !defined(WITHIN)
-	#define WITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
+   #define WITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
 #endif
 
 #if !defined(MEGABYTES)
-	#define MEGABYTES(x) ((x)*1024LLU*1024LLU)
+   #define MEGABYTES(x) ((x)*1024LLU*1024LLU)
 #endif
 #if !defined(GIGABYTES)
-	#define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
+   #define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
 #endif
 #if !defined(MAX_PATH)
-	#define MAX_PATH 0xff
+   #define MAX_PATH 0xff
 #endif
 
+
+#define STB_SPRINTF_IMPLEMENTATION
+#define STB_SPRINTF_STATIC
+#include "stb/stb_sprintf.h"
+
+#define STB_LEAKCHECK_IMPLEMENTATION
+#include "stb/stb_leakcheck.h"
+
+
+#include "elf.h"
 
 #include "src/error.h"
 #include "src/debug.h"
@@ -109,105 +115,104 @@ at the same time when using clang-cl */
 typedef int Instr;
 
 
+typedef struct elf_Closure {
+   elf_Object       obj;
+   elf_Shell     *state;
+   elf_Function   proto;
+   elf_Value  values[1];
+} elf_Closure;
+
+
+
+typedef struct delaylist delaylist;
+typedef struct delaylist {
+   delaylist *n;
+   Instr j;
+} delaylist;
+
+
+typedef struct elf_StackFrame elf_StackFrame;
+typedef struct elf_StackFrame {
+   elf_StackFrame    *caller;
+   elf_Closure      *closure;
+   elf_Value         *locals;
+   int               nlocals;
+   char                nargs;
+   char                nregs;
+   int                origin;
+   delaylist    * delay_list;
+   elf_Bool            logging;
+} elf_StackFrame;
+
+
+#define elf_GC_PHASE_MARK elf_GC_WHITE
+#define elf_GC_PHASE_FREE elf_GC_BLACK
+
+
+typedef struct elf_Collector {
+   elf_Bool       paused;
+   int          phase;
+   elf_Int      memory_allocated;
+   elf_Int      memory_threshold;
+   elf_Object **new_objects;
+   elf_Object **objects;
+   /* this changes dynamically based on
+   object min threshold, it tends to
+   be around there... */
+   elf_Int      object_trigger_threshold;
+} elf_Collector;
+
+
 /* symbols are mapped at load time, so the code generator
 references globals by index... */
-typedef struct elModule {
-	elTable *globals;
-	int *track;
-	Bytecode *bytes;
-	Instr nbytes;
-	char **lines;
-	elFunction *files;
-	elTable *strings;
-	elNumber *numbers;
-	elInteger *integers;
-	elFunction *functions;
-} elModule;
+typedef struct elf_Module {
+   elf_Table      *globals;
+   int              *track;
+   elf_Bytecode     *bytes;
+   Instr            nbytes;
+   Source           *lines;
+   elf_Function     *files;
+   elf_Table      *strings;
+   elf_Num        *numbers;
+   elf_Int       *integers;
+   elf_Function *functions;
+} elf_Module;
 
 
-typedef struct elf_delaylist elf_delaylist;
-typedef struct elf_delaylist {
-	elf_delaylist *n;
-	Instr j;
-} elf_delaylist;
+#define FLAG_DEBUGGER         (1 << 0)
+#define FLAG_DEBUGGER_ONCALL  (1 << 1)
+#define FLAG_BYTETRACKING     (1 << 2)
+#define FLAG_BYTELOGGING      (1 << 3)
 
 
-typedef struct elStackFrame elStackFrame;
-typedef struct elStackFrame {
-	elStackFrame   *caller;
-	elClosure      *closure;
-	elValue        *locals;
-	int            nlocals;
-	char			     nargs;
-	char			     nregs;
-	int             origin;
-	elf_delaylist * delay_list;
-	elBool 			 logging;
-} elStackFrame;
+typedef struct elf_Shell {
+   elf_Module     *M;
+   elf_Value      *stack;
+   int             stack_max;
+   elf_Value      *stack_ptr;
+   elf_StackFrame *frame;
+   int            nframe;
+   int             flags;
 
-
-typedef enum elGCColor elGCPhase;
-#define elGC_PHASE_HOLD GC_WHITE
-#define elGC_PHASE_FREE GC_BLACK
-
-
-typedef struct elCollector {
-	elBool     paused;
-	elGCPhase  phase;
-	elInteger  memory_allocated;
-	elInteger  memory_threshold;
-	elObject **new_objects;
-	elObject **objects;
-	/* this changes dynamically based on
-	object min threshold, it tends to
-	be around there... */
-	elInteger  object_trigger_threshold;
-} elCollector;
-
-
-#define FLAG_DEBUGGER 			(1 << 0)
-#define FLAG_DEBUGGER_ONCALL 	(1 << 1)
-#define FLAG_BYTETRACKING 		(1 << 2)
-#define FLAG_BYTELOGGING 		(1 << 3)
-
-
-typedef struct elState {
-	elModule *M;
-	elValue  *stack;
-	int 		 stack_max;
-	elValue  *stack_ptr;
-
-	elStackFrame *frame;
-	int          nframe;
-	int           flags;
-
-	struct {
-		elTable *integer;
-		elTable *number;
-		elTable *string;
-		elTable *table;
-	} metatables;
-	struct {
-		elValue oncall;
-		elValue ongc;
-	} hooks;
-	/* todo: remove */
-	struct {
-		elString *x,*y,*z,*w;
-		elString *width,*height;
-		elString *__add,*__sub,*__mul,*__div;
-		elString *__add1,*__sub1,*__mul1,*__div1;
-		elString *__getfield,*__setfield;
-		elString *__hash;
-	} cache;
-	/* the current instruction */
-	Instr byte;
-	union { elCollector collector, memory; };
-} elState;
+   struct {
+      elf_Table *integer;
+      elf_Table *number;
+      elf_Table *string;
+      elf_Table *table;
+   } metatables;
+   struct {
+      elf_Value oncall;
+      elf_Value ongc;
+   } hooks;
+   /* the current instruction */
+   Instr byte;
+   union { elf_Collector collector, memory; };
+} elf_Shell;
 
 
 #include "src/node.h"
 #include "src/file.h"
+#include "src/help.h"
 
 #include "src/debug.c"
 #include "src/log.c"
@@ -215,21 +220,19 @@ typedef struct elState {
 #include "src/elf-mem.c"
 #include "src/text.c"
 
+#include "src/closure.c"
 #include "src/table.c"
 #include "src/string.c"
 #include "src/elf-aux.c"
 
 
-#include "src/elf-obj.c"
-// #include "src/elf-chr.c"
-#include "src/elf-node.c"
 #include "src/lexer.c"
+#include "src/node.c"
 #include "src/emit.c"
 #include "src/file.c"
-#include "src/node.c"
-/* todo: remove this */
-#include "src/elf-api.c"
-#include "src/elf-lib.c"
+#include "src/user.c"
+#include "src/libcore.c"
+#include "src/libtable.c"
 #include "src/runtime.c"
 #include "src/system.c"
 
@@ -238,40 +241,40 @@ typedef struct elState {
 #include "src/elf-cli.c"
 
 int main(int n, char **c) {
-	(void) n;
-	elf_cliopts cli = {0};
-	if (elf_loadcliopts(&cli,n,c)) return 0;
+   (void) n;
+   elf_cliopts cli = {0};
+   if (elf_loadcliopts(&cli,n,c)) return 0;
 
-	elModule M = {0};
-	elState R = {0};
-	elf_begin(&R,&M);
-	if (cli.logging) R.bytelogging = 1;
+   elf_Module M = {0};
+   elf_Shell R = {0};
+   elf_begin(&R,&M);
+   if (cli.logging) R.bytelogging = 1;
 
-	elStackFrame frame = {0};
-	frame.base = R.top;
-	R.frame = &frame;
+   elf_StackFrame frame = {0};
+   frame.base = R.top;
+   R.frame = &frame;
 
-	if (cli.filename != 0) {
-		elString *filename = elf_put_new_string(&R,cli.filename);
-		/* todo: remove this?? */
-		filename->obj.color = GC_PINK;
-		FileState fs = {0};
-		elf_parse_file_fs(&R,&fs,filename,0,0);
-	}
-	if (cli.dump) {
-		FILE *dumpf = stdout;
-		if (strcmp(cli.dumpfilename,"stdout")) {
-			dumpf = fopen(elf_tpf("%s.module.ignore",cli.dumpfilename),"wb");
-		}
-		if (dumpf == 0) {
-			printf("error: could open specified dump file for writting");
-		} else {
-			lang_dumpmodule(&M,dumpf);
-			if (dumpf != stdout) fclose(dumpf);
-		}
-	}
-	sys_console_print(LOG_KINFO,"exited");
-	return 0;
+   if (cli.filename != 0) {
+      elf_String *filename = elf_new_string(&R,cli.filename);
+      /* todo: remove this?? */
+      filename->obj.color = elf_GC_PINK;
+      FileState fs = {0};
+      elf_parse_file_fs(&R,&fs,filename,0,0);
+   }
+   if (cli.dump) {
+      FILE *dumpf = stdout;
+      if (strcmp(cli.dumpfilename,"stdout")) {
+         dumpf = fopen(elf_tpf("%s.module.ignore",cli.dumpfilename),"wb");
+      }
+      if (dumpf == 0) {
+         printf("error: could open specified dump file for writting");
+      } else {
+         lang_dumpmodule(&M,dumpf);
+         if (dumpf != stdout) fclose(dumpf);
+      }
+   }
+   sys_console_print(LOG_KINFO,"exited");
+   return 0;
 }
 
 #endif

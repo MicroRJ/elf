@@ -18,20 +18,20 @@
 // } LMSG;
 
 
-// elAPI int netlib_init(elState *R) {
+// elAPI int netlib_init(elf_Shell *R) {
 // 	WSADATA data;
 // 	WSAStartup(MAKEWORD(2,2),&data);
 // 	return 0;
 // }
 
 
-// elAPI int netlib_close(elState *R) {
+// elAPI int netlib_close(elf_Shell *R) {
 // 	WSACleanup();
 // 	return 0;
 // }
 
 
-// elAPI int netlib_listen(elState *R) {
+// elAPI int netlib_listen(elf_Shell *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	int error = listen(handle,SOMAXCONN);
 // 	elf_put_integer(R,error!=SOCKET_ERROR);
@@ -39,15 +39,15 @@
 // }
 
 
-// elAPI int netlib_accept(elState *R) {
+// elAPI int netlib_accept(elf_Shell *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
-// 	elf_put_handle(R,(elHandle)client);
+// 	elf_put_handle(R,(elf_Handle)client);
 // 	return 1;
 // }
 
 
-// elAPI int netlib_pollclient(elState *R) {
+// elAPI int netlib_pollclient(elf_Shell *R) {
 // 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
 // 	fd_set ready;
 // 	FD_ZERO(&ready);
@@ -57,15 +57,15 @@
 //    if (FD_ISSET(handle,&ready)) {
 //       SOCKET client = accept(handle,NULL,NULL);
 //       ASSERT(client != INVALID_SOCKET);
-// 		elf_put_handle(R,(elHandle)client);
+// 		elf_put_handle(R,(elf_Handle)client);
 //    } else elf_put_nil(R);
 // 	return 1;
 // }
 
 
-// elAPI int netlib_tcpserver(elState *R) {
-// 	elString *addrnameS = elf_get_string(R,0);
-// 	elString *addrportS = elf_get_string(R,1);
+// elAPI int netlib_tcpserver(elf_Shell *R) {
+// 	elf_String *addrnameS = elf_get_string(R,0);
+// 	elf_String *addrportS = elf_get_string(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -79,16 +79,16 @@
 // 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 // 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_put_handle(R,(elHandle)thesocket);
+// 		elf_put_handle(R,(elf_Handle)thesocket);
 // 	} else elf_put_nil(R);
 
 // 	return 1;
 // }
 
 
-// elAPI int netlib_tcpclient(elState *R) {
-// 	elString *addrnameS = elf_get_string(R,0);
-// 	elString *addrportS = elf_get_string(R,1);
+// elAPI int netlib_tcpclient(elf_Shell *R) {
+// 	elf_String *addrnameS = elf_get_string(R,0);
+// 	elf_String *addrportS = elf_get_string(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -103,18 +103,18 @@
 
 // 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_put_handle(R,(elHandle)thesocket);
+// 		elf_put_handle(R,(elf_Handle)thesocket);
 // 	} else elf_put_nil(R);
 // 	return 1;
 // }
 
 
-// elAPI int netlib_send(elState *R) {
+// elAPI int netlib_send(elf_Shell *R) {
 // 	/* todo: make this a class? */
 // 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
-// 	elString *payload = elf_get_string(R,1);
+// 	elf_String *payload = elf_get_string(R,1);
 // 	LMSG message = { payload->length };
-// 	elInteger sent = 0;
+// 	elf_Int sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
 // 	elf_put_integer(R,sent);
@@ -122,7 +122,7 @@
 // }
 
 
-// elAPI int netlib_ioctl(elState *R) {
+// elAPI int netlib_ioctl(elf_Shell *R) {
 // 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
@@ -131,17 +131,17 @@
 // }
 
 
-// elAPI int netlib_recv(elState *R) {
+// elAPI int netlib_recv(elf_Shell *R) {
 // 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
 // 	LMSG message = {0};
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {
-// 			elInteger length = message.length;
-// 			elString *obj = elf_new_lstring(R,length);
+// 			elf_Int length = message.length;
+// 			elf_String *obj = elf_alloc_string2(R,length);
 // 			elf_put_string(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
-// 				elInteger result = recv(socket,cursor,length,0);
+// 				elf_Int result = recv(socket,cursor,length,0);
 // 				if (result == SOCKET_ERROR) {
 // 					int error = WSAGetLastError();
 // 					if (error == WSAEWOULDBLOCK) {
@@ -167,21 +167,21 @@
 // 	return 1;
 // }
 // #else
-// elAPI int netlib_init(elState *R) { return 0; };
-// elAPI int netlib_close(elState *R) { return 0; };
-// elAPI int netlib_listen(elState *R) { return 0; };
-// elAPI int netlib_accept(elState *R) { return 0; };
-// elAPI int netlib_pollclient(elState *R) { return 0; };
-// elAPI int netlib_tcpserver(elState *R) { return 0; };
-// elAPI int netlib_tcpclient(elState *R) { return 0; };
-// elAPI int netlib_send(elState *R) { return 0; };
-// elAPI int netlib_ioctl(elState *R) { return 0; };
-// elAPI int netlib_recv(elState *R) { return 0; };
+// elAPI int netlib_init(elf_Shell *R) { return 0; };
+// elAPI int netlib_close(elf_Shell *R) { return 0; };
+// elAPI int netlib_listen(elf_Shell *R) { return 0; };
+// elAPI int netlib_accept(elf_Shell *R) { return 0; };
+// elAPI int netlib_pollclient(elf_Shell *R) { return 0; };
+// elAPI int netlib_tcpserver(elf_Shell *R) { return 0; };
+// elAPI int netlib_tcpclient(elf_Shell *R) { return 0; };
+// elAPI int netlib_send(elf_Shell *R) { return 0; };
+// elAPI int netlib_ioctl(elf_Shell *R) { return 0; };
+// elAPI int netlib_recv(elf_Shell *R) { return 0; };
 // #endif
 
 
-// elAPI void elf_netlib_loadfunctions(elState *R) {
-// 	elModule *md = R->md;
+// elAPI void elf_netlib_loadfunctions(elf_Shell *R) {
+// 	elf_Module *md = R->md;
 
 // 	elf_gsetx_cfn(R,"elf.sockets.init",netlib_init);
 // 	elf_gsetx_cfn(R,"elf.sockets.close",netlib_close);

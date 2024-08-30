@@ -7,32 +7,32 @@
 
 
 
-elBool is_eol_chr(char x) {
+elf_Bool is_eol_chr(char x) {
 	return x == '\r' || x == '\n' || x == '\0';
 }
 
 
-elBool is_digit_chr(char x) {
+elf_Bool is_digit_chr(char x) {
 	return x >= '0' && x <= '9';
 }
 
 
-elBool is_lowercase_chr(char x) {
+elf_Bool is_lowercase_chr(char x) {
 	return x >= 'a' && x <= 'z';
 }
 
 
-elBool is_uppercase_chr(char x) {
+elf_Bool is_uppercase_chr(char x) {
 	return x >= 'A' && x <= 'Z';
 }
 
 
-elBool is_letter_chr(char x) {
+elf_Bool is_letter_chr(char x) {
 	return is_uppercase_chr(x) || is_lowercase_chr(x);
 }
 
 
-elBool is_letter_or_digit_chr(char x) {
+elf_Bool is_letter_or_digit_chr(char x) {
 	return is_letter_chr(x) || is_digit_chr(x);
 }
 
@@ -65,7 +65,7 @@ int text_length(char const *s) {
 
 
 #if 0
-elBool elf_cstrhasprefix(char *str, char *prefix) {
+elf_Bool elf_cstrhasprefix(char *str, char *prefix) {
 	if (prefix == 0 || *prefix == 0 || *str == 0 || *str == 0) {
 		return 0;
 	}
@@ -78,7 +78,7 @@ elBool elf_cstrhasprefix(char *str, char *prefix) {
 }
 #endif
 
-elBool text_eql(char const *x, char const *y, int n) {
+elf_Bool text_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
 			return 0;
@@ -88,7 +88,7 @@ elBool text_eql(char const *x, char const *y, int n) {
 }
 
 
-elBool text_eq(char const *x, char const *y) {
+elf_Bool text_eq(char const *x, char const *y) {
 	if (x == y) {
 		return 1;
 	}
@@ -103,7 +103,7 @@ char *copy_text2(elAllocator fn, int length, char const *text) {
 		length = text_length(text);
 	}
 	char *result = elf_alloc(fn,length+1);
-	elf_copy_memory(result,text,length);
+	copy_memory(result,text,length);
 	result[length]=0;
 	return result;
 }
@@ -114,7 +114,7 @@ char *copy_text(elAllocator fn, char const *text) {
 }
 
 
-char *xpf(elAllocator fn, char const *format, va_list v) {
+char *xpfv(elAllocator fn, char const *format, va_list v) {
 	int length = stbsp_vsnprintf(NULL,0,format,v);
 	char *text = elf_alloc(fn,length+1);
 	stbsp_vsnprintf(text,length+1,format,v);
@@ -123,7 +123,7 @@ char *xpf(elAllocator fn, char const *format, va_list v) {
 
 
 char *tpfv(char const *format, va_list v) {
-	return xpf(TLS_ALLOCATOR,format,v);
+	return xpfv(TLS_ALLOCATOR,format,v);
 }
 
 
@@ -136,10 +136,21 @@ char *tpf_(char const *format, ...) {
 }
 
 
+char *xpf_(elAllocator alloc, char const *format, ...) {
+	char *text;
+	va_list args;
+
+	va_start(args,format);
+	text=xpfv(alloc,format,args);
+	va_end(args);
+	return text;
+}
+
+
 /*
 ** Simple pattern matcher utility.
 */
-elBool match_entire_text_noclause(char *p, char *s);
+elf_Bool match_entire_text_noclause(char *p, char *s);
 
 
 /* Younger me wrote:
@@ -148,7 +159,7 @@ elBool match_entire_text_noclause(char *p, char *s);
 
   Now, I don't remember what the flaw is!
 */
-elBool match_entire_text(char *p, char *s) {
+elf_Bool match_entire_text(char *p, char *s) {
 	char *b = s;
 	while (!match_entire_text_noclause(p,s)) {
 		while (*p != 0 && *p != '|') ++p;
@@ -159,7 +170,7 @@ elBool match_entire_text(char *p, char *s) {
 }
 
 
-elBool match_entire_text_noclause(char *p, char *s) {
+elf_Bool match_entire_text_noclause(char *p, char *s) {
 	while (*p != 0 && *p != '|') {
 		if (*p == '?') {
 			/* matches any character except terminator. */

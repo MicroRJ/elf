@@ -29,7 +29,7 @@ char *log2s(int type) {
 }
 
 
-elAPI void elf_log_(int type, SourceInfo source, const char *fmt, ...) {
+elAPI void elf_log_(int type, DBGSource source, const char *fmt, ...) {
 
 	char b[0x1000];
 

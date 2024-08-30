@@ -1,3 +1,7 @@
+#eof
+// elf has changed substantially and this
+// test is no longer supported...
+
 // STATUS [FIXED]:
 // GC would trigger when a new object
 // was created, however, I was careless
@@ -14,9 +18,9 @@
 // The fix is just to create the object,
 // then modify the value.
 __gc()
-for i in 0..422 ? {let thing={}}
+for i=0...422 ? {let thing={}}
 __logging(true)
-for i in 0..1024 ? {
+for i in 0...1024 ? {
 	let thing = {}
 	pf("i: ", i, " = ", thing)
 }

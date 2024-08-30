@@ -25,10 +25,10 @@ int main(int n, char **c) {
 
 
 struct {
-	elState R;
-	elModule M;
-	elStackFrame C;
-} elGLOBAL elf = {{&elf.M}};
+	elf_Shell R;
+	elf_Module M;
+	elf_StackFrame C;
+} GLOBAL elf = {{&elf.M}};
 
 
 elAPI void elf_global_initialize() {
@@ -37,12 +37,12 @@ elAPI void elf_global_initialize() {
 
 #if 0
 elAPI int elf_global_loadcode(char *filename, char *contents) {
-	elValue *top = elGETTOP(&elf.R);
-	elString *name = elf_put_new_string(&elf.R,filename);
-	elString *string = elf_put_new_string(&elf.R,contents);
+	elf_Value *top = GET_TOP(&elf.R);
+	elf_String *name = elf_new_string(&elf.R,filename);
+	elf_String *string = elf_new_string(&elf.R,contents);
 	FileState fs = {0};
 	int nyield = elf_fs_load_code(&elf.R,&fs,name,0,string);
-	elSETTOP(&elf.R,top);
+	SET_TOP(&elf.R,top);
 	return nyield;
 }
 #endif

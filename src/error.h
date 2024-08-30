@@ -25,8 +25,8 @@ enum {
 };
 
 
-elGLOBAL char const *lErrorNames[] = {
-	"No elError",
+GLOBAL char const *lErrorNames[] = {
+	"No elf_Error",
 
 #define ERROR_XITEM(NAME,DESC) DESC,
 	#include LERROR
@@ -36,7 +36,7 @@ elGLOBAL char const *lErrorNames[] = {
 
 #else
 ERROR_XITEM(AsssertionTriggered,            "Assertion Triggered")
-ERROR_XITEM(InternalError,                  "Internal elError")
+ERROR_XITEM(InternalError,                  "Internal elf_Error")
 ERROR_XITEM(OutOfMemory,                    "Out of Memory")
 ERROR_XITEM(InvalidArguments,               "Invalid Arguments")
 ERROR_XITEM(FileNameIsInvalid,              "File Name is Invalid")

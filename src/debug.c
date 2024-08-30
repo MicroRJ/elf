@@ -5,15 +5,15 @@
 */
 
 
-static int (*global_assertion_hook)(SourceInfo);
+static int (*global_assertion_hook)(DBGSource);
 
 
-void set_assertion_hook(int (*hook)(SourceInfo)) {
+void set_assertion_hook(int (*hook)(DBGSource)) {
 	global_assertion_hook = hook;
 }
 
 
-void assertion_function(SourceInfo ind, char const *message) {
+void assertion_function(DBGSource ind, char const *message) {
 	printf("%s[%i] %s(): '%s' triggered assertion\n",ind.fileName,ind.lineNumber,ind.func,message);
 	if (global_assertion_hook != 0) {
 		global_assertion_hook(ind);

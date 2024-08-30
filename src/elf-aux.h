@@ -5,9 +5,9 @@
 */
 
 
-elInteger elf_get_clock_time();
-elNumber elf_time_diff_s(elInteger begin);
-elNumber elf_time_diff_ms(elInteger begin);
+elf_Int elf_get_clock_time();
+elf_Num elf_time_diff_s(elf_Int begin);
+elf_Num elf_time_diff_ms(elf_Int begin);
 
 
 

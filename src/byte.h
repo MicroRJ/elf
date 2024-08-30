@@ -6,9 +6,9 @@
 
 
 /* todo: make use only 32 bits */
-typedef unsigned long long int Bytecode;
+typedef unsigned long long int elf_Bytecode;
 
-#define BC_XYZ(K,X,Y,Z) (Bytecode){\
+#define BC_XYZ(K,X,Y,Z) (elf_Bytecode){\
 ((((K) & 0xffffllu) <<(0x30))|\
  (((X) & 0xffffllu) <<(0x20))|\
  (((Y) & 0xffffllu) <<(0x10))|\
@@ -65,14 +65,13 @@ _(ADD, XYZ, "add") _(SUB, XYZ, "sub") \
 _(SHL, XYZ, "shl") _(SHR, XYZ, "shr") \
 _(BIT_XOR, XYZ, "xor") _(BIT_OR, XYZ, "or") \
 _(BIT_AND, XYZ, "and") \
-_(MOD, XYZ, "mod") _(POW, XYZ, "pow")
+_(MOD, XYZ, "mod") _(POW, XYZ, "pow") \
+_(I2N,XY,"i2n") _(N2I,XY, "n2i") \
+_(FLOAT2,XYZ,"float2")
+
 
 #define BCITEM(NAME,MODE,SYM) FUSE(BC_,NAME),
-
-typedef enum ByteOP {
-	BCLIST(BCITEM)
-} ByteOP;
-
+typedef enum ByteOP { BCLIST(BCITEM) } ByteOP;
 #undef BCITEM
 
 

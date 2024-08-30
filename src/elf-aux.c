@@ -1,12 +1,20 @@
 /*
 ** See Copyright Notice In elf.h
-** elf-run.c
+** elf-aux.c
 ** Auxiliary Stuff
 */
 
 
-static char const *elf_get_byte_label(int op);
-static int elf_get_byte_class(int op);
+
+#define TAGENUM(NAME) TO_TEXT(NAME),
+static char const *tag2s[] = { ELF_TAG_LIST(TAGENUM) };
+#undef TAGENUM
+
+
+
+
+static char const *get_byte_label(int op);
+static int get_byte_class(int op);
 
 
 void elf_debugger(char *message) {
@@ -17,75 +25,75 @@ void elf_debugger(char *message) {
 }
 
 
-elInteger elf_get_clock_time() {
+elf_Int elf_get_clock_time() {
 	return sys_get_clock_time();
 }
 
 
-elNumber elf_time_diff_s(elInteger begin) {
-	return (sys_get_clock_time() - begin) / (elNumber) sys_get_clock_freq();
+elf_Num elf_time_diff_s(elf_Int begin) {
+	return (sys_get_clock_time() - begin) / (elf_Num) sys_get_clock_freq();
 }
 
 
-elNumber elf_time_diff_ms(elInteger begin) {
+elf_Num elf_time_diff_ms(elf_Int begin) {
 	return elf_time_diff_s(begin) * 1000.;
 }
 
 
-int elf_add_function(elModule *M, elFunction fn) {
+int elf_add_function(elf_Module *M, elf_Function fn) {
 	int i = ARRAY_GROW(M->functions,1);
 	M->functions[i] = fn;
 	return i;
 }
 
 
-elSymbolId elf_get_global_symbol(elModule *M, elString *name) {
+elf_SymbolId elf_get_global_symbol(elf_Module *M, elf_String *name) {
 	if (name != 0) return elf_tgeti(M->globals,elSTR(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
 
 
-elSymbolId elf_gset(elModule *M, elString *name, elValue value) {
-	elSymbolId id;
+elf_SymbolId elf_gset(elf_Module *M, elf_String *name, elf_Value value) {
+	elf_SymbolId id;
 	id=elf_get_global_symbol(M,name);
 	M->globals->array[id]=value;
 	return id;
 }
 
 
-void elf_gsetx_sys(elState *R, char *name, elHandle val) {
-	elf_gset(R->M,elf_put_new_string(R,name),elSYS(val));
+void elf_gsetx_sys(elf_Shell *R, char *name, elf_Handle val) {
+	elf_gset(R->M,elf_new_string(R,name),elSYS(val));
 }
 
 
-void elf_gsetx_int(elState *R, char *name, elInteger val) {
-	elf_gset(R->M,elf_put_new_string(R,name),elINT(val));
+void elf_gsetx_int(elf_Shell *R, char *name, elf_Int val) {
+	elf_gset(R->M,elf_new_string(R,name),elINT(val));
 }
 
 
-void elf_gsetx_tab(elState *R, char *name, elTable *val) {
-	elf_gset(R->M,elf_put_new_string(R,name),elTAB(val));
+void elf_gsetx_tab(elf_Shell *R, char *name, elf_Table *val) {
+	elf_gset(R->M,elf_new_string(R,name),elTAB(val));
 }
 
 
-void elf_gsetx_str(elState *R, char *name, char *val) {
-	elf_gset(R->M,elf_put_new_string(R,name),elSTR(elf_put_new_string(R,val)));
+void elf_gsetx_str(elf_Shell *R, char *name, char *val) {
+	elf_gset(R->M,elf_new_string(R,name),elSTR(elf_new_string(R,val)));
 }
 
 
-void elf_gsetx_cfn(elState *R, char *name, elCFunction fn) {
-	elf_gset(R->M,elf_put_new_string(R,name),elCFN(fn));
+void elf_gsetx_cfn(elf_Shell *R, char *name, elf_CFunction fn) {
+	elf_gset(R->M,elf_new_string(R,name),elCFN(fn));
 }
 
 
-void elf_gset_bindings(elState *R, elCBinding *list, int num) {
+void elf_gset_bindings(elf_Shell *R, elf_CBinding *list, int num) {
 	elf_tsetx_bindings(R,R->M->globals,list,num);
 }
 
 
-int elf_get_instr_file(elModule *M, Instr byte) {
-	elFunction *files;
-	elFunction file;
+int elf_get_instr_file(elf_Module *M, Instr byte) {
+	elf_Function *files;
+	elf_Function file;
 
 	files=M->files;
 	FOR_ARRAY(i,files) {
@@ -98,7 +106,7 @@ int elf_get_instr_file(elModule *M, Instr byte) {
 }
 
 
-char *elf_get_instr_line(elModule *M, Instr byte) {
+char *elf_get_instr_line(elf_Module *M, Instr byte) {
 	ASSERT(WITHIN(byte,0,ARRAY_LENGTH(M->lines)));
 	return M->lines[byte];
 }
@@ -123,15 +131,15 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 }
 
 
-elFunction elf_get_running_file(elState *S) {
-	elFunction fi = {0};
+elf_Function elf_get_running_file(elf_Shell *S) {
+	elf_Function fi = {0};
 	int id = elf_get_instr_file(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
 }
 
 
-void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, Bytecode byte, char const *fmt, ...) {
+void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, elf_Bytecode byte, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_get_line_source_info(contents,loc,&linenum,&lineloc);
@@ -167,14 +175,14 @@ void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, 
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elInteger)(1+loc-lineloc),byte_loc,elf_get_byte_label(BC_OP(byte)),b);
+		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elf_Int)(1+loc-lineloc),byte_loc,get_byte_label(BC_OP(byte)),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
 }
 
 
-void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
+void elf_dump_byte_trace(elf_Shell *S, elf_StackFrame *call, int level) {
 	ASSERT(level > -1);
 
 	/* Don't show the first root call frame
@@ -187,23 +195,23 @@ void elf_dump_byte_trace(elState *S, elStackFrame *call, int level) {
 
 	elf_dump_byte_trace(S,call->caller,level-1);
 
-	elModule *M = S->M;
+	elf_Module *M = S->M;
 	int fileid = elf_get_instr_file(M,call->origin);
 	if (fileid != -1) {
-		elFunction *file = &M->files[fileid];
+		elf_Function *file = &M->files[fileid];
 		Source line = elf_get_instr_line(M,call->origin);
 		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
 	}
 }
 
 
-void elf_fail(elState *R, int byte, const char *error) {
-	elModule *M = R->M;
+void elf_fail(elf_Shell *R, int byte, const char *error) {
+	elf_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_instr_line(M,byte);
 	int fileid = elf_get_instr_file(M,byte);
 	if (fileid != -1) {
-		elFunction *file = &M->files[fileid];
+		elf_Function *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	}
 
@@ -213,14 +221,14 @@ void elf_fail(elState *R, int byte, const char *error) {
 }
 
 
-elAPI void elf_check_args(elState *R, char *fnname, int n, char *usage) {
-	if (elGETNARGS(R) != n) {
-		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elGETNARGS(R),usage));
+elAPI void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage) {
+	if (elf_get_num_args(R) != n) {
+		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
 	}
 }
 
 
-int elf_type_check(elState *R, Instr id, elRegId loc, ValueTag x, ValueTag y) {
+int elf_type_check(elf_Shell *R, Instr id, elf_StackId loc, elValueTag x, elValueTag y) {
 	if (x != y) {
 		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
@@ -228,23 +236,74 @@ int elf_type_check(elState *R, Instr id, elRegId loc, ValueTag x, ValueTag y) {
 }
 
 
-int elf_fpf_value(FILE *file, elValue v, elBool quotes);
+static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
+	switch (v.tag) {
+		case TAG_NIL: return fprintf(file,"nil");
+		case TAG_SYS: return fprintf(file,"h%llX",v.x_int);
+		case TAG_INT: return fprintf(file,"%lli",v.x_int);
+		case TAG_NUM: return fprintf(file,"%f",v.x_num);
+		case TAG_CLS: return fprintf(file,"F()");
+		case TAG_CFN: return fprintf(file,"C()");
+		case TAG_FLOAT2: return fprintf(file,"float2(%f,%f)",v.x_f32,v.y_f32);
+		case TAG_TAB: {
+			/* todo: this is slow! */
+			int wrote = 0;
+			elf_Table *tab = v.x_tab;
+			wrote += fprintf(file,"{");
+			elf_Int i,j,n;
+			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
+				if (i != 0) wrote += fprintf(file,", ");
+				for (j=0,n=0;j<tab->ntotal;++j) {
+					elf_Entry it = tab->slots[j];
+					if (it.key.tag==TAG_NIL) continue;
+					if (it.idx!=i) continue;
+					if (n ++ != 0) wrote += fprintf(file,", ");
+					wrote += fpf_value(file,it.key,1);
+				}
+				if (n != 0) wrote += fprintf(file," = ");
+				wrote += fpf_value(file,tab->array[i],1);
+			}
+			// for (i=0,n=0;i<tab->nslots;++i) {
+			// 	elf_Entry it = tab->slots[i];
+			// 	if (it.key.tag == TAG_NIL) continue;
+			// 	if (n ++ != 0) wrote += fprintf(file,", ");
+			// 	wrote += fpf_value(file,it.key,1);
+			// 	wrote += fprintf(file," = ");
+			// 	wrote += fpf_value(file,tab->array[it.i],1);
+			// }
+			// FOR_ARRAY(t->v) {
+			// 	if (i != 0) wrote += fprintf(file,", ");
+			// 	wrote += fpf_value(file,t->v[i],1);
+			// }
+			wrote += fprintf(file,"}");
+			return wrote;
+		} break;
+		case TAG_STR: {
+			if (flags) {
+				return fprintf(file,"\"%s\"",v.x_str->text);
+			} else {
+				return fprintf(file,"%s",v.x_str->text);
+			}
+		} break;
+		default: return fprintf(file,"(?)");
+	}
+}
 
 
-static void fpf_byte(FILE *io, elModule *M, elInteger fid, Instr id, Bytecode b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
 	if (fid != -1) {
-		elFunction file = M->files[fid];
+		elf_Function file = M->files[fid];
 		int linenum;
 		elf_get_line_source_info(file.contents->text,M->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name->text,linenum);
 	}
 
 	fprintf(io,"%08i %04i\t%s"
-	, M->track[id],id,elf_get_byte_label(BC_OP(b)));
+	, M->track[id],id,get_byte_label(BC_OP(b)));
 
-	if (elf_get_byte_class(BC_OP(b)) == BC_CLASS_XYZ) {
+	if (get_byte_class(BC_OP(b)) == BC_CLASS_XYZ) {
 		fprintf(io,"(x=%i,y=%i,z=%i)",BC_ARGX(b),BC_ARGY(b),BC_ARGZ(b));
-	} else if (elf_get_byte_class(BC_OP(b)) == BC_CLASS_XY) {
+	} else if (get_byte_class(BC_OP(b)) == BC_CLASS_XY) {
 		fprintf(io,"(x=%i,y=%i)",BC_ARGX(b),BC_ARGY(b));
 	} else {
 		fprintf(io,"(x=%i)",BC_ARGX(b));
@@ -260,12 +319,12 @@ static void fpf_byte(FILE *io, elModule *M, elInteger fid, Instr id, Bytecode b)
 		fprintf(io," #%f",M->numbers[BC_ARGY(b)]);
 	} else
 	if (BC_OP(b) == BC_GETGLOBAL) {
-		elValue val = M->globals->array[BC_ARGY(b)];
+		elf_Value val = M->globals->array[BC_ARGY(b)];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag == TAG_STR) || (val.tag == TAG_NUM) || (val.tag == TAG_INT)) {
-			elf_fpf_value(io,val,1);
+		if ((val.tag==TAG_STR)||(val.tag==TAG_NUM)||(val.tag==TAG_INT)) {
+			fpf_value(io,val,1);
 		}
 	}
 	fprintf(io,"\n");
@@ -276,8 +335,8 @@ void elf_get_line_source_info(char *q, char *p, int *linenum, char **lineloc);
 
 
 #if 0
-void lang_dumpmodule(elModule *md, elHandle io) {
-	fprintf(file,"elModule:\n");
+void lang_dumpmodule(elf_Module *md, elf_Handle io) {
+	fprintf(file,"elf_Module:\n");
 	fprintf(file,"Globals:\n");
 	FOR_ARRAY(md->g->v) {
 		fprintf(file,"%04llX: ", i);
@@ -288,11 +347,11 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_get_my_pid());
 	FOR_ARRAY(i,md->files) {
-		elFunction ff = md->files[i];
+		elf_Function ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
-			Bytecode b = md->bytes[ff.bytes+j];
+			elf_Bytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// elf_get_line_source_info(md->file,md->lines[j],&linenum,&lineloc);
@@ -302,10 +361,10 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 	}
 #if 0
 	FOR_ARRAY(md->p) {
-		elFunction p = md->p[i];
+		elf_Function p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
-			Bytecode b = md->bytes[p.bytes+j];
+			elf_Bytecode b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");
@@ -315,7 +374,7 @@ void lang_dumpmodule(elModule *md, elHandle io) {
 #endif
 
 
-int elf_get_byte_class(int k) {
+int get_byte_class(int k) {
 #define BCITEM(NAME,FMT,__) case FUSE(BC_,NAME): return FUSE(BC_CLASS_,FMT);
 	switch (k) {
 		BCLIST(BCITEM)
@@ -326,7 +385,7 @@ int elf_get_byte_class(int k) {
 }
 
 
-char const *elf_get_byte_label(int k) {
+char const *get_byte_label(int k) {
 #define BCITEM(NAME,_,SYM) case FUSE(BC_,NAME): return SYM;
 	switch (k) {
 		BCLIST(BCITEM)

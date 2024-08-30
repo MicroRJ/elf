@@ -1,5 +1,7 @@
 /* test runner */
-PREVDIR = elf.get_work_dir() lastly elf.change_work_dir(PREVDIR)
+PREVDIR = elf.get_work_dir()
+lastly elf.change_work_dir(PREVDIR)
+
 elf.change_work_dir("code/tests")
 
 let sysfile = elf.fopen("tests.ignore","wb")

@@ -5,6 +5,16 @@
 
 
 
+#define NODE_ENUM(NAME) #NAME,
+static char *node2s[] = {
+	"NONE",
+	NODE_LIST(NODE_ENUM)
+};
+#undef NODE_ENUM
+
+
+
+
 Node get_node(FileState *fs, NodeId id) {
 	ASSERT(id != NO_SLOT);
 	return fs->nodes[id];
@@ -35,8 +45,7 @@ static Node get_target_node(FileState *fs, NodeIdGuard id) {
 	node=get_node(fs,id.id);
 	switch (node.kind) {
 		case NODE_TYPEGUARD:
-		case NODE_GROUP:
-		case NODE_REGION: {
+		case NODE_GROUP: {
 			return get_target_node(fs,NODE(node.x));
 		}
 		default: {
@@ -46,7 +55,7 @@ static Node get_target_node(FileState *fs, NodeIdGuard id) {
 }
 
 
-static elBool node_is_lvalue(NodeKi kind) {
+static elf_Bool node_is_lvalue(NodeKi kind) {
 	switch (kind) {
 		case NODE_RANGE_INDEX:
 		case NODE_GLOBAL:
@@ -62,7 +71,7 @@ static elBool node_is_lvalue(NodeKi kind) {
 }
 
 
-ValueTag node2tag(NodeTy ty) {
+elValueTag node2tag(NodeTy ty) {
 	switch (ty) {
 		case NT_SYS: return TAG_SYS;
 		case NT_NUM: return TAG_NUM;
@@ -103,7 +112,7 @@ ByteOP node2byte(NodeKi tt) {
 
 NodeId node_xyz(FileState *fs, Source line, NodeKi kind, NodeTy type, NodeId x, NodeId y, NodeId *z) {
 	NodeId id=fs->nnodes ++;
-	ARRAY_GROW(fs->nodes,fs->nnodes-ARRAY_MIN(fs->nodes));
+	ARRAY_GROW(fs->nodes,fs->nnodes-ARRAY_GET_MIN(fs->nodes));
 	Node *node=fs->nodes+id;
 	node->level=fs->nblocks-1;
 	node->line=line;
@@ -147,14 +156,14 @@ NodeId node_group(FileState *fs, Source line, NodeId x) {
 }
 
 
-NodeId node_integer(FileState *fs, Source line, elInteger i) {
+NodeId node_integer(FileState *fs, Source line, elf_Int i) {
 	NodeId v = node_nullary(fs,line,NODE_INTEGER,NT_INT);
 	fs->nodes[v].lit.i = i;
 	return v;
 }
 
 
-NodeId node_number(FileState *fs, Source line, elNumber n) {
+NodeId node_number(FileState *fs, Source line, elf_Num n) {
 	NodeId v = node_nullary(fs,line,NODE_NUMBER,NT_NUM);
 	fs->nodes[v].lit.n = n;
 	return v;
@@ -183,12 +192,12 @@ NodeId node_nil(FileState *fs, Source line) {
 }
 
 
-NodeId node_closure_value(FileState *fs, Source line, elRegId x) {
+NodeId node_closure_value(FileState *fs, Source line, elf_StackId x) {
 	return node_x(fs,line,NODE_CLSVAL,NT_ANY,x);
 }
 
 
-NodeId node_local(FileState *fs, Source line, elRegId x) {
+NodeId node_local(FileState *fs, Source line, elf_StackId x) {
 	return node_x(fs,line,NODE_LOCAL,NT_ANY,x);
 }
 
@@ -198,7 +207,7 @@ NodeId node_this(FileState *fs, Source line) {
 }
 
 
-NodeId node_global(FileState *fs, Source line, elSymbolId x) {
+NodeId node_global(FileState *fs, Source line, elf_SymbolId x) {
 	return node_x(fs,line,NODE_GLOBAL,NT_ANY,x);
 }
 
@@ -250,7 +259,7 @@ NodeId node_call_metafield(FileState *fs, Source line, NodeId x, NodeId *z, char
 
 
 NodeId node_global_name(FileState *fs, Source line, char *name) {
-	elSymbolId x = elf_get_global_symbol(fs->M,elf_new_string(fs->R,name));
+	elf_SymbolId x = elf_get_global_symbol(fs->M,elf_alloc_string(fs->R,name));
 	ASSERT(x != -1);
 	return node_global(fs,line,x);
 }
@@ -271,7 +280,7 @@ NodeId node_call_set_metatable(FileState *fs, Source line, NodeId object, NodeId
 }
 
 
-static elBool is_binary_node(NodeKi kind) {
+static elf_Bool is_binary_node(NodeKi kind) {
 	return kind >= NODE_AND && kind <= NODE_BIT_OR;
 }
 
@@ -300,9 +309,6 @@ static void fpf_node(FileState *fs, FILE *io, NodeId id) {
 			fprintf(io,")");
 		} break;
 		default: fprintf(io,"%s",node2s[node.kind]);
-	}
-	if (get_node_register(fs,NODE(id)) != NO_SLOT) {
-		fprintf(io,"@r%i",get_node_register(fs,NODE(id)));
 	}
 }
 

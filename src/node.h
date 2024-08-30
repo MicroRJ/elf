@@ -56,8 +56,7 @@ _(METAFIELD)\
 _(CALL)\
 _(RANGE_INDEX)\
 _(RANGE)\
-_(GROUP)\
-_(REGION)
+_(GROUP)
 
 
 #define NODE_ENUM(NAME) NODE_##NAME,
@@ -65,13 +64,6 @@ typedef enum NodeKi {
 	NODE_NONE = 0,
 	NODE_LIST(NODE_ENUM)
 } NodeKi;
-#undef NODE_ENUM
-
-#define NODE_ENUM(NAME) #NAME,
-elGLOBAL char *node2s[] = {
-	"NONE",
-	NODE_LIST(NODE_ENUM)
-};
 #undef NODE_ENUM
 
 
@@ -87,8 +79,8 @@ typedef struct Node {
 		struct { NodeId x,y,*z; };
 		union {
 			char      *s;
-			elInteger  i;
-			elNumber   n;
+			elf_Int  i;
+			elf_Num   n;
 		} lit;
 	};
 } Node;
@@ -103,8 +95,8 @@ static NodeId node_xyz(FileState *fs, Source, NodeKi k, NodeTy ty, NodeId x, Nod
 static NodeId node_xy(FileState *fs, Source, NodeKi k, NodeTy ty, NodeId x, NodeId y);
 static NodeId node_x(FileState *fs, Source, NodeKi k, NodeTy ty, NodeId x);
 static NodeId node_nil(FileState *fs, Source);
-static NodeId node_integer(FileState *fs, Source, elInteger i);
-static NodeId node_number(FileState *fs, Source, elNumber n);
+static NodeId node_integer(FileState *fs, Source, elf_Int i);
+static NodeId node_number(FileState *fs, Source, elf_Num n);
 static NodeId node_string(FileState *fs, Source, Source);
 static NodeId node_nullary(FileState *fs, Source, NodeKi k, NodeTy t);
 static NodeId node_group(FileState *fs, Source, NodeId x);
@@ -128,6 +120,6 @@ static NodeId node_global_name(FileState *fs, Source line, char *name);
 static NodeId node_call_pf(FileState *fs, Source line, NodeId *args);
 static NodeId node_call_set_metatable(FileState *fs, Source line, NodeId object, NodeId metatable);
 
-static ValueTag node2tag(NodeTy ty);
+static elValueTag node2tag(NodeTy ty);
 static ByteOP node2byte(NodeKi tt);
-static elBool node_is_lvalue(NodeKi kind);
+static elf_Bool node_is_lvalue(NodeKi kind);

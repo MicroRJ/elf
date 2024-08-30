@@ -5,9 +5,9 @@
 */
 
 
-elInteger array_allocate(void **var, elInteger per, elInteger res, elInteger com) {
-	elArray *arr = 0;
-	elInteger max = 0, min = 0;
+elf_Int array_allocate(void **var, elf_Int per, elf_Int res, elf_Int com) {
+	ArrayH *arr = 0;
+	elf_Int max = 0, min = 0;
 	if (*var != 0) {
 		arr = &ARRAY(*var);
 		max = arr->max;
@@ -23,7 +23,7 @@ elInteger array_allocate(void **var, elInteger per, elInteger res, elInteger com
 		if(min + res > max) {
 			max = min + res;
 		}
-		arr = elf_realloc(HEAP_ALLOCATOR,sizeof(elArray)+per*max,arr);
+		arr = elf_realloc(HEAP_ALLOCATOR,sizeof(ArrayH)+per*max,arr);
 	}
 	if (arr != 0) {
 		arr->max = max;

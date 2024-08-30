@@ -79,18 +79,18 @@ void jittestall() {
 }
 
 #if 0
-void do_add(elValue *x, elValue *y) {
+void do_add(elf_Value *x, elf_Value *y) {
 	if (x->tag == TAG_NUM) {
-		x->n = elTONUM(* x) + elTONUM(* y);
+		x->n = VI2N(* x) + VI2N(* y);
 	} else
 	if (x->tag == TAG_INT) {
-		x->i = elTOINT(* x) + elTOINT(* y);
+		x->i = VN2I(* x) + VN2I(* y);
 	}
 }
 #endif
 
 
-elInteger do_add(elInteger x, elInteger y) {
+elf_Int do_add(elf_Int x, elf_Int y) {
 	pf("do add %lli, %lli\n", x, y);
 	return x + y;
 }
@@ -140,7 +140,7 @@ void emit86_shift(ByteOP type, ljValue x, ljValue y) {
 }
 
 
-elCFunction jit(elModule *md, elFunction fn) {
+elf_CFunction jit(elf_Module *md, elf_Function fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();
@@ -150,7 +150,7 @@ elCFunction jit(elModule *md, elFunction fn) {
 
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
-	Bytecode *bytes = md->bytes + fn.bytes;
+	elf_Bytecode *bytes = md->bytes + fn.bytes;
 	Instr nbytes = fn.nbytes;
 
 	for (Instr i = 0; i < nbytes; ++i) {
@@ -213,7 +213,7 @@ elCFunction jit(elModule *md, elFunction fn) {
 	typedef int (*xorfn)(int);
 	int result = ((xorfn)jit_mem)(5282);
 	pf("result: %i\n",result);
-	return (elCFunction) jit_mem;
+	return (elf_CFunction) jit_mem;
 }
 
 

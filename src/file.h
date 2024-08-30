@@ -10,8 +10,8 @@ typedef struct FileToken {
 	Source line;
 	unsigned int eol: 1;
 	union {
-		elInteger integer;
-		elNumber   number;
+		elf_Int integer;
+		elf_Num   number;
 		char 		   *text;
 	};
 } FileToken;
@@ -146,7 +146,7 @@ typedef struct elFileLoopState {
 
 typedef struct FileBlock FileBlock;
 typedef struct FileBlock {
-	elBool flags;
+	elf_Bool flags;
 	int level;
 	int xmemory;
 	int nlocals;
@@ -198,8 +198,8 @@ typedef struct FileFunction {
 
 typedef struct FileState {
 	FileFunction function;
-	elModule           *M;
-	elState            *R;
+	elf_Module           *M;
+	elf_Shell            *R;
 	char        *filename;
 	char        *filetext;
 	char        *linechar;
@@ -218,7 +218,7 @@ typedef struct FileState {
 	int             nloops;
 	FileFunction       *fn;
 	int              flags;
-	elBool    debuggerflag;
+	elf_Bool    debuggerflag;
 	int   default_register;
 } FileState;
 
@@ -234,9 +234,9 @@ static void begin_function(FileState *fs, FileFunction *fn, Source line);
 static void close_function(FileState *fs);
 
 
-static BlockId begin_block(FileState *fs, elBool flags);
+static BlockId begin_block(FileState *fs, elf_Bool flags);
 static void close_block(FileState *fs);
-static FileBlock *get_loop_block(FileState *fs, elRegId with_value_register);
+static FileBlock *get_loop_block(FileState *fs, elf_StackId with_value_register);
 
 
 static void begin_delay_block(FileState *fs, Source line);
@@ -247,6 +247,7 @@ static void emit_store(FileState *fs, Source line, NodeId x, NodeId y);
 
 static int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id);
 static int emit_load(FileState *fs, NodeId id);
+static int emit_preload(FileState *fs, NodeId id);
 
 
 static int emit_branch_if_false(FileState *fs, BooleanJumps *js, NodeId id);
@@ -275,9 +276,9 @@ static void close_while_loop(FileState *fs);
 static char *fs_get_name(FileState *fs);
 
 static NodeId parse_table(FileState *fs);
-static NodeId parse_unary(FileState *fs, BooleanJumps *expr, elBool flags);
+static NodeId parse_unary(FileState *fs, BooleanJumps *expr, elf_Bool flags);
 static NodeId parse_subexpr(FileState *fs, BooleanJumps *expr, int rank, int flags);
-static NodeId parse_expr(FileState *fs, BooleanJumps *expr, elBool flags);
+static NodeId parse_expr(FileState *fs, BooleanJumps *expr, elf_Bool flags);
 static int parse_stat(FileState *fs);
 static void parse_for_loop(FileState *fs);
 
