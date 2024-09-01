@@ -64,9 +64,9 @@ _(PAREN_LEFT,"(") _(PAREN_RIGHT,")") \
 typedef enum elTokenType {
 	TK_NONE = 0,
 
-#define TKITEM(NAME,_) FUSE(TK_,NAME),
-#define OPITEM(NAME,_,__) FUSE(TK_,NAME),
-#define MCITEM(NAME,_) FUSE(TK_M_,NAME),
+#define TKITEM(NAME,_) XFUSE(TK_,NAME),
+#define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
+#define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
 
 	KWLIST(TKITEM)
 	MCLIST(MCITEM)
@@ -96,7 +96,7 @@ typedef int BlockId;
 
 typedef struct { EntityId id; } EntityIdGuard;
 
-#define ENTITY(X) LITERAL(EntityIdGuard){X}
+#define ENTITY(X) XLITERAL(EntityIdGuard){X}
 
 
 #define ENTITY_REFERENCED (1 << 0)

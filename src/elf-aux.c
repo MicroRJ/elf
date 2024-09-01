@@ -6,13 +6,6 @@
 
 
 
-#define TAGENUM(NAME) TO_TEXT(NAME),
-static char const *tag2s[] = { ELF_TAG_LIST(TAGENUM) };
-#undef TAGENUM
-
-
-
-
 static char const *get_byte_label(int op);
 static int get_byte_class(int op);
 
@@ -48,7 +41,7 @@ int elf_add_function(elf_Module *M, elf_Function fn) {
 
 
 elf_SymbolId elf_get_global_symbol(elf_Module *M, elf_String *name) {
-	if (name != 0) return elf_tgeti(M->globals,elSTR(name));
+	if (name != 0) return elf_tget_ornew(M->globals,VSTR(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
 
@@ -62,27 +55,27 @@ elf_SymbolId elf_gset(elf_Module *M, elf_String *name, elf_Value value) {
 
 
 void elf_gsetx_sys(elf_Shell *R, char *name, elf_Handle val) {
-	elf_gset(R->M,elf_new_string(R,name),elSYS(val));
+	elf_gset(R->M,elf_new_string(R,name),VSYS(val));
 }
 
 
 void elf_gsetx_int(elf_Shell *R, char *name, elf_Int val) {
-	elf_gset(R->M,elf_new_string(R,name),elINT(val));
+	elf_gset(R->M,elf_new_string(R,name),VINT(val));
 }
 
 
 void elf_gsetx_tab(elf_Shell *R, char *name, elf_Table *val) {
-	elf_gset(R->M,elf_new_string(R,name),elTAB(val));
+	elf_gset(R->M,elf_new_string(R,name),VTAB(val));
 }
 
 
 void elf_gsetx_str(elf_Shell *R, char *name, char *val) {
-	elf_gset(R->M,elf_new_string(R,name),elSTR(elf_new_string(R,val)));
+	elf_gset(R->M,elf_new_string(R,name),VSTR(elf_new_string(R,val)));
 }
 
 
 void elf_gsetx_cfn(elf_Shell *R, char *name, elf_CFunction fn) {
-	elf_gset(R->M,elf_new_string(R,name),elCFN(fn));
+	elf_gset(R->M,elf_new_string(R,name),VCFN(fn));
 }
 
 
@@ -118,7 +111,7 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 	char *c = q;
 	int n = 0;
 	while (q < loc) {
-		while ((*q != '\r' && *q != '\n' && *q != '\0') && q < loc) q ++;
+		while (((*q != '\r') && (*q != '\n') && (*q != '\0')) && (q < loc)) q ++;
 		if (*q == 0) break;
 		if ((*q != '\n') || (c = ++ q, n ++, 1)) {
 			if ((*q == '\r') && (c = ++ q, n ++, 1)) {
@@ -200,12 +193,12 @@ void elf_dump_byte_trace(elf_Shell *S, elf_StackFrame *call, int level) {
 	if (fileid != -1) {
 		elf_Function *file = &M->files[fileid];
 		Source line = elf_get_instr_line(M,call->origin);
-		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(bytecode function)" : "(binding)");
+		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(elf-function)" : "(c-function)");
 	}
 }
 
 
-void elf_fail(elf_Shell *R, int byte, const char *error) {
+void elf_fail_(elf_Shell *R, int byte, const char *error) {
 	elf_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_instr_line(M,byte);
@@ -216,7 +209,7 @@ void elf_fail(elf_Shell *R, int byte, const char *error) {
 	}
 
 	printf(" -- BYTE TRACE:\n");
-	elf_dump_byte_trace(R,elGETFRAME(R),R->nframe);
+	elf_dump_byte_trace(R,GET_FRAME(R),R->nframe);
 	elf_debugger("runtime throw");
 }
 
@@ -228,7 +221,7 @@ elAPI void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_type_check(elf_Shell *R, Instr id, elf_StackId loc, elValueTag x, elValueTag y) {
+int elf_type_check(elf_Shell *R, Instr id, elf_StackId loc, elf_ValueTag x, elf_ValueTag y) {
 	if (x != y) {
 		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
@@ -238,14 +231,14 @@ int elf_type_check(elf_Shell *R, Instr id, elf_StackId loc, elValueTag x, elValu
 
 static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 	switch (v.tag) {
-		case TAG_NIL: return fprintf(file,"nil");
-		case TAG_SYS: return fprintf(file,"h%llX",v.x_int);
-		case TAG_INT: return fprintf(file,"%lli",v.x_int);
-		case TAG_NUM: return fprintf(file,"%f",v.x_num);
-		case TAG_CLS: return fprintf(file,"F()");
-		case TAG_CFN: return fprintf(file,"C()");
-		case TAG_FLOAT2: return fprintf(file,"float2(%f,%f)",v.x_f32,v.y_f32);
-		case TAG_TAB: {
+		case elf_TAG_NIL: return fprintf(file,"nil");
+		case elf_TAG_SYS: return fprintf(file,"h%llX",v.x_int);
+		case elf_TAG_INT: return fprintf(file,"%lli",v.x_int);
+		case elf_TAG_NUM: return fprintf(file,"%f",v.x_num);
+		case elf_TAG_CLS: return fprintf(file,"F()");
+		case elf_TAG_CFN: return fprintf(file,"C()");
+		case elf_TAG_FLOAT2: return fprintf(file,"float2(%f,%f)",v.x_f32,v.y_f32);
+		case elf_TAG_TAB: {
 			/* todo: this is slow! */
 			int wrote = 0;
 			elf_Table *tab = v.x_tab;
@@ -255,7 +248,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elf_Entry it = tab->slots[j];
-					if (it.key.tag==TAG_NIL) continue;
+					if (it.key.tag==elf_TAG_NIL) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += fprintf(file,", ");
 					wrote += fpf_value(file,it.key,1);
@@ -265,7 +258,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
 			// 	elf_Entry it = tab->slots[i];
-			// 	if (it.key.tag == TAG_NIL) continue;
+			// 	if (it.key.tag == elf_TAG_NIL) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
 			// 	wrote += fpf_value(file,it.key,1);
 			// 	wrote += fprintf(file," = ");
@@ -278,7 +271,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			wrote += fprintf(file,"}");
 			return wrote;
 		} break;
-		case TAG_STR: {
+		case elf_TAG_STR: {
 			if (flags) {
 				return fprintf(file,"\"%s\"",v.x_str->text);
 			} else {
@@ -323,7 +316,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecod
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag==TAG_STR)||(val.tag==TAG_NUM)||(val.tag==TAG_INT)) {
+		if ((val.tag==elf_TAG_STR)||(val.tag==elf_TAG_NUM)||(val.tag==elf_TAG_INT)) {
 			fpf_value(io,val,1);
 		}
 	}
@@ -375,7 +368,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 
 
 int get_byte_class(int k) {
-#define BCITEM(NAME,FMT,__) case FUSE(BC_,NAME): return FUSE(BC_CLASS_,FMT);
+#define BCITEM(NAME,FMT,__) case XFUSE(BC_,NAME): return XFUSE(BC_CLASS_,FMT);
 	switch (k) {
 		BCLIST(BCITEM)
 		default: NO_CODE;
@@ -386,7 +379,7 @@ int get_byte_class(int k) {
 
 
 char const *get_byte_label(int k) {
-#define BCITEM(NAME,_,SYM) case FUSE(BC_,NAME): return SYM;
+#define BCITEM(NAME,_,SYM) case XFUSE(BC_,NAME): return SYM;
 	switch (k) {
 		BCLIST(BCITEM)
 		default: NO_CODE;

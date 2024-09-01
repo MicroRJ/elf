@@ -98,32 +98,32 @@ elf_Bool text_eq(char const *x, char const *y) {
 }
 
 
-char *copy_text2(elAllocator fn, int length, char const *text) {
+char *copy_text2(Allocator fn, int length, char const *text) {
 	if (length <= 0) {
 		length = text_length(text);
 	}
-	char *result = elf_alloc(fn,length+1);
+	char *result = alloc_memory(fn,length+1);
 	copy_memory(result,text,length);
 	result[length]=0;
 	return result;
 }
 
 
-char *copy_text(elAllocator fn, char const *text) {
+char *copy_text(Allocator fn, char const *text) {
 	return copy_text2(fn,-1,text);
 }
 
 
-char *xpfv(elAllocator fn, char const *format, va_list v) {
+char *xpfv(Allocator fn, char const *format, va_list v) {
 	int length = stbsp_vsnprintf(NULL,0,format,v);
-	char *text = elf_alloc(fn,length+1);
+	char *text = alloc_memory(fn,length+1);
 	stbsp_vsnprintf(text,length+1,format,v);
 	return text;
 }
 
 
 char *tpfv(char const *format, va_list v) {
-	return xpfv(TLS_ALLOCATOR,format,v);
+	return xpfv(THREAD_ALLOCATOR,format,v);
 }
 
 
@@ -136,7 +136,7 @@ char *tpf_(char const *format, ...) {
 }
 
 
-char *xpf_(elAllocator alloc, char const *format, ...) {
+char *xpf_(Allocator alloc, char const *format, ...) {
 	char *text;
 	va_list args;
 

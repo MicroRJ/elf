@@ -4,161 +4,174 @@
 */
 
 
-static void _expected(elf_Shell *S, elValueTag tag, elValueTag got, elf_StackId x) {
-	elf_fail(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
-}
-
-
-int elf_get_num_args(elf_Shell *S) {
-	return S->frame->nargs-1;
-}
-
-
-elf_Value elf_get_arg(elf_Shell *S, int x) {
-	return S->frame->locals[x+1];
-}
-
-
-elValueTag elf_get_tag(elf_Shell *S, int x) {
-	return S->frame->locals[x+1].tag;
-}
-
-
-elf_Object *elf_get_this(elf_Shell *S) {
-	return S->frame->locals[0].x_obj;
-}
-
-
-void elf_put_nil(elf_Shell *S) {
-	PUSHV(S,elNIL());
-}
-
-void elf_put_closure(elf_Shell *S, elf_Closure *x) {
-	PUSHV(S,elCLS(x));
-}
-
-void elf_put_object(elf_Shell *S, elf_Object *x) {
-	PUSHV(S,elOBJ(x));
-}
-
-void elf_put_cfunction(elf_Shell *S, elf_CFunction x) {
-	PUSHV(S,elCFN(x));
-}
-
-void elf_new_table(elf_Shell *S, elf_Table *x) {
-	PUSHV(S,elTAB(x));
-}
-
-void elf_put_integer(elf_Shell *S, elf_Int x) {
-	PUSHV(S,elINT(x));
-}
-
-void elf_put_number(elf_Shell *S, elf_Num x) {
-	PUSHV(S,elNUM(x));
-}
-
-void elf_put_string(elf_Shell *S, elf_String *x) {
-	PUSHV(S,elSTR(x));
-}
-
-void elf_put_handle(elf_Shell *S, elf_Handle x) {
-	PUSHV(S,elSYS(x));
-}
-
-elf_String *elf_get_string(elf_Shell *R, elf_StackId x) {
-	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==TAG_NIL) return 0;
-	if (v.tag==TAG_STR) return v.x_str;
-	_expected(R,TAG_STR,v.tag,x);
-	return 0;
-}
-
-
-elAPI char *elf_get_text(elf_Shell *R, elf_StackId x) {
-	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==TAG_NIL) return 0;
-	if (v.tag==TAG_STR) return v.x_str->text;
-	_expected(R,TAG_STR,v.tag,x);
-	return 0;
-}
-
-
-elAPI elf_Object *elf_get_object(elf_Shell *R, elf_StackId x) {
-	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==TAG_NIL) return 0;
-	if (IS_TOBJ(v.tag)) return v.x_obj;
-	_expected(R,TAG_OBJ,v.tag,x);
-	return 0;
-}
-
-
-elAPI elf_Table *elf_get_table(elf_Shell *R, elf_StackId x) {
-	elf_Value v = elf_get_arg(R,x);
-	if (v.tag == TAG_TAB) {
-		return v.x_tab;
-	} else if (v.tag != TAG_NIL) _expected(R,TAG_TAB,v.tag,x);
-	return 0;
-}
-
-
-elAPI elf_Closure *elf_get_closure(elf_Shell *R, elf_StackId x) {
-	return elf_get_arg(R,x).x_cls;
-}
-
-
-elAPI elf_Handle elf_get_handle(elf_Shell *R, elf_StackId x) {
-	elf_Value v = elf_get_arg(R,x);
-	if (v.tag != TAG_NIL && v.tag != TAG_SYS) {
-		elf_fail(R,NO_BYTE,elf_tpf("expected system object at local %i",x));
-		NO_CODE;
-	}
-	return v.x_sys;
-}
-
-
-elAPI elf_Int elf_get_integer(elf_Shell *R, int x) {
-	elf_Value v = elf_get_arg(R,x);
-	if (v.tag == TAG_NUM) return (elf_Int) v.x_num;
-	if (v.tag == TAG_INT) return v.x_int;
-	_expected(R,TAG_INT,v.tag,x);
-	return 0;
-}
-
-
-elf_Num elf_get_number(elf_Shell *R, elf_StackId x) {
-	elf_Value v = elf_get_arg(R,x);
-	if (v.tag == TAG_INT) return (elf_Num) v.x_int;
-	if (v.tag == TAG_NUM) return v.x_num;
-	_expected(R,TAG_NUM,v.tag,x);
-	return 0;
-}
-
-
 elf_String *elf_new_string(elf_Shell *R, const char *text) {
 	elf_String *string=elf_alloc_string(R,text);
-	elf_put_string(R,string);
+	elf_add_str(R,string);
 	return string;
 }
 
 
 elf_String *elf_new_string2(elf_Shell *R, elf_Int length) {
 	elf_String *string=elf_alloc_string2(R,length);
-	elf_put_string(R,string);
+	elf_add_str(R,string);
 	return string;
 }
 
 
-
-elf_Object *elf_put_new_object(elf_Shell *R, elf_Int tell) {
-	elf_Object *obj = elf_alloc_object(R,GC_OBJ,tell);
-	elf_put_object(R,obj);
+elf_Object *elf_new_object(elf_Shell *R, elf_Int size) {
+	elf_Object *obj=elf_alloc_object(R,GC_OBJ,size);
+	elf_add_obj(R,obj);
 	return obj;
 }
 
 
-elf_Table *elf_put_new_table(elf_Shell *R) {
-	elf_Table *tab = elf_alloc_table(R);
-	elf_new_table(R,tab);
+elf_Table *elf_new_table(elf_Shell *R) {
+	elf_Table *tab=elf_alloc_table(R);
+	elf_add_tab(R,tab);
 	return tab;
 }
 
+
+static void check_tag(elf_Shell *S, elf_ValueTag tag, elf_ValueTag got, elf_StackId x) {
+	elf_fail(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
+}
+
+
+int elf_get_num_args(elf_Shell *S) {
+	return GET_FRAME(S)->nargs-1;
+}
+
+
+elf_Value elf_get_arg(elf_Shell *S, int x) {
+	return GET_FRAME(S)->locals[x+1];
+}
+
+
+elf_ValueTag elf_get_tag(elf_Shell *S, int x) {
+	return GET_FRAME(S)->locals[x+1].tag;
+}
+
+
+elf_Object *elf_get_this(elf_Shell *S) {
+	return GET_FRAME(S)->locals[0].x_obj;
+}
+
+
+void elf_add_any(elf_Shell *S, elf_Value value) {
+	PUSHV(S,value);
+}
+
+
+void elf_add_nil(elf_Shell *S) {
+	PUSHV(S,VNIL());
+}
+
+
+void elf_add_cls(elf_Shell *S, elf_Closure *x) {
+	PUSHV(S,VCLS(x));
+}
+
+
+void elf_add_obj(elf_Shell *S, elf_Object *x) {
+	if (x) PUSHV(S,VOBJ(x)); else PUSHV(S,VNIL());
+}
+
+
+void elf_add_cfn(elf_Shell *S, elf_CFunction x) {
+	PUSHV(S,VCFN(x));
+}
+
+
+void elf_add_tab(elf_Shell *S, elf_Table *x) {
+	PUSHV(S,VTAB(x));
+}
+
+
+void elf_add_int(elf_Shell *S, elf_Int x) {
+	PUSHV(S,VINT(x));
+}
+
+
+void elf_add_num(elf_Shell *S, elf_Num x) {
+	PUSHV(S,VNUM(x));
+}
+
+
+void elf_add_str(elf_Shell *S, elf_String *x) {
+	PUSHV(S,VSTR(x));
+}
+
+
+void elf_add_sys(elf_Shell *S, elf_Handle x) {
+	PUSHV(S,VSYS(x));
+}
+
+
+elf_String *elf_get_str(elf_Shell *R, elf_StackId x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_NIL) return 0;
+	if (v.tag==elf_TAG_STR) return v.x_str;
+	check_tag(R,elf_TAG_STR,v.tag,x);
+	return 0;
+}
+
+
+char *elf_get_txt(elf_Shell *R, elf_StackId x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_NIL) return 0;
+	if (v.tag==elf_TAG_STR) return v.x_str->text;
+	check_tag(R,elf_TAG_STR,v.tag,x);
+	return 0;
+}
+
+
+elf_Object *elf_get_obj(elf_Shell *R, elf_StackId x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_NIL) return 0;
+	if (ISOBJT(v.tag)) return v.x_obj;
+	check_tag(R,elf_TAG_OBJ,v.tag,x);
+	return 0;
+}
+
+
+elf_Table *elf_get_tab(elf_Shell *R, elf_StackId x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_NIL) return 0;
+	if (v.tag==elf_TAG_TAB) return v.x_tab;
+	check_tag(R,elf_TAG_TAB,v.tag,x);
+	return 0;
+}
+
+
+elf_Closure *elf_get_cls(elf_Shell *S, elf_StackId x) {
+	elf_Value thing;
+	thing=elf_get_arg(S,x);
+	return thing.tag!=elf_TAG_CLS?0:thing.x_cls;
+}
+
+
+elf_Handle elf_get_sys(elf_Shell *R, elf_StackId x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_NIL) return 0;
+	if (v.tag==elf_TAG_SYS) return v.x_sys;
+	check_tag(R,elf_TAG_SYS,v.tag,x);
+	return 0;
+}
+
+
+elf_Int elf_get_int(elf_Shell *R, int x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_NUM) return (elf_Int) v.x_num;
+	if (v.tag==elf_TAG_INT) return v.x_int;
+	check_tag(R,elf_TAG_INT,v.tag,x);
+	return 0;
+}
+
+
+elf_Num elf_get_num(elf_Shell *R, elf_StackId x) {
+	elf_Value v=elf_get_arg(R,x);
+	if (v.tag==elf_TAG_INT) return (elf_Num) v.x_int;
+	if (v.tag==elf_TAG_NUM) return v.x_num;
+	check_tag(R,elf_TAG_NUM,v.tag,x);
+	return 0;
+}

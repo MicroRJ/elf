@@ -5,27 +5,41 @@
 */
 
 
+static int string_lib_length(elf_Shell *S);
+static int string_lib_match(elf_Shell *S);
+static int string_lib_pop(elf_Shell *S);
+static int string_lib_append(elf_Shell *S);
+static int string_lib_append_char(elf_Shell *S);
+static int string_lib_get_hash(elf_Shell *S);
+static int string_lib_uppercase(elf_Shell *S);
+static int string_lib_lowercase(elf_Shell *S);
+static int string_lib_split_by_lines(elf_Shell *S);
+static int string_lib_get_index(elf_Shell *S);
+static int string_lib_find(elf_Shell *S);
+static int string_lib_split(elf_Shell *S);
+
+
 elf_Table *elf_new_string_lib(elf_Shell *R) {
 	elf_CBinding lib[] = {
-		{"length",elf_slib_length},
-		{"match",elf_slib_match},
-		{"uppercase",elf_slib_uppercase},
-		{"lowercase",elf_slib_lowercase},
-		{"__add",elf_slib_append},
-		{"__add1",elf_slib_append},
-		{"append",elf_slib_append},
-		{"append_char",elf_slib_append_char},
-		{"pop",elf_slib_pop},
-		{"get_hash",elf_slib_get_hash},
-		{"split_by_lines",elf_slib_split_by_lines},
-		{"idx",elf_slib_get_index},
-		{"find",elf_slib_find},
+		{"length",string_lib_length},
+		{"match",string_lib_match},
+		{"uppercase",string_lib_uppercase},
+		{"lowercase",string_lib_lowercase},
+		{"__add",string_lib_append},
+		{"__add1",string_lib_append},
+		{"append",string_lib_append},
+		{"append_char",string_lib_append_char},
+		{"pop",string_lib_pop},
+		{"get_hash",string_lib_get_hash},
+		{"split_by_lines",string_lib_split_by_lines},
+		{"idx",string_lib_get_index},
+		{"find",string_lib_find},
 	};
 
 
 	elf_Table *tab;
 
-	tab=elf_put_new_table(R);
+	tab=elf_new_table(R);
 	elf_tsetx_bindings(R,tab,lib,COUNTOF(lib));
 	return tab;
 }
@@ -55,10 +69,10 @@ elf_String *elf_alloc_string(elf_Shell *R, const char *text) {
 
 	if (length < 64 && registry != 0) {
 		elf_check_table(registry);
-		elf_Int slot=elf_ttry_text(registry,text,length,hash);
+		elf_Int slot=elf_ttryx(registry,text,length,hash);
 		ASSERT(slot != -1);
 		elf_Entry entry=registry->slots[slot];
-		if (entry.key.tag != TAG_NIL) {
+		if (entry.key.tag != elf_TAG_NIL) {
 			elf_Value target=registry->array[registry->slots[slot].idx];
 			string=target.x_str;
 		} else {
@@ -67,8 +81,8 @@ elf_String *elf_alloc_string(elf_Shell *R, const char *text) {
 			string->hash = hash;
 
 			elf_Int i = ARRAY_GROW(registry->array,1);
-			registry->array[i]=elSTR(string);
-			registry->slots[slot].key=elSTR(string);
+			registry->array[i]=VSTR(string);
+			registry->slots[slot].key=VSTR(string);
 			registry->slots[slot].idx=i;
 			registry->nslots ++;
 		}
@@ -81,7 +95,7 @@ elf_String *elf_alloc_string(elf_Shell *R, const char *text) {
 }
 
 
-elf_Bool elf_string_eq(elf_String *x, elf_String *y) {
+elf_Bool elf_seq(elf_String *x, elf_String *y) {
 	if (x == y) return 1;
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;
@@ -90,8 +104,8 @@ elf_Bool elf_string_eq(elf_String *x, elf_String *y) {
 }
 
 
-int elf_slib_length(elf_Shell *S) {
-	elf_put_integer(S,((elf_String*)elf_get_this(S))->length);
+int string_lib_length(elf_Shell *S) {
+	elf_add_int(S,((elf_String*)elf_get_this(S))->length);
 	return 1;
 }
 
@@ -110,47 +124,47 @@ void strcatf(char *buffer, char *fmt, ...) {
 }
 
 
-int elf_slib_get_index(elf_Shell *R) {
+int string_lib_get_index(elf_Shell *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_put_integer(R,str->text[elf_get_integer(R,0)]);
+	elf_add_int(R,str->text[elf_get_int(R,0)]);
 	return 1;
 }
 
 
-int elf_slib_pop(elf_Shell *R) {
+int string_lib_pop(elf_Shell *R) {
 	elf_String *yo = (elf_String*) elf_get_this(R);
 	elf_String *el = elf_alloc_string2(R,MAX(0,yo->length-1));
 	copy_memory(el->text,yo->text,MAX(0,yo->length-1));
-	elf_put_string(R,el);
+	elf_add_str(R,el);
 	return 1;
 }
 
 
-int elf_slib_append_char(elf_Shell *R) {
+int string_lib_append_char(elf_Shell *R) {
 	elf_String *yo = (elf_String*) elf_get_this(R);
 	elf_String *el = elf_alloc_string2(R,yo->length + elf_get_num_args(R));
 	copy_memory(el->text,yo->text,yo->length);
 	for ( int i = 0; i < elf_get_num_args(R); i += 1 ) {
-		el->text[yo->length + i] = elf_get_integer(R,i);
+		el->text[yo->length + i] = elf_get_int(R,i);
 	}
-	elf_put_string(R,el);
+	elf_add_str(R,el);
 	return 1;
 }
 
 
-int elf_slib_append(elf_Shell *R) {
+int string_lib_append(elf_Shell *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elf_get_num_args(R); ++ i) {
 		elf_Value v = elf_get_arg(R,i);
-		if (v.tag == TAG_STR) {
+		if (v.tag == elf_TAG_STR) {
 			strcatf(buffer,"%s",v.x_str->text);
-		} else if (v.tag == TAG_NIL) {
+		} else if (v.tag == elf_TAG_NIL) {
 			strcatf(buffer,"nil");
-		} else if (v.tag == TAG_NUM) {
+		} else if (v.tag == elf_TAG_NUM) {
 			strcatf(buffer,"%.2f",v.x_num);
-		} else if (v.tag == TAG_INT) {
+		} else if (v.tag == elf_TAG_INT) {
 			strcatf(buffer,"%lli",v.x_int);
 		} else NO_CODE;
 	}
@@ -159,20 +173,20 @@ int elf_slib_append(elf_Shell *R) {
 }
 
 
-int elf_slib_match(elf_Shell *R) {
+int string_lib_match(elf_Shell *R) {
 	elf_String *s = (elf_String*) elf_get_this(R);
-	elf_String *p = elf_get_string(R,0);
-	elf_put_integer(R,match_entire_text(p->text,s->text));
+	elf_String *p = elf_get_str(R,0);
+	elf_add_int(R,match_entire_text(p->text,s->text));
 	return 1;
 }
 
 
-int elf_slib_find(elf_Shell *R) {
+int string_lib_find(elf_Shell *R) {
 	elf_String *string = (elf_String*) elf_get_this(R);
-	char *pattern = elf_get_text(R,0);
+	char *pattern = elf_get_txt(R,0);
 	char *buffer = 0;
 	char *cursor = string->text;
-	elf_Table *list = elf_put_new_table(R);
+	elf_Table *list = elf_new_table(R);
 	while (*cursor) {
 		char *match = match_text_single_clause_ex(cursor,pattern);
 		if (match != 0) {
@@ -182,7 +196,7 @@ int elf_slib_find(elf_Shell *R) {
 			/* todo: there's no need for the buffer! */
 			ARRAY_ADD(buffer,0);
 			elf_Int narray = ARRAY_LENGTH(list->array);
-			elf_tset(list,elINT(narray),elSTR(elf_alloc_string(R,buffer)));
+			elf_tset(list,VINT(narray),VSTR(elf_alloc_string(R,buffer)));
 			ARRAY(buffer).min = 0;
 		} else cursor += 1;
 	}
@@ -190,11 +204,11 @@ int elf_slib_find(elf_Shell *R) {
 }
 
 
-int elf_slib_split_by_lines(elf_Shell *R) {
+int string_lib_split_by_lines(elf_Shell *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	char *buffer = 0;
 	char *cursor = str->text;
-	elf_Table *list = elf_put_new_table(R);
+	elf_Table *list = elf_new_table(R);
 	while (*cursor) {
 		while (*cursor && *cursor != '\n' && *cursor != '\r') {
 			ARRAY_ADD(buffer,*cursor ++);
@@ -203,21 +217,21 @@ int elf_slib_split_by_lines(elf_Shell *R) {
 			cursor += 1 + (cursor[0] == '\r' && cursor[1] == '\n');
 		}
 		ARRAY_ADD(buffer,0);
-		elf_tset(list,elINT(ARRAY_LENGTH(list->array)),elSTR(elf_alloc_string(R,buffer)));
+		elf_tset(list,VINT(ARRAY_LENGTH(list->array)),VSTR(elf_alloc_string(R,buffer)));
 		ARRAY(buffer).min = 0;
 	}
 	return 1;
 }
 
 
-int elf_slib_get_hash(elf_Shell *R) {
+int string_lib_get_hash(elf_Shell *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_put_integer(R,str->hash);
+	elf_add_int(R,str->hash);
 	return 1;
 }
 
 
-int elf_slib_lowercase(elf_Shell *R) {
+int string_lib_lowercase(elf_Shell *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	elf_String *newstr = elf_new_string2(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
@@ -227,7 +241,7 @@ int elf_slib_lowercase(elf_Shell *R) {
 }
 
 
-int elf_slib_uppercase(elf_Shell *R) {
+int string_lib_uppercase(elf_Shell *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	elf_String *newstr = elf_new_string2(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {

@@ -18,45 +18,57 @@ void *copy_memory(void *dst, void const *src, elf_Int length) {
 }
 
 
-void elf_dealloc_(elAllocator fn, const void *memory, DBGSource loca) {
-	elf_Error error = fn(0,0,0,0,(void **)&memory,loca);
+void dealloc_memory_debug(Allocator fn, const void *memory, DBGSource loca) {
+	Error error = fn(0,0,0,0,(void **)&memory,loca);
 	ASSERT(PASSED(error));
 }
 
 
-void *elf_alloc_(elAllocator fn, elf_Int length, DBGSource loca) {
+void *alloc_memory_debug(Allocator fn, elf_Int length, DBGSource loca) {
 	void *memory = 0;
-	elf_Error error = fn(0,0,0,length,&memory,loca);
+	Error error = fn(0,0,0,length,&memory,loca);
 	ASSERT(PASSED(error));
 	return memory;
 }
 
 
-void *elf_realloc_(elAllocator fn, elf_Int length, void *memory, DBGSource loca) {
-	elf_Error error = fn(0,0,0,length,&memory,loca);
+void *realloc_memory_debug(Allocator fn, elf_Int length, void *memory, DBGSource loca) {
+	Error error = fn(0,0,0,length,&memory,loca);
 	ASSERT(PASSED(error));
 	return memory;
 }
 
 
-void *elf_calloc_(elAllocator fn, elf_Int size, DBGSource loca) {
-	return clear_memory(elf_alloc_(fn,size,loca),size);
+void *calloc_memory_debug(Allocator fn, elf_Int size, DBGSource loca) {
+	return clear_memory(alloc_memory_debug(fn,size,loca),size);
 }
 
 
-ALLOCATOR_FN(heap_allocfn) {
+ALLOCATOR_FN(global_allocator) {
 	if (memory==0) {
 		return Error_InvalidArguments;
 	}
-	if (new_size == 0) {
+	if (new_size==0) {
+#if defined(_DEBUG_ALLOC)
+		stb_leakcheck_free(*memory);
+#else
 		free(*memory);
+#endif
 	} else {
-		if (*memory == 0) {
-			*memory = stb_leakcheck_malloc(new_size,debug.fileName,debug.lineNumber);
+		if (*memory==0) {
+#if defined(_DEBUG_ALLOC)
+			*memory=stb_leakcheck_malloc(new_size,debug.fileName,debug.lineNumber);
+#else
+			*memory=malloc(new_size);
+#endif
 		} else {
-			*memory = stb_leakcheck_realloc(*memory,new_size,debug.fileName,debug.lineNumber);
+#if defined(_DEBUG_ALLOC)
+			*memory=stb_leakcheck_realloc(*memory,new_size,debug.fileName,debug.lineNumber);
+#else
+			*memory=realloc(*memory,new_size);
+#endif
 		}
-		if (*memory == 0) {
+		if (*memory==0) {
 			elf_debugger("fatal error: out of memory");
 			return Error_OutOfMemory;
 		}
@@ -65,14 +77,14 @@ ALLOCATOR_FN(heap_allocfn) {
 }
 
 
-ALLOCATOR_FN(tls_allocfn) {
+ALLOCATOR_FN(thread_allocator) {
 	if (memory==0) {
 		return Error_InvalidArguments;
 	}
 	if (new_size==0) {
 		return Error_InvalidArguments;
 	} else {
-		if (*memory != 0) {
+		if (*memory!=0) {
 			return Error_InvalidArguments;
 		}
 

@@ -4,8 +4,8 @@
 */
 
 
-
 /* todo: make use only 32 bits */
+#if 1
 typedef unsigned long long int elf_Bytecode;
 
 #define BC_XYZ(K,X,Y,Z) (elf_Bytecode){\
@@ -14,15 +14,30 @@ typedef unsigned long long int elf_Bytecode;
  (((Y) & 0xffffllu) <<(0x10))|\
  (((Z) & 0xffffllu) <<(0x00)))}
 
-#define BC_XYY(K,X,Y) BC_XYZ(K,X,Y,0)
-#define BC_XXX(K,X)   BC_XYZ(K,X,0,0)
 
-#define BC_OP(B)   (short)(((B)>>(0x30))&0xffff)//((B)._k) //
+#define BC_OP(B)   (short)(((B)>>(0x30))&0xffff)
 #define BC_ARGX(B) (short)(((B)>>(0x20))&0xffff)
 #define BC_ARGY(B) (short)(((B)>>(0x10))&0xffff)
 #define BC_ARGZ(B) (short)(((B)>>(0x00))&0xffff)
+#else
 
+typedef struct elf_Bytecode {
+	short z;
+	short y;
+	short x;
+	short k;
+} elf_Bytecode;
 
+#define BC_XYZ(K,X,Y,Z) (elf_Bytecode){Z,Y,X,K}
+
+#define BC_OP(B)   (B).k
+#define BC_ARGX(B) (B).x
+#define BC_ARGY(B) (B).y
+#define BC_ARGZ(B) (B).z
+#endif
+
+#define BC_XYY(K,X,Y) BC_XYZ(K,X,Y,0)
+#define BC_XXX(K,X)   BC_XYZ(K,X,0,0)
 
 typedef enum elByteClass {
 	BC_CLASS_XXX,
@@ -70,7 +85,7 @@ _(I2N,XY,"i2n") _(N2I,XY, "n2i") \
 _(FLOAT2,XYZ,"float2")
 
 
-#define BCITEM(NAME,MODE,SYM) FUSE(BC_,NAME),
+#define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),
 typedef enum ByteOP { BCLIST(BCITEM) } ByteOP;
 #undef BCITEM
 

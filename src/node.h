@@ -120,6 +120,6 @@ static NodeId node_global_name(FileState *fs, Source line, char *name);
 static NodeId node_call_pf(FileState *fs, Source line, NodeId *args);
 static NodeId node_call_set_metatable(FileState *fs, Source line, NodeId object, NodeId metatable);
 
-static elValueTag node2tag(NodeTy ty);
+static elf_ValueTag node2tag(NodeTy ty);
 static ByteOP node2byte(NodeKi tt);
 static elf_Bool node_is_lvalue(NodeKi kind);

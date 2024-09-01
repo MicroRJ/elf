@@ -32,23 +32,23 @@
 
 
 // elAPI int netlib_listen(elf_Shell *R) {
-// 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
+// 	SOCKET handle = (SOCKET) elf_get_sys(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elf_put_integer(R,error!=SOCKET_ERROR);
+// 	elf_add_int(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_accept(elf_Shell *R) {
-// 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
+// 	SOCKET handle = (SOCKET) elf_get_sys(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
-// 	elf_put_handle(R,(elf_Handle)client);
+// 	elf_add_sys(R,(elf_Handle)client);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_pollclient(elf_Shell *R) {
-// 	SOCKET handle = (SOCKET) elf_get_handle(R,0);
+// 	SOCKET handle = (SOCKET) elf_get_sys(R,0);
 // 	fd_set ready;
 // 	FD_ZERO(&ready);
 // 	FD_SET(handle,&ready);
@@ -57,15 +57,15 @@
 //    if (FD_ISSET(handle,&ready)) {
 //       SOCKET client = accept(handle,NULL,NULL);
 //       ASSERT(client != INVALID_SOCKET);
-// 		elf_put_handle(R,(elf_Handle)client);
-//    } else elf_put_nil(R);
+// 		elf_add_sys(R,(elf_Handle)client);
+//    } else elf_add_nil(R);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_tcpserver(elf_Shell *R) {
-// 	elf_String *addrnameS = elf_get_string(R,0);
-// 	elf_String *addrportS = elf_get_string(R,1);
+// 	elf_String *addrnameS = elf_get_str(R,0);
+// 	elf_String *addrportS = elf_get_str(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -79,16 +79,16 @@
 // 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 // 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_put_handle(R,(elf_Handle)thesocket);
-// 	} else elf_put_nil(R);
+// 		elf_add_sys(R,(elf_Handle)thesocket);
+// 	} else elf_add_nil(R);
 
 // 	return 1;
 // }
 
 
 // elAPI int netlib_tcpclient(elf_Shell *R) {
-// 	elf_String *addrnameS = elf_get_string(R,0);
-// 	elf_String *addrportS = elf_get_string(R,1);
+// 	elf_String *addrnameS = elf_get_str(R,0);
+// 	elf_String *addrportS = elf_get_str(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -103,42 +103,42 @@
 
 // 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_put_handle(R,(elf_Handle)thesocket);
-// 	} else elf_put_nil(R);
+// 		elf_add_sys(R,(elf_Handle)thesocket);
+// 	} else elf_add_nil(R);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_send(elf_Shell *R) {
 // 	/* todo: make this a class? */
-// 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
-// 	elf_String *payload = elf_get_string(R,1);
+// 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
+// 	elf_String *payload = elf_get_str(R,1);
 // 	LMSG message = { payload->length };
 // 	elf_Int sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elf_put_integer(R,sent);
+// 	elf_add_int(R,sent);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_ioctl(elf_Shell *R) {
-// 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
+// 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elf_put_integer(R,error == 0);
+// 	elf_add_int(R,error == 0);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_recv(elf_Shell *R) {
-// 	SOCKET socket = (SOCKET) elf_get_handle(R,0);
+// 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
 // 	LMSG message = {0};
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {
 // 			elf_Int length = message.length;
 // 			elf_String *obj = elf_alloc_string2(R,length);
-// 			elf_put_string(R,obj);
+// 			elf_add_str(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
 // 				elf_Int result = recv(socket,cursor,length,0);
@@ -162,8 +162,8 @@
 // 				}
 // 			} while (length != 0);
 // 			*cursor = 0;
-// 		} else elf_put_nil(R);
-// 	} else elf_put_nil(R);
+// 		} else elf_add_nil(R);
+// 	} else elf_add_nil(R);
 // 	return 1;
 // }
 // #else

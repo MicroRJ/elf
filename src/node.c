@@ -71,14 +71,14 @@ static elf_Bool node_is_lvalue(NodeKi kind) {
 }
 
 
-elValueTag node2tag(NodeTy ty) {
+elf_ValueTag node2tag(NodeTy ty) {
 	switch (ty) {
-		case NT_SYS: return TAG_SYS;
-		case NT_NUM: return TAG_NUM;
-		case NT_INT: return TAG_INT;
+		case NT_SYS: return elf_TAG_SYS;
+		case NT_NUM: return elf_TAG_NUM;
+		case NT_INT: return elf_TAG_INT;
 		default: NO_CODE;
 	}
-	return TAG_NIL;
+	return elf_TAG_NIL;
 }
 
 

@@ -8,7 +8,7 @@
 ** along with a header. This header contains
 ** information about the array.
 **
-** I got this from STB, pretty much.
+** See stb's implementation.
 **
 ** Arrays are not exposed directly to elf, instead,
 ** we use them internally as a core data type.
@@ -61,7 +61,7 @@ pointer */
 #define ARRAY_LENGTH ARRAY_GET_MIN
 
 
-#define ARRAY_DELETE(D) ((D != 0) ? elf_dealloc(HEAP_ALLOCATOR,&ARRAY(D)), 0 : 0)
+#define ARRAY_DELETE(D) ((D != 0) ? dealloc_memory(GLOBAL_ALLOCATOR,&ARRAY(D)), 0 : 0)
 
 
 #define FOR_RANGE(N,X,Y) for (elf_Int N = X; N < Y; N += 1)

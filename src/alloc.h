@@ -1,25 +1,29 @@
 /*
 ** See Copyright Notice In elf.h
 ** alloc.h
+** memory allocation functions
 */
 
 
-#define elf_dealloc(cator,mem) elf_dealloc_(cator,mem,DBG_SOURCE)
-#define elf_realloc(cator,sze,mem) elf_realloc_(cator,sze,mem,DBG_SOURCE)
-#define elf_alloc(cator,sze) elf_alloc_(cator,sze,DBG_SOURCE)
-#define elf_calloc(cator,sze) elf_calloc_(cator,sze,DBG_SOURCE)
-
 #define ALLOCATOR_FN(NAME) int (NAME)(void *user, int flags, elf_Int old_size, elf_Int new_size, void **memory, DBGSource debug)
-typedef ALLOCATOR_FN(* elAllocator);
+typedef ALLOCATOR_FN(* Allocator);
 
-static void elf_dealloc_(elAllocator fn, void const *memory, DBGSource info);
-static void *elf_realloc_(elAllocator fn, elf_Int size, void *memory, DBGSource info);
-static void *elf_alloc_(elAllocator fn, elf_Int size, DBGSource info);
-static void *elf_calloc_(elAllocator fn, elf_Int size, DBGSource info);
 
-static ALLOCATOR_FN(tls_allocfn);
-static ALLOCATOR_FN(heap_allocfn);
+static ALLOCATOR_FN(thread_allocator);
+static ALLOCATOR_FN(global_allocator);
 
-#define TLS_ALLOCATOR (tls_allocfn)
-#define HEAP_ALLOCATOR (heap_allocfn)
 
+#define THREAD_ALLOCATOR (thread_allocator)
+#define GLOBAL_ALLOCATOR (global_allocator)
+
+
+#define dealloc_memory(allocator,memory)       dealloc_memory_debug(allocator,memory,DBG_SOURCE)
+#define realloc_memory(allocator,size,memory)  realloc_memory_debug(allocator,size,memory,DBG_SOURCE)
+#define alloc_memory(allocator,size)           alloc_memory_debug(allocator,size,DBG_SOURCE)
+#define calloc_memory(allocator,size)          calloc_memory_debug(allocator,size,DBG_SOURCE)
+
+
+static void  dealloc_memory_debug(Allocator fn, void const *memory, DBGSource debug);
+static void *realloc_memory_debug(Allocator fn, elf_Int size, void *memory, DBGSource debug);
+static void *alloc_memory_debug(Allocator fn, elf_Int size, DBGSource debug);
+static void *calloc_memory_debug(Allocator fn, elf_Int size, DBGSource debug);

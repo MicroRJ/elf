@@ -60,38 +60,6 @@ at the same time when using clang-cl */
 #define elDEFAULT_STACK_SIZE 4096
 
 
-#if defined(__EMSCRIPTEN__)
-   #define THREAD static
-   #define GLOBAL static
-#else
-   #define THREAD static __declspec(thread)
-   #define GLOBAL static
-#endif
-
-
-/* few utility macros */
-#if !defined(MAX)
-   #define MAX(x,y) ((x) > (y) ? (x) : (y))
-#endif
-#if !defined(MIN)
-   #define MIN(x,y) ((x) < (y) ? (x) : (y))
-#endif
-
-#if !defined(WITHIN)
-   #define WITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
-#endif
-
-#if !defined(MEGABYTES)
-   #define MEGABYTES(x) ((x)*1024LLU*1024LLU)
-#endif
-#if !defined(GIGABYTES)
-   #define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
-#endif
-#if !defined(MAX_PATH)
-   #define MAX_PATH 0xff
-#endif
-
-
 #define STB_SPRINTF_IMPLEMENTATION
 #define STB_SPRINTF_STATIC
 #include "stb/stb_sprintf.h"
@@ -102,6 +70,7 @@ at the same time when using clang-cl */
 
 #include "elf.h"
 
+#include "src/help.h"
 #include "src/error.h"
 #include "src/debug.h"
 #include "src/alloc.h"
@@ -113,35 +82,35 @@ at the same time when using clang-cl */
 
 
 typedef int Instr;
+typedef char *Source;
 
 
 typedef struct elf_Closure {
-   elf_Object       obj;
-   elf_Shell     *state;
-   elf_Function   proto;
-   elf_Value  values[1];
+	elf_Object       obj;
+	elf_Function   proto;
+	elf_Value  values[1];
 } elf_Closure;
 
 
 
 typedef struct delaylist delaylist;
 typedef struct delaylist {
-   delaylist *n;
-   Instr j;
+	delaylist *n;
+	Instr j;
 } delaylist;
 
 
 typedef struct elf_StackFrame elf_StackFrame;
 typedef struct elf_StackFrame {
-   elf_StackFrame    *caller;
-   elf_Closure      *closure;
-   elf_Value         *locals;
-   int               nlocals;
-   char                nargs;
-   char                nregs;
-   int                origin;
-   delaylist    * delay_list;
-   elf_Bool            logging;
+	elf_StackFrame    *caller;
+	elf_Closure      *closure;
+	elf_Value         *locals;
+	int               nlocals;
+	char                nargs;
+	char                nregs;
+	int                origin;
+	delaylist    * delay_list;
+	elf_Bool            logging;
 } elf_StackFrame;
 
 
@@ -150,32 +119,32 @@ typedef struct elf_StackFrame {
 
 
 typedef struct elf_Collector {
-   elf_Bool       paused;
-   int          phase;
-   elf_Int      memory_allocated;
-   elf_Int      memory_threshold;
-   elf_Object **new_objects;
-   elf_Object **objects;
+	elf_Bool       paused;
+	int          phase;
+	elf_Int      memory_allocated;
+	elf_Int      memory_threshold;
+	elf_Object **new_objects;
+	elf_Object **objects;
    /* this changes dynamically based on
    object min threshold, it tends to
    be around there... */
-   elf_Int      object_trigger_threshold;
+	elf_Int      object_trigger_threshold;
 } elf_Collector;
 
 
 /* symbols are mapped at load time, so the code generator
 references globals by index... */
 typedef struct elf_Module {
-   elf_Table      *globals;
-   int              *track;
-   elf_Bytecode     *bytes;
-   Instr            nbytes;
-   Source           *lines;
-   elf_Function     *files;
-   elf_Table      *strings;
-   elf_Num        *numbers;
-   elf_Int       *integers;
-   elf_Function *functions;
+	elf_Table      *globals;
+	int              *track;
+	elf_Bytecode     *bytes;
+	Instr            nbytes;
+	Source           *lines;
+	elf_Function     *files;
+	elf_Table      *strings;
+	elf_Num        *numbers;
+	elf_Int       *integers;
+	elf_Function *functions;
 } elf_Module;
 
 
@@ -186,38 +155,37 @@ typedef struct elf_Module {
 
 
 typedef struct elf_Shell {
-   elf_Module     *M;
-   elf_Value      *stack;
-   int             stack_max;
-   elf_Value      *stack_ptr;
-   elf_StackFrame *frame;
-   int            nframe;
-   int             flags;
+	elf_Module     *M;
+	elf_Value      *stack;
+	int             stack_max;
+	elf_Value      *stack_ptr;
+	elf_StackFrame *frame;
+	int            nframe;
+	int             flags;
 
-   struct {
-      elf_Table *integer;
-      elf_Table *number;
-      elf_Table *string;
-      elf_Table *table;
-   } metatables;
-   struct {
-      elf_Value oncall;
-      elf_Value ongc;
-   } hooks;
+	struct {
+		elf_Table *integer;
+		elf_Table *number;
+		elf_Table *string;
+		elf_Table *table;
+	} metatables;
+	struct {
+		elf_Value oncall;
+		elf_Value ongc;
+	} hooks;
    /* the current instruction */
-   Instr byte;
-   union { elf_Collector collector, memory; };
+	Instr byte;
+	union { elf_Collector collector, memory; };
 } elf_Shell;
 
 
 #include "src/node.h"
 #include "src/file.h"
-#include "src/help.h"
 
 #include "src/debug.c"
 #include "src/log.c"
 #include "src/array.c"
-#include "src/elf-mem.c"
+#include "src/alloc.c"
 #include "src/text.c"
 
 #include "src/closure.c"
@@ -233,51 +201,8 @@ typedef struct elf_Shell {
 #include "src/user.c"
 #include "src/libcore.c"
 #include "src/libtable.c"
-#include "src/runtime.c"
+#include "src/shell.c"
 #include "src/system.c"
-
-
-#if 0
-#include "src/elf-cli.c"
-
-int main(int n, char **c) {
-   (void) n;
-   elf_cliopts cli = {0};
-   if (elf_loadcliopts(&cli,n,c)) return 0;
-
-   elf_Module M = {0};
-   elf_Shell R = {0};
-   elf_begin(&R,&M);
-   if (cli.logging) R.bytelogging = 1;
-
-   elf_StackFrame frame = {0};
-   frame.base = R.top;
-   R.frame = &frame;
-
-   if (cli.filename != 0) {
-      elf_String *filename = elf_new_string(&R,cli.filename);
-      /* todo: remove this?? */
-      filename->obj.color = elf_GC_PINK;
-      FileState fs = {0};
-      elf_parse_file_fs(&R,&fs,filename,0,0);
-   }
-   if (cli.dump) {
-      FILE *dumpf = stdout;
-      if (strcmp(cli.dumpfilename,"stdout")) {
-         dumpf = fopen(elf_tpf("%s.module.ignore",cli.dumpfilename),"wb");
-      }
-      if (dumpf == 0) {
-         printf("error: could open specified dump file for writting");
-      } else {
-         lang_dumpmodule(&M,dumpf);
-         if (dumpf != stdout) fclose(dumpf);
-      }
-   }
-   sys_console_print(LOG_KINFO,"exited");
-   return 0;
-}
-
-#endif
 
 
 #if defined(_MSC_VER)

@@ -23,7 +23,7 @@ elf_Int array_allocate(void **var, elf_Int per, elf_Int res, elf_Int com) {
 		if(min + res > max) {
 			max = min + res;
 		}
-		arr = elf_realloc(HEAP_ALLOCATOR,sizeof(ArrayH)+per*max,arr);
+		arr = realloc_memory(GLOBAL_ALLOCATOR,sizeof(ArrayH)+per*max,arr);
 	}
 	if (arr != 0) {
 		arr->max = max;

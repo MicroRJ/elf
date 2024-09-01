@@ -28,21 +28,8 @@ typedef struct DBGSource {
 #endif
 
 
-#if !defined(NO_CODE)
-	#define NO_CODE elf_debugger(__FILE__" ["TO_TEXT(__LINE__)"]: internal error: unexpected code branch")
-#endif
-
-
-#if defined(_DEBUG)
-	#define CHECK_FORMAT(FORMAT,...) ((0)?(snprintf(0,0,FORMAT,##__VA_ARGS__),0):0)
-#else
-	#define CHECK_FORMAT(FORMAT,...) 0
-#endif
-
-
-
 #if !defined(ASSERT_ALWAYS)
-	#define ASSERT_ALWAYS(xx) do { if (!(xx)) assertion_function(DBG_SOURCE,TO_TEXT(xx)); } while(0)
+	#define ASSERT_ALWAYS(xx) do { if (!(xx)) assertion_function(DBG_SOURCE,XTEXT(xx)); } while(0)
 #endif
 
 

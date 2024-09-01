@@ -6,11 +6,11 @@
 
 
 
-#define CHARA()   (file->thischar[0])
-#define CHARB()   (file->thischar[1])
+#define CHAR0()   (file->thischar[0])
+#define CHAR1()   (file->thischar[1])
 #define MOVE()  (*(file->thischar ++))
 #define MOVEN(n) ((file->thischar += n))
-#define PICK(xx) ((CHARA()==(xx))?MOVE(),1:0)
+#define PICK(xx) ((CHAR0()==(xx))?MOVE(),1:0)
 
 #define LEX1(C,T) case C:MOVE();tk.type=T;break
 #define LEX2(A,X,B,Y) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;break
@@ -26,7 +26,7 @@ static void new_line(FileState *fs) {
 
 /* todo: speed */
 static elTokenType text_is_word_or_macro(char *name) {
-#define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return FUSE(TK_M_,NAME);
+#define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_M_,NAME);
 	MCLIST(MCITEM)
 #undef MCITEM
 	return TK_WORD;
@@ -34,7 +34,7 @@ static elTokenType text_is_word_or_macro(char *name) {
 
 
 static elTokenType text_is_word_or_keyword(char *name) {
-	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return FUSE(TK_,NAME);
+	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_,NAME);
 	KWLIST(KWITEM)
 	#undef KWITEM
 	return TK_WORD;
@@ -123,7 +123,7 @@ static int lex_word(FileState *file, char *buffer) {
 	int length = 0;
 	do {
 		buffer[length++] = MOVE();
-	} while (is_letter_or_digit_chr(CHARA()) || (CHARA() == '_'));
+	} while (is_letter_or_digit_chr(CHAR0()) || (CHAR0() == '_'));
 buffer[length] = 0;
 return length;
 }
@@ -157,7 +157,7 @@ elf_Num lex_number(FileState *file, int base) {
 	do {
 		N=N*base+(MOVE()-'0');
 		P=P*base;
-	} while(is_digit_chr(CHARA()));
+	} while(is_digit_chr(CHAR0()));
 return N/P;
 }
 
@@ -173,19 +173,19 @@ FileToken poll_token(FileState *file) {
 	tk.line=file->thischar;
 
 	/* not sure how portable this is */
-	switch (CHARA()) {
+	switch (CHAR0()) {
 
 	case 'A'...'Z': case 'a'...'z': case '_': {
 		int length = 0;
 		do {
 			ASSERT(length < 0xff);
 			buffer[length++] = MOVE();
-		} while (is_letter_or_digit_chr(CHARA()) || (CHARA() == '_'));
+		} while (is_letter_or_digit_chr(CHAR0()) || (CHAR0() == '_'));
 		buffer[length] = 0;
 		tk.type=text_is_word_or_keyword(buffer);
 		if (tk.type==TK_WORD) {
 				/* todo: string interner please */
-			tk.text=copy_text2(HEAP_ALLOCATOR,length,buffer);
+			tk.text=copy_text2(GLOBAL_ALLOCATOR,length,buffer);
 		}
 	} break;
 	case '0'...'9': {
@@ -193,19 +193,19 @@ FileToken poll_token(FileState *file) {
 		elf_Int B,I,C;
 
 		B=10;
-		if (CHARA()=='0') {
-			if (CHARB()=='b') MOVEN(2),B=2; else
-			if (CHARB()=='x') MOVEN(2),B=16;
+		if (CHAR0()=='0') {
+			if (CHAR1()=='b') MOVEN(2),B=2; else
+			if (CHAR1()=='x') MOVEN(2),B=16;
 		}
 
 		for (I = 0, C = -1; ; I = I * B + C) {
-			if(WITHIN(CHARA(),'A','Z'+1)) {
+			if(WITHIN(CHAR0(),'A','Z'+1)) {
 				C = 10 + MOVE() - 'A';
 				if (B != 16) goto _error;
-			} else if(WITHIN(CHARA(),'a','z'+1)) {
+			} else if(WITHIN(CHAR0(),'a','z'+1)) {
 				C = 10 + MOVE() - 'A';
 				if (B != 16) goto _error;
-			} else if(WITHIN(CHARA(),'0','9'+1)) {
+			} else if(WITHIN(CHAR0(),'0','9'+1)) {
 				C = MOVE() - '0';
 				if (B == 2 && C > 1) goto _error;
 			} else {
@@ -218,11 +218,11 @@ FileToken poll_token(FileState *file) {
 		tk.integer=I;
 			/* lex decimal part */
 		elf_Num P,N;
-		if ((CHARA()=='.')&&(CHARB()!='.')) {
+		if ((CHAR0()=='.')&&(CHAR1()!='.')) {
 			MOVE();
 			tk.type=TK_NUMBER;
 			P=1,N=0;
-			while (is_digit_chr(CHARA())) {
+			while (is_digit_chr(CHAR0())) {
 				N=N*10+(MOVE()-'0');
 				P=P*10;
 			}
@@ -244,8 +244,8 @@ FileToken poll_token(FileState *file) {
 			/* todo: use static buffer first */
 		char *buffer = 0;
 		int   length = 0;
-		while (CHARA() != 0) {
-			while (CHARA() != 0 && CHARA() != '"') {
+		while (CHAR0() != 0) {
+			while (CHAR0() != 0 && CHAR0() != '"') {
 					/* are multi-line strings illegal? */
 				if (PICK('\n') || (PICK('\r') && (PICK('\n'),1))) {
 					new_line(file);
@@ -269,20 +269,20 @@ FileToken poll_token(FileState *file) {
 		ARRAY_ADD(buffer,0);
 
 		tk.type = TK_STRING;
-		tk.text = copy_text2(HEAP_ALLOCATOR,length,buffer);
+		tk.text = copy_text2(GLOBAL_ALLOCATOR,length,buffer);
 	} break;
 	case '.': { MOVE(); tk.type = TK_DOT;
 		if (PICK('.')) { tk.type = TK_DOT_DOT;
 				/* todo: eventually rename use TK_ELLIPSIS */
 			if (PICK('.'))   tk.type = TK_DOT_DOT;
-		} else if (is_digit_chr(CHARA())) {
+		} else if (is_digit_chr(CHAR0())) {
 			tk.type = TK_NUMBER;
 			elf_Num n = 0;
 			elf_Num p = 1;
 			do {
 				n = n * 10 + (MOVE() - '0');
 				p *= 10;
-			} while (is_digit_chr(CHARA()));
+			} while (is_digit_chr(CHAR0()));
 			tk.number = n / p;
 		}
 	} break;
@@ -323,7 +323,7 @@ FileToken poll_token(FileState *file) {
 	} goto retry;
 	case ';': {
 		MOVE();
-		while (CHARA() != 0 && !is_eol_chr(CHARA())) {
+		while (CHAR0() != 0 && !is_eol_chr(CHAR0())) {
 			MOVE();
 		}
 		goto retry;
@@ -367,7 +367,7 @@ FileToken poll_token(FileState *file) {
 			goto retry;
 		} else
 		if (PICK('/')) {
-			while (CHARA() != 0 && !is_eol_chr(CHARA())) {
+			while (CHAR0() != 0 && !is_eol_chr(CHAR0())) {
 				MOVE();
 			}
 			goto retry;
@@ -398,12 +398,12 @@ FileToken poll_token(FileState *file) {
 esc: ;
 
 	/* passive hinting */
-while ((CHARA()==' ')||(CHARA()=='\t')) {
+while ((CHAR0()==' ')||(CHAR0()=='\t')) {
 	MOVE();
 }
-if ((CHARA()==';')||((CHARA()=='/')&&((CHARB()=='/')||(CHARB()=='*')))) {
+if ((CHAR0()==';')||((CHAR0()=='/')&&((CHAR1()=='/')||(CHAR1()=='*')))) {
 	tk.eol = 1;
-} else if ((CHARA()=='\n')||(CHARA()=='\r')) {
+} else if ((CHAR0()=='\n')||(CHAR0()=='\r')) {
 	tk.eol = 1;
 }
 

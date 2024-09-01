@@ -1,33 +1,132 @@
 /*
 ** See Copyright Notice In elf.h
 ** help.h
+** internal utility macros
 */
 
 
-#define IS_TOBJ(tag) ((tag) >= TAG_OBJ)
-#define IS_TNUM(tag) ((tag) == TAG_NUM || (tag) == TAG_INT)
-#define IS_TCALL(tag) ((tag) == TAG_CLS || (tag) == TAG_CFN)
+
+#if defined(__EMSCRIPTEN__)
+   #define THREAD static
+   #define GLOBAL static
+#else
+   #define THREAD static __declspec(thread)
+   #define GLOBAL static
+#endif
 
 
-#define IS_NIL_OBJ(val) (IS_TOBJ((val).tag) && (val).x_obj == 0)
-
-#define IS_VNIL(val) ((val).tag == TAG_NIL || IS_NIL_OBJ(val))
-
-#define VI2N(val) ((val).tag == TAG_INT ? (elf_Num)  (val).x_int : (val).x_num)
-#define VN2I(val) ((val).tag == TAG_NUM ? (elf_Int) (val).x_num : (val).x_int)
-
-
-#define TO_OBJ(thing) ((elf_Object*)(thing))
-#define OBJ_COLOR(thing) (TO_OBJ(thing)->color)
+#if !defined(MAX)
+   #define MAX(x,y) ((x) > (y) ? (x) : (y))
+#endif
+#if !defined(MIN)
+   #define MIN(x,y) ((x) < (y) ? (x) : (y))
+#endif
 
 
-#define GET_LOCAL(S,X) (elGETFRAME(S)->locals[X])
+#if !defined(WITHIN)
+   #define WITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
+#endif
 
-#define OBJ2V(ty) (TAG_OBJ+ty)
+
+#if !defined(MEGABYTES)
+   #define MEGABYTES(x) ((x)*1024LLU*1024LLU)
+#endif
+#if !defined(GIGABYTES)
+   #define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
+#endif
+
+
+#if !defined(MAX_PATH)
+   #define MAX_PATH 0xff
+#endif
+
+
+#if defined(_DEBUG)
+	#define CHECK_FORMAT(FORMAT,...) ((0)?(snprintf(0,0,FORMAT,##__VA_ARGS__),0):0)
+#else
+	#define CHECK_FORMAT(FORMAT,...) 0
+#endif
+
+
+#if !defined(__cplusplus)
+	#define XLITERAL(X) (X)
+#else
+	#define XLITERAL(X) X
+#endif
+
+
+/* cast to union types, c feature */
+#define UCAST(D,T) ( ((union { T _; }){D})._ )
+
+
+#define XTEST_(X) #X
+#define XTEXT(X) XTEST_(X)
+
+
+#define XFUSE_(X,Y) X##Y
+#define XFUSE(X,Y) XFUSE_(X,Y)
+
+
+#if !defined(COUNTOF)
+	#define COUNTOF(X) (sizeof(X)/sizeof((X)[0]))
+#endif
+
+
+/* call elf debugger when reached */
+#if !defined(NO_CODE)
+	#define NO_CODE elf_debugger(__FILE__" ["XTEXT(__LINE__)"]: internal error: unexpected code branch")
+#endif
+
+
+#define NO_BYTE (-1)
+
+
+#define ISOBJT(tag) ((tag)>=elf_TAG_OBJ)
+#define ISNUMT(tag) (((tag)==elf_TAG_NUM)||((tag)==elf_TAG_INT))
+#define ISFUNT(tag) (((tag)==elf_TAG_CLS)||((tag)==elf_TAG_CFN))
+
+
+#define ISNILOBJ(X) (ISOBJT((X).tag) && (X).x_obj == 0)
+
+
+#define ISNILV(X) (((X).tag==elf_TAG_NIL)||ISNILOBJ(X))
+
+
+#define VI2N(X) (((X).tag==elf_TAG_INT) ? (elf_Num) (X).x_int : (X).x_num)
+#define VN2I(X) (((X).tag==elf_TAG_NUM) ? (elf_Int) (X).x_num : (X).x_int)
+
+
+#define POBJ(thing) ((elf_Object*)(thing))
+#define OBJ_COLOR(thing) (POBJ(thing)->color)
+
+
+#define OBJ2V(ty) (elf_TAG_OBJ+ty)
+
+
+#define GET_FRAME(S) ((S)->frame)
+#define GET_LOCAL(S,X) (GET_FRAME(S)->locals[X])
+
 
 #define GET_TOP(S)   ((S)->stack_ptr)
 #define SET_TOP(S,X) (GET_TOP(S) = UCAST(X, elf_Value *))
 #define PUSHV(S,X)   (* GET_TOP(S) ++ = (X))
-#define elGETFRAME(S) ((S)->frame)
+
+
+#define VNIL() (XLITERAL(elf_Value){elf_TAG_NIL})
+#define VNUM(thing) (XLITERAL(elf_Value){ elf_TAG_NUM, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
+#define VINT(thing) (XLITERAL(elf_Value){ elf_TAG_INT, {(elf_Int) UCAST(thing, elf_Int)} })
+#define VSYS(thing) (XLITERAL(elf_Value){ elf_TAG_SYS, {(elf_Int) UCAST(thing, elf_Handle)} })
+#define VTAB(thing) (XLITERAL(elf_Value){ elf_TAG_TAB, {(elf_Int) UCAST(thing, elf_Table *)} })
+#define VOBJ(thing) (XLITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Object *)} })
+#define VSTR(thing) (XLITERAL(elf_Value){ elf_TAG_STR, {(elf_Int) UCAST(thing, elf_String *)} })
+#define VCLS(thing) (XLITERAL(elf_Value){ elf_TAG_CLS, {(elf_Int) UCAST(thing, elf_Closure *)} })
+#define VCFN(thing) (XLITERAL(elf_Value){ elf_TAG_CFN, {(elf_Int) UCAST(thing, elf_CFunction)} })
+
+
+static char const *tag2s[] = {
+	"NIL","NUM","INT",
+	"SYS","CFN","FLOAT2",
+	"OBJ","CLS","STR","TAB"
+};
 
 

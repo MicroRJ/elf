@@ -231,9 +231,9 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 }
 
 
-elf_Error sys_load_file_data(elAllocator fn, void **data, char const *name) {
+Error sys_load_file_data(Allocator fn, void **data, char const *name) {
 
-	elf_Error error = Error_None;
+	Error error = Error_None;
 
 	if (name == 0) {
 		error = Error_FileNameIsInvalid;
@@ -249,7 +249,7 @@ elf_Error sys_load_file_data(elAllocator fn, void **data, char const *name) {
 	HANDLE hfile = CreateFileA(name,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
 	if (hfile != INVALID_HANDLE_VALUE) {
 		DWORD hi,lo = GetFileSize(hfile,&hi);
-		char *buf = elf_alloc(fn,lo+1);
+		char *buf = alloc_memory(fn,lo+1);
 		DWORD bytes;
 		if (ReadFile(hfile,buf,lo,&bytes,NULL)) {
 			buf[bytes] = 0;
@@ -259,7 +259,7 @@ elf_Error sys_load_file_data(elAllocator fn, void **data, char const *name) {
 				goto esc;
 			}
 		} else {
-			elf_dealloc(fn,buf);
+			dealloc_memory(fn,buf);
 			error = Error_CouldNotReadFile;
 			goto esc;
 		}
@@ -281,7 +281,7 @@ elf_Error sys_load_file_data(elAllocator fn, void **data, char const *name) {
 	fseek(file,0,SEEK_END);
 	long fileSize = ftell(file);
 	fseek(file,0,SEEK_SET);
-	char *buf = (char *) elf_alloc(fn,fileSize+1);
+	char *buf = (char *) alloc_memory(fn,fileSize+1);
 	fread(buf,1,fileSize,file);
 	fclose(file);
 	buf[fileSize] = 0;
@@ -298,7 +298,7 @@ elf_Error sys_load_file_data(elAllocator fn, void **data, char const *name) {
 }
 
 
-elf_Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileName) {
+Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");
@@ -310,7 +310,7 @@ elf_Error sys_save_file_data(char const *buffer, elf_Int length, char const *fil
 		return Error_CouldNotOpenFile;
 	}
 
-	elf_Error error = Error_None;
+	Error error = Error_None;
 	elf_Int lengthWritten = fwrite(buffer, 1, length, file);
 
 	if (lengthWritten != length) {
@@ -351,37 +351,58 @@ static int issymlink(char const *fn) {
 
 
 #if defined(_WIN32)
-static int sys_enumerate_folder(elAllocator alloc, char const *folder, void *user, enumerate_folder_callback callback) {
+static int sys_enumerate_folder(Allocator alloc, char const *folder, void *user, enumerate_folder_callback callback) {
 	HANDLE handle;
 	WIN32_FIND_DATAA data;
-	int flags;
+	int type;
 	char *name,*path;
+	size_t size;
 
 	handle=FindFirstFileA(elf_tpf("%s\\*",folder),&data);
 	if (handle!=INVALID_HANDLE_VALUE) do {
 		if (issymlink(data.cFileName)) continue;
 
 		name=data.cFileName;
-		flags=data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY;
-		path=elf_xpf(alloc,"%s\\%s",folder,data.cFileName);
-		callback(user,flags,name,path);
+		type=data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+		size=data.nFileSizeLow;
 
-		// elf_Value *top = GET_TOP(R);
-		// elf_Table *file = elf_put_new_table(R);
-		// elf_tsets_str(file,elf_new_string(R,"name"),name);
-		// elf_tsets_str(file,elf_new_string(R,"path"),path);
-		// elf_tsets_int(file,elf_new_string(R,"is_directory"),is_directory);
-		// elf_tsets_int(file,elf_new_string(R,"size"),f.nFileSizeLow);
-		// elf_put_closure(R,cls);
-		// int results = 0; NO_CODE; // elf_call_function(R,base,1,1);
-		// if (is_directory) {
-		// 	if ((results > 0) && elf_get_integer(R,base) != 0) {
-		// 		core_lib_enumerate_folder_(R,path,cls);
-		// 	}
-		// }
-		// SET_TOP(R,top);
+		path=elf_xpf(alloc,"%s\\%s",folder,data.cFileName);
+
+		if (callback(user,type,size,name,path)) {
+			break;
+		}
+
 	} while (FindNextFileA(handle,&data));
 	return 0;
 }
+
+#if 0
+	// defined(PLATFORM_WEB)
+	DIR *dirfd = opendir(dir->c);
+	if (dirfd != 0) {
+		struct dirent *entry;
+		while ((entry = readdir(dirfd)) != 0) {
+			if (elf_is_virtual_file_name(entry->d_name)) {
+				continue;
+			}
+			elf_Bool isdir = (entry->d_type & DT_DIR) != 0;
+			elf_Value *top = GET_TOP(R);
+
+			elf_String *name = elf_new_string(R,entry->d_name);
+			elf_String *path = elf_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			elf_StackId base = elf_add_cls(R,cls);
+			elf_Table *file = elf_new_table(R);
+
+			elf_tsets_str(file,elf_new_string(R,"name"),name);
+			elf_tsets_str(file,elf_new_string(R,"path"),path);
+			elf_tsets_int(file,elf_new_string(R,"isdir"),isdir);
+			int r = elf_call_function(R,base,1,1);
+			if ((r > 0) && isdir && elf_get_int(R,base)) {
+				core_lib_enumerate_folder_(R,path,cls);
+			}
+			SET_TOP(R,top);
+		}
+		closedir(dirfd);
+#endif
 #else
 #endif

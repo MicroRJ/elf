@@ -24,33 +24,6 @@
 #endif
 
 
-/* todo: remove these from here?? */
-#if !defined(__cplusplus)
-	#define LITERAL(X) (X)
-#else
-	#define LITERAL(X) X
-#endif
-
-
-#define TO_TEXT_(X) #X
-#define TO_TEXT(X) TO_TEXT_(X)
-
-#define FUSE_(X,Y) X##Y
-#define FUSE(X,Y) FUSE_(X,Y)
-
-#if !defined(COUNTOF)
-	#define COUNTOF(X) (sizeof(X)/sizeof(X[0]))
-#endif
-
-
-/* cast to union types */
-#define UCAST(D,T) ( ((union { T _; }){D})._ )
-
-
-/* todo: remove this from here */
-#define NO_BYTE (-1)
-
-
 typedef struct elf_Module 	elf_Module;
 typedef struct elf_Shell 	elf_Shell;
 typedef struct elf_Object 	elf_Object;
@@ -64,7 +37,7 @@ typedef long long int 	   elf_Int;
 typedef signed int 		   elf_Bool;
 typedef double 			   elf_Num;
 typedef void 			     *elf_Handle;
-typedef int 					elf_Error;
+typedef int 					Error;
 typedef int 				   elf_StackId;
 typedef int 				   elf_SymbolId;
 typedef unsigned int 		elf_Hash;
@@ -96,29 +69,32 @@ typedef struct elf_Function {
 } elf_Function;
 
 
-/* todo: convert this to an offset  */
-typedef char *Source;
-
-
 /* first object tag must be OBJ, all other
 objects come after it, same order as object
 types... */
-#define ELF_TAG_LIST(_) _(NIL)_(NUM)_(INT)_(SYS)_(CFN)_(FLOAT2)_(OBJ)_(CLS)_(STR)_(TAB)
-
-
-#define TAGENUM(NAME) FUSE(TAG_,NAME),
-typedef enum { ELF_TAG_LIST(TAGENUM) } elValueTag;
-#undef TAGENUM
-
-
-typedef enum elf_GCColor {
-	elf_GC_WHITE = 0, elf_GC_BLACK, elf_GC_RED, elf_GC_PINK, elf_GC_TRAP,
-} elf_GCColor;
+typedef enum {
+	elf_TAG_NIL=0,
+	elf_TAG_NUM,
+	elf_TAG_INT,
+	elf_TAG_SYS,
+	elf_TAG_CFN,
+	elf_TAG_FLOAT2,
+	elf_TAG_OBJ,
+	elf_TAG_CLS,
+	elf_TAG_STR,
+	elf_TAG_TAB
+} elf_ValueTag;
 
 
 typedef enum elf_GCTy {
-	GC_OBJ = 0, GC_CLS, GC_STR, GC_TAB
+	GC_OBJ=0,GC_CLS,GC_STR,GC_TAB,
 } elf_GCTy;
+
+
+typedef enum elf_GCColor {
+	elf_GC_WHITE=0, elf_GC_BLACK, elf_GC_RED, elf_GC_PINK, elf_GC_TRAP,
+} elf_GCColor;
+
 
 
 typedef struct elf_Object {
@@ -175,80 +151,139 @@ typedef struct elf_Table {
 
 
 elAPI void elf_begin(elf_Shell *R, elf_Module *M);
-elAPI void elf_put_nil(elf_Shell *S);
-elAPI void elf_put_integer(elf_Shell *S, elf_Int);
-elAPI void elf_put_number(elf_Shell *S, elf_Num);
-elAPI void elf_put_object(elf_Shell *S, elf_Object *);
-elAPI void elf_put_string(elf_Shell *S, elf_String *);
-elAPI void elf_put_handle(elf_Shell *S, elf_Handle);
-elAPI void elf_new_table(elf_Shell *S, elf_Table *);
-elAPI void elf_put_closure(elf_Shell *S, elf_Closure *);
-elAPI void elf_put_cfunction(elf_Shell *S, elf_CFunction);
 
 
-elAPI elf_Int elf_get_integer(elf_Shell *R, int arg);
-elAPI elf_Num elf_get_number(elf_Shell *R, int arg);
-elAPI elf_String *elf_get_string(elf_Shell *R, int arg);
-elAPI char *elf_get_text(elf_Shell *R, int arg);
-elAPI elf_Object *elf_get_object(elf_Shell *R, int arg);
-elAPI elf_Table *elf_get_table(elf_Shell *R, int arg);
-elAPI elf_Handle elf_get_handle(elf_Shell *R, int arg);
-elAPI elf_Closure *elf_get_closure(elf_Shell *R, int arg);
-
-
+/* allocate and add objects to stack */
 elAPI elf_String *elf_new_string(elf_Shell *, const char *text);
-elAPI elf_Object *elf_put_new_object(elf_Shell *, elf_Int size);
-elAPI elf_Table *elf_put_new_table(elf_Shell *);
 elAPI elf_String *elf_new_string2(elf_Shell *, elf_Int length);
+elAPI elf_Object *elf_new_object(elf_Shell *, elf_Int size);
+elAPI elf_Table  *elf_new_table(elf_Shell *);
 
 
-/* todo: move to table */
-elAPI void elf_tsetx_bindings(elf_Shell *, elf_Table *, elf_CBinding *list, int num);
+/* add objects to stack */
+elAPI void elf_add_any(elf_Shell *S, elf_Value value);
+elAPI void elf_add_nil(elf_Shell *S);
+elAPI void elf_add_int(elf_Shell *S, elf_Int);
+elAPI void elf_add_num(elf_Shell *S, elf_Num);
+elAPI void elf_add_obj(elf_Shell *S, elf_Object *);
+elAPI void elf_add_str(elf_Shell *S, elf_String *);
+elAPI void elf_add_sys(elf_Shell *S, elf_Handle);
+elAPI void elf_add_tab(elf_Shell *S, elf_Table *);
+elAPI void elf_add_cls(elf_Shell *S, elf_Closure *);
+elAPI void elf_add_cfn(elf_Shell *S, elf_CFunction);
 
+
+/* getting arguments from stack (past 'this' arg) */
+elAPI elf_Int      elf_get_int(elf_Shell *R, int arg);
+elAPI elf_Num      elf_get_num(elf_Shell *R, int arg);
+elAPI elf_String  *elf_get_str(elf_Shell *R, int arg);
+elAPI char        *elf_get_txt(elf_Shell *R, int arg);
+elAPI elf_Object  *elf_get_obj(elf_Shell *R, int arg);
+elAPI elf_Table   *elf_get_tab(elf_Shell *R, int arg);
+elAPI elf_Handle   elf_get_sys(elf_Shell *R, int arg);
+elAPI elf_Closure *elf_get_cls(elf_Shell *R, int arg);
+
+
+
+/* globals */
 elAPI void elf_gset_bindings(elf_Shell *, elf_CBinding *list, int num);
-
-
 elAPI void elf_gsetx_cfn(elf_Shell *R, char *name, elf_CFunction thing);
 elAPI void elf_gsetx_int(elf_Shell *R, char *name, elf_Int thing);
 elAPI void elf_gsetx_tab(elf_Shell *R, char *name, elf_Table *thing);
 
 
-elAPI elf_String *elf_alloc_string2(elf_Shell *R, elf_Int length);
-elAPI elf_String *elf_alloc_string(elf_Shell *R, const char *text);
-elAPI int elf_str_get_length(elf_String *);
-elAPI elf_Hash elf_str_get_hash(elf_String *);
-elAPI char *elf_str_get_text(elf_String *);
-elf_Bool elf_string_eq(elf_String *x, elf_String *y);
+
+/* strings */
+elAPI elf_String *elf_alloc_string2  (elf_Shell *R, elf_Int length);
+elAPI elf_String *elf_alloc_string   (elf_Shell *R, const char *text);
+elAPI int         elf_sget_length    (elf_String *);
+elAPI elf_Hash    elf_sget_hash      (elf_String *);
+elAPI char       *elf_sget_text      (elf_String *);
+elAPI elf_Bool    elf_seq            (elf_String *x, elf_String *y);
 
 
 
-#include "src/string.h"
-#include "src/table.h"
+/* tables */
+elAPI elf_Table *new_table_lib(elf_Shell *);
+elAPI elf_Table *elf_alloc_table2(elf_Shell *, elf_Int);
+elAPI elf_Table *elf_alloc_table(elf_Shell *);
+elAPI void       elf_free_table_contents(elf_Table *);
 
 
+/* tries a key, if the key is found it returns its address,
+otherwise returns the nearest vacant slot's address, if no
+vacant slot found, returns -1 */
+elAPI elf_Int elf_ttry(elf_Table *tab, elf_Value key);
+elAPI elf_Int elf_ttryx(elf_Table *tab, const char *text, elf_Int length, elf_Hash hash);
+
+
+elAPI elf_Int elf_get_table_length(elf_Table *table);
+
+/* table get associated array index of key, if no entry
+found for given key, a new entry is added */
+elAPI elf_Int elf_tget_ornew(elf_Table *table, elf_Value key);
+
+elAPI elf_Value elf_tget_any(elf_Table *tab, elf_Value key);
+
+/* table get by string */
+elAPI elf_Value   elf_tgets_any(elf_Table *tab, elf_String *key);
+elAPI elf_Num     elf_tgets_num(elf_Table *tab, elf_String *key);
+elAPI elf_Int     elf_tgets_int(elf_Table *tab, elf_String *key);
+elAPI elf_String *elf_tgets_str(elf_Table *tab, elf_String *key);
+elAPI elf_Table  *elf_tgets_tab(elf_Table *tab, elf_String *key);
+
+elAPI elf_Int    elf_tgetsor_int(elf_Table *tab, elf_String *key, elf_Int or);
+
+/* table get by text */
+elAPI elf_Value   elf_tgetx_any(elf_Table *tab, char const *key/* , or = nil */);
+elAPI elf_Num     elf_tgetx_num(elf_Table *tab, char const *key, elf_Num     or);
+elAPI elf_Int     elf_tgetx_int(elf_Table *tab, char const *key, elf_Int     or);
+elAPI elf_String *elf_tgetx_str(elf_Table *tab, char const *key, elf_String *or);
+elAPI elf_Table  *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table  *or);
+elAPI char const *elf_tgetx_txt(elf_Table *tab, char const *key, char const *or);
+
+/* add item to array part of table */
+elAPI void elf_tadd(elf_Table *table, elf_Value thing);
+elAPI void elf_tadd_tab(elf_Table *table, elf_Table *thing);
+
+/* table set using value field */
+elAPI elf_Bool elf_tset(elf_Table *table, elf_Value k, elf_Value v);
+
+/* table set bindings */
+elAPI void elf_tsetx_bindings(elf_Shell *R, elf_Table *tab, elf_CBinding *list, int num);
+
+/* table set using string field */
+elAPI void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val);
+elAPI void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val);
+elAPI void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val);
+elAPI void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val);
+
+elAPI void elf_check_table(elf_Table *table);
+elAPI void elf_table_alias(elf_Shell *S, elf_Table *tab, elf_Value key, elf_Value alias);
+elAPI void elf_merge_tables(elf_Table *tab, elf_Table *merger);
 
 
 elAPI void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage);
 elAPI elf_Object *elf_get_this(elf_Shell *S);
 elAPI elf_Value elf_get_arg(elf_Shell *S, int X);
-elAPI elValueTag elf_get_tag(elf_Shell *S, int x);
+elAPI elf_ValueTag elf_get_tag(elf_Shell *S, int x);
 elAPI int elf_get_num_args(elf_Shell *S);
 
 
+elAPI void *elf_alloc_object(elf_Shell *R, elf_GCTy type, elf_Int length);
 elAPI int elf_load_file(elf_Shell *, elf_String *name, int nargs, int nregs);
 elAPI int elf_call_function(elf_Shell *R, int nargs, int nregs);
-elAPI int elf_run(elf_Shell *);
 
 /* todo: why are these public */
 elf_Int elf_trigger_collection_cycle(elf_Shell *R);
 elf_Int elf_mark_object(elf_Object *obj);
 
-void *elf_alloc_object(elf_Shell *R, elf_GCTy type, elf_Int length);
 
 
 elAPI void elf_debugger(char *message);
-elAPI void elf_fail(elf_Shell *R, int instr, const char *error);
+elAPI void elf_fail_(elf_Shell *R, int instr, const char *error);
 
+#define elf_fail(R,instr,error) elf_fail_(R,instr,error)
 
 
 elAPI elf_SymbolId elf_get_global_symbol(elf_Module *M, elf_String *name);
@@ -259,16 +294,6 @@ elAPI int elf_get_instr_file(elf_Module *M, int instr);
 elAPI char *elf_get_instr_line(elf_Module *M, int instr);
 elAPI void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc);
 
-
-#define elNUM(thing) (LITERAL(elf_Value){ TAG_NUM, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
-#define elINT(thing) (LITERAL(elf_Value){ TAG_INT, {(elf_Int) UCAST(thing, elf_Int)} })
-#define elSYS(thing) (LITERAL(elf_Value){ TAG_SYS, {(elf_Int) UCAST(thing, elf_Handle)} })
-#define elTAB(thing) (LITERAL(elf_Value){ TAG_TAB, {(elf_Int) UCAST(thing, elf_Table *)} })
-#define elOBJ(thing) (LITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Object *)} })
-#define elSTR(thing) (LITERAL(elf_Value){ TAG_STR, {(elf_Int) UCAST(thing, elf_String *)} })
-#define elCLS(thing) (LITERAL(elf_Value){ TAG_CLS, {(elf_Int) UCAST(thing, elf_Closure *)} })
-#define elCFN(thing) (LITERAL(elf_Value){ TAG_CFN, {(elf_Int) UCAST(thing, elf_CFunction)} })
-#define elNIL() (LITERAL(elf_Value){TAG_NIL})
 
 
 #endif
