@@ -14,6 +14,7 @@
    #define GLOBAL static
 #endif
 
+#define INTERNAL static
 
 #if !defined(MAX)
    #define MAX(x,y) ((x) > (y) ? (x) : (y))
@@ -86,10 +87,7 @@
 #define ISFUNT(tag) (((tag)==elf_TAG_CLS)||((tag)==elf_TAG_CFN))
 
 
-#define ISNILOBJ(X) (ISOBJT((X).tag) && (X).x_obj == 0)
-
-
-#define ISNILV(X) (((X).tag==elf_TAG_NIL)||ISNILOBJ(X))
+#define ISNILV(X) (((X).tag==elf_TAG_NIL)||(ISOBJT((X).tag)&&(X).x_obj==0))
 
 
 #define VI2N(X) (((X).tag==elf_TAG_INT) ? (elf_Num) (X).x_int : (X).x_num)

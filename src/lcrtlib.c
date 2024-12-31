@@ -161,20 +161,20 @@
 
 
 
-// 	elf_gset(md,elf_new_string(rt,"_execl"),VCFN(crtlib__execl));
-// 	elf_gset(md,elf_new_string(rt,"system"),VCFN(crtlib_system));
-// 	elf_gset(md,elf_new_string(rt,"_getch"),VCFN(crtlib__getch));
-// 	elf_gset(md,elf_new_string(rt,"time"),VCFN(crtlib_time));
-// 	elf_gset(md,elf_new_string(rt,"_getpid"),VCFN(crtlib__getpid));
-// 	elf_gset(md,elf_new_string(rt,"_strdate"),VCFN(crtlib__strdate));
-// 	elf_gset(md,elf_new_string(rt,"_strtime"),VCFN(crtlib__strtime));
+// 	elf_gsets(md,elf_new_string(rt,"_execl"),VCFN(crtlib__execl));
+// 	elf_gsets(md,elf_new_string(rt,"system"),VCFN(crtlib_system));
+// 	elf_gsets(md,elf_new_string(rt,"_getch"),VCFN(crtlib__getch));
+// 	elf_gsets(md,elf_new_string(rt,"time"),VCFN(crtlib_time));
+// 	elf_gsets(md,elf_new_string(rt,"_getpid"),VCFN(crtlib__getpid));
+// 	elf_gsets(md,elf_new_string(rt,"_strdate"),VCFN(crtlib__strdate));
+// 	elf_gsets(md,elf_new_string(rt,"_strtime"),VCFN(crtlib__strtime));
 
-// 	elf_gset(md,elf_new_string(rt,"_unlink"),VCFN(crtlib__unlink));
-// 	elf_gset(md,elf_new_string(rt,"_unlock_file"),VCFN(crtlib__unlock_file));
-// 	elf_gset(md,elf_new_string(rt,"_write"),VCFN(crtlib__write));
-// 	elf_gset(md,elf_new_string(rt,"_commit"),VCFN(crtlib__commit));
-// 	elf_gset(md,elf_new_string(rt,"_close"),VCFN(crtlib__close));
-// 	elf_gset(md,elf_new_string(rt,"_chdir"),VCFN(crtlib__chdir));
-// 	elf_gset(md,elf_new_string(rt,"_chdrive"),VCFN(crtlib__chdrive));
-// 	elf_gset(md,elf_new_string(rt,"clock"),VCFN(crtlib_clock));
+// 	elf_gsets(md,elf_new_string(rt,"_unlink"),VCFN(crtlib__unlink));
+// 	elf_gsets(md,elf_new_string(rt,"_unlock_file"),VCFN(crtlib__unlock_file));
+// 	elf_gsets(md,elf_new_string(rt,"_write"),VCFN(crtlib__write));
+// 	elf_gsets(md,elf_new_string(rt,"_commit"),VCFN(crtlib__commit));
+// 	elf_gsets(md,elf_new_string(rt,"_close"),VCFN(crtlib__close));
+// 	elf_gsets(md,elf_new_string(rt,"_chdir"),VCFN(crtlib__chdir));
+// 	elf_gsets(md,elf_new_string(rt,"_chdrive"),VCFN(crtlib__chdrive));
+// 	elf_gsets(md,elf_new_string(rt,"clock"),VCFN(crtlib_clock));
 // }

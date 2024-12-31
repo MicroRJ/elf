@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** libtable.c
+** lib_table.c
 */
 
 
@@ -369,6 +369,7 @@ int table_lib_find_aliases(elf_Shell *R) {
 
 
 int table_lib_bubble_sort(elf_Shell *R) {
+	#if 0
 	elf_check_args(R,":bubblesort",1,"comparator function");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Value *arr = tab->array;
@@ -395,6 +396,7 @@ int table_lib_bubble_sort(elf_Shell *R) {
 			SET_TOP(R,top);
 		}
 	} while(sorted != 1);
+	#endif
 	return 0;
 }
 

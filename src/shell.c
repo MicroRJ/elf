@@ -4,19 +4,28 @@
 */
 
 
+static int elf_run(elf_Shell *R);
+
+
+elf_Closure *elf_alloc_closure(elf_Shell *S, elf_Function proto) {
+	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_Value) * (proto.nlocals-1));
+	cls->proto=proto;
+	return cls;
+}
+
 
 void elf_begin(elf_Shell *R, elf_Module *M) {
-	R->M = M;
-	R->stack_max = elDEFAULT_STACK_SIZE;
-	R->stack = calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
-	R->stack_ptr = R->stack;
-	R->nframe = 0;
-	R->metatables.string = elf_new_string_lib(R);
-	R->metatables.table  = new_table_lib(R);
-	/* global table is on the stack, so we don't really
-	to need treat it independently when GC'ing... */
-	M->globals = elf_new_table(R);
-	M->strings = elf_new_table(R);
+	R->M=M;
+	R->stack_max=elDEFAULT_STACK_SIZE;
+	R->stack    =calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
+	R->stack_ptr=R->stack;
+	R->first_frame.locals=R->stack_ptr;
+	R->frame=&R->first_frame;
+	R->nframe=0;
+	R->metatables.string=elf_new_string_lib(R);
+	R->metatables.table =new_table_lib(R);
+	M->globals=elf_new_table(R);
+	M->strings=elf_new_table(R);
 	elf_include_core_lib(R);
 }
 
@@ -25,11 +34,12 @@ int elf_call_function(elf_Shell *R, int nargs, int nregs) {
 	int nyield=0;
 	/* todo: do not make this recursive dude! */
 	elf_StackFrame F = {0};
-	F.caller = R->frame;
-	F.origin	= R->byte;
-	F.locals = R->stack_ptr - nargs;
-	F.nargs = nargs;
-	F.nregs = nregs;
+	F.caller=R->frame;
+	F.origin=R->byte;
+	F.locals=R->stack_ptr - nargs;
+	F.nargs=nargs;
+	F.nregs=nregs;
+
 	elf_Value fn = F.locals[-1];
 
 	if (!ISFUNT(fn.tag)) {
@@ -89,65 +99,64 @@ int elf_parse_expr3_fs(elf_Shell *R, FileState *fs, elf_String *filename, elf_St
 }
 
 
-elf_Closure *elf_fs_load_code(elf_Shell *R, FileState *fs, elf_String *filename, int nargs, elf_String *contents) {
-	if ((filename == 0) || (contents == 0)) {
+elf_Closure *elf_load_code_closure(elf_Shell *R, FileState *fs, elf_String *filename, elf_String *contents) {
+	if ((filename==0)||(contents==0)) {
 		return 0;
 	}
 	elf_Module *M = R->M;
-	fs->R = R;
-	fs->M = M;
+	fs->R=R;
+	fs->M=M;
 	begin_file_state(fs,filename->text,contents->text);
 	while (parse_stat(fs));
 	close_file_state(fs);
 
 	elf_Function fp = {0};
-	fp.name     = filename;
-	fp.contents = contents;
-	fp.bytes    = fs->function.bytes;
-	fp.nbytes   = M->nbytes - fs->function.bytes;
-	fp.nlocals  = fs->function.nlocals;
+	fp.name=filename;
+	fp.contents=contents;
+	fp.bytes=fs->function.bytes;
+	fp.nbytes=M->nbytes-fs->function.bytes;
+	fp.nlocals=fs->function.nlocals;
 	ARRAY_ADD(M->files,fp);
-	elf_Closure *cls = elf_alloc_closure(R,fp);
-	/* todo: hack! */
-	elf_tadd(M->globals,VCLS(cls));
-	return cls;
+	return elf_new_closure(R,fp);
 }
 
 
-/* todo: rename to call file or something... */
-int elf_fs_load_file(elf_Shell *R, FileState *fs, elf_String *name, int nargs, int nregs) {
-
+elf_Closure *elf_load_file_closure(elf_Shell *R, FileState *fs, elf_String *name) {
 	Error error;
 	elf_String *string;
-	elf_Closure *cls;
 	char *text;
 
-	/* todo: please instead allocate the string and read
-	the file into it... */
+	/* todo: use string allocator instead?... */
 	error=sys_load_file_data(GLOBAL_ALLOCATOR,(void**)&text,name->text);
 	if (FAILED(error)) {
 		elf_error_log("'%s': could not load file",name->text);
-		return -1;
-	} else {
-		elf_debug_log("'%s': file loaded successfully",name->text);
+		goto error;
 	}
+
+	elf_debug_log("'%s': file loaded successfully",name->text);
 
 	string=elf_new_string(R,text);
 	dealloc_memory(GLOBAL_ALLOCATOR,text);
-
-	cls=elf_fs_load_code(R,fs,name,nargs,string);
-	elf_add_cls(R,cls);
-	return elf_call_function(R,0,nregs);
+	return elf_load_code_closure(R,fs,name,string);
+	error:
+	return 0;
 }
 
 
-int elf_load_file(elf_Shell *R, elf_String *name, int nargs, int nregs) {
+int elf_exec_file(elf_Shell *R, elf_String *name, int nargs, int nregs) {
 	FileState fs = {0};
-	return elf_fs_load_file(R,&fs,name,nargs,nregs);
+	elf_Closure *cls;
+
+	cls=elf_load_file_closure(R,&fs,name);
+	/* todo: HACK! */
+	elf_gsets(R->M,name,VCLS(cls));
+	elf_add_cls(R,cls);
+	elf_add_this(R);
+	return elf_call_function(R,2,nregs);
 }
 
 
-void check_division_by_zero(elf_Shell *S, elf_Value xx, elf_Value yy) {
+INTERNAL void check_division_by_zero(elf_Shell *S, elf_Value xx, elf_Value yy) {
 	if ((yy.tag == elf_TAG_NUM) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
 	if ((yy.tag == elf_TAG_INT) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
 }
@@ -243,8 +252,8 @@ elf_Int elf_mark_object(elf_Object *obj) {
 
 
 elf_Int elf_hold_phase(elf_Shell *R) {
-	ASSERT(R->memory.phase == elf_GC_PHASE_MARK);
-	R->memory.phase ^= 1;
+	ASSERT(R->collector.phase == elf_GC_PHASE_MARK);
+	R->collector.phase ^= 1;
 
 	elf_Int Ni = 0;
 	elf_Value *Ki;
@@ -258,12 +267,12 @@ elf_Int elf_hold_phase(elf_Shell *R) {
 
 
 elf_Int elf_free_phase(elf_Shell *R) {
-	ASSERT(R->memory.phase==elf_GC_PHASE_FREE);
-	R->memory.phase^=1;
+	ASSERT(R->collector.phase==elf_GC_PHASE_FREE);
+	R->collector.phase^=1;
 
 
-	elf_Object **new_objects=R->memory.new_objects;
-	elf_Object **objects=R->memory.objects;
+	elf_Object **new_objects=R->collector.new_objects;
+	elf_Object **objects=R->collector.objects;
 	if (new_objects) {
 		ARRAY_SET_MIN(new_objects,0);
 	}
@@ -288,15 +297,15 @@ elf_Int elf_free_phase(elf_Shell *R) {
 		} else if (OBJ_COLOR(it) == elf_GC_WHITE) {
 			n += 1;
 			OBJ_COLOR(it) = elf_GC_RED;
-			R->memory.memory_allocated -= it->size;
+			R->collector.memory_allocated -= it->size;
 			if (it->type == GC_TAB) {
 				elf_free_table_contents((elf_Table*)it);
 			}
 			dealloc_memory(GLOBAL_ALLOCATOR,it);
 		} else n += 1;
 	}
-	R->memory.objects = new_objects;
-	R->memory.new_objects = objects;
+	R->collector.objects = new_objects;
+	R->collector.new_objects = objects;
 	return n;
 }
 
@@ -306,7 +315,7 @@ elf_Int elf_trigger_collection_cycle(elf_Shell *R) {
 
 	time_ = elf_get_clock_time();
 	num_marked = elf_hold_phase(R);
-	num_objects = ARRAY_LENGTH(R->memory.objects);
+	num_objects = ARRAY_LENGTH(R->collector.objects);
 	num_to_collect = num_objects - num_marked;
 	obj_trigger_threshold = R->collector.object_trigger_threshold;
 
@@ -373,7 +382,7 @@ void *elf_alloc_object(elf_Shell *R, elf_GCTy type, elf_Int size) {
 }
 
 
-static int elf_run(elf_Shell *R) {
+int elf_run(elf_Shell *R) {
 
 	elf_Module *M;
 	elf_Table *globals;
@@ -430,6 +439,8 @@ static int elf_run(elf_Shell *R) {
 		}
 #endif
 		switch (BC_OP(byte)) {
+			case BC_NOP: {
+			} break;
 			case BC_LEAVE: {
 				delay = F->delay_list;
 				if (delay != 0) {
@@ -459,8 +470,6 @@ static int elf_run(elf_Shell *R) {
 				next_instr = instr+BC_ARGX(byte);
 
 				F->nregs = nregs;
-			} break;
-			case BC_NOP: {
 			} break;
 			case BC_LOOP: {
 			} break;
@@ -703,7 +712,7 @@ static int elf_run(elf_Shell *R) {
 			case OPNAME : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
-				if (((BC_OP(byte) == BC_DIV) || (BC_OP(byte) == BC_MOD))) {\
+				if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
 					check_division_by_zero(R,xx,yy);\
 				}\
 				locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\

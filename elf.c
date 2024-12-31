@@ -92,6 +92,21 @@ typedef struct elf_Closure {
 } elf_Closure;
 
 
+/* symbols are mapped at load time, so the code generator
+references globals by index... */
+typedef struct elf_Module {
+	elf_Table      *globals;
+	int              *track;
+	elf_Bytecode     *bytes;
+	Instr            nbytes;
+	Source           *lines;
+	elf_Function     *files;
+	elf_Table      *strings;
+	elf_Num        *numbers;
+	elf_Int       *integers;
+	elf_Function *functions;
+} elf_Module;
+
 
 typedef struct delaylist delaylist;
 typedef struct delaylist {
@@ -110,7 +125,7 @@ typedef struct elf_StackFrame {
 	char                nregs;
 	int                origin;
 	delaylist    * delay_list;
-	elf_Bool            logging;
+	elf_Bool          logging;
 } elf_StackFrame;
 
 
@@ -119,33 +134,17 @@ typedef struct elf_StackFrame {
 
 
 typedef struct elf_Collector {
-	elf_Bool       paused;
+	elf_Bool     paused;
 	int          phase;
 	elf_Int      memory_allocated;
 	elf_Int      memory_threshold;
 	elf_Object **new_objects;
 	elf_Object **objects;
-   /* this changes dynamically based on
-   object min threshold, it tends to
-   be around there... */
+	/* this changes dynamically based on
+	object min threshold, it tends to
+	be around there... */
 	elf_Int      object_trigger_threshold;
 } elf_Collector;
-
-
-/* symbols are mapped at load time, so the code generator
-references globals by index... */
-typedef struct elf_Module {
-	elf_Table      *globals;
-	int              *track;
-	elf_Bytecode     *bytes;
-	Instr            nbytes;
-	Source           *lines;
-	elf_Function     *files;
-	elf_Table      *strings;
-	elf_Num        *numbers;
-	elf_Int       *integers;
-	elf_Function *functions;
-} elf_Module;
 
 
 #define FLAG_DEBUGGER         (1 << 0)
@@ -159,6 +158,7 @@ typedef struct elf_Shell {
 	elf_Value      *stack;
 	int             stack_max;
 	elf_Value      *stack_ptr;
+	elf_StackFrame  first_frame;
 	elf_StackFrame *frame;
 	int            nframe;
 	int             flags;
@@ -175,7 +175,7 @@ typedef struct elf_Shell {
 	} hooks;
    /* the current instruction */
 	Instr byte;
-	union { elf_Collector collector, memory; };
+	elf_Collector collector;
 } elf_Shell;
 
 
@@ -199,8 +199,8 @@ typedef struct elf_Shell {
 #include "src/emit.c"
 #include "src/file.c"
 #include "src/user.c"
-#include "src/libcore.c"
-#include "src/libtable.c"
+#include "src/lib_core.c"
+#include "src/lib_table.c"
 #include "src/shell.c"
 #include "src/system.c"
 

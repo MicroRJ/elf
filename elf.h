@@ -25,12 +25,12 @@
 
 
 typedef struct elf_Module 	elf_Module;
-typedef struct elf_Shell 	elf_Shell;
+typedef struct elf_Shell 	  elf_Shell;
 typedef struct elf_Object 	elf_Object;
-typedef struct elf_Table 	elf_Table;
+typedef struct elf_Table 	  elf_Table;
 typedef struct elf_String 	elf_String;
-typedef struct elf_Closure elf_Closure;
-typedef struct elf_Value   elf_Value;
+typedef struct elf_Closure  elf_Closure;
+typedef struct elf_Value    elf_Value;
 
 
 typedef long long int 	   elf_Int;
@@ -150,17 +150,30 @@ typedef struct elf_Table {
 
 
 
-elAPI void elf_begin(elf_Shell *R, elf_Module *M);
+elAPI void elf_begin(elf_Shell *S, elf_Module *M);
 
 
-/* allocate and add objects to stack */
-elAPI elf_String *elf_new_string(elf_Shell *, const char *text);
+/* get clock time (unknown frequency) */
+elf_Int elf_get_clock_time();
+
+/* time difference in seconds */
+elf_Num elf_time_diff_s(elf_Int begin);
+
+/* time difference in milliseconds */
+elf_Num elf_time_diff_ms(elf_Int begin);
+
+
+/* allocate and adds the object to stack (prevents it from
+getting GC'd) */
+elAPI elf_Closure *elf_new_closure(elf_Shell *, elf_Function fn);
 elAPI elf_String *elf_new_string2(elf_Shell *, elf_Int length);
+elAPI elf_String *elf_new_string(elf_Shell *, const char *text);
 elAPI elf_Object *elf_new_object(elf_Shell *, elf_Int size);
 elAPI elf_Table  *elf_new_table(elf_Shell *);
 
 
 /* add objects to stack */
+elAPI void elf_add_this(elf_Shell *S);
 elAPI void elf_add_any(elf_Shell *S, elf_Value value);
 elAPI void elf_add_nil(elf_Shell *S);
 elAPI void elf_add_int(elf_Shell *S, elf_Int);
@@ -173,41 +186,48 @@ elAPI void elf_add_cls(elf_Shell *S, elf_Closure *);
 elAPI void elf_add_cfn(elf_Shell *S, elf_CFunction);
 
 
-/* getting arguments from stack (past 'this' arg) */
-elAPI elf_Int      elf_get_int(elf_Shell *R, int arg);
-elAPI elf_Num      elf_get_num(elf_Shell *R, int arg);
-elAPI elf_String  *elf_get_str(elf_Shell *R, int arg);
-elAPI char        *elf_get_txt(elf_Shell *R, int arg);
-elAPI elf_Object  *elf_get_obj(elf_Shell *R, int arg);
-elAPI elf_Table   *elf_get_tab(elf_Shell *R, int arg);
-elAPI elf_Handle   elf_get_sys(elf_Shell *R, int arg);
-elAPI elf_Closure *elf_get_cls(elf_Shell *R, int arg);
+/* getting arguments from stack */
+elAPI elf_Object  *elf_get_this(elf_Shell *S);
 
+elAPI elf_Value    elf_get_arg(elf_Shell *S, int arg);
+elAPI elf_Int      elf_get_int(elf_Shell *S, int arg);
+elAPI elf_Num      elf_get_num(elf_Shell *S, int arg);
+elAPI elf_String  *elf_get_str(elf_Shell *S, int arg);
+elAPI char        *elf_get_txt(elf_Shell *S, int arg);
+elAPI elf_Object  *elf_get_obj(elf_Shell *S, int arg);
+elAPI elf_Table   *elf_get_tab(elf_Shell *S, int arg);
+elAPI elf_Handle   elf_get_sys(elf_Shell *S, int arg);
+elAPI elf_Closure *elf_get_cls(elf_Shell *S, int arg);
+
+elAPI int elf_get_num_args(elf_Shell *S);
+elAPI elf_ValueTag elf_get_tag(elf_Shell *S, int x);
+elAPI void elf_check_args(elf_Shell *S, char *func, int nargs, char *usage);
 
 
 /* globals */
-elAPI void elf_gset_bindings(elf_Shell *, elf_CBinding *list, int num);
-elAPI void elf_gsetx_cfn(elf_Shell *R, char *name, elf_CFunction thing);
-elAPI void elf_gsetx_int(elf_Shell *R, char *name, elf_Int thing);
-elAPI void elf_gsetx_tab(elf_Shell *R, char *name, elf_Table *thing);
+elAPI void elf_gset_bindings(elf_Shell *S, elf_CBinding *list, int num);
+elAPI void elf_gsetx_cfn(elf_Shell *S, char *name, elf_CFunction thing);
+elAPI void elf_gsetx_int(elf_Shell *S, char *name, elf_Int thing);
+elAPI void elf_gsetx_tab(elf_Shell *S, char *name, elf_Table *thing);
 
+
+/* allocating objects */
+elAPI elf_Closure *elf_alloc_closure(elf_Shell *S, elf_Function proto);
+elAPI elf_String *elf_alloc_string2(elf_Shell *S, elf_Int length);
+elAPI elf_String *elf_alloc_string(elf_Shell *S, const char *text);
+elAPI elf_Table *elf_alloc_table2(elf_Shell *, elf_Int length);
+elAPI elf_Table *elf_alloc_table(elf_Shell *);
 
 
 /* strings */
-elAPI elf_String *elf_alloc_string2  (elf_Shell *R, elf_Int length);
-elAPI elf_String *elf_alloc_string   (elf_Shell *R, const char *text);
-elAPI int         elf_sget_length    (elf_String *);
-elAPI elf_Hash    elf_sget_hash      (elf_String *);
-elAPI char       *elf_sget_text      (elf_String *);
-elAPI elf_Bool    elf_seq            (elf_String *x, elf_String *y);
-
+elAPI int         elf_sget_length(elf_String *);
+elAPI elf_Hash    elf_sget_hash(elf_String *);
+elAPI char       *elf_sget_text(elf_String *);
+elAPI elf_Bool    elf_seq(elf_String *x, elf_String *y);
 
 
 /* tables */
-elAPI elf_Table *new_table_lib(elf_Shell *);
-elAPI elf_Table *elf_alloc_table2(elf_Shell *, elf_Int);
-elAPI elf_Table *elf_alloc_table(elf_Shell *);
-elAPI void       elf_free_table_contents(elf_Table *);
+elAPI void elf_free_table_contents(elf_Table *);
 
 
 /* tries a key, if the key is found it returns its address,
@@ -250,7 +270,7 @@ elAPI void elf_tadd_tab(elf_Table *table, elf_Table *thing);
 elAPI elf_Bool elf_tset(elf_Table *table, elf_Value k, elf_Value v);
 
 /* table set bindings */
-elAPI void elf_tsetx_bindings(elf_Shell *R, elf_Table *tab, elf_CBinding *list, int num);
+elAPI void elf_tsetx_bindings(elf_Shell *S, elf_Table *tab, elf_CBinding *list, int num);
 
 /* table set using string field */
 elAPI void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val);
@@ -263,32 +283,25 @@ elAPI void elf_table_alias(elf_Shell *S, elf_Table *tab, elf_Value key, elf_Valu
 elAPI void elf_merge_tables(elf_Table *tab, elf_Table *merger);
 
 
-elAPI void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage);
-elAPI elf_Object *elf_get_this(elf_Shell *S);
-elAPI elf_Value elf_get_arg(elf_Shell *S, int X);
-elAPI elf_ValueTag elf_get_tag(elf_Shell *S, int x);
-elAPI int elf_get_num_args(elf_Shell *S);
-
-
-elAPI void *elf_alloc_object(elf_Shell *R, elf_GCTy type, elf_Int length);
-elAPI int elf_load_file(elf_Shell *, elf_String *name, int nargs, int nregs);
-elAPI int elf_call_function(elf_Shell *R, int nargs, int nregs);
+elAPI void *elf_alloc_object(elf_Shell *S, elf_GCTy type, elf_Int length);
+elAPI int elf_exec_file(elf_Shell *, elf_String *name, int nargs, int nregs);
+elAPI int elf_call_function(elf_Shell *S, int nargs, int nregs);
 
 /* todo: why are these public */
-elf_Int elf_trigger_collection_cycle(elf_Shell *R);
+elf_Int elf_trigger_collection_cycle(elf_Shell *S);
 elf_Int elf_mark_object(elf_Object *obj);
 
 
 
 elAPI void elf_debugger(char *message);
-elAPI void elf_fail_(elf_Shell *R, int instr, const char *error);
+elAPI void elf_fail_(elf_Shell *S, int instr, const char *error);
 
 #define elf_fail(R,instr,error) elf_fail_(R,instr,error)
 
 
-elAPI elf_SymbolId elf_get_global_symbol(elf_Module *M, elf_String *name);
-elAPI elf_SymbolId elf_gset(elf_Module *M, elf_String *name, elf_Value v);
-elAPI elf_SymbolId elf_add_function(elf_Module *M, elf_Function p);
+elAPI elf_SymbolId elf_add_function(elf_Module *M, elf_Function fn);
+elAPI elf_SymbolId elf_ggets(elf_Module *M, elf_String *name);
+elAPI elf_SymbolId elf_gsets(elf_Module *M, elf_String *name, elf_Value v);
 
 elAPI int elf_get_instr_file(elf_Module *M, int instr);
 elAPI char *elf_get_instr_line(elf_Module *M, int instr);

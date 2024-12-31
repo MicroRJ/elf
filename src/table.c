@@ -262,20 +262,20 @@ elf_Value elf_tget_any(elf_Table *tab, elf_Value k) {
 }
 
 
-elf_Int elf_tget_ornew(elf_Table *table, elf_Value k) {
-	ASSERT((k.tag == elf_TAG_INT || k.tag == elf_TAG_NUM) || k.x_obj != 0);
-	/* todo: why do we check the table here? */
+elf_Int elf_tget_ornew(elf_Table *table, elf_Value key) {
+	elf_Int lot,idx;
+	ASSERT(!ISNILV(key));
 	elf_check_table(table);
-	elf_Int slot = elf_ttry(table,k);
-	if (slot < 0) NO_CODE;
-	if (!slotiskey(table,slot)) {
-		elf_Int i = ARRAY_GROW(table->array,1);
-		table->array[i] = (elf_Value){elf_TAG_NIL};
-		table->slots[slot].key = k;
-		table->slots[slot].idx = i;
-		table->nslots ++;
+	lot=elf_ttry(table,key);
+	ASSERT(lot>=0);
+	if (!slotiskey(table,lot)) {
+		idx=ARRAY_GROW(table->array,1);
+		table->array[idx]=VNIL();
+		table->slots[lot].key=key;
+		table->slots[lot].idx=idx;
+		table->nslots++;
 	}
-	return slot2index(table,slot);
+	return slot2index(table,lot);
 }
 
 

@@ -6,7 +6,7 @@
 
 
 #define NODE_ENUM(NAME) #NAME,
-static char *node2s[] = {
+INTERNAL char *node2s[] = {
 	"NONE",
 	NODE_LIST(NODE_ENUM)
 };
@@ -259,7 +259,7 @@ NodeId node_call_metafield(FileState *fs, Source line, NodeId x, NodeId *z, char
 
 
 NodeId node_global_name(FileState *fs, Source line, char *name) {
-	elf_SymbolId x = elf_get_global_symbol(fs->M,elf_alloc_string(fs->R,name));
+	elf_SymbolId x = elf_ggets(fs->M,elf_alloc_string(fs->R,name));
 	ASSERT(x != -1);
 	return node_global(fs,line,x);
 }

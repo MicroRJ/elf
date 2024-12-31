@@ -40,50 +40,6 @@ int elf_add_function(elf_Module *M, elf_Function fn) {
 }
 
 
-elf_SymbolId elf_get_global_symbol(elf_Module *M, elf_String *name) {
-	if (name != 0) return elf_tget_ornew(M->globals,VSTR(name));
-	return ARRAY_GROW(M->globals->array,1);
-}
-
-
-elf_SymbolId elf_gset(elf_Module *M, elf_String *name, elf_Value value) {
-	elf_SymbolId id;
-	id=elf_get_global_symbol(M,name);
-	M->globals->array[id]=value;
-	return id;
-}
-
-
-void elf_gsetx_sys(elf_Shell *R, char *name, elf_Handle val) {
-	elf_gset(R->M,elf_new_string(R,name),VSYS(val));
-}
-
-
-void elf_gsetx_int(elf_Shell *R, char *name, elf_Int val) {
-	elf_gset(R->M,elf_new_string(R,name),VINT(val));
-}
-
-
-void elf_gsetx_tab(elf_Shell *R, char *name, elf_Table *val) {
-	elf_gset(R->M,elf_new_string(R,name),VTAB(val));
-}
-
-
-void elf_gsetx_str(elf_Shell *R, char *name, char *val) {
-	elf_gset(R->M,elf_new_string(R,name),VSTR(elf_new_string(R,val)));
-}
-
-
-void elf_gsetx_cfn(elf_Shell *R, char *name, elf_CFunction fn) {
-	elf_gset(R->M,elf_new_string(R,name),VCFN(fn));
-}
-
-
-void elf_gset_bindings(elf_Shell *R, elf_CBinding *list, int num) {
-	elf_tsetx_bindings(R,R->M->globals,list,num);
-}
-
-
 int elf_get_instr_file(elf_Module *M, Instr byte) {
 	elf_Function *files;
 	elf_Function file;
@@ -214,7 +170,7 @@ void elf_fail_(elf_Shell *R, int byte, const char *error) {
 }
 
 
-elAPI void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage) {
+void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage) {
 	if (elf_get_num_args(R) != n) {
 		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
 	}

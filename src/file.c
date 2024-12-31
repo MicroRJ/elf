@@ -644,7 +644,7 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elf_Bool flags) {
 				strcat(dir,fs->last_token.text);
 			} while (pick_token_inline(fs,TK_DOT));
 			int x;
-			x=elf_get_global_symbol(fs->M,elf_alloc_string(fs->R,dir));
+			x=elf_ggets(fs->M,elf_alloc_string(fs->R,dir));
 			v=node_global(fs,tk.line,x);
 		} break;
 		case TK_WORD: {

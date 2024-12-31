@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** libcore.c
+** lib_core.c
 */
 
 
@@ -86,7 +86,7 @@ int core_lib_get_allocated_memory(elf_Shell *R) {
 
 
 int core_lib_get_collector_threshold(elf_Shell *R) {
-	elf_add_int(R,R->memory.memory_threshold);
+	elf_add_int(R,R->collector.memory_threshold);
 	return 1;
 }
 
@@ -300,7 +300,7 @@ int core_lib_load_file(elf_Shell *R) {
 	int nresults;
 
 	filename=elf_get_str(R,0);
-	nresults=elf_load_file(R,filename,GET_FRAME(R)->nargs,GET_FRAME(R)->nregs);
+	nresults=elf_exec_file(R,filename,GET_FRAME(R)->nargs,GET_FRAME(R)->nregs);
 	// if (nresults != -1 && !strcmp(filename->text,"patterns.elf")){
 	// 	__debugbreak();
 	// }
