@@ -54,10 +54,10 @@ at the same time when using clang-cl */
 #define elGC_MEM_THRESHOLD_MAX (elf_Int) MEGABYTES(1024)
 
 #define elGC_OBJ_THRESHOLD_MIN (elf_Int) ((1024)*2)
-#define elGC_OBJ_THRESHOLD_MAX (elf_Int) ((2048)*4)
+#define elGC_OBJ_THRESHOLD_MAX (elf_Int) ((1024)*8)
 
 
-#define elDEFAULT_STACK_SIZE 4096
+#define DEFAULT_STACK_SIZE 4096
 
 
 #define STB_SPRINTF_IMPLEMENTATION
@@ -86,23 +86,19 @@ typedef char *Source;
 
 
 typedef struct elf_Closure {
-	elf_Object       obj;
+	elf_Node       obj;
 	elf_Prototype   proto;
 	elf_Value  values[1];
 } elf_Closure;
 
-
-/* symbols are mapped at load time, so the code generator
-references globals by index...
-
-Todo: why does this have to be a separate thing? */
+/* */
 typedef struct elf_Module {
 	elf_Table      *globals;
 	int              *track;
 	elf_Bytecode     *bytes;
 	Instr            nbytes;
 	Source           *lines;
-	elf_Prototype     *files;
+	elf_Prototype    *files;
 	elf_Table      *strings;
 	elf_Num        *numbers;
 	elf_Int       *integers;
@@ -140,8 +136,8 @@ typedef struct elf_Collector {
 	int          phase;
 	elf_Int      memory_allocated;
 	elf_Int      memory_threshold;
-	elf_Object **new_objects;
-	elf_Object **objects;
+	elf_Node **new_objects;
+	elf_Node **objects;
 	/* this changes dynamically based on
 	object min threshold, it tends to
 	be around there... */
@@ -181,7 +177,7 @@ typedef struct elf_State {
 } elf_State;
 
 
-#include "src/node.h"
+#include "src/tree.h"
 #include "src/file.h"
 
 #include "src/debug.c"
@@ -199,7 +195,7 @@ typedef struct elf_State {
 #include "src/lexer.c"
 #include "src/node.c"
 #include "src/emit.c"
-#include "src/file.c"
+#include "src/parse.c"
 #include "src/user.c"
 #include "src/lib_core.c"
 #include "src/lib_table.c"

@@ -6,27 +6,27 @@
 
 
 
-static elf_Bytecode get_byte(FileState *fs, int instr) {
+static elf_Bytecode get_byte(Parser *fs, int instr) {
 	return fs->M->bytes[instr];
 }
 
 
-static int get_instr_cursor(FileState *fs) {
+static int get_instr_cursor(Parser *fs) {
 	return fs->M->nbytes;
 }
 
 
-static int get_mem_state(FileState *fs) {
+static int get_mem_state(Parser *fs) {
 	return fs->fn->xmemory;
 }
 
 
-static void set_mem_state(FileState *fs, int memory) {
+static void set_mem_state(Parser *fs, int memory) {
 	fs->fn->xmemory=memory;
 }
 
 
-static int emit_byte(FileState *fs, Source line, elf_Bytecode byte) {
+static int emit_byte(Parser *fs, Source line, elf_Bytecode byte) {
 	elf_Module *M=fs->M;
 	ARRAY_ADD(M->lines,line);
 	ARRAY_ADD(M->bytes,byte);
@@ -36,7 +36,7 @@ static int emit_byte(FileState *fs, Source line, elf_Bytecode byte) {
 }
 
 
-static int emit_bytex(FileState *fs, Source line, int k, int x) {
+static int emit_bytex(Parser *fs, Source line, int k, int x) {
 	elf_Bytecode byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
@@ -44,7 +44,7 @@ static int emit_bytex(FileState *fs, Source line, int k, int x) {
 }
 
 
-static int emit_bytexy(FileState *fs, Source line, int k, int x, int y) {
+static int emit_bytexy(Parser *fs, Source line, int k, int x, int y) {
 	elf_Bytecode byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
@@ -53,7 +53,7 @@ static int emit_bytexy(FileState *fs, Source line, int k, int x, int y) {
 }
 
 
-static int emit_bytexyz(FileState *fs, Source line, int k, int x, int y, int z) {
+static int emit_bytexyz(Parser *fs, Source line, int k, int x, int y, int z) {
 	elf_Bytecode byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
@@ -63,19 +63,19 @@ static int emit_bytexyz(FileState *fs, Source line, int k, int x, int y, int z) 
 }
 
 
-static FileBlock *get_block(FileState *fs, BlockId id) {
+static FileBlock *get_block(Parser *fs, BlockId id) {
 	return &fs->blocks[id > -1 ? id : fs->nblocks + id];
 }
 
 
 /* todo: the block ended flag could be added automatically when
 we add a terminating byte to the current block */
-static void add_block_flags(FileState *fs, int flags) {
+static void add_block_flags(Parser *fs, int flags) {
 	get_block(fs,-1)->flags |= flags;
 }
 
 
-static int reg_alloc(FileState *fs) {
+static int reg_alloc(Parser *fs) {
 	int reg = fs->fn->xmemory ++;
 	ASSERT(reg<=0xff);
 	fs->fn->nlocals = MAX(fs->fn->nlocals,fs->fn->xmemory);
@@ -88,7 +88,7 @@ static int reg_alloc(FileState *fs) {
 
 // todo: re-add support for specifying which
 // loop you're referring to
-static int get_loop_reg(FileState *F, int type) {
+static int get_loop_reg(Parser *F, int type) {
 	FileBlock *bl = get_loop_block(F,-1);
 	ASSERT(bl != 0);
 	ASSERT(bl->flags & BLOCK_LOOP);
@@ -109,9 +109,9 @@ static int get_loop_reg(FileState *F, int type) {
 }
 
 
-static int get_node_register(FileState *fs, NodeIdGuard id) {
+static int get_node_register(Parser *fs, NodeIdGuard id) {
 	if (id.id==NO_NODE) return NO_SLOT;
-	Node node;
+	Tree node;
 	int reg=-1;
 	node=get_target_node(fs,id);
 	if (node.kind==NODE_LOCAL) {
@@ -119,7 +119,7 @@ static int get_node_register(FileState *fs, NodeIdGuard id) {
 		if (reg>0xff) {
 			reg=get_loop_reg(fs,reg);
 			if (reg==NO_SLOT) {
-				file_dialog(fs,node.line,"invalid register");
+				parser_dialog(fs,node.line,"invalid register");
 			}
 		}
 	}
@@ -127,7 +127,7 @@ static int get_node_register(FileState *fs, NodeIdGuard id) {
 }
 
 
-static void patch_jump2(FileState *fs, int src, int dst) {
+static void patch_jump2(Parser *fs, int src, int dst) {
 	elf_Bytecode byte,*bytes;
 	bytes=fs->M->bytes;
 	byte=bytes[src];
@@ -146,31 +146,31 @@ static void patch_jump2(FileState *fs, int src, int dst) {
 }
 
 
-static void patch_jumps2(FileState *fs, Instr *js, Instr j) {
+static void patch_jumps2(Parser *fs, Instr *js, Instr j) {
 	FOR_ARRAY(i,js) {
 		patch_jump2(fs,js[i],j);
 	}
 }
 
 
-static void patch_jump(FileState *fs, Instr i) {
+static void patch_jump(Parser *fs, Instr i) {
 	patch_jump2(fs,i,get_instr_cursor(fs));
 }
 
 
-static void patch_jumps(FileState *fs, Instr *js) {
+static void patch_jumps(Parser *fs, Instr *js) {
 	FOR_ARRAY(i,js) {
 		patch_jump(fs,js[i]);
 	}
 }
 
 
-static Instr emit_jump(FileState *fs, Source line, Instr j) {
+static Instr emit_jump(Parser *fs, Source line, Instr j) {
 	return emit_bytex(fs,line,BC_J,j-fs->M->nbytes);
 }
 
 
-int begin_block(FileState *fs, elf_Bool flags) {
+int begin_block(Parser *fs, elf_Bool flags) {
 	int level = fs->nblocks ++;
 	if (ARRAY_LENGTH(fs->blocks) < fs->nblocks) {
 		ARRAY_GROW(fs->blocks,1);
@@ -196,14 +196,14 @@ int begin_block(FileState *fs, elf_Bool flags) {
 }
 
 
-void close_block(FileState *fs) {
+void close_block(Parser *fs) {
 	ASSERT(fs->nentities >= fs->fn->entities);
 	FileBlock *bl = get_block(fs,-1);
 	EntityId id;
 	/* xentity is the first entity within a block, if any. */
 	for (id = bl->xentity; id < fs->nentities; ++ id) {
 		if (~fs->entities[id].flags & ENTITY_REFERENCED) {
-			file_dialog(fs,fs->entities[id].line,"'%s': unreferenced entity", fs->entities[id].name);
+			parser_dialog(fs,fs->entities[id].line,"'%s': unreferenced entity", fs->entities[id].name);
 		}
 	}
 	fs->nentities = bl->xentity;
@@ -221,7 +221,7 @@ void close_block(FileState *fs) {
 }
 
 
-FileBlock *get_loop_block(FileState *fs, elf_StackId reg) {
+FileBlock *get_loop_block(Parser *fs, elf_StackId reg) {
 	int level;
 	for (level = fs->nblocks-1; level > -1; -- level) {
 		FileBlock *bl = get_block(fs,level);
@@ -234,14 +234,14 @@ FileBlock *get_loop_block(FileState *fs, elf_StackId reg) {
 }
 
 
-void begin_delay_block(FileState *fs, Source line) {
+void begin_delay_block(Parser *fs, Source line) {
 	Instr jo = emit_bytex(fs,line,BC_DELAY,NO_JUMP);
 	BlockId id = begin_block(fs,BLOCK_DELAYED);
 	fs->blocks[id].jumpover = jo;
 }
 
 
-void close_delay_block(FileState *fs, Source line) {
+void close_delay_block(Parser *fs, Source line) {
 	FileBlock *bl = get_block(fs,-1);
 	emit_bytex(fs,line,BC_LEAVE,0);
 	add_block_flags(fs,BLOCK_ENDED);
@@ -251,8 +251,8 @@ void close_delay_block(FileState *fs, Source line) {
 }
 
 
-int emit_branch_if(FileState *fs, BooleanJumps *js, elf_Bool if_true, NodeId id) {
-	Node node;
+int emit_branch_if(Parser *fs, BooleanJumps *js, elf_Bool if_true, TreeId id) {
+	Tree node;
 
 	node=get_node(fs,id);
 	int mem,reg,jmp;
@@ -285,19 +285,19 @@ int emit_branch_if(FileState *fs, BooleanJumps *js, elf_Bool if_true, NodeId id)
 }
 
 
-int emit_branch_if_false(FileState *fs, BooleanJumps *js, NodeId id) {
+int emit_branch_if_false(Parser *fs, BooleanJumps *js, TreeId id) {
 	return emit_branch_if(fs,js,0,id);
 }
 
 
-int emit_branch_if_true(FileState *fs, BooleanJumps *js, NodeId id) {
+int emit_branch_if_true(Parser *fs, BooleanJumps *js, TreeId id) {
 	return emit_branch_if(fs,js,1,id);
 }
 
 
 /* similar to branch if true, but additionally all
 false jumps converge here */
-int *emit_jump_if_true(FileState *fs, BooleanJumps *js, NodeId id) {
+int *emit_jump_if_true(Parser *fs, BooleanJumps *js, TreeId id) {
 	emit_branch_if_true(fs,js,id);
 	patch_jumps(fs,js->f);
 	ARRAY_DELETE(js->f);
@@ -306,7 +306,7 @@ int *emit_jump_if_true(FileState *fs, BooleanJumps *js, NodeId id) {
 }
 
 
-Instr *emit_jump_if_false(FileState *fs, BooleanJumps *js, NodeId id) {
+Instr *emit_jump_if_false(Parser *fs, BooleanJumps *js, TreeId id) {
 	emit_branch_if_false(fs,js,id);
 	patch_jumps(fs,js->t);
 	ARRAY_DELETE(js->t);
@@ -315,17 +315,17 @@ Instr *emit_jump_if_false(FileState *fs, BooleanJumps *js, NodeId id) {
 }
 
 
-int *emit_jump_if_not_nil(FileState *fs, Source line, BooleanJumps *js, NodeId id) {
+int *emit_jump_if_not_nil(Parser *fs, Source line, BooleanJumps *js, TreeId id) {
 	return emit_jump_if_false(fs,js,node_xy(fs,line,NODE_EQ,NT_BOL,id,node_nil(fs,line)));
 }
 
 
-int *emit_jump_if_nil(FileState *fs, Source line, BooleanJumps *js, NodeId id) {
+int *emit_jump_if_nil(Parser *fs, Source line, BooleanJumps *js, TreeId id) {
 	return emit_jump_if_true(fs,js,node_xy(fs,line,NODE_EQ,NT_BOL,id,node_nil(fs,line)));
 }
 
 
-void emit_continue(FileState *fs, Source line, int reg) {
+void emit_continue(Parser *fs, Source line, int reg) {
 	ASSERT(fs->nloops > 0);
 	Instr jmp;
 	FileBlock *bl;
@@ -339,7 +339,7 @@ void emit_continue(FileState *fs, Source line, int reg) {
 }
 
 
-void emit_break(FileState *fs, Source line, elf_StackId with_value_register) {
+void emit_break(Parser *fs, Source line, elf_StackId with_value_register) {
 	ASSERT(fs->nloops > 0);
 	Instr jmp;
 	FileBlock *bl;
@@ -353,8 +353,8 @@ void emit_break(FileState *fs, Source line, elf_StackId with_value_register) {
 }
 
 
-void desugar_range_expr_epilogue(FileState *fs, NodeId x) {
-	Node node = get_node(fs,x);
+void desugar_range_expr_epilogue(Parser *fs, TreeId x) {
+	Tree node = get_node(fs,x);
 	switch (node.kind) {
 		case NODE_INDEX: case NODE_FIELD: {
 			desugar_range_expr_epilogue(fs,node.x);
@@ -369,11 +369,11 @@ void desugar_range_expr_epilogue(FileState *fs, NodeId x) {
 }
 
 
-NodeId desugar_range_expr(FileState *fs, NodeId x, elf_Bool flags) {
-	Node node;
+TreeId desugar_range_expr(Parser *fs, TreeId x, elf_Bool flags) {
+	Tree node;
 	Source line;
-	NodeId xx;
-	NodeId array,index,value;
+	TreeId xx;
+	TreeId array,index,value;
 
 	node=get_target_node(fs,NODE(x));
 	switch (node.kind) {
@@ -399,7 +399,7 @@ NodeId desugar_range_expr(FileState *fs, NodeId x, elf_Bool flags) {
 			index = node_local(fs,line,index_reg);
 			value = node_index(fs,line,array,index);
 
-			NodeId lo,hi;
+			TreeId lo,hi;
 			lo=get_node(fs,node.y).x;
 			hi=get_node(fs,node.y).y;
 			if (lo==NO_NODE) lo=node_integer(fs,line,0);
@@ -420,15 +420,15 @@ NodeId desugar_range_expr(FileState *fs, NodeId x, elf_Bool flags) {
 }
 
 
-void emit_field_initer(FileState *fs, Source line, int reg, NodeId id) {
-	Node node;
+void emit_field_initer(Parser *fs, Source line, int reg, TreeId id) {
+	Tree node;
 	int mem,xx,xy,yy;
 
 	node=get_node(fs,id);
 	mem=get_mem_state(fs);
 	switch (node.k) {
 		case NODE_STORE: {
-			Node x = get_node(fs,node.x);
+			Tree x = get_node(fs,node.x);
 			if ((x.kind == NODE_LOCAL)) {
 				NO_CODE;
 			} else if ((x.kind == NODE_FIELD) || (x.k == NODE_INDEX)) {
@@ -450,7 +450,7 @@ void emit_field_initer(FileState *fs, Source line, int reg, NodeId id) {
 
 /* emits code when the node is not already a register to
 load that node into any register */
-int emit_load(FileState *fs, NodeId id) {
+int emit_load(Parser *fs, TreeId id) {
 	int reg;
 	reg=get_node_register(fs,NODE(id));
 	if (reg==NO_SLOT) {
@@ -461,7 +461,7 @@ int emit_load(FileState *fs, NodeId id) {
 }
 
 
-static int find_local_const_store(FileState *fs, int reg) {
+static int find_local_const_store(Parser *fs, int reg) {
 	if (fs->nloops > 0) {
 		return -1;
 	}
@@ -487,9 +487,9 @@ static int find_local_const_store(FileState *fs, int reg) {
 }
 
 
-void opt_const_fold(FileState *fs, Node node) {
+void opt_const_fold(Parser *fs, Tree node) {
 	#define isconst(k) (k==NODE_STRING||k==NODE_INTEGER||k==NODE_NUMBER)
-	Node xx,yy;
+	Tree xx,yy;
 	int xconst;
 	int yconst;
 	xx=get_node(fs,node.x);
@@ -498,7 +498,7 @@ void opt_const_fold(FileState *fs, Node node) {
 	yconst = isconst(yy.k) || ((yy.k==NODE_LOCAL) && (find_local_const_store(fs,yy.x) != -1));
 
 	if (xconst && yconst) {
-		file_dialog(fs,node.line,"possible constant fold");
+		parser_dialog(fs,node.line,"possible constant fold");
 	}
 }
 
@@ -509,9 +509,9 @@ results in minimal register usage.
 This function will always allocate a new register,
 even if the node is a local, in which case it will
 emit a reload instruction. */
-int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
+int emit_eval(Parser *fs, int flags, int reg, int nreg, TreeId id) {
 	elf_Module *M;
-	Node node;
+	Tree node;
 	Source line;
 	int mem, rx,ry;
 
@@ -526,7 +526,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			int src;
 			src=get_node_register(fs,NODE(id));
 			if (src<0||src>=get_mem_state(fs)) {
-				file_dialog(fs,line,"invalid memory state!");
+				parser_dialog(fs,line,"invalid memory state!");
 			}
 			ASSERT(src>=0&&src<get_mem_state(fs));
 			emit_bytexy(fs,line,BC_RELOAD,reg,src);
@@ -555,7 +555,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 
 			/* todo: interning */
 			int yy = ARRAY_GROW(M->integers,1);
-			M->integers[yy] = node.lit.i;
+			M->integers[yy] = node.i;
 			emit_bytexy(fs,line,BC_GETKINT,reg,yy);
 		} break;
 		case NODE_NUMBER: {
@@ -564,7 +564,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 
 			/* todo: interning */
 			int yy = ARRAY_GROW(M->numbers,1);
-			M->numbers[yy] = node.lit.n;
+			M->numbers[yy] = node.n;
 			emit_bytexy(fs,line,BC_GETKNUM,reg,yy);
 		} break;
 		case NODE_STRING: {
@@ -572,7 +572,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			if (reg<0) reg=reg_alloc(fs);
 
 			/* todo: interning */
-			int xx = elf_set_global(M,0,VSTR(elf_alloc_string(fs->R,node.lit.s)));
+			int xx = elf_set_global(M,0,VSTR(elf_alloc_string(fs->R,node.s)));
 			emit_bytexy(fs,line,BC_GETGLOBAL,reg,xx);
 		} break;
 		case NODE_TABLE: {
@@ -621,7 +621,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 		because it's wrapped in parenthesis, could this be
 		a feature */
 		case NODE_CALL: {
-			Node xx;
+			Tree xx;
 			int nargs;
 
 			xx=get_node(fs,node.x);
@@ -646,7 +646,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			nargs=ARRAY_LENGTH(node.z)+1;
 			emit_bytexyz(fs,line,BC_CALL,mem,nargs,nreg);
 			if (nreg<1) goto esc;
-			if (nreg>1) file_dialog(fs,line,"unsupported");
+			if (nreg>1) parser_dialog(fs,line,"unsupported");
 			if (reg<0) reg=reg_alloc(fs);
 			if (reg!=mem) {
 				emit_bytexy(fs,line,BC_RELOAD,reg,mem);
@@ -712,7 +712,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			}
 		} break;
 		default: {
-			file_dialog(fs,line,"invalid node (%s)",node2s[node.kind]);
+			parser_dialog(fs,line,"invalid node (%s)",node2s[node.kind]);
 			NO_CODE;
 		}
 	}
@@ -739,10 +739,10 @@ tmp=a.b.c
 if tmp.d nil ? tmp.d=1
 
 */
-NodeId emit_preload(FileState *fs, NodeId x) {
+TreeId emit_preload(Parser *fs, TreeId x) {
 	ASSERT(x>=0);
 
-	Node   node;
+	Tree   node;
 	int     reg;
 
 	node=get_target_node(fs,NODE(x));
@@ -763,14 +763,14 @@ NodeId emit_preload(FileState *fs, NodeId x) {
 }
 
 
-void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
-	Node node;
+void emit_store(Parser *fs, Source line, TreeId x, TreeId y) {
+	Tree node;
 	node=get_target_node(fs,NODE(x));
 	if (y<0) {
-		file_dialog(fs,line,"invalid statement, expected a value for assignment");
+		parser_dialog(fs,line,"invalid statement, expected a value for assignment");
 	}
 	if (!node_is_lvalue(node.kind)) {
-		file_dialog(fs,line,"invalid assignment to (%s)",node2s[node.kind]);
+		parser_dialog(fs,line,"invalid assignment to (%s)",node2s[node.kind]);
 		elf_fail(fs->R,0,"syntax error: invalid assignment");
 	}
 	if (node.kind==NODE_LOCAL) {
@@ -779,7 +779,7 @@ void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 		/* todo: */
 		if(id!=-1){
 			if (fs->entities[id].flags & ENTITY_CONSTANT) {
-				file_dialog(fs,line,"invalid assignment to constant entity");
+				parser_dialog(fs,line,"invalid assignment to constant entity");
 				elf_fail(fs->R,0,"syntax error: invalid assignment to constant entity");
 			}
 			fs->entities[id].flags|=ENTITY_ASSIGNED;
@@ -811,10 +811,10 @@ void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 			emit_bytexyz(fs,line,op,rx,ry,rz);
 		} break;
 		case NODE_CLSVAL: {
-			file_dialog(fs,line,"assignment of closure value is not possible");
+			parser_dialog(fs,line,"assignment of closure value is not possible");
 		} break;
 		case NODE_METAFIELD: {
-			file_dialog(fs,line,"assignment of metafields is not possible");
+			parser_dialog(fs,line,"assignment of metafields is not possible");
 		} break;
 		default: {
 			NO_CODE;
@@ -823,7 +823,7 @@ void emit_store(FileState *fs, Source line, NodeId x, NodeId y) {
 }
 
 
-void begin_if(FileState *fs, Source line, BranchJumps *s, NodeId x, int z) {
+void begin_if(Parser *fs, Source line, BranchJumps *s, TreeId x, int z) {
 	BooleanJumps js = {0};
 	emit_branch_if(fs,&js,z,x);
 	// if  0 = jz
@@ -849,9 +849,9 @@ void begin_if(FileState *fs, Source line, BranchJumps *s, NodeId x, int z) {
 ** escape jump, patches previous jz (jump if false)
 ** list to enter this block.
 */
-void add_else_clause(FileState *fs, Source line, BranchJumps *s) {
+void add_else_clause(Parser *fs, Source line, BranchJumps *s) {
 	if (s->jz == 0) {
-		file_dialog(fs,line,"invalid else clause");
+		parser_dialog(fs,line,"invalid else clause");
 	}
 	ASSERT(s->jz != 0);
 	int j = emit_jump(fs,line,-1);
@@ -863,13 +863,13 @@ void add_else_clause(FileState *fs, Source line, BranchJumps *s) {
 }
 
 
-void add_elif_clause(FileState *fs, Source line, BranchJumps *s, int x) {
+void add_elif_clause(Parser *fs, Source line, BranchJumps *s, int x) {
 	add_else_clause(fs,line,s);
 	begin_if(fs,line,s,x,L_IF);
 }
 
 
-void add_then_clause(FileState *fs, Source line, BranchJumps *s) {
+void add_then_clause(Parser *fs, Source line, BranchJumps *s) {
 	/* we don't need to close the previous block, it can just fall
 	through to our branch, do collect all the other exit jumps and
 	tie them to this branch block, naturally we don't need to add
@@ -882,7 +882,7 @@ void add_then_clause(FileState *fs, Source line, BranchJumps *s) {
 }
 
 
-void close_if(FileState *fs, Source line, BranchJumps *s) {
+void close_if(Parser *fs, Source line, BranchJumps *s) {
 	/* collect missing else branch */
 	if (s->jz != 0) {
 		patch_jumps(fs,s->jz);
@@ -899,7 +899,7 @@ void close_if(FileState *fs, Source line, BranchJumps *s) {
 
 
 /* todo: add support for multiple results */
-void emit_yield(FileState *fs, Source line, NodeId id) {
+void emit_yield(Parser *fs, Source line, TreeId id) {
 	/* todo: if we only return one value we don't have to reload */
 	int mem,reg,nreg,j;
 	mem=get_mem_state(fs);
@@ -915,7 +915,7 @@ void emit_yield(FileState *fs, Source line, NodeId id) {
 }
 
 
-void begin_do_while_loop(FileState *fs, Source line) {
+void begin_do_while_loop(Parser *fs, Source line) {
 	FileBlock *bl = get_block(fs,-1); // fs->fn->block
 	ASSERT(bl->flags & BLOCK_LOOP);
 	bl->loop.entry = get_instr_cursor(fs);
@@ -925,7 +925,7 @@ void begin_do_while_loop(FileState *fs, Source line) {
 }
 
 
-void close_do_while_loop(FileState *fs, Source line, NodeId x) {
+void close_do_while_loop(Parser *fs, Source line, TreeId x) {
 	FileBlock *bl = get_block(fs,-1); // fs->fn->block;
 	ASSERT(bl->flags & BLOCK_LOOP);
 
@@ -942,7 +942,7 @@ void close_do_while_loop(FileState *fs, Source line, NodeId x) {
 }
 
 
-void begin_while_loop(FileState *fs, NodeId x) {
+void begin_while_loop(Parser *fs, TreeId x) {
 	FileBlock *bl = get_block(fs,-1);
 	ASSERT(bl->flags & BLOCK_LOOP);
 
@@ -960,7 +960,7 @@ void begin_while_loop(FileState *fs, NodeId x) {
 }
 
 
-void close_while_loop(FileState *fs) {
+void close_while_loop(Parser *fs) {
 	FileBlock *bl = get_block(fs,-1);
 	ASSERT(bl->flags & BLOCK_LOOP);
 
@@ -980,7 +980,7 @@ void close_while_loop(FileState *fs) {
 }
 
 
-void begin_range_loop(FileState *fs, Source line, NodeId index_node, NodeId lo, NodeId hi) {
+void begin_range_loop(Parser *fs, Source line, TreeId index_node, TreeId lo, TreeId hi) {
 	FileBlock *bl = get_block(fs,-1);
 	ASSERT(bl->flags & BLOCK_LOOP);
 
@@ -997,7 +997,7 @@ void begin_range_loop(FileState *fs, Source line, NodeId index_node, NodeId lo, 
 
 	elf_StackId hi_register = emit_load(fs,node_type_guard(fs,get_node_line(fs,hi),hi,NT_INT));
 	hi = node_local(fs,line,hi_register);
-	NodeId c = node_less_than(fs,line,index_node,hi);
+	TreeId c = node_less_than(fs,line,index_node,hi);
 
 	ASSERT(bl->loop.false_jumps == 0);
 
@@ -1006,16 +1006,16 @@ void begin_range_loop(FileState *fs, Source line, NodeId index_node, NodeId lo, 
 }
 
 
-void close_range_loop(FileState *fs, Source line) {
+void close_range_loop(Parser *fs, Source line) {
 	FileBlock *bl = get_block(fs,-1); // fs->fn->block;
 	ASSERT(bl->flags & BLOCK_LOOP);
 
 	patch_jumps(fs,bl->loop.true_jumps);
 	ARRAY_DELETE(bl->loop.true_jumps);
 	bl->loop.true_jumps = 0;
-	// NodeId index_node = bl->loop.index_node;
-	NodeId index_node = node_local(fs,NO_LINE,bl->loop.index_register);
-	NodeId k = node_xy(fs,NO_LINE,NODE_ADD,NT_INT,index_node,node_integer(fs,NO_LINE,1));
+	// TreeId index_node = bl->loop.index_node;
+	TreeId index_node = node_local(fs,NO_LINE,bl->loop.index_register);
+	TreeId k = node_xy(fs,NO_LINE,NODE_ADD,NT_INT,index_node,node_integer(fs,NO_LINE,1));
 	emit_store(fs,line,index_node,k);
 	emit_jump(fs,line,bl->loop.entry);
 

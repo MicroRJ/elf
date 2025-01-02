@@ -8,39 +8,39 @@
 #define NODE_ENUM(NAME) #NAME,
 INTERNAL char *node2s[] = {
 	"NONE",
-	NODE_LIST(NODE_ENUM)
+	TREEDEF(NODE_ENUM)
 };
 #undef NODE_ENUM
 
 
 
 
-Node get_node(FileState *fs, NodeId id) {
+Tree get_node(Parser *fs, TreeId id) {
 	ASSERT(id != NO_SLOT);
 	return fs->nodes[id];
 }
 
 
-NodeKi get_node_kind(FileState *fs, NodeId id) {
+TreeKi get_node_kind(Parser *fs, TreeId id) {
 	return get_node(fs,id).kind;
 }
 
 
-NodeTy get_node_type(FileState *fs, NodeId id) {
+TreeTy get_node_type(Parser *fs, TreeId id) {
 	return get_node(fs,id).type;
 }
 
 
-char *get_node_line(FileState *fs, NodeId id) {
+char *get_node_line(Parser *fs, TreeId id) {
 	return get_node(fs,id).line;
 }
 
 
-static ByteOP node2byte(NodeKi tt);
+static ByteOP node2byte(TreeKi tt);
 
 
-static Node get_target_node(FileState *fs, NodeIdGuard id) {
-	Node node;
+static Tree get_target_node(Parser *fs, NodeIdGuard id) {
+	Tree node;
 
 	node=get_node(fs,id.id);
 	switch (node.kind) {
@@ -55,7 +55,7 @@ static Node get_target_node(FileState *fs, NodeIdGuard id) {
 }
 
 
-static elf_Bool node_is_lvalue(NodeKi kind) {
+static elf_Bool node_is_lvalue(TreeKi kind) {
 	switch (kind) {
 		case NODE_RANGE_INDEX:
 		case NODE_GLOBAL:
@@ -71,7 +71,7 @@ static elf_Bool node_is_lvalue(NodeKi kind) {
 }
 
 
-elf_ValueTag node2tag(NodeTy ty) {
+elf_ValueTag node2tag(TreeTy ty) {
 	switch (ty) {
 		case NT_SYS: return elf_TAG_SYS;
 		case NT_NUM: return elf_TAG_NUM;
@@ -82,7 +82,7 @@ elf_ValueTag node2tag(NodeTy ty) {
 }
 
 
-ByteOP node2byte(NodeKi tt) {
+ByteOP node2byte(TreeKi tt) {
 	switch (tt) {
 		case NODE_FIELD: 		return BC_GETFIELD;
 		case NODE_INDEX: 		return BC_GETINDEX;
@@ -110,10 +110,10 @@ ByteOP node2byte(NodeKi tt) {
 }
 
 
-NodeId node_xyz(FileState *fs, Source line, NodeKi kind, NodeTy type, NodeId x, NodeId y, NodeId *z) {
-	NodeId id=fs->nnodes ++;
+TreeId node_xyz(Parser *fs, Source line, TreeKi kind, TreeTy type, TreeId x, TreeId y, TreeId *z) {
+	TreeId id=fs->nnodes ++;
 	ARRAY_GROW(fs->nodes,fs->nnodes-ARRAY_GET_MIN(fs->nodes));
-	Node *node=fs->nodes+id;
+	Tree *node=fs->nodes+id;
 	node->level=fs->nblocks-1;
 	node->line=line;
 	node->type=type;
@@ -125,168 +125,168 @@ NodeId node_xyz(FileState *fs, Source line, NodeKi kind, NodeTy type, NodeId x, 
 }
 
 
-NodeId node_xy(FileState *fs, Source line, NodeKi k, NodeTy t, NodeId x, NodeId y) {
+TreeId node_xy(Parser *fs, Source line, TreeKi k, TreeTy t, TreeId x, TreeId y) {
 	return node_xyz(fs,line,k,t,x,y,0);
 }
 
 
-NodeId node_x(FileState *fs, Source line, NodeKi k, NodeTy t, NodeId x) {
+TreeId node_x(Parser *fs, Source line, TreeKi k, TreeTy t, TreeId x) {
 	return node_xy(fs,line,k,t,x,NO_NODE);
 }
 
 
-NodeId node_nullary(FileState *fs, Source line, NodeKi k, NodeTy t) {
+TreeId node_nullary(Parser *fs, Source line, TreeKi k, TreeTy t) {
 	return node_x(fs,line,k,t,NO_NODE);
 }
 
 
-NodeId node_store(FileState *fs, Source line, NodeId x, NodeId y) {
+TreeId node_store(Parser *fs, Source line, TreeId x, TreeId y) {
 	return node_xy(fs,line,NODE_STORE,NT_ANY,x,y);
 }
 
 
-NodeId node_type_guard(FileState *fs, Source line, NodeId x, NodeTy y) {
+TreeId node_type_guard(Parser *fs, Source line, TreeId x, TreeTy y) {
 	return node_xy(fs,line,NODE_TYPEGUARD,y,x,y);
 }
 
 
-NodeId node_group(FileState *fs, Source line, NodeId x) {
-	NodeId id = node_x(fs,line,NODE_GROUP,get_node_type(fs,x),x);
+TreeId node_group(Parser *fs, Source line, TreeId x) {
+	TreeId id = node_x(fs,line,NODE_GROUP,get_node_type(fs,x),x);
 	return id;
 }
 
 
-NodeId node_integer(FileState *fs, Source line, elf_Int i) {
-	NodeId v = node_nullary(fs,line,NODE_INTEGER,NT_INT);
-	fs->nodes[v].lit.i = i;
+TreeId node_integer(Parser *fs, Source line, elf_Int i) {
+	TreeId v = node_nullary(fs,line,NODE_INTEGER,NT_INT);
+	fs->nodes[v].i = i;
 	return v;
 }
 
 
-NodeId node_number(FileState *fs, Source line, elf_Num n) {
-	NodeId v = node_nullary(fs,line,NODE_NUMBER,NT_NUM);
-	fs->nodes[v].lit.n = n;
+TreeId node_number(Parser *fs, Source line, elf_Num n) {
+	TreeId v = node_nullary(fs,line,NODE_NUMBER,NT_NUM);
+	fs->nodes[v].n = n;
 	return v;
 }
 
 
-NodeId node_string(FileState *fs, Source line, char *s) {
-	NodeId v = node_nullary(fs,line,NODE_STRING,NT_STR);
-	fs->nodes[v].lit.s = s;
+TreeId node_string(Parser *fs, Source line, char *s) {
+	TreeId v = node_nullary(fs,line,NODE_STRING,NT_STR);
+	fs->nodes[v].s = s;
 	return v;
 }
 
 
-NodeId node_new_table(FileState *fs, Source line, NodeId *z) {
+TreeId node_new_table(Parser *fs, Source line, TreeId *z) {
 	return node_xyz(fs,line,NODE_TABLE,NT_TAB,NO_NODE,NO_NODE,z);
 }
 
 
-NodeId node_new_closure(FileState *fs, Source line, NodeId x, NodeId *z) {
+TreeId node_new_closure(Parser *fs, Source line, TreeId x, TreeId *z) {
 	return node_xyz(fs,line,NODE_CLOSURE,NT_FUN,x,NO_NODE,z);
 }
 
 
-NodeId node_nil(FileState *fs, Source line) {
+TreeId node_nil(Parser *fs, Source line) {
 	return node_nullary(fs,line,NODE_NIL,NT_NIL);
 }
 
 
-NodeId node_closure_value(FileState *fs, Source line, elf_StackId x) {
+TreeId node_closure_value(Parser *fs, Source line, elf_StackId x) {
 	return node_x(fs,line,NODE_CLSVAL,NT_ANY,x);
 }
 
 
-NodeId node_local(FileState *fs, Source line, elf_StackId x) {
+TreeId node_local(Parser *fs, Source line, elf_StackId x) {
 	return node_x(fs,line,NODE_LOCAL,NT_ANY,x);
 }
 
 
-NodeId node_this(FileState *fs, Source line) {
+TreeId node_this(Parser *fs, Source line) {
 	return node_local(fs,line,0);
 }
 
 
-NodeId node_global(FileState *fs, Source line, elf_SymbolId x) {
+TreeId node_global(Parser *fs, Source line, elf_SymbolId x) {
 	return node_x(fs,line,NODE_GLOBAL,NT_ANY,x);
 }
 
 
-NodeId node_field(FileState *fs, Source line, NodeId x, NodeId y) {
+TreeId node_field(Parser *fs, Source line, TreeId x, TreeId y) {
 	return node_xy(fs,line,NODE_FIELD,NT_ANY,x,y);
 }
 
 
-NodeId node_index(FileState *fs, Source line, NodeId x, NodeId y) {
+TreeId node_index(Parser *fs, Source line, TreeId x, TreeId y) {
 	return node_xy(fs,line,NODE_INDEX,NT_ANY,x,y);
 }
 
 
-NodeId node_ranged_index(FileState *fs, Source line, NodeId x, NodeId y) {
+TreeId node_ranged_index(Parser *fs, Source line, TreeId x, TreeId y) {
 	return node_xy(fs,line,NODE_RANGE_INDEX,NT_ANY,x,y);
 }
 
 
-NodeId node_metafield(FileState *fs, Source line, NodeId x, NodeId y) {
+TreeId node_metafield(Parser *fs, Source line, TreeId x, TreeId y) {
 	return node_xy(fs,line,NODE_METAFIELD,NT_ANY,x,y);
 }
 
 
-NodeId node_call(FileState *fs, Source line, NodeId x, NodeId *z) {
+TreeId node_call(Parser *fs, Source line, TreeId x, TreeId *z) {
 	return node_xyz(fs,line,NODE_CALL,NT_ANY,x,NO_NODE,z);
 }
 
 
-NodeId node_multi(FileState *fs, Source line, NodeId *z) {
+TreeId node_multi(Parser *fs, Source line, TreeId *z) {
 	return node_xyz(fs,line,NODE_MULTI,NT_ANY,NO_NODE,NO_NODE,z);
 }
 
 
-NodeId node_less_than(FileState *fs, Source line, NodeId x, NodeId y) {
+TreeId node_less_than(Parser *fs, Source line, TreeId x, TreeId y) {
 	return node_xy(fs,line,NODE_LT,NT_BOL,x,y);
 }
 
 
-NodeId node_eq_nil(FileState *fs, Source line, NodeId x) {
+TreeId node_eq_nil(Parser *fs, Source line, TreeId x) {
 	return node_xy(fs,line,NODE_EQ,NT_BOL,x,node_nil(fs,line));
 }
 
 
-NodeId node_call_metafield(FileState *fs, Source line, NodeId x, NodeId *z, char *name) {
-	NodeId field = node_metafield(fs,line,x,node_string(fs,line,name));
+TreeId node_call_metafield(Parser *fs, Source line, TreeId x, TreeId *z, char *name) {
+	TreeId field = node_metafield(fs,line,x,node_string(fs,line,name));
 	return node_call(fs,line,field,z);
 }
 
 
-NodeId node_global_name(FileState *fs, Source line, char *name) {
+TreeId node_global_name(Parser *fs, Source line, char *name) {
 	elf_SymbolId x = elf_get_global(fs->M,elf_alloc_string(fs->R,name));
 	ASSERT(x != -1);
 	return node_global(fs,line,x);
 }
 
 
-NodeId node_call_pf(FileState *fs, Source line, NodeId *args) {
-	NodeId fn = node_global_name(fs,line,"elf.pf");
+TreeId node_call_pf(Parser *fs, Source line, TreeId *args) {
+	TreeId fn = node_global_name(fs,line,"elf.pf");
 	return node_call(fs,line,fn,args);
 }
 
 
-NodeId node_call_set_metatable(FileState *fs, Source line, NodeId object, NodeId metatable) {
-	NodeId fn = node_global_name(fs,line,"elf.set_object_metatable");
-	NodeId *z = 0;
+TreeId node_call_set_metatable(Parser *fs, Source line, TreeId object, TreeId metatable) {
+	TreeId fn = node_global_name(fs,line,"elf.set_object_metatable");
+	TreeId *z = 0;
 	ARRAY_ADD(z,object);
 	ARRAY_ADD(z,metatable);
 	return node_call(fs,line,fn,z);
 }
 
 
-static elf_Bool is_binary_node(NodeKi kind) {
+static elf_Bool is_binary_node(TreeKi kind) {
 	return kind >= NODE_AND && kind <= NODE_BIT_OR;
 }
 
 
-static void fpf_node(FileState *fs, FILE *io, NodeId id) {
-	Node node = get_node(fs,id);
+static void fpf_node(Parser *fs, FILE *io, TreeId id) {
+	Tree node = get_node(fs,id);
 	if (is_binary_node(node.kind)) {
 		fprintf(io, "(%s ", node2s[node.kind]);
 		fpf_node(fs,io,node.x);
@@ -300,8 +300,8 @@ static void fpf_node(FileState *fs, FILE *io, NodeId id) {
 			fpf_node(fs,io,node.y);
 			fprintf(io, "]");
 		} break;
-		case NODE_INTEGER: fprintf(io,"int(%lli)",node.lit.i); break;
-		case NODE_NUMBER: fprintf(io,"num(%f)",node.lit.n); break;
+		case NODE_INTEGER: fprintf(io,"int(%lli)",node.i); break;
+		case NODE_NUMBER: fprintf(io,"num(%f)",node.n); break;
 		case NODE_NIL: fprintf(io,"nil"); break;
 		case NODE_GROUP: {
 			fprintf(io,"(");

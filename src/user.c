@@ -18,8 +18,8 @@ elf_String *elf_new_string2(elf_State *R, elf_Int length) {
 }
 
 
-elf_Object *elf_new_object(elf_State *R, elf_Int size) {
-	elf_Object *obj=elf_alloc_object(R,GC_OBJ,size);
+elf_Node *elf_new_object(elf_State *R, elf_Int size) {
+	elf_Node *obj=elf_alloc_object(R,GC_OBJ,size);
 	elf_add_obj(R,obj);
 	return obj;
 }
@@ -31,9 +31,8 @@ elf_Table *elf_new_table(elf_State *R) {
 	return tab;
 }
 
-
 elf_Closure *elf_new_closure(elf_State *R, elf_Prototype fn) {
-	elf_Closure *cls=elf_alloc_closure(R,fn);
+	elf_Closure *cls = elf_alloc_closure(R,fn);
 	elf_add_cls(R,cls);
 	return cls;
 }
@@ -59,7 +58,7 @@ elf_ValueTag elf_get_tag(elf_State *S, int x) {
 }
 
 
-elf_Object *elf_get_this(elf_State *S) {
+elf_Node *elf_get_this(elf_State *S) {
 	return GET_FRAME(S)->locals[0].x_obj;
 }
 
@@ -84,12 +83,12 @@ void elf_add_cls(elf_State *S, elf_Closure *x) {
 }
 
 
-void elf_add_obj(elf_State *S, elf_Object *x) {
+void elf_add_obj(elf_State *S, elf_Node *x) {
 	if (x) PUSHV(S,VOBJ(x)); else PUSHV(S,VNIL());
 }
 
 
-void elf_add_cfn(elf_State *S, elf_CFunction x) {
+void elf_add_cfn(elf_State *S, elf_Function x) {
 	PUSHV(S,VCFN(x));
 }
 
@@ -137,7 +136,7 @@ char *elf_get_txt(elf_State *R, elf_StackId x) {
 }
 
 
-elf_Object *elf_get_obj(elf_State *R, elf_StackId x) {
+elf_Node *elf_get_obj(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_TAG_NIL) return 0;
 	if (ISOBJT(v.tag)) return v.x_obj;
@@ -206,7 +205,7 @@ elf_SymbolId elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
 /* Todo: remove all this, the user can create their own utility
 functions for all this, this just adds unnecessary bloat */
 elAPI void elf_gset_bindings(elf_State *S, elf_CBinding *list, int num);
-elAPI void elf_gsetx_cfn(elf_State *S, char *name, elf_CFunction thing);
+elAPI void elf_gsetx_cfn(elf_State *S, char *name, elf_Function thing);
 elAPI void elf_gsetx_int(elf_State *S, char *name, elf_Int thing);
 elAPI void elf_gsetx_tab(elf_State *S, char *name, elf_Table *thing);
 
@@ -231,7 +230,7 @@ void elf_gsetx_str(elf_State *R, char *name, char *val) {
 }
 
 
-void elf_gsetx_cfn(elf_State *R, char *name, elf_CFunction fn) {
+void elf_gsetx_cfn(elf_State *R, char *name, elf_Function fn) {
 	elf_set_global(R->M,elf_new_string(R,name),VCFN(fn));
 }
 

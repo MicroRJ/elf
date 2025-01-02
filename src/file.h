@@ -61,7 +61,7 @@ _(SQUARE_LEFT,"[") _(SQUARE_RIGHT,"]") _(CURLY_LEFT,"{") _(CURLY_RIGHT,"}") \
 _(PAREN_LEFT,"(") _(PAREN_RIGHT,")") \
 
 
-typedef enum elTokenType {
+typedef enum elf_TokenType {
 	TK_NONE = 0,
 
 #define TKITEM(NAME,_) XFUSE(TK_,NAME),
@@ -76,7 +76,7 @@ typedef enum elTokenType {
 #undef TKITEM
 #undef MCITEM
 #undef OPITEM
-} elTokenType;
+} elf_TokenType;
 
 
 
@@ -130,12 +130,12 @@ typedef struct elFileLoopState {
 	#array and #index are guaranteed to be register nodes,
 	and #value is an (index node), which translates to
 	#array[#index] */
-	NodeId array_register; // _register;
-	NodeId index_register; // _register;
-	NodeId value_register;
+	TreeId array_register; // _register;
+	TreeId index_register; // _register;
+	TreeId value_register;
 	/* todo: why do we need this, please
 	remove? */
-	union { NodeId x; };
+	union { TreeId x; };
 } elFileLoopState;
 
 
@@ -196,7 +196,7 @@ typedef struct FileFunction {
 } FileFunction;
 
 
-typedef struct FileState {
+typedef struct Parser {
 	FileFunction function;
 	elf_Module           *M;
 	elf_State            *R;
@@ -209,8 +209,8 @@ typedef struct FileState {
 		FileToken this_token,tk;
 	};
 	FileToken last_token,then_token;
-	Node 	          *nodes;
-	NodeId          nnodes;
+	Tree 	          *nodes;
+	TreeId          nnodes;
 	FileEntity   *entities;
 	EntityId     nentities;
 	FileBlock      *blocks;
@@ -219,68 +219,67 @@ typedef struct FileState {
 	FileFunction       *fn;
 	int              flags;
 	elf_Bool    debuggerflag;
-	int   default_register;
-} FileState;
+} Parser;
 
 
-static int find_local_entity(FileState *fs, int reg);
+static int find_local_entity(Parser *fs, int reg);
 
 
-static int begin_file_state(FileState *fs, char *name, char *text);
-static void close_file_state(FileState *fs);
+static int parser_begin(Parser *fs, char *name, char *text);
+static void parser_end(Parser *fs);
 
 
-static void begin_function(FileState *fs, FileFunction *fn, Source line);
-static void close_function(FileState *fs);
+static void begin_function(Parser *fs, FileFunction *fn, Source line);
+static void close_function(Parser *fs);
 
 
-static BlockId begin_block(FileState *fs, elf_Bool flags);
-static void close_block(FileState *fs);
-static FileBlock *get_loop_block(FileState *fs, elf_StackId with_value_register);
+static BlockId begin_block(Parser *fs, elf_Bool flags);
+static void close_block(Parser *fs);
+static FileBlock *get_loop_block(Parser *fs, elf_StackId with_value_register);
 
 
-static void begin_delay_block(FileState *fs, Source line);
-static void close_delay_block(FileState *fs, Source line);
+static void begin_delay_block(Parser *fs, Source line);
+static void close_delay_block(Parser *fs, Source line);
 
 
-static void emit_store(FileState *fs, Source line, NodeId x, NodeId y);
+static void emit_store(Parser *fs, Source line, TreeId x, TreeId y);
 
-static int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id);
-static int emit_load(FileState *fs, NodeId id);
-static int emit_preload(FileState *fs, NodeId id);
+static int emit_eval(Parser *fs, int flags, int reg, int nreg, TreeId id);
+static int emit_load(Parser *fs, TreeId id);
+static int emit_preload(Parser *fs, TreeId id);
 
 
-static int emit_branch_if_false(FileState *fs, BooleanJumps *js, NodeId id);
-static int emit_branch_if_true(FileState *fs, BooleanJumps *js, NodeId id);
-static int *emit_jump_if_true(FileState *fs, BooleanJumps *js, NodeId id);
-static int *emit_jump_if_false(FileState *fs, BooleanJumps *js, NodeId id);
+static int emit_branch_if_false(Parser *fs, BooleanJumps *js, TreeId id);
+static int emit_branch_if_true(Parser *fs, BooleanJumps *js, TreeId id);
+static int *emit_jump_if_true(Parser *fs, BooleanJumps *js, TreeId id);
+static int *emit_jump_if_false(Parser *fs, BooleanJumps *js, TreeId id);
 
 
 // JZ, JNZ
 enum { L_IF  = 0, L_IFF = 1, };
 
 
-static void begin_if(FileState *fs, Source line, BranchJumps *s, NodeId x, int z);
-static void add_elif_clause(FileState *fs, Source line, BranchJumps *s, NodeId x);
-static void add_else_clause(FileState *fs, Source line, BranchJumps *s);
-static void add_then_clause(FileState *fs, Source line, BranchJumps *s);
-static void close_if(FileState *fs, Source line, BranchJumps *s);
+static void begin_if(Parser *fs, Source line, BranchJumps *s, TreeId x, int z);
+static void add_elif_clause(Parser *fs, Source line, BranchJumps *s, TreeId x);
+static void add_else_clause(Parser *fs, Source line, BranchJumps *s);
+static void add_then_clause(Parser *fs, Source line, BranchJumps *s);
+static void close_if(Parser *fs, Source line, BranchJumps *s);
 
-static void begin_range_loop(FileState *fs, Source line, NodeId x, NodeId lo, NodeId hi);
-static void close_range_loop(FileState *fs, Source line);
-static void begin_do_while_loop(FileState *fs, Source line);
-static void close_do_while_loop(FileState *fs, Source line, NodeId x);
-static void begin_while_loop(FileState *fs, NodeId x);
-static void close_while_loop(FileState *fs);
+static void begin_range_loop(Parser *fs, Source line, TreeId x, TreeId lo, TreeId hi);
+static void close_range_loop(Parser *fs, Source line);
+static void begin_do_while_loop(Parser *fs, Source line);
+static void close_do_while_loop(Parser *fs, Source line, TreeId x);
+static void begin_while_loop(Parser *fs, TreeId x);
+static void close_while_loop(Parser *fs);
 
-static char *fs_get_name(FileState *fs);
+static char *parser_get_name(Parser *fs);
 
-static NodeId parse_table(FileState *fs);
-static NodeId parse_unary(FileState *fs, BooleanJumps *expr, elf_Bool flags);
-static NodeId parse_subexpr(FileState *fs, BooleanJumps *expr, int rank, int flags);
-static NodeId parse_expr(FileState *fs, BooleanJumps *expr, elf_Bool flags);
-static int parse_stat(FileState *fs);
-static void parse_for_loop(FileState *fs);
+static TreeId parse_table(Parser *fs);
+static TreeId parse_unary(Parser *fs, BooleanJumps *expr, elf_Bool flags);
+static TreeId parse_subexpr(Parser *fs, BooleanJumps *expr, int rank, int flags);
+static TreeId parse_expr(Parser *fs, BooleanJumps *expr, elf_Bool flags);
+static int parse_stat(Parser *fs);
+static void parse_for_loop(Parser *fs);
 
 
 

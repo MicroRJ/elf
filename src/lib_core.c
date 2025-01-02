@@ -111,7 +111,7 @@ int core_lib_tagof(elf_State *R) {
 
 
 int core_lib_get_object_color(elf_State *R) {
-	elf_Object *obj = elf_get_obj(R,0);
+	elf_Node *obj = elf_get_obj(R,0);
 	int color = obj->color;
 	elf_new_string(R,
 	color == elf_GC_BLACK ? "black" :
@@ -149,13 +149,13 @@ int core_lib_merge_tables(elf_State *R) {
 
 
 int core_lib_get_metatable(elf_State *R) {
-	elf_add_tab(R,elf_get_obj(R,0)->metatable);
+	elf_add_tab(R,elf_get_obj(R,0)->meta);
 	return 1;
 }
 
 
 int core_lib_set_metatable(elf_State *R) {
-	elf_get_obj(R,0)->metatable=elf_get_tab(R,1);
+	elf_get_obj(R,0)->meta=elf_get_tab(R,1);
 	PUSHV(R,elf_get_arg(R,0));
 	return 1;
 }
@@ -316,7 +316,7 @@ int core_lib_load_file(elf_State *R) {
 int core_lib_get_dll_fn(elf_State *S) {
 	elf_Handle lib = elf_get_sys(S,0);
 	char *name = elf_get_txt(S,1);
-	elf_CFunction fn = (elf_CFunction) sys_get_dll_fn(lib,name);
+	elf_Function fn = (elf_Function) sys_get_dll_fn(lib,name);
 
 	if (fn != 0) elf_add_cfn(S,fn);
 	else elf_add_nil(S);

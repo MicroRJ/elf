@@ -1,8 +1,7 @@
 /*
 ** See Copyright Notice Below.
 ** elf.h
-** The elf language.
-*/
+e*/
 
 /* Todo: better logging, with colors, with so many warnings
 and things, its hard to tell the difference between a log
@@ -31,17 +30,35 @@ saying so... */
 #endif
 
 
+
+
 typedef struct elf_Module 	elf_Module;
 typedef struct elf_State 	elf_State;
-typedef struct elf_Object 	elf_Object;
+typedef struct elf_Node 	elf_Node;
 typedef struct elf_Table 	elf_Table;
 typedef struct elf_String 	elf_String;
 typedef struct elf_Closure elf_Closure;
 typedef struct elf_Value   elf_Value;
 
 
-typedef long long int 	   elf_Int;
+
+typedef signed int 		   bool;
 typedef signed int 		   elf_Bool;
+
+
+typedef signed   char           elf_i8;
+typedef unsigned char           elf_u8;
+typedef signed   short         elf_i16;
+typedef unsigned short         elf_u16;
+typedef signed   int           elf_i32;
+typedef unsigned int           elf_u32;
+typedef   signed long long int elf_i64;
+typedef unsigned long long int elf_u64;
+typedef double 			       elf_f64;
+typedef float  			       elf_f32;
+
+
+typedef long long int 	   elf_Int;
 typedef double 			   elf_Num;
 typedef void 			     *elf_Handle;
 typedef int 					Error;
@@ -50,25 +67,19 @@ typedef int 				   elf_SymbolId;
 typedef unsigned int 		elf_Hash;
 
 
-typedef int (* elf_CFunction)(elf_State *);
-
+typedef int (* elf_Function)(elf_State *);
 
 typedef struct elf_CBinding {
 	char *name;
-	elf_CFunction fn;
+	elf_Function fn;
 } elf_CBinding;
 
-
-
-/* nlocals is the stack size required
-for this function (includes arity),
-nvalues is the number of closure values */
 typedef struct elf_Prototype {
-	unsigned char     arity;
-	unsigned char   nvalues;
-	unsigned char   nlocals;
-	int 	           nbytes;
-	int 	            bytes;
+	int               arity;
+	int             nvalues;
+	int             nlocals;
+	int              nbytes;
+	int               bytes;
 	int            **protos;
 	int              parent;
 	elf_String        *name;
@@ -97,23 +108,27 @@ typedef enum elf_GCTy {
 	GC_OBJ=0,GC_CLS,GC_STR,GC_TAB,
 } elf_GCTy;
 
+enum {
+	elf_GC_WHITE=0,
+	elf_GC_BLACK,
+	elf_GC_RED,
+	elf_GC_PINK,
+	elf_GC_TRAP,
+};
 
-typedef enum elf_GCColor {
-	elf_GC_WHITE=0, elf_GC_BLACK, elf_GC_RED, elf_GC_PINK, elf_GC_TRAP,
-} elf_GCColor;
+struct elf_Node {
+	elf_i8      type;
+	elf_i8     color;
+	elf_i16     size;
+	elf_Table  *meta;
+};
 
-
-
-typedef struct elf_Object {
-	unsigned  type: 4; // elf_GCTy
-	unsigned color: 4; // elf_GCColor
-	short     size;
-	elf_Table  *metatable;
-} elf_Object;
-
-
+/* Todo: figure out what do actually do with this,
+it's going to get padded to 128 - bits anyways...
+this gave me the idea tho, why not go with it?
+Maybe every value is vector type? */
 typedef struct elf_Value {
-	elf_Int tag;
+	elf_i32 tag;
 	union {
 		union {
 			elf_Int         x_int;
@@ -121,19 +136,19 @@ typedef struct elf_Value {
 			void           *x_ptr;
 			elf_Handle      x_sys;
 			elf_Closure    *x_cls;
-			elf_Object     *x_obj;
+			elf_Node       *x_obj;
 			elf_Table      *x_tab;
 			elf_String     *x_str;
-			elf_CFunction   x_cfn;
+			elf_Function    x_fun;
 		};
-		struct {   int x_i32,y_i32; };
-		struct { float x_f32,y_f32; };
+		struct { elf_i32 x_i32, y_i32, z_i32; };
+		struct { elf_f32 x_f32, y_f32, z_f32; };
 	};
 } elf_Value;
 
 
 typedef struct elf_String {
-	elf_Object     obj;
+	elf_Node       obj;
 	elf_Hash      hash;
 	int     	   length;
 	char       text[1];
@@ -145,25 +160,24 @@ typedef struct elf_Entry {
 	elf_Int   idx;
 } elf_Entry;
 
-
 typedef struct elf_Table {
-	elf_Object obj;
+	elf_Node      obj;
 	elf_Int    ntotal;
 	elf_Int    nslots;
-	elf_Int    ncollisions;
-	elf_Entry *slots;
-	elf_Value *array;
+	elf_Int    ndebug;
+	elf_Entry  *slots;
+	elf_Value  *array;
 } elf_Table;
 
-elAPI void elf_begin(elf_State *S, elf_Module *M);
 
-/* allocate and adds the object to stack (prevents it from
-getting GC'd) */
+elAPI void elf_init(elf_State *S, elf_Module *M);
+
+/* allocate and adds the object to stack (prevents it from getting GC'd) */
 elAPI elf_Closure *elf_new_closure(elf_State *, elf_Prototype fn);
 elAPI elf_String *elf_new_string2(elf_State *, elf_Int length);
 elAPI elf_String *elf_new_string(elf_State *, const char *text);
-elAPI elf_Object *elf_new_object(elf_State *, elf_Int size);
-elAPI elf_Table  *elf_new_table(elf_State *);
+elAPI elf_Node *elf_new_object(elf_State *, elf_Int size);
+elAPI elf_Table *elf_new_table(elf_State *);
 
 
 /* add objects to stack */
@@ -172,23 +186,23 @@ elAPI void elf_add_any(elf_State *S, elf_Value value);
 elAPI void elf_add_nil(elf_State *S);
 elAPI void elf_add_int(elf_State *S, elf_Int);
 elAPI void elf_add_num(elf_State *S, elf_Num);
-elAPI void elf_add_obj(elf_State *S, elf_Object *);
+elAPI void elf_add_obj(elf_State *S, elf_Node *);
 elAPI void elf_add_str(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
 elAPI void elf_add_tab(elf_State *S, elf_Table *);
 elAPI void elf_add_cls(elf_State *S, elf_Closure *);
-elAPI void elf_add_cfn(elf_State *S, elf_CFunction);
+elAPI void elf_add_cfn(elf_State *S, elf_Function);
 
 
 /* getting arguments from stack */
-elAPI elf_Object  *elf_get_this(elf_State *S);
+elAPI elf_Node  *elf_get_this(elf_State *S);
 
 elAPI elf_Value    elf_get_arg(elf_State *S, int arg);
 elAPI elf_Int      elf_get_int(elf_State *S, int arg);
 elAPI elf_Num      elf_get_num(elf_State *S, int arg);
 elAPI elf_String  *elf_get_str(elf_State *S, int arg);
 elAPI char        *elf_get_txt(elf_State *S, int arg);
-elAPI elf_Object  *elf_get_obj(elf_State *S, int arg);
+elAPI elf_Node  *elf_get_obj(elf_State *S, int arg);
 elAPI elf_Table   *elf_get_tab(elf_State *S, int arg);
 elAPI elf_Handle   elf_get_sys(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
@@ -208,11 +222,7 @@ elAPI elf_Table *elf_alloc_table(elf_State *);
 elAPI int         elf_get_string_length(elf_String *);
 elAPI elf_Hash    elf_get_string_hash(elf_String *);
 elAPI char       *elf_get_string_text(elf_String *);
-elAPI elf_Bool    elf_strings_eq(elf_String *x, elf_String *y);
-
-
-/* tables */
-elAPI void elf_free_table_contents(elf_Table *);
+elAPI elf_Bool    elf_get_strings_eq(elf_String *x, elf_String *y);
 
 
 /* tries a key, if the key is found it returns its address,
@@ -273,7 +283,7 @@ elAPI int elf_call_function(elf_State *S, int nargs, int nrets);
 
 /* todo: why are these public */
 elf_Int elf_trigger_collection_cycle(elf_State *S);
-elf_Int elf_mark_object(elf_Object *obj);
+elf_Int elf_mark_object(elf_Node *obj);
 
 /* Todo: why are we exposing any of this */
 

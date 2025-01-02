@@ -100,22 +100,22 @@ int table_lib_contains(elf_State *S) {
 
 int table_lib_get_collisions(elf_State *S) {
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
-	elf_add_int(S,tab->ncollisions);
+	elf_add_int(S,tab->ndebug);
 	return 1;
 }
 
 
 int table_lib_get_metatable(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_add_tab(R,POBJ(tab)->metatable);
+	elf_add_tab(R,POBJ(tab)->meta);
 	return 1;
 }
 
 
 int table_lib_set_metatable(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_add_tab(R,POBJ(tab)->metatable);
-	POBJ(tab)->metatable = elf_get_tab(R,0);
+	elf_add_tab(R,POBJ(tab)->meta);
+	POBJ(tab)->meta = elf_get_tab(R,0);
 	return 1;
 }
 
@@ -254,7 +254,7 @@ int table_lib_xdelete(elf_State *R) {
 	elf_Int len = ARRAY_LENGTH(tab->array);
 	if (len != 0) {
 		if (ISOBJT(elf_get_tag(R,0))) {
-			elf_Object *object = elf_get_obj(R,0);
+			elf_Node *object = elf_get_obj(R,0);
 			/* todo: Speed */
 			elf_Value *item = 0;
 			elf_Int idx;
@@ -296,7 +296,7 @@ int table_lib_xremove(elf_State *R) {
 
 	if (len != 0) {
 		if (ISOBJT(elf_get_tag(R,0))) {
-			elf_Object *object = elf_get_obj(R,0);
+			elf_Node *object = elf_get_obj(R,0);
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */
@@ -523,7 +523,7 @@ int table_lib_merge(elf_State *R) {
 	for ( int i = 0; i < elf_get_num_args(R); ++ i ) {
 		elf_merge_tables(sum,elf_get_tab(R,i));
 	}
-	sum->obj.metatable = tab->obj.metatable;
+	sum->obj.meta = tab->obj.meta;
 	return 1;
 }
 

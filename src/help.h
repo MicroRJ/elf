@@ -94,7 +94,7 @@
 #define VN2I(X) (((X).tag==elf_TAG_NUM) ? (elf_Int) (X).x_num : (X).x_int)
 
 
-#define POBJ(thing) ((elf_Object*)(thing))
+#define POBJ(thing) ((elf_Node*)(thing))
 #define OBJ_COLOR(thing) (POBJ(thing)->color)
 
 
@@ -115,10 +115,10 @@
 #define VINT(thing) (XLITERAL(elf_Value){ elf_TAG_INT, {(elf_Int) UCAST(thing, elf_Int)} })
 #define VSYS(thing) (XLITERAL(elf_Value){ elf_TAG_SYS, {(elf_Int) UCAST(thing, elf_Handle)} })
 #define VTAB(thing) (XLITERAL(elf_Value){ elf_TAG_TAB, {(elf_Int) UCAST(thing, elf_Table *)} })
-#define VOBJ(thing) (XLITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Object *)} })
+#define VOBJ(thing) (XLITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Node *)} })
 #define VSTR(thing) (XLITERAL(elf_Value){ elf_TAG_STR, {(elf_Int) UCAST(thing, elf_String *)} })
 #define VCLS(thing) (XLITERAL(elf_Value){ elf_TAG_CLS, {(elf_Int) UCAST(thing, elf_Closure *)} })
-#define VCFN(thing) (XLITERAL(elf_Value){ elf_TAG_CFN, {(elf_Int) UCAST(thing, elf_CFunction)} })
+#define VCFN(thing) (XLITERAL(elf_Value){ elf_TAG_CFN, {(elf_Int) UCAST(thing, elf_Function)} })
 
 
 static char const *tag2s[] = {

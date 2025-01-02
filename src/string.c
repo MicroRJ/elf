@@ -47,7 +47,7 @@ elf_Table *elf_new_string_lib(elf_State *R) {
 
 elf_String *elf_alloc_string2(elf_State *R, elf_Int length) {
 	elf_String *obj = elf_alloc_object(R,GC_STR,sizeof(elf_String)+length+1);
-	if (R) obj->obj.metatable = R->metatables.string;
+	if (R) obj->obj.meta = R->metatables.string;
 	obj->length = length;
 	obj->hash = -1;
 	obj->text[length] = 0;
@@ -95,7 +95,7 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 }
 
 
-elf_Bool elf_strings_eq(elf_String *x, elf_String *y) {
+elf_Bool elf_get_strings_eq(elf_String *x, elf_String *y) {
 	if (x == y) return 1;
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;

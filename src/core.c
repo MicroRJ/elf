@@ -3,29 +3,20 @@
 ** shell.c
 */
 
-
 static int elf_run(elf_State *R);
 
-
-elf_Closure *elf_alloc_closure(elf_State *S, elf_Prototype proto) {
-	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_Value) * (proto.nlocals-1));
-	cls->proto=proto;
-	return cls;
-}
-
-
-void elf_begin(elf_State *R, elf_Module *M) {
+void elf_init(elf_State *R, elf_Module *M) {
 	R->M=M;
-	R->stack_max=elDEFAULT_STACK_SIZE;
-	R->stack    =calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
-	R->stack_ptr=R->stack;
-	R->first_frame.locals=R->stack_ptr;
-	R->frame=&R->first_frame;
-	R->nframe=0;
-	R->metatables.string=elf_new_string_lib(R);
-	R->metatables.table =new_table_lib(R);
-	M->globals=elf_new_table(R);
-	M->strings=elf_new_table(R);
+	R->stack_max = DEFAULT_STACK_SIZE;
+	R->stack = calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
+	R->stack_ptr = R->stack;
+	R->first_frame.locals = R->stack_ptr;
+	R->frame = &R->first_frame;
+	R->nframe = 0;
+	R->metatables.string = elf_new_string_lib(R);
+	R->metatables.table = new_table_lib(R);
+	M->globals = elf_new_table(R);
+	M->strings = elf_new_table(R);
 	elf_include_core_lib(R);
 }
 
@@ -92,7 +83,7 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 		nyield = elf_run(S);
 	} else if (value.tag == elf_TAG_CFN) {
 		results = S->stack_ptr;
-		nyield = value.x_cfn(S);
+		nyield = value.x_fun(S);
 		ptr = S->stack_ptr;
 		if ((ptr-results) < nyield) {
 			elf_fail(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - results),nyield));
@@ -114,9 +105,9 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 }
 
 
-int elf_parse_expr3_fs(elf_State *R, FileState *fs, elf_String *filename, elf_StackId rxy, int ny, elf_String *contents) {
+int elf_parse_expr3_fs(elf_State *R, Parser *fs, elf_String *filename, elf_StackId rxy, int ny, elf_String *contents) {
 #if 0
-	NodeId id;
+	TreeId id;
 	id=parse_expr(fs,0,0);
 	emit_yield(fs,fs->this_token.line,id);
 #endif
@@ -125,16 +116,16 @@ int elf_parse_expr3_fs(elf_State *R, FileState *fs, elf_String *filename, elf_St
 }
 
 
-elf_Closure *elf_load_code_closure(elf_State *R, FileState *fs, elf_String *filename, elf_String *contents) {
+elf_Closure *elf_load_code_closure(elf_State *R, Parser *fs, elf_String *filename, elf_String *contents) {
 	if ((filename==0)||(contents==0)) {
 		return 0;
 	}
 	elf_Module *M = R->M;
 	fs->R=R;
 	fs->M=M;
-	begin_file_state(fs,filename->text,contents->text);
+	parser_begin(fs,filename->text,contents->text);
 	while (parse_stat(fs));
-	close_file_state(fs);
+	parser_end(fs);
 
 	elf_Prototype fp = {0};
 	fp.name=filename;
@@ -147,7 +138,7 @@ elf_Closure *elf_load_code_closure(elf_State *R, FileState *fs, elf_String *file
 }
 
 
-elf_Closure *elf_load_file_closure(elf_State *R, FileState *fs, elf_String *name) {
+elf_Closure *elf_load_file_closure(elf_State *R, Parser *fs, elf_String *name) {
 	Error error;
 	elf_String *string;
 	char *text;
@@ -170,7 +161,7 @@ elf_Closure *elf_load_file_closure(elf_State *R, FileState *fs, elf_String *name
 
 
 int elf_exec_file(elf_State *R, elf_String *name, int nargs, int nrets) {
-	FileState fs = {0};
+	Parser fs = {0};
 	elf_Closure *cls;
 
 	cls=elf_load_file_closure(R,&fs,name);
@@ -188,12 +179,12 @@ INTERNAL void check_division_by_zero(elf_State *S, elf_Value xx, elf_Value yy) {
 }
 
 
-static int call_overload(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
-	if (obj->metatable == 0) {
+static int call_overload(elf_State *S, elf_Node *obj, char const *name, int reg, int nargs, elf_Value *args) {
+	if (obj->meta == 0) {
 		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elf_Value field;
-	field=elf_tgetx_any(obj->metatable,name);
+	field=elf_tgetx_any(obj->meta,name);
 	if (!CAN_CALL(field.tag)) {
 		elf_fail(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name,tag2s[field.tag]));
 	}
@@ -210,7 +201,7 @@ static int call_overload(elf_State *S, elf_Object *obj, char const *name, int re
 
 
 /* returns number of objects uniquely marked */
-elf_Int elf_mark_object(elf_Object *obj) {
+elf_Int elf_mark_object(elf_Node *obj) {
 	ASSERT(obj != 0);
 	ASSERT(obj->color != elf_GC_RED);
 	/* black object simply means it was
@@ -234,8 +225,8 @@ elf_Int elf_mark_object(elf_Object *obj) {
 	if ((OBJ_COLOR(obj) == elf_GC_WHITE) || (OBJ_COLOR(obj) == elf_GC_TRAP)) {
 		OBJ_COLOR(obj) = elf_GC_BLACK;
 	}
-	if (obj->metatable) {
-		num += elf_mark_object((elf_Object*)obj->metatable);
+	if (obj->meta) {
+		num += elf_mark_object((elf_Node*)obj->meta);
 	}
 	if (obj->type == GC_CLS) {
 		elf_Closure *cls = (elf_Closure*) obj;
@@ -297,14 +288,14 @@ elf_Int elf_free_phase(elf_State *R) {
 	R->collector.phase^=1;
 
 
-	elf_Object **new_objects=R->collector.new_objects;
-	elf_Object **objects=R->collector.objects;
+	elf_Node **new_objects=R->collector.new_objects;
+	elf_Node **objects=R->collector.objects;
 	if (new_objects) {
 		ARRAY_SET_MIN(new_objects,0);
 	}
 	elf_Int n = 0;
 	FOR_ARRAY(i,objects) {
-		elf_Object *it = objects[i];
+		elf_Node *it = objects[i];
 		ASSERT(it != 0);
 		if ((OBJ_COLOR(it) == elf_GC_RED) || (OBJ_COLOR(it) == elf_GC_TRAP)) {
 #if 0
@@ -396,7 +387,7 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_Int size) {
 	R->collector.memory_allocated+=size;
 	elf_collect(R);
 
-	elf_Object *obj;
+	elf_Node *obj;
 
 	obj=calloc_memory(GLOBAL_ALLOCATOR,size);
 	obj->color=R->collector.phase;
@@ -561,7 +552,7 @@ int elf_run(elf_State *R) {
 				switch (yy.tag) {
 					case elf_TAG_STR: case elf_TAG_TAB:
 					case elf_TAG_OBJ: case elf_TAG_CLS: {
-						metatable = yy.x_obj->metatable;
+						metatable = yy.x_obj->meta;
 					} goto _lookup;
 					case elf_TAG_NUM: {
 						metatable = R->metatables.number;
@@ -674,7 +665,7 @@ int elf_run(elf_State *R) {
 				if ((xx.tag==elf_TAG_NIL)||(yy.tag==elf_TAG_NIL)) {
 					eq=ISNILV(xx)==ISNILV(yy);
 				} else if ((xx.tag==elf_TAG_STR)&&(yy.tag==elf_TAG_STR)) {
-					eq=elf_strings_eq(xx.x_str,yy.x_str);
+					eq=elf_get_strings_eq(xx.x_str,yy.x_str);
 				} else if ((ISNUMT(xx.tag))&&(ISNUMT(yy.tag))) {
 					eq=xx.x_int==yy.x_int;
 				} else {

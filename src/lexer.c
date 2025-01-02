@@ -18,14 +18,14 @@
 
 
 
-static void new_line(FileState *fs) {
+static void new_line(Parser *fs) {
 	fs->linechar = fs->thischar;
 	fs->linenumber += 1;
 }
 
 
 /* todo: speed */
-static elTokenType text_is_word_or_macro(char *name) {
+static elf_TokenType text_is_word_or_macro(char *name) {
 #define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_M_,NAME);
 	MCLIST(MCITEM)
 #undef MCITEM
@@ -33,7 +33,7 @@ static elTokenType text_is_word_or_macro(char *name) {
 }
 
 
-static elTokenType text_is_word_or_keyword(char *name) {
+static elf_TokenType text_is_word_or_keyword(char *name) {
 	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_,NAME);
 	KWLIST(KWITEM)
 	#undef KWITEM
@@ -58,7 +58,7 @@ GLOBAL t_token_info elf_token_intel[] = {
 };
 
 
-void file_dialog(FileState *fs, char *line, char const *fmt, ...) {
+void parser_dialog(Parser *fs, char *line, char const *fmt, ...) {
 	line = line ? line : fs->this_token.line;
 
 	int linenum;
@@ -96,7 +96,7 @@ void file_dialog(FileState *fs, char *line, char const *fmt, ...) {
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		char *filename = fs_get_name(fs);
+		char *filename = parser_get_name(fs);
 		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_Int)(1+line-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
@@ -104,7 +104,7 @@ void file_dialog(FileState *fs, char *line, char const *fmt, ...) {
 }
 
 
-static int pick_esc_char(FileState *file) {
+static int pick_esc_char(Parser *file) {
 	int tk = MOVE();
 	if (tk != '\\') return tk;
 	tk = MOVE();
@@ -119,7 +119,7 @@ static int pick_esc_char(FileState *file) {
 }
 
 
-static int lex_word(FileState *file, char *buffer) {
+static int lex_word(Parser *file, char *buffer) {
 	int length = 0;
 	do {
 		buffer[length++] = MOVE();
@@ -129,7 +129,7 @@ return length;
 }
 
 
-static int pick_empty_chars(FileState *file) {
+static int pick_empty_chars(Parser *file) {
 	int lines=0;
 	retry:
 	switch (*file->thischar) {
@@ -152,7 +152,7 @@ static int pick_empty_chars(FileState *file) {
 }
 
 
-elf_Num lex_number(FileState *file, int base) {
+elf_Num lex_number(Parser *file, int base) {
 	elf_Num N=0,P=1;
 	do {
 		N=N*base+(MOVE()-'0');
@@ -162,7 +162,7 @@ return N/P;
 }
 
 
-FileToken poll_token(FileState *file) {
+FileToken poll_token(Parser *file) {
 	GLOBAL char buffer[0x100];
 
 	FileToken tk;
@@ -210,7 +210,7 @@ FileToken poll_token(FileState *file) {
 				if (B == 2 && C > 1) goto _error;
 			} else {
 				if (0) _error: {
-					file_dialog(file, file->thischar, "invalid base '%i' for digit", B);
+					parser_dialog(file, file->thischar, "invalid base '%i' for digit", B);
 				}
 				break;
 			}
@@ -236,7 +236,7 @@ FileToken poll_token(FileState *file) {
 		do { tk.integer = MOVE();
 		} while(0);
 		if (!PICK('\'')) {
-			file_dialog(file,tk.line,"invalid character constant, expected \"'\"");
+			parser_dialog(file,tk.line,"invalid character constant, expected \"'\"");
 		}
 	} break;
 	case '"': {
@@ -256,7 +256,7 @@ FileToken poll_token(FileState *file) {
 				}
 			}
 			if (!PICK('"')) {
-				file_dialog(file,tk.line,"invalid string");
+				parser_dialog(file,tk.line,"invalid string");
 			}
 			int lines=pick_empty_chars(file);
 			if (lines)tk.eol=1;
@@ -294,12 +294,12 @@ FileToken poll_token(FileState *file) {
 			tk.type=TK_NONE;
 		} else if (tk.type==TK_M_FILE_NAME) {
 			tk.type=TK_STRING;
-			tk.text=fs_get_name(file);
+			tk.text=parser_get_name(file);
 		} else if (tk.type==TK_M_LINE_NUMBER) {
 			tk.type=TK_INTEGER;
 			tk.integer=file->linenumber;
 		} else if (tk.type==TK_WORD) {
-			file_dialog(file,tk.line,"unrecognized macro");
+			parser_dialog(file,tk.line,"unrecognized macro");
 		} else {
 				/* let parser handle this */
 		}

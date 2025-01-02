@@ -14,9 +14,9 @@ static elf_Bool elf_value_eq(elf_Value *x, elf_Value *y);
 
 elf_Table *elf_alloc_table2(elf_State *R, elf_Int ntotal) {
 	elf_Table *table = elf_alloc_object(R,GC_TAB,sizeof(elf_Table));
-	table->obj.metatable = R->metatables.table;
+	table->obj.meta = R->metatables.table;
 	/* What if this is the first table... */
-	// ASSERT(!! table->obj.metatable);
+	// ASSERT(!! table->obj.meta);
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
@@ -290,7 +290,7 @@ elf_Bool elf_value_eq(elf_Value *x, elf_Value *y) {
 	}
 	switch (x->tag) {
 		case elf_TAG_STR: {
-			return elf_strings_eq(x->x_str,y->x_str);
+			return elf_get_strings_eq(x->x_str,y->x_str);
 		}
 		case elf_TAG_OBJ:
 		case elf_TAG_SYS: case elf_TAG_INT: case elf_TAG_NUM:

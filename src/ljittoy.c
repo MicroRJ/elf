@@ -140,7 +140,7 @@ void emit86_shift(ByteOP type, ljValue x, ljValue y) {
 }
 
 
-elf_CFunction jit(elf_Module *md, elf_Prototype fn) {
+elf_Function jit(elf_Module *md, elf_Prototype fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();
@@ -213,7 +213,7 @@ elf_CFunction jit(elf_Module *md, elf_Prototype fn) {
 	typedef int (*xorfn)(int);
 	int result = ((xorfn)jit_mem)(5282);
 	pf("result: %i\n",result);
-	return (elf_CFunction) jit_mem;
+	return (elf_Function) jit_mem;
 }
 
 
