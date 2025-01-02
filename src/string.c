@@ -5,21 +5,21 @@
 */
 
 
-static int string_lib_length(elf_Shell *S);
-static int string_lib_match(elf_Shell *S);
-static int string_lib_pop(elf_Shell *S);
-static int string_lib_append(elf_Shell *S);
-static int string_lib_append_char(elf_Shell *S);
-static int string_lib_get_hash(elf_Shell *S);
-static int string_lib_uppercase(elf_Shell *S);
-static int string_lib_lowercase(elf_Shell *S);
-static int string_lib_split_by_lines(elf_Shell *S);
-static int string_lib_get_index(elf_Shell *S);
-static int string_lib_find(elf_Shell *S);
-static int string_lib_split(elf_Shell *S);
+static int string_lib_length(elf_State *S);
+static int string_lib_match(elf_State *S);
+static int string_lib_pop(elf_State *S);
+static int string_lib_append(elf_State *S);
+static int string_lib_append_char(elf_State *S);
+static int string_lib_get_hash(elf_State *S);
+static int string_lib_uppercase(elf_State *S);
+static int string_lib_lowercase(elf_State *S);
+static int string_lib_split_by_lines(elf_State *S);
+static int string_lib_get_index(elf_State *S);
+static int string_lib_find(elf_State *S);
+static int string_lib_split(elf_State *S);
 
 
-elf_Table *elf_new_string_lib(elf_Shell *R) {
+elf_Table *elf_new_string_lib(elf_State *R) {
 	elf_CBinding lib[] = {
 		{"length",string_lib_length},
 		{"match",string_lib_match},
@@ -45,7 +45,7 @@ elf_Table *elf_new_string_lib(elf_Shell *R) {
 }
 
 
-elf_String *elf_alloc_string2(elf_Shell *R, elf_Int length) {
+elf_String *elf_alloc_string2(elf_State *R, elf_Int length) {
 	elf_String *obj = elf_alloc_object(R,GC_STR,sizeof(elf_String)+length+1);
 	if (R) obj->obj.metatable = R->metatables.string;
 	obj->length = length;
@@ -55,7 +55,7 @@ elf_String *elf_alloc_string2(elf_Shell *R, elf_Int length) {
 }
 
 
-elf_String *elf_alloc_string(elf_Shell *R, const char *text) {
+elf_String *elf_alloc_string(elf_State *R, const char *text) {
 	int length;
 	elf_Hash hash;
 	elf_String *string;
@@ -95,7 +95,7 @@ elf_String *elf_alloc_string(elf_Shell *R, const char *text) {
 }
 
 
-elf_Bool elf_seq(elf_String *x, elf_String *y) {
+elf_Bool elf_strings_eq(elf_String *x, elf_String *y) {
 	if (x == y) return 1;
 	/* assuming we use the same hash function */
 	if (x->hash != y->hash) return 0;
@@ -104,7 +104,7 @@ elf_Bool elf_seq(elf_String *x, elf_String *y) {
 }
 
 
-int string_lib_length(elf_Shell *S) {
+int string_lib_length(elf_State *S) {
 	elf_add_int(S,((elf_String*)elf_get_this(S))->length);
 	return 1;
 }
@@ -124,14 +124,14 @@ void strcatf(char *buffer, char *fmt, ...) {
 }
 
 
-int string_lib_get_index(elf_Shell *R) {
+int string_lib_get_index(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	elf_add_int(R,str->text[elf_get_int(R,0)]);
 	return 1;
 }
 
 
-int string_lib_pop(elf_Shell *R) {
+int string_lib_pop(elf_State *R) {
 	elf_String *yo = (elf_String*) elf_get_this(R);
 	elf_String *el = elf_alloc_string2(R,MAX(0,yo->length-1));
 	copy_memory(el->text,yo->text,MAX(0,yo->length-1));
@@ -140,7 +140,7 @@ int string_lib_pop(elf_Shell *R) {
 }
 
 
-int string_lib_append_char(elf_Shell *R) {
+int string_lib_append_char(elf_State *R) {
 	elf_String *yo = (elf_String*) elf_get_this(R);
 	elf_String *el = elf_alloc_string2(R,yo->length + elf_get_num_args(R));
 	copy_memory(el->text,yo->text,yo->length);
@@ -152,7 +152,7 @@ int string_lib_append_char(elf_Shell *R) {
 }
 
 
-int string_lib_append(elf_Shell *R) {
+int string_lib_append(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->text);
@@ -173,7 +173,7 @@ int string_lib_append(elf_Shell *R) {
 }
 
 
-int string_lib_match(elf_Shell *R) {
+int string_lib_match(elf_State *R) {
 	elf_String *s = (elf_String*) elf_get_this(R);
 	elf_String *p = elf_get_str(R,0);
 	elf_add_int(R,match_entire_text(p->text,s->text));
@@ -181,7 +181,7 @@ int string_lib_match(elf_Shell *R) {
 }
 
 
-int string_lib_find(elf_Shell *R) {
+int string_lib_find(elf_State *R) {
 	elf_String *string = (elf_String*) elf_get_this(R);
 	char *pattern = elf_get_txt(R,0);
 	char *buffer = 0;
@@ -204,7 +204,7 @@ int string_lib_find(elf_Shell *R) {
 }
 
 
-int string_lib_split_by_lines(elf_Shell *R) {
+int string_lib_split_by_lines(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	char *buffer = 0;
 	char *cursor = str->text;
@@ -224,14 +224,14 @@ int string_lib_split_by_lines(elf_Shell *R) {
 }
 
 
-int string_lib_get_hash(elf_Shell *R) {
+int string_lib_get_hash(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	elf_add_int(R,str->hash);
 	return 1;
 }
 
 
-int string_lib_lowercase(elf_Shell *R) {
+int string_lib_lowercase(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	elf_String *newstr = elf_new_string2(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {
@@ -241,7 +241,7 @@ int string_lib_lowercase(elf_Shell *R) {
 }
 
 
-int string_lib_uppercase(elf_Shell *R) {
+int string_lib_uppercase(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
 	elf_String *newstr = elf_new_string2(R,str->length);
 	for (int i = 0; i < str->length; ++ i) {

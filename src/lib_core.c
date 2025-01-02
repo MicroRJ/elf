@@ -8,51 +8,51 @@
 #include "libmath.c"
 
 
-static int core_lib_float2(elf_Shell *R);
-static int core_lib_pause_collector(elf_Shell *R);
-static int core_lib_get_allocated_objects(elf_Shell *R);
-static int core_lib_get_allocated_memory(elf_Shell *R);
-static int core_lib_get_collector_threshold(elf_Shell *R);
-static int core_lib_mark_object(elf_Shell *R);
-static int core_lib_collect(elf_Shell *R);
-static int core_lib_tagof(elf_Shell *R);
-static int core_lib_get_object_color(elf_Shell *R);
-static int core_lib_set_object_trap(elf_Shell *R);
-static int core_lib_get_object_address(elf_Shell *R);
-static int core_lib_merge_tables(elf_Shell *R);
-static int core_lib_get_metatable(elf_Shell *R);
-static int core_lib_set_metatable(elf_Shell *R);
-static int core_lib_abort(elf_Shell *R);
-static int core_lib_exit(elf_Shell *R);
-static int core_lib_flags(elf_Shell *R);
-static int core_lib_debugger(elf_Shell *R);
-static int core_lib_log(elf_Shell *R);
-static int core_lib_err_log(elf_Shell *R);
-static int core_lib_include(elf_Shell *R);
-static int core_lib_load_expr(elf_Shell *R);
-static int core_lib_load_code(elf_Shell *R);
-static int core_lib_load_file(elf_Shell *R);
-static int core_lib_load_dll(elf_Shell *R);
-static int core_lib_shell(elf_Shell *R);
-static int core_lib_exec(elf_Shell *R);
+static int core_lib_float2(elf_State *R);
+static int core_lib_pause_collector(elf_State *R);
+static int core_lib_get_allocated_objects(elf_State *R);
+static int core_lib_get_allocated_memory(elf_State *R);
+static int core_lib_get_collector_threshold(elf_State *R);
+static int core_lib_mark_object(elf_State *R);
+static int core_lib_collect(elf_State *R);
+static int core_lib_tagof(elf_State *R);
+static int core_lib_get_object_color(elf_State *R);
+static int core_lib_set_object_trap(elf_State *R);
+static int core_lib_get_object_address(elf_State *R);
+static int core_lib_merge_tables(elf_State *R);
+static int core_lib_get_metatable(elf_State *R);
+static int core_lib_set_metatable(elf_State *R);
+static int core_lib_abort(elf_State *R);
+static int core_lib_exit(elf_State *R);
+static int core_lib_flags(elf_State *R);
+static int core_lib_debugger(elf_State *R);
+static int core_lib_log(elf_State *R);
+static int core_lib_err_log(elf_State *R);
+static int core_lib_include(elf_State *R);
+static int core_lib_load_expr(elf_State *R);
+static int core_lib_load_code(elf_State *R);
+static int core_lib_load_file(elf_State *R);
+static int core_lib_load_dll(elf_State *R);
+static int core_lib_shell(elf_State *R);
+static int core_lib_exec(elf_State *R);
 
-static int core_lib_fopen(elf_Shell *R);
-static int core_lib_fclose(elf_Shell *R);
-static int core_lib_fsize(elf_Shell *R);
-static int core_lib_load_file_data(elf_Shell *R);
-static int core_lib_ftemp(elf_Shell *R);
-static int core_lib_change_work_dir(elf_Shell *R);
-static int core_lib_get_work_dir(elf_Shell *R);
-static int core_lib_get_disk_info(elf_Shell *R);
-static int core_lib_list_volumes(elf_Shell *R);
-static int core_lib_list_folder(elf_Shell *R);
-static int core_lib_enumerate_folder(elf_Shell *R);
+static int core_lib_fopen(elf_State *R);
+static int core_lib_fclose(elf_State *R);
+static int core_lib_fsize(elf_State *R);
+static int core_lib_load_file_data(elf_State *R);
+static int core_lib_ftemp(elf_State *R);
+static int core_lib_change_work_dir(elf_State *R);
+static int core_lib_get_work_dir(elf_State *R);
+static int core_lib_get_disk_info(elf_State *R);
+static int core_lib_list_volumes(elf_State *R);
+static int core_lib_list_folder(elf_State *R);
+static int core_lib_enumerate_folder(elf_State *R);
 
-static void elf_include_core_lib(elf_Shell *R);
+static void elf_include_core_lib(elf_State *R);
 
 
 // mostly experimental...
-int core_lib_float2(elf_Shell *R) {
+int core_lib_float2(elf_State *R) {
 	elf_Value v={elf_TAG_FLOAT2};
 	v.x_f32=(float)elf_get_num(R,0);
 	v.y_f32=v.x_f32;
@@ -64,7 +64,7 @@ int core_lib_float2(elf_Shell *R) {
 }
 
 
-int core_lib_pause_collector(elf_Shell *R) {
+int core_lib_pause_collector(elf_State *R) {
 	R->collector.paused = 1;
 	if (elf_get_num_args(R) == 1) {
 		R->collector.paused = elf_get_int(R,0) != 0;
@@ -73,44 +73,44 @@ int core_lib_pause_collector(elf_Shell *R) {
 }
 
 
-int core_lib_get_allocated_objects(elf_Shell *R) {
+int core_lib_get_allocated_objects(elf_State *R) {
 	elf_add_int(R,ARRAY_LENGTH(R->collector.objects));
 	return 1;
 }
 
 
-int core_lib_get_allocated_memory(elf_Shell *R) {
+int core_lib_get_allocated_memory(elf_State *R) {
 	elf_add_int(R,R->collector.memory_allocated);
 	return 1;
 }
 
 
-int core_lib_get_collector_threshold(elf_Shell *R) {
+int core_lib_get_collector_threshold(elf_State *R) {
 	elf_add_int(R,R->collector.memory_threshold);
 	return 1;
 }
 
 
-int core_lib_mark_object(elf_Shell *R) {
+int core_lib_mark_object(elf_State *R) {
 	elf_Int num = elf_mark_object(elf_get_obj(R,0));
 	elf_add_int(R,num);
 	return 1;
 }
 
 
-int core_lib_collect(elf_Shell *R) {
+int core_lib_collect(elf_State *R) {
 	elf_trigger_collection_cycle(R);
 	return 0;
 }
 
 
-int core_lib_tagof(elf_Shell *R) {
+int core_lib_tagof(elf_State *R) {
 	elf_new_string(R,(char*)tag2s[elf_get_tag(R,0)]);
 	return 1;
 }
 
 
-int core_lib_get_object_color(elf_Shell *R) {
+int core_lib_get_object_color(elf_State *R) {
 	elf_Object *obj = elf_get_obj(R,0);
 	int color = obj->color;
 	elf_new_string(R,
@@ -123,14 +123,14 @@ int core_lib_get_object_color(elf_Shell *R) {
 }
 
 
-int core_lib_set_object_trap(elf_Shell *R) {
+int core_lib_set_object_trap(elf_State *R) {
 	elf_Int set = elf_get_int(R,1);
 	OBJ_COLOR(elf_get_obj(R,0)) = set ? elf_GC_TRAP : elf_GC_WHITE;
 	return 0;
 }
 
 
-int core_lib_get_object_address(elf_Shell *R) {
+int core_lib_get_object_address(elf_State *R) {
 	elf_add_int(R,(elf_Int) (void *) elf_get_obj(R,0));
 	return 1;
 }
@@ -138,7 +138,7 @@ int core_lib_get_object_address(elf_Shell *R) {
 
 /* merges one or several tables together into
 a new table, which is then returned. */
-int core_lib_merge_tables(elf_Shell *R) {
+int core_lib_merge_tables(elf_State *R) {
 	elf_Table *tab = elf_new_table(R);
 	int i;
 	for (i = 0; i < elf_get_num_args(R); i += 1) {
@@ -148,13 +148,13 @@ int core_lib_merge_tables(elf_Shell *R) {
 }
 
 
-int core_lib_get_metatable(elf_Shell *R) {
+int core_lib_get_metatable(elf_State *R) {
 	elf_add_tab(R,elf_get_obj(R,0)->metatable);
 	return 1;
 }
 
 
-int core_lib_set_metatable(elf_Shell *R) {
+int core_lib_set_metatable(elf_State *R) {
 	elf_get_obj(R,0)->metatable=elf_get_tab(R,1);
 	PUSHV(R,elf_get_arg(R,0));
 	return 1;
@@ -162,20 +162,20 @@ int core_lib_set_metatable(elf_Shell *R) {
 
 
 /*  */
-int core_lib_abort(elf_Shell *R) {
+int core_lib_abort(elf_State *R) {
 	if(1) abort();
 	return 0;
 }
 
 
-int core_lib_exit(elf_Shell *R) {
+int core_lib_exit(elf_State *R) {
 	if(1) exit(elf_get_int(R,0));
 	return 0;
 }
 
 
 /* debugging */
-int core_lib_flags(elf_Shell *R) {
+int core_lib_flags(elf_State *R) {
 	int flags = R->flags;
 	R->flags |= elf_get_int(R,0);
 	elf_add_int(R,flags);
@@ -183,7 +183,7 @@ int core_lib_flags(elf_Shell *R) {
 }
 
 
-int core_lib_debugger(elf_Shell *R) {
+int core_lib_debugger(elf_State *R) {
 #if defined(_DEBUG)
 	R->flags |= FLAG_DEBUGGER;
 #else
@@ -197,7 +197,7 @@ int core_lib_debugger(elf_Shell *R) {
 }
 
 
-int core_lib_log(elf_Shell *R) {
+int core_lib_log(elf_State *R) {
 	FOR_RANGE(i,0,elf_get_num_args(R)) {
 		fpf_value(stdout,elf_get_arg(R,i),0);
 	}
@@ -206,7 +206,7 @@ int core_lib_log(elf_Shell *R) {
 }
 
 
-int core_lib_err_log(elf_Shell *R) {
+int core_lib_err_log(elf_State *R) {
 	FOR_RANGE(i,0,elf_get_num_args(R)) {
 		fpf_value(stderr,elf_get_arg(R,i),0);
 	}
@@ -228,7 +228,7 @@ static char *in_sym_dir(char *dir, char *sym) {
 /* the dot is added so that symbols like elf.math.floor
 are not mistaken with table accesses when shortened,
 math.floor != .math.floor */
-int core_lib_include(elf_Shell *R) {
+int core_lib_include(elf_State *R) {
 	elf_check_args(R,".include",1,"(the directory to include to add to the global directory)");
 	char *dir = elf_get_txt(R,0);
 	int plen = text_length(dir);
@@ -257,7 +257,7 @@ int core_lib_include(elf_Shell *R) {
 }
 
 
-int core_lib_load_expr(elf_Shell *R) {
+int core_lib_load_expr(elf_State *R) {
 	elf_String *filename = 0;
 	elf_String *contents = 0;
 	if (elf_get_num_args(R) == 2) {
@@ -276,7 +276,7 @@ int core_lib_load_expr(elf_Shell *R) {
 }
 
 
-int core_lib_load_code(elf_Shell *R) {
+int core_lib_load_code(elf_State *R) {
 	elf_String *filename = 0;
 	elf_String *contents = 0;
 	if (elf_get_num_args(R) == 2) {
@@ -295,12 +295,12 @@ int core_lib_load_code(elf_Shell *R) {
 }
 
 
-int core_lib_load_file(elf_Shell *R) {
+int core_lib_load_file(elf_State *R) {
 	elf_String *filename;
 	int nresults;
 
 	filename=elf_get_str(R,0);
-	nresults=elf_exec_file(R,filename,GET_FRAME(R)->nargs,GET_FRAME(R)->nregs);
+	nresults=elf_exec_file(R,filename,GET_FRAME(R)->nargs,GET_FRAME(R)->nrets);
 	// if (nresults != -1 && !strcmp(filename->text,"patterns.elf")){
 	// 	__debugbreak();
 	// }
@@ -313,7 +313,7 @@ int core_lib_load_file(elf_Shell *R) {
 
 // typedef void (*em_dlopen_callback)(void* handle, void* user_data);
 // void emscripten_dlopen(const char *filename, int flags, void* user_data, em_dlopen_callback onsuccess, em_arg_callback_func onerror);
-int core_lib_get_dll_fn(elf_Shell *S) {
+int core_lib_get_dll_fn(elf_State *S) {
 	elf_Handle lib = elf_get_sys(S,0);
 	char *name = elf_get_txt(S,1);
 	elf_CFunction fn = (elf_CFunction) sys_get_dll_fn(lib,name);
@@ -324,7 +324,7 @@ int core_lib_get_dll_fn(elf_Shell *S) {
 }
 
 
-int core_lib_load_dll(elf_Shell *R) {
+int core_lib_load_dll(elf_State *R) {
 	char *file = elf_get_txt(R,0);
 	elf_Handle lib = sys_load_dll(file);
 
@@ -334,7 +334,7 @@ int core_lib_load_dll(elf_Shell *R) {
 }
 
 
-int core_lib_shell(elf_Shell *R) {
+int core_lib_shell(elf_State *R) {
 	char *verb = elf_get_txt(R,0);
 	char *file = elf_get_txt(R,1);
 	char *args = elf_get_txt(R,2);
@@ -343,7 +343,7 @@ int core_lib_shell(elf_Shell *R) {
 }
 
 
-int core_lib_exec(elf_Shell *R) {
+int core_lib_exec(elf_State *R) {
 	char *cline=elf_get_txt(R,0);
 	int result=sys_exec(0,cline);
 	elf_add_int(R,result);
@@ -351,7 +351,7 @@ int core_lib_exec(elf_Shell *R) {
 }
 
 
-int core_lib_fopen(elf_Shell *R) {
+int core_lib_fopen(elf_State *R) {
 	ASSERT(elf_get_num_args(R) == 2);
 	char *name = elf_get_txt(R,0);
 	char *flags = elf_get_txt(R,1);
@@ -361,7 +361,7 @@ int core_lib_fopen(elf_Shell *R) {
 }
 
 
-int core_lib_fclose(elf_Shell *R) {
+int core_lib_fclose(elf_State *R) {
 	ASSERT(elf_get_num_args(R) == 1);
 	elf_Handle file = elf_get_sys(R,0);
 	fclose(file);
@@ -369,7 +369,7 @@ int core_lib_fclose(elf_Shell *R) {
 }
 
 
-int core_lib_fsize(elf_Shell *R) {
+int core_lib_fsize(elf_State *R) {
 	if (elf_get_tag(R,0) == elf_TAG_SYS) {
 		elf_Handle file = (FILE*) elf_get_sys(R,0);
 		fseek(file,0,SEEK_END);
@@ -380,7 +380,7 @@ int core_lib_fsize(elf_Shell *R) {
 
 
 /* todo: update to use sys layer */
-int core_lib_load_file_data(elf_Shell *R) {
+int core_lib_load_file_data(elf_State *R) {
 	FILE *file = (FILE*) elf_get_sys(R,0);
 	if (file != 0) {
 		fseek(file,0,SEEK_END);
@@ -394,7 +394,7 @@ int core_lib_load_file_data(elf_Shell *R) {
 }
 
 
-int core_lib_ftemp(elf_Shell *R) {
+int core_lib_ftemp(elf_State *R) {
 	FILE *file = {0};
 #if defined(PLATFORM_WEB)
 	file = tmpfile();
@@ -406,14 +406,14 @@ int core_lib_ftemp(elf_Shell *R) {
 }
 
 
-int core_lib_change_work_dir(elf_Shell *R) {
+int core_lib_change_work_dir(elf_State *R) {
 	int ok = sys_set_work_dir(elf_get_txt(R,0));
 	elf_add_int(R,ok);
 	return 1;
 }
 
 
-int core_lib_get_work_dir(elf_Shell *R) {
+int core_lib_get_work_dir(elf_State *R) {
 	char buf[MAX_PATH];
 	sys_get_work_dir(sizeof(buf),buf);
 	elf_new_string(R,buf);
@@ -421,7 +421,7 @@ int core_lib_get_work_dir(elf_Shell *R) {
 }
 
 
-int core_lib_fpf(elf_Shell *S) {
+int core_lib_fpf(elf_State *S) {
 	elf_Handle file = elf_get_sys(S,0);
 	int wrote = 0;
 	for (int i = 1; i < elf_get_num_args(S); i ++) {
@@ -434,14 +434,14 @@ int core_lib_fpf(elf_Shell *S) {
 
 GLOBAL int pf_indent;
 GLOBAL int pf_char;
-int core_lib_pf_indent(elf_Shell *S) {
+int core_lib_pf_indent(elf_State *S) {
 	pf_indent = elf_get_int(S,0);
 	elf_add_int(S,pf_indent);
 	return 1;
 }
 
 
-int core_lib_lpf(elf_Shell *S) {
+int core_lib_lpf(elf_State *S) {
 	for (int i = 0; i < elf_get_num_args(S); i ++) {
 		if (i != 0) fprintf(stdout,"\n");
 		for (int j = 0; j < pf_indent; ++ j) {
@@ -454,7 +454,7 @@ int core_lib_lpf(elf_Shell *S) {
 }
 
 
-int core_lib_pf(elf_Shell *S) {
+int core_lib_pf(elf_State *S) {
 	for (int j = 0; j < pf_indent; ++ j) {
 		fprintf(stdout,"  ");
 	}
@@ -466,20 +466,20 @@ int core_lib_pf(elf_Shell *S) {
 }
 
 
-int core_lib_sleep(elf_Shell *S) {
+int core_lib_sleep(elf_State *S) {
 	ASSERT(elf_get_num_args(S) >= 1);
 	sys_sleep(elf_get_int(S,0));
 	return 0;
 }
 
 
-int core_lib_clocktime(elf_Shell *rt) {
+int core_lib_clocktime(elf_State *rt) {
 	elf_add_int(rt,sys_get_clock_time());
 	return 1;
 }
 
 
-int core_lib_timediffs(elf_Shell *S) {
+int core_lib_timediffs(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Int time = elf_get_int(S,0);
 	elf_add_num(S,elf_time_diff_s(time));
@@ -487,7 +487,7 @@ int core_lib_timediffs(elf_Shell *S) {
 }
 
 
-int core_lib_timediffms(elf_Shell *S) {
+int core_lib_timediffms(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Int time = elf_get_int(S,0);
 	elf_add_num(S,elf_time_diff_ms(time));
@@ -495,7 +495,7 @@ int core_lib_timediffms(elf_Shell *S) {
 }
 
 
-int core_lib_get_file_size(elf_Shell *S) {
+int core_lib_get_file_size(elf_State *S) {
 	char *path = elf_get_txt(S,0);
 	elf_Int size = -1;
 	#if 0
@@ -511,7 +511,7 @@ int core_lib_get_file_size(elf_Shell *S) {
 }
 
 
-int core_lib_get_disk_info(elf_Shell *R) {
+int core_lib_get_disk_info(elf_State *R) {
 	elf_Table *info = elf_new_table(R);
 #if 0
 	DWORD SectorsPerCluster;
@@ -530,7 +530,7 @@ int core_lib_get_disk_info(elf_Shell *R) {
 }
 
 
-int core_lib_list_volumes(elf_Shell *R) {
+int core_lib_list_volumes(elf_State *R) {
 	elf_Table *list = elf_new_table(R); /* <- */
 #if 0
 	char buffer[MAX_PATH];
@@ -566,7 +566,7 @@ int core_lib_list_volumes(elf_Shell *R) {
 
 
 typedef struct folder_enumerator {
-	elf_Shell *shell;
+	elf_State *shell;
 	elf_Closure *closure;
 	elf_String *sfolder,*sfile,*sname,*spath,*stype,*ssize;
 	elf_Table *storage;
@@ -576,10 +576,10 @@ typedef struct folder_enumerator {
 static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t filesize, char *filename, char *filepath) {
 	folder_enumerator *fc=user;
 	elf_Closure *cls=fc->closure;
-	elf_Shell *shell=fc->shell;
+	elf_State *shell=fc->shell;
 	elf_String *name,path;
 	elf_Table *storage=fc->storage;
-	int nregs;
+	int nrets;
 
 	elf_Table *file=elf_new_table(shell);
 	elf_tsets_str(file,fc->sname,elf_new_string(shell,filename));
@@ -591,7 +591,7 @@ static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t f
 		elf_add_cls(shell,cls);
 		elf_add_obj(shell,elf_get_this(shell));
 		elf_add_tab(shell,file);
-		nregs=elf_call_function(shell,2,1);
+		nrets=elf_call_function(shell,2,1);
 	}
 	if (storage){
 		elf_tadd_tab(storage,file);
@@ -607,7 +607,7 @@ static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t f
 }
 
 
-static folder_enumerator make_folder_enumerator(elf_Shell *shell, elf_Closure *closure, elf_Table *storage){
+static folder_enumerator make_folder_enumerator(elf_State *shell, elf_Closure *closure, elf_Table *storage){
 	folder_enumerator folder;
 	folder.shell=shell;
 	folder.closure=closure;
@@ -622,7 +622,7 @@ static folder_enumerator make_folder_enumerator(elf_Shell *shell, elf_Closure *c
 }
 
 
-int core_lib_list_folder(elf_Shell *R) {
+int core_lib_list_folder(elf_State *R) {
 	ASSERT(elf_get_num_args(R) > 0);
 
 	char *filename;
@@ -643,7 +643,7 @@ int core_lib_list_folder(elf_Shell *R) {
 }
 
 
-int core_lib_enumerate_folder(elf_Shell *R) {
+int core_lib_enumerate_folder(elf_State *R) {
 	ASSERT(elf_get_num_args(R)==2);
 	/* push these keys temporarily so they won't
 	be gc'd and also to to avoid creating them so often  */
@@ -688,7 +688,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 }
 
 
-int core_lib_unload(elf_Shell *S) {
+int core_lib_unload(elf_State *S) {
 	elf_Handle io = elf_get_sys(S,0);
 	elf_Table *tab = elf_get_tab(S,1);
 	elf_unload(io,tab,0);
@@ -697,7 +697,7 @@ int core_lib_unload(elf_Shell *S) {
 
 
 // DEPRECATED
-int core_lib_iton(elf_Shell *R) {
+int core_lib_iton(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_TAG_INT) {
 		elf_add_num(R,(elf_Num)v.x_int);
@@ -707,7 +707,7 @@ int core_lib_iton(elf_Shell *R) {
 
 
 // DEPRECATED
-int core_lib_ntoi(elf_Shell *R) {
+int core_lib_ntoi(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_TAG_NUM) {
 		elf_add_int(R,(elf_Int)v.x_num);
@@ -716,7 +716,7 @@ int core_lib_ntoi(elf_Shell *R) {
 }
 
 
-void elf_include_core_lib(elf_Shell *R) {
+void elf_include_core_lib(elf_State *R) {
 	elf_gsetx_int(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
 	elf_gsetx_str(R,"elf.PLATFORM","WEB");

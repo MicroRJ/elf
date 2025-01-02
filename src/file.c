@@ -2,6 +2,7 @@
 ** file.c
 ** See Copyright Notice In elf.h
 */
+/* Todo: rename to parse */
 
 
 static char *fs_get_name(FileState *fs) {
@@ -406,7 +407,7 @@ NodeId parse_function(FileState *fs) {
 
 	/* create a new prototype and add this function
 	to the list of prototypes */
-	elf_Function fp = {0};
+	elf_Prototype fp = {0};
 	/* todo: implement this */
 	// fp.parent  = fn.enclosing
 	fp.arity	  = arity;
@@ -644,7 +645,7 @@ NodeId parse_unary(FileState *fs, BooleanJumps *expr, elf_Bool flags) {
 				strcat(dir,fs->last_token.text);
 			} while (pick_token_inline(fs,TK_DOT));
 			int x;
-			x=elf_ggets(fs->M,elf_alloc_string(fs->R,dir));
+			x=elf_get_global(fs->M,elf_alloc_string(fs->R,dir));
 			v=node_global(fs,tk.line,x);
 		} break;
 		case TK_WORD: {

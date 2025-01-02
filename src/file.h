@@ -199,7 +199,7 @@ typedef struct FileFunction {
 typedef struct FileState {
 	FileFunction function;
 	elf_Module           *M;
-	elf_Shell            *R;
+	elf_State            *R;
 	char        *filename;
 	char        *filetext;
 	char        *linechar;

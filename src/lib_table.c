@@ -7,37 +7,37 @@
 /* todo: to be revised */
 
 
-static int table_lib_get_metatable(elf_Shell *);
-static int table_lib_set_metatable(elf_Shell *);
-static int table_lib_add(elf_Shell *);
-static int table_lib_xadd(elf_Shell *);
-static int table_lib_xremove(elf_Shell *);
-static int table_lib_xdelete(elf_Shell *);
-static int table_lib_index(elf_Shell *);
-static int table_lib_tally(elf_Shell *);
-static int table_lib_length(elf_Shell *);
-static int table_lib_delete(elf_Shell *);
-static int table_lib_itemize(elf_Shell *);
-static int table_lib_inject(elf_Shell *);
-static int table_lib_alias(elf_Shell *);
-static int table_lib_contains(elf_Shell *);
-static int table_lib_foreach(elf_Shell *);
-static int table_lib_get_collisions(elf_Shell *);
-static int table_lib_bubble_sort(elf_Shell *);
-static int table_lib_find_aliases(elf_Shell *);
-static int table_lib_array(elf_Shell *);
-static int table_lib_xset(elf_Shell *);
-static int table_lib_merge(elf_Shell *);
-static int table_lib_xmerge(elf_Shell *);
-static int table_lib_diff(elf_Shell *);
-static int table_lib_xclone(elf_Shell *);
-static int table_lib_reverse(elf_Shell *);
-static int table_lib_clone(elf_Shell *);
-static int table_lib_slice(elf_Shell *);
-static int table_lib_swap(elf_Shell *);
+static int table_lib_get_metatable(elf_State *);
+static int table_lib_set_metatable(elf_State *);
+static int table_lib_add(elf_State *);
+static int table_lib_xadd(elf_State *);
+static int table_lib_xremove(elf_State *);
+static int table_lib_xdelete(elf_State *);
+static int table_lib_index(elf_State *);
+static int table_lib_tally(elf_State *);
+static int table_lib_length(elf_State *);
+static int table_lib_delete(elf_State *);
+static int table_lib_itemize(elf_State *);
+static int table_lib_inject(elf_State *);
+static int table_lib_alias(elf_State *);
+static int table_lib_contains(elf_State *);
+static int table_lib_foreach(elf_State *);
+static int table_lib_get_collisions(elf_State *);
+static int table_lib_bubble_sort(elf_State *);
+static int table_lib_find_aliases(elf_State *);
+static int table_lib_array(elf_State *);
+static int table_lib_xset(elf_State *);
+static int table_lib_merge(elf_State *);
+static int table_lib_xmerge(elf_State *);
+static int table_lib_diff(elf_State *);
+static int table_lib_xclone(elf_State *);
+static int table_lib_reverse(elf_State *);
+static int table_lib_clone(elf_State *);
+static int table_lib_slice(elf_State *);
+static int table_lib_swap(elf_State *);
 
 
-elf_Table *new_table_lib(elf_Shell *R) {
+elf_Table *new_table_lib(elf_State *R) {
 	elf_CBinding lib[] = {
 		{"get_metatable",table_lib_get_metatable},
 		{"set_metatable",table_lib_set_metatable},
@@ -75,21 +75,21 @@ elf_Table *new_table_lib(elf_Shell *R) {
 }
 
 
-int table_lib_length(elf_Shell *R) {
+int table_lib_length(elf_State *R) {
 	elf_Table *tab = (elf_Table*) elf_get_this(R);
 	elf_add_int(R,ARRAY_LENGTH(tab->array));
 	return 1;
 }
 
 
-int table_lib_tally(elf_Shell *R) {
+int table_lib_tally(elf_State *R) {
 	elf_Table *tab = (elf_Table*) elf_get_this(R);
 	elf_add_int(R,ARRAY_LENGTH(tab->array));
 	return 1;
 }
 
 
-int table_lib_contains(elf_Shell *S) {
+int table_lib_contains(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
 	elf_Value key = elf_get_arg(S,0);
@@ -98,21 +98,21 @@ int table_lib_contains(elf_Shell *S) {
 }
 
 
-int table_lib_get_collisions(elf_Shell *S) {
+int table_lib_get_collisions(elf_State *S) {
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
 	elf_add_int(S,tab->ncollisions);
 	return 1;
 }
 
 
-int table_lib_get_metatable(elf_Shell *R) {
+int table_lib_get_metatable(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_add_tab(R,POBJ(tab)->metatable);
 	return 1;
 }
 
 
-int table_lib_set_metatable(elf_Shell *R) {
+int table_lib_set_metatable(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_add_tab(R,POBJ(tab)->metatable);
 	POBJ(tab)->metatable = elf_get_tab(R,0);
@@ -124,7 +124,7 @@ int table_lib_set_metatable(elf_Shell *R) {
 also xadd should be add instead, since
 names with 'x' prefix work only for
 arrays */
-int table_lib_xadd(elf_Shell *R) {
+int table_lib_xadd(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int length = ARRAY_LENGTH(tab->array);
 	FOR_RANGE(i,0,elf_get_num_args(R)) {
@@ -134,7 +134,7 @@ int table_lib_xadd(elf_Shell *R) {
 }
 
 
-int table_lib_add(elf_Shell *R) {
+int table_lib_add(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	int i;
 	for ( i = 0; i < elf_get_num_args(R); ++i ) {
@@ -144,7 +144,7 @@ int table_lib_add(elf_Shell *R) {
 }
 
 
-int table_lib_inject(elf_Shell *R) {
+int table_lib_inject(elf_State *R) {
 	elf_check_args(R,":inject",1,"the table, all the fields of the table are injected onto this one");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_merge_tables(tab,elf_get_tab(R,0));
@@ -152,7 +152,7 @@ int table_lib_inject(elf_Shell *R) {
 }
 
 
-int table_lib_itemize(elf_Shell *R) {
+int table_lib_itemize(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *result = elf_new_table(R);
 	FOR_ARRAY(i,tab->array) {
@@ -172,7 +172,7 @@ int table_lib_itemize(elf_Shell *R) {
 }
 
 
-int table_lib_index(elf_Shell *R) {
+int table_lib_index(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int len = ARRAY_LENGTH(tab->array);
 	elf_Value value = VNIL();
@@ -209,7 +209,7 @@ int table_lib_index(elf_Shell *R) {
 ** value from a table.
 ** The algorithm is pretty slow...
 */
-int table_lib_delete(elf_Shell *R) {
+int table_lib_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Value key = elf_get_arg(R,0);
@@ -248,7 +248,7 @@ int table_lib_delete(elf_Shell *R) {
 }
 
 
-int table_lib_xdelete(elf_Shell *R) {
+int table_lib_xdelete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int len = ARRAY_LENGTH(tab->array);
@@ -289,7 +289,7 @@ int table_lib_xdelete(elf_Shell *R) {
 }
 
 
-int table_lib_xremove(elf_Shell *R) {
+int table_lib_xremove(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int len = ARRAY_LENGTH(tab->array);
@@ -337,7 +337,7 @@ int table_lib_xremove(elf_Shell *R) {
 }
 
 
-int table_lib_alias(elf_Shell *R) {
+int table_lib_alias(elf_State *R) {
 	elf_check_args(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_table_alias(R,tab,elf_get_arg(R,0),elf_get_arg(R,1));
@@ -345,7 +345,7 @@ int table_lib_alias(elf_Shell *R) {
 }
 
 
-int table_lib_find_aliases(elf_Shell *R) {
+int table_lib_find_aliases(elf_State *R) {
 	elf_check_args(R,":fndaliases",1,"the key to find aliases for");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Value key = elf_get_arg(R,0);
@@ -368,7 +368,7 @@ int table_lib_find_aliases(elf_Shell *R) {
 }
 
 
-int table_lib_bubble_sort(elf_Shell *R) {
+int table_lib_bubble_sort(elf_State *R) {
 	#if 0
 	elf_check_args(R,":bubblesort",1,"comparator function");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
@@ -401,7 +401,7 @@ int table_lib_bubble_sort(elf_Shell *R) {
 }
 
 
-int table_lib_foreach(elf_Shell *R) {
+int table_lib_foreach(elf_State *R) {
 	NO_CODE;
 	// ASSERT(R->frame->nx == 1);
 	// elf_Table *tab = (elf_Table *) elf_get_this(R);
@@ -424,7 +424,7 @@ int table_lib_foreach(elf_Shell *R) {
 
 
 /* todo: account for keyless values */
-elf_Table *elf_tabcopy(elf_Shell *S, elf_Table *tab) {
+elf_Table *elf_tabcopy(elf_State *S, elf_Table *tab) {
 
 	elf_debugger("not impl");
 
@@ -441,7 +441,7 @@ elf_Table *elf_tabcopy(elf_Shell *S, elf_Table *tab) {
 
 
 /* this function only clones keyed values... */
-elf_Table *elf_clone_table(elf_Shell *S, elf_Table *tab) {
+elf_Table *elf_clone_table(elf_State *S, elf_Table *tab) {
 	elf_Table *clone = elf_alloc_table(S);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
@@ -453,7 +453,7 @@ elf_Table *elf_clone_table(elf_Shell *S, elf_Table *tab) {
 }
 
 
-int table_lib_array(elf_Shell *S) {
+int table_lib_array(elf_State *S) {
 	elf_check_args(S,":array",0,"the table to get a copy of as an array");
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
 
@@ -466,7 +466,7 @@ int table_lib_array(elf_Shell *S) {
 }
 
 
-int table_lib_clone(elf_Shell *R) {
+int table_lib_clone(elf_State *R) {
 	elf_check_args(R,":clone",0,"the table to clone");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_add_tab(R,elf_clone_table(R,tab));
@@ -474,7 +474,7 @@ int table_lib_clone(elf_Shell *R) {
 }
 
 
-int table_lib_slice(elf_Shell *R) {
+int table_lib_slice(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int x = 0;
 	elf_Int y = ARRAY_LENGTH(tab->array);
@@ -488,7 +488,7 @@ int table_lib_slice(elf_Shell *R) {
 }
 
 
-int table_lib_xset(elf_Shell *R) {
+int table_lib_xset(elf_State *R) {
 	elf_check_args(R,":xset",2,"the value, and the index where to place the value");
 
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
@@ -503,7 +503,7 @@ int table_lib_xset(elf_Shell *R) {
 }
 
 
-int table_lib_swap(elf_Shell *R) {
+int table_lib_swap(elf_State *R) {
 	elf_check_args(R,":swap",2,"the two indexes to swap");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int x = elf_get_int(R,0);
@@ -515,7 +515,7 @@ int table_lib_swap(elf_Shell *R) {
 }
 
 
-int table_lib_merge(elf_Shell *R) {
+int table_lib_merge(elf_State *R) {
 	elf_check_args(R,":merge",1,"the tables to merge into a new table (keys only), if no arguments are passed in, this acts like a clone");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *sum = elf_new_table(R); /* <- */
@@ -532,7 +532,7 @@ int table_lib_merge(elf_Shell *R) {
 ** table, like merge does...
 ** todo: could this be renamed to make more clear?
 */
-int table_lib_xmerge(elf_Shell *R) {
+int table_lib_xmerge(elf_State *R) {
 	elf_check_args(R,":xmerge",1,"the table to merge, all values are of the table are added to a new one, unline :merge, :xmerge will not check for duplicates");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *add = elf_get_tab(R,0);
@@ -548,7 +548,7 @@ int table_lib_xmerge(elf_Shell *R) {
 }
 
 
-int table_lib_xclone(elf_Shell *R) {
+int table_lib_xclone(elf_State *R) {
 	elf_check_args(R,":xclone",0,"");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *clone = elf_alloc_table(R);
@@ -561,7 +561,7 @@ int table_lib_xclone(elf_Shell *R) {
 }
 
 
-int table_lib_reverse(elf_Shell *R) {
+int table_lib_reverse(elf_State *R) {
 	elf_check_args(R,":reverse",0,"");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int n = ARRAY_LENGTH(tab->array);
@@ -576,7 +576,7 @@ int table_lib_reverse(elf_Shell *R) {
 }
 
 
-int table_lib_diff(elf_Shell *R) {
+int table_lib_diff(elf_State *R) {
 	elf_check_args(R,":diff",1,"");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *sub = elf_get_tab(R,0);

@@ -572,7 +572,7 @@ int emit_eval(FileState *fs, int flags, int reg, int nreg, NodeId id) {
 			if (reg<0) reg=reg_alloc(fs);
 
 			/* todo: interning */
-			int xx = elf_gsets(M,0,VSTR(elf_alloc_string(fs->R,node.lit.s)));
+			int xx = elf_set_global(M,0,VSTR(elf_alloc_string(fs->R,node.lit.s)));
 			emit_bytexy(fs,line,BC_GETGLOBAL,reg,xx);
 		} break;
 		case NODE_TABLE: {

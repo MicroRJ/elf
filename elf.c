@@ -87,24 +87,26 @@ typedef char *Source;
 
 typedef struct elf_Closure {
 	elf_Object       obj;
-	elf_Function   proto;
+	elf_Prototype   proto;
 	elf_Value  values[1];
 } elf_Closure;
 
 
 /* symbols are mapped at load time, so the code generator
-references globals by index... */
+references globals by index...
+
+Todo: why does this have to be a separate thing? */
 typedef struct elf_Module {
 	elf_Table      *globals;
 	int              *track;
 	elf_Bytecode     *bytes;
 	Instr            nbytes;
 	Source           *lines;
-	elf_Function     *files;
+	elf_Prototype     *files;
 	elf_Table      *strings;
 	elf_Num        *numbers;
 	elf_Int       *integers;
-	elf_Function *functions;
+	elf_Prototype *functions;
 } elf_Module;
 
 
@@ -122,7 +124,7 @@ typedef struct elf_StackFrame {
 	elf_Value         *locals;
 	int               nlocals;
 	char                nargs;
-	char                nregs;
+	char                nrets;
 	int                origin;
 	delaylist    * delay_list;
 	elf_Bool          logging;
@@ -153,7 +155,7 @@ typedef struct elf_Collector {
 #define FLAG_BYTELOGGING      (1 << 3)
 
 
-typedef struct elf_Shell {
+typedef struct elf_State {
 	elf_Module     *M;
 	elf_Value      *stack;
 	int             stack_max;
@@ -176,7 +178,7 @@ typedef struct elf_Shell {
    /* the current instruction */
 	Instr byte;
 	elf_Collector collector;
-} elf_Shell;
+} elf_State;
 
 
 #include "src/node.h"
@@ -201,7 +203,7 @@ typedef struct elf_Shell {
 #include "src/user.c"
 #include "src/lib_core.c"
 #include "src/lib_table.c"
-#include "src/shell.c"
+#include "src/core.c"
 #include "src/system.c"
 
 

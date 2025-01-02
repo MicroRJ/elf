@@ -4,17 +4,17 @@
 */
 
 
-static int elf_run(elf_Shell *R);
+static int elf_run(elf_State *R);
 
 
-elf_Closure *elf_alloc_closure(elf_Shell *S, elf_Function proto) {
+elf_Closure *elf_alloc_closure(elf_State *S, elf_Prototype proto) {
 	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_Value) * (proto.nlocals-1));
 	cls->proto=proto;
 	return cls;
 }
 
 
-void elf_begin(elf_Shell *R, elf_Module *M) {
+void elf_begin(elf_State *R, elf_Module *M) {
 	R->M=M;
 	R->stack_max=elDEFAULT_STACK_SIZE;
 	R->stack    =calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
@@ -29,66 +29,92 @@ void elf_begin(elf_Shell *R, elf_Module *M) {
 	elf_include_core_lib(R);
 }
 
+/*
+Note: the function is expected to be the first argument, however
+the number of arguments does not include the function itself.
+Note: The function's prototype tells how many locals to allocate
+space for, this includes the arguments, the remaining space is
+allocated and initialized to zero.
+Note: if the number of arguments is greater than the number of
+locals (too many arguments) then the number of locals for this
+call frame is the number of arguments.
+Todo: why is the function itself required to be adjacent to
+the arguments? Couldn't we just call a function at any given
+register.
+Todo: why do we require the user to push the return values to
+the stack, to then copy them?
+*/
+int elf_call_function(elf_State *S, int nargs, int nrets) {
+	int nyield = 0;
 
-int elf_call_function(elf_Shell *R, int nargs, int nregs) {
-	int nyield=0;
+	elf_Value *locals = S->stack_ptr - nargs;
+	elf_Value value = locals[-1];
+	if (!CAN_CALL(value.tag)) {
+		elf_fail(S,NO_BYTE,elf_tpf("cannot call '%s'", tag2s[value.tag]));
+	}
+
+	int num_locals = nargs;
+	elf_Closure *closure = 0;
+
+	if (value.tag == elf_TAG_CLS) {
+		closure = value.x_cls;
+		elf_Prototype proto = closure->proto;
+		if (num_locals < proto.nlocals) {
+			num_locals = proto.nlocals;
+		}
+		int stack_size = num_locals - nargs;
+		ASSERT(stack_size >= 0);
+		clear_memory(locals+nargs,stack_size * sizeof(elf_Value));
+	}
+
 	/* todo: do not make this recursive dude! */
 	elf_StackFrame F = {0};
-	F.caller=R->frame;
-	F.origin=R->byte;
-	F.locals=R->stack_ptr - nargs;
-	F.nargs=nargs;
-	F.nregs=nregs;
+	/* Todo: remove this */
+	F.caller = S->frame;
+	/* Todo: this is for debugging */
+	F.origin = S->byte;
+	F.locals = locals;
+	F.nargs = nargs;
+	F.nrets = nrets;
+	F.closure = closure;
+	F.nlocals = num_locals;
+	GET_FRAME(S) = &F;
+	SET_TOP(S,locals+num_locals);
 
-	elf_Value fn = F.locals[-1];
+	S->nframe ++;
 
-	if (!ISFUNT(fn.tag)) {
-		elf_fail(R,NO_BYTE,elf_tpf("cannot call '%s'", tag2s[fn.tag]));
-	}
-
-	if (fn.tag==elf_TAG_CLS) {
-		F.closure=fn.x_cls;
-		F.nlocals=fn.x_cls->proto.nlocals;
-		clear_memory(F.locals+F.nargs,(F.nlocals-F.nargs)*sizeof(elf_Value));
-		SET_TOP(R,F.locals+F.nlocals);
-	} else {
-		SET_TOP(R,F.locals+F.nargs);
-	}
-
-	GET_FRAME(R) = &F;
-	R->nframe ++;
-
-	if (R->flags & FLAG_DEBUGGER_ONCALL) {
+	if (S->flags & FLAG_DEBUGGER_ONCALL) {
 		elf_debugger("debugger 'FLAG_DEBUGGER_ONCALL'");
 	}
-	elf_Value *results,*ptr;
-	if (fn.tag == elf_TAG_CLS) {
-		nyield=elf_run(R);
-	} else if (fn.tag == elf_TAG_CFN) {
-		results=R->stack_ptr;
-		nyield=fn.x_cfn(R);
-		ptr=R->stack_ptr;
+
+	elf_Value *results, *ptr;
+	if (value.tag == elf_TAG_CLS) {
+		nyield = elf_run(S);
+	} else if (value.tag == elf_TAG_CFN) {
+		results = S->stack_ptr;
+		nyield = value.x_cfn(S);
+		ptr = S->stack_ptr;
 		if ((ptr-results) < nyield) {
-			elf_fail(R,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - results),nyield));
+			elf_fail(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - results),nyield));
 		}
-		// if ((nyield==0)&&(nregs>0)){
+		// if ((nyield==0)&&(nrets>0)){
 		// 	elf_debug_log("seems like this function does not return anything");
 		// }
 		/* todo: clear only the part we didn't write */
-		clear_memory(F.locals-1,nregs*sizeof(elf_Value));
-		copy_memory(F.locals-1,results,MIN(nyield,nregs)*sizeof(elf_Value));
+		clear_memory(F.locals-1,nrets*sizeof(elf_Value));
+		copy_memory(F.locals-1,results,MIN(nyield,nrets)*sizeof(elf_Value));
 	} else {
 		nyield = -1;
-		elf_fail(R,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[fn.tag]));
+		elf_fail(S,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[value.tag]));
 	}
-	GET_FRAME(R) = F.caller;
-	R->nframe -= 1;
-	ASSERT(R->nframe > -1);
+	GET_FRAME(S) = F.caller;
+	S->nframe -= 1;
+	ASSERT(S->nframe > -1);
 	return nyield;
 }
 
 
-int elf_parse_expr3_fs(elf_Shell *R, FileState *fs, elf_String *filename, elf_StackId rxy, int ny, elf_String *contents) {
+int elf_parse_expr3_fs(elf_State *R, FileState *fs, elf_String *filename, elf_StackId rxy, int ny, elf_String *contents) {
 #if 0
 	NodeId id;
 	id=parse_expr(fs,0,0);
@@ -99,7 +125,7 @@ int elf_parse_expr3_fs(elf_Shell *R, FileState *fs, elf_String *filename, elf_St
 }
 
 
-elf_Closure *elf_load_code_closure(elf_Shell *R, FileState *fs, elf_String *filename, elf_String *contents) {
+elf_Closure *elf_load_code_closure(elf_State *R, FileState *fs, elf_String *filename, elf_String *contents) {
 	if ((filename==0)||(contents==0)) {
 		return 0;
 	}
@@ -110,7 +136,7 @@ elf_Closure *elf_load_code_closure(elf_Shell *R, FileState *fs, elf_String *file
 	while (parse_stat(fs));
 	close_file_state(fs);
 
-	elf_Function fp = {0};
+	elf_Prototype fp = {0};
 	fp.name=filename;
 	fp.contents=contents;
 	fp.bytes=fs->function.bytes;
@@ -121,7 +147,7 @@ elf_Closure *elf_load_code_closure(elf_Shell *R, FileState *fs, elf_String *file
 }
 
 
-elf_Closure *elf_load_file_closure(elf_Shell *R, FileState *fs, elf_String *name) {
+elf_Closure *elf_load_file_closure(elf_State *R, FileState *fs, elf_String *name) {
 	Error error;
 	elf_String *string;
 	char *text;
@@ -143,32 +169,32 @@ elf_Closure *elf_load_file_closure(elf_Shell *R, FileState *fs, elf_String *name
 }
 
 
-int elf_exec_file(elf_Shell *R, elf_String *name, int nargs, int nregs) {
+int elf_exec_file(elf_State *R, elf_String *name, int nargs, int nrets) {
 	FileState fs = {0};
 	elf_Closure *cls;
 
 	cls=elf_load_file_closure(R,&fs,name);
 	/* todo: HACK! */
-	elf_gsets(R->M,name,VCLS(cls));
+	elf_set_global(R->M,name,VCLS(cls));
 	elf_add_cls(R,cls);
 	elf_add_this(R);
-	return elf_call_function(R,2,nregs);
+	return elf_call_function(R,2,nrets);
 }
 
 
-INTERNAL void check_division_by_zero(elf_Shell *S, elf_Value xx, elf_Value yy) {
+INTERNAL void check_division_by_zero(elf_State *S, elf_Value xx, elf_Value yy) {
 	if ((yy.tag == elf_TAG_NUM) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
 	if ((yy.tag == elf_TAG_INT) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
 }
 
 
-static int call_overload(elf_Shell *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
+static int call_overload(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
 	if (obj->metatable == 0) {
 		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elf_Value field;
 	field=elf_tgetx_any(obj->metatable,name);
-	if (!ISFUNT(field.tag)) {
+	if (!CAN_CALL(field.tag)) {
 		elf_fail(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name,tag2s[field.tag]));
 	}
 	elf_Value *top;
@@ -251,7 +277,7 @@ elf_Int elf_mark_object(elf_Object *obj) {
 }
 
 
-elf_Int elf_hold_phase(elf_Shell *R) {
+elf_Int elf_hold_phase(elf_State *R) {
 	ASSERT(R->collector.phase == elf_GC_PHASE_MARK);
 	R->collector.phase ^= 1;
 
@@ -266,7 +292,7 @@ elf_Int elf_hold_phase(elf_Shell *R) {
 }
 
 
-elf_Int elf_free_phase(elf_Shell *R) {
+elf_Int elf_free_phase(elf_State *R) {
 	ASSERT(R->collector.phase==elf_GC_PHASE_FREE);
 	R->collector.phase^=1;
 
@@ -310,7 +336,7 @@ elf_Int elf_free_phase(elf_Shell *R) {
 }
 
 
-elf_Int elf_trigger_collection_cycle(elf_Shell *R) {
+elf_Int elf_trigger_collection_cycle(elf_State *R) {
 	elf_Int time_, num_marked, num_objects, num_to_collect, obj_trigger_threshold, num_collected;
 
 	time_ = elf_get_clock_time();
@@ -329,7 +355,7 @@ elf_Int elf_trigger_collection_cycle(elf_Shell *R) {
 }
 
 
-void elf_collect(elf_Shell *R) {
+void elf_collect(elf_State *R) {
 	if (R->collector.paused) {
 		return;
 	}
@@ -362,7 +388,7 @@ void elf_collect(elf_Shell *R) {
 }
 
 
-void *elf_alloc_object(elf_Shell *R, elf_GCTy type, elf_Int size) {
+void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_Int size) {
 	if (R->collector.phase!=elf_GC_WHITE) {
 		elf_fail(R,NO_BYTE,"object allocation out of phase");
 	}
@@ -382,13 +408,13 @@ void *elf_alloc_object(elf_Shell *R, elf_GCTy type, elf_Int size) {
 }
 
 
-int elf_run(elf_Shell *R) {
+int elf_run(elf_State *R) {
 
 	elf_Module *M;
 	elf_Table *globals;
 	elf_StackFrame *F;
 	elf_Value *locals;
-	elf_Function proto;
+	elf_Prototype proto;
 	elf_Value *values;
 	elf_Int module_instr,instr,next_instr;
 	elf_Bytecode byte;
@@ -428,7 +454,7 @@ int elf_run(elf_Shell *R) {
 		if (R->bytetracking) {
 			elf_Int track = ++ M->track[module_instr];
 			if (track == 64) {
-				elf_Function file;
+				elf_Prototype file;
 				char *line;
 				int linenum;
 				file=M->files[elf_get_instr_file(M,module_instr)];
@@ -462,14 +488,14 @@ int elf_run(elf_Shell *R) {
 			} break;
 			case BC_YIELD: {
 				ASSERT(BC_ARGX(byte) >= 0);
-				int reg,nregs;
-				nregs = MIN(BC_ARGZ(byte),F->nregs);
-				for (reg=0; reg<nregs; ++reg) {
+				int reg,nrets;
+				nrets = MIN(BC_ARGZ(byte),F->nrets);
+				for (reg=0; reg<nrets; ++reg) {
 					locals[reg-1] = locals[reg+BC_ARGY(byte)];
 				}
 				next_instr = instr+BC_ARGX(byte);
 
-				F->nregs = nregs;
+				F->nrets = nrets;
 			} break;
 			case BC_LOOP: {
 			} break;
@@ -515,7 +541,7 @@ int elf_run(elf_Shell *R) {
 			} break;
 			case BC_CLOSURE: {
 				ASSERT(WITHIN(BC_ARGY(byte),0,ARRAY_LENGTH(M->functions)));
-				elf_Function proto = M->functions[BC_ARGY(byte)];
+				elf_Prototype proto = M->functions[BC_ARGY(byte)];
 				elf_Closure *new_cls = elf_alloc_closure(R,proto);
 				copy_memory(new_cls->values,locals+BC_ARGX(byte),proto.nvalues*sizeof(elf_Value));
 				locals[BC_ARGX(byte)].tag   = elf_TAG_CLS;
@@ -648,7 +674,7 @@ int elf_run(elf_Shell *R) {
 				if ((xx.tag==elf_TAG_NIL)||(yy.tag==elf_TAG_NIL)) {
 					eq=ISNILV(xx)==ISNILV(yy);
 				} else if ((xx.tag==elf_TAG_STR)&&(yy.tag==elf_TAG_STR)) {
-					eq=elf_seq(xx.x_str,yy.x_str);
+					eq=elf_strings_eq(xx.x_str,yy.x_str);
 				} else if ((ISNUMT(xx.tag))&&(ISNUMT(yy.tag))) {
 					eq=xx.x_int==yy.x_int;
 				} else {
@@ -794,6 +820,6 @@ int elf_run(elf_Shell *R) {
 	}
 
 	esc:
-	return F->nregs;
+	return F->nrets;
 }
 

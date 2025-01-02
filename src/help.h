@@ -84,7 +84,7 @@
 
 #define ISOBJT(tag) ((tag)>=elf_TAG_OBJ)
 #define ISNUMT(tag) (((tag)==elf_TAG_NUM)||((tag)==elf_TAG_INT))
-#define ISFUNT(tag) (((tag)==elf_TAG_CLS)||((tag)==elf_TAG_CFN))
+#define CAN_CALL(tag) (((tag)==elf_TAG_CLS)||((tag)==elf_TAG_CFN))
 
 
 #define ISNILV(X) (((X).tag==elf_TAG_NIL)||(ISOBJT((X).tag)&&(X).x_obj==0))

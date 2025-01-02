@@ -33,7 +33,7 @@ elf_Num elf_time_diff_ms(elf_Int begin) {
 }
 
 
-int elf_add_function(elf_Module *M, elf_Function fn) {
+int elf_add_function(elf_Module *M, elf_Prototype fn) {
 	int i = ARRAY_GROW(M->functions,1);
 	M->functions[i] = fn;
 	return i;
@@ -41,8 +41,8 @@ int elf_add_function(elf_Module *M, elf_Function fn) {
 
 
 int elf_get_instr_file(elf_Module *M, Instr byte) {
-	elf_Function *files;
-	elf_Function file;
+	elf_Prototype *files;
+	elf_Prototype file;
 
 	files=M->files;
 	FOR_ARRAY(i,files) {
@@ -80,8 +80,8 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 }
 
 
-elf_Function elf_get_running_file(elf_Shell *S) {
-	elf_Function fi = {0};
+elf_Prototype elf_get_running_file(elf_State *S) {
+	elf_Prototype fi = {0};
 	int id = elf_get_instr_file(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
@@ -131,7 +131,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, 
 }
 
 
-void elf_dump_byte_trace(elf_Shell *S, elf_StackFrame *call, int level) {
+void elf_dump_byte_trace(elf_State *S, elf_StackFrame *call, int level) {
 	ASSERT(level > -1);
 
 	/* Don't show the first root call frame
@@ -147,20 +147,25 @@ void elf_dump_byte_trace(elf_Shell *S, elf_StackFrame *call, int level) {
 	elf_Module *M = S->M;
 	int fileid = elf_get_instr_file(M,call->origin);
 	if (fileid != -1) {
-		elf_Function *file = &M->files[fileid];
+		elf_Prototype *file = &M->files[fileid];
 		Source line = elf_get_instr_line(M,call->origin);
 		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(elf-function)" : "(c-function)");
 	}
 }
 
+void elf_fail_(elf_State *R, int byte, const char *error) {
+	/* Alternatively, do proper coloring... */
+	printf("\n\n");
+	printf("\txxxxxxxxxx:\n");
+	printf("\txx FAIL xx:\n");
+	printf("\txxxxxxxxxx:\n\n");
 
-void elf_fail_(elf_Shell *R, int byte, const char *error) {
 	elf_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_instr_line(M,byte);
 	int fileid = elf_get_instr_file(M,byte);
 	if (fileid != -1) {
-		elf_Function *file = &M->files[fileid];
+		elf_Prototype *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	}
 
@@ -170,14 +175,14 @@ void elf_fail_(elf_Shell *R, int byte, const char *error) {
 }
 
 
-void elf_check_args(elf_Shell *R, char *fnname, int n, char *usage) {
+void elf_check_args(elf_State *R, char *fnname, int n, char *usage) {
 	if (elf_get_num_args(R) != n) {
 		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
 	}
 }
 
 
-int elf_type_check(elf_Shell *R, Instr id, elf_StackId loc, elf_ValueTag x, elf_ValueTag y) {
+int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_ValueTag x, elf_ValueTag y) {
 	if (x != y) {
 		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
@@ -241,7 +246,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 
 static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
 	if (fid != -1) {
-		elf_Function file = M->files[fid];
+		elf_Prototype file = M->files[fid];
 		int linenum;
 		elf_get_line_source_info(file.contents->text,M->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name->text,linenum);
@@ -296,7 +301,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_get_my_pid());
 	FOR_ARRAY(i,md->files) {
-		elf_Function ff = md->files[i];
+		elf_Prototype ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
@@ -310,7 +315,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 	}
 #if 0
 	FOR_ARRAY(md->p) {
-		elf_Function p = md->p[i];
+		elf_Prototype p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
 			elf_Bytecode b = md->bytes[p.bytes+j];

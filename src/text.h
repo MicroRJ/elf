@@ -28,5 +28,7 @@ static char *xpf_(Allocator alloc, char const *format, ...);
 static char *tpfv(char const *format, va_list v);
 static char *tpf_(char const *format, ...);
 
-#define elf_tpf(format,...) (CHECK_FORMAT(format,__VA_ARGS__),tpf_(format,__VA_ARGS__))
-#define elf_xpf(alloc,format,...) (CHECK_FORMAT(format,__VA_ARGS__),xpf_(alloc,format,__VA_ARGS__))
+// CHECK_FORMAT(format,__VA_ARGS__),
+// CHECK_FORMAT(format,__VA_ARGS__),
+#define elf_tpf(format,...) (tpf_(format,__VA_ARGS__))
+#define elf_xpf(alloc,format,...) (xpf_(alloc,format,__VA_ARGS__))
