@@ -55,9 +55,11 @@ static int get_mem(Compiler *C, IR_Id id) {
 }
 
 static int set_mem(Compiler *C, IR_Id id) {
+	ASSERT(get_ir_kind(C->P,id) != IR_NOP);
 	ASSERT(C->memory_state < _countof(C->memory_slots));
 	int reg = C->memory_state ++;
 	C->memory_slots[reg] = id;
+	elf_debug_log("REG: %i <- %i (%s)",reg,id,node2s[get_ir_kind(C->P,id)]);
 	if (C->memory_usage < C->memory_state) {
 		C->memory_usage = C->memory_state;
 	}
@@ -66,45 +68,79 @@ static int set_mem(Compiler *C, IR_Id id) {
 
 static IR_Id compile_ir(Compiler *C, IR_Id id);
 
-static void compile_bb(Compiler *C, int id) {
-	if (!C->postorder_map[id]) {
-		C->postorder_map[id] = 1;
-		/* terminating instruction points to the following basic
-		block if any, or it should!? */
-		IR_Basic_Block bb = C->F->bbs[id];
-		elf_debug_log("COMPILE BB: %i",id);
-		for (IR_Id ir = bb.src; ir < bb.end;) {
-			ir = compile_ir(C,ir);
-		}
+static void compile_label(Compiler *C, IR_LabelId id) {
+	IR_Id ir;
+	IR_Label *lab;
+
+	lab=&C->F->labels[id];
+	if(lab->mark++){
+		return;
 	}
+	elf_debug_log("-- LABEL: %s %i",lab->name,id);
+
+	ir=lab->src;
+	do {
+		ir=compile_ir(C,ir);
+	} while(ir != 0xffff);
 }
+
+#include "emitter.c"
 
 static IR_Id compile_ir(Compiler *C, IR_Id id) {
 	IR_Node ir = C->P->ir[id];
 	IR_Function *F = C->F;
-	elf_debug_log("%s",node2s[ir.kind]);
+	Source line = ir.line;
+	elf_debug_log("%04i: %s",id,node2s[ir.kind]);
+	// if (ir.x != NO_IR)elf_debug_log("	x = %s",node2s[get_ir_kind(C->P,ir.x)]);
+	// if (ir.y != NO_IR)elf_debug_log("	y = %s",node2s[get_ir_kind(C->P,ir.y)]);
+	// if (ir.z != 0) {
+	// 	FOR_ARRAY(i,ir.z) {
+	// 		elf_debug_log("	z[%i] = %s",(int)i,node2s[get_ir_kind(C->P,ir.z[i])]);
+	// 	}
+	// }
 
 	Source src = ir.line;
 	switch (ir.kind) {
+		case IR_PUSH_MEMORY_STATE: { push_mem_state(C); } break;
+		case  IR_POP_MEMORY_STATE: {  pop_mem_state(C); } break;
+		case IR_STORE: {
+			IR_Node xx;
+			xx=get_ir(C->P,ir.x);
+			if ((xx.kind==IR_INDEX)||(xx.kind==IR_FIELD)){
+				int rz,rx,ry,so;
+				rz=to_any_mem(C,ir.y);
+				rx=to_any_mem(C,xx.x);
+				ry=to_any_mem(C,xx.y);
+				so=ir.kind==IR_INDEX?BC_SETINDEX:BC_SETFIELD;
+				emit_bytexyz(C,line,so,rx,ry,rz);
+			}
+		} break;
 		case IR_PARAM: {
 			/* allocate memory for parameter */
-			int mem = set_mem(C,id);
+			int mem;
+			mem=set_mem(C,id);
 			ASSERT(mem != NO_SLOT);
+			C->memory_slots[mem]=id;
 		} break;
 		case IR_LOCAL: {
-			int mem = to_mem(C,0,-1,1,ir.x);
+			int mem;
+			mem=to_mem(C,0,-1,1,ir.x);
 			ASSERT(mem != NO_SLOT);
-		} break;
-		case IR_PUSH_MEMORY_STATE: { push_mem_state(C); } break;
-		case IR_POP_MEMORY_STATE: { pop_mem_state(C); } break;
-		case IR_BASIC_BLOCK: {
-			compile_bb(C,ir.x);
-			__debugbreak();
+			C->memory_slots[mem]=id;
 		} break;
 		case IR_IF: {
-			compile_bb(C,ir.x);
-			// xxx
-			compile_bb(C,ir.y);
+			int mem,jmp,rx;
+
+			mem=get_mem_state(C);
+			rx=to_any_mem(C,ir.x);
+			set_mem_state(C,mem);
+
+			jmp=emit_bytexy(C,ir.line,BC_JZ,NO_JUMP,rx);
+			compile_label(C,ir.z[0]);
+			patch_jump(C->P,jmp);
+			if (ARRAY_LENGTH(ir.z) > 1) {
+				compile_label(C,ir.z[1]);
+			}
 		} break;
 		// so before we had yield and return, yield did
 		// process defer blocks, leave didn't, we don't
@@ -168,7 +204,7 @@ static int compile_module(Parser *parser) {
 		// todo: this is so whack
 		p.bytes = S->M->nbytes;
 
-		compile_bb(&compiler,0);
+		compile_label(&compiler,0);
 
 		// todo: this is so whack
 		p.nbytes = S->M->nbytes-p.bytes;
@@ -189,7 +225,6 @@ static int compile_module(Parser *parser) {
 }
 
 
-#include "emitter.c"
 
 // todo: define this somewhere else
 
@@ -216,33 +251,48 @@ int to_any_mem(Compiler *C, IR_Id id) {
 	return reg;
 }
 
-/* additionally, will omit instruction if no side effects and
-no results expected, otherwise will allocate a register if no
-register is given. */
 int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 	ASSERT(reg == NO_SLOT);
-	elf_State *S = C->R;
+	elf_State *S;
+	IR_Node node;
+	Source line;
 
-	IR_Node node = get_ir(C->P,id);
+	S=C->R;
+	node=get_ir(C->P,id);
+	line=node.line;
+
 	ASSERT(node.type != NT_NON);
-	Source line = node.line;
 
-	int mem = get_mem(C,id);
+	int mem,rx,ry,rz;
+
+	mem=get_mem(C,id);
 	if (mem != NO_SLOT) {
-		if (nreg < 1) goto esc;
+		if (nreg<1) goto esc;
 		ASSERT(reg != mem);
-		ASSERT(reg != NO_SLOT);
+		if(reg<0)reg=set_mem(C,id);
+		// ASSERT(reg != NO_SLOT);
 		emit_bytexy(C,line,BC_RELOAD,reg,mem);
 	}
 
-	/* otherwise determine how to load ir */
-	int rx,ry;
 	switch (node.kind) {
-		//todo:hack?
+		case IR_LOCAL: {
+			ASSERT(mem!=NO_SLOT);
+		} break;
 		case IR_LOAD: {
 			if (nreg<1) goto esc;
 			ASSERT(reg == NO_SLOT);
-			reg = to_any_mem(C,node.x);
+			reg = to_mem(C,0,-1,nreg,node.x);
+			ASSERT(reg != NO_SLOT);
+		} break;
+		//todo: hack!
+		case IR_LOAD_DIRECT: {
+			if (nreg<1) goto esc;
+			ASSERT(reg == NO_SLOT);
+			ASSERT(node.x < C->memory_state);
+
+			reg = set_mem(C,id);
+			emit_bytexy(C,line,BC_RELOAD,reg,node.x);
+
 			ASSERT(reg != NO_SLOT);
 		} break;
 		case IR_CLSVAL: {
@@ -371,9 +421,9 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 			// register here, as suppossed to letting eval allocate
 			// one? Todo: check this...
 			if (reg<0)reg = reg_alloc(fs);
-			emit_eval_deprecated(C,0,reg,1,ir_integer(C,line,0));
+			emit_eval_deprecated(C,0,reg,1,node_int(C,line,0));
 			Instr *js = emit_jump_if_false(C,&e,id);
-			emit_eval_deprecated(C,0,reg,1,ir_integer(C,line,1));
+			emit_eval_deprecated(C,0,reg,1,node_int(C,line,1));
 			patch_jumps(C,js);
 			ARRAY_DELETE(js);
 		} break;
@@ -419,15 +469,16 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 					ry=to_mem(C,0,-1,1,xx.y);
 					rx=to_mem(C,0,-1,1,xx.x);
 					emit_bytexyz(C,line,ir2b(xx.kind),ry,rx,ry);
-					ASSERT(ry==mem);
 				} else {
 					/* regular call with context 'this' */
 					ry=to_mem(C,0,-1,1,node.x);
 					rx=to_mem(C,0,-1,1,ir_this(C->P,line));
-					ASSERT(ry==mem);
 				}
+				ASSERT(ry==mem+0);
+				ASSERT(rx==mem+1);
 				FOR_ARRAY(i,node.z) {
-					to_mem(C,0,-1,1,node.z[i]);
+					rz=to_mem(C,0,-1,1,node.z[i]);
+					ASSERT(rz==mem+2+i);
 				}
 			} set_mem_state(C,mem);
 
@@ -438,11 +489,8 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 			if (nreg>1) parser_dialog(C->P,line,"multi-returns are not supported yet!");
 
 			if (reg<0) reg=set_mem(C,id);
-
-			/* put the result in the right register, since the call
-			instruction can't put the result in any specific register,
-			perhaps we could create a separate call instruction that's
-			faster */
+			//todo: call instruction that puts
+			//the result in a specific registers
 			if (reg!=mem) {
 				emit_bytexy(C,line,BC_RELOAD,reg,mem);
 			}
@@ -665,7 +713,7 @@ IR_Id desugar_range_expr(Parser *fs, IR_Id x, int flags) {
 			IR_Id lo,hi;
 			lo=get_ir(fs,node.y).x;
 			hi=get_ir(fs,node.y).y;
-			if (lo==NO_IR) lo=ir_integer(fs,line,0);
+			if (lo==NO_IR) lo=node_int(fs,line,0);
 			if (hi==NO_IR) hi=node_call_metafield(fs,line,array,0,"length");
 
 			begin_range_loop(fs,line,index,lo,hi);
@@ -993,9 +1041,9 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 			// register here, as suppossed to letting eval allocate
 			// one? Todo: check this...
 			if (reg<0)reg = reg_alloc_deprecated(fs);
-			emit_eval_deprecated(fs,0,reg,1,ir_integer(fs,line,0));
+			emit_eval_deprecated(fs,0,reg,1,node_int(fs,line,0));
 			Instr *js = emit_jump_if_false(fs,&e,id);
-			emit_eval_deprecated(fs,0,reg,1,ir_integer(fs,line,1));
+			emit_eval_deprecated(fs,0,reg,1,node_int(fs,line,1));
 			patch_jumps(fs,js);
 			ARRAY_DELETE(js);
 		} break;

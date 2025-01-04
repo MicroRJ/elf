@@ -4,11 +4,10 @@
 */
 
 
+
 /* Todo: should be the instruction not the register*/
 void emit_continue(Parser *fs, Source line, int reg);
 void emit_break(Parser *fs, Source line, elf_StackId with_value_register);
-
-
 
 char *parser_get_name(Parser *parser) {
 	return parser->filename;
@@ -65,7 +64,7 @@ static bool term_eol_token(Parser *parser) {
 	return parser->tok.type == TK_NONE || parser->tok_prev.eol == 1;
 }
 
-static bool pick_token(Parser *parser, elf_TokenType k) {
+static bool pick_tok(Parser *parser, elf_TokenType k) {
 	return test_tok(parser,k) && (get_tok(parser), 1);
 }
 
@@ -75,17 +74,17 @@ static bool pick_token_inline(Parser *parser, elf_TokenType k) {
 }
 
 
-static FileToken take_tok(Parser *fs, int k) {
-	FileToken tk = fs->tk;
-	if (!pick_token(fs,k)) {
+static tokenT take_tok(Parser *fs, int k) {
+	tokenT tk = fs->tk;
+	if (!pick_tok(fs,k)) {
 		parser_dialog(fs,fs->tok.line,"expected '%s'\n",elf_token_intel[k].name);
 	}
 	return tk;
 }
 
 
-static FileToken get_token_inline(Parser *fs, int k) {
-	FileToken tok = fs->tok;
+static tokenT get_token_inline(Parser *fs, int k) {
+	tokenT tok = fs->tok;
 	if (!pick_token_inline(fs,k)) {
 		parser_dialog(fs,tok.line,"expected '%s'\n",elf_token_intel[k].name);
 	}
@@ -250,6 +249,9 @@ static IR_Id find_name(Parser *F, Source line, int flags, char *name) {
 	}
 }
 
+#include "tree.c"
+
+
 
 void begin_scope(Parser *parser) {
 	parser->scope_stack[parser->scope_index ++] = parser->scope;
@@ -331,13 +333,12 @@ static IR_FuncId begin_function(Parser *parser, Source line) {
 
 	ir_set_func_arity(parser,id,1);
 
-	IR_Id ir = ir_param(parser,line,0);
+	IR_Id ir = ir_param(parser,line,NO_IR);
+	ir_add_prox(parser,ir);
 
 	parser_bind(parser, line
 	, ENTITY_PARAMETER|ENTITY_ASSIGNED|ENTITY_CONSTANT|ENTITY_REFERENCED
 	, "this", ir);
-
-	ir_add_prox(parser,ir);
 	return id;
 }
 
@@ -371,7 +372,7 @@ static IR_Id *parse_call_args(Parser *fs) {
 	if (test_tok(fs,TK_CURLY_LEFT)) {
 		x=parse_table(fs);
 		ARRAY_ADD(z,x);
-	} else if (pick_token(fs,TK_PAREN_LEFT)) {
+	} else if (pick_tok(fs,TK_PAREN_LEFT)) {
 		if (!test_tok(fs,TK_PAREN_RIGHT)) do {
 			x=parse_expr(fs,0,0);
 			if (x!=NO_IR) {
@@ -382,7 +383,7 @@ static IR_Id *parse_call_args(Parser *fs) {
 					}
 				} else ARRAY_ADD(z,x);
 			} else break;
-		} while (pick_token(fs,TK_COMMA));
+		} while (pick_tok(fs,TK_COMMA));
 		take_tok(fs,TK_PAREN_RIGHT);
 	} else {
 		x=parse_expr(fs,0,0);
@@ -392,7 +393,7 @@ static IR_Id *parse_call_args(Parser *fs) {
 }
 
 
-static elf_TokenType word2tok(FileToken tk) {
+static elf_TokenType word2tok(tokenT tk) {
 	/* todo: meh... remove this */
 	if (tk.type != TK_WORD) return tk.type;
 	if (!strcmp(tk.text,"and")) return TK_LOG_AND;
@@ -402,7 +403,7 @@ static elf_TokenType word2tok(FileToken tk) {
 }
 
 
-static int get_token_prec(elf_TokenType type) {
+static int get_tok_prec(elf_TokenType type) {
 	return elf_token_intel[type].prec;
 }
 
@@ -439,14 +440,14 @@ static IR_Kind tok2node(elf_TokenType tk) {
 IR_Id parse_subexpr(Parser *fs, BooleanJumps *expr, int rank, int flags) {
 	int oper,prio;
 	IR_Id x,y;
-	FileToken tk;
+	tokenT tk;
 
 	x=parse_unary(fs,expr,flags|EXPR_ALLOW_POSTFIX);
 	if (x==NO_IR) goto esc;
 
 	retry:
 	oper=word2tok(fs->tok);
-	prio=get_token_prec(oper);
+	prio=get_tok_prec(oper);
 	if (prio<=rank) goto esc;
 	if (fs->tok_prox.type==TK_ASSIGN) goto esc;
 	tk=get_tok(fs);
@@ -460,7 +461,7 @@ IR_Id parse_subexpr(Parser *fs, BooleanJumps *expr, int rank, int flags) {
 }
 
 static IR_Id parse_function(Parser *parser) {
-	FileToken tok = take_tok(parser,TK_FUN);
+	tokenT tok = take_tok(parser,TK_FUN);
 	IR_FuncId fun = begin_function(parser,tok.line);
 
 	int arity = 1;
@@ -469,13 +470,15 @@ static IR_Id parse_function(Parser *parser) {
 	if (!test_tok(parser,TK_PAREN_RIGHT)) do {
 		/* todo: default values would be pretty easy to add, maybe? */
 
-		FileToken name = take_tok(parser,TK_WORD);
+		tokenT name = take_tok(parser,TK_WORD);
+
 		IR_Id param = ir_param(parser,name.line,NO_IR);
 		ir_add_prox(parser,param);
+
 		parser_bind(parser,name.line,ENTITY_PARAMETER|ENTITY_ASSIGNED,name.text,param);
 
 		arity += 1;
-	} while (pick_token(parser,TK_COMMA));
+	} while (pick_tok(parser,TK_COMMA));
 
 	ir_set_func_arity(parser,fun,arity);
 
@@ -485,7 +488,7 @@ static IR_Id parse_function(Parser *parser) {
 	take_tok(parser,TK_PAREN_RIGHT);
 
 	/* '?' are now optional */
-	pick_token(parser,TK_QMARK);
+	pick_tok(parser,TK_QMARK);
 
 	if (test_tok(parser,TK_CURLY_LEFT)) {
 		take_tok(parser,TK_CURLY_LEFT);
@@ -553,23 +556,23 @@ void parse_assign(Parser *fs, IR_Id lexpr) {
 
 	IR_Id x,y;
 	int mem;
-	FileToken tk,op;
+	tokenT tk,op;
 
 	tk=fs->tk;
 	mem=get_mem_state_deprecated(fs);
 	x=desugar_range_expr(fs,lexpr,0);
 	x=emit_preload_deprecated(fs,x);
-	if (pick_token(fs,TK_ASSIGN)) {
+	if (pick_tok(fs,TK_ASSIGN)) {
 		y=parse_expr(fs,0,0);
 		emit_store_deprecated(fs,tk.line,x,y);
-	} else if (pick_token(fs,TK_NIL_ASSIGN)) {
+	} else if (pick_tok(fs,TK_NIL_ASSIGN)) {
 		BooleanJumps js = {0};
 		y=parse_expr(fs,0,0);
 		emit_jump_if_not_nil(fs,tk.line,&js,x);
 		emit_store_deprecated(fs,tk.line,x,y);
 		patch_jumps(fs,js.f);
 	} else {
-		if (get_token_prec(tk.type) > 0) {
+		if (get_tok_prec(tk.type) > 0) {
 			op=get_tok(fs);
 			take_tok(fs,TK_ASSIGN);
 			/* todo: optimization! */
@@ -586,48 +589,57 @@ void parse_assign(Parser *fs, IR_Id lexpr) {
 #endif
 
 
-IR_Id parse_table(Parser *fs) {
-	IR_Id *args,table,key,field,store,value;
-	FileToken token;
+IR_Id parse_table(Parser *parser) {
+	IR_Id table,key,field,store,value;
+	tokenT token;
 	int index;
+	// xx *args
 
-	token=take_tok(fs,TK_CURLY_LEFT);
-	table=node_new_table(fs,token.line,0);
-	args=0;
+	token=take_tok(parser,TK_CURLY_LEFT);
+
+	table=node_new_table(parser,token.line,0);
+	table=node_local(parser,token.line,table);
+	ir_add_prox(parser,table);
+	// xx args=0;
 	index=0;
-	token=fs->tok;
+	token=parser->tok;
 
-	for (;(token.type!=TK_NONE)&&(token.type!=TK_CURLY_RIGHT);token=fs->tok) {
+
+	for (;(token.type!=TK_NONE)&&(token.type!=TK_CURLY_RIGHT);token=parser->tok) {
+		ir_add_prox(parser,node_push_memory_state(parser,token.line));
+
 		value=NO_IR;
-		if ((token.type==TK_WORD)&&(fs->tok_prox.type==TK_ASSIGN)) {
-			token=get_tok(fs);
-			key=ir_string(fs,token.line,token.text);
+		if ((token.type==TK_WORD)&&(parser->tok_prox.type==TK_ASSIGN)) {
+			token=get_tok(parser);
+			key=node_str(parser,token.line,token.text);
 		} else {
-			key=value=parse_expr(fs,0,0);
+			key=value=parse_expr(parser,0,0);
 		}
-		token=fs->tok;
-		if (pick_token(fs,TK_ASSIGN)) {
-			value=parse_expr(fs,0,0);
+		token=parser->tok;
+		if (pick_tok(parser,TK_ASSIGN)) {
+			value=parse_expr(parser,0,0);
 		} else {
-			key=ir_integer(fs,token.line,index++);
+			key=node_int(parser,token.line,index++);
 		}
 
-		check_expr(fs,token.line,key);
-		check_expr(fs,token.line,value);
-		token=fs->tok;
-		field=node_field(fs,token.line,table,key);
+		check_expr(parser,token.line,key);
+		check_expr(parser,token.line,value);
+		token=parser->tok;
+		field=node_field(parser,token.line,table,key);
 
-		// this will be sugar coated now
-		// xxx store=node_store(fs,token.line,field,value);
+		store=node_store(parser,token.line,field,value);
+		ir_add_prox(parser,store);
 
-		ARRAY_ADD(args,store);
-		if (pick_token(fs,TK_COMMA)) {
+		// xx ARRAY_ADD(args,store);
+		ir_add_prox(parser,node_pop_memory_state(parser,token.line));
+
+		if (pick_tok(parser,TK_COMMA)) {
 			continue;
 		}
 	}
-	take_tok(fs,TK_CURLY_RIGHT);
+	take_tok(parser,TK_CURLY_RIGHT);
 
-	fs->ir[table].z = args;
+	// xx parser->ir[table].z = args;
 
 	return table;
 }
@@ -662,9 +674,12 @@ if (!term_eol_token(fs)) {
 #endif
 
 static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
-	IR_Id v = NO_IR;
-	FileToken tk = parser->tok;
+	IR_Id v;
+	tokenT tk;
 	IR_Id x;
+
+	v=NO_IR;
+	tk=parser->tok;
 	switch (tk.type) {
 		case TK_M_INDEX: case TK_M_ARRAY: case TK_M_VALUE: {
 			get_tok(parser);
@@ -692,7 +707,7 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 			tk=take_tok(parser,TK_WORD);
 			x=get_entity(parser,tk.text,0);
 			if (x!=NO_ENTITY) {
-				v=ir_integer(parser,tk.line,parser->entities[x].args);
+				v=node_int(parser,tk.line,parser->entities[x].args);
 			} else parser_dialog(parser,tk.line,"'%s': invalid entity (must be a local)",tk.text);
 		} break;
 		//
@@ -734,7 +749,7 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 
 			table=node_call_set_metatable(parser,tk.line,table,meta_table);
 
-			meta_field_name=ir_string(parser,tk.line,"__new");
+			meta_field_name=node_str(parser,tk.line,"__new");
 			get_meta_field=node_metafield(parser,tk.line,table,meta_field_name);
 			call_new=node_call(parser,tk.line,get_meta_field,call_args);
 
@@ -748,7 +763,7 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 		/* todo: this is temporary */
 		case TK_DOT: case TK_ELF: {
 			char dir[MAX_PATH] = {};
-			if (pick_token(parser,TK_ELF)) {
+			if (pick_tok(parser,TK_ELF)) {
 				strcat(dir,"elf");
 				/* remind the user elf is a reserved keyword */
 				if (!test_token_inline(parser,TK_DOT)) {
@@ -773,7 +788,7 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 		case TK_SUB: {
 			get_tok(parser);
 			v=parse_subexpr(parser,0,10000,flags);
-			v=node_xy(parser,tk.line,IR_SUB,NT_INT,ir_integer(parser,tk.line,0),v);
+			v=node_xy(parser,tk.line,IR_SUB,NT_INT,node_int(parser,tk.line,0),v);
 		} break;
 		case TK_ADD: {
 			get_tok(parser);
@@ -801,11 +816,11 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 		} break;
 		case TK_TRUE: case TK_FALSE: {
 			get_tok(parser);
-			v=ir_integer(parser,tk.line,tk.type==TK_TRUE);
+			v=node_int(parser,tk.line,tk.type==TK_TRUE);
 		} break;
 		case TK_LETTER: case TK_INTEGER: {
 			get_tok(parser);
-			v=ir_integer(parser,tk.line,tk.integer);
+			v=node_int(parser,tk.line,tk.integer);
 		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
@@ -813,7 +828,7 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			v=ir_string(parser,tk.line,tk.text);
+			v=node_str(parser,tk.line,tk.text);
 		} break;
 		case TK_DEFAULT: {
 			parser_dialog(parser,tk.line,"syntax error: default expressions can only be top level");
@@ -837,26 +852,26 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 			case TK_DOT: {
 				get_tok(parser);
 				// table.(x,y) -> (table.x, table.y)
-				if (pick_token(parser,TK_PAREN_LEFT)) {
+				if (pick_tok(parser,TK_PAREN_LEFT)) {
 					IR_Id *z = {0};
 					do {
-						FileToken n = take_tok(parser,TK_WORD);
+						tokenT n = take_tok(parser,TK_WORD);
 						IR_Id x,y;
-						y=ir_string(parser,n.line,n.text);
+						y=node_str(parser,n.line,n.text);
 						x=node_field(parser,tk.line,v,y);
 						ARRAY_ADD(z,x);
-					} while (pick_token(parser,TK_COMMA));
+					} while (pick_tok(parser,TK_COMMA));
 					v = node_multi(parser,tk.line,z);
 					take_tok(parser,TK_PAREN_RIGHT);
 				} else
 				// table.{x,y}
-				if (pick_token(parser,TK_CURLY_LEFT)) {
+				if (pick_tok(parser,TK_CURLY_LEFT)) {
 					NO_CODE;
 				} else {
-					FileToken name;
+					tokenT name;
 					IR_Id field;
 					name=take_tok(parser,TK_WORD);
-					field=ir_string(parser,name.line,name.text);
+					field=node_str(parser,name.line,name.text);
 					v=node_field(parser,tk.line,v,field);
 				}
 			} break;
@@ -886,21 +901,22 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 					inner multi expressions, make multi
 					expressions be regular 'comma' expressions
 					instead */
-				} while(pick_token(parser,TK_COMMA));
+				} while(pick_tok(parser,TK_COMMA));
 				take_tok(parser,TK_SQUARE_RIGHT);
 			} break;
 
 			case TK_COLON: {
-				FileToken n;
+				tokenT n;
 				IR_Id y;
 				get_tok(parser);
 				n=take_tok(parser,TK_WORD);
-				y=ir_string(parser,n.line,n.text);
+				y=node_str(parser,n.line,n.text);
 				v=node_metafield(parser,tk.line,v,y);
 			} break;
 			case TK_CURLY_LEFT:
 			case TK_PAREN_LEFT: {
-				IR_Id *z=parse_call_args(parser);
+				IR_Id *z;
+				z=parse_call_args(parser);
 				v=node_call(parser,tk.line,v,z);
 			} break;
 			default: goto esc;
@@ -911,7 +927,7 @@ static IR_Id parse_unary(Parser *parser, BooleanJumps *expr, bool flags) {
 	return v;
 }
 
-IR_Id* parse_expr_list(Parser *fs) {
+static IR_Id *parse_expr_list(Parser *fs) {
 	IR_Id y,*yz,*z=0;
 	do {
 		y=parse_expr(fs,0,0);
@@ -921,7 +937,7 @@ IR_Id* parse_expr_list(Parser *fs) {
 		} else {
 			ARRAY_ADD(z,y);
 		}
-	} while (pick_token(fs,TK_COMMA));
+	} while (pick_tok(fs,TK_COMMA));
 	return z;
 }
 
@@ -929,7 +945,7 @@ IR_Id* parse_expr_list(Parser *fs) {
 void parse_for_loop(Parser *fs) {
 	__debugbreak();
 #if 0
-	FileToken tk,name;
+	tokenT tk,name;
 	IR_Id y,*z,value,array,index,lo,hi;
 	int block,block_head=NO_BYTE,block_tail=NO_BYTE;
 	int value_register,array_register,index_register;
@@ -968,11 +984,11 @@ void parse_for_loop(Parser *fs) {
 			if (array==NO_IR) {
 				index=value;
 				// for ... ? { }
-				if (lo==NO_IR)lo=ir_integer(fs,tk.line,0);
-				if (hi==NO_IR)hi=ir_integer(fs,tk.line,-1);
+				if (lo==NO_IR)lo=node_int(fs,tk.line,0);
+				if (hi==NO_IR)hi=node_int(fs,tk.line,-1);
 			} else {
 				// for array[...] ? { }
-				if (lo==NO_IR)lo=ir_integer(fs,tk.line,0);
+				if (lo==NO_IR)lo=node_int(fs,tk.line,0);
 				if (hi==NO_IR)hi=node_call_metafield(fs,tk.line,array,0,"length");
 				/* todo: we're allocating this here, and never freeing it! */
 				index=node_load(fs,tk.line,reg_alloc_deprecated(fs));
@@ -1029,7 +1045,7 @@ void parse_for_loop(Parser *fs) {
 
 void parse_block(Parser *parser) {
 	parser_begin_block(parser,0);
-	if (pick_token(parser,TK_CURLY_LEFT)) {
+	if (pick_tok(parser,TK_CURLY_LEFT)) {
 		while (!term_token(parser,TK_CURLY_RIGHT)) {
 			parse_stat(parser);
 		}
@@ -1039,14 +1055,21 @@ void parse_block(Parser *parser) {
 }
 
 int parse_stat(Parser *parser) {
+	return (int) parse_stat2(parser);
+}
+
+
+#if 0
+int parse_stat(Parser *parser) {
 	IR_Id ir = NO_IR;
-	FileToken tok = parser->tok;
+	tokenT tok = parser->tok;
 	switch (tok.type) {
 		case TK_NONE: case TK_CURLY_RIGHT:
 		case TK_THEN: case TK_ELSE: case TK_ELIF: {
 			return 0;
 		}
 	}
+
 
 	// xxx FileBlock *bl = get_block(parser,-1);
 	// xxx if (bl->flags & BLOCK_ENDED) {
@@ -1064,16 +1087,19 @@ int parse_stat(Parser *parser) {
 					elf_fail(parser->R,0,"syntax error: invalid declaration");
 				}
 
-				FileToken name = take_tok(parser,TK_WORD);
+				tokenT name = take_tok(parser,TK_WORD);
 				take_tok(parser,TK_ASSIGN);
 
 				IR_Id x = parse_expr(parser,0,0);
+
 				ir = node_local(parser,name.line,x);
+				ir_add_prox(parser,ir);
+
 				parser_bind(parser,name.line,0,name.text,ir);
 
 				// xxx parse_assign(parser,node_load(parser,name.line,reg));
 
-			} while (pick_token(parser,TK_COMMA));
+			} while (pick_tok(parser,TK_COMMA));
 		} break;
 		case TK_LASTLY: case TK_FINALLY: {
 			__debugbreak();
@@ -1093,26 +1119,36 @@ int parse_stat(Parser *parser) {
 
 			get_tok(parser);
 
-			IR_Id x = parse_expr(parser,0,0);
+			IR_Id x;
 
-
+			x=parse_expr(parser,0,0);
 			take_tok(parser,TK_QMARK);
-
 			// xxx BranchJumps s = {0};
 			// xxx begin_if(parser,tk.line,&s,x,L_IF);
-			ir = node_if(parser,tok.line,x,-1,-1);
+			//note: if node has to be created prior
+			//to its labels to assume control
+			ir=node_if(parser,tok.line,x,-1,-1);
 			ir_add_prox(parser,ir);
 
-			int true_bb = ir_start_bb(parser);
+			int t,f;
+			t=ir_start_label(parser,"IF.T");
 			parse_block(parser);
+			f=ir_start_label(parser,"IF.F");
+			// parse_block(parser);
+			ir_start_label(parser,"RESUME");
 
-			parser->ir[ir].x = true_bb;
+			parser->prev=ir;
+			parser->ir[ir].prox=0xffff;
+			ARRAY_ADD(parser->ir[ir].z,t);
+			ARRAY_ADD(parser->ir[ir].z,f);
+
+
 
 
 
 #if 0
 			while (!test_tok(parser,TK_NONE)) {
-				if (pick_token(parser,TK_ELIF)) {
+				if (pick_tok(parser,TK_ELIF)) {
 					parser_begin_block(parser,0);
 
 					x = parse_expr(parser,0,0);
@@ -1122,14 +1158,14 @@ int parse_stat(Parser *parser) {
 					// xxx parse_stat(parser);
 
 					parser_close_block(parser);
-				} else if (pick_token(parser,TK_THEN)) {
+				} else if (pick_tok(parser,TK_THEN)) {
 					parser_begin_block(parser,0);
 
 					// xx add_then_clause(parser,parser->tok_prev.line,&s);
 					// xx parse_stat(parser);
 
 					parser_close_block(parser);
-				} else if (pick_token(parser,TK_ELSE)) {
+				} else if (pick_tok(parser,TK_ELSE)) {
 					parser_begin_block(parser,0);
 
 					// xxx add_else_clause(parser,parser->tok_prev.line,&s);
@@ -1218,23 +1254,23 @@ int parse_stat(Parser *parser) {
 				x=parse_expr(parser,0,0);
 			}
 #endif
+			ir_add_prox(parser,node_push_memory_state(parser,tok.line));
 			ir = parse_expr(parser,0,0);
 			if (ir != NO_IR) {
+				ir_add_prox(parser,ir);
 				// xx parse_assign(parser,x);
 			} else {
 				parser_dialog(parser,tok.line,"invalid statement");
 			}
+			ir_add_prox(parser,node_pop_memory_state(parser,tok.line));
 		} break;
 	}
 
-	ASSERT(ir != NO_IR);
-	ir_add_prox(parser,ir);
 
 	return 1;
-
-	err:
-	return 0;
 }
+#endif
+
 
 #if 0
 
@@ -1438,7 +1474,7 @@ void close_range_loop(Parser *fs, Source line) {
 	bl->loop.true_jumps = 0;
 	// IR_Id index_node = bl->loop.index_node;
 	IR_Id index_node = node_load(fs,NO_LINE,bl->loop.index_register);
-	IR_Id k = node_xy(fs,NO_LINE,IR_ADD,NT_INT,index_node,ir_integer(fs,NO_LINE,1));
+	IR_Id k = node_xy(fs,NO_LINE,IR_ADD,NT_INT,index_node,node_int(fs,NO_LINE,1));
 
 	__debugbreak();
 	// xxx emit_store_deprecated(fs,line,index_node,k);

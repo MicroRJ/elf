@@ -75,7 +75,8 @@ static void patch_jumps(Parser *fs, Instr *js) {
 
 
 static Instr emit_jump(Parser *fs, Source line, Instr j) {
-	return emit_bytex_deprecated(fs,line,BC_J,j-fs->M->nbytes);
+	__debugbreak();
+	// xx return emit_bytex_deprecated(fs,line,BC_J,j-fs->M->nbytes);
 }
 
 

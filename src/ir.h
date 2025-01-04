@@ -12,8 +12,6 @@ typedef int IR_Id;
 // #define NO_IR 0
 // typedef IR_Node *IR_Id;
 
-
-
 typedef struct { IR_Id id; } IR_Id2;
 
 
@@ -62,6 +60,7 @@ _(IF)\
 _(PARAM)\
 _(YIELD)\
 _(LOAD)\
+_(LOAD_DIRECT)\
 /* end */
 
 
@@ -95,13 +94,13 @@ static IR_Node get_ir(Parser *fs, IR_Id id);
 static IR_Kind get_ir_kind(Parser *fs, IR_Id id);
 static IR_DataTy get_ir_type(Parser *fs, IR_Id id);
 static Source get_ir_line(Parser *fs, IR_Id id);
-static IR_Id ir_xyz(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x, IR_Id y, IR_Id *z);
+static IR_Id node_xyz(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x, IR_Id y, IR_Id *z);
 static IR_Id node_xy(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x, IR_Id y);
 static IR_Id node_x(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x);
 static IR_Id node_nil(Parser *fs, Source);
-static IR_Id ir_integer(Parser *fs, Source, elf_Int i);
+static IR_Id node_int(Parser *fs, Source, elf_Int i);
 static IR_Id ir_number(Parser *fs, Source, elf_Num n);
-static IR_Id ir_string(Parser *fs, Source, Source);
+static IR_Id node_str(Parser *fs, Source, Source);
 static IR_Id node_nullary(Parser *fs, Source, IR_Kind k, IR_DataTy t);
 static IR_Id node_group(Parser *fs, Source, IR_Id x);
 static IR_Id node_new_table(Parser *fs, Source, IR_Id *z);

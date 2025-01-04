@@ -162,10 +162,10 @@ return N/P;
 }
 
 
-FileToken get_tok(Parser *file) {
+tokenT get_tok(Parser *file) {
 	GLOBAL char buffer[0x100];
 
-	FileToken tk;
+	tokenT tk;
 
 	retry:
 	clear_memory(&tk,sizeof(tk));

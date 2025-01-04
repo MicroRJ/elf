@@ -3,8 +3,11 @@
 ** ir.c
 */
 
-/* todo: for now the parser is the ir builder, normally
-it'd be its own separate thing. */
+
+IR_Id node_push_memory_state(Parser *parser, Source src);
+IR_Id node_pop_memory_state(Parser *parser, Source src);
+
+
 
 #define IR_ENUM(NAME) #NAME,
 INTERNAL char *node2s[] = {
@@ -28,9 +31,13 @@ IR_Id ir_get_label(Parser *parser) {
 
 void ir_add_prox(Parser *parser, IR_Id prox) {
 	IR_Id prev = parser->prev;
-
-	ASSERT(prox > parser->bb->src);
-	ASSERT(prox < parser->bb->end);
+	//note:we can still link to a node from
+	//the previous label
+	ASSERT(prox > 0);
+	ASSERT(prox >= parser->label->src);
+	ASSERT(prox < parser->label->end);
+	//note:the previous nodes should not be linked
+	//to anything
 	ASSERT(get_ir(parser,prox).prox == 0xffff);
 	ASSERT(get_ir(parser,prev).prox == 0xffff);
 
@@ -46,19 +53,20 @@ void ir_add_prox(Parser *parser, IR_Id prox) {
 // seems we're going for stateful approach
 typedef Parser IR_Builder;
 
-int ir_start_bb(IR_Builder *builder) {
-	IR_Function *func = & builder->funcs[builder->func];
-
-	int bb = ARRAY_GROW(func->bbs,1);
-	func->bbs[bb].src = builder->ir_index;
-	func->bbs[bb].end = builder->ir_index;
-	elf_debug_log("IR.BB[%i] @ %04X",bb,builder->ir_index);
-	builder->bb = & func->bbs[bb];
-	return bb;
+int ir_start_label(Parser *parser, char *name) {
+	IR_Function *func = & parser->funcs[parser->func];
+	int label = ARRAY_GROW(func->labels,1);
+	func->labels[label].name = name;
+	func->labels[label].mark = 0;
+	func->labels[label].src = parser->ir_index;
+	func->labels[label].end = parser->ir_index;
+	elf_debug_log("-- LABEL %s [%i] @ %04X",name,label,parser->ir_index);
+	parser->label = & func->labels[label];
+	return label;
 }
 
 void ir_close_func(IR_Builder *parser) {
-	IR_Id ir = node_pop_memory_state(parser);
+	IR_Id ir = node_pop_memory_state(parser,0);
 	ir_add_prox(parser,ir);
 	IR_Function *func = & parser->funcs[parser->func];
 	parser->func = func->enclosing;
@@ -77,26 +85,30 @@ IR_FuncId ir_begin_func(IR_Builder *parser, Source line) {
 	elf_debug_log("IR.FUNC %i", id);
 
 	parser->func = id;
-	ir_start_bb(parser);
 
-	IR_Id ir = node_push_memory_state(parser);
-	parser->prev = ir;
+	ir_start_label(parser,"START");
+
+	IR_Id ir;
+	ir=node_push_memory_state(parser,line);
+
+	parser->prev=ir;
 	return id;
 }
 
-IR_Id ir_xyz(IR_Builder *builder, Source line, IR_Kind kind, IR_DataTy type, IR_Id x, IR_Id y, IR_Id *z) {
-	elf_debug_log("IR: %s", node2s[kind]);
+IR_Id node_xyz(IR_Builder *builder, Source line, IR_Kind kind, IR_DataTy type, IR_Id x, IR_Id y, IR_Id *z) {
 
-	/* Todo: switch allocation strat */
+	//todo:switch allocation strategy
 	IR_Id id = ARRAY_LENGTH(builder->ir);
 
-	ASSERT(builder->bb);
+	elf_debug_log("%02i IR: %s", id,node2s[kind]);
+
+	ASSERT(builder->label);
 	ASSERT(id == builder->ir_index);
-	ASSERT(builder->bb->src <= builder->bb->end);
-	ASSERT(builder->bb->end == builder->ir_index);
+	ASSERT(builder->label->src <= builder->label->end);
+	ASSERT(builder->label->end == builder->ir_index);
 
 	/* update current basic block */
-	builder->bb->end ++;
+	builder->label->end ++;
 
 	ARRAY_GROW(builder->ir,1);
 
@@ -111,23 +123,18 @@ IR_Id ir_xyz(IR_Builder *builder, Source line, IR_Kind kind, IR_DataTy type, IR_
 	return id;
 }
 
-IR_Id node_goto(Parser *fs, Source line, int bb) {
-	IR_Id id = node_x(fs,line,IR_GOTO,NT_NON,bb);
-	ir_start_bb(fs);
+IR_Id node_goto(Parser *parser, Source line, int bb) {
+	IR_Id id = node_x(parser,line,IR_GOTO,NT_NON,bb);
 	return id;
 }
 
 IR_Id node_if(Parser *fs, Source line, IR_Id cond, int true_bb, int false_bb) {
-	IR_Id *z = 0;
-	ARRAY_ADD(z,true_bb);
-	ARRAY_ADD(z,false_bb);
-	IR_Id id = ir_xyz(fs,line,IR_IF,NT_NON,cond,0,z);
-	ir_start_bb(fs);
+	IR_Id id = node_x(fs,line,IR_IF,NT_NON,cond);
 	return id;
 }
 
 IR_Id node_xy(Parser *fs, Source line, IR_Kind k, IR_DataTy t, IR_Id x, IR_Id y) {
-	return ir_xyz(fs,line,k,t,x,y,0);
+	return node_xyz(fs,line,k,t,x,y,0);
 }
 
 
@@ -153,7 +160,7 @@ only be a parse time thing... */
 // }
 
 
-IR_Id ir_integer(Parser *parser, Source line, elf_Int i) {
+IR_Id node_int(Parser *parser, Source line, elf_Int i) {
 	IR_Id v = node_nullary(parser,line,IR_INTEGER,NT_INT);
 	parser->ir[v].i = i;
 	return v;
@@ -167,7 +174,7 @@ IR_Id ir_number(Parser *parser, Source line, elf_Num n) {
 }
 
 
-IR_Id ir_string(Parser *parser, Source line, char *s) {
+IR_Id node_str(Parser *parser, Source line, char *s) {
 	IR_Id v = node_nullary(parser,line,IR_STRING,NT_STR);
 	parser->ir[v].s = s;
 	return v;
@@ -175,12 +182,12 @@ IR_Id ir_string(Parser *parser, Source line, char *s) {
 
 
 IR_Id node_new_table(Parser *fs, Source line, IR_Id *z) {
-	return ir_xyz(fs,line,IR_TABLE,NT_TAB,NO_IR,NO_IR,z);
+	return node_xyz(fs,line,IR_TABLE,NT_TAB,NO_IR,NO_IR,z);
 }
 
 
 IR_Id ir_new_closure(Parser *fs, Source line, IR_Id x, IR_Id *z) {
-	return ir_xyz(fs,line,IR_CLOSURE,NT_FUN,x,NO_IR,z);
+	return node_xyz(fs,line,IR_CLOSURE,NT_FUN,x,NO_IR,z);
 }
 
 
@@ -211,17 +218,21 @@ IR_Id node_local(Parser *fs, Source line, IR_Id x) {
 }
 
 IR_Id node_store(Parser *fs, Source line, IR_Id x, IR_Id y) {
-	return node_xy(fs,line,IR_STORE,NT_ANY,x,y);
+	return node_xy(fs,line,IR_STORE,NT_NON,x,y);
 }
 
 IR_Id node_load(Parser *parser, Source line, IR_Id x) {
 	return node_x(parser,line,IR_LOAD,NT_ANY,x);
 }
 
+//todo: hack, refers directly to memory
+IR_Id node_load_direct(Parser *parser, Source line, int x) {
+	return node_x(parser,line,IR_LOAD_DIRECT,NT_ANY,x);
+}
+
 
 IR_Id ir_this(Parser *fs, Source line) {
-	IR_Id ir = fs->funcs[fs->func].bbs[0].src+1;
-	return node_load(fs,line,ir);
+	return node_load_direct(fs,line,0);
 }
 
 
@@ -251,12 +262,12 @@ IR_Id node_metafield(Parser *fs, Source line, IR_Id x, IR_Id y) {
 
 
 IR_Id node_call(Parser *fs, Source line, IR_Id x, IR_Id *z) {
-	return ir_xyz(fs,line,IR_CALL,NT_ANY,x,NO_IR,z);
+	return node_xyz(fs,line,IR_CALL,NT_ANY,x,NO_IR,z);
 }
 
 
 IR_Id node_multi(Parser *fs, Source line, IR_Id *z) {
-	return ir_xyz(fs,line,IR_MULTI,NT_ANY,NO_IR,NO_IR,z);
+	return node_xyz(fs,line,IR_MULTI,NT_ANY,NO_IR,NO_IR,z);
 }
 
 
@@ -271,7 +282,7 @@ IR_Id node_eq_nil(Parser *fs, Source line, IR_Id x) {
 
 
 IR_Id node_call_metafield(Parser *fs, Source line, IR_Id x, IR_Id *z, char *name) {
-	IR_Id field = node_metafield(fs,line,x,ir_string(fs,line,name));
+	IR_Id field = node_metafield(fs,line,x,node_str(fs,line,name));
 	return node_call(fs,line,field,z);
 }
 
@@ -297,9 +308,9 @@ IR_Id node_call_set_metatable(Parser *fs, Source line, IR_Id object, IR_Id metat
 	return node_call(fs,line,fn,z);
 }
 
-IR_Id node_basic_block(Parser *parser, Source line, int bb) {
-	return node_x(parser,line,IR_BASIC_BLOCK,NT_NON,bb);
-}
+// xx IR_Id node_basic_block(Parser *parser, Source line, int bb) {
+// xx 	return node_x(parser,line,IR_BASIC_BLOCK,NT_NON,bb);
+// xx }
 IR_Id node_push_memory_state(Parser *parser, Source src) {
 	return node_nullary(parser,src,IR_PUSH_MEMORY_STATE,NT_NON);
 }

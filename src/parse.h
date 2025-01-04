@@ -5,7 +5,7 @@
 */
 
 
-typedef struct FileToken {
+typedef struct tokenT {
 	unsigned char 	type;
 	Source line;
 	unsigned int eol: 1;
@@ -14,7 +14,7 @@ typedef struct FileToken {
 		elf_Num   number;
 		char 		   *text;
 	};
-} FileToken;
+} tokenT;
 
 
 #define KWLIST(_) \
@@ -182,9 +182,13 @@ typedef elf_i32 IR_FuncId;
 
 typedef struct IR_Function IR_Function;
 
-typedef struct IR_Basic_Block IR_Basic_Block;
-struct IR_Basic_Block {
+typedef elf_i32 IR_LabelId;
+
+typedef struct IR_Label IR_Label;
+struct IR_Label {
 	IR_Id src,end;
+	bool mark;
+	char *name;
 };
 
 /* so now a function is made up of basic blocks, a basic
@@ -196,11 +200,12 @@ struct IR_Function {
 	Source             line;
 	EntityId     *enclosure;
 	IR_Id      *yield_jumps;
-	/* first basic block is always start */
-	IR_Basic_Block     *bbs;
+	IR_Label        *labels;
 	int               arity;
 	int               nrets;
 };
+
+#include "tree.h"
 
 typedef struct IR_Module IR_Module;
 struct Parser {
@@ -212,10 +217,9 @@ struct Parser {
 	int         ir_index;
 	IR_Function   *funcs;
 	IR_FuncId       func;
-
-	IR_Basic_Block *bb;
-	IR_Id prev;
-
+	IR_Label      *label;
+	IR_Id           prev;
+	treeID     enclosing;
 	// we need to get rid of this from here
 
 	FileEntity   *entities;
@@ -239,9 +243,9 @@ struct Parser {
 	char        *thischar;
 	int        linenumber;
 	union {
-		FileToken tok,tk;
+		tokenT tok,tk;
 	};
-	FileToken tok_prev,tok_prox;
+	tokenT tok_prev,tok_prox;
 
 	// Now this is in the IR module...
 	// IR_Node 	  *nodes;
