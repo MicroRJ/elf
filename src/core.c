@@ -5,7 +5,7 @@
 
 static int elf_run(elf_State *R);
 
-void elf_init(elf_State *R, elf_Module *M) {
+void elf_init(elf_State *R, BC_Module *M) {
 	R->M=M;
 	R->stack_max = DEFAULT_STACK_SIZE;
 	R->stack = calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
@@ -104,37 +104,36 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 	return nyield;
 }
 
-
-int elf_parse_expr3_fs(elf_State *R, Parser *fs, elf_String *filename, elf_StackId rxy, int ny, elf_String *contents) {
-#if 0
-	TreeId id;
-	id=parse_expr(fs,0,0);
-	emit_yield(fs,fs->this_token.line,id);
-#endif
-	NO_CODE;
-	return -1;
-}
-
-
 elf_Closure *elf_load_code_closure(elf_State *R, Parser *fs, elf_String *filename, elf_String *contents) {
-	if ((filename==0)||(contents==0)) {
+	if (!filename || !contents) {
 		return 0;
 	}
-	elf_Module *M = R->M;
+
+	BC_Module *M = R->M;
 	fs->R=R;
 	fs->M=M;
-	parser_begin(fs,filename->text,contents->text);
+	begin_parser(fs,filename->text,contents->text);
 	while (parse_stat(fs));
-	parser_end(fs);
+	end_parser(fs);
 
-	elf_Prototype fp = {0};
-	fp.name=filename;
-	fp.contents=contents;
-	fp.bytes=fs->function.bytes;
-	fp.nbytes=M->nbytes-fs->function.bytes;
-	fp.nlocals=fs->function.nlocals;
-	ARRAY_ADD(M->files,fp);
+	// todo: so whack!
+	int proto = compile_module(fs);
+	elf_Prototype fp = M->functions[proto];
 	return elf_new_closure(R,fp);
+
+	// xx elf_Prototype fp = {0};
+	// xx fp.name=filename;
+	// xx fp.contents=contents;
+	// xx fp.bytes=fs->function.bytes;
+	// xx fp.nbytes=M->nbytes-fs->function.bytes;
+	// xx fp.nlocals=fs->function.nlocals;
+	// xx ARRAY_ADD(M->files,fp);
+	// xx return elf_new_closure(R,fp);
+
+
+	// elf_error_log("did not compile anything");
+	// elf_add_nil(R);
+	// return 0;
 }
 
 
@@ -401,14 +400,14 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_Int size) {
 
 int elf_run(elf_State *R) {
 
-	elf_Module *M;
+	BC_Module *M;
 	elf_Table *globals;
 	elf_StackFrame *F;
 	elf_Value *locals;
 	elf_Prototype proto;
 	elf_Value *values;
 	elf_Int module_instr,instr,next_instr;
-	elf_Bytecode byte;
+	Bytecode byte;
 	delaylist *delay;
 	/* operands .(z,y) */
 	elf_Value xx,yy;
@@ -433,7 +432,8 @@ int elf_run(elf_State *R) {
 		ASSERT(GET_TOP(R)>=locals+proto.nlocals);
 
 #if defined(_DEBUG)
-		if (R->flags & FLAG_BYTELOGGING || F->logging) {
+		// if (R->flags & FLAG_BYTELOGGING || F->logging) {
+		{
 			fpf_byte(stdout,M,-1,instr,byte);
 		}
 		if (R->flags & FLAG_DEBUGGER) {

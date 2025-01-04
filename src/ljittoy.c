@@ -140,7 +140,7 @@ void emit86_shift(ByteOP type, ljValue x, ljValue y) {
 }
 
 
-elf_Function jit(elf_Module *md, elf_Prototype fn) {
+elf_Function jit(BC_Module *md, elf_Prototype fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();
@@ -150,7 +150,7 @@ elf_Function jit(elf_Module *md, elf_Prototype fn) {
 
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
-	elf_Bytecode *bytes = md->bytes + fn.bytes;
+	Bytecode *bytes = md->bytes + fn.bytes;
 	Instr nbytes = fn.nbytes;
 
 	for (Instr i = 0; i < nbytes; ++i) {

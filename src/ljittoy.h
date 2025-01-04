@@ -49,7 +49,7 @@
 */
 
 
-#define NO_NODE 0
+#define NO_IR 0
 
 
 /* -- Yet another extremely simple graph for the IR,
@@ -68,11 +68,11 @@
 - great LuaJIT project by Mike Pall...
 - */
 typedef enum {
-	NODE_NONE = 0,
-	NODE_DATA,
-	NODE_LOAD,
-	NODE_LOCAL,
-	NODE_STORE,
+	IR_NONE = 0,
+	IR_DATA,
+	IR_LOAD,
+	IR_LOCAL,
+	IR_STORE,
 } ljNodeOp;
 
 
@@ -137,19 +137,19 @@ ljnodeid alloc_node(ljState *lj, ljNodeOp op, ljDataTy ty, ljnodeid x, ljnodeid 
 
 
 ljnodeid emit_irlongint(ljState *lj, elf_Int li) {
-	ljnodeid id = alloc_node(lj,NODE_DATA,DATA_INT64,NO_NODE,NO_NODE);
+	ljnodeid id = alloc_node(lj,IR_DATA,DATA_INT64,NO_IR,NO_IR);
 	lj->nodes[id].li = li;
 	return id;
 }
 
 
 ljnodeid emit_irloadlocal(ljState *lj, ljDataTy ty, ljnodeid x, ljnodeid y) {
-	return alloc_node(lj,NODE_LOAD,ty,x,y);
+	return alloc_node(lj,IR_LOAD,ty,x,y);
 }
 
 
 ljnodeid emit_irloadintolocal(ljState *lj, ljDataTy ty, ljnodeid x, ljnodeid y) {
-	return alloc_node(lj,NODE_STORE,ty,x,y);
+	return alloc_node(lj,IR_STORE,ty,x,y);
 }
 
 

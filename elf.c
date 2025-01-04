@@ -92,18 +92,21 @@ typedef struct elf_Closure {
 } elf_Closure;
 
 /* */
-typedef struct elf_Module {
+typedef struct BC_Module {
 	elf_Table      *globals;
-	int              *track;
-	elf_Bytecode     *bytes;
-	Instr            nbytes;
-	Source           *lines;
-	elf_Prototype    *files;
 	elf_Table      *strings;
 	elf_Num        *numbers;
 	elf_Int       *integers;
+	elf_Prototype    *files;
+
+	//todo: rename
 	elf_Prototype *functions;
-} elf_Module;
+
+	int              *track;
+	Source           *lines;
+	Bytecode         *bytes;
+	Instr            nbytes;
+} BC_Module;
 
 
 typedef struct delaylist delaylist;
@@ -152,7 +155,7 @@ typedef struct elf_Collector {
 
 
 typedef struct elf_State {
-	elf_Module     *M;
+	BC_Module     *M;
 	elf_Value      *stack;
 	int             stack_max;
 	elf_Value      *stack_ptr;
@@ -177,8 +180,8 @@ typedef struct elf_State {
 } elf_State;
 
 
-#include "src/tree.h"
-#include "src/file.h"
+#include "src/ir.h"
+#include "src/parse.h"
 
 #include "src/debug.c"
 #include "src/log.c"
@@ -193,8 +196,8 @@ typedef struct elf_State {
 
 
 #include "src/lexer.c"
-#include "src/node.c"
-#include "src/emit.c"
+#include "src/ir.c"
+#include "src/compile.c"
 #include "src/parse.c"
 #include "src/user.c"
 #include "src/lib_core.c"

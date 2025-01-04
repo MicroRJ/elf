@@ -93,7 +93,7 @@ elf_Int elf_ttry(elf_Table *tab, elf_Value key) {
 			return tail;
 		}
 		tail = (tail+walk) % ntotal;
-		DEBUG_CODE( tab->ncollisions ++ );
+		// DEBUG_CODE( tab->ncollisions ++ );
 	} while(head != tail);
 	return -1;
 }
@@ -119,7 +119,7 @@ elf_Int elf_ttryx(elf_Table *tab, const char *text, elf_Int length, elf_Hash has
 			}
 		}
 		tail = (tail + walk) % ntotal;
-		DEBUG_CODE( tab->ncollisions ++ );
+		// DEBUG_CODE( tab->ncollisions ++ );
 	} while(head != tail);
 	return -1;
 }

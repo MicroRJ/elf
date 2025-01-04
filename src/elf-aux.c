@@ -33,14 +33,14 @@ elf_Num elf_time_diff_ms(elf_Int begin) {
 }
 
 
-int elf_add_function(elf_Module *M, elf_Prototype fn) {
+int elf_add_function(BC_Module *M, elf_Prototype fn) {
 	int i = ARRAY_GROW(M->functions,1);
 	M->functions[i] = fn;
 	return i;
 }
 
 
-int elf_get_instr_file(elf_Module *M, Instr byte) {
+int elf_get_instr_file(BC_Module *M, Instr byte) {
 	elf_Prototype *files;
 	elf_Prototype file;
 
@@ -55,9 +55,12 @@ int elf_get_instr_file(elf_Module *M, Instr byte) {
 }
 
 
-char *elf_get_instr_line(elf_Module *M, Instr byte) {
+char *elf_get_instr_line(BC_Module *M, Instr byte) {
 	ASSERT(WITHIN(byte,0,ARRAY_LENGTH(M->lines)));
-	return M->lines[byte];
+	if (M->lines) {
+		return M->lines[byte];
+	}
+	return "";
 }
 
 
@@ -88,7 +91,7 @@ elf_Prototype elf_get_running_file(elf_State *S) {
 }
 
 
-void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, elf_Bytecode byte, char const *fmt, ...) {
+void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, Bytecode byte, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_get_line_source_info(contents,loc,&linenum,&lineloc);
@@ -144,7 +147,7 @@ void elf_dump_byte_trace(elf_State *S, elf_StackFrame *call, int level) {
 
 	elf_dump_byte_trace(S,call->caller,level-1);
 
-	elf_Module *M = S->M;
+	BC_Module *M = S->M;
 	int fileid = elf_get_instr_file(M,call->origin);
 	if (fileid != -1) {
 		elf_Prototype *file = &M->files[fileid];
@@ -160,13 +163,15 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 	printf("\txx FAIL xx:\n");
 	printf("\txxxxxxxxxx:\n\n");
 
-	elf_Module *M = R->M;
+	BC_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_instr_line(M,byte);
 	int fileid = elf_get_instr_file(M,byte);
 	if (fileid != -1) {
 		elf_Prototype *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
+	} else {
+		printf("error: %s\n",error);
 	}
 
 	printf(" -- BYTE TRACE:\n");
@@ -244,7 +249,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 }
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
+static void fpf_byte(FILE *io, BC_Module *M, elf_Int fid, Instr id, Bytecode b) {
 	if (fid != -1) {
 		elf_Prototype file = M->files[fid];
 		int linenum;
@@ -289,8 +294,8 @@ void elf_get_line_source_info(char *q, char *p, int *linenum, char **lineloc);
 
 
 #if 0
-void lang_dumpmodule(elf_Module *md, elf_Handle io) {
-	fprintf(file,"elf_Module:\n");
+void lang_dumpmodule(BC_Module *md, elf_Handle io) {
+	fprintf(file,"BC_Module:\n");
 	fprintf(file,"Globals:\n");
 	FOR_ARRAY(md->g->v) {
 		fprintf(file,"%04llX: ", i);
@@ -305,7 +310,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[ff.bytes+j];
+			Bytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// elf_get_line_source_info(md->file,md->lines[j],&linenum,&lineloc);
@@ -318,7 +323,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		elf_Prototype p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[p.bytes+j];
+			Bytecode b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");

@@ -59,7 +59,7 @@ GLOBAL t_token_info elf_token_intel[] = {
 
 
 void parser_dialog(Parser *fs, char *line, char const *fmt, ...) {
-	line = line ? line : fs->this_token.line;
+	line = line ? line : fs->tok.line;
 
 	int linenum;
 	char *lineloc;
@@ -162,7 +162,7 @@ return N/P;
 }
 
 
-FileToken poll_token(Parser *file) {
+FileToken get_tok(Parser *file) {
 	GLOBAL char buffer[0x100];
 
 	FileToken tk;
@@ -407,8 +407,8 @@ if ((CHAR0()==';')||((CHAR0()=='/')&&((CHAR1()=='/')||(CHAR1()=='*')))) {
 	tk.eol = 1;
 }
 
-file->last_token = file->this_token;
-file->this_token = file->then_token;
-file->then_token = tk;
-return file->last_token;
+file->tok_prev = file->tok;
+file->tok = file->tok_prox;
+file->tok_prox = tk;
+return file->tok_prev;
 }

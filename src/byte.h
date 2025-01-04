@@ -6,9 +6,9 @@
 
 /* todo: make use only 32 bits */
 #if 1
-typedef unsigned long long int elf_Bytecode;
+typedef unsigned long long int Bytecode;
 
-#define BC_XYZ(K,X,Y,Z) (elf_Bytecode){\
+#define BC_XYZ(K,X,Y,Z) (Bytecode){\
 ((((K) & 0xffffllu) <<(0x30))|\
  (((X) & 0xffffllu) <<(0x20))|\
  (((Y) & 0xffffllu) <<(0x10))|\
@@ -21,14 +21,14 @@ typedef unsigned long long int elf_Bytecode;
 #define BC_ARGZ(B) (short)(((B)>>(0x00))&0xffff)
 #else
 
-typedef struct elf_Bytecode {
+typedef struct Bytecode {
 	short z;
 	short y;
 	short x;
 	short k;
-} elf_Bytecode;
+} Bytecode;
 
-#define BC_XYZ(K,X,Y,Z) (elf_Bytecode){Z,Y,X,K}
+#define BC_XYZ(K,X,Y,Z) (Bytecode){Z,Y,X,K}
 
 #define BC_OP(B)   (B).k
 #define BC_ARGX(B) (B).x

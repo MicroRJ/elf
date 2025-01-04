@@ -64,7 +64,7 @@ pointer */
 #define ARRAY_DELETE(D) ((D != 0) ? dealloc_memory(GLOBAL_ALLOCATOR,&ARRAY(D)), 0 : 0)
 
 
-#define FOR_RANGE(N,X,Y) for (elf_Int N = X; N < Y; N += 1)
+#define FOR_RANGE(N,X,Y) for (elf_i64 N = X; N < Y; N += 1)
 
 #define FOR_ARRAY(N,D) FOR_RANGE(N,0,ARRAY_LENGTH(D))
 

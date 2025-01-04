@@ -26,7 +26,7 @@ int main(int n, char **c) {
 
 struct {
 	elf_State R;
-	elf_Module M;
+	BC_Module M;
 	elf_StackFrame C;
 } GLOBAL elf = {{&elf.M}};
 

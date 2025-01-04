@@ -188,13 +188,13 @@ elf_Num elf_get_num(elf_State *R, elf_StackId x) {
 }
 
 
-elf_SymbolId elf_get_global(elf_Module *M, elf_String *name) {
+elf_SymbolId elf_get_global(BC_Module *M, elf_String *name) {
 	if (name != 0) return elf_tget_ornew(M->globals,VSTR(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
 
 
-elf_SymbolId elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
+elf_SymbolId elf_set_global(BC_Module *M, elf_String *name, elf_Value value) {
 	elf_SymbolId id = elf_get_global(M,name);
 	M->globals->array[id] = value;
 	return id;

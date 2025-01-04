@@ -32,7 +32,7 @@ saying so... */
 
 
 
-typedef struct elf_Module 	elf_Module;
+typedef struct BC_Module 	BC_Module;
 typedef struct elf_State 	elf_State;
 typedef struct elf_Node 	elf_Node;
 typedef struct elf_Table 	elf_Table;
@@ -170,7 +170,7 @@ typedef struct elf_Table {
 } elf_Table;
 
 
-elAPI void elf_init(elf_State *S, elf_Module *M);
+elAPI void elf_init(elf_State *S, BC_Module *M);
 
 /* allocate and adds the object to stack (prevents it from getting GC'd) */
 elAPI elf_Closure *elf_new_closure(elf_State *, elf_Prototype fn);
@@ -297,13 +297,13 @@ elAPI void elf_debugger(char *message);
 elAPI void elf_fail_(elf_State *S, int instr, const char *error);
 #define elf_fail(R,instr,error) elf_fail_(R,instr,error)
 
-
-elAPI elf_SymbolId elf_add_function(elf_Module *M, elf_Prototype fn);
-elAPI elf_SymbolId elf_get_global(elf_Module *M, elf_String *name);
-elAPI elf_SymbolId elf_set_global(elf_Module *M, elf_String *name, elf_Value v);
-
-elAPI int elf_get_instr_file(elf_Module *M, int instr);
-elAPI char *elf_get_instr_line(elf_Module *M, int instr);
+/* Todo: BC module and none of these functions should be exposed
+as if they were API */
+elAPI elf_SymbolId elf_add_function(BC_Module *M, elf_Prototype fn);
+elAPI elf_SymbolId elf_get_global(BC_Module *M, elf_String *name);
+elAPI elf_SymbolId elf_set_global(BC_Module *M, elf_String *name, elf_Value v);
+elAPI int elf_get_instr_file(BC_Module *M, int instr);
+elAPI char *elf_get_instr_line(BC_Module *M, int instr);
 elAPI void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc);
 
 
