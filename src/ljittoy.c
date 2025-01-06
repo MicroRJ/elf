@@ -140,7 +140,7 @@ void emit86_shift(ByteOP type, ljValue x, ljValue y) {
 }
 
 
-elf_Function jit(BC_Module *md, elf_protoT fn) {
+elf_Function jit(BC_Module *md, elf_Proto fn) {
 	pf("jitting fn\n");
 	int loc = ((fn.nlocals*8+15)/16)*16;
 	DO_PUSH_RBP();

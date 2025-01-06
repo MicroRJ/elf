@@ -46,7 +46,7 @@ typedef enum elByteClass {
 } elByteClass;
 
 
-#define BCLIST(_) \
+#define BCDEF(_) \
 _(HALT, XXX, "halt") \
 _(NOP, XXX, "nop") \
 _(J, XXX, "jump") \
@@ -86,7 +86,7 @@ _(FLOAT2,XYZ,"float2")
 
 
 #define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),
-typedef enum ByteOP { BCLIST(BCITEM) } ByteOP;
+typedef enum ByteOP { BCDEF(BCITEM) } ByteOP;
 #undef BCITEM
 
 

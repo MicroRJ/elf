@@ -7,12 +7,12 @@
 
 typedef struct tokenT {
 	unsigned char 	type;
-	Source line;
+	Source         line;
 	unsigned int eol: 1;
 	union {
 		elf_Int integer;
-		elf_Num   number;
-		char 		   *text;
+		elf_Num  number;
+		char 		 *text;
 	};
 } tokenT;
 
@@ -25,30 +25,42 @@ _(TRY,"try") _(CATCH,"catch") _(FINALLY,"finally") \
 _(DO,"do") _(WHILE,"while") _(BREAK,"break") _(CONTINUE,"continue") \
 _(LET,"let") _(FOR,"for") _(LASTLY,"lastly") _(LEAVE,"leave") \
 _(IF,"if") _(IFF,"iff") _(ELSE,"else") _(ELIF,"elif") _(THEN,"then") \
+/* end */
 
-
-#define MCLIST(_) \
-_(LINE_NUMBER,"line_number") _(LINE_CHAR,"line_char") _(FILE_NAME,"file_name") \
-_(INT,"int") _(NUM,"num") \
-_(LEVEL,"level") _(REGISTER,"register") \
-_(INDEX,"index") _(VALUE,"value") _(ARRAY,"array") _(FIELD,"field") _(ENDOFFILE,"eof")
+#define MACRODEF(_) \
+_(LINE_NUMBER,"line_number") \
+_(LINE_CHAR,"line_char") \
+_(FILE_NAME,"file_name") \
+_(INT,"int") \
+_(NUM,"num") \
+_(LEVEL,"level") \
+_(REGISTER,"register") \
+_(INDEX,"index") \
+_(VALUE,"value") \
+_(ARRAY,"array") \
+_(FIELD,"field") \
+_(ENDOFFILE,"eof") \
+/* end */
 
 
 /* todo: why would !! and ?? have lower precedence
 than relational operators, when !! and ?? work on
 values */
-#define OPLIST(_) \
-_(POW,"**",12) \
-_(MUL,"*",11) _(DIV,"/",11) _(MOD,"%",11) \
-_(ADD,"+",10) _(SUB,"-",10) \
-_(SHR,">>",9) _(SHL,"<<",9) \
-_(LT,"<", 8) _(LTEQ,"<=", 8) \
-_(GT,">", 8) _(GTEQ,">=", 8) \
-_(EQ, "==", 7) _(NEQ , "!=", 7) \
-_(BIT_AND,"&",6) _(BIT_OR,"|",5) _(BIT_XOR,"^",4) \
-_(LOG_AND,"&&",3) _(LOG_OR,"||",2) \
-_(NIL_AND,"!!",3) _(NIL_OR,"??",2) \
-_(ELLIPSIS,"...",1) _(DOT_DOT,"..",1)
+#define OPERATORDEF(_) \
+_(     POW, "**",12) \
+_(     MUL,  "*",11) _( DIV,  "/", 11) _(MOD,"%",11) \
+_(     ADD,  "+",10) _( SUB,  "-", 10) \
+_(     SHR, ">>", 9) _( SHL, "<<",  9) \
+_(      LT,  "<", 8) _(LTEQ, "<=",  8) \
+_(      GT,  ">", 8) _(GTEQ, ">=",  8) \
+_(      EQ, "==", 7) _( NEQ, "!=",  7) \
+_( BIT_AND,  "&", 6) \
+_(  BIT_OR,  "|", 5) \
+_( BIT_XOR,  "^", 4) \
+_( LOG_AND, "&&", 3) _( LOG_OR, "||", 2) \
+_( NIL_AND, "!!", 3) _( NIL_OR, "??", 2) \
+_(ELLIPSIS,"...", 1) _(DOT_DOT, "..", 1) \
+/* end */
 
 
 #define TKLIST(_) \
@@ -69,9 +81,9 @@ typedef enum tokenTy {
 #define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
 
 	KWLIST(TKITEM)
-	MCLIST(MCITEM)
+	MACRODEF(MCITEM)
 	TKLIST(TKITEM)
-	OPLIST(OPITEM)
+	OPERATORDEF(OPITEM)
 
 #undef TKITEM
 #undef MCITEM
@@ -85,37 +97,6 @@ typedef int BlockId;
 #define BLOCK_LOOP 		0x01
 #define BLOCK_ENDED  	0x02
 #define BLOCK_DELAYED 	0x04
-
-
-// we'll come back to this later....
-typedef struct ParseLoopState {
-	Instr entry;
-	Instr *false_jumps,*true_jumps;
-	/* these can be directly accessed using #array, #index, and #value.
-	#array and #index are guaranteed to be register nodes,
-	and #value is an (index node), which translates to
-	#array[#index] */
-	treeID array_register; // _register;
-	treeID index_register; // _register;
-	treeID value_register;
-	/* todo: why do we need this, please remove? */
-	union { treeID x; };
-} ParseLoopState;
-
-// so i guess this just stores additional
-// data for the parser to do some form
-// of semantic analysis...
-// todo: if we only end up using this for loops,
-// then use a loop stack instead and remove this
-typedef struct FileBlock FileBlock;
-struct FileBlock {
-	treeID            entry;
-	int              flags;
-	int              level;
-	treeID         jumpover;
-	ParseLoopState    loop;
-	treeID      *leavejumps;
-};
 
 
 typedef struct BooleanJumps {
@@ -163,40 +144,35 @@ typedef struct {
 	Source   line;
 } entityT;
 
-typedef struct{
+typedef struct Block Block;
+struct Block {
 	treeID *body;
-}Block;
-typedef struct Parser Parser;
-struct Parser {
-	elf_State  *R;
-	char      *filename;
-	char      *filetext;
-	char      *linechar;
-	char      *thischar;
-	int      linenumber;
-	treeID    enclosing;
-	entityT   *entities;
-	entityID  entity_index;
-	entityID  scope_stack[16];
-	entityID  scope_index;
-	Block  block_stack[16];
-	int    block_index;
-	Block  block;
-	entityID  scope;
-	tokenT tok,tok_prev,tok_prox;
+	Block  *lastly_blocks;
+	int     ended;
+	int     has_ret;
 };
 
 
-
-// static int begin_parser(Parser *fs, char *name, char *text);
-// static void end_parser(Parser *fs);
-
-// static IR_FuncId begin_function(Parser *parser, Source line);
-// static void close_function(Parser *parser);
-
-/* this syntactic block */
-static void parser_begin_block(Parser *parser, int flags);
-static void parser_close_block(Parser *parser);
+typedef struct Parser Parser;
+struct Parser {
+	elf_State              *R;
+	char                *name;
+	char                *text;
+	char            *line_pos;
+	char                 *pos;
+	int              line_num;
+	treeID          enclosing;
+	treeID         *functions;
+	entityT         *entities;
+	entityID     entity_index;
+	entityID  scope_stack[16];
+	entityID      scope_index;
+	Block     block_stack[16];
+	int           block_index;
+	Block               block;
+	entityID            scope;
+	tokenT tok,tok_prev,tok_prox;
+};
 
 // todo:
 // static FileBlock *get_loop_block(Parser *fs, elf_StackId with_value_register);
@@ -221,9 +197,6 @@ static void begin_do_while_loop(Parser *fs, Source line);
 static void close_do_while_loop(Parser *fs, Source line, treeID x);
 static void begin_while_loop(Parser *fs, treeID x);
 static void close_while_loop(Parser *fs);
-
-static char *parser_get_name(Parser *fs);
-
 
 
 

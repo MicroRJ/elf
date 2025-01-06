@@ -32,7 +32,7 @@ int elf_loadcliopts(elf_cliopts *cli, int n, char **c) {
 	#define SETFIELD(N,V) (cli->N = V)
 
 
-#define OPLIST(_) \
+#define OPERATORDEF(_) \
 	_("help", "displays command line interface help",{})\
 	_("logging", "log bytecode instructions as they execute (only in debug mode)",{SETFIELD(logging,1);})\
 	_("dump", "[filename] whether to dump the resulting module (when program exits)",\
@@ -50,12 +50,12 @@ int elf_loadcliopts(elf_cliopts *cli, int n, char **c) {
 			help:
 			printf("usage: --op [args...]\n");
 #define DEFOP(N,I,A) printf("  --%s: %s\n", N,I);
-			OPLIST(DEFOP)
+			OPERATORDEF(DEFOP)
 #undef DEFOP
 			return 1;
 		}
 #define DEFOP(N,I,A) if (GETOP(N)) { printf("%s:\n",N); A; continue; };
-		OPLIST(DEFOP)
+		OPERATORDEF(DEFOP)
 #undef DEFOP
 		printf("error: unrecognized verb: %s\n",c[i]);
 		break;

@@ -49,7 +49,7 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 
 	if (value.tag == elf_TAG_CLS) {
 		closure = value.x_cls;
-		elf_protoT proto = closure->proto;
+		elf_Proto proto = closure->proto;
 		if (num_locals < proto.nlocals) {
 			num_locals = proto.nlocals;
 		}
@@ -110,16 +110,16 @@ elf_Closure *elf_load_code_closure(elf_State *R, Parser *fs, elf_String *filenam
 	}
 
 	treeID tree;
-	elf_protoT proto;
+	elf_Proto proto;
 	tree=parse(fs,R,filename->text,contents->text);
-	proto=gen(fs,tree);
+	proto=gen_file(fs,tree);
 
 	// todo: so whack!
 	// int proto = compile_module(fs);
-	// elf_protoT fp = M->functions[proto];
+	// elf_Proto fp = M->functions[proto];
 	return elf_new_closure(R,proto);
 
-	// xx elf_protoT fp = {0};
+	// xx elf_Proto fp = {0};
 	// xx fp.name=filename;
 	// xx fp.contents=contents;
 	// xx fp.bytes=fs->function.bytes;
@@ -368,9 +368,12 @@ void elf_collect(elf_State *R) {
 		if (R->collector.memory_threshold > elGC_MEM_THRESHOLD_MAX) {
 			R->collector.memory_threshold = elGC_MEM_THRESHOLD_MAX;
 		}
-		elf_trigger_collection_cycle(R);
+		num_collected = elf_trigger_collection_cycle(R);
+		ASSERT(num_collected <= num_objects);
 		if (R->collector.memory_allocated > R->collector.memory_threshold) {
-			elf_fail(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated",R->collector.memory_allocated / MEGABYTES(1)));
+			elf_fail(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated, %lliMB threshold"
+			, R->collector.memory_allocated / MEGABYTES(1)
+			, R->collector.memory_threshold / MEGABYTES(1)));
 		}
 	}
 }
@@ -402,7 +405,7 @@ int elf_run(elf_State *R) {
 	elf_Table *globals;
 	elf_StackFrame *F;
 	elf_Value *locals;
-	elf_protoT proto;
+	elf_Proto proto;
 	elf_Value *values;
 	elf_Int module_instr,instr,next_instr;
 	Bytecode byte;
@@ -443,7 +446,7 @@ int elf_run(elf_State *R) {
 		if (R->bytetracking) {
 			elf_Int track = ++ M->track[module_instr];
 			if (track == 64) {
-				elf_protoT file;
+				elf_Proto file;
 				char *line;
 				int linenum;
 				file=M->files[elf_get_instr_file(M,module_instr)];
@@ -529,8 +532,8 @@ int elf_run(elf_State *R) {
 				locals[BC_ARGX(byte)] = values[BC_ARGY(byte)];
 			} break;
 			case BC_CLOSURE: {
-				ASSERT(WITHIN(BC_ARGY(byte),0,ARRAY_LENGTH(M->functions)));
-				elf_protoT proto = M->functions[BC_ARGY(byte)];
+				ASSERT(WITHIN(BC_ARGY(byte),0,ARRAY_LENGTH(M->protos)));
+				elf_Proto proto = M->protos[BC_ARGY(byte)];
 				elf_Closure *new_cls = elf_alloc_closure(R,proto);
 				copy_memory(new_cls->values,locals+BC_ARGX(byte),proto.nvalues*sizeof(elf_Value));
 				locals[BC_ARGX(byte)].tag   = elf_TAG_CLS;

@@ -5,7 +5,7 @@
 
 
 
-#include "libmath.c"
+#include "lib_math.c"
 
 
 static int core_lib_float2(elf_State *R);
@@ -566,7 +566,7 @@ int core_lib_list_volumes(elf_State *R) {
 
 
 typedef struct folder_enumerator {
-	elf_State *shell;
+	elf_State *state;
 	elf_Closure *closure;
 	elf_String *sfolder,*sfile,*sname,*spath,*stype,*ssize;
 	elf_Table *storage;
@@ -576,22 +576,22 @@ typedef struct folder_enumerator {
 static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t filesize, char *filename, char *filepath) {
 	folder_enumerator *fc=user;
 	elf_Closure *cls=fc->closure;
-	elf_State *shell=fc->shell;
+	elf_State *state=fc->state;
 	elf_String *name,path;
 	elf_Table *storage=fc->storage;
 	int nrets;
 
-	elf_Table *file=elf_new_table(shell);
-	elf_tsets_str(file,fc->sname,elf_new_string(shell,filename));
-	elf_tsets_str(file,fc->spath,elf_new_string(shell,filepath));
+	elf_Table *file=elf_new_table(state);
+	elf_tsets_str(file,fc->sname,elf_new_string(state,filename));
+	elf_tsets_str(file,fc->spath,elf_new_string(state,filepath));
 	elf_tsets_str(file,fc->stype,filetype?fc->sfolder:fc->sfile);
 	elf_tsets_int(file,fc->ssize,filesize);
 
 	if (cls){
-		elf_add_cls(shell,cls);
-		elf_add_obj(shell,elf_get_this(shell));
-		elf_add_tab(shell,file);
-		nrets=elf_call_function(shell,2,1);
+		elf_add_cls(state,cls);
+		elf_add_obj(state,elf_get_this(state));
+		elf_add_tab(state,file);
+		nrets=elf_call_function(state,2,1);
 	}
 	if (storage){
 		elf_tadd_tab(storage,file);
@@ -607,17 +607,17 @@ static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t f
 }
 
 
-static folder_enumerator make_folder_enumerator(elf_State *shell, elf_Closure *closure, elf_Table *storage){
+static folder_enumerator make_folder_enumerator(elf_State *state, elf_Closure *closure, elf_Table *storage){
 	folder_enumerator folder;
-	folder.shell=shell;
+	folder.state=state;
 	folder.closure=closure;
 	folder.storage=storage;
-	folder.sfolder=elf_new_string(shell,"folder");
-	folder.sfile=elf_new_string(shell,"file");
-	folder.sname=elf_new_string(shell,"name");
-	folder.spath=elf_new_string(shell,"path");
-	folder.stype=elf_new_string(shell,"type");
-	folder.ssize=elf_new_string(shell,"size");
+	folder.sfolder=elf_new_string(state,"folder");
+	folder.sfile=elf_new_string(state,"file");
+	folder.sname=elf_new_string(state,"name");
+	folder.spath=elf_new_string(state,"path");
+	folder.stype=elf_new_string(state,"type");
+	folder.ssize=elf_new_string(state,"size");
 	return folder;
 }
 

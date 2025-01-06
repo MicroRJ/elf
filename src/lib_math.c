@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** libmath.c
+** lib_math.c
 */
 
 

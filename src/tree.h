@@ -3,6 +3,7 @@
 // #define TREE_LOOP_VALUE ((treeID)(2))
 // #define TREE_LOOP_INDEX ((treeID)(3))
 // #define TREE_LOOP_ARRAY ((treeID)(4))
+#define NO_TREE 0
 
 
 typedef struct Parser Parser;
@@ -13,15 +14,7 @@ typedef struct { treeID id; } treeID2;
 
 #define TREEID(id) (treeID2){id}
 
-
-#define NO_TREE 0
-
-//block:
-//z: are the statements
-//expr-builder:
-//x: is the resulting value
-//z: are the statements to be evaluated
-//note:mind order
+/* MIND ORDER */
 #define TREEDEF(_) \
 _(TREE_NONE) \
 _(TREE_NOP) \
@@ -37,27 +30,25 @@ _(EXPR_BIT_XOR)_(EXPR_BIT_OR) \
 _(EXPR_BIT_AND) \
 _(EXPR_NIL_OR)_(EXPR_NIL_AND) \
 _(EXPR_THIS_REF) \
-_(EXPR_LOCAL_REF) \
 _(EXPR_GLOBAL_REF) \
 _(EXPR_UPVALUE_REF) \
 _(EXPR_NUM)_(EXPR_INT)_(EXPR_STR) \
-_(EXPR_FUN)_(EXPR_TAB) \
+_(TREE_FUNCTION)_(EXPR_TAB) \
 _(EXPR_CLOSURE) \
 _(EXPR_INDEX) \
 _(EXPR_FIELD) \
 _(EXPR_METAFIELD) \
 _(EXPR_CALL) \
 _(EXPR_NIL) \
+_(TREE_ASSIGN_MEM) \
+_(TREE_STORE) \
+_(STAT_BLOCK) \
+_(STAT_IF) \
+_(TREE_WHILE_LOOP)_(STAT_DO_WHILE) \
 _(EXPR_RANGE) \
 _(EXPR_RANGE_INDEX) \
 _(EXPR_MULTI) \
-_(EXPR_COMPOSITE) \
-_(STAT_ASSIGN_MEM) \
-_(STAT_YIELD) \
-_(STAT_STORE) \
-_(STAT_BLOCK) \
-_(STAT_IF) \
-_(STAT_WHILE)_(STAT_DO_WHILE) \
+_(TREE_RET) \
 /* end */
 
 typedef enum {
@@ -78,30 +69,25 @@ struct treeT {
 	treeKi kind;
 	treeTy type;
 	Source line;
+	treeID prox;
 	union {
 		struct {
 			treeID x,y,*z;
 		};
+		int  expr_global;
+		int expr_upvalue;
+		char   *expr_str;
+		elf_i64 expr_int;
+		elf_f64 expr_num;
 		struct {
-			char *name;
-			union{
-				treeID local_ref;
-				int global_ref;
-				int upvalue_ref;
-			};
-		}expr_ref;
-		char *expr_str;
-		elf_Int expr_int;
-		elf_Num expr_num;
-		struct {
-			int scope;
-			treeID enclosing;
-			treeID *params;
-			treeID body;
+			int         proto;
+			int         scope;
+			treeID  enclosing;
+			treeID    *params;
+			treeID       body;
 		} expr_fun;
-		treeID stat_expr;
 		struct {
-			treeID pred;
+			treeID        pred;
 			treeID true_clause;
 			treeID else_clause;
 		} stat_if;
@@ -137,7 +123,7 @@ static treeID tree_table(Parser *, Source, treeID *z);
 static treeID tree_closure(Parser *, Source, treeID x, treeID *z);
 static treeID tree_store(Parser *, Source line, treeID x, treeID y);
 
-static treeID tree_yield(Parser *, Source, treeID i);
+static treeID tree_ret(Parser *, Source, treeID i);
 
 static treeID tree_this_ref(Parser *, Source line);
 static treeID tree_global_ref(Parser *, Source line, char *name, int x);

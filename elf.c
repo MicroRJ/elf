@@ -87,7 +87,7 @@ typedef char *Source;
 
 typedef struct elf_Closure {
 	elf_Node       obj;
-	elf_protoT   proto;
+	elf_Proto   proto;
 	elf_Value  values[1];
 } elf_Closure;
 
@@ -97,11 +97,8 @@ typedef struct BC_Module {
 	elf_Table      *strings;
 	elf_Num        *numbers;
 	elf_Int       *integers;
-	elf_protoT    *files;
-
-	//todo: rename
-	elf_protoT *functions;
-
+	elf_Proto       *files;
+	elf_Proto      *protos;
 	int              *track;
 	Source           *lines;
 	Bytecode         *bytes;

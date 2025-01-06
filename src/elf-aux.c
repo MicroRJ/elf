@@ -5,6 +5,34 @@
 */
 
 
+int elf_add_const_int(elf_State *S, elf_Int i) {
+	int index = ARRAY_GROW(S->M->integers,1);
+	S->M->integers[index] = i;
+	return index;
+}
+int elf_add_const_num(elf_State *S, elf_Num i) {
+	int index = ARRAY_GROW(S->M->integers,1);
+	S->M->numbers[index] = i;
+	return index;
+}
+int elf_add_proto(elf_State *S) {
+	int index = ARRAY_GROW(S->M->protos,1);
+	return index;
+}
+
+int elf_get_global(BC_Module *M, elf_String *name) {
+	if (name != 0) return elf_tget_ornew(M->globals,VSTR(name));
+	return ARRAY_GROW(M->globals->array,1);
+}
+
+
+int elf_set_global(BC_Module *M, elf_String *name, elf_Value value) {
+	int id = elf_get_global(M,name);
+	M->globals->array[id] = value;
+	return id;
+}
+
+
 
 static char const *get_byte_label(int op);
 static int get_byte_class(int op);
@@ -32,17 +60,9 @@ elf_Num elf_time_diff_ms(elf_Int begin) {
 	return elf_time_diff_s(begin) * 1000.;
 }
 
-
-int elf_add_function(BC_Module *M, elf_protoT fn) {
-	int i = ARRAY_GROW(M->functions,1);
-	M->functions[i] = fn;
-	return i;
-}
-
-
 int elf_get_instr_file(BC_Module *M, Instr byte) {
-	elf_protoT *files;
-	elf_protoT file;
+	elf_Proto *files;
+	elf_Proto file;
 
 	files=M->files;
 	FOR_ARRAY(i,files) {
@@ -83,8 +103,8 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 }
 
 
-elf_protoT elf_get_running_file(elf_State *S) {
-	elf_protoT fi = {0};
+elf_Proto elf_get_running_file(elf_State *S) {
+	elf_Proto fi = {0};
 	int id = elf_get_instr_file(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
@@ -150,7 +170,7 @@ void elf_dump_byte_trace(elf_State *S, elf_StackFrame *call, int level) {
 	BC_Module *M = S->M;
 	int fileid = elf_get_instr_file(M,call->origin);
 	if (fileid != -1) {
-		elf_protoT *file = &M->files[fileid];
+		elf_Proto *file = &M->files[fileid];
 		Source line = elf_get_instr_line(M,call->origin);
 		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(elf-function)" : "(c-function)");
 	}
@@ -168,7 +188,7 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 	char *line = elf_get_instr_line(M,byte);
 	int fileid = elf_get_instr_file(M,byte);
 	if (fileid != -1) {
-		elf_protoT *file = &M->files[fileid];
+		elf_Proto *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	} else {
 		printf("error: %s\n",error);
@@ -251,7 +271,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 
 static void fpf_byte(FILE *io, BC_Module *M, elf_Int fid, Instr id, Bytecode b) {
 	if (fid != -1) {
-		elf_protoT file = M->files[fid];
+		elf_Proto file = M->files[fid];
 		int linenum;
 		elf_get_line_source_info(file.contents->text,M->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name->text,linenum);
@@ -306,7 +326,7 @@ void lang_dumpmodule(BC_Module *md, elf_Handle io) {
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_get_my_pid());
 	FOR_ARRAY(i,md->files) {
-		elf_protoT ff = md->files[i];
+		elf_Proto ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
@@ -320,7 +340,7 @@ void lang_dumpmodule(BC_Module *md, elf_Handle io) {
 	}
 #if 0
 	FOR_ARRAY(md->p) {
-		elf_protoT p = md->p[i];
+		elf_Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
 			Bytecode b = md->bytes[p.bytes+j];
@@ -336,7 +356,7 @@ void lang_dumpmodule(BC_Module *md, elf_Handle io) {
 int get_byte_class(int k) {
 #define BCITEM(NAME,FMT,__) case XFUSE(BC_,NAME): return XFUSE(BC_CLASS_,FMT);
 	switch (k) {
-		BCLIST(BCITEM)
+		BCDEF(BCITEM)
 		default: NO_CODE;
 	}
 #undef BCITEM
@@ -347,7 +367,7 @@ int get_byte_class(int k) {
 char const *get_byte_label(int k) {
 #define BCITEM(NAME,_,SYM) case XFUSE(BC_,NAME): return SYM;
 	switch (k) {
-		BCLIST(BCITEM)
+		BCDEF(BCITEM)
 		default: NO_CODE;
 	}
 #undef BCITEM

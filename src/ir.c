@@ -112,7 +112,7 @@
 // 	return tree_x(parser,line,IR_PARAM,NT_ANY,x);
 // }
 
-// static treeID tree_yield(Parser *parser, Source line, treeID x) {
+// static treeID tree_ret(Parser *parser, Source line, treeID x) {
 // 	return tree_x(parser,line,IR_YIELD,NT_ANY,x);
 // }
 

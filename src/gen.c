@@ -5,24 +5,16 @@
 
 #include "emitter.c"
 
-static int emit_jump(Parser *parser, Source line, int dst);
 
-int elf_add_const_int(elf_State *S, elf_Int i) {
-	int index = ARRAY_GROW(S->M->integers,1);
-	S->M->integers[index] = i;
-	return index;
-}
-int elf_add_const_num(elf_State *S, elf_Num i) {
-	int index = ARRAY_GROW(S->M->integers,1);
-	S->M->numbers[index] = i;
-	return index;
-}
+
 
 static int memory_usage;
 static int memory_state;
 static int memory_state_stack[16];
 static int memory_state_index;
 static treeID memory_slots[128];
+
+static int emit_jump(Parser *parser, Source line, int dst);
 
 int to_mem(Parser *parser, treeID id, int dst, int ndst);
 int to_any_mem(Parser *parser, treeID id);
@@ -35,10 +27,11 @@ static void set_mem_state(Parser *parser, int state) { memory_state = state; }
 static void push_mem_state(Parser *parser) {
 	memory_state_stack[memory_state_index ++] = get_mem_state(parser);
 }
-static int pop_mem_state(Parser *parser) {
+static void pop_mem_state(Parser *parser) {
 	set_mem_state(parser,memory_state_stack[-- memory_state_index]);
 }
 
+/* get the memory associated with the tree */
 static int get_mem(Parser *parser, treeID id) {
 	int reg = -1;
 	if (id != NO_TREE) {
@@ -51,6 +44,7 @@ static int get_mem(Parser *parser, treeID id) {
 	return NO_SLOT;
 }
 
+/* assign a memory location to the given tree */
 static int set_mem(Parser *parser, treeID id) {
 	ASSERT(memory_state < _countof(memory_slots));
 
@@ -73,36 +67,70 @@ int to_any_mem(Parser *parser, treeID id) {
 	return reg;
 }
 
-static int compile_module(Parser *parser){
-}
-
 static void gen_tree(Parser *parser, treeID id);
 
-// #define NO_TREE ((treeID)0)
-// #define THIS_TREE ((treeID)1)
-
-static elf_protoT gen(Parser *parser, treeID tree){
-	elf_protoT p = {};
-	p.arity=1;
-	p.bytes=parser->R->M->nbytes;
-
+static elf_Proto gen_proto(Parser *parser, treeID tree){
+	ASSERT(memory_state_index==0);
+	ASSERT(memory_state==0);
+	ASSERT(memory_usage==0);
+	elf_Proto proto = {};
+	proto.arity=1;
+	proto.bytes=parser->R->M->nbytes;
+	push_mem_state(parser);
 	set_mem(parser,(treeID)1);
 	gen_tree(parser,tree);
+	pop_mem_state(parser);
+	proto.nlocals=memory_usage;
+	proto.nbytes=parser->R->M->nbytes-proto.bytes;
+	ASSERT(memory_state==0);
+	ASSERT(memory_state_index==0);
+	memory_usage=0;
+	return proto;
+}
+static elf_Proto gen_subproto(Parser *parser, treeID tree){
+	ASSERT(tree->kind==TREE_FUNCTION);
+	return gen_proto(parser,tree->expr_fun.body);
+}
 
-	p.nbytes=parser->R->M->nbytes-p.bytes;
-	return p;
+static elf_Proto gen_file(Parser *parser, treeID tree){
+	// ASSERT(tree->kind==TREE_FUNCTION);
+	elf_Proto proto,subproto;
+	treeID it;
+
+	int proto_index;
+	FOR_ARRAY(i,parser->functions){
+		it=parser->functions[i];
+		ASSERT(it->kind==TREE_FUNCTION);
+		proto_index=elf_add_proto(parser->R);
+		it->expr_fun.proto=proto_index;
+	}
+	//todo: proto 0 should be entry...
+	// proto_index=elf_add_proto(parser->R);
+	proto=gen_proto(parser,tree);
+
+	FOR_ARRAY(i,parser->functions){
+		it=parser->functions[i];
+		ASSERT(it->expr_fun.proto!=-1);
+		subproto=gen_subproto(parser,it);
+		parser->R->M->protos[it->expr_fun.proto]=subproto;
+	}
+	return proto;
 }
 
 static void gen_tree(Parser *parser, treeID id) {
 	treeT tree;
 
 	tree=get_tree(parser,id);
-	switch(tree.kind){
-		case STAT_ASSIGN_MEM:{
+	switch(tree.kind) {
+		case TREE_ASSIGN_MEM:{
 			int mem;
 			mem=to_mem(parser,tree.x,-1,1);
-		}break;
-		case STAT_WHILE:{
+			ASSERT(mem!=-1);
+		} break;
+		case TREE_RET: {
+			emit_bytex(parser,tree.line,BC_LEAVE,0);
+		} break;
+		case TREE_WHILE_LOOP: {
 			treeID pred,body;
 			int entry;
 			BooleanJumps js = {0};
@@ -122,16 +150,32 @@ static void gen_tree(Parser *parser, treeID id) {
 
 			pop_mem_state(parser);
 		} break;
-		case STAT_STORE: {
+		case TREE_STORE: {
+			treeT xx;
 			int dst,mem;
+			int rx,ry,rz,op;
+
+			xx=get_tree(parser,tree.x);
+
 			dst=get_mem(parser,tree.x);
 			if(dst!=NO_SLOT){
 				mem=to_mem(parser,tree.y,dst,1);
 				ASSERT(mem==dst);
-				// todo: actually, we could just do this here,
-				// we could do a map from the tree to the current
-				// definition, the definition could be another stack
-				// memory_slots[dst]=tree.y;
+				ASSERT(xx.kind!=EXPR_FIELD);
+				ASSERT(xx.kind!=EXPR_INDEX);
+				ASSERT(xx.kind!=EXPR_GLOBAL_REF);
+			}else if(xx.kind==EXPR_FIELD||xx.kind==EXPR_INDEX){
+				rz=to_any_mem(parser,tree.y);
+				rx=to_any_mem(parser,xx.x);
+				ry=to_any_mem(parser,xx.y);
+				op=xx.kind==EXPR_INDEX?BC_SETINDEX:BC_SETFIELD;
+				emit_bytexyz(parser,tree.line,op,rx,ry,rz);
+			}else if(xx.kind==EXPR_GLOBAL_REF){
+				rx=xx.expr_global;
+				rz=to_any_mem(parser,tree.y);
+				emit_bytexy(parser,tree.line,BC_SETGLOBAL,rx,rz);
+			}else{
+				parser_dialog(parser,tree.line,"invalid store, operand must be a global or field or index or memory");
 			}
 		} break;
 		case STAT_BLOCK: {
@@ -141,7 +185,7 @@ static void gen_tree(Parser *parser, treeID id) {
 			}
 			pop_mem_state(parser);
 		} break;
-		case STAT_IF:{
+		case STAT_IF: {
 			ASSERT(tree.stat_if.pred);
 			ASSERT(tree.stat_if.true_clause);
 			BranchJumps s={};
@@ -176,14 +220,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 		emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 		goto esc;
 	}
-
 	switch (tree.kind) {
-		case EXPR_LOCAL_REF: {
-			__debugbreak();
-			// if (ndst<1) goto esc;
-			// if (dst<0) dst=set_mem(parser,id);
-			// emit_bytexy(parser,line,BC_RELOAD,dst,0);
-		} break;
 		case EXPR_THIS_REF: {
 			if (ndst<1) goto esc;
 			if (dst<0) dst=set_mem(parser,id);
@@ -192,7 +229,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 		case EXPR_GLOBAL_REF: {
 			if (ndst<1) goto esc;
 			if (dst<0) dst=set_mem(parser,id);
-			emit_bytexy(parser,line,BC_GETGLOBAL,dst,tree.expr_ref.global_ref);
+			emit_bytexy(parser,line,BC_GETGLOBAL,dst,tree.expr_global);
 		} break;
 		case EXPR_NIL: {
 			if (ndst<1) goto esc;
@@ -228,6 +265,11 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 			yy=elf_set_global(S->M,0,VSTR(str));
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
 		} break;
+		case EXPR_TAB:{
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+			emit_bytexy(parser,line,BC_TABLE,dst,0);
+		} break;
 		case EXPR_EQ: case EXPR_NEQ:
 		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
 		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
@@ -250,8 +292,26 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 				pop_mem_state(parser);
 				if (ndst<1) goto esc;
 				if (dst<0) dst=set_mem(parser,id);
-				// elf_debug_log("%s %i, %i, %i",tree2s[tree.kind], dst,rx,ry);
 				emit_bytexyz(parser,tree.line,tree2o(tree.kind),dst,rx,ry);
+			}
+		} break;
+		case TREE_FUNCTION: {
+			ASSERT(id->expr_fun.proto!=-1);
+
+			if (ndst<1) goto esc;
+			mem=get_mem_state(parser);
+			// mem=get_mem_state(fs); {
+			// 	FOR_ARRAY(i,node.z) {
+			// 		emit_eval_deprecated(C,0,dst_alloc(fs),1,node.z[i]);
+			// 	}
+			// }
+			set_mem_state(parser,mem);
+			if (dst<0) dst=set_mem(parser,id);
+			int proto;
+			proto=tree.expr_fun.proto;
+			emit_bytexy(parser,line,BC_CLOSURE,mem,proto);
+			if (mem!=dst) {
+				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
 		} break;
 		case EXPR_CALL: {
@@ -296,6 +356,11 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 			parser_dialog(parser,line,"invalid tree (%s)",tree2s[tree.kind]);
 			NO_CODE;
 		}
+	}
+	ASSERT(dst!=NO_SLOT);
+	treeID prox;
+	for(prox=tree.prox;prox;prox=prox->prox){
+		gen_tree(parser,prox);
 	}
 	esc:
 	return dst;
@@ -479,192 +544,6 @@ void close_if(Parser *fs, Source line, BranchJumps *s) {
 
 
 #if 0
-typedef struct {
-	elf_State   *R;
-	Parser      *P;
-	IR_Function *F;
-
-	/* todo: */
-	elf_i8 postorder_map[128];
-	treeID *postorder;
-
-	// treeID *esc_js;
-
-	treeID memory_slots[128];
-	int memory_state_stack[128];
-	int memory_state_index;
-	int memory_state;
-	int memory_usage;
-
-} Compiler;
-
-
-static treeID compile_ir(Compiler *C, treeID id);
-
-static void compile_label(Compiler *C, IR_LabelId id) {
-	treeID ir;
-	IR_Label *lab;
-
-	lab=&C->F->labels[id];
-	if(lab->mark++){
-		return;
-	}
-	elf_debug_log("-- LABEL: %s %i",lab->name,id);
-
-	ir=lab->src;
-	do {
-		ir=compile_ir(C,ir);
-	} while(ir != 0xffff);
-}
-
-#include "emitter.c"
-
-static treeID compile_ir(Compiler *C, treeID id) {
-	treeT ir = C->P->ir[id];
-	IR_Function *F = C->F;
-	Source line = ir.line;
-	elf_debug_log("%04i: %s",id,node2s[ir.kind]);
-	// if (ir.x != NO_TREE)elf_debug_log("	x = %s",node2s[get_tree_kind(C->P,ir.x)]);
-	// if (ir.y != NO_TREE)elf_debug_log("	y = %s",node2s[get_tree_kind(C->P,ir.y)]);
-	// if (ir.z != 0) {
-	// 	FOR_ARRAY(i,ir.z) {
-	// 		elf_debug_log("	z[%i] = %s",(int)i,node2s[get_tree_kind(C->P,ir.z[i])]);
-	// 	}
-	// }
-
-	Source src = ir.line;
-	switch (ir.kind) {
-		case IR_PUSH_MEMORY_STATE: { push_mem_state(C); } break;
-		case  IR_POP_MEMORY_STATE: {  pop_mem_state(C); } break;
-		case IR_STORE: {
-			treeT xx;
-			xx=get_tree(C->P,ir.x);
-			if ((xx.kind==IR_INDEX)||(xx.kind==IR_FIELD)){
-				int rz,rx,ry,so;
-				rz=to_any_mem(C,ir.y);
-				rx=to_any_mem(C,xx.x);
-				ry=to_any_mem(C,xx.y);
-				so=ir.kind==IR_INDEX?BC_SETINDEX:BC_SETFIELD;
-				emit_bytexyz(C,line,so,rx,ry,rz);
-			}
-		} break;
-		case IR_PARAM: {
-			/* allocate memory for parameter */
-			int mem;
-			mem=set_mem(C,id);
-			ASSERT(mem != NO_SLOT);
-			C->memory_slots[mem]=id;
-		} break;
-		case IR_LOCAL: {
-			int mem;
-			mem=to_mem(C,0,-1,1,ir.x);
-			ASSERT(mem != NO_SLOT);
-			C->memory_slots[mem]=id;
-		} break;
-		case IR_IF: {
-			int mem,jmp,rx;
-
-			mem=get_mem_state(C);
-			rx=to_any_mem(C,ir.x);
-			set_mem_state(C,mem);
-
-			jmp=emit_bytexy(C,ir.line,BC_JZ,NO_JUMP,rx);
-			compile_label(C,ir.z[0]);
-			patch_jump(C->P,jmp);
-			if (ARRAY_LENGTH(ir.z) > 1) {
-				compile_label(C,ir.z[1]);
-			}
-		} break;
-		// so before we had yield and return, yield did
-		// process defer blocks, leave didn't, we don't
-		// need this anymore because now we can emit
-		// blocks whenever we want...
-		case IR_YIELD: {
-			// /* todo: multi-returns, use z instead */
-			// if (ir.x != NO_TREE) {
-			// 	int nrets = 1;
-			// 	int mem = get_mem_state(C);
-
-			// 	// xxx emit_eval_deprecated(fs,0,reg=reg_alloc_deprecated(fs),nreg=1,id);
-
-			// 	if (F->nrets < nrets) {
-			// 		F->nrets = nrets;
-			// 	}
-
-			// 	// so now I remember, that YIELD will actually do a
-			// 	// jump, which is crazy, who thought of this...
-
-			// 	int j = 0; // xxx emit_bytexyz_deprecated(fs,line,BC_YIELD,NO_JUMP,reg,nreg);
-			// 	ARRAY_ADD(C->esc_js,j);
-
-			// 	set_mem_state(C,mem);
-			// } else {
-			// 	// so a leave instruction is the same? but it won't
-			// 	// do the jump and it won't set setup the return
-			// 	// values? Whaat?
-			// 	// xxx emit_bytex_deprecated(fs,line,BC_LEAVE,0);
-			// }
-			// The parser already does this?
-			// But we should be the ones to check really.
-			// xxx add_block_flags(fs,BLOCK_ENDED);
-		} break;
-
-		default: {
-			to_mem(C,0,-1,0,id);
-		} break;
-	}
-	return ir.prox;
-}
-
-static int compile_module(Parser *parser) {
-
-	elf_State *S = parser->R;
-
-	Compiler compiler = {};
-	compiler.R = S;
-	compiler.P = parser;
-
-	//todo:
-	int proto = ARRAY_LENGTH(parser->R->M->functions);
-	FOR_ARRAY(i,parser->funcs) {
-		compiler.F = &parser->funcs[i];
-		for (int i = 0; i < _countof(compiler.memory_slots); i ++) {
-			compiler.memory_slots[i] = NO_TREE;
-		}
-
-		elf_protoT p = {0};
-
-		// todo: this is so whack
-		p.bytes = S->M->nbytes;
-
-		compile_label(&compiler,0);
-
-		// todo: this is so whack
-		p.nbytes = S->M->nbytes-p.bytes;
-		p.nlocals = compiler.memory_usage;
-		// xx p.name      = 0;
-		// xx p.contents  = 0;
-		elf_debug_log("PROTO:   %i",proto);
-		elf_debug_log("NBYTES:  %i",p.nbytes);
-		elf_debug_log("NLOCALS: %i",p.nlocals);
-
-		ARRAY_ADD(S->M->functions,p);
-
-		ASSERT(compiler.memory_state == 0);
-		// compiler.memory_state = 0;
-		compiler.memory_usage = 0;
-	}
-	return proto;
-}
-
-
-
-// todo: define this somewhere else
-
-/* todo: interning */
-/* todo: eventually merge state and module, I see no reason
-to have two separate things */
-
 int to_mem(Compiler *C, int flags, int reg, int nreg, treeID id) {
 	ASSERT(reg == NO_SLOT);
 	elf_State *S;
@@ -754,8 +633,6 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, treeID id) {
 			/* we can't skip here because of possible side effects
 			in the table's initializer, instead let the parser turn
 			this into sugar */
-
-
 			emit_bytexy(C,line,BC_TABLE,reg,0);
 
 			/* todo: turn this into sugar? we can't yet... */

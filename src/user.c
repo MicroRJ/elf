@@ -31,7 +31,7 @@ elf_Table *elf_new_table(elf_State *R) {
 	return tab;
 }
 
-elf_Closure *elf_new_closure(elf_State *R, elf_protoT fn) {
+elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 	elf_Closure *cls = elf_alloc_closure(R,fn);
 	elf_add_cls(R,cls);
 	return cls;
@@ -185,19 +185,6 @@ elf_Num elf_get_num(elf_State *R, elf_StackId x) {
 	if (v.tag==elf_TAG_NUM) return v.x_num;
 	check_tag(R,elf_TAG_NUM,v.tag,x);
 	return 0;
-}
-
-
-elf_SymbolId elf_get_global(BC_Module *M, elf_String *name) {
-	if (name != 0) return elf_tget_ornew(M->globals,VSTR(name));
-	return ARRAY_GROW(M->globals->array,1);
-}
-
-
-elf_SymbolId elf_set_global(BC_Module *M, elf_String *name, elf_Value value) {
-	elf_SymbolId id = elf_get_global(M,name);
-	M->globals->array[id] = value;
-	return id;
 }
 
 

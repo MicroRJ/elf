@@ -55,7 +55,7 @@ _(LOAD_DIRECT)\
 // static static treeID tree_closure(Parser *fs, Source, treeID x, treeID *z);
 // static treeID tree_store(Parser *fs, Source line, treeID x, treeID y);
 
-// static static treeID tree_yield(Parser *fs, Source, treeID i);
+// static static treeID tree_ret(Parser *fs, Source, treeID i);
 // static static treeID tree_param(Parser *fs, Source, treeID i);
 // static treeID tree_global_ref(Parser *fs, Source line, treeID i);
 

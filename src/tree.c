@@ -10,7 +10,7 @@ int get_tree_type(Parser *parser, treeID id) { return id->type; }
 Source get_tree_line(Parser *parser, treeID id) { return id->line; }
 
 static treeID new_tree(Parser *parser, int kind, Source line) {
-	elf_debug_log("NEW TREE: %s",tree2s[kind]);
+	// elf_debug_log("NEW TREE: %s",tree2s[kind]);
 	//todo:switch to linear allocator, this is slow!
 	treeID tree=calloc(sizeof(treeT),1);
 	tree->kind=kind;
@@ -67,15 +67,8 @@ static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
 // xx static treeID tree_type_guard(Parser *parser, Source line, treeID x, int y) {
 // xx 	return tree_xy(parser,line,EXPR_TYPEGUARD,y,x,y);
 // xx }
-//	xx	static treeID tree_param(Parser *parser, Source line, treeID x) {
-//	xx		return tree_x(parser,line,EXPR_PARAM,NT_ANY,x);
-//	xx	}
-//x: return value
-static treeID tree_yield(Parser *parser, Source line, treeID x) {
-	return tree_x(parser,line,STAT_YIELD,NT_ANY,x);
-}
-static treeID tree_composite(Parser *parser, Source line, treeID x, treeID *z) {
-	return tree_xyz(parser,line,EXPR_COMPOSITE,NT_ANY,NO_TREE,NO_TREE,z);
+static treeID tree_ret(Parser *parser, Source line, treeID x) {
+	return tree_x(parser,line,TREE_RET,NT_ANY,x);
 }
 static treeID tree_block(Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,STAT_BLOCK,NT_NON,NO_TREE,NO_TREE,z);
@@ -101,10 +94,10 @@ static treeID tree_multi(Parser *parser, Source line, treeID *z) {
 }
 
 static treeID tree_assign_mem(Parser *parser, Source line, treeID x) {
-	return tree_x(parser,line,STAT_ASSIGN_MEM,NT_NON,x);
+	return tree_x(parser,line,TREE_ASSIGN_MEM,NT_NON,x);
 }
 static treeID tree_store(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,STAT_STORE,NT_NON,x,y);
+	return tree_xy(parser,line,TREE_STORE,NT_NON,x,y);
 }
 static treeID tree_less_than(Parser *parser, Source line, treeID x, treeID y) {
 	return tree_xy(parser,line,EXPR_LT,NT_BOL,x,y);
@@ -119,19 +112,14 @@ static treeID tree_call_metafield(Parser *parser, Source line, treeID x, treeID 
 	return tree_call(parser,line,field,z);
 }
 
-//todo:
 static treeID tree_this_ref(Parser *parser, Source line) {
-	treeID v;
-	v=tree_nullary(parser,line,EXPR_THIS_REF,NT_ANY);
-	v->expr_ref.name="this";
-	return v;
+	return tree_nullary(parser,line,EXPR_THIS_REF,NT_ANY);
 }
 
 static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
 	treeID v;
 	v=tree_nullary(parser,line,EXPR_GLOBAL_REF,NT_ANY);
-	v->expr_ref.name=name;
-	v->expr_ref.global_ref=x;
+	v->expr_global=x;
 	return v;
 }
 
