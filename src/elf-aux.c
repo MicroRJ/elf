@@ -33,7 +33,7 @@ elf_Num elf_time_diff_ms(elf_Int begin) {
 }
 
 
-int elf_add_function(BC_Module *M, elf_Prototype fn) {
+int elf_add_function(BC_Module *M, elf_protoT fn) {
 	int i = ARRAY_GROW(M->functions,1);
 	M->functions[i] = fn;
 	return i;
@@ -41,8 +41,8 @@ int elf_add_function(BC_Module *M, elf_Prototype fn) {
 
 
 int elf_get_instr_file(BC_Module *M, Instr byte) {
-	elf_Prototype *files;
-	elf_Prototype file;
+	elf_protoT *files;
+	elf_protoT file;
 
 	files=M->files;
 	FOR_ARRAY(i,files) {
@@ -83,8 +83,8 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 }
 
 
-elf_Prototype elf_get_running_file(elf_State *S) {
-	elf_Prototype fi = {0};
+elf_protoT elf_get_running_file(elf_State *S) {
+	elf_protoT fi = {0};
 	int id = elf_get_instr_file(S->M,S->byte);
 	if (id != -1) fi = S->M->files[id];
 	return fi;
@@ -150,7 +150,7 @@ void elf_dump_byte_trace(elf_State *S, elf_StackFrame *call, int level) {
 	BC_Module *M = S->M;
 	int fileid = elf_get_instr_file(M,call->origin);
 	if (fileid != -1) {
-		elf_Prototype *file = &M->files[fileid];
+		elf_protoT *file = &M->files[fileid];
 		Source line = elf_get_instr_line(M,call->origin);
 		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(elf-function)" : "(c-function)");
 	}
@@ -168,7 +168,7 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 	char *line = elf_get_instr_line(M,byte);
 	int fileid = elf_get_instr_file(M,byte);
 	if (fileid != -1) {
-		elf_Prototype *file = &M->files[fileid];
+		elf_protoT *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	} else {
 		printf("error: %s\n",error);
@@ -251,7 +251,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 
 static void fpf_byte(FILE *io, BC_Module *M, elf_Int fid, Instr id, Bytecode b) {
 	if (fid != -1) {
-		elf_Prototype file = M->files[fid];
+		elf_protoT file = M->files[fid];
 		int linenum;
 		elf_get_line_source_info(file.contents->text,M->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name->text,linenum);
@@ -306,7 +306,7 @@ void lang_dumpmodule(BC_Module *md, elf_Handle io) {
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_get_my_pid());
 	FOR_ARRAY(i,md->files) {
-		elf_Prototype ff = md->files[i];
+		elf_protoT ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
@@ -320,7 +320,7 @@ void lang_dumpmodule(BC_Module *md, elf_Handle io) {
 	}
 #if 0
 	FOR_ARRAY(md->p) {
-		elf_Prototype p = md->p[i];
+		elf_protoT p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
 			Bytecode b = md->bytes[p.bytes+j];

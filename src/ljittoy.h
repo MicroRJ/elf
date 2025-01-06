@@ -49,7 +49,7 @@
 */
 
 
-#define NO_IR 0
+#define NO_TREE 0
 
 
 /* -- Yet another extremely simple graph for the IR,
@@ -137,7 +137,7 @@ ljnodeid alloc_node(ljState *lj, ljNodeOp op, ljDataTy ty, ljnodeid x, ljnodeid 
 
 
 ljnodeid emit_irlongint(ljState *lj, elf_Int li) {
-	ljnodeid id = alloc_node(lj,IR_DATA,DATA_INT64,NO_IR,NO_IR);
+	ljnodeid id = alloc_node(lj,IR_DATA,DATA_INT64,NO_TREE,NO_TREE);
 	lj->nodes[id].li = li;
 	return id;
 }

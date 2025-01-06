@@ -49,7 +49,7 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 
 	if (value.tag == elf_TAG_CLS) {
 		closure = value.x_cls;
-		elf_Prototype proto = closure->proto;
+		elf_protoT proto = closure->proto;
 		if (num_locals < proto.nlocals) {
 			num_locals = proto.nlocals;
 		}
@@ -109,19 +109,17 @@ elf_Closure *elf_load_code_closure(elf_State *R, Parser *fs, elf_String *filenam
 		return 0;
 	}
 
-	BC_Module *M = R->M;
-	fs->R=R;
-	fs->M=M;
-	begin_parser(fs,filename->text,contents->text);
-	while (parse_stat(fs));
-	end_parser(fs);
+	treeID tree;
+	elf_protoT proto;
+	tree=parse(fs,R,filename->text,contents->text);
+	proto=gen(fs,tree);
 
 	// todo: so whack!
-	int proto = compile_module(fs);
-	elf_Prototype fp = M->functions[proto];
-	return elf_new_closure(R,fp);
+	// int proto = compile_module(fs);
+	// elf_protoT fp = M->functions[proto];
+	return elf_new_closure(R,proto);
 
-	// xx elf_Prototype fp = {0};
+	// xx elf_protoT fp = {0};
 	// xx fp.name=filename;
 	// xx fp.contents=contents;
 	// xx fp.bytes=fs->function.bytes;
@@ -404,7 +402,7 @@ int elf_run(elf_State *R) {
 	elf_Table *globals;
 	elf_StackFrame *F;
 	elf_Value *locals;
-	elf_Prototype proto;
+	elf_protoT proto;
 	elf_Value *values;
 	elf_Int module_instr,instr,next_instr;
 	Bytecode byte;
@@ -432,7 +430,7 @@ int elf_run(elf_State *R) {
 		ASSERT(GET_TOP(R)>=locals+proto.nlocals);
 
 #if defined(_DEBUG)
-		// if (R->flags & FLAG_BYTELOGGING || F->logging) {
+		if (R->flags & FLAG_BYTELOGGING || F->logging)
 		{
 			fpf_byte(stdout,M,-1,instr,byte);
 		}
@@ -445,7 +443,7 @@ int elf_run(elf_State *R) {
 		if (R->bytetracking) {
 			elf_Int track = ++ M->track[module_instr];
 			if (track == 64) {
-				elf_Prototype file;
+				elf_protoT file;
 				char *line;
 				int linenum;
 				file=M->files[elf_get_instr_file(M,module_instr)];
@@ -532,7 +530,7 @@ int elf_run(elf_State *R) {
 			} break;
 			case BC_CLOSURE: {
 				ASSERT(WITHIN(BC_ARGY(byte),0,ARRAY_LENGTH(M->functions)));
-				elf_Prototype proto = M->functions[BC_ARGY(byte)];
+				elf_protoT proto = M->functions[BC_ARGY(byte)];
 				elf_Closure *new_cls = elf_alloc_closure(R,proto);
 				copy_memory(new_cls->values,locals+BC_ARGX(byte),proto.nvalues*sizeof(elf_Value));
 				locals[BC_ARGX(byte)].tag   = elf_TAG_CLS;

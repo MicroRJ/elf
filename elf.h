@@ -74,7 +74,7 @@ typedef struct elf_CBinding {
 	elf_Function fn;
 } elf_CBinding;
 
-typedef struct elf_Prototype {
+typedef struct elf_protoT {
 	int               arity;
 	int             nvalues;
 	int             nlocals;
@@ -84,7 +84,7 @@ typedef struct elf_Prototype {
 	int              parent;
 	elf_String        *name;
 	elf_String    *contents;
-} elf_Prototype;
+} elf_protoT;
 
 
 /* first object tag must be OBJ, all other
@@ -173,7 +173,7 @@ typedef struct elf_Table {
 elAPI void elf_init(elf_State *S, BC_Module *M);
 
 /* allocate and adds the object to stack (prevents it from getting GC'd) */
-elAPI elf_Closure *elf_new_closure(elf_State *, elf_Prototype fn);
+elAPI elf_Closure *elf_new_closure(elf_State *, elf_protoT fn);
 elAPI elf_String *elf_new_string2(elf_State *, elf_Int length);
 elAPI elf_String *elf_new_string(elf_State *, const char *text);
 elAPI elf_Node *elf_new_object(elf_State *, elf_Int size);
@@ -212,7 +212,7 @@ elAPI elf_ValueTag elf_get_tag(elf_State *S, int x);
 elAPI void elf_check_args(elf_State *S, char *func, int nargs, char *usage);
 
 /* allocating objects */
-elAPI elf_Closure *elf_alloc_closure(elf_State *S, elf_Prototype proto);
+elAPI elf_Closure *elf_alloc_closure(elf_State *S, elf_protoT proto);
 elAPI elf_String *elf_alloc_string2(elf_State *S, elf_Int length);
 elAPI elf_String *elf_alloc_string(elf_State *S, const char *text);
 elAPI elf_Table *elf_alloc_table2(elf_State *, elf_Int length);
@@ -299,7 +299,7 @@ elAPI void elf_fail_(elf_State *S, int instr, const char *error);
 
 /* Todo: BC module and none of these functions should be exposed
 as if they were API */
-elAPI elf_SymbolId elf_add_function(BC_Module *M, elf_Prototype fn);
+elAPI elf_SymbolId elf_add_function(BC_Module *M, elf_protoT fn);
 elAPI elf_SymbolId elf_get_global(BC_Module *M, elf_String *name);
 elAPI elf_SymbolId elf_set_global(BC_Module *M, elf_String *name, elf_Value v);
 elAPI int elf_get_instr_file(BC_Module *M, int instr);

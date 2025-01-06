@@ -1,52 +1,49 @@
 /*
 ** See Copyright Notice In elf.h
-** emit.c
-** ir -> bytecode
+** compile.c
 */
 
-//todo:remove check
-#ifndef _DEBUG
-# error
-#endif
+#include "emitter.c"
 
-typedef struct {
-	elf_State   *R;
-	Parser      *P;
-	IR_Function *F;
+static int emit_jump(Parser *parser, Source line, int dst);
 
-	/* todo: */
-	elf_i8 postorder_map[128];
-	IR_Id *postorder;
+int elf_add_const_int(elf_State *S, elf_Int i) {
+	int index = ARRAY_GROW(S->M->integers,1);
+	S->M->integers[index] = i;
+	return index;
+}
+int elf_add_const_num(elf_State *S, elf_Num i) {
+	int index = ARRAY_GROW(S->M->integers,1);
+	S->M->numbers[index] = i;
+	return index;
+}
 
-	// IR_Id *esc_js;
+static int memory_usage;
+static int memory_state;
+static int memory_state_stack[16];
+static int memory_state_index;
+static treeID memory_slots[128];
 
-	IR_Id memory_slots[128];
-	int memory_state_stack[128];
-	int memory_state_index;
-	int memory_state;
-	int memory_usage;
-
-} Compiler;
-
-int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id);
-int to_any_mem(Compiler *C, IR_Id id);
+int to_mem(Parser *parser, treeID id, int dst, int ndst);
+int to_any_mem(Parser *parser, treeID id);
+int tree2o(int kind);
 
 /* this is just a simple linear 'memory' allocator */
-static int get_mem_state(Compiler *C) { return C->memory_state; }
-static void set_mem_state(Compiler *C, int state) { C->memory_state = state; }
+static int get_mem_state(Parser *parser) { return memory_state; }
+static void set_mem_state(Parser *parser, int state) { memory_state = state; }
 
-static void push_mem_state(Compiler *C) {
-	C->memory_state_stack[C->memory_state_index ++] = get_mem_state(C);
+static void push_mem_state(Parser *parser) {
+	memory_state_stack[memory_state_index ++] = get_mem_state(parser);
 }
-static int pop_mem_state(Compiler *C) {
-	set_mem_state(C,C->memory_state_stack[-- C->memory_state_index]);
+static int pop_mem_state(Parser *parser) {
+	set_mem_state(parser,memory_state_stack[-- memory_state_index]);
 }
 
-static int get_mem(Compiler *C, IR_Id id) {
+static int get_mem(Parser *parser, treeID id) {
 	int reg = -1;
-	if (id != NO_IR) {
-		for (int i = 0; i < C->memory_state; i ++) {
-			if (C->memory_slots[i] == id) {
+	if (id != NO_TREE) {
+		for (int i = 0; i < memory_state; i ++) {
+			if (memory_slots[i] == id) {
 				return i;
 			}
 		}
@@ -54,22 +51,458 @@ static int get_mem(Compiler *C, IR_Id id) {
 	return NO_SLOT;
 }
 
-static int set_mem(Compiler *C, IR_Id id) {
-	ASSERT(get_ir_kind(C->P,id) != IR_NOP);
-	ASSERT(C->memory_state < _countof(C->memory_slots));
-	int reg = C->memory_state ++;
-	C->memory_slots[reg] = id;
-	elf_debug_log("REG: %i <- %i (%s)",reg,id,node2s[get_ir_kind(C->P,id)]);
-	if (C->memory_usage < C->memory_state) {
-		C->memory_usage = C->memory_state;
+static int set_mem(Parser *parser, treeID id) {
+	ASSERT(memory_state < _countof(memory_slots));
+
+	int reg = memory_state ++;
+	memory_slots[reg] = id;
+	if (memory_usage < memory_state) {
+		memory_usage = memory_state;
 	}
+
 	return reg;
 }
 
-static IR_Id compile_ir(Compiler *C, IR_Id id);
+int to_any_mem(Parser *parser, treeID id) {
+	int reg;
+	reg=get_mem(parser,id);
+	if (reg==NO_SLOT) {
+		reg=to_mem(parser,id,-1,1);
+	}
+	ASSERT(reg != NO_SLOT);
+	return reg;
+}
+
+static int compile_module(Parser *parser){
+}
+
+static void gen_tree(Parser *parser, treeID id);
+
+// #define NO_TREE ((treeID)0)
+// #define THIS_TREE ((treeID)1)
+
+static elf_protoT gen(Parser *parser, treeID tree){
+	elf_protoT p = {};
+	p.arity=1;
+	p.bytes=parser->R->M->nbytes;
+
+	set_mem(parser,(treeID)1);
+	gen_tree(parser,tree);
+
+	p.nbytes=parser->R->M->nbytes-p.bytes;
+	return p;
+}
+
+static void gen_tree(Parser *parser, treeID id) {
+	treeT tree;
+
+	tree=get_tree(parser,id);
+	switch(tree.kind){
+		case STAT_ASSIGN_MEM:{
+			int mem;
+			mem=to_mem(parser,tree.x,-1,1);
+		}break;
+		case STAT_WHILE:{
+			treeID pred,body;
+			int entry;
+			BooleanJumps js = {0};
+
+			pred=tree.stat_while.pred;
+			body=tree.stat_while.body;
+			push_mem_state(parser);
+
+			entry=parser->R->M->nbytes;
+			emit_jump_if_false(parser,&js,pred);
+			gen_tree(parser,body);
+			emit_jump(parser,NO_LINE,entry);
+
+			patch_jumps(parser,js.f);
+			ARRAY_DELETE(js.f);
+			js.f = 0;
+
+			pop_mem_state(parser);
+		} break;
+		case STAT_STORE: {
+			int dst,mem;
+			dst=get_mem(parser,tree.x);
+			if(dst!=NO_SLOT){
+				mem=to_mem(parser,tree.y,dst,1);
+				ASSERT(mem==dst);
+				// todo: actually, we could just do this here,
+				// we could do a map from the tree to the current
+				// definition, the definition could be another stack
+				// memory_slots[dst]=tree.y;
+			}
+		} break;
+		case STAT_BLOCK: {
+			push_mem_state(parser);
+			FOR_ARRAY(i,tree.z) {
+				gen_tree(parser,tree.z[i]);
+			}
+			pop_mem_state(parser);
+		} break;
+		case STAT_IF:{
+			ASSERT(tree.stat_if.pred);
+			ASSERT(tree.stat_if.true_clause);
+			BranchJumps s={};
+			begin_if(parser,tree.line,&s,tree.stat_if.pred,0);
+			gen_tree(parser,tree.stat_if.true_clause);
+			if(tree.stat_if.else_clause){
+				add_else_clause(parser,tree.line,&s);
+				gen_tree(parser,tree.stat_if.else_clause);
+			}
+			close_if(parser,tree.line,&s);
+		} break;
+		default: {
+			to_mem(parser,id,-1,0);
+		} break;
+	}
+}
+static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
+	elf_State *S;
+	treeT tree;
+	Source line;
+	int mem,rx,ry,rz;
+
+	S=parser->R;
+	tree=get_tree(parser,id);
+	line=tree.line;
+
+	mem=get_mem(parser,id);
+	if(mem!=NO_SLOT){
+		if (ndst<1) goto esc;
+		if (dst<0) dst=set_mem(parser,id);
+		ASSERT(dst!=mem);
+		emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+		goto esc;
+	}
+
+	switch (tree.kind) {
+		case EXPR_LOCAL_REF: {
+			__debugbreak();
+			// if (ndst<1) goto esc;
+			// if (dst<0) dst=set_mem(parser,id);
+			// emit_bytexy(parser,line,BC_RELOAD,dst,0);
+		} break;
+		case EXPR_THIS_REF: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+			emit_bytexy(parser,line,BC_RELOAD,dst,0);
+		} break;
+		case EXPR_GLOBAL_REF: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+			emit_bytexy(parser,line,BC_GETGLOBAL,dst,tree.expr_ref.global_ref);
+		} break;
+		case EXPR_NIL: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+
+			emit_bytexy(parser,line,BC_LOADNIL,dst,0);
+		} break;
+		case EXPR_INT: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+
+			int yy;
+			yy=elf_add_const_int(S,tree.expr_int);
+			emit_bytexy(parser,line,BC_GETKINT,dst,yy);
+		} break;
+		case EXPR_NUM: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+
+			int yy;
+			yy=elf_add_const_num(S,tree.expr_num);
+			emit_bytexy(parser,line,BC_GETKNUM,dst,yy);
+		} break;
+		case EXPR_STR: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser,id);
+
+			/* todo: interning */
+			elf_String *str;
+			int yy;
+
+			str=elf_alloc_string(S,tree.expr_str);
+			yy=elf_set_global(S->M,0,VSTR(str));
+			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
+		} break;
+		case EXPR_EQ: case EXPR_NEQ:
+		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
+		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
+		case EXPR_SUB: case EXPR_ADD: case EXPR_POW:
+		case EXPR_BIT_SHL: case EXPR_BIT_SHR:
+		case EXPR_BIT_XOR:
+		case EXPR_BIT_AND: case EXPR_BIT_OR: {
+			if ((tree.kind==EXPR_GT)||(tree.kind==EXPR_GTEQ)) {
+				push_mem_state(parser);
+				rx=to_any_mem(parser,tree.y);
+				ry=to_any_mem(parser,tree.x);
+				pop_mem_state(parser);
+				if (ndst<1) goto esc;
+				if (dst<0) dst=set_mem(parser,id);
+				emit_bytexyz(parser,tree.line,tree2o(tree.kind^1),dst,rx,ry);
+			} else {
+				push_mem_state(parser);
+				rx=to_any_mem(parser,tree.x);
+				ry=to_any_mem(parser,tree.y);
+				pop_mem_state(parser);
+				if (ndst<1) goto esc;
+				if (dst<0) dst=set_mem(parser,id);
+				// elf_debug_log("%s %i, %i, %i",tree2s[tree.kind], dst,rx,ry);
+				emit_bytexyz(parser,tree.line,tree2o(tree.kind),dst,rx,ry);
+			}
+		} break;
+		case EXPR_CALL: {
+			treeT xx;
+			int nargs;
+
+			mem=get_mem_state(parser);
+			ASSERT(dst<mem);
+
+			xx=*tree.x;
+			if ((xx.kind==EXPR_FIELD)||(xx.kind==EXPR_METAFIELD)) {
+				ry=to_mem(parser,xx.y,-1,1);
+				rx=to_mem(parser,xx.x,-1,1);
+				emit_bytexyz(parser,line,tree2o(xx.kind),ry,rx,ry);
+			} else {
+				ry=to_mem(parser,                    tree.x,-1,1);
+				rx=to_mem(parser,tree_this_ref(parser,line),-1,1);
+			}
+
+			ASSERT(ry==mem+0);
+			ASSERT(rx==mem+1);
+			FOR_ARRAY(i,tree.z) {
+				rz=to_mem(parser,tree.z[i],-1,1);
+				ASSERT(rz==mem+2+i);
+			}
+			set_mem_state(parser,mem);
+
+			nargs=ARRAY_LENGTH(tree.z)+1;
+			emit_bytexyz(parser,line,BC_CALL,mem,nargs,ndst);
+
+			if (ndst<1) goto esc;
+			if (ndst>1) parser_dialog(parser,line,"multi-returns are not supported yet!");
+
+			if (dst<0) dst=set_mem(parser,id);
+			//todo: call instruction that puts
+			//the result in a specific dstisters
+			if (dst!=mem) {
+				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+			}
+		} break;
+		default: {
+			parser_dialog(parser,line,"invalid tree (%s)",tree2s[tree.kind]);
+			NO_CODE;
+		}
+	}
+	esc:
+	return dst;
+}
+
+int tree2o(int kind) {
+	switch (kind) {
+		case EXPR_FIELD: 	   return BC_GETFIELD;     // *
+		case EXPR_INDEX: 	   return BC_GETINDEX;     // *
+		case EXPR_METAFIELD: return BC_GETMETAFIELD; // *
+		case EXPR_CALL:      return BC_CALL;         // *
+		case EXPR_ADD:       return BC_ADD;
+		case EXPR_SUB:       return BC_SUB;
+		case EXPR_DIV:       return BC_DIV;
+		case EXPR_MUL:       return BC_MUL;
+		case EXPR_POW:       return BC_POW;
+		case EXPR_MOD:       return BC_MOD;
+		case EXPR_NEQ:       return BC_NEQ;
+		case EXPR_EQ:        return BC_EQ;
+		case EXPR_LT:        return BC_LT;
+		case EXPR_LTEQ:      return BC_LTEQ;
+		case EXPR_BIT_OR:    return BC_BIT_OR;
+		case EXPR_BIT_AND:   return BC_BIT_AND;
+		case EXPR_BIT_SHL:   return BC_SHL;
+		case EXPR_BIT_SHR:   return BC_SHR;
+		case EXPR_BIT_XOR:   return BC_BIT_XOR;
+		default: NO_CODE;
+	}
+	return BC_HALT;
+}
+
+static int emit_jump(Parser *parser, Source line, int dst) {
+	return emit_bytex(parser,line,BC_J,dst-parser->R->M->nbytes);
+}
+
+static int emit_branch_if(Parser *parser, BooleanJumps *js, bool if_true, treeID id) {
+	treeT node = get_tree(parser,id);
+
+	int reg,jmp;
+	switch (node.kind) {
+		case EXPR_AND: {
+			emit_jump_if_false(parser,js,node.x);
+			jmp=emit_branch_if(parser,js,if_true,node.y);
+		} break;
+		case EXPR_OR: {
+			emit_jump_if_true(parser,js,node.x);
+			jmp=emit_branch_if(parser,js,if_true,node.y);
+		} break;
+		default: {
+			push_mem_state(parser);
+			reg=to_any_mem(parser,id);
+			pop_mem_state(parser);
+
+			if (if_true) {
+				jmp=emit_bytexy(parser,node.line,BC_JNZ,NO_JUMP,reg);
+				ARRAY_ADD(js->t,jmp);
+			} else {
+				jmp=emit_bytexy(parser,node.line,BC_JZ,NO_JUMP,reg);
+				ARRAY_ADD(js->f,jmp);
+			}
+		} break;
+	}
+
+	return jmp;
+}
+
+
+int emit_branch_if_false(Parser *fs, BooleanJumps *js, treeID id) {
+	return emit_branch_if(fs,js,0,id);
+}
+
+
+int emit_branch_if_true(Parser *fs, BooleanJumps *js, treeID id) {
+	return emit_branch_if(fs,js,1,id);
+}
+
+
+/* similar to branch if true, but additionally all
+false jumps converge here */
+int *emit_jump_if_true(Parser *fs, BooleanJumps *js, treeID id) {
+	emit_branch_if_true(fs,js,id);
+	patch_jumps(fs,js->f);
+	ARRAY_DELETE(js->f);
+	js->f = 0;
+	return js->t;
+}
+
+
+Instr *emit_jump_if_false(Parser *fs, BooleanJumps *js, treeID id) {
+	emit_branch_if_false(fs,js,id);
+	patch_jumps(fs,js->t);
+	ARRAY_DELETE(js->t);
+	js->t = 0;
+	return js->f;
+}
+
+
+int *emit_jump_if_not_nil(Parser *parser, Source line, BooleanJumps *js, treeID id) {
+	return emit_jump_if_false(parser,js,tree_xy(parser,line,EXPR_EQ,NT_BOL,id,tree_nil(parser,line)));
+}
+
+
+int *emit_jump_if_nil(Parser *parser, Source line, BooleanJumps *js, treeID id) {
+	return emit_jump_if_true(parser,js,tree_xy(parser,line,EXPR_EQ,NT_BOL,id,tree_nil(parser,line)));
+}
+
+static void begin_if(Parser *parser, Source line, BranchJumps *s, treeID x, int if_true) {
+	BooleanJumps js = {0};
+	emit_branch_if(parser,&js,if_true,x);
+	if (if_true) {
+		ASSERT(js.t != 0);
+		patch_jumps(parser,js.f);
+		ARRAY_DELETE(js.f);
+		js.f = 0;
+		s->jz = js.t;
+	} else {
+		ASSERT(js.f != 0);
+		patch_jumps(parser,js.t);
+		ARRAY_DELETE(js.t);
+		js.t = 0;
+		s->jz = js.f;
+	}
+}
+
+
+/* closes previous conditional block by emitting
+escape jump, patches previous jz (jump if false)
+list to enter this block. */
+void add_else_clause(Parser *fs, Source line, BranchJumps *s) {
+	if (s->jz == 0) {
+		parser_dialog(fs,line,"invalid else clause");
+	}
+	ASSERT(s->jz != 0);
+	int j = emit_jump(fs,line,-1);
+	ARRAY_ADD(s->j,j);
+
+	patch_jumps(fs,s->jz);
+	ARRAY_DELETE(s->jz);
+	s->jz = 0;
+}
+
+
+void add_elif_clause(Parser *parser, Source line, BranchJumps *s, treeID x) {
+	add_else_clause(parser,line,s);
+	begin_if(parser,line,s,x,0);
+}
+
+
+void add_then_clause(Parser *parser, Source line, BranchJumps *s) {
+	/* we don't need to close the previous block, it can just fall
+	through to our branch, do collect all the other exit jumps and
+	tie them to this branch block, naturally we don't need to add
+	an exit jump since else and elif or closeif will terminate
+	this block, multiple then blocks are simply chained together
+	naturally. (can't believe I used the word natuarally twice) */
+	patch_jumps(parser,s->j);
+	ARRAY_DELETE(s->j);
+	s->j = 0;
+}
+
+
+void close_if(Parser *fs, Source line, BranchJumps *s) {
+	/* collect missing else branch */
+	if (s->jz != 0) {
+		patch_jumps(fs,s->jz);
+		ARRAY_DELETE(s->jz);
+		s->jz = 0;
+	}
+	/* collect missing then branch */
+	if (s->j != 0) {
+		patch_jumps(fs,s->j);
+		ARRAY_DELETE(s->j);
+		s->j = 0;
+	}
+}
+
+
+
+
+
+
+
+#if 0
+typedef struct {
+	elf_State   *R;
+	Parser      *P;
+	IR_Function *F;
+
+	/* todo: */
+	elf_i8 postorder_map[128];
+	treeID *postorder;
+
+	// treeID *esc_js;
+
+	treeID memory_slots[128];
+	int memory_state_stack[128];
+	int memory_state_index;
+	int memory_state;
+	int memory_usage;
+
+} Compiler;
+
+
+static treeID compile_ir(Compiler *C, treeID id);
 
 static void compile_label(Compiler *C, IR_LabelId id) {
-	IR_Id ir;
+	treeID ir;
 	IR_Label *lab;
 
 	lab=&C->F->labels[id];
@@ -86,16 +519,16 @@ static void compile_label(Compiler *C, IR_LabelId id) {
 
 #include "emitter.c"
 
-static IR_Id compile_ir(Compiler *C, IR_Id id) {
-	IR_Node ir = C->P->ir[id];
+static treeID compile_ir(Compiler *C, treeID id) {
+	treeT ir = C->P->ir[id];
 	IR_Function *F = C->F;
 	Source line = ir.line;
 	elf_debug_log("%04i: %s",id,node2s[ir.kind]);
-	// if (ir.x != NO_IR)elf_debug_log("	x = %s",node2s[get_ir_kind(C->P,ir.x)]);
-	// if (ir.y != NO_IR)elf_debug_log("	y = %s",node2s[get_ir_kind(C->P,ir.y)]);
+	// if (ir.x != NO_TREE)elf_debug_log("	x = %s",node2s[get_tree_kind(C->P,ir.x)]);
+	// if (ir.y != NO_TREE)elf_debug_log("	y = %s",node2s[get_tree_kind(C->P,ir.y)]);
 	// if (ir.z != 0) {
 	// 	FOR_ARRAY(i,ir.z) {
-	// 		elf_debug_log("	z[%i] = %s",(int)i,node2s[get_ir_kind(C->P,ir.z[i])]);
+	// 		elf_debug_log("	z[%i] = %s",(int)i,node2s[get_tree_kind(C->P,ir.z[i])]);
 	// 	}
 	// }
 
@@ -104,8 +537,8 @@ static IR_Id compile_ir(Compiler *C, IR_Id id) {
 		case IR_PUSH_MEMORY_STATE: { push_mem_state(C); } break;
 		case  IR_POP_MEMORY_STATE: {  pop_mem_state(C); } break;
 		case IR_STORE: {
-			IR_Node xx;
-			xx=get_ir(C->P,ir.x);
+			treeT xx;
+			xx=get_tree(C->P,ir.x);
 			if ((xx.kind==IR_INDEX)||(xx.kind==IR_FIELD)){
 				int rz,rx,ry,so;
 				rz=to_any_mem(C,ir.y);
@@ -148,7 +581,7 @@ static IR_Id compile_ir(Compiler *C, IR_Id id) {
 		// blocks whenever we want...
 		case IR_YIELD: {
 			// /* todo: multi-returns, use z instead */
-			// if (ir.x != NO_IR) {
+			// if (ir.x != NO_TREE) {
 			// 	int nrets = 1;
 			// 	int mem = get_mem_state(C);
 
@@ -196,10 +629,10 @@ static int compile_module(Parser *parser) {
 	FOR_ARRAY(i,parser->funcs) {
 		compiler.F = &parser->funcs[i];
 		for (int i = 0; i < _countof(compiler.memory_slots); i ++) {
-			compiler.memory_slots[i] = NO_IR;
+			compiler.memory_slots[i] = NO_TREE;
 		}
 
-		elf_Prototype p = {0};
+		elf_protoT p = {0};
 
 		// todo: this is so whack
 		p.bytes = S->M->nbytes;
@@ -231,34 +664,15 @@ static int compile_module(Parser *parser) {
 /* todo: interning */
 /* todo: eventually merge state and module, I see no reason
 to have two separate things */
-int elf_add_const_int(elf_State *S, elf_Int i) {
-	int index = ARRAY_GROW(S->M->integers,1);
-	S->M->integers[index] = i;
-	return index;
-}
-int elf_add_const_num(elf_State *S, elf_Num i) {
-	int index = ARRAY_GROW(S->M->integers,1);
-	S->M->numbers[index] = i;
-	return index;
-}
 
-int to_any_mem(Compiler *C, IR_Id id) {
-	int reg = get_mem(C,id);
-	if (reg == NO_SLOT) {
-		reg = to_mem(C,0,-1,1,id);
-	}
-	ASSERT(reg != NO_SLOT);
-	return reg;
-}
-
-int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
+int to_mem(Compiler *C, int flags, int reg, int nreg, treeID id) {
 	ASSERT(reg == NO_SLOT);
 	elf_State *S;
-	IR_Node node;
+	treeT node;
 	Source line;
 
 	S=C->R;
-	node=get_ir(C->P,id);
+	node=get_tree(C->P,id);
 	line=node.line;
 
 	ASSERT(node.type != NT_NON);
@@ -304,7 +718,6 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 		case IR_GLOBAL: {
 			if (nreg<1) goto esc;
 			if (reg<0) reg=set_mem(C,id);
-
 			emit_bytexy(C,line,BC_GETGLOBAL,reg,node.x);
 		} break;
 		case IR_NIL: {
@@ -358,7 +771,7 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 				ry=to_any_mem(C,node.y);
 			} set_mem_state(C,mem);
 			if (reg<0) reg=set_mem(C,id);
-			emit_bytexyz(C,line,ir2b(node.kind),reg,rx,ry);
+			emit_bytexyz(C,line,tree2o(node.kind),reg,rx,ry);
 		} break;
 #if 0
 		case IR_CLOSURE: {
@@ -392,7 +805,7 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 
 			if (reg<0)reg=reg_alloc(fs);
 			emit_eval_deprecated(C,0,reg,1,node.x);
-			js=emit_jump_if_nil(C,NO_LINE,&e,node_local(C,NO_LINE,reg));
+			js=emit_jump_if_nil(C,NO_LINE,&e,tree_local(C,NO_LINE,reg));
 			emit_eval_deprecated(C,0,reg,1,node.y);
 			patch_jumps(C,js);
 			ARRAY_DELETE(js);
@@ -403,7 +816,7 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 
 			if (reg<0)reg=reg_alloc(fs);
 			emit_eval_deprecated(C,0,reg,1,node.x);
-			js=emit_jump_if_not_nil(C,NO_LINE,&e,node_local(C,get_ir_line(C,node.x),reg));
+			js=emit_jump_if_not_nil(C,NO_LINE,&e,tree_local(C,get_tree_line(C,node.x),reg));
 			emit_eval_deprecated(C,0,reg,1,node.y);
 			patch_jumps(C,js);
 			ARRAY_DELETE(js);
@@ -421,9 +834,9 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 			// register here, as suppossed to letting eval allocate
 			// one? Todo: check this...
 			if (reg<0)reg = reg_alloc(fs);
-			emit_eval_deprecated(C,0,reg,1,node_int(C,line,0));
+			emit_eval_deprecated(C,0,reg,1,tree_int(C,line,0));
 			Instr *js = emit_jump_if_false(C,&e,id);
-			emit_eval_deprecated(C,0,reg,1,node_int(C,line,1));
+			emit_eval_deprecated(C,0,reg,1,tree_int(C,line,1));
 			patch_jumps(C,js);
 			ARRAY_DELETE(js);
 		} break;
@@ -444,7 +857,7 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 				} set_mem_state(C,mem);
 				if (nreg<1) goto esc;
 				if (reg<0) reg=set_mem(C,id);
-				emit_bytexyz(C,node.line,ir2b(node.k^1),reg,rx,ry);
+				emit_bytexyz(C,node.line,tree2o(node.k^1),reg,rx,ry);
 			} else {
 				mem=get_mem_state(C); {
 					rx=to_any_mem(C,node.x);
@@ -453,22 +866,22 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, IR_Id id) {
 				if (nreg<1) goto esc;
 				if (reg<0) reg=set_mem(C,id);
 				elf_debug_log("%s %i, %i, %i",node2s[node.kind], reg,rx,ry);
-				emit_bytexyz(C,node.line,ir2b(node.kind),reg,rx,ry);
+				emit_bytexyz(C,node.line,tree2o(node.kind),reg,rx,ry);
 			}
 		} break;
 		case IR_CALL: {
-			IR_Node xx;
+			treeT xx;
 			int nargs;
 
 
 			mem=get_mem_state(C); {
 				ASSERT(reg<mem);
 				/* meta-call */
-				xx=get_ir(C->P,node.x);
+				xx=get_tree(C->P,node.x);
 				if ((xx.kind==IR_FIELD)||(xx.kind==IR_METAFIELD)) {
 					ry=to_mem(C,0,-1,1,xx.y);
 					rx=to_mem(C,0,-1,1,xx.x);
-					emit_bytexyz(C,line,ir2b(xx.kind),ry,rx,ry);
+					emit_bytexyz(C,line,tree2o(xx.kind),ry,rx,ry);
 				} else {
 					/* regular call with context 'this' */
 					ry=to_mem(C,0,-1,1,node.x);
@@ -513,10 +926,10 @@ static FileBlock *get_block(Parser *fs, BlockId id) {
 
 #if 0
 
-static void emit_store_deprecated(Parser *fs, Source line, IR_Id x, IR_Id y);
-static int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id);
-static int any_reg_deprecated(Parser *fs, IR_Id id);
-static int emit_preload_deprecated(Parser *fs, IR_Id id);
+static void emit_store_deprecated(Parser *fs, Source line, treeID x, treeID y);
+static int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, treeID id);
+static int any_reg_deprecated(Parser *fs, treeID id);
+static int emit_preload_deprecated(Parser *fs, treeID id);
 
 
 
@@ -663,8 +1076,8 @@ void close_delay_block(Parser *fs, Source line) {
 
 
 
-void desugar_range_expr_epilogue(Parser *fs, IR_Id x) {
-	IR_Node node = get_ir(fs,x);
+void desugar_range_expr_epilogue(Parser *fs, treeID x) {
+	treeT node = get_tree(fs,x);
 	switch (node.kind) {
 		case IR_INDEX: case IR_FIELD: {
 			desugar_range_expr_epilogue(fs,node.x);
@@ -679,21 +1092,21 @@ void desugar_range_expr_epilogue(Parser *fs, IR_Id x) {
 }
 
 
-IR_Id desugar_range_expr(Parser *fs, IR_Id x, int flags) {
+treeID desugar_range_expr(Parser *fs, treeID x, int flags) {
 #if 0
-	IR_Node node;
+	treeT node;
 	Source line;
-	IR_Id xx;
-	IR_Id array,index,value;
+	treeID xx;
+	treeID array,index,value;
 
-	node=get_target_node(fs,NODE(x));
+	node=get_target_node(fs,TREEID(x));
 	switch (node.kind) {
 		case IR_INDEX: case IR_FIELD: {
 			xx=desugar_range_expr(fs,node.x,flags&~EXPR_LHS);
-			return node_xy(fs,node.line,node.kind,NT_ANY,xx,node.y);
+			return tree_xy(fs,node.line,node.kind,NT_ANY,xx,node.y);
 		}
 		case IR_RANGE_INDEX: {
-			ASSERT(get_ir_kind(fs,node.y) == IR_RANGE);
+			ASSERT(get_tree_kind(fs,node.y) == IR_RANGE);
 
 			line=node.line;
 			array=desugar_range_expr(fs,node.x,flags&~EXPR_LHS);
@@ -706,15 +1119,15 @@ IR_Id desugar_range_expr(Parser *fs, IR_Id x, int flags) {
 			array_reg=any_reg_deprecated(fs,array);
 			index_reg=reg_alloc_deprecated(fs);
 
-			array = node_local(fs,line,array_reg);
-			index = node_local(fs,line,index_reg);
-			value = node_index(fs,line,array,index);
+			array = tree_local(fs,line,array_reg);
+			index = tree_local(fs,line,index_reg);
+			value = tree_index(fs,line,array,index);
 
-			IR_Id lo,hi;
-			lo=get_ir(fs,node.y).x;
-			hi=get_ir(fs,node.y).y;
-			if (lo==NO_IR) lo=node_int(fs,line,0);
-			if (hi==NO_IR) hi=node_call_metafield(fs,line,array,0,"length");
+			treeID lo,hi;
+			lo=get_tree(fs,node.y).x;
+			hi=get_tree(fs,node.y).y;
+			if (lo==NO_TREE) lo=tree_int(fs,line,0);
+			if (hi==NO_TREE) hi=tree_call_metafield(fs,line,array,0,"length");
 
 			begin_range_loop(fs,line,index,lo,hi);
 			value_reg=any_reg_deprecated(fs,value);
@@ -731,19 +1144,19 @@ IR_Id desugar_range_expr(Parser *fs, IR_Id x, int flags) {
 #endif
 	// Todo: come back to this later
 	__debugbreak();
-	return NO_IR;
+	return NO_TREE;
 }
 
 
-void emit_field_initer(Parser *fs, Source line, int reg, IR_Id id) {
-	IR_Node node;
+void emit_field_initer(Parser *fs, Source line, int reg, treeID id) {
+	treeT node;
 	int mem,xx,xy,yy;
 
-	node=get_ir(fs,id);
+	node=get_tree(fs,id);
 	mem=get_mem_state_deprecated(fs);
 	switch (node.kind) {
 		case IR_STORE: {
-			IR_Node x = get_ir(fs,node.x);
+			treeT x = get_tree(fs,node.x);
 			if ((x.kind == IR_LOCAL)) {
 				NO_CODE;
 			} else if ((x.kind == IR_FIELD) || (x.k == IR_INDEX)) {
@@ -764,9 +1177,9 @@ void emit_field_initer(Parser *fs, Source line, int reg, IR_Id id) {
 
 
 #if 0
-static int get_irreg_deprecated(Parser *fs, IR_Id2 id) {
-	if (id.id==NO_IR) return NO_SLOT;
-	IR_Node node;
+static int get_treereg_deprecated(Parser *fs, treeID2 id) {
+	if (id.id==NO_TREE) return NO_SLOT;
+	treeT node;
 	int reg=-1;
 	node=get_target_node(fs,id);
 	if (node.kind==IR_LOCAL) {
@@ -788,9 +1201,9 @@ load that node into any register */
 // ok, seems  there's a function specifically for
 // this, allocating a register for an instruction when
 // it doesn't already have one.
-int any_reg_deprecated(Parser *fs, IR_Id id) {
+int any_reg_deprecated(Parser *fs, treeID id) {
 	int reg;
-	reg=get_irreg_deprecated(fs,NODE(id));
+	reg=get_treereg_deprecated(fs,TREEID(id));
 	if (reg==NO_SLOT) {
 		reg=emit_eval_deprecated(fs,0,-1,1,id);
 		ASSERT(reg!=-1);
@@ -825,13 +1238,13 @@ static int find_local_const_store(Parser *fs, int reg) {
 }
 
 
-void opt_const_fold(Parser *fs, IR_Node node) {
+void opt_const_fold(Parser *fs, treeT node) {
 	#define isconst(k) (k==IR_STRING||k==IR_INTEGER||k==IR_NUMBER)
-	IR_Node xx,yy;
+	treeT xx,yy;
 	int xconst;
 	int yconst;
-	xx=get_ir(fs,node.x);
-	yy=get_ir(fs,node.y);
+	xx=get_tree(fs,node.x);
+	yy=get_tree(fs,node.y);
 	xconst = isconst(xx.kind) || ((xx.k==IR_LOCAL) && (find_local_const_store(fs,xx.x) != -1));
 	yconst = isconst(yy.kind) || ((yy.k==IR_LOCAL) && (find_local_const_store(fs,yy.x) != -1));
 
@@ -848,14 +1261,14 @@ void opt_const_fold(Parser *fs, IR_Node node) {
 /* the instruction is always loaded in the target register,
 even if it is already loaded, if no target register is given,
 a new one is allocated */
-int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
+int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, treeID id) {
 	BC_Module *M;
-	IR_Node node;
+	treeT node;
 	Source line;
 	int mem, rx,ry;
 
 	M=fs->M;
-	node=get_ir(fs,id);
+	node=get_tree(fs,id);
 	line=node.line;
 
 	switch (node.kind) {
@@ -873,7 +1286,7 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 			if (nreg<1) goto esc;
 			if (reg<0) reg=reg_alloc_deprecated(fs);
 			int src;
-			src=get_irreg_deprecated(fs,NODE(id));
+			src=get_treereg_deprecated(fs,TREEID(id));
 			if (src<0||src>=get_mem_state_deprecated(fs)) {
 				parser_dialog(fs,line,"invalid memory state!");
 			}
@@ -943,7 +1356,7 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 				ry=any_reg_deprecated(fs,node.y);
 			} set_mem_state_deprecated(fs,mem);
 			if (reg<0) reg=reg_alloc_deprecated(fs);
-			emit_bytexyz_deprecated(fs,line,ir2b(node.kind),reg,rx,ry);
+			emit_bytexyz_deprecated(fs,line,tree2o(node.kind),reg,rx,ry);
 		} break;
 		case IR_CLOSURE: {
 			if (nreg<1) goto esc;
@@ -974,21 +1387,21 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 		because it's wrapped in parenthesis, could this be
 		a feature? (I don't think so silly) */
 		case IR_CALL: {
-			IR_Node xx;
+			treeT xx;
 			int nargs;
 
-			xx=get_ir(fs,node.x);
+			xx=get_tree(fs,node.x);
 
 			mem=get_mem_state_deprecated(fs); {
 				ASSERT(reg<mem);
 				if ((xx.k==IR_FIELD)||(xx.k==IR_METAFIELD)) {
 					ry=emit_eval_deprecated(fs,0,-1,1,xx.y);
 					rx=emit_eval_deprecated(fs,0,-1,1,xx.x);
-					emit_bytexyz_deprecated(fs,line,ir2b(xx.kind),ry,rx,ry);
+					emit_bytexyz_deprecated(fs,line,tree2o(xx.kind),ry,rx,ry);
 					ASSERT(ry==mem);
 				} else {
 					ry=emit_eval_deprecated(fs,0,-1,1,node.x);
-					rx=emit_eval_deprecated(fs,0,-1,1,node_local(fs,line,0));
+					rx=emit_eval_deprecated(fs,0,-1,1,tree_local(fs,line,0));
 					ASSERT(ry==mem);
 				}
 				FOR_ARRAY(i,node.z) {
@@ -1012,7 +1425,7 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 
 			if (reg<0)reg=reg_alloc_deprecated(fs);
 			emit_eval_deprecated(fs,0,reg,1,node.x);
-			js=emit_jump_if_nil(fs,NO_LINE,&e,node_local(fs,NO_LINE,reg));
+			js=emit_jump_if_nil(fs,NO_LINE,&e,tree_local(fs,NO_LINE,reg));
 			emit_eval_deprecated(fs,0,reg,1,node.y);
 			patch_jumps(fs,js);
 			ARRAY_DELETE(js);
@@ -1023,7 +1436,7 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 
 			if (reg<0)reg=reg_alloc_deprecated(fs);
 			emit_eval_deprecated(fs,0,reg,1,node.x);
-			js=emit_jump_if_not_nil(fs,NO_LINE,&e,node_local(fs,get_ir_line(fs,node.x),reg));
+			js=emit_jump_if_not_nil(fs,NO_LINE,&e,tree_local(fs,get_tree_line(fs,node.x),reg));
 			emit_eval_deprecated(fs,0,reg,1,node.y);
 			patch_jumps(fs,js);
 			ARRAY_DELETE(js);
@@ -1041,9 +1454,9 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 			// register here, as suppossed to letting eval allocate
 			// one? Todo: check this...
 			if (reg<0)reg = reg_alloc_deprecated(fs);
-			emit_eval_deprecated(fs,0,reg,1,node_int(fs,line,0));
+			emit_eval_deprecated(fs,0,reg,1,tree_int(fs,line,0));
 			Instr *js = emit_jump_if_false(fs,&e,id);
-			emit_eval_deprecated(fs,0,reg,1,node_int(fs,line,1));
+			emit_eval_deprecated(fs,0,reg,1,tree_int(fs,line,1));
 			patch_jumps(fs,js);
 			ARRAY_DELETE(js);
 		} break;
@@ -1061,7 +1474,7 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 				} set_mem_state_deprecated(fs,mem);
 				if (nreg < 1) goto esc;
 				if (reg < 0) reg = reg_alloc_deprecated(fs);
-				emit_bytexyz_deprecated(fs,node.line,ir2b(node.k^1),reg,rx,ry);
+				emit_bytexyz_deprecated(fs,node.line,tree2o(node.k^1),reg,rx,ry);
 			} else {
 				mem=get_mem_state_deprecated(fs); {
 					rx=any_reg_deprecated(fs,node.x);
@@ -1069,7 +1482,7 @@ int emit_eval_deprecated(Parser *fs, int flags, int reg, int nreg, IR_Id id) {
 				} set_mem_state_deprecated(fs,mem);
 				if (nreg<1) goto esc;
 				if (reg<0) reg=reg_alloc_deprecated(fs);
-				emit_bytexyz_deprecated(fs,node.line,ir2b(node.kind),reg,rx,ry);
+				emit_bytexyz_deprecated(fs,node.line,tree2o(node.kind),reg,rx,ry);
 			}
 		} break;
 		default: {
@@ -1103,22 +1516,22 @@ tmp=a.b.c
 if tmp.d nil ? tmp.d=1
 
 */
-IR_Id emit_preload_deprecated(Parser *fs, IR_Id x) {
+treeID emit_preload_deprecated(Parser *fs, treeID x) {
 	ASSERT(x>=0);
 
-	IR_Node   node;
+	treeT   node;
 	int     reg;
 
-	node=get_target_node(fs,NODE(x));
+	node=get_target_node(fs,TREEID(x));
 
 	switch (node.kind) {
 		case IR_FIELD: {
 			reg=any_reg_deprecated(fs,node.x);
-			x=node_field(fs,node.line,node_local(fs,node.line,reg),node.y);
+			x=tree_field(fs,node.line,tree_local(fs,node.line,reg),node.y);
 		} break;
 		case IR_INDEX: {
 			reg=any_reg_deprecated(fs,node.x);
-			x=node_index(fs,node.line,node_local(fs,node.line,reg),node.y);
+			x=tree_index(fs,node.line,tree_local(fs,node.line,reg),node.y);
 		} break;
 		default:;
 	}
@@ -1127,21 +1540,21 @@ IR_Id emit_preload_deprecated(Parser *fs, IR_Id x) {
 }
 
 #if 0
-void emit_store_deprecated(Parser *fs, Source line, IR_Id x, IR_Id y) {
+void emit_store_deprecated(Parser *fs, Source line, treeID x, treeID y) {
 	__debugbreak();
 
-	IR_Node node;
-	node=get_target_node(fs,NODE(x));
+	treeT node;
+	node=get_target_node(fs,TREEID(x));
 	if (y<0) {
 		parser_dialog(fs,line,"invalid statement, expected a value for assignment");
 	}
-	if (!node_is_lvalue(node.kind)) {
+	if (!tree_is_lvalue(node.kind)) {
 		parser_dialog(fs,line,"invalid assignment to (%s)",node2s[node.kind]);
 		elf_fail(fs->R,0,"syntax error: invalid assignment");
 	}
 
 	if (node.kind==IR_LOCAL) {
-		EntityId id;
+		entityID id;
 		id=find_local_entity(fs,node.x);
 		/* todo: */
 		if(id!=-1){
@@ -1193,7 +1606,7 @@ void emit_store_deprecated(Parser *fs, Source line, IR_Id x, IR_Id y) {
 #endif
 
 // Note the mapping (*)
-ByteOP ir2b(IR_Kind kind) {
+ByteOP tree2o(treeKi kind) {
 	switch (kind) {
 		case IR_FIELD: 	 return BC_GETFIELD;     // *
 		case IR_INDEX: 	 return BC_GETINDEX;     // *
@@ -1222,3 +1635,4 @@ ByteOP ir2b(IR_Kind kind) {
 
 
 
+#endif

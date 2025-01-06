@@ -25,7 +25,7 @@ static void new_line(Parser *fs) {
 
 
 /* todo: speed */
-static elf_TokenType text_is_word_or_macro(char *name) {
+static tokenTy text_is_word_or_macro(char *name) {
 #define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_M_,NAME);
 	MCLIST(MCITEM)
 #undef MCITEM
@@ -33,7 +33,7 @@ static elf_TokenType text_is_word_or_macro(char *name) {
 }
 
 
-static elf_TokenType text_is_word_or_keyword(char *name) {
+static tokenTy text_is_word_or_keyword(char *name) {
 	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_,NAME);
 	KWLIST(KWITEM)
 	#undef KWITEM
@@ -47,7 +47,7 @@ typedef struct t_token_info {
 } t_token_info;
 
 
-GLOBAL t_token_info elf_token_intel[] = {
+GLOBAL t_token_info tok2inf[] = {
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},

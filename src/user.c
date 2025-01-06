@@ -31,7 +31,7 @@ elf_Table *elf_new_table(elf_State *R) {
 	return tab;
 }
 
-elf_Closure *elf_new_closure(elf_State *R, elf_Prototype fn) {
+elf_Closure *elf_new_closure(elf_State *R, elf_protoT fn) {
 	elf_Closure *cls = elf_alloc_closure(R,fn);
 	elf_add_cls(R,cls);
 	return cls;

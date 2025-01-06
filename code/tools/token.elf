@@ -189,7 +189,7 @@ fpf(file,"\t};\n")
 fpf(file,"} tokenT;\n\n\n")
 
 
-fpf(file,"typedef enum elf_TokenType {\n")
+fpf(file,"typedef enum tokenTy {\n")
 for i in 0..Tokens:length() ? {
 	let tk = Tokens:idx(i)
 
@@ -197,7 +197,7 @@ for i in 0..Tokens:length() ? {
 	for _ in x..24 ? fpf(file," ")
 	fpf(file," = ",tk.v,",\n")
 }
-fpf(file,"} elf_TokenType;\n\n\n")
+fpf(file,"} tokenTy;\n\n\n")
 
 fpf(file,"typedef struct elTokenIntel {\n")
 fpf(file,"\tchar *name;\n")

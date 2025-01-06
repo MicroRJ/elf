@@ -3,36 +3,11 @@
 ** ir.h
 */
 
-typedef struct Parser Parser;
-
-
-typedef int IR_Id;
-#define NO_IR (-1)
-
-// #define NO_IR 0
-// typedef IR_Node *IR_Id;
-
-typedef struct { IR_Id id; } IR_Id2;
-
-
 #define SPECIAL_REGISTER_THIS   (  0) // #this
 #define SPECIAL_REGISTER_INDEX  (256) // #index
 #define SPECIAL_REGISTER_VALUE  (257) // #value
 #define SPECIAL_REGISTER_ARRAY  (258) // #array
 
-
-#define NODE(id) (IR_Id2){id}
-
-
-typedef enum IR_DataTy {
-	NT_NON = 0,
-	NT_ANY, NT_SYS,
-	NT_NIL, NT_BOL, NT_INT, NT_NUM,
-	NT_OBJ, NT_TAB, NT_FUN, NT_STR
-} IR_DataTy;
-
-
-/* Note: preserve order - rj */
 #define IRDEF(_) \
 _(NOP)\
 _(AND)_(OR)_(NIL_AND)_(NIL_OR)\
@@ -63,75 +38,48 @@ _(LOAD)\
 _(LOAD_DIRECT)\
 /* end */
 
+// static treeT get_tree(Parser *fs, treeID id);
+// static treeKi get_tree_kind(Parser *fs, treeID id);
+// static treeTy get_tree_type(Parser *fs, treeID id);
+// static Source get_tree_line(Parser *fs, treeID id);
+// static treeID tree_xyz(Parser *fs, Source, treeKi k, treeTy ty, treeID x, treeID y, treeID *z);
+// static treeID tree_xy(Parser *fs, Source, treeKi k, treeTy ty, treeID x, treeID y);
+// static treeID tree_x(Parser *fs, Source, treeKi k, treeTy ty, treeID x);
+// static treeID tree_nil(Parser *fs, Source);
+// static treeID tree_int(Parser *fs, Source, elf_Int i);
+// static static treeID tree_num(Parser *fs, Source, elf_Num n);
+// static treeID tree_str(Parser *fs, Source, Source);
+// static treeID tree_nullary(Parser *fs, Source, treeKi k, treeTy t);
+// static treeID tree_group(Parser *fs, Source, treeID x);
+// static treeID tree_table(Parser *fs, Source, treeID *z);
+// static static treeID tree_closure(Parser *fs, Source, treeID x, treeID *z);
+// static treeID tree_store(Parser *fs, Source line, treeID x, treeID y);
+
+// static static treeID tree_yield(Parser *fs, Source, treeID i);
+// static static treeID tree_param(Parser *fs, Source, treeID i);
+// static treeID tree_global_ref(Parser *fs, Source line, treeID i);
+
+// /* Todo: deprecate */
+// static treeID tree_local(Parser *fs, Source line, treeID i);
+
+// static static treeID tree_this_ref(Parser *fs, Source line);
+// static treeID tree_closure_value(Parser *fs, Source line, treeID i);
+// static treeID tree_type_guard(Parser *fs, Source line, treeID x, treeTy y);
+// static treeID tree_metafield(Parser *fs, Source line, treeID x, treeID y);
+// static treeID tree_field(Parser *fs, Source line, treeID x, treeID y);
+// static treeID tree_index(Parser *fs, Source line, treeID x, treeID y);
+// static treeID tree_ranged_index(Parser *fs, Source line, treeID x, treeID y);
+// static treeID tree_call(Parser *fs, Source line, treeID x, treeID *z);
+// static treeID tree_less_than(Parser *fs, Source line, treeID x, treeID y);
+// static treeID tree_call_metafield(Parser *fs, Source line, treeID x, treeID *z, char *name);
+// static treeID tree_multi(Parser *fs, Source line, treeID *z);
+// static treeID tree_global_ref_by_name(Parser *fs, Source line, char *name);
+// static treeID tree_call_pf(Parser *fs, Source line, treeID *args);
+// static treeID tree_call_set_metatable(Parser *fs, Source line, treeID object, treeID metatable);
+
+// static static treeID tree_block(Parser *fs, Source line, treeID src, treeID end);
 
 
-typedef enum IR_Kind {
-	IR_NONE = 0,
-#define TREE(NAME) IR_##NAME,
-	IRDEF(TREE)
-#undef TREE
-} IR_Kind;
-
-typedef struct IR_Node IR_Node;
-struct IR_Node {
-	union { IR_Kind kind, ki, k; };
-	union { IR_DataTy type, ty; };
-
-	IR_Id prox;
-	union {
-		struct { IR_Id x,y,*z; };
-		union {
-			char     *s;
-			elf_Int   i;
-			elf_Num   n;
-		};
-	};
-
-	Source line;
-};
-
-static IR_Node get_ir(Parser *fs, IR_Id id);
-static IR_Kind get_ir_kind(Parser *fs, IR_Id id);
-static IR_DataTy get_ir_type(Parser *fs, IR_Id id);
-static Source get_ir_line(Parser *fs, IR_Id id);
-static IR_Id node_xyz(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x, IR_Id y, IR_Id *z);
-static IR_Id node_xy(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x, IR_Id y);
-static IR_Id node_x(Parser *fs, Source, IR_Kind k, IR_DataTy ty, IR_Id x);
-static IR_Id node_nil(Parser *fs, Source);
-static IR_Id node_int(Parser *fs, Source, elf_Int i);
-static IR_Id ir_number(Parser *fs, Source, elf_Num n);
-static IR_Id node_str(Parser *fs, Source, Source);
-static IR_Id node_nullary(Parser *fs, Source, IR_Kind k, IR_DataTy t);
-static IR_Id node_group(Parser *fs, Source, IR_Id x);
-static IR_Id node_new_table(Parser *fs, Source, IR_Id *z);
-static IR_Id ir_new_closure(Parser *fs, Source, IR_Id x, IR_Id *z);
-static IR_Id node_store(Parser *fs, Source line, IR_Id x, IR_Id y);
-
-static IR_Id ir_yield(Parser *fs, Source, IR_Id i);
-static IR_Id ir_param(Parser *fs, Source, IR_Id i);
-static IR_Id node_global(Parser *fs, Source line, IR_Id i);
-
-/* Todo: deprecate */
-static IR_Id node_local(Parser *fs, Source line, IR_Id i);
-
-static IR_Id ir_this(Parser *fs, Source line);
-static IR_Id node_closure_value(Parser *fs, Source line, IR_Id i);
-static IR_Id node_type_guard(Parser *fs, Source line, IR_Id x, IR_DataTy y);
-static IR_Id node_metafield(Parser *fs, Source line, IR_Id x, IR_Id y);
-static IR_Id node_field(Parser *fs, Source line, IR_Id x, IR_Id y);
-static IR_Id node_index(Parser *fs, Source line, IR_Id x, IR_Id y);
-static IR_Id node_ranged_index(Parser *fs, Source line, IR_Id x, IR_Id y);
-static IR_Id node_call(Parser *fs, Source line, IR_Id x, IR_Id *z);
-static IR_Id node_less_than(Parser *fs, Source line, IR_Id x, IR_Id y);
-static IR_Id node_call_metafield(Parser *fs, Source line, IR_Id x, IR_Id *z, char *name);
-static IR_Id node_multi(Parser *fs, Source line, IR_Id *z);
-static IR_Id node_global_name(Parser *fs, Source line, char *name);
-static IR_Id node_call_pf(Parser *fs, Source line, IR_Id *args);
-static IR_Id node_call_set_metatable(Parser *fs, Source line, IR_Id object, IR_Id metatable);
-
-static IR_Id ir_block(Parser *fs, Source line, IR_Id src, IR_Id end);
-
-
-static elf_ValueTag node2tag(IR_DataTy ty);
-static ByteOP ir2b(IR_Kind tt);
-static elf_Bool node_is_lvalue(IR_Kind kind);
+// static elf_ValueTag node2tag(treeTy ty);
+// static ByteOP ir2b(treeKi tt);
+// static elf_Bool tree_is_lvalue(treeKi kind);

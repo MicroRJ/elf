@@ -1,409 +1,221 @@
-
-char *tree2s[]={
-#define TREE(NAME) #NAME,
-	TREEDEF(TREE)
-#undef TREE
-};
-
-static int tok2tree(int tok);
-static int get_tok_prec(int tok);
-static treeID parse_stat2(Parser *parser);
+/*
+** See Copyright Notice In elf.h
+** tree.c
+*/
 
 
-static void tree2b(Parser *parser, treeID tree){
-	int mem;
-	switch(tree->kind){
-		case STAT_DECL:{
-			treeID value;
-			treeID name;
-
-			name=tree->stat_decl.name;
-			value=tree->stat_decl.value;
-
-			mem=tree2mem(C,0,-1,1,value);
-			ASSERT(mem!=NO_SLOT);
-		} break;
-	}
-}
-
-int tree2mem(Parser *P, treeID id, int nreg) {
-	ASSERT(reg == NO_SLOT);
-	elf_State *S;
-	Tree node;
-	Source line;
-	int reg;
-
-	node=*id;
-
-	switch (node.kind) {
-		case IR_NIL: {
-			if (nreg<1) goto esc;
-			if (reg<0) reg=set_mem(C,id);
-
-			emit_bytexy(C,line,BC_LOADNIL,reg,0);
-		} break;
-		case IR_INTEGER: {
-			if (nreg<1) goto esc;
-			if (reg<0) reg=set_mem(C,id);
-
-			int yy = elf_add_const_int(S,node.i);
-			emit_bytexy(C,line,BC_GETKINT,reg,yy);
-		} break;
-		case IR_NUMBER: {
-			if (nreg<1) goto esc;
-			if (reg<0) reg=set_mem(C,id);
-
-			/* todo: interning */
-			int yy = elf_add_const_num(S,node.n);
-			emit_bytexy(C,line,BC_GETKNUM,reg,yy);
-		} break;
-		case IR_STRING: {
-			if (nreg<1) goto esc;
-			if (reg<0) reg=set_mem(C,id);
-
-			/* todo: interning */
-			int xx = elf_set_global(S->M,0,VSTR(elf_alloc_string(C->R,node.s)));
-			emit_bytexy(C,line,BC_GETGLOBAL,reg,xx);
-		} break;
-		case EXPR_EQ: case EXPR_NEQ:
-		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
-		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
-		case EXPR_SUB: case EXPR_ADD: case EXPR_POW:
-		case EXPR_BIT_SHL: case EXPR_BIT_SHR:
-		case EXPR_BIT_XOR:
-		case EXPR_BIT_AND: case EXPR_BIT_OR: {
-			int x,y;
-			x=tree.expr_binary.x;
-			y=tree.expr_binary.y;
-			if ((node.kind==IR_GT)||(node.kind==IR_GTEQ)) {
-				mem=get_mem_state(C);
-				rx=to_any_mem(C,node.y);
-				ry=to_any_mem(C,node.x);
-				set_mem_state(C,mem);
-				if (nreg<1) goto esc;
-				if (reg<0) reg=set_mem(C,id);
-				emit_bytexyz(C,node.line,ir2b(node.k^1),reg,rx,ry);
-			} else {
-				mem=get_mem_state(C);
-				rx=to_any_mem(C,node.x);
-				ry=to_any_mem(C,node.y);
-				set_mem_state(C,mem);
-				if (nreg<1) goto esc;
-				if (reg<0) reg=set_mem(C,id);
-				elf_debug_log("%s %i, %i, %i",node2s[node.kind], reg,rx,ry);
-				emit_bytexyz(C,node.line,ir2b(node.kind),reg,rx,ry);
-			}
-		} break;
-		case IR_CALL: {
-			IR_Node xx;
-			int nargs;
-
-
-			mem=get_mem_state(C); {
-				ASSERT(reg<mem);
-				/* meta-call */
-				xx=get_ir(C->P,node.x);
-				if ((xx.kind==IR_FIELD)||(xx.kind==IR_METAFIELD)) {
-					ry=to_mem(C,0,-1,1,xx.y);
-					rx=to_mem(C,0,-1,1,xx.x);
-					emit_bytexyz(C,line,ir2b(xx.kind),ry,rx,ry);
-				} else {
-					/* regular call with context 'this' */
-					ry=to_mem(C,0,-1,1,node.x);
-					rx=to_mem(C,0,-1,1,ir_this(C->P,line));
-				}
-				ASSERT(ry==mem+0);
-				ASSERT(rx==mem+1);
-				FOR_ARRAY(i,node.z) {
-					rz=to_mem(C,0,-1,1,node.z[i]);
-					ASSERT(rz==mem+2+i);
-				}
-			} set_mem_state(C,mem);
-
-			nargs=ARRAY_LENGTH(node.z)+1;
-			emit_bytexyz(C,line,BC_CALL,mem,nargs,nreg);
-
-			if (nreg<1) goto esc;
-			if (nreg>1) parser_dialog(C->P,line,"multi-returns are not supported yet!");
-
-			if (reg<0) reg=set_mem(C,id);
-			//todo: call instruction that puts
-			//the result in a specific registers
-			if (reg!=mem) {
-				emit_bytexy(C,line,BC_RELOAD,reg,mem);
-			}
-		} break;
-		default: {
-			parser_dialog(C->P,line,"invalid node (%s)",node2s[node.kind]);
-			NO_CODE;
-		}
-	}
-	esc:
-	return reg;
-}
-
-
+treeT get_tree(Parser *parser, treeID id) { return *id; }
+int get_tree_kind(Parser *parser, treeID id) { return id->kind; }
+int get_tree_type(Parser *parser, treeID id) { return id->type; }
+Source get_tree_line(Parser *parser, treeID id) { return id->line; }
 
 static treeID new_tree(Parser *parser, int kind, Source line) {
 	elf_debug_log("NEW TREE: %s",tree2s[kind]);
-	treeID tree=calloc(sizeof(Tree),1);
+	//todo:switch to linear allocator, this is slow!
+	treeID tree=calloc(sizeof(treeT),1);
 	tree->kind=kind;
 	tree->line=line;
 	return tree;
 }
-
-static treeID parse_ident(Parser *parser){
+static treeID tree_xyz(Parser *parser, Source line, int kind, int type, treeID x, treeID y, treeID *z) {
 	treeID v;
-	tokenT tok;
+	v=new_tree(parser,kind,line);
+	v->line=line;
+	v->type=type;
+	v->kind=kind;
+	v->x=x;
+	v->y=y;
+	v->z=z;
+	return v;
+}
+static treeID tree_xy(Parser *parser, Source line, int k, int t, treeID x, treeID y) {
+	return tree_xyz(parser,line,k,t,x,y,0);
+}
+static treeID tree_x(Parser *parser, Source line, int k, int t, treeID x) {
+	return tree_xy(parser,line,k,t,x,NO_TREE);
+}
+static treeID tree_nullary(Parser *parser, Source line, int k, int t) {
+	return tree_x(parser,line,k,t,NO_TREE);
+}
+static treeID tree_nil(Parser *parser, Source line) {
+	return tree_nullary(parser,line,EXPR_NIL,NT_NIL);
+}
+static treeID tree_int(Parser *parser, Source line, elf_Int i) {
+	treeID v;
+	v=tree_nullary(parser,line,EXPR_INT,NT_INT);
+	v->expr_int=i;
+	return v;
+}
+static treeID tree_num(Parser *parser, Source line, elf_Num n) {
+	treeID v;
+	v=tree_nullary(parser,line,EXPR_NUM,NT_NUM);
+	v->expr_num=n;
+	return v;
+}
+static treeID tree_str(Parser *parser, Source line, char *s) {
+	treeID v;
+	v=tree_nullary(parser,line,EXPR_STR,NT_STR);
+	v->expr_str=s;
+	return v;
+}
+static treeID tree_table(Parser *parser, Source line, treeID *z) {
+	return tree_xyz(parser,line,EXPR_TAB,NT_TAB,NO_TREE,NO_TREE,z);
+}
+static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
+	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,NO_TREE,z);
+}
+// xx static treeID tree_type_guard(Parser *parser, Source line, treeID x, int y) {
+// xx 	return tree_xy(parser,line,EXPR_TYPEGUARD,y,x,y);
+// xx }
+//	xx	static treeID tree_param(Parser *parser, Source line, treeID x) {
+//	xx		return tree_x(parser,line,EXPR_PARAM,NT_ANY,x);
+//	xx	}
+//x: return value
+static treeID tree_yield(Parser *parser, Source line, treeID x) {
+	return tree_x(parser,line,STAT_YIELD,NT_ANY,x);
+}
+static treeID tree_composite(Parser *parser, Source line, treeID x, treeID *z) {
+	return tree_xyz(parser,line,EXPR_COMPOSITE,NT_ANY,NO_TREE,NO_TREE,z);
+}
+static treeID tree_block(Parser *parser, Source line, treeID *z) {
+	return tree_xyz(parser,line,STAT_BLOCK,NT_NON,NO_TREE,NO_TREE,z);
+}
 
-	tok=take_tok(parser,EXPR_IDENT);
-	v=new_tree(parser,EXPR_IDENT,tok.line);
-	v->expr_ident=tok.text;
+static treeID tree_field(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xy(parser,line,EXPR_FIELD,NT_ANY,x,y);
+}
+static treeID tree_index(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xy(parser,line,EXPR_INDEX,NT_ANY,x,y);
+}
+static treeID tree_ranged_index(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xy(parser,line,EXPR_RANGE_INDEX,NT_ANY,x,y);
+}
+static treeID tree_metafield(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xy(parser,line,EXPR_METAFIELD,NT_ANY,x,y);
+}
+static treeID tree_call(Parser *parser, Source line, treeID x, treeID *z) {
+	return tree_xyz(parser,line,EXPR_CALL,NT_ANY,x,NO_TREE,z);
+}
+static treeID tree_multi(Parser *parser, Source line, treeID *z) {
+	return tree_xyz(parser,line,EXPR_MULTI,NT_ANY,NO_TREE,NO_TREE,z);
+}
+
+static treeID tree_assign_mem(Parser *parser, Source line, treeID x) {
+	return tree_x(parser,line,STAT_ASSIGN_MEM,NT_NON,x);
+}
+static treeID tree_store(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xy(parser,line,STAT_STORE,NT_NON,x,y);
+}
+static treeID tree_less_than(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xy(parser,line,EXPR_LT,NT_BOL,x,y);
+}
+static treeID tree_eq_nil(Parser *parser, Source line, treeID x) {
+	return tree_xy(parser,line,EXPR_EQ,NT_BOL,x,tree_nil(parser,line));
+}
+
+
+static treeID tree_call_metafield(Parser *parser, Source line, treeID x, treeID *z, char *name) {
+	treeID field = tree_metafield(parser,line,x,tree_str(parser,line,name));
+	return tree_call(parser,line,field,z);
+}
+
+//todo:
+static treeID tree_this_ref(Parser *parser, Source line) {
+	treeID v;
+	v=tree_nullary(parser,line,EXPR_THIS_REF,NT_ANY);
+	v->expr_ref.name="this";
 	return v;
 }
 
-static treeID parse_fun2(Parser *parser){
-	tokenT tok;
-	int arity;
-	treeID *params,param,body,v,enclosing;
-
-	tok=take_tok(parser,TK_FUN);
-	params=0;
-
-	v=new_tree(parser,EXPR_FUN,tok.line);
-
-	enclosing=parser->enclosing;
-	parser->enclosing=v;
-
-	take_tok(parser,TK_PAREN_LEFT);
-	if (!test_tok(parser,TK_PAREN_RIGHT)) do {
-		param=parse_ident(parser);
-		ARRAY_ADD(params,param);
-	} while (pick_tok(parser,TK_COMMA));
-
-	if (!test_tok(parser,TK_PAREN_RIGHT)) {
-		parser_dialog(parser,0,"did you miss a ',' ?");
-	}
-	take_tok(parser,TK_PAREN_RIGHT);
-	pick_tok(parser,TK_QMARK);
-	body=parse_stat2(parser);
-
-	v->expr_fun.body=body;
-	v->expr_fun.params=params;
-	v->expr_fun.enclosing=enclosing;
-
-	parser->enclosing=enclosing;
-
+static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
+	treeID v;
+	v=tree_nullary(parser,line,EXPR_GLOBAL_REF,NT_ANY);
+	v->expr_ref.name=name;
+	v->expr_ref.global_ref=x;
 	return v;
 }
 
-static treeID parse_unary2(Parser *parser, bool flags) {
-	tokenT tok;
-	treeID v,x;
-
-	v=NO_TREE;
-	tok=parser->tok;
-
-	switch (tok.type) {
-		case TK_WORD: {
-			get_tok(parser);
-			v=new_tree(parser,EXPR_IDENT,tok.line);
-			v->expr_ident=tok.text;
-		} break;
-		case TK_CURLY_LEFT: {
-		} break;
-		case TK_PAREN_LEFT: {
-		} break;
-		case TK_FUN: {
-		} break;
-		case TK_NIL: {
-			get_tok(parser);
-			v=new_tree(parser,EXPR_NIL,tok.line);
-		} break;
-		case TK_TRUE:{
-			get_tok(parser);
-			v=new_tree(parser,EXPR_INT,tok.line);
-			v->expr_int=1;
-		} break;
-		case TK_FALSE: {
-			v=new_tree(parser,EXPR_INT,tok.line);
-			v->expr_int=0;
-		} break;
-		case TK_LETTER: case TK_INTEGER: {
-			get_tok(parser);
-			v=new_tree(parser,EXPR_INT,tok.line);
-			v->expr_int=tok.integer;
-		} break;
-		case TK_NUMBER: {
-			get_tok(parser);
-			v=new_tree(parser,EXPR_NUM,tok.line);
-			v->expr_num=tok.number;
-		} break;
-		case TK_STRING: {
-			get_tok(parser);
-			v=new_tree(parser,EXPR_STR,tok.line);
-			v->expr_str=tok.text;
-		} break;
-		default: {
-			parser_dialog(parser,tok.line,"'%s': unexpected token", elf_token_intel[tok.type].name);
-			elf_fail(parser->R,0,"syntax error: unexpected token");
-		} break;
-	}
-
-	if (~flags & EXPR_ALLOW_POSTFIX) {
-		goto esc;
-	}
-
-	esc:
-	return v;
+static treeID tree_global_ref_by_name(Parser *parser, Source line, char *name) {
+	int x = elf_get_global(parser->R->M,elf_alloc_string(parser->R,name));
+	ASSERT(x != -1);
+	return tree_global_ref(parser,line,name,x);
 }
 
-static treeID parse_subexpr2(Parser *parser, int rank, int flags) {
-	int oper,prio;
-	treeID x,y;
-	tokenT tok;
 
-	x=parse_unary2(parser,flags|EXPR_ALLOW_POSTFIX);
-	if (x==NO_TREE) goto esc;
-
-	retry:
-	oper=parser->tok.type;
-	prio=get_tok_prec(oper);
-	if (prio<=rank) goto esc;
-	if (parser->tok_prox.type==TK_ASSIGN) goto esc;
-	tok=get_tok(parser);
-	y=parse_subexpr2(parser,prio,flags);
-	if (y==NO_TREE) goto esc;
-
-	x=new_tree(parser,tok2tree(oper),tok.line);
-	x->expr_binary.x=x;
-	x->expr_binary.y=y;
-
-	goto retry;
-
-	esc:
-	return x;
+static treeID tree_call_pf(Parser *parser, Source line, treeID *args) {
+	treeID fn = tree_global_ref_by_name(parser,line,"elf.pf");
+	return tree_call(parser,line,fn,args);
 }
 
-static treeID parse_expr2(Parser *parser, int flags) {
-	switch (parser->tok.type) {
-		case TK_NONE:
-		case TK_LET:
-		case TK_FOR: case TK_WHILE: case TK_LASTLY:
-		case TK_COMMA:
-		case TK_PAREN_RIGHT: case TK_CURLY_RIGHT: case TK_SQUARE_RIGHT: {
-			return NO_TREE;
+
+static treeID tree_call_set_metatable(Parser *parser, Source line, treeID object, treeID metatable) {
+	treeID fn = tree_global_ref_by_name(parser,line,"elf.set_object_metatable");
+	treeID *z = 0;
+	ARRAY_ADD(z,object);
+	ARRAY_ADD(z,metatable);
+	return tree_call(parser,line,fn,z);
+}
+
+// todo: this doesn't require the id anymore, is just
+// the current function
+#if 0
+
+static elf_Bool is_binary_node(int kind) {
+	return kind >= EXPR_AND && kind <= EXPR_BIT_OR;
+}
+
+
+static void fpf_node(Parser *parser, FILE *io, treeID id) {
+	treeT node = get_tree(parser,id);
+	if (is_binary_node(node.kind)) {
+		fprintf(io, "(%s ", node2s[node.kind]);
+		fpf_node(parser,io,node.x);
+		fprintf(io, ", ");
+		fpf_node(parser,io,node.y);
+		fprintf(io, ")");
+	} else switch (node.kind) {
+		case EXPR_INDEX: {
+			fpf_node(parser,io,node.x);
+			fprintf(io, "[");
+			fpf_node(parser,io,node.y);
+			fprintf(io, "]");
+		} break;
+		case EXPR_INTEGER: fprintf(io,"int(%lli)",node.i); break;
+		case EXPR_NUMBER: fprintf(io,"num(%f)",node.n); break;
+		case EXPR_NIL: fprintf(io,"nil"); break;
+		// xx case EXPR_GROUP: {
+		// xx 	fprintf(io,"(");
+		// xx 	fpf_node(parser,io,node.x);
+		// xx 	fprintf(io,")");
+		// xx } break;
+		default: fprintf(io,"%s",node2s[node.kind]);
+	}
+}
+static ByteOP ir2b(int tt);
+
+static elf_Bool tree_is_lvalue(int kind) {
+	switch (kind) {
+		case EXPR_RANGE_INDEX:
+		case EXPR_GLOBAL:
+		case EXPR_LOCAL:
+		case EXPR_INDEX:
+		case EXPR_FIELD: {
+			return 1;
 		}
-	}
-	return parse_subexpr2(parser,0,flags);
-}
-
-static int tok2tree(int tok) {
-	switch (tok) {
-		case TK_DOT_DOT: return EXPR_RANGE;
-		case TK_LOG_AND: return EXPR_AND;
-		case TK_LOG_OR: return EXPR_OR;
-		case TK_NIL_OR: return EXPR_NIL_OR;
-		case TK_NIL_AND: return EXPR_NIL_AND;
-		case TK_ADD: return EXPR_ADD;
-		case TK_SUB: return EXPR_SUB;
-		case TK_DIV: return EXPR_DIV;
-		case TK_MUL: return EXPR_MUL;
-		case TK_POW: return EXPR_POW;
-		case TK_MOD: return EXPR_MOD;
-		case TK_NEQ: return EXPR_NEQ;
-		case TK_EQ: return EXPR_EQ;
-		case TK_GT: return EXPR_GT;
-		case TK_GTEQ: return EXPR_GTEQ;
-		case TK_LT: return EXPR_LT;
-		case TK_LTEQ: return EXPR_LTEQ;
-		case TK_SHL: return EXPR_BIT_SHL;
-		case TK_SHR: return EXPR_BIT_SHR;
-		case TK_BIT_XOR: return EXPR_BIT_XOR;
-		case TK_BIT_OR: return EXPR_BIT_OR;
-		case TK_BIT_AND: return EXPR_BIT_AND;
-		default: return EXPR_NONE;
-	}
-}
-
-static treeID parse_stat2(Parser *parser) {
-	treeID v;
-	tokenT tok;
-
-	v=NO_TREE;
-	tok=parser->tok;
-
-	switch (tok.type) {
-		case TK_NONE: case TK_CURLY_RIGHT:
-		case TK_THEN: case TK_ELSE: case TK_ELIF: {
+		default: {
 			return 0;
 		}
 	}
-
-	switch (tok.type) {
-		case TK_CURLY_LEFT: {
-			treeID *stats,stat;
-
-			stats=0;
-
-			get_tok(parser);
-			while (!term_token(parser,TK_CURLY_RIGHT)) {
-				stat=parse_stat2(parser);
-				ARRAY_ADD(stats,stat);
-			}
-			take_tok(parser,TK_CURLY_RIGHT);
-
-			v=new_tree(parser,STAT_BLOCK,tok.line);
-			v->stat_block=stats;
-		} break;
-		case TK_LET: {
-			get_tok(parser);
-			if (test_tok(parser,TK_LET)) {
-				parser_dialog(parser,parser->tok_prev.line,"invalid declaration, expected next declarator's name after ',' instead got 'let'");
-				parser_dialog(parser,parser->tok.line,"invalid declaration, 'let' after comma");
-				elf_fail(parser->R,0,"syntax error: invalid declaration");
-			}
-
-			treeID name,value;
-
-			name=parse_unary2(parser,0);
-			take_tok(parser,TK_ASSIGN);
-
-			value=parse_expr2(parser,0);
-
-			v=new_tree(parser,STAT_DECL,tok.line);
-			v->stat_decl.name=name;
-			v->stat_decl.value=value;
-		} break;
-		case TK_IF: case TK_IFF: {
-			ASSERT(tok.type==TK_IF);
-			get_tok(parser);
-
-			treeID pred;
-			treeID true_clause;
-			treeID else_clause;
-
-			pred=parse_expr2(parser,0);
-			take_tok(parser,TK_QMARK);
-			true_clause=parse_stat2(parser);
-			if (pick_tok(parser,TK_ELSE)) {
-				else_clause=parse_stat2(parser);
-			}else else_clause=NO_TREE;
-
-			v=new_tree(parser,STAT_IF,tok.line);
-			v->stat_if.true_clause=true_clause;
-			v->stat_if.else_clause=else_clause;
-		} break;
-		default: {
-			treeID x,y;
-			x=v=parse_expr2(parser,0);
-			if(pick_tok(parser,TK_ASSIGN)){
-				y=parse_expr2(parser,0);
-				v=new_tree(parser,STAT_ASSIGN,tok.line);
-				v->stat_assign.x=x;
-				v->stat_assign.y=y;
-			}
-		} break;
-	}
-	return v;
 }
+#endif
+
+
+// elf_ValueTag node2tag(int ty) {
+// 	switch (ty) {
+// 		case NT_SYS: return elf_TAG_SYS;
+// 		case NT_NUM: return elf_TAG_NUM;
+// 		case NT_INT: return elf_TAG_INT;
+// 		default: NO_CODE;
+// 	}
+// 	return elf_TAG_NIL;
+// }
