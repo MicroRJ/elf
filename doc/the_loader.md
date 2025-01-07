@@ -77,7 +77,7 @@ quite slow...
 
 In launch.elf you can then load the
 file you actually want using
-'elf.loadfile' or 'load'.
+'elf.load_file' or 'load'.
 
 Alternatively you can tell emcc
 (the compiler used for targeting the web)

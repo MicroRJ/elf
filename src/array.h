@@ -37,17 +37,17 @@
 // has been reserved for if already, must always be
 // greater than or equal to min, otherwise the array
 // is invalid...
-typedef struct ArrayH {
+typedef struct subarrayT {
 	elf_Int max;
 	elf_Int min;
    /* contents are past this point */
-} ArrayH;
+} subarrayT;
 
 
 
 /* Converts a regular pointer to an array
 pointer */
-#define ARRAY(D) ((ArrayH*)(D))[-1]
+#define ARRAY(D) ((subarrayT*)(D))[-1]
 
 
 #define ARRAY_MAX(D) (ARRAY(D).max)

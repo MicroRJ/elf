@@ -459,7 +459,18 @@ int elf_run(elf_State *R) {
 		switch (BC_OP(byte)) {
 			case BC_NOP: {
 			} break;
+			case BC_RET: {
+				int reg,nrets;
+				nrets = MIN(BC_ARGY(byte),F->nrets);
+				for (reg=0; reg<nrets; ++reg) {
+					locals[reg-1] = locals[reg+BC_ARGX(byte)];
+				}
+				F->nrets = nrets;
+				goto esc;
+			} break;
+			//deprecated
 			case BC_LEAVE: {
+				__debugbreak();
 				delay = F->delay_list;
 				if (delay != 0) {
 					next_instr    = delay->j;
@@ -467,7 +478,9 @@ int elf_run(elf_State *R) {
 					dealloc_memory(GLOBAL_ALLOCATOR,delay);
 				} else goto esc;
 			} break;
+			//deprecated
 			case BC_DELAY: {
+				__debugbreak();
 				ASSERT(BC_ARGX(byte) >= 0);
 
 				/* todo: make this better??? */
@@ -478,7 +491,9 @@ int elf_run(elf_State *R) {
 
 				next_instr = instr + BC_ARGX(byte);
 			} break;
+			//deprecated
 			case BC_YIELD: {
+				__debugbreak();
 				ASSERT(BC_ARGX(byte) >= 0);
 				int reg,nrets;
 				nrets = MIN(BC_ARGZ(byte),F->nrets);
@@ -527,7 +542,7 @@ int elf_run(elf_State *R) {
 				locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;
 				locals[BC_ARGX(byte)].x_num = M->numbers[BC_ARGY(byte)];
 			} break;
-			case BC_GETCLOSED: {
+			case BC_GETUPVAL: {
 				ASSERT(WITHIN(BC_ARGY(byte),0,proto.nvalues));
 				locals[BC_ARGX(byte)] = values[BC_ARGY(byte)];
 			} break;

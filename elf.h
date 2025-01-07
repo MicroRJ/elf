@@ -80,6 +80,8 @@ typedef struct elf_Proto {
 	int             nlocals;
 	int              nbytes;
 	int               bytes;
+	//todo: remove these, maybe instead
+	//have pointer to file
 	int            **protos;
 	int              parent;
 	elf_String        *name;

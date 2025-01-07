@@ -1,45 +1,65 @@
 /*
 ** See Copyright Notice In elf.h
-** file.h
-** Parsing And Code Generation...
+** parse.h
 */
 
 
-typedef struct tokenT {
+typedef struct {
 	unsigned char 	type;
 	Source         line;
 	unsigned int eol: 1;
 	union {
-		elf_Int integer;
-		elf_Num  number;
-		char 		 *text;
+		elf_i64 integer;
+		elf_f64 number;
+		char 	 *text;
 	};
 } tokenT;
 
 
-#define KWLIST(_) \
-_(ELF,"elf") _(DEFAULT,"default") _(LOAD,"load") _(NEW,"new") _(FUN,"fun") \
-_(NIL,"nil") _(TRUE,"true") _(FALSE,"false") \
-_(ENUM,"enum") \
-_(TRY,"try") _(CATCH,"catch") _(FINALLY,"finally") \
-_(DO,"do") _(WHILE,"while") _(BREAK,"break") _(CONTINUE,"continue") \
-_(LET,"let") _(FOR,"for") _(LASTLY,"lastly") _(LEAVE,"leave") \
-_(IF,"if") _(IFF,"iff") _(ELSE,"else") _(ELIF,"elif") _(THEN,"then") \
+//todo:remove "LEAVE"
+//todo:remove "iff"
+#define KEYWORDDEF(_) \
+_(ELF      ,"elf"         ) \
+_(DEFAULT  ,"default"     ) \
+_(LOAD     ,"load"        ) \
+_(NEW      ,"new"         ) \
+_(FUN      ,"fun"         ) \
+_(NIL      ,"nil"         ) \
+_(TRUE     ,"true"        ) \
+_(FALSE    ,"false"       ) \
+_(ENUM     ,"enum"        ) \
+_(TRY      ,"try"         ) \
+_(CATCH    ,"catch"       ) \
+_(FINALLY  ,"finally"     ) \
+_(DO       ,"do"          ) \
+_(WHILE    ,"while"       ) \
+_(BREAK    ,"break"       ) \
+_(CONTINUE ,"continue"    ) \
+_(LET      ,"let"         ) \
+_(FOR      ,"for"         ) \
+_(LASTLY   ,"lastly"      ) \
+_(RET      ,"ret"         ) \
+_(LEAVE    ,"leave"       ) \
+_(IF       ,"if"          ) \
+_(IFF      ,"iff"         ) \
+_(ELSE     ,"else"        ) \
+_(ELIF     ,"elif"        ) \
+_(THEN     ,"then"        ) \
 /* end */
 
 #define MACRODEF(_) \
-_(LINE_NUMBER,"line_number") \
-_(LINE_CHAR,"line_char") \
-_(FILE_NAME,"file_name") \
-_(INT,"int") \
-_(NUM,"num") \
-_(LEVEL,"level") \
-_(REGISTER,"register") \
-_(INDEX,"index") \
-_(VALUE,"value") \
-_(ARRAY,"array") \
-_(FIELD,"field") \
-_(ENDOFFILE,"eof") \
+_(LINE_NUMBER   , "line_number" ) \
+_(LINE_CHAR     , "line_char"   ) \
+_(FILE_NAME     , "file_name"   ) \
+_(INT           , "int"         ) \
+_(NUM           , "num"         ) \
+_(LEVEL         , "level"       ) \
+_(REGISTER      , "register"    ) \
+_(INDEX         , "index"       ) \
+_(VALUE         , "value"       ) \
+_(ARRAY         , "array"       ) \
+_(FIELD         , "field"       ) \
+_(ENDOFFILE     , "eof"         ) \
 /* end */
 
 
@@ -63,15 +83,27 @@ _(ELLIPSIS,"...", 1) _(DOT_DOT, "..", 1) \
 /* end */
 
 
-#define TKLIST(_) \
-_(INTEGER,"integer") _(NUMBER,"number") _(STRING,"string") _(LETTER,"letter") _(WORD,"word") \
-_(QMARK,"?") _(EXCLAMATION_MARK,"!") \
-_(ASSIGN,"=") _(NIL_ASSIGN,"?=") \
-_(COLON,":") _(SEMI_COLON,";") \
-_(COMMA,",") _(DOT,".") \
-_(SQUARE_LEFT,"[") _(SQUARE_RIGHT,"]") _(CURLY_LEFT,"{") _(CURLY_RIGHT,"}") \
-_(PAREN_LEFT,"(") _(PAREN_RIGHT,")") \
-
+#define TOKENDEF(_)                 \
+_(INTEGER            ,"integer")    \
+_(NUMBER             , "number")    \
+_(STRING             , "string")    \
+_(LETTER             , "letter")    \
+_(WORD               ,   "word")    \
+_(QMARK              ,"?")          \
+_(EXCLAMATION_MARK   ,"!")          \
+_(ASSIGN             ,"=")          \
+_(NIL_ASSIGN         ,"?=")         \
+_(COLON              ,":")          \
+_(SEMI_COLON         ,";")          \
+_(COMMA              ,",")          \
+_(DOT                ,".")          \
+_(SQUARE_LEFT        ,"[")          \
+_(SQUARE_RIGHT       ,"]")          \
+_(CURLY_LEFT         ,"{")          \
+_(CURLY_RIGHT        ,"}")          \
+_(PAREN_LEFT         ,"(")          \
+_(PAREN_RIGHT        ,")")          \
+/* end */
 
 typedef enum tokenTy {
 	TK_NONE = 0,
@@ -80,9 +112,9 @@ typedef enum tokenTy {
 #define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
 #define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
 
-	KWLIST(TKITEM)
+	KEYWORDDEF(TKITEM)
 	MACRODEF(MCITEM)
-	TKLIST(TKITEM)
+	TOKENDEF(TKITEM)
 	OPERATORDEF(OPITEM)
 
 #undef TKITEM
@@ -99,19 +131,19 @@ typedef int BlockId;
 #define BLOCK_DELAYED 	0x04
 
 
-typedef struct BooleanJumps {
-	Instr *t,*f;
-} BooleanJumps;
+typedef struct {
+	int *t,*f;
+} jumpS;
 
 
 typedef struct BranchJumps {
 	/* Conditional false jump instructions
 	to be patched so that they jump to
 	the next block or instruction */
-	Instr *jz;
+	int *jz;
 	/* list of exit jump instructions from
 	each consecutive block to be patched */
-	Instr *j;
+	int *j;
 } BranchJumps;
 
 #define NO_SLOT (-1)
@@ -161,7 +193,7 @@ struct Parser {
 	char            *line_pos;
 	char                 *pos;
 	int              line_num;
-	treeID          enclosing;
+	treeID          enc;
 	treeID         *functions;
 	entityT         *entities;
 	entityID     entity_index;
@@ -179,10 +211,10 @@ struct Parser {
 // static void begin_delay_block(Parser *fs, Source line);
 // static void close_delay_block(Parser *fs, Source line);
 
-static int emit_branch_if_false(Parser *fs, BooleanJumps *js, treeID id);
-static int emit_branch_if_true(Parser *fs, BooleanJumps *js, treeID id);
-static int *emit_jump_if_true(Parser *fs, BooleanJumps *js, treeID id);
-static int *emit_jump_if_false(Parser *fs, BooleanJumps *js, treeID id);
+static int emit_branch_if_false(Parser *fs, jumpS *js, treeID id);
+static int emit_branch_if_true(Parser *fs, jumpS *js, treeID id);
+static int *emit_jump_if_true(Parser *fs, jumpS *js, treeID id);
+static int *emit_jump_if_false(Parser *fs, jumpS *js, treeID id);
 
 
 static void begin_if(Parser *fs, Source line, BranchJumps *s, treeID x, int z);

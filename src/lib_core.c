@@ -768,7 +768,7 @@ void elf_include_core_lib(elf_State *R) {
 	elf_gsetx_cfn(R,"elf.include",core_lib_include);
 	elf_gsetx_cfn(R,"elf.loadcode",core_lib_load_code);
 	elf_gsetx_cfn(R,"elf.loadexpr",core_lib_load_expr);
-	elf_gsetx_cfn(R,"elf.loadfile",core_lib_load_file);
+	elf_gsetx_cfn(R,"elf.load_file",core_lib_load_file);
 	elf_gsetx_cfn(R,"elf.unload",core_lib_unload);
 
 	elf_gsetx_cfn(R,"elf.pf_indent",core_lib_pf_indent);

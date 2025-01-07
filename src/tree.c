@@ -28,11 +28,11 @@ static treeID tree_xyz(Parser *parser, Source line, int kind, int type, treeID x
 	v->z=z;
 	return v;
 }
-static treeID tree_xy(Parser *parser, Source line, int k, int t, treeID x, treeID y) {
+static treeID tree_binary(Parser *parser, Source line, int k, int t, treeID x, treeID y) {
 	return tree_xyz(parser,line,k,t,x,y,0);
 }
 static treeID tree_x(Parser *parser, Source line, int k, int t, treeID x) {
-	return tree_xy(parser,line,k,t,x,NO_TREE);
+	return tree_binary(parser,line,k,t,x,NO_TREE);
 }
 static treeID tree_nullary(Parser *parser, Source line, int k, int t) {
 	return tree_x(parser,line,k,t,NO_TREE);
@@ -58,33 +58,36 @@ static treeID tree_str(Parser *parser, Source line, char *s) {
 	v->expr_str=s;
 	return v;
 }
-static treeID tree_table(Parser *parser, Source line, treeID *z) {
-	return tree_xyz(parser,line,EXPR_TAB,NT_TAB,NO_TREE,NO_TREE,z);
+static treeID tree_table(Parser *parser, Source line) {
+	return tree_nullary(parser,line,TREE_NEW_TABLE,NT_TAB);
 }
 static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,NO_TREE,z);
 }
 // xx static treeID tree_type_guard(Parser *parser, Source line, treeID x, int y) {
-// xx 	return tree_xy(parser,line,EXPR_TYPEGUARD,y,x,y);
+// xx 	return tree_binary(parser,line,EXPR_TYPEGUARD,y,x,y);
 // xx }
 static treeID tree_ret(Parser *parser, Source line, treeID x) {
 	return tree_x(parser,line,TREE_RET,NT_ANY,x);
+}
+static treeID tree_dummy(Parser *parser, Source line) {
+	return tree_nullary(parser,line,TREE_DUMMY,NT_ANY);
 }
 static treeID tree_block(Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,STAT_BLOCK,NT_NON,NO_TREE,NO_TREE,z);
 }
 
 static treeID tree_field(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,EXPR_FIELD,NT_ANY,x,y);
+	return tree_binary(parser,line,EXPR_FIELD,NT_ANY,x,y);
 }
 static treeID tree_index(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,EXPR_INDEX,NT_ANY,x,y);
+	return tree_binary(parser,line,EXPR_INDEX,NT_ANY,x,y);
 }
 static treeID tree_ranged_index(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,EXPR_RANGE_INDEX,NT_ANY,x,y);
+	return tree_binary(parser,line,EXPR_RANGE_INDEX,NT_ANY,x,y);
 }
 static treeID tree_metafield(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,EXPR_METAFIELD,NT_ANY,x,y);
+	return tree_binary(parser,line,EXPR_METAFIELD,NT_ANY,x,y);
 }
 static treeID tree_call(Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,EXPR_CALL,NT_ANY,x,NO_TREE,z);
@@ -97,28 +100,23 @@ static treeID tree_assign_mem(Parser *parser, Source line, treeID x) {
 	return tree_x(parser,line,TREE_ASSIGN_MEM,NT_NON,x);
 }
 static treeID tree_store(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,TREE_STORE,NT_NON,x,y);
+	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
 }
 static treeID tree_less_than(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_xy(parser,line,EXPR_LT,NT_BOL,x,y);
+	return tree_binary(parser,line,EXPR_LT,NT_BOL,x,y);
 }
 static treeID tree_eq_nil(Parser *parser, Source line, treeID x) {
-	return tree_xy(parser,line,EXPR_EQ,NT_BOL,x,tree_nil(parser,line));
+	return tree_binary(parser,line,EXPR_EQ,NT_BOL,x,tree_nil(parser,line));
 }
-
 
 static treeID tree_call_metafield(Parser *parser, Source line, treeID x, treeID *z, char *name) {
 	treeID field = tree_metafield(parser,line,x,tree_str(parser,line,name));
 	return tree_call(parser,line,field,z);
 }
 
-static treeID tree_this_ref(Parser *parser, Source line) {
-	return tree_nullary(parser,line,EXPR_THIS_REF,NT_ANY);
-}
-
 static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
 	treeID v;
-	v=tree_nullary(parser,line,EXPR_GLOBAL_REF,NT_ANY);
+	v=tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
 	v->expr_global=x;
 	return v;
 }
@@ -143,6 +141,19 @@ static treeID tree_call_set_metatable(Parser *parser, Source line, treeID object
 	ARRAY_ADD(z,metatable);
 	return tree_call(parser,line,fn,z);
 }
+
+static treeID tree_if(Parser *parser, Source line, treeID pred, treeID true_clause, treeID else_clause) {
+	treeID v;
+	v=new_tree(parser,TREE_IF,line);
+	v->stat_if.pred=pred;
+	v->stat_if.true_clause=true_clause;
+	v->stat_if.else_clause=else_clause;
+	return v;
+}
+
+
+
+
 
 // todo: this doesn't require the id anymore, is just
 // the current function

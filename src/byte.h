@@ -56,10 +56,11 @@ _(JE, XY, "je") \
 _(JNE, XY, "jne") \
 _(LOOP, XXX, "loop") \
 _(DELAY, XXX, "delay") \
+_(RET, XXX, "ret") \
 _(LEAVE, XXX, "leave") \
 _(YIELD, XYZ, "yield") \
 _(TYPEGUARD, XY, "typeguard") \
-_(GETCLOSED, XY, "getclosed") \
+_(GETUPVAL, XY, "getclosed") \
 _(GETGLOBAL, XY, "getglobal")\
 _(SETGLOBAL, XY, "setglobal")\
 _(GETKNUM, XY, "getnum") \

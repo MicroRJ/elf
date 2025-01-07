@@ -5,9 +5,9 @@
 */
 
 
-elf_Int array_allocate(void **var, elf_Int per, elf_Int res, elf_Int com) {
-	ArrayH *arr = 0;
-	elf_Int max = 0, min = 0;
+elf_i64 array_allocate(void **var, elf_i64 per, elf_i64 res, elf_i64 com) {
+	subarrayT *arr = 0;
+	elf_i64 max = 0, min = 0;
 	if (*var != 0) {
 		arr = &ARRAY(*var);
 		max = arr->max;
@@ -23,7 +23,7 @@ elf_Int array_allocate(void **var, elf_Int per, elf_Int res, elf_Int com) {
 		if(min + res > max) {
 			max = min + res;
 		}
-		arr = realloc_memory(GLOBAL_ALLOCATOR,sizeof(ArrayH)+per*max,arr);
+		arr = realloc_memory(GLOBAL_ALLOCATOR,sizeof(subarrayT)+per*max,arr);
 	}
 	if (arr != 0) {
 		arr->max = max;

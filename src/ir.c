@@ -44,13 +44,13 @@
 // 	return id;
 // }
 
-// treeID tree_xy(Parser *fs, Source line, treeKi k, treeTy t, treeID x, treeID y) {
+// treeID tree_binary(Parser *fs, Source line, treeKi k, treeTy t, treeID x, treeID y) {
 // 	return tree_xyz(fs,line,k,t,x,y,0);
 // }
 
 
 // treeID tree_x(Parser *fs, Source line, treeKi k, treeTy t, treeID x) {
-// 	return tree_xy(fs,line,k,t,x,NO_TREE);
+// 	return tree_binary(fs,line,k,t,x,NO_TREE);
 // }
 
 
@@ -59,7 +59,7 @@
 // }
 
 // treeID tree_type_guard(Parser *fs, Source line, treeID x, treeTy y) {
-// 	return tree_xy(fs,line,IR_TYPEGUARD,y,x,y);
+// 	return tree_binary(fs,line,IR_TYPEGUARD,y,x,y);
 // }
 
 
@@ -129,7 +129,7 @@
 // }
 
 // treeID tree_store(Parser *fs, Source line, treeID x, treeID y) {
-// 	return tree_xy(fs,line,IR_STORE,NT_NON,x,y);
+// 	return tree_binary(fs,line,IR_STORE,NT_NON,x,y);
 // }
 
 // treeID tree_load(Parser *parser, Source line, treeID x) {
@@ -153,22 +153,22 @@
 
 
 // treeID tree_field(Parser *fs, Source line, treeID x, treeID y) {
-// 	return tree_xy(fs,line,IR_FIELD,NT_ANY,x,y);
+// 	return tree_binary(fs,line,IR_FIELD,NT_ANY,x,y);
 // }
 
 
 // treeID tree_index(Parser *fs, Source line, treeID x, treeID y) {
-// 	return tree_xy(fs,line,IR_INDEX,NT_ANY,x,y);
+// 	return tree_binary(fs,line,IR_INDEX,NT_ANY,x,y);
 // }
 
 
 // treeID tree_ranged_index(Parser *fs, Source line, treeID x, treeID y) {
-// 	return tree_xy(fs,line,IR_RANGE_INDEX,NT_ANY,x,y);
+// 	return tree_binary(fs,line,IR_RANGE_INDEX,NT_ANY,x,y);
 // }
 
 
 // treeID tree_metafield(Parser *fs, Source line, treeID x, treeID y) {
-// 	return tree_xy(fs,line,IR_METAFIELD,NT_ANY,x,y);
+// 	return tree_binary(fs,line,IR_METAFIELD,NT_ANY,x,y);
 // }
 
 
@@ -183,12 +183,12 @@
 
 
 // treeID tree_less_than(Parser *fs, Source line, treeID x, treeID y) {
-// 	return tree_xy(fs,line,IR_LT,NT_BOL,x,y);
+// 	return tree_binary(fs,line,IR_LT,NT_BOL,x,y);
 // }
 
 
 // treeID tree_eq_nil(Parser *fs, Source line, treeID x) {
-// 	return tree_xy(fs,line,IR_EQ,NT_BOL,x,tree_nil(fs,line));
+// 	return tree_binary(fs,line,IR_EQ,NT_BOL,x,tree_nil(fs,line));
 // }
 
 

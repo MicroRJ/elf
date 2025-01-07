@@ -35,7 +35,7 @@ static tokenTy text_is_word_or_macro(char *name) {
 /* todo: speed! */
 static tokenTy text_is_word_or_keyword(char *name) {
 	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_,NAME);
-	KWLIST(KWITEM)
+	KEYWORDDEF(KWITEM)
 	#undef KWITEM
 	return TK_WORD;
 }
@@ -51,9 +51,9 @@ GLOBAL t_token_info tok2inf[] = {
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},
-	KWLIST(TKITEM)
+	KEYWORDDEF(TKITEM)
 	MACRODEF(TKITEM)
-	TKLIST(TKITEM)
+	TOKENDEF(TKITEM)
 	OPERATORDEF(OPITEM)
 };
 
