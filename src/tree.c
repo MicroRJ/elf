@@ -117,6 +117,13 @@ static treeID tree_call_metafield(Parser *parser, Source line, treeID x, treeID 
 	return tree_call(parser,line,field,z);
 }
 
+static treeID tree_upvalue_ref(Parser *parser, Source line, int x) {
+	treeID v;
+	v=tree_nullary(parser,line,TREE_UPVALUE,NT_ANY);
+	v->expr_upvalue=x;
+	return v;
+}
+
 static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
 	treeID v;
 	v=tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);

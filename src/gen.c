@@ -76,15 +76,20 @@ int to_any_mem(Parser *parser, treeID id) {
 static void gen_tree(Parser *parser, treeID id);
 
 static elf_Proto gen_proto(Parser *parser, treeID tree){
+	ASSERT(get_tree_kind(parser,tree)==TREE_FUNCTION);
 	ASSERT(memory_state_index==0);
 	ASSERT(memory_state==0);
 	ASSERT(memory_usage==0);
+	int start=parser->R->M->nbytes;
+	gen_tree(parser,tree->expr_fun.body);
+
 	elf_Proto proto = {};
 	proto.arity=1;
-	proto.bytes=parser->R->M->nbytes;
-	gen_tree(parser,tree);
+	proto.bytes=start;
+	proto.nvalues=ARRAY_LENGTH(tree->expr_fun.capts);
 	proto.nlocals=memory_usage;
-	proto.nbytes=parser->R->M->nbytes-proto.bytes;
+	proto.nbytes=parser->R->M->nbytes-start;
+
 	ASSERT(memory_state==0);
 	ASSERT(memory_state_index==0);
 	memory_usage=0;
@@ -99,10 +104,7 @@ static elf_Proto gen_file(Parser *parser, treeID tree){
 		parser->functions[i]->expr_fun.proto=index++;
 	}
 	FOR_ARRAY(i,parser->functions){
-		treeID it;
-		it=parser->functions[i];
-		ASSERT(it->kind==TREE_FUNCTION);
-		protos[i]=gen_proto(parser,it->expr_fun.body);
+		protos[i]=gen_proto(parser,parser->functions[i]);
 	}
 	return protos[0];
 }
@@ -151,10 +153,6 @@ static void gen_tree(Parser *parser, treeID id) {
 
 			push_mem_state(parser);
 
-			// for i = 0...10 ? {
-			// 	break
-			// 	continue
-			// }
 			int continue_target;
 			int entry;
 			entry=parser->R->M->nbytes;
@@ -191,14 +189,12 @@ static void gen_tree(Parser *parser, treeID id) {
 			int rx,ry,rz,op;
 
 			xx=get_tree(parser,tree.x);
+			ASSERT(xx.type!=NT_NON);
 
 			dst=get_mem(parser,tree.x);
 			if(dst!=NO_SLOT){
 				mem=to_mem(parser,tree.y,dst,1);
 				ASSERT(mem==dst);
-				ASSERT(xx.kind!=EXPR_FIELD);
-				ASSERT(xx.kind!=EXPR_INDEX);
-				ASSERT(xx.kind!=TREE_GLOBAL);
 			}else if(xx.kind==EXPR_FIELD||xx.kind==EXPR_INDEX){
 				rz=to_any_mem(parser,tree.y);
 				rx=to_any_mem(parser,xx.x);
@@ -389,17 +385,22 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 			}
 		} break;
 		case TREE_FUNCTION: {
-			int proto;
+			int     proto;
+			treeID *capts;
 			proto=tree.expr_fun.proto;
+			capts=tree.expr_fun.capts;
+
 			ASSERT(proto!=-1);
 
 			if (ndst<1) goto esc;
 			mem=get_mem_state(parser);
-			// mem=get_mem_state(fs); {
-			// 	FOR_ARRAY(i,node.z) {
-			// 		emit_eval_deprecated(C,0,dst_alloc(fs),1,node.z[i]);
-			// 	}
-			// }
+			FOR_ARRAY(i,capts) {
+				// we can only capture things with memory,
+				// this should evaluate to a reload...
+				ASSERT(get_mem(parser,capts[i])!=NO_SLOT);
+				int x=to_mem(parser,capts[i],-1,1);
+				ASSERT(x==mem+i);
+			}
 			set_mem_state(parser,mem);
 			if (dst<0) dst=set_mem(parser,id);
 			emit_bytexy(parser,line,BC_CLOSURE,mem,proto);

@@ -18,6 +18,8 @@ typedef struct {
 
 //todo:remove "LEAVE"
 //todo:remove "iff"
+//todo:remove "lastly"
+//todo:remove "let"
 #define KEYWORDDEF(_) \
 _(ELF      ,"elf"         ) \
 _(DEFAULT  ,"default"     ) \
@@ -37,6 +39,7 @@ _(BREAK    ,"break"       ) \
 _(CONTINUE ,"continue"    ) \
 _(LET      ,"let"         ) \
 _(FOR      ,"for"         ) \
+_(DEFER    ,"defer"       ) \
 _(LASTLY   ,"lastly"      ) \
 _(RET      ,"ret"         ) \
 _(LEAVE    ,"leave"       ) \
@@ -172,7 +175,7 @@ typedef struct {
 typedef struct Block Block;
 struct Block {
 	treeID *body;
-	Block  *defer_blocks;
+	treeID *defers;
 	int     ended;
 	int     has_ret;
 };

@@ -74,6 +74,9 @@ struct treeT {
 		struct {
 			treeID x,y,*z;
 		};
+		// todo: maybe we should get rid of this,
+		// and use the same strategy that we used
+		// for register allocation
 		int         jump;
 		int  expr_global;
 		int expr_upvalue;
@@ -81,13 +84,13 @@ struct treeT {
 		elf_i64 expr_int;
 		elf_f64 expr_num;
 		struct {
-			treeID       body;
-			//seems we need this...
-			int         proto;
-			//todo:we don't need these beyond parsing,
-			//could do with a stack...
-			int         scope;
-			treeID        enc;
+			treeID    body;
+			treeID   *capts;
+			// seems we need this...
+			int       proto;
+			// todo: these are not used beyond parsing
+			int       scope;
+			treeID      enc;
 		} expr_fun;
 		struct {
 			treeID        pred;

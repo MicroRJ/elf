@@ -43,7 +43,36 @@ static treeID parse(Parser *parser, elf_State *R, char *name, char *text) {
 	while (parser->tok.type!=TK_NONE) {
 		if(!parse_stat(parser))break;
 	}
+
+	// maybe use the goto instruction along
+	// with labels to chain these together...
+	// {
+	// 	defer { elf.pf("do this last") }
+	// 	...
+	// 	{
+	//			{
+	//				...
+	//				ret 2
+	//			}
+	// 		...
+	// 		ret 1
+	// 	}
+	// 	...
+	// 	ret 2
+	// }
+	// todo: this is temporary!
+	//	Whenever a block is ended, right before
+	// the ending instruction we insert the
+	// defer blocks, if we are an inner block
+	// and we do a return, instead of actually
+	// issuing the return instruction we just
+	// jump to the return instruction at the
+	// end of every function.
+	FOR_ARRAY(i,parser->block.defers){
+		ARRAY_ADD(parser->block.body,parser->block.defers[i]);
+	}
 	func->expr_fun.body=tree_block(parser,parser->tok.line,parser->block.body);
+
 
 	return func;
 }
@@ -112,18 +141,24 @@ static treeID close_block(Parser *parser) {
 	close_scope(parser);
 	Block block;
 	block=parser->block;
+
+	//todo: we actually have to do this whenever
+	//we end a block with any block terminating
+	//instruction!
+	FOR_ARRAY(i,block.defers){
+		ARRAY_ADD(block.body,block.defers[i]);
+	}
+
 	parser->block = parser->block_stack[-- parser->block_index];
 	return tree_block(parser,parser->tok.line,block.body);
 }
 
-static entityID identify(Parser *parser, char *name, bool enclose) {
-	// IR_Function *fn = parser->fn;
+static entityID identify(Parser *parser, char *name) {
 	entityID id;
+	entityT ent;
 	for (id = parser->entity_index-1; id > -1; -- id) {
-		if (text_eq(parser->entities[id].name,name)) {
-			// if ((id < fn->entities) && (enclose)) {
-			// 	enclose_entity(parser,fn,(entityID2){id});
-			// }
+		ent=parser->entities[id];
+		if (text_eq(ent.name,name)) {
 			parser->entities[id].status |= ENTITY_REFERENCED;
 			return id;
 		}
@@ -136,7 +171,7 @@ static entityID parser_bind(Parser *parser, Source line, int flags, char *name, 
 
 	{
 		entityID entity_id;
-		entity_id=identify(parser,name,0);
+		entity_id=identify(parser,name);
 
 		if (entity_id!=NO_ENTITY) {
 
@@ -278,7 +313,7 @@ static treeID parse_fun(Parser *parser){
 		{
 			// todo: only if the block doesn't have a return already
 			entityID ent;
-			ent=identify(parser,"this",0);
+			ent=identify(parser,"this");
 			ASSERT(ent!=-1);
 
 			entityT this_;
@@ -423,23 +458,36 @@ static treeID parse_unary(Parser *parser, bool flags) {
 			get_tok(parser);
 
 			name=tok.text;
-			id=identify(parser,name,1);
+			id=identify(parser,name);
 
 			if (id!=NO_ENTITY) {
 				entity=parser->entities[id];
-				if (~parser->entities[id].status & ENTITY_ASSIGNED) {
+				if (~entity.status & ENTITY_ASSIGNED) {
 					parser_dialog(parser,tok.line,"warning: usage of possibly unassigned variable");
 				}
+				// check if we have to capture this thing
 				treeID enc=parser->enc;
 				if (entity.scope<enc->expr_fun.scope) {
-					ASSERT(!"FIXME");
+					int upvalue_index;
+					upvalue_index = -1;
+					// check if we've captured this already
+					FOR_ARRAY(i,enc->expr_fun.capts) {
+						if (enc->expr_fun.capts[i] == entity.tree){
+							upvalue_index = i;
+							goto already_captured;
+						}
+					}
+					upvalue_index=ARRAY_LENGTH(enc->expr_fun.capts);
+					ARRAY_ADD(enc->expr_fun.capts,entity.tree);
+					already_captured:
+					v=tree_upvalue_ref(parser,tok.line,upvalue_index);
+
 					enc=enc->expr_fun.enc;
 					if (entity.scope<enc->expr_fun.scope) {
 						parser_dialog(parser,tok.line,"cannot capture?");
 					}
-				}else{
+				} else {
 					v=entity.tree;
-					// tree_local_ref(parser,tok.line,tok.text,entity.tree);
 				}
 			} else {
 				//todo:
@@ -463,28 +511,23 @@ static treeID parse_unary(Parser *parser, bool flags) {
 		} break;
 		case TK_TRUE:{
 			get_tok(parser);
-			v=new_tree(parser,EXPR_INT,tok.line);
-			v->expr_int=1;
+			v=tree_int(parser,tok.line,1);
 		} break;
 		case TK_FALSE: {
 			get_tok(parser);
-			v=new_tree(parser,EXPR_INT,tok.line);
-			v->expr_int=0;
+			v=tree_int(parser,tok.line,0);
 		} break;
 		case TK_LETTER: case TK_INTEGER: {
 			get_tok(parser);
-			v=new_tree(parser,EXPR_INT,tok.line);
-			v->expr_int=tok.integer;
+			v=tree_int(parser,tok.line,tok.integer);
 		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
-			v=new_tree(parser,EXPR_NUM,tok.line);
-			v->expr_num=tok.number;
+			v=tree_num(parser,tok.line,tok.number);
 		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			v=new_tree(parser,EXPR_STR,tok.line);
-			v->expr_str=tok.text;
+			v=tree_str(parser,tok.line,tok.text);
 		} break;
 		default: goto err;
 	}
@@ -798,6 +841,18 @@ static int parse_stat(Parser *parser) {
 	}
 
 	switch (tok.type) {
+		case TK_DEFER:
+		case TK_LASTLY:
+		case TK_FINALLY: {
+			get_tok(parser);
+			if (tok.type!=TK_DEFER) {
+				parser_dialog(parser,tok.line,"consider using defer instead!");
+			}
+			treeID v;
+			v=parse_bl(parser);
+			ARRAY_ADD(parser->block.defers,v);
+		} break;
+
 		// todo: deprecate leave!
 		case TK_LEAVE:
 		case TK_RET:
@@ -1094,16 +1149,6 @@ static int get_closure_value_index(IR_Function *fn, entityID2 id) {
 	}
 	return NO_SLOT;
 }
-/* encloses an entity within the given function. */
-static void enclose_entity(Parser *fs, IR_Function *fn, entityID2 id) {
-	/* ensure the entity should actually be captured */
-	// ASSERT(id.id < fn->entities);
-	/* check whether the entity was already captured */
-	FOR_ARRAY(i,fn->enclosure) {
-		if (fn->enclosure[i] == id.id) return;
-	}
-	ARRAY_ADD(fn->enclosure,id.id);
-}
 
 static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 	treeID v;
@@ -1191,17 +1236,6 @@ static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 }
 
 	switch (tok.type) {
-		case TK_LASTLY: case TK_FINALLY: {
-			__debugbreak();
-			get_tok(parser);
-			if (tk.type == TK_FINALLY) {
-				parser_dialog(parser,tk.line,"warning: please consider using 'lastly' instead, 'finally' could change semantics in the future");
-			}
-			begin_delay_block(parser,tk.line);
-			parse_stat(parser);
-			close_delay_block(parser,tk.line);
-			ASSERT(get_mem_state_deprecated(parser)==mem);
-		} break;
 		case TK_DO: {
 			get_tok(parser);
 			parser_begin_block(parser,BLOCK_LOOP);
