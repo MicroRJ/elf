@@ -70,6 +70,9 @@ static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
 static treeID tree_ret(Parser *parser, Source line, treeID x) {
 	return tree_x(parser,line,TREE_RET,NT_ANY,x);
 }
+static treeID tree_goto(Parser *parser, Source line) {
+	return tree_nullary(parser,line,TREE_GOTO,NT_ANY);
+}
 static treeID tree_dummy(Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_DUMMY,NT_ANY);
 }

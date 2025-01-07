@@ -57,7 +57,6 @@ typedef unsigned long long int elf_u64;
 typedef double 			       elf_f64;
 typedef float  			       elf_f32;
 
-
 typedef long long int 	   elf_Int;
 typedef double 			   elf_Num;
 typedef void 			     *elf_Handle;
@@ -65,6 +64,7 @@ typedef int 					Error;
 typedef int 				   elf_StackId;
 typedef int 				   elf_SymbolId;
 typedef unsigned int 		elf_Hash;
+
 
 
 typedef int (* elf_Function)(elf_State *);
@@ -204,7 +204,7 @@ elAPI elf_Int      elf_get_int(elf_State *S, int arg);
 elAPI elf_Num      elf_get_num(elf_State *S, int arg);
 elAPI elf_String  *elf_get_str(elf_State *S, int arg);
 elAPI char        *elf_get_txt(elf_State *S, int arg);
-elAPI elf_Node  *elf_get_obj(elf_State *S, int arg);
+elAPI elf_Node    *elf_get_obj(elf_State *S, int arg);
 elAPI elf_Table   *elf_get_tab(elf_State *S, int arg);
 elAPI elf_Handle   elf_get_sys(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);

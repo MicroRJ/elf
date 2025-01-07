@@ -1,9 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** lexer.c
-** not the fastest thing out there
 */
-
 
 
 #define POS0()   (file->pos[0])
@@ -15,8 +13,6 @@
 #define LEX1(C,T) case C:MOVE();tk.type=T;break
 #define LEX2(A,X,B,Y) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;break
 #define LEX3(A,X,B,Y,C,Z) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;else if(PICK(C))tk.type=Z;break
-
-
 
 static void new_line(Parser *fs) {
 	fs->line_pos = fs->pos;

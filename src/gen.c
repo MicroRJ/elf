@@ -3,8 +3,6 @@
 ** gen.c
 */
 
-#include "emitter.c"
-
 static int memory_usage;
 static int memory_state;
 static int memory_state_stack[16];
@@ -136,24 +134,51 @@ static void gen_tree(Parser *parser, treeID id) {
 
 			emit_bytexy(parser,tree.line,BC_RET,mem,num);
 		} break;
+		case TREE_GOTO: {
+			int jmp;
+			jmp=emit_jump(parser,tree.line,NO_JUMP);
+			id->jump=jmp;
+		} break;
 		case TREE_WHILE_LOOP: {
-			int entry;
 			jumpS js = {0};
 
 			treeID pred,body,post,prev;
-			pred=tree.stat_while.pred;
-			body=tree.stat_while.body;
-			post=tree.stat_while.post;
-			prev=tree.stat_while.prev;
+			pred=tree.loop.pred;
+			body=tree.loop.body;
+			post=tree.loop.post;
+			prev=tree.loop.prev;
+
+
 			push_mem_state(parser);
 
+			// for i = 0...10 ? {
+			// 	break
+			// 	continue
+			// }
+			int continue_target;
+			int entry;
 			entry=parser->R->M->nbytes;
+			continue_target=entry;
 			emit_jump_if_false(parser,&js,pred);
+
 			if(prev)gen_tree(parser,prev);
 			gen_tree(parser,body);
-			if(post)gen_tree(parser,post);
+			if(post){
+				continue_target=parser->R->M->nbytes;
+				gen_tree(parser,post);
+			}
 			emit_jump(parser,NO_LINE,entry);
 
+			treeID *c,*b;
+			b=tree.loop.b;
+			c=tree.loop.c;
+			FOR_ARRAY(i,c){
+				patch_jump2(parser,c[i]->jump,continue_target);
+			}
+
+			FOR_ARRAY(i,b){
+				patch_jump(parser,b[i]->jump);
+			}
 			patch_jumps(parser,js.f);
 			ARRAY_DELETE(js.f);
 			js.f = 0;
@@ -240,8 +265,11 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 	if(mem!=NO_SLOT){
 		if (ndst<1) goto esc;
 		if (dst<0) dst=set_mem(parser,id);
-		ASSERT(dst!=mem);
-		emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+		// let a = 0
+		// a = a ?? 1
+		if(dst!=mem){
+			emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+		}
 		goto esc;
 	}
 	switch (tree.kind) {
@@ -316,7 +344,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 			mem=get_mem(parser,tree.x);
 			dst=to_mem(parser,tree.x,dst,1);
 			j=emit_jump_if_nil(parser,NO_LINE,&e,tree.x);
-			ASSERT(mem==NO_SLOT||dst==mem);
+			// ASSERT(mem==NO_SLOT||dst==mem);
 
 			dst=to_mem(parser,tree.y,dst,1);
 			patch_jumps(parser,j);
@@ -329,7 +357,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 			mem=get_mem(parser,tree.x);
 			dst=to_mem(parser,tree.x,dst,1);
 			j=emit_jump_if_not_nil(parser,NO_LINE,&e,tree.x);
-			ASSERT(mem==NO_SLOT||dst==mem);
+			// ASSERT(mem==NO_SLOT||dst==mem);
 
 			dst=to_mem(parser,tree.y,dst,1);
 			patch_jumps(parser,j);
@@ -435,10 +463,12 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 		}
 	}
 	ASSERT(dst!=NO_SLOT);
+	push_mem_state(parser);
 	treeID prox;
 	for(prox=tree.prox;prox;prox=prox->prox){
 		gen_tree(parser,prox);
 	}
+	pop_mem_state(parser);
 	esc:
 	ASSERT(_dst==NO_SLOT||_dst==dst);
 	return dst;
@@ -658,6 +688,7 @@ static void patch_jump2(Parser *fs, int src, int dst) {
 	byte=bytes[src];
 	int j = dst - src;
 	switch (BC_OP(byte)) {
+		// TODO: remove BC_DELAY and BC_YIELD!
 		case BC_J: case BC_DELAY: {
 			// bytes[src].x = j;
 			bytes[src]=BC_XXX(BC_OP(byte),j);

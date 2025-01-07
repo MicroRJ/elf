@@ -124,13 +124,6 @@ typedef enum tokenTy {
 
 #include "tree.h"
 
-typedef int BlockId;
-
-#define BLOCK_LOOP 		0x01
-#define BLOCK_ENDED  	0x02
-#define BLOCK_DELAYED 	0x04
-
-
 typedef struct {
 	int *t,*f;
 } jumpS;
@@ -179,9 +172,16 @@ typedef struct {
 typedef struct Block Block;
 struct Block {
 	treeID *body;
-	Block  *lastly_blocks;
+	Block  *defer_blocks;
 	int     ended;
 	int     has_ret;
+};
+
+typedef struct Loop Loop;
+struct Loop {
+	treeID *breaks;
+	treeID *continues;
+	treeID  name;
 };
 
 
@@ -199,10 +199,16 @@ struct Parser {
 	entityID     entity_index;
 	entityID  scope_stack[16];
 	entityID      scope_index;
+	entityID            scope;
+	Source         src_stack[32];
+	Source         src_index;
+	Source               src;
 	Block     block_stack[16];
 	int           block_index;
 	Block               block;
-	entityID            scope;
+	Loop       loop_stack[16];
+	int            loop_index;
+	Loop                 loop;
 	tokenT tok,tok_prev,tok_prox;
 };
 

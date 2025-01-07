@@ -17,6 +17,8 @@ static int tok2tree(int tok);
 static int tok2prec(int tok);
 static void add_this_param(Parser *parser, Source line);
 static treeID parse_if(Parser *parser, int negate);
+static bool parse_for(Parser *parser);
+
 static treeID *parse_args(Parser *parser);
 
 
@@ -89,12 +91,21 @@ static void close_scope(Parser *parser) {
 	parser->entity_index = parser->scope_stack[-- parser->scope_index];
 	parser->scope --;
 }
+
+static void begin_loop(Parser *parser) {
+	parser->loop_stack[parser->loop_index ++] = parser->loop;
+	parser->loop=(Loop){};
+}
+static void close_loop(Parser *parser) {
+	parser->loop = parser->loop_stack[-- parser->loop_index];
+}
+
 static void block_add(Parser *parser, treeID id){
 	ARRAY_ADD(parser->block.body,id);
 }
 static void begin_block(Parser *parser) {
 	parser->block_stack[parser->block_index ++] = parser->block;
-	parser->block.body=0;
+	parser->block=(Block){};
 	begin_scope(parser);
 }
 static treeID close_block(Parser *parser) {
@@ -322,6 +333,8 @@ static treeID parse_new(Parser *parser){
 	tokenT tok;
 	tok=take_tok(parser,TK_NEW);
 
+	// todo: instead use parse postfix, break
+	// the call expression down
 	treeID meta,*args;
 	meta=parse_unary(parser,0);
 	args=parse_args(parser);
@@ -435,8 +448,11 @@ static treeID parse_unary(Parser *parser, bool flags) {
 		} break;
 		case TK_PAREN_LEFT: {
 			get_tok(parser);
-			v=parse_expr(parser,0);
+			if(!peek_tok(parser,TK_PAREN_RIGHT)){
+				v=parse_expr(parser,0);
+			}
 			take_tok(parser,TK_PAREN_RIGHT);
+			goto no_err;
 		} break;
 		case TK_FUN: {
 			v=parse_fun(parser);
@@ -478,6 +494,7 @@ static treeID parse_unary(Parser *parser, bool flags) {
 		parser_dialog(parser,tok.line,"'%s': unexpected token", tok2inf[tok.type].name);
 		elf_fail(parser->R,0,"syntax error: unexpected token");
 	}
+	no_err:
 	return v;
 }
 
@@ -504,7 +521,7 @@ static treeID parse_table(Parser *parser) {
 			tok=get_tok(parser);
 			key=tree_str(parser,tok.line,tok.text);
 		} else {
-			value=parse_expr(parser,0);
+			key=value=parse_expr(parser,0);
 		}
 		tok=parser->tok;
 		if (pick_tok(parser,TK_ASSIGN)) {
@@ -737,8 +754,9 @@ static treeID *parse_expr_list(Parser *parser) {
 static treeID parse_bl(Parser *parser){
 	tokenT tok;
 	tok=parser->tok;
+	begin_block(parser);
+
 	if(pick_tok(parser,TK_CURLY_LEFT)){
-		begin_block(parser);
 		while (parser->tok.type!=TK_NONE && parser->tok.type!=TK_CURLY_RIGHT) {
 			parse_stat(parser);
 		}
@@ -747,6 +765,22 @@ static treeID parse_bl(Parser *parser){
 		parse_stat(parser);
 	}
 	return close_block(parser);
+}
+
+static Loop *get_loop(Parser *parser, treeID name) {
+	if(parser->loop_index==0) return 0;
+	int index;
+	Loop *loop;
+
+	index=parser->loop_index-1;
+	loop=&parser->loop;
+	do {
+		if ((name == NO_TREE) || (loop->name == name)) {
+			return loop;
+		}
+	}while(-- index >= 0);
+
+	return 0;
 }
 
 static int parse_stat(Parser *parser) {
@@ -764,24 +798,40 @@ static int parse_stat(Parser *parser) {
 	}
 
 	switch (tok.type) {
+		// todo: deprecate leave!
+		case TK_LEAVE:
 		case TK_RET:
-		case TK_LEAVE: {
+		case TK_BREAK:
+		case TK_CONTINUE: {
+			get_tok(parser);
 
 			if(tok.type==TK_LEAVE){
 				parser_dialog(parser,tok.line,"consider using 'ret' instead!");
 			}
-
-			treeID v;
-
 			parser->block.ended=1;
 			parser->block.has_ret=1;
 
-			v=NO_TREE;
-			tok=get_tok(parser);
+			treeID v=NO_TREE;
 			if(!tok.eol){
 				v=parse_expr(parser,0);
 			}
-			v=tree_ret(parser,tok.line,v);
+			Loop *loop;
+			if((tok.type==TK_CONTINUE)||(tok.type==TK_BREAK)){
+				loop=get_loop(parser,v);
+				if(loop!=0){
+					ASSERT(loop!=parser->loop_stack);
+					v=tree_goto(parser,tok.line);
+					if(tok.type==TK_CONTINUE){
+						ARRAY_ADD(loop->continues,v);
+					}else{
+						ARRAY_ADD(loop->breaks,v);
+					}
+				}else{
+					parser_dialog(parser,tok.line,"not in a loop");
+				}
+			}else{
+				v=tree_ret(parser,tok.line,v);
+			}
 			block_add(parser,v);
 		} break;
 		case TK_CURLY_LEFT: {
@@ -803,15 +853,23 @@ static int parse_stat(Parser *parser) {
 		} break;
 		case TK_WHILE:{
 			treeID pred,body,v;
-
 			get_tok(parser);
+
 			pred=parse_expr(parser,0);
 			take_tok(parser,TK_QMARK);
+
+			begin_loop(parser);
+
 			body=parse_bl(parser);
 
 			v=new_tree(parser,TREE_WHILE_LOOP,tok.line);
-			v->stat_while.pred=pred;
-			v->stat_while.body=body;
+			v->loop.pred=pred;
+			v->loop.body=body;
+			v->loop.c=parser->loop.continues;
+			v->loop.b=parser->loop.breaks;
+
+			close_loop(parser);
+
 			block_add(parser,v);
 		}break;
 		//todo:
@@ -819,99 +877,7 @@ static int parse_stat(Parser *parser) {
 		// 	#index
 		// }
 		case TK_FOR: {
-			tokenT name;
-			treeID body,v,step;
-			treeID *steps;
-
-			begin_scope(parser);
-
-			get_tok(parser);
-
-			name=take_tok(parser,TK_WORD);
-			take_tok(parser,TK_ASSIGN);
-
-			steps=0;
-			do {
-				v=parse_expr(parser,0);
-				ARRAY_ADD(steps,v);
-			}while(pick_tok(parser,TK_COMMA));
-
-			take_tok(parser,TK_QMARK);
-
-			treeID index_,value_;
-
-			index_=tree_dummy(parser,name.line);
-			v=tree_assign_mem(parser,tok.line,index_);
-			block_add(parser,v);
-
-			value_=tree_dummy(parser,name.line);
-			v=tree_assign_mem(parser,tok.line,value_);
-			block_add(parser,v);
-
-			parser_bind(parser,name.line
-			, ENTITY_REFERENCED|ENTITY_ASSIGNED|ENTITY_FORLOOP
-			, name.text,value_);
-
-			body=parse_bl(parser);
-			ASSERT(body->kind==STAT_BLOCK);
-
-			FOR_ARRAY(i,steps){
-				step=v=steps[i];
-
-				begin_block(parser);
-
-				treeT range;
-				range=get_tree(parser,step);
-				if(range.kind==TREE_RANGE || range.kind==EXPR_RANGE_INDEX){
-					treeID index,value,array,prev;
-					index=index_;
-					value=value_;
-					array=prev=NO_TREE;
-
-					if(range.kind==EXPR_RANGE_INDEX){
-						array=range.x;
-						range=get_tree(parser,range.y);
-						ASSERT(range.kind==TREE_RANGE);
-						ASSERT(index!=value);
-
-						//todo: we use this so often, make intrinsic
-						treeID *args=0;
-						ARRAY_ADD(args,index);
-						v=tree_call_metafield(parser,tok.line,array,args,"idx");
-
-						prev=tree_store(parser,tok.line,value,v);
-					}else{
-						index=value;
-					}
-
-					v=tree_store(parser,tok.line,index,range.x);
-					block_add(parser,v);
-
-					treeID pred;
-					pred=tree_less_than(parser,tok.line,index,range.y);
-
-					treeID post;
-					post=tree_binary(parser,tok.line,EXPR_ADD,NT_ANY,index,tree_int(parser,tok.line,1));
-					post=tree_store(parser,tok.line,index,post);
-
-					v=new_tree(parser,TREE_WHILE_LOOP,tok.line);
-					v->stat_while.pred=pred;
-					v->stat_while.prev=prev;
-					v->stat_while.body=body;
-					v->stat_while.post=post;
-					block_add(parser,v);
-				}else {
-					v=tree_store(parser,tok.line,value_,step);
-					block_add(parser,v);
-
-					block_add(parser,body);
-				}
-
-				v=close_block(parser);
-				block_add(parser,v);
-			}
-
-			close_scope(parser);
+			parse_for(parser);
 		} break;
 		case TK_IF: case TK_IFF: {
 			get_tok(parser);
@@ -976,6 +942,142 @@ static treeID parse_if(Parser *parser, int negate){
 	return close_block(parser);
 }
 
+static bool parse_for(Parser *parser){
+	bool success = true;
+
+	tokenT tok,name;
+	treeID *steps,v;
+
+	tok=take_tok(parser,TK_FOR);
+
+	name=take_tok(parser,TK_WORD);
+	take_tok(parser,TK_ASSIGN);
+
+	steps=0;
+	do {
+		v=parse_expr(parser,0);
+		if(v==NO_TREE){
+			success=false;
+			goto esc;
+		}
+		ARRAY_ADD(steps,v);
+	}while(pick_tok(parser,TK_COMMA));
+
+	take_tok(parser,TK_QMARK);
+
+	treeID index_,value_;
+
+	index_=tree_dummy(parser,name.line);
+	v=tree_assign_mem(parser,tok.line,index_);
+	block_add(parser,v);
+
+	value_=tree_dummy(parser,name.line);
+	v=tree_assign_mem(parser,tok.line,value_);
+	block_add(parser,v);
+
+	begin_scope(parser);
+
+	parser_bind(parser,name.line
+	, ENTITY_REFERENCED|ENTITY_ASSIGNED|ENTITY_FORLOOP
+	, name.text,value_);
+
+	treeID body,step;
+
+	begin_loop(parser);
+
+	body=parse_bl(parser);
+	ASSERT(body->kind==STAT_BLOCK);
+
+	FOR_ARRAY(i,steps){
+		step=v=steps[i];
+
+		begin_block(parser);
+
+		treeT range;
+		range=get_tree(parser,step);
+		if(range.kind==TREE_RANGE || range.kind==EXPR_RANGE_INDEX){
+			treeID index,value,prev;
+			index=index_;
+			value=value_;
+			prev=NO_TREE;
+
+			if(range.kind==EXPR_RANGE_INDEX){
+				ASSERT(range.x!=NO_TREE);
+				ASSERT(range.y!=NO_TREE);
+
+				treeID array;
+				array=range.x;
+
+				// get the actual range
+				range=get_tree(parser,range.y);
+				ASSERT(range.kind==TREE_RANGE);
+				ASSERT(index!=value);
+
+				// todo: we use this so often, make intrinsic
+				treeID *args=0;
+				ARRAY_ADD(args,index);
+				v=tree_call_metafield(parser,tok.line,array,args,"idx");
+
+				prev=tree_store(parser,tok.line,value,v);
+			}else{
+				index=value;
+			}
+			ASSERT(range.kind==TREE_RANGE);
+
+			// todo: if the range is actually nil on both
+			// ends, then there's no condition!
+			if(range.x==NO_TREE){
+				range.x=tree_int(parser,tok.line,0);
+			}
+			if(range.y==NO_TREE){
+				//todo: true infinite
+				range.y=tree_int(parser,tok.line,0xffffffffLLU);
+			}
+
+			ASSERT(range.x!=NO_TREE);
+			ASSERT(range.y!=NO_TREE);
+
+			// initialize index to lower bound of range
+			v=tree_store(parser,tok.line,index,range.x);
+			block_add(parser,v);
+
+			// generate predicate
+			treeID pred;
+			pred=tree_less_than(parser,tok.line,index,range.y);
+
+			// what to do after the loop body's
+			treeID post;
+			post=tree_binary(parser,tok.line,EXPR_ADD,NT_ANY,index,tree_int(parser,tok.line,1));
+			post=tree_store(parser,tok.line,index,post);
+
+			v=new_tree(parser,TREE_WHILE_LOOP,tok.line);
+			v->loop.pred=pred;
+			v->loop.prev=prev;
+			v->loop.body=body;
+			v->loop.post=post;
+			v->loop.c=parser->loop.continues;
+			v->loop.b=parser->loop.breaks;
+			block_add(parser,v);
+		}else {
+			v=tree_store(parser,tok.line,value_,step);
+			block_add(parser,v);
+
+			block_add(parser,body);
+		}
+
+		v=close_block(parser);
+		block_add(parser,v);
+	}
+
+	close_loop(parser);
+
+	close_scope(parser);
+
+	esc:
+	return success;
+}
+
+
 static int tok2prec(int type) {
 	return tok2inf[type].prec;
 }
@@ -1002,21 +1104,6 @@ static void enclose_entity(Parser *fs, IR_Function *fn, entityID2 id) {
 	}
 	ARRAY_ADD(fn->enclosure,id.id);
 }
-
-/* todo: add support for:
-specifing which for loop you're reffering to. */
-#if 0
-elf_StackId target_value_register = NO_SLOT;
-if (!eof_or_eol_tok(fs)) {
-	treeID value = parse_expr(fs,0);
-	if (value != NO_TREE) {
-		target_value_register = get_treereg_deprecated(fs,TREEID(value));
-		if (target_value_register < 0) {
-			parser_dialog(fs,get_tree_line(fs,value),"invalid value");
-		}
-	}
-}
-#endif
 
 static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 	treeID v;
@@ -1103,51 +1190,9 @@ static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 	return v;
 }
 
-#if 0
-int parse_stat(Parser *parser) {
-	treeID ir = NO_TREE;
-	tokenT tok = parser->tok;
 	switch (tok.type) {
-		case TK_NONE: case TK_CURLY_RIGHT:
-		case TK_THEN: case TK_ELSE: case TK_ELIF: {
-			return 0;
-		}
-	}
-
-
-	// xxx FileBlock *bl = get_block(parser,-1);
-	// xxx if (bl->flags & BLOCK_ENDED) {
-	// xxx 	parser_dialog(parser,tok.line,"warning: unreachable statement");
-	// xxx }
-
-	switch (tok.type) {
-		/* todo: go back to := */
-		case TK_LET: {
-			get_tok(parser);
-			do {
-				if (peek_tok(parser,TK_LET)) {
-					parser_dialog(parser,parser->tok_prev.line,"invalid declaration, expected next declarator's name after ',' instead got 'let'");
-					parser_dialog(parser,parser->tok.line,"invalid declaration, 'let' after comma");
-					elf_fail(parser->R,0,"syntax error: invalid declaration");
-				}
-
-				tokenT name = take_tok(parser,TK_WORD);
-				take_tok(parser,TK_ASSIGN);
-
-				treeID x = parse_expr(parser,0,0);
-
-				ir = tree_local(parser,name.line,x);
-				ir_add_prox(parser,ir);
-
-				parser_bind(parser,name.line,0,name.text,ir);
-
-				// xxx parse_assign(parser,tree_load(parser,name.line,reg));
-
-			} while (pick_tok(parser,TK_COMMA));
-		} break;
 		case TK_LASTLY: case TK_FINALLY: {
 			__debugbreak();
-			#if 0
 			get_tok(parser);
 			if (tk.type == TK_FINALLY) {
 				parser_dialog(parser,tk.line,"warning: please consider using 'lastly' instead, 'finally' could change semantics in the future");
@@ -1156,24 +1201,6 @@ int parse_stat(Parser *parser) {
 			parse_stat(parser);
 			close_delay_block(parser,tk.line);
 			ASSERT(get_mem_state_deprecated(parser)==mem);
-			#endif
-		} break;
-
-#if 0
-		case TK_BREAK: case TK_CONTINUE: {
-			int reg = NO_TREE;
-			get_tok(parser);
-			/* Todo: defer til code generation */
-			if (!eof_or_eol_tok(parser)) {
-				treeID value = parse_unary(parser,0,0);
-				if (value == NO_TREE) {
-					if ((reg=get_treereg_deprecated(parser,TREEID(value)))<0) {
-						parser_dialog(parser,get_tree_line(parser,value),"invalid value");
-					}
-				}
-			}
-			if (tk.type==TK_CONTINUE) emit_continue(parser,tk.line,reg);
-			else emit_break(parser,tk.line,reg);
 		} break;
 		case TK_DO: {
 			get_tok(parser);
@@ -1198,308 +1225,9 @@ int parse_stat(Parser *parser) {
 		case TK_FOR: {
 			parse_for_loop(parser);
 		} break;
-#endif
 		default: {
-#if 0
-			entityID entity;
-			int reg;
-			if (parser->nblocks>1 && parser->tok_prox.type==TK_ASSIGN){
-				get_tok(parser);
-				entity=identify(parser,tk.text,0);
-				if (entity==-1){
-					parser_dialog(parser,tk.line,"new implicit entity: %s", tk.text);
-					reg=reg_alloc_deprecated(parser);
-					entity=parser_bind(parser,tk.line,0,tk.text,reg);
-				} else {
-					reg=parser->entities[entity].args;
-				}
-				x=tree_load(parser,tk.line,reg);
-			} else {
-				x=parse_expr(parser,0,0);
-			}
-#endif
-			ir_add_prox(parser,tree_push_memory_state(parser,tok.line));
-			ir = parse_expr(parser,0,0);
-			if (ir != NO_TREE) {
-				ir_add_prox(parser,ir);
-				// xx parse_assign(parser,x);
-			} else {
-				parser_dialog(parser,tok.line,"invalid statement");
-			}
-			ir_add_prox(parser,tree_pop_memory_state(parser,tok.line));
-		} break;
-	}
-
-
 	return 1;
 }
 #endif
 
 
-#if 0
-
-//
-//	I think if statements don't have to be IR, because it wouldn't
-// really matter, and 'if' is just a conditional jump, so we can
-// translate that directly from code to lower level IR.
-//
-// yield has to be IR, it's literally an instruction.
-//
-// break / continue, those can be IR, but all the backend would
-// do is store the addresses patch, and it would require the
-// backend know what a loop is... So we can translate them to
-// lower level IR instead...
-//
-// '&&' and expressions that can be short-circuited could be
-// translated to lower level IR, but then it becomes harder to
-// optimize? But then we'd have to replicate the same code for
-// each backend.. Ok, since we're not doing and sort of optimization
-// yet, we can translate it to lower level IR directly, and then
-// if it becomes a problem we can revert.
-// All loops can become lower level IR, since loop are pretty easy
-// to find anyways... Alrighty then, we would have to remove some
-// IR instructions, like AND and OR and so on... we  can leave that
-// for last...
-//
-void begin_if(Parser *fs, Source line, BranchJumps *s, treeID x, int z) {
-	jumpS js = {0};
-	emit_branch_if(fs,&js,z,x);
-	// if  0 = jz
-	// iff 1 = jnz
-	if (z == L_IF) {
-		ASSERT(js.f != 0);
-		patch_jumps(fs,js.t);
-		ARRAY_DELETE(js.t);
-		js.t = 0;
-		s->jz = js.f;
-	} else {
-		ASSERT(js.t != 0);
-		patch_jumps(fs,js.f);
-		ARRAY_DELETE(js.f);
-		js.f = 0;
-		s->jz = js.t;
-	}
-}
-
-
-/*
-** Closes previous conditional block by emitting
-** escape jump, patches previous jz (jump if false)
-** list to enter this block.
-*/
-void add_else_clause(Parser *fs, Source line, BranchJumps *s) {
-	if (s->jz == 0) {
-		parser_dialog(fs,line,"invalid else clause");
-	}
-	ASSERT(s->jz != 0);
-	int j = emit_jump(fs,line,-1);
-	ARRAY_ADD(s->j,j);
-
-	patch_jumps(fs,s->jz);
-	ARRAY_DELETE(s->jz);
-	s->jz = 0;
-}
-
-
-void add_elif_clause(Parser *fs, Source line, BranchJumps *s, int x) {
-	add_else_clause(fs,line,s);
-	begin_if(fs,line,s,x,L_IF);
-}
-
-
-void add_then_clause(Parser *fs, Source line, BranchJumps *s) {
-	/* we don't need to close the previous block, it can just fall
-	through to our branch, do collect all the other exit jumps and
-	tie them to this branch block, naturally we don't need to add
-	an exit jump since else and elif or closeif will terminate
-	this block, multiple then blocks are simply chained together
-	naturally. */
-	patch_jumps(fs,s->j);
-	ARRAY_DELETE(s->j);
-	s->j = 0;
-}
-
-
-void close_if(Parser *fs, Source line, BranchJumps *s) {
-	/* collect missing else branch */
-	if (s->jz != 0) {
-		patch_jumps(fs,s->jz);
-		ARRAY_DELETE(s->jz);
-		s->jz = 0;
-	}
-	/* collect missing then branch */
-	if (s->j != 0) {
-		patch_jumps(fs,s->j);
-		ARRAY_DELETE(s->j);
-		s->j = 0;
-	}
-}
-
-void begin_do_while_loop(Parser *fs, Source line) {
-	FileBlock *bl = get_block(fs,-1); // fs->fn->block
-	ASSERT(bl->flags & BLOCK_LOOP);
-	bl->loop.entry = get_instr_cursor(fs);
-	bl->loop.false_jumps = 0;
-	bl->loop.x = NO_TREE;
-	bl->loop.index_register = NO_SLOT;
-}
-
-
-void close_do_while_loop(Parser *fs, Source line, treeID x) {
-	FileBlock *bl = get_block(fs,-1); // fs->fn->block;
-	ASSERT(bl->flags & BLOCK_LOOP);
-
-	jumpS js = {0};
-	emit_jump_if_true(fs,&js,x);
-
-	patch_jumps2(fs,js.t,bl->loop.entry);
-	ARRAY_DELETE(js.t);
-	js.t = 0;
-
-	patch_jumps2(fs,bl->loop.true_jumps,bl->loop.entry);
-	ARRAY_DELETE(bl->loop.true_jumps);
-	bl->loop.true_jumps = 0;
-}
-
-
-void begin_while_loop(Parser *fs, treeID x) {
-	FileBlock *bl = get_block(fs,-1);
-	ASSERT(bl->flags & BLOCK_LOOP);
-
-	bl->loop.x = x;
-
-	bl->loop.entry = get_instr_cursor(fs);
-
-	/* todo: this is temporary */
-	emit_bytex_deprecated(fs,NO_LINE,BC_LOOP,-1);
-
-	ASSERT(bl->loop.false_jumps == 0);
-
-	jumpS js = {0};
-	bl->loop.false_jumps = emit_jump_if_false(fs,&js,x);
-}
-
-
-void close_while_loop(Parser *fs) {
-	FileBlock *bl = get_block(fs,-1);
-	ASSERT(bl->flags & BLOCK_LOOP);
-
-	patch_jumps(fs,bl->loop.true_jumps);
-	ARRAY_DELETE(bl->loop.true_jumps);
-	bl->loop.true_jumps = 0;
-
-	/* todo: this is temporary */
-	ASSERT(BC_OP(get_byte(fs,bl->loop.entry))==BC_LOOP);
-	// fs->M->bytes[bl->loop.entry].x = get_instr_cursor(fs);
-
-	emit_jump(fs,NO_LINE,bl->loop.entry);
-
-	patch_jumps(fs,bl->loop.false_jumps);
-	ARRAY_DELETE(bl->loop.false_jumps);
-	bl->loop.false_jumps = 0;
-}
-
-
-void begin_range_loop(Parser *fs, Source line, treeID index_node, treeID lo, treeID hi) {
-	__debugbreak();
-
-	FileBlock *bl = get_block(fs,-1);
-	ASSERT(bl->flags & BLOCK_LOOP);
-
-	ASSERT(index_node != NO_TREE);
-
-	elf_StackId index_register; // xxx = compiler_ir2anyreg(fs,index_node);
-	index_node = tree_load(fs,line,index_register);
-
-	bl->loop.index_register = index_register;
-	bl->loop.x = index_node;
-	emit_eval_deprecated(fs,0,index_register,1,tree_type_guard(fs,get_tree_line(fs,lo),lo,NT_INT));
-
-	bl->loop.entry = get_instr_cursor(fs);
-
-	__debugbreak();
-	elf_StackId hi_register; // xxx = compiler_ir2anyreg(fs,tree_type_guard(fs,get_tree_line(fs,hi),hi,NT_INT));
-	hi = tree_load(fs,line,hi_register);
-	treeID c = tree_less_than(fs,line,index_node,hi);
-
-	ASSERT(bl->loop.false_jumps == 0);
-
-	jumpS js = {0};
-	bl->loop.false_jumps = emit_jump_if_false(fs,&js,c);
-}
-
-
-void close_range_loop(Parser *fs, Source line) {
-	FileBlock *bl = get_block(fs,-1); // fs->fn->block;
-	ASSERT(bl->flags & BLOCK_LOOP);
-
-	patch_jumps(fs,bl->loop.true_jumps);
-	ARRAY_DELETE(bl->loop.true_jumps);
-	bl->loop.true_jumps = 0;
-	// treeID index_node = bl->loop.index_node;
-	treeID index_node = tree_load(fs,NO_LINE,bl->loop.index_register);
-	treeID k = tree_binary(fs,NO_LINE,IR_ADD,NT_INT,index_node,tree_int(fs,NO_LINE,1));
-
-	__debugbreak();
-	// xxx emit_store_deprecated(fs,line,index_node,k);
-
-	emit_jump(fs,line,bl->loop.entry);
-
-	patch_jumps(fs,bl->loop.false_jumps);
-	ARRAY_DELETE(bl->loop.false_jumps);
-	bl->loop.false_jumps = 0;
-}
-#endif
-
-#if 0
-// this is the code that emits a byte-code yield
-// this should be over in emit, all we do here is
-// emit the yield ir
-void emit_yield(Parser *fs, Source line, treeID id) {
-	/* todo: add support for multiple results */
-	/* todo: if we only return one value we don't have to reload */
-	int mem,reg,nreg,j;
-	mem=get_mem_state_deprecated(fs);
-	if (id!=NO_TREE) {
-		/* todo: multi-returns */
-		emit_eval_deprecated(fs,0,reg=reg_alloc_deprecated(fs),nreg=1,id);
-		if (fs->fn->nyield < nreg) fs->fn->nyield = nreg;
-		j=emit_bytexyz_deprecated(fs,line,BC_YIELD,NO_JUMP,reg,nreg);
-		ARRAY_ADD(fs->fn->yield_jumps,j);
-	} else emit_bytex_deprecated(fs,line,BC_LEAVE,0);
-	set_mem_state_deprecated(fs,mem);
-	add_block_flags(fs,BLOCK_ENDED);
-}
-
-void emit_continue(Parser *fs, Source line, int reg) {
-	__debugbreak();
-
-	ASSERT(fs->nloops > 0);
-	Instr jmp;
-	FileBlock *bl;
-
-	bl=get_loop_block(fs,reg);
-	ASSERT(bl!=0);
-	add_block_flags(fs,BLOCK_ENDED);
-
-	jmp=emit_jump(fs,line,get_instr_cursor(fs));
-	ARRAY_ADD(bl->loop.true_jumps,jmp);
-}
-
-// get_instr_cursor is only for bytecode
-void emit_break(Parser *fs, Source line, elf_StackId with_value_register) {
-	__debugbreak();
-
-	ASSERT(fs->nloops > 0);
-	Instr jmp;
-	FileBlock *bl;
-
-	bl=get_loop_block(fs,with_value_register);
-	ASSERT(bl!=0);
-	add_block_flags(fs,BLOCK_ENDED);
-
-	jmp=emit_jump(fs,line,get_instr_cursor(fs));
-	ARRAY_ADD(bl->leavejumps,jmp);
-}
-#endif
-#endif

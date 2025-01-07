@@ -11,7 +11,7 @@ int elf_add_const_int(elf_State *S, elf_Int i) {
 	return index;
 }
 int elf_add_const_num(elf_State *S, elf_Num i) {
-	int index = ARRAY_GROW(S->M->integers,1);
+	int index = ARRAY_GROW(S->M->numbers,1);
 	S->M->numbers[index] = i;
 	return index;
 }

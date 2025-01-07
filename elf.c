@@ -177,7 +177,6 @@ typedef struct elf_State {
 } elf_State;
 
 
-#include "src/ir.h"
 #include "src/parse.h"
 
 #include "src/debug.c"
@@ -193,7 +192,6 @@ typedef struct elf_State {
 
 
 #include "src/lexer.c"
-#include "src/ir.c"
 #include "src/gen.c"
 #include "src/parse.c"
 #include "src/user.c"

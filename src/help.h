@@ -1,9 +1,20 @@
 /*
 ** See Copyright Notice In elf.h
 ** help.h
-** internal utility macros
 */
+//todo: rename to base
 
+enum{true=1,false=0};
+
+
+#define STATIC_ASSERT(x) typedef char _static_assert_[x ? 1 : -1]
+
+
+STATIC_ASSERT(sizeof(elf_Int)==sizeof(elf_i64));
+STATIC_ASSERT(sizeof(elf_Num)==sizeof(elf_f64));
+
+STATIC_ASSERT(sizeof(elf_i64)==8);
+STATIC_ASSERT(sizeof(elf_f64)==8);
 
 
 #if defined(__EMSCRIPTEN__)
@@ -60,8 +71,8 @@
 #define UCAST(D,T) ( ((union { T _; }){D})._ )
 
 
-#define XTEST_(X) #X
-#define XTEXT(X) XTEST_(X)
+#define XTEXT_(X) #X
+#define XTEXT(X) XTEXT_(X)
 
 
 #define XFUSE_(X,Y) X##Y
