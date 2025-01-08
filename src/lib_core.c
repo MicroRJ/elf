@@ -250,7 +250,7 @@ int core_lib_include(elf_State *R) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);
-			elf_tset(globals,VSTR(ref),globals->array[entry.idx]);
+			elf_table_set(globals,VSTR(ref),globals->array[entry.idx]);
 		}
 	}
 	return 0;

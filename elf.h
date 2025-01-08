@@ -224,7 +224,7 @@ elAPI elf_Table *elf_alloc_table(elf_State *);
 elAPI int         elf_get_string_length(elf_String *);
 elAPI elf_Hash    elf_get_string_hash(elf_String *);
 elAPI char       *elf_get_string_text(elf_String *);
-elAPI elf_Bool    elf_get_strings_eq(elf_String *x, elf_String *y);
+elAPI bool    elf_get_strings_eq(elf_String *x, elf_String *y);
 
 
 /* tries a key, if the key is found it returns its address,
@@ -263,9 +263,11 @@ elAPI void elf_tadd(elf_Table *table, elf_Value thing);
 elAPI void elf_tadd_tab(elf_Table *table, elf_Table *thing);
 
 /* table set using value field */
-elAPI elf_Bool elf_tset(elf_Table *table, elf_Value k, elf_Value v);
+elAPI bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v);
 
-/* table set bindings */
+/* todo: deprecate!
+
+table set bindings */
 elAPI void elf_tsetx_bindings(elf_State *S, elf_Table *tab, elf_CBinding *list, int num);
 
 /* table set using string field */

@@ -152,7 +152,7 @@ void elf_check_table(elf_Table *table) {
 }
 
 
-elf_Bool elf_tset(elf_Table *table, elf_Value k, elf_Value v) {
+elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_check_table(table);
 	elf_Int slot = elf_ttry(table,k);
 	/* todo: instead return an error here */
@@ -232,7 +232,7 @@ void elf_merge_tables(elf_Table *tab, elf_Table *merger) {
 	for (i=0;i<merger->ntotal;++i) {
 		elf_Entry it = merger->slots[i];
 		if (it.key.tag == elf_TAG_NIL) continue;
-		elf_tset(tab,it.key,merger->array[it.idx]);
+		elf_table_set(tab,it.key,merger->array[it.idx]);
 	}
 }
 

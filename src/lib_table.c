@@ -128,7 +128,7 @@ int table_lib_xadd(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int length = ARRAY_LENGTH(tab->array);
 	FOR_RANGE(i,0,elf_get_num_args(R)) {
-		elf_tset(tab,VINT(length+i),elf_get_arg(R,i));
+		elf_table_set(tab,VINT(length+i),elf_get_arg(R,i));
 	}
 	return 0;
 }
@@ -434,7 +434,7 @@ elf_Table *elf_tabcopy(elf_State *S, elf_Table *tab) {
 		elf_Entry it = tab->slots[i];
 		if (it.key.tag == elf_TAG_NIL) continue;
 		elf_Value item = tab->array[it.idx];
-		elf_tset(copy,it.key,item);
+		elf_table_set(copy,it.key,item);
 	}
 	return copy;
 }
@@ -447,7 +447,7 @@ elf_Table *elf_clone_table(elf_State *S, elf_Table *tab) {
 	for ( i = 0; i < tab->ntotal; ++i ) {
 		elf_Entry it = tab->slots[i];
 		if (it.key.tag == elf_TAG_NIL) continue;
-		elf_tset(clone,it.key,tab->array[it.idx]);
+		elf_table_set(clone,it.key,tab->array[it.idx]);
 	}
 	return clone;
 }
@@ -589,7 +589,7 @@ int table_lib_diff(elf_State *R) {
 		elf_Entry it = tab->slots[i];
 		if (it.key.tag == elf_TAG_NIL) continue;
 		if (elf_table_contains(sub,it.key)) continue;
-		elf_tset(dif,it.key,tab->array[it.idx]);
+		elf_table_set(dif,it.key,tab->array[it.idx]);
 	}
 	elf_add_tab(R,dif);
 	return 1;

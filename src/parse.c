@@ -208,8 +208,8 @@ static entityID parser_bind(Parser *parser, Source line, int flags, char *name, 
 	return entity_id;
 }
 
-/* if no assignment is found, the return is tree
-passed in */
+/* if no assignment is found, the return is
+the tree passed in */
 static treeID parse_assign(Parser *parser, treeID x) {
 	ASSERT(x!=NO_TREE);
 

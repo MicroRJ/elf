@@ -280,27 +280,27 @@ elf_Table *elf_tgets_tab(elf_Table *tab, elf_String *key) {
 
 
 void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val) {
-	elf_tset(tab,VSTR(key),VSTR(val));
+	elf_table_set(tab,VSTR(key),VSTR(val));
 }
 
 
 void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val) {
-	elf_tset(tab,VSTR(key),VINT(val));
+	elf_table_set(tab,VSTR(key),VINT(val));
 }
 
 
 void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val) {
-	elf_tset(tab,VSTR(key),VNUM(val));
+	elf_table_set(tab,VSTR(key),VNUM(val));
 }
 
 
 void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val) {
-	elf_tset(tab,VSTR(key),VTAB(val));
+	elf_table_set(tab,VSTR(key),VTAB(val));
 }
 
 
 void elf_tsetx_bindings(elf_State *R, elf_Table *tab, elf_CBinding *list, int num) {
 	FOR_RANGE(i,0,num) {
-		elf_tset(tab,VSTR(elf_alloc_string(R,list[i].name)),VCFN(list[i].fn));
+		elf_table_set(tab,VSTR(elf_alloc_string(R,list[i].name)),VCFN(list[i].fn));
 	}
 }

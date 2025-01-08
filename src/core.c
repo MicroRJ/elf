@@ -640,7 +640,7 @@ int elf_run(elf_State *R) {
 						locals[BC_ARGX(byte)].y_f32=zz.x_num;
 					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
 				} else if (xx.tag==elf_TAG_TAB) {
-					elf_tset(xx.x_tab,yy,zz);
+					elf_table_set(xx.x_tab,yy,zz);
 				} else if (xx.tag==elf_TAG_OBJ) {
 					elf_Value args[] = { yy, zz };
 					call_overload(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
