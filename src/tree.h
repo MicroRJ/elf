@@ -7,7 +7,6 @@ typedef struct treeT treeT;
 typedef treeT *treeID;
 
 /* MIND ORDER */
-// todo:dummy tree could be replaced with NOP
 #define TREEDEF(_)   \
 _(TREE_NONE)         \
 _(TREE_NOP)          \
@@ -32,7 +31,6 @@ _(EXPR_BIT_OR)       \
 _(EXPR_BIT_XOR)      \
 _(EXPR_NIL_AND)      \
 _(EXPR_NIL_OR)       \
-_(TREE_DUMMY)        \
 _(TREE_GLOBAL)       \
 _(TREE_UPVALUE)      \
 _(EXPR_NUM)          \
@@ -80,10 +78,10 @@ typedef enum treeTy {
 
 
 struct treeT {
-	treeKi kind;
-	treeTy type;
-	Source line;
-	treeID prox;
+	treeKi   kind;
+	treeTy   type;
+	Source   line;
+	treeID   prox;
 	union {
 		struct {
 			treeID x,y,*z;
@@ -136,7 +134,7 @@ static treeTy get_tree_type(Parser *, treeID id);
 static Source get_tree_line(Parser *, treeID id);
 static treeID tree_xyz(Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y, treeID *z);
 static treeID tree_binary(Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y);
-static treeID tree_x(Parser *, Source, treeKi k, treeTy ty, treeID x);
+static treeID tree_unary(Parser *, Source, treeKi k, treeTy ty, treeID x);
 static treeID tree_nil(Parser *, Source);
 static treeID tree_int(Parser *, Source, elf_Int i);
 static treeID tree_num(Parser *, Source, elf_Num n);
@@ -149,7 +147,6 @@ static treeID tree_store(Parser *, Source line, treeID x, treeID y);
 
 static treeID tree_ret(Parser *, Source, treeID i);
 static treeID tree_goto(Parser *, Source);
-static treeID tree_dummy(Parser *, Source);
 
 static treeID tree_this_ref(Parser *, Source line);
 static treeID tree_global_ref(Parser *, Source line, char *name, int x);

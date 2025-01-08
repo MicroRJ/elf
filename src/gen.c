@@ -269,7 +269,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 		goto esc;
 	}
 	switch (tree.kind) {
-		case TREE_DUMMY: {
+		case TREE_NOP: {
 			if (ndst<1) goto esc;
 			if (dst<0) dst=set_mem(parser,id);
 		} break;

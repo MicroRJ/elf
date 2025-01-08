@@ -10,10 +10,6 @@
 #define MOVEN(n) ((file->pos += n))
 #define PICK(xx) ((POS0()==(xx))?MOVE(),1:0)
 
-#define LEX1(C,T) case C:MOVE();tk.type=T;break
-#define LEX2(A,X,B,Y) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;break
-#define LEX3(A,X,B,Y,C,Z) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;else if(PICK(C))tk.type=Z;break
-
 static void new_line(Parser *fs) {
 	fs->line_pos = fs->pos;
 	fs->line_num ++;
@@ -370,8 +366,27 @@ static tokenT get_tok(Parser *file) {
 			}
 		} break;
 
+		case ':': {
+			MOVE();
+			tk.type=TK_COLON;
+			if(PICK(':')){
+				tk.type=TK_COLON;
+				if(PICK('=')){
+					tk.type=TK_HARD_BIND;
+				}
+			}else if(PICK('=')){
+				tk.type=TK_BIND;
+			}
+		} break;
+
+#define LEX1(C,T) case C:MOVE();tk.type=T;break
+#define LEX2(A,X,B,Y) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;break
+#define LEX3(A,X,B,Y,C,Z) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;else if(PICK(C))tk.type=Z;break
+
 		LEX3('>',TK_GT,'=',TK_GTEQ,'>',TK_SHR);
+
 		LEX3('?',TK_QMARK,'?',TK_NIL_OR,'=',TK_NIL_ASSIGN);
+
 		LEX3('!',TK_EXCLAMATION_MARK,'!',TK_NIL_AND,'=',TK_NEQ);
 		LEX2('|',TK_BIT_OR,'|',TK_LOG_OR);
 		LEX2('&',TK_BIT_AND,'&',TK_LOG_AND);
@@ -385,7 +400,6 @@ static tokenT get_tok(Parser *file) {
 		LEX1('}',TK_CURLY_RIGHT);
 		LEX1(',',TK_COMMA);
 		LEX1('%',TK_MOD);
-		LEX1(':',TK_COLON);
 		LEX1('^',TK_BIT_XOR);
 		LEX1('-',TK_SUB);
 		LEX1('+',TK_ADD);

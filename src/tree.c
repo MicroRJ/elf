@@ -28,16 +28,18 @@ static treeID tree_xyz(Parser *parser, Source line, int kind, int type, treeID x
 	v->z=z;
 	return v;
 }
+static treeID tree_nullary(Parser *parser, Source line, int k, int t) {
+	return tree_xyz(parser,line,k,t,NO_TREE,NO_TREE,NO_TREE);
+}
+static treeID tree_unary(Parser *parser, Source line, int k, int t, treeID x) {
+	return tree_xyz(parser,line,k,t,x,NO_TREE,NO_TREE);
+}
 static treeID tree_binary(Parser *parser, Source line, int k, int t, treeID x, treeID y) {
 	return tree_xyz(parser,line,k,t,x,y,0);
 }
-static treeID tree_x(Parser *parser, Source line, int k, int t, treeID x) {
-	return tree_binary(parser,line,k,t,x,NO_TREE);
+static treeID tree_nop(Parser *parser, Source line) {
+	return tree_nullary(parser,line,TREE_NOP,NT_ANY);
 }
-static treeID tree_nullary(Parser *parser, Source line, int k, int t) {
-	return tree_x(parser,line,k,t,NO_TREE);
-}
-
 
 static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
 	treeID v;
@@ -86,15 +88,12 @@ static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
 // xx 	return tree_binary(parser,line,EXPR_TYPEGUARD,y,x,y);
 // xx }
 static treeID tree_ret(Parser *parser, Source line, treeID x) {
-	return tree_x(parser,line,TREE_RET,NT_ANY,x);
+	return tree_unary(parser,line,TREE_RET,NT_ANY,x);
 }
 static treeID tree_goto(Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_GOTO,NT_ANY);
 }
-// todo: remove!
-static treeID tree_dummy(Parser *parser, Source line) {
-	return tree_nullary(parser,line,TREE_DUMMY,NT_ANY);
-}
+
 static treeID tree_block(Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,STAT_BLOCK,NT_NON,NO_TREE,NO_TREE,z);
 }
@@ -116,7 +115,7 @@ static treeID tree_multi(Parser *parser, Source line, treeID *z) {
 }
 
 static treeID tree_assign_mem(Parser *parser, Source line, treeID x) {
-	return tree_x(parser,line,TREE_ASSIGN_MEM,NT_NON,x);
+	return tree_unary(parser,line,TREE_ASSIGN_MEM,NT_NON,x);
 }
 static treeID tree_store(Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);

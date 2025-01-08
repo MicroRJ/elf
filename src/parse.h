@@ -10,8 +10,8 @@ typedef struct {
 	unsigned int eol: 1;
 	union {
 		elf_i64 integer;
-		elf_f64 number;
-		char 	 *text;
+		elf_f64  number;
+		char 	    *text;
 	};
 } tokenT;
 
@@ -94,9 +94,12 @@ _(LETTER             , "letter")    \
 _(WORD               ,   "word")    \
 _(QMARK              ,"?")          \
 _(EXCLAMATION_MARK   ,"!")          \
+_(BIND               ,":=")         \
+_(HARD_BIND          ,"::=")        \
 _(ASSIGN             ,"=")          \
 _(NIL_ASSIGN         ,"?=")         \
 _(COLON              ,":")          \
+_(COLON_COLON        ,":")          \
 _(SEMI_COLON         ,";")          \
 _(COMMA              ,",")          \
 _(DOT                ,".")          \
@@ -125,31 +128,13 @@ typedef enum tokenTy {
 #undef OPITEM
 } tokenTy;
 
-#include "tree.h"
-
-typedef struct {
-	int *t,*f;
-} jumpS;
-
-
-typedef struct BranchJumps {
-	/* Conditional false jump instructions
-	to be patched so that they jump to
-	the next block or instruction */
-	int *jz;
-	/* list of exit jump instructions from
-	each consecutive block to be patched */
-	int *j;
-} BranchJumps;
-
 #define NO_SLOT (-1)
 #define NO_JUMP (-0)
 #define NO_LINE (0)
 
-
 typedef int entityID;
-typedef struct { entityID id; } entityID2;
-#define ENTITY(X) XLITERAL(entityID2){X}
+
+#include "tree.h"
 
 #define NO_ENTITY -1
 
@@ -171,6 +156,23 @@ typedef struct {
 	char    *name;
 	Source   line;
 } entityT;
+
+
+
+typedef struct {
+	int *t,*f;
+} jumpS;
+
+
+typedef struct BranchJumps {
+	/* Conditional false jump instructions
+	to be patched so that they jump to
+	the next block or instruction */
+	int *jz;
+	/* list of exit jump instructions from
+	each consecutive block to be patched */
+	int *j;
+} BranchJumps;
 
 typedef struct Block Block;
 struct Block {
@@ -196,7 +198,7 @@ struct Parser {
 	char            *line_pos;
 	char                 *pos;
 	int              line_num;
-	treeID          enc;
+	treeID                enc;
 	treeID         *functions;
 	entityT         *entities;
 	entityID     entity_index;
