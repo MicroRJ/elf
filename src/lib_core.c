@@ -20,8 +20,8 @@ static int core_lib_get_object_color(elf_State *R);
 static int core_lib_set_object_trap(elf_State *R);
 static int core_lib_get_object_address(elf_State *R);
 static int core_lib_merge_tables(elf_State *R);
-static int core_lib_get_metatable(elf_State *R);
-static int core_lib_set_metatable(elf_State *R);
+static int core_lib_get_meta(elf_State *R);
+static int core_lib_set_meta(elf_State *R);
 static int core_lib_abort(elf_State *R);
 static int core_lib_exit(elf_State *R);
 static int core_lib_flags(elf_State *R);
@@ -148,13 +148,13 @@ int core_lib_merge_tables(elf_State *R) {
 }
 
 
-int core_lib_get_metatable(elf_State *R) {
+int core_lib_get_meta(elf_State *R) {
 	elf_add_tab(R,elf_get_obj(R,0)->meta);
 	return 1;
 }
 
 
-int core_lib_set_metatable(elf_State *R) {
+int core_lib_set_meta(elf_State *R) {
 	elf_get_obj(R,0)->meta=elf_get_tab(R,1);
 	PUSHV(R,elf_get_arg(R,0));
 	return 1;
@@ -552,7 +552,7 @@ int core_lib_list_volumes(elf_State *R) {
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				elf_tadd(path_names,VSTR(elf_alloc_string(R,buffer)));
+				elf_array_add(path_names,VSTR(elf_alloc_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -591,12 +591,12 @@ static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t f
 		elf_add_cls(state,cls);
 		elf_add_obj(state,elf_get_this(state));
 		elf_add_tab(state,file);
-		nrets=elf_call_function(state,2,1);
+		nrets=elf_call(state,2,1);
 	}
 	if (storage){
 		elf_tadd_tab(storage,file);
 	}
-		// int results = 0; NO_CODE; // elf_call_function(R,base,1,1);
+		// int results = 0; NO_CODE; // elf_call(R,base,1,1);
 		// if (is_directory) {
 		// 	if ((results > 0) && elf_get_int(R,base) != 0) {
 		// 		core_lib_enumerate_folder_(R,path,cls);
@@ -741,11 +741,10 @@ void elf_include_core_lib(elf_State *R) {
 	elf_gsetx_cfn(R,"elf.get_allocated_objects",core_lib_get_allocated_objects);
 	elf_gsetx_cfn(R,"elf.get_allocated_memory",core_lib_get_allocated_memory);
 	elf_gsetx_cfn(R,"elf.collect",core_lib_collect);
-
 	elf_gsetx_cfn(R,"elf.tagof",core_lib_tagof);
 
-	elf_gsetx_cfn(R,"elf.set_object_metatable",core_lib_set_metatable);
-	elf_gsetx_cfn(R,"elf.get_object_metatable",core_lib_get_metatable);
+	elf_gsetx_cfn(R,"elf.set_meta",core_lib_set_meta);
+	elf_gsetx_cfn(R,"elf.get_meta",core_lib_get_meta);
 	elf_gsetx_cfn(R,"elf.get_object_address",core_lib_get_object_address);
 	elf_gsetx_cfn(R,"elf.get_object_color",core_lib_get_object_color);
 	elf_gsetx_cfn(R,"elf.set_object_trap",core_lib_set_object_trap);

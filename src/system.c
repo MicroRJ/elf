@@ -396,7 +396,7 @@ static int sys_enumerate_folder(Allocator alloc, char const *folder, void *user,
 			elf_tsets_str(file,elf_new_string(R,"name"),name);
 			elf_tsets_str(file,elf_new_string(R,"path"),path);
 			elf_tsets_int(file,elf_new_string(R,"isdir"),isdir);
-			int r = elf_call_function(R,base,1,1);
+			int r = elf_call(R,base,1,1);
 			if ((r > 0) && isdir && elf_get_int(R,base)) {
 				core_lib_enumerate_folder_(R,path,cls);
 			}

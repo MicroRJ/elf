@@ -7,8 +7,8 @@
 /* todo: to be revised */
 
 
-static int table_lib_get_metatable(elf_State *);
-static int table_lib_set_metatable(elf_State *);
+static int table_lib_get_meta(elf_State *);
+static int table_lib_set_meta(elf_State *);
 static int table_lib_add(elf_State *);
 static int table_lib_xadd(elf_State *);
 static int table_lib_xremove(elf_State *);
@@ -39,8 +39,8 @@ static int table_lib_swap(elf_State *);
 
 elf_Table *new_table_lib(elf_State *R) {
 	elf_CBinding lib[] = {
-		{"get_metatable",table_lib_get_metatable},
-		{"set_metatable",table_lib_set_metatable},
+		{"get_meta",table_lib_get_meta},
+		{"set_meta",table_lib_set_meta},
 		{"length",table_lib_length},
 		{"tally",table_lib_tally},
 		{"delete",table_lib_delete},
@@ -93,7 +93,7 @@ int table_lib_contains(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
 	elf_Value key = elf_get_arg(S,0);
-	elf_add_int(S,slotiskey(tab,elf_ttry(tab,key)));
+	elf_add_int(S,slotiskey(tab,elf_table_try(tab,key)));
 	return 1;
 }
 
@@ -105,14 +105,14 @@ int table_lib_get_collisions(elf_State *S) {
 }
 
 
-int table_lib_get_metatable(elf_State *R) {
+int table_lib_get_meta(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_add_tab(R,POBJ(tab)->meta);
 	return 1;
 }
 
 
-int table_lib_set_metatable(elf_State *R) {
+int table_lib_set_meta(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_add_tab(R,POBJ(tab)->meta);
 	POBJ(tab)->meta = elf_get_tab(R,0);
@@ -138,7 +138,7 @@ int table_lib_add(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	int i;
 	for ( i = 0; i < elf_get_num_args(R); ++i ) {
-		elf_tadd(tab,elf_get_arg(R,i));
+		elf_array_add(tab,elf_get_arg(R,i));
 	}
 	return 0;
 }
@@ -156,16 +156,16 @@ int table_lib_itemize(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *result = elf_new_table(R);
 	FOR_ARRAY(i,tab->array) {
-		elf_tadd(result,tab->array[i]);
+		elf_array_add(result,tab->array[i]);
 	}
 	FOR_RANGE(i,0,elf_get_num_args(R)) {
 		if (elf_get_tag(R,0)==elf_TAG_TAB) {
 			elf_Table *that = elf_get_tab(R,0);
 			FOR_ARRAY(j,that->array) {
-				elf_tadd(result,that->array[j]);
+				elf_array_add(result,that->array[j]);
 			}
 		} else {
-			elf_tadd(result,elf_get_arg(R,i));
+			elf_array_add(result,elf_get_arg(R,i));
 		}
 	}
 	return 1;
@@ -215,7 +215,7 @@ int table_lib_delete(elf_State *R) {
 	elf_Value key = elf_get_arg(R,0);
 	elf_Entry *slots = tab->slots;
 	elf_Value *array = tab->array;
-	elf_Int slot = elf_ttry(tab,key);
+	elf_Int slot = elf_table_try(tab,key);
 	if ((slot < 0) || (slots[slot].key.tag == elf_TAG_NIL)) {
 		elf_fail(R,NO_BYTE,"invalid key");
 		goto leave_;
@@ -351,7 +351,7 @@ int table_lib_find_aliases(elf_State *R) {
 	elf_Value key = elf_get_arg(R,0);
 	elf_Table *list = elf_new_table(R);
 	if (key.tag != elf_TAG_NIL) {
-		elf_Int slot = elf_ttry(tab,key);
+		elf_Int slot = elf_table_try(tab,key);
 		if (slotiskey(tab,slot)) {
 			elf_Entry entry = tab->slots[slot];
 			elf_Int i;
@@ -360,7 +360,7 @@ int table_lib_find_aliases(elf_State *R) {
 				elf_Entry it = tab->slots[i];
 				if (it.idx != entry.idx) continue;
 				if (it.key.tag == elf_TAG_NIL) continue;
-				elf_tadd(list,it.key);
+				elf_array_add(list,it.key);
 			}
 		}
 	}
@@ -384,7 +384,7 @@ int table_lib_bubble_sort(elf_State *R) {
 			PUSHV(R,arr[i+0]);
 			PUSHV(R,arr[i+1]);
 			NO_CODE;
-			int r = elf_call_function(R,2,1);
+			int r = elf_call(R,2,1);
 			ASSERT(r == 1);
 			// if (elf_get_int(R,base))
 			{
@@ -416,7 +416,7 @@ int table_lib_foreach(elf_State *R) {
 	// 	R->stack[v] = tab->array[it.idx];
 	// 	/* todo: should yield boolean to signal whether to
 	// 	stop or not */
-	// 	int ny = elf_call_function(R,tab,0,0,2,0);
+	// 	int ny = elf_call(R,tab,0,0,2,0);
 	// 	if (ny != 0) if (elf_get_int(R,0) != 1) break;
 	// }
 	return 0;
@@ -460,7 +460,7 @@ int table_lib_array(elf_State *S) {
 	elf_Table *array = elf_new_table(S);
 	elf_Int i;
 	for (i = 0; i < ARRAY_LENGTH(tab->array); ++i) {
-		elf_tadd(array,tab->array[i]);
+		elf_array_add(array,tab->array[i]);
 	}
 	return 1;
 }
@@ -482,7 +482,7 @@ int table_lib_slice(elf_State *R) {
 	if (elf_get_num_args(R) >= 2) y = elf_get_int(R,1);
 	elf_Table *slice = elf_new_table(R);
 	while (x < y) {
-		elf_tadd(slice,tab->array[x ++]);
+		elf_array_add(slice,tab->array[x ++]);
 	}
 	return 1;
 }

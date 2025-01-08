@@ -21,7 +21,7 @@ int elf_add_proto(elf_State *S) {
 }
 
 int elf_get_global(BC_Module *M, elf_String *name) {
-	if (name != 0) return elf_tget_ornew(M->globals,VSTR(name));
+	if (name != 0) return elf_table_get_or_add(M->globals,VSTR(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
 
@@ -192,6 +192,7 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	} else {
 		printf("error: %s\n",error);
+		printf("source information could not be found, file id: %i\n",fileid);
 	}
 
 	printf(" -- BYTE TRACE:\n");

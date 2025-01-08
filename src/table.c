@@ -47,14 +47,14 @@ void elf_free_table_contents(elf_Table *tab) {
 }
 
 
-elf_Int elf_get_table_length(elf_Table *table) {
+elf_Int elf_get_array_tally(elf_Table *table) {
 	return ARRAY_LENGTH(table->array);
 }
 
 
 
 elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
-	return elf_tget_any(tab,VSTR(key));
+	return elf_table_get(tab,VSTR(key));
 }
 
 
@@ -64,7 +64,7 @@ elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	elf_Int slot;
 	length=text_length(key);
 	hash=elf_hash_text(key);
-	slot=elf_ttryx(tab,key,length,hash);
+	slot=elf_table_try_text(tab,key,length,hash);
 	ASSERT(slot!=-2);
 	if (slotiskey(tab,slot)) {
 		return slot2value(tab,slot);
@@ -78,7 +78,7 @@ out of the hash value. First hash computes the starting index,
 and the secondary hash computes the step by which we increment.
 since the increment depends on the data, it should reduce
 clustering. */
-elf_Int elf_ttry(elf_Table *tab, elf_Value key) {
+elf_Int elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
 	elf_Entry *slots = tab->slots;
 	elf_Int ntotal = tab->ntotal;
@@ -99,7 +99,7 @@ elf_Int elf_ttry(elf_Table *tab, elf_Value key) {
 }
 
 
-elf_Int elf_ttryx(elf_Table *tab, const char *text, elf_Int length, elf_Hash hash) {
+elf_Int elf_table_try_text(elf_Table *tab, const char *text, elf_Int length, elf_Hash hash) {
 	elf_Entry *slots = tab->slots;
 	elf_Int ntotal = tab->ntotal;
 	elf_Int head = hash % ntotal;
@@ -140,7 +140,7 @@ void elf_check_table(elf_Table *table) {
 			old_slot=table->slots[i];
 			if (old_slot.key.tag==elf_TAG_NIL) continue;
 
-			new_slot=elf_ttry(&new_table,old_slot.key);
+			new_slot=elf_table_try(&new_table,old_slot.key);
 			ASSERT(new_slot>=0);
 			new_table.slots[new_slot]=old_slot;
 		}
@@ -154,7 +154,7 @@ void elf_check_table(elf_Table *table) {
 
 elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_check_table(table);
-	elf_Int slot = elf_ttry(table,k);
+	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
 	elf_Entry *entry = table->slots + slot;
@@ -173,8 +173,8 @@ elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 }
 
 
-elf_Value elf_tget_any(elf_Table *tab, elf_Value k) {
-	elf_Int slot = elf_ttry(tab,k);
+elf_Value elf_table_get(elf_Table *tab, elf_Value k) {
+	elf_Int slot = elf_table_try(tab,k);
 	if (slot == -2) NO_CODE;
 	if (slotiskey(tab,slot)) {
 		return slot2value(tab,slot);
@@ -183,11 +183,11 @@ elf_Value elf_tget_any(elf_Table *tab, elf_Value k) {
 }
 
 
-elf_Int elf_tget_ornew(elf_Table *table, elf_Value key) {
+elf_Int elf_table_get_or_add(elf_Table *table, elf_Value key) {
 	elf_Int lot,idx;
 	ASSERT(!ISNILV(key));
 	elf_check_table(table);
-	lot=elf_ttry(table,key);
+	lot=elf_table_try(table,key);
 	ASSERT(lot>=0);
 	if (!slotiskey(table,lot)) {
 		idx=ARRAY_GROW(table->array,1);
@@ -203,9 +203,9 @@ elf_Int elf_tget_ornew(elf_Table *table, elf_Value key) {
 
 void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias) {
 	elf_check_table(tab);
-	elf_Int key_slot = elf_ttry(tab,key);
+	elf_Int key_slot = elf_table_try(tab,key);
 	if (slotiskey(tab,key_slot)) {
-		elf_Int alias_slot = elf_ttry(tab,alias);
+		elf_Int alias_slot = elf_table_try(tab,alias);
 		tab->slots[alias_slot].key = alias;
 		tab->slots[alias_slot].idx = tab->slots[key_slot].idx;
 	} else elf_fail(S,NO_BYTE,"attempted to alias a key that was never added");
@@ -213,11 +213,11 @@ void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alia
 
 
 elf_Bool elf_table_contains(elf_Table *tab, elf_Value key) {
-	return slotiskey(tab,elf_ttry(tab,key));
+	return slotiskey(tab,elf_table_try(tab,key));
 }
 
 
-void elf_tadd(elf_Table *table, elf_Value v) {
+void elf_array_add(elf_Table *table, elf_Value v) {
 	ARRAY_ADD(table->array,v);
 }
 

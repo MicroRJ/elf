@@ -408,7 +408,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
 		} break;
-		case EXPR_CALL: {
+		case TREE_CALL: {
 			treeT xx;
 			int nargs;
 
@@ -480,7 +480,7 @@ int tree2o(int kind) {
 		case EXPR_FIELD: 	   return BC_GETFIELD;     // *
 		case EXPR_INDEX: 	   return BC_GETINDEX;     // *
 		case EXPR_METAFIELD: return BC_GETMETAFIELD; // *
-		case EXPR_CALL:      return BC_CALL;         // *
+		case TREE_CALL:      return BC_CALL;         // *
 		case EXPR_ADD:       return BC_ADD;
 		case EXPR_SUB:       return BC_SUB;
 		case EXPR_DIV:       return BC_DIV;
@@ -795,7 +795,7 @@ treeID desugar_range_expr(Parser *fs, treeID x, int flags) {
 			lo=get_tree(fs,node.y).x;
 			hi=get_tree(fs,node.y).y;
 			if (lo==NO_TREE) lo=tree_int(fs,line,0);
-			if (hi==NO_TREE) hi=tree_call_metafield(fs,line,array,0,"length");
+			if (hi==NO_TREE) hi=tree_meta_call(fs,line,array,0,"length");
 
 			begin_range_loop(fs,line,index,lo,hi);
 			value_reg=any_reg_deprecated(fs,value);

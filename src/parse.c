@@ -362,7 +362,7 @@ static treeID parser_load(Parser *parser){
 //
 // 'new' <meta-table> ( <argument-list> )
 //
-// ret elf.set_object_metatable({},Vector2):__new(x,y)
+// ret elf.set_meta({},Vector2):__new(x,y)
 //
 static treeID parse_new(Parser *parser){
 	tokenT tok;
@@ -371,8 +371,15 @@ static treeID parse_new(Parser *parser){
 	// todo: instead use parse postfix, break
 	// the call expression down
 	treeID meta,*args;
-	meta=parse_unary(parser,0);
-	args=parse_args(parser);
+	meta=parse_postfix(parser,0);
+	if(meta->kind==TREE_CALL){
+		args=meta->z;
+		meta=meta->x;
+		elf_debug_log("meta: %s", tree2s[meta->kind]);
+		elf_debug_log("args: %lli", ARRAY_LENGTH(args));
+	}else{
+		parser_dialog(parser,tok.line,"invalid expression");
+	}
 
 	treeID table;
 	if ((ARRAY_LENGTH(args) == 1) && (get_tree_kind(parser,args[0]) == TREE_NEW_TABLE)) {
@@ -384,14 +391,14 @@ static treeID parse_new(Parser *parser){
 
 	/* note: relies on the function returning the table,
 	may want to move away from this */
-	table=tree_call_set_metatable(parser,tok.line,table,meta);
+	table=tree_call_set_meta(parser,tok.line,table,meta);
 
 	treeID v;
 	v=tree_str(parser,tok.line,"__new");
 	/* todo: this is sort of inefficient, but if we don't issue
 	the call instruction with a meta-field, the generator won't
 	insert the 'this' parameter */
-	v=tree_metafield(parser,tok.line,table,v);
+	v=tree_meta_field(parser,tok.line,table,v);
 	v=tree_call(parser,tok.line,v,args);
 	return v;
 }
@@ -629,6 +636,7 @@ static treeID parse_postfix(Parser *parser, int flags) {
 	tokenT tok;
 	treeID v;
 
+	tok=parser->tok;
 	v=parse_unary(parser,flags);
 
 	while(parser->tok.type != TK_NONE && !parser->tok_prev.eol) {
@@ -640,8 +648,7 @@ static treeID parse_postfix(Parser *parser, int flags) {
 				// table.(x,y) -> (table.x, table.y)
 				if (pick_tok(parser,TK_PAREN_LEFT)) {
 					tokenT n;
-					treeID x,y,*z;
-					z=0;
+					treeID x,y,*z=0;
 					do {
 						n=take_tok(parser,TK_WORD);
 						y=tree_str(parser,n.line,n.text);
@@ -691,7 +698,7 @@ static treeID parse_postfix(Parser *parser, int flags) {
 				get_tok(parser);
 				n=take_tok(parser,TK_WORD);
 				y=tree_str(parser,n.line,n.text);
-				v=tree_metafield(parser,tok.line,v,y);
+				v=tree_meta_field(parser,tok.line,v,y);
 			} break;
 			case TK_CURLY_LEFT:
 			case TK_PAREN_LEFT: {
@@ -1071,7 +1078,7 @@ static bool parse_for(Parser *parser){
 				// todo: we use this so often, make intrinsic
 				treeID *args=0;
 				ARRAY_ADD(args,index);
-				v=tree_call_metafield(parser,tok.line,array,args,"idx");
+				v=tree_meta_call(parser,tok.line,array,args,"idx");
 
 				prev=tree_store(parser,tok.line,value,v);
 			}else{
@@ -1219,7 +1226,7 @@ static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 				get_tok(parser);
 				n=take_tok(parser,TK_WORD);
 				y=tree_str(parser,n.line,n.text);
-				v=tree_metafield(parser,tk.line,v,y);
+				v=tree_meta_field(parser,tk.line,v,y);
 			} break;
 			case TK_CURLY_LEFT:
 			case TK_PAREN_LEFT: {

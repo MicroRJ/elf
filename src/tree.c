@@ -37,6 +37,22 @@ static treeID tree_x(Parser *parser, Source line, int k, int t, treeID x) {
 static treeID tree_nullary(Parser *parser, Source line, int k, int t) {
 	return tree_x(parser,line,k,t,NO_TREE);
 }
+
+
+static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
+	treeID v;
+	v=tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
+	v->expr_global=x;
+	return v;
+}
+
+static treeID tree_global_ref_by_name(Parser *parser, Source line, char *name) {
+	int x = elf_get_global(parser->R->M,elf_alloc_string(parser->R,name));
+	ASSERT(x != -1);
+	return tree_global_ref(parser,line,name,x);
+}
+
+
 static treeID tree_nil(Parser *parser, Source line) {
 	return tree_nullary(parser,line,EXPR_NIL,NT_NIL);
 }
@@ -58,12 +74,14 @@ static treeID tree_str(Parser *parser, Source line, char *s) {
 	v->expr_str=s;
 	return v;
 }
+
 static treeID tree_table(Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_NEW_TABLE,NT_TAB);
 }
 static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,NO_TREE,z);
 }
+
 // xx static treeID tree_type_guard(Parser *parser, Source line, treeID x, int y) {
 // xx 	return tree_binary(parser,line,EXPR_TYPEGUARD,y,x,y);
 // xx }
@@ -73,6 +91,7 @@ static treeID tree_ret(Parser *parser, Source line, treeID x) {
 static treeID tree_goto(Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_GOTO,NT_ANY);
 }
+// todo: remove!
 static treeID tree_dummy(Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_DUMMY,NT_ANY);
 }
@@ -89,11 +108,8 @@ static treeID tree_index(Parser *parser, Source line, treeID x, treeID y) {
 static treeID tree_ranged_index(Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,EXPR_RANGE_INDEX,NT_ANY,x,y);
 }
-static treeID tree_metafield(Parser *parser, Source line, treeID x, treeID y) {
-	return tree_binary(parser,line,EXPR_METAFIELD,NT_ANY,x,y);
-}
 static treeID tree_call(Parser *parser, Source line, treeID x, treeID *z) {
-	return tree_xyz(parser,line,EXPR_CALL,NT_ANY,x,NO_TREE,z);
+	return tree_xyz(parser,line,TREE_CALL,NT_ANY,x,NO_TREE,z);
 }
 static treeID tree_multi(Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,EXPR_MULTI,NT_ANY,NO_TREE,NO_TREE,z);
@@ -112,8 +128,22 @@ static treeID tree_eq_nil(Parser *parser, Source line, treeID x) {
 	return tree_binary(parser,line,EXPR_EQ,NT_BOL,x,tree_nil(parser,line));
 }
 
-static treeID tree_call_metafield(Parser *parser, Source line, treeID x, treeID *z, char *name) {
-	treeID field = tree_metafield(parser,line,x,tree_str(parser,line,name));
+
+static treeID tree_meta_field(Parser *parser, Source line, treeID x, treeID y) {
+	return tree_binary(parser,line,EXPR_METAFIELD,NT_ANY,x,y);
+}
+
+static treeID tree_call_set_meta(Parser *parser, Source line, treeID object, treeID metatable) {
+	treeID fn = tree_global_ref_by_name(parser,line,"elf.set_meta");
+	treeID *z = 0;
+	ARRAY_ADD(z,object);
+	ARRAY_ADD(z,metatable);
+	return tree_call(parser,line,fn,z);
+}
+
+
+static treeID tree_meta_call(Parser *parser, Source line, treeID x, treeID *z, char *name) {
+	treeID field = tree_meta_field(parser,line,x,tree_str(parser,line,name));
 	return tree_call(parser,line,field,z);
 }
 
@@ -124,32 +154,9 @@ static treeID tree_upvalue_ref(Parser *parser, Source line, int x) {
 	return v;
 }
 
-static treeID tree_global_ref(Parser *parser, Source line, char *name, int x) {
-	treeID v;
-	v=tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
-	v->expr_global=x;
-	return v;
-}
-
-static treeID tree_global_ref_by_name(Parser *parser, Source line, char *name) {
-	int x = elf_get_global(parser->R->M,elf_alloc_string(parser->R,name));
-	ASSERT(x != -1);
-	return tree_global_ref(parser,line,name,x);
-}
-
-
 static treeID tree_call_pf(Parser *parser, Source line, treeID *args) {
 	treeID fn = tree_global_ref_by_name(parser,line,"elf.pf");
 	return tree_call(parser,line,fn,args);
-}
-
-
-static treeID tree_call_set_metatable(Parser *parser, Source line, treeID object, treeID metatable) {
-	treeID fn = tree_global_ref_by_name(parser,line,"elf.set_object_metatable");
-	treeID *z = 0;
-	ARRAY_ADD(z,object);
-	ARRAY_ADD(z,metatable);
-	return tree_call(parser,line,fn,z);
 }
 
 static treeID tree_if(Parser *parser, Source line, treeID pred, treeID true_clause, treeID else_clause) {
@@ -160,71 +167,3 @@ static treeID tree_if(Parser *parser, Source line, treeID pred, treeID true_clau
 	v->stat_if.else_clause=else_clause;
 	return v;
 }
-
-
-
-
-
-// todo: this doesn't require the id anymore, is just
-// the current function
-#if 0
-
-static elf_Bool is_binary_node(int kind) {
-	return kind >= EXPR_AND && kind <= EXPR_BIT_OR;
-}
-
-
-static void fpf_node(Parser *parser, FILE *io, treeID id) {
-	treeT node = get_tree(parser,id);
-	if (is_binary_node(node.kind)) {
-		fprintf(io, "(%s ", node2s[node.kind]);
-		fpf_node(parser,io,node.x);
-		fprintf(io, ", ");
-		fpf_node(parser,io,node.y);
-		fprintf(io, ")");
-	} else switch (node.kind) {
-		case EXPR_INDEX: {
-			fpf_node(parser,io,node.x);
-			fprintf(io, "[");
-			fpf_node(parser,io,node.y);
-			fprintf(io, "]");
-		} break;
-		case EXPR_INTEGER: fprintf(io,"int(%lli)",node.i); break;
-		case EXPR_NUMBER: fprintf(io,"num(%f)",node.n); break;
-		case EXPR_NIL: fprintf(io,"nil"); break;
-		// xx case EXPR_GROUP: {
-		// xx 	fprintf(io,"(");
-		// xx 	fpf_node(parser,io,node.x);
-		// xx 	fprintf(io,")");
-		// xx } break;
-		default: fprintf(io,"%s",node2s[node.kind]);
-	}
-}
-static ByteOP ir2b(int tt);
-
-static elf_Bool tree_is_lvalue(int kind) {
-	switch (kind) {
-		case EXPR_RANGE_INDEX:
-		case EXPR_GLOBAL:
-		case EXPR_LOCAL:
-		case EXPR_INDEX:
-		case EXPR_FIELD: {
-			return 1;
-		}
-		default: {
-			return 0;
-		}
-	}
-}
-#endif
-
-
-// elf_ValueTag node2tag(int ty) {
-// 	switch (ty) {
-// 		case NT_SYS: return elf_TAG_SYS;
-// 		case NT_NUM: return elf_TAG_NUM;
-// 		case NT_INT: return elf_TAG_INT;
-// 		default: NO_CODE;
-// 	}
-// 	return elf_TAG_NIL;
-// }

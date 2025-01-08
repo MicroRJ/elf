@@ -8,41 +8,55 @@ typedef treeT *treeID;
 
 /* MIND ORDER */
 // todo:dummy tree could be replaced with NOP
-#define TREEDEF(_) \
-_(TREE_NONE) \
-_(TREE_NOP)               \
-_(EXPR_AND)  _(EXPR_OR)   \
-_(EXPR_ADD)  _(EXPR_SUB)  \
-_(EXPR_MUL)  _(EXPR_DIV)  \
-_(EXPR_POW)  _(EXPR_MOD)  \
-_(EXPR_EQ)   _(EXPR_NEQ)  \
-_(EXPR_LT)   _(EXPR_GT)   \
-_(EXPR_LTEQ) _(EXPR_GTEQ) \
-_(EXPR_BIT_SHL)_(EXPR_BIT_SHR)  \
-_(EXPR_BIT_AND)                 \
-_(EXPR_BIT_OR) _(EXPR_BIT_XOR)  \
-_(EXPR_NIL_AND) _(EXPR_NIL_OR)  \
-_(TREE_DUMMY)  \
-_(TREE_GLOBAL) \
-_(TREE_UPVALUE) \
-_(EXPR_NUM)_(EXPR_INT)_(EXPR_STR) \
-_(TREE_FUNCTION)_(TREE_NEW_TABLE) \
-_(EXPR_CLOSURE) \
-_(EXPR_INDEX) \
-_(EXPR_FIELD) \
-_(EXPR_METAFIELD) \
-_(EXPR_CALL) \
-_(EXPR_NIL) \
-_(TREE_ASSIGN_MEM) \
-_(TREE_STORE) \
-_(STAT_BLOCK) \
-_(TREE_IF) \
-_(TREE_GOTO) \
-_(TREE_WHILE_LOOP)_(STAT_DO_WHILE) \
-_(TREE_RANGE) \
-_(EXPR_RANGE_INDEX) \
-_(EXPR_MULTI) \
-_(TREE_RET) \
+#define TREEDEF(_)   \
+_(TREE_NONE)         \
+_(TREE_NOP)          \
+_(EXPR_AND)          \
+_(EXPR_OR)           \
+_(EXPR_ADD)          \
+_(EXPR_SUB)          \
+_(EXPR_MUL)          \
+_(EXPR_DIV)          \
+_(EXPR_POW)          \
+_(EXPR_MOD)          \
+_(EXPR_EQ)           \
+_(EXPR_NEQ)          \
+_(EXPR_LT)           \
+_(EXPR_GT)           \
+_(EXPR_LTEQ)         \
+_(EXPR_GTEQ)         \
+_(EXPR_BIT_SHL)      \
+_(EXPR_BIT_SHR)      \
+_(EXPR_BIT_AND)      \
+_(EXPR_BIT_OR)       \
+_(EXPR_BIT_XOR)      \
+_(EXPR_NIL_AND)      \
+_(EXPR_NIL_OR)       \
+_(TREE_DUMMY)        \
+_(TREE_GLOBAL)       \
+_(TREE_UPVALUE)      \
+_(EXPR_NUM)          \
+_(EXPR_INT)          \
+_(EXPR_STR)          \
+_(TREE_CALL)         \
+_(TREE_FUNCTION)     \
+_(TREE_NEW_TABLE)    \
+_(EXPR_CLOSURE)      \
+_(EXPR_INDEX)        \
+_(EXPR_FIELD)        \
+_(EXPR_METAFIELD)    \
+_(EXPR_NIL)          \
+_(TREE_ASSIGN_MEM)   \
+_(TREE_STORE)        \
+_(STAT_BLOCK)        \
+_(TREE_IF)           \
+_(TREE_GOTO)         \
+_(TREE_WHILE_LOOP)   \
+_(STAT_DO_WHILE)     \
+_(TREE_RANGE)        \
+_(EXPR_RANGE_INDEX)  \
+_(EXPR_MULTI)        \
+_(TREE_RET)          \
 /* end */
 
 typedef enum {
@@ -140,17 +154,20 @@ static treeID tree_dummy(Parser *, Source);
 static treeID tree_this_ref(Parser *, Source line);
 static treeID tree_global_ref(Parser *, Source line, char *name, int x);
 
+static treeID tree_call(Parser *, Source line, treeID x, treeID *z);
+
 static treeID tree_type_guard(Parser *, Source line, treeID x, treeTy y);
-static treeID tree_metafield(Parser *, Source line, treeID x, treeID y);
+static treeID tree_meta_field(Parser *, Source line, treeID x, treeID y);
 static treeID tree_field(Parser *, Source line, treeID x, treeID y);
 static treeID tree_index(Parser *, Source line, treeID x, treeID y);
 static treeID tree_ranged_index(Parser *, Source line, treeID x, treeID y);
-static treeID tree_call(Parser *, Source line, treeID x, treeID *z);
+
+
 static treeID tree_less_than(Parser *, Source line, treeID x, treeID y);
-static treeID tree_call_metafield(Parser *, Source line, treeID x, treeID *z, char *name);
+static treeID tree_meta_call(Parser *, Source line, treeID x, treeID *z, char *name);
 static treeID tree_multi(Parser *, Source line, treeID *z);
 static treeID tree_block(Parser *, Source line, treeID *z);
 
 static treeID tree_global_ref_by_name(Parser *, Source line, char *name);
 static treeID tree_call_pf(Parser *, Source line, treeID *args);
-static treeID tree_call_set_metatable(Parser *, Source line, treeID object, treeID metatable);
+static treeID tree_call_set_meta(Parser *, Source line, treeID object, treeID metatable);

@@ -69,7 +69,7 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 
 	if (length < 64 && registry != 0) {
 		elf_check_table(registry);
-		elf_Int slot=elf_ttryx(registry,text,length,hash);
+		elf_Int slot=elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
 		elf_Entry entry=registry->slots[slot];
 		if (entry.key.tag != elf_TAG_NIL) {

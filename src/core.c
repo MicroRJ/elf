@@ -35,7 +35,7 @@ register.
 Todo: why do we require the user to push the return values to
 the stack, to then copy them?
 */
-int elf_call_function(elf_State *S, int nargs, int nrets) {
+int elf_call(elf_State *S, int nargs, int nrets) {
 	int nyield = 0;
 
 	elf_Value *locals = S->stack_ptr - nargs;
@@ -78,22 +78,23 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 		elf_debugger("debugger 'FLAG_DEBUGGER_ONCALL'");
 	}
 
-	elf_Value *results, *ptr;
 	if (value.tag == elf_TAG_CLS) {
 		nyield = elf_run(S);
 	} else if (value.tag == elf_TAG_CFN) {
-		results = S->stack_ptr;
+		elf_Value *res, *ptr;
+		res = S->stack_ptr;
 		nyield = value.x_fun(S);
 		ptr = S->stack_ptr;
-		if ((ptr-results) < nyield) {
-			elf_fail(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - results),nyield));
+		if ((ptr-res) < nyield) {
+			elf_fail(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - res),nyield));
 		}
+		res=ptr-nyield;
 		// if ((nyield==0)&&(nrets>0)){
 		// 	elf_debug_log("seems like this function does not return anything");
 		// }
 		/* todo: clear only the part we didn't write */
 		clear_memory(F.locals-1,nrets*sizeof(elf_Value));
-		copy_memory(F.locals-1,results,MIN(nyield,nrets)*sizeof(elf_Value));
+		copy_memory(F.locals-1,res,MIN(nyield,nrets)*sizeof(elf_Value));
 	} else {
 		nyield = -1;
 		elf_fail(S,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[value.tag]));
@@ -104,34 +105,24 @@ int elf_call_function(elf_State *S, int nargs, int nrets) {
 	return nyield;
 }
 
-elf_Closure *elf_load_code_closure(elf_State *R, Parser *fs, elf_String *filename, elf_String *contents) {
-	if (!filename || !contents) {
+// todo: why do we pass in the parser and why
+// are there so many variations of the same thing
+elf_Closure *elf_load_code_closure(elf_State *R, Parser *parser, elf_String *name, elf_String *contents) {
+	if (!name || !contents) {
 		return 0;
 	}
 
 	treeID tree;
+	tree=parse(parser,R,name->text,contents->text);
 	elf_Proto proto;
-	tree=parse(fs,R,filename->text,contents->text);
-	proto=gen_file(fs,tree);
+	proto=gen_file(parser,tree);
+	// todo: remove this from here! prototypes
+	// should not allocate this crap!
+	proto.contents=contents;
+	proto.name=name;
 
-	// todo: so whack!
-	// int proto = compile_module(fs);
-	// elf_Proto fp = M->functions[proto];
+	ARRAY_ADD(parser->R->M->files,proto);
 	return elf_new_closure(R,proto);
-
-	// xx elf_Proto fp = {0};
-	// xx fp.name=filename;
-	// xx fp.contents=contents;
-	// xx fp.bytes=fs->function.bytes;
-	// xx fp.nbytes=M->nbytes-fs->function.bytes;
-	// xx fp.nlocals=fs->function.nlocals;
-	// xx ARRAY_ADD(M->files,fp);
-	// xx return elf_new_closure(R,fp);
-
-
-	// elf_error_log("did not compile anything");
-	// elf_add_nil(R);
-	// return 0;
 }
 
 
@@ -166,7 +157,7 @@ int elf_exec_file(elf_State *R, elf_String *name, int nargs, int nrets) {
 	elf_set_global(R->M,name,VCLS(cls));
 	elf_add_cls(R,cls);
 	elf_add_this(R);
-	return elf_call_function(R,2,nrets);
+	return elf_call(R,2,nrets);
 }
 
 
@@ -191,7 +182,7 @@ static int call_overload(elf_State *S, elf_Node *obj, char const *name, int reg,
 	PUSHV(S,VOBJ(obj));
 	copy_memory(GET_TOP(S),args,sizeof(elf_Value)*nargs);
 	GET_TOP(S) += nargs;
-	int ny = elf_call_function(S,nargs+1,1);
+	int ny = elf_call(S,nargs+1,1);
 	GET_LOCAL(S,reg)=*top;
 	return ny;
 }
@@ -586,7 +577,7 @@ int elf_run(elf_State *R) {
 				if (metatable == 0) {
 					elf_fail(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
 				}
-				locals[BC_ARGX(byte)] = elf_tget_any(metatable,locals[BC_ARGZ(byte)]);
+				locals[BC_ARGX(byte)] = elf_table_get(metatable,locals[BC_ARGZ(byte)]);
 			} break;
 			/* todo: why are these two identical bro... */
 			case BC_GETINDEX: case BC_GETFIELD: {
@@ -608,7 +599,7 @@ int elf_run(elf_State *R) {
 						locals[BC_ARGX(byte)].x_num=xx.y_f32;
 					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
 				} else if (xx.tag==elf_TAG_TAB) {
-					locals[BC_ARGX(byte)]=elf_tget_any(xx.x_tab,yy);
+					locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
 				} else if (xx.tag==elf_TAG_OBJ) {
 					call_overload(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
 				} else if (xx.tag==elf_TAG_STR) {
@@ -651,7 +642,7 @@ int elf_run(elf_State *R) {
 			case BC_CALL: {
 				R->byte = module_instr;
 				SET_TOP(R,locals+BC_ARGX(byte)+1+BC_ARGY(byte));
-				elf_call_function(R,BC_ARGY(byte),BC_ARGZ(byte));
+				elf_call(R,BC_ARGY(byte),BC_ARGZ(byte));
 				SET_TOP(R,locals+proto.nlocals);
 			} break;
 			case BC_ISNIL: {

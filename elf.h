@@ -226,23 +226,16 @@ elAPI elf_Hash    elf_get_string_hash(elf_String *);
 elAPI char       *elf_get_string_text(elf_String *);
 elAPI bool    elf_get_strings_eq(elf_String *x, elf_String *y);
 
+#include "src\table.h"
 
-/* tries a key, if the key is found it returns its address,
-otherwise returns the nearest vacant slot's address, if no
-vacant slot found, returns -1 */
-elAPI elf_Int elf_ttry(elf_Table *tab, elf_Value key);
-elAPI elf_Int elf_ttryx(elf_Table *tab, const char *text, elf_Int length, elf_Hash hash);
-
-
-elAPI elf_Int elf_get_table_length(elf_Table *table);
-
-/* table get associated array index of key, if no entry
-found for given key, a new entry is added */
-elAPI elf_Int elf_tget_ornew(elf_Table *table, elf_Value key);
-
-elAPI elf_Value elf_tget_any(elf_Table *tab, elf_Value key);
-
-/* table get by string */
+/* todo: deprecate! */
+elAPI void elf_tsetx_bindings(elf_State *S, elf_Table *tab, elf_CBinding *list, int num);
+elAPI elf_Value   elf_tgetx_any(elf_Table *tab, char const *key/* , or = nil */);
+elAPI elf_Num     elf_tgetx_num(elf_Table *tab, char const *key, elf_Num     or);
+elAPI elf_Int     elf_tgetx_int(elf_Table *tab, char const *key, elf_Int     or);
+elAPI elf_String *elf_tgetx_str(elf_Table *tab, char const *key, elf_String *or);
+elAPI elf_Table  *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table  *or);
+elAPI char const *elf_tgetx_txt(elf_Table *tab, char const *key, char const *or);
 elAPI elf_Value   elf_tgets_any(elf_Table *tab, elf_String *key);
 elAPI elf_Num     elf_tgets_num(elf_Table *tab, elf_String *key);
 elAPI elf_Int     elf_tgets_int(elf_Table *tab, elf_String *key);
@@ -250,25 +243,6 @@ elAPI elf_String *elf_tgets_str(elf_Table *tab, elf_String *key);
 elAPI elf_Table  *elf_tgets_tab(elf_Table *tab, elf_String *key);
 elAPI elf_Int    elf_tgetsor_int(elf_Table *tab, elf_String *key, elf_Int or);
 
-/* table get by text */
-elAPI elf_Value   elf_tgetx_any(elf_Table *tab, char const *key/* , or = nil */);
-elAPI elf_Num     elf_tgetx_num(elf_Table *tab, char const *key, elf_Num     or);
-elAPI elf_Int     elf_tgetx_int(elf_Table *tab, char const *key, elf_Int     or);
-elAPI elf_String *elf_tgetx_str(elf_Table *tab, char const *key, elf_String *or);
-elAPI elf_Table  *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table  *or);
-elAPI char const *elf_tgetx_txt(elf_Table *tab, char const *key, char const *or);
-
-/* add item to array part of table */
-elAPI void elf_tadd(elf_Table *table, elf_Value thing);
-elAPI void elf_tadd_tab(elf_Table *table, elf_Table *thing);
-
-/* table set using value field */
-elAPI bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v);
-
-/* todo: deprecate!
-
-table set bindings */
-elAPI void elf_tsetx_bindings(elf_State *S, elf_Table *tab, elf_CBinding *list, int num);
 
 /* table set using string field */
 elAPI void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val);
@@ -283,7 +257,7 @@ elAPI void elf_merge_tables(elf_Table *tab, elf_Table *merger);
 
 elAPI void *elf_alloc_object(elf_State *S, elf_GCTy type, elf_Int length);
 elAPI int elf_exec_file(elf_State *, elf_String *name, int nargs, int nrets);
-elAPI int elf_call_function(elf_State *S, int nargs, int nrets);
+elAPI int elf_call(elf_State *S, int nargs, int nrets);
 
 /* todo: why are these public */
 elf_Int elf_trigger_collection_cycle(elf_State *S);
