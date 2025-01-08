@@ -5,7 +5,7 @@
 
 static int elf_run(elf_State *R);
 
-void elf_init(elf_State *R, BC_Module *M) {
+void elf_init(elf_State *R, elf_Module *M) {
 	R->M=M;
 	R->stack_max = DEFAULT_STACK_SIZE;
 	R->stack = calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
@@ -112,17 +112,17 @@ elf_Closure *elf_load_code_closure(elf_State *R, Parser *parser, elf_String *nam
 		return 0;
 	}
 
-	treeID tree;
-	tree=parse(parser,R,name->text,contents->text);
-	elf_Proto proto;
-	proto=gen_file(parser,tree);
-	// todo: remove this from here! prototypes
-	// should not allocate this crap!
-	proto.contents=contents;
-	proto.name=name;
+	treeID tree = parse(parser,R,name->text,contents->text);
+	elf_File file = gen_file(parser,tree);
+	file.contents=contents;
+	file.name=name;
+	// todo: how do we track this, should each proto
+	// point to the file they are from?...
+	elf_array_add(R->M->globals,VSTR(contents));
+	elf_array_add(R->M->globals,VSTR(name));
 
-	ARRAY_ADD(parser->R->M->files,proto);
-	return elf_new_closure(R,proto);
+	ARRAY_ADD(R->M->files,file);
+	return elf_new_closure(R,file.proto);
 }
 
 
@@ -218,15 +218,14 @@ elf_Int elf_mark_object(elf_Node *obj) {
 	}
 	if (obj->type == GC_CLS) {
 		elf_Closure *cls = (elf_Closure*) obj;
-		if (cls->proto.name != 0) {
-			elf_mark_object(POBJ(cls->proto.name));
-		}
-		if (cls->proto.contents != 0) {
-			elf_mark_object(POBJ(cls->proto.contents));
-		}
-		if (cls->proto.parent != -1) {
-			/* todo: implement this */
-		}
+		// if (cls->proto.name != 0) {
+		// 	elf_mark_object(POBJ(cls->proto.name));
+		// }
+		// if (cls->proto.contents != 0) {
+		// 	elf_mark_object(POBJ(cls->proto.contents));
+		// }
+		// if (cls->proto.parent != -1) {
+		// }
 		FOR_RANGE(i, 0, cls->proto.nlocals) {
 			if (ISOBJT(cls->values[i].tag)) {
 				num += elf_mark_object(cls->values[i].x_obj);
@@ -392,7 +391,7 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_Int size) {
 
 int elf_run(elf_State *R) {
 
-	BC_Module *M;
+	elf_Module *M;
 	elf_Table *globals;
 	elf_StackFrame *F;
 	elf_Value *locals;
@@ -426,7 +425,7 @@ int elf_run(elf_State *R) {
 #if defined(_DEBUG)
 		if (R->flags & FLAG_BYTELOGGING || F->logging)
 		{
-			fpf_byte(stdout,M,-1,instr,byte);
+			fpf_byte(stdout,M,-1,module_instr,byte);
 		}
 		if (R->flags & FLAG_DEBUGGER) {
 			elf_debugger("debugger 'FLAG_DEBUGGER'");

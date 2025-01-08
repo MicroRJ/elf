@@ -92,18 +92,17 @@ typedef struct elf_Closure {
 } elf_Closure;
 
 /* */
-typedef struct BC_Module {
+typedef struct elf_Module {
 	elf_Table      *globals;
 	elf_Table      *strings;
 	elf_Num        *numbers;
 	elf_Int       *integers;
-	elf_Proto       *files;
-	elf_Proto      *protos;
-	int              *track;
+	elf_File         *files;
+	elf_Proto       *protos;
 	Source           *lines;
 	Bytecode         *bytes;
 	Instr            nbytes;
-} BC_Module;
+} elf_Module;
 
 
 typedef struct delaylist delaylist;
@@ -152,7 +151,7 @@ typedef struct elf_Collector {
 
 
 typedef struct elf_State {
-	BC_Module     *M;
+	elf_Module     *M;
 	elf_Value      *stack;
 	int             stack_max;
 	elf_Value      *stack_ptr;

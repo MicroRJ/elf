@@ -43,44 +43,10 @@ static treeID parse(Parser *parser, elf_State *R, char *name, char *text) {
 	while (parser->tok.type!=TK_NONE) {
 		if(!parse_stat(parser))break;
 	}
-
-	// maybe use the goto instruction along
-	// with labels to chain these together...
-	//	like every inner block will emit these
-	// goto instructions and store them in
-	// their blocks, and then the parent block
-	// takes those instructions and patches adds
-	// them to itself, until a terminating
-	// statement is found
-	//
-	// {
-	// 	defer { elf.pf("do this last") }
-	// 	...
-	// 	{
-	//			{
-	//				...
-	//				ret 2
-	//			}
-	// 		...
-	// 		ret 1
-	// 	}
-	// 	...
-	// 	ret 2
-	// }
-	// todo: this is temporary!
-	//	Whenever a block is ended, right before
-	// the ending instruction we insert the
-	// defer blocks, if we are an inner block
-	// and we do a return, instead of actually
-	// issuing the return instruction we just
-	// jump to the return instruction at the
-	// end of every function.
 	FOR_ARRAY(i,parser->block.defers){
 		ARRAY_ADD(parser->block.body,parser->block.defers[i]);
 	}
 	func->expr_fun.body=tree_block(parser,parser->tok.line,parser->block.body);
-
-
 	return func;
 }
 
@@ -482,7 +448,7 @@ static treeID parse_unary(Parser *parser, bool flags) {
 		} break;
 		case TK_NIL: {
 			get_tok(parser);
-			v=new_tree(parser,EXPR_NIL,tok.line);
+			v=tree_nil(parser,tok.line);
 		} break;
 		case TK_TRUE:{
 			get_tok(parser);
@@ -682,30 +648,43 @@ static treeID parse_postfix(Parser *parser, int flags) {
 	esc:;
 	return v;
 }
-//note:if the expression turns out to be an assignment statement,
-//then the name expression is returned, the operator isn't parsed.
+
 static treeID parse_subexpr(Parser *parser, int flags, int rank) {
 	ASSERT(flags==0);
 
-	int oper,prio;
-	treeID x,y;
 	tokenT tok;
+	tok=parser->tok;
 
+	treeID x,y;
 	x=parse_postfix(parser,flags);
 	if (x==NO_TREE) goto esc;
 
-	retry:
-	oper=parser->tok.type;
-	prio=tok2prec(oper);
+	int   prio;
 
-	if (prio<=rank) goto esc;
+	for(;;) {
+		tok=parser->tok;
 
-	tok=get_tok(parser);
-	y=parse_subexpr(parser,flags,prio);
-	if (y==NO_TREE) goto esc;
+		prio=tok2prec(tok.type);
+		if (prio<=rank) goto esc;
 
-	x=tree_binary(parser,tok.line,tok2tree(oper),NT_ANY,x,y);
-	goto retry;
+		if(parser->tok_prox.type==TK_ASSIGN){
+			goto esc;
+		}
+
+		if(x->type==NT_NON){
+			parser_dialog(parser,x->line
+			,	"invalid data class");
+		}
+
+		get_tok(parser);
+
+
+		y=parse_subexpr(parser,flags,prio);
+		if (y==NO_TREE) goto esc;
+		ASSERT(y->type!=NT_NON);
+
+		x=tree_binary(parser,tok.line,tok2tree(tok.type),NT_ANY,x,y);
+	}
 
 	esc:
 	return x;
@@ -800,6 +779,10 @@ static Loop *get_loop(Parser *parser, treeID name) {
 }
 
 static void check_assign(Parser *parser, Source line, treeID tree){
+	if(tree->type==NT_NON){
+		parser_dialog(parser,line
+		,	"invalid data class");
+	}
 	entityID e = identify_by_tree(parser,tree);
 	if(e != NO_ENTITY){
 		if (parser->entities[e].status & ENTITY_CONSTANT){
@@ -960,7 +943,7 @@ static int parse_stat(Parser *parser) {
 				// int mem;
 				// x=desugar_range_expr(parser,lexpr,0);
 				// x=emit_preload_deprecated(parser,x);
-
+				tok=parser->tok;
 				treeID y;
 				if (pick_tok(parser,TK_ASSIGN)) {
 					check_assign(parser,tok.line,v);
@@ -969,12 +952,11 @@ static int parse_stat(Parser *parser) {
 					v=tree_store(parser,tok.line,v,y);
 				} else if (pick_tok(parser,TK_NIL_ASSIGN)) {
 					check_assign(parser,tok.line,v);
-
 					y=parse_expr(parser,0);
-					v=tree_store(parser,tok.line,v,y);
-
-					y=tree_binary(parser,tok.line,EXPR_EQ,NT_ANY,y,tree_nil(parser,tok.line));
-					v=tree_if(parser,tok.line,y,v,0);
+					v=tree_if(parser,tok.line
+					, tree_binary(parser,tok.line,EXPR_EQ,NT_ANY,v,tree_nil(parser,tok.line))
+					, tree_store(parser,tok.line,v,y)
+					, 0);
 				} else if (tok2prec(tok.type) > 0) {
 					check_assign(parser,tok.line,v);
 
@@ -1086,16 +1068,15 @@ static bool parse_for(Parser *parser){
 		treeT range;
 		range=get_tree(parser,step);
 		if(range.kind==TREE_RANGE || range.kind==EXPR_RANGE_INDEX){
-			treeID index,value,prev;
+			treeID index,value,array,prev;
 			index=index_;
 			value=value_;
-			prev=NO_TREE;
+			prev=array=NO_TREE;
 
 			if(range.kind==EXPR_RANGE_INDEX){
 				ASSERT(range.x!=NO_TREE);
 				ASSERT(range.y!=NO_TREE);
 
-				treeID array;
 				array=range.x;
 
 				// get the actual range
@@ -1120,8 +1101,12 @@ static bool parse_for(Parser *parser){
 				range.x=tree_int(parser,tok.line,0);
 			}
 			if(range.y==NO_TREE){
-				//todo: true infinite
-				range.y=tree_int(parser,tok.line,0xffffffffLLU);
+				if(array){
+					range.y=tree_meta_call(parser,tok.line,array,0,"length");
+				}else{
+					// todo: true infinite
+					range.y=tree_int(parser,tok.line,0xffffffffLLU);
+				}
 			}
 
 			ASSERT(range.x!=NO_TREE);
@@ -1173,26 +1158,6 @@ static int tok2prec(int type) {
 }
 
 #if 0
-/* looks for an enclosed entity within the function,
-and returns the index where the entity, the index
-can then be used to emit instructions. */
-static int get_closure_value_index(IR_Function *fn, entityID2 id) {
-	FOR_ARRAY(i,fn->enclosure) {
-		if (fn->enclosure[i] == id.id) {
-			return i;
-		}
-	}
-	return NO_SLOT;
-}
-
-static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
-	treeID v;
-	tokenT tk;
-	treeID x;
-
-	v=NO_TREE;
-	tk=parser->tok;
-	switch (tk.type) {
 		case TK_M_INDEX: case TK_M_ARRAY: case TK_M_VALUE: {
 			get_tok(parser);
 			int reg;
@@ -1202,8 +1167,6 @@ static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 
 			v=tree_load(parser,tk.line,reg);
 		} break;
-		/* todo: make this an intrinsic instruction! */
-
 		case TK_M_REGISTER: {
 			get_tok(parser);
 			tk=take_tok(parser,TK_WORD);
@@ -1216,61 +1179,6 @@ static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 	if (~flags & EXPR_ALLOW_POSTFIX) {
 		goto esc;
 	}
-
-	/* ensure we don't parse a postfix past a line */
-	while (!eof_or_eol_tok(parser)) {
-		tk = parser->tk;
-
-		switch (tk.type) {
-			case TK_DOT: {
-				get_tok(parser);
-				// table.(x,y) -> (table.x, table.y)
-				if (pick_tok(parser,TK_PAREN_LEFT)) {
-					treeID *z = {0};
-					do {
-						tokenT n = take_tok(parser,TK_WORD);
-						treeID x,y;
-						y=tree_str(parser,n.line,n.text);
-						x=tree_field(parser,tk.line,v,y);
-						ARRAY_ADD(z,x);
-					} while (pick_tok(parser,TK_COMMA));
-					v = tree_multi(parser,tk.line,z);
-					take_tok(parser,TK_PAREN_RIGHT);
-				} else
-				// table.{x,y}
-				if (pick_tok(parser,TK_CURLY_LEFT)) {
-					NO_CODE;
-				} else {
-					tokenT name;
-					treeID field;
-					name=take_tok(parser,TK_WORD);
-					field=tree_str(parser,name.line,name.text);
-					v=tree_field(parser,tk.line,v,field);
-				}
-			} break;
-			case TK_COLON: {
-				tokenT n;
-				treeID y;
-				get_tok(parser);
-				n=take_tok(parser,TK_WORD);
-				y=tree_str(parser,n.line,n.text);
-				v=tree_meta_field(parser,tk.line,v,y);
-			} break;
-			case TK_CURLY_LEFT:
-			case TK_PAREN_LEFT: {
-				treeID *z;
-				z=parse_args(parser);
-				v=tree_call(parser,tk.line,v,z);
-			} break;
-			default: goto esc;
-		}
-	}
-
-	esc:
-	return v;
-}
-
-	switch (tok.type) {
 		case TK_DO: {
 			get_tok(parser);
 			parser_begin_block(parser,BLOCK_LOOP);
@@ -1281,21 +1189,6 @@ static treeID parse_unary(Parser *parser, jumpS *expr, bool flags) {
 			close_do_while_loop(parser,tk.line,x);
 			parser_close_block(parser);
 		} break;
-		/* parse a block */
-		case TK_CURLY_LEFT: {
-			parser_begin_block(parser,0);
-			get_tok(parser);
-			while (!eof_or_tok(parser,TK_CURLY_RIGHT)) {
-				parse_stat(parser);
-			}
-			take_tok(parser,TK_CURLY_RIGHT);
-			x = parser_close_block(parser);
-		} break;
-		case TK_FOR: {
-			parse_for_loop(parser);
-		} break;
-		default: {
-	return 1;
 }
 #endif
 

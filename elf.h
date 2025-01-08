@@ -32,7 +32,7 @@ saying so... */
 
 
 
-typedef struct BC_Module 	BC_Module;
+typedef struct elf_Module 	elf_Module;
 typedef struct elf_State 	elf_State;
 typedef struct elf_Node 	elf_Node;
 typedef struct elf_Table 	elf_Table;
@@ -80,13 +80,14 @@ typedef struct elf_Proto {
 	int             nlocals;
 	int              nbytes;
 	int               bytes;
-	//todo: remove these, maybe instead
-	//have pointer to file
-	int            **protos;
-	int              parent;
-	elf_String        *name;
-	elf_String    *contents;
 } elf_Proto;
+
+typedef struct elf_File {
+	int pos,end;
+	elf_Proto proto;
+	elf_String *contents;
+	elf_String *name;
+} elf_File;
 
 
 /* first object tag must be OBJ, all other
@@ -172,7 +173,7 @@ typedef struct elf_Table {
 } elf_Table;
 
 
-elAPI void elf_init(elf_State *S, BC_Module *M);
+elAPI void elf_init(elf_State *S, elf_Module *M);
 
 /* allocate and adds the object to stack (prevents it from getting GC'd) */
 elAPI elf_Closure *elf_new_closure(elf_State *, elf_Proto fn);
@@ -278,14 +279,14 @@ elAPI void elf_fail_(elf_State *S, int instr, const char *error);
 int elf_add_const_int(elf_State *S, elf_Int i);
 int elf_add_const_num(elf_State *S, elf_Num i);
 int elf_add_proto(elf_State *S);
-int elf_get_global(BC_Module *M, elf_String *name);
-int elf_set_global(BC_Module *M, elf_String *name, elf_Value value);
+int elf_get_global(elf_Module *M, elf_String *name);
+int elf_set_global(elf_Module *M, elf_String *name, elf_Value value);
 
-// elAPI elf_SymbolId elf_add_proto(BC_Module *M, elf_Proto fn);
-// elAPI elf_SymbolId elf_get_global(BC_Module *M, elf_String *name);
-// elAPI elf_SymbolId elf_set_global(BC_Module *M, elf_String *name, elf_Value v);
-elAPI int elf_get_instr_file(BC_Module *M, int instr);
-elAPI char *elf_get_instr_line(BC_Module *M, int instr);
+// elAPI elf_SymbolId elf_add_proto(elf_Module *M, elf_Proto fn);
+// elAPI elf_SymbolId elf_get_global(elf_Module *M, elf_String *name);
+// elAPI elf_SymbolId elf_set_global(elf_Module *M, elf_String *name, elf_Value v);
+elAPI int elf_get_instr_file(elf_Module *M, int instr);
+elAPI char *elf_get_instr_line(elf_Module *M, int instr);
 elAPI void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc);
 
 

@@ -95,18 +95,33 @@ static elf_Proto gen_proto(Parser *parser, treeID tree){
 	memory_usage=0;
 	return proto;
 }
-static elf_Proto gen_file(Parser *parser, treeID tree){
+
+// just have one big, compile function
+static elf_File gen_file(Parser *parser, treeID tree){
 	int index;
 	elf_Proto *protos;
 	index=ARRAY_GROW(parser->R->M->protos,ARRAY_LENGTH(parser->functions));
 	protos=& parser->R->M->protos[index];
+
+	int start=parser->R->M->nbytes;
 	FOR_ARRAY(i,parser->functions){
 		parser->functions[i]->expr_fun.proto=index++;
 	}
 	FOR_ARRAY(i,parser->functions){
 		protos[i]=gen_proto(parser,parser->functions[i]);
+		elf_debug_log("PROTO: [%i, %i) (%i)"
+		, 	protos[i].bytes
+		, 	protos[i].bytes+protos[i].nbytes
+		,	protos[i].nbytes);
 	}
-	return protos[0];
+	int end=parser->R->M->nbytes;
+	elf_File file = {};
+	file.pos=start;
+	file.end=end;
+	file.proto=protos[0];
+	// ASSERT(protos[0].bytes==start);
+	// protos[0].nbytes=end-start;
+	return file;
 }
 
 static void gen_tree(Parser *parser, treeID id) {
@@ -189,6 +204,10 @@ static void gen_tree(Parser *parser, treeID id) {
 			int rx,ry,rz,op;
 
 			xx=get_tree(parser,tree.x);
+			if(xx.type==NT_NON){
+				parser_dialog(parser,tree.line
+				,	"invalid storage class");
+			}
 			ASSERT(xx.type!=NT_NON);
 
 			dst=get_mem(parser,tree.x);
@@ -220,6 +239,8 @@ static void gen_tree(Parser *parser, treeID id) {
 			}
 			pop_mem_state(parser);
 		} break;
+		// todo: allow true clause to be nil, then just
+		// invert the condition...
 		case TREE_IF: {
 			treeID pred,true_clause,else_clause,then_clause;
 			pred=tree.stat_if.pred;
@@ -648,10 +669,9 @@ void close_if(Parser *fs, Source line, BranchJumps *s) {
 
 
 static int emit_byte(Parser *C, Source line, Bytecode byte) {
-	BC_Module *M = C->R->M;
+	elf_Module *M = C->R->M;
 	ARRAY_ADD(M->lines,line);
 	ARRAY_ADD(M->bytes,byte);
-	ARRAY_ADD(M->track,0);
 	// fpf_byte(stdout,M,-1,M->nbytes-C->fn->bytes,byte);
 	return M->nbytes ++;
 }

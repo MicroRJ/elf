@@ -157,7 +157,7 @@
 // #endif
 
 // elAPI void crtlib_load(elf_State *rt) {
-// 	BC_Module *md = rt->md;
+// 	elf_Module *md = rt->md;
 
 
 

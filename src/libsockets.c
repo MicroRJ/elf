@@ -181,7 +181,7 @@
 
 
 // elAPI void elf_netlib_loadfunctions(elf_State *R) {
-// 	BC_Module *md = R->md;
+// 	elf_Module *md = R->md;
 
 // 	elf_gsetx_cfn(R,"elf.sockets.init",netlib_init);
 // 	elf_gsetx_cfn(R,"elf.sockets.close",netlib_close);
