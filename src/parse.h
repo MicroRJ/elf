@@ -22,6 +22,7 @@ typedef struct {
 //todo:remove "let"
 #define KEYWORDDEF(_) \
 _(ELF      ,"elf"         ) \
+_(JSON     ,"json"        ) \
 _(DEFAULT  ,"default"     ) \
 _(LOAD     ,"load"        ) \
 _(NEW      ,"new"         ) \
@@ -190,8 +191,8 @@ struct Loop {
 };
 
 
-typedef struct Parser Parser;
-struct Parser {
+typedef struct elf_Parser elf_Parser;
+struct elf_Parser {
 	elf_State              *R;
 	char                *name;
 	char                *text;
@@ -218,28 +219,28 @@ struct Parser {
 };
 
 // todo:
-// static FileBlock *get_loop_block(Parser *fs, elf_StackId with_value_register);
-// static void begin_delay_block(Parser *fs, Source line);
-// static void close_delay_block(Parser *fs, Source line);
+// static FileBlock *get_loop_block(elf_Parser *fs, elf_StackId with_value_register);
+// static void begin_delay_block(elf_Parser *fs, Source line);
+// static void close_delay_block(elf_Parser *fs, Source line);
 
-static int emit_branch_if_false(Parser *fs, jumpS *js, treeID id);
-static int emit_branch_if_true(Parser *fs, jumpS *js, treeID id);
-static int *emit_jump_if_true(Parser *fs, jumpS *js, treeID id);
-static int *emit_jump_if_false(Parser *fs, jumpS *js, treeID id);
+static int emit_branch_if_false(elf_Parser *fs, jumpS *js, treeID id);
+static int emit_branch_if_true(elf_Parser *fs, jumpS *js, treeID id);
+static int *emit_jump_if_true(elf_Parser *fs, jumpS *js, treeID id);
+static int *emit_jump_if_false(elf_Parser *fs, jumpS *js, treeID id);
 
 
-static void begin_if(Parser *fs, Source line, BranchJumps *s, treeID x, int z);
-static void add_elif_clause(Parser *fs, Source line, BranchJumps *s, treeID x);
-static void add_else_clause(Parser *fs, Source line, BranchJumps *s);
-static void add_then_clause(Parser *fs, Source line, BranchJumps *s);
-static void close_if(Parser *fs, Source line, BranchJumps *s);
+static void begin_if(elf_Parser *fs, Source line, BranchJumps *s, treeID x, int z);
+static void add_elif_clause(elf_Parser *fs, Source line, BranchJumps *s, treeID x);
+static void add_else_clause(elf_Parser *fs, Source line, BranchJumps *s);
+static void add_then_clause(elf_Parser *fs, Source line, BranchJumps *s);
+static void close_if(elf_Parser *fs, Source line, BranchJumps *s);
 
-static void begin_range_loop(Parser *fs, Source line, treeID x, treeID lo, treeID hi);
-static void close_range_loop(Parser *fs, Source line);
-static void begin_do_while_loop(Parser *fs, Source line);
-static void close_do_while_loop(Parser *fs, Source line, treeID x);
-static void begin_while_loop(Parser *fs, treeID x);
-static void close_while_loop(Parser *fs);
+static void begin_range_loop(elf_Parser *fs, Source line, treeID x, treeID lo, treeID hi);
+static void close_range_loop(elf_Parser *fs, Source line);
+static void begin_do_while_loop(elf_Parser *fs, Source line);
+static void close_do_while_loop(elf_Parser *fs, Source line, treeID x);
+static void begin_while_loop(elf_Parser *fs, treeID x);
+static void close_while_loop(elf_Parser *fs);
 
 
 

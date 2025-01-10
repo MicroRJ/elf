@@ -6,25 +6,26 @@
 #include "tree.c"
 
 
-static treeID parse_unary(Parser *parser, int flags);
-static treeID parse_expr(Parser *parser, int flags);
-static treeID parse_table(Parser *parser);
-static treeID parse_subexpr(Parser *parser, int flags, int rank);
-static treeID parse_postfix(Parser *parser, int flags);
-static treeID parse_bl(Parser *parser);
-static int parse_stat(Parser *parser);
+static treeID parse_unary(elf_Parser *parser, int flags);
+static treeID parse_expr(elf_Parser *parser, int flags);
+static treeID parse_table(elf_Parser *parser);
+static treeID parse_subexpr(elf_Parser *parser, int flags, int rank);
+static treeID parse_postfix(elf_Parser *parser, int flags);
+static treeID parse_bl(elf_Parser *parser);
+static int parse_stat(elf_Parser *parser);
 static int tok2tree(int tok);
-static int tok2prec(int tok);
-static void add_this_param(Parser *parser, Source line);
-static treeID parse_if(Parser *parser, int negate);
-static bool parse_for(Parser *parser);
 
-static treeID *parse_args(Parser *parser);
+static int tok2prec(int type) {
+	return tok2inf[type].prec;
+}
 
+static void add_this_param(elf_Parser *parser, Source line);
+static treeID parse_if(elf_Parser *parser, int negate);
+static bool parse_for(elf_Parser *parser);
+static treeID parse_json(elf_Parser *parser);
+static treeID *parse_args(elf_Parser *parser);
 
-//todo:who cares bout the parser,
-//don't pass it in as a pointer....
-static treeID parse(Parser *parser, elf_State *R, char *name, char *text) {
+static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text) {
 	parser->R = R;
 	parser->name=name;
 	parser->text=text;
@@ -33,43 +34,53 @@ static treeID parse(Parser *parser, elf_State *R, char *name, char *text) {
 	parser->pos=text;
 	get_tok(parser);
 	get_tok(parser);
+}
 
-	treeID func;
-	func=new_tree(parser,TREE_FUNCTION,parser->tok.line);
+// todo: rename to elf_parse, but don't use
+// global replace cuz there's only one reference,
+// other references are just plain text
+static treeID parse(elf_Parser *parser, elf_State *R, char *name, char *text) {
+	prep_parser(parser,R,name,text);
+
+	treeID func = new_tree(parser,TREE_FUNCTION,parser->tok.line);
+	parser->enc = func;
 	add_this_param(parser,parser->tok.line);
-	parser->enc=func;
+
 	ARRAY_ADD(parser->functions,func);
 
 	while (parser->tok.type!=TK_NONE) {
 		if(!parse_stat(parser))break;
 	}
+
+	// todo: this is temporary...
 	FOR_ARRAY(i,parser->block.defers){
 		ARRAY_ADD(parser->block.body,parser->block.defers[i]);
 	}
-	func->expr_fun.body=tree_block(parser,parser->tok.line,parser->block.body);
+
+	func->expr_fun.body = tree_block(parser,parser->tok.line,parser->block.body);
 	return func;
 }
 
-static void check_tree(Parser *parser, Source line, treeID id) {
+static void check_tree(elf_Parser *parser, Source line, treeID id) {
 	if (id == NO_TREE){
 		parser_dialog(parser,line,"invalid expression");
 	}
 }
 
-static bool peek_tok(Parser *parser, int type) {
+static bool peek_tok(elf_Parser *parser, int type) {
 	return parser->tok.type == type;
 }
-static bool pick_tok(Parser *parser, int k) {
+static bool pick_tok(elf_Parser *parser, int k) {
 	return peek_tok(parser,k) && (get_tok(parser), 1);
 }
-static bool peek_tok_inl(Parser *parser, int k) {
+static bool peek_tok_inl(elf_Parser *parser, int k) {
 	return peek_tok(parser,k) && parser->tok_prev.eol != 1;
 }
-static bool pick_tok_inl(Parser *parser, int k) {
+static bool pick_tok_inl(elf_Parser *parser, int k) {
 	return peek_tok_inl(parser,k) && (get_tok(parser), 1);
 }
 
-static tokenT get_token_inline(Parser *parser, int k) {
+static tokenT get_token_inline(elf_Parser *parser, int k) {
 	tokenT tok = parser->tok;
 	if (!pick_tok_inl(parser,k)) {
 		parser_dialog(parser,tok.line,"expected '%s'\n",tok2inf[k].name);
@@ -77,7 +88,7 @@ static tokenT get_token_inline(Parser *parser, int k) {
 	return tok;
 }
 
-static tokenT take_tok(Parser *parser, int k) {
+static tokenT take_tok(elf_Parser *parser, int k) {
 	tokenT tok = parser->tok;
 	if (!pick_tok(parser,k)) {
 		parser_dialog(parser,parser->tok.line,"expected '%s'\n",tok2inf[k].name);
@@ -85,32 +96,32 @@ static tokenT take_tok(Parser *parser, int k) {
 	return tok;
 }
 
-static void begin_scope(Parser *parser) {
+static void begin_scope(elf_Parser *parser) {
 	parser->scope_stack[parser->scope_index ++] = parser->entity_index;
 	parser->scope ++;
 }
-static void close_scope(Parser *parser) {
+static void close_scope(elf_Parser *parser) {
 	parser->entity_index = parser->scope_stack[-- parser->scope_index];
 	parser->scope --;
 }
 
-static void begin_loop(Parser *parser) {
+static void begin_loop(elf_Parser *parser) {
 	parser->loop_stack[parser->loop_index ++] = parser->loop;
 	parser->loop=(Loop){};
 }
-static void close_loop(Parser *parser) {
+static void close_loop(elf_Parser *parser) {
 	parser->loop = parser->loop_stack[-- parser->loop_index];
 }
 
-static void block_add(Parser *parser, treeID id){
+static void block_add(elf_Parser *parser, treeID id){
 	ARRAY_ADD(parser->block.body,id);
 }
-static void begin_block(Parser *parser) {
+static void begin_block(elf_Parser *parser) {
 	parser->block_stack[parser->block_index ++] = parser->block;
 	parser->block=(Block){};
 	begin_scope(parser);
 }
-static treeID close_block(Parser *parser) {
+static treeID close_block(elf_Parser *parser) {
 	close_scope(parser);
 	Block block;
 	block=parser->block;
@@ -126,7 +137,7 @@ static treeID close_block(Parser *parser) {
 	return tree_block(parser,parser->tok.line,block.body);
 }
 
-static entityID identify_by_tree(Parser *parser, treeID tree) {
+static entityID identify_by_tree(elf_Parser *parser, treeID tree) {
 	entityID id;
 	entityT ent;
 	for (id = parser->entity_index-1; id >= 0; -- id) {
@@ -138,7 +149,7 @@ static entityID identify_by_tree(Parser *parser, treeID tree) {
 	return NO_ENTITY;
 }
 
-static entityID identify_by_name(Parser *parser, char *name) {
+static entityID identify_by_name(elf_Parser *parser, char *name) {
 	entityID id;
 	entityT ent;
 	for (id = parser->entity_index-1; id >= 0; -- id) {
@@ -150,7 +161,7 @@ static entityID identify_by_name(Parser *parser, char *name) {
 	}
 	return NO_ENTITY;
 }
-static entityID parser_bind(Parser *parser, Source line, int flags, char *name, treeID tree) {
+static entityID parser_bind(elf_Parser *parser, Source line, int flags, char *name, treeID tree) {
 	treeID enc;
 	enc=parser->enc;
 
@@ -193,7 +204,7 @@ static entityID parser_bind(Parser *parser, Source line, int flags, char *name, 
 	return entity_id;
 }
 
-static void add_this_param(Parser *parser, Source line){
+static void add_this_param(elf_Parser *parser, Source line){
 	treeID param,x;
 	param=tree_nop(parser,line);
 
@@ -205,7 +216,7 @@ static void add_this_param(Parser *parser, Source line){
 	, "this", param);
 }
 
-static treeID parse_fun(Parser *parser){
+static treeID parse_fun(elf_Parser *parser){
 	tokenT tok;
 
 	tok=take_tok(parser,TK_FUN);
@@ -285,7 +296,7 @@ static treeID parse_fun(Parser *parser){
 //
 //  elf.load_file(<file-name>)
 //
-static treeID parse_load(Parser *parser){
+static treeID parse_load(elf_Parser *parser){
 	tokenT tok;
 	tok=take_tok(parser,TK_LOAD);
 
@@ -302,7 +313,7 @@ static treeID parse_load(Parser *parser){
 //
 // ret elf.set_meta({},Vector2):__new(x,y)
 //
-static treeID parse_new(Parser *parser){
+static treeID parse_new(elf_Parser *parser){
 	tokenT tok;
 	tok=take_tok(parser,TK_NEW);
 
@@ -336,7 +347,7 @@ static treeID parse_new(Parser *parser){
 	v=tree_call(parser,tok.line,v,args);
 	return v;
 }
-static treeID parse_unary(Parser *parser, bool flags) {
+static treeID parse_unary(elf_Parser *parser, bool flags) {
 	tokenT tok;
 	treeID v,x;
 
@@ -354,9 +365,12 @@ static treeID parse_unary(Parser *parser, bool flags) {
 			get_tok(parser);
 			v=parse_subexpr(parser,0,10000);
 		} break;
+		case TK_JSON: {
+			v=parse_json(parser);
+		} break;
 		case TK_NEW: {
 			v=parse_new(parser);
-		}break;
+		} break;
 		case TK_LOAD: {
 			v=parse_load(parser);
 		} break;
@@ -482,7 +496,7 @@ static treeID parse_unary(Parser *parser, bool flags) {
 	return v;
 }
 
-static treeID parse_table(Parser *parser) {
+static treeID parse_table(elf_Parser *parser) {
 	treeID table,prev;
 	tokenT tok;
 	int index;
@@ -537,7 +551,7 @@ static treeID parse_table(Parser *parser) {
 }
 
 /* {x} | ( x { ... } ) | { <table-initializer-list> } */
-static treeID *parse_args(Parser *parser) {
+static treeID *parse_args(elf_Parser *parser) {
 	treeID x;
 	treeID *z,*n;
 	z=0;
@@ -567,7 +581,7 @@ static treeID *parse_args(Parser *parser) {
 }
 
 
-static treeID parse_postfix(Parser *parser, int flags) {
+static treeID parse_postfix(elf_Parser *parser, int flags) {
 	tokenT tok;
 	treeID v;
 
@@ -649,7 +663,7 @@ static treeID parse_postfix(Parser *parser, int flags) {
 	return v;
 }
 
-static treeID parse_subexpr(Parser *parser, int flags, int rank) {
+static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 	ASSERT(flags==0);
 
 	tokenT tok;
@@ -690,7 +704,7 @@ static treeID parse_subexpr(Parser *parser, int flags, int rank) {
 	return x;
 }
 
-static treeID parse_expr(Parser *parser, int flags) {
+static treeID parse_expr(elf_Parser *parser, int flags) {
 	switch (parser->tok.type) {
 		case TK_NONE:
 		case TK_LET:
@@ -732,7 +746,7 @@ static int tok2tree(int tok) {
 	}
 }
 
-static treeID *parse_expr_list(Parser *parser) {
+static treeID *parse_expr_list(elf_Parser *parser) {
 	treeID y,*yz,*z=0;
 	do{
 		y=parse_expr(parser,0);
@@ -746,7 +760,7 @@ static treeID *parse_expr_list(Parser *parser) {
 	return z;
 }
 
-static treeID parse_bl(Parser *parser){
+static treeID parse_bl(elf_Parser *parser){
 	tokenT tok;
 	tok=parser->tok;
 	begin_block(parser);
@@ -762,7 +776,7 @@ static treeID parse_bl(Parser *parser){
 	return close_block(parser);
 }
 
-static Loop *get_loop(Parser *parser, treeID name) {
+static Loop *get_loop(elf_Parser *parser, treeID name) {
 	if(parser->loop_index==0) return 0;
 	int index;
 	Loop *loop;
@@ -778,7 +792,7 @@ static Loop *get_loop(Parser *parser, treeID name) {
 	return 0;
 }
 
-static void check_assign(Parser *parser, Source line, treeID tree){
+static void check_assign(elf_Parser *parser, Source line, treeID tree){
 	if(tree->type==NT_NON){
 		parser_dialog(parser,line
 		,	"invalid data class");
@@ -794,7 +808,7 @@ static void check_assign(Parser *parser, Source line, treeID tree){
 	}
 }
 
-static int parse_stat(Parser *parser) {
+static int parse_stat(elf_Parser *parser) {
 	int success;
 	tokenT tok;
 
@@ -978,7 +992,7 @@ static int parse_stat(Parser *parser) {
 	return success;
 }
 
-static treeID parse_if(Parser *parser, int negate){
+static treeID parse_if(elf_Parser *parser, int negate){
 	tokenT tok;
 	tok=parser->tok;
 
@@ -1014,7 +1028,7 @@ static treeID parse_if(Parser *parser, int negate){
 	return close_block(parser);
 }
 
-static bool parse_for(Parser *parser){
+static bool parse_for(elf_Parser *parser){
 	bool success = true;
 
 	tokenT tok,name;
@@ -1153,9 +1167,93 @@ static bool parse_for(Parser *parser){
 }
 
 
-static int tok2prec(int type) {
-	return tok2inf[type].prec;
+static elf_tabID parse_json_obj(elf_Parser *parser);
+
+//
+// todo: we won't screw anything else by
+// adding stuff to the stack right?
+//
+//	todo: we're adding this to the globals
+//	should add to some other pool?
+//
+// json, crazy right
+static treeID parse_json(elf_Parser *parser){
+
+	tokenT tok = take_tok(parser,TK_JSON);
+	elf_tabID tab = parse_json_obj(parser);
+	int gid = elf_set_global(parser->R->M,0,VTAB(tab));
+
+	return tree_global(parser,tok.line,gid);
 }
+
+static elf_Value parse_json_value(elf_Parser *parser);
+
+static elf_tabID parse_json_array(elf_Parser *parser){
+	elf_tabID arr = elf_new_table(parser->R);
+	take_tok(parser,TK_SQUARE_LEFT);
+	if(!pick_tok(parser,TK_SQUARE_RIGHT)) do {
+		elf_Value val = parse_json_value(parser);
+		elf_array_add(arr,val);
+	} while(pick_tok(parser,TK_COMMA));
+	take_tok(parser,TK_SQUARE_RIGHT);
+	return arr;
+}
+
+static elf_tabID parse_json_obj(elf_Parser *parser){
+	tokenT tok;
+	elf_tabID table;
+
+	table = elf_new_table(parser->R);
+	elf_Value key,val;
+
+
+	take_tok(parser,TK_CURLY_LEFT);
+	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
+		tok=take_tok(parser,TK_STRING);
+		key=VSTR(elf_new_string(parser->R,tok.text));
+		take_tok(parser,TK_COLON);
+		val=parse_json_value(parser);
+		elf_table_set(table,key,val);
+	} while(pick_tok(parser,TK_COMMA));
+	take_tok(parser,TK_CURLY_RIGHT);
+
+	return table;
+}
+
+static elf_Value parse_json_value(elf_Parser *parser) {
+	elf_Value val = VNIL();
+	elf_tabID obj;
+	tokenT tok = parser->tok;
+	switch (tok.type) {
+		case TK_STRING: {
+			get_tok(parser);
+			val = VSTR(elf_new_string(parser->R,tok.text));
+		} break;
+		case TK_INTEGER: {
+			get_tok(parser);
+			val = VINT(tok.integer);
+		} break;
+		case TK_NUMBER: {
+			get_tok(parser);
+			val = VINT(tok.number);
+		} break;
+		case TK_CURLY_LEFT: {
+			obj = parse_json_obj(parser);
+			val = VTAB(obj);
+		} break;
+		case TK_SQUARE_LEFT: {
+			obj = parse_json_array(parser);
+			val = VTAB(obj);
+		} break;
+		default: {
+			parser_dialog(parser,tok.line,"invalid json value");
+		} break;
+	}
+	return val;
+}
+
+
+
 
 #if 0
 		case TK_M_INDEX: case TK_M_ARRAY: case TK_M_VALUE: {

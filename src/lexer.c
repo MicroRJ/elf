@@ -10,7 +10,7 @@
 #define MOVEN(n) ((file->pos += n))
 #define PICK(xx) ((POS0()==(xx))?MOVE(),1:0)
 
-static void new_line(Parser *fs) {
+static void new_line(elf_Parser *fs) {
 	fs->line_pos = fs->pos;
 	fs->line_num ++;
 }
@@ -50,7 +50,7 @@ GLOBAL t_token_info tok2inf[] = {
 };
 
 
-void parser_dialog(Parser *fs, char *line, char const *fmt, ...) {
+void parser_dialog(elf_Parser *fs, char *line, char const *fmt, ...) {
 	line = line ? line : fs->tok.line;
 
 	int linenum;
@@ -96,7 +96,7 @@ void parser_dialog(Parser *fs, char *line, char const *fmt, ...) {
 }
 
 
-static int pick_esc_char(Parser *file) {
+static int pick_esc_char(elf_Parser *file) {
 	int tk = MOVE();
 	if (tk != '\\') return tk;
 	tk = MOVE();
@@ -111,7 +111,7 @@ static int pick_esc_char(Parser *file) {
 }
 
 
-static int lex_word(Parser *file, char *buffer) {
+static int lex_word(elf_Parser *file, char *buffer) {
 	int length = 0;
 	do {
 		buffer[length++] = MOVE();
@@ -121,7 +121,7 @@ static int lex_word(Parser *file, char *buffer) {
 }
 
 
-static int pick_empty_chars(Parser *file) {
+static int pick_empty_chars(elf_Parser *file) {
 	int lines=0;
 	retry:
 	switch (*file->pos) {
@@ -144,7 +144,7 @@ static int pick_empty_chars(Parser *file) {
 }
 
 
-elf_f64 lex_number(Parser *file, int base) {
+elf_f64 lex_number(elf_Parser *file, int base) {
 	elf_f64 n=0,p=1;
 	do {
 		n=n*base+(MOVE()-'0');
@@ -154,7 +154,7 @@ elf_f64 lex_number(Parser *file, int base) {
 }
 
 
-static tokenT get_tok(Parser *file) {
+static tokenT get_tok(elf_Parser *file) {
 	GLOBAL char buffer[0x100];
 
 

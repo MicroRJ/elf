@@ -1,7 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** error.h
-** Error Codes
+** elf_Error Codes
 */
 
 
@@ -26,7 +26,7 @@ enum {
 
 
 GLOBAL char const *lErrorNames[] = {
-	"No Error",
+	"No elf_Error",
 
 #define ERROR_XITEM(NAME,DESC) DESC,
 	#include LERROR
@@ -36,7 +36,7 @@ GLOBAL char const *lErrorNames[] = {
 
 #else
 ERROR_XITEM(AsssertionTriggered,            "Assertion Triggered")
-ERROR_XITEM(InternalError,                  "Internal Error")
+ERROR_XITEM(InternalError,                  "Internal elf_Error")
 ERROR_XITEM(OutOfMemory,                    "Out of Memory")
 ERROR_XITEM(InvalidArguments,               "Invalid Arguments")
 ERROR_XITEM(FileNameIsInvalid,              "File Name is Invalid")

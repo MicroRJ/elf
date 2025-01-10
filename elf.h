@@ -3,16 +3,6 @@
 ** elf.h
 e*/
 
-/* Todo: better logging, with colors, with so many warnings
-and things, its hard to tell the difference between a log
-and an error */
-/* Todo: NEW is used quite often, probably turn into an
-instruction eventually, also, for now when we do get
-metatable, and invoke __new, we don't check whether it
-is null or not, so this requires the user to provide a
-__new function, which is fine, but, we don't get an error
-saying so... */
-
 #ifndef _elf_lang_
 #define _elf_lang_
 
@@ -41,11 +31,17 @@ typedef struct elf_Closure elf_Closure;
 typedef struct elf_Value   elf_Value;
 
 
+typedef elf_Table   *elf_tabID;
+typedef elf_String  *elf_strID;
+typedef elf_Closure *elf_clsID;
 
-typedef signed int 		   bool;
-typedef signed int 		   elf_Bool;
+
+// Todo: deprecated!
+typedef signed int  elf_Bool;
 
 
+// Todo: move to base or something
+typedef signed   int  				 bool;
 typedef signed   char           elf_i8;
 typedef unsigned char           elf_u8;
 typedef signed   short         elf_i16;
@@ -60,7 +56,7 @@ typedef float  			       elf_f32;
 typedef long long int 	   elf_Int;
 typedef double 			   elf_Num;
 typedef void 			     *elf_Handle;
-typedef int 					Error;
+typedef int 					elf_Error;
 typedef int 				   elf_StackId;
 typedef int 				   elf_SymbolId;
 typedef unsigned int 		elf_Hash;

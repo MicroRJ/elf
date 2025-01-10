@@ -45,9 +45,9 @@ static int sys_set_work_dir(char *text);
 static elf_Handle sys_load_dll(char const *name);
 static void *sys_get_dll_fn(elf_Handle lib, char const *name);
 
-static Error sys_load_file_data(Allocator alloc, void **pdata, char const *name);
+static elf_Error sys_read_text(Allocator alloc, void **pdata, char const *name);
 /* use length=0 or length<0 to use strlen */
-static Error sys_save_file_data(char const *text, elf_Int length, char const *name);
+static elf_Error sys_save_file_data(char const *text, elf_Int length, char const *name);
 
 static int sys_get_last_error();
 static void sys_get_error_msg(int error, char *buff, int len);

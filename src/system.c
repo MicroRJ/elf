@@ -231,9 +231,9 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 }
 
 
-Error sys_load_file_data(Allocator fn, void **data, char const *name) {
+elf_Error sys_read_text(Allocator fn, void **data, char const *name) {
 
-	Error error = Error_None;
+	elf_Error error = Error_None;
 
 	if (name == 0) {
 		error = Error_FileNameIsInvalid;
@@ -298,7 +298,7 @@ Error sys_load_file_data(Allocator fn, void **data, char const *name) {
 }
 
 
-Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileName) {
+elf_Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileName) {
 	FILE *file;
 #if defined(_MSC_VER)
 	fopen_s(&file,fileName,"wb");
@@ -310,7 +310,7 @@ Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileNam
 		return Error_CouldNotOpenFile;
 	}
 
-	Error error = Error_None;
+	elf_Error error = Error_None;
 	elf_Int lengthWritten = fwrite(buffer, 1, length, file);
 
 	if (lengthWritten != length) {

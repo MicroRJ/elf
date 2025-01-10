@@ -18,21 +18,21 @@ void *copy_memory(void *dst, void const *src, elf_Int length) {
 
 
 void dealloc_memory_debug(Allocator fn, const void *memory, DBGSource loca) {
-	Error error = fn(0,0,0,0,(void **)&memory,loca);
+	elf_Error error = fn(0,0,0,0,(void **)&memory,loca);
 	ASSERT(PASSED(error));
 }
 
 
 void *alloc_memory_debug(Allocator fn, elf_Int length, DBGSource loca) {
 	void *memory = 0;
-	Error error = fn(0,0,0,length,&memory,loca);
+	elf_Error error = fn(0,0,0,length,&memory,loca);
 	ASSERT(PASSED(error));
 	return memory;
 }
 
 
 void *realloc_memory_debug(Allocator fn, elf_Int length, void *memory, DBGSource loca) {
-	Error error = fn(0,0,0,length,&memory,loca);
+	elf_Error error = fn(0,0,0,length,&memory,loca);
 	ASSERT(PASSED(error));
 	return memory;
 }

@@ -5,40 +5,42 @@
 
 static int memory_usage;
 static int memory_state;
-static int memory_state_stack[16];
+static int memory_state_stack[128];
 static int memory_state_index;
 static treeID memory_slots[128];
 
-static int emit_jump(Parser *parser, Source line, int dst);
-static int emit_byte(Parser *parser, Source line, Bytecode byte);
-static int emit_bytex(Parser *parser, Source line, int k, int x);
-static int emit_bytexy(Parser *parser, Source line, int k, int x, int y);
-static int emit_bytexyz(Parser *parser, Source line, int k, int x, int y, int z);
-static void patch_jump2(Parser *parser, int src, int dst);
-static void patch_jumps2(Parser *parser, Instr *js, Instr j);
-static void patch_jump(Parser *parser, Instr i);
-static void patch_jumps(Parser *parser, Instr *js);
+static int emit_jump(elf_Parser *parser, Source line, int dst);
+static int emit_byte(elf_Parser *parser, Source line, Bytecode byte);
+static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
+static int emit_bytexy(elf_Parser *parser, Source line, int k, int x, int y);
+static int emit_bytexyz(elf_Parser *parser, Source line, int k, int x, int y, int z);
+static void patch_jump2(elf_Parser *parser, int src, int dst);
+static void patch_jumps2(elf_Parser *parser, Instr *js, Instr j);
+static void patch_jump(elf_Parser *parser, Instr i);
+static void patch_jumps(elf_Parser *parser, Instr *js);
 
 
-int to_mem(Parser *parser, treeID id, int dst, int ndst);
-int to_any_mem(Parser *parser, treeID id);
+int to_mem(elf_Parser *parser, treeID id, int dst, int ndst);
+int to_any_mem(elf_Parser *parser, treeID id);
 int tree2o(int kind);
-int *emit_jump_if_not_nil(Parser *parser, Source line, jumpS *js, treeID id);
-int *emit_jump_if_nil(Parser *parser, Source line, jumpS *js, treeID id);
+int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
+int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 
 /* this is just a simple linear 'memory' allocator */
-static int get_mem_state(Parser *parser) { return memory_state; }
-static void set_mem_state(Parser *parser, int state) { memory_state = state; }
+static int get_mem_state(elf_Parser *parser) { return memory_state; }
+static void set_mem_state(elf_Parser *parser, int state) { memory_state = state; }
 
-static void push_mem_state(Parser *parser) {
+static void push_mem_state(elf_Parser *parser) {
+	ASSERT(memory_state_index < _countof(memory_state_stack));
 	memory_state_stack[memory_state_index ++] = get_mem_state(parser);
 }
-static void pop_mem_state(Parser *parser) {
+static void pop_mem_state(elf_Parser *parser) {
+	ASSERT(memory_state_index > 0);
 	set_mem_state(parser,memory_state_stack[-- memory_state_index]);
 }
 
 /* get the memory associated with the tree */
-static int get_mem(Parser *parser, treeID id) {
+static int get_mem(elf_Parser *parser, treeID id) {
 	int reg = -1;
 	if (id != NO_TREE) {
 		for (int i = 0; i < memory_state; i ++) {
@@ -51,7 +53,7 @@ static int get_mem(Parser *parser, treeID id) {
 }
 
 /* assign a memory location to the given tree */
-static int set_mem(Parser *parser, treeID id) {
+static int set_mem(elf_Parser *parser, treeID id) {
 	ASSERT(memory_state < _countof(memory_slots));
 
 	int reg = memory_state ++;
@@ -63,7 +65,7 @@ static int set_mem(Parser *parser, treeID id) {
 	return reg;
 }
 
-int to_any_mem(Parser *parser, treeID id) {
+int to_any_mem(elf_Parser *parser, treeID id) {
 	int reg;
 	reg=get_mem(parser,id);
 	if (reg==NO_SLOT) {
@@ -73,9 +75,9 @@ int to_any_mem(Parser *parser, treeID id) {
 	return reg;
 }
 
-static void gen_tree(Parser *parser, treeID id);
+static void gen_tree(elf_Parser *parser, treeID id);
 
-static elf_Proto gen_proto(Parser *parser, treeID tree){
+static elf_Proto gen_proto(elf_Parser *parser, treeID tree){
 	ASSERT(get_tree_kind(parser,tree)==TREE_FUNCTION);
 	ASSERT(memory_state_index==0);
 	ASSERT(memory_state==0);
@@ -97,7 +99,7 @@ static elf_Proto gen_proto(Parser *parser, treeID tree){
 }
 
 // just have one big, compile function
-static elf_File gen_file(Parser *parser, treeID tree){
+static elf_File gen_file(elf_Parser *parser, treeID tree){
 	int index;
 	elf_Proto *protos;
 	index=ARRAY_GROW(parser->R->M->protos,ARRAY_LENGTH(parser->functions));
@@ -109,10 +111,10 @@ static elf_File gen_file(Parser *parser, treeID tree){
 	}
 	FOR_ARRAY(i,parser->functions){
 		protos[i]=gen_proto(parser,parser->functions[i]);
-		elf_debug_log("PROTO: [%i, %i) (%i)"
-		, 	protos[i].bytes
-		, 	protos[i].bytes+protos[i].nbytes
-		,	protos[i].nbytes);
+		// elf_debug_log("PROTO: [%i, %i) (%i)"
+		// , 	protos[i].bytes
+		// , 	protos[i].bytes+protos[i].nbytes
+		// ,	protos[i].nbytes);
 	}
 	int end=parser->R->M->nbytes;
 	elf_File file = {};
@@ -124,7 +126,7 @@ static elf_File gen_file(Parser *parser, treeID tree){
 	return file;
 }
 
-static void gen_tree(Parser *parser, treeID id) {
+static void gen_tree(elf_Parser *parser, treeID id) {
 	treeT tree;
 
 	tree=get_tree(parser,id);
@@ -229,7 +231,8 @@ static void gen_tree(Parser *parser, treeID id) {
 			}else if(xx.kind==EXPR_METAFIELD) {
 				parser_dialog(parser,tree.line,"assignment of metafields is not possible");
 			} else {
-				parser_dialog(parser,tree.line,"invalid store, operand must be a global or field or index or memory");
+				parser_dialog(parser,tree.line,"internal error: invalid store, operand must be a global or field or index or memory, instead got: %s", tree2s[xx.kind]);
+				ASSERT(!"error");
 			}
 		} break;
 		case STAT_BLOCK: {
@@ -264,7 +267,7 @@ static void gen_tree(Parser *parser, treeID id) {
 		} break;
 	}
 }
-static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
+static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	int _dst=dst;
 
 	ASSERT(id!=0);
@@ -522,11 +525,11 @@ int tree2o(int kind) {
 	return BC_HALT;
 }
 
-static int emit_jump(Parser *parser, Source line, int dst) {
+static int emit_jump(elf_Parser *parser, Source line, int dst) {
 	return emit_bytex(parser,line,BC_J,dst-parser->R->M->nbytes);
 }
 
-static int emit_branch_if(Parser *parser, jumpS *js, bool if_true, treeID id) {
+static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id) {
 	treeT node = get_tree(parser,id);
 
 	int reg,jmp;
@@ -558,19 +561,19 @@ static int emit_branch_if(Parser *parser, jumpS *js, bool if_true, treeID id) {
 }
 
 
-int emit_branch_if_false(Parser *fs, jumpS *js, treeID id) {
+int emit_branch_if_false(elf_Parser *fs, jumpS *js, treeID id) {
 	return emit_branch_if(fs,js,0,id);
 }
 
 
-int emit_branch_if_true(Parser *fs, jumpS *js, treeID id) {
+int emit_branch_if_true(elf_Parser *fs, jumpS *js, treeID id) {
 	return emit_branch_if(fs,js,1,id);
 }
 
 
 /* similar to branch if true, but additionally all
 false jumps converge here */
-int *emit_jump_if_true(Parser *fs, jumpS *js, treeID id) {
+int *emit_jump_if_true(elf_Parser *fs, jumpS *js, treeID id) {
 	emit_branch_if_true(fs,js,id);
 	patch_jumps(fs,js->f);
 	ARRAY_DELETE(js->f);
@@ -579,7 +582,7 @@ int *emit_jump_if_true(Parser *fs, jumpS *js, treeID id) {
 }
 
 
-Instr *emit_jump_if_false(Parser *fs, jumpS *js, treeID id) {
+Instr *emit_jump_if_false(elf_Parser *fs, jumpS *js, treeID id) {
 	emit_branch_if_false(fs,js,id);
 	patch_jumps(fs,js->t);
 	ARRAY_DELETE(js->t);
@@ -588,16 +591,16 @@ Instr *emit_jump_if_false(Parser *fs, jumpS *js, treeID id) {
 }
 
 
-int *emit_jump_if_not_nil(Parser *parser, Source line, jumpS *js, treeID id) {
+int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id) {
 	return emit_jump_if_false(parser,js,tree_binary(parser,line,EXPR_EQ,NT_BOL,id,tree_nil(parser,line)));
 }
 
 
-int *emit_jump_if_nil(Parser *parser, Source line, jumpS *js, treeID id) {
+int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id) {
 	return emit_jump_if_true(parser,js,tree_binary(parser,line,EXPR_EQ,NT_BOL,id,tree_nil(parser,line)));
 }
 
-static void begin_if(Parser *parser, Source line, BranchJumps *s, treeID x, int if_true) {
+static void begin_if(elf_Parser *parser, Source line, BranchJumps *s, treeID x, int if_true) {
 	jumpS js = {0};
 	emit_branch_if(parser,&js,if_true,x);
 	if (if_true) {
@@ -619,7 +622,7 @@ static void begin_if(Parser *parser, Source line, BranchJumps *s, treeID x, int 
 /* closes previous conditional block by emitting
 escape jump, patches previous jz (jump if false)
 list to enter this block. */
-void add_else_clause(Parser *fs, Source line, BranchJumps *s) {
+void add_else_clause(elf_Parser *fs, Source line, BranchJumps *s) {
 	if (s->jz == 0) {
 		parser_dialog(fs,line,"invalid else clause");
 	}
@@ -633,13 +636,13 @@ void add_else_clause(Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-void add_elif_clause(Parser *parser, Source line, BranchJumps *s, treeID x) {
+void add_elif_clause(elf_Parser *parser, Source line, BranchJumps *s, treeID x) {
 	add_else_clause(parser,line,s);
 	begin_if(parser,line,s,x,0);
 }
 
 
-void add_then_clause(Parser *parser, Source line, BranchJumps *s) {
+void add_then_clause(elf_Parser *parser, Source line, BranchJumps *s) {
 	/* we don't need to close the previous block, it can just fall
 	through to our branch, do collect all the other exit jumps and
 	tie them to this branch block, naturally we don't need to add
@@ -652,7 +655,7 @@ void add_then_clause(Parser *parser, Source line, BranchJumps *s) {
 }
 
 
-void close_if(Parser *fs, Source line, BranchJumps *s) {
+void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 	/* collect missing else branch */
 	if (s->jz != 0) {
 		patch_jumps(fs,s->jz);
@@ -668,7 +671,7 @@ void close_if(Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(Parser *C, Source line, Bytecode byte) {
+static int emit_byte(elf_Parser *C, Source line, Bytecode byte) {
 	elf_Module *M = C->R->M;
 	ARRAY_ADD(M->lines,line);
 	ARRAY_ADD(M->bytes,byte);
@@ -677,7 +680,7 @@ static int emit_byte(Parser *C, Source line, Bytecode byte) {
 }
 
 
-static int emit_bytex(Parser *C, Source line, int k, int x) {
+static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
 	Bytecode byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
@@ -685,7 +688,7 @@ static int emit_bytex(Parser *C, Source line, int k, int x) {
 }
 
 
-static int emit_bytexy(Parser *C, Source line, int k, int x, int y) {
+static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
 	Bytecode byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
@@ -694,7 +697,7 @@ static int emit_bytexy(Parser *C, Source line, int k, int x, int y) {
 }
 
 
-static int emit_bytexyz(Parser *C, Source line, int k, int x, int y, int z) {
+static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) {
 	Bytecode byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
@@ -703,7 +706,7 @@ static int emit_bytexyz(Parser *C, Source line, int k, int x, int y, int z) {
 	return emit_byte(C,line,byte);
 }
 
-static void patch_jump2(Parser *fs, int src, int dst) {
+static void patch_jump2(elf_Parser *fs, int src, int dst) {
 	Bytecode byte,*bytes;
 	bytes=fs->R->M->bytes;
 	byte=bytes[src];
@@ -723,19 +726,19 @@ static void patch_jump2(Parser *fs, int src, int dst) {
 }
 
 
-static void patch_jumps2(Parser *fs, Instr *js, Instr j) {
+static void patch_jumps2(elf_Parser *fs, Instr *js, Instr j) {
 	FOR_ARRAY(i,js) {
 		patch_jump2(fs,js[i],j);
 	}
 }
 
 
-static void patch_jump(Parser *fs, Instr i) {
+static void patch_jump(elf_Parser *fs, Instr i) {
 	patch_jump2(fs,i,fs->R->M->nbytes);
 }
 
 
-static void patch_jumps(Parser *fs, Instr *js) {
+static void patch_jumps(elf_Parser *fs, Instr *js) {
 	FOR_ARRAY(i,js) {
 		patch_jump(fs,js[i]);
 	}
@@ -754,7 +757,7 @@ int to_mem(Compiler *C, int flags, int reg, int nreg, treeID id) {
 		} break;
 
 
-FileBlock *get_loop_block(Parser *fs, elf_StackId reg) {
+FileBlock *get_loop_block(elf_Parser *fs, elf_StackId reg) {
 	__debugbreak();
 	int level;
 	for (level = fs->nblocks-1; level > -1; -- level) {
@@ -767,7 +770,7 @@ FileBlock *get_loop_block(Parser *fs, elf_StackId reg) {
 	return 0;
 }
 
-void desugar_range_expr_epilogue(Parser *fs, treeID x) {
+void desugar_range_expr_epilogue(elf_Parser *fs, treeID x) {
 	treeT node = get_tree(fs,x);
 	switch (node.kind) {
 		case IR_INDEX: case IR_FIELD: {
@@ -781,7 +784,7 @@ void desugar_range_expr_epilogue(Parser *fs, treeID x) {
 		default: ;
 	}
 }
-treeID desugar_range_expr(Parser *fs, treeID x, int flags) {
+treeID desugar_range_expr(elf_Parser *fs, treeID x, int flags) {
 	treeT node;
 	Source line;
 	treeID xx;
@@ -834,7 +837,7 @@ treeID desugar_range_expr(Parser *fs, treeID x, int flags) {
 	return NO_TREE;
 }
 
-void opt_const_fold(Parser *fs, treeT node) {
+void opt_const_fold(elf_Parser *fs, treeT node) {
 	#define isconst(k) (k==IR_STRING||k==IR_INTEGER||k==IR_NUMBER)
 	treeT xx,yy;
 	int xconst;
@@ -889,7 +892,7 @@ tmp=a.b.c
 if tmp.d nil ? tmp.d=1
 
 */
-treeID emit_preload_deprecated(Parser *fs, treeID x) {
+treeID emit_preload_deprecated(elf_Parser *fs, treeID x) {
 	ASSERT(x>=0);
 
 	treeT   node;

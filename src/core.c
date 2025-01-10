@@ -107,7 +107,7 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 
 // todo: why do we pass in the parser and why
 // are there so many variations of the same thing
-elf_Closure *elf_load_code_closure(elf_State *R, Parser *parser, elf_String *name, elf_String *contents) {
+elf_Closure *elf_load_code_closure(elf_State *R, elf_Parser *parser, elf_String *name, elf_String *contents) {
 	if (!name || !contents) {
 		return 0;
 	}
@@ -126,13 +126,15 @@ elf_Closure *elf_load_code_closure(elf_State *R, Parser *parser, elf_String *nam
 }
 
 
-elf_Closure *elf_load_file_closure(elf_State *R, Parser *fs, elf_String *name) {
-	Error error;
-	elf_String *string;
+// todo: why is file IO being done here?
+// this is the core file... this is just
+// some variant, put this somewhere else
+elf_clsID elf_load_file_closure(elf_State *R, elf_String *name) {
+	elf_Error error;
 	char *text;
 
 	/* todo: use string allocator instead?... */
-	error=sys_load_file_data(GLOBAL_ALLOCATOR,(void**)&text,name->text);
+	error=sys_read_text(GLOBAL_ALLOCATOR,(void**)&text,name->text);
 	if (FAILED(error)) {
 		elf_error_log("'%s': could not load file",name->text);
 		goto error;
@@ -140,19 +142,21 @@ elf_Closure *elf_load_file_closure(elf_State *R, Parser *fs, elf_String *name) {
 
 	elf_debug_log("'%s': file loaded successfully",name->text);
 
-	string=elf_new_string(R,text);
+	elf_strID string=elf_new_string(R,text);
 	dealloc_memory(GLOBAL_ALLOCATOR,text);
-	return elf_load_code_closure(R,fs,name,string);
+
+	elf_Parser parser = {0};
+	return elf_load_code_closure(R,&parser,name,string);
+
 	error:
 	return 0;
 }
 
 
 int elf_exec_file(elf_State *R, elf_String *name, int nargs, int nrets) {
-	Parser fs = {0};
-	elf_Closure *cls;
-
-	cls=elf_load_file_closure(R,&fs,name);
+	ASSERT(nargs >= 0);
+	ASSERT(nrets >= 0);
+	elf_clsID cls = elf_load_file_closure(R,name);
 	/* todo: HACK! */
 	elf_set_global(R->M,name,VCLS(cls));
 	elf_add_cls(R,cls);
@@ -761,21 +765,16 @@ int elf_run(elf_State *R) {
 					locals[BC_ARGX(byte)].y_f32 = y0 OP y1;\
 				} else if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {\
 					if (!ISOBJT(xx.tag)) elf_fail(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
-					/* Could we redefine this? */ \
-					if (BC_OP(byte)==BC_DIV) check_division_by_zero(R,xx,yy);\
 					call_overload(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
-				} else if ((xx.tag==elf_TAG_NUM) || (yy.tag==elf_TAG_NUM)) {\
-					if (!ISNUMT(yy.tag)) elf_fail(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
-					/* Could we redefine this? */ \
+				} else if (ISNUMT(xx.tag) && ISNUMT(yy.tag)) {\
 					if (BC_OP(byte)==BC_DIV) check_division_by_zero(R,xx,yy);\
-					locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;\
-					locals[BC_ARGX(byte)].x_num = VI2N(xx) OP VI2N(yy);\
-				} else if ((xx.tag==elf_TAG_INT)||(yy.tag==elf_TAG_INT)) {\
-					if (!ISNUMT(yy.tag)) elf_fail(R,NO_BYTE,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));\
-					/* Could we redefine this? */ \
-					if (BC_OP(byte)==BC_DIV) check_division_by_zero(R,xx,yy);\
-					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
-					locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
+					if((xx.tag==elf_TAG_NUM) || (yy.tag==elf_TAG_NUM)) {\
+						locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;\
+						locals[BC_ARGX(byte)].x_num = VI2N(xx) OP VI2N(yy);\
+					}else{\
+						locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
+						locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
+					}\
 				} else elf_fail(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));\
 			} break
 			case BC_LTEQ: {

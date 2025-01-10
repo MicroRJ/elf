@@ -1,7 +1,7 @@
 #define TREE_THIS ((treeID)(1))
 #define NO_TREE 0
 
-typedef struct Parser Parser;
+typedef struct elf_Parser elf_Parser;
 
 typedef struct treeT treeT;
 typedef treeT *treeID;
@@ -128,43 +128,43 @@ static char *tree2s[]={
 
 
 
-static treeT get_tree(Parser *, treeID id);
-static treeKi get_tree_kind(Parser *, treeID id);
-static treeTy get_tree_type(Parser *, treeID id);
-static Source get_tree_line(Parser *, treeID id);
-static treeID tree_xyz(Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y, treeID *z);
-static treeID tree_binary(Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y);
-static treeID tree_unary(Parser *, Source, treeKi k, treeTy ty, treeID x);
-static treeID tree_nil(Parser *, Source);
-static treeID tree_int(Parser *, Source, elf_Int i);
-static treeID tree_num(Parser *, Source, elf_Num n);
-static treeID tree_str(Parser *, Source, Source);
-static treeID tree_nullary(Parser *, Source, treeKi k, treeTy t);
-static treeID tree_group(Parser *, Source, treeID x);
-static treeID tree_table(Parser *, Source);
-static treeID tree_closure(Parser *, Source, treeID x, treeID *z);
-static treeID tree_store(Parser *, Source line, treeID x, treeID y);
+static treeT get_tree(elf_Parser *, treeID id);
+static treeKi get_tree_kind(elf_Parser *, treeID id);
+static treeTy get_tree_type(elf_Parser *, treeID id);
+static Source get_tree_line(elf_Parser *, treeID id);
+static treeID tree_xyz(elf_Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y, treeID *z);
+static treeID tree_binary(elf_Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y);
+static treeID tree_unary(elf_Parser *, Source, treeKi k, treeTy ty, treeID x);
+static treeID tree_nil(elf_Parser *, Source);
+static treeID tree_int(elf_Parser *, Source, elf_Int i);
+static treeID tree_num(elf_Parser *, Source, elf_Num n);
+static treeID tree_str(elf_Parser *, Source, Source);
+static treeID tree_nullary(elf_Parser *, Source, treeKi k, treeTy t);
+static treeID tree_group(elf_Parser *, Source, treeID x);
+static treeID tree_table(elf_Parser *, Source);
+static treeID tree_closure(elf_Parser *, Source, treeID x, treeID *z);
+static treeID tree_store(elf_Parser *, Source line, treeID x, treeID y);
 
-static treeID tree_ret(Parser *, Source, treeID i);
-static treeID tree_goto(Parser *, Source);
+static treeID tree_ret(elf_Parser *, Source, treeID i);
+static treeID tree_goto(elf_Parser *, Source);
 
-static treeID tree_this_ref(Parser *, Source line);
-static treeID tree_global_ref(Parser *, Source line, char *name, int x);
+static treeID tree_this_ref(elf_Parser *, Source line);
+static treeID tree_global(elf_Parser *, Source line, int x);
 
-static treeID tree_call(Parser *, Source line, treeID x, treeID *z);
+static treeID tree_call(elf_Parser *, Source line, treeID x, treeID *z);
 
-static treeID tree_type_guard(Parser *, Source line, treeID x, treeTy y);
-static treeID tree_meta_field(Parser *, Source line, treeID x, treeID y);
-static treeID tree_field(Parser *, Source line, treeID x, treeID y);
-static treeID tree_index(Parser *, Source line, treeID x, treeID y);
-static treeID tree_ranged_index(Parser *, Source line, treeID x, treeID y);
+static treeID tree_type_guard(elf_Parser *, Source line, treeID x, treeTy y);
+static treeID tree_meta_field(elf_Parser *, Source line, treeID x, treeID y);
+static treeID tree_field(elf_Parser *, Source line, treeID x, treeID y);
+static treeID tree_index(elf_Parser *, Source line, treeID x, treeID y);
+static treeID tree_ranged_index(elf_Parser *, Source line, treeID x, treeID y);
 
 
-static treeID tree_less_than(Parser *, Source line, treeID x, treeID y);
-static treeID tree_meta_call(Parser *, Source line, treeID x, treeID *z, char *name);
-static treeID tree_multi(Parser *, Source line, treeID *z);
-static treeID tree_block(Parser *, Source line, treeID *z);
+static treeID tree_less_than(elf_Parser *, Source line, treeID x, treeID y);
+static treeID tree_meta_call(elf_Parser *, Source line, treeID x, treeID *z, char *name);
+static treeID tree_multi(elf_Parser *, Source line, treeID *z);
+static treeID tree_block(elf_Parser *, Source line, treeID *z);
 
-static treeID tree_global_ref_by_name(Parser *, Source line, char *name);
-static treeID tree_call_pf(Parser *, Source line, treeID *args);
-static treeID tree_call_set_meta(Parser *, Source line, treeID object, treeID metatable);
+static treeID tree_global_ref_by_name(elf_Parser *, Source line, char *name);
+static treeID tree_call_pf(elf_Parser *, Source line, treeID *args);
+static treeID tree_call_set_meta(elf_Parser *, Source line, treeID object, treeID metatable);

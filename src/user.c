@@ -4,6 +4,12 @@
 */
 
 
+elf_Node *elf_new_object(elf_State *R, elf_Int size) {
+	elf_Node *obj=elf_alloc_object(R,GC_OBJ,size);
+	elf_add_obj(R,obj);
+	return obj;
+}
+
 elf_String *elf_new_string(elf_State *R, const char *text) {
 	elf_String *string=elf_alloc_string(R,text);
 	elf_add_str(R,string);
@@ -16,14 +22,6 @@ elf_String *elf_new_string2(elf_State *R, elf_Int length) {
 	elf_add_str(R,string);
 	return string;
 }
-
-
-elf_Node *elf_new_object(elf_State *R, elf_Int size) {
-	elf_Node *obj=elf_alloc_object(R,GC_OBJ,size);
-	elf_add_obj(R,obj);
-	return obj;
-}
-
 
 elf_Table *elf_new_table(elf_State *R) {
 	elf_Table *tab=elf_alloc_table(R);
@@ -45,6 +43,9 @@ static void check_tag(elf_State *S, elf_ValueTag tag, elf_ValueTag got, elf_Stac
 
 int elf_get_num_args(elf_State *S) {
 	return GET_FRAME(S)->nargs-1;
+}
+int elf_get_num_rets(elf_State *S) {
+	return GET_FRAME(S)->nrets;
 }
 
 

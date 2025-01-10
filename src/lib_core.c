@@ -296,19 +296,29 @@ int core_lib_load_code(elf_State *R) {
 
 
 int core_lib_load_file(elf_State *R) {
-	elf_String *filename;
-	int nresults;
-
-	filename=elf_get_str(R,0);
-	nresults=elf_exec_file(R,filename,GET_FRAME(R)->nargs,GET_FRAME(R)->nrets);
-	// if (nresults != -1 && !strcmp(filename->text,"patterns.elf")){
-	// 	__debugbreak();
-	// }
-	// copy_memory(R->frame->locals-1,R->stack_ptr-nresults,nresults*sizeof(elf_Value));
-	return nresults;
+	elf_strID name = elf_get_str(R,0);
+	int nrets = elf_exec_file(R,name
+	,	elf_get_num_args(R)
+	,	elf_get_num_rets(R));
+	return nrets;
 }
 
+int core_lib_load_json(elf_State *R) {
+	elf_strID name = elf_get_str(R,0);
 
+	char *text = 0;
+	elf_Error err = sys_read_text(GLOBAL_ALLOCATOR,(void**)&text,name->text);
+
+	elf_Parser parser = {};
+	prep_parser(&parser, R, name->text, text);
+
+	elf_tabID tab = parse_json_obj(&parser);
+
+	dealloc_memory(GLOBAL_ALLOCATOR,text);
+
+	elf_add_tab(R,tab);
+	return 1;
+}
 
 
 // typedef void (*em_dlopen_callback)(void* handle, void* user_data);
@@ -767,8 +777,10 @@ void elf_include_core_lib(elf_State *R) {
 	elf_gsetx_cfn(R,"elf.include",core_lib_include);
 	elf_gsetx_cfn(R,"elf.loadcode",core_lib_load_code);
 	elf_gsetx_cfn(R,"elf.loadexpr",core_lib_load_expr);
-	elf_gsetx_cfn(R,"elf.load_file",core_lib_load_file);
 	elf_gsetx_cfn(R,"elf.unload",core_lib_unload);
+
+	elf_gsetx_cfn(R,"elf.load_file",core_lib_load_file);
+	elf_gsetx_cfn(R,"elf.load_json",core_lib_load_json);
 
 	elf_gsetx_cfn(R,"elf.pf_indent",core_lib_pf_indent);
 	elf_gsetx_cfn(R,"elf.pf",core_lib_pf);
