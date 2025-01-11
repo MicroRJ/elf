@@ -146,7 +146,7 @@ elf_Node *elf_get_obj(elf_State *R, elf_StackId x) {
 }
 
 
-elf_Table *elf_get_tab(elf_State *R, elf_StackId x) {
+elf_Table *elf_get_table(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_TAG_NIL) return 0;
 	if (v.tag==elf_TAG_TAB) return v.x_tab;

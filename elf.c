@@ -196,6 +196,7 @@ typedef struct elf_State {
 #include "src/user.c"
 #include "src/lib_core.c"
 #include "src/lib_table.c"
+#include "src/lib_array.c"
 #include "src/core.c"
 #include "src/system.c"
 

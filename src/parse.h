@@ -93,8 +93,12 @@ _(NUMBER             , "number")    \
 _(STRING             , "string")    \
 _(LETTER             , "letter")    \
 _(WORD               ,   "word")    \
+_(MINUS_MINUS        ,"--")         \
+_(PLUS_PLUS          ,"++")         \
 _(QMARK              ,"?")          \
 _(EXCLAMATION_MARK   ,"!")          \
+_(ARROW              ,"->")         \
+_(HARD_ARROW         ,"-->")        \
 _(BIND               ,":=")         \
 _(HARD_BIND          ,"::=")        \
 _(ASSIGN             ,"=")          \

@@ -78,13 +78,13 @@ out of the hash value. First hash computes the starting index,
 and the secondary hash computes the step by which we increment.
 since the increment depends on the data, it should reduce
 clustering. */
-elf_Int elf_table_try(elf_Table *tab, elf_Value key) {
+elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
 	elf_Entry *slots = tab->slots;
-	elf_Int ntotal = tab->ntotal;
-	elf_Int hash = elf_hash_value(key);
-	elf_Int head = hash % ntotal;
-	elf_Int tail = head;
+	elf_i64 ntotal = tab->ntotal;
+	elf_i64 hash = elf_hash_value(key);
+	elf_i64 head = hash % ntotal;
+	elf_i64 tail = head;
 	elf_Hash walk = elf_rehash(hash)|1;
 	elf_Value value;
 	do {
@@ -99,11 +99,11 @@ elf_Int elf_table_try(elf_Table *tab, elf_Value key) {
 }
 
 
-elf_Int elf_table_try_text(elf_Table *tab, const char *text, elf_Int length, elf_Hash hash) {
+elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf_Hash hash) {
 	elf_Entry *slots = tab->slots;
-	elf_Int ntotal = tab->ntotal;
-	elf_Int head = hash % ntotal;
-	elf_Int tail = head;
+	elf_i64 ntotal = tab->ntotal;
+	elf_i64 head = hash % ntotal;
+	elf_i64 tail = head;
 	elf_Hash walk = elf_rehash(hash)|1;
 	do {
 		elf_Value x = slots[tail].key;
@@ -222,9 +222,9 @@ void elf_array_add(elf_Table *table, elf_Value v) {
 }
 
 
-void elf_tadd_tab(elf_Table *table, elf_Table *thing) {
-	ARRAY_ADD(table->array,VTAB(thing));
-}
+// void elf_tadd_tab(elf_Table *table, elf_Table *thing) {
+// 	ARRAY_ADD(table->array,VTAB(thing));
+// }
 
 
 void elf_merge_tables(elf_Table *tab, elf_Table *merger) {

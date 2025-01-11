@@ -379,6 +379,20 @@ static tokenT get_tok(elf_Parser *file) {
 			}
 		} break;
 
+		case '-': {
+			MOVE();
+			tk.type=TK_SUB;
+			if(PICK('-')){
+				tk.type=TK_MINUS_MINUS;
+				if(PICK('>')){
+					tk.type=TK_HARD_ARROW;
+				}
+			}else if(PICK('>')){
+				tk.type=TK_ARROW;
+			}
+		} break;
+
+
 #define LEX1(C,T) case C:MOVE();tk.type=T;break
 #define LEX2(A,X,B,Y) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;break
 #define LEX3(A,X,B,Y,C,Z) case A:MOVE();tk.type=X;if(PICK(B))tk.type=Y;else if(PICK(C))tk.type=Z;break
@@ -392,6 +406,8 @@ static tokenT get_tok(elf_Parser *file) {
 		LEX2('&',TK_BIT_AND,'&',TK_LOG_AND);
 		LEX2('=',TK_ASSIGN,'=',TK_EQ);
 		LEX2('*',TK_MUL,'*',TK_POW);
+		// LEX2('-',TK_SUB,'>',TK_ARROW);
+
 		LEX1('[',TK_SQUARE_LEFT);
 		LEX1(']',TK_SQUARE_RIGHT);
 		LEX1('(',TK_PAREN_LEFT);
@@ -401,7 +417,6 @@ static tokenT get_tok(elf_Parser *file) {
 		LEX1(',',TK_COMMA);
 		LEX1('%',TK_MOD);
 		LEX1('^',TK_BIT_XOR);
-		LEX1('-',TK_SUB);
 		LEX1('+',TK_ADD);
 	}
 

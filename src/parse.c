@@ -48,9 +48,7 @@ static treeID parse(elf_Parser *parser, elf_State *R, char *name, char *text) {
 
 	ARRAY_ADD(parser->functions,func);
 
-	while (parser->tok.type!=TK_NONE) {
-		if(!parse_stat(parser))break;
-	}
+	while (parse_stat(parser));
 
 	// todo: this is temporary...
 	FOR_ARRAY(i,parser->block.defers){
@@ -97,19 +95,23 @@ static tokenT take_tok(elf_Parser *parser, int k) {
 }
 
 static void begin_scope(elf_Parser *parser) {
+	ASSERT(parser->scope_index < _countof(parser->scope_stack));
 	parser->scope_stack[parser->scope_index ++] = parser->entity_index;
 	parser->scope ++;
 }
 static void close_scope(elf_Parser *parser) {
+	ASSERT(parser->scope_index > 0);
 	parser->entity_index = parser->scope_stack[-- parser->scope_index];
 	parser->scope --;
 }
 
 static void begin_loop(elf_Parser *parser) {
+	ASSERT(parser->loop_index < _countof(parser->loop_stack));
 	parser->loop_stack[parser->loop_index ++] = parser->loop;
 	parser->loop=(Loop){};
 }
 static void close_loop(elf_Parser *parser) {
+	ASSERT(parser->loop_index > 0);
 	parser->loop = parser->loop_stack[-- parser->loop_index];
 }
 
@@ -117,11 +119,13 @@ static void block_add(elf_Parser *parser, treeID id){
 	ARRAY_ADD(parser->block.body,id);
 }
 static void begin_block(elf_Parser *parser) {
+	ASSERT(parser->block_index < _countof(parser->block_stack));
 	parser->block_stack[parser->block_index ++] = parser->block;
 	parser->block=(Block){};
 	begin_scope(parser);
 }
 static treeID close_block(elf_Parser *parser) {
+	ASSERT(parser->block_index > 0);
 	close_scope(parser);
 	Block block;
 	block=parser->block;
@@ -255,6 +259,7 @@ static treeID parse_fun(elf_Parser *parser){
 		parser_dialog(parser,0,"did you miss a ',' ?");
 	}
 	take_tok(parser,TK_PAREN_RIGHT);
+
 	pick_tok(parser,TK_QMARK);
 
 	if(peek_tok(parser,TK_CURLY_LEFT)){
@@ -518,15 +523,20 @@ static treeID parse_table(elf_Parser *parser) {
 		if ((tok.type==TK_WORD)&&(parser->tok_prox.type==TK_ASSIGN)) {
 			tok=get_tok(parser);
 			key=tree_str(parser,tok.line,tok.text);
+			if(key==NO_TREE) goto _err;
 		} else {
 			key=value=parse_expr(parser,0);
+			if(key==NO_TREE) goto _err;
 		}
 		tok=parser->tok;
 		if (pick_tok(parser,TK_ASSIGN)) {
 			value=parse_expr(parser,0);
+			if(value==NO_TREE) goto _err;
 		} else {
 			key=tree_int(parser,tok.line,index++);
+			if(key==NO_TREE) goto _err;
 		}
+
 		ASSERT(value!=NO_TREE);
 		ASSERT(key!=NO_TREE);
 
@@ -547,6 +557,9 @@ static treeID parse_table(elf_Parser *parser) {
 	}
 	take_tok(parser,TK_CURLY_RIGHT);
 
+	return table;
+	_err:
+	parser_dialog(parser,parser->tok.line,"invalid field intializer");
 	return table;
 }
 
@@ -766,9 +779,7 @@ static treeID parse_bl(elf_Parser *parser){
 	begin_block(parser);
 
 	if(pick_tok(parser,TK_CURLY_LEFT)){
-		while (parser->tok.type!=TK_NONE && parser->tok.type!=TK_CURLY_RIGHT) {
-			parse_stat(parser);
-		}
+		while(parse_stat(parser));
 		take_tok(parser,TK_CURLY_RIGHT);
 	} else {
 		parse_stat(parser);
@@ -838,6 +849,7 @@ static int parse_stat(elf_Parser *parser) {
 		// todo: deprecate leave!
 		case TK_LEAVE:
 		case TK_RET:
+		case TK_HARD_ARROW:
 		case TK_BREAK:
 		case TK_CONTINUE: {
 			get_tok(parser);

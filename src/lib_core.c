@@ -142,7 +142,7 @@ int core_lib_merge_tables(elf_State *R) {
 	elf_Table *tab = elf_new_table(R);
 	int i;
 	for (i = 0; i < elf_get_num_args(R); i += 1) {
-		elf_merge_tables(tab,elf_get_tab(R,i));
+		elf_merge_tables(tab,elf_get_table(R,i));
 	}
 	return 1;
 }
@@ -155,7 +155,7 @@ int core_lib_get_meta(elf_State *R) {
 
 
 int core_lib_set_meta(elf_State *R) {
-	elf_get_obj(R,0)->meta=elf_get_tab(R,1);
+	elf_get_obj(R,0)->meta=elf_get_table(R,1);
 	PUSHV(R,elf_get_arg(R,0));
 	return 1;
 }
@@ -604,7 +604,7 @@ static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t f
 		nrets=elf_call(state,2,1);
 	}
 	if (storage){
-		elf_tadd_tab(storage,file);
+		elf_array_add(storage,VTAB(file));
 	}
 		// int results = 0; NO_CODE; // elf_call(R,base,1,1);
 		// if (is_directory) {
@@ -700,7 +700,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 
 int core_lib_unload(elf_State *S) {
 	elf_Handle io = elf_get_sys(S,0);
-	elf_Table *tab = elf_get_tab(S,1);
+	elf_Table *tab = elf_get_table(S,1);
 	elf_unload(io,tab,0);
 	return 0;
 }

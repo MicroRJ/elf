@@ -202,7 +202,7 @@ elAPI elf_Num      elf_get_num(elf_State *S, int arg);
 elAPI elf_String  *elf_get_str(elf_State *S, int arg);
 elAPI char        *elf_get_txt(elf_State *S, int arg);
 elAPI elf_Node    *elf_get_obj(elf_State *S, int arg);
-elAPI elf_Table   *elf_get_tab(elf_State *S, int arg);
+elAPI elf_Table   *elf_get_table(elf_State *S, int arg);
 elAPI elf_Handle   elf_get_sys(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
 

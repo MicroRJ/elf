@@ -6,7 +6,6 @@
 
 enum{true=1,false=0};
 
-
 #define STATIC_ASSERT(x) typedef char _static_assert_[x ? 1 : -1]
 
 
@@ -94,7 +93,7 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 
 
 #define ISOBJT(tag) ((tag)>=elf_TAG_OBJ)
-#define ISNUMT(tag) (((tag)==elf_TAG_NUM)||((tag)==elf_TAG_INT))
+#define INTORNUM(tag) (((tag)==elf_TAG_NUM)||((tag)==elf_TAG_INT))
 #define CAN_CALL(tag) (((tag)==elf_TAG_CLS)||((tag)==elf_TAG_CFN))
 
 
@@ -118,7 +117,13 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 
 #define GET_TOP(S)   ((S)->stack_ptr)
 #define SET_TOP(S,X) (GET_TOP(S) = UCAST(X, elf_Value *))
-#define PUSHV(S,X)   (* GET_TOP(S) ++ = (X))
+
+
+#if defined(_DEBUG)
+#define PUSHV(S,X) (* GET_TOP(S) ++ = (X))
+#else
+#define PUSHV(S,X) _debug_stack_push(S,X)
+#endif
 
 
 #define VNIL() (XLITERAL(elf_Value){elf_TAG_NIL})
