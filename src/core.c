@@ -739,12 +739,15 @@ int elf_run(elf_State *R) {
 			case OPNAME : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
-				if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
-					check_division_by_zero(R,xx,yy);\
-				}\
-				locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
-				locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
+				if((xx.tag==elf_TAG_INT) && (yy.tag==elf_TAG_INT)) {\
+					if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
+						check_division_by_zero(R,xx,yy);\
+					}\
+					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
+					locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
+				} else elf_fail(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));\
 			} break
+
 	#define CASE_BOP(OPCODE,OP,FN,FN1) \
 			case OPCODE : {\
 				xx=locals[BC_ARGY(byte)];\
