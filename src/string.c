@@ -71,7 +71,7 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 		elf_check_table(registry);
 		elf_Int slot=elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
-		elf_Entry entry=registry->slots[slot];
+		tabentryT entry=registry->slots[slot];
 		if (entry.key.tag != elf_TAG_NIL) {
 			elf_Value target=registry->array[registry->slots[slot].idx];
 			string=target.x_str;

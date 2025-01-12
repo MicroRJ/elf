@@ -244,7 +244,7 @@ elf_Int elf_mark_object(elf_Node *obj) {
 	} else if (obj->type == GC_TAB) {
 		elf_Table *table;
 		elf_Value *array;
-		elf_Entry *slots;
+		tabentryT *slots;
 
 		table=(elf_Table*)obj;
 		array=table->array;

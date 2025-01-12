@@ -243,7 +243,7 @@ int core_lib_include(elf_State *R) {
 	todo: */
 
 	elf_Table *globals = R->M->globals;
-	elf_Entry entry;
+	tabentryT entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
 		if (entry.key.tag == elf_TAG_STR) {
@@ -374,6 +374,7 @@ int core_lib_fopen(elf_State *R) {
 int core_lib_fclose(elf_State *R) {
 	ASSERT(elf_get_num_args(R) == 1);
 	elf_Handle file = elf_get_sys(R,0);
+	if(file==0) elf_fail(R,NO_BYTE,"invalid argument");
 	fclose(file);
 	return 0;
 }
@@ -668,8 +669,8 @@ int core_lib_enumerate_folder(elf_State *R) {
 }
 
 
-void ftabs(FILE *io, int level) {
-	while (level --) fprintf(io,"\t");
+static void print_num_tabs(FILE *io, int num) {
+	while (num --) fprintf(io,"\t");
 }
 
 
@@ -677,7 +678,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 	fprintf(io,"{");
 	int nitems = 0;
 	for (elf_Int i = 0; i < tab->ntotal; ++ i) {
-		elf_Entry slot = tab->slots[i];
+		tabentryT slot = tab->slots[i];
 		if (slot.key.tag == elf_TAG_NIL) {
 			continue;
 		}

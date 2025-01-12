@@ -154,17 +154,17 @@ typedef struct elf_String {
 } elf_String;
 
 
-typedef struct elf_Entry {
+typedef struct tabentryT {
 	elf_Value key;
 	elf_Int   idx;
-} elf_Entry;
+} tabentryT;
 
 typedef struct elf_Table {
 	elf_Node      obj;
 	elf_Int    ntotal;
 	elf_Int    nslots;
 	elf_Int    ndebug;
-	elf_Entry  *slots;
+	tabentryT  *slots;
 	elf_Value  *array;
 } elf_Table;
 

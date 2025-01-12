@@ -42,7 +42,7 @@ static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text
 static treeID parse(elf_Parser *parser, elf_State *R, char *name, char *text) {
 	prep_parser(parser,R,name,text);
 
-	treeID func = new_tree(parser,TREE_FUNCTION,parser->tok.line);
+	treeID func = new_tree(parser,parser->tok.line,TREE_FUNCTION,NT_FUN);
 	parser->enc = func;
 	add_this_param(parser,parser->tok.line);
 
@@ -227,11 +227,9 @@ static treeID parse_fun(elf_Parser *parser){
 
 	begin_block(parser);
 
-	treeID enc;
-	enc=parser->enc;
+	treeID enc=parser->enc;
 
-	treeID fun;
-	fun=new_tree(parser,TREE_FUNCTION,tok.line);
+	treeID fun=new_tree(parser,tok.line,TREE_FUNCTION,NT_FUN);
 	fun->expr_fun.scope=parser->scope;
 	fun->expr_fun.enc=enc;
 	parser->enc=fun;
@@ -685,8 +683,12 @@ static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 	treeID x,y;
 	x=parse_postfix(parser,flags);
 	if (x==NO_TREE) goto esc;
+	if(x->type==NT_NON){
+		parser_dialog(parser,x->line,"invalid data class");
+		goto esc;
+	}
 
-	int   prio;
+	int prio;
 
 	for(;;) {
 		tok=parser->tok;
@@ -698,17 +700,14 @@ static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 			goto esc;
 		}
 
-		if(x->type==NT_NON){
-			parser_dialog(parser,x->line
-			,	"invalid data class");
-		}
-
 		get_tok(parser);
-
 
 		y=parse_subexpr(parser,flags,prio);
 		if (y==NO_TREE) goto esc;
-		ASSERT(y->type!=NT_NON);
+		if(y->type==NT_NON){
+			parser_dialog(parser,y->line,"invalid data class, no data operand");
+			goto esc;
+		}
 
 		x=tree_binary(parser,tok.line,tok2tree(tok.type),NT_ANY,x,y);
 	}
@@ -910,7 +909,7 @@ static int parse_stat(elf_Parser *parser) {
 
 			body=parse_bl(parser);
 
-			v=new_tree(parser,TREE_WHILE_LOOP,tok.line);
+			v=new_tree(parser,tok.line,TREE_WHILE_LOOP,NT_NON);
 			v->loop.pred=pred;
 			v->loop.body=body;
 			v->loop.c=parser->loop.continues;
@@ -1151,7 +1150,7 @@ static bool parse_for(elf_Parser *parser){
 			post=tree_binary(parser,tok.line,EXPR_ADD,NT_ANY,index,tree_int(parser,tok.line,1));
 			post=tree_store(parser,tok.line,index,post);
 
-			v=new_tree(parser,TREE_WHILE_LOOP,tok.line);
+			v=new_tree(parser,tok.line,TREE_WHILE_LOOP,NT_NON);
 			v->loop.pred=pred;
 			v->loop.prev=prev;
 			v->loop.body=body;

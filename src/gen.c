@@ -488,12 +488,12 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 		}
 	}
 	ASSERT(dst!=NO_SLOT);
-	push_mem_state(parser);
 	treeID prox;
 	for(prox=tree.prox;prox;prox=prox->prox){
+		push_mem_state(parser);
 		gen_tree(parser,prox);
+		pop_mem_state(parser);
 	}
-	pop_mem_state(parser);
 	esc:
 	ASSERT(_dst==NO_SLOT||_dst==dst);
 	return dst;

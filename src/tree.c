@@ -9,23 +9,19 @@ int get_tree_kind(elf_Parser *parser, treeID id) { return id->kind; }
 int get_tree_type(elf_Parser *parser, treeID id) { return id->type; }
 Source get_tree_line(elf_Parser *parser, treeID id) { return id->line; }
 
-static treeID new_tree(elf_Parser *parser, int kind, Source line) {
+static treeID new_tree(elf_Parser *parser, Source line, int kind, int type) {
 	// elf_debug_log("NEW TREE: %s",tree2s[kind]);
 	//todo:switch to linear allocator, this is slow!
 	treeID tree=calloc(sizeof(treeT),1);
-	tree->kind=kind;
 	tree->line=line;
+	tree->kind=kind;
+	tree->type=type;
 	return tree;
 }
+
 static treeID tree_xyz(elf_Parser *parser, Source line, int kind, int type, treeID x, treeID y, treeID *z) {
-	treeID v;
-	v=new_tree(parser,kind,line);
-	v->line=line;
-	v->type=type;
-	v->kind=kind;
-	v->x=x;
-	v->y=y;
-	v->z=z;
+	treeID v=new_tree(parser,line,kind,type);
+	v->x=x,v->y=y,v->z=z;
 	return v;
 }
 static treeID tree_nullary(elf_Parser *parser, Source line, int k, int t) {
@@ -159,8 +155,7 @@ static treeID tree_call_pf(elf_Parser *parser, Source line, treeID *args) {
 }
 
 static treeID tree_if(elf_Parser *parser, Source line, treeID pred, treeID true_clause, treeID else_clause) {
-	treeID v;
-	v=new_tree(parser,TREE_IF,line);
+	treeID v=new_tree(parser,line,TREE_IF,NT_NON);
 	v->stat_if.pred=pred;
 	v->stat_if.true_clause=true_clause;
 	v->stat_if.else_clause=else_clause;

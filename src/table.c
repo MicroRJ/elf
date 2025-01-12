@@ -20,7 +20,7 @@ elf_Table *elf_alloc_table2(elf_State *R, elf_Int ntotal) {
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
-	table->slots = calloc_memory(GLOBAL_ALLOCATOR,ntotal*sizeof(elf_Entry));
+	table->slots = calloc_memory(GLOBAL_ALLOCATOR,ntotal*sizeof(tabentryT));
 	return table;
 }
 
@@ -80,7 +80,7 @@ since the increment depends on the data, it should reduce
 clustering. */
 elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
-	elf_Entry *slots = tab->slots;
+	tabentryT *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 hash = elf_hash_value(key);
 	elf_i64 head = hash % ntotal;
@@ -100,7 +100,7 @@ elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 
 
 elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf_Hash hash) {
-	elf_Entry *slots = tab->slots;
+	tabentryT *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
@@ -132,9 +132,9 @@ void elf_check_table(elf_Table *table) {
 		elf_Table new_table = *table;
 		new_table.ntotal=table->ntotal << 2;
 		if (new_table.ntotal<table->ntotal) NO_CODE;
-		new_table.slots=calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(elf_Entry));
+		new_table.slots=calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(tabentryT));
 
-		elf_Entry old_slot;
+		tabentryT old_slot;
 		elf_Int new_slot;
 		FOR_RANGE(i,0,table->ntotal) {
 			old_slot=table->slots[i];
@@ -157,7 +157,7 @@ elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
-	elf_Entry *entry = table->slots + slot;
+	tabentryT *entry = table->slots + slot;
 	if (!slotiskey(table,slot)) {
 		elf_Int i = ARRAY_GROW(table->array,1);
 		table->array[i] = v;
@@ -230,7 +230,7 @@ void elf_array_add(elf_Table *table, elf_Value v) {
 void elf_merge_tables(elf_Table *tab, elf_Table *merger) {
 	elf_Int i;
 	for (i=0;i<merger->ntotal;++i) {
-		elf_Entry it = merger->slots[i];
+		tabentryT it = merger->slots[i];
 		if (it.key.tag == elf_TAG_NIL) continue;
 		elf_table_set(tab,it.key,merger->array[it.idx]);
 	}
