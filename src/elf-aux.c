@@ -4,27 +4,10 @@
 ** Auxiliary Stuff
 */
 
-
-int elf_add_const_int(elf_State *S, elf_Int i) {
-	int index = ARRAY_GROW(S->M->integers,1);
-	S->M->integers[index] = i;
-	return index;
-}
-int elf_add_const_num(elf_State *S, elf_Num i) {
-	int index = ARRAY_GROW(S->M->numbers,1);
-	S->M->numbers[index] = i;
-	return index;
-}
-int elf_add_proto(elf_State *S) {
-	int index = ARRAY_GROW(S->M->protos,1);
-	return index;
-}
-
 int elf_get_global(elf_Module *M, elf_String *name) {
 	if (name != 0) return elf_table_get_or_add(M->globals,VSTR(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
-
 
 int elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
 	int id = elf_get_global(M,name);
@@ -33,31 +16,25 @@ int elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
 }
 
 
+void elf_add_lib(elf_State *S, char *prefix, elf_CBinding *bindings, int num) {
+	// todo: ensure the symbol name is valid
+	for(int i = 0; i < num; i ++) {
+		char *temp = bindings[i].name;
+		if(prefix) temp = elf_tpf("%s.%s",prefix,temp);
 
-static char const *get_byte_label(int op);
+		elf_String *name = elf_alloc_string(S,temp);
+		elf_debug_log("	lib: %s",name->text);
+		elf_table_set(S->M->globals, VSTR(name), VCFN(bindings[i].fn));
+	}
+}
+
 static int get_byte_class(int op);
-
 
 void elf_debugger(char *message) {
 	sys_console_print(LOG_KDEBUG,"debugger: ");
 	sys_console_print(LOG_KDEBUG,message);
 	sys_console_print(LOG_KDEBUG,"end");
 	sys_debugger();
-}
-
-
-elf_Int elf_get_clock_time() {
-	return sys_get_clock_time();
-}
-
-
-elf_Num elf_time_diff_s(elf_Int begin) {
-	return (sys_get_clock_time() - begin) / (elf_Num) sys_get_clock_freq();
-}
-
-
-elf_Num elf_time_diff_ms(elf_Int begin) {
-	return elf_time_diff_s(begin) * 1000.;
 }
 
 int elf_get_instr_file(elf_Module *M, int byte) {
@@ -134,7 +111,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, 
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elf_Int)(1+loc-lineloc),byte_loc,get_byte_label(BC_OP(byte)),b);
+		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elf_Int)(1+loc-lineloc),byte_loc,byte2s[BC_OP(byte)],b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -266,7 +243,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, Bytecode b)
 	}
 
 	fprintf(io,"%04i\t%s"
-	, id,get_byte_label(BC_OP(b)));
+	, id,byte2s[BC_OP(b)]);
 
 	if (get_byte_class(BC_OP(b)) == BC_CLASS_XYZ) {
 		fprintf(io,"(x=%i,y=%i,z=%i)",BC_ARGX(b),BC_ARGY(b),BC_ARGZ(b));
@@ -298,10 +275,13 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, Bytecode b)
 }
 
 
+
+#if 0
 void elf_get_line_source_info(char *q, char *p, int *linenum, char **lineloc);
 
 
-#if 0
+// holy... this function is old... is not even the same name,
+// is not even the same coding style...
 void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 	fprintf(file,"elf_Module:\n");
 	fprintf(file,"Globals:\n");
@@ -340,7 +320,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 }
 #endif
 
-
+// todo: remove this!
 int get_byte_class(int k) {
 #define BCITEM(NAME,FMT,__) case XFUSE(BC_,NAME): return XFUSE(BC_CLASS_,FMT);
 	switch (k) {
@@ -349,15 +329,4 @@ int get_byte_class(int k) {
 	}
 #undef BCITEM
 	return -1;
-}
-
-
-char const *get_byte_label(int k) {
-#define BCITEM(NAME,_,SYM) case XFUSE(BC_,NAME): return SYM;
-	switch (k) {
-		BCDEF(BCITEM)
-		default: NO_CODE;
-	}
-#undef BCITEM
-	return 0;
 }

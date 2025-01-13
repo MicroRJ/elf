@@ -1,8 +1,8 @@
 /*
 ** See Copyright Notice In elf.h
 ** alloc.h
-** memory allocation functions
 */
+
 
 
 #define ALLOCATOR_FN(NAME) int (NAME)(void *user, int flags, elf_Int old_size, elf_Int new_size, void **memory, DBGSource debug)

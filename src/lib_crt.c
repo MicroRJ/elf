@@ -16,7 +16,7 @@
 
 
 // int crtlib__chdir(elf_State *rt) {
-// 	elf_String *name = elf_get_str(rt,0);
+// 	elf_String *name = elf_get_string(rt,0);
 // #if defined(PLATFORM_WEB)
 // 	elf_add_int(rt,chdir(name->c));
 // #else
@@ -69,7 +69,7 @@
 
 
 // int crtlib__unlink(elf_State *rt) {
-// 	elf_String *name = elf_get_str(rt,0);
+// 	elf_String *name = elf_get_string(rt,0);
 // 	elf_add_int(rt,_unlink(name->c));
 // 	return 1;
 // }
@@ -84,7 +84,7 @@
 
 // int crtlib__write(elf_State *rt) {
 // 	elf_Handle file = elf_get_sys(rt,0);
-// 	elf_String *buf = elf_get_str(rt,1);
+// 	elf_String *buf = elf_get_string(rt,1);
 // 	elf_add_int(rt,_write((elf_Int)file,buf->c,buf->length));
 // 	return 1;
 // }
@@ -112,7 +112,7 @@
 
 
 // int crtlib__chmode(elf_State *rt) {
-// 	elf_String *name = elf_get_str(rt,0);
+// 	elf_String *name = elf_get_string(rt,0);
 // 	elf_Int mode = elf_get_int(rt,1);
 // 	elf_add_int(rt,_chmod(name->c,mode));
 // 	return 1;
@@ -120,14 +120,14 @@
 
 
 // int crtlib__execl(elf_State *rt) {
-// 	elf_String *cl = elf_get_str(rt,0);
+// 	elf_String *cl = elf_get_string(rt,0);
 // 	elf_add_int(rt,_execl(cl->c,0,0));
 // 	return 1;
 // }
 
 
 // int crtlib_system(elf_State *rt) {
-// 	elf_String *cl = elf_get_str(rt,0);
+// 	elf_String *cl = elf_get_string(rt,0);
 // 	elf_add_int(rt,system(cl->c));
 // 	return 1;
 // }

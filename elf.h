@@ -180,7 +180,7 @@ elAPI elf_Table *elf_new_table(elf_State *);
 
 
 /* add objects to stack */
-elAPI void elf_add_this(elf_State *S);
+elAPI void elf_push_this(elf_State *S);
 elAPI void elf_add_any(elf_State *S, elf_Value value);
 elAPI void elf_add_nil(elf_State *S);
 elAPI void elf_add_int(elf_State *S, elf_Int);
@@ -188,8 +188,8 @@ elAPI void elf_add_num(elf_State *S, elf_Num);
 elAPI void elf_add_obj(elf_State *S, elf_Node *);
 elAPI void elf_add_str(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
-elAPI void elf_add_tab(elf_State *S, elf_Table *);
-elAPI void elf_add_cls(elf_State *S, elf_Closure *);
+elAPI void elf_push_table(elf_State *S, elf_Table *);
+elAPI void elf_push_closure(elf_State *S, elf_Closure *);
 elAPI void elf_add_cfn(elf_State *S, elf_Function);
 
 
@@ -199,8 +199,8 @@ elAPI elf_Node  *elf_get_this(elf_State *S);
 elAPI elf_Value    elf_get_arg(elf_State *S, int arg);
 elAPI elf_Int      elf_get_int(elf_State *S, int arg);
 elAPI elf_Num      elf_get_num(elf_State *S, int arg);
-elAPI elf_String  *elf_get_str(elf_State *S, int arg);
-elAPI char        *elf_get_txt(elf_State *S, int arg);
+elAPI elf_String  *elf_get_string(elf_State *S, int arg);
+elAPI char        *elf_get_text(elf_State *S, int arg);
 elAPI elf_Node    *elf_get_obj(elf_State *S, int arg);
 elAPI elf_Table   *elf_get_table(elf_State *S, int arg);
 elAPI elf_Handle   elf_get_sys(elf_State *S, int arg);
@@ -220,7 +220,6 @@ elAPI elf_Table *elf_alloc_table(elf_State *);
 /* strings */
 elAPI int         elf_get_string_length(elf_String *);
 elAPI elf_Hash    elf_get_string_hash(elf_String *);
-elAPI char       *elf_get_string_text(elf_String *);
 elAPI bool    elf_get_strings_eq(elf_String *x, elf_String *y);
 
 #include "src\table.h"

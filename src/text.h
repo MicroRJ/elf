@@ -17,7 +17,6 @@ static int text_length(char const *text);
 static elf_Bool text_eql(char const *x, char const *y, int n);
 static elf_Bool text_eq(char const *x, char const *y);
 static char *copy_text2(Allocator fn, int length, char const *string);
-static char *copy_text(Allocator fn, char const *contents);
 static elf_Bool match_entire_text_noclause(char *pattern, char *text);
 static elf_Bool match_entire_text(char *pattern, char *text);
 static char *match_text_single_clause_ex(char *p, char *s);

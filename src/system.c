@@ -1,9 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
 ** system.c
-** Basic system layer
 */
-
 
 #if defined(PLATFORM_WEB)
 #include <sys/types.h>
@@ -13,49 +11,6 @@
 #pragma comment(lib,"user32")
 #pragma comment(lib,"Ws2_32")
 #define WIN32_LEAN_AND_MEAN
-#if !defined(ELF_KEEPWINDOWS)
-/* todo: should probaly just define the functions
-I want to use instead! */
-#define NOGDICAPMASKS //     - CC_*, LC_*, PC_*, CP_*, TC_*, RC_
-#define NOVIRTUALKEYCODES // - VK_*
-#define NOWINMESSAGES //     - WM_*, EM_*, LB_*, CB_*
-#define NOWINSTYLES //       - WS_*, CS_*, ES_*, LBS_*, SBS_*, CBS_*
-#define NOSYSMETRICS //      - SM_*
-#define NOMENUS //           - MF_*
-#define NOICONS //           - IDI_*
-#define NOKEYSTATES //       - MK_*
-#define NOSYSCOMMANDS //     - SC_*
-#define NORASTEROPS //       - Binary and Tertiary raster ops
-#define NOSHOWWINDOW //      - SW_*
-#define OEMRESOURCE //       - OEM Resource values
-#define NOATOM //            - Atom Manager routines
-#define NOCLIPBOARD //       - Clipboard routines
-#define NOCOLOR //           - Screen colors
-#define NOCTLMGR //          - Control and Dialog routines
-#define NODRAWTEXT //        - DrawText() and DT_*
-#define NOGDI //             - All GDI defines and routines
-#define NOKERNEL //          - All KERNEL defines and routines
-#define NOUSER //            - All USER defines and routines
-#define NONLS //             - All NLS defines and routines
-#define NOMB //              - MB_* and MessageBox()
-#define NOMEMMGR //          - GMEM_*, LMEM_*, GHND, LHND, associated routines
-#define NOMETAFILE //        - typedef METAFILEPICT
-#define NOMINMAX //          - Macros min(a,b) and max(a,b)
-#define NOMSG //             - typedef MSG and associated routines
-#define NOOPENFILE //        - OpenFile(), OemToAnsi, AnsiToOem, and OF_*
-#define NOSCROLL //          - SB_* and scrolling routines
-#define NOSERVICE //         - All Service Controller routines, SERVICE_ equates, etc.
-#define NOSOUND //           - Sound driver routines
-#define NOTEXTMETRIC //      - typedef TEXTMETRIC and associated routines
-#define NOWH //              - SetWindowsHook and WH_*
-#define NOWINOFFSETS //      - GWL_*, GCL_*, associated routines
-#define NOCOMM //            - COMM driver routines
-#define NOKANJI //           - Kanji support stuff.
-#define NOHELP //            - Help engine interface.
-#define NOPROFILER //        - Profiler interface.
-#define NODEFERWINDOWPOS //  - DeferWindowPos routines
-#define NOMCX //             - Modem Configuration Extensions
-#endif
 #include <windows.h>
 #include <Windowsx.h>
 #include <Winsock2.h>
@@ -231,151 +186,22 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 }
 
 
-elf_Error sys_read_text(Allocator fn, void **data, char const *name) {
-
-	elf_Error error = Error_None;
-
-	if (name == 0) {
-		error = Error_FileNameIsInvalid;
-		goto esc;
-	}
-	if (data == 0) {
-		error = Error_InvalidArguments;
-		goto esc;
-	}
-
-	*data = 0;
-#if defined(PLATFORM_DESKTOP)
-	HANDLE hfile = CreateFileA(name,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
-	if (hfile != INVALID_HANDLE_VALUE) {
-		DWORD hi,lo = GetFileSize(hfile,&hi);
-		char *buf = alloc_memory(fn,lo+1);
-		DWORD bytes;
-		if (ReadFile(hfile,buf,lo,&bytes,NULL)) {
-			buf[bytes] = 0;
-			*data = buf;
-			if (bytes != lo) {
-				error = Error_CouldNotReadEntireFile;
-				goto esc;
-			}
-		} else {
-			dealloc_memory(fn,buf);
-			error = Error_CouldNotReadFile;
-			goto esc;
-		}
-		CloseHandle(hfile);
-	} else {
-		DWORD lasterror = GetLastError();
-		if (lasterror == ERROR_FILE_NOT_FOUND) {
-			error = Error_FileNotFound;
-		} else {
-			error = Error_CouldNotLoadFile;
-		}
-	}
-#else
-	FILE *file = fopen(name,"rb");
-	if (file == 0) {
-		error = Error_FileNotFound;
-		goto esc;
-	}
-	fseek(file,0,SEEK_END);
-	long fileSize = ftell(file);
-	fseek(file,0,SEEK_SET);
-	char *buf = (char *) alloc_memory(fn,fileSize+1);
-	fread(buf,1,fileSize,file);
-	fclose(file);
-	buf[fileSize] = 0;
-	*data = buf;
-#endif
-	esc:
-	// if PASSED(error) {
-	// 	elf_info_log("'%s': file loaded",name);
-	// } else {
-	// 	elf_info_log("'%s': failed to load file, %s",name,ERNAME(error));
-	// }
-	return error;
-
-}
+// int sys_exec(char const *file, char const *args) {
+// #if defined(PLATFORM_DESKTOP)
+// 	STARTUPINFO si = {sizeof(si)};
+// 	PROCESS_INFORMATION pi = {0};
+// 	int result = CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
+// 	CloseHandle(pi.hProcess);
+// 	CloseHandle(pi.hThread);
+// 	return result;
+// #endif
+// 	return -1;
+// }
 
 
-elf_Error sys_save_file_data(char const *buffer, elf_Int length, char const *fileName) {
-	FILE *file;
-#if defined(_MSC_VER)
-	fopen_s(&file,fileName,"wb");
-#else
-	file = fopen(fileName,"wb");
-#endif
 
-	if (file == 0) {
-		return Error_CouldNotOpenFile;
-	}
-
-	elf_Error error = Error_None;
-	elf_Int lengthWritten = fwrite(buffer, 1, length, file);
-
-	if (lengthWritten != length) {
-		error = Error_CouldNotWriteEntireFile;
-	}
-
-	fclose(file);
-
-	return error;
-}
-
-
-int sys_shell(char const *verb, char const *file, char const *args) {
-#if defined(PLATFORM_DESKTOP)
-	return (INT_PTR)ShellExecute(NULL,verb,file,args,NULL,10) > 32;
-#endif
-	return 0;
-}
-
-
-int sys_exec(char const *file, char const *args) {
-#if defined(PLATFORM_DESKTOP)
-	STARTUPINFO si = {sizeof(si)};
-	PROCESS_INFORMATION pi = {0};
-	int result = CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-	return result;
-#endif
-	return -1;
-}
-
-
-static int issymlink(char const *fn) {
-	while (*fn == '.') ++ fn;
-	return *fn == 0;
-}
-
-
-#if defined(_WIN32)
-static int sys_enumerate_folder(Allocator alloc, char const *folder, void *user, enumerate_folder_callback callback) {
-	HANDLE handle;
-	WIN32_FIND_DATAA data;
-	int type;
-	char *name,*path;
-	size_t size;
-
-	handle=FindFirstFileA(elf_tpf("%s\\*",folder),&data);
-	if (handle!=INVALID_HANDLE_VALUE) do {
-		if (issymlink(data.cFileName)) continue;
-
-		name=data.cFileName;
-		type=data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
-		size=data.nFileSizeLow;
-
-		path=elf_xpf(alloc,"%s\\%s",folder,data.cFileName);
-
-		if (callback(user,type,size,name,path)) {
-			break;
-		}
-
-	} while (FindNextFileA(handle,&data));
-	return 0;
-}
-
+// todo: might actually use this instead of window's, and then
+// i can just put it in lib core directly.
 #if 0
 	// defined(PLATFORM_WEB)
 	DIR *dirfd = opendir(dir->c);
@@ -390,7 +216,7 @@ static int sys_enumerate_folder(Allocator alloc, char const *folder, void *user,
 
 			elf_String *name = elf_new_string(R,entry->d_name);
 			elf_String *path = elf_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
-			elf_StackId base = elf_add_cls(R,cls);
+			elf_StackId base = elf_push_closure(R,cls);
 			elf_Table *file = elf_new_table(R);
 
 			elf_tsets_str(file,elf_new_string(R,"name"),name);
@@ -403,6 +229,5 @@ static int sys_enumerate_folder(Allocator alloc, char const *folder, void *user,
 			SET_TOP(R,top);
 		}
 		closedir(dirfd);
-#endif
-#else
+
 #endif

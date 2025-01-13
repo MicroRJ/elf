@@ -1,9 +1,8 @@
 /*
 ** See Copyright Notice In elf.h
 ** error.h
-** elf_Error Codes
 */
-
+#if 0
 
 #define LERROR "error.h"
 
@@ -51,3 +50,4 @@ ERROR_XITEM(Halted,                         "Halted")
 ERROR_XITEM(Breaked,                        "Breaked")
 #endif
 
+#endif

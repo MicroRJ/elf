@@ -1,10 +1,8 @@
 /*
 ** See Copyright Notice In elf.h
-** elf-web.c
-** web lib
+** elf-em.c
 */
 
-// elEXPORT elfem_()
 // run_script
 // run_script_int
 // run_script_string

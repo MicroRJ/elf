@@ -4,51 +4,68 @@
 */
 
 
+int core_lib_load_file(elf_State *R) {
+	elf_String *name = elf_get_string(R,0);
+	// the number of arguments we pass in to the file proto,
+	// not taking into account or argument which was the
+	// file name
+	int nargs = elf_get_num_args(R) - 1;
+	int nrets = elf_get_num_rets(R);
 
-#include "lib_math.c"
+	FILE *io = fopen(name->text,"rb");
+	if (io == 0) {
+		elf_error_log("'%s': could not load file",name->text);
+		goto _error;
+	}
 
 
-static int core_lib_float2(elf_State *R);
-static int core_lib_pause_collector(elf_State *R);
-static int core_lib_get_allocated_objects(elf_State *R);
-static int core_lib_get_allocated_memory(elf_State *R);
-static int core_lib_get_collector_threshold(elf_State *R);
-static int core_lib_mark_object(elf_State *R);
-static int core_lib_collect(elf_State *R);
-static int core_lib_tagof(elf_State *R);
-static int core_lib_get_object_color(elf_State *R);
-static int core_lib_set_object_trap(elf_State *R);
-static int core_lib_get_object_address(elf_State *R);
-static int core_lib_merge_tables(elf_State *R);
-static int core_lib_get_meta(elf_State *R);
-static int core_lib_set_meta(elf_State *R);
-static int core_lib_abort(elf_State *R);
-static int core_lib_exit(elf_State *R);
-static int core_lib_flags(elf_State *R);
-static int core_lib_debugger(elf_State *R);
-static int core_lib_log(elf_State *R);
-static int core_lib_err_log(elf_State *R);
-static int core_lib_include(elf_State *R);
-static int core_lib_load_expr(elf_State *R);
-static int core_lib_load_code(elf_State *R);
-static int core_lib_load_file(elf_State *R);
-static int core_lib_load_dll(elf_State *R);
-static int core_lib_shell(elf_State *R);
-static int core_lib_exec(elf_State *R);
+	elf_debug_log("'%s': file loaded successfully",name->text);
 
-static int core_lib_fopen(elf_State *R);
-static int core_lib_fclose(elf_State *R);
-static int core_lib_fsize(elf_State *R);
-static int core_lib_load_file_data(elf_State *R);
-static int core_lib_ftemp(elf_State *R);
-static int core_lib_change_work_dir(elf_State *R);
-static int core_lib_get_work_dir(elf_State *R);
-static int core_lib_get_disk_info(elf_State *R);
-static int core_lib_list_volumes(elf_State *R);
-static int core_lib_list_folder(elf_State *R);
-static int core_lib_enumerate_folder(elf_State *R);
 
-static void elf_include_core_lib(elf_State *R);
+	fseek(io,0,SEEK_END);
+	long size = ftell(io);
+
+	elf_String *contents = elf_new_string2(R,size);
+
+	fseek(io,0,SEEK_SET);
+	fread(contents->text,1,size,io);
+
+	// todo: parse and gen file should just be one function,
+	// or maybe just have the one 'parse' function...
+	elf_Parser parser = {};
+	treeID tree = parse(&parser,R,name->text,contents->text);
+	elf_File file = gen_file(&parser,tree);
+	// todo: we need this in the file for debugging...
+	file.contents=contents;
+	file.name=name;
+	// todo: how do we track this, should each proto
+	// point to the file they are from?...
+	elf_array_add(R->M->globals,VSTR(contents));
+	elf_array_add(R->M->globals,VSTR(name));
+
+	ARRAY_ADD(R->M->files,file);
+	elf_Closure *cls = elf_new_closure(R,file.proto);
+
+
+	// ASSERT(nargs >= 0);
+	// ASSERT(nrets >= 0);
+	/* todo: HACK!
+	Todo: the file closure doesn't have to be kept alive... */
+	elf_set_global(R->M,0,VCLS(cls));
+
+	elf_push_closure(R,cls);
+	elf_push_this(R);
+
+	nrets = elf_call(R,nargs+1,nrets);
+	return nrets;
+
+	_error:
+	return 0;
+}
+
+// int nrets = elf_exec_file(R,name
+// ,	elf_get_num_args(R)
+// ,	elf_get_num_rets(R));
 
 
 // mostly experimental...
@@ -149,7 +166,7 @@ int core_lib_merge_tables(elf_State *R) {
 
 
 int core_lib_get_meta(elf_State *R) {
-	elf_add_tab(R,elf_get_obj(R,0)->meta);
+	elf_push_table(R,elf_get_obj(R,0)->meta);
 	return 1;
 }
 
@@ -189,7 +206,7 @@ int core_lib_debugger(elf_State *R) {
 #else
 	char *message = "no message";
 	if (elf_get_num_args(R) != 0) {
-		message = elf_get_txt(R,0);
+		message = elf_get_text(R,0);
 	}
 	elf_debugger(message);
 #endif
@@ -230,7 +247,7 @@ are not mistaken with table accesses when shortened,
 math.floor != .math.floor */
 int core_lib_include(elf_State *R) {
 	elf_check_args(R,".include",1,"(the directory to include to add to the global directory)");
-	char *dir = elf_get_txt(R,0);
+	char *dir = elf_get_text(R,0);
 	int plen = text_length(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:
@@ -261,11 +278,11 @@ int core_lib_load_expr(elf_State *R) {
 	elf_String *filename = 0;
 	elf_String *contents = 0;
 	if (elf_get_num_args(R) == 2) {
-		filename = elf_get_str(R,0);
-		contents = elf_get_str(R,1);
+		filename = elf_get_string(R,0);
+		contents = elf_get_string(R,1);
 	} else if (elf_get_num_args(R) == 1) {
 		filename = elf_new_string(R,"unnamed");
-		contents = elf_get_str(R,0);
+		contents = elf_get_string(R,0);
 	} else NO_CODE;
 	NO_CODE;
 	(void) filename;
@@ -280,11 +297,11 @@ int core_lib_load_code(elf_State *R) {
 	elf_String *filename = 0;
 	elf_String *contents = 0;
 	if (elf_get_num_args(R) == 2) {
-		filename = elf_get_str(R,0);
-		contents = elf_get_str(R,1);
+		filename = elf_get_string(R,0);
+		contents = elf_get_string(R,1);
 	} else if (elf_get_num_args(R) == 1) {
 		filename = elf_new_string(R,"unnamed");
-		contents = elf_get_str(R,0);
+		contents = elf_get_string(R,0);
 	} else NO_CODE;
 	NO_CODE;
 	(void) filename;
@@ -295,83 +312,53 @@ int core_lib_load_code(elf_State *R) {
 }
 
 
-int core_lib_load_file(elf_State *R) {
-	elf_strID name = elf_get_str(R,0);
-	int nrets = elf_exec_file(R,name
-	,	elf_get_num_args(R)
-	,	elf_get_num_rets(R));
-	return nrets;
-}
-
 int core_lib_load_json(elf_State *R) {
-	elf_strID name = elf_get_str(R,0);
+	char *name = elf_get_text(R,0);
 
-	char *text = 0;
-	elf_Error err = sys_read_text(GLOBAL_ALLOCATOR,(void**)&text,name->text);
+	FILE *file = fopen(name,"rb");
+	if (file == 0) goto _error;
+
+	fseek(file,0,SEEK_END);
+	long size = ftell(file);
+
+	elf_String *contents = elf_new_string2(R,size);
+
+	fseek(file,0,SEEK_SET);
+	fread(contents->text,1,size,file);
 
 	elf_Parser parser = {};
-	prep_parser(&parser, R, name->text, text);
+	prep_parser(&parser, R, name, contents->text);
 
 	elf_tabID tab = parse_json_obj(&parser);
+	elf_push_table(R,tab);
 
-	dealloc_memory(GLOBAL_ALLOCATOR,text);
-
-	elf_add_tab(R,tab);
+	return 1;
+	_error:
+	elf_add_nil(R);
 	return 1;
 }
 
-
-// typedef void (*em_dlopen_callback)(void* handle, void* user_data);
-// void emscripten_dlopen(const char *filename, int flags, void* user_data, em_dlopen_callback onsuccess, em_arg_callback_func onerror);
-int core_lib_get_dll_fn(elf_State *S) {
-	elf_Handle lib = elf_get_sys(S,0);
-	char *name = elf_get_txt(S,1);
-	elf_Function fn = (elf_Function) sys_get_dll_fn(lib,name);
-
-	if (fn != 0) elf_add_cfn(S,fn);
-	else elf_add_nil(S);
+int core_lib_open_temp_file(elf_State *R) {
+	FILE *file = {0};
+#if defined(PLATFORM_WEB)
+	file = tmpfile();
+#else
+	tmpfile_s(&file);
+#endif
+	elf_add_sys(R,(elf_Handle)file);
 	return 1;
 }
 
-
-int core_lib_load_dll(elf_State *R) {
-	char *file = elf_get_txt(R,0);
-	elf_Handle lib = sys_load_dll(file);
-
-	if (lib != 0) elf_add_sys(R,lib);
-	else elf_add_nil(R);
-	return 1;
-}
-
-
-int core_lib_shell(elf_State *R) {
-	char *verb = elf_get_txt(R,0);
-	char *file = elf_get_txt(R,1);
-	char *args = elf_get_txt(R,2);
-	elf_add_int(R,sys_shell(verb,file,args));
-	return 1;
-}
-
-
-int core_lib_exec(elf_State *R) {
-	char *cline=elf_get_txt(R,0);
-	int result=sys_exec(0,cline);
-	elf_add_int(R,result);
-	return 1;
-}
-
-
-int core_lib_fopen(elf_State *R) {
+int core_lib_open_file(elf_State *R) {
 	ASSERT(elf_get_num_args(R) == 2);
-	char *name = elf_get_txt(R,0);
-	char *flags = elf_get_txt(R,1);
+	char *name = elf_get_text(R,0);
+	char *flags = elf_get_text(R,1);
 	FILE *file = fopen(name,flags);
 	elf_add_sys(R,(elf_Handle)file);
 	return 1;
 }
 
-
-int core_lib_fclose(elf_State *R) {
+int core_lib_close_file(elf_State *R) {
 	ASSERT(elf_get_num_args(R) == 1);
 	elf_Handle file = elf_get_sys(R,0);
 	if(file==0) elf_fail(R,NO_BYTE,"invalid argument");
@@ -379,19 +366,17 @@ int core_lib_fclose(elf_State *R) {
 	return 0;
 }
 
+int core_lib_get_file_size(elf_State *R) {
+	ASSERT(elf_get_tag(R,0) == elf_TAG_SYS);
 
-int core_lib_fsize(elf_State *R) {
-	if (elf_get_tag(R,0) == elf_TAG_SYS) {
-		elf_Handle file = (FILE*) elf_get_sys(R,0);
-		fseek(file,0,SEEK_END);
-		elf_add_int(R,ftell(file));
-	} else NO_CODE;
+	elf_Handle file = (FILE*) elf_get_sys(R,0);
+	fseek(file,0,SEEK_END);
+	elf_add_int(R,ftell(file));
 	return 1;
 }
 
-
-/* todo: update to use sys layer */
-int core_lib_load_file_data(elf_State *R) {
+// todo: make it work with a file path...
+int core_lib_get_file_data(elf_State *R) {
 	FILE *file = (FILE*) elf_get_sys(R,0);
 	if (file != 0) {
 		fseek(file,0,SEEK_END);
@@ -405,20 +390,9 @@ int core_lib_load_file_data(elf_State *R) {
 }
 
 
-int core_lib_ftemp(elf_State *R) {
-	FILE *file = {0};
-#if defined(PLATFORM_WEB)
-	file = tmpfile();
-#else
-	tmpfile_s(&file);
-#endif
-	elf_add_sys(R,(elf_Handle)file);
-	return 1;
-}
-
 
 int core_lib_change_work_dir(elf_State *R) {
-	int ok = sys_set_work_dir(elf_get_txt(R,0));
+	int ok = sys_set_work_dir(elf_get_text(R,0));
 	elf_add_int(R,ok);
 	return 1;
 }
@@ -442,16 +416,7 @@ int core_lib_fpf(elf_State *S) {
 	return 1;
 }
 
-
-GLOBAL int pf_indent;
-GLOBAL int pf_char;
-int core_lib_pf_indent(elf_State *S) {
-	pf_indent = elf_get_int(S,0);
-	elf_add_int(S,pf_indent);
-	return 1;
-}
-
-
+#if 0
 int core_lib_lpf(elf_State *S) {
 	for (int i = 0; i < elf_get_num_args(S); i ++) {
 		if (i != 0) fprintf(stdout,"\n");
@@ -463,12 +428,14 @@ int core_lib_lpf(elf_State *S) {
 	fprintf(stdout,"\n");
 	return 0;
 }
-
+#endif
 
 int core_lib_pf(elf_State *S) {
+	#if 0
 	for (int j = 0; j < pf_indent; ++ j) {
 		fprintf(stdout,"  ");
 	}
+	#endif
 	for (int i = 0; i < elf_get_num_args(S); i ++) {
 		fpf_value(stdout,elf_get_arg(S,i),0);
 	}
@@ -484,6 +451,10 @@ int core_lib_sleep(elf_State *S) {
 }
 
 
+static elf_f64 _time_diff_s(elf_i64 time) {
+	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
+}
+
 int core_lib_clocktime(elf_State *rt) {
 	elf_add_int(rt,sys_get_clock_time());
 	return 1;
@@ -493,7 +464,7 @@ int core_lib_clocktime(elf_State *rt) {
 int core_lib_timediffs(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Int time = elf_get_int(S,0);
-	elf_add_num(S,elf_time_diff_s(time));
+	elf_add_num(S,_time_diff_s(time));
 	return 1;
 }
 
@@ -501,179 +472,15 @@ int core_lib_timediffs(elf_State *S) {
 int core_lib_timediffms(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Int time = elf_get_int(S,0);
-	elf_add_num(S,elf_time_diff_ms(time));
+	elf_add_num(S,_time_diff_s(time) * 1000);
 	return 1;
 }
-
-
-int core_lib_get_file_size(elf_State *S) {
-	char *path = elf_get_txt(S,0);
-	elf_Int size = -1;
-	#if 0
-	#if defined(_WIN32)
-	WIN32_FILE_ATTRIBUTE_DATA attrs;
-	if (GetFileAttributesEx(path,GetFileExInfoStandard,&attrs)) {
-		size = (attrs.nFileSizeHigh * (MAXDWORD + 1)) + attrs.nFileSizeLow;
-	}
- 	#endif
- 	#endif
-	elf_add_int(S,size);
-	return 1;
-}
-
-
-int core_lib_get_disk_info(elf_State *R) {
-	elf_Table *info = elf_new_table(R);
-#if 0
-	DWORD SectorsPerCluster;
-	DWORD BytesPerSector;
-	DWORD NumberOfFreeClusters;
-	DWORD TotalNumberOfClusters;
-	GetDiskFreeSpaceA(elf_get_txt(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	elf_tsets_int(info,elf_alloc_string(R,"SectorsPerCluster"),SectorsPerCluster);
-	elf_tsets_int(info,elf_alloc_string(R,"BytesPerSector"),BytesPerSector);
-	elf_tsets_int(info,elf_alloc_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
-	elf_tsets_int(info,elf_alloc_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
-#else
-	elf_debug_log("this function is not implemented for this platform");
-#endif
-	return 1;
-}
-
-
-int core_lib_list_volumes(elf_State *R) {
-	elf_Table *list = elf_new_table(R); /* <- */
-#if 0
-	char buffer[MAX_PATH];
-	HANDLE handle = FindFirstVolumeA(buffer,MAX_PATH);
-
-	elf_String *name = 0;
-	if (handle != INVALID_HANDLE_VALUE) do {
-
-		elf_Table *volume = elf_new_table(R);
-		name = elf_new_string(R,buffer);
-
-		elf_tsets_tab(list,name,volume);
-
-		elf_tsets_str(volume,elf_alloc_string(R,"name"),name);
-
-		elf_Table *path_names = elf_new_table(R);
-		elf_tsets_tab(volume,elf_alloc_string(R,"path_names"),path_names);
-
-		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
-			char *cursor = buffer;
-			while (*cursor != '\0') {
-				elf_array_add(path_names,VSTR(elf_alloc_string(R,buffer)));
-				cursor += strlen(cursor) + 1;
-			}
-		}
-	} while(FindNextVolumeA(handle,buffer,MAX_PATH));
-	FindVolumeClose(handle);
-#endif
-
-	elf_add_tab(R,list); /* <- */
-	return 1;
-}
-
-
-typedef struct folder_enumerator {
-	elf_State *state;
-	elf_Closure *closure;
-	elf_String *sfolder,*sfile,*sname,*spath,*stype,*ssize;
-	elf_Table *storage;
-} folder_enumerator;
-
-
-static int core_lib_enumerate_folder_callback(void *user, int filetype, size_t filesize, char *filename, char *filepath) {
-	folder_enumerator *fc=user;
-	elf_Closure *cls=fc->closure;
-	elf_State *state=fc->state;
-	elf_String *name,path;
-	elf_Table *storage=fc->storage;
-	int nrets;
-
-	elf_Table *file=elf_new_table(state);
-	elf_tsets_str(file,fc->sname,elf_new_string(state,filename));
-	elf_tsets_str(file,fc->spath,elf_new_string(state,filepath));
-	elf_tsets_str(file,fc->stype,filetype?fc->sfolder:fc->sfile);
-	elf_tsets_int(file,fc->ssize,filesize);
-
-	if (cls){
-		elf_add_cls(state,cls);
-		elf_add_obj(state,elf_get_this(state));
-		elf_add_tab(state,file);
-		nrets=elf_call(state,2,1);
-	}
-	if (storage){
-		elf_array_add(storage,VTAB(file));
-	}
-		// int results = 0; NO_CODE; // elf_call(R,base,1,1);
-		// if (is_directory) {
-		// 	if ((results > 0) && elf_get_int(R,base) != 0) {
-		// 		core_lib_enumerate_folder_(R,path,cls);
-		// 	}
-		// }
-		// SET_TOP(R,top);
-	return 0;
-}
-
-
-static folder_enumerator make_folder_enumerator(elf_State *state, elf_Closure *closure, elf_Table *storage){
-	folder_enumerator folder;
-	folder.state=state;
-	folder.closure=closure;
-	folder.storage=storage;
-	folder.sfolder=elf_new_string(state,"folder");
-	folder.sfile=elf_new_string(state,"file");
-	folder.sname=elf_new_string(state,"name");
-	folder.spath=elf_new_string(state,"path");
-	folder.stype=elf_new_string(state,"type");
-	folder.ssize=elf_new_string(state,"size");
-	return folder;
-}
-
-
-int core_lib_list_folder(elf_State *R) {
-	ASSERT(elf_get_num_args(R) > 0);
-
-	char *filename;
-	elf_Closure *closure;
-	elf_Table *storage;
-	folder_enumerator folder;
-
-	filename=elf_get_txt(R,0);
-	closure=elf_get_cls(R,1);
-	storage=elf_new_table(R);
-	folder=make_folder_enumerator(R,closure,storage);
-
-
-	sys_enumerate_folder(THREAD_ALLOCATOR,filename,&folder,core_lib_enumerate_folder_callback);
-
-	elf_add_tab(R,storage);
-	return 1;
-}
-
-
-int core_lib_enumerate_folder(elf_State *R) {
-	ASSERT(elf_get_num_args(R)==2);
-	/* push these keys temporarily so they won't
-	be gc'd and also to to avoid creating them so often  */
-
-	char *filename;
-	folder_enumerator folder;
-
-	filename=elf_get_txt(R,0);
-	folder=make_folder_enumerator(R,elf_get_cls(R,1),0);
-	sys_enumerate_folder(THREAD_ALLOCATOR,filename,&folder,core_lib_enumerate_folder_callback);
-	return 0;
-}
-
 
 static void print_num_tabs(FILE *io, int num) {
 	while (num --) fprintf(io,"\t");
 }
 
-
+// todo: move this to core.c?
 void elf_unload(FILE *io, elf_Table *tab, int level) {
 	fprintf(io,"{");
 	int nitems = 0;
@@ -707,7 +514,7 @@ int core_lib_unload(elf_State *S) {
 }
 
 
-// DEPRECATED
+// DEPRECATED SHOULD BE INTRINSIC
 int core_lib_iton(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_TAG_INT) {
@@ -717,7 +524,7 @@ int core_lib_iton(elf_State *R) {
 }
 
 
-// DEPRECATED
+// DEPRECATED SHOULD BE INTRINSIC
 int core_lib_ntoi(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_TAG_NUM) {
@@ -727,6 +534,7 @@ int core_lib_ntoi(elf_State *R) {
 }
 
 
+#if 0
 void elf_include_core_lib(elf_State *R) {
 	elf_gsetx_int(R,"elf.VERSION",0);
 #if defined(PLATFORM_WEB)
@@ -790,10 +598,12 @@ void elf_include_core_lib(elf_State *R) {
 
 	elf_gsetx_cfn(R,"elf.change_work_dir",core_lib_change_work_dir);
 	elf_gsetx_cfn(R,"elf.get_work_dir",core_lib_get_work_dir);
-	elf_gsetx_cfn(R,"elf.enumerate_folder",core_lib_enumerate_folder);
-	elf_gsetx_cfn(R,"elf.list_folder",core_lib_list_folder);
-	elf_gsetx_cfn(R,"elf.list_volumes",core_lib_list_volumes);
-	elf_gsetx_cfn(R,"elf.get_disk_info",core_lib_get_disk_info);
+
+	// elf_gsetx_cfn(R,"elf.enumerate_folder",core_lib_enumerate_folder);
+	// elf_gsetx_cfn(R,"elf.get_disk_info",core_lib_get_disk_info);
+	// elf_gsetx_cfn(R,"elf.list_volumes",core_lib_list_volumes);
+	// elf_gsetx_cfn(R,"elf.list_folder",core_lib_list_folder);
+
 
 	elf_gsetx_sys(R,"elf.ferr",stderr);
 	elf_gsetx_sys(R,"elf.fout",stdout);
@@ -801,18 +611,19 @@ void elf_include_core_lib(elf_State *R) {
 
 	elf_gsetx_cfn(R,"elf.pf",core_lib_pf);
 	elf_gsetx_cfn(R,"elf.fpf",core_lib_fpf);
-	elf_gsetx_cfn(R,"elf.fload",core_lib_load_file_data);
-	elf_gsetx_cfn(R,"elf.ftemp",core_lib_ftemp);
-	elf_gsetx_cfn(R,"elf.fopen",core_lib_fopen);
-	elf_gsetx_cfn(R,"elf.fclose",core_lib_fclose);
-	elf_gsetx_cfn(R,"elf.fsize",core_lib_fsize);
-	elf_gsetx_cfn(R,"elf.get_file_size",core_lib_get_file_size);
+	elf_gsetx_cfn(R,"elf.fload",core_lib_get_file_data);
+	elf_gsetx_cfn(R,"elf.ftemp",core_lib_open_temp_file);
+	elf_gsetx_cfn(R,"elf.fopen",core_lib_open_file);
+	elf_gsetx_cfn(R,"elf.fclose",core_lib_close_file);
+	elf_gsetx_cfn(R,"elf.fsize",core_lib_get_file_size);
+	// elf_gsetx_cfn(R,"elf.get_file_size",core_lib_get_file_size);
 
 	elf_gsetx_cfn(R,"elf.sleep",core_lib_sleep);
 	elf_gsetx_cfn(R,"elf.exec",core_lib_exec);
-	elf_gsetx_cfn(R,"elf.shell",core_lib_shell);
+	elf_gsetx_cfn(R,"elf.shell",lib_core_shell);
 
 	elf_gsetx_cfn(R,"elf.float2",core_lib_float2);
 
-	math_lib_include(R);
+	// math_lib_include(R);
 }
+#endif

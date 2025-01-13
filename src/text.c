@@ -108,12 +108,6 @@ char *copy_text2(Allocator fn, int length, char const *text) {
 	return result;
 }
 
-
-char *copy_text(Allocator fn, char const *text) {
-	return copy_text2(fn,-1,text);
-}
-
-
 char *xpfv(Allocator fn, char const *format, va_list v) {
 	int length = stbsp_vsnprintf(NULL,0,format,v);
 	char *text = alloc_memory(fn,length+1);

@@ -3,11 +3,19 @@
 ** gen.c
 */
 
-static int memory_usage;
-static int memory_state;
-static int memory_state_stack[128];
-static int memory_state_index;
-static treeID memory_slots[128];
+// functions used during code generation, these seem sort of
+// generic...
+static int elf_add_const_int(elf_State *S, elf_Int i) {
+	int index = ARRAY_GROW(S->M->integers,1);
+	S->M->integers[index] = i;
+	return index;
+}
+static int elf_add_const_num(elf_State *S, elf_Num i) {
+	int index = ARRAY_GROW(S->M->numbers,1);
+	S->M->numbers[index] = i;
+	return index;
+}
+
 
 static int emit_jump(elf_Parser *parser, Source line, int dst);
 static int emit_byte(elf_Parser *parser, Source line, Bytecode byte);
@@ -26,7 +34,13 @@ int tree2o(int kind);
 int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 
-/* this is just a simple linear 'memory' allocator */
+/* simple memory allocator */
+static int memory_usage;
+static int memory_state;
+static int memory_state_stack[128];
+static int memory_state_index;
+static treeID memory_slots[128];
+
 static int get_mem_state(elf_Parser *parser) { return memory_state; }
 static void set_mem_state(elf_Parser *parser, int state) { memory_state = state; }
 
@@ -39,7 +53,7 @@ static void pop_mem_state(elf_Parser *parser) {
 	set_mem_state(parser,memory_state_stack[-- memory_state_index]);
 }
 
-/* get the memory associated with the tree */
+
 static int get_mem(elf_Parser *parser, treeID id) {
 	int reg = -1;
 	if (id != NO_TREE) {

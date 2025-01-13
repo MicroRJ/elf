@@ -100,7 +100,7 @@ int elf_array_lib_clone(elf_State *R) {
 	for ( i = 0; i < ARRAY_LENGTH(tab->array); i += 1 ) {
 		ARRAY_ADD(clone->array,tab->array[i]);
 	}
-	elf_add_tab(R,clone);
+	elf_push_table(R,clone);
 	return 1;
 }
 

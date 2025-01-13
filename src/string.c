@@ -175,7 +175,7 @@ int string_lib_append(elf_State *R) {
 
 int string_lib_match(elf_State *R) {
 	elf_String *s = (elf_String*) elf_get_this(R);
-	elf_String *p = elf_get_str(R,0);
+	elf_String *p = elf_get_string(R,0);
 	elf_add_int(R,match_entire_text(p->text,s->text));
 	return 1;
 }
@@ -183,7 +183,7 @@ int string_lib_match(elf_State *R) {
 
 int string_lib_find(elf_State *R) {
 	elf_String *string = (elf_String*) elf_get_this(R);
-	char *pattern = elf_get_txt(R,0);
+	char *pattern = elf_get_text(R,0);
 	char *buffer = 0;
 	char *cursor = string->text;
 	elf_Table *list = elf_new_table(R);

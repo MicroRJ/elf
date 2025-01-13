@@ -10,9 +10,9 @@ typedef unsigned long long int Bytecode;
 
 #define BC_XYZ(K,X,Y,Z) (Bytecode){\
 ((((K) & 0xffffllu) <<(0x30))|\
- (((X) & 0xffffllu) <<(0x20))|\
- (((Y) & 0xffffllu) <<(0x10))|\
- (((Z) & 0xffffllu) <<(0x00)))}
+(((X) & 0xffffllu) <<(0x20))|\
+(((Y) & 0xffffllu) <<(0x10))|\
+(((Z) & 0xffffllu) <<(0x00)))}
 
 
 #define BC_OP(B)   (short)(((B)>>(0x30))&0xffff)
@@ -45,7 +45,7 @@ typedef enum elByteClass {
 	BC_CLASS_XYZ,
 } elByteClass;
 
-
+// dude, we don't use delay, leave nor yield ...
 #define BCDEF(_) \
 _(HALT, XXX, "halt") \
 _(NOP, XXX, "nop") \
@@ -90,6 +90,10 @@ _(FLOAT2,XYZ,"float2")
 typedef enum ByteOP { BCDEF(BCITEM) } ByteOP;
 #undef BCITEM
 
+#define BCITEM(_,__,NAME) #NAME,
+// @global
+static char *byte2s[] = { BCDEF(BCITEM) };
+#undef BCITEM
 
 
 

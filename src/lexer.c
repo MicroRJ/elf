@@ -173,8 +173,12 @@ static tokenT get_tok(elf_Parser *file) {
 			} while (is_letter_or_digit_chr(POS0()) || (POS0() == '_'));
 			buffer[length] = 0;
 			tk.type=text_is_word_or_keyword(buffer);
+			// todo: because we only ever have two tokens
+			// for look-ahead we can just store a small
+			// circular buffer in the parser instead for
+			// identifiers.
+			// todo: leak!
 			if (tk.type==TK_WORD) {
-				/* todo: string interner please */
 				tk.text=copy_text2(GLOBAL_ALLOCATOR,length,buffer);
 			}
 		} break;
@@ -258,8 +262,17 @@ static tokenT get_tok(elf_Parser *file) {
 
 			ARRAY_ADD(buffer,0);
 
+			// todo: leak.
+			// todo: strings can be arbitrarily big so
+			// this has to be heap allocated, but could
+			// we instead GC allocate this? and then it
+			// will get automatically collected if not
+			// referenced? Would this cause other unintended
+			// constraints?
 			tk.type = TK_STRING;
 			tk.text = copy_text2(GLOBAL_ALLOCATOR,length,buffer);
+
+			ARRAY_DELETE(buffer);
 		} break;
 		case '.': {
 			MOVE(); tk.type = TK_DOT;

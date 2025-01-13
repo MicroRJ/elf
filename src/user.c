@@ -25,13 +25,13 @@ elf_String *elf_new_string2(elf_State *R, elf_Int length) {
 
 elf_Table *elf_new_table(elf_State *R) {
 	elf_Table *tab=elf_alloc_table(R);
-	elf_add_tab(R,tab);
+	elf_push_table(R,tab);
 	return tab;
 }
 
 elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 	elf_Closure *cls = elf_alloc_closure(R,fn);
-	elf_add_cls(R,cls);
+	elf_push_closure(R,cls);
 	return cls;
 }
 
@@ -64,7 +64,7 @@ elf_Node *elf_get_this(elf_State *S) {
 }
 
 
-void elf_add_this(elf_State *S) {
+void elf_push_this(elf_State *S) {
 	PUSHV(S,GET_FRAME(S)->locals[0]);
 }
 
@@ -79,7 +79,7 @@ void elf_add_nil(elf_State *S) {
 }
 
 
-void elf_add_cls(elf_State *S, elf_Closure *x) {
+void elf_push_closure(elf_State *S, elf_Closure *x) {
 	PUSHV(S,VCLS(x));
 }
 
@@ -94,7 +94,7 @@ void elf_add_cfn(elf_State *S, elf_Function x) {
 }
 
 
-void elf_add_tab(elf_State *S, elf_Table *x) {
+void elf_push_table(elf_State *S, elf_Table *x) {
 	PUSHV(S,VTAB(x));
 }
 
@@ -119,7 +119,7 @@ void elf_add_sys(elf_State *S, elf_Handle x) {
 }
 
 
-elf_String *elf_get_str(elf_State *R, elf_StackId x) {
+elf_String *elf_get_string(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_TAG_NIL) return 0;
 	if (v.tag==elf_TAG_STR) return v.x_str;
@@ -128,7 +128,7 @@ elf_String *elf_get_str(elf_State *R, elf_StackId x) {
 }
 
 
-char *elf_get_txt(elf_State *R, elf_StackId x) {
+char *elf_get_text(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_TAG_NIL) return 0;
 	if (v.tag==elf_TAG_STR) return v.x_str->text;

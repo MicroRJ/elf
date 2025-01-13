@@ -1,6 +1,7 @@
 /*
 ** See Copyright Notice In elf.h
-** shell.c
+** core.c
+** core runtime functions
 */
 
 static int elf_run(elf_State *R);
@@ -17,7 +18,38 @@ void elf_init(elf_State *R, elf_Module *M) {
 	R->metatables.table = new_table_lib(R);
 	M->globals = elf_new_table(R);
 	M->strings = elf_new_table(R);
-	elf_include_core_lib(R);
+
+	elf_gsetx_int(R,"elf.VERSION",0);
+	#if defined(PLATFORM_WEB)
+	elf_gsetx_str(R,"elf.PLATFORM","WEB");
+	elf_gsetx_str(R,"elf.OS","UNKNOWN");
+	#else
+	elf_gsetx_str(R,"elf.PLATFORM","DESKTOP");
+		#if defined(_WIN32)
+	elf_gsetx_str(R,"elf.OS","WINDOWS");
+		#else
+	elf_gsetx_str(R,"elf.OS","UNKNOWN");
+		#endif
+	#endif
+
+	static elf_CBinding lib_base[] = {
+		{"ntoi", core_lib_ntoi},
+		{"iton", core_lib_iton},
+	};
+	elf_add_lib(R,0,lib_base,_countof(lib_base));
+	elf_add_lib(R,0,lib_math,_countof(lib_math));
+	elf_add_lib(R,"elf",lib_core,_countof(lib_core));
+}
+
+// functions that we use internally for profiling
+elf_i64 elf_get_clock_time() {
+	return sys_get_clock_time();
+}
+elf_f64 elf_time_diff_s(elf_i64 time) {
+	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
+}
+elf_f64 elf_time_diff_ms(elf_i64 time) {
+	return elf_time_diff_s(time) * 1000.;
 }
 
 
@@ -111,67 +143,9 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 	return nyield;
 }
 
-// todo: why do we pass in the parser and why
-// are there so many variations of the same thing
-elf_Closure *elf_load_code_closure(elf_State *R, elf_Parser *parser, elf_String *name, elf_String *contents) {
-	if (!name || !contents) {
-		return 0;
-	}
 
-	treeID tree = parse(parser,R,name->text,contents->text);
-	elf_File file = gen_file(parser,tree);
-	file.contents=contents;
-	file.name=name;
-	// todo: how do we track this, should each proto
-	// point to the file they are from?...
-	elf_array_add(R->M->globals,VSTR(contents));
-	elf_array_add(R->M->globals,VSTR(name));
-
-	ARRAY_ADD(R->M->files,file);
-	return elf_new_closure(R,file.proto);
-}
-
-
-// todo: why is file IO being done here?
-// this is the core file... this is just
-// some variant, put this somewhere else
-elf_clsID elf_load_file_closure(elf_State *R, elf_String *name) {
-	elf_Error error;
-	char *text;
-
-	/* todo: use string allocator instead?... */
-	error=sys_read_text(GLOBAL_ALLOCATOR,(void**)&text,name->text);
-	if (FAILED(error)) {
-		elf_error_log("'%s': could not load file",name->text);
-		goto error;
-	}
-
-	elf_debug_log("'%s': file loaded successfully",name->text);
-
-	elf_strID string=elf_new_string(R,text);
-	dealloc_memory(GLOBAL_ALLOCATOR,text);
-
-	elf_Parser parser = {0};
-	return elf_load_code_closure(R,&parser,name,string);
-
-	error:
-	return 0;
-}
-
-
-int elf_exec_file(elf_State *R, elf_String *name, int nargs, int nrets) {
-	ASSERT(nargs >= 0);
-	ASSERT(nrets >= 0);
-	elf_clsID cls = elf_load_file_closure(R,name);
-	/* todo: HACK! */
-	elf_set_global(R->M,name,VCLS(cls));
-	elf_add_cls(R,cls);
-	elf_add_this(R);
-	return elf_call(R,2,nrets);
-}
-
-
-INTERNAL void check_division_by_zero(elf_State *S, elf_Value xx, elf_Value yy) {
+// todo: make this legit!
+static void _check_zero_div(elf_State *S, elf_Value xx, elf_Value yy) {
 	if ((yy.tag == elf_TAG_NUM) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
 	if ((yy.tag == elf_TAG_INT) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
 }
@@ -724,7 +698,7 @@ int elf_run(elf_State *R) {
 					if (!INTORNUM(yy.tag)) {
 						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					check_division_by_zero(R,xx,yy);
+					_check_zero_div(R,xx,yy);
 					x=VI2N(xx);
 					y=VI2N(yy);
 					locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;
@@ -733,7 +707,7 @@ int elf_run(elf_State *R) {
 					if (!INTORNUM(yy.tag)) {
 						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					check_division_by_zero(R,xx,yy);
+					_check_zero_div(R,xx,yy);
 					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
 					locals[BC_ARGX(byte)].x_int = VN2I(xx) % VN2I(yy);
 				} else {
@@ -751,7 +725,7 @@ int elf_run(elf_State *R) {
 				yy=locals[BC_ARGZ(byte)];\
 				if((xx.tag==elf_TAG_INT) && (yy.tag==elf_TAG_INT)) {\
 					if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
-						check_division_by_zero(R,xx,yy);\
+						_check_zero_div(R,xx,yy);\
 					}\
 					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
 					locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
@@ -780,7 +754,7 @@ int elf_run(elf_State *R) {
 					if (!ISOBJT(xx.tag)) elf_fail(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
 					call_overload(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
 				} else if (INTORNUM(xx.tag) && INTORNUM(yy.tag)) {\
-					if (BC_OP(byte)==BC_DIV) check_division_by_zero(R,xx,yy);\
+					if (BC_OP(byte)==BC_DIV) _check_zero_div(R,xx,yy);\
 					if((xx.tag==elf_TAG_NUM) || (yy.tag==elf_TAG_NUM)) {\
 						locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;\
 						locals[BC_ARGX(byte)].x_num = VI2N(xx) OP VI2N(yy);\
@@ -827,7 +801,7 @@ int elf_run(elf_State *R) {
 			CASE_BOP(BC_DIV, /, "__div", "__div1");
 	#undef CASE_BOP
 			default: {
-				elf_fail(R,module_instr,elf_tpf("unsupported instruction: %s", get_byte_label(BC_OP(byte))));
+				elf_fail(R,module_instr,elf_tpf("unsupported instruction: %s", byte2s[BC_OP(byte)]));
 			} break;
 		}
 	}

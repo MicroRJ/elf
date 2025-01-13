@@ -64,8 +64,8 @@
 
 
 // elAPI int netlib_tcpserver(elf_State *R) {
-// 	elf_String *addrnameS = elf_get_str(R,0);
-// 	elf_String *addrportS = elf_get_str(R,1);
+// 	elf_String *addrnameS = elf_get_string(R,0);
+// 	elf_String *addrportS = elf_get_string(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -87,8 +87,8 @@
 
 
 // elAPI int netlib_tcpclient(elf_State *R) {
-// 	elf_String *addrnameS = elf_get_str(R,0);
-// 	elf_String *addrportS = elf_get_str(R,1);
+// 	elf_String *addrnameS = elf_get_string(R,0);
+// 	elf_String *addrportS = elf_get_string(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -112,7 +112,7 @@
 // elAPI int netlib_send(elf_State *R) {
 // 	/* todo: make this a class? */
 // 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
-// 	elf_String *payload = elf_get_str(R,1);
+// 	elf_String *payload = elf_get_string(R,1);
 // 	LMSG message = { payload->length };
 // 	elf_Int sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);

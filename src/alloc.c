@@ -19,21 +19,21 @@ void *copy_memory(void *dst, void const *src, elf_Int length) {
 
 void dealloc_memory_debug(Allocator fn, const void *memory, DBGSource loca) {
 	elf_Error error = fn(0,0,0,0,(void **)&memory,loca);
-	ASSERT(PASSED(error));
+	// ASSERT(PASSED(error));
 }
 
 
 void *alloc_memory_debug(Allocator fn, elf_Int length, DBGSource loca) {
 	void *memory = 0;
 	elf_Error error = fn(0,0,0,length,&memory,loca);
-	ASSERT(PASSED(error));
+	// ASSERT(PASSED(error));
 	return memory;
 }
 
 
 void *realloc_memory_debug(Allocator fn, elf_Int length, void *memory, DBGSource loca) {
 	elf_Error error = fn(0,0,0,length,&memory,loca);
-	ASSERT(PASSED(error));
+	// ASSERT(PASSED(error));
 	return memory;
 }
 
@@ -45,7 +45,7 @@ void *calloc_memory_debug(Allocator fn, elf_Int size, DBGSource loca) {
 
 ALLOCATOR_FN(global_allocator) {
 	if (memory==0) {
-		return Error_InvalidArguments;
+		return 1;
 	}
 	if (new_size==0) {
 #if defined(_DEBUG_ALLOC)
@@ -69,22 +69,22 @@ ALLOCATOR_FN(global_allocator) {
 		}
 		if (*memory==0) {
 			elf_debugger("fatal error: out of memory");
-			return Error_OutOfMemory;
+			return 1;
 		}
 	}
-	return Error_None;
+	return 0;
 }
 
 
 ALLOCATOR_FN(thread_allocator) {
 	if (memory==0) {
-		return Error_InvalidArguments;
+		return 1;
 	}
 	if (new_size==0) {
-		return Error_InvalidArguments;
+		return 1;
 	} else {
 		if (*memory!=0) {
-			return Error_InvalidArguments;
+			return 1;
 		}
 
 		// TODO:
@@ -93,7 +93,7 @@ ALLOCATOR_FN(thread_allocator) {
 		if (cursor == 0) cursor = buffer;
 
 		if (new_size > sizeof(buffer)) {
-			return Error_OutOfMemory;
+			return 1;
 		}
 
 		if((cursor - buffer) + new_size > sizeof(buffer)) {
@@ -103,5 +103,5 @@ ALLOCATOR_FN(thread_allocator) {
 		*memory = cursor;
 		cursor += new_size;
 	}
-	return Error_None;
+	return 0;
 }
