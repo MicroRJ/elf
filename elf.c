@@ -150,6 +150,7 @@ typedef struct elf_State {
 	elf_Value      *stack;
 	int             stack_max;
 	elf_Value      *stack_ptr;
+
 	elf_StackFrame  first_frame;
 	elf_StackFrame *frame;
 	int            nframe;

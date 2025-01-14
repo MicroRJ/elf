@@ -4,40 +4,40 @@
 */
 
 
-int core_lib_load_file(elf_State *R) {
-	elf_String *name = elf_get_string(R,0);
-	// the number of arguments we pass in to the file proto,
-	// not taking into account or argument which was the
-	// file name
-	int nargs = elf_get_num_args(R) - 1;
-	int nrets = elf_get_num_rets(R);
-
-	FILE *io = fopen(name->text,"rb");
-	if (io == 0) {
-		elf_error_log("'%s': could not load file",name->text);
-		goto _error;
+static elf_String *_read_file(elf_State *R, char *name) {
+	FILE *file = fopen(name,"rb");
+	elf_String *string = 0;
+	if (file) {
+		fseek(file,0,SEEK_END);
+		long size = ftell(file);
+		string = elf_new_string2(R,size);
+		fseek(file,0,SEEK_SET);
+		fread(string->text,1,size,file);
+		fclose(file);
+		elf_debug_log("'%s': file loaded successfully",name);
+	} else {
+		elf_error_log("'%s': could not load file",name);
 	}
+	return string;
+}
 
-
-	elf_debug_log("'%s': file loaded successfully",name->text);
-
-
-	fseek(io,0,SEEK_END);
-	long size = ftell(io);
-
-	elf_String *contents = elf_new_string2(R,size);
-
-	fseek(io,0,SEEK_SET);
-	fread(contents->text,1,size,io);
+static int _call_file(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name) {
+	elf_String *contents = _read_file(R,name->text);
+	if(!contents) {
+		nrets = 0;
+		goto esc;
+	}
 
 	// todo: parse and gen file should just be one function,
 	// or maybe just have the one 'parse' function...
 	elf_Parser parser = {};
-	treeID tree = parse(&parser,R,name->text,contents->text);
+	treeID tree = parse(&parser,R,as_expr,name->text,contents->text);
 	elf_File file = gen_file(&parser,tree);
+
 	// todo: we need this in the file for debugging...
-	file.contents=contents;
-	file.name=name;
+	file.contents = contents;
+	file.name = name;
+
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
 	elf_array_add(R->M->globals,VSTR(contents));
@@ -46,26 +46,37 @@ int core_lib_load_file(elf_State *R) {
 	ARRAY_ADD(R->M->files,file);
 	elf_Closure *cls = elf_new_closure(R,file.proto);
 
-
 	// ASSERT(nargs >= 0);
 	// ASSERT(nrets >= 0);
 	/* todo: HACK!
 	Todo: the file closure doesn't have to be kept alive... */
 	elf_set_global(R->M,0,VCLS(cls));
-
+	elf_Value *rets = R->stack_ptr;
 	elf_push_closure(R,cls);
 	elf_push_this(R);
-
 	nrets = elf_call(R,nargs+1,nrets);
+	R->stack_ptr = rets + nrets;
+	esc:
 	return nrets;
-
-	_error:
-	return 0;
 }
 
-// int nrets = elf_exec_file(R,name
-// ,	elf_get_num_args(R)
-// ,	elf_get_num_rets(R));
+int core_lib_load_file(elf_State *R) {
+	elf_String *name = elf_get_string(R,0);
+	int nargs = elf_get_num_args(R) - 1;
+	int nrets = elf_get_num_rets(R);
+	nrets = _call_file(R,false,nargs,nrets,name);
+	return nrets;
+}
+
+
+int core_lib_load_expr(elf_State *R) {
+	elf_String *name = elf_get_string(R,0);
+	int nargs = elf_get_num_args(R) - 1;
+	int nrets = elf_get_num_rets(R);
+	nrets = _call_file(R,true,nargs,nrets,name);
+	return nrets;
+}
+
 
 
 // mostly experimental...
@@ -274,44 +285,6 @@ int core_lib_include(elf_State *R) {
 }
 
 
-int core_lib_load_expr(elf_State *R) {
-	elf_String *filename = 0;
-	elf_String *contents = 0;
-	if (elf_get_num_args(R) == 2) {
-		filename = elf_get_string(R,0);
-		contents = elf_get_string(R,1);
-	} else if (elf_get_num_args(R) == 1) {
-		filename = elf_new_string(R,"unnamed");
-		contents = elf_get_string(R,0);
-	} else NO_CODE;
-	NO_CODE;
-	(void) filename;
-	(void) contents;
-	// elf_parse_expr3(R,filename,GET_FRAME(R)->ry,GET_FRAME(R)->ntoyield,contents);
-	/* no need to do hoisting */
-	return 0;
-}
-
-
-int core_lib_load_code(elf_State *R) {
-	elf_String *filename = 0;
-	elf_String *contents = 0;
-	if (elf_get_num_args(R) == 2) {
-		filename = elf_get_string(R,0);
-		contents = elf_get_string(R,1);
-	} else if (elf_get_num_args(R) == 1) {
-		filename = elf_new_string(R,"unnamed");
-		contents = elf_get_string(R,0);
-	} else NO_CODE;
-	NO_CODE;
-	(void) filename;
-	(void) contents;
-	// elf_parse_code3(R,filename,GET_FRAME(R)->ry,GET_FRAME(R)->ntoyield,contents);
-	/* no need to do hoisting */
-	return 0;
-}
-
-
 int core_lib_load_json(elf_State *R) {
 	char *name = elf_get_text(R,0);
 
@@ -334,7 +307,7 @@ int core_lib_load_json(elf_State *R) {
 
 	return 1;
 	_error:
-	elf_add_nil(R);
+	elf_push_nil(R);
 	return 1;
 }
 
@@ -385,7 +358,7 @@ int core_lib_get_file_data(elf_State *R) {
 		elf_String *buf = elf_alloc_string2(R,size);
 		fread(buf->text,1,size,file);
 		elf_add_str(R,buf);
-	} else elf_add_nil(R);
+	} else elf_push_nil(R);
 	return 1;
 }
 
@@ -484,22 +457,35 @@ static void print_num_tabs(FILE *io, int num) {
 void elf_unload(FILE *io, elf_Table *tab, int level) {
 	fprintf(io,"{");
 	int nitems = 0;
-	for (elf_Int i = 0; i < tab->ntotal; ++ i) {
-		tabentryT slot = tab->slots[i];
-		if (slot.key.tag == elf_TAG_NIL) {
-			continue;
+	// todo:
+	if(tab->nslots) {
+		for (elf_i64 i = 0; i < tab->ntotal; ++ i) {
+			tabentryT slot = tab->slots[i];
+			if (slot.key.tag == elf_TAG_NIL) {
+				continue;
+			}
+			elf_Value v = tab->array[slot.idx];
+			if ((v.tag == elf_TAG_CLS) || (v.tag == elf_TAG_CFN)) {
+				continue;
+			}
+			if (nitems ++ != 0) fprintf(io,",");
+			fpf_value(io,slot.key,1);
+			fprintf(io," = ");
+			if (v.tag == elf_TAG_TAB) {
+				elf_unload(io,v.x_tab,level+1);
+			} else {
+				fpf_value(io,v,1);
+			}
 		}
-		elf_Value v = tab->array[slot.idx];
-		if ((v.tag == elf_TAG_CLS) || (v.tag == elf_TAG_CFN)) {
-			continue;
-		}
-		if (nitems ++ != 0) fprintf(io,",");
-		fpf_value(io,slot.key,1);
-		fprintf(io," = ");
-		if (v.tag == elf_TAG_TAB) {
-			elf_unload(io,v.x_tab,level+1);
-		} else {
-			fpf_value(io,v,1);
+	} else {
+		FOR_ARRAY(i,tab->array) {
+			elf_Value v = tab->array[i];
+			fprintf(io,"%lli = ",i);
+			if (v.tag==elf_TAG_TAB) {
+				elf_unload(io,v.x_tab,level+1);
+			} else {
+				fpf_value(io,v,1);
+			}
 		}
 	}
 	fprintf(io,"}");

@@ -74,7 +74,7 @@ void elf_add_any(elf_State *S, elf_Value value) {
 }
 
 
-void elf_add_nil(elf_State *S) {
+void elf_push_nil(elf_State *S) {
 	PUSHV(S,VNIL());
 }
 
@@ -89,7 +89,7 @@ void elf_add_obj(elf_State *S, elf_Node *x) {
 }
 
 
-void elf_add_cfn(elf_State *S, elf_Function x) {
+void elf_push_function(elf_State *S, elf_Function x) {
 	PUSHV(S,VCFN(x));
 }
 

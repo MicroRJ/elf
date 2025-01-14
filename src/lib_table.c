@@ -164,7 +164,7 @@ int elf_lib_table_delete(elf_State *R) {
 	// }
 
 	return 1;
-	_err: elf_add_nil(R);
+	_err: elf_push_nil(R);
 	return 1;
 }
 
@@ -205,7 +205,7 @@ int table_lib_xdelete(elf_State *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		}
-	} else elf_add_nil(R);
+	} else elf_push_nil(R);
 	return 1;
 }
 
@@ -253,7 +253,7 @@ int table_lib_xremove(elf_State *R) {
 				tab->array[idx] = tab->array[min];
 			}
 		}
-	} else elf_add_nil(R);
+	} else elf_push_nil(R);
 	return 1;
 }
 #endif

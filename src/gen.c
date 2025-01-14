@@ -92,19 +92,22 @@ int to_any_mem(elf_Parser *parser, treeID id) {
 static void gen_tree(elf_Parser *parser, treeID id);
 
 static elf_Proto gen_proto(elf_Parser *parser, treeID tree){
+	elf_State *R = parser->R;
+	elf_Module *M = parser->R->M;
 	ASSERT(get_tree_kind(parser,tree)==TREE_FUNCTION);
 	ASSERT(memory_state_index==0);
 	ASSERT(memory_state==0);
 	ASSERT(memory_usage==0);
-	int start=parser->R->M->nbytes;
+	int start=M->nbytes;
 	gen_tree(parser,tree->expr_fun.body);
-
 	elf_Proto proto = {};
 	proto.arity=1;
 	proto.bytes=start;
 	proto.nvalues=ARRAY_LENGTH(tree->expr_fun.capts);
 	proto.nlocals=memory_usage;
-	proto.nbytes=parser->R->M->nbytes-start;
+	proto.nbytes=M->nbytes-start;
+	// todo: come back to this
+	// ASSERT(BC_OP(M->bytes[M->nbytes-1]) == BC_RET);
 
 	ASSERT(memory_state==0);
 	ASSERT(memory_state_index==0);
@@ -160,10 +163,7 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 				ASSERT(mem!=NO_SLOT);
 			}
 
-			// emit_eval_deprecated(fs,0,reg=reg_alloc_deprecated(fs),nreg=1,id);
 			// if (fs->fn->nyield < nreg) fs->fn->nyield = nreg;
-			// j=emit_bytexyz_deprecated(parser,line,BC_YIELD,NO_JUMP,reg,nreg);
-			// emit_bytex(parser,tree.line,BC_LEAVE,0);
 
 			emit_bytexy(parser,tree.line,BC_RET,mem,num);
 		} break;

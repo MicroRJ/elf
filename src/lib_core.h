@@ -31,7 +31,6 @@ _(include)\
 _(load_file)\
 _(load_json)\
 _(load_expr)\
-_(load_code)\
 _(pf)\
 _(ntoi)\
 _(iton)\

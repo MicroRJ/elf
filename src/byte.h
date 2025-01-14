@@ -5,7 +5,7 @@
 
 
 /* todo: make use only 32 bits */
-#if 1
+#if 0
 typedef unsigned long long int Bytecode;
 
 #define BC_XYZ(K,X,Y,Z) (Bytecode){\
@@ -56,9 +56,9 @@ _(JE, XY, "je") \
 _(JNE, XY, "jne") \
 _(LOOP, XXX, "loop") \
 _(DELAY, XXX, "delay") \
-_(RET, XXX, "ret") \
 _(LEAVE, XXX, "leave") \
 _(YIELD, XYZ, "yield") \
+_(RET, XY, "ret") \
 _(TYPEGUARD, XY, "typeguard") \
 _(GETUPVAL, XY, "getclosed") \
 _(GETGLOBAL, XY, "getglobal")\

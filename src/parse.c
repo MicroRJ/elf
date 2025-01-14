@@ -24,6 +24,7 @@ static treeID parse_if(elf_Parser *parser, int negate);
 static bool parse_for(elf_Parser *parser);
 static treeID parse_json(elf_Parser *parser);
 static treeID *parse_args(elf_Parser *parser);
+static void block_add(elf_Parser *parser, treeID id);
 
 static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text) {
 	parser->R = R;
@@ -36,10 +37,11 @@ static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text
 	get_tok(parser);
 }
 
+
 // todo: rename to elf_parse, but don't use
 // global replace cuz there's only one reference,
 // other references are just plain text
-static treeID parse(elf_Parser *parser, elf_State *R, char *name, char *text) {
+static treeID parse(elf_Parser *parser, elf_State *R, bool as_expr, char *name, char *text) {
 	prep_parser(parser,R,name,text);
 
 	treeID func = new_tree(parser,parser->tok.line,TREE_FUNCTION,NT_FUN);
@@ -48,13 +50,17 @@ static treeID parse(elf_Parser *parser, elf_State *R, char *name, char *text) {
 
 	ARRAY_ADD(parser->functions,func);
 
-	while (parse_stat(parser));
-
-	// todo: this is temporary...
-	FOR_ARRAY(i,parser->block.defers){
-		ARRAY_ADD(parser->block.body,parser->block.defers[i]);
+	if (as_expr) {
+		treeID v;
+		v=parse_expr(parser,0);
+		v=tree_ret(parser,parser->tok.line,v);
+		block_add(parser,v);
+	} else{
+		while (parse_stat(parser));
+		FOR_ARRAY(i,parser->block.defers){
+			ARRAY_ADD(parser->block.body,parser->block.defers[i]);
+		}
 	}
-
 	func->expr_fun.body = tree_block(parser,parser->tok.line,parser->block.body);
 	return func;
 }
