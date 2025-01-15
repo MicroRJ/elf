@@ -454,12 +454,14 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			ASSERT(dst<mem);
 
 			xx=get_tree(parser,tree.x);
-			if ((xx.kind==EXPR_FIELD)||(xx.kind==EXPR_METAFIELD)) {
+			// todo: do in parser
+			if (get_mem(parser,tree.x)==NO_SLOT && (xx.kind==EXPR_FIELD)||(xx.kind==EXPR_METAFIELD)) {
 				ry=to_mem(parser,xx.y,-1,1);
 				rx=to_mem(parser,xx.x,-1,1);
 				emit_bytexyz(parser,line,tree2o(xx.kind),ry,rx,ry);
 			} else {
-				ry=to_mem(parser,                    tree.x,-1,1);
+				ry=to_mem(parser,tree.x,-1,1);
+				ASSERT(get_mem(parser,id)==NO_SLOT);
 				// rx=to_mem(parser,tree_this_ref(parser,line),-1,1);
 				rx=set_mem(parser,id);
 				emit_bytexy(parser,line,BC_RELOAD,rx,0);

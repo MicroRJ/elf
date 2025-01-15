@@ -172,7 +172,7 @@ void elf_check_args(elf_State *R, char *fnname, int n, char *usage) {
 }
 
 
-int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_ValueTag x, elf_ValueTag y) {
+int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tagenum x, elf_tagenum y) {
 	if (x != y) {
 		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
@@ -182,14 +182,14 @@ int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_ValueTag x, elf_
 
 static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 	switch (v.tag) {
-		case elf_TAG_NIL: return fprintf(file,"nil");
-		case elf_TAG_SYS: return fprintf(file,"h%llX",v.x_int);
-		case elf_TAG_INT: return fprintf(file,"%lli",v.x_int);
-		case elf_TAG_NUM: return fprintf(file,"%f",v.x_num);
-		case elf_TAG_CLS: return fprintf(file,"F()");
-		case elf_TAG_CFN: return fprintf(file,"C()");
-		case elf_TAG_FLOAT2: return fprintf(file,"float2(%f,%f)",v.x_f32,v.y_f32);
-		case elf_TAG_TAB: {
+		case elf_tag_nil: return fprintf(file,"nil");
+		case elf_tag_sysobj: return fprintf(file,"h%llX",v.x_int);
+		case elf_tag_int: return fprintf(file,"%lli",v.x_int);
+		case elf_tag_num: return fprintf(file,"%f",v.x_num);
+		case elf_tag_closure: return fprintf(file,"F()");
+		case elf_tag_proc: return fprintf(file,"C()");
+		case elf_tag_float2: return fprintf(file,"float2(%f,%f)",v.x_f32,v.y_f32);
+		case elf_tag_tab: {
 			/* todo: this is slow! */
 			int wrote = 0;
 			elf_Table *tab = v.x_tab;
@@ -198,8 +198,8 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
-					tabentryT it = tab->slots[j];
-					if (it.key.tag==elf_TAG_NIL) continue;
+					elf_Entry it = tab->slots[j];
+					if (it.key.tag==elf_tag_nil) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += fprintf(file,", ");
 					wrote += fpf_value(file,it.key,1);
@@ -208,8 +208,8 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 				wrote += fpf_value(file,tab->array[i],1);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	tabentryT it = tab->slots[i];
-			// 	if (it.key.tag == elf_TAG_NIL) continue;
+			// 	elf_Entry it = tab->slots[i];
+			// 	if (it.key.tag == elf_tag_nil) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
 			// 	wrote += fpf_value(file,it.key,1);
 			// 	wrote += fprintf(file," = ");
@@ -222,7 +222,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			wrote += fprintf(file,"}");
 			return wrote;
 		} break;
-		case elf_TAG_STR: {
+		case elf_tag_str: {
 			if (flags) {
 				return fprintf(file,"\"%s\"",v.x_str->text);
 			} else {
@@ -267,7 +267,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, Bytecode b)
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag==elf_TAG_STR)||(val.tag==elf_TAG_NUM)||(val.tag==elf_TAG_INT)) {
+		if ((val.tag==elf_tag_str)||(val.tag==elf_tag_num)||(val.tag==elf_tag_int)) {
 			fpf_value(io,val,1);
 		}
 	}

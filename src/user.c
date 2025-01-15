@@ -36,7 +36,7 @@ elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 }
 
 
-static void check_tag(elf_State *S, elf_ValueTag tag, elf_ValueTag got, elf_StackId x) {
+static void check_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, elf_StackId x) {
 	elf_fail(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 
@@ -54,7 +54,7 @@ elf_Value elf_get_arg(elf_State *S, int x) {
 }
 
 
-elf_ValueTag elf_get_tag(elf_State *S, int x) {
+elf_tagenum elf_get_tag(elf_State *S, int x) {
 	return GET_FRAME(S)->locals[x+1].tag;
 }
 
@@ -121,36 +121,36 @@ void elf_add_sys(elf_State *S, elf_Handle x) {
 
 elf_String *elf_get_string(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_NIL) return 0;
-	if (v.tag==elf_TAG_STR) return v.x_str;
-	check_tag(R,elf_TAG_STR,v.tag,x);
+	if (v.tag==elf_tag_nil) return 0;
+	if (v.tag==elf_tag_str) return v.x_str;
+	check_tag(R,elf_tag_str,v.tag,x);
 	return 0;
 }
 
 
 char *elf_get_text(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_NIL) return 0;
-	if (v.tag==elf_TAG_STR) return v.x_str->text;
-	check_tag(R,elf_TAG_STR,v.tag,x);
+	if (v.tag==elf_tag_nil) return 0;
+	if (v.tag==elf_tag_str) return v.x_str->text;
+	check_tag(R,elf_tag_str,v.tag,x);
 	return 0;
 }
 
 
 elf_Node *elf_get_obj(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_NIL) return 0;
+	if (v.tag==elf_tag_nil) return 0;
 	if (ISOBJT(v.tag)) return v.x_obj;
-	check_tag(R,elf_TAG_OBJ,v.tag,x);
+	check_tag(R,elf_tag_userobj,v.tag,x);
 	return 0;
 }
 
 
 elf_Table *elf_get_table(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_NIL) return 0;
-	if (v.tag==elf_TAG_TAB) return v.x_tab;
-	check_tag(R,elf_TAG_TAB,v.tag,x);
+	if (v.tag==elf_tag_nil) return 0;
+	if (v.tag==elf_tag_tab) return v.x_tab;
+	check_tag(R,elf_tag_tab,v.tag,x);
 	return 0;
 }
 
@@ -158,33 +158,33 @@ elf_Table *elf_get_table(elf_State *R, elf_StackId x) {
 elf_Closure *elf_get_cls(elf_State *S, elf_StackId x) {
 	elf_Value thing;
 	thing=elf_get_arg(S,x);
-	return thing.tag!=elf_TAG_CLS?0:thing.x_cls;
+	return thing.tag!=elf_tag_closure?0:thing.x_cls;
 }
 
 
 elf_Handle elf_get_sys(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_NIL) return 0;
-	if (v.tag==elf_TAG_SYS) return v.x_sys;
-	check_tag(R,elf_TAG_SYS,v.tag,x);
+	if (v.tag==elf_tag_nil) return 0;
+	if (v.tag==elf_tag_sysobj) return v.x_sys;
+	check_tag(R,elf_tag_sysobj,v.tag,x);
 	return 0;
 }
 
 
 elf_Int elf_get_int(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_NUM) return (elf_Int) v.x_num;
-	if (v.tag==elf_TAG_INT) return v.x_int;
-	check_tag(R,elf_TAG_INT,v.tag,x);
+	if (v.tag==elf_tag_num) return (elf_Int) v.x_num;
+	if (v.tag==elf_tag_int) return v.x_int;
+	check_tag(R,elf_tag_int,v.tag,x);
 	return 0;
 }
 
 
 elf_Num elf_get_num(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_TAG_INT) return (elf_Num) v.x_int;
-	if (v.tag==elf_TAG_NUM) return v.x_num;
-	check_tag(R,elf_TAG_NUM,v.tag,x);
+	if (v.tag==elf_tag_int) return (elf_Num) v.x_int;
+	if (v.tag==elf_tag_num) return v.x_num;
+	check_tag(R,elf_tag_num,v.tag,x);
 	return 0;
 }
 
@@ -230,21 +230,21 @@ void elf_gset_bindings(elf_State *R, elf_CBinding *list, int num) {
 elf_Int elf_tgetx_int(elf_Table *tab, char const *key, elf_Int or) {
 	elf_Value val;
 	val=elf_tgetx_any(tab,key);
-	return val.tag!=elf_TAG_NIL?VN2I(val):or;
+	return val.tag!=elf_tag_nil?VN2I(val):or;
 }
 
 
 elf_Num elf_tgetx_num(elf_Table *tab, char const *key, elf_Num or) {
 	elf_Value val;
 	val=elf_tgetx_any(tab,key);
-	return val.tag!=elf_TAG_NIL?VI2N(val):or;
+	return val.tag!=elf_tag_nil?VI2N(val):or;
 }
 
 
 elf_Table *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table *or) {
 	elf_Value val;
 	val=elf_tgetx_any(tab,key);
-	return val.tag==elf_TAG_TAB?val.x_tab:or;
+	return val.tag==elf_tag_tab?val.x_tab:or;
 }
 
 
@@ -264,7 +264,7 @@ elf_Int elf_tgets_int(elf_Table *tab, elf_String *key) {
 
 elf_Int elf_tgetsor_int(elf_Table *tab, elf_String *key, elf_Int or) {
 	elf_Value val=elf_tgets_any(tab,key);
-	if (val.tag!=elf_TAG_NIL) {
+	if (val.tag!=elf_tag_nil) {
 		return VN2I(val);
 	} else return or;
 }

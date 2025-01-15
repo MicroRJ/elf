@@ -85,7 +85,7 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 	int num_locals = nargs;
 	elf_Closure *closure = 0;
 
-	if (value.tag == elf_TAG_CLS) {
+	if (value.tag == elf_tag_closure) {
 		closure = value.x_cls;
 		elf_Proto proto = closure->proto;
 		if (num_locals < proto.nlocals) {
@@ -116,9 +116,9 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 		elf_debugger("debugger 'FLAG_DEBUGGER_ONCALL'");
 	}
 
-	if (value.tag == elf_TAG_CLS) {
+	if (value.tag == elf_tag_closure) {
 		nyield = elf_run(S);
-	} else if (value.tag == elf_TAG_CFN) {
+	} else if (value.tag == elf_tag_proc) {
 		elf_Value *res, *ptr;
 		res = S->stack_ptr;
 		nyield = value.x_fun(S);
@@ -146,8 +146,8 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 
 // todo: make this legit!
 static void _check_zero_div(elf_State *S, elf_Value xx, elf_Value yy) {
-	if ((yy.tag == elf_TAG_NUM) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
-	if ((yy.tag == elf_TAG_INT) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
+	if ((yy.tag == elf_tag_num) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
+	if ((yy.tag == elf_tag_int) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
 }
 
 
@@ -218,7 +218,7 @@ elf_Int elf_mark_object(elf_Node *obj) {
 	} else if (obj->type == GC_TAB) {
 		elf_Table *table;
 		elf_Value *array;
-		tabentryT *slots;
+		elf_Entry *slots;
 
 		table=(elf_Table*)obj;
 		array=table->array;
@@ -505,15 +505,15 @@ int elf_run(elf_State *R) {
 				globals->array[BC_ARGX(byte)]=locals[BC_ARGY(byte)];
 			} break;
 			case BC_LOADNIL: {
-				locals[BC_ARGX(byte)].tag    = elf_TAG_NIL;
+				locals[BC_ARGX(byte)].tag    = elf_tag_nil;
 				locals[BC_ARGX(byte)].x_int  = 0;
 			} break;
 			case BC_GETKINT: {
-				locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+				locals[BC_ARGX(byte)].tag   = elf_tag_int;
 				locals[BC_ARGX(byte)].x_int = M->integers[BC_ARGY(byte)];
 			} break;
 			case BC_GETKNUM: {
-				locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;
+				locals[BC_ARGX(byte)].tag   = elf_tag_num;
 				locals[BC_ARGX(byte)].x_num = M->numbers[BC_ARGY(byte)];
 			} break;
 			case BC_GETUPVAL: {
@@ -525,12 +525,12 @@ int elf_run(elf_State *R) {
 				elf_Proto proto = M->protos[BC_ARGY(byte)];
 				elf_Closure *new_cls = elf_alloc_closure(R,proto);
 				copy_memory(new_cls->values,locals+BC_ARGX(byte),proto.nvalues*sizeof(elf_Value));
-				locals[BC_ARGX(byte)].tag   = elf_TAG_CLS;
+				locals[BC_ARGX(byte)].tag   = elf_tag_closure;
 				locals[BC_ARGX(byte)].x_cls = new_cls;
 			} break;
 			case BC_TABLE: {
 				elf_Table *tab = elf_alloc_table(R);
-				locals[BC_ARGX(byte)].tag   = elf_TAG_TAB;
+				locals[BC_ARGX(byte)].tag   = elf_tag_tab;
 				locals[BC_ARGX(byte)].x_tab = tab;
 			} break;
 			case BC_TYPEGUARD: {
@@ -540,15 +540,15 @@ int elf_run(elf_State *R) {
 				elf_Value yy = locals[BC_ARGY(byte)];
 				elf_Table *metatable = {0};
 				switch (yy.tag) {
-					case elf_TAG_STR: case elf_TAG_TAB:
-					case elf_TAG_OBJ: case elf_TAG_CLS: {
+					case elf_tag_str: case elf_tag_tab:
+					case elf_tag_userobj: case elf_tag_closure: {
 						metatable = yy.x_obj->meta;
 					} goto _lookup;
-					case elf_TAG_NUM: {
+					case elf_tag_num: {
 						metatable = R->metatables.number;
 						elf_fail(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
-					case elf_TAG_INT: {
+					case elf_tag_int: {
 						metatable = R->metatables.integer;
 						elf_fail(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
@@ -566,36 +566,36 @@ int elf_run(elf_State *R) {
 			case BC_GETINDEX: case BC_GETFIELD: {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
-				if (yy.tag==elf_TAG_NIL) {
+				if (yy.tag==elf_tag_nil) {
 					/* I don't know whether this worth throwing an error
 					over, it's just my preference and use cases, maybe
 					tables can have a default field which gets returned
 					when the value is nil?  */
 					elf_fail(R,module_instr,"attempted to get nil field");
-				} else if (xx.tag==elf_TAG_FLOAT2) {
-					ASSERT(yy.tag==elf_TAG_STR);
+				} else if (xx.tag==elf_tag_float2) {
+					ASSERT(yy.tag==elf_tag_str);
 					if (text_eq(yy.x_str->text,"x")){
-						locals[BC_ARGX(byte)].tag=elf_TAG_NUM;
+						locals[BC_ARGX(byte)].tag=elf_tag_num;
 						locals[BC_ARGX(byte)].x_num=xx.x_f32;
 					} else if (text_eq(yy.x_str->text,"y")){
-						locals[BC_ARGX(byte)].tag=elf_TAG_NUM;
+						locals[BC_ARGX(byte)].tag=elf_tag_num;
 						locals[BC_ARGX(byte)].x_num=xx.y_f32;
 					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
-				} else if (xx.tag==elf_TAG_TAB) {
+				} else if (xx.tag==elf_tag_tab) {
 					locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
-				} else if (xx.tag==elf_TAG_OBJ) {
+				} else if (xx.tag==elf_tag_userobj) {
 					call_overload(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
-				} else if (xx.tag==elf_TAG_STR) {
+				} else if (xx.tag==elf_tag_str) {
 					elf_Int index;
 					elf_String *string;
 					/* todo: allow for indexing for substrings,
 					for instrance, "my name is"["name"] */
-					elf_type_check(R,module_instr,0,elf_TAG_INT,yy.tag);
+					elf_type_check(R,module_instr,0,elf_tag_int,yy.tag);
 					string=xx.x_str;
 					index=yy.x_int;
-					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+					locals[BC_ARGX(byte)].tag   = elf_tag_int;
 					locals[BC_ARGX(byte)].x_int = string->text[index];
-				} else if (xx.tag==elf_TAG_NIL) {
+				} else if (xx.tag==elf_tag_nil) {
 					elf_fail(R,module_instr,"attempted to get field of 'nil' value");
 				} else {
 					elf_fail(R,module_instr,elf_tpf("invalid object '%s' to perform this operator on", tag2s[yy.tag]));
@@ -606,16 +606,16 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGX(byte)];
 				yy=locals[BC_ARGY(byte)];
 				zz=locals[BC_ARGZ(byte)];
-				if (xx.tag==elf_TAG_FLOAT2) {
-					ASSERT(yy.tag==elf_TAG_STR);
+				if (xx.tag==elf_tag_float2) {
+					ASSERT(yy.tag==elf_tag_str);
 					if (text_eq(yy.x_str->text,"x")){
 						locals[BC_ARGX(byte)].x_f32=zz.x_num;
 					} else if (text_eq(yy.x_str->text,"y")){
 						locals[BC_ARGX(byte)].y_f32=zz.x_num;
 					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
-				} else if (xx.tag==elf_TAG_TAB) {
+				} else if (xx.tag==elf_tag_tab) {
 					elf_table_set(xx.x_tab,yy,zz);
-				} else if (xx.tag==elf_TAG_OBJ) {
+				} else if (xx.tag==elf_tag_userobj) {
 					elf_Value args[] = { yy, zz };
 					call_overload(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
 				} else {
@@ -633,18 +633,18 @@ int elf_run(elf_State *R) {
 				elf_Bool nan;
 
 				xx = locals[BC_ARGY(byte)];
-				nan = xx.tag != elf_TAG_INT && xx.tag != elf_TAG_NUM;
-				locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
-				locals[BC_ARGX(byte)].x_int = xx.tag == elf_TAG_NIL || (nan && xx.x_int == 0);
+				nan = xx.tag != elf_tag_int && xx.tag != elf_tag_num;
+				locals[BC_ARGX(byte)].tag   = elf_tag_int;
+				locals[BC_ARGX(byte)].x_int = xx.tag == elf_tag_nil || (nan && xx.x_int == 0);
 			} break;
 			case BC_N2I: {
 				xx=locals[BC_ARGY(byte)];
-				locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+				locals[BC_ARGX(byte)].tag   = elf_tag_int;
 				locals[BC_ARGX(byte)].x_int = VN2I(xx);
 			} break;
 			case BC_I2N: {
 				xx=locals[BC_ARGY(byte)];
-				locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;
+				locals[BC_ARGX(byte)].tag   = elf_tag_num;
 				locals[BC_ARGX(byte)].x_num = VI2N(xx);
 			} break;
 			elf_Bool eq;
@@ -652,9 +652,9 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				eq=0;
-				if ((xx.tag==elf_TAG_NIL)||(yy.tag==elf_TAG_NIL)) {
+				if ((xx.tag==elf_tag_nil)||(yy.tag==elf_tag_nil)) {
 					eq=ISNILV(xx)==ISNILV(yy);
-				} else if ((xx.tag==elf_TAG_STR)&&(yy.tag==elf_TAG_STR)) {
+				} else if ((xx.tag==elf_tag_str)&&(yy.tag==elf_tag_str)) {
 					eq=elf_get_strings_eq(xx.x_str,yy.x_str);
 				} else if ((INTORNUM(xx.tag))&&(INTORNUM(yy.tag))) {
 					eq=xx.x_int==yy.x_int;
@@ -664,7 +664,7 @@ int elf_run(elf_State *R) {
 				if (BC_OP(byte)==BC_NEQ) {
 					eq=!eq;
 				}
-				locals[BC_ARGX(byte)].tag  =elf_TAG_INT;
+				locals[BC_ARGX(byte)].tag  =elf_tag_int;
 				locals[BC_ARGX(byte)].x_int=eq;
 			} break;
 			case BC_POW: {
@@ -672,17 +672,17 @@ int elf_run(elf_State *R) {
 				yy=locals[BC_ARGZ(byte)];
 				if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {
 					NO_CODE;
-				} else if ((xx.tag==elf_TAG_NUM)||(yy.tag==elf_TAG_NUM)) {
+				} else if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
 					if (!INTORNUM(yy.tag)) {
 						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;
+					locals[BC_ARGX(byte)].tag   = elf_tag_num;
 					locals[BC_ARGX(byte)].x_num = pow(VI2N(xx),VI2N(yy));
-				} else if ((xx.tag==elf_TAG_INT)||(yy.tag==elf_TAG_INT)) {
+				} else if ((xx.tag==elf_tag_int)||(yy.tag==elf_tag_int)) {
 					if (!INTORNUM(yy.tag)) {
 						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+					locals[BC_ARGX(byte)].tag   = elf_tag_int;
 					locals[BC_ARGX(byte)].x_int = pow(VN2I(xx),VN2I(yy));
 				} else {
 					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
@@ -694,21 +694,21 @@ int elf_run(elf_State *R) {
 				yy=locals[BC_ARGZ(byte)];
 				if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {
 					NO_CODE;
-				} else if ((xx.tag == elf_TAG_NUM)||(yy.tag == elf_TAG_NUM)) {
+				} else if ((xx.tag == elf_tag_num)||(yy.tag == elf_tag_num)) {
 					if (!INTORNUM(yy.tag)) {
 						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					_check_zero_div(R,xx,yy);
 					x=VI2N(xx);
 					y=VI2N(yy);
-					locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;
+					locals[BC_ARGX(byte)].tag   = elf_tag_num;
 					locals[BC_ARGX(byte)].x_num = x - (elf_Int)(x / y) * y;
-				} else if ((xx.tag==elf_TAG_INT)||(yy.tag==elf_TAG_INT)) {
+				} else if ((xx.tag==elf_tag_int)||(yy.tag==elf_tag_int)) {
 					if (!INTORNUM(yy.tag)) {
 						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					_check_zero_div(R,xx,yy);
-					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+					locals[BC_ARGX(byte)].tag   = elf_tag_int;
 					locals[BC_ARGX(byte)].x_int = VN2I(xx) % VN2I(yy);
 				} else {
 					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
@@ -723,11 +723,11 @@ int elf_run(elf_State *R) {
 			case OPNAME : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
-				if((xx.tag==elf_TAG_INT) && (yy.tag==elf_TAG_INT)) {\
+				if((xx.tag==elf_tag_int) && (yy.tag==elf_tag_int)) {\
 					if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
 						_check_zero_div(R,xx,yy);\
 					}\
-					locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
+					locals[BC_ARGX(byte)].tag   = elf_tag_int;\
 					locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
 				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
 			} break
@@ -737,17 +737,17 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
 				float x0,y0,x1,y1;\
-				if ((xx.tag==elf_TAG_FLOAT2)||(yy.tag==elf_TAG_FLOAT2)) {\
+				if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 					\
-					if (xx.tag==elf_TAG_NUM)x0=y0=(float)xx.x_num;\
-					else if(xx.tag==elf_TAG_INT)x0=y0=(float)xx.x_int;\
+					if (xx.tag==elf_tag_num)x0=y0=(float)xx.x_num;\
+					else if(xx.tag==elf_tag_int)x0=y0=(float)xx.x_int;\
 					else x0=xx.x_f32,y0=xx.y_f32;\
 					\
-					if (yy.tag==elf_TAG_NUM)x1=y1=(float)yy.x_num;\
-					else if(yy.tag==elf_TAG_INT)x1=y1=(float)yy.x_int;\
+					if (yy.tag==elf_tag_num)x1=y1=(float)yy.x_num;\
+					else if(yy.tag==elf_tag_int)x1=y1=(float)yy.x_int;\
 					else x1=yy.x_f32,y1=yy.y_f32;\
 					\
-					locals[BC_ARGX(byte)].tag   = elf_TAG_FLOAT2;\
+					locals[BC_ARGX(byte)].tag   = elf_tag_float2;\
 					locals[BC_ARGX(byte)].x_f32 = x0 OP x1;\
 					locals[BC_ARGX(byte)].y_f32 = y0 OP y1;\
 				} else if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {\
@@ -755,11 +755,11 @@ int elf_run(elf_State *R) {
 					call_overload(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
 				} else if (INTORNUM(xx.tag) && INTORNUM(yy.tag)) {\
 					if (BC_OP(byte)==BC_DIV) _check_zero_div(R,xx,yy);\
-					if((xx.tag==elf_TAG_NUM) || (yy.tag==elf_TAG_NUM)) {\
-						locals[BC_ARGX(byte)].tag   = elf_TAG_NUM;\
+					if((xx.tag==elf_tag_num) || (yy.tag==elf_tag_num)) {\
+						locals[BC_ARGX(byte)].tag   = elf_tag_num;\
 						locals[BC_ARGX(byte)].x_num = VI2N(xx) OP VI2N(yy);\
 					}else{\
-						locals[BC_ARGX(byte)].tag   = elf_TAG_INT;\
+						locals[BC_ARGX(byte)].tag   = elf_tag_int;\
 						locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
 					}\
 				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
@@ -768,11 +768,11 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				if(INTORNUM(xx.tag) && INTORNUM(yy.tag)){
-					if ((xx.tag==elf_TAG_NUM)||(yy.tag==elf_TAG_NUM)) {
-						locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+					if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
+						locals[BC_ARGX(byte)].tag   = elf_tag_int;
 						locals[BC_ARGX(byte)].x_int = VI2N(xx) <= VI2N(yy);
 					} else {
-						locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+						locals[BC_ARGX(byte)].tag   = elf_tag_int;
 						locals[BC_ARGX(byte)].x_int = VN2I(xx) <= VN2I(yy);
 					}
 				} else INVALID_OPERANDS(xx.tag,yy.tag,<=);
@@ -781,11 +781,11 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				if(INTORNUM(xx.tag) && INTORNUM(yy.tag)){
-					if ((xx.tag==elf_TAG_NUM)||(yy.tag==elf_TAG_NUM)) {
-						locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+					if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
+						locals[BC_ARGX(byte)].tag   = elf_tag_int;
 						locals[BC_ARGX(byte)].x_int = VI2N(xx) < VI2N(yy);
 					} else {
-						locals[BC_ARGX(byte)].tag   = elf_TAG_INT;
+						locals[BC_ARGX(byte)].tag   = elf_tag_int;
 						locals[BC_ARGX(byte)].x_int = VN2I(xx) < VN2I(yy);
 					}
 				} else INVALID_OPERANDS(xx.tag,yy.tag,<);

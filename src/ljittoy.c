@@ -80,10 +80,10 @@ void jittestall() {
 
 #if 0
 void do_add(elf_Value *x, elf_Value *y) {
-	if (x->tag == elf_TAG_NUM) {
+	if (x->tag == elf_tag_num) {
 		x->n = VI2N(* x) + VI2N(* y);
 	} else
-	if (x->tag == elf_TAG_INT) {
+	if (x->tag == elf_tag_int) {
 		x->i = VN2I(* x) + VN2I(* y);
 	}
 }

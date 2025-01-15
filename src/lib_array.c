@@ -17,12 +17,12 @@ int elf_array_lib_get(elf_State *R) {
 	if (len != 0) {
 		for (int i = 0; i < elf_get_num_args(R); ++ i) {
 			if (i != 0) {
-				if (value.tag == elf_TAG_NIL) {
+				if (value.tag == elf_tag_nil) {
 					elf_fail(R,NO_BYTE,"nil object");
 				}
 				/* todo: please do much better error reporting
 				here, this can be hard to figure out */
-				if (value.tag != elf_TAG_TAB) {
+				if (value.tag != elf_tag_tab) {
 					elf_fail(R,NO_BYTE,"not a table");
 				}
 				if (tab == 0) {
@@ -75,7 +75,7 @@ int elf_lib_array_swap(elf_State *R) {
 	return 0;
 }
 
-int elf_array_lib_merge(elf_State *R) {
+int lib_array_merge(elf_State *R) {
 	elf_check_args(R,":array_merge",1
 	, "takes: the array to merge, all values of the arrays"
 	" are added into a new array");

@@ -20,7 +20,7 @@ elf_Table *elf_alloc_table2(elf_State *R, elf_Int ntotal) {
 
 	table->ntotal = ntotal;
 	table->nslots = 0;
-	table->slots = calloc_memory(GLOBAL_ALLOCATOR,ntotal*sizeof(tabentryT));
+	table->slots = calloc_memory(GLOBAL_ALLOCATOR,ntotal*sizeof(elf_Entry));
 	return table;
 }
 
@@ -36,7 +36,7 @@ static elf_Int slot2index(elf_Table *table, elf_Int slot) {
 
 
 #define slot2value(T,X) (T->array[T->slots[X].idx])
-#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_TAG_NIL))
+#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_tag_nil))
 
 
 void elf_free_table_contents(elf_Table *tab) {
@@ -69,7 +69,7 @@ elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	if (slotiskey(tab,slot)) {
 		return slot2value(tab,slot);
 	}
-	return (elf_Value){elf_TAG_NIL,0};
+	return (elf_Value){elf_tag_nil,0};
 }
 
 
@@ -80,37 +80,36 @@ since the increment depends on the data, it should reduce
 clustering. */
 elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
-	tabentryT *slots = tab->slots;
+	elf_Entry *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 hash = elf_hash_value(key);
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
-	elf_Hash walk = elf_rehash(hash)|1;
+	elf_i64 walk = elf_rehash(hash)|1;
 	elf_Value value;
 	do {
 		value=slots[tail].key;
-		if ((value.tag==elf_TAG_NIL)||(elf_value_eq(&value,&key))){
+		if ((value.tag==elf_tag_nil)||(elf_value_eq(&value,&key))){
 			return tail;
 		}
 		tail = (tail+walk) % ntotal;
-		// DEBUG_CODE( tab->ncollisions ++ );
 	} while(head != tail);
 	return -1;
 }
 
 
 elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf_Hash hash) {
-	tabentryT *slots = tab->slots;
+	elf_Entry *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
 	elf_Hash walk = elf_rehash(hash)|1;
 	do {
 		elf_Value x = slots[tail].key;
-		if (x.tag==elf_TAG_NIL) {
+		if (x.tag==elf_tag_nil) {
 			return tail;
 		}
-		if (x.tag==elf_TAG_STR) {
+		if (x.tag==elf_tag_str) {
 			if (x.x_str->text==text) {
 				return tail;
 			}
@@ -132,13 +131,13 @@ void elf_check_table(elf_Table *table) {
 		elf_Table new_table = *table;
 		new_table.ntotal=table->ntotal << 2;
 		if (new_table.ntotal<table->ntotal) NO_CODE;
-		new_table.slots=calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(tabentryT));
+		new_table.slots=calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(elf_Entry));
 
-		tabentryT old_slot;
+		elf_Entry old_slot;
 		elf_Int new_slot;
 		FOR_RANGE(i,0,table->ntotal) {
 			old_slot=table->slots[i];
-			if (old_slot.key.tag==elf_TAG_NIL) continue;
+			if (old_slot.key.tag==elf_tag_nil) continue;
 
 			new_slot=elf_table_try(&new_table,old_slot.key);
 			ASSERT(new_slot>=0);
@@ -157,7 +156,7 @@ elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
-	tabentryT *entry = table->slots + slot;
+	elf_Entry *entry = table->slots + slot;
 	if (!slotiskey(table,slot)) {
 		elf_Int i = ARRAY_GROW(table->array,1);
 		table->array[i] = v;
@@ -179,7 +178,7 @@ elf_Value elf_table_get(elf_Table *tab, elf_Value k) {
 	if (slotiskey(tab,slot)) {
 		return slot2value(tab,slot);
 	}
-	return (elf_Value){elf_TAG_NIL,0};
+	return (elf_Value){elf_tag_nil,0};
 }
 
 
@@ -230,8 +229,8 @@ void elf_array_add(elf_Table *table, elf_Value v) {
 void elf_merge_tables(elf_Table *tab, elf_Table *merger) {
 	elf_Int i;
 	for (i=0;i<merger->ntotal;++i) {
-		tabentryT it = merger->slots[i];
-		if (it.key.tag == elf_TAG_NIL) continue;
+		elf_Entry it = merger->slots[i];
+		if (it.key.tag == elf_tag_nil) continue;
 		elf_table_set(tab,it.key,merger->array[it.idx]);
 	}
 }
@@ -268,14 +267,14 @@ elf_Hash elf_hash_ptr(void *p) {
 
 elf_Int elf_hash_value(elf_Value v) {
 	switch (v.tag) {
-		case elf_TAG_STR: {
+		case elf_tag_str: {
 			ASSERT(v.x_str != 0);
 			ASSERT(v.x_str->hash != 0);
 			return v.x_str->hash;
 		}
-		case elf_TAG_OBJ:
-		case elf_TAG_TAB: case elf_TAG_CLS: case elf_TAG_SYS:
-		case elf_TAG_INT: case elf_TAG_NUM: case elf_TAG_CFN: {
+		case elf_tag_userobj:
+		case elf_tag_tab: case elf_tag_closure: case elf_tag_sysobj:
+		case elf_tag_int: case elf_tag_num: case elf_tag_proc: {
 			return elf_hash_ptr(v.x_ptr);
 		}
 		default: NO_CODE;
@@ -289,12 +288,12 @@ elf_Bool elf_value_eq(elf_Value *x, elf_Value *y) {
 		return 0;
 	}
 	switch (x->tag) {
-		case elf_TAG_STR: {
+		case elf_tag_str: {
 			return elf_get_strings_eq(x->x_str,y->x_str);
 		}
-		case elf_TAG_OBJ:
-		case elf_TAG_SYS: case elf_TAG_INT: case elf_TAG_NUM:
-		case elf_TAG_TAB: case elf_TAG_CLS: case elf_TAG_CFN: {
+		case elf_tag_userobj:
+		case elf_tag_sysobj: case elf_tag_int: case elf_tag_num:
+		case elf_tag_tab: case elf_tag_closure: case elf_tag_proc: {
 			return x->x_int == y->x_int;
 		}
 		default: NO_CODE;

@@ -53,7 +53,7 @@ _(TREE_WHILE_LOOP)   \
 _(STAT_DO_WHILE)     \
 _(TREE_RANGE)        \
 _(EXPR_RANGE_INDEX)  \
-_(EXPR_MULTI)        \
+_(TREE_TUPLE)        \
 _(TREE_RET)          \
 /* end */
 

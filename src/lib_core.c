@@ -81,7 +81,7 @@ int core_lib_load_expr(elf_State *R) {
 
 // mostly experimental...
 int core_lib_float2(elf_State *R) {
-	elf_Value v={elf_TAG_FLOAT2};
+	elf_Value v={elf_tag_float2};
 	v.x_f32=(float)elf_get_num(R,0);
 	v.y_f32=v.x_f32;
 	if (elf_get_num_args(R)>1){
@@ -271,10 +271,10 @@ int core_lib_include(elf_State *R) {
 	todo: */
 
 	elf_Table *globals = R->M->globals;
-	tabentryT entry;
+	elf_Entry entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
-		if (entry.key.tag == elf_TAG_STR) {
+		if (entry.key.tag == elf_tag_str) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);
@@ -340,7 +340,7 @@ int core_lib_close_file(elf_State *R) {
 }
 
 int core_lib_get_file_size(elf_State *R) {
-	ASSERT(elf_get_tag(R,0) == elf_TAG_SYS);
+	ASSERT(elf_get_tag(R,0) == elf_tag_sysobj);
 
 	elf_Handle file = (FILE*) elf_get_sys(R,0);
 	fseek(file,0,SEEK_END);
@@ -460,18 +460,18 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 	// todo:
 	if(tab->nslots) {
 		for (elf_i64 i = 0; i < tab->ntotal; ++ i) {
-			tabentryT slot = tab->slots[i];
-			if (slot.key.tag == elf_TAG_NIL) {
+			elf_Entry slot = tab->slots[i];
+			if (slot.key.tag == elf_tag_nil) {
 				continue;
 			}
 			elf_Value v = tab->array[slot.idx];
-			if ((v.tag == elf_TAG_CLS) || (v.tag == elf_TAG_CFN)) {
+			if ((v.tag == elf_tag_closure) || (v.tag == elf_tag_proc)) {
 				continue;
 			}
 			if (nitems ++ != 0) fprintf(io,",");
 			fpf_value(io,slot.key,1);
 			fprintf(io," = ");
-			if (v.tag == elf_TAG_TAB) {
+			if (v.tag == elf_tag_tab) {
 				elf_unload(io,v.x_tab,level+1);
 			} else {
 				fpf_value(io,v,1);
@@ -481,7 +481,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 		FOR_ARRAY(i,tab->array) {
 			elf_Value v = tab->array[i];
 			fprintf(io,"%lli = ",i);
-			if (v.tag==elf_TAG_TAB) {
+			if (v.tag==elf_tag_tab) {
 				elf_unload(io,v.x_tab,level+1);
 			} else {
 				fpf_value(io,v,1);
@@ -503,7 +503,7 @@ int core_lib_unload(elf_State *S) {
 // DEPRECATED SHOULD BE INTRINSIC
 int core_lib_iton(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
-	if (v.tag==elf_TAG_INT) {
+	if (v.tag==elf_tag_int) {
 		elf_add_num(R,(elf_Num)v.x_int);
 	} else elf_add_num(R,v.x_num);
 	return 1;
@@ -513,7 +513,7 @@ int core_lib_iton(elf_State *R) {
 // DEPRECATED SHOULD BE INTRINSIC
 int core_lib_ntoi(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
-	if (v.tag==elf_TAG_NUM) {
+	if (v.tag==elf_tag_num) {
 		elf_add_int(R,(elf_Int)v.x_num);
 	} else elf_add_int(R,v.x_int);
 	return 1;

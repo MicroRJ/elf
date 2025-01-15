@@ -107,7 +107,7 @@ static treeID tree_call(elf_Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,TREE_CALL,NT_ANY,x,NO_TREE,z);
 }
 static treeID tree_multi(elf_Parser *parser, Source line, treeID *z) {
-	return tree_xyz(parser,line,EXPR_MULTI,NT_ANY,NO_TREE,NO_TREE,z);
+	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY,NO_TREE,NO_TREE,z);
 }
 
 static treeID tree_assign_mem(elf_Parser *parser, Source line, treeID x) {
@@ -142,7 +142,7 @@ static treeID tree_meta_call(elf_Parser *parser, Source line, treeID x, treeID *
 	return tree_call(parser,line,field,z);
 }
 
-static treeID tree_upvalue_ref(elf_Parser *parser, Source line, int x) {
+static treeID tree_closure_value(elf_Parser *parser, Source line, int x) {
 	treeID v;
 	v=tree_nullary(parser,line,TREE_UPVALUE,NT_ANY);
 	v->expr_upvalue=x;

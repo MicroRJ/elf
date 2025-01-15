@@ -432,19 +432,18 @@ static treeID parse_unary(elf_Parser *parser, bool flags) {
 				// check if we have to capture this thing
 				treeID enc=parser->enc;
 				if (entity.scope<enc->expr_fun.scope) {
-					int upvalue_index;
-					upvalue_index = -1;
+					int index = -1;
 					// check if we've captured this already
 					FOR_ARRAY(i,enc->expr_fun.capts) {
 						if (enc->expr_fun.capts[i] == entity.tree){
-							upvalue_index = i;
+							index = i;
 							goto already_captured;
 						}
 					}
-					upvalue_index=ARRAY_LENGTH(enc->expr_fun.capts);
+					index=ARRAY_LENGTH(enc->expr_fun.capts);
 					ARRAY_ADD(enc->expr_fun.capts,entity.tree);
 					already_captured:
-					v=tree_upvalue_ref(parser,tok.line,upvalue_index);
+					v=tree_closure_value(parser,tok.line,index);
 
 					enc=enc->expr_fun.enc;
 					if (entity.scope<enc->expr_fun.scope) {
@@ -581,7 +580,7 @@ static treeID *parse_args(elf_Parser *parser) {
 			x=parse_expr(parser,0);
 			if(x!=NO_TREE){
 				// desugar multi expressions
-				if (get_tree_kind(parser,x)==EXPR_MULTI) {
+				if (get_tree_kind(parser,x)==TREE_TUPLE) {
 					n=get_tree(parser,x).z;
 					FOR_ARRAY(i,n){
 						ARRAY_ADD(z,n[i]);
@@ -645,7 +644,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 					if (x==NO_TREE) break;
 					/* registry[location.(y,x)] ->
 					registry[location.y,location.x] */
-					if (get_tree_kind(parser,x)==EXPR_MULTI) {
+					if (get_tree_kind(parser,x)==TREE_TUPLE) {
 						z=get_tree(parser,x).z;
 						FOR_ARRAY(i,z) {
 							v=tree_index(parser,tok.line,v,z[i]);
@@ -768,7 +767,7 @@ static treeID *parse_expr_list(elf_Parser *parser) {
 	treeID y,*yz,*z=0;
 	do{
 		y=parse_expr(parser,0);
-		if(get_tree_kind(parser,y)==EXPR_MULTI) {
+		if(get_tree_kind(parser,y)==TREE_TUPLE) {
 			yz=get_tree(parser,y).z;
 			FOR_ARRAY(i,yz) ARRAY_ADD(z,yz[i]);
 		} else {
@@ -939,9 +938,7 @@ static int parse_stat(elf_Parser *parser) {
 			block_add(parser,v);
 		} break;
 		default: {
-			if(parser->tok.type==TK_WORD
-			&& (parser->tok_prox.type==TK_BIND
-			||	 parser->tok_prox.type==TK_HARD_BIND))
+			if(parser->tok.type==TK_WORD && (parser->tok_prox.type==TK_BIND || parser->tok_prox.type==TK_HARD_BIND))
 			{
 				char *name;
 				name=take_tok(parser,TK_WORD).text;

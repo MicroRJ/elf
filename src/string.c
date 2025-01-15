@@ -71,8 +71,8 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 		elf_check_table(registry);
 		elf_Int slot=elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
-		tabentryT entry=registry->slots[slot];
-		if (entry.key.tag != elf_TAG_NIL) {
+		elf_Entry entry=registry->slots[slot];
+		if (entry.key.tag != elf_tag_nil) {
 			elf_Value target=registry->array[registry->slots[slot].idx];
 			string=target.x_str;
 		} else {
@@ -158,13 +158,13 @@ int string_lib_append(elf_State *R) {
 	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elf_get_num_args(R); ++ i) {
 		elf_Value v = elf_get_arg(R,i);
-		if (v.tag == elf_TAG_STR) {
+		if (v.tag == elf_tag_str) {
 			strcatf(buffer,"%s",v.x_str->text);
-		} else if (v.tag == elf_TAG_NIL) {
+		} else if (v.tag == elf_tag_nil) {
 			strcatf(buffer,"nil");
-		} else if (v.tag == elf_TAG_NUM) {
+		} else if (v.tag == elf_tag_num) {
 			strcatf(buffer,"%.2f",v.x_num);
-		} else if (v.tag == elf_TAG_INT) {
+		} else if (v.tag == elf_tag_int) {
 			strcatf(buffer,"%lli",v.x_int);
 		} else NO_CODE;
 	}

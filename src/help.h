@@ -92,23 +92,21 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 #define NO_BYTE (-1)
 
 
-#define ISOBJT(tag) ((tag)>=elf_TAG_OBJ)
-#define INTORNUM(tag) (((tag)==elf_TAG_NUM)||((tag)==elf_TAG_INT))
-#define CAN_CALL(tag) (((tag)==elf_TAG_CLS)||((tag)==elf_TAG_CFN))
+#define ISOBJT(tag) ((tag)>=elf_tag_userobj)
+#define INTORNUM(tag) (((tag)==elf_tag_num)||((tag)==elf_tag_int))
+#define CAN_CALL(tag) (((tag)==elf_tag_closure)||((tag)==elf_tag_proc))
+#define ISNILV(X) (((X).tag==elf_tag_nil)||(ISOBJT((X).tag)&&(X).x_obj==0))
 
 
-#define ISNILV(X) (((X).tag==elf_TAG_NIL)||(ISOBJT((X).tag)&&(X).x_obj==0))
-
-
-#define VI2N(X) (((X).tag==elf_TAG_INT) ? (elf_Num) (X).x_int : (X).x_num)
-#define VN2I(X) (((X).tag==elf_TAG_NUM) ? (elf_Int) (X).x_num : (X).x_int)
+#define VI2N(X) (((X).tag==elf_tag_int) ? (elf_Num) (X).x_int : (X).x_num)
+#define VN2I(X) (((X).tag==elf_tag_num) ? (elf_Int) (X).x_num : (X).x_int)
 
 
 #define POBJ(thing) ((elf_Node*)(thing))
 #define OBJ_COLOR(thing) (POBJ(thing)->color)
 
 
-#define OBJ2V(ty) (elf_TAG_OBJ+ty)
+#define OBJ2V(ty) (elf_tag_userobj+ty)
 
 
 #define GET_FRAME(S) ((S)->frame)
@@ -126,21 +124,15 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 #endif
 
 
-#define VNIL() (XLITERAL(elf_Value){elf_TAG_NIL})
-#define VNUM(thing) (XLITERAL(elf_Value){ elf_TAG_NUM, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
-#define VINT(thing) (XLITERAL(elf_Value){ elf_TAG_INT, {(elf_Int) UCAST(thing, elf_Int)} })
-#define VSYS(thing) (XLITERAL(elf_Value){ elf_TAG_SYS, {(elf_Int) UCAST(thing, elf_Handle)} })
-#define VTAB(thing) (XLITERAL(elf_Value){ elf_TAG_TAB, {(elf_Int) UCAST(thing, elf_Table *)} })
+#define VNIL() (XLITERAL(elf_Value){elf_tag_nil})
+#define VNUM(thing) (XLITERAL(elf_Value){ elf_tag_num, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
+#define VINT(thing) (XLITERAL(elf_Value){ elf_tag_int, {(elf_Int) UCAST(thing, elf_Int)} })
+#define VSYS(thing) (XLITERAL(elf_Value){ elf_tag_sysobj, {(elf_Int) UCAST(thing, elf_Handle)} })
+#define VTAB(thing) (XLITERAL(elf_Value){ elf_tag_tab, {(elf_Int) UCAST(thing, elf_Table *)} })
 #define VOBJ(thing) (XLITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Node *)} })
-#define VSTR(thing) (XLITERAL(elf_Value){ elf_TAG_STR, {(elf_Int) UCAST(thing, elf_String *)} })
-#define VCLS(thing) (XLITERAL(elf_Value){ elf_TAG_CLS, {(elf_Int) UCAST(thing, elf_Closure *)} })
-#define VCFN(thing) (XLITERAL(elf_Value){ elf_TAG_CFN, {(elf_Int) UCAST(thing, elf_Function)} })
+#define VSTR(thing) (XLITERAL(elf_Value){ elf_tag_str, {(elf_Int) UCAST(thing, elf_String *)} })
+#define VCLS(thing) (XLITERAL(elf_Value){ elf_tag_closure, {(elf_Int) UCAST(thing, elf_Closure *)} })
+#define VCFN(thing) (XLITERAL(elf_Value){ elf_tag_proc, {(elf_Int) UCAST(thing, elf_Function)} })
 
-
-static char const *tag2s[] = {
-	"NIL","NUM","INT",
-	"SYS","CFN","FLOAT2",
-	"OBJ","CLS","STR","TAB"
-};
 
 

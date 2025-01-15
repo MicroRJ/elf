@@ -58,7 +58,6 @@ typedef double 			   elf_Num;
 typedef void 			     *elf_Handle;
 typedef int 					elf_Error;
 typedef int 				   elf_StackId;
-typedef int 				   elf_SymbolId;
 typedef unsigned int 		elf_Hash;
 
 
@@ -90,17 +89,32 @@ typedef struct elf_File {
 objects come after it, same order as object
 types... */
 typedef enum {
-	elf_TAG_NIL=0,
-	elf_TAG_NUM,
-	elf_TAG_INT,
-	elf_TAG_SYS,
-	elf_TAG_CFN,
-	elf_TAG_FLOAT2,
-	elf_TAG_OBJ,
-	elf_TAG_CLS,
-	elf_TAG_STR,
-	elf_TAG_TAB
-} elf_ValueTag;
+	elf_tag_nil=0,
+	elf_tag_tomb,
+	elf_tag_num,
+	elf_tag_int,
+	elf_tag_sysobj,
+	elf_tag_proc,
+	elf_tag_float2,
+	elf_tag_userobj,
+	elf_tag_closure,
+	elf_tag_str,
+	elf_tag_tab,
+} elf_tagenum;
+
+static char const *tag2s[] = {
+	"nil",
+	"tomb",
+	"num",
+	"int",
+	"sysobj",
+	"proc",
+	"float2",
+	"userobj",
+	"closure",
+	"str",
+	"tab",
+};
 
 
 typedef enum elf_GCTy {
@@ -154,17 +168,17 @@ typedef struct elf_String {
 } elf_String;
 
 
-typedef struct tabentryT {
+typedef struct elf_Entry {
 	elf_Value key;
 	elf_Int   idx;
-} tabentryT;
+} elf_Entry;
 
 typedef struct elf_Table {
 	elf_Node      obj;
 	elf_Int    ntotal;
 	elf_Int    nslots;
 	elf_Int    ndebug;
-	tabentryT  *slots;
+	elf_Entry  *slots;
 	elf_Value  *array;
 } elf_Table;
 
@@ -207,7 +221,7 @@ elAPI elf_Handle   elf_get_sys(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
 
 elAPI int elf_get_num_args(elf_State *S);
-elAPI elf_ValueTag elf_get_tag(elf_State *S, int x);
+elAPI elf_tagenum elf_get_tag(elf_State *S, int x);
 elAPI void elf_check_args(elf_State *S, char *func, int nargs, char *usage);
 
 /* allocating objects */
