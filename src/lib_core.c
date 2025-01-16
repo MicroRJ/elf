@@ -12,11 +12,16 @@ static int core_lib_const_expr(elf_State *R) {
 	return ret < 0 ? 0 : ret;
 }
 
-static elf_String *_read_file_io(elf_State *R, FILE *io) {
-	fseek(io,0,SEEK_END);
-	elf_i64 size = ftell(io);
+static elf_String *_read_file_io(elf_State *R, FILE *io, int size, int pos) {
+	if (pos != -1) fseek(io,pos,SEEK_SET);
+	if (size == -1) {
+		fseek(io,0,SEEK_END);
+		size = ftell(io);
+		fseek(io,0,SEEK_SET);
+	}
+
 	elf_String *contents = elf_new_string2(R,size);
-	fseek(io,0,SEEK_SET);
+	// fseek(io,0,SEEK_SET);
 	fread(contents->text,1,size,io);
 	return contents;
 }
@@ -25,11 +30,11 @@ static int _write_file_io(elf_State *R, FILE *io, char *text) {
 	return fwrite(text,1,strlen(text),io);
 }
 
-static elf_String *_read_file(elf_State *R, char *name) {
+static elf_String *_read_file(elf_State *R, char *name, int size, int pos) {
 	elf_String *contents = 0;
 	FILE *file = fopen(name,"rb");
 	if (file) {
-		contents = _read_file_io(R,file);
+		contents = _read_file_io(R,file,size,pos);
 		fclose(file);
 		elf_debug_log("'%s': file read successfully",name);
 	} else {
@@ -51,12 +56,9 @@ static int _write_file(elf_State *R, char *name, char *text) {
 	return wrote;
 }
 
-static int _call_file(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name) {
-	elf_String *contents = _read_file(R,name->text);
-	if(!contents) {
-		nrets = 0;
-		goto esc;
-	}
+static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents) {
+	ASSERT(contents);
+	ASSERT(name);
 
 	// todo: parse and gen file should just be one function,
 	// or maybe just have the one 'parse' function...
@@ -91,19 +93,53 @@ static int _call_file(elf_State *R, bool as_expr, int nargs, int nrets, elf_Stri
 }
 
 int core_lib_load_file(elf_State *R) {
-	elf_String *name = elf_get_string(R,0);
-	int nargs = elf_get_num_args(R) - 1;
+	elf_String *name, *contents;
+	FILE *file;
+	int auto_close = false;
+	int pos = -1;
+	int size = -1;
+	if(elf_get_tag(R,0) == elf_tag_str) {
+		name = elf_get_string(R,0);
+		file = fopen(name->text,"rb");
+		auto_close = true;
+	} else {
+		name = elf_new_string(R,"no name");
+		file = (FILE *) elf_get_sysobj(R,0);
+	}
+	if (elf_get_num_args(R) > 1) {
+		size = elf_get_int(R,1);
+		if (elf_get_num_args(R) > 2) {
+			pos = elf_get_int(R,2);
+		}
+	}
+	contents = _read_file_io(R,file,size,pos);
+
+	int nargs = 1; // elf_get_num_args(R) - 1;
 	int nrets = elf_get_num_rets(R);
-	nrets = _call_file(R,false,nargs,nrets,name);
+	nrets = _exec(R,false,nargs,nrets,name,contents);
+
+	if (auto_close) {
+		fclose(file);
+	}
 	return nrets;
 }
 
 
 int core_lib_load_expr(elf_State *R) {
-	elf_String *name = elf_get_string(R,0);
+	elf_String *name, *contents;
+	int pos=-1,size=-1;
+
+	if(elf_get_tag(R,0) == elf_tag_str) {
+		name = elf_get_string(R,0);
+		contents = _read_file(R,name->text,size,pos);
+	} else {
+		name = elf_new_string(R,"no name");
+		contents = _read_file_io(R,(FILE *)elf_get_sysobj(R,0),size,pos);
+	}
+
 	int nargs = elf_get_num_args(R) - 1;
 	int nrets = elf_get_num_rets(R);
-	nrets = _call_file(R,true,nargs,nrets,name);
+	nrets = _exec(R,true,nargs,nrets,name,contents);
 	return nrets;
 }
 
@@ -378,16 +414,18 @@ int core_lib_get_file_size(elf_State *R) {
 	}
 	fseek(file,0,SEEK_END);
 	int size = ftell(file);
+	fseek(file,0,SEEK_SET);
 	elf_push_integer(R,size);
 	return 1;
 }
 
 int core_lib_read_file(elf_State *R) {
 	elf_String *contents = 0;
+	int pos=-1,size=-1;
 	if(elf_get_tag(R,0) == elf_tag_str) {
-		contents = _read_file(R,elf_get_text(R,0));
+		contents = _read_file(R,elf_get_text(R,0),size,pos);
 	} else {
-		contents = _read_file_io(R,elf_get_sysobj(R,0));
+		contents = _read_file_io(R,elf_get_sysobj(R,0),size,pos);
 	}
 	elf_push_string(R,contents);
 	return 1;
