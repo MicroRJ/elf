@@ -151,7 +151,7 @@ static void _check_zero_div(elf_State *S, elf_Value xx, elf_Value yy) {
 }
 
 
-static int call_overload(elf_State *S, elf_Node *obj, char const *name, int reg, int nargs, elf_Value *args) {
+static int call_overload(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
 	if (obj->meta == 0) {
 		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
@@ -173,7 +173,7 @@ static int call_overload(elf_State *S, elf_Node *obj, char const *name, int reg,
 
 
 /* returns number of objects uniquely marked */
-elf_Int elf_mark_object(elf_Node *obj) {
+elf_Int elf_mark_object(elf_Object *obj) {
 	ASSERT(obj != 0);
 	ASSERT(obj->color != elf_GC_RED);
 	/* black object simply means it was
@@ -198,7 +198,7 @@ elf_Int elf_mark_object(elf_Node *obj) {
 		OBJ_COLOR(obj) = elf_GC_BLACK;
 	}
 	if (obj->meta) {
-		num += elf_mark_object((elf_Node*)obj->meta);
+		num += elf_mark_object((elf_Object*)obj->meta);
 	}
 	if (obj->type == GC_CLS) {
 		elf_Closure *cls = (elf_Closure*) obj;
@@ -259,14 +259,14 @@ elf_Int elf_free_phase(elf_State *R) {
 	R->collector.phase^=1;
 
 
-	elf_Node **new_objects=R->collector.new_objects;
-	elf_Node **objects=R->collector.objects;
+	elf_Object **new_objects=R->collector.new_objects;
+	elf_Object **objects=R->collector.objects;
 	if (new_objects) {
 		ARRAY_SET_MIN(new_objects,0);
 	}
 	elf_Int n = 0;
 	FOR_ARRAY(i,objects) {
-		elf_Node *it = objects[i];
+		elf_Object *it = objects[i];
 		ASSERT(it != 0);
 		if ((OBJ_COLOR(it) == elf_GC_RED) || (OBJ_COLOR(it) == elf_GC_TRAP)) {
 #if 0
@@ -361,7 +361,7 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_Int size) {
 	R->collector.memory_allocated+=size;
 	elf_collect(R);
 
-	elf_Node *obj;
+	elf_Object *obj;
 
 	obj=calloc_memory(GLOBAL_ALLOCATOR,size);
 	obj->color=R->collector.phase;

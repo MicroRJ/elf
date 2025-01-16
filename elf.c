@@ -81,7 +81,7 @@ typedef char *Source;
 
 
 typedef struct elf_Closure {
-	elf_Node       obj;
+	elf_Object       obj;
 	elf_Proto   proto;
 	elf_Value  values[1];
 } elf_Closure;
@@ -130,8 +130,8 @@ typedef struct elf_Collector {
 	int          phase;
 	elf_Int      memory_allocated;
 	elf_Int      memory_threshold;
-	elf_Node **new_objects;
-	elf_Node **objects;
+	elf_Object **new_objects;
+	elf_Object **objects;
 	/* this changes dynamically based on
 	object min threshold, it tends to
 	be around there... */

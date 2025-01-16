@@ -4,8 +4,8 @@
 */
 
 
-elf_Node *elf_new_object(elf_State *R, elf_Int size) {
-	elf_Node *obj=elf_alloc_object(R,GC_OBJ,size);
+elf_Object *elf_new_object(elf_State *R, elf_Int size) {
+	elf_Object *obj=elf_alloc_object(R,GC_OBJ,size);
 	elf_add_obj(R,obj);
 	return obj;
 }
@@ -59,7 +59,7 @@ elf_tagenum elf_get_tag(elf_State *S, int x) {
 }
 
 
-elf_Node *elf_get_this(elf_State *S) {
+elf_Object *elf_get_this(elf_State *S) {
 	return GET_FRAME(S)->locals[0].x_obj;
 }
 
@@ -84,12 +84,12 @@ void elf_push_closure(elf_State *S, elf_Closure *x) {
 }
 
 
-void elf_add_obj(elf_State *S, elf_Node *x) {
+void elf_add_obj(elf_State *S, elf_Object *x) {
 	if (x) PUSHV(S,VOBJ(x)); else PUSHV(S,VNIL());
 }
 
 
-void elf_push_function(elf_State *S, elf_Function x) {
+void elf_push_proc(elf_State *S, elf_Function x) {
 	PUSHV(S,VCFN(x));
 }
 
@@ -137,7 +137,7 @@ char *elf_get_text(elf_State *R, elf_StackId x) {
 }
 
 
-elf_Node *elf_get_obj(elf_State *R, elf_StackId x) {
+elf_Object *elf_get_obj(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (ISOBJT(v.tag)) return v.x_obj;

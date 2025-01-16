@@ -24,7 +24,7 @@ e*/
 
 typedef struct elf_Module 	elf_Module;
 typedef struct elf_State 	elf_State;
-typedef struct elf_Node 	elf_Node;
+typedef struct elf_Object 	elf_Object;
 typedef struct elf_Table 	elf_Table;
 typedef struct elf_String 	elf_String;
 typedef struct elf_Closure elf_Closure;
@@ -129,7 +129,7 @@ enum {
 	elf_GC_TRAP,
 };
 
-struct elf_Node {
+struct elf_Object {
 	elf_i8      type;
 	elf_i8     color;
 	elf_i16     size;
@@ -149,7 +149,7 @@ typedef struct elf_Value {
 			void           *x_ptr;
 			elf_Handle      x_sys;
 			elf_Closure    *x_cls;
-			elf_Node       *x_obj;
+			elf_Object       *x_obj;
 			elf_Table      *x_tab;
 			elf_String     *x_str;
 			elf_Function    x_fun;
@@ -161,7 +161,7 @@ typedef struct elf_Value {
 
 
 typedef struct elf_String {
-	elf_Node       obj;
+	elf_Object       obj;
 	elf_Hash      hash;
 	int     	   length;
 	char       text[1];
@@ -174,7 +174,7 @@ typedef struct elf_Entry {
 } elf_Entry;
 
 typedef struct elf_Table {
-	elf_Node      obj;
+	elf_Object      obj;
 	elf_Int    ntotal;
 	elf_Int    nslots;
 	elf_Int    ndebug;
@@ -189,7 +189,7 @@ elAPI void elf_init(elf_State *S, elf_Module *M);
 elAPI elf_Closure *elf_new_closure(elf_State *, elf_Proto fn);
 elAPI elf_String *elf_new_string2(elf_State *, elf_Int length);
 elAPI elf_String *elf_new_string(elf_State *, const char *text);
-elAPI elf_Node *elf_new_object(elf_State *, elf_Int size);
+elAPI elf_Object *elf_new_object(elf_State *, elf_Int size);
 elAPI elf_Table *elf_new_table(elf_State *);
 
 
@@ -199,23 +199,23 @@ elAPI void elf_push(elf_State *S, elf_Value value);
 elAPI void elf_push_nil(elf_State *S);
 elAPI void elf_push_integer(elf_State *S, elf_Int);
 elAPI void elf_push_number(elf_State *S, elf_Num);
-elAPI void elf_add_obj(elf_State *S, elf_Node *);
+elAPI void elf_add_obj(elf_State *S, elf_Object *);
 elAPI void elf_push_string(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
 elAPI void elf_push_table(elf_State *S, elf_Table *);
 elAPI void elf_push_closure(elf_State *S, elf_Closure *);
-elAPI void elf_push_function(elf_State *S, elf_Function);
+elAPI void elf_push_proc(elf_State *S, elf_Function);
 
 
 /* getting arguments from stack */
-elAPI elf_Node  *elf_get_this(elf_State *S);
+elAPI elf_Object  *elf_get_this(elf_State *S);
 
 elAPI elf_Value    elf_get_arg(elf_State *S, int arg);
 elAPI elf_Int      elf_get_int(elf_State *S, int arg);
 elAPI elf_Num      elf_get_num(elf_State *S, int arg);
 elAPI elf_String  *elf_get_string(elf_State *S, int arg);
 elAPI char        *elf_get_text(elf_State *S, int arg);
-elAPI elf_Node    *elf_get_obj(elf_State *S, int arg);
+elAPI elf_Object    *elf_get_obj(elf_State *S, int arg);
 elAPI elf_Table   *elf_get_table(elf_State *S, int arg);
 elAPI elf_Handle   elf_get_sysobj(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
@@ -271,7 +271,7 @@ elAPI int elf_call(elf_State *S, int nargs, int nrets);
 
 /* todo: why are these public */
 elf_Int elf_trigger_collection_cycle(elf_State *S);
-elf_Int elf_mark_object(elf_Node *obj);
+elf_Int elf_mark_object(elf_Object *obj);
 
 /* Todo: why are we exposing any of this */
 

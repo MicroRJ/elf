@@ -177,7 +177,7 @@ int table_lib_xdelete(elf_State *R) {
 	elf_Int len = ARRAY_LENGTH(tab->array);
 	if (len != 0) {
 		if (ISOBJT(elf_get_tag(R,0))) {
-			elf_Node *object = elf_get_obj(R,0);
+			elf_Object *object = elf_get_obj(R,0);
 			/* todo: Speed */
 			elf_Value *item = 0;
 			elf_Int idx;
@@ -219,7 +219,7 @@ int table_lib_xremove(elf_State *R) {
 
 	if (len != 0) {
 		if (ISOBJT(elf_get_tag(R,0))) {
-			elf_Node *object = elf_get_obj(R,0);
+			elf_Object *object = elf_get_obj(R,0);
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */

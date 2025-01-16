@@ -169,7 +169,7 @@ int core_lib_tagof(elf_State *R) {
 
 
 int core_lib_get_object_color(elf_State *R) {
-	elf_Node *obj = elf_get_obj(R,0);
+	elf_Object *obj = elf_get_obj(R,0);
 	int color = obj->color;
 	elf_new_string(R,
 	color == elf_GC_BLACK ? "black" :
@@ -370,11 +370,15 @@ int core_lib_close_file(elf_State *R) {
 }
 
 int core_lib_get_file_size(elf_State *R) {
-	ASSERT(elf_get_tag(R,0) == elf_tag_sysobj);
-
-	elf_Handle file = (FILE*) elf_get_sysobj(R,0);
+	FILE *file;
+	if(elf_get_tag(R,0) == elf_tag_str) {
+		file = fopen(elf_get_text(R,0),"rb");
+	} else {
+		file = (FILE *) elf_get_sysobj(R,0);
+	}
 	fseek(file,0,SEEK_END);
-	elf_push_integer(R,ftell(file));
+	int size = ftell(file);
+	elf_push_integer(R,size);
 	return 1;
 }
 
@@ -482,16 +486,14 @@ int core_lib_sleep(elf_State *S) {
 	return 0;
 }
 
-
 static elf_f64 _time_diff_s(elf_i64 time) {
 	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
 }
 
-int core_lib_clocktime(elf_State *rt) {
-	elf_push_integer(rt,sys_get_clock_time());
+int core_lib_clocktime(elf_State *R) {
+	elf_push_integer(R,sys_get_clock_time());
 	return 1;
 }
-
 
 int core_lib_timediffs(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
@@ -499,7 +501,6 @@ int core_lib_timediffs(elf_State *S) {
 	elf_push_number(S,_time_diff_s(time));
 	return 1;
 }
-
 
 int core_lib_timediffms(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
