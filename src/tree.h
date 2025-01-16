@@ -33,6 +33,9 @@ _(EXPR_NIL_AND)      \
 _(EXPR_NIL_OR)       \
 _(TREE_GLOBAL)       \
 _(TREE_UPVALUE)      \
+_(TREE_GETEXPR)      \
+_(TREE_GETMEM)       \
+_(TREE_SETMEM)       \
 _(EXPR_NUM)          \
 _(EXPR_INT)          \
 _(EXPR_STR)          \
@@ -44,7 +47,6 @@ _(EXPR_INDEX)        \
 _(EXPR_FIELD)        \
 _(EXPR_METAFIELD)    \
 _(EXPR_NIL)          \
-_(TREE_ASSIGN_MEM)   \
 _(TREE_STORE)        \
 _(STAT_BLOCK)        \
 _(TREE_IF)           \

@@ -188,6 +188,7 @@ typedef struct elf_State {
 
 #include "src/lexer.c"
 #include "src/gen.c"
+#include "src/tree.c"
 #include "src/parse.c"
 #include "src/user.c"
 #include "src/lib_math.h"

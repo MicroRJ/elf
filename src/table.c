@@ -134,10 +134,10 @@ void elf_check_table(elf_Table *table) {
 		new_table.slots=calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(elf_Entry));
 
 		elf_Entry old_slot;
-		elf_Int new_slot;
+		elf_i64 new_slot;
 		FOR_RANGE(i,0,table->ntotal) {
 			old_slot=table->slots[i];
-			if (old_slot.key.tag==elf_tag_nil) continue;
+			if (old_slot.key.tag==elf_tag_nil||old_slot.key.tag==elf_tag_tomb) continue;
 
 			new_slot=elf_table_try(&new_table,old_slot.key);
 			ASSERT(new_slot>=0);

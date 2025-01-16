@@ -3,8 +3,6 @@
 ** See Copyright Notice In elf.h
 */
 
-#include "tree.c"
-
 
 static treeID parse_unary(elf_Parser *parser, int flags);
 static treeID parse_expr(elf_Parser *parser, int flags);
@@ -364,7 +362,17 @@ static treeID parse_unary(elf_Parser *parser, bool flags) {
 	tok=parser->tok;
 
 	switch (tok.type) {
-		//todo: intrinsic!
+		case TK_M_GETMEM: {
+			get_tok(parser);
+			v=parse_subexpr(parser,0,10000);
+			v=tree_unary(parser,tok.line,TREE_GETMEM,NT_INT,v);
+		} break;
+		case TK_M_GETEXPR: {
+			get_tok(parser);
+			v=parse_subexpr(parser,0,10000);
+			v=tree_unary(parser,tok.line,TREE_GETEXPR,NT_INT,v);
+		} break;
+		// todo: intrinsic!
 		case TK_SUB: {
 			get_tok(parser);
 			v=parse_subexpr(parser,0,10000);
@@ -899,7 +907,7 @@ static int parse_stat(elf_Parser *parser) {
 			name=take_tok(parser,TK_WORD).text;
 			take_tok(parser,TK_ASSIGN);
 			value=parse_expr(parser,0);
-			v=tree_unary(parser,tok.line,TREE_ASSIGN_MEM,NT_ANY,value);
+			v=tree_unary(parser,tok.line,TREE_SETMEM,NT_ANY,value);
 			block_add(parser,v);
 			parser_bind(parser,tok.line,ENTITY_ASSIGNED,name,value);
 		} break;
@@ -1021,24 +1029,15 @@ static treeID parse_if(elf_Parser *parser, int negate){
 
 	take_tok(parser,TK_QMARK);
 
-	treeID true_clause;
+	treeID true_clause,else_clause,v;
+
 	true_clause=parse_bl(parser);
-
-	treeID else_clause;
 	else_clause=NO_TREE;
-
 	if(pick_tok(parser,TK_ELIF)) else_clause=parse_if(parser,0); else
 	if(pick_tok(parser,TK_ELSE)) else_clause=parse_bl(parser);
 
-	treeID v;
 	v=tree_if(parser,tok.line,pred,true_clause,else_clause);
-
-	// v=new_tree(parser,TREE_IF,tok.line);
-	// v->stat_if.pred=pred;
-	// v->stat_if.true_clause=true_clause;
-	// v->stat_if.else_clause=else_clause;
 	block_add(parser,v);
-
 	return close_block(parser);
 }
 

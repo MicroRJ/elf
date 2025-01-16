@@ -480,7 +480,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 	} else {
 		FOR_ARRAY(i,tab->array) {
 			elf_Value v = tab->array[i];
-			fprintf(io,"%lli = ",i);
+			if (i != 0) fprintf(io,", ");
 			if (v.tag==elf_tag_tab) {
 				elf_unload(io,v.x_tab,level+1);
 			} else {

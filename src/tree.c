@@ -111,7 +111,7 @@ static treeID tree_multi(elf_Parser *parser, Source line, treeID *z) {
 }
 
 static treeID tree_assign_mem(elf_Parser *parser, Source line, treeID x) {
-	return tree_unary(parser,line,TREE_ASSIGN_MEM,NT_NON,x);
+	return tree_unary(parser,line,TREE_SETMEM,NT_NON,x);
 }
 static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);

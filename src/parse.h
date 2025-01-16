@@ -58,7 +58,8 @@ _(FILE_NAME     , "file_name"   ) \
 _(INT           , "int"         ) \
 _(NUM           , "num"         ) \
 _(LEVEL         , "level"       ) \
-_(REGISTER      , "register"    ) \
+_(GETMEM        , "getmem"      ) \
+_(GETEXPR       , "getexpr"     ) \
 _(INDEX         , "index"       ) \
 _(VALUE         , "value"       ) \
 _(ARRAY         , "array"       ) \

@@ -148,7 +148,7 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 
 	tree=get_tree(parser,id);
 	switch(tree.kind) {
-		case TREE_ASSIGN_MEM:{
+		case TREE_SETMEM:{
 			int mem;
 			mem=to_mem(parser,tree.x,-1,1);
 			ASSERT(mem!=-1);
@@ -267,6 +267,9 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 
 			ASSERT(pred);
 			ASSERT(true_clause);
+			// todo: support when no there's no true clause,
+			// if there's just else clause, we can just flip
+			// the condition...
 			BranchJumps s={};
 			begin_if(parser,tree.line,&s,pred,0);
 			gen_tree(parser,true_clause);
@@ -310,6 +313,18 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 		case TREE_NOP: {
 			if (ndst<1) goto esc;
 			if (dst<0) dst=set_mem(parser,id);
+		} break;
+		case TREE_GETMEM: {
+			int mem;
+			mem=get_mem(parser,tree.x);
+			if(mem==NO_SLOT){
+				parser_dialog(parser,get_tree_line(parser,tree.x),"no memory assigned to this thing");
+			}
+			dst=to_mem(parser,tree_int(parser,tree.line,mem),dst,ndst);
+		} break;
+		case TREE_GETEXPR: {
+			char *expr = tree2s[get_tree_kind(parser,tree.x)];
+			dst=to_mem(parser,tree_str(parser,tree.line,expr),dst,ndst);
 		} break;
 		case EXPR_METAFIELD:
 		case EXPR_FIELD: case EXPR_INDEX: {
@@ -397,31 +412,6 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			patch_jumps(parser,j);
 			ARRAY_DELETE(j);
 		} break;
-		case EXPR_EQ: case EXPR_NEQ:
-		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
-		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
-		case EXPR_SUB: case EXPR_ADD: case EXPR_POW:
-		case EXPR_BIT_SHL: case EXPR_BIT_SHR:
-		case EXPR_BIT_XOR:
-		case EXPR_BIT_AND: case EXPR_BIT_OR: {
-			if ((tree.kind==EXPR_GT)||(tree.kind==EXPR_GTEQ)) {
-				push_mem_state(parser);
-				rx=to_any_mem(parser,tree.y);
-				ry=to_any_mem(parser,tree.x);
-				pop_mem_state(parser);
-				if (ndst<1) goto esc;
-				if (dst<0) dst=set_mem(parser,id);
-				emit_bytexyz(parser,tree.line,tree2o(tree.kind^1),dst,rx,ry);
-			} else {
-				push_mem_state(parser);
-				rx=to_any_mem(parser,tree.x);
-				ry=to_any_mem(parser,tree.y);
-				pop_mem_state(parser);
-				if (ndst<1) goto esc;
-				if (dst<0) dst=set_mem(parser,id);
-				emit_bytexyz(parser,tree.line,tree2o(tree.kind),dst,rx,ry);
-			}
-		} break;
 		case TREE_FUNCTION: {
 			int     proto;
 			treeID *capts;
@@ -488,7 +478,32 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
 		} break;
-		//todo:fix the bug!
+		case EXPR_EQ: case EXPR_NEQ:
+		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
+		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
+		case EXPR_SUB: case EXPR_ADD: case EXPR_POW:
+		case EXPR_BIT_SHL: case EXPR_BIT_SHR:
+		case EXPR_BIT_XOR:
+		case EXPR_BIT_AND: case EXPR_BIT_OR: {
+			if ((tree.kind==EXPR_GT)||(tree.kind==EXPR_GTEQ)) {
+				push_mem_state(parser);
+				rx=to_any_mem(parser,tree.y);
+				ry=to_any_mem(parser,tree.x);
+				pop_mem_state(parser);
+				if (ndst<1) goto esc;
+				if (dst<0) dst=set_mem(parser,id);
+				emit_bytexyz(parser,tree.line,tree2o(tree.kind^1),dst,rx,ry);
+			} else {
+				push_mem_state(parser);
+				rx=to_any_mem(parser,tree.x);
+				ry=to_any_mem(parser,tree.y);
+				pop_mem_state(parser);
+				if (ndst<1) goto esc;
+				if (dst<0) dst=set_mem(parser,id);
+				emit_bytexyz(parser,tree.line,tree2o(tree.kind),dst,rx,ry);
+			}
+		} break;
+		// todo:fix the bug!
 		case EXPR_AND: case EXPR_OR: {
 			jumpS e = {0};
 			int *js;
@@ -497,6 +512,8 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			dst=to_mem(parser,tree_int(parser,line,1),dst,1);
 			patch_jumps(parser,js);
 			ARRAY_DELETE(js);
+
+			memory_slots[dst] = id;
 		} break;
 		default: {
 			parser_dialog(parser,line,"invalid tree (%s)",tree2s[tree.kind]);
@@ -546,28 +563,32 @@ static int emit_jump(elf_Parser *parser, Source line, int dst) {
 }
 
 static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id) {
-	treeT node = get_tree(parser,id);
+	treeT tree = get_tree(parser,id);
+	int mem,jmp;
 
-	int reg,jmp;
-	switch (node.kind) {
+	mem=get_mem(parser,id);
+	if(mem!=NO_SLOT) goto _got_mem;
+
+	switch (tree.kind) {
 		case EXPR_AND: {
-			emit_jump_if_false(parser,js,node.x);
-			jmp=emit_branch_if(parser,js,if_true,node.y);
+			emit_jump_if_false(parser,js,tree.x);
+			jmp=emit_branch_if(parser,js,if_true,tree.y);
 		} break;
 		case EXPR_OR: {
-			emit_jump_if_true(parser,js,node.x);
-			jmp=emit_branch_if(parser,js,if_true,node.y);
+			emit_jump_if_true(parser,js,tree.x);
+			jmp=emit_branch_if(parser,js,if_true,tree.y);
 		} break;
 		default: {
 			push_mem_state(parser);
-			reg=to_any_mem(parser,id);
+			mem=to_any_mem(parser,id);
 			pop_mem_state(parser);
 
+			_got_mem:
 			if (if_true) {
-				jmp=emit_bytexy(parser,node.line,BC_JNZ,NO_JUMP,reg);
+				jmp=emit_bytexy(parser,tree.line,BC_JNZ,NO_JUMP,mem);
 				ARRAY_ADD(js->t,jmp);
 			} else {
-				jmp=emit_bytexy(parser,node.line,BC_JZ,NO_JUMP,reg);
+				jmp=emit_bytexy(parser,tree.line,BC_JZ,NO_JUMP,mem);
 				ARRAY_ADD(js->f,jmp);
 			}
 		} break;
