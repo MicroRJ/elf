@@ -105,7 +105,7 @@ elf_Bool elf_get_strings_eq(elf_String *x, elf_String *y) {
 
 
 int string_lib_length(elf_State *S) {
-	elf_add_int(S,((elf_String*)elf_get_this(S))->length);
+	elf_push_integer(S,((elf_String*)elf_get_this(S))->length);
 	return 1;
 }
 
@@ -126,7 +126,7 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 int string_lib_get_index(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_add_int(R,str->text[elf_get_int(R,0)]);
+	elf_push_integer(R,str->text[elf_get_int(R,0)]);
 	return 1;
 }
 
@@ -135,7 +135,7 @@ int string_lib_pop(elf_State *R) {
 	elf_String *yo = (elf_String*) elf_get_this(R);
 	elf_String *el = elf_alloc_string2(R,MAX(0,yo->length-1));
 	copy_memory(el->text,yo->text,MAX(0,yo->length-1));
-	elf_add_str(R,el);
+	elf_push_string(R,el);
 	return 1;
 }
 
@@ -147,7 +147,7 @@ int string_lib_append_char(elf_State *R) {
 	for ( int i = 0; i < elf_get_num_args(R); i += 1 ) {
 		el->text[yo->length + i] = elf_get_int(R,i);
 	}
-	elf_add_str(R,el);
+	elf_push_string(R,el);
 	return 1;
 }
 
@@ -176,7 +176,7 @@ int string_lib_append(elf_State *R) {
 int string_lib_match(elf_State *R) {
 	elf_String *s = (elf_String*) elf_get_this(R);
 	elf_String *p = elf_get_string(R,0);
-	elf_add_int(R,match_entire_text(p->text,s->text));
+	elf_push_integer(R,match_entire_text(p->text,s->text));
 	return 1;
 }
 
@@ -226,7 +226,7 @@ int string_lib_split_by_lines(elf_State *R) {
 
 int string_lib_get_hash(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_add_int(R,str->hash);
+	elf_push_integer(R,str->hash);
 	return 1;
 }
 

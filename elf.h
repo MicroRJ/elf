@@ -195,12 +195,12 @@ elAPI elf_Table *elf_new_table(elf_State *);
 
 /* add objects to stack */
 elAPI void elf_push_this(elf_State *S);
-elAPI void elf_add_any(elf_State *S, elf_Value value);
+elAPI void elf_push(elf_State *S, elf_Value value);
 elAPI void elf_push_nil(elf_State *S);
-elAPI void elf_add_int(elf_State *S, elf_Int);
-elAPI void elf_add_num(elf_State *S, elf_Num);
+elAPI void elf_push_integer(elf_State *S, elf_Int);
+elAPI void elf_push_number(elf_State *S, elf_Num);
 elAPI void elf_add_obj(elf_State *S, elf_Node *);
-elAPI void elf_add_str(elf_State *S, elf_String *);
+elAPI void elf_push_string(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
 elAPI void elf_push_table(elf_State *S, elf_Table *);
 elAPI void elf_push_closure(elf_State *S, elf_Closure *);
@@ -217,7 +217,7 @@ elAPI elf_String  *elf_get_string(elf_State *S, int arg);
 elAPI char        *elf_get_text(elf_State *S, int arg);
 elAPI elf_Node    *elf_get_obj(elf_State *S, int arg);
 elAPI elf_Table   *elf_get_table(elf_State *S, int arg);
-elAPI elf_Handle   elf_get_sys(elf_State *S, int arg);
+elAPI elf_Handle   elf_get_sysobj(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
 
 elAPI int elf_get_num_args(elf_State *S);

@@ -32,15 +32,15 @@
 
 
 // elAPI int netlib_listen(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sys(R,0);
+// 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elf_add_int(R,error!=SOCKET_ERROR);
+// 	elf_push_integer(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_accept(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sys(R,0);
+// 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
 // 	elf_add_sys(R,(elf_Handle)client);
 // 	return 1;
@@ -48,7 +48,7 @@
 
 
 // elAPI int netlib_pollclient(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sys(R,0);
+// 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
 // 	fd_set ready;
 // 	FD_ZERO(&ready);
 // 	FD_SET(handle,&ready);
@@ -111,34 +111,34 @@
 
 // elAPI int netlib_send(elf_State *R) {
 // 	/* todo: make this a class? */
-// 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
+// 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
 // 	elf_String *payload = elf_get_string(R,1);
 // 	LMSG message = { payload->length };
 // 	elf_Int sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elf_add_int(R,sent);
+// 	elf_push_integer(R,sent);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_ioctl(elf_State *R) {
-// 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
+// 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elf_add_int(R,error == 0);
+// 	elf_push_integer(R,error == 0);
 // 	return 1;
 // }
 
 
 // elAPI int netlib_recv(elf_State *R) {
-// 	SOCKET socket = (SOCKET) elf_get_sys(R,0);
+// 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
 // 	LMSG message = {0};
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {
 // 			elf_Int length = message.length;
 // 			elf_String *obj = elf_alloc_string2(R,length);
-// 			elf_add_str(R,obj);
+// 			elf_push_string(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
 // 				elf_Int result = recv(socket,cursor,length,0);

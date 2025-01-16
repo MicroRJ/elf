@@ -117,10 +117,12 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 #define SET_TOP(S,X) (GET_TOP(S) = UCAST(X, elf_Value *))
 
 
+static void _debug_stack_push(elf_State *S, elf_Value v);
+
 #if defined(_DEBUG)
-#define PUSHV(S,X) (* GET_TOP(S) ++ = (X))
-#else
 #define PUSHV(S,X) _debug_stack_push(S,X)
+#else
+#define PUSHV(S,X) (* GET_TOP(S) ++ = (X))
 #endif
 
 

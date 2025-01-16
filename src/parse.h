@@ -15,6 +15,7 @@ typedef struct {
 	};
 } tokenT;
 
+typedef tokenT elf_Token;
 
 //todo:remove "LEAVE"
 //todo:remove "iff"

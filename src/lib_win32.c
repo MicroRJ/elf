@@ -18,7 +18,7 @@
 // typedef void (*em_dlopen_callback)(void* handle, void* user_data);
 // void emscripten_dlopen(const char *filename, int flags, void* user_data, em_dlopen_callback onsuccess, em_arg_callback_func onerror);
 int core_lib_get_dll_fn(elf_State *S) {
-	elf_Handle lib = elf_get_sys(S,0);
+	elf_Handle lib = elf_get_sysobj(S,0);
 	char *name = elf_get_text(S,1);
 	elf_Function fn = (elf_Function) sys_get_dll_fn(lib,name);
 
@@ -44,7 +44,7 @@ int lib_core_shell(elf_State *R) {
 	char *args = elf_get_text(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
-	elf_add_int(R,success);
+	elf_push_integer(R,success);
 	return 1;
 }
 
@@ -52,7 +52,7 @@ int lib_core_shell(elf_State *R) {
 int core_lib_exec(elf_State *R) {
 	char *cline=elf_get_text(R,0);
 	int result=sys_exec(0,cline);
-	elf_add_int(R,result);
+	elf_push_integer(R,result);
 	return 1;
 }
 

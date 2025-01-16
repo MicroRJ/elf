@@ -12,14 +12,14 @@ elf_Node *elf_new_object(elf_State *R, elf_Int size) {
 
 elf_String *elf_new_string(elf_State *R, const char *text) {
 	elf_String *string=elf_alloc_string(R,text);
-	elf_add_str(R,string);
+	elf_push_string(R,string);
 	return string;
 }
 
 
 elf_String *elf_new_string2(elf_State *R, elf_Int length) {
 	elf_String *string=elf_alloc_string2(R,length);
-	elf_add_str(R,string);
+	elf_push_string(R,string);
 	return string;
 }
 
@@ -69,7 +69,7 @@ void elf_push_this(elf_State *S) {
 }
 
 
-void elf_add_any(elf_State *S, elf_Value value) {
+void elf_push(elf_State *S, elf_Value value) {
 	PUSHV(S,value);
 }
 
@@ -99,18 +99,18 @@ void elf_push_table(elf_State *S, elf_Table *x) {
 }
 
 
-void elf_add_int(elf_State *S, elf_Int x) {
+void elf_push_integer(elf_State *S, elf_Int x) {
 	PUSHV(S,VINT(x));
 }
 
 
-void elf_add_num(elf_State *S, elf_Num x) {
+void elf_push_number(elf_State *S, elf_Num x) {
 	PUSHV(S,VNUM(x));
 }
 
 
-void elf_add_str(elf_State *S, elf_String *x) {
-	PUSHV(S,VSTR(x));
+void elf_push_string(elf_State *S, elf_String *x) {
+	if (x) PUSHV(S,VSTR(x)); else elf_push_nil(S);
 }
 
 
@@ -162,7 +162,7 @@ elf_Closure *elf_get_cls(elf_State *S, elf_StackId x) {
 }
 
 
-elf_Handle elf_get_sys(elf_State *R, elf_StackId x) {
+elf_Handle elf_get_sysobj(elf_State *R, elf_StackId x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_sysobj) return v.x_sys;

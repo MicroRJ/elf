@@ -23,6 +23,8 @@ static bool parse_for(elf_Parser *parser);
 static treeID parse_json(elf_Parser *parser);
 static treeID *parse_args(elf_Parser *parser);
 static void block_add(elf_Parser *parser, treeID id);
+// the result is pushed onto the stack
+static int parse_const(elf_Parser *parser);
 
 static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text) {
 	parser->R = R;
@@ -1179,6 +1181,99 @@ static bool parse_for(elf_Parser *parser){
 	return success;
 }
 
+static bool is_key_tok(int tok) {
+	return tok == TK_INTEGER || tok == TK_NUMBER || tok == TK_STRING || tok == TK_WORD;
+}
+// todo: legitimize
+static int parse_const(elf_Parser *parser) {
+	elf_Token tok = parser->tok;
+	int ret = -1;
+	switch (tok.type) {
+		case TK_ADD: case TK_SUB: {
+			int sign = (tok.type == TK_ADD) * 2 - 1;
+			get_tok(parser);
+			tok = parser->tok;
+			if (pick_tok(parser,TK_NUMBER)) {
+				elf_push_number(parser->R,tok.number * sign);
+				ret = 1;
+			}else if (pick_tok(parser,TK_INTEGER)) {
+				elf_push_integer(parser->R,tok.integer * sign);
+				ret = 1;
+			} else {
+				parser_dialog(parser,tok.line,"operator can only be used for numbers");
+				goto esc;
+			}
+		} break;
+		case TK_NUMBER: {
+			get_tok(parser);
+			elf_push_number(parser->R,tok.number);
+			ret = 1;
+		} break;
+		case TK_INTEGER: {
+			get_tok(parser);
+			elf_push_integer(parser->R,tok.integer);
+			ret = 1;
+		} break;
+		case TK_STRING: {
+			get_tok(parser);
+			elf_new_string(parser->R,tok.text);
+			ret = 1;
+		} break;
+		case TK_CURLY_LEFT: {
+			get_tok(parser);
+			elf_Table *tab = elf_new_table(parser->R);
+			elf_Value *check_ptr = parser->R->stack_ptr;
+			while(parser->tok.type != TK_NONE && !peek_tok(parser,TK_CURLY_RIGHT)) {
+				tok = parser->tok;
+				if (parser->tok_prox.type == TK_ASSIGN) {
+					if (tok.type == TK_WORD) {
+						get_tok(parser);
+						elf_new_string(parser->R,tok.text);
+						ret = 1;
+					} else if (is_key_tok(parser->tok.type)) {
+						ret = parse_const(parser);
+					} else {
+						parser_dialog(parser,tok.line,"invalid key token");
+						goto esc;
+					}
+					if (ret == -1) goto esc;
+
+					take_tok(parser,TK_ASSIGN);
+
+					ret = parse_const(parser);
+					if (ret == -1) goto esc;
+					elf_Value key = parser->R->stack_ptr[-2];
+					elf_Value value = parser->R->stack_ptr[-1];
+					parser->R->stack_ptr -= 2;
+					ASSERT(parser->R->stack_ptr == check_ptr);
+					elf_table_set(tab,key,value);
+				} else {
+					ret = parse_const(parser);
+					if (ret == -1) goto esc;
+					elf_Value value = parser->R->stack_ptr[-1];
+					parser->R->stack_ptr -= 1;
+					elf_array_add(tab,value);
+					if (peek_tok(parser,TK_ASSIGN)) {
+						parser_dialog(parser,tok.line,"not a proper key");
+						goto esc;
+					}
+				}
+				pick_tok(parser,TK_COMMA);
+			}
+			ASSERT(parser->R->stack_ptr == check_ptr);
+
+			// empty table...
+			ret = 1;
+			take_tok(parser,TK_CURLY_RIGHT);
+		} break;
+		default: {
+			parser_dialog(parser,tok.line,"not a constant expression");
+		} break;
+	}
+
+	esc:
+	return ret;
+}
 
 static elf_tabID parse_json_obj(elf_Parser *parser);
 
@@ -1186,7 +1281,7 @@ static elf_tabID parse_json_obj(elf_Parser *parser);
 // todo: we won't screw anything else by
 // adding stuff to the stack right?
 //
-//	todo: we're adding this to the globals
+//	todo: we're adding this to the globals,
 //	should add to some other pool?
 //
 // json, crazy right

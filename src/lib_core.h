@@ -28,6 +28,7 @@ _(debugger)\
 _(log)\
 _(err_log)\
 _(include)\
+_(const_expr)\
 _(load_file)\
 _(load_json)\
 _(load_expr)\
@@ -39,7 +40,9 @@ _(get_dll_fn)\
 _(open_file)\
 _(close_file)\
 _(get_file_size)\
-_(get_file_data)\
+_(read_file)\
+_(write_file)\
+_(write_file_to_file)\
 _(open_temp_file)\
 _(change_work_dir)\
 _(get_work_dir)\

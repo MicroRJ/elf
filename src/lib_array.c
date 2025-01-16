@@ -6,7 +6,7 @@
 
 int elf_array_lib_tally(elf_State *R) {
 	elf_tabID tab = (elf_tabID) elf_get_this(R);
-	elf_add_int(R,ARRAY_LENGTH(tab->array));
+	elf_push_integer(R,ARRAY_LENGTH(tab->array));
 	return 1;
 }
 

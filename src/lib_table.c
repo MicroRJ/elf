@@ -95,14 +95,14 @@ int table_lib_contains(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
 	elf_Value key = elf_get_arg(S,0);
-	elf_add_int(S,slotiskey(tab,elf_table_try(tab,key)));
+	elf_push_integer(S,slotiskey(tab,elf_table_try(tab,key)));
 	return 1;
 }
 
 
 int table_lib_get_collisions(elf_State *S) {
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
-	elf_add_int(S,tab->ndebug);
+	elf_push_integer(S,tab->ndebug);
 	return 1;
 }
 
