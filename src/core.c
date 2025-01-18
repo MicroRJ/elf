@@ -382,7 +382,7 @@ int elf_run(elf_State *R) {
 	elf_Proto proto;
 	elf_Value *values;
 	elf_Int module_instr,instr,next_instr;
-	Bytecode byte;
+	elf_Bytecode byte;
 	delaylist *delay;
 	/* operands .(z,y) */
 	elf_Value xx,yy;
@@ -441,44 +441,6 @@ int elf_run(elf_State *R) {
 				}
 				F->nrets = nrets;
 				goto esc;
-			} break;
-			//deprecated
-			case BC_LEAVE: {
-				__debugbreak();
-				delay = F->delay_list;
-				if (delay != 0) {
-					next_instr    = delay->j;
-					F->delay_list = delay->n;
-					dealloc_memory(GLOBAL_ALLOCATOR,delay);
-				} else goto esc;
-			} break;
-			//deprecated
-			case BC_DELAY: {
-				__debugbreak();
-				ASSERT(BC_ARGX(byte) >= 0);
-
-				/* todo: make this better??? */
-				delay = alloc_memory(GLOBAL_ALLOCATOR,sizeof(delaylist));
-				delay->n = F->delay_list;
-				delay->j = next_instr;
-				F->delay_list = delay;
-
-				next_instr = instr + BC_ARGX(byte);
-			} break;
-			//deprecated
-			case BC_YIELD: {
-				__debugbreak();
-				ASSERT(BC_ARGX(byte) >= 0);
-				int reg,nrets;
-				nrets = MIN(BC_ARGZ(byte),F->nrets);
-				for (reg=0; reg<nrets; ++reg) {
-					locals[reg-1] = locals[reg+BC_ARGY(byte)];
-				}
-				next_instr = instr+BC_ARGX(byte);
-
-				F->nrets = nrets;
-			} break;
-			case BC_LOOP: {
 			} break;
 			case BC_J: {
 				next_instr = instr+BC_ARGX(byte);
@@ -540,8 +502,10 @@ int elf_run(elf_State *R) {
 				elf_Value yy = locals[BC_ARGY(byte)];
 				elf_Table *metatable = {0};
 				switch (yy.tag) {
-					case elf_tag_str: case elf_tag_tab:
-					case elf_tag_userobj: case elf_tag_closure: {
+					case elf_tag_str:
+					case elf_tag_tab:
+					case elf_tag_userobj:
+					case elf_tag_closure: {
 						metatable = yy.x_obj->meta;
 					} goto _lookup;
 					case elf_tag_num: {
@@ -557,7 +521,7 @@ int elf_run(elf_State *R) {
 					} break;
 				}
 				_lookup:
-				if (metatable == 0) {
+				if (!metatable) {
 					elf_fail(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
 				}
 				locals[BC_ARGX(byte)] = elf_table_get(metatable,locals[BC_ARGZ(byte)]);
@@ -572,7 +536,9 @@ int elf_run(elf_State *R) {
 					tables can have a default field which gets returned
 					when the value is nil?  */
 					elf_fail(R,module_instr,"attempted to get nil field");
-				} else if (xx.tag==elf_tag_float2) {
+				}
+#if 0
+				 else if (xx.tag==elf_tag_float2) {
 					ASSERT(yy.tag==elf_tag_str);
 					if (text_eq(yy.x_str->text,"x")){
 						locals[BC_ARGX(byte)].tag=elf_tag_num;
@@ -581,7 +547,9 @@ int elf_run(elf_State *R) {
 						locals[BC_ARGX(byte)].tag=elf_tag_num;
 						locals[BC_ARGX(byte)].x_num=xx.y_f32;
 					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
-				} else if (xx.tag==elf_tag_tab) {
+				}
+#endif
+				else if (xx.tag==elf_tag_tab) {
 					locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
 				} else if (xx.tag==elf_tag_userobj) {
 					call_overload(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
@@ -628,15 +596,50 @@ int elf_run(elf_State *R) {
 				elf_call(R,BC_ARGY(byte),BC_ARGZ(byte));
 				SET_TOP(R,locals+proto.nlocals);
 			} break;
+#if 0
+			case BC_LEAVE: {
+				delay = F->delay_list;
+				if (delay != 0) {
+					next_instr    = delay->j;
+					F->delay_list = delay->n;
+					dealloc_memory(GLOBAL_ALLOCATOR,delay);
+				} else goto esc;
+			} break;
+			case BC_DELAY: {
+				ASSERT(BC_ARGX(byte) >= 0);
+
+				/* todo: make this better??? */
+				delay = alloc_memory(GLOBAL_ALLOCATOR,sizeof(delaylist));
+				delay->n = F->delay_list;
+				delay->j = next_instr;
+				F->delay_list = delay;
+
+				next_instr = instr + BC_ARGX(byte);
+			} break;
+			case BC_YIELD: {
+				__debugbreak();
+				ASSERT(BC_ARGX(byte) >= 0);
+				int reg,nrets;
+				nrets = MIN(BC_ARGZ(byte),F->nrets);
+				for (reg=0; reg<nrets; ++reg) {
+					locals[reg-1] = locals[reg+BC_ARGY(byte)];
+				}
+				next_instr = instr+BC_ARGX(byte);
+
+				F->nrets = nrets;
+			} break;
+			case BC_LOOP: {
+			} break;
 			case BC_ISNIL: {
 				elf_Value xx;
-				elf_Bool nan;
+				bool nan;
 
 				xx = locals[BC_ARGY(byte)];
 				nan = xx.tag != elf_tag_int && xx.tag != elf_tag_num;
 				locals[BC_ARGX(byte)].tag   = elf_tag_int;
 				locals[BC_ARGX(byte)].x_int = xx.tag == elf_tag_nil || (nan && xx.x_int == 0);
 			} break;
+#endif
 			case BC_N2I: {
 				xx=locals[BC_ARGY(byte)];
 				locals[BC_ARGX(byte)].tag   = elf_tag_int;
@@ -647,11 +650,10 @@ int elf_run(elf_State *R) {
 				locals[BC_ARGX(byte)].tag   = elf_tag_num;
 				locals[BC_ARGX(byte)].x_num = VI2N(xx);
 			} break;
-			elf_Bool eq;
 			case BC_EQ: case BC_NEQ: {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
-				eq=0;
+				bool eq=0;
 				if ((xx.tag==elf_tag_nil)||(yy.tag==elf_tag_nil)) {
 					eq=ISNILV(xx)==ISNILV(yy);
 				} else if ((xx.tag==elf_tag_str)&&(yy.tag==elf_tag_str)) {
@@ -667,6 +669,7 @@ int elf_run(elf_State *R) {
 				locals[BC_ARGX(byte)].tag  =elf_tag_int;
 				locals[BC_ARGX(byte)].x_int=eq;
 			} break;
+#if 0
 			case BC_POW: {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
@@ -688,6 +691,7 @@ int elf_run(elf_State *R) {
 					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
 				}
 			} break;
+#endif
 			case BC_MOD: {
 				elf_Num x,y;
 				xx=locals[BC_ARGY(byte)];
@@ -719,7 +723,7 @@ int elf_run(elf_State *R) {
 	#define INVALID_OPERANDS(X,Y,OP) elf_fail(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[X],tag2s[Y],XTEXT(OP)))
 
 	/* todo: make this better */
-	#define CASE_IBOP(OPNAME,OP) \
+	#define INTBOP(OPNAME,OP) \
 			case OPNAME : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
@@ -728,39 +732,41 @@ int elf_run(elf_State *R) {
 						_check_zero_div(R,xx,yy);\
 					}\
 					locals[BC_ARGX(byte)].tag   = elf_tag_int;\
-					locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
+					locals[BC_ARGX(byte)].x_int = OP(VN2I(xx),VN2I(yy));\
 				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
 			} break
-
-	#define CASE_BOP(OPCODE,OP,FN,FN1) \
+#if 0
+float x0,y0,x1,y1;\
+if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
+	\
+	if (xx.tag==elf_tag_num)x0=y0=(float)xx.x_num;\
+	else if(xx.tag==elf_tag_int)x0=y0=(float)xx.x_int;\
+	else x0=xx.x_f32,y0=xx.y_f32;\
+	\
+	if (yy.tag==elf_tag_num)x1=y1=(float)yy.x_num;\
+	else if(yy.tag==elf_tag_int)x1=y1=(float)yy.x_int;\
+	else x1=yy.x_f32,y1=yy.y_f32;\
+	\
+	locals[BC_ARGX(byte)].tag   = elf_tag_float2;\
+	locals[BC_ARGX(byte)].x_f32 = x0 OP x1;\
+	locals[BC_ARGX(byte)].y_f32 = y0 OP y1;\
+} else
+#endif
+	#define NUMBOP(OPCODE,OP,FN,FN1) \
 			case OPCODE : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
-				float x0,y0,x1,y1;\
-				if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
-					\
-					if (xx.tag==elf_tag_num)x0=y0=(float)xx.x_num;\
-					else if(xx.tag==elf_tag_int)x0=y0=(float)xx.x_int;\
-					else x0=xx.x_f32,y0=xx.y_f32;\
-					\
-					if (yy.tag==elf_tag_num)x1=y1=(float)yy.x_num;\
-					else if(yy.tag==elf_tag_int)x1=y1=(float)yy.x_int;\
-					else x1=yy.x_f32,y1=yy.y_f32;\
-					\
-					locals[BC_ARGX(byte)].tag   = elf_tag_float2;\
-					locals[BC_ARGX(byte)].x_f32 = x0 OP x1;\
-					locals[BC_ARGX(byte)].y_f32 = y0 OP y1;\
-				} else if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {\
+				if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {\
 					if (!ISOBJT(xx.tag)) elf_fail(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
 					call_overload(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
 				} else if (INTORNUM(xx.tag) && INTORNUM(yy.tag)) {\
 					if (BC_OP(byte)==BC_DIV) _check_zero_div(R,xx,yy);\
 					if((xx.tag==elf_tag_num) || (yy.tag==elf_tag_num)) {\
 						locals[BC_ARGX(byte)].tag   = elf_tag_num;\
-						locals[BC_ARGX(byte)].x_num = VI2N(xx) OP VI2N(yy);\
+						locals[BC_ARGX(byte)].x_num = OP(VI2N(xx),VI2N(yy));\
 					}else{\
 						locals[BC_ARGX(byte)].tag   = elf_tag_int;\
-						locals[BC_ARGX(byte)].x_int = VN2I(xx) OP VN2I(yy);\
+						locals[BC_ARGX(byte)].x_int = OP(VN2I(xx),VN2I(yy));\
 					}\
 				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
 			} break
@@ -790,16 +796,30 @@ int elf_run(elf_State *R) {
 					}
 				} else INVALID_OPERANDS(xx.tag,yy.tag,<);
 			} break;
-			CASE_IBOP(BC_SHL,  <<);
-			CASE_IBOP(BC_SHR,  >>);
-			CASE_IBOP(BC_BIT_XOR, ^);
-			CASE_IBOP(BC_BIT_AND, &);
-			CASE_IBOP(BC_BIT_OR,  |);
-			CASE_BOP(BC_ADD, +, "__add", "__add1");
-			CASE_BOP(BC_SUB, -, "__sub", "__sub1");
-			CASE_BOP(BC_MUL, *, "__mul", "__mul1");
-			CASE_BOP(BC_DIV, /, "__div", "__div1");
-	#undef CASE_BOP
+
+#define __shl(a,b) ((a) << (b))
+#define __shr(a,b) ((a) >> (b))
+#define __add(a,b) ((a) + (b))
+#define __sub(a,b) ((a) - (b))
+#define __mul(a,b) ((a) * (b))
+#define __div(a,b) ((a) / (b))
+#define __and(a,b) ((a) & (b))
+#define __or(a,b)  ((a) | (b))
+#define __xor(a,b) ((a) ^ (b))
+#define __pow(a,b) (pow((a),(b)))
+
+			INTBOP(BC_SHL,  	 __shl);
+			INTBOP(BC_SHR,  	 __shr);
+			INTBOP(BC_BIT_XOR, __xor);
+			INTBOP(BC_BIT_AND, __and);
+			INTBOP(BC_BIT_OR,   __or);
+
+			NUMBOP(BC_ADD, __add, "__add", "__add1");
+			NUMBOP(BC_SUB, __sub, "__sub", "__sub1");
+			NUMBOP(BC_MUL, __mul, "__mul", "__mul1");
+			NUMBOP(BC_DIV, __div, "__div", "__div1");
+			NUMBOP(BC_POW, __pow, "__pow", "__pow1");
+	#undef NUMBOP
 			default: {
 				elf_fail(R,module_instr,elf_tpf("unsupported instruction: %s", byte2s[BC_OP(byte)]));
 			} break;

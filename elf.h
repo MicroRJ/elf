@@ -20,8 +20,6 @@ e*/
 #endif
 
 
-
-
 typedef struct elf_Module 	elf_Module;
 typedef struct elf_State 	elf_State;
 typedef struct elf_Object 	elf_Object;

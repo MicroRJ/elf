@@ -150,7 +150,7 @@ elf_Function jit(elf_Module *md, elf_Proto fn) {
 
 	DO_MOV32_MEM_REG_8DISP(REG_RBP,-8,REG_ECX);
 
-	Bytecode *bytes = md->bytes + fn.bytes;
+	elf_Bytecode *bytes = md->bytes + fn.bytes;
 	Instr nbytes = fn.nbytes;
 
 	for (Instr i = 0; i < nbytes; ++i) {

@@ -18,7 +18,7 @@ static int elf_add_const_num(elf_State *S, elf_Num i) {
 
 
 static int emit_jump(elf_Parser *parser, Source line, int dst);
-static int emit_byte(elf_Parser *parser, Source line, Bytecode byte);
+static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte);
 static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
 static int emit_bytexy(elf_Parser *parser, Source line, int k, int x, int y);
 static int emit_bytexyz(elf_Parser *parser, Source line, int k, int x, int y, int z);
@@ -708,7 +708,7 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(elf_Parser *C, Source line, Bytecode byte) {
+static int emit_byte(elf_Parser *C, Source line, elf_Bytecode byte) {
 	elf_Module *M = C->R->M;
 	ARRAY_ADD(M->lines,line);
 	ARRAY_ADD(M->bytes,byte);
@@ -718,7 +718,7 @@ static int emit_byte(elf_Parser *C, Source line, Bytecode byte) {
 
 
 static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
-	Bytecode byte=BC_XXX(k,x);
+	elf_Bytecode byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	return emit_byte(C,line,byte);
@@ -726,7 +726,7 @@ static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
 
 
 static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
-	Bytecode byte=BC_XYY(k,x,y);
+	elf_Bytecode byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -735,7 +735,7 @@ static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
 
 
 static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) {
-	Bytecode byte=BC_XYZ(k,x,y,z);
+	elf_Bytecode byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -744,17 +744,18 @@ static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) 
 }
 
 static void patch_jump2(elf_Parser *fs, int src, int dst) {
-	Bytecode byte,*bytes;
+	elf_Bytecode byte,*bytes;
 	bytes=fs->R->M->bytes;
 	byte=bytes[src];
 	int j = dst - src;
 	switch (BC_OP(byte)) {
-		// TODO: remove BC_DELAY and BC_YIELD!
-		case BC_J: case BC_DELAY: {
-			// bytes[src].x = j;
+		// case BC_DELAY:
+		case BC_J: {
+			bytes[src].x = j;
 			bytes[src]=BC_XXX(BC_OP(byte),j);
 		} break;
-		case BC_JZ: case BC_JNZ: case BC_YIELD: {
+		// case BC_YIELD:
+		case BC_JZ: case BC_JNZ: {
 			// bytes[src].x = j;
 			bytes[src]=BC_XYZ(BC_OP(byte),j,BC_ARGY(byte),BC_ARGZ(byte));
 		} break;

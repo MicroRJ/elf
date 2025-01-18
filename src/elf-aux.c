@@ -75,7 +75,7 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 	if (lineloc != 0) *lineloc = c;
 }
 
-void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, Bytecode byte, char const *fmt, ...) {
+void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, elf_Bytecode byte, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_get_line_source_info(contents,loc,&linenum,&lineloc);
@@ -234,7 +234,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 }
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, Bytecode b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
 	if (fid != -1) {
 		elf_File file = M->files[fid];
 		int linenum;
@@ -298,7 +298,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
-			Bytecode b = md->bytes[ff.bytes+j];
+			elf_Bytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// elf_get_line_source_info(md->file,md->lines[j],&linenum,&lineloc);
@@ -311,7 +311,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		elf_Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
-			Bytecode b = md->bytes[p.bytes+j];
+			elf_Bytecode b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");

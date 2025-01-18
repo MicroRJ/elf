@@ -95,7 +95,7 @@ typedef struct elf_Module {
 	elf_File         *files;
 	elf_Proto       *protos;
 	Source           *lines;
-	Bytecode         *bytes;
+	elf_Bytecode         *bytes;
 	Instr            nbytes;
 } elf_Module;
 
@@ -162,11 +162,11 @@ typedef struct elf_State {
 		elf_Table *string;
 		elf_Table *table;
 	} metatables;
+	// todo: remove this
 	struct {
 		elf_Value oncall;
 		elf_Value ongc;
 	} hooks;
-   /* the current instruction */
 	Instr byte;
 	elf_Collector collector;
 } elf_State;
