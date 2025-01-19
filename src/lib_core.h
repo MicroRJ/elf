@@ -3,17 +3,18 @@
 ** lib_core.h
 */
 
+// _(pause_collector)
+// _(get_allocated_objects)
+// _(get_allocated_memory)
+// _(get_collector_threshold)
+// _(mark_object)
+// _(collect)
+
 // todo: there are functions here that should
 // be under elf.sys... instead... idk?
 #define LIBDEF(_) \
 _(float2)\
 _(unload)\
-_(pause_collector)\
-_(get_allocated_objects)\
-_(get_allocated_memory)\
-_(get_collector_threshold)\
-_(mark_object)\
-_(collect)\
 _(tagof)\
 _(get_object_color)\
 _(set_object_trap)\

@@ -157,47 +157,6 @@ int core_lib_float2(elf_State *R) {
 	return 1;
 }
 
-
-int core_lib_pause_collector(elf_State *R) {
-	R->collector.paused = 1;
-	if (elf_get_num_args(R) == 1) {
-		R->collector.paused = elf_get_int(R,0) != 0;
-	}
-	return 0;
-}
-
-
-int core_lib_get_allocated_objects(elf_State *R) {
-	elf_push_integer(R,ARRAY_LENGTH(R->collector.objects));
-	return 1;
-}
-
-
-int core_lib_get_allocated_memory(elf_State *R) {
-	elf_push_integer(R,R->collector.memory_allocated);
-	return 1;
-}
-
-
-int core_lib_get_collector_threshold(elf_State *R) {
-	elf_push_integer(R,R->collector.memory_threshold);
-	return 1;
-}
-
-
-int core_lib_mark_object(elf_State *R) {
-	elf_Int num = elf_mark_object(elf_get_obj(R,0));
-	elf_push_integer(R,num);
-	return 1;
-}
-
-
-int core_lib_collect(elf_State *R) {
-	elf_trigger_collection_cycle(R);
-	return 0;
-}
-
-
 int core_lib_tagof(elf_State *R) {
 	elf_new_string(R,(char*)tag2s[elf_get_tag(R,0)]);
 	return 1;

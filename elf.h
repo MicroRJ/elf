@@ -268,7 +268,7 @@ elAPI int elf_exec_file(elf_State *, elf_String *name, int nargs, int nrets);
 elAPI int elf_call(elf_State *S, int nargs, int nrets);
 
 /* todo: why are these public */
-elf_Int elf_trigger_collection_cycle(elf_State *S);
+elf_Int _gc_cycle(elf_State *S);
 elf_Int elf_mark_object(elf_Object *obj);
 
 /* Todo: why are we exposing any of this */

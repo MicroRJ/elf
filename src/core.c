@@ -1,7 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
 ** core.c
-** core runtime functions
 */
 
 static int elf_run(elf_State *R);
@@ -171,208 +170,6 @@ static int call_overload(elf_State *S, elf_Object *obj, char const *name, int re
 	return ny;
 }
 
-
-/* returns number of objects uniquely marked */
-elf_Int elf_mark_object(elf_Object *obj) {
-	ASSERT(obj != 0);
-	ASSERT(obj->color != elf_GC_RED);
-	/* black object simply means it was
-	already marked and we found another
-	path to it, since the object was
-	already accounted for, return 0 */
-	if (obj->color == elf_GC_BLACK) {
-		return 0;
-	}
-	elf_Int num = 1;
-	/* Here we check whether the object is explicitly white,
-	because there are other colors that we don't want to get
-	rid of.
-	I suppose we don't propagate pink because if
-	the object were to ever change color we'd have to also
-	propagate those changes...
-	Pink objects are rare though...
-	And I think they are soon to be deprecated...
-	Trap objects are for debugging only, they are meant to
-	trigger a GC fault if not marked... */
-	if ((OBJ_COLOR(obj) == elf_GC_WHITE) || (OBJ_COLOR(obj) == elf_GC_TRAP)) {
-		OBJ_COLOR(obj) = elf_GC_BLACK;
-	}
-	if (obj->meta) {
-		num += elf_mark_object((elf_Object*)obj->meta);
-	}
-	if (obj->type == GC_CLS) {
-		elf_Closure *cls = (elf_Closure*) obj;
-		// if (cls->proto.name != 0) {
-		// 	elf_mark_object(POBJ(cls->proto.name));
-		// }
-		// if (cls->proto.contents != 0) {
-		// 	elf_mark_object(POBJ(cls->proto.contents));
-		// }
-		// if (cls->proto.parent != -1) {
-		// }
-		FOR_RANGE(i, 0, cls->proto.nlocals) {
-			if (ISOBJT(cls->values[i].tag)) {
-				num += elf_mark_object(cls->values[i].x_obj);
-			}
-		}
-	} else if (obj->type == GC_TAB) {
-		elf_Table *table;
-		elf_Value *array;
-		elf_Entry *slots;
-
-		table=(elf_Table*)obj;
-		array=table->array;
-		slots=table->slots;
-
-		FOR_RANGE(k,0,table->ntotal) {
-			if (ISOBJT(slots[k].key.tag)) {
-				num += elf_mark_object(slots[k].key.x_obj);
-			}
-		}
-		FOR_RANGE(k,0,ARRAY_LENGTH(array)) {
-			if (ISOBJT(array[k].tag)) {
-				num += elf_mark_object(array[k].x_obj);
-			}
-		}
-	}
-	return num;
-}
-
-
-elf_Int elf_hold_phase(elf_State *R) {
-	ASSERT(R->collector.phase == elf_GC_PHASE_MARK);
-	R->collector.phase ^= 1;
-
-	elf_Int Ni = 0;
-	elf_Value *Ki;
-	for (Ki = R->stack; Ki < GET_TOP(R); ++ Ki) {
-		if (ISOBJT(Ki->tag)) {
-			Ni += elf_mark_object(Ki->x_obj);
-		}
-	}
-	return Ni;
-}
-
-
-elf_Int elf_free_phase(elf_State *R) {
-	ASSERT(R->collector.phase==elf_GC_PHASE_FREE);
-	R->collector.phase^=1;
-
-
-	elf_Object **new_objects=R->collector.new_objects;
-	elf_Object **objects=R->collector.objects;
-	if (new_objects) {
-		ARRAY_SET_MIN(new_objects,0);
-	}
-	elf_Int n = 0;
-	FOR_ARRAY(i,objects) {
-		elf_Object *it = objects[i];
-		ASSERT(it != 0);
-		if ((OBJ_COLOR(it) == elf_GC_RED) || (OBJ_COLOR(it) == elf_GC_TRAP)) {
-#if 0
-			for(elf_Value *Ki = R->stack; Ki < R->T; Ki += 1) {
-				if (Ki->x_obj == it) {
-					elf_debug_log("Object '%p' found in stack at: '%p'. From top '%p' -> %lli", it, Ki, R->T, (R->T - Ki));
-				}
-			}
-			elf_fail(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
-#endif
-		}
-		if (OBJ_COLOR(it) == elf_GC_BLACK) {
-			OBJ_COLOR(it) = elf_GC_WHITE;
-			/* todo: instead simply ensure 'new_objects' is big enough */
-			ARRAY_ADD(new_objects,it);
-		} else if (OBJ_COLOR(it) == elf_GC_WHITE) {
-			n += 1;
-			OBJ_COLOR(it) = elf_GC_RED;
-			R->collector.memory_allocated -= it->size;
-			if (it->type == GC_TAB) {
-				elf_free_table_contents((elf_Table*)it);
-			}
-			dealloc_memory(GLOBAL_ALLOCATOR,it);
-		} else n += 1;
-	}
-	R->collector.objects = new_objects;
-	R->collector.new_objects = objects;
-	return n;
-}
-
-
-elf_Int elf_trigger_collection_cycle(elf_State *R) {
-	elf_Int time_, num_marked, num_objects, num_to_collect, obj_trigger_threshold, num_collected;
-
-	time_ = elf_get_clock_time();
-	num_marked = elf_hold_phase(R);
-	num_objects = ARRAY_LENGTH(R->collector.objects);
-	num_to_collect = num_objects - num_marked;
-	obj_trigger_threshold = R->collector.object_trigger_threshold;
-
-	// elf_debug_log("GC: %lli - %lli -> %lli (%lli), (total - marked = expected) (threshold)",num_objects,num_to_collect,num_marked,obj_trigger_threshold);
-
-	num_collected = elf_free_phase(R);
-	num_to_collect -= num_collected;
-
-	// elf_debug_log("	(%f) => leaked: %lli", elf_time_diff_ms(time_),num_to_collect);
-	return num_collected;
-}
-
-
-void elf_collect(elf_State *R) {
-	if (R->collector.paused) {
-		return;
-	}
-	if (R->collector.memory_threshold <= 0) {
-		R->collector.memory_threshold = elGC_MEM_THRESHOLD_MIN;
-	}
-	if (R->collector.object_trigger_threshold <= 0) {
-		R->collector.object_trigger_threshold = elGC_OBJ_THRESHOLD_MIN;
-	}
-
-	elf_Int num_objects, obj_threshold, num_collected;
-
-	num_objects = ARRAY_LENGTH(R->collector.objects);
-	obj_threshold = R->collector.object_trigger_threshold;
-
-	if (num_objects > obj_threshold) {
-		num_collected = elf_trigger_collection_cycle(R);
-		ASSERT(num_collected <= num_objects);
-		R->collector.object_trigger_threshold += elGC_OBJ_THRESHOLD_MIN - num_collected;
-	} else if (R->collector.memory_allocated > R->collector.memory_threshold) {
-		R->collector.memory_threshold <<= 1;
-		if (R->collector.memory_threshold > elGC_MEM_THRESHOLD_MAX) {
-			R->collector.memory_threshold = elGC_MEM_THRESHOLD_MAX;
-		}
-		num_collected = elf_trigger_collection_cycle(R);
-		ASSERT(num_collected <= num_objects);
-		if (R->collector.memory_allocated > R->collector.memory_threshold) {
-			elf_fail(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated, %lliMB threshold"
-			, R->collector.memory_allocated / MEGABYTES(1)
-			, R->collector.memory_threshold / MEGABYTES(1)));
-		}
-	}
-}
-
-
-void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_Int size) {
-	if (R->collector.phase!=elf_GC_WHITE) {
-		elf_fail(R,NO_BYTE,"object allocation out of phase");
-	}
-
-	R->collector.memory_allocated+=size;
-	elf_collect(R);
-
-	elf_Object *obj;
-
-	obj=calloc_memory(GLOBAL_ALLOCATOR,size);
-	obj->color=R->collector.phase;
-	obj->type=type;
-	obj->size=size;
-	// obj->byte=R->byte;
-	ARRAY_ADD(R->collector.objects,obj);
-	return obj;
-}
-
-
 int elf_run(elf_State *R) {
 
 	elf_Module *M;
@@ -383,7 +180,9 @@ int elf_run(elf_State *R) {
 	elf_Value *values;
 	elf_Int module_instr,instr,next_instr;
 	elf_Bytecode byte;
+	#if 0
 	delaylist *delay;
+	#endif
 	/* operands .(z,y) */
 	elf_Value xx,yy;
 

@@ -95,17 +95,17 @@ typedef struct elf_Module {
 	elf_File         *files;
 	elf_Proto       *protos;
 	Source           *lines;
-	elf_Bytecode         *bytes;
+	elf_Bytecode     *bytes;
 	Instr            nbytes;
 } elf_Module;
 
-
+#if 0
 typedef struct delaylist delaylist;
 typedef struct delaylist {
 	delaylist *n;
 	Instr j;
 } delaylist;
-
+#endif
 
 typedef struct elf_StackFrame elf_StackFrame;
 typedef struct elf_StackFrame {
@@ -116,27 +116,12 @@ typedef struct elf_StackFrame {
 	char                nargs;
 	char                nrets;
 	int                origin;
-	delaylist    * delay_list;
-	elf_Bool          logging;
+	bool              logging;
 } elf_StackFrame;
 
 
 #define elf_GC_PHASE_MARK elf_GC_WHITE
 #define elf_GC_PHASE_FREE elf_GC_BLACK
-
-
-typedef struct elf_Collector {
-	elf_Bool     paused;
-	int          phase;
-	elf_Int      memory_allocated;
-	elf_Int      memory_threshold;
-	elf_Object **new_objects;
-	elf_Object **objects;
-	/* this changes dynamically based on
-	object min threshold, it tends to
-	be around there... */
-	elf_Int      object_trigger_threshold;
-} elf_Collector;
 
 
 #define FLAG_DEBUGGER         (1 << 0)
@@ -163,12 +148,16 @@ typedef struct elf_State {
 		elf_Table *table;
 	} metatables;
 	// todo: remove this
-	struct {
-		elf_Value oncall;
-		elf_Value ongc;
-	} hooks;
 	Instr byte;
-	elf_Collector collector;
+	struct {
+		int          phase;
+		bool         paused;
+		elf_i64      memory_allocated;
+		elf_i64      memory_threshold;
+		elf_Object **new_objects;
+		elf_Object **objects;
+		elf_i64      object_trigger_threshold;
+	} gc;
 } elf_State;
 
 
@@ -201,6 +190,7 @@ typedef struct elf_State {
 #include "src/system.c"
 #include "src/lib_table.c"
 #include "src/lib_array.c"
+#include "src/obj.c"
 #include "src/core.c"
 
 
