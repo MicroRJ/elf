@@ -18,9 +18,9 @@
 // int crtlib__chdir(elf_State *rt) {
 // 	elf_String *name = elf_get_string(rt,0);
 // #if defined(PLATFORM_WEB)
-// 	elf_push_integer(rt,chdir(name->c));
+// 	elf_push_int(rt,chdir(name->c));
 // #else
-// 	elf_push_integer(rt,_chdir(name->c));
+// 	elf_push_int(rt,_chdir(name->c));
 // #endif
 // 	return 1;
 // }
@@ -29,25 +29,25 @@
 // #if defined(_MSC_VER)
 
 // int crtlib__getch(elf_State *rt) {
-// 	elf_push_integer(rt,_getch());
+// 	elf_push_int(rt,_getch());
 // 	return 1;
 // }
 
 
 // int crtlib__getpid(elf_State *rt) {
-// 	elf_push_integer(rt,_getpid());
+// 	elf_push_int(rt,_getpid());
 // 	return 1;
 // }
 
 
 // int crtlib_time(elf_State *rt) {
-// 	elf_push_integer(rt,time(0));
+// 	elf_push_int(rt,time(0));
 // 	return 1;
 // }
 
 
 // int crtlib_clock(elf_State *rt) {
-// 	elf_push_integer(rt,clock());
+// 	elf_push_int(rt,clock());
 // 	return 1;
 // }
 
@@ -70,7 +70,7 @@
 
 // int crtlib__unlink(elf_State *rt) {
 // 	elf_String *name = elf_get_string(rt,0);
-// 	elf_push_integer(rt,_unlink(name->c));
+// 	elf_push_int(rt,_unlink(name->c));
 // 	return 1;
 // }
 
@@ -85,28 +85,28 @@
 // int crtlib__write(elf_State *rt) {
 // 	elf_Handle file = elf_get_sysobj(rt,0);
 // 	elf_String *buf = elf_get_string(rt,1);
-// 	elf_push_integer(rt,_write((elf_Int)file,buf->c,buf->length));
+// 	elf_push_int(rt,_write((elf_Int)file,buf->c,buf->length));
 // 	return 1;
 // }
 
 
 // int crtlib__close(elf_State *rt) {
 // 	elf_Handle file = elf_get_sysobj(rt,0);
-// 	elf_push_integer(rt,_close((int)(elf_Int)file));
+// 	elf_push_int(rt,_close((int)(elf_Int)file));
 // 	return 1;
 // }
 
 
 // int crtlib__commit(elf_State *rt) {
 // 	elf_Handle file = elf_get_sysobj(rt,0);
-// 	elf_push_integer(rt,_commit((int)(elf_Int)file));
+// 	elf_push_int(rt,_commit((int)(elf_Int)file));
 // 	return 1;
 // }
 
 
 // int crtlib__chdrive(elf_State *rt) {
 // 	elf_Int letter = elf_get_int(rt,0);
-// 	elf_push_integer(rt,_chdrive(letter));
+// 	elf_push_int(rt,_chdrive(letter));
 // 	return 1;
 // }
 
@@ -114,21 +114,21 @@
 // int crtlib__chmode(elf_State *rt) {
 // 	elf_String *name = elf_get_string(rt,0);
 // 	elf_Int mode = elf_get_int(rt,1);
-// 	elf_push_integer(rt,_chmod(name->c,mode));
+// 	elf_push_int(rt,_chmod(name->c,mode));
 // 	return 1;
 // }
 
 
 // int crtlib__execl(elf_State *rt) {
 // 	elf_String *cl = elf_get_string(rt,0);
-// 	elf_push_integer(rt,_execl(cl->c,0,0));
+// 	elf_push_int(rt,_execl(cl->c,0,0));
 // 	return 1;
 // }
 
 
 // int crtlib_system(elf_State *rt) {
 // 	elf_String *cl = elf_get_string(rt,0);
-// 	elf_push_integer(rt,system(cl->c));
+// 	elf_push_int(rt,system(cl->c));
 // 	return 1;
 // }
 // #else

@@ -44,7 +44,7 @@ int lib_core_shell(elf_State *R) {
 	char *args = elf_get_text(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
-	elf_push_integer(R,success);
+	elf_push_int(R,success);
 	return 1;
 }
 
@@ -52,7 +52,7 @@ int lib_core_shell(elf_State *R) {
 int core_lib_exec(elf_State *R) {
 	char *cline=elf_get_text(R,0);
 	int result=sys_exec(0,cline);
-	elf_push_integer(R,result);
+	elf_push_int(R,result);
 	return 1;
 }
 

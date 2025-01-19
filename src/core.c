@@ -36,6 +36,7 @@ void elf_init(elf_State *R, elf_Module *M) {
 		{"iton", core_lib_iton},
 	};
 	elf_add_lib(R,0,lib_base,_countof(lib_base));
+	elf_add_lib(R,"elf",_lib_time,_countof(_lib_time));
 	elf_add_lib(R,0,lib_math,_countof(lib_math));
 	elf_add_lib(R,"elf",lib_core,_countof(lib_core));
 }

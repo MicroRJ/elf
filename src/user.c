@@ -99,7 +99,7 @@ void elf_push_table(elf_State *S, elf_Table *x) {
 }
 
 
-void elf_push_integer(elf_State *S, elf_Int x) {
+void elf_push_int(elf_State *S, elf_Int x) {
 	PUSHV(S,VINT(x));
 }
 

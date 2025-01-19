@@ -14,26 +14,26 @@ int core_lib_pause_collector(elf_State *R) {
 
 
 int core_lib_get_allocated_objects(elf_State *R) {
-	elf_push_integer(R,ARRAY_LENGTH(R->gc.objects));
+	elf_push_int(R,ARRAY_LENGTH(R->gc.objects));
 	return 1;
 }
 
 
 int core_lib_get_allocated_memory(elf_State *R) {
-	elf_push_integer(R,R->gc.memory_allocated);
+	elf_push_int(R,R->gc.memory_allocated);
 	return 1;
 }
 
 
 int core_lib_get_collector_threshold(elf_State *R) {
-	elf_push_integer(R,R->gc.memory_threshold);
+	elf_push_int(R,R->gc.memory_threshold);
 	return 1;
 }
 
 
 int core_lib_mark_object(elf_State *R) {
 	elf_Int num = elf_mark_object(elf_get_obj(R,0));
-	elf_push_integer(R,num);
+	elf_push_int(R,num);
 	return 1;
 }
 

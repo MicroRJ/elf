@@ -1197,7 +1197,7 @@ static int parse_const(elf_Parser *parser) {
 				elf_push_number(parser->R,tok.number * sign);
 				ret = 1;
 			}else if (pick_tok(parser,TK_INTEGER)) {
-				elf_push_integer(parser->R,tok.integer * sign);
+				elf_push_int(parser->R,tok.integer * sign);
 				ret = 1;
 			} else {
 				parser_dialog(parser,tok.line,"operator can only be used for numbers");
@@ -1211,7 +1211,7 @@ static int parse_const(elf_Parser *parser) {
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);
-			elf_push_integer(parser->R,tok.integer);
+			elf_push_int(parser->R,tok.integer);
 			ret = 1;
 		} break;
 		case TK_STRING: {

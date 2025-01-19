@@ -184,7 +184,7 @@ int core_lib_set_object_trap(elf_State *R) {
 
 
 int core_lib_get_object_address(elf_State *R) {
-	elf_push_integer(R,(elf_Int) (void *) elf_get_obj(R,0));
+	elf_push_int(R,(elf_Int) (void *) elf_get_obj(R,0));
 	return 1;
 }
 
@@ -231,7 +231,7 @@ int core_lib_exit(elf_State *R) {
 int core_lib_flags(elf_State *R) {
 	int flags = R->flags;
 	R->flags |= elf_get_int(R,0);
-	elf_push_integer(R,flags);
+	elf_push_int(R,flags);
 	return 1;
 }
 
@@ -374,7 +374,7 @@ int core_lib_get_file_size(elf_State *R) {
 	fseek(file,0,SEEK_END);
 	int size = ftell(file);
 	fseek(file,0,SEEK_SET);
-	elf_push_integer(R,size);
+	elf_push_int(R,size);
 	return 1;
 }
 
@@ -418,7 +418,7 @@ int core_lib_write_file_to_file(elf_State *R) {
 		wrote += fwrite(buffer,1,read,dst);
 	} while(read > 0);
 
-	elf_push_integer(R,wrote);
+	elf_push_int(R,wrote);
 	return 1;
 }
 
@@ -426,7 +426,7 @@ int core_lib_write_file_to_file(elf_State *R) {
 
 int core_lib_change_work_dir(elf_State *R) {
 	int ok = sys_set_work_dir(elf_get_text(R,0));
-	elf_push_integer(R,ok);
+	elf_push_int(R,ok);
 	return 1;
 }
 
@@ -445,7 +445,7 @@ int core_lib_fpf(elf_State *S) {
 	for (int i = 1; i < elf_get_num_args(S); i ++) {
 		wrote += fpf_value(file,elf_get_arg(S,i),0);
 	}
-	elf_push_integer(S,wrote);
+	elf_push_int(S,wrote);
 	return 1;
 }
 
@@ -481,29 +481,6 @@ int core_lib_sleep(elf_State *S) {
 	ASSERT(elf_get_num_args(S) >= 1);
 	sys_sleep(elf_get_int(S,0));
 	return 0;
-}
-
-static elf_f64 _time_diff_s(elf_i64 time) {
-	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
-}
-
-int core_lib_clocktime(elf_State *R) {
-	elf_push_integer(R,sys_get_clock_time());
-	return 1;
-}
-
-int core_lib_timediffs(elf_State *S) {
-	ASSERT(elf_get_num_args(S) == 1);
-	elf_Int time = elf_get_int(S,0);
-	elf_push_number(S,_time_diff_s(time));
-	return 1;
-}
-
-int core_lib_timediffms(elf_State *S) {
-	ASSERT(elf_get_num_args(S) == 1);
-	elf_Int time = elf_get_int(S,0);
-	elf_push_number(S,_time_diff_s(time) * 1000);
-	return 1;
 }
 
 static void print_num_tabs(FILE *io, int num) {
@@ -571,8 +548,8 @@ int core_lib_iton(elf_State *R) {
 int core_lib_ntoi(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_tag_num) {
-		elf_push_integer(R,(elf_Int)v.x_num);
-	} else elf_push_integer(R,v.x_int);
+		elf_push_int(R,(elf_Int)v.x_num);
+	} else elf_push_int(R,v.x_int);
 	return 1;
 }
 

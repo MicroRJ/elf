@@ -195,7 +195,7 @@ elAPI elf_Table *elf_new_table(elf_State *);
 elAPI void elf_push_this(elf_State *S);
 elAPI void elf_push(elf_State *S, elf_Value value);
 elAPI void elf_push_nil(elf_State *S);
-elAPI void elf_push_integer(elf_State *S, elf_Int);
+elAPI void elf_push_int(elf_State *S, elf_Int);
 elAPI void elf_push_number(elf_State *S, elf_Num);
 elAPI void elf_add_obj(elf_State *S, elf_Object *);
 elAPI void elf_push_string(elf_State *S, elf_String *);

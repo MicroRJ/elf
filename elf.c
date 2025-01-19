@@ -184,6 +184,7 @@ typedef struct elf_State {
 #include "src/lib_core.h"
 #include "src/lib_math.c"
 #include "src/lib_core.c"
+#include "src/lib_time.c"
 #if defined(_WIN32)
 #include "src/lib_win32.c"
 #endif
