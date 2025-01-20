@@ -8,7 +8,7 @@ static treeID parse_unary(elf_Parser *parser, int flags);
 static treeID parse_expr(elf_Parser *parser, int flags);
 static treeID parse_table(elf_Parser *parser);
 static treeID parse_subexpr(elf_Parser *parser, int flags, int rank);
-static treeID parse_postfix(elf_Parser *parser, int flags);
+static treeID parse_post(elf_Parser *parser, int flags);
 static treeID parse_bl(elf_Parser *parser);
 static int parse_stat(elf_Parser *parser);
 static int tok2tree(int tok);
@@ -327,7 +327,7 @@ static treeID parse_new(elf_Parser *parser){
 	tok=take_tok(parser,TK_NEW);
 
 	treeID meta,*args;
-	meta=parse_postfix(parser,0);
+	meta=parse_post(parser,0);
 	if(meta->kind==TREE_CALL){
 		args=meta->z;
 		meta=meta->x;
@@ -589,7 +589,7 @@ static treeID *parse_args(elf_Parser *parser) {
 		if (!peek_tok(parser,TK_PAREN_RIGHT)) do {
 			x=parse_expr(parser,0);
 			if(x!=NO_TREE){
-				// desugar multi expressions
+				// desugar tuple expressions
 				if (get_tree_kind(parser,x)==TREE_TUPLE) {
 					n=get_tree(parser,x).z;
 					FOR_ARRAY(i,n){
@@ -607,7 +607,7 @@ static treeID *parse_args(elf_Parser *parser) {
 }
 
 
-static treeID parse_postfix(elf_Parser *parser, int flags) {
+static treeID parse_post(elf_Parser *parser, int flags) {
 	tokenT tok;
 	treeID v;
 
@@ -630,7 +630,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 						x=tree_field(parser,tok.line,v,y);
 						ARRAY_ADD(z,x);
 					} while (pick_tok(parser,TK_COMMA));
-					v = tree_multi(parser,tok.line,z);
+					v = tree_tuple(parser,tok.line,z);
 					take_tok(parser,TK_PAREN_RIGHT);
 				} else
 				// table.{x,y}
@@ -696,7 +696,7 @@ static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 	tok=parser->tok;
 
 	treeID x,y;
-	x=parse_postfix(parser,flags);
+	x=parse_post(parser,flags);
 	if (x==NO_TREE) goto esc;
 	if(x->type==NT_NON){
 		parser_dialog(parser,x->line,"invalid data class");

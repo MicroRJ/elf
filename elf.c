@@ -45,11 +45,11 @@ at the same time when using clang-cl */
 #endif
 
 
-#define elGC_MEM_THRESHOLD_MIN (elf_Int) MEGABYTES(1)
-#define elGC_MEM_THRESHOLD_MAX (elf_Int) MEGABYTES(1024)
+#define elGC_MEM_THRESHOLD_MIN (elf_i64) MEGABYTES(1)
+#define elGC_MEM_THRESHOLD_MAX (elf_i64) MEGABYTES(1024)
 
-#define elGC_OBJ_THRESHOLD_MIN (elf_Int) ((1024)*2)
-#define elGC_OBJ_THRESHOLD_MAX (elf_Int) ((1024)*8)
+#define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((1024)*2)
+#define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((1024)*128)
 
 
 #define DEFAULT_STACK_SIZE 4096

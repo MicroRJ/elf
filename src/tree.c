@@ -106,7 +106,7 @@ static treeID tree_ranged_index(elf_Parser *parser, Source line, treeID x, treeI
 static treeID tree_call(elf_Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,TREE_CALL,NT_ANY,x,NO_TREE,z);
 }
-static treeID tree_multi(elf_Parser *parser, Source line, treeID *z) {
+static treeID tree_tuple(elf_Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY,NO_TREE,NO_TREE,z);
 }
 

@@ -164,7 +164,7 @@ static treeID tree_ranged_index(elf_Parser *, Source line, treeID x, treeID y);
 
 static treeID tree_less_than(elf_Parser *, Source line, treeID x, treeID y);
 static treeID tree_meta_call(elf_Parser *, Source line, treeID x, treeID *z, char *name);
-static treeID tree_multi(elf_Parser *, Source line, treeID *z);
+static treeID tree_tuple(elf_Parser *, Source line, treeID *z);
 static treeID tree_block(elf_Parser *, Source line, treeID *z);
 
 static treeID tree_global_ref_by_name(elf_Parser *, Source line, char *name);

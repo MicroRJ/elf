@@ -98,6 +98,7 @@ int core_lib_load_file(elf_State *R) {
 	int auto_close = false;
 	int pos = -1;
 	int size = -1;
+	int res = 0;
 	if(elf_get_tag(R,0) == elf_tag_str) {
 		name = elf_get_string(R,0);
 		file = fopen(name->text,"rb");
@@ -106,6 +107,11 @@ int core_lib_load_file(elf_State *R) {
 		name = elf_new_string(R,"no name");
 		file = (FILE *) elf_get_sysobj(R,0);
 	}
+	if (!file) {
+		elf_error_log("'%s': failed to load file",name->text);
+		goto esc;
+	}
+
 	if (elf_get_num_args(R) > 1) {
 		size = elf_get_int(R,1);
 		if (elf_get_num_args(R) > 2) {
@@ -116,12 +122,14 @@ int core_lib_load_file(elf_State *R) {
 
 	int nargs = 1; // elf_get_num_args(R) - 1;
 	int nrets = elf_get_num_rets(R);
-	nrets = _exec(R,false,nargs,nrets,name,contents);
+	res = _exec(R,false,nargs,nrets,name,contents);
 
 	if (auto_close) {
 		fclose(file);
 	}
-	return nrets;
+
+	esc:
+	return res;
 }
 
 
