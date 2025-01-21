@@ -186,8 +186,8 @@ elAPI void elf_init(elf_State *S, elf_Module *M);
 /* allocate and adds the object to stack (prevents it from getting GC'd) */
 elAPI elf_Closure *elf_new_closure(elf_State *, elf_Proto fn);
 elAPI elf_String *elf_new_string2(elf_State *, elf_Int length);
-elAPI elf_String *elf_new_string(elf_State *, const char *text);
-elAPI elf_Object *elf_new_object(elf_State *, elf_Int size);
+elAPI elf_String *elf_push_new_string(elf_State *, const char *text);
+elAPI elf_Object *elf_push_new_object(elf_State *, elf_Int size);
 elAPI elf_Table *elf_new_table(elf_State *);
 
 

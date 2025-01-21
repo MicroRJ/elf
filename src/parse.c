@@ -1216,7 +1216,7 @@ static int parse_const(elf_Parser *parser) {
 		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			elf_new_string(parser->R,tok.text);
+			elf_push_new_string(parser->R,tok.text);
 			ret = 1;
 		} break;
 		case TK_CURLY_LEFT: {
@@ -1228,7 +1228,7 @@ static int parse_const(elf_Parser *parser) {
 				if (parser->tok_prox.type == TK_ASSIGN) {
 					if (tok.type == TK_WORD) {
 						get_tok(parser);
-						elf_new_string(parser->R,tok.text);
+						elf_push_new_string(parser->R,tok.text);
 						ret = 1;
 					} else if (is_key_tok(parser->tok.type)) {
 						ret = parse_const(parser);
@@ -1318,7 +1318,7 @@ static elf_tabID parse_json_obj(elf_Parser *parser){
 	take_tok(parser,TK_CURLY_LEFT);
 	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
 		tok=take_tok(parser,TK_STRING);
-		key=VSTR(elf_new_string(parser->R,tok.text));
+		key=VSTR(elf_push_new_string(parser->R,tok.text));
 		take_tok(parser,TK_COLON);
 		val=parse_json_value(parser);
 		elf_table_set(table,key,val);
@@ -1335,7 +1335,7 @@ static elf_Value parse_json_value(elf_Parser *parser) {
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);
-			val = VSTR(elf_new_string(parser->R,tok.text));
+			val = VSTR(elf_push_new_string(parser->R,tok.text));
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);

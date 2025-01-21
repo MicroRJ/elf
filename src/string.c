@@ -168,7 +168,7 @@ int string_lib_append(elf_State *R) {
 			strcatf(buffer,"%lli",v.x_int);
 		} else NO_CODE;
 	}
-	elf_new_string(R,buffer);
+	elf_push_new_string(R,buffer);
 	return 1;
 }
 

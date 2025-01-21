@@ -1,14 +1,11 @@
 /*
 ** See Copyright Notice In elf.h
 ** log.h
-** Simple Logging Tools
 */
-
 
 enum {
 	LOG_KDEBUG = 0, LOG_KINFO, LOG_KWARNING, LOG_KERROR, LOG_KFATAL
 };
-
 
 char *log2s(int);
 

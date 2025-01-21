@@ -66,7 +66,9 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 #endif
 
 
-/* cast to union types, c feature */
+/* so I think is a C feature only, and it allows you
+to cast to explict types, so the user should get a warning
+of the type isn't one of the given ones? */
 #define UCAST(D,T) ( ((union { T _; }){D})._ )
 
 

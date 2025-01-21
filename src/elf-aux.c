@@ -164,14 +164,6 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 	elf_debugger("runtime throw");
 }
 
-
-void elf_check_args(elf_State *R, char *fnname, int n, char *usage) {
-	if (elf_get_num_args(R) != n) {
-		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
-	}
-}
-
-
 int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tagenum x, elf_tagenum y) {
 	if (x != y) {
 		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
