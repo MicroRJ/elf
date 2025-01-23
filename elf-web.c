@@ -29,8 +29,8 @@
 // #if 0
 // elAPI int elf_global_loadcode(char *filename, char *contents) {
 // 	elf_Value *top = GET_TOP(&elf.R);
-// 	elf_String *name = elf_push_new_string(&elf.R,filename);
-// 	elf_String *string = elf_push_new_string(&elf.R,contents);
+// 	elf_String *name = elf_new_string(&elf.R,filename);
+// 	elf_String *string = elf_new_string(&elf.R,contents);
 // 	elf_Parser fs = {0};
 // 	int nyield = elf_load_code_closure(&elf.R,&fs,name,0,string);
 // 	SET_TOP(&elf.R,top);

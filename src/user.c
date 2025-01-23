@@ -16,7 +16,7 @@ elf_Object *elf_push_new_object(elf_State *R, elf_Int size) {
 	return obj;
 }
 
-elf_String *elf_push_new_string(elf_State *R, const char *text) {
+elf_String *elf_new_string(elf_State *R, const char *text) {
 	elf_String *string=elf_alloc_string(R,text);
 	elf_push_string(R,string);
 	return string;
@@ -205,27 +205,27 @@ elAPI void elf_gsetx_tab(elf_State *S, char *name, elf_Table *thing);
 
 
 void elf_gsetx_sys(elf_State *R, char *name, elf_Handle val) {
-	elf_set_global(R->M,elf_push_new_string(R,name),VSYS(val));
+	elf_set_global(R->M,elf_new_string(R,name),VSYS(val));
 }
 
 
 void elf_gsetx_int(elf_State *R, char *name, elf_Int val) {
-	elf_set_global(R->M,elf_push_new_string(R,name),VINT(val));
+	elf_set_global(R->M,elf_new_string(R,name),VINT(val));
 }
 
 
 void elf_gsetx_tab(elf_State *R, char *name, elf_Table *val) {
-	elf_set_global(R->M,elf_push_new_string(R,name),VTAB(val));
+	elf_set_global(R->M,elf_new_string(R,name),VTAB(val));
 }
 
 
 void elf_gsetx_str(elf_State *R, char *name, char *val) {
-	elf_set_global(R->M,elf_push_new_string(R,name),VSTR(elf_push_new_string(R,val)));
+	elf_set_global(R->M,elf_new_string(R,name),VSTR(elf_new_string(R,val)));
 }
 
 
 void elf_gsetx_cfn(elf_State *R, char *name, elf_Function fn) {
-	elf_set_global(R->M,elf_push_new_string(R,name),VCFN(fn));
+	elf_set_global(R->M,elf_new_string(R,name),VCFN(fn));
 }
 
 

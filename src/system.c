@@ -214,14 +214,14 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 			elf_Bool isdir = (entry->d_type & DT_DIR) != 0;
 			elf_Value *top = GET_TOP(R);
 
-			elf_String *name = elf_push_new_string(R,entry->d_name);
-			elf_String *path = elf_push_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			elf_String *name = elf_new_string(R,entry->d_name);
+			elf_String *path = elf_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
 			elf_StackId base = elf_push_closure(R,cls);
 			elf_Table *file = elf_new_table(R);
 
-			elf_tsets_str(file,elf_push_new_string(R,"name"),name);
-			elf_tsets_str(file,elf_push_new_string(R,"path"),path);
-			elf_tsets_int(file,elf_push_new_string(R,"isdir"),isdir);
+			elf_tsets_str(file,elf_new_string(R,"name"),name);
+			elf_tsets_str(file,elf_new_string(R,"path"),path);
+			elf_tsets_int(file,elf_new_string(R,"isdir"),isdir);
 			int r = elf_call(R,base,1,1);
 			if ((r > 0) && isdir && elf_get_int(R,base)) {
 				core_lib_enumerate_folder_(R,path,cls);

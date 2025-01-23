@@ -3,6 +3,9 @@
 ** tree.c
 */
 
+bool is_tree_trivial_constant(elf_Parser *parser, treeID id) {
+	return id->kind == EXPR_INT || id->kind == EXPR_NUM;
+}
 
 treeT get_tree(elf_Parser *parser, treeID id) { return *id; }
 int get_tree_kind(elf_Parser *parser, treeID id) { return id->kind; }
@@ -44,7 +47,7 @@ static treeID tree_global(elf_Parser *parser, Source line, int x) {
 	return v;
 }
 
-static treeID tree_global_ref_by_name(elf_Parser *parser, Source line, char *name) {
+static treeID tree_global_name(elf_Parser *parser, Source line, char *name) {
 	int x = elf_get_global(parser->R->M,elf_alloc_string(parser->R,name));
 	ASSERT(x != -1);
 	return tree_global(parser,line,x);
@@ -129,7 +132,7 @@ static treeID tree_meta_field(elf_Parser *parser, Source line, treeID x, treeID 
 }
 
 static treeID tree_call_set_meta(elf_Parser *parser, Source line, treeID object, treeID metatable) {
-	treeID fn = tree_global_ref_by_name(parser,line,"elf.set_meta");
+	treeID fn = tree_global_name(parser,line,"elf.set_meta");
 	treeID *z = 0;
 	ARRAY_ADD(z,object);
 	ARRAY_ADD(z,metatable);
@@ -150,7 +153,7 @@ static treeID tree_closure_value(elf_Parser *parser, Source line, int x) {
 }
 
 static treeID tree_call_pf(elf_Parser *parser, Source line, treeID *args) {
-	treeID fn = tree_global_ref_by_name(parser,line,"elf.pf");
+	treeID fn = tree_global_name(parser,line,"elf.pf");
 	return tree_call(parser,line,fn,args);
 }
 

@@ -167,6 +167,6 @@ static treeID tree_meta_call(elf_Parser *, Source line, treeID x, treeID *z, cha
 static treeID tree_tuple(elf_Parser *, Source line, treeID *z);
 static treeID tree_block(elf_Parser *, Source line, treeID *z);
 
-static treeID tree_global_ref_by_name(elf_Parser *, Source line, char *name);
+static treeID tree_global_name(elf_Parser *, Source line, char *name);
 static treeID tree_call_pf(elf_Parser *, Source line, treeID *args);
 static treeID tree_call_set_meta(elf_Parser *, Source line, treeID object, treeID metatable);

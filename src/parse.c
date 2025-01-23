@@ -246,17 +246,16 @@ static treeID parse_fun(elf_Parser *parser){
 
 	if (!peek_tok(parser,TK_PAREN_RIGHT)) do {
 		tokenT name;
+		treeID para,expr;
 
 		name=take_tok(parser,TK_WORD);
-
-		treeID param,x;
-		param=tree_nop(parser,name.line);
-		x=tree_assign_mem(parser,name.line,param);
-		block_add(parser,x);
+		para=tree_nop(parser,name.line);
+		expr=tree_assign_mem(parser,name.line,para);
+		block_add(parser,expr);
 
 		parser_bind(parser, name.line
 		, ENTITY_ASSIGNED|ENTITY_PARAMETER
-		, name.text, param);
+		, name.text,para);
 	} while (pick_tok(parser,TK_COMMA));
 
 	if (!peek_tok(parser,TK_PAREN_RIGHT)) {
@@ -312,7 +311,7 @@ static treeID parse_load(elf_Parser *parser){
 	treeID v,*z;
 	z=parse_args(parser);
 
-	v=tree_global_ref_by_name(parser,tok.line,"elf.load_file");
+	v=tree_global_name(parser,tok.line,"elf.load_file");
 	v=tree_call(parser,tok.line,v,z);
 	return v;
 }
@@ -422,7 +421,7 @@ static treeID parse_unary(elf_Parser *parser, bool flags) {
 				strcat(sym,parser->tok_prev.text);
 			}while(pick_tok_inl(parser,TK_DOT));
 
-			v=tree_global_ref_by_name(parser,tok.line,sym);
+			v=tree_global_name(parser,tok.line,sym);
 		} break;
 		case TK_WORD: {
 			entityID id;
@@ -463,8 +462,16 @@ static treeID parse_unary(elf_Parser *parser, bool flags) {
 					v=entity.tree;
 				}
 			} else {
-				//todo:
-				v=tree_global_ref_by_name(parser,tok.line,name);
+				// todo: I dislike this system very much...
+				// globals should be explictly declared,
+				// otherwise you get some very annoying errors
+				// every now and then because you mispelled
+				// something and then it thinks that it is a
+				// global, instead, you should use a global
+				// keyword
+				v=tree_global_name(parser,tok.line,name);
+				// parser_dialog(parser,tok.line,"undeclared entity");
+				// exit(1);
 			}
 		} break;
 		case TK_PAREN_LEFT: {
@@ -878,8 +885,8 @@ static int parse_stat(elf_Parser *parser) {
 			if(!tok.eol){
 				v=parse_expr(parser,0);
 			}
-			Loop *loop;
 			if((tok.type==TK_CONTINUE)||(tok.type==TK_BREAK)){
+				Loop *loop;
 				loop=get_loop(parser,v);
 				if(loop!=0){
 					ASSERT(loop!=parser->loop_stack);
@@ -968,7 +975,24 @@ static int parse_stat(elf_Parser *parser) {
 				parser_bind(parser,tok.line
 				, flags,name, v);
 
-				v=tree_assign_mem(parser,tok.line,v);
+				// todo: i disabled this because I didn't exactly
+				// check how this would play out with closures...
+				// I assume the code that checks whether to capture
+				// something or not would have to check whether this
+				// is a constant or not too, maybe we could set a flag
+				// or something.
+				// Or maybe the entity should just be the
+				// constant value...
+#if 0
+				if ((flags & ENTITY_CONSTANT) && is_tree_trivial_constant(parser,v)) {
+					// tree is simple enough that there's no
+					// need to allocate memory for it.
+				} else
+#endif
+				{
+					v=tree_assign_mem(parser,tok.line,v);
+
+				}
 				block_add(parser,v);
 			} else {
 				treeID v;
@@ -1216,7 +1240,7 @@ static int parse_const(elf_Parser *parser) {
 		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			elf_push_new_string(parser->R,tok.text);
+			elf_new_string(parser->R,tok.text);
 			ret = 1;
 		} break;
 		case TK_CURLY_LEFT: {
@@ -1228,7 +1252,7 @@ static int parse_const(elf_Parser *parser) {
 				if (parser->tok_prox.type == TK_ASSIGN) {
 					if (tok.type == TK_WORD) {
 						get_tok(parser);
-						elf_push_new_string(parser->R,tok.text);
+						elf_new_string(parser->R,tok.text);
 						ret = 1;
 					} else if (is_key_tok(parser->tok.type)) {
 						ret = parse_const(parser);
@@ -1318,7 +1342,7 @@ static elf_tabID parse_json_obj(elf_Parser *parser){
 	take_tok(parser,TK_CURLY_LEFT);
 	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
 		tok=take_tok(parser,TK_STRING);
-		key=VSTR(elf_push_new_string(parser->R,tok.text));
+		key=VSTR(elf_new_string(parser->R,tok.text));
 		take_tok(parser,TK_COLON);
 		val=parse_json_value(parser);
 		elf_table_set(table,key,val);
@@ -1335,7 +1359,7 @@ static elf_Value parse_json_value(elf_Parser *parser) {
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);
-			val = VSTR(elf_push_new_string(parser->R,tok.text));
+			val = VSTR(elf_new_string(parser->R,tok.text));
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);

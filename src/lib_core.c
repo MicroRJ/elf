@@ -104,7 +104,7 @@ int core_lib_load_file(elf_State *R) {
 		file = fopen(name->text,"rb");
 		auto_close = true;
 	} else {
-		name = elf_push_new_string(R,"no name");
+		name = elf_new_string(R,"no name");
 		file = (FILE *) elf_get_sysobj(R,0);
 	}
 	if (!file) {
@@ -141,7 +141,7 @@ int core_lib_load_expr(elf_State *R) {
 		name = elf_get_string(R,0);
 		contents = _read_file(R,name->text,size,pos);
 	} else {
-		name = elf_push_new_string(R,"no name");
+		name = elf_new_string(R,"no name");
 		contents = _read_file_io(R,(FILE *)elf_get_sysobj(R,0),size,pos);
 	}
 
@@ -166,7 +166,7 @@ int core_lib_float2(elf_State *R) {
 }
 
 int core_lib_tagof(elf_State *R) {
-	elf_push_new_string(R,(char*)tag2s[elf_get_tag(R,0)]);
+	elf_new_string(R,(char*)tag2s[elf_get_tag(R,0)]);
 	return 1;
 }
 
@@ -174,7 +174,7 @@ int core_lib_tagof(elf_State *R) {
 int core_lib_get_object_color(elf_State *R) {
 	elf_Object *obj = elf_get_obj(R,0);
 	int color = obj->color;
-	elf_push_new_string(R,
+	elf_new_string(R,
 	color == elf_GC_BLACK ? "black" :
 	color == elf_GC_WHITE ? "white" :
 	color == elf_GC_PINK  ? "pink"  :
@@ -442,7 +442,7 @@ int core_lib_change_work_dir(elf_State *R) {
 int core_lib_get_work_dir(elf_State *R) {
 	char buf[MAX_PATH];
 	sys_get_work_dir(sizeof(buf),buf);
-	elf_push_new_string(R,buf);
+	elf_new_string(R,buf);
 	return 1;
 }
 
