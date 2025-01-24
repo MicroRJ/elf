@@ -1232,6 +1232,11 @@ static int parse_const(elf_Parser *parser) {
 				goto esc;
 			}
 		} break;
+		case TK_NIL: {
+			get_tok(parser);
+			elf_push_nil(parser->R);
+			ret = 1;
+		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
 			elf_push_number(parser->R,tok.number);
