@@ -166,6 +166,8 @@ int string_lib_append(elf_State *R) {
 			strcatf(buffer,"%.2f",v.x_num);
 		} else if (v.tag == elf_tag_int) {
 			strcatf(buffer,"%lli",v.x_int);
+		} else if (v.tag == elf_tag_tab) {
+			strcatf(buffer,"(tab %p)",v.x_tab);
 		} else NO_CODE;
 	}
 	elf_new_string(R,buffer);
