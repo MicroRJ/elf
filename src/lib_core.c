@@ -3,16 +3,13 @@
 ** lib_core.c
 */
 
-
-static int core_lib_const_expr(elf_State *R) {
-	elf_String *contents = elf_get_string(R,0);
-	elf_Parser parser = {};
-	prep_parser(&parser,R,"no name",contents->text);
-	int ret = parse_const(&parser);
-	return ret < 0 ? 0 : ret;
-}
-
+//
+// todo: just have the same function to reading/writting
+//
+// -- files
+//
 static elf_String *_read_file_io(elf_State *R, FILE *io, int size, int pos) {
+	ASSERT(io != 0);
 	if (pos != -1) fseek(io,pos,SEEK_SET);
 	if (size == -1) {
 		fseek(io,0,SEEK_END);
@@ -27,10 +24,12 @@ static elf_String *_read_file_io(elf_State *R, FILE *io, int size, int pos) {
 }
 
 static int _write_file_io(elf_State *R, FILE *io, char *text) {
+	ASSERT(io != 0);
 	return fwrite(text,1,strlen(text),io);
 }
 
 static elf_String *_read_file(elf_State *R, char *name, int size, int pos) {
+
 	elf_String *contents = 0;
 	FILE *file = fopen(name,"rb");
 	if (file) {
@@ -55,6 +54,118 @@ static int _write_file(elf_State *R, char *name, char *text) {
 	}
 	return wrote;
 }
+
+
+int core_lib_open_temp_file(elf_State *R) {
+	FILE *file = {0};
+#if defined(PLATFORM_WEB)
+	file = tmpfile();
+#else
+	tmpfile_s(&file);
+#endif
+	elf_add_sys(R,(elf_Handle)file);
+	return 1;
+}
+
+int core_lib_open_file(elf_State *R) {
+	ASSERT(elf_get_num_args(R) == 2);
+	char *name = elf_get_text(R,0);
+	char *flags = elf_get_text(R,1);
+	FILE *file = fopen(name,flags);
+	elf_add_sys(R,(elf_Handle)file);
+	return 1;
+}
+
+int core_lib_close_file(elf_State *R) {
+	ASSERT(elf_get_num_args(R)==1);
+	FILE *file=(FILE *)elf_get_sysobj(R,0);
+	if(file){
+		fclose(file);
+	}
+	return 0;
+}
+
+int core_lib_get_file_size(elf_State *R) {
+	FILE *file;
+	if(elf_get_tag(R,0) == elf_tag_str) {
+		file = fopen(elf_get_text(R,0),"rb");
+	} else {
+		file = (FILE *) elf_get_sysobj(R,0);
+	}
+	fseek(file,0,SEEK_END);
+	int size = ftell(file);
+	fseek(file,0,SEEK_SET);
+	elf_push_int(R,size);
+	return 1;
+}
+
+int core_lib_read_file(elf_State *R) {
+	elf_String *contents=0;
+	int pos=-1,size=-1;
+	FILE *io;
+	if(elf_get_tag(R,0)==elf_tag_str){
+		io=fopen(elf_get_text(R,0),"rb");
+	} else {
+		io=elf_get_sysobj(R,0);
+	}
+	if(io){
+		contents=_read_file_io(R,io,size,pos);
+		if(elf_get_tag(R,0)==elf_tag_str) {
+			fclose(io);
+		}
+	}
+	elf_push_string(R,contents);
+	return 1;
+}
+
+int core_lib_write_file(elf_State *R) {
+	if(elf_get_tag(R,0) == elf_tag_str) {
+		_write_file(R,elf_get_text(R,0),elf_get_text(R,1));
+	} else {
+		_write_file_io(R,elf_get_sysobj(R,0),elf_get_text(R,1));
+	}
+	return 0;
+}
+
+int core_lib_write_file_to_file(elf_State *R) {
+	FILE *dst,*src;
+	if(elf_get_tag(R,0) == elf_tag_str) {
+		dst = fopen(elf_get_text(R,0),"wb");
+	} else {
+		dst = (FILE *) elf_get_sysobj(R,0);
+	}
+	if(elf_get_tag(R,1) == elf_tag_str) {
+		src = fopen(elf_get_text(R,1),"rb");
+	} else {
+		src = (FILE *) elf_get_sysobj(R,1);
+	}
+	char buffer[4096];
+	int read,wrote = 0;
+	do {
+		read = fread(buffer,1,sizeof(buffer),src);
+		wrote += fwrite(buffer,1,read,dst);
+	} while(read > 0);
+
+	elf_push_int(R,wrote);
+	return 1;
+}
+
+
+
+int core_lib_change_work_dir(elf_State *R) {
+	int ok = sys_set_work_dir(elf_get_text(R,0));
+	elf_push_int(R,ok);
+	return 1;
+}
+
+
+int core_lib_get_work_dir(elf_State *R) {
+	char buf[MAX_PATH];
+	sys_get_work_dir(sizeof(buf),buf);
+	elf_new_string(R,buf);
+	return 1;
+}
+
 
 static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents) {
 	ASSERT(contents);
@@ -90,6 +201,21 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 	R->stack_ptr = rets + nrets;
 	esc:
 	return nrets;
+}
+
+//
+// -- meta
+//
+static int core_lib_const_expr(elf_State *R) {
+	elf_String *contents = elf_get_string(R,0);
+	int ret=0;
+	if(contents){
+		elf_Parser parser = {};
+		prep_parser(&parser,R,"no name",contents->text);
+		// the result is on the stack already
+		ret=parse_const(&parser);
+	}
+	return ret < 0 ? 0 : ret;
 }
 
 int core_lib_load_file(elf_State *R) {
@@ -344,107 +470,6 @@ int core_lib_load_json(elf_State *R) {
 	return 1;
 }
 
-int core_lib_open_temp_file(elf_State *R) {
-	FILE *file = {0};
-#if defined(PLATFORM_WEB)
-	file = tmpfile();
-#else
-	tmpfile_s(&file);
-#endif
-	elf_add_sys(R,(elf_Handle)file);
-	return 1;
-}
-
-int core_lib_open_file(elf_State *R) {
-	ASSERT(elf_get_num_args(R) == 2);
-	char *name = elf_get_text(R,0);
-	char *flags = elf_get_text(R,1);
-	FILE *file = fopen(name,flags);
-	elf_add_sys(R,(elf_Handle)file);
-	return 1;
-}
-
-int core_lib_close_file(elf_State *R) {
-	ASSERT(elf_get_num_args(R) == 1);
-	elf_Handle file = elf_get_sysobj(R,0);
-	if(file==0) elf_fail(R,NO_BYTE,"invalid argument");
-	fclose(file);
-	return 0;
-}
-
-int core_lib_get_file_size(elf_State *R) {
-	FILE *file;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		file = fopen(elf_get_text(R,0),"rb");
-	} else {
-		file = (FILE *) elf_get_sysobj(R,0);
-	}
-	fseek(file,0,SEEK_END);
-	int size = ftell(file);
-	fseek(file,0,SEEK_SET);
-	elf_push_int(R,size);
-	return 1;
-}
-
-int core_lib_read_file(elf_State *R) {
-	elf_String *contents = 0;
-	int pos=-1,size=-1;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		contents = _read_file(R,elf_get_text(R,0),size,pos);
-	} else {
-		contents = _read_file_io(R,elf_get_sysobj(R,0),size,pos);
-	}
-	elf_push_string(R,contents);
-	return 1;
-}
-
-int core_lib_write_file(elf_State *R) {
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		_write_file(R,elf_get_text(R,0),elf_get_text(R,1));
-	} else {
-		_write_file_io(R,elf_get_sysobj(R,0),elf_get_text(R,1));
-	}
-	return 0;
-}
-
-int core_lib_write_file_to_file(elf_State *R) {
-	FILE *dst,*src;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		dst = fopen(elf_get_text(R,0),"wb");
-	} else {
-		dst = (FILE *) elf_get_sysobj(R,0);
-	}
-	if(elf_get_tag(R,1) == elf_tag_str) {
-		src = fopen(elf_get_text(R,1),"rb");
-	} else {
-		src = (FILE *) elf_get_sysobj(R,1);
-	}
-	char buffer[4096];
-	int read,wrote = 0;
-	do {
-		read = fread(buffer,1,sizeof(buffer),src);
-		wrote += fwrite(buffer,1,read,dst);
-	} while(read > 0);
-
-	elf_push_int(R,wrote);
-	return 1;
-}
-
-
-
-int core_lib_change_work_dir(elf_State *R) {
-	int ok = sys_set_work_dir(elf_get_text(R,0));
-	elf_push_int(R,ok);
-	return 1;
-}
-
-
-int core_lib_get_work_dir(elf_State *R) {
-	char buf[MAX_PATH];
-	sys_get_work_dir(sizeof(buf),buf);
-	elf_new_string(R,buf);
-	return 1;
-}
 
 
 int core_lib_fpf(elf_State *S) {

@@ -27,6 +27,10 @@ static void block_add(elf_Parser *parser, treeID id);
 static int parse_const(elf_Parser *parser);
 
 static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text) {
+	ASSERT(parser!=0);
+	ASSERT(R!=0);
+	ASSERT(name!=0);
+	ASSERT(text!=0);
 	parser->R = R;
 	parser->name=name;
 	parser->text=text;
