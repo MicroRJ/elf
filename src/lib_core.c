@@ -204,8 +204,16 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 }
 
 //
-// -- meta
+// meta
 //
+
+static int core_lib_get_global(elf_State *R) {
+	elf_String *name=elf_get_string(R,0);
+	int index=elf_get_global(R->M,name);
+	elf_push(R,R->M->globals->array[index]);
+	return 1;
+}
+
 static int core_lib_const_expr(elf_State *R) {
 	elf_String *contents = elf_get_string(R,0);
 	int ret=0;

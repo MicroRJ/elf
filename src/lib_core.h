@@ -16,6 +16,7 @@
 _(float2)\
 _(unload)\
 _(tagof)\
+_(get_global)\
 _(get_object_color)\
 _(set_object_trap)\
 _(get_object_address)\
