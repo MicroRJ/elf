@@ -32,24 +32,6 @@ static tokenTy text_is_word_or_keyword(char *name) {
 	return TK_WORD;
 }
 
-
-typedef struct t_token_info {
-	char *name;
-	char prec;
-} t_token_info;
-
-
-GLOBAL t_token_info tok2inf[] = {
-	{"none",-2},
-#define TKITEM(_,SYM) {SYM,-2},
-#define OPITEM(_,SYM,PRC) {SYM,PRC},
-	KEYWORDDEF(TKITEM)
-	MACRODEF(TKITEM)
-	TOKENDEF(TKITEM)
-	OPERATORDEF(OPITEM)
-};
-
-
 void parser_dialog(elf_Parser *fs, char *line, char const *fmt, ...) {
 	line = line ? line : fs->tok.line;
 

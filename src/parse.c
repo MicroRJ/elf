@@ -13,7 +13,7 @@ static treeID parse_bl(elf_Parser *parser);
 static int parse_stat(elf_Parser *parser);
 static int tok2tree(int tok);
 
-static int tok2prec(int type) {
+static int get_tok_prec(int type) {
 	return tok2inf[type].prec;
 }
 
@@ -26,7 +26,7 @@ static void block_add(elf_Parser *parser, treeID id);
 // the result is pushed onto the stack
 static int parse_const(elf_Parser *parser);
 
-static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text) {
+static void elf_prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text) {
 	ASSERT(parser!=0);
 	ASSERT(R!=0);
 	ASSERT(name!=0);
@@ -42,11 +42,9 @@ static void prep_parser(elf_Parser *parser, elf_State *R, char *name, char *text
 }
 
 
-// todo: rename to elf_parse, but don't use
-// global replace cuz there's only one reference,
-// other references are just plain text
-static treeID parse(elf_Parser *parser, elf_State *R, bool as_expr, char *name, char *text) {
-	prep_parser(parser,R,name,text);
+static treeID elf_parse(elf_Parser *parser, elf_State *R, bool as_expr, char *name, char *text) {
+	elf_prep_parser(parser,R,name,text);
+	elf_i64 time=elf_get_clock_time();
 
 	treeID func = new_tree(parser,parser->tok.line,TREE_FUNCTION,NT_FUN);
 	parser->enc = func;
@@ -66,6 +64,9 @@ static treeID parse(elf_Parser *parser, elf_State *R, bool as_expr, char *name, 
 		}
 	}
 	func->expr_fun.body = tree_block(parser,parser->tok.line,parser->block.body);
+
+	elf_f64 took=elf_time_diff_ms(time);
+	elf_debug_log("%s: parse took: %fms", name, took);
 	return func;
 }
 
@@ -719,7 +720,7 @@ static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 	for(;;) {
 		tok=parser->tok;
 
-		prio=tok2prec(tok.type);
+		prio=get_tok_prec(tok.type);
 		if (prio<=rank) goto esc;
 
 		if(parser->tok_prox.type==TK_ASSIGN){
@@ -755,7 +756,7 @@ static treeID parse_expr(elf_Parser *parser, int flags) {
 	return parse_subexpr(parser,flags,0);
 }
 
-//todo:just use the same enum for the token and the tree
+// todo:just use the same enum for the token and the tree
 static int tok2tree(int tok) {
 	switch (tok) {
 		case TK_DOT_DOT: return TREE_RANGE;
@@ -1023,7 +1024,7 @@ static int parse_stat(elf_Parser *parser) {
 					, tree_binary(parser,tok.line,EXPR_EQ,NT_ANY,v,tree_nil(parser,tok.line))
 					, tree_store(parser,tok.line,v,y)
 					, 0);
-				} else if (tok2prec(tok.type) > 0) {
+				} else if (get_tok_prec(tok.type) > 0) {
 					check_assign(parser,tok.line,v);
 
 					tok=get_tok(parser);

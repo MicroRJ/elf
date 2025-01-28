@@ -118,6 +118,27 @@ _(PAREN_LEFT         ,"(")          \
 _(PAREN_RIGHT        ,")")          \
 /* end */
 
+
+
+typedef struct t_token_info {
+	char *name;
+	char prec;
+} t_token_info;
+
+GLOBAL t_token_info tok2inf[] = {
+	{"none",-2},
+#define TKITEM(_,SYM) {SYM,-2},
+#define OPITEM(_,SYM,PRC) {SYM,PRC},
+	KEYWORDDEF(TKITEM)
+	MACRODEF(TKITEM)
+	TOKENDEF(TKITEM)
+	OPERATORDEF(OPITEM)
+};
+
+#undef TKITEM
+#undef MCITEM
+#undef OPITEM
+
 typedef enum tokenTy {
 	TK_NONE = 0,
 
@@ -196,38 +217,47 @@ struct Loop {
 	treeID  name;
 };
 
+typedef struct tree_arena tree_arena;
+struct tree_arena{
+
+	int index;
+};
 
 typedef struct elf_Parser elf_Parser;
 struct elf_Parser {
-	elf_State              *R;
-	char                *name;
-	char                *text;
-	char            *line_pos;
-	char                 *pos;
-	int              line_num;
-	treeID                enc;
-	treeID         *functions;
-	entityT         *entities;
-	entityID     entity_index;
-	entityID  scope_stack[16];
-	entityID      scope_index;
-	entityID            scope;
-	Source         src_stack[32];
-	Source         src_index;
-	Source               src;
-	Block     block_stack[16];
-	int           block_index;
-	Block               block;
-	Loop       loop_stack[16];
-	int            loop_index;
-	Loop                 loop;
+	elf_State                 *R;
+	char                   *name;
+	char                   *text;
+	char               *line_pos;
+	char                    *pos;
+	int                 line_num;
 	tokenT tok,tok_prev,tok_prox;
+	// -- parsing
+	char             *tree_arena;
+	int               tree_index;
+	treeID                   enc;
+	treeID            *functions;
+	entityT            *entities;
+	entityID        entity_index;
+	entityID     scope_stack[16];
+	entityID         scope_index;
+	entityID               scope;
+	Source         src_stack[32];
+	Source             src_index;
+	Source                   src;
+	Block        block_stack[16];
+	int              block_index;
+	Block                  block;
+	Loop          loop_stack[16];
+	int               loop_index;
+	Loop                    loop;
+	// -- codegen
+	int 	 memory_usage;
+	int 	 memory_state;
+	int 	 memory_state_stack[128];
+	int 	 memory_state_index;
+	treeID memory_slots[128];
 };
-
-// todo:
-// static FileBlock *get_loop_block(elf_Parser *fs, elf_StackId with_value_register);
-// static void begin_delay_block(elf_Parser *fs, Source line);
-// static void close_delay_block(elf_Parser *fs, Source line);
 
 static int emit_branch_if_false(elf_Parser *fs, jumpS *js, treeID id);
 static int emit_branch_if_true(elf_Parser *fs, jumpS *js, treeID id);

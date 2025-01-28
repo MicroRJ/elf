@@ -3,168 +3,7 @@
 ** lib_core.c
 */
 
-//
-// todo: just have the same function to reading/writting
-//
-// -- files
-//
-static elf_String *_read_file_io(elf_State *R, FILE *io, int size, int pos) {
-	ASSERT(io != 0);
-	if (pos != -1) fseek(io,pos,SEEK_SET);
-	if (size == -1) {
-		fseek(io,0,SEEK_END);
-		size = ftell(io);
-		fseek(io,0,SEEK_SET);
-	}
-
-	elf_String *contents = elf_new_string2(R,size);
-	// fseek(io,0,SEEK_SET);
-	fread(contents->text,1,size,io);
-	return contents;
-}
-
-static int _write_file_io(elf_State *R, FILE *io, char *text) {
-	ASSERT(io != 0);
-	return fwrite(text,1,strlen(text),io);
-}
-
-static elf_String *_read_file(elf_State *R, char *name, int size, int pos) {
-
-	elf_String *contents = 0;
-	FILE *file = fopen(name,"rb");
-	if (file) {
-		contents = _read_file_io(R,file,size,pos);
-		fclose(file);
-		elf_debug_log("'%s': file read successfully",name);
-	} else {
-		elf_error_log("'%s': could not read",name);
-	}
-	return contents;
-}
-
-static int _write_file(elf_State *R, char *name, char *text) {
-	FILE *file = fopen(name,"wb");
-	int wrote = 0;
-	if (file) {
-		wrote = _write_file_io(R,file,text);
-		fclose(file);
-		elf_debug_log("'%s': file wrote successfully",name);
-	} else {
-		elf_error_log("'%s': could not write",name);
-	}
-	return wrote;
-}
-
-
-int core_lib_open_temp_file(elf_State *R) {
-	FILE *file = {0};
-#if defined(PLATFORM_WEB)
-	file = tmpfile();
-#else
-	tmpfile_s(&file);
-#endif
-	elf_add_sys(R,(elf_Handle)file);
-	return 1;
-}
-
-int core_lib_open_file(elf_State *R) {
-	ASSERT(elf_get_num_args(R) == 2);
-	char *name = elf_get_text(R,0);
-	char *flags = elf_get_text(R,1);
-	FILE *file = fopen(name,flags);
-	elf_add_sys(R,(elf_Handle)file);
-	return 1;
-}
-
-int core_lib_close_file(elf_State *R) {
-	ASSERT(elf_get_num_args(R)==1);
-	FILE *file=(FILE *)elf_get_sysobj(R,0);
-	if(file){
-		fclose(file);
-	}
-	return 0;
-}
-
-int core_lib_get_file_size(elf_State *R) {
-	FILE *file;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		file = fopen(elf_get_text(R,0),"rb");
-	} else {
-		file = (FILE *) elf_get_sysobj(R,0);
-	}
-	fseek(file,0,SEEK_END);
-	int size = ftell(file);
-	fseek(file,0,SEEK_SET);
-	elf_push_int(R,size);
-	return 1;
-}
-
-int core_lib_read_file(elf_State *R) {
-	elf_String *contents=0;
-	int pos=-1,size=-1;
-	FILE *io;
-	if(elf_get_tag(R,0)==elf_tag_str){
-		io=fopen(elf_get_text(R,0),"rb");
-	} else {
-		io=elf_get_sysobj(R,0);
-	}
-	if(io){
-		contents=_read_file_io(R,io,size,pos);
-		if(elf_get_tag(R,0)==elf_tag_str) {
-			fclose(io);
-		}
-	}
-	elf_push_string(R,contents);
-	return 1;
-}
-
-int core_lib_write_file(elf_State *R) {
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		_write_file(R,elf_get_text(R,0),elf_get_text(R,1));
-	} else {
-		_write_file_io(R,elf_get_sysobj(R,0),elf_get_text(R,1));
-	}
-	return 0;
-}
-
-int core_lib_write_file_to_file(elf_State *R) {
-	FILE *dst,*src;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		dst = fopen(elf_get_text(R,0),"wb");
-	} else {
-		dst = (FILE *) elf_get_sysobj(R,0);
-	}
-	if(elf_get_tag(R,1) == elf_tag_str) {
-		src = fopen(elf_get_text(R,1),"rb");
-	} else {
-		src = (FILE *) elf_get_sysobj(R,1);
-	}
-	char buffer[4096];
-	int read,wrote = 0;
-	do {
-		read = fread(buffer,1,sizeof(buffer),src);
-		wrote += fwrite(buffer,1,read,dst);
-	} while(read > 0);
-
-	elf_push_int(R,wrote);
-	return 1;
-}
-
-
-
-int core_lib_change_work_dir(elf_State *R) {
-	int ok = sys_set_work_dir(elf_get_text(R,0));
-	elf_push_int(R,ok);
-	return 1;
-}
-
-
-int core_lib_get_work_dir(elf_State *R) {
-	char buf[MAX_PATH];
-	sys_get_work_dir(sizeof(buf),buf);
-	elf_new_string(R,buf);
-	return 1;
-}
+#include "lib_file.c"
 
 
 static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents) {
@@ -174,7 +13,7 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 	// todo: parse and gen file should just be one function,
 	// or maybe just have the one 'parse' function...
 	elf_Parser parser = {};
-	treeID tree = parse(&parser,R,as_expr,name->text,contents->text);
+	treeID tree = elf_parse(&parser,R,as_expr,name->text,contents->text);
 	elf_File file = gen_file(&parser,tree);
 
 	// todo: we need this in the file for debugging...
@@ -191,9 +30,10 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 
 	// ASSERT(nargs >= 0);
 	// ASSERT(nrets >= 0);
-	/* todo: HACK!
-	Todo: the file closure doesn't have to be kept alive... */
-	elf_set_global(R->M,0,VCLS(cls));
+	// todo: ensure the closure doesn't actually have to be
+	// kept alive...
+	// elf_set_global(R->M,0,VCLS(cls));
+
 	elf_Value *rets = R->stack_ptr;
 	elf_push_closure(R,cls);
 	elf_push_this(R);
@@ -203,89 +43,7 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 	return nrets;
 }
 
-//
-// meta
-//
-
-static int core_lib_get_global(elf_State *R) {
-	elf_String *name=elf_get_string(R,0);
-	int index=elf_get_global(R->M,name);
-	elf_push(R,R->M->globals->array[index]);
-	return 1;
-}
-
-static int core_lib_const_expr(elf_State *R) {
-	elf_String *contents = elf_get_string(R,0);
-	int ret=0;
-	if(contents){
-		elf_Parser parser = {};
-		prep_parser(&parser,R,"no name",contents->text);
-		// the result is on the stack already
-		ret=parse_const(&parser);
-	}
-	return ret < 0 ? 0 : ret;
-}
-
-int core_lib_load_file(elf_State *R) {
-	elf_String *name, *contents;
-	FILE *file;
-	int auto_close = false;
-	int pos = -1;
-	int size = -1;
-	int res = 0;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		name = elf_get_string(R,0);
-		file = fopen(name->text,"rb");
-		auto_close = true;
-	} else {
-		name = elf_new_string(R,"no name");
-		file = (FILE *) elf_get_sysobj(R,0);
-	}
-	if (!file) {
-		elf_error_log("'%s': failed to load file",name->text);
-		goto esc;
-	}
-
-	if (elf_get_num_args(R) > 1) {
-		size = elf_get_int(R,1);
-		if (elf_get_num_args(R) > 2) {
-			pos = elf_get_int(R,2);
-		}
-	}
-	contents = _read_file_io(R,file,size,pos);
-
-	int nargs = 1; // elf_get_num_args(R) - 1;
-	int nrets = elf_get_num_rets(R);
-	res = _exec(R,false,nargs,nrets,name,contents);
-
-	if (auto_close) {
-		fclose(file);
-	}
-
-	esc:
-	return res;
-}
-
-
-int core_lib_load_expr(elf_State *R) {
-	elf_String *name, *contents;
-	int pos=-1,size=-1;
-
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		name = elf_get_string(R,0);
-		contents = _read_file(R,name->text,size,pos);
-	} else {
-		name = elf_new_string(R,"no name");
-		contents = _read_file_io(R,(FILE *)elf_get_sysobj(R,0),size,pos);
-	}
-
-	int nargs = elf_get_num_args(R) - 1;
-	int nrets = elf_get_num_rets(R);
-	nrets = _exec(R,true,nargs,nrets,name,contents);
-	return nrets;
-}
-
-
+#include "lib_meta.c"
 
 // mostly experimental...
 int core_lib_float2(elf_State *R) {
@@ -298,39 +56,6 @@ int core_lib_float2(elf_State *R) {
 	*R->stack_ptr++=v;
 	return 1;
 }
-
-int core_lib_tagof(elf_State *R) {
-	elf_new_string(R,(char*)tag2s[elf_get_tag(R,0)]);
-	return 1;
-}
-
-
-int core_lib_get_object_color(elf_State *R) {
-	elf_Object *obj = elf_get_obj(R,0);
-	int color = obj->color;
-	elf_new_string(R,
-	color == elf_GC_BLACK ? "black" :
-	color == elf_GC_WHITE ? "white" :
-	color == elf_GC_PINK  ? "pink"  :
-	color == elf_GC_RED   ? "red"   :
-	color == elf_GC_TRAP  ? "trap"  : "error");
-	return 1;
-}
-
-
-int core_lib_set_object_trap(elf_State *R) {
-	elf_Int set = elf_get_int(R,1);
-	OBJ_COLOR(elf_get_obj(R,0)) = set ? elf_GC_TRAP : elf_GC_WHITE;
-	return 0;
-}
-
-
-int core_lib_get_object_address(elf_State *R) {
-	elf_push_int(R,(elf_Int) (void *) elf_get_obj(R,0));
-	return 1;
-}
-
-
 /* merges one or several tables together into
 a new table, which is then returned. */
 int core_lib_merge_tables(elf_State *R) {
@@ -467,7 +192,7 @@ int core_lib_load_json(elf_State *R) {
 	fread(contents->text,1,size,file);
 
 	elf_Parser parser = {};
-	prep_parser(&parser, R, name, contents->text);
+	elf_prep_parser(&parser, R, name, contents->text);
 
 	elf_tabID tab = parse_json_obj(&parser);
 	elf_push_table(R,tab);
@@ -593,98 +318,3 @@ int core_lib_ntoi(elf_State *R) {
 	} else elf_push_int(R,v.x_int);
 	return 1;
 }
-
-
-#if 0
-void elf_include_core_lib(elf_State *R) {
-	elf_gsetx_int(R,"elf.VERSION",0);
-#if defined(PLATFORM_WEB)
-	elf_gsetx_str(R,"elf.PLATFORM","WEB");
-	elf_gsetx_str(R,"elf.OS","UNKNOWN");
-#else
-	elf_gsetx_str(R,"elf.PLATFORM","DESKTOP");
-	#if defined(_WIN32)
-	elf_gsetx_str(R,"elf.OS","WINDOWS");
-	#else
-	elf_gsetx_str(R,"elf.OS","UNKNOWN");
-	#endif
-#endif
-
-	elf_gsetx_cfn(R,"elf.flags",core_lib_flags);
-	elf_gsetx_cfn(R,"elf.debugger",core_lib_debugger);
-
-	elf_gsetx_cfn(R,"elf.merge_tables",core_lib_merge_tables);
-
-	elf_gsetx_cfn(R,"elf.pause_collector",core_lib_pause_collector);
-	elf_gsetx_cfn(R,"elf.mark_object",core_lib_mark_object);
-	elf_gsetx_cfn(R,"elf.get_collector_threshold",core_lib_get_collector_threshold);
-	elf_gsetx_cfn(R,"elf.get_allocated_objects",core_lib_get_allocated_objects);
-	elf_gsetx_cfn(R,"elf.get_allocated_memory",core_lib_get_allocated_memory);
-	elf_gsetx_cfn(R,"elf.collect",core_lib_collect);
-	elf_gsetx_cfn(R,"elf.tagof",core_lib_tagof);
-
-	elf_gsetx_cfn(R,"elf.set_meta",core_lib_set_meta);
-	elf_gsetx_cfn(R,"elf.get_meta",core_lib_get_meta);
-	elf_gsetx_cfn(R,"elf.get_object_address",core_lib_get_object_address);
-	elf_gsetx_cfn(R,"elf.get_object_color",core_lib_get_object_color);
-	elf_gsetx_cfn(R,"elf.set_object_trap",core_lib_set_object_trap);
-
-
-	elf_gsetx_cfn(R,"elf.log",core_lib_log);
-	elf_gsetx_cfn(R,"elf.err",core_lib_err_log);
-
-	/* todo: these should be intrinsic */
-	elf_gsetx_cfn(R,"ntoi",core_lib_ntoi);
-	elf_gsetx_cfn(R,"iton",core_lib_iton);
-
-	elf_gsetx_cfn(R,"elf.clocktime",core_lib_clocktime);
-	elf_gsetx_cfn(R,"elf.timediffs",core_lib_timediffs);
-	elf_gsetx_cfn(R,"elf.timediffms",core_lib_timediffms);
-
-	elf_gsetx_cfn(R,"elf.loadlib",core_lib_load_dll);
-	elf_gsetx_cfn(R,"elf.libfn",core_lib_get_dll_fn);
-
-	elf_gsetx_cfn(R,"elf.include",core_lib_include);
-	elf_gsetx_cfn(R,"elf.loadcode",core_lib_load_code);
-	elf_gsetx_cfn(R,"elf.loadexpr",core_lib_load_expr);
-	elf_gsetx_cfn(R,"elf.unload",core_lib_unload);
-
-	elf_gsetx_cfn(R,"elf.load_file",core_lib_load_file);
-	elf_gsetx_cfn(R,"elf.load_json",core_lib_load_json);
-
-	elf_gsetx_cfn(R,"elf.pf_indent",core_lib_pf_indent);
-	elf_gsetx_cfn(R,"elf.pf",core_lib_pf);
-	elf_gsetx_cfn(R,"elf.lpf",core_lib_lpf);
-
-
-	elf_gsetx_cfn(R,"elf.change_work_dir",core_lib_change_work_dir);
-	elf_gsetx_cfn(R,"elf.get_work_dir",core_lib_get_work_dir);
-
-	// elf_gsetx_cfn(R,"elf.enumerate_folder",core_lib_enumerate_folder);
-	// elf_gsetx_cfn(R,"elf.get_disk_info",core_lib_get_disk_info);
-	// elf_gsetx_cfn(R,"elf.list_volumes",core_lib_list_volumes);
-	// elf_gsetx_cfn(R,"elf.list_folder",core_lib_list_folder);
-
-
-	elf_gsetx_sys(R,"elf.ferr",stderr);
-	elf_gsetx_sys(R,"elf.fout",stdout);
-	elf_gsetx_sys(R,"elf.fin",stdin);
-
-	elf_gsetx_cfn(R,"elf.pf",core_lib_pf);
-	elf_gsetx_cfn(R,"elf.fpf",core_lib_fpf);
-	elf_gsetx_cfn(R,"elf.fload",core_lib_read_file);
-	elf_gsetx_cfn(R,"elf.ftemp",core_lib_open_temp_file);
-	elf_gsetx_cfn(R,"elf.fopen",core_lib_open_file);
-	elf_gsetx_cfn(R,"elf.fclose",core_lib_close_file);
-	elf_gsetx_cfn(R,"elf.fsize",core_lib_get_file_size);
-	// elf_gsetx_cfn(R,"elf.get_file_size",core_lib_get_file_size);
-
-	elf_gsetx_cfn(R,"elf.sleep",core_lib_sleep);
-	elf_gsetx_cfn(R,"elf.exec",core_lib_exec);
-	elf_gsetx_cfn(R,"elf.shell",lib_core_shell);
-
-	elf_gsetx_cfn(R,"elf.float2",core_lib_float2);
-
-	// math_lib_include(R);
-}
-#endif

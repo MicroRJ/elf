@@ -3,8 +3,7 @@
 ** gen.c
 */
 
-// functions used during code generation, these seem sort of
-// generic...
+// todo: interning!
 static int elf_add_const_int(elf_State *S, elf_Int i) {
 	int index = ARRAY_GROW(S->M->integers,1);
 	S->M->integers[index] = i;
@@ -34,31 +33,24 @@ int tree2o(int kind);
 int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 
-/* simple memory allocator */
-static int memory_usage;
-static int memory_state;
-static int memory_state_stack[128];
-static int memory_state_index;
-static treeID memory_slots[128];
-
-static int get_mem_state(elf_Parser *parser) { return memory_state; }
-static void set_mem_state(elf_Parser *parser, int state) { memory_state = state; }
+static int get_mem_state(elf_Parser *parser) { return parser->memory_state; }
+static void set_mem_state(elf_Parser *parser, int state) { parser->memory_state = state; }
 
 static void push_mem_state(elf_Parser *parser) {
-	ASSERT(memory_state_index < _countof(memory_state_stack));
-	memory_state_stack[memory_state_index ++] = get_mem_state(parser);
+	ASSERT(parser->memory_state_index < _countof(parser->memory_state_stack));
+	parser->memory_state_stack[parser->memory_state_index ++] = get_mem_state(parser);
 }
 static void pop_mem_state(elf_Parser *parser) {
-	ASSERT(memory_state_index > 0);
-	set_mem_state(parser,memory_state_stack[-- memory_state_index]);
+	ASSERT(parser->memory_state_index > 0);
+	set_mem_state(parser,parser->memory_state_stack[-- parser->memory_state_index]);
 }
 
 
 static int get_mem(elf_Parser *parser, treeID id) {
 	int reg = -1;
 	if (id != NO_TREE) {
-		for (int i = 0; i < memory_state; i ++) {
-			if (memory_slots[i] == id) {
+		for (int i = 0; i < parser->memory_state; i ++) {
+			if (parser->memory_slots[i] == id) {
 				return i;
 			}
 		}
@@ -68,12 +60,12 @@ static int get_mem(elf_Parser *parser, treeID id) {
 
 /* assign a memory location to the given tree */
 static int set_mem(elf_Parser *parser, treeID id) {
-	ASSERT(memory_state < _countof(memory_slots));
+	ASSERT(parser->memory_state < _countof(parser->memory_slots));
 
-	int reg = memory_state ++;
-	memory_slots[reg] = id;
-	if (memory_usage < memory_state) {
-		memory_usage = memory_state;
+	int reg = parser->memory_state ++;
+	parser->memory_slots[reg] = id;
+	if (parser->memory_usage < parser->memory_state) {
+		parser->memory_usage = parser->memory_state;
 	}
 
 	return reg;
@@ -95,23 +87,23 @@ static elf_Proto gen_proto(elf_Parser *parser, treeID tree){
 	elf_State *R = parser->R;
 	elf_Module *M = parser->R->M;
 	ASSERT(get_tree_kind(parser,tree)==TREE_FUNCTION);
-	ASSERT(memory_state_index==0);
-	ASSERT(memory_state==0);
-	ASSERT(memory_usage==0);
+	ASSERT(parser->memory_state_index==0);
+	ASSERT(parser->memory_state==0);
+	ASSERT(parser->memory_usage==0);
 	int start=M->nbytes;
 	gen_tree(parser,tree->expr_fun.body);
 	elf_Proto proto = {};
 	proto.arity=1;
 	proto.bytes=start;
 	proto.nvalues=ARRAY_LENGTH(tree->expr_fun.capts);
-	proto.nlocals=memory_usage;
+	proto.nlocals=parser->memory_usage;
 	proto.nbytes=M->nbytes-start;
 	// todo: come back to this
 	// ASSERT(BC_OP(M->bytes[M->nbytes-1]) == BC_RET);
 
-	ASSERT(memory_state==0);
-	ASSERT(memory_state_index==0);
-	memory_usage=0;
+	ASSERT(parser->memory_state==0);
+	ASSERT(parser->memory_state_index==0);
+	parser->memory_usage=0;
 	return proto;
 }
 
@@ -513,7 +505,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			patch_jumps(parser,js);
 			ARRAY_DELETE(js);
 
-			memory_slots[dst] = id;
+			parser->memory_slots[dst] = id;
 		} break;
 		default: {
 			parser_dialog(parser,line,"invalid tree (%s)",tree2s[tree.kind]);

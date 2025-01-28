@@ -13,9 +13,17 @@ int get_tree_type(elf_Parser *parser, treeID id) { return id->type; }
 Source get_tree_line(elf_Parser *parser, treeID id) { return id->line; }
 
 static treeID new_tree(elf_Parser *parser, Source line, int kind, int type) {
-	// elf_debug_log("NEW TREE: %s",tree2s[kind]);
-	//todo:switch to linear allocator, this is slow!
-	treeID tree=calloc(sizeof(treeT),1);
+	// todo: proper arena
+	treeID tree;
+	if(!parser->tree_arena){
+		parser->tree_arena=calloc(1,MEGABYTES(1));
+	}
+	if(parser->tree_index+sizeof(treeT)<MEGABYTES(1)){
+		tree=(treeID)(parser->tree_arena+parser->tree_index);
+		parser->tree_index+=sizeof(treeT);
+	}else{
+		tree=calloc(sizeof(treeT),1);
+	}
 	tree->line=line;
 	tree->kind=kind;
 	tree->type=type;
