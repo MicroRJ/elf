@@ -200,7 +200,7 @@ elAPI void elf_push_number(elf_State *S, elf_Num);
 elAPI void elf_add_obj(elf_State *S, elf_Object *);
 elAPI void elf_push_string(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
-elAPI void elf_push_table(elf_State *S, elf_Table *);
+elAPI void elf_add_table(elf_State *S, elf_Table *);
 elAPI void elf_push_closure(elf_State *S, elf_Closure *);
 elAPI void elf_push_proc(elf_State *S, elf_Function);
 

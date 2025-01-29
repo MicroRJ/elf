@@ -69,7 +69,7 @@ int core_lib_merge_tables(elf_State *R) {
 
 
 int core_lib_get_meta(elf_State *R) {
-	elf_push_table(R,elf_get_obj(R,0)->meta);
+	elf_add_table(R,elf_get_obj(R,0)->meta);
 	return 1;
 }
 
@@ -195,7 +195,7 @@ int core_lib_load_json(elf_State *R) {
 	elf_prep_parser(&parser, R, name, contents->text);
 
 	elf_tabID tab = parse_json_obj(&parser);
-	elf_push_table(R,tab);
+	elf_add_table(R,tab);
 
 	return 1;
 	_error:

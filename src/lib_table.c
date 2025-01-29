@@ -79,14 +79,14 @@ elf_Table *new_table_lib(elf_State *R) {
 
 int table_lib_get_meta(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_push_table(R,POBJ(tab)->meta);
+	elf_add_table(R,POBJ(tab)->meta);
 	return 1;
 }
 
 
 int table_lib_set_meta(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_push_table(R,POBJ(tab)->meta);
+	elf_add_table(R,POBJ(tab)->meta);
 	POBJ(tab)->meta = elf_get_table(R,0);
 	return 1;
 }
@@ -367,7 +367,7 @@ int lib_table_keys(elf_State *S) {
 		if (entry.key.tag == elf_tag_nil || entry.key.tag == elf_tag_tomb) continue;
 		elf_array_add(array,entry.key);
 	}
-	elf_push_table(S,array);
+	elf_add_table(S,array);
 	return 1;
 }
 
@@ -386,7 +386,7 @@ int lib_table_array(elf_State *S) {
 int table_lib_clone(elf_State *R) {
 	elf_check_args(R,":clone",0,"the table to clone");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_push_table(R,elf_clone_table(R,tab));
+	elf_add_table(R,elf_clone_table(R,tab));
 	return 1;
 }
 
@@ -417,7 +417,7 @@ int table_lib_diff(elf_State *R) {
 		if (elf_table_contains(sub,it.key)) continue;
 		elf_table_set(dif,it.key,tab->array[it.idx]);
 	}
-	elf_push_table(R,dif);
+	elf_add_table(R,dif);
 	return 1;
 }
 

@@ -31,7 +31,7 @@ elf_String *elf_new_string2(elf_State *R, elf_Int length) {
 
 elf_Table *elf_new_table(elf_State *R) {
 	elf_Table *tab=elf_alloc_table(R);
-	elf_push_table(R,tab);
+	elf_add_table(R,tab);
 	return tab;
 }
 
@@ -100,7 +100,7 @@ void elf_push_proc(elf_State *S, elf_Function x) {
 }
 
 
-void elf_push_table(elf_State *S, elf_Table *x) {
+void elf_add_table(elf_State *S, elf_Table *x) {
 	PUSHV(S,VTAB(x));
 }
 

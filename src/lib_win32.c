@@ -107,7 +107,7 @@ int core_lib_list_volumes(elf_State *R) {
 	FindVolumeClose(handle);
 #endif
 
-	elf_push_table(R,list); /* <- */
+	elf_add_table(R,list); /* <- */
 	return 1;
 }
 #endif
@@ -148,6 +148,6 @@ static int core_lib_list_folder(elf_State *S) {
 
 	} while (FindNextFileA(search,&info));
 
-	elf_push_table(S,array);
+	elf_add_table(S,array);
 	return 1;
 }

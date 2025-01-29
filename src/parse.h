@@ -66,6 +66,7 @@ _(VALUE         , "value"       ) \
 _(ARRAY         , "array"       ) \
 _(FIELD         , "field"       ) \
 _(ENDOFFILE     , "eof"         ) \
+_(THIS          , "this"        ) \
 /* end */
 
 
@@ -256,7 +257,7 @@ struct elf_Parser {
 	int 	 memory_state;
 	int 	 memory_state_stack[128];
 	int 	 memory_state_index;
-	treeID memory_slots[128];
+	treeID memory_slots[1024];
 };
 
 static int emit_branch_if_false(elf_Parser *fs, jumpS *js, treeID id);

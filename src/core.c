@@ -374,19 +374,22 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGX(byte)];
 				yy=locals[BC_ARGY(byte)];
 				zz=locals[BC_ARGZ(byte)];
-				if (xx.tag==elf_tag_float2) {
-					ASSERT(yy.tag==elf_tag_str);
-					if (text_eq(yy.x_str->text,"x")){
-						locals[BC_ARGX(byte)].x_f32=zz.x_num;
-					} else if (text_eq(yy.x_str->text,"y")){
-						locals[BC_ARGX(byte)].y_f32=zz.x_num;
-					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
-				} else if (xx.tag==elf_tag_tab) {
+				// if(xx.tag==elf_tag_float2){
+				// 	ASSERT(yy.tag==elf_tag_str);
+				// 	if (text_eq(yy.x_str->text,"x")){
+				// 		locals[BC_ARGX(byte)].x_f32=zz.x_num;
+				// 	} else if (text_eq(yy.x_str->text,"y")){
+				// 		locals[BC_ARGX(byte)].y_f32=zz.x_num;
+				// 	} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
+				// }else
+				if(xx.tag==elf_tag_tab){
+					if(!xx.x_tab) elf_fail(R,module_instr,elf_tpf("table is nil, how did this happen?"));
+					if(yy.tag==elf_tag_nil) elf_fail(R,module_instr,elf_tpf("key is nil..."));
 					elf_table_set(xx.x_tab,yy,zz);
-				} else if (xx.tag==elf_tag_userobj) {
+				}else if(xx.tag==elf_tag_userobj){
 					elf_Value args[] = { yy, zz };
 					call_overload(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
-				} else {
+				}else{
 					elf_fail(R,module_instr,elf_tpf("attempted to set field of (%lli) '%s' value",xx.tag,tag2s[xx.tag]));
 				}
 			} break;
