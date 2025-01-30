@@ -180,7 +180,6 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 		case elf_tag_num: return fprintf(file,"%f",v.x_num);
 		case elf_tag_closure: return fprintf(file,"F()");
 		case elf_tag_proc: return fprintf(file,"C()");
-		case elf_tag_float2: return fprintf(file,"float2(%f,%f)",v.x_f32,v.y_f32);
 		case elf_tag_tab: {
 			/* todo: this is slow! */
 			int wrote = 0;

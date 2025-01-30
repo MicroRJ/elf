@@ -45,17 +45,6 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 
 #include "lib_meta.c"
 
-// mostly experimental...
-int core_lib_float2(elf_State *R) {
-	elf_Value v={elf_tag_float2};
-	v.x_f32=(float)elf_get_num(R,0);
-	v.y_f32=v.x_f32;
-	if (elf_get_num_args(R)>1){
-		v.y_f32=(float)elf_get_num(R,1);
-	}
-	*R->stack_ptr++=v;
-	return 1;
-}
 /* merges one or several tables together into
 a new table, which is then returned. */
 int core_lib_merge_tables(elf_State *R) {
@@ -253,9 +242,10 @@ static void print_num_tabs(FILE *io, int num) {
 	while (num --) fprintf(io,"\t");
 }
 
-// todo: move this to core.c?
+// todo: cyclic references will break this
 void elf_unload(FILE *io, elf_Table *tab, int level) {
-	fprintf(io,"{");
+	fprintf(io,"{\n");
+	level += 1;
 	int nitems = 0;
 	// todo:
 	if(tab->nslots) {
@@ -268,11 +258,12 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 			if ((v.tag == elf_tag_closure) || (v.tag == elf_tag_proc)) {
 				continue;
 			}
-			if (nitems ++ != 0) fprintf(io,",");
+			if (nitems ++ != 0) fprintf(io,",\n");
+			print_num_tabs(io,level);
 			fpf_value(io,slot.key,1);
 			fprintf(io," = ");
 			if (v.tag == elf_tag_tab) {
-				elf_unload(io,v.x_tab,level+1);
+				elf_unload(io,v.x_tab,level);
 			} else {
 				fpf_value(io,v,1);
 			}
@@ -280,7 +271,8 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 	} else {
 		FOR_ARRAY(i,tab->array) {
 			elf_Value v = tab->array[i];
-			if (i != 0) fprintf(io,", ");
+			if (i != 0) fprintf(io,",\n");
+			print_num_tabs(io,level);
 			if (v.tag==elf_tag_tab) {
 				elf_unload(io,v.x_tab,level+1);
 			} else {
@@ -288,6 +280,8 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 			}
 		}
 	}
+	fprintf(io,"\n");
+	print_num_tabs(io,level-1);
 	fprintf(io,"}");
 }
 

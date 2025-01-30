@@ -141,25 +141,21 @@ Maybe every value is vector type? */
 typedef struct elf_Value {
 	elf_i32 tag;
 	union {
-		union {
-			elf_Int         x_int;
-			elf_Num         x_num;
-			void           *x_ptr;
-			elf_Handle      x_sys;
-			elf_Closure    *x_cls;
-			elf_Object       *x_obj;
-			elf_Table      *x_tab;
-			elf_String     *x_str;
-			elf_Function    x_fun;
-		};
-		struct { elf_i32 x_i32, y_i32, z_i32; };
-		struct { elf_f32 x_f32, y_f32, z_f32; };
+		elf_i64         x_int;
+		elf_f64         x_num;
+		void           *x_ptr;
+		elf_Handle      x_sys;
+		elf_Closure    *x_cls;
+		elf_Object     *x_obj;
+		elf_Table      *x_tab;
+		elf_String     *x_str;
+		elf_Function    x_fun;
 	};
 } elf_Value;
 
 
 typedef struct elf_String {
-	elf_Object       obj;
+	elf_Object     obj;
 	elf_Hash      hash;
 	int     	   length;
 	char       text[1];
@@ -168,14 +164,14 @@ typedef struct elf_String {
 
 typedef struct elf_Entry {
 	elf_Value key;
-	elf_Int   idx;
+	elf_i64   idx;
 } elf_Entry;
 
 typedef struct elf_Table {
-	elf_Object      obj;
-	elf_Int    ntotal;
-	elf_Int    nslots;
-	elf_Int    ndebug;
+	elf_Object    obj;
+	elf_i64    ntotal;
+	elf_i64    nslots;
+	elf_i64    ndebug;
 	elf_Entry  *slots;
 	elf_Value  *array;
 } elf_Table;

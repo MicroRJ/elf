@@ -13,7 +13,6 @@
 // todo: there are functions here that should
 // be under elf.sys... instead... idk?
 #define LIBDEF(_) \
-_(float2)\
 _(unload)\
 _(tagof)\
 _(get_global)\
