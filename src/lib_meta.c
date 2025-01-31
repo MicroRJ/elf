@@ -90,18 +90,15 @@ int core_lib_get_object_color(elf_State *R) {
 	elf_Object *obj = elf_get_obj(R,0);
 	int color = obj->color;
 	elf_new_string(R,
-	color == elf_GC_BLACK ? "black" :
-	color == elf_GC_WHITE ? "white" :
-	color == elf_GC_PINK  ? "pink"  :
-	color == elf_GC_RED   ? "red"   :
-	color == elf_GC_TRAP  ? "trap"  : "error");
+	color == GC_NOCOLLECT   ? "black" :
+	color == GC_COLLECTABLE ? "white" : "other");
 	return 1;
 }
 
 
 int core_lib_set_object_trap(elf_State *R) {
-	elf_Int set = elf_get_int(R,1);
-	OBJ_COLOR(elf_get_obj(R,0)) = set ? elf_GC_TRAP : elf_GC_WHITE;
+	// elf_Int set = elf_get_int(R,1);
+	// OBJ_COLOR(elf_get_obj(R,0)) = set ? elf_GC_TRAP : GC_COLLECTABLE;
 	return 0;
 }
 

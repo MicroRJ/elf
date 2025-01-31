@@ -130,7 +130,7 @@ int elf_lib_table_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab;
 	elf_Value key;
-	elf_Entry *slots;
+	elf_Table_Entry *slots;
 	elf_Value *array;
 	elf_i64 slot;
 
@@ -276,11 +276,11 @@ int table_lib_find_aliases(elf_State *R) {
 	if (key.tag != elf_tag_nil) {
 		elf_Int slot = elf_table_try(tab,key);
 		if (slotiskey(tab,slot)) {
-			elf_Entry entry = tab->slots[slot];
+			elf_Table_Entry entry = tab->slots[slot];
 			elf_Int i;
 			for (i=0;i<tab->ntotal;++i) {
 				/* we also include ourselves */
-				elf_Entry it = tab->slots[i];
+				elf_Table_Entry it = tab->slots[i];
 				if (it.idx != entry.idx) continue;
 				if (it.key.tag == elf_tag_nil) continue;
 				elf_array_add(list,it.key);
@@ -332,7 +332,7 @@ int table_lib_foreach(elf_State *R) {
 	// elf_StackId v = elf_local_alloc(R,1);
 	// elf_Int i;
 	// for (i=0;i<tab->ntotal;++i) {
-	// 	elf_Entry it = tab->slots[i];
+	// 	elf_Table_Entry it = tab->slots[i];
 	// 	if (it.key.tag == elf_tag_nil) continue;
 	// 	R->stack[k] = it.k;
 	// 	R->stack[v] = tab->array[it.idx];
@@ -351,7 +351,7 @@ elf_Table *elf_clone_table(elf_State *S, elf_Table *tab) {
 	elf_Table *clone = elf_alloc_table(S);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
-		elf_Entry it = tab->slots[i];
+		elf_Table_Entry it = tab->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		elf_table_set(clone,it.key,tab->array[it.idx]);
 	}
@@ -363,7 +363,7 @@ int lib_table_keys(elf_State *S) {
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
 	elf_Table *array = elf_new_table(S);
 	for (elf_i64 i = 0; i < tab->ntotal; i++) {
-		elf_Entry entry = tab->slots[i];
+		elf_Table_Entry entry = tab->slots[i];
 		if (entry.key.tag == elf_tag_nil || entry.key.tag == elf_tag_tomb) continue;
 		elf_array_add(array,entry.key);
 	}
@@ -412,7 +412,7 @@ int table_lib_diff(elf_State *R) {
 	elf_Table *dif = elf_alloc_table(R);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
-		elf_Entry it = tab->slots[i];
+		elf_Table_Entry it = tab->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		if (elf_table_contains(sub,it.key)) continue;
 		elf_table_set(dif,it.key,tab->array[it.idx]);

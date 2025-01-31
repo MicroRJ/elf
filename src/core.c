@@ -7,6 +7,12 @@ static int elf_run(elf_State *R);
 
 void elf_init(elf_State *R, elf_Module *M) {
 	R->M=M;
+
+	// R->G.arenas[0] = (elf_Arena){sys_valloc(GIGABYTES(1))};
+	// R->G.arenas[1] = (elf_Arena){sys_valloc(GIGABYTES(1))};
+	// R->G.arenas[2] = (elf_Arena){sys_valloc(GIGABYTES(1))};
+	// R->G.arenas[3] = (elf_Arena){sys_valloc(GIGABYTES(1))};
+
 	R->stack_max = DEFAULT_STACK_SIZE;
 	R->stack = calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);
 	R->stack_ptr = R->stack;
@@ -97,7 +103,7 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 	}
 
 	/* todo: do not make this recursive dude! */
-	elf_StackFrame F = {0};
+	elf_Stack_Frame F = {0};
 	/* Todo: remove this */
 	F.caller = S->frame;
 	/* Todo: this is for debugging */
@@ -175,7 +181,7 @@ int elf_run(elf_State *R) {
 
 	elf_Module *M;
 	elf_Table *globals;
-	elf_StackFrame *F;
+	elf_Stack_Frame *F;
 	elf_Value *locals;
 	elf_Proto proto;
 	elf_Value *values;

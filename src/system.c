@@ -74,7 +74,7 @@ void sys_get_error_msg(int error, char *buf, int len) {
 }
 
 
-void *sys_valloc(elf_Int length) {
+void *sys_valloc(elf_i64 length) {
 #if defined(PLATFORM_DESKTOP)
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else

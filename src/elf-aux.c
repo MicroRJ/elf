@@ -118,7 +118,7 @@ void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, 
 }
 
 
-void elf_dump_byte_trace(elf_State *S, elf_StackFrame *call, int level) {
+void elf_dump_byte_trace(elf_State *S, elf_Stack_Frame *call, int level) {
 	ASSERT(level > -1);
 
 	/* Don't show the first root call frame
@@ -189,7 +189,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
-					elf_Entry it = tab->slots[j];
+					elf_Table_Entry it = tab->slots[j];
 					if (it.key.tag==elf_tag_nil) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += fprintf(file,", ");
@@ -199,7 +199,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 				wrote += fpf_value(file,tab->array[i],1);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	elf_Entry it = tab->slots[i];
+			// 	elf_Table_Entry it = tab->slots[i];
 			// 	if (it.key.tag == elf_tag_nil) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
 			// 	wrote += fpf_value(file,it.key,1);

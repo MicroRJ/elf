@@ -152,7 +152,7 @@ int core_lib_include(elf_State *R) {
 	todo: */
 
 	elf_Table *globals = R->M->globals;
-	elf_Entry entry;
+	elf_Table_Entry entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
 		if (entry.key.tag == elf_tag_str) {
@@ -250,7 +250,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 	// todo:
 	if(tab->nslots) {
 		for (elf_i64 i = 0; i < tab->ntotal; ++ i) {
-			elf_Entry slot = tab->slots[i];
+			elf_Table_Entry slot = tab->slots[i];
 			if (slot.key.tag == elf_tag_nil) {
 				continue;
 			}

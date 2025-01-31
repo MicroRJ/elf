@@ -6,6 +6,14 @@ e*/
 #ifndef _elf_lang_
 #define _elf_lang_
 
+
+#define elGC_MEM_THRESHOLD_MIN (elf_i64) MEGABYTES(1)
+#define elGC_MEM_THRESHOLD_MAX (elf_i64) MEGABYTES(8)
+#define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((1024)*2)
+#define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((1024)*16)
+#define DEFAULT_STACK_SIZE 4096
+
+
 #if defined(__EMSCRIPTEN__)
 	#define elAPI 		EMSCRIPTEN_KEEPALIVE
 	#define elEXPORT 	EMSCRIPTEN_KEEPALIVE
@@ -119,26 +127,15 @@ typedef enum elf_GCTy {
 	GC_OBJ=0,GC_CLS,GC_STR,GC_TAB,
 } elf_GCTy;
 
+char *obj2s[]={"obj","cls","str","tab"};
+
 enum {
-	elf_GC_WHITE=0,
-	elf_GC_BLACK,
-	elf_GC_RED,
-	elf_GC_PINK,
-	elf_GC_TRAP,
+	GC_COLLECTABLE=0,
+	GC_NOCOLLECT,
 };
 
-struct elf_Object {
-	elf_i8      type;
-	elf_i8     color;
-	elf_i16     size;
-	elf_Table  *meta;
-};
-
-/* Todo: figure out what do actually do with this,
-it's going to get padded to 128 - bits anyways...
-this gave me the idea tho, why not go with it?
-Maybe every value is vector type? */
-typedef struct elf_Value {
+typedef struct elf_Value elf_Value;
+struct elf_Value {
 	elf_i32 tag;
 	union {
 		elf_i64         x_int;
@@ -151,30 +148,155 @@ typedef struct elf_Value {
 		elf_String     *x_str;
 		elf_Function    x_fun;
 	};
-} elf_Value;
+};
 
+typedef struct elf_Object elf_Object;
+struct elf_Object {
+	elf_Object *prox;
+	elf_i32      age;
+	elf_i8      type;
+	elf_i8     color;
+	elf_i16     size;
+	elf_Table  *meta;
+};
 
-typedef struct elf_String {
+typedef struct elf_String elf_String;
+struct elf_String {
 	elf_Object     obj;
 	elf_Hash      hash;
 	int     	   length;
 	char       text[1];
-} elf_String;
+};
 
-
-typedef struct elf_Entry {
+typedef struct elf_Table_Entry {
 	elf_Value key;
 	elf_i64   idx;
-} elf_Entry;
+} elf_Table_Entry;
 
-typedef struct elf_Table {
+typedef struct elf_Table elf_Table;
+struct elf_Table {
+	elf_Object    			obj;
+	elf_i64    			ntotal;
+	elf_i64    			nslots;
+	elf_i64    			ndebug;
+	// todo: look into storing these separatedly,
+	// or hear me, about have separate versions
+	// for each table, like for the most part
+	// we have table which accept keys of a specific
+	// type... so if we initially create a table,
+	// we assume the type is amibigus once we set
+	// a key we know the type, and so long as the
+	// key is teh same the table is the same, otherwise
+	// it is converted...
+	elf_Table_Entry   *slots;
+	elf_Value  			*array;
+};
+
+typedef struct elf_Bytecode elf_Bytecode;
+
+typedef struct elf_Closure elf_Closure;
+struct elf_Closure {
 	elf_Object    obj;
-	elf_i64    ntotal;
-	elf_i64    nslots;
-	elf_i64    ndebug;
-	elf_Entry  *slots;
-	elf_Value  *array;
-} elf_Table;
+	elf_Proto   proto;
+	elf_Value  values[1];
+};
+
+typedef struct elf_Module elf_Module;
+struct elf_Module {
+	elf_Table      *globals;
+	elf_Table      *strings;
+	elf_f64        *numbers;
+	elf_i64       *integers;
+	elf_File         *files;
+	elf_Proto       *protos;
+	char            **lines;
+	elf_Bytecode     *bytes;
+	int              nbytes;
+};
+
+typedef struct elf_Stack_Frame elf_Stack_Frame;
+struct elf_Stack_Frame {
+	elf_Stack_Frame   *caller;
+	elf_Closure      *closure;
+	elf_Value         *locals;
+	int               nlocals;
+	char                nargs;
+	char                nrets;
+	int                origin;
+	bool              logging;
+};
+
+typedef struct elf_Entry_Chunk elf_Entry_Chunk;
+struct elf_Entry_Chunk{
+	elf_Entry_Chunk *prox;
+	elf_Table_Entry entries[];
+};
+
+
+// todo:!
+static elf_Entry_Chunk *elf_chunks_of_4;
+static elf_Entry_Chunk *elf_first_free_chunk_of_4;
+
+typedef struct elf_Arena elf_Arena;
+struct elf_Arena {
+	elf_u8 *memory;
+	elf_i32 capacity;
+	elf_i32 usage;
+};
+
+typedef struct elf_Collector elf_Collector;
+struct elf_Collector{
+	int          phase;
+	bool         paused;
+	elf_i64      memory_allocated;
+	elf_i64      memory_threshold;
+
+	elf_Table  *table_objects;
+	elf_Table  *free_table_object;
+
+	// elf_Arena   arenas[4];
+	// elf_i32     num_objects[4];
+	// elf_Object *first_free_object[4];
+	elf_i64     object_trigger_threshold;
+	elf_Object **new_objects;
+	elf_Object **objects;
+};
+
+
+typedef struct elf_State elf_State;
+struct elf_State {
+	elf_Module     *M;
+	union{elf_Collector G,gc;};
+
+	elf_Value      *stack;
+	int             stack_max;
+	elf_Value      *stack_ptr;
+
+	elf_Stack_Frame  first_frame;
+	elf_Stack_Frame *frame;
+	int            nframe;
+	int             flags;
+
+	struct {
+		elf_Table *integer;
+		elf_Table *number;
+		elf_Table *string;
+		elf_Table *table;
+	} metatables;
+	// todo: remove this
+	int byte;
+};
+
+
+#define elf_GC_PHASE_MARK GC_COLLECTABLE
+#define elf_GC_PHASE_FREE GC_NOCOLLECT
+#define FLAG_DEBUGGER         (1 << 0)
+#define FLAG_DEBUGGER_ONCALL  (1 << 1)
+#define FLAG_BYTETRACKING     (1 << 2)
+#define FLAG_BYTELOGGING      (1 << 3)
+
+typedef int Instr;
+typedef char *Source;
 
 
 elAPI void elf_init(elf_State *S, elf_Module *M);

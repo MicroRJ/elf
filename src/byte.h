@@ -3,7 +3,6 @@
 ** byte.h
 */
 
-
 typedef struct elf_Bytecode {
 	short z,y,x,k;
 } elf_Bytecode;
