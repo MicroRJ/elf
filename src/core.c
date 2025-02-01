@@ -3,15 +3,23 @@
 ** core.c
 */
 
+
+elf_Value *elf_get_stack(elf_State *S){
+	return S->stack;
+}
+elf_Value *elf_get_stack_ptr(elf_State *S){
+	return S->stack_ptr;
+}
+
+
 static int elf_run(elf_State *R);
 
 void elf_init(elf_State *R, elf_Module *M) {
 	R->M=M;
-
-	// R->G.arenas[0] = (elf_Arena){sys_valloc(GIGABYTES(1))};
-	// R->G.arenas[1] = (elf_Arena){sys_valloc(GIGABYTES(1))};
-	// R->G.arenas[2] = (elf_Arena){sys_valloc(GIGABYTES(1))};
-	// R->G.arenas[3] = (elf_Arena){sys_valloc(GIGABYTES(1))};
+	elf_entry_chunk_arena = sys_virtual_alloc(GIGABYTES(1));
+	elf_entry_chunk_arena_index = 0;
+	R->G.table_objects  = sys_virtual_alloc(GIGABYTES(1));
+	R->G.string_objects = sys_virtual_alloc(GIGABYTES(1));
 
 	R->stack_max = DEFAULT_STACK_SIZE;
 	R->stack = calloc_memory(GLOBAL_ALLOCATOR,sizeof(elf_Value)*R->stack_max);

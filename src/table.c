@@ -96,7 +96,7 @@ elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf
 }
 
 elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
-	elf_check_table(table);
+	_check_table(table);
 	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
@@ -129,7 +129,7 @@ elf_Value elf_table_get(elf_Table *tab, elf_Value k) {
 elf_Int elf_table_get_or_add(elf_Table *table, elf_Value key) {
 	elf_Int lot,idx;
 	ASSERT(!ISNILV(key));
-	elf_check_table(table);
+	_check_table(table);
 	lot=elf_table_try(table,key);
 	ASSERT(lot>=0);
 	if (!slotiskey(table,lot)) {
@@ -145,7 +145,7 @@ elf_Int elf_table_get_or_add(elf_Table *table, elf_Value key) {
 
 
 void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias) {
-	elf_check_table(tab);
+	_check_table(tab);
 	elf_Int key_slot = elf_table_try(tab,key);
 	if (slotiskey(tab,key_slot)) {
 		elf_Int alias_slot = elf_table_try(tab,alias);

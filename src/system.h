@@ -5,7 +5,7 @@
 
 
 /* virtual alloc */
-static void *sys_valloc(elf_i64 length);
+static void *sys_virtual_alloc(elf_i64 length);
 
 
 /* printing, use type (LOG_TYPE),

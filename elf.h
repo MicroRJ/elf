@@ -8,9 +8,9 @@ e*/
 
 
 #define elGC_MEM_THRESHOLD_MIN (elf_i64) MEGABYTES(1)
-#define elGC_MEM_THRESHOLD_MAX (elf_i64) MEGABYTES(8)
-#define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((1024)*2)
-#define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((1024)*16)
+#define elGC_MEM_THRESHOLD_MAX (elf_i64) MEGABYTES(2)
+#define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((1024)*1)
+#define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((1024)*1)
 #define DEFAULT_STACK_SIZE 4096
 
 
@@ -101,7 +101,6 @@ typedef enum {
 	elf_tag_int,
 	elf_tag_sysobj,
 	elf_tag_proc,
-	elf_tag_float2,
 	elf_tag_userobj,
 	elf_tag_closure,
 	elf_tag_str,
@@ -115,7 +114,6 @@ static char const *tag2s[] = {
 	"int",
 	"sysobj",
 	"proc",
-	"float2",
 	"userobj",
 	"closure",
 	"str",
@@ -132,6 +130,7 @@ char *obj2s[]={"obj","cls","str","tab"};
 enum {
 	GC_COLLECTABLE=0,
 	GC_NOCOLLECT,
+	GC_REUSEABLE,
 };
 
 typedef struct elf_Value elf_Value;
@@ -173,21 +172,13 @@ typedef struct elf_Table_Entry {
 	elf_i64   idx;
 } elf_Table_Entry;
 
+// todo: table templates?
 typedef struct elf_Table elf_Table;
 struct elf_Table {
 	elf_Object    			obj;
 	elf_i64    			ntotal;
 	elf_i64    			nslots;
 	elf_i64    			ndebug;
-	// todo: look into storing these separatedly,
-	// or hear me, about have separate versions
-	// for each table, like for the most part
-	// we have table which accept keys of a specific
-	// type... so if we initially create a table,
-	// we assume the type is amibigus once we set
-	// a key we know the type, and so long as the
-	// key is teh same the table is the same, otherwise
-	// it is converted...
 	elf_Table_Entry   *slots;
 	elf_Value  			*array;
 };
@@ -234,8 +225,13 @@ struct elf_Entry_Chunk{
 
 
 // todo:!
-static elf_Entry_Chunk *elf_chunks_of_4;
+static elf_u8 *elf_entry_chunk_arena;
+static int elf_entry_chunk_arena_index;
 static elf_Entry_Chunk *elf_first_free_chunk_of_4;
+static elf_Entry_Chunk *elf_first_free_chunk_of_16;
+static elf_Entry_Chunk *elf_first_free_chunk_of_512;
+static elf_Entry_Chunk *elf_first_free_chunk_of_4096;
+static elf_Entry_Chunk *elf_first_free_chunk;
 
 typedef struct elf_Arena elf_Arena;
 struct elf_Arena {
@@ -251,12 +247,16 @@ struct elf_Collector{
 	elf_i64      memory_allocated;
 	elf_i64      memory_threshold;
 
+	elf_i32     table_objects_index;
+	elf_i32 num_table_objects_free;
 	elf_Table  *table_objects;
-	elf_Table  *free_table_object;
+	elf_Table  *table_objects_free;
 
-	// elf_Arena   arenas[4];
-	// elf_i32     num_objects[4];
-	// elf_Object *first_free_object[4];
+	elf_String *string_objects;
+	elf_i32     string_objects_index;
+	elf_String *string_objects_free;
+
+	elf_i32     num_objects;
 	elf_i64     object_trigger_threshold;
 	elf_Object **new_objects;
 	elf_Object **objects;
@@ -269,8 +269,8 @@ struct elf_State {
 	union{elf_Collector G,gc;};
 
 	elf_Value      *stack;
-	int             stack_max;
 	elf_Value      *stack_ptr;
+	int             stack_max;
 
 	elf_Stack_Frame  first_frame;
 	elf_Stack_Frame *frame;
@@ -300,6 +300,8 @@ typedef char *Source;
 
 
 elAPI void elf_init(elf_State *S, elf_Module *M);
+elf_Value *elf_get_stack(elf_State *S);
+elf_Value *elf_get_stack_ptr(elf_State *S);
 
 /* allocate and adds the object to stack (prevents it from getting GC'd) */
 elAPI elf_Closure *elf_new_closure(elf_State *, elf_Proto fn);
@@ -342,7 +344,7 @@ elAPI void elf_check_args(elf_State *S, char *func, int nargs, char *usage);
 
 /* allocating objects */
 elAPI elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto);
-elAPI elf_String *elf_alloc_string2(elf_State *S, elf_Int length);
+elAPI elf_String *elf_alloc_string2(elf_State *S, elf_i32 length);
 elAPI elf_String *elf_alloc_string(elf_State *S, const char *text);
 elAPI elf_Table *elf_alloc_table2(elf_State *, elf_Int length);
 elAPI elf_Table *elf_alloc_table(elf_State *);
@@ -376,7 +378,7 @@ elAPI void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val);
 elAPI void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val);
 elAPI void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val);
 
-elAPI void elf_check_table(elf_Table *table);
+elAPI void _check_table(elf_Table *table);
 elAPI void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias);
 elAPI void elf_merge_tables(elf_Table *tab, elf_Table *merger);
 

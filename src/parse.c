@@ -1213,6 +1213,7 @@ static bool parse_for(elf_Parser *parser){
 static bool is_key_tok(int tok) {
 	return tok == TK_INTEGER || tok == TK_NUMBER || tok == TK_STRING || tok == TK_WORD;
 }
+
 // todo: legitimize
 static int parse_const(elf_Parser *parser) {
 	elf_Token tok = parser->tok;
@@ -1256,7 +1257,7 @@ static int parse_const(elf_Parser *parser) {
 		case TK_CURLY_LEFT: {
 			get_tok(parser);
 			elf_Table *tab = elf_new_table(parser->R);
-			elf_Value *check_ptr = parser->R->stack_ptr;
+			elf_Value *check_ptr = elf_get_stack_ptr(parser->R);
 			while(parser->tok.type != TK_NONE && !peek_tok(parser,TK_CURLY_RIGHT)) {
 				tok = parser->tok;
 				if (parser->tok_prox.type == TK_ASSIGN) {
@@ -1276,8 +1277,8 @@ static int parse_const(elf_Parser *parser) {
 
 					ret = parse_const(parser);
 					if (ret == -1) goto esc;
-					elf_Value key = parser->R->stack_ptr[-2];
-					elf_Value value = parser->R->stack_ptr[-1];
+					elf_Value key = elf_get_stack_ptr(parser->R)[-2];
+					elf_Value value = elf_get_stack_ptr(parser->R)[-1];
 					parser->R->stack_ptr -= 2;
 					ASSERT(parser->R->stack_ptr == check_ptr);
 					elf_table_set(tab,key,value);

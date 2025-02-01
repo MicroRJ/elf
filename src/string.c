@@ -44,57 +44,6 @@ elf_Table *elf_new_string_lib(elf_State *R) {
 	return tab;
 }
 
-
-elf_String *elf_alloc_string2(elf_State *R, elf_Int length) {
-	elf_String *obj = elf_alloc_object(R,GC_STR,sizeof(elf_String)+length+1);
-	if (R) obj->obj.meta = R->metatables.string;
-	obj->length = length;
-	obj->hash = -1;
-	obj->text[length] = 0;
-	return obj;
-}
-
-
-elf_String *elf_alloc_string(elf_State *R, const char *text) {
-	int length;
-	elf_Hash hash;
-	elf_String *string;
-	elf_Table *registry;
-
-	length=text_length(text);
-	hash=elf_hash_text(text);
-	string=0;
-	registry=R->M->strings;
-
-
-	if (length < 64 && registry != 0) {
-		elf_check_table(registry);
-		elf_Int slot=elf_table_try_text(registry,text,length,hash);
-		ASSERT(slot != -1);
-		elf_Table_Entry entry=registry->slots[slot];
-		if (entry.key.tag != elf_tag_nil) {
-			elf_Value target=registry->array[registry->slots[slot].idx];
-			string=target.x_str;
-		} else {
-			string = elf_alloc_string2(R,length);
-			copy_memory(string->text,text,length);
-			string->hash = hash;
-
-			elf_Int i = ARRAY_GROW(registry->array,1);
-			registry->array[i]=VSTR(string);
-			registry->slots[slot].key=VSTR(string);
-			registry->slots[slot].idx=i;
-			registry->nslots ++;
-		}
-	} else {
-		string = elf_alloc_string2(R,length);
-		copy_memory(string->text,text,length);
-		string->hash = hash;
-	}
-	return string;
-}
-
-
 elf_Bool elf_get_strings_eq(elf_String *x, elf_String *y) {
 	if (x == y) return 1;
 	/* assuming we use the same hash function */
