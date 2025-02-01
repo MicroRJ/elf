@@ -130,7 +130,7 @@ int elf_lib_table_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab;
 	elf_Value key;
-	elf_Table_Entry *slots;
+	elf_Entry *slots;
 	elf_Value *array;
 	elf_i64 slot;
 
@@ -140,7 +140,7 @@ int elf_lib_table_delete(elf_State *R) {
 	array = tab->array;
 	slot = elf_table_try(tab,key);
 	if ((slot < 0) || (slots[slot].key.tag == elf_tag_nil)) {
-		elf_fail(R,NO_BYTE,elf_tpf("invalid key, %s, slot is %i", tag2s[key.tag], slot));
+		elf_error(R,NO_BYTE,elf_tpf("invalid key, %s, slot is %i", tag2s[key.tag], slot));
 		goto _err;
 	}
 	elf_i64 idx = slots[slot].idx;
@@ -148,7 +148,7 @@ int elf_lib_table_delete(elf_State *R) {
 	slots[slot].idx = 0;
 	elf_i64 len = ARRAY_LENGTH(array);
 	if ((idx < 0) || (idx > len-1)) {
-		elf_fail(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
+		elf_error(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
 		goto _err;
 	}
 	PUSHV(R,array[idx]);
@@ -189,7 +189,7 @@ int table_lib_xdelete(elf_State *R) {
 			}
 			if (item == 0) {
 				/* todo: maybe not crash here */
-				elf_fail(R,NO_BYTE,"item does not belong");
+				elf_error(R,NO_BYTE,"item does not belong");
 			}
 			ASSERT((item - tab->array) == idx);
 			PUSHV(R,*item);
@@ -234,10 +234,10 @@ int table_lib_xremove(elf_State *R) {
 			ASSERT((item - tab->array) == idx);
 			// elf_Int idx = item - tab->array;
 			// if (item < tab->array || item > tab->array + len - 1) {
-			// 	elf_fail(R,NO_BYTE,"item does not belong");
+			// 	elf_error(R,NO_BYTE,"item does not belong");
 			// }
 			if (item == 0) {
-				elf_fail(R,NO_BYTE,"item does not belong");
+				elf_error(R,NO_BYTE,"item does not belong");
 			}
 			PUSHV(R,*item);
 			elf_Int min = ARRAY_POP(tab->array);
@@ -276,11 +276,11 @@ int table_lib_find_aliases(elf_State *R) {
 	if (key.tag != elf_tag_nil) {
 		elf_Int slot = elf_table_try(tab,key);
 		if (slotiskey(tab,slot)) {
-			elf_Table_Entry entry = tab->slots[slot];
+			elf_Entry entry = tab->slots[slot];
 			elf_Int i;
 			for (i=0;i<tab->ntotal;++i) {
 				/* we also include ourselves */
-				elf_Table_Entry it = tab->slots[i];
+				elf_Entry it = tab->slots[i];
 				if (it.idx != entry.idx) continue;
 				if (it.key.tag == elf_tag_nil) continue;
 				elf_array_add(list,it.key);
@@ -332,7 +332,7 @@ int table_lib_foreach(elf_State *R) {
 	// elf_StackId v = elf_local_alloc(R,1);
 	// elf_Int i;
 	// for (i=0;i<tab->ntotal;++i) {
-	// 	elf_Table_Entry it = tab->slots[i];
+	// 	elf_Entry it = tab->slots[i];
 	// 	if (it.key.tag == elf_tag_nil) continue;
 	// 	R->stack[k] = it.k;
 	// 	R->stack[v] = tab->array[it.idx];
@@ -351,7 +351,7 @@ elf_Table *elf_clone_table(elf_State *S, elf_Table *tab) {
 	elf_Table *clone = elf_alloc_table(S);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
-		elf_Table_Entry it = tab->slots[i];
+		elf_Entry it = tab->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		elf_table_set(clone,it.key,tab->array[it.idx]);
 	}
@@ -363,7 +363,7 @@ int lib_table_keys(elf_State *S) {
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
 	elf_Table *array = elf_new_table(S);
 	for (elf_i64 i = 0; i < tab->ntotal; i++) {
-		elf_Table_Entry entry = tab->slots[i];
+		elf_Entry entry = tab->slots[i];
 		if (entry.key.tag == elf_tag_nil || entry.key.tag == elf_tag_tomb) continue;
 		elf_array_add(array,entry.key);
 	}
@@ -407,12 +407,12 @@ int table_lib_diff(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *sub = elf_get_table(R,0);
 	if (sub == 0) {
-		elf_fail(R,NO_BYTE,"argument is nil");
+		elf_error(R,NO_BYTE,"argument is nil");
 	}
 	elf_Table *dif = elf_alloc_table(R);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
-		elf_Table_Entry it = tab->slots[i];
+		elf_Entry it = tab->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		if (elf_table_contains(sub,it.key)) continue;
 		elf_table_set(dif,it.key,tab->array[it.idx]);

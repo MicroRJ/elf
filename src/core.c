@@ -93,7 +93,7 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 	elf_Value *locals = S->stack_ptr - nargs;
 	elf_Value value = locals[-1];
 	if (!CAN_CALL(value.tag)) {
-		elf_fail(S,NO_BYTE,elf_tpf("cannot call '%s'", tag2s[value.tag]));
+		elf_error(S,NO_BYTE,elf_tpf("cannot call '%s'", tag2s[value.tag]));
 	}
 
 	int num_locals = nargs;
@@ -138,7 +138,7 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 		nyield = value.x_fun(S);
 		ptr = S->stack_ptr;
 		if ((ptr-res) < nyield) {
-			elf_fail(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - res),nyield));
+			elf_error(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of yielded values '%i'",(int)(ptr - res),nyield));
 		}
 		res=ptr-nyield;
 		// if ((nyield==0)&&(nrets>0)){
@@ -149,7 +149,7 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 		copy_memory(F.locals-1,res,MIN(nyield,nrets)*sizeof(elf_Value));
 	} else {
 		nyield = -1;
-		elf_fail(S,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[value.tag]));
+		elf_error(S,NO_BYTE,elf_tpf("'%s': is not a function",tag2s[value.tag]));
 	}
 	GET_FRAME(S) = F.caller;
 	S->nframe -= 1;
@@ -159,20 +159,20 @@ int elf_call(elf_State *S, int nargs, int nrets) {
 
 
 // todo: make this legit!
-static void _check_zero_div(elf_State *S, elf_Value xx, elf_Value yy) {
-	if ((yy.tag == elf_tag_num) && (yy.x_num == 0.)) elf_fail(S,NO_BYTE,"division by zero"); else
-	if ((yy.tag == elf_tag_int) && (yy.x_int == 0)) elf_fail(S,NO_BYTE,"integer division by zero");
+static inline void _check_zero_div(elf_State *S, elf_Value *xx, elf_Value *yy) {
+	if ((yy->tag == elf_tag_num) && (yy->x_num == 0)) elf_error(S,NO_BYTE,"division by zero"); else
+	if ((yy->tag == elf_tag_int) && (yy->x_int == 0)) elf_error(S,NO_BYTE,"integer division by zero");
 }
 
 
 static int call_overload(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
 	if (obj->meta == 0) {
-		elf_fail(S,NO_BYTE,"object does not have a metatable, cannot use overload");
+		elf_error(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	elf_Value field;
 	field=elf_tgetx_any(obj->meta,name);
 	if (!CAN_CALL(field.tag)) {
-		elf_fail(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name,tag2s[field.tag]));
+		elf_error(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name,tag2s[field.tag]));
 	}
 	elf_Value *top;
 	top=GET_TOP(S);
@@ -324,19 +324,19 @@ int elf_run(elf_State *R) {
 					} goto _lookup;
 					case elf_tag_num: {
 						metatable = R->metatables.number;
-						elf_fail(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
+						elf_error(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
 					case elf_tag_int: {
 						metatable = R->metatables.integer;
-						elf_fail(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
+						elf_error(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
 					default: {
-						elf_fail(R,module_instr,elf_tpf("'%s': not an object", tag2s[yy.tag]));
+						elf_error(R,module_instr,elf_tpf("'%s': not an object", tag2s[yy.tag]));
 					} break;
 				}
 				_lookup:
 				if (!metatable) {
-					elf_fail(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
+					elf_error(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
 				}
 				locals[BC_ARGX(byte)] = elf_table_get(metatable,locals[BC_ARGZ(byte)]);
 			} break;
@@ -344,43 +344,31 @@ int elf_run(elf_State *R) {
 			case BC_GETINDEX: case BC_GETFIELD: {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
-				if (yy.tag==elf_tag_nil) {
-					/* I don't know whether this worth throwing an error
-					over, it's just my preference and use cases, maybe
-					tables can have a default field which gets returned
-					when the value is nil?  */
-					elf_fail(R,module_instr,"attempted to get nil field");
-				}
-#if 0
-				 else if (xx.tag==elf_tag_float2) {
-					ASSERT(yy.tag==elf_tag_str);
-					if (text_eq(yy.x_str->text,"x")){
-						locals[BC_ARGX(byte)].tag=elf_tag_num;
-						locals[BC_ARGX(byte)].x_num=xx.x_f32;
-					} else if (text_eq(yy.x_str->text,"y")){
-						locals[BC_ARGX(byte)].tag=elf_tag_num;
-						locals[BC_ARGX(byte)].x_num=xx.y_f32;
-					} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
-				}
-#endif
-				else if (xx.tag==elf_tag_tab) {
-					locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
-				} else if (xx.tag==elf_tag_userobj) {
-					call_overload(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
-				} else if (xx.tag==elf_tag_str) {
-					elf_Int index;
-					elf_String *string;
-					/* todo: allow for indexing for substrings,
-					for instrance, "my name is"["name"] */
-					elf_type_check(R,module_instr,0,elf_tag_int,yy.tag);
-					string=xx.x_str;
-					index=yy.x_int;
-					locals[BC_ARGX(byte)].tag   = elf_tag_int;
-					locals[BC_ARGX(byte)].x_int = string->text[index];
-				} else if (xx.tag==elf_tag_nil) {
-					elf_fail(R,module_instr,"attempted to get field of 'nil' value");
-				} else {
-					elf_fail(R,module_instr,elf_tpf("invalid object '%s' to perform this operator on", tag2s[yy.tag]));
+				// todo: my preference, maybe this could be configured...
+				if(yy.tag==elf_tag_nil) {
+					elf_error(R,module_instr,"attempted to get nil field");
+				}else switch (xx.tag){
+					case elf_tag_tab:{
+						locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
+					}break;
+					case elf_tag_userobj:{
+						call_overload(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
+					}break;
+					case elf_tag_str:{
+						/* todo: allow for indexing for substrings,
+						for instrance, "my name is"["name"] */
+						elf_type_check(R,module_instr,0,elf_tag_int,yy.tag);
+						elf_String *string = xx.x_str;
+						elf_i32 index = yy.x_i32;
+						locals[BC_ARGX(byte)].tag   = elf_tag_int;
+						locals[BC_ARGX(byte)].x_i32 = string->text[index];
+					}break;
+					case elf_tag_nil:{
+						elf_error(R,module_instr,"attempted to get field of 'nil' value");
+					}break;
+					default:{
+						elf_error(R,module_instr,elf_tpf("invalid object '%s' to perform this operator on", tag2s[yy.tag]));
+					}break;
 				}
 			} break;
 			elf_Value xx,yy,zz;
@@ -388,23 +376,15 @@ int elf_run(elf_State *R) {
 				xx=locals[BC_ARGX(byte)];
 				yy=locals[BC_ARGY(byte)];
 				zz=locals[BC_ARGZ(byte)];
-				// if(xx.tag==elf_tag_float2){
-				// 	ASSERT(yy.tag==elf_tag_str);
-				// 	if (text_eq(yy.x_str->text,"x")){
-				// 		locals[BC_ARGX(byte)].x_f32=zz.x_num;
-				// 	} else if (text_eq(yy.x_str->text,"y")){
-				// 		locals[BC_ARGX(byte)].y_f32=zz.x_num;
-				// 	} else elf_fail(R,module_instr,"type 'float2' only has x and y fields");
-				// }else
 				if(xx.tag==elf_tag_tab){
-					if(!xx.x_tab) elf_fail(R,module_instr,elf_tpf("table is nil, how did this happen?"));
-					if(yy.tag==elf_tag_nil) elf_fail(R,module_instr,elf_tpf("key is nil..."));
+					if(!xx.x_tab) elf_error(R,module_instr,elf_tpf("table is nil, how did this happen?"));
+					if(yy.tag==elf_tag_nil) elf_error(R,module_instr,elf_tpf("key is nil..."));
 					elf_table_set(xx.x_tab,yy,zz);
 				}else if(xx.tag==elf_tag_userobj){
 					elf_Value args[] = { yy, zz };
 					call_overload(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
 				}else{
-					elf_fail(R,module_instr,elf_tpf("attempted to set field of (%lli) '%s' value",xx.tag,tag2s[xx.tag]));
+					elf_error(R,module_instr,elf_tpf("attempted to set field of (%lli) '%s' value",xx.tag,tag2s[xx.tag]));
 				}
 			} break;
 			case BC_CALL: {
@@ -494,18 +474,18 @@ int elf_run(elf_State *R) {
 					NO_CODE;
 				} else if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
 					if (!INTORNUM(yy.tag)) {
-						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					locals[BC_ARGX(byte)].tag   = elf_tag_num;
 					locals[BC_ARGX(byte)].x_num = pow(VI2N(xx),VI2N(yy));
 				} else if ((xx.tag==elf_tag_int)||(yy.tag==elf_tag_int)) {
 					if (!INTORNUM(yy.tag)) {
-						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					locals[BC_ARGX(byte)].tag   = elf_tag_int;
 					locals[BC_ARGX(byte)].x_int = pow(VN2I(xx),VN2I(yy));
 				} else {
-					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
+					elf_error(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
 				}
 			} break;
 #endif
@@ -517,27 +497,27 @@ int elf_run(elf_State *R) {
 					NO_CODE;
 				} else if ((xx.tag == elf_tag_num)||(yy.tag == elf_tag_num)) {
 					if (!INTORNUM(yy.tag)) {
-						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					_check_zero_div(R,xx,yy);
+					_check_zero_div(R,&xx,&yy);
 					x=VI2N(xx);
 					y=VI2N(yy);
 					locals[BC_ARGX(byte)].tag   = elf_tag_num;
 					locals[BC_ARGX(byte)].x_num = x - (elf_Int)(x / y) * y;
 				} else if ((xx.tag==elf_tag_int)||(yy.tag==elf_tag_int)) {
 					if (!INTORNUM(yy.tag)) {
-						elf_fail(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
+						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					_check_zero_div(R,xx,yy);
+					_check_zero_div(R,&xx,&yy);
 					locals[BC_ARGX(byte)].tag   = elf_tag_int;
 					locals[BC_ARGX(byte)].x_int = VN2I(xx) % VN2I(yy);
 				} else {
-					elf_fail(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
+					elf_error(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
 				}
 			} break;
 
 
-	#define INVALID_OPERANDS(X,Y,OP) elf_fail(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[X],tag2s[Y],XTEXT(OP)))
+	#define INVALID_OPERANDS(X,Y,OP) elf_error(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[X],tag2s[Y],XTEXT(OP)))
 
 	/* todo: make this better */
 	#define INTBOP(OPNAME,OP) \
@@ -546,7 +526,7 @@ int elf_run(elf_State *R) {
 				yy=locals[BC_ARGZ(byte)];\
 				if((xx.tag==elf_tag_int) && (yy.tag==elf_tag_int)) {\
 					if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
-						_check_zero_div(R,xx,yy);\
+						_check_zero_div(R,&xx,&yy);\
 					}\
 					locals[BC_ARGX(byte)].tag   = elf_tag_int;\
 					locals[BC_ARGX(byte)].x_int = OP(VN2I(xx),VN2I(yy));\
@@ -569,15 +549,15 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 	locals[BC_ARGX(byte)].y_f32 = y0 OP y1;\
 } else
 #endif
-	#define NUMBOP(OPCODE,OP,FN,FN1) \
+	#define NUMBOP(OPCODE,OP,FN,FN1,PREOP_CHECK) \
 			case OPCODE : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
 				if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {\
-					if (!ISOBJT(xx.tag)) elf_fail(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
+					if (!ISOBJT(xx.tag)) elf_error(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
 					call_overload(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
 				} else if (INTORNUM(xx.tag) && INTORNUM(yy.tag)) {\
-					if (BC_OP(byte)==BC_DIV) _check_zero_div(R,xx,yy);\
+					PREOP_CHECK;\
 					if((xx.tag==elf_tag_num) || (yy.tag==elf_tag_num)) {\
 						locals[BC_ARGX(byte)].tag   = elf_tag_num;\
 						locals[BC_ARGX(byte)].x_num = OP(VI2N(xx),VI2N(yy));\
@@ -630,15 +610,14 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 			INTBOP(BC_BIT_XOR, __xor);
 			INTBOP(BC_BIT_AND, __and);
 			INTBOP(BC_BIT_OR,   __or);
-
-			NUMBOP(BC_ADD, __add, "__add", "__add1");
-			NUMBOP(BC_SUB, __sub, "__sub", "__sub1");
-			NUMBOP(BC_MUL, __mul, "__mul", "__mul1");
-			NUMBOP(BC_DIV, __div, "__div", "__div1");
-			NUMBOP(BC_POW, __pow, "__pow", "__pow1");
+			NUMBOP(BC_ADD, __add, "__add", "__add1", (void)0);
+			NUMBOP(BC_SUB, __sub, "__sub", "__sub1", (void)0);
+			NUMBOP(BC_MUL, __mul, "__mul", "__mul1", (void)0);
+			NUMBOP(BC_DIV, __div, "__div", "__div1", _check_zero_div(R,&xx,&yy));
+			NUMBOP(BC_POW, __pow, "__pow", "__pow1", (void)0);
 	#undef NUMBOP
 			default: {
-				elf_fail(R,module_instr,elf_tpf("unsupported instruction: %s", byte2s[BC_OP(byte)]));
+				elf_error(R,module_instr,elf_tpf("unsupported instruction: %s", byte2s[BC_OP(byte)]));
 			} break;
 		}
 	}

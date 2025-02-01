@@ -137,6 +137,9 @@ typedef struct elf_Value elf_Value;
 struct elf_Value {
 	elf_i32 tag;
 	union {
+		elf_i64       x_i64;
+		union{elf_i32 x_i32,y_i32;};
+
 		elf_i64         x_int;
 		elf_f64         x_num;
 		void           *x_ptr;
@@ -167,10 +170,10 @@ struct elf_String {
 	char       text[1];
 };
 
-typedef struct elf_Table_Entry {
+typedef struct elf_Entry {
 	elf_Value key;
 	elf_i64   idx;
-} elf_Table_Entry;
+} elf_Entry;
 
 // todo: table templates?
 typedef struct elf_Table elf_Table;
@@ -179,7 +182,7 @@ struct elf_Table {
 	elf_i64    			ntotal;
 	elf_i64    			nslots;
 	elf_i64    			ndebug;
-	elf_Table_Entry   *slots;
+	elf_Entry   *slots;
 	elf_Value  			*array;
 };
 
@@ -215,29 +218,6 @@ struct elf_Stack_Frame {
 	char                nrets;
 	int                origin;
 	bool              logging;
-};
-
-typedef struct elf_Entry_Chunk elf_Entry_Chunk;
-struct elf_Entry_Chunk{
-	elf_Entry_Chunk *prox;
-	elf_Table_Entry entries[];
-};
-
-
-// todo:!
-static elf_u8 *elf_entry_chunk_arena;
-static int elf_entry_chunk_arena_index;
-static elf_Entry_Chunk *elf_first_free_chunk_of_4;
-static elf_Entry_Chunk *elf_first_free_chunk_of_16;
-static elf_Entry_Chunk *elf_first_free_chunk_of_512;
-static elf_Entry_Chunk *elf_first_free_chunk_of_4096;
-static elf_Entry_Chunk *elf_first_free_chunk;
-
-typedef struct elf_Arena elf_Arena;
-struct elf_Arena {
-	elf_u8 *memory;
-	elf_i32 capacity;
-	elf_i32 usage;
 };
 
 typedef struct elf_Collector elf_Collector;
@@ -401,7 +381,7 @@ elf_Num elf_time_diff_s(elf_Int begin);
 elf_Num elf_time_diff_ms(elf_Int begin);
 elAPI void elf_debugger(char *message);
 elAPI void elf_fail_(elf_State *S, int instr, const char *error);
-#define elf_fail(R,instr,error) elf_fail_(R,instr,error)
+#define elf_error(R,instr,error) elf_fail_(R,instr,error)
 
 int elf_add_const_int(elf_State *S, elf_Int i);
 int elf_add_const_num(elf_State *S, elf_Num i);

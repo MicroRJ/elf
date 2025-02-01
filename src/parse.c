@@ -520,7 +520,7 @@ static treeID parse_unary(elf_Parser *parser, bool flags) {
 	if(v==NO_TREE){
 		err:
 		parser_dialog(parser,tok.line,"'%s': unexpected token", tok2inf[tok.type].name);
-		elf_fail(parser->R,0,"syntax error: unexpected token");
+		elf_error(parser->R,0,"syntax error: unexpected token");
 	}
 	no_err:
 	return v;

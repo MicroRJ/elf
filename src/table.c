@@ -4,12 +4,71 @@
 ** Table
 */
 
+#if 1
+static inline elf_i64 _vhash(elf_Value *v) {
+	if(v->tag==elf_tag_str){
+		return v->x_str->hash;
+	}
+	return v->x_i64;
+}
 
-static elf_Int elf_hash_value(elf_Value v);
+static inline bool _veq(elf_Value *x, elf_Value *y) {
+	if(x->x_i32==y->x_i32 && x->y_i32==y->y_i32){
+		return true;
+	}
+	if (x->tag==y->tag) {
+		if(x->tag==elf_tag_str){
+			if (x->x_str->hash==y->x_str->hash){
+				if (x->x_str->length==y->x_str->length){
+					return text_eq(x->x_str->text,y->x_str->text);
+				}
+			}
+		}
+	}
+	return 0;
+}
+#else
+static inline elf_i64 _vhash(elf_Value *v) {
+	switch (v.tag) {
+		case elf_tag_str: {
+			ASSERT(v.x_str != 0);
+			ASSERT(v.x_str->hash != 0);
+			return v.x_str->hash;
+		}
+		case elf_tag_userobj:
+		case elf_tag_tab: case elf_tag_closure: case elf_tag_sysobj:
+		case elf_tag_int: case elf_tag_num: case elf_tag_proc: {
+			return elf_hash_ptr(v.x_ptr);
+		}
+		default: NO_CODE;
+	}
+	return 0;
+}
+
+
+bool _veq(elf_Value *x, elf_Value *y) {
+	if (x->tag != y->tag) {
+		return 0;
+	}
+	switch (x->tag) {
+		case elf_tag_str: {
+			return elf_get_strings_eq(x->x_str,y->x_str);
+		}
+		case elf_tag_userobj:
+		case elf_tag_sysobj: case elf_tag_int: case elf_tag_num:
+		case elf_tag_tab: case elf_tag_closure: case elf_tag_proc: {
+			return x->x_int == y->x_int;
+		}
+		default: NO_CODE;
+	}
+	return 0;
+}
+#endif
+
 static elf_Hash elf_rehash(elf_Hash hash);
 static elf_Hash elf_hash_text(const char *text);
 static elf_Hash elf_hash_ptr(void *ptr);
-static elf_Bool elf_value_eq(elf_Value *x, elf_Value *y);
+static elf_Bool _veq(elf_Value *x, elf_Value *y);
 
 static elf_Int slot2index(elf_Table *table, elf_Int slot) {
 	return table->slots[slot].idx;
@@ -52,16 +111,16 @@ since the increment depends on the data, it should reduce
 clustering. */
 elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
-	elf_Table_Entry *slots = tab->slots;
+	elf_Entry *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
-	elf_i64 hash = elf_hash_value(key);
+	elf_i64 hash = _vhash(&key);
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
-	elf_i64 walk = elf_rehash(hash)|1;
+	elf_i64 walk = 1; // elf_rehash(hash)|1;
 	elf_Value value;
 	do {
 		value=slots[tail].key;
-		if ((value.tag==elf_tag_nil)||(elf_value_eq(&value,&key))){
+		if ((value.tag==elf_tag_nil)||(_veq(&value,&key))){
 			return tail;
 		}
 		tail = (tail+walk) % ntotal;
@@ -71,7 +130,7 @@ elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 
 
 elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf_Hash hash) {
-	elf_Table_Entry *slots = tab->slots;
+	elf_Entry *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
@@ -100,7 +159,7 @@ elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
-	elf_Table_Entry *entry = table->slots + slot;
+	elf_Entry *entry = table->slots + slot;
 	if (!slotiskey(table,slot)) {
 		elf_Int i = ARRAY_GROW(table->array,1);
 		table->array[i] = v;
@@ -151,7 +210,7 @@ void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alia
 		elf_Int alias_slot = elf_table_try(tab,alias);
 		tab->slots[alias_slot].key = alias;
 		tab->slots[alias_slot].idx = tab->slots[key_slot].idx;
-	} else elf_fail(S,NO_BYTE,"attempted to alias a key that was never added");
+	} else elf_error(S,NO_BYTE,"attempted to alias a key that was never added");
 }
 
 
@@ -173,7 +232,7 @@ void elf_array_add(elf_Table *table, elf_Value v) {
 void elf_merge_tables(elf_Table *tab, elf_Table *merger) {
 	elf_Int i;
 	for (i=0;i<merger->ntotal;++i) {
-		elf_Table_Entry it = merger->slots[i];
+		elf_Entry it = merger->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		elf_table_set(tab,it.key,merger->array[it.idx]);
 	}
@@ -207,42 +266,4 @@ elf_Hash elf_hash_ptr(void *p) {
 	hash ^= hash << 10;
 	return elf_rehash(hash);
 }
-
-
-elf_Int elf_hash_value(elf_Value v) {
-	switch (v.tag) {
-		case elf_tag_str: {
-			ASSERT(v.x_str != 0);
-			ASSERT(v.x_str->hash != 0);
-			return v.x_str->hash;
-		}
-		case elf_tag_userobj:
-		case elf_tag_tab: case elf_tag_closure: case elf_tag_sysobj:
-		case elf_tag_int: case elf_tag_num: case elf_tag_proc: {
-			return elf_hash_ptr(v.x_ptr);
-		}
-		default: NO_CODE;
-	}
-	return 0;
-}
-
-
-elf_Bool elf_value_eq(elf_Value *x, elf_Value *y) {
-	if (x->tag != y->tag) {
-		return 0;
-	}
-	switch (x->tag) {
-		case elf_tag_str: {
-			return elf_get_strings_eq(x->x_str,y->x_str);
-		}
-		case elf_tag_userobj:
-		case elf_tag_sysobj: case elf_tag_int: case elf_tag_num:
-		case elf_tag_tab: case elf_tag_closure: case elf_tag_proc: {
-			return x->x_int == y->x_int;
-		}
-		default: NO_CODE;
-	}
-	return 0;
-}
-
 

@@ -18,15 +18,15 @@ int elf_array_lib_get(elf_State *R) {
 		for (int i = 0; i < elf_get_num_args(R); ++ i) {
 			if (i != 0) {
 				if (value.tag == elf_tag_nil) {
-					elf_fail(R,NO_BYTE,"nil object");
+					elf_error(R,NO_BYTE,"nil object");
 				}
 				/* todo: please do much better error reporting
 				here, this can be hard to figure out */
 				if (value.tag != elf_tag_tab) {
-					elf_fail(R,NO_BYTE,"not a table");
+					elf_error(R,NO_BYTE,"not a table");
 				}
 				if (tab == 0) {
-					elf_fail(R,NO_BYTE,"nil object");
+					elf_error(R,NO_BYTE,"nil object");
 				}
 			}
 

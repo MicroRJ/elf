@@ -6,7 +6,7 @@
 
 void elf_check_args(elf_State *R, char *fnname, int n, char *usage) {
 	if (elf_get_num_args(R) != n) {
-		elf_fail(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
+		elf_error(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
 	}
 }
 
@@ -43,7 +43,7 @@ elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 
 
 static void check_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, elf_StackId x) {
-	elf_fail(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
+	elf_error(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 
 

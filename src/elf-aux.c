@@ -166,7 +166,7 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 
 int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tagenum x, elf_tagenum y) {
 	if (x != y) {
-		elf_fail(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
+		elf_error(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
 	return x == y;
 }
@@ -189,7 +189,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
-					elf_Table_Entry it = tab->slots[j];
+					elf_Entry it = tab->slots[j];
 					if (it.key.tag==elf_tag_nil) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += fprintf(file,", ");
@@ -199,7 +199,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 				wrote += fpf_value(file,tab->array[i],1);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	elf_Table_Entry it = tab->slots[i];
+			// 	elf_Entry it = tab->slots[i];
 			// 	if (it.key.tag == elf_tag_nil) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
 			// 	wrote += fpf_value(file,it.key,1);

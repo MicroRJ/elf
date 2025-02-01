@@ -5,6 +5,33 @@
 
 #if 1
 
+
+typedef struct Entry_Chunk Entry_Chunk;
+struct Entry_Chunk{
+	Entry_Chunk *prox;
+	elf_Entry entries[];
+};
+
+typedef struct Array_Chunk Array_Chunk;
+struct Array_Chunk{
+	Array_Chunk *prox;
+	elf_Value values[];
+};
+
+// todo:!
+static elf_u8 *elf_entry_chunk_arena;
+static int elf_entry_chunk_arena_index;
+
+static Array_Chunk *first_free_array_chunk_of_4;
+
+static Entry_Chunk *elf_first_free_chunk_of_4;
+static Entry_Chunk *elf_first_free_chunk_of_16;
+static Entry_Chunk *elf_first_free_chunk_of_512;
+static Entry_Chunk *elf_first_free_chunk_of_4096;
+static Entry_Chunk *elf_first_free_chunk;
+
+
+
 void _gc_check(elf_State *R, int size);
 
 void _init_obj(elf_State *R, elf_Object *obj, int type, int size){
@@ -15,7 +42,7 @@ void _init_obj(elf_State *R, elf_Object *obj, int type, int size){
 
 void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_i64 size) {
 	if (R->G.phase!=GC_COLLECTABLE) {
-		elf_fail(R,NO_BYTE,"object allocation out of phase");
+		elf_error(R,NO_BYTE,"object allocation out of phase");
 	}
 	_gc_check(R,size);
 	elf_Object *obj=calloc(size,1);
@@ -27,8 +54,8 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_i64 size) {
 	return obj;
 }
 
-void _dealloc_entry_chunk(elf_Table_Entry *entries, elf_i32 num_entries){
-	elf_Entry_Chunk *chunk = &((elf_Entry_Chunk*)entries)[-1];
+void _dealloc_entry_chunk(elf_Entry *entries, elf_i32 num_entries){
+	Entry_Chunk *chunk = &((Entry_Chunk*)entries)[-1];
 	if(num_entries<=4){
 		chunk->prox=elf_first_free_chunk_of_4;
 		elf_first_free_chunk_of_4=chunk;
@@ -49,26 +76,54 @@ void _dealloc_entry_chunk(elf_Table_Entry *entries, elf_i32 num_entries){
 	}
 }
 
-static inline elf_Entry_Chunk *_alloc_entry_chunk_nocap(elf_i32 num_entries){
-	elf_Entry_Chunk *chunk = (elf_Entry_Chunk *)(elf_entry_chunk_arena + elf_entry_chunk_arena_index);
-	int size = sizeof(elf_Entry_Chunk) + sizeof(elf_Table_Entry) * num_entries;
+static inline Entry_Chunk *_alloc_entry_chunk_nocap(elf_i32 num_entries){
+	Entry_Chunk *chunk = (Entry_Chunk *)(elf_entry_chunk_arena + elf_entry_chunk_arena_index);
+	int size = sizeof(Entry_Chunk) + sizeof(elf_Entry) * num_entries;
+	elf_entry_chunk_arena_index += size;
+	return chunk;
+}
+
+#if 0
+static inline Array_Chunk *_alloc_array_chunk_nocap(elf_i32 num_entries){
+	Array_Chunk *chunk = (Array_Chunk *)(elf_entry_chunk_arena + elf_entry_chunk_arena_index);
+	int size = sizeof(Array_Chunk) + sizeof(elf_Value) * num_entries;
 	elf_entry_chunk_arena_index += size;
 	return chunk;
 }
 
 typedef struct {
+	elf_i32 num_values;
+	elf_Value *values;
+} Alloc_Array_Chunk;
+Alloc_Array_Chunk _alloc_array_chunk(elf_i32 num_values){
+	Array_Chunk *chunk=first_free_array_chunk_of_4;
+	if(num_values<=4){
+		num_values=4;
+		chunk=first_free_array_chunk_of_4;
+		if(chunk){
+			first_free_array_chunk_of_4=chunk->prox;
+			clear_memory(chunk,sizeof_chunk_of_4);
+		}else{
+			chunk=_alloc_entry_chunk_nocap(4);
+		}
+	}
+	return chunk;
+}
+#endif
+
+typedef struct {
 	elf_i32 num_entries;
-	elf_Table_Entry *entries;
+	elf_Entry *entries;
 } Alloc_Entry_Chunk;
 
 Alloc_Entry_Chunk _alloc_entry_chunk(elf_i32 num_entries){
 	enum{
-		sizeof_chunk_of_4=sizeof(elf_Entry_Chunk)+sizeof(elf_Table_Entry)*4,
-		sizeof_chunk_of_16=sizeof(elf_Entry_Chunk)+sizeof(elf_Table_Entry)*16,
-		sizeof_chunk_of_512=sizeof(elf_Entry_Chunk)+sizeof(elf_Table_Entry)*512,
-		sizeof_chunk_of_4096=sizeof(elf_Entry_Chunk)+sizeof(elf_Table_Entry)*4096,
+		sizeof_chunk_of_4=sizeof(Entry_Chunk)+sizeof(elf_Entry)*4,
+		sizeof_chunk_of_16=sizeof(Entry_Chunk)+sizeof(elf_Entry)*16,
+		sizeof_chunk_of_512=sizeof(Entry_Chunk)+sizeof(elf_Entry)*512,
+		sizeof_chunk_of_4096=sizeof(Entry_Chunk)+sizeof(elf_Entry)*4096,
 	};
-	elf_Entry_Chunk *chunk=elf_first_free_chunk_of_4;
+	Entry_Chunk *chunk=elf_first_free_chunk_of_4;
 	if(num_entries<=4){
 		num_entries=4;
 		chunk=elf_first_free_chunk_of_4;
@@ -118,6 +173,7 @@ elf_Table *elf_alloc_table2(elf_State *R, elf_i64 ntotal) {
 	elf_Table *table = R->G.table_objects_free;
 	if(!table){
 		_gc_check(R,size);
+		table = R->G.table_objects_free;
 	}
 	if(table){
 		ASSERT(table->obj.type==GC_TAB);
@@ -126,12 +182,12 @@ elf_Table *elf_alloc_table2(elf_State *R, elf_i64 ntotal) {
 		R->G.table_objects_free = (elf_Table*) table->obj.prox;
 		R->G.num_table_objects_free --;
 		table->obj.prox = 0;
-		elf_debug_log("recycling table: %i",R->G.num_table_objects_free);
+		// elf_debug_log("recycling table: %i",R->G.num_table_objects_free);
 	}else{
 		table = R->G.table_objects + R->G.table_objects_index;
 		R->G.table_objects_index += 1;
 		ASSERT(R->G.table_objects_index*size < GIGABYTES(1));
-		elf_debug_log("allocating table: %i/%i",R->G.table_objects_index,R->G.num_table_objects_free);
+		// elf_debug_log("allocating table: %i/%i",R->G.table_objects_index,R->G.num_table_objects_free);
 	}
 	_init_obj(R,&table->obj,GC_TAB,size);
 	// elf_Table *table = elf_alloc_object(R,GC_TAB,sizeof(elf_Table));
@@ -170,9 +226,9 @@ void _check_table(elf_Table *table) {
 		// new_table.ntotal = table->ntotal << 1;
 		// if (new_table.ntotal < table->ntotal) NO_CODE;
 		// new_table.slots = _alloc_entry_chunk(new_table.ntotal);
-		// new_table.slots = calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(elf_Table_Entry));
+		// new_table.slots = calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(elf_Entry));
 
-		elf_Table_Entry old_slot;
+		elf_Entry old_slot;
 		elf_i64 new_slot;
 		FOR_RANGE(i,0,table->ntotal) {
 			old_slot=table->slots[i];
@@ -215,7 +271,7 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 		_check_table(registry);
 		elf_Int slot=elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
-		elf_Table_Entry entry=registry->slots[slot];
+		elf_Entry entry=registry->slots[slot];
 		if (entry.key.tag != elf_tag_nil) {
 			elf_Value target=registry->array[registry->slots[slot].idx];
 			string=target.x_str;
@@ -240,42 +296,35 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 
 static elf_i64 _mark(elf_Object *obj) {
 	ASSERT(obj != 0);
-	ASSERT(obj->color!=GC_REUSEABLE);
-	if (obj->color==GC_NOCOLLECT) {
-		/* already accounted for */
-		return 0;
-	}
-	ASSERT(obj->color==GC_COLLECTABLE);
-	obj->color=GC_NOCOLLECT;
-
-	elf_i64 num = 1;
-	if (obj->meta) {
-		num += _mark((elf_Object*)obj->meta);
-	}
-	if (obj->type == GC_CLS) {
-		elf_Closure *closure = (elf_Closure*) obj;
-		FOR_RANGE(i, 0, closure->proto.nvalues) {
-			if (ISOBJT(closure->values[i].tag)) {
-				num += _mark(closure->values[i].x_obj);
-			}
+	ASSERT(obj->color != GC_REUSEABLE);
+	elf_i64 num = 0;
+	if (obj->color != GC_NOCOLLECT) {
+		num = 1;
+		ASSERT(obj->color == GC_COLLECTABLE);
+		obj->color = GC_NOCOLLECT;
+		if (obj->meta) {
+			num += _mark((elf_Object*)obj->meta);
 		}
-	} else if (obj->type == GC_TAB) {
-		elf_Table *table;
-		elf_Value *array;
-		elf_Table_Entry *slots;
-
-		table=(elf_Table*)obj;
-		array=table->array;
-		slots=table->slots;
-
-		FOR_RANGE(k,0,table->ntotal) {
-			if (ISOBJT(slots[k].key.tag)) {
-				num += _mark(slots[k].key.x_obj);
+		if (obj->type == GC_CLS) {
+			elf_Closure *closure = (elf_Closure*) obj;
+			FOR_RANGE(i, 0, closure->proto.nvalues) {
+				if (ISOBJT(closure->values[i].tag)) {
+					num += _mark(closure->values[i].x_obj);
+				}
 			}
-		}
-		FOR_RANGE(k,0,ARRAY_LENGTH(array)) {
-			if (ISOBJT(array[k].tag)) {
-				num += _mark(array[k].x_obj);
+		} else if (obj->type == GC_TAB) {
+			elf_Table *table = (elf_Table *) obj;
+			elf_Value *array = table->array;
+			elf_Entry *slots = table->slots;
+			FOR_RANGE(i,0,table->ntotal) {
+				if (ISOBJT(slots[i].key.tag)) {
+					num += _mark(slots[i].key.x_obj);
+				}
+			}
+			FOR_RANGE(i,0,ARRAY_LENGTH(array)) {
+				if (ISOBJT(array[i].tag)) {
+					num += _mark(array[i].x_obj);
+				}
 			}
 		}
 	}
@@ -321,7 +370,7 @@ elf_i64 _gc_free(elf_State *R) {
 				R->G.memory_allocated -= table->obj.size;
 				R->G.num_objects --;
 				_dealloc_table_contents(table);
-				n --;
+				n ++;
 			}else if(table->obj.color==GC_NOCOLLECT){
 				table->obj.color=GC_COLLECTABLE;
 			}
@@ -354,7 +403,7 @@ elf_i64 _gc_free(elf_State *R) {
 					elf_debug_log("Object '%p' found in stack at: '%p'. From top '%p' -> %lli", it, Ki, R->T, (R->T - Ki));
 				}
 			}
-			elf_fail(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
+			elf_error(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
 		}
 #endif
 		if (OBJ_COLOR(it) == GC_NOCOLLECT) {
@@ -438,7 +487,7 @@ void _gc_check(elf_State *R, int size) {
 			num_collected = _gc_cycle(R);
 			ASSERT(num_collected <= num_objects);
 			if (G->memory_allocated > G->memory_threshold) {
-				elf_fail(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated, %lliMB threshold"
+				elf_error(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated, %lliMB threshold"
 				, G->memory_allocated / MEGABYTES(1)
 				, G->memory_threshold / MEGABYTES(1)));
 			}
@@ -479,7 +528,7 @@ static elf_i64 _mark(elf_Object *obj) {
 	} else if (obj->type == GC_TAB) {
 		elf_Table *table;
 		elf_Value *array;
-		elf_Table_Entry *slots;
+		elf_Entry *slots;
 
 		table=(elf_Table*)obj;
 		array=table->array;
@@ -542,7 +591,7 @@ elf_i64 _gc_free(elf_State *R) {
 					elf_debug_log("Object '%p' found in stack at: '%p'. From top '%p' -> %lli", it, Ki, R->T, (R->T - Ki));
 				}
 			}
-			elf_fail(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
+			elf_error(R,it->byte,elf_tpf("internal error, GC failed, attempted to collect object '%p'", it));
 		}
 #endif
 		if (OBJ_COLOR(it) == GC_NOCOLLECT) {
@@ -625,7 +674,7 @@ void _gc_check(elf_State *R) {
 		num_collected = _gc_cycle(R);
 		ASSERT(num_collected <= num_objects);
 		if (R->G.memory_allocated > R->G.memory_threshold) {
-			elf_fail(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated, %lliMB threshold"
+			elf_error(R,NO_BYTE,elf_tpf("out of memory, %lliMB allocated, %lliMB threshold"
 			, R->G.memory_allocated / MEGABYTES(1)
 			, R->G.memory_threshold / MEGABYTES(1)));
 		}
@@ -635,7 +684,7 @@ void _gc_check(elf_State *R) {
 
 void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_i64 size) {
 	if (R->G.phase!=GC_COLLECTABLE) {
-		elf_fail(R,NO_BYTE,"object allocation out of phase");
+		elf_error(R,NO_BYTE,"object allocation out of phase");
 	}
 	R->G.memory_allocated += size;
 	_gc_check(R);
