@@ -16,8 +16,8 @@ static int elf_run(elf_State *R);
 
 void elf_init(elf_State *R, elf_Module *M) {
 	R->M=M;
-	elf_entry_chunk_arena = sys_virtual_alloc(GIGABYTES(1));
-	elf_entry_chunk_arena_index = 0;
+	_memory_arena = sys_virtual_alloc(GIGABYTES(1));
+	_memory_arena_index = 0;
 	R->G.table_objects  = sys_virtual_alloc(GIGABYTES(1));
 	R->G.string_objects = sys_virtual_alloc(GIGABYTES(1));
 
@@ -169,20 +169,27 @@ static int call_overload(elf_State *S, elf_Object *obj, char const *name, int re
 	if (obj->meta == 0) {
 		elf_error(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
-	elf_Value field;
-	field=elf_tgetx_any(obj->meta,name);
-	if (!CAN_CALL(field.tag)) {
-		elf_error(S,NO_BYTE,elf_tpf("'%s': overload is %s, not a function",name,tag2s[field.tag]));
+	int num_rets = 0;
+	elf_Value value = elf_tgetx_any(obj->meta,name);
+	if((value.tag)==elf_tag_closure||(value.tag)==elf_tag_proc) {
+		elf_Value *top = GET_TOP(S);
+		PUSHV(S,value);
+		PUSHV(S,VOBJ(obj));
+		copy_memory(GET_TOP(S),args,sizeof(elf_Value)*nargs);
+		GET_TOP(S) += nargs;
+		num_rets = elf_call(S,nargs+1,1);
+		GET_LOCAL(S,reg)=*top;
+	}else{
+		for(int i=0;i<obj->meta->ntotal;i++){
+			if(obj->meta->slots[i].key.tag==elf_tag_str){
+				printf(" -> '%s'\n", obj->meta->slots[i].key.x_str->text);
+			}
+		}
+		elf_error(S,NO_BYTE,elf_tpf("'%s': meta field of object '%s' is '%s', not a function, there are %i metafield(s) available:",name,obj2s[obj->type],tag2s[value.tag],obj->meta->ntotal));
+		// todo: remove
+		elf_tgetx_any(obj->meta,name);
 	}
-	elf_Value *top;
-	top=GET_TOP(S);
-	PUSHV(S,field);
-	PUSHV(S,VOBJ(obj));
-	copy_memory(GET_TOP(S),args,sizeof(elf_Value)*nargs);
-	GET_TOP(S) += nargs;
-	int ny = elf_call(S,nargs+1,1);
-	GET_LOCAL(S,reg)=*top;
-	return ny;
+	return num_rets;
 }
 
 int elf_run(elf_State *R) {

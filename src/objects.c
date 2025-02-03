@@ -3,32 +3,151 @@
 ** obj.c
 */
 
+// so we have a limited amount of data, generated
+// by the parser and the code generator, and we
+// are to somehow optimize memory usage.
+// ultimately, to do things in a performance oriented
+// fashion we want to satisfy the following constraints
+// or or avoid them entirely.
+//	So following that line of thought we could say:
+//
+// 	Well, can we get rid of garbage collection entirely,
+//		I think the answer is no because it would sort of
+// 	defeat the purpose. So what's the next best thing?
+//
+//		We'll can we optimize some of the aspects of garbage
+//		collection?
+//		Well, garbage collections works off of the following
+// 	principles:
+//		Reachability analysis:
+//		This is the process in which we figure which objects
+//		are reachable. We'll refer to objects as nodes.
+//		We have what's called a stack, every node on the stack
+//		is considered reachable and so is every node reachable
+//		from other node. So really, the only meaning meaningful
+///   information that we can extract from this graph is
+//    reachability information.
+//		There are a few useful heuristics we can extract from
+//    usage patterns.
+//		This reachability analysis is typically the most expensive
+//		part of garbage collection given the fact that we have to
+//		do a bunch of pointer chases to objects that are sparsely
+//		allocated, in other words, is not cache friendly. And even
+//		then, we risk traversing over a node that is rather large,
+//		without knowing that the node itself is never going to be
+//		collected because is global.
+//		So doing this reachability analysis on a node per node level
+//		is slow. Can we make this better?
+//
+//		Well, what do we know about the nodes themselves, from first
+//		principles, typically when a node is allocated multiple
+//		other nodes are allocated, and typically, they are "released"
+//		together. In other words, where there's one there's many.
+//		For instance, take a basic function, most of the nodes within
+//		that function will be released, in other words, only a few
+//		nodes are persisted.
+//		So, if instead of doing a graph traversal algorithm, we iterated
+//		over a linear set of regions, and we could check which regions
+//		are reachable.
+//		So instead of having a reachability graph,
+//		we had some form of region graph or set, where each region
+//    represented a region of memory, where many objects
+//		with the same lifetime are persisted.
+//		So this other data structure is derived from how we would
+//		like to process information, we don't necessarily care about
+//    objects themselves we just care about regions of memory, whether
+//		there are many or few objects it doesn't matter.
+//
+//		So we need a way to associated objects by memory locality,
+//		which objects are allocated together or which objects are
+//		deallocated together.
+//
+//		Anyways, let's suppose we did have this data structure,
+//		which is just an array of regions, each region contains
+//		a set of objects which are likely to be released together.
+//		Right, so then it would be a matter of traversing the stack,
+//		figure out which nodes are present in the stack and their
+//		associated region and then mark which regions are reachable,
+//		and then not free those regions. It still seems we have the
+//		same problem of having to perform reachability analysis on
+//		the entire object graph to check which regions are reachable.
+//
+//		Ok, so the whole goal of the reachability analysis stage is
+//		to figure out which objects are reachable or not, and from
+//		previous passes we've built this object region, which is
+//		essentially a representation of which objects are likely to
+//		released together.
+//
+//		The problem is that we
+//
+//
+//
+
+
 #if 1
-
-
-typedef struct Entry_Chunk Entry_Chunk;
-struct Entry_Chunk{
-	Entry_Chunk *prox;
-	elf_Entry entries[];
+typedef struct Memory_Chunk Memory_Chunk;
+struct Memory_Chunk{
+	Memory_Chunk *prox;
+	int size;
 };
 
-typedef struct Array_Chunk Array_Chunk;
-struct Array_Chunk{
-	Array_Chunk *prox;
-	elf_Value values[];
-};
 
 // todo:!
-static elf_u8 *elf_entry_chunk_arena;
-static int elf_entry_chunk_arena_index;
+static elf_u8 *_memory_arena;
+static int _memory_arena_index;
+const int free_chunk_sizes[]={0x40,0x80,0x100,0x200,0x400,0x800,0x1000,0x2000};
+static Memory_Chunk *free_chunks[_countof(free_chunk_sizes)];
 
-static Array_Chunk *first_free_array_chunk_of_4;
+void _recycle_memory_chunk(void *memory){
+	free(memory);
+	#if 0
+	Memory_Chunk *chunk = &((Memory_Chunk*)memory)[-1];
+	int size = chunk->size;
+	for(int i=0;i<_countof(free_chunks);i++){
+		if(size<=free_chunk_sizes[i]){
+			ASSERT(!chunk->prox);
+			chunk->prox=free_chunks[i];
+			free_chunks[i]=chunk;
+			goto esc;
+		}
+	}
+	esc:;
+	#endif
+}
 
-static Entry_Chunk *elf_first_free_chunk_of_4;
-static Entry_Chunk *elf_first_free_chunk_of_16;
-static Entry_Chunk *elf_first_free_chunk_of_512;
-static Entry_Chunk *elf_first_free_chunk_of_4096;
-static Entry_Chunk *elf_first_free_chunk;
+typedef struct {
+	void *memory;
+	int size;
+} Alloc_Memory_Chunk;
+
+Alloc_Memory_Chunk _alloc_memory_chunk(int required_size){
+	return (Alloc_Memory_Chunk){ .memory=calloc(1,required_size), .size=required_size };
+#if 0
+	Memory_Chunk *chunk = 0;
+	int size = required_size;
+	for(int i=0;i<_countof(free_chunks);i++){
+		if(required_size <= free_chunk_sizes[i]){
+			chunk = free_chunks[i];
+			size = free_chunk_sizes[i];
+			if(chunk){
+				ASSERT(chunk->size == free_chunk_sizes[i]);
+				free_chunks[i] = chunk->prox;
+				chunk->prox = 0;
+			}
+			break;
+		}
+	}
+	if(!chunk){
+		elf_debug_log("allocating chunk!: %i", size);
+		chunk = (Memory_Chunk *)(_memory_arena + _memory_arena_index);
+		chunk->size = size;
+		_memory_arena_index += sizeof(Memory_Chunk) + size;
+	}
+	clear_memory(chunk + 1,size);
+	_esc:
+	return (Alloc_Memory_Chunk){.memory=chunk + 1,.size=size};
+#endif
+}
 
 
 
@@ -54,121 +173,9 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_i64 size) {
 	return obj;
 }
 
-void _dealloc_entry_chunk(elf_Entry *entries, elf_i32 num_entries){
-	Entry_Chunk *chunk = &((Entry_Chunk*)entries)[-1];
-	if(num_entries<=4){
-		chunk->prox=elf_first_free_chunk_of_4;
-		elf_first_free_chunk_of_4=chunk;
-	}else
-	// if(num_entries<=16){
-	// 	chunk->prox=elf_first_free_chunk_of_16;
-	// 	elf_first_free_chunk_of_16=chunk;
-	// }else if(num_entries<=512){
-	// 	chunk->prox=elf_first_free_chunk_of_512;
-	// 	elf_first_free_chunk_of_512=chunk;
-	// }else
-	if(num_entries<=4096){
-		chunk->prox=elf_first_free_chunk_of_4096;
-		elf_first_free_chunk_of_4096=chunk;
-	}else{
-		chunk->prox=elf_first_free_chunk;
-		elf_first_free_chunk=chunk;
-	}
-}
-
-static inline Entry_Chunk *_alloc_entry_chunk_nocap(elf_i32 num_entries){
-	Entry_Chunk *chunk = (Entry_Chunk *)(elf_entry_chunk_arena + elf_entry_chunk_arena_index);
-	int size = sizeof(Entry_Chunk) + sizeof(elf_Entry) * num_entries;
-	elf_entry_chunk_arena_index += size;
-	return chunk;
-}
-
+elf_Table *elf_alloc_table2(elf_State *R, elf_i64 num_initial_entries) {
+	elf_Table *table = elf_alloc_object(R,GC_TAB,sizeof(elf_Table));
 #if 0
-static inline Array_Chunk *_alloc_array_chunk_nocap(elf_i32 num_entries){
-	Array_Chunk *chunk = (Array_Chunk *)(elf_entry_chunk_arena + elf_entry_chunk_arena_index);
-	int size = sizeof(Array_Chunk) + sizeof(elf_Value) * num_entries;
-	elf_entry_chunk_arena_index += size;
-	return chunk;
-}
-
-typedef struct {
-	elf_i32 num_values;
-	elf_Value *values;
-} Alloc_Array_Chunk;
-Alloc_Array_Chunk _alloc_array_chunk(elf_i32 num_values){
-	Array_Chunk *chunk=first_free_array_chunk_of_4;
-	if(num_values<=4){
-		num_values=4;
-		chunk=first_free_array_chunk_of_4;
-		if(chunk){
-			first_free_array_chunk_of_4=chunk->prox;
-			clear_memory(chunk,sizeof_chunk_of_4);
-		}else{
-			chunk=_alloc_entry_chunk_nocap(4);
-		}
-	}
-	return chunk;
-}
-#endif
-
-typedef struct {
-	elf_i32 num_entries;
-	elf_Entry *entries;
-} Alloc_Entry_Chunk;
-
-Alloc_Entry_Chunk _alloc_entry_chunk(elf_i32 num_entries){
-	enum{
-		sizeof_chunk_of_4=sizeof(Entry_Chunk)+sizeof(elf_Entry)*4,
-		sizeof_chunk_of_16=sizeof(Entry_Chunk)+sizeof(elf_Entry)*16,
-		sizeof_chunk_of_512=sizeof(Entry_Chunk)+sizeof(elf_Entry)*512,
-		sizeof_chunk_of_4096=sizeof(Entry_Chunk)+sizeof(elf_Entry)*4096,
-	};
-	Entry_Chunk *chunk=elf_first_free_chunk_of_4;
-	if(num_entries<=4){
-		num_entries=4;
-		chunk=elf_first_free_chunk_of_4;
-		if(chunk){
-			elf_first_free_chunk_of_4=chunk->prox;
-			clear_memory(chunk,sizeof_chunk_of_4);
-		}else{
-			chunk=_alloc_entry_chunk_nocap(4);
-		}
-	}else
-	// if(num_entries<=16){
-	// 	chunk=elf_first_free_chunk_of_16;
-	// 	if(chunk){
-	// 		elf_first_free_chunk_of_16=chunk->prox;
-	// 		clear_memory(chunk,sizeof_chunk_of_16);
-	// 	}else{
-	// 		chunk=_alloc_entry_chunk_nocap(16);
-	// 	}
-	// }else if(num_entries<=512){
-	// 	chunk=elf_first_free_chunk_of_512;
-	// 	if(chunk){
-	// 		elf_first_free_chunk_of_512=chunk->prox;
-	// 		clear_memory(chunk,sizeof_chunk_of_512);
-	// 	}else{
-	// 		chunk=_alloc_entry_chunk_nocap(512);
-	// 	}
-	// }else
-	if(num_entries<=4096){
-		num_entries=4096;
-		chunk=elf_first_free_chunk_of_4096;
-		if(chunk){
-			elf_first_free_chunk_of_4096=chunk->prox;
-			clear_memory(chunk,sizeof_chunk_of_4096);
-		}else{
-			chunk=_alloc_entry_chunk_nocap(4096);
-		}
-	}else{
-		chunk=_alloc_entry_chunk_nocap(num_entries);
-		elf_debug_log("allocating chunk: %i", num_entries);
-	}
-	Alloc_Entry_Chunk o={ .entries=chunk->entries, .num_entries=num_entries };
-	return o;
-}
-
-elf_Table *elf_alloc_table2(elf_State *R, elf_i64 ntotal) {
 	enum{size=sizeof(elf_Table)};
 	elf_Table *table = R->G.table_objects_free;
 	if(!table){
@@ -190,14 +197,15 @@ elf_Table *elf_alloc_table2(elf_State *R, elf_i64 ntotal) {
 		// elf_debug_log("allocating table: %i/%i",R->G.table_objects_index,R->G.num_table_objects_free);
 	}
 	_init_obj(R,&table->obj,GC_TAB,size);
-	// elf_Table *table = elf_alloc_object(R,GC_TAB,sizeof(elf_Table));
+	R->G.num_objects ++;
+#endif
 	table->obj.meta = R->metatables.table;
 	table->ndebug = 0;
-	Alloc_Entry_Chunk chunk = _alloc_entry_chunk(ntotal);
-	table->slots = chunk.entries; // _alloc_entry_chunk(ntotal);
-	table->ntotal = chunk.num_entries; // ntotal;
+	Alloc_Memory_Chunk chunk = _alloc_memory_chunk(num_initial_entries * sizeof(elf_Entry));
+	ASSERT(chunk.size >= num_initial_entries * sizeof(elf_Entry));
+	table->slots = chunk.memory;
+	table->ntotal = chunk.size / sizeof(elf_Entry);
 	table->nslots = 0;
-	R->G.num_objects ++;
 	return table;
 }
 
@@ -209,7 +217,7 @@ elf_Table *elf_alloc_table(elf_State *R) {
 
 void _dealloc_table_contents(elf_Table *tab) {
 	// dealloc_memory(GLOBAL_ALLOCATOR,tab->slots-1);
-	_dealloc_entry_chunk(tab->slots,tab->ntotal);
+	_recycle_memory_chunk(tab->slots);
 	ARRAY_DELETE(tab->array);
 	tab->array = 0;
 	tab->slots = 0;
@@ -220,29 +228,28 @@ void _check_table(elf_Table *table) {
 		// DEBUG_CODE( table->ncollisions = 0 );
 		/* todo: better strat */
 		elf_Table new_table = *table;
-		Alloc_Entry_Chunk chunk = _alloc_entry_chunk(table->ntotal << 1);
-		new_table.slots = chunk.entries;
-		new_table.ntotal = chunk.num_entries;
+		Alloc_Memory_Chunk chunk = _alloc_memory_chunk((table->ntotal << 1) * sizeof(elf_Entry));
+		ASSERT(chunk.size >= chunk.size / sizeof(elf_Entry));
+		new_table.slots = chunk.memory;
+		new_table.ntotal = chunk.size / sizeof(elf_Entry);
 		// new_table.ntotal = table->ntotal << 1;
 		// if (new_table.ntotal < table->ntotal) NO_CODE;
 		// new_table.slots = _alloc_entry_chunk(new_table.ntotal);
 		// new_table.slots = calloc_memory(GLOBAL_ALLOCATOR,new_table.ntotal*sizeof(elf_Entry));
 
-		elf_Entry old_slot;
-		elf_i64 new_slot;
 		FOR_RANGE(i,0,table->ntotal) {
-			old_slot=table->slots[i];
-			if (old_slot.key.tag==elf_tag_nil||old_slot.key.tag==elf_tag_tomb) continue;
-
-			new_slot=elf_table_try(&new_table,old_slot.key);
-			ASSERT(new_slot>=0);
-			new_table.slots[new_slot]=old_slot;
+			elf_Entry prev_entry = table->slots[i];
+			if(prev_entry.key.tag != elf_tag_nil && prev_entry.key.tag != elf_tag_tomb){
+				elf_i64 prev_index = elf_table_try(&new_table,prev_entry.key);
+				ASSERT(prev_index >= 0);
+				new_table.slots[prev_index] = prev_entry;
+			}
 		}
 		// dealloc_memory(GLOBAL_ALLOCATOR,table->slots);
-		_dealloc_entry_chunk(table->slots,table->nslots);
+		_recycle_memory_chunk(table->slots);
 
-		table->ntotal=new_table.ntotal;
-		table->slots=new_table.slots;
+		table->ntotal = new_table.ntotal;
+		table->slots = new_table.slots;
 	}
 }
 
@@ -344,7 +351,7 @@ static elf_i64 _gc_mark(elf_State *R) {
 			num_objs += _mark(ptr->x_obj);
 		}
 	}
-	elf_debug_log("mark took: %fms", elf_time_diff_ms(time));
+	// elf_debug_log("mark took: %fms", elf_time_diff_ms(time));
 	return num_objs;
 }
 
@@ -355,28 +362,28 @@ elf_i64 _gc_free(elf_State *R) {
 
 	elf_i64 n = 0;
 
-	{
-		elf_i64 _time = elf_get_clock_time();
-		R->G.num_table_objects_free=0;
-		elf_Table *table;
-		for(table=R->G.table_objects;table<R->G.table_objects+R->G.table_objects_index;table++){
-			ASSERT(table->obj.type==GC_TAB);
-			ASSERT(table->obj.size==sizeof(elf_Table));
-			if(table->obj.color==GC_COLLECTABLE){
-				table->obj.color=GC_REUSEABLE;
-				table->obj.prox=(elf_Object*)R->G.table_objects_free;
-				R->G.table_objects_free = table;
-				R->G.num_table_objects_free ++;
-				R->G.memory_allocated -= table->obj.size;
-				R->G.num_objects --;
-				_dealloc_table_contents(table);
-				n ++;
-			}else if(table->obj.color==GC_NOCOLLECT){
-				table->obj.color=GC_COLLECTABLE;
-			}
-		}
-		elf_debug_log("time recycling tables: %fms (%i tables found)", elf_time_diff_ms(_time), R->G.num_table_objects_free);
-	}
+	// {
+	// 	elf_i64 _time = elf_get_clock_time();
+	// 	R->G.num_table_objects_free=0;
+	// 	elf_Table *table;
+	// 	for(table=R->G.table_objects;table<R->G.table_objects+R->G.table_objects_index;table++){
+	// 		ASSERT(table->obj.type==GC_TAB);
+	// 		ASSERT(table->obj.size==sizeof(elf_Table));
+	// 		if(table->obj.color==GC_COLLECTABLE){
+	// 			table->obj.color=GC_REUSEABLE;
+	// 			table->obj.prox=(elf_Object*)R->G.table_objects_free;
+	// 			R->G.table_objects_free = table;
+	// 			R->G.num_table_objects_free ++;
+	// 			R->G.memory_allocated -= table->obj.size;
+	// 			R->G.num_objects --;
+	// 			_dealloc_table_contents(table);
+	// 			n ++;
+	// 		}else if(table->obj.color==GC_NOCOLLECT){
+	// 			table->obj.color=GC_COLLECTABLE;
+	// 		}
+	// 	}
+	// 	elf_debug_log("time recycling tables: %fms (%i tables found)", elf_time_diff_ms(_time), R->G.num_table_objects_free);
+	// }
 
 
 	int num_objs[4]={};
@@ -395,8 +402,8 @@ elf_i64 _gc_free(elf_State *R) {
 	FOR_ARRAY(i,objects) {
 		elf_Object *it = objects[i];
 		ASSERT(it != 0);
-		ASSERT(it->type!=GC_TAB);
 #if 0
+		ASSERT(it->type!=GC_TAB);
 		if ((OBJ_COLOR(it) == elf_GC_RED) || (OBJ_COLOR(it) == elf_GC_TRAP)) {
 			for(elf_Value *Ki = R->stack; Ki < R->T; Ki += 1) {
 				if (Ki->x_obj == it) {
@@ -424,9 +431,9 @@ elf_i64 _gc_free(elf_State *R) {
 			// OBJ_COLOR(it) = elf_GC_RED;
 			R->G.memory_allocated -= it->size;
 			R->G.num_objects --;
-			// if (it->type == GC_TAB) {
-			// 	_dealloc_table_contents((elf_Table*)it);
-			// }
+			if (it->type == GC_TAB) {
+				_dealloc_table_contents((elf_Table*)it);
+			}
 			dealloc_memory(GLOBAL_ALLOCATOR,it);
 		} else n += 1;
 	}
@@ -446,13 +453,25 @@ elf_i64 _gc_free(elf_State *R) {
 
 static elf_i64 _gc_cycle(elf_State *R) {
 	elf_i64 time_ = elf_get_clock_time();
-	elf_i64 num_marked = _gc_mark(R);
+
+	elf_i64 num_marked;
+	{
+		// elf_i64 _time = elf_get_clock_time();
+	 	num_marked = _gc_mark(R);
+		// elf_debug_log("mark took: %fms", elf_time_diff_ms(_time));
+	}
 	elf_i64 num_objects = R->G.num_objects; // ARRAY_LENGTH(R->G.objects);
 	elf_i64 num_to_collect = num_objects - num_marked;
 	elf_i64 obj_trigger_threshold = R->G.object_trigger_threshold;
 	// elf_debug_log("GC: %lli - %lli -> %lli (%lli), (total - marked = expected) (threshold)",num_objects,num_to_collect,num_marked,obj_trigger_threshold);
 
-	elf_i64 num_collected = _gc_free(R);
+	elf_i64 num_collected;
+	{
+		// elf_i64 _time = elf_get_clock_time();
+		num_collected = _gc_free(R);
+		// elf_debug_log("free took: %fms", elf_time_diff_ms(_time));
+	}
+
 	num_to_collect -= num_collected;
 
 	elf_debug_log("	(%fms) => leaked: %lli", elf_time_diff_ms(time_),num_to_collect);

@@ -39,14 +39,6 @@ STATIC_ASSERT(sizeof(elf_f64)==8);
 #endif
 
 
-#if !defined(MEGABYTES)
-   #define MEGABYTES(x) ((x)*1024LLU*1024LLU)
-#endif
-#if !defined(GIGABYTES)
-   #define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
-#endif
-
-
 #if !defined(MAX_PATH)
    #define MAX_PATH 0xff
 #endif

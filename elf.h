@@ -7,11 +7,21 @@ e*/
 #define _elf_lang_
 
 
+#if !defined(KILOBYTES)
+   #define KILOBYTES(x) ((x)*1024LLU)
+#endif
+#if !defined(MEGABYTES)
+   #define MEGABYTES(x) ((x)*1024LLU*1024LLU)
+#endif
+#if !defined(GIGABYTES)
+   #define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
+#endif
+
 #define elGC_MEM_THRESHOLD_MIN (elf_i64) MEGABYTES(1)
 #define elGC_MEM_THRESHOLD_MAX (elf_i64) MEGABYTES(2)
-#define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((1024)*1)
-#define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((1024)*1)
-#define DEFAULT_STACK_SIZE 4096
+#define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((512)*1)
+#define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((512)*1)
+#define DEFAULT_STACK_SIZE KILOBYTES(4)
 
 
 #if defined(__EMSCRIPTEN__)
@@ -380,9 +390,7 @@ elf_Num elf_time_diff_s(elf_Int begin);
 /* time difference in milliseconds */
 elf_Num elf_time_diff_ms(elf_Int begin);
 elAPI void elf_debugger(char *message);
-elAPI void elf_fail_(elf_State *S, int instr, const char *error);
-#define elf_error(R,instr,error) elf_fail_(R,instr,error)
-
+elAPI void elf_error(elf_State *S, int instr, const char *error);
 int elf_add_const_int(elf_State *S, elf_Int i);
 int elf_add_const_num(elf_State *S, elf_Num i);
 int elf_add_proto(elf_State *S);

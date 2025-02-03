@@ -95,7 +95,7 @@ at the same time when using clang-cl */
 #include "src/system.c"
 #include "src/lib_table.c"
 #include "src/lib_array.c"
-#include "src/obj.c"
+#include "src/objects.c"
 #include "src/core.c"
 
 

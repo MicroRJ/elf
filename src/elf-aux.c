@@ -140,7 +140,7 @@ void elf_dump_byte_trace(elf_State *S, elf_Stack_Frame *call, int level) {
 	}
 }
 
-void elf_fail_(elf_State *R, int byte, const char *error) {
+void elf_error(elf_State *R, int byte, const char *error) {
 	/* Alternatively, do proper coloring... */
 	printf("\n\n");
 	printf("\txxxxxxxxxx:\n");
@@ -161,7 +161,7 @@ void elf_fail_(elf_State *R, int byte, const char *error) {
 
 	printf(" -- BYTE TRACE:\n");
 	elf_dump_byte_trace(R,GET_FRAME(R),R->nframe);
-	elf_debugger("runtime throw");
+	elf_debugger("error");
 }
 
 int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tagenum x, elf_tagenum y) {

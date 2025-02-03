@@ -134,7 +134,7 @@ elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
-	elf_Hash walk = elf_rehash(hash)|1;
+	elf_Hash walk = 1; // elf_rehash(hash)|1;
 	do {
 		elf_Value x = slots[tail].key;
 		if (x.tag==elf_tag_nil) {
