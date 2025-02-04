@@ -390,9 +390,9 @@ elf_i64 _gc_free(elf_State *R) {
 	int tot_size[4]={};
 	int tot_age[4]={};
 
-	int k_num_objs[4]={};
-	int k_tot_size[4]={};
-	int k_tot_age[4]={};
+	// int k_num_objs[4]={};
+	// int k_tot_size[4]={};
+	// int k_tot_age[4]={};
 
 	elf_Object **new_objects=R->G.new_objects;
 	elf_Object **objects=R->G.objects;
@@ -457,7 +457,7 @@ static elf_i64 _gc_cycle(elf_State *R) {
 	elf_i64 num_marked;
 	{
 		// elf_i64 _time = elf_get_clock_time();
-	 	num_marked = _gc_mark(R);
+		num_marked = _gc_mark(R);
 		// elf_debug_log("mark took: %fms", elf_time_diff_ms(_time));
 	}
 	elf_i64 num_objects = R->G.num_objects; // ARRAY_LENGTH(R->G.objects);
@@ -474,7 +474,7 @@ static elf_i64 _gc_cycle(elf_State *R) {
 
 	num_to_collect -= num_collected;
 
-	elf_debug_log("	(%fms) => leaked: %lli", elf_time_diff_ms(time_),num_to_collect);
+	// elf_debug_log("	(%fms) => leaked: %lli", elf_time_diff_ms(time_),num_to_collect);
 	return num_collected;
 }
 
