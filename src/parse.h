@@ -240,16 +240,13 @@ struct elf_Parser {
 	treeID            *functions;
 	entityT            *entities;
 	entityID        entity_index;
-	entityID     scope_stack[16];
+	entityID     scope_stack[32];
 	entityID         scope_index;
 	entityID               scope;
-	Source         src_stack[32];
-	Source             src_index;
-	Source                   src;
-	Block        block_stack[16];
+	Block        block_stack[32];
 	int              block_index;
 	Block                  block;
-	Loop          loop_stack[16];
+	Loop          loop_stack[32];
 	int               loop_index;
 	Loop                    loop;
 	// -- codegen

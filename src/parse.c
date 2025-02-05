@@ -130,6 +130,9 @@ static void block_add(elf_Parser *parser, treeID id){
 	ARRAY_ADD(parser->block.body,id);
 }
 static void begin_block(elf_Parser *parser) {
+	if(parser->block_index >= _countof(parser->block_stack)){
+		parser_dialog(parser,parser->tok.line,"block nesting too deep");
+	}
 	ASSERT(parser->block_index < _countof(parser->block_stack));
 	parser->block_stack[parser->block_index ++] = parser->block;
 	parser->block=(Block){};
