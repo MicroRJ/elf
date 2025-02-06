@@ -85,13 +85,14 @@ typedef struct elf_CBinding {
 	elf_Function fn;
 } elf_CBinding;
 
-typedef struct elf_Proto {
-	int               arity;
-	int             nvalues;
-	int             nlocals;
-	int              nbytes;
-	int               bytes;
-} elf_Proto;
+typedef struct elf_Proto elf_Proto;
+struct elf_Proto {
+	int      arity;
+	int  numvalues;
+	int  stacksize;
+	int   numbytes;
+	int      bytes;
+};
 
 typedef struct elf_File {
 	int pos,end;
@@ -154,11 +155,11 @@ struct elf_Value {
 		elf_f64         x_num;
 		void           *x_ptr;
 		elf_Handle      x_sys;
-		elf_Closure    *x_cls;
+		elf_Closure    *x_closure;
 		elf_Object     *x_obj;
 		elf_Table      *x_tab;
 		elf_String     *x_str;
-		elf_Function    x_fun;
+		elf_Function    x_proc;
 	};
 };
 
@@ -213,6 +214,7 @@ struct elf_Module {
 	elf_i64       *integers;
 	elf_File         *files;
 	elf_Proto       *protos;
+	elf_u8           *track;
 	char            **lines;
 	elf_Bytecode     *bytes;
 	int              nbytes;
@@ -220,14 +222,12 @@ struct elf_Module {
 
 typedef struct elf_Stack_Frame elf_Stack_Frame;
 struct elf_Stack_Frame {
-	elf_Stack_Frame   *caller;
 	elf_Closure      *closure;
 	elf_Value         *locals;
+	int           bytecounter;
 	int               nlocals;
 	char                nargs;
 	char                nrets;
-	int                origin;
-	bool              logging;
 };
 
 typedef struct elf_Collector elf_Collector;
@@ -237,36 +237,34 @@ struct elf_Collector{
 	elf_i64      memory_allocated;
 	elf_i64      memory_threshold;
 
-	elf_i32     table_objects_index;
-	elf_i32 num_table_objects_free;
-	elf_Table  *table_objects;
-	elf_Table  *table_objects_free;
-
-	elf_String *string_objects;
-	elf_i32     string_objects_index;
-	elf_String *string_objects_free;
-
 	elf_i32     num_objects;
 	elf_i64     object_trigger_threshold;
 	elf_Object **new_objects;
 	elf_Object **objects;
 };
 
-
 typedef struct elf_State elf_State;
 struct elf_State {
-	elf_Module     *M;
-	union{elf_Collector G,gc;};
-
+	elf_Module         *M;
+	elf_Collector       G;
 	elf_Value      *stack;
-	elf_Value      *stack_ptr;
-	int             stack_max;
+	elf_Value  *stack_ptr;
+	int         stack_max;
 
-	elf_Stack_Frame  first_frame;
-	elf_Stack_Frame *frame;
-	int            nframe;
-	int             flags;
+	elf_Stack_Frame frame_stack[64];
+	int             frame_index;
+	elf_Stack_Frame frame;
 
+	int                      flags;
+	int            disable_tracing;
+	int  trace_inner_loop_stack[16];
+	int  trace_inner_loop_counter;
+	int           trace_stop_instr;
+	int          trace_start_instr;
+	int           active_trace_pos;
+	int           active_trace_len;
+	elf_Bytecode     *trace_buffer;
+	elf_Table         *trace_table;
 	struct {
 		elf_Table *integer;
 		elf_Table *number;
@@ -281,9 +279,8 @@ struct elf_State {
 #define elf_GC_PHASE_MARK GC_COLLECTABLE
 #define elf_GC_PHASE_FREE GC_NOCOLLECT
 #define FLAG_DEBUGGER         (1 << 0)
-#define FLAG_DEBUGGER_ONCALL  (1 << 1)
-#define FLAG_BYTETRACKING     (1 << 2)
-#define FLAG_BYTELOGGING      (1 << 3)
+#define FLAG_BYTELOGGING      (1 << 1)
+#define FLAG_TRACING          (1 << 2)
 
 typedef int Instr;
 typedef char *Source;
@@ -302,17 +299,17 @@ elAPI elf_Table *elf_new_table(elf_State *);
 
 
 /* add objects to stack */
-elAPI void elf_push_this(elf_State *S);
-elAPI void elf_push(elf_State *S, elf_Value value);
-elAPI void elf_push_nil(elf_State *S);
+elAPI void elf_add_this(elf_State *S);
+elAPI void elf_add_any(elf_State *S, elf_Value value);
+elAPI void elf_add_nil(elf_State *S);
 elAPI void elf_push_int(elf_State *S, elf_Int);
 elAPI void elf_push_number(elf_State *S, elf_Num);
 elAPI void elf_add_obj(elf_State *S, elf_Object *);
 elAPI void elf_push_string(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
 elAPI void elf_add_table(elf_State *S, elf_Table *);
-elAPI void elf_push_closure(elf_State *S, elf_Closure *);
-elAPI void elf_push_proc(elf_State *S, elf_Function);
+elAPI void elf_add_closure(elf_State *S, elf_Closure *);
+elAPI void elf_add_proc(elf_State *S, elf_Function);
 
 
 /* getting arguments from stack */

@@ -22,8 +22,8 @@ int core_lib_get_dll_fn(elf_State *S) {
 	char *name = elf_get_text(S,1);
 	elf_Function fn = (elf_Function) sys_get_dll_fn(lib,name);
 
-	if (fn != 0) elf_push_proc(S,fn);
-	else elf_push_nil(S);
+	if (fn != 0) elf_add_proc(S,fn);
+	else elf_add_nil(S);
 	return 1;
 }
 
@@ -33,7 +33,7 @@ int core_lib_load_dll(elf_State *R) {
 	elf_Handle lib = sys_load_dll(file);
 
 	if (lib != 0) elf_add_sys(R,lib);
-	else elf_push_nil(R);
+	else elf_add_nil(R);
 	return 1;
 }
 

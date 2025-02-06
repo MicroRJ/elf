@@ -233,7 +233,7 @@ struct elf_Parser {
 	char                    *pos;
 	int                 line_num;
 	tokenT tok,tok_prev,tok_prox;
-	// -- parsing
+	char              *expr_line;
 	char             *tree_arena;
 	int               tree_index;
 	treeID                   enc;
@@ -249,7 +249,6 @@ struct elf_Parser {
 	Loop          loop_stack[32];
 	int               loop_index;
 	Loop                    loop;
-	// -- codegen
 	int 	 memory_usage;
 	int 	 memory_state;
 	int 	 memory_state_stack[128];

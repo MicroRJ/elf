@@ -95,9 +95,9 @@ static elf_Proto gen_proto(elf_Parser *parser, treeID tree){
 	elf_Proto proto = {};
 	proto.arity=1;
 	proto.bytes=start;
-	proto.nvalues=ARRAY_LENGTH(tree->expr_fun.capts);
-	proto.nlocals=parser->memory_usage;
-	proto.nbytes=M->nbytes-start;
+	proto.numvalues=ARRAY_LENGTH(tree->expr_fun.capts);
+	proto.stacksize=parser->memory_usage;
+	proto.numbytes=M->nbytes-start;
 	// todo: come back to this
 	// ASSERT(BC_OP(M->bytes[M->nbytes-1]) == BC_RET);
 
@@ -702,8 +702,12 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 
 static int emit_byte(elf_Parser *C, Source line, elf_Bytecode byte) {
 	elf_Module *M = C->R->M;
+	line=line?line:C->expr_line;
+	ASSERT(line!=0);
+	C->expr_line=line;
 	ARRAY_ADD(M->lines,line);
 	ARRAY_ADD(M->bytes,byte);
+	ARRAY_ADD(M->track,0);
 	// fpf_byte(stdout,M,-1,M->nbytes-C->fn->bytes,byte);
 	return M->nbytes ++;
 }

@@ -117,26 +117,17 @@ void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, 
 	printf("| %.*s\n",underline+1,u);
 }
 
-
-void elf_dump_byte_trace(elf_State *S, elf_Stack_Frame *call, int level) {
-	ASSERT(level > -1);
-
-	/* Don't show the first root call frame
-	(which is the one without a caller) because that'll
-	just be the first instruction that executed for that
-	function/file, which is irrelevant */
-	if (call->caller == 0) return;
-
-	ASSERT(level > 0);
-
-	elf_dump_byte_trace(S,call->caller,level-1);
-
+void elf_dump_byte_trace(elf_State *S) {
 	elf_Module *M = S->M;
-	int fileid = elf_get_instr_file(M,call->origin);
-	if (fileid != -1) {
-		elf_File *file = &M->files[fileid];
-		Source line = elf_get_instr_line(M,call->origin);
-		elf_line_dialog(file->name->text,file->contents->text,line,call->origin,M->bytes[call->origin],call->closure != 0 ? "(elf-function)" : "(c-function)");
+	S->frame_stack[S->frame_index] = S->frame;
+	for(int i=1; i<=S->frame_index; i++){
+		elf_Stack_Frame *frame = & S->frame_stack[i];
+		int id = elf_get_instr_file(M,frame->bytecounter);
+		if (id != -1) {
+			elf_File *file = &M->files[id];
+			Source line = elf_get_instr_line(M,frame->bytecounter);
+			elf_line_dialog(file->name->text,file->contents->text,line,frame->bytecounter,M->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
+		}
 	}
 }
 
@@ -160,7 +151,7 @@ void elf_error(elf_State *R, int byte, const char *error) {
 	}
 
 	printf(" -- BYTE TRACE:\n");
-	elf_dump_byte_trace(R,GET_FRAME(R),R->nframe);
+	elf_dump_byte_trace(R);
 	elf_debugger("error");
 }
 

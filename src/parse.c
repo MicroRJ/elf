@@ -1239,7 +1239,7 @@ static int parse_const(elf_Parser *parser) {
 		} break;
 		case TK_NIL: {
 			get_tok(parser);
-			elf_push_nil(parser->R);
+			elf_add_nil(parser->R);
 			ret = 1;
 		} break;
 		case TK_NUMBER: {

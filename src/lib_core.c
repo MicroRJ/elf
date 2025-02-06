@@ -35,8 +35,8 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 	// elf_set_global(R->M,0,VCLS(cls));
 
 	elf_Value *rets = R->stack_ptr;
-	elf_push_closure(R,cls);
-	elf_push_this(R);
+	elf_add_closure(R,cls);
+	elf_add_this(R);
 	nrets = elf_call(R,nargs+1,nrets);
 	R->stack_ptr = rets + nrets;
 	esc:
@@ -188,7 +188,7 @@ int core_lib_load_json(elf_State *R) {
 
 	return 1;
 	_error:
-	elf_push_nil(R);
+	elf_add_nil(R);
 	return 1;
 }
 

@@ -37,7 +37,7 @@ elf_Table *elf_new_table(elf_State *R) {
 
 elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 	elf_Closure *cls = elf_alloc_closure(R,fn);
-	elf_push_closure(R,cls);
+	elf_add_closure(R,cls);
 	return cls;
 }
 
@@ -48,57 +48,47 @@ static void check_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, elf_StackI
 
 
 int elf_get_num_args(elf_State *S) {
-	return GET_FRAME(S)->nargs-1;
+	return S->frame.nargs-1;
 }
 int elf_get_num_rets(elf_State *S) {
-	return GET_FRAME(S)->nrets;
+	return S->frame.nrets;
 }
-
 
 elf_Value elf_get_arg(elf_State *S, int x) {
-	return GET_FRAME(S)->locals[x+1];
+	return S->frame.locals[x + 1];
 }
-
 
 elf_tagenum elf_get_tag(elf_State *S, int x) {
-	return GET_FRAME(S)->locals[x+1].tag;
+	return S->frame.locals[x + 1].tag;
 }
-
 
 elf_Object *elf_get_this(elf_State *S) {
-	return GET_FRAME(S)->locals[0].x_obj;
+	return S->frame.locals[0].x_obj;
 }
 
-
-void elf_push_this(elf_State *S) {
-	PUSHV(S,GET_FRAME(S)->locals[0]);
+void elf_add_this(elf_State *S) {
+	PUSHV(S,S->frame.locals[0]);
 }
 
-
-void elf_push(elf_State *S, elf_Value value) {
+void elf_add_any(elf_State *S, elf_Value value) {
 	PUSHV(S,value);
 }
 
-
-void elf_push_nil(elf_State *S) {
+void elf_add_nil(elf_State *S) {
 	PUSHV(S,VNIL());
 }
 
-
-void elf_push_closure(elf_State *S, elf_Closure *x) {
+void elf_add_closure(elf_State *S, elf_Closure *x) {
 	PUSHV(S,VCLS(x));
 }
-
 
 void elf_add_obj(elf_State *S, elf_Object *x) {
 	if (x) PUSHV(S,VOBJ(x)); else PUSHV(S,VNIL());
 }
 
-
-void elf_push_proc(elf_State *S, elf_Function x) {
+void elf_add_proc(elf_State *S, elf_Function x) {
 	PUSHV(S,VCFN(x));
 }
-
 
 void elf_add_table(elf_State *S, elf_Table *x) {
 	PUSHV(S,VTAB(x));
@@ -116,7 +106,7 @@ void elf_push_number(elf_State *S, elf_Num x) {
 
 
 void elf_push_string(elf_State *S, elf_String *x) {
-	if (x) PUSHV(S,VSTR(x)); else elf_push_nil(S);
+	if (x) PUSHV(S,VSTR(x)); else elf_add_nil(S);
 }
 
 
@@ -164,7 +154,7 @@ elf_Table *elf_get_table(elf_State *R, elf_StackId x) {
 elf_Closure *elf_get_cls(elf_State *S, elf_StackId x) {
 	elf_Value thing;
 	thing=elf_get_arg(S,x);
-	return thing.tag!=elf_tag_closure?0:thing.x_cls;
+	return thing.tag!=elf_tag_closure?0:thing.x_closure;
 }
 
 
