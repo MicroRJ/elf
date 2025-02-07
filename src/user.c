@@ -42,7 +42,7 @@ elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 }
 
 
-static void check_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, elf_StackId x) {
+static void _check_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, int x) {
 	elf_error(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
 }
 
@@ -115,54 +115,54 @@ void elf_add_sys(elf_State *S, elf_Handle x) {
 }
 
 
-elf_String *elf_get_string(elf_State *R, elf_StackId x) {
+elf_String *elf_get_string(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_str) return v.x_str;
-	check_tag(R,elf_tag_str,v.tag,x);
+	_check_tag(R,elf_tag_str,v.tag,x);
 	return 0;
 }
 
 
-char *elf_get_text(elf_State *R, elf_StackId x) {
+char *elf_get_text(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_str) return v.x_str->text;
-	check_tag(R,elf_tag_str,v.tag,x);
+	_check_tag(R,elf_tag_str,v.tag,x);
 	return 0;
 }
 
 
-elf_Object *elf_get_obj(elf_State *R, elf_StackId x) {
+elf_Object *elf_get_obj(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (ISOBJT(v.tag)) return v.x_obj;
-	check_tag(R,elf_tag_userobj,v.tag,x);
+	_check_tag(R,elf_tag_userobj,v.tag,x);
 	return 0;
 }
 
 
-elf_Table *elf_get_table(elf_State *R, elf_StackId x) {
+elf_Table *elf_get_table(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_tab) return v.x_tab;
-	check_tag(R,elf_tag_tab,v.tag,x);
+	_check_tag(R,elf_tag_tab,v.tag,x);
 	return 0;
 }
 
 
-elf_Closure *elf_get_cls(elf_State *S, elf_StackId x) {
+elf_Closure *elf_get_cls(elf_State *S, int x) {
 	elf_Value thing;
 	thing=elf_get_arg(S,x);
 	return thing.tag!=elf_tag_closure?0:thing.x_closure;
 }
 
 
-elf_Handle elf_get_sysobj(elf_State *R, elf_StackId x) {
+elf_Handle elf_get_sysobj(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_sysobj) return v.x_sys;
-	check_tag(R,elf_tag_sysobj,v.tag,x);
+	_check_tag(R,elf_tag_sysobj,v.tag,x);
 	return 0;
 }
 
@@ -171,16 +171,16 @@ elf_Int elf_get_int(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_num) return (elf_Int) v.x_num;
 	if (v.tag==elf_tag_int) return v.x_int;
-	check_tag(R,elf_tag_int,v.tag,x);
+	_check_tag(R,elf_tag_int,v.tag,x);
 	return 0;
 }
 
 
-elf_Num elf_get_num(elf_State *R, elf_StackId x) {
+elf_Num elf_get_num(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_int) return (elf_Num) v.x_int;
 	if (v.tag==elf_tag_num) return v.x_num;
-	check_tag(R,elf_tag_num,v.tag,x);
+	_check_tag(R,elf_tag_num,v.tag,x);
 	return 0;
 }
 

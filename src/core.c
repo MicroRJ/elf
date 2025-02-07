@@ -33,9 +33,6 @@ void elf_init(elf_State *R, elf_Module *M) {
 	R->stack_ptr = R->stack;
 
 	R->frame.locals = R->stack;
-	// R->first_frame.locals = R->stack_ptr;
-	// R->frame = &R->first_frame;
-	// R->nframe = 0;
 
 	R->metatables.string = elf_new_string_lib(R);
 	R->metatables.table = new_table_lib(R);
@@ -163,7 +160,7 @@ static inline void _check_zero_div(elf_State *S, elf_Value *xx, elf_Value *yy) {
 }
 
 // todo: the overload should just be a string id, the heck...
-static int call_overload(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
+static int _callov(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
 	if (obj->meta == 0) {
 		elf_error(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
@@ -400,7 +397,7 @@ int _resume(elf_State *R) {
 						locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
 					}break;
 					case elf_tag_userobj:{
-						call_overload(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
+						_callov(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
 					}break;
 					case elf_tag_str:{
 						/* todo: allow for indexing for substrings,
@@ -429,7 +426,7 @@ int _resume(elf_State *R) {
 					elf_table_set(xx.x_tab,yy,zz);
 				}else if(xx.tag==elf_tag_userobj){
 					elf_Value args[] = { yy, zz };
-					call_overload(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
+					_callov(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
 				}else{
 					elf_error(R,module_instr,elf_tpf("attempted to set field of (%lli) '%s' value",xx.tag,tag2s[xx.tag]));
 				}
@@ -596,7 +593,7 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 				yy=locals[BC_ARGZ(byte)];\
 				if (ISOBJT(xx.tag)||ISOBJT(yy.tag)) {\
 					if (!ISOBJT(xx.tag)) elf_error(R,NO_BYTE,"invalid ordering, object type must come first, (todo: call converter function on the object, __tonumber)");\
-					call_overload(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
+					_callov(R,xx.x_obj,ISOBJT(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
 				} else if (INTORNUM(xx.tag) && INTORNUM(yy.tag)) {\
 					PREOP_CHECK;\
 					if((xx.tag==elf_tag_num) || (yy.tag==elf_tag_num)) {\

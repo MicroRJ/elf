@@ -257,8 +257,8 @@ struct elf_State {
 
 	int                      flags;
 	int            disable_tracing;
-	int  trace_inner_loop_stack[16];
-	int  trace_inner_loop_counter;
+	int trace_inner_loop_stack[16];
+	int   trace_inner_loop_counter;
 	int           trace_stop_instr;
 	int          trace_start_instr;
 	int           active_trace_pos;
