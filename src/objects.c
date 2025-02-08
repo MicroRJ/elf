@@ -440,7 +440,7 @@ elf_i64 _gc_free(elf_State *R) {
 			if (it->type == GC_TAB) {
 				_dealloc_table_contents((elf_Table*)it);
 			}
-			dealloc_memory(GLOBAL_ALLOCATOR,it);
+			free(it);
 		} else n += 1;
 	}
 

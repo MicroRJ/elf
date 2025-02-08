@@ -17,13 +17,13 @@ void *copy_memory(void *dst, void const *src, elf_Int length) {
 }
 
 
-void dealloc_memory_debug(Allocator fn, const void *memory, DBGSource loca) {
+void dealloc_memory_debug(Allocator fn, const void *memory, Debug_Source loca) {
 	elf_Error error = fn(0,0,0,0,(void **)&memory,loca);
 	// ASSERT(PASSED(error));
 }
 
 
-void *alloc_memory_debug(Allocator fn, elf_Int length, DBGSource loca) {
+void *alloc_memory_debug(Allocator fn, elf_Int length, Debug_Source loca) {
 	void *memory = 0;
 	elf_Error error = fn(0,0,0,length,&memory,loca);
 	// ASSERT(PASSED(error));
@@ -31,14 +31,14 @@ void *alloc_memory_debug(Allocator fn, elf_Int length, DBGSource loca) {
 }
 
 
-void *realloc_memory_debug(Allocator fn, elf_Int length, void *memory, DBGSource loca) {
+void *realloc_memory_debug(Allocator fn, elf_Int length, void *memory, Debug_Source loca) {
 	elf_Error error = fn(0,0,0,length,&memory,loca);
 	// ASSERT(PASSED(error));
 	return memory;
 }
 
 
-void *calloc_memory_debug(Allocator fn, elf_Int size, DBGSource loca) {
+void *calloc_memory_debug(Allocator fn, elf_Int size, Debug_Source loca) {
 	return clear_memory(alloc_memory_debug(fn,size,loca),size);
 }
 

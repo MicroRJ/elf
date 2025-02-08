@@ -122,6 +122,7 @@ struct treeT {
 	};
 };
 
+// @global
 static char *tree2s[]={
 #define TREE(NAME) #NAME,
 	TREEDEF(TREE)

@@ -218,12 +218,6 @@ struct Loop {
 	treeID  name;
 };
 
-typedef struct tree_arena tree_arena;
-struct tree_arena{
-
-	int index;
-};
-
 typedef struct elf_Parser elf_Parser;
 struct elf_Parser {
 	elf_State                 *R;
@@ -249,8 +243,8 @@ struct elf_Parser {
 	Loop          loop_stack[32];
 	int               loop_index;
 	Loop                    loop;
-	int 	 memory_usage;
-	int 	 memory_state;
+	int 	          memory_usage;
+	int 	          memory_state;
 	int 	 memory_state_stack[128];
 	int 	 memory_state_index;
 	treeID memory_slots[1024];

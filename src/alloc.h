@@ -5,7 +5,7 @@
 
 
 
-#define ALLOCATOR_FN(NAME) int (NAME)(void *user, int flags, elf_Int old_size, elf_Int new_size, void **memory, DBGSource debug)
+#define ALLOCATOR_FN(NAME) int (NAME)(void *user, int flags, elf_Int old_size, elf_Int new_size, void **memory, Debug_Source debug)
 typedef ALLOCATOR_FN(* Allocator);
 
 
@@ -23,7 +23,7 @@ static ALLOCATOR_FN(global_allocator);
 #define calloc_memory(allocator,size)          calloc_memory_debug(allocator,size,DBG_SOURCE)
 
 
-static void  dealloc_memory_debug(Allocator fn, void const *memory, DBGSource debug);
-static void *realloc_memory_debug(Allocator fn, elf_Int size, void *memory, DBGSource debug);
-static void *alloc_memory_debug(Allocator fn, elf_Int size, DBGSource debug);
-static void *calloc_memory_debug(Allocator fn, elf_Int size, DBGSource debug);
+static void  dealloc_memory_debug(Allocator fn, void const *memory, Debug_Source debug);
+static void *realloc_memory_debug(Allocator fn, elf_Int size, void *memory, Debug_Source debug);
+static void *alloc_memory_debug(Allocator fn, elf_Int size, Debug_Source debug);
+static void *calloc_memory_debug(Allocator fn, elf_Int size, Debug_Source debug);

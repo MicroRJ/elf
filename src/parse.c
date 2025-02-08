@@ -44,7 +44,7 @@ static void elf_prep_parser(elf_Parser *parser, elf_State *R, char *name, char *
 
 static treeID elf_parse(elf_Parser *parser, elf_State *R, bool as_expr, char *name, char *text) {
 	elf_prep_parser(parser,R,name,text);
-	elf_i64 time=elf_get_clock_time();
+	elf_i64 time = elf_get_clock_time();
 
 	treeID func = new_tree(parser,parser->tok.line,TREE_FUNCTION,NT_FUN);
 	parser->enc = func;

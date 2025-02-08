@@ -1,7 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** elf-tab.c
-** Table
+** table.c
 */
 
 #if 1
@@ -76,7 +75,7 @@ static elf_Int slot2index(elf_Table *table, elf_Int slot) {
 
 
 #define slot2value(T,X) (T->array[T->slots[X].idx])
-#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_tag_nil))
+#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_tag_nil) && (T->slots[X].key.tag != elf_tag_tomb))
 
 elf_Int elf_get_array_tally(elf_Table *table) {
 	return ARRAY_LENGTH(table->array);
@@ -88,7 +87,7 @@ elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
 	return elf_table_get(tab,VSTR(key));
 }
 
-
+// todo: remove!
 elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	int length;
 	elf_Hash hash;
@@ -103,12 +102,17 @@ elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	return (elf_Value){elf_tag_nil,0};
 }
 
-
-/* uses 'double hashing', which aims to get more 'resolution'
+/*
+todo: the following comment may not be true anymore
+because I found this to be somewhat impractical for
+my use-cases due to performance requirements:
+---
+uses 'double hashing', which aims to get more 'resolution'
 out of the hash value. First hash computes the starting index,
 and the secondary hash computes the step by which we increment.
 since the increment depends on the data, it should reduce
 clustering. */
+// todo: remove modulus, fairly expensive at least on my machine...
 elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
 	elf_Entry *slots = tab->slots;
@@ -117,18 +121,20 @@ elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
 	elf_i64 walk = 1; // elf_rehash(hash)|1;
-	elf_Value value;
 	do {
-		value=slots[tail].key;
-		if ((value.tag==elf_tag_nil)||(_veq(&value,&key))){
-			return tail;
+		elf_Value value = slots[tail].key;
+		if(value.tag==elf_tag_nil)return tail;
+		if(value.tag!=elf_tag_tomb){
+			if(_veq(&value,&key)){
+				return tail;
+			}
 		}
 		tail = (tail+walk) % ntotal;
 	} while(head != tail);
 	return -1;
 }
 
-
+// todo: remove!
 elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf_Hash hash) {
 	elf_Entry *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;

@@ -189,12 +189,12 @@ typedef struct elf_Entry {
 // todo: table templates?
 typedef struct elf_Table elf_Table;
 struct elf_Table {
-	elf_Object    			obj;
-	elf_i64    			ntotal;
-	elf_i64    			nslots;
-	elf_i64    			ndebug;
-	elf_Entry   *slots;
-	elf_Value  			*array;
+	elf_Object      obj;
+	elf_i64      ntotal;
+	elf_i64      nslots;
+	elf_i64    	 ndebug;
+	elf_Entry    *slots;
+	elf_Value  	 *array;
 };
 
 typedef struct elf_Bytecode elf_Bytecode;
@@ -271,7 +271,7 @@ struct elf_State {
 		elf_Table *string;
 		elf_Table *table;
 	} metatables;
-	// todo: remove this
+	// todo: rename this
 	int byte;
 };
 

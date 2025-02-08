@@ -10,10 +10,10 @@ enum {
 char *log2s(int);
 
 
-typedef void (elf_logger)(int type, DBGSource source, char const *fmt, ...);
-elAPI void elf_set_logger(int type, DBGSource loc, char const *fmt, ...);
+typedef void (elf_logger)(int type, Debug_Source source, char const *fmt, ...);
+elAPI void elf_set_logger(int type, Debug_Source loc, char const *fmt, ...);
 
-elAPI void elf_log_(int type, DBGSource loc, char const *fmt, ...);
+elAPI void elf_log_(int type, Debug_Source loc, char const *fmt, ...);
 
 
 #define elf_log(TYPE,FORMAT,...) (CHECK_FORMAT(FORMAT,##__VA_ARGS__),elf_log_(TYPE,DBG_SOURCE,FORMAT,##__VA_ARGS__))

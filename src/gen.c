@@ -72,13 +72,12 @@ static int set_mem(elf_Parser *parser, treeID id) {
 }
 
 int to_any_mem(elf_Parser *parser, treeID id) {
-	int reg;
-	reg=get_mem(parser,id);
-	if (reg==NO_SLOT) {
-		reg=to_mem(parser,id,-1,1);
+	int mem = get_mem(parser,id);
+	if (mem == NO_SLOT) {
+		mem = to_mem(parser,id,-1,1);
 	}
-	ASSERT(reg != NO_SLOT);
-	return reg;
+	ASSERT(mem != NO_SLOT);
+	return mem;
 }
 
 static void gen_tree(elf_Parser *parser, treeID id);

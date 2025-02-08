@@ -124,49 +124,40 @@ int table_lib_itemize(elf_State *R) {
 	}
 	return 1;
 }
-
-// todo: this is buggy!
+//
+// table:delete()
+// The following conditions are met:
+// Only one array item is to be removed, but there's
+// no limit as to how many keys can be removed.
+// That is because multiple keys can have the same
+// array index.
+// The array part must remain in the same order,
+// keys pointing to the target index must be
+// removed.
+// All other keys must point to their previous values.
 int elf_lib_table_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
-	elf_Table *tab;
-	elf_Value key;
-	elf_Entry *slots;
-	elf_Value *array;
-	elf_i64 slot;
-
-	tab = (elf_Table *) elf_get_this(R);
-	key = elf_get_arg(R,0);
-	slots = tab->slots;
-	array = tab->array;
-	slot = elf_table_try(tab,key);
-	if ((slot < 0) || (slots[slot].key.tag == elf_tag_nil)) {
-		elf_error(R,NO_BYTE,elf_tpf("invalid key, %s, slot is %i", tag2s[key.tag], slot));
-		goto _err;
+	elf_Table *tab = (elf_Table *) elf_get_this(R);
+	elf_Value key = elf_get_arg(R,0);
+	elf_Entry *slots = tab->slots;
+	elf_Value *array = tab->array;
+	int slot = elf_table_try(tab,key);
+	if ((slot >= 0) && (slots[slot].key.tag != elf_tag_nil) && (slots[slot].key.tag != elf_tag_tomb)) {
+		int idx = slots[slot].idx;
+		elf_add_any(R,array[idx]);
+		for(int i=0; i<tab->ntotal; i++){
+			if(slots[i].idx==idx){
+				slots[i].key.tag = elf_tag_tomb;
+			}else if(slots[i].idx>idx){
+				ASSERT(slots[i].idx>0);
+				slots[i].idx -= 1;
+			}
+		}
+		memmove(array+idx,array+idx+1,(ARRAY_LENGTH(array)-idx-1)*sizeof(elf_Value));
+		ARRAY_SET_MIN(array,ARRAY_LENGTH(array)-1);
+	}else{
+		elf_add_nil(R);
 	}
-	elf_i64 idx = slots[slot].idx;
-	slots[slot].key = (elf_Value){elf_tag_tomb};
-	slots[slot].idx = 0;
-	elf_i64 len = ARRAY_LENGTH(array);
-	if ((idx < 0) || (idx > len-1)) {
-		elf_error(R,NO_BYTE,elf_tpf("key is invalid, points to invalid index %lli, there are %lli item(s)",idx,len));
-		goto _err;
-	}
-	PUSHV(R,array[idx]);
-	array[idx].tag = elf_tag_nil;
-
-	// elf_i64 min = ARRAY_POP(array);
-	// if (idx != min) {
-	// array[idx] = array[min];
-	// elf_i64 i;
-	// for (i=0;i<tab->ntotal;++i) {
-	// 	if (slots[i].key.tag != elf_tag_nil && slots[i].idx == min) {
-	// 		slots[i].idx = idx;
-	// 	}
-	// }
-	// }
-
-	return 1;
-	_err: elf_add_nil(R);
 	return 1;
 }
 
