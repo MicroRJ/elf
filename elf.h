@@ -21,7 +21,7 @@ e*/
 #define elGC_MEM_THRESHOLD_MAX (elf_i64) MEGABYTES(2)
 #define elGC_OBJ_THRESHOLD_MIN (elf_i64) ((512)*1)
 #define elGC_OBJ_THRESHOLD_MAX (elf_i64) ((512)*1)
-#define DEFAULT_STACK_SIZE KILOBYTES(4)
+#define DEFAULT_STACK_SIZE 4096*8
 
 
 #if defined(__EMSCRIPTEN__)
