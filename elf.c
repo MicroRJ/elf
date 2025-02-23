@@ -203,13 +203,14 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 
 #define VNIL() (XLITERAL(elf_Value){elf_tag_nil})
 #define VNUM(thing) (XLITERAL(elf_Value){ elf_tag_num, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
-#define VINT(thing) (XLITERAL(elf_Value){ elf_tag_int, {(elf_Int) UCAST(thing, elf_Int)} })
-#define VSYS(thing) (XLITERAL(elf_Value){ elf_tag_sysobj, {(elf_Int) UCAST(thing, elf_Handle)} })
-#define VTAB(thing) (XLITERAL(elf_Value){ elf_tag_tab, {(elf_Int) UCAST(thing, elf_Table *)} })
+#define VALUE_INTEGER(thing) (XLITERAL(elf_Value){ elf_tag_int, {(elf_Int) UCAST(thing, elf_Int)} })
+#define VALUE_TABLE(thing) (XLITERAL(elf_Value){ elf_tag_tab, {(elf_Int) UCAST(thing, elf_Table *)} })
 #define VOBJ(thing) (XLITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Object *)} })
-#define VSTR(thing) (XLITERAL(elf_Value){ elf_tag_str, {(elf_Int) UCAST(thing, elf_String *)} })
+#define VALUE_STRING(thing) (XLITERAL(elf_Value){ elf_tag_str, {(elf_Int) UCAST(thing, elf_String *)} })
 #define VCLS(thing) (XLITERAL(elf_Value){ elf_tag_closure, {(elf_Int) UCAST(thing, elf_Closure *)} })
-#define VCFN(thing) (XLITERAL(elf_Value){ elf_tag_proc, {(elf_Int) UCAST(thing, elf_Function)} })
+#define VALUE_FUNCTION(thing) (XLITERAL(elf_Value){ elf_tag_proc, {(elf_Int) UCAST(thing, elf_Function)} })
+// todo: remove this, this is unnecessary
+#define VSYS(thing) (XLITERAL(elf_Value){ elf_tag_sysobj, {(elf_Int) UCAST(thing, elf_Handle)} })
 
 #include "src/alloc.h"
 #include "src/array.c"

@@ -1,5 +1,5 @@
 /*
-** See Copyright Notice Below.
+** See Copyright Notice In elf.h
 ** elf.h
 */
 

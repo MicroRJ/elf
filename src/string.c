@@ -54,7 +54,7 @@ elf_Bool elf_get_strings_eq(elf_String *x, elf_String *y) {
 
 
 int string_lib_length(elf_State *S) {
-	elf_push_int(S,((elf_String*)elf_get_this(S))->length);
+	elf_add_int(S,((elf_String*)elf_get_this(S))->length);
 	return 1;
 }
 
@@ -75,7 +75,7 @@ void strcatf(char *buffer, char *fmt, ...) {
 
 int string_lib_get_index(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_push_int(R,str->text[elf_get_int(R,0)]);
+	elf_add_int(R,str->text[elf_get_int(R,0)]);
 	return 1;
 }
 
@@ -127,7 +127,7 @@ int string_lib_append(elf_State *R) {
 int string_lib_match(elf_State *R) {
 	elf_String *s = (elf_String*) elf_get_this(R);
 	elf_String *p = elf_get_string(R,0);
-	elf_push_int(R,match_entire_text(p->text,s->text));
+	elf_add_int(R,match_entire_text(p->text,s->text));
 	return 1;
 }
 
@@ -147,7 +147,7 @@ int string_lib_find(elf_State *R) {
 			/* todo: there's no need for the buffer! */
 			ARRAY_ADD(buffer,0);
 			elf_Int narray = ARRAY_LENGTH(list->array);
-			elf_table_set(list,VINT(narray),VSTR(elf_alloc_string(R,buffer)));
+			elf_table_set(list,VALUE_INTEGER(narray),VALUE_STRING(elf_alloc_string(R,buffer)));
 			ARRAY(buffer).min = 0;
 		} else cursor += 1;
 	}
@@ -168,7 +168,7 @@ int string_lib_split_by_lines(elf_State *R) {
 			cursor += 1 + (cursor[0] == '\r' && cursor[1] == '\n');
 		}
 		ARRAY_ADD(buffer,0);
-		elf_table_set(list,VINT(ARRAY_LENGTH(list->array)),VSTR(elf_alloc_string(R,buffer)));
+		elf_table_set(list,VALUE_INTEGER(ARRAY_LENGTH(list->array)),VALUE_STRING(elf_alloc_string(R,buffer)));
 		ARRAY(buffer).min = 0;
 	}
 	return 1;
@@ -177,7 +177,7 @@ int string_lib_split_by_lines(elf_State *R) {
 
 int string_lib_get_hash(elf_State *R) {
 	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_push_int(R,str->hash);
+	elf_add_int(R,str->hash);
 	return 1;
 }
 

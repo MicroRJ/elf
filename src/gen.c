@@ -368,7 +368,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			int yy;
 
 			str=elf_alloc_string(S,tree.expr_str);
-			yy=elf_set_global(S->M,0,VSTR(str));
+			yy=elf_set_global(S->M,0,VALUE_STRING(str));
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
 		} break;
 		case TREE_NEW_TABLE:{

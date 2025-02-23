@@ -1230,7 +1230,7 @@ static int parse_const(elf_Parser *parser) {
 				elf_push_number(parser->R,tok.number * sign);
 				ret = 1;
 			}else if (pick_tok(parser,TK_INTEGER)) {
-				elf_push_int(parser->R,tok.integer * sign);
+				elf_add_int(parser->R,tok.integer * sign);
 				ret = 1;
 			} else {
 				parser_dialog(parser,tok.line,"operator can only be used for numbers");
@@ -1249,7 +1249,7 @@ static int parse_const(elf_Parser *parser) {
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);
-			elf_push_int(parser->R,tok.integer);
+			elf_add_int(parser->R,tok.integer);
 			ret = 1;
 		} break;
 		case TK_STRING: {
@@ -1327,7 +1327,7 @@ static treeID parse_json(elf_Parser *parser){
 
 	tokenT tok = take_tok(parser,TK_JSON);
 	elf_tabID tab = parse_json_obj(parser);
-	int gid = elf_set_global(parser->R->M,0,VTAB(tab));
+	int gid = elf_set_global(parser->R->M,0,VALUE_TABLE(tab));
 
 	return tree_global(parser,tok.line,gid);
 }
@@ -1356,7 +1356,7 @@ static elf_tabID parse_json_obj(elf_Parser *parser){
 	take_tok(parser,TK_CURLY_LEFT);
 	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
 		tok=take_tok(parser,TK_STRING);
-		key=VSTR(elf_new_string(parser->R,tok.text));
+		key=VALUE_STRING(elf_new_string(parser->R,tok.text));
 		take_tok(parser,TK_COLON);
 		val=parse_json_value(parser);
 		elf_table_set(table,key,val);
@@ -1373,23 +1373,23 @@ static elf_Value parse_json_value(elf_Parser *parser) {
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);
-			val = VSTR(elf_new_string(parser->R,tok.text));
+			val = VALUE_STRING(elf_new_string(parser->R,tok.text));
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);
-			val = VINT(tok.integer);
+			val = VALUE_INTEGER(tok.integer);
 		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
-			val = VINT(tok.number);
+			val = VALUE_INTEGER(tok.number);
 		} break;
 		case TK_CURLY_LEFT: {
 			obj = parse_json_obj(parser);
-			val = VTAB(obj);
+			val = VALUE_TABLE(obj);
 		} break;
 		case TK_SQUARE_LEFT: {
 			obj = parse_json_array(parser);
-			val = VTAB(obj);
+			val = VALUE_TABLE(obj);
 		} break;
 		default: {
 			parser_dialog(parser,tok.line,"invalid json value");

@@ -5,7 +5,7 @@
 */
 
 int elf_get_global(elf_Module *M, elf_String *name) {
-	if (name != 0) return elf_table_get_or_add(M->globals,VSTR(name));
+	if (name != 0) return elf_table_get_or_add(M->globals,VALUE_STRING(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
 
@@ -24,7 +24,7 @@ void elf_add_lib(elf_State *S, char *prefix, elf_CBinding *bindings, int num) {
 
 		elf_String *name = elf_alloc_string(S,temp);
 		elf_debug_log("	lib: %s",name->text);
-		elf_table_set(S->M->globals, VSTR(name), VCFN(bindings[i].fn));
+		elf_table_set(S->M->globals, VALUE_STRING(name), VALUE_FUNCTION(bindings[i].fn));
 	}
 }
 

@@ -3,15 +3,28 @@
 ** table.c
 */
 
+// todo: optimize
 #if 1
-static inline elf_i64 _vhash(elf_Value *v) {
-	if(v->tag==elf_tag_str){
+
+
+static inline elf_Hash rehash(elf_Hash hash);
+static inline elf_Hash hash_text(const char *text);
+static inline elf_Hash hash_i64(elf_i64);
+static inline elf_b32 value_equals(elf_Value *x, elf_Value *y);
+
+static inline elf_Hash hash_value(elf_Value *v) {
+	if (v->tag == elf_tag_str) {
 		return v->x_str->hash;
 	}
-	return v->x_i64;
+	// you know, I wonder why my game starts dropping
+	// dropping frames out of nowhere, I wonder why my
+	// game is RED on the task manager, nope not the GC...
+	// Seems integer lookups are unusually expensive,
+	// this is why integers are scrambled...
+	return hash_i64(v->x_i64);
 }
 
-static inline bool _veq(elf_Value *x, elf_Value *y) {
+static inline bool value_equals(elf_Value *x, elf_Value *y) {
 	if(x->x_i32==y->x_i32 && x->y_i32==y->y_i32){
 		return true;
 	}
@@ -27,7 +40,7 @@ static inline bool _veq(elf_Value *x, elf_Value *y) {
 	return 0;
 }
 #else
-static inline elf_i64 _vhash(elf_Value *v) {
+static inline elf_i64 hash_value(elf_Value *v) {
 	switch (v.tag) {
 		case elf_tag_str: {
 			ASSERT(v.x_str != 0);
@@ -37,7 +50,7 @@ static inline elf_i64 _vhash(elf_Value *v) {
 		case elf_tag_userobj:
 		case elf_tag_tab: case elf_tag_closure: case elf_tag_sysobj:
 		case elf_tag_int: case elf_tag_num: case elf_tag_proc: {
-			return elf_hash_ptr(v.x_ptr);
+			return hash_i64(v.x_ptr);
 		}
 		default: NO_CODE;
 	}
@@ -45,7 +58,7 @@ static inline elf_i64 _vhash(elf_Value *v) {
 }
 
 
-bool _veq(elf_Value *x, elf_Value *y) {
+bool value_equals(elf_Value *x, elf_Value *y) {
 	if (x->tag != y->tag) {
 		return 0;
 	}
@@ -64,11 +77,6 @@ bool _veq(elf_Value *x, elf_Value *y) {
 }
 #endif
 
-static elf_Hash elf_rehash(elf_Hash hash);
-static elf_Hash elf_hash_text(const char *text);
-static elf_Hash elf_hash_ptr(void *ptr);
-static elf_Bool _veq(elf_Value *x, elf_Value *y);
-
 static elf_Int slot2index(elf_Table *table, elf_Int slot) {
 	return table->slots[slot].idx;
 }
@@ -84,16 +92,16 @@ elf_Int elf_get_array_tally(elf_Table *table) {
 
 
 elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
-	return elf_table_get(tab,VSTR(key));
+	return elf_table_get(tab,VALUE_STRING(key));
 }
 
 // todo: remove!
 elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	int length;
-	elf_Hash hash;
+	elf_i64 hash;
 	elf_Int slot;
 	length=text_length(key);
-	hash=elf_hash_text(key);
+	hash=hash_text(key);
 	slot=elf_table_try_text(tab,key,length,hash);
 	ASSERT(slot!=-2);
 	if (slotiskey(tab,slot)) {
@@ -102,34 +110,24 @@ elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	return (elf_Value){elf_tag_nil,0};
 }
 
-/*
-todo: the following comment may not be true anymore
-because I found this to be somewhat impractical for
-my use-cases due to performance requirements:
----
-uses 'double hashing', which aims to get more 'resolution'
-out of the hash value. First hash computes the starting index,
-and the secondary hash computes the step by which we increment.
-since the increment depends on the data, it should reduce
-clustering. */
-// todo: remove modulus, fairly expensive at least on my machine...
 elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
 	elf_Entry *slots = tab->slots;
 	elf_i64 ntotal = tab->ntotal;
-	elf_i64 hash = _vhash(&key);
-	elf_i64 head = hash % ntotal;
+	elf_i64 hash = hash_value(&key);
+	elf_i64 head = hash & (ntotal - 1);
 	elf_i64 tail = head;
-	elf_i64 walk = 1; // elf_rehash(hash)|1;
+	// todo: try double hashing
+	elf_i64 walk = 1;
 	do {
 		elf_Value value = slots[tail].key;
-		if(value.tag==elf_tag_nil)return tail;
-		if(value.tag!=elf_tag_tomb){
-			if(_veq(&value,&key)){
+		if(value.tag == elf_tag_nil) return tail;
+		if(value.tag != elf_tag_tomb){
+			if(value_equals(&value,&key)){
 				return tail;
 			}
 		}
-		tail = (tail+walk) % ntotal;
+		tail = (tail + walk) & (ntotal - 1);
 	} while(head != tail);
 	return -1;
 }
@@ -140,7 +138,7 @@ elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf
 	elf_i64 ntotal = tab->ntotal;
 	elf_i64 head = hash % ntotal;
 	elf_i64 tail = head;
-	elf_Hash walk = 1; // elf_rehash(hash)|1;
+	elf_i64 walk = 1; // rehash(hash)|1;
 	do {
 		elf_Value x = slots[tail].key;
 		if (x.tag==elf_tag_nil) {
@@ -160,8 +158,8 @@ elf_i64 elf_table_try_text(elf_Table *tab, const char *text, elf_i64 length, elf
 	return -1;
 }
 
-elf_Bool elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
-	_check_table(table);
+elf_b32 elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
+	resize_table(table);
 	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
@@ -194,7 +192,7 @@ elf_Value elf_table_get(elf_Table *tab, elf_Value k) {
 elf_Int elf_table_get_or_add(elf_Table *table, elf_Value key) {
 	elf_Int lot,idx;
 	ASSERT(!ISNILV(key));
-	_check_table(table);
+	resize_table(table);
 	lot=elf_table_try(table,key);
 	ASSERT(lot>=0);
 	if (!slotiskey(table,lot)) {
@@ -210,7 +208,7 @@ elf_Int elf_table_get_or_add(elf_Table *table, elf_Value key) {
 
 
 void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias) {
-	_check_table(tab);
+	resize_table(tab);
 	elf_Int key_slot = elf_table_try(tab,key);
 	if (slotiskey(tab,key_slot)) {
 		elf_Int alias_slot = elf_table_try(tab,alias);
@@ -220,7 +218,7 @@ void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alia
 }
 
 
-elf_Bool elf_table_contains(elf_Table *tab, elf_Value key) {
+elf_b32 elf_table_contains(elf_Table *tab, elf_Value key) {
 	return slotiskey(tab,elf_table_try(tab,key));
 }
 
@@ -231,7 +229,7 @@ void elf_array_add(elf_Table *table, elf_Value v) {
 
 
 // void elf_tadd_tab(elf_Table *table, elf_Table *thing) {
-// 	ARRAY_ADD(table->array,VTAB(thing));
+// 	ARRAY_ADD(table->array,VALUE_TABLE(thing));
 // }
 
 
@@ -248,28 +246,27 @@ void elf_merge_tables(elf_Table *tab, elf_Table *merger) {
 /* some of the hash functions and comments
 were borrowed from the great Sean Barrett (stb),
 will return later... */
-elf_Hash elf_rehash(elf_Hash hash) {
+elf_Hash rehash(elf_Hash hash) {
 	return ((hash) + ((hash) >> 6) + ((hash) >> 19));
 }
 
 
-elf_Hash elf_hash_text(const char *text) {
+elf_Hash hash_text(const char *text) {
 	elf_Hash hash;
-	for (hash=2166136261u; *text; hash^=*text++, hash*=16777619);
+	for (hash=2166136261u; *text; hash ^= *text++, hash *= 16777619);
 	return hash;
 }
 
-
-elf_Hash elf_hash_ptr(void *p) {
-   // typically lacking in low bits and high bits
-	elf_Hash hash = elf_rehash((elf_Hash)(elf_Int)p);
+// probably stole from stb:
+// typically lacking in low bits and high bits
+elf_Hash hash_i64(elf_i64 p) {
+	elf_Hash hash = rehash(p);
 	hash += hash << 16;
-   // pearson's shuffle
 	hash ^= hash << 3;
 	hash += hash >> 5;
 	hash ^= hash << 2;
 	hash += hash >> 15;
 	hash ^= hash << 10;
-	return elf_rehash(hash);
+	return rehash(hash);
 }
 

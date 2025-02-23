@@ -34,7 +34,7 @@
 // elAPI int netlib_listen(elf_State *R) {
 // 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elf_push_int(R,error!=SOCKET_ERROR);
+// 	elf_add_int(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
@@ -117,7 +117,7 @@
 // 	elf_Int sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elf_push_int(R,sent);
+// 	elf_add_int(R,sent);
 // 	return 1;
 // }
 
@@ -126,7 +126,7 @@
 // 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elf_push_int(R,error == 0);
+// 	elf_add_int(R,error == 0);
 // 	return 1;
 // }
 

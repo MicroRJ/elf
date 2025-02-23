@@ -1,20 +1,20 @@
 /*
 ** See Copyright Notice Below.
 ** elf.h
-e*/
+*/
 
 #ifndef _elf_lang_
 #define _elf_lang_
 
 
 #if !defined(KILOBYTES)
-   #define KILOBYTES(x) ((x)*1024LLU)
+#define KILOBYTES(x) ((x)*1024LLU)
 #endif
 #if !defined(MEGABYTES)
-   #define MEGABYTES(x) ((x)*1024LLU*1024LLU)
+#define MEGABYTES(x) ((x)*1024LLU*1024LLU)
 #endif
 #if !defined(GIGABYTES)
-   #define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
+#define GIGABYTES(x) ((x)*1024LLU*1024LLU*1024LLU)
 #endif
 
 #define elGC_MEM_THRESHOLD_MIN (elf_i64) MEGABYTES(1)
@@ -63,6 +63,7 @@ typedef unsigned char           elf_u8;
 typedef signed   short         elf_i16;
 typedef unsigned short         elf_u16;
 typedef signed   int           elf_i32;
+typedef signed   int           elf_b32;
 typedef unsigned int           elf_u32;
 typedef   signed long long int elf_i64;
 typedef unsigned long long int elf_u64;
@@ -80,6 +81,7 @@ typedef unsigned int 		elf_Hash;
 
 typedef int (* elf_Function)(elf_State *);
 
+// Todo: remove this, this is silly...
 typedef struct elf_CBinding {
 	char *name;
 	elf_Function fn;
@@ -118,6 +120,7 @@ typedef enum {
 	elf_tag_tab,
 } elf_tagenum;
 
+// todo: remove this!
 static char const *tag2s[] = {
 	"nil",
 	"tomb",
@@ -237,10 +240,10 @@ struct elf_Collector{
 	elf_i64      memory_allocated;
 	elf_i64      memory_threshold;
 
-	elf_i32     num_objects;
-	elf_i64     object_trigger_threshold;
-	elf_Object **new_objects;
-	elf_Object **objects;
+	elf_i32      num_objects;
+	elf_i64      object_trigger_threshold;
+	elf_Object **open_object_slots;
+	elf_Object **close_object_slots;
 };
 
 typedef struct elf_State elf_State;
@@ -291,10 +294,10 @@ elf_Value *elf_get_stack(elf_State *S);
 elf_Value *elf_get_stack_ptr(elf_State *S);
 
 /* allocate and adds the object to stack (prevents it from getting GC'd) */
-elAPI elf_Closure *elf_new_closure(elf_State *, elf_Proto fn);
-elAPI elf_String *elf_new_string2(elf_State *, elf_Int length);
+elAPI elf_Closure *elf_new_closure(elf_State *, elf_Proto proto);
+elAPI elf_String *elf_new_string2(elf_State *, elf_i32 length);
 elAPI elf_String *elf_new_string(elf_State *, const char *text);
-elAPI elf_Object *elf_push_new_object(elf_State *, elf_Int size);
+elAPI elf_Object *elf_new_object(elf_State *, elf_i32 size);
 elAPI elf_Table *elf_new_table(elf_State *);
 
 
@@ -302,9 +305,9 @@ elAPI elf_Table *elf_new_table(elf_State *);
 elAPI void elf_add_this(elf_State *S);
 elAPI void elf_add_any(elf_State *S, elf_Value value);
 elAPI void elf_add_nil(elf_State *S);
-elAPI void elf_push_int(elf_State *S, elf_Int);
+elAPI void elf_add_int(elf_State *S, elf_Int);
 elAPI void elf_push_number(elf_State *S, elf_Num);
-elAPI void elf_add_obj(elf_State *S, elf_Object *);
+elAPI void elf_add_object(elf_State *S, elf_Object *);
 elAPI void elf_push_string(elf_State *S, elf_String *);
 elAPI void elf_add_sys(elf_State *S, elf_Handle);
 elAPI void elf_add_table(elf_State *S, elf_Table *);
@@ -315,14 +318,14 @@ elAPI void elf_add_proc(elf_State *S, elf_Function);
 /* getting arguments from stack */
 elAPI elf_Object  *elf_get_this(elf_State *S);
 
-elAPI elf_Value    elf_get_arg(elf_State *S, int arg);
-elAPI elf_Int      elf_get_int(elf_State *S, int arg);
-elAPI elf_Num      elf_get_num(elf_State *S, int arg);
-elAPI elf_String  *elf_get_string(elf_State *S, int arg);
-elAPI char        *elf_get_text(elf_State *S, int arg);
-elAPI elf_Object    *elf_get_obj(elf_State *S, int arg);
-elAPI elf_Table   *elf_get_table(elf_State *S, int arg);
-elAPI elf_Handle   elf_get_sysobj(elf_State *S, int arg);
+elAPI elf_Value elf_get_arg(elf_State *S, int arg);
+elAPI elf_Int elf_get_int(elf_State *S, int arg);
+elAPI elf_Num elf_get_num(elf_State *S, int arg);
+elAPI elf_String *elf_get_string(elf_State *S, int arg);
+elAPI char *elf_get_text(elf_State *S, int arg);
+elAPI elf_Object *elf_get_object(elf_State *S, int arg);
+elAPI elf_Table *elf_get_table(elf_State *S, int arg);
+elAPI elf_Handle elf_get_sysobj(elf_State *S, int arg);
 elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
 
 elAPI int elf_get_num_args(elf_State *S);
@@ -365,7 +368,7 @@ elAPI void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val);
 elAPI void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val);
 elAPI void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val);
 
-elAPI void _check_table(elf_Table *table);
+elAPI void resize_table(elf_Table *table);
 elAPI void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias);
 elAPI void elf_merge_tables(elf_Table *tab, elf_Table *merger);
 

@@ -44,7 +44,7 @@ int lib_core_shell(elf_State *R) {
 	char *args = elf_get_text(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
-	elf_push_int(R,success);
+	elf_add_int(R,success);
 	return 1;
 }
 
@@ -52,7 +52,7 @@ int lib_core_shell(elf_State *R) {
 int core_lib_exec(elf_State *R) {
 	char *cline=elf_get_text(R,0);
 	int result=sys_exec(0,cline);
-	elf_push_int(R,result);
+	elf_add_int(R,result);
 	return 1;
 }
 
@@ -99,7 +99,7 @@ int core_lib_list_volumes(elf_State *R) {
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				elf_array_add(path_names,VSTR(elf_alloc_string(R,buffer)));
+				elf_array_add(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -144,7 +144,7 @@ static int core_lib_list_folder(elf_State *S) {
 		elf_tsets_str(file,path_s,elf_new_string(S,elf_tpf("%s\\%s",base,name)));
 		elf_tsets_str(file,type_s,type?folder_s:file_s);
 		elf_tsets_int(file,size_s,size);
-		elf_array_add(array,VTAB(file));
+		elf_array_add(array,VALUE_TABLE(file));
 
 	} while (FindNextFileA(search,&info));
 

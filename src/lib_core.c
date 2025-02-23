@@ -22,8 +22,8 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
-	elf_array_add(R->M->globals,VSTR(contents));
-	elf_array_add(R->M->globals,VSTR(name));
+	elf_array_add(R->M->globals,VALUE_STRING(contents));
+	elf_array_add(R->M->globals,VALUE_STRING(name));
 
 	ARRAY_ADD(R->M->files,file);
 	elf_Closure *cls = elf_new_closure(R,file.proto);
@@ -58,13 +58,13 @@ int core_lib_merge_tables(elf_State *R) {
 
 
 int core_lib_get_meta(elf_State *R) {
-	elf_add_table(R,elf_get_obj(R,0)->meta);
+	elf_add_table(R,elf_get_object(R,0)->meta);
 	return 1;
 }
 
 
 int core_lib_set_meta(elf_State *R) {
-	elf_get_obj(R,0)->meta=elf_get_table(R,1);
+	elf_get_object(R,0)->meta=elf_get_table(R,1);
 	PUSHV(R,elf_get_arg(R,0));
 	return 1;
 }
@@ -87,21 +87,17 @@ int core_lib_exit(elf_State *R) {
 int core_lib_flags(elf_State *R) {
 	int flags = R->flags;
 	R->flags |= elf_get_int(R,0);
-	elf_push_int(R,flags);
+	elf_add_int(R,flags);
 	return 1;
 }
 
 
 int core_lib_debugger(elf_State *R) {
-#if defined(_DEBUG)
-	R->flags |= FLAG_DEBUGGER;
-#else
 	char *message = "no message";
 	if (elf_get_num_args(R) != 0) {
 		message = elf_get_text(R,0);
 	}
 	elf_debugger(message);
-#endif
 	return 0;
 }
 
@@ -159,7 +155,7 @@ int core_lib_include(elf_State *R) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);
-			elf_table_set(globals,VSTR(ref),globals->array[entry.idx]);
+			elf_table_set(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}
 	return 0;
@@ -200,7 +196,7 @@ int core_lib_fpf(elf_State *S) {
 	for (int i = 1; i < elf_get_num_args(S); i ++) {
 		wrote += fpf_value(file,elf_get_arg(S,i),0);
 	}
-	elf_push_int(S,wrote);
+	elf_add_int(S,wrote);
 	return 1;
 }
 
@@ -308,7 +304,7 @@ int core_lib_iton(elf_State *R) {
 int core_lib_ntoi(elf_State *R) {
 	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_tag_num) {
-		elf_push_int(R,(elf_Int)v.x_num);
-	} else elf_push_int(R,v.x_int);
+		elf_add_int(R,(elf_Int)v.x_num);
+	} else elf_add_int(R,v.x_int);
 	return 1;
 }

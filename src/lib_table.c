@@ -36,6 +36,7 @@ static int elf_lib_array_reverse(elf_State *);
 static int table_lib_clone(elf_State *);
 static int elf_lib_array_slice(elf_State *);
 static int elf_lib_array_swap(elf_State *);
+static int elf_lib_array_set(elf_State *);
 
 
 elf_Table *new_table_lib(elf_State *R) {
@@ -95,14 +96,14 @@ int table_lib_contains(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
 	elf_Value key = elf_get_arg(S,0);
-	elf_push_int(S,slotiskey(tab,elf_table_try(tab,key)));
+	elf_add_int(S,slotiskey(tab,elf_table_try(tab,key)));
 	return 1;
 }
 
 
 int table_lib_get_collisions(elf_State *S) {
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
-	elf_push_int(S,tab->ndebug);
+	elf_add_int(S,tab->ndebug);
 	return 1;
 }
 
@@ -168,7 +169,7 @@ int table_lib_xdelete(elf_State *R) {
 	elf_Int len = ARRAY_LENGTH(tab->array);
 	if (len != 0) {
 		if (ISOBJT(elf_get_tag(R,0))) {
-			elf_Object *object = elf_get_obj(R,0);
+			elf_Object *object = elf_get_object(R,0);
 			/* todo: Speed */
 			elf_Value *item = 0;
 			elf_Int idx;
@@ -210,7 +211,7 @@ int table_lib_xremove(elf_State *R) {
 
 	if (len != 0) {
 		if (ISOBJT(elf_get_tag(R,0))) {
-			elf_Object *object = elf_get_obj(R,0);
+			elf_Object *object = elf_get_object(R,0);
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */

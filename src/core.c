@@ -27,7 +27,9 @@ void _set_stack_ptr(elf_State *S, elf_Value *stack_ptr){
 
 void elf_init(elf_State *R, elf_Module *M) {
 	R->M = M;
-	// who cares
+	// todo:
+	R->G.open_object_slots = sys_virtual_alloc(GIGABYTES(1));
+	R->G.close_object_slots = sys_virtual_alloc(GIGABYTES(1));
 	R->stack = sys_virtual_alloc(GIGABYTES(1));
 	R->stack_max = DEFAULT_STACK_SIZE;
 	R->stack_ptr = R->stack;
@@ -223,7 +225,7 @@ int _resume(elf_State *R) {
 		#if 0
 		if(!R->disable_tracing){
 			if(R->flags & FLAG_TRACING){
-				elf_Value trace_value = elf_table_get(R->trace_table,VINT(module_instr));
+				elf_Value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(module_instr));
 				if(trace_value.tag!=elf_tag_nil){
 					if(module_instr!=R->trace_start_instr){
 						ASSERT(BC_OP(byte) != BC_J && BC_OP(byte) != BC_JZ && BC_OP(byte) != BC_JNZ);
@@ -257,7 +259,7 @@ int _resume(elf_State *R) {
 					}
 				}else{
 					ASSERT(R->trace_inner_loop_counter == 0);
-					elf_Value trace_value = elf_table_get(R->trace_table,VINT(trace_start_instr));
+					elf_Value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(trace_start_instr));
 					if(trace_value.tag==elf_tag_nil){
 						if(R->M->track[module_instr]>=64){
 							R->flags |= FLAG_TRACING;
@@ -265,7 +267,7 @@ int _resume(elf_State *R) {
 							R->trace_stop_instr  = module_instr;
 							R->active_trace_pos  = ARRAY_LENGTH(R->trace_buffer);
 							R->active_trace_len  = 0;
-							elf_table_set(R->trace_table,VINT(trace_start_instr),VINT(R->active_trace_pos));
+							elf_table_set(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
 						}else{
 							R->M->track[module_instr]+=1;
 						}
@@ -428,7 +430,7 @@ int _resume(elf_State *R) {
 					elf_Value args[] = { yy, zz };
 					_callov(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
 				}else{
-					elf_error(R,module_instr,elf_tpf("attempted to set field of (%lli) '%s' value",xx.tag,tag2s[xx.tag]));
+					elf_error(R,module_instr,elf_tpf("attempted to set field of '%s' value",tag2s[xx.tag]));
 				}
 			} break;
 #if 0

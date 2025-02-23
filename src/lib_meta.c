@@ -87,7 +87,7 @@ int core_lib_tagof(elf_State *R) {
 }
 
 int core_lib_get_object_color(elf_State *R) {
-	elf_Object *obj = elf_get_obj(R,0);
+	elf_Object *obj = elf_get_object(R,0);
 	int color = obj->color;
 	elf_new_string(R,
 	color == GC_NOCOLLECT   ? "black" :
@@ -98,11 +98,11 @@ int core_lib_get_object_color(elf_State *R) {
 
 int core_lib_set_object_trap(elf_State *R) {
 	// elf_Int set = elf_get_int(R,1);
-	// OBJ_COLOR(elf_get_obj(R,0)) = set ? elf_GC_TRAP : GC_COLLECTABLE;
+	// OBJ_COLOR(elf_get_object(R,0)) = set ? elf_GC_TRAP : GC_COLLECTABLE;
 	return 0;
 }
 
 int core_lib_get_object_address(elf_State *R) {
-	elf_push_int(R,(elf_Int) (void *) elf_get_obj(R,0));
+	elf_add_int(R,(elf_Int) (void *) elf_get_object(R,0));
 	return 1;
 }

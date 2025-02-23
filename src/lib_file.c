@@ -102,7 +102,7 @@ int core_lib_get_file_size(elf_State *R) {
 	fseek(file,0,SEEK_END);
 	int size = ftell(file);
 	fseek(file,0,SEEK_SET);
-	elf_push_int(R,size);
+	elf_add_int(R,size);
 	return 1;
 }
 
@@ -162,7 +162,7 @@ int core_lib_write_file_to_file(elf_State *R) {
 		wrote += fwrite(buffer,1,read,dst);
 	} while(read > 0);
 
-	elf_push_int(R,wrote);
+	elf_add_int(R,wrote);
 	return 1;
 }
 
@@ -170,7 +170,7 @@ int core_lib_write_file_to_file(elf_State *R) {
 
 int core_lib_change_work_dir(elf_State *R) {
 	int ok = sys_set_work_dir(elf_get_text(R,0));
-	elf_push_int(R,ok);
+	elf_add_int(R,ok);
 	return 1;
 }
 

@@ -69,7 +69,14 @@ _(ENDOFFILE     , "eof"         ) \
 _(THIS          , "this"        ) \
 /* end */
 
-
+// !! and ?? should have higher precedence,
+// for instance:
+// 1 + some_variable ?? 0
+// here you want ?? to bind stronger, there's
+// no reason to expect ?? to be weaker, because
+// if some variable actually is nil, then there's
+// an error because addition with a nil value is
+// undefined...
 /* todo: why would !! and ?? have lower precedence
 than relational operators, when !! and ?? work on
 values */

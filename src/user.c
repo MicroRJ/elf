@@ -10,9 +10,9 @@ void elf_check_args(elf_State *R, char *fnname, int n, char *usage) {
 	}
 }
 
-elf_Object *elf_push_new_object(elf_State *R, elf_Int size) {
+elf_Object *elf_new_object(elf_State *R, elf_i32 size) {
 	elf_Object *obj = elf_alloc_object(R,GC_OBJ,size);
-	elf_add_obj(R,obj);
+	elf_add_object(R,obj);
 	return obj;
 }
 
@@ -23,8 +23,8 @@ elf_String *elf_new_string(elf_State *R, const char *text) {
 }
 
 
-elf_String *elf_new_string2(elf_State *R, elf_Int length) {
-	elf_String *string=elf_alloc_string2(R,length);
+elf_String *elf_new_string2(elf_State *R, elf_i32 length) {
+	elf_String *string = elf_alloc_string2(R,length);
 	elf_push_string(R,string);
 	return string;
 }
@@ -42,14 +42,14 @@ elf_Closure *elf_new_closure(elf_State *R, elf_Proto fn) {
 }
 
 
-static void _check_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, int x) {
-	elf_error(S,NO_BYTE,elf_tpf("expected '%s' at local %i, instead got '%s'",tag2s[tag],x,tag2s[got]));
+static void _check_arg_tag(elf_State *S, elf_tagenum tag, elf_tagenum got, int index) {
+	elf_error(S,NO_BYTE,elf_tpf("'%s': argument %i is invalid, expected '%s'",tag2s[got],index,tag2s[tag]));
 }
-
 
 int elf_get_num_args(elf_State *S) {
-	return S->frame.nargs-1;
+	return S->frame.nargs - 1;
 }
+
 int elf_get_num_rets(elf_State *S) {
 	return S->frame.nrets;
 }
@@ -82,21 +82,21 @@ void elf_add_closure(elf_State *S, elf_Closure *x) {
 	PUSHV(S,VCLS(x));
 }
 
-void elf_add_obj(elf_State *S, elf_Object *x) {
+void elf_add_object(elf_State *S, elf_Object *x) {
 	if (x) PUSHV(S,VOBJ(x)); else PUSHV(S,VNIL());
 }
 
 void elf_add_proc(elf_State *S, elf_Function x) {
-	PUSHV(S,VCFN(x));
+	PUSHV(S,VALUE_FUNCTION(x));
 }
 
 void elf_add_table(elf_State *S, elf_Table *x) {
-	PUSHV(S,VTAB(x));
+	PUSHV(S,VALUE_TABLE(x));
 }
 
 
-void elf_push_int(elf_State *S, elf_Int x) {
-	PUSHV(S,VINT(x));
+void elf_add_int(elf_State *S, elf_Int x) {
+	PUSHV(S,VALUE_INTEGER(x));
 }
 
 
@@ -106,7 +106,7 @@ void elf_push_number(elf_State *S, elf_Num x) {
 
 
 void elf_push_string(elf_State *S, elf_String *x) {
-	if (x) PUSHV(S,VSTR(x)); else elf_add_nil(S);
+	if (x) PUSHV(S,VALUE_STRING(x)); else elf_add_nil(S);
 }
 
 
@@ -119,25 +119,25 @@ elf_String *elf_get_string(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_str) return v.x_str;
-	_check_tag(R,elf_tag_str,v.tag,x);
+	_check_arg_tag(R,elf_tag_str,v.tag,x);
 	return 0;
 }
 
 
 char *elf_get_text(elf_State *R, int x) {
-	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_tag_nil) return 0;
-	if (v.tag==elf_tag_str) return v.x_str->text;
-	_check_tag(R,elf_tag_str,v.tag,x);
+	elf_Value v = elf_get_arg(R,x);
+	if (v.tag == elf_tag_nil) return 0;
+	if (v.tag == elf_tag_str) return v.x_str->text;
+	_check_arg_tag(R,elf_tag_str,v.tag,x);
 	return 0;
 }
 
 
-elf_Object *elf_get_obj(elf_State *R, int x) {
+elf_Object *elf_get_object(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (ISOBJT(v.tag)) return v.x_obj;
-	_check_tag(R,elf_tag_userobj,v.tag,x);
+	_check_arg_tag(R,elf_tag_userobj,v.tag,x);
 	return 0;
 }
 
@@ -146,7 +146,7 @@ elf_Table *elf_get_table(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_tab) return v.x_tab;
-	_check_tag(R,elf_tag_tab,v.tag,x);
+	_check_arg_tag(R,elf_tag_tab,v.tag,x);
 	return 0;
 }
 
@@ -162,7 +162,7 @@ elf_Handle elf_get_sysobj(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_sysobj) return v.x_sys;
-	_check_tag(R,elf_tag_sysobj,v.tag,x);
+	_check_arg_tag(R,elf_tag_sysobj,v.tag,x);
 	return 0;
 }
 
@@ -171,7 +171,7 @@ elf_Int elf_get_int(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_num) return (elf_Int) v.x_num;
 	if (v.tag==elf_tag_int) return v.x_int;
-	_check_tag(R,elf_tag_int,v.tag,x);
+	_check_arg_tag(R,elf_tag_int,v.tag,x);
 	return 0;
 }
 
@@ -180,7 +180,7 @@ elf_Num elf_get_num(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_int) return (elf_Num) v.x_int;
 	if (v.tag==elf_tag_num) return v.x_num;
-	_check_tag(R,elf_tag_num,v.tag,x);
+	_check_arg_tag(R,elf_tag_num,v.tag,x);
 	return 0;
 }
 
@@ -200,22 +200,22 @@ void elf_gsetx_sys(elf_State *R, char *name, elf_Handle val) {
 
 
 void elf_gsetx_int(elf_State *R, char *name, elf_Int val) {
-	elf_set_global(R->M,elf_new_string(R,name),VINT(val));
+	elf_set_global(R->M,elf_new_string(R,name),VALUE_INTEGER(val));
 }
 
 
 void elf_gsetx_tab(elf_State *R, char *name, elf_Table *val) {
-	elf_set_global(R->M,elf_new_string(R,name),VTAB(val));
+	elf_set_global(R->M,elf_new_string(R,name),VALUE_TABLE(val));
 }
 
 
 void elf_gsetx_str(elf_State *R, char *name, char *val) {
-	elf_set_global(R->M,elf_new_string(R,name),VSTR(elf_new_string(R,val)));
+	elf_set_global(R->M,elf_new_string(R,name),VALUE_STRING(elf_new_string(R,val)));
 }
 
 
 void elf_gsetx_cfn(elf_State *R, char *name, elf_Function fn) {
-	elf_set_global(R->M,elf_new_string(R,name),VCFN(fn));
+	elf_set_global(R->M,elf_new_string(R,name),VALUE_FUNCTION(fn));
 }
 
 
@@ -277,27 +277,27 @@ elf_Table *elf_tgets_tab(elf_Table *tab, elf_String *key) {
 
 
 void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val) {
-	elf_table_set(tab,VSTR(key),VSTR(val));
+	elf_table_set(tab,VALUE_STRING(key),VALUE_STRING(val));
 }
 
 
 void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val) {
-	elf_table_set(tab,VSTR(key),VINT(val));
+	elf_table_set(tab,VALUE_STRING(key),VALUE_INTEGER(val));
 }
 
 
 void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val) {
-	elf_table_set(tab,VSTR(key),VNUM(val));
+	elf_table_set(tab,VALUE_STRING(key),VNUM(val));
 }
 
 
 void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val) {
-	elf_table_set(tab,VSTR(key),VTAB(val));
+	elf_table_set(tab,VALUE_STRING(key),VALUE_TABLE(val));
 }
 
 
 void elf_tsetx_bindings(elf_State *R, elf_Table *tab, elf_CBinding *list, int num) {
 	FOR_RANGE(i,0,num) {
-		elf_table_set(tab,VSTR(elf_alloc_string(R,list[i].name)),VCFN(list[i].fn));
+		elf_table_set(tab,VALUE_STRING(elf_alloc_string(R,list[i].name)),VALUE_FUNCTION(list[i].fn));
 	}
 }

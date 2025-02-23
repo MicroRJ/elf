@@ -4,7 +4,7 @@ static elf_f64 _time_diff_s(elf_i64 time) {
 }
 
 int lib_time__get_clock_time(elf_State *R) {
-	elf_push_int(R,sys_get_clock_time());
+	elf_add_int(R,sys_get_clock_time());
 	return 1;
 }
 
