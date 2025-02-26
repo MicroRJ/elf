@@ -56,7 +56,9 @@ _(STAT_DO_WHILE)     \
 _(TREE_RANGE)        \
 _(EXPR_RANGE_INDEX)  \
 _(TREE_TUPLE)        \
+_(TREE_LABEL)        \
 _(TREE_RET)          \
+_(TREE_LOAD)         \
 /* end */
 
 typedef enum {
@@ -117,6 +119,7 @@ struct treeT {
 			treeID prev;
 			treeID body;
 			treeID post;
+			// todo: remove
 			treeID *b,*c;
 		} loop;
 	};
@@ -146,13 +149,16 @@ static treeID tree_nullary(elf_Parser *, Source, treeKi k, treeTy t);
 static treeID tree_group(elf_Parser *, Source, treeID x);
 static treeID tree_table(elf_Parser *, Source);
 static treeID tree_closure(elf_Parser *, Source, treeID x, treeID *z);
+
 static treeID tree_store(elf_Parser *, Source line, treeID x, treeID y);
+static treeID tree_load(elf_Parser *, Source line, treeID x);
 
 static treeID tree_ret(elf_Parser *, Source, treeID i);
 static treeID tree_goto(elf_Parser *, Source);
 
-static treeID tree_this_ref(elf_Parser *, Source line);
 static treeID tree_global(elf_Parser *, Source line, int x);
+
+static treeID tree_label(elf_Parser *, Source line, treeID *x);
 
 static treeID tree_call(elf_Parser *, Source line, treeID x, treeID *z);
 

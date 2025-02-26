@@ -6,7 +6,7 @@
 
 void _gc_check(elf_State *R, int size);
 
-void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_i64 size) {
+void *elf_alloc_object(elf_State *R, elf_obj_enum type, elf_i64 size) {
 	if (R->G.phase != GC_COLLECTABLE) {
 		elf_error(R,NO_BYTE,"object allocation out of phase");
 	}
@@ -21,7 +21,7 @@ void *elf_alloc_object(elf_State *R, elf_GCTy type, elf_i64 size) {
 }
 
 elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto) {
-	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_Value) * (proto.stacksize-1));
+	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_value) * (proto.stacksize-1));
 	cls->proto = proto;
 	return cls;
 }
@@ -30,7 +30,7 @@ elf_Table *elf_alloc_table2(elf_State *R, elf_i64 num_initial_entries) {
 	elf_Table *table = elf_alloc_object(R, GC_TAB, sizeof(elf_Table));
 	table->obj.meta = R->metatables.table;
 	table->ndebug = 0;
-	table->slots = calloc(1, num_initial_entries * sizeof(elf_Entry));
+	table->slots = calloc(1, num_initial_entries * sizeof(elf_table_entry));
 	table->ntotal = num_initial_entries;
 	table->nslots = 0;
 	return table;
@@ -53,10 +53,10 @@ static void resize_table(elf_Table *table) {
 	if (table->ntotal * 3 < table->nslots * 4) {
 		elf_Table new_table = *table;
 		new_table.ntotal = table->ntotal << 1;
-		new_table.slots = calloc(1,new_table.ntotal * sizeof(elf_Entry));
+		new_table.slots = calloc(1,new_table.ntotal * sizeof(elf_table_entry));
 
 		FOR_RANGE(i,0,table->ntotal) {
-			elf_Entry prev_entry = table->slots[i];
+			elf_table_entry prev_entry = table->slots[i];
 			if(prev_entry.key.tag != elf_tag_nil && prev_entry.key.tag != elf_tag_tomb){
 				elf_i64 prev_index = elf_table_try(&new_table,prev_entry.key);
 				ASSERT(prev_index >= 0);
@@ -95,9 +95,9 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 		resize_table(registry);
 		elf_Int slot=elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
-		elf_Entry entry=registry->slots[slot];
+		elf_table_entry entry=registry->slots[slot];
 		if (entry.key.tag != elf_tag_nil) {
-			elf_Value target=registry->array[registry->slots[slot].idx];
+			elf_value target=registry->array[registry->slots[slot].idx];
 			string=target.x_str;
 		} else {
 			string = elf_alloc_string2(R,length);
@@ -120,7 +120,6 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 
 static elf_i64 _mark(elf_Object *obj) {
 	ASSERT(obj != 0);
-	ASSERT(obj->color != GC_REUSEABLE);
 	elf_i64 num = 0;
 	if (obj->color != GC_NOCOLLECT) {
 		num = 1;
@@ -138,8 +137,8 @@ static elf_i64 _mark(elf_Object *obj) {
 			}
 		} else if (obj->type == GC_TAB) {
 			elf_Table *table = (elf_Table *) obj;
-			elf_Value *array = table->array;
-			elf_Entry *slots = table->slots;
+			elf_value *array = table->array;
+			elf_table_entry *slots = table->slots;
 			FOR_RANGE(i,0,table->ntotal) {
 				if (ISOBJT(slots[i].key.tag)) {
 					num += _mark(slots[i].key.x_obj);
@@ -161,7 +160,7 @@ static elf_i64 _gc_mark(elf_State *R) {
 	elf_i64 time = elf_get_clock_time();
 
 	elf_i64 num_objs = 0;
-	elf_Value *ptr;
+	elf_value *ptr;
 	// todo: cache line!
 	for (ptr = R->stack; ptr < GET_TOP(R); ++ ptr) {
 		if (ISOBJT(ptr->tag)) {

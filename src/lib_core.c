@@ -34,7 +34,7 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 	// kept alive...
 	// elf_set_global(R->M,0,VCLS(cls));
 
-	elf_Value *rets = R->stack_ptr;
+	elf_value *rets = R->stack_ptr;
 	elf_add_closure(R,cls);
 	elf_add_this(R);
 	nrets = elf_call(R,nargs+1,nrets);
@@ -148,7 +148,7 @@ int core_lib_include(elf_State *R) {
 	todo: */
 
 	elf_Table *globals = R->M->globals;
-	elf_Entry entry;
+	elf_table_entry entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
 		if (entry.key.tag == elf_tag_str) {
@@ -246,11 +246,11 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 	// todo:
 	if(tab->nslots) {
 		for (elf_i64 i = 0; i < tab->ntotal; ++ i) {
-			elf_Entry slot = tab->slots[i];
+			elf_table_entry slot = tab->slots[i];
 			if (slot.key.tag == elf_tag_nil) {
 				continue;
 			}
-			elf_Value v = tab->array[slot.idx];
+			elf_value v = tab->array[slot.idx];
 			if ((v.tag == elf_tag_closure) || (v.tag == elf_tag_proc)) {
 				continue;
 			}
@@ -266,7 +266,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 		}
 	} else {
 		FOR_ARRAY(i,tab->array) {
-			elf_Value v = tab->array[i];
+			elf_value v = tab->array[i];
 			if (i != 0) fprintf(io,",\n");
 			print_num_tabs(io,level);
 			if (v.tag==elf_tag_tab) {
@@ -292,7 +292,7 @@ int core_lib_unload(elf_State *S) {
 
 // DEPRECATED SHOULD BE INTRINSIC
 int core_lib_iton(elf_State *R) {
-	elf_Value v = elf_get_arg(R,0);
+	elf_value v = elf_get_arg(R,0);
 	if (v.tag==elf_tag_int) {
 		elf_push_number(R,(elf_Num)v.x_int);
 	} else elf_push_number(R,v.x_num);
@@ -302,7 +302,7 @@ int core_lib_iton(elf_State *R) {
 
 // DEPRECATED SHOULD BE INTRINSIC
 int core_lib_ntoi(elf_State *R) {
-	elf_Value v = elf_get_arg(R,0);
+	elf_value v = elf_get_arg(R,0);
 	if (v.tag==elf_tag_num) {
 		elf_add_int(R,(elf_Int)v.x_num);
 	} else elf_add_int(R,v.x_int);

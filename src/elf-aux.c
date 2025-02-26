@@ -4,18 +4,22 @@
 ** Auxiliary Stuff
 */
 
-int elf_get_global(elf_Module *M, elf_String *name) {
+
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecode b);
+
+
+int elf_get_global_slot(elf_Module *M, elf_String *name) {
 	if (name != 0) return elf_table_get_or_add(M->globals,VALUE_STRING(name));
 	return ARRAY_GROW(M->globals->array,1);
 }
 
-int elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
-	int id = elf_get_global(M,name);
+int elf_set_global(elf_Module *M, elf_String *name, elf_value value) {
+	int id = elf_get_global_slot(M,name);
 	M->globals->array[id] = value;
 	return id;
 }
 
-
+// todo: remove, this is not core functionality
 void elf_add_lib(elf_State *S, char *prefix, elf_CBinding *bindings, int num) {
 	// todo: ensure the symbol name is valid
 	for(int i = 0; i < num; i ++) {
@@ -37,7 +41,7 @@ void elf_debugger(char *message) {
 	sys_debugger();
 }
 
-int elf_get_instr_file(elf_Module *M, int byte) {
+int elf_query_file_for_instr(elf_Module *M, int byte) {
 	FOR_ARRAY(i,M->files) {
 		elf_File file = M->files[i];
 		if (WITHIN(byte,file.pos,file.end)) {
@@ -56,10 +60,13 @@ char *elf_get_instr_line(elf_Module *M, Instr byte) {
 	return "";
 }
 
-
-/* todo: this is so generic, it could just be part of
-the text api */
 void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) {
+	//
+	// get line number and starting address
+	// of the line for the given address within
+	// the file q
+	//
+
 	char *c = q;
 	int n = 0;
 	while (q < loc) {
@@ -75,7 +82,7 @@ void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) 
 	if (lineloc != 0) *lineloc = c;
 }
 
-void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, elf_Bytecode byte, char const *fmt, ...) {
+void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, elf_bytecode byte, char const *fmt, ...) {
 	int linenum;
 	char *lineloc;
 	elf_get_line_source_info(contents,loc,&linenum,&lineloc);
@@ -122,12 +129,48 @@ void elf_dump_byte_trace(elf_State *S) {
 	S->frame_stack[S->frame_index] = S->frame;
 	for(int i=1; i<=S->frame_index; i++){
 		elf_Stack_Frame *frame = & S->frame_stack[i];
-		int id = elf_get_instr_file(M,frame->bytecounter);
+		int id = elf_query_file_for_instr(M,frame->bytecounter);
 		if (id != -1) {
 			elf_File *file = &M->files[id];
 			Source line = elf_get_instr_line(M,frame->bytecounter);
 			elf_line_dialog(file->name->text,file->contents->text,line,frame->bytecounter,M->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
 		}
+	}
+}
+
+// todo:
+// for this to work properly we'd have to construct
+// some sort of dependency graph to figure out why
+// something happened
+// also, ideally it would only print the associated
+// instructions, or at least highlight them
+void elf_analyze_exec_trail(elf_State *S) {
+	elf_i32 range_x0 = 0;
+	elf_i32 range_y0 = 0;
+	elf_i32 range_x1 = 0;
+	elf_i32 range_y1 = 0;
+	elf_i32 mask = S->exec_trail_capacity - 1;
+	// todo: make this neater
+	if (S->exec_trail_index > S->exec_trail_capacity) {
+		range_x0 = S->exec_trail_index & mask;
+		range_y0 = S->exec_trail_capacity;
+		if (range_x0) {
+			range_x1 = 0;
+			range_y1 = range_x0 + 1;
+		}
+	} else {
+		range_x0 = 0;
+		range_y0 = S->exec_trail_index;
+	}
+	for(elf_i32 i = range_x0; i < range_y0; i ++) {
+		elf_trail_entry entry = S->exec_trail[i];
+		int id = elf_query_file_for_instr(S->M,entry.address);
+		fpf_byte(stdout,S->M,id,entry.address,entry.bytecode);
+	}
+	for(elf_i32 i = range_x1; i < range_y1; i ++) {
+		elf_trail_entry entry = S->exec_trail[i];
+		int id = elf_query_file_for_instr(S->M,entry.address);
+		fpf_byte(stdout,S->M,id,entry.address,entry.bytecode);
 	}
 }
 
@@ -141,7 +184,7 @@ void elf_error(elf_State *R, int byte, const char *error) {
 	elf_Module *M = R->M;
 	if (byte == NO_BYTE) byte = R->byte;
 	char *line = elf_get_instr_line(M,byte);
-	int fileid = elf_get_instr_file(M,byte);
+	int fileid = elf_query_file_for_instr(M,byte);
 	if (fileid != -1) {
 		elf_File *file = &M->files[fileid];
 		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
@@ -152,10 +195,11 @@ void elf_error(elf_State *R, int byte, const char *error) {
 
 	printf(" -- BYTE TRACE:\n");
 	elf_dump_byte_trace(R);
+	elf_analyze_exec_trail(R);
 	elf_debugger("error");
 }
 
-int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tagenum x, elf_tagenum y) {
+int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tag_enum x, elf_tag_enum y) {
 	if (x != y) {
 		elf_error(R,id,elf_tpf("$%i, expected %s, instead got %s",loc,tag2s[x],tag2s[y]));
 	}
@@ -163,7 +207,7 @@ int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tagenum x, elf_t
 }
 
 
-static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
+static int fpf_value(FILE *file, elf_value v, elf_Bool flags) {
 	switch (v.tag) {
 		case elf_tag_nil: return fprintf(file,"nil");
 		case elf_tag_sysobj: return fprintf(file,"h%llX",v.x_int);
@@ -180,7 +224,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
 				if (i != 0) wrote += fprintf(file,", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
-					elf_Entry it = tab->slots[j];
+					elf_table_entry it = tab->slots[j];
 					if (it.key.tag==elf_tag_nil) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += fprintf(file,", ");
@@ -190,7 +234,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 				wrote += fpf_value(file,tab->array[i],1);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	elf_Entry it = tab->slots[i];
+			// 	elf_table_entry it = tab->slots[i];
 			// 	if (it.key.tag == elf_tag_nil) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
 			// 	wrote += fpf_value(file,it.key,1);
@@ -216,7 +260,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 }
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecode b) {
 	if (fid != -1) {
 		elf_File file = M->files[fid];
 		int linenum;
@@ -245,7 +289,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecod
 		fprintf(io," #%f",M->numbers[BC_ARGY(b)]);
 	} else
 	if (BC_OP(b) == BC_GETGLOBAL) {
-		elf_Value val = M->globals->array[BC_ARGY(b)];
+		elf_value val = M->globals->array[BC_ARGY(b)];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
@@ -280,7 +324,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[ff.bytes+j];
+			elf_bytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// elf_get_line_source_info(md->file,md->lines[j],&linenum,&lineloc);
@@ -293,7 +337,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		elf_Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[p.bytes+j];
+			elf_bytecode b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");

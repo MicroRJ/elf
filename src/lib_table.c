@@ -15,7 +15,8 @@ static int elf_lib_array_add(elf_State *);
 // static int table_lib_xdelete(elf_State *);
 static int elf_array_lib_get(elf_State *);
 // static int table_lib_tally(elf_State *);
-static int elf_array_lib_tally(elf_State *);
+static int lib_table_get_length(elf_State *);
+static int lib_table_set_length(elf_State *);
 static int elf_lib_table_delete(elf_State *);
 static int table_lib_itemize(elf_State *);
 // static int table_lib_inject(elf_State *);
@@ -43,8 +44,9 @@ elf_Table *new_table_lib(elf_State *R) {
 	elf_CBinding lib[] = {
 		{"get_meta",table_lib_get_meta},
 		{"set_meta",table_lib_set_meta},
-		{"length",elf_array_lib_tally},
-		{"tally",elf_array_lib_tally},
+		{"length",lib_table_get_length},
+		{"set_length",lib_table_set_length},
+		{"tally",lib_table_get_length},
 		{"delete",elf_lib_table_delete},
 		{"haskey",table_lib_contains},
 		// {"foreach",table_lib_foreach},
@@ -95,7 +97,7 @@ int table_lib_set_meta(elf_State *R) {
 int table_lib_contains(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
-	elf_Value key = elf_get_arg(S,0);
+	elf_value key = elf_get_arg(S,0);
 	elf_add_int(S,slotiskey(tab,elf_table_try(tab,key)));
 	return 1;
 }
@@ -139,9 +141,9 @@ int table_lib_itemize(elf_State *R) {
 int elf_lib_table_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_Value key = elf_get_arg(R,0);
-	elf_Entry *slots = tab->slots;
-	elf_Value *array = tab->array;
+	elf_value key = elf_get_arg(R,0);
+	elf_table_entry *slots = tab->slots;
+	elf_value *array = tab->array;
 	int slot = elf_table_try(tab,key);
 	if ((slot >= 0) && (slots[slot].key.tag != elf_tag_nil) && (slots[slot].key.tag != elf_tag_tomb)) {
 		int idx = slots[slot].idx;
@@ -154,7 +156,7 @@ int elf_lib_table_delete(elf_State *R) {
 				slots[i].idx -= 1;
 			}
 		}
-		memmove(array+idx,array+idx+1,(ARRAY_LENGTH(array)-idx-1)*sizeof(elf_Value));
+		memmove(array+idx,array+idx+1,(ARRAY_LENGTH(array)-idx-1)*sizeof(elf_value));
 		ARRAY_SET_MIN(array,ARRAY_LENGTH(array)-1);
 	}else{
 		elf_add_nil(R);
@@ -171,7 +173,7 @@ int table_lib_xdelete(elf_State *R) {
 		if (ISOBJT(elf_get_tag(R,0))) {
 			elf_Object *object = elf_get_object(R,0);
 			/* todo: Speed */
-			elf_Value *item = 0;
+			elf_value *item = 0;
 			elf_Int idx;
 			for ( idx = 0; idx < len; idx += 1 ) {
 				if (tab->array[idx].x_obj == object) {
@@ -215,7 +217,7 @@ int table_lib_xremove(elf_State *R) {
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */
-			elf_Value *item = 0;
+			elf_value *item = 0;
 			elf_Int idx;
 			for (idx=0;idx<len;++idx) {
 				if (tab->array[idx].x_obj == object) {
@@ -263,16 +265,16 @@ int table_lib_alias(elf_State *R) {
 int table_lib_find_aliases(elf_State *R) {
 	elf_check_args(R,":find_aliases",1,"the key to find aliases for");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_Value key = elf_get_arg(R,0);
+	elf_value key = elf_get_arg(R,0);
 	elf_Table *list = elf_new_table(R);
 	if (key.tag != elf_tag_nil) {
 		elf_Int slot = elf_table_try(tab,key);
 		if (slotiskey(tab,slot)) {
-			elf_Entry entry = tab->slots[slot];
+			elf_table_entry entry = tab->slots[slot];
 			elf_Int i;
 			for (i=0;i<tab->ntotal;++i) {
 				/* we also include ourselves */
-				elf_Entry it = tab->slots[i];
+				elf_table_entry it = tab->slots[i];
 				if (it.idx != entry.idx) continue;
 				if (it.key.tag == elf_tag_nil) continue;
 				elf_array_add(list,it.key);
@@ -287,14 +289,14 @@ int table_lib_find_aliases(elf_State *R) {
 int table_lib_bubble_sort(elf_State *R) {
 	elf_check_args(R,":bubblesort",1,"comparator function");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_Value *arr = tab->array;
+	elf_value *arr = tab->array;
 	elf_Closure *cls = elf_get_cls(R,0);
 	elf_Bool sorted = 0;
 	do {
 		sorted = 1;
 		elf_Int i;
 		for (i=0;i<ARRAY_LENGTH(arr)-1;++i) {
-			elf_Value *top = GET_TOP(R);
+			elf_value *top = GET_TOP(R);
 			elf_add_closure(R,cls);
 			PUSHV(R,arr[i+0]);
 			PUSHV(R,arr[i+1]);
@@ -303,7 +305,7 @@ int table_lib_bubble_sort(elf_State *R) {
 			ASSERT(r == 1);
 			// if (elf_get_int(R,base))
 			{
-				elf_Value tmp = arr[i+0];
+				elf_value tmp = arr[i+0];
 				arr[i+0] = arr[i+1];
 				arr[i+1] = tmp;
 				sorted = 0;
@@ -324,7 +326,7 @@ int table_lib_foreach(elf_State *R) {
 	// elf_StackId v = elf_local_alloc(R,1);
 	// elf_Int i;
 	// for (i=0;i<tab->ntotal;++i) {
-	// 	elf_Entry it = tab->slots[i];
+	// 	elf_table_entry it = tab->slots[i];
 	// 	if (it.key.tag == elf_tag_nil) continue;
 	// 	R->stack[k] = it.k;
 	// 	R->stack[v] = tab->array[it.idx];
@@ -343,7 +345,7 @@ elf_Table *elf_clone_table(elf_State *S, elf_Table *tab) {
 	elf_Table *clone = elf_alloc_table(S);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
-		elf_Entry it = tab->slots[i];
+		elf_table_entry it = tab->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		elf_table_set(clone,it.key,tab->array[it.idx]);
 	}
@@ -355,7 +357,7 @@ int lib_table_keys(elf_State *S) {
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
 	elf_Table *array = elf_new_table(S);
 	for (elf_i64 i = 0; i < tab->ntotal; i++) {
-		elf_Entry entry = tab->slots[i];
+		elf_table_entry entry = tab->slots[i];
 		if (entry.key.tag == elf_tag_nil || entry.key.tag == elf_tag_tomb) continue;
 		elf_array_add(array,entry.key);
 	}
@@ -404,7 +406,7 @@ int table_lib_diff(elf_State *R) {
 	elf_Table *dif = elf_alloc_table(R);
 	elf_Int i;
 	for ( i = 0; i < tab->ntotal; ++i ) {
-		elf_Entry it = tab->slots[i];
+		elf_table_entry it = tab->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
 		if (elf_table_contains(sub,it.key)) continue;
 		elf_table_set(dif,it.key,tab->array[it.idx]);

@@ -1,6 +1,6 @@
 /*
 ** See Copyright Notice In elf.h
-** gen.c
+** bytecode_gen.c
 */
 
 // todo: interning!
@@ -17,7 +17,7 @@ static int elf_add_const_num(elf_State *S, elf_Num i) {
 
 
 static int emit_jump(elf_Parser *parser, Source line, int dst);
-static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte);
+static int emit_byte(elf_Parser *parser, Source line, elf_bytecode byte);
 static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
 static int emit_bytexy(elf_Parser *parser, Source line, int k, int x, int y);
 static int emit_bytexyz(elf_Parser *parser, Source line, int k, int x, int y, int z);
@@ -135,14 +135,15 @@ static elf_File gen_file(elf_Parser *parser, treeID tree){
 }
 
 static void gen_tree(elf_Parser *parser, treeID id) {
-	treeT tree;
-
-	tree=get_tree(parser,id);
-	switch(tree.kind) {
-		case TREE_SETMEM:{
-			int mem;
-			mem=to_mem(parser,tree.x,-1,1);
-			ASSERT(mem!=-1);
+	treeT tree = get_tree(parser,id);
+	switch ( tree.kind ) {
+		case TREE_SETMEM: {
+			if (get_mem(parser,tree.x) != -1) {
+				parser_dialog(parser,tree.line,"target tree has already been assigned memory");
+				elf_error(parser->R,0,"internal error");
+			}
+			int mem = to_mem(parser,tree.x,-1,1);
+			ASSERT(mem != -1);
 		} break;
 		case TREE_RET: {
 			int mem,num;
@@ -275,43 +276,51 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 		} break;
 	}
 }
+
 static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
-	int _dst=dst;
+	int _dst = dst;
 
-	ASSERT(id!=0);
-	ASSERT(id!=NO_TREE);
-	elf_State *S;
-	treeT tree;
-	Source line;
-	int mem,rx,ry,rz;
+	ASSERT(id != 0);
+	ASSERT(id != NO_TREE);
 
-	S=parser->R;
-	tree=get_tree(parser,id);
-	line=tree.line;
 
-	mem=get_mem(parser,id);
-	if(mem!=NO_SLOT){
-		if (ndst<1) goto esc;
-		if (dst<0) dst=set_mem(parser,id);
+	elf_State *S = parser->R;
+	treeT tree = get_tree(parser,id);
+	Source line = tree.line;
+
+	int rx,ry,rz;
+	int mem = get_mem(parser,id);
+
+	if(mem != NO_SLOT) {
+		if (ndst < 1) goto esc;
+		if (dst < 0) dst = set_mem(parser,id);
 		// let a = 0
 		// a = a ?? 1
-		if(dst!=mem){
+		if (dst != mem) {
 			emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 		}
 		goto esc;
 	}
 	switch (tree.kind) {
 		case TREE_NOP: {
-			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (ndst < 1) goto esc;
+			if (dst < 0) dst = set_mem(parser,id);
+		} break;
+		// todo: come back to this and clarify this
+		case TREE_LOAD: {
+			if (ndst < 1) goto esc;
+			if (get_mem(parser,tree.x) != -1) {
+				if (dst < 0) dst = set_mem(parser,id);
+			}
+			dst = to_mem(parser,tree.x,dst,ndst);
+			parser->memory_slots[dst] = id;
 		} break;
 		case TREE_GETMEM: {
-			int mem;
-			mem=get_mem(parser,tree.x);
-			if(mem==NO_SLOT){
+			int mem = get_mem(parser,tree.x);
+			if (mem == NO_SLOT) {
 				parser_dialog(parser,get_tree_line(parser,tree.x),"no memory assigned to this thing");
 			}
-			dst=to_mem(parser,tree_int(parser,tree.line,mem),dst,ndst);
+			dst = to_mem(parser,tree_int(parser,tree.line,mem),dst,ndst);
 		} break;
 		case TREE_GETEXPR: {
 			char *expr = tree2s[get_tree_kind(parser,tree.x)];
@@ -699,7 +708,7 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(elf_Parser *C, Source line, elf_Bytecode byte) {
+static int emit_byte(elf_Parser *C, Source line, elf_bytecode byte) {
 	elf_Module *M = C->R->M;
 	line=line?line:C->expr_line;
 	ASSERT(line!=0);
@@ -713,7 +722,7 @@ static int emit_byte(elf_Parser *C, Source line, elf_Bytecode byte) {
 
 
 static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
-	elf_Bytecode byte=BC_XXX(k,x);
+	elf_bytecode byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	return emit_byte(C,line,byte);
@@ -721,7 +730,7 @@ static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
 
 
 static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
-	elf_Bytecode byte=BC_XYY(k,x,y);
+	elf_bytecode byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -730,7 +739,7 @@ static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
 
 
 static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) {
-	elf_Bytecode byte=BC_XYZ(k,x,y,z);
+	elf_bytecode byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -739,7 +748,7 @@ static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) 
 }
 
 static void patch_jump2(elf_Parser *fs, int src, int dst) {
-	elf_Bytecode byte,*bytes;
+	elf_bytecode byte,*bytes;
 	bytes=fs->R->M->bytes;
 	byte=bytes[src];
 	int j = dst - src;

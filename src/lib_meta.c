@@ -5,7 +5,7 @@
 
 static int core_lib_get_global(elf_State *R) {
 	elf_String *name=elf_get_string(R,0);
-	int index=elf_get_global(R->M,name);
+	int index=elf_get_global_slot(R->M,name);
 	elf_add_any(R,R->M->globals->array[index]);
 	return 1;
 }

@@ -49,18 +49,22 @@ static treeID tree_nop(elf_Parser *parser, Source line) {
 }
 
 static treeID tree_global(elf_Parser *parser, Source line, int x) {
-	treeID v;
-	v=tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
-	v->expr_global=x;
+	treeID v = tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
+	v->expr_global = x;
 	return v;
 }
 
 static treeID tree_global_name(elf_Parser *parser, Source line, char *name) {
-	int x = elf_get_global(parser->R->M,elf_alloc_string(parser->R,name));
+	int x = elf_get_global_slot(parser->R->M,elf_alloc_string(parser->R,name));
 	ASSERT(x != -1);
 	return tree_global(parser,line,x);
 }
 
+static treeID tree_label(elf_Parser *parser, Source line, treeID *z) {
+	treeID v = tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
+	v->z = z;
+	return v;
+}
 
 static treeID tree_nil(elf_Parser *parser, Source line) {
 	return tree_nullary(parser,line,EXPR_NIL,NT_NIL);
@@ -127,6 +131,15 @@ static treeID tree_assign_mem(elf_Parser *parser, Source line, treeID x) {
 static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
 }
+
+// todo: the load tree could be removed if the
+// set memory tree took into account trees that
+// already had memory, but I don't know that we
+// want that always?
+static treeID tree_load(elf_Parser *parser, Source line, treeID x) {
+	return tree_unary(parser,line,TREE_LOAD,get_tree_type(parser,x),x);
+}
+
 static treeID tree_less_than(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,EXPR_LT,NT_BOL,x,y);
 }

@@ -21,6 +21,7 @@ static elf_Bool match_entire_text_noclause(char *pattern, char *text);
 static elf_Bool match_entire_text(char *pattern, char *text);
 static char *match_text_single_clause_ex(char *p, char *s);
 
+// bro this is core...
 static char *xpfv(Allocator alloc, char const *format, va_list v);
 static char *xpf_(Allocator alloc, char const *format, ...);
 

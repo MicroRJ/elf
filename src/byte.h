@@ -3,11 +3,8 @@
 ** byte.h
 */
 
-typedef struct elf_Bytecode {
-	short z,y,x,k;
-} elf_Bytecode;
 
-#define BC_XYZ(K,X,Y,Z) (elf_Bytecode){Z,Y,X,K}
+#define BC_XYZ(K,X,Y,Z) (elf_bytecode){Z,Y,X,K}
 
 #define BC_OP(B)   (B).k
 #define BC_ARGX(B) (B).x

@@ -106,7 +106,7 @@ int string_lib_append(elf_State *R) {
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elf_get_num_args(R); ++ i) {
-		elf_Value v = elf_get_arg(R,i);
+		elf_value v = elf_get_arg(R,i);
 		if (v.tag == elf_tag_str) {
 			strcatf(buffer,"%s",v.x_str->text);
 		} else if (v.tag == elf_tag_nil) {

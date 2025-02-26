@@ -32,12 +32,20 @@ static tokenTy text_is_word_or_keyword(char *name) {
 	return TK_WORD;
 }
 
-void parser_dialog(elf_Parser *fs, char *line, char const *fmt, ...) {
-	line = line ? line : fs->tok.line;
+void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) {
+	line = line ? line : parser->tok.line;
+
+	// | attempted to get field of
+	//
+	// | name := 0
+	// | name.name = 0
+	// | ^
+	// |
+	// |
 
 	int linenum;
 	char *lineloc;
-	elf_get_line_source_info(fs->text,line,&linenum,&lineloc);
+	elf_get_line_source_info(parser->text,line,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -70,7 +78,7 @@ void parser_dialog(elf_Parser *fs, char *line, char const *fmt, ...) {
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		char *filename = fs->name;
+		char *filename = parser->name;
 		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_Int)(1+line-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
