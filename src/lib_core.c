@@ -5,28 +5,80 @@
 
 #include "lib_file.c"
 
-
 static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents) {
+	elf_i64 time = elf_get_clock_time();
+
 	ASSERT(contents);
 	ASSERT(name);
 
-	// todo: parse and gen file should just be one function,
-	// or maybe just have the one 'parse' function...
-	elf_Parser parser = {};
-	treeID tree = elf_parse(&parser,R,as_expr,name->text,contents->text);
-	elf_File file = gen_file(&parser,tree);
+	elf_Module *M = R->M;
 
-	// todo: we need this in the file for debugging...
-	file.contents = contents;
-	file.name = name;
+	elf_Parser parser_ = {};
+	elf_Parser *parser = & parser_;
+	elf_init_parser(R, parser, name->text, contents->text);
+
+	treeID func = new_tree(parser,parser->tok.line,TREE_FUNCTION,NT_FUN);
+
+	parser->enc = func;
+	add_this_param(parser,parser->tok.line);
+
+	ARRAY_ADD(parser->functions,func);
+
+	if (as_expr) {
+		treeID v = parse_expr(parser,0);
+		v = tree_ret(parser,parser->tok.line,v);
+		block_add(parser,v);
+	} else{
+		while (parse_stat(parser));
+		FOR_ARRAY(i,parser->block.defers){
+			ARRAY_ADD(parser->block.body,parser->block.defers[i]);
+		}
+	}
+	func->expr_fun.body = tree_block(parser,parser->tok.line,parser->block.body);
+
+	elf_f64 took = elf_time_diff_ms(time);
+	elf_debug_log("%s: parse took: %fms", parser->name, took);
+
+	// elf_File file = gen_file(parser, func);
+	int index = ARRAY_GROW(M->protos, ARRAY_LENGTH(parser->functions));
+	elf_Proto *protos = & M->protos[index];
+
+	int start = M->nbytes;
+	FOR_ARRAY(i, parser->functions) {
+		parser->functions[i]->expr_fun.proto = index ++;
+	}
+	FOR_ARRAY(i, parser->functions) {
+		protos[i] = elf_compile_function(parser,parser->functions[i]);
+		// elf_debug_log("PROTO: [%i, %i) (%i)"
+		// , 	protos[i].bytes
+		// , 	protos[i].bytes+protos[i].nbytes
+		// ,	protos[i].nbytes);
+	}
+	int end = M->nbytes;
+
+	{
+		//
+		// todo: because we show source code when
+		// the program crashes at runtime the
+		// contents string is kept alive, can we
+		// do better ?
+		//
+		elf_File file = {};
+		file.pos = start;
+		file.end = end;
+		file.proto = protos[0];
+		file.contents = contents;
+		file.name = name;
+		ARRAY_ADD(M->files, file);
+	}
+
 
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
-	elf_array_add(R->M->globals,VALUE_STRING(contents));
-	elf_array_add(R->M->globals,VALUE_STRING(name));
+	elf_array_add(M->globals,VALUE_STRING(contents));
+	elf_array_add(M->globals,VALUE_STRING(name));
 
-	ARRAY_ADD(R->M->files,file);
-	elf_Closure *cls = elf_new_closure(R,file.proto);
+	elf_Closure *cls = elf_new_closure(R, protos[0]);
 
 	// ASSERT(nargs >= 0);
 	// ASSERT(nrets >= 0);
@@ -34,7 +86,7 @@ static int _exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *n
 	// kept alive...
 	// elf_set_global(R->M,0,VCLS(cls));
 
-	elf_value *rets = R->stack_ptr;
+	elf_Value *rets = R->stack_ptr;
 	elf_add_closure(R,cls);
 	elf_add_this(R);
 	nrets = elf_call(R,nargs+1,nrets);
@@ -177,9 +229,9 @@ int core_lib_load_json(elf_State *R) {
 	fread(contents->text,1,size,file);
 
 	elf_Parser parser = {};
-	elf_prep_parser(&parser, R, name, contents->text);
+	elf_init_parser(R, &parser, name, contents->text);
 
-	elf_tabID tab = parse_json_obj(&parser);
+	elf_TableId tab = elf_parse_json_obj(&parser);
 	elf_add_table(R,tab);
 
 	return 1;
@@ -250,7 +302,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 			if (slot.key.tag == elf_tag_nil) {
 				continue;
 			}
-			elf_value v = tab->array[slot.idx];
+			elf_Value v = tab->array[slot.idx];
 			if ((v.tag == elf_tag_closure) || (v.tag == elf_tag_proc)) {
 				continue;
 			}
@@ -266,7 +318,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 		}
 	} else {
 		FOR_ARRAY(i,tab->array) {
-			elf_value v = tab->array[i];
+			elf_Value v = tab->array[i];
 			if (i != 0) fprintf(io,",\n");
 			print_num_tabs(io,level);
 			if (v.tag==elf_tag_tab) {
@@ -292,17 +344,17 @@ int core_lib_unload(elf_State *S) {
 
 // DEPRECATED SHOULD BE INTRINSIC
 int core_lib_iton(elf_State *R) {
-	elf_value v = elf_get_arg(R,0);
+	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_tag_int) {
-		elf_push_number(R,(elf_Num)v.x_int);
-	} else elf_push_number(R,v.x_num);
+		elf_add_num(R,(elf_Num)v.x_int);
+	} else elf_add_num(R,v.x_num);
 	return 1;
 }
 
 
 // DEPRECATED SHOULD BE INTRINSIC
 int core_lib_ntoi(elf_State *R) {
-	elf_value v = elf_get_arg(R,0);
+	elf_Value v = elf_get_arg(R,0);
 	if (v.tag==elf_tag_num) {
 		elf_add_int(R,(elf_Int)v.x_num);
 	} else elf_add_int(R,v.x_int);

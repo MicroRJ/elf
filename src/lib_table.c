@@ -1,12 +1,9 @@
-/*
-** See Copyright Notice In elf.h
-** lib_table.c
-*/
+//
+// See Copyright Notice In elf.h
+//
 
-
-/* todo: to be revised */
-
-
+/* todo: these functions are to be refactored,
+a bunch of them are rather useless and or misnamed */
 static int table_lib_get_meta(elf_State *);
 static int table_lib_set_meta(elf_State *);
 static int elf_lib_array_add(elf_State *);
@@ -40,8 +37,8 @@ static int elf_lib_array_swap(elf_State *);
 static int elf_lib_array_set(elf_State *);
 
 
-elf_Table *new_table_lib(elf_State *R) {
-	elf_CBinding lib[] = {
+elf_Table *elf_new_table_metatable(elf_State *S) {
+	NameFunctionPair lib[] = {
 		{"get_meta",table_lib_get_meta},
 		{"set_meta",table_lib_set_meta},
 		{"length",lib_table_get_length},
@@ -71,10 +68,12 @@ elf_Table *new_table_lib(elf_State *R) {
 		{"swap",elf_lib_array_swap},
 		{"diff",table_lib_diff},
 	};
-	/* todo: these functions are to be refactored,
-	a bunch of them are rather useless and or misnamed */
-	elf_Table *tab = elf_new_table(R);
-	elf_tsetx_bindings(R,tab,lib,COUNTOF(lib));
+
+	elf_Table *tab = elf_new_table(S);
+	for (int i = 0; i < COUNTOF(lib); i ++) {
+		elf_String *name = elf_new_string(S, lib[i].name);
+		elf_table_set(tab, VALUE_STRING(name), VALUE_FUNCTION(lib[i].fn));
+	}
 	return tab;
 }
 
@@ -97,7 +96,7 @@ int table_lib_set_meta(elf_State *R) {
 int table_lib_contains(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
-	elf_value key = elf_get_arg(S,0);
+	elf_Value key = elf_get_arg(S,0);
 	elf_add_int(S,slotiskey(tab,elf_table_try(tab,key)));
 	return 1;
 }
@@ -141,9 +140,9 @@ int table_lib_itemize(elf_State *R) {
 int elf_lib_table_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_value key = elf_get_arg(R,0);
+	elf_Value key = elf_get_arg(R,0);
 	elf_table_entry *slots = tab->slots;
-	elf_value *array = tab->array;
+	elf_Value *array = tab->array;
 	int slot = elf_table_try(tab,key);
 	if ((slot >= 0) && (slots[slot].key.tag != elf_tag_nil) && (slots[slot].key.tag != elf_tag_tomb)) {
 		int idx = slots[slot].idx;
@@ -156,7 +155,7 @@ int elf_lib_table_delete(elf_State *R) {
 				slots[i].idx -= 1;
 			}
 		}
-		memmove(array+idx,array+idx+1,(ARRAY_LENGTH(array)-idx-1)*sizeof(elf_value));
+		memmove(array+idx,array+idx+1,(ARRAY_LENGTH(array)-idx-1)*sizeof(elf_Value));
 		ARRAY_SET_MIN(array,ARRAY_LENGTH(array)-1);
 	}else{
 		elf_add_nil(R);
@@ -173,7 +172,7 @@ int table_lib_xdelete(elf_State *R) {
 		if (ISOBJT(elf_get_tag(R,0))) {
 			elf_Object *object = elf_get_object(R,0);
 			/* todo: Speed */
-			elf_value *item = 0;
+			elf_Value *item = 0;
 			elf_Int idx;
 			for ( idx = 0; idx < len; idx += 1 ) {
 				if (tab->array[idx].x_obj == object) {
@@ -217,7 +216,7 @@ int table_lib_xremove(elf_State *R) {
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */
-			elf_value *item = 0;
+			elf_Value *item = 0;
 			elf_Int idx;
 			for (idx=0;idx<len;++idx) {
 				if (tab->array[idx].x_obj == object) {
@@ -265,7 +264,7 @@ int table_lib_alias(elf_State *R) {
 int table_lib_find_aliases(elf_State *R) {
 	elf_check_args(R,":find_aliases",1,"the key to find aliases for");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_value key = elf_get_arg(R,0);
+	elf_Value key = elf_get_arg(R,0);
 	elf_Table *list = elf_new_table(R);
 	if (key.tag != elf_tag_nil) {
 		elf_Int slot = elf_table_try(tab,key);
@@ -289,14 +288,14 @@ int table_lib_find_aliases(elf_State *R) {
 int table_lib_bubble_sort(elf_State *R) {
 	elf_check_args(R,":bubblesort",1,"comparator function");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_value *arr = tab->array;
+	elf_Value *arr = tab->array;
 	elf_Closure *cls = elf_get_cls(R,0);
 	elf_Bool sorted = 0;
 	do {
 		sorted = 1;
 		elf_Int i;
 		for (i=0;i<ARRAY_LENGTH(arr)-1;++i) {
-			elf_value *top = GET_TOP(R);
+			elf_Value *top = GET_TOP(R);
 			elf_add_closure(R,cls);
 			PUSHV(R,arr[i+0]);
 			PUSHV(R,arr[i+1]);
@@ -305,7 +304,7 @@ int table_lib_bubble_sort(elf_State *R) {
 			ASSERT(r == 1);
 			// if (elf_get_int(R,base))
 			{
-				elf_value tmp = arr[i+0];
+				elf_Value tmp = arr[i+0];
 				arr[i+0] = arr[i+1];
 				arr[i+1] = tmp;
 				sorted = 0;

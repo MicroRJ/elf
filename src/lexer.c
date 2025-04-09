@@ -144,12 +144,12 @@ elf_f64 lex_number(elf_Parser *file, int base) {
 }
 
 
-static tokenT get_tok(elf_Parser *file) {
+static elf_Token get_tok(elf_Parser *file) {
 	GLOBAL char buffer[0x100];
 
 
 	retry:
-	tokenT tk = {};
+	elf_Token tk = {};
 	tk.type=TK_NONE;
 	tk.line=file->pos;
 

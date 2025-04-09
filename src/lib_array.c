@@ -4,7 +4,7 @@
 */
 
 int lib_table_set_length(elf_State *R) {
-	elf_tabID tab = (elf_tabID) elf_get_this(R);
+	elf_TableId tab = (elf_TableId) elf_get_this(R);
 	elf_i32 length = elf_get_int(R,0);
 	ARRAY_SET_MIN(tab->array,length);
 	return 0;
@@ -12,15 +12,15 @@ int lib_table_set_length(elf_State *R) {
 
 
 int lib_table_get_length(elf_State *R) {
-	elf_tabID tab = (elf_tabID) elf_get_this(R);
+	elf_TableId tab = (elf_TableId) elf_get_this(R);
 	elf_add_int(R,ARRAY_LENGTH(tab->array));
 	return 1;
 }
 
 int elf_array_lib_get(elf_State *R) {
-	elf_tabID tab = (elf_tabID) elf_get_this(R);
+	elf_TableId tab = (elf_TableId) elf_get_this(R);
 	elf_i64 len = ARRAY_LENGTH(tab->array);
-	elf_value value = VNIL();
+	elf_Value value = VNIL();
 	if (len != 0) {
 		for (int i = 0; i < elf_get_num_args(R); ++ i) {
 			if (i != 0) {
@@ -49,7 +49,7 @@ int elf_array_lib_get(elf_State *R) {
 }
 
 int elf_lib_array_add(elf_State *R) {
-	elf_tabID tab=(elf_tabID)elf_get_this(R);
+	elf_TableId tab=(elf_TableId)elf_get_this(R);
 	int i;
 	for (i=0;i<elf_get_num_args(R);i++) {
 		elf_array_add(tab,elf_get_arg(R,i));
@@ -60,8 +60,8 @@ int elf_lib_array_add(elf_State *R) {
 int elf_lib_array_set(elf_State *R) {
 	elf_check_args(R,":array_set",2,"the value, and the index where to place the value");
 
-	elf_tabID tab = (elf_tabID) elf_get_this(R);
-	elf_value value = elf_get_arg(R,0);
+	elf_TableId tab = (elf_TableId) elf_get_this(R);
+	elf_Value value = elf_get_arg(R,0);
 
 	elf_i64 len=ARRAY_LENGTH(tab);
 	elf_i64 idx=elf_get_int(R,1);
@@ -73,10 +73,10 @@ int elf_lib_array_set(elf_State *R) {
 
 int elf_lib_array_swap(elf_State *R) {
 	elf_check_args(R,":array_swap",2,"the two indexes to swap");
-	elf_tabID tab = (elf_tabID) elf_get_this(R);
+	elf_TableId tab = (elf_TableId) elf_get_this(R);
 	elf_i64 x = elf_get_int(R,0);
 	elf_i64 y = elf_get_int(R,1);
-	elf_value temp = tab->array[x];
+	elf_Value temp = tab->array[x];
 	tab->array[x] = tab->array[y];
 	tab->array[y] = temp;
 	return 0;
@@ -86,9 +86,9 @@ int lib_array_merge(elf_State *R) {
 	elf_check_args(R,":array_merge",1
 	, "takes: the array to merge, all values of the arrays"
 	" are added into a new array");
-	elf_tabID tab = (elf_tabID) elf_get_this(R);
-	elf_tabID add = elf_get_table(R,0);
-	elf_tabID res = elf_new_table(R);
+	elf_TableId tab = (elf_TableId) elf_get_this(R);
+	elf_TableId add = elf_get_table(R,0);
+	elf_TableId res = elf_new_table(R);
 	elf_i64 i;
 	for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
 		ARRAY_ADD(res->array,tab->array[i]);
@@ -101,8 +101,8 @@ int lib_array_merge(elf_State *R) {
 
 int elf_array_lib_clone(elf_State *R) {
 	elf_check_args(R,":xclone",0,"");
-	elf_tabID tab = (elf_tabID ) elf_get_this(R);
-	elf_tabID clone = elf_alloc_table(R);
+	elf_TableId tab = (elf_TableId ) elf_get_this(R);
+	elf_TableId clone = elf_alloc_table(R);
 	elf_i64 i;
 	for ( i = 0; i < ARRAY_LENGTH(tab->array); i += 1 ) {
 		ARRAY_ADD(clone->array,tab->array[i]);
@@ -116,9 +116,9 @@ int elf_lib_array_reverse(elf_State *R) {
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int n = ARRAY_LENGTH(tab->array);
 	elf_Int i;
-	elf_value *array = tab->array;
+	elf_Value *array = tab->array;
 	for (i = 0; i < n >> 1; i += 1) {
-		elf_value value = array[i];
+		elf_Value value = array[i];
 		array[i] = array[n-1-i];
 		array[n-1-i] = value;
 	}

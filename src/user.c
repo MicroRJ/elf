@@ -54,7 +54,7 @@ int elf_get_num_rets(elf_State *S) {
 	return S->frame.nrets;
 }
 
-elf_value elf_get_arg(elf_State *S, int x) {
+elf_Value elf_get_arg(elf_State *S, int x) {
 	return S->frame.locals[x + 1];
 }
 
@@ -70,7 +70,7 @@ void elf_add_this(elf_State *S) {
 	PUSHV(S,S->frame.locals[0]);
 }
 
-void elf_add_any(elf_State *S, elf_value value) {
+void elf_add_any(elf_State *S, elf_Value value) {
 	PUSHV(S,value);
 }
 
@@ -100,7 +100,7 @@ void elf_add_int(elf_State *S, elf_Int x) {
 }
 
 
-void elf_push_number(elf_State *S, elf_Num x) {
+void elf_add_num(elf_State *S, elf_Num x) {
 	PUSHV(S,VNUM(x));
 }
 
@@ -116,7 +116,7 @@ void elf_add_sys(elf_State *S, elf_Handle x) {
 
 
 elf_String *elf_get_string(elf_State *R, int x) {
-	elf_value v=elf_get_arg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_str) return v.x_str;
 	_check_arg_tag(R,elf_tag_str,v.tag,x);
@@ -125,7 +125,7 @@ elf_String *elf_get_string(elf_State *R, int x) {
 
 
 char *elf_get_text(elf_State *R, int x) {
-	elf_value v = elf_get_arg(R,x);
+	elf_Value v = elf_get_arg(R,x);
 	if (v.tag == elf_tag_nil) return 0;
 	if (v.tag == elf_tag_str) return v.x_str->text;
 	_check_arg_tag(R,elf_tag_str,v.tag,x);
@@ -134,7 +134,7 @@ char *elf_get_text(elf_State *R, int x) {
 
 
 elf_Object *elf_get_object(elf_State *R, int x) {
-	elf_value v=elf_get_arg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (ISOBJT(v.tag)) return v.x_obj;
 	_check_arg_tag(R,elf_tag_userobj,v.tag,x);
@@ -143,7 +143,7 @@ elf_Object *elf_get_object(elf_State *R, int x) {
 
 
 elf_Table *elf_get_table(elf_State *R, int x) {
-	elf_value v=elf_get_arg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_tab) return v.x_tab;
 	_check_arg_tag(R,elf_tag_tab,v.tag,x);
@@ -152,14 +152,14 @@ elf_Table *elf_get_table(elf_State *R, int x) {
 
 
 elf_Closure *elf_get_cls(elf_State *S, int x) {
-	elf_value thing;
+	elf_Value thing;
 	thing=elf_get_arg(S,x);
 	return thing.tag!=elf_tag_closure?0:thing.x_closure;
 }
 
 
 elf_Handle elf_get_sysobj(elf_State *R, int x) {
-	elf_value v=elf_get_arg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_nil) return 0;
 	if (v.tag==elf_tag_sysobj) return v.x_sys;
 	_check_arg_tag(R,elf_tag_sysobj,v.tag,x);
@@ -168,7 +168,7 @@ elf_Handle elf_get_sysobj(elf_State *R, int x) {
 
 
 elf_Int elf_get_int(elf_State *R, int x) {
-	elf_value v=elf_get_arg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_num) return (elf_Int) v.x_num;
 	if (v.tag==elf_tag_int) return v.x_int;
 	_check_arg_tag(R,elf_tag_int,v.tag,x);
@@ -177,7 +177,7 @@ elf_Int elf_get_int(elf_State *R, int x) {
 
 
 elf_Num elf_get_num(elf_State *R, int x) {
-	elf_value v=elf_get_arg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_int) return (elf_Num) v.x_int;
 	if (v.tag==elf_tag_num) return v.x_num;
 	_check_arg_tag(R,elf_tag_num,v.tag,x);
@@ -185,119 +185,119 @@ elf_Num elf_get_num(elf_State *R, int x) {
 }
 
 
-/* Todo: a bunch of weird variants, to be removed */
-/* Todo: remove all this, the user can create their own utility
-functions for all this, this just adds unnecessary bloat */
-elAPI void elf_gset_bindings(elf_State *S, elf_CBinding *list, int num);
-elAPI void elf_gsetx_cfn(elf_State *S, char *name, elf_Function thing);
-elAPI void elf_gsetx_int(elf_State *S, char *name, elf_Int thing);
-elAPI void elf_gsetx_tab(elf_State *S, char *name, elf_Table *thing);
+// /* Todo: a bunch of weird variants, to be removed */
+// /* Todo: remove all this, the user can create their own utility
+// functions for all this, this just adds unnecessary bloat */
+// elAPI void elf_gset_bindings(elf_State *S, NameFunctionPair *list, int num);
+// elAPI void elf_gsetx_cfn(elf_State *S, char *name, elf_Function thing);
+// elAPI void elf_gsetx_int(elf_State *S, char *name, elf_Int thing);
+// elAPI void elf_gsetx_tab(elf_State *S, char *name, elf_Table *thing);
 
 
-void elf_gsetx_sys(elf_State *R, char *name, elf_Handle val) {
-	elf_set_global(R->M,elf_new_string(R,name),VSYS(val));
-}
+// void elf_gsetx_sys(elf_State *R, char *name, elf_Handle val) {
+// 	elf_set_global(R->M,elf_new_string(R,name),VSYS(val));
+// }
 
 
-void elf_gsetx_int(elf_State *R, char *name, elf_Int val) {
-	elf_set_global(R->M,elf_new_string(R,name),VALUE_INTEGER(val));
-}
+// void elf_gsetx_int(elf_State *R, char *name, elf_Int val) {
+// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_INTEGER(val));
+// }
 
 
-void elf_gsetx_tab(elf_State *R, char *name, elf_Table *val) {
-	elf_set_global(R->M,elf_new_string(R,name),VALUE_TABLE(val));
-}
+// void elf_gsetx_tab(elf_State *R, char *name, elf_Table *val) {
+// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_TABLE(val));
+// }
 
 
-void elf_gsetx_str(elf_State *R, char *name, char *val) {
-	elf_set_global(R->M,elf_new_string(R,name),VALUE_STRING(elf_new_string(R,val)));
-}
+// void elf_gsetx_str(elf_State *R, char *name, char *val) {
+// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_STRING(elf_new_string(R,val)));
+// }
 
 
-void elf_gsetx_cfn(elf_State *R, char *name, elf_Function fn) {
-	elf_set_global(R->M,elf_new_string(R,name),VALUE_FUNCTION(fn));
-}
+// void elf_gsetx_cfn(elf_State *R, char *name, elf_Function fn) {
+// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_FUNCTION(fn));
+// }
 
 
-void elf_gset_bindings(elf_State *R, elf_CBinding *list, int num) {
-	elf_tsetx_bindings(R,R->M->globals,list,num);
-}
+// // void elf_gset_bindings(elf_State *R, NameFunctionPair *list, int num) {
+// // 	elf_tsetx_bindings(R,R->M->globals,list,num);
+// // }
 
-elf_Int elf_tgetx_int(elf_Table *tab, char const *key, elf_Int or) {
-	elf_value val;
-	val=elf_tgetx_any(tab,key);
-	return val.tag!=elf_tag_nil?VN2I(val):or;
-}
-
-
-elf_Num elf_tgetx_num(elf_Table *tab, char const *key, elf_Num or) {
-	elf_value val;
-	val=elf_tgetx_any(tab,key);
-	return val.tag!=elf_tag_nil?VI2N(val):or;
-}
+// elf_Int elf_tgetx_int(elf_Table *tab, char const *key, elf_Int or) {
+// 	elf_Value val;
+// 	val=elf_tgetx_any(tab,key);
+// 	return val.tag!=elf_tag_nil?VN2I(val):or;
+// }
 
 
-elf_Table *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table *or) {
-	elf_value val;
-	val=elf_tgetx_any(tab,key);
-	return val.tag==elf_tag_tab?val.x_tab:or;
-}
+// elf_Num elf_tgetx_num(elf_Table *tab, char const *key, elf_Num or) {
+// 	elf_Value val;
+// 	val=elf_tgetx_any(tab,key);
+// 	return val.tag!=elf_tag_nil?VI2N(val):or;
+// }
 
 
-elf_Num elf_tgets_num(elf_Table *tab, elf_String *key) {
-	elf_value val;
-	val=elf_tgets_any(tab,key);
-	return VI2N(val);
-}
+// elf_Table *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table *or) {
+// 	elf_Value val;
+// 	val=elf_tgetx_any(tab,key);
+// 	return val.tag==elf_tag_tab?val.x_tab:or;
+// }
 
 
-elf_Int elf_tgets_int(elf_Table *tab, elf_String *key) {
-	elf_value val;
-	val=elf_tgets_any(tab,key);
-	return VN2I(val);
-}
+// elf_Num elf_tgets_num(elf_Table *tab, elf_String *key) {
+// 	elf_Value val;
+// 	val=elf_tgets_any(tab,key);
+// 	return VI2N(val);
+// }
 
 
-elf_Int elf_tgetsor_int(elf_Table *tab, elf_String *key, elf_Int or) {
-	elf_value val=elf_tgets_any(tab,key);
-	if (val.tag!=elf_tag_nil) {
-		return VN2I(val);
-	} else return or;
-}
+// elf_Int elf_tgets_int(elf_Table *tab, elf_String *key) {
+// 	elf_Value val;
+// 	val=elf_tgets_any(tab,key);
+// 	return VN2I(val);
+// }
 
 
-elf_String *elf_tgets_str(elf_Table *tab, elf_String *key) {
-	return elf_tgets_any(tab,key).x_str;
-}
+// elf_Int elf_tgetsor_int(elf_Table *tab, elf_String *key, elf_Int or) {
+// 	elf_Value val=elf_tgets_any(tab,key);
+// 	if (val.tag!=elf_tag_nil) {
+// 		return VN2I(val);
+// 	} else return or;
+// }
 
 
-elf_Table *elf_tgets_tab(elf_Table *tab, elf_String *key) {
-	return elf_tgets_any(tab,key).x_tab;
-}
+// elf_String *elf_tgets_str(elf_Table *tab, elf_String *key) {
+// 	return elf_tgets_any(tab,key).x_str;
+// }
 
 
-void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val) {
-	elf_table_set(tab,VALUE_STRING(key),VALUE_STRING(val));
-}
+// elf_Table *elf_tgets_tab(elf_Table *tab, elf_String *key) {
+// 	return elf_tgets_any(tab,key).x_tab;
+// }
 
 
-void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val) {
-	elf_table_set(tab,VALUE_STRING(key),VALUE_INTEGER(val));
-}
+// void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val) {
+// 	elf_table_set(tab,VALUE_STRING(key),VALUE_STRING(val));
+// }
 
 
-void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val) {
-	elf_table_set(tab,VALUE_STRING(key),VNUM(val));
-}
+// void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val) {
+// 	elf_table_set(tab,VALUE_STRING(key),VALUE_INTEGER(val));
+// }
 
 
-void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val) {
-	elf_table_set(tab,VALUE_STRING(key),VALUE_TABLE(val));
-}
+// void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val) {
+// 	elf_table_set(tab,VALUE_STRING(key),VNUM(val));
+// }
 
 
-void elf_tsetx_bindings(elf_State *R, elf_Table *tab, elf_CBinding *list, int num) {
-	FOR_RANGE(i,0,num) {
-		elf_table_set(tab,VALUE_STRING(elf_alloc_string(R,list[i].name)),VALUE_FUNCTION(list[i].fn));
-	}
-}
+// void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val) {
+// 	elf_table_set(tab,VALUE_STRING(key),VALUE_TABLE(val));
+// }
+
+
+// void elf_tsetx_bindings(elf_State *R, elf_Table *tab, NameFunctionPair *list, int num) {
+// 	FOR_RANGE(i,0,num) {
+// 		elf_table_set(tab,VALUE_STRING(elf_alloc_string(R,list[i].name)),VALUE_FUNCTION(list[i].fn));
+// 	}
+// }

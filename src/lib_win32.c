@@ -1,9 +1,6 @@
-/*
-** See Copyright Notice In elf.h
-** lib_win32.c
-** implementation of some of the core lib for windows
-*/
-
+//
+// See Copyright Notice In elf.h
+//
 #pragma comment(lib,"user32")
 #pragma comment(lib,"Ws2_32")
 #define WIN32_LEAN_AND_MEAN
@@ -122,12 +119,12 @@ static int core_lib_list_folder(elf_State *S) {
 
 	char *base = elf_get_text(S,0);
 
-	elf_String *folder_s = elf_new_string(S,"folder");
-	elf_String *file_s = elf_new_string(S,"file");
-	elf_String *name_s = elf_new_string(S,"name");
-	elf_String *path_s = elf_new_string(S,"path");
-	elf_String *type_s = elf_new_string(S,"type");
-	elf_String *size_s = elf_new_string(S,"size");
+	elf_Value folder_s = VALUE_STRING(elf_new_string(S,"folder"));
+	elf_Value file_s = VALUE_STRING(elf_new_string(S,"file"));
+	elf_Value name_s = VALUE_STRING(elf_new_string(S,"name"));
+	elf_Value path_s = VALUE_STRING(elf_new_string(S,"path"));
+	elf_Value type_s = VALUE_STRING(elf_new_string(S,"type"));
+	elf_Value size_s = VALUE_STRING(elf_new_string(S,"size"));
 
 	elf_Table *array = elf_new_table(S);
 	WIN32_FIND_DATAA info;
@@ -140,11 +137,11 @@ static int core_lib_list_folder(elf_State *S) {
 		int size = info.nFileSizeLow;
 
 		elf_Table *file = elf_new_table(S);
-		elf_tsets_str(file,name_s,elf_new_string(S,name));
-		elf_tsets_str(file,path_s,elf_new_string(S,elf_tpf("%s\\%s",base,name)));
-		elf_tsets_str(file,type_s,type?folder_s:file_s);
-		elf_tsets_int(file,size_s,size);
-		elf_array_add(array,VALUE_TABLE(file));
+		elf_table_set(file, name_s, VALUE_STRING(elf_new_string(S,name)));
+		elf_table_set(file, path_s, VALUE_STRING(elf_new_string(S,elf_tpf("%s\\%s",base,name))));
+		elf_table_set(file, type_s, type ? folder_s : file_s);
+		elf_table_set(file, size_s, VALUE_INTEGER(size));
+		elf_array_add(array, VALUE_TABLE(file));
 
 	} while (FindNextFileA(search,&info));
 

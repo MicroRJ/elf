@@ -15,13 +15,13 @@ elf_f64 elf_time_diff_s(elf_i64 time) {
 elf_f64 elf_time_diff_ms(elf_i64 time) {
 	return elf_time_diff_s(time) * 1000.0;
 }
-elf_value *elf_get_stack(elf_State *S){
+elf_Value *elf_get_stack(elf_State *S){
 	return S->stack;
 }
-elf_value *elf_get_stack_ptr(elf_State *S){
+elf_Value *elf_get_stack_ptr(elf_State *S){
 	return S->stack_ptr;
 }
-void _set_stack_ptr(elf_State *S, elf_value *stack_ptr){
+void _set_stack_ptr(elf_State *S, elf_Value *stack_ptr){
 	S->stack_ptr = stack_ptr;
 }
 
@@ -40,31 +40,18 @@ void elf_init(elf_State *R, elf_Module *M) {
 
 	// todo:
 	R->stack = sys_virtual_alloc(STACK_MAX);
-	R->stack_max = STACK_MAX / sizeof(elf_value);
+	R->stack_max = STACK_MAX / sizeof(elf_Value);
 	R->stack_ptr = R->stack;
 
 	R->frame.locals = R->stack;
 
-	R->metatables.string = elf_new_string_lib(R);
-	R->metatables.table = new_table_lib(R);
+	R->metatables.string = elf_new_string_metatable(R);
+	R->metatables.table = elf_new_table_metatable(R);
 	M->globals = elf_new_table(R);
 	M->strings = elf_new_table(R);
 	R->trace_table = elf_new_table(R);
 
-	elf_gsetx_int(R,"elf.VERSION",0);
-	#if defined(PLATFORM_WEB)
-	elf_gsetx_str(R,"elf.PLATFORM","WEB");
-	elf_gsetx_str(R,"elf.OS","UNKNOWN");
-	#else
-	elf_gsetx_str(R,"elf.PLATFORM","DESKTOP");
-		#if defined(_WIN32)
-	elf_gsetx_str(R,"elf.OS","WINDOWS");
-		#else
-	elf_gsetx_str(R,"elf.OS","UNKNOWN");
-		#endif
-	#endif
-
-	static elf_CBinding lib_base[] = {
+	static NameFunctionPair lib_base[] = {
 		{"ntoi", core_lib_ntoi},
 		{"iton", core_lib_iton},
 	};
@@ -74,7 +61,7 @@ void elf_init(elf_State *R, elf_Module *M) {
 	elf_add_lib(R,"elf",lib_core,_countof(lib_core));
 }
 
-static void _debug_stack_push(elf_State *S, elf_value v) {
+static void _debug_stack_push(elf_State *S, elf_Value v) {
 	ASSERT(S->stack_ptr - S->stack < S->stack_max);
 	* GET_TOP(S) ++ = v;
 }
@@ -108,8 +95,8 @@ static inline void _pop_stack_frame(elf_State *S){
 
 static int elf_call(elf_State *S, int numargs, int maxrets) {
 	int numrets = -1;
-	elf_value *base_ptr = S->stack_ptr - numargs;
-	elf_value value = base_ptr[-1];
+	elf_Value *base_ptr = S->stack_ptr - numargs;
+	elf_Value value = base_ptr[-1];
 
 	if(value.tag==elf_tag_closure){
 		elf_Closure *closure = value.x_closure;
@@ -129,7 +116,7 @@ static int elf_call(elf_State *S, int numargs, int maxrets) {
 
 		int toclear = framesize - numargs;
 		ASSERT(toclear >= 0);
-		clear_memory(base_ptr + numargs, toclear * sizeof(elf_value));
+		clear_memory(base_ptr + numargs, toclear * sizeof(elf_Value));
 		S->stack_ptr = base_ptr + framesize;
 
 		numrets = _resume(S);
@@ -144,16 +131,16 @@ static int elf_call(elf_State *S, int numargs, int maxrets) {
 		_push_stack_frame(S,frame);
 		S->stack_ptr = base_ptr + numargs;
 
-		elf_value *retsptr = S->stack_ptr;
+		elf_Value *retsptr = S->stack_ptr;
 		numrets = value.x_proc(S);
 		if(numrets>=0){
-			elf_value *stackptr = S->stack_ptr;
+			elf_Value *stackptr = S->stack_ptr;
 			if ((stackptr - retsptr) < numrets) {
 				elf_error(S,NO_BYTE,elf_tpf("number of values on stack '%i', is incoherent with specified number of return values '%i'",(int)(stackptr - retsptr),numrets));
 			}
 			retsptr = stackptr - numrets;
-			clear_memory(base_ptr - 1, maxrets * sizeof(elf_value));
-			copy_memory(base_ptr - 1, retsptr, MIN(numrets,maxrets) * sizeof(elf_value));
+			clear_memory(base_ptr - 1, maxrets * sizeof(elf_Value));
+			copy_memory(base_ptr - 1, retsptr, MIN(numrets,maxrets) * sizeof(elf_Value));
 		}else{
 			// elf_error(S,NO_BYTE,elf_tpf("error when calling function, return value: %i",numrets));
 		}
@@ -165,23 +152,23 @@ static int elf_call(elf_State *S, int numargs, int maxrets) {
 }
 
 // todo: make this legit!
-static inline void _check_zero_div(elf_State *S, elf_value *xx, elf_value *yy) {
+static inline void _check_zero_div(elf_State *S, elf_Value *xx, elf_Value *yy) {
 	if ((yy->tag == elf_tag_num) && (yy->x_num == 0)) elf_error(S,NO_BYTE,"division by zero"); else
 	if ((yy->tag == elf_tag_int) && (yy->x_int == 0)) elf_error(S,NO_BYTE,"integer division by zero");
 }
 
 // todo: the overload should just be a string id, the heck...
-static int _callov(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_value *args) {
+static int _callov(elf_State *S, elf_Object *obj, char const *name, int reg, int nargs, elf_Value *args) {
 	if (obj->meta == 0) {
 		elf_error(S,NO_BYTE,"object does not have a metatable, cannot use overload");
 	}
 	int num_rets = 0;
-	elf_value value = elf_tgetx_any(obj->meta,name);
+	elf_Value value = elf_tgetx_any(obj->meta,name);
 	if((value.tag)==elf_tag_closure||(value.tag)==elf_tag_proc) {
-		elf_value *top = GET_TOP(S);
+		elf_Value *top = GET_TOP(S);
 		PUSHV(S,value);
 		PUSHV(S,VOBJ(obj));
-		copy_memory(GET_TOP(S),args,sizeof(elf_value)*nargs);
+		copy_memory(GET_TOP(S),args,sizeof(elf_Value)*nargs);
 		GET_TOP(S) += nargs;
 		num_rets = elf_call(S,nargs+1,1);
 		S->frame.locals[reg] = *top;
@@ -207,14 +194,14 @@ int _resume(elf_State *R) {
 	elf_Table *globals = M->globals;
 
 	elf_Stack_Frame F = R->frame;
-	elf_value *locals = F.locals;
+	elf_Value *locals = F.locals;
 	elf_Closure *closure = F.closure;
 	elf_Proto proto = closure->proto;
-	elf_value *values = closure->values;
+	elf_Value *values = closure->values;
 
 	int next_instr = 0;
 	while (next_instr < proto.numbytes) {
-		elf_value xx,yy,zz;
+		elf_Value xx,yy,zz;
 		int instr = next_instr ++;
 		int module_instr = proto.bytes + instr;
 		elf_bytecode byte = M->bytes[module_instr];
@@ -234,7 +221,7 @@ int _resume(elf_State *R) {
 		#if 0
 		if(!R->disable_tracing){
 			if(R->flags & FLAG_TRACING){
-				elf_value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(module_instr));
+				elf_Value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(module_instr));
 				if(trace_value.tag!=elf_tag_nil){
 					if(module_instr!=R->trace_start_instr){
 						ASSERT(BC_OP(byte) != BC_J && BC_OP(byte) != BC_JZ && BC_OP(byte) != BC_JNZ);
@@ -268,7 +255,7 @@ int _resume(elf_State *R) {
 					}
 				}else{
 					ASSERT(R->trace_inner_loop_counter == 0);
-					elf_value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(trace_start_instr));
+					elf_Value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(trace_start_instr));
 					if(trace_value.tag==elf_tag_nil){
 						if(R->M->track[module_instr]>=64){
 							R->flags |= FLAG_TRACING;
@@ -365,7 +352,7 @@ int _resume(elf_State *R) {
 				ASSERT(WITHIN(BC_ARGY(byte),0,ARRAY_LENGTH(M->protos)));
 				elf_Proto proto = M->protos[BC_ARGY(byte)];
 				elf_Closure *new_closure = elf_alloc_closure(R,proto);
-				copy_memory(new_closure->values,locals+BC_ARGX(byte),proto.numvalues*sizeof(elf_value));
+				copy_memory(new_closure->values,locals+BC_ARGX(byte),proto.numvalues*sizeof(elf_Value));
 				locals[BC_ARGX(byte)].tag   = elf_tag_closure;
 				locals[BC_ARGX(byte)].x_closure = new_closure;
 			} break;
@@ -378,7 +365,7 @@ int _resume(elf_State *R) {
 				elf_type_check(R,module_instr,BC_ARGX(byte),BC_ARGY(byte),locals[BC_ARGX(byte)].tag);
 			} break;
 			case BC_GETMETAFIELD: {
-				elf_value yy = locals[BC_ARGY(byte)];
+				elf_Value yy = locals[BC_ARGY(byte)];
 				elf_Table *metatable = {0};
 				switch (yy.tag) {
 					case elf_tag_str:
@@ -445,7 +432,7 @@ int _resume(elf_State *R) {
 					if(yy.tag==elf_tag_nil) elf_error(R,module_instr,elf_tpf("key is nil..."));
 					elf_table_set(xx.x_tab,yy,zz);
 				}else if(xx.tag==elf_tag_userobj){
-					elf_value args[] = { yy, zz };
+					elf_Value args[] = { yy, zz };
 					_callov(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
 				}else{
 					elf_error(R,module_instr,elf_tpf("attempted to set field of '%s' value",tag2s[xx.tag]));
@@ -486,7 +473,7 @@ int _resume(elf_State *R) {
 			case BC_LOOP: {
 			} break;
 			case BC_ISNIL: {
-				elf_value xx;
+				elf_Value xx;
 				bool nan;
 
 				xx = locals[BC_ARGY(byte)];

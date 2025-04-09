@@ -34,6 +34,7 @@ _(load_file)\
 _(load_json)\
 _(load_expr)\
 _(pf)\
+_(fpf)\
 _(ntoi)\
 _(iton)\
 _(load_dll)\
@@ -55,7 +56,7 @@ LIBDEF(LIBNAME)
 #undef LIBNAME
 
 // todo: sort these in order of relevance
-static elf_CBinding lib_core[] = {
+static NameFunctionPair lib_core[] = {
 #define LIBNAME(NAME) {#NAME,core_lib_##NAME},
 	LIBDEF(LIBNAME)
 #undef LIBNAME

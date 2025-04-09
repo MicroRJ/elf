@@ -13,21 +13,21 @@ int elf_get_global_slot(elf_Module *M, elf_String *name) {
 	return ARRAY_GROW(M->globals->array,1);
 }
 
-int elf_set_global(elf_Module *M, elf_String *name, elf_value value) {
+int elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
 	int id = elf_get_global_slot(M,name);
 	M->globals->array[id] = value;
 	return id;
 }
 
 // todo: remove, this is not core functionality
-void elf_add_lib(elf_State *S, char *prefix, elf_CBinding *bindings, int num) {
+void elf_add_lib(elf_State *S, char *prefix, NameFunctionPair *bindings, int num) {
 	// todo: ensure the symbol name is valid
 	for(int i = 0; i < num; i ++) {
 		char *temp = bindings[i].name;
 		if(prefix) temp = elf_tpf("%s.%s",prefix,temp);
 
 		elf_String *name = elf_alloc_string(S,temp);
-		elf_debug_log("	lib: %s",name->text);
+		// elf_debug_log("	lib: %s",name->text);
 		elf_table_set(S->M->globals, VALUE_STRING(name), VALUE_FUNCTION(bindings[i].fn));
 	}
 }
@@ -207,7 +207,7 @@ int elf_type_check(elf_State *R, Instr id, elf_StackId loc, elf_tag_enum x, elf_
 }
 
 
-static int fpf_value(FILE *file, elf_value v, elf_Bool flags) {
+static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 	switch (v.tag) {
 		case elf_tag_nil: return fprintf(file,"nil");
 		case elf_tag_sysobj: return fprintf(file,"h%llX",v.x_int);
@@ -289,7 +289,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecod
 		fprintf(io," #%f",M->numbers[BC_ARGY(b)]);
 	} else
 	if (BC_OP(b) == BC_GETGLOBAL) {
-		elf_value val = M->globals->array[BC_ARGY(b)];
+		elf_Value val = M->globals->array[BC_ARGY(b)];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */

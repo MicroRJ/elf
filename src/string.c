@@ -19,8 +19,8 @@ static int string_lib_find(elf_State *S);
 static int string_lib_split(elf_State *S);
 
 
-elf_Table *elf_new_string_lib(elf_State *R) {
-	elf_CBinding lib[] = {
+elf_Table *elf_new_string_metatable(elf_State *S) {
+	NameFunctionPair lib[] = {
 		{"length",string_lib_length},
 		{"match",string_lib_match},
 		{"uppercase",string_lib_uppercase},
@@ -35,12 +35,11 @@ elf_Table *elf_new_string_lib(elf_State *R) {
 		{"idx",string_lib_get_index},
 		{"find",string_lib_find},
 	};
-
-
-	elf_Table *tab;
-
-	tab=elf_new_table(R);
-	elf_tsetx_bindings(R,tab,lib,COUNTOF(lib));
+	elf_Table *tab = elf_new_table(S);
+	for (int i = 0; i < COUNTOF(lib); i ++) {
+		elf_String *name = elf_new_string(S, lib[i].name);
+		elf_table_set(tab, VALUE_STRING(name), VALUE_FUNCTION(lib[i].fn));
+	}
 	return tab;
 }
 
@@ -106,7 +105,7 @@ int string_lib_append(elf_State *R) {
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elf_get_num_args(R); ++ i) {
-		elf_value v = elf_get_arg(R,i);
+		elf_Value v = elf_get_arg(R,i);
 		if (v.tag == elf_tag_str) {
 			strcatf(buffer,"%s",v.x_str->text);
 		} else if (v.tag == elf_tag_nil) {

@@ -21,7 +21,7 @@ void *elf_alloc_object(elf_State *R, elf_obj_enum type, elf_i64 size) {
 }
 
 elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto) {
-	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_value) * (proto.stacksize-1));
+	elf_Closure *cls = (elf_Closure *) elf_alloc_object(S,GC_CLS,sizeof(elf_Closure) + sizeof(elf_Value) * (proto.stacksize-1));
 	cls->proto = proto;
 	return cls;
 }
@@ -97,7 +97,7 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 		ASSERT(slot != -1);
 		elf_table_entry entry=registry->slots[slot];
 		if (entry.key.tag != elf_tag_nil) {
-			elf_value target=registry->array[registry->slots[slot].idx];
+			elf_Value target=registry->array[registry->slots[slot].idx];
 			string=target.x_str;
 		} else {
 			string = elf_alloc_string2(R,length);
@@ -137,7 +137,7 @@ static elf_i64 _mark(elf_Object *obj) {
 			}
 		} else if (obj->type == GC_TAB) {
 			elf_Table *table = (elf_Table *) obj;
-			elf_value *array = table->array;
+			elf_Value *array = table->array;
 			elf_table_entry *slots = table->slots;
 			FOR_RANGE(i,0,table->ntotal) {
 				if (ISOBJT(slots[i].key.tag)) {
@@ -160,7 +160,7 @@ static elf_i64 _gc_mark(elf_State *R) {
 	elf_i64 time = elf_get_clock_time();
 
 	elf_i64 num_objs = 0;
-	elf_value *ptr;
+	elf_Value *ptr;
 	// todo: cache line!
 	for (ptr = R->stack; ptr < GET_TOP(R); ++ ptr) {
 		if (ISOBJT(ptr->tag)) {

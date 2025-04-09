@@ -13,9 +13,9 @@ typedef struct {
 		elf_f64  number;
 		char 	    *text;
 	};
-} tokenT;
+} elf_Token;
 
-typedef tokenT elf_Token;
+typedef elf_Token elf_Token;
 
 //todo:remove "LEAVE"
 //todo:remove "iff"
@@ -233,7 +233,7 @@ struct elf_Parser {
 	char               *line_pos;
 	char                    *pos;
 	int                 line_num;
-	tokenT tok,tok_prev,tok_prox;
+	elf_Token tok,tok_prev,tok_prox;
 	char              *expr_line;
 	char             *tree_arena;
 	int               tree_index;

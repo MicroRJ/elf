@@ -1,6 +1,5 @@
 //
 // See Copyright Notice In elf.h
-// lib_meta.c
 //
 
 static int core_lib_get_global(elf_State *R) {
@@ -12,12 +11,16 @@ static int core_lib_get_global(elf_State *R) {
 
 static int core_lib_const_expr(elf_State *R) {
 	elf_String *contents = elf_get_string(R,0);
-	int ret=0;
-	if(contents){
+
+	int ret = 0;
+
+	if (contents) {
+
 		elf_Parser parser = {};
-		elf_prep_parser(&parser,R,"no name",contents->text);
+		elf_init_parser(R, &parser, "no name", contents->text);
+
 		// the result is on the stack already
-		ret=parse_const(&parser);
+		ret = parse_const(&parser);
 	}
 	return ret < 0 ? 0 : ret;
 }
@@ -62,7 +65,6 @@ int core_lib_load_file(elf_State *R) {
 	return res;
 }
 
-
 int core_lib_load_expr(elf_State *R) {
 	elf_String *name, *contents;
 	int pos=-1,size=-1;
@@ -106,3 +108,14 @@ int core_lib_get_object_address(elf_State *R) {
 	elf_add_int(R,(elf_Int) (void *) elf_get_object(R,0));
 	return 1;
 }
+
+#if 0
+int core_lib_parse_expr(elf_State *R) {
+	elf_String *contents = elf_get_string(R, 0);
+	elf_Parser parser = {};
+	elf_init_parser(&parser, R, "no name", contents->text);
+	treeID v = parse_expr(&parser, 0);
+
+	return 1;
+}
+#endif

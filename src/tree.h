@@ -100,11 +100,15 @@ struct treeT {
 		elf_i64 expr_int;
 		elf_f64 expr_num;
 		struct {
+			// this only matter when generating the code
 			treeID    body;
+			// these are the only two things the compiler
+			// cares about when generating code
 			treeID   *capts;
-			// seems we need this...
 			int       proto;
-			// todo: these are not used beyond parsing
+			// todo: remove this from here
+			// these are not used beyond
+			// parsing
 			int       scope;
 			treeID      enc;
 		} expr_fun;

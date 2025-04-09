@@ -219,7 +219,7 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 				continue;
 			}
 			elf_Bool isdir = (entry->d_type & DT_DIR) != 0;
-			elf_value *top = GET_TOP(R);
+			elf_Value *top = GET_TOP(R);
 
 			elf_String *name = elf_new_string(R,entry->d_name);
 			elf_String *path = elf_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));

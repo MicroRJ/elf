@@ -80,63 +80,39 @@ int to_any_mem(elf_Parser *parser, treeID id) {
 	return mem;
 }
 
-static void gen_tree(elf_Parser *parser, treeID id);
+static void elf_compile_tree(elf_Parser *parser, treeID id);
 
-static elf_Proto gen_proto(elf_Parser *parser, treeID tree){
+static elf_Proto elf_compile_function(elf_Parser *parser, treeID tree) {
 	elf_State *R = parser->R;
-	elf_Module *M = parser->R->M;
-	ASSERT(get_tree_kind(parser,tree)==TREE_FUNCTION);
-	ASSERT(parser->memory_state_index==0);
-	ASSERT(parser->memory_state==0);
-	ASSERT(parser->memory_usage==0);
-	int start=M->nbytes;
-	gen_tree(parser,tree->expr_fun.body);
+	elf_Module *M = R->M;
+
+	ASSERT(get_tree_kind(parser,tree) == TREE_FUNCTION);
+	ASSERT(parser->memory_state_index == 0);
+	ASSERT(parser->memory_state == 0);
+	ASSERT(parser->memory_usage == 0);
+
+	int start = M->nbytes;
+	elf_compile_tree(parser, tree->expr_fun.body);
+
 	elf_Proto proto = {};
-	proto.arity=1;
-	proto.bytes=start;
-	proto.numvalues=ARRAY_LENGTH(tree->expr_fun.capts);
-	proto.stacksize=parser->memory_usage;
-	proto.numbytes=M->nbytes-start;
+	proto.arity = 1;
+	proto.bytes = start;
+	proto.numvalues = ARRAY_LENGTH(tree->expr_fun.capts);
+	proto.stacksize = parser->memory_usage;
+	proto.numbytes = M->nbytes - start;
+
 	// todo: come back to this
 	// ASSERT(BC_OP(M->bytes[M->nbytes-1]) == BC_RET);
 
-	ASSERT(parser->memory_state==0);
-	ASSERT(parser->memory_state_index==0);
-	parser->memory_usage=0;
+	ASSERT(parser->memory_state == 0);
+	ASSERT(parser->memory_state_index == 0);
+	parser->memory_usage = 0;
 	return proto;
 }
 
-// just have one big, compile function
-static elf_File gen_file(elf_Parser *parser, treeID tree){
-	int index;
-	elf_Proto *protos;
-	index=ARRAY_GROW(parser->R->M->protos,ARRAY_LENGTH(parser->functions));
-	protos=& parser->R->M->protos[index];
-
-	int start=parser->R->M->nbytes;
-	FOR_ARRAY(i,parser->functions){
-		parser->functions[i]->expr_fun.proto=index++;
-	}
-	FOR_ARRAY(i,parser->functions){
-		protos[i]=gen_proto(parser,parser->functions[i]);
-		// elf_debug_log("PROTO: [%i, %i) (%i)"
-		// , 	protos[i].bytes
-		// , 	protos[i].bytes+protos[i].nbytes
-		// ,	protos[i].nbytes);
-	}
-	int end=parser->R->M->nbytes;
-	elf_File file = {};
-	file.pos=start;
-	file.end=end;
-	file.proto=protos[0];
-	// ASSERT(protos[0].bytes==start);
-	// protos[0].nbytes=end-start;
-	return file;
-}
-
-static void gen_tree(elf_Parser *parser, treeID id) {
+static void elf_compile_tree(elf_Parser *parser, treeID id) {
 	treeT tree = get_tree(parser,id);
-	switch ( tree.kind ) {
+	switch (tree.kind) {
 		case TREE_SETMEM: {
 			if (get_mem(parser,tree.x) != -1) {
 				parser_dialog(parser,tree.line,"target tree has already been assigned memory");
@@ -182,11 +158,11 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 			continue_target=entry;
 			emit_jump_if_false(parser,&js,pred);
 
-			if(prev)gen_tree(parser,prev);
-			gen_tree(parser,body);
+			if(prev)elf_compile_tree(parser,prev);
+			elf_compile_tree(parser,body);
 			if(post){
 				continue_target=parser->R->M->nbytes;
-				gen_tree(parser,post);
+				elf_compile_tree(parser,post);
 			}
 			emit_jump(parser,NO_LINE,entry);
 
@@ -244,7 +220,7 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 		case STAT_BLOCK: {
 			push_mem_state(parser);
 			FOR_ARRAY(i,tree.z) {
-				gen_tree(parser,tree.z[i]);
+				elf_compile_tree(parser,tree.z[i]);
 			}
 			pop_mem_state(parser);
 		} break;
@@ -264,10 +240,10 @@ static void gen_tree(elf_Parser *parser, treeID id) {
 			// the condition...
 			BranchJumps s={};
 			begin_if(parser,tree.line,&s,pred,0);
-			gen_tree(parser,true_clause);
+			elf_compile_tree(parser,true_clause);
 			if(else_clause){
 				add_else_clause(parser,tree.line,&s);
-				gen_tree(parser,else_clause);
+				elf_compile_tree(parser,else_clause);
 			}
 			close_if(parser,tree.line,&s);
 		} break;
@@ -524,7 +500,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	treeID prox;
 	for(prox=tree.prox;prox;prox=prox->prox){
 		push_mem_state(parser);
-		gen_tree(parser,prox);
+		elf_compile_tree(parser,prox);
 		pop_mem_state(parser);
 	}
 	esc:
