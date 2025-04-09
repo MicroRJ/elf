@@ -245,6 +245,7 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 #include "src/system.c"
 #include "src/lib_table.c"
 #include "src/lib_array.c"
+#include "src/lib_random.c"
 #include "src/objects.c"
 #include "src/core.c"
 

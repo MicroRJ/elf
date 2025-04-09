@@ -1,7 +1,6 @@
-/*
-** See Copyright Notice In elf.h
-** core.c
-*/
+//
+// See Copyright Notice In elf.h
+//
 
 static int elf_call(elf_State *S, int nargs, int nrets);
 static int _resume(elf_State *S);
@@ -59,6 +58,7 @@ void elf_init(elf_State *R, elf_Module *M) {
 	elf_add_lib(R,"elf",_lib_time,_countof(_lib_time));
 	elf_add_lib(R,0,lib_math,_countof(lib_math));
 	elf_add_lib(R,"elf",lib_core,_countof(lib_core));
+	elf_add_lib(R,"elf",lib_random,_countof(lib_random));
 }
 
 static void _debug_stack_push(elf_State *S, elf_Value v) {
