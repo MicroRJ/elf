@@ -1,6 +1,5 @@
 /*
 ** See Copyright Notice In elf.h
-** obj.c
 */
 
 
