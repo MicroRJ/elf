@@ -1,7 +1,6 @@
-/*
-** See Copyright Notice In elf.h
-** lexer.c
-*/
+//
+// See Copyright Notice In elf.h
+//
 
 
 #define POS0()   (file->pos[0])
@@ -212,8 +211,11 @@ static elf_Token get_tok(elf_Parser *file) {
 		} break;
 		case '\'': {
 			MOVE();
+			// todo!!: come back to this!
 			tk.type = TK_LETTER;
-			do { tk.integer = MOVE();
+			do {
+				tk.integer = pick_esc_char(file);
+				// MOVE();
 			} while(0);
 			if (!PICK('\'')) {
 				parser_dialog(file,tk.line,"invalid character constant, expected \"'\"");
