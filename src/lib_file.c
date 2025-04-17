@@ -1,13 +1,7 @@
 //
 // See Copyright Notice In elf.h
-// lib_file.c
 //
 
-//
-// todo: just have the same function to reading/writting
-//
-// -- files
-//
 static elf_String *elf_read_file_string(elf_State *R, char *name, FILE *io, int size, int pos) {
 	elf_String *contents=0;
 

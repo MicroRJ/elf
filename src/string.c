@@ -88,14 +88,19 @@ int string_lib_pop(elf_State *R) {
 }
 
 
-int string_lib_append_char(elf_State *R) {
-	elf_String *yo = (elf_String*) elf_get_this(R);
-	elf_String *el = elf_alloc_string2(R,yo->length + elf_get_num_args(R));
-	copy_memory(el->text,yo->text,yo->length);
-	for ( int i = 0; i < elf_get_num_args(R); i += 1 ) {
-		el->text[yo->length + i] = elf_get_int(R,i);
+ELF_FUNCTION(string_lib_append_char) {
+	int nargs = elf_get_num_args(S);
+	elf_String *me = (elf_String *) elf_get_this(S);
+
+	elf_String *new_string = elf_alloc_string2(S, me->length + nargs);
+	copy_memory(new_string->text, me->text, me->length);
+
+	for (int i = 0; i < nargs; i += 1) {
+		new_string->text[me->length + i] = elf_get_int(S,i);
 	}
-	elf_push_string(R,el);
+
+	new_string->hash = hash_text(new_string->text);
+	elf_push_string(S, new_string);
 	return 1;
 }
 

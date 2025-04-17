@@ -405,6 +405,8 @@ elAPI void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lin
 
 
 
+#define ELF_FUNCTION(NAME) int NAME(elf_State *S)
+
 #endif
 /*
 ** Copyright (C) 2023-2024 Dayan Rodriguez

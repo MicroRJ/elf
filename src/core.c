@@ -5,27 +5,35 @@
 static int elf_call(elf_State *S, int nargs, int nrets);
 static int _resume(elf_State *S);
 
+
 elf_i64 elf_get_clock_time() {
 	return sys_get_clock_time();
 }
+
 elf_f64 elf_time_diff_s(elf_i64 time) {
 	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
 }
+
 elf_f64 elf_time_diff_ms(elf_i64 time) {
 	return elf_time_diff_s(time) * 1000.0;
 }
-elf_Value *elf_get_stack(elf_State *S){
+
+elf_Value *elf_get_stack(elf_State *S) {
 	return S->stack;
 }
-elf_Value *elf_get_stack_ptr(elf_State *S){
+
+elf_Value *elf_get_stack_ptr(elf_State *S) {
 	return S->stack_ptr;
 }
-void _set_stack_ptr(elf_State *S, elf_Value *stack_ptr){
+
+static void _set_stack_ptr(elf_State *S, elf_Value *stack_ptr) {
 	S->stack_ptr = stack_ptr;
 }
 
 void elf_init(elf_State *R, elf_Module *M) {
+
 	R->M = M;
+
 	// todo: proper allocations
 	R->G.open_object_slots = sys_virtual_alloc(GIGABYTES(1));
 	R->G.close_object_slots = sys_virtual_alloc(GIGABYTES(1));
@@ -44,11 +52,13 @@ void elf_init(elf_State *R, elf_Module *M) {
 
 	R->frame.locals = R->stack;
 
+	// todo: metatables should be per module, technically...
 	R->metatables.string = elf_new_string_metatable(R);
 	R->metatables.table = elf_new_table_metatable(R);
+	R->trace_table = elf_new_table(R);
+
 	M->globals = elf_new_table(R);
 	M->strings = elf_new_table(R);
-	R->trace_table = elf_new_table(R);
 
 	static NameFunctionPair lib_base[] = {
 		{"ntoi", core_lib_ntoi},
