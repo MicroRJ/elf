@@ -58,12 +58,12 @@ int elf_lib_array_add(elf_State *R) {
 }
 
 int elf_lib_array_set(elf_State *R) {
-	elf_check_args(R,":array_set",2,"the value, and the index where to place the value");
+	elf_check_num_args(R,":array_set",2,"the value, and the index where to place the value");
 
 	elf_TableId tab = (elf_TableId) elf_get_this(R);
 	elf_Value value = elf_get_arg(R,0);
 
-	elf_i64 len=ARRAY_LENGTH(tab);
+	elf_i64 len=ARRAY_LENGTH(tab->array);
 	elf_i64 idx=elf_get_int(R,1);
 	if ((idx%=len)<0)idx+=len;
 	tab->array[idx] = value;
@@ -72,7 +72,7 @@ int elf_lib_array_set(elf_State *R) {
 
 
 int elf_lib_array_swap(elf_State *R) {
-	elf_check_args(R,":array_swap",2,"the two indexes to swap");
+	elf_check_num_args(R,":array_swap",2,"the two indexes to swap");
 	elf_TableId tab = (elf_TableId) elf_get_this(R);
 	elf_i64 x = elf_get_int(R,0);
 	elf_i64 y = elf_get_int(R,1);
@@ -83,7 +83,7 @@ int elf_lib_array_swap(elf_State *R) {
 }
 
 int lib_array_merge(elf_State *R) {
-	elf_check_args(R,":array_merge",1
+	elf_check_num_args(R,":array_merge",1
 	, "takes: the array to merge, all values of the arrays"
 	" are added into a new array");
 	elf_TableId tab = (elf_TableId) elf_get_this(R);
@@ -100,7 +100,7 @@ int lib_array_merge(elf_State *R) {
 }
 
 int elf_array_lib_clone(elf_State *R) {
-	elf_check_args(R,":xclone",0,"");
+	elf_check_num_args(R,":xclone",0,"");
 	elf_TableId tab = (elf_TableId ) elf_get_this(R);
 	elf_TableId clone = elf_alloc_table(R);
 	elf_i64 i;
@@ -112,7 +112,7 @@ int elf_array_lib_clone(elf_State *R) {
 }
 
 int elf_lib_array_reverse(elf_State *R) {
-	elf_check_args(R,":reverse",0,"");
+	elf_check_num_args(R,":reverse",0,"");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Int n = ARRAY_LENGTH(tab->array);
 	elf_Int i;

@@ -1,8 +1,3 @@
-/*
-** See Copyright Notice In elf.h
-** elf-em.c
-*/
-
 // run_script
 // run_script_int
 // run_script_string

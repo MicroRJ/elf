@@ -202,7 +202,7 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 
 
 #define VNIL() (XLITERAL(elf_Value){elf_tag_nil})
-#define VNUM(thing) (XLITERAL(elf_Value){ elf_tag_num, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
+#define VALUE_NUMBER(thing) (XLITERAL(elf_Value){ elf_tag_num, ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
 #define VALUE_INTEGER(thing) (XLITERAL(elf_Value){ elf_tag_int, {(elf_Int) UCAST(thing, elf_Int)} })
 #define VALUE_TABLE(thing) (XLITERAL(elf_Value){ elf_tag_tab, {(elf_Int) UCAST(thing, elf_Table *)} })
 #define VOBJ(thing) (XLITERAL(elf_Value){ OBJ2V(thing->type), {(elf_Int) UCAST(thing, elf_Object *)} })
@@ -243,6 +243,7 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 #include "src/lib_win32.c"
 #endif
 #include "src/system.c"
+#include "src/lib_vec.c"
 #include "src/lib_table.c"
 #include "src/lib_array.c"
 #include "src/lib_random.c"

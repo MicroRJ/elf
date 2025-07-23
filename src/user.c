@@ -1,24 +1,24 @@
-/*
-** See Copyright Notice In elf.h
-** user.c
-*/
+//
+// See Copyright Notice In elf.h
+//
+// todo: this could all be
+// in core.c
 
-
-void elf_check_args(elf_State *R, char *fnname, int n, char *usage) {
-	if (elf_get_num_args(R) != n) {
-		elf_error(R,R->byte,elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s",fnname,n,elf_get_num_args(R),usage));
+void elf_check_num_args(elf_State *S, char *name, int nargs, char *usage) {
+	if (elf_get_num_args(S) != nargs) {
+		elf_error(S, S->byte, elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s", name, nargs, elf_get_num_args(S), usage));
 	}
 }
 
-elf_Object *elf_new_object(elf_State *R, elf_i32 size) {
-	elf_Object *obj = elf_alloc_object(R,GC_OBJ,size);
-	elf_add_object(R,obj);
+elf_Object *elf_new_object(elf_State *S, elf_i32 size) {
+	elf_Object *obj = elf_alloc_object(S, GC_OBJ, size);
+	elf_add_object(S, obj);
 	return obj;
 }
 
-elf_String *elf_new_string(elf_State *R, const char *text) {
-	elf_String *string=elf_alloc_string(R,text);
-	elf_push_string(R,string);
+elf_String *elf_new_string(elf_State *S, const char *text) {
+	elf_String *string = elf_alloc_string(S, text);
+	elf_push_string(S, string);
 	return string;
 }
 
@@ -29,9 +29,9 @@ elf_String *elf_new_string2(elf_State *R, elf_i32 length) {
 	return string;
 }
 
-elf_Table *elf_new_table(elf_State *R) {
-	elf_Table *tab=elf_alloc_table(R);
-	elf_add_table(R,tab);
+elf_Table *elf_new_table(elf_State *S) {
+	elf_Table *tab = elf_alloc_table(S);
+	elf_add_table(S, tab);
 	return tab;
 }
 
@@ -101,7 +101,7 @@ void elf_add_int(elf_State *S, elf_Int x) {
 
 
 void elf_add_num(elf_State *S, elf_Num x) {
-	PUSHV(S,VNUM(x));
+	PUSHV(S,VALUE_NUMBER(x));
 }
 
 
@@ -183,121 +183,3 @@ elf_Num elf_get_num(elf_State *R, int x) {
 	_check_arg_tag(R,elf_tag_num,v.tag,x);
 	return 0;
 }
-
-
-// /* Todo: a bunch of weird variants, to be removed */
-// /* Todo: remove all this, the user can create their own utility
-// functions for all this, this just adds unnecessary bloat */
-// elAPI void elf_gset_bindings(elf_State *S, NameFunctionPair *list, int num);
-// elAPI void elf_gsetx_cfn(elf_State *S, char *name, elf_Function thing);
-// elAPI void elf_gsetx_int(elf_State *S, char *name, elf_Int thing);
-// elAPI void elf_gsetx_tab(elf_State *S, char *name, elf_Table *thing);
-
-
-// void elf_gsetx_sys(elf_State *R, char *name, elf_Handle val) {
-// 	elf_set_global(R->M,elf_new_string(R,name),VSYS(val));
-// }
-
-
-// void elf_gsetx_int(elf_State *R, char *name, elf_Int val) {
-// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_INTEGER(val));
-// }
-
-
-// void elf_gsetx_tab(elf_State *R, char *name, elf_Table *val) {
-// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_TABLE(val));
-// }
-
-
-// void elf_gsetx_str(elf_State *R, char *name, char *val) {
-// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_STRING(elf_new_string(R,val)));
-// }
-
-
-// void elf_gsetx_cfn(elf_State *R, char *name, elf_Function fn) {
-// 	elf_set_global(R->M,elf_new_string(R,name),VALUE_FUNCTION(fn));
-// }
-
-
-// // void elf_gset_bindings(elf_State *R, NameFunctionPair *list, int num) {
-// // 	elf_tsetx_bindings(R,R->M->globals,list,num);
-// // }
-
-// elf_Int elf_tgetx_int(elf_Table *tab, char const *key, elf_Int or) {
-// 	elf_Value val;
-// 	val=elf_tgetx_any(tab,key);
-// 	return val.tag!=elf_tag_nil?VN2I(val):or;
-// }
-
-
-// elf_Num elf_tgetx_num(elf_Table *tab, char const *key, elf_Num or) {
-// 	elf_Value val;
-// 	val=elf_tgetx_any(tab,key);
-// 	return val.tag!=elf_tag_nil?VI2N(val):or;
-// }
-
-
-// elf_Table *elf_tgetx_tab(elf_Table *tab, char const *key, elf_Table *or) {
-// 	elf_Value val;
-// 	val=elf_tgetx_any(tab,key);
-// 	return val.tag==elf_tag_tab?val.x_tab:or;
-// }
-
-
-// elf_Num elf_tgets_num(elf_Table *tab, elf_String *key) {
-// 	elf_Value val;
-// 	val=elf_tgets_any(tab,key);
-// 	return VI2N(val);
-// }
-
-
-// elf_Int elf_tgets_int(elf_Table *tab, elf_String *key) {
-// 	elf_Value val;
-// 	val=elf_tgets_any(tab,key);
-// 	return VN2I(val);
-// }
-
-
-// elf_Int elf_tgetsor_int(elf_Table *tab, elf_String *key, elf_Int or) {
-// 	elf_Value val=elf_tgets_any(tab,key);
-// 	if (val.tag!=elf_tag_nil) {
-// 		return VN2I(val);
-// 	} else return or;
-// }
-
-
-// elf_String *elf_tgets_str(elf_Table *tab, elf_String *key) {
-// 	return elf_tgets_any(tab,key).x_str;
-// }
-
-
-// elf_Table *elf_tgets_tab(elf_Table *tab, elf_String *key) {
-// 	return elf_tgets_any(tab,key).x_tab;
-// }
-
-
-// void elf_tsets_str(elf_Table *tab, elf_String *key, elf_String *val) {
-// 	elf_table_set(tab,VALUE_STRING(key),VALUE_STRING(val));
-// }
-
-
-// void elf_tsets_int(elf_Table *tab, elf_String *key, elf_Int val) {
-// 	elf_table_set(tab,VALUE_STRING(key),VALUE_INTEGER(val));
-// }
-
-
-// void elf_tsets_num(elf_Table *tab, elf_String *key, elf_Num val) {
-// 	elf_table_set(tab,VALUE_STRING(key),VNUM(val));
-// }
-
-
-// void elf_tsets_tab(elf_Table *tab, elf_String *key, elf_Table *val) {
-// 	elf_table_set(tab,VALUE_STRING(key),VALUE_TABLE(val));
-// }
-
-
-// void elf_tsetx_bindings(elf_State *R, elf_Table *tab, NameFunctionPair *list, int num) {
-// 	FOR_RANGE(i,0,num) {
-// 		elf_table_set(tab,VALUE_STRING(elf_alloc_string(R,list[i].name)),VALUE_FUNCTION(list[i].fn));
-// 	}
-// }

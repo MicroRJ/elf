@@ -193,8 +193,6 @@ typedef struct {
 	Source   line;
 } entityT;
 
-
-
 typedef struct {
 	int *t,*f;
 } jumpS;
@@ -234,27 +232,41 @@ struct elf_Parser {
 	char                    *pos;
 	int                 line_num;
 	elf_Token tok,tok_prev,tok_prox;
-	char              *expr_line;
-	char             *tree_arena;
-	int               tree_index;
-	treeID                   enc;
-	treeID            *functions;
-	entityT            *entities;
-	entityID        entity_index;
-	entityID     scope_stack[32];
+	char           *expr_line;
+	char           *tree_arena;
+	int             tree_index;
+	treeID                 enc;
+	treeID          *functions;
+	// entities are named objects, variables,
+	// symbols, special names, and such...
+	entityT         *entities;
+	entityID         entity_index;
+	// remember scope hierarchy, 'scope'
+	// is the first visible entity
+	entityID         scope_stack[32];
 	entityID         scope_index;
-	entityID               scope;
-	Block        block_stack[32];
+	entityID         scope;
+	// remember block hierarchy
+	Block            block_stack[32];
 	int              block_index;
-	Block                  block;
-	Loop          loop_stack[32];
-	int               loop_index;
-	Loop                    loop;
+	Block            block;
+	// remember hierarchy
+	Loop             loop_stack[32];
+	int              loop_index;
+	Loop             loop;
+	// DURING CODE GENERATION:
+	// track memory usage
 	int 	          memory_usage;
+	// remember memory state
 	int 	          memory_state;
-	int 	 memory_state_stack[128];
-	int 	 memory_state_index;
-	treeID memory_slots[1024];
+	int 	          memory_state_stack[128];
+	int 	          memory_state_index;
+	// remember which trees have memory
+	treeID          memory_slots[1024];
+	// temporary memory for keeping track
+	// of jump instructions
+	int            *t_jumps[128];
+	int            *f_jumps[128];
 };
 
 static int emit_branch_if_false(elf_Parser *fs, jumpS *js, treeID id);

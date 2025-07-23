@@ -30,6 +30,28 @@ static void _set_stack_ptr(elf_State *S, elf_Value *stack_ptr) {
 	S->stack_ptr = stack_ptr;
 }
 
+static elf_Table *elf_create_metatable_from_lib(elf_State *S, NameFunctionPair *lib, int num) {
+	elf_Table *tab = elf_new_table(S);
+	for (int i = 0; i < num; i ++) {
+		elf_String *name = elf_new_string(S, lib[i].name);
+		elf_table_set(tab, VALUE_STRING(name), VALUE_FUNCTION(lib[i].fn));
+	}
+	return tab;
+}
+
+int elf_get_global_slot(elf_Module *M, elf_String *name) {
+	if (name != 0) {
+		return elf_table_get_or_add(M->globals, VALUE_STRING(name));
+	}
+	return ARRAY_GROW(M->globals->array, 1);
+}
+
+int elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
+	int id = elf_get_global_slot(M, name);
+	M->globals->array[id] = value;
+	return id;
+}
+
 void elf_init(elf_State *R, elf_Module *M) {
 
 	R->M = M;
@@ -52,9 +74,11 @@ void elf_init(elf_State *R, elf_Module *M) {
 
 	R->frame.locals = R->stack;
 
-	// todo: metatables should be per module, technically...
+	// todo: metatables should be per module?
+	// todo: how is this not getting gc'd?
 	R->metatables.string = elf_new_string_metatable(R);
 	R->metatables.table = elf_new_table_metatable(R);
+
 	R->trace_table = elf_new_table(R);
 
 	M->globals = elf_new_table(R);

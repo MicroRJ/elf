@@ -29,7 +29,7 @@ static void patch_jumps(elf_Parser *parser, Instr *js);
 
 int to_mem(elf_Parser *parser, treeID id, int dst, int ndst);
 int to_any_mem(elf_Parser *parser, treeID id);
-int tree2o(int kind);
+int expr_to_instr(int kind);
 int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 
@@ -182,6 +182,15 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 
 			pop_mem_state(parser);
 		} break;
+		//
+		// STORE:
+		// if there's memory associated with this
+		// tree, the the r-value is stored to that
+		// memory, otherwise, the tree should be
+		// a valid l-value.
+		//	rj - 7/16/2025
+		//
+		//
 		case TREE_STORE: {
 			treeT xx;
 			int dst,mem;
@@ -310,7 +319,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			ry=to_any_mem(parser,tree.y);
 			pop_mem_state(parser);
 			if (dst<0) dst=set_mem(parser,id);
-			emit_bytexyz(parser,line,tree2o(tree.kind),dst,rx,ry);
+			emit_bytexyz(parser,line,expr_to_instr(tree.kind),dst,rx,ry);
 		} break;
 		case TREE_UPVALUE: {
 			if (ndst<1) goto esc;
@@ -424,7 +433,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			if (get_mem(parser,tree.x)==NO_SLOT && (xx.kind==EXPR_FIELD)||(xx.kind==EXPR_METAFIELD)) {
 				ry=to_mem(parser,xx.y,-1,1);
 				rx=to_mem(parser,xx.x,-1,1);
-				emit_bytexyz(parser,line,tree2o(xx.kind),ry,rx,ry);
+				emit_bytexyz(parser,line,expr_to_instr(xx.kind),ry,rx,ry);
 			} else {
 				ry=to_mem(parser,tree.x,-1,1);
 				ASSERT(get_mem(parser,id)==NO_SLOT);
@@ -468,7 +477,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 				pop_mem_state(parser);
 				if (ndst<1) goto esc;
 				if (dst<0) dst=set_mem(parser,id);
-				emit_bytexyz(parser,tree.line,tree2o(tree.kind^1),dst,rx,ry);
+				emit_bytexyz(parser,tree.line,expr_to_instr(tree.kind^1),dst,rx,ry);
 			} else {
 				push_mem_state(parser);
 				rx=to_any_mem(parser,tree.x);
@@ -476,7 +485,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 				pop_mem_state(parser);
 				if (ndst<1) goto esc;
 				if (dst<0) dst=set_mem(parser,id);
-				emit_bytexyz(parser,tree.line,tree2o(tree.kind),dst,rx,ry);
+				emit_bytexyz(parser,tree.line,expr_to_instr(tree.kind),dst,rx,ry);
 			}
 		} break;
 		// todo:fix the bug!
@@ -508,7 +517,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	return dst;
 }
 
-int tree2o(int kind) {
+static int expr_to_instr(int kind) {
 	switch (kind) {
 		case EXPR_FIELD: 	   return BC_GETFIELD;     // *
 		case EXPR_INDEX: 	   return BC_GETINDEX;     // *
@@ -756,9 +765,9 @@ static void patch_jump(elf_Parser *fs, Instr i) {
 }
 
 
-static void patch_jumps(elf_Parser *fs, Instr *js) {
-	FOR_ARRAY(i,js) {
-		patch_jump(fs,js[i]);
+static void patch_jumps(elf_Parser *parser, Instr *s) {
+	FOR_ARRAY(i,s) {
+		patch_jump(parser,s[i]);
 	}
 }
 

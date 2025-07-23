@@ -6,6 +6,12 @@
 
 // todo: all of these should be instrinsics...
 
+static int math_lib_exp(elf_State *R) {
+	elf_add_num(R,exp(elf_get_num(R,0)));
+	return 1;
+}
+
+
 static int math_lib_floor(elf_State *R) {
 	elf_add_num(R,floor(elf_get_num(R,0)));
 	return 1;
@@ -60,6 +66,7 @@ static int math_lib_atan2(elf_State *R) {
 }
 
 static NameFunctionPair lib_math[] = {
+	{"exp",math_lib_exp},
 	{"floor",math_lib_floor},
 	{"ceil",math_lib_ceil},
 	{"sqrt",math_lib_sqrt},

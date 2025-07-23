@@ -348,7 +348,7 @@ elAPI elf_Closure *elf_get_cls(elf_State *S, int arg);
 
 elAPI int elf_get_num_args(elf_State *S);
 elAPI elf_tag_enum elf_get_tag(elf_State *S, int x);
-elAPI void elf_check_args(elf_State *S, char *func, int nargs, char *usage);
+elAPI void elf_check_num_args(elf_State *S, char *func, int nargs, char *usage);
 
 /* allocating objects */
 elAPI elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto);

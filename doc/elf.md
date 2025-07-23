@@ -31,3 +31,15 @@ in their proper right to be as they wish,
 elf is meant to be a whimsical programming
 language, that aims to recapture the
 magic and fun of programming.
+
+
+-inf < X   true always
+-inf > X  false always
+inf == inf true always
+inf > X    true always
+inf < X   false always
+inf * X     inf always
+inf / X     inf always
+inf + X     inf always
+inf - X     inf always
+inf % X       X always

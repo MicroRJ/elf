@@ -91,9 +91,9 @@ elf_Int elf_get_array_tally(elf_Table *table) {
 
 
 
-elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
-	return elf_table_get(tab,VALUE_STRING(key));
-}
+//	elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
+//		return elf_table_get(tab,VALUE_STRING(key));
+//	}
 
 // todo: remove!
 elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {

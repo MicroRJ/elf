@@ -8,17 +8,6 @@
 static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecode b);
 
 
-int elf_get_global_slot(elf_Module *M, elf_String *name) {
-	if (name != 0) return elf_table_get_or_add(M->globals,VALUE_STRING(name));
-	return ARRAY_GROW(M->globals->array,1);
-}
-
-int elf_set_global(elf_Module *M, elf_String *name, elf_Value value) {
-	int id = elf_get_global_slot(M,name);
-	M->globals->array[id] = value;
-	return id;
-}
-
 // todo: remove, this is not core functionality
 void elf_add_lib(elf_State *S, char *prefix, NameFunctionPair *bindings, int num) {
 	// todo: ensure the symbol name is valid

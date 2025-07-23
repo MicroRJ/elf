@@ -254,7 +254,7 @@ int table_lib_xremove(elf_State *R) {
 #endif
 
 int table_lib_alias(elf_State *R) {
-	elf_check_args(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
+	elf_check_num_args(R,":alias",2,"(key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_table_alias(R,tab,elf_get_arg(R,0),elf_get_arg(R,1));
 	return 0;
@@ -262,7 +262,7 @@ int table_lib_alias(elf_State *R) {
 
 
 int table_lib_find_aliases(elf_State *R) {
-	elf_check_args(R,":find_aliases",1,"the key to find aliases for");
+	elf_check_num_args(R,":find_aliases",1,"the key to find aliases for");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Value key = elf_get_arg(R,0);
 	elf_Table *list = elf_new_table(R);
@@ -286,7 +286,7 @@ int table_lib_find_aliases(elf_State *R) {
 
 #if 0
 int table_lib_bubble_sort(elf_State *R) {
-	elf_check_args(R,":bubblesort",1,"comparator function");
+	elf_check_num_args(R,":bubblesort",1,"comparator function");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Value *arr = tab->array;
 	elf_Closure *cls = elf_get_cls(R,0);
@@ -365,7 +365,7 @@ int lib_table_keys(elf_State *S) {
 }
 
 int lib_table_array(elf_State *S) {
-	elf_check_args(S,":array",0,"the table to get a copy of as an array");
+	elf_check_num_args(S,":array",0,"the table to get a copy of as an array");
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
 	elf_Table *array = elf_new_table(S);
 	elf_Int i;
@@ -377,14 +377,14 @@ int lib_table_array(elf_State *S) {
 
 
 int table_lib_clone(elf_State *R) {
-	elf_check_args(R,":clone",0,"the table to clone");
+	elf_check_num_args(R,":clone",0,"the table to clone");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_add_table(R,elf_clone_table(R,tab));
 	return 1;
 }
 
 int elf_lib_table_merge(elf_State *R) {
-	elf_check_args(R,":merge",1,"the tables to merge into a new table (keys only), if no arguments are passed in, this acts like a clone");
+	elf_check_num_args(R,":merge",1,"the tables to merge into a new table (keys only), if no arguments are passed in, this acts like a clone");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *sum = elf_new_table(R);
 	elf_merge_tables(sum,tab);
@@ -396,7 +396,7 @@ int elf_lib_table_merge(elf_State *R) {
 }
 
 int table_lib_diff(elf_State *R) {
-	elf_check_args(R,":diff",1,"");
+	elf_check_num_args(R,":diff",1,"");
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
 	elf_Table *sub = elf_get_table(R,0);
 	if (sub == 0) {

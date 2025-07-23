@@ -186,7 +186,7 @@ static char *in_sym_dir(char *dir, char *sym) {
 are not mistaken with table accesses when shortened,
 math.floor != .math.floor */
 int core_lib_include(elf_State *R) {
-	elf_check_args(R,".include",1,"(the directory to include to add to the global directory)");
+	elf_check_num_args(R,".include",1,"(the directory to include to add to the global directory)");
 	char *dir = elf_get_text(R,0);
 	int plen = text_length(dir);
 	/* accumulate all symbols here first to
