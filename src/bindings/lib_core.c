@@ -16,7 +16,7 @@ static int core_lib_get_global(elf_State *R) {
 	elf_String *name = elf_get_string(R, 0);
 
 	int index = elf_get_global_slot(R, name);
-	elf_push_any(R, R->globals->array[index]);
+	elf_push_value_raw(R, R->globals->array[index]);
 	return 1;
 }
 
@@ -35,37 +35,37 @@ static int core_lib_const_expr(elf_State *R) {
 	return ret < 0 ? 0 : ret;
 }
 
-int core_lib_load_file(elf_State *R) {
+ELF_FUNCTION(core_lib_load_file) {
 	elf_String *name, *contents;
 	FILE *file;
 	int auto_close = false;
 	int pos = -1;
 	int size = -1;
 	int res = 0;
-	if(elf_get_tag(R,0) == elf_tag_str) {
-		name = elf_get_string(R,0);
+	if(elf_get_tag(S,0) == elf_tag_String) {
+		name = elf_get_string(S,0);
 		file = fopen(name->text,"rb");
 		auto_close = true;
 	} else {
-		name = elf_new_string(R,"no name");
-		file = (FILE *) elf_get_sysobj(R,0);
+		name = elf_new_string(S,"no name");
+		file = (FILE *) elf_get_sysobj(S,0);
 	}
 	if (!file) {
 		elf_error_log("'%s': failed to load file",name->text);
 		goto esc;
 	}
 
-	if (elf_get_num_args(R) > 1) {
-		size = elf_get_int(R,1);
-		if (elf_get_num_args(R) > 2) {
-			pos = elf_get_int(R,2);
+	if (elf_get_num_args(S) > 1) {
+		size = elf_get_int(S,1);
+		if (elf_get_num_args(S) > 2) {
+			pos = elf_get_int(S,2);
 		}
 	}
-	contents = elf_read_file_string(R,"noname",file,size,pos);
+	contents = elf_read_file_string(S,"noname",file,size,pos);
 
-	int nargs = 1; // elf_get_num_args(R) - 1;
-	int nrets = elf_get_num_rets(R);
-	res = elf_exec(R,false,nargs,nrets,name,contents);
+	int nargs = 1; // elf_get_num_args(S) - 1;
+	int nrets = elf_get_num_rets(S);
+	res = elf_exec(S,false,nargs,nrets,name,contents);
 
 	if (auto_close) {
 		fclose(file);
@@ -79,7 +79,7 @@ int core_lib_load_expr(elf_State *R) {
 	elf_String *name, *contents;
 	int pos=-1,size=-1;
 
-	if(elf_get_tag(R,0) == elf_tag_str) {
+	if(elf_get_tag(R,0) == elf_tag_String) {
 		name = elf_get_string(R,0);
 		contents = elf_read_file_string(R,name->text,0,size,pos);
 	} else {
@@ -144,7 +144,7 @@ int core_lib_merge_tables(elf_State *R) {
 
 
 int core_lib_get_meta(elf_State *R) {
-	elf_push_table(R,elf_get_object(R,0)->meta);
+	elf_push_table_raw(R,elf_get_object(R,0)->meta);
 	return 1;
 }
 
@@ -237,11 +237,11 @@ int core_lib_include(elf_State *R) {
 	elf_Table_Entry entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
-		if (entry.key.tag == elf_tag_str) {
+		if (entry.key.tag == elf_tag_String) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);
-			elf_table_set(globals,VALUE_STRING(ref),globals->array[entry.idx]);
+			elf_table_set_raw(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}
 	return 0;
@@ -263,7 +263,7 @@ int core_lib_load_json(elf_State *R) {
 	fread(contents->text,1,size,file);
 
 	elf_Table * tab = elf_parse_json(R, name, contents->text);
-	elf_push_table(R,tab);
+	elf_push_table_raw(R,tab);
 
 	return 1;
 	_error:
@@ -334,14 +334,14 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 				continue;
 			}
 			elf_Value v = tab->array[slot.idx];
-			if ((v.tag == elf_tag_closure) || (v.tag == elf_tag_function)) {
+			if ((v.tag == elf_tag_Closure) || (v.tag == elf_tag_Function)) {
 				continue;
 			}
 			if (nitems ++ != 0) fprintf(io,",\n");
 			print_num_tabs(io,level);
 			fpf_value(io,slot.key,1);
 			fprintf(io," = ");
-			if (v.tag == elf_tag_tab) {
+			if (v.tag == elf_tag_Table) {
 				elf_unload(io,v.x_tab,level);
 			} else {
 				fpf_value(io,v,1);
@@ -352,7 +352,7 @@ void elf_unload(FILE *io, elf_Table *tab, int level) {
 			elf_Value v = tab->array[i];
 			if (i != 0) fprintf(io,",\n");
 			print_num_tabs(io,level);
-			if (v.tag==elf_tag_tab) {
+			if (v.tag==elf_tag_Table) {
 				elf_unload(io,v.x_tab,level+1);
 			} else {
 				fpf_value(io,v,1);

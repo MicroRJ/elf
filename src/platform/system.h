@@ -63,6 +63,16 @@ enum {
 	FILE_TYPE_SYMLINK = 2,
 };
 
+
+//	typedef struct FileEntry {
+//		char name[256];
+//		int  tags;
+//		int  size;
+//	} FileEntry;
+//
+//	FileEntry *sys_list_folder(const char *name, int *nentries);
+
+
 // todo: make better!
 typedef struct {
 	char  name[256];

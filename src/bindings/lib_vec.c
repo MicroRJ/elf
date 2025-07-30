@@ -50,8 +50,8 @@
 typedef struct { float x, y; } elf_vec2;
 
 static inline elf_vec2 _get_vec2(elf_Table *tab, elf_Value sx, elf_Value sy) {
-	elf_Value x = elf_table_get(tab, sx);
-	elf_Value y = elf_table_get(tab, sy);
+	elf_Value x = elf_table_get_raw(tab, sx);
+	elf_Value y = elf_table_get_raw(tab, sy);
 	return (elf_vec2){ VI2N(x), VI2N(y) };
 }
 
@@ -69,9 +69,9 @@ ELF_FUNCTION(lib_vec2__##NAME) { \
 	elf_vec2 y = _get_vec2(elf_get_table(S, 0), sx, sy); \
 	elf_vec2 v = { OP(x.x, y.x), OP(x.y, y.y) }; \
 	elf_Table *res = elf_new_table(S); \
-	elf_table_set(res, sx, VALUE_NUMBER(v.x)); \
-	elf_table_set(res, sy, VALUE_NUMBER(v.y)); \
-	elf_push_table(S, res); \
+	elf_table_set_raw(res, sx, VALUE_NUMBER(v.x)); \
+	elf_table_set_raw(res, sy, VALUE_NUMBER(v.y)); \
+	elf_push_table_raw(S, res); \
 	return 1; \
 } \
 /* end */
@@ -83,7 +83,7 @@ VEC2OPDEF(sub, OP_SUB)
 VEC2OPDEF(pow, OP_POW)
 
 
-NameFunctionPair metatable_lib_vec2[] = {
+elf_Binding metatable_lib_vec2[] = {
 	{"mul", lib_vec2__mul},
 	{"div", lib_vec2__div},
 	{"add", lib_vec2__add},

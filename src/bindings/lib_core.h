@@ -37,18 +37,6 @@ _(pf)\
 _(fpf)\
 _(ntoi)\
 _(iton)\
-_(load_dll)\
-_(get_dll_fn)\
-_(open_file)\
-_(close_file)\
-_(get_file_size)\
-_(read_file)\
-_(write_file)\
-_(write_file_to_file)\
-_(open_temp_file)\
-_(change_work_dir)\
-_(get_work_dir)\
-_(list_folder)\
 /* end */
 
 #define LIBNAME(NAME) static int core_lib_##NAME(elf_State *R);
@@ -56,7 +44,7 @@ LIBDEF(LIBNAME)
 #undef LIBNAME
 
 // todo: sort these in order of relevance
-static NameFunctionPair lib_core[] = {
+static elf_Binding lib_core[] = {
 #define LIBNAME(NAME) {#NAME,core_lib_##NAME},
 	LIBDEF(LIBNAME)
 #undef LIBNAME

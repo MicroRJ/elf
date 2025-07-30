@@ -23,7 +23,7 @@ int lib_time__get_time_diff_ms(elf_State *S) {
 }
 
 
-static NameFunctionPair _lib_time[] = {
+static elf_Binding _lib_time[] = {
 	{"get_clock_time", lib_time__get_clock_time},
 	{"get_time_diff_s", lib_time__get_time_diff_s},
 	{"get_time_diff_ms", lib_time__get_time_diff_ms},

@@ -10,29 +10,27 @@ void elf_table_recycle(elf_Table *tab) {
 	tab->slots = 0;
 }
 
-void elf_init_table(elf_State *S, elf_Table *table, elf_i64 num_initial_entries) {
+static inline void init_table(elf_State *S, elf_Table *table, elf_IndexInt nentries) {
 	table->ndebug = 0;
-	table->slots  = calloc(1, num_initial_entries * sizeof(elf_Table_Entry));
-	table->ntotal = num_initial_entries;
+	table->slots  = calloc(1, nentries * sizeof(elf_Table_Entry));
+	table->ntotal = nentries;
 	table->nslots = 0;
 }
 
-elf_Table *elf_alloc_table2(elf_State *S, elf_i64 num_initial_entries) {
+elf_Table *elf_alloc_table2(elf_State *S, elf_IndexInt nentries) {
 	elf_Table *table = elf_gc_alloc(S, GC_TAB, sizeof(elf_Table));
 	table->obj.meta = S->metatables.table;
 
-	elf_init_table(S, table, num_initial_entries);
+	init_table(S, table, nentries);
 	return table;
 }
 
-// todo: just make this take the length and if the
-// length is zero then use some default value
 elf_Table *elf_alloc_table(elf_State *R) {
 	return elf_alloc_table2(R, 4);
 }
 
 
-static void elf_table_resize_maybe(elf_Table *table) {
+static void check_resize(elf_Table *table) {
 	if (table->ntotal * 3 < table->nslots * 4) {
 		elf_Table new_table = *table;
 		new_table.ntotal = table->ntotal << 1;
@@ -62,7 +60,7 @@ static void elf_table_resize_maybe(elf_Table *table) {
 
 
 static inline elf_HashInt hash_value(elf_Value *v) {
-	if (v->tag == elf_tag_str) {
+	if (v->tag == elf_tag_String) {
 		return elf_get_string_hash(v->x_str);
 	}
 	//
@@ -96,7 +94,7 @@ static inline bool value_equals(elf_Value *x, elf_Value *y) {
 		return true;
 	}
 	if (x->tag==y->tag) {
-		if(x->tag==elf_tag_str){
+		if(x->tag==elf_tag_String){
 			if (x->x_str->hash==y->x_str->hash){
 				if (x->x_str->length==y->x_str->length){
 					return text_eq(x->x_str->text,y->x_str->text);
@@ -109,14 +107,14 @@ static inline bool value_equals(elf_Value *x, elf_Value *y) {
 #else
 static inline elf_i64 hash_value(elf_Value *v) {
 	switch (v.tag) {
-		case elf_tag_str: {
+		case elf_tag_String: {
 			ASSERT(v.x_str != 0);
 			ASSERT(v.x_str->hash != 0);
 			return v.x_str->hash;
 		}
-		case elf_tag_userobj:
-		case elf_tag_tab: case elf_tag_closure: case elf_tag_sysobj:
-		case elf_tag_int: case elf_tag_num: case elf_tag_function: {
+		case elf_tag_UserObject:
+		case elf_tag_Table: case elf_tag_Closure: case elf_tag_Handle:
+		case elf_tag_int: case elf_tag_num: case elf_tag_Function: {
 			return hash64(v.x_ptr);
 		}
 		default: NO_CODE;
@@ -130,12 +128,12 @@ bool value_equals(elf_Value *x, elf_Value *y) {
 		return 0;
 	}
 	switch (x->tag) {
-		case elf_tag_str: {
+		case elf_tag_String: {
 			return elf_get_strings_eq(x->x_str,y->x_str);
 		}
-		case elf_tag_userobj:
-		case elf_tag_sysobj: case elf_tag_int: case elf_tag_num:
-		case elf_tag_tab: case elf_tag_closure: case elf_tag_function: {
+		case elf_tag_UserObject:
+		case elf_tag_Handle: case elf_tag_int: case elf_tag_num:
+		case elf_tag_Table: case elf_tag_Closure: case elf_tag_Function: {
 			return x->x_int == y->x_int;
 		}
 		default: NO_CODE;
@@ -145,8 +143,7 @@ bool value_equals(elf_Value *x, elf_Value *y) {
 #endif
 
 
-
-static elf_Int slot2index(elf_Table *table, elf_Int slot) {
+static inline elf_IndexInt T_slottoindex(elf_Table *table, elf_Int slot) {
 	return table->slots[slot].idx;
 }
 
@@ -156,9 +153,70 @@ elf_Int elf_array_get_length(elf_Table *table) {
 }
 
 
+elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key) {
+	ASSERT(tab != 0);
+
+	check_resize(tab);
+
+	elf_HashInt hash = hash_value(&key);
+
+	elf_Table_Entry *slots = tab->slots;
+	elf_IndexInt ntotal = tab->ntotal;
+
+	elf_IndexInt head,tail,walk;
+
+	head = hash & (ntotal - 1);
+	tail = head;
+	// todo: try double hashing
+	walk = 1;
+
+	do {
+		elf_Value value = slots[tail].key;
+		if (value.tag == elf_tag_nil) return tail;
+		if (value.tag != elf_tag_tomb) {
+			if(value_equals(&value,&key)){
+				return tail;
+			}
+		}
+		tail = (tail + walk) & (ntotal - 1);
+	} while(head != tail);
+
+	return -1;
+}
+
+// todo: remove!
+elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash) {
+	check_resize(tab);
+
+	elf_Table_Entry *slots = tab->slots;
+	elf_i64 ntotal = tab->ntotal;
+	elf_i64 head = hash % ntotal;
+	elf_i64 tail = head;
+	elf_i64 walk = 1; // rehash(hash)|1;
+	do {
+		elf_Value x = slots[tail].key;
+		if (x.tag==elf_tag_nil) {
+			return tail;
+		}
+		if (x.tag==elf_tag_String) {
+			if (x.x_str->text==text) {
+				return tail;
+			}
+			if ((x.x_str->hash==hash) && (x.x_str->length==length) && text_eq(x.x_str->text,text)) {
+				return tail;
+			}
+		}
+		tail = (tail + walk) % ntotal;
+		// DEBUG_CODE( tab->ncollisions ++ );
+	} while(head != tail);
+	return -1;
+}
+
+
+
 
 //	elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
-//		return elf_table_get(tab,VALUE_STRING(key));
+//		return elf_table_get_raw(tab,VALUE_STRING(key));
 //	}
 
 // todo: remove!
@@ -176,56 +234,10 @@ elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	return (elf_Value){elf_tag_nil,0};
 }
 
-elf_i64 elf_table_try(elf_Table *tab, elf_Value key) {
-	ASSERT(tab != 0);
-	elf_Table_Entry *slots = tab->slots;
-	elf_i64 ntotal = tab->ntotal;
-	elf_i64 hash = hash_value(&key);
-	elf_i64 head = hash & (ntotal - 1);
-	elf_i64 tail = head;
-	// todo: try double hashing
-	elf_i64 walk = 1;
-	do {
-		elf_Value value = slots[tail].key;
-		if(value.tag == elf_tag_nil) return tail;
-		if(value.tag != elf_tag_tomb){
-			if(value_equals(&value,&key)){
-				return tail;
-			}
-		}
-		tail = (tail + walk) & (ntotal - 1);
-	} while(head != tail);
-	return -1;
-}
 
-// todo: remove!
-elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash) {
-	elf_Table_Entry *slots = tab->slots;
-	elf_i64 ntotal = tab->ntotal;
-	elf_i64 head = hash % ntotal;
-	elf_i64 tail = head;
-	elf_i64 walk = 1; // rehash(hash)|1;
-	do {
-		elf_Value x = slots[tail].key;
-		if (x.tag==elf_tag_nil) {
-			return tail;
-		}
-		if (x.tag==elf_tag_str) {
-			if (x.x_str->text==text) {
-				return tail;
-			}
-			if ((x.x_str->hash==hash) && (x.x_str->length==length) && text_eq(x.x_str->text,text)) {
-				return tail;
-			}
-		}
-		tail = (tail + walk) % ntotal;
-		// DEBUG_CODE( tab->ncollisions ++ );
-	} while(head != tail);
-	return -1;
-}
 
-elf_b32 elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
-	elf_table_resize_maybe(table);
+
+elf_b32 elf_table_set_raw(elf_Table *table, elf_Value k, elf_Value v) {
 	elf_Int slot = elf_table_try(table,k);
 	/* todo: instead return an error here */
 	if (slot < 0) NO_CODE;
@@ -245,7 +257,7 @@ elf_b32 elf_table_set(elf_Table *table, elf_Value k, elf_Value v) {
 }
 
 
-elf_Value elf_table_get(elf_Table *tab, elf_Value k) {
+elf_Value elf_table_get_raw(elf_Table *tab, elf_Value k) {
 	elf_Int slot = elf_table_try(tab,k);
 	if (slot == -2) NO_CODE;
 	if (slotiskey(tab,slot)) {
@@ -255,26 +267,27 @@ elf_Value elf_table_get(elf_Table *tab, elf_Value k) {
 }
 
 
-elf_Int elf_table_get_or_add(elf_Table *table, elf_Value key) {
-	elf_Int lot,idx;
+elf_IndexInt elf_table_get_or_add_raw(elf_Table *table, elf_Value key) {
+	elf_IndexInt entry,index;
 	ASSERT(!IS_NIL_VALUE(key));
-	elf_table_resize_maybe(table);
-	lot=elf_table_try(table,key);
-	ASSERT(lot>=0);
-	if (!slotiskey(table,lot)) {
-		idx=ARRAY_GROW(table->array,1);
-		table->array[idx]=VALUE_NIL();
-		table->slots[lot].key=key;
-		table->slots[lot].idx=idx;
+	entry=elf_table_try(table,key);
+
+	ASSERT(entry>=0);
+	if (!slotiskey(table,entry)) {
+		index=ARRAY_GROW(table->array,1);
+
+		table->array[index]=VALUE_NIL();
+
+		table->slots[entry].key=key;
+		table->slots[entry].idx=index;
 		table->nslots++;
 	}
-	return slot2index(table,lot);
+	return T_slottoindex(table,entry);
 }
 
 
 
 void elf_table_alias(elf_Table *tab, elf_Value key, elf_Value alias) {
-	elf_table_resize_maybe(tab);
 	elf_Int key_slot = elf_table_try(tab,key);
 	if (slotiskey(tab,key_slot)) {
 		elf_Int alias_slot = elf_table_try(tab,alias);
@@ -291,7 +304,7 @@ elf_b32 elf_table_contains(elf_Table *tab, elf_Value key) {
 }
 
 
-void elf_array_add(elf_Table *table, elf_Value v) {
+void elf_array_add_raw(elf_Table *table, elf_Value v) {
 	ARRAY_ADD(table->array,v);
 }
 
@@ -306,8 +319,25 @@ void elf_table_merge(elf_Table *tab, elf_Table *merger) {
 	for (i=0;i<merger->ntotal;++i) {
 		elf_Table_Entry it = merger->slots[i];
 		if (it.key.tag == elf_tag_nil) continue;
-		elf_table_set(tab,it.key,merger->array[it.idx]);
+		elf_table_set_raw(tab,it.key,merger->array[it.idx]);
 	}
 }
 
+#if 0
+typedef struct TABLE_BINARY_FILE {
+	int num_keys;
+} TABLE_BINARY_FILE;
 
+void elf_table_export_binary(elf_Table *tab, FILE *io) {
+	FOR_RANGE(i, 0, ARRAY_LENGTH(tab->array)) {
+		elf_Value value = tab->array[i];
+		switch (value.tag) {
+			// todo: compression!
+			case elf_tag_int: { fprintf(io, "%lli", value.x_i64); } break;
+			default: {
+				elf_error();
+			}
+		}
+	}
+}
+#endif

@@ -19,6 +19,13 @@ elf_String *elf_alloc_string2(elf_State *S, elf_i32 length) {
 }
 
 elf_String *elf_alloc_string(elf_State *R, const char *text) {
+	int length = strlen(text);
+	elf_String *string = elf_alloc_string2(R, length);
+	elf_HashInt hash = hash_text(text);
+	copy_memory(string->text,text,length);
+	string->hash = hash;
+	return string;
+#if 0
 	int length;
 	elf_HashInt hash;
 	elf_String *string;
@@ -31,7 +38,6 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 
 
 	if (length < 64 && registry != 0) {
-		elf_table_resize_maybe(registry);
 		elf_Int slot=elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
 		elf_Table_Entry entry=registry->slots[slot];
@@ -54,27 +60,11 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 		copy_memory(string->text,text,length);
 		string->hash = hash;
 	}
+#endif
 	return string;
 }
 
 
-elf_String *elf_new_string(elf_State *S, const char *text) {
-	elf_String *string = elf_alloc_string(S, text);
-	elf_push_string(S, string);
-	return string;
-}
-
-
-elf_String *elf_new_string2(elf_State *R, elf_i32 length) {
-	elf_String *string = elf_alloc_string2(R,length);
-	elf_push_string(R,string);
-	return string;
-}
-
-elf_Value elf_string(elf_State *R, char *text) {
-	elf_String *string = elf_new_string(R, text);
-	return VALUE_STRING(string);
-}
 
 inline elf_HashInt elf_get_string_hash(elf_String *string) {
 	return string->hash;

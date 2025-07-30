@@ -2,19 +2,17 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: remove this!
-static char const *tag2s[] = {
-	"nil",
-	"tomb",
-	"num",
-	"int",
-	"sysobj",
-	"proc",
-	"userobj",
-	"closure",
-	"str",
-	"tab",
-};
+
+//
+// todo: remove this from here!
+//
+typedef int Instr;
+typedef char *Source;
+
+
+// todo:
+extern const char *tag2s[];
+
 
 // todo: NaN tagging!
 typedef struct elf_Value elf_Value;
@@ -118,13 +116,13 @@ struct elf_Stack_Frame {
 
 
 // todo: make 32 bits
-typedef struct elf_bytecode {
+typedef struct elf_Bytecode {
 	short z,y,x,k;
-} elf_bytecode;
+} elf_Bytecode;
 
 typedef struct {
 	elf_i32      address;
-	elf_bytecode bytecode;
+	elf_Bytecode bytecode;
 	// todo: use different data structure,
 	// objects could have been freed,
 	elf_Value   operand_x;
@@ -184,7 +182,7 @@ struct elf_State {
 		elf_u8           *track;
 		// todo: make this better!
 		char            **lines;
-		elf_bytecode     *bytes;
+		elf_Bytecode     *bytes;
 		int              nbytes;
 	};
 
@@ -211,7 +209,7 @@ struct elf_State {
 	int          trace_start_instr;
 	int           active_trace_pos;
 	int           active_trace_len;
-	elf_bytecode     *trace_buffer;
+	elf_Bytecode     *trace_buffer;
 	elf_Table         *trace_table;
 	elf_i32                   byte;
 
@@ -223,8 +221,4 @@ struct elf_State {
 	} metatables;
 };
 
-/* allocates an object and performs a garbage collection check
-if gc is active */
-void *elf_gc_alloc(elf_State *, elf_GC_Ty type, elf_i64 size);
-elf_Closure *elf_new_closure(elf_State *, elf_Proto proto);
-elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto);
+#include "internal.h"

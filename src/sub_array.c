@@ -1,8 +1,8 @@
-/*
-** See Copyright Notice In elf.h
-** array.c
-** for internal use only
-*/
+//
+// See Copyright Notice In elf.h
+//
+// avoid using wherever possible
+//
 
 typedef struct {
 	int max;
@@ -11,23 +11,15 @@ typedef struct {
 } Dynamic_Array;
 
 #define ARRAY(D) ((Dynamic_Array*)(D))[-1]
-
 #define ARRAY_MAX(D) (ARRAY(D).max)
 #define ARRAY_MIN(D) (ARRAY(D).min)
-
 #define ARRAY_GET_MAX(D) ((D != 0) ? ARRAY_MAX(D) : 0)
 #define ARRAY_GET_MIN(D) ((D != 0) ? ARRAY_MIN(D) : 0)
-
 #define ARRAY_SET_MIN(D,N) ((D != 0) ? ARRAY_MIN(D)=(N) : 0)
-
 #define ARRAY_LENGTH ARRAY_GET_MIN
-
-
 #define ARRAY_DELETE(D) ((D != 0) ? free(&ARRAY(D)), 0 : 0)
-
-#define FOR_ARRAY(N,D) FOR_RANGE(N,0,ARRAY_LENGTH(D))
-
 #define ARRAY_GROW(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
+#define FOR_ARRAY(N,D) FOR_RANGE(N,0,ARRAY_LENGTH(D))
 
 /* this seems to be the more cross compiler solution, emcc fails,
 clang fails and gcc fail in other more compact ways...

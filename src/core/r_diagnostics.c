@@ -3,10 +3,7 @@
 //
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecode b);
-
-
-
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b);
 static int get_byte_class(int op);
 
 // todo: this function is deprecated because who even calls this?
@@ -27,69 +24,47 @@ int elf_query_file_for_instr(elf_Module *M, int byte) {
 	return -1;
 }
 
+static Source get_instr_line(elf_Module *M, int instr) {
+	ASSERT(WITHIN(instr, 0, ARRAY_LENGTH(M->lines)));
 
-char *elf_get_instr_line(elf_Module *M, Instr byte) {
-	ASSERT(WITHIN(byte,0,ARRAY_LENGTH(M->lines)));
 	if (M->lines) {
-		return M->lines[byte];
+		return M->lines[instr];
 	}
+
 	return "";
 }
 
-//
-// todo: put in tools or something
-//
-void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc) {
-	//
-	// get line number and starting address
-	// of the line for the given address within
-	// the file q
-	//
+static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, elf_Bytecode byte, char const *fmt, ...) {
+	char *line_start;
+	int line_number;
+	char underline_buf[64];
 
-	char *c = q;
-	int n = 0;
-	while (q < loc) {
-		while (((*q != '\r') && (*q != '\n') && (*q != '\0')) && (q < loc)) q ++;
-		if (*q == 0) break;
-		if ((*q != '\n') || (c = ++ q, n ++, 1)) {
-			if ((*q == '\r') && (c = ++ q, n ++, 1)) {
-				if (*q == '\n') c = ++ q;
-			} else q ++;
-		}
-	}
-	if (linenum != 0) *linenum = n + 1;
-	if (lineloc != 0) *lineloc = c;
-}
+	get_source_info(source,cursor,&line_number,&line_start);
 
-void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, elf_bytecode byte, char const *fmt, ...) {
-	int linenum;
-	char *lineloc;
-	elf_get_line_source_info(contents,loc,&linenum,&lineloc);
-
-	/* skip initial blank characters for optimal gimmicky */
-	while (*lineloc == '\t' || *lineloc == ' ') {
-		lineloc += 1;
+	while (*line_start == '\t' || *line_start == ' ') {
+		line_start += 1;
 	}
 
-	char u[0x40];
+	int underline = MIN(sizeof(underline_buf), cursor - line_start);
+	line_start = cursor - underline;
 
-	int underline = loc - lineloc;
-	if (underline >= sizeof(u)) {
-		underline = sizeof(u)-1;
-		lineloc = loc - underline;
-	}
+	//	int underline = cursor - line_start;
+	//	if (underline >= sizeof(underline_buf)) {
+	//		underline = sizeof(underline_buf)-1;
+	//		line_start = cursor - underline;
+	//	}
 
 	int linelen = 0;
 	for (; linelen < underline+32; ++ linelen) {
-		if (lineloc[linelen] == '\0') break;
-		if (lineloc[linelen] == '\r') break;
-		if (lineloc[linelen] == '\n') break;
+		if (line_start[linelen] == '\0') break;
+		if (line_start[linelen] == '\r') break;
+		if (line_start[linelen] == '\n') break;
 	}
 
 	for (int i = 0; i < underline; ++ i) {
-		u[i] = lineloc[i] == '\t' ? '\t' : '-';
+		underline_buf[i] = line_start[i] == '\t' ? '\t' : '-';
 	}
-	u[underline]='^';
+	underline_buf[underline]='^';
 
 	if (fmt !=  0) {
 		char b[0x1000];
@@ -97,10 +72,10 @@ void elf_line_dialog(char *filename, char *contents, char *loc, Instr byte_loc, 
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli] [%i](%s): %s\n",filename,linenum,(elf_Int)(1+loc-lineloc),byte_loc,byte2s[BC_OP(byte)],b);
+		printf("%s [%i:%lli] [%i](%s): %s\n",name,line_number,(elf_Int)(1+cursor-line_start),instr,byte2s[BC_OP(byte)],b);
 	}
-	printf("| %.*s\n",linelen,lineloc);
-	printf("| %.*s\n",underline+1,u);
+	printf("| %.*s\n",linelen,line_start);
+	printf("| %.*s\n",underline+1,underline_buf);
 }
 
 void elf_dump_byte_trace(elf_State *S) {
@@ -111,8 +86,8 @@ void elf_dump_byte_trace(elf_State *S) {
 
 		if (id != -1) {
 			elf_File *file = &S->files[id];
-			Source line = elf_get_instr_line(S,frame->bytecounter);
-			elf_line_dialog(file->name->text,file->contents->text,line,frame->bytecounter,S->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
+			Source line = get_instr_line(S,frame->bytecounter);
+			cursor_dialog(file->name->text,file->contents->text,line,frame->bytecounter,S->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
 		}
 	}
 }
@@ -162,11 +137,11 @@ void elf_error(elf_State *R, int byte, const char *error) {
 
 	elf_State *M = R;
 	if (byte == NO_BYTE) byte = R->byte;
-	char *line = elf_get_instr_line(M,byte);
+	char *line = get_instr_line(M,byte);
 	int fileid = elf_query_file_for_instr(M,byte);
 	if (fileid != -1) {
 		elf_File *file = &M->files[fileid];
-		elf_line_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
+		cursor_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
 	} else {
 		printf("error: %s\n",error);
 		printf("source information could not be found, file id: %i\n",fileid);
@@ -185,12 +160,12 @@ void elf_error(elf_State *R, int byte, const char *error) {
 static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 	switch (v.tag) {
 	case elf_tag_nil: return fprintf(file,"nil");
-	case elf_tag_sysobj: return fprintf(file,"h%llX",v.x_int);
+	case elf_tag_Handle: return fprintf(file,"h%llX",v.x_int);
 	case elf_tag_int: return fprintf(file,"%lli",v.x_int);
 	case elf_tag_num: return fprintf(file,"%f",v.x_num);
-	case elf_tag_closure: return fprintf(file,"F()");
-	case elf_tag_function: return fprintf(file,"C()");
-	case elf_tag_tab: {
+	case elf_tag_Closure: return fprintf(file,"F()");
+	case elf_tag_Function: return fprintf(file,"C()");
+	case elf_tag_Table: {
 			/* todo: this is slow! */
 		int wrote = 0;
 		elf_Table *tab = v.x_tab;
@@ -223,7 +198,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 		wrote += fprintf(file,"}");
 		return wrote;
 	} break;
-case elf_tag_str: {
+case elf_tag_String: {
 	if (flags) {
 		return fprintf(file,"\"%s\"",v.x_str->text);
 	} else {
@@ -235,11 +210,11 @@ default: return fprintf(file,"(?)");
 }
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecode b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
 	if (fid != -1) {
 		elf_File file = M->files[fid];
 		int linenum;
-		elf_get_line_source_info(file.contents->text,M->lines[id],&linenum,0);
+		get_source_info(file.contents->text,M->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name->text,linenum);
 	}
 
@@ -268,7 +243,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecod
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag==elf_tag_str)||(val.tag==elf_tag_num)||(val.tag==elf_tag_int)) {
+		if ((val.tag==elf_tag_String)||(val.tag==elf_tag_num)||(val.tag==elf_tag_int)) {
 			fpf_value(io,val,1);
 		}
 	}
@@ -278,7 +253,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_bytecod
 
 
 #if 0
-void elf_get_line_source_info(char *q, char *p, int *linenum, char **lineloc);
+void get_source_info(char *q, char *p, int *linenum, char **lineloc);
 
 
 // holy... this function is old... is not even the same name,
@@ -299,10 +274,10 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
-			elf_bytecode b = md->bytes[ff.bytes+j];
+			elf_Bytecode b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
-			// elf_get_line_source_info(md->file,md->lines[j],&linenum,&lineloc);
+			// get_source_info(md->file,md->lines[j],&linenum,&lineloc);
 			// fprintf(file,"%-3i:%-3i",linenum,(int)(md->lines[j]-lineloc));
 			fpf_byte(io,md,i,j,b);
 		}
@@ -312,7 +287,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		elf_Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
-			elf_bytecode b = md->bytes[p.bytes+j];
+			elf_Bytecode b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");
@@ -320,14 +295,3 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 #endif
 }
 #endif
-
-// todo: remove this!
-int get_byte_class(int k) {
-#define BCITEM(NAME,FMT,__) case XFUSE(BC_,NAME): return XFUSE(BC_CLASS_,FMT);
-	switch (k) {
-		BCDEF(BCITEM)
-	default: NO_CODE;
-	}
-#undef BCITEM
-	return -1;
-}

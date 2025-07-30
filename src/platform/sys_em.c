@@ -170,7 +170,7 @@ int sys_readdir(FILE_VISITOR *visitor) {
 
 			elf_String *name = elf_new_string(R,entry->d_name);
 			elf_String *path = elf_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
-			elf_StackId base = elf_push_closure(R,cls);
+			elf_StackId base = elf_push_closure_raw(R,cls);
 			elf_Table *file = elf_new_table(R);
 
 			elf_tsets_str(file,elf_new_string(R,"name"),name);

@@ -23,19 +23,13 @@ typedef elf_i64 elf_IndexInt;
 #define ELF_FUNCTION(NAME) int (NAME)(elf_State *S)
 typedef ELF_FUNCTION(* elf_Function);
 
-
-// Todo: remove this, this is silly...
+//
+// this is just a helper struct for creating libraries
+//
 typedef struct {
-	char *name;
-	elf_Function fn;
-} NameFunctionPair;
-
-
-//
-// todo: remove this from here!
-//
-typedef int Instr;
-typedef char *Source;
+	char         *name;
+	elf_Function  function;
+} elf_Binding;
 
 
 /* first object tag must be OBJ, all other
@@ -52,47 +46,47 @@ typedef enum {
 	/* the value is a 64 bit integer */
 	elf_tag_int,
 	/* the value is a handle */
-	elf_tag_sysobj,
+	elf_tag_Handle,
 	/* the value is a function */
-	elf_tag_function,
+	elf_tag_Function,
 	/* the value is a custom object */
-	elf_tag_userobj,
+	elf_tag_UserObject,
 	/* the value is a closure object */
-	elf_tag_closure,
+	elf_tag_Closure,
 	/* the value is string object */
-	elf_tag_str,
+	elf_tag_String,
 	/* the value is table object */
-	elf_tag_tab,
-} elf_tag_enum;
+	elf_tag_Table,
+} elf_Tag;
 
-
-
+// todo: init is internal stuff because it takes a pointer
 ELF_API void elf_init(elf_State *S);
+
 ELF_API int elf_exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents);
 ELF_API elf_b32 elf_exec_file(elf_State *S, char *name, int nargs, int nrets);
 ELF_API int elf_call(elf_State *S, int nargs, int nrets);
 
+int elf_push_this(elf_State *S);
+int elf_push_globals(elf_State *S);
+int elf_push_int(elf_State *S, elf_Int);
+int elf_push_nil(elf_State *S);
+int elf_push_table(elf_State *S);
+int elf_push_string(elf_State *S, const char *);
+int elf_push_num(elf_State *S, elf_Num);
+int elf_push_function(elf_State *S, elf_Function);
+int elf_push_handle(elf_State *S, elf_Handle);
 
-// [ GLOBALS ]
-int elf_get_global_slot(elf_State *S, elf_String *name);
-int elf_set_global(elf_State *S, elf_String *name, elf_Value value);
+/* the following are stack based instructions, they require the
+arguments on the stack
+todo: need version of this that takes the stack address */
+void elf_table_set(elf_State *S);
+void elf_array_add(elf_State *S);
 
 
-// [ STACK ]
+
 elf_Value *elf_get_stack(elf_State *S);
 elf_Value *elf_get_stack_ptr(elf_State *S);
 
-void elf_push_this     (elf_State *S);
-void elf_push_any      (elf_State *S, elf_Value value);
-void elf_push_nil      (elf_State *S);
-void elf_push_int      (elf_State *S, elf_Int);
-void elf_push_num      (elf_State *S, elf_Num);
-void elf_push_object   (elf_State *S, elf_Object *);
-void elf_push_string   (elf_State *S, elf_String *);
-void elf_push_handle   (elf_State *S, elf_Handle);
-void elf_push_table    (elf_State *S, elf_Table *);
-void elf_push_closure  (elf_State *S, elf_Closure *);
-void elf_push_function (elf_State *S, elf_Function);
 
 
 elf_Object  *elf_get_this   (elf_State *S);
@@ -104,49 +98,18 @@ elf_Value    elf_get_arg    (elf_State *S, int stk);
 
 elf_Int      elf_get_int     (elf_State *S, int stk);
 elf_Num      elf_get_num     (elf_State *S, int stk);
+elf_Handle   elf_get_sysobj  (elf_State *S, int stk);
+
 elf_String  *elf_get_string  (elf_State *S, int stk);
 char        *elf_get_text    (elf_State *S, int stk);
 elf_Object  *elf_get_object  (elf_State *S, int stk);
 elf_Table   *elf_get_table   (elf_State *S, int stk);
-elf_Handle   elf_get_sysobj  (elf_State *S, int stk);
 elf_Closure *elf_get_closure (elf_State *S, int stk);
 
-ELF_API elf_tag_enum elf_get_tag(elf_State *S, int x);
+ELF_API elf_Tag elf_get_tag(elf_State *S, int x);
 
 /* getting call frame information */
 ELF_API int elf_get_num_args(elf_State *S);
-
-
-/* allocating objects */
-
-/* allocate and adds the object to stack (prevents it from getting GC'd) */
-elf_String *elf_new_string2(elf_State *, elf_i32 length);
-elf_String *elf_new_string(elf_State *, const char *text);
-elf_String *elf_alloc_string2(elf_State *S, elf_i32 length);
-elf_String *elf_alloc_string(elf_State *S, const char *text);
-
-int      elf_get_string_length(elf_String *);
-elf_HashInt  elf_get_string_hash(elf_String *);
-
-
-//
-// -+- TABLE -+-
-//
-
-elf_Table *elf_alloc_table2(elf_State *, elf_Int length);
-elf_Table *elf_alloc_table(elf_State *);
-elf_Table *elf_new_table(elf_State *);
-void elf_table_resize_maybe(elf_Table *tab);
-void elf_table_alias(elf_Table *tab, elf_Value key, elf_Value alias);
-void elf_table_merge(elf_Table *tab, elf_Table *merger);
-void elf_table_recycle(elf_Table *tab);
-elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key);
-elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash);
-elf_IndexInt elf_table_get_or_add(elf_Table *tab, elf_Value key);
-elf_Value elf_table_get(elf_Table *tab, elf_Value key);
-elf_b32 elf_table_set(elf_Table *tab, elf_Value k, elf_Value v);
-elf_IndexInt elf_array_get_length(elf_Table *tab);
-void elf_array_add(elf_Table *tab, elf_Value thing);
 
 
 
@@ -167,9 +130,6 @@ void elf_gc_check(elf_State *);
 
 
 void elf_error(elf_State *S, int instr, const char *error);
-int elf_query_file_for_instr(elf_State *S, int instr);
-char *elf_get_instr_line(elf_State *S, int instr);
-
 
 
 

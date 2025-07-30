@@ -130,7 +130,7 @@ typedef struct token_metadata_t {
 	char prec;
 } token_metadata_t;
 
-GLOBAL token_metadata_t g_token_metadata_table[] = {
+global token_metadata_t g_token_metadata_table[] = {
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},

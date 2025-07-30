@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#define IS_OBJ_TAG(tag) ((tag) >= elf_tag_userobj)
+#define IS_OBJ_TAG(tag) ((tag) >= elf_tag_UserObject)
 
 #define IS_INT_OR_NUM(tag) (((tag) == elf_tag_num) || ((tag) == elf_tag_int))
 
@@ -16,7 +16,7 @@
 #define OBJ_COLOR(thing) (POBJ(thing)->color)
 
 
-#define OBJ2V(ty) (elf_tag_userobj+ty)
+#define OBJ2V(ty) (elf_tag_UserObject+ty)
 
 
 #define GET_FRAME(S) ((S)->frame)
@@ -39,12 +39,12 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 #define VALUE_NIL()           (XLITERAL(elf_Value){ elf_tag_nil                                                 })
 #define VALUE_NUMBER(thing)   (XLITERAL(elf_Value){ elf_tag_num        , ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
 #define VALUE_INTEGER(thing)  (XLITERAL(elf_Value){ elf_tag_int        , {(elf_Int) UCAST(thing, elf_Int)      }})
-#define VALUE_TABLE(thing)    (XLITERAL(elf_Value){ elf_tag_tab        , {(elf_Int) UCAST(thing, elf_Table *)  }})
+#define VALUE_TABLE(thing)    (XLITERAL(elf_Value){ elf_tag_Table        , {(elf_Int) UCAST(thing, elf_Table *)  }})
 #define VALUE_OBJECT(thing)   (XLITERAL(elf_Value){ OBJ2V(thing->type) , {(elf_Int) UCAST(thing, elf_Object *) }})
-#define VALUE_STRING(thing)   (XLITERAL(elf_Value){ elf_tag_str        , {(elf_Int) UCAST(thing, elf_String *) }})
-#define VALUE_CLOSURE(thing)  (XLITERAL(elf_Value){ elf_tag_closure    , {(elf_Int) UCAST(thing, elf_Closure *)}})
-#define VALUE_FUNCTION(thing) (XLITERAL(elf_Value){ elf_tag_function       , {(elf_Int) UCAST(thing, elf_Function) }})
-#define VALUE_HANDLE(thing)   (XLITERAL(elf_Value){ elf_tag_sysobj     , {(elf_Int) UCAST(thing, elf_Handle)   }})
+#define VALUE_STRING(thing)   (XLITERAL(elf_Value){ elf_tag_String        , {(elf_Int) UCAST(thing, elf_String *) }})
+#define VALUE_CLOSURE(thing)  (XLITERAL(elf_Value){ elf_tag_Closure    , {(elf_Int) UCAST(thing, elf_Closure *)}})
+#define VALUE_FUNCTION(thing) (XLITERAL(elf_Value){ elf_tag_Function       , {(elf_Int) UCAST(thing, elf_Function) }})
+#define VALUE_HANDLE(thing)   (XLITERAL(elf_Value){ elf_tag_Handle     , {(elf_Int) UCAST(thing, elf_Handle)   }})
 
 
 
@@ -57,12 +57,6 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 
 
 
-//
-// TODO: REMOVE THIS FROM HERE
-//
-#if !defined(NO_CODE)
-	#define NO_CODE __debugbreak();
-#endif
 // elf_debugger(__FILE__" ["XTEXT(__LINE__)"]: internal error: unexpected code branch")
 
 

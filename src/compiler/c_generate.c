@@ -21,7 +21,7 @@ static void close_if(elf_Parser *fs, Source line, BranchJumps *s);
 // static void close_while_loop(elf_Parser *fs);
 
 static int emit_jump(elf_Parser *parser, Source line, int dst);
-static int emit_byte(elf_Parser *parser, Source line, elf_bytecode byte);
+static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte);
 static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
 static int emit_bytexy(elf_Parser *parser, Source line, int k, int x, int y);
 static int emit_bytexyz(elf_Parser *parser, Source line, int k, int x, int y, int z);
@@ -715,7 +715,7 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(elf_Parser *C, Source line, elf_bytecode byte) {
+static int emit_byte(elf_Parser *C, Source line, elf_Bytecode byte) {
 	elf_State *M = C->R;
 	line = line ? line : C->expr_line;
 	ASSERT(line != 0);
@@ -729,7 +729,7 @@ static int emit_byte(elf_Parser *C, Source line, elf_bytecode byte) {
 
 
 static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
-	elf_bytecode byte=BC_XXX(k,x);
+	elf_Bytecode byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	return emit_byte(C,line,byte);
@@ -737,7 +737,7 @@ static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
 
 
 static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
-	elf_bytecode byte=BC_XYY(k,x,y);
+	elf_Bytecode byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -746,7 +746,7 @@ static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
 
 
 static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) {
-	elf_bytecode byte=BC_XYZ(k,x,y,z);
+	elf_Bytecode byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -755,7 +755,7 @@ static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) 
 }
 
 static void patch_jump2(elf_Parser *fs, int src, int dst) {
-	elf_bytecode byte,*bytes;
+	elf_Bytecode byte,*bytes;
 	bytes=fs->R->bytes;
 	byte=bytes[src];
 	int j = dst - src;

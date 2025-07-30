@@ -76,7 +76,7 @@ int core_lib_list_volumes(elf_State *R) {
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				elf_array_add(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
+				elf_array_add_raw(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -84,7 +84,7 @@ int core_lib_list_volumes(elf_State *R) {
 	FindVolumeClose(handle);
 #endif
 
-	elf_push_table(R,list); /* <- */
+	elf_push_table_raw(R,list); /* <- */
 	return 1;
 }
 #endif
@@ -98,6 +98,8 @@ bool sys_debugger() {
 	DebugBreak();
 	return 1;
 }
+
+#include "logging.c"
 
 // todo: make this legit, this depends on the subsystem!
 void sys_console_print(int type, char *message) {

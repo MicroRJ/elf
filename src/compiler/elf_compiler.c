@@ -8,15 +8,15 @@
 #include "elf.h"
 #include "r_core.h"
 #include "subsystem.h"
-
 #include "r_auxilary.h"
 
-#include "r_bytecode.h"
+#include "bytecode_metadata.h"
 
-#include "c_compiler.h"
+#include "elf_compiler.h"
 #include "c_token.h"
 #include "c_tree.h"
 #include "c_parse.h"
+
 
 #include "c_lexer.c"
 #include "c_tree.c"
@@ -40,7 +40,7 @@ int elf_parse_const(elf_State *S, char *name, char *contents) {
 	return c_parse_const(&parser);
 }
 
-
+// todo: remove the as_expr thing?
 elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool as_expr) {
 	ASSERT(contents);
 	ASSERT(name);
@@ -116,8 +116,8 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
-	elf_array_add(S->globals, VALUE_STRING(contents));
-	elf_array_add(S->globals, VALUE_STRING(name));
+	elf_array_add_raw(S->globals, VALUE_STRING(contents));
+	elf_array_add_raw(S->globals, VALUE_STRING(name));
 
 	return protos[0];
 }

@@ -65,7 +65,7 @@ static int math_lib_atan2(elf_State *R) {
 	return 1;
 }
 
-static NameFunctionPair lib_math[] = {
+static elf_Binding lib_math[] = {
 	{"exp",math_lib_exp},
 	{"floor",math_lib_floor},
 	{"ceil",math_lib_ceil},

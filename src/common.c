@@ -1,9 +1,96 @@
-/*
-** See Copyright Notice In elf.h
-** text.c
-** Text Tools
-*/
+//
+// See Copyright Notice In elf.h
+//
 
+//
+// Various Utility Functions
+//
+
+
+static elf_i64 prof_get_time() {
+	return sys_get_clock_time();
+}
+
+static elf_f64 prof_time_diff_s(elf_i64 time) {
+	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
+}
+
+static elf_f64 prof_time_diff_ms(elf_i64 time) {
+	return prof_time_diff_s(time) * 1000.0;
+}
+
+
+//
+// Hash <3 stb
+//
+
+static inline unsigned int rehash(unsigned int hash) {
+	return ((hash) + ((hash) >> 6) + ((hash) >> 19));
+}
+
+
+static inline unsigned int hash_text(const char *text) {
+	unsigned int hash;
+	for (hash=2166136261u; *text; hash ^= *text++, hash *= 16777619);
+	return hash;
+}
+
+static inline unsigned int hash64(elf_i64 i) {
+	unsigned int hash = rehash(i);
+	hash += hash << 16;
+	hash ^= hash << 3;
+	hash += hash >> 5;
+	hash ^= hash << 2;
+	hash += hash >> 15;
+	hash ^= hash << 10;
+	return rehash(hash);
+}
+
+
+static char *get_name_from_file_path(const char *s) {
+	char *p, *n;
+
+	p = (char *) s;
+
+	for (n = p; *p != 0; p += 1) {
+		if (*p == '/' || *p == '\\') {
+			n = p + 1;
+		}
+	}
+	return n;
+}
+
+
+static void get_source_info(char *source, char *cursor, int *line_number, char **line_start) {
+	//
+	// get line number and starting address
+	// of the line for the given address within
+	// the file q
+	//
+
+	char *q, *c;
+	int n;
+
+	q=source,c=source;
+
+	for (n=0; q < cursor; ) {
+		// skip line
+		while (((*q != '\r') && (*q != '\n') && (*q != '\0')) && (q < cursor)) q ++;
+		// did we reach end of file?
+		if (*q == '\0') break;
+
+		if ((*q != '\n') || (c = ++ q, n ++, 1)) {
+			if ((*q == '\r') && (c = ++ q, n ++, 1)) {
+				if (*q == '\n') c = ++ q;
+
+				// todo: come back to this, why do we still increment
+				// on the else branch here?
+			} else q ++;
+		}
+	}
+	if (line_number) *line_number = n + 1;
+	if (line_start) *line_start = c;
+}
 
 static void *clear_memory(void *target, elf_Int length) {
 	memset(target,0,length);

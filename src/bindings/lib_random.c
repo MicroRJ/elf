@@ -14,7 +14,7 @@ static int _random(elf_State *S) {
 	return 1;
 }
 
-static NameFunctionPair lib_random[] = {
+static elf_Binding lib_random[] = {
 	{"random", _random}
 };
 

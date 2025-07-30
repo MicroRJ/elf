@@ -2,10 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: remove!
-void elf_get_line_source_info(char *q, char *loc, int *linenum, char **lineloc);
-
-
 #define POS0() (parser->pos[0])
 #define POS1() (parser->pos[1])
 #define MOVE() (*(parser->pos ++))
@@ -47,7 +43,7 @@ static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) 
 
 	int linenum;
 	char *lineloc;
-	elf_get_line_source_info(parser->text,line,&linenum,&lineloc);
+	get_source_info(parser->text,line,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {

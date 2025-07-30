@@ -44,7 +44,7 @@ int string_lib_pop(elf_State *R) {
 	elf_String *yo = (elf_String*) elf_get_this(R);
 	elf_String *el = elf_alloc_string2(R,MAX(0,yo->length-1));
 	copy_memory(el->text,yo->text,MAX(0,yo->length-1));
-	elf_push_string(R,el);
+	elf_push_string_raw(R,el);
 	return 1;
 }
 
@@ -61,7 +61,7 @@ ELF_FUNCTION(string_lib_append_char) {
 	}
 
 	new_string->hash = hash_text(new_string->text);
-	elf_push_string(S, new_string);
+	elf_push_string_raw(S, new_string);
 	return 1;
 }
 
@@ -72,7 +72,7 @@ int string_lib_append(elf_State *R) {
 	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elf_get_num_args(R); ++ i) {
 		elf_Value v = elf_get_arg(R,i);
-		if (v.tag == elf_tag_str) {
+		if (v.tag == elf_tag_String) {
 			strcatf(buffer,"%s",v.x_str->text);
 		} else if (v.tag == elf_tag_nil) {
 			strcatf(buffer,"nil");
@@ -80,7 +80,7 @@ int string_lib_append(elf_State *R) {
 			strcatf(buffer,"%.2f",v.x_num);
 		} else if (v.tag == elf_tag_int) {
 			strcatf(buffer,"%lli",v.x_int);
-		} else if (v.tag == elf_tag_tab) {
+		} else if (v.tag == elf_tag_Table) {
 			strcatf(buffer,"(tab %p)",v.x_tab);
 		} else NO_CODE;
 	}
@@ -112,7 +112,7 @@ int string_lib_find(elf_State *R) {
 			/* todo: there's no need for the buffer! */
 			ARRAY_ADD(buffer,0);
 			elf_Int narray = ARRAY_LENGTH(list->array);
-			elf_table_set(list,VALUE_INTEGER(narray),VALUE_STRING(elf_alloc_string(R,buffer)));
+			elf_table_set_raw(list,VALUE_INTEGER(narray),VALUE_STRING(elf_alloc_string(R,buffer)));
 			ARRAY(buffer).min = 0;
 		} else cursor += 1;
 	}
@@ -133,7 +133,7 @@ int string_lib_split_by_lines(elf_State *R) {
 			cursor += 1 + (cursor[0] == '\r' && cursor[1] == '\n');
 		}
 		ARRAY_ADD(buffer,0);
-		elf_table_set(list,VALUE_INTEGER(ARRAY_LENGTH(list->array)),VALUE_STRING(elf_alloc_string(R,buffer)));
+		elf_table_set_raw(list,VALUE_INTEGER(ARRAY_LENGTH(list->array)),VALUE_STRING(elf_alloc_string(R,buffer)));
 		ARRAY(buffer).min = 0;
 	}
 	return 1;
@@ -167,7 +167,7 @@ int string_lib_uppercase(elf_State *R) {
 }
 
 
-NameFunctionPair string_metafuncs[] = {
+elf_Binding string_metafuncs[] = {
 	{ "length"          , string_lib_length         },
 	{ "match"           , string_lib_match          },
 	{ "uppercase"       , string_lib_uppercase      },

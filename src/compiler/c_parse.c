@@ -1253,7 +1253,7 @@ static int c_parse_const(elf_Parser *parser) {
 			get_tok(parser);
 			elf_Table *tab = elf_new_table(parser->R);
 			elf_Value *check_ptr = elf_get_stack_ptr(parser->R);
-			while(parser->tok.type != TK_NONE && !peek_tok(parser,TK_CURLY_RIGHT)) {
+			while(!peek_tok(parser,TK_NONE) && !peek_tok(parser,TK_CURLY_RIGHT)) {
 				tok = parser->tok;
 				if (parser->tok_prox.type == TK_ASSIGN) {
 					if (tok.type == TK_WORD) {
@@ -1276,13 +1276,13 @@ static int c_parse_const(elf_Parser *parser) {
 					elf_Value value = elf_get_stack_ptr(parser->R)[-1];
 					parser->R->stack_ptr -= 2;
 					ASSERT(parser->R->stack_ptr == check_ptr);
-					elf_table_set(tab,key,value);
+					elf_table_set_raw(tab,key,value);
 				} else {
 					ret = c_parse_const(parser);
 					if (ret == -1) goto esc;
 					elf_Value value = parser->R->stack_ptr[-1];
 					parser->R->stack_ptr -= 1;
-					elf_array_add(tab,value);
+					elf_array_add_raw(tab,value);
 					if (peek_tok(parser,TK_ASSIGN)) {
 						parser_dialog(parser,tok.line,"not a proper key");
 						goto esc;
@@ -1326,12 +1326,12 @@ static treeID parse_json_expr(elf_Parser *parser){
 
 static elf_Value parse_json_value(elf_Parser *parser);
 
-static elf_Table * parse_json_array(elf_Parser *parser){
-	elf_Table * arr = elf_new_table(parser->R);
+static elf_Table *parse_json_array(elf_Parser *parser){
+	elf_Table *arr = elf_new_table(parser->R);
 	take_tok(parser,TK_SQUARE_LEFT);
 	if(!pick_tok(parser,TK_SQUARE_RIGHT)) do {
 		elf_Value val = parse_json_value(parser);
-		elf_array_add(arr,val);
+		elf_array_add_raw(arr,val);
 	} while(pick_tok(parser,TK_COMMA));
 	take_tok(parser,TK_SQUARE_RIGHT);
 	return arr;
@@ -1351,7 +1351,7 @@ static elf_Table * c_parse_json(elf_Parser *parser){
 		key=VALUE_STRING(elf_new_string(parser->R,tok.text));
 		take_tok(parser,TK_COLON);
 		val=parse_json_value(parser);
-		elf_table_set(table,key,val);
+		elf_table_set_raw(table,key,val);
 	} while(pick_tok(parser,TK_COMMA));
 	take_tok(parser,TK_CURLY_RIGHT);
 

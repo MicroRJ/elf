@@ -28,17 +28,20 @@
 #include "system.h"
 
 #include "subsystem.h"
-#include "r_bytecode.h"
-#include "r_auxilary.h"
-#include "hash.c"
 
+#include "logging.c"
+
+#include "bytecode_metadata.h"
+#include "r_auxilary.h"
 #include "o_string.c"
 #include "o_table.c"
 #include "o_closure.c"
 #include "r_diagnostics.c"
+#include "internal.c"
+#include "public.c"
 
-#include "c_compiler.h"
-#include "r_mundane.c"
+#include "elf_compiler.h"
+
 #include "r_collector.c"
 #include "lib_core.h"
 #include "lib_math.c"
@@ -67,7 +70,7 @@ static void _debug_stack_push(elf_State *S, elf_Value v) {
 int elf_get_global_slot(elf_State *S, elf_String *name) {
 
 	if (name != 0) {
-		return elf_table_get_or_add(S->globals, VALUE_STRING(name));
+		return elf_table_get_or_add_raw(S->globals, VALUE_STRING(name));
 	}
 
 	return ARRAY_GROW(S->globals->array, 1);
@@ -83,9 +86,10 @@ int elf_set_global(elf_State *S, elf_String *name, elf_Value value) {
 
 int elf_exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents) {
 	elf_Proto proto = elf_compile(R, name, contents, as_expr);
-	elf_Closure *closure = elf_new_closure(R, proto);
+	elf_Closure *closure = elf_alloc_closure(R, proto);
+	elf_push_closure_raw(R, closure);
 	elf_Value *rets = R->stack_ptr;
-	elf_push_closure(R, closure);
+	elf_push_closure_raw(R, closure);
 	elf_push_this(R);
 	nrets = elf_call(R, nargs + 1, nrets);
 	R->stack_ptr = rets + nrets;
@@ -104,26 +108,21 @@ elf_b32 elf_exec_file(elf_State *S, char *name, int nargs, int nrets) {
 	return elf_exec(S, false, nargs, nrets, elf_new_string(S, name), contents);
 }
 
-static elf_Table *instantiate(elf_State *S, NameFunctionPair *lib, int num) {
-	elf_Table *tab = elf_new_table(S);
-	for (int i = 0; i < num; i ++) {
-		elf_String *name = elf_new_string(S, lib[i].name);
-		elf_table_set(tab, VALUE_STRING(name), VALUE_FUNCTION(lib[i].fn));
-	}
-	return tab;
-}
-
-static void install(elf_State *S, char *prefix, NameFunctionPair *bindings, int num) {
-	// todo: ensure the symbol name is valid
+static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num) {
 	for(int i = 0; i < num; i ++) {
-		char *temp = bindings[i].name;
-		if(prefix) temp = elf_tpf("%s.%s",prefix,temp);
 
-		elf_String *name = elf_alloc_string(S,temp);
-		// elf_debug_log("	lib: %s",name->text);
-		elf_table_set(S->globals, VALUE_STRING(name), VALUE_FUNCTION(bindings[i].fn));
+		char *name = lib[i].name;
+
+		// todo: ensure the symbol name is valid?
+		if (prefix) name = elf_tpf("%s.%s",prefix,name);
+
+		elf_push_string(S, name);
+		elf_push_function(S, lib[i].function);
+
+		elf_table_set(S);
 	}
 }
+
 
 //
 // so here we rely on the virtual memory system for things
@@ -154,20 +153,26 @@ void elf_init(elf_State *R) {
 
 
 	// todo: metatables should be per module?
-	R->metatables.string = instantiate(R, string_metafuncs, COUNTOF(string_metafuncs));
-	R->metatables.table = instantiate(R, table_metafuncs, COUNTOF(table_metafuncs));
-	R->globals = elf_new_table(R);
+	R->metatables.string = elf_new_table(R);
+	install(R, 0, string_metafuncs, COUNTOF(string_metafuncs));
+
+	R->metatables.table = elf_new_table(R);
+	install(R, 0, table_metafuncs, COUNTOF(table_metafuncs));
+
 	R->strings = elf_new_table(R);
 
-	static NameFunctionPair lib_base[] = {
+	static elf_Binding lib_base[] = {
 		{"ntoi", core_lib_ntoi},
 		{"iton", core_lib_iton},
 	};
+
+	R->globals = elf_new_table(R);
 	install(R,     0,  lib_base  , COUNTOF(lib_base));
 	install(R,"elf" , _lib_time  , COUNTOF(_lib_time));
 	install(R,     0,  lib_math  , COUNTOF(lib_math));
 	install(R,"elf" ,  lib_core  , COUNTOF(lib_core));
 	install(R,"elf" ,  lib_random, COUNTOF(lib_random));
+	install(R,"elf" ,  l_sys,      COUNTOF(l_sys));
 }
 
 
@@ -203,7 +208,7 @@ static int elf_call(elf_State *S, int numargs, int maxrets) {
 	elf_Value *base_ptr = S->stack_ptr - numargs;
 	elf_Value value = base_ptr[-1];
 
-	if(value.tag==elf_tag_closure){
+	if(value.tag==elf_tag_Closure){
 		elf_Closure *closure = value.x_closure;
 		elf_Proto proto = closure->proto;
 		int framesize = numargs;
@@ -224,9 +229,11 @@ static int elf_call(elf_State *S, int numargs, int maxrets) {
 		clear_memory(base_ptr + numargs, toclear * sizeof(elf_Value));
 		S->stack_ptr = base_ptr + framesize;
 
+		// todo: do not make this recursive hello??
 		numrets = _resume(S);
+
 		_pop_stack_frame(S);
-	}else if(value.tag==elf_tag_function){
+	}else if(value.tag==elf_tag_Function){
 		elf_Stack_Frame frame = {};
 		frame.bytecounter = S->byte;
 		frame.locals = base_ptr;
@@ -263,7 +270,7 @@ static inline void divcheck(elf_State *S, elf_Value *xx, elf_Value *yy) {
 }
 
 
-static int tagcheck(elf_State *R, Instr id, int stk, elf_tag_enum x, elf_tag_enum y) {
+static int tagcheck(elf_State *R, Instr id, int stk, elf_Tag x, elf_Tag y) {
 	if (x != y) {
 		elf_error(R,id,elf_tpf("$%i, expected %s, instead got %s",stk,tag2s[x],tag2s[y]));
 	}
@@ -277,7 +284,7 @@ static int _callov(elf_State *S, elf_Object *obj, char const *name, int reg, int
 	}
 	int num_rets = 0;
 	elf_Value value = elf_tgetx_any(obj->meta,name);
-	if((value.tag)==elf_tag_closure||(value.tag)==elf_tag_function) {
+	if((value.tag)==elf_tag_Closure||(value.tag)==elf_tag_Function) {
 		elf_Value *top = GET_TOP(S);
 		PUSHV(S,value);
 		PUSHV(S,VALUE_OBJECT(obj));
@@ -288,7 +295,7 @@ static int _callov(elf_State *S, elf_Object *obj, char const *name, int reg, int
 		// GET_LOCAL(S,reg)=*top;
 	}else{
 		for(int i=0;i<obj->meta->ntotal;i++){
-			if(obj->meta->slots[i].key.tag==elf_tag_str){
+			if(obj->meta->slots[i].key.tag==elf_tag_String){
 				printf(" -> '%s'\n", obj->meta->slots[i].key.x_str->text);
 			}
 		}
@@ -322,7 +329,7 @@ int _resume(elf_State *R) {
 		elf_Value xx,yy,zz;
 		int instr = next_instr ++;
 		int module_instr = proto.bytes + instr;
-		elf_bytecode byte = M->bytes[module_instr];
+		elf_Bytecode byte = M->bytes[module_instr];
 
 		// todo: in case we crash, preferably do this right
 		// before or pass it in to the function?
@@ -339,7 +346,7 @@ int _resume(elf_State *R) {
 		#if 0
 		if(!R->disable_tracing){
 			if(R->flags & FLAG_TRACING){
-				elf_Value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(module_instr));
+				elf_Value trace_value = elf_table_get_raw(R->trace_table,VALUE_INTEGER(module_instr));
 				if(trace_value.tag!=elf_tag_nil){
 					if(module_instr!=R->trace_start_instr){
 						ASSERT(BC_OP(byte) != BC_J && BC_OP(byte) != BC_JZ && BC_OP(byte) != BC_JNZ);
@@ -373,7 +380,7 @@ int _resume(elf_State *R) {
 					}
 				}else{
 					ASSERT(R->trace_inner_loop_counter == 0);
-					elf_Value trace_value = elf_table_get(R->trace_table,VALUE_INTEGER(trace_start_instr));
+					elf_Value trace_value = elf_table_get_raw(R->trace_table,VALUE_INTEGER(trace_start_instr));
 					if(trace_value.tag==elf_tag_nil){
 						if(R->track[module_instr]>=64){
 							R->flags |= FLAG_TRACING;
@@ -381,7 +388,7 @@ int _resume(elf_State *R) {
 							R->trace_stop_instr  = module_instr;
 							R->active_trace_pos  = ARRAY_LENGTH(R->trace_buffer);
 							R->active_trace_len  = 0;
-							elf_table_set(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
+							elf_table_set_raw(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
 						}else{
 							R->track[module_instr]+=1;
 						}
@@ -471,12 +478,12 @@ int _resume(elf_State *R) {
 				elf_Proto proto = M->protos[BC_ARGY(byte)];
 				elf_Closure *new_closure = elf_alloc_closure(R,proto);
 				copy_memory(new_closure->values,locals+BC_ARGX(byte),proto.ncaptures*sizeof(elf_Value));
-				locals[BC_ARGX(byte)].tag   = elf_tag_closure;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Closure;
 				locals[BC_ARGX(byte)].x_closure = new_closure;
 			} break;
 			case BC_TABLE: {
 				elf_Table *tab = elf_alloc_table(R);
-				locals[BC_ARGX(byte)].tag   = elf_tag_tab;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Table;
 				locals[BC_ARGX(byte)].x_tab = tab;
 			} break;
 			case BC_TYPEGUARD: {
@@ -486,10 +493,10 @@ int _resume(elf_State *R) {
 				elf_Value yy = locals[BC_ARGY(byte)];
 				elf_Table *metatable = {0};
 				switch (yy.tag) {
-					case elf_tag_str:
-					case elf_tag_tab:
-					case elf_tag_userobj:
-					case elf_tag_closure: {
+					case elf_tag_String:
+					case elf_tag_Table:
+					case elf_tag_UserObject:
+					case elf_tag_Closure: {
 						metatable = yy.x_obj->meta;
 					} goto _lookup;
 					case elf_tag_num: {
@@ -508,7 +515,7 @@ int _resume(elf_State *R) {
 				if (!metatable) {
 					elf_error(R,module_instr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
 				}
-				locals[BC_ARGX(byte)] = elf_table_get(metatable,locals[BC_ARGZ(byte)]);
+				locals[BC_ARGX(byte)] = elf_table_get_raw(metatable,locals[BC_ARGZ(byte)]);
 			} break;
 			/* todo: why are these two identical bro... */
 			case BC_GETINDEX: case BC_GETFIELD: {
@@ -518,13 +525,13 @@ int _resume(elf_State *R) {
 				if(yy.tag==elf_tag_nil) {
 					elf_error(R,module_instr,"attempted to get nil field");
 				}else switch (xx.tag){
-					case elf_tag_tab:{
-						locals[BC_ARGX(byte)]=elf_table_get(xx.x_tab,yy);
+					case elf_tag_Table:{
+						locals[BC_ARGX(byte)]=elf_table_get_raw(xx.x_tab,yy);
 					}break;
-					case elf_tag_userobj:{
+					case elf_tag_UserObject:{
 						_callov(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
 					}break;
-					case elf_tag_str:{
+					case elf_tag_String:{
 						/* todo: allow for indexing for substrings,
 						for instrance, "my name is"["name"] */
 						tagcheck(R,module_instr,0,elf_tag_int,yy.tag);
@@ -545,11 +552,11 @@ int _resume(elf_State *R) {
 				xx=locals[BC_ARGX(byte)];
 				yy=locals[BC_ARGY(byte)];
 				zz=locals[BC_ARGZ(byte)];
-				if(xx.tag==elf_tag_tab){
+				if(xx.tag==elf_tag_Table){
 					if(!xx.x_tab) elf_error(R,module_instr,elf_tpf("table is nil, how did this happen?"));
 					if(yy.tag==elf_tag_nil) elf_error(R,module_instr,elf_tpf("key is nil..."));
-					elf_table_set(xx.x_tab,yy,zz);
-				}else if(xx.tag==elf_tag_userobj){
+					elf_table_set_raw(xx.x_tab,yy,zz);
+				}else if(xx.tag==elf_tag_UserObject){
 					elf_Value args[] = { yy, zz };
 					_callov(R,xx.x_obj,"__setfield",BC_ARGX(byte),2,args);
 				}else{
@@ -616,7 +623,7 @@ int _resume(elf_State *R) {
 				bool eq=0;
 				if ((xx.tag==elf_tag_nil)||(yy.tag==elf_tag_nil)) {
 					eq=IS_NIL_VALUE(xx)==IS_NIL_VALUE(yy);
-				} else if ((xx.tag==elf_tag_str)&&(yy.tag==elf_tag_str)) {
+				} else if ((xx.tag==elf_tag_String)&&(yy.tag==elf_tag_String)) {
 					eq=elf_get_strings_eq(xx.x_str,yy.x_str);
 				} else if ((IS_INT_OR_NUM(xx.tag))&&(IS_INT_OR_NUM(yy.tag))) {
 					eq=xx.x_int==yy.x_int;

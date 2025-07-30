@@ -138,7 +138,7 @@
 // 		if (message.length != 0) {
 // 			elf_Int length = message.length;
 // 			elf_String *obj = elf_alloc_string2(R,length);
-// 			elf_push_string(R,obj);
+// 			elf_push_string_raw(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
 // 				elf_Int result = recv(socket,cursor,length,0);

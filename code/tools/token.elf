@@ -205,7 +205,7 @@ fpf(file,"\tchar prec;\n")
 fpf(file,"\telf_hashint hash;\n")
 fpf(file,"} elTokenIntel;\n\n\n")
 
-fpf(file,"GLOBAL elTokenIntel elTokenIntelTable[] = {\n")
+fpf(file,"global elTokenIntel elTokenIntelTable[] = {\n")
 
 for i in 0..Tokens:length() ? {
 	let tk = Tokens:idx(i)
