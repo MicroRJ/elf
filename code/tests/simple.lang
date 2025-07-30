@@ -29,7 +29,7 @@ if 0 ? {
 
 
 // let fn = fun(x) ? {
-// 	if x == VNIL ? x = 1
+// 	if x == VALUE_NIL ? x = 1
 // 	for i in 0..12 ? pf("welcome")
 // }
 

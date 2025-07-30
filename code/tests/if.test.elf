@@ -1,4 +1,4 @@
-if 0 == VNIL ? failed = true
+if 0 == VALUE_NIL ? failed = true
 if false ? failed = true
 iff true ? failed = true
 let test = fun(x,y) ? {
