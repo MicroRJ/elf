@@ -1062,125 +1062,138 @@ static treeID parse_if(elf_Parser *parser, int negate){
 }
 
 static bool parse_for(elf_Parser *parser){
-	bool success = true;
+	bool noerror = true;
 
 	Token tok = take_tok(parser,TK_FOR);
 
 	Token name = take_tok(parser,TK_WORD);
 	take_tok(parser,TK_ASSIGN);
 
-	treeID v;
-	treeID *steps = 0;
+	// parse all the steps, for i = < X, Y, Z, ... > ?
+	treeID v, *steps = 0;
 	do {
 		v = parse_expr(parser,0);
 		if (v == NO_TREE) {
-			success = false;
+			noerror = false;
 			goto esc;
 		}
-		ARRAY_ADD(steps,v);
-	} while(pick_tok(parser,TK_COMMA));
+		ARRAY_ADD(steps, v);
+	} while (pick_tok(parser,TK_COMMA));
 
-	take_tok(parser,TK_QMARK);
+	take_tok(parser, TK_QMARK);
 
-	treeID index_ = tree_nop(parser,name.line);
+	treeID index_, value_;
+
+	// create memory locations for index and value variables
+	index_ = tree_nop(parser,name.line);
 	v = tree_assign_mem(parser,tok.line,index_);
 	block_add(parser,v);
 
-	treeID value_ = tree_nop(parser,name.line);
+	value_ = tree_nop(parser,name.line);
 	v = tree_assign_mem(parser,tok.line,value_);
 	block_add(parser,v);
 
+	// begin a new scope (the scope contains the entire for loop)
 	begin_scope(parser);
 
-	parser_bind(parser,name.line
+	// bind the name to the value variable, for <i> = ... ?
+	parser_bind(parser, name.line
 	, ENTITY_REFERENCED|ENTITY_ASSIGNED|ENTITY_FORLOOP
-	, name.text,value_);
+	, name.text, value_);
 
+	// begin a new loop
 	begin_loop(parser);
 
+	// parse the body, for i = ... ? < { ... } >
 	treeID body = parse_block(parser);
 	ASSERT(body->kind == STAT_BLOCK);
 
-	FOR_ARRAY(i,steps){
-		treeID step = v = steps[i];
+	//
+	// a for loop declares a variable that can take on multiple values.
+	//
+	// each step of the loop is a new value.
+	//
+	// A step can be single a values or a range.
+	//
+	// A ranges translates to an actual loop, single values to stores.
+	//
+
+	// generate loops or stores for each step
+	FOR_ARRAY(i, steps) {
+		treeID step = steps[i];
 
 		begin_block(parser);
 
-		treeT range = get_tree(parser,step);
-		// a for loop is a value that can take on multiple
-		// values, these are called steps, steps can be
-		// single values or ranges, ranges translate to
-		// actual loops, single values to stores.
-		if (range.kind == TREE_RANGE || range.kind == EXPR_RANGE_INDEX) {
-			treeID prev;
+
+		// check if the step translates into a loop
+		if (step->kind == TREE_RANGE || step->kind == EXPR_RANGE_INDEX) {
+
+			// we have two registers, one for the index, one for the value
 			treeID index = index_;
 			treeID value = value_;
-			treeID array = prev = NO_TREE;
 
-			// if this is a ranged index, then extract
-			// the range itself and the array, then range
-			// becomes the range itself and we continue
-			if (range.kind == EXPR_RANGE_INDEX) {
-				ASSERT(range.x != NO_TREE);
-				ASSERT(range.y != NO_TREE);
+			treeID rangelo = NO_TREE, rangehi = NO_TREE;
+			treeID prebody = NO_TREE;
 
-				array = range.x;
-				// get the actual range
-				range = get_tree(parser,range.y);
-				ASSERT(range.kind == TREE_RANGE);
-				ASSERT(index != value);
+			if (step->kind == EXPR_RANGE_INDEX) {
+				ASSERT(step->x != NO_TREE);
+				ASSERT(step->y != NO_TREE);
 
-				// todo: we use this so often, make intrinsic
+				treeID array = step->x;
+				treeID range = step->y;
+				ASSERT(range->kind == TREE_RANGE);
+
+				rangelo = range->x;
+				rangehi = range->y;
+
+				// index array and store in value register
 				treeID *args = 0;
-				ARRAY_ADD(args,index);
+				ARRAY_ADD(args, index);
 				v = tree_meta_call(parser,tok.line,array,args,"idx");
+				prebody = tree_store(parser,tok.line,value,v);
 
-				// what do you before the loop's body starts, we have
-				// to fetch the array item
-				prev = tree_store(parser,tok.line,value,v);
-			}else{
+				rangelo = range->x, rangehi = range->y;
+
+				if (rangelo == NO_TREE) rangelo = tree_int(parser,tok.line,0);
+				if (rangehi == NO_TREE) rangehi = tree_meta_call(parser,tok.line,array,0,"length");
+			} else {
+
+				// value same as index
 				index = value;
-			}
-			ASSERT(range.kind == TREE_RANGE);
 
-			// todo: if the range is actually nil on both
-			// ends, then there's no condition!
-			if (range.x == NO_TREE) {
-				range.x = tree_int(parser,tok.line,0);
-			}
-			if (range.y == NO_TREE) {
-				if (array) {
-					range.y = tree_meta_call(parser,tok.line,array,0,"length");
-				} else {
-					// todo: true infinite
-					range.y = tree_int(parser,tok.line,0xffffffffLLU);
-				}
+				rangelo = step->x, rangehi = step->y;
+
+				// todo: true infinite
+				if(rangehi == NO_TREE) rangehi = tree_int(parser,tok.line,0xffffffffLLU);
+				if(rangelo == NO_TREE) rangelo = tree_int(parser,tok.line,0);
 			}
 
-			ASSERT(range.x != NO_TREE);
-			ASSERT(range.y != NO_TREE);
+			ASSERT(rangelo != NO_TREE);
+			ASSERT(rangehi != NO_TREE);
 
-			// initialize index to lower bound of range
-			v = tree_store(parser,tok.line,index,range.x);
+
+			// initialize index
+			v = tree_store(parser,tok.line,index,rangelo);
 			block_add(parser,v);
 
 			// generate predicate
-			treeID pred = tree_less_than(parser,tok.line,index,range.y);
+			treeID pred = tree_less_than(parser,tok.line,index,rangehi);
 
 			// what to do after the loop body's
-			treeID post;
-			post = tree_binary(parser,tok.line,EXPR_ADD,NT_ANY,index,tree_int(parser,tok.line,1));
-			post = tree_store(parser,tok.line,index,post);
+			treeID probody;
+			probody = tree_binary(parser,tok.line,EXPR_ADD,NT_ANY,index,tree_int(parser,tok.line,1));
+			probody = tree_store(parser,tok.line,index,probody);
 
 			v = new_tree(parser,tok.line,TREE_WHILE_LOOP,NT_NON);
 			v->loop.pred = pred;
-			v->loop.prev = prev;
 			v->loop.body = body;
-			v->loop.post = post;
+			v->loop.prebody = prebody;
+			v->loop.probody = probody;
 			v->loop.c = parser->loop.continues;
 			v->loop.b = parser->loop.breaks;
 			block_add(parser,v);
-		}else {
+		} else {
+			// todo: should still store 0 to index?
 			v = tree_store(parser,tok.line,value_,step);
 			block_add(parser,v);
 			block_add(parser,body);
@@ -1206,17 +1219,18 @@ static bool parse_for(elf_Parser *parser){
 	close_loop(parser);
 	close_scope(parser);
 	esc:
-	return success;
+	return noerror;
 }
 
 //	static bool iskeyexpr(int tok) {
 //		return tok == TK_INTEGER || tok == TK_NUMBER || tok == TK_STRING || tok == TK_WORD;
 //	}
 
-static void checkstk(elf_State *inter, int state) {
-	int index = inter->stack_ptr - inter->stack;
+static void checkstk(elf_Parser *parser, int state) {
+	int index = parser->R->stack_ptr - parser->R->stack;
 	if (index != state) {
-		elf_error(inter, NO_BYTE, "internal error, invalid stack state");
+		parser_dialog(parser, parser->tok.line, "internal error, invalid stack state");
+		elf_error(parser->R, NO_BYTE, "internal error, invalid stack state");
 	}
 }
 // todo: legitimize
@@ -1263,21 +1277,30 @@ static int parse_constexpr(elf_Parser *parser) {
 
 				// push key (or value)
 				if (pick_tok(parser, TK_WORD)) {
+
 					elf_push_string(parser->R, parser->tok.text);
+
 				} else  {
-					parse_constexpr(parser);
+
+					ret = parse_constexpr(parser);
+					// todo: instead attempt to do some error recovery
+					if (ret == -1) goto esc;
+
 				}
 
 				if (pick_tok(parser, TK_ASSIGN)) {
-					// push value
-					parse_constexpr(parser);
 
-					checkstk(parser->R, tablestk + 3);
+					// push value
+					ret = parse_constexpr(parser);
+					// todo: instead attempt to do some error recovery
+					if (ret == -1) goto esc;
+
+					checkstk(parser, tablestk + 2 + 1);
 
 					elf_table_set(parser->R);
 				} else {
 
-					checkstk(parser->R, tablestk + 3);
+					checkstk(parser, tablestk + 1 + 1);
 
 					// keyless entry
 					elf_array_add(parser->R);
@@ -1285,11 +1308,13 @@ static int parse_constexpr(elf_Parser *parser) {
 
 				pick_tok(parser,TK_COMMA);
 			}
-
-			checkstk(parser->R, tablestk + 1);
-
-			ret = 1;
 			take_tok(parser,TK_CURLY_RIGHT);
+
+			checkstk(parser, tablestk + 1);
+			ret = 1;
+
+			goto esc;
+
 		} break;
 		default: {
 			errorcase:

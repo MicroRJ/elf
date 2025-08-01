@@ -124,9 +124,9 @@ struct treeT {
 		} stat_if;
 		struct {
 			treeID pred;
-			treeID prev;
+			treeID prebody;
+			treeID probody;
 			treeID body;
-			treeID post;
 			// todo: remove
 			treeID *b,*c;
 		} loop;

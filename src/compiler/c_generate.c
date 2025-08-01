@@ -168,8 +168,8 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 			treeID pred,body,post,prev;
 			pred=tree.loop.pred;
 			body=tree.loop.body;
-			post=tree.loop.post;
-			prev=tree.loop.prev;
+			post=tree.loop.probody;
+			prev=tree.loop.prebody;
 
 
 			push_mem_state(parser);
