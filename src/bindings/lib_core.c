@@ -29,7 +29,7 @@ static int core_lib_const_expr(elf_State *R) {
 
 		// elf_Parser parser = {};
 		// c_parser_init(R, &parser, "no name", contents->text);
-		// ret = c_parse_const(&parser);
+		// ret = parse_constexpr(&parser);
 		ret = elf_parse_const(R, "no name", contents->text);
 	}
 	return ret < 0 ? 0 : ret;

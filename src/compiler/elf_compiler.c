@@ -20,7 +20,7 @@
 
 #include "c_lexer.c"
 #include "c_tree.c"
-#include "c_parse.c"
+#include "elf_parser.c"
 #include "c_generate.c"
 
 
@@ -37,7 +37,7 @@ int elf_parse_const(elf_State *S, char *name, char *contents) {
 	elf_Parser parser = {};
 	c_parser_init(S, &parser, name, contents);
 
-	return c_parse_const(&parser);
+	return parse_constexpr(&parser);
 }
 
 // todo: remove the as_expr thing?

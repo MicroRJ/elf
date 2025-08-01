@@ -72,7 +72,7 @@ struct elf_Parser {
 	char                        *pos;
 	char                   *line_pos;
 	int                     line_num;
-	elf_Token  tok,tok_prev,tok_prox;
+	Token  tok,tok_prev,tok_prox;
 	char                  *expr_line;
 	treeID                       enc;
 	treeID                *functions;

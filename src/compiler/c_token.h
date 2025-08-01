@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+// todo: properly metagenerate this
+
 typedef struct {
 	unsigned char 	type;
 	Source         line;
@@ -11,14 +13,14 @@ typedef struct {
 		elf_f64  number;
 		char 	    *text;
 	};
-} elf_Token;
+} Token;
 
-typedef elf_Token elf_Token;
+typedef Token Token;
 
-//todo:remove "LEAVE"
-//todo:remove "iff"
-//todo:remove "lastly"
-//todo:remove "let"
+// todo:remove "LEAVE"
+// todo:remove "iff"
+// todo:remove "lastly"
+// todo:remove "let"
 #define KEYWORDDEF(_) \
 _(ELF      ,"elf"         ) \
 _(JSON     ,"json"        ) \
@@ -125,6 +127,21 @@ _(PAREN_RIGHT        ,")")          \
 /* end */
 
 
+typedef enum tokenTy {
+	TK_NONE = 0,
+#define TKITEM(NAME,_) XFUSE(TK_,NAME),
+#define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
+#define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
+	KEYWORDDEF(TKITEM)
+	MACRODEF(MCITEM)
+	TOKENDEF(TKITEM)
+	OPERATORDEF(OPITEM)
+#undef TKITEM
+#undef MCITEM
+#undef OPITEM
+} tokenTy;
+
+
 typedef struct token_metadata_t {
 	char *name;
 	char prec;
@@ -144,19 +161,3 @@ global token_metadata_t g_token_metadata_table[] = {
 #undef MCITEM
 #undef OPITEM
 
-typedef enum tokenTy {
-	TK_NONE = 0,
-
-#define TKITEM(NAME,_) XFUSE(TK_,NAME),
-#define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
-#define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
-
-	KEYWORDDEF(TKITEM)
-	MACRODEF(MCITEM)
-	TOKENDEF(TKITEM)
-	OPERATORDEF(OPITEM)
-
-#undef TKITEM
-#undef MCITEM
-#undef OPITEM
-} tokenTy;

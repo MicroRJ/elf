@@ -175,32 +175,24 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 	return (void *) GetProcAddress(dll,name);
 }
 
-
-
-static int _sym_link(char const *name) {
-	while (*name == '.') ++ name;
-	return *name == 0;
-}
-
-
 static inline void win32_find_data_to_file_data(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
-	if (_sym_link(info->cFileName)) {
+	visitor->type = FILE_TYPE_FILE;
+	if (info->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
 		visitor->type = FILE_TYPE_SYMLINK;
 	} else if (info->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 		visitor->type = FILE_TYPE_FOLDER;
-	} else {
-		visitor->type = FILE_TYPE_FILE;
 	}
 	visitor->size = info->nFileSizeLow;
+	ASSERT(sizeof(visitor->name) >= sizeof(info->cFileName));
 	CopyMemory(visitor->name, info->cFileName, sizeof(info->cFileName));
 }
 
 int sys_opendir(FILE_VISITOR *visitor, char *const path) {
 	WIN32_FIND_DATAA info;
 	HANDLE hand = FindFirstFileA(elf_tpf("%s\\*", path), &info);
+	visitor->hand = hand;
 
 	win32_find_data_to_file_data(visitor, &info);
-	visitor->hand = hand;
 	return hand != INVALID_HANDLE_VALUE;
 }
 

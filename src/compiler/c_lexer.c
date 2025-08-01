@@ -188,12 +188,12 @@ static int pick_empty_chars(elf_Parser *parser) {
 // todo: would it be faster to just do all the tokens
 // in one go...
 //
-static elf_Token get_tok(elf_Parser *parser) {
+static Token get_tok(elf_Parser *parser) {
 
 	char buffer[256];
 
 	retry:
-	elf_Token token = {};
+	Token token = {};
 	token.type = TK_NONE;
 	token.line = parser->pos;
 

@@ -2,6 +2,11 @@
 //	See Copyright Notice In elf.h
 //
 
+//
+// todo: re-implement if, elif, then
+// todo: re-implement #index
+//
+//
 
 static treeID parse_unary(elf_Parser *parser, int flags);
 static treeID parse_expr(elf_Parser *parser, int flags);
@@ -12,7 +17,7 @@ static treeID parse_block(elf_Parser *parser);
 static int parse_stat(elf_Parser *parser);
 static int tok2tree(int tok);
 
-static int get_tok_prec(int type) {
+static int token_precedence(int type) {
 	return g_token_metadata_table[type].prec;
 }
 
@@ -23,7 +28,7 @@ static treeID parse_json_expr(elf_Parser *parser);
 static treeID *parse_args(elf_Parser *parser);
 static void block_add(elf_Parser *parser, treeID id);
 // the result is pushed onto the stack
-static int c_parse_const(elf_Parser *parser);
+static int parse_constexpr(elf_Parser *parser);
 
 static void c_parser_init(elf_State *S, elf_Parser *parser, char *name, char *text) {
 	ASSERT(S != 0);
@@ -59,16 +64,16 @@ static bool pick_tok_inl(elf_Parser *parser, int k) {
 	return peek_tok_inl(parser,k) && (get_tok(parser), 1);
 }
 
-static elf_Token get_token_inline(elf_Parser *parser, int k) {
-	elf_Token tok = parser->tok;
+static Token get_token_inline(elf_Parser *parser, int k) {
+	Token tok = parser->tok;
 	if (!pick_tok_inl(parser,k)) {
 		parser_dialog(parser,tok.line,"expected '%s'\n",g_token_metadata_table[k].name);
 	}
 	return tok;
 }
 
-static elf_Token take_tok(elf_Parser *parser, int k) {
-	elf_Token tok = parser->tok;
+static Token take_tok(elf_Parser *parser, int k) {
+	Token tok = parser->tok;
 	if (!pick_tok(parser,k)) {
 		parser_dialog(parser,parser->tok.line,"expected '%s'\n",g_token_metadata_table[k].name);
 	}
@@ -223,7 +228,7 @@ static void add_this_param(elf_Parser *parser, Source line) {
 }
 
 static treeID parse_fun(elf_Parser *parser) {
-	elf_Token tok;
+	Token tok;
 
 	tok=take_tok(parser,TK_FUN);
 
@@ -241,7 +246,7 @@ static treeID parse_fun(elf_Parser *parser) {
 	add_this_param(parser,tok.line);
 
 	if (!peek_tok(parser,TK_PAREN_RIGHT)) do {
-		elf_Token name;
+		Token name;
 		treeID para,expr;
 
 		name=take_tok(parser,TK_WORD);
@@ -301,7 +306,7 @@ static treeID parse_fun(elf_Parser *parser) {
 //  elf.load_file(<file-name>)
 //
 static treeID parse_load(elf_Parser *parser){
-	elf_Token tok;
+	Token tok;
 	tok=take_tok(parser,TK_LOAD);
 
 	treeID v,*z;
@@ -321,7 +326,7 @@ static treeID parse_load(elf_Parser *parser){
 // instead have an enum to guarantee they exist no matter what
 //
 static treeID parse_new(elf_Parser *parser){
-	elf_Token tok;
+	Token tok;
 	tok=take_tok(parser,TK_NEW);
 
 	treeID callexpr=parse_postfix(parser,0);
@@ -355,7 +360,7 @@ static treeID parse_new(elf_Parser *parser){
 	return v;
 }
 static treeID parse_unary(elf_Parser *parser, bool flags) {
-	elf_Token tok;
+	Token tok;
 	treeID v,x;
 
 	v=NO_TREE;
@@ -521,7 +526,7 @@ static treeID parse_unary(elf_Parser *parser, bool flags) {
 }
 
 static treeID parse_table(elf_Parser *parser) {
-	elf_Token tok = take_tok(parser,TK_CURLY_LEFT);
+	Token tok = take_tok(parser,TK_CURLY_LEFT);
 	int index = 0;
 	treeID table = tree_table(parser,tok.line);
 	treeID prev = table;
@@ -605,7 +610,7 @@ static treeID *parse_args(elf_Parser *parser) {
 
 // parse a postfix expression
 static treeID parse_postfix(elf_Parser *parser, int flags) {
-	elf_Token tok;
+	Token tok;
 	treeID v;
 
 	tok=parser->tok;
@@ -619,7 +624,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 				get_tok(parser);
 				// table.(x,y) -> (table.x, table.y)
 				if (pick_tok(parser,TK_PAREN_LEFT)) {
-					elf_Token n;
+					Token n;
 					treeID x,y,*z=0;
 					do {
 						n=take_tok(parser,TK_WORD);
@@ -634,7 +639,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 				if (pick_tok(parser,TK_CURLY_LEFT)) {
 					NO_CODE;
 				} else {
-					elf_Token name;
+					Token name;
 					treeID field;
 					name=take_tok(parser,TK_WORD);
 					field=tree_str(parser,name.line,name.text);
@@ -667,7 +672,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 				take_tok(parser,TK_SQUARE_RIGHT);
 			} break;
 			case TK_COLON: {
-				elf_Token n;
+				Token n;
 				treeID y;
 				get_tok(parser);
 				n=take_tok(parser,TK_WORD);
@@ -691,7 +696,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 	ASSERT(flags==0);
 
-	elf_Token tok = parser->tok;
+	Token tok = parser->tok;
 
 	treeID x,y;
 
@@ -705,7 +710,7 @@ static treeID parse_subexpr(elf_Parser *parser, int flags, int rank) {
 	for(;;) {
 		tok=parser->tok;
 
-		int prio = get_tok_prec(tok.type);
+		int prio = token_precedence(tok.type);
 		if (prio <= rank) goto esc;
 
 		if (parser->tok_prox.type == TK_ASSIGN) {
@@ -831,7 +836,7 @@ static void check_assign(elf_Parser *parser, Source line, treeID tree){
 
 static int parse_stat(elf_Parser *parser) {
 	int success = true;
-	elf_Token tok = parser->tok;
+	Token tok = parser->tok;
 
 	switch (tok.type) {
 		case TK_NONE: case TK_CURLY_RIGHT:
@@ -1011,7 +1016,7 @@ static int parse_stat(elf_Parser *parser) {
 					, tree_binary(parser,tok.line,EXPR_EQ,NT_ANY,v,tree_nil(parser,tok.line))
 					, tree_store(parser,tok.line,v,y)
 					, 0);
-				} else if (get_tok_prec(tok.type) > 0) {
+				} else if (token_precedence(tok.type) > 0) {
 					check_assign(parser,tok.line,v);
 
 					tok = get_tok(parser);
@@ -1034,7 +1039,7 @@ static int parse_stat(elf_Parser *parser) {
 
 static treeID parse_if(elf_Parser *parser, int negate){
 
-	elf_Token tok = parser->tok;
+	Token tok = parser->tok;
 	begin_block(parser);
 
 	treeID pred = parse_expr(parser,0);
@@ -1059,9 +1064,9 @@ static treeID parse_if(elf_Parser *parser, int negate){
 static bool parse_for(elf_Parser *parser){
 	bool success = true;
 
-	elf_Token tok = take_tok(parser,TK_FOR);
+	Token tok = take_tok(parser,TK_FOR);
 
-	elf_Token name = take_tok(parser,TK_WORD);
+	Token name = take_tok(parser,TK_WORD);
 	take_tok(parser,TK_ASSIGN);
 
 	treeID v;
@@ -1204,99 +1209,91 @@ static bool parse_for(elf_Parser *parser){
 	return success;
 }
 
-static bool is_key_tok(int tok) {
-	return tok == TK_INTEGER || tok == TK_NUMBER || tok == TK_STRING || tok == TK_WORD;
-}
+//	static bool iskeyexpr(int tok) {
+//		return tok == TK_INTEGER || tok == TK_NUMBER || tok == TK_STRING || tok == TK_WORD;
+//	}
 
+static void checkstk(elf_State *inter, int state) {
+	int index = inter->stack_ptr - inter->stack;
+	if (index != state) {
+		elf_error(inter, NO_BYTE, "internal error, invalid stack state");
+	}
+}
 // todo: legitimize
 // todo: also json is a constant
-static int c_parse_const(elf_Parser *parser) {
-	elf_Token tok = parser->tok;
+static int parse_constexpr(elf_Parser *parser) {
+	Token tok = parser->tok;
 	int ret = -1;
+	int sign = 1;
 	switch (tok.type) {
 		case TK_ADD: case TK_SUB: {
-			int sign = (tok.type == TK_ADD) * 2 - 1;
+			sign = (tok.type == TK_ADD) * 2 - 1;
 			get_tok(parser);
-			tok = parser->tok;
-			if (pick_tok(parser,TK_NUMBER)) {
-				elf_push_num(parser->R,tok.number * sign);
-				ret = 1;
-			}else if (pick_tok(parser,TK_INTEGER)) {
-				elf_push_int(parser->R,tok.integer * sign);
-				ret = 1;
-			} else {
-				parser_dialog(parser,tok.line,"operator can only be used for numbers");
-				goto esc;
-			}
+			if (peek_tok(parser, TK_NUMBER)) goto numcase;
+			else if (peek_tok(parser, TK_INTEGER)) goto intcase;
+			parser_dialog(parser, parser->tok.line, "expected integer or number after '-'");
+			goto errorcase;
+		} break;
+		case TK_NUMBER: { numcase:
+			get_tok(parser);
+			elf_push_num(parser->R, tok.number * sign);
+			ret = 1;
+		} break;
+		case TK_INTEGER: { intcase:
+			get_tok(parser);
+			elf_push_int(parser->R, tok.integer * sign);
+			ret = 1;
 		} break;
 		case TK_NIL: {
 			get_tok(parser);
 			elf_push_nil(parser->R);
 			ret = 1;
 		} break;
-		case TK_NUMBER: {
-			get_tok(parser);
-			elf_push_num(parser->R,tok.number);
-			ret = 1;
-		} break;
-		case TK_INTEGER: {
-			get_tok(parser);
-			elf_push_int(parser->R,tok.integer);
-			ret = 1;
-		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			elf_new_string(parser->R,tok.text);
+			elf_push_string(parser->R, tok.text);
 			ret = 1;
 		} break;
 		case TK_CURLY_LEFT: {
 			get_tok(parser);
-			elf_Table *tab = elf_new_table(parser->R);
-			elf_Value *check_ptr = elf_get_stack_ptr(parser->R);
+
+			int tablestk = elf_push_table(parser->R);
+
 			while(!peek_tok(parser,TK_NONE) && !peek_tok(parser,TK_CURLY_RIGHT)) {
-				tok = parser->tok;
-				if (parser->tok_prox.type == TK_ASSIGN) {
-					if (tok.type == TK_WORD) {
-						get_tok(parser);
-						elf_new_string(parser->R,tok.text);
-						ret = 1;
-					} else if (is_key_tok(parser->tok.type)) {
-						ret = c_parse_const(parser);
-					} else {
-						parser_dialog(parser,tok.line,"invalid key token");
-						goto esc;
-					}
-					if (ret == -1) goto esc;
 
-					take_tok(parser,TK_ASSIGN);
-
-					ret = c_parse_const(parser);
-					if (ret == -1) goto esc;
-					elf_Value key = elf_get_stack_ptr(parser->R)[-2];
-					elf_Value value = elf_get_stack_ptr(parser->R)[-1];
-					parser->R->stack_ptr -= 2;
-					ASSERT(parser->R->stack_ptr == check_ptr);
-					elf_table_set_raw(tab,key,value);
-				} else {
-					ret = c_parse_const(parser);
-					if (ret == -1) goto esc;
-					elf_Value value = parser->R->stack_ptr[-1];
-					parser->R->stack_ptr -= 1;
-					elf_array_add_raw(tab,value);
-					if (peek_tok(parser,TK_ASSIGN)) {
-						parser_dialog(parser,tok.line,"not a proper key");
-						goto esc;
-					}
+				// push key (or value)
+				if (pick_tok(parser, TK_WORD)) {
+					elf_push_string(parser->R, parser->tok.text);
+				} else  {
+					parse_constexpr(parser);
 				}
+
+				if (pick_tok(parser, TK_ASSIGN)) {
+					// push value
+					parse_constexpr(parser);
+
+					checkstk(parser->R, tablestk + 3);
+
+					elf_table_set(parser->R);
+				} else {
+
+					checkstk(parser->R, tablestk + 3);
+
+					// keyless entry
+					elf_array_add(parser->R);
+				}
+
 				pick_tok(parser,TK_COMMA);
 			}
-			ASSERT(parser->R->stack_ptr == check_ptr);
 
-			// empty table...
+			checkstk(parser->R, tablestk + 1);
+
 			ret = 1;
 			take_tok(parser,TK_CURLY_RIGHT);
 		} break;
 		default: {
+			errorcase:
+			elf_push_nil(parser->R);
 			parser_dialog(parser,tok.line,"not a constant expression");
 		} break;
 	}
@@ -1317,7 +1314,7 @@ static elf_Table * c_parse_json(elf_Parser *parser);
 //
 static treeID parse_json_expr(elf_Parser *parser){
 
-	elf_Token tok = take_tok(parser,TK_JSON);
+	Token tok = take_tok(parser,TK_JSON);
 	elf_Table * tab = c_parse_json(parser);
 	int gid = elf_set_global(parser->R, 0, VALUE_TABLE(tab));
 
@@ -1338,7 +1335,7 @@ static elf_Table *parse_json_array(elf_Parser *parser){
 }
 
 static elf_Table * c_parse_json(elf_Parser *parser){
-	elf_Token tok;
+	Token tok;
 	elf_Table * table;
 
 	table = elf_new_table(parser->R);
@@ -1361,7 +1358,7 @@ static elf_Table * c_parse_json(elf_Parser *parser){
 static elf_Value parse_json_value(elf_Parser *parser) {
 	elf_Value val = VALUE_NIL();
 	elf_Table * obj;
-	elf_Token tok = parser->tok;
+	Token tok = parser->tok;
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);

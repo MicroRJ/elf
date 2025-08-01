@@ -75,11 +75,10 @@ enum {
 
 // todo: make better!
 typedef struct {
-	char  name[256];
+	void *hand;
 	int   type;
 	int   size;
-
-	void *hand;
+	char  name[1024];
 } FILE_VISITOR;
 
 int sys_opendir(FILE_VISITOR *visitor, char *const path);

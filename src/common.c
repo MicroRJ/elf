@@ -47,6 +47,11 @@ static inline unsigned int hash64(elf_i64 i) {
 }
 
 
+static int is_file_name_empty(char const *name) {
+	while (*name == '.' || *name == '\\' || *name == '/') ++ name;
+	return *name == 0;
+}
+
 static char *get_name_from_file_path(const char *s) {
 	char *p, *n;
 

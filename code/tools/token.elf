@@ -177,7 +177,7 @@ fpf(file,"#define  LAST_KEYWORD ", LstKeyword, "\n\n\n")
 fpf(file,"#define FIRST_MACRO ", FstMacro, "\n")
 fpf(file,"#define  LAST_MACRO ", LstMacro, "\n\n\n")
 
-fpf(file,"typedef struct elf_Token {\n")
+fpf(file,"typedef struct Token {\n")
 fpf(file,"\tunsigned char type;\n")
 fpf(file,"\telf_lineid line;\n")
 fpf(file,"\tunsigned int eol: 1;\n")
@@ -186,7 +186,7 @@ fpf(file,"\t\tchar *s;\n")
 fpf(file,"\t\telInteger i;\n")
 fpf(file,"\t\telNumber n;\n")
 fpf(file,"\t};\n")
-fpf(file,"} elf_Token;\n\n\n")
+fpf(file,"} Token;\n\n\n")
 
 
 fpf(file,"typedef enum tokenTy {\n")

@@ -116,7 +116,7 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 static inline void em_dirent_to_file_data(FILE_VISITOR *visitor, dirent *info) {
 	int isdir = () != 0;
 
-	if (_sym_link(info->d_name)) {
+	if (is_file_name_empty(info->d_name)) {
 		visitor->type = FILE_TYPE_SYMLINK;
 	} else if (info->d_type & DT_DIR) {
 		visitor->type = FILE_TYPE_FOLDER;
