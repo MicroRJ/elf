@@ -2,8 +2,13 @@
 // See Copyright Notice In elf.h
 //
 
+//
+// todo: why does this file even exist! merge with internal.c
+//
+
+
 const char *tag2s[] = {
-	[elf_tag_nil] = "nil",
+	[elf_tag_Nil] = "nil",
 	[elf_tag_tomb] = "tomb",
 	[elf_tag_num] = "num",
 	[elf_tag_int] = "int",
@@ -15,6 +20,7 @@ const char *tag2s[] = {
 	[elf_tag_Table] = "Table",
 };
 
+
 #define TOP(S) (S->stack_ptr)
 
 static inline int inctop(elf_State *S) {
@@ -22,7 +28,31 @@ static inline int inctop(elf_State *S) {
 	ASSERT(index < S->stack_max);
 	return index;
 }
+static elf_String *stkstr(elf_State *inter, int index) {
+	elf_Value *v = inter->stack_ptr + index;
+	if (v->tag != elf_tag_Nil && v->tag != elf_tag_String) {
+		elf_error(inter, NO_BYTE, "expected string");
+	}
+	return v->x_str;
+}
 
+// return value is number of returns, if negative, errors occurred
+int elf_exec(elf_State *inter, int nargs, int nrets, bool asexpr) {
+	elf_String *name = stkstr(inter, -2);
+	elf_String *contents = stkstr(inter, -1);
+	if (!name || !contents) {
+		elf_push_nil(inter);
+		return 1;
+	}
+	return elf_exec_raw(inter, nargs, nrets, asexpr, name, contents);
+}
+
+
+elf_State *elf_new() {
+	elf_State *inter = calloc(1, sizeof(*inter));
+	elf_init_raw(inter);
+	return inter;
+}
 
 int elf_get_num_args(elf_State *S) {
 	return S->frame.nargs - 1;
@@ -32,12 +62,12 @@ int elf_get_num_rets(elf_State *S) {
 	return S->frame.nrets;
 }
 
-elf_Tag elf_get_tag(elf_State *S, int x) {
+elf_Tag elf_get_argtag(elf_State *S, int x) {
 	return S->frame.locals[x + 1].tag;
 }
 
 int elf_push_nil(elf_State *S) {
-	TOP(S)->tag = elf_tag_nil;
+	TOP(S)->tag = elf_tag_Nil;
 	TOP(S)->x_i64 = 0;
 	return inctop(S);
 }

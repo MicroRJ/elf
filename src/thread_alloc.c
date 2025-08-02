@@ -3,17 +3,17 @@
 //
 
 // todo: we're single threaded, and ... memory per translation unit??
-static void *thread_alloc(int amount) {
-	THREAD char buffer[2048];
+static void *thread_alloc(int size) {
+	THREAD char buffer[4096];
 	THREAD int cursor;
 
-	if (amount > sizeof(buffer)) {
+	if (size > sizeof(buffer)) {
 		return 0;
 	}
-	if(cursor + amount > sizeof(buffer)) {
+	if(cursor + size > sizeof(buffer)) {
 		cursor = 0;
 	}
 	void *memory = buffer + cursor;
-	cursor += amount;
+	cursor += size;
 	return memory;
 }

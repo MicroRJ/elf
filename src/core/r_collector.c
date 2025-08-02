@@ -2,8 +2,12 @@
 // See Copyright Notice In elf.h
 //
 
-void elf_gc_state(elf_State *S, elf_GC_State state) {
-	S->G.state = state;
+int elf_gc_state(elf_State *S, elf_GC_State state) {
+	elf_GC_State prevstate = S->G.state;
+	if (state != ELF_GC_GETSTATE) {
+		S->G.state = state;
+	}
+	return prevstate;
 }
 
 void *elf_gc_alloc(elf_State *R, elf_GC_Ty type, elf_i64 size) {

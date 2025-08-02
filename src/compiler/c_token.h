@@ -2,20 +2,10 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: properly metagenerate this
+// todo: could we meta-generate this?
 
-typedef struct {
-	unsigned char 	type;
-	Source         line;
-	unsigned int eol: 1;
-	union {
-		elf_i64 integer;
-		elf_f64  number;
-		char 	    *text;
-	};
-} Token;
 
-typedef Token Token;
+#define FORMAT_CHAR '%'
 
 // todo:remove "LEAVE"
 // todo:remove "iff"
@@ -101,6 +91,7 @@ _(ELLIPSIS,"...", 1) _(DOT_DOT, "..", 1) \
 _(INTEGER            ,"integer")    \
 _(NUMBER             , "number")    \
 _(STRING             , "string")    \
+_(FORMAT_STRING      , "format")    \
 _(LETTER             , "letter")    \
 _(WORD               ,   "word")    \
 _(MINUS_MINUS        ,"--")         \
@@ -161,3 +152,14 @@ global token_metadata_t g_token_metadata_table[] = {
 #undef MCITEM
 #undef OPITEM
 
+
+typedef struct {
+	tokenTy        type;
+	Source         line;
+	unsigned int eol: 1;
+	union {
+		elf_i64 integer;
+		elf_f64  number;
+		char 	    *text;
+	};
+} Token;

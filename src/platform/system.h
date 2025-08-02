@@ -10,6 +10,13 @@
 // Interface With The Operating System.
 //
 
+// TODO: TOMORROW!
+int sys_file_size(int file);
+int sys_file_open(char *name);
+int sys_file_close(int file);
+int sys_file_read(int file, char *buf, int size);
+int sys_file_write(int file, char *buf, int size);
+
 
 void *sys_virtual_alloc(elf_i64 length);
 

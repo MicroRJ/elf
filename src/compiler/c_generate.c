@@ -103,9 +103,9 @@ static int to_any_mem(elf_Parser *parser, treeID id) {
 	return mem;
 }
 
-static void elf_compile_tree(elf_Parser *parser, treeID id);
+static void gentree(elf_Parser *parser, treeID id);
 
-static elf_Proto elf_compile_function(elf_Parser *parser, treeID tree) {
+static elf_Proto genfunction(elf_Parser *parser, treeID tree) {
 	elf_State *R = parser->R;
 
 	ASSERT(get_tree_kind(parser,tree) == TREE_FUNCTION);
@@ -114,12 +114,12 @@ static elf_Proto elf_compile_function(elf_Parser *parser, treeID tree) {
 	ASSERT(parser->memory_usage == 0);
 
 	int start = R->nbytes;
-	elf_compile_tree(parser, tree->expr_fun.body);
+	gentree(parser, tree->tree_funexpr.body);
 
 	elf_Proto proto = {};
 	proto.arity = 1;
 	proto.bytes = start;
-	proto.ncaptures = ARRAY_LENGTH(tree->expr_fun.capts);
+	proto.ncaptures = ARRAY_LENGTH(tree->tree_funexpr.capts);
 	proto.stacksize = parser->memory_usage;
 	proto.numbytes = R->nbytes - start;
 
@@ -132,7 +132,7 @@ static elf_Proto elf_compile_function(elf_Parser *parser, treeID tree) {
 	return proto;
 }
 
-static void elf_compile_tree(elf_Parser *parser, treeID id) {
+static void gentree(elf_Parser *parser, treeID id) {
 	treeT tree = get_tree(parser,id);
 	switch (tree.kind) {
 		case TREE_SETMEM: {
@@ -158,9 +158,8 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 			emit_bytexy(parser,tree.line,BC_RET,mem,num);
 		} break;
 		case TREE_GOTO: {
-			int jmp;
-			jmp=emit_jump(parser,tree.line,NO_JUMP);
-			id->jump=jmp;
+			int jmp = emit_jump(parser,tree.line,NO_JUMP);
+			id->jump = jmp;
 		} break;
 		case TREE_WHILE_LOOP: {
 			jumpS js = {0};
@@ -180,11 +179,11 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 			continue_target=entry;
 			emit_jump_if_false(parser,&js,pred);
 
-			if(prev)elf_compile_tree(parser,prev);
-			elf_compile_tree(parser,body);
+			if(prev)gentree(parser,prev);
+			gentree(parser,body);
 			if(post){
 				continue_target=parser->R->nbytes;
-				elf_compile_tree(parser,post);
+				gentree(parser,post);
 			}
 			emit_jump(parser,NO_LINE,entry);
 
@@ -251,7 +250,7 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 		case STAT_BLOCK: {
 			push_mem_state(parser);
 			FOR_ARRAY(i,tree.z) {
-				elf_compile_tree(parser,tree.z[i]);
+				gentree(parser,tree.z[i]);
 			}
 			pop_mem_state(parser);
 		} break;
@@ -259,10 +258,10 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 		// invert the condition...
 		case TREE_IF: {
 			treeID pred,true_clause,else_clause,then_clause;
-			pred=tree.stat_if.pred;
-			true_clause=tree.stat_if.true_clause;
-			else_clause=tree.stat_if.else_clause;
-			then_clause=tree.stat_if.then_clause;
+			pred=tree.tree_ifstat.pred;
+			true_clause=tree.tree_ifstat.true_clause;
+			else_clause=tree.tree_ifstat.else_clause;
+			then_clause=tree.tree_ifstat.then_clause;
 
 			ASSERT(pred);
 			ASSERT(true_clause);
@@ -271,10 +270,10 @@ static void elf_compile_tree(elf_Parser *parser, treeID id) {
 			// the condition...
 			BranchJumps s={};
 			begin_if(parser,tree.line,&s,pred,0);
-			elf_compile_tree(parser,true_clause);
+			gentree(parser,true_clause);
 			if(else_clause){
 				add_else_clause(parser,tree.line,&s);
-				elf_compile_tree(parser,else_clause);
+				gentree(parser,else_clause);
 			}
 			close_if(parser,tree.line,&s);
 		} break;
@@ -422,8 +421,8 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 		case TREE_FUNCTION: {
 			int     proto;
 			treeID *capts;
-			proto=tree.expr_fun.proto;
-			capts=tree.expr_fun.capts;
+			proto=tree.tree_funexpr.proto;
+			capts=tree.tree_funexpr.capts;
 
 			ASSERT(proto!=-1);
 
@@ -531,7 +530,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	treeID prox;
 	for(prox=tree.prox;prox;prox=prox->prox){
 		push_mem_state(parser);
-		elf_compile_tree(parser,prox);
+		gentree(parser,prox);
 		pop_mem_state(parser);
 	}
 	esc:
@@ -715,11 +714,12 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(elf_Parser *C, Source line, elf_Bytecode byte) {
-	elf_State *M = C->R;
-	line = line ? line : C->expr_line;
+static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte) {
+	elf_State *M = parser->R;
+	// todo: please remove this :)
+	line = line ? line : parser->sourceloc;
 	ASSERT(line != 0);
-	C->expr_line = line;
+	parser->sourceloc = line;
 	ARRAY_ADD(M->lines, line);
 	ARRAY_ADD(M->bytes, byte);
 	ARRAY_ADD(M->track, 0);

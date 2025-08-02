@@ -157,9 +157,9 @@ void elf_error(elf_State *R, int byte, const char *error) {
 }
 
 
-static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
+static int fpf_value(FILE *file, elf_Value v, bool flags) {
 	switch (v.tag) {
-	case elf_tag_nil: return fprintf(file,"nil");
+	case elf_tag_Nil: return fprintf(file,"nil");
 	case elf_tag_Handle: return fprintf(file,"h%llX",v.x_int);
 	case elf_tag_int: return fprintf(file,"%lli",v.x_int);
 	case elf_tag_num: return fprintf(file,"%f",v.x_num);
@@ -175,7 +175,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 			if (i != 0) wrote += fprintf(file,", ");
 			for (j=0,n=0;j<tab->ntotal;++j) {
 				elf_Table_Entry it = tab->slots[j];
-				if (it.key.tag==elf_tag_nil) continue;
+				if (it.key.tag==elf_tag_Nil) continue;
 				if (it.idx!=i) continue;
 				if (n ++ != 0) wrote += fprintf(file,", ");
 				wrote += fpf_value(file,it.key,1);
@@ -185,7 +185,7 @@ static int fpf_value(FILE *file, elf_Value v, elf_Bool flags) {
 		}
 			// for (i=0,n=0;i<tab->nslots;++i) {
 			// 	elf_Table_Entry it = tab->slots[i];
-			// 	if (it.key.tag == elf_tag_nil) continue;
+			// 	if (it.key.tag == elf_tag_Nil) continue;
 			// 	if (n ++ != 0) wrote += fprintf(file,", ");
 			// 	wrote += fpf_value(file,it.key,1);
 			// 	wrote += fprintf(file," = ");

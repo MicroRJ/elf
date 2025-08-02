@@ -10,14 +10,14 @@ int lib_time__get_clock_time(elf_State *R) {
 
 int lib_time__get_time_diff_s(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
-	elf_i64 time = elf_get_int(S,0);
+	elf_i64 time = elf_get_intarg(S,0);
 	elf_push_num(S,_time_diff_s(time));
 	return 1;
 }
 
 int lib_time__get_time_diff_ms(elf_State *S) {
 	ASSERT(elf_get_num_args(S) == 1);
-	elf_i64 time = elf_get_int(S,0);
+	elf_i64 time = elf_get_intarg(S,0);
 	elf_push_num(S,_time_diff_s(time) * 1000);
 	return 1;
 }

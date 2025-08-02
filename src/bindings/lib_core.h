@@ -3,6 +3,8 @@
 ** lib_core.h
 */
 
+// todo: remove this entire header file!
+
 // _(pause_collector)
 // _(get_allocated_objects)
 // _(get_allocated_memory)
@@ -15,6 +17,8 @@
 #define LIBDEF(_) \
 _(unload)\
 _(tagof)\
+_(format)\
+_(get_file_name_from_path)\
 _(get_global)\
 _(get_object_color)\
 _(set_object_trap)\

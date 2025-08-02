@@ -16,9 +16,9 @@
 
 #if 0
 int lib_core_shell(elf_State *R) {
-	char *verb = elf_get_text(R,0);
-	char *file = elf_get_text(R,1);
-	char *args = elf_get_text(R,2);
+	char *verb = elf_getargtext(R,0);
+	char *file = elf_getargtext(R,1);
+	char *args = elf_getargtext(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
 	elf_push_int(R,success);
@@ -27,7 +27,7 @@ int lib_core_shell(elf_State *R) {
 
 
 int core_lib_exec(elf_State *R) {
-	char *cline=elf_get_text(R,0);
+	char *cline=elf_getargtext(R,0);
 	int result=sys_exec(0,cline);
 	elf_push_int(R,result);
 	return 1;
@@ -42,7 +42,7 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
-	GetDiskFreeSpaceA(elf_get_text(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
+	GetDiskFreeSpaceA(elf_getargtext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
 	elf_tsets_int(info,elf_alloc_string(R,"SectorsPerCluster"),SectorsPerCluster);
 	elf_tsets_int(info,elf_alloc_string(R,"BytesPerSector"),BytesPerSector);
 	elf_tsets_int(info,elf_alloc_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
@@ -99,9 +99,8 @@ bool sys_debugger() {
 	return 1;
 }
 
+// todo: make this legit, it should be the other way around!
 #include "logging.c"
-
-// todo: make this legit, this depends on the subsystem!
 void sys_console_print(int type, char *message) {
 	elf_log(type,"%s",message);
 }
@@ -175,7 +174,7 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 	return (void *) GetProcAddress(dll,name);
 }
 
-static inline void win32_find_data_to_file_data(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
+static inline void convfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 	visitor->type = FILE_TYPE_FILE;
 	if (info->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
 		visitor->type = FILE_TYPE_SYMLINK;
@@ -192,14 +191,14 @@ int sys_opendir(FILE_VISITOR *visitor, char *const path) {
 	HANDLE hand = FindFirstFileA(elf_tpf("%s\\*", path), &info);
 	visitor->hand = hand;
 
-	win32_find_data_to_file_data(visitor, &info);
+	convfiledata(visitor, &info);
 	return hand != INVALID_HANDLE_VALUE;
 }
 
 int sys_readdir(FILE_VISITOR *visitor) {
 	WIN32_FIND_DATAA info;
 	int result = FindNextFileA((HANDLE) visitor->hand, &info);
-	win32_find_data_to_file_data(visitor, &info);
+	convfiledata(visitor, &info);
 	return result;
 }
 

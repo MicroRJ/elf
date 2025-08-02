@@ -23,7 +23,7 @@
 #include "elf.h"
 #include "internal_utils.h"
 
-#include "r_core.h"
+#include "internal.h"
 
 #include "system.h"
 
@@ -37,12 +37,14 @@
 #include "o_table.c"
 #include "o_closure.c"
 #include "r_diagnostics.c"
+#include "r_collector.c"
 #include "internal.c"
 #include "public.c"
 
 #include "elf_compiler.h"
 
-#include "r_collector.c"
+#include "core_io.c"
+
 #include "lib_core.h"
 #include "lib_math.c"
 #include "lib_core.c"
@@ -84,28 +86,18 @@ int elf_set_global(elf_State *S, elf_String *name, elf_Value value) {
 	return id;
 }
 
-int elf_exec(elf_State *R, bool as_expr, int nargs, int nrets, elf_String *name, elf_String *contents) {
-	elf_Proto proto = elf_compile(R, name, contents, as_expr);
-	elf_Closure *closure = elf_alloc_closure(R, proto);
-	elf_push_closure_raw(R, closure);
-	elf_Value *rets = R->stack_ptr;
-	elf_push_closure_raw(R, closure);
-	elf_push_this(R);
-	nrets = elf_call(R, nargs + 1, nrets);
-	R->stack_ptr = rets + nrets;
+int elf_exec_raw(elf_State *inter, int nargs, int nrets, bool asexpr, elf_String *name, elf_String *contents) {
+	ASSERT(name);
+	ASSERT(contents);
+	elf_Proto proto = elf_compile(inter, name, contents, asexpr);
+	elf_Closure *closure = elf_alloc_closure(inter, proto);
+	elf_push_closure_raw(inter, closure);
+	elf_Value *rets = inter->stack_ptr;
+	elf_push_closure_raw(inter, closure);
+	elf_push_this(inter);
+	nrets = elf_call(inter, nargs + 1, nrets);
+	inter->stack_ptr = rets + nrets;
 	return nrets;
-}
-
-elf_b32 elf_exec_file(elf_State *S, char *name, int nargs, int nrets) {
-	FILE *io = fopen(name,"rb");
-	fseek(io, 0, SEEK_END);
-	int size = ftell(io);
-	fseek(io, 0, SEEK_SET);
-	elf_String *contents = elf_new_string2(S, size);
-	fread(contents->text, 1, size, io);
-	fclose(io);
-
-	return elf_exec(S, false, nargs, nrets, elf_new_string(S, name), contents);
 }
 
 static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num) {
@@ -129,7 +121,7 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 // to work properly, otherwise, we're screwed...
 // todo: proper allocations
 //
-void elf_init(elf_State *R) {
+void elf_init_raw(elf_State *R) {
 	R->G.open_object_slots = sys_virtual_alloc(GIGABYTES(1));
 	R->G.close_object_slots = sys_virtual_alloc(GIGABYTES(1));
 
@@ -347,7 +339,7 @@ int _resume(elf_State *R) {
 		if(!R->disable_tracing){
 			if(R->flags & FLAG_TRACING){
 				elf_Value trace_value = elf_table_get_raw(R->trace_table,VALUE_INTEGER(module_instr));
-				if(trace_value.tag!=elf_tag_nil){
+				if(trace_value.tag!=elf_tag_Nil){
 					if(module_instr!=R->trace_start_instr){
 						ASSERT(BC_OP(byte) != BC_J && BC_OP(byte) != BC_JZ && BC_OP(byte) != BC_JNZ);
 						ASSERT(trace_value.x_i64 != R->trace_start_instr);
@@ -381,7 +373,7 @@ int _resume(elf_State *R) {
 				}else{
 					ASSERT(R->trace_inner_loop_counter == 0);
 					elf_Value trace_value = elf_table_get_raw(R->trace_table,VALUE_INTEGER(trace_start_instr));
-					if(trace_value.tag==elf_tag_nil){
+					if(trace_value.tag==elf_tag_Nil){
 						if(R->track[module_instr]>=64){
 							R->flags |= FLAG_TRACING;
 							R->trace_start_instr = trace_start_instr;
@@ -458,7 +450,7 @@ int _resume(elf_State *R) {
 				globals->array[BC_ARGX(byte)]=locals[BC_ARGY(byte)];
 			} break;
 			case BC_LOADNIL: {
-				locals[BC_ARGX(byte)].tag    = elf_tag_nil;
+				locals[BC_ARGX(byte)].tag    = elf_tag_Nil;
 				locals[BC_ARGX(byte)].x_int  = 0;
 			} break;
 			case BC_GETKINT: {
@@ -522,7 +514,7 @@ int _resume(elf_State *R) {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				// todo: my preference, maybe this could be configured...
-				if(yy.tag==elf_tag_nil) {
+				if(yy.tag==elf_tag_Nil) {
 					elf_error(R,module_instr,"attempted to get nil field");
 				}else switch (xx.tag){
 					case elf_tag_Table:{
@@ -540,7 +532,7 @@ int _resume(elf_State *R) {
 						locals[BC_ARGX(byte)].tag   = elf_tag_int;
 						locals[BC_ARGX(byte)].x_i32 = string->text[index];
 					}break;
-					case elf_tag_nil:{
+					case elf_tag_Nil:{
 						elf_error(R,module_instr,"attempted to get field of 'nil' value");
 					}break;
 					default:{
@@ -554,7 +546,7 @@ int _resume(elf_State *R) {
 				zz=locals[BC_ARGZ(byte)];
 				if(xx.tag==elf_tag_Table){
 					if(!xx.x_tab) elf_error(R,module_instr,elf_tpf("table is nil, how did this happen?"));
-					if(yy.tag==elf_tag_nil) elf_error(R,module_instr,elf_tpf("key is nil..."));
+					if(yy.tag==elf_tag_Nil) elf_error(R,module_instr,elf_tpf("key is nil..."));
 					elf_table_set_raw(xx.x_tab,yy,zz);
 				}else if(xx.tag==elf_tag_UserObject){
 					elf_Value args[] = { yy, zz };
@@ -604,7 +596,7 @@ int _resume(elf_State *R) {
 				xx = locals[BC_ARGY(byte)];
 				nan = xx.tag != elf_tag_int && xx.tag != elf_tag_num;
 				locals[BC_ARGX(byte)].tag   = elf_tag_int;
-				locals[BC_ARGX(byte)].x_int = xx.tag == elf_tag_nil || (nan && xx.x_int == 0);
+				locals[BC_ARGX(byte)].x_int = xx.tag == elf_tag_Nil || (nan && xx.x_int == 0);
 			} break;
 #endif
 			case BC_N2I: {
@@ -621,7 +613,7 @@ int _resume(elf_State *R) {
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				bool eq=0;
-				if ((xx.tag==elf_tag_nil)||(yy.tag==elf_tag_nil)) {
+				if ((xx.tag==elf_tag_Nil)||(yy.tag==elf_tag_Nil)) {
 					eq=IS_NIL_VALUE(xx)==IS_NIL_VALUE(yy);
 				} else if ((xx.tag==elf_tag_String)&&(yy.tag==elf_tag_String)) {
 					eq=elf_get_strings_eq(xx.x_str,yy.x_str);

@@ -18,37 +18,37 @@
 // } LMSG;
 
 
-// ELF_API int netlib_init(elf_State *R) {
+// elf_userapi int netlib_init(elf_State *R) {
 // 	WSADATA data;
 // 	WSAStartup(MAKEWORD(2,2),&data);
 // 	return 0;
 // }
 
 
-// ELF_API int netlib_close(elf_State *R) {
+// elf_userapi int netlib_close(elf_State *R) {
 // 	WSACleanup();
 // 	return 0;
 // }
 
 
-// ELF_API int netlib_listen(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
+// elf_userapi int netlib_listen(elf_State *R) {
+// 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
 // 	int error = listen(handle,SOMAXCONN);
 // 	elf_push_int(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
 
-// ELF_API int netlib_accept(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
+// elf_userapi int netlib_accept(elf_State *R) {
+// 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
 // 	elf_push_handle(R,(elf_Handle)client);
 // 	return 1;
 // }
 
 
-// ELF_API int netlib_pollclient(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sysobj(R,0);
+// elf_userapi int netlib_pollclient(elf_State *R) {
+// 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
 // 	fd_set ready;
 // 	FD_ZERO(&ready);
 // 	FD_SET(handle,&ready);
@@ -63,9 +63,9 @@
 // }
 
 
-// ELF_API int netlib_tcpserver(elf_State *R) {
-// 	elf_String *addrnameS = elf_get_string(R,0);
-// 	elf_String *addrportS = elf_get_string(R,1);
+// elf_userapi int netlib_tcpserver(elf_State *R) {
+// 	elf_String *addrnameS = elf_getStringArg(R,0);
+// 	elf_String *addrportS = elf_getStringArg(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -86,9 +86,9 @@
 // }
 
 
-// ELF_API int netlib_tcpclient(elf_State *R) {
-// 	elf_String *addrnameS = elf_get_string(R,0);
-// 	elf_String *addrportS = elf_get_string(R,1);
+// elf_userapi int netlib_tcpclient(elf_State *R) {
+// 	elf_String *addrnameS = elf_getStringArg(R,0);
+// 	elf_String *addrportS = elf_getStringArg(R,1);
 // 	char *addrname = addrnameS ? addrnameS->c : 0;
 // 	char *addrport = addrportS ? addrportS->c : 0;
 // 	ADDRINFOA idealaddr = {0};
@@ -109,10 +109,10 @@
 // }
 
 
-// ELF_API int netlib_send(elf_State *R) {
+// elf_userapi int netlib_send(elf_State *R) {
 // 	/* todo: make this a class? */
-// 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
-// 	elf_String *payload = elf_get_string(R,1);
+// 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
+// 	elf_String *payload = elf_getStringArg(R,1);
 // 	LMSG message = { payload->length };
 // 	elf_Int sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
@@ -122,8 +122,8 @@
 // }
 
 
-// ELF_API int netlib_ioctl(elf_State *R) {
-// 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
+// elf_userapi int netlib_ioctl(elf_State *R) {
+// 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
 // 	elf_push_int(R,error == 0);
@@ -131,8 +131,8 @@
 // }
 
 
-// ELF_API int netlib_recv(elf_State *R) {
-// 	SOCKET socket = (SOCKET) elf_get_sysobj(R,0);
+// elf_userapi int netlib_recv(elf_State *R) {
+// 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
 // 	LMSG message = {0};
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {
@@ -167,20 +167,20 @@
 // 	return 1;
 // }
 // #else
-// ELF_API int netlib_init(elf_State *R) { return 0; };
-// ELF_API int netlib_close(elf_State *R) { return 0; };
-// ELF_API int netlib_listen(elf_State *R) { return 0; };
-// ELF_API int netlib_accept(elf_State *R) { return 0; };
-// ELF_API int netlib_pollclient(elf_State *R) { return 0; };
-// ELF_API int netlib_tcpserver(elf_State *R) { return 0; };
-// ELF_API int netlib_tcpclient(elf_State *R) { return 0; };
-// ELF_API int netlib_send(elf_State *R) { return 0; };
-// ELF_API int netlib_ioctl(elf_State *R) { return 0; };
-// ELF_API int netlib_recv(elf_State *R) { return 0; };
+// elf_userapi int netlib_init(elf_State *R) { return 0; };
+// elf_userapi int netlib_close(elf_State *R) { return 0; };
+// elf_userapi int netlib_listen(elf_State *R) { return 0; };
+// elf_userapi int netlib_accept(elf_State *R) { return 0; };
+// elf_userapi int netlib_pollclient(elf_State *R) { return 0; };
+// elf_userapi int netlib_tcpserver(elf_State *R) { return 0; };
+// elf_userapi int netlib_tcpclient(elf_State *R) { return 0; };
+// elf_userapi int netlib_send(elf_State *R) { return 0; };
+// elf_userapi int netlib_ioctl(elf_State *R) { return 0; };
+// elf_userapi int netlib_recv(elf_State *R) { return 0; };
 // #endif
 
 
-// ELF_API void elf_netlib_loadfunctions(elf_State *R) {
+// elf_userapi void elf_netlib_loadfunctions(elf_State *R) {
 // 	elf_Module *md = R->md;
 
 // 	elf_gsetx_cfn(R,"elf.sockets.init",netlib_init);

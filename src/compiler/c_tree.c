@@ -102,8 +102,13 @@ static treeID tree_goto(elf_Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_GOTO,NT_ANY);
 }
 
-static treeID tree_block(elf_Parser *parser, Source line, treeID *z) {
-	return tree_xyz(parser,line,STAT_BLOCK,NT_NON,NO_TREE,NO_TREE,z);
+static treeID tree_block(elf_Parser *parser, Source line, treeID *stats, treeID *defers, treeID *breaks ) {
+	treeID v = tree_nullary(parser,line,STAT_BLOCK,NT_NON);
+	v->tree_blockstat.stats = stats;
+	v->tree_blockstat.defers = defers;
+	v->tree_blockstat.breaks = breaks;
+	return v;
+
 }
 
 static treeID tree_field(elf_Parser *parser, Source line, treeID x, treeID y) {
@@ -172,8 +177,8 @@ static treeID tree_closure_value(elf_Parser *parser, Source line, int x) {
 
 static treeID tree_if(elf_Parser *parser, Source line, treeID pred, treeID true_clause, treeID else_clause) {
 	treeID v=new_tree(parser,line,TREE_IF,NT_NON);
-	v->stat_if.pred=pred;
-	v->stat_if.true_clause=true_clause;
-	v->stat_if.else_clause=else_clause;
+	v->tree_ifstat.pred=pred;
+	v->tree_ifstat.true_clause=true_clause;
+	v->tree_ifstat.else_clause=else_clause;
 	return v;
 }

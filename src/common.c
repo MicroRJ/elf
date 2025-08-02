@@ -111,32 +111,32 @@ static void *copy_memory(void *dst, void const *src, elf_Int length) {
 
 
 
-elf_Bool is_eol_chr(char x) {
+bool is_eol_chr(char x) {
 	return x == '\r' || x == '\n' || x == '\0';
 }
 
 
-elf_Bool is_digit_chr(char x) {
+bool is_digit_chr(char x) {
 	return x >= '0' && x <= '9';
 }
 
 
-elf_Bool is_lowercase_chr(char x) {
+bool is_lowercase_chr(char x) {
 	return x >= 'a' && x <= 'z';
 }
 
 
-elf_Bool is_uppercase_chr(char x) {
+bool is_uppercase_chr(char x) {
 	return x >= 'A' && x <= 'Z';
 }
 
 
-elf_Bool is_letter_chr(char x) {
+bool is_letter_chr(char x) {
 	return is_uppercase_chr(x) || is_lowercase_chr(x);
 }
 
 
-elf_Bool is_letter_or_digit_chr(char x) {
+bool is_letter_or_digit_chr(char x) {
 	return is_letter_chr(x) || is_digit_chr(x);
 }
 
@@ -169,7 +169,7 @@ int text_length(char const *s) {
 
 
 #if 0
-elf_Bool elf_cstrhasprefix(char *str, char *prefix) {
+bool elf_cstrhasprefix(char *str, char *prefix) {
 	if (prefix == 0 || *prefix == 0 || *str == 0 || *str == 0) {
 		return 0;
 	}
@@ -182,7 +182,7 @@ elf_Bool elf_cstrhasprefix(char *str, char *prefix) {
 }
 #endif
 
-elf_Bool text_eql(char const *x, char const *y, int n) {
+bool text_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
 			return 0;
@@ -192,7 +192,7 @@ elf_Bool text_eql(char const *x, char const *y, int n) {
 }
 
 
-elf_Bool text_eq(char const *x, char const *y) {
+bool text_eq(char const *x, char const *y) {
 	if (x == y) {
 		return 1;
 	}
@@ -231,7 +231,7 @@ static char *tpf_(char const *format, ...) {
 /*
 ** Simple pattern matcher utility.
 */
-elf_Bool match_entire_text_noclause(char *p, char *s);
+bool match_entire_text_noclause(char *p, char *s);
 
 
 /* Younger me wrote:
@@ -240,7 +240,7 @@ elf_Bool match_entire_text_noclause(char *p, char *s);
 
   Now, I don't remember what the flaw is!
 */
-elf_Bool match_entire_text(char *p, char *s) {
+bool match_entire_text(char *p, char *s) {
 	char *b = s;
 	while (!match_entire_text_noclause(p,s)) {
 		while (*p != 0 && *p != '|') ++p;
@@ -251,7 +251,7 @@ elf_Bool match_entire_text(char *p, char *s) {
 }
 
 
-elf_Bool match_entire_text_noclause(char *p, char *s) {
+bool match_entire_text_noclause(char *p, char *s) {
 	while (*p != 0 && *p != '|') {
 		if (*p == '?') {
 			/* matches any character except terminator. */

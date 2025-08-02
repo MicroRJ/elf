@@ -1,4 +1,5 @@
 # these submodules are optional
+# delete this wth??? #todo
 [submodule "lgi"]
 	path = elf-lgi/lgi
 	url = https://github.com/MicroRJ/lgi

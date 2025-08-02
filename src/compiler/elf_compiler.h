@@ -10,4 +10,4 @@ int elf_parse_const(elf_State *S, char *name, char *contents);
 
 // " parses JSON as a table "
 // return value is the the JSON object
-elf_Table *elf_parse_json(elf_State *S, char *name, char *contents);
+elf_Table *elf_load_json(elf_State *S, char *name, char *contents);

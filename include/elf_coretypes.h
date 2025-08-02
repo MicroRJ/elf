@@ -3,10 +3,11 @@
 // elf.c
 //
 
-// todo: remove
+#if !defined(HAS_BOOL)
+// NOTE: do not use for storage, size could change!
 typedef signed   int  			 bool;
+#endif
 
-typedef signed   int           elf_Bool;
 typedef signed   char          elf_i8;
 typedef unsigned char          elf_u8;
 typedef signed   short         elf_i16;

@@ -59,20 +59,20 @@
 
 static char *get_name_from_file_path(const char *p);
 static void get_source_info(char *source, char *cursor, int *line_number, char **line_start);
-static elf_Bool is_eol_chr(char x);
-static elf_Bool is_digit_chr(char x);
-static elf_Bool is_lowercase_chr(char x);
-static elf_Bool is_uppercase_chr(char x);
-static elf_Bool is_letter_chr(char x);
-static elf_Bool is_letter_or_digit_chr(char x);
+static bool is_eol_chr(char x);
+static bool is_digit_chr(char x);
+static bool is_lowercase_chr(char x);
+static bool is_uppercase_chr(char x);
+static bool is_letter_chr(char x);
+static bool is_letter_or_digit_chr(char x);
 static char chr_to_uppercase(char x);
 static char chr_to_lowercase(char x);
 static int text_length(char const *text);
-static elf_Bool text_eql(char const *x, char const *y, int n);
-static elf_Bool text_eq(char const *x, char const *y);
+static bool text_eql(char const *x, char const *y, int n);
+static bool text_eq(char const *x, char const *y);
 static char *copy_text2(int length, char const *string);
-static elf_Bool match_entire_text_noclause(char *pattern, char *text);
-static elf_Bool match_entire_text(char *pattern, char *text);
+static bool match_entire_text_noclause(char *pattern, char *text);
+static bool match_entire_text(char *pattern, char *text);
 static char *match_text_single_clause_ex(char *p, char *s);
 static char *thread_format_v(char const *format, va_list v);
 

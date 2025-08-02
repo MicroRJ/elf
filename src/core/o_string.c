@@ -25,43 +25,6 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 	copy_memory(string->text,text,length);
 	string->hash = hash;
 	return string;
-#if 0
-	int length;
-	elf_HashInt hash;
-	elf_String *string;
-	elf_Table *registry;
-
-	length=text_length(text);
-	hash=hash_text(text);
-	string=0;
-	registry=R->strings;
-
-
-	if (length < 64 && registry != 0) {
-		elf_Int slot=elf_table_try_text(registry,text,length,hash);
-		ASSERT(slot != -1);
-		elf_Table_Entry entry=registry->slots[slot];
-		if (entry.key.tag != elf_tag_nil) {
-			elf_Value target=registry->array[registry->slots[slot].idx];
-			string=target.x_str;
-		} else {
-			string = elf_alloc_string2(R,length);
-			copy_memory(string->text,text,length);
-			string->hash = hash;
-
-			elf_Int i = ARRAY_GROW(registry->array,1);
-			registry->array[i]=VALUE_STRING(string);
-			registry->slots[slot].key=VALUE_STRING(string);
-			registry->slots[slot].idx=i;
-			registry->nslots ++;
-		}
-	} else {
-		string = elf_alloc_string2(R,length);
-		copy_memory(string->text,text,length);
-		string->hash = hash;
-	}
-#endif
-	return string;
 }
 
 

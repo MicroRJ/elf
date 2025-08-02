@@ -2,8 +2,9 @@
 // See Copyright Notice In elf.h
 //
 
-#define TREE_THIS ((treeID)(1))
+// todo: this name can be confusing
 #define NO_TREE 0
+#define INVALID_TREE -1
 
 typedef struct elf_Parser elf_Parser;
 
@@ -94,10 +95,11 @@ struct treeT {
 		struct {
 			treeID x,y,*z;
 		};
-		// todo: maybe we should get rid of this,
-		// and use the same strategy that we used
-		// for register allocation
+		// intenal to the generator, the generator fills this in
+		// with a real address, when the tree is referenced again
+		// the address is used
 		int         jump;
+
 		int  expr_global;
 		int expr_upvalue;
 		char   *expr_str;
@@ -115,13 +117,18 @@ struct treeT {
 			// parsing
 			int       scope;
 			treeID      enc;
-		} expr_fun;
+		} tree_funexpr;
+		struct {
+			treeID *defers;
+			treeID *breaks;
+			treeID *stats; // match z
+		} tree_blockstat;
 		struct {
 			treeID        pred;
 			treeID true_clause;
 			treeID else_clause;
 			treeID then_clause;
-		} stat_if;
+		} tree_ifstat;
 		struct {
 			treeID pred;
 			treeID prebody;
@@ -180,7 +187,7 @@ static treeID tree_ranged_index(elf_Parser *, Source line, treeID x, treeID y);
 static treeID tree_less_than(elf_Parser *, Source line, treeID x, treeID y);
 static treeID tree_meta_call(elf_Parser *, Source line, treeID x, treeID *z, char *name);
 static treeID tree_tuple(elf_Parser *, Source line, treeID *z);
-static treeID tree_block(elf_Parser *, Source line, treeID *z);
+static treeID tree_block(elf_Parser *, Source line, treeID *stats, treeID *defers, treeID *breaks);
 
 static treeID tree_global_symbol(elf_Parser *, Source line, char *name);
 static treeID tree_call_set_meta(elf_Parser *, Source line, treeID object, treeID metatable);

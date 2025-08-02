@@ -64,21 +64,41 @@ struct Loop {
 	treeID  name;
 };
 
+enum {
+	MAX_ENTITIES = 1024
+};
+// todo:
+// we use the parser for everything, but we may want to split
+// it because there are some functions that all they want to
+// do is parse a constant expression, in which case the only
+// thing they want is a lexer
+// NOTE: maybe don't allocate on the stack, this thing might be big!
 typedef struct elf_Parser elf_Parser;
 struct elf_Parser {
-	elf_State                     *R;
-	char                       *name;
-	char                       *text;
-	char                        *pos;
-	char                   *line_pos;
-	int                     line_num;
-	Token  tok,tok_prev,tok_prox;
-	char                  *expr_line;
+	union {
+		elf_State                  *R;
+		elf_State              *inter;
+	};
+
+	// name is only for error reporting, allocate here to remove
+	// ambiguity of who owns what..
+	// also the name may not fit so make sure to handle that properly
+	char                      name[256];
+	// source must be kept alive by user
+	char                     *source;
+
+	char                     *cursor;
+	Token      tok,tok_prev,tok_prox;
+
+	// active source location to prevent the annoyance
+	// of having to pass to all functions that need it.
+	char                  *sourceloc;
 	treeID                       enc;
 	treeID                *functions;
 	// entities are named objects, variables,
 	// symbols, special names, and such...
-	entityT         *entities;
+	// todo: allocate within struct
+	entityT          entities[MAX_ENTITIES];
 	entityID         entity_index;
 	// remember scope hierarchy, 'scope'
 	// is the first visible entity
@@ -102,10 +122,9 @@ struct elf_Parser {
 	int 	          memory_state_index;
 	// remember which trees have memory
 	treeID          memory_slots[1024];
-	// temporary memory for keeping track
-	// of jump instructions
-	int            *t_jumps[128];
-	int            *f_jumps[128];
+
+	// immediate temporary buffer, some temporary results are placed here
+	char            tempbuf[1024];
 };
 
 

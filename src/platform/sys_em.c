@@ -10,7 +10,7 @@
 
 
 
-elf_Bool sys_debugger() {
+bool sys_debugger() {
 	emscripten_debugger();
 	return 1;
 }
@@ -165,7 +165,7 @@ int sys_readdir(FILE_VISITOR *visitor) {
 			if (elf_is_virtual_file_name(entry->d_name)) {
 				continue;
 			}
-			elf_Bool isdir = (entry->d_type & DT_DIR) != 0;
+			bool isdir = (entry->d_type & DT_DIR) != 0;
 			elf_Value *top = GET_TOP(R);
 
 			elf_String *name = elf_new_string(R,entry->d_name);
@@ -177,7 +177,7 @@ int sys_readdir(FILE_VISITOR *visitor) {
 			elf_tsets_str(file,elf_new_string(R,"path"),path);
 			elf_tsets_int(file,elf_new_string(R,"isdir"),isdir);
 			int r = elf_call(R,base,1,1);
-			if ((r > 0) && isdir && elf_get_int(R,base)) {
+			if ((r > 0) && isdir && elf_get_intarg(R,base)) {
 				core_lib_enumerate_folder_(R,path,cls);
 			}
 			SET_TOP(R,top);

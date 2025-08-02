@@ -2,16 +2,17 @@
 // See Copyright Notice In elf.h
 //
 
-#define POS0() (parser->pos[0])
-#define POS1() (parser->pos[1])
-#define MOVE() (*(parser->pos ++))
-#define MOVEN(n) ((parser->pos += n))
+// todo: avoid using these macros, they're ugly
+#define POS0() (parser->cursor[0])
+#define POS1() (parser->cursor[1])
+#define MOVE() (*(parser->cursor ++))
+#define MOVEN(n) ((parser->cursor += n))
 #define PICK(xx) ((POS0() == (xx)) ? (MOVEN(1), 1) : 0)
 
-static void new_line(elf_Parser *parser) {
-	parser->line_pos = parser->pos;
-	parser->line_num ++;
-}
+//	static void new_line(elf_Parser *parser) {
+//		parser->line_pos = parser->cursor;
+//		parser->line_num ++;
+//	}
 
 
 /* todo: speed */
@@ -30,6 +31,9 @@ static tokenTy check_keyword(char *name) {
 	return TK_WORD;
 }
 
+//
+// todo: we already have one of these somewhere, recycle!
+//
 static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) {
 	line = line ? line : parser->tok.line;
 
@@ -43,7 +47,7 @@ static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) 
 
 	int linenum;
 	char *lineloc;
-	get_source_info(parser->text,line,&linenum,&lineloc);
+	get_source_info(parser->source,line,&linenum,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -136,7 +140,7 @@ static elf_i64 lex_integer(elf_Parser *parser) {
 			if (x == 2 && z > 1) goto _error;
 		} else {
 			if (0) _error: {
-				parser_dialog(parser, parser->pos, "invalid base '%i' for digit", x);
+				parser_dialog(parser, parser->cursor, "invalid base '%i' for digit", x);
 			}
 			break;
 		}
@@ -151,7 +155,7 @@ static int lex_identifier(elf_Parser *parser, char *buffer, int capacity) {
 
 	do {
 		if (length >= capacity) {
-			parser_dialog(parser, parser->pos, "identifier is too long");
+			parser_dialog(parser, parser->cursor, "identifier is too long");
 		}
 		buffer[length ++] = MOVE();
 	} while (is_letter_or_digit_chr(POS0()) || (POS0() == '_'));
@@ -162,22 +166,22 @@ static int lex_identifier(elf_Parser *parser, char *buffer, int capacity) {
 
 
 static int pick_empty_chars(elf_Parser *parser) {
-	int lines=0;
+	int lines = 0;
 	retry:
-	switch (*parser->pos) {
+	switch (*parser->cursor) {
 		case ' ': case '\t': {
 			MOVE();
 		} goto retry;
 		case '\n': {
 			MOVE();
-			new_line(parser);
-			lines+=1;
+			// new_line(parser);
+			lines += 1;
 		} goto retry;
 		case '\r': {
 			MOVE();
 			PICK('\n');
-			new_line(parser);
-			lines+=1;
+			// new_line(parser);
+			lines += 1;
 		} goto retry;
 	}
 	return lines;
@@ -190,23 +194,26 @@ static int pick_empty_chars(elf_Parser *parser) {
 //
 static Token get_tok(elf_Parser *parser) {
 
-	char buffer[256];
-
 	retry:
 	Token token = {};
 	token.type = TK_NONE;
-	token.line = parser->pos;
+	token.line = parser->cursor;
 
 	switch (POS0()) {
 		case 'A'...'Z': case 'a'...'z': case '_': {
+			if (parser->cursor[0] == 'f' && parser->cursor[1] == '"') {
+				parser->cursor ++;
+				token.type = TK_FORMAT_STRING;
+				goto strcase;
+			}
 
-			int length = lex_identifier(parser, buffer, sizeof(buffer) - 1);
+			int length = lex_identifier(parser, parser->tempbuf, sizeof(parser->tempbuf) - 1);
 
-			token.type = check_keyword(buffer);
+			token.type = check_keyword(parser->tempbuf);
 			if (token.type == TK_WORD) {
 				// todo: proper string allocator
 				// todo: leak!
-				token.text = copy_text2(length, buffer);
+				token.text = copy_text2(length, parser->tempbuf);
 			}
 
 		} break;
@@ -243,44 +250,61 @@ static Token get_tok(elf_Parser *parser) {
 			}
 		} break;
 		case '"': {
+			strcase:
 			MOVE();
-			/* todo: use static buffer first */
+
+			/* todo: use static buffer first if that fills up move onto
+			the dynamic buffer, store static buffer within the lexer */
 			char *buffer = 0;
 			int   length = 0;
-			while (POS0() != 0) {
+			int needsformatting = false;
+
+			while (*parser->cursor) {
 				while (POS0() != 0 && POS0() != '"') {
 					/* are multi-line strings illegal? */
 					if (PICK('\n') || (PICK('\r') && (PICK('\n'),1))) {
-						new_line(parser);
+						// new_line(parser);
 						ARRAY_ADD(buffer,'\n');
 					} else {
-						char chr = pick_esc_char(parser);
-						ARRAY_ADD(buffer,chr);
+						// don't check for format
+						if (token.type != TK_FORMAT_STRING) goto escchar;
+
+						// todo: make it so that we can escape the formatting
+						if (POS0() == FORMAT_CHAR && POS1() == '{') {
+							needsformatting = true;
+							ARRAY_ADD(buffer, *parser->cursor ++);
+							ARRAY_ADD(buffer, *parser->cursor ++);
+						} else {
+							escchar:
+							int chr = pick_esc_char(parser);
+							ARRAY_ADD(buffer, chr);
+						}
 					}
 				}
 				if (!PICK('"')) {
 					parser_dialog(parser,token.line,"invalid string");
 				}
-				int lines=pick_empty_chars(parser);
-				if (lines)token.eol=1;
-				if (!PICK('"')) {
-					break;
-				}
-				ARRAY_ADD(buffer,'\n');
+
+				// try to find another string to join with
+				int lines = pick_empty_chars(parser);
+				if (lines) token.eol = true;
+
+				// did we find anything?
+				if (PICK('"')) {
+					ARRAY_ADD(buffer,'\n');
+				} else break;
 			}
 
 			ARRAY_ADD(buffer,0);
 
-			// todo: leak.
-			// todo: strings can be arbitrarily big so
-			// this has to be heap allocated, but could
-			// we instead GC allocate this? and then it
-			// will get automatically collected if not
-			// referenced? Would this cause other unintended
-			// effects?
-			token.type = TK_STRING;
+			// todo: leak, allocate this properly in some sort
+			// of constant pool with intering, use the atomizer
+			// that way we avoid going thru the GC, if during
+			// parsing we figure out the thing is dead, we dealloc it
+			if (!needsformatting || token.type != TK_FORMAT_STRING) {
+				token.type = TK_STRING;
+			}
 			token.text = copy_text2(length,buffer);
-
 			ARRAY_DELETE(buffer);
 		} break;
 		case '.': {
@@ -301,16 +325,19 @@ static Token get_tok(elf_Parser *parser) {
 		} break;
 		case '#': {
 			MOVE();
-			lex_identifier(parser, buffer, sizeof(buffer) - 1);
-			token.type = text_is_word_or_macro(buffer);
+			lex_identifier(parser, parser->tempbuf, sizeof(parser->tempbuf) - 1);
+			token.type = text_is_word_or_macro(parser->tempbuf);
 			if (token.type == TK_M_ENDOFFILE) {
 				token.type = TK_NONE;
 			} else if (token.type==TK_M_FILE_NAME) {
 				token.type = TK_STRING;
 				token.text = parser->name;
 			} else if (token.type == TK_M_LINE_NUMBER) {
+				// todo: get this from the source location!
+				__debugbreak();
+
 				token.type = TK_INTEGER;
-				token.integer = parser->line_num;
+				token.integer = -1;
 			} else if (token.type == TK_WORD) {
 				parser_dialog(parser,token.line,"unrecognized macro");
 			} else {
@@ -325,14 +352,14 @@ static Token get_tok(elf_Parser *parser) {
 		} goto retry;
 		case '\n': {
 			MOVE();
-			parser->line_pos = parser->pos;
-			parser->line_num += 1;
+			//	parser->line_pos = parser->cursor;
+			//	parser->line_num += 1;
 		} goto retry;
 		case '\r': {
 			MOVE();
 			PICK('\n');
-			parser->line_pos = parser->pos;
-			parser->line_num += 1;
+			//	parser->line_pos = parser->cursor;
+			//	parser->line_num += 1;
 		} goto retry;
 		case ';': {
 			MOVE();
@@ -351,13 +378,13 @@ static Token get_tok(elf_Parser *parser) {
 				for (;;) {
 					/* handle lines */
 					if (PICK('\n')) {
-						parser->line_pos = parser->pos;
-						parser->line_num += 1;
+						//	parser->line_pos = parser->cursor;
+						//	parser->line_num += 1;
 					} else
 					if (PICK('\r')) {
 						PICK('\n');
-						parser->line_pos = parser->pos;
-						parser->line_num += 1;
+						//	parser->line_pos = parser->cursor;
+						//	parser->line_num += 1;
 					} else
 					if (PICK('*')) {
 						if (PICK('/')) {

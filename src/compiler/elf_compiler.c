@@ -6,7 +6,9 @@
 #include <stdlib.h>
 
 #include "elf.h"
-#include "r_core.h"
+
+#include "internal.h"
+
 #include "subsystem.h"
 #include "r_auxilary.h"
 
@@ -24,30 +26,28 @@
 #include "c_generate.c"
 
 
-elf_Table *elf_parse_json(elf_State *S, char *name, char *contents) {
-	elf_Parser parser = {};
-	c_parser_init(S, &parser, name, contents);
-
-	elf_Table *table = c_parse_json(&parser);
-	return table;
+// todo: find a better name for this!
+elf_Table *elf_load_json(elf_State *S, char *name, char *contents) {
+	elf_Parser *parser = elf_new_parser(S, name, contents);
+	elf_Table *result = c_parse_json_object(parser);
+	free(parser);
+	return result;
 }
 
-
 int elf_parse_const(elf_State *S, char *name, char *contents) {
-	elf_Parser parser = {};
-	c_parser_init(S, &parser, name, contents);
-
-	return parse_constexpr(&parser);
+	elf_Parser *parser = elf_new_parser(S, name, contents);
+	int result = parse_constexpr(parser);
+	free(parser);
+	return result;
 }
 
 // todo: remove the as_expr thing?
 elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool as_expr) {
 	ASSERT(contents);
 	ASSERT(name);
+
 	// todo: uninit the parser!
-	elf_Parser parser_ = {};
-	elf_Parser *parser = &parser_;
-	c_parser_init(S, parser, name->text, contents->text);
+	elf_Parser *parser = elf_new_parser(S, name->text, contents->text);
 
 	// Todo: this pattern is common, just create one "begin" / "end"
 	// set of functions
@@ -74,7 +74,7 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 		}
 
 	}
-	func->expr_fun.body = tree_block(parser, parser->tok.line, parser->block.body);
+	func->tree_funexpr.body = tree_block(parser, parser->tok.line, parser->block.body, 0, 0);
 
 	// create prototypes for every function
 	int nfunctions = ARRAY_LENGTH(parser->functions);
@@ -84,12 +84,12 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 	// assign prototypes to each function
 	int start = S->nbytes;
 	FOR_ARRAY(i, parser->functions) {
-		parser->functions[i]->expr_fun.proto = index ++;
+		parser->functions[i]->tree_funexpr.proto = index ++;
 	}
 
 	// then compile each
 	FOR_ARRAY(i, parser->functions) {
-		protos[i] = elf_compile_function(parser, parser->functions[i]);
+		protos[i] = genfunction(parser, parser->functions[i]);
 		// elf_debug_log("PROTO: [%i, %i) (%i)"
 		// , 	protos[i].bytes
 		// , 	protos[i].bytes+protos[i].nbytes
@@ -118,6 +118,8 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 	// point to the file they are from?...
 	elf_array_add_raw(S->globals, VALUE_STRING(contents));
 	elf_array_add_raw(S->globals, VALUE_STRING(name));
+
+	free(parser);
 
 	return protos[0];
 }
