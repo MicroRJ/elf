@@ -66,25 +66,31 @@ ELF_FUNCTION(string_lib_append_char) {
 }
 
 
-int string_lib_append(elf_State *R) {
-	elf_String *str = (elf_String*) elf_get_this(R);
-	char buffer[0x100] = {0};
-	strcatf(buffer,"%s",str->text);
-	for (int i = 0; i < elf_get_num_args(R); ++ i) {
-		elf_Value v = elf_get_arg(R,i);
+ELF_FUNCTION(string_lib_append) {
+	elf_String *str = (elf_String *) elf_get_this(S);
+	char *heapbuf = calloc(1, 1024);
+
+	// todo: brother...
+	strcatf(heapbuf, "%s", str->text);
+	for (int i = 0; i < elf_get_num_args(S); ++ i) {
+		elf_Value v = elf_get_arg(S,i);
 		if (v.tag == elf_tag_String) {
-			strcatf(buffer,"%s",v.x_str->text);
+			strcatf(heapbuf,"%s",v.x_str->text);
 		} else if (v.tag == elf_tag_Nil) {
-			strcatf(buffer,"nil");
+			strcatf(heapbuf,"nil");
 		} else if (v.tag == elf_tag_num) {
-			strcatf(buffer,"%.2f",v.x_num);
+			strcatf(heapbuf,"%.2f",v.x_num);
 		} else if (v.tag == elf_tag_int) {
-			strcatf(buffer,"%lli",v.x_int);
+			strcatf(heapbuf,"%lli",v.x_int);
 		} else if (v.tag == elf_tag_Table) {
-			strcatf(buffer,"(tab %p)",v.x_tab);
-		} else NO_CODE;
+			strcatf(heapbuf,"(tab %p)",v.x_tab);
+		} else {
+			NO_CODE;
+		}
 	}
-	elf_new_string(R,buffer);
+
+	elf_new_string(S, heapbuf);
+	free(heapbuf);
 	return 1;
 }
 

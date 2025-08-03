@@ -15,18 +15,19 @@ ELF_FUNCTION(l_sys_get_file_name_from_path) {
 	return 1;
 }
 
-ELF_FUNCTION(l_sys_create_process) {
-	char *args = elf_get_text_arg(S, 0);
-	int result = sys_create_process(0, args);
+ELF_FUNCTION(l_sys_create_directory) {
+	char *path = elf_get_text_arg(S, 0);
+	int result = sys_create_directory(path);
 	elf_push_int(S, result);
 	return 1;
 }
+
 
 ELF_FUNCTION(l_sys_get_file_times) {
 	elf_Handle file = elf_get_sysarg(S, 0);
 
 	FILE_TIMES times;
-	sys_get_file_times(file, &times);
+	sys_time_file(file, &times);
 
 	elf_push_table(S);
 	elf_push_string(S, "created");  elf_push_int(S, times.create.time); elf_table_set(S);
@@ -190,6 +191,11 @@ ELF_FUNCTION(l_sys_open_temp_file) {
 	return 1;
 }
 
+ELF_FUNCTION(l_sys_delete_file) {
+	elf_push_int(S, sys_delete_file(elf_get_text_arg(S, 0)));
+	return 1;
+}
+
 ELF_FUNCTION(l_sys_open_file) {
 	ASSERT(elf_get_num_args(S) == 2);
 
@@ -252,17 +258,38 @@ ELF_FUNCTION(l_sys_write_file_to_file) {
 }
 
 ELF_FUNCTION(l_sys_change_work_dir) {
-	int err = sys_set_work_dir(elf_get_text_arg(S,0));
-	elf_push_int(S,err);
+	int result = sys_set_work_dir(elf_get_text_arg(S,0));
+	elf_push_int(S, result);
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_get_work_dir) {
 	char buf[256];
-	sys_get_work_dir(sizeof(buf),buf);
+	sys_get_work_dir(buf, sizeof(buf));
 	elf_new_string(S,buf);
 	return 1;
 }
+
+
+// process
+ELF_FUNCTION(l_sys_create_process) {
+	char *args = elf_get_text_arg(S, 0);
+	elf_Handle process = sys_create_process(0, args);
+	elf_push_handle(S, process);
+	return 1;
+}
+
+ELF_FUNCTION(l_sys_exit_this_process) {
+	sys_exit_this_process(elf_get_intarg(S, 0));
+	return 0;
+}
+
+ELF_FUNCTION(l_sys_get_this_process_id) {
+	int id = sys_get_this_process_id();
+	elf_push_int(S, id);
+	return 1;
+}
+
 
 static const elf_Binding l_sys[] = {
 	{"load_dll",                  l_sys_load_dll                  },
@@ -283,7 +310,12 @@ static const elf_Binding l_sys[] = {
 
 	{"get_file_times",            l_sys_get_file_times            },
 	{"file_time_to_system_time",  l_sys_file_time_to_system_time  },
-	{"create_process",            l_sys_create_process            },
-	{"sys_sleep",                 l_sys_sleep                     },
+	{"sleep",                     l_sys_sleep                     },
 	{"get_file_name_from_path",   l_sys_get_file_name_from_path   },
+	{"create_directory",          l_sys_create_directory          },
+	{"delete_file",               l_sys_delete_file               },
+
+	{"create_process",            l_sys_create_process            },
+	{"exit",                      l_sys_exit_this_process         },
+	{"get_process_id",            l_sys_get_this_process_id       },
 };

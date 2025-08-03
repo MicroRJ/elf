@@ -16,8 +16,11 @@ static treeID parse_postfix(elf_Parser *parser, int flags);
 static treeID parse_block(elf_Parser *parser);
 static int tok2tree(int tok);
 static int parse_stat(elf_Parser *parser);
+
+// the result is pushed onto the stack
 static int parse_json_object(elf_Parser *parser);
 static int parse_json_value(elf_Parser *parser);
+static int parse_constexpr(elf_Parser *parser);
 
 static int token_precedence(int type) {
 	return g_token_metadata_table[type].prec;
@@ -26,11 +29,8 @@ static int token_precedence(int type) {
 static void add_this_param(elf_Parser *parser, Source line);
 static treeID parse_if(elf_Parser *parser, int negate);
 static bool parse_for(elf_Parser *parser);
-static treeID parse_json_expr(elf_Parser *parser);
 static treeID *parse_args(elf_Parser *parser);
 static void block_add(elf_Parser *parser, treeID id);
-// the result is pushed onto the stack
-static int parse_constexpr(elf_Parser *parser);
 
 static void parser_restart(elf_Parser *parser, char *cursor) {
 	parser->cursor = cursor;

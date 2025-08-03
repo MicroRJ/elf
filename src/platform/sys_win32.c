@@ -42,9 +42,20 @@ unsigned int sys_size_file(FILE_HANDLE file) {
 	return size;
 }
 
+
+int sys_create_directory(char *path) {
+	return CreateDirectory(path, NULL);
+}
+
+
+bool sys_delete_file(char *path) {
+	return DeleteFile(path);
+}
+
 void sys_close_file(FILE_HANDLE file) {
 	CloseHandle(file);
 }
+
 
 FILE_HANDLE sys_open_file(char *name, int flags, int mode) {
 
@@ -70,7 +81,7 @@ FILE_HANDLE sys_open_file(char *name, int flags, int mode) {
 	return handle;
 }
 
-int sys_get_file_times(FILE_HANDLE file, FILE_TIMES *times) {
+int sys_time_file(FILE_HANDLE file, FILE_TIMES *times) {
 	int result = GetFileTime(file, &times->create, &times->access, &times->write);
 	//	FILETIME create, access, write;
 	//	int result = GetFileTime(file, &create, &access, &write);
@@ -208,24 +219,26 @@ elf_Int sys_get_clock_time() {
 	return large_integer.QuadPart;
 }
 
-
-int sys_get_my_name(int length, char *buffer) {
-	return GetModuleFileName(NULL,buffer,length);
+void sys_exit_this_process(int errorcode) {
+	ExitProcess(errorcode);
 }
 
+//	int sys_get_my_name(int length, char *buffer) {
+//		return GetModuleFileName(NULL,buffer,length);
+//	}
 
-int sys_get_my_pid() {
+int sys_get_this_process_id() {
 	return GetCurrentProcessId();
 }
 
 
-int sys_get_work_dir(int length, char *buffer) {
-	return GetCurrentDirectory(length,buffer);
+int sys_get_work_dir(char *buf, int bufsize) {
+	return GetCurrentDirectory(bufsize, buf);
 }
 
 
-int sys_set_work_dir(char *buffer) {
-	return SetCurrentDirectory(buffer);
+int sys_set_work_dir(char *buf) {
+	return SetCurrentDirectory(buf);
 }
 
 
@@ -266,12 +279,13 @@ int sys_read_directory(FILE_VISITOR *visitor) {
 	return result;
 }
 
+elf_Handle sys_create_process(char const *file, char const *args) {
+	STARTUPINFO startupinfo = {sizeof(startupinfo)};
+	PROCESS_INFORMATION processinfo = {0};
 
-int sys_create_process(char const *file, char const *args) {
-	STARTUPINFO si = {sizeof(si)};
-	PROCESS_INFORMATION pi = {0};
-	int result = CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-	return result;
+	CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&startupinfo,&processinfo);
+	WaitForSingleObject(processinfo.hProcess, INFINITE);
+	CloseHandle(processinfo.hProcess);
+	CloseHandle(processinfo.hThread);
+	return 0;
 }

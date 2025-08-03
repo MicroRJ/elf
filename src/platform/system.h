@@ -74,12 +74,15 @@ enum {
 };
 
 
+int sys_create_directory(char *path);
+
+bool sys_delete_file(char *name);
 FILE_HANDLE sys_open_file(char *name, int flags, int options);
-int sys_get_file_times(FILE_HANDLE file, FILE_TIMES *);
 void sys_close_file(FILE_HANDLE file);
 unsigned int sys_size_file(FILE_HANDLE file);
 unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int from, unsigned int size);
 unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int from, unsigned int size);
+int sys_time_file(FILE_HANDLE file, FILE_TIMES *);
 
 void sys_file_time_to_system_time(FILE_TIME *, SYSTEM_TIME *);
 
@@ -114,11 +117,12 @@ elf_i64 sys_get_clock_freq();
 elf_i64 sys_get_clock_time();
 
 
-int sys_get_my_name(int length, char *text);
-int sys_get_my_pid();
+// int sys_get_my_name(int length, char *text);
+int sys_get_this_process_id();
+void sys_exit_this_process(int errorcode);
 
-int sys_get_work_dir(int length, char *text);
-int sys_set_work_dir(char *text);
+int sys_get_work_dir(char *buf, int bufsize);
+int sys_set_work_dir(char *buf);
 
 
 elf_Handle sys_load_dll(char const *name);
@@ -128,7 +132,7 @@ void *sys_get_dll_fn(elf_Handle lib, char const *name);
 int sys_get_last_error();
 void sys_get_error_msg(int error, char *buff, int len);
 
-int sys_create_process(char const *file, char const *args);
+elf_Handle sys_create_process(char const *file, char const *args);
 
 enum {
 	FILE_TYPE_FILE    = 0,

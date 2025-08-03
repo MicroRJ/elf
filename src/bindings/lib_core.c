@@ -160,17 +160,10 @@ int core_lib_merge_tables(elf_State *R) {
 }
 
 
-/*  */
-int core_lib_abort(elf_State *R) {
-	if(1) abort();
-	return 0;
-}
-
-
-int core_lib_exit(elf_State *R) {
-	if(1) exit(elf_get_intarg(R,0));
-	return 0;
-}
+//	int core_lib_abort(elf_State *R) {
+//		if(1) abort();
+//		return 0;
+//	}
 
 
 /* debugging */

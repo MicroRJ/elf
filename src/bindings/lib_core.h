@@ -21,8 +21,6 @@ _(format)\
 _(merge_tables)\
 _(get_meta)\
 _(set_meta)\
-_(abort)\
-_(exit)\
 _(flags)\
 _(debugger)\
 _(const_expr)\
