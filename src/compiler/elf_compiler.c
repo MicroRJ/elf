@@ -7,7 +7,7 @@
 
 #include "elf.h"
 
-#include "internal.h"
+#include "elf_internal.h"
 
 #include "subsystem.h"
 #include "r_auxilary.h"
@@ -27,14 +27,14 @@
 
 
 // todo: find a better name for this!
-elf_Table *elf_load_json(elf_State *S, char *name, char *contents) {
+int elf_load_json(elf_State *S, char *name, char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
-	elf_Table *result = c_parse_json_object(parser);
+	int result = parse_json_object(parser);
 	free(parser);
 	return result;
 }
 
-int elf_parse_const(elf_State *S, char *name, char *contents) {
+int elf_load_const_expr(elf_State *S, char *name, char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_constexpr(parser);
 	free(parser);

@@ -3,41 +3,65 @@
 //
 
 
-// todo: remove!
-// todo: TOMORROW!
-static int _write_file_io(elf_State *S, FILE *io, char *text) {
-	ASSERT(io != 0);
-	return fwrite(text,1,strlen(text),io);
+ELF_FUNCTION(l_sys_sleep) {
+	ASSERT(elf_get_num_args(S) >= 1);
+	sys_sleep(elf_get_intarg(S,0));
+	return 0;
 }
 
-// todo: remove!
-// todo: TOMORROW!
-static int _write_file(elf_State *S, char *name, char *text) {
-	FILE *file = fopen(name,"wb");
-	int wrote = 0;
-	if (file) {
-		wrote = _write_file_io(S,file,text);
-		fclose(file);
-		elf_debug_log("'%s': file wrote successfully",name);
-	} else {
-		elf_error_log("'%s': could not write",name);
-	}
-	return wrote;
+ELF_FUNCTION(l_sys_get_file_name_from_path) {
+	char *path = elf_get_text_arg(S, 0);
+	elf_push_string(S, get_name_from_file_path(path));
+	return 1;
 }
 
+ELF_FUNCTION(l_sys_create_process) {
+	char *args = elf_get_text_arg(S, 0);
+	int result = sys_create_process(0, args);
+	elf_push_int(S, result);
+	return 1;
+}
 
+ELF_FUNCTION(l_sys_get_file_times) {
+	elf_Handle file = elf_get_sysarg(S, 0);
 
+	FILE_TIMES times;
+	sys_get_file_times(file, &times);
 
+	elf_push_table(S);
+	elf_push_string(S, "created");  elf_push_int(S, times.create.time); elf_table_set(S);
+	elf_push_string(S, "access");   elf_push_int(S, times.access.time); elf_table_set(S);
+	elf_push_string(S, "write");    elf_push_int(S, times.write.time);  elf_table_set(S);
+	return 1;
+}
 
+ELF_FUNCTION(l_sys_file_time_to_system_time) {
 
+	elf_Int time = elf_get_intarg(S, 0);
+	FILE_TIME filetime = { .time = time };
 
+	SYSTEM_TIME systemtime;
+	sys_file_time_to_system_time(&filetime, &systemtime);
+
+	elf_push_table(S);
+
+	elf_push_string(S, "year");         elf_push_int(S, systemtime.year);           elf_table_set(S);
+	elf_push_string(S, "month");        elf_push_int(S, systemtime.month);          elf_table_set(S);
+	elf_push_string(S, "dayofweek");    elf_push_int(S, systemtime.dayofweek);      elf_table_set(S);
+	elf_push_string(S, "day");          elf_push_int(S, systemtime.day);            elf_table_set(S);
+	elf_push_string(S, "hour");         elf_push_int(S, systemtime.hour);           elf_table_set(S);
+	elf_push_string(S, "minute");       elf_push_int(S, systemtime.minute);         elf_table_set(S);
+	elf_push_string(S, "second");       elf_push_int(S, systemtime.second);         elf_table_set(S);
+	elf_push_string(S, "milliseconds"); elf_push_int(S, systemtime.milliseconds);   elf_table_set(S);
+	return 1;
+}
 
 //
 // name: the name of the dynamic library in
 // the file system
 //
 ELF_FUNCTION(l_sys_load_dll) {
-	char *name = elf_getargtext(S, 0);
+	char *name = elf_get_text_arg(S, 0);
 
 	elf_Handle lib = sys_load_dll(name);
 	if (lib != 0) elf_push_handle(S, lib);
@@ -45,10 +69,9 @@ ELF_FUNCTION(l_sys_load_dll) {
 	return 1;
 }
 
-
 ELF_FUNCTION(l_sys_get_dll_fn) {
 	elf_Handle lib = elf_get_sysarg(S, 0);
-	char *name = elf_getargtext(S, 1);
+	char *name = elf_get_text_arg(S, 1);
 
 	elf_Function fn = (elf_Function) sys_get_dll_fn(lib, name);
 	if (fn != 0) elf_push_function(S,fn);
@@ -56,14 +79,13 @@ ELF_FUNCTION(l_sys_get_dll_fn) {
 	return 1;
 }
 
-
 static int foldertree(elf_State *inter, char *path, int recurse) {
 	int resstk = elf_push_table(inter);
 
 	// todo: speed! we can pre-push all these strings and reference
 	// them by stack address instead!
 	FILE_VISITOR visitor;
-	if (sys_opendir(&visitor, path)) do {
+	if (sys_open_directory(&visitor, path)) do {
 		if (visitor.type == FILE_TYPE_SYMLINK) continue;
 		if (is_file_name_empty(visitor.name)) continue;
 
@@ -83,7 +105,7 @@ static int foldertree(elf_State *inter, char *path, int recurse) {
 			elf_table_set(inter);
 
 			char * const type2s[] = {
-				[FILE_TYPE_FILE] = "folder",
+				[FILE_TYPE_FILE] = "file",
 				[FILE_TYPE_FOLDER] = "folder",
 				[FILE_TYPE_SYMLINK] = "symlink",
 			};
@@ -104,7 +126,7 @@ static int foldertree(elf_State *inter, char *path, int recurse) {
 		}
 		elf_array_add(inter);
 
-	} while (sys_readdir(&visitor));
+	} while (sys_read_directory(&visitor));
 
 	return resstk;
 }
@@ -115,7 +137,7 @@ static void pathlist(elf_State *inter, char *path, int recurse) {
 	// todo: speed! we can pre-push all these strings and reference
 	// them by stack address instead!
 	FILE_VISITOR visitor;
-	if (sys_opendir(&visitor, path)) do {
+	if (sys_open_directory(&visitor, path)) do {
 		if (visitor.type == FILE_TYPE_SYMLINK) continue;
 		if (is_file_name_empty(visitor.name)) continue;
 
@@ -132,11 +154,11 @@ static void pathlist(elf_State *inter, char *path, int recurse) {
 			}
 		}
 		free(childpath);
-	} while (sys_readdir(&visitor));
+	} while (sys_read_directory(&visitor));
 }
 
 ELF_FUNCTION(l_sys_get_file_tree) {
-	char *path = elf_getargtext(S,0);
+	char *path = elf_get_text_arg(S,0);
 	int recursion = 0;
 	if (elf_get_num_args(S) >= 2) {
 		recursion = elf_get_intarg(S,1);
@@ -146,7 +168,7 @@ ELF_FUNCTION(l_sys_get_file_tree) {
 }
 
 ELF_FUNCTION(l_sys_get_path_list) {
-	char *path = elf_getargtext(S,0);
+	char *path = elf_get_text_arg(S,0);
 	int recursion = 0;
 	if (elf_get_num_args(S) >= 2) {
 		recursion = elf_get_intarg(S,1);
@@ -170,84 +192,70 @@ ELF_FUNCTION(l_sys_open_temp_file) {
 
 ELF_FUNCTION(l_sys_open_file) {
 	ASSERT(elf_get_num_args(S) == 2);
-	char *name = elf_getargtext(S,0);
-	char *flags = elf_getargtext(S,1);
-	FILE *file = fopen(name,flags);
-	elf_push_handle(S,(elf_Handle)file);
+
+	char *name = elf_get_text_arg(S,0);
+	char *text_flags = elf_get_text_arg(S,1);
+
+	int flags;
+	for (flags = 0; *text_flags; text_flags ++) {
+		if (*text_flags == 'r') flags |= SYS_OPEN_READ;
+		else if (*text_flags == 'w') flags |= SYS_OPEN_WRITE;
+		else if (*text_flags == 'b') flags |= 0;
+		else elf_error(S, NO_BYTE, "unrecognized flag");
+	}
+	elf_Handle file = sys_open_file(name, flags, SYS_OPEN_ALWAYS);
+	elf_push_handle(S, file);
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_close_file) {
-	ASSERT(elf_get_num_args(S)==1);
-	FILE *file=(FILE *)elf_get_sysarg(S,0);
-	if(file){
-		fclose(file);
+	ASSERT(elf_get_num_args(S) == 1);
+	elf_Handle file = elf_get_sysarg(S,0);
+	if (file) {
+		sys_close_file(file);
 	}
 	return 0;
 }
 
 ELF_FUNCTION(l_sys_get_file_size) {
-	FILE *file;
-	if(elf_get_argtag(S,0) == elf_tag_String) {
-		file = fopen(elf_getargtext(S,0),"rb");
-	} else {
-		file = (FILE *) elf_get_sysarg(S,0);
-	}
-	fseek(file,0,SEEK_END);
-	int size = ftell(file);
-	fseek(file,0,SEEK_SET);
-	elf_push_int(S,size);
+	elf_Handle file = elf_get_sysarg(S,0);
+	elf_push_int(S, sys_size_file(file));
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_read_file) {
 	// for this sort of stuff, we could just reposition
-	// the stack pointer... ? #todo
-	* S->stack_ptr ++ = elf_getarg(S, 0);
+	// the stack pointer... ?
+	// todo: also make this be public lib or something
+	// or make read file take a stack address
+	* S->stack_ptr ++ = elf_get_arg(S, 0);
 	elf_read_file(S, -1);
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_write_file) {
-	if(elf_get_argtag(S,0) == elf_tag_String) {
-		_write_file(S,elf_getargtext(S,0),elf_getargtext(S,1));
-	} else {
-		_write_file_io(S,elf_get_sysarg(S,0),elf_getargtext(S,1));
-	}
+	elf_Handle file = elf_get_sysarg(S,0);
+	elf_String *str = elf_get_string_arg(S, 1);
+	sys_write_file(file, str->text, 0, str->length);
 	return 0;
 }
 
 ELF_FUNCTION(l_sys_write_file_to_file) {
-	FILE *dst,*src;
-	if(elf_get_argtag(S,0) == elf_tag_String) {
-		dst = fopen(elf_getargtext(S,0),"wb");
-	} else {
-		dst = (FILE *) elf_get_sysarg(S,0);
-	}
-	if(elf_get_argtag(S,1) == elf_tag_String) {
-		src = fopen(elf_getargtext(S,1),"rb");
-	} else {
-		src = (FILE *) elf_get_sysarg(S,1);
-	}
-	char buffer[4096];
-	int read,wrote = 0;
-	do {
-		read = fread(buffer,1,sizeof(buffer),src);
-		wrote += fwrite(buffer,1,read,dst);
-	} while(read > 0);
-
-	elf_push_int(S,wrote);
+	elf_Handle dst = elf_get_sysarg(S, 0);
+	elf_Handle src = elf_get_sysarg(S, 1);
+	int size = sys_size_file(src);
+	char *heapbuf = malloc(size);
+	sys_read_file(src, heapbuf, 0, size);
+	sys_write_file(dst, heapbuf, 0, size);
+	free(heapbuf);
 	return 1;
 }
-
-
 
 ELF_FUNCTION(l_sys_change_work_dir) {
-	int ok = sys_set_work_dir(elf_getargtext(S,0));
-	elf_push_int(S,ok);
+	int err = sys_set_work_dir(elf_get_text_arg(S,0));
+	elf_push_int(S,err);
 	return 1;
 }
-
 
 ELF_FUNCTION(l_sys_get_work_dir) {
 	char buf[256];
@@ -257,19 +265,25 @@ ELF_FUNCTION(l_sys_get_work_dir) {
 }
 
 static const elf_Binding l_sys[] = {
-	{"load_dll", l_sys_load_dll},
-	{"get_dll_fn", l_sys_get_dll_fn},
+	{"load_dll",                  l_sys_load_dll                  },
+	{"get_dll_fn",                l_sys_get_dll_fn                },
 
-	{"get_file_tree", l_sys_get_file_tree},
-	{"get_path_list", l_sys_get_path_list},
+	{"get_file_tree",             l_sys_get_file_tree             },
+	{"get_path_list",             l_sys_get_path_list             },
 
-	{"open_temp_file", l_sys_open_temp_file},
-	{"open_file", l_sys_open_file},
-	{"close_file", l_sys_close_file},
-	{"get_file_size", l_sys_get_file_size},
-	{"read_file", l_sys_read_file},
-	{"write_file", l_sys_write_file},
-	{"write_file_to_file", l_sys_write_file_to_file},
-	{"change_work_dir", l_sys_change_work_dir},
-	{"get_work_dir", l_sys_get_work_dir},
+	{"open_temp_file",            l_sys_open_temp_file            },
+	{"open_file",                 l_sys_open_file                 },
+	{"close_file",                l_sys_close_file                },
+	{"get_file_size",             l_sys_get_file_size             },
+	{"read_file",                 l_sys_read_file                 },
+	{"write_file",                l_sys_write_file                },
+	{"write_file_to_file",        l_sys_write_file_to_file        },
+	{"change_work_dir",           l_sys_change_work_dir           },
+	{"get_work_dir",              l_sys_get_work_dir              },
+
+	{"get_file_times",            l_sys_get_file_times            },
+	{"file_time_to_system_time",  l_sys_file_time_to_system_time  },
+	{"create_process",            l_sys_create_process            },
+	{"sys_sleep",                 l_sys_sleep                     },
+	{"get_file_name_from_path",   l_sys_get_file_name_from_path   },
 };

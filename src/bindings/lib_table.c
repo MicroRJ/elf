@@ -23,7 +23,7 @@ int table_lib_set_meta(elf_State *R) {
 ELF_FUNCTION(table_lib_contains) {
 	ASSERT(elf_get_num_args(S) == 1);
 	elf_Table *tab = (elf_Table*) elf_get_this(S);
-	elf_Value key = elf_getarg(S, 0);
+	elf_Value key = elf_get_arg(S, 0);
 	elf_push_int(S, slotiskey(tab, elf_table_try(tab, key)));
 	return 1;
 }
@@ -48,7 +48,7 @@ int table_lib_itemize(elf_State *R) {
 				elf_array_add_raw(result,that->array[j]);
 			}
 		} else {
-			elf_array_add_raw(result,elf_getarg(R,i));
+			elf_array_add_raw(result,elf_get_arg(R,i));
 		}
 	}
 	return 1;
@@ -67,7 +67,7 @@ int table_lib_itemize(elf_State *R) {
 int elf_lib_table_delete(elf_State *R) {
 	ASSERT(elf_get_num_args(R) >= 1);
 	elf_Table *tab = (elf_Table *) elf_get_this(R);
-	elf_Value key = elf_getarg(R,0);
+	elf_Value key = elf_get_arg(R,0);
 	elf_Table_Entry *slots = tab->slots;
 	elf_Value *array = tab->array;
 	int slot = elf_table_try(tab,key);
@@ -97,7 +97,7 @@ int table_lib_xdelete(elf_State *R) {
 	elf_Int len = ARRAY_LENGTH(tab->array);
 	if (len != 0) {
 		if (IS_OBJ_TAG(elf_get_argtag(R,0))) {
-			elf_Object *object = elf_get_object(R,0);
+			elf_Object *object = elf_get_object_arg_raw(R,0);
 			/* todo: Speed */
 			elf_Value *item = 0;
 			elf_Int idx;
@@ -139,7 +139,7 @@ int table_lib_xremove(elf_State *R) {
 
 	if (len != 0) {
 		if (IS_OBJ_TAG(elf_get_argtag(R,0))) {
-			elf_Object *object = elf_get_object(R,0);
+			elf_Object *object = elf_get_object_arg_raw(R,0);
 			/* todo: lookup can be removed if tag came
 			after the data instead so that obj addr was
 			the same as value addr! Otherwise this is expensive!  */
@@ -184,7 +184,7 @@ int table_lib_xremove(elf_State *R) {
 // (key of any, alias of any) -> none, adds a new entry to the table (alias) that points to where (key) points
 ELF_FUNCTION(table_lib_alias) {
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
-	elf_table_alias(tab, elf_getarg(S,0), elf_getarg(S,1));
+	elf_table_alias(tab, elf_get_arg(S,0), elf_get_arg(S,1));
 	return 0;
 }
 
@@ -192,7 +192,7 @@ ELF_FUNCTION(table_lib_alias) {
 ELF_FUNCTION(table_lib_find_aliases) {
 	elf_Table *tab = (elf_Table *) elf_get_this(S);
 
-	elf_Value key = elf_getarg(S,0);
+	elf_Value key = elf_get_arg(S,0);
 	elf_Table *aliases = elf_new_table(S);
 
 	if (key.tag != elf_tag_Nil) {
@@ -394,7 +394,7 @@ int elf_lib_array_add(elf_State *R) {
 	elf_Table * tab=(elf_Table *)elf_get_this(R);
 	int i;
 	for (i=0;i<elf_get_num_args(R);i++) {
-		elf_array_add_raw(tab,elf_getarg(R,i));
+		elf_array_add_raw(tab,elf_get_arg(R,i));
 	}
 	return 0;
 }
@@ -403,7 +403,7 @@ int elf_lib_array_set(elf_State *R) {
 	elf_check_num_args(R,":array_set",2,"the value, and the index where to place the value");
 
 	elf_Table * tab = (elf_Table *) elf_get_this(R);
-	elf_Value value = elf_getarg(R,0);
+	elf_Value value = elf_get_arg(R,0);
 
 	elf_i64 len=ARRAY_LENGTH(tab->array);
 	elf_i64 idx=elf_get_intarg(R,1);

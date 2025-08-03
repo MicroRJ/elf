@@ -22,8 +22,10 @@ typedef float  			       elf_f32;
 
 typedef elf_i64  elf_Int;
 typedef elf_f64  elf_Num;
-typedef void    *elf_Handle;
 typedef elf_i32  elf_Error;
+
+// cross platform unit (64-bits)
+typedef void    *elf_Handle;
 
 // todo: internal
 enum { true = 1, false = 0 };

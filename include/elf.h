@@ -103,19 +103,16 @@ elf_userapi int elf_push_num(elf_State *, elf_Num);
 elf_userapi int elf_push_function(elf_State *, elf_Function);
 elf_userapi int elf_push_handle(elf_State *, elf_Handle);
 
-elf_userapi int elf_getstkstate(elf_State *, int stk);
-elf_userapi void elf_setstkstate(elf_State *, int stk);
-
 elf_userapi char *elf_get_text_from_string_on_stack(elf_State *, int stk);
 
 /* the following are stack based instructions, they require the
 arguments on the stack.
 the arguments except for the subject are popped.
 todo: version of this that takes the stack address? */
-elf_userapi void elf_table_set(elf_State *);
-elf_userapi void elf_array_add(elf_State *);
+elf_userapi elf_IndexInt elf_table_set(elf_State *);
+elf_userapi elf_IndexInt elf_array_add(elf_State *);
 
-elf_userapi int       elf_get_num_args(elf_State *);
+elf_userapi int elf_get_num_args(elf_State *);
 
 
 // todo: TOMORROW, instead have a single API for getting
@@ -131,7 +128,7 @@ elf_userapi elf_Num    elf_get_numarg(elf_State *, int argi);
 elf_userapi elf_Handle elf_get_sysarg(elf_State *, int argi);
 // todo: @deprecated
 // todo: also this should return constant memory!
-elf_userapi char      *elf_getargtext(elf_State *, int argi);
+elf_userapi char      *elf_get_text_arg(elf_State *, int argi);
 
 
 

@@ -127,7 +127,7 @@ static inline void em_dirent_to_file_data(FILE_VISITOR *visitor, dirent *info) {
 	CopyMemory(visitor->name, info->d_name, sizeof(info->d_name));
 }
 
-int sys_opendir(FILE_VISITOR *visitor, char *const path) {
+int sys_open_directory(FILE_VISITOR *visitor, char *const path) {
 
 	DIR *dir = opendir(path);
 	visitor->hand = dir;
@@ -144,7 +144,7 @@ int sys_opendir(FILE_VISITOR *visitor, char *const path) {
 	return entry != 0;
 }
 
-int sys_readdir(FILE_VISITOR *visitor) {
+int sys_read_directory(FILE_VISITOR *visitor) {
 	struct dirent *entry = readdir(dir);
 	if (entry) {
 		em_dirent_to_file_data(visitor, entry);

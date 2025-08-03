@@ -13,12 +13,83 @@
 #include   <ws2def.h>
 #include <shellapi.h>
 
+#define FILE_HANDLE HANDLE
+#define FILE_TIME FILETIME
+#define SYSTEM_TIME SYSTEMTIME
+
+#include "elf_coretypes.h"
+#include "system.h"
+#include "subsystem.h"
+
+STATIC_ASSERT(sizeof(_FILE_HANDLE) >= sizeof(FILE_HANDLE));
+
+
+// todo: implement offsets
+unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int pos, unsigned int size) {
+	DWORD read = 0;
+	ReadFile(file, buf, size, &read, NULL);
+	return read;
+}
+
+unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int pos, unsigned int size) {
+	DWORD wrote = 0;
+	WriteFile(file, buf, size, &wrote, NULL);
+	return wrote;
+}
+
+unsigned int sys_size_file(FILE_HANDLE file) {
+	DWORD size = GetFileSize(file, NULL);
+	return size;
+}
+
+void sys_close_file(FILE_HANDLE file) {
+	CloseHandle(file);
+}
+
+FILE_HANDLE sys_open_file(char *name, int flags, int mode) {
+
+	int os_flags = 0;
+	if (flags & SYS_OPEN_READ) os_flags |= GENERIC_READ;
+	if (flags & SYS_OPEN_WRITE) os_flags |= GENERIC_WRITE;
+	if (flags & SYS_OPEN_EXECUTE) os_flags |= GENERIC_EXECUTE;
+
+	int os_sharing_flags = 0;
+	if (flags & SYS_SHARE_READ) os_sharing_flags |= FILE_SHARE_READ;
+	if (flags & SYS_SHARE_WRITE) os_sharing_flags |= FILE_SHARE_WRITE;
+
+	int os_mode = OPEN_ALWAYS;
+	switch (mode) {
+		case SYS_CREATE_ALWAYS: os_mode = CREATE_ALWAYS; break;
+		case SYS_CREATE_NEW: os_mode = CREATE_NEW; break;
+		case SYS_OPEN_ALWAYS: os_mode = OPEN_ALWAYS; break;
+		case SYS_OPEN_EXISTING: os_mode = OPEN_EXISTING; break;
+		case SYS_TRUNCATE_EXISTING: os_mode = TRUNCATE_EXISTING; break;
+	}
+
+	FILE_HANDLE handle = CreateFileA(name, os_flags, os_sharing_flags, NULL, os_mode, 0, NULL);
+	return handle;
+}
+
+int sys_get_file_times(FILE_HANDLE file, FILE_TIMES *times) {
+	int result = GetFileTime(file, &times->create, &times->access, &times->write);
+	//	FILETIME create, access, write;
+	//	int result = GetFileTime(file, &create, &access, &write);
+	//	times->create = (FILE_TIME) { create.dwLowDateTime, create.dwHighDateTime };
+	//	times->access = (FILE_TIME) { access.dwLowDateTime, access.dwHighDateTime };
+	//	times->write = (FILE_TIME) { write.dwLowDateTime, write.dwHighDateTime };
+	return result;
+}
+
+void sys_file_time_to_system_time(FILE_TIME *filetime, SYSTEM_TIME *systimeout) {
+	FileTimeToSystemTime(filetime, systimeout);
+}
+
 
 #if 0
 int lib_core_shell(elf_State *R) {
-	char *verb = elf_getargtext(R,0);
-	char *file = elf_getargtext(R,1);
-	char *args = elf_getargtext(R,2);
+	char *verb = elf_get_text_arg(R,0);
+	char *file = elf_get_text_arg(R,1);
+	char *args = elf_get_text_arg(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
 	elf_push_int(R,success);
@@ -26,12 +97,6 @@ int lib_core_shell(elf_State *R) {
 }
 
 
-int core_lib_exec(elf_State *R) {
-	char *cline=elf_getargtext(R,0);
-	int result=sys_exec(0,cline);
-	elf_push_int(R,result);
-	return 1;
-}
 
 
 
@@ -42,7 +107,7 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
-	GetDiskFreeSpaceA(elf_getargtext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
+	GetDiskFreeSpaceA(elf_get_text_arg(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
 	elf_tsets_int(info,elf_alloc_string(R,"SectorsPerCluster"),SectorsPerCluster);
 	elf_tsets_int(info,elf_alloc_string(R,"BytesPerSector"),BytesPerSector);
 	elf_tsets_int(info,elf_alloc_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
@@ -112,7 +177,6 @@ int sys_get_last_error() {
 
 
 void sys_get_error_msg(int error, char *buf, int len) {
-	if (error == 0) error = GetLastError();
 	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,0x00,error,LANG_USER_DEFAULT,buf,len,NULL);
 }
 
@@ -186,7 +250,7 @@ static inline void convfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 	CopyMemory(visitor->name, info->cFileName, sizeof(info->cFileName));
 }
 
-int sys_opendir(FILE_VISITOR *visitor, char *const path) {
+int sys_open_directory(FILE_VISITOR *visitor, char *const path) {
 	WIN32_FIND_DATAA info;
 	HANDLE hand = FindFirstFileA(elf_tpf("%s\\*", path), &info);
 	visitor->hand = hand;
@@ -195,7 +259,7 @@ int sys_opendir(FILE_VISITOR *visitor, char *const path) {
 	return hand != INVALID_HANDLE_VALUE;
 }
 
-int sys_readdir(FILE_VISITOR *visitor) {
+int sys_read_directory(FILE_VISITOR *visitor) {
 	WIN32_FIND_DATAA info;
 	int result = FindNextFileA((HANDLE) visitor->hand, &info);
 	convfiledata(visitor, &info);
@@ -203,7 +267,7 @@ int sys_readdir(FILE_VISITOR *visitor) {
 }
 
 
-int sys_exec(char const *file, char const *args) {
+int sys_create_process(char const *file, char const *args) {
 	STARTUPINFO si = {sizeof(si)};
 	PROCESS_INFORMATION pi = {0};
 	int result = CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);

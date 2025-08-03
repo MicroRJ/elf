@@ -170,6 +170,11 @@ struct elf_Collector {
 	elf_Object **close_object_slots;
 };
 
+
+enum {
+	ELF_TEMPBUF_SIZE = 4096
+};
+
 typedef struct elf_State elf_State;
 struct elf_State {
 
@@ -207,6 +212,7 @@ struct elf_State {
 	int              frame_index;
 	elf_Stack_Frame  frame;
 
+	// todo: disable this
 	elf_trail_entry *exec_trail;
 	elf_i32 			  exec_trail_index;
 	elf_i32 			  exec_trail_capacity; // power of two!
@@ -228,6 +234,8 @@ struct elf_State {
 		elf_Table *string;
 		elf_Table *table;
 	} metatables;
+
+	char tempbuf[ELF_TEMPBUF_SIZE];
 };
 
 // todo: init is internal stuff because it takes a pointer
@@ -236,9 +244,9 @@ elf_rawapi int elf_exec_raw(elf_State *inter, int nargs, int nrets, bool asexpr,
 
 
 elf_Object  *elf_get_this(elf_State *S);
-elf_Value    elf_getarg     (elf_State *S, int stk);
-elf_String  *elf_getStringArg  (elf_State *S, int stk);
-elf_Object  *elf_get_object  (elf_State *S, int stk);
+elf_Value    elf_get_arg     (elf_State *S, int stk);
+elf_String  *elf_get_string_arg  (elf_State *S, int stk);
+elf_Object  *elf_get_object_arg_raw  (elf_State *S, int stk);
 elf_Table   *elf_get_table   (elf_State *S, int stk);
 elf_Closure *elf_get_closure (elf_State *S, int stk);
 
@@ -274,6 +282,6 @@ elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key);
 elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash);
 elf_IndexInt elf_table_get_or_add_raw(elf_Table *tab, elf_Value key);
 elf_Value elf_table_get_raw(elf_Table *tab, elf_Value key);
-elf_b32 elf_table_set_raw(elf_Table *tab, elf_Value k, elf_Value v);
+elf_IndexInt elf_table_set_raw(elf_Table *tab, elf_Value k, elf_Value v);
 elf_IndexInt elf_array_get_length(elf_Table *tab);
-void elf_array_add_raw(elf_Table *tab, elf_Value thing);
+elf_IndexInt elf_array_add_raw(elf_Table *tab, elf_Value thing);

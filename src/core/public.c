@@ -122,21 +122,21 @@ int elf_push_string(elf_State *S, const char *text) {
 }
 
 
-void elf_table_set(elf_State *S) {
+elf_IndexInt elf_table_set(elf_State *S) {
 	elf_Value value = * -- S->stack_ptr;
 	elf_Value key = * -- S->stack_ptr;
 	elf_Value *table = S->stack_ptr - 1;
 	if (table->tag != elf_tag_Table) {
 		elf_error(S, NO_BYTE, "Not A Table!");
 	}
-	elf_table_set_raw(table->x_tab, key, value);
+	return elf_table_set_raw(table->x_tab, key, value);
 }
 
-void elf_array_add(elf_State *S) {
+elf_IndexInt elf_array_add(elf_State *S) {
 	elf_Value value = * -- S->stack_ptr;
 	elf_Value *table = S->stack_ptr - 1;
 	if (table->tag != elf_tag_Table) {
 		elf_error(S, NO_BYTE, "Not A Table!");
 	}
-	elf_array_add_raw(table->x_tab, value);
+	return elf_array_add_raw(table->x_tab, value);
 }

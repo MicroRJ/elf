@@ -71,7 +71,7 @@ int string_lib_append(elf_State *R) {
 	char buffer[0x100] = {0};
 	strcatf(buffer,"%s",str->text);
 	for (int i = 0; i < elf_get_num_args(R); ++ i) {
-		elf_Value v = elf_getarg(R,i);
+		elf_Value v = elf_get_arg(R,i);
 		if (v.tag == elf_tag_String) {
 			strcatf(buffer,"%s",v.x_str->text);
 		} else if (v.tag == elf_tag_Nil) {
@@ -91,7 +91,7 @@ int string_lib_append(elf_State *R) {
 
 int string_lib_match(elf_State *R) {
 	elf_String *s = (elf_String*) elf_get_this(R);
-	elf_String *p = elf_getStringArg(R,0);
+	elf_String *p = elf_get_string_arg(R,0);
 	elf_push_int(R,match_entire_text(p->text,s->text));
 	return 1;
 }
@@ -99,7 +99,7 @@ int string_lib_match(elf_State *R) {
 
 int string_lib_find(elf_State *R) {
 	elf_String *string = (elf_String*) elf_get_this(R);
-	char *pattern = elf_getargtext(R,0);
+	char *pattern = elf_get_text_arg(R,0);
 	char *buffer = 0;
 	char *cursor = string->text;
 	elf_Table *list = elf_new_table(R);

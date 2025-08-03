@@ -10,13 +10,78 @@
 // Interface With The Operating System.
 //
 
-// TODO: TOMORROW!
-int sys_file_size(int file);
-int sys_file_open(char *name);
-int sys_file_close(int file);
-int sys_file_read(int file, char *buf, int size);
-int sys_file_write(int file, char *buf, int size);
 
+#if !defined(FILE_HANDLE)
+#define FILE_HANDLE _FILE_HANDLE
+#endif
+
+#if !defined(FILE_TIME)
+#define FILE_TIME _FILE_TIME
+#endif
+
+#if !defined(SYSTEM_TIME)
+#define SYSTEM_TIME _SYSTEM_TIME
+#endif
+
+
+typedef elf_Handle _FILE_HANDLE;
+
+// must match windows headers, for now
+typedef struct {
+	elf_u16 year;
+	elf_u16 month;
+	elf_u16 dayofweek;
+	elf_u16 day;
+	elf_u16 hour;
+	elf_u16 minute;
+	elf_u16 second;
+	elf_u16 milliseconds;
+} _SYSTEM_TIME;
+
+// must match windows headers, for now
+typedef union {
+	struct { elf_u32 low, high; };
+	elf_u64 time;
+} _FILE_TIME;
+
+typedef struct {
+	FILE_TIME create;
+	FILE_TIME write;
+	// read / write or ran
+	FILE_TIME access;
+} FILE_TIMES;
+
+enum {
+	// create a new file or truncate the existing one
+	SYS_CREATE_ALWAYS,
+	// create a new file, fail if it already exists
+	SYS_CREATE_NEW,
+	// truncate (zero) a file if it exists, otherwise fail
+	SYS_TRUNCATE_EXISTING,
+
+	// open an existing file, or create a new one
+	SYS_OPEN_ALWAYS,
+	// open an existing file, otherwise fail
+	SYS_OPEN_EXISTING,
+};
+
+enum {
+	SYS_OPEN_READ     = 1,
+	SYS_OPEN_WRITE    = 2,
+	SYS_OPEN_EXECUTE  = 4,
+	SYS_SHARE_READ    = 8,
+	SYS_SHARE_WRITE   = 16,
+};
+
+
+FILE_HANDLE sys_open_file(char *name, int flags, int options);
+int sys_get_file_times(FILE_HANDLE file, FILE_TIMES *);
+void sys_close_file(FILE_HANDLE file);
+unsigned int sys_size_file(FILE_HANDLE file);
+unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int from, unsigned int size);
+unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int from, unsigned int size);
+
+void sys_file_time_to_system_time(FILE_TIME *, SYSTEM_TIME *);
 
 void *sys_virtual_alloc(elf_i64 length);
 
@@ -63,6 +128,7 @@ void *sys_get_dll_fn(elf_Handle lib, char const *name);
 int sys_get_last_error();
 void sys_get_error_msg(int error, char *buff, int len);
 
+int sys_create_process(char const *file, char const *args);
 
 enum {
 	FILE_TYPE_FILE    = 0,
@@ -88,8 +154,8 @@ typedef struct {
 	char  name[1024];
 } FILE_VISITOR;
 
-int sys_opendir(FILE_VISITOR *visitor, char *const path);
-int sys_readdir(FILE_VISITOR *visitor);
+int sys_open_directory(FILE_VISITOR *visitor, char *const path);
+int sys_read_directory(FILE_VISITOR *visitor);
 void sys_closedir(FILE_VISITOR *visitor);
 
 

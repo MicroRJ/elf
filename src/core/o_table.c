@@ -152,7 +152,8 @@ elf_Int elf_array_get_length(elf_Table *table) {
 	return ARRAY_LENGTH(table->array);
 }
 
-
+// todo: also why does this return the slot as supposed to just
+// the entry directly? what is this for?
 elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
 
@@ -184,7 +185,8 @@ elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key) {
 	return -1;
 }
 
-// todo: remove!
+// todo: this path can be entirely removed because we only
+// ever use it for the registry stuff which will get its own data structure
 elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash) {
 	check_resize(tab);
 
@@ -214,11 +216,6 @@ elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length
 
 
 
-
-//	elf_Value elf_tgets_any(elf_Table *tab, elf_String *key) {
-//		return elf_table_get_raw(tab,VALUE_STRING(key));
-//	}
-
 // todo: remove!
 elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 	int length;
@@ -235,25 +232,23 @@ elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 }
 
 
+elf_IndexInt elf_table_set_raw(elf_Table *table, elf_Value key, elf_Value value) {
+	elf_IndexInt index = -1;
+	elf_IndexInt slot = elf_table_try(table, key);
+	ASSERT(slot >= 0);
 
-
-elf_b32 elf_table_set_raw(elf_Table *table, elf_Value k, elf_Value v) {
-	elf_Int slot = elf_table_try(table,k);
-	/* todo: instead return an error here */
-	if (slot < 0) NO_CODE;
 	elf_Table_Entry *entry = table->slots + slot;
 	if (!slotiskey(table,slot)) {
-		elf_Int i = ARRAY_GROW(table->array,1);
-		table->array[i] = v;
-
-		table->slots[slot].key = k;
-		table->slots[slot].idx = i;
+		index = ARRAY_GROW(table->array,1);
+		table->slots[slot].key = key;
+		table->slots[slot].idx = index;
 		table->nslots ++;
-		return 0;
 	} else {
-		table->array[entry->idx] = v;
-		return 1;
+		index = entry->idx;
 	}
+
+	table->array[index] = value;
+	return index;
 }
 
 
@@ -303,9 +298,11 @@ elf_b32 elf_table_contains(elf_Table *tab, elf_Value key) {
 	return slotiskey(tab,elf_table_try(tab,key));
 }
 
-
-void elf_array_add_raw(elf_Table *table, elf_Value v) {
-	ARRAY_ADD(table->array,v);
+// todo: inline version of this?
+elf_IndexInt elf_array_add_raw(elf_Table *table, elf_Value v) {
+	elf_IndexInt index = ARRAY_GROW(table->array, 1);
+	table->array[index] = v;
+	return index;
 }
 
 

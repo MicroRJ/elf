@@ -14,8 +14,10 @@ static treeID parse_table(elf_Parser *parser);
 static treeID parse_subexpr(elf_Parser *parser, int flags, int rank);
 static treeID parse_postfix(elf_Parser *parser, int flags);
 static treeID parse_block(elf_Parser *parser);
-static int parse_stat(elf_Parser *parser);
 static int tok2tree(int tok);
+static int parse_stat(elf_Parser *parser);
+static int parse_json_object(elf_Parser *parser);
+static int parse_json_value(elf_Parser *parser);
 
 static int token_precedence(int type) {
 	return g_token_metadata_table[type].prec;
@@ -394,7 +396,21 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 			v = parse_subexpr(parser,0,10000);
 		} break;
 		case TK_JSON: {
-			v = parse_json_expr(parser);
+			//
+			//	todo: we need some constant pool, for now we
+			// add to globals...
+			//
+
+			// todo: restore stack
+			elf_push_globals(parser->inter);
+
+			Token tok = take_tok(parser,TK_JSON);
+
+			int noerr = parse_json_object(parser);
+			if (noerr) {
+				int index = elf_array_add(parser->inter);
+				v = tree_global(parser, tok.line, index);
+			}
 		} break;
 		case TK_NEW: {
 			v = parse_new(parser);
@@ -1399,87 +1415,81 @@ static int parse_constexpr(elf_Parser *parser) {
 	return ret;
 }
 
-static elf_Table *c_parse_json_object(elf_Parser *parser);
+static int parse_json_array(elf_Parser *parser){
+	int noerr = true;
+	elf_push_table(parser->inter);
 
-//
-// todo: we won't screw anything else by
-// adding stuff to the stack right?
-//
-//	todo: this is constant, but we're adding this to the globals
-// because we need some constant pool
-//
-//
-static treeID parse_json_expr(elf_Parser *parser) {
-	Token tok = take_tok(parser,TK_JSON);
-	elf_Table *jsontab = c_parse_json_object(parser);
-	int globalindex = elf_set_global(parser->R, 0, VALUE_TABLE(jsontab));
-	return tree_global(parser,tok.line,globalindex);
+	take_tok(parser, TK_SQUARE_LEFT);
+
+	if (!pick_tok(parser,TK_SQUARE_RIGHT)) do {
+
+		// todo: attempt to recover and ensure the
+		// stack is proper still
+		noerr = parse_json_value(parser);
+		if (noerr != true) goto esc;
+
+		elf_array_add(parser->inter);
+
+	} while (pick_tok(parser, TK_COMMA));
+
+	take_tok(parser, TK_SQUARE_RIGHT);
+	esc:
+	return noerr;
 }
 
-static elf_Value parse_json_value(elf_Parser *parser);
-
-static elf_Table *parse_json_array(elf_Parser *parser){
-	elf_Table *arr = elf_new_table(parser->R);
-	take_tok(parser,TK_SQUARE_LEFT);
-	if(!pick_tok(parser,TK_SQUARE_RIGHT)) do {
-		elf_Value val = parse_json_value(parser);
-		elf_array_add_raw(arr,val);
-	} while(pick_tok(parser,TK_COMMA));
-	take_tok(parser,TK_SQUARE_RIGHT);
-	return arr;
-}
-
-// todo: is this a constant?
-static elf_Table *c_parse_json_object(elf_Parser *parser) {
-	elf_Table *table;
-	Token tok;
-	elf_Value key,val;
-
-	table=elf_new_table(parser->R);
+static int parse_json_object(elf_Parser *parser) {
+	int noerr = true;
+	elf_push_table(parser->inter);
 
 	take_tok(parser,TK_CURLY_LEFT);
 	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
-		tok=take_tok(parser,TK_STRING);
-		key=VALUE_STRING(elf_new_string(parser->R,tok.text));
-		take_tok(parser,TK_COLON);
-		val=parse_json_value(parser);
-		elf_table_set_raw(table,key,val);
-	} while(pick_tok(parser,TK_COMMA));
+
+		Token tok = take_tok(parser, TK_STRING);
+		elf_push_string(parser->inter, tok.text);
+
+		take_tok(parser, TK_COLON);
+
+		noerr = parse_json_value(parser);
+		if (noerr != true) goto esc;
+
+		elf_table_set(parser->inter);
+	} while (pick_tok(parser,TK_COMMA));
 
 	take_tok(parser,TK_CURLY_RIGHT);
-	return table;
+	esc:
+	return noerr;
 }
 
-static elf_Value parse_json_value(elf_Parser *parser) {
-	elf_Value val = VALUE_NIL();
-	elf_Table * obj;
+static int parse_json_value(elf_Parser *parser) {
+	int noerr = true;
+
 	Token tok = parser->tok;
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);
-			val = VALUE_STRING(elf_new_string(parser->R,tok.text));
+			elf_push_string(parser->inter, tok.text);
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);
-			val = VALUE_INTEGER(tok.integer);
+			elf_push_int(parser->inter, tok.integer);
 		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
-			val = VALUE_INTEGER(tok.number);
+			elf_push_num(parser->inter, tok.number);
 		} break;
 		case TK_CURLY_LEFT: {
-			obj = c_parse_json_object(parser);
-			val = VALUE_TABLE(obj);
+			parse_json_object(parser);
 		} break;
 		case TK_SQUARE_LEFT: {
-			obj = parse_json_array(parser);
-			val = VALUE_TABLE(obj);
+			parse_json_array(parser);
 		} break;
 		default: {
-			parser_dialog(parser,tok.line,"invalid json value");
+			elf_push_nil(parser->inter);
+			parser_dialog(parser, tok.line, "invalid json value");
+			noerr = false;
 		} break;
 	}
-	return val;
+	return noerr;
 }
 
 

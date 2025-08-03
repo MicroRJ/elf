@@ -23,7 +23,7 @@
 #include "elf.h"
 #include "internal_utils.h"
 
-#include "internal.h"
+#include "elf_internal.h"
 
 #include "system.h"
 

@@ -18,11 +18,6 @@
 _(unload)\
 _(tagof)\
 _(format)\
-_(get_file_name_from_path)\
-_(get_global)\
-_(get_object_color)\
-_(set_object_trap)\
-_(get_object_address)\
 _(merge_tables)\
 _(get_meta)\
 _(set_meta)\
@@ -30,9 +25,6 @@ _(abort)\
 _(exit)\
 _(flags)\
 _(debugger)\
-_(log)\
-_(err_log)\
-_(include)\
 _(const_expr)\
 _(load_file)\
 _(load_json)\

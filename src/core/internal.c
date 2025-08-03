@@ -46,7 +46,7 @@ static void _check_arg_tag(elf_State *S, elf_Tag tag, elf_Tag got, int index) {
 }
 
 
-elf_Value elf_getarg(elf_State *S, int x) {
+elf_Value elf_get_arg(elf_State *S, int x) {
 	return S->frame.locals[x + 1];
 }
 
@@ -86,8 +86,8 @@ void elf_push_string_raw(elf_State *S, elf_String *x) {
 
 
 
-elf_String *elf_getStringArg(elf_State *R, int x) {
-	elf_Value v=elf_getarg(R,x);
+elf_String *elf_get_string_arg(elf_State *R, int x) {
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_Nil) return 0;
 	if (v.tag==elf_tag_String) return v.x_str;
 	_check_arg_tag(R,elf_tag_String,v.tag,x);
@@ -103,8 +103,8 @@ char *elf_get_text_from_string_on_stack(elf_State *inter, int stk) {
 	return 0;
 }
 
-char *elf_getargtext(elf_State *R, int x) {
-	elf_Value v = elf_getarg(R,x);
+char *elf_get_text_arg(elf_State *R, int x) {
+	elf_Value v = elf_get_arg(R,x);
 	if (v.tag == elf_tag_Nil) return 0;
 	if (v.tag == elf_tag_String) return v.x_str->text;
 	_check_arg_tag(R,elf_tag_String,v.tag,x);
@@ -112,8 +112,8 @@ char *elf_getargtext(elf_State *R, int x) {
 }
 
 
-elf_Object *elf_get_object(elf_State *R, int x) {
-	elf_Value v=elf_getarg(R,x);
+elf_Object *elf_get_object_arg_raw(elf_State *R, int x) {
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_Nil) return 0;
 	if (IS_OBJ_TAG(v.tag)) return v.x_obj;
 	_check_arg_tag(R,elf_tag_UserObject,v.tag,x);
@@ -122,7 +122,7 @@ elf_Object *elf_get_object(elf_State *R, int x) {
 
 
 elf_Table *elf_get_table(elf_State *R, int x) {
-	elf_Value v=elf_getarg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_Nil) return 0;
 	if (v.tag==elf_tag_Table) return v.x_tab;
 	_check_arg_tag(R,elf_tag_Table,v.tag,x);
@@ -132,13 +132,13 @@ elf_Table *elf_get_table(elf_State *R, int x) {
 
 elf_Closure *elf_get_closure(elf_State *S, int x) {
 	elf_Value thing;
-	thing=elf_getarg(S,x);
+	thing=elf_get_arg(S,x);
 	return thing.tag!=elf_tag_Closure?0:thing.x_closure;
 }
 
 
 elf_Handle elf_get_sysarg(elf_State *R, int x) {
-	elf_Value v=elf_getarg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_Nil) return 0;
 	if (v.tag==elf_tag_Handle) return v.x_sys;
 	_check_arg_tag(R,elf_tag_Handle,v.tag,x);
@@ -147,7 +147,7 @@ elf_Handle elf_get_sysarg(elf_State *R, int x) {
 
 
 elf_Int elf_get_intarg(elf_State *R, int x) {
-	elf_Value v=elf_getarg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_num) return (elf_Int) v.x_num;
 	if (v.tag==elf_tag_int) return v.x_int;
 	_check_arg_tag(R,elf_tag_int,v.tag,x);
@@ -156,7 +156,7 @@ elf_Int elf_get_intarg(elf_State *R, int x) {
 
 
 elf_Num elf_get_numarg(elf_State *R, int x) {
-	elf_Value v=elf_getarg(R,x);
+	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_int) return (elf_Num) v.x_int;
 	if (v.tag==elf_tag_num) return v.x_num;
 	_check_arg_tag(R,elf_tag_num,v.tag,x);
