@@ -9,9 +9,9 @@
 
 const char *tag2s[] = {
 	[elf_tag_Nil] = "nil",
-	[elf_tag_tomb] = "tomb",
-	[elf_tag_num] = "num",
-	[elf_tag_int] = "int",
+	[elf_tag_Tomb] = "tomb",
+	[elf_tag_Num] = "num",
+	[elf_tag_Int] = "int",
 	[elf_tag_Handle] = "sysobj",
 	[elf_tag_UserObject] = "userobj",
 	[elf_tag_Function] = "Function",
@@ -73,13 +73,13 @@ int elf_push_nil(elf_State *S) {
 }
 
 int elf_push_int(elf_State *S, elf_Int x) {
-	TOP(S)->tag = elf_tag_int;
+	TOP(S)->tag = elf_tag_Int;
 	TOP(S)->x_int = x;
 	return inctop(S);
 }
 
 int elf_push_num(elf_State *S, elf_Num x) {
-	TOP(S)->tag = elf_tag_num;
+	TOP(S)->tag = elf_tag_Num;
 	TOP(S)->x_num = x;
 	return inctop(S);
 }

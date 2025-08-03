@@ -78,9 +78,9 @@ ELF_FUNCTION(string_lib_append) {
 			strcatf(heapbuf,"%s",v.x_str->text);
 		} else if (v.tag == elf_tag_Nil) {
 			strcatf(heapbuf,"nil");
-		} else if (v.tag == elf_tag_num) {
+		} else if (v.tag == elf_tag_Num) {
 			strcatf(heapbuf,"%.2f",v.x_num);
-		} else if (v.tag == elf_tag_int) {
+		} else if (v.tag == elf_tag_Int) {
 			strcatf(heapbuf,"%lli",v.x_int);
 		} else if (v.tag == elf_tag_Table) {
 			strcatf(heapbuf,"(tab %p)",v.x_tab);

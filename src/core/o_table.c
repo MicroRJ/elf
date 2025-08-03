@@ -39,7 +39,7 @@ static void check_resize(elf_Table *table) {
 		FOR_RANGE(i, 0, table->ntotal) {
 			elf_Table_Entry prev_entry = table->slots[i];
 
-			if (prev_entry.key.tag != elf_tag_Nil && prev_entry.key.tag != elf_tag_tomb) {
+			if (prev_entry.key.tag != elf_tag_Nil && prev_entry.key.tag != elf_tag_Tomb) {
 
 				elf_i64 prev_index = elf_table_try(&new_table,prev_entry.key);
 				ASSERT(prev_index >= 0);
@@ -114,7 +114,7 @@ static inline elf_i64 hash_value(elf_Value *v) {
 		}
 		case elf_tag_UserObject:
 		case elf_tag_Table: case elf_tag_Closure: case elf_tag_Handle:
-		case elf_tag_int: case elf_tag_num: case elf_tag_Function: {
+		case elf_tag_Int: case elf_tag_Num: case elf_tag_Function: {
 			return hash64(v.x_ptr);
 		}
 		default: NO_CODE;
@@ -132,7 +132,7 @@ bool value_equals(elf_Value *x, elf_Value *y) {
 			return elf_get_strings_eq(x->x_str,y->x_str);
 		}
 		case elf_tag_UserObject:
-		case elf_tag_Handle: case elf_tag_int: case elf_tag_num:
+		case elf_tag_Handle: case elf_tag_Int: case elf_tag_Num:
 		case elf_tag_Table: case elf_tag_Closure: case elf_tag_Function: {
 			return x->x_int == y->x_int;
 		}
@@ -174,7 +174,7 @@ elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key) {
 	do {
 		elf_Value value = slots[tail].key;
 		if (value.tag == elf_tag_Nil) return tail;
-		if (value.tag != elf_tag_tomb) {
+		if (value.tag != elf_tag_Tomb) {
 			if(value_equals(&value,&key)){
 				return tail;
 			}
@@ -330,7 +330,7 @@ void elf_table_export_binary(elf_Table *tab, FILE *io) {
 		elf_Value value = tab->array[i];
 		switch (value.tag) {
 			// todo: compression!
-			case elf_tag_int: { fprintf(io, "%lli", value.x_i64); } break;
+			case elf_tag_Int: { fprintf(io, "%lli", value.x_i64); } break;
 			default: {
 				elf_error();
 			}

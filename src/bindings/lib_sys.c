@@ -209,7 +209,11 @@ ELF_FUNCTION(l_sys_open_file) {
 		else if (*text_flags == 'b') flags |= 0;
 		else elf_error(S, NO_BYTE, "unrecognized flag");
 	}
-	elf_Handle file = sys_open_file(name, flags, SYS_OPEN_ALWAYS);
+	int mode = SYS_OPEN_EXISTING;
+	if (flags & SYS_OPEN_WRITE) {
+		mode = SYS_CREATE_ALWAYS;
+	}
+	elf_Handle file = sys_open_file(name, flags, mode);
 	elf_push_handle(S, file);
 	return 1;
 }

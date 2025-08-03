@@ -71,12 +71,12 @@ int elf_lib_table_delete(elf_State *R) {
 	elf_Table_Entry *slots = tab->slots;
 	elf_Value *array = tab->array;
 	int slot = elf_table_try(tab,key);
-	if ((slot >= 0) && (slots[slot].key.tag != elf_tag_Nil) && (slots[slot].key.tag != elf_tag_tomb)) {
+	if ((slot >= 0) && (slots[slot].key.tag != elf_tag_Nil) && (slots[slot].key.tag != elf_tag_Tomb)) {
 		int idx = slots[slot].idx;
 		elf_push_value_raw(R,array[idx]);
 		for(int i=0; i<tab->ntotal; i++){
 			if(slots[i].idx==idx){
-				slots[i].key.tag = elf_tag_tomb;
+				slots[i].key.tag = elf_tag_Tomb;
 			}else if(slots[i].idx>idx){
 				ASSERT(slots[i].idx>0);
 				slots[i].idx -= 1;
@@ -287,7 +287,7 @@ ELF_FUNCTION(lib_table_keys) {
 	elf_Table *array = elf_new_table(S);
 	for (elf_i64 i = 0; i < tab->ntotal; i++) {
 		elf_Table_Entry entry = tab->slots[i];
-		if (entry.key.tag == elf_tag_Nil || entry.key.tag == elf_tag_tomb) continue;
+		if (entry.key.tag == elf_tag_Nil || entry.key.tag == elf_tag_Tomb) continue;
 		elf_array_add_raw(array,entry.key);
 	}
 	elf_push_table_raw(S,array);

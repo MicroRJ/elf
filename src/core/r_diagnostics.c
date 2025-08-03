@@ -160,9 +160,9 @@ void elf_error(elf_State *R, int byte, const char *error) {
 static int fpf_value(FILE *file, elf_Value v, bool flags) {
 	switch (v.tag) {
 	case elf_tag_Nil: return fprintf(file,"nil");
+	case elf_tag_Int: return fprintf(file,"%lli",v.x_int);
+	case elf_tag_Num: return fprintf(file,"%f",v.x_num);
 	case elf_tag_Handle: return fprintf(file,"h%llX",v.x_int);
-	case elf_tag_int: return fprintf(file,"%lli",v.x_int);
-	case elf_tag_num: return fprintf(file,"%f",v.x_num);
 	case elf_tag_Closure: return fprintf(file,"F()");
 	case elf_tag_Function: return fprintf(file,"C()");
 	case elf_tag_Table: {
@@ -243,7 +243,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecod
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag==elf_tag_String)||(val.tag==elf_tag_num)||(val.tag==elf_tag_int)) {
+		if ((val.tag==elf_tag_String)||(val.tag==elf_tag_Num)||(val.tag==elf_tag_Int)) {
 			fpf_value(io,val,1);
 		}
 	}

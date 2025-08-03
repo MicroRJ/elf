@@ -148,17 +148,17 @@ elf_Handle elf_get_sysarg(elf_State *R, int x) {
 
 elf_Int elf_get_intarg(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_tag_num) return (elf_Int) v.x_num;
-	if (v.tag==elf_tag_int) return v.x_int;
-	_check_arg_tag(R,elf_tag_int,v.tag,x);
+	if (v.tag==elf_tag_Num) return (elf_Int) v.x_num;
+	if (v.tag==elf_tag_Int) return v.x_int;
+	_check_arg_tag(R,elf_tag_Int,v.tag,x);
 	return 0;
 }
 
 
 elf_Num elf_get_numarg(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_tag_int) return (elf_Num) v.x_int;
-	if (v.tag==elf_tag_num) return v.x_num;
-	_check_arg_tag(R,elf_tag_num,v.tag,x);
+	if (v.tag==elf_tag_Int) return (elf_Num) v.x_int;
+	if (v.tag==elf_tag_Num) return v.x_num;
+	_check_arg_tag(R,elf_tag_Num,v.tag,x);
 	return 0;
 }

@@ -60,11 +60,11 @@ typedef enum {
 	/* the value is nil */
 	elf_tag_Nil = 0,
 	/* the value is a tombstone, values of this type only reside in closed systems */
-	elf_tag_tomb,
+	elf_tag_Tomb,
 	/* the value is a 64 bit floating point number */
-	elf_tag_num,
+	elf_tag_Num,
 	/* the value is a 64 bit integer */
-	elf_tag_int,
+	elf_tag_Int,
 	/* the value is a handle */
 	elf_tag_Handle,
 	/* the value is a function */

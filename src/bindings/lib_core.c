@@ -21,7 +21,7 @@ ELF_FUNCTION(core_lib_tagof) {
 
 ELF_FUNCTION(core_lib_iton) {
 	elf_Value v = elf_get_arg(S, 0);
-	if (v.tag == elf_tag_int) {
+	if (v.tag == elf_tag_Int) {
 		elf_push_num(S, (elf_Num) v.x_int);
 	} else elf_push_num(S, v.x_num);
 	return 1;
@@ -29,7 +29,7 @@ ELF_FUNCTION(core_lib_iton) {
 
 ELF_FUNCTION(core_lib_ntoi) {
 	elf_Value v = elf_get_arg(S, 0);
-	if (v.tag == elf_tag_num) {
+	if (v.tag == elf_tag_Num) {
 		elf_push_int(S, (elf_Int) v.x_num);
 	} else elf_push_int(S, v.x_int);
 	return 1;
@@ -99,10 +99,10 @@ static int formatvalue(char *buff, int size, elf_Value v) {
 		case elf_tag_Nil: {
 			res=stbsp_snprintf(buff,size,"%s","nil");
 		} break;
-		case elf_tag_int: {
+		case elf_tag_Int: {
 			res=stbsp_snprintf(buff,size,"%lli",v.x_int);
 		} break;
-		case elf_tag_num: {
+		case elf_tag_Num: {
 			res=stbsp_snprintf(buff,size,"%f",v.x_num);
 		} break;
 		case elf_tag_String: {
@@ -268,57 +268,92 @@ int core_lib_pf(elf_State *S) {
 
 
 
-static void print_num_tabs(FILE *io, int num) {
-	while (num --) fprintf(io,"\t");
+static void bprinttabs(String_Builder *sb, int num) {
+	while (num --) bprintf(sb, "\t");
 }
 
 // todo: cyclic references will break this
-void elf_unload(FILE *io, elf_Table *tab, int level) {
-	fprintf(io,"{\n");
-	level += 1;
-	int nitems = 0;
-	// todo:
-	if(tab->nslots) {
-		for (elf_i64 i = 0; i < tab->ntotal; ++ i) {
-			elf_Table_Entry slot = tab->slots[i];
-			if (slot.key.tag == elf_tag_Nil) {
-				continue;
-			}
-			elf_Value v = tab->array[slot.idx];
-			if ((v.tag == elf_tag_Closure) || (v.tag == elf_tag_Function)) {
-				continue;
-			}
-			if (nitems ++ != 0) fprintf(io,",\n");
-			print_num_tabs(io,level);
-			fpf_value(io,slot.key,1);
-			fprintf(io," = ");
-			if (v.tag == elf_tag_Table) {
-				elf_unload(io,v.x_tab,level);
+// todo: performance!
+static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int level) {
+	int noerror = true;
+	switch (thing.tag) {
+		case elf_tag_Nil:    bprintf(sb, "nil"                       ); break;
+		case elf_tag_Int:    bprintf(sb, "%lli"  , thing.x_int       ); break;
+		case elf_tag_Num:    bprintf(sb, "%f"    , thing.x_num       ); break;
+		case elf_tag_String: bprintf(sb, "\"%s\"", thing.x_str->text ); break;
+		case elf_tag_Table: {
+			elf_Table *table = thing.x_tab;
+
+			int nwrote = 0;
+
+			bprintf(sb, "{\n");
+
+			// todo:
+			// figure this out, or pass in flags to determine whether to omit the hash part or the array part
+			if (table->nslots) {
+				elf_IndexInt i;
+				for (i = 0; i < table->ntotal; ++ i) {
+					elf_Table_Entry entry = table->slots[i];
+					elf_IndexInt index = entry.idx;
+					elf_Value key = entry.key;
+
+					if ((key.tag != elf_tag_Num)
+					&&  (key.tag != elf_tag_Int)
+					&&  (key.tag != elf_tag_String))
+					{
+						continue;
+					}
+
+					elf_Value value = table->array[index];
+					if ((value.tag != elf_tag_Num)
+					&&  (value.tag != elf_tag_Int)
+					&&  (value.tag != elf_tag_Table)
+					&&  (value.tag != elf_tag_String))
+					{
+						continue;
+					}
+
+					if (nwrote ++) bprintf(sb, ",\n");
+					bprinttabs(sb, level + 1);
+
+					unparse(inter, sb, key, 1);
+					bprintf(sb, " = ");
+					unparse(inter, sb, value, level + 1);
+				}
 			} else {
-				fpf_value(io,v,1);
+				FOR_ARRAY(i, table->array) {
+					elf_Value value = table->array[i];
+					if ((value.tag != elf_tag_Num)
+					&&  (value.tag != elf_tag_Int)
+					&&  (value.tag != elf_tag_Table)
+					&&  (value.tag != elf_tag_String))
+					{
+						continue;
+					}
+					if (nwrote ++) bprintf(sb, ",\n");
+					bprinttabs(sb, level + 1);
+					unparse(inter, sb, value, level + 1);
+				}
 			}
-		}
-	} else {
-		FOR_ARRAY(i,tab->array) {
-			elf_Value v = tab->array[i];
-			if (i != 0) fprintf(io,",\n");
-			print_num_tabs(io,level);
-			if (v.tag==elf_tag_Table) {
-				elf_unload(io,v.x_tab,level+1);
-			} else {
-				fpf_value(io,v,1);
-			}
-		}
+			bprintf(sb,"\n");
+			bprinttabs(sb, level);
+			bprintf(sb,"}");
+		} break;
+		default: noerror = false;
 	}
-	fprintf(io,"\n");
-	print_num_tabs(io,level-1);
-	fprintf(io,"}");
+	return noerror;
 }
 
 
-int core_lib_unload(elf_State *S) {
-	elf_Handle io = elf_get_sysarg(S,0);
-	elf_Table *tab = elf_get_table(S,1);
-	elf_unload(io,tab,0);
-	return 0;
+ELF_FUNCTION(core_lib_unload) {
+	elf_Handle file = elf_get_sysarg(S, 0);
+	elf_Value thing = elf_get_arg(S, 1);
+	String_Builder sb = {};
+	int noerr = unparse(S, &sb, thing, 0);
+	if (noerr) {
+		sys_write_file(file, sb.buf, 0, sb.min);
+	}
+	free(sb.buf);
+	elf_push_int(S, noerr);
+	return 1;
 }

@@ -257,8 +257,8 @@ static int elf_call(elf_State *S, int numargs, int maxrets) {
 
 // todo: make this legit!
 static inline void divcheck(elf_State *S, elf_Value *xx, elf_Value *yy) {
-	if ((yy->tag == elf_tag_num) && (yy->x_num == 0)) elf_error(S,NO_BYTE,"division by zero"); else
-	if ((yy->tag == elf_tag_int) && (yy->x_int == 0)) elf_error(S,NO_BYTE,"integer division by zero");
+	if ((yy->tag == elf_tag_Num) && (yy->x_num == 0)) elf_error(S,NO_BYTE,"division by zero"); else
+	if ((yy->tag == elf_tag_Int) && (yy->x_int == 0)) elf_error(S,NO_BYTE,"integer division by zero");
 }
 
 
@@ -454,11 +454,11 @@ int _resume(elf_State *R) {
 				locals[BC_ARGX(byte)].x_int  = 0;
 			} break;
 			case BC_GETKINT: {
-				locals[BC_ARGX(byte)].tag   = elf_tag_int;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 				locals[BC_ARGX(byte)].x_int = M->integers[BC_ARGY(byte)];
 			} break;
 			case BC_GETKNUM: {
-				locals[BC_ARGX(byte)].tag   = elf_tag_num;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Num;
 				locals[BC_ARGX(byte)].x_num = M->numbers[BC_ARGY(byte)];
 			} break;
 			case BC_GETUPVAL: {
@@ -491,11 +491,11 @@ int _resume(elf_State *R) {
 					case elf_tag_Closure: {
 						metatable = yy.x_obj->meta;
 					} goto _lookup;
-					case elf_tag_num: {
+					case elf_tag_Num: {
 						metatable = R->metatables.number;
 						elf_error(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
-					case elf_tag_int: {
+					case elf_tag_Int: {
 						metatable = R->metatables.integer;
 						elf_error(R,module_instr,"this feature is not implemented yet, metatables for numeric types");
 					} goto _lookup;
@@ -526,10 +526,10 @@ int _resume(elf_State *R) {
 					case elf_tag_String:{
 						/* todo: allow for indexing for substrings,
 						for instrance, "my name is"["name"] */
-						tagcheck(R,module_instr,0,elf_tag_int,yy.tag);
+						tagcheck(R,module_instr,0,elf_tag_Int,yy.tag);
 						elf_String *string = xx.x_str;
 						elf_i32 index = yy.x_i32;
-						locals[BC_ARGX(byte)].tag   = elf_tag_int;
+						locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 						locals[BC_ARGX(byte)].x_i32 = string->text[index];
 					}break;
 					case elf_tag_Nil:{
@@ -594,19 +594,19 @@ int _resume(elf_State *R) {
 				bool nan;
 
 				xx = locals[BC_ARGY(byte)];
-				nan = xx.tag != elf_tag_int && xx.tag != elf_tag_num;
-				locals[BC_ARGX(byte)].tag   = elf_tag_int;
+				nan = xx.tag != elf_tag_Int && xx.tag != elf_tag_Num;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 				locals[BC_ARGX(byte)].x_int = xx.tag == elf_tag_Nil || (nan && xx.x_int == 0);
 			} break;
 #endif
 			case BC_N2I: {
 				xx=locals[BC_ARGY(byte)];
-				locals[BC_ARGX(byte)].tag   = elf_tag_int;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 				locals[BC_ARGX(byte)].x_int = VN2I(xx);
 			} break;
 			case BC_I2N: {
 				xx=locals[BC_ARGY(byte)];
-				locals[BC_ARGX(byte)].tag   = elf_tag_num;
+				locals[BC_ARGX(byte)].tag   = elf_tag_Num;
 				locals[BC_ARGX(byte)].x_num = VI2N(xx);
 			} break;
 			case BC_EQ: case BC_NEQ: {
@@ -625,7 +625,7 @@ int _resume(elf_State *R) {
 				if (BC_OP(byte)==BC_NEQ) {
 					eq=!eq;
 				}
-				locals[BC_ARGX(byte)].tag  =elf_tag_int;
+				locals[BC_ARGX(byte)].tag  =elf_tag_Int;
 				locals[BC_ARGX(byte)].x_int=eq;
 			} break;
 #if 0
@@ -634,17 +634,17 @@ int _resume(elf_State *R) {
 				yy=locals[BC_ARGZ(byte)];
 				if (IS_OBJ_TAG(xx.tag)||IS_OBJ_TAG(yy.tag)) {
 					NO_CODE;
-				} else if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
+				} else if ((xx.tag==elf_tag_Num)||(yy.tag==elf_tag_Num)) {
 					if (!IS_INT_OR_NUM(yy.tag)) {
 						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					locals[BC_ARGX(byte)].tag   = elf_tag_num;
+					locals[BC_ARGX(byte)].tag   = elf_tag_Num;
 					locals[BC_ARGX(byte)].x_num = pow(VI2N(xx),VI2N(yy));
-				} else if ((xx.tag==elf_tag_int)||(yy.tag==elf_tag_int)) {
+				} else if ((xx.tag==elf_tag_Int)||(yy.tag==elf_tag_Int)) {
 					if (!IS_INT_OR_NUM(yy.tag)) {
 						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
-					locals[BC_ARGX(byte)].tag   = elf_tag_int;
+					locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 					locals[BC_ARGX(byte)].x_int = pow(VN2I(xx),VN2I(yy));
 				} else {
 					elf_error(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
@@ -657,21 +657,21 @@ int _resume(elf_State *R) {
 				yy=locals[BC_ARGZ(byte)];
 				if (IS_OBJ_TAG(xx.tag)||IS_OBJ_TAG(yy.tag)) {
 					NO_CODE;
-				} else if ((xx.tag == elf_tag_num)||(yy.tag == elf_tag_num)) {
+				} else if ((xx.tag == elf_tag_Num)||(yy.tag == elf_tag_Num)) {
 					if (!IS_INT_OR_NUM(yy.tag)) {
 						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					divcheck(R,&xx,&yy);
 					x=VI2N(xx);
 					y=VI2N(yy);
-					locals[BC_ARGX(byte)].tag   = elf_tag_num;
+					locals[BC_ARGX(byte)].tag   = elf_tag_Num;
 					locals[BC_ARGX(byte)].x_num = x - (elf_Int)(x / y) * y;
-				} else if ((xx.tag==elf_tag_int)||(yy.tag==elf_tag_int)) {
+				} else if ((xx.tag==elf_tag_Int)||(yy.tag==elf_tag_Int)) {
 					if (!IS_INT_OR_NUM(yy.tag)) {
 						elf_error(R,module_instr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
 					}
 					divcheck(R,&xx,&yy);
-					locals[BC_ARGX(byte)].tag   = elf_tag_int;
+					locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 					locals[BC_ARGX(byte)].x_int = VN2I(xx) % VN2I(yy);
 				} else {
 					elf_error(R,module_instr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
@@ -686,11 +686,11 @@ int _resume(elf_State *R) {
 			case OPNAME : {\
 				xx=locals[BC_ARGY(byte)];\
 				yy=locals[BC_ARGZ(byte)];\
-				if((xx.tag==elf_tag_int) && (yy.tag==elf_tag_int)) {\
+				if((xx.tag==elf_tag_Int) && (yy.tag==elf_tag_Int)) {\
 					if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
 						divcheck(R,&xx,&yy);\
 					}\
-					locals[BC_ARGX(byte)].tag   = elf_tag_int;\
+					locals[BC_ARGX(byte)].tag   = elf_tag_Int;\
 					locals[BC_ARGX(byte)].x_int = OP(VN2I(xx),VN2I(yy));\
 				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
 			} break
@@ -698,12 +698,12 @@ int _resume(elf_State *R) {
 float x0,y0,x1,y1;\
 if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 	\
-	if (xx.tag==elf_tag_num)x0=y0=(float)xx.x_num;\
-	else if(xx.tag==elf_tag_int)x0=y0=(float)xx.x_int;\
+	if (xx.tag==elf_tag_Num)x0=y0=(float)xx.x_num;\
+	else if(xx.tag==elf_tag_Int)x0=y0=(float)xx.x_int;\
 	else x0=xx.x_f32,y0=xx.y_f32;\
 	\
-	if (yy.tag==elf_tag_num)x1=y1=(float)yy.x_num;\
-	else if(yy.tag==elf_tag_int)x1=y1=(float)yy.x_int;\
+	if (yy.tag==elf_tag_Num)x1=y1=(float)yy.x_num;\
+	else if(yy.tag==elf_tag_Int)x1=y1=(float)yy.x_int;\
 	else x1=yy.x_f32,y1=yy.y_f32;\
 	\
 	locals[BC_ARGX(byte)].tag   = elf_tag_float2;\
@@ -720,11 +720,11 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 					_callov(R,xx.x_obj,IS_OBJ_TAG(yy.tag)?FN:FN1,BC_ARGX(byte),1,&yy);\
 				} else if (IS_INT_OR_NUM(xx.tag) && IS_INT_OR_NUM(yy.tag)) {\
 					PREOP_CHECK;\
-					if((xx.tag==elf_tag_num) || (yy.tag==elf_tag_num)) {\
-						locals[BC_ARGX(byte)].tag   = elf_tag_num;\
+					if((xx.tag==elf_tag_Num) || (yy.tag==elf_tag_Num)) {\
+						locals[BC_ARGX(byte)].tag   = elf_tag_Num;\
 						locals[BC_ARGX(byte)].x_num = OP(VI2N(xx),VI2N(yy));\
 					}else{\
-						locals[BC_ARGX(byte)].tag   = elf_tag_int;\
+						locals[BC_ARGX(byte)].tag   = elf_tag_Int;\
 						locals[BC_ARGX(byte)].x_int = OP(VN2I(xx),VN2I(yy));\
 					}\
 				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
@@ -733,11 +733,11 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				if(IS_INT_OR_NUM(xx.tag) && IS_INT_OR_NUM(yy.tag)){
-					if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
-						locals[BC_ARGX(byte)].tag   = elf_tag_int;
+					if ((xx.tag==elf_tag_Num)||(yy.tag==elf_tag_Num)) {
+						locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 						locals[BC_ARGX(byte)].x_i64 = VI2N(xx) <= VI2N(yy);
 					} else {
-						locals[BC_ARGX(byte)].tag   = elf_tag_int;
+						locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 						locals[BC_ARGX(byte)].x_i64 = VN2I(xx) <= VN2I(yy);
 					}
 				} else INVALID_OPERANDS(xx.tag,yy.tag,<=);
@@ -746,11 +746,11 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 				xx=locals[BC_ARGY(byte)];
 				yy=locals[BC_ARGZ(byte)];
 				if(IS_INT_OR_NUM(xx.tag) && IS_INT_OR_NUM(yy.tag)){
-					if ((xx.tag==elf_tag_num)||(yy.tag==elf_tag_num)) {
-						locals[BC_ARGX(byte)].tag   = elf_tag_int;
+					if ((xx.tag==elf_tag_Num)||(yy.tag==elf_tag_Num)) {
+						locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 						locals[BC_ARGX(byte)].x_int = VI2N(xx) < VI2N(yy);
 					} else {
-						locals[BC_ARGX(byte)].tag   = elf_tag_int;
+						locals[BC_ARGX(byte)].tag   = elf_tag_Int;
 						locals[BC_ARGX(byte)].x_int = VN2I(xx) < VN2I(yy);
 					}
 				} else INVALID_OPERANDS(xx.tag,yy.tag,<);

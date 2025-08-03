@@ -19,8 +19,8 @@
 #include "system.h"
 
 
-#define STB_SPRINTF_IMPLEMENTATION
 #define STB_SPRINTF_STATIC
+#define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
 
@@ -32,7 +32,8 @@
 #include "common.h"
 #include "thread_alloc.c"
 
-#include "sub_array.c"
+#include "dynamic_array.c"
+#include "string_builder.c"
 
 // #include "sub_alloc.c"
 #include "common.c"
