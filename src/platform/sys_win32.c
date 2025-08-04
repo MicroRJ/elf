@@ -23,15 +23,22 @@
 
 STATIC_ASSERT(sizeof(_FILE_HANDLE) >= sizeof(FILE_HANDLE));
 
+FILE_HANDLE sys_get_std_file(int std) {
+	switch (std) {
+		case SYS_STD_OUTPUT: return GetStdHandle(STD_OUTPUT_HANDLE);
+		case SYS_STD_INPUT:  return GetStdHandle(STD_INPUT_HANDLE);
+		case SYS_STD_ERROR:  return GetStdHandle(STD_ERROR_HANDLE);
+	}
+	return 0;
+}
 
-// todo: implement offsets
-unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int pos, unsigned int size) {
+unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int size) {
 	DWORD read = 0;
 	ReadFile(file, buf, size, &read, NULL);
 	return read;
 }
 
-unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int pos, unsigned int size) {
+unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int size) {
 	DWORD wrote = 0;
 	WriteFile(file, buf, size, &wrote, NULL);
 	return wrote;
@@ -56,7 +63,15 @@ void sys_close_file(FILE_HANDLE file) {
 	CloseHandle(file);
 }
 
+int sys_get_file_cursor(FILE_HANDLE file) {
+	return SetFilePointer(file, 0, 0, FILE_CURRENT);
+}
 
+int sys_set_file_cursor(FILE_HANDLE file, int cursor) {
+	return SetFilePointer(file, cursor, 0, FILE_CURRENT);
+}
+
+// todo: support temporary files
 FILE_HANDLE sys_open_file(char *name, int flags, int mode) {
 
 	int os_flags = 0;
@@ -259,23 +274,40 @@ static inline void convfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 		visitor->type = FILE_TYPE_FOLDER;
 	}
 	visitor->size = info->nFileSizeLow;
-	ASSERT(sizeof(visitor->name) >= sizeof(info->cFileName));
-	CopyMemory(visitor->name, info->cFileName, sizeof(info->cFileName));
+	pushpath(visitor, info->cFileName);
+	// ASSERT((sizeof(visitor->path) - visitor->pcur) >= sizeof(info->cFileName));
+	// CopyMemory(visitor->name, info->cFileName, sizeof(info->cFileName));
 }
 
-int sys_open_directory(FILE_VISITOR *visitor, char *const path) {
-	WIN32_FIND_DATAA info;
-	HANDLE hand = FindFirstFileA(elf_tpf("%s\\*", path), &info);
-	visitor->hand = hand;
-
-	convfiledata(visitor, &info);
-	return hand != INVALID_HANDLE_VALUE;
+void sys_close_directory(FILE_HANDLE hand) {
+	FindClose(hand);
 }
 
-int sys_read_directory(FILE_VISITOR *visitor) {
+FILE_HANDLE sys_open_directory(FILE_VISITOR *visitor) {
+
+	visitor->path[visitor->pcur ++] = '\\';
+	visitor->path[visitor->pcur ++] = '*';
+	visitor->path[visitor->pcur   ] = '\0';
+
 	WIN32_FIND_DATAA info;
-	int result = FindNextFileA((HANDLE) visitor->hand, &info);
-	convfiledata(visitor, &info);
+	FILE_HANDLE hand = FindFirstFileA(visitor->path, &info);
+
+	visitor->pcur -= 2;
+	visitor->path[visitor->pcur] = '\0';
+
+	int result = hand != INVALID_HANDLE_VALUE;
+	if (result) {
+		convfiledata(visitor, &info);
+	}
+	return result ? hand : 0;
+}
+
+int sys_read_directory(FILE_HANDLE hand, FILE_VISITOR *visitor) {
+	WIN32_FIND_DATAA info;
+	int result = FindNextFileA(hand, &info);
+	if (result) {
+		convfiledata(visitor, &info);
+	}
 	return result;
 }
 

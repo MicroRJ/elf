@@ -66,6 +66,12 @@ enum {
 };
 
 enum {
+	SYS_BEGIN = 0,
+	SYS_CURRENT,
+	SYS_END,
+};
+
+enum {
 	SYS_OPEN_READ     = 1,
 	SYS_OPEN_WRITE    = 2,
 	SYS_OPEN_EXECUTE  = 4,
@@ -73,17 +79,29 @@ enum {
 	SYS_SHARE_WRITE   = 16,
 };
 
+enum {
+	SYS_STD_OUTPUT = 0,
+	SYS_STD_ERROR,
+	SYS_STD_INPUT,
+};
+
 
 int sys_create_directory(char *path);
 
-bool sys_delete_file(char *name);
+FILE_HANDLE sys_get_std_file(int std);
 FILE_HANDLE sys_open_file(char *name, int flags, int options);
+bool sys_delete_file(char *name);
+int sys_get_file_cursor(FILE_HANDLE file);
+int sys_set_file_cursor(FILE_HANDLE file, int cursor);
+
 void sys_close_file(FILE_HANDLE file);
 unsigned int sys_size_file(FILE_HANDLE file);
-unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int from, unsigned int size);
-unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int from, unsigned int size);
-int sys_time_file(FILE_HANDLE file, FILE_TIMES *);
+unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int size);
+unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int size);
+unsigned int sys_write_file_append(FILE_HANDLE file, char *buf, unsigned int size);
 
+
+int sys_time_file(FILE_HANDLE file, FILE_TIMES *);
 void sys_file_time_to_system_time(FILE_TIME *, SYSTEM_TIME *);
 
 void *sys_virtual_alloc(elf_i64 length);
@@ -141,26 +159,46 @@ enum {
 };
 
 
-//	typedef struct FileEntry {
-//		char name[256];
-//		int  tags;
-//		int  size;
-//	} FileEntry;
-//
-//	FileEntry *sys_list_folder(const char *name, int *nentries);
+typedef struct File_Node File_Node;
+struct File_Node {
+	elf_u64    size;
+	int        nsub;
+	// todo: arena buffer
+	char       name[256];
+};
 
-
-// todo: make better!
 typedef struct {
-	void *hand;
-	int   type;
-	int   size;
-	char  name[1024];
+	File_Node   *nodes;
+	int          type;
+	int          size;
+	int          pcnt;
+	int          pcur;
+	char         path[4096];
 } FILE_VISITOR;
 
-int sys_open_directory(FILE_VISITOR *visitor, char *const path);
-int sys_read_directory(FILE_VISITOR *visitor);
-void sys_closedir(FILE_VISITOR *visitor);
+
+static void pullpath(FILE_VISITOR *visi) {
+	visi->pcnt -= 1;
+	while (visi->pcur > 0 && visi->path[visi->pcur] != '\\') {
+		visi->pcur --;
+	}
+	visi->path[visi->pcur] = '\0';
+}
+
+static void pushpath(FILE_VISITOR *visi, char *name) {
+	visi->pcnt += 1;
+	if (visi->pcur) {
+		visi->path[visi->pcur ++] = '\\';
+	}
+	while (*name) {
+		visi->path[visi->pcur ++] = *name ++;
+	}
+	visi->path[visi->pcur] = '\0';
+}
+
+FILE_HANDLE sys_open_directory(FILE_VISITOR *visitor);
+int sys_read_directory(FILE_HANDLE hand, FILE_VISITOR *visitor);
+void sys_close_directory(FILE_HANDLE hand);
 
 
 #endif

@@ -4,7 +4,6 @@
 #ifndef _elf_lang_
 #define _elf_lang_
 
-
 #if defined(__EMSCRIPTEN__)
 	#define elf_userapi EMSCRIPTEN_KEEPALIVE
 	#define ELF_EXPORT  EMSCRIPTEN_KEEPALIVE
@@ -30,8 +29,7 @@ typedef struct elf_Value   elf_Value;
 #include "elf_coretypes.h"
 
 
-typedef elf_u32 elf_HashInt;
-typedef elf_i64 elf_IndexInt;
+typedef int elf_StkInt;
 
 
 /*
@@ -89,19 +87,18 @@ elf_userapi int elf_exec(elf_State *, int nargs, int nrets, bool asexpr);
 /* push Closure or Function push call arguments  */
 elf_userapi int elf_call(elf_State *, int nargs, int nrets);
 
+// todo: no, I don't like this!
+elf_userapi elf_StkInt elf_read_file(elf_State *, int size);
 
-elf_userapi int elf_read_file(elf_State *, int size);
-
-
-elf_userapi int elf_push_this(elf_State *);
-elf_userapi int elf_push_globals(elf_State *);
-elf_userapi int elf_push_int(elf_State *, elf_Int);
-elf_userapi int elf_push_nil(elf_State *);
-elf_userapi int elf_push_table(elf_State *);
-elf_userapi int elf_push_string(elf_State *, const char *);
-elf_userapi int elf_push_num(elf_State *, elf_Num);
-elf_userapi int elf_push_function(elf_State *, elf_Function);
-elf_userapi int elf_push_handle(elf_State *, elf_Handle);
+elf_userapi elf_StkInt elf_push_this(elf_State *);
+elf_userapi elf_StkInt elf_push_globals(elf_State *);
+elf_userapi elf_StkInt elf_push_int(elf_State *, elf_Int);
+elf_userapi elf_StkInt elf_push_nil(elf_State *);
+elf_userapi elf_StkInt elf_push_table(elf_State *);
+elf_userapi elf_StkInt elf_push_string(elf_State *, const char *);
+elf_userapi elf_StkInt elf_push_num(elf_State *, elf_Num);
+elf_userapi elf_StkInt elf_push_function(elf_State *, elf_Function);
+elf_userapi elf_StkInt elf_push_handle(elf_State *, elf_Handle);
 
 elf_userapi char *elf_get_text_from_string_on_stack(elf_State *, int stk);
 

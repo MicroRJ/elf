@@ -33,7 +33,7 @@ int elf_read_file(elf_State *inter, int size) {
 	}
 
 	elf_String *contents = elf_alloc_string2(inter, size);
-	sys_read_file(file, contents->text, 0, size);
+	sys_read_file(file, contents->text, size);
 
 	TOP(inter)->tag = elf_tag_String;
 	TOP(inter)->x_str = contents;

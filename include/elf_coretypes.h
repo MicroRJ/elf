@@ -24,7 +24,9 @@ typedef elf_i64  elf_Int;
 typedef elf_f64  elf_Num;
 typedef elf_i32  elf_Error;
 
-// cross platform unit (64-bits)
+typedef elf_u32 elf_HashInt;
+typedef elf_i64 elf_IndexInt;
+
 typedef void    *elf_Handle;
 
 // todo: internal

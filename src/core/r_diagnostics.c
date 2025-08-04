@@ -157,58 +157,6 @@ void elf_error(elf_State *R, int byte, const char *error) {
 }
 
 
-static int fpf_value(FILE *file, elf_Value v, bool flags) {
-	switch (v.tag) {
-	case elf_tag_Nil: return fprintf(file,"nil");
-	case elf_tag_Int: return fprintf(file,"%lli",v.x_int);
-	case elf_tag_Num: return fprintf(file,"%f",v.x_num);
-	case elf_tag_Handle: return fprintf(file,"h%llX",v.x_int);
-	case elf_tag_Closure: return fprintf(file,"F()");
-	case elf_tag_Function: return fprintf(file,"C()");
-	case elf_tag_Table: {
-			/* todo: this is slow! */
-		int wrote = 0;
-		elf_Table *tab = v.x_tab;
-		wrote += fprintf(file,"{");
-		elf_Int i,j,n;
-		for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
-			if (i != 0) wrote += fprintf(file,", ");
-			for (j=0,n=0;j<tab->ntotal;++j) {
-				elf_Table_Entry it = tab->slots[j];
-				if (it.key.tag==elf_tag_Nil) continue;
-				if (it.idx!=i) continue;
-				if (n ++ != 0) wrote += fprintf(file,", ");
-				wrote += fpf_value(file,it.key,1);
-			}
-			if (n != 0) wrote += fprintf(file," = ");
-			wrote += fpf_value(file,tab->array[i],1);
-		}
-			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	elf_Table_Entry it = tab->slots[i];
-			// 	if (it.key.tag == elf_tag_Nil) continue;
-			// 	if (n ++ != 0) wrote += fprintf(file,", ");
-			// 	wrote += fpf_value(file,it.key,1);
-			// 	wrote += fprintf(file," = ");
-			// 	wrote += fpf_value(file,tab->array[it.i],1);
-			// }
-			// FOR_ARRAY(t->v) {
-			// 	if (i != 0) wrote += fprintf(file,", ");
-			// 	wrote += fpf_value(file,t->v[i],1);
-			// }
-		wrote += fprintf(file,"}");
-		return wrote;
-	} break;
-case elf_tag_String: {
-	if (flags) {
-		return fprintf(file,"\"%s\"",v.x_str->text);
-	} else {
-		return fprintf(file,"%s",v.x_str->text);
-	}
-} break;
-default: return fprintf(file,"(?)");
-}
-}
-
 
 static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
 	if (fid != -1) {
@@ -244,7 +192,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecod
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
 		if ((val.tag==elf_tag_String)||(val.tag==elf_tag_Num)||(val.tag==elf_tag_Int)) {
-			fpf_value(io,val,1);
+			// fpf_value(io,val,1);
 		}
 	}
 	fprintf(io,"\n");

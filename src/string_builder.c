@@ -21,14 +21,21 @@ static char *string_builder_alloc(String_Builder *sb, int res, int com) {
 	return ret;
 }
 
+static int bwritechar(String_Builder *sb, int chr) {
+	char *text = string_builder_alloc(sb, 1 + 1, 1);
+	*text ++ = chr;
+	*text ++ = '\0';
+	return 1;
+}
+
 static int bprintf(String_Builder *sb, char *format, ...) {
 	va_list vargs;
 	va_start(vargs, format);
-	int length = stbsp_vsnprintf(NULL, 0, format, vargs);
-	char *text = string_builder_alloc(sb, length + 1, length);
-	stbsp_vsnprintf(text, length + 1, format, vargs);
+	int size = stbsp_vsnprintf(NULL, 0, format, vargs);
+	char *text = string_builder_alloc(sb, size + 1, size);
+	stbsp_vsnprintf(text, size + 1, format, vargs);
 	va_end(vargs);
-	return length;
+	return size;
 }
 
 

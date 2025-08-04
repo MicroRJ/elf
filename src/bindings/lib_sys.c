@@ -80,8 +80,52 @@ ELF_FUNCTION(l_sys_get_dll_fn) {
 	return 1;
 }
 
-static int foldertree(elf_State *inter, char *path, int recurse) {
-	int resstk = elf_push_table(inter);
+#if 0
+
+
+static void filetreecompressed(FILE_VISITOR *visitor, File_Node *node, int recurse) {
+	if (sys_open_directory(visitor)) do {
+		if (visitor->type == FILE_TYPE_SYMLINK) continue;
+		if (is_file_name_empty(visitor->name)) continue;
+
+		int index = ARRAY_GROW(visitor->nodes, 1);
+		File_Node *subnode = & visitor->nodes[index];
+		subnode->nsub = 0;
+		subnode->size = 0;
+
+		if (visitor->type == FILE_TYPE_FOLDER) {
+			pushpath(visitor, visitor->name);
+			filetreecompressed(visitor, subnode, recurse - 1);
+			pullpath(visitor);
+		}
+
+		node->size += subnode->size;
+		node->nsub ++;
+	} while (sys_read_directory(visitor));
+}
+
+
+static elf_StkInt filetree(elf_State *inter, char *path, int recurse, int *size) {
+
+	elf_StkInt resstk = elf_push_table(inter);
+
+	const char *type2s[] = {
+		[FILE_TYPE_FILE] = "file",
+		[FILE_TYPE_FOLDER] = "folder",
+		[FILE_TYPE_SYMLINK] = "symlink",
+	};
+
+	elf_push_string(inter, "path");
+	elf_push_string(inter, path);
+	elf_table_set(inter);
+
+	elf_push_string(inter, "type");
+	elf_push_string(inter, type2s[visitor.type]);
+	elf_table_set(inter);
+
+
+	elf_push_table(inter);
+
 
 	// todo: speed! we can pre-push all these strings and reference
 	// them by stack address instead!
@@ -96,33 +140,34 @@ static int foldertree(elf_State *inter, char *path, int recurse) {
 
 		elf_push_table(inter);
 		{
-			elf_push_string(inter, "name");
-			elf_push_string(inter, visitor.name);
-			elf_table_set(inter);
 
-			// todo: a bit wasteful don't you think!
-			elf_push_string(inter, "path");
-			elf_push_string(inter, childpath);
-			elf_table_set(inter);
+			if (visitor.type == FILE_TYPE_FOLDER) {
+				if (recurse > 0) {
+					elf_push_string(inter, "children");
+					int childsize = 0;
+					elf_StkInt child = filetree(inter, childpath, recurse - 1, &childsize);
 
-			char * const type2s[] = {
-				[FILE_TYPE_FILE] = "file",
-				[FILE_TYPE_FOLDER] = "folder",
-				[FILE_TYPE_SYMLINK] = "symlink",
-			};
-			elf_push_string(inter, "type");
-			elf_push_string(inter, type2s[visitor.type]);
-			elf_table_set(inter);
+					// todo:
+					elf_push_string(inter, "parent");
+					* inter->stack_ptr ++ = inter->stack[child];
+					elf_table_set(inter);
 
-			elf_push_string(inter, "size");
-			elf_push_int(inter, visitor.size);
-			elf_table_set(inter);
+					elf_table_set(inter);
 
-			if (recurse > 0 && visitor.type == FILE_TYPE_FOLDER) {
-				elf_push_string(inter, "children");
-				foldertree(inter, childpath, recurse - 1);
+					*size += childsize;
+				}
+
+				elf_push_string(inter, "size");
+				elf_push_int(inter, visitor.size);
 				elf_table_set(inter);
+			} else {
+				elf_push_string(inter, "size");
+				elf_push_int(inter, visitor.size);
+				elf_table_set(inter);
+
+				*size += visitor.size;
 			}
+
 			free(childpath);
 		}
 		elf_array_add(inter);
@@ -131,31 +176,31 @@ static int foldertree(elf_State *inter, char *path, int recurse) {
 
 	return resstk;
 }
+#endif
+
 
 // NOTE: requires a table on the stack!
 // TODO: use utility function to ensure this!
-static void pathlist(elf_State *inter, char *path, int recurse) {
-	// todo: speed! we can pre-push all these strings and reference
-	// them by stack address instead!
-	FILE_VISITOR visitor;
-	if (sys_open_directory(&visitor, path)) do {
-		if (visitor.type == FILE_TYPE_SYMLINK) continue;
-		if (is_file_name_empty(visitor.name)) continue;
+static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
+	elf_Handle dir = sys_open_directory(visitor);
+	if (dir) do {
+		if (visitor->type == FILE_TYPE_SYMLINK) goto nop;
+		// todo: dedicated function, like points_to_file
+		char *name = get_name_from_file_path(visitor->path);
+		if (is_file_name_empty(name)) goto nop;
 
-		// todo: can we have our cake and eat it too please?
-		char *childpath = malloc(1024);
-		stbsp_snprintf(childpath, 1024, "%s\\%s", path, visitor.name);
-
-		if (visitor.type == FILE_TYPE_FILE) {
-			elf_push_string(inter, childpath);
+		if (visitor->type == FILE_TYPE_FILE) {
+			elf_push_string(inter, visitor->path);
 			elf_array_add(inter);
-		} else if (visitor.type == FILE_TYPE_FOLDER) {
+		} else if (visitor->type == FILE_TYPE_FOLDER) {
 			if (recurse > 0) {
-				pathlist(inter, childpath, recurse - 1);
+				pathlist(inter, visitor, recurse - 1);
 			}
 		}
-		free(childpath);
-	} while (sys_read_directory(&visitor));
+
+		nop:;
+		pullpath(visitor);
+	} while (sys_read_directory(dir, visitor));
 }
 
 ELF_FUNCTION(l_sys_get_file_tree) {
@@ -164,19 +209,26 @@ ELF_FUNCTION(l_sys_get_file_tree) {
 	if (elf_get_num_args(S) >= 2) {
 		recursion = elf_get_intarg(S,1);
 	}
-	foldertree(S, path, recursion);
+	// filetree(S, path, recursion);
+	elf_push_nil(S);
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_get_path_list) {
 	char *path = elf_get_text_arg(S,0);
-	int recursion = 0;
-	if (elf_get_num_args(S) >= 2) {
-		recursion = elf_get_intarg(S,1);
-	}
 
+	int recurse = 0;
+	if (elf_get_num_args(S) >= 2) {
+		recurse = elf_get_intarg(S,1);
+	}
 	elf_push_table(S);
-	pathlist(S, path, recursion);
+
+	FILE_VISITOR *visi = calloc(1, sizeof(*visi));
+
+	pushpath(visi, path);
+	pathlist(S, visi, recurse);
+
+	free(visi);
 	return 1;
 }
 
@@ -233,6 +285,12 @@ ELF_FUNCTION(l_sys_get_file_size) {
 	return 1;
 }
 
+ELF_FUNCTION(l_sys_get_file_cursor) {
+	elf_Handle file = elf_get_sysarg(S,0);
+	elf_push_int(S, sys_get_file_cursor(file));
+	return 1;
+}
+
 ELF_FUNCTION(l_sys_read_file) {
 	// for this sort of stuff, we could just reposition
 	// the stack pointer... ?
@@ -246,7 +304,7 @@ ELF_FUNCTION(l_sys_read_file) {
 ELF_FUNCTION(l_sys_write_file) {
 	elf_Handle file = elf_get_sysarg(S,0);
 	elf_String *str = elf_get_string_arg(S, 1);
-	sys_write_file(file, str->text, 0, str->length);
+	sys_write_file(file, str->text, str->length);
 	return 0;
 }
 
@@ -255,8 +313,8 @@ ELF_FUNCTION(l_sys_write_file_to_file) {
 	elf_Handle src = elf_get_sysarg(S, 1);
 	int size = sys_size_file(src);
 	char *heapbuf = malloc(size);
-	sys_read_file(src, heapbuf, 0, size);
-	sys_write_file(dst, heapbuf, 0, size);
+	sys_read_file(src, heapbuf, size);
+	sys_write_file(dst, heapbuf, size);
 	free(heapbuf);
 	return 1;
 }
@@ -307,6 +365,7 @@ static const elf_Binding l_sys[] = {
 	{"close_file",                l_sys_close_file                },
 	{"get_file_size",             l_sys_get_file_size             },
 	{"read_file",                 l_sys_read_file                 },
+	{"get_file_cursor",           l_sys_get_file_cursor           },
 	{"write_file",                l_sys_write_file                },
 	{"write_file_to_file",        l_sys_write_file_to_file        },
 	{"change_work_dir",           l_sys_change_work_dir           },
