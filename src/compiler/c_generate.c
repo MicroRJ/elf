@@ -21,7 +21,7 @@ static void close_if(elf_Parser *fs, Source line, BranchJumps *s);
 // static void close_while_loop(elf_Parser *fs);
 
 static int emit_jump(elf_Parser *parser, Source line, int dst);
-static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte);
+static int emit_byte(elf_Parser *parser, Source line, elf_Bytec byte);
 static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
 static int emit_bytexy(elf_Parser *parser, Source line, int k, int x, int y);
 static int emit_bytexyz(elf_Parser *parser, Source line, int k, int x, int y, int z);
@@ -50,7 +50,7 @@ static int add_const_int(elf_State *S, elf_Int i) {
 }
 
 // todo: interning
-static int add_const_num(elf_State *S, elf_Num i) {
+static int add_const_num(elf_State *S, elf_Number i) {
 
 	elf_IndexInt index = ARRAY_GROW(S->numbers, 1);
 	S->numbers[index] = i;
@@ -382,8 +382,12 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			elf_String *str;
 			int yy;
 
+			// todo: add to constant pool and create new
+			// GETKSTR instruction
 			str=elf_alloc_string(S,tree.expr_str);
 			yy=elf_set_global(S,0,VALUE_STRING(str));
+
+
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
 		} break;
 		case TREE_NEW_TABLE:{
@@ -714,7 +718,7 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte) {
+static int emit_byte(elf_Parser *parser, Source line, elf_Bytec byte) {
 	elf_State *M = parser->R;
 	// todo: please remove this :)
 	line = line ? line : parser->sourceloc;
@@ -729,7 +733,7 @@ static int emit_byte(elf_Parser *parser, Source line, elf_Bytecode byte) {
 
 
 static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
-	elf_Bytecode byte=BC_XXX(k,x);
+	elf_Bytec byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	return emit_byte(C,line,byte);
@@ -737,7 +741,7 @@ static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
 
 
 static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
-	elf_Bytecode byte=BC_XYY(k,x,y);
+	elf_Bytec byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -746,7 +750,7 @@ static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
 
 
 static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) {
-	elf_Bytecode byte=BC_XYZ(k,x,y,z);
+	elf_Bytec byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -755,14 +759,14 @@ static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) 
 }
 
 static void patch_jump2(elf_Parser *fs, int src, int dst) {
-	elf_Bytecode byte,*bytes;
+	elf_Bytec byte,*bytes;
 	bytes=fs->R->bytes;
 	byte=bytes[src];
 	int j = dst - src;
 	switch (BC_OP(byte)) {
 		// case BC_DELAY:
 		case BC_J: {
-			bytes[src].x = j;
+			bytes[src].b_x = j;
 			bytes[src]=BC_XXX(BC_OP(byte),j);
 		} break;
 		// case BC_YIELD:

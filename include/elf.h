@@ -5,15 +5,15 @@
 #define _elf_lang_
 
 #if defined(__EMSCRIPTEN__)
-	#define elf_userapi EMSCRIPTEN_KEEPALIVE
+	#define elf_pubapi EMSCRIPTEN_KEEPALIVE
 	#define ELF_EXPORT  EMSCRIPTEN_KEEPALIVE
 #else
 	#define ELF_EXPORT __declspec(dllexport)
 
 	#if defined(BUILD_STATIC)
-		#define elf_userapi static
+		#define elf_pubapi static
 	#else
-		#define elf_userapi
+		#define elf_pubapi
 	#endif
 #endif
 
@@ -78,54 +78,78 @@ typedef enum {
 } elf_Tag;
 
 // todo: delete!
-elf_userapi elf_State *elf_new();
+elf_pubapi elf_State *elf_new();
 
 /* push call arguments, push the (name of the file),
 push the (file contents or the file handle) */
-elf_userapi int elf_exec(elf_State *, int nargs, int nrets, bool asexpr);
+elf_pubapi int elf_exec(elf_State *, int nargs, int nrets, bool asexpr);
 
-/* push Closure or Function push call arguments  */
-elf_userapi int elf_call(elf_State *, int nargs, int nrets);
+/*
+* Push the function and push the 'this' arg, then push additional arguments.
+* nargs does not include the closure.
+* nargs must be atleast 1 because since the 'this' arg is always present,
+* 'this' can be nil.
+*
+* 	elf_push_function(...)
+* 	elf_push_nil(...)
+* 	elf_call()
+*
+*	the result is the number of returns,
+*  the stack pointer is below the return values, such that you can
+*  pop them.
+*
+*		[ FUNCTION ] = [ RET-0 ]
+*		[ 'THIS'   ] = [ RET-1 ]
+*		[ ARG-0    ] = [ RET-2 ]
+*		[ ARG-1    ] = [ RET-3 ]
+*		[ ARG-N    ] = [ RET-N ]
+*
+*	* the number of returns does not have to match the number of arguments,
+*  and the stack pointer will on top of the last return.
+*
+*
+*/
+elf_pubapi int elf_call(elf_State *, int nargs, int nrets);
 
 // todo: no, I don't like this!
-elf_userapi elf_StkInt elf_read_file(elf_State *, int size);
+elf_pubapi elf_StkInt elf_read_file(elf_State *, int size);
 
-elf_userapi elf_StkInt elf_push_this(elf_State *);
-elf_userapi elf_StkInt elf_push_globals(elf_State *);
-elf_userapi elf_StkInt elf_push_int(elf_State *, elf_Int);
-elf_userapi elf_StkInt elf_push_nil(elf_State *);
-elf_userapi elf_StkInt elf_push_table(elf_State *);
-elf_userapi elf_StkInt elf_push_string(elf_State *, const char *);
-elf_userapi elf_StkInt elf_push_num(elf_State *, elf_Num);
-elf_userapi elf_StkInt elf_push_function(elf_State *, elf_Function);
-elf_userapi elf_StkInt elf_push_handle(elf_State *, elf_Handle);
+elf_pubapi elf_StkInt elf_push_globals(elf_State *);
+elf_pubapi elf_StkInt elf_push_int(elf_State *, elf_Int);
+elf_pubapi elf_StkInt elf_push_nil(elf_State *);
+elf_pubapi elf_StkInt elf_push_table(elf_State *);
+elf_pubapi elf_StkInt elf_push_string(elf_State *, const char *);
+elf_pubapi elf_StkInt elf_push_string2(elf_State *, const char *, int length);
+elf_pubapi elf_StkInt elf_push_num(elf_State *, elf_Number);
+elf_pubapi elf_StkInt elf_push_function(elf_State *, elf_Function);
+elf_pubapi elf_StkInt elf_push_handle(elf_State *, elf_Handle);
 
-elf_userapi char *elf_get_text_from_string_on_stack(elf_State *, int stk);
+elf_pubapi char *elf_get_text_from_string_on_stack(elf_State *, int stk);
 
 /* the following are stack based instructions, they require the
 arguments on the stack.
 the arguments except for the subject are popped.
 todo: version of this that takes the stack address? */
-elf_userapi elf_IndexInt elf_table_set(elf_State *);
-elf_userapi elf_IndexInt elf_array_add(elf_State *);
+elf_pubapi elf_IndexInt elf_table_set(elf_State *);
+elf_pubapi elf_IndexInt elf_array_add(elf_State *);
 
-elf_userapi int elf_get_num_args(elf_State *);
+elf_pubapi int elf_get_num_args(elf_State *);
 
 
 // todo: TOMORROW, instead have a single API for getting
 // anything anywhere on the stack, and the elf function signature
 // tells the user the first argument index
 // todo: @deprecated
-elf_userapi elf_Tag    elf_get_argtag(elf_State *, int argi);
+elf_pubapi elf_Tag    elf_get_argtag(elf_State *, int argi);
 // todo: @deprecated
-elf_userapi elf_Int    elf_get_intarg(elf_State *, int argi);
+elf_pubapi elf_Int    elf_get_intarg(elf_State *, int argi);
 // todo: @deprecated
-elf_userapi elf_Num    elf_get_numarg(elf_State *, int argi);
+elf_pubapi elf_Number    elf_get_numarg(elf_State *, int argi);
 // todo: @deprecated
-elf_userapi elf_Handle elf_get_sysarg(elf_State *, int argi);
+elf_pubapi elf_Handle elf_get_sysarg(elf_State *, int argi);
 // todo: @deprecated
 // todo: also this should return constant memory!
-elf_userapi char      *elf_get_text_arg(elf_State *, int argi);
+elf_pubapi char      *elf_get_text_arg(elf_State *, int argi);
 
 
 
@@ -147,6 +171,17 @@ void elf_gc_check(elf_State *);
 
 void elf_error(elf_State *, int instr, const char *error);
 
+
+// names of all the overloads you can do in elf
+#define ELF_OVERLOAD_ADD   "__add"
+#define ELF_OVERLOAD_SUB   "__sub"
+#define ELF_OVERLOAD_MUL   "__mul"
+#define ELF_OVERLOAD_DIV   "__div"
+#define ELF_OVERLOAD_POW   "__pow"
+#define ELF_OVERLOAD_LT    "__pow"
+#define ELF_OVERLOAD_LTEQ  "__lteq"
+#define ELF_OVERLOAD_INDEX "__index"
+#define ELF_OVERLOAD_FIELD "__field"
 
 
 #endif

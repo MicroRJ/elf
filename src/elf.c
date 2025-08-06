@@ -35,7 +35,7 @@ at the same time when using clang-cl */
 
 
 STATIC_ASSERT(sizeof(elf_Int)==sizeof(elf_i64));
-STATIC_ASSERT(sizeof(elf_Num)==sizeof(elf_f64));
+STATIC_ASSERT(sizeof(elf_Number)==sizeof(elf_f64));
 STATIC_ASSERT(sizeof(elf_i64)==8);
 STATIC_ASSERT(sizeof(elf_f64)==8);
 

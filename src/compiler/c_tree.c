@@ -72,7 +72,7 @@ static treeID tree_int(elf_Parser *parser, Source line, elf_Int i) {
 	v->expr_int=i;
 	return v;
 }
-static treeID tree_num(elf_Parser *parser, Source line, elf_Num n) {
+static treeID tree_num(elf_Parser *parser, Source line, elf_Number n) {
 	treeID v;
 	v=tree_nullary(parser,line,EXPR_NUM,NT_NUM);
 	v->expr_num=n;

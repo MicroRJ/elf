@@ -129,10 +129,10 @@ clock time to seconds, for web you might get
 milliseconds, so freq=1000, for desktop,
 you get a performance counter, which has
 a nano-second resolution  */
-elf_i64 sys_get_clock_freq();
+elf_i64 sys_get_performance_counter_frequency();
 
 /* get the highest resolution clock available */
-elf_i64 sys_get_clock_time();
+elf_i64 sys_get_performance_counter();
 
 
 // int sys_get_my_name(int length, char *text);

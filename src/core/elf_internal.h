@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#define elf_rawapi
+#define elf_rawapi static
 
 
 //
@@ -75,9 +75,9 @@ struct elf_Object {
 
 typedef struct elf_Closure elf_Closure;
 struct elf_Closure {
-	elf_Object    obj;
-	elf_Proto   proto;
-	elf_Value  values[];
+	elf_Object      obj;
+	elf_Proto     proto;
+	elf_Value  captures[];
 };
 
 // todo: we use 64 bits for all indices
@@ -89,11 +89,14 @@ typedef struct {
 
 typedef struct elf_Table elf_Table;
 struct elf_Table {
-	elf_Object           obj;
-	elf_IndexInt        ntotal;
-	elf_IndexInt        nslots;
-	elf_IndexInt    	  ndebug;
-	elf_Table_Entry    *slots;
+	elf_Object            obj;
+	elf_IndexInt       ntotal;
+	elf_IndexInt       nslots;
+	elf_IndexInt    	 ndebug;
+	union {
+		elf_Table_Entry    *slots;
+		elf_Table_Entry    *entries;
+	};
 	elf_Value  	       *array;
 };
 
@@ -109,23 +112,28 @@ struct elf_String {
 
 typedef struct elf_Stack_Frame elf_Stack_Frame;
 struct elf_Stack_Frame {
-	elf_Closure      *closure;
-	elf_Value         *locals;
-	int           bytecounter;
-	int               nlocals;
-	char                nargs;
-	char                nrets;
+	int               bytes;
+	int               bytec;
+	short             nargs;
+	short             nrets;
+	int           framesize;
+	// note that frame base is on top of the function, so returns
+	// are placed starting at framebase-1 so that they override the
+	// function
+	elf_Value    *framebase;
+	elf_Value    *closureenv;
+	char          closuresize;
 };
 
 
 // todo: make 32 bits
-typedef struct elf_Bytecode {
-	short z,y,x,k;
-} elf_Bytecode;
+typedef struct elf_Bytec {
+	short b_z,b_y,b_x,b_k;
+} elf_Bytec;
 
 typedef struct {
-	elf_i32      address;
-	elf_Bytecode bytecode;
+	elf_i32     address;
+	elf_Bytec   bytecode;
 	// todo: use different data structure,
 	// objects could have been freed,
 	elf_Value   operand_x;
@@ -170,9 +178,9 @@ struct elf_Collector {
 	elf_Object **close_object_slots;
 };
 
-
-enum {
-	ELF_TEMPBUF_SIZE = 4096
+typedef struct elf_Interner elf_Interner;
+struct elf_Interner {
+	elf_String **atoms[4096];
 };
 
 typedef struct elf_State elf_State;
@@ -180,7 +188,6 @@ struct elf_State {
 
 	struct {
 		elf_Table      *globals;
-		elf_Table      *strings;
 		elf_f64        *numbers;
 		elf_i64       *integers;
 	};
@@ -191,9 +198,11 @@ struct elf_State {
 		elf_u8           *track;
 		// todo: make this better!
 		char            **lines;
-		elf_Bytecode     *bytes;
+		elf_Bytec        *bytes;
 		int              nbytes;
 	};
+
+	elf_Interner      interner;
 
 	// todo: experiment with allocating types and tags
 	// in separate buffers!
@@ -204,7 +213,8 @@ struct elf_State {
 	elf_Value        *stack_ptr;
 	int               stack_max;
 
-	elf_Collector     G;
+	union {  elf_Collector  G, gc; };
+
 
 
 	elf_i32          frame_stack_max;
@@ -224,7 +234,7 @@ struct elf_State {
 	int          trace_start_instr;
 	int           active_trace_pos;
 	int           active_trace_len;
-	elf_Bytecode     *trace_buffer;
+	elf_Bytec     *trace_buffer;
 	elf_Table         *trace_table;
 	elf_i32                   byte;
 
@@ -234,15 +244,18 @@ struct elf_State {
 		elf_Table *string;
 		elf_Table *table;
 	} metatables;
-
-	char tempbuf[ELF_TEMPBUF_SIZE];
 };
 
 // todo: init is internal stuff because it takes a pointer
 elf_rawapi void elf_init_raw(elf_State *);
-elf_rawapi int elf_exec_raw(elf_State *inter, int nargs, int nrets, bool asexpr, elf_String *name, elf_String *contents);
+elf_rawapi int elf_raw_exec(elf_State *inter, int nargs, int nrets, bool asexpr, elf_String *name, elf_String *contents);
 
-
+// todo: 'this' argument should be argument zero so
+// that there's no difference between a binding that
+// works on a meta-field or a regular call,
+// table_delete("asd") == table:delete("asd"),
+// but with this system, there's no way to do this...
+//
 elf_Object  *elf_get_this(elf_State *S);
 elf_Value    elf_get_arg     (elf_State *S, int stk);
 elf_String  *elf_get_string_arg  (elf_State *S, int stk);
@@ -277,11 +290,11 @@ elf_Table *elf_alloc_table(elf_State *);
 
 void elf_table_alias(elf_Table *tab, elf_Value key, elf_Value alias);
 void elf_table_merge(elf_Table *tab, elf_Table *merger);
-void elf_table_recycle(elf_Table *tab);
-elf_IndexInt elf_table_try(elf_Table *tab, elf_Value key);
+void elf_tableK_recycle(elf_Table *tab);
+elf_IndexInt elf_table_try_(elf_Table *tab, elf_Value key);
 elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash);
-elf_IndexInt elf_table_get_or_add_raw(elf_Table *tab, elf_Value key);
+elf_IndexInt elf_table_get_index_always_(elf_Table *tab, elf_Value key);
 elf_Value elf_table_get_raw(elf_Table *tab, elf_Value key);
-elf_IndexInt elf_table_set_raw(elf_Table *tab, elf_Value k, elf_Value v);
+elf_IndexInt elf_raw_table_set(elf_Table *tab, elf_Value k, elf_Value v);
 elf_IndexInt elf_array_get_length(elf_Table *tab);
-elf_IndexInt elf_array_add_raw(elf_Table *tab, elf_Value thing);
+elf_IndexInt elf_array_add_k(elf_Table *tab, elf_Value thing);

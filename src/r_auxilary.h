@@ -2,30 +2,48 @@
 // See Copyright Notice In elf.h
 //
 
-#define IS_OBJ_TAG(tag) ((tag) >= elf_tag_UserObject)
+#define tisobject(tag) ((tag) >= elf_tag_UserObject)
 
-#define IS_INT_OR_NUM(tag) (((tag) == elf_tag_Num) || ((tag) == elf_tag_Int))
+// convert from integer/number to number/integer, assumes the value
+// is either an integer or a number
+#define vitonum(v) (((v).tag == elf_tag_Int) ? (elf_Number) (v).x_int : (v).x_num)
+#define vntoint(v) (((v).tag == elf_tag_Num) ? (elf_Int)    (v).x_num : (v).x_int)
 
-#define IS_NIL_VALUE(X) (((X).tag == elf_tag_Nil) || (IS_OBJ_TAG((X).tag) && (X).x_obj == 0))
+#define isnum(v) ((v).tag == elf_tag_Num)
+#define isint(v) ((v).tag == elf_tag_Int)
+#define istab(v) ((v).tag == elf_tag_Table)
+#define isstr(v) ((v).tag == elf_tag_String)
+#define isusr(v) ((v).tag == elf_tag_UserObject)
 
-#define VI2N(X) (((X).tag==elf_tag_Int) ? (elf_Num) (X).x_int : (X).x_num)
-#define VN2I(X) (((X).tag==elf_tag_Num) ? (elf_Int) (X).x_num : (X).x_int)
+#define isnumeric(v) (isnum(v) || isint(v))
+
+#define isobject(v) (tisobject((v).tag))
+
+// an object tag with nullptr should never really happen!
+#define isnil(v) (((v).tag == elf_tag_Nil) || (tisobject((v).tag) && (v).x_obj == 0))
+
+#define vgetint(v) ((v).x_int)
+#define vgetobj(v) ((v).x_obj)
+#define vgetstr(v) ((v).x_str)
+#define vgettab(v) ((v).x_tab)
+
+#define vsetnil(v) ((v)->tag=elf_tag_Nil,(v)->x_int=0)
+#define vsetint(v,x) ((v)->tag=elf_tag_Int,(v)->x_int=x)
+#define vsetnum(v,x) ((v)->tag=elf_tag_Num,(v)->x_num=x)
+#define vsetstr(v,x) ((v)->tag=elf_tag_String,(v)->x_str=x)
+#define vSetClosure(v,x) ((v)->tag=elf_tag_Closure,(v)->x_closure=x)
+
+
+
+
 
 
 #define POBJ(thing) (&(thing)->obj)
-#define OBJ_COLOR(thing) (POBJ(thing)->color)
-
-
 #define OBJ2V(ty) (elf_tag_UserObject+ty)
 
 
-#define GET_FRAME(S) ((S)->frame)
-#define GET_LOCAL(S,X) (GET_FRAME(S)->locals[X])
 
-
-#define GET_TOP(S)   ((S)->stack_ptr)
-#define SET_TOP(S,X) (GET_TOP(S) = UCAST(X, elf_Value *))
-
+// todo: remove!
 static void _debug_stack_push(elf_State *S, elf_Value v);
 
 // todo: remove this!
@@ -37,7 +55,7 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 
 
 #define VALUE_NIL()           (XLITERAL(elf_Value){ elf_tag_Nil                                                 })
-#define VALUE_NUMBER(thing)   (XLITERAL(elf_Value){ elf_tag_Num        , ((union { elf_Num _; float __; elf_Int I; }){thing}).I })
+#define VALUE_NUMBER(thing)   (XLITERAL(elf_Value){ elf_tag_Num        , ((union { elf_Number _; float __; elf_Int I; }){thing}).I })
 #define VALUE_INTEGER(thing)  (XLITERAL(elf_Value){ elf_tag_Int        , {(elf_Int) UCAST(thing, elf_Int)      }})
 #define VALUE_TABLE(thing)    (XLITERAL(elf_Value){ elf_tag_Table        , {(elf_Int) UCAST(thing, elf_Table *)  }})
 #define VALUE_OBJECT(thing)   (XLITERAL(elf_Value){ OBJ2V(thing->type) , {(elf_Int) UCAST(thing, elf_Object *) }})
@@ -52,8 +70,6 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 //
 // TODO: REMOVE THIS FROM HERE
 //
-#define slot2value(T,X) (T->array[T->slots[X].idx])
-#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_tag_Nil) && (T->slots[X].key.tag != elf_tag_Tomb))
 
 
 

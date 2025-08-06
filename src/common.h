@@ -71,9 +71,6 @@ static int text_length(char const *text);
 static bool text_eql(char const *x, char const *y, int n);
 static bool text_eq(char const *x, char const *y);
 static char *copy_text2(int length, char const *string);
-static bool match_entire_text_noclause(char *pattern, char *text);
-static bool match_entire_text(char *pattern, char *text);
-static char *match_text_single_clause_ex(char *p, char *s);
 static char *thread_format_v(char const *format, va_list v);
 
 

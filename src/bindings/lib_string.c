@@ -1,190 +1,196 @@
 //
 // See Copyright Notice In elf.h
-// string.c
 //
 
 
-bool elf_get_strings_eq(elf_String *x, elf_String *y) {
-	if (x == y) return 1;
-	/* assuming we use the same hash function */
-	if (x->hash != y->hash) return 0;
-	if (x->length != y->length) return 0;
-	return text_eq(x->text,y->text);
+// todo: proper matcher
+#include "string_matcher.c"
+
+
+ELF_FUNCTION(l_str_length) {
+	elf_push_int(S, elf_get_string_arg(S, 0)->length);
+	return 1;
 }
 
+ELF_FUNCTION(l_str_get_hash) {
+	elf_String *str = elf_get_string_arg(S, -1);
+	elf_push_int(S, str->hash);
+	return 1;
+}
 
-int string_lib_length(elf_State *S) {
-	elf_push_int(S,((elf_String*)elf_get_this(S))->length);
+ELF_FUNCTION(l_str_get_index) {
+	char *text = elf_get_text_arg(S, -1);
+	int index = elf_get_intarg(S, 0);
+	elf_push_int(S, text[index]);
+	return 1;
+}
+
+ELF_FUNCTION(l_str_slice) {
+	elf_String *str = elf_get_string_arg(S, -1);
+	// todo: out of bounds check
+	int from = elf_get_intarg(S, 0);
+	int to = elf_get_intarg(S, 1);
+	elf_push_string3(S, str->text + from, to);
 	return 1;
 }
 
 
-#define BUFFER 0x10000
 
+// todo: this should be like an elf thing, elf_formatting.c
+static int value_bprintf(String_Builder *sb, elf_Value v, bool flags);
 
-/* todo: this is so unsafe is crazy */
-void strcatf(char *buffer, char *fmt, ...) {
-	char *cursor = buffer;
-	while (*cursor != 0) ++ cursor;
-	va_list v;
-	va_start(v,fmt);
-	stbsp_vsnprintf(cursor,BUFFER-(cursor-buffer),fmt,v);
-	va_end(v);
-}
-
-
-int string_lib_get_index(elf_State *R) {
-	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_push_int(R,str->text[elf_get_intarg(R,0)]);
-	return 1;
-}
-
-
-int string_lib_pop(elf_State *R) {
-	elf_String *yo = (elf_String*) elf_get_this(R);
-	elf_String *el = elf_alloc_string2(R,MAX(0,yo->length-1));
-	copy_memory(el->text,yo->text,MAX(0,yo->length-1));
-	elf_push_string_raw(R,el);
-	return 1;
-}
-
-
-ELF_FUNCTION(string_lib_append_char) {
-	int nargs = elf_get_num_args(S);
-	elf_String *me = (elf_String *) elf_get_this(S);
-
-	elf_String *new_string = elf_alloc_string2(S, me->length + nargs);
-	copy_memory(new_string->text, me->text, me->length);
-
-	for (int i = 0; i < nargs; i += 1) {
-		new_string->text[me->length + i] = elf_get_intarg(S,i);
+ELF_FUNCTION(l_str_join) {
+	String_Builder sb = {};
+	for (int i = -1; i < elf_get_num_args(S); ++ i) {
+		value_bprintf(&sb, elf_get_arg(S, i), 0);
 	}
-
-	new_string->hash = hash_text(new_string->text);
-	elf_push_string_raw(S, new_string);
+	elf_push_string3(S, sb.buf, sb.min);
+	free(sb.buf);
 	return 1;
 }
 
 
-ELF_FUNCTION(string_lib_append) {
-	elf_String *str = (elf_String *) elf_get_this(S);
-	char *heapbuf = calloc(1, 1024);
-
-	// todo: brother...
-	strcatf(heapbuf, "%s", str->text);
-	for (int i = 0; i < elf_get_num_args(S); ++ i) {
-		elf_Value v = elf_get_arg(S,i);
-		if (v.tag == elf_tag_String) {
-			strcatf(heapbuf,"%s",v.x_str->text);
-		} else if (v.tag == elf_tag_Nil) {
-			strcatf(heapbuf,"nil");
-		} else if (v.tag == elf_tag_Num) {
-			strcatf(heapbuf,"%.2f",v.x_num);
-		} else if (v.tag == elf_tag_Int) {
-			strcatf(heapbuf,"%lli",v.x_int);
-		} else if (v.tag == elf_tag_Table) {
-			strcatf(heapbuf,"(tab %p)",v.x_tab);
-		} else {
-			NO_CODE;
-		}
-	}
-
-	elf_new_string(S, heapbuf);
-	free(heapbuf);
+// todo: what if multiple inputs!
+// @doc whether the string matches the passed in pattern
+ELF_FUNCTION(l_str_match) {
+	char *s = elf_get_text_arg(S, -1);
+	char *p = elf_get_text_arg(S,  0);
+	char *match = string_match(s, p);
+	elf_push_int(S, match != 0);
 	return 1;
 }
 
+// todo: doesn't actually work
+// @doc finds all the matches and returns a list of all the strings
+ELF_FUNCTION(l_str_find) {
+	char *s = elf_get_text_arg(S, -1);
+	char *p = elf_get_text_arg(S,  0);
 
-int string_lib_match(elf_State *R) {
-	elf_String *s = (elf_String*) elf_get_this(R);
-	elf_String *p = elf_get_string_arg(R,0);
-	elf_push_int(R,match_entire_text(p->text,s->text));
-	return 1;
-}
+	// return a list
+	elf_push_table(S);
 
+	String_Builder sb = {};
 
-int string_lib_find(elf_State *R) {
-	elf_String *string = (elf_String*) elf_get_this(R);
-	char *pattern = elf_get_text_arg(R,0);
-	char *buffer = 0;
-	char *cursor = string->text;
-	elf_Table *list = elf_new_table(R);
-	while (*cursor) {
-		char *match = match_text_single_clause_ex(cursor,pattern);
-		if (match != 0) {
-			while (cursor < match) {
-				ARRAY_ADD(buffer,*cursor ++);
+	char *cur = s;
+	while (*cur) {
+
+		char *tail = string_match(cur, p);
+
+		if (tail) {
+			while (cur < tail) {
+				bwritechar(&sb, *cur ++);
 			}
-			/* todo: there's no need for the buffer! */
-			ARRAY_ADD(buffer,0);
-			elf_Int narray = ARRAY_LENGTH(list->array);
-			elf_table_set_raw(list,VALUE_INTEGER(narray),VALUE_STRING(elf_alloc_string(R,buffer)));
-			ARRAY(buffer).min = 0;
-		} else cursor += 1;
+
+			elf_push_string3(S, sb.buf, sb.min);
+			elf_array_add(S);
+
+			sb.min = 0;
+
+		} else cur ++;
 	}
+
+	free(sb.buf);
+
 	return 1;
 }
 
+// @doc returns an list of lines from this string
+ELF_FUNCTION(l_str_split_by_lines) {
+	char *s = elf_get_text_arg(S, -1);
 
-int string_lib_split_by_lines(elf_State *R) {
-	elf_String *str = (elf_String*) elf_get_this(R);
-	char *buffer = 0;
-	char *cursor = str->text;
-	elf_Table *list = elf_new_table(R);
-	while (*cursor) {
-		while (*cursor && *cursor != '\n' && *cursor != '\r') {
-			ARRAY_ADD(buffer,*cursor ++);
+	elf_push_table(S);
+
+	String_Builder sb = {};
+
+	char *cur = s;
+	while (*cur) {
+
+		while (*cur != 0 && *cur != '\n' && *cur != '\r') {
+			bwritechar(&sb, *cur ++);
 		}
-		if (*cursor == '\n' || *cursor == '\r') {
-			cursor += 1 + (cursor[0] == '\r' && cursor[1] == '\n');
+		if (*cur == '\n' || *cur == '\r') {
+			// skip additional char if \r\n, windows style line ending?
+			cur += 1 + (cur[0] == '\r' && cur[1] == '\n');
 		}
-		ARRAY_ADD(buffer,0);
-		elf_table_set_raw(list,VALUE_INTEGER(ARRAY_LENGTH(list->array)),VALUE_STRING(elf_alloc_string(R,buffer)));
-		ARRAY(buffer).min = 0;
+
+		elf_push_string3(S, sb.buf, sb.min);
+		elf_array_add(S);
+
+		sb.min = 0;
 	}
+
+	free(sb.buf);
+
 	return 1;
 }
 
 
-int string_lib_get_hash(elf_State *R) {
-	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_push_int(R,str->hash);
+ELF_FUNCTION(l_str_split_by_char) {
+
+	char *s = elf_get_text_arg(S, -1);
+	int chr = elf_get_intarg(S, 0);
+
+	elf_push_table(S);
+
+	String_Builder sb = {};
+
+	char *cur = s;
+	while (*cur) {
+
+		while (*cur != 0 && *cur != chr) {
+			bwritechar(&sb, *cur ++);
+		}
+
+		if (*cur == chr) {
+			cur ++;
+		}
+
+		elf_push_string3(S, sb.buf, sb.min);
+		elf_array_add(S);
+
+		sb.min = 0;
+	}
+
+	free(sb.buf);
+
 	return 1;
 }
 
 
-int string_lib_lowercase(elf_State *R) {
-	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_String *newstr = elf_new_string2(R,str->length);
+ELF_FUNCTION(l_str_lowercase) {
+	elf_String *str = elf_get_string_arg(S, -1);
+	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
-		newstr->text[i] = chr_to_lowercase(str->text[i]);
+		temp[i] = chr_to_lowercase(str->text[i]);
 	}
+	elf_push_string3(S, temp, str->length);
+	free(temp);
 	return 1;
 }
 
 
-int string_lib_uppercase(elf_State *R) {
-	elf_String *str = (elf_String*) elf_get_this(R);
-	elf_String *newstr = elf_new_string2(R,str->length);
+ELF_FUNCTION(l_str_uppercase) {
+	elf_String *str = elf_get_string_arg(S, -1);
+	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
-		newstr->text[i] = chr_to_uppercase(str->text[i]);
+		temp[i] = chr_to_uppercase(str->text[i]);
 	}
+	elf_push_string3(S, temp, str->length);
+	free(temp);
 	return 1;
 }
 
 
 elf_Binding string_metafuncs[] = {
-	{ "length"          , string_lib_length         },
-	{ "match"           , string_lib_match          },
-	{ "uppercase"       , string_lib_uppercase      },
-	{ "lowercase"       , string_lib_lowercase      },
-	{ "__add"           , string_lib_append         },
-	{ "__add1"          , string_lib_append         },
-	{ "append"          , string_lib_append         },
-	{ "append_char"     , string_lib_append_char    },
-	{ "pop"             , string_lib_pop            },
-	{ "get_hash"        , string_lib_get_hash       },
-	{ "split_by_lines"  , string_lib_split_by_lines },
-	{ "idx"             , string_lib_get_index      },
-	{ "find"            , string_lib_find           },
+	{ "length"          , l_str_length         },
+	{ "match"           , l_str_match          },
+	{ "uppercase"       , l_str_uppercase      },
+	{ "lowercase"       , l_str_lowercase      },
+	{ "join"            , l_str_join           },
+	{ "get_hash"        , l_str_get_hash       },
+	{ "split_by_lines"  , l_str_split_by_lines },
+	{ "split_by_char"   , l_str_split_by_char  },
+	{ "idx"             , l_str_get_index      },
+	{ "find"            , l_str_find           },
+	{ ELF_OVERLOAD_ADD  , l_str_join           },
 };

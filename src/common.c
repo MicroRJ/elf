@@ -8,11 +8,11 @@
 
 
 static elf_i64 prof_get_time() {
-	return sys_get_clock_time();
+	return sys_get_performance_counter();
 }
 
 static elf_f64 prof_time_diff_s(elf_i64 time) {
-	return (sys_get_clock_time() - time) / (elf_f64) sys_get_clock_freq();
+	return (sys_get_performance_counter() - time) / (elf_f64) sys_get_performance_counter_frequency();
 }
 
 static elf_f64 prof_time_diff_ms(elf_i64 time) {
@@ -167,6 +167,18 @@ int text_length(char const *s) {
 	return n;
 }
 
+static int find_subtext(char *s, char *p) {
+	for (int i = 0; *s; s ++, i ++) {
+		char *c = p;
+		while (*c) {
+			if (*s != *c ++) goto retry;
+		}
+		return i;
+		retry: ;
+	}
+	return -1;
+}
+
 
 #if 0
 bool elf_cstrhasprefix(char *str, char *prefix) {
@@ -227,111 +239,3 @@ static char *tpf_(char const *format, ...) {
 }
 
 
-
-/*
-** Simple pattern matcher utility.
-*/
-bool match_entire_text_noclause(char *p, char *s);
-
-
-/* Younger me wrote:
-	" todo: support for ()
-	  todo: this has a flaw!! "
-
-  Now, I don't remember what the flaw is!
-*/
-bool match_entire_text(char *p, char *s) {
-	char *b = s;
-	while (!match_entire_text_noclause(p,s)) {
-		while (*p != 0 && *p != '|') ++p;
-		if (*p == 0) return 0;
-		++ p, s = b;
-	}
-	return 1;
-}
-
-
-bool match_entire_text_noclause(char *p, char *s) {
-	while (*p != 0 && *p != '|') {
-		if (*p == '?') {
-			/* matches any character except terminator. */
-			if (*s != 0) {
-				return 0;
-			}
-			++ p, ++ s;
-		} else
-		if (*p == '*') {
-			/* unlikely the user will do this. */
-			while (p[1] == '*') ++ p;
-
-			/* got to end of string, do we still
-			have a pattern? If so then no match. */
-			if (*s == 0) return p[1] == 0 || p[1] == '|';
-
-			/* '*' operator causes matcher to split branches,
-			we can either match the next pattern after '*' or
-			delay the match by skipping this char and remaining
-			in this pattern char. */
-			if (match_entire_text_noclause(p+1,s)) {
-				return 1;
-			}
-			/* no match, move on to next char, remain in
-			this branch and keep checking for matches. */
-			++ s;
-		/* otherwise, match literal, fail if no match. */
-		} else if (*p != *s) {
-			return 0;
-		} else {
-			++ p, ++ s;
-		}
-	}
-	/* did we match the whole string */
-	return *s == 0;
-}
-
-
-char *match_text_single_clause_ex(char *p, char *s) {
-	while (*p != 0 && *p != '|') {
-		if (*p == '?') {
-			/* matches any character except terminator. */
-			if (*s != 0) {
-				return 0;
-			}
-			++ p, ++ s;
-		} else
-		if (*p == '*') {
-			/* unlikely the user will do this. */
-			while (p[1] == '*') ++ p;
-
-			/* got to end of string, do we still
-			have a pattern? If so then no match. */
-			if (*s == 0) {
-				/* todo: if we remove the match multiple clauses
-				version we can't simply return here without first
-				scanning the entire string for '|' */
-				if (p[1] == 0 || p[1] == '|') {
-					return s;
-				} else {
-					return 0;
-				}
-			}
-
-			/* '*' operator causes matcher to split branches,
-			we can either match the next pattern after '*' or
-			delay the match by skipping this char and remaining
-			in this pattern char. */
-			char *g = match_text_single_clause_ex(p+1,s);
-			if (g) return g;
-			/* no match, move on to next char, remain in
-			this branch and keep checking for matches. */
-			++ s;
-		/* otherwise, match literal, fail if no match. */
-		} else if (*p != *s) {
-			return 0;
-		} else {
-			++ p, ++ s;
-		}
-	}
-	/* did we match the whole string */
-	return s;
-}

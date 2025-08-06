@@ -53,13 +53,13 @@ void sys_sleep(elf_Int ms) {
 }
 
 
-elf_Int sys_get_clock_freq() {
+elf_Int sys_get_performance_counter_frequency() {
 	/* todo: where does it say this */
 	return 1000;
 }
 
 
-elf_Int sys_get_clock_time() {
+elf_Int sys_get_performance_counter() {
 	return emscripten_get_now();
 }
 

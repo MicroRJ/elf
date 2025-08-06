@@ -2,32 +2,33 @@
 // See Copyright Notice In elf.h
 //
 
-ELF_FUNCTION(core_lib_get_meta) {
+
+ELF_FUNCTION(l_core_get_meta) {
 	elf_push_table_raw(S, elf_get_object_arg_raw(S, 0)->meta);
 	return 1;
 }
 
 
-ELF_FUNCTION(core_lib_set_meta) {
-	elf_get_object_arg_raw(S,0)->meta = elf_get_table(S, 1);
+ELF_FUNCTION(l_core_set_meta) {
+	elf_get_object_arg_raw(S, 0)->meta = elf_get_table(S, 1);
 	*S->stack_ptr ++ = elf_get_arg(S, 0);
 	return 1;
 }
 
-ELF_FUNCTION(core_lib_tagof) {
+ELF_FUNCTION(l_core_tagof) {
 	elf_push_string(S, tag2s[elf_get_argtag(S, 0)]);
 	return 1;
 }
 
-ELF_FUNCTION(core_lib_iton) {
+ELF_FUNCTION(l_core_iton) {
 	elf_Value v = elf_get_arg(S, 0);
 	if (v.tag == elf_tag_Int) {
-		elf_push_num(S, (elf_Num) v.x_int);
+		elf_push_num(S, (elf_Number) v.x_int);
 	} else elf_push_num(S, v.x_num);
 	return 1;
 }
 
-ELF_FUNCTION(core_lib_ntoi) {
+ELF_FUNCTION(l_core_ntoi) {
 	elf_Value v = elf_get_arg(S, 0);
 	if (v.tag == elf_tag_Num) {
 		elf_push_int(S, (elf_Int) v.x_num);
@@ -36,7 +37,22 @@ ELF_FUNCTION(core_lib_ntoi) {
 }
 
 
-ELF_FUNCTION(core_lib_load_file) {
+ELF_FUNCTION(l_core_load_file) {
+	int nargs = 0; // elf_get_num_args(S) - 1;
+	int nrets = elf_get_num_rets(S);
+
+	elf_push_string(S, "noname");
+
+	// todo: no like
+	*S->stack_ptr ++ = elf_get_arg(S, 0);
+	elf_read_file(S, -1);
+
+	nrets = elf_exec(S,nargs,nrets,false);
+	return nrets;
+}
+
+
+ELF_FUNCTION(l_core_load_expr) {
 	int nargs = 1; // elf_get_num_args(S) - 1;
 	int nrets = elf_get_num_rets(S);
 
@@ -51,28 +67,13 @@ ELF_FUNCTION(core_lib_load_file) {
 }
 
 
-ELF_FUNCTION(core_lib_load_expr) {
-	int nargs = 1; // elf_get_num_args(S) - 1;
-	int nrets = elf_get_num_rets(S);
-
-	elf_push_string(S, "noname");
-
-	// todo: no like
-	*S->stack_ptr ++ = elf_get_arg(S, 0);
-	elf_read_file(S, -1);
-
-	nrets = elf_exec(S,nargs,nrets,false);
-	return nrets;
-}
-
-
-ELF_FUNCTION(core_lib_const_expr) {
+ELF_FUNCTION(l_core_const_expr) {
 	char *contents = elf_get_text_arg(S, 0);
 	elf_load_const_expr(S, "no name", contents);
 	return 1;
 }
 
-ELF_FUNCTION(core_lib_load_json) {
+ELF_FUNCTION(l_core_load_json) {
 	char *name = elf_get_text_arg(S, 0);
 	elf_Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_ALWAYS);
 	if (file) {
@@ -83,19 +84,6 @@ ELF_FUNCTION(core_lib_load_json) {
 		elf_load_json(S, name, heapbuf);
 	} else {
 		elf_push_nil(S);
-	}
-	return 1;
-}
-
-
-
-/* merges one or several tables together into
-a new table, which is then returned. */
-ELF_FUNCTION(core_lib_merge_tables) {
-	elf_Table *tab = elf_new_table(S);
-	int i;
-	for (i = 0; i < elf_get_num_args(S); i += 1) {
-		elf_table_merge(tab,elf_get_table(S,i));
 	}
 	return 1;
 }
@@ -155,7 +143,7 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 }
 
 // todo: handle escape sequences
-ELF_FUNCTION(core_lib_format) {
+ELF_FUNCTION(l_core_format) {
 	int argindex = 0;
 	char *format = elf_get_text_arg(S, argindex ++);
 	String_Builder sb = {};
@@ -179,7 +167,7 @@ ELF_FUNCTION(core_lib_format) {
 	return 1;
 }
 
-ELF_FUNCTION(core_lib_fpf) {
+ELF_FUNCTION(l_core_fpf) {
 	elf_Handle file = elf_get_sysarg(S, 0);
 
 	String_Builder sb = {};
@@ -194,7 +182,7 @@ ELF_FUNCTION(core_lib_fpf) {
 	return 1;
 }
 
-ELF_FUNCTION(core_lib_pf) {
+ELF_FUNCTION(l_core_pf) {
 	String_Builder sb = {};
 	for (int i = 0; i < elf_get_num_args(S); i ++) {
 		value_bprintf(&sb, elf_get_arg(S,i),0);
@@ -287,7 +275,7 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 }
 
 
-ELF_FUNCTION(core_lib_unload) {
+ELF_FUNCTION(l_core_unload) {
 	elf_Handle file = elf_get_sysarg(S, 0);
 	elf_Value thing = elf_get_arg(S, 1);
 	String_Builder sb = {};
@@ -301,20 +289,19 @@ ELF_FUNCTION(core_lib_unload) {
 }
 
 const static elf_Binding lib_core[] = {
-	{"get_meta", core_lib_get_meta},
-	{"set_meta", core_lib_set_meta},
-	{"tagof", core_lib_tagof},
-	{"iton", core_lib_iton},
-	{"ntoi", core_lib_ntoi},
-	{"load_file", core_lib_load_file},
-	{"load_expr", core_lib_load_expr},
-	{"const_expr", core_lib_const_expr},
-	{"load_json", core_lib_load_json},
-	{"merge_tables", core_lib_merge_tables},
-	{"format", core_lib_format},
-	{"fpf", core_lib_fpf},
-	{"pf", core_lib_pf},
-	{"unload", core_lib_unload},
+	{"get_meta", l_core_get_meta},
+	{"set_meta", l_core_set_meta},
+	{"tagof", l_core_tagof},
+	{"iton", l_core_iton},
+	{"ntoi", l_core_ntoi},
+	{"load_file", l_core_load_file},
+	{"load_expr", l_core_load_expr},
+	{"const_expr", l_core_const_expr},
+	{"load_json", l_core_load_json},
+	{"format", l_core_format},
+	{"fpf", l_core_fpf},
+	{"pf", l_core_pf},
+	{"unload", l_core_unload},
 };
 
 
@@ -354,7 +341,7 @@ int core_lib_include(elf_State *R) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);
-			elf_table_set_raw(globals,VALUE_STRING(ref),globals->array[entry.idx]);
+			elf_raw_table_set(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}
 	return 0;

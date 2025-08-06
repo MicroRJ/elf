@@ -47,6 +47,7 @@
 // I use them all the time for games.
 //
 
+#if 0
 typedef struct { float x, y; } elf_vec2;
 
 static inline elf_vec2 _get_vec2(elf_Table *tab, elf_Value sx, elf_Value sy) {
@@ -69,8 +70,8 @@ ELF_FUNCTION(lib_vec2__##NAME) { \
 	elf_vec2 y = _get_vec2(elf_get_table(S, 0), sx, sy); \
 	elf_vec2 v = { OP(x.x, y.x), OP(x.y, y.y) }; \
 	elf_Table *res = elf_new_table(S); \
-	elf_table_set_raw(res, sx, VALUE_NUMBER(v.x)); \
-	elf_table_set_raw(res, sy, VALUE_NUMBER(v.y)); \
+	elf_raw_table_set(res, sx, VALUE_NUMBER(v.x)); \
+	elf_raw_table_set(res, sy, VALUE_NUMBER(v.y)); \
 	elf_push_table_raw(S, res); \
 	return 1; \
 } \
@@ -90,3 +91,4 @@ elf_Binding metatable_lib_vec2[] = {
 	{"sub", lib_vec2__sub},
 	{"pow", lib_vec2__pow},
 };
+#endif

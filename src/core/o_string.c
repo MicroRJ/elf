@@ -2,8 +2,21 @@
 // See Copyright Notice In elf.h
 //
 
-elf_String *elf_alloc_string2(elf_State *S, elf_i32 length) {
 
+elf_rawapi
+elf_String *elf_alloc_string3(elf_State *inter, char const *text, elf_i32 length) {
+	elf_String *str = elf_gc_alloc(inter, GC_STR, sizeof(elf_String) + length + 1);
+	if (inter) str->obj.meta = inter->metatables.string;
+	str->length = length;
+	str->text[length] = 0;
+	str->hash = hash_text(text);
+	copy_memory(str->text, text, length);
+	return str;
+}
+
+
+elf_rawapi
+elf_String *elf_alloc_string2(elf_State *S, elf_i32 length) {
 	elf_String *obj = elf_gc_alloc(S, GC_STR, sizeof(elf_String)+length+1);
 	//
 	// todo: instead of doing this, have a table of metatables, which maps
@@ -28,7 +41,7 @@ elf_String *elf_alloc_string(elf_State *R, const char *text) {
 }
 
 
-
 inline elf_HashInt elf_get_string_hash(elf_String *string) {
 	return string->hash;
 }
+

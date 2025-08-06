@@ -38,7 +38,7 @@ int elf_read_file(elf_State *inter, int size) {
 	TOP(inter)->tag = elf_tag_String;
 	TOP(inter)->x_str = contents;
 
-	int stk = inctop(inter);
+	int stk = incstackptr(inter);
 	if (closeio) sys_close_file(file);
 	return stk;
 }

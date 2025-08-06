@@ -3,11 +3,47 @@
 //
 
 
+//
+// TIMING
+//
+
+static inline elf_f64 get_performance_counter_elapsed_s(elf_i64 time) {
+	return (sys_get_performance_counter() - time) / (elf_f64) sys_get_performance_counter_frequency();
+}
+
+ELF_FUNCTION(l_sys_get_performance_counter) {
+	elf_push_int(S, sys_get_performance_counter());
+	return 1;
+}
+
+ELF_FUNCTION(l_sys_get_performance_counter_frequency) {
+	elf_push_int(S, sys_get_performance_counter_frequency());
+	return 1;
+}
+
+ELF_FUNCTION(l_sys_get_performance_counter_elapsed_s) {
+	ASSERT(elf_get_num_args(S) == 1);
+	elf_i64 time = elf_get_intarg(S, 0);
+	elf_push_num(S, get_performance_counter_elapsed_s(time));
+	return 1;
+}
+
+ELF_FUNCTION(l_sys_get_performance_counter_elapsed_ms) {
+	ASSERT(elf_get_num_args(S) == 1);
+	elf_i64 time = elf_get_intarg(S, 0);
+	elf_push_num(S, get_performance_counter_elapsed_s(time) * 1000);
+	return 1;
+}
+
 ELF_FUNCTION(l_sys_sleep) {
 	ASSERT(elf_get_num_args(S) >= 1);
-	sys_sleep(elf_get_intarg(S,0));
+	sys_sleep(elf_get_intarg(S, 0));
 	return 0;
 }
+
+//
+// files
+//
 
 ELF_FUNCTION(l_sys_get_file_name_from_path) {
 	char *path = elf_get_text_arg(S, 0);
@@ -319,16 +355,18 @@ ELF_FUNCTION(l_sys_write_file_to_file) {
 	return 1;
 }
 
+
 ELF_FUNCTION(l_sys_change_work_dir) {
-	int result = sys_set_work_dir(elf_get_text_arg(S,0));
-	elf_push_int(S, result);
+	int noerr = sys_set_work_dir(elf_get_text_arg(S,0));
+	elf_push_int(S, noerr);
 	return 1;
 }
+
 
 ELF_FUNCTION(l_sys_get_work_dir) {
 	char buf[256];
 	sys_get_work_dir(buf, sizeof(buf));
-	elf_new_string(S,buf);
+	elf_push_string(S, buf);
 	return 1;
 }
 
@@ -381,4 +419,10 @@ static const elf_Binding l_sys[] = {
 	{"create_process",            l_sys_create_process            },
 	{"exit",                      l_sys_exit_this_process         },
 	{"get_process_id",            l_sys_get_this_process_id       },
+
+
+	{"get_performance_counter",              l_sys_get_performance_counter                  },
+	{"get_performance_counter_frequency",    l_sys_get_performance_counter_frequency        },
+	{"get_performance_counter_elapsed_s",    l_sys_get_performance_counter_elapsed_s        },
+	{"get_performance_counter_elapsed_ms",   l_sys_get_performance_counter_elapsed_ms       },
 };

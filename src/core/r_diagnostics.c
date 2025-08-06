@@ -3,17 +3,11 @@
 //
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b);
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytec b);
 static int get_byte_class(int op);
 
-// todo: this function is deprecated because who even calls this?
-void elf_debugger(char *message) {
-	sys_console_print(LOG_KDEBUG,"debugger: ");
-	sys_console_print(LOG_KDEBUG,message);
-	sys_console_print(LOG_KDEBUG,"end");
-	sys_debugger();
-}
 
+elf_rawapi
 int elf_query_file_for_instr(elf_Module *M, int byte) {
 	FOR_ARRAY(i,M->files) {
 		elf_File file = M->files[i];
@@ -24,17 +18,7 @@ int elf_query_file_for_instr(elf_Module *M, int byte) {
 	return -1;
 }
 
-static Source get_instr_line(elf_Module *M, int instr) {
-	ASSERT(WITHIN(instr, 0, ARRAY_LENGTH(M->lines)));
-
-	if (M->lines) {
-		return M->lines[instr];
-	}
-
-	return "";
-}
-
-static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, elf_Bytecode byte, char const *fmt, ...) {
+static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, elf_Bytec byte, char const *fmt, ...) {
 	char *line_start;
 	int line_number;
 	char underline_buf[64];
@@ -47,12 +31,6 @@ static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, e
 
 	int underline = MIN(sizeof(underline_buf), cursor - line_start);
 	line_start = cursor - underline;
-
-	//	int underline = cursor - line_start;
-	//	if (underline >= sizeof(underline_buf)) {
-	//		underline = sizeof(underline_buf)-1;
-	//		line_start = cursor - underline;
-	//	}
 
 	int linelen = 0;
 	for (; linelen < underline+32; ++ linelen) {
@@ -78,18 +56,74 @@ static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, e
 	printf("| %.*s\n",underline+1,underline_buf);
 }
 
-void elf_dump_byte_trace(elf_State *S) {
-	S->frame_stack[S->frame_index] = S->frame;
-	for(int i=1; i<=S->frame_index; i++){
-		elf_Stack_Frame *frame = & S->frame_stack[i];
-		int id = elf_query_file_for_instr(S, frame->bytecounter);
 
-		if (id != -1) {
-			elf_File *file = &S->files[id];
-			Source line = get_instr_line(S,frame->bytecounter);
-			cursor_dialog(file->name->text,file->contents->text,line,frame->bytecounter,S->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
-		}
+static void printerrorbanner() {
+	printf("============= ELF-ERROR =============\n");
+}
+
+
+elf_pubapi
+void elf_errorf(elf_State *inter, int instr, const char *format, ...)
+{
+	printerrorbanner();
+
+
+	if (instr == NO_BYTE)
+	{
+		instr = inter->byte;
 	}
+
+	// todo: instead of keeping source code in memory, which is
+	// kinda weird, make a hash of the file we loaded the code from,
+	// and get a path to it, if the hash didn't change we reload the
+	// file, and always make sure to print a notice saying the error
+	// report could be inaccurate if the source file changed
+	Source line = inter->lines ? inter->lines[instr] : 0;
+
+	int fidi = elf_query_file_for_instr(inter, instr);
+
+	va_list vargs;
+	va_start(vargs, format);
+	char *error = thread_format_v(format, vargs);
+	va_end(vargs);
+
+	if (fidi != -1) {
+
+		elf_File *file = &inter->files[fidi];
+		cursor_dialog(file->name->text, file->contents->text, line, instr, inter->bytes[instr], error);
+	}
+	else
+	{
+		printf("source information could not be found, file id: %i\n", fidi);
+		printf("error: %s\n", error);
+	}
+
+	printf("elf is exiting...\n");
+	sys_exit_this_process(0);
+}
+
+
+elf_pubapi
+void elf_error(elf_State *inter, int byte, const char *message)
+{
+	elf_errorf(inter, byte, message);
+}
+
+
+
+#if 0
+void elf_dump_byte_trace(elf_State *S) {
+	// S->frame_stack[S->frame_index] = S->frame;
+	// for(int i=1; i<=S->frame_index; i++){
+	// 	elf_Stack_Frame *frame = & S->frame_stack[i];
+	// 	int id = elf_query_file_for_instr(S, frame->bytecounter);
+
+	// 	if (id != -1) {
+	// 		elf_File *file = &S->files[id];
+	// 		Source line = instrline(S,frame->bytecounter);
+	// 		cursor_dialog(file->name->text,file->contents->text,line,frame->bytecounter,S->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
+	// 	}
+	// }
 }
 
 // todo:
@@ -128,37 +162,7 @@ void elf_analyze_exec_trail(elf_State *S) {
 	}
 }
 
-void elf_error(elf_State *R, int byte, const char *error) {
-	/* Alternatively, do proper coloring... */
-	printf("\n\n");
-	printf("\txxxxxxxxxx:\n");
-	printf("\txx FAIL xx:\n");
-	printf("\txxxxxxxxxx:\n\n");
-
-	elf_State *M = R;
-	if (byte == NO_BYTE) byte = R->byte;
-	char *line = get_instr_line(M,byte);
-	int fileid = elf_query_file_for_instr(M,byte);
-	if (fileid != -1) {
-		elf_File *file = &M->files[fileid];
-		cursor_dialog(file->name->text,file->contents->text,line,byte,M->bytes[byte],error);
-	} else {
-		printf("error: %s\n",error);
-		printf("source information could not be found, file id: %i\n",fileid);
-	}
-
-	// todo: do this interactively?
-	// like as for input from the command line, hey do you want
-	// dump the byte trace?
-	// printf(" -- BYTE TRACE:\n");
-	// elf_dump_byte_trace(R);
-	// elf_analyze_exec_trail(R);
-	elf_debugger("error");
-}
-
-
-
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecode b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytec b) {
 	if (fid != -1) {
 		elf_File file = M->files[fid];
 		int linenum;
@@ -197,7 +201,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytecod
 	}
 	fprintf(io,"\n");
 }
-
+#endif
 
 
 #if 0
@@ -222,7 +226,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
 		for (Instr j = 0; j < ff.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[ff.bytes+j];
+			elf_Bytec b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// get_source_info(md->file,md->lines[j],&linenum,&lineloc);
@@ -235,7 +239,7 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 		elf_Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
 		for (Instr j = 0; j < p.nbytes; ++j) {
-			elf_Bytecode b = md->bytes[p.bytes+j];
+			elf_Bytec b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");

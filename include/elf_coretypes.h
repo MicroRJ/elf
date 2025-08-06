@@ -21,7 +21,7 @@ typedef double 			       elf_f64;
 typedef float  			       elf_f32;
 
 typedef elf_i64  elf_Int;
-typedef elf_f64  elf_Num;
+typedef elf_f64  elf_Number;
 typedef elf_i32  elf_Error;
 
 typedef elf_u32 elf_HashInt;

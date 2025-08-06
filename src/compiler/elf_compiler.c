@@ -116,8 +116,8 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
-	elf_array_add_raw(S->globals, VALUE_STRING(contents));
-	elf_array_add_raw(S->globals, VALUE_STRING(name));
+	elf_array_add_k(S->globals, VALUE_STRING(contents));
+	elf_array_add_k(S->globals, VALUE_STRING(name));
 
 	free(parser);
 

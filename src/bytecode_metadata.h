@@ -55,13 +55,14 @@ typedef enum ByteOP {
 #undef BCITEM
 
 
-#define BC_XYZ(K,X,Y,Z) (elf_Bytecode){Z,Y,X,K}
-#define BC_OP(B)        (B).k
-#define BC_ARGX(B)      (B).x
-#define BC_ARGY(B)      (B).y
-#define BC_ARGZ(B)      (B).z
+#define BC_XYZ(K,X,Y,Z) (elf_Bytec){Z,Y,X,K}
 #define BC_XYY(K,X,Y)    BC_XYZ(K,X,Y,0)
 #define BC_XXX(K,X)      BC_XYZ(K,X,0,0)
+
+#define BC_OP(B)        (B).b_k
+#define BC_ARGX(B)      (B).b_x
+#define BC_ARGY(B)      (B).b_y
+#define BC_ARGZ(B)      (B).b_z
 
 
 //

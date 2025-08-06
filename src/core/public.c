@@ -23,11 +23,13 @@ const char *tag2s[] = {
 
 #define TOP(S) (S->stack_ptr)
 
-static inline int inctop(elf_State *S) {
-	int index = S->stack_ptr ++ - S->stack;
+elf_rawapi
+inline elf_StkInt incstackptr(elf_State *S) {
+	elf_StkInt index = S->stack_ptr ++ - S->stack;
 	ASSERT(index < S->stack_max);
 	return index;
 }
+
 static elf_String *stkstr(elf_State *inter, int index) {
 	elf_Value *v = inter->stack_ptr + index;
 	if (v->tag != elf_tag_Nil && v->tag != elf_tag_String) {
@@ -44,7 +46,7 @@ int elf_exec(elf_State *inter, int nargs, int nrets, bool asexpr) {
 		elf_push_nil(inter);
 		return 1;
 	}
-	return elf_exec_raw(inter, nargs, nrets, asexpr, name, contents);
+	return elf_raw_exec(inter, nargs, nrets, asexpr, name, contents);
 }
 
 
@@ -63,62 +65,69 @@ int elf_get_num_rets(elf_State *S) {
 }
 
 elf_Tag elf_get_argtag(elf_State *S, int x) {
-	return S->frame.locals[x + 1].tag;
+	return S->frame.framebase[x + 1].tag;
 }
 
 int elf_push_nil(elf_State *S) {
 	TOP(S)->tag = elf_tag_Nil;
 	TOP(S)->x_i64 = 0;
-	return inctop(S);
+	return incstackptr(S);
 }
 
 int elf_push_int(elf_State *S, elf_Int x) {
 	TOP(S)->tag = elf_tag_Int;
 	TOP(S)->x_int = x;
-	return inctop(S);
+	return incstackptr(S);
 }
 
-int elf_push_num(elf_State *S, elf_Num x) {
+int elf_push_num(elf_State *S, elf_Number x) {
 	TOP(S)->tag = elf_tag_Num;
 	TOP(S)->x_num = x;
-	return inctop(S);
+	return incstackptr(S);
 }
 
 int elf_push_handle(elf_State *S, elf_Handle x) {
 	TOP(S)->tag = elf_tag_Handle;
 	TOP(S)->x_sys = x;
-	return inctop(S);
+	return incstackptr(S);
 }
 
 
 int elf_push_this(elf_State *S) {
-	*TOP(S) = S->frame.locals[0];
-	return inctop(S);
+	*TOP(S) = S->frame.framebase[0];
+	return incstackptr(S);
 }
 
 int elf_push_function(elf_State *S, elf_Function x) {
 	TOP(S)->tag = elf_tag_Function;
 	TOP(S)->x_proc = x;
-	return inctop(S);
+	return incstackptr(S);
 }
 
 int elf_push_table(elf_State *S) {
 	TOP(S)->tag = elf_tag_Table;
 	TOP(S)->x_tab = elf_alloc_table(S);
-	return inctop(S);
+	return incstackptr(S);
 }
 
 int elf_push_globals(elf_State *S) {
 	TOP(S)->tag = elf_tag_Table;
 	TOP(S)->x_tab = S->globals;
-	return inctop(S);
+	return incstackptr(S);
 }
 
-int elf_push_string(elf_State *S, const char *text) {
-	elf_String *str = elf_alloc_string(S, text);
-	TOP(S)->tag = elf_tag_String;
-	TOP(S)->x_str = str;
-	return inctop(S);
+elf_pubapi
+int elf_push_string(elf_State *inter, const char *text) {
+	elf_String *str = elf_alloc_string(inter, text);
+	vsetstr(inter->stack_ptr, str);
+	return incstackptr(inter);
+}
+
+elf_pubapi
+int elf_push_string3(elf_State *inter, const char *text, int length) {
+	elf_String *str = elf_alloc_string3(inter, text, length);
+	vsetstr(inter->stack_ptr, str);
+	return incstackptr(inter);
 }
 
 
@@ -129,7 +138,7 @@ elf_IndexInt elf_table_set(elf_State *S) {
 	if (table->tag != elf_tag_Table) {
 		elf_error(S, NO_BYTE, "Not A Table!");
 	}
-	return elf_table_set_raw(table->x_tab, key, value);
+	return elf_raw_table_set(table->x_tab, key, value);
 }
 
 elf_IndexInt elf_array_add(elf_State *S) {
@@ -138,5 +147,5 @@ elf_IndexInt elf_array_add(elf_State *S) {
 	if (table->tag != elf_tag_Table) {
 		elf_error(S, NO_BYTE, "Not A Table!");
 	}
-	return elf_array_add_raw(table->x_tab, value);
+	return elf_array_add_k(table->x_tab, value);
 }

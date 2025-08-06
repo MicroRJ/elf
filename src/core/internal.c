@@ -19,18 +19,6 @@ elf_String *elf_new_string(elf_State *S, const char *text) {
 }
 
 
-elf_String *elf_new_string2(elf_State *R, elf_i32 length) {
-	elf_String *string = elf_alloc_string2(R,length);
-	elf_push_string_raw(R,string);
-	return string;
-}
-
-
-static void _set_stack_ptr(elf_State *S, elf_Value *stack_ptr) {
-	S->stack_ptr = stack_ptr;
-}
-
-
 // todo: deprecate!
 void elf_check_num_args(elf_State *S, char *name, int nargs, char *usage) {
 	if (elf_get_num_args(S) != nargs) {
@@ -47,18 +35,19 @@ static void _check_arg_tag(elf_State *S, elf_Tag tag, elf_Tag got, int index) {
 
 
 elf_Value elf_get_arg(elf_State *S, int x) {
-	return S->frame.locals[x + 1];
+	return S->frame.framebase[x + 1];
 }
 
 
 elf_Object *elf_get_this(elf_State *S) {
-	return S->frame.locals[0].x_obj;
+	return S->frame.framebase[0].x_obj;
 }
 
 
-
-void elf_push_value_raw(elf_State *S, elf_Value value) {
-	PUSHV(S,value);
+elf_rawapi
+void elf_push_value_raw(elf_State *inter, elf_Value value) {
+	// @stack_push
+	* inter->stack_ptr ++ = value;
 }
 
 
@@ -115,7 +104,7 @@ char *elf_get_text_arg(elf_State *R, int x) {
 elf_Object *elf_get_object_arg_raw(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
 	if (v.tag==elf_tag_Nil) return 0;
-	if (IS_OBJ_TAG(v.tag)) return v.x_obj;
+	if (tisobject(v.tag)) return v.x_obj;
 	_check_arg_tag(R,elf_tag_UserObject,v.tag,x);
 	return 0;
 }
@@ -127,13 +116,6 @@ elf_Table *elf_get_table(elf_State *R, int x) {
 	if (v.tag==elf_tag_Table) return v.x_tab;
 	_check_arg_tag(R,elf_tag_Table,v.tag,x);
 	return 0;
-}
-
-
-elf_Closure *elf_get_closure(elf_State *S, int x) {
-	elf_Value thing;
-	thing=elf_get_arg(S,x);
-	return thing.tag!=elf_tag_Closure?0:thing.x_closure;
 }
 
 
@@ -155,9 +137,9 @@ elf_Int elf_get_intarg(elf_State *R, int x) {
 }
 
 
-elf_Num elf_get_numarg(elf_State *R, int x) {
+elf_Number elf_get_numarg(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_tag_Int) return (elf_Num) v.x_int;
+	if (v.tag==elf_tag_Int) return (elf_Number) v.x_int;
 	if (v.tag==elf_tag_Num) return v.x_num;
 	_check_arg_tag(R,elf_tag_Num,v.tag,x);
 	return 0;

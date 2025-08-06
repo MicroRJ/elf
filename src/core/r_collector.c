@@ -41,13 +41,13 @@ static elf_i64 _mark(elf_Object *obj) {
 		ASSERT(obj->color == GC_COLLECTABLE);
 		obj->color = GC_NOCOLLECT;
 		if (obj->meta) {
-			num += _mark((elf_Object*)obj->meta);
+			num += _mark((elf_Object*) obj->meta);
 		}
 		if (obj->type == GC_CLS) {
 			elf_Closure *closure = (elf_Closure*) obj;
 			FOR_RANGE(i, 0, closure->proto.ncaptures) {
-				if (IS_OBJ_TAG(closure->values[i].tag)) {
-					num += _mark(closure->values[i].x_obj);
+				if (tisobject(closure->captures[i].tag)) {
+					num += _mark(closure->captures[i].x_obj);
 				}
 			}
 		} else if (obj->type == GC_TAB) {
@@ -55,12 +55,12 @@ static elf_i64 _mark(elf_Object *obj) {
 			elf_Value *array = table->array;
 			elf_Table_Entry *slots = table->slots;
 			FOR_RANGE(i,0,table->ntotal) {
-				if (IS_OBJ_TAG(slots[i].key.tag)) {
+				if (tisobject(slots[i].key.tag)) {
 					num += _mark(slots[i].key.x_obj);
 				}
 			}
 			FOR_RANGE(i,0,ARRAY_LENGTH(array)) {
-				if (IS_OBJ_TAG(array[i].tag)) {
+				if (tisobject(array[i].tag)) {
 					num += _mark(array[i].x_obj);
 				}
 			}
@@ -69,21 +69,24 @@ static elf_i64 _mark(elf_Object *obj) {
 	return num;
 }
 
-static elf_i64 _gc_mark(elf_State *R) {
-	ASSERT(R->G.phase == GC_PHASE_MARK);
-	R->G.phase ^= 1;
-	elf_i64 time = prof_get_time();
+elf_rawapi
+int _gc_mark(elf_State *inter)
+{
+	ASSERT(inter->gc.phase == GC_PHASE_MARK);
+	inter->gc.phase ^= 1;
 
-	elf_i64 num_objs = 0;
-	elf_Value *ptr;
+	int nmarked = 0;
+
 	// todo: cache line!
-	for (ptr = R->stack; ptr < GET_TOP(R); ++ ptr) {
-		if (IS_OBJ_TAG(ptr->tag)) {
-			num_objs += _mark(ptr->x_obj);
+	elf_Value *ptr;
+	for (ptr = inter->stack; ptr < inter->stack; ++ ptr) {
+		if (tisobject(ptr->tag)) {
+			nmarked += _mark(ptr->x_obj);
 		}
 	}
+
 	// elf_debug_log("mark took: %fms", prof_time_diff_ms(time));
-	return num_objs;
+	return nmarked;
 }
 
 
@@ -113,7 +116,7 @@ elf_i64 _gc_free(elf_State *R) {
 		} else if(obj->color == GC_COLLECTABLE) {
 			gc->memory_allocated -= obj->size;
 			if (obj->type == GC_TAB) {
-				elf_table_recycle((elf_Table *) obj);
+				elf_tableK_recycle((elf_Table *) obj);
 			}
 			free(obj);
 		}
