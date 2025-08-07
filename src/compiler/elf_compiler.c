@@ -27,14 +27,14 @@
 
 
 // todo: find a better name for this!
-int elf_load_json(elf_State *S, char *name, char *contents) {
+int elf_load_json(elf_State *S, const char *name, const char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_json_object(parser);
 	free(parser);
 	return result;
 }
 
-int elf_load_const_expr(elf_State *S, char *name, char *contents) {
+int elf_load_const_expr(elf_State *S, const char *name, const char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_constexpr(parser);
 	free(parser);

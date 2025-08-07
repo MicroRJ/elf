@@ -2,6 +2,13 @@
 // See Copyright Notice In elf.h
 //
 
+#ifndef STRING_BUILDER_H
+#define STRING_BUILDER_H
+
+
+#include <malloc.h>
+
+
 typedef struct {
 	int   max;
 	int   min;
@@ -22,6 +29,7 @@ static char *string_builder_alloc(String_Builder *sb, int res, int com) {
 	return ret;
 }
 
+
 static inline int bwritechar(String_Builder *sb, int chr) {
 	char *text = string_builder_alloc(sb, 1 + 1, 1);
 	*text ++ = chr;
@@ -29,15 +37,9 @@ static inline int bwritechar(String_Builder *sb, int chr) {
 	return 1;
 }
 
-static int bprintf(String_Builder *sb, char *format, ...) {
-	va_list vargs;
-	va_start(vargs, format);
-	int size = stbsp_vsnprintf(NULL, 0, format, vargs);
-	char *text = string_builder_alloc(sb, size + 1, size);
-	stbsp_vsnprintf(text, size + 1, format, vargs);
-	va_end(vargs);
-	return size;
-}
+
+
+#endif
 
 
 

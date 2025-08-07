@@ -29,7 +29,7 @@ typedef struct elf_Value   elf_Value;
 #include "elf_coretypes.h"
 
 
-typedef int elf_StkInt;
+typedef int elf_stkid;
 
 
 /*
@@ -80,9 +80,12 @@ typedef enum {
 // todo: delete!
 elf_pubapi elf_State *elf_new();
 
+
 /* push call arguments, push the (name of the file),
 push the (file contents or the file handle) */
-elf_pubapi int elf_exec(elf_State *, int nargs, int nrets, bool asexpr);
+elf_pubapi int elf_loadcode(elf_State *inter, bool asexpr);
+
+
 
 /*
 * Push the function and push the 'this' arg, then push additional arguments.
@@ -90,8 +93,8 @@ elf_pubapi int elf_exec(elf_State *, int nargs, int nrets, bool asexpr);
 * nargs must be atleast 1 because since the 'this' arg is always present,
 * 'this' can be nil.
 *
-* 	elf_push_function(...)
-* 	elf_push_nil(...)
+* 	elf_pushfun(...)
+* 	elf_pushnil(...)
 * 	elf_call()
 *
 *	the result is the number of returns,
@@ -111,49 +114,43 @@ elf_pubapi int elf_exec(elf_State *, int nargs, int nrets, bool asexpr);
 */
 elf_pubapi int elf_call(elf_State *, int nargs, int nrets);
 
-// todo: no, I don't like this!
-elf_pubapi elf_StkInt elf_read_file(elf_State *, int size);
-
-elf_pubapi elf_StkInt elf_push_globals(elf_State *);
-elf_pubapi elf_StkInt elf_push_int(elf_State *, elf_Integer);
-elf_pubapi elf_StkInt elf_push_nil(elf_State *);
-elf_pubapi elf_StkInt elf_push_table(elf_State *);
-elf_pubapi elf_StkInt elf_push_string(elf_State *, const char *);
-elf_pubapi elf_StkInt elf_push_string2(elf_State *, const char *, int length);
-elf_pubapi elf_StkInt elf_push_num(elf_State *, elf_Number);
-elf_pubapi elf_StkInt elf_push_function(elf_State *, elf_Function);
-elf_pubapi elf_StkInt elf_push_handle(elf_State *, elf_Handle);
-
-elf_pubapi char *elf_get_text_from_string_on_stack(elf_State *, int stk);
-
-/* the following are stack based instructions, they require the
-arguments on the stack.
-the arguments except for the subject are popped.
-todo: version of this that takes the stack address? */
-elf_pubapi index_t elf_table_set(elf_State *);
-elf_pubapi index_t elf_array_add(elf_State *);
+// todo: should these return instead the numer of returns?
+// similar to the elf signature?
+elf_pubapi int elf_readfileh(elf_State *, elf_Handle file, int size);
+elf_pubapi int elf_readfilen(elf_State *, const char *name, int size);
+elf_pubapi int elf_readfile(elf_State *, int stk, int size);
+elf_pubapi void elf_setfield(elf_State *);
+elf_pubapi void elf_arrayadd(elf_State *);
 
 
-elf_pubapi int elf_pushmetatab(elf_State *, int stk);
+elf_pubapi elf_stkid elf_gettop(elf_State *);
+elf_pubapi elf_Tag elf_gettag(elf_State *, elf_stkid from);
+
+elf_pubapi elf_stkid elf_pushmetatab(elf_State *, elf_stkid from);
+elf_pubapi elf_stkid elf_pushglobals(elf_State *);
+elf_pubapi elf_stkid elf_pushint(elf_State *, elf_Integer);
+elf_pubapi elf_stkid elf_pushnil(elf_State *);
+elf_pubapi elf_stkid elf_pushnum(elf_State *, elf_Number);
+elf_pubapi elf_stkid elf_pushtab(elf_State *);
+elf_pubapi elf_stkid elf_pushstr(elf_State *, const char *);
+elf_pubapi elf_stkid elf_pushstrl(elf_State *, const char *, int length);
+elf_pubapi elf_stkid elf_pushfun(elf_State *, elf_Function);
+elf_pubapi elf_stkid elf_pushsys(elf_State *, elf_Handle);
+
+elf_pubapi elf_Number elf_tonum(elf_State *, elf_stkid stk);
+elf_pubapi elf_Integer elf_toint(elf_State *, elf_stkid stk);
+elf_pubapi const char *elf_tostr(elf_State *, elf_stkid stk);
+elf_pubapi elf_Handle elf_tosys(elf_State *, elf_stkid stk);
 
 
-elf_pubapi elf_Number elf_tonum(elf_State *, int stk);
-elf_pubapi elf_Integer elf_toint(elf_State *, int stk);
 
 
-
-// todo: TOMORROW, instead have a single API for getting
-// anything anywhere on the stack, and the elf function signature
-// tells the user the first argument index
-// todo: @deprecated
-elf_pubapi elf_Tag    elf_gettag(elf_State *, int argi);
 // todo: @deprecated
 elf_pubapi elf_Integer    elf_get_intarg(elf_State *, int argi);
 // todo: @deprecated
 // todo: @deprecated
 elf_pubapi elf_Handle elf_get_sysarg(elf_State *, int argi);
 // todo: @deprecated
-// todo: also this should return constant memory!
 elf_pubapi char      *elf_get_text_arg(elf_State *, int argi);
 
 
@@ -168,10 +165,10 @@ typedef enum {
 } elf_GC_State;
 
 /* returns the prior state of the GC */
-int elf_gc_state(elf_State *, elf_GC_State state);
+int elf_gcstate(elf_State *, int state);
 
 /* performs a garbage collection check */
-void elf_gc_check(elf_State *);
+void elf_gccheck(elf_State *);
 
 
 void elf_error(elf_State *, int instr, const char *error);
@@ -182,9 +179,6 @@ void elf_error(elf_State *, int instr, const char *error);
 #define ELF_OVERLOAD_SUB   "__sub"
 #define ELF_OVERLOAD_MUL   "__mul"
 #define ELF_OVERLOAD_DIV   "__div"
-#define ELF_OVERLOAD_POW   "__pow"
-#define ELF_OVERLOAD_LT    "__pow"
-#define ELF_OVERLOAD_LTEQ  "__lteq"
 #define ELF_OVERLOAD_INDEX "__index"
 #define ELF_OVERLOAD_FIELD "__field"
 

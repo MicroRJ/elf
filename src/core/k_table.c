@@ -277,40 +277,6 @@ elf_Value elf_table_get(elf_State *inter) {
 }
 
 
-elf_pubapi
-index_t elf_table_set(elf_State *inter) {
-	elf_Value tab = inter->stack_ptr[-3];
-	elf_Value key = inter->stack_ptr[-2];
-	elf_Value val = inter->stack_ptr[-1];
-
-	if (tab.tag != elf_tag_Table) {
-		elf_error(inter, NO_BYTE, "Not A Table!");
-	}
-
-	index_t idx = elf_raw_table_set(vgettab(tab), key, val);
-
-	inter->stack_ptr -= 2;
-	return idx;
-}
-
-
-elf_pubapi
-index_t elf_array_add(elf_State *inter) {
-	elf_Value tab = inter->stack_ptr[-2];
-	elf_Value val = inter->stack_ptr[-1];
-
-	if (tab.tag != elf_tag_Table) {
-		elf_error(inter, NO_BYTE, "Not A Table!");
-	}
-
-	index_t idx = elf_raw_array_add(vgettab(tab), val);
-
-	inter->stack_ptr -= 1;
-	return idx;
-}
-
-
-
 
 
 

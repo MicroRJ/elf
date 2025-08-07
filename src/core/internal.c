@@ -66,14 +66,6 @@ elf_String *elf_get_string_arg(elf_State *R, int x) {
 }
 
 
-char *elf_get_text_from_string_on_stack(elf_State *inter, int stk) {
-	elf_Value v = inter->stack[stk];
-	if (v.tag == elf_tag_Nil) return 0;
-	if (v.tag == elf_tag_String) return v.x_str->text;
-	_check_arg_tag(inter, elf_tag_String, v.tag, stk);
-	return 0;
-}
-
 char *elf_get_text_arg(elf_State *R, int x) {
 	elf_Value v = elf_get_arg(R,x);
 	if (v.tag == elf_tag_Nil) return 0;

@@ -50,12 +50,12 @@ unsigned int sys_size_file(FILE_HANDLE file) {
 }
 
 
-int sys_create_directory(char *path) {
+int sys_create_directory(const char *path) {
 	return CreateDirectory(path, NULL);
 }
 
 
-bool sys_delete_file(char *path) {
+bool sys_delete_file(const char *path) {
 	return DeleteFile(path);
 }
 
@@ -72,7 +72,7 @@ int sys_set_file_cursor(FILE_HANDLE file, int cursor) {
 }
 
 // todo: support temporary files
-FILE_HANDLE sys_open_file(char *name, int flags, int mode) {
+FILE_HANDLE sys_open_file(const char *name, int flags, int mode) {
 
 	int os_flags = 0;
 	if (flags & SYS_OPEN_READ) os_flags |= GENERIC_READ;
@@ -118,7 +118,7 @@ int lib_core_shell(elf_State *R) {
 	char *args = elf_get_text_arg(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
-	elf_push_int(R,success);
+	elf_pushint(R,success);
 	return 1;
 }
 
@@ -266,7 +266,7 @@ void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 	return (void *) GetProcAddress(dll,name);
 }
 
-static inline void convfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
+static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 	visitor->type = FILE_TYPE_FILE;
 	if (info->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
 		visitor->type = FILE_TYPE_SYMLINK;
@@ -274,41 +274,45 @@ static inline void convfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 		visitor->type = FILE_TYPE_FOLDER;
 	}
 	visitor->size = info->nFileSizeLow;
-	pushpath(visitor, info->cFileName);
-	// ASSERT((sizeof(visitor->path) - visitor->pcur) >= sizeof(info->cFileName));
-	// CopyMemory(visitor->name, info->cFileName, sizeof(info->cFileName));
+	pushpath(&visitor->pb, info->cFileName);
 }
 
-void sys_close_directory(FILE_HANDLE hand) {
+
+void sys_find_close(FILE_HANDLE hand) {
 	FindClose(hand);
 }
 
-FILE_HANDLE sys_open_directory(FILE_VISITOR *visitor) {
+FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor) {
 
-	visitor->path[visitor->pcur ++] = '\\';
-	visitor->path[visitor->pcur ++] = '*';
-	visitor->path[visitor->pcur   ] = '\0';
+	// insert some temporary stuff for windows path matching
+	visitor->pb.path[visitor->pb.pcur ++] = '\\';
+	visitor->pb.path[visitor->pb.pcur ++] = '*';
+	visitor->pb.path[visitor->pb.pcur   ] = '\0';
 
 	WIN32_FIND_DATAA info;
-	FILE_HANDLE hand = FindFirstFileA(visitor->path, &info);
+	FILE_HANDLE hand = FindFirstFileA(visitor->pb.path, &info);
 
-	visitor->pcur -= 2;
-	visitor->path[visitor->pcur] = '\0';
+	// pop what we inserted
+	visitor->pb.pcur -= 2;
+	visitor->pb.path[visitor->pb.pcur] = '\0';
 
 	int result = hand != INVALID_HANDLE_VALUE;
 	if (result) {
-		convfiledata(visitor, &info);
+		pushfiledata(visitor, &info);
 	}
 	return result ? hand : 0;
 }
 
-int sys_read_directory(FILE_HANDLE hand, FILE_VISITOR *visitor) {
+int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
+	// pull the path from before
+	pullpath(&visitor->pb);
+
 	WIN32_FIND_DATAA info;
-	int result = FindNextFileA(hand, &info);
-	if (result) {
-		convfiledata(visitor, &info);
+	int noerr = FindNextFileA(hand, &info);
+	if (noerr) {
+		pushfiledata(visitor, &info);
 	}
-	return result;
+	return noerr;
 }
 
 elf_Handle sys_create_process(char const *file, char const *args) {

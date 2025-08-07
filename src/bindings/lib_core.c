@@ -15,75 +15,76 @@ ELF_FUNCTION(l_core_set_meta) {
 }
 
 ELF_FUNCTION(l_core_tagof) {
-	elf_push_string(S, tag2s[elf_gettag(S, args + 1)]);
+	elf_pushstr(S, tag2s[elf_gettag(S, args + 1)]);
 	return 1;
 }
 
 ELF_FUNCTION(l_core_iton) {
 	elf_Value v = elf_get_arg(S, 0);
-	if (v.tag == elf_tag_Int) {
-		elf_push_num(S, (elf_Number) v.x_int);
-	} else elf_push_num(S, v.x_num);
+	if (!isnumeric(v)) {
+		elf_error(S, -1, "expected numeric value");
+	}
+	elf_pushnum(S, vitonum(v));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_ntoi) {
 	elf_Value v = elf_get_arg(S, 0);
-	if (v.tag == elf_tag_Num) {
-		elf_push_int(S, (elf_Integer) v.x_num);
-	} else elf_push_int(S, v.x_int);
+	if (!isnumeric(v)) {
+		elf_error(S, -1, "expected numeric value");
+	}
+	elf_pushint(S, vntoint(v));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_core_load_file) {
-	int c_nargs = 0; // (nargs - 1) - 1;
-	int c_nrets = nrets;
-
-	elf_push_string(S, "noname");
-
-	// todo: no like
-	*S->stack_ptr ++ = elf_get_arg(S, 0);
-	elf_read_file(S, -1);
-
-	c_nrets = elf_exec(S,c_nargs,c_nrets,false);
-	return c_nrets;
+	elf_pushstr(S, "noname");
+	elf_readfile(S, args + 1, -1);
+	elf_loadcode(S, false);
+	elf_pushnil(S);
+	return elf_call(S, 1, nrets);
 }
 
 
 ELF_FUNCTION(l_core_load_expr) {
-	int c_nargs = 1; // (nargs - 1) - 1;
-	int c_nrets = nrets;
-
-	elf_push_string(S, "noname");
-
-	// todo: no like
-	*S->stack_ptr ++ = elf_get_arg(S, 0);
-	elf_read_file(S, -1);
-
-	c_nrets = elf_exec(S,c_nargs,c_nrets,false);
-	return c_nrets;
+	elf_pushstr(S, "noname");
+	elf_readfile(S, args + 1, -1);
+	elf_loadcode(S, true);
+	elf_pushnil(S);
+	return elf_call(S, 1, nrets);
 }
 
 
 ELF_FUNCTION(l_core_const_expr) {
-	char *contents = elf_get_text_arg(S, 0);
+	const char *contents = elf_tostr(S, args + 1);
 	elf_load_const_expr(S, "no name", contents);
 	return 1;
 }
 
+// todo: also accept a file handle directly!
 ELF_FUNCTION(l_core_load_json) {
-	char *name = elf_get_text_arg(S, 0);
-	elf_Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_ALWAYS);
-	if (file) {
-		unsigned int size = sys_size_file(file);
-		char *heapbuf = malloc(size);
-		sys_read_file(file, heapbuf, size);
-		sys_close_file(file);
-		elf_load_json(S, name, heapbuf);
-	} else {
-		elf_push_nil(S);
+	const char *name = elf_tostr(S, args + 1);
+
+	elf_Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN);
+	if (!file) {
+		elf_pushnil(S);
+		goto esc;
 	}
+
+	unsigned int size = sys_size_file(file);
+
+	char *heapbuf = malloc(size);
+
+	sys_read_file(file, heapbuf, size);
+
+	sys_close_file(file);
+
+	elf_load_json(S, name, heapbuf);
+
+	free(heapbuf);
+
+	esc:
 	return 1;
 }
 
@@ -142,26 +143,37 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 }
 
 // todo: handle escape sequences
+//
+// @doc: takes a format string similar to that of a c printf
+// function, the type does not have to be specified
+//
 ELF_FUNCTION(l_core_format) {
-	int argindex = 0;
-	char *format = elf_get_text_arg(S, argindex ++);
+	int argindex = 1;
+
+	const char *format = elf_tostr(S, args + argindex);
+
 	String_Builder sb = {};
 	while (*format) {
+
 		while (*format && *format != '%') {
 			// todo: preallocate a small buffer to avoid
 			// one call per char
 			bwritechar(&sb, *format ++);
 		}
+
 		if (*format == '%') {
 			if (argindex >= (nargs - 1)) {
 				elf_error(S, NO_BYTE, "not enough arguments to format string!");
 			}
 			format += 1;
+
+			// todo:
 			elf_Value value = elf_get_arg(S, argindex ++);
 			value_bprintf(&sb, value, 0);
 		}
 	}
-	elf_push_string(S, sb.buf);
+
+	elf_pushstr(S, sb.buf);
 	free(sb.buf);
 	return 1;
 }
@@ -173,7 +185,7 @@ ELF_FUNCTION(l_core_fpf) {
 	for (int i = 1; i < (nargs - 1); i ++) {
 		value_bprintf(&sb, elf_get_arg(S, i), 0);
 	}
-	elf_push_int(S, sb.min);
+	elf_pushint(S, sb.min);
 
 	sys_write_file(file, sb.buf, sb.min);
 
@@ -193,7 +205,7 @@ ELF_FUNCTION(l_core_pf) {
 
 	free(sb.buf);
 
-	elf_push_int(S, sb.min);
+	elf_pushint(S, sb.min);
 	return 1;
 }
 
@@ -283,7 +295,7 @@ ELF_FUNCTION(l_core_unload) {
 		sys_write_file(file, sb.buf, sb.min);
 	}
 	free(sb.buf);
-	elf_push_int(S, noerr);
+	elf_pushint(S, noerr);
 	return 1;
 }
 

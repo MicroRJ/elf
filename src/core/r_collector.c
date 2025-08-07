@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-int elf_gc_state(elf_State *S, elf_GC_State state) {
+int elf_gcstate(elf_State *S, elf_GC_State state) {
 	elf_GC_State prevstate = S->G.state;
 	if (state != ELF_GC_GETSTATE) {
 		S->G.state = state;
@@ -20,7 +20,7 @@ void *elf_gc_alloc(elf_State *R, elf_GC_Ty type, elf_i64 size) {
 	gc->memory_allocated += size;
 
 	if (gc->state == ELF_GC_ACTIVE) {
-		elf_gc_check(R);
+		elf_gccheck(R);
 	}
 
 	elf_Object *obj = calloc(size,1);
@@ -153,7 +153,7 @@ static elf_i64 elf_gc_cycle(elf_State *R) {
 }
 
 
-void elf_gc_check(elf_State *R) {
+void elf_gccheck(elf_State *R) {
 	elf_Collector *G = & R->G;
 
 

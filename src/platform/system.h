@@ -86,11 +86,13 @@ enum {
 };
 
 
-int sys_create_directory(char *path);
+int sys_create_directory(const char *path);
 
 FILE_HANDLE sys_get_std_file(int std);
-FILE_HANDLE sys_open_file(char *name, int flags, int options);
-bool sys_delete_file(char *name);
+
+FILE_HANDLE sys_open_file(const char *name, int flags, int options);
+bool sys_delete_file(const char *name);
+
 int sys_get_file_cursor(FILE_HANDLE file);
 int sys_set_file_cursor(FILE_HANDLE file, int cursor);
 
@@ -158,47 +160,19 @@ enum {
 	FILE_TYPE_SYMLINK = 2,
 };
 
-
-typedef struct File_Node File_Node;
-struct File_Node {
-	elf_u64    size;
-	int        nsub;
-	// todo: arena buffer
-	char       name[256];
-};
+#include "path_builder.c"
 
 typedef struct {
-	File_Node   *nodes;
+	// todo: this could honestly just be in the path builder
+	// and we'd have a little api thing for pushing files and dirs
 	int          type;
 	int          size;
-	int          pcnt;
-	int          pcur;
-	char         path[4096];
+	Path_Builder pb;
 } FILE_VISITOR;
 
-
-static void pullpath(FILE_VISITOR *visi) {
-	visi->pcnt -= 1;
-	while (visi->pcur > 0 && visi->path[visi->pcur] != '\\') {
-		visi->pcur --;
-	}
-	visi->path[visi->pcur] = '\0';
-}
-
-static void pushpath(FILE_VISITOR *visi, char *name) {
-	visi->pcnt += 1;
-	if (visi->pcur) {
-		visi->path[visi->pcur ++] = '\\';
-	}
-	while (*name) {
-		visi->path[visi->pcur ++] = *name ++;
-	}
-	visi->path[visi->pcur] = '\0';
-}
-
-FILE_HANDLE sys_open_directory(FILE_VISITOR *visitor);
-int sys_read_directory(FILE_HANDLE hand, FILE_VISITOR *visitor);
-void sys_close_directory(FILE_HANDLE hand);
+FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor);
+int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor);
+void sys_find_close(FILE_HANDLE hand);
 
 
 #endif

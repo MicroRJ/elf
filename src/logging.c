@@ -11,7 +11,7 @@ enum {
 #define elf_info_log(yyy,...)    elf_log(LOG_KINFO,yyy,##__VA_ARGS__)
 #define elf_debug_log(yyy,...)   elf_log(LOG_KDEBUG,yyy,##__VA_ARGS__)
 #define elf_warning_log(yyy,...) elf_log(LOG_KWARNING,yyy,##__VA_ARGS__)
-#define elf_error_log(yyy,...)   elf_log(LOG_KERROR,yyy,##__VA_ARGS__)
+#define elf_lerror(yyy,...)   elf_log(LOG_KERROR,yyy,##__VA_ARGS__)
 #define elf_fatal_log(yyy,...)   elf_log(LOG_KFATAL,yyy,##__VA_ARGS__)
 
 

@@ -23,11 +23,6 @@ if the type isn't one of the given ones? */
 	#define NO_CODE __debugbreak();
 #endif
 
-
-// #if !defined(MAX_PATH)
-//    #define MAX_PATH 256
-// #endif
-
 #if !defined(ASSERT_ALWAYS)
 #define ASSERT_ALWAYS(xx) \
 do { \

@@ -25,14 +25,14 @@ ELF_FUNCTION(l_table_contains) {
 	ASSERT((nargs - 1) == 1);
 	elf_Table *tab = elf_get_table(S, -1);
 	elf_Value key = elf_get_arg(S, 0);
-	elf_push_int(S, tablecontains(tab, key));
+	elf_pushint(S, tablecontains(tab, key));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_table_get_collisions) {
 	elf_Table *tab = elf_get_table(S, -1);
-	elf_push_int(S, tab->ndebug);
+	elf_pushint(S, tab->ndebug);
 	return 1;
 }
 
@@ -73,7 +73,7 @@ ELF_FUNCTION(l_table_delete) {
 
 		ARRAY_SET_MIN(array, arrlen(array) - 1);
 	} else {
-		elf_push_nil(S);
+		elf_pushnil(S);
 	}
 	return 1;
 }
@@ -111,7 +111,7 @@ ELF_FUNCTION(l_find_aliases) {
 
 	elf_Value key = elf_get_arg(S,0);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	index_t i;
 	elf_Table_Entry entry;
@@ -135,7 +135,7 @@ ELF_FUNCTION(l_find_aliases) {
 					if (alias.idx != entry.idx) continue;
 
 					elf_push_value_raw(S, alias.key);
-					elf_array_add(S);
+					elf_arrayadd(S);
 				}
 			}
 		}
@@ -151,7 +151,7 @@ ELF_FUNCTION(l_find_aliases) {
 ELF_FUNCTION(l_table_get_keys) {
 	elf_Table *tab = elf_get_table(S, -1);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	index_t i;
 	for (i = 0; i < tab->ntotal; i ++) {
@@ -162,7 +162,7 @@ ELF_FUNCTION(l_table_get_keys) {
 		}
 
 		elf_push_value_raw(S, entry.key);
-		elf_array_add(S);
+		elf_arrayadd(S);
 	}
 	return 1;
 }
@@ -178,7 +178,7 @@ ELF_FUNCTION(l_table_get_keys) {
 // * - if no additional tables are passed in then this is equivalent
 // * to creating a clone of the table, but additionally, loose values are lost.
 ELF_FUNCTION(l_table_merge) {
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	index_t slot;
 	elf_Table_Entry entry;
@@ -192,7 +192,7 @@ ELF_FUNCTION(l_table_merge) {
 
 			elf_push_value_raw(S, entry.key);
 			elf_push_value_raw(S, merger->array[entry.idx]);
-			elf_table_set(S);
+			elf_setfield(S);
 		}
 	}
 
@@ -207,7 +207,7 @@ ELF_FUNCTION(l_table_fork) {
 		elf_error(S, NO_BYTE, "argument is nil");
 	}
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	index_t i;
 	for (i = 0; i < tab->ntotal; ++i) {
@@ -219,7 +219,7 @@ ELF_FUNCTION(l_table_fork) {
 
 		elf_push_value_raw(S, entry.key);
 		elf_push_value_raw(S, tab->array[entry.idx]);
-		elf_table_set(S);
+		elf_setfield(S);
 	}
 
 	return 1;
@@ -228,7 +228,7 @@ ELF_FUNCTION(l_table_fork) {
 
 ELF_FUNCTION(l_array_length) {
 	elf_Table *tab = elf_get_table(S, -1);
-	elf_push_int(S, arrlen(tab->array));
+	elf_pushint(S, arrlen(tab->array));
 	return 1;
 }
 
@@ -249,7 +249,7 @@ ELF_FUNCTION(l_array_add) {
 
 	for (int i = 0; i < (nargs - 1); i++) {
 		elf_push_value_raw(S, elf_get_arg(S, i));
-		elf_array_add(S);
+		elf_arrayadd(S);
 	}
 	return 0;
 }
@@ -284,16 +284,16 @@ ELF_FUNCTION(l_array_merge) {
 	elf_Table *tab = elf_get_table(S, -1);
 	elf_Table *add = elf_get_table(S,  0);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	index_t i;
 	for (i=0;i<arrlen(tab->array);++i) {
 		elf_push_value_raw(S, tab->array[i]);
-		elf_array_add(S);
+		elf_arrayadd(S);
 	}
 	for (i=0;i<arrlen(add->array);++i) {
 		elf_push_value_raw(S, add->array[i]);
-		elf_array_add(S);
+		elf_arrayadd(S);
 	}
 	return 1;
 }
@@ -301,13 +301,13 @@ ELF_FUNCTION(l_array_merge) {
 ELF_FUNCTION(l_array_clone) {
 	elf_Table *tab = elf_get_table(S, -1);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	index_t i;
 	for (i=0;i<arrlen(tab->array);++i)
 	{
 		elf_push_value_raw(S, tab->array[i]);
-		elf_array_add(S);
+		elf_arrayadd(S);
 	}
 	return 1;
 }
@@ -337,10 +337,10 @@ ELF_FUNCTION(l_array_slice) {
 	if ((nargs - 1) >= 1) x = elf_get_intarg(S,0);
 	if ((nargs - 1) >= 2) y = elf_get_intarg(S,1);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 	while (x < y) {
 		elf_push_value_raw(S, tab->array[x ++]);
-		elf_array_add(S);
+		elf_arrayadd(S);
 	}
 	return 1;
 }

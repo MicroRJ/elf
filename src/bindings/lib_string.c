@@ -8,20 +8,20 @@
 
 
 ELF_FUNCTION(l_str_length) {
-	elf_push_int(S, elf_get_string_arg(S, 0)->length);
+	elf_pushint(S, elf_get_string_arg(S, 0)->length);
 	return 1;
 }
 
 ELF_FUNCTION(l_str_get_hash) {
 	elf_String *str = elf_get_string_arg(S, -1);
-	elf_push_int(S, str->hash);
+	elf_pushint(S, str->hash);
 	return 1;
 }
 
 ELF_FUNCTION(l_str_get_index) {
 	char *text = elf_get_text_arg(S, -1);
 	int index = elf_get_intarg(S, 0);
-	elf_push_int(S, text[index]);
+	elf_pushint(S, text[index]);
 	return 1;
 }
 
@@ -30,7 +30,7 @@ ELF_FUNCTION(l_str_slice) {
 	// todo: out of bounds check
 	int from = elf_get_intarg(S, 0);
 	int to = elf_get_intarg(S, 1);
-	elf_push_string3(S, str->text + from, to);
+	elf_pushstrl(S, str->text + from, to);
 	return 1;
 }
 
@@ -44,7 +44,7 @@ ELF_FUNCTION(l_str_join) {
 	for (int i = -1; i < (nargs - 1); ++ i) {
 		value_bprintf(&sb, elf_get_arg(S, i), 0);
 	}
-	elf_push_string3(S, sb.buf, sb.min);
+	elf_pushstrl(S, sb.buf, sb.min);
 	free(sb.buf);
 	return 1;
 }
@@ -56,7 +56,7 @@ ELF_FUNCTION(l_str_match) {
 	char *s = elf_get_text_arg(S, -1);
 	char *p = elf_get_text_arg(S,  0);
 	char *match = string_match(s, p);
-	elf_push_int(S, match != 0);
+	elf_pushint(S, match != 0);
 	return 1;
 }
 
@@ -67,7 +67,7 @@ ELF_FUNCTION(l_str_find) {
 	char *p = elf_get_text_arg(S,  0);
 
 	// return a list
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	String_Builder sb = {};
 
@@ -81,8 +81,8 @@ ELF_FUNCTION(l_str_find) {
 				bwritechar(&sb, *cur ++);
 			}
 
-			elf_push_string3(S, sb.buf, sb.min);
-			elf_array_add(S);
+			elf_pushstrl(S, sb.buf, sb.min);
+			elf_arrayadd(S);
 
 			sb.min = 0;
 
@@ -98,7 +98,7 @@ ELF_FUNCTION(l_str_find) {
 ELF_FUNCTION(l_str_split_by_lines) {
 	char *s = elf_get_text_arg(S, -1);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	String_Builder sb = {};
 
@@ -113,8 +113,8 @@ ELF_FUNCTION(l_str_split_by_lines) {
 			cur += 1 + (cur[0] == '\r' && cur[1] == '\n');
 		}
 
-		elf_push_string3(S, sb.buf, sb.min);
-		elf_array_add(S);
+		elf_pushstrl(S, sb.buf, sb.min);
+		elf_arrayadd(S);
 
 		sb.min = 0;
 	}
@@ -130,7 +130,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 	char *s = elf_get_text_arg(S, -1);
 	int chr = elf_get_intarg(S, 0);
 
-	elf_push_table(S);
+	elf_pushtab(S);
 
 	String_Builder sb = {};
 
@@ -145,8 +145,8 @@ ELF_FUNCTION(l_str_split_by_char) {
 			cur ++;
 		}
 
-		elf_push_string3(S, sb.buf, sb.min);
-		elf_array_add(S);
+		elf_pushstrl(S, sb.buf, sb.min);
+		elf_arrayadd(S);
 
 		sb.min = 0;
 	}
@@ -163,7 +163,7 @@ ELF_FUNCTION(l_str_lowercase) {
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
 	}
-	elf_push_string3(S, temp, str->length);
+	elf_pushstrl(S, temp, str->length);
 	free(temp);
 	return 1;
 }
@@ -175,7 +175,7 @@ ELF_FUNCTION(l_str_uppercase) {
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);
 	}
-	elf_push_string3(S, temp, str->length);
+	elf_pushstrl(S, temp, str->length);
 	free(temp);
 	return 1;
 }

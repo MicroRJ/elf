@@ -39,7 +39,7 @@ static void parser_restart(elf_Parser *parser, char *cursor) {
 	get_tok(parser);
 }
 
-static elf_Parser *elf_new_parser(elf_State *inter, char *name, char *source) {
+static elf_Parser *elf_new_parser(elf_State *inter, const char *name, const char *source) {
 	elf_Parser *parser = calloc(1, sizeof(*parser));
 	ASSERT(inter != 0);
 	ASSERT(parser != 0);
@@ -48,8 +48,8 @@ static elf_Parser *elf_new_parser(elf_State *inter, char *name, char *source) {
 	ASSERT(strlen(name) < sizeof(parser->name));
 	parser->inter = inter;
 	copy_memory(parser->name, name, strlen(name) + 1);
-	parser->source = source;
-	parser_restart(parser, source);
+	parser->source = (char *) source;
+	parser_restart(parser, (char *) source);
 	return parser;
 }
 
@@ -401,14 +401,17 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 			// add to globals...
 			//
 
-			// todo: restore stack
-			elf_push_globals(parser->inter);
-
 			Token tok = take_tok(parser,TK_JSON);
 
 			int noerr = parse_json_object(parser);
 			if (noerr) {
-				int index = elf_array_add(parser->inter);
+
+				elf_Value json = parser->inter->stack_ptr[-1];
+				int index = elf_set_global(parser->inter, 0, json);
+				// pop json
+				parser->inter->stack_ptr --;
+
+
 				v = tree_global(parser, tok.line, index);
 			}
 		} break;
@@ -1338,35 +1341,35 @@ static int parse_constexpr(elf_Parser *parser) {
 		} break;
 		case TK_NUMBER: { numcase:
 			get_tok(parser);
-			elf_push_num(parser->R, tok.number * sign);
+			elf_pushnum(parser->R, tok.number * sign);
 			ret = 1;
 		} break;
 		case TK_INTEGER: { intcase:
 			get_tok(parser);
-			elf_push_int(parser->R, tok.integer * sign);
+			elf_pushint(parser->R, tok.integer * sign);
 			ret = 1;
 		} break;
 		case TK_NIL: {
 			get_tok(parser);
-			elf_push_nil(parser->R);
+			elf_pushnil(parser->R);
 			ret = 1;
 		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			elf_push_string(parser->R, tok.text);
+			elf_pushstr(parser->R, tok.text);
 			ret = 1;
 		} break;
 		case TK_CURLY_LEFT: {
 			get_tok(parser);
 
-			int tablestk = elf_push_table(parser->R);
+			int tablestk = elf_pushtab(parser->R);
 
 			while(!peek_tok(parser,TK_NONE) && !peek_tok(parser,TK_CURLY_RIGHT)) {
 
 				// push key (or value)
 				if (pick_tok(parser, TK_WORD)) {
 
-					elf_push_string(parser->R, parser->tok.text);
+					elf_pushstr(parser->R, parser->tok.text);
 
 				} else  {
 
@@ -1385,13 +1388,13 @@ static int parse_constexpr(elf_Parser *parser) {
 
 					checkstk(parser, tablestk + 2 + 1);
 
-					elf_table_set(parser->R);
+					elf_setfield(parser->R);
 				} else {
 
 					checkstk(parser, tablestk + 1 + 1);
 
 					// keyless entry
-					elf_array_add(parser->R);
+					elf_arrayadd(parser->R);
 				}
 
 				pick_tok(parser,TK_COMMA);
@@ -1406,7 +1409,7 @@ static int parse_constexpr(elf_Parser *parser) {
 		} break;
 		default: {
 			errorcase:
-			elf_push_nil(parser->R);
+			elf_pushnil(parser->R);
 			parser_dialog(parser,tok.line,"not a constant expression");
 		} break;
 	}
@@ -1417,7 +1420,7 @@ static int parse_constexpr(elf_Parser *parser) {
 
 static int parse_json_array(elf_Parser *parser){
 	int noerr = true;
-	elf_push_table(parser->inter);
+	elf_pushtab(parser->inter);
 
 	take_tok(parser, TK_SQUARE_LEFT);
 
@@ -1428,7 +1431,7 @@ static int parse_json_array(elf_Parser *parser){
 		noerr = parse_json_value(parser);
 		if (noerr != true) goto esc;
 
-		elf_array_add(parser->inter);
+		elf_arrayadd(parser->inter);
 
 	} while (pick_tok(parser, TK_COMMA));
 
@@ -1439,20 +1442,20 @@ static int parse_json_array(elf_Parser *parser){
 
 static int parse_json_object(elf_Parser *parser) {
 	int noerr = true;
-	elf_push_table(parser->inter);
+	elf_pushtab(parser->inter);
 
 	take_tok(parser,TK_CURLY_LEFT);
 	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
 
 		Token tok = take_tok(parser, TK_STRING);
-		elf_push_string(parser->inter, tok.text);
+		elf_pushstr(parser->inter, tok.text);
 
 		take_tok(parser, TK_COLON);
 
 		noerr = parse_json_value(parser);
 		if (noerr != true) goto esc;
 
-		elf_table_set(parser->inter);
+		elf_setfield(parser->inter);
 	} while (pick_tok(parser,TK_COMMA));
 
 	take_tok(parser,TK_CURLY_RIGHT);
@@ -1467,15 +1470,15 @@ static int parse_json_value(elf_Parser *parser) {
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);
-			elf_push_string(parser->inter, tok.text);
+			elf_pushstr(parser->inter, tok.text);
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);
-			elf_push_int(parser->inter, tok.integer);
+			elf_pushint(parser->inter, tok.integer);
 		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
-			elf_push_num(parser->inter, tok.number);
+			elf_pushnum(parser->inter, tok.number);
 		} break;
 		case TK_CURLY_LEFT: {
 			parse_json_object(parser);
@@ -1484,7 +1487,7 @@ static int parse_json_value(elf_Parser *parser) {
 			parse_json_array(parser);
 		} break;
 		default: {
-			elf_push_nil(parser->inter);
+			elf_pushnil(parser->inter);
 			parser_dialog(parser, tok.line, "invalid json value");
 			noerr = false;
 		} break;

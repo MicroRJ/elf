@@ -34,7 +34,7 @@
 // elf_pubapi int netlib_listen(elf_State *R) {
 // 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
 // 	int error = listen(handle,SOMAXCONN);
-// 	elf_push_int(R,error!=SOCKET_ERROR);
+// 	elf_pushint(R,error!=SOCKET_ERROR);
 // 	return 1;
 // }
 
@@ -42,7 +42,7 @@
 // elf_pubapi int netlib_accept(elf_State *R) {
 // 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
-// 	elf_push_handle(R,(elf_Handle)client);
+// 	elf_pushsys(R,(elf_Handle)client);
 // 	return 1;
 // }
 
@@ -57,8 +57,8 @@
 //    if (FD_ISSET(handle,&ready)) {
 //       SOCKET client = accept(handle,NULL,NULL);
 //       ASSERT(client != INVALID_SOCKET);
-// 		elf_push_handle(R,(elf_Handle)client);
-//    } else elf_push_nil(R);
+// 		elf_pushsys(R,(elf_Handle)client);
+//    } else elf_pushnil(R);
 // 	return 1;
 // }
 
@@ -79,8 +79,8 @@
 // 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 // 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_push_handle(R,(elf_Handle)thesocket);
-// 	} else elf_push_nil(R);
+// 		elf_pushsys(R,(elf_Handle)thesocket);
+// 	} else elf_pushnil(R);
 
 // 	return 1;
 // }
@@ -103,8 +103,8 @@
 
 // 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 // 	if(error != SOCKET_ERROR) {
-// 		elf_push_handle(R,(elf_Handle)thesocket);
-// 	} else elf_push_nil(R);
+// 		elf_pushsys(R,(elf_Handle)thesocket);
+// 	} else elf_pushnil(R);
 // 	return 1;
 // }
 
@@ -117,7 +117,7 @@
 // 	elf_Integer sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
-// 	elf_push_int(R,sent);
+// 	elf_pushint(R,sent);
 // 	return 1;
 // }
 
@@ -126,7 +126,7 @@
 // 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
-// 	elf_push_int(R,error == 0);
+// 	elf_pushint(R,error == 0);
 // 	return 1;
 // }
 
@@ -149,7 +149,7 @@
 // 					} else {
 // 						char erbuf[0x100];
 // 						sys_get_error_msg(error,erbuf,sizeof(erbuf));
-// 						elf_error_log("netlib sys error '%i': %s",error,erbuf);
+// 						elf_lerror("netlib sys error '%i': %s",error,erbuf);
 // 						break;
 // 					}
 // 				} else if (result == 0) {
@@ -162,8 +162,8 @@
 // 				}
 // 			} while (length != 0);
 // 			*cursor = 0;
-// 		} else elf_push_nil(R);
-// 	} else elf_push_nil(R);
+// 		} else elf_pushnil(R);
+// 	} else elf_pushnil(R);
 // 	return 1;
 // }
 // #else

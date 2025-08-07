@@ -39,9 +39,10 @@
 #include "r_diagnostics.c"
 #include "r_collector.c"
 #include "internal.c"
-#include "public.c"
 
 #include "elf_compiler.h"
+
+#include "public.c"
 
 #include "core_io.c"
 
@@ -83,27 +84,6 @@ int elf_set_global(elf_State *S, elf_String *name, elf_Value value) {
 	return id;
 }
 
-// todo: remove, this is retarded, if the arguments are already
-// on the stack, we're screwed!
-elf_rawapi
-int elf_raw_exec(elf_State *inter, int nargs, int nrets, bool asexpr, elf_String *name, elf_String *contents) {
-	ASSERT(name);
-	ASSERT(contents);
-
-	ASSERT(nargs == 0);
-
-	elf_Proto proto = elf_compile(inter, name, contents, asexpr);
-
-	elf_Closure *closure = elf_alloc_closure(inter, proto);
-
-	// push closure and 'this' from the current frame
-	vSetClosure(&inter->stack_ptr[0], closure);
-	inter->stack_ptr[1] = inter->frame.framebase[0];
-	inter->stack_ptr += 2;
-
-	int ntruerets = elf_call(inter, nargs + 1, nrets);
-	return ntruerets;
-}
 
 
 /* expects a table on the stack
@@ -116,10 +96,10 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 		// todo: ensure the symbol name is valid?
 		if (prefix) name = elf_tpf("%s.%s",prefix,name);
 
-		elf_push_string(S, name);
-		elf_push_function(S, lib[i].function);
+		elf_pushstr(S, name);
+		elf_pushfun(S, lib[i].function);
 
-		elf_table_set(S);
+		elf_setfield(S);
 	}
 }
 
@@ -286,6 +266,10 @@ int callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
 elf_pubapi
 int elf_call(elf_State *inter, int nargs, int nrets)
 {
+	if (nargs < 1) {
+		elf_errorf(inter, -1
+		, "'__call': expects at least one argument, 'this' is always passed in, it can be nil.");
+	}
 	pushstackframe(inter);
 
 	elf_Value value = inter->stack_ptr[- nargs - 1];
@@ -297,7 +281,7 @@ int elf_call(elf_State *inter, int nargs, int nrets)
 		nrets = callfunction(inter, vgetfnc(value), nargs, nrets);
 	}
 	else {
-		elf_errorf(inter, NO_BYTE, "cannot call '%s'", tag2s[value.tag]);
+		elf_errorf(inter, NO_BYTE, "'%s': __call expects callable value", tag2s[value.tag]);
 	}
 
 	pullstackframe(inter);
@@ -318,7 +302,7 @@ static void error_invalidoperandsforoperator(elf_State *inter, char *name, elf_V
 
 // the result is on the stack
 static int callmetafield(elf_State *inter, elf_Object *obj, char *name, int nargs, elf_Value xx, elf_Value yy) {
-	elf_push_string(inter, name);
+	elf_pushstr(inter, name);
 
 	elf_Value vv = elf_table_get_raw(obj->meta, inter->stack_ptr[-1]);
 

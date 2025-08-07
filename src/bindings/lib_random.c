@@ -19,7 +19,7 @@ ELF_FUNCTION(l_rand_seed) {
 
 ELF_FUNCTION(l_rand_random) {
 	global_random_state = xorshift32(global_random_state);
-	elf_push_num(S, global_random_state / (double) UINT_MAX);
+	elf_pushnum(S, global_random_state / (double) UINT_MAX);
 	return 1;
 }
 

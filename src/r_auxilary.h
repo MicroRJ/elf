@@ -9,6 +9,20 @@
 #define vitonum(v) (isint(v) ? (elf_Number)  vgetint(v) : vgetnum(v))
 #define vntoint(v) (isnum(v) ? (elf_Integer) vgetnum(v) : vgetint(v))
 
+#define tisnil(v) ((v) == elf_tag_Nil)
+#define tisdead(v) ((v) == elf_tag_Nil || (v) == elf_tag_Tomb)
+#define tisnum(v) ((v) == elf_tag_Num)
+#define tisint(v) ((v) == elf_tag_Int)
+#define tistab(v) ((v) == elf_tag_Table)
+#define tisstr(v) ((v) == elf_tag_String)
+#define tisusr(v) ((v) == elf_tag_UserObject)
+#define tisfnc(v) ((v) == elf_tag_Function)
+#define tiscls(v) ((v) == elf_tag_Closure)
+#define tissys(v) ((v) == elf_tag_Handle)
+#define tisnumeric(v) (tisnum(v) || tisint(v))
+#define tiscallable(v) (tiscls(v) || tisfnc(v))
+
+
 // an object tag with nullptr should never really happen!
 #define isnil(v) (((v).tag == elf_tag_Nil) || (tisobject((v).tag) && (v).x_obj == 0))
 #define isdead(v) ((v).tag == elf_tag_Nil || (v).tag == elf_tag_Tomb)
@@ -19,7 +33,7 @@
 #define isusr(v) ((v).tag == elf_tag_UserObject)
 #define isfnc(v) ((v).tag == elf_tag_Function)
 #define iscls(v) ((v).tag == elf_tag_Closure)
-
+#define issys(v) ((v).tag == elf_tag_Handle)
 
 
 #define isnumeric(v) (isnum(v) || isint(v))
@@ -34,6 +48,7 @@
 #define vgetobj(v) ((v).x_obj)
 #define vgetstr(v) ((v).x_str)
 #define vgettab(v) ((v).x_tab)
+#define vgetsys(v) ((v).x_sys)
 #define vgetcls(v) ((v).x_closure)
 #define vgetfnc(v) ((v).x_proc)
 
@@ -48,9 +63,11 @@ static inline void *vcheckptr(void *obj) {
 #define vsetnil(v) ((v)->tag=elf_tag_Nil,(v)->x_int=0)
 #define vsetint(v,x) ((v)->tag=elf_tag_Int,(v)->x_int=x)
 #define vsetnum(v,x) ((v)->tag=elf_tag_Num,(v)->x_num=x)
-
 #define vsetstr(v,x) ((v)->tag=elf_tag_String,(v)->x_obj=vcheckptr(x))
 #define vsettab(v,x) ((v)->tag=elf_tag_Table,(v)->x_obj=vcheckptr(x))
+#define vsetfnc(v,x) ((v)->tag=elf_tag_Function,(v)->x_obj=vcheckptr(x))
+
+
 #define vSetClosure(v,x) ((v)->tag=elf_tag_Closure,(v)->x_obj=vcheckptr(x))
 
 
