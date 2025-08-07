@@ -1,7 +1,7 @@
 
 // #if defined(ELF_EXPERIMENTAL_FEATURES)
 // 		if (R->bytetracking) {
-// 			elf_Int track = ++ M->track[module_instr];
+// 			elf_Integer track = ++ M->track[module_instr];
 // 			if (track == 64) {
 // 				elf_Proto file;
 // 				char *line;

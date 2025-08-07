@@ -3,7 +3,7 @@
 //
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytec b);
+static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, Instr id, elf_Bytec b);
 static int get_byte_class(int op);
 
 
@@ -50,7 +50,7 @@ static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, e
 		va_start(v,fmt);
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
-		printf("%s [%i:%lli] [%i](%s): %s\n",name,line_number,(elf_Int)(1+cursor-line_start),instr,byte2s[BC_OP(byte)],b);
+		printf("%s [%i:%lli] [%i](%s): %s\n",name,line_number,(elf_Integer)(1+cursor-line_start),instr,byte2s[BC_OP(byte)],b);
 	}
 	printf("| %.*s\n",linelen,line_start);
 	printf("| %.*s\n",underline+1,underline_buf);
@@ -162,7 +162,7 @@ void elf_analyze_exec_trail(elf_State *S) {
 	}
 }
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Int fid, Instr id, elf_Bytec b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, Instr id, elf_Bytec b) {
 	if (fid != -1) {
 		elf_File file = M->files[fid];
 		int linenum;

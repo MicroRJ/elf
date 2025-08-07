@@ -4,6 +4,12 @@
 
 
 
+
+
+
+
+
+
 elf_Table *elf_new_table(elf_State *R) {
 	elf_Table *table = elf_alloc_table(R);
 	elf_push_table_raw(R, table);
@@ -12,17 +18,10 @@ elf_Table *elf_new_table(elf_State *R) {
 
 
 
-elf_String *elf_new_string(elf_State *S, const char *text) {
-	elf_String *string = elf_alloc_string(S, text);
-	elf_push_string_raw(S, string);
-	return string;
-}
-
-
 // todo: deprecate!
 void elf_check_num_args(elf_State *S, char *name, int nargs, char *usage) {
-	if (elf_get_num_args(S) != nargs) {
-		elf_error(S, S->byte, elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s", name, nargs, elf_get_num_args(S), usage));
+	if ((nargs - 1) != nargs) {
+		elf_error(S, S->byte, elf_tpf("'%s': expects %i argument(s), you gave %i, usage: %s", name, nargs, (nargs - 1), usage));
 	}
 }
 
@@ -51,25 +50,8 @@ void elf_push_value_raw(elf_State *inter, elf_Value value) {
 }
 
 
-void elf_push_closure_raw(elf_State *S, elf_Closure *x) {
-	PUSHV(S,VALUE_CLOSURE(x));
-}
-
-void elf_push_object_raw(elf_State *S, elf_Object *x) {
-	if (x) PUSHV(S,VALUE_OBJECT(x)); else PUSHV(S,VALUE_NIL());
-}
-
-
-
 void elf_push_table_raw(elf_State *S, elf_Table *x) {
 	PUSHV(S,VALUE_TABLE(x));
-}
-
-
-
-// todo: @deprecated!
-void elf_push_string_raw(elf_State *S, elf_String *x) {
-	if (x) PUSHV(S,VALUE_STRING(x)); else elf_push_nil(S);
 }
 
 
@@ -127,20 +109,12 @@ elf_Handle elf_get_sysarg(elf_State *R, int x) {
 	return 0;
 }
 
-
-elf_Int elf_get_intarg(elf_State *R, int x) {
+elf_Integer elf_get_intarg(elf_State *R, int x) {
 	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_tag_Num) return (elf_Int) v.x_num;
+	if (v.tag==elf_tag_Num) return (elf_Integer) v.x_num;
 	if (v.tag==elf_tag_Int) return v.x_int;
 	_check_arg_tag(R,elf_tag_Int,v.tag,x);
 	return 0;
 }
 
 
-elf_Number elf_get_numarg(elf_State *R, int x) {
-	elf_Value v=elf_get_arg(R,x);
-	if (v.tag==elf_tag_Int) return (elf_Number) v.x_int;
-	if (v.tag==elf_tag_Num) return v.x_num;
-	_check_arg_tag(R,elf_tag_Num,v.tag,x);
-	return 0;
-}

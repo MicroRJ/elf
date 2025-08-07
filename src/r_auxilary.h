@@ -6,33 +6,52 @@
 
 // convert from integer/number to number/integer, assumes the value
 // is either an integer or a number
-#define vitonum(v) (((v).tag == elf_tag_Int) ? (elf_Number) (v).x_int : (v).x_num)
-#define vntoint(v) (((v).tag == elf_tag_Num) ? (elf_Int)    (v).x_num : (v).x_int)
+#define vitonum(v) (isint(v) ? (elf_Number)  vgetint(v) : vgetnum(v))
+#define vntoint(v) (isnum(v) ? (elf_Integer) vgetnum(v) : vgetint(v))
 
+// an object tag with nullptr should never really happen!
+#define isnil(v) (((v).tag == elf_tag_Nil) || (tisobject((v).tag) && (v).x_obj == 0))
+#define isdead(v) ((v).tag == elf_tag_Nil || (v).tag == elf_tag_Tomb)
 #define isnum(v) ((v).tag == elf_tag_Num)
 #define isint(v) ((v).tag == elf_tag_Int)
 #define istab(v) ((v).tag == elf_tag_Table)
 #define isstr(v) ((v).tag == elf_tag_String)
 #define isusr(v) ((v).tag == elf_tag_UserObject)
+#define isfnc(v) ((v).tag == elf_tag_Function)
+#define iscls(v) ((v).tag == elf_tag_Closure)
+
+
 
 #define isnumeric(v) (isnum(v) || isint(v))
+#define iscallable(v) (iscls(v) || isfnc(v))
 
-#define isobject(v) (tisobject((v).tag))
+#define isobj(v) (tisobject((v).tag))
 
-// an object tag with nullptr should never really happen!
-#define isnil(v) (((v).tag == elf_tag_Nil) || (tisobject((v).tag) && (v).x_obj == 0))
 
+#define vgettag(v) ((v).tag)
 #define vgetint(v) ((v).x_int)
+#define vgetnum(v) ((v).x_num)
 #define vgetobj(v) ((v).x_obj)
 #define vgetstr(v) ((v).x_str)
 #define vgettab(v) ((v).x_tab)
+#define vgetcls(v) ((v).x_closure)
+#define vgetfnc(v) ((v).x_proc)
+
+
+// todo: we loose type check!
+static inline void *vcheckptr(void *obj) {
+	ASSERT(obj != 0);
+	return obj;
+}
+
 
 #define vsetnil(v) ((v)->tag=elf_tag_Nil,(v)->x_int=0)
 #define vsetint(v,x) ((v)->tag=elf_tag_Int,(v)->x_int=x)
 #define vsetnum(v,x) ((v)->tag=elf_tag_Num,(v)->x_num=x)
-#define vsetstr(v,x) ((v)->tag=elf_tag_String,(v)->x_str=x)
-#define vSetClosure(v,x) ((v)->tag=elf_tag_Closure,(v)->x_closure=x)
 
+#define vsetstr(v,x) ((v)->tag=elf_tag_String,(v)->x_obj=vcheckptr(x))
+#define vsettab(v,x) ((v)->tag=elf_tag_Table,(v)->x_obj=vcheckptr(x))
+#define vSetClosure(v,x) ((v)->tag=elf_tag_Closure,(v)->x_obj=vcheckptr(x))
 
 
 
@@ -55,14 +74,14 @@ static void _debug_stack_push(elf_State *S, elf_Value v);
 
 
 #define VALUE_NIL()           (XLITERAL(elf_Value){ elf_tag_Nil                                                 })
-#define VALUE_NUMBER(thing)   (XLITERAL(elf_Value){ elf_tag_Num        , ((union { elf_Number _; float __; elf_Int I; }){thing}).I })
-#define VALUE_INTEGER(thing)  (XLITERAL(elf_Value){ elf_tag_Int        , {(elf_Int) UCAST(thing, elf_Int)      }})
-#define VALUE_TABLE(thing)    (XLITERAL(elf_Value){ elf_tag_Table        , {(elf_Int) UCAST(thing, elf_Table *)  }})
-#define VALUE_OBJECT(thing)   (XLITERAL(elf_Value){ OBJ2V(thing->type) , {(elf_Int) UCAST(thing, elf_Object *) }})
-#define VALUE_STRING(thing)   (XLITERAL(elf_Value){ elf_tag_String        , {(elf_Int) UCAST(thing, elf_String *) }})
-#define VALUE_CLOSURE(thing)  (XLITERAL(elf_Value){ elf_tag_Closure    , {(elf_Int) UCAST(thing, elf_Closure *)}})
-#define VALUE_FUNCTION(thing) (XLITERAL(elf_Value){ elf_tag_Function       , {(elf_Int) UCAST(thing, elf_Function) }})
-#define VALUE_HANDLE(thing)   (XLITERAL(elf_Value){ elf_tag_Handle     , {(elf_Int) UCAST(thing, elf_Handle)   }})
+#define VALUE_NUMBER(thing)   (XLITERAL(elf_Value){ elf_tag_Num        , ((union { elf_Number _; float __; elf_Integer I; }){thing}).I })
+#define VALUE_INTEGER(thing)  (XLITERAL(elf_Value){ elf_tag_Int        , {(elf_Integer) UCAST(thing, elf_Integer)      }})
+#define VALUE_TABLE(thing)    (XLITERAL(elf_Value){ elf_tag_Table        , {(elf_Integer) UCAST(thing, elf_Table *)  }})
+#define VALUE_OBJECT(thing)   (XLITERAL(elf_Value){ OBJ2V(thing->type) , {(elf_Integer) UCAST(thing, elf_Object *) }})
+#define VALUE_STRING(thing)   (XLITERAL(elf_Value){ elf_tag_String        , {(elf_Integer) UCAST(thing, elf_String *) }})
+#define VALUE_CLOSURE(thing)  (XLITERAL(elf_Value){ elf_tag_Closure    , {(elf_Integer) UCAST(thing, elf_Closure *)}})
+#define VALUE_FUNCTION(thing) (XLITERAL(elf_Value){ elf_tag_Function       , {(elf_Integer) UCAST(thing, elf_Function) }})
+#define VALUE_HANDLE(thing)   (XLITERAL(elf_Value){ elf_tag_Handle     , {(elf_Integer) UCAST(thing, elf_Handle)   }})
 
 
 

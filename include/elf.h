@@ -33,12 +33,12 @@ typedef int elf_StkInt;
 
 
 /*
-todo: #TOMORROW
-the stack address of the first argument and the number of arguments,
-the 'this' argument is always -1, the closure is always -2 */
-// #define ELF_FUNCTION(NAME) int (NAME)(elf_State *, int args, int nargs, int nrets)
-
-#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S)
+* The core elf function has the following signature:
+* args: which is the stack address of the first argument, 'this' is 0.
+* nargs: the number of arguments
+* nrets: the number of expected results
+*/
+#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int args, int nargs, int nrets)
 typedef ELF_FUNCTION(* elf_Function);
 
 //
@@ -115,7 +115,7 @@ elf_pubapi int elf_call(elf_State *, int nargs, int nrets);
 elf_pubapi elf_StkInt elf_read_file(elf_State *, int size);
 
 elf_pubapi elf_StkInt elf_push_globals(elf_State *);
-elf_pubapi elf_StkInt elf_push_int(elf_State *, elf_Int);
+elf_pubapi elf_StkInt elf_push_int(elf_State *, elf_Integer);
 elf_pubapi elf_StkInt elf_push_nil(elf_State *);
 elf_pubapi elf_StkInt elf_push_table(elf_State *);
 elf_pubapi elf_StkInt elf_push_string(elf_State *, const char *);
@@ -130,21 +130,26 @@ elf_pubapi char *elf_get_text_from_string_on_stack(elf_State *, int stk);
 arguments on the stack.
 the arguments except for the subject are popped.
 todo: version of this that takes the stack address? */
-elf_pubapi elf_IndexInt elf_table_set(elf_State *);
-elf_pubapi elf_IndexInt elf_array_add(elf_State *);
+elf_pubapi index_t elf_table_set(elf_State *);
+elf_pubapi index_t elf_array_add(elf_State *);
 
-elf_pubapi int elf_get_num_args(elf_State *);
+
+elf_pubapi int elf_pushmetatab(elf_State *, int stk);
+
+
+elf_pubapi elf_Number elf_tonum(elf_State *, int stk);
+elf_pubapi elf_Integer elf_toint(elf_State *, int stk);
+
 
 
 // todo: TOMORROW, instead have a single API for getting
 // anything anywhere on the stack, and the elf function signature
 // tells the user the first argument index
 // todo: @deprecated
-elf_pubapi elf_Tag    elf_get_argtag(elf_State *, int argi);
+elf_pubapi elf_Tag    elf_gettag(elf_State *, int argi);
 // todo: @deprecated
-elf_pubapi elf_Int    elf_get_intarg(elf_State *, int argi);
+elf_pubapi elf_Integer    elf_get_intarg(elf_State *, int argi);
 // todo: @deprecated
-elf_pubapi elf_Number    elf_get_numarg(elf_State *, int argi);
 // todo: @deprecated
 elf_pubapi elf_Handle elf_get_sysarg(elf_State *, int argi);
 // todo: @deprecated

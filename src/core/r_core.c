@@ -53,13 +53,13 @@
 #include "lib_string.c"
 #include "lib_random.c"
 
-//
-// todo: remove!
-//
 
 static int _resume(elf_State *S);
 
 
+//
+// todo: remove!
+//
 static inline void _debug_stack_push(elf_State *inter, elf_Value v) {
 	ASSERT(inter->stack_ptr - inter->stack < inter->stack_max);
 	* inter->stack_ptr ++ = v;
@@ -176,68 +176,82 @@ void elf_init_raw(elf_State *inter) {
 	install(inter,"elf" ,  l_sys,      COUNTOF(l_sys));
 }
 
-static inline void _push_stack_frame(elf_State *S, elf_Stack_Frame frame){
-	ASSERT(S->frame_index < S->frame_stack_max);
-	S->frame_stack[S->frame_index ++] = S->frame;
-	S->frame = frame;
+// save the current frame
+static inline void pushstackframe(elf_State *inter) {
+	ASSERT(inter->frame_index < inter->frame_stack_max);
+	inter->frame_stack[inter->frame_index ++] = inter->frame;
 }
 
-static inline void _pop_stack_frame(elf_State *S){
-	ASSERT(S->frame_index > 0);
-	S->frame = S->frame_stack[-- S->frame_index];
+// restore the previous frame
+static inline void pullstackframe(elf_State *inter) {
+	ASSERT(inter->frame_index > 0);
+	inter->frame = inter->frame_stack[-- inter->frame_index];
 }
 
-elf_rawapi
-inline int elf_call_closure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
+
+
+// update the current frame for the given closure
+static inline
+void prepframeforclosure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
 {
+
 	elf_Proto proto = closure->proto;
 
 	int framesize = nargs < proto.stacksize ? proto.stacksize : nargs;
+
 	elf_Value *framebase = inter->stack_ptr - nargs;
 
-	elf_Stack_Frame frame = {};
-	frame.nargs = nargs;
-	frame.nrets = nrets;
-	frame.bytes = proto.bytes;
-	frame.bytec = proto.numbytes;
-	frame.framesize = framesize;
-	frame.framebase = framebase;
-	frame.closureenv = closure->captures;
-	frame.closuresize = proto.ncaptures;
+	inter->frame.framesize = framesize;
+	inter->frame.framebase = framebase;
+	inter->frame.nargs = nargs;
+	inter->frame.nrets = nrets;
+	inter->frame.bytes = proto.bytes;
+	inter->frame.bytec = proto.numbytes;
+	inter->frame.closureenv = closure->captures;
+	inter->frame.closuresize = proto.ncaptures;
 
-	_push_stack_frame(inter, frame);
+	// prevent the collector from tripping on possibly garbage values
+	int restofstack = framesize - nargs;
+	clear_memory(framebase + nargs, restofstack * sizeof(elf_Value));
+}
 
-	int unset = framesize - nargs;
-	clear_memory(framebase + nargs, unset * sizeof(elf_Value));
 
-	inter->stack_ptr = framebase + framesize;
+
+static inline
+int callclosure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
+{
+	elf_Proto proto = closure->proto;
+
+	prepframeforclosure(inter, closure, nargs, nrets);
+
+	// update stack pointer to cover the entire frame
+	inter->stack_ptr = inter->frame.framebase + inter->frame.framesize;
 
 	nrets = _resume(inter);
 
-	_pop_stack_frame(inter);
-
-	// restore stack pointer
-	inter->stack_ptr = framebase - 1 + nrets;
+	// put stack pointer right on top of all the returns
+	inter->stack_ptr = inter->frame.framebase - 1 + nrets;
 	return nrets;
 }
 
-elf_rawapi
-int inline elf_call_procedure(elf_State *inter, elf_Function proc, int nargs, int nrets)
+
+
+static inline
+int callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
 {
 	elf_Value *framebase = inter->stack_ptr - nargs;
 	int framesize = nargs;
+	inter->frame.framebase = framebase;
+	inter->frame.framesize = framesize;
+	inter->frame.nargs = nargs;
+	inter->frame.nrets = nrets;
 
-	elf_Stack_Frame frame = {};
-	frame.framebase = framebase;
-	frame.framesize = framesize;
-	frame.nargs = nargs;
-	frame.nrets = nrets;
-
-	_push_stack_frame(inter, frame);
 
 	inter->stack_ptr = framebase + framesize;
 
-	int nuserrets = proc(inter);
+	int args = framebase - inter->stack;
+
+	int nuserrets = proc(inter, args, nargs, nrets);
 
 	int nretpushed = inter->stack_ptr - framebase - framesize;
 
@@ -248,7 +262,7 @@ int inline elf_call_procedure(elf_State *inter, elf_Function proc, int nargs, in
 	if (nuserrets < 0 || nretpushed < nuserrets)
 	{
 		elf_error(inter, NO_BYTE
-		, elf_tpf("invalid number of returns from procedure: %i, however the procedure only pushed %i"
+		, elf_tpf("invalid number of returns from procedure: %i, however the procedure pushed: %i"
 		, 				nuserrets, nretpushed));
 	}
 
@@ -261,174 +275,34 @@ int inline elf_call_procedure(elf_State *inter, elf_Function proc, int nargs, in
 	// copy results to return space
 	memcpy(framebase - 1, inter->stack_ptr - nuserrets, ntruerets * sizeof(elf_Value));
 
-	_pop_stack_frame(inter);
 
+	// put stack pointer right on top of all the returns
 	inter->stack_ptr = framebase - 1 + ntruerets;
 	return ntruerets;
 }
 
 
+
 elf_pubapi
 int elf_call(elf_State *inter, int nargs, int nrets)
 {
+	pushstackframe(inter);
+
 	elf_Value value = inter->stack_ptr[- nargs - 1];
 
-	if (value.tag == elf_tag_Closure) {
-		nrets = elf_call_closure(inter, value.x_closure, nargs, nrets);
+	if (iscls(value)) {
+		nrets = callclosure(inter, vgetcls(value), nargs, nrets);
 	}
-	else if(value.tag == elf_tag_Function) {
-		nrets = elf_call_procedure(inter, value.x_proc, nargs, nrets);
+	else if(isfnc(value)) {
+		nrets = callfunction(inter, vgetfnc(value), nargs, nrets);
 	}
 	else {
-		elf_error(inter, NO_BYTE, elf_tpf("cannot call '%s'", tag2s[value.tag]));
+		elf_errorf(inter, NO_BYTE, "cannot call '%s'", tag2s[value.tag]);
 	}
+
+	pullstackframe(inter);
 	return nrets;
 }
-
-static int tagcheck(elf_State *R, Instr id, int stk, elf_Tag x, elf_Tag y) {
-	if (x != y) {
-		elf_error(R,id,elf_tpf("$%i, expected %s, instead got %s",stk,tag2s[x],tag2s[y]));
-	}
-	return x == y;
-}
-
-// todo: just take the string instead?
-static elf_Value findmetafunc(elf_State *inter, elf_Table *metatable, char const *name) {
-
-	elf_String *sname;
-	elf_IndexInt slot;
-
-	// todo: don't do this here!
-	sname = elf_new_string(inter, name);
-	slot = elf_table_try_(metatable, VALUE_STRING(sname));
-	inter->stack_ptr --;
-	if (slot < 0 || IS_DEAD_TAG(metatable->entries[slot].key.tag)) {
-		elf_error(inter, NO_BYTE, "no such meta field");
-		// todo: as a courtesy, look for similar strings if any and
-		// ask them if he meant ...
-	}
-
-
-	elf_Value value = metatable->array[metatable->entries[slot].idx];
-	if ((value.tag != elf_tag_Closure) && (value.tag != elf_tag_Function)) {
-		elf_error(inter, NO_BYTE, "cannot call meta field, because it is not a function");
-		// todo: as a courtesy, look for similar strings if any and
-		// ask them if he meant ...
-	}
-
-	return value;
-}
-
-// static inline void premetacall(elf_State *inter, elf_Object *obj, char const *name) {
-	//	if (!obj->meta) {
-	//		elf_error(inter, NO_BYTE, "object does not have a metatable");
-	//	}
-	//	findmetafunc(inter, obj->meta, name);
-	//	* inter->stack_ptr = VALUE_OBJECT(obj);
-	//	incstackptr(inter);
-// }
-
-
-static int _callov(elf_State  *inter
-,                  elf_Object *obj
-,                  char const *name
-,                  int         reg
-,                  int         nargs
-,                  elf_Value  *args)
-{
-	__debugbreak();
-	return 0;
-	// elf_Value *top = GET_TOP(inter);
-	// premetacall(inter, obj, name);
-
-	// copy_memory(GET_TOP(inter),args,sizeof(elf_Value)*nargs);
-
-	// GET_TOP(inter) += nargs;
-	// int num_rets = elf_call(inter,nargs+1,1);
-	// inter->frame.framebase[reg] = *top;
-	// // GET_LOCAL(inter,reg)=*top;
-	// return num_rets;
-}
-
-
-#define __fmod(a,b) ((a) -  ((elf_Int) ((a) / (b))) * (b) )
-#define __mod(a,b) ((a) % (b))
-#define __lteq(a,b) ((a) <= (b))
-#define __lt(a,b)   ((a) <  (b))
-#define __shl(a,b) ((a) << (b))
-#define __shr(a,b) ((a) >> (b))
-#define __add(a,b) ((a) + (b))
-#define __sub(a,b) ((a) - (b))
-#define __mul(a,b) ((a) * (b))
-#define __div(a,b) ((a) / (b))
-#define __and(a,b) ((a) & (b))
-#define __or(a,b)  ((a) | (b))
-#define __xor(a,b) ((a) ^ (b))
-#define __pow(a,b) (pow((a),(b)))
-
-
-
-
-#define __INSERT_NO_CHECK__(A, B, C) 0
-
-
-#define divisionsafetycheck(S,  A,  B) \
-do {\
-	if (((B).tag == elf_tag_Num) && ((B).x_num == 0)) elf_error(S, NO_BYTE, "division by zero"); else\
-	if (((B).tag == elf_tag_Int) && ((B).x_int == 0)) elf_error(S, NO_BYTE, "integer division by zero");\
-} while (0)
-
-#define __INSERT_OBJECT_OVERLOAD_ARITHMETIC__(OP, FN, FN1) \
-do {\
-	if (!tisobject(xx.tag)) {\
-		elf_error(R, NO_BYTE, "invalid ordering, object type must come first");\
-	}\
-	_callov(R, xx.x_obj, tisobject(yy.tag) ? FN : FN1, BC_ARGX(byte), 1, &yy);\
-} while(0)
-
-
-#define BINOP_TEMPLATE(OP, FN, FN1, PREOPCODE) \
-do {\
-	xx = frame.framebase[ BC_ARGY(byte) ];\
-	yy = frame.framebase[ BC_ARGZ(byte) ];\
-	if (isnumeric(xx) && isnumeric(yy)) {\
-		PREOPCODE(R, xx, yy);\
-		if((xx.tag == elf_tag_Num) || (yy.tag == elf_tag_Num)) {\
-			frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Num;\
-			frame.framebase[BC_ARGX(byte)].x_num = OP(vitonum(xx), vitonum(yy));\
-		} else {\
-			frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Int;\
-			frame.framebase[BC_ARGX(byte)].x_int = OP(vntoint(xx), vntoint(yy));\
-		}\
-	} else if (tisobject(xx.tag) || tisobject(yy.tag)) {\
-		__INSERT_OBJECT_OVERLOAD_ARITHMETIC__(OP, FN, FN1);\
-	} else {\
-		INVALID_OPERANDS(xx.tag, yy.tag, OP);\
-	}\
-} while(0)
-
-
-
-#define VMCASE(OPCODE) case OPCODE:
-#define VMBREAK break
-
-
-#define push(v) (*inter->stack_ptr ++ = v)
-
-#define lget(i) (frame.framebase[i])
-
-#define lset(i, v) (frame.framebase[i]=v)
-#define lsetint(i, x) (vsetint(&frame.framebase[i], x))
-#define lsetnum(i, x) (vsetnum(&frame.framebase[i], x))
-
-#define lsetx(v) lset(by.b_x, v)
-#define lsetxint(v) lsetint(by.b_x, v)
-#define lsetxnum(v) lsetnum(by.b_x, v)
-
-
-#define lgetx(v) lget(by.b_x)
-#define lgety(v) lget(by.b_y)
-#define lgetz(v) lget(by.b_z)
 
 
 static void error_expectednumericrightoperand(elf_State *inter, char *name, elf_Value x, elf_Value y)
@@ -438,36 +312,230 @@ static void error_expectednumericrightoperand(elf_State *inter, char *name, elf_
 
 static void error_invalidoperandsforoperator(elf_State *inter, char *name, elf_Value x, elf_Value y)
 {
-	elf_errorf(inter, -1, "'%s': invalid operands for operator %s", tag2s[x.tag], name);
+	elf_errorf(inter, -1, "'%s': invalid operands for operator %s, (%s, %s)", tag2s[x.tag], name, tag2s[x.tag], tag2s[y.tag]);
 }
+
+
+// the result is on the stack
+static int callmetafield(elf_State *inter, elf_Object *obj, char *name, int nargs, elf_Value xx, elf_Value yy) {
+	elf_push_string(inter, name);
+
+	elf_Value vv = elf_table_get_raw(obj->meta, inter->stack_ptr[-1]);
+
+	if (isnil(vv)) {
+						// todo: as a courtesy, look for similar strings if any and
+						// ask them if he meant ...
+		elf_errorf(inter, NO_BYTE, "'%s': no such meta field", name);
+	}
+
+	if (!iscallable(vv)) {
+		elf_errorf(inter, NO_BYTE, "'%s': is not a function, got: %s", name, tag2s[vv.tag]);
+	}
+
+	// push the [function, left-operand ('this'), right-operand]
+	*inter->stack_ptr ++ = vv;
+	*inter->stack_ptr ++ = xx;
+	*inter->stack_ptr ++ = yy;
+
+	int nrets = elf_call(inter, nargs, 1);
+
+	if (nrets != 1) {
+		elf_errorf(inter, -1, "'%s': invalid number of returns for overload, expected only 1", name);
+	}
+
+	return nrets;
+}
+
+
+
+static inline bool streq(elf_String *x, elf_String *y) {
+	bool eq = (x == y) || ((x->hash == y->hash) && (x->length == y->length) && text_eq(x->text, y->text));
+	return eq;
+}
+
+static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
+	bool eq = 0;
+
+	// comparison between numeric operands
+	if (isnumeric(xx) && isnumeric(yy)) {
+		if (isnum(xx) || isnum(yy)) {
+			eq = vitonum(xx) == vitonum(yy);
+		} else {
+			eq = vgetint(xx) == vgetint(yy);
+		}
+	}
+	else if (vgettag(xx) == vgettag(yy)) {
+		if (isstr(xx)) {
+			eq = streq(vgetstr(xx), vgetstr(yy));
+		}
+		else {
+			// raw compare
+			eq = xx.x_int == yy.x_int;
+		}
+	}
+
+	return eq;
+}
+
+
+
+/* =====================================================
+	Macros For Generating Code
+======================================================== */
+
+
+#define VMCASE(OPCODE) case OPCODE:
+#define VMBREAK break
+
+
+#define moveX(v) (frame.framebase[by.b_x] = v)
+#define moveXi(v) (vsetint(&frame.framebase[by.b_x], v))
+#define moveXn(v) (vsetnum(&frame.framebase[by.b_x], v))
+
+#define localx(v) frame.framebase[by.b_x]
+#define localy(v) frame.framebase[by.b_y]
+#define localz(v) frame.framebase[by.b_z]
+
+
+
+#define __lteq(a,b) ((a) <= (b))
+#define __lt(a,b)  ((a) <  (b))
+
+#define __shl(a,b) ((a) << (b))
+#define __shr(a,b) ((a) >> (b))
+#define __and(a,b) ((a) & (b))
+#define __or(a,b)  ((a) | (b))
+#define __xor(a,b) ((a) ^ (b))
+
+#define __add(a,b) ((a) + (b))
+#define __sub(a,b) ((a) - (b))
+#define __mul(a,b) ((a) * (b))
+#define __div(a,b) ((a) / (b))
+#define __pow(a,b) (pow((a),(b)))
+#define __fmod(a,b) ((a) -  ((elf_Integer) ((a) / (b))) * (b) )
+#define __mod(a,b)  ((a) % (b))
+
+
+
+#define arithbranchnum2(nopfn, iopfn)             \
+do {                                              \
+	if (isnum(xx) || isnum(yy)) {                  \
+		moveXn(nopfn(vitonum(xx), vitonum(yy)));  \
+	}                                              \
+	else {                                         \
+		moveXi(iopfn(vgetint(xx), vgetint(yy)));  \
+	}                                              \
+} while (0)
+
+
+#define arithbranchobj(name)                                        \
+do {                                                                \
+	int nrets = callmetafield(inter, vgetobj(xx), name, 2, xx, yy);  \
+	\
+	moveX(inter->stack_ptr[-nrets]);                                 \
+	\
+	inter->stack_ptr = frame.framebase + frame.framesize;            \
+} while (0)
+
+
+#define arithcase(name, nopfn, iopfn) \
+do { \
+	xx=localy(), yy=localz(); \
+	\
+	if (isnumeric(xx)) { \
+		\
+		if (!isnumeric(yy)) { \
+			error_invalidoperandsforoperator(inter, name, xx, yy); \
+		} \
+		\
+		arithbranchnum2(nopfn, iopfn); \
+	} \
+	else if (isobj(xx)) { \
+		\
+		arithbranchobj(name); \
+		\
+	} \
+	else { \
+		error_invalidoperandsforoperator(inter, name, xx, yy); \
+	} \
+} while (0)
+
+
+#define bwcase(name, opfn) \
+do { \
+	xx=localy(), yy=localz(); \
+	\
+	if (isint(xx)) { \
+		\
+		if (!isint(yy)) { \
+			error_invalidoperandsforoperator(inter, name, xx, yy); \
+		} \
+		\
+		moveXi(opfn(vgetint(xx), vgetint(yy)));   \
+	} \
+	else if (isobj(xx)) { \
+		\
+		arithbranchobj(name); \
+		\
+	} \
+	else { \
+		error_invalidoperandsforoperator(inter, name, xx, yy); \
+	} \
+} while (0)
+
+
+#define relcase(name, opfn) \
+do { \
+	xx=localy(), yy=localz(); \
+	\
+	if (isnumeric(xx)) { \
+		\
+		if (!isnumeric(yy)) error_invalidoperandsforoperator(inter, name, xx, yy); \
+		\
+		if (isnum(xx) || isnum(yy)) { \
+			moveXi(opfn(vitonum(xx), vitonum(yy))); \
+		} \
+		else { \
+			moveXi(opfn(vgetint(xx), vgetint(yy))); \
+		} \
+	} \
+	else if (isobj(xx)) { \
+		elf_errorf(inter, minstr, "'%s': not over-loadable", name); \
+	} \
+	else { \
+		elf_errorf(inter, minstr, "'%s': invalid operands, %s, %s", name, tag2s[xx.tag], tag2s[yy.tag]); \
+	} \
+} while (0) \
 
 
 /* =====================================================
 	Main Interpreter Loop
 ======================================================== */
 int _resume(elf_State *inter) {
-	int numrets = -1;
-
-	elf_Table *globals = inter->globals;
-	elf_Stack_Frame frame = inter->frame;
 
 	elf_State *R = inter;
-
+	elf_Table *globals = inter->globals;
+	elf_Stack_Frame frame = inter->frame;
 	elf_Value xx,yy,zz;
 
-	int next_instr = 0;
+	ASSERT(inter->stack_ptr == frame.framebase + frame.framesize);
 
-	while (next_instr < frame.bytec) {
-		int instr = next_instr ++;
+	int subframes = 0;
+
+	int nrets = 0;
+
+	// todo: ensure that the caller sets this properly!
+	frame.nextinstr = 0;
+
+	while (frame.nextinstr < frame.bytec) {
+		int instr = frame.nextinstr ++;
+
 		int minstr = frame.bytes + instr;
-		elf_Bytec byte = R->bytes[minstr];
+		elf_Bytec byte = inter->bytes[minstr];
 		elf_Bytec by = byte;
 
-		// todo: in case we crash, preferably do this right
-		// before or pass it in to the function?
-		R->byte = minstr;
+		inter->byte = minstr;
 
-		ASSERT(inter->stack_ptr == frame.framebase + frame.framesize);
 
 		switch (BC_OP(byte)) {
 
@@ -476,53 +544,102 @@ int _resume(elf_State *inter) {
 				// put stack pointer right above all the arguments
 				inter->stack_ptr = frame.framebase + by.b_x + by.b_y + 1;
 
-				elf_call(R, by.b_y, by.b_z);
+				xx = localx();
 
-				// restore stack
-				inter->stack_ptr = frame.framebase + frame.framesize;
-			} break;
+				if (iscls(xx)) {
 
-			case BC_RET:
-			{
-				numrets = MIN(BC_ARGY(byte), frame.nrets);
+					// update next instr from our local version
+					inter->frame.nextinstr = frame.nextinstr;
 
-				for(int i = 0; i < numrets; i ++) {
-					frame.framebase[i - 1] = frame.framebase[i + BC_ARGX(byte)];
+					// save call frame
+					pushstackframe(inter);
+
+					// update call frame from closure
+					// todo: this also sets the stack pointer, but we can do that here
+					prepframeforclosure(inter, vgetcls(xx), by.b_y, by.b_z);
+
+					// load frame copy
+					frame = inter->frame;
+
+					inter->stack_ptr = frame.framebase + frame.framesize;
+
+					// reset next instruction pointer
+					frame.nextinstr = 0;
+
+					// track the number of sub-frames locally
+					subframes ++;
 				}
-				goto esc;
+				else if (isfnc(xx)) {
 
-			} break;
+					// there's no need to push the stack frame because
+					// we've already got a local copy of it here
+					callfunction(inter, vgetfnc(xx), by.b_y, by.b_z);
+
+					// restore call frame from our local copy
+					inter->frame = frame;
+
+					// restore stack
+					inter->stack_ptr = frame.framebase + frame.framesize;
+				}
+				else {
+					elf_error(inter, -1, "cannot call");
+				}
+
+				ASSERT(inter->stack_ptr == frame.framebase + frame.framesize);
+			} VMBREAK;
+
+			VMCASE(BC_RET) {
+				inter->frame.nrets = MIN(by.b_y, inter->frame.nrets);
+
+				// restore stack frame
+				copy_memory(frame.framebase - 1, frame.framebase + by.b_x, inter->frame.nrets * sizeof(elf_Value));
+
+				pullstackframe(inter);
+
+				// restore stack pointer to proper state regardless of
+				// whether we exit or not
+				inter->stack_ptr = inter->frame.framebase + inter->frame.framesize;
+
+				// sub-frame zero means we're the main frame, we can exit the routine
+				// on return
+				if (!subframes) goto esc;
+				subframes --;
+
+				// restore our local frame
+				frame = inter->frame;
+
+			} VMBREAK;
 
 			case BC_NOP: {
 			} break;
 
 			case BC_J: {
 				int x = BC_ARGX(byte);
-				next_instr = instr + x;
+				frame.nextinstr = instr + x;
 			} break;
 			case BC_JZ: {
 				if (frame.framebase[BC_ARGY(byte)].x_i64 == 0) {
 					int x = BC_ARGX(byte);
-					next_instr = instr + x;
+					frame.nextinstr = instr + x;
 				}
 			} break;
 			case BC_JNZ: {
 				if (frame.framebase[BC_ARGY(byte)].x_i64 != 0) {
 					int x = BC_ARGX(byte);
-					next_instr = instr + x;
+					frame.nextinstr = instr + x;
 				}
 			} break;
-			case BC_RELOAD: {
-				frame.framebase[BC_ARGX(byte)] = frame.framebase[BC_ARGY(byte)];
-			} break;
-			/* todo: prob cache 'globals->array' as globals
-			instead... */
 			case BC_GETGLOBAL: {
 				frame.framebase[BC_ARGX(byte)]=globals->array[BC_ARGY(byte)];
 			} break;
 			case BC_SETGLOBAL: {
 				globals->array[BC_ARGX(byte)]=frame.framebase[BC_ARGY(byte)];
 			} break;
+
+			case BC_RELOAD: {
+				moveX(localy());
+			} break;
+
 			case BC_LOADNIL: {
 				frame.framebase[BC_ARGX(byte)].tag    = elf_tag_Nil;
 				frame.framebase[BC_ARGX(byte)].x_int  = 0;
@@ -540,52 +657,58 @@ int _resume(elf_State *inter) {
 				frame.framebase[BC_ARGX(byte)] = frame.closureenv[BC_ARGY(byte)];
 			} break;
 			case BC_CLOSURE: {
-				ASSERT(WITHIN(BC_ARGY(byte),0,ARRAY_LENGTH(R->protos)));
-				elf_Proto proto = R->protos[BC_ARGY(byte)];
-				elf_Closure *new_closure = elf_alloc_closure(R,proto);
-				copy_memory(new_closure->captures,frame.framebase+BC_ARGX(byte),proto.ncaptures*sizeof(elf_Value));
-				frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Closure;
-				frame.framebase[BC_ARGX(byte)].x_closure = new_closure;
+				ASSERT(WITHIN(BC_ARGY(byte), 0, arrlen(inter->protos)));
+
+				elf_Proto proto = inter->protos[BC_ARGY(byte)];
+
+				elf_Closure *cls = elf_alloc_closure(inter, proto);
+				copy_memory(cls->captures, frame.framebase+BC_ARGX(byte), proto.ncaptures * sizeof(elf_Value));
+
+				vSetClosure(&localx(), cls);
 			} break;
 			case BC_TABLE: {
+
 				elf_Table *tab = elf_alloc_table(R);
-				frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Table;
-				frame.framebase[BC_ARGX(byte)].x_tab = tab;
+				vsettab(&localx(), tab);
+
 			} break;
-			case BC_TYPEGUARD: {
-				tagcheck(R,minstr,BC_ARGX(byte),BC_ARGY(byte),frame.framebase[BC_ARGX(byte)].tag);
-			} break;
+
 			case BC_GETMETAFIELD: {
-				elf_Value yy = frame.framebase[BC_ARGY(byte)];
-				elf_Table *metatable = {0};
+				yy = localy();
+
+				elf_Table *metatable = 0;
+
 				switch (yy.tag) {
 					case elf_tag_String:
 					case elf_tag_Table:
 					case elf_tag_UserObject:
 					case elf_tag_Closure: {
-						metatable = yy.x_obj->meta;
-					} goto _lookup;
+						metatable = vgetobj(yy)->meta;
+					} break;
+
 					case elf_tag_Num: {
-						metatable = R->metatables.number;
-						elf_error(R,minstr,"this feature is not implemented yet, metatables for numeric types");
-					} goto _lookup;
+						metatable = inter->metatables.number;
+					} break;
+
 					case elf_tag_Int: {
-						metatable = R->metatables.integer;
-						elf_error(R,minstr,"this feature is not implemented yet, metatables for numeric types");
-					} goto _lookup;
+						metatable = inter->metatables.integer;
+					} break;
+
 					default: {
-						elf_error(R,minstr,elf_tpf("'%s': not an object", tag2s[yy.tag]));
+						elf_errorf(inter, minstr, "'%s': not an object", tag2s[yy.tag]);
 					} break;
 				}
-				_lookup:
+
 				if (!metatable) {
-					elf_error(R,minstr,elf_tpf("'%s': invalid object, no metatable", tag2s[yy.tag]));
+					elf_errorf(inter, minstr, "'%s': invalid object, no meta-table", tag2s[yy.tag]);
 				}
-				frame.framebase[BC_ARGX(byte)] = elf_table_get_raw(metatable,frame.framebase[BC_ARGZ(byte)]);
+
+				elf_Value metafield = elf_table_get_raw(metatable, localz());
+				moveX(metafield);
 			} break;
 			// todo: INDEX should be array mode!
 			case BC_GETINDEX: case BC_GETFIELD: {
-				xx=lgety(), yy=lgetz();
+				xx=localy(), yy=localz();
 
 				if (isnil(yy)) {
 					elf_error(inter, minstr, "attempted to get nil field");
@@ -593,7 +716,7 @@ int _resume(elf_State *inter) {
 				switch (xx.tag) {
 
 					case elf_tag_Table: {
-						lsetx(elf_table_get_raw(vgettab(xx), yy));
+						moveX(elf_table_get_raw(vgettab(xx), yy));
 					}break;
 
 					case elf_tag_UserObject: {
@@ -605,12 +728,12 @@ int _resume(elf_State *inter) {
 
 						if (isint(yy)) {
 							int index = vgetint(yy);
-							lsetxint(vgetstr(xx)->text[index]);
+							moveXi(vgetstr(xx)->text[index]);
 						}
 						else if (isstr(yy)) {
 
 							int index = find_subtext(vgetstr(xx)->text, vgetstr(yy)->text);
-							lsetxint(index);
+							moveXi(index);
 						}
 						else {
 							elf_error(inter, minstr, "invalid value for string:__index(of int)");
@@ -628,7 +751,7 @@ int _resume(elf_State *inter) {
 			// todo: INDEX should be array mode!
 			case BC_SETINDEX:
 			case BC_SETFIELD: {
-				xx=lgetx(), yy=lgety(), zz=lgetz();
+				xx=localx(), yy=localy(), zz=localz();
 
 				if (istab(xx)) {
 					if (isnil(yy)) elf_error(inter, minstr, "key is nil...");
@@ -648,256 +771,44 @@ int _resume(elf_State *inter) {
 
 			case BC_N2I:
 			{
-				lsetxint(vntoint(lgetx()));
+				moveXi(vntoint(localx()));
 			} break;
 
 			case BC_I2N:
 			{
-				lsetxnum(vitonum(lgetx()));
+				moveXn(vitonum(localx()));
 			} break;
 
-#define INVALID_OPERANDS(X,Y,OP) elf_error(R,NO_BYTE,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[X],tag2s[Y],XTEXT(OP)))
-
-			case BC_EQ: case BC_NEQ: {
-				xx=frame.framebase[BC_ARGY(byte)];
-				yy=frame.framebase[BC_ARGZ(byte)];
-				bool eq=0;
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, NO_BYTE, "invalid right-operand");
-					eq = xx.x_int == yy.x_int;
-				} else if ((xx.tag == elf_tag_Nil) || (yy.tag == elf_tag_Nil)) {
-					eq = isnil(xx) == isnil(yy);
-				} else if ((xx.tag == elf_tag_String) && (yy.tag == elf_tag_String)) {
-					elf_String *x = xx.x_str, *y = yy.x_str;
-					eq = (x == y) || ((x->hash == y->hash) && (x->length == y->length) && text_eq(x->text, y->text));
-				} else {
-					eq = (xx.tag == yy.tag) && (xx.x_int == yy.x_int);
-				}
-				if (BC_OP(byte)==BC_NEQ) {
-					eq=!eq;
-				}
-				frame.framebase[BC_ARGX(byte)].tag  =elf_tag_Int;
-				frame.framebase[BC_ARGX(byte)].x_int=eq;
+			case BC_NEQ: {
+				bool eq = veq(inter, localy(), localz());
+				moveXi(!eq);
 			} break;
-			case BC_POW: {
-				xx=frame.framebase[BC_ARGY(byte)];
-				yy=frame.framebase[BC_ARGZ(byte)];
-				if (tisobject(xx.tag)||tisobject(yy.tag)) {
-					NO_CODE;
-				} else if ((xx.tag==elf_tag_Num)||(yy.tag==elf_tag_Num)) {
-					if (!isnumeric(yy)) {
-						elf_error(R,minstr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
-					}
-					frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Num;
-					frame.framebase[BC_ARGX(byte)].x_num = pow(vitonum(xx),vitonum(yy));
-				} else if ((xx.tag==elf_tag_Int)||(yy.tag==elf_tag_Int)) {
-					if (!isnumeric(yy)) {
-						elf_error(R,minstr,elf_tpf("'%s': incompatible with '%s'",tag2s[xx.tag],tag2s[yy.tag]));
-					}
-					frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Int;
-					frame.framebase[BC_ARGX(byte)].x_int = pow(vntoint(xx),vntoint(yy));
-				} else {
-					elf_error(R,minstr,elf_tpf("invalid types '%s' and '%s', for operator '%s'", tag2s[xx.tag],tag2s[yy.tag],XTEXT(OP)));
-				}
-			} break;
-
-			case BC_MOD: {
-				xx=lgety(), yy=lgetz();
-
-
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) {
-						error_expectednumericrightoperand(inter, "__mod", xx, yy);
-					}
-
-					if (isnum(xx) || isnum(yy)) {
-						elf_Number x=vitonum(xx), y=vitonum(yy);
-						lsetxnum(x - (elf_Int)(x / y) * y);
-					} else {
-						lsetxint(vntoint(xx) % vntoint(yy));
-					}
-				}
-				else if (isobject(xx)) {
-
-					elf_error(R, minstr, "__pow operator not over-loadable");
-
-				} else {
-					error_invalidoperandsforoperator(inter, "__mod", xx, yy);
-				}
+			case BC_EQ: {
+				bool eq = veq(inter, localy(), localz());
+				moveXi(eq);
 			} break;
 
 
-
-	/* todo: make this better */
-	#define INTBOP(OPNAME,OP) \
-			case OPNAME : {\
-				xx=frame.framebase[BC_ARGY(byte)];\
-				yy=frame.framebase[BC_ARGZ(byte)];\
-				if((xx.tag==elf_tag_Int) && (yy.tag==elf_tag_Int)) {\
-					if ((BC_OP(byte)==BC_DIV)||(BC_OP(byte)==BC_MOD)) {\
-						divisionsafetycheck(R,  xx , yy);\
-					}\
-					frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Int;\
-					frame.framebase[BC_ARGX(byte)].x_int = OP(vntoint(xx),vntoint(yy));\
-				} else INVALID_OPERANDS(xx.tag,yy.tag,OP); \
-			} break
-#if 0
-float x0,y0,x1,y1;\
-if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
-	\
-	if (xx.tag==elf_tag_Num)x0=y0=(float)xx.x_num;\
-	else if(xx.tag==elf_tag_Int)x0=y0=(float)xx.x_int;\
-	else x0=xx.x_f32,y0=xx.y_f32;\
-	\
-	if (yy.tag==elf_tag_Num)x1=y1=(float)yy.x_num;\
-	else if(yy.tag==elf_tag_Int)x1=y1=(float)yy.x_int;\
-	else x1=yy.x_f32,y1=yy.y_f32;\
-	\
-	frame.framebase[BC_ARGX(byte)].tag   = elf_tag_float2;\
-	frame.framebase[BC_ARGX(byte)].x_f32 = x0 OP x1;\
-	frame.framebase[BC_ARGX(byte)].y_f32 = y0 OP y1;\
-} else
-#endif
-			INTBOP(BC_SHL,  	 __shl);
-			INTBOP(BC_SHR,  	 __shr);
-			INTBOP(BC_BIT_XOR, __xor);
-			INTBOP(BC_BIT_AND, __and);
-			INTBOP(BC_BIT_OR,   __or);
+			VMCASE(BC_SHL)      { bwcase("__shl", __shl); } VMBREAK;
+			VMCASE(BC_SHR)      { bwcase("__shr", __shr); } VMBREAK;
+			VMCASE(BC_BIT_XOR)  { bwcase("__xor", __xor); } VMBREAK;
+			VMCASE(BC_BIT_AND)  { bwcase("__and", __and); } VMBREAK;
+			VMCASE(BC_BIT_OR)   { bwcase("__or" , __or ); } VMBREAK;
 
 
-			case BC_MUL: {
-				xx=lgety(),yy=lgetz();
-
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, minstr, "invalid right operand for __mul");
-
-					if (isnum(xx) || isnum(yy)) {
-						lsetxnum(vitonum(xx) * vitonum(yy));
-					}
-					// otherwise both of them are integers
-					else {
-						lsetxint(vgetint(xx) * vgetint(yy));
-					}
-				}
-				else if (isobject(xx)) {
-				}
-				else {
-					elf_error(inter, minstr, elf_tpf("invalid operands for __mul, %s, %s", tag2s[xx.tag], tag2s[yy.tag]));
-				}
-			} break;
-
-			case BC_DIV: {
-				xx=lgety(),yy=lgetz();
-
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, minstr, "invalid right operand for __div");
-
-					if (isnum(xx) || isnum(yy)) {
-						lsetxnum(vitonum(xx) / vitonum(yy));
-					}
-					// otherwise both of them are integers
-					else {
-						lsetxint(vgetint(xx) / vgetint(yy));
-					}
-				}
-				else if (isobject(xx)) {
-				}
-				else {
-					elf_error(inter, minstr, elf_tpf("invalid operands for __div, %s, %s", tag2s[xx.tag], tag2s[yy.tag]));
-				}
-			} break;
-
-			case BC_ADD: {
-				xx=lgety(),yy=lgetz();
-
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, minstr, "invalid right operand for __add");
-
-					if (isnum(xx) || isnum(yy)) {
-						lsetxnum(vitonum(xx) + vitonum(yy));
-					}
-					// otherwise both of them are integers
-					else {
-						lsetxint(vgetint(xx) + vgetint(yy));
-					}
-				}
-				else if (isobject(xx)) {
-					// push the [function, left-operand ('this'), right-operand]
-					*inter->stack_ptr ++ = findmetafunc(inter, vgetobj(xx)->meta, "__add");
-					*inter->stack_ptr ++ = xx;
-					*inter->stack_ptr ++ = yy;
-
-					int nrets = elf_call(inter, 2, 1);
-
-					if (nrets != 1) {
-						elf_error(inter, minstr, "invalid number of returns for overload __add, expected only 1");
-					}
-
-					lsetx(inter->stack_ptr[-nrets]);
-
-					// restore stack pointer
-					inter->stack_ptr = frame.framebase + frame.framesize;
-				}
-				else {
-					elf_error(inter, minstr, elf_tpf("invalid operands for __add, %s, %s", tag2s[xx.tag], tag2s[yy.tag]));
-				}
-			} break;
-
-			case BC_SUB: {
-				xx=lgety(),yy=lgetz();
-
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, minstr, "invalid right operand for __sub");
-
-					if (isnum(xx) || isnum(yy)) {
-						lsetxnum(vitonum(xx) - vitonum(yy));
-					}
-					// otherwise both of them are integers
-					else {
-						lsetxint(vgetint(xx) - vgetint(yy));
-					}
-				}
-				else if (isobject(xx)) {
-				}
-				else {
-					elf_error(inter, minstr, elf_tpf("invalid operands for __sub, %s, %s", tag2s[xx.tag], tag2s[yy.tag]));
-				}
-			} break;
+			VMCASE(BC_MUL) { arithcase("__mul",  __mul, __mul ); } VMBREAK;
+			VMCASE(BC_DIV) { arithcase("__div",  __div, __div ); } VMBREAK;
+			VMCASE(BC_ADD) { arithcase("__add",  __add, __add ); } VMBREAK;
+			VMCASE(BC_SUB) { arithcase("__sub",  __sub, __sub ); } VMBREAK;
+			VMCASE(BC_MOD) { arithcase("__mod", __fmod, __mod ); } VMBREAK;
+			VMCASE(BC_POW) { arithcase("__pow",  __pow, __pow ); } VMBREAK;
 
 
-			case BC_LT: {
-				xx=frame.framebase[by.b_y], yy=frame.framebase[by.b_z];
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, minstr, "invalid right operand for __lt");
-					if (isnum(xx) || isnum(yy)) {
-						lsetint(by.b_x, vitonum(xx) < vitonum(yy));
-					} else {
-						lsetint(by.b_x, vgetint(xx) < vgetint(yy));
-					}
-				} else if (isobject(xx)) {
-					elf_error(inter, minstr, "__lt not over-loadable");
-				} else {
-					elf_error(inter, minstr, elf_tpf("invalid operands for __lt, %s, %s", tag2s[xx.tag], tag2s[yy.tag]));
-				}
-			} break;
-			case BC_LTEQ: {
-				xx=frame.framebase[by.b_y], yy=frame.framebase[by.b_z];
-				if (isnumeric(xx)) {
-					if (!isnumeric(yy)) elf_error(inter, minstr, "invalid right operand for __lteq");
-					if (isnum(xx) || isnum(yy)) {
-						lsetint(by.b_x, vitonum(xx) <= vitonum(yy));
-					} else {
-						lsetint(by.b_x, vgetint(xx) <= vgetint(yy));
-					}
-				} else if (isobject(xx)) {
-					elf_error(inter, minstr, "__lteq not over-loadable");
-				} else {
-					elf_error(inter, minstr, "invalid operands for __lteq");
-				}
-			} break;
+			VMCASE(BC_LT)   { relcase("__lt"  , __lt   ); } VMBREAK;
+			VMCASE(BC_LTEQ) { relcase("__lteq", __lteq ); } VMBREAK;
 
 			default: {
-				elf_error(R,minstr,elf_tpf("unsupported instruction: %s", byte2s[BC_OP(byte)]));
+				elf_errorf(inter, minstr, "unsupported instruction: %s", byte2s[BC_OP(byte)]);
 			} break;
 		}
 
@@ -905,7 +816,7 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 	}
 
 	esc:
-	return numrets;
+	return nrets;
 }
 
 // if (R->flags & FLAG_BYTELOGGING || frame.logging)
@@ -932,7 +843,7 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 					ASSERT(minstr!=R->trace_stop_instr);
 				}
 				if(R->trace_inner_loop_counter==0){
-					ARRAY_ADD(R->trace_buffer,byte);
+					arradd(R->trace_buffer,byte);
 					R->active_trace_len += 1;
 				}
 			}
@@ -958,7 +869,7 @@ if ((xx.tag==elf_tag_float2)||(yy.tag==elf_tag_float2)) {\
 							R->flags |= FLAG_TRACING;
 							R->trace_start_instr = trace_start_instr;
 							R->trace_stop_instr  = minstr;
-							R->active_trace_pos  = ARRAY_LENGTH(R->trace_buffer);
+							R->active_trace_pos  = arrlen(R->trace_buffer);
 							R->active_trace_len  = 0;
 							elf_raw_table_set(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
 						}else{

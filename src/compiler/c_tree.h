@@ -157,7 +157,7 @@ static treeID tree_xyz(elf_Parser *, Source, treeKi k, treeTy ty, treeID x, tree
 static treeID tree_binary(elf_Parser *, Source, treeKi k, treeTy ty, treeID x, treeID y);
 static treeID tree_unary(elf_Parser *, Source, treeKi k, treeTy ty, treeID x);
 static treeID tree_nil(elf_Parser *, Source);
-static treeID tree_int(elf_Parser *, Source, elf_Int i);
+static treeID tree_int(elf_Parser *, Source, elf_Integer i);
 static treeID tree_num(elf_Parser *, Source, elf_Number n);
 static treeID tree_str(elf_Parser *, Source, Source);
 static treeID tree_nullary(elf_Parser *, Source, treeKi k, treeTy t);

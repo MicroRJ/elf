@@ -20,12 +20,12 @@ typedef unsigned long long int elf_u64;
 typedef double 			       elf_f64;
 typedef float  			       elf_f32;
 
-typedef elf_i64  elf_Int;
+typedef elf_i64  elf_Integer;
 typedef elf_f64  elf_Number;
 typedef elf_i32  elf_Error;
 
-typedef elf_u32 elf_HashInt;
-typedef elf_i64 elf_IndexInt;
+typedef elf_u32  hash_t;
+typedef elf_i64 index_t;
 
 typedef void    *elf_Handle;
 

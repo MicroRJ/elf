@@ -48,18 +48,18 @@ void sys_virtual_dealloc(void *memory) {
 }
 
 
-void sys_sleep(elf_Int ms) {
+void sys_sleep(elf_Integer ms) {
 	emscripten_sleep(ms);
 }
 
 
-elf_Int sys_get_performance_counter_frequency() {
+elf_Integer sys_get_performance_counter_frequency() {
 	/* todo: where does it say this */
 	return 1000;
 }
 
 
-elf_Int sys_get_performance_counter() {
+elf_Integer sys_get_performance_counter() {
 	return emscripten_get_now();
 }
 

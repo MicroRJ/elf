@@ -41,7 +41,7 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags);
 
 ELF_FUNCTION(l_str_join) {
 	String_Builder sb = {};
-	for (int i = -1; i < elf_get_num_args(S); ++ i) {
+	for (int i = -1; i < (nargs - 1); ++ i) {
 		value_bprintf(&sb, elf_get_arg(S, i), 0);
 	}
 	elf_push_string3(S, sb.buf, sb.min);

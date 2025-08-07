@@ -22,21 +22,21 @@ ELF_FUNCTION(l_sys_get_performance_counter_frequency) {
 }
 
 ELF_FUNCTION(l_sys_get_performance_counter_elapsed_s) {
-	ASSERT(elf_get_num_args(S) == 1);
+	ASSERT((nargs - 1) == 1);
 	elf_i64 time = elf_get_intarg(S, 0);
 	elf_push_num(S, get_performance_counter_elapsed_s(time));
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_get_performance_counter_elapsed_ms) {
-	ASSERT(elf_get_num_args(S) == 1);
+	ASSERT((nargs - 1) == 1);
 	elf_i64 time = elf_get_intarg(S, 0);
 	elf_push_num(S, get_performance_counter_elapsed_s(time) * 1000);
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_sleep) {
-	ASSERT(elf_get_num_args(S) >= 1);
+	ASSERT((nargs - 1) >= 1);
 	sys_sleep(elf_get_intarg(S, 0));
 	return 0;
 }
@@ -74,7 +74,7 @@ ELF_FUNCTION(l_sys_get_file_times) {
 
 ELF_FUNCTION(l_sys_file_time_to_system_time) {
 
-	elf_Int time = elf_get_intarg(S, 0);
+	elf_Integer time = elf_get_intarg(S, 0);
 	FILE_TIME filetime = { .time = time };
 
 	SYSTEM_TIME systemtime;
@@ -242,7 +242,7 @@ static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 ELF_FUNCTION(l_sys_get_file_tree) {
 	char *path = elf_get_text_arg(S,0);
 	int recursion = 0;
-	if (elf_get_num_args(S) >= 2) {
+	if ((nargs - 1) >= 2) {
 		recursion = elf_get_intarg(S,1);
 	}
 	// filetree(S, path, recursion);
@@ -254,7 +254,7 @@ ELF_FUNCTION(l_sys_get_path_list) {
 	char *path = elf_get_text_arg(S,0);
 
 	int recurse = 0;
-	if (elf_get_num_args(S) >= 2) {
+	if ((nargs - 1) >= 2) {
 		recurse = elf_get_intarg(S,1);
 	}
 	elf_push_table(S);
@@ -285,7 +285,7 @@ ELF_FUNCTION(l_sys_delete_file) {
 }
 
 ELF_FUNCTION(l_sys_open_file) {
-	ASSERT(elf_get_num_args(S) == 2);
+	ASSERT((nargs - 1) == 2);
 
 	char *name = elf_get_text_arg(S,0);
 	char *text_flags = elf_get_text_arg(S,1);
@@ -307,7 +307,7 @@ ELF_FUNCTION(l_sys_open_file) {
 }
 
 ELF_FUNCTION(l_sys_close_file) {
-	ASSERT(elf_get_num_args(S) == 1);
+	ASSERT((nargs - 1) == 1);
 	elf_Handle file = elf_get_sysarg(S,0);
 	if (file) {
 		sys_close_file(file);
@@ -373,11 +373,12 @@ ELF_FUNCTION(l_sys_get_work_dir) {
 
 // process
 ELF_FUNCTION(l_sys_create_process) {
-	char *args = elf_get_text_arg(S, 0);
-	elf_Handle process = sys_create_process(0, args);
+	char *textargs = elf_get_text_arg(S, 0);
+	elf_Handle process = sys_create_process(0, textargs);
 	elf_push_handle(S, process);
 	return 1;
 }
+
 
 ELF_FUNCTION(l_sys_exit_this_process) {
 	sys_exit_this_process(elf_get_intarg(S, 0));

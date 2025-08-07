@@ -4,19 +4,18 @@
 
 
 ELF_FUNCTION(l_core_get_meta) {
-	elf_push_table_raw(S, elf_get_object_arg_raw(S, 0)->meta);
+	elf_pushmetatab(S, args + 1);
 	return 1;
 }
 
-
 ELF_FUNCTION(l_core_set_meta) {
-	elf_get_object_arg_raw(S, 0)->meta = elf_get_table(S, 1);
-	*S->stack_ptr ++ = elf_get_arg(S, 0);
+	elf_setmetatab(S, args + 1, args + 2);
+	elf_pushmetatab(S, args + 1);
 	return 1;
 }
 
 ELF_FUNCTION(l_core_tagof) {
-	elf_push_string(S, tag2s[elf_get_argtag(S, 0)]);
+	elf_push_string(S, tag2s[elf_gettag(S, args + 1)]);
 	return 1;
 }
 
@@ -31,15 +30,15 @@ ELF_FUNCTION(l_core_iton) {
 ELF_FUNCTION(l_core_ntoi) {
 	elf_Value v = elf_get_arg(S, 0);
 	if (v.tag == elf_tag_Num) {
-		elf_push_int(S, (elf_Int) v.x_num);
+		elf_push_int(S, (elf_Integer) v.x_num);
 	} else elf_push_int(S, v.x_int);
 	return 1;
 }
 
 
 ELF_FUNCTION(l_core_load_file) {
-	int nargs = 0; // elf_get_num_args(S) - 1;
-	int nrets = elf_get_num_rets(S);
+	int c_nargs = 0; // (nargs - 1) - 1;
+	int c_nrets = nrets;
 
 	elf_push_string(S, "noname");
 
@@ -47,14 +46,14 @@ ELF_FUNCTION(l_core_load_file) {
 	*S->stack_ptr ++ = elf_get_arg(S, 0);
 	elf_read_file(S, -1);
 
-	nrets = elf_exec(S,nargs,nrets,false);
-	return nrets;
+	c_nrets = elf_exec(S,c_nargs,c_nrets,false);
+	return c_nrets;
 }
 
 
 ELF_FUNCTION(l_core_load_expr) {
-	int nargs = 1; // elf_get_num_args(S) - 1;
-	int nrets = elf_get_num_rets(S);
+	int c_nargs = 1; // (nargs - 1) - 1;
+	int c_nrets = nrets;
 
 	elf_push_string(S, "noname");
 
@@ -62,8 +61,8 @@ ELF_FUNCTION(l_core_load_expr) {
 	*S->stack_ptr ++ = elf_get_arg(S, 0);
 	elf_read_file(S, -1);
 
-	nrets = elf_exec(S,nargs,nrets,false);
-	return nrets;
+	c_nrets = elf_exec(S,c_nargs,c_nrets,false);
+	return c_nrets;
 }
 
 
@@ -110,8 +109,8 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 			elf_Table *tab = v.x_tab;
 			wrote += bprintf(sb, "{");
 
-			elf_IndexInt i,j,n;
-			for (i=0;i<ARRAY_LENGTH(tab->array);++i) {
+			index_t i,j,n;
+			for (i=0;i<arrlen(tab->array);++i) {
 				if (i != 0) wrote += bprintf(sb, ", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elf_Table_Entry it = tab->slots[j];
@@ -154,7 +153,7 @@ ELF_FUNCTION(l_core_format) {
 			bwritechar(&sb, *format ++);
 		}
 		if (*format == '%') {
-			if (argindex >= elf_get_num_args(S)) {
+			if (argindex >= (nargs - 1)) {
 				elf_error(S, NO_BYTE, "not enough arguments to format string!");
 			}
 			format += 1;
@@ -171,7 +170,7 @@ ELF_FUNCTION(l_core_fpf) {
 	elf_Handle file = elf_get_sysarg(S, 0);
 
 	String_Builder sb = {};
-	for (int i = 1; i < elf_get_num_args(S); i ++) {
+	for (int i = 1; i < (nargs - 1); i ++) {
 		value_bprintf(&sb, elf_get_arg(S, i), 0);
 	}
 	elf_push_int(S, sb.min);
@@ -184,7 +183,7 @@ ELF_FUNCTION(l_core_fpf) {
 
 ELF_FUNCTION(l_core_pf) {
 	String_Builder sb = {};
-	for (int i = 0; i < elf_get_num_args(S); i ++) {
+	for (int i = 0; i < (nargs - 1); i ++) {
 		value_bprintf(&sb, elf_get_arg(S,i),0);
 	}
 	bprintf(&sb, "\n");
@@ -221,10 +220,10 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 			// todo:
 			// figure this out, or pass in flags to determine whether to omit the hash part or the array part
 			if (table->nslots) {
-				elf_IndexInt i;
+				index_t i;
 				for (i = 0; i < table->ntotal; ++ i) {
 					elf_Table_Entry entry = table->slots[i];
-					elf_IndexInt index = entry.idx;
+					index_t index = entry.idx;
 					elf_Value key = entry.key;
 
 					if ((key.tag != elf_tag_Num)

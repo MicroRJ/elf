@@ -11,23 +11,28 @@
 // todo: remove!
 #define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_tag_Nil) && (T->slots[X].key.tag != elf_tag_Tomb))
 
-#define IS_DEAD_TAG(T) (((T) == elf_tag_Nil) || ((T) == elf_tag_Tomb))
 
-static inline void elf_tableK_recycle(elf_Table *tab) {
+elf_rawapi
+inline void elf_tableK_recycle(elf_Table *tab) {
 	free(tab->slots);
+
 	ARRAY_DELETE(tab->array);
+
 	tab->array = 0;
 	tab->slots = 0;
 }
 
-static inline void init_table(elf_State *S, elf_Table *table, elf_IndexInt nentries) {
+
+static inline void init_table(elf_State *S, elf_Table *table, index_t nentries) {
 	table->ndebug = 0;
 	table->slots  = calloc(1, nentries * sizeof(elf_Table_Entry));
 	table->ntotal = nentries;
 	table->nslots = 0;
 }
 
-static inline elf_Table *elf_alloc_table2(elf_State *S, elf_IndexInt nentries) {
+
+elf_rawapi
+inline elf_Table *elf_alloc_table2(elf_State *S, index_t nentries) {
 	elf_Table *table = elf_gc_alloc(S, GC_TAB, sizeof(elf_Table));
 	table->obj.meta = S->metatables.table;
 
@@ -35,7 +40,9 @@ static inline elf_Table *elf_alloc_table2(elf_State *S, elf_IndexInt nentries) {
 	return table;
 }
 
-elf_Table *elf_alloc_table(elf_State *R) {
+
+elf_rawapi
+inline elf_Table *elf_alloc_table(elf_State *R) {
 	return elf_alloc_table2(R, 4);
 }
 
@@ -69,7 +76,7 @@ static void check_resize(elf_Table *table) {
 #if 1
 
 
-static inline elf_HashInt hash_value(elf_Value *v) {
+static inline hash_t hash_value(elf_Value *v) {
 	if (v->tag == elf_tag_String) {
 		return elf_get_string_hash(v->x_str);
 	}
@@ -153,25 +160,24 @@ bool value_equals(elf_Value *x, elf_Value *y) {
 #endif
 
 
-
-
-elf_Int elf_array_get_length(elf_Table *table) {
-	return ARRAY_LENGTH(table->array);
+elf_rawapi
+inline elf_Integer elf_array_get_length(elf_Table *table) {
+	return arrlen(table->array);
 }
 
-// todo: also why does this return the slot as supposed to just
-// the entry directly? what is this for?
-elf_IndexInt elf_table_try_(elf_Table *tab, elf_Value key) {
+
+elf_rawapi
+index_t elf_table_try_(elf_Table *tab, elf_Value key) {
 	ASSERT(tab != 0);
 
 	check_resize(tab);
 
-	elf_HashInt hash = hash_value(&key);
+	hash_t hash = hash_value(&key);
 
 	elf_Table_Entry *slots = tab->slots;
-	elf_IndexInt ntotal = tab->ntotal;
+	index_t ntotal = tab->ntotal;
 
-	elf_IndexInt head,tail,walk;
+	index_t head,tail,walk;
 
 	head = hash & (ntotal - 1);
 	tail = head;
@@ -192,9 +198,10 @@ elf_IndexInt elf_table_try_(elf_Table *tab, elf_Value key) {
 	return -1;
 }
 
-elf_IndexInt elf_raw_table_set(elf_Table *table, elf_Value key, elf_Value value) {
-	elf_IndexInt index = -1;
-	elf_IndexInt slot = elf_table_try_(table, key);
+elf_rawapi
+index_t elf_raw_table_set(elf_Table *table, elf_Value key, elf_Value value) {
+	index_t index = -1;
+	index_t slot = elf_table_try_(table, key);
 	ASSERT(slot >= 0);
 
 	elf_Table_Entry *entry = table->slots + slot;
@@ -213,7 +220,7 @@ elf_IndexInt elf_raw_table_set(elf_Table *table, elf_Value key, elf_Value value)
 
 
 elf_Value elf_table_get_raw(elf_Table *tab, elf_Value k) {
-	elf_Int slot = elf_table_try_(tab,k);
+	elf_Integer slot = elf_table_try_(tab,k);
 	if (slot == -2) NO_CODE;
 	if (slotiskey(tab,slot)) {
 		return slot2value(tab,slot);
@@ -221,17 +228,18 @@ elf_Value elf_table_get_raw(elf_Table *tab, elf_Value k) {
 	return (elf_Value){elf_tag_Nil,0};
 }
 
-static elf_IndexInt elf_table_get_index_always_(elf_Table *table, elf_Value key) {
+
+static index_t elf_table_get_index_always_(elf_Table *table, elf_Value key) {
 
 	ASSERT(!isnil(key));
 
-	elf_IndexInt slot = elf_table_try_(table, key);
+	index_t slot = elf_table_try_(table, key);
 	ASSERT(slot >= 0);
 
-	elf_IndexInt index = table->entries[slot].idx;
+	index_t index = table->entries[slot].idx;
 
 	// there's nothing here, so create use up the slot
-	if (IS_DEAD_TAG(table->entries[slot].key.tag)) {
+	if (isdead(table->entries[slot].key)) {
 		index = ARRAY_GROW(table->array, 1);
 		table->entries[slot].key = key;
 		table->entries[slot].idx = index;
@@ -245,16 +253,80 @@ static elf_IndexInt elf_table_get_index_always_(elf_Table *table, elf_Value key)
 }
 
 
-// todo: inline version of this?
-elf_IndexInt elf_array_add_k(elf_Table *table, elf_Value v) {
-	elf_IndexInt index = ARRAY_GROW(table->array, 1);
+elf_rawapi
+index_t elf_raw_array_add(elf_Table *table, elf_Value v) {
+	index_t index = ARRAY_GROW(table->array, 1);
 	table->array[index] = v;
 	return index;
 }
 
 
+elf_pubapi
+elf_Value elf_table_get(elf_State *inter) {
+	elf_Value tab = inter->stack_ptr[-2];
+	elf_Value key = inter->stack_ptr[-1];
+
+	if (tab.tag != elf_tag_Table) {
+		elf_error(inter, NO_BYTE, "Not A Table!");
+	}
+
+	elf_Value val = elf_table_get_raw(vgettab(tab), key);
+
+	inter->stack_ptr -= 1;
+	return val;
+}
+
+
+elf_pubapi
+index_t elf_table_set(elf_State *inter) {
+	elf_Value tab = inter->stack_ptr[-3];
+	elf_Value key = inter->stack_ptr[-2];
+	elf_Value val = inter->stack_ptr[-1];
+
+	if (tab.tag != elf_tag_Table) {
+		elf_error(inter, NO_BYTE, "Not A Table!");
+	}
+
+	index_t idx = elf_raw_table_set(vgettab(tab), key, val);
+
+	inter->stack_ptr -= 2;
+	return idx;
+}
+
+
+elf_pubapi
+index_t elf_array_add(elf_State *inter) {
+	elf_Value tab = inter->stack_ptr[-2];
+	elf_Value val = inter->stack_ptr[-1];
+
+	if (tab.tag != elf_tag_Table) {
+		elf_error(inter, NO_BYTE, "Not A Table!");
+	}
+
+	index_t idx = elf_raw_array_add(vgettab(tab), val);
+
+	inter->stack_ptr -= 1;
+	return idx;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // void elf_tadd_tab(elf_Table *table, elf_Table *thing) {
-// 	ARRAY_ADD(table->array,VALUE_TABLE(thing));
+// 	arradd(table->array,VALUE_TABLE(thing));
 // }
 
 
@@ -265,7 +337,7 @@ typedef struct TABLE_BINARY_FILE {
 } TABLE_BINARY_FILE;
 
 void elf_table_export_binary(elf_Table *tab, FILE *io) {
-	FOR_RANGE(i, 0, ARRAY_LENGTH(tab->array)) {
+	FOR_RANGE(i, 0, arrlen(tab->array)) {
 		elf_Value value = tab->array[i];
 		switch (value.tag) {
 			// todo: compression!
@@ -285,7 +357,7 @@ void elf_table_export_binary(elf_Table *tab, FILE *io) {
 
 // todo: this path can be entirely removed because we only
 // ever use it for the registry stuff which will get its own data structure
-// elf_IndexInt elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, elf_HashInt hash) {
+// index_t elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, hash_t hash) {
 // 	check_resize(tab);
 
 // 	elf_Table_Entry *slots = tab->slots;
@@ -318,7 +390,7 @@ void elf_table_export_binary(elf_Table *tab, FILE *io) {
 // elf_Value elf_tgetx_any(elf_Table *tab, char const *key) {
 // 	int length;
 // 	elf_i64 hash;
-// 	elf_Int slot;
+// 	elf_Integer slot;
 // 	length=text_length(key);
 // 	hash=hash_text(key);
 // 	slot=elf_table_try_text(tab,key,length,hash);

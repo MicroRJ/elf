@@ -66,7 +66,7 @@ static treeID tree_label(elf_Parser *parser, Source line, treeID *z) {
 static treeID tree_nil(elf_Parser *parser, Source line) {
 	return tree_nullary(parser,line,EXPR_NIL,NT_NIL);
 }
-static treeID tree_int(elf_Parser *parser, Source line, elf_Int i) {
+static treeID tree_int(elf_Parser *parser, Source line, elf_Integer i) {
 	treeID v;
 	v=tree_nullary(parser,line,EXPR_INT,NT_INT);
 	v->expr_int=i;
@@ -157,8 +157,8 @@ static treeID tree_meta_field(elf_Parser *parser, Source line, treeID x, treeID 
 static treeID tree_call_set_meta(elf_Parser *parser, Source line, treeID object, treeID metatable) {
 	treeID name = tree_global_symbol(parser,line,"elf.set_meta");
 	treeID *z = 0;
-	ARRAY_ADD(z, object);
-	ARRAY_ADD(z, metatable);
+	arradd(z, object);
+	arradd(z, metatable);
 	return tree_call(parser,line,name,z);
 }
 

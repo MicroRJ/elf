@@ -41,9 +41,9 @@ static void set_mem_state(elf_Parser *parser, int state) { parser->memory_state 
 
 
 // todo: interning
-static int add_const_int(elf_State *S, elf_Int i) {
+static int add_const_int(elf_State *S, elf_Integer i) {
 
-	elf_IndexInt index = ARRAY_GROW(S->integers, 1);
+	index_t index = ARRAY_GROW(S->integers, 1);
 	S->integers[index] = i;
 
 	return index;
@@ -52,7 +52,7 @@ static int add_const_int(elf_State *S, elf_Int i) {
 // todo: interning
 static int add_const_num(elf_State *S, elf_Number i) {
 
-	elf_IndexInt index = ARRAY_GROW(S->numbers, 1);
+	index_t index = ARRAY_GROW(S->numbers, 1);
 	S->numbers[index] = i;
 
 	return index;
@@ -119,7 +119,7 @@ static elf_Proto genfunction(elf_Parser *parser, treeID tree) {
 	elf_Proto proto = {};
 	proto.arity = 1;
 	proto.bytes = start;
-	proto.ncaptures = ARRAY_LENGTH(tree->tree_funexpr.capts);
+	proto.ncaptures = arrlen(tree->tree_funexpr.capts);
 	proto.stacksize = parser->memory_usage;
 	proto.numbytes = R->nbytes - start;
 
@@ -475,7 +475,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			}
 			set_mem_state(parser,mem);
 
-			nargs=ARRAY_LENGTH(tree.z)+1;
+			nargs=arrlen(tree.z)+1;
 			emit_bytexyz(parser,line,BC_CALL,mem,nargs,ndst);
 
 			if (ndst<1) goto esc;
@@ -596,10 +596,10 @@ static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id
 			_got_mem:
 			if (if_true) {
 				jmp=emit_bytexy(parser,tree.line,BC_JNZ,NO_JUMP,mem);
-				ARRAY_ADD(js->t,jmp);
+				arradd(js->t,jmp);
 			} else {
 				jmp=emit_bytexy(parser,tree.line,BC_JZ,NO_JUMP,mem);
-				ARRAY_ADD(js->f,jmp);
+				arradd(js->f,jmp);
 			}
 		} break;
 	}
@@ -675,7 +675,7 @@ void add_else_clause(elf_Parser *fs, Source line, BranchJumps *s) {
 	}
 	ASSERT(s->jz != 0);
 	int j = emit_jump(fs,line,-1);
-	ARRAY_ADD(s->j,j);
+	arradd(s->j,j);
 
 	patch_jumps(fs,s->jz);
 	ARRAY_DELETE(s->jz);
@@ -724,9 +724,9 @@ static int emit_byte(elf_Parser *parser, Source line, elf_Bytec byte) {
 	line = line ? line : parser->sourceloc;
 	ASSERT(line != 0);
 	parser->sourceloc = line;
-	ARRAY_ADD(M->lines, line);
-	ARRAY_ADD(M->bytes, byte);
-	ARRAY_ADD(M->track, 0);
+	arradd(M->lines, line);
+	arradd(M->bytes, byte);
+	arradd(M->track, 0);
 	// fpf_byte(stdout,M,-1,M->nbytes-C->fn->bytes,byte);
 	return M->nbytes ++;
 }

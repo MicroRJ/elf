@@ -5,10 +5,10 @@
 static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 	elf_String *result = 0;
 	elf_Table *registry = R->strings;
-	elf_HashInt hash = hash_text(text);
+	hash_t hash = hash_text(text);
 
 	if (length < 64 && registry != 0) {
-		elf_Int slot = elf_table_try_text(registry,text,length,hash);
+		elf_Integer slot = elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
 		elf_Table_Entry entry = registry->slots[slot];
 		if (entry.key.tag != elf_tag_Nil) {
@@ -19,7 +19,7 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 			copy_memory(string->text,text,length);
 			string->hash = hash;
 
-			elf_Int i = ARRAY_GROW(registry->array,1);
+			elf_Integer i = ARRAY_GROW(registry->array,1);
 			registry->array[i]=VALUE_STRING(string);
 			registry->slots[slot].key=VALUE_STRING(string);
 			registry->slots[slot].idx=i;

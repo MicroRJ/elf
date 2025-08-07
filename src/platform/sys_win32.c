@@ -167,7 +167,7 @@ int core_lib_list_volumes(elf_State *R) {
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				elf_array_add_k(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
+				elf_raw_array_add(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -216,19 +216,19 @@ void sys_virtual_dealloc(void *memory) {
 }
 
 
-void sys_sleep(elf_Int ms) {
+void sys_sleep(elf_Integer ms) {
 	Sleep((DWORD) ms);
 }
 
 
-elf_Int sys_get_performance_counter_frequency() {
+elf_Integer sys_get_performance_counter_frequency() {
 	LARGE_INTEGER large_integer;
 	QueryPerformanceFrequency(&large_integer);
 	return large_integer.QuadPart;
 }
 
 
-elf_Int sys_get_performance_counter() {
+elf_Integer sys_get_performance_counter() {
 	LARGE_INTEGER large_integer;
 	QueryPerformanceCounter(&large_integer);
 	return large_integer.QuadPart;

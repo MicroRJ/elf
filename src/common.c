@@ -97,13 +97,13 @@ static void get_source_info(char *source, char *cursor, int *line_number, char *
 	if (line_start) *line_start = c;
 }
 
-static void *clear_memory(void *target, elf_Int length) {
+static void *clear_memory(void *target, elf_Integer length) {
 	memset(target,0,length);
 	return target;
 }
 
 
-static void *copy_memory(void *dst, void const *src, elf_Int length) {
+static void *copy_memory(void *dst, void const *src, elf_Integer length) {
 	memcpy(dst,src,length);
 	return dst;
 }
@@ -169,13 +169,20 @@ int text_length(char const *s) {
 
 static int find_subtext(char *s, char *p) {
 	for (int i = 0; *s; s ++, i ++) {
-		char *c = p;
-		while (*c) {
-			if (*s != *c ++) goto retry;
+
+		char *pc, *sc;
+		for (sc = s, pc = p; *pc; sc ++, pc ++) {
+			if (*sc != *pc) goto retry;
 		}
+
+		// got here, no match, if subtext longer, return
+		if (*sc == 0 && *pc != 0) goto esc;
+
 		return i;
 		retry: ;
 	}
+
+	esc:
 	return -1;
 }
 

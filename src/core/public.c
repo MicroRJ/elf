@@ -6,6 +6,73 @@
 // todo: why does this file even exist! merge with internal.c
 //
 
+#define TOP(S) (S->stack_ptr)
+
+elf_rawapi
+inline elf_StkInt incstackptr(elf_State *S) {
+	elf_StkInt index = S->stack_ptr ++ - S->stack;
+	ASSERT(index < S->stack_max);
+	return index;
+}
+
+
+
+elf_pubapi
+int elf_pushmetatab(elf_State *inter, int objstk) {
+	elf_Value v = inter->stack[objstk];
+	if (!isobj(v)) {
+		elf_errorf(inter, -1, "expected object at %i", objstk);
+	}
+	vsettab(inter->stack_ptr, vgetobj(v)->meta);
+	return incstackptr(inter);
+}
+
+
+elf_pubapi
+void elf_setmetatab(elf_State *inter, int objstk, int tabstk) {
+	elf_Value obj = inter->stack[objstk];
+	elf_Value tab = inter->stack[tabstk];
+	if (!isobj(obj)) {
+		elf_errorf(inter, -1, "expected object at %i", objstk);
+	}
+	if (!istab(tab)) {
+		elf_errorf(inter, -1, "expected table at %i", tabstk);
+	}
+	vgetobj(obj)->meta = vgettab(tab);
+}
+
+
+
+
+
+
+
+elf_pubapi
+elf_Tag elf_gettag(elf_State *inter, int x) {
+	return inter->stack[x].tag;
+}
+
+
+elf_pubapi
+elf_Number elf_tonum(elf_State *inter, int x) {
+	elf_Value v = inter->stack[x];
+	if (isint(v)) return vgetint(v); // cast
+	if (isnum(v)) return vgetnum(v);
+	_check_arg_tag(inter, elf_tag_Num, v.tag,x);
+	return 0;
+}
+
+
+elf_pubapi
+elf_Integer elf_toint(elf_State *inter, int x) {
+	elf_Value v = inter->stack[x];
+	if (isnum(v)) return vgetnum(v); // cast
+	if (isint(v)) return vgetint(v);
+	_check_arg_tag(inter, elf_tag_Num, v.tag,x);
+	return 0;
+}
+
+
 
 const char *tag2s[] = {
 	[elf_tag_Nil] = "nil",
@@ -21,14 +88,6 @@ const char *tag2s[] = {
 };
 
 
-#define TOP(S) (S->stack_ptr)
-
-elf_rawapi
-inline elf_StkInt incstackptr(elf_State *S) {
-	elf_StkInt index = S->stack_ptr ++ - S->stack;
-	ASSERT(index < S->stack_max);
-	return index;
-}
 
 static elf_String *stkstr(elf_State *inter, int index) {
 	elf_Value *v = inter->stack_ptr + index;
@@ -38,6 +97,7 @@ static elf_String *stkstr(elf_State *inter, int index) {
 	return v->x_str;
 }
 
+// todo: remove, this function is retarded!
 // return value is number of returns, if negative, errors occurred
 int elf_exec(elf_State *inter, int nargs, int nrets, bool asexpr) {
 	elf_String *name = stkstr(inter, -2);
@@ -56,16 +116,12 @@ elf_State *elf_new() {
 	return inter;
 }
 
-int elf_get_num_args(elf_State *S) {
-	return S->frame.nargs - 1;
-}
 
-int elf_get_num_rets(elf_State *S) {
-	return S->frame.nrets;
-}
 
-elf_Tag elf_get_argtag(elf_State *S, int x) {
-	return S->frame.framebase[x + 1].tag;
+int elf_push_globals(elf_State *S) {
+	TOP(S)->tag = elf_tag_Table;
+	TOP(S)->x_tab = S->globals;
+	return incstackptr(S);
 }
 
 int elf_push_nil(elf_State *S) {
@@ -74,7 +130,7 @@ int elf_push_nil(elf_State *S) {
 	return incstackptr(S);
 }
 
-int elf_push_int(elf_State *S, elf_Int x) {
+int elf_push_int(elf_State *S, elf_Integer x) {
 	TOP(S)->tag = elf_tag_Int;
 	TOP(S)->x_int = x;
 	return incstackptr(S);
@@ -110,12 +166,6 @@ int elf_push_table(elf_State *S) {
 	return incstackptr(S);
 }
 
-int elf_push_globals(elf_State *S) {
-	TOP(S)->tag = elf_tag_Table;
-	TOP(S)->x_tab = S->globals;
-	return incstackptr(S);
-}
-
 elf_pubapi
 int elf_push_string(elf_State *inter, const char *text) {
 	elf_String *str = elf_alloc_string(inter, text);
@@ -128,24 +178,4 @@ int elf_push_string3(elf_State *inter, const char *text, int length) {
 	elf_String *str = elf_alloc_string3(inter, text, length);
 	vsetstr(inter->stack_ptr, str);
 	return incstackptr(inter);
-}
-
-
-elf_IndexInt elf_table_set(elf_State *S) {
-	elf_Value value = * -- S->stack_ptr;
-	elf_Value key = * -- S->stack_ptr;
-	elf_Value *table = S->stack_ptr - 1;
-	if (table->tag != elf_tag_Table) {
-		elf_error(S, NO_BYTE, "Not A Table!");
-	}
-	return elf_raw_table_set(table->x_tab, key, value);
-}
-
-elf_IndexInt elf_array_add(elf_State *S) {
-	elf_Value value = * -- S->stack_ptr;
-	elf_Value *table = S->stack_ptr - 1;
-	if (table->tag != elf_tag_Table) {
-		elf_error(S, NO_BYTE, "Not A Table!");
-	}
-	return elf_array_add_k(table->x_tab, value);
 }

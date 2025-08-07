@@ -114,7 +114,7 @@
 // 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
 // 	elf_String *payload = elf_get_string_arg(R,1);
 // 	LMSG message = { payload->length };
-// 	elf_Int sent = 0;
+// 	elf_Integer sent = 0;
 // 	sent += send(socket,(char*)&message,sizeof(message),0);
 // 	sent += send(socket,payload->c,payload->length,0);
 // 	elf_push_int(R,sent);
@@ -136,12 +136,12 @@
 // 	LMSG message = {0};
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {
-// 			elf_Int length = message.length;
+// 			elf_Integer length = message.length;
 // 			elf_String *obj = elf_alloc_string2(R,length);
 // 			elf_push_string_raw(R,obj);
 // 			char *cursor = obj->c;
 // 			do {
-// 				elf_Int result = recv(socket,cursor,length,0);
+// 				elf_Integer result = recv(socket,cursor,length,0);
 // 				if (result == SOCKET_ERROR) {
 // 					int error = WSAGetLastError();
 // 					if (error == WSAEWOULDBLOCK) {

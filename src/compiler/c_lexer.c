@@ -81,7 +81,7 @@ static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) 
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
 		char *filename = parser->name;
-		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_Int)(1+line-lineloc),b);
+		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_Integer)(1+line-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -264,7 +264,7 @@ static Token get_tok(elf_Parser *parser) {
 					/* are multi-line strings illegal? */
 					if (PICK('\n') || (PICK('\r') && (PICK('\n'),1))) {
 						// new_line(parser);
-						ARRAY_ADD(buffer,'\n');
+						arradd(buffer,'\n');
 					} else {
 						// don't check for format
 						if (token.type != TK_FORMAT_STRING) goto escchar;
@@ -272,12 +272,12 @@ static Token get_tok(elf_Parser *parser) {
 						// todo: make it so that we can escape the formatting
 						if (POS0() == FORMAT_CHAR && POS1() == '{') {
 							needsformatting = true;
-							ARRAY_ADD(buffer, *parser->cursor ++);
-							ARRAY_ADD(buffer, *parser->cursor ++);
+							arradd(buffer, *parser->cursor ++);
+							arradd(buffer, *parser->cursor ++);
 						} else {
 							escchar:
 							int chr = pick_esc_char(parser);
-							ARRAY_ADD(buffer, chr);
+							arradd(buffer, chr);
 						}
 					}
 				}
@@ -291,11 +291,11 @@ static Token get_tok(elf_Parser *parser) {
 
 				// did we find anything?
 				if (PICK('"')) {
-					ARRAY_ADD(buffer,'\n');
+					arradd(buffer,'\n');
 				} else break;
 			}
 
-			ARRAY_ADD(buffer,0);
+			arradd(buffer,0);
 
 			// todo: leak, allocate this properly in some sort
 			// of constant pool with intering, use the atomizer

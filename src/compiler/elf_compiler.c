@@ -57,7 +57,7 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 
 	add_this_param(parser, parser->tok.line);
 
-	ARRAY_ADD(parser->functions, func);
+	arradd(parser->functions, func);
 
 	if (as_expr) {
 
@@ -70,14 +70,14 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 		// todo: parse block function?
 		while (parse_stat(parser));
 		FOR_ARRAY(i, parser->block.defers) {
-			ARRAY_ADD(parser->block.body, parser->block.defers[i]);
+			arradd(parser->block.body, parser->block.defers[i]);
 		}
 
 	}
 	func->tree_funexpr.body = tree_block(parser, parser->tok.line, parser->block.body, 0, 0);
 
 	// create prototypes for every function
-	int nfunctions = ARRAY_LENGTH(parser->functions);
+	int nfunctions = arrlen(parser->functions);
 	int index = ARRAY_GROW(S->protos, nfunctions);
 	elf_Proto *protos = & S->protos[index];
 
@@ -111,13 +111,13 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 			.contents = contents,
 			.name = name,
 		};
-		ARRAY_ADD(S->files, file);
+		arradd(S->files, file);
 	}
 
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
-	elf_array_add_k(S->globals, VALUE_STRING(contents));
-	elf_array_add_k(S->globals, VALUE_STRING(name));
+	elf_raw_array_add(S->globals, VALUE_STRING(contents));
+	elf_raw_array_add(S->globals, VALUE_STRING(name));
 
 	free(parser);
 

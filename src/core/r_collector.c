@@ -59,7 +59,7 @@ static elf_i64 _mark(elf_Object *obj) {
 					num += _mark(slots[i].key.x_obj);
 				}
 			}
-			FOR_RANGE(i,0,ARRAY_LENGTH(array)) {
+			FOR_RANGE(i,0,arrlen(array)) {
 				if (tisobject(array[i].tag)) {
 					num += _mark(array[i].x_obj);
 				}
@@ -136,7 +136,7 @@ static elf_i64 elf_gc_cycle(elf_State *R) {
 		num_marked = _gc_mark(R);
 		// elf_debug_log("mark took: %fms", prof_time_diff_ms(_time));
 	}
-	elf_i64 num_objects = R->G.num_objects; // ARRAY_LENGTH(R->G.objects);
+	elf_i64 num_objects = R->G.num_objects; // arrlen(R->G.objects);
 	elf_i64 num_to_collect = num_objects - num_marked;
 	elf_i64 obj_trigger_threshold = R->G.object_trigger_threshold;
 	// elf_debug_log("GC: %lli - %lli -> %lli (%lli), (total - marked = expected) (threshold)",num_objects,num_to_collect,num_marked,obj_trigger_threshold);
