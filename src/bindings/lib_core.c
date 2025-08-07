@@ -2,6 +2,28 @@
 // See Copyright Notice In elf.h
 //
 
+// todo: we need something that hashes the pointer
+// with more weight, and the pointer hash should weight
+// the middle bits more, since the low bits are usually
+// empty because of alignment, and the high bits remain
+// similar because allocations tend to be smaller
+// So most of the sporadic distribution should come from
+// the pointer, but it shouldn't be too much because most
+// objects tend to have few fields.
+ELF_FUNCTION(l_core_registryhash64) {
+	elf_Integer ptr = S->stack[args + 1].x_int;
+	// elf_String *str = S->stack[args + 2].x_str;
+	// hash_t hsh = str->hash + 0x9e3779b97f4a7c15ULL + (ptr << 6) + (ptr >> 2);
+	char buf[64] = {};
+	const char *str = elf_tostr(S, args + 2);
+	memcpy(buf, &ptr, sizeof(ptr));
+	memcpy(buf, str, strlen(str) + 1);
+	// ASSERT(strlen(str) + 1 < 64 - 8);
+	elf_Integer hsh = hash_text(buf);
+	elf_pushint(S, hsh);
+	return 1;
+}
+
 
 ELF_FUNCTION(l_core_get_meta) {
 	elf_pushmetatab(S, args + 1);
@@ -313,6 +335,7 @@ const static elf_Binding lib_core[] = {
 	{"fpf", l_core_fpf},
 	{"pf", l_core_pf},
 	{"unload", l_core_unload},
+	{"registryhash64", l_core_registryhash64},
 };
 
 
