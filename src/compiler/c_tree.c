@@ -134,12 +134,14 @@ static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
 }
 
-// todo: the load tree could be removed if the
-// set memory tree took into account trees that
-// already had memory, but I don't know that we
-// want that always?
-static treeID tree_load(elf_Parser *parser, Source line, treeID x) {
-	return tree_unary(parser,line,TREE_LOAD,get_tree_type(parser,x),x);
+// if the tree doesn't have any memory, it gets loaded, otherwise it gets reloaded
+// into a new memory slot that slot is associated with this tree.
+static treeID tree_reload(elf_Parser *parser, Source line, treeID x) {
+	return tree_unary(parser, line, TREE_RELOAD, get_tree_type(parser, x), x);
+}
+
+static treeID tree_proxy(elf_Parser *parser, Source line, treeID x) {
+	return tree_unary(parser, line, TREE_PROXY, get_tree_type(parser, x), x);
 }
 
 static treeID tree_less_than(elf_Parser *parser, Source line, treeID x, treeID y) {
@@ -157,8 +159,8 @@ static treeID tree_meta_field(elf_Parser *parser, Source line, treeID x, treeID 
 static treeID tree_call_set_meta(elf_Parser *parser, Source line, treeID object, treeID metatable) {
 	treeID name = tree_global_symbol(parser,line,"elf.set_meta");
 	treeID *z = 0;
-	arradd(z, object);
-	arradd(z, metatable);
+	d_array_add(z, object);
+	d_array_add(z, metatable);
 	return tree_call(parser,line,name,z);
 }
 

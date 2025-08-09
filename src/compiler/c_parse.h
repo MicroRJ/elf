@@ -61,6 +61,13 @@ typedef struct Loop Loop;
 struct Loop {
 	treeID *breaks;
 	treeID *continues;
+	treeID  index, value;
+	// so this is intersting, because for us to find a loop
+	// by name in the first place - for instance, #index(i),
+	// the parser has to resolve i by looking up the entity,
+	// but then what we get is a tree, so we could look up
+	// the entity by the tree, or we could just lookup the
+	// loop by the tree directly (which ends up being faster).
 	treeID  name;
 };
 
@@ -112,7 +119,6 @@ struct elf_Parser {
 	// remember loop hierarchy
 	Loop             loop_stack[32];
 	int              loop_index;
-	Loop             loop;
 	// DURING CODE GENERATION:
 	// track memory usage
 	int 	          memory_usage;

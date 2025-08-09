@@ -56,25 +56,25 @@ types... if this changes then ensure it lines
 up with elf_GC_Ty */
 typedef enum {
 	/* the value is nil */
-	elf_tag_Nil = 0,
+	ELF_TNIL = 0,
 	/* the value is a tombstone, values of this type only reside in closed systems */
-	elf_tag_Tomb,
+	ELF_TTOMB,
 	/* the value is a 64 bit floating point number */
-	elf_tag_Num,
+	ELF_TNUMBER,
 	/* the value is a 64 bit integer */
-	elf_tag_Int,
+	ELF_TINTEGER,
 	/* the value is a handle */
-	elf_tag_Handle,
+	ELF_THANDLE,
 	/* the value is a function */
-	elf_tag_Function,
+	ELF_TFUNCTION,
 	/* the value is a custom object */
-	elf_tag_UserObject,
+	ELF_TUSER,
 	/* the value is a closure object */
-	elf_tag_Closure,
+	ELF_TCLOSURE,
 	/* the value is string object */
-	elf_tag_String,
+	ELF_TSTRING,
 	/* the value is table object */
-	elf_tag_Table,
+	ELF_TTABLE,
 } elf_Tag;
 
 // todo: delete!
@@ -116,26 +116,33 @@ elf_pubapi int elf_call(elf_State *, int nargs, int nrets);
 
 // todo: should these return instead the numer of returns?
 // similar to the elf signature?
+
 elf_pubapi int elf_readfileh(elf_State *, elf_Handle file, int size);
 elf_pubapi int elf_readfilen(elf_State *, const char *name, int size);
 elf_pubapi int elf_readfile(elf_State *, int stk, int size);
+
 elf_pubapi void elf_setfield(elf_State *);
 elf_pubapi void elf_arrayadd(elf_State *);
+elf_pubapi void elf_arrayget(elf_State *);
 
 
-elf_pubapi elf_stkid elf_gettop(elf_State *);
 elf_pubapi elf_Tag elf_gettag(elf_State *, elf_stkid from);
 
-elf_pubapi elf_stkid elf_pushmetatab(elf_State *, elf_stkid from);
-elf_pubapi elf_stkid elf_pushglobals(elf_State *);
-elf_pubapi elf_stkid elf_pushint(elf_State *, elf_Integer);
-elf_pubapi elf_stkid elf_pushnil(elf_State *);
-elf_pubapi elf_stkid elf_pushnum(elf_State *, elf_Number);
-elf_pubapi elf_stkid elf_pushtab(elf_State *);
-elf_pubapi elf_stkid elf_pushstr(elf_State *, const char *);
-elf_pubapi elf_stkid elf_pushstrl(elf_State *, const char *, int length);
-elf_pubapi elf_stkid elf_pushfun(elf_State *, elf_Function);
-elf_pubapi elf_stkid elf_pushsys(elf_State *, elf_Handle);
+
+elf_pubapi void elf_pushnil(elf_State *);
+elf_pubapi void elf_pushint(elf_State *, elf_Integer);
+elf_pubapi void elf_pushnum(elf_State *, elf_Number);
+elf_pubapi void elf_pushtab(elf_State *);
+elf_pubapi void elf_pushstr(elf_State *, const char *);
+elf_pubapi void elf_pushstrl(elf_State *, const char *, int length);
+elf_pubapi void elf_pushfun(elf_State *, elf_Function);
+elf_pubapi void elf_pushsys(elf_State *, elf_Handle);
+
+elf_pubapi void elf_getmetatab(elf_State *, elf_stkid from);
+elf_pubapi void elf_setmetatab(elf_State *inter, int objstk, int tabstk);
+elf_pubapi void elf_getglobals(elf_State *);
+elf_pubapi void elf_pushfrom(elf_State *, elf_stkid stk);
+
 
 elf_pubapi elf_Number elf_tonum(elf_State *, elf_stkid stk);
 elf_pubapi elf_Integer elf_toint(elf_State *, elf_stkid stk);
@@ -146,12 +153,12 @@ elf_pubapi elf_Handle elf_tosys(elf_State *, elf_stkid stk);
 
 
 // todo: @deprecated
-elf_pubapi elf_Integer    elf_get_intarg(elf_State *, int argi);
+elf_pubapi elf_Integer    f_checkint(elf_State *, int argi);
 // todo: @deprecated
 // todo: @deprecated
-elf_pubapi elf_Handle elf_get_sysarg(elf_State *, int argi);
+elf_pubapi elf_Handle f_checkhand(elf_State *, int argi);
 // todo: @deprecated
-elf_pubapi char      *elf_get_text_arg(elf_State *, int argi);
+elf_pubapi char      *f_checktext(elf_State *, int argi);
 
 
 
@@ -171,7 +178,6 @@ int elf_gcstate(elf_State *, int state);
 void elf_gccheck(elf_State *);
 
 
-void elf_error(elf_State *, int instr, const char *error);
 
 
 // names of all the overloads you can do in elf

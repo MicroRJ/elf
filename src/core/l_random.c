@@ -13,7 +13,7 @@ static elf_u32 xorshift32(elf_u32 x) {
 }
 
 ELF_FUNCTION(l_rand_seed) {
-	global_random_state = elf_get_intarg(S, 0);
+	global_random_state = f_checkint(S, 0);
 	return 1;
 }
 

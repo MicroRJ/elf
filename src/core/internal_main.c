@@ -3,11 +3,6 @@
 //
 #define _CRT_SECURE_NO_WARNINGS
 
-//
-// translation unit for the intepreter and the "core"
-// runtime stuff
-//
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,56 +16,49 @@
 
 
 #include "elf.h"
-#include "internal_utils.h"
-
-#include "elf_internal.h"
 
 #include "system.h"
 
+#include "internal_utils.h"
 #include "subsystem.h"
-
 #include "logging.c"
 
+
 #include "bytecode_metadata.h"
-#include "r_auxilary.h"
+
+
+#include "internal_types.h"
+#include "internal_api.h"
+#include "internal_helpers.h"
+#include "internal_helpers.c"
+#include "internal_metadata.c"
+#include "internal_diagnostics.c"
+
 #include "o_string.c"
 #include "k_table.c"
 #include "o_closure.c"
-#include "r_diagnostics.c"
 #include "r_collector.c"
-#include "internal.c"
 
 #include "elf_compiler.h"
 
-#include "public.c"
-
-#include "core_io.c"
-
-#include "lib_math.c"
-#include "lib_core.c"
-#include "lib_sys.c"
-#include "lib_vec.c"
-#include "lib_table.c"
-#include "lib_string.c"
-#include "lib_random.c"
+#include "l_math.c"
+#include "l_core.c"
+#include "l_sys.c"
+#include "l_vec.c"
+#include "l_table.c"
+#include "l_string.c"
+#include "l_random.c"
 
 
 static int _resume(elf_State *S);
 
 
-//
-// todo: remove!
-//
-static inline void _debug_stack_push(elf_State *inter, elf_Value v) {
-	ASSERT(inter->stack_ptr - inter->stack < inter->stack_max);
-	* inter->stack_ptr ++ = v;
-}
-
-
 int elf_get_global_slot(elf_State *S, elf_String *name) {
 
 	if (name != 0) {
-		return elf_table_get_index_always_(S->globals, VALUE_STRING(name));
+		elf_Value vname;
+		vsetstr(&vname, name);
+		return elf_table_get_index_always_(S->globals, vname);
 	}
 
 	return ARRAY_GROW(S->globals->array, 1);
@@ -103,44 +91,45 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 	}
 }
 
-
 //
-// so here we rely on the virtual memory system for things
-// to work properly, otherwise, we're screwed...
-// todo: proper allocations
+// todo: we rely on the virtual memory system
 //
 elf_rawapi
-void elf_init_raw(elf_State *inter) {
-	inter->gc.open_object_slots = sys_virtual_alloc(GIGABYTES(1));
-	inter->gc.close_object_slots = sys_virtual_alloc(GIGABYTES(1));
+void elf_init_raw(elf_State *S) {
+	S->gc.open_object_slots = sys_virtual_alloc(GIGABYTES(1));
+	S->gc.close_object_slots = sys_virtual_alloc(GIGABYTES(1));
+
+	// todo: can we use the value regular stack instead
+	S->frame_stack = sys_virtual_alloc(GIGABYTES(1));
+	S->frame_stack_max = GIGABYTES(1) / sizeof(*S->frame_stack);
+
+	S->stack = sys_virtual_alloc(GIGABYTES(1));
+	S->stack_max = GIGABYTES(1) / sizeof(elf_Value);
+	S->stack_ptr = S->stack;
+
+
+	// it literally doesn't matter, but techinically, framebase-1
+	// is where the function is at, we don't have one, so nil.
+	pushnil(S);
+
+	S->frame.framebase = S->stack;
+	S->frame.framesize = 16;
 
 #if 0
-	inter->exec_trail_capacity = 128;
-	inter->exec_trail = sys_virtual_alloc(inter->exec_trail_capacity * sizeof(*inter->exec_trail));
-#endif
-
-	inter->frame_stack = sys_virtual_alloc(GIGABYTES(1));
-	inter->frame_stack_max = GIGABYTES(1) / sizeof(*inter->frame_stack);
-
-	inter->stack = sys_virtual_alloc(GIGABYTES(1));
-	inter->stack_max = GIGABYTES(1) / sizeof(elf_Value);
-	inter->stack_ptr = inter->stack;
-
-	inter->frame.framebase = inter->stack;
-
-#if 1
-	inter->trace_table = elf_new_table(inter);
+	S->exec_trail_capacity = 128;
+	S->exec_trail = sys_virtual_alloc(S->exec_trail_capacity * sizeof(*S->exec_trail));
+	S->trace_table = pushtable(S);
 #endif
 
 
 	// todo: metatables should be per module?
-	inter->metatables.string = elf_new_table(inter);
-	install(inter, 0, string_metafuncs, COUNTOF(string_metafuncs));
+	S->metatables.string = pushtable(S);
+	install(S, 0, string_metafuncs, COUNTOF(string_metafuncs));
 
-	inter->metatables.table = elf_new_table(inter);
-	install(inter, 0, table_metafuncs, COUNTOF(table_metafuncs));
+	S->metatables.table = pushtable(S);
+	install(S, 0, table_metafuncs, COUNTOF(table_metafuncs));
 
-	// inter->strings = elf_new_table(inter);
+	// S->strings = pushtable(S);
 
 	// todo: builtin instrinsics
 	static elf_Binding lib_base[] = {
@@ -148,31 +137,48 @@ void elf_init_raw(elf_State *inter) {
 		{"iton", l_core_iton},
 	};
 
-	inter->globals = elf_new_table(inter);
-	install(inter,     0,  lib_base  , COUNTOF(lib_base));
-	install(inter,     0,  lib_math  , COUNTOF(lib_math));
-	install(inter,"elf" ,  lib_core  , COUNTOF(lib_core));
-	install(inter,"elf" ,  lib_random, COUNTOF(lib_random));
-	install(inter,"elf" ,  l_sys,      COUNTOF(l_sys));
+	S->globals = pushtable(S);
+	install(S,     0,  lib_base  , COUNTOF(lib_base));
+	install(S,     0,  lib_math  , COUNTOF(lib_math));
+	install(S,"elf" ,  lib_core  , COUNTOF(lib_core));
+	install(S,"elf" ,  lib_random, COUNTOF(lib_random));
+	install(S,"elf" ,  l_sys,      COUNTOF(l_sys));
+
+
+	ASSERT(stackcursor(S) < S->frame.framesize);
+
+	S->stack_ptr = S->frame.framebase + S->frame.framesize;
 }
+
+
 
 // save the current frame
-static inline void pushstackframe(elf_State *inter) {
+static inline void
+pushstackframe(elf_State *inter)
+{
+
 	ASSERT(inter->frame_index < inter->frame_stack_max);
 	inter->frame_stack[inter->frame_index ++] = inter->frame;
+
 }
 
+
+
 // restore the previous frame
-static inline void pullstackframe(elf_State *inter) {
+static inline void
+pullstackframe(elf_State *inter)
+{
+
 	ASSERT(inter->frame_index > 0);
 	inter->frame = inter->frame_stack[-- inter->frame_index];
+
 }
 
 
 
 // update the current frame for the given closure
-static inline
-void prepframeforclosure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
+static inline void
+prepframeforclosure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
 {
 
 	elf_Proto proto = closure->proto;
@@ -197,27 +203,27 @@ void prepframeforclosure(elf_State *inter, elf_Closure *closure, int nargs, int 
 
 
 
-static inline
-int callclosure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
+static inline int
+callclosure(elf_State *S, elf_Closure *closure, int nargs, int nrets)
 {
 	elf_Proto proto = closure->proto;
 
-	prepframeforclosure(inter, closure, nargs, nrets);
+	prepframeforclosure(S, closure, nargs, nrets);
 
 	// update stack pointer to cover the entire frame
-	inter->stack_ptr = inter->frame.framebase + inter->frame.framesize;
+	S->stack_ptr = S->frame.framebase + S->frame.framesize;
 
-	nrets = _resume(inter);
+	nrets = _resume(S);
 
 	// put stack pointer right on top of all the returns
-	inter->stack_ptr = inter->frame.framebase - 1 + nrets;
+	S->stack_ptr = S->frame.framebase - 1 + nrets;
 	return nrets;
 }
 
 
 
-static inline
-int callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
+static inline int
+callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
 {
 	elf_Value *framebase = inter->stack_ptr - nargs;
 	int framesize = nargs;
@@ -264,27 +270,28 @@ int callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
 
 
 elf_pubapi
-int elf_call(elf_State *inter, int nargs, int nrets)
+int elf_call(elf_State *S, int nargs, int nrets)
 {
 	if (nargs < 1) {
-		elf_errorf(inter, -1
-		, "'__call': expects at least one argument, 'this' is always passed in, it can be nil.");
+		// __call wants at least the 'this' arg
+		pushnil(S);
 	}
-	pushstackframe(inter);
 
-	elf_Value value = inter->stack_ptr[- nargs - 1];
+	pushstackframe(S);
+
+	elf_Value value = S->stack_ptr[- nargs - 1];
 
 	if (iscls(value)) {
-		nrets = callclosure(inter, vgetcls(value), nargs, nrets);
+		nrets = callclosure(S, vgetcls(value), nargs, nrets);
 	}
 	else if(isfnc(value)) {
-		nrets = callfunction(inter, vgetfnc(value), nargs, nrets);
+		nrets = callfunction(S, vgetfnc(value), nargs, nrets);
 	}
 	else {
-		elf_errorf(inter, NO_BYTE, "'%s': __call expects callable value", tag2s[value.tag]);
+		elf_errorf(S, NO_BYTE, "'%s': __call expects callable value", tag2s[value.tag]);
 	}
 
-	pullstackframe(inter);
+	pullstackframe(S);
 	return nrets;
 }
 
@@ -372,12 +379,16 @@ static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
 #define VMBREAK break
 
 
-#define moveX(v) (frame.framebase[by.b_x] = v)
-#define moveXi(v) (vsetint(&frame.framebase[by.b_x], v))
-#define moveXn(v) (vsetnum(&frame.framebase[by.b_x], v))
+#define global_store_x(v) (globals->array[by.b_x] = v)
+#define global_y() (globals->array[by.b_y])
 
-#define localx(v) frame.framebase[by.b_x]
-#define localy(v) frame.framebase[by.b_y]
+
+#define local_store_x(v) (frame.framebase[by.b_x] = v)
+#define local_store_x_int(v) (vsetint(&frame.framebase[by.b_x], v))
+#define local_store_x_num(v) (vsetnum(&frame.framebase[by.b_x], v))
+
+#define local_x(v) frame.framebase[by.b_x]
+#define local_y(v) frame.framebase[by.b_y]
 #define localz(v) frame.framebase[by.b_z]
 
 
@@ -404,10 +415,10 @@ static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
 #define arithbranchnum2(nopfn, iopfn)             \
 do {                                              \
 	if (isnum(xx) || isnum(yy)) {                  \
-		moveXn(nopfn(vitonum(xx), vitonum(yy)));  \
+		local_store_x_num(nopfn(vitonum(xx), vitonum(yy)));  \
 	}                                              \
 	else {                                         \
-		moveXi(iopfn(vgetint(xx), vgetint(yy)));  \
+		local_store_x_int(iopfn(vgetint(xx), vgetint(yy)));  \
 	}                                              \
 } while (0)
 
@@ -416,7 +427,7 @@ do {                                              \
 do {                                                                \
 	int nrets = callmetafield(inter, vgetobj(xx), name, 2, xx, yy);  \
 	\
-	moveX(inter->stack_ptr[-nrets]);                                 \
+	local_store_x(inter->stack_ptr[-nrets]);                                 \
 	\
 	inter->stack_ptr = frame.framebase + frame.framesize;            \
 } while (0)
@@ -424,7 +435,7 @@ do {                                                                \
 
 #define arithcase(name, nopfn, iopfn) \
 do { \
-	xx=localy(), yy=localz(); \
+	xx=local_y(), yy=localz(); \
 	\
 	if (isnumeric(xx)) { \
 		\
@@ -447,7 +458,7 @@ do { \
 
 #define bwcase(name, opfn) \
 do { \
-	xx=localy(), yy=localz(); \
+	xx=local_y(), yy=localz(); \
 	\
 	if (isint(xx)) { \
 		\
@@ -455,7 +466,7 @@ do { \
 			error_invalidoperandsforoperator(inter, name, xx, yy); \
 		} \
 		\
-		moveXi(opfn(vgetint(xx), vgetint(yy)));   \
+		local_store_x_int(opfn(vgetint(xx), vgetint(yy)));   \
 	} \
 	else if (isobj(xx)) { \
 		\
@@ -470,17 +481,17 @@ do { \
 
 #define relcase(name, opfn) \
 do { \
-	xx=localy(), yy=localz(); \
+	xx=local_y(), yy=localz(); \
 	\
 	if (isnumeric(xx)) { \
 		\
 		if (!isnumeric(yy)) error_invalidoperandsforoperator(inter, name, xx, yy); \
 		\
 		if (isnum(xx) || isnum(yy)) { \
-			moveXi(opfn(vitonum(xx), vitonum(yy))); \
+			local_store_x_int(opfn(vitonum(xx), vitonum(yy))); \
 		} \
 		else { \
-			moveXi(opfn(vgetint(xx), vgetint(yy))); \
+			local_store_x_int(opfn(vgetint(xx), vgetint(yy))); \
 		} \
 	} \
 	else if (isobj(xx)) { \
@@ -499,7 +510,7 @@ int _resume(elf_State *inter) {
 
 	elf_State *R = inter;
 	elf_Table *globals = inter->globals;
-	elf_Stack_Frame frame = inter->frame;
+	Stack_Frame frame = inter->frame;
 	elf_Value xx,yy,zz;
 
 	ASSERT(inter->stack_ptr == frame.framebase + frame.framesize);
@@ -528,7 +539,7 @@ int _resume(elf_State *inter) {
 				// put stack pointer right above all the arguments
 				inter->stack_ptr = frame.framebase + by.b_x + by.b_y + 1;
 
-				xx = localx();
+				xx = local_x();
 
 				if (iscls(xx)) {
 
@@ -575,9 +586,13 @@ int _resume(elf_State *inter) {
 			VMCASE(BC_RET) {
 				inter->frame.nrets = MIN(by.b_y, inter->frame.nrets);
 
-				// restore stack frame
+
+				// note that 'framebase' is right below the function,
+				// or at framebase - 1, so the returns are thus placed
+				// at framebase - 1
 				copy_memory(frame.framebase - 1, frame.framebase + by.b_x, inter->frame.nrets * sizeof(elf_Value));
 
+				// restore stack frame
 				pullstackframe(inter);
 
 				// restore stack pointer to proper state regardless of
@@ -598,83 +613,82 @@ int _resume(elf_State *inter) {
 			} break;
 
 			case BC_J: {
-				int x = BC_ARGX(byte);
-				frame.nextinstr = instr + x;
+
+				int dst = BC_ARGX(byte);
+				frame.nextinstr = instr + dst;
+
 			} break;
+
 			case BC_JZ: {
-				if (frame.framebase[BC_ARGY(byte)].x_i64 == 0) {
-					int x = BC_ARGX(byte);
-					frame.nextinstr = instr + x;
+
+				if (local_y().x_i64 == 0) {
+					int dst = by.b_x;
+					frame.nextinstr = instr + dst;
 				}
+
 			} break;
+
 			case BC_JNZ: {
-				if (frame.framebase[BC_ARGY(byte)].x_i64 != 0) {
-					int x = BC_ARGX(byte);
-					frame.nextinstr = instr + x;
+
+				if (local_y().x_i64 != 0) {
+					int dst = by.b_x;
+					frame.nextinstr = instr + dst;
 				}
-			} break;
-			case BC_GETGLOBAL: {
-				frame.framebase[BC_ARGX(byte)]=globals->array[BC_ARGY(byte)];
-			} break;
-			case BC_SETGLOBAL: {
-				globals->array[BC_ARGX(byte)]=frame.framebase[BC_ARGY(byte)];
+
 			} break;
 
-			case BC_RELOAD: {
-				moveX(localy());
-			} break;
+			VMCASE(BC_GETGLOBAL) { local_store_x(global_y()); } VMBREAK;
 
-			case BC_LOADNIL: {
-				frame.framebase[BC_ARGX(byte)].tag    = elf_tag_Nil;
-				frame.framebase[BC_ARGX(byte)].x_int  = 0;
-			} break;
-			case BC_GETKINT: {
-				frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Int;
-				frame.framebase[BC_ARGX(byte)].x_int = R->integers[BC_ARGY(byte)];
-			} break;
-			case BC_GETKNUM: {
-				frame.framebase[BC_ARGX(byte)].tag   = elf_tag_Num;
-				frame.framebase[BC_ARGX(byte)].x_num = R->numbers[BC_ARGY(byte)];
-			} break;
-			case BC_GETUPVAL: {
+			VMCASE(BC_SETGLOBAL) { global_store_x(local_y());  } VMBREAK;
+
+			VMCASE(BC_RELOAD)  { local_store_x(local_y()); } VMBREAK;
+
+			VMCASE(BC_LOADNIL) { vsetnil(&local_x()); } VMBREAK;
+
+			VMCASE(BC_GETKINT) { local_store_x_int(inter->integers[by.b_y]); } VMBREAK;
+
+			VMCASE(BC_GETKNUM) { local_store_x_num(inter-> numbers[by.b_y]); } VMBREAK;
+
+			VMCASE(BC_GETUPVAL) {
 				ASSERT(WITHIN(BC_ARGY(byte), 0, frame.closuresize));
-				frame.framebase[BC_ARGX(byte)] = frame.closureenv[BC_ARGY(byte)];
-			} break;
+				local_store_x(frame.closureenv[by.b_y]);
+			} VMBREAK;
+
 			case BC_CLOSURE: {
-				ASSERT(WITHIN(BC_ARGY(byte), 0, arrlen(inter->protos)));
+				ASSERT(WITHIN(BC_ARGY(byte), 0, darr_l(inter->protos)));
 
 				elf_Proto proto = inter->protos[BC_ARGY(byte)];
 
 				elf_Closure *cls = elf_alloc_closure(inter, proto);
-				copy_memory(cls->captures, frame.framebase+BC_ARGX(byte), proto.ncaptures * sizeof(elf_Value));
+				copy_memory(cls->captures, &local_x(), proto.ncaptures * sizeof(elf_Value));
 
-				vSetClosure(&localx(), cls);
+				vsetcls(&local_x(), cls);
 			} break;
 			case BC_TABLE: {
 
 				elf_Table *tab = elf_alloc_table(R);
-				vsettab(&localx(), tab);
+				vsettab(&local_x(), tab);
 
 			} break;
 
 			case BC_GETMETAFIELD: {
-				yy = localy();
+				yy = local_y();
 
 				elf_Table *metatable = 0;
 
 				switch (yy.tag) {
-					case elf_tag_String:
-					case elf_tag_Table:
-					case elf_tag_UserObject:
-					case elf_tag_Closure: {
+					case ELF_TSTRING:
+					case ELF_TTABLE:
+					case ELF_TUSER:
+					case ELF_TCLOSURE: {
 						metatable = vgetobj(yy)->meta;
 					} break;
 
-					case elf_tag_Num: {
+					case ELF_TNUMBER: {
 						metatable = inter->metatables.number;
 					} break;
 
-					case elf_tag_Int: {
+					case ELF_TINTEGER: {
 						metatable = inter->metatables.integer;
 					} break;
 
@@ -688,43 +702,45 @@ int _resume(elf_State *inter) {
 				}
 
 				elf_Value metafield = elf_table_get_raw(metatable, localz());
-				moveX(metafield);
+				local_store_x(metafield);
 			} break;
+
+
 			// todo: INDEX should be array mode!
 			case BC_GETINDEX: case BC_GETFIELD: {
-				xx=localy(), yy=localz();
+				xx=local_y(), yy=localz();
 
 				if (isnil(yy)) {
 					elf_error(inter, minstr, "attempted to get nil field");
 				}
 				switch (xx.tag) {
 
-					case elf_tag_Table: {
-						moveX(elf_table_get_raw(vgettab(xx), yy));
+					case ELF_TTABLE: {
+						local_store_x(elf_table_get_raw(vgettab(xx), yy));
 					}break;
 
-					case elf_tag_UserObject: {
+					case ELF_TUSER: {
 						// _callov(R,xx.x_obj,"__getfield",BC_ARGX(byte),1,&yy);
 						__debugbreak();
 					}break;
 
-					case elf_tag_String: {
+					case ELF_TSTRING: {
 
 						if (isint(yy)) {
 							int index = vgetint(yy);
-							moveXi(vgetstr(xx)->text[index]);
+							local_store_x_int(vgetstr(xx)->text[index]);
 						}
 						else if (isstr(yy)) {
 
 							int index = find_subtext(vgetstr(xx)->text, vgetstr(yy)->text);
-							moveXi(index);
+							local_store_x_int(index);
 						}
 						else {
 							elf_error(inter, minstr, "invalid value for string:__index(of int)");
 						}
 
 					}break;
-					case elf_tag_Nil: {
+					case ELF_TNIL: {
 						elf_error(inter, minstr, "attempted to get field of 'nil' value");
 					} break;
 					default: {
@@ -735,7 +751,7 @@ int _resume(elf_State *inter) {
 			// todo: INDEX should be array mode!
 			case BC_SETINDEX:
 			case BC_SETFIELD: {
-				xx=localx(), yy=localy(), zz=localz();
+				xx=local_x(), yy=local_y(), zz=localz();
 
 				if (istab(xx)) {
 					if (isnil(yy)) elf_error(inter, minstr, "key is nil...");
@@ -755,21 +771,21 @@ int _resume(elf_State *inter) {
 
 			case BC_N2I:
 			{
-				moveXi(vntoint(localx()));
+				local_store_x_int(vntoint(local_x()));
 			} break;
 
 			case BC_I2N:
 			{
-				moveXn(vitonum(localx()));
+				local_store_x_num(vitonum(local_x()));
 			} break;
 
 			case BC_NEQ: {
-				bool eq = veq(inter, localy(), localz());
-				moveXi(!eq);
+				bool eq = veq(inter, local_y(), localz());
+				local_store_x_int(!eq);
 			} break;
 			case BC_EQ: {
-				bool eq = veq(inter, localy(), localz());
-				moveXi(eq);
+				bool eq = veq(inter, local_y(), localz());
+				local_store_x_int(eq);
 			} break;
 
 
@@ -814,7 +830,7 @@ int _resume(elf_State *inter) {
 		if(!R->disable_tracing){
 			if(R->flags & FLAG_TRACING){
 				elf_Value trace_value = elf_table_get_raw(R->trace_table,VALUE_INTEGER(minstr));
-				if(trace_value.tag!=elf_tag_Nil){
+				if(trace_value.tag!=ELF_TNIL){
 					if(minstr!=R->trace_start_instr){
 						ASSERT(BC_OP(byte) != BC_J && BC_OP(byte) != BC_JZ && BC_OP(byte) != BC_JNZ);
 						ASSERT(trace_value.x_i64 != R->trace_start_instr);
@@ -827,7 +843,7 @@ int _resume(elf_State *inter) {
 					ASSERT(minstr!=R->trace_stop_instr);
 				}
 				if(R->trace_inner_loop_counter==0){
-					arradd(R->trace_buffer,byte);
+					d_array_add(R->trace_buffer,byte);
 					R->active_trace_len += 1;
 				}
 			}
@@ -848,12 +864,12 @@ int _resume(elf_State *inter) {
 				}else{
 					ASSERT(R->trace_inner_loop_counter == 0);
 					elf_Value trace_value = elf_table_get_raw(R->trace_table,VALUE_INTEGER(trace_start_instr));
-					if(trace_value.tag==elf_tag_Nil){
+					if(trace_value.tag==ELF_TNIL){
 						if(R->track[minstr]>=64){
 							R->flags |= FLAG_TRACING;
 							R->trace_start_instr = trace_start_instr;
 							R->trace_stop_instr  = minstr;
-							R->active_trace_pos  = arrlen(R->trace_buffer);
+							R->active_trace_pos  = darr_l(R->trace_buffer);
 							R->active_trace_len  = 0;
 							elf_raw_table_set(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
 						}else{

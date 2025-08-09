@@ -3,14 +3,17 @@
 //
 
 
-#define elf_rawapi
+#define NO_BYTE (-1)
 
 
-//
-// todo: remove this from here or rename to something
-// more descriptive!
-//
+typedef elf_String *strID;
+typedef elf_Table  *tabID;
+
+
+// todo: remove, rename to something else
 typedef int Instr;
+
+
 typedef char *Source;
 
 
@@ -112,17 +115,21 @@ struct elf_String {
 };
 
 
-typedef struct elf_Stack_Frame elf_Stack_Frame;
-struct elf_Stack_Frame {
+typedef struct Stack_Frame Stack_Frame;
+struct Stack_Frame {
+	// todo: you could get this from the closure
+	// at framebase-1
 	int               bytes;
 	int               bytec;
+
 	short             nargs;
 	short             nrets;
 	int           nextinstr;
 	int           framesize;
-	// note that 'framebase' is on top of the function, so returns
-	// are placed starting at framebase-1
 	elf_Value    *framebase;
+
+	// todo: you could get this from the closure
+	// at framebase-1
 	elf_Value    *closureenv;
 	char          closuresize;
 };
@@ -166,8 +173,8 @@ typedef enum elf_GC_Ty {
 // todo: proper object pooling
 // todo: custom allocator
 //
-typedef struct elf_Collector elf_Collector;
-struct elf_Collector {
+typedef struct GCState GCState;
+struct GCState {
 	elf_i32      phase;
 	elf_GC_State state;
 	elf_i64      memory_allocated;
@@ -176,13 +183,9 @@ struct elf_Collector {
 	elf_i32      num_objects;
 	elf_i64      object_trigger_threshold;
 
+	// todo: remove this!
 	elf_Object **open_object_slots;
 	elf_Object **close_object_slots;
-};
-
-typedef struct elf_Interner elf_Interner;
-struct elf_Interner {
-	elf_String **atoms[4096];
 };
 
 typedef struct elf_State elf_State;
@@ -204,8 +207,6 @@ struct elf_State {
 		int              nbytes;
 	};
 
-	elf_Interner      interner;
-
 	// todo: experiment with allocating types and tags
 	// in separate buffers!
 	// We also wouldn't need to increment or decrement
@@ -215,14 +216,14 @@ struct elf_State {
 	elf_Value        *stack_ptr;
 	int               stack_max;
 
-	union {  elf_Collector  G, gc; };
+	union {  GCState  G, gc; };
 
 
+	int          frame_stack_max;
+	Stack_Frame *frame_stack;
+	int          frame_index;
+	Stack_Frame  frame;
 
-	elf_i32          frame_stack_max;
-	elf_Stack_Frame *frame_stack;
-	int              frame_index;
-	elf_Stack_Frame  frame;
 
 	// todo: disable this
 	elf_trail_entry *exec_trail;
@@ -247,49 +248,3 @@ struct elf_State {
 		elf_Table *table;
 	} metatables;
 };
-
-// todo: init is internal stuff because it takes a pointer
-elf_rawapi void elf_init_raw(elf_State *);
-elf_rawapi int elf_raw_exec(elf_State *inter, int nargs, int nrets, bool asexpr, elf_String *name, elf_String *contents);
-
-// todo: 'this' argument should be argument zero so
-// that there's no difference between a binding that
-// works on a meta-field or a regular call,
-// table_delete("asd") == table:delete("asd"),
-// but with this system, there's no way to do this...
-//
-elf_Object  *elf_get_this(elf_State *S);
-elf_Value    elf_get_arg     (elf_State *S, int stk);
-elf_String  *elf_get_string_arg  (elf_State *S, int stk);
-elf_Object  *elf_get_object_arg_raw  (elf_State *S, int stk);
-elf_Table   *elf_get_table   (elf_State *S, int stk);
-elf_Closure *elf_get_closure (elf_State *S, int stk);
-
-elf_Table *elf_new_table(elf_State *);
-
-elf_rawapi elf_String  *elf_alloc_string2(elf_State *S, elf_i32 length);
-elf_rawapi elf_String  *elf_alloc_string(elf_State *S, const char *text);
-elf_rawapi elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto);
-
-elf_rawapi int elf_get_string_length(elf_String *);
-elf_rawapi hash_t elf_get_string_hash(elf_String *);
-
-void *elf_gc_alloc(elf_State *, elf_GC_Ty type, elf_i64 size);
-int elf_get_global_slot(elf_State *S, elf_String *name);
-int elf_set_global(elf_State *S, elf_String *name, elf_Value value);
-void elf_push_value_raw(elf_State *S, elf_Value value);
-void elf_push_table_raw(elf_State *S, elf_Table *);
-
-elf_Table *elf_alloc_table2(elf_State *, index_t nentries);
-elf_Table *elf_alloc_table(elf_State *);
-
-// todo: this API can't be so open because we need more control
-// over whathappens with a table
-void elf_tableK_recycle(elf_Table *tab);
-index_t elf_table_try_(elf_Table *tab, elf_Value key);
-index_t elf_table_try_text(elf_Table *tab, const char *text, elf_i32 length, hash_t hash);
-index_t elf_table_get_index_always_(elf_Table *tab, elf_Value key);
-elf_Value elf_table_get_raw(elf_Table *tab, elf_Value key);
-index_t elf_raw_table_set(elf_Table *tab, elf_Value k, elf_Value v);
-index_t elf_array_get_length(elf_Table *tab);
-index_t elf_raw_array_add(elf_Table *tab, elf_Value thing);

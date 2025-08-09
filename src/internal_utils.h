@@ -1,23 +1,16 @@
 //
 // See Copyright Notice In elf.h
-// elf.c
 //
+
 #ifndef INTERNAL_UTILS_H
 #define INTERNAL_UTILS_H
 
-// todo: remove this file!
+
+#include <stdlib.h>
+#include <stdio.h>
 
 
-/* so I think is a C feature only, and it allows you
-to cast to explict types, so the user should get a warning
-if the type isn't one of the given ones? */
-
-// todo: @deprecated!
-#define UCAST(D,T) ( ((union { T _; }){ D })._ )
-
-// todo: @deprecated!
 #define FOR_RANGE(N,X,Y) for (int N = X; N < Y; N += 1)
-
 
 #if !defined(NO_CODE)
 	#define NO_CODE __debugbreak();

@@ -120,33 +120,51 @@ static elf_f64 lex_fractional(elf_Parser *parser) {
 // assuming we're already at an integer char
 static elf_i64 lex_integer(elf_Parser *parser) {
 
-	elf_i64 x = 10, y, z;
+	elf_i64 base = 10;
 
 	// figure out the base
-	if (POS0() == '0') {
-		if (POS1() == 'b') MOVEN(2), x =  2; else
-		if (POS1() == 'x') MOVEN(2), x = 16;
+	if (*parser->cursor == '0') {
+		parser->cursor += 1;
+		if (*parser->cursor == 'b') {
+			parser->cursor += 1;
+			base = 2;
+		}
+		else if (*parser->cursor == 'x') {
+			parser->cursor += 1;
+			base = 16;
+		}
 	}
 
-	for (y = 0, z = -1; ; y = y * x + z) {
-		if (WITHIN(POS0(), 'A', 'Z' + 1)) {
-			z = 10 + MOVE() - 'A';
-			if (x != 16) goto _error;
-		} else if (WITHIN(POS0(), 'a', 'z' + 1)) {
-			z = 10 + MOVE() - 'A';
-			if (x != 16) goto _error;
-		} else if (WITHIN(POS0(), '0', '9' + 1)) {
-			z = MOVE() - '0';
-			if (x == 2 && z > 1) goto _error;
-		} else {
-			if (0) _error: {
-				parser_dialog(parser, parser->cursor, "invalid base '%i' for digit", x);
-			}
+	elf_i64 integer, digit;
+	for (integer = 0, digit = -1; ; integer = integer * base + digit) {
+
+		if (WITHIN(*parser->cursor, 'A', 'Z' + 1)) {
+
+			digit = 10 + *parser->cursor ++ - 'A';
+
+			if (base != 16) goto _err;
+		}
+		else if (WITHIN(*parser->cursor, 'a', 'z' + 1)) {
+
+			digit = 10 + *parser->cursor ++ - 'a';
+
+			if (base != 16) goto _err;
+		}
+		else if (WITHIN(*parser->cursor, '0', '9' + 1)) {
+
+			digit = *parser->cursor ++ - '0';
+
+			if (base == 2 && digit > 1) goto _err;
+		}
+		else {
 			break;
 		}
 	}
 
-	return y;
+	return integer;
+	_err:
+	parser_dialog(parser, parser->cursor, "invalid base '%i' for digit", base);
+	return integer;
 }
 
 // assuming we're at an identifier char
@@ -264,7 +282,7 @@ static Token get_tok(elf_Parser *parser) {
 					/* are multi-line strings illegal? */
 					if (PICK('\n') || (PICK('\r') && (PICK('\n'),1))) {
 						// new_line(parser);
-						arradd(buffer,'\n');
+						d_array_add(buffer,'\n');
 					} else {
 						// don't check for format
 						if (token.type != TK_FORMAT_STRING) goto escchar;
@@ -272,12 +290,12 @@ static Token get_tok(elf_Parser *parser) {
 						// todo: make it so that we can escape the formatting
 						if (POS0() == FORMAT_CHAR && POS1() == '{') {
 							needsformatting = true;
-							arradd(buffer, *parser->cursor ++);
-							arradd(buffer, *parser->cursor ++);
+							d_array_add(buffer, *parser->cursor ++);
+							d_array_add(buffer, *parser->cursor ++);
 						} else {
 							escchar:
 							int chr = pick_esc_char(parser);
-							arradd(buffer, chr);
+							d_array_add(buffer, chr);
 						}
 					}
 				}
@@ -291,11 +309,11 @@ static Token get_tok(elf_Parser *parser) {
 
 				// did we find anything?
 				if (PICK('"')) {
-					arradd(buffer,'\n');
+					d_array_add(buffer,'\n');
 				} else break;
 			}
 
-			arradd(buffer,0);
+			d_array_add(buffer,0);
 
 			// todo: leak, allocate this properly in some sort
 			// of constant pool with intering, use the atomizer

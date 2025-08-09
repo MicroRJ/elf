@@ -62,7 +62,7 @@ ELF_FUNCTION(l_sys_create_directory) {
 
 
 ELF_FUNCTION(l_sys_get_file_times) {
-	elf_Handle file = elf_get_sysarg(S, 0);
+	elf_Handle file = f_checkhand(S, 0);
 
 	FILE_TIMES times;
 	sys_time_file(file, &times);
@@ -100,7 +100,7 @@ ELF_FUNCTION(l_sys_file_time_to_system_time) {
 // the file system
 //
 ELF_FUNCTION(l_sys_load_dll) {
-	char *name = elf_get_text_arg(S, 0);
+	char *name = f_checktext(S, 0);
 
 	elf_Handle lib = sys_load_dll(name);
 	if (lib != 0) elf_pushsys(S, lib);
@@ -309,15 +309,15 @@ ELF_FUNCTION(l_sys_open_temp_file) {
 }
 
 ELF_FUNCTION(l_sys_delete_file) {
-	elf_pushint(S, sys_delete_file(elf_get_text_arg(S, 0)));
+	elf_pushint(S, sys_delete_file(f_checktext(S, 0)));
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_open_file) {
 	ASSERT((nargs - 1) == 2);
 
-	char *name = elf_get_text_arg(S,0);
-	char *text_flags = elf_get_text_arg(S,1);
+	char *name = f_checktext(S,0);
+	char *text_flags = f_checktext(S,1);
 
 	int flags;
 	for (flags = 0; *text_flags; text_flags ++) {
@@ -337,7 +337,7 @@ ELF_FUNCTION(l_sys_open_file) {
 
 ELF_FUNCTION(l_sys_close_file) {
 	ASSERT((nargs - 1) == 1);
-	elf_Handle file = elf_get_sysarg(S,0);
+	elf_Handle file = f_checkhand(S,0);
 	if (file) {
 		sys_close_file(file);
 	}
@@ -345,13 +345,13 @@ ELF_FUNCTION(l_sys_close_file) {
 }
 
 ELF_FUNCTION(l_sys_get_file_size) {
-	elf_Handle file = elf_get_sysarg(S,0);
+	elf_Handle file = f_checkhand(S,0);
 	elf_pushint(S, sys_size_file(file));
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_get_file_cursor) {
-	elf_Handle file = elf_get_sysarg(S,0);
+	elf_Handle file = f_checkhand(S,0);
 	elf_pushint(S, sys_get_file_cursor(file));
 	return 1;
 }
@@ -369,15 +369,15 @@ ELF_FUNCTION(l_sys_read_file) {
 
 
 ELF_FUNCTION(l_sys_write_file) {
-	elf_Handle file = elf_get_sysarg(S,0);
-	elf_String *str = elf_get_string_arg(S, 1);
+	elf_Handle file = f_checkhand(S,0);
+	elf_String *str = f_checkstr(S, 1);
 	sys_write_file(file, str->text, str->length);
 	return 0;
 }
 
 ELF_FUNCTION(l_sys_write_file_to_file) {
-	elf_Handle dst = elf_get_sysarg(S, 0);
-	elf_Handle src = elf_get_sysarg(S, 1);
+	elf_Handle dst = f_checkhand(S, 0);
+	elf_Handle src = f_checkhand(S, 1);
 	int size = sys_size_file(src);
 	char *heapbuf = malloc(size);
 	sys_read_file(src, heapbuf, size);
@@ -388,7 +388,7 @@ ELF_FUNCTION(l_sys_write_file_to_file) {
 
 
 ELF_FUNCTION(l_sys_change_work_dir) {
-	int noerr = sys_set_work_dir(elf_get_text_arg(S,0));
+	int noerr = sys_set_work_dir(f_checktext(S,0));
 	elf_pushint(S, noerr);
 	return 1;
 }
@@ -404,7 +404,7 @@ ELF_FUNCTION(l_sys_get_work_dir) {
 
 // process
 ELF_FUNCTION(l_sys_create_process) {
-	char *textargs = elf_get_text_arg(S, 0);
+	char *textargs = f_checktext(S, 0);
 	elf_Handle process = sys_create_process(0, textargs);
 	elf_pushsys(S, process);
 	return 1;

@@ -26,23 +26,25 @@ ELF_FUNCTION(l_core_registryhash64) {
 
 
 ELF_FUNCTION(l_core_get_meta) {
-	elf_pushmetatab(S, args + 1);
+	elf_getmetatab(S, args + 1);
 	return 1;
 }
 
 ELF_FUNCTION(l_core_set_meta) {
 	elf_setmetatab(S, args + 1, args + 2);
-	elf_pushmetatab(S, args + 1);
+	elf_getmetatab(S, args + 1);
 	return 1;
 }
+
 
 ELF_FUNCTION(l_core_tagof) {
 	elf_pushstr(S, tag2s[elf_gettag(S, args + 1)]);
 	return 1;
 }
 
+
 ELF_FUNCTION(l_core_iton) {
-	elf_Value v = elf_get_arg(S, 0);
+	elf_Value v = loadvalue(S, 0);
 	if (!isnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
@@ -50,8 +52,9 @@ ELF_FUNCTION(l_core_iton) {
 	return 1;
 }
 
+
 ELF_FUNCTION(l_core_ntoi) {
-	elf_Value v = elf_get_arg(S, 0);
+	elf_Value v = loadvalue(S, 0);
 	if (!isnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
@@ -118,26 +121,26 @@ ELF_FUNCTION(l_core_load_json) {
 
 static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 	switch (v.tag) {
-		case elf_tag_Nil:        return bprintf(sb,   "nil"               );
-		case elf_tag_Int:        return bprintf(sb,  "%lli", v.x_int      );
-		case elf_tag_Num:        return bprintf(sb,    "%f", v.x_num      );
-		case elf_tag_Handle:     return bprintf(sb, "h%llX", v.x_int      );
-		case elf_tag_String:     return bprintf(sb,    "%s", v.x_str->text);
-		case elf_tag_Closure:    return bprintf(sb,   "F()");
-		case elf_tag_Function:   return bprintf(sb,   "C()");
+		case ELF_TNIL:        return bprintf(sb,   "nil"               );
+		case ELF_TINTEGER:        return bprintf(sb,  "%lli", v.x_int      );
+		case ELF_TNUMBER:        return bprintf(sb,    "%f", v.x_num      );
+		case ELF_THANDLE:     return bprintf(sb, "h%llX", v.x_int      );
+		case ELF_TSTRING:     return bprintf(sb,    "%s", v.x_str->text);
+		case ELF_TCLOSURE:    return bprintf(sb,   "F()");
+		case ELF_TFUNCTION:   return bprintf(sb,   "C()");
 
-		case elf_tag_Table: {
+		case ELF_TTABLE: {
 			/* todo: this is slow! */
 			int wrote = 0;
 			elf_Table *tab = v.x_tab;
 			wrote += bprintf(sb, "{");
 
 			index_t i,j,n;
-			for (i=0;i<arrlen(tab->array);++i) {
+			for (i=0;i<darr_l(tab->array);++i) {
 				if (i != 0) wrote += bprintf(sb, ", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elf_Table_Entry it = tab->slots[j];
-					if (it.key.tag==elf_tag_Nil) continue;
+					if (it.key.tag==ELF_TNIL) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += bprintf(sb, ", ");
 					wrote += value_bprintf(sb,it.key,1);
@@ -147,7 +150,7 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
 			// 	elf_Table_Entry it = tab->slots[i];
-			// 	if (it.key.tag == elf_tag_Nil) continue;
+			// 	if (it.key.tag == ELF_TNIL) continue;
 			// 	if (n ++ != 0) wrote += bprintf(sb,", ");
 			// 	wrote += value_bprintf(sb,it.key,1);
 			// 	wrote += bprintf(sb," = ");
@@ -190,7 +193,7 @@ ELF_FUNCTION(l_core_format) {
 			format += 1;
 
 			// todo:
-			elf_Value value = elf_get_arg(S, argindex ++);
+			elf_Value value = loadvalue(S, argindex ++);
 			value_bprintf(&sb, value, 0);
 		}
 	}
@@ -201,11 +204,11 @@ ELF_FUNCTION(l_core_format) {
 }
 
 ELF_FUNCTION(l_core_fpf) {
-	elf_Handle file = elf_get_sysarg(S, 0);
+	elf_Handle file = f_checkhand(S, 0);
 
 	String_Builder sb = {};
 	for (int i = 1; i < (nargs - 1); i ++) {
-		value_bprintf(&sb, elf_get_arg(S, i), 0);
+		value_bprintf(&sb, loadvalue(S, i), 0);
 	}
 	elf_pushint(S, sb.min);
 
@@ -218,7 +221,7 @@ ELF_FUNCTION(l_core_fpf) {
 ELF_FUNCTION(l_core_pf) {
 	String_Builder sb = {};
 	for (int i = 0; i < (nargs - 1); i ++) {
-		value_bprintf(&sb, elf_get_arg(S,i),0);
+		value_bprintf(&sb, loadvalue(S,i),0);
 	}
 	bprintf(&sb, "\n");
 
@@ -240,11 +243,11 @@ static void bprinttabs(String_Builder *sb, int num) {
 static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int level) {
 	int noerror = true;
 	switch (thing.tag) {
-		case elf_tag_Nil:    bprintf(sb, "nil"                       ); break;
-		case elf_tag_Int:    bprintf(sb, "%lli"  , thing.x_int       ); break;
-		case elf_tag_Num:    bprintf(sb, "%f"    , thing.x_num       ); break;
-		case elf_tag_String: bprintf(sb, "\"%s\"", thing.x_str->text ); break;
-		case elf_tag_Table: {
+		case ELF_TNIL:    bprintf(sb, "nil"                       ); break;
+		case ELF_TINTEGER:    bprintf(sb, "%lli"  , thing.x_int       ); break;
+		case ELF_TNUMBER:    bprintf(sb, "%f"    , thing.x_num       ); break;
+		case ELF_TSTRING: bprintf(sb, "\"%s\"", thing.x_str->text ); break;
+		case ELF_TTABLE: {
 			elf_Table *table = thing.x_tab;
 
 			int nwrote = 0;
@@ -260,18 +263,18 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 					index_t index = entry.idx;
 					elf_Value key = entry.key;
 
-					if ((key.tag != elf_tag_Num)
-					&&  (key.tag != elf_tag_Int)
-					&&  (key.tag != elf_tag_String))
+					if ((key.tag != ELF_TNUMBER)
+					&&  (key.tag != ELF_TINTEGER)
+					&&  (key.tag != ELF_TSTRING))
 					{
 						continue;
 					}
 
 					elf_Value value = table->array[index];
-					if ((value.tag != elf_tag_Num)
-					&&  (value.tag != elf_tag_Int)
-					&&  (value.tag != elf_tag_Table)
-					&&  (value.tag != elf_tag_String))
+					if ((value.tag != ELF_TNUMBER)
+					&&  (value.tag != ELF_TINTEGER)
+					&&  (value.tag != ELF_TTABLE)
+					&&  (value.tag != ELF_TSTRING))
 					{
 						continue;
 					}
@@ -286,10 +289,10 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 			} else {
 				FOR_ARRAY(i, table->array) {
 					elf_Value value = table->array[i];
-					if ((value.tag != elf_tag_Num)
-					&&  (value.tag != elf_tag_Int)
-					&&  (value.tag != elf_tag_Table)
-					&&  (value.tag != elf_tag_String))
+					if ((value.tag != ELF_TNUMBER)
+					&&  (value.tag != ELF_TINTEGER)
+					&&  (value.tag != ELF_TTABLE)
+					&&  (value.tag != ELF_TSTRING))
 					{
 						continue;
 					}
@@ -309,8 +312,8 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 
 
 ELF_FUNCTION(l_core_unload) {
-	elf_Handle file = elf_get_sysarg(S, 0);
-	elf_Value thing = elf_get_arg(S, 1);
+	elf_Handle file = f_checkhand(S, 0);
+	elf_Value thing = loadvalue(S, 1);
 	String_Builder sb = {};
 	int noerr = unparse(S, &sb, thing, 0);
 	if (noerr) {
@@ -355,7 +358,7 @@ are not mistaken with table accesses when shortened,
 math.floor != .math.floor */
 int core_lib_include(elf_State *R) {
 	elf_check_num_args(R,".include",1,"(the directory to include to add to the global directory)");
-	char *dir = elf_get_text_arg(R,0);
+	char *dir = f_checktext(R,0);
 	int plen = text_length(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:
@@ -371,7 +374,7 @@ int core_lib_include(elf_State *R) {
 	elf_Table_Entry entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
-		if (entry.key.tag == elf_tag_String) {
+		if (entry.key.tag == ELF_TSTRING) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);

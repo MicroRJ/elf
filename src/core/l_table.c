@@ -3,9 +3,8 @@
 //
 
 
-
 ELF_FUNCTION(l_table_get_meta) {
-	elf_pushmetatab(S, args + 0);
+	elf_getmetatab(S, args + 0);
 	return 1;
 }
 
@@ -23,15 +22,15 @@ static inline bool tablecontains(elf_Table *tab, elf_Value key) {
 
 ELF_FUNCTION(l_table_contains) {
 	ASSERT((nargs - 1) == 1);
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_Value key = elf_get_arg(S, 0);
+	elf_Table *tab = f_checktable(S, -1);
+	elf_Value key = loadvalue(S, 0);
 	elf_pushint(S, tablecontains(tab, key));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_table_get_collisions) {
-	elf_Table *tab = elf_get_table(S, -1);
+	elf_Table *tab = f_checktable(S, -1);
 	elf_pushint(S, tab->ndebug);
 	return 1;
 }
@@ -46,32 +45,32 @@ ELF_FUNCTION(l_table_get_collisions) {
 ELF_FUNCTION(l_table_delete) {
 	ASSERT((nargs - 1) >= 1);
 
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_Value key = elf_get_arg(S, 0);
+	elf_Table *tab = f_checktable(S, -1);
+	elf_Value key = loadvalue(S, 0);
 
 	elf_Table_Entry *entries = tab->entries;
 	elf_Value *array = tab->array;
 
 	index_t slot = elf_table_try_(tab, key);
 
-	if ((slot >= 0) && (entries[slot].key.tag != elf_tag_Nil) && (entries[slot].key.tag != elf_tag_Tomb)) {
+	if ((slot >= 0) && (entries[slot].key.tag != ELF_TNIL) && (entries[slot].key.tag != ELF_TTOMB)) {
 
 		index_t idx = entries[slot].idx;
-		elf_push_value_raw(S, array[idx]);
+		pushvalue(S, array[idx]);
 
 		index_t i;
 		for (i = 0; i < tab->ntotal; i ++) {
 			if (entries[i].idx == idx) {
-				entries[i].key.tag = elf_tag_Tomb;
+				entries[i].key.tag = ELF_TTOMB;
 			} else if(entries[i].idx > idx) {
 				ASSERT(entries[i].idx > 0);
 				entries[i].idx -= 1;
 			}
 		}
 
-		memmove(array + idx, array + idx + 1, (arrlen(array) - idx - 1) * sizeof(elf_Value));
+		memmove(array + idx, array + idx + 1, (darr_l(array) - idx - 1) * sizeof(elf_Value));
 
-		ARRAY_SET_MIN(array, arrlen(array) - 1);
+		ARRAY_SET_MIN(array, darr_l(array) - 1);
 	} else {
 		elf_pushnil(S);
 	}
@@ -96,8 +95,8 @@ static inline void aliastable(elf_Table *tab, elf_Value key, elf_Value alias) {
 // creates a new one entry of the given 'new_key' that
 // points to where 'existing_key' points to
 ELF_FUNCTION(l_table_alias) {
-	elf_Table *tab = elf_get_table(S, -1);
-	aliastable(tab, elf_get_arg(S,0), elf_get_arg(S,1));
+	elf_Table *tab = f_checktable(S, -1);
+	aliastable(tab, loadvalue(S,0), loadvalue(S,1));
 	return 0;
 }
 
@@ -107,16 +106,16 @@ ELF_FUNCTION(l_table_alias) {
 // finds all the aliases of the given 'key' including the
 // key itself
 ELF_FUNCTION(l_find_aliases) {
-	elf_Table *tab = elf_get_table(S, -1);
+	elf_Table *tab = f_checktable(S, -1);
 
-	elf_Value key = elf_get_arg(S,0);
+	elf_Value key = loadvalue(S,0);
 
 	elf_pushtab(S);
 
 	index_t i;
 	elf_Table_Entry entry;
 
-	if (key.tag != elf_tag_Nil) {
+	if (key.tag != ELF_TNIL) {
 
 		i = elf_table_try_(tab, key);
 
@@ -134,7 +133,7 @@ ELF_FUNCTION(l_find_aliases) {
 					if (isdead(alias.key)) continue;
 					if (alias.idx != entry.idx) continue;
 
-					elf_push_value_raw(S, alias.key);
+					pushvalue(S, alias.key);
 					elf_arrayadd(S);
 				}
 			}
@@ -149,7 +148,7 @@ ELF_FUNCTION(l_find_aliases) {
 // returns an array containg all the keys for this table
 //
 ELF_FUNCTION(l_table_get_keys) {
-	elf_Table *tab = elf_get_table(S, -1);
+	elf_Table *tab = f_checktable(S, -1);
 
 	elf_pushtab(S);
 
@@ -161,7 +160,7 @@ ELF_FUNCTION(l_table_get_keys) {
 			continue;
 		}
 
-		elf_push_value_raw(S, entry.key);
+		pushvalue(S, entry.key);
 		elf_arrayadd(S);
 	}
 	return 1;
@@ -184,14 +183,14 @@ ELF_FUNCTION(l_table_merge) {
 	elf_Table_Entry entry;
 
 	for (int i = -1; i < (nargs - 1); ++ i ) {
-		elf_Table *merger = elf_get_table(S, i);
+		elf_Table *merger = f_checktable(S, i);
 		for (slot = 0; slot < merger->ntotal; ++ slot) {
 			entry = merger->slots[slot];
 
 			if (isdead(entry.key)) continue;
 
-			elf_push_value_raw(S, entry.key);
-			elf_push_value_raw(S, merger->array[entry.idx]);
+			pushvalue(S, entry.key);
+			pushvalue(S, merger->array[entry.idx]);
 			elf_setfield(S);
 		}
 	}
@@ -200,8 +199,8 @@ ELF_FUNCTION(l_table_merge) {
 }
 
 ELF_FUNCTION(l_table_fork) {
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_Table *sub = elf_get_table(S,  0);
+	elf_Table *tab = f_checktable(S, -1);
+	elf_Table *sub = f_checktable(S,  0);
 
 	if (sub == 0) {
 		elf_error(S, NO_BYTE, "argument is nil");
@@ -217,8 +216,8 @@ ELF_FUNCTION(l_table_fork) {
 		if (isdead(entry.key)) continue;
 		if (tablecontains(sub, entry.key)) continue;
 
-		elf_push_value_raw(S, entry.key);
-		elf_push_value_raw(S, tab->array[entry.idx]);
+		pushvalue(S, entry.key);
+		pushvalue(S, tab->array[entry.idx]);
 		elf_setfield(S);
 	}
 
@@ -227,29 +226,41 @@ ELF_FUNCTION(l_table_fork) {
 
 
 ELF_FUNCTION(l_array_length) {
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_pushint(S, arrlen(tab->array));
+	elf_Table *tab = f_checktable(S, -1);
+	elf_pushint(S, darr_l(tab->array));
 	return 1;
 }
 
+static void checktab(elf_State *inter, elf_stkid stk) {
+	if (!istab(inter->stack[stk])) {
+		elf_errorf(inter, -1, "'%s': expected 'table'", tag2s[vgettag(inter->stack[stk])]);
+	}
+}
+
+
 ELF_FUNCTION(l_array_index) {
-	elf_Table *tab = elf_get_table(S, -1);
+	checktab(S, args + 0);
+	elf_Table *tab = f_checktable(S, -1);
 
-	index_t len = arrlen(tab->array);
-	index_t idx = elf_get_intarg(S, 0);
-	if ((idx %= len) < 0) idx += len;
+	index_t idx = elf_toint(S, args + 1);
+	index_t len = darr_l(tab->array);
 
-	elf_push_value_raw(S, tab->array[idx]);
+	if (idx < 0 || idx >= len) {
+		elf_errorf(S, -1, "'%lli': index out of bounds", idx);
+	}
+
+	// if ((idx %= len) < 0) idx += len;
+
+	pushvalue(S, tab->array[idx]);
 	return 1;
 }
 
 ELF_FUNCTION(l_array_add) {
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_push_table_raw(S, tab);
+	elf_Table *tab = f_checktable(S, -1);
 
-	for (int i = 0; i < (nargs - 1); i++) {
-		elf_push_value_raw(S, elf_get_arg(S, i));
-		elf_arrayadd(S);
+	for (int i = 0; i < nargs - 1; i++) {
+		elf_Value itm = loadvalue(S, i);
+		elf_raw_array_add(tab, itm);
 	}
 	return 0;
 }
@@ -257,11 +268,11 @@ ELF_FUNCTION(l_array_add) {
 
 ELF_FUNCTION(l_array_replace) {
 
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_Value value = elf_get_arg(S, 0);
+	elf_Table *tab = f_checktable(S, -1);
+	elf_Value value = loadvalue(S, 0);
 
-	index_t len = arrlen(tab->array);
-	index_t idx = elf_get_intarg(S, 1);
+	index_t len = darr_l(tab->array);
+	index_t idx = f_checkint(S, 1);
 	if ((idx %= len) < 0) idx += len;
 
 	tab->array[idx] = value;
@@ -270,9 +281,13 @@ ELF_FUNCTION(l_array_replace) {
 
 
 ELF_FUNCTION(l_array_swap) {
-	elf_Table *tab = elf_get_table(S, -1);
-	index_t x = elf_get_intarg(S, 0);
-	index_t y = elf_get_intarg(S, 1);
+	elf_Table *tab = f_checktable(S, -1);
+	index_t x = elf_toint(S, args + 0);
+	index_t y = elf_toint(S, args + 1);
+
+	if (y < 0) y += darr_l(tab->array);
+	if (x < 0) x += darr_l(tab->array);
+
 	elf_Value temp = tab->array[x];
 	tab->array[x] = tab->array[y];
 	tab->array[y] = temp;
@@ -280,33 +295,44 @@ ELF_FUNCTION(l_array_swap) {
 }
 
 
-ELF_FUNCTION(l_array_merge) {
-	elf_Table *tab = elf_get_table(S, -1);
-	elf_Table *add = elf_get_table(S,  0);
 
-	elf_pushtab(S);
+ELF_FUNCTION(l_array_pop) {
+	elf_Table *tab = f_checktable(S, -1);
+
+	Dynamic_Array *darr = d_array_raw(tab->array);
+	pushvalue(S, tab->array[-- darr->min]);
+
+	return 1;
+}
+
+
+ELF_FUNCTION(l_array_merge) {
+
+	elf_Table *tab = f_checktable(S, -1);
+	elf_Table *add = f_checktable(S,  0);
+
+	elf_Table *sum = elf_alloc_table(S);
+	vsettab(S->stack_ptr ++, tab);
 
 	index_t i;
-	for (i=0;i<arrlen(tab->array);++i) {
-		elf_push_value_raw(S, tab->array[i]);
-		elf_arrayadd(S);
+	for (i=0;i<darr_l(tab->array);++i) {
+		d_array_add(sum->array, tab->array[i]);
 	}
-	for (i=0;i<arrlen(add->array);++i) {
-		elf_push_value_raw(S, add->array[i]);
-		elf_arrayadd(S);
+	for (i=0;i<darr_l(add->array);++i) {
+		d_array_add(sum->array, tab->array[i]);
 	}
 	return 1;
 }
 
 ELF_FUNCTION(l_array_clone) {
-	elf_Table *tab = elf_get_table(S, -1);
+	elf_Table *tab = f_checktable(S, -1);
 
 	elf_pushtab(S);
 
 	index_t i;
-	for (i=0;i<arrlen(tab->array);++i)
+	for (i=0;i<darr_l(tab->array);++i)
 	{
-		elf_push_value_raw(S, tab->array[i]);
+		pushvalue(S, tab->array[i]);
 		elf_arrayadd(S);
 	}
 	return 1;
@@ -314,8 +340,8 @@ ELF_FUNCTION(l_array_clone) {
 
 ELF_FUNCTION(l_array_reverse) {
 
-	elf_Table *tab = elf_get_table(S, -1);
-	index_t n = arrlen(tab->array);
+	elf_Table *tab = f_checktable(S, -1);
+	index_t n = darr_l(tab->array);
 
 	elf_Value *array = tab->array;
 
@@ -330,16 +356,16 @@ ELF_FUNCTION(l_array_reverse) {
 
 
 ELF_FUNCTION(l_array_slice) {
-	elf_Table *tab = elf_get_table(S, -1);
+	elf_Table *tab = f_checktable(S, -1);
 
 	index_t x = 0;
-	index_t y = arrlen(tab->array);
-	if ((nargs - 1) >= 1) x = elf_get_intarg(S,0);
-	if ((nargs - 1) >= 2) y = elf_get_intarg(S,1);
+	index_t y = darr_l(tab->array);
+	if ((nargs - 1) >= 1) x = f_checkint(S,0);
+	if ((nargs - 1) >= 2) y = f_checkint(S,1);
 
 	elf_pushtab(S);
 	while (x < y) {
-		elf_push_value_raw(S, tab->array[x ++]);
+		pushvalue(S, tab->array[x ++]);
 		elf_arrayadd(S);
 	}
 	return 1;
@@ -366,6 +392,8 @@ elf_Binding table_metafuncs[] = {
 	{"delete"       , l_table_delete       },
 
 	// array part
+	{"pop"          , l_array_pop          },
+	{"swap"         , l_array_swap         },
 	{"length"       , l_array_length       },
 	{"tally"        , l_array_length       },
 	{"add"          , l_array_add          },
@@ -375,5 +403,4 @@ elf_Binding table_metafuncs[] = {
 	{"merge_array"  , l_array_merge        },
 	{"clone_array"  , l_array_clone        },
 	{"slice"        , l_array_slice        },
-	{"swap"         , l_array_swap         },
 };

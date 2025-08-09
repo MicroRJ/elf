@@ -10,7 +10,7 @@
 // object was created, making the gc
 // think that the object was a different
 // type.
-// ; locals[b.x].tag = elf_tag_Table;
+// ; locals[b.x].tag = ELF_TTABLE;
 // ; locals[b.x].t   = elf_newtab(R);
 // So when the gc would check local at b.x
 // it would think that it was a table, when

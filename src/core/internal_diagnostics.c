@@ -3,14 +3,9 @@
 //
 
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, Instr id, elf_Bytec b);
-static int get_byte_class(int op);
-
-
-elf_rawapi
-int elf_query_file_for_instr(elf_Module *M, int byte) {
-	FOR_ARRAY(i,M->files) {
-		elf_File file = M->files[i];
+static int findfileforinstr(elf_State *inter, int byte) {
+	FOR_ARRAY(i, inter->files) {
+		elf_File file = inter->files[i];
 		if (WITHIN(byte,file.pos,file.end)) {
 			return i;
 		}
@@ -21,14 +16,13 @@ int elf_query_file_for_instr(elf_Module *M, int byte) {
 static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, elf_Bytec byte, char const *fmt, ...) {
 	char *line_start;
 	int line_number;
-	char underline_buf[64];
-
 	get_source_info(source,cursor,&line_number,&line_start);
 
 	while (*line_start == '\t' || *line_start == ' ') {
 		line_start += 1;
 	}
 
+	char underline_buf[64];
 	int underline = MIN(sizeof(underline_buf), cursor - line_start);
 	line_start = cursor - underline;
 
@@ -57,15 +51,9 @@ static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, e
 }
 
 
-static void printerrorbanner() {
-	printf("============= ELF-ERROR =============\n");
-}
-
-
-elf_pubapi
 void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 {
-	printerrorbanner();
+	printf("============= ELF-ERROR =============\n");
 
 
 	if (instr == NO_BYTE)
@@ -80,7 +68,7 @@ void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 	// report could be inaccurate if the source file changed
 	Source line = inter->lines ? inter->lines[instr] : 0;
 
-	int fidi = elf_query_file_for_instr(inter, instr);
+	int fidi = findfileforinstr(inter, instr);
 
 	va_list vargs;
 	va_start(vargs, format);
@@ -103,7 +91,6 @@ void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 }
 
 
-elf_pubapi
 void elf_error(elf_State *inter, int byte, const char *message)
 {
 	elf_errorf(inter, byte, message);
@@ -115,8 +102,8 @@ void elf_error(elf_State *inter, int byte, const char *message)
 void elf_dump_byte_trace(elf_State *S) {
 	// S->frame_stack[S->frame_index] = S->frame;
 	// for(int i=1; i<=S->frame_index; i++){
-	// 	elf_Stack_Frame *frame = & S->frame_stack[i];
-	// 	int id = elf_query_file_for_instr(S, frame->bytecounter);
+	// 	Stack_Frame *frame = & S->frame_stack[i];
+	// 	int id = findfileforinstr(S, frame->bytecounter);
 
 	// 	if (id != -1) {
 	// 		elf_File *file = &S->files[id];
@@ -152,12 +139,12 @@ void elf_analyze_exec_trail(elf_State *S) {
 	}
 	for(elf_i32 i = range_x0; i < range_y0; i ++) {
 		elf_trail_entry entry = S->exec_trail[i];
-		int id = elf_query_file_for_instr(S, entry.address);
+		int id = findfileforinstr(S, entry.address);
 		fpf_byte(stdout,S,id,entry.address,entry.bytecode);
 	}
 	for(elf_i32 i = range_x1; i < range_y1; i ++) {
 		elf_trail_entry entry = S->exec_trail[i];
-		int id = elf_query_file_for_instr(S, entry.address);
+		int id = findfileforinstr(S, entry.address);
 		fpf_byte(stdout,S,id,entry.address,entry.bytecode);
 	}
 }
@@ -195,7 +182,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, Instr id, elf_Byt
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag==elf_tag_String)||(val.tag==elf_tag_Num)||(val.tag==elf_tag_Int)) {
+		if ((val.tag==ELF_TSTRING)||(val.tag==ELF_TNUMBER)||(val.tag==ELF_TINTEGER)) {
 			// fpf_value(io,val,1);
 		}
 	}

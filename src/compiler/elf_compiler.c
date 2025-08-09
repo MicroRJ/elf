@@ -7,10 +7,11 @@
 
 #include "elf.h"
 
-#include "elf_internal.h"
-
 #include "subsystem.h"
-#include "r_auxilary.h"
+
+#include "internal_types.h"
+#include "internal_api.h"
+#include "internal_helpers.h"
 
 #include "bytecode_metadata.h"
 
@@ -57,7 +58,7 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 
 	add_this_param(parser, parser->tok.line);
 
-	arradd(parser->functions, func);
+	d_array_add(parser->functions, func);
 
 	if (as_expr) {
 
@@ -70,14 +71,14 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 		// todo: parse block function?
 		while (parse_stat(parser));
 		FOR_ARRAY(i, parser->block.defers) {
-			arradd(parser->block.body, parser->block.defers[i]);
+			d_array_add(parser->block.body, parser->block.defers[i]);
 		}
 
 	}
 	func->tree_funexpr.body = tree_block(parser, parser->tok.line, parser->block.body, 0, 0);
 
 	// create prototypes for every function
-	int nfunctions = arrlen(parser->functions);
+	int nfunctions = darr_l(parser->functions);
 	int index = ARRAY_GROW(S->protos, nfunctions);
 	elf_Proto *protos = & S->protos[index];
 
@@ -111,13 +112,16 @@ elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool
 			.contents = contents,
 			.name = name,
 		};
-		arradd(S->files, file);
+		d_array_add(S->files, file);
 	}
 
 	// todo: how do we track this, should each proto
 	// point to the file they are from?...
-	elf_raw_array_add(S->globals, VALUE_STRING(contents));
-	elf_raw_array_add(S->globals, VALUE_STRING(name));
+	elf_Value vcontents, vname;
+	vsetstr(&vcontents, contents);
+	vsetstr(&vname, name);
+	elf_raw_array_add(S->globals, vcontents);
+	elf_raw_array_add(S->globals, vname);
 
 	free(parser);
 

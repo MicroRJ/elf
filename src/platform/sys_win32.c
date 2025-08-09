@@ -6,6 +6,8 @@
 #pragma comment(lib,"Ws2_32")
 #define WIN32_LEAN_AND_MEAN
 
+#include "winconfig.h"
+
 #include <windows.h>
 #include <Windowsx.h>
 #include <Winsock2.h>
@@ -113,9 +115,9 @@ void sys_file_time_to_system_time(FILE_TIME *filetime, SYSTEM_TIME *systimeout) 
 
 #if 0
 int lib_core_shell(elf_State *R) {
-	char *verb = elf_get_text_arg(R,0);
-	char *file = elf_get_text_arg(R,1);
-	char *args = elf_get_text_arg(R,2);
+	char *verb = f_checktext(R,0);
+	char *file = f_checktext(R,1);
+	char *args = f_checktext(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
 	elf_pushint(R,success);
@@ -133,7 +135,7 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
-	GetDiskFreeSpaceA(elf_get_text_arg(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
+	GetDiskFreeSpaceA(f_checktext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
 	elf_tsets_int(info,elf_alloc_string(R,"SectorsPerCluster"),SectorsPerCluster);
 	elf_tsets_int(info,elf_alloc_string(R,"BytesPerSector"),BytesPerSector);
 	elf_tsets_int(info,elf_alloc_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);

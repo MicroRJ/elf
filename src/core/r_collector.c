@@ -11,7 +11,7 @@ int elf_gcstate(elf_State *S, elf_GC_State state) {
 }
 
 void *elf_gc_alloc(elf_State *R, elf_GC_Ty type, elf_i64 size) {
-	elf_Collector *gc = & R->G;
+	GCState *gc = & R->G;
 
 	if (gc->phase != GC_COLLECTABLE) {
 		elf_error(R,NO_BYTE,"object allocation out of phase");
@@ -59,7 +59,7 @@ static elf_i64 _mark(elf_Object *obj) {
 					num += _mark(slots[i].key.x_obj);
 				}
 			}
-			FOR_RANGE(i,0,arrlen(array)) {
+			FOR_RANGE(i,0,darr_l(array)) {
 				if (tisobject(array[i].tag)) {
 					num += _mark(array[i].x_obj);
 				}
@@ -91,7 +91,7 @@ int _gc_mark(elf_State *inter)
 
 
 elf_i64 _gc_free(elf_State *R) {
-	elf_Collector *gc = &R->G;
+	GCState *gc = &R->G;
 	ASSERT(gc->phase == GC_PHASE_FREE);
 	gc->phase ^= 1;
 
@@ -136,7 +136,7 @@ static elf_i64 elf_gc_cycle(elf_State *R) {
 		num_marked = _gc_mark(R);
 		// elf_debug_log("mark took: %fms", prof_time_diff_ms(_time));
 	}
-	elf_i64 num_objects = R->G.num_objects; // arrlen(R->G.objects);
+	elf_i64 num_objects = R->G.num_objects; // darr_l(R->G.objects);
 	elf_i64 num_to_collect = num_objects - num_marked;
 	elf_i64 obj_trigger_threshold = R->G.object_trigger_threshold;
 	// elf_debug_log("GC: %lli - %lli -> %lli (%lli), (total - marked = expected) (threshold)",num_objects,num_to_collect,num_marked,obj_trigger_threshold);
@@ -154,7 +154,7 @@ static elf_i64 elf_gc_cycle(elf_State *R) {
 
 
 void elf_gccheck(elf_State *R) {
-	elf_Collector *G = & R->G;
+	GCState *G = & R->G;
 
 
 	if (G->memory_threshold <= 0) {

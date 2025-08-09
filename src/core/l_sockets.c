@@ -32,7 +32,7 @@
 
 
 // elf_pubapi int netlib_listen(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
+// 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 // 	int error = listen(handle,SOMAXCONN);
 // 	elf_pushint(R,error!=SOCKET_ERROR);
 // 	return 1;
@@ -40,7 +40,7 @@
 
 
 // elf_pubapi int netlib_accept(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
+// 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 // 	SOCKET client = accept(handle,NULL,NULL);
 // 	elf_pushsys(R,(elf_Handle)client);
 // 	return 1;
@@ -48,7 +48,7 @@
 
 
 // elf_pubapi int netlib_pollclient(elf_State *R) {
-// 	SOCKET handle = (SOCKET) elf_get_sysarg(R,0);
+// 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 // 	fd_set ready;
 // 	FD_ZERO(&ready);
 // 	FD_SET(handle,&ready);
@@ -111,7 +111,7 @@
 
 // elf_pubapi int netlib_send(elf_State *R) {
 // 	/* todo: make this a class? */
-// 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
+// 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 // 	elf_String *payload = elf_get_string_arg(R,1);
 // 	LMSG message = { payload->length };
 // 	elf_Integer sent = 0;
@@ -123,7 +123,7 @@
 
 
 // elf_pubapi int netlib_ioctl(elf_State *R) {
-// 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
+// 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 // 	long mode = 1;
 // 	int error = ioctlsocket(socket,FIONBIO,&mode);
 // 	elf_pushint(R,error == 0);
@@ -132,7 +132,7 @@
 
 
 // elf_pubapi int netlib_recv(elf_State *R) {
-// 	SOCKET socket = (SOCKET) elf_get_sysarg(R,0);
+// 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 // 	LMSG message = {0};
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {

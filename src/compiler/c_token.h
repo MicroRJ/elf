@@ -7,10 +7,6 @@
 
 #define FORMAT_CHAR '%'
 
-// todo:remove "LEAVE"
-// todo:remove "iff"
-// todo:remove "lastly"
-// todo:remove "let"
 #define KEYWORDDEF(_) \
 _(ELF      ,"elf"         ) \
 _(JSON     ,"json"        ) \
@@ -18,6 +14,7 @@ _(DEFAULT  ,"default"     ) \
 _(LOAD     ,"load"        ) \
 _(NEW      ,"new"         ) \
 _(FUN      ,"fun"         ) \
+_(FUNCTION ,"function"    ) \
 _(NIL      ,"nil"         ) \
 _(TRUE     ,"true"        ) \
 _(FALSE    ,"false"       ) \
@@ -29,14 +26,10 @@ _(DO       ,"do"          ) \
 _(WHILE    ,"while"       ) \
 _(BREAK    ,"break"       ) \
 _(CONTINUE ,"continue"    ) \
-_(LET      ,"let"         ) \
 _(FOR      ,"for"         ) \
 _(DEFER    ,"defer"       ) \
-_(LASTLY   ,"lastly"      ) \
 _(RET      ,"ret"         ) \
-_(LEAVE    ,"leave"       ) \
 _(IF       ,"if"          ) \
-_(IFF      ,"iff"         ) \
 _(ELSE     ,"else"        ) \
 _(ELIF     ,"elif"        ) \
 _(THEN     ,"then"        ) \

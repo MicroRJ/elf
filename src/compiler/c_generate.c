@@ -119,7 +119,7 @@ static elf_Proto genfunction(elf_Parser *parser, treeID tree) {
 	elf_Proto proto = {};
 	proto.arity = 1;
 	proto.bytes = start;
-	proto.ncaptures = arrlen(tree->tree_funexpr.capts);
+	proto.ncaptures = darr_l(tree->tree_funexpr.capts);
 	proto.stacksize = parser->memory_usage;
 	proto.numbytes = R->nbytes - start;
 
@@ -300,27 +300,41 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	if(mem != NO_SLOT) {
 		if (ndst < 1) goto esc;
 		if (dst < 0) dst = set_mem(parser,id);
+
 		// let a = 0
 		// a = a ?? 1
+
 		if (dst != mem) {
 			emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 		}
 		goto esc;
 	}
+
+
 	switch (tree.kind) {
 		case TREE_NOP: {
 			if (ndst < 1) goto esc;
 			if (dst < 0) dst = set_mem(parser,id);
 		} break;
-		// todo: come back to this and clarify this
-		case TREE_LOAD: {
+
+		case TREE_PROXY: {
+			dst = to_mem(parser, tree.x, dst, ndst);
+		} break;
+
+		// todo: come back to this and explain this
+		case TREE_RELOAD: {
 			if (ndst < 1) goto esc;
-			if (get_mem(parser,tree.x) != -1) {
+
+			// if the tree already has memory, create new memory
+			if (get_mem(parser, tree.x) != -1) {
+				// unless we were given memory
 				if (dst < 0) dst = set_mem(parser,id);
 			}
+
 			dst = to_mem(parser,tree.x,dst,ndst);
 			parser->memory_slots[dst] = id;
 		} break;
+
 		case TREE_GETMEM: {
 			int mem = get_mem(parser,tree.x);
 			if (mem == NO_SLOT) {
@@ -378,15 +392,12 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			if (ndst<1) goto esc;
 			if (dst<0) dst=set_mem(parser,id);
 
-			/* todo: interning */
-			elf_String *str;
-			int yy;
-
 			// todo: add to constant pool and create new
 			// GETKSTR instruction
-			str=elf_alloc_string(S,tree.expr_str);
-			yy=elf_set_global(S,0,VALUE_STRING(str));
+			elf_String *str = elf_alloc_string(S, tree.expr_str);
 
+			int yy = elf_get_global_slot(S, 0);
+			vsetstr(&S->globals->array[yy], str);
 
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
 		} break;
@@ -475,7 +486,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			}
 			set_mem_state(parser,mem);
 
-			nargs=arrlen(tree.z)+1;
+			nargs=darr_l(tree.z)+1;
 			emit_bytexyz(parser,line,BC_CALL,mem,nargs,ndst);
 
 			if (ndst<1) goto esc;
@@ -596,10 +607,10 @@ static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id
 			_got_mem:
 			if (if_true) {
 				jmp=emit_bytexy(parser,tree.line,BC_JNZ,NO_JUMP,mem);
-				arradd(js->t,jmp);
+				d_array_add(js->t,jmp);
 			} else {
 				jmp=emit_bytexy(parser,tree.line,BC_JZ,NO_JUMP,mem);
-				arradd(js->f,jmp);
+				d_array_add(js->f,jmp);
 			}
 		} break;
 	}
@@ -675,7 +686,7 @@ void add_else_clause(elf_Parser *fs, Source line, BranchJumps *s) {
 	}
 	ASSERT(s->jz != 0);
 	int j = emit_jump(fs,line,-1);
-	arradd(s->j,j);
+	d_array_add(s->j,j);
 
 	patch_jumps(fs,s->jz);
 	ARRAY_DELETE(s->jz);
@@ -724,9 +735,9 @@ static int emit_byte(elf_Parser *parser, Source line, elf_Bytec byte) {
 	line = line ? line : parser->sourceloc;
 	ASSERT(line != 0);
 	parser->sourceloc = line;
-	arradd(M->lines, line);
-	arradd(M->bytes, byte);
-	arradd(M->track, 0);
+	d_array_add(M->lines, line);
+	d_array_add(M->bytes, byte);
+	d_array_add(M->track, 0);
 	// fpf_byte(stdout,M,-1,M->nbytes-C->fn->bytes,byte);
 	return M->nbytes ++;
 }

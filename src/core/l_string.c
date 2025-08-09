@@ -6,30 +6,29 @@
 // todo: proper matcher
 #include "string_matcher.c"
 
-
 ELF_FUNCTION(l_str_length) {
-	elf_pushint(S, elf_get_string_arg(S, 0)->length);
+	elf_pushint(S, f_checkstr(S, 0)->length);
 	return 1;
 }
 
 ELF_FUNCTION(l_str_get_hash) {
-	elf_String *str = elf_get_string_arg(S, -1);
+	elf_String *str = f_checkstr(S, -1);
 	elf_pushint(S, str->hash);
 	return 1;
 }
 
 ELF_FUNCTION(l_str_get_index) {
-	char *text = elf_get_text_arg(S, -1);
-	int index = elf_get_intarg(S, 0);
+	char *text = f_checktext(S, -1);
+	int index = f_checkint(S, 0);
 	elf_pushint(S, text[index]);
 	return 1;
 }
 
 ELF_FUNCTION(l_str_slice) {
-	elf_String *str = elf_get_string_arg(S, -1);
+	elf_String *str = f_checkstr(S, -1);
 	// todo: out of bounds check
-	int from = elf_get_intarg(S, 0);
-	int to = elf_get_intarg(S, 1);
+	int from = f_checkint(S, 0);
+	int to = f_checkint(S, 1);
 	elf_pushstrl(S, str->text + from, to);
 	return 1;
 }
@@ -42,7 +41,7 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags);
 ELF_FUNCTION(l_str_join) {
 	String_Builder sb = {};
 	for (int i = -1; i < (nargs - 1); ++ i) {
-		value_bprintf(&sb, elf_get_arg(S, i), 0);
+		value_bprintf(&sb, loadvalue(S, i), 0);
 	}
 	elf_pushstrl(S, sb.buf, sb.min);
 	free(sb.buf);
@@ -53,8 +52,8 @@ ELF_FUNCTION(l_str_join) {
 // todo: what if multiple inputs!
 // @doc whether the string matches the passed in pattern
 ELF_FUNCTION(l_str_match) {
-	char *s = elf_get_text_arg(S, -1);
-	char *p = elf_get_text_arg(S,  0);
+	char *s = f_checktext(S, -1);
+	char *p = f_checktext(S,  0);
 	char *match = string_match(s, p);
 	elf_pushint(S, match != 0);
 	return 1;
@@ -63,8 +62,8 @@ ELF_FUNCTION(l_str_match) {
 // todo: doesn't actually work
 // @doc finds all the matches and returns a list of all the strings
 ELF_FUNCTION(l_str_find) {
-	char *s = elf_get_text_arg(S, -1);
-	char *p = elf_get_text_arg(S,  0);
+	char *s = f_checktext(S, -1);
+	char *p = f_checktext(S,  0);
 
 	// return a list
 	elf_pushtab(S);
@@ -96,7 +95,7 @@ ELF_FUNCTION(l_str_find) {
 
 // @doc returns an list of lines from this string
 ELF_FUNCTION(l_str_split_by_lines) {
-	char *s = elf_get_text_arg(S, -1);
+	char *s = f_checktext(S, -1);
 
 	elf_pushtab(S);
 
@@ -127,8 +126,8 @@ ELF_FUNCTION(l_str_split_by_lines) {
 
 ELF_FUNCTION(l_str_split_by_char) {
 
-	char *s = elf_get_text_arg(S, -1);
-	int chr = elf_get_intarg(S, 0);
+	char *s = f_checktext(S, -1);
+	int chr = f_checkint(S, 0);
 
 	elf_pushtab(S);
 
@@ -158,7 +157,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 
 
 ELF_FUNCTION(l_str_lowercase) {
-	elf_String *str = elf_get_string_arg(S, -1);
+	elf_String *str = f_checkstr(S, -1);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
@@ -170,7 +169,7 @@ ELF_FUNCTION(l_str_lowercase) {
 
 
 ELF_FUNCTION(l_str_uppercase) {
-	elf_String *str = elf_get_string_arg(S, -1);
+	elf_String *str = f_checkstr(S, -1);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);

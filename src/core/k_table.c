@@ -9,7 +9,7 @@
 // todo: remove!
 #define slot2value(T,X) (T->array[T->slots[X].idx])
 // todo: remove!
-#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != elf_tag_Nil) && (T->slots[X].key.tag != elf_tag_Tomb))
+#define slotiskey(T,X) ((X >= 0) && (T->slots[X].key.tag != ELF_TNIL) && (T->slots[X].key.tag != ELF_TTOMB))
 
 
 elf_rawapi
@@ -56,7 +56,7 @@ static void check_resize(elf_Table *table) {
 		FOR_RANGE(i, 0, table->ntotal) {
 			elf_Table_Entry prev_entry = table->slots[i];
 
-			if (prev_entry.key.tag != elf_tag_Nil && prev_entry.key.tag != elf_tag_Tomb) {
+			if (prev_entry.key.tag != ELF_TNIL && prev_entry.key.tag != ELF_TTOMB) {
 
 				elf_i64 prev_index = elf_table_try_(&new_table,prev_entry.key);
 				ASSERT(prev_index >= 0);
@@ -77,7 +77,7 @@ static void check_resize(elf_Table *table) {
 
 
 static inline hash_t hash_value(elf_Value *v) {
-	if (v->tag == elf_tag_String) {
+	if (v->tag == ELF_TSTRING) {
 		return elf_get_string_hash(v->x_str);
 	}
 	//
@@ -111,7 +111,7 @@ static inline bool value_equals(elf_Value *x, elf_Value *y) {
 		return true;
 	}
 	if (x->tag==y->tag) {
-		if(x->tag==elf_tag_String){
+		if(x->tag==ELF_TSTRING){
 			if (x->x_str->hash==y->x_str->hash){
 				if (x->x_str->length==y->x_str->length){
 					return text_eq(x->x_str->text,y->x_str->text);
@@ -124,14 +124,14 @@ static inline bool value_equals(elf_Value *x, elf_Value *y) {
 #else
 static inline elf_i64 hash_value(elf_Value *v) {
 	switch (v.tag) {
-		case elf_tag_String: {
+		case ELF_TSTRING: {
 			ASSERT(v.x_str != 0);
 			ASSERT(v.x_str->hash != 0);
 			return v.x_str->hash;
 		}
-		case elf_tag_UserObject:
-		case elf_tag_Table: case elf_tag_Closure: case elf_tag_Handle:
-		case elf_tag_Int: case elf_tag_Num: case elf_tag_Function: {
+		case ELF_TUSER:
+		case ELF_TTABLE: case ELF_TCLOSURE: case ELF_THANDLE:
+		case ELF_TINTEGER: case ELF_TNUMBER: case ELF_TFUNCTION: {
 			return hash64(v.x_ptr);
 		}
 		default: NO_CODE;
@@ -145,12 +145,12 @@ bool value_equals(elf_Value *x, elf_Value *y) {
 		return 0;
 	}
 	switch (x->tag) {
-		case elf_tag_String: {
+		case ELF_TSTRING: {
 			return elf_get_strings_eq(x->x_str,y->x_str);
 		}
-		case elf_tag_UserObject:
-		case elf_tag_Handle: case elf_tag_Int: case elf_tag_Num:
-		case elf_tag_Table: case elf_tag_Closure: case elf_tag_Function: {
+		case ELF_TUSER:
+		case ELF_THANDLE: case ELF_TINTEGER: case ELF_TNUMBER:
+		case ELF_TTABLE: case ELF_TCLOSURE: case ELF_TFUNCTION: {
 			return x->x_int == y->x_int;
 		}
 		default: NO_CODE;
@@ -162,7 +162,7 @@ bool value_equals(elf_Value *x, elf_Value *y) {
 
 elf_rawapi
 inline elf_Integer elf_array_get_length(elf_Table *table) {
-	return arrlen(table->array);
+	return darr_l(table->array);
 }
 
 
@@ -186,8 +186,8 @@ index_t elf_table_try_(elf_Table *tab, elf_Value key) {
 
 	do {
 		elf_Value value = slots[tail].key;
-		if (value.tag == elf_tag_Nil) return tail;
-		if (value.tag != elf_tag_Tomb) {
+		if (value.tag == ELF_TNIL) return tail;
+		if (value.tag != ELF_TTOMB) {
 			if(value_equals(&value,&key)){
 				return tail;
 			}
@@ -225,7 +225,7 @@ elf_Value elf_table_get_raw(elf_Table *tab, elf_Value k) {
 	if (slotiskey(tab,slot)) {
 		return slot2value(tab,slot);
 	}
-	return (elf_Value){elf_tag_Nil,0};
+	return (elf_Value){ELF_TNIL,0};
 }
 
 
@@ -245,7 +245,7 @@ static index_t elf_table_get_index_always_(elf_Table *table, elf_Value key) {
 		table->entries[slot].idx = index;
 		table->nslots++;
 
-		table->array[index] = VALUE_NIL();
+		vsetnil(&table->array[index]);
 	}
 
 	// todo: remove
@@ -266,7 +266,7 @@ elf_Value elf_table_get(elf_State *inter) {
 	elf_Value tab = inter->stack_ptr[-2];
 	elf_Value key = inter->stack_ptr[-1];
 
-	if (tab.tag != elf_tag_Table) {
+	if (tab.tag != ELF_TTABLE) {
 		elf_error(inter, NO_BYTE, "Not A Table!");
 	}
 
@@ -292,7 +292,7 @@ elf_Value elf_table_get(elf_State *inter) {
 
 
 // void elf_tadd_tab(elf_Table *table, elf_Table *thing) {
-// 	arradd(table->array,VALUE_TABLE(thing));
+// 	d_array_add(table->array,VALUE_TABLE(thing));
 // }
 
 
@@ -303,11 +303,11 @@ typedef struct TABLE_BINARY_FILE {
 } TABLE_BINARY_FILE;
 
 void elf_table_export_binary(elf_Table *tab, FILE *io) {
-	FOR_RANGE(i, 0, arrlen(tab->array)) {
+	FOR_RANGE(i, 0, darr_l(tab->array)) {
 		elf_Value value = tab->array[i];
 		switch (value.tag) {
 			// todo: compression!
-			case elf_tag_Int: { fprintf(io, "%lli", value.x_i64); } break;
+			case ELF_TINTEGER: { fprintf(io, "%lli", value.x_i64); } break;
 			default: {
 				elf_error();
 			}
@@ -333,10 +333,10 @@ void elf_table_export_binary(elf_Table *tab, FILE *io) {
 // 	elf_i64 walk = 1; // rehash(hash)|1;
 // 	do {
 // 		elf_Value x = slots[tail].key;
-// 		if (x.tag==elf_tag_Nil) {
+// 		if (x.tag==ELF_TNIL) {
 // 			return tail;
 // 		}
-// 		if (x.tag==elf_tag_String) {
+// 		if (x.tag==ELF_TSTRING) {
 // 			if (x.x_str->text==text) {
 // 				return tail;
 // 			}
@@ -364,5 +364,5 @@ void elf_table_export_binary(elf_Table *tab, FILE *io) {
 // 	if (slotiskey(tab,slot)) {
 // 		return slot2value(tab,slot);
 // 	}
-// 	return (elf_Value){elf_tag_Nil,0};
+// 	return (elf_Value){ELF_TNIL,0};
 // }

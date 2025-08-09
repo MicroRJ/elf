@@ -177,7 +177,7 @@ int sys_find_next_file(FILE_VISITOR *visitor) {
 			elf_tsets_str(file,elf_new_string(R,"path"),path);
 			elf_tsets_int(file,elf_new_string(R,"isdir"),isdir);
 			int r = elf_call(R,base,1,1);
-			if ((r > 0) && isdir && elf_get_intarg(R,base)) {
+			if ((r > 0) && isdir && f_checkint(R,base)) {
 				core_lib_enumerate_folder_(R,path,cls);
 			}
 			SET_TOP(R,top);

@@ -67,7 +67,7 @@ ELF_FUNCTION(lib_vec2__##NAME) { \
 	elf_Value sx = VALUE_STRING(elf_new_string(S, "x")); \
 	elf_Value sy = VALUE_STRING(elf_new_string(S, "y")); \
 	elf_vec2 x = _get_vec2((elf_Table *) elf_get_this(S), sx, sy); \
-	elf_vec2 y = _get_vec2(elf_get_table(S, 0), sx, sy); \
+	elf_vec2 y = _get_vec2(elf_gettabraw(S, 0), sx, sy); \
 	elf_vec2 v = { OP(x.x, y.x), OP(x.y, y.y) }; \
 	elf_Table *res = elf_new_table(S); \
 	elf_raw_table_set(res, sx, VALUE_NUMBER(v.x)); \
