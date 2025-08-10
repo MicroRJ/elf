@@ -24,9 +24,6 @@
 #include "logging.c"
 
 
-#include "bytecode_metadata.h"
-
-
 #include "internal_types.h"
 #include "internal_api.h"
 #include "internal_helpers.h"
@@ -61,7 +58,7 @@ int elf_get_global_slot(elf_State *S, elf_String *name) {
 		return elf_table_get_index_always_(S->globals, vname);
 	}
 
-	return ARRAY_GROW(S->globals->array, 1);
+	return darr_grow(S->globals->array, 1);
 }
 
 int elf_set_global(elf_State *S, elf_String *name, elf_Value value) {
@@ -140,12 +137,12 @@ void elf_init_raw(elf_State *S) {
 	S->globals = pushtable(S);
 	install(S,     0,  lib_base  , COUNTOF(lib_base));
 	install(S,     0,  lib_math  , COUNTOF(lib_math));
-	install(S,"elf" ,  lib_core  , COUNTOF(lib_core));
+	install(S,"elf" ,  l_core    , COUNTOF(l_core));
 	install(S,"elf" ,  lib_random, COUNTOF(lib_random));
 	install(S,"elf" ,  l_sys,      COUNTOF(l_sys));
 
 
-	ASSERT(stackcursor(S) < S->frame.framesize);
+	ASSERT(abstop(S) < S->frame.framesize);
 
 	S->stack_ptr = S->frame.framebase + S->frame.framesize;
 }
@@ -176,70 +173,94 @@ pullstackframe(elf_State *inter)
 
 
 
-// update the current frame for the given closure
+// update the given frame to match the given closure's needs
 static inline void
-prepframeforclosure(elf_State *inter, elf_Closure *closure, int nargs, int nrets)
+prepframeforclosure(elf_State *E, Stack_Frame *frame, elf_Closure *closure, int nargs, int nrets)
 {
 
-	elf_Proto proto = closure->proto;
+	Proto proto = closure->proto;
 
+	// todo: do not grow frame size less we care about vargs
 	int framesize = nargs < proto.stacksize ? proto.stacksize : nargs;
 
-	elf_Value *framebase = inter->stack_ptr - nargs;
+	V *framebase = E->stack_ptr - nargs;
 
-	inter->frame.framesize = framesize;
-	inter->frame.framebase = framebase;
-	inter->frame.nargs = nargs;
-	inter->frame.nrets = nrets;
-	inter->frame.bytes = proto.bytes;
-	inter->frame.bytec = proto.numbytes;
-	inter->frame.closureenv = closure->captures;
-	inter->frame.closuresize = proto.ncaptures;
+	V *reference = framebase;
+
+	// Do we care about excess args? And do we have any?
+	// todo: unlikely
+	if (proto.variadic && nargs > proto.arity) {
+		reference += nargs;
+		framesize += proto.arity;
+		copy_values(reference, framebase, proto.arity);
+	}
 
 	// prevent the collector from tripping on possibly garbage values
-	int restofstack = framesize - nargs;
-	clear_memory(framebase + nargs, restofstack * sizeof(elf_Value));
+	// clear the remaining stack space
+	zero_values(reference + MIN(proto.arity, nargs), framesize - MIN(proto.arity, nargs) - (reference - framebase));
+
+
+	frame->framesize = framesize;
+	frame->framebase = framebase;
+	frame->reference = reference;
+	frame->nargs = nargs;
+	frame->nrets = nrets;
+	frame->arity = proto.arity;
+	frame->variadic = proto.variadic;
+	frame->bytes = proto.bytes;
+	frame->bytec = proto.numbytes;
+	frame->closureenv = closure->captures;
+	frame->closuresize = proto.ncaptures;
+	frame->nextinstr = 0;
+
 }
 
 
-
+// is is still a call function, the only difference is that it happens
+// to be the interpreter's resume and it has access to a closure but who
+// doesn't these days
 static inline int
-callclosure(elf_State *S, elf_Closure *closure, int nargs, int nrets)
+callclosure(elf_State *E, elf_Closure *closure, int nargs, int nrets)
 {
-	elf_Proto proto = closure->proto;
+	Proto proto = closure->proto;
 
-	prepframeforclosure(S, closure, nargs, nrets);
+	prepframeforclosure(E, &E->frame, closure, nargs, nrets);
 
 	// update stack pointer to cover the entire frame
-	S->stack_ptr = S->frame.framebase + S->frame.framesize;
+	E->stack_ptr = E->frame.framebase + E->frame.framesize;
 
-	nrets = _resume(S);
+	nrets = _resume(E);
 
 	// put stack pointer right on top of all the returns
-	S->stack_ptr = S->frame.framebase - 1 + nrets;
+	E->stack_ptr = E->frame.framebase - 1 + nrets;
 	return nrets;
 }
 
 
 
+// nrets would not matter for the frame size because returns are pushed
+// regardless
 static inline int
-callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
+callfunction(elf_State *E, elf_Function proc, int nargs, int nrets)
 {
-	elf_Value *framebase = inter->stack_ptr - nargs;
+	V *framebase = E->stack_ptr - nargs;
+	V *reference = framebase;
+
 	int framesize = nargs;
-	inter->frame.framebase = framebase;
-	inter->frame.framesize = framesize;
-	inter->frame.nargs = nargs;
-	inter->frame.nrets = nrets;
 
+	E->frame.framebase = framebase;
+	E->frame.reference = reference;
+	E->frame.framesize = framesize;
+	E->frame.nargs = nargs;
+	E->frame.nrets = nrets;
 
-	inter->stack_ptr = framebase + framesize;
+	E->stack_ptr = framebase + framesize;
 
-	int args = framebase - inter->stack;
+	int args = framebase - E->stack;
 
-	int nuserrets = proc(inter, args, nargs, nrets);
+	int nuserrets = proc(E, args, nargs, nrets);
 
-	int nretpushed = inter->stack_ptr - framebase - framesize;
+	int nretpushed = E->stack_ptr - framebase - framesize;
 
 	// Ensure that the number of returns is consistent with the stack state.
 	// The user could have used the stack for other things, so we only enforce
@@ -247,23 +268,23 @@ callfunction(elf_State *inter, elf_Function proc, int nargs, int nrets)
 	// the returns the user said
 	if (nuserrets < 0 || nretpushed < nuserrets)
 	{
-		elf_error(inter, NO_BYTE
+		elf_error(E, NO_BYTE
 		, elf_tpf("invalid number of returns from procedure: %i, however the procedure pushed: %i"
 		, 				nuserrets, nretpushed));
 	}
 
-	// clear return space (todo: only clear the part that's doesn't overlap with the user rets)
-	memset(framebase - 1, 0, nrets * sizeof(elf_Value));
-
 	// the number of returns cannot exceed the return space
 	int ntruerets = MIN(nuserrets, nrets);
 
+	// clear return space (todo: only clear the part that's doesn't overlap with the user rets)
+	zero_values(framebase - 1, nrets);
+
 	// copy results to return space
-	memcpy(framebase - 1, inter->stack_ptr - nuserrets, ntruerets * sizeof(elf_Value));
+	copy_values(framebase - 1, E->stack_ptr - nuserrets, ntruerets);
 
 
 	// put stack pointer right on top of all the returns
-	inter->stack_ptr = framebase - 1 + ntruerets;
+	E->stack_ptr = framebase - 1 + ntruerets;
 	return ntruerets;
 }
 
@@ -273,8 +294,7 @@ elf_pubapi
 int elf_call(elf_State *S, int nargs, int nrets)
 {
 	if (nargs < 1) {
-		// __call wants at least the 'this' arg
-		pushnil(S);
+		elf_errorf(S, -1, "'call': expects at least one argument, got: %i", nargs);
 	}
 
 	pushstackframe(S);
@@ -313,7 +333,7 @@ static int callmetafield(elf_State *inter, elf_Object *obj, char *name, int narg
 
 	elf_Value vv = elf_table_get_raw(obj->meta, inter->stack_ptr[-1]);
 
-	if (isnil(vv)) {
+	if (visnil(vv)) {
 						// todo: as a courtesy, look for similar strings if any and
 						// ask them if he meant ...
 		elf_errorf(inter, NO_BYTE, "'%s': no such meta field", name);
@@ -348,15 +368,15 @@ static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
 	bool eq = 0;
 
 	// comparison between numeric operands
-	if (isnumeric(xx) && isnumeric(yy)) {
+	if (visnumeric(xx) && visnumeric(yy)) {
 		if (isnum(xx) || isnum(yy)) {
 			eq = vitonum(xx) == vitonum(yy);
 		} else {
 			eq = vgetint(xx) == vgetint(yy);
 		}
 	}
-	else if (vgettag(xx) == vgettag(yy)) {
-		if (isstr(xx)) {
+	else if (vtagof(xx) == vtagof(yy)) {
+		if (visstr(xx)) {
 			eq = streq(vgetstr(xx), vgetstr(yy));
 		}
 		else {
@@ -370,9 +390,8 @@ static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
 
 
 
-/* =====================================================
-	Macros For Generating Code
-======================================================== */
+/* all these are macros for generating the interpreter
+so they only work within that function ya heard */
 
 
 #define VMCASE(OPCODE) case OPCODE:
@@ -383,13 +402,13 @@ static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
 #define global_y() (globals->array[by.b_y])
 
 
-#define local_store_x(v) (frame.framebase[by.b_x] = v)
-#define local_store_x_int(v) (vsetint(&frame.framebase[by.b_x], v))
-#define local_store_x_num(v) (vsetnum(&frame.framebase[by.b_x], v))
+#define rstoreX(v) (frame.reference[by.b_x] = v)
+#define rstoreXi(v) (vsetint(&frame.reference[by.b_x], v))
+#define rstoreXn(v) (vsetnum(&frame.reference[by.b_x], v))
 
-#define local_x(v) frame.framebase[by.b_x]
-#define local_y(v) frame.framebase[by.b_y]
-#define localz(v) frame.framebase[by.b_z]
+#define rvalueX(v) (frame.reference[by.b_x])
+#define rvalueY(v) (frame.reference[by.b_y])
+#define rvalueZ(v) (frame.reference[by.b_z])
 
 
 
@@ -415,10 +434,10 @@ static inline bool veq(elf_State *inter, elf_Value xx, elf_Value yy) {
 #define arithbranchnum2(nopfn, iopfn)             \
 do {                                              \
 	if (isnum(xx) || isnum(yy)) {                  \
-		local_store_x_num(nopfn(vitonum(xx), vitonum(yy)));  \
+		rstoreXn(nopfn(vitonum(xx), vitonum(yy)));  \
 	}                                              \
 	else {                                         \
-		local_store_x_int(iopfn(vgetint(xx), vgetint(yy)));  \
+		rstoreXi(iopfn(vgetint(xx), vgetint(yy)));  \
 	}                                              \
 } while (0)
 
@@ -427,7 +446,7 @@ do {                                              \
 do {                                                                \
 	int nrets = callmetafield(inter, vgetobj(xx), name, 2, xx, yy);  \
 	\
-	local_store_x(inter->stack_ptr[-nrets]);                                 \
+	rstoreX(inter->stack_ptr[-nrets]);                         \
 	\
 	inter->stack_ptr = frame.framebase + frame.framesize;            \
 } while (0)
@@ -435,11 +454,11 @@ do {                                                                \
 
 #define arithcase(name, nopfn, iopfn) \
 do { \
-	xx=local_y(), yy=localz(); \
+	xx=rvalueY(), yy=rvalueZ(); \
 	\
-	if (isnumeric(xx)) { \
+	if (visnumeric(xx)) { \
 		\
-		if (!isnumeric(yy)) { \
+		if (!visnumeric(yy)) { \
 			error_invalidoperandsforoperator(inter, name, xx, yy); \
 		} \
 		\
@@ -458,7 +477,7 @@ do { \
 
 #define bwcase(name, opfn) \
 do { \
-	xx=local_y(), yy=localz(); \
+	xx=rvalueY(), yy=rvalueZ(); \
 	\
 	if (isint(xx)) { \
 		\
@@ -466,7 +485,7 @@ do { \
 			error_invalidoperandsforoperator(inter, name, xx, yy); \
 		} \
 		\
-		local_store_x_int(opfn(vgetint(xx), vgetint(yy)));   \
+		rstoreXi(opfn(vgetint(xx), vgetint(yy)));   \
 	} \
 	else if (isobj(xx)) { \
 		\
@@ -481,17 +500,17 @@ do { \
 
 #define relcase(name, opfn) \
 do { \
-	xx=local_y(), yy=localz(); \
+	xx=rvalueY(), yy=rvalueZ(); \
 	\
-	if (isnumeric(xx)) { \
+	if (visnumeric(xx)) { \
 		\
-		if (!isnumeric(yy)) error_invalidoperandsforoperator(inter, name, xx, yy); \
+		if (!visnumeric(yy)) error_invalidoperandsforoperator(inter, name, xx, yy); \
 		\
 		if (isnum(xx) || isnum(yy)) { \
-			local_store_x_int(opfn(vitonum(xx), vitonum(yy))); \
+			rstoreXi(opfn(vitonum(xx), vitonum(yy))); \
 		} \
 		else { \
-			local_store_x_int(opfn(vgetint(xx), vgetint(yy))); \
+			rstoreXi(opfn(vgetint(xx), vgetint(yy))); \
 		} \
 	} \
 	else if (isobj(xx)) { \
@@ -504,32 +523,44 @@ do { \
 
 
 /* =====================================================
-	Main Interpreter Loop
+		Interpreter Function
 ======================================================== */
 int _resume(elf_State *inter) {
+	int nrets = 0;
 
 	elf_State *R = inter;
-	elf_Table *globals = inter->globals;
-	Stack_Frame frame = inter->frame;
-	elf_Value xx,yy,zz;
 
+	Stack_Frame frame = inter->frame;
+
+
+	// we do this here because we don't store reference in the frame
+	// essentially we just have to:
+
+
+	// ensure that we got enough space
+	ASSERT(frame.framesize >= frame.nargs);
+
+	// ensure the stack pointer is properly set
 	ASSERT(inter->stack_ptr == frame.framebase + frame.framesize);
+
+	// ensure that the caller set this properly
+	ASSERT(frame.nextinstr == 0);
 
 	int subframes = 0;
 
-	int nrets = 0;
 
-	// todo: ensure that the caller sets this properly!
-	frame.nextinstr = 0;
+	T globals = inter->globals;
 
+	V xx,yy,zz;
 	while (frame.nextinstr < frame.bytec) {
 		int instr = frame.nextinstr ++;
 
 		int minstr = frame.bytes + instr;
-		elf_Bytec byte = inter->bytes[minstr];
-		elf_Bytec by = byte;
-
 		inter->byte = minstr;
+
+		Bytec byte = inter->bytebuf[minstr];
+
+		#define by byte
 
 
 		switch (BC_OP(byte)) {
@@ -537,43 +568,38 @@ int _resume(elf_State *inter) {
 			case BC_CALL:
 			{
 				// put stack pointer right above all the arguments
-				inter->stack_ptr = frame.framebase + by.b_x + by.b_y + 1;
+				// note how this will lead to the sub-function having
+				// a framebase relative to our reference, so the results
+				// get placed where we want them...
+				inter->stack_ptr = frame.reference + by.b_x + by.b_y + 1;
 
-				xx = local_x();
+				xx = rvalueX();
 
 				if (iscls(xx)) {
 
-					// update next instr from our local version
-					inter->frame.nextinstr = frame.nextinstr;
+					// save our frame
+					inter->frame_stack[inter->frame_index ++] = frame;
 
-					// save call frame
-					pushstackframe(inter);
-
-					// update call frame from closure
-					// todo: this also sets the stack pointer, but we can do that here
-					prepframeforclosure(inter, vgetcls(xx), by.b_y, by.b_z);
-
-					// load frame copy
-					frame = inter->frame;
+					// update frame for new closure
+					prepframeforclosure(inter, &frame, vgetcls(xx), by.b_y, by.b_z);
 
 					inter->stack_ptr = frame.framebase + frame.framesize;
-
-					// reset next instruction pointer
-					frame.nextinstr = 0;
 
 					// track the number of sub-frames locally
 					subframes ++;
 				}
 				else if (isfnc(xx)) {
 
-					// there's no need to push the stack frame because
-					// we've already got a local copy of it here
+					// we have to reflect our changes so that sub-functions
+					// that want access to the parent's call frame can get it,
+					// if you know what I mean
+					inter->frame_stack[inter->frame_index ++] = frame;
+
 					callfunction(inter, vgetfnc(xx), by.b_y, by.b_z);
 
-					// restore call frame from our local copy
-					inter->frame = frame;
+					inter->frame_index --;
 
-					// restore stack
+					// restore stack pointer
 					inter->stack_ptr = frame.framebase + frame.framesize;
 				}
 				else {
@@ -584,29 +610,37 @@ int _resume(elf_State *inter) {
 			} VMBREAK;
 
 			VMCASE(BC_RET) {
-				inter->frame.nrets = MIN(by.b_y, inter->frame.nrets);
+				// we can set nrets regardless of whether we're
+				// the main function or a subfunction, because
+				// if we're the main function we'll exit right
+				// after we set this...
+				nrets = MIN(by.b_y, frame.nrets);
 
 
-				// note that 'framebase' is right below the function,
-				// or at framebase - 1, so the returns are thus placed
-				// at framebase - 1
-				copy_memory(frame.framebase - 1, frame.framebase + by.b_x, inter->frame.nrets * sizeof(elf_Value));
+				// returns are placed right on the function
+				copy_values(frame.framebase - 1, frame.reference + by.b_x, nrets);
 
 				// restore stack frame
-				pullstackframe(inter);
-
-				// restore stack pointer to proper state regardless of
-				// whether we exit or not
-				inter->stack_ptr = inter->frame.framebase + inter->frame.framesize;
-
-				// sub-frame zero means we're the main frame, we can exit the routine
-				// on return
-				if (!subframes) goto esc;
+				frame = inter->frame_stack[-- inter->frame_index];
+				//
+				// now we're officially a different function
+				//
+				// sub-frame zero means we're the top call, we can exit
+				// the routine function now
+				if (!subframes) {
+					// set stack pointer so that our caller can pop the
+					// results
+					inter->stack_ptr = frame.framebase + nrets;
+					goto esc;
+				}
+				//
+				//
 				subframes --;
-
-				// restore our local frame
-				frame = inter->frame;
-
+				//
+				//
+				// restore stack pointer to cover the entire frame.
+				inter->stack_ptr = frame.framebase + frame.framesize;
+				//
 			} VMBREAK;
 
 			case BC_NOP: {
@@ -621,7 +655,7 @@ int _resume(elf_State *inter) {
 
 			case BC_JZ: {
 
-				if (local_y().x_i64 == 0) {
+				if (rvalueY().x_i64 == 0) {
 					int dst = by.b_x;
 					frame.nextinstr = instr + dst;
 				}
@@ -630,49 +664,58 @@ int _resume(elf_State *inter) {
 
 			case BC_JNZ: {
 
-				if (local_y().x_i64 != 0) {
+				if (rvalueY().x_i64 != 0) {
 					int dst = by.b_x;
 					frame.nextinstr = instr + dst;
 				}
 
 			} break;
 
-			VMCASE(BC_GETGLOBAL) { local_store_x(global_y()); } VMBREAK;
+			VMCASE(BC_GETGLOBAL) { rstoreX(global_y()); } VMBREAK;
 
-			VMCASE(BC_SETGLOBAL) { global_store_x(local_y());  } VMBREAK;
+			VMCASE(BC_SETGLOBAL) { global_store_x(rvalueY());  } VMBREAK;
 
-			VMCASE(BC_RELOAD)  { local_store_x(local_y()); } VMBREAK;
+			VMCASE(BC_RELOAD) { rstoreX(rvalueY()); } VMBREAK;
 
-			VMCASE(BC_LOADNIL) { vsetnil(&local_x()); } VMBREAK;
+			VMCASE(BC_LOADNIL) { vsetnil(&rvalueX()); } VMBREAK;
 
-			VMCASE(BC_GETKINT) { local_store_x_int(inter->integers[by.b_y]); } VMBREAK;
+			VMCASE(BC_GETKINT) { rstoreXi(inter->integers[by.b_y]); } VMBREAK;
 
-			VMCASE(BC_GETKNUM) { local_store_x_num(inter-> numbers[by.b_y]); } VMBREAK;
+			VMCASE(BC_GETKNUM) { rstoreXn(inter->numbers[by.b_y]); } VMBREAK;
+
+
+			VMCASE(BC_BIT_NOT) {
+				if (!isint(rvalueY())) {
+					elf_errorf(inter, -1, "'~': expects integer");
+				}
+				rstoreXi( ~ vgetint(rvalueY()));
+			} VMBREAK;
+
 
 			VMCASE(BC_GETUPVAL) {
 				ASSERT(WITHIN(BC_ARGY(byte), 0, frame.closuresize));
-				local_store_x(frame.closureenv[by.b_y]);
+				rstoreX(frame.closureenv[by.b_y]);
 			} VMBREAK;
 
 			case BC_CLOSURE: {
 				ASSERT(WITHIN(BC_ARGY(byte), 0, darr_l(inter->protos)));
 
-				elf_Proto proto = inter->protos[BC_ARGY(byte)];
+				Proto proto = inter->protos[BC_ARGY(byte)];
 
 				elf_Closure *cls = elf_alloc_closure(inter, proto);
-				copy_memory(cls->captures, &local_x(), proto.ncaptures * sizeof(elf_Value));
+				copy_memory(cls->captures, &rvalueX(), proto.ncaptures * sizeof(elf_Value));
 
-				vsetcls(&local_x(), cls);
+				vsetcls(&rvalueX(), cls);
 			} break;
 			case BC_TABLE: {
 
 				elf_Table *tab = elf_alloc_table(R);
-				vsettab(&local_x(), tab);
+				vsettab(&rvalueX(), tab);
 
 			} break;
 
 			case BC_GETMETAFIELD: {
-				yy = local_y();
+				yy = rvalueY();
 
 				elf_Table *metatable = 0;
 
@@ -701,22 +744,22 @@ int _resume(elf_State *inter) {
 					elf_errorf(inter, minstr, "'%s': invalid object, no meta-table", tag2s[yy.tag]);
 				}
 
-				elf_Value metafield = elf_table_get_raw(metatable, localz());
-				local_store_x(metafield);
+				elf_Value metafield = elf_table_get_raw(metatable, rvalueZ());
+				rstoreX(metafield);
 			} break;
 
 
 			// todo: INDEX should be array mode!
 			case BC_GETINDEX: case BC_GETFIELD: {
-				xx=local_y(), yy=localz();
+				xx=rvalueY(), yy=rvalueZ();
 
-				if (isnil(yy)) {
+				if (visnil(yy)) {
 					elf_error(inter, minstr, "attempted to get nil field");
 				}
 				switch (xx.tag) {
 
 					case ELF_TTABLE: {
-						local_store_x(elf_table_get_raw(vgettab(xx), yy));
+						rstoreX(elf_table_get_raw(vgettab(xx), yy));
 					}break;
 
 					case ELF_TUSER: {
@@ -728,12 +771,12 @@ int _resume(elf_State *inter) {
 
 						if (isint(yy)) {
 							int index = vgetint(yy);
-							local_store_x_int(vgetstr(xx)->text[index]);
+							rstoreXi(vgetstr(xx)->text[index]);
 						}
-						else if (isstr(yy)) {
+						else if (visstr(yy)) {
 
 							int index = find_subtext(vgetstr(xx)->text, vgetstr(yy)->text);
-							local_store_x_int(index);
+							rstoreXi(index);
 						}
 						else {
 							elf_error(inter, minstr, "invalid value for string:__index(of int)");
@@ -741,27 +784,29 @@ int _resume(elf_State *inter) {
 
 					}break;
 					case ELF_TNIL: {
-						elf_error(inter, minstr, "attempted to get field of 'nil' value");
+						elf_error(inter, minstr
+						, "attempted to get field of 'nil' value");
 					} break;
 					default: {
-						elf_errorf(inter, minstr, "invalid object '%s' to perform this operator on", tag2s[yy.tag]);
+						elf_errorf(inter, minstr
+						, "'%s': invalid x operand for instruction", vtag2s(xx));
 					} break;
 				}
 			} break;
 			// todo: INDEX should be array mode!
 			case BC_SETINDEX:
 			case BC_SETFIELD: {
-				xx=local_x(), yy=local_y(), zz=localz();
+				xx=rvalueX(), yy=rvalueY(), zz=rvalueZ();
 
-				if (istab(xx)) {
-					if (isnil(yy)) elf_error(inter, minstr, "key is nil...");
+				if (vistab(xx)) {
+					if (visnil(yy)) elf_error(inter, minstr, "key is nil...");
 
 					elf_raw_table_set(xx.x_tab, yy, zz);
 				}
 				else if (isusr(xx)) {
 					elf_error(inter, minstr, "overload not implemented");
 				}
-				else if (isstr(xx)) {
+				else if (visstr(xx)) {
 					elf_error(inter, minstr, "strings are constant, you may not change them");
 				}
 				else {
@@ -771,26 +816,26 @@ int _resume(elf_State *inter) {
 
 			case BC_N2I:
 			{
-				local_store_x_int(vntoint(local_x()));
+				rstoreXi(vntoint(rvalueX()));
 			} break;
 
 			case BC_I2N:
 			{
-				local_store_x_num(vitonum(local_x()));
+				rstoreXn(vitonum(rvalueX()));
 			} break;
 
 			case BC_NEQ: {
-				bool eq = veq(inter, local_y(), localz());
-				local_store_x_int(!eq);
+				bool eq = veq(inter, rvalueY(), rvalueZ());
+				rstoreXi(!eq);
 			} break;
 			case BC_EQ: {
-				bool eq = veq(inter, local_y(), localz());
-				local_store_x_int(eq);
+				bool eq = veq(inter, rvalueY(), rvalueZ());
+				rstoreXi(eq);
 			} break;
 
 
-			VMCASE(BC_SHL)      { bwcase("__shl", __shl); } VMBREAK;
-			VMCASE(BC_SHR)      { bwcase("__shr", __shr); } VMBREAK;
+			VMCASE(BC_BIT_SHL)  { bwcase("__shl", __shl); } VMBREAK;
+			VMCASE(BC_BIT_SHR)  { bwcase("__shr", __shr); } VMBREAK;
 			VMCASE(BC_BIT_XOR)  { bwcase("__xor", __xor); } VMBREAK;
 			VMCASE(BC_BIT_AND)  { bwcase("__and", __and); } VMBREAK;
 			VMCASE(BC_BIT_OR)   { bwcase("__or" , __or ); } VMBREAK;
@@ -843,7 +888,7 @@ int _resume(elf_State *inter) {
 					ASSERT(minstr!=R->trace_stop_instr);
 				}
 				if(R->trace_inner_loop_counter==0){
-					d_array_add(R->trace_buffer,byte);
+					darr_add(R->trace_buffer,byte);
 					R->active_trace_len += 1;
 				}
 			}
@@ -859,7 +904,7 @@ int _resume(elf_State *inter) {
 					}else{
 						ASSERT(R->trace_inner_loop_counter==0);
 						R->flags &= ~FLAG_TRACING;
-						elf_debug_log("finished recording trace, %i bytes recorded", R->active_trace_len);
+						elf_ldebug("finished recording trace, %i bytes recorded", R->active_trace_len);
 					}
 				}else{
 					ASSERT(R->trace_inner_loop_counter == 0);

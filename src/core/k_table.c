@@ -206,7 +206,7 @@ index_t elf_raw_table_set(elf_Table *table, elf_Value key, elf_Value value) {
 
 	elf_Table_Entry *entry = table->slots + slot;
 	if (!slotiskey(table,slot)) {
-		index = ARRAY_GROW(table->array,1);
+		index = darr_grow(table->array,1);
 		table->slots[slot].key = key;
 		table->slots[slot].idx = index;
 		table->nslots ++;
@@ -231,7 +231,7 @@ elf_Value elf_table_get_raw(elf_Table *tab, elf_Value k) {
 
 static index_t elf_table_get_index_always_(elf_Table *table, elf_Value key) {
 
-	ASSERT(!isnil(key));
+	ASSERT(!visnil(key));
 
 	index_t slot = elf_table_try_(table, key);
 	ASSERT(slot >= 0);
@@ -240,7 +240,7 @@ static index_t elf_table_get_index_always_(elf_Table *table, elf_Value key) {
 
 	// there's nothing here, so create use up the slot
 	if (isdead(table->entries[slot].key)) {
-		index = ARRAY_GROW(table->array, 1);
+		index = darr_grow(table->array, 1);
 		table->entries[slot].key = key;
 		table->entries[slot].idx = index;
 		table->nslots++;
@@ -255,7 +255,7 @@ static index_t elf_table_get_index_always_(elf_Table *table, elf_Value key) {
 
 elf_rawapi
 index_t elf_raw_array_add(elf_Table *table, elf_Value v) {
-	index_t index = ARRAY_GROW(table->array, 1);
+	index_t index = darr_grow(table->array, 1);
 	table->array[index] = v;
 	return index;
 }
@@ -292,7 +292,7 @@ elf_Value elf_table_get(elf_State *inter) {
 
 
 // void elf_tadd_tab(elf_Table *table, elf_Table *thing) {
-// 	d_array_add(table->array,VALUE_TABLE(thing));
+// 	darr_add(table->array,VALUE_TABLE(thing));
 // }
 
 
@@ -357,7 +357,7 @@ void elf_table_export_binary(elf_Table *tab, FILE *io) {
 // 	int length;
 // 	elf_i64 hash;
 // 	elf_Integer slot;
-// 	length=text_length(key);
+// 	length=text_l(key);
 // 	hash=hash_text(key);
 // 	slot=elf_table_try_text(tab,key,length,hash);
 // 	ASSERT(slot!=-2);

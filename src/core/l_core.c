@@ -2,27 +2,94 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: we need something that hashes the pointer
-// with more weight, and the pointer hash should weight
-// the middle bits more, since the low bits are usually
-// empty because of alignment, and the high bits remain
-// similar because allocations tend to be smaller
-// So most of the sporadic distribution should come from
-// the pointer, but it shouldn't be too much because most
-// objects tend to have few fields.
-ELF_FUNCTION(l_core_registryhash64) {
-	elf_Integer ptr = S->stack[args + 1].x_int;
-	// elf_String *str = S->stack[args + 2].x_str;
-	// hash_t hsh = str->hash + 0x9e3779b97f4a7c15ULL + (ptr << 6) + (ptr >> 2);
-	char buf[64] = {};
-	const char *str = elf_tostr(S, args + 2);
-	memcpy(buf, &ptr, sizeof(ptr));
-	memcpy(buf, str, strlen(str) + 1);
-	// ASSERT(strlen(str) + 1 < 64 - 8);
-	elf_Integer hsh = hash_text(buf);
-	elf_pushint(S, hsh);
+
+
+ELF_FUNCTION(l_core_assert) {
+	Int cond = lint(S, 1);
+	const char *emsg = lstrdata(S, 2);
+	if (!cond) {
+		elf_errorf(S, -1, "assertion triggered: %s", emsg);
+	}
+	return 0;
+}
+
+
+
+/* ======= Arguments API: ====================================
+
+	Get Parent Call Frame Information
+
+ 	- elf.arg(i):       Returns the i-th argument of the caller.
+ 	- elf.varg(i):      Returns the i-th variadic argument (extra argument beyond declared params).
+ 	- elf.nargs():      Returns the total number of arguments passed to the caller.
+ 	- elf.nvargs():     Returns the number of variadic (extra) arguments passed.
+ 	- elf.nrets():      Returns the number of expected results for the caller's function call.
+
+ 	** Out-of-bounds argument accesses return nil.
+============================================================== */
+
+
+#define caller(S) ((S)->frame_stack[(S)->frame_index - 1])
+
+
+ELF_FUNCTION(l_core_nvargs) {
+	int n = caller(S).nargs - caller(S).arity;
+	if (n < 0) n = 0;
+	pushint(S, n);
 	return 1;
 }
+
+
+ELF_FUNCTION(l_core_varg) {
+	int i = lint(S, 1);
+	int n = caller(S).nargs;
+	int a = caller(S).arity;
+
+	int nvargs = n - a;
+	if (nvargs < 0) nvargs = 0;
+
+	if (i >= nvargs) {
+		pushnil(S);
+	} else {
+		V v = caller(S).framebase[a + i];
+		pushvalueunsafe(S, v);
+	}
+	return 1;
+}
+
+
+ELF_FUNCTION(l_core_nrets) {
+	int n = caller(S).nrets;
+	pushint(S, n);
+	return 1;
+}
+
+
+ELF_FUNCTION(l_core_nargs) {
+	int n = caller(S).nargs;
+	pushint(S, n);
+	return 1;
+}
+
+
+ELF_FUNCTION(l_core_arg) {
+	int i = lint(S, 1);
+	int n = caller(S).nargs;
+	if (i >= n) {
+		pushnil(S);
+	} else {
+		V v = caller(S).framebase[i];
+		pushvalueunsafe(S, v);
+	}
+	return 1;
+}
+
+
+
+
+
+
+
 
 
 ELF_FUNCTION(l_core_get_meta) {
@@ -45,7 +112,7 @@ ELF_FUNCTION(l_core_tagof) {
 
 ELF_FUNCTION(l_core_iton) {
 	elf_Value v = loadvalue(S, 0);
-	if (!isnumeric(v)) {
+	if (!visnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
 	elf_pushnum(S, vitonum(v));
@@ -55,7 +122,7 @@ ELF_FUNCTION(l_core_iton) {
 
 ELF_FUNCTION(l_core_ntoi) {
 	elf_Value v = loadvalue(S, 0);
-	if (!isnumeric(v)) {
+	if (!visnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
 	elf_pushint(S, vntoint(v));
@@ -63,27 +130,28 @@ ELF_FUNCTION(l_core_ntoi) {
 }
 
 
+// todo: support handles!
 ELF_FUNCTION(l_core_load_file) {
-	elf_pushstr(S, "noname");
-	elf_readfile(S, args + 1, -1);
-	elf_loadcode(S, false);
-	elf_pushnil(S);
+	elf_loadcodefile(S, lstrdata(S, 1));
+	pushthis(S);
 	return elf_call(S, 1, nrets);
 }
 
 
+// todo: support handles!
 ELF_FUNCTION(l_core_load_expr) {
-	elf_pushstr(S, "noname");
-	elf_readfile(S, args + 1, -1);
-	elf_loadcode(S, true);
-	elf_pushnil(S);
-	return elf_call(S, 1, nrets);
+	//	elf_loadcodefile(S, lstrdata(S, 1), true);
+	//	pushthis(S);
+	//	return elf_call(S, 1, nrets);
+	// todo:!
+	__debugbreak();
+	return 0;
 }
 
 
 ELF_FUNCTION(l_core_const_expr) {
-	const char *contents = elf_tostr(S, args + 1);
-	elf_load_const_expr(S, "no name", contents);
+	const char *contents = lstrdata(S, 1);
+	elf_load_const_expr_from_text(S, "no name", contents);
 	return 1;
 }
 
@@ -96,13 +164,9 @@ ELF_FUNCTION(l_core_load_json) {
 		elf_pushnil(S);
 		goto esc;
 	}
-
 	unsigned int size = sys_size_file(file);
-
 	char *heapbuf = malloc(size);
-
 	sys_read_file(file, heapbuf, size);
-
 	sys_close_file(file);
 
 	elf_load_json(S, name, heapbuf);
@@ -173,9 +237,9 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 // function, the type does not have to be specified
 //
 ELF_FUNCTION(l_core_format) {
-	int argindex = 1;
 
-	const char *format = elf_tostr(S, args + argindex);
+	int index = 1;
+	const char *format = lstrdata(S, index ++);
 
 	String_Builder sb = {};
 	while (*format) {
@@ -187,13 +251,13 @@ ELF_FUNCTION(l_core_format) {
 		}
 
 		if (*format == '%') {
-			if (argindex >= (nargs - 1)) {
+			if (index >= nargs) {
 				elf_error(S, NO_BYTE, "not enough arguments to format string!");
 			}
 			format += 1;
 
 			// todo:
-			elf_Value value = loadvalue(S, argindex ++);
+			V value = lvalue(S, index ++);
 			value_bprintf(&sb, value, 0);
 		}
 	}
@@ -218,7 +282,7 @@ ELF_FUNCTION(l_core_fpf) {
 	return 1;
 }
 
-ELF_FUNCTION(l_core_pf) {
+ELF_FUNCTION(l_core_printl) {
 	String_Builder sb = {};
 	for (int i = 0; i < (nargs - 1); i ++) {
 		value_bprintf(&sb, loadvalue(S,i),0);
@@ -324,9 +388,15 @@ ELF_FUNCTION(l_core_unload) {
 	return 1;
 }
 
-const static elf_Binding lib_core[] = {
+const static elf_Binding l_core[] = {
 	{"get_meta", l_core_get_meta},
 	{"set_meta", l_core_set_meta},
+	{"assert", l_core_assert},
+	{"nvargs", l_core_nvargs },
+	{"varg", l_core_varg },
+	{"nrets", l_core_nrets },
+	{"nargs", l_core_nargs },
+	{"arg", l_core_arg },
 	{"tagof", l_core_tagof},
 	{"iton", l_core_iton},
 	{"ntoi", l_core_ntoi},
@@ -335,10 +405,13 @@ const static elf_Binding lib_core[] = {
 	{"const_expr", l_core_const_expr},
 	{"load_json", l_core_load_json},
 	{"format", l_core_format},
-	{"fpf", l_core_fpf},
-	{"pf", l_core_pf},
+	{"fprint", l_core_fpf},
+	{"printl", l_core_printl},
 	{"unload", l_core_unload},
-	{"registryhash64", l_core_registryhash64},
+
+	// todo: deprecated?
+	{"fpf", l_core_fpf},
+	{"pf", l_core_printl},
 };
 
 
@@ -359,7 +432,7 @@ math.floor != .math.floor */
 int core_lib_include(elf_State *R) {
 	elf_check_num_args(R,".include",1,"(the directory to include to add to the global directory)");
 	char *dir = f_checktext(R,0);
-	int plen = text_length(dir);
+	int plen = text_l(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:
 	elf.ray.elf.ray could include the symbol

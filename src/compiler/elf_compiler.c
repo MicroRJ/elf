@@ -13,8 +13,6 @@
 #include "internal_api.h"
 #include "internal_helpers.h"
 
-#include "bytecode_metadata.h"
-
 #include "elf_compiler.h"
 #include "c_token.h"
 #include "c_tree.h"
@@ -25,7 +23,10 @@
 #include "c_tree.c"
 #include "elf_parser.c"
 #include "c_generate.c"
+#include "logging.c"
 
+
+#include "internal_shorternames.h"
 
 // todo: find a better name for this!
 int elf_load_json(elf_State *S, const char *name, const char *contents) {
@@ -35,95 +36,65 @@ int elf_load_json(elf_State *S, const char *name, const char *contents) {
 	return result;
 }
 
-int elf_load_const_expr(elf_State *S, const char *name, const char *contents) {
+int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_constexpr(parser);
 	free(parser);
 	return result;
 }
 
-// todo: remove the as_expr thing?
-elf_Proto elf_compile(elf_State *S, elf_String *name, elf_String *contents, bool as_expr) {
-	ASSERT(contents);
+//	treeID v = parse_expr(parser, 0);
+//	v = tree_ret(parser, parser->tok.line, v);
+//	block_add(parser, v);
+
+int elf_makefile(elf_State *S, char const *name) {
 	ASSERT(name);
 
-	// todo: uninit the parser!
-	elf_Parser *parser = elf_new_parser(S, name->text, contents->text);
+	H hfile = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 
-	// Todo: this pattern is common, just create one "begin" / "end"
-	// set of functions
-
-	treeID func = new_tree(parser, parser->tok.line, TREE_FUNCTION, NT_FUN);
-	parser->enc = func;
-
-	add_this_param(parser, parser->tok.line);
-
-	d_array_add(parser->functions, func);
-
-	if (as_expr) {
-
-		treeID v = parse_expr(parser, 0);
-		v = tree_ret(parser, parser->tok.line, v);
-		block_add(parser, v);
-
-	} else{
-
-		// todo: parse block function?
-		while (parse_stat(parser));
-		FOR_ARRAY(i, parser->block.defers) {
-			d_array_add(parser->block.body, parser->block.defers[i]);
-		}
-
+	if (ELF_HISINVALID(hfile)) {
+		elf_lerror("'%s': failed to load file, cannot make", name);
+		return -1;
 	}
-	func->tree_funexpr.body = tree_block(parser, parser->tok.line, parser->block.body, 0, 0);
+
+	// todo: add size to allocated memory in GC!
+	unsigned int size = sys_size_file(hfile);
+
+	Proto_File *prof = calloc(1, sizeof(*prof) + size + 1);
+
+	copy_text(prof->name, sizeof(prof->name), name);
+
+	sys_read_file(hfile, prof->text, size);
+	sys_close_file(hfile);
+
+	// null terminate
+	prof->text[size] = 0;
+
+	darr_add(S->files, prof);
+
+	elf_Parser *parser = elf_new_parser(S, name, prof->text);
+	parse_file(parser);
+
 
 	// create prototypes for every function
-	int nfunctions = darr_l(parser->functions);
-	int index = ARRAY_GROW(S->protos, nfunctions);
-	elf_Proto *protos = & S->protos[index];
+	int nfuncs = darr_l(parser->functions);
 
-	// assign prototypes to each function
-	int start = S->nbytes;
+	int protoindex = darr_grow(S->protos, nfuncs);
+	int mainproto = protoindex;
+
+	Proto *protos = & S->protos[protoindex];
 	FOR_ARRAY(i, parser->functions) {
-		parser->functions[i]->tree_funexpr.proto = index ++;
+		parser->functions[i]->tree_funexpr.proto = protoindex ++;
 	}
 
-	// then compile each
+	prof->bytepos = S->bytecur;
 	FOR_ARRAY(i, parser->functions) {
-		protos[i] = genfunction(parser, parser->functions[i]);
-		// elf_debug_log("PROTO: [%i, %i) (%i)"
-		// , 	protos[i].bytes
-		// , 	protos[i].bytes+protos[i].nbytes
-		// ,	protos[i].nbytes);
+		protos[i] = make_function(parser, parser->functions[i]);
 	}
-	int end = S->nbytes;
+	prof->byteend = S->bytecur;
 
-	{
-		//
-		// todo: because we show source code when
-		// the program crashes at runtime the
-		// contents string is kept alive, can we
-		// do better ?
-		//
-		elf_File file = {
-			.pos = start,
-			.end = end,
-			.proto = protos[0],
-			.contents = contents,
-			.name = name,
-		};
-		d_array_add(S->files, file);
-	}
 
-	// todo: how do we track this, should each proto
-	// point to the file they are from?...
-	elf_Value vcontents, vname;
-	vsetstr(&vcontents, contents);
-	vsetstr(&vname, name);
-	elf_raw_array_add(S->globals, vcontents);
-	elf_raw_array_add(S->globals, vname);
-
+	// todo: uninit!
 	free(parser);
-
-	return protos[0];
+	return mainproto;
 }

@@ -7,6 +7,32 @@
 //
 
 
+static inline void *zero_memory(void *mem, int len) {
+	memset(mem, 0, len);
+	return mem;
+}
+
+
+static inline void *copy_memory(void *dst, void const *src, int len) {
+	memcpy(dst, src, len);
+	return dst;
+}
+
+
+static inline void *copy_text(void *buf, int zbuf, void const *src) {
+	strcpy_s(buf, zbuf, src);
+	return buf;
+}
+
+
+
+
+
+
+
+
+
+
 static elf_i64 prof_get_time() {
 	return sys_get_performance_counter();
 }
@@ -97,18 +123,6 @@ static void get_source_info(char *source, char *cursor, int *line_number, char *
 	if (line_start) *line_start = c;
 }
 
-static void *clear_memory(void *target, elf_Integer length) {
-	memset(target,0,length);
-	return target;
-}
-
-
-static void *copy_memory(void *dst, void const *src, elf_Integer length) {
-	memcpy(dst,src,length);
-	return dst;
-}
-
-
 
 
 bool is_eol_chr(char x) {
@@ -157,7 +171,7 @@ char chr_to_uppercase(char x) {
 }
 
 
-int text_length(char const *s) {
+int text_l(char const *s) {
 	int n = 0;
 	if (s != 0) {
 		while (*s ++ != 0) {
@@ -211,18 +225,24 @@ bool text_eql(char const *x, char const *y, int n) {
 }
 
 
-bool text_eq(char const *x, char const *y) {
+
+static bool text_eq(char const *x, char const *y) {
 	if (x == y) {
 		return 1;
 	}
-	int lx = text_length(x);
-	int ly = text_length(y);
+
+	int lx = text_l(x);
+	int ly = text_l(y);
+
 	return (lx == ly) && text_eql(x,y,lx);
 }
 
+
+
+// todo: deprecated!
 char *copy_text2(int length, char const *text) {
 	if (length <= 0) {
-		length = text_length(text);
+		length = text_l(text);
 	}
 	char *result = malloc(length+1);
 	copy_memory(result,text,length);

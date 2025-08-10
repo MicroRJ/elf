@@ -3,17 +3,20 @@
 //
 
 
-static int findfileforinstr(elf_State *inter, int byte) {
-	FOR_ARRAY(i, inter->files) {
-		elf_File file = inter->files[i];
-		if (WITHIN(byte,file.pos,file.end)) {
+
+static int findfileforinstr(elf_State *S, int byte) {
+	FOR_ARRAY(i, S->files)
+	{
+		if (byte >= S->files[i]->bytepos && byte < S->files[i]->byteend) {
 			return i;
 		}
 	}
 	return -1;
 }
 
-static void cursor_dialog(char *name, char *source, char *cursor, Instr instr, elf_Bytec byte, char const *fmt, ...) {
+
+
+static void cursor_dialog(char *name, char *source, char *cursor, BCPos instr, Bytec byte, char const *fmt, ...) {
 	char *line_start;
 	int line_number;
 	get_source_info(source,cursor,&line_number,&line_start);
@@ -77,8 +80,8 @@ void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 
 	if (fidi != -1) {
 
-		elf_File *file = &inter->files[fidi];
-		cursor_dialog(file->name->text, file->contents->text, line, instr, inter->bytes[instr], error);
+		Proto_File *file = inter->files[fidi];
+		cursor_dialog(file->name, file->text, line, instr, inter->bytebuf[instr], error);
 	}
 	else
 	{
@@ -106,7 +109,7 @@ void elf_dump_byte_trace(elf_State *S) {
 	// 	int id = findfileforinstr(S, frame->bytecounter);
 
 	// 	if (id != -1) {
-	// 		elf_File *file = &S->files[id];
+	// 		Proto_File *file = &S->files[id];
 	// 		Source line = instrline(S,frame->bytecounter);
 	// 		cursor_dialog(file->name->text,file->contents->text,line,frame->bytecounter,S->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
 	// 	}
@@ -149,9 +152,9 @@ void elf_analyze_exec_trail(elf_State *S) {
 	}
 }
 
-static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, Instr id, elf_Bytec b) {
+static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, BCPos id, Bytec b) {
 	if (fid != -1) {
-		elf_File file = M->files[fid];
+		Proto_File file = M->files[fid];
 		int linenum;
 		get_source_info(file.contents->text,M->lines[id],&linenum,0);
 		fprintf(io,"%s %04i: \t",file.name->text,linenum);
@@ -209,11 +212,11 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 	fprintf(io,"- INSTR: %i\n",md->nbytes);
 	fprintf(io,"- PID: %i\n",sys_get_my_pid());
 	FOR_ARRAY(i,md->files) {
-		elf_Proto ff = md->files[i];
+		Proto ff = md->files[i];
 		fprintf(io,"- FILE (%s):\n",ff.name->text);
 		fprintf(io,"INDEX INSTRUCTION\n");
-		for (Instr j = 0; j < ff.nbytes; ++j) {
-			elf_Bytec b = md->bytes[ff.bytes+j];
+		for (BCPos j = 0; j < ff.nbytes; ++j) {
+			Bytec b = md->bytes[ff.bytes+j];
 			// int linenum;
 			// char *lineloc;
 			// get_source_info(md->file,md->lines[j],&linenum,&lineloc);
@@ -223,10 +226,10 @@ void lang_dumpmodule(elf_Module *md, elf_Handle io) {
 	}
 #if 0
 	FOR_ARRAY(md->p) {
-		elf_Proto p = md->p[i];
+		Proto p = md->p[i];
 		fprintf(file,"FUNC: [%i] %i,%i (%i:%i):\n",(int)i,p.bytes,p.nbytes,p.x,p.nlocals);
-		for (Instr j = 0; j < p.nbytes; ++j) {
-			elf_Bytec b = md->bytes[p.bytes+j];
+		for (BCPos j = 0; j < p.nbytes; ++j) {
+			Bytec b = md->bytes[p.bytes+j];
 			fpf_byte(md,file,j,b);
 		}
 		fprintf(file,"end\n");

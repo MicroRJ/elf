@@ -2,6 +2,12 @@
 // See Copyright Notice In elf.h
 //
 
+
+#define BCITEM(_,__,NAME) #NAME,
+const char *byte2s[] = { BCDEF(BCITEM) };
+#undef BCITEM
+
+
 const char *tag2s[] = {
 	[ELF_TNIL] = "nil",
 	[ELF_TTOMB] = "tomb",

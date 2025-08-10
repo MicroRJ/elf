@@ -89,21 +89,20 @@ bool elf_readfile(elf_State *inter, int stk, int size) {
 
 /* todo: remove the asexpr thing? */
 elf_pubapi
-int elf_loadcode(elf_State *inter, bool asexpr) {
-	elf_String *name = topstr(inter, -2);
-	elf_String *contents = topstr(inter, -1);
-	if (!name || !contents) {
-		elf_lerror("'%s': could not load code", name->text);
-		elf_pushnil(inter);
-		return false;
+int elf_loadcodefile(elf_State *S, const char *name) {
+	ASSERT(name);
+	int iproto = elf_makefile(S, name);
+
+	if (iproto >= 0) {
+		Proto proto = S->protos[iproto];
+
+		// todo: instead of taking the proto directly, take an index into the
+		// proto array... that way we can mark whether a file is still needed.
+		elf_Closure *closure = elf_alloc_closure(S, proto);
+		pushcls(S, closure);
+
 	}
-
-	elf_Proto proto = elf_compile(inter, name, contents, asexpr);
-
-	// pops the contents at the same time
-	elf_Closure *closure = elf_alloc_closure(inter, proto);
-	vsetcls(&inter->stack_ptr[-1], closure);
-	return true;
+	return iproto;
 }
 
 
@@ -126,7 +125,7 @@ void elf_setmetatab(elf_State *inter, int objstk, int tabstk) {
 	if (!isobj(obj)) {
 		elf_errorf(inter, -1, "expected object at %i", objstk);
 	}
-	if (!istab(tab)) {
+	if (!vistab(tab)) {
 		elf_errorf(inter, -1, "expected table at %i", tabstk);
 	}
 	vgetobj(obj)->meta = vgettab(tab);
@@ -149,6 +148,8 @@ static inline void tagerror(elf_State *inter, int want, int got, int idx) {
 }
 
 
+// for all these to** functions, assert that x doesn't exceed the
+// current framebase!
 elf_pubapi
 elf_Number elf_tonum(elf_State *inter, int x) {
 	elf_Value v = inter->stack[x];
@@ -181,8 +182,8 @@ elf_Handle elf_tosys(elf_State *inter, int x) {
 elf_pubapi
 const char *elf_tostr(elf_State *inter, int x) {
 	elf_Value v = inter->stack[x];
-	if (isstr(v)) return vgetstr(v)->text;
-	if (isnil(v)) return 0;
+	if (visstr(v)) return vgetstr(v)->text;
+	if (visnil(v)) return 0;
 	tagerror(inter, ELF_TSTRING, v.tag, x);
 	return 0;
 }
@@ -195,11 +196,7 @@ elf_State *elf_new() {
 }
 
 
-elf_pubapi
-void elf_pushfrom(elf_State *inter, int stk) {
-	* inter->stack_ptr ++ = inter->stack[stk];
-	pushstacksafe(inter);
-}
+
 
 
 elf_pubapi
@@ -266,7 +263,7 @@ void elf_arrayget(elf_State *inter) {
 	elf_Value tab = inter->stack_ptr[-2];
 	elf_Value idx = inter->stack_ptr[-1];
 
-	if (!istab(tab))  elf_error(inter, NO_BYTE, "Not A Table!");
+	if (!vistab(tab))  elf_error(inter, NO_BYTE, "Not A Table!");
 	if (!isint(idx))  elf_error(inter, NO_BYTE, "Not A Table!");
 
 	elf_Value v = vgettab(tab)->array[vgetint(idx)];

@@ -54,7 +54,10 @@
 #define GIGABYTES(x) ((x) << 30)
 #define WITHIN(X,XMIN,XMAX) ((XMIN) <= (X) && (X) < (XMAX))
 #define COUNTOF(X) (sizeof(X) / sizeof((X)[0]))
-#define STATIC_ASSERT(x) typedef char _static_assert_[x ? 1 : -1]
+
+
+// #define STATIC_ASSERT(x) typedef char _static_assert_[x ? 1 : -1]
+#define STATIC_ASSERT(x) _Static_assert(x, "no message")
 
 
 static char *get_name_from_file_path(const char *p);
@@ -67,7 +70,7 @@ static bool is_letter_chr(char x);
 static bool is_letter_or_digit_chr(char x);
 static char chr_to_uppercase(char x);
 static char chr_to_lowercase(char x);
-static int text_length(char const *text);
+static int text_l(char const *text);
 static bool text_eql(char const *x, char const *y, int n);
 static bool text_eq(char const *x, char const *y);
 static char *copy_text2(int length, char const *string);

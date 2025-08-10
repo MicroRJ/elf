@@ -85,7 +85,7 @@ int _gc_mark(elf_State *inter)
 		}
 	}
 
-	// elf_debug_log("mark took: %fms", prof_time_diff_ms(time));
+	// elf_ldebug("mark took: %fms", prof_time_diff_ms(time));
 	return nmarked;
 }
 
@@ -134,21 +134,21 @@ static elf_i64 elf_gc_cycle(elf_State *R) {
 	{
 		// elf_i64 _time = prof_get_time();
 		num_marked = _gc_mark(R);
-		// elf_debug_log("mark took: %fms", prof_time_diff_ms(_time));
+		// elf_ldebug("mark took: %fms", prof_time_diff_ms(_time));
 	}
 	elf_i64 num_objects = R->G.num_objects; // darr_l(R->G.objects);
 	elf_i64 num_to_collect = num_objects - num_marked;
 	elf_i64 obj_trigger_threshold = R->G.object_trigger_threshold;
-	// elf_debug_log("GC: %lli - %lli -> %lli (%lli), (total - marked = expected) (threshold)",num_objects,num_to_collect,num_marked,obj_trigger_threshold);
+	// elf_ldebug("GC: %lli - %lli -> %lli (%lli), (total - marked = expected) (threshold)",num_objects,num_to_collect,num_marked,obj_trigger_threshold);
 
 	elf_i64 num_collected;
 	{
 		// elf_i64 _time = prof_get_time();
 		num_collected = _gc_free(R);
-		// elf_debug_log("free took: %fms", prof_time_diff_ms(_time));
+		// elf_ldebug("free took: %fms", prof_time_diff_ms(_time));
 	}
 	num_to_collect -= num_collected;
-	// elf_debug_log("	(%fms) => leaked: %lli", prof_time_diff_ms(time_),num_to_collect);
+	// elf_ldebug("	(%fms) => leaked: %lli", prof_time_diff_ms(time_),num_to_collect);
 	return num_collected;
 }
 

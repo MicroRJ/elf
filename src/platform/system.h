@@ -89,7 +89,6 @@ enum {
 int sys_create_directory(const char *path);
 
 FILE_HANDLE sys_get_std_file(int std);
-
 FILE_HANDLE sys_open_file(const char *name, int flags, int options);
 bool sys_delete_file(const char *name);
 

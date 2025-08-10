@@ -2,17 +2,21 @@
 // See Copyright Notice In elf.h
 //
 
+
+// todo: unary operator and keyword isnil
+// if table isnil == isnil table ? {
+//
+// }
+// todo: experiment with pack16, pack32, pack64 macros,
+// I think they could be useful!
+
+
 // todo: avoid using these macros, they're ugly
 #define POS0() (parser->cursor[0])
 #define POS1() (parser->cursor[1])
 #define MOVE() (*(parser->cursor ++))
 #define MOVEN(n) ((parser->cursor += n))
 #define PICK(xx) ((POS0() == (xx)) ? (MOVEN(1), 1) : 0)
-
-//	static void new_line(elf_Parser *parser) {
-//		parser->line_pos = parser->cursor;
-//		parser->line_num ++;
-//	}
 
 
 /* todo: speed */
@@ -217,7 +221,8 @@ static Token get_tok(elf_Parser *parser) {
 	token.type = TK_NONE;
 	token.line = parser->cursor;
 
-	switch (POS0()) {
+	switch (*parser->cursor) {
+
 		case 'A'...'Z': case 'a'...'z': case '_': {
 			if (parser->cursor[0] == 'f' && parser->cursor[1] == '"') {
 				parser->cursor ++;
@@ -282,7 +287,7 @@ static Token get_tok(elf_Parser *parser) {
 					/* are multi-line strings illegal? */
 					if (PICK('\n') || (PICK('\r') && (PICK('\n'),1))) {
 						// new_line(parser);
-						d_array_add(buffer,'\n');
+						darr_add(buffer,'\n');
 					} else {
 						// don't check for format
 						if (token.type != TK_FORMAT_STRING) goto escchar;
@@ -290,12 +295,12 @@ static Token get_tok(elf_Parser *parser) {
 						// todo: make it so that we can escape the formatting
 						if (POS0() == FORMAT_CHAR && POS1() == '{') {
 							needsformatting = true;
-							d_array_add(buffer, *parser->cursor ++);
-							d_array_add(buffer, *parser->cursor ++);
+							darr_add(buffer, *parser->cursor ++);
+							darr_add(buffer, *parser->cursor ++);
 						} else {
 							escchar:
 							int chr = pick_esc_char(parser);
-							d_array_add(buffer, chr);
+							darr_add(buffer, chr);
 						}
 					}
 				}
@@ -309,11 +314,11 @@ static Token get_tok(elf_Parser *parser) {
 
 				// did we find anything?
 				if (PICK('"')) {
-					d_array_add(buffer,'\n');
+					darr_add(buffer,'\n');
 				} else break;
 			}
 
-			d_array_add(buffer,0);
+			darr_add(buffer,0);
 
 			// todo: leak, allocate this properly in some sort
 			// of constant pool with intering, use the atomizer
@@ -424,7 +429,9 @@ static Token get_tok(elf_Parser *parser) {
 			}
 		} break;
 
+
 		#define ROW(A, X, B, Y) if (A) { token.type = X; if (B) { token.type = Y; } }
+
 		#define COL(A, X, B, Y, C, Z, D, W) ROW(A, X, B, Y) else ROW(C, Z, D, W)
 
 		#define CASE(A, TA, B, TB, BB, TBB, C, TC, CC, TCC) case (A): { MOVE(); token.type = TA; COL(B, TB, BB, TBB, C, TC, CC, TCC) } break;
@@ -465,6 +472,7 @@ static Token get_tok(elf_Parser *parser) {
 		LEX1('%', TK_MOD);
 		LEX1('^', TK_BIT_XOR);
 		LEX1('+', TK_ADD);
+		LEX1('~', TK_TILDE);
 	}
 
 	esc: ;

@@ -27,7 +27,18 @@ typedef elf_i32  elf_Error;
 typedef elf_u32  hash_t;
 typedef elf_i64 index_t;
 
-typedef void    *elf_Handle;
 
 // todo: internal
 enum { true = 1, false = 0 };
+
+
+#define ELF_HINVALID  ((elf_Handle) -1)
+#define ELF_HTAGFILE  1
+#define ELF_HTAGDLIB  1
+#define ELF_HTAGINVA  255
+
+#define ELF_HTAG(H)   ((H) >> ((sizeof(elf_Handle)-1)<<3))
+#define ELF_HISINVALID(H) ((H) == ELF_HINVALID)
+
+typedef elf_u64 elf_Handle;
+

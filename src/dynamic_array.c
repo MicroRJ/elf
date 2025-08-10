@@ -20,14 +20,14 @@ typedef struct {
 #define ARRAY_SET_MIN(D,N) ((D != 0) ? ARRAY_MIN(D)=(N) : 0)
 #define darr_l ARRAY_GET_MIN
 #define ARRAY_DELETE(D) ((D != 0) ? free(&ARRAY(D)), 0 : 0)
-#define ARRAY_GROW(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
+#define darr_grow(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
 #define FOR_ARRAY(N,D) FOR_RANGE(N,0,darr_l(D))
 
 /* this seems to be the more cross compiler solution, emcc fails,
 clang fails and gcc fail in other more compact ways...
 I'm not sure why, and frankly since it hasn't broken ever since
 I can't be bothered... */
-#define d_array_add(D,T) do { int X = ARRAY_GROW(D,1); D[X] = T; } while(0)
+#define darr_add(D,T) do { int X = darr_grow(D,1); D[X] = T; } while(0)
 
 
 /* returns the newly allocated starting index of the array,

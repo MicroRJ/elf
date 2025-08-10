@@ -2,16 +2,13 @@
 // See Copyright Notice In elf.h
 //
 
+#include "internal_shorternames.h"
 
+
+typedef int BCPos;
 #define NO_BYTE (-1)
 
-
-typedef elf_String *strID;
-typedef elf_Table  *tabID;
-
-
-// todo: remove, rename to something else
-typedef int Instr;
+#include "bytecode.h"
 
 
 typedef char *Source;
@@ -19,12 +16,13 @@ typedef char *Source;
 
 // todo:
 extern const char *tag2s[];
+extern const char *byte2s[];
 
 
 // todo: NaN tagging!
 typedef struct elf_Value elf_Value;
 struct elf_Value {
-	elf_i32 tag;
+	elf_Tag tag;
 	union {
 		elf_i64         x_i64;
 		struct {elf_i32 x_i32, y_i32; };
@@ -43,30 +41,44 @@ struct elf_Value {
 
 
 //
-// functions are parsed, compiled, ultimately these
-// remain, storing the necessary information for a
-// function.
+// if a function is variadic it just means it won't overwrite
+// the additional arguments, so add '...' to your functions if
+// you care about those!
 //
-typedef struct elf_Proto elf_Proto;
-struct elf_Proto {
-	int      arity;
-	int  ncaptures;
-	int  stacksize;
-	int   numbytes;
-	int      bytes;
+typedef struct Proto Proto;
+struct Proto {
+	// and storage for other flags
+	u8    variadic;
+	u8       arity;
+	u8   ncaptures;
+	u16  stacksize;
+	u16   numbytes;
+	u32      bytes;
 };
 
+
+#if !defined(ELF_MAX_FILE_PATH)
+#define ELF_MAX_FILE_PATH 256
+#endif
+
+
 //
-// keeps information about a file for introspection
+// information about a compiled file
 //
-typedef struct elf_File {
-	int pos, end;
-	elf_Proto   proto;
-	// todo: do not keep this in memory, instead just
-	// re-read the file?
-	elf_String *contents;
-	elf_String *name;
-} elf_File;
+// todo: eventually will need at the proto level
+//
+typedef struct Proto_File Proto_File;
+struct Proto_File {
+	Proto_File *prox;
+	Proto_File *prev;
+	int         bytepos;
+	int         byteend;
+	Proto   proto;
+	int         size;
+	char        name[ELF_MAX_FILE_PATH];
+	// this is null terminated!
+	char        text[];
+};
 
 
 typedef struct elf_Object elf_Object;
@@ -79,9 +91,9 @@ struct elf_Object {
 
 typedef struct elf_Closure elf_Closure;
 struct elf_Closure {
-	elf_Object      obj;
+	elf_Object obj;
 	// todo: should be proto id or something instead?
-	elf_Proto     proto;
+	Proto      proto;
 	elf_Value  captures[];
 };
 
@@ -117,32 +129,34 @@ struct elf_String {
 
 typedef struct Stack_Frame Stack_Frame;
 struct Stack_Frame {
-	// todo: you could get this from the closure
-	// at framebase-1
+	// the start of this frame on the stack right on bellow of the function
+	V            *framebase;
+
+	u8                nargs;
+	u8                nrets;
+
+	//
+	// todo: remove could be retrieved from the value above framebase
+	u8                arity;
+	u8             variadic;
+	// the rest is only for interpreter frames
+	//
+	// todo: you could get this from the closure at framebase-1
 	int               bytes;
 	int               bytec;
-
-	short             nargs;
-	short             nrets;
-	int           nextinstr;
+	// only for interpreter because no other functions care about this.
 	int           framesize;
-	elf_Value    *framebase;
-
-	// todo: you could get this from the closure
-	// at framebase-1
-	elf_Value    *closureenv;
+	int           nextinstr;
+	V            *reference;
+	// todo: could get this from the closure at framebase-1
+	V            *closureenv;
 	char          closuresize;
 };
 
 
-// todo: make 32 bits
-typedef struct elf_Bytec {
-	short b_z,b_y,b_x,b_k;
-} elf_Bytec;
-
 typedef struct {
 	elf_i32     address;
-	elf_Bytec   bytecode;
+	Bytec   bytecode;
 	// todo: use different data structure,
 	// objects could have been freed,
 	elf_Value   operand_x;
@@ -198,13 +212,20 @@ struct elf_State {
 	};
 
 	struct {
-		elf_File         *files;
-		elf_Proto       *protos;
+		Proto       *protos;
+		//
 		elf_u8           *track;
-		// todo: make this better!
+		// todo: compress this
 		char            **lines;
-		elf_Bytec        *bytes;
-		int              nbytes;
+
+		Proto_File      **files;
+		// todo: I don't know how long we'll manage with just the one
+		// buffer, especially with people loading stuff at runtime,
+		// I think we'll do our own memory management here, and once
+		// we run out of space we can either reallocate to get more, or
+		// if too fragmented do a copy and compact
+		Bytec        *bytebuf;
+		int               bytecur;
 	};
 
 	// todo: experiment with allocating types and tags
@@ -237,7 +258,7 @@ struct elf_State {
 	int          trace_start_instr;
 	int           active_trace_pos;
 	int           active_trace_len;
-	elf_Bytec     *trace_buffer;
+	Bytec     *trace_buffer;
 	elf_Table         *trace_table;
 	elf_i32                   byte;
 

@@ -126,7 +126,7 @@ static void filetreecompressed(FILE_VISITOR *visitor, File_Node *node, int recur
 		if (visitor->type == FILE_TYPE_SYMLINK) continue;
 		if (is_file_name_empty(visitor->name)) continue;
 
-		int index = ARRAY_GROW(visitor->nodes, 1);
+		int index = darr_grow(visitor->nodes, 1);
 		File_Node *subnode = & visitor->nodes[index];
 		subnode->nsub = 0;
 		subnode->size = 0;
@@ -331,7 +331,11 @@ ELF_FUNCTION(l_sys_open_file) {
 		mode = SYS_CREATE_ALWAYS;
 	}
 	elf_Handle file = sys_open_file(name, flags, mode);
-	elf_pushsys(S, file);
+	if (ELF_HISINVALID(file)) {
+		pushnil(S);
+	} else {
+		pushsys(S, file);
+	}
 	return 1;
 }
 
@@ -357,7 +361,12 @@ ELF_FUNCTION(l_sys_get_file_cursor) {
 }
 
 
-// @doc __readfile(name or handle, size) -> contents
+elf_pubapi
+bool elf_readfile(elf_State *inter, int stk, int size);
+
+//
+// @doc sys.read_file(name or handle, size) -> contents
+//
 ELF_FUNCTION(l_sys_read_file) {
 	int size = -1;
 	if (nargs >= 3) {

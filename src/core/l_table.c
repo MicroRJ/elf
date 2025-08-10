@@ -2,29 +2,42 @@
 // See Copyright Notice In elf.h
 //
 
+// todo: avoid having to do pushing and popping in these
+// libs on return?!
+// It doesn't matter how much of the stack space we actually
+// overwrite... Because at call time we're always at the very
+// bottom... right?
+
+#include "internal_shorternames.h"
+
 
 ELF_FUNCTION(l_table_get_meta) {
-	elf_getmetatab(S, args + 0);
+	T t = ltable(S, 0);
+	pushtab(S, getmeta(t));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_table_set_meta) {
-	elf_setmetatab(S, args + 0, args + 1);
-	return 0;
+	T t = ltable(S, 0);
+	T m = ltable(S, 1);
+	setmeta(t, m);
+	pushtab(S, m);
+	return 1;
 }
 
 
-static inline bool tablecontains(elf_Table *tab, elf_Value key) {
-	index_t slot = elf_table_try_(tab, key);
-	return slot >= 0 && !isdead(tab->entries[slot].key);
+static inline bool tablecontains(T t, V k) {
+	index_t s = elf_table_try_(t, k);
+	return s >= 0 && !isdead(t->entries[s].key);
 }
+
 
 ELF_FUNCTION(l_table_contains) {
 	ASSERT((nargs - 1) == 1);
-	elf_Table *tab = f_checktable(S, -1);
-	elf_Value key = loadvalue(S, 0);
-	elf_pushint(S, tablecontains(tab, key));
+	T t = ltable(S, 0);
+	V k = lvalue(S, 1);
+	elf_pushint(S, tablecontains(t, k));
 	return 1;
 }
 
@@ -56,7 +69,7 @@ ELF_FUNCTION(l_table_delete) {
 	if ((slot >= 0) && (entries[slot].key.tag != ELF_TNIL) && (entries[slot].key.tag != ELF_TTOMB)) {
 
 		index_t idx = entries[slot].idx;
-		pushvalue(S, array[idx]);
+		pushvalueunsafe(S, array[idx]);
 
 		index_t i;
 		for (i = 0; i < tab->ntotal; i ++) {
@@ -133,7 +146,7 @@ ELF_FUNCTION(l_find_aliases) {
 					if (isdead(alias.key)) continue;
 					if (alias.idx != entry.idx) continue;
 
-					pushvalue(S, alias.key);
+					pushvalueunsafe(S, alias.key);
 					elf_arrayadd(S);
 				}
 			}
@@ -160,7 +173,7 @@ ELF_FUNCTION(l_table_get_keys) {
 			continue;
 		}
 
-		pushvalue(S, entry.key);
+		pushvalueunsafe(S, entry.key);
 		elf_arrayadd(S);
 	}
 	return 1;
@@ -189,8 +202,8 @@ ELF_FUNCTION(l_table_merge) {
 
 			if (isdead(entry.key)) continue;
 
-			pushvalue(S, entry.key);
-			pushvalue(S, merger->array[entry.idx]);
+			pushvalueunsafe(S, entry.key);
+			pushvalueunsafe(S, merger->array[entry.idx]);
 			elf_setfield(S);
 		}
 	}
@@ -216,8 +229,8 @@ ELF_FUNCTION(l_table_fork) {
 		if (isdead(entry.key)) continue;
 		if (tablecontains(sub, entry.key)) continue;
 
-		pushvalue(S, entry.key);
-		pushvalue(S, tab->array[entry.idx]);
+		pushvalueunsafe(S, entry.key);
+		pushvalueunsafe(S, tab->array[entry.idx]);
 		elf_setfield(S);
 	}
 
@@ -232,8 +245,8 @@ ELF_FUNCTION(l_array_length) {
 }
 
 static void checktab(elf_State *inter, elf_stkid stk) {
-	if (!istab(inter->stack[stk])) {
-		elf_errorf(inter, -1, "'%s': expected 'table'", tag2s[vgettag(inter->stack[stk])]);
+	if (!vistab(inter->stack[stk])) {
+		elf_errorf(inter, -1, "'%s': expected 'table'", tag2s[vtagof(inter->stack[stk])]);
 	}
 }
 
@@ -251,7 +264,7 @@ ELF_FUNCTION(l_array_index) {
 
 	// if ((idx %= len) < 0) idx += len;
 
-	pushvalue(S, tab->array[idx]);
+	pushvalueunsafe(S, tab->array[idx]);
 	return 1;
 }
 
@@ -300,7 +313,7 @@ ELF_FUNCTION(l_array_pop) {
 	elf_Table *tab = f_checktable(S, -1);
 
 	Dynamic_Array *darr = d_array_raw(tab->array);
-	pushvalue(S, tab->array[-- darr->min]);
+	pushvalueunsafe(S, tab->array[-- darr->min]);
 
 	return 1;
 }
@@ -316,10 +329,10 @@ ELF_FUNCTION(l_array_merge) {
 
 	index_t i;
 	for (i=0;i<darr_l(tab->array);++i) {
-		d_array_add(sum->array, tab->array[i]);
+		darr_add(sum->array, tab->array[i]);
 	}
 	for (i=0;i<darr_l(add->array);++i) {
-		d_array_add(sum->array, tab->array[i]);
+		darr_add(sum->array, tab->array[i]);
 	}
 	return 1;
 }
@@ -332,7 +345,7 @@ ELF_FUNCTION(l_array_clone) {
 	index_t i;
 	for (i=0;i<darr_l(tab->array);++i)
 	{
-		pushvalue(S, tab->array[i]);
+		pushvalueunsafe(S, tab->array[i]);
 		elf_arrayadd(S);
 	}
 	return 1;
@@ -365,7 +378,7 @@ ELF_FUNCTION(l_array_slice) {
 
 	elf_pushtab(S);
 	while (x < y) {
-		pushvalue(S, tab->array[x ++]);
+		pushvalueunsafe(S, tab->array[x ++]);
 		elf_arrayadd(S);
 	}
 	return 1;

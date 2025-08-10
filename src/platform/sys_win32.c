@@ -34,21 +34,21 @@ FILE_HANDLE sys_get_std_file(int std) {
 	return 0;
 }
 
-unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int size) {
+unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int zbuf) {
 	DWORD read = 0;
-	ReadFile(file, buf, size, &read, NULL);
+	ReadFile(file, buf, zbuf, &read, NULL);
 	return read;
 }
 
-unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int size) {
+unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int zbuf) {
 	DWORD wrote = 0;
-	WriteFile(file, buf, size, &wrote, NULL);
+	WriteFile(file, buf, zbuf, &wrote, NULL);
 	return wrote;
 }
 
 unsigned int sys_size_file(FILE_HANDLE file) {
-	DWORD size = GetFileSize(file, NULL);
-	return size;
+	DWORD zfile = GetFileSize(file, NULL);
+	return zfile;
 }
 
 
@@ -94,8 +94,8 @@ FILE_HANDLE sys_open_file(const char *name, int flags, int mode) {
 		case SYS_TRUNCATE_EXISTING: os_mode = TRUNCATE_EXISTING; break;
 	}
 
-	FILE_HANDLE handle = CreateFileA(name, os_flags, os_sharing_flags, NULL, os_mode, 0, NULL);
-	return handle;
+	FILE_HANDLE hfile = CreateFileA(name, os_flags, os_sharing_flags, NULL, os_mode, 0, NULL);
+	return hfile;
 }
 
 int sys_time_file(FILE_HANDLE file, FILE_TIMES *times) {
@@ -141,7 +141,7 @@ int core_lib_get_disk_info(elf_State *R) {
 	elf_tsets_int(info,elf_alloc_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
 	elf_tsets_int(info,elf_alloc_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
 #else
-	elf_debug_log("this function is not implemented for this platform");
+	elf_ldebug("this function is not implemented for this platform");
 #endif
 	return 1;
 }
@@ -265,7 +265,7 @@ elf_Handle sys_load_dll(char const *name) {
 
 
 void *sys_get_dll_fn(elf_Handle dll, char const *name) {
-	return (void *) GetProcAddress(dll,name);
+	return (void *) GetProcAddress((HMODULE) dll, name);
 }
 
 static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {

@@ -14,12 +14,12 @@ strID elf_alloc_string3(elf_State *, char const *text, elf_i32 length);
 
 
 
-elf_Closure *elf_alloc_closure(elf_State *S, elf_Proto proto);
+elf_Closure *elf_alloc_closure(elf_State *S, Proto proto);
 
 void *elf_gc_alloc(elf_State *, elf_GC_Ty type, elf_i64 size);
 int elf_get_global_slot(elf_State *S, elf_String *name);
 int elf_set_global(elf_State *S, elf_String *name, elf_Value value);
-// static void pushvalue(elf_State *S, elf_Value value);
+// static void pushvalueunsafe(elf_State *S, elf_Value value);
 
 
 // todo: rework this api, make separate paths for different

@@ -2,6 +2,15 @@
 // See Copyright Notice In elf.h
 //
 
+
+
+
+
+
+
+
+
+// todo: prob stop using dynamic arrays and use linked lists instead
 // todo: this name can be confusing
 #define NO_TREE 0
 #define INVALID_TREE -1
@@ -36,6 +45,7 @@ _(EXPR_BIT_OR)       \
 _(EXPR_BIT_XOR)      \
 _(EXPR_NIL_AND)      \
 _(EXPR_NIL_OR)       \
+_(EXPR_BIT_NOT)      \
 _(TREE_GLOBAL)       \
 _(TREE_UPVALUE)      \
 _(TREE_GETEXPR)      \
@@ -108,17 +118,27 @@ struct treeT {
 		elf_f64   expr_num;
 		treeID    proxyfor;
 		struct {
-			// this only matter when generating the code
-			treeID    body;
-			// these are the only two things the compiler
-			// cares about when generating code
-			treeID   *capts;
-			int       proto;
-			// todo: remove this from here
-			// these are not used beyond
-			// parsing
-			int       scope;
+			// scope is used during parsing to detect captures,
+			// could be placed somewhere else, some sort of function stack,
+			// but here is convenient.
+			i16       scope;
+			// the arity for the code generator to create the prototype
+			// includes 'this', so it is always at least 1.
+			u8        arity;
+			u8     variadic;
+			// this is the current parent of this function, only used
+			// during parsing to traverse the function hierarchy.
 			treeID      enc;
+			// list of captures for the parser to remember which ones
+			// it has already, also tells code gen the number of captures
+			// for the proto
+			treeID   *capts;
+			// body of instructions for the code generator to make
+			treeID     body;
+			// at make time, associate a proto id with each function
+			// so that when the closure instruction is generated, there's
+			// a proto ready for it.
+			int       proto;
 		} tree_funexpr;
 		struct {
 			treeID *defers;

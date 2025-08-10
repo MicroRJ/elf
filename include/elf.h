@@ -77,13 +77,15 @@ typedef enum {
 	ELF_TTABLE,
 } elf_Tag;
 
-// todo: delete!
+
+
 elf_pubapi elf_State *elf_new();
+elf_pubapi void elf_end(elf_State *);
 
 
-/* push call arguments, push the (name of the file),
-push the (file contents or the file handle) */
-elf_pubapi int elf_loadcode(elf_State *inter, bool asexpr);
+// pass in a file name, the result is on the stack
+// todo: support for loading code files from memory is pending
+elf_pubapi int elf_loadcodefile(elf_State *S, const char *name);
 
 
 
@@ -114,17 +116,9 @@ elf_pubapi int elf_loadcode(elf_State *inter, bool asexpr);
 */
 elf_pubapi int elf_call(elf_State *, int nargs, int nrets);
 
-// todo: should these return instead the numer of returns?
-// similar to the elf signature?
-
-elf_pubapi int elf_readfileh(elf_State *, elf_Handle file, int size);
-elf_pubapi int elf_readfilen(elf_State *, const char *name, int size);
-elf_pubapi int elf_readfile(elf_State *, int stk, int size);
-
 elf_pubapi void elf_setfield(elf_State *);
 elf_pubapi void elf_arrayadd(elf_State *);
 elf_pubapi void elf_arrayget(elf_State *);
-
 
 elf_pubapi elf_Tag elf_gettag(elf_State *, elf_stkid from);
 
@@ -141,7 +135,6 @@ elf_pubapi void elf_pushsys(elf_State *, elf_Handle);
 elf_pubapi void elf_getmetatab(elf_State *, elf_stkid from);
 elf_pubapi void elf_setmetatab(elf_State *inter, int objstk, int tabstk);
 elf_pubapi void elf_getglobals(elf_State *);
-elf_pubapi void elf_pushfrom(elf_State *, elf_stkid stk);
 
 
 elf_pubapi elf_Number elf_tonum(elf_State *, elf_stkid stk);

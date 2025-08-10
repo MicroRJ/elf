@@ -39,6 +39,7 @@ _(THEN     ,"then"        ) \
 _(LINE_NUMBER   , "line_number" ) \
 _(LINE_CHAR     , "line_char"   ) \
 _(FILE_NAME     , "file_name"   ) \
+_(ASSERT        , "assert"      ) \
 _(INT           , "int"         ) \
 _(NUM           , "num"         ) \
 _(LEVEL         , "level"       ) \
@@ -52,31 +53,26 @@ _(ENDOFFILE     , "eof"         ) \
 _(THIS          , "this"        ) \
 /* end */
 
-// !! and ?? should have higher precedence,
-// for instance:
-// 1 + some_variable ?? 0
-// here you want ?? to bind stronger, there's
-// no reason to expect ?? to be weaker, because
-// if some variable actually is nil, then there's
-// an error because addition with a nil value is
-// undefined...
-/* todo: why would !! and ?? have lower precedence
-than relational operators, when !! and ?? work on
-values */
-#define OPERATORDEF(_) \
-_(     POW, "**",12) \
-_(     MUL,  "*",11) _( DIV,  "/", 11) _(MOD,"%",11) \
-_(     ADD,  "+",10) _( SUB,  "-", 10) \
-_(     SHR, ">>", 9) _( SHL, "<<",  9) \
-_(      LT,  "<", 8) _(LTEQ, "<=",  8) \
-_(      GT,  ">", 8) _(GTEQ, ">=",  8) \
-_(      EQ, "==", 7) _( NEQ, "!=",  7) \
-_( BIT_AND,  "&", 6) \
-_(  BIT_OR,  "|", 5) \
-_( BIT_XOR,  "^", 4) \
-_( LOG_AND, "&&", 3) _( LOG_OR, "||", 2) \
-_( NIL_AND, "!!", 3) _( NIL_OR, "??", 2) \
-_(ELLIPSIS,"...", 1) _(DOT_DOT, "..", 1) \
+/* === Binary Operators ======================
+	Only binary operators are defined here
+	for the parser to generate code for binary
+	expression parsing.
+	===========================================
+*/
+#define BOPDEF(_) \
+_(     POW, "**", 12) \
+_(     MUL,  "*", 11) _( DIV,  "/",  11) _(MOD, "%", 11) \
+_(     ADD,  "+", 10) _( SUB,  "-",  10) \
+_(     SHR, ">>",  9) _( SHL, "<<",   9) \
+_(      LT,  "<",  8) _(LTEQ, "<=",   8) \
+_(      GT,  ">",  8) _(GTEQ, ">=",   8) \
+_(      EQ, "==",  7) _( NEQ, "!=",   7) \
+_( BIT_AND,  "&",  6) \
+_(  BIT_OR,  "|",  5) \
+_( BIT_XOR,  "^",  4) \
+_( LOG_AND, "&&",  3) _( LOG_OR, "||",  2) \
+_( NIL_AND, "!!",  3) _( NIL_OR, "??",  2) \
+_(ELLIPSIS,"...",  1) _(DOT_DOT, "..",  1) \
 /* end */
 
 
@@ -87,6 +83,7 @@ _(STRING             , "string")    \
 _(FORMAT_STRING      , "format")    \
 _(LETTER             , "letter")    \
 _(WORD               ,   "word")    \
+_(TILDE              ,"~")          \
 _(MINUS_MINUS        ,"--")         \
 _(PLUS_PLUS          ,"++")         \
 _(QMARK              ,"?")          \
@@ -119,7 +116,7 @@ typedef enum tokenTy {
 	KEYWORDDEF(TKITEM)
 	MACRODEF(MCITEM)
 	TOKENDEF(TKITEM)
-	OPERATORDEF(OPITEM)
+	BOPDEF(OPITEM)
 #undef TKITEM
 #undef MCITEM
 #undef OPITEM
@@ -127,7 +124,7 @@ typedef enum tokenTy {
 
 
 typedef struct token_metadata_t {
-	char *name;
+	char name[16];
 	char prec;
 } token_metadata_t;
 
@@ -138,7 +135,7 @@ global token_metadata_t g_token_metadata_table[] = {
 	KEYWORDDEF(TKITEM)
 	MACRODEF(TKITEM)
 	TOKENDEF(TKITEM)
-	OPERATORDEF(OPITEM)
+	BOPDEF(OPITEM)
 };
 
 #undef TKITEM

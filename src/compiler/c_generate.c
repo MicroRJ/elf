@@ -21,14 +21,14 @@ static void close_if(elf_Parser *fs, Source line, BranchJumps *s);
 // static void close_while_loop(elf_Parser *fs);
 
 static int emit_jump(elf_Parser *parser, Source line, int dst);
-static int emit_byte(elf_Parser *parser, Source line, elf_Bytec byte);
+static int emit_byte(elf_Parser *parser, Source line, Bytec byte);
 static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
 static int emit_bytexy(elf_Parser *parser, Source line, int k, int x, int y);
 static int emit_bytexyz(elf_Parser *parser, Source line, int k, int x, int y, int z);
 static void patch_jump2(elf_Parser *parser, int src, int dst);
-static void patch_jumps2(elf_Parser *parser, Instr *js, Instr j);
-static void patch_jump(elf_Parser *parser, Instr i);
-static void patch_jumps(elf_Parser *parser, Instr *js);
+static void patch_jumps2(elf_Parser *parser, BCPos *js, BCPos j);
+static void patch_jump(elf_Parser *parser, BCPos i);
+static void patch_jumps(elf_Parser *parser, BCPos *js);
 
 static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst);
 static int to_any_mem(elf_Parser *parser, treeID id);
@@ -43,7 +43,7 @@ static void set_mem_state(elf_Parser *parser, int state) { parser->memory_state 
 // todo: interning
 static int add_const_int(elf_State *S, elf_Integer i) {
 
-	index_t index = ARRAY_GROW(S->integers, 1);
+	index_t index = darr_grow(S->integers, 1);
 	S->integers[index] = i;
 
 	return index;
@@ -52,7 +52,7 @@ static int add_const_int(elf_State *S, elf_Integer i) {
 // todo: interning
 static int add_const_num(elf_State *S, elf_Number i) {
 
-	index_t index = ARRAY_GROW(S->numbers, 1);
+	index_t index = darr_grow(S->numbers, 1);
 	S->numbers[index] = i;
 
 	return index;
@@ -103,9 +103,9 @@ static int to_any_mem(elf_Parser *parser, treeID id) {
 	return mem;
 }
 
-static void gentree(elf_Parser *parser, treeID id);
+static void make_tree(elf_Parser *parser, treeID id);
 
-static elf_Proto genfunction(elf_Parser *parser, treeID tree) {
+static Proto make_function(elf_Parser *parser, treeID tree) {
 	elf_State *R = parser->R;
 
 	ASSERT(get_tree_kind(parser,tree) == TREE_FUNCTION);
@@ -113,18 +113,20 @@ static elf_Proto genfunction(elf_Parser *parser, treeID tree) {
 	ASSERT(parser->memory_state == 0);
 	ASSERT(parser->memory_usage == 0);
 
-	int start = R->nbytes;
-	gentree(parser, tree->tree_funexpr.body);
+	int bytepos = R->bytecur;
+	make_tree(parser, tree->tree_funexpr.body);
 
-	elf_Proto proto = {};
-	proto.arity = 1;
-	proto.bytes = start;
+	ASSERT(tree->tree_funexpr.arity >= 1);
+	Proto proto = {};
+	proto.bytes = bytepos;
+	proto.arity = tree->tree_funexpr.arity;
+	proto.variadic = tree->tree_funexpr.variadic;
+	proto.numbytes = R->bytecur - bytepos;
 	proto.ncaptures = darr_l(tree->tree_funexpr.capts);
 	proto.stacksize = parser->memory_usage;
-	proto.numbytes = R->nbytes - start;
 
 	// todo: come back to this
-	// ASSERT(BC_OP(R->bytes[R->nbytes-1]) == BC_RET);
+	// ASSERT(BC_OP(R->bytes[R->bytecur-1]) == BC_RET);
 
 	ASSERT(parser->memory_state == 0);
 	ASSERT(parser->memory_state_index == 0);
@@ -132,7 +134,7 @@ static elf_Proto genfunction(elf_Parser *parser, treeID tree) {
 	return proto;
 }
 
-static void gentree(elf_Parser *parser, treeID id) {
+static void make_tree(elf_Parser *parser, treeID id) {
 	treeT tree = get_tree(parser,id);
 	switch (tree.kind) {
 		case TREE_SETMEM: {
@@ -175,15 +177,15 @@ static void gentree(elf_Parser *parser, treeID id) {
 
 			int continue_target;
 			int entry;
-			entry=parser->R->nbytes;
+			entry=parser->R->bytecur;
 			continue_target=entry;
 			emit_jump_if_false(parser,&js,pred);
 
-			if(prev)gentree(parser,prev);
-			gentree(parser,body);
+			if(prev)make_tree(parser,prev);
+			make_tree(parser,body);
 			if(post){
-				continue_target=parser->R->nbytes;
-				gentree(parser,post);
+				continue_target=parser->R->bytecur;
+				make_tree(parser,post);
 			}
 			emit_jump(parser,NO_LINE,entry);
 
@@ -250,7 +252,7 @@ static void gentree(elf_Parser *parser, treeID id) {
 		case STAT_BLOCK: {
 			push_mem_state(parser);
 			FOR_ARRAY(i,tree.z) {
-				gentree(parser,tree.z[i]);
+				make_tree(parser,tree.z[i]);
 			}
 			pop_mem_state(parser);
 		} break;
@@ -270,10 +272,10 @@ static void gentree(elf_Parser *parser, treeID id) {
 			// the condition...
 			BranchJumps s={};
 			begin_if(parser,tree.line,&s,pred,0);
-			gentree(parser,true_clause);
+			make_tree(parser,true_clause);
 			if(else_clause){
 				add_else_clause(parser,tree.line,&s);
-				gentree(parser,else_clause);
+				make_tree(parser,else_clause);
 			}
 			close_if(parser,tree.line,&s);
 		} break;
@@ -434,12 +436,10 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			ARRAY_DELETE(j);
 		} break;
 		case TREE_FUNCTION: {
-			int     proto;
-			treeID *capts;
-			proto=tree.tree_funexpr.proto;
-			capts=tree.tree_funexpr.capts;
 
-			ASSERT(proto!=-1);
+			int     proto = tree.tree_funexpr.proto;
+			treeID *capts = tree.tree_funexpr.capts;
+			ASSERT(proto != -1);
 
 			if (ndst<1) goto esc;
 			mem=get_mem_state(parser);
@@ -499,6 +499,18 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
 		} break;
+
+		case EXPR_BIT_NOT: {
+			if (ndst<1) goto esc;
+			if (dst<0) dst=set_mem(parser, id);
+
+			push_mem_state(parser);
+			rx = to_any_mem(parser, tree.x);
+			pop_mem_state(parser);
+
+			emit_bytexy(parser,tree.line,expr_to_instr(tree.kind),dst,rx);
+		} break;
+
 		case EXPR_EQ: case EXPR_NEQ:
 		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
 		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
@@ -545,7 +557,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	treeID prox;
 	for(prox=tree.prox;prox;prox=prox->prox){
 		push_mem_state(parser);
-		gentree(parser,prox);
+		make_tree(parser,prox);
 		pop_mem_state(parser);
 	}
 	esc:
@@ -553,6 +565,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	return dst;
 }
 
+// todo: replace with table!
 static int expr_to_instr(int kind) {
 	switch (kind) {
 		case EXPR_FIELD: 	   return BC_GETFIELD;     // *
@@ -569,10 +582,11 @@ static int expr_to_instr(int kind) {
 		case EXPR_EQ:        return BC_EQ;
 		case EXPR_LT:        return BC_LT;
 		case EXPR_LTEQ:      return BC_LTEQ;
+		case EXPR_BIT_NOT:   return BC_BIT_NOT;
 		case EXPR_BIT_OR:    return BC_BIT_OR;
 		case EXPR_BIT_AND:   return BC_BIT_AND;
-		case EXPR_BIT_SHL:   return BC_SHL;
-		case EXPR_BIT_SHR:   return BC_SHR;
+		case EXPR_BIT_SHL:   return BC_BIT_SHL;
+		case EXPR_BIT_SHR:   return BC_BIT_SHR;
 		case EXPR_BIT_XOR:   return BC_BIT_XOR;
 		default: NO_CODE;
 	}
@@ -580,7 +594,7 @@ static int expr_to_instr(int kind) {
 }
 
 static int emit_jump(elf_Parser *parser, Source line, int dst) {
-	return emit_bytex(parser,line,BC_J,dst-parser->R->nbytes);
+	return emit_bytex(parser,line,BC_J,dst-parser->R->bytecur);
 }
 
 static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id) {
@@ -607,10 +621,10 @@ static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id
 			_got_mem:
 			if (if_true) {
 				jmp=emit_bytexy(parser,tree.line,BC_JNZ,NO_JUMP,mem);
-				d_array_add(js->t,jmp);
+				darr_add(js->t,jmp);
 			} else {
 				jmp=emit_bytexy(parser,tree.line,BC_JZ,NO_JUMP,mem);
-				d_array_add(js->f,jmp);
+				darr_add(js->f,jmp);
 			}
 		} break;
 	}
@@ -640,7 +654,7 @@ int *emit_jump_if_true(elf_Parser *fs, jumpS *js, treeID id) {
 }
 
 
-Instr *emit_jump_if_false(elf_Parser *fs, jumpS *js, treeID id) {
+BCPos *emit_jump_if_false(elf_Parser *fs, jumpS *js, treeID id) {
 	emit_branch_if_false(fs,js,id);
 	patch_jumps(fs,js->t);
 	ARRAY_DELETE(js->t);
@@ -686,7 +700,7 @@ void add_else_clause(elf_Parser *fs, Source line, BranchJumps *s) {
 	}
 	ASSERT(s->jz != 0);
 	int j = emit_jump(fs,line,-1);
-	d_array_add(s->j,j);
+	darr_add(s->j,j);
 
 	patch_jumps(fs,s->jz);
 	ARRAY_DELETE(s->jz);
@@ -729,22 +743,22 @@ void close_if(elf_Parser *fs, Source line, BranchJumps *s) {
 }
 
 
-static int emit_byte(elf_Parser *parser, Source line, elf_Bytec byte) {
-	elf_State *M = parser->R;
+static int emit_byte(elf_Parser *parser, Source line, Bytec byte) {
+	elf_State *S = parser->R;
 	// todo: please remove this :)
 	line = line ? line : parser->sourceloc;
 	ASSERT(line != 0);
 	parser->sourceloc = line;
-	d_array_add(M->lines, line);
-	d_array_add(M->bytes, byte);
-	d_array_add(M->track, 0);
-	// fpf_byte(stdout,M,-1,M->nbytes-C->fn->bytes,byte);
-	return M->nbytes ++;
+	darr_add(S->lines, line);
+	darr_add(S->track, 0);
+	darr_add(S->bytebuf, byte);
+	// fpf_byte(stdout,S,-1,S->nbytes-C->fn->bytes,byte);
+	return S->bytecur ++;
 }
 
 
 static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
-	elf_Bytec byte=BC_XXX(k,x);
+	Bytec byte=BC_XXX(k,x);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	return emit_byte(C,line,byte);
@@ -752,7 +766,7 @@ static int emit_bytex(elf_Parser *C, Source line, int k, int x) {
 
 
 static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
-	elf_Bytec byte=BC_XYY(k,x,y);
+	Bytec byte=BC_XYY(k,x,y);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -761,7 +775,7 @@ static int emit_bytexy(elf_Parser *C, Source line, int k, int x, int y) {
 
 
 static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) {
-	elf_Bytec byte=BC_XYZ(k,x,y,z);
+	Bytec byte=BC_XYZ(k,x,y,z);
 	ASSERT(BC_OP(byte)==k);
 	ASSERT(BC_ARGX(byte)==x);
 	ASSERT(BC_ARGY(byte)==y);
@@ -769,40 +783,45 @@ static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) 
 	return emit_byte(C,line,byte);
 }
 
-static void patch_jump2(elf_Parser *fs, int src, int dst) {
-	elf_Bytec byte,*bytes;
-	bytes=fs->R->bytes;
-	byte=bytes[src];
+
+static void patch_jump2(elf_Parser *parser, BCPos src, BCPos dst) {
+
+	Bytec byte, *bytebuf;
+
+	bytebuf = parser->R->bytebuf;
+	byte = bytebuf[src];
+
 	int j = dst - src;
 	switch (BC_OP(byte)) {
-		// case BC_DELAY:
+
 		case BC_J: {
-			bytes[src].b_x = j;
-			bytes[src]=BC_XXX(BC_OP(byte),j);
+			bytebuf[src].b_x = j;
+			bytebuf[src]=BC_XXX(BC_OP(byte),j);
 		} break;
-		// case BC_YIELD:
+
 		case BC_JZ: case BC_JNZ: {
-			// bytes[src].x = j;
-			bytes[src]=BC_XYZ(BC_OP(byte),j,BC_ARGY(byte),BC_ARGZ(byte));
+			// bytebuf[src].x = j;
+			bytebuf[src]=BC_XYZ(BC_OP(byte),j,BC_ARGY(byte),BC_ARGZ(byte));
 		} break;
+
 		default: NO_CODE;
 	}
 }
 
 
-static void patch_jumps2(elf_Parser *fs, Instr *js, Instr j) {
+static void patch_jumps2(elf_Parser *fs, BCPos *js, BCPos j) {
 	FOR_ARRAY(i,js) {
 		patch_jump2(fs,js[i],j);
 	}
 }
 
 
-static void patch_jump(elf_Parser *fs, Instr i) {
-	patch_jump2(fs,i,fs->R->nbytes);
+static void patch_jump(elf_Parser *fs, BCPos i) {
+	patch_jump2(fs,i,fs->R->bytecur);
 }
 
 
-static void patch_jumps(elf_Parser *parser, Instr *s) {
+static void patch_jumps(elf_Parser *parser, BCPos *s) {
 	FOR_ARRAY(i,s) {
 		patch_jump(parser,s[i]);
 	}

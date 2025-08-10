@@ -2,6 +2,11 @@
 // See Copyright Notice In elf.h
 //
 
+
+
+
+
+
 static bool is_tree_trivial_constant(elf_Parser *parser, treeID id) {
 	return id->kind == EXPR_INT || id->kind == EXPR_NUM;
 }
@@ -51,11 +56,16 @@ static treeID tree_global(elf_Parser *parser, Source line, int x) {
 	return v;
 }
 
-static treeID tree_global_symbol(elf_Parser *parser, Source line, char *name) {
+
+
+// todo: we should already have the String by now...
+static treeID tree_global_symbol(elf_Parser *parser, Source line, const char *name) {
 	int x = elf_get_global_slot(parser->R, elf_alloc_string(parser->R, name));
 	ASSERT(x != -1);
 	return tree_global(parser, line, x);
 }
+
+
 
 static treeID tree_label(elf_Parser *parser, Source line, treeID *z) {
 	treeID v = tree_nullary(parser,line,TREE_GLOBAL,NT_ANY);
@@ -72,16 +82,21 @@ static treeID tree_int(elf_Parser *parser, Source line, elf_Integer i) {
 	v->expr_int=i;
 	return v;
 }
+
+
+
 static treeID tree_num(elf_Parser *parser, Source line, elf_Number n) {
 	treeID v;
 	v=tree_nullary(parser,line,EXPR_NUM,NT_NUM);
 	v->expr_num=n;
 	return v;
 }
+
+
+
 static treeID tree_str(elf_Parser *parser, Source line, char *s) {
-	treeID v;
-	v=tree_nullary(parser,line,EXPR_STR,NT_STR);
-	v->expr_str=s;
+	treeID v = tree_nullary(parser,line,EXPR_STR,NT_STR);
+	v->expr_str = s;
 	return v;
 }
 
@@ -159,8 +174,8 @@ static treeID tree_meta_field(elf_Parser *parser, Source line, treeID x, treeID 
 static treeID tree_call_set_meta(elf_Parser *parser, Source line, treeID object, treeID metatable) {
 	treeID name = tree_global_symbol(parser,line,"elf.set_meta");
 	treeID *z = 0;
-	d_array_add(z, object);
-	d_array_add(z, metatable);
+	darr_add(z, object);
+	darr_add(z, metatable);
 	return tree_call(parser,line,name,z);
 }
 
@@ -182,5 +197,50 @@ static treeID tree_if(elf_Parser *parser, Source line, treeID pred, treeID true_
 	v->tree_ifstat.pred=pred;
 	v->tree_ifstat.true_clause=true_clause;
 	v->tree_ifstat.else_clause=else_clause;
+	return v;
+}
+
+// todo: where to put this
+// enum, symbol, variadic, num args, num rets
+#define DEFCOREAPI(_) \
+_(ASSERT,  "elf.assert"  , 0,  2,  0) \
+_(FORMAT,  "elf.format"  , 0,  1,  2) \
+_(SETMETA, "elf.set_meta", 0,  2,  1) \
+_(GETMETA, "elf.get_meta", 0,  1,  1) \
+/* end */
+
+enum {
+#define BUILTIN(EN, SY, V, A, R) BUILTIN_##EN,
+	DEFCOREAPI(BUILTIN)
+#undef BUILTIN
+};
+
+static const char *coreapi2s[] = {
+#define BUILTIN(EN, SY, V, A, R) SY,
+	DEFCOREAPI(BUILTIN)
+#undef BUILTIN
+};
+
+
+static treeID tree_callcoreapi(elf_Parser *parser, Source line, int id, treeID *z) {
+	treeID v = tree_global_symbol(parser, line, coreapi2s[id]);
+	v = tree_call(parser, line, v, z);
+	return v;
+}
+
+static treeID tree_callcoreapi2(elf_Parser *parser, Source line, int id, treeID x, treeID y) {
+	treeID *args = 0;
+	darr_add(args, x);
+	darr_add(args, y);
+	treeID v = tree_callcoreapi(parser, line, id, args);
+	return v;
+}
+
+static treeID tree_callcoreapi3(elf_Parser *parser, Source line, int id, treeID x, treeID y, treeID z) {
+	treeID *args = 0;
+	darr_add(args, x);
+	darr_add(args, y);
+	darr_add(args, z);
+	treeID v = tree_callcoreapi(parser, line, id, args);
 	return v;
 }

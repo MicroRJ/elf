@@ -9,7 +9,7 @@ enum {
 #define elf_log(TYPE,FORMAT,...) (CHECK_FORMAT(FORMAT,##__VA_ARGS__), elf_log_(TYPE,__FILE__,__func__,__LINE__, FORMAT, ##__VA_ARGS__))
 
 #define elf_info_log(yyy,...)    elf_log(LOG_KINFO,yyy,##__VA_ARGS__)
-#define elf_debug_log(yyy,...)   elf_log(LOG_KDEBUG,yyy,##__VA_ARGS__)
+#define elf_ldebug(yyy,...)   elf_log(LOG_KDEBUG,yyy,##__VA_ARGS__)
 #define elf_warning_log(yyy,...) elf_log(LOG_KWARNING,yyy,##__VA_ARGS__)
 #define elf_lerror(yyy,...)   elf_log(LOG_KERROR,yyy,##__VA_ARGS__)
 #define elf_fatal_log(yyy,...)   elf_log(LOG_KFATAL,yyy,##__VA_ARGS__)
