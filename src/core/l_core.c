@@ -93,13 +93,19 @@ ELF_FUNCTION(l_core_arg) {
 
 
 ELF_FUNCTION(l_core_get_meta) {
-	elf_getmetatab(S, args + 1);
+	TRef t = ltable(S, 1);
+	TRef m = getmeta(t);
+	pushtab(S, m);
 	return 1;
 }
 
+
+// result is the object we passed in
 ELF_FUNCTION(l_core_set_meta) {
-	elf_setmetatab(S, args + 1, args + 2);
-	elf_getmetatab(S, args + 1);
+	TRef t = ltable(S, 1);
+	TRef m = ltable(S, 2);
+	setmeta(t, m);
+	pushtab(S, t);
 	return 1;
 }
 

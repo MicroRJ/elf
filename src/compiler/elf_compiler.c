@@ -22,7 +22,7 @@
 #include "c_lexer.c"
 #include "c_tree.c"
 #include "elf_parser.c"
-#include "c_generate.c"
+#include "c_make.c"
 #include "logging.c"
 
 

@@ -28,7 +28,7 @@ typedef struct {
 	treeID   tree;
 	char    *name;
 	Source   line;
-} entityT;
+} Entity;
 
 //
 // todo: this uses dynamic arrays, which isn't
@@ -121,7 +121,7 @@ struct elf_Parser {
 	// entities are named objects, variables,
 	// symbols, special names, and such...
 	// todo: allocate within struct
-	entityT          entities[MAX_ENTITIES];
+	Entity          entities[MAX_ENTITIES];
 	entID            entity_index;
 	// remember scope hierarchy, 'scope'
 	// is the first visible entity

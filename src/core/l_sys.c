@@ -364,6 +364,17 @@ ELF_FUNCTION(l_sys_get_file_cursor) {
 elf_pubapi
 bool elf_readfile(elf_State *inter, int stk, int size);
 
+
+// todo: should take a buffer
+ELF_FUNCTION(l_sys_read_console) {
+	int zbuf = lint(S, 1);
+	char *buf = calloc(1, zbuf + 1);
+	int ret = sys_read_console(SYS_STD_INPUT, buf, zbuf);
+	pushstring(S, buf);
+	return 1;
+}
+
+
 //
 // @doc sys.read_file(name or handle, size) -> contents
 //
@@ -444,6 +455,7 @@ static const elf_Binding l_sys[] = {
 	{"close_file",                l_sys_close_file                },
 	{"get_file_size",             l_sys_get_file_size             },
 	{"read_file",                 l_sys_read_file                 },
+	{"read_console",              l_sys_read_console                 },
 	{"get_file_cursor",           l_sys_get_file_cursor           },
 	{"write_file",                l_sys_write_file                },
 	{"write_file_to_file",        l_sys_write_file_to_file        },

@@ -58,7 +58,7 @@ static void pushpath(Path_Builder *pb, const char *name) {
 
 	if (pb->segs) {
 		// todo: perf
-		char *q = string_builder_alloc(&pb->sb, 1, 1);
+		char *q = sb_alloc(&pb->sb, 1, 1);
 		*q = '\\';
 		// pb->path[pb->pcur ++] = '\\';
 	}
@@ -80,14 +80,14 @@ static void pushpath(Path_Builder *pb, const char *name) {
 	// copy it into the buffer
 	while (*name) {
 		// todo: perf
-		char *q = string_builder_alloc(&pb->sb, 1, 1);
+		char *q = sb_alloc(&pb->sb, 1, 1);
 		*q = *name ++;
 
 		// pb->path[pb->pcur ++] = *name ++;
 	}
 
 	// todo: perf
-	char *q = string_builder_alloc(&pb->sb, 1, 0);
+	char *q = sb_alloc(&pb->sb, 1, 0);
 	*q = '\0';
 
 	// pb->path[pb->pcur] = '\0';

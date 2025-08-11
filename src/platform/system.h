@@ -86,6 +86,8 @@ enum {
 };
 
 
+unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int size);
+
 int sys_create_directory(const char *path);
 
 FILE_HANDLE sys_get_std_file(int std);

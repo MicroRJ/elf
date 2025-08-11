@@ -175,6 +175,8 @@ do { \
 
 #define lvalue(S, x) ((S)->frame.framebase[x])
 
+#define lpush(S, x) (pushvalueunsafe(S, lvalue(S, x))
+
 
 
 static inline const char *lstrdata(elf_State *S, int x)
@@ -218,6 +220,11 @@ static inline T ltable(elf_State *S, int x)
 }
 
 
+static inline SRef pushstring(elf_State *S, char const *text) {
+	SRef str = elf_alloc_string(S, text);
+	pushstr(S, str);
+	return str;
+}
 
 
 static inline T pushtable(elf_State *S) {

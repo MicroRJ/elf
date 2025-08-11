@@ -171,19 +171,14 @@ static treeID tree_meta_field(elf_Parser *parser, Source line, treeID x, treeID 
 	return tree_binary(parser,line,EXPR_METAFIELD,NT_ANY,x,y);
 }
 
-static treeID tree_call_set_meta(elf_Parser *parser, Source line, treeID object, treeID metatable) {
-	treeID name = tree_global_symbol(parser,line,"elf.set_meta");
-	treeID *z = 0;
-	darr_add(z, object);
-	darr_add(z, metatable);
-	return tree_call(parser,line,name,z);
-}
 
-
-static treeID tree_meta_call(elf_Parser *parser, Source line, treeID x, treeID *z, char *name) {
+// todo: meta calls cannot be sugar coated at parse time
+// becase of bytecode optimizations
+static treeID tree_meta_call(elf_Parser *parser, Source line, treeID x, char *name, treeID *z) {
 	treeID field = tree_meta_field(parser,line,x,tree_str(parser,line,name));
 	return tree_call(parser,line,field,z);
 }
+
 
 static treeID tree_closure_value(elf_Parser *parser, Source line, int x) {
 	treeID v;
@@ -203,11 +198,13 @@ static treeID tree_if(elf_Parser *parser, Source line, treeID pred, treeID true_
 // todo: where to put this
 // enum, symbol, variadic, num args, num rets
 #define DEFCOREAPI(_) \
-_(ASSERT,  "elf.assert"  , 0,  2,  0) \
-_(FORMAT,  "elf.format"  , 0,  1,  2) \
-_(SETMETA, "elf.set_meta", 0,  2,  1) \
-_(GETMETA, "elf.get_meta", 0,  1,  1) \
+_(ASSERT,   "elf.assert"   , 0,  2,  0) \
+_(FORMAT,   "elf.format"   , 0,  1,  2) \
+_(SETMETA,  "elf.set_meta" , 0,  2,  1) \
+_(GETMETA,  "elf.get_meta" , 0,  1,  1) \
+_(LOADFILE, "elf.load_file", 0,  1,  1) \
 /* end */
+
 
 enum {
 #define BUILTIN(EN, SY, V, A, R) BUILTIN_##EN,

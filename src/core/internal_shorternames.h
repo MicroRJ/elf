@@ -9,6 +9,8 @@
 typedef elf_Handle  H;
 typedef elf_Table  *T;
 typedef elf_Value   V;
+typedef elf_Table  *TRef;
+typedef elf_String *SRef;
 
 typedef elf_String *strID;
 typedef elf_Table  *tabID;

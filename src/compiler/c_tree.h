@@ -3,13 +3,6 @@
 //
 
 
-
-
-
-
-
-
-
 // todo: prob stop using dynamic arrays and use linked lists instead
 // todo: this name can be confusing
 #define NO_TREE 0

@@ -269,7 +269,7 @@ static int bprintf(String_Builder *sb, char *format, ...) {
 	va_list vargs;
 	va_start(vargs, format);
 	int size = stbsp_vsnprintf(NULL, 0, format, vargs);
-	char *text = string_builder_alloc(sb, size + 1, size);
+	char *text = sb_alloc(sb, size + 1, size);
 	stbsp_vsnprintf(text, size + 1, format, vargs);
 	va_end(vargs);
 	return size;

@@ -559,6 +559,7 @@ int _resume(elf_State *inter) {
 		inter->byte = minstr;
 
 		Bytec byte = inter->bytebuf[minstr];
+		// printf("%s(%i, %i, %i)\n", byte2s[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
 
 		#define by byte
 
@@ -703,7 +704,7 @@ int _resume(elf_State *inter) {
 				Proto proto = inter->protos[BC_ARGY(byte)];
 
 				elf_Closure *cls = elf_alloc_closure(inter, proto);
-				copy_memory(cls->captures, &rvalueX(), proto.ncaptures * sizeof(elf_Value));
+				copy_values(cls->captures, &rvalueX(), proto.ncaptures);
 
 				vsetcls(&rvalueX(), cls);
 			} break;

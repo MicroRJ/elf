@@ -34,6 +34,16 @@ FILE_HANDLE sys_get_std_file(int std) {
 	return 0;
 }
 
+
+
+unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int zbuf) {
+	DWORD read;
+	ReadConsole(GetStdHandle(STD_INPUT_HANDLE), buf, zbuf, &read, NULL);
+	return read;
+}
+
+
+
 unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int zbuf) {
 	DWORD read = 0;
 	ReadFile(file, buf, zbuf, &read, NULL);
