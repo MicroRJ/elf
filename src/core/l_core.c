@@ -191,49 +191,49 @@ ELF_FUNCTION(l_core_load_json) {
 
 static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 	switch (v.tag) {
-		case ELF_TNIL:        return bprintf(sb,   "nil"               );
-		case ELF_TINTEGER:        return bprintf(sb,  "%lli", v.x_int      );
-		case ELF_TNUMBER:        return bprintf(sb,    "%f", v.x_num      );
-		case ELF_THANDLE:     return bprintf(sb, "h%llX", v.x_int      );
-		case ELF_TSTRING:     return bprintf(sb,    "%s", v.x_str->text);
-		case ELF_TCLOSURE:    return bprintf(sb,   "F()");
-		case ELF_TFUNCTION:   return bprintf(sb,   "C()");
+		case ELF_TNIL:        return sb_sprintf(sb,   "nil"               );
+		case ELF_TINTEGER:        return sb_sprintf(sb,  "%lli", v.x_int      );
+		case ELF_TNUMBER:        return sb_sprintf(sb,    "%f", v.x_num      );
+		case ELF_THANDLE:     return sb_sprintf(sb, "h%llX", v.x_int      );
+		case ELF_TSTRING:     return sb_sprintf(sb,    "%s", v.x_str->text);
+		case ELF_TCLOSURE:    return sb_sprintf(sb,   "F()");
+		case ELF_TFUNCTION:   return sb_sprintf(sb,   "C()");
 
 		case ELF_TTABLE: {
 			/* todo: this is slow! */
 			int wrote = 0;
 			elf_Table *tab = v.x_tab;
-			wrote += bprintf(sb, "{");
+			wrote += sb_sprintf(sb, "{");
 
 			index_t i,j,n;
 			for (i=0;i<darr_l(tab->array);++i) {
-				if (i != 0) wrote += bprintf(sb, ", ");
+				if (i != 0) wrote += sb_sprintf(sb, ", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 					elf_Table_Entry it = tab->slots[j];
 					if (it.key.tag==ELF_TNIL) continue;
 					if (it.idx!=i) continue;
-					if (n ++ != 0) wrote += bprintf(sb, ", ");
+					if (n ++ != 0) wrote += sb_sprintf(sb, ", ");
 					wrote += value_bprintf(sb,it.key,1);
 				}
-				if (n != 0) wrote += bprintf(sb, " = ");
+				if (n != 0) wrote += sb_sprintf(sb, " = ");
 				wrote += value_bprintf(sb,tab->array[i],1);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
 			// 	elf_Table_Entry it = tab->slots[i];
 			// 	if (it.key.tag == ELF_TNIL) continue;
-			// 	if (n ++ != 0) wrote += bprintf(sb,", ");
+			// 	if (n ++ != 0) wrote += sb_sprintf(sb,", ");
 			// 	wrote += value_bprintf(sb,it.key,1);
-			// 	wrote += bprintf(sb," = ");
+			// 	wrote += sb_sprintf(sb," = ");
 			// 	wrote += value_bprintf(sb,tab->array[it.i],1);
 			// }
 			// FOR_ARRAY(t->v) {
-			// 	if (i != 0) wrote += bprintf(sb,", ");
+			// 	if (i != 0) wrote += sb_sprintf(sb,", ");
 			// 	wrote += value_bprintf(sb,t->v[i],1);
 			// }
-			wrote += bprintf(sb,"}");
+			wrote += sb_sprintf(sb,"}");
 			return wrote;
 		} break;
-		default: return bprintf(sb,"(?)");
+		default: return sb_sprintf(sb,"(?)");
 	}
 }
 
@@ -253,7 +253,7 @@ ELF_FUNCTION(l_core_format) {
 		while (*format && *format != '%') {
 			// todo: preallocate a small buffer to avoid
 			// one call per char
-			bwritechar(&sb, *format ++);
+			sb_writechar(&sb, *format ++);
 		}
 
 		if (*format == '%') {
@@ -293,7 +293,7 @@ ELF_FUNCTION(l_core_printl) {
 	for (int i = 0; i < (nargs - 1); i ++) {
 		value_bprintf(&sb, loadvalue(S,i),0);
 	}
-	bprintf(&sb, "\n");
+	sb_sprintf(&sb, "\n");
 
 	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
 	sys_write_file(file, sb.buf, sb.min);
@@ -305,7 +305,7 @@ ELF_FUNCTION(l_core_printl) {
 }
 
 static void bprinttabs(String_Builder *sb, int num) {
-	while (num --) bprintf(sb, "\t");
+	while (num --) sb_sprintf(sb, "\t");
 }
 
 // todo: cyclic references will break this
@@ -313,16 +313,16 @@ static void bprinttabs(String_Builder *sb, int num) {
 static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int level) {
 	int noerror = true;
 	switch (thing.tag) {
-		case ELF_TNIL:    bprintf(sb, "nil"                       ); break;
-		case ELF_TINTEGER:    bprintf(sb, "%lli"  , thing.x_int       ); break;
-		case ELF_TNUMBER:    bprintf(sb, "%f"    , thing.x_num       ); break;
-		case ELF_TSTRING: bprintf(sb, "\"%s\"", thing.x_str->text ); break;
+		case ELF_TNIL:    sb_sprintf(sb, "nil"                       ); break;
+		case ELF_TINTEGER:    sb_sprintf(sb, "%lli"  , thing.x_int       ); break;
+		case ELF_TNUMBER:    sb_sprintf(sb, "%f"    , thing.x_num       ); break;
+		case ELF_TSTRING: sb_sprintf(sb, "\"%s\"", thing.x_str->text ); break;
 		case ELF_TTABLE: {
 			elf_Table *table = thing.x_tab;
 
 			int nwrote = 0;
 
-			bprintf(sb, "{\n");
+			sb_sprintf(sb, "{\n");
 
 			// todo:
 			// figure this out, or pass in flags to determine whether to omit the hash part or the array part
@@ -349,11 +349,11 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 						continue;
 					}
 
-					if (nwrote ++) bprintf(sb, ",\n");
+					if (nwrote ++) sb_sprintf(sb, ",\n");
 					bprinttabs(sb, level + 1);
 
 					unparse(inter, sb, key, 1);
-					bprintf(sb, " = ");
+					sb_sprintf(sb, " = ");
 					unparse(inter, sb, value, level + 1);
 				}
 			} else {
@@ -366,14 +366,14 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 					{
 						continue;
 					}
-					if (nwrote ++) bprintf(sb, ",\n");
+					if (nwrote ++) sb_sprintf(sb, ",\n");
 					bprinttabs(sb, level + 1);
 					unparse(inter, sb, value, level + 1);
 				}
 			}
-			bprintf(sb,"\n");
+			sb_sprintf(sb,"\n");
 			bprinttabs(sb, level);
-			bprintf(sb,"}");
+			sb_sprintf(sb,"}");
 		} break;
 		default: noerror = false;
 	}

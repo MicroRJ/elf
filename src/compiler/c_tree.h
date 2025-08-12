@@ -43,11 +43,12 @@ _(TREE_GLOBAL)       \
 _(TREE_UPVALUE)      \
 _(TREE_GETEXPR)      \
 _(TREE_GETMEM)       \
-_(TREE_SETMEM)       \
+_(TREE_MEMORY)       \
 _(EXPR_NUM)          \
 _(EXPR_INT)          \
 _(EXPR_STR)          \
 _(TREE_CALL)         \
+_(TREE_META_CALL)    \
 _(TREE_FUNCTION)     \
 _(TREE_NEW_TABLE)    \
 _(EXPR_CLOSURE)      \
@@ -56,6 +57,9 @@ _(EXPR_FIELD)        \
 _(EXPR_METAFIELD)    \
 _(EXPR_NIL)          \
 _(TREE_STORE)        \
+_(TREE_MULTISTORE)   \
+_(TREE_READ_MODIFY_STORE)  \
+_(TREE_CONDITIONAL_STORE)  \
 _(STAT_BLOCK)        \
 _(TREE_IF)           \
 _(TREE_GOTO)         \
@@ -67,7 +71,6 @@ _(TREE_TUPLE)        \
 _(TREE_LABEL)        \
 _(TREE_RET)          \
 _(TREE_PROXY)        \
-_(TREE_RELOAD)       \
 /* end */
 
 typedef enum {
@@ -89,12 +92,16 @@ typedef enum treeTy {
 	NT_OBJ, NT_TAB, NT_FUN, NT_STR
 } treeTy;
 
+typedef struct {
+	treeID x;
+	treeID y;
+} KV;
+
 
 struct treeT {
 	treeKi   kind;
 	treeTy   type;
 	Source   line;
-	treeID   prox;
 	union {
 		struct {
 			treeID x,y,*z;
@@ -102,14 +109,30 @@ struct treeT {
 		// intenal to the generator, the generator fills this in
 		// with a real address, when the tree is referenced again
 		// the address is used
-		int         jump;
+		int       jump;
 
 		int       expr_global;
 		int       expr_upvalue;
 		char     *expr_str;
 		elf_i64   expr_int;
 		elf_f64   expr_num;
-		treeID    proxyfor;
+
+		struct {
+			treeID ini; // match x
+			int    mem;
+		} tree_memory;
+
+		struct {
+			KV *kvs;
+		} expr_newtable;
+
+		struct {
+			treeID *xs;
+			treeID *ys;
+			treeKi  modify;
+			treeKi  cond;
+		} tree_multistore;
+
 		struct {
 			// scope is used during parsing to detect captures,
 			// could be placed somewhere else, some sort of function stack,

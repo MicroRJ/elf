@@ -32,7 +32,7 @@ static void patch_jumps(elf_Parser *parser, BCPos *js);
 
 static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst);
 static int to_any_mem(elf_Parser *parser, treeID id);
-static int expr_to_instr(int kind);
+static int tree_to_bytec(int kind);
 static int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 static int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 
@@ -70,32 +70,49 @@ static void pop_mem_state(elf_Parser *parser) {
 
 
 static int get_mem(elf_Parser *parser, treeID id) {
-	int reg = -1;
-	if (id != NO_TREE) {
-		for (int i = 0; i < parser->memory_state; i ++) {
-			if (parser->memory_slots[i] == id) {
-				return i;
+	int mem = -1;
+	if (id->kind == TREE_MEMORY) {
+#ifdef _DEBUG
+		if (id->tree_memory.mem != -1) {
+			for (int i = 0; i < parser->memory_state; i ++) {
+				if (parser->memory_slots[i] == id) {
+					ASSERT(id->kind == TREE_MEMORY);
+					ASSERT(id->tree_memory.mem == i);
+					return i;
+				}
 			}
+			ASSERT(!"internal error");
 		}
+#else
+		return id->tree_memory.mem;
+#endif
 	}
 	return NO_SLOT;
 }
 
-/* assign a memory location to the given tree */
-static int set_mem(elf_Parser *parser, treeID id) {
-	ASSERT(parser->memory_state < _countof(parser->memory_slots));
 
-	int reg = parser->memory_state ++;
-	parser->memory_slots[reg] = id;
+
+static int req_mem2(elf_Parser *parser, int z) {
+	ASSERT(parser->memory_state + z < _countof(parser->memory_slots));
+
+	int mem = parser->memory_state;
+	parser->memory_state += z;
 	if (parser->memory_usage < parser->memory_state) {
 		parser->memory_usage = parser->memory_state;
 	}
 
-	return reg;
+	return mem;
 }
 
+
+static int req_mem(elf_Parser *parser) {
+	return req_mem2(parser, 1);
+}
+
+
+
 static int to_any_mem(elf_Parser *parser, treeID id) {
-	int mem = get_mem(parser,id);
+	int mem = get_mem(parser, id);
 	if (mem == NO_SLOT) {
 		mem = to_mem(parser,id,-1,1);
 	}
@@ -103,12 +120,15 @@ static int to_any_mem(elf_Parser *parser, treeID id) {
 	return mem;
 }
 
+
+
 static void make_tree(elf_Parser *parser, treeID id);
 
-static Proto make_function(elf_Parser *parser, treeID tree) {
+
+static Proto make_proto(elf_Parser *parser, treeID tree) {
 	elf_State *R = parser->R;
 
-	ASSERT(get_tree_kind(parser,tree) == TREE_FUNCTION);
+	ASSERT(tree->kind == TREE_FUNCTION);
 	ASSERT(parser->memory_state_index == 0);
 	ASSERT(parser->memory_state == 0);
 	ASSERT(parser->memory_usage == 0);
@@ -134,17 +154,187 @@ static Proto make_function(elf_Parser *parser, treeID tree) {
 	return proto;
 }
 
+
+
+static int make_call(elf_Parser *parser, treeID id, int dst, int nrets) {
+
+	treeID x, *z;
+	int mem;
+	int rx, ry, rz;
+
+	x=id->x;
+	z=id->z;
+	mem=get_mem_state(parser);
+
+	ASSERT(dst < mem);
+
+	treeT xx = get_tree(parser, x);
+
+	// todo: parser should generate meta-call tree instead
+	// we essentially have to check whether the tree has memory to make
+	// sure is a direct meta call
+	if (get_mem(parser, x) == NO_SLOT && (xx.kind==EXPR_FIELD)||(xx.kind==EXPR_METAFIELD)) {
+
+		ry = to_mem(parser, xx.y, -1, 1);
+		rx = to_mem(parser, xx.x, -1, 1);
+		emit_bytexyz(parser, id->line, tree_to_bytec(xx.kind), ry, rx, ry);
+	}
+	else {
+		ry = to_mem(parser, x, -1, 1);
+		// implicit 'this'
+		rx = req_mem(parser);
+		emit_bytexy(parser, id->line, BC_RELOAD, rx, 0);
+	}
+
+	// ensure memory is contiguous
+	ASSERT(ry == mem + 0);
+	ASSERT(rx == mem + 1);
+
+	FOR_ARRAY(i, z) {
+		rz = to_mem(parser, z[i], -1, 1);
+		// ensure memory is contiguous
+		ASSERT(rz == mem + 2 + i);
+	}
+
+	// free up memory
+	set_mem_state(parser, mem);
+
+	int nargs = darr_l(z) + 1;
+	emit_bytexyz(parser, id->line, BC_CALL, mem, nargs, nrets);
+
+	if (nrets < 1) goto esc;
+	if (nrets > 1) parser_dialog(parser, id->line, "multi-returns are not supported yet!");
+
+	// todo: allocate memory for the number of expected returns
+	if (dst < 0) dst = req_mem(parser);
+
+	if (dst != mem) {
+		emit_bytexy(parser, id->line, BC_RELOAD, dst, mem);
+	}
+
+	esc:
+	return dst;
+}
+
+
+
+static void make_store(elf_Parser *parser, Source line, treeID x, treeID y, int nrets) {
+	int rx,ry,rz,op;
+
+	treeT xx = get_tree(parser, x);
+	ASSERT(xx.type != NT_NON);
+	ASSERT(xx.kind == TREE_MEMORY || get_mem(parser, x) == -1);
+
+	push_mem_state(parser);
+
+	if (xx.kind == TREE_MEMORY) {
+		int dst = get_mem(parser, x);
+		int tomem = to_mem(parser, y, dst, 1);
+		ASSERT(tomem == dst);
+	}
+	else if (xx.kind == EXPR_FIELD || xx.kind == EXPR_INDEX) {
+		rz = to_any_mem(parser, y);
+		rx = to_any_mem(parser, xx.x);
+		ry = to_any_mem(parser, xx.y);
+		op = xx.kind == EXPR_INDEX ? BC_SETINDEX : BC_SETFIELD;
+		emit_bytexyz(parser, line, op, rx, ry, rz);
+	}
+	else if(xx.kind == TREE_GLOBAL) {
+		rx = xx.expr_global;
+		rz = to_any_mem(parser, y);
+		emit_bytexy(parser, line, BC_SETGLOBAL, rx, rz);
+	}
+	else if(xx.kind == TREE_UPVALUE) {
+		parser_dialog(parser, line, "assignment of closure value is not possible");
+	}
+	else if(xx.kind == EXPR_METAFIELD) {
+		parser_dialog(parser, line, "assignment of metafields is not possible");
+	}
+	else {
+
+		parser_dialog(parser, line
+		, "internal error: invalid l-value, got: %s", tree2s[xx.kind]);
+
+		ASSERT(!"error");
+	}
+
+	pop_mem_state(parser);
+}
+
+
+
+static int make_binary_expr(elf_Parser *parser, treeID id, int dst, int ndst) {
+	int rx, ry;
+	if ((id->kind==EXPR_GT)||(id->kind==EXPR_GTEQ)) {
+		push_mem_state(parser);
+		rx=to_any_mem(parser,id->y);
+		ry=to_any_mem(parser,id->x);
+		pop_mem_state(parser);
+		if (ndst<1) goto esc;
+		if (dst<0) dst=req_mem(parser);
+		emit_bytexyz(parser,id->line,tree_to_bytec(id->kind^1),dst,rx,ry);
+	} else {
+		push_mem_state(parser);
+		rx=to_any_mem(parser,id->x);
+		ry=to_any_mem(parser,id->y);
+		pop_mem_state(parser);
+		if (ndst<1) goto esc;
+		if (dst<0) dst=req_mem(parser);
+		emit_bytexyz(parser,id->line,tree_to_bytec(id->kind),dst,rx,ry);
+	}
+	esc:
+	return dst;
+}
+
+
+
 static void make_tree(elf_Parser *parser, treeID id) {
 	treeT tree = get_tree(parser,id);
+
 	switch (tree.kind) {
-		case TREE_SETMEM: {
-			if (get_mem(parser,tree.x) != -1) {
-				parser_dialog(parser,tree.line,"target tree has already been assigned memory");
-				elf_error(parser->R,0,"internal error");
-			}
-			int mem = to_mem(parser,tree.x,-1,1);
-			ASSERT(mem != -1);
+
+		case TREE_MEMORY: {
+			// tree has already been assigned memory, no good
+			ASSERT(get_mem(parser, id) == -1);
+
+			int mem = to_mem(parser, tree.x, -1, 1);
+			ASSERT(mem != -1 && mem < parser->memory_state);
+
+			id->tree_memory.mem = mem;
+			parser->memory_slots[mem] = id;
 		} break;
+
+		case TREE_MULTISTORE: {
+			treeID *xs = tree.tree_multistore.xs;
+			treeID *ys = tree.tree_multistore.ys;
+			int i;
+			for (i = 0; i < darr_l(xs); i ++) {
+				treeID x = xs[i];
+				treeID y;
+				if (i < darr_l(ys)) {
+					y = ys[i];
+				} else {
+					y = tree_nil(parser, x->line);
+				}
+				make_store(parser, x->line, x, y, 1);
+			}
+		} break;
+
+		case TREE_STORE: {
+
+			make_store(parser, tree.line, tree.x, tree.y, 1);
+		} break;
+
+		case STAT_BLOCK: {
+			push_mem_state(parser);
+
+			FOR_ARRAY(i, tree.z) {
+				make_tree(parser, tree.z[i]);
+			}
+
+			pop_mem_state(parser);
+		} break;
+
 		case TREE_RET: {
 			int mem,num;
 
@@ -159,10 +349,12 @@ static void make_tree(elf_Parser *parser, treeID id) {
 
 			emit_bytexy(parser,tree.line,BC_RET,mem,num);
 		} break;
+
 		case TREE_GOTO: {
-			int jmp = emit_jump(parser,tree.line,NO_JUMP);
+			int jmp = emit_jump(parser, tree.line, NO_JUMP);
 			id->jump = jmp;
 		} break;
+
 		case TREE_WHILE_LOOP: {
 			jumpS js = {0};
 
@@ -175,24 +367,24 @@ static void make_tree(elf_Parser *parser, treeID id) {
 
 			push_mem_state(parser);
 
-			int continue_target;
-			int entry;
-			entry=parser->R->bytecur;
-			continue_target=entry;
-			emit_jump_if_false(parser,&js,pred);
+			int entry = parser->R->bytecur;
+			int continue_target = entry;
 
-			if(prev)make_tree(parser,prev);
+			emit_jump_if_false(parser, &js, pred);
+
+			if (prev) make_tree(parser, prev);
+
 			make_tree(parser,body);
-			if(post){
-				continue_target=parser->R->bytecur;
-				make_tree(parser,post);
+			if (post) {
+				continue_target = parser->R->bytecur;
+				make_tree(parser, post);
 			}
-			emit_jump(parser,NO_LINE,entry);
+			emit_jump(parser, NO_LINE, entry);
 
 			treeID *c,*b;
 			b=tree.loop.b;
 			c=tree.loop.c;
-			FOR_ARRAY(i,c){
+			FOR_ARRAY(i, c) {
 				patch_jump2(parser,c[i]->jump,continue_target);
 			}
 
@@ -205,57 +397,8 @@ static void make_tree(elf_Parser *parser, treeID id) {
 
 			pop_mem_state(parser);
 		} break;
-		//
-		// STORE:
-		// if there's memory associated with this
-		// tree, the the r-value is stored to that
-		// memory, otherwise, the tree should be
-		// a valid l-value.
-		//	rj - 7/16/2025
-		//
-		//
-		case TREE_STORE: {
-			treeT xx;
-			int dst,mem;
-			int rx,ry,rz,op;
 
-			xx=get_tree(parser,tree.x);
-			if(xx.type==NT_NON){
-				parser_dialog(parser,tree.line
-				,	"invalid storage class");
-			}
-			ASSERT(xx.type!=NT_NON);
 
-			dst=get_mem(parser,tree.x);
-			if(dst!=NO_SLOT){
-				mem=to_mem(parser,tree.y,dst,1);
-				ASSERT(mem==dst);
-			}else if(xx.kind==EXPR_FIELD||xx.kind==EXPR_INDEX){
-				rz=to_any_mem(parser,tree.y);
-				rx=to_any_mem(parser,xx.x);
-				ry=to_any_mem(parser,xx.y);
-				op=xx.kind==EXPR_INDEX?BC_SETINDEX:BC_SETFIELD;
-				emit_bytexyz(parser,tree.line,op,rx,ry,rz);
-			}else if(xx.kind==TREE_GLOBAL){
-				rx=xx.expr_global;
-				rz=to_any_mem(parser,tree.y);
-				emit_bytexy(parser,tree.line,BC_SETGLOBAL,rx,rz);
-			}else if(xx.kind==TREE_UPVALUE) {
-				parser_dialog(parser,tree.line,"assignment of closure value is not possible");
-			}else if(xx.kind==EXPR_METAFIELD) {
-				parser_dialog(parser,tree.line,"assignment of metafields is not possible");
-			} else {
-				parser_dialog(parser,tree.line,"internal error: invalid store, operand must be a global or field or index or memory, instead got: %s", tree2s[xx.kind]);
-				ASSERT(!"error");
-			}
-		} break;
-		case STAT_BLOCK: {
-			push_mem_state(parser);
-			FOR_ARRAY(i,tree.z) {
-				make_tree(parser,tree.z[i]);
-			}
-			pop_mem_state(parser);
-		} break;
 		// todo: allow true clause to be nil, then just
 		// invert the condition...
 		case TREE_IF: {
@@ -285,6 +428,31 @@ static void make_tree(elf_Parser *parser, treeID id) {
 	}
 }
 
+
+
+static int make_newtable_expr(elf_Parser *parser, treeID v, int dst, int ndst) {
+	if (ndst<1) goto esc;
+	if (dst<0) dst=req_mem(parser);
+
+	emit_bytexy(parser, v->line, BC_TABLE, dst, 0);
+
+	int rx, ry;
+	FOR_ARRAY(i, v->expr_newtable.kvs) {
+		push_mem_state(parser);
+
+		rx = to_any_mem(parser, v->expr_newtable.kvs[i].x);
+		ry = to_any_mem(parser, v->expr_newtable.kvs[i].y);
+		emit_bytexyz(parser, v->line, BC_SETFIELD, dst, rx, ry);
+
+		pop_mem_state(parser);
+	}
+
+	esc:
+	return dst;
+}
+
+
+
 static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	int _dst = dst;
 
@@ -297,45 +465,55 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	Source line = tree.line;
 
 	int rx,ry,rz;
-	int mem = get_mem(parser,id);
+	// int mem = get_mem(parser,id);
+	// if(mem != NO_SLOT) {
+	// 	if (ndst < 1) goto esc;
+	// 	if (dst < 0) dst = req_mem(parser);
+	// 	// let a = 0
+	// 	// a = a ?? 1
+	// 	if (dst != mem) {
+	// 		emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+	// 	}
+	// 	goto esc;
+	// }
 
-	if(mem != NO_SLOT) {
-		if (ndst < 1) goto esc;
-		if (dst < 0) dst = set_mem(parser,id);
-
-		// let a = 0
-		// a = a ?? 1
-
-		if (dst != mem) {
-			emit_bytexy(parser,line,BC_RELOAD,dst,mem);
-		}
-		goto esc;
+	if (tree.kind != TREE_MEMORY) {
+		ASSERT(get_mem(parser, id) == -1);
 	}
 
-
 	switch (tree.kind) {
-		case TREE_NOP: {
-			if (ndst < 1) goto esc;
-			if (dst < 0) dst = set_mem(parser,id);
-		} break;
 
 		case TREE_PROXY: {
 			dst = to_mem(parser, tree.x, dst, ndst);
 		} break;
 
-		// todo: come back to this and explain this
-		case TREE_RELOAD: {
+		case TREE_MEMORY: {
+			int mem = get_mem(parser, id);
+			ASSERT(mem != -1);
 			if (ndst < 1) goto esc;
+			if (dst < 0) dst = req_mem(parser);
 
-			// if the tree already has memory, create new memory
-			if (get_mem(parser, tree.x) != -1) {
-				// unless we were given memory
-				if (dst < 0) dst = set_mem(parser,id);
+			if (dst != mem) {
+				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
-
-			dst = to_mem(parser,tree.x,dst,ndst);
-			parser->memory_slots[dst] = id;
 		} break;
+
+		case TREE_NOP: {
+			if (ndst < 1) goto esc;
+			if (dst < 0) dst = req_mem(parser);
+		} break;
+
+		// todo: come back to this and explain this
+		// case TREE_RELOAD: {
+		// 	if (ndst < 1) goto esc;
+		// 	int mem = get_mem(parser,tree.x);
+		// 	// if already has memory create new one, unless we were
+		// 	// given memory
+		// 	if (mem != -1 && dst < 0) {
+		// 		dst=req_mem(parser);
+		// 	}
+		// 	dst=to_mem(parser,tree.x,dst,ndst);
+		// } break;
 
 		case TREE_GETMEM: {
 			int mem = get_mem(parser,tree.x);
@@ -344,10 +522,12 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			}
 			dst = to_mem(parser,tree_int(parser,tree.line,mem),dst,ndst);
 		} break;
+
 		case TREE_GETEXPR: {
 			char *expr = tree2s[get_tree_kind(parser,tree.x)];
 			dst=to_mem(parser,tree_str(parser,tree.line,expr),dst,ndst);
 		} break;
+
 		case EXPR_METAFIELD:
 		case EXPR_FIELD: case EXPR_INDEX: {
 			if (ndst<1) goto esc;
@@ -355,44 +535,45 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			rx=to_any_mem(parser,tree.x);
 			ry=to_any_mem(parser,tree.y);
 			pop_mem_state(parser);
-			if (dst<0) dst=set_mem(parser,id);
-			emit_bytexyz(parser,line,expr_to_instr(tree.kind),dst,rx,ry);
+			if (dst<0) dst=req_mem(parser);
+			emit_bytexyz(parser, line, tree_to_bytec(tree.kind), dst, rx, ry);
 		} break;
+
 		case TREE_UPVALUE: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (dst<0) dst=req_mem(parser);
 			emit_bytexy(parser,line,BC_GETUPVAL,dst,tree.expr_upvalue);
 		} break;
+
+
 		case TREE_GLOBAL: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (dst<0) dst=req_mem(parser);
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,tree.expr_global);
 		} break;
 		case EXPR_NIL: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (dst<0) dst=req_mem(parser);
 
 			emit_bytexy(parser,line,BC_LOADNIL,dst,0);
 		} break;
 		case EXPR_INT: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (dst<0) dst=req_mem(parser);
 
-			int yy;
-			yy=add_const_int(S,tree.expr_int);
+			int yy=add_const_int(S,tree.expr_int);
 			emit_bytexy(parser,line,BC_GETKINT,dst,yy);
 		} break;
 		case EXPR_NUM: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (dst<0) dst=req_mem(parser);
 
-			int yy;
-			yy=add_const_num(S,tree.expr_num);
+			int yy=add_const_num(S,tree.expr_num);
 			emit_bytexy(parser,line,BC_GETKNUM,dst,yy);
 		} break;
 		case EXPR_STR: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
+			if (dst<0) dst=req_mem(parser);
 
 			// todo: add to constant pool and create new
 			// GETKSTR instruction
@@ -403,11 +584,11 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
 		} break;
+
 		case TREE_NEW_TABLE:{
-			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser,id);
-			emit_bytexy(parser,line,BC_TABLE,dst,0);
+			dst = make_newtable_expr(parser, id, dst, ndst);
 		} break;
+
 		/* (a !! b) = (a == nil ? a : b) */
 		case EXPR_NIL_AND: {
 			jumpS e = {0};
@@ -423,119 +604,71 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			ARRAY_DELETE(j);
 		} break;
 		case EXPR_NIL_OR: {
-			jumpS e={0};
-			int *j,mem;
 
-			mem=get_mem(parser,tree.x);
-			dst=to_mem(parser,tree.x,dst,1);
-			j=emit_jump_if_not_nil(parser,NO_LINE,&e,tree.x);
-			// ASSERT(mem==NO_SLOT||dst==mem);
+			dst = to_mem(parser,tree.x,dst,1);
 
-			dst=to_mem(parser,tree.y,dst,1);
+			jumpS e = {0};
+			int *j = emit_jump_if_not_nil(parser,NO_LINE,&e,tree.x);
+
+			dst = to_mem(parser,tree.y,dst,1);
 			patch_jumps(parser,j);
 			ARRAY_DELETE(j);
 		} break;
-		case TREE_FUNCTION: {
 
+		case TREE_FUNCTION: {
 			int     proto = tree.tree_funexpr.proto;
 			treeID *capts = tree.tree_funexpr.capts;
 			ASSERT(proto != -1);
-
 			if (ndst<1) goto esc;
-			mem=get_mem_state(parser);
+
+			int mem=get_mem_state(parser);
 			FOR_ARRAY(i,capts) {
 				// we can only capture things with memory,
 				// this should evaluate to a reload...
-				ASSERT(get_mem(parser,capts[i])!=NO_SLOT);
-				int x=to_mem(parser,capts[i],-1,1);
-				ASSERT(x==mem+i);
+				ASSERT(get_mem(parser, capts[i]) != NO_SLOT);
+				int x = to_mem(parser, capts[i], -1, 1);
+				ASSERT(x == mem + i);
 			}
 			set_mem_state(parser,mem);
-			if (dst<0) dst=set_mem(parser,id);
+
+			if (dst<0) dst = req_mem(parser);
 			emit_bytexy(parser,line,BC_CLOSURE,mem,proto);
+
 			if (mem!=dst) {
 				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
+
 		} break;
+
 		case TREE_CALL: {
-			treeT xx;
-			int nargs;
-
-			mem=get_mem_state(parser);
-			ASSERT(dst<mem);
-
-			xx=get_tree(parser,tree.x);
-			// todo: do in parser
-			if (get_mem(parser,tree.x)==NO_SLOT && (xx.kind==EXPR_FIELD)||(xx.kind==EXPR_METAFIELD)) {
-				ry=to_mem(parser,xx.y,-1,1);
-				rx=to_mem(parser,xx.x,-1,1);
-				emit_bytexyz(parser,line,expr_to_instr(xx.kind),ry,rx,ry);
-			} else {
-				ry=to_mem(parser,tree.x,-1,1);
-				ASSERT(get_mem(parser,id)==NO_SLOT);
-				// rx=to_mem(parser,tree_this_ref(parser,line),-1,1);
-				rx=set_mem(parser,id);
-				emit_bytexy(parser,line,BC_RELOAD,rx,0);
-			}
-
-			ASSERT(ry==mem+0);
-			ASSERT(rx==mem+1);
-			FOR_ARRAY(i,tree.z) {
-				rz=to_mem(parser,tree.z[i],-1,1);
-				ASSERT(rz==mem+2+i);
-			}
-			set_mem_state(parser,mem);
-
-			nargs=darr_l(tree.z)+1;
-			emit_bytexyz(parser,line,BC_CALL,mem,nargs,ndst);
-
-			if (ndst<1) goto esc;
-			if (ndst>1) parser_dialog(parser,line,"multi-returns are not supported yet!");
-
-			if (dst<0) dst=set_mem(parser,id);
-			//todo: call instruction that puts
-			//the result in a specific dstisters
-			if (dst!=mem) {
-				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+			dst = make_call(parser, id, dst, ndst);
+			if (dst == -1) {
+				goto esc;
 			}
 		} break;
 
 		case EXPR_BIT_NOT: {
 			if (ndst<1) goto esc;
-			if (dst<0) dst=set_mem(parser, id);
+			if (dst<0) dst=req_mem(parser);
 
 			push_mem_state(parser);
 			rx = to_any_mem(parser, tree.x);
 			pop_mem_state(parser);
 
-			emit_bytexy(parser,tree.line,expr_to_instr(tree.kind),dst,rx);
+			emit_bytexy(parser,tree.line,tree_to_bytec(tree.kind),dst,rx);
 		} break;
 
 		case EXPR_EQ: case EXPR_NEQ:
-		case EXPR_GT: case EXPR_GTEQ: case EXPR_LT: case EXPR_LTEQ:
+		case EXPR_GT: case EXPR_GTEQ:
+		case EXPR_LT: case EXPR_LTEQ:
 		case EXPR_DIV: case EXPR_MUL: case EXPR_MOD:
 		case EXPR_SUB: case EXPR_ADD: case EXPR_POW:
 		case EXPR_BIT_SHL: case EXPR_BIT_SHR:
 		case EXPR_BIT_XOR:
 		case EXPR_BIT_AND: case EXPR_BIT_OR: {
-			if ((tree.kind==EXPR_GT)||(tree.kind==EXPR_GTEQ)) {
-				push_mem_state(parser);
-				rx=to_any_mem(parser,tree.y);
-				ry=to_any_mem(parser,tree.x);
-				pop_mem_state(parser);
-				if (ndst<1) goto esc;
-				if (dst<0) dst=set_mem(parser,id);
-				emit_bytexyz(parser,tree.line,expr_to_instr(tree.kind^1),dst,rx,ry);
-			} else {
-				push_mem_state(parser);
-				rx=to_any_mem(parser,tree.x);
-				ry=to_any_mem(parser,tree.y);
-				pop_mem_state(parser);
-				if (ndst<1) goto esc;
-				if (dst<0) dst=set_mem(parser,id);
-				emit_bytexyz(parser,tree.line,expr_to_instr(tree.kind),dst,rx,ry);
-			}
+			dst = make_binary_expr(parser, id, dst, ndst);
 		} break;
+
 		// todo:fix the bug!
 		case EXPR_AND: case EXPR_OR: {
 			jumpS e = {0};
@@ -545,8 +678,6 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			dst=to_mem(parser,tree_int(parser,line,1),dst,1);
 			patch_jumps(parser,js);
 			ARRAY_DELETE(js);
-
-			parser->memory_slots[dst] = id;
 		} break;
 		default: {
 			parser_dialog(parser,line,"invalid tree (%s)",tree2s[tree.kind]);
@@ -554,19 +685,19 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 		}
 	}
 	ASSERT(dst!=NO_SLOT);
-	treeID prox;
-	for(prox=tree.prox;prox;prox=prox->prox){
-		push_mem_state(parser);
-		make_tree(parser,prox);
-		pop_mem_state(parser);
-	}
+	//	treeID prox;
+	//	for(prox=tree.prox;prox;prox=prox->prox){
+	//		push_mem_state(parser);
+	//		make_tree(parser,prox);
+	//		pop_mem_state(parser);
+	//	}
 	esc:
 	ASSERT(_dst==NO_SLOT||_dst==dst);
 	return dst;
 }
 
 // todo: replace with table!
-static int expr_to_instr(int kind) {
+static int tree_to_bytec(int kind) {
 	switch (kind) {
 		case EXPR_FIELD: 	   return BC_GETFIELD;     // *
 		case EXPR_INDEX: 	   return BC_GETINDEX;     // *
@@ -597,28 +728,31 @@ static int emit_jump(elf_Parser *parser, Source line, int dst) {
 	return emit_bytex(parser,line,BC_J,dst-parser->R->bytecur);
 }
 
-static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id) {
-	treeT tree = get_tree(parser,id);
-	int mem,jmp;
 
-	mem=get_mem(parser,id);
-	if(mem!=NO_SLOT) goto _got_mem;
+static int emit_branch_if(elf_Parser *parser, jumpS *js, bool if_true, treeID id) {
+
+	// int mem=get_mem(parser,id);
+	// if(mem!=NO_SLOT) goto _got_mem;
+
+	int jmp;
+
+	treeT tree = get_tree(parser,id);
 
 	switch (tree.kind) {
 		case EXPR_AND: {
+			ASSERT(get_mem(parser, id) == -1);
 			emit_jump_if_false(parser,js,tree.x);
 			jmp=emit_branch_if(parser,js,if_true,tree.y);
 		} break;
 		case EXPR_OR: {
+			ASSERT(get_mem(parser, id) == -1);
 			emit_jump_if_true(parser,js,tree.x);
 			jmp=emit_branch_if(parser,js,if_true,tree.y);
 		} break;
 		default: {
 			push_mem_state(parser);
-			mem=to_any_mem(parser,id);
+			int mem=to_any_mem(parser,id);
 			pop_mem_state(parser);
-
-			_got_mem:
 			if (if_true) {
 				jmp=emit_bytexy(parser,tree.line,BC_JNZ,NO_JUMP,mem);
 				darr_add(js->t,jmp);
@@ -752,7 +886,8 @@ static int emit_byte(elf_Parser *parser, Source line, Bytec byte) {
 	darr_add(S->lines, line);
 	darr_add(S->track, 0);
 	darr_add(S->bytebuf, byte);
-	// fpf_byte(stdout,S,-1,S->nbytes-C->fn->bytes,byte);
+
+	// printf("%s(%i, %i, %i)\n", byte2s[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
 	return S->bytecur ++;
 }
 
@@ -829,30 +964,6 @@ static void patch_jumps(elf_Parser *parser, BCPos *s) {
 
 
 #if 0
-int to_mem(Compiler *C, int flags, int reg, int nreg, treeID id) {
-	switch (node.kind) {
-
-
-		case IR_TYPEGUARD: {
-			if (nreg<1) goto esc;
-			reg=emit_eval_deprecated(C,flags,reg,nreg,node.x);
-			emit_bytexy(C,node.line,BC_TYPEGUARD,reg,node2tag(node.y));
-		} break;
-
-
-FileBlock *get_loop_block(elf_Parser *fs, elf_StackId reg) {
-	__debugbreak();
-	int level;
-	for (level = fs->nblocks-1; level > -1; -- level) {
-		FileBlock *bl = get_block(fs,level);
-		if (bl->flags & BLOCK_LOOP) {
-			if (reg < 0) return bl; else
-			if (bl->loop.value_register == reg) return bl;
-		}
-	}
-	return 0;
-}
-
 void desugar_range_expr_epilogue(elf_Parser *fs, treeID x) {
 	treeT node = get_tree(fs,x);
 	switch (node.kind) {

@@ -4,12 +4,11 @@
 
 
 
-
-
-
 static bool is_tree_trivial_constant(elf_Parser *parser, treeID id) {
 	return id->kind == EXPR_INT || id->kind == EXPR_NUM;
 }
+
+
 
 static treeT get_tree(elf_Parser *parser, treeID id) { return *id; }
 
@@ -100,16 +99,18 @@ static treeID tree_str(elf_Parser *parser, Source line, char *s) {
 	return v;
 }
 
-static treeID tree_table(elf_Parser *parser, Source line) {
-	return tree_nullary(parser,line,TREE_NEW_TABLE,NT_TAB);
+
+static treeID tree_table(elf_Parser *parser, Source line, KV *kvs) {
+	treeID v = tree_nullary(parser,line,TREE_NEW_TABLE,NT_TAB);
+	v->expr_newtable.kvs = kvs;
+	return v;
 }
+
+
 static treeID tree_closure(elf_Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,NO_TREE,z);
 }
 
-// xx static treeID tree_type_guard(elf_Parser *parser, Source line, treeID x, int y) {
-// xx 	return tree_binary(parser,line,EXPR_TYPEGUARD,y,x,y);
-// xx }
 static treeID tree_ret(elf_Parser *parser, Source line, treeID x) {
 	return tree_unary(parser,line,TREE_RET,NT_ANY,x);
 }
@@ -142,17 +143,16 @@ static treeID tree_tuple(elf_Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY,NO_TREE,NO_TREE,z);
 }
 
-static treeID tree_assign_mem(elf_Parser *parser, Source line, treeID x) {
-	return tree_unary(parser,line,TREE_SETMEM,NT_NON,x);
-}
-static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
-	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
+
+static treeID tree_memory(elf_Parser *parser, Source line, treeID x) {
+	treeID v = tree_unary(parser,line,TREE_MEMORY,x->type,x);
+	v->tree_memory.mem = -1;
+	return v;
 }
 
-// if the tree doesn't have any memory, it gets loaded, otherwise it gets reloaded
-// into a new memory slot that slot is associated with this tree.
-static treeID tree_reload(elf_Parser *parser, Source line, treeID x) {
-	return tree_unary(parser, line, TREE_RELOAD, get_tree_type(parser, x), x);
+
+static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
+	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
 }
 
 static treeID tree_proxy(elf_Parser *parser, Source line, treeID x) {
@@ -175,6 +175,9 @@ static treeID tree_meta_field(elf_Parser *parser, Source line, treeID x, treeID 
 // todo: meta calls cannot be sugar coated at parse time
 // becase of bytecode optimizations
 static treeID tree_meta_call(elf_Parser *parser, Source line, treeID x, char *name, treeID *z) {
+	//	treeID y = tree_str(parser,line,name);
+	//	return tree_xyz(parser,line,TREE_META_CALL,NT_ANY,x,y,z);
+
 	treeID field = tree_meta_field(parser,line,x,tree_str(parser,line,name));
 	return tree_call(parser,line,field,z);
 }

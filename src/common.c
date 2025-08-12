@@ -265,7 +265,7 @@ static char *tpf_(char const *format, ...) {
 	return contents;
 }
 
-static int bprintf(String_Builder *sb, char *format, ...) {
+static int sb_sprintf(String_Builder *sb, char *format, ...) {
 	va_list vargs;
 	va_start(vargs, format);
 	int size = stbsp_vsnprintf(NULL, 0, format, vargs);

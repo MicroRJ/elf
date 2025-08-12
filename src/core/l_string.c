@@ -2,30 +2,35 @@
 // See Copyright Notice In elf.h
 //
 
-
 // todo: proper matcher
 #include "string_matcher.c"
 
+
+
 ELF_FUNCTION(l_str_length) {
-	elf_pushint(S, f_checkstr(S, 0)->length);
+	pushint(S, lstring(S, 0)->length);
 	return 1;
 }
+
+
 
 ELF_FUNCTION(l_str_get_hash) {
-	elf_String *str = f_checkstr(S, -1);
-	elf_pushint(S, str->hash);
+	elf_String *str = lstring(S, 0);
+	pushint(S, str->hash);
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_str_get_index) {
-	char *text = f_checktext(S, -1);
-	int index = f_checkint(S, 0);
-	elf_pushint(S, text[index]);
+	const char *text = lstrdata(S, 0);
+	int index = lint(S, 1);
+	pushint(S, text[index]);
 	return 1;
 }
 
 ELF_FUNCTION(l_str_slice) {
-	elf_String *str = f_checkstr(S, -1);
+	elf_String *str = lstring(S, 0);
 	// todo: out of bounds check
 	int from = f_checkint(S, 0);
 	int to = f_checkint(S, 1);
@@ -55,7 +60,7 @@ ELF_FUNCTION(l_str_match) {
 	char *s = f_checktext(S, -1);
 	char *p = f_checktext(S,  0);
 	char *match = string_match(s, p);
-	elf_pushint(S, match != 0);
+	pushint(S, match != 0);
 	return 1;
 }
 
@@ -77,7 +82,7 @@ ELF_FUNCTION(l_str_find) {
 
 		if (tail) {
 			while (cur < tail) {
-				bwritechar(&sb, *cur ++);
+				sb_writechar(&sb, *cur ++);
 			}
 
 			elf_pushstrl(S, sb.buf, sb.min);
@@ -105,7 +110,7 @@ ELF_FUNCTION(l_str_split_by_lines) {
 	while (*cur) {
 
 		while (*cur != 0 && *cur != '\n' && *cur != '\r') {
-			bwritechar(&sb, *cur ++);
+			sb_writechar(&sb, *cur ++);
 		}
 		if (*cur == '\n' || *cur == '\r') {
 			// skip additional char if \r\n, windows style line ending?
@@ -137,7 +142,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 	while (*cur) {
 
 		while (*cur != 0 && *cur != chr) {
-			bwritechar(&sb, *cur ++);
+			sb_writechar(&sb, *cur ++);
 		}
 
 		if (*cur == chr) {
@@ -157,7 +162,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 
 
 ELF_FUNCTION(l_str_lowercase) {
-	elf_String *str = f_checkstr(S, -1);
+	elf_String *str = lstring(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
@@ -169,7 +174,7 @@ ELF_FUNCTION(l_str_lowercase) {
 
 
 ELF_FUNCTION(l_str_uppercase) {
-	elf_String *str = f_checkstr(S, -1);
+	elf_String *str = lstring(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);

@@ -21,7 +21,7 @@
 
 #include "c_lexer.c"
 #include "c_tree.c"
-#include "elf_parser.c"
+#include "c_parser.c"
 #include "c_make.c"
 #include "logging.c"
 
@@ -89,7 +89,7 @@ int elf_makefile(elf_State *S, char const *name) {
 
 	prof->bytepos = S->bytecur;
 	FOR_ARRAY(i, parser->functions) {
-		protos[i] = make_function(parser, parser->functions[i]);
+		protos[i] = make_proto(parser, parser->functions[i]);
 	}
 	prof->byteend = S->bytecur;
 

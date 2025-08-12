@@ -22,7 +22,7 @@ elf_pubapi
 bool elf_readfileh(elf_State *inter, elf_Handle file, int size) {
 	if (!file) {
 		elf_lerror("invalid file handle");
-		elf_pushnil(inter);
+		pushnil(inter);
 		return false;
 	}
 
