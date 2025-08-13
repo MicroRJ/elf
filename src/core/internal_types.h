@@ -5,6 +5,9 @@
 #include "internal_shorternames.h"
 
 
+enum { true = 1, false = 0 };
+
+
 typedef int BCPos;
 #define NO_BYTE (-1)
 

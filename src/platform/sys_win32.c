@@ -19,9 +19,12 @@
 #define FILE_TIME FILETIME
 #define SYSTEM_TIME SYSTEMTIME
 
+
 #include "elf_coretypes.h"
-#include "system.h"
 #include "subsystem.h"
+#include "system.h"
+
+
 
 STATIC_ASSERT(sizeof(_FILE_HANDLE) >= sizeof(FILE_HANDLE));
 
@@ -44,13 +47,13 @@ unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int zbuf) {
 
 
 
-unsigned int sys_read_file(FILE_HANDLE file, char *buf, unsigned int zbuf) {
+unsigned int sys_read_file(FILE_HANDLE file, void *buf, unsigned int zbuf) {
 	DWORD read = 0;
 	ReadFile(file, buf, zbuf, &read, NULL);
 	return read;
 }
 
-unsigned int sys_write_file(FILE_HANDLE file, char *buf, unsigned int zbuf) {
+unsigned int sys_write_file(FILE_HANDLE file, void *buf, unsigned int zbuf) {
 	DWORD wrote = 0;
 	WriteFile(file, buf, zbuf, &wrote, NULL);
 	return wrote;

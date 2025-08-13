@@ -3,11 +3,6 @@
 //
 
 
-#include "string_builder.c"
-// todo: we have our own assert
-#include <assert.h>
-
-
 enum {
 	PATH_NAME = 0,
 	PATH_CURRENT, // "."

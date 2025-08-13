@@ -28,10 +28,6 @@ typedef elf_u32  hash_t;
 typedef elf_i64 index_t;
 
 
-// todo: internal
-enum { true = 1, false = 0 };
-
-
 #define ELF_HINVALID  ((elf_Handle) -1)
 #define ELF_HTAGFILE  1
 #define ELF_HTAGDLIB  1

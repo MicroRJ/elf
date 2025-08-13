@@ -14,9 +14,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-
-
-#include "system.h"
+#include <assert.h>
 
 
 #define STB_SPRINTF_STATIC
@@ -34,6 +32,11 @@
 
 #include "dynamic_array.c"
 #include "string_builder.c"
+#include "path_builder.c"
+
+
+#include "system.h"
+
 
 #include "common.c"
 

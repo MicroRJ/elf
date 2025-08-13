@@ -17,10 +17,9 @@
 
 #include "elf.h"
 
+#include "subsystem.h"
 #include "system.h"
 
-#include "internal_utils.h"
-#include "subsystem.h"
 #include "logging.c"
 
 
