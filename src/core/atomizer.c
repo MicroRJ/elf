@@ -5,7 +5,7 @@
 static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 	elf_String *result = 0;
 	elf_Table *registry = R->strings;
-	hash_t hash = hash_text(text);
+	elf_Hash hash = hash_text(text);
 
 	if (length < 64 && registry != 0) {
 		elf_Integer slot = elf_table_try_text(registry,text,length,hash);

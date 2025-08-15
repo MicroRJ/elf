@@ -38,7 +38,7 @@ typedef int elf_stkid;
 * nargs: the number of arguments
 * nrets: the number of expected results
 */
-#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int args, int nargs, int nrets)
+#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
 typedef ELF_FUNCTION(* elf_Function);
 
 //
@@ -53,7 +53,7 @@ typedef struct {
 /* first object tag must be OBJ, all other
 objects come after it, same order as object
 types... if this changes then ensure it lines
-up with elf_GC_Ty */
+up with GCType */
 typedef enum {
 	/* the value is nil */
 	ELF_TNIL = 0,
@@ -85,7 +85,7 @@ elf_pubapi void elf_end(elf_State *);
 
 // pass in a file name, the result is on the stack
 // todo: support for loading code files from memory is pending
-elf_pubapi int elf_loadcodefile(elf_State *S, const char *name);
+elf_pubapi int elf_pushcodefile(elf_State *S, const char *name);
 
 
 
@@ -120,38 +120,25 @@ elf_pubapi void elf_setfield(elf_State *);
 elf_pubapi void elf_arrayadd(elf_State *);
 elf_pubapi void elf_arrayget(elf_State *);
 
-elf_pubapi elf_Tag elf_gettag(elf_State *, elf_stkid from);
-
 
 elf_pubapi void elf_pushnil(elf_State *);
 elf_pubapi void elf_pushint(elf_State *, elf_Integer);
 elf_pubapi void elf_pushnum(elf_State *, elf_Number);
 elf_pubapi void elf_pushtab(elf_State *);
-elf_pubapi void elf_pushstr(elf_State *, const char *);
-elf_pubapi void elf_pushstrl(elf_State *, const char *, int length);
+elf_pubapi void elf_pushtext(elf_State *, const char *);
+elf_pubapi void elf_pushtext2(elf_State *, const char *, int length);
 elf_pubapi void elf_pushfun(elf_State *, elf_Function);
 elf_pubapi void elf_pushsys(elf_State *, elf_Handle);
 
-elf_pubapi void elf_getmetatab(elf_State *, elf_stkid from);
-elf_pubapi void elf_setmetatab(elf_State *inter, int objstk, int tabstk);
-elf_pubapi void elf_getglobals(elf_State *);
+elf_pubapi void elf_pullglobals(elf_State *);
 
 
-elf_pubapi elf_Number elf_tonum(elf_State *, elf_stkid stk);
-elf_pubapi elf_Integer elf_toint(elf_State *, elf_stkid stk);
-elf_pubapi const char *elf_tostr(elf_State *, elf_stkid stk);
-elf_pubapi elf_Handle elf_tosys(elf_State *, elf_stkid stk);
+elf_pubapi const char *elf_loadtext(elf_State *, int x);
+elf_pubapi elf_Number elf_loadnum(elf_State *, int x);
+elf_pubapi elf_Integer elf_loadint(elf_State *, int x);
 
+elf_pubapi elf_Handle elf_tosys(elf_State *, int x);
 
-
-
-// todo: @deprecated
-elf_pubapi elf_Integer    f_checkint(elf_State *, int argi);
-// todo: @deprecated
-// todo: @deprecated
-elf_pubapi elf_Handle f_checkhand(elf_State *, int argi);
-// todo: @deprecated
-elf_pubapi char      *f_checktext(elf_State *, int argi);
 
 
 

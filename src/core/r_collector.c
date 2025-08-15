@@ -2,15 +2,18 @@
 // See Copyright Notice In elf.h
 //
 
+
+
 int elf_gcstate(elf_State *S, elf_GC_State state) {
-	elf_GC_State prevstate = S->G.state;
+	elf_GC_State prevstate = S->gc.state;
 	if (state != ELF_GC_GETSTATE) {
-		S->G.state = state;
+		S->gc.state = state;
 	}
 	return prevstate;
 }
 
-void *elf_gc_alloc(elf_State *R, elf_GC_Ty type, elf_i64 size) {
+
+void *elf_gc_alloc(elf_State *R, GCType type, elf_i64 size) {
 	GCState *gc = & R->G;
 
 	if (gc->phase != GC_COLLECTABLE) {
@@ -77,8 +80,7 @@ int _gc_mark(elf_State *inter)
 
 	int nmarked = 0;
 
-	// todo: cache line!
-	elf_Value *ptr;
+	V *ptr;
 	for (ptr = inter->stack; ptr < inter->stack; ++ ptr) {
 		if (tisobject(ptr->tag)) {
 			nmarked += _mark(ptr->x_obj);
@@ -116,7 +118,7 @@ elf_i64 _gc_free(elf_State *R) {
 		} else if(obj->color == GC_COLLECTABLE) {
 			gc->memory_allocated -= obj->size;
 			if (obj->type == GC_TAB) {
-				elf_tableK_recycle((elf_Table *) obj);
+				recycletable((elf_Table *) obj);
 			}
 			free(obj);
 		}

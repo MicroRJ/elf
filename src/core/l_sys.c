@@ -21,40 +21,45 @@ ELF_FUNCTION(l_sys_get_performance_counter_frequency) {
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_sys_get_performance_counter_elapsed_s) {
-	ASSERT((nargs - 1) == 1);
-	elf_i64 time = elf_toint(S, args + 1 + 0);
+	Time time = loadint(S, 1);
 	elf_pushnum(S, get_performance_counter_elapsed_s(time));
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_sys_get_performance_counter_elapsed_ms) {
-	ASSERT((nargs - 1) == 1);
-	elf_i64 time = elf_toint(S, args + 1 + 0);
+	Time time = loadint(S, 1);
 	elf_pushnum(S, get_performance_counter_elapsed_s(time) * 1000);
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_sys_sleep) {
-	ASSERT((nargs - 1) >= 1);
-	sys_sleep(elf_toint(S, args + 1 + 0));
+	sys_sleep(loadint(S, 1));
 	return 0;
 }
+
+
 
 //
 // files
 //
 
 ELF_FUNCTION(l_sys_get_file_name_from_path) {
-	const char *path = elf_tostr(S, args + 1);
+	const char *path = elf_loadtext(S, 1);
 	const char *name = get_name_from_file_path(path);
-	elf_pushstr(S, name);
+	elf_pushtext(S, name);
 	return 1;
 }
 
 
 ELF_FUNCTION(l_sys_create_directory) {
-	const char *path = elf_tostr(S, args + 1);
+	const char *path = elf_loadtext(S, 1);
 	int noerr = sys_create_directory(path);
 	elf_pushint(S, noerr);
 	return 1;
@@ -62,61 +67,70 @@ ELF_FUNCTION(l_sys_create_directory) {
 
 
 ELF_FUNCTION(l_sys_get_file_times) {
-	elf_Handle file = f_checkhand(S, 0);
+	Handle file = loadsys(S, 1);
 
 	FILE_TIMES times;
 	sys_time_file(file, &times);
 
-	elf_pushtab(S);
-	elf_pushstr(S, "created");  elf_pushint(S, times.create.time); elf_setfield(S);
-	elf_pushstr(S, "access");   elf_pushint(S, times.access.time); elf_setfield(S);
-	elf_pushstr(S, "write");    elf_pushint(S, times.write.time);  elf_setfield(S);
+	// todo: set fields directly
+	Table tab = pushtable(S);
+	elf_pushtext(S, "created");  elf_pushint(S, times.create.time); elf_setfield(S);
+	elf_pushtext(S, "access");   elf_pushint(S, times.access.time); elf_setfield(S);
+	elf_pushtext(S, "write");    elf_pushint(S, times.write.time);  elf_setfield(S);
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_file_time_to_system_time) {
 
-	elf_Integer time = elf_toint(S, args + 1 + 0);
+	Time time = loadint(S, 1);
 	FILE_TIME filetime = { .time = time };
 
 	SYSTEM_TIME systemtime;
 	sys_file_time_to_system_time(&filetime, &systemtime);
 
-	elf_pushtab(S);
+	pushtable(S);
 
-	elf_pushstr(S, "year");         elf_pushint(S, systemtime.year);           elf_setfield(S);
-	elf_pushstr(S, "month");        elf_pushint(S, systemtime.month);          elf_setfield(S);
-	elf_pushstr(S, "dayofweek");    elf_pushint(S, systemtime.dayofweek);      elf_setfield(S);
-	elf_pushstr(S, "day");          elf_pushint(S, systemtime.day);            elf_setfield(S);
-	elf_pushstr(S, "hour");         elf_pushint(S, systemtime.hour);           elf_setfield(S);
-	elf_pushstr(S, "minute");       elf_pushint(S, systemtime.minute);         elf_setfield(S);
-	elf_pushstr(S, "second");       elf_pushint(S, systemtime.second);         elf_setfield(S);
-	elf_pushstr(S, "milliseconds"); elf_pushint(S, systemtime.milliseconds);   elf_setfield(S);
+	pushtext(S, "year");         pushint(S, systemtime.year);           elf_setfield(S);
+	pushtext(S, "month");        pushint(S, systemtime.month);          elf_setfield(S);
+	pushtext(S, "dayofweek");    pushint(S, systemtime.dayofweek);      elf_setfield(S);
+	pushtext(S, "day");          pushint(S, systemtime.day);            elf_setfield(S);
+	pushtext(S, "hour");         pushint(S, systemtime.hour);           elf_setfield(S);
+	pushtext(S, "minute");       pushint(S, systemtime.minute);         elf_setfield(S);
+	pushtext(S, "second");       pushint(S, systemtime.second);         elf_setfield(S);
+	pushtext(S, "milliseconds"); pushint(S, systemtime.milliseconds);   elf_setfield(S);
 	return 1;
 }
+
+
 
 //
 // name: the name of the dynamic library in
 // the file system
 //
 ELF_FUNCTION(l_sys_load_dll) {
-	char *name = f_checktext(S, 0);
+	const char *name = loadtext(S, 1);
 
-	elf_Handle lib = sys_load_dll(name);
-	if (lib != 0) elf_pushsys(S, lib);
-	else          elf_pushnil(S);
+	Handle dll = sys_load_dll(name);
+
+	if (dll != 0) pushsys(S, dll);
+	else          pushnil(S);
 	return 1;
 }
+
+
 
 ELF_FUNCTION(l_sys_get_dll_fn) {
-	elf_Handle lib = elf_tosys(S, args + 1);
-	const char *name = elf_tostr(S, args + 2);
+	Handle dll = loadsys(S, 1);
+	const char *name = loadtext(S, 2);
 
-	elf_Function fn = (elf_Function) sys_get_dll_fn(lib, name);
-	if (fn != 0) elf_pushfun(S,fn);
-	else         elf_pushnil(S);
+	elf_Function fun = (elf_Function) sys_get_dll_fn(dll, name);
+	if (fun != 0) pushfun(S,fun);
+	else          pushnil(S);
 	return 1;
 }
+
+
+
 
 #if 0
 
@@ -153,12 +167,12 @@ static elf_stkid filetree(elf_State *inter, char *path, int recurse, int *size) 
 		[FILE_TYPE_SYMLINK] = "symlink",
 	};
 
-	elf_pushstr(inter, "path");
-	elf_pushstr(inter, path);
+	elf_pushtext(inter, "path");
+	elf_pushtext(inter, path);
 	elf_setfield(inter);
 
-	elf_pushstr(inter, "type");
-	elf_pushstr(inter, type2s[visitor.type]);
+	elf_pushtext(inter, "type");
+	elf_pushtext(inter, type2s[visitor.type]);
 	elf_setfield(inter);
 
 
@@ -181,12 +195,12 @@ static elf_stkid filetree(elf_State *inter, char *path, int recurse, int *size) 
 
 			if (visitor.type == FILE_TYPE_FOLDER) {
 				if (recurse > 0) {
-					elf_pushstr(inter, "children");
+					elf_pushtext(inter, "children");
 					int childsize = 0;
 					elf_stkid child = filetree(inter, childpath, recurse - 1, &childsize);
 
 					// todo:
-					elf_pushstr(inter, "parent");
+					elf_pushtext(inter, "parent");
 					* inter->stack_ptr ++ = inter->stack[child];
 					elf_setfield(inter);
 
@@ -195,11 +209,11 @@ static elf_stkid filetree(elf_State *inter, char *path, int recurse, int *size) 
 					*size += childsize;
 				}
 
-				elf_pushstr(inter, "size");
+				elf_pushtext(inter, "size");
 				elf_pushint(inter, visitor.size);
 				elf_setfield(inter);
 			} else {
-				elf_pushstr(inter, "size");
+				elf_pushtext(inter, "size");
 				elf_pushint(inter, visitor.size);
 				elf_setfield(inter);
 
@@ -239,7 +253,7 @@ static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 
 		if (visitor->type == FILE_TYPE_FILE) {
 
-			elf_pushstr(inter, visitor->pb.path);
+			elf_pushtext(inter, visitor->pb.path);
 			elf_arrayadd(inter);
 
 		}
@@ -262,11 +276,11 @@ static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 
 ELF_FUNCTION(l_sys_get_file_tree) {
 
-	const char *path = elf_tostr(S, args + 1);
+	const char *path = loadtext(S, 1);
 
 	int recurse = 0;
 	if (nargs >= 3) {
-		recurse = elf_toint(S, args + 2);
+		recurse = loadint(S, 2);
 	}
 
 	// filetree(S, path, recurse);
@@ -277,11 +291,11 @@ ELF_FUNCTION(l_sys_get_file_tree) {
 
 ELF_FUNCTION(l_sys_get_path_list) {
 
-	const char *path = elf_tostr(S, args + 1);
+	const char *path = loadtext(S, 1);
 
 	int recurse = 0;
 	if (nargs >= 3) {
-		recurse = elf_toint(S, args + 2);
+		recurse = loadint(S, 2);
 	}
 
 	elf_pushtab(S);
@@ -309,15 +323,13 @@ ELF_FUNCTION(l_sys_open_temp_file) {
 }
 
 ELF_FUNCTION(l_sys_delete_file) {
-	elf_pushint(S, sys_delete_file(f_checktext(S, 0)));
+	elf_pushint(S, sys_delete_file(elf_loadtext(S, 0)));
 	return 1;
 }
 
 ELF_FUNCTION(l_sys_open_file) {
-	ASSERT((nargs - 1) == 2);
-
-	char *name = f_checktext(S,0);
-	char *text_flags = f_checktext(S,1);
+	const char *name = loadtext(S, 1);
+	const char *text_flags = loadtext(S, 2);
 
 	int flags;
 	for (flags = 0; *text_flags; text_flags ++) {
@@ -339,30 +351,32 @@ ELF_FUNCTION(l_sys_open_file) {
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_sys_close_file) {
-	ASSERT((nargs - 1) == 1);
-	elf_Handle file = f_checkhand(S,0);
+	Handle file = loadsys(S, 1);
 	if (file) {
 		sys_close_file(file);
 	}
 	return 0;
 }
 
+
+
 ELF_FUNCTION(l_sys_get_file_size) {
-	elf_Handle file = f_checkhand(S,0);
-	elf_pushint(S, sys_size_file(file));
+	Handle file = loadsys(S, 1);
+	pushint(S, sys_size_file(file));
 	return 1;
 }
+
+
 
 ELF_FUNCTION(l_sys_get_file_cursor) {
-	elf_Handle file = f_checkhand(S,0);
-	elf_pushint(S, sys_get_file_cursor(file));
+	Handle file = loadsys(S, 1);
+	pushint(S, sys_get_file_cursor(file));
 	return 1;
 }
 
-
-elf_pubapi
-bool elf_readfile(elf_State *inter, int stk, int size);
 
 
 // todo: should take a buffer
@@ -370,9 +384,33 @@ ELF_FUNCTION(l_sys_read_console) {
 	int zbuf = loadint(S, 1);
 	char *buf = calloc(1, zbuf + 1);
 	int ret = sys_read_console(SYS_STD_INPUT, buf, zbuf);
-	pushstring(S, buf);
+	pushtext(S, buf);
 	return 1;
 }
+
+
+
+static bool readfilesys(elf_State *S, Handle file, int size) {
+	if (!file) {
+		elf_lerror("invalid file handle");
+		pushnil(S);
+		return false;
+	}
+
+	if (size == -1) {
+		size = sys_size_file(file);
+	}
+
+	// todo: we need a dedicated object for this!
+	String contents = elf_alloc_string2(S, size);
+	vsetstr(S->stack_ptr, contents);
+	pushstacksafe(S);
+
+	sys_read_file(file, contents->text, size);
+
+	return true;
+}
+
 
 
 //
@@ -381,23 +419,52 @@ ELF_FUNCTION(l_sys_read_console) {
 ELF_FUNCTION(l_sys_read_file) {
 	int size = -1;
 	if (nargs >= 3) {
-		size = elf_toint(S, 2);
+		size = loadint(S, 2);
 	}
-	elf_readfile(S, args + 1, size);
+
+	int noerr = 0;
+
+	if (tisstr(loadtype(S, 1))) {
+
+		const char *name = loadtext(S, 1);
+
+		Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+
+		noerr = readfilesys(S, file, size);
+
+		sys_close_file(file);
+	}
+	else if (tissys(loadtype(S, 1))) {
+
+		Handle file = loadsys(S, 1);
+
+		noerr = readfilesys(S, file, size);
+	}
+	else {
+
+		elf_errorf(S, -1
+		, "'%s': 'readfile' expected handle or file name", tag2s[loadtype(S, 1)]);
+
+		pushnil(S);
+	}
 	return 1;
 }
 
 
+
 ELF_FUNCTION(l_sys_write_file) {
-	elf_Handle file = f_checkhand(S,0);
-	elf_String *str = f_checkstr(S, 1);
+	Handle file = loadsys(S, 1);
+	String str = loadstr(S, 2);
 	sys_write_file(file, str->text, str->length);
 	return 0;
 }
 
+
+
 ELF_FUNCTION(l_sys_write_file_to_file) {
-	elf_Handle dst = f_checkhand(S, 0);
-	elf_Handle src = f_checkhand(S, 1);
+	Handle dst = loadsys(S, 1);
+	Handle src = loadsys(S, 2);
+
 	int size = sys_size_file(src);
 	char *heapbuf = malloc(size);
 	sys_read_file(src, heapbuf, size);
@@ -407,32 +474,34 @@ ELF_FUNCTION(l_sys_write_file_to_file) {
 }
 
 
+
 ELF_FUNCTION(l_sys_change_work_dir) {
-	int noerr = sys_set_work_dir(f_checktext(S,0));
-	elf_pushint(S, noerr);
+	int noerr = sys_set_work_dir(loadtext(S, 1));
+	pushint(S, noerr);
 	return 1;
 }
+
 
 
 ELF_FUNCTION(l_sys_get_work_dir) {
 	char buf[256];
 	sys_get_work_dir(buf, sizeof(buf));
-	elf_pushstr(S, buf);
+	pushtext(S, buf);
 	return 1;
 }
 
 
 // process
 ELF_FUNCTION(l_sys_create_process) {
-	char *textargs = f_checktext(S, 0);
-	elf_Handle process = sys_create_process(0, textargs);
-	elf_pushsys(S, process);
+	const char *text = loadtext(S, 1);
+	Handle process = sys_create_process(0, text);
+	pushsys(S, process);
 	return 1;
 }
 
 
 ELF_FUNCTION(l_sys_exit_this_process) {
-	sys_exit_this_process(elf_toint(S, args + 1 + 0));
+	sys_exit_this_process(loadint(S, 1));
 	return 0;
 }
 

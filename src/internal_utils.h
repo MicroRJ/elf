@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 
-#define FOR_RANGE(N,X,Y) for (int N = X; N < Y; N += 1)
 
 #if !defined(NO_CODE)
 	#define NO_CODE __debugbreak();

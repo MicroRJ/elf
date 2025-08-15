@@ -24,9 +24,10 @@ typedef elf_i64  elf_Integer;
 typedef elf_f64  elf_Number;
 typedef elf_i32  elf_Error;
 
-typedef elf_u32  hash_t;
-typedef elf_i64 elf_Index;
-
+typedef elf_u32  elf_Hash;
+typedef elf_i64  elf_Index;
+typedef elf_u64  elf_Time;
+typedef elf_u64  elf_Handle;
 
 #define ELF_HINVALID  ((elf_Handle) -1)
 #define ELF_HTAGFILE  1
@@ -36,5 +37,4 @@ typedef elf_i64 elf_Index;
 #define ELF_HTAG(H)   ((H) >> ((sizeof(elf_Handle)-1)<<3))
 #define ELF_HISINVALID(H) ((H) == ELF_HINVALID)
 
-typedef elf_u64 elf_Handle;
 

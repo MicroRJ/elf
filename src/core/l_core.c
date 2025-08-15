@@ -6,7 +6,7 @@
 
 ELF_FUNCTION(l_core_assert) {
 	Int cond = loadint(S, 1);
-	const char *emsg = lstrdata(S, 2);
+	const char *emsg = loadtext(S, 2);
 	if (!cond) {
 		elf_errorf(S, -1, "assertion triggered: %s", emsg);
 	}
@@ -111,9 +111,10 @@ ELF_FUNCTION(l_core_set_meta) {
 
 
 ELF_FUNCTION(l_core_tagof) {
-	elf_pushstr(S, tag2s[elf_gettag(S, args + 1)]);
+	pushtext(S, tag2s[loadtype(S, 1)]);
 	return 1;
 }
+
 
 
 ELF_FUNCTION(l_core_iton) {
@@ -121,9 +122,10 @@ ELF_FUNCTION(l_core_iton) {
 	if (!visnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
-	elf_pushnum(S, vitonum(v));
+	pushnum(S, vitonum(v));
 	return 1;
 }
+
 
 
 ELF_FUNCTION(l_core_ntoi) {
@@ -131,14 +133,14 @@ ELF_FUNCTION(l_core_ntoi) {
 	if (!visnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
-	elf_pushint(S, vntoint(v));
+	pushint(S, vntoint(v));
 	return 1;
 }
 
 
 // todo: support handles!
 ELF_FUNCTION(l_core_load_file) {
-	elf_loadcodefile(S, lstrdata(S, 1));
+	elf_pushcodefile(S, loadtext(S, 1));
 	pushthis(S);
 	return elf_call(S, 1, nrets);
 }
@@ -146,7 +148,7 @@ ELF_FUNCTION(l_core_load_file) {
 
 // todo: support handles!
 ELF_FUNCTION(l_core_load_expr) {
-	//	elf_loadcodefile(S, lstrdata(S, 1), true);
+	//	elf_pushcodefile(S, loadtext(S, 1), true);
 	//	pushthis(S);
 	//	return elf_call(S, 1, nrets);
 	// todo:!
@@ -155,17 +157,20 @@ ELF_FUNCTION(l_core_load_expr) {
 }
 
 
+
 ELF_FUNCTION(l_core_const_expr) {
-	const char *contents = lstrdata(S, 1);
+	const char *contents = loadtext(S, 1);
 	elf_load_const_expr_from_text(S, "no name", contents);
 	return 1;
 }
 
+
+
 // todo: also accept a file handle directly!
 ELF_FUNCTION(l_core_load_json) {
-	const char *name = elf_tostr(S, args + 1);
+	const char *name = loadtext(S, 1);
 
-	elf_Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN);
+	Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN);
 	if (!file) {
 		elf_pushnil(S);
 		goto esc;
@@ -192,8 +197,8 @@ ELF_FUNCTION(l_core_load_json) {
 static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 	switch (v.tag) {
 		case ELF_TNIL:        return sb_sprintf(sb,   "nil"               );
-		case ELF_TINTEGER:        return sb_sprintf(sb,  "%lli", v.x_int      );
-		case ELF_TNUMBER:        return sb_sprintf(sb,    "%f", v.x_num      );
+		case ELF_TINTEGER:    return sb_sprintf(sb,  "%lli", v.x_int      );
+		case ELF_TNUMBER:     return sb_sprintf(sb,    "%f", v.x_num      );
 		case ELF_THANDLE:     return sb_sprintf(sb, "h%llX", v.x_int      );
 		case ELF_TSTRING:     return sb_sprintf(sb,    "%s", v.x_str->text);
 		case ELF_TCLOSURE:    return sb_sprintf(sb,   "F()");
@@ -205,15 +210,18 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 			elf_Table *tab = v.x_tab;
 			wrote += sb_sprintf(sb, "{");
 
-			elf_Index i,j,n;
+			Index i,j,n;
 			for (i=0;i<darr_l(tab->array);++i) {
-				if (i != 0) wrote += sb_sprintf(sb, ", ");
+				if (i!=0) wrote += sb_sprintf(sb, ", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
-					TEntry it = tab->slots[j];
-					if (it.key.tag==ELF_TNIL) continue;
-					if (it.idx!=i) continue;
+
+					TEntry en = tab->entries[j];
+
+					if (visnil(en.key)) continue;
+					if (en.idx!=i) continue;
+
 					if (n ++ != 0) wrote += sb_sprintf(sb, ", ");
-					wrote += value_bprintf(sb,it.key,1);
+					wrote += value_bprintf(sb,en.key,1);
 				}
 				if (n != 0) wrote += sb_sprintf(sb, " = ");
 				wrote += value_bprintf(sb,tab->array[i],1);
@@ -237,6 +245,9 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 	}
 }
 
+
+
+
 // todo: handle escape sequences
 //
 // @doc: takes a format string similar to that of a c printf
@@ -245,7 +256,7 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 ELF_FUNCTION(l_core_format) {
 
 	int index = 1;
-	const char *format = lstrdata(S, index ++);
+	const char *format = loadtext(S, index ++);
 
 	String_Builder sb = {};
 	while (*format) {
@@ -268,19 +279,21 @@ ELF_FUNCTION(l_core_format) {
 		}
 	}
 
-	elf_pushstr(S, sb.buf);
+	pushtext2(S, sb.buf, sb.min);
 	free(sb.buf);
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_core_fpf) {
-	elf_Handle file = f_checkhand(S, 0);
+	Handle file = loadsys(S, 1);
 
 	String_Builder sb = {};
-	for (int i = 1; i < (nargs - 1); i ++) {
+	for (int i = 2; i < nargs; i ++) {
 		value_bprintf(&sb, loadvalue(S, i), 0);
 	}
-	elf_pushint(S, sb.min);
+	pushint(S, sb.min);
 
 	sys_write_file(file, sb.buf, sb.min);
 
@@ -288,44 +301,51 @@ ELF_FUNCTION(l_core_fpf) {
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_core_printl) {
 	String_Builder sb = {};
-	for (int i = 0; i < (nargs - 1); i ++) {
+	for (int i = 1; i < nargs; i ++) {
 		value_bprintf(&sb, loadvalue(S,i),0);
 	}
 	sb_sprintf(&sb, "\n");
 
-	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
+	Handle file = sys_get_std_file(SYS_STD_OUTPUT);
 	sys_write_file(file, sb.buf, sb.min);
 
 	free(sb.buf);
 
-	elf_pushint(S, sb.min);
+	pushint(S, sb.min);
 	return 1;
 }
 
-static void bprinttabs(String_Builder *sb, int num) {
+
+
+static void sb_printtabs(String_Builder *sb, int num) {
 	while (num --) sb_sprintf(sb, "\t");
 }
 
+
+
 // todo: cyclic references will break this
 // todo: performance!
-static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int level) {
+static int unparse(elf_State *inter, String_Builder *sb, V thing, int level) {
 	int noerror = true;
 	switch (thing.tag) {
-		case ELF_TNIL:    sb_sprintf(sb, "nil"                       ); break;
-		case ELF_TINTEGER:    sb_sprintf(sb, "%lli"  , thing.x_int       ); break;
-		case ELF_TNUMBER:    sb_sprintf(sb, "%f"    , thing.x_num       ); break;
-		case ELF_TSTRING: sb_sprintf(sb, "\"%s\"", thing.x_str->text ); break;
+		case ELF_TNIL:      sb_sprintf(sb, "nil"                       ); break;
+		case ELF_TINTEGER:  sb_sprintf(sb, "%lli"  , thing.x_int       ); break;
+		case ELF_TNUMBER:   sb_sprintf(sb, "%f"    , thing.x_num       ); break;
+		case ELF_TSTRING:   sb_sprintf(sb, "\"%s\"", thing.x_str->text ); break;
 		case ELF_TTABLE: {
-			elf_Table *table = thing.x_tab;
+			Table table = thing.x_tab;
 
 			int nwrote = 0;
 
 			sb_sprintf(sb, "{\n");
 
 			// todo:
-			// figure this out, or pass in flags to determine whether to omit the hash part or the array part
+			// figure this out, or pass in flags to determine
+			// whether to omit the hash part or the array part
 			if (table->nslots) {
 				elf_Index i;
 				for (i = 0; i < table->ntotal; ++ i) {
@@ -350,7 +370,7 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 					}
 
 					if (nwrote ++) sb_sprintf(sb, ",\n");
-					bprinttabs(sb, level + 1);
+					sb_printtabs(sb, level + 1);
 
 					unparse(inter, sb, key, 1);
 					sb_sprintf(sb, " = ");
@@ -367,12 +387,12 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 						continue;
 					}
 					if (nwrote ++) sb_sprintf(sb, ",\n");
-					bprinttabs(sb, level + 1);
+					sb_printtabs(sb, level + 1);
 					unparse(inter, sb, value, level + 1);
 				}
 			}
 			sb_sprintf(sb,"\n");
-			bprinttabs(sb, level);
+			sb_printtabs(sb, level);
 			sb_sprintf(sb,"}");
 		} break;
 		default: noerror = false;
@@ -381,18 +401,21 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 }
 
 
+
 ELF_FUNCTION(l_core_unload) {
-	elf_Handle file = f_checkhand(S, 0);
-	elf_Value thing = loadvalue(S, 2);
+	Handle file = loadsys(S, 1);
+	V value = loadvalue(S, 2);
 	String_Builder sb = {};
-	int noerr = unparse(S, &sb, thing, 0);
+	int noerr = unparse(S, &sb, value, 0);
 	if (noerr) {
 		sys_write_file(file, sb.buf, sb.min);
 	}
 	free(sb.buf);
-	elf_pushint(S, noerr);
+	pushint(S, noerr);
 	return 1;
 }
+
+
 
 const static elf_Binding l_core[] = {
 	{"get_meta", l_core_get_meta},
@@ -437,7 +460,7 @@ are not mistaken with table accesses when shortened,
 math.floor != .math.floor */
 int core_lib_include(elf_State *R) {
 	elf_check_num_args(R,".include",1,"(the directory to include to add to the global directory)");
-	char *dir = f_checktext(R,0);
+	char *dir = loadtext(R, 1);
 	int plen = text_l(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:

@@ -26,7 +26,6 @@
 #include "internal_types.h"
 #include "internal_api.h"
 #include "internal_helpers.h"
-#include "internal_helpers.c"
 #include "internal_metadata.c"
 #include "internal_diagnostics.c"
 
@@ -40,7 +39,6 @@
 #include "l_math.c"
 #include "l_core.c"
 #include "l_sys.c"
-#include "l_vec.c"
 #include "l_table.c"
 #include "l_string.c"
 #include "l_random.c"
@@ -80,7 +78,7 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 		// todo: ensure the symbol name is valid?
 		if (prefix) name = elf_tpf("%s.%s",prefix,name);
 
-		elf_pushstr(S, name);
+		elf_pushtext(S, name);
 		elf_pushfun(S, lib[i].function);
 
 		elf_setfield(S);
@@ -255,9 +253,7 @@ callfunction(elf_State *E, elf_Function proc, int nargs, int nrets)
 
 	E->stack_ptr = framebase + framesize;
 
-	int args = framebase - E->stack;
-
-	int nuserrets = proc(E, args, nargs, nrets);
+	int nuserrets = proc(E, nargs, nrets);
 
 	int nretpushed = E->stack_ptr - framebase - framesize;
 
@@ -328,9 +324,9 @@ static void error_invalidoperandsforoperator(elf_State *inter, char *name, elf_V
 
 // the result is on the stack
 static int callmetafield(elf_State *inter, elf_Object *obj, char *name, int nargs, elf_Value xx, elf_Value yy) {
-	elf_pushstr(inter, name);
+	pushtext(inter, name);
 
-	elf_Value vv = elf_table_get_raw(obj->meta, inter->stack_ptr[-1]);
+	V vv = elf_table_get_raw(obj->meta, inter->stack_ptr[-1]);
 
 	if (visnil(vv)) {
 						// todo: as a courtesy, look for similar strings if any and
@@ -547,8 +543,7 @@ int _resume(elf_State *inter) {
 
 	int subframes = 0;
 
-
-	T globals = inter->globals;
+	Table globals = inter->globals;
 
 	V xx,yy,zz;
 	while (frame.nextinstr < frame.bytec) {
@@ -709,7 +704,7 @@ int _resume(elf_State *inter) {
 			} break;
 			case BC_TABLE: {
 
-				elf_Table *tab = elf_alloc_table(R);
+				elf_Table *tab = newtable(R);
 				vsettab(&rvalueX(), tab);
 
 			} break;

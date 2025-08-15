@@ -7,61 +7,61 @@
 // todo: all of these should be instrinsics...
 
 ELF_FUNCTION(math_lib_exp) {
-	elf_pushnum(S,exp(elf_tonum(S,args+1)));
+	pushnum(S,exp(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_floor) {
-	elf_pushnum(S,floor(elf_tonum(S,args+1)));
+	pushnum(S,floor(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_ceil) {
-	elf_pushnum(S,ceil(elf_tonum(S,args+1)));
+	pushnum(S,ceil(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_sqrt) {
-	elf_pushnum(S,sqrt(elf_tonum(S,args+1)));
+	pushnum(S,sqrt(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_pow) {
-	elf_pushnum(S,pow(elf_tonum(S,args+1),elf_tonum(S,args+2)));
+	pushnum(S,pow(loadnum(S,1),loadnum(S,2)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_sin) {
-	elf_pushnum(S,sin(elf_tonum(S,args+1)));
+	pushnum(S,sin(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_cos) {
-	elf_pushnum(S,cos(elf_tonum(S,args+1)));
+	pushnum(S,cos(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_acos) {
-	elf_pushnum(S,acos(elf_tonum(S,args+1)));
+	pushnum(S,acos(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_tan) {
-	elf_pushnum(S,tan(elf_tonum(S,args+1)));
+	pushnum(S,tan(loadnum(S,1)));
 	return 1;
 }
 
 
 ELF_FUNCTION(math_lib_atan2) {
-	elf_pushnum(S,atan2(elf_tonum(S,args+1),elf_tonum(S,args+2)));
+	pushnum(S,atan2(loadnum(S,1),loadnum(S,2)));
 	return 1;
 }
 

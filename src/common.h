@@ -17,6 +17,11 @@
 #endif
 
 
+
+// todo: remove!
+#define FOR_RANGE(N,X,Y) for (int N = X; N < Y; N += 1)
+
+
 // not too necessary
 #if !defined(__cplusplus)
 	#define XLITERAL(X) (X)

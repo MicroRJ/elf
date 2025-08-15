@@ -86,7 +86,7 @@ static inline void zero_values(V *dst, int num) {
 { 	elf_errorf(S, -1, "'%s': expected '%s'", tag2s[v.tag], tag2s[t]); } } while (0)
 
 
-#define loadtop(S, x) ((S)->stack_ptr[(x)])
+
 #define abstop(S) ((S)->stack_ptr - (S)->stack)
 
 
@@ -176,12 +176,13 @@ do { \
 #define loadvalue(S, x) ((S)->frame.framebase[x])
 
 
-
-#define lpush(S, x) (pushvalueunsafe(S, loadvalue(S, x))
-
+#define loadpush(S, x) (pushvalueunsafe(S, loadvalue(S, x))
 
 
-static inline const char *lstrdata(elf_State *S, int x)
+#define loadtype(S, x) (vtagof(loadvalue(S, x)))
+
+
+static inline const char *loadtext(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (visstr(v)) return vgetstrd(v);
@@ -192,12 +193,22 @@ static inline const char *lstrdata(elf_State *S, int x)
 
 
 
-static inline strID lstring(elf_State *S, int x)
+static inline String loadstr(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (visstr(v)) return vgetstr(v);
 	if (visnil(v)) return 0;
 	vcheck(S, v, ELF_TSTRING);
+	return 0;
+}
+
+
+
+static inline Int loadsys(elf_State *S, int x)
+{
+	V v = loadvalue(S, x);
+	if (issys(v)) return vgetsys(v);
+	vcheck(S, v, ELF_THANDLE);
 	return 0;
 }
 
@@ -212,6 +223,15 @@ static inline Int loadint(elf_State *S, int x)
 }
 
 
+static inline Num loadnum(elf_State *S, int x)
+{
+	V v = loadvalue(S, x);
+	if (visnumeric(v)) return vitonum(v);
+	vcheck(S, v, ELF_TNUMBER);
+	return 0;
+}
+
+
 static inline Table loadtable(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
@@ -222,22 +242,22 @@ static inline Table loadtable(elf_State *S, int x)
 }
 
 
-static inline SRef pushstring(elf_State *S, char const *text) {
-	SRef str = elf_alloc_string(S, text);
+static inline String pushtext(elf_State *S, char const *text) {
+	String str = elf_alloc_string(S, text);
 	pushstr(S, str);
 	return str;
 }
 
 
-static inline SRef pushstringl(elf_State *S, char const *text, int length) {
-	SRef str = elf_alloc_string3(S, text, length);
+static inline String pushtext2(elf_State *S, char const *text, int length) {
+	String str = elf_alloc_string3(S, text, length);
 	pushstr(S, str);
 	return str;
 }
 
 
-static inline T pushtable(elf_State *S) {
-	T tab = elf_alloc_table(S);
+static inline Table pushtable(elf_State *S) {
+	Table tab = newtable(S);
 	pushtab(S, tab);
 	return tab;
 }

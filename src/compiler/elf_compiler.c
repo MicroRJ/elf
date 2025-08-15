@@ -43,14 +43,12 @@ int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *co
 	return result;
 }
 
-//	treeID v = parse_expr(parser, 0);
-//	v = tree_ret(parser, parser->tok.line, v);
-//	block_add(parser, v);
+
 
 int elf_makefile(elf_State *S, char const *name) {
 	ASSERT(name);
 
-	H hfile = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+	Handle hfile = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 
 	if (ELF_HISINVALID(hfile)) {
 		elf_lerror("'%s': failed to load file, cannot make", name);

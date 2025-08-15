@@ -144,7 +144,7 @@ int sys_get_this_process_id();
 void sys_exit_this_process(int errorcode);
 
 int sys_get_work_dir(char *buf, int bufsize);
-int sys_set_work_dir(char *buf);
+int sys_set_work_dir(const char *buf);
 
 
 elf_Handle sys_load_dll(char const *name);

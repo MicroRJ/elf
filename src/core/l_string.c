@@ -8,14 +8,14 @@
 
 
 ELF_FUNCTION(l_str_length) {
-	pushint(S, lstring(S, 0)->length);
+	pushint(S, loadstr(S, 0)->length);
 	return 1;
 }
 
 
 
 ELF_FUNCTION(l_str_get_hash) {
-	elf_String *str = lstring(S, 0);
+	String str = loadstr(S, 0);
 	pushint(S, str->hash);
 	return 1;
 }
@@ -23,18 +23,20 @@ ELF_FUNCTION(l_str_get_hash) {
 
 
 ELF_FUNCTION(l_str_get_index) {
-	const char *text = lstrdata(S, 0);
+	const char *text = loadtext(S, 0);
 	int index = loadint(S, 1);
 	pushint(S, text[index]);
 	return 1;
 }
 
+
+
 ELF_FUNCTION(l_str_slice) {
-	elf_String *str = lstring(S, 0);
+	String str = loadstr(S, 0);
 	// todo: out of bounds check
-	int from = f_checkint(S, 0);
-	int to = f_checkint(S, 1);
-	elf_pushstrl(S, str->text + from, to);
+	int lo = loadint(S, 2);
+	int hi = loadint(S, 3);
+	pushtext2(S, str->text + lo, hi);
 	return 1;
 }
 
@@ -48,7 +50,7 @@ ELF_FUNCTION(l_str_join) {
 	for (int i = 0; i < nargs; ++ i) {
 		value_bprintf(&sb, loadvalue(S, i), 0);
 	}
-	pushstringl(S, sb.buf, sb.min);
+	pushtext2(S, sb.buf, sb.min);
 	free(sb.buf);
 	return 1;
 }
@@ -57,9 +59,9 @@ ELF_FUNCTION(l_str_join) {
 // todo: what if multiple inputs!
 // @doc whether the string matches the passed in pattern
 ELF_FUNCTION(l_str_match) {
-	char *s = f_checktext(S, -1);
-	char *p = f_checktext(S,  0);
-	char *match = string_match(s, p);
+	const char *s = loadtext(S, 0);
+	const char *p = loadtext(S, 1);
+	char *match = string_match((char *) s, (char *) p);
 	pushint(S, match != 0);
 	return 1;
 }
@@ -67,25 +69,25 @@ ELF_FUNCTION(l_str_match) {
 // todo: doesn't actually work
 // @doc finds all the matches and returns a list of all the strings
 ELF_FUNCTION(l_str_find) {
-	char *s = f_checktext(S, -1);
-	char *p = f_checktext(S,  0);
+	const char *s = loadtext(S, 0);
+	const char *p = loadtext(S, 1);
 
 	// return a list
-	elf_pushtab(S);
+	pushtable(S);
 
 	String_Builder sb = {};
 
-	char *cur = s;
+	char *cur = (char *) s;
 	while (*cur) {
 
-		char *tail = string_match(cur, p);
+		char *tail = string_match(cur, (char *) p);
 
 		if (tail) {
 			while (cur < tail) {
 				sb_writechar(&sb, *cur ++);
 			}
 
-			elf_pushstrl(S, sb.buf, sb.min);
+			elf_pushtext2(S, sb.buf, sb.min);
 			elf_arrayadd(S);
 
 			sb.min = 0;
@@ -98,15 +100,17 @@ ELF_FUNCTION(l_str_find) {
 	return 1;
 }
 
+
+
 // @doc returns an list of lines from this string
 ELF_FUNCTION(l_str_split_by_lines) {
-	char *s = f_checktext(S, -1);
+	const char *s = loadtext(S, 0);
 
-	elf_pushtab(S);
+	pushtable(S);
 
 	String_Builder sb = {};
 
-	char *cur = s;
+	char *cur = (char *) s;
 	while (*cur) {
 
 		while (*cur != 0 && *cur != '\n' && *cur != '\r') {
@@ -117,7 +121,7 @@ ELF_FUNCTION(l_str_split_by_lines) {
 			cur += 1 + (cur[0] == '\r' && cur[1] == '\n');
 		}
 
-		elf_pushstrl(S, sb.buf, sb.min);
+		pushtext2(S, sb.buf, sb.min);
 		elf_arrayadd(S);
 
 		sb.min = 0;
@@ -131,26 +135,28 @@ ELF_FUNCTION(l_str_split_by_lines) {
 
 ELF_FUNCTION(l_str_split_by_char) {
 
-	char *s = f_checktext(S, -1);
-	int chr = f_checkint(S, 0);
+	const char *s = loadtext(S, 0);
+	int chr = loadint(S, 1);
 
-	elf_pushtab(S);
+	Table splits = pushtable(S);
 
 	String_Builder sb = {};
 
-	char *cur = s;
-	while (*cur) {
+	while (*s) {
 
-		while (*cur != 0 && *cur != chr) {
-			sb_writechar(&sb, *cur ++);
+		while (*s != 0 && *s != chr) {
+			sb_writechar(&sb, *s ++);
 		}
 
-		if (*cur == chr) {
-			cur ++;
+		if (*s == chr) {
+			s ++;
 		}
 
-		elf_pushstrl(S, sb.buf, sb.min);
-		elf_arrayadd(S);
+		String split = elf_alloc_string3(S, sb.buf, sb.min);
+		V value;
+		vsetstr(&value, split);
+
+		darr_add(splits->array, value);
 
 		sb.min = 0;
 	}
@@ -162,24 +168,24 @@ ELF_FUNCTION(l_str_split_by_char) {
 
 
 ELF_FUNCTION(l_str_lowercase) {
-	elf_String *str = lstring(S, 0);
+	String str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
 	}
-	elf_pushstrl(S, temp, str->length);
+	elf_pushtext2(S, temp, str->length);
 	free(temp);
 	return 1;
 }
 
 
 ELF_FUNCTION(l_str_uppercase) {
-	elf_String *str = lstring(S, 0);
+	String str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);
 	}
-	elf_pushstrl(S, temp, str->length);
+	elf_pushtext2(S, temp, str->length);
 	free(temp);
 	return 1;
 }

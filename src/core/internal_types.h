@@ -2,6 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
+
 #include "internal_shorternames.h"
 
 
@@ -76,7 +77,7 @@ struct Proto_File {
 	Proto_File *prev;
 	int         bytepos;
 	int         byteend;
-	Proto   proto;
+	Proto       main;
 	int         size;
 	char        name[ELF_MAX_FILE_PATH];
 	// this is null terminated!
@@ -100,6 +101,7 @@ struct elf_Closure {
 	elf_Value  captures[];
 };
 
+
 // todo: we use 64 bits for all indices
 typedef struct {
 	elf_Value  key;
@@ -110,22 +112,23 @@ typedef struct {
 typedef struct elf_Table elf_Table;
 struct elf_Table {
 	elf_Object         obj;
-	elf_Index       ntotal;
-	elf_Index       nslots;
-	elf_Index    	 ndebug;
+	Index           ntotal;
+	Index           nslots;
+	Index    	    ndebug;
 	union {
-		TEntry    *slots;
-		TEntry    *entries;
+		TEntry       *slots; // remove
+		TEntry     *entries;
 	};
-	elf_Value  	       *array;
+	V               *array;
 };
+
 
 // todo: 64 bit strings?
 typedef struct elf_String elf_String;
 struct elf_String {
 	elf_Object      obj;
-	hash_t    hash;
-	elf_i32 	    length;
+	Hash           hash;
+	i32 	       length;
 	char        text[1];
 };
 
@@ -152,29 +155,24 @@ struct Stack_Frame {
 	int           nextinstr;
 	V            *reference;
 	// todo: could get this from the closure at framebase-1
-	V            *closureenv;
-	char          closuresize;
+	V           *closureenv;
+	char        closuresize;
 };
 
 
+
 typedef struct {
-	elf_i32     address;
-	Bytec   bytecode;
-	// todo: use different data structure,
-	// objects could have been freed,
-	elf_Value   operand_x;
-	elf_Value   operand_y;
+	BCPos    address;
+	Bytec    bytecode;
 } elf_trail_entry;
 
-// todo: remove!
-#define elf_Module elf_State
 
-typedef enum elf_GC_Ty {
+typedef enum GCType {
 	GC_OBJ = 0,
 	GC_CLS,
 	GC_STR,
 	GC_TAB,
-} elf_GC_Ty;
+} GCType;
 
 
 #define	GC_COLLECTABLE 0
@@ -185,6 +183,7 @@ typedef enum elf_GC_Ty {
 #define	GC_MEM_THRESHOLD_MAX ((elf_i64) MEGABYTES(128))
 #define	GC_OBJ_THRESHOLD_MIN ((elf_i64) ((512) * 1))
 #define	GC_OBJ_THRESHOLD_MAX ((elf_i64) ((512) * 1))
+
 
 //
 // todo: proper object pooling
@@ -205,6 +204,8 @@ struct GCState {
 	elf_Object **close_object_slots;
 };
 
+
+
 typedef struct elf_State elf_State;
 struct elf_State {
 
@@ -215,9 +216,10 @@ struct elf_State {
 	};
 
 	struct {
-		Proto       *protos;
+		Proto           *protos;
 		//
-		elf_u8           *track;
+		u8               *track;
+
 		// todo: compress this
 		char            **lines;
 
@@ -227,8 +229,8 @@ struct elf_State {
 		// I think we'll do our own memory management here, and once
 		// we run out of space we can either reallocate to get more, or
 		// if too fragmented do a copy and compact
-		Bytec        *bytebuf;
-		int               bytecur;
+		Bytec           *bytebuf;
+		int              bytecur;
 	};
 
 	// todo: experiment with allocating types and tags
@@ -236,8 +238,8 @@ struct elf_State {
 	// We also wouldn't need to increment or decrement
 	// the tags stack, but we would either have to convert
 	// stack_ptr to an integer, or make stack_ptr be an integer
-	elf_Value        *stack;
-	elf_Value        *stack_ptr;
+	V                *stack;
+	V                *stack_ptr;
 	int               stack_max;
 
 	union {  GCState  G, gc; };
@@ -251,8 +253,9 @@ struct elf_State {
 
 	// todo: disable this
 	elf_trail_entry *exec_trail;
-	elf_i32 			  exec_trail_index;
-	elf_i32 			  exec_trail_capacity; // power of two!
+	i32   			  exec_trail_index;
+	// power of two!
+	i32           exec_trail_capacity;
 	int                      flags;
 	int            disable_tracing;
 	int trace_inner_loop_stack[16];
@@ -261,14 +264,14 @@ struct elf_State {
 	int          trace_start_instr;
 	int           active_trace_pos;
 	int           active_trace_len;
-	Bytec     *trace_buffer;
-	elf_Table         *trace_table;
+	Bytec            *trace_buffer;
+	Table              trace_table;
 	elf_i32                   byte;
 
 	struct {
-		elf_Table *integer;
-		elf_Table *number;
-		elf_Table *string;
-		elf_Table *table;
+		Table integer;
+		Table number;
+		Table string;
+		Table table;
 	} metatables;
 };

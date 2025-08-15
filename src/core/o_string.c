@@ -34,14 +34,14 @@ elf_String *elf_alloc_string2(elf_State *S, elf_i32 length) {
 elf_String *elf_alloc_string(elf_State *R, const char *text) {
 	int length = strlen(text);
 	elf_String *string = elf_alloc_string2(R, length);
-	hash_t hash = hash_text(text);
+	elf_Hash hash = hash_text(text);
 	copy_memory(string->text,text,length);
 	string->hash = hash;
 	return string;
 }
 
 
-inline hash_t elf_get_string_hash(elf_String *string) {
+inline elf_Hash elf_get_string_hash(elf_String *string) {
 	return string->hash;
 }
 

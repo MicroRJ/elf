@@ -1662,6 +1662,10 @@ static void checkstk(elf_Parser *parser, int state) {
 		elf_error(parser->R, NO_BYTE, "internal error, invalid stack state");
 	}
 }
+
+
+
+
 // todo: legitimize
 // todo: also json is a constant
 static int parse_constexpr(elf_Parser *parser) {
@@ -1679,28 +1683,28 @@ static int parse_constexpr(elf_Parser *parser) {
 		} break;
 		case TK_NUMBER: { numcase:
 			get_tok(parser);
-			elf_pushnum(parser->R, tok.number * sign);
+			pushnum(parser->R, tok.number * sign);
 			ret = 1;
 		} break;
 		case TK_INTEGER: { intcase:
 			get_tok(parser);
-			elf_pushint(parser->R, tok.integer * sign);
+			pushint(parser->R, tok.integer * sign);
 			ret = 1;
 		} break;
 		case TK_NIL: {
 			get_tok(parser);
-			elf_pushnil(parser->R);
+			pushnil(parser->R);
 			ret = 1;
 		} break;
 		case TK_STRING: {
 			get_tok(parser);
-			elf_pushstr(parser->R, tok.text);
+			pushtext(parser->R, tok.text);
 			ret = 1;
 		} break;
 		case TK_CURLY_LEFT: {
 			get_tok(parser);
 
-			tabID tab = pushtable(parser->R);
+			Table tab = pushtable(parser->R);
 			int tablestk = abstop(parser->R) - 1;
 
 			while(!peek_tok(parser,TK_NONE) && !peek_tok(parser,TK_CURLY_RIGHT)) {
@@ -1708,7 +1712,7 @@ static int parse_constexpr(elf_Parser *parser) {
 				// push key (or value)
 				if (pick_tok(parser, TK_WORD)) {
 
-					elf_pushstr(parser->R, parser->tok.text);
+					pushtext(parser->R, parser->tok.text);
 
 				} else  {
 
@@ -1748,7 +1752,7 @@ static int parse_constexpr(elf_Parser *parser) {
 		} break;
 		default: {
 			errorcase:
-			elf_pushnil(parser->R);
+			pushnil(parser->R);
 			parser_dialog(parser,tok.line,"not a constant expression");
 		} break;
 	}
@@ -1757,9 +1761,11 @@ static int parse_constexpr(elf_Parser *parser) {
 	return ret;
 }
 
+
+
 static int parse_json_array(elf_Parser *parser){
 	int noerr = true;
-	elf_pushtab(parser->inter);
+	pushtable(parser->inter);
 
 	take_tok(parser, TK_SQUARE_LEFT);
 
@@ -1768,26 +1774,29 @@ static int parse_json_array(elf_Parser *parser){
 		// todo: attempt to recover and ensure the
 		// stack is proper still
 		noerr = parse_json_value(parser);
-		if (noerr != true) goto esc;
+		if (!noerr) goto esc;
 
 		elf_arrayadd(parser->inter);
 
 	} while (pick_tok(parser, TK_COMMA));
 
 	take_tok(parser, TK_SQUARE_RIGHT);
+
 	esc:
 	return noerr;
 }
 
+
+
 static int parse_json_object(elf_Parser *parser) {
 	int noerr = true;
-	elf_pushtab(parser->inter);
+	pushtable(parser->inter);
 
 	take_tok(parser,TK_CURLY_LEFT);
 	if (!peek_tok(parser,TK_CURLY_RIGHT)) do {
 
 		Token tok = take_tok(parser, TK_STRING);
-		elf_pushstr(parser->inter, tok.text);
+		pushtext(parser->inter, tok.text);
 
 		take_tok(parser, TK_COLON);
 
@@ -1797,10 +1806,13 @@ static int parse_json_object(elf_Parser *parser) {
 		elf_setfield(parser->inter);
 	} while (pick_tok(parser,TK_COMMA));
 
+
 	take_tok(parser,TK_CURLY_RIGHT);
 	esc:
 	return noerr;
 }
+
+
 
 static int parse_json_value(elf_Parser *parser) {
 	int noerr = true;
@@ -1809,15 +1821,15 @@ static int parse_json_value(elf_Parser *parser) {
 	switch (tok.type) {
 		case TK_STRING: {
 			get_tok(parser);
-			elf_pushstr(parser->inter, tok.text);
+			pushtext(parser->inter, tok.text);
 		} break;
 		case TK_INTEGER: {
 			get_tok(parser);
-			elf_pushint(parser->inter, tok.integer);
+			pushint(parser->inter, tok.integer);
 		} break;
 		case TK_NUMBER: {
 			get_tok(parser);
-			elf_pushnum(parser->inter, tok.number);
+			pushnum(parser->inter, tok.number);
 		} break;
 		case TK_CURLY_LEFT: {
 			parse_json_object(parser);
@@ -1826,7 +1838,7 @@ static int parse_json_value(elf_Parser *parser) {
 			parse_json_array(parser);
 		} break;
 		default: {
-			elf_pushnil(parser->inter);
+			pushnil(parser->inter);
 			parser_dialog(parser, tok.line, "invalid json value");
 			noerr = false;
 		} break;
