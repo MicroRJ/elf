@@ -32,14 +32,14 @@
 int elf_load_json(elf_State *S, const char *name, const char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_json_object(parser);
-	free(parser);
+	elf_end_parser(parser);
 	return result;
 }
 
 int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *contents) {
 	elf_Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_constexpr(parser);
-	free(parser);
+	elf_end_parser(parser);
 	return result;
 }
 
@@ -94,7 +94,6 @@ int elf_makefile(elf_State *S, char const *name) {
 	prof->byteend = S->bytecur;
 
 
-	// todo: uninit!
-	free(parser);
+	elf_end_parser(parser);
 	return mainproto;
 }

@@ -155,7 +155,7 @@ do { \
 } while (0)
 
 
-#define pushthis(S)  do { pushvalueunsafe(S, lvalue(S, 0));     } while(0)
+#define pushthis(S)  do { pushvalueunsafe(S, loadvalue(S, 0));     } while(0)
 #define pushnil(S)   do { settopnil(S);    pushstackunsafe(S);  } while(0)
 
 #define pushint(S,x) do { settopint(S, x); pushstackunsafe(S);  } while(0)
@@ -173,15 +173,17 @@ do { \
 #define pushvalueunsafe(S, v) do { *(S)->stack_ptr ++ = v; } while (0)
 
 
-#define lvalue(S, x) ((S)->frame.framebase[x])
+#define loadvalue(S, x) ((S)->frame.framebase[x])
 
-#define lpush(S, x) (pushvalueunsafe(S, lvalue(S, x))
+
+
+#define lpush(S, x) (pushvalueunsafe(S, loadvalue(S, x))
 
 
 
 static inline const char *lstrdata(elf_State *S, int x)
 {
-	V v = lvalue(S, x);
+	V v = loadvalue(S, x);
 	if (visstr(v)) return vgetstrd(v);
 	if (visnil(v)) return 0;
 	vcheck(S, v, ELF_TSTRING);
@@ -192,7 +194,7 @@ static inline const char *lstrdata(elf_State *S, int x)
 
 static inline strID lstring(elf_State *S, int x)
 {
-	V v = lvalue(S, x);
+	V v = loadvalue(S, x);
 	if (visstr(v)) return vgetstr(v);
 	if (visnil(v)) return 0;
 	vcheck(S, v, ELF_TSTRING);
@@ -201,18 +203,18 @@ static inline strID lstring(elf_State *S, int x)
 
 
 
-static inline Int lint(elf_State *S, int x)
+static inline Int loadint(elf_State *S, int x)
 {
-	V v = lvalue(S, x);
+	V v = loadvalue(S, x);
 	if (visnumeric(v)) return vntoint(v);
 	vcheck(S, v, ELF_TINTEGER);
 	return 0;
 }
 
 
-static inline T ltable(elf_State *S, int x)
+static inline Table loadtable(elf_State *S, int x)
 {
-	V v = lvalue(S, x);
+	V v = loadvalue(S, x);
 	if (vistab(v)) return vgettab(v);
 	if (visnil(v)) return 0;
 	vcheck(S, v, ELF_TTABLE);
@@ -222,6 +224,13 @@ static inline T ltable(elf_State *S, int x)
 
 static inline SRef pushstring(elf_State *S, char const *text) {
 	SRef str = elf_alloc_string(S, text);
+	pushstr(S, str);
+	return str;
+}
+
+
+static inline SRef pushstringl(elf_State *S, char const *text, int length) {
+	SRef str = elf_alloc_string3(S, text, length);
 	pushstr(S, str);
 	return str;
 }

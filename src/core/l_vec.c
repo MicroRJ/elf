@@ -70,8 +70,8 @@ ELF_FUNCTION(lib_vec2__##NAME) { \
 	elf_vec2 y = _get_vec2(elf_gettabraw(S, 0), sx, sy); \
 	elf_vec2 v = { OP(x.x, y.x), OP(x.y, y.y) }; \
 	elf_Table *res = elf_new_table(S); \
-	elf_raw_table_set(res, sx, VALUE_NUMBER(v.x)); \
-	elf_raw_table_set(res, sy, VALUE_NUMBER(v.y)); \
+	tableset(res, sx, VALUE_NUMBER(v.x)); \
+	tableset(res, sy, VALUE_NUMBER(v.y)); \
 	elf_push_table_raw(S, res); \
 	return 1; \
 } \

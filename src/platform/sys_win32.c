@@ -182,7 +182,7 @@ int core_lib_list_volumes(elf_State *R) {
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				elf_raw_array_add(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
+				arrayadd(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -226,7 +226,7 @@ void *sys_virtual_alloc(elf_i64 length) {
 	return VirtualAlloc(NULL,length,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 }
 
-void sys_virtual_dealloc(void *memory) {
+void sys_virtual_free(void *memory) {
 	VirtualFree(memory,0,MEM_RELEASE);
 }
 

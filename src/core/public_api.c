@@ -239,7 +239,7 @@ void elf_setfield(elf_State *inter) {
 		elf_error(inter, NO_BYTE, "Not A Table!");
 	}
 
-	elf_raw_table_set(vgettab(tab), key, val);
+	tableset(vgettab(tab), key, val);
 	inter->stack_ptr -= 2;
 }
 
@@ -253,7 +253,7 @@ void elf_arrayadd(elf_State *inter) {
 		elf_error(inter, NO_BYTE, "Not A Table!");
 	}
 
-	elf_raw_array_add(vgettab(tab), val);
+	arrayadd(vgettab(tab), val);
 	inter->stack_ptr -= 1;
 }
 

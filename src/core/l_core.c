@@ -5,7 +5,7 @@
 
 
 ELF_FUNCTION(l_core_assert) {
-	Int cond = lint(S, 1);
+	Int cond = loadint(S, 1);
 	const char *emsg = lstrdata(S, 2);
 	if (!cond) {
 		elf_errorf(S, -1, "assertion triggered: %s", emsg);
@@ -41,7 +41,7 @@ ELF_FUNCTION(l_core_nvargs) {
 
 
 ELF_FUNCTION(l_core_varg) {
-	int i = lint(S, 1);
+	int i = loadint(S, 1);
 	int n = caller(S).nargs;
 	int a = caller(S).arity;
 
@@ -73,7 +73,7 @@ ELF_FUNCTION(l_core_nargs) {
 
 
 ELF_FUNCTION(l_core_arg) {
-	int i = lint(S, 1);
+	int i = loadint(S, 1);
 	int n = caller(S).nargs;
 	if (i >= n) {
 		pushnil(S);
@@ -93,8 +93,8 @@ ELF_FUNCTION(l_core_arg) {
 
 
 ELF_FUNCTION(l_core_get_meta) {
-	TRef t = ltable(S, 1);
-	TRef m = getmeta(t);
+	Table t = loadtable(S, 1);
+	Table m = getmeta(t);
 	pushtab(S, m);
 	return 1;
 }
@@ -102,8 +102,8 @@ ELF_FUNCTION(l_core_get_meta) {
 
 // result is the object we passed in
 ELF_FUNCTION(l_core_set_meta) {
-	TRef t = ltable(S, 1);
-	TRef m = ltable(S, 2);
+	Table t = loadtable(S, 1);
+	Table m = loadtable(S, 2);
 	setmeta(t, m);
 	pushtab(S, t);
 	return 1;
@@ -117,7 +117,7 @@ ELF_FUNCTION(l_core_tagof) {
 
 
 ELF_FUNCTION(l_core_iton) {
-	elf_Value v = loadvalue(S, 0);
+	V v = loadvalue(S, 1);
 	if (!visnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
@@ -127,7 +127,7 @@ ELF_FUNCTION(l_core_iton) {
 
 
 ELF_FUNCTION(l_core_ntoi) {
-	elf_Value v = loadvalue(S, 0);
+	V v = loadvalue(S, 1);
 	if (!visnumeric(v)) {
 		elf_error(S, -1, "expected numeric value");
 	}
@@ -205,11 +205,11 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 			elf_Table *tab = v.x_tab;
 			wrote += sb_sprintf(sb, "{");
 
-			index_t i,j,n;
+			elf_Index i,j,n;
 			for (i=0;i<darr_l(tab->array);++i) {
 				if (i != 0) wrote += sb_sprintf(sb, ", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
-					elf_Table_Entry it = tab->slots[j];
+					TEntry it = tab->slots[j];
 					if (it.key.tag==ELF_TNIL) continue;
 					if (it.idx!=i) continue;
 					if (n ++ != 0) wrote += sb_sprintf(sb, ", ");
@@ -219,7 +219,7 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
 				wrote += value_bprintf(sb,tab->array[i],1);
 			}
 			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	elf_Table_Entry it = tab->slots[i];
+			// 	TEntry it = tab->slots[i];
 			// 	if (it.key.tag == ELF_TNIL) continue;
 			// 	if (n ++ != 0) wrote += sb_sprintf(sb,", ");
 			// 	wrote += value_bprintf(sb,it.key,1);
@@ -263,7 +263,7 @@ ELF_FUNCTION(l_core_format) {
 			format += 1;
 
 			// todo:
-			V value = lvalue(S, index ++);
+			V value = loadvalue(S, index ++);
 			value_bprintf(&sb, value, 0);
 		}
 	}
@@ -327,10 +327,10 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 			// todo:
 			// figure this out, or pass in flags to determine whether to omit the hash part or the array part
 			if (table->nslots) {
-				index_t i;
+				elf_Index i;
 				for (i = 0; i < table->ntotal; ++ i) {
-					elf_Table_Entry entry = table->slots[i];
-					index_t index = entry.idx;
+					TEntry entry = table->slots[i];
+					elf_Index index = entry.idx;
 					elf_Value key = entry.key;
 
 					if ((key.tag != ELF_TNUMBER)
@@ -383,7 +383,7 @@ static int unparse(elf_State *inter, String_Builder *sb, elf_Value thing, int le
 
 ELF_FUNCTION(l_core_unload) {
 	elf_Handle file = f_checkhand(S, 0);
-	elf_Value thing = loadvalue(S, 1);
+	elf_Value thing = loadvalue(S, 2);
 	String_Builder sb = {};
 	int noerr = unparse(S, &sb, thing, 0);
 	if (noerr) {
@@ -450,14 +450,14 @@ int core_lib_include(elf_State *R) {
 	todo: */
 
 	elf_Table *globals = R->globals;
-	elf_Table_Entry entry;
+	TEntry entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
 		if (entry.key.tag == ELF_TSTRING) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = elf_alloc_string(R,sym);
-			elf_raw_table_set(globals,VALUE_STRING(ref),globals->array[entry.idx]);
+			tableset(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}
 	return 0;

@@ -13,10 +13,6 @@ static inline elf_String *topstr(elf_State *S, int x) {
 
 
 
-static inline elf_Value loadvalue(elf_State *S, elf_stkid x) {
-	return S->frame.framebase[x + 1];
-}
-
 
 
 static inline elf_Value f_checkobj(elf_State *S, int x, elf_Tag tag) {
@@ -62,7 +58,7 @@ static inline elf_Handle f_checkhand(elf_State *S, int x) {
 
 
 static inline elf_Integer f_checkint(elf_State *S, int x) {
-	elf_Value v = loadvalue(S, x);
+	elf_Value v = loadvalue(S, x + 1);
 	if (!visnumeric(v)) {
 		return 0;
 	}

@@ -367,7 +367,7 @@ bool elf_readfile(elf_State *inter, int stk, int size);
 
 // todo: should take a buffer
 ELF_FUNCTION(l_sys_read_console) {
-	int zbuf = lint(S, 1);
+	int zbuf = loadint(S, 1);
 	char *buf = calloc(1, zbuf + 1);
 	int ret = sys_read_console(SYS_STD_INPUT, buf, zbuf);
 	pushstring(S, buf);

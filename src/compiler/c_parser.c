@@ -41,8 +41,16 @@ static void parser_restart(elf_Parser *parser, char *cursor) {
 
 
 
+static void elf_end_parser(elf_Parser *parser) {
+	sys_virtual_free(parser->tree_memory);
+	free(parser);
+}
+
+
 static elf_Parser *elf_new_parser(elf_State *inter, const char *name, const char *source) {
 	elf_Parser *parser = calloc(1, sizeof(*parser));
+	parser->tree_memory = sys_virtual_alloc(GIGABYTES(1));
+
 	ASSERT(inter != 0);
 	ASSERT(parser != 0);
 	ASSERT(name != 0);
@@ -546,7 +554,7 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 		case TK_M_GETEXPR: {
 			get_tok(parser);
 			v=parse_subexpr(parser,0,10000);
-			v=tree_unary(parser,tok.line,TREE_GETEXPR,NT_INT,v);
+			v=tree_unary(parser,tok.line,TREE_GETEXPR,NT_STR,v);
 		} break;
 		case TK_TILDE: {
 			get_tok(parser);
@@ -594,15 +602,6 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 			v=parse_table(parser);
 		} break;
 
-		case TK_DOT_DOT: {
-			/* provide an empty range so that the caller can interpret
-			according to context */
-			get_tok(parser);
-			v = tree_nullary(parser,tok.line,TREE_RANGE,NT_ANY);
-			// attempt to parse the hi part, it's ok to be nil
-			treeID y = parse_postfix(parser, 0);
-			v->y = y;
-		} break;
 		// todo: dot syntax is to be repurposed
 		case TK_DOT:
 		// todo: make this legitimate, add directories and stuff
@@ -784,51 +783,47 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 
 
 static treeID parse_table(elf_Parser *parser) {
-	Token tok = take_tok(parser,TK_CURLY_LEFT);
+	take_tok(parser,TK_CURLY_LEFT);
+
+	Token tok = parser->tok;
+
+	treeID *key_value_tuples = 0;
+
 	int index = 0;
-
-	tok = parser->tok;
-
-	KV *kvs = 0;
-
 	for (;(tok.type != TK_NONE) && (tok.type != TK_CURLY_RIGHT); tok = parser->tok) {
-		KV kv = { NO_TREE, NO_TREE };
+		treeID x = NO_TREE, y = NO_TREE;
 
 		// multi stores
 		if ((tok.type == TK_WORD) && (parser->tok_prox.type == TK_ASSIGN)) {
 			tok = get_tok(parser);
-			kv.x = tree_str(parser,tok.line,tok.text);
-			if (kv.x == NO_TREE) goto _err;
+			x = tree_str(parser,tok.line,tok.text);
+			if (x == NO_TREE) goto _err;
 		} else {
-			kv.x = kv.y = parse_expr(parser,0);
-			if (kv.x == NO_TREE) goto _err;
+			x = y = parse_expr(parser,0);
+			if (x == NO_TREE) goto _err;
 		}
 
 		tok = parser->tok;
 		if (pick_tok(parser,TK_ASSIGN)) {
 
-			kv.y = parse_expr(parser, 0);
-			if (kv.y == NO_TREE) goto _err;
+			y = parse_expr(parser, 0);
+			if (y == NO_TREE) goto _err;
 
 		} else {
 
 			// todo: unsafe, could overwrite previous stuff
-			kv.x = tree_int(parser,tok.line,index++);
-			if (kv.x == NO_TREE) goto _err;
+			x = tree_int(parser,tok.line,index++);
+			if (x == NO_TREE) goto _err;
 		}
 
-		ASSERT(kv.y != NO_TREE);
-		ASSERT(kv.x != NO_TREE);
+		ASSERT(y != NO_TREE);
+		ASSERT(x != NO_TREE);
 
-		check_tree(parser,tok.line,kv.x);
-		check_tree(parser,tok.line,kv.y);
+		check_tree(parser,tok.line,x);
+		check_tree(parser,tok.line,y);
 		tok = parser->tok;
 
-		darr_add(kvs, kv);
-
-		// treeID field = tree_field(parser,tok.line,table,key);
-		// treeID store = tree_store(parser,tok.line,field,value);
-		// prev = prev->prox = store;
+		darr_add(key_value_tuples, tree_tuple2(parser, tok.line, x, y));
 
 		if (pick_tok(parser,TK_COMMA)) {
 			continue;
@@ -837,7 +832,7 @@ static treeID parse_table(elf_Parser *parser) {
 	take_tok(parser,TK_CURLY_RIGHT);
 
 
-	treeID table = tree_table(parser, tok.line, kvs);
+	treeID table = tree_table(parser, tok.line, key_value_tuples);
 	return table;
 	_err:
 	parser_dialog(parser,parser->tok.line,"invalid field intializer");
@@ -976,22 +971,32 @@ static treeID parse_subexpr(elf_Parser *parser, int nrets, int rank) {
 
 	treeID x,y;
 
-	x = parse_postfix(parser, nrets);
-	if (x == NO_TREE) goto esc;
+	if (peek_tok(parser, TK_DOT_DOT)) {
+		x = NO_TREE;
+		// empty range
+		// ... <y>
+		goto parsey;
+	}
+	else {
+		x = parse_postfix(parser, nrets);
+		if (x == NO_TREE) goto esc;
 
-	if (x->type == NT_NON) {
-		parser_dialog(parser, x->line, "invalid data type");
-		goto esc;
+		if (x->type == NT_NON) {
+			parser_dialog(parser, x->line, "invalid data type");
+			goto esc;
+		}
 	}
 
 	for(;;) {
+		parsey:
+
 		tok = parser->tok;
 
 		int prio = token_precedence(tok.type);
 		if (prio <= rank) goto esc;
 
 		// assign is not an expression, quit now and let
-		// the caller handle it as a top level statement
+		// the caller handle it
 		if (parser->tok_prox.type == TK_ASSIGN) {
 			goto esc;
 		}
@@ -999,14 +1004,16 @@ static treeID parse_subexpr(elf_Parser *parser, int nrets, int rank) {
 		get_tok(parser);
 
 		y = parse_subexpr(parser, 1, prio);
-		if (y == NO_TREE) goto esc;
-
-		if (y->type == NT_NON) {
-			parser_dialog(parser, y->line, "invalid data type");
-			goto esc;
+		if (tok.type != TK_DOT_DOT) {
+			if (!y || y->type == NT_NON) {
+				parser_dialog(parser, tok.line, "invalid right operand");
+				goto esc;
+			}
 		}
 
 		x = tree_binary(parser, tok.line, tok2tree(tok.type), NT_ANY, x, y);
+
+		if (y == NO_TREE) goto esc;
 	}
 
 	esc:

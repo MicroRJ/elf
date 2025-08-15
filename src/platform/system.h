@@ -106,7 +106,9 @@ unsigned int sys_write_file(FILE_HANDLE file, void *buf, unsigned int size);
 int sys_time_file(FILE_HANDLE file, FILE_TIMES *);
 void sys_file_time_to_system_time(FILE_TIME *, SYSTEM_TIME *);
 
+
 void *sys_virtual_alloc(elf_i64 length);
+void sys_virtual_free(void *memory);
 
 
 /* printing, use type (LOG_TYPE),

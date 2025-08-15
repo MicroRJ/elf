@@ -801,7 +801,7 @@ int _resume(elf_State *inter) {
 				if (vistab(xx)) {
 					if (visnil(yy)) elf_error(inter, minstr, "key is nil...");
 
-					elf_raw_table_set(xx.x_tab, yy, zz);
+					tableset(xx.x_tab, yy, zz);
 				}
 				else if (isusr(xx)) {
 					elf_error(inter, minstr, "overload not implemented");
@@ -916,7 +916,7 @@ int _resume(elf_State *inter) {
 							R->trace_stop_instr  = minstr;
 							R->active_trace_pos  = darr_l(R->trace_buffer);
 							R->active_trace_len  = 0;
-							elf_raw_table_set(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
+							tableset(R->trace_table,VALUE_INTEGER(trace_start_instr),VALUE_INTEGER(R->active_trace_pos));
 						}else{
 							R->track[minstr]+=1;
 						}

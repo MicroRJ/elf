@@ -10,7 +10,7 @@ static bool is_tree_trivial_constant(elf_Parser *parser, treeID id) {
 
 
 
-static treeT get_tree(elf_Parser *parser, treeID id) { return *id; }
+static Tree get_tree(elf_Parser *parser, treeID id) { return *id; }
 
 static int get_tree_kind(elf_Parser *parser, treeID id) { return id->kind; }
 
@@ -18,14 +18,19 @@ static int get_tree_type(elf_Parser *parser, treeID id) { return id->type; }
 
 static Source get_tree_line(elf_Parser *parser, treeID id) { return id->line; }
 
+
+
 static treeID new_tree(elf_Parser *parser, Source line, int kind, int type) {
 	// todo: proper arena
-	treeID tree = calloc(sizeof(treeT),1);
+	treeID tree = & parser->tree_memory[parser->tree_index ++];
 	tree->line = line;
 	tree->kind = kind;
 	tree->type = type;
 	return tree;
 }
+
+
+
 
 static treeID tree_xyz(elf_Parser *parser, Source line, int kind, int type, treeID x, treeID y, treeID *z) {
 	treeID v=new_tree(parser,line,kind,type);
@@ -100,9 +105,9 @@ static treeID tree_str(elf_Parser *parser, Source line, char *s) {
 }
 
 
-static treeID tree_table(elf_Parser *parser, Source line, KV *kvs) {
-	treeID v = tree_nullary(parser,line,TREE_NEW_TABLE,NT_TAB);
-	v->expr_newtable.kvs = kvs;
+static treeID tree_table(elf_Parser *parser, Source line, treeID *key_value_tuples) {
+	treeID v = tree_nullary(parser, line, TREE_NEW_TABLE, NT_TAB);
+	v->expr_newtable.key_value_tuples = key_value_tuples;
 	return v;
 }
 
@@ -133,14 +138,21 @@ static treeID tree_field(elf_Parser *parser, Source line, treeID x, treeID y) {
 static treeID tree_index(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,EXPR_INDEX,NT_ANY,x,y);
 }
+
 static treeID tree_ranged_index(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,EXPR_RANGE_INDEX,NT_ANY,x,y);
 }
+
 static treeID tree_call(elf_Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,TREE_CALL,NT_ANY,x,NO_TREE,z);
 }
+
 static treeID tree_tuple(elf_Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY,NO_TREE,NO_TREE,z);
+}
+
+static treeID tree_tuple2(elf_Parser *parser, Source line, treeID x, treeID y) {
+	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY, x, y, 0);
 }
 
 

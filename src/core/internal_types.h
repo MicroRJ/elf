@@ -103,19 +103,19 @@ struct elf_Closure {
 // todo: we use 64 bits for all indices
 typedef struct {
 	elf_Value  key;
-	index_t    idx;
-} elf_Table_Entry;
+	elf_Index  idx;
+} TEntry;
 
 
 typedef struct elf_Table elf_Table;
 struct elf_Table {
-	elf_Object            obj;
-	index_t       ntotal;
-	index_t       nslots;
-	index_t    	 ndebug;
+	elf_Object         obj;
+	elf_Index       ntotal;
+	elf_Index       nslots;
+	elf_Index    	 ndebug;
 	union {
-		elf_Table_Entry    *slots;
-		elf_Table_Entry    *entries;
+		TEntry    *slots;
+		TEntry    *entries;
 	};
 	elf_Value  	       *array;
 };

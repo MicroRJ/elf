@@ -39,15 +39,12 @@ typedef struct {
 } jumpS;
 
 
-typedef struct BranchJumps {
-	/* Conditional false jump instructions
-	to be patched so that they jump to
-	the next block or instruction */
-	int *jz;
+typedef struct JBuf {
+	BCPos *jz;
 	/* list of exit jump instructions from
 	each consecutive block to be patched */
-	int *j;
-} BranchJumps;
+	BCPos *j;
+} JBuf;
 
 typedef struct Block Block;
 struct Block {
@@ -105,23 +102,27 @@ struct elf_Parser {
 	// of having to pass to all functions that need it.
 	char                  *sourceloc;
 
+	// todo: proper arena
+	Tree                  *tree_memory;
+	int                    tree_index;
+
 	// the current function
 	treeID                       enc;
 	// Record all the functions we've come across, to help
-	// during code generation, since we can only generate
-	// one function at a time.
+	// during code generation.
 	// Because we write to the same contiguous buffer, we
 	// need to queue functions so that they generate one
 	// after the other.
 	// Note that the generator will eventually see all these
-	// functions regardless, but we want to have this ready,
-	// before that happens.
+	// functions regardless.
+	// By tracking the functions as we parse them, we avoid
+	// having to re-discover them during code gen.
 	//
 	treeID          *functions;
 	// entities are named objects, variables,
 	// symbols, special names, and such...
 	// todo: allocate within struct
-	Entity          entities[MAX_ENTITIES];
+	Entity           entities[MAX_ENTITIES];
 	entID            entity_index;
 	// remember scope hierarchy, 'scope'
 	// is the first visible entity

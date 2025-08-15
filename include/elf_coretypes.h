@@ -25,7 +25,7 @@ typedef elf_f64  elf_Number;
 typedef elf_i32  elf_Error;
 
 typedef elf_u32  hash_t;
-typedef elf_i64 index_t;
+typedef elf_i64 elf_Index;
 
 
 #define ELF_HINVALID  ((elf_Handle) -1)

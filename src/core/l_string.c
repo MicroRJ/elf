@@ -24,7 +24,7 @@ ELF_FUNCTION(l_str_get_hash) {
 
 ELF_FUNCTION(l_str_get_index) {
 	const char *text = lstrdata(S, 0);
-	int index = lint(S, 1);
+	int index = loadint(S, 1);
 	pushint(S, text[index]);
 	return 1;
 }
@@ -45,10 +45,10 @@ static int value_bprintf(String_Builder *sb, elf_Value v, bool flags);
 
 ELF_FUNCTION(l_str_join) {
 	String_Builder sb = {};
-	for (int i = -1; i < (nargs - 1); ++ i) {
+	for (int i = 0; i < nargs; ++ i) {
 		value_bprintf(&sb, loadvalue(S, i), 0);
 	}
-	elf_pushstrl(S, sb.buf, sb.min);
+	pushstringl(S, sb.buf, sb.min);
 	free(sb.buf);
 	return 1;
 }

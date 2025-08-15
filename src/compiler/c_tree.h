@@ -10,8 +10,8 @@
 
 typedef struct elf_Parser elf_Parser;
 
-typedef struct treeT treeT;
-typedef treeT *treeID;
+typedef struct Tree Tree;
+typedef Tree *treeID;
 
 /* MIND ORDER */
 #define TREEDEF(_)   \
@@ -92,13 +92,13 @@ typedef enum treeTy {
 	NT_OBJ, NT_TAB, NT_FUN, NT_STR
 } treeTy;
 
-typedef struct {
-	treeID x;
-	treeID y;
-} KV;
+// typedef struct {
+// 	treeID x;
+// 	treeID y;
+// } KV;
 
 
-struct treeT {
+struct Tree {
 	treeKi   kind;
 	treeTy   type;
 	Source   line;
@@ -123,7 +123,7 @@ struct treeT {
 		} tree_memory;
 
 		struct {
-			KV *kvs;
+			treeID *key_value_tuples;
 		} expr_newtable;
 
 		struct {

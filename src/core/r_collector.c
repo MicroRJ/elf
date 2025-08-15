@@ -53,7 +53,7 @@ static elf_i64 _mark(elf_Object *obj) {
 		} else if (obj->type == GC_TAB) {
 			elf_Table *table = (elf_Table *) obj;
 			elf_Value *array = table->array;
-			elf_Table_Entry *slots = table->slots;
+			TEntry *slots = table->slots;
 			FOR_RANGE(i,0,table->ntotal) {
 				if (tisobject(slots[i].key.tag)) {
 					num += _mark(slots[i].key.x_obj);
