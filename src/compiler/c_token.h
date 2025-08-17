@@ -33,6 +33,7 @@ _(IF       ,"if"          ) \
 _(ELSE     ,"else"        ) \
 _(ELIF     ,"elif"        ) \
 _(THEN     ,"then"        ) \
+_(GLOBAL   ,"global"      ) \
 /* end */
 
 #define MACRODEF(_) \
@@ -92,6 +93,7 @@ _(ARROW              ,"->")         \
 _(HARD_ARROW         ,"-->")        \
 _(BIND               ,":=")         \
 _(HARD_BIND          ,"::=")        \
+_(STATIC_BIND        ,"::")         \
 _(ASSIGN             ,"=")          \
 _(NIL_ASSIGN         ,"?=")         \
 _(COLON              ,":")          \

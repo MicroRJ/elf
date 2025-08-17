@@ -3,10 +3,13 @@
 //
 
 
-// todo: prob stop using dynamic arrays and use linked lists instead
-// todo: this name can be confusing
-#define NO_TREE 0
-#define INVALID_TREE -1
+#define Y_NULL     (0)
+// some internal error
+#define Y_ERROR   ((treeID) (-1))
+// undeclared identifier
+#define Y_UNIDENT ((treeID) (-2))
+
+#define TREE_NO_ERROR(t) ((t) > 0)
 
 typedef struct elf_Parser elf_Parser;
 

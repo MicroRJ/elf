@@ -28,6 +28,15 @@
 
 STATIC_ASSERT(sizeof(_FILE_HANDLE) >= sizeof(FILE_HANDLE));
 
+
+
+char *sys_get_cmd_line() {
+	return GetCommandLineA();
+}
+
+
+
+
 FILE_HANDLE sys_get_std_file(int std) {
 	switch (std) {
 		case SYS_STD_OUTPUT: return GetStdHandle(STD_OUTPUT_HANDLE);
@@ -47,25 +56,25 @@ unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int zbuf) {
 
 
 
-unsigned int sys_read_file(FILE_HANDLE file, void *buf, unsigned int zbuf) {
+elf_i64 sys_read_file(FILE_HANDLE file, void *buf, elf_i64 zbuf) {
 	DWORD read = 0;
 	ReadFile(file, buf, zbuf, &read, NULL);
 	return read;
 }
 
-unsigned int sys_write_file(FILE_HANDLE file, void *buf, unsigned int zbuf) {
+elf_i64 sys_write_file(FILE_HANDLE file, void *buf, elf_i64 zbuf) {
 	DWORD wrote = 0;
 	WriteFile(file, buf, zbuf, &wrote, NULL);
 	return wrote;
 }
 
-unsigned int sys_size_file(FILE_HANDLE file) {
+elf_i64 sys_size_file(FILE_HANDLE file) {
 	DWORD zfile = GetFileSize(file, NULL);
 	return zfile;
 }
 
 
-int sys_create_directory(const char *path) {
+int sys_make_dir(const char *path) {
 	return CreateDirectory(path, NULL);
 }
 
@@ -78,12 +87,14 @@ void sys_close_file(FILE_HANDLE file) {
 	CloseHandle(file);
 }
 
-int sys_get_file_cursor(FILE_HANDLE file) {
-	return SetFilePointer(file, 0, 0, FILE_CURRENT);
-}
-
-int sys_set_file_cursor(FILE_HANDLE file, int cursor) {
-	return SetFilePointer(file, cursor, 0, FILE_CURRENT);
+elf_i64 sys_move_file_cursor(FILE_HANDLE file, int relativeto, elf_i64 dist) {
+	if (relativeto == SYS_END) {
+		return SetFilePointer(file, dist, 0, FILE_END);
+	} else if (relativeto == SYS_BEGIN) {
+		return SetFilePointer(file, dist, 0, FILE_BEGIN);
+	} else {
+		return SetFilePointer(file, dist, 0, FILE_CURRENT);
+	}
 }
 
 // todo: support temporary files

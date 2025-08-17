@@ -2,6 +2,11 @@
 // See Copyright Notice In elf.h
 //
 
+
+#define NO_SLOT (-1)
+#define NO_JUMP (-0)
+
+
 static int emit_branch_if_false(elf_Parser *fs, jumpS *js, treeID id);
 static int emit_branch_if_true(elf_Parser *fs, jumpS *js, treeID id);
 static int *emit_jump_if_true(elf_Parser *fs, jumpS *js, treeID id);
@@ -81,9 +86,9 @@ static void _pop_mem_state(elf_Parser *parser) {
 
 	int i;
 	for (i=former_mem_state-1; i>=parser->memory_state; --i){
-		if(parser->memory_slots[i]!=NO_TREE){
+		if(parser->memory_slots[i]!=Y_NULL){
 			parser->memory_slots[i]->tree_memory.mem=NO_SLOT;
-			parser->memory_slots[i]=NO_TREE;
+			parser->memory_slots[i]=Y_NULL;
 		}
 	}
 }
@@ -356,7 +361,7 @@ static void make_tree(elf_Parser *parser, treeID id) {
 			int mem,num;
 
 			mem=0,num=0;
-			if(tree.x!=NO_TREE){
+			if(tree.x!=Y_NULL){
 				num=1;
 				mem=to_mem(parser,tree.x,NO_SLOT,num);
 				ASSERT(mem!=NO_SLOT);
@@ -410,7 +415,7 @@ static void make_tree(elf_Parser *parser, treeID id) {
 					patch_jump(parser,b[i]->jump);
 				}
 				patch_jumps(parser,js.f);
-				ARRAY_DELETE(js.f);
+				darr_free(js.f);
 				js.f = 0;
 			}
 		} break;
@@ -475,7 +480,7 @@ static int make_newtable_expr(elf_Parser *parser, treeID v, int dst, int ndst) {
 
 static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	ASSERT(id != 0);
-	ASSERT(id != NO_TREE);
+	ASSERT(id != Y_NULL);
 	ASSERT(id->line);
 
 	elf_State *S = parser->R;
@@ -596,7 +601,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			js=emit_jump_if_false(parser,&e,id);
 			dst=to_mem(parser,tree_int(parser,line,1),dst,1);
 			patch_jumps(parser,js);
-			ARRAY_DELETE(js);
+			darr_free(js);
 		} break;
 
 		/* (a !! b) = (a == nil ? a : b) */
@@ -610,7 +615,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			dst=to_mem(parser,tree.y,dst,1);
 
 			patch_jumps(parser,j);
-			ARRAY_DELETE(j);
+			darr_free(j);
 		} break;
 
 		/* (a ?? b) = (a != nil ? a : b) */
@@ -624,7 +629,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			dst=to_mem(parser,tree.y,dst,1);
 
 			patch_jumps(parser,j);
-			ARRAY_DELETE(j);
+			darr_free(j);
 		} break;
 
 		case TREE_FUNCTION: {
@@ -772,7 +777,7 @@ false jumps converge here */
 static inline BCPos *emit_jump_if_true(elf_Parser *fs, jumpS *js, treeID id) {
 	emit_branch_if_true(fs,js,id);
 	patch_jumps(fs,js->f);
-	ARRAY_DELETE(js->f);
+	darr_free(js->f);
 	js->f = 0;
 	return js->t;
 }
@@ -781,7 +786,7 @@ static inline BCPos *emit_jump_if_true(elf_Parser *fs, jumpS *js, treeID id) {
 static inline BCPos *emit_jump_if_false(elf_Parser *fs, jumpS *js, treeID id) {
 	emit_branch_if_false(fs,js,id);
 	patch_jumps(fs,js->t);
-	ARRAY_DELETE(js->t);
+	darr_free(js->t);
 	js->t = 0;
 	return js->f;
 }
@@ -807,13 +812,13 @@ static void begin_if(elf_Parser *parser, Source line, JBuf *jb, treeID x, int if
 	if (if_true) {
 		ASSERT(js.t != 0);
 		patch_jumps(parser,js.f);
-		ARRAY_DELETE(js.f);
+		darr_free(js.f);
 		js.f = 0;
 		jb->jz = js.t;
 	} else {
 		ASSERT(js.f != 0);
 		patch_jumps(parser,js.t);
-		ARRAY_DELETE(js.t);
+		darr_free(js.t);
 		js.t = 0;
 		jb->jz = js.f;
 	}
@@ -832,7 +837,7 @@ void add_else_clause(elf_Parser *fs, Source line, JBuf *s) {
 	darr_add(s->j,j);
 
 	patch_jumps(fs,s->jz);
-	ARRAY_DELETE(s->jz);
+	darr_free(s->jz);
 	s->jz = 0;
 }
 
@@ -856,7 +861,7 @@ static void add_then_clause(elf_Parser *parser, Source line, JBuf *s) {
 	(Can't believe you misspelled naturally) */
 
 	patch_jumps(parser,s->j);
-	ARRAY_DELETE(s->j);
+	darr_free(s->j);
 	s->j = 0;
 }
 
@@ -866,13 +871,13 @@ void close_if(elf_Parser *fs, Source line, JBuf *s) {
 	/* collect missing else branch */
 	if (s->jz != 0) {
 		patch_jumps(fs,s->jz);
-		ARRAY_DELETE(s->jz);
+		darr_free(s->jz);
 		s->jz = 0;
 	}
 	/* collect missing then branch */
 	if (s->j != 0) {
 		patch_jumps(fs,s->j);
-		ARRAY_DELETE(s->j);
+		darr_free(s->j);
 		s->j = 0;
 	}
 }
@@ -1010,8 +1015,8 @@ treeID desugar_range_expr(elf_Parser *fs, treeID x, int flags) {
 			treeID lo,hi;
 			lo=get_tree(fs,node.y).x;
 			hi=get_tree(fs,node.y).y;
-			if (lo==NO_TREE) lo=tree_int(fs,line,0);
-			if (hi==NO_TREE) hi=tree_meta_call(fs,line,array,0,"length");
+			if (lo==Y_NULL) lo=tree_int(fs,line,0);
+			if (hi==Y_NULL) hi=tree_meta_call(fs,line,array,0,"length");
 
 			begin_range_loop(fs,line,index,lo,hi);
 			value_reg=any_reg_deprecated(fs,value);
@@ -1027,7 +1032,7 @@ treeID desugar_range_expr(elf_Parser *fs, treeID x, int flags) {
 	return x;
 	// Todo: come back to this later
 	__debugbreak();
-	return NO_TREE;
+	return Y_NULL;
 }
 
 void opt_const_fold(elf_Parser *fs, Tree node) {

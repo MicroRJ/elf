@@ -3,6 +3,7 @@
 //
 #define _CRT_SECURE_NO_WARNINGS
 
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -543,7 +544,7 @@ int _resume(elf_State *inter) {
 
 	int subframes = 0;
 
-	Table globals = inter->globals;
+	Tab globals = inter->globals;
 
 	V xx,yy,zz;
 	while (frame.nextinstr < frame.bytec) {

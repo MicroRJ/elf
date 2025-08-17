@@ -66,8 +66,8 @@ enum {
 };
 
 enum {
-	SYS_BEGIN = 0,
-	SYS_CURRENT,
+	SYS_CURRENT = 0,
+	SYS_BEGIN,
 	SYS_END,
 };
 
@@ -85,22 +85,21 @@ enum {
 	SYS_STD_INPUT,
 };
 
+// i hear that on linux you can't do this...
+char *sys_get_cmd_line();
+
 
 unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int size);
 
-int sys_create_directory(const char *path);
-
+int sys_make_dir(const char *path);
 FILE_HANDLE sys_get_std_file(int std);
 FILE_HANDLE sys_open_file(const char *name, int access, int options);
 bool sys_delete_file(const char *name);
-
-int sys_get_file_cursor(FILE_HANDLE file);
-int sys_set_file_cursor(FILE_HANDLE file, int cursor);
-
 void sys_close_file(FILE_HANDLE file);
-unsigned int sys_size_file(FILE_HANDLE file);
-unsigned int sys_read_file(FILE_HANDLE file, void *buf, unsigned int size);
-unsigned int sys_write_file(FILE_HANDLE file, void *buf, unsigned int size);
+elf_i64 sys_move_file_cursor(FILE_HANDLE file, int relativeto, elf_i64 dist);
+elf_i64 sys_size_file(FILE_HANDLE file);
+elf_i64 sys_read_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
+elf_i64 sys_write_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
 
 
 int sys_time_file(FILE_HANDLE file, FILE_TIMES *);
@@ -163,6 +162,8 @@ enum {
 };
 
 
+#if defined(PATH_BUILDER)
+
 typedef struct {
 	// todo: this could honestly just be in the path builder
 	// and we'd have a little api thing for pushing files
@@ -177,6 +178,8 @@ typedef struct {
 FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor);
 int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor);
 void sys_find_close(FILE_HANDLE hand);
+
+#endif
 
 
 #endif

@@ -15,6 +15,8 @@
 
 Num elf_loadnum(elf_State *S, int x) { return loadnum(S, x); }
 Int elf_loadint(elf_State *S, int x) { return loadint(S, x); }
+Handle elf_loadsys(elf_State *S, int x) { return loadsys(S, x); }
+
 const char *elf_loadtext(elf_State *S, int x) {
 	return loadtext(S, x);
 }
@@ -24,6 +26,7 @@ void elf_pushint(elf_State *S, elf_Integer   x) { pushint(S, x); }
 void elf_pushnum(elf_State *S, elf_Number    x) { pushnum(S, x); }
 void elf_pushfun(elf_State *S, elf_Function  x) { pushfun(S, x); }
 void elf_pushsys(elf_State *S, elf_Handle    x) { pushsys(S, x); }
+
 
 
 void elf_pushtab(elf_State *S) {

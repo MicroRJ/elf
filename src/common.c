@@ -277,3 +277,5 @@ static int sb_sprintf(String_Builder *sb, char *format, ...) {
 	va_end(vargs);
 	return size;
 }
+
+

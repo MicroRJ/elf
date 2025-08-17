@@ -12,22 +12,22 @@
 
 
 ELF_FUNCTION(l_table_get_meta) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	pushtab(S, getmeta(tab));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_table_set_meta) {
-	Table tab = loadtable(S, 0);
-	Table meta = loadtable(S, 1);
+	Tab tab = loadtable(S, 0);
+	Tab meta = loadtable(S, 1);
 	setmeta(tab, meta);
 	pushtab(S, meta);
 	return 1;
 }
 
 
-static inline bool tablecontains(Table t, V k) {
+static inline bool tablecontains(Tab t, V k) {
 	Index s = tabletry(t, k);
 	return s >= 0 && !isdead(t->entries[s].key);
 }
@@ -35,7 +35,7 @@ static inline bool tablecontains(Table t, V k) {
 
 
 ELF_FUNCTION(l_table_contains) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	V     key = loadvalue(S, 1);
 	pushint(S, tablecontains(tab, key));
 	return 1;
@@ -44,7 +44,7 @@ ELF_FUNCTION(l_table_contains) {
 
 
 ELF_FUNCTION(l_table_get_collisions) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	pushint(S, tab->ndebug);
 	return 1;
 }
@@ -60,7 +60,7 @@ ELF_FUNCTION(l_table_get_collisions) {
 ELF_FUNCTION(l_table_delete) {
 	ASSERT((nargs - 1) >= 1);
 
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	V key = loadvalue(S, 0);
 
 	TEntry *entries = tab->entries;
@@ -93,7 +93,7 @@ ELF_FUNCTION(l_table_delete) {
 }
 
 
-static inline void aliastable(Table tab, V key, V alias) {
+static inline void aliastable(Tab tab, V key, V alias) {
 	Index slot = tabletry(tab,key);
 	if (slot >= 0) {
 		if (!isdead(tab->entries[slot].key)) {
@@ -110,7 +110,7 @@ static inline void aliastable(Table tab, V key, V alias) {
 // creates a new one entry of the given 'new_key' that
 // points to where 'existing_key' points to
 ELF_FUNCTION(l_table_alias) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	aliastable(tab, loadvalue(S, 1), loadvalue(S, 2));
 	return 0;
 }
@@ -121,7 +121,7 @@ ELF_FUNCTION(l_table_alias) {
 // finds all the aliases of the given 'key' including the
 // key itself
 ELF_FUNCTION(l_find_aliases) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	V     key = loadvalue(S, 1);
 
 	pushtable(S);
@@ -160,7 +160,7 @@ ELF_FUNCTION(l_find_aliases) {
 // returns an array containg all the keys for this table
 //
 ELF_FUNCTION(l_table_get_keys) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 
 	elf_pushtab(S);
 
@@ -193,10 +193,10 @@ ELF_FUNCTION(l_table_merge) {
 
 	Index slot;
 
-	Table sum = pushtable(S);
+	Tab sum = pushtable(S);
 
 	for (int i = 0; i < nargs; ++ i) {
-		Table merger = loadtable(S, i);
+		Tab merger = loadtable(S, i);
 		for (slot = 0; slot < merger->ntotal; ++ slot) {
 			TEntry entry = merger->entries[slot];
 
@@ -215,8 +215,8 @@ ELF_FUNCTION(l_table_merge) {
 
 
 ELF_FUNCTION(l_table_fork) {
-	Table tab = loadtable(S, 0);
-	Table sub = loadtable(S, 1);
+	Tab tab = loadtable(S, 0);
+	Tab sub = loadtable(S, 1);
 
 	if (sub == 0) {
 		elf_error(S, NO_BYTE, "argument is nil");
@@ -243,14 +243,14 @@ ELF_FUNCTION(l_table_fork) {
 
 
 ELF_FUNCTION(l_array_length) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	pushint(S, darr_l(tab->array));
 	return 1;
 }
 
 
 
-static Index loadindex(elf_State *S, int stk, Table tab) {
+static Index loadindex(elf_State *S, int stk, Tab tab) {
 	Index index = loadint(S, stk);
 	if (index < 0) index += darr_l(tab->array);
 
@@ -263,7 +263,7 @@ static Index loadindex(elf_State *S, int stk, Table tab) {
 
 
 ELF_FUNCTION(l_array_index) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	Index idx = loadindex(S, 1, tab);
 	pushvalueunsafe(S, tab->array[idx]);
 	return 1;
@@ -272,7 +272,7 @@ ELF_FUNCTION(l_array_index) {
 
 
 ELF_FUNCTION(l_array_add) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 
 	for (int i = 1; i < nargs; i++) {
 		V v = loadvalue(S, i);
@@ -285,7 +285,7 @@ ELF_FUNCTION(l_array_add) {
 
 
 ELF_FUNCTION(l_array_replace) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	V     val = loadvalue(S, 1);
 	Index idx = loadindex(S, 2, tab);
 
@@ -296,7 +296,7 @@ ELF_FUNCTION(l_array_replace) {
 
 
 ELF_FUNCTION(l_array_swap) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	Index x   = loadindex(S, 1, tab);
 	Index y   = loadindex(S, 2, tab);
 
@@ -310,7 +310,7 @@ ELF_FUNCTION(l_array_swap) {
 
 
 ELF_FUNCTION(l_array_pop) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 
 	Dynamic_Array *darr = d_array_raw(tab->array);
 	pushvalueunsafe(S, tab->array[-- darr->min]);
@@ -320,10 +320,10 @@ ELF_FUNCTION(l_array_pop) {
 
 ELF_FUNCTION(l_array_merge) {
 
-	Table tab = loadtable(S, 0);
-	Table add = loadtable(S, 1);
+	Tab tab = loadtable(S, 0);
+	Tab add = loadtable(S, 1);
 
-	Table sum = pushtable(S);
+	Tab sum = pushtable(S);
 
 	Index i;
 	for (i=0;i<darr_l(tab->array);++i) {
@@ -338,7 +338,7 @@ ELF_FUNCTION(l_array_merge) {
 
 
 ELF_FUNCTION(l_array_clone) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 
 	elf_pushtab(S);
 
@@ -353,7 +353,7 @@ ELF_FUNCTION(l_array_clone) {
 
 ELF_FUNCTION(l_array_reverse) {
 
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 	elf_Index n = darr_l(tab->array);
 
 	V *array = tab->array;
@@ -369,14 +369,14 @@ ELF_FUNCTION(l_array_reverse) {
 
 
 ELF_FUNCTION(l_array_slice) {
-	Table tab = loadtable(S, 0);
+	Tab tab = loadtable(S, 0);
 
 	Index x = 0;
 	Index y = darr_l(tab->array);
 	if (nargs >= 2) x = loadint(S, 0);
 	if (nargs >= 3) y = loadint(S, 1);
 
-	Table slice = pushtable(S);
+	Tab slice = pushtable(S);
 	while (x < y) {
 		darr_add(slice->array, tab->array[x ++]);
 	}

@@ -17,7 +17,7 @@ const char *tag2s[] = {
 	[ELF_TUSER] = "userobj",
 	[ELF_TFUNCTION] = "Function",
 	[ELF_TCLOSURE] = "Closure",
-	[ELF_TSTRING] = "String",
-	[ELF_TTABLE] = "Table",
+	[ELF_TSTRING] = "Str",
+	[ELF_TTABLE] = "Tab",
 };
 

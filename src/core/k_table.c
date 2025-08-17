@@ -13,17 +13,17 @@
 
 
 
-inline void recycletable(Table tab) {
+inline void recycletable(Tab tab) {
 	free(tab->entries);
 
-	ARRAY_DELETE(tab->array);
+	darr_free(tab->array);
 
 	tab->array = 0;
 	tab->entries = 0;
 }
 
 
-static inline void init_table(elf_State *S, Table table, elf_Index nentries) {
+static inline void init_table(elf_State *S, Tab table, elf_Index nentries) {
 	table->ndebug = 0;
 	table->slots  = calloc(1, nentries * sizeof(TEntry));
 	table->ntotal = nentries;
@@ -33,8 +33,8 @@ static inline void init_table(elf_State *S, Table table, elf_Index nentries) {
 
 
 elf_rawapi
-Table newtable2(elf_State *S, Index nentries) {
-	Table table = elf_gc_alloc(S, GC_TAB, sizeof(elf_Table));
+Tab newtable2(elf_State *S, Index nentries) {
+	Tab table = elf_gc_alloc(S, GC_TAB, sizeof(elf_Table));
 	table->obj.meta = S->metatables.table;
 
 	init_table(S, table, nentries);
@@ -44,13 +44,13 @@ Table newtable2(elf_State *S, Index nentries) {
 
 
 elf_rawapi
-Table newtable(elf_State *R) {
+Tab newtable(elf_State *R) {
 	return newtable2(R, 4);
 }
 
 
 
-static void check_resize(Table table) {
+static void check_resize(Tab table) {
 	if (table->ntotal * 3 < table->nslots * 4) {
 		elf_Table new_table = *table;
 		new_table.ntotal = table->ntotal << 1;
@@ -105,7 +105,7 @@ static inline bool value_equals(V *x, V *y) {
 
 // todo: try double hashing
 elf_rawapi
-Index tabletry(Table tab, V key) {
+Index tabletry(Tab tab, V key) {
 	ASSERT(tab != 0);
 
 	check_resize(tab);
@@ -134,7 +134,7 @@ Index tabletry(Table tab, V key) {
 
 
 elf_rawapi
-Index tableset(Table table, V key, V value) {
+Index tableset(Tab table, V key, V value) {
 	Index index = -1;
 	Index slot = tabletry(table, key);
 	ASSERT(slot >= 0);
@@ -155,7 +155,7 @@ Index tableset(Table table, V key, V value) {
 
 
 
-V elf_table_get_raw(Table tab, V k) {
+V elf_table_get_raw(Tab tab, V k) {
 	Index slot = tabletry(tab,k);
 	if (slot == -2) NO_CODE;
 	if (slotiskey(tab,slot)) {
@@ -166,7 +166,7 @@ V elf_table_get_raw(Table tab, V k) {
 
 
 
-static Index elf_table_get_index_always_(Table table, elf_Value key) {
+static Index elf_table_get_index_always_(Tab table, elf_Value key) {
 
 	ASSERT(!visnil(key));
 
@@ -191,7 +191,7 @@ static Index elf_table_get_index_always_(Table table, elf_Value key) {
 
 
 elf_rawapi
-Index arrayadd(Table table, V v) {
+Index arrayadd(Tab table, V v) {
 	Index index = darr_grow(table->array, 1);
 	table->array[index] = v;
 	return index;
@@ -235,7 +235,7 @@ Index arrayadd(Table table, V v) {
 
 
 
-// void elf_tadd_tab(Table table, Table thing) {
+// void elf_tadd_tab(Tab table, Tab thing) {
 // 	darr_add(table->array,VALUE_TABLE(thing));
 // }
 
@@ -246,7 +246,7 @@ typedef struct TABLE_BINARY_FILE {
 	int num_keys;
 } TABLE_BINARY_FILE;
 
-void elf_table_export_binary(Table tab, FILE *io) {
+void elf_table_export_binary(Tab tab, FILE *io) {
 	FOR_RANGE(i, 0, darr_l(tab->array)) {
 		elf_Value value = tab->array[i];
 		switch (value.tag) {
@@ -267,7 +267,7 @@ void elf_table_export_binary(Table tab, FILE *io) {
 
 // todo: this path can be entirely removed because we only
 // ever use it for the registry stuff which will get its own data structure
-// elf_Index elf_table_try_text(Table tab, const char *text, elf_i32 length, elf_Hash hash) {
+// elf_Index elf_table_try_text(Tab tab, const char *text, elf_i32 length, elf_Hash hash) {
 // 	check_resize(tab);
 
 // 	TEntry *slots = tab->slots;
@@ -297,7 +297,7 @@ void elf_table_export_binary(Table tab, FILE *io) {
 
 
 // todo: remove!
-// elf_Value elf_tgetx_any(Table tab, char const *key) {
+// elf_Value elf_tgetx_any(Tab tab, char const *key) {
 // 	int length;
 // 	elf_i64 hash;
 // 	elf_Integer slot;

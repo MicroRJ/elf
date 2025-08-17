@@ -39,11 +39,11 @@ static treeID tree_xyz(elf_Parser *parser, Source line, int kind, int type, tree
 }
 
 static treeID tree_nullary(elf_Parser *parser, Source line, int k, int t) {
-	return tree_xyz(parser,line,k,t,NO_TREE,NO_TREE,NO_TREE);
+	return tree_xyz(parser,line,k,t,Y_NULL,Y_NULL,Y_NULL);
 }
 
 static treeID tree_unary(elf_Parser *parser, Source line, int k, int t, treeID x) {
-	return tree_xyz(parser,line,k,t,x,NO_TREE,NO_TREE);
+	return tree_xyz(parser,line,k,t,x,Y_NULL,Y_NULL);
 }
 
 static treeID tree_binary(elf_Parser *parser, Source line, int k, int t, treeID x, treeID y) {
@@ -62,7 +62,7 @@ static treeID tree_global(elf_Parser *parser, Source line, int x) {
 
 
 
-// todo: we should already have the String by now...
+// todo: we should already have the Str by now...
 static treeID tree_global_symbol(elf_Parser *parser, Source line, const char *name) {
 	int x = elf_get_global_slot(parser->R, elf_alloc_string(parser->R, name));
 	ASSERT(x != -1);
@@ -113,7 +113,7 @@ static treeID tree_table(elf_Parser *parser, Source line, treeID *key_value_tupl
 
 
 static treeID tree_closure(elf_Parser *parser, Source line, treeID x, treeID *z) {
-	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,NO_TREE,z);
+	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,Y_NULL,z);
 }
 
 static treeID tree_ret(elf_Parser *parser, Source line, treeID x) {
@@ -144,11 +144,11 @@ static treeID tree_ranged_index(elf_Parser *parser, Source line, treeID x, treeI
 }
 
 static treeID tree_call(elf_Parser *parser, Source line, treeID x, treeID *z) {
-	return tree_xyz(parser,line,TREE_CALL,NT_ANY,x,NO_TREE,z);
+	return tree_xyz(parser,line,TREE_CALL,NT_ANY,x,Y_NULL,z);
 }
 
 static treeID tree_tuple(elf_Parser *parser, Source line, treeID *z) {
-	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY,NO_TREE,NO_TREE,z);
+	return tree_xyz(parser,line,TREE_TUPLE,NT_ANY,Y_NULL,Y_NULL,z);
 }
 
 static treeID tree_tuple2(elf_Parser *parser, Source line, treeID x, treeID y) {
@@ -164,6 +164,8 @@ static treeID tree_memory(elf_Parser *parser, Source line, treeID x) {
 
 
 static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
+	ASSERT(TREE_NO_ERROR(x));
+	ASSERT(TREE_NO_ERROR(y));
 	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
 }
 

@@ -15,7 +15,7 @@ ELF_FUNCTION(l_str_length) {
 
 
 ELF_FUNCTION(l_str_get_hash) {
-	String str = loadstr(S, 0);
+	Str str = loadstr(S, 0);
 	pushint(S, str->hash);
 	return 1;
 }
@@ -32,7 +32,7 @@ ELF_FUNCTION(l_str_get_index) {
 
 
 ELF_FUNCTION(l_str_slice) {
-	String str = loadstr(S, 0);
+	Str str = loadstr(S, 0);
 	// todo: out of bounds check
 	int lo = loadint(S, 2);
 	int hi = loadint(S, 3);
@@ -138,7 +138,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 	const char *s = loadtext(S, 0);
 	int chr = loadint(S, 1);
 
-	Table splits = pushtable(S);
+	Tab splits = pushtable(S);
 
 	String_Builder sb = {};
 
@@ -152,7 +152,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 			s ++;
 		}
 
-		String split = elf_alloc_string3(S, sb.buf, sb.min);
+		Str split = elf_alloc_string3(S, sb.buf, sb.min);
 		V value;
 		vsetstr(&value, split);
 
@@ -168,7 +168,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 
 
 ELF_FUNCTION(l_str_lowercase) {
-	String str = loadstr(S, 0);
+	Str str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
@@ -180,7 +180,7 @@ ELF_FUNCTION(l_str_lowercase) {
 
 
 ELF_FUNCTION(l_str_uppercase) {
-	String str = loadstr(S, 0);
+	Str str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);

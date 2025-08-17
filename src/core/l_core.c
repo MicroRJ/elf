@@ -93,8 +93,8 @@ ELF_FUNCTION(l_core_arg) {
 
 
 ELF_FUNCTION(l_core_get_meta) {
-	Table t = loadtable(S, 1);
-	Table m = getmeta(t);
+	Tab t = loadtable(S, 1);
+	Tab m = getmeta(t);
 	pushtab(S, m);
 	return 1;
 }
@@ -102,8 +102,8 @@ ELF_FUNCTION(l_core_get_meta) {
 
 // result is the object we passed in
 ELF_FUNCTION(l_core_set_meta) {
-	Table t = loadtable(S, 1);
-	Table m = loadtable(S, 2);
+	Tab t = loadtable(S, 1);
+	Tab m = loadtable(S, 2);
 	setmeta(t, m);
 	pushtab(S, t);
 	return 1;
@@ -337,7 +337,7 @@ static int unparse(elf_State *inter, String_Builder *sb, V thing, int level) {
 		case ELF_TNUMBER:   sb_sprintf(sb, "%f"    , thing.x_num       ); break;
 		case ELF_TSTRING:   sb_sprintf(sb, "\"%s\"", thing.x_str->text ); break;
 		case ELF_TTABLE: {
-			Table table = thing.x_tab;
+			Tab table = thing.x_tab;
 
 			int nwrote = 0;
 

@@ -19,7 +19,7 @@
 #define PICK(xx) ((POS0() == (xx)) ? (MOVEN(1), 1) : 0)
 
 
-/* todo: speed */
+/* todo: binary search or something goofy */
 static tokenTy text_is_word_or_macro(char *name) {
 #define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_M_,NAME);
 	MACRODEF(MCITEM)
@@ -93,10 +93,10 @@ static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) 
 
 
 static int pick_esc_char(elf_Parser *parser) {
-	int chr = MOVE();
+	int chr = *parser->cursor ++;
 	if (chr == '\\') {
 
-		chr = MOVE();
+		chr = *parser->cursor ++;
 
 		switch (chr) {
 			case '\\': return '\\';
@@ -109,22 +109,26 @@ static int pick_esc_char(elf_Parser *parser) {
 	return chr;
 }
 
+
+
 // assuming we're already at an integer char,
 // todo: also, we assume base 10, but do we want to
 // support 0x255.255 type stuff?
-static elf_f64 lex_fractional(elf_Parser *parser) {
-	elf_f64 x = 0, y = 1;
-	while (is_digit_chr(POS0())) {
-		x = x * 10 + (MOVE() - '0');
+static Num lex_fractional(elf_Parser *parser) {
+	Num x = 0, y = 1;
+	while (is_digit_chr(*parser->cursor)) {
+		x = x * 10 + (*parser->cursor ++ - '0');
 		y = y * 10;
 	}
 	return x / y;
 }
 
-// assuming we're already at an integer char
-static elf_i64 lex_integer(elf_Parser *parser) {
 
-	elf_i64 base = 10;
+
+// assuming we're already at an integer char
+static Int lex_integer(elf_Parser *parser) {
+
+	Int base = 10;
 
 	// figure out the base
 	if (*parser->cursor == '0') {
@@ -139,7 +143,7 @@ static elf_i64 lex_integer(elf_Parser *parser) {
 		}
 	}
 
-	elf_i64 integer, digit;
+	Int integer, digit;
 	for (integer = 0, digit = -1; ; integer = integer * base + digit) {
 
 		if (WITHIN(*parser->cursor, 'A', 'Z' + 1)) {
@@ -171,20 +175,27 @@ static elf_i64 lex_integer(elf_Parser *parser) {
 	return integer;
 }
 
+
+
 // assuming we're at an identifier char
-static int lex_identifier(elf_Parser *parser, char *buffer, int capacity) {
-	int length = 0;
+static int lex_identifier(elf_Parser *parser, char *buf, int cap) {
+	int len = 0;
 
 	do {
-		if (length >= capacity) {
+		if (len >= cap) {
 			parser_dialog(parser, parser->cursor, "identifier is too long");
 		}
-		buffer[length ++] = MOVE();
-	} while (is_letter_or_digit_chr(POS0()) || (POS0() == '_'));
+		buf[len ++] = *parser->cursor ++;
+	} while (is_letter_or_digit_chr(*parser->cursor) || (*parser->cursor == '_'));
 
-	buffer[length] = 0;
-	return length;
+	buf[len] = 0;
+	return len;
 }
+
+
+
+
+
 
 
 static int pick_empty_chars(elf_Parser *parser) {
@@ -208,6 +219,8 @@ static int pick_empty_chars(elf_Parser *parser) {
 	}
 	return lines;
 }
+
+
 
 
 //
@@ -328,7 +341,7 @@ static Token get_tok(elf_Parser *parser) {
 				token.type = TK_STRING;
 			}
 			token.text = copy_text2(length,buffer);
-			ARRAY_DELETE(buffer);
+			darr_free(buffer);
 		} break;
 		case '.': {
 
@@ -445,8 +458,8 @@ static Token get_tok(elf_Parser *parser) {
 		,   PICK('<'), TK_SHL,  0, 0)
 
 		CASE(':', TK_COLON
-		, 	 PICK(':'), TK_COLON, PICK('='), TK_HARD_BIND
-		,   PICK('='), TK_BIND ,         0,            0)
+		, 	 PICK(':'), TK_STATIC_BIND, PICK('='), TK_HARD_BIND
+		,   PICK('='),       TK_BIND ,         0,            0)
 
 		CASE('-', TK_SUB
 		, 	 PICK('-'), TK_MINUS_MINUS, PICK('>'), TK_HARD_ARROW

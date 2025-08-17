@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#ifndef PATH_BUILDER
+#define PATH_BUILDER
 
 enum {
 	PATH_NAME = 0,
@@ -72,3 +74,5 @@ static void pushpath(Path_Builder *pb, const char *name) {
 
 	pb->name = pb->path + namecur;
 }
+
+#endif

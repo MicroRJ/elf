@@ -265,13 +265,13 @@ struct elf_State {
 	int           active_trace_pos;
 	int           active_trace_len;
 	Bytec            *trace_buffer;
-	Table              trace_table;
+	Tab              trace_table;
 	elf_i32                   byte;
 
 	struct {
-		Table integer;
-		Table number;
-		Table string;
-		Table table;
+		Tab integer;
+		Tab number;
+		Tab string;
+		Tab table;
 	} metatables;
 };

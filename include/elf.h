@@ -120,6 +120,8 @@ elf_pubapi void elf_setfield(elf_State *);
 elf_pubapi void elf_arrayadd(elf_State *);
 elf_pubapi void elf_arrayget(elf_State *);
 
+#define elf_pushtrue(S) elf_pushint(S, 1)
+#define elf_pushfalse(S) elf_pushint(S, 0)
 
 elf_pubapi void elf_pushnil(elf_State *);
 elf_pubapi void elf_pushint(elf_State *, elf_Integer);
@@ -136,9 +138,9 @@ elf_pubapi void elf_pullglobals(elf_State *);
 elf_pubapi const char *elf_loadtext(elf_State *, int x);
 elf_pubapi elf_Number elf_loadnum(elf_State *, int x);
 elf_pubapi elf_Integer elf_loadint(elf_State *, int x);
+elf_pubapi elf_Handle elf_loadsys(elf_State *, int x);
 
-elf_pubapi elf_Handle elf_tosys(elf_State *, int x);
-
+int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *contents);
 
 
 

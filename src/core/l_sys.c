@@ -60,7 +60,7 @@ ELF_FUNCTION(l_sys_get_file_name_from_path) {
 
 ELF_FUNCTION(l_sys_create_directory) {
 	const char *path = elf_loadtext(S, 1);
-	int noerr = sys_create_directory(path);
+	int noerr = sys_make_dir(path);
 	elf_pushint(S, noerr);
 	return 1;
 }
@@ -73,7 +73,7 @@ ELF_FUNCTION(l_sys_get_file_times) {
 	sys_time_file(file, &times);
 
 	// todo: set fields directly
-	Table tab = pushtable(S);
+	Tab tab = pushtable(S);
 	elf_pushtext(S, "created");  elf_pushint(S, times.create.time); elf_setfield(S);
 	elf_pushtext(S, "access");   elf_pushint(S, times.access.time); elf_setfield(S);
 	elf_pushtext(S, "write");    elf_pushint(S, times.write.time);  elf_setfield(S);
@@ -371,9 +371,11 @@ ELF_FUNCTION(l_sys_get_file_size) {
 
 
 
-ELF_FUNCTION(l_sys_get_file_cursor) {
+ELF_FUNCTION(l_sys_move_file_cursor) {
 	Handle file = loadsys(S, 1);
-	pushint(S, sys_get_file_cursor(file));
+	Int relativeto = loadint(S, 2);
+	Int distance = loadint(S, 3);
+	pushint(S, sys_move_file_cursor(file, relativeto, distance));
 	return 1;
 }
 
@@ -402,7 +404,7 @@ static bool readfilesys(elf_State *S, Handle file, int size) {
 	}
 
 	// todo: we need a dedicated object for this!
-	String contents = elf_alloc_string2(S, size);
+	Str contents = elf_alloc_string2(S, size);
 	vsetstr(S->stack_ptr, contents);
 	pushstacksafe(S);
 
@@ -454,7 +456,7 @@ ELF_FUNCTION(l_sys_read_file) {
 
 ELF_FUNCTION(l_sys_write_file) {
 	Handle file = loadsys(S, 1);
-	String str = loadstr(S, 2);
+	Str str = loadstr(S, 2);
 	sys_write_file(file, str->text, str->length);
 	return 0;
 }
@@ -524,8 +526,8 @@ static const elf_Binding l_sys[] = {
 	{"close_file",                l_sys_close_file                },
 	{"get_file_size",             l_sys_get_file_size             },
 	{"read_file",                 l_sys_read_file                 },
-	{"read_console",              l_sys_read_console                 },
-	{"get_file_cursor",           l_sys_get_file_cursor           },
+	{"read_console",              l_sys_read_console              },
+	{"move_file_cursor",          l_sys_move_file_cursor          },
 	{"write_file",                l_sys_write_file                },
 	{"write_file_to_file",        l_sys_write_file_to_file        },
 	{"change_work_dir",           l_sys_change_work_dir           },

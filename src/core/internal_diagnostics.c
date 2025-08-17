@@ -54,6 +54,7 @@ static void cursor_dialog(char *name, char *source, char *cursor, BCPos instr, B
 }
 
 
+
 void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 {
 	printf("============= ELF-ERROR =============\n");
@@ -90,6 +91,9 @@ void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 	}
 
 	printf("elf is exiting...\n");
+#if defined(_DEBUG)
+	__debugbreak();
+#endif
 	sys_exit_this_process(0);
 }
 

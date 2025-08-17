@@ -79,11 +79,11 @@ static inline void zero_values(V *dst, int num) {
 #define vtag2s(v) tag2s[vtagof(v)]
 
 
-// todo: special value for vcheck, sometimes I want
-// multiple types, like numeric, so maybe a bit flag,
-// and a simple shift and & won't do too much more harm
 #define vcheck(S, v, t) do { if (v.tag != t) \
 { 	elf_errorf(S, -1, "'%s': expected '%s'", tag2s[v.tag], tag2s[t]); } } while (0)
+
+
+
 
 
 
@@ -101,7 +101,7 @@ static inline void *checkptr(void *obj) {
 
 
 // invalid handles must be replaced with nil
-static inline elf_Handle checksys(elf_Handle obj) {
+static inline Handle checksys(Handle obj) {
 	ASSERT(!ELF_HISINVALID(obj));
 	return obj;
 }
@@ -142,7 +142,7 @@ static inline elf_Handle checksys(elf_Handle obj) {
 #define pushstackunsafe(S) ((S)->stack_ptr ++)
 
 
-// @todo: mark check unlikely
+// todo: mark check unlikely
 #define pushstacksafe(S) \
 do { \
 	\
@@ -182,23 +182,27 @@ do { \
 #define loadtype(S, x) (vtagof(loadvalue(S, x)))
 
 
+
+#define loadtypeerror(S, t, x) do { elf_errorf(S, -1, "'%s': expected '%s' for argument %i", tag2s[loadtype(S, x)], tag2s[t], x); } while (0)
+
+
 static inline const char *loadtext(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (visstr(v)) return vgetstrd(v);
 	if (visnil(v)) return 0;
-	vcheck(S, v, ELF_TSTRING);
+	loadtypeerror(S, ELF_TSTRING, x);
 	return 0;
 }
 
 
 
-static inline String loadstr(elf_State *S, int x)
+static inline Str loadstr(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (visstr(v)) return vgetstr(v);
 	if (visnil(v)) return 0;
-	vcheck(S, v, ELF_TSTRING);
+	loadtypeerror(S, ELF_TSTRING, x);
 	return 0;
 }
 
@@ -208,7 +212,7 @@ static inline Int loadsys(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (issys(v)) return vgetsys(v);
-	vcheck(S, v, ELF_THANDLE);
+	loadtypeerror(S, ELF_THANDLE, x);
 	return 0;
 }
 
@@ -218,46 +222,51 @@ static inline Int loadint(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (visnumeric(v)) return vntoint(v);
-	vcheck(S, v, ELF_TINTEGER);
+	loadtypeerror(S, ELF_TINTEGER, x);
 	return 0;
 }
+
 
 
 static inline Num loadnum(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (visnumeric(v)) return vitonum(v);
-	vcheck(S, v, ELF_TNUMBER);
+	loadtypeerror(S, ELF_TNUMBER, x);
 	return 0;
 }
 
 
-static inline Table loadtable(elf_State *S, int x)
+
+static inline Tab loadtable(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (vistab(v)) return vgettab(v);
 	if (visnil(v)) return 0;
-	vcheck(S, v, ELF_TTABLE);
+	loadtypeerror(S, ELF_TTABLE, x);
 	return 0;
 }
 
 
-static inline String pushtext(elf_State *S, char const *text) {
-	String str = elf_alloc_string(S, text);
+
+static inline Str pushtext(elf_State *S, char const *text) {
+	Str str = elf_alloc_string(S, text);
 	pushstr(S, str);
 	return str;
 }
 
 
-static inline String pushtext2(elf_State *S, char const *text, int length) {
-	String str = elf_alloc_string3(S, text, length);
+
+static inline Str pushtext2(elf_State *S, char const *text, int length) {
+	Str str = elf_alloc_string3(S, text, length);
 	pushstr(S, str);
 	return str;
 }
 
 
-static inline Table pushtable(elf_State *S) {
-	Table tab = newtable(S);
+
+static inline Tab pushtable(elf_State *S) {
+	Tab tab = newtable(S);
 	pushtab(S, tab);
 	return tab;
 }

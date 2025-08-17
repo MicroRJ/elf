@@ -2,24 +2,30 @@
 // See Copyright Notice In elf.h
 //
 
-#define NO_SLOT (-1)
-#define NO_JUMP (-0)
+
 #define NO_LINE ( 0)
+
 
 enum {
 	ENTITY_REFERENCED = (1 << 0),
-	ENTITY_CONSTANT   = (1 << 1),
+	ENT_FLAG_CONSTANT = (1 << 1),
 	ENTITY_ASSIGNED   = (1 << 2),
 	ENTITY_PARAMETER  = (1 << 3),
 	ENTITY_FORLOOP    = (1 << 4),
+	ENT_FLAG_STATIC   = (1 << 5),
 };
 
+
 typedef enum {
-	ENTITY_INVALID = 0, ENTITY_DIRECTORY, ENTITY_LOCAL, ENTITY_GLOBAL,
+	ENTITY_INVALID = 0,
+	ENTITY_DIRECTORY,
+	ENTITY_LOCAL,
 } entityKi;
+
 
 typedef int entID;
 #define NO_ENTITY -1
+
 
 typedef struct {
 	entityKi kind;
