@@ -2,10 +2,13 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: how cute
-static elf_u32 global_random_state = 305419896;
 
-static elf_u32 xorshift32(elf_u32 x) {
+
+// todo:
+static u32 global_random_state = 305419896;
+
+
+static u32 xorshift32(u32 x) {
 	x = x ^ x << 13;
 	x = x ^ x >> 7;
 	x = x ^ x << 17;

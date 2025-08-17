@@ -6,7 +6,7 @@
 // todo: all of these should be instrinsics...
 
 
-ELF_FUNCTION(math_lib_sgn) {
+ELF_FUNCTION(l_math_sgn) {
 	V vx = loadvalue(S, 1);
 	ASSERT(visnumeric(vx));
 
@@ -23,7 +23,7 @@ ELF_FUNCTION(math_lib_sgn) {
 
 
 
-ELF_FUNCTION(math_lib_abs) {
+ELF_FUNCTION(l_math_abs) {
 	V vx = loadvalue(S, 1);
 	ASSERT(visnumeric(vx));
 
@@ -40,7 +40,7 @@ ELF_FUNCTION(math_lib_abs) {
 
 
 
-ELF_FUNCTION(math_lib_max) {
+ELF_FUNCTION(l_math_max) {
 	V vx = loadvalue(S, 1);
 	V vy = loadvalue(S, 2);
 	ASSERT(visnumeric(vx) && visnumeric(vy));
@@ -64,7 +64,7 @@ ELF_FUNCTION(math_lib_max) {
 }
 
 
-ELF_FUNCTION(math_lib_min) {
+ELF_FUNCTION(l_math_min) {
 	V vx = loadvalue(S, 1);
 	V vy = loadvalue(S, 2);
 	ASSERT(visnumeric(vx) && visnumeric(vy));
@@ -88,7 +88,7 @@ ELF_FUNCTION(math_lib_min) {
 }
 
 
-ELF_FUNCTION(math_lib_trim) {
+ELF_FUNCTION(l_math_trim) {
 	V vx = loadvalue(S, 1);
 	V vy = loadvalue(S, 2);
 	V vz = loadvalue(S, 3);
@@ -114,79 +114,79 @@ ELF_FUNCTION(math_lib_trim) {
 
 
 
-ELF_FUNCTION(math_lib_exp) {
+ELF_FUNCTION(l_math_exp) {
 	pushnum(S,exp(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_floor) {
+ELF_FUNCTION(l_math_floor) {
 	pushnum(S,floor(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_ceil) {
+ELF_FUNCTION(l_math_ceil) {
 	pushnum(S,ceil(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_sqrt) {
+ELF_FUNCTION(l_math_sqrt) {
 	pushnum(S,sqrt(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_pow) {
+ELF_FUNCTION(l_math_pow) {
 	pushnum(S,pow(loadnum(S,1),loadnum(S,2)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_sin) {
+ELF_FUNCTION(l_math_sin) {
 	pushnum(S,sin(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_cos) {
+ELF_FUNCTION(l_math_cos) {
 	pushnum(S,cos(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_acos) {
+ELF_FUNCTION(l_math_acos) {
 	pushnum(S,acos(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_tan) {
+ELF_FUNCTION(l_math_tan) {
 	pushnum(S,tan(loadnum(S,1)));
 	return 1;
 }
 
 
-ELF_FUNCTION(math_lib_atan2) {
+ELF_FUNCTION(l_math_atan2) {
 	pushnum(S,atan2(loadnum(S,1),loadnum(S,2)));
 	return 1;
 }
 
 static elf_Binding lib_math[] = {
-	{"abs",math_lib_abs},
-	{"max",math_lib_max},
-	{"min",math_lib_min},
-	{"trim",math_lib_trim},
-	{"sgn",math_lib_sgn},
-	{"exp",math_lib_exp},
-	{"floor",math_lib_floor},
-	{"ceil",math_lib_ceil},
-	{"sqrt",math_lib_sqrt},
-	{"pow",math_lib_pow},
-	{"sin",math_lib_sin},
-	{"cos",math_lib_cos},
-	{"acos",math_lib_acos},
-	{"tan",math_lib_tan},
-	{"atan2",math_lib_atan2},
+	{"abs",l_math_abs},
+	{"max",l_math_max},
+	{"min",l_math_min},
+	{"trim",l_math_trim},
+	{"sgn",l_math_sgn},
+	{"exp",l_math_exp},
+	{"floor",l_math_floor},
+	{"ceil",l_math_ceil},
+	{"sqrt",l_math_sqrt},
+	{"pow",l_math_pow},
+	{"sin",l_math_sin},
+	{"cos",l_math_cos},
+	{"acos",l_math_acos},
+	{"tan",l_math_tan},
+	{"atan2",l_math_atan2},
 };
