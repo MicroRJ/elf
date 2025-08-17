@@ -13,6 +13,7 @@
 #include "elf_compiler.h"
 
 
+Tag elf_loadtype(elf_State *S, int x) { return loadtype(S, x); }
 Num elf_loadnum(elf_State *S, int x) { return loadnum(S, x); }
 Int elf_loadint(elf_State *S, int x) { return loadint(S, x); }
 Handle elf_loadsys(elf_State *S, int x) { return loadsys(S, x); }

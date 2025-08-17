@@ -284,15 +284,18 @@ ELF_FUNCTION(l_array_add) {
 }
 
 
+// the index of the thing to replace, the value to replace
+// it with
 ELF_FUNCTION(l_array_replace) {
-	Tab tab = loadtable(S, 0);
-	V     val = loadvalue(S, 1);
-	Index idx = loadindex(S, 2, tab);
+	Tab   tab = loadtable(S, 0);
+	Index idx = loadindex(S, 1, tab);
+	V     val = loadvalue(S, 2);
 
 	// todo: barrier
 	tab->array[idx] = val;
 	return 0;
 }
+
 
 
 ELF_FUNCTION(l_array_swap) {

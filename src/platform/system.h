@@ -77,6 +77,8 @@ enum {
 	SYS_OPEN_EXECUTE  = 4,
 	SYS_SHARE_READ    = 8,
 	SYS_SHARE_WRITE   = 16,
+	// write must be a multiple of the sector size
+	SYS_NO_BUFFERING  = 32,
 };
 
 enum {
@@ -100,6 +102,8 @@ elf_i64 sys_move_file_cursor(FILE_HANDLE file, int relativeto, elf_i64 dist);
 elf_i64 sys_size_file(FILE_HANDLE file);
 elf_i64 sys_read_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
 elf_i64 sys_write_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
+// windows will do file buffering by default
+void sys_flush_file(FILE_HANDLE file);
 
 
 int sys_time_file(FILE_HANDLE file, FILE_TIMES *);
@@ -122,23 +126,16 @@ attached */
 bool sys_debugger();
 
 
-/* this uses milliseconds, but seconds would
-by my preference, since it is an SI unit */
 void sys_sleep(elf_i64 ms);
 
 
-/* the clock frequency, use to translate
-clock time to seconds, for web you might get
-milliseconds, so freq=1000, for desktop,
-you get a performance counter, which has
-a nano-second resolution  */
+// counts per second
 elf_i64 sys_get_performance_counter_frequency();
 
-/* get the highest resolution clock available */
+// get the highest resolution clock available
 elf_i64 sys_get_performance_counter();
 
 
-// int sys_get_my_name(int length, char *text);
 int sys_get_this_process_id();
 void sys_exit_this_process(int errorcode);
 

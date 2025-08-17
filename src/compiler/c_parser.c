@@ -1574,7 +1574,7 @@ static bool parse_for(elf_Parser *parser) {
 				rangelo = step->x, rangehi = step->y;
 
 				// todo: true infinite
-				if(rangehi == Y_NULL) rangehi = tree_int(parser,tok.line,0xffffffffLLU);
+				if(rangehi == Y_NULL) rangehi = tree_int(parser,tok.line,UINT_MAX);
 				if(rangelo == Y_NULL) rangelo = tree_int(parser,tok.line,0);
 			}
 

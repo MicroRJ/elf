@@ -17,6 +17,8 @@ typedef elf_String *Str;
 typedef elf_Integer Int;
 typedef elf_Number  Num;
 
+typedef elf_Tag     Tag;
+
 
 typedef elf_u8  u8;
 typedef elf_u16 u16;

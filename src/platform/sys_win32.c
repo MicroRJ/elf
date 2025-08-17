@@ -87,6 +87,10 @@ void sys_close_file(FILE_HANDLE file) {
 	CloseHandle(file);
 }
 
+void sys_flush_file(FILE_HANDLE file) {
+	FlushFileBuffers(file);
+}
+
 elf_i64 sys_move_file_cursor(FILE_HANDLE file, int relativeto, elf_i64 dist) {
 	if (relativeto == SYS_END) {
 		return SetFilePointer(file, dist, 0, FILE_END);
@@ -108,6 +112,9 @@ FILE_HANDLE sys_open_file(const char *name, int flags, int mode) {
 	int os_sharing_flags = 0;
 	if (flags & SYS_SHARE_READ) os_sharing_flags |= FILE_SHARE_READ;
 	if (flags & SYS_SHARE_WRITE) os_sharing_flags |= FILE_SHARE_WRITE;
+
+	int os_misc_flags = 0;
+	if (flags & SYS_NO_BUFFERING) os_sharing_flags |= FILE_FLAG_NO_BUFFERING;
 
 	int os_mode = OPEN_ALWAYS;
 	switch (mode) {
