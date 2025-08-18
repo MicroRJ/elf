@@ -13,7 +13,7 @@ int elf_gcstate(elf_State *S, elf_GC_State state) {
 }
 
 
-void *elf_gc_alloc(elf_State *R, GCType type, elf_i64 size) {
+void *gcalloc(elf_State *R, GCType type, elf_i64 size) {
 	GCState *gc = & R->G;
 
 	if (gc->phase != GC_COLLECTABLE) {

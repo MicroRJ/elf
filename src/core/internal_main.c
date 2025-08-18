@@ -25,7 +25,6 @@
 
 
 #include "internal_types.h"
-#include "internal_api.h"
 #include "internal_helpers.h"
 #include "internal_metadata.c"
 #include "internal_diagnostics.c"
@@ -46,26 +45,6 @@
 
 
 static int _resume(elf_State *S);
-
-
-int elf_get_global_slot(elf_State *S, elf_String *name) {
-
-	if (name != 0) {
-		elf_Value vname;
-		vsetstr(&vname, name);
-		return elf_table_get_index_always_(S->globals, vname);
-	}
-
-	return darr_grow(S->globals->array, 1);
-}
-
-int elf_set_global(elf_State *S, elf_String *name, elf_Value value) {
-
-	int id = elf_get_global_slot(S, name);
-	S->globals->array[id] = value;
-
-	return id;
-}
 
 
 
@@ -140,7 +119,7 @@ void elf_init_raw(elf_State *S) {
 	install(S,"elf" ,  l_sys,      COUNTOF(l_sys));
 
 
-	ASSERT(abstop(S) < S->frame.framesize);
+	ASSERT(stack2index(S) < S->frame.framesize);
 
 	S->stack_ptr = S->frame.framebase + S->frame.framesize;
 }
@@ -175,7 +154,6 @@ pullstackframe(elf_State *inter)
 static inline void
 prepframeforclosure(elf_State *E, Stack_Frame *frame, elf_Closure *closure, int nargs, int nrets)
 {
-
 	Proto proto = closure->proto;
 
 	// todo: do not grow frame size less we care about vargs
@@ -220,8 +198,6 @@ prepframeforclosure(elf_State *E, Stack_Frame *frame, elf_Closure *closure, int 
 static inline int
 callclosure(elf_State *E, elf_Closure *closure, int nargs, int nrets)
 {
-	Proto proto = closure->proto;
-
 	prepframeforclosure(E, &E->frame, closure, nargs, nrets);
 
 	// update stack pointer to cover the entire frame
@@ -667,17 +643,29 @@ int _resume(elf_State *inter) {
 
 			} break;
 
-			VMCASE(BC_GETGLOBAL) { rstoreX(global_y()); } VMBREAK;
+			VMCASE(BC_GETGLOBAL) {
+				rstoreX(global_y());
+			} VMBREAK;
 
-			VMCASE(BC_SETGLOBAL) { global_store_x(rvalueY());  } VMBREAK;
+			VMCASE(BC_SETGLOBAL) {
+				global_store_x(rvalueY());
+			} VMBREAK;
 
-			VMCASE(BC_RELOAD) { rstoreX(rvalueY()); } VMBREAK;
+			VMCASE(BC_RELOAD) {
+				rstoreX(rvalueY());
+			} VMBREAK;
 
-			VMCASE(BC_LOADNIL) { vsetnil(&rvalueX()); } VMBREAK;
+			VMCASE(BC_LOADNIL) {
+				vsetnil(&rvalueX());
+			} VMBREAK;
 
-			VMCASE(BC_GETKINT) { rstoreXi(inter->integers[by.b_y]); } VMBREAK;
+			VMCASE(BC_GETKINT) {
+				rstoreXi(inter->integers[by.b_y]);
+			} VMBREAK;
 
-			VMCASE(BC_GETKNUM) { rstoreXn(inter->numbers[by.b_y]); } VMBREAK;
+			VMCASE(BC_GETKNUM) {
+				rstoreXn(inter->numbers[by.b_y]);
+			} VMBREAK;
 
 
 			VMCASE(BC_BIT_NOT) {
@@ -696,12 +684,20 @@ int _resume(elf_State *inter) {
 			case BC_CLOSURE: {
 				ASSERT(WITHIN(BC_ARGY(byte), 0, darr_l(inter->protos)));
 
-				Proto proto = inter->protos[BC_ARGY(byte)];
+				int proto_index = BC_ARGY(byte);
 
-				elf_Closure *cls = elf_alloc_closure(inter, proto);
-				copy_values(cls->captures, &rvalueX(), proto.ncaptures);
+				Proto proto = inter->protos[proto_index];
 
-				vsetcls(&rvalueX(), cls);
+				Closure closure;
+
+				int size = sizeof(*closure) + sizeof(closure->captures[0]) * proto.ncaptures;
+
+				closure = (Closure) gcalloc(inter, GC_CLS, size);
+				closure->proto_index = proto_index;
+				closure->proto = proto;
+				copy_values(closure->captures, &rvalueX(), proto.ncaptures);
+
+				vsetcls(&rvalueX(), closure);
 			} break;
 			case BC_TABLE: {
 

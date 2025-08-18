@@ -34,7 +34,7 @@ static inline void init_table(elf_State *S, Tab table, elf_Index nentries) {
 
 elf_rawapi
 Tab newtable2(elf_State *S, Index nentries) {
-	Tab table = elf_gc_alloc(S, GC_TAB, sizeof(elf_Table));
+	Tab table = gcalloc(S, GC_TAB, sizeof(elf_Table));
 	table->obj.meta = S->metatables.table;
 
 	init_table(S, table, nentries);
@@ -166,7 +166,7 @@ V elf_table_get_raw(Tab tab, V k) {
 
 
 
-static Index elf_table_get_index_always_(Tab table, elf_Value key) {
+static Index tablecreateindex(Tab table, elf_Value key) {
 
 	ASSERT(!visnil(key));
 

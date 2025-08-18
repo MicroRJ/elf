@@ -64,7 +64,11 @@ static treeID tree_global(elf_Parser *parser, Source line, int x) {
 
 // todo: we should already have the Str by now...
 static treeID tree_global_symbol(elf_Parser *parser, Source line, const char *name) {
-	int x = elf_get_global_slot(parser->R, elf_alloc_string(parser->R, name));
+
+	V v;
+	vsetstr(&v, newstr(parser->inter, name));
+	Index x = tablecreateindex(parser->inter->globals, v);
+
 	ASSERT(x != -1);
 	return tree_global(parser, line, x);
 }

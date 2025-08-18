@@ -15,7 +15,7 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 			elf_Value target = registry->array[registry->slots[slot].idx];
 			string = target.x_str;
 		} else {
-			string = elf_alloc_string2(R,length);
+			string = newstr_empty(R,length);
 			copy_memory(string->text,text,length);
 			string->hash = hash;
 
@@ -26,7 +26,7 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 			registry->nslots ++;
 		}
 	} else {
-		string = elf_alloc_string2(R,length);
+		string = newstr_empty(R,length);
 		copy_memory(string->text,text,length);
 		string->hash = hash;
 	}

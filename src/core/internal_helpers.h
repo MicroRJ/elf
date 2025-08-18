@@ -87,7 +87,7 @@ static inline void zero_values(V *dst, int num) {
 
 
 
-#define abstop(S) ((S)->stack_ptr - (S)->stack)
+#define stack2index(S) ((S)->stack_ptr - (S)->stack)
 
 
 
@@ -122,18 +122,6 @@ static inline Handle checksys(Handle obj) {
 #define vsetcls(v,x) ((v)->tag=ELF_TCLOSURE , vsetobjf(v, x))
 
 
-#define settopnil(S)   vsetnil((S)->stack_ptr)
-
-#define settopint(S,x) vsetint((S)->stack_ptr, x)
-#define settopnum(S,x) vsetnum((S)->stack_ptr, x)
-
-#define settopstr(S,x) vsetstr((S)->stack_ptr, x)
-#define settoptab(S,x) vsettab((S)->stack_ptr, x)
-#define settopcls(S,x) vsetcls((S)->stack_ptr, x)
-
-#define settopfnc(S,x) vsetfnc((S)->stack_ptr, x)
-
-#define settopsys(S,x) vsetsys((S)->stack_ptr, x)
 
 
 
@@ -155,28 +143,32 @@ do { \
 } while (0)
 
 
-#define pushthis(S)  do { pushvalueunsafe(S, loadvalue(S, 0));     } while(0)
-#define pushnil(S)   do { settopnil(S);    pushstackunsafe(S);  } while(0)
-
-#define pushint(S,x) do { settopint(S, x); pushstackunsafe(S);  } while(0)
-#define pushnum(S,x) do { settopnum(S, x); pushstackunsafe(S);  } while(0)
-
-#define pushsys(S,x) do { settopsys(S, x); pushstackunsafe(S);  } while(0)
-
-#define pushcls(S,x) do { settopcls(S, x); pushstackunsafe(S);  } while(0)
-#define pushstr(S,x) do { settopstr(S, x); pushstackunsafe(S);  } while(0)
-#define pushtab(S,x) do { settoptab(S, x); pushstackunsafe(S);  } while(0)
-
-#define pushfun(S,x) do { settopfnc(S, x); pushstackunsafe(S);  } while(0)
-
-
-#define pushvalueunsafe(S, v) do { *(S)->stack_ptr ++ = v; } while (0)
-
-
 #define loadvalue(S, x) ((S)->frame.framebase[x])
 
+#define pushvalueunsafe(S, v) (*(S)->stack_ptr ++ = (v))
+#define popvalue(S) (* -- (S)->stack_ptr)
 
-#define loadpush(S, x) (pushvalueunsafe(S, loadvalue(S, x))
+
+#define loadpush(S, x) (pushvalueunsafe(S, loadvalue(S, x)))
+
+#define pushthis(S)  (loadpush(S, 0))
+
+#define pushnil(S)   do { vsetnil((S)->stack_ptr);    pushstackunsafe(S);  } while(0)
+
+#define pushint(S,x) do { vsetint((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+#define pushnum(S,x) do { vsetnum((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+
+#define pushsys(S,x) do { vsetsys((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+
+#define pushcls(S,x) do { vsetcls((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+#define pushstr(S,x) do { vsetstr((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+#define pushtab(S,x) do { vsettab((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+
+#define pushfun(S,x) do { vsetfnc((S)->stack_ptr, x); pushstackunsafe(S);  } while(0)
+
+
+
+
 
 
 #define loadtype(S, x) (vtagof(loadvalue(S, x)))
@@ -250,7 +242,7 @@ static inline Tab loadtable(elf_State *S, int x)
 
 
 static inline Str pushtext(elf_State *S, char const *text) {
-	Str str = elf_alloc_string(S, text);
+	Str str = newstr(S, text);
 	pushstr(S, str);
 	return str;
 }
@@ -258,7 +250,7 @@ static inline Str pushtext(elf_State *S, char const *text) {
 
 
 static inline Str pushtext2(elf_State *S, char const *text, int length) {
-	Str str = elf_alloc_string3(S, text, length);
+	Str str = newstrl(S, text, length);
 	pushstr(S, str);
 	return str;
 }

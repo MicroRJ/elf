@@ -36,9 +36,7 @@ static void elf_log_(int type, const char *file, const char *func, int line, con
 	stbsp_vsnprintf(b,sizeof(b),fmt,va);
 	va_end(va);
 
-	char *name;
-
-	name=get_name_from_file_path(file);
+	char *name = get_name_from_file_path(file);
 	printf("%s %s[%i] %s(): %s\n",log2s(type),name,line,func,b);
 }
 

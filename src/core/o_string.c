@@ -4,8 +4,8 @@
 
 
 elf_rawapi
-elf_String *elf_alloc_string3(elf_State *inter, char const *text, elf_i32 length) {
-	elf_String *str = elf_gc_alloc(inter, GC_STR, sizeof(elf_String) + length + 1);
+elf_String *newstrl(elf_State *inter, char const *text, elf_i32 length) {
+	elf_String *str = gcalloc(inter, GC_STR, sizeof(elf_String) + length + 1);
 	if (inter) str->obj.meta = inter->metatables.string;
 	str->length = length;
 	str->text[length] = 0;
@@ -16,8 +16,8 @@ elf_String *elf_alloc_string3(elf_State *inter, char const *text, elf_i32 length
 
 
 elf_rawapi
-elf_String *elf_alloc_string2(elf_State *S, elf_i32 length) {
-	elf_String *obj = elf_gc_alloc(S, GC_STR, sizeof(elf_String)+length+1);
+elf_String *newstr_empty(elf_State *S, elf_i32 length) {
+	elf_String *obj = gcalloc(S, GC_STR, sizeof(elf_String)+length+1);
 	//
 	// todo: instead of doing this, have a table of metatables, which maps
 	// the object type to a metatable pointer, so in alloc object, the metatable
@@ -31,9 +31,9 @@ elf_String *elf_alloc_string2(elf_State *S, elf_i32 length) {
 	return obj;
 }
 
-elf_String *elf_alloc_string(elf_State *R, const char *text) {
+elf_String *newstr(elf_State *R, const char *text) {
 	int length = strlen(text);
-	elf_String *string = elf_alloc_string2(R, length);
+	elf_String *string = newstr_empty(R, length);
 	elf_Hash hash = hash_text(text);
 	copy_memory(string->text,text,length);
 	string->hash = hash;

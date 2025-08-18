@@ -3,7 +3,8 @@
 //
 
 
-// common macro definitions for build configuration
+
+// common macro definitions
 #if defined(__EMSCRIPTEN__)
    #define THREAD static
    #define global static

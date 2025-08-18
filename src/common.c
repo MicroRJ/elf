@@ -81,17 +81,15 @@ static int is_file_name_empty(char const *name) {
 	return *name == 0;
 }
 
+
 static char *get_name_from_file_path(const char *s) {
-	char *p, *n;
-
-	p = (char *) s;
-
-	for (n = p; *p != 0; p += 1) {
-		if (*p == '/' || *p == '\\') {
-			n = p + 1;
+	const char *c;
+	for (c=s; *s; ++s) {
+		if (*s=='/' || *s=='\\') {
+			c=s+1;
 		}
 	}
-	return n;
+	return (char *) c;
 }
 
 

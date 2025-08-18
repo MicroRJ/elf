@@ -137,7 +137,7 @@
 // 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 // 		if (message.length != 0) {
 // 			elf_Integer length = message.length;
-// 			elf_String *obj = elf_alloc_string2(R,length);
+// 			elf_String *obj = newstr_empty(R,length);
 // 			elf_push_string_raw(R,obj);
 // 			char *cursor = obj->c;
 // 			do {

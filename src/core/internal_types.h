@@ -93,20 +93,27 @@ struct elf_Object {
 	elf_Table  *meta;
 };
 
+
 typedef struct elf_Closure elf_Closure;
 struct elf_Closure {
 	elf_Object obj;
-	// todo: should be proto id or something instead?
+	short      proto_index;
+	short      extra;
 	Proto      proto;
-	elf_Value  captures[];
+	Value      captures[];
 };
 
+Closure newclosure(elf_State *, int proto);
 
-// todo: we use 64 bits for all indices
+
+
+
+
 typedef struct {
-	elf_Value  key;
-	elf_Index  idx;
+	Value key;
+	Index idx;
 } TEntry;
+
 
 
 typedef struct elf_Table elf_Table;
@@ -122,6 +129,18 @@ struct elf_Table {
 	V               *array;
 };
 
+Tab newtable2(elf_State *, Index nentries);
+Tab newtable(elf_State *);
+void recycletable(Tab tab);
+Index tabletry(Tab tab, V key);
+Index tablecreateindex(Tab tab, V key);
+Index tableset(Tab tab, V k, V v);
+Index arrayadd(Tab tab, V thing);
+
+
+
+
+
 
 // todo: 64 bit strings?
 typedef struct elf_String elf_String;
@@ -131,6 +150,11 @@ struct elf_String {
 	i32 	       length;
 	char        text[1];
 };
+
+Str newstr_empty(elf_State *, int length);
+Str newstrl(elf_State *, char const *text, int length);
+Str newstr(elf_State *, const char *text);
+
 
 
 typedef struct Stack_Frame Stack_Frame;
@@ -205,14 +229,16 @@ struct GCState {
 };
 
 
+void *gcalloc(elf_State *, GCType type, Int size);
+
 
 typedef struct elf_State elf_State;
 struct elf_State {
 
 	struct {
-		elf_Table      *globals;
-		elf_f64        *numbers;
-		elf_i64       *integers;
+		Tab      globals;
+		Num     *numbers;
+		Int     *integers;
 	};
 
 	struct {
@@ -275,3 +301,8 @@ struct elf_State {
 		Tab table;
 	} metatables;
 };
+
+void elf_init_raw(elf_State *);
+void elf_error(elf_State *, int instr, const char *error);
+void elf_errorf(elf_State *, int instr, const char *format, ...);
+

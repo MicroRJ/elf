@@ -479,7 +479,7 @@ int core_lib_include(elf_State *R) {
 		if (entry.key.tag == ELF_TSTRING) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
-			elf_String *ref = elf_alloc_string(R,sym);
+			elf_String *ref = newstr(R,sym);
 			tableset(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}

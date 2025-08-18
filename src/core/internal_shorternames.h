@@ -5,14 +5,16 @@
 #define SHORTER_NAMES
 
 typedef elf_Value   V;
+typedef elf_Value   Value;
 
 typedef elf_Handle  Handle;
 typedef elf_Time    Time;
 typedef elf_Index   Index;
 typedef elf_Hash    Hash;
 
-typedef elf_Table  *Tab;
-typedef elf_String *Str;
+typedef elf_Table   *Tab;
+typedef elf_String  *Str;
+typedef elf_Closure *Closure;
 
 typedef elf_Integer Int;
 typedef elf_Number  Num;

@@ -643,10 +643,10 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 			int noerr = parse_json_object(parser);
 			if (noerr) {
 
-				elf_Value json = parser->inter->stack_ptr[-1];
-				int index = elf_set_global(parser->inter, 0, json);
-				// pop json
-				parser->inter->stack_ptr --;
+				// todo:
+				V json = popvalue(parser->inter);
+				int index = darr_grow(parser->inter->globals->array, 1);
+				parser->inter->globals->array[index] = json;
 
 
 				v = tree_global(parser, tok.line, index);
@@ -1711,7 +1711,7 @@ static int parse_constexpr(elf_Parser *parser) {
 			get_tok(parser);
 
 			Tab tab = pushtable(parser->R);
-			int tablestk = abstop(parser->R) - 1;
+			int tablestk = stack2index(parser->R) - 1;
 
 			while(!peek_tok(parser,TK_NONE) && !peek_tok(parser,TK_CURLY_RIGHT)) {
 

@@ -146,9 +146,9 @@ static void filetreecompressed(FILE_VISITOR *visitor, File_Node *node, int recur
 		subnode->size = 0;
 
 		if (visitor->type == FILE_TYPE_FOLDER) {
-			pushpath(visitor, visitor->name);
+			pb_push(visitor, visitor->name);
 			filetreecompressed(visitor, subnode, recurse - 1);
-			pullpath(visitor);
+			pb_pull(visitor);
 		}
 
 		node->size += subnode->size;
@@ -302,7 +302,7 @@ ELF_FUNCTION(l_sys_get_path_list) {
 
 	FILE_VISITOR *visi = calloc(1, sizeof(*visi));
 
-	pushpath(&visi->pb, path);
+	pb_push(&visi->pb, path);
 	pathlist(S, visi, recurse);
 
 	// todo:
@@ -404,7 +404,7 @@ static bool readfilesys(elf_State *S, Handle file, int size) {
 	}
 
 	// todo: we need a dedicated object for this!
-	Str contents = elf_alloc_string2(S, size);
+	Str contents = newstr_empty(S, size);
 	vsetstr(S->stack_ptr, contents);
 	pushstacksafe(S);
 

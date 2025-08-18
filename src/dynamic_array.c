@@ -28,10 +28,6 @@ typedef struct {
 #define darr_add(d,v) do { int __x__ = darr_grow(d, 1); (d)[__x__] = (v); } while(0)
 
 
-/* returns the newly allocated starting index of the array,
-res is how much to reserve which increments (max) if
-necessary, and com is how much to commit, which increments (min) */
-
 static int array_allocate(void **var, int per, int res, int com) {
 	Dynamic_Array *arr = 0;
 	int max = 0, min = 0;

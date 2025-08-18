@@ -6,7 +6,8 @@
 #define PATH_BUILDER
 
 enum {
-	PATH_NAME = 0,
+	PATH_NONE = 0,
+	PATH_NAME,
 	PATH_CURRENT, // "."
 	PATH_PARENT,  // ".."
 };
@@ -22,8 +23,9 @@ typedef struct {
 			char *path;
 		};
 	};
-
+	// the number of segments in the current path
 	short segs;
+	// the type of the last path segment
 	char  type;
 	// since name gets set each time a push or pop
 	// happens it won't matter that the buffer is
@@ -32,8 +34,9 @@ typedef struct {
 } Path_Builder;
 
 
+#define pb_path(pb) ((pb)->sb.buf)
 
-static void pullpath(Path_Builder *pb) {
+static void pb_pull(Path_Builder *pb) {
 	assert(pb->segs > 0);
 
 	pb->segs -= 1;
@@ -51,7 +54,7 @@ static void pullpath(Path_Builder *pb) {
 }
 
 
-static void pushpath(Path_Builder *pb, const char *name) {
+static void pb_push(Path_Builder *pb, const char *name) {
 
 	if (pb->segs) {
 		sb_writechar(&pb->sb, '\\');

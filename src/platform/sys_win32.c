@@ -167,10 +167,10 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
 	GetDiskFreeSpaceA(elf_loadtext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	elf_tsets_int(info,elf_alloc_string(R,"SectorsPerCluster"),SectorsPerCluster);
-	elf_tsets_int(info,elf_alloc_string(R,"BytesPerSector"),BytesPerSector);
-	elf_tsets_int(info,elf_alloc_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
-	elf_tsets_int(info,elf_alloc_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+	elf_tsets_int(info,newstr(R,"SectorsPerCluster"),SectorsPerCluster);
+	elf_tsets_int(info,newstr(R,"BytesPerSector"),BytesPerSector);
+	elf_tsets_int(info,newstr(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
+	elf_tsets_int(info,newstr(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
 #else
 	elf_ldebug("this function is not implemented for this platform");
 #endif
@@ -192,15 +192,15 @@ int core_lib_list_volumes(elf_State *R) {
 
 		elf_tsets_tab(list,name,volume);
 
-		elf_tsets_str(volume,elf_alloc_string(R,"name"),name);
+		elf_tsets_str(volume,newstr(R,"name"),name);
 
 		elf_Table *path_names = elf_new_table(R);
-		elf_tsets_tab(volume,elf_alloc_string(R,"path_names"),path_names);
+		elf_tsets_tab(volume,newstr(R,"path_names"),path_names);
 
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				arrayadd(path_names,VALUE_STRING(elf_alloc_string(R,buffer)));
+				arrayadd(path_names,VALUE_STRING(newstr(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -307,7 +307,7 @@ static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 		visitor->type = FILE_TYPE_FOLDER;
 	}
 	visitor->size = info->nFileSizeLow;
-	pushpath(&visitor->pb, info->cFileName);
+	pb_push(&visitor->pb, info->cFileName);
 }
 
 
@@ -338,7 +338,7 @@ FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor) {
 
 int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	// pull the path from before
-	pullpath(&visitor->pb);
+	pb_pull(&visitor->pb);
 
 	WIN32_FIND_DATAA info;
 	int noerr = FindNextFileA(hand, &info);

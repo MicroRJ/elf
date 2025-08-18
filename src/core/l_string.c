@@ -152,7 +152,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 			s ++;
 		}
 
-		Str split = elf_alloc_string3(S, sb.buf, sb.min);
+		Str split = newstrl(S, sb.buf, sb.min);
 		V value;
 		vsetstr(&value, split);
 

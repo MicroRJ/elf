@@ -10,7 +10,6 @@
 #include "subsystem.h"
 
 #include "internal_types.h"
-#include "internal_api.h"
 #include "internal_helpers.h"
 
 #include "elf_compiler.h"

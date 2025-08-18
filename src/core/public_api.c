@@ -8,7 +8,6 @@
 #include "subsystem.h"
 #include "logging.c"
 #include "internal_types.h"
-#include "internal_api.h"
 #include "internal_helpers.h"
 #include "elf_compiler.h"
 
@@ -47,18 +46,16 @@ void elf_pushtext2(elf_State *S, const char *text, int len) {
 elf_pubapi
 int elf_pushcodefile(elf_State *S, const char *name) {
 	ASSERT(name);
-	int iproto = elf_makefile(S, name);
+	int proto_index = elf_makefile(S, name);
 
-	if (iproto >= 0) {
-		Proto proto = S->protos[iproto];
-
-		// todo: instead of taking the proto directly, take an index into the
-		// proto array... that way we can mark whether a file is still needed.
-		elf_Closure *closure = elf_alloc_closure(S, proto);
+	if (proto_index >= 0) {
+		Closure closure = (Closure) gcalloc(S, GC_CLS, sizeof(*closure));
+		closure->proto_index = proto_index;
+		closure->proto = S->protos[proto_index];
 		pushcls(S, closure);
 
 	}
-	return iproto;
+	return proto_index;
 }
 
 
@@ -74,8 +71,7 @@ elf_State *elf_new() {
 
 elf_pubapi
 void elf_pullglobals(elf_State *S) {
-	settoptab(S, S->globals);
-	pushstacksafe(S);
+	pushtab(S, S->globals);
 }
 
 

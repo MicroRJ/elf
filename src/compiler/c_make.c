@@ -581,9 +581,9 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			// todo: add to constant pool and create new GETKSTR instruction
 			// todo: also add dedicated get str field instruction, which is
 			// the common case for field accesses!
-			elf_String *str = elf_alloc_string(S, tree.expr_str);
+			elf_String *str = newstr(S, tree.expr_str);
 
-			int yy = elf_get_global_slot(S, 0);
+			int yy = darr_grow(S->globals->array, 1);
 			vsetstr(&S->globals->array[yy], str);
 
 			emit_bytexy(parser,line,BC_GETGLOBAL,dst,yy);
