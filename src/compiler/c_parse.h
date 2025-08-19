@@ -52,13 +52,22 @@ typedef struct JBuf {
 	BCPos *j;
 } JBuf;
 
+
+enum {
+	BLOCK_ENDED  = 1,
+	BLOCK_HASRET = 2,
+};
+
+
 typedef struct Block Block;
 struct Block {
+	int     status;
+	Source *begin, *end;
 	treeID *body;
 	treeID *defers;
-	int     ended;
-	int     has_ret;
 };
+
+
 
 typedef struct Loop Loop;
 struct Loop {

@@ -3,10 +3,14 @@
 //
 
 
-// todo: all of these should be instrinsics...
+#define checknumargs(S, n, x) do \
+{ if ((n) != (x)) elf_errorf(S, -1, "wrong number of arguments: %i, expected %i instead", n - 1, x - 1); \
+} while(0)
 
 
 ELF_FUNCTION(l_math_sgn) {
+	checknumargs(S, nargs, 2);
+
 	V vx = loadvalue(S, 1);
 	ASSERT(visnumeric(vx));
 
@@ -24,6 +28,8 @@ ELF_FUNCTION(l_math_sgn) {
 
 
 ELF_FUNCTION(l_math_abs) {
+	checknumargs(S, nargs, 2);
+
 	V vx = loadvalue(S, 1);
 	ASSERT(visnumeric(vx));
 
@@ -41,6 +47,8 @@ ELF_FUNCTION(l_math_abs) {
 
 
 ELF_FUNCTION(l_math_max) {
+	checknumargs(S, nargs, 3);
+
 	V vx = loadvalue(S, 1);
 	V vy = loadvalue(S, 2);
 	ASSERT(visnumeric(vx) && visnumeric(vy));
@@ -65,6 +73,8 @@ ELF_FUNCTION(l_math_max) {
 
 
 ELF_FUNCTION(l_math_min) {
+	checknumargs(S, nargs, 3);
+
 	V vx = loadvalue(S, 1);
 	V vy = loadvalue(S, 2);
 	ASSERT(visnumeric(vx) && visnumeric(vy));
@@ -89,6 +99,8 @@ ELF_FUNCTION(l_math_min) {
 
 
 ELF_FUNCTION(l_math_trim) {
+	checknumargs(S, nargs, 4);
+
 	V vx = loadvalue(S, 1);
 	V vy = loadvalue(S, 2);
 	V vz = loadvalue(S, 3);

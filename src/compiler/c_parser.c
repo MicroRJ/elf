@@ -130,17 +130,36 @@ static Token take_tok(elf_Parser *parser, int k) {
 	return tok;
 }
 
+
+
 static void begin_scope(elf_Parser *parser) {
-	ASSERT(parser->scope_index < _countof(parser->scope_stack));
+	ASSERT(parser->scope_index < COUNTOF(parser->scope_stack));
 	parser->scope_stack[parser->scope_index ++] = parser->entity_index;
 	parser->scope ++;
 }
 
-static void close_scope(elf_Parser *parser) {
-	ASSERT(parser->scope_index > 0);
-	parser->entity_index = parser->scope_stack[-- parser->scope_index];
-	parser->scope --;
+
+
+static void close_scope(elf_Parser *par) {
+	ASSERT(par->scope_index > 0);
+
+	int new_index = par->scope_stack[-- par->scope_index];
+
+	for (int i=par->entity_index-1; i>=new_index; --i)
+	{
+		if (~par->entities[i].status & ENTITY_REFERENCED)
+		{
+			parser_dialog(par, par->entities[i].line
+			, "warning: unreferenced entity");
+		}
+	}
+
+	ASSERT(new_index <= par->entity_index);
+
+	par->entity_index = new_index;
+	par->scope --;
 }
+
 
 
 static Loop *begin_loop(elf_Parser *parser) {
@@ -151,6 +170,7 @@ static Loop *begin_loop(elf_Parser *parser) {
 }
 
 
+
 static void close_loop(elf_Parser *parser) {
 	ASSERT(parser->loop_index > 0);
 	-- parser->loop_index;
@@ -158,7 +178,7 @@ static void close_loop(elf_Parser *parser) {
 
 
 
-static Loop *getloop(elf_Parser *parser, treeID name) {
+static Loop *get_loop(elf_Parser *parser, treeID name) {
 	// no loop
 	if (parser->loop_index < 1) {
 		return 0;
@@ -182,20 +202,32 @@ static Loop *getloop(elf_Parser *parser, treeID name) {
 }
 
 
-// == blocks ==
-static void block_add(elf_Parser *parser, treeID id){
-	darr_add(parser->block.body, id);
+
+static void block_add(elf_Parser *parser, treeID id) {
+	if (~parser->block.status & BLOCK_ENDED) {
+		darr_add(parser->block.body, id);
+	}
+	else {
+		parser_dialog(parser, id->line
+		, "warning: statement will be ignored because the block has already ended.");
+	}
 }
 
+
 static void begin_block(elf_Parser *parser) {
-	if(parser->block_index >= _countof(parser->block_stack)){
-		parser_dialog(parser,parser->tok.line,"block nesting too deep");
+	if (parser->block_index >= COUNTOF(parser->block_stack)) {
+		parser_dialog(parser, parser->tok.line, "block nesting too deep");
 	}
-	ASSERT(parser->block_index < _countof(parser->block_stack));
+
+	ASSERT(parser->block_index < COUNTOF(parser->block_stack));
+
 	parser->block_stack[parser->block_index ++] = parser->block;
 	parser->block = (Block){};
+
 	begin_scope(parser);
 }
+
+
 
 // this is only meant to be called when you reach the end
 // of a syntactic block, not when you reach a block
@@ -229,12 +261,17 @@ static treeID close_block(elf_Parser *parser) {
 
 
 
-static entID identifytree(elf_Parser *parser, treeID tree) {
-	entID id;
-	Entity ent;
-	for (id = parser->entity_index-1; id >= 0; -- id) {
-		ent=parser->entities[id];
-		if (ent.tree==tree) {
+// todo: we could just store the entity id within the
+// tree, because now all entities point their own trees...
+static int identify_tree(elf_Parser *par, treeID tree) {
+	int id;
+
+	for (id=par->entity_index-1; id >= 0; --id)
+	{
+		Entity en=par->entities[id];
+
+		if (en.tree==tree)
+		{
 			return id;
 		}
 	}
@@ -242,26 +279,28 @@ static entID identifytree(elf_Parser *parser, treeID tree) {
 }
 
 
+// todo: can we at-least hash the name?
+static int identify_name(elf_Parser *par, char *name) {
 
-static entID identifyname(elf_Parser *parser, char *name) {
-	entID id;
-	Entity ent;
-	for (id = parser->entity_index-1; id >= 0; -- id) {
-		ent=parser->entities[id];
-		if (text_eq(ent.name,name)) {
-			parser->entities[id].status |= ENTITY_REFERENCED;
+	int id;
+	for (id=par->entity_index-1; id>=0; --id)
+	{
+		Entity en=par->entities[id];
+
+		if (text_eq(en.name,name))
+		{
+			par->entities[id].status |= ENTITY_REFERENCED;
 			return id;
 		}
 	}
 	return NO_ENTITY;
 }
-
 
 
 
 static entID parser_bind(elf_Parser *parser, Source line, int flags, char *name, treeID tree) {
 	{
-		entID id = identifyname(parser, name);
+		entID id = identify_name(parser, name);
 
 		if (id != NO_ENTITY) {
 
@@ -401,7 +440,7 @@ static treeID parse_function(elf_Parser *parser) {
 		parse_stat(parser);
 		{
 			// todo: only if the block doesn't have a return already
-			entID ent = identifyname(parser,"this");
+			entID ent = identify_name(parser,"this");
 			ASSERT(ent != -1);
 
 			Entity this_;
@@ -496,7 +535,7 @@ static treeID nametotree(elf_Parser *parser, Source line, char *name, int lval) 
 
 	treeID v = Y_NULL;
 
-	entID id = identifyname(parser, name);
+	entID id = identify_name(parser, name);
 
 	if (id != NO_ENTITY) {
 		Entity entity = parser->entities[id];
@@ -572,7 +611,7 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 			get_tok(parser);
 
 			// todo: handle operand '#index(<loop-name>)'
-			Loop *loop = getloop(parser, Y_NULL);
+			Loop *loop = get_loop(parser, Y_NULL);
 
 			if (!loop) {
 				parser_dialog(parser, tok.line, "not in a loop");
@@ -585,7 +624,7 @@ static treeID parse_unary(elf_Parser *parser, bool unused) {
 			get_tok(parser);
 
 			// todo: handle operand '#index(<loop-name>)'
-			Loop *loop = getloop(parser, Y_NULL);
+			Loop *loop = get_loop(parser, Y_NULL);
 
 			if (!loop) {
 				parser_dialog(parser, tok.line, "not in a loop");
@@ -1073,38 +1112,49 @@ static int tok2tree(int tok) {
 }
 
 
-static treeID parse_block(elf_Parser *parser) {
-	begin_block(parser);
 
-	if (pick_tok(parser,TK_CURLY_LEFT)) {
-		while (parse_stat(parser));
-		take_tok(parser,TK_CURLY_RIGHT);
-	} else {
-		parse_stat(parser);
+static treeID parse_block(elf_Parser *par) {
+	begin_block(par);
+
+	if (pick_tok(par,TK_CURLY_LEFT)) {
+
+		while (parse_stat(par));
+
+		take_tok(par,TK_CURLY_RIGHT);
 	}
-	return close_block(parser);
+	else {
+		parse_stat(par);
+	}
+
+	return close_block(par);
 }
 
 
-static void checkstoreto(elf_Parser *parser, Source line, treeID tree){
 
-	if (tree <= 0 || tree->type == NT_NON){
-		parser_dialog(parser, line, "invalid l-value for store");
+static void checkstoreto(elf_Parser *par, Source line, treeID tree){
+
+
+	if (tree <= 0 || tree->type == NT_NON) {
+		parser_dialog(par, line, "invalid l-value for store");
 	}
 
-	entID e = identifytree(parser, tree);
-	if(e != NO_ENTITY){
-		if (parser->entities[e].status & ENT_FLAG_CONSTANT){
-			parser_dialog(parser,line
+	entID e = identify_tree(par, tree);
+
+	if (e != NO_ENTITY) {
+		if (par->entities[e].status & ENT_FLAG_CONSTANT) {
+			parser_dialog(par, line
 			,	"reassignment of constant entity");
-			parser_dialog(parser,parser->entities[e].line
+			parser_dialog(par, par->entities[e].line
 			,	"see declaration");
 		}
 	}
 }
 
 
-// todo: this double evaluates the expression!
+
+
+// todo: this double evaluates the operands
+// of the condition expression!
 static void parse_assert(elf_Parser *parser) {
 	Token tok = take_tok(parser, TK_M_ASSERT);
 
@@ -1116,9 +1166,13 @@ static void parse_assert(elf_Parser *parser) {
 
 	String_Builder sb = {};
 	switch (get_tree_kind(parser, cond)) {
-		case EXPR_NEQ: sb_sprintf(&sb, "(%% != %%) is false"); goto _bcase;
-		case EXPR_EQ:  sb_sprintf(&sb, "(%% == %%) is false"); goto _bcase;
-		case EXPR_OR:  sb_sprintf(&sb, "(%% || %%) is false"); goto _bcase;
+		case EXPR_NEQ:   sb_sprintf(&sb, "(%% != %%) is false"); goto _bcase;
+		case EXPR_EQ:    sb_sprintf(&sb, "(%% == %%) is false"); goto _bcase;
+		case EXPR_OR:    sb_sprintf(&sb, "(%% || %%) is false"); goto _bcase;
+		case EXPR_LT:    sb_sprintf(&sb, "(%% < %%) is false"); goto _bcase;
+		case EXPR_GT:    sb_sprintf(&sb, "(%% > %%) is false"); goto _bcase;
+		case EXPR_GTEQ:  sb_sprintf(&sb, "(%% >= %%) is false"); goto _bcase;
+		case EXPR_LTEQ:  sb_sprintf(&sb, "(%% <= %%) is false"); goto _bcase;
 
 		default: {
 
@@ -1130,9 +1184,8 @@ static void parse_assert(elf_Parser *parser) {
 			// char *
 			treeID tformatstr = tree_str(parser, tok.line, sb.buf);
 
-			treeID tcallformat = tree_callcoreapi3(parser, tok.line, BUILTIN_FORMAT
-			// elf.format(tformatstr, cond->x, cond->y)
-			, tformatstr, cond->x, cond->y);
+			treeID tcallformat = tree_callcoreapi3(parser, tok.line
+			, BUILTIN_FORMAT, tformatstr, cond->x, cond->y);
 
 			darr_add(tassertargs, tcallformat);
 		} break;
@@ -1140,8 +1193,6 @@ static void parse_assert(elf_Parser *parser) {
 
 
 	treeID v = tree_callcoreapi(parser, tok.line, BUILTIN_ASSERT, tassertargs);
-	// assertion cannot be implemented this way because we double evaluate
-	// the operands, leading to errors
 	block_add(parser, v);
 
 	esc:
@@ -1219,9 +1270,7 @@ static int parse_stat(elf_Parser *parser) {
 
 		case TK_DEFER: {
 			get_tok(parser);
-			if (tok.type != TK_DEFER) {
-				parser_dialog(parser,tok.line,"consider using defer instead!");
-			}
+
 			treeID v = parse_block(parser);
 			darr_add(parser->block.defers, v);
 		} break;
@@ -1233,16 +1282,13 @@ static int parse_stat(elf_Parser *parser) {
 		case TK_CONTINUE: {
 			get_tok(parser);
 
-			// todo: replace with bit flags, neater
-			parser->block.ended=1;
-			parser->block.has_ret=1;
 
 			treeID v = Y_NULL;
 			if(!tok.eol) {
 				v = parse_expr(parser,0);
 			}
 			if((tok.type == TK_CONTINUE) || (tok.type == TK_BREAK)) {
-				Loop *loop = getloop(parser,v);
+				Loop *loop = get_loop(parser,v);
 				if (loop != 0) {
 					v = tree_goto(parser,tok.line);
 					if (tok.type == TK_CONTINUE) {
@@ -1256,7 +1302,11 @@ static int parse_stat(elf_Parser *parser) {
 			} else {
 				v = tree_ret(parser,tok.line,v);
 			}
+
+
 			block_add(parser,v);
+
+			parser->block.status = BLOCK_ENDED | BLOCK_HASRET;
 		} break;
 		case TK_CURLY_LEFT: {
 			treeID v = parse_block(parser);
