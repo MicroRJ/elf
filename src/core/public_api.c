@@ -70,7 +70,7 @@ elf_State *elf_new() {
 
 
 elf_pubapi
-void elf_pullglobals(elf_State *S) {
+void elf_pushglobals(elf_State *S) {
 	pushtab(S, S->globals);
 }
 
@@ -93,7 +93,7 @@ void elf_arrayadd(elf_State *S) {
 	V val = S->stack_ptr[-1];
 	vcheck(S, tab, ELF_TTABLE);
 
-	arrayadd(vgettab(tab), val);
+	arrayadd(S, vgettab(tab), val);
 	S->stack_ptr -= 1;
 }
 

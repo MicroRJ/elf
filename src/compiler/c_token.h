@@ -78,12 +78,12 @@ _(ELLIPSIS,"...",  1) _(DOT_DOT, "..",  1) \
 
 
 #define TOKENDEF(_)                 \
-_(INTEGER            ,"integer")    \
-_(NUMBER             , "number")    \
-_(STRING             , "string")    \
-_(FORMAT_STRING      , "format")    \
-_(LETTER             , "letter")    \
-_(WORD               ,   "word")    \
+_(INTEGER            ,"int")        \
+_(NUMBER             ,"num")        \
+_(STRING             ,"str")        \
+_(FORMAT_STRING      ,"fmt")        \
+_(LETTER             ,"chr")        \
+_(WORD               ,"word")       \
 _(TILDE              ,"~")          \
 _(MINUS_MINUS        ,"--")         \
 _(PLUS_PLUS          ,"++")         \
@@ -127,7 +127,7 @@ typedef enum tokenTy {
 
 typedef struct token_metadata_t {
 	char name[16];
-	char prec;
+	char rank;
 } token_metadata_t;
 
 global token_metadata_t g_token_metadata_table[] = {

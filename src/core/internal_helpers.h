@@ -258,7 +258,7 @@ static inline Str pushtext2(elf_State *S, char const *text, int length) {
 
 
 static inline Tab pushtable(elf_State *S) {
-	Tab tab = newtable(S);
+	Tab tab = new_table(S);
 	pushtab(S, tab);
 	return tab;
 }

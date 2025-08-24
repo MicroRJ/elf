@@ -6,6 +6,7 @@
 
 typedef elf_Value   V;
 typedef elf_Value   Value;
+typedef elf_Value   Val;
 
 typedef elf_Handle  Handle;
 typedef elf_Time    Time;

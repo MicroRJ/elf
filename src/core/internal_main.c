@@ -300,6 +300,7 @@ static void error_invalidoperandsforoperator(elf_State *inter, char *name, elf_V
 
 
 // the result is on the stack
+// todo: why are we using char *!
 static int callmetafield(elf_State *inter, elf_Object *obj, char *name, int nargs, elf_Value xx, elf_Value yy) {
 	pushtext(inter, name);
 
@@ -500,9 +501,8 @@ do { \
 int _resume(elf_State *inter) {
 	int nrets = 0;
 
-	elf_State *R = inter;
-
 	Stack_Frame frame = inter->frame;
+	Tab globals = inter->globals;
 
 
 	// we do this here because we don't store reference in the frame
@@ -518,15 +518,15 @@ int _resume(elf_State *inter) {
 	// ensure that the caller set this properly
 	ASSERT(frame.nextinstr == 0);
 
-	int subframes = 0;
+	int framecounter = 0;
+	int loopcounter = 0;
 
-	Tab globals = inter->globals;
 
 	V xx,yy,zz;
 	while (frame.nextinstr < frame.bytec) {
-		int instr = frame.nextinstr ++;
+		BCPos instr = frame.nextinstr ++;
 
-		int minstr = frame.bytes + instr;
+		BCPos minstr = frame.bytes + instr;
 		inter->byte = minstr;
 
 		Bytec byte = inter->bytebuf[minstr];
@@ -534,10 +534,21 @@ int _resume(elf_State *inter) {
 
 		#define by byte
 
+		if (inter->trace_counter) {
+			// we're looping
+			if (!loopcounter) {
+				darr_add(inter->trace, byte);
+			}
+		}
+
 
 		switch (BC_OP(byte)) {
 
-			case BC_CALL:
+			VMCASE(BC_NOP)
+			{
+			} VMBREAK;
+
+			VMCASE(BC_CALL)
 			{
 				// put stack pointer right above all the arguments
 				// note how this will lead to the sub-function having
@@ -558,13 +569,12 @@ int _resume(elf_State *inter) {
 					inter->stack_ptr = frame.framebase + frame.framesize;
 
 					// track the number of sub-frames locally
-					subframes ++;
+					framecounter ++;
 				}
 				else if (isfnc(xx)) {
 
-					// we have to reflect our changes so that sub-functions
-					// that want access to the parent's call frame can get it,
-					// if you know what I mean
+					// we wouldn't need to do this if sub-functions didn't
+					// need access the the caller's frame, for core API
 					inter->frame_stack[inter->frame_index ++] = frame;
 
 					callfunction(inter, vgetfnc(xx), by.b_y, by.b_z);
@@ -599,7 +609,7 @@ int _resume(elf_State *inter) {
 				//
 				// sub-frame zero means we're the top call, we can exit
 				// the routine function now
-				if (!subframes) {
+				if (!framecounter) {
 					// set stack pointer so that our caller can pop the
 					// results
 					inter->stack_ptr = frame.framebase + nrets;
@@ -607,7 +617,7 @@ int _resume(elf_State *inter) {
 				}
 				//
 				//
-				subframes --;
+				framecounter --;
 				//
 				//
 				// restore stack pointer to cover the entire frame.
@@ -615,8 +625,49 @@ int _resume(elf_State *inter) {
 				//
 			} VMBREAK;
 
-			case BC_NOP: {
-			} break;
+#if 0
+			VMCASE(BC_TRACE) {
+				Bytec *bptr = & inter->bytebuf[minstr];
+
+				// if not traced already
+				if (bptr->b_z == 0) {
+
+					// if no trace active, begin new trace
+					if (inter->trace_counter == 0) {
+						inter->trace_counter ++;
+						inter->trace_start = minstr;
+						// mark tracing
+						ASSERT(bptr->b_x == 0);
+						bptr->b_x = 1;
+
+						elf_ldebug("begin trace");
+					}
+					// if we've looped back, end the trace
+					else if (inter->trace_start == minstr) {
+						elf_ldebug("end trace: %i instructions", darr_l(inter->trace));
+
+						// mark traced
+						bptr->b_z = 1;
+
+
+						// mark not tracing
+						ASSERT(bptr->b_x == 1);
+						bptr->b_x = 0;
+
+						// ensure everything ok
+						ASSERT(inter->trace_counter == 1);
+
+						// disable trace
+						inter->trace_counter = 0;
+					}
+					else {
+						// child trace instr
+						inter->trace_counter ++;
+					}
+				}
+
+			} VMBREAK;
+#endif
 
 			case BC_J: {
 
@@ -624,6 +675,18 @@ int _resume(elf_State *inter) {
 				frame.nextinstr = instr + dst;
 
 			} break;
+
+#if 0
+			case BC_EXIT_LOOP_JUMP: {
+				int dst = BC_ARGX(byte);
+				frame.nextinstr = instr + dst;
+			} break;
+
+			case BC_LOOP_JUMP: {
+				int dst = BC_ARGX(byte);
+				frame.nextinstr = instr + dst;
+			} break;
+#endif
 
 			case BC_JZ: {
 
@@ -651,9 +714,12 @@ int _resume(elf_State *inter) {
 				global_store_x(rvalueY());
 			} VMBREAK;
 
-			VMCASE(BC_RELOAD) {
+			VMCASE(BC_RELOAD)
+			{
 				rstoreX(rvalueY());
-			} VMBREAK;
+
+				VMBREAK;
+			}
 
 			VMCASE(BC_LOADNIL) {
 				vsetnil(&rvalueX());
@@ -699,9 +765,11 @@ int _resume(elf_State *inter) {
 
 				vsetcls(&rvalueX(), closure);
 			} break;
+
+
 			case BC_TABLE: {
 
-				elf_Table *tab = newtable(R);
+				elf_Table *tab = new_table(inter);
 				vsettab(&rvalueX(), tab);
 
 			} break;

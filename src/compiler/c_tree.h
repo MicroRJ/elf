@@ -11,10 +11,11 @@
 
 #define TREE_NO_ERROR(t) ((t) > 0)
 
-typedef struct elf_Parser elf_Parser;
 
 typedef struct Tree Tree;
 typedef Tree *treeID;
+
+
 
 /* MIND ORDER */
 #define TREEDEF(_)   \
@@ -44,9 +45,10 @@ _(EXPR_NIL_OR)       \
 _(EXPR_BIT_NOT)      \
 _(TREE_GLOBAL)       \
 _(TREE_UPVALUE)      \
-_(TREE_GETEXPR)      \
-_(TREE_GETMEM)       \
-_(TREE_MEMORY)       \
+_(TREE_DEBUG_GET_EXPRESSION_NAME)      \
+_(TREE_DEBUG_GET_MEMORY)               \
+_(TREE_MEMORY)                         \
+_(TREE_MEMORY_BLOCK)                   \
 _(EXPR_NUM)          \
 _(EXPR_INT)          \
 _(EXPR_STR)          \
@@ -60,10 +62,6 @@ _(EXPR_FIELD)        \
 _(EXPR_METAFIELD)    \
 _(EXPR_NIL)          \
 _(TREE_STORE)        \
-_(TREE_MULTISTORE)   \
-_(TREE_READ_MODIFY_STORE)  \
-_(TREE_CONDITIONAL_STORE)  \
-_(STAT_BLOCK)        \
 _(TREE_IF)           \
 _(TREE_GOTO)         \
 _(TREE_WHILE_LOOP)   \
@@ -71,10 +69,10 @@ _(STAT_DO_WHILE)     \
 _(TREE_RANGE)        \
 _(EXPR_RANGE_INDEX)  \
 _(TREE_TUPLE)        \
-_(TREE_LABEL)        \
 _(TREE_RET)          \
-_(TREE_PROXY)        \
 /* end */
+// _(TREE_EXIT_LOOP)    \
+// _(TREE_TRACE)        \
 
 typedef enum {
 #define TREE(NAME) NAME,
@@ -94,11 +92,6 @@ typedef enum treeTy {
 	NT_NIL, NT_BOL, NT_INT, NT_NUM,
 	NT_OBJ, NT_TAB, NT_FUN, NT_STR
 } treeTy;
-
-// typedef struct {
-// 	treeID x;
-// 	treeID y;
-// } KV;
 
 
 struct Tree {
@@ -150,7 +143,8 @@ struct Tree {
 			treeID      enc;
 			// list of captures for the parser to remember which ones
 			// it has already, also tells code gen the number of captures
-			// for the proto
+			// for the proto and emits the instructions for creating new
+			// closure
 			treeID   *capts;
 			// body of instructions for the code generator to make
 			treeID     body;
@@ -159,11 +153,13 @@ struct Tree {
 			// a proto ready for it.
 			int       proto;
 		} tree_funexpr;
+
 		struct {
-			treeID *defers;
-			treeID *breaks;
+			treeID *empty_0;
+			treeID *empty_1;
 			treeID *stats; // match z
 		} tree_blockstat;
+
 		struct {
 			treeID        pred;
 			treeID true_clause;
@@ -175,7 +171,7 @@ struct Tree {
 			treeID prebody;
 			treeID probody;
 			treeID body;
-			// todo: remove
+			treeID prepred;
 			treeID *b,*c;
 		} loop;
 	};

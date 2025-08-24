@@ -63,8 +63,13 @@ typedef struct Block Block;
 struct Block {
 	int     status;
 	Source *begin, *end;
-	treeID *body;
 	treeID *defers;
+	// todo: can we remove this? we keep allocating these sub arrays
+	// because we want to remember instructions, but not emit them
+	// to the main execution block, they get emitted later in particular
+	// ways, so we can just have a secondary buffer, and blocks are just
+	// begin end integer pairs
+	treeID *body;
 };
 
 
@@ -86,6 +91,7 @@ struct Loop {
 enum {
 	MAX_ENTITIES = 1024
 };
+
 
 
 // todo:
@@ -159,9 +165,8 @@ struct elf_Parser {
 	int 	          memory_state_stack[128];
 	int 	          memory_state_index;
 	// remember which trees have memory
-	treeID          memory_slots[1024];
-
-	// immediate temporary buffer, some temporary results are placed here
+	treeID          memory_slots[128];
+	// immediate buffer?
 	char            tempbuf[1024];
 };
 

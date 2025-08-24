@@ -18,13 +18,6 @@ static void add_else_clause(elf_Parser *fs, Source line, JBuf *s);
 static void add_then_clause(elf_Parser *fs, Source line, JBuf *s);
 static void close_if(elf_Parser *fs, Source line, JBuf *s);
 
-// static void begin_range_loop(elf_Parser *fs, Source line, treeID x, treeID lo, treeID hi);
-// static void close_range_loop(elf_Parser *fs, Source line);
-// static void begin_do_while_loop(elf_Parser *fs, Source line);
-// static void close_do_while_loop(elf_Parser *fs, Source line, treeID x);
-// static void begin_while_loop(elf_Parser *fs, treeID x);
-// static void close_while_loop(elf_Parser *fs);
-
 static int emit_jump(elf_Parser *parser, Source line, int dst);
 static int emit_byte(elf_Parser *parser, Source line, Bytec byte);
 static int emit_bytex(elf_Parser *parser, Source line, int k, int x);
@@ -40,6 +33,11 @@ static int to_any_mem(elf_Parser *parser, treeID id);
 static int tree_to_bytec(int kind);
 static int *emit_jump_if_not_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
 static int *emit_jump_if_nil(elf_Parser *parser, Source line, jumpS *js, treeID id);
+
+#if 0
+static BCPos emit_loop_jump(elf_Parser *parser, Source line, BCPos dst);
+static BCPos emit_exit_loop_jump(elf_Parser *parser, Source line);
+#endif
 
 static int get_mem_state(elf_Parser *parser) { return parser->memory_state; }
 
@@ -103,7 +101,7 @@ static int get_mem(elf_Parser *parser, treeID id) {
 	if (id->tree_memory.mem != -1) {
 		int occurrences;
 		int i;
-		for (occurrences=0, i=0; i<parser->memory_state; ++i) {
+		for (i=0,occurrences=0; i<parser->memory_state; ++i) {
 			if (parser->memory_slots[i] == id) {
 				ASSERT(id->tree_memory.mem == i);
 				occurrences ++;
@@ -189,7 +187,8 @@ static void make_store(elf_Parser *parser, Source line, treeID x, treeID y, int 
 	Tree tx = get_tree(parser, x);
 	ASSERT(tx.type != NT_NON);
 
-	SCOPE_MEM_STATE(parser) {
+	SCOPE_MEM_STATE(parser)
+	{
 		if (tx.kind == TREE_MEMORY) {
 
 			int rx = get_mem(parser, x);
@@ -287,24 +286,31 @@ static int make_call_expr(elf_Parser *parser, treeID callexpr, int dst, int nret
 
 
 
-static int make_binary_expr(elf_Parser *parser, treeID v, int dst, int ndst) {
+static int make_binary_expr(elf_Parser *par, treeID expr, int dst, int ndst) {
 	int rx, ry;
-	if ((v->kind==EXPR_GT)||(v->kind==EXPR_GTEQ)) {
-		SCOPE_MEM_STATE(parser) {
-			rx=to_any_mem(parser,v->y);
-			ry=to_any_mem(parser,v->x);
+
+	// inverse
+	if ((expr->kind==EXPR_GT)||(expr->kind==EXPR_GTEQ))
+	{
+		SCOPE_MEM_STATE(par)
+		{
+			rx=to_any_mem(par,expr->y);
+			ry=to_any_mem(par,expr->x);
 		}
 		if (ndst<1) goto esc;
-		if (dst<0) dst=req_mem(parser);
-		emit_bytexyz(parser,v->line,tree_to_bytec(v->kind^1),dst,rx,ry);
-	} else {
-		SCOPE_MEM_STATE(parser) {
-			rx=to_any_mem(parser,v->x);
-			ry=to_any_mem(parser,v->y);
+		if (dst<0) dst=req_mem(par);
+		emit_bytexyz(par,expr->line,tree_to_bytec(expr->kind^1),dst,rx,ry);
+	}
+	else
+	{
+		SCOPE_MEM_STATE(par)
+		{
+			rx=to_any_mem(par,expr->x);
+			ry=to_any_mem(par,expr->y);
 		}
 		if (ndst<1) goto esc;
-		if (dst<0) dst=req_mem(parser);
-		emit_bytexyz(parser,v->line,tree_to_bytec(v->kind),dst,rx,ry);
+		if (dst<0) dst=req_mem(par);
+		emit_bytexyz(par,expr->line,tree_to_bytec(expr->kind),dst,rx,ry);
 	}
 	esc:
 	return dst;
@@ -328,34 +334,32 @@ static void make_tree(elf_Parser *parser, treeID id) {
 			parser->memory_slots[mem] = id;
 		} break;
 
-		case TREE_MULTISTORE: {
-			treeID *xs = tree.tree_multistore.xs;
-			treeID *ys = tree.tree_multistore.ys;
-			int i;
-			for (i = 0; i < darr_l(xs); i ++) {
-				treeID x = xs[i];
-				treeID y;
-				if (i < darr_l(ys)) {
-					y = ys[i];
-				} else {
-					y = tree_nil(parser, x->line);
-				}
-				make_store(parser, x->line, x, y, 1);
-			}
-		} break;
-
-		case TREE_STORE: {
-
-			make_store(parser, tree.line, tree.x, tree.y, 1);
-		} break;
-
-		case STAT_BLOCK: {
-			SCOPE_MEM_STATE(parser) {
-				FOR_ARRAY(i, tree.z) {
+		// todo: the memory block thing could have just been replaced
+		// with two trees, begin/end memory... and this wouldn't be
+		// recursive.. and it would remove the need for dynamic arrays
+		// for each block tree...
+		case TREE_MEMORY_BLOCK:
+		{
+			SCOPE_MEM_STATE(parser)
+			{
+				FOR_ARRAY(i, tree.z)
+				{
 					make_tree(parser, tree.z[i]);
 				}
 			}
 		} break;
+
+#if 0
+		case TREE_TRACE: {
+			emit_bytex(parser, tree.line, BC_TRACE, 0);
+		} break;
+#endif
+
+		case TREE_STORE:
+		{
+			make_store(parser, tree.line, tree.x, tree.y, 1);
+		} break;
+
 
 		case TREE_RET: {
 			int mem,num;
@@ -372,47 +376,59 @@ static void make_tree(elf_Parser *parser, treeID id) {
 			emit_bytexy(parser,tree.line,BC_RET,mem,num);
 		} break;
 
-		// todo:
+#if 0
+		case TREE_EXIT_LOOP: {
+			int jmp = emit_exit_loop_jump(parser, tree.line);
+			id->jump = jmp;
+		} break;
+#endif
+
 		case TREE_GOTO: {
 			int jmp = emit_jump(parser, tree.line, NO_JUMP);
 			id->jump = jmp;
 		} break;
 
 		case TREE_WHILE_LOOP: {
-
-			treeID pred,body,post,prev;
-			pred=tree.loop.pred;
-			body=tree.loop.body;
-			post=tree.loop.probody;
-			prev=tree.loop.prebody;
-
 			// todo: user should do this?
-			SCOPE_MEM_STATE(parser) {
+			SCOPE_MEM_STATE(parser)
+			{
+				treeID prepred=tree.loop.prepred;
+				treeID pred=tree.loop.pred;
+				treeID prebody=tree.loop.prebody;
+				treeID body=tree.loop.body;
+				treeID probody=tree.loop.probody;
 
-				int entry = parser->R->bytecur;
+				int entry = parser->inter->bytecur;
 				int continue_target = entry;
+
+				if (prepred) make_tree(parser, prepred);
 
 				jumpS js = {0};
 				emit_jump_if_false(parser, &js, pred);
 
-				if (prev) make_tree(parser, prev);
+				if (prebody) make_tree(parser, prebody);
 
 				make_tree(parser,body);
-				if (post) {
-					continue_target = parser->R->bytecur;
-					make_tree(parser, post);
-				}
-				emit_jump(parser,body->line,entry);
 
-				treeID *c,*b;
-				b=tree.loop.b;
-				c=tree.loop.c;
-				FOR_ARRAY(i, c) {
-					patch_jump2(parser,c[i]->jump,continue_target);
+				if (probody) {
+					continue_target = parser->inter->bytecur;
+					make_tree(parser, probody);
 				}
 
-				FOR_ARRAY(i,b){
-					patch_jump(parser,b[i]->jump);
+				emit_jump(parser, body->line, entry);
+
+				treeID *c=tree.loop.c;
+				FOR_ARRAY(i, c)
+				{
+					ASSERT(c[i]->kind == TREE_GOTO);
+					patch_jump2(parser, c[i]->jump, continue_target);
+				}
+
+				treeID *b=tree.loop.b;
+				FOR_ARRAY(i,b)
+				{
+					// ASSERT(b[i]->kind == TREE_EXIT_LOOP);
+					patch_jump(parser, b[i]->jump);
 				}
 				patch_jumps(parser,js.f);
 				darr_free(js.f);
@@ -489,20 +505,44 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 
 	int rx,ry,rz;
 	switch (tree.kind) {
-
-		case TREE_PROXY: {
-			dst = to_mem(parser, tree.x, dst, ndst);
-		} break;
-
 		case TREE_MEMORY: {
-			int mem = get_mem(parser, id);
-			ASSERT(mem != -1);
+#if 1
 			if (ndst < 1) goto esc;
 			if (dst < 0) dst = req_mem(parser);
 
+			int mem = get_mem(parser, id);
+			ASSERT(mem != -1);
 			if (dst != mem) {
 				emit_bytexy(parser,line,BC_RELOAD,dst,mem);
 			}
+#else
+			int mem = get_mem(parser, id);
+
+			// if no memory, evaluate to memory
+			if (mem == -1)
+			{
+				mem = to_mem(parser, tree.x, dst, 1);
+
+				// if 'dst' was provided, then it remains unchanged
+				// since 'mem' = 'dst'
+				dst = mem;
+
+				ASSERT(mem != -1);
+
+				id->tree_memory.mem = mem;
+				parser->memory_slots[mem] = id;
+			}
+			else {
+				// no results needed so we can exit now
+				if (ndst < 1) goto esc;
+				if (dst < 0) {
+					dst = req_mem(parser);
+				}
+				if (dst != mem) {
+					emit_bytexy(parser,line,BC_RELOAD,dst,mem);
+				}
+			}
+#endif
 		} break;
 
 		case TREE_NOP: {
@@ -510,7 +550,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			if (dst < 0) dst = req_mem(parser);
 		} break;
 
-		case TREE_GETMEM: {
+		case TREE_DEBUG_GET_MEMORY: {
 			int mem = get_mem(parser,tree.x);
 			if (mem == NO_SLOT) {
 				parser_dialog(parser,get_tree_line(parser,tree.x),"no memory assigned to this thing");
@@ -518,7 +558,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			dst = to_mem(parser,tree_int(parser,tree.line,mem),dst,ndst);
 		} break;
 
-		case TREE_GETEXPR: {
+		case TREE_DEBUG_GET_EXPRESSION_NAME: {
 			char *expr = tree2s[get_tree_kind(parser,tree.x)];
 			dst=to_mem(parser,tree_str(parser,tree.line,expr),dst,ndst);
 		} break;
@@ -581,7 +621,7 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			// todo: add to constant pool and create new GETKSTR instruction
 			// todo: also add dedicated get str field instruction, which is
 			// the common case for field accesses!
-			elf_String *str = newstr(S, tree.expr_str);
+			Str str = newstr(S, tree.expr_str);
 
 			int yy = darr_grow(S->globals->array, 1);
 			vsetstr(&S->globals->array[yy], str);
@@ -723,9 +763,23 @@ static int tree_to_bytec(int kind) {
 
 
 
-static int emit_jump(elf_Parser *parser, Source line, int dst) {
-	return emit_bytex(parser,line,BC_J,dst-parser->R->bytecur);
+static BCPos emit_jump(elf_Parser *parser, Source line, BCPos dst) {
+	BCPos rel = dst - parser->R->bytecur;
+	return emit_bytex(parser, line, BC_J, rel);
 }
+
+
+#if 0
+static BCPos emit_loop_jump(elf_Parser *parser, Source line, BCPos dst) {
+	BCPos rel = dst - parser->R->bytecur;
+	ASSERT(rel < 0);
+	return emit_bytex(parser, line, BC_LOOP_JUMP, rel);
+}
+
+static BCPos emit_exit_loop_jump(elf_Parser *parser, Source line) {
+	return emit_bytex(parser, line, BC_EXIT_LOOP_JUMP, 0);
+}
+#endif
 
 
 
@@ -923,6 +977,7 @@ static int emit_bytexyz(elf_Parser *C, Source line, int k, int x, int y, int z) 
 }
 
 
+
 static void patch_jump2(elf_Parser *parser, BCPos src, BCPos dst) {
 
 	Bytec byte, *bytebuf;
@@ -932,7 +987,9 @@ static void patch_jump2(elf_Parser *parser, BCPos src, BCPos dst) {
 
 	int j = dst - src;
 	switch (BC_OP(byte)) {
-
+#if 0
+		case BC_EXIT_LOOP_JUMP:
+#endif
 		case BC_J: {
 			bytebuf[src].b_x = j;
 			bytebuf[src]=BC_XXX(BC_OP(byte),j);
@@ -948,21 +1005,21 @@ static void patch_jump2(elf_Parser *parser, BCPos src, BCPos dst) {
 }
 
 
-static void patch_jumps2(elf_Parser *fs, BCPos *js, BCPos j) {
-	FOR_ARRAY(i,js) {
-		patch_jump2(fs,js[i],j);
+static void patch_jumps2(elf_Parser *par, BCPos *js, BCPos dst) {
+	FOR_ARRAY(i, js) {
+		patch_jump2(par, js[i], dst);
 	}
 }
 
 
-static void patch_jump(elf_Parser *fs, BCPos i) {
-	patch_jump2(fs,i,fs->R->bytecur);
+static void patch_jump(elf_Parser *par, BCPos j) {
+	patch_jump2(par, j, par->R->bytecur);
 }
 
 
-static void patch_jumps(elf_Parser *parser, BCPos *s) {
-	FOR_ARRAY(i,s) {
-		patch_jump(parser,s[i]);
+static void patch_jumps(elf_Parser *par, BCPos *js) {
+	FOR_ARRAY(i, js) {
+		patch_jump(par, js[i]);
 	}
 }
 
@@ -1033,83 +1090,5 @@ treeID desugar_range_expr(elf_Parser *fs, treeID x, int flags) {
 	// Todo: come back to this later
 	__debugbreak();
 	return Y_NULL;
-}
-
-void opt_const_fold(elf_Parser *fs, Tree node) {
-	#define isconst(k) (k==IR_STRING||k==IR_INTEGER||k==IR_NUMBER)
-	Tree xx,yy;
-	int xconst;
-	int yconst;
-	xx=get_tree(fs,node.x);
-	yy=get_tree(fs,node.y);
-	xconst = isconst(xx.kind) || ((xx.k==IR_LOCAL) && (find_local_const_store(fs,xx.x) != -1));
-	yconst = isconst(yy.kind) || ((yy.k==IR_LOCAL) && (find_local_const_store(fs,yy.x) != -1));
-
-	if (xconst && yconst) {
-		parser_dialog(fs,node.line,"possible constant fold");
-	}
-}
-		case IR_CLOSURE: {
-			if (nreg<1) goto esc;
-			/* todo: why is it that we can't just start at reg */
-			mem=get_mem_state_deprecated(fs); {
-				FOR_ARRAY(i,node.z) {
-					emit_eval_deprecated(fs,0,reg_alloc_deprecated(fs),1,node.z[i]);
-				}
-			} set_mem_state_deprecated(fs,mem);
-			if (reg<0) reg=reg_alloc_deprecated(fs);
-			emit_bytexy_deprecated(fs,line,BC_CLOSURE,mem,node.x);
-			if (mem!=reg) {
-				emit_bytexy_deprecated(fs,line,BC_RELOAD,reg,mem);
-			}
-		} break;
-		case IR_TYPEGUARD: {
-			if (nreg<1) goto esc;
-			reg=emit_eval_deprecated(fs,flags,reg,nreg,node.x);
-			emit_bytexy_deprecated(fs,node.line,BC_TYPEGUARD,reg,node2tag(node.y));
-		} break;
-
-/*
--- I think this hack will become obsolete
-
-
-Emits auxilary code for a particular compound expression.
-
-More specifically, it loads the dependencies of said
-expression into a register, and then returns a new node
-which points to the register where the dependencies
-where evaluated.
-
-For instance, the expression:
-a.b.c.d ?= 1 ::= (if a.b.c.d nil ? a.b.c.d = 1)
-
-Which uses emits a bunch of loads and stores, gets
-translated to:
-
-tmp=a.b.c
-if tmp.d nil ? tmp.d=1
-
-*/
-treeID emit_preload_deprecated(elf_Parser *fs, treeID x) {
-	ASSERT(x>=0);
-
-	Tree   node;
-	int     reg;
-
-	node=get_target_node(fs,TREEID(x));
-
-	switch (node.kind) {
-		case IR_FIELD: {
-			reg=any_reg_deprecated(fs,node.x);
-			x=tree_field(fs,node.line,tree_local(fs,node.line,reg),node.y);
-		} break;
-		case IR_INDEX: {
-			reg=any_reg_deprecated(fs,node.x);
-			x=tree_index(fs,node.line,tree_local(fs,node.line,reg),node.y);
-		} break;
-		default:;
-	}
-
-	return x;
 }
 #endif

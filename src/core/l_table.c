@@ -2,13 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: avoid having to do pushing and popping in these
-// libs on return?!
-// It doesn't matter how much of the stack space we actually
-// overwrite... Because at call time we're always at the very
-// bottom... right?
-
-#include "internal_shorternames.h"
 
 
 ELF_FUNCTION(l_table_get_meta) {
@@ -36,7 +29,7 @@ static inline bool tablecontains(Tab t, V k) {
 
 ELF_FUNCTION(l_table_contains) {
 	Tab tab = loadtable(S, 0);
-	V     key = loadvalue(S, 1);
+	Val key = loadvalue(S, 1);
 	pushint(S, tablecontains(tab, key));
 	return 1;
 }
@@ -61,19 +54,19 @@ ELF_FUNCTION(l_table_delete) {
 	ASSERT((nargs - 1) >= 1);
 
 	Tab tab = loadtable(S, 0);
-	V key = loadvalue(S, 0);
+	Val key = loadvalue(S, 0);
 
 	TEntry *entries = tab->entries;
-	V *array = tab->array;
+	Val      *array = tab->  array;
 
-	elf_Index slot = tabletry(tab, key);
+	Index slot = tabletry(tab, key);
 
 	if ((slot >= 0) && (entries[slot].key.tag != ELF_TNIL) && (entries[slot].key.tag != ELF_TTOMB)) {
 
-		elf_Index idx = entries[slot].idx;
+		Index idx = entries[slot].idx;
 		pushvalueunsafe(S, array[idx]);
 
-		elf_Index i;
+		Index i;
 		for (i = 0; i < tab->ntotal; i ++) {
 			if (entries[i].idx == idx) {
 				entries[i].key.tag = ELF_TTOMB;
@@ -93,7 +86,7 @@ ELF_FUNCTION(l_table_delete) {
 }
 
 
-static inline void aliastable(Tab tab, V key, V alias) {
+static inline void tablealias(Tab tab, V key, V alias) {
 	Index slot = tabletry(tab,key);
 	if (slot >= 0) {
 		if (!isdead(tab->entries[slot].key)) {
@@ -111,7 +104,7 @@ static inline void aliastable(Tab tab, V key, V alias) {
 // points to where 'existing_key' points to
 ELF_FUNCTION(l_table_alias) {
 	Tab tab = loadtable(S, 0);
-	aliastable(tab, loadvalue(S, 1), loadvalue(S, 2));
+	tablealias(tab, loadvalue(S, 1), loadvalue(S, 2));
 	return 0;
 }
 
@@ -122,31 +115,29 @@ ELF_FUNCTION(l_table_alias) {
 // key itself
 ELF_FUNCTION(l_find_aliases) {
 	Tab tab = loadtable(S, 0);
-	V     key = loadvalue(S, 1);
+	V   key = loadvalue(S, 1);
 
-	pushtable(S);
+	Tab res = pushtable(S);
 
-	TEntry entry;
 	if (!visnil(key)) {
 
 		Index i=tabletry(tab, key);
 
 		if (i > 0) {
 
-			entry = tab->slots[i];
+			TEntry entry=tab->entries[i];
 
 			if (!isdead(entry.key)) {
 
 				for (i = 0; i < tab->ntotal; ++i) {
 					/* we also include ourselves */
 
-					TEntry alias = tab->slots[i];
+					TEntry alias=tab->entries[i];
 
 					if (isdead(alias.key)) continue;
 					if (alias.idx != entry.idx) continue;
 
-					pushvalueunsafe(S, alias.key);
-					elf_arrayadd(S);
+					arrayadd(S, tab, alias.key);
 				}
 			}
 		}
@@ -164,7 +155,7 @@ ELF_FUNCTION(l_table_get_keys) {
 
 	elf_pushtab(S);
 
-	elf_Index i;
+	Index i;
 	for (i = 0; i < tab->ntotal; i ++) {
 		TEntry entry = tab->slots[i];
 		// omit non-keys
@@ -274,19 +265,23 @@ ELF_FUNCTION(l_array_index) {
 ELF_FUNCTION(l_array_add) {
 	Tab tab = loadtable(S, 0);
 
-	for (int i = 1; i < nargs; i++) {
-		V v = loadvalue(S, i);
-		arrayadd(tab, v);
-		pushvalueunsafe(S, v);
+	V v = loadvalue(S, 1);
+	Index index = arrayadd(S, tab, v);
+	pushint(S, index);
+
+	for (int i = 2; i < nargs; i++) {
+		v = loadvalue(S, i);
+		index = arrayadd(S, tab, v);
+		pushint(S, index);
 	}
 
-	return nargs - 1;
+	return 1;
 }
 
 
 // the index of the thing to replace, the value to replace
 // it with
-ELF_FUNCTION(l_array_replace) {
+ELF_FUNCTION(l_array_repl) {
 	Tab   tab = loadtable(S, 0);
 	Index idx = loadindex(S, 1, tab);
 	V     val = loadvalue(S, 2);
@@ -413,7 +408,7 @@ elf_Binding table_metafuncs[] = {
 	{"tally"        , l_array_length       },
 	{"add"          , l_array_add          },
 	{"idx"          , l_array_index        },
-	{"replace"      , l_array_replace      },
+	{"repl"         , l_array_repl         },
 	{"reverse"      , l_array_reverse      },
 	{"merge_array"  , l_array_merge        },
 	{"clone_array"  , l_array_clone        },

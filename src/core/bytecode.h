@@ -8,7 +8,10 @@ typedef struct {
 	short b_z,b_y,b_x,b_k;
 } Bytec;
 
-
+// _(EXIT_LOOP_JUMP,  XYZ      , "exit_loop_jump")
+// _(LOOP_JUMP,       XYZ      , "loop_jump")
+// _(TRACE,           XYZ      , "trace")
+// _(TYPEGUARD,       XY       , "typeguard")
 
 #define BCDEF(_)                                  \
 _(HALT,            XXX      , "halt")             \
@@ -19,7 +22,6 @@ _(JNZ,             XY       , "jnz")              \
 _(JE,              XY       , "je")               \
 _(JNE,             XY       , "jne")              \
 _(RET,             XY       , "ret")              \
-_(TYPEGUARD,       XY       , "typeguard")        \
 _(GETUPVAL,        XY       , "getupval")         \
 _(GETGLOBAL,       XY       , "getglobal")        \
 _(SETGLOBAL,       XY       , "setglobal")        \

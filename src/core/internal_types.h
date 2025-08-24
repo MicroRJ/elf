@@ -130,12 +130,12 @@ struct elf_Table {
 };
 
 Tab newtable2(elf_State *, Index nentries);
-Tab newtable(elf_State *);
+Tab new_table(elf_State *);
 void recycletable(Tab tab);
 Index tabletry(Tab tab, V key);
 Index tablecreateindex(Tab tab, V key);
 Index tableset(Tab tab, V k, V v);
-Index arrayadd(Tab tab, V thing);
+Index arrayadd(elf_State *S, Tab tab, V thing);
 
 
 
@@ -184,11 +184,6 @@ struct Stack_Frame {
 };
 
 
-
-typedef struct {
-	BCPos    address;
-	Bytec    bytecode;
-} elf_trail_entry;
 
 
 typedef enum GCType {
@@ -276,23 +271,13 @@ struct elf_State {
 	int          frame_index;
 	Stack_Frame  frame;
 
+	// count number of trace instructions
+	int               trace_counter;
+	// remember the starting point of the current trace
+	BCPos             trace_start;
+	Bytec            *trace;
 
-	// todo: disable this
-	elf_trail_entry *exec_trail;
-	i32   			  exec_trail_index;
-	// power of two!
-	i32           exec_trail_capacity;
-	int                      flags;
-	int            disable_tracing;
-	int trace_inner_loop_stack[16];
-	int   trace_inner_loop_counter;
-	int           trace_stop_instr;
-	int          trace_start_instr;
-	int           active_trace_pos;
-	int           active_trace_len;
-	Bytec            *trace_buffer;
-	Tab              trace_table;
-	elf_i32                   byte;
+	elf_i32           byte;
 
 	struct {
 		Tab integer;

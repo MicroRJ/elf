@@ -227,7 +227,7 @@ static int pick_empty_chars(elf_Parser *parser) {
 // todo: would it be faster to just do all the tokens
 // in one go...
 //
-static Token get_tok(elf_Parser *parser) {
+static Token next_tok(elf_Parser *parser) {
 
 	retry:
 	Token token = {};

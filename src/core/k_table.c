@@ -44,7 +44,7 @@ Tab newtable2(elf_State *S, Index nentries) {
 
 
 elf_rawapi
-Tab newtable(elf_State *R) {
+Tab new_table(elf_State *R) {
 	return newtable2(R, 4);
 }
 
@@ -191,7 +191,7 @@ static Index tablecreateindex(Tab table, elf_Value key) {
 
 
 elf_rawapi
-Index arrayadd(Tab table, V v) {
+Index arrayadd(elf_State *S, Tab table, V v) {
 	Index index = darr_grow(table->array, 1);
 	table->array[index] = v;
 	return index;

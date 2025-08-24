@@ -132,7 +132,7 @@ elf_pubapi void elf_pushtext2(elf_State *, const char *, int length);
 elf_pubapi void elf_pushfun(elf_State *, elf_Function);
 elf_pubapi void elf_pushsys(elf_State *, elf_Handle);
 
-elf_pubapi void elf_pullglobals(elf_State *);
+elf_pubapi void elf_pushglobals(elf_State *);
 
 
 elf_pubapi elf_Tag elf_loadtype(elf_State *, int x);

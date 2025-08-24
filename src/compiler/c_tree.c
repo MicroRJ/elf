@@ -120,18 +120,31 @@ static treeID tree_closure(elf_Parser *parser, Source line, treeID x, treeID *z)
 	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,Y_NULL,z);
 }
 
+
 static treeID tree_ret(elf_Parser *parser, Source line, treeID x) {
 	return tree_unary(parser,line,TREE_RET,NT_ANY,x);
 }
+
+
 static treeID tree_goto(elf_Parser *parser, Source line) {
 	return tree_nullary(parser,line,TREE_GOTO,NT_ANY);
 }
 
-static treeID tree_block(elf_Parser *parser, Source line, treeID *stats, treeID *defers, treeID *breaks ) {
-	treeID v = tree_nullary(parser,line,STAT_BLOCK,NT_NON);
+#if 0
+static treeID tree_exit_loop(elf_Parser *parser, Source line) {
+	return tree_nullary(parser,line,TREE_EXIT_LOOP,NT_ANY);
+}
+static treeID tree_trace(elf_Parser *parser, Source line) {
+	return tree_nullary(parser, line, TREE_TRACE, NT_NON);
+}
+#endif
+
+// , treeID *defers, treeID *breaks
+static treeID tree_block(elf_Parser *parser, Source line, treeID *stats) {
+	treeID v = tree_nullary(parser,line,TREE_MEMORY_BLOCK,NT_NON);
 	v->tree_blockstat.stats = stats;
-	v->tree_blockstat.defers = defers;
-	v->tree_blockstat.breaks = breaks;
+	// v->tree_blockstat.defers = defers;
+	// v->tree_blockstat.breaks = breaks;
 	return v;
 
 }
@@ -171,10 +184,6 @@ static treeID tree_store(elf_Parser *parser, Source line, treeID x, treeID y) {
 	ASSERT(TREE_NO_ERROR(x));
 	ASSERT(TREE_NO_ERROR(y));
 	return tree_binary(parser,line,TREE_STORE,NT_NON,x,y);
-}
-
-static treeID tree_proxy(elf_Parser *parser, Source line, treeID x) {
-	return tree_unary(parser, line, TREE_PROXY, get_tree_type(parser, x), x);
 }
 
 static treeID tree_less_than(elf_Parser *parser, Source line, treeID x, treeID y) {
