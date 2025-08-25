@@ -137,6 +137,7 @@ elf_pubapi void elf_pushglobals(elf_State *);
 
 elf_pubapi elf_Tag elf_loadtype(elf_State *, int x);
 elf_pubapi const char *elf_loadtext(elf_State *, int x);
+elf_pubapi const char *elf_loadtextl(elf_State *, int x, int *l);
 elf_pubapi elf_Number elf_loadnum(elf_State *, int x);
 elf_pubapi elf_Integer elf_loadint(elf_State *, int x);
 elf_pubapi elf_Handle elf_loadsys(elf_State *, int x);

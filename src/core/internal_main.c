@@ -375,7 +375,7 @@ so they only work within that function ya heard */
 #define global_y() (globals->array[by.b_y])
 
 
-#define rstoreX(v) (frame.reference[by.b_x] = v)
+#define vm_store_x(v) (frame.reference[by.b_x] = v)
 #define rstoreXi(v) (vsetint(&frame.reference[by.b_x], v))
 #define rstoreXn(v) (vsetnum(&frame.reference[by.b_x], v))
 
@@ -419,7 +419,7 @@ do {                                              \
 do {                                                                \
 	int nrets = callmetafield(inter, vgetobj(xx), name, 2, xx, yy);  \
 	\
-	rstoreX(inter->stack_ptr[-nrets]);                         \
+	vm_store_x(inter->stack_ptr[-nrets]);                         \
 	\
 	inter->stack_ptr = frame.framebase + frame.framesize;            \
 } while (0)
@@ -452,9 +452,9 @@ do { \
 do { \
 	xx=rvalueY(), yy=rvalueZ(); \
 	\
-	if (isint(xx)) { \
+	if (visint(xx)) { \
 		\
-		if (!isint(yy)) { \
+		if (!visint(yy)) { \
 			error_invalidoperandsforoperator(inter, name, xx, yy); \
 		} \
 		\
@@ -625,68 +625,12 @@ int _resume(elf_State *inter) {
 				//
 			} VMBREAK;
 
-#if 0
-			VMCASE(BC_TRACE) {
-				Bytec *bptr = & inter->bytebuf[minstr];
-
-				// if not traced already
-				if (bptr->b_z == 0) {
-
-					// if no trace active, begin new trace
-					if (inter->trace_counter == 0) {
-						inter->trace_counter ++;
-						inter->trace_start = minstr;
-						// mark tracing
-						ASSERT(bptr->b_x == 0);
-						bptr->b_x = 1;
-
-						elf_ldebug("begin trace");
-					}
-					// if we've looped back, end the trace
-					else if (inter->trace_start == minstr) {
-						elf_ldebug("end trace: %i instructions", darr_l(inter->trace));
-
-						// mark traced
-						bptr->b_z = 1;
-
-
-						// mark not tracing
-						ASSERT(bptr->b_x == 1);
-						bptr->b_x = 0;
-
-						// ensure everything ok
-						ASSERT(inter->trace_counter == 1);
-
-						// disable trace
-						inter->trace_counter = 0;
-					}
-					else {
-						// child trace instr
-						inter->trace_counter ++;
-					}
-				}
-
-			} VMBREAK;
-#endif
-
 			case BC_J: {
 
 				int dst = BC_ARGX(byte);
 				frame.nextinstr = instr + dst;
 
 			} break;
-
-#if 0
-			case BC_EXIT_LOOP_JUMP: {
-				int dst = BC_ARGX(byte);
-				frame.nextinstr = instr + dst;
-			} break;
-
-			case BC_LOOP_JUMP: {
-				int dst = BC_ARGX(byte);
-				frame.nextinstr = instr + dst;
-			} break;
-#endif
 
 			case BC_JZ: {
 
@@ -707,7 +651,7 @@ int _resume(elf_State *inter) {
 			} break;
 
 			VMCASE(BC_GETGLOBAL) {
-				rstoreX(global_y());
+				vm_store_x(global_y());
 			} VMBREAK;
 
 			VMCASE(BC_SETGLOBAL) {
@@ -716,7 +660,7 @@ int _resume(elf_State *inter) {
 
 			VMCASE(BC_RELOAD)
 			{
-				rstoreX(rvalueY());
+				vm_store_x(rvalueY());
 
 				VMBREAK;
 			}
@@ -735,7 +679,7 @@ int _resume(elf_State *inter) {
 
 
 			VMCASE(BC_BIT_NOT) {
-				if (!isint(rvalueY())) {
+				if (!visint(rvalueY())) {
 					elf_errorf(inter, -1, "'~': expects integer");
 				}
 				rstoreXi( ~ vgetint(rvalueY()));
@@ -744,7 +688,7 @@ int _resume(elf_State *inter) {
 
 			VMCASE(BC_GETUPVAL) {
 				ASSERT(WITHIN(BC_ARGY(byte), 0, frame.closuresize));
-				rstoreX(frame.closureenv[by.b_y]);
+				vm_store_x(frame.closureenv[by.b_y]);
 			} VMBREAK;
 
 			case BC_CLOSURE: {
@@ -804,13 +748,60 @@ int _resume(elf_State *inter) {
 					elf_errorf(inter, minstr, "'%s': invalid object, no meta-table", tag2s[yy.tag]);
 				}
 
-				elf_Value metafield = elf_table_get_raw(metatable, rvalueZ());
-				rstoreX(metafield);
+				V metafield = elf_table_get_raw(metatable, rvalueZ());
+				vm_store_x(metafield);
 			} break;
 
+			VMCASE(BC_SETINDEX) {
+				V table_v = rvalueX();
+				V index_v = rvalueY();
+				V value = rvalueZ();
 
-			// todo: INDEX should be array mode!
-			case BC_GETINDEX: case BC_GETFIELD: {
+				if (!vistab(table_v)) {
+					elf_error(inter, minstr, "invalid left operand");
+				}
+				if (!visint(index_v)) {
+					elf_error(inter, minstr, "invalid index type");
+				}
+
+				V *array = vgettab(table_v)->array;
+				Index index = vgetint(index_v);
+
+				if (index < 0) {
+					index += darr_l(array);
+				}
+				if (index < 0 || index >= darr_l(array)) {
+					elf_error(inter, minstr, "index out of bounds");
+				}
+
+				array[index] = value;
+			} VMBREAK;
+
+			VMCASE(BC_GETINDEX) {
+				V table_v = rvalueY();
+				V index_v = rvalueZ();
+
+				if (!vistab(table_v)) {
+					elf_error(inter, minstr, "invalid left operand");
+				}
+				if (!visint(index_v)) {
+					elf_error(inter, minstr, "invalid index type");
+				}
+
+				V *array = vgettab(table_v)->array;
+				Index index = vgetint(index_v);
+
+				if (index < 0) {
+					index += darr_l(array);
+				}
+				if (index < 0 || index >= darr_l(array)) {
+					elf_error(inter, minstr, "index out of bounds");
+				}
+
+				vm_store_x(array[index]);
+			} VMBREAK;
+
+			case BC_GETFIELD: {
 				xx=rvalueY(), yy=rvalueZ();
 
 				if (visnil(yy)) {
@@ -819,7 +810,7 @@ int _resume(elf_State *inter) {
 				switch (xx.tag) {
 
 					case ELF_TTABLE: {
-						rstoreX(elf_table_get_raw(vgettab(xx), yy));
+						vm_store_x(elf_table_get_raw(vgettab(xx), yy));
 					}break;
 
 					case ELF_TUSER: {
@@ -829,7 +820,7 @@ int _resume(elf_State *inter) {
 
 					case ELF_TSTRING: {
 
-						if (isint(yy)) {
+						if (visint(yy)) {
 							int index = vgetint(yy);
 							rstoreXi(vgetstr(xx)->text[index]);
 						}
@@ -853,8 +844,7 @@ int _resume(elf_State *inter) {
 					} break;
 				}
 			} break;
-			// todo: INDEX should be array mode!
-			case BC_SETINDEX:
+
 			case BC_SETFIELD: {
 				xx=rvalueX(), yy=rvalueY(), zz=rvalueZ();
 

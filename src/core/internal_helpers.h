@@ -43,7 +43,7 @@ static inline void zero_values(V *dst, int num) {
 #define visnil(v) ((v).tag == ELF_TNIL)
 #define vistomb(v) ((v).tag == ELF_TTOMB)
 #define isnum(v) ((v).tag == ELF_TNUMBER)
-#define isint(v) ((v).tag == ELF_TINTEGER)
+#define visint(v) ((v).tag == ELF_TINTEGER)
 #define vistab(v) ((v).tag == ELF_TTABLE)
 #define visstr(v) ((v).tag == ELF_TSTRING)
 #define isusr(v) ((v).tag == ELF_TUSER)
@@ -52,13 +52,13 @@ static inline void zero_values(V *dst, int num) {
 #define issys(v) ((v).tag == ELF_THANDLE)
 
 #define isdead(v) (visnil(v) || vistomb(v))
-#define visnumeric(v) (isnum(v) || isint(v))
+#define visnumeric(v) (isnum(v) || visint(v))
 #define iscallable(v) (iscls(v) || isfnc(v))
 #define isobj(v) (tisobject((v).tag))
 
 
 // ** assumes the value is either an integer or a number **
-#define vitonum(v) (isint(v) ? (elf_Number) vgetint(v) : vgetnum(v))
+#define vitonum(v) (visint(v) ? (elf_Number) vgetint(v) : vgetnum(v))
 #define vntoint(v) (isnum(v) ? (elf_Integer) vgetnum(v) : vgetint(v))
 
 

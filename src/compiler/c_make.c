@@ -198,11 +198,11 @@ static void make_store(elf_Parser *parser, Source line, treeID x, treeID y, int 
 
 			ASSERT(ry == rx);
 		}
-		else if (tx.kind == EXPR_FIELD || tx.kind == EXPR_INDEX) {
+		else if (tx.kind == EXPR_FIELD || tx.kind == EXPR_DIRECT_INDEX) {
 			rz = to_any_mem(parser, y);
 			rx = to_any_mem(parser, tx.x);
 			ry = to_any_mem(parser, tx.y);
-			op = tx.kind == EXPR_INDEX ? BC_SETINDEX : BC_SETFIELD;
+			op = tx.kind == EXPR_DIRECT_INDEX ? BC_SETINDEX : BC_SETFIELD;
 			emit_bytexyz(parser, line, op, rx, ry, rz);
 		}
 		else if(tx.kind == TREE_GLOBAL) {
@@ -563,8 +563,10 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 			dst=to_mem(parser,tree_str(parser,tree.line,expr),dst,ndst);
 		} break;
 
+		case EXPR_DIRECT_INDEX:
+		case EXPR_FIELD:
 		case EXPR_METAFIELD:
-		case EXPR_FIELD: case EXPR_INDEX: {
+		{
 			if (ndst<1) goto esc;
 			SCOPE_MEM_STATE(parser) {
 				rx=to_any_mem(parser,tree.x);
@@ -733,12 +735,12 @@ static int to_mem(elf_Parser *parser, treeID id, int dst, int ndst) {
 	return dst;
 }
 
-// todo: replace with table!
+
 static int tree_to_bytec(int kind) {
 	switch (kind) {
-		case EXPR_FIELD: 	   return BC_GETFIELD;     // *
-		case EXPR_INDEX: 	   return BC_GETINDEX;     // *
-		case EXPR_METAFIELD: return BC_GETMETAFIELD; // *
+		case EXPR_FIELD: 	      return BC_GETFIELD;     // *
+		case EXPR_DIRECT_INDEX: return BC_GETINDEX;     // *
+		case EXPR_METAFIELD:    return BC_GETMETAFIELD; // *
 		case TREE_CALL:      return BC_CALL;         // *
 		case EXPR_ADD:       return BC_ADD;
 		case EXPR_SUB:       return BC_SUB;

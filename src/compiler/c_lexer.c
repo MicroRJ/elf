@@ -453,6 +453,14 @@ static Token next_tok(elf_Parser *parser) {
 #define LEX2(A,X,B,Y)     CASE(A, X, PICK(B), Y, 0, 0,       0, 0, 0, 0)
 #define LEX3(A,X,B,Y,C,Z) CASE(A, X, PICK(B), Y, 0, 0, PICK(C), Z, 0, 0)
 
+		CASE('[', TK_SQUARE_LEFT
+		, 		PICK('['), TK_SQUARE_SQUARE_LEFT, 0, 0
+		, 		0,                             0, 0, 0);
+		CASE(']', TK_SQUARE_RIGHT
+		, 		PICK(']'), TK_SQUARE_SQUARE_RIGHT, 0, 0
+		, 		0,                              0, 0, 0);
+
+
 		CASE('<', TK_LT
 		, 	 PICK('='), TK_LTEQ, 0, 0
 		,   PICK('<'), TK_SHL,  0, 0)
@@ -475,8 +483,6 @@ static Token next_tok(elf_Parser *parser) {
 		LEX2('=', TK_ASSIGN  , '=', TK_EQ);
 		LEX2('*', TK_MUL     , '*', TK_POW);
 
-		LEX1('[', TK_SQUARE_LEFT);
-		LEX1(']', TK_SQUARE_RIGHT);
 		LEX1('(', TK_PAREN_LEFT);
 		LEX1(')', TK_PAREN_RIGHT);
 		LEX1('{', TK_CURLY_LEFT);

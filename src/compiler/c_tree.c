@@ -149,11 +149,14 @@ static treeID tree_block(elf_Parser *parser, Source line, treeID *stats) {
 
 }
 
+
 static treeID tree_field(elf_Parser *parser, Source line, treeID x, treeID y) {
 	return tree_binary(parser,line,EXPR_FIELD,NT_ANY,x,y);
 }
-static treeID tree_index(elf_Parser *parser, Source line, treeID x, treeID y) {
-	return tree_binary(parser,line,EXPR_INDEX,NT_ANY,x,y);
+
+
+static treeID tree_direct_index(elf_Parser *parser, Source line, treeID x, treeID y) {
+	return tree_binary(parser,line,EXPR_DIRECT_INDEX,NT_ANY,x,y);
 }
 
 static treeID tree_ranged_index(elf_Parser *parser, Source line, treeID x, treeID y) {

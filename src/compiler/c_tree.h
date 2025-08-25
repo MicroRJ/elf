@@ -57,7 +57,7 @@ _(TREE_META_CALL)    \
 _(TREE_FUNCTION)     \
 _(TREE_NEW_TABLE)    \
 _(EXPR_CLOSURE)      \
-_(EXPR_INDEX)        \
+_(EXPR_DIRECT_INDEX) \
 _(EXPR_FIELD)        \
 _(EXPR_METAFIELD)    \
 _(EXPR_NIL)          \

@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+// todo: a lot of these could be intrinsics!
+
 
 #define checknumargs(S, n, x) do \
 { if ((n) != (x)) elf_errorf(S, -1, "wrong number of arguments: %i, expected %i instead", n - 1, x - 1); \

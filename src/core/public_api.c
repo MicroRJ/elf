@@ -17,9 +17,21 @@ Num elf_loadnum(elf_State *S, int x) { return loadnum(S, x); }
 Int elf_loadint(elf_State *S, int x) { return loadint(S, x); }
 Handle elf_loadsys(elf_State *S, int x) { return loadsys(S, x); }
 
+
+
 const char *elf_loadtext(elf_State *S, int x) {
 	return loadtext(S, x);
 }
+
+
+
+const char *elf_loadtextl(elf_State *S, int x, int *l) {
+	Str str = loadstr(S, x);
+	if (l) *l = str->length;
+	return str->text;
+}
+
+
 
 void elf_pushnil(elf_State *S)                  { pushnil(S);    }
 void elf_pushint(elf_State *S, elf_Integer   x) { pushint(S, x); }

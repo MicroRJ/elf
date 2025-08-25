@@ -967,7 +967,7 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 		switch (tok.type) {
 			case TK_DOT: {
 				next_tok(parser);
-				// table.(x,y) -> (table.x, table.y)
+				// <expr>.(x,y) -> (<expr>.x, <expr>.y)
 				if (pick_tok(parser,TK_PAREN_LEFT)) {
 					Token n;
 					treeID x,y,*z=0;
@@ -979,9 +979,11 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 					} while (pick_tok(parser,TK_COMMA));
 					v = tree_tuple(parser,tok.line,z);
 					take_tok(parser,TK_PAREN_RIGHT);
-				} else
+				}
+				// for this return a new table with the fields x and y
+				// from 'table'
 				// table.{x,y}
-				if (pick_tok(parser,TK_CURLY_LEFT)) {
+				else if (pick_tok(parser,TK_CURLY_LEFT)) {
 					NO_CODE;
 				} else {
 					Token name;
@@ -991,33 +993,40 @@ static treeID parse_postfix(elf_Parser *parser, int flags) {
 					v=tree_field(parser,tok.line,v,field);
 				}
 			} break;
+			case TK_SQUARE_SQUARE_LEFT: {
+				take_tok(parser,TK_SQUARE_SQUARE_LEFT);
+				treeID x = parse_expr(parser, 0);
+				v = tree_direct_index(parser,tok.line, v, x);
+				take_tok(parser,TK_SQUARE_SQUARE_RIGHT);
+			} break;
 			/* todo: make this nil safe, so [0,0] shouldn't
 			fail if item at 0 is nil, we should have a separate
 			instruction for getfield, which is like getfieldoptional
 			or something to avoid having to generate additional code */
 			case TK_SQUARE_LEFT: {
 				take_tok(parser,TK_SQUARE_LEFT);
-				treeID x,*z;
+
 				do {
-					x = parse_expr(parser,0);
+					treeID x = parse_expr(parser,0);
 					if (x == Y_NULL) break;
 					//
 					// apply desugaring
 					// A [ B . (y, x) ] -> A [ B . y , B . x ]
 					//
 					if (x->kind == TREE_TUPLE) {
-						z = get_tree(parser,x).z;
+						treeID *z = get_tree(parser,x).z;
 						FOR_ARRAY(i,z) {
-							v = tree_index(parser,tok.line,v,z[i]);
+							v = tree_field(parser,tok.line,v,z[i]);
 						}
 					}
 					else if (x->kind == TREE_RANGE) {
 						v = tree_ranged_index(parser,tok.line,v,x);
 					}
 					else {
-						v = tree_index(parser,tok.line,v,x);
+						v = tree_field(parser,tok.line,v,x);
 					}
 				} while(pick_tok(parser,TK_COMMA));
+
 				take_tok(parser,TK_SQUARE_RIGHT);
 			} break;
 			case TK_COLON: {
@@ -1286,7 +1295,7 @@ static treeID *parse_rhs(elf_Parser *parser, int nrets, treeKi empty) {
 
 
 static void rewrite_lhs(elf_Parser *parser, treeID lhs) {
-	if (lhs->kind == EXPR_FIELD || lhs->kind == EXPR_INDEX) {
+	if (lhs->kind == EXPR_FIELD || lhs->kind == EXPR_DIRECT_INDEX) {
 
 		// already memory
 		if (lhs->x->kind != TREE_MEMORY)
