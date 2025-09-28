@@ -8,6 +8,7 @@ typedef struct {
 	short b_z,b_y,b_x,b_k;
 } Bytec;
 
+
 // _(EXIT_LOOP_JUMP,  XYZ      , "exit_loop_jump")
 // _(LOOP_JUMP,       XYZ      , "loop_jump")
 // _(TRACE,           XYZ      , "trace")
@@ -22,21 +23,23 @@ _(JNZ,             XY       , "jnz")              \
 _(JE,              XY       , "je")               \
 _(JNE,             XY       , "jne")              \
 _(RET,             XY       , "ret")              \
-_(GETUPVAL,        XY       , "getupval")         \
-_(GETGLOBAL,       XY       , "getglobal")        \
-_(SETGLOBAL,       XY       , "setglobal")        \
-_(GETKNUM,         XY       , "getnum")           \
-_(GETKINT,         XY       , "getint")           \
+_(LOADCVAL,        XY       , "getupval")         \
+_(LOADGLOBAL,      XY       , "getglobal")        \
+_(LOADKNUM,        XY       , "getnum")           \
+_(LOADKINT,        XY       , "getint")           \
 _(LOADNIL,         XXX      , "getnil")           \
-_(GETINDEX,        XYZ      , "getindex")         \
-_(SETINDEX,        XYZ      , "setindex")         \
-_(GETFIELD,        XYZ      , "getfield")         \
-_(SETFIELD,        XYZ      , "setfield")         \
-_(GETMETAFIELD,    XYZ      , "getmetafield")     \
 _(RELOAD,          XY       , "reload")           \
+_(GETINDEX,        XYZ      , "getindex")         \
+_(GETMETAFIELD,    XYZ      , "getmetafield")     \
+_(GETLENGTH,       XY       , "getlength")        \
+_(GETFIELD,        XYZ      , "getfield")         \
+_(SETGLOBAL,       XY       , "setglobal")        \
+_(SETFIELD,        XYZ      , "setfield")         \
+_(SETINDEX,        XYZ      , "setindex")         \
 _(CALL,            XYZ      , "call")             \
 _(TABLE,           XXX      , "new_table")        \
 _(CLOSURE,         XY       , "new_closure")      \
+_(ENFORCE,         XY       , "enforce")          \
 _(LT,              XYZ      , "lt")               \
 _(LTEQ,            XYZ      , "lteq")             \
 _(EQ,              XYZ      , "eq")               \
@@ -60,6 +63,8 @@ _(BIT_NOT,         XYZ      , "not")              \
 #define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),
 typedef enum ByteOP {
 	BCDEF(BCITEM)
+
+	BC_COUNT_,
 } ByteOP;
 #undef BCITEM
 

@@ -7,14 +7,20 @@
 // TIMING
 //
 
+
+
 static inline elf_f64 get_performance_counter_elapsed_s(elf_i64 time) {
 	return (sys_get_performance_counter() - time) / (elf_f64) sys_get_performance_counter_frequency();
 }
+
+
 
 ELF_FUNCTION(l_sys_get_performance_counter) {
 	elf_pushint(S, sys_get_performance_counter());
 	return 1;
 }
+
+
 
 ELF_FUNCTION(l_sys_get_performance_counter_frequency) {
 	elf_pushint(S, sys_get_performance_counter_frequency());
@@ -47,24 +53,201 @@ ELF_FUNCTION(l_sys_sleep) {
 
 
 //
-// files
+// PATHS
 //
 
-ELF_FUNCTION(l_sys_get_file_name_from_path) {
-	const char *path = elf_loadtext(S, 1);
-	const char *name = get_name_from_file_path(path);
-	elf_pushtext(S, name);
+
+
+
+
+
+ELF_FUNCTION(l_sys_get_parent_path) {
+	Str p = loadstr(S, 1);
+	int n = 1;
+	if (nargs >= 3) {
+		n = loadint(S, 2);
+	}
+
+	const char *s = strt(p);
+	const char *e = strt(p) + strl(p);
+
+	while (n -- > 0) {
+		do e --; while(e > s && *e != '\\' && *e != '/');
+	}
+
+	pushtext2(S, s, e - s);
+
 	return 1;
 }
 
 
+static char *slice_path(char *p, int *l, int n) {
+	char *e = p + *l;
+
+	if (n < 0) {
+		while (n ++) {
+			e --;
+			while (e > p && e[-1] != '\\' && e[-1] != '/') e --;
+		}
+		*l = *l - (e - p);
+		return e;
+	}
+	else {
+		char *s = p;
+		while (n --) {
+			do s ++; while (s < e && *s != '\\' && *s != '/');
+		}
+		*l = s - p;
+		return p;
+	}
+}
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+ELF_FUNCTION(l_sys_slice_path) {
+	Str p = loadstr(S, 1);
+	int n = 1;
+	if (nargs > 2) {
+		n = loadint(S, 2);
+	}
+
+	int l = strl(p);
+	char *s = slice_path((char *) strt(p), &l, n);
+
+	if (nargs > 3) {
+		n = loadint(S, 3);
+		s = slice_path(s, &l, n);
+	}
+
+	pushtext2(S, s, l);
+	return 1;
+}
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+
+
+//
+// some      -> some
+// some.name -> some
+//           ->
+//
+// .../some.name -> some
+// .../some      -> some
+// .../          ->
+//
+//
+
+ELF_FUNCTION(l_sys_get_file_name) {
+	Str p = loadstr(S, 1);
+	const char *s = strt(p);
+	const char *e = strt(p) + strl(p);
+	const char *d = e;
+
+	while (e > s && *e != '\\' && *e != '/' && *e != '.') e --;
+	if (*e == '.') d = e;
+	while (e > s && e[-1] != '\\' && e[-1] != '/') e --;
+
+	pushtext2(S, e, d - e);
+	return 1;
+}
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+ELF_FUNCTION(l_sys_get_file_extension) {
+	Str p = loadstr(S, 1);
+	const char *s = strt(p);
+	const char *e = strt(p) + strl(p);
+	while (e > s && e[-1] != '\\' && e[-1] != '/' && e[-1] != '.') e --;
+	pushtext2(S, e, strl(p) - (e - strt(p)));
+	return 1;
+}
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
 ELF_FUNCTION(l_sys_create_directory) {
-	const char *path = elf_loadtext(S, 1);
+	const char *path = loadtext(S, 1);
 	int noerr = sys_make_dir(path);
 	elf_pushint(S, noerr);
 	return 1;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 ELF_FUNCTION(l_sys_get_file_times) {
 	Handle file = loadsys(S, 1);
@@ -73,12 +256,29 @@ ELF_FUNCTION(l_sys_get_file_times) {
 	sys_time_file(file, &times);
 
 	// todo: set fields directly
-	Tab tab = pushtable(S);
+	Tab tab = pushnewtable(S);
 	elf_pushtext(S, "created");  elf_pushint(S, times.create.time); elf_setfield(S);
 	elf_pushtext(S, "access");   elf_pushint(S, times.access.time); elf_setfield(S);
 	elf_pushtext(S, "write");    elf_pushint(S, times.write.time);  elf_setfield(S);
 	return 1;
 }
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 ELF_FUNCTION(l_sys_file_time_to_system_time) {
 
@@ -88,20 +288,50 @@ ELF_FUNCTION(l_sys_file_time_to_system_time) {
 	SYSTEM_TIME systemtime;
 	sys_file_time_to_system_time(&filetime, &systemtime);
 
-	pushtable(S);
+	pushnewtable(S);
 
-	pushtext(S, "year");         pushint(S, systemtime.year);           elf_setfield(S);
-	pushtext(S, "month");        pushint(S, systemtime.month);          elf_setfield(S);
-	pushtext(S, "dayofweek");    pushint(S, systemtime.dayofweek);      elf_setfield(S);
-	pushtext(S, "day");          pushint(S, systemtime.day);            elf_setfield(S);
-	pushtext(S, "hour");         pushint(S, systemtime.hour);           elf_setfield(S);
-	pushtext(S, "minute");       pushint(S, systemtime.minute);         elf_setfield(S);
-	pushtext(S, "second");       pushint(S, systemtime.second);         elf_setfield(S);
-	pushtext(S, "milliseconds"); pushint(S, systemtime.milliseconds);   elf_setfield(S);
+	pushtext(S, "year");
+	pushint(S, systemtime.year);
+	elf_setfield(S);
+	pushtext(S, "month");
+	pushint(S, systemtime.month);
+	elf_setfield(S);
+	pushtext(S, "dayofweek");
+	pushint(S, systemtime.dayofweek);
+	elf_setfield(S);
+	pushtext(S, "day");
+	pushint(S, systemtime.day);
+	elf_setfield(S);
+	pushtext(S, "hour");
+	pushint(S, systemtime.hour);
+	elf_setfield(S);
+	pushtext(S, "minute");
+	pushint(S, systemtime.minute);
+	elf_setfield(S);
+	pushtext(S, "second");
+	pushint(S, systemtime.second);
+	elf_setfield(S);
+	pushtext(S, "milliseconds");
+	pushint(S, systemtime.milliseconds);
+	elf_setfield(S);
 	return 1;
 }
-
-
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 //
 // name: the name of the dynamic library in
@@ -110,137 +340,66 @@ ELF_FUNCTION(l_sys_file_time_to_system_time) {
 ELF_FUNCTION(l_sys_load_dll) {
 	const char *name = loadtext(S, 1);
 
-	Handle dll = sys_load_dll(name);
+	Sys dll = sys_load_dll(name);
 
 	if (dll != 0) pushsys(S, dll);
 	else          pushnil(S);
 	return 1;
 }
 
-
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 ELF_FUNCTION(l_sys_get_dll_fn) {
-	Handle dll = loadsys(S, 1);
+	Sys dll = loadsys(S, 1);
 	const char *name = loadtext(S, 2);
 
-	elf_Function fun = (elf_Function) sys_get_dll_fn(dll, name);
+	Fun fun = (Fun) sys_get_dll_fn(dll, name);
 	if (fun != 0) pushfun(S,fun);
 	else          pushnil(S);
 	return 1;
 }
 
-
-
-
-#if 0
-
-
-static void filetreecompressed(FILE_VISITOR *visitor, File_Node *node, int recurse) {
-	if (sys_find_first_file(visitor)) do {
-		if (visitor->type == FILE_TYPE_SYMLINK) continue;
-		if (is_file_name_empty(visitor->name)) continue;
-
-		int index = darr_grow(visitor->nodes, 1);
-		File_Node *subnode = & visitor->nodes[index];
-		subnode->nsub = 0;
-		subnode->size = 0;
-
-		if (visitor->type == FILE_TYPE_FOLDER) {
-			pb_push(visitor, visitor->name);
-			filetreecompressed(visitor, subnode, recurse - 1);
-			pb_pull(visitor);
-		}
-
-		node->size += subnode->size;
-		node->nsub ++;
-	} while (sys_find_next_file(visitor));
-}
-
-
-static elf_stkid filetree(elf_State *inter, char *path, int recurse, int *size) {
-
-	elf_stkid resstk = elf_pushtab(inter);
-
-	const char *type2s[] = {
-		[FILE_TYPE_FILE] = "file",
-		[FILE_TYPE_FOLDER] = "folder",
-		[FILE_TYPE_SYMLINK] = "symlink",
-	};
-
-	elf_pushtext(inter, "path");
-	elf_pushtext(inter, path);
-	elf_setfield(inter);
-
-	elf_pushtext(inter, "type");
-	elf_pushtext(inter, type2s[visitor.type]);
-	elf_setfield(inter);
-
-
-	elf_pushtab(inter);
-
-
-	// todo: speed! we can pre-push all these strings and reference
-	// them by stack address instead!
-	FILE_VISITOR visitor;
-	if (sys_find_first_file(&visitor, path)) do {
-		if (visitor.type == FILE_TYPE_SYMLINK) continue;
-		if (is_file_name_empty(visitor.name)) continue;
-
-		// todo: can we have our cake and eat it too please?
-		char *childpath = malloc(1024);
-		stbsp_snprintf(childpath, 1024, "%s\\%s", path, visitor.name);
-
-		elf_pushtab(inter);
-		{
-
-			if (visitor.type == FILE_TYPE_FOLDER) {
-				if (recurse > 0) {
-					elf_pushtext(inter, "children");
-					int childsize = 0;
-					elf_stkid child = filetree(inter, childpath, recurse - 1, &childsize);
-
-					// todo:
-					elf_pushtext(inter, "parent");
-					* inter->stack_ptr ++ = inter->stack[child];
-					elf_setfield(inter);
-
-					elf_setfield(inter);
-
-					*size += childsize;
-				}
-
-				elf_pushtext(inter, "size");
-				elf_pushint(inter, visitor.size);
-				elf_setfield(inter);
-			} else {
-				elf_pushtext(inter, "size");
-				elf_pushint(inter, visitor.size);
-				elf_setfield(inter);
-
-				*size += visitor.size;
-			}
-
-			free(childpath);
-		}
-		elf_arrayadd(inter);
-
-	} while (sys_find_next_file(&visitor));
-
-	return resstk;
-}
-#endif
-
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 // NOTE: requires a table on the stack!
 // TODO: use utility function to ensure this!
 static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 
-	elf_Handle dir = sys_find_first_file(visitor);
+	Sys dir = sys_find_first_file(visitor);
 	if (!dir) goto esc;
 
 	for (;;)
 	{
-
 		if (visitor->type == FILE_TYPE_SYMLINK) {
 			goto skip;
 		}
@@ -248,17 +407,11 @@ static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 		if (visitor->pb.type != PATH_NAME) {
 			goto skip;
 		}
-		//	char *name = get_name_from_file_path(visitor->pb.path);
-		//	if (is_file_name_empty(name)) goto nop;
 
-		if (visitor->type == FILE_TYPE_FILE) {
+		elf_pushtext(inter, visitor->pb.path);
+		elf_arrayadd(inter);
 
-			elf_pushtext(inter, visitor->pb.path);
-			elf_arrayadd(inter);
-
-		}
-		else if (visitor->type == FILE_TYPE_FOLDER) {
-
+		if (visitor->type == FILE_TYPE_FOLDER) {
 			if (recurse > 0) {
 				pathlist(inter, visitor, recurse - 1);
 			}
@@ -273,6 +426,22 @@ static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 	esc: ;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 ELF_FUNCTION(l_sys_get_file_tree) {
 
@@ -289,6 +458,28 @@ ELF_FUNCTION(l_sys_get_file_tree) {
 	return 1;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+
+//
+// returns all child paths including folders
+// todo: add filters!
+//
 ELF_FUNCTION(l_sys_get_path_list) {
 
 	const char *path = loadtext(S, 1);
@@ -311,6 +502,23 @@ ELF_FUNCTION(l_sys_get_path_list) {
 	return 1;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//	todo: remove this!
+//
+//
+//
+
 ELF_FUNCTION(l_sys_open_temp_file) {
 	FILE *file = {0};
 #if defined(PLATFORM_WEB)
@@ -322,36 +530,91 @@ ELF_FUNCTION(l_sys_open_temp_file) {
 	return 1;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
 ELF_FUNCTION(l_sys_delete_file) {
-	elf_pushint(S, sys_delete_file(elf_loadtext(S, 0)));
+	char const *path = loadtext(S, 1);
+	int ok = sys_delete_file(path);
+	elf_pushint(S, ok);
 	return 1;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
 ELF_FUNCTION(l_sys_open_file) {
 	const char *name = loadtext(S, 1);
-	const char *text_flags = loadtext(S, 2);
+	const char *text = loadtext(S, 2);
 
 	int flags;
-	for (flags = 0; *text_flags; text_flags ++) {
-		if (*text_flags == 'r') flags |= SYS_OPEN_READ;
-		else if (*text_flags == 'w') flags |= SYS_OPEN_WRITE;
-		else if (*text_flags == 'b') flags |= 0;
-		else elf_error(S, NO_BYTE, "unrecognized flag");
+	for (flags = 0; *text; text ++) {
+		if      (*text == 'r') flags |= SYS_OPEN_READ;
+		else if (*text == 'w') flags |= SYS_OPEN_WRITE;
+		else if (*text == 'b') flags |= 0;
+		else reporterror(S, NO_BYTE, "unrecognized flag");
 	}
+
 	int mode = SYS_OPEN_EXISTING;
 	if (flags & SYS_OPEN_WRITE) {
 		mode = SYS_CREATE_ALWAYS;
 	}
-	elf_Handle file = sys_open_file(name, flags, mode);
+
+	Sys file = sys_open_file(name, flags, mode);
+
 	if (ELF_HISINVALID(file)) {
 		pushnil(S);
-	} else {
+	}
+	else {
 		pushsys(S, file);
 	}
 	return 1;
 }
 
-
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 ELF_FUNCTION(l_sys_close_file) {
 	Handle file = loadsys(S, 1);
@@ -360,6 +623,24 @@ ELF_FUNCTION(l_sys_close_file) {
 	}
 	return 0;
 }
+
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 
 
@@ -404,8 +685,8 @@ static bool readfilesys(elf_State *S, Handle file, int size) {
 	}
 
 	// todo: we need a dedicated object for this!
-	Str contents = newstr_empty(S, size);
-	vsetstr(S->stack_ptr, contents);
+	Str contents = new_emptystr(S, size);
+	to_str(S->stack_ptr, contents);
 	pushstacksafe(S);
 
 	sys_read_file(file, contents->text, size);
@@ -426,7 +707,7 @@ ELF_FUNCTION(l_sys_read_file) {
 
 	int noerr = 0;
 
-	if (tisstr(loadtype(S, 1))) {
+	if (is_string_type(loadtype(S, 1))) {
 
 		const char *name = loadtext(S, 1);
 
@@ -444,7 +725,7 @@ ELF_FUNCTION(l_sys_read_file) {
 	}
 	else {
 
-		elf_errorf(S, -1
+		reporterrorf(S, -1
 		, "'%s': 'readfile' expected handle or file name", tag2s[loadtype(S, 1)]);
 
 		pushnil(S);
@@ -536,17 +817,22 @@ static const elf_Binding l_sys[] = {
 	{"get_file_times",            l_sys_get_file_times            },
 	{"file_time_to_system_time",  l_sys_file_time_to_system_time  },
 	{"sleep",                     l_sys_sleep                     },
-	{"get_file_name_from_path",   l_sys_get_file_name_from_path   },
+
+	{"slice_path",                l_sys_slice_path                },
+	{"get_file_name",             l_sys_get_file_name             },
+	{"get_file_extension",        l_sys_get_file_extension        },
+	{"get_parent_path",           l_sys_get_parent_path           },
+
 	{"create_directory",          l_sys_create_directory          },
 	{"delete_file",               l_sys_delete_file               },
 
 	{"create_process",            l_sys_create_process            },
-	{"exit",                      l_sys_exit_this_process         },
 	{"get_process_id",            l_sys_get_this_process_id       },
+	{"exit",                      l_sys_exit_this_process         },
 
 
-	{"get_performance_counter",              l_sys_get_performance_counter                  },
-	{"get_performance_counter_frequency",    l_sys_get_performance_counter_frequency        },
-	{"get_performance_counter_elapsed_s",    l_sys_get_performance_counter_elapsed_s        },
-	{"get_performance_counter_elapsed_ms",   l_sys_get_performance_counter_elapsed_ms       },
+	{"get_perf_counter",      l_sys_get_performance_counter             },
+	{"get_perf_frequency",    l_sys_get_performance_counter_frequency   },
+	{"get_perf_elapsed_s",    l_sys_get_performance_counter_elapsed_s   },
+	{"get_perf_elapsed_ms",   l_sys_get_performance_counter_elapsed_ms  },
 };

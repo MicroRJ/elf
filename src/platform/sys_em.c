@@ -53,13 +53,13 @@ void sys_sleep(elf_Integer ms) {
 }
 
 
-elf_Integer sys_get_performance_counter_frequency() {
+elf_i64 sys_get_performance_counter_frequency() {
 	/* todo: where does it say this */
 	return 1000;
 }
 
 
-elf_Integer sys_get_performance_counter() {
+elf_i64 sys_get_performance_counter() {
 	return emscripten_get_now();
 }
 
@@ -169,7 +169,7 @@ int sys_find_next_file(FILE_VISITOR *visitor) {
 			elf_Value *top = GET_TOP(R);
 
 			elf_String *name = elf_new_string(R,entry->d_name);
-			elf_String *path = elf_new_string(R,elf_tpf("%s/%s",dir->c,entry->d_name));
+			elf_String *path = elf_new_string(R,tpf("%s/%s",dir->c,entry->d_name));
 			elf_StackId base = elf_push_closure_raw(R,cls);
 			elf_Table *file = elf_new_table(R);
 

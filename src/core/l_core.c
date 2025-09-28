@@ -4,14 +4,74 @@
 
 
 
+
+
+
+ELF_FUNCTION(l_core_new_buffer) {
+	Buf buf = new_buffer(S, 0, 0);
+	pushbuf(S, buf);
+	return 1;
+}
+
+
+
+
+
+
+
+
+
+// todo: (readonly ?= true)
+ELF_FUNCTION(l_core_get_obj_pointer) {
+	pushint(S, (Int) loadref(S, 1));
+	return 1;
+}
+
+
+
+
+
+
+
+// todo: (readonly ?= true)
+ELF_FUNCTION(l_core_mark_readonly) {
+	loadrulecheck(S, 1, TRULE_OBJECT);
+
+	Ref ref = loadref(S, 1);
+	int counter = markreadonly(S, ref);
+	pushint(S, counter);
+	return 1;
+}
+
+
+
+
+
+
+ELF_FUNCTION(l_core_get_mem_counter) {
+	pushint(S, S->gc.memcounter);
+	return 1;
+}
+
+
+
+ELF_FUNCTION(l_core_get_obj_counter) {
+	pushint(S, S->gc.objcounter);
+	return 1;
+}
+
+
+
+// todo: this might be temporary!
 ELF_FUNCTION(l_core_assert) {
 	Int cond = loadint(S, 1);
-	const char *emsg = loadtext(S, 2);
+	const char *errmsg = loadtext(S, 2);
 	if (!cond) {
-		elf_errorf(S, -1, "assertion triggered: %s", emsg);
+		reporterrorf(S, -1, "assertion triggered: %s", errmsg);
 	}
 	return 0;
 }
+
 
 
 
@@ -32,6 +92,8 @@ ELF_FUNCTION(l_core_assert) {
 #define caller(S) ((S)->frame_stack[(S)->frame_index - 1])
 
 
+// todo: doing this with functions, requires other code to compromise,
+// because we get the information from the caller's call frame
 ELF_FUNCTION(l_core_nvargs) {
 	int n = caller(S).nargs - caller(S).arity;
 	if (n < 0) n = 0;
@@ -110,6 +172,29 @@ ELF_FUNCTION(l_core_set_meta) {
 }
 
 
+
+
+
+
+ELF_FUNCTION(l_core_is_string) {
+	pushint(S, is_string_type(loadtype(S, 1)));
+	return 1;
+}
+
+
+
+
+
+ELF_FUNCTION(l_core_is_numeric) {
+	pushint(S, is_numeric_type(loadtype(S, 1)));
+	return 1;
+}
+
+
+
+
+
+
 ELF_FUNCTION(l_core_tagof) {
 	pushtext(S, tag2s[loadtype(S, 1)]);
 	return 1;
@@ -119,10 +204,10 @@ ELF_FUNCTION(l_core_tagof) {
 
 ELF_FUNCTION(l_core_iton) {
 	V v = loadvalue(S, 1);
-	if (!visnumeric(v)) {
-		elf_error(S, -1, "expected numeric value");
+	if (!is_numeric(v)) {
+		reporterrorf(S, -1, "expected numeric value, instead got %s", tag2s[tag_of(v)]);
 	}
-	pushnum(S, vitonum(v));
+	pushnum(S, int_to_num(v));
 	return 1;
 }
 
@@ -130,20 +215,31 @@ ELF_FUNCTION(l_core_iton) {
 
 ELF_FUNCTION(l_core_ntoi) {
 	V v = loadvalue(S, 1);
-	if (!visnumeric(v)) {
-		elf_error(S, -1, "expected numeric value");
+	if (!is_numeric(v)) {
+		reporterrorf(S, -1, "expected numeric value, instead got %s", tag2s[tag_of(v)]);
 	}
-	pushint(S, vntoint(v));
+	pushint(S, num_to_int(v));
 	return 1;
 }
 
 
+
 // todo: support handles!
 ELF_FUNCTION(l_core_load_file) {
-	elf_pushcodefile(S, loadtext(S, 1));
-	pushthis(S);
-	return elf_call(S, 1, nrets);
+	int ok = elf_pushcodefile(S, loadtext(S, 1), 0);
+	if (!ok) {
+		return 0;
+	}
+	loadpush(S, 0);
+	// we need to move the arguments down!
+	for (int i = 2; i < nargs; ++ i) {
+		loadpush(S, i);
+	}
+	nrets = elf_tailcall(S, nargs - 1, nrets);
+	return nrets;
 }
+
+
 
 
 // todo: support handles!
@@ -160,7 +256,7 @@ ELF_FUNCTION(l_core_load_expr) {
 
 ELF_FUNCTION(l_core_const_expr) {
 	const char *contents = loadtext(S, 1);
-	elf_load_const_expr_from_text(S, "no name", contents);
+	elf_pushconstexpr(S, "no name", contents);
 	return 1;
 }
 
@@ -189,66 +285,83 @@ ELF_FUNCTION(l_core_load_json) {
 }
 
 
+
+// todo: this should instead return a string!?
+ELF_FUNCTION(l_core_unparse) {
+	Sys file = loadsys(S, 1);
+	V value = loadvalue(S, 2);
+
+	Stringer sb = {};
+	int ok = unparse(S, &sb, value, 0);
+
+	if (ok) {
+		sys_write_file(file, sb.buf, sb.min);
+	}
+
+	free(sb.buf);
+
+	pushint(S, ok);
+	return 1;
+}
+
+
+
+
 //
 // FORMATTING
 //
+//
+//	todo: terrible at that
+//
 
 
-static int value_bprintf(String_Builder *sb, elf_Value v, bool flags) {
+
+static int valuetostr(Stringer *sb, V v, bool flags) {
 	switch (v.tag) {
-		case ELF_TNIL:        return sb_sprintf(sb,   "nil"               );
-		case ELF_TINTEGER:    return sb_sprintf(sb,  "%lli", v.x_int      );
-		case ELF_TNUMBER:     return sb_sprintf(sb,    "%f", v.x_num      );
-		case ELF_THANDLE:     return sb_sprintf(sb, "h%llX", v.x_int      );
-		case ELF_TSTRING:     return sb_sprintf(sb,    "%s", v.x_str->text);
-		case ELF_TCLOSURE:    return sb_sprintf(sb,   "F()");
-		case ELF_TFUNCTION:   return sb_sprintf(sb,   "C()");
+		case ELF_TNIL:        return sb_writetextf(sb,   "nil"               );
+		case ELF_TINTEGER:    return sb_writetextf(sb,  "%lli", v.x_int      );
+		case ELF_TNUMBER:     return sb_writetextf(sb,    "%f", v.x_num      );
+		case ELF_THANDLE:     return sb_writetextf(sb, "h%llX", v.x_int      );
+		case ELF_TSTRING:     return sb_writetextf(sb,    "%s", v.x_str->text);
+		case ELF_TCLOSURE:    return sb_writetextf(sb,   "F()");
+		case ELF_TFUNCTION:   return sb_writetextf(sb,   "C()");
+		case ELF_TBUFFER:     return sb_writebuf(sb,   as_buffer(v));
 
 		case ELF_TTABLE: {
 			/* todo: this is slow! */
 			int wrote = 0;
 			elf_Table *tab = v.x_tab;
-			wrote += sb_sprintf(sb, "{");
+			wrote += sb_writetextf(sb, "{");
 
 			Index i,j,n;
-			for (i=0;i<darr_l(tab->array);++i) {
-				if (i!=0) wrote += sb_sprintf(sb, ", ");
+			for (i=0;i<_table_arraylen(tab);++i) {
+				if (i!=0) wrote += sb_writetextf(sb, ", ");
 				for (j=0,n=0;j<tab->ntotal;++j) {
 
-					TEntry en = tab->entries[j];
+					IndexValue en = tab->entries[j];
 
-					if (visnil(en.key)) continue;
-					if (en.idx!=i) continue;
+					if (isdead(en.key)) continue;
+					if (en.idx != i) continue;
 
-					if (n ++ != 0) wrote += sb_sprintf(sb, ", ");
-					wrote += value_bprintf(sb,en.key,1);
+					if (n ++ != 0) wrote += sb_writetextf(sb, ", ");
+					wrote += valuetostr(sb,en.key,1);
 				}
-				if (n != 0) wrote += sb_sprintf(sb, " = ");
-				wrote += value_bprintf(sb,tab->array[i],1);
+				if (n != 0) wrote += sb_writetextf(sb, " = ");
+				wrote += valuetostr(sb,tab->array[i],1);
 			}
-			// for (i=0,n=0;i<tab->nslots;++i) {
-			// 	TEntry it = tab->slots[i];
-			// 	if (it.key.tag == ELF_TNIL) continue;
-			// 	if (n ++ != 0) wrote += sb_sprintf(sb,", ");
-			// 	wrote += value_bprintf(sb,it.key,1);
-			// 	wrote += sb_sprintf(sb," = ");
-			// 	wrote += value_bprintf(sb,tab->array[it.i],1);
-			// }
-			// FOR_ARRAY(t->v) {
-			// 	if (i != 0) wrote += sb_sprintf(sb,", ");
-			// 	wrote += value_bprintf(sb,t->v[i],1);
-			// }
-			wrote += sb_sprintf(sb,"}");
+			wrote += sb_writetextf(sb,"}");
 			return wrote;
 		} break;
-		default: return sb_sprintf(sb,"(?)");
+		default: return sb_writetextf(sb,"(?)");
 	}
 }
 
 
 
 
+//
 // todo: handle escape sequences
+// todo: make it actually handle format specifiers!
 //
 // @doc: takes a format string similar to that of a c printf
 // function, the type does not have to be specified
@@ -258,7 +371,7 @@ ELF_FUNCTION(l_core_format) {
 	int index = 1;
 	const char *format = loadtext(S, index ++);
 
-	String_Builder sb = {};
+	Stringer sb = {};
 	while (*format) {
 
 		while (*format && *format != '%') {
@@ -269,13 +382,13 @@ ELF_FUNCTION(l_core_format) {
 
 		if (*format == '%') {
 			if (index >= nargs) {
-				elf_error(S, NO_BYTE, "not enough arguments to format string!");
+				reporterror(S, NO_BYTE, "not enough arguments to format string!");
 			}
 			format += 1;
 
 			// todo:
 			V value = loadvalue(S, index ++);
-			value_bprintf(&sb, value, 0);
+			valuetostr(&sb, value, 0);
 		}
 	}
 
@@ -284,14 +397,22 @@ ELF_FUNCTION(l_core_format) {
 	return 1;
 }
 
-
+//
+//
+//
+//
+//
+//
+// todo: can we deprecate this? who cares about this anymore?
+// we can use buffers... and the user can just write to file.
+//
 
 ELF_FUNCTION(l_core_fpf) {
 	Handle file = loadsys(S, 1);
 
-	String_Builder sb = {};
+	Stringer sb = {};
 	for (int i = 2; i < nargs; i ++) {
-		value_bprintf(&sb, loadvalue(S, i), 0);
+		valuetostr(&sb, loadvalue(S, i), 0);
 	}
 	pushint(S, sb.min);
 
@@ -301,16 +422,46 @@ ELF_FUNCTION(l_core_fpf) {
 	return 1;
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
 
+ELF_FUNCTION(l_core_print) {
+	Stringer sb = {};
+	for (int i = 1; i < nargs; i ++) {
+		valuetostr(&sb, loadvalue(S,i),0);
+	}
+
+	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
+	sys_write_file(file, sb.buf, sb.min);
+	free(sb.buf);
+
+	pushint(S, sb.min);
+	return 1;
+}
+
+//
+//
+//
+//
+//
+//
+//
+//
 
 ELF_FUNCTION(l_core_printl) {
-	String_Builder sb = {};
+	Stringer sb = {};
 	for (int i = 1; i < nargs; i ++) {
-		value_bprintf(&sb, loadvalue(S,i),0);
+		valuetostr(&sb, loadvalue(S,i),0);
 	}
-	sb_sprintf(&sb, "\n");
+	sb_writetextf(&sb, "\n");
 
-	Handle file = sys_get_std_file(SYS_STD_OUTPUT);
+	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
 	sys_write_file(file, sb.buf, sb.min);
 
 	free(sb.buf);
@@ -319,128 +470,49 @@ ELF_FUNCTION(l_core_printl) {
 	return 1;
 }
 
-
-
-static void sb_printtabs(String_Builder *sb, int num) {
-	while (num --) sb_sprintf(sb, "\t");
-}
-
-
-
-// todo: cyclic references will break this
-// todo: performance!
-static int unparse(elf_State *inter, String_Builder *sb, V thing, int level) {
-	int noerror = true;
-	switch (thing.tag) {
-		case ELF_TNIL:      sb_sprintf(sb, "nil"                       ); break;
-		case ELF_TINTEGER:  sb_sprintf(sb, "%lli"  , thing.x_int       ); break;
-		case ELF_TNUMBER:   sb_sprintf(sb, "%f"    , thing.x_num       ); break;
-		case ELF_TSTRING:   sb_sprintf(sb, "\"%s\"", thing.x_str->text ); break;
-		case ELF_TTABLE: {
-			Tab table = thing.x_tab;
-
-			int nwrote = 0;
-
-			sb_sprintf(sb, "{\n");
-
-			// todo:
-			// figure this out, or pass in flags to determine
-			// whether to omit the hash part or the array part
-			if (table->nslots) {
-				elf_Index i;
-				for (i = 0; i < table->ntotal; ++ i) {
-					TEntry entry = table->slots[i];
-					elf_Index index = entry.idx;
-					elf_Value key = entry.key;
-
-					if ((key.tag != ELF_TNUMBER)
-					&&  (key.tag != ELF_TINTEGER)
-					&&  (key.tag != ELF_TSTRING))
-					{
-						continue;
-					}
-
-					elf_Value value = table->array[index];
-					if ((value.tag != ELF_TNUMBER)
-					&&  (value.tag != ELF_TINTEGER)
-					&&  (value.tag != ELF_TTABLE)
-					&&  (value.tag != ELF_TSTRING))
-					{
-						continue;
-					}
-
-					if (nwrote ++) sb_sprintf(sb, ",\n");
-					sb_printtabs(sb, level + 1);
-
-					unparse(inter, sb, key, 1);
-					sb_sprintf(sb, " = ");
-					unparse(inter, sb, value, level + 1);
-				}
-			} else {
-				FOR_ARRAY(i, table->array) {
-					elf_Value value = table->array[i];
-					if ((value.tag != ELF_TNUMBER)
-					&&  (value.tag != ELF_TINTEGER)
-					&&  (value.tag != ELF_TTABLE)
-					&&  (value.tag != ELF_TSTRING))
-					{
-						continue;
-					}
-					if (nwrote ++) sb_sprintf(sb, ",\n");
-					sb_printtabs(sb, level + 1);
-					unparse(inter, sb, value, level + 1);
-				}
-			}
-			sb_sprintf(sb,"\n");
-			sb_printtabs(sb, level);
-			sb_sprintf(sb,"}");
-		} break;
-		default: noerror = false;
-	}
-	return noerror;
-}
-
-
-
-ELF_FUNCTION(l_core_unload) {
-	Handle file = loadsys(S, 1);
-	V value = loadvalue(S, 2);
-	String_Builder sb = {};
-	int noerr = unparse(S, &sb, value, 0);
-	if (noerr) {
-		sys_write_file(file, sb.buf, sb.min);
-	}
-	free(sb.buf);
-	pushint(S, noerr);
-	return 1;
-}
 
 
 
 const static elf_Binding l_core[] = {
-	{"get_meta", l_core_get_meta},
-	{"set_meta", l_core_set_meta},
-	{"assert", l_core_assert},
-	{"nvargs", l_core_nvargs },
-	{"varg", l_core_varg },
-	{"nrets", l_core_nrets },
-	{"nargs", l_core_nargs },
-	{"arg", l_core_arg },
-	{"tagof", l_core_tagof},
-	{"iton", l_core_iton},
-	{"ntoi", l_core_ntoi},
-	{"load_file", l_core_load_file},
-	{"load_expr", l_core_load_expr},
-	{"const_expr", l_core_const_expr},
-	{"load_json", l_core_load_json},
-	{"format", l_core_format},
-	{"fprint", l_core_fpf},
-	{"printl", l_core_printl},
-	{"unload", l_core_unload},
+	{"get_meta",        l_core_get_meta        },
+	{"set_meta",        l_core_set_meta        },
+	{"mark_readonly",   l_core_mark_readonly   },
+
+	{"assert",          l_core_assert          },
+	{"new_buffer",      l_core_new_buffer      },
+
+	{"get_mem_counter", l_core_get_mem_counter },
+	{"get_obj_counter", l_core_get_obj_counter },
+	{"get_obj_pointer", l_core_get_obj_pointer },
+
+	{"nvargs",          l_core_nvargs          },
+	{"varg",            l_core_varg            },
+	{"nrets",           l_core_nrets           },
+	{"nargs",           l_core_nargs           },
+	{"arg",             l_core_arg             },
+
+	{"tagof",           l_core_tagof           },
+
+	{"is_str",          l_core_is_string       },
+	{"is_numeric",      l_core_is_numeric      },
+
+	{"iton",            l_core_iton            },
+	{"ntoi",            l_core_ntoi            },
+
+	{"load_file",       l_core_load_file  },
+	{"load_expr",       l_core_load_expr  },
+	{"const_expr",      l_core_const_expr },
+	{"load_json",       l_core_load_json  },
+	{"unparse",         l_core_unparse    },
+
+	{"format",          l_core_format     },
+	{"printl",          l_core_printl     },
+	{"print",           l_core_print      },
 
 	// todo: deprecated?
-	{"fpf", l_core_fpf},
-	{"pf", l_core_printl},
+	{"fprint",     l_core_fpf              },
+	{"fpf"   ,     l_core_fpf              },
+	{"pf"    ,     l_core_printl           },
 };
 
 
@@ -473,13 +545,13 @@ int core_lib_include(elf_State *R) {
 	todo: */
 
 	elf_Table *globals = R->globals;
-	TEntry entry;
+	IndexValue entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
 		if (entry.key.tag == ELF_TSTRING) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
-			elf_String *ref = newstr(R,sym);
+			elf_String *ref = new_string(R,sym);
 			tableset(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}

@@ -15,7 +15,7 @@ enum {
 
 typedef struct {
 	union {
-		String_Builder sb;
+		Stringer sb;
 		struct {
 			// has to match string builder
 			int   pcap;
@@ -73,7 +73,7 @@ static void pb_push(Path_Builder *pb, const char *name) {
 
 	int namecur = pb->pcur;
 
-	sb_writestr(&pb->sb, name);
+	sb_writetext(&pb->sb, name);
 
 	pb->name = pb->path + namecur;
 }

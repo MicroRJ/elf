@@ -18,6 +18,6 @@ const char *tag2s[] = {
 	[ELF_TFUNCTION] = "Function",
 	[ELF_TCLOSURE] = "Closure",
 	[ELF_TSTRING] = "Str",
+	[ELF_TBUFFER] = "Buffer",
 	[ELF_TTABLE] = "Tab",
 };
-

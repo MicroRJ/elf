@@ -26,13 +26,6 @@ static inline void *copy_text(void *buf, int zbuf, void const *src) {
 
 
 
-
-
-
-
-
-
-
 static elf_i64 prof_get_time() {
 	return sys_get_performance_counter();
 }
@@ -45,35 +38,6 @@ static elf_f64 prof_time_diff_ms(elf_i64 time) {
 	return prof_time_diff_s(time) * 1000.0;
 }
 
-
-
-
-
-//
-// Hash <3 stb
-//
-
-static inline unsigned int rehash(unsigned int hash) {
-	return ((hash) + ((hash) >> 6) + ((hash) >> 19));
-}
-
-
-static inline unsigned int hash_text(const char *text) {
-	unsigned int hash;
-	for (hash=2166136261u; *text; hash ^= *text++, hash *= 16777619);
-	return hash;
-}
-
-static inline unsigned int hash64(elf_i64 i) {
-	unsigned int hash = rehash(i);
-	hash += hash << 16;
-	hash ^= hash << 3;
-	hash += hash >> 5;
-	hash ^= hash << 2;
-	hash += hash >> 15;
-	hash ^= hash << 10;
-	return rehash(hash);
-}
 
 
 static int is_file_name_empty(char const *name) {
@@ -93,35 +57,30 @@ static char *get_name_from_file_path(const char *s) {
 }
 
 
-static void get_source_info(char *source, char *cursor, int *line_number, char **line_start) {
-	//
-	// get line number and starting address
-	// of the line for the given address within
-	// the file q
-	//
+static int get_source_info(char *source, char *cursor, char **line_start) {
+	int line_counter = 1;
+	if (line_start) *line_start = source;
 
-	char *q, *c;
-	int n;
+	while (source < cursor) {
 
-	q=source,c=source;
+		while ((source < cursor) && (*source != '\r') && (*source != '\n')) {
+			++ source;
+		}
 
-	for (n=0; q < cursor; ) {
-		// skip line
-		while (((*q != '\r') && (*q != '\n') && (*q != '\0')) && (q < cursor)) q ++;
-		// did we reach end of file?
-		if (*q == '\0') break;
+		if (source < cursor)
+		{
+			if (*source == '\r') {
+				++ source;
+			}
+			if (source < cursor && *source == '\n') {
+				++ source;
+			}
+			++ line_counter;
 
-		if ((*q != '\n') || (c = ++ q, n ++, 1)) {
-			if ((*q == '\r') && (c = ++ q, n ++, 1)) {
-				if (*q == '\n') c = ++ q;
-
-				// todo: come back to this, why do we still increment
-				// on the else branch here?
-			} else q ++;
+			if (line_start) *line_start = source;
 		}
 	}
-	if (line_number) *line_number = n + 1;
-	if (line_start) *line_start = c;
+	return line_counter;
 }
 
 
@@ -251,6 +210,8 @@ char *copy_text2(int length, char const *text) {
 	return result;
 }
 
+
+
 static char *thread_format_v(char const *format, va_list v) {
 	int length = stbsp_vsnprintf(NULL, 0, format, v);
 	char *text = thread_alloc(length + 1);
@@ -258,22 +219,28 @@ static char *thread_format_v(char const *format, va_list v) {
 	return text;
 }
 
-static char *tpf_(char const *format, ...) {
-	va_list v;
-	va_start(v,format);
-	char *contents = thread_format_v(format,v);
-	va_end(v);
-	return contents;
+
+
+static char *tempvpf(char const *format, va_list vargs) {
+	char *text = thread_format_v(format,vargs);
+	return text;
 }
 
-static int sb_sprintf(String_Builder *sb, char *format, ...) {
+
+
+static char *temppf(char const *format, ...) {
 	va_list vargs;
 	va_start(vargs, format);
-	int size = stbsp_vsnprintf(NULL, 0, format, vargs);
-	char *text = sb_alloc(sb, size + 1, size);
-	stbsp_vsnprintf(text, size + 1, format, vargs);
+
+	char *text = tempvpf(format, vargs);
+
 	va_end(vargs);
-	return size;
+	return text;
 }
+
+
+
+
+
 
 

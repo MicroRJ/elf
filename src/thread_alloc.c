@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: we're single threaded, and ... memory per translation unit??
+// todo: we're single threaded, and ... memory per TU??
 static void *thread_alloc(int size) {
 	THREAD char buffer[4096];
 	THREAD int cursor;

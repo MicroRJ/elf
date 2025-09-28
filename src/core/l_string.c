@@ -7,10 +7,13 @@
 
 
 
+
+
 ELF_FUNCTION(l_str_length) {
 	pushint(S, loadstr(S, 0)->length);
 	return 1;
 }
+
 
 
 
@@ -22,7 +25,7 @@ ELF_FUNCTION(l_str_get_hash) {
 
 
 
-ELF_FUNCTION(l_str_get_index) {
+ELF_FUNCTION(l_str_idx) {
 	const char *text = loadtext(S, 0);
 	int index = loadint(S, 1);
 	pushint(S, text[index]);
@@ -43,17 +46,18 @@ ELF_FUNCTION(l_str_slice) {
 
 
 // todo: this should be like an elf thing, elf_formatting.c
-static int value_bprintf(String_Builder *sb, elf_Value v, bool flags);
+static int valuetostr(Stringer *sb, elf_Value v, bool flags);
 
 ELF_FUNCTION(l_str_join) {
-	String_Builder sb = {};
+	Stringer sb = {};
 	for (int i = 0; i < nargs; ++ i) {
-		value_bprintf(&sb, loadvalue(S, i), 0);
+		valuetostr(&sb, loadvalue(S, i), 0);
 	}
 	pushtext2(S, sb.buf, sb.min);
 	free(sb.buf);
 	return 1;
 }
+
 
 
 // todo: what if multiple inputs!
@@ -66,6 +70,8 @@ ELF_FUNCTION(l_str_match) {
 	return 1;
 }
 
+
+
 // todo: doesn't actually work
 // @doc finds all the matches and returns a list of all the strings
 ELF_FUNCTION(l_str_find) {
@@ -73,9 +79,9 @@ ELF_FUNCTION(l_str_find) {
 	const char *p = loadtext(S, 1);
 
 	// return a list
-	pushtable(S);
+	pushnewtable(S);
 
-	String_Builder sb = {};
+	Stringer sb = {};
 
 	char *cur = (char *) s;
 	while (*cur) {
@@ -106,9 +112,9 @@ ELF_FUNCTION(l_str_find) {
 ELF_FUNCTION(l_str_split_by_lines) {
 	const char *s = loadtext(S, 0);
 
-	pushtable(S);
+	pushnewtable(S);
 
-	String_Builder sb = {};
+	Stringer sb = {};
 
 	char *cur = (char *) s;
 	while (*cur) {
@@ -133,14 +139,15 @@ ELF_FUNCTION(l_str_split_by_lines) {
 }
 
 
+
 ELF_FUNCTION(l_str_split_by_char) {
 
 	const char *s = loadtext(S, 0);
 	int chr = loadint(S, 1);
 
-	Tab splits = pushtable(S);
+	Tab splits = pushnewtable(S);
 
-	String_Builder sb = {};
+	Stringer sb = {};
 
 	while (*s) {
 
@@ -152,11 +159,11 @@ ELF_FUNCTION(l_str_split_by_char) {
 			s ++;
 		}
 
-		Str split = newstrl(S, sb.buf, sb.min);
+		Str split = new_stringl(S, sb.buf, sb.min);
 		V value;
-		vsetstr(&value, split);
+		to_str(&value, split);
 
-		darr_add(splits->array, value);
+		heap_array_add(splits->array, value);
 
 		sb.min = 0;
 	}
@@ -165,6 +172,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 
 	return 1;
 }
+
 
 
 ELF_FUNCTION(l_str_lowercase) {
@@ -179,6 +187,7 @@ ELF_FUNCTION(l_str_lowercase) {
 }
 
 
+
 ELF_FUNCTION(l_str_uppercase) {
 	Str str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
@@ -191,6 +200,7 @@ ELF_FUNCTION(l_str_uppercase) {
 }
 
 
+
 elf_Binding string_metafuncs[] = {
 	{ "length"          , l_str_length         },
 	{ "match"           , l_str_match          },
@@ -200,7 +210,7 @@ elf_Binding string_metafuncs[] = {
 	{ "get_hash"        , l_str_get_hash       },
 	{ "split_by_lines"  , l_str_split_by_lines },
 	{ "split_by_char"   , l_str_split_by_char  },
-	{ "idx"             , l_str_get_index      },
+	{ "idx"             , l_str_idx            },
 	{ "find"            , l_str_find           },
-	{ ELF_OVERLOAD_ADD  , l_str_join           },
+	{ OVERLOAD_ADD      , l_str_join           },
 };

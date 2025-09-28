@@ -1,10 +1,11 @@
-@echo off
-@rem -fsanitize=address
+@REM this just builds an object
+@REM see elf-lang/elven @ github
 
+@ECHO OFF
 @SET SRCIN=               ^
 src/platform/system.c     ^
 src/core/internal_main.c  ^
-src/core/public_api.c     ^
+src/core/userapi.c        ^
 src/compiler/elf_compiler.c
 
 @SET INC= ^
@@ -15,5 +16,8 @@ src/compiler/elf_compiler.c
 /Iinclude ^
 /Istb
 
-clang-cl /nologo -Od -Zi /c %SRCIN% %INC% -DPLATFORM_DESKTOP -D_DEBUG
-lib /nologo /out:elf.lib system.obj internal_main.obj elf_compiler.obj public_api.obj
+@SET FLAGS=%1
+
+
+clang-cl /nologo -Od -Zi /c %FLAGS% %SRCIN% %INC% -DPLATFORM_DESKTOP -D_DEBUG
+lib /nologo /out:elf.lib system.obj internal_main.obj elf_compiler.obj userapi.obj

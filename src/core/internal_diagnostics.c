@@ -16,63 +16,111 @@ static int findfileforinstr(elf_State *S, int byte) {
 
 
 
-static void cursor_dialog(char *name, char *source, char *cursor, BCPos instr, Bytec byte, char const *fmt, ...) {
+static void printsourcelocator(char *name, char *source, char *cursor, BCPos instr, Bytec byte) {
 	char *line_start;
-	int line_number;
-	get_source_info(source,cursor,&line_number,&line_start);
+	int line_number = get_source_info(source,cursor,&line_start);
 
 	while (*line_start == '\t' || *line_start == ' ') {
 		line_start += 1;
 	}
 
 	char underline_buf[64];
+
 	int underline = MIN(sizeof(underline_buf), cursor - line_start);
 	line_start = cursor - underline;
 
-	int linelen = 0;
-	for (; linelen < underline+32; ++ linelen) {
-		if (line_start[linelen] == '\0') break;
-		if (line_start[linelen] == '\r') break;
-		if (line_start[linelen] == '\n') break;
+	int line_length = 0;
+	for (; line_length < underline+32; ++ line_length) {
+		if (line_start[line_length] == '\0') break;
+		if (line_start[line_length] == '\r') break;
+		if (line_start[line_length] == '\n') break;
 	}
 
+	// mimic tabs because we don't know how large tabs look,
+	// alternatively we could replace tabs in the source...
 	for (int i = 0; i < underline; ++ i) {
 		underline_buf[i] = line_start[i] == '\t' ? '\t' : '-';
 	}
 	underline_buf[underline]='^';
 
-	if (fmt !=  0) {
-		char b[0x1000];
-		va_list v;
-		va_start(v,fmt);
-		stbsp_vsnprintf(b,sizeof(b),fmt,v);
-		va_end(v);
-		printf("%s [%i:%lli] [%i](%s): %s\n",name,line_number,(elf_Integer)(1+cursor-line_start),instr,byte2s[BC_OP(byte)],b);
-	}
-	printf("| %.*s\n",linelen,line_start);
+	int char_index = 1 + cursor - line_start;
+
+	printf("%s [%i:%i] [%i](%s): \n"
+	, name
+	, line_number
+	, char_index
+	, instr
+	, byte2s[BC_OP(byte)]);
+
+	printf("|\n");
+	printf("| %.*s\n",line_length,line_start);
 	printf("| %.*s\n",underline+1,underline_buf);
+	printf("|\n");
 }
 
 
 
-void elf_errorf(elf_State *inter, int instr, const char *format, ...)
-{
-	printf("============= ELF-ERROR =============\n");
 
+
+
+void printcallstack(elf_State *S) {
+
+	for(int i=1; i<S->frame_index; i++)
+	{
+		Stack_Frame *frame = & S->frame_stack[i];
+		BCPos instr = frame->bytes + frame->nextinstr;
+
+		int id = findfileforinstr(S, instr);
+
+		if (id != -1) {
+
+			Proto_File *file = S->files[id];
+			Source line = S->lines[instr];
+
+			printsourcelocator(file->name,file->text,line,instr,S->bytebuf[instr]);
+		}
+
+	}
+}
+
+
+
+
+
+
+
+
+
+void reporterrorf(elf_State *S, int instr, const char *format, ...)
+{
 
 	if (instr == NO_BYTE)
 	{
-		instr = inter->byte;
+		instr = S->byte;
 	}
+
+	printf("\n\n");
+	printf("============= ELF-ERROR =============\n");
+
+	printf("\n\n");
+	printcallstack(S);
+
+	printf("\n\n");
+
 
 	// todo: instead of keeping source code in memory, which is
 	// kinda weird, make a hash of the file we loaded the code from,
 	// and get a path to it, if the hash didn't change we reload the
 	// file, and always make sure to print a notice saying the error
-	// report could be inaccurate if the source file changed
-	Source line = inter->lines ? inter->lines[instr] : 0;
+	// report could be inaccurate if the source file changed.
+	//
+	// Whether we store the contents of the file in our own memory
+	// can be done, but it should be separate, only necessary in moments
+	// like this...
+	//
+	Source line = S->lines ? S->lines[instr] : 0;
 
-	int fidi = findfileforinstr(inter, instr);
+	int fidi = findfileforinstr(S, instr);
 
 	va_list vargs;
 	va_start(vargs, format);
@@ -81,44 +129,41 @@ void elf_errorf(elf_State *inter, int instr, const char *format, ...)
 
 	if (fidi != -1) {
 
-		Proto_File *file = inter->files[fidi];
-		cursor_dialog(file->name, file->text, line, instr, inter->bytebuf[instr], error);
+		Proto_File *file = S->files[fidi];
+		printsourcelocator(file->name, file->text, line, instr, S->bytebuf[instr]);
 	}
 	else
 	{
 		printf("source information could not be found, file id: %i\n", fidi);
-		printf("error: %s\n", error);
 	}
 
-	printf("elf is exiting...\n");
+	printf("[ERROR]: %s\n", error);
+
+	printf("\n\n");
+
+
+
+
+	printf("\n\n");
+
 #if defined(_DEBUG)
 	__debugbreak();
-#endif
+#else
+	printf("elf is exiting...\n");
 	sys_exit_this_process(0);
+#endif
 }
 
 
-void elf_error(elf_State *inter, int byte, const char *message)
+void reporterror(elf_State *inter, int byte, const char *message)
 {
-	elf_errorf(inter, byte, message);
+	reporterrorf(inter, byte, message);
 }
 
 
 
 #if 0
-void elf_dump_byte_trace(elf_State *S) {
-	// S->frame_stack[S->frame_index] = S->frame;
-	// for(int i=1; i<=S->frame_index; i++){
-	// 	Stack_Frame *frame = & S->frame_stack[i];
-	// 	int id = findfileforinstr(S, frame->bytecounter);
 
-	// 	if (id != -1) {
-	// 		Proto_File *file = &S->files[id];
-	// 		Source line = instrline(S,frame->bytecounter);
-	// 		cursor_dialog(file->name->text,file->contents->text,line,frame->bytecounter,S->bytes[frame->bytecounter],frame->closure != 0 ? "(elf-function)" : "(c-function)");
-	// 	}
-	// }
-}
 
 // todo:
 // for this to work properly we'd have to construct
@@ -178,13 +223,13 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, BCPos id, Bytec b
 	if (BC_OP(b) == BC_TYPEGUARD) {
 		fprintf(io," #%s",tag2s[BC_ARGY(b)]);
 	} else
-	if (BC_OP(b) == BC_GETKINT) {
+	if (BC_OP(b) == BC_LOADKINT) {
 		fprintf(io," #%lli",M->integers[BC_ARGY(b)]);
 	} else
-	if (BC_OP(b) == BC_GETKNUM) {
+	if (BC_OP(b) == BC_LOADKNUM) {
 		fprintf(io," #%f",M->numbers[BC_ARGY(b)]);
 	} else
-	if (BC_OP(b) == BC_GETGLOBAL) {
+	if (BC_OP(b) == BC_LOADGLOBAL) {
 		elf_Value val = M->globals->array[BC_ARGY(b)];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells

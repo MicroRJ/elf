@@ -9,7 +9,8 @@
 // undeclared identifier
 #define Y_UNIDENT ((treeID) (-2))
 
-#define TREE_NO_ERROR(t) ((t) > 0)
+#define istree(t) ((t) > 0)
+#define notree(t) ((t) <= 0)
 
 
 typedef struct Tree Tree;
@@ -45,10 +46,12 @@ _(EXPR_NIL_OR)       \
 _(EXPR_BIT_NOT)      \
 _(TREE_GLOBAL)       \
 _(TREE_UPVALUE)      \
+_(TREE_ENFORCE)      \
 _(TREE_DEBUG_GET_EXPRESSION_NAME)      \
-_(TREE_DEBUG_GET_MEMORY)               \
-_(TREE_MEMORY)                         \
-_(TREE_MEMORY_BLOCK)                   \
+_(TREE_DEBUG_GET_MEMORY)          \
+_(TREE_MEMORY)                    \
+_(TREE_MEMORY_BLOCK)              \
+_(TREE_MEMORY_REF)                \
 _(EXPR_NUM)          \
 _(EXPR_INT)          \
 _(EXPR_STR)          \
@@ -57,15 +60,15 @@ _(TREE_META_CALL)    \
 _(TREE_FUNCTION)     \
 _(TREE_NEW_TABLE)    \
 _(EXPR_CLOSURE)      \
-_(EXPR_DIRECT_INDEX) \
-_(EXPR_FIELD)        \
+_(TREE_LENGTH)       \
+_(TREE_INDEX)        \
+_(TREE_TABLE_FIELD)  \
 _(EXPR_METAFIELD)    \
 _(EXPR_NIL)          \
 _(TREE_STORE)        \
 _(TREE_IF)           \
 _(TREE_GOTO)         \
 _(TREE_WHILE_LOOP)   \
-_(STAT_DO_WHILE)     \
 _(TREE_RANGE)        \
 _(EXPR_RANGE_INDEX)  \
 _(TREE_TUPLE)        \
@@ -98,6 +101,7 @@ struct Tree {
 	treeKi   kind;
 	treeTy   type;
 	Source   line;
+	int     debug;
 	union {
 		struct {
 			treeID x,y,*z;
@@ -107,27 +111,39 @@ struct Tree {
 		// the address is used
 		int       jump;
 
-		int       expr_global;
-		int       expr_upvalue;
-		char     *expr_str;
-		elf_i64   expr_int;
-		elf_f64   expr_num;
+		int    expr_global;
+		int    expr_cvalue;
+		char  *expr_str;
+		i64    expr_int;
+		f64    expr_num;
+
+
 
 		struct {
-			treeID ini; // match x
+			treeID x, y, *z;
+			TypeRule rule;
+		} tree_enforce;
+
+
+
+
+		struct {
+			treeID ini, y, *z;
+			int    rem;
 			int    mem;
 		} tree_memory;
+
+
+
 
 		struct {
 			treeID *key_value_tuples;
 		} expr_newtable;
 
 		struct {
-			treeID *xs;
-			treeID *ys;
-			treeKi  modify;
-			treeKi  cond;
-		} tree_multistore;
+			treeID x, y, *z;
+			int    nrets;
+		} tree_call;
 
 		struct {
 			// scope is used during parsing to detect captures,

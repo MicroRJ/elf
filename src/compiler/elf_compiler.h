@@ -9,7 +9,7 @@ int elf_makefile(elf_State *S, const char *name);
 
 // " parses a constant expression "
 // return value indicates success, the result is on the stack
-int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *contents);
+int elf_pushconstexpr(elf_State *S, const char *name, const char *contents);
 
 
 

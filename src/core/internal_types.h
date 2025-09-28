@@ -3,7 +3,121 @@
 //
 
 
+
+// todo:
+//
+// GET_SFIELD: u8 u8 u16 | u32
+//	                      | u16 memo
+//	                      | u16 date
+//
+//
+//
+// observe that fields are not likely to mutate.
+//
+// instructions are likely to operate on similar or same
+// data structures.
+//
+//	layouts tend to be similar for related objects.
+//
+// e.g Looping over an array of entities, over and over again, as it is
+// typical in games.
+//
+// indirect accessing is expensive, if likelyhood of same index
+// for same key is high, attempt direct lookup.
+//
+// cannot very that index is still valid, date the instruction to
+// the date of the object.
+//
+// When object mutates fields, increment object date.
+//
+// Old instructions are forced to reupdate.
+//
+//	What if instructions too old? Say date 0. What if the object mutates
+// so much that it wraps back to 0?
+//
+// Now old instructions think they up to date.
+//
+// Black list the object, if object mutates too much, probably not worth
+// tracking either, too volatile.
+//
+//	Simply prevent wrap around, if object date == MAX(date), it means black listed,
+// can no longer trust.
+//
+//
+//	Black listing is unlikely to happen, either way.
+//
+//	This means, date can be 8 bits instead, or even 4.
+//
+// Can use the rest for other information.
+//
+//
+// "hot" objects?
+//
+//
+//
+//	Objects are central, easy to track.
+//
+//
+//	Frequently accessed object live longer. Adapt instructions to these
+// objects.
+//
+//
+// Field mutation is rare, deletions are rare.
+//
+//
+//	Indirect accesses are expensive, bad for cache, replace with direct access.
+//
+//
+//
+// Increment counter for read / writes if > threshold, object is hot...
+// The hotter the object, the more priority...
+//
+//
+// Adequate instruction accesses hot object, instruction tracks it,
+// cache index in instruction.
+//
+//	Next time, if instruction up to date, direct access.
+//
+//	Object mutates, increment mutatecounter, any key could have changed,
+// we don't know, not worth knowing.
+//
+//	Instruction clears cache, re-fetch.
+//
+//
+//
+//
+//
+//
+// todo:
+// experiment with storing strings entirely
+// in values and see if we get some performance benefits!
+//
+//	todo:
+//	do the same with closures!
+//
+//
+
+
+
+
+
+
+#if !defined(ELF_MAX_FILE_PATH)
+#define ELF_MAX_FILE_PATH 256
+#endif
+
+
+
+
+
+
+#define OVERLOAD_ADD "__add"
+#define OVERLOAD_SUB "__sub"
+
+
+
 #include "internal_shorternames.h"
+#include "hash.c"
 
 
 enum { true = 1, false = 0 };
@@ -12,10 +126,12 @@ enum { true = 1, false = 0 };
 typedef int BCPos;
 #define NO_BYTE (-1)
 
+
 #include "bytecode.h"
 
 
 typedef char *Source;
+
 
 
 // todo:
@@ -23,25 +139,161 @@ extern const char *tag2s[];
 extern const char *byte2s[];
 
 
-// todo: NaN tagging!
-typedef struct elf_Value elf_Value;
-struct elf_Value {
-	elf_Tag tag;
-	union {
-		elf_i64         x_i64;
-		struct {elf_i32 x_i32, y_i32; };
 
-		elf_i64         x_int;
-		elf_f64         x_num;
-		void           *x_ptr;
-		elf_Handle      x_sys;
-		elf_Closure    *x_closure;
-		elf_Object     *x_obj;
-		elf_Table      *x_tab;
-		elf_String     *x_str;
-		elf_Function    x_proc;
+
+
+
+
+
+
+
+
+
+typedef enum {
+	TBIT_NIL       = 1 << ELF_TNIL,
+	TBIT_TOMB      = 1 << ELF_TTOMB,
+	TBIT_NUMBER    = 1 << ELF_TNUMBER,
+	TBIT_INTEGER   = 1 << ELF_TINTEGER,
+	TBIT_HANDLE    = 1 << ELF_THANDLE,
+	TBIT_FUNCTION  = 1 << ELF_TFUNCTION,
+	TBIT_USER      = 1 << ELF_TUSER,
+	TBIT_CLOSURE   = 1 << ELF_TCLOSURE,
+	TBIT_STRING    = 1 << ELF_TSTRING,
+	TBIT_TABLE     = 1 << ELF_TTABLE,
+	TBIT_BUFFER    = 1 << ELF_TBUFFER,
+	//
+	TBIT_ALLMASK   = (1 << ELF_TCOUNT_) - 1,
+} TypeBit;
+
+
+
+
+
+
+
+
+
+// todo: type rules are not enough for detailed logging,
+// encoding semantics is necessary, for instance, an index type...
+
+typedef enum {
+	TRULE_NIL      = TBIT_NIL,
+	TRULE_TOMB     = TBIT_TOMB,
+	TRULE_NUMBER   = TBIT_NUMBER,
+	TRULE_INTEGER  = TBIT_INTEGER,
+	TRULE_HANDLE   = TBIT_HANDLE,
+	TRULE_FUNCTION = TBIT_FUNCTION,
+	TRULE_USER     = TBIT_USER,
+	TRULE_CLOSURE  = TBIT_CLOSURE,
+	TRULE_STRING   = TBIT_STRING,
+	TRULE_TABLE    = TBIT_TABLE,
+	TRULE_BUFFER   = TBIT_BUFFER,
+	//
+	TRULE_GENERIC  = TBIT_ALLMASK,
+	TRULE_NONNIL   = TRULE_GENERIC & ~TBIT_NIL,
+
+	TRULE_OBJECT   = TBIT_USER|TBIT_CLOSURE|TBIT_STRING|TBIT_TABLE|TBIT_BUFFER,
+
+	TRULE_NUMERIC  = TBIT_INTEGER|TBIT_NUMBER,
+	TRULE_CALLABLE = TBIT_FUNCTION|TBIT_CLOSURE,
+
+	TRULE_COUNT,
+} TypeRule;
+
+
+
+
+
+
+
+
+
+
+
+#define NIL_VALUE ((Value) { ELF_TNIL })
+
+#define VALUE_READONLY 2
+
+struct elf_Value {
+	u32   tag;
+	// we get this plus 3 bytes for free...
+	i32   status;
+
+	union {
+		i64         x_i64;
+		struct {i32 x_i32, y_i32; };
+		i64         x_int;
+		f64         x_num;
+		Sys         x_sys;
+		Ref         x_obj;
+		Tab         x_tab;
+		Str         x_str;
+		Fun         x_proc;
+		Closure     x_closure;
+		Buf         x_buf;
+		void       *x_ptr;
 	};
 };
+STATIC_ASSERT(sizeof(Value) == 16);
+
+
+
+
+
+
+
+
+
+typedef Index Rank;
+
+
+typedef struct {
+	// 8  bytes
+	Rank   rank;
+
+	// 16 bytes
+	Value value;
+} RankValue;
+STATIC_ASSERT(sizeof(RankValue) == 24);
+
+
+
+
+
+
+// todo: we should try to make this much smaller, limit the key size to 64 bits
+// and the index to 32
+typedef struct {
+	union {
+		Index idx;	 // todo: remove!
+		Index index;
+	};
+	Value key;
+} IndexValue, Entry;
+STATIC_ASSERT(sizeof(IndexValue) == 24);
+
+
+
+
+STATIC_ASSERT(offsetof(RankValue, value) == offsetof(IndexValue,   key));
+STATIC_ASSERT(offsetof(RankValue,  rank) == offsetof(IndexValue, index));
+
+
+
+typedef struct {
+	Value key;
+	Value value;
+} KeyValue;
+STATIC_ASSERT(sizeof(KeyValue) == 32);
+
+
+
+
+
+
+
+
+
 
 
 //
@@ -61,15 +313,21 @@ struct Proto {
 };
 
 
-#if !defined(ELF_MAX_FILE_PATH)
-#define ELF_MAX_FILE_PATH 256
-#endif
+
+
+
+
+
+
 
 
 //
 // information about a compiled file
 //
-// todo: eventually will need at the proto level
+// todo: only keep source around if not possible
+// to just reload from file system, implement
+// a layered system, when we need source info,
+// check cache, otherwise fall back to file system.
 //
 typedef struct Proto_File Proto_File;
 struct Proto_File {
@@ -85,146 +343,322 @@ struct Proto_File {
 };
 
 
-typedef struct elf_Object elf_Object;
-struct elf_Object {
-	elf_i8      type;
-	elf_i8     color;
-	elf_i16     size;
-	elf_Table  *meta;
+
+
+
+
+
+
+
+
+#define NODE_REACHABLE      1
+#define NODE_READONLY       2
+#define NODE_NOCHILDREN     4
+#define NODE_DEBUGTRAP      8
+
+
+
+
+
+struct GCNode {
+	unsigned char       type;
+	unsigned char     status;
+	unsigned short      size;
+	u32             debugsrc;
+	Ref                 next;
+	Tab                 meta;
 };
 
 
-typedef struct elf_Closure elf_Closure;
+
+static int markreadonly(elf_State *S, Ref ref);
+
+
+
+
+
+
+
+
+
+
+
 struct elf_Closure {
-	elf_Object obj;
+	GCNode obj;
 	short      proto_index;
 	short      extra;
 	Proto      proto;
 	Value      captures[];
 };
 
-Closure newclosure(elf_State *, int proto);
 
 
 
 
 
-typedef struct {
-	Value key;
-	Index idx;
-} TEntry;
-
-
-
-typedef struct elf_Table elf_Table;
 struct elf_Table {
-	elf_Object         obj;
-	Index           ntotal;
-	Index           nslots;
+	GCNode      obj;
+	union {
+		Index        ntotal;
+		Index        nentries;
+	};
+	union {
+		Index        nslots;       // todo: remove
+		Index        fillcounter;
+	};
 	Index    	    ndebug;
 	union {
-		TEntry       *slots; // remove
-		TEntry     *entries;
+		IndexValue       *slots; // todo: remove
+		IndexValue     *entries;
 	};
-	V               *array;
+	union {
+		Value        *array;
+		Value       *values;
+	};
 };
 
+
+void _table_freeinternalmemory(Tab tab);
 Tab newtable2(elf_State *, Index nentries);
 Tab new_table(elf_State *);
-void recycletable(Tab tab);
-Index tabletry(Tab tab, V key);
-Index tablecreateindex(Tab tab, V key);
-Index tableset(Tab tab, V k, V v);
-Index arrayadd(elf_State *S, Tab tab, V thing);
+
+Index tableset(elf_State *S, Tab tab, V k, V v);
+
+Value _table_getornil(elf_State *S, Tab tab, Value key);
+Index _table_getalways(Tab tab, V key);
+
+Index _table_arrayadd(elf_State *S, Tab tab, Value value);
+Value _table_arrayget(elf_State *S, Tab tab, Index index);
+Index _table_arraylen(Tab tab);
+
+
+void tableunparse(elf_State *S, Stringer *sb, Tab tab, int level);
 
 
 
+struct elf_Buffer {
+	GCNode  obj;
+	u8      enc;
+	Index   max;
+	Index   min;
+	char   *mem;
+};
 
 
 
-// todo: 64 bit strings?
-typedef struct elf_String elf_String;
+//
+// Structure for regular strings
+//
+// | u32 | u32 | u32 u32
+// |     |     |
+// |     |     | string pointer
+// |     |
+// |     | hash
+// |
+// | u16 length
+//
+//
+// A good majority of strings are 16 bytes or less, right?
+//
+// some_space_and_0
+//
+// like this is a 15 char string, including null term.
+//
+//
+// | u32 u32 u32 u32
+// |
+// |
+// | data
+//
+//
+//	No need to store hash nor length, determining length becomes
+// trivial.
+//
+//	Max length is known, can read safely 4 byte aligned.
+//
+//
+//	The hash is the string itself, would need to figure out
+// how to compare against other strings.
+//
+//
+//	Normally, you compare 4 bytes for length, 4 bytes for hash,
+// and then arbitrarily long text.
+//
+//
+// Why not just compare entire block in one go?
+//
+//
+//
+// Would to need to ensure regular strings are least 16 bytes,
+// they are aligned already, so this is free..
+//
+//
+//
 struct elf_String {
-	elf_Object      obj;
+	GCNode          obj;
 	Hash           hash;
+	// todo: remove this! we already know this from
+	// the size (obj->size - sizeof(*String) - 1)
 	i32 	       length;
+
+	// todo: ensure 16 byte aligned
 	char        text[1];
 };
 
-Str newstr_empty(elf_State *, int length);
-Str newstrl(elf_State *, char const *text, int length);
-Str newstr(elf_State *, const char *text);
 
 
 
+
+
+Str new_emptystr(elf_State *, int length);
+Str new_stringl(elf_State *, char const *text, int length);
+Str new_string(elf_State *, const char *text);
+int         strl(Str str);
+const char *strt(Str str);
+Hash        strh(Str str);
+
+
+
+
+
+
+
+
+//
+// todo: store closure frames entirely on the stack, values are large,
+// so we can pack lots of frame info there.
+//
+//
 typedef struct Stack_Frame Stack_Frame;
 struct Stack_Frame {
-	// the start of this frame on the stack right on bellow of the function
+
+	// the start of this frame on the stack right after the function
 	V            *framebase;
 
 	u8                nargs;
 	u8                nrets;
 
-	//
-	// todo: remove could be retrieved from the value above framebase
+
+	// the rest is only for interpreter frames
+
+
+	// todo: you could get these from the closure at framebase-1
 	u8                arity;
 	u8             variadic;
-	// the rest is only for interpreter frames
-	//
-	// todo: you could get this from the closure at framebase-1
+
+
+	// todo: could be stored along with the closure value
+	// the starting byte and the byte count
 	int               bytes;
 	int               bytec;
-	// only for interpreter because no other functions care about this.
+
+
+	//
+	//
+	//	Closure value
+	//
+	//	first 64 bits are prototype information, the next 64 are a pointer
+	// into the closure where you can access its captures and other information
+	// that isn't as hot.
+	// Values are much larger than this so we could pack everything in a closure
+	// but only do if performace actually goes up!
+	//
+	//         | u16 byte count
+	//         | u8  number of captures
+	//         | u8  arity and whether it is variadic
+	//         |
+	//         |
+	// | u32   | u32 | u32 u32
+	// |             |
+	//	|             | closure pointer
+	//	|
+	//	|	u32 byte start
+	//
+	//
+	//
+	//
+	//	Use special tag to not trip the interpreter!
+	//	call info value
+	//
+	//
+	//	| u32              | u32           | u32   | u32
+	//	|                  |               |       | nextinstr
+	// | caller frame     |               |
+	//                    |               | u8 vaoffset
+	//                    |               | u8  frame size
+	//							 | return instr  |
+	//
+
+
+
+	// todo: frame size could be a u8!
 	int           framesize;
+
+
+	// todo: nextinstr could be a u16
 	int           nextinstr;
+
+
+	// to handle v-args, could be a u8, an additional offset
+	// on top of framebase
 	V            *reference;
+
+
 	// todo: could get this from the closure at framebase-1
+	// since values are large, we can store that along with
+	// the closure to avoid having to fetch the closure pointer
 	V           *closureenv;
-	char        closuresize;
+	u8          closuresize;
 };
 
 
 
 
-typedef enum GCType {
+
+
+
+
+
+typedef enum {
 	GC_OBJ = 0,
 	GC_CLS,
 	GC_STR,
 	GC_TAB,
+	GC_BUF,
 } GCType;
 
 
-#define	GC_COLLECTABLE 0
-#define	GC_NOCOLLECT   1
-#define	GC_PHASE_MARK  GC_COLLECTABLE
-#define	GC_PHASE_FREE  GC_NOCOLLECT
-#define	GC_MEM_THRESHOLD_MIN ((elf_i64) MEGABYTES(  1))
-#define	GC_MEM_THRESHOLD_MAX ((elf_i64) MEGABYTES(128))
+
+
+#define	GC_MEM_THRESHOLD_MIN ((elf_i64) MEGABYTES(1))
+#define	GC_MEM_THRESHOLD_MAX ((elf_i64) GIGABYTES(1))
 #define	GC_OBJ_THRESHOLD_MIN ((elf_i64) ((512) * 1))
 #define	GC_OBJ_THRESHOLD_MAX ((elf_i64) ((512) * 1))
 
 
 //
-// todo: proper object pooling
 // todo: custom allocator
 //
 typedef struct GCState GCState;
 struct GCState {
-	elf_i32      phase;
-	elf_GC_State state;
-	elf_i64      memory_allocated;
-	elf_i64      memory_threshold;
-
-	elf_i32      num_objects;
-	elf_i64      object_trigger_threshold;
-
-	// todo: remove this!
-	elf_Object **open_object_slots;
-	elf_Object **close_object_slots;
+	int         state;
+	Int         memcounter;
+	Int         memthreshold;
+	Int         objcounter;
+	Int         objthreshold;
+	GCMem       head;
+	GCRef       tail;
 };
 
 
-void *gcalloc(elf_State *, GCType type, Int size);
+
+
+static int markreachable(elf_State *S, Ref ref);
+void *gcalloc(elf_State *S, GCType type, int size);
+
+
+
+
 
 
 typedef struct elf_State elf_State;
@@ -232,6 +666,8 @@ struct elf_State {
 
 	struct {
 		Tab      globals;
+
+		// minimize usage of these!
 		Num     *numbers;
 		Int     *integers;
 	};
@@ -242,9 +678,15 @@ struct elf_State {
 		u8               *track;
 
 		// todo: compress this
+		// todo: also, allocate per Proto_File?
 		char            **lines;
 
+
+		// todo: why is this a double pointer?
 		Proto_File      **files;
+
+
+
 		// todo: I don't know how long we'll manage with just the one
 		// buffer, especially with people loading stuff at runtime,
 		// I think we'll do our own memory management here, and once
@@ -263,31 +705,25 @@ struct elf_State {
 	V                *stack_ptr;
 	int               stack_max;
 
-	union {  GCState  G, gc; };
+	GCState      gc;
 
-
+	int          frame_index;
 	int          frame_stack_max;
 	Stack_Frame *frame_stack;
-	int          frame_index;
 	Stack_Frame  frame;
 
-	// count number of trace instructions
-	int               trace_counter;
-	// remember the starting point of the current trace
-	BCPos             trace_start;
-	Bytec            *trace;
-
-	elf_i32           byte;
+	BCPos        byte;
 
 	struct {
 		Tab integer;
 		Tab number;
 		Tab string;
 		Tab table;
+		Tab buffer;
 	} metatables;
 };
 
 void elf_init_raw(elf_State *);
-void elf_error(elf_State *, int instr, const char *error);
-void elf_errorf(elf_State *, int instr, const char *format, ...);
+void reporterror(elf_State *, int instr, const char *error);
+void reporterrorf(elf_State *, int instr, const char *format, ...);
 

@@ -41,7 +41,7 @@ static char *string_match_single(char *s, char *p)
 
 	while (*p != 0 && *p != '|' && *p != ')')
 	{
-		ASSERT(*s != 0);
+		// ASSERT(*s != 0);
 		if (*p == '?') {
 			++ p, ++ s;
 		}

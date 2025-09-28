@@ -129,6 +129,9 @@ FILE_HANDLE sys_open_file(const char *name, int flags, int mode) {
 	return hfile;
 }
 
+
+
+// todo: this depends on FILE_TIMES having the same structure!
 int sys_time_file(FILE_HANDLE file, FILE_TIMES *times) {
 	int result = GetFileTime(file, &times->create, &times->access, &times->write);
 	//	FILETIME create, access, write;
@@ -138,6 +141,8 @@ int sys_time_file(FILE_HANDLE file, FILE_TIMES *times) {
 	//	times->write = (FILE_TIME) { write.dwLowDateTime, write.dwHighDateTime };
 	return result;
 }
+
+
 
 void sys_file_time_to_system_time(FILE_TIME *filetime, SYSTEM_TIME *systimeout) {
 	FileTimeToSystemTime(filetime, systimeout);
@@ -167,10 +172,10 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
 	GetDiskFreeSpaceA(elf_loadtext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	elf_tsets_int(info,newstr(R,"SectorsPerCluster"),SectorsPerCluster);
-	elf_tsets_int(info,newstr(R,"BytesPerSector"),BytesPerSector);
-	elf_tsets_int(info,newstr(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
-	elf_tsets_int(info,newstr(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+	elf_tsets_int(info,new_string(R,"SectorsPerCluster"),SectorsPerCluster);
+	elf_tsets_int(info,new_string(R,"BytesPerSector"),BytesPerSector);
+	elf_tsets_int(info,new_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
+	elf_tsets_int(info,new_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
 #else
 	elf_ldebug("this function is not implemented for this platform");
 #endif
@@ -192,15 +197,15 @@ int core_lib_list_volumes(elf_State *R) {
 
 		elf_tsets_tab(list,name,volume);
 
-		elf_tsets_str(volume,newstr(R,"name"),name);
+		elf_tsets_str(volume,new_string(R,"name"),name);
 
 		elf_Table *path_names = elf_new_table(R);
-		elf_tsets_tab(volume,newstr(R,"path_names"),path_names);
+		elf_tsets_tab(volume,new_string(R,"path_names"),path_names);
 
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				arrayadd(path_names,VALUE_STRING(newstr(R,buffer)));
+				_table_arrayadd(path_names,VALUE_STRING(new_string(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -249,23 +254,28 @@ void sys_virtual_free(void *memory) {
 }
 
 
+
 void sys_sleep(elf_Integer ms) {
 	Sleep((DWORD) ms);
 }
 
 
-elf_Integer sys_get_performance_counter_frequency() {
+
+elf_i64 sys_get_performance_counter_frequency() {
 	LARGE_INTEGER large_integer;
 	QueryPerformanceFrequency(&large_integer);
 	return large_integer.QuadPart;
 }
 
 
-elf_Integer sys_get_performance_counter() {
+
+elf_i64 sys_get_performance_counter() {
 	LARGE_INTEGER large_integer;
 	QueryPerformanceCounter(&large_integer);
 	return large_integer.QuadPart;
 }
+
+
 
 void sys_exit_this_process(int errorcode) {
 	ExitProcess(errorcode);
@@ -280,9 +290,11 @@ int sys_get_this_process_id() {
 }
 
 
+
 int sys_get_work_dir(char *buf, int bufsize) {
 	return GetCurrentDirectory(bufsize, buf);
 }
+
 
 
 int sys_set_work_dir(const char *buf) {
@@ -290,14 +302,18 @@ int sys_set_work_dir(const char *buf) {
 }
 
 
+
 elf_Handle sys_load_dll(char const *name) {
 	return (elf_Handle) LoadLibraryA(name);
 }
 
 
+
 void *sys_get_dll_fn(elf_Handle dll, char const *name) {
 	return (void *) GetProcAddress((HMODULE) dll, name);
 }
+
+
 
 static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 	visitor->type = FILE_TYPE_FILE;
@@ -311,23 +327,23 @@ static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 }
 
 
+
 void sys_find_close(FILE_HANDLE hand) {
 	FindClose(hand);
 }
 
+
+
 FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor) {
 
 	// insert some temporary stuff for windows path matching
-	visitor->pb.path[visitor->pb.pcur ++] = '\\';
-	visitor->pb.path[visitor->pb.pcur ++] = '*';
-	visitor->pb.path[visitor->pb.pcur   ] = '\0';
+	sb_writetext(&visitor->pb.sb, "\\*");
 
 	WIN32_FIND_DATAA info;
 	FILE_HANDLE hand = FindFirstFileA(visitor->pb.path, &info);
 
 	// pop what we inserted
-	visitor->pb.pcur -= 2;
-	visitor->pb.path[visitor->pb.pcur] = '\0';
+	sb_regress(&visitor->pb.sb, 2);
 
 	int result = hand != INVALID_HANDLE_VALUE;
 	if (result) {
@@ -335,6 +351,8 @@ FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor) {
 	}
 	return result ? hand : 0;
 }
+
+
 
 int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	// pull the path from before
@@ -347,6 +365,8 @@ int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	}
 	return noerr;
 }
+
+
 
 elf_Handle sys_create_process(char const *file, char const *args) {
 	STARTUPINFO startupinfo = {sizeof(startupinfo)};

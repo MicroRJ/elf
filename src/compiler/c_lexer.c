@@ -38,7 +38,7 @@ static tokenTy check_keyword(char *name) {
 //
 // todo: we already have one of these somewhere, recycle!
 //
-static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) {
+static void parser_dialog(Parser *parser, char *line, char const *fmt, ...) {
 	line = line ? line : parser->tok.line;
 
 	// | attempted to get field of
@@ -49,9 +49,8 @@ static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) 
 	// |
 	// |
 
-	int linenum;
 	char *lineloc;
-	get_source_info(parser->source,line,&linenum,&lineloc);
+	int linenum = get_source_info(parser->source,line,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -92,7 +91,7 @@ static void parser_dialog(elf_Parser *parser, char *line, char const *fmt, ...) 
 }
 
 
-static int pick_esc_char(elf_Parser *parser) {
+static int pick_esc_char(Parser *parser) {
 	int chr = *parser->cursor ++;
 	if (chr == '\\') {
 
@@ -114,7 +113,7 @@ static int pick_esc_char(elf_Parser *parser) {
 // assuming we're already at an integer char,
 // todo: also, we assume base 10, but do we want to
 // support 0x255.255 type stuff?
-static Num lex_fractional(elf_Parser *parser) {
+static Num lex_fractional(Parser *parser) {
 	Num x = 0, y = 1;
 	while (is_digit_chr(*parser->cursor)) {
 		x = x * 10 + (*parser->cursor ++ - '0');
@@ -126,7 +125,7 @@ static Num lex_fractional(elf_Parser *parser) {
 
 
 // assuming we're already at an integer char
-static Int lex_integer(elf_Parser *parser) {
+static Int lex_integer(Parser *parser) {
 
 	Int base = 10;
 
@@ -178,7 +177,7 @@ static Int lex_integer(elf_Parser *parser) {
 
 
 // assuming we're at an identifier char
-static int lex_identifier(elf_Parser *parser, char *buf, int cap) {
+static int lex_identifier(Parser *parser, char *buf, int cap) {
 	int len = 0;
 
 	do {
@@ -198,7 +197,7 @@ static int lex_identifier(elf_Parser *parser, char *buf, int cap) {
 
 
 
-static int pick_empty_chars(elf_Parser *parser) {
+static int pick_empty_chars(Parser *parser) {
 	int lines = 0;
 	retry:
 	switch (*parser->cursor) {
@@ -227,7 +226,7 @@ static int pick_empty_chars(elf_Parser *parser) {
 // todo: would it be faster to just do all the tokens
 // in one go...
 //
-static Token next_tok(elf_Parser *parser) {
+static Token next_tok(Parser *parser) {
 
 	retry:
 	Token token = {};
@@ -300,7 +299,7 @@ static Token next_tok(elf_Parser *parser) {
 					/* are multi-line strings illegal? */
 					if (PICK('\n') || (PICK('\r') && (PICK('\n'),1))) {
 						// new_line(parser);
-						darr_add(buffer,'\n');
+						heap_array_add(buffer,'\n');
 					} else {
 						// don't check for format
 						if (token.type != TK_FORMAT_STRING) goto escchar;
@@ -308,12 +307,12 @@ static Token next_tok(elf_Parser *parser) {
 						// todo: make it so that we can escape the formatting
 						if (POS0() == FORMAT_CHAR && POS1() == '{') {
 							needsformatting = true;
-							darr_add(buffer, *parser->cursor ++);
-							darr_add(buffer, *parser->cursor ++);
+							heap_array_add(buffer, *parser->cursor ++);
+							heap_array_add(buffer, *parser->cursor ++);
 						} else {
 							escchar:
 							int chr = pick_esc_char(parser);
-							darr_add(buffer, chr);
+							heap_array_add(buffer, chr);
 						}
 					}
 				}
@@ -327,11 +326,11 @@ static Token next_tok(elf_Parser *parser) {
 
 				// did we find anything?
 				if (PICK('"')) {
-					darr_add(buffer,'\n');
+					heap_array_add(buffer,'\n');
 				} else break;
 			}
 
-			darr_add(buffer,0);
+			heap_array_add(buffer,0);
 
 			// todo: leak, allocate this properly in some sort
 			// of constant pool with intering, use the atomizer
@@ -341,7 +340,7 @@ static Token next_tok(elf_Parser *parser) {
 				token.type = TK_STRING;
 			}
 			token.text = copy_text2(length,buffer);
-			darr_free(buffer);
+			free_heap_array(buffer);
 		} break;
 		case '.': {
 
@@ -397,13 +396,13 @@ static Token next_tok(elf_Parser *parser) {
 			//	parser->line_pos = parser->cursor;
 			//	parser->line_num += 1;
 		} goto retry;
-		case ';': {
-			MOVE();
-			while (POS0() != 0 && !is_eol_chr(POS0())) {
-				MOVE();
-			}
-			goto retry;
-		} break;
+		//	case ';': {
+		//		MOVE();
+		//		while (POS0() != 0 && !is_eol_chr(POS0())) {
+		//			MOVE();
+		//		}
+		//		goto retry;
+		//	} break;
 
 
 
@@ -492,15 +491,18 @@ static Token next_tok(elf_Parser *parser) {
 		LEX1('^', TK_BIT_XOR);
 		LEX1('+', TK_ADD);
 		LEX1('~', TK_TILDE);
+		LEX1(';', TK_SEMI_COLON);
 	}
 
 	esc: ;
 
 	/* passive hinting */
-	while ((POS0()==' ')||(POS0()=='\t')) {
-		MOVE();
+	while (*parser->cursor == ' ' || *parser->cursor == '\t') {
+		++ parser->cursor;
 	}
-	if ((POS0()==';')||((POS0()=='/')&&((POS1()=='/')||(POS1()=='*')))) {
+
+	// (POS0()==';')
+	if (((POS0()=='/')&&((POS1()=='/')||(POS1()=='*')))) {
 		token.eol = 1;
 	} else if ((POS0()=='\n')||(POS0()=='\r')) {
 		token.eol = 1;

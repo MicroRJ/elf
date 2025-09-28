@@ -4,173 +4,228 @@
 #ifndef _elf_lang_
 #define _elf_lang_
 
-#if defined(__EMSCRIPTEN__)
-	#define elf_pubapi EMSCRIPTEN_KEEPALIVE
-	#define ELF_EXPORT  EMSCRIPTEN_KEEPALIVE
-#else
-	#define ELF_EXPORT __declspec(dllexport)
 
-	#if defined(BUILD_STATIC)
-		#define elf_pubapi static
-	#else
-		#define elf_pubapi
-	#endif
+
+
+#if defined(__EMSCRIPTEN__)
+   #define elf_pubapi  EMSCRIPTEN_KEEPALIVE
+   #define ELF_EXPORT  EMSCRIPTEN_KEEPALIVE
+#else
+   #define ELF_EXPORT __declspec(dllexport)
+
+   #if defined(BUILD_STATIC)
+      #define elf_pubapi static
+   #else
+      #define elf_pubapi
+   #endif
 #endif
 
 
-typedef struct elf_State 	elf_State;
-typedef struct elf_Object 	elf_Object;
-typedef struct elf_Table 	elf_Table;
-typedef struct elf_String 	elf_String;
-typedef struct elf_Closure elf_Closure;
-typedef struct elf_Value   elf_Value;
+
+
+
+typedef struct elf_State   elf_State;
 
 
 #include "elf_coretypes.h"
 
 
-typedef int elf_stkid;
-
 
 /*
-* The core elf function has the following signature:
-* args: which is the stack address of the first argument, 'this' is 0.
+* Standard elf function signature:
 * nargs: the number of arguments
 * nrets: the number of expected results
 */
 #define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
 typedef ELF_FUNCTION(* elf_Function);
 
+
+
+
 //
 // this is just a helper struct for creating libraries
 //
 typedef struct {
-	char         *name;
-	elf_Function  function;
+   char         *name;
+   elf_Function  function;
 } elf_Binding;
 
 
-/* first object tag must be OBJ, all other
-objects come after it, same order as object
-types... if this changes then ensure it lines
-up with GCType */
+
+
+
 typedef enum {
-	/* the value is nil */
-	ELF_TNIL = 0,
-	/* the value is a tombstone, values of this type only reside in closed systems */
-	ELF_TTOMB,
-	/* the value is a 64 bit floating point number */
-	ELF_TNUMBER,
-	/* the value is a 64 bit integer */
-	ELF_TINTEGER,
-	/* the value is a handle */
-	ELF_THANDLE,
-	/* the value is a function */
-	ELF_TFUNCTION,
-	/* the value is a custom object */
-	ELF_TUSER,
-	/* the value is a closure object */
-	ELF_TCLOSURE,
-	/* the value is string object */
-	ELF_TSTRING,
-	/* the value is table object */
-	ELF_TTABLE,
+   // the value is nil
+   ELF_TNIL = 0,
+   // the value is a tombstone, should not be seen outside
+   // of table code
+   ELF_TTOMB,
+   // the value is a number
+   ELF_TNUMBER,
+   // the value is a integer
+   ELF_TINTEGER,
+   // the value is a handle
+   ELF_THANDLE,
+   // the value is a function
+   ELF_TFUNCTION,
+   // the value is a custom object
+   ELF_TUSER,
+   // the value is a closure object
+   ELF_TCLOSURE,
+   // the value is table object
+   ELF_TTABLE,
+   // the value is string object
+   ELF_TSTRING,
+   // the value is a dynamic string object
+   ELF_TBUFFER,
+
+
+   ELF_TCOUNT_,
 } elf_Tag;
 
 
 
-elf_pubapi elf_State *elf_new();
-elf_pubapi void elf_end(elf_State *);
-
-
-// pass in a file name, the result is on the stack
-// todo: support for loading code files from memory is pending
-elf_pubapi int elf_pushcodefile(elf_State *S, const char *name);
 
 
 
-/*
-* Push the function and push the 'this' arg, then push additional arguments.
-* nargs does not include the closure.
-* nargs must be atleast 1 because since the 'this' arg is always present,
-* 'this' can be nil.
-*
-* 	elf_pushfun(...)
-* 	elf_pushnil(...)
-* 	elf_call()
-*
-*	the result is the number of returns,
-*  the stack pointer is below the return values, such that you can
-*  pop them.
-*
-*		[ FUNCTION ] = [ RET-0 ]
-*		[ 'THIS'   ] = [ RET-1 ]
-*		[ ARG-0    ] = [ RET-2 ]
-*		[ ARG-1    ] = [ RET-3 ]
-*		[ ARG-N    ] = [ RET-N ]
-*
-*	* the number of returns does not have to match the number of arguments,
-*  and the stack pointer will on top of the last return.
-*
-*
-*/
-elf_pubapi int elf_call(elf_State *, int nargs, int nrets);
+elf_State *elf_new();
+void elf_end(elf_State *);
 
-elf_pubapi void elf_setfield(elf_State *);
-elf_pubapi void elf_arrayadd(elf_State *);
-elf_pubapi void elf_arrayget(elf_State *);
+
+
+
+//
+//
+//	todo: the results are placed starting where the function is at,
+// but this is pending, due to internal bytecode limitations,
+// the user facing API should be able to leave the function
+// on the stack and the results below it.
+//
+//
+// To call a function:
+// Push the function and push the 'this' arg, then push
+// additional arguments.
+// * nargs does not include the closure.
+// * 'this' can be nil.
+//
+//  elf_pushfun(...)
+//  elf_pushnil(...)
+//  elf_call()
+//
+//  The result is the number of returns,
+//  the stack pointer is below the return values, you can pop them.
+//
+//     STACK LAYOUT:
+//
+//     | PRE-CALL | POST-CALL
+//  0  |  FUNC    | RET 0
+//  1  | 'THIS'   | RET 1
+//  2  |  ARG-0   | RET 2
+//  3  |  ARG-1   | RET 3
+//  N  |  ARG-N   | RET N
+//
+//
+//
+int elf_call(elf_State *, int nargs, int nrets);
+int elf_tailcall(elf_State *, int nargs, int nrets);
+
+void elf_setfield(elf_State *);
+void elf_arrayadd(elf_State *);
+void elf_arrayget(elf_State *);
+
+
+
+
+void elf_error(elf_State *, int error, const char *message, ...);
+
 
 #define elf_pushtrue(S) elf_pushint(S, 1)
 #define elf_pushfalse(S) elf_pushint(S, 0)
 
-elf_pubapi void elf_pushnil(elf_State *);
-elf_pubapi void elf_pushint(elf_State *, elf_Integer);
-elf_pubapi void elf_pushnum(elf_State *, elf_Number);
-elf_pubapi void elf_pushtab(elf_State *);
-elf_pubapi void elf_pushtext(elf_State *, const char *);
-elf_pubapi void elf_pushtext2(elf_State *, const char *, int length);
-elf_pubapi void elf_pushfun(elf_State *, elf_Function);
-elf_pubapi void elf_pushsys(elf_State *, elf_Handle);
-
-elf_pubapi void elf_pushglobals(elf_State *);
+void elf_pushnil(elf_State *);
+void elf_pushint(elf_State *, elf_Integer);
+void elf_pushnum(elf_State *, elf_Number);
+void elf_pushtab(elf_State *);
+void elf_pushtext(elf_State *, const char *);
+void elf_pushtext2(elf_State *, const char *, int length);
+void elf_pushfun(elf_State *, elf_Function);
+void elf_pushsys(elf_State *, elf_Handle);
 
 
-elf_pubapi elf_Tag elf_loadtype(elf_State *, int x);
-elf_pubapi const char *elf_loadtext(elf_State *, int x);
-elf_pubapi const char *elf_loadtextl(elf_State *, int x, int *l);
-elf_pubapi elf_Number elf_loadnum(elf_State *, int x);
-elf_pubapi elf_Integer elf_loadint(elf_State *, int x);
-elf_pubapi elf_Handle elf_loadsys(elf_State *, int x);
+// allocates managed memory, the result is visible
+// in the form of an USER object.
+// You must provide a table on the stack that is the
+// meta-table for this object.
+void *elf_pushuser(elf_State *S, int size);
 
-int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *contents);
+
+
+
+
+// push the globals table onto the stack
+void elf_pushglobals(elf_State *);
+
+
+
+
+
+// The following is true for
+//
+// elf_pushconstexpr
+// elf_pushcodefile
+//
+// If no text  is provided then name indicates the file to load
+// the text from.
+//
+// If text is provided, then name is simply used for printouts.
+//
+//	The integer result indicates success.
+//
+
+
+// push a constant expression onto the stack, value is on the stack.
+int elf_pushconstexpr(elf_State *S, const char *name, const char *text);
+
+
+
+// push an executable script onto the stack, closure is on the stack.
+int elf_pushcodefile(elf_State *S, const char *name, const char *text);
+
+
+
+
+
+elf_Tag elf_loadtype(elf_State *, int x);
+elf_Tag elf_loadpush(elf_State *, int x);
+const char *elf_loadtext(elf_State *, int x);
+const char *elf_loadtextl(elf_State *, int x, int *l);
+elf_Number elf_loadnum(elf_State *, int x);
+elf_Integer elf_loadint(elf_State *, int x);
+elf_Handle elf_loadsys(elf_State *, int x);
+
+
+
+
+
 
 
 
 /* garbage collector */
 
-typedef enum {
-	ELF_GC_PAUSED = 0,
-	ELF_GC_ACTIVE,
-	/* get the state of the garbage collector, not a valid state */
-	ELF_GC_GETSTATE = 255,
-} elf_GC_State;
+enum {
+   ELF_GC_ACTIVE = 0,
+   ELF_GC_PAUSED,
+   /* get the state of the garbage collector, not a valid state */
+   ELF_GC_GETSTATE = 255,
+};
 
 /* returns the prior state of the GC */
 int elf_gcstate(elf_State *, int state);
 
-/* performs a garbage collection check */
-void elf_gccheck(elf_State *);
 
 
 
 
-// names of all the overloads you can do in elf
-#define ELF_OVERLOAD_ADD   "__add"
-#define ELF_OVERLOAD_SUB   "__sub"
-#define ELF_OVERLOAD_MUL   "__mul"
-#define ELF_OVERLOAD_DIV   "__div"
-#define ELF_OVERLOAD_INDEX "__index"
-#define ELF_OVERLOAD_FIELD "__field"
 
 
 #endif

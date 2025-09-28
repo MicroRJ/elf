@@ -67,7 +67,7 @@
 
 
 static char *get_name_from_file_path(const char *p);
-static void get_source_info(char *source, char *cursor, int *line_number, char **line_start);
+static int get_source_info(char *source, char *cursor, char **line_start);
 static bool is_eol_chr(char x);
 static bool is_digit_chr(char x);
 static bool is_lowercase_chr(char x);
@@ -82,5 +82,6 @@ static bool text_eq(char const *x, char const *y);
 static char *copy_text2(int length, char const *string);
 static char *thread_format_v(char const *format, va_list v);
 
-
-#define elf_tpf(format,...) (tpf_(format,__VA_ARGS__))
+static char *tempvpf(char const *format, va_list vargs);
+static char *temppf(char const *format, ...);
+#define tpf temppf

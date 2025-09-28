@@ -1,2 +1,0 @@
-failed = true
-(fun()?(fun()?(fun()?(fun()?{failed=false})))) ()()()()

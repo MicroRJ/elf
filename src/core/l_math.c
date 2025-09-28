@@ -2,26 +2,31 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: a lot of these could be intrinsics!
+
+// todo: most of these are to be made intrinsic!
 
 
 #define checknumargs(S, n, x) do \
-{ if ((n) != (x)) elf_errorf(S, -1, "wrong number of arguments: %i, expected %i instead", n - 1, x - 1); \
+{ if ((n) != (x)) reporterrorf(S, -1, "wrong number of arguments: %i, expected %i instead", n - 1, x - 1); \
 } while(0)
+
+
+
+
+
 
 
 ELF_FUNCTION(l_math_sgn) {
 	checknumargs(S, nargs, 2);
 
-	V vx = loadvalue(S, 1);
-	ASSERT(visnumeric(vx));
+	V vx = loadnumeric(S, 1);
 
-	if (isnum(vx)) {
-		Num x=vitonum(vx);
+	if (is_num(vx)) {
+		Num x=int_to_num(vx);
 		pushint(S, x < 0 ? -1 : x > 0 ? +1 : 0);
 	}
 	else {
-		Int x=vgetint(vx);
+		Int x=as_int(vx);
 		pushint(S, x < 0 ? -1 : x > 0 ? +1 : 0);
 	}
 	return 1;
@@ -32,15 +37,14 @@ ELF_FUNCTION(l_math_sgn) {
 ELF_FUNCTION(l_math_abs) {
 	checknumargs(S, nargs, 2);
 
-	V vx = loadvalue(S, 1);
-	ASSERT(visnumeric(vx));
+	V vx = loadnumeric(S, 1);
 
-	if (isnum(vx)) {
-		Num x=vitonum(vx);
+	if (is_num(vx)) {
+		Num x=as_num(vx);
 		pushnum(S, x < 0 ? -x : x);
 	}
 	else {
-		Int x=vgetint(vx);
+		Int x=as_int(vx);
 		pushint(S, x < 0 ? -x : x);
 	}
 	return 1;
@@ -48,81 +52,105 @@ ELF_FUNCTION(l_math_abs) {
 
 
 
+
+
+static inline void pushinorder(elf_State *S, int inorder, V x, V y) {
+	if (inorder) {
+		pushvalueunsafe(S, x);
+		pushvalueunsafe(S, y);
+	}
+	else {
+		pushvalueunsafe(S, y);
+		pushvalueunsafe(S, x);
+	}
+}
+
+
+
 ELF_FUNCTION(l_math_max) {
 	checknumargs(S, nargs, 3);
 
-	V vx = loadvalue(S, 1);
-	V vy = loadvalue(S, 2);
-	ASSERT(visnumeric(vx) && visnumeric(vy));
+	V vx = loadnumeric(S, 1);
+	V vy = loadnumeric(S, 2);
 
 
-	if (isnum(vx) || isnum(vy)) {
+	if (is_num(vx) || is_num(vy)) {
 		Num x, y;
-		x = vitonum(vx);
-		y = vitonum(vy);
+		x = int_to_num(vx);
+		y = int_to_num(vy);
 
-		pushnum(S, x > y ? x : y);
+		pushinorder(S, x > y, vx, vy);
 	}
 	else {
 		Int x, y;
-		x = vgetint(vx);
-		y = vgetint(vy);
+		x = as_int(vx);
+		y = as_int(vy);
 
-		pushint(S, x > y ? x : y);
+		pushinorder(S, x > y, vx, vy);
 	}
-	return 1;
+
+	return 2;
 }
+
+
 
 
 ELF_FUNCTION(l_math_min) {
 	checknumargs(S, nargs, 3);
 
-	V vx = loadvalue(S, 1);
-	V vy = loadvalue(S, 2);
-	ASSERT(visnumeric(vx) && visnumeric(vy));
+	V vx = loadnumeric(S, 1);
+	V vy = loadnumeric(S, 2);
 
 
-	if (isnum(vx) || isnum(vy)) {
+	if (is_num(vx) || is_num(vy)) {
 		Num x, y;
-		x = vitonum(vx);
-		y = vitonum(vy);
+		x = int_to_num(vx);
+		y = int_to_num(vy);
 
-		pushnum(S, x < y ? x : y);
+		pushinorder(S, x < y, vx, vy);
 	}
 	else {
 		Int x, y;
-		x = vgetint(vx);
-		y = vgetint(vy);
+		x = as_int(vx);
+		y = as_int(vy);
 
-		pushint(S, x < y ? x : y);
+		pushinorder(S, x < y, vx, vy);
 	}
-	return 1;
+
+	return 2;
 }
+
 
 
 ELF_FUNCTION(l_math_trim) {
 	checknumargs(S, nargs, 4);
 
-	V vx = loadvalue(S, 1);
-	V vy = loadvalue(S, 2);
-	V vz = loadvalue(S, 3);
-	ASSERT(visnumeric(vx) && visnumeric(vy) && visnumeric(vz));
+	V vx = loadnumeric(S, 1);
+	V vy = loadnumeric(S, 2);
+	V vz = loadnumeric(S, 3);
 
 
-	if (isnum(vx) || isnum(vy) || isnum(vz)) {
+	if (is_num(vx) || is_num(vy) || is_num(vz)) {
 		Num x, y, z;
-		x = vitonum(vx);
-		y = vitonum(vy);
-		z = vitonum(vz);
+		x = int_to_num(vx);
+		y = int_to_num(vy);
+		z = int_to_num(vz);
 		pushnum(S, x < y ? y : x > z ? z : x);
 	}
 	else {
 		Int x, y, z;
-		x = vgetint(vx);
-		y = vgetint(vy);
-		z = vgetint(vz);
+		x = as_int(vx);
+		y = as_int(vy);
+		z = as_int(vz);
 		pushint(S, x < y ? y : x > z ? z : x);
 	}
+	return 1;
+}
+
+
+
+ELF_FUNCTION(l_math_log2) {
+	pushnum(S,log2(loadnum(S,1)));
 	return 1;
 }
 
@@ -132,6 +160,7 @@ ELF_FUNCTION(l_math_exp) {
 	pushnum(S,exp(loadnum(S,1)));
 	return 1;
 }
+
 
 
 ELF_FUNCTION(l_math_floor) {
@@ -194,6 +223,7 @@ static elf_Binding lib_math[] = {
 	{"trim",l_math_trim},
 	{"sgn",l_math_sgn},
 	{"exp",l_math_exp},
+	{"log2",l_math_log2},
 	{"floor",l_math_floor},
 	{"ceil",l_math_ceil},
 	{"sqrt",l_math_sqrt},

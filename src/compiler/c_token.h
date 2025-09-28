@@ -97,7 +97,7 @@ _(STATIC_BIND         ,"::")         \
 _(ASSIGN              ,"=")          \
 _(NIL_ASSIGN          ,"?=")         \
 _(COLON               ,":")          \
-_(COLON_COLON         ,":")          \
+_(COLON_COLON         ,"::")         \
 _(SEMI_COLON          ,";")          \
 _(COMMA               ,",")          \
 _(DOT                 ,".")          \

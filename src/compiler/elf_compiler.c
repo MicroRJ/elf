@@ -18,18 +18,18 @@
 #include "c_parse.h"
 
 
+#include "logging.c"
 #include "c_lexer.c"
 #include "c_tree.c"
 #include "c_parser.c"
 #include "c_make.c"
-#include "logging.c"
 
 
 #include "internal_shorternames.h"
 
 // todo: find a better name for this!
 int elf_load_json(elf_State *S, const char *name, const char *contents) {
-	elf_Parser *parser = elf_new_parser(S, name, contents);
+	Parser *parser = elf_new_parser(S, name, contents);
 	int result = parse_json_object(parser);
 	elf_end_parser(parser);
 	return result;
@@ -39,8 +39,8 @@ int elf_load_json(elf_State *S, const char *name, const char *contents) {
 // todo: this is meant to be super light-weight, but it is not!
 // also have a version that takes multiple strings, and outputs multiple
 // expressions...
-int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *text) {
-	elf_Parser *parser = elf_new_parser(S, name, text);
+int elf_pushconstexpr(elf_State *S, const char *name, const char *text) {
+	Parser *parser = elf_new_parser(S, name, text);
 	int result = parse_constexpr(parser);
 	elf_end_parser(parser);
 	return result;
@@ -48,37 +48,42 @@ int elf_load_const_expr_from_text(elf_State *S, const char *name, const char *te
 
 
 
+
 int elf_makefile(elf_State *S, char const *name) {
 	ASSERT(name);
 
-	Handle hfile = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+	Sys file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 
-	if (ELF_HISINVALID(hfile)) {
+	if (ELF_HISINVALID(file)) {
 		elf_lerror("'%s': failed to load file, cannot make", name);
 		return -1;
 	}
 
 	// todo: add size to allocated memory in GC!
-	unsigned int size = sys_size_file(hfile);
+	unsigned int size = sys_size_file(file);
 
-	Proto_File *prof = calloc(1, sizeof(*prof) + size + 1);
+	//
+	// todo: alloc aligned, ensure text starts aligned too!
+	//
+	Proto_File *protofile = calloc(1, sizeof(*protofile) + size + 1);
 
-	copy_text(prof->name, sizeof(prof->name), name);
+	copy_text(protofile->name, sizeof(protofile->name), name);
 
-	sys_read_file(hfile, prof->text, size);
-	sys_close_file(hfile);
+	sys_read_file(file, protofile->text, size);
+	sys_close_file(file);
 
+	// todo: we're using calloc already!
 	// null terminate
-	prof->text[size] = 0;
+	protofile->text[size] = 0;
 
-	darr_add(S->files, prof);
+	heap_array_add(S->files, protofile);
 
-	elf_Parser *parser = elf_new_parser(S, name, prof->text);
+	Parser *parser = elf_new_parser(S, name, protofile->text);
 	parse_file(parser);
 
 
 	// create prototypes for every function
-	int nfuncs = darr_l(parser->functions);
+	int nfuncs = heap_array_length(parser->functions);
 
 	int protoindex = darr_grow(S->protos, nfuncs);
 	int mainproto = protoindex;
@@ -88,11 +93,11 @@ int elf_makefile(elf_State *S, char const *name) {
 		parser->functions[i]->tree_funexpr.proto = protoindex ++;
 	}
 
-	prof->bytepos = S->bytecur;
+	protofile->bytepos = S->bytecur;
 	FOR_ARRAY(i, parser->functions) {
 		protos[i] = make_proto(parser, parser->functions[i]);
 	}
-	prof->byteend = S->bytecur;
+	protofile->byteend = S->bytecur;
 
 
 	elf_end_parser(parser);
