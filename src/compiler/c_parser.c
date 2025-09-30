@@ -1132,7 +1132,7 @@ static treeID parse_unary(Parser *parser, bool unused) {
 
 				// todo:
 				V json = popvalue(parser->inter);
-				int index = darr_grow(parser->inter->globals->array, 1);
+				int index = heap_array_grow(parser->inter->globals->array, 1);
 				parser->inter->globals->array[index] = json;
 
 

@@ -1,6 +1,7 @@
 //
 // See Copyright Notice In elf.h
 //
+
 #define _CRT_SECURE_NO_WARNINGS
 
 
@@ -36,11 +37,11 @@
 #include "table.c"
 #include "buffer.c"
 
-#include "internal_gc.c"
+#include "gc.c"
 
 #include "elf_compiler.h"
 
-#include "instructions.c"
+#include "intrinsics.c"
 
 
 #include "l_math.c"
@@ -141,7 +142,7 @@ void elf_init_raw(elf_State *S) {
 
 	// S->strings = pushnewtable(S);
 
-	// todo: builtin instrinsics
+	// todo: builtin intrinsics
 	static elf_Binding lib_base[] = {
 		{"ntoi", l_core_ntoi},
 		{"iton", l_core_iton},
@@ -292,26 +293,6 @@ int elf_call(elf_State *S, int nargs, int nrets)
 
 
 
-// todo: proper error codes!
-static void error_expectednumericrightoperand(elf_State *S, char *name, elf_Value x, elf_Value y)
-{
-	reporterrorf(S, -1, "'%s': invalid right-operand, for operator %s", tag2s[x.tag], name);
-}
-
-
-
-
-
-
-
-
-static void error_invalidoperandsforoperator(elf_State *S, char *name, elf_Value x, elf_Value y)
-{
-	reporterrorf(S, -1, "'%s': invalid operands for operator %s, (%s, %s)", tag2s[x.tag], name, tag2s[x.tag], tag2s[y.tag]);
-}
-
-
-
 
 
 
@@ -415,7 +396,6 @@ so they only work within that function ya heard */
 
 #define StoreX(v) (frame.reference[by.b_x] = v)
 #define StoreXInt(v) (to_int(&frame.reference[by.b_x], v))
-#define StoreXNum(v) (to_num(&frame.reference[by.b_x], v))
 
 #define LoadX() (frame.reference[by.b_x])
 #define LoadY() (frame.reference[by.b_y])
@@ -660,8 +640,8 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 
 
-			VMCASE(BC_LOADGLOBAL) {
-				StoreX(global_y());
+		VMCASE(BC_LOADGLOBAL) {
+				vmove(&LoadX(), global_y());
 			} VMBREAK;
 
 			VMCASE(BC_LOADNIL) {
@@ -677,11 +657,11 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} VMBREAK;
 
 			VMCASE(BC_SETGLOBAL) {
-				vmove(&global_x(), &LoadY());
+				vmove(&global_x(), LoadY());
 			} VMBREAK;
 
 			VMCASE(BC_RELOAD) {
-				vmove(&LoadX(), &LoadY());
+				vmove(&LoadX(), LoadY());
 			} VMBREAK;
 
 
@@ -738,7 +718,10 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} VMBREAK;
 
 
-
+			// todo: replace with table intrinsics!
+			// _table_arraylen
+			// _table_arrayset
+			// _table_arrayget
 
 			VMCASE(BC_GETLENGTH)
 			{

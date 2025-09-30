@@ -6,7 +6,7 @@
 
 
 // todo: remove!
-Str new_emptystr(elf_State *S, int length) {
+Str _new_empty_str(elf_State *S, int length) {
 	Str str = gcalloc(S, GC_STR, sizeof(*str)+length+1);
 	if (S) setmeta(str, S->metatables.string);
 
@@ -19,7 +19,7 @@ Str new_emptystr(elf_State *S, int length) {
 
 
 
-Str new_stringl(elf_State *S, char const *text, int length) {
+Str _string_newl(elf_State *S, char const *text, int length) {
 	Str str = gcalloc(S, GC_STR, sizeof(*str) + length + 1);
 	if (S) setmeta(str, S->metatables.string);
 	str->length = length;
@@ -32,9 +32,9 @@ Str new_stringl(elf_State *S, char const *text, int length) {
 
 
 
-Str new_string(elf_State *S, const char *text) {
+Str _string_new(elf_State *S, const char *text) {
 	int length = strlen(text);
-	return new_stringl(S, text, length);
+	return _string_newl(S, text, length);
 }
 
 

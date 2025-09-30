@@ -3,7 +3,7 @@
 //
 
 
-#define getgc(S) (&(S)->gc)
+
 
 
 
@@ -50,8 +50,8 @@ static inline void swap_values(V *x, V *y) {
 
 
 
-static inline void vmove(V *dst, V *src) {
-	copy_memory(dst, src, sizeof(*src));
+static inline void vmove(V *dst, V src) {
+	copy_memory(dst, &src, sizeof(src));
 }
 
 
@@ -317,6 +317,7 @@ static inline void pushcls(elf_State *S, Closure x) {
 
 
 static inline void pushstr(elf_State *S, Str x) {
+	ASSERT(x != 0);
 	to_str(S->stack_ptr, x);
 	pushstackunsafe(S);
 }
@@ -458,6 +459,24 @@ static inline const char *loadtext(elf_State *S, int x)
 
 
 
+static inline void *loadmem(elf_State *S, int x, Int *zmem) {
+	void *mem = 0;
+	*zmem = 0;
+
+	V v = loadvalue(S, x);
+	if (is_buf(v)) {
+		*zmem = as_buffer(v)->min;
+		mem = as_buffer(v)->mem;
+	}
+	else if (is_str(v)) {
+		*zmem = as_string(v)->length;
+		mem = as_string(v)->text;
+	}
+	else {
+		loadrulecheck(S, x, TRULE_STRING|TRULE_BUFFER);
+	}
+	return mem;
+}
 
 
 
@@ -470,10 +489,6 @@ static inline Buf loadbuf(elf_State *S, int x)
 	loadtypeerror(S, ELF_TBUFFER, x);
 	return 0;
 }
-
-
-
-
 
 
 
@@ -532,10 +547,7 @@ static inline Num loadnum(elf_State *S, int x)
 
 
 static inline V loadnumeric(elf_State *S, int x) {
-	V v = loadvalue(S, x);
-	if (!is_numeric(v)) {
-		loadtypeerror(S, TRULE_NUMERIC, x);
-	}
+	V v = loadrulecheck(S, x, TRULE_NUMERIC);
 	return v;
 }
 
@@ -545,16 +557,9 @@ static inline V loadnumeric(elf_State *S, int x) {
 
 
 static inline V loadcallable(elf_State *S, int x) {
-	V v = loadvalue(S, x);
-	if (!is_callable(v)) {
-		loadtypeerror(S, TRULE_CALLABLE, x);
-	}
+	V v = loadrulecheck(S, x, TRULE_CALLABLE);
 	return v;
 }
-
-
-
-
 
 
 
@@ -593,7 +598,7 @@ static inline Tab loadtable(elf_State *S, int x)
 
 
 static inline Str pushtext(elf_State *S, char const *text) {
-	Str str = new_string(S, text);
+	Str str = _string_new(S, text);
 	pushstr(S, str);
 	return str;
 }
@@ -603,7 +608,7 @@ static inline Str pushtext(elf_State *S, char const *text) {
 
 
 static inline Str pushtext2(elf_State *S, char const *text, int length) {
-	Str str = new_stringl(S, text, length);
+	Str str = _string_newl(S, text, length);
 	pushstr(S, str);
 	return str;
 }

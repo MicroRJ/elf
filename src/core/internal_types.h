@@ -268,7 +268,10 @@ typedef struct {
 		Index idx;	 // todo: remove!
 		Index index;
 	};
-	Value key;
+	union {
+		Value key;
+		Value field;
+	};
 } IndexValue, Entry;
 STATIC_ASSERT(sizeof(IndexValue) == 24);
 
@@ -425,8 +428,7 @@ Tab new_table(elf_State *);
 Index tableset(elf_State *S, Tab tab, V k, V v);
 
 Value _table_getornil(elf_State *S, Tab tab, Value key);
-Index _table_getalways(Tab tab, V key);
-
+Index _table_getalways(elf_State *S, Tab tab, V key);
 Index _table_arrayadd(elf_State *S, Tab tab, Value value);
 Value _table_arrayget(elf_State *S, Tab tab, Index index);
 Index _table_arraylen(Tab tab);
@@ -510,9 +512,9 @@ struct elf_String {
 
 
 
-Str new_emptystr(elf_State *, int length);
-Str new_stringl(elf_State *, char const *text, int length);
-Str new_string(elf_State *, const char *text);
+Str _new_empty_str(elf_State *, int length);
+Str _string_newl(elf_State *, char const *text, int length);
+Str _string_new(elf_State *, const char *text);
 int         strl(Str str);
 const char *strt(Str str);
 Hash        strh(Str str);

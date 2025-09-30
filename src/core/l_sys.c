@@ -250,7 +250,7 @@ ELF_FUNCTION(l_sys_create_directory) {
 //
 
 ELF_FUNCTION(l_sys_get_file_times) {
-	Handle file = loadsys(S, 1);
+	Sys file = loadsys(S, 1);
 
 	FILE_TIMES times;
 	sys_time_file(file, &times);
@@ -391,9 +391,7 @@ ELF_FUNCTION(l_sys_get_dll_fn) {
 //
 //
 
-// NOTE: requires a table on the stack!
-// TODO: use utility function to ensure this!
-static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
+static void pathlist(elf_State *S, FILE_VISITOR *visitor, Tab list, int recurse) {
 
 	Sys dir = sys_find_first_file(visitor);
 	if (!dir) goto esc;
@@ -401,23 +399,27 @@ static void pathlist(elf_State *inter, FILE_VISITOR *visitor, int recurse) {
 	for (;;)
 	{
 		if (visitor->type == FILE_TYPE_SYMLINK) {
-			goto skip;
+			goto _prox;
 		}
 
 		if (visitor->pb.type != PATH_NAME) {
-			goto skip;
+			goto _prox;
 		}
 
-		elf_pushtext(inter, visitor->pb.path);
-		elf_arrayadd(inter);
+		Str s = _string_new(S, visitor->pb.path);
+
+		V v;
+		to_str(&v, s);
+
+		_table_arrayadd(S, list, v);
 
 		if (visitor->type == FILE_TYPE_FOLDER) {
 			if (recurse > 0) {
-				pathlist(inter, visitor, recurse - 1);
+				pathlist(S, visitor, list, recurse - 1);
 			}
 		}
 
-		skip:
+		_prox:
 		if (!sys_find_next_file(dir, visitor)) {
 			goto esc;
 		}
@@ -489,12 +491,12 @@ ELF_FUNCTION(l_sys_get_path_list) {
 		recurse = loadint(S, 2);
 	}
 
-	elf_pushtab(S);
+	Tab list = pushnewtable(S);
 
 	FILE_VISITOR *visi = calloc(1, sizeof(*visi));
 
 	pb_push(&visi->pb, path);
-	pathlist(S, visi, recurse);
+	pathlist(S, visi, list, recurse);
 
 	// todo:
 	free(visi->pb.sb.buf);
@@ -526,7 +528,7 @@ ELF_FUNCTION(l_sys_open_temp_file) {
 #else
 	tmpfile_s(&file);
 #endif
-	elf_pushsys(S,(elf_Handle)file);
+	elf_pushsys(S,(Sys)file);
 	return 1;
 }
 
@@ -617,7 +619,7 @@ ELF_FUNCTION(l_sys_open_file) {
 //
 
 ELF_FUNCTION(l_sys_close_file) {
-	Handle file = loadsys(S, 1);
+	Sys file = loadsys(S, 1);
 	if (file) {
 		sys_close_file(file);
 	}
@@ -645,7 +647,7 @@ ELF_FUNCTION(l_sys_close_file) {
 
 
 ELF_FUNCTION(l_sys_get_file_size) {
-	Handle file = loadsys(S, 1);
+	Sys file = loadsys(S, 1);
 	pushint(S, sys_size_file(file));
 	return 1;
 }
@@ -653,7 +655,7 @@ ELF_FUNCTION(l_sys_get_file_size) {
 
 
 ELF_FUNCTION(l_sys_move_file_cursor) {
-	Handle file = loadsys(S, 1);
+	Sys file = loadsys(S, 1);
 	Int relativeto = loadint(S, 2);
 	Int distance = loadint(S, 3);
 	pushint(S, sys_move_file_cursor(file, relativeto, distance));
@@ -673,80 +675,84 @@ ELF_FUNCTION(l_sys_read_console) {
 
 
 
-static bool readfilesys(elf_State *S, Handle file, int size) {
-	if (!file) {
-		elf_lerror("invalid file handle");
-		pushnil(S);
-		return false;
-	}
-
-	if (size == -1) {
-		size = sys_size_file(file);
-	}
-
-	// todo: we need a dedicated object for this!
-	Str contents = new_emptystr(S, size);
-	to_str(S->stack_ptr, contents);
-	pushstacksafe(S);
-
-	sys_read_file(file, contents->text, size);
-
-	return true;
-}
-
-
-
 //
 // @doc sys.read_file(name or handle, size) -> contents
 //
+//
+//	todo: read_file returns a string, instead the user should
+// pass in a buffer, we read the file into the buffer!
+//
+//
+//	.read_file(file)
+//	.read_file(file, size)
+//
 ELF_FUNCTION(l_sys_read_file) {
+
 	int size = -1;
-	if (nargs >= 3) {
-		size = loadint(S, 2);
+	int read = 0;
+
+	Sys file = ELF_HINVALID;
+	const char *name = 0;
+
+	if (is_string_type(loadtype(S, 1)))
+	{
+		name = loadtext(S, 1);
+		file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 	}
-
-	int noerr = 0;
-
-	if (is_string_type(loadtype(S, 1))) {
-
-		const char *name = loadtext(S, 1);
-
-		Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
-
-		noerr = readfilesys(S, file, size);
-
-		sys_close_file(file);
-	}
-	else if (tissys(loadtype(S, 1))) {
-
-		Handle file = loadsys(S, 1);
-
-		noerr = readfilesys(S, file, size);
+	else if (tissys(loadtype(S, 1)))
+	{
+		file = loadsys(S, 1);
 	}
 	else {
+		loadrulecheck(S, 1, TRULE_STRING|TRULE_HANDLE);
+	}
 
-		reporterrorf(S, -1
-		, "'%s': 'readfile' expected handle or file name", tag2s[loadtype(S, 1)]);
 
+	if (nargs > 2) {
+		size = loadint(S, 2);
+	}
+	if (size < 0) {
+		size = sys_size_file(file);
+	}
+
+	if (file != ELF_HINVALID)
+	{
+		// todo:
+		Str contents = _new_empty_str(S, size);
+		read = sys_read_file(file, contents->text, size);
+
+		if (name) {
+			sys_close_file(file);
+		}
+
+		// -->
+		pushstr(S, contents);
+	}
+	else {
+		// -->
 		pushnil(S);
 	}
+
 	return 1;
 }
 
 
 
 ELF_FUNCTION(l_sys_write_file) {
-	Handle file = loadsys(S, 1);
-	Str str = loadstr(S, 2);
-	sys_write_file(file, str->text, str->length);
+	Sys file = loadsys(S, 1);
+
+	Int zmem;
+	void *mem = loadmem(S, 2, &zmem);
+
+	sys_write_file(file, mem, zmem);
 	return 0;
 }
 
 
-
+// todo:
 ELF_FUNCTION(l_sys_write_file_to_file) {
-	Handle dst = loadsys(S, 1);
-	Handle src = loadsys(S, 2);
+	Sys dst = loadsys(S, 1);
+	Sys src = loadsys(S, 2);
 
 	int size = sys_size_file(src);
 	char *heapbuf = malloc(size);
@@ -777,7 +783,7 @@ ELF_FUNCTION(l_sys_get_work_dir) {
 // process
 ELF_FUNCTION(l_sys_create_process) {
 	const char *text = loadtext(S, 1);
-	Handle process = sys_create_process(0, text);
+	Sys process = sys_create_process(0, text);
 	pushsys(S, process);
 	return 1;
 }

@@ -85,7 +85,7 @@ int elf_makefile(elf_State *S, char const *name) {
 	// create prototypes for every function
 	int nfuncs = heap_array_length(parser->functions);
 
-	int protoindex = darr_grow(S->protos, nfuncs);
+	int protoindex = heap_array_grow(S->protos, nfuncs);
 	int mainproto = protoindex;
 
 	Proto *protos = & S->protos[protoindex];

@@ -551,7 +551,7 @@ int core_lib_include(elf_State *R) {
 		if (entry.key.tag == ELF_TSTRING) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
-			elf_String *ref = new_string(R,sym);
+			elf_String *ref = _string_new(R,sym);
 			tableset(globals,VALUE_STRING(ref),globals->array[entry.idx]);
 		}
 	}

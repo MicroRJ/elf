@@ -4,6 +4,12 @@
 
 
 
+
+#define getgc(S) (&(S)->gc)
+
+
+
+
 void gccheck(elf_State *S);
 
 

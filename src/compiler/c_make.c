@@ -45,7 +45,7 @@ static int get_mem_state(Parser *parser) { return parser->memory_state; }
 // todo: interning
 static int add_const_int(elf_State *S, elf_Integer i) {
 
-	elf_Index index = darr_grow(S->integers, 1);
+	elf_Index index = heap_array_grow(S->integers, 1);
 	S->integers[index] = i;
 
 	return index;
@@ -54,7 +54,7 @@ static int add_const_int(elf_State *S, elf_Integer i) {
 // todo: interning
 static int add_const_num(elf_State *S, elf_Number i) {
 
-	elf_Index index = darr_grow(S->numbers, 1);
+	elf_Index index = heap_array_grow(S->numbers, 1);
 	S->numbers[index] = i;
 
 	return index;
@@ -660,9 +660,9 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 			// todo: add to constant pool and create new GETKSTR instruction
 			// todo: also add dedicated get str field instruction, which is
 			// the common case for field accesses!
-			Str str = new_string(S, tree.expr_str);
+			Str str = _string_new(S, tree.expr_str);
 
-			int yy = darr_grow(S->globals->array, 1);
+			int yy = heap_array_grow(S->globals->array, 1);
 			to_str(&S->globals->array[yy], str);
 
 			emit_bytexy(parser,line,BC_LOADGLOBAL,dst,yy);

@@ -69,8 +69,8 @@ static treeID tree_global(Parser *parser, Source line, int x) {
 static treeID tree_global_symbol(Parser *parser, Source line, const char *name) {
 
 	V v;
-	to_str(&v, new_string(parser->inter, name));
-	Index x = _table_getalways(parser->inter->globals, v);
+	to_str(&v, _string_new(parser->inter, name));
+	Index x = _table_getalways(parser->R, parser->inter->globals, v);
 
 	ASSERT(x != -1);
 	return tree_global(parser, line, x);

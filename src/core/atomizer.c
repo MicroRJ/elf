@@ -19,18 +19,18 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 			elf_Value target = registry->array[registry->slots[slot].idx];
 			string = target.x_str;
 		} else {
-			string = new_emptystr(R,length);
+			string = _new_empty_str(R,length);
 			copy_memory(string->text,text,length);
 			string->hash = hash;
 
-			elf_Integer i = darr_grow(registry->array,1);
+			elf_Integer i = heap_array_grow(registry->array,1);
 			registry->array[i]=VALUE_STRING(string);
 			registry->slots[slot].key=VALUE_STRING(string);
 			registry->slots[slot].idx=i;
 			registry->nslots ++;
 		}
 	} else {
-		string = new_emptystr(R,length);
+		string = _new_empty_str(R,length);
 		copy_memory(string->text,text,length);
 		string->hash = hash;
 	}

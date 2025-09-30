@@ -17,17 +17,17 @@ bool sys_debugger() {
 
 void sys_console_print(int type, char *message) {
 	switch (type) {
-	case LOG_KDEBUG: case LOG_KINFO: {
-		type = EM_LOG_CONSOLE;
-	} break;
-case LOG_KERROR: case LOG_KFATAL: {
-	type = EM_LOG_ERROR;
-} break;
-case LOG_KWARNING: {
-	type = EM_LOG_WARN;
-} break;
-}
-emscripten_log(type, message);
+		case LOG_KDEBUG: case LOG_KINFO: {
+			type = EM_LOG_CONSOLE;
+		} break;
+		case LOG_KERROR: case LOG_KFATAL: {
+			type = EM_LOG_ERROR;
+		} break;
+		case LOG_KWARNING: {
+			type = EM_LOG_WARN;
+		} break;
+	}
+	emscripten_log(type, message);
 }
 
 

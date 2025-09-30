@@ -2,6 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
+// value intrinsics
 
 
 
@@ -148,6 +149,8 @@ static void _error_cannot_call(elf_State *S, V x) {
 
 
 
+// todo: extend this signature system?
+// doesn't have to be fast, only used once signature validation code fails
 static const char *_get_field_signatures[] = {
 	"_get_field(x: str, y: int): int",
 	"_get_field(x: str, y: str): int",
@@ -306,7 +309,7 @@ static int metaintrin(elf_State *S, int intrin, V *x, V y, V z) {
 
 
 	// todo: !!!
-	Str name = new_string(S, intrin2s[intrin]);
+	Str name = _string_new(S, intrin2s[intrin]);
 
 
 	Ref ref = as_ref(y);
@@ -345,8 +348,10 @@ static int metaintrin(elf_State *S, int intrin, V *x, V y, V z) {
 	return nrets;
 }
 
-
-
+//
+//
+//
+//
 
 #define INTARITHFUNC(NAME)                                 \
 static inline void v__##NAME(elf_State *S, V *x, V y, V z) \
@@ -360,11 +365,6 @@ static inline void v__##NAME(elf_State *S, V *x, V y, V z) \
 }                                                          \
 /* end */
 
-
-//
-//
-//
-//
 //
 //
 //
@@ -390,7 +390,10 @@ static inline void v__##NAME (elf_State *S, V *x, V y, V z)                   \
 }                                                                             \
 /* end */
 
-
+//
+//
+//
+//
 
 #define RELFUNC(NAME)                                            \
 static inline void v__##NAME(elf_State *S, V *x, V y, V z) {     \
@@ -455,18 +458,19 @@ static inline bool __eq(elf_State *S, V x, V y) {
 	return eq;
 }
 
-
-
-
-
-
-
-
+//
+//
+//
+//
 
 static inline void v__eq(elf_State *S, V *x, V y, V z) {
 	to_int(x, __eq(S, y, z));
 }
 
+//
+//
+//
+//
 
 static inline void v__neq(elf_State *S, V *x, V y, V z) {
 	to_int(x, !__eq(S, y, z));

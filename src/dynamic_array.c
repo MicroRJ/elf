@@ -4,6 +4,8 @@
 // avoid using wherever possible
 //
 
+
+
 typedef struct {
 	int max;
 	int min;
@@ -11,6 +13,9 @@ typedef struct {
 } HArray;
 
 #define d_array_raw(d) (& ( (HArray *) (d) ) [-1] )
+
+
+
 
 #define ARRAY(D) ((HArray*)(D))[-1]
 #define ARRAY_MAX(D) (ARRAY(D).max)
@@ -20,25 +25,23 @@ typedef struct {
 #define ARRAY_SET_MIN(D,N) ((D != 0) ? ARRAY_MIN(D)=(N) : 0)
 #define heap_array_length ARRAY_GET_MIN
 #define free_heap_array(D) ((D != 0) ? free(&ARRAY(D)), 0 : 0)
-#define darr_grow(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
+#define heap_array_grow(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
 
 #define FOR_ARRAY(N,D) for (int N = 0; N < heap_array_length(D); N += 1)
 
-// written like this because it seems to work on all compilers I've
-// tested
-#define heap_array_add(d,v) do { int __x__ = darr_grow(d, 1); (d)[__x__] = (v); } while(0)
+#define heap_array_add(d,v) do { int __x__ = heap_array_grow(d, 1); (d)[__x__] = (v); } while(0)
 
 
 
 
 
-
-
-static inline void *new_heap_array2(int per, int min, int max) {
+// todo: log2 size !
+static inline void *new_heap_array2(int per, int max, int min) {
 	ASSERT(min <= max);
+	// todo: why calloc!
 	HArray *arr = calloc(sizeof(*arr), per * max);
-	arr->min = min;
 	arr->max = max;
+	arr->min = min;
 	return arr + 1;
 }
 
@@ -49,6 +52,17 @@ static inline void *new_heap_array2(int per, int min, int max) {
 
 static inline void *new_heap_array(int per, int min) {
 	return new_heap_array2(per, min, min);
+}
+
+
+
+
+static inline void *new_heap_array_with_memory(void *memory, int per, int min) {
+	HArray *array = malloc(sizeof(HArray) + per * min);
+	array->min = min;
+	array->max = min;
+	memcpy(array + 1, memory, per * min);
+	return array + 1;
 }
 
 

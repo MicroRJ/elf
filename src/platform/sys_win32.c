@@ -172,10 +172,10 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
 	GetDiskFreeSpaceA(elf_loadtext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	elf_tsets_int(info,new_string(R,"SectorsPerCluster"),SectorsPerCluster);
-	elf_tsets_int(info,new_string(R,"BytesPerSector"),BytesPerSector);
-	elf_tsets_int(info,new_string(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
-	elf_tsets_int(info,new_string(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+	elf_tsets_int(info,_string_new(R,"SectorsPerCluster"),SectorsPerCluster);
+	elf_tsets_int(info,_string_new(R,"BytesPerSector"),BytesPerSector);
+	elf_tsets_int(info,_string_new(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
+	elf_tsets_int(info,_string_new(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
 #else
 	elf_ldebug("this function is not implemented for this platform");
 #endif
@@ -197,15 +197,15 @@ int core_lib_list_volumes(elf_State *R) {
 
 		elf_tsets_tab(list,name,volume);
 
-		elf_tsets_str(volume,new_string(R,"name"),name);
+		elf_tsets_str(volume,_string_new(R,"name"),name);
 
 		elf_Table *path_names = elf_new_table(R);
-		elf_tsets_tab(volume,new_string(R,"path_names"),path_names);
+		elf_tsets_tab(volume,_string_new(R,"path_names"),path_names);
 
 		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				_table_arrayadd(path_names,VALUE_STRING(new_string(R,buffer)));
+				_table_arrayadd(path_names,VALUE_STRING(_string_new(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}

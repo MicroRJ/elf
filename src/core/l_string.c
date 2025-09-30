@@ -159,7 +159,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 			s ++;
 		}
 
-		Str split = new_stringl(S, sb.buf, sb.min);
+		Str split = _string_newl(S, sb.buf, sb.min);
 		V value;
 		to_str(&value, split);
 

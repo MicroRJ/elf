@@ -145,6 +145,10 @@ static inline bool _table_veq(V x, V y) {
 //
 // Return a find result instead?
 //
+// If I return whether the key was found or not, might be more obvious
+// control flow wise.
+//
+//
 //	Loading the value after will definitely cause a cache miss
 // values are large, entries are larger ...
 //
@@ -223,21 +227,45 @@ static void _table_checkresize(Tab table) {
 //
 //
 //
-//
-//
-//
-//
 
-static inline Index _table_tryresize(Tab tab, V key) {
+static inline Index _table_tryresize(elf_State *S, Tab tab, V key) {
 	ASSERT(tab != 0);
 	_table_checkresize(tab);
-	return _table_findentry_internal(tab->entries, tab->nentries, key);
+	Index index = _table_findentry_internal(tab->entries, tab->nentries, key);
+	if (index <= FIND_ENTRY_FAILED) {
+		reporterrorf(S, -1, "'%s': internal error, _table_tryresize failed", tag2s[key.tag]);
+	}
+	return index;
 }
 
 //
 //
 //
 //
+
+static inline bool _table_contains(elf_State *S, Tab tab, V key) {
+	Index s = _table_tryresize(S, tab, key);
+	return s >= 0 && !isdead(tab->entries[s].key);
+}
+
+//
+//
+//
+//
+
+
+static inline void tablealias(elf_State *S, Tab tab, V key, V alias) {
+	// todo: no need to resize!
+	Index s = _table_tryresize(S, tab,key);
+
+	if (s >= 0 && !isdead(tab->entries[s].key)) {
+		Index c = _table_tryresize(S, tab, alias);
+		tab->entries[c].key = alias;
+		tab->entries[c].index = tab->entries[s].index;
+		tab->fillcounter += 1;
+	}
+}
+
 //
 //
 //
@@ -263,28 +291,25 @@ Value _table_getornil(elf_State *S, Tab tab, Value key) {
 //
 //
 //
-//
-//
-//
-//
 
-static Index _table_getalways(Tab table, Value key) {
-	Index index = _table_tryresize(table, key);
+static Index _table_getalways(elf_State *S, Tab table, Value key) {
+	Index index = _table_tryresize(S, table, key);
 	ASSERT(index != FIND_ENTRY_FAILED);
 
-	IndexValue *entry = & table->entries[index];
+	Entry *entry = & table->entries[index];
 
-	// there's nothing here, so create use up the slot
+	// there's nothing here, so use up the slot
 	if (isdead(entry->key)) {
-		index = darr_grow(table->array, 1);
+
+		index = heap_array_grow(table->array, 1);
 		to_nil(&table->array[index]);
 
 		entry->key = key;
-		entry->idx = index;
+		entry->index = index;
 		table->fillcounter ++;
 	}
 	else {
-		index = entry->idx;
+		index = entry->index;
 	}
 
 	return index;
@@ -299,13 +324,13 @@ static Index _table_getalways(Tab table, Value key) {
 //
 //
 
-Index tablesetindex(elf_State *S, Tab table, Val key, Index index) {
+Index _table_bindtoindex(elf_State *S, Tab table, Value key, Index index) {
 	checkwrite(S, (Ref) table);
 
-	Index entry_index = _table_tryresize(table, key);
+	Index entry_index = _table_tryresize(S, table, key);
 	ASSERT(entry_index != FIND_ENTRY_FAILED);
 
-	Entry *entry = table->entries + entry_index;
+	Entry *entry = & table->entries[entry_index];
 
 	if (isdead(entry->key)) {
 		entry->key = key;
@@ -313,16 +338,12 @@ Index tablesetindex(elf_State *S, Tab table, Val key, Index index) {
 		table->fillcounter ++;
 	}
 	else {
-		index = entry->idx;
+		index = entry->index;
 	}
 
 	return index;
 }
 
-//
-//
-//
-//
 //
 //
 //
@@ -331,17 +352,13 @@ Index tablesetindex(elf_State *S, Tab table, Val key, Index index) {
 Index tableset(elf_State *S, Tab table, Val key, Val value) {
 	checkwrite(S, (Ref) table);
 
-	Index index = _table_tryresize(table, key);
-	if (index <= FIND_ENTRY_FAILED) {
-		reporterrorf(S, -1, "'%s': internal error, _table_tryresize failed", tag2s[key.tag]);
-	}
-
+	Index index = _table_tryresize(S, table, key);
 	ASSERT(index != FIND_ENTRY_FAILED);
 
 	Entry *entry = table->entries + index;
 
 	if (isdead(entry->key)) {
-		index = darr_grow(table->array, 1);
+		index = heap_array_grow(table->array, 1);
 		entry->key = key;
 		entry->idx = index;
 		table->fillcounter ++;
@@ -378,7 +395,7 @@ Index _table_arraylen(Tab tab) {
 
 Index _table_arrayadd(elf_State *S, Tab tab, V v) {
 	checkwrite(S, (Ref) tab);
-	Index index = darr_grow(tab->array, 1);
+	Index index = heap_array_grow(tab->array, 1);
 	tab->array[index] = v;
 	return index;
 }

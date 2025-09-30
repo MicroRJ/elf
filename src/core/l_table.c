@@ -73,10 +73,7 @@ ELF_FUNCTION(l_table_set_meta) {
 
 
 
-static inline bool _table_contains(Tab t, V k) {
-	Index s = _table_tryresize(t, k);
-	return s >= 0 && !isdead(t->entries[s].key);
-}
+
 
 
 
@@ -123,7 +120,7 @@ ELF_FUNCTION(l_table_clear_entries) {
 ELF_FUNCTION(l_table_contains) {
 	Tab tab = loadtable(S, 0);
 	Val key = loadvalue(S, 1);
-	pushint(S, _table_contains(tab, key));
+	pushint(S, _table_contains(S, tab, key));
 	return 1;
 }
 
@@ -234,7 +231,7 @@ ELF_FUNCTION(l_table_delete) {
 
 
 static inline void tablebind(elf_State *S, Tab tab, V key, Index index) {
-	tablesetindex(S, tab, key, index);
+	_table_bindtoindex(S, tab, key, index);
 }
 
 
@@ -250,19 +247,6 @@ static inline void tablebind(elf_State *S, Tab tab, V key, Index index) {
 
 
 
-
-
-static inline void tablealias(Tab tab, V key, V alias) {
-	Index slot = _table_tryresize(tab,key);
-	if (slot >= 0) {
-		if (!isdead(tab->entries[slot].key)) {
-			Index aliasslot = _table_tryresize(tab, alias);
-			tab->entries[aliasslot].key = alias;
-			tab->entries[aliasslot].idx = tab->entries[slot].idx;
-			tab->fillcounter += 1;
-		}
-	}
-}
 
 
 
@@ -279,7 +263,9 @@ static inline void tablealias(Tab tab, V key, V alias) {
 // points to where 'existing_key' points to
 ELF_FUNCTION(l_table_alias) {
 	Tab tab = loadtable(S, 0);
-	tablealias(tab, loadvalue(S, 1), loadvalue(S, 2));
+	V x = loadvalue(S, 1);
+	V y = loadvalue(S, 2);
+	tablealias(S, tab, x, y);
 	return 0;
 }
 
@@ -329,7 +315,7 @@ ELF_FUNCTION(l_find_aliases) {
 
 	if (!is_nil(key)) {
 
-		Index i=_table_tryresize(tab, key);
+		Index i=_table_tryresize(S, tab, key);
 
 		if (i > 0) {
 
@@ -461,8 +447,9 @@ ELF_FUNCTION(l_table_fork) {
 		IndexValue entry = tab->entries[i];
 
 		if (isdead(entry.key)) continue;
-		if (_table_contains(sub, entry.key)) continue;
+		if (_table_contains(S, sub, entry.key)) continue;
 
+		// todo: remove this!
 		pushvalueunsafe(S, entry.key);
 		pushvalueunsafe(S, tab->array[entry.idx]);
 		elf_setfield(S);
@@ -688,20 +675,21 @@ ELF_FUNCTION(l_array_trim) {
 
 
 
-
 ELF_FUNCTION(l_array_merge) {
+	Tab sum = loadtable(S, 0);
+	pushtab(S, sum);
 
-	Tab tab = loadtable(S, 0);
-	Tab add = loadtable(S, 1);
+	Index i, j;
 
-	Tab sum = pushnewtable(S);
+	for (i = 1; i < nargs; ++ i) {
+		Tab tab = loadtable(S, i);
 
-	Index i;
-	for (i=0;i<heap_array_length(tab->array);++i) {
-		heap_array_add(sum->array, tab->array[i]);
-	}
-	for (i=0;i<heap_array_length(add->array);++i) {
-		heap_array_add(sum->array, tab->array[i]);
+		for (j = 0; j < _table_arraylen(tab); ++ j) {
+
+			Value v = _table_arrayget(S, tab, j);
+			_table_arrayadd(S, sum, v);
+
+		}
 	}
 	return 1;
 }
@@ -863,7 +851,7 @@ ELF_FUNCTION(l_array_rank)
 	RankValue *rv = malloc(l * sizeof(*rv));
 
 	Value __rank;
-	to_str(&__rank, new_string(S, "__rank"));
+	to_str(&__rank, _string_new(S, "__rank"));
 
 	for (i=0; i<l; ++i) {
 		Value value = tab->array[i];

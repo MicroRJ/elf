@@ -87,7 +87,6 @@ static inline char *sb_writetextl(Stringer *sb, const char *text, int l) {
 //
 //
 
-
 // todo: perf!
 static inline char *sb_writetextesc(Stringer *sb, const char *str) {
 	char *mem = sb->buf + sb->min;
