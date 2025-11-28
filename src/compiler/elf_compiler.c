@@ -35,19 +35,21 @@ int elf_load_json(elf_State *S, const char *name, const char *contents) {
 	return result;
 }
 
-
 // todo: this is meant to be super light-weight, but it is not!
-// also have a version that takes multiple strings, and outputs multiple
-// expressions...
+// todo: so why is this using the stack stuff... why couldn't it
+// return a value?
 int elf_pushconstexpr(elf_State *S, const char *name, const char *text) {
-	Parser *parser = elf_new_parser(S, name, text);
-	int result = parse_constexpr(parser);
-	elf_end_parser(parser);
-	return result;
+	if (text) {
+		Parser *parser = elf_new_parser(S, name, text);
+		int result = parse_constexpr(parser);
+		elf_end_parser(parser);
+		return result;
+	}
+	else {
+		pushnil(S);
+		return false;
+	}
 }
-
-
-
 
 int elf_makefile(elf_State *S, char const *name) {
 	ASSERT(name);

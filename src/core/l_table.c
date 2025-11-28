@@ -829,14 +829,37 @@ ELF_FUNCTION(l_table_ordered_pairs)
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
+// todo: should this return a new table or no?
+ELF_FUNCTION(l_array_filter) {
+	Tab tab = loadtable(S, 0);
+	V filter = loadrulecheck(S, 1, TRULE_CALLABLE);
+
+	V *new_array = 0;
+
+	Index l = heap_array_length(tab->array);
+	Index i;
+
+	for (i=0; i<l; ++i) {
+		Value value = tab->array[i];
+		pushvalueunsafe(S, filter);
+		pushthis(S);
+		pushvalueunsafe(S, value);
+		elf_call(S, 2, 1);
+		int keep = popint(S);
+		if (keep) {
+			heap_array_add(new_array, value);
+		}
+	}
+
+	// todo:
+	free_heap_array(tab->array);
+
+	tab->array = new_array;
+
+	// return self
+	pushtab(S, tab);
+	return 1;
+}
 
 ELF_FUNCTION(l_array_rank)
 {
@@ -1014,6 +1037,7 @@ static const elf_Binding l_table[] = {
 	// array part
 	{"sort"         , l_array_sort         },
 	{"rank"         , l_array_rank         },
+	{"filter"       , l_array_filter       },
 
 
 	{"array_remove" , l_array_remove       },

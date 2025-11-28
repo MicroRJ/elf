@@ -103,7 +103,7 @@ int elf_pushcodefile(elf_State *S, const char *name, const char *text) {
 elf_pubapi
 elf_State *elf_new() {
 	elf_State *inter = calloc(1, sizeof(*inter));
-	elf_init_raw(inter);
+	_initstate(inter);
 	return inter;
 }
 

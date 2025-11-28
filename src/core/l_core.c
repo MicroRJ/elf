@@ -171,29 +171,15 @@ ELF_FUNCTION(l_core_set_meta) {
 	return 1;
 }
 
-
-
-
-
-
 ELF_FUNCTION(l_core_is_string) {
 	pushint(S, is_string_type(loadtype(S, 1)));
 	return 1;
 }
 
-
-
-
-
 ELF_FUNCTION(l_core_is_numeric) {
 	pushint(S, is_numeric_type(loadtype(S, 1)));
 	return 1;
 }
-
-
-
-
-
 
 ELF_FUNCTION(l_core_tagof) {
 	pushtext(S, tag2s[loadtype(S, 1)]);
@@ -304,9 +290,6 @@ ELF_FUNCTION(l_core_unparse) {
 	return 1;
 }
 
-
-
-
 //
 // FORMATTING
 //
@@ -315,49 +298,48 @@ ELF_FUNCTION(l_core_unparse) {
 //
 
 
+static int valuetostr(Stringer *sb, V v, bool flags);
+
+
+// todo: this is slow! if we pre-rank entries for large tables
+// it should be much better!
+static int tabletostr(Stringer *sb, Tab tab, bool flags) {
+	sb_writetext(sb, "{");
+
+	Index i,j,n;
+	for (i = 0; i < _table_arraylen(tab); ++ i) {
+		if (i != 0) sb_writetext(sb, ", ");
+
+		for (j = 0, n = 0; j < tab->ntotal; ++j) {
+			IndexValue en = tab->entries[j];
+
+			if (isdead(en.key)) continue;
+			if (en.idx != i) continue;
+
+			if (n ++ != 0) sb_writetext(sb, ", ");
+			valuetostr(sb, en.key, 1);
+		}
+		if (n != 0) sb_writetext(sb, " = ");
+		valuetostr(sb, tab->array[i], 1);
+	}
+	sb_writetext(sb, "}");
+	return true;
+}
 
 static int valuetostr(Stringer *sb, V v, bool flags) {
 	switch (v.tag) {
-		case ELF_TNIL:        return sb_writetextf(sb,   "nil"               );
-		case ELF_TINTEGER:    return sb_writetextf(sb,  "%lli", v.x_int      );
-		case ELF_TNUMBER:     return sb_writetextf(sb,    "%f", v.x_num      );
-		case ELF_THANDLE:     return sb_writetextf(sb, "h%llX", v.x_int      );
-		case ELF_TSTRING:     return sb_writetextf(sb,    "%s", v.x_str->text);
-		case ELF_TCLOSURE:    return sb_writetextf(sb,   "F()");
-		case ELF_TFUNCTION:   return sb_writetextf(sb,   "C()");
-		case ELF_TBUFFER:     return sb_writebuf(sb,   as_buffer(v));
-
-		case ELF_TTABLE: {
-			/* todo: this is slow! */
-			int wrote = 0;
-			elf_Table *tab = v.x_tab;
-			wrote += sb_writetextf(sb, "{");
-
-			Index i,j,n;
-			for (i=0;i<_table_arraylen(tab);++i) {
-				if (i!=0) wrote += sb_writetextf(sb, ", ");
-				for (j=0,n=0;j<tab->ntotal;++j) {
-
-					IndexValue en = tab->entries[j];
-
-					if (isdead(en.key)) continue;
-					if (en.idx != i) continue;
-
-					if (n ++ != 0) wrote += sb_writetextf(sb, ", ");
-					wrote += valuetostr(sb,en.key,1);
-				}
-				if (n != 0) wrote += sb_writetextf(sb, " = ");
-				wrote += valuetostr(sb,tab->array[i],1);
-			}
-			wrote += sb_writetextf(sb,"}");
-			return wrote;
-		} break;
+		case ELF_TNIL:        return sb_writetextf(sb, "nil"                  );
+		case ELF_TINTEGER:    return sb_writetextf(sb, "%lli"  , v.x_int      );
+		case ELF_TNUMBER:     return sb_writetextf(sb, "%f"    , v.x_num      );
+		case ELF_THANDLE:     return sb_writetextf(sb, "h%llX" , v.x_int      );
+		case ELF_TSTRING:     return sb_writetextf(sb, "%s"    , v.x_str->text);
+		case ELF_TCLOSURE:    return sb_writetextf(sb, "C()");
+		case ELF_TFUNCTION:   return sb_writetextf(sb, "F()");
+		case ELF_TBUFFER:     return   sb_writebuf(sb, as_buffer(v));
+		case ELF_TTABLE:      return    tabletostr(sb, as_table(v), flags);
 		default: return sb_writetextf(sb,"(?)");
 	}
 }
-
-
-
 
 //
 // todo: handle escape sequences
@@ -397,40 +379,6 @@ ELF_FUNCTION(l_core_format) {
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-// todo: can we deprecate this? who cares about this anymore?
-// we can use buffers... and the user can just write to file.
-//
-
-ELF_FUNCTION(l_core_fpf) {
-	Handle file = loadsys(S, 1);
-
-	Stringer sb = {};
-	for (int i = 2; i < nargs; i ++) {
-		valuetostr(&sb, loadvalue(S, i), 0);
-	}
-	pushint(S, sb.min);
-
-	sys_write_file(file, sb.buf, sb.min);
-
-	free(sb.buf);
-	return 1;
-}
-
-//
-//
-//
-//
-//
-//
-//
-//
-
 ELF_FUNCTION(l_core_print) {
 	Stringer sb = {};
 	for (int i = 1; i < nargs; i ++) {
@@ -445,14 +393,21 @@ ELF_FUNCTION(l_core_print) {
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(l_core_printl_csv) {
+	Stringer sb = {};
+	for (int i = 1; i < nargs; i ++) {
+		if (i != 1) sb_writetext(&sb, ", ");
+		valuetostr(&sb, loadvalue(S,i),0);
+	}
+	sb_writechar(&sb, '\n');
+
+	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
+	sys_write_file(file, sb.buf, sb.min);
+	free(sb.buf);
+
+	pushint(S, sb.min);
+	return 1;
+}
 
 ELF_FUNCTION(l_core_printl) {
 	Stringer sb = {};
@@ -463,10 +418,28 @@ ELF_FUNCTION(l_core_printl) {
 
 	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
 	sys_write_file(file, sb.buf, sb.min);
-
 	free(sb.buf);
 
 	pushint(S, sb.min);
+	return 1;
+}
+
+//
+// todo: can we deprecate this? who cares about this anymore?
+// we can use buffers... and the user can just write to file.
+//
+ELF_FUNCTION(l_core_fprintl) {
+	Handle file = loadsys(S, 1);
+
+	Stringer sb = {};
+	for (int i = 2; i < nargs; i ++) {
+		valuetostr(&sb, loadvalue(S, i), 0);
+	}
+	pushint(S, sb.min);
+
+	sys_write_file(file, sb.buf, sb.min);
+
+	free(sb.buf);
 	return 1;
 }
 
@@ -507,11 +480,12 @@ const static elf_Binding l_core[] = {
 
 	{"format",          l_core_format     },
 	{"printl",          l_core_printl     },
+	{"printl_csv",      l_core_printl_csv },
 	{"print",           l_core_print      },
 
 	// todo: deprecated?
-	{"fprint",     l_core_fpf              },
-	{"fpf"   ,     l_core_fpf              },
+	{"fprint",     l_core_fprintl              },
+	{"fpf"   ,     l_core_fprintl              },
 	{"pf"    ,     l_core_printl           },
 };
 

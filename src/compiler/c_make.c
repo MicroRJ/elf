@@ -94,6 +94,7 @@ static void _pop_mem_state(Parser *parser) {
 
 
 static int get_mem(Parser *parser, treeID id) {
+	ASSERT(id);
 
 	if (id->kind == TREE_MEMORY_REF) {
 		id = id->x;
@@ -143,10 +144,12 @@ static int req_mem(Parser *parser) {
 
 
 
-static int to_any_mem(Parser *parser, treeID id) {
-	int mem = get_mem(parser, id);
+static int to_any_mem(Parser *par, treeID id) {
+	ASSERT(id);
+
+	int mem = get_mem(par, id);
 	if (mem == NO_SLOT) {
-		mem = to_mem(parser,id,-1,1);
+		mem = to_mem(par,id,-1,1);
 	}
 	ASSERT(mem != NO_SLOT);
 	return mem;
@@ -225,10 +228,10 @@ static void make_store(Parser *parser, Source line, treeID x, treeID y) {
 			emit_bytexy(parser, line, BC_SETGLOBAL, rx, rz);
 		}
 		else if(tx.kind == TREE_UPVALUE) {
-			parser_dialog(parser, line, "assignment of closure value is not possible");
+			push_error(parser, ERROR_INVALID_STORE_CLOSURE_VALUE, line, "assignment of closure value is not possible");
 		}
 		else if(tx.kind == EXPR_METAFIELD) {
-			parser_dialog(parser, line, "assignment of metafields is not possible");
+			push_error(parser, ERROR_INVALID_STORE_METAFIELD, line, "assignment of metafields is not possible");
 		}
 		else {
 
@@ -529,7 +532,9 @@ static void make_tree(Parser *parser, treeID id) {
 }
 
 
-
+// we need these sort of expressions because the IR isn't explicit
+// enough for the parser to generate arbitrary instructions and at
+// the same time yield an expression...
 static int make_newtable_expr(Parser *parser, treeID v, int dst, int ndst) {
 	if (ndst<1) goto esc;
 	if (dst<0) dst=req_mem(parser);
@@ -539,17 +544,22 @@ static int make_newtable_expr(Parser *parser, treeID v, int dst, int ndst) {
 	int rx, ry;
 	FOR_ARRAY(i, v->expr_newtable.key_value_tuples) {
 		SCOPE_MEM_STATE(parser) {
-			rx = to_any_mem(parser, v->expr_newtable.key_value_tuples[i]->x);
-			ry = to_any_mem(parser, v->expr_newtable.key_value_tuples[i]->y);
-			emit_bytexyz(parser, v->line, BC_SETFIELD, dst, rx, ry);
+			treeID kv = v->expr_newtable.key_value_tuples[i];
+			if (kv->x) {
+				rx = to_any_mem(parser, v->expr_newtable.key_value_tuples[i]->x);
+				ry = to_any_mem(parser, v->expr_newtable.key_value_tuples[i]->y);
+				emit_bytexyz(parser, v->line, BC_SETFIELD, dst, rx, ry);
+			}
+			else {
+				rx = to_any_mem(parser, v->expr_newtable.key_value_tuples[i]->y);
+				emit_bytexy(parser, v->line, BC_ARRAYADD, dst, rx);
+			}
 		}
 	}
 
 	esc:
 	return dst;
 }
-
-
 
 static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 	ASSERT(id != 0);
@@ -733,7 +743,7 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 					// we don't have a tree for it!
 					int reg = get_mem(parser, capts[i]);
 					if (reg == NO_SLOT) {
-						push_error(parser, capts[i]->line, EC_INTERNAL_CANNOT_CAPTURE_NO_MEMORY, "can only capture things with memory");
+						push_error(parser, EC_INTERNAL_CANNOT_CAPTURE_NO_MEMORY, capts[i]->line, "can only capture things with memory");
 					}
 
 					int x = to_mem(parser, capts[i], -1, 1);
@@ -781,7 +791,8 @@ static int to_mem(Parser *parser, treeID id, int dst, int ndst) {
 		} break;
 
 		default: {
-			parser_dialog(parser,line,"invalid tree (%s)",tree2s[tree.kind]);
+			push_error(parser, INTERNAL_ERROR_INVALID_TREE
+			,	line,	"invalid tree (%s)",	tree2s[tree.kind]);
 			NO_CODE;
 		}
 	}
@@ -999,7 +1010,6 @@ static int emit_byte(Parser *parser, Source line, Bytec byte) {
 	assert(line);
 	elf_State *S = parser->R;
 	heap_array_add(S->lines, line);
-	heap_array_add(S->track, 0);
 	heap_array_add(S->bytebuf, byte);
 	// printf("%s(%i, %i, %i)\n", byte2s[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
 	return S->bytecur ++;

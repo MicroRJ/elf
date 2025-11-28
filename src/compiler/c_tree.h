@@ -11,6 +11,7 @@
 
 #define istree(t) ((t) > 0)
 #define notree(t) ((t) <= 0)
+#define iserror(t) ((t) < 0)
 
 
 typedef struct Tree Tree;

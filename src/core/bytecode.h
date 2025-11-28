@@ -36,6 +36,7 @@ _(GETFIELD,        XYZ      , "getfield")         \
 _(SETGLOBAL,       XY       , "setglobal")        \
 _(SETFIELD,        XYZ      , "setfield")         \
 _(SETINDEX,        XYZ      , "setindex")         \
+_(ARRAYADD,        XYZ      , "arrayadd")         \
 _(CALL,            XYZ      , "call")             \
 _(TABLE,           XXX      , "new_table")        \
 _(CLOSURE,         XY       , "new_closure")      \
@@ -50,14 +51,14 @@ _(ADD,             XYZ      , "add")              \
 _(SUB,             XYZ      , "sub")              \
 _(MOD,             XYZ      , "mod")              \
 _(POW,             XYZ      , "pow")              \
-_(I2N,             XY       , "i2n")              \
-_(N2I,             XY       , "n2i")              \
 _(BIT_SHL,         XYZ      , "shl")              \
 _(BIT_SHR,         XYZ      , "shr")              \
 _(BIT_XOR,         XYZ      , "xor")              \
 _(BIT_OR,          XYZ      , "or")               \
 _(BIT_AND,         XYZ      , "and")              \
 _(BIT_NOT,         XYZ      , "not")              \
+_(I2N,             XY       , "i2n")              \
+_(N2I,             XY       , "n2i")              \
 /* end */
 
 #define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),

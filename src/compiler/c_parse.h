@@ -117,7 +117,7 @@ typedef struct Parser Parser;
 struct Parser {
 
 	union {
-		elf_State                  *R;
+		elf_State              *R, *S;
 		elf_State              *inter;
 	};
 
@@ -184,9 +184,13 @@ struct Parser {
 
 
 	// remember loop hierarchy
-	Loop             loop_stack[32];
+	Loop             loop_stack[16];
 	int              loop_index;
 
+	#if 0
+	Token            tok_stack[32];
+	int              tok_index;
+	#endif
 
 	// DURING CODE GENERATION:
 	// track memory usage

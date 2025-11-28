@@ -183,15 +183,6 @@ static void _error_get_field_invalid_arguments(elf_State *S, V x, V y) {
 	sb_free(&sb);
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-
 static inline Tab _get_metatable(elf_State *S, V v) {
 	Tab metatable = 0;
 
@@ -222,15 +213,6 @@ static inline Tab _get_metatable(elf_State *S, V v) {
 	return metatable;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-
 static inline V _get_metafield(elf_State *S, V x, V y) {
 	Tab metatable = _get_metatable(S, x);
 	if (!metatable) {
@@ -238,15 +220,6 @@ static inline V _get_metafield(elf_State *S, V x, V y) {
 	}
 	return _table_getornil(S, metatable, y);
 }
-
-//
-//
-//
-//
-//
-//
-//
-//
 
 // todo: implement user overload!
 static inline void _get_field(elf_State *S, V *x, V y, V z) {
@@ -292,15 +265,6 @@ static inline void _get_field(elf_State *S, V *x, V y, V z) {
 		} break;
 	}
 }
-
-//
-//
-//
-//
-//
-//
-//
-//
 
 // todo:
 static int metaintrin(elf_State *S, int intrin, V *x, V y, V z) {

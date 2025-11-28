@@ -60,26 +60,21 @@ typedef enum {
    // the value is a tombstone, should not be seen outside
    // of table code
    ELF_TTOMB,
-   // the value is a number
+   // the value is a 64 - bit floating point number
    ELF_TNUMBER,
-   // the value is a integer
+   // the value is a 64 - bit integer
    ELF_TINTEGER,
-   // the value is a handle
+   // the value is a non-arithmetic 64 - bit integer
    ELF_THANDLE,
-   // the value is a function
+   // the value is a 4 component 32 - bit vector
+   ELF_TVEC4,
+
    ELF_TFUNCTION,
-   // the value is a custom object
    ELF_TUSER,
-   // the value is a closure object
    ELF_TCLOSURE,
-   // the value is table object
    ELF_TTABLE,
-   // the value is string object
    ELF_TSTRING,
-   // the value is a dynamic string object
    ELF_TBUFFER,
-
-
    ELF_TCOUNT_,
 } elf_Tag;
 
@@ -139,8 +134,9 @@ void elf_arrayget(elf_State *);
 void elf_error(elf_State *, int error, const char *message, ...);
 
 
-#define elf_pushtrue(S) elf_pushint(S, 1)
-#define elf_pushfalse(S) elf_pushint(S, 0)
+#define elf_pushbool(S, x) elf_pushint(S, x)
+#define elf_pushtrue(S) elf_pushbool(S, 1)
+#define elf_pushfalse(S) elf_pushbool(S, 0)
 
 void elf_pushnil(elf_State *);
 void elf_pushint(elf_State *, elf_Integer);

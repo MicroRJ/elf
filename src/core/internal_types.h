@@ -25,7 +25,7 @@
 // indirect accessing is expensive, if likelyhood of same index
 // for same key is high, attempt direct lookup.
 //
-// cannot very that index is still valid, date the instruction to
+// cannot verify that index is still valid, date the instruction to
 // the date of the object.
 //
 // When object mutates fields, increment object date.
@@ -215,13 +215,12 @@ typedef enum {
 #define VALUE_READONLY 2
 
 struct elf_Value {
-	u32   tag;
-	// we get this plus 3 bytes for free...
-	i32   status;
-
+	u8   tag;
+	u8   status;
+	u16  unused;
 	union {
 		i64         x_i64;
-		struct {i32 x_i32, y_i32; };
+		struct {i32 x_i32, y_i32;};
 		i64         x_int;
 		f64         x_num;
 		Sys         x_sys;
@@ -661,7 +660,11 @@ void *gcalloc(elf_State *S, GCType type, int size);
 
 
 
-
+typedef struct Record Record;
+struct Record {
+	Bytec b;
+	V o, x, y;
+};
 
 typedef struct elf_State elf_State;
 struct elf_State {
@@ -676,8 +679,6 @@ struct elf_State {
 
 	struct {
 		Proto           *protos;
-		//
-		u8               *track;
 
 		// todo: compress this
 		// todo: also, allocate per Proto_File?
@@ -698,23 +699,25 @@ struct elf_State {
 		int              bytecur;
 	};
 
-	// todo: experiment with allocating types and tags
-	// in separate buffers!
-	// We also wouldn't need to increment or decrement
-	// the tags stack, but we would either have to convert
-	// stack_ptr to an integer, or make stack_ptr be an integer
-	V                *stack;
-	V                *stack_ptr;
-	int               stack_max;
 
 	GCState      gc;
 
-	int          frame_index;
-	int          frame_stack_max;
-	Stack_Frame *frame_stack;
-	Stack_Frame  frame;
+	struct {
+		V           *stack;
+		V           *stack_ptr;
+		int          stack_max;
 
-	BCPos        byte;
+		u32          record_min;
+		u32          record_max;
+		Record      *record;
+
+		int          frame_index;
+		int          frame_stack_max;
+		Stack_Frame *frame_stack;
+		Stack_Frame  frame;
+
+		BCPos        byte;
+	};
 
 	struct {
 		Tab integer;
@@ -725,7 +728,7 @@ struct elf_State {
 	} metatables;
 };
 
-void elf_init_raw(elf_State *);
+void _initstate(elf_State *);
 void reporterror(elf_State *, int instr, const char *error);
 void reporterrorf(elf_State *, int instr, const char *format, ...);
 

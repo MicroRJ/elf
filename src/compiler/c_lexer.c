@@ -223,10 +223,9 @@ static int pick_empty_chars(Parser *parser) {
 
 
 //
-// todo: would it be faster to just do all the tokens
-// in one go...
+// todo: would it be faster to just do all the tokens in one go?
 //
-static Token next_tok(Parser *parser) {
+static Token lex_token(Parser *parser) {
 
 	retry:
 	Token token = {};

@@ -139,20 +139,16 @@ static treeID tree_closure(Parser *parser, Source line, treeID x, treeID *z) {
 	return tree_xyz(parser,line,EXPR_CLOSURE,NT_FUN,x,Y_NULL,z);
 }
 
-
-
-static treeID tree_ret2(Parser *parser, Source line, treeID *z) {
+static treeID tree_return(Parser *parser, Source line, treeID *z) {
 	return tree_xyz(parser, line, TREE_RET, NT_NON, Y_NULL, Y_NULL, z);
 }
 
-
-
-static treeID tree_ret(Parser *parser, Source line, treeID x) {
+static treeID tree_return_one(Parser *parser, Source line, treeID x) {
 	treeID *z = 0;
 	if (x) {
 		heap_array_add(z, x);
 	}
-	return tree_ret2(parser, line, z);
+	return tree_return(parser, line, z);
 }
 
 

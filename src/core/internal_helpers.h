@@ -143,7 +143,6 @@ static inline void *checknullptrobj(void *obj) {
 
 
 
-#define set_obj(v,x) ((v)->x_obj=checknullptrobj(x))
 
 
 #define to_nil(v)   ((v)->tag=ELF_TNIL     , (v)->x_int=0)
@@ -151,6 +150,10 @@ static inline void *checknullptrobj(void *obj) {
 #define to_num(v,x) ((v)->tag=ELF_TNUMBER  , (v)->x_num=x)
 #define to_sys(v,x) ((v)->tag=ELF_THANDLE  , (v)->x_sys=x)
 
+
+
+
+#define set_obj(v,x) ((v)->x_obj=checknullptrobj(x))
 
 
 
@@ -403,10 +406,6 @@ static inline void typerulecheck(elf_State *S, V v, TypeRule trule) {
 	}
 }
 
-//
-//
-//
-//
 
 static inline V loadrulecheck(elf_State *S, int x, TypeRule rule)
 {
@@ -414,11 +413,6 @@ static inline V loadrulecheck(elf_State *S, int x, TypeRule rule)
 	typerulecheck(S, v, rule);
 	return v;
 }
-
-
-
-
-
 
 
 static inline bool popbool(elf_State *S)
@@ -429,10 +423,6 @@ static inline bool popbool(elf_State *S)
 	return as_int(v);
 }
 
-//
-//
-//
-//
 
 static inline Int popint(elf_State *S)
 {
@@ -444,48 +434,11 @@ static inline Int popint(elf_State *S)
 
 
 
-
-
-static inline const char *loadtext(elf_State *S, int x)
-{
-	V v = loadvalue(S, x);
-	if (is_str(v)) return strt(as_string(v));
-	if (is_buf(v)) return as_buffer(v)->mem;
-	if (is_nil(v)) return 0;
-	loadtypeerror(S, ELF_TSTRING, x);
-	return 0;
-}
-
-
-
-
-static inline void *loadmem(elf_State *S, int x, Int *zmem) {
-	void *mem = 0;
-	*zmem = 0;
-
-	V v = loadvalue(S, x);
-	if (is_buf(v)) {
-		*zmem = as_buffer(v)->min;
-		mem = as_buffer(v)->mem;
-	}
-	else if (is_str(v)) {
-		*zmem = as_string(v)->length;
-		mem = as_string(v)->text;
-	}
-	else {
-		loadrulecheck(S, x, TRULE_STRING|TRULE_BUFFER);
-	}
-	return mem;
-}
-
-
-
-
 static inline Buf loadbuf(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_buf(v)) return as_buffer(v);
-	if (is_nil(v)) return 0;
+	// if (is_nil(v)) return 0;
 	loadtypeerror(S, ELF_TBUFFER, x);
 	return 0;
 }
@@ -497,7 +450,7 @@ static inline Str loadstr(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_str(v)) return as_string(v);
-	if (is_nil(v)) return 0;
+	// if (is_nil(v)) return 0;
 	loadtypeerror(S, ELF_TSTRING, x);
 	return 0;
 }
@@ -572,7 +525,7 @@ static inline Ref loadref(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_ref(v)) return as_ref(v);
-	if (is_nil(v)) return 0;
+	// if (is_nil(v)) return 0;
 	loadtypeerror(S, TRULE_OBJECT, x);
 	return 0;
 }
@@ -587,9 +540,48 @@ static inline Tab loadtable(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_tab(v)) return as_table(v);
-	if (is_nil(v)) return 0;
+	// if (is_nil(v)) return 0;
 	loadtypeerror(S, ELF_TTABLE, x);
 	return 0;
+}
+
+
+// todo: loadtext and loadmem could be replace with loadtextv()
+// and loadtextv returns a text view
+
+// todo: instead return a text view or something
+// text_view { const char *text; int length; }
+static inline const char *loadtext(elf_State *S, int x)
+{
+	V v = loadvalue(S, x);
+	if (is_str(v)) return strt(as_string(v));
+	if (is_buf(v)) return as_buffer(v)->mem;
+	// todo: we allow nil here...
+	if (is_nil(v)) return 0;
+
+	loadtypeerror(S, ELF_TSTRING, x);
+	return 0;
+}
+
+// todo: instead return a text view or something
+// text_view { const char *text; int length; }
+static inline void *loadmem(elf_State *S, int x, Int *zmem) {
+	void *mem = 0;
+	*zmem = 0;
+
+	V v = loadvalue(S, x);
+	if (is_buf(v)) {
+		*zmem = as_buffer(v)->min;
+		mem = as_buffer(v)->mem;
+	}
+	else if (is_str(v)) {
+		*zmem = as_string(v)->length;
+		mem = as_string(v)->text;
+	}
+	else {
+		loadrulecheck(S, x, TRULE_STRING|TRULE_BUFFER);
+	}
+	return mem;
 }
 
 

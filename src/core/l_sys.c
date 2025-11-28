@@ -102,23 +102,6 @@ static char *slice_path(char *p, int *l, int n) {
 	}
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
 ELF_FUNCTION(l_sys_slice_path) {
 	Str p = loadstr(S, 1);
 	int n = 1;
@@ -736,15 +719,38 @@ ELF_FUNCTION(l_sys_read_file) {
 	return 1;
 }
 
-
+static Sys load_file(elf_State *S, int x, int *close) {
+	Sys file;
+	if (tissys(loadtype(S, 1))) {
+		file = loadsys(S, 1);
+		*close = false;
+	}
+	else {
+		const char *name = loadtext(S, 1);
+		file = sys_open_file(name, SYS_OPEN_WRITE, SYS_CREATE_ALWAYS);
+		*close = true;
+	}
+	return file;
+}
 
 ELF_FUNCTION(l_sys_write_file) {
-	Sys file = loadsys(S, 1);
 
-	Int zmem;
-	void *mem = loadmem(S, 2, &zmem);
+	const char *name = 0;
 
-	sys_write_file(file, mem, zmem);
+	int close;
+	Sys file = load_file(S, 1, &close);
+
+	if (file != ELF_HINVALID) {
+		Int zmem;
+		void *mem = loadmem(S, 2, &zmem);
+
+		sys_write_file(file, mem, zmem);
+
+		if (close) {
+			sys_close_file(file);
+		}
+	}
+
 	return 0;
 }
 

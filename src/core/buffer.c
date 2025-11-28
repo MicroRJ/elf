@@ -2,12 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-
-
-
-
-
-
 Buf new_buffer(elf_State *S, Index min, Index max) {
 	Buf buf = gcalloc(S, GC_BUF, sizeof(*buf));
 	if (S) setmeta(buf, S->metatables.buffer);
@@ -19,11 +13,6 @@ Buf new_buffer(elf_State *S, Index min, Index max) {
 	buf->mem = calloc(1, max);
 	return buf;
 }
-
-
-
-
-
 
 static char *bufalloc(Buf buf, Index res, Index com) {
 
@@ -118,10 +107,22 @@ ELF_FUNCTION(l_buf_insert_char) {
 	return 1;
 }
 
+ELF_FUNCTION(l_buf_append) {
+	Buf buf = loadbuf(S, 0);
+	Str str = loadstr(S, 1);
 
+	int len = strl(str);
+	const char *src = strt(str);
 
+	char *dst = bufalloc(buf, len + 1, len);
+	memcpy(dst, src, len);
 
+	dst[len] = 0;
 
+	// return self
+	loadpush(S, 0);
+	return 1;
+}
 
 // insert a string into the buffer, if no position is
 // specified, then it appends to the end
@@ -154,16 +155,10 @@ ELF_FUNCTION(l_buf_insert) {
 
 
 
-
-
-
-
-
-
-
-
 static const elf_Binding l_buffer[] = {
 	{ "insert", l_buf_insert },
+	{ "__add", l_buf_append },
+	{ "append", l_buf_append },
 	{ "insert_char", l_buf_insert_char },
 	{ "delete", l_buf_delete },
 };

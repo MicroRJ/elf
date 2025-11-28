@@ -86,28 +86,28 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 	}
 }
 
+void _initstate(elf_State *S) {
+	// todo: we over rely on the virtual memory system
 
+	// todo: to be removed
+	{
+		S->frame_stack_max = GIGABYTES(1) / sizeof(*S->frame_stack);
+		S->frame_stack = sys_virtual_alloc(sizeof(*S->frame_stack) * S->frame_stack_max);
+	}
 
+	{
+		S->stack_max = GIGABYTES(1) / sizeof(*S->stack);
+		S->stack = sys_virtual_alloc(sizeof(*S->stack) * S->stack_max);
+		S->stack_ptr = S->stack;
+	}
 
-
-
-
-
-
-
-
-
-//
-// todo: we over rely on the virtual memory system
-//
-void elf_init_raw(elf_State *S) {
-	// todo: can we use the value regular stack instead
-	S->frame_stack = sys_virtual_alloc(GIGABYTES(1));
-	S->frame_stack_max = GIGABYTES(1) / sizeof(*S->frame_stack);
-
-	S->stack = sys_virtual_alloc(GIGABYTES(1));
-	S->stack_max = GIGABYTES(1) / sizeof(*S->stack);
-	S->stack_ptr = S->stack;
+	{
+		// todo: isn't there a way to create native circular buffer using
+		// some form of paged addressing
+		S->record_max = 1024;
+		S->record_min = 0;
+		S->record = sys_virtual_alloc(sizeof(*S->record) * S->record_max);
+	}
 
 	S->gc.memthreshold = GC_MEM_THRESHOLD_MIN;
 	S->gc.objthreshold = GC_OBJ_THRESHOLD_MIN;
@@ -120,14 +120,6 @@ void elf_init_raw(elf_State *S) {
 
 	S->frame.framebase = S->stack;
 	S->frame.framesize = 16;
-
-#if 0
-	S->exec_trail_capacity = 128;
-	S->exec_trail = sys_virtual_alloc(S->exec_trail_capacity * sizeof(*S->exec_trail));
-	S->trace_table = pushnewtable(S);
-#endif
-
-
 
 	// todo: metatables should be per module?
 	S->metatables.string = pushnewtable(S);
@@ -291,18 +283,6 @@ int elf_call(elf_State *S, int nargs, int nrets)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 static inline Array check_array(elf_State *S, V v) {
 	typecheck(S, v, ELF_TTABLE);
 	return as_table(v)->array;
@@ -341,46 +321,6 @@ static inline Index check_index(elf_State *S, V v, Index l) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* all these are macros for generating the interpreter
 so they only work within that function ya heard */
 
@@ -389,42 +329,11 @@ so they only work within that function ya heard */
 #define VMBREAK break
 
 
-#define global_store_x(v) (globals->array[by.b_x] = v)
 #define global_x() (globals->array[by.b_x])
 #define global_y() (globals->array[by.b_y])
-
-
-#define StoreX(v) (frame.reference[by.b_x] = v)
-#define StoreXInt(v) (to_int(&frame.reference[by.b_x], v))
-
 #define LoadX() (frame.reference[by.b_x])
 #define LoadY() (frame.reference[by.b_y])
 #define LoadZ() (frame.reference[by.b_z])
-
-#define LoadYInt() as_int(LoadY())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -463,6 +372,7 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 
 
 	// todo: this is redundant, we already zero when we set the stack pointer!
+
 	// prevent the collector from tripping on possibly garbage values
 	// clear the remaining stack space
 	zero_values(reference + MIN(proto.arity, nargs), framesize - MIN(proto.arity, nargs) - (reference - framebase));
@@ -486,16 +396,46 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 }
 
 
+#define _pushrec0(S,b,o) _pushrec(S,b,o,NIL_VALUE,NIL_VALUE)
+#define _pushrec1(S,b,o,x) _pushrec(S,b,o,x,NIL_VALUE)
+static inline void _pushrec(elf_State *S, Bytec b, V o, V x, V y)
+{
+	Record *rec = & S->record[S->record_min ++ & (S->record_max - 1)];
+	rec->b = b;
+	rec->o = o;
+	rec->x = x;
+	rec->y = y;
+}
 
+static void _tracerecords(elf_State *S, u32 x) {
+	u32 mask = S->record_max - 1;
+	for (u32 i = S->record_min - 1; i >= 0; -- i) {
+		Record *rec = & S->record[i & mask];
+		Bytec b = rec->b;
 
-
-
-
-
-
-
-
-
+		switch (b.b_k) {
+			case BC_LT:
+			case BC_LTEQ:
+			case BC_EQ:
+			case BC_NEQ:
+			case BC_MOD:
+			case BC_POW:
+			case BC_MUL:
+			case BC_DIV:
+			case BC_ADD:
+			case BC_SUB:
+			case BC_BIT_XOR:
+			case BC_BIT_SHL:
+			case BC_BIT_SHR:
+			case BC_BIT_OR: {
+				if (b.b_x == x) {
+					printf("instr write to: \n");
+					printf("%s(%i, %i, %i)\n", byte2s[b.b_k], b.b_x, b.b_y, b.b_z);
+				}
+			} break;
+		}
+	}
+}
 
 
 // todo: outward facing root call should not write results to the function,
@@ -523,6 +463,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 		S->byte = minstr;
 
 		Bytec byte = S->bytebuf[minstr];
+
 		// printf("%s(%i, %i, %i)\n", byte2s[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
 
 		#define by byte
@@ -612,7 +553,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 			case BC_JZ: {
 
-				if (LoadYInt() == 0) {
+				if (as_int(LoadY()) == 0) {
 					int dst = by.b_x;
 					frame.nextinstr = instr + dst;
 				}
@@ -621,7 +562,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 			case BC_JNZ: {
 
-				if (LoadYInt() != 0) {
+				if (as_int(LoadY()) != 0) {
 					int dst = by.b_x;
 					frame.nextinstr = instr + dst;
 				}
@@ -629,53 +570,117 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} break;
 
 
+			VMCASE(BC_LOADNIL) {
+				to_nil(&LoadX());
+				_pushrec0(S, byte, LoadX());
+			} VMBREAK;
+
+			VMCASE(BC_LOADKINT) {
+				to_int(&LoadX(), S->integers[by.b_y]);
+				_pushrec0(S, byte, LoadX());
+			} VMBREAK;
+
+			VMCASE(BC_LOADKNUM) {
+				to_num(&LoadX(), S->numbers[by.b_y]);
+				_pushrec0(S, byte, LoadX());
+			} VMBREAK;
+
+
+			VMCASE(BC_LOADGLOBAL) {
+				vmove(&LoadX(), global_y());
+				_pushrec1(S, byte, LoadX(), global_y());
+			} VMBREAK;
+
+			VMCASE(BC_SETGLOBAL) {
+				vmove(&global_x(), LoadY());
+				_pushrec1(S, byte, global_x(), LoadY());
+			} VMBREAK;
+
+			VMCASE(BC_RELOAD) {
+				V x = LoadY();
+				vmove(&LoadX(), x);
+				_pushrec1(S, byte, LoadX(), x);
+			} VMBREAK;
+
+			VMCASE(BC_LOADCVAL) {
+				ASSERT(WITHIN(BC_ARGY(byte), 0, frame.closuresize));
+				vmove(&LoadX(), frame.closureenv[by.b_y]);
+			} VMBREAK;
+
+			VMCASE(BC_GETMETAFIELD)
+			{
+				V x = LoadY(), y = LoadZ();
+				V o = _get_metafield(S, x, y);
+
+				vmove(&LoadX(), o);
+
+				_pushrec(S, byte, o, x, y);
+			} VMBREAK;
+
+
+			VMCASE(BC_SETINDEX)
+			{
+				V x = LoadY(), y = LoadZ();
+				V o = LoadZ();
+
+				Array array  = check_array(S, x);
+				Index index  = check_index(S, y, heap_array_length(array));
+				array[index] = o;
+
+				_pushrec(S, byte, o, x, y);
+			} VMBREAK;
+
+			VMCASE(BC_GETINDEX)
+			{
+				V x = LoadY(), y = LoadZ();
+
+				Array array = check_array(S, x);
+				Index index = check_index(S, y, heap_array_length(array));
+
+				V o = array[index];
+
+				vmove(&LoadX(), o);
+
+				_pushrec(S, byte, o, x, y);
+			} VMBREAK;
+
+
+			case BC_GETFIELD: {
+
+				_get_field(S, &LoadX(), LoadY(), LoadZ());
+
+			} break;
+
+			case BC_SETFIELD: {
+				xx=LoadX(), yy=LoadY(), zz=LoadZ();
+
+				if (is_tab(xx)) {
+					if (is_nil(yy)) reporterror(S, minstr, "key is nil...");
+
+					tableset(S,  xx.x_tab, yy, zz);
+				}
+				else if (isusr(xx)) {
+					reporterror(S, minstr, "overload not implemented");
+				}
+				else if (is_str(xx)) {
+					reporterror(S, minstr, "strings are readonly, you may not change them");
+				}
+				else {
+					reporterrorf(S, minstr, "attempted to set field of '%s' value", tag2s[xx.tag]);
+				}
+			} break;
+
+
+			// todo: replace with table intrinsics!
+			// _table_arraylen
+			// _table_arrayset
+			// _table_arrayget
 
 
 			VMCASE(BC_ENFORCE) {
 
 				typerulecheck(S, LoadX(), by.b_y);
 
-			} VMBREAK;
-
-
-
-
-		VMCASE(BC_LOADGLOBAL) {
-				vmove(&LoadX(), global_y());
-			} VMBREAK;
-
-			VMCASE(BC_LOADNIL) {
-				to_nil(&LoadX());
-			} VMBREAK;
-
-			VMCASE(BC_LOADKINT) {
-				to_int(&LoadX(), S->integers[by.b_y]);
-			} VMBREAK;
-
-			VMCASE(BC_LOADKNUM) {
-				to_num(&LoadX(), S->numbers[by.b_y]);
-			} VMBREAK;
-
-			VMCASE(BC_SETGLOBAL) {
-				vmove(&global_x(), LoadY());
-			} VMBREAK;
-
-			VMCASE(BC_RELOAD) {
-				vmove(&LoadX(), LoadY());
-			} VMBREAK;
-
-
-			VMCASE(BC_BIT_NOT) {
-				if (!is_int(LoadY())) {
-					reporterrorf(S, -1, "'~': expects integer");
-				}
-				StoreXInt( ~ as_int(LoadY()));
-			} VMBREAK;
-
-
-			VMCASE(BC_LOADCVAL) {
-				ASSERT(WITHIN(BC_ARGY(byte), 0, frame.closuresize));
-				StoreX(frame.closureenv[by.b_y]);
 			} VMBREAK;
 
 			case BC_CLOSURE: {
@@ -706,78 +711,21 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} break;
 
 
-
-
-
-			VMCASE(BC_GETMETAFIELD)
-			{
-
-				V metafield = _get_metafield(S, LoadY(), LoadZ());
-				StoreX(metafield);
-
-			} VMBREAK;
-
-
-			// todo: replace with table intrinsics!
-			// _table_arraylen
-			// _table_arrayset
-			// _table_arrayget
-
 			VMCASE(BC_GETLENGTH)
 			{
-
 				Array array  = check_array(S, LoadY());
-				StoreXInt(heap_array_length(array));
-
+				to_int(&LoadX(), heap_array_length(array));
 			} VMBREAK;
 
 
-
-
-			VMCASE(BC_SETINDEX)
-			{
-
-				Array array  = check_array(S, LoadX());
-				Index index  = check_index(S, LoadY(), heap_array_length(array));
-				array[index] = LoadZ();
-
+			VMCASE(BC_ARRAYADD) {
+				Value table = LoadX();
+				Value value = LoadY();
+				typecheck(S, table, ELF_TTABLE);
+				_table_arrayadd(S, as_table(table), value);
 			} VMBREAK;
 
 
-
-			VMCASE(BC_GETINDEX)
-			{
-
-				Array array = check_array(S, LoadY());
-				Index index = check_index(S, LoadZ(), heap_array_length(array));
-				StoreX(array[index]);
-
-			} VMBREAK;
-
-			case BC_GETFIELD: {
-
-				_get_field(S, &LoadX(), LoadY(), LoadZ());
-
-			} break;
-
-			case BC_SETFIELD: {
-				xx=LoadX(), yy=LoadY(), zz=LoadZ();
-
-				if (is_tab(xx)) {
-					if (is_nil(yy)) reporterror(S, minstr, "key is nil...");
-
-					tableset(S,  xx.x_tab, yy, zz);
-				}
-				else if (isusr(xx)) {
-					reporterror(S, minstr, "overload not implemented");
-				}
-				else if (is_str(xx)) {
-					reporterror(S, minstr, "strings are readonly, you may not change them");
-				}
-				else {
-					reporterrorf(S, minstr, "attempted to set field of '%s' value", tag2s[xx.tag]);
-				}
-			} break;
 
 			case BC_N2I:
 			{
@@ -790,63 +738,109 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} break;
 
 
-			VMCASE(BC_NEQ) {
-				v__neq(S, &LoadX(), LoadY(), LoadZ());
+			VMCASE(BC_BIT_NOT) {
+
+				V x = LoadY();
+				typecheck(S, x, ELF_TINTEGER);
+
+				V o;
+				to_int(&o, ~ as_int(x));
+
+				vmove(&LoadX(), o);
+
+				_pushrec1(S, byte, o, x);
 			} VMBREAK;
 
 			VMCASE(BC_EQ) {
-				v__eq(S, &LoadX(), LoadY(), LoadZ());
+				V x = LoadY(), y = LoadZ();
+				v__eq(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-
-			VMCASE(BC_BIT_SHL) {
-				v__shl(S, &LoadX(), LoadY(), LoadZ());
+			VMCASE(BC_NEQ) {
+				V x = LoadY(), y = LoadZ();
+				v__neq(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
-
-			VMCASE(BC_BIT_SHR) {
-				v__shr(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-
-			VMCASE(BC_BIT_XOR) {
-				v__eor(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-
-			VMCASE(BC_BIT_OR) {
-				v__ior(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-
-			VMCASE(BC_BIT_AND) {
-				v__and(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-
-
-			VMCASE(BC_MUL) {
-				v__mul(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-			VMCASE(BC_DIV) {
-				v__div(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-			VMCASE(BC_ADD) {
-				v__add(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-			VMCASE(BC_SUB) {
-				v__sub(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-			VMCASE(BC_MOD) {
-				v__mod(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-			VMCASE(BC_POW) {
-				v__pow(S, &LoadX(), LoadY(), LoadZ());
-			} VMBREAK;
-
 
 			VMCASE(BC_LT) {
-				v__lt(S, &LoadX(), LoadY(), LoadZ());
+				V x = LoadY(), y = LoadZ();
+				v__lt(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
 			VMCASE(BC_LTEQ) {
-				v__lteq(S, &LoadX(), LoadY(), LoadZ());
+				V x = LoadY(), y = LoadZ();
+				v__lteq(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
+
+			VMCASE(BC_POW) {
+				V x = LoadY(), y = LoadZ();
+				v__pow(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_MOD) {
+				V x = LoadY(), y = LoadZ();
+				v__mod(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_MUL) {
+				V x = LoadY(), y = LoadZ();
+				v__mul(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_DIV) {
+				V x = LoadY(), y = LoadZ();
+				v__div(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_ADD) {
+				V x = LoadY(), y = LoadZ();
+				v__add(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_SUB) {
+				V x = LoadY(), y = LoadZ();
+				v__sub(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_BIT_XOR) {
+				V x = LoadY(), y = LoadZ();
+				v__eor(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_BIT_SHL) {
+				V x = LoadY(), y = LoadZ();
+				v__shl(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_BIT_SHR) {
+				V x = LoadY(), y = LoadZ();
+				v__shr(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_BIT_AND) {
+				V x = LoadY(), y = LoadZ();
+				v__and(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
+			VMCASE(BC_BIT_OR) {
+				V x = LoadY(), y = LoadZ();
+				v__ior(S, &LoadX(), x, y);
+				_pushrec(S, byte, LoadX(), x, y);
+			} VMBREAK;
+
 
 			default: {
 				reporterrorf(S, minstr, "unsupported instruction: %s", byte2s[BC_OP(byte)]);

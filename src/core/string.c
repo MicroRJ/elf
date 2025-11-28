@@ -20,6 +20,7 @@ Str _new_empty_str(elf_State *S, int length) {
 
 
 Str _string_newl(elf_State *S, char const *text, int length) {
+	ASSERT(text);
 	Str str = gcalloc(S, GC_STR, sizeof(*str) + length + 1);
 	if (S) setmeta(str, S->metatables.string);
 	str->length = length;
@@ -33,6 +34,7 @@ Str _string_newl(elf_State *S, char const *text, int length) {
 
 
 Str _string_new(elf_State *S, const char *text) {
+	ASSERT(text);
 	int length = strlen(text);
 	return _string_newl(S, text, length);
 }
