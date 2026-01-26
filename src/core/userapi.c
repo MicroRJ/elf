@@ -45,7 +45,7 @@ const char *elf_loadtextl(elf_State *S, int x, int *l) {
 
 
 
-void elf_pushnil(elf_State *S)                  { pushnil(S);    }
+void elf_push_nil(elf_State *S)                  { pushnil(S);    }
 void elf_pushint(elf_State *S, elf_Integer   x) { pushint(S, x); }
 void elf_pushnum(elf_State *S, elf_Number    x) { pushnum(S, x); }
 void elf_pushfun(elf_State *S, elf_Function  x) { pushfun(S, x); }
@@ -69,7 +69,7 @@ void elf_pushtext(elf_State *S, const char *text) {
 
 
 
-void elf_pushtext2(elf_State *S, const char *text, int len) {
+void elf_push_textl(elf_State *S, const char *text, int len) {
 	pushtext2(S, text, len);
 }
 

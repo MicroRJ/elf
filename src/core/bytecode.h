@@ -4,15 +4,11 @@
 
 
 // todo: make 32 bits
-typedef struct {
-	short b_z,b_y,b_x,b_k;
-} Bytec;
-
-
-// _(EXIT_LOOP_JUMP,  XYZ      , "exit_loop_jump")
-// _(LOOP_JUMP,       XYZ      , "loop_jump")
-// _(TRACE,           XYZ      , "trace")
-// _(TYPEGUARD,       XY       , "typeguard")
+typedef struct
+{
+	i16 b_z, b_y, b_x, b_k;
+}
+Bytec;
 
 #define BCDEF(_)                                  \
 _(HALT,            XXX      , "halt")             \
@@ -62,11 +58,14 @@ _(N2I,             XY       , "n2i")              \
 /* end */
 
 #define BCITEM(NAME,MODE,SYM) XFUSE(BC_,NAME),
-typedef enum ByteOP {
+
+typedef enum
+{
 	BCDEF(BCITEM)
 
 	BC_COUNT_,
 } ByteOP;
+
 #undef BCITEM
 
 

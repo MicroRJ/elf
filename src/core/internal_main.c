@@ -50,6 +50,7 @@
 #include "l_table.c"
 #include "l_string.c"
 #include "l_random.c"
+#include "l_sockets.c"
 
 
 
@@ -114,7 +115,7 @@ void _initstate(elf_State *S) {
 	S->gc.tail = & S->gc.head;
 
 
-	// it literally doesn't matter, but techinically, framebase-1
+	// it literally doesn't matter, but technically, framebase-1
 	// is where the function is at, we don't have one, so nil.
 	pushnil(S);
 
@@ -141,11 +142,12 @@ void _initstate(elf_State *S) {
 	};
 
 	S->globals = pushnewtable(S);
-	install(S,     0,  lib_base  , COUNTOF(lib_base));
-	install(S,     0,  lib_math  , COUNTOF(lib_math));
-	install(S,"elf" ,  l_core    , COUNTOF(l_core));
-	install(S,"elf" ,  lib_random, COUNTOF(lib_random));
-	install(S,"elf" ,  l_sys,      COUNTOF(l_sys));
+	install(S,"elf.sockets",  l_sockets  , COUNTOF(l_sockets));
+	install(S,           0 ,  lib_base   , COUNTOF(lib_base));
+	install(S,           0 ,  lib_math   , COUNTOF(lib_math));
+	install(S, "elf"       ,  l_core     , COUNTOF(l_core));
+	install(S, "elf"       ,  lib_random , COUNTOF(lib_random));
+	install(S, "elf"       ,  l_sys      , COUNTOF(l_sys));
 
 
 	ASSERT(stack2index(S) < S->frame.framesize);

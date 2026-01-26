@@ -104,7 +104,7 @@ void elf_end(elf_State *);
 // * 'this' can be nil.
 //
 //  elf_pushfun(...)
-//  elf_pushnil(...)
+//  elf_push_nil(...)
 //  elf_call()
 //
 //  The result is the number of returns,
@@ -138,12 +138,12 @@ void elf_error(elf_State *, int error, const char *message, ...);
 #define elf_pushtrue(S) elf_pushbool(S, 1)
 #define elf_pushfalse(S) elf_pushbool(S, 0)
 
-void elf_pushnil(elf_State *);
+void elf_push_nil(elf_State *);
 void elf_pushint(elf_State *, elf_Integer);
 void elf_pushnum(elf_State *, elf_Number);
 void elf_pushtab(elf_State *);
 void elf_pushtext(elf_State *, const char *);
-void elf_pushtext2(elf_State *, const char *, int length);
+void elf_push_textl(elf_State *, const char *, int length);
 void elf_pushfun(elf_State *, elf_Function);
 void elf_pushsys(elf_State *, elf_Handle);
 

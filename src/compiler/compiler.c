@@ -15,13 +15,13 @@
 #include "elf_compiler.h"
 #include "c_token.h"
 #include "c_tree.h"
-#include "c_parse.h"
+#include "parse.h"
 
 
 #include "logging.c"
 #include "c_lexer.c"
 #include "c_tree.c"
-#include "c_parser.c"
+#include "parse.c"
 #include "c_make.c"
 
 
@@ -97,7 +97,7 @@ int elf_makefile(elf_State *S, char const *name) {
 
 	protofile->bytepos = S->bytecur;
 	FOR_ARRAY(i, parser->functions) {
-		protos[i] = make_proto(parser, parser->functions[i]);
+		protos[i] = k_do_proto(parser, parser->functions[i]);
 	}
 	protofile->byteend = S->bytecur;
 

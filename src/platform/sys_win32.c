@@ -10,9 +10,6 @@
 
 #include <windows.h>
 #include <Windowsx.h>
-#include <Winsock2.h>
-#include <ws2tcpip.h>
-#include   <ws2def.h>
 #include <shellapi.h>
 
 #define FILE_HANDLE HANDLE
@@ -366,15 +363,15 @@ int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	return noerr;
 }
 
-
-
-elf_Handle sys_create_process(char const *file, char const *args) {
+// Todo, args must actually be writeable
+elf_Handle sys_create_process(char const *file, char const *args)
+{
 	STARTUPINFO startupinfo = {sizeof(startupinfo)};
 	PROCESS_INFORMATION processinfo = {0};
 
 	CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&startupinfo,&processinfo);
-	WaitForSingleObject(processinfo.hProcess, INFINITE);
-	CloseHandle(processinfo.hProcess);
-	CloseHandle(processinfo.hThread);
+	//	WaitForSingleObject(processinfo.hProcess, INFINITE);
+	//	CloseHandle(processinfo.hProcess);
+	//	CloseHandle(processinfo.hThread);
 	return 0;
 }

@@ -93,7 +93,7 @@ ELF_FUNCTION(l_str_find) {
 				sb_writechar(&sb, *cur ++);
 			}
 
-			elf_pushtext2(S, sb.buf, sb.min);
+			elf_push_textl(S, sb.buf, sb.min);
 			elf_arrayadd(S);
 
 			sb.min = 0;
@@ -181,7 +181,7 @@ ELF_FUNCTION(l_str_lowercase) {
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
 	}
-	elf_pushtext2(S, temp, str->length);
+	elf_push_textl(S, temp, str->length);
 	free(temp);
 	return 1;
 }
@@ -194,7 +194,7 @@ ELF_FUNCTION(l_str_uppercase) {
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);
 	}
-	elf_pushtext2(S, temp, str->length);
+	elf_push_textl(S, temp, str->length);
 	free(temp);
 	return 1;
 }

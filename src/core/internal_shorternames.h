@@ -69,5 +69,6 @@ typedef elf_i16 i16;
 typedef elf_i32 i32;
 typedef elf_i64 i64;
 typedef elf_f64 f64;
+typedef elf_i32 b32;
 
 #endif

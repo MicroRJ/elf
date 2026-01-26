@@ -165,18 +165,8 @@ typedef enum {
 	TBIT_ALLMASK   = (1 << ELF_TCOUNT_) - 1,
 } TypeBit;
 
-
-
-
-
-
-
-
-
-// todo: type rules are not enough for detailed logging,
-// encoding semantics is necessary, for instance, an index type...
-
 typedef enum {
+	TRULE_NONE     = 0,
 	TRULE_NIL      = TBIT_NIL,
 	TRULE_TOMB     = TBIT_TOMB,
 	TRULE_NUMBER   = TBIT_NUMBER,
@@ -199,15 +189,6 @@ typedef enum {
 
 	TRULE_COUNT,
 } TypeRule;
-
-
-
-
-
-
-
-
-
 
 
 #define NIL_VALUE ((Value) { ELF_TNIL })

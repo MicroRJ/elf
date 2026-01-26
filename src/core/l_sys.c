@@ -439,7 +439,7 @@ ELF_FUNCTION(l_sys_get_file_tree) {
 
 	// filetree(S, path, recurse);
 
-	elf_pushnil(S);
+	elf_push_nil(S);
 	return 1;
 }
 

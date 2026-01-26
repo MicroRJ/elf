@@ -3,86 +3,77 @@
 //
 
 
-
-
-
 #define NO_LINE (0)
+#define NO_ENTITY -1
+typedef i32 EntityId;
 
+typedef enum
+{
+	ENTITY_BIT_REFERENCED  = 1 << 0,
+	ENTITY_BIT_CONSTANT    = 1 << 1,
+	ENTITY_BIT_ASSIGNED    = 1 << 2,
+	ENTITY_BIT_PARAMETER   = 1 << 3,
+	ENTITY_BIT_FORLOOP     = 1 << 4,
+	ENTITY_BIT_STATIC      = 1 << 5,
+}
+EntityBits;
 
-
-
-enum {
-	ENTITY_REFERENCED = (1 << 0),
-	ENT_FLAG_CONSTANT = (1 << 1),
-	ENTITY_ASSIGNED   = (1 << 2),
-	ENTITY_PARAMETER  = (1 << 3),
-	ENTITY_FORLOOP    = (1 << 4),
-	ENT_FLAG_STATIC   = (1 << 5),
-};
-
-
-
-
-typedef enum {
+typedef enum
+{
 	ENTITY_INVALID = 0,
 	ENTITY_DIRECTORY,
 	ENTITY_LOCAL,
-} entityKi;
+}
+EntityKind;
 
-
-typedef int entID;
-#define NO_ENTITY -1
-
-
-
-typedef struct {
-	entityKi kind;
-	int    status;
-	int     scope;
-	treeID   tree;
-	char    *name;
-	Source   line;
-} Entity;
-
-
-
+typedef struct
+{
+	EntityKind    kind;
+	EntityBits  status;
+	int          scope;
+	TreeId        tree;
+	char         *name;
+	Source        line;
+}
+Entity;
 
 //
 // todo: this uses dynamic arrays, which isn't
 // needed!
 //
-typedef struct {
+typedef struct
+{
 	int *t,*f;
-} jumpS;
+}
+jumpS;
 
 
-typedef struct JBuf {
+typedef struct JBuf
+{
 	BCPos *jz;
 	/* list of exit jump instructions from
 	each consecutive block to be patched */
 	BCPos *j;
-} JBuf;
+}
+JBuf;
 
 
-enum {
+typedef enum
+{
 	BLOCK_ENDED  = 1,
 	BLOCK_HASRET = 2,
-};
-
-
-
+}
+BlockBits;
 
 typedef struct Block Block;
-struct Block {
-	int     status;
-	Source *begin, *end;
-	treeID *defers;
-	// todo: can we remove this? we keep allocating these sub arrays
-	// because we want to remember instructions, but not emit them
-	// to the main execution block, they get emitted later in particular
-	// ways, so we can just have a secondary buffer, and blocks are just
-	// begin end integer pairs
-	treeID *body;
+struct Block
+{
+	BlockBits status;
+	Source    *begin, *end;
+	TreeId    *defers;
+
+	TreeChain  body;
+	// TreeId    *body;
 };
 
 
@@ -91,10 +82,10 @@ struct Block {
 
 typedef struct Loop Loop;
 struct Loop {
-	treeID *breaks;
-	treeID *continues;
-	treeID  index, *values;
-	treeID  name;
+	TreeId *breaks;
+	TreeId *continues;
+	TreeId  index, *values;
+	TreeId  name;
 };
 
 
@@ -147,7 +138,7 @@ struct Parser {
 
 
 	// the current function
-	treeID                       enc;
+	TreeId                       enc;
 
 
 	// Record all the functions we've come across, to help
@@ -160,21 +151,21 @@ struct Parser {
 	// By tracking the functions as we parse them, we avoid
 	// having to re-discover them during code gen.
 	//
-	treeID          *functions;
+	TreeId          *functions;
 
 
 	// entities are named objects, variables,
 	// symbols, special names, and such...
 	// todo: allocate within struct
 	Entity           entities[MAX_ENTITIES];
-	entID            entity_index;
+	EntityId            entity_index;
 
 
 	// remember scope hierarchy, 'scope'
 	// is the first visible entity
-	entID            scope_stack[32];
-	entID            scope_index;
-	entID            scope;
+	EntityId            scope_stack[32];
+	EntityId            scope_index;
+	EntityId            scope;
 
 
 	// remember block hierarchy
@@ -204,7 +195,7 @@ struct Parser {
 
 
 	// remember which trees have memory
-	treeID          memory_slots[128];
+	TreeId          memory_slots[128];
 
 	// immediate buffer?
 	char            tempbuf[1024];

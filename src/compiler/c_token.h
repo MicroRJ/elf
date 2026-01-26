@@ -2,12 +2,9 @@
 // See Copyright Notice In elf.h
 //
 
-// todo: could we meta-generate this?
-
-
 #define FORMAT_CHAR '%'
 
-#define KEYWORDDEF(_) \
+#define KEYWORDDEF(_)       \
 _(ELF      ,"elf"         ) \
 _(JSON     ,"json"        ) \
 _(DEFAULT  ,"default"     ) \
@@ -112,7 +109,8 @@ _(PAREN_RIGHT         ,")")          \
 /* end */
 
 
-typedef enum tokenTy {
+typedef enum
+{
 	TK_NONE = 0,
 #define TKITEM(NAME,_) XFUSE(TK_,NAME),
 #define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
@@ -124,15 +122,20 @@ typedef enum tokenTy {
 #undef TKITEM
 #undef MCITEM
 #undef OPITEM
-} tokenTy;
+}
+TokenType;
 
 
-typedef struct token_metadata_t {
+typedef struct
+{
 	char name[16];
 	char rank;
-} token_metadata_t;
+}
+TokenDesc;
 
-global token_metadata_t g_token_metadata_table[] = {
+// Todo, put this somewhere proper!
+global TokenDesc g_token_metadata_table[] =
+{
 	{"none",-2},
 #define TKITEM(_,SYM) {SYM,-2},
 #define OPITEM(_,SYM,PRC) {SYM,PRC},
@@ -146,14 +149,20 @@ global token_metadata_t g_token_metadata_table[] = {
 #undef MCITEM
 #undef OPITEM
 
-
-typedef struct {
-	tokenTy        type;
-	Source         line;
+typedef struct
+{
+	TokenType    type;
+	union
+	{
+		Source    line;
+		Source    curs;
+		Source    cursor;
+	};
 	unsigned int eol: 1;
 	union {
 		elf_i64 integer;
 		elf_f64  number;
 		char 	    *text;
 	};
-} Token;
+}
+Token;

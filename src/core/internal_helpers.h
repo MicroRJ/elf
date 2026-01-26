@@ -2,74 +2,48 @@
 // See Copyright Notice In elf.h
 //
 
-
-
-
-
-
-
-
-
-
-static inline void checktrap(elf_State *S, Ref ref) {
-	if (ref->status & NODE_DEBUGTRAP) {
+static inline void checktrap(elf_State *S, Ref ref)
+{
+	if (ref->status & NODE_DEBUGTRAP)
+	{
 		reporterrorf(S, ref->debugsrc, "'%p': trapped object found", ref);
 	}
 }
 
-
-
-
-
-
-static inline bool is_readonly(Ref ref) {
+static inline bool is_readonly(Ref ref)
+{
 	return ref->status & NODE_READONLY;
 }
 
-
-
-
-
-
-static void checkwrite(elf_State *S, Ref ref) {
-	if (is_readonly(ref)) {
+static void checkwrite(elf_State *S, Ref ref)
+{
+	if (is_readonly(ref))
+	{
 		reporterrorf(S, -1, "attempted to write to readonly object");
 	}
 }
 
-
-
-
-
-static inline void swap_values(V *x, V *y) {
+static inline void swap_values(V *x, V *y)
+{
 	V temp = *x;
 	*x = *y;
 	*y = temp;
 }
 
-
-
-
-static inline void vmove(V *dst, V src) {
+static inline void vmove(V *dst, V src)
+{
 	copy_memory(dst, &src, sizeof(src));
 }
 
-
-static inline void copy_values(V *dst, V *src, int num) {
+static inline void copy_values(V *dst, V *src, int num)
+{
 	copy_memory(dst, src, num * sizeof(*src));
 }
 
-
-
-static inline void zero_values(V *dst, int num) {
+static inline void zero_values(V *dst, int num)
+{
 	zero_memory(dst, num * sizeof(V));
 }
-
-
-
-
-
-
 
 #define getmeta(o) ((o)->obj.meta)
 #define setmeta(o, m) ((o)->obj.meta = (m))

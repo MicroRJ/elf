@@ -6,7 +6,7 @@
 src/platform/system.c     ^
 src/core/internal_main.c  ^
 src/core/userapi.c        ^
-src/compiler/elf_compiler.c
+src/compiler/compiler.c
 
 @SET INC= ^
 /Isrc ^
@@ -20,4 +20,4 @@ src/compiler/elf_compiler.c
 
 
 clang-cl /nologo -Od -Zi /c %FLAGS% %SRCIN% %INC% -DPLATFORM_DESKTOP -D_DEBUG
-lib /nologo /out:elf.lib system.obj internal_main.obj elf_compiler.obj userapi.obj
+lib /nologo /out:elf.lib system.obj internal_main.obj compiler.obj userapi.obj

@@ -254,7 +254,7 @@ ELF_FUNCTION(l_core_load_json) {
 
 	Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN);
 	if (!file) {
-		elf_pushnil(S);
+		elf_push_nil(S);
 		goto esc;
 	}
 	unsigned int size = sys_size_file(file);

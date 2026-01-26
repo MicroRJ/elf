@@ -20,7 +20,7 @@
 
 
 /* todo: binary search or something goofy */
-static tokenTy text_is_word_or_macro(char *name) {
+static TokenType text_is_word_or_macro(char *name) {
 #define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_M_,NAME);
 	MACRODEF(MCITEM)
 #undef MCITEM
@@ -28,7 +28,7 @@ static tokenTy text_is_word_or_macro(char *name) {
 }
 
 /* todo: speed! */
-static tokenTy check_keyword(char *name) {
+static TokenType check_keyword(char *name) {
 	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_,NAME);
 	KEYWORDDEF(KWITEM)
 	#undef KWITEM
