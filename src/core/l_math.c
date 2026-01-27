@@ -11,12 +11,8 @@
 } while(0)
 
 
-
-
-
-
-
-ELF_FUNCTION(l_math_sgn) {
+ELF_FUNCTION(l_math_sgn)
+{
 	checknumargs(S, nargs, 2);
 
 	V vx = loadnumeric(S, 1);
@@ -32,9 +28,8 @@ ELF_FUNCTION(l_math_sgn) {
 	return 1;
 }
 
-
-
-ELF_FUNCTION(l_math_abs) {
+ELF_FUNCTION(l_math_abs)
+{
 	checknumargs(S, nargs, 2);
 
 	V vx = loadnumeric(S, 1);
@@ -50,11 +45,8 @@ ELF_FUNCTION(l_math_abs) {
 	return 1;
 }
 
-
-
-
-
-static inline void pushinorder(elf_State *S, int inorder, V x, V y) {
+static inline void pushinorder(elf_State *S, int inorder, V x, V y)
+{
 	if (inorder) {
 		pushvalueunsafe(S, x);
 		pushvalueunsafe(S, y);
@@ -65,9 +57,8 @@ static inline void pushinorder(elf_State *S, int inorder, V x, V y) {
 	}
 }
 
-
-
-ELF_FUNCTION(l_math_max) {
+ELF_FUNCTION(l_math_max)
+{
 	checknumargs(S, nargs, 3);
 
 	V vx = loadnumeric(S, 1);
@@ -92,17 +83,16 @@ ELF_FUNCTION(l_math_max) {
 	return 2;
 }
 
-
-
-
-ELF_FUNCTION(l_math_min) {
+ELF_FUNCTION(l_math_min)
+{
 	checknumargs(S, nargs, 3);
 
 	V vx = loadnumeric(S, 1);
 	V vy = loadnumeric(S, 2);
 
 
-	if (is_num(vx) || is_num(vy)) {
+	if (is_num(vx) || is_num(vy))
+	{
 		Num x, y;
 		x = int_to_num(vx);
 		y = int_to_num(vy);
@@ -120,9 +110,8 @@ ELF_FUNCTION(l_math_min) {
 	return 2;
 }
 
-
-
-ELF_FUNCTION(l_math_trim) {
+ELF_FUNCTION(l_math_trim)
+{
 	checknumargs(S, nargs, 4);
 
 	V vx = loadnumeric(S, 1);
@@ -147,7 +136,23 @@ ELF_FUNCTION(l_math_trim) {
 	return 1;
 }
 
+ELF_FUNCTION(l_math_mix)
+{
+	checknumargs(S, nargs, 4);
 
+	V vx = loadnumeric(S, 1);
+	V vy = loadnumeric(S, 2);
+	V vz = loadnumeric(S, 3);
+
+	Num x, y, z;
+	x = int_to_num(vx);
+	y = int_to_num(vy);
+	z = int_to_num(vz);
+
+	Num r = x + (y - x) * z;
+	pushnum(S, r);
+	return 1;
+}
 
 ELF_FUNCTION(l_math_log2) {
 	pushnum(S,log2(loadnum(S,1)));
@@ -220,6 +225,7 @@ static elf_Binding lib_math[] = {
 	{"abs",l_math_abs},
 	{"max",l_math_max},
 	{"min",l_math_min},
+	{"mix",l_math_mix},
 	{"trim",l_math_trim},
 	{"sgn",l_math_sgn},
 	{"exp",l_math_exp},

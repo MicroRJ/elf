@@ -1670,31 +1670,37 @@ static void rewrite_lhs(Parser *par, TreeId lhs) {
 	}
 }
 
-static TreeId *parse_rhs(Parser *parser, int nlhs, TreeKind empty) {
-	TreeId *rhs = 0;
+static TreeChain parse_rhs(Parser *parser, u32 num_lhs, TreeKind empty)
+{
+	TreeChain rhs = {};
 
-	do {
-		if (pick_tok(parser, TK_DOT_DOT)) {
-
+	do
+	{
+		if (pick_tok(parser, TK_DOT_DOT))
+		{
 			// helper message
-			if (heap_array_length(rhs) >= nlhs) {
-				parser_dialog(parser, parser->tok.line
-				, "redundant ellipsis, enough r-values already");
+			if (rhs.tally >= num_lhs)
+			{
+				parser_dialog(parser, parser->tok.cursor
+				, "redundant ellipsis, enough r-values already!");
 			}
 
 			// '...' with no previous y's just means fill everything with nil,
 			// which is what happens by default
-			if (heap_array_length(rhs)) {
-				TreeId r = rhs[heap_array_length(rhs)-1];
-				for (int i=heap_array_length(rhs); i<nlhs; ++i) {
+			if (rhs.tally)
+			{
+				TreeId r = rhs[rhs.tally-1];
+				for (u32 i=rhs.tally; i<num_lhs; ++i)
+				{
 					heap_array_add(rhs, r);
 				}
 			}
 
 
 			// helper message
-			if (peek_tok(parser, TK_COMMA)) {
-				parser_dialog(parser, parser->tok.line
+			if (peek_tok(parser, TK_COMMA))
+			{
+				parser_dialog(parser, parser->tok.cursor
 				, "'...': terminates the expression list");
 			}
 			break;
@@ -1703,17 +1709,20 @@ static TreeId *parse_rhs(Parser *parser, int nlhs, TreeKind empty) {
 		TreeId v = parse_expr(parser, 0);
 		if (notree(v)) break;
 
-		heap_array_add(rhs, v);
+		tree_chain_add(&rhs, v);
 
-		if (heap_array_length(rhs) > nlhs) {
-			parser_dialog(parser, parser->tok.line
+		if (rhs.tally > num_lhs)
+		{
+			parser_dialog(parser, parser->tok.cursor
 			, "warning: excess right hand side value");
 		}
-	} while (pick_tok(parser, TK_COMMA));
+	}
+	while (pick_tok(parser, TK_COMMA));
 
 	// fill with nil
-	for (int i=heap_array_length(rhs); i<nlhs; ++i) {
-		heap_array_add(rhs, tree_nullary(parser, parser->tok.line, empty, NT_ANY));
+	for (u32 i=rhs.tally; i<num_lhs; ++i)
+	{
+		tree_chain_add(rhs, tree_nullary(parser, parser->tok.line, empty, NT_ANY));
 	}
 	return rhs;
 }
@@ -1792,33 +1801,37 @@ static int parse_expr_stat(Parser *parser) {
 			take_tok(parser, TK_BIND);
 		}
 
-		TreeId *rhs = parse_rhs(parser, heap_array_length(names), TREE_NOP);
-		ASSERT(heap_array_length(rhs) >= heap_array_length(names));
+		TreeChain rhs = parse_rhs(parser, heap_array_length(names), TREE_NOP);
+		ASSERT(rhs.tally >= heap_array_length(names));
 
 		//
-		// todo:
-		// reason for memory tree taking an initializer is to
+		// Todo:
+		// Reason for memory tree taking an initializer is to
 		// evaluate the initializer without first allocating
 		// memory for the memory tree, which is what happens
 		// if you do memory tree and then a store.
-		// getting rid of the initializer however, would make
+		// Getting rid of the initializer however, would make
 		// this neater because the path for decls and stores
 		// would merge.
+		// ---
+		// Could we make the generator, simply not allocate the memory
+		// until it is first used or stored to?
 		//
 		// note that we only bind the lhs once we've parsed
 		// the rhs!
-		for (int i = 0; i < heap_array_length(names); ++ i) {
+		//
+		TreeId *next_rhs = rhs.first;
+		for (int i = 0; i < heap_array_length(names); ++ i)
+		{
 			char *name = names[i].text;
 
 			int rem = heap_array_length(names) - i;
 
-			TreeId v = tree_memory2(parser, names[i].line, rhs[i], rem);
+			TreeId v = tree_memory2(parser, names[i].line, next_rhs, rem);
 			next_instr(parser, v);
 
 			parser_bind(parser, names[i].line, status, name, v);
 		}
-
-		free_heap_array(rhs);
 
 		success = true;
 	}
