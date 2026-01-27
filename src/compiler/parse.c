@@ -2,6 +2,7 @@
 //	See Copyright Notice In elf.h
 //
 // Todo, make global declarations explicit!
+// Todo, remove dynamic array usage!
 //
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,15 +28,46 @@ static void next_instr(Parser *parser, TreeId id);
 static void add_this_param(Parser *parser, Source line);
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-static int tok2tree(int tok);
 #define tok2s(type) (g_token_metadata_table[type].name)
-static int tokenrank(int type)
+
+static int token_rank_from_type(int type)
 {
 	return g_token_metadata_table[type].rank;
 }
 
+static int tree_kind_from_token_type(int tok)
+{
+	switch (tok)
+	{
+		case TK_DOT_DOT:   return TREE_RANGE;
+		case TK_LOG_AND:   return EXPR_AND;
+		case TK_LOG_OR:    return EXPR_OR;
+		case TK_NIL_OR:    return EXPR_NIL_OR;
+		case TK_NIL_AND:   return EXPR_NIL_AND;
+		case TK_ADD:       return EXPR_ADD;
+		case TK_SUB:       return EXPR_SUB;
+		case TK_DIV:       return EXPR_DIV;
+		case TK_MUL:       return EXPR_MUL;
+		case TK_POW:       return EXPR_POW;
+		case TK_MOD:       return EXPR_MOD;
+		case TK_NEQ:       return EXPR_NEQ;
+		case TK_EQ:        return EXPR_EQ;
+		case TK_GT:        return EXPR_GT;
+		case TK_GTEQ:      return EXPR_GTEQ;
+		case TK_LT:        return EXPR_LT;
+		case TK_LTEQ:      return EXPR_LTEQ;
+		case TK_SHL:       return EXPR_BIT_SHL;
+		case TK_SHR:       return EXPR_BIT_SHR;
+		case TK_BIT_XOR:   return EXPR_BIT_XOR;
+		case TK_BIT_OR:    return EXPR_BIT_OR;
+		case TK_BIT_AND:   return EXPR_BIT_AND;
+		default:           return TREE_NONE;
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1503,7 +1535,7 @@ static TreeId parse_subexpr(Parser *parser, int flags, int rank)
 
 		tok = parser->tok;
 
-		int prio = tokenrank(tok.type);
+		int prio = token_rank_from_type(tok.type);
 		if (prio <= rank) goto esc;
 
 		// assign is not an expression, quit now and let
@@ -1522,7 +1554,7 @@ static TreeId parse_subexpr(Parser *parser, int flags, int rank)
 			}
 		}
 
-		x = tree_binary(parser, tok.line, tok2tree(tok.type), NT_ANY, x, y);
+		x = tree_binary(parser, tok.line, tree_kind_from_token_type(tok.type), NT_ANY, x, y);
 
 		if (y == Y_NULL) goto esc;
 	}
@@ -1544,33 +1576,6 @@ static TreeId parse_expr(Parser *parser, int flags) {
 	return parse_subexpr(parser, 0, 0);
 }
 
-static int tok2tree(int tok) {
-	switch (tok) {
-		case TK_DOT_DOT: return TREE_RANGE;
-		case TK_LOG_AND: return EXPR_AND;
-		case TK_LOG_OR: return EXPR_OR;
-		case TK_NIL_OR: return EXPR_NIL_OR;
-		case TK_NIL_AND: return EXPR_NIL_AND;
-		case TK_ADD: return EXPR_ADD;
-		case TK_SUB: return EXPR_SUB;
-		case TK_DIV: return EXPR_DIV;
-		case TK_MUL: return EXPR_MUL;
-		case TK_POW: return EXPR_POW;
-		case TK_MOD: return EXPR_MOD;
-		case TK_NEQ: return EXPR_NEQ;
-		case TK_EQ: return EXPR_EQ;
-		case TK_GT: return EXPR_GT;
-		case TK_GTEQ: return EXPR_GTEQ;
-		case TK_LT: return EXPR_LT;
-		case TK_LTEQ: return EXPR_LTEQ;
-		case TK_SHL: return EXPR_BIT_SHL;
-		case TK_SHR: return EXPR_BIT_SHR;
-		case TK_BIT_XOR: return EXPR_BIT_XOR;
-		case TK_BIT_OR: return EXPR_BIT_OR;
-		case TK_BIT_AND: return EXPR_BIT_AND;
-		default: return TREE_NONE;
-	}
-}
 
 static TreeId parse_block(Parser *par) {
 
@@ -1656,9 +1661,11 @@ static void parse_assert(Parser *parser)
 	return;
 }
 
-static void rewrite_lhs(Parser *par, TreeId lhs) {
-	if (lhs->kind == TREE_TABLE_FIELD || lhs->kind == TREE_INDEX) {
-
+// Todo, can we return a new tree instead of mutating the existing one?
+static void rewrite_lhs(Parser *par, TreeId lhs)
+{
+	if (lhs->kind == TREE_TABLE_FIELD || lhs->kind == TREE_INDEX)
+	{
 		// already memory
 		if (lhs->x->kind != TREE_MEMORY)
 		{
@@ -1689,10 +1696,10 @@ static TreeChain parse_rhs(Parser *parser, u32 num_lhs, TreeKind empty)
 			// which is what happens by default
 			if (rhs.tally)
 			{
-				TreeId r = rhs[rhs.tally-1];
+				TreeId r = rhs.tail;
 				for (u32 i=rhs.tally; i<num_lhs; ++i)
 				{
-					heap_array_add(rhs, r);
+					tree_chain_add(&rhs, r);
 				}
 			}
 
@@ -1722,7 +1729,7 @@ static TreeChain parse_rhs(Parser *parser, u32 num_lhs, TreeKind empty)
 	// fill with nil
 	for (u32 i=rhs.tally; i<num_lhs; ++i)
 	{
-		tree_chain_add(rhs, tree_nullary(parser, parser->tok.line, empty, NT_ANY));
+		tree_chain_add(&rhs, tree_nullary(parser, parser->tok.cursor, empty, NT_ANY));
 	}
 	return rhs;
 }
@@ -1783,21 +1790,27 @@ static int parse_expr_stat(Parser *parser) {
 	int success = false;
 
 	Token tok = parser->tok;
+
+	// Todo, remove dynamic array use!
 	Token *names = parse_decl_names(parser);
 
 	// this is a declaration
-	if (peek_tok(parser, TK_BIND) || peek_tok(parser, TK_HARD_BIND)) {
-		if (heap_array_length(names) <= 0) {
+	if (peek_tok(parser, TK_BIND) || peek_tok(parser, TK_HARD_BIND))
+	{
+		if (heap_array_length(names) <= 0)
+		{
 			push_error(parser, ERROR_INVALID_DECL, tok.line
 			, "invalid declaration, left hand side is not a name");
 		}
 
-		int status = ENTITY_BIT_ASSIGNED;
+		EntityBits status = ENTITY_BIT_ASSIGNED;
 
-		if (pick_tok(parser, TK_HARD_BIND)) {
+		if (pick_tok(parser, TK_HARD_BIND))
+		{
 			status |= ENTITY_BIT_CONSTANT;
 		}
-		else {
+		else
+		{
 			take_tok(parser, TK_BIND);
 		}
 
@@ -1820,7 +1833,7 @@ static int parse_expr_stat(Parser *parser) {
 		// note that we only bind the lhs once we've parsed
 		// the rhs!
 		//
-		TreeId *next_rhs = rhs.first;
+		TreeId next_rhs = rhs.head;
 		for (int i = 0; i < heap_array_length(names); ++ i)
 		{
 			char *name = names[i].text;
@@ -1831,6 +1844,7 @@ static int parse_expr_stat(Parser *parser) {
 			next_instr(parser, v);
 
 			parser_bind(parser, names[i].line, status, name, v);
+			next_rhs = next_rhs->next;
 		}
 
 		success = true;
@@ -1839,7 +1853,7 @@ static int parse_expr_stat(Parser *parser) {
 	else {
 
 		TreeId *lhs = complete_lhs(parser, names);
-		TreeId *rhs = 0;
+		TreeChain rhs = {};
 
 		tok = parser->tok;
 
@@ -1851,7 +1865,7 @@ static int parse_expr_stat(Parser *parser) {
 		}
 		else if (pick_tok(parser,TK_NIL_ASSIGN)){
 		}
-		else if (tokenrank(tok.type) > 0){
+		else if (token_rank_from_type(tok.type) > 0){
 			next_tok(parser);
 			take_tok(parser, TK_ASSIGN);
 		}
@@ -1865,35 +1879,42 @@ static int parse_expr_stat(Parser *parser) {
 
 
 		rhs = parse_rhs(parser, heap_array_length(lhs), EXPR_NIL);
-		ASSERT(heap_array_length(rhs) >= heap_array_length(lhs));
+		ASSERT(rhs.tally >= heap_array_length(lhs));
 
 
 		// regular store
 		if (tok.type == TK_ASSIGN)
 		{
+			TreeId next_rhs = rhs.head;
 			for (int i=0; i<heap_array_length(lhs); ++i)
 			{
-				MEMORY_SCOPE(parser) {
-					TreeId v = tree_store(parser, tok.line, lhs[i], rhs[i]);
+				MEMORY_SCOPE(parser)
+				{
+					TreeId v = tree_store(parser, tok.line, lhs[i], next_rhs);
 					next_instr(parser, v);
 				}
+
+				next_rhs = next_rhs->next;
 			}
 		}
 		else if (tok.type == TK_NIL_ASSIGN)
 		{
+			TreeId next_rhs = rhs.head;
 			for (int i=0; i<heap_array_length(lhs); ++i)
 			{
-				MEMORY_SCOPE(parser) {
+				MEMORY_SCOPE(parser)
+				{
 					rewrite_lhs(parser, lhs[i]);
 
 					TreeId c = tree_binary(parser, tok.line, EXPR_EQ, NT_ANY, lhs[i], tree_nil(parser, tok.line));
-					TreeId s = tree_store(parser, tok.line, lhs[i], rhs[i]);
+					TreeId s = tree_store(parser, tok.line, lhs[i], next_rhs);
 					TreeId v = tree_if(parser, tok.line, c, s, 0);
 					next_instr(parser, v);
 				}
+				next_rhs = next_rhs->next;
 			}
 		}
-		else if (tokenrank(tok.type) > 0)
+		else if (token_rank_from_type(tok.type) > 0)
 		{
 			//
 			// if we got here it means that we attempted to
@@ -1902,26 +1923,32 @@ static int parse_expr_stat(Parser *parser) {
 			// an assignment, so the parser returned the left
 			// hand side expression but didn't take the token.
 			//
+			TreeId next_rhs = rhs.head;
 			for (int i = 0; i < heap_array_length(lhs); ++ i)
 			{
-				MEMORY_SCOPE(parser) {
+				MEMORY_SCOPE(parser)
+				{
 					rewrite_lhs(parser, lhs[i]);
 
-					TreeId o = tree_binary(parser, tok.line, tok2tree(tok.type), NT_ANY, lhs[i], rhs[i]);
+					TreeId o = tree_binary(parser, tok.line, tree_kind_from_token_type(tok.type), NT_ANY, lhs[i], next_rhs);
 					TreeId v = tree_store(parser, tok.line, lhs[i], o);
 					next_instr(parser, v);
 				}
+				next_rhs = next_rhs->next;
 			}
 		}
-		else {
+		else
+		{
 			_regularexpr:
 			// if they're regular expressions, just add them to the
 			// block and the generator will figure out whether
 			// to keep them or not
-			FOR_ARRAY(i, lhs) {
+			FOR_ARRAY(i, lhs)
+			{
 				// top-level memory trees mean "allocate" memory, there's
 				// no way to "reference" memory, either way, prune it.
-				if (lhs[i]->kind != TREE_MEMORY) {
+				if (lhs[i]->kind != TREE_MEMORY)
+				{
 					next_instr(parser, lhs[i]);
 				}
 			}
@@ -1929,7 +1956,6 @@ static int parse_expr_stat(Parser *parser) {
 
 		success = true;
 		free_heap_array(lhs);
-		free_heap_array(rhs);
 
 		// not a decl branch
 	}
@@ -2561,8 +2587,9 @@ static int parse_json_object(Parser *parser) {
 	return noerr;
 }
 
-static int parse_json_value(Parser *parser) {
-	int noerr = true;
+static int parse_json_value(Parser *parser)
+{
+	int success = true;
 
 	Token tok = parser->tok;
 	switch (tok.type) {
@@ -2587,8 +2614,8 @@ static int parse_json_value(Parser *parser) {
 		default: {
 			pushnil(parser->inter);
 			parser_dialog(parser, tok.line, "invalid json value");
-			noerr = false;
+			success = false;
 		} break;
 	}
-	return noerr;
+	return success;
 }

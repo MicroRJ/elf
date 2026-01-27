@@ -251,24 +251,28 @@ static Token lex_token(Parser *parser) {
 			}
 
 		} break;
-		case '0'...'9': {
 
-			elf_i64 x = lex_integer(parser);
+		// Todo, handle exponent notation!
+		case '0'...'9':
+		{
+			i64 x = lex_integer(parser);
 
-			token.type = TK_INTEGER;
+			token.type    = TK_INTEGER;
 			token.integer = x;
 
 			// post-decimal part, ensure we don't match a ".."
-			if ((POS0() == '.') && (POS1() != '.')) {
-
+			if ((POS0() == '.') && (POS1() != '.'))
+			{
 				MOVE();
 
-				elf_f64 y = lex_fractional(parser);
+				f64 y = lex_fractional(parser);
 
-				token.type = TK_NUMBER;
+				token.type   = TK_NUMBER;
 				token.number = x + y;
 			}
-		} break;
+		}
+		break;
+
 		case '\'': {
 			MOVE();
 
