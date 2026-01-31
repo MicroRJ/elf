@@ -31,7 +31,7 @@ ELF_FUNCTION(l_sys_get_performance_counter_frequency) {
 
 ELF_FUNCTION(l_sys_get_performance_counter_elapsed_s) {
 	Time time = loadint(S, 1);
-	elf_pushnum(S, get_performance_counter_elapsed_s(time));
+	elf_push_num(S, get_performance_counter_elapsed_s(time));
 	return 1;
 }
 
@@ -39,7 +39,7 @@ ELF_FUNCTION(l_sys_get_performance_counter_elapsed_s) {
 
 ELF_FUNCTION(l_sys_get_performance_counter_elapsed_ms) {
 	Time time = loadint(S, 1);
-	elf_pushnum(S, get_performance_counter_elapsed_s(time) * 1000);
+	elf_push_num(S, get_performance_counter_elapsed_s(time) * 1000);
 	return 1;
 }
 

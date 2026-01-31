@@ -25,7 +25,7 @@ void elf_error(elf_State *S, int error, const char *format, ...) {
 
 
 Tag elf_loadtype(elf_State *S, int x) { return loadtype(S, x); }
-Num elf_loadnum(elf_State *S, int x) { return loadnum(S, x); }
+Num elf_load_num(elf_State *S, int x) { return loadnum(S, x); }
 Int elf_loadint(elf_State *S, int x) { return loadint(S, x); }
 Handle elf_loadsys(elf_State *S, int x) { return loadsys(S, x); }
 
@@ -47,7 +47,7 @@ const char *elf_loadtextl(elf_State *S, int x, int *l) {
 
 void elf_push_nil(elf_State *S)                  { pushnil(S);    }
 void elf_pushint(elf_State *S, elf_Integer   x) { pushint(S, x); }
-void elf_pushnum(elf_State *S, elf_Number    x) { pushnum(S, x); }
+void elf_push_num(elf_State *S, elf_Number    x) { pushnum(S, x); }
 void elf_pushfun(elf_State *S, elf_Function  x) { pushfun(S, x); }
 void elf_pushsys(elf_State *S, elf_Handle    x) { pushsys(S, x); }
 

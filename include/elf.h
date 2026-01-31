@@ -140,7 +140,7 @@ void elf_error(elf_State *, int error, const char *message, ...);
 
 void elf_push_nil(elf_State *);
 void elf_pushint(elf_State *, elf_Integer);
-void elf_pushnum(elf_State *, elf_Number);
+void elf_push_num(elf_State *, elf_Number);
 void elf_pushtab(elf_State *);
 void elf_pushtext(elf_State *, const char *);
 void elf_push_textl(elf_State *, const char *, int length);
@@ -195,7 +195,7 @@ elf_Tag elf_loadtype(elf_State *, int x);
 elf_Tag elf_loadpush(elf_State *, int x);
 const char *elf_loadtext(elf_State *, int x);
 const char *elf_loadtextl(elf_State *, int x, int *l);
-elf_Number elf_loadnum(elf_State *, int x);
+elf_Number elf_load_num(elf_State *, int x);
 elf_Integer elf_loadint(elf_State *, int x);
 elf_Handle elf_loadsys(elf_State *, int x);
 
