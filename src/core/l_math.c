@@ -17,12 +17,14 @@ ELF_FUNCTION(l_math_sgn)
 
 	V vx = loadnumeric(S, 1);
 
-	if (is_num(vx)) {
-		Num x=int_to_num(vx);
+	if (is_num(vx))
+	{
+		Num x = int_to_num(vx);
 		pushint(S, x < 0 ? -1 : x > 0 ? +1 : 0);
 	}
-	else {
-		Int x=as_int(vx);
+	else
+	{
+		Int x = as_int(vx);
 		pushint(S, x < 0 ? -1 : x > 0 ? +1 : 0);
 	}
 	return 1;
