@@ -39,7 +39,7 @@
 
 #include "gc.c"
 
-#include "elf_compiler.h"
+#include "compiler.h"
 
 #include "intrinsics.c"
 
@@ -349,7 +349,7 @@ so they only work within that function ya heard */
 // update the given frame to match the given closure's needs
 static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Closure *closure, int nargs, int nrets)
 {
-	Proto proto = closure->proto;
+	BytecodeFunction proto = closure->proto;
 
 	// todo: do not grow frame size less we care about vargs
 	int framesize = nargs < proto.stacksize ? proto.stacksize : nargs;
@@ -400,7 +400,7 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 
 #define _pushrec0(S,b,o) _pushrec(S,b,o,NIL_VALUE,NIL_VALUE)
 #define _pushrec1(S,b,o,x) _pushrec(S,b,o,x,NIL_VALUE)
-static inline void _pushrec(elf_State *S, Bytec b, V o, V x, V y)
+static inline void _pushrec(elf_State *S, Bytecode b, V o, V x, V y)
 {
 	Record *rec = & S->record[S->record_min ++ & (S->record_max - 1)];
 	rec->b = b;
@@ -413,26 +413,26 @@ static void _tracerecords(elf_State *S, u32 x) {
 	u32 mask = S->record_max - 1;
 	for (u32 i = S->record_min - 1; i >= 0; -- i) {
 		Record *rec = & S->record[i & mask];
-		Bytec b = rec->b;
+		Bytecode b = rec->b;
 
 		switch (b.b_k) {
-			case BC_LT:
-			case BC_LTEQ:
-			case BC_EQ:
-			case BC_NEQ:
-			case BC_MOD:
-			case BC_POW:
-			case BC_MUL:
-			case BC_DIV:
-			case BC_ADD:
-			case BC_SUB:
-			case BC_BIT_XOR:
-			case BC_BIT_SHL:
-			case BC_BIT_SHR:
-			case BC_BIT_OR: {
+			case BYTECODE_LT:
+			case BYTECODE_LTEQ:
+			case BYTECODE_EQ:
+			case BYTECODE_NEQ:
+			case BYTECODE_MOD:
+			case BYTECODE_POW:
+			case BYTECODE_MUL:
+			case BYTECODE_DIV:
+			case BYTECODE_ADD:
+			case BYTECODE_SUB:
+			case BYTECODE_BIT_XOR:
+			case BYTECODE_BIT_SHL:
+			case BYTECODE_BIT_SHR:
+			case BYTECODE_BIT_OR: {
 				if (b.b_x == x) {
 					printf("instr write to: \n");
-					printf("%s(%i, %i, %i)\n", byte2s[b.b_k], b.b_x, b.b_y, b.b_z);
+					printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[b.b_k], b.b_x, b.b_y, b.b_z);
 				}
 			} break;
 		}
@@ -464,20 +464,20 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 		BCPos minstr = frame.bytes + instr;
 		S->byte = minstr;
 
-		Bytec byte = S->bytebuf[minstr];
+		Bytecode byte = S->bytebuf[minstr];
 
-		// printf("%s(%i, %i, %i)\n", byte2s[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
+		// printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
 
 		#define by byte
 
 
-		switch (BC_OP(byte)) {
+		switch (BYTECODE_OP(byte)) {
 
-			VMCASE(BC_NOP)
+			VMCASE(BYTECODE_NOP)
 			{
 			} VMBREAK;
 
-			VMCASE(BC_CALL)
+			VMCASE(BYTECODE_CALL)
 			{
 				// put stack pointer right above all the arguments
 				// note how this will lead to the sub-function having
@@ -525,7 +525,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 				ASSERT(S->stack_ptr == frame.framebase + frame.framesize);
 			} VMBREAK;
 
-			VMCASE(BC_RET) {
+			VMCASE(BYTECODE_RET) {
 				nrets = MIN(by.b_y, frame.nrets);
 
 				// returns are placed right on the function
@@ -546,14 +546,14 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 				}
 			} VMBREAK;
 
-			case BC_J: {
+			case BYTECODE_J: {
 
-				int dst = BC_ARGX(byte);
+				int dst = BYTECODE_ARGX(byte);
 				frame.nextinstr = instr + dst;
 
 			} break;
 
-			case BC_JZ: {
+			case BYTECODE_JZ: {
 
 				if (as_int(LoadY()) == 0) {
 					int dst = by.b_x;
@@ -562,7 +562,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 			} break;
 
-			case BC_JNZ: {
+			case BYTECODE_JNZ: {
 
 				if (as_int(LoadY()) != 0) {
 					int dst = by.b_x;
@@ -572,44 +572,44 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} break;
 
 
-			VMCASE(BC_LOADNIL) {
+			VMCASE(BYTECODE_LOADNIL) {
 				to_nil(&LoadX());
 				_pushrec0(S, byte, LoadX());
 			} VMBREAK;
 
-			VMCASE(BC_LOADKINT) {
+			VMCASE(BYTECODE_LOADKINT) {
 				to_int(&LoadX(), S->integers[by.b_y]);
 				_pushrec0(S, byte, LoadX());
 			} VMBREAK;
 
-			VMCASE(BC_LOADKNUM) {
+			VMCASE(BYTECODE_LOADKNUM) {
 				to_num(&LoadX(), S->numbers[by.b_y]);
 				_pushrec0(S, byte, LoadX());
 			} VMBREAK;
 
 
-			VMCASE(BC_LOADGLOBAL) {
+			VMCASE(BYTECODE_LOADGLOBAL) {
 				vmove(&LoadX(), global_y());
 				_pushrec1(S, byte, LoadX(), global_y());
 			} VMBREAK;
 
-			VMCASE(BC_SETGLOBAL) {
+			VMCASE(BYTECODE_SETGLOBAL) {
 				vmove(&global_x(), LoadY());
 				_pushrec1(S, byte, global_x(), LoadY());
 			} VMBREAK;
 
-			VMCASE(BC_RELOAD) {
+			VMCASE(BYTECODE_RELOAD) {
 				V x = LoadY();
 				vmove(&LoadX(), x);
 				_pushrec1(S, byte, LoadX(), x);
 			} VMBREAK;
 
-			VMCASE(BC_LOADCVAL) {
-				ASSERT(WITHIN(BC_ARGY(byte), 0, frame.closuresize));
+			VMCASE(BYTECODE_LOADCVAL) {
+				ASSERT(WITHIN(BYTECODE_ARGY(byte), 0, frame.closuresize));
 				vmove(&LoadX(), frame.closureenv[by.b_y]);
 			} VMBREAK;
 
-			VMCASE(BC_GETMETAFIELD)
+			VMCASE(BYTECODE_GETMETAFIELD)
 			{
 				V x = LoadY(), y = LoadZ();
 				V o = _get_metafield(S, x, y);
@@ -620,7 +620,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} VMBREAK;
 
 
-			VMCASE(BC_SETINDEX)
+			VMCASE(BYTECODE_SETINDEX)
 			{
 				V x = LoadY(), y = LoadZ();
 				V o = LoadZ();
@@ -632,7 +632,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 				_pushrec(S, byte, o, x, y);
 			} VMBREAK;
 
-			VMCASE(BC_GETINDEX)
+			VMCASE(BYTECODE_GETINDEX)
 			{
 				V x = LoadY(), y = LoadZ();
 
@@ -647,13 +647,13 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} VMBREAK;
 
 
-			case BC_GETFIELD: {
+			case BYTECODE_GETFIELD: {
 
 				_get_field(S, &LoadX(), LoadY(), LoadZ());
 
 			} break;
 
-			case BC_SETFIELD: {
+			case BYTECODE_SETFIELD: {
 				xx=LoadX(), yy=LoadY(), zz=LoadZ();
 
 				if (is_tab(xx)) {
@@ -679,18 +679,18 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			// _table_arrayget
 
 
-			VMCASE(BC_ENFORCE) {
+			VMCASE(BYTECODE_ENFORCE) {
 
 				typerulecheck(S, LoadX(), by.b_y);
 
 			} VMBREAK;
 
-			case BC_CLOSURE: {
-				ASSERT(WITHIN(BC_ARGY(byte), 0, heap_array_length(S->protos)));
+			case BYTECODE_CLOSURE: {
+				ASSERT(WITHIN(BYTECODE_ARGY(byte), 0, heap_array_length(S->protos)));
 
-				int proto_index = BC_ARGY(byte);
+				int proto_index = BYTECODE_ARGY(byte);
 
-				Proto proto = S->protos[proto_index];
+				BytecodeFunction proto = S->protos[proto_index];
 
 				Closure closure;
 
@@ -705,7 +705,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} break;
 
 
-			case BC_TABLE: {
+			case BYTECODE_TABLE: {
 
 				elf_Table *tab = new_table(S);
 				to_tab(&LoadX(), tab);
@@ -713,14 +713,14 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} break;
 
 
-			VMCASE(BC_GETLENGTH)
+			VMCASE(BYTECODE_GETLENGTH)
 			{
 				Array array  = check_array(S, LoadY());
 				to_int(&LoadX(), heap_array_length(array));
 			} VMBREAK;
 
 
-			VMCASE(BC_ARRAYADD) {
+			VMCASE(BYTECODE_ARRAYADD) {
 				Value table = LoadX();
 				Value value = LoadY();
 				typecheck(S, table, ELF_TTABLE);
@@ -729,18 +729,18 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 
 
-			case BC_N2I:
+			case BYTECODE_N2I:
 			{
 				to_int(&LoadX(), num_to_int(LoadY()));
 			} break;
 
-			case BC_I2N:
+			case BYTECODE_I2N:
 			{
 				to_num(&LoadX(), int_to_num(LoadY()));
 			} break;
 
 
-			VMCASE(BC_BIT_NOT) {
+			VMCASE(BYTECODE_BIT_NOT) {
 
 				V x = LoadY();
 				typecheck(S, x, ELF_TINTEGER);
@@ -753,91 +753,91 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 				_pushrec1(S, byte, o, x);
 			} VMBREAK;
 
-			VMCASE(BC_EQ) {
+			VMCASE(BYTECODE_EQ) {
 				V x = LoadY(), y = LoadZ();
 				v__eq(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_NEQ) {
+			VMCASE(BYTECODE_NEQ) {
 				V x = LoadY(), y = LoadZ();
 				v__neq(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_LT) {
+			VMCASE(BYTECODE_LT) {
 				V x = LoadY(), y = LoadZ();
 				v__lt(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_LTEQ) {
+			VMCASE(BYTECODE_LTEQ) {
 				V x = LoadY(), y = LoadZ();
 				v__lteq(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_POW) {
+			VMCASE(BYTECODE_POW) {
 				V x = LoadY(), y = LoadZ();
 				v__pow(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_MOD) {
+			VMCASE(BYTECODE_MOD) {
 				V x = LoadY(), y = LoadZ();
 				v__mod(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_MUL) {
+			VMCASE(BYTECODE_MUL) {
 				V x = LoadY(), y = LoadZ();
 				v__mul(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_DIV) {
+			VMCASE(BYTECODE_DIV) {
 				V x = LoadY(), y = LoadZ();
 				v__div(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_ADD) {
+			VMCASE(BYTECODE_ADD) {
 				V x = LoadY(), y = LoadZ();
 				v__add(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_SUB) {
+			VMCASE(BYTECODE_SUB) {
 				V x = LoadY(), y = LoadZ();
 				v__sub(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_BIT_XOR) {
+			VMCASE(BYTECODE_BIT_XOR) {
 				V x = LoadY(), y = LoadZ();
 				v__eor(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_BIT_SHL) {
+			VMCASE(BYTECODE_BIT_SHL) {
 				V x = LoadY(), y = LoadZ();
 				v__shl(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_BIT_SHR) {
+			VMCASE(BYTECODE_BIT_SHR) {
 				V x = LoadY(), y = LoadZ();
 				v__shr(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_BIT_AND) {
+			VMCASE(BYTECODE_BIT_AND) {
 				V x = LoadY(), y = LoadZ();
 				v__and(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
 			} VMBREAK;
 
-			VMCASE(BC_BIT_OR) {
+			VMCASE(BYTECODE_BIT_OR) {
 				V x = LoadY(), y = LoadZ();
 				v__ior(S, &LoadX(), x, y);
 				_pushrec(S, byte, LoadX(), x, y);
@@ -845,7 +845,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 
 			default: {
-				reporterrorf(S, minstr, "unsupported instruction: %s", byte2s[BC_OP(byte)]);
+				reporterrorf(S, minstr, "unsupported instruction: %s", Static_StrFromBytecode[BYTECODE_OP(byte)]);
 			} break;
 		}
 	}

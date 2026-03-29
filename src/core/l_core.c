@@ -252,15 +252,15 @@ ELF_FUNCTION(l_core_const_expr) {
 ELF_FUNCTION(l_core_load_json) {
 	const char *name = loadtext(S, 1);
 
-	Handle file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN);
+	Handle file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN);
 	if (!file) {
 		elf_push_nil(S);
 		goto esc;
 	}
-	unsigned int size = sys_size_file(file);
+	unsigned int size = elf_platform_get_file_size(file);
 	char *heapbuf = malloc(size);
-	sys_read_file(file, heapbuf, size);
-	sys_close_file(file);
+	elf_platform_read_file(file, heapbuf, size);
+	elf_platform_close_file(file);
 
 	elf_load_json(S, name, heapbuf);
 

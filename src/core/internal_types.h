@@ -136,10 +136,37 @@ typedef char *Source;
 
 // todo:
 extern const char *tag2s[];
-extern const char *byte2s[];
+extern const char *Static_StrFromBytecode[];
 
+// Todo, how do va-args functions work again?
+// if a function is variadic it just means it won't overwrite
+// the additional arguments, so add '...' to your functions if
+// you care about those!
+// and storage for other flags
+typedef struct BytecodeFunction BytecodeFunction;
+struct BytecodeFunction
+{
+	u8    variadic;
+	u8       arity;
+	u8   ncaptures;
+	u16  stacksize;
+	u16   numbytes;
+	u32      bytes;
+};
 
-
+// Todo, just keep name as an atom, in case of error, attempt to load the file or lookup in a cache or something ...
+typedef struct BytecodeFile BytecodeFile;
+struct BytecodeFile
+{
+	u32               bytepos;
+	u32               byteend;
+	BytecodeFunction  main;
+	// Todo, why do we store this?
+	u32               size;
+	char             *data;
+	// Todo, use proper atoms!
+	char              name[ELF_MAX_FILE_PATH];
+};
 
 
 
@@ -263,68 +290,6 @@ STATIC_ASSERT(offsetof(RankValue,  rank) == offsetof(IndexValue, index));
 
 
 
-typedef struct {
-	Value key;
-	Value value;
-} KeyValue;
-STATIC_ASSERT(sizeof(KeyValue) == 32);
-
-
-
-
-
-
-
-
-
-
-
-//
-// if a function is variadic it just means it won't overwrite
-// the additional arguments, so add '...' to your functions if
-// you care about those!
-//
-typedef struct Proto Proto;
-struct Proto {
-	// and storage for other flags
-	u8    variadic;
-	u8       arity;
-	u8   ncaptures;
-	u16  stacksize;
-	u16   numbytes;
-	u32      bytes;
-};
-
-
-
-
-
-
-
-
-
-
-//
-// information about a compiled file
-//
-// todo: only keep source around if not possible
-// to just reload from file system, implement
-// a layered system, when we need source info,
-// check cache, otherwise fall back to file system.
-//
-typedef struct Proto_File Proto_File;
-struct Proto_File {
-	Proto_File *prox;
-	Proto_File *prev;
-	int         bytepos;
-	int         byteend;
-	Proto       main;
-	int         size;
-	char        name[ELF_MAX_FILE_PATH];
-	// this is null terminated!
-	char        text[];
-};
-
 
 
 
@@ -370,7 +335,7 @@ struct elf_Closure {
 	GCNode obj;
 	short      proto_index;
 	short      extra;
-	Proto      proto;
+	BytecodeFunction      proto;
 	Value      captures[];
 };
 
@@ -408,7 +373,7 @@ Tab new_table(elf_State *);
 Index tableset(elf_State *S, Tab tab, V k, V v);
 
 Value _table_getornil(elf_State *S, Tab tab, Value key);
-Index _table_getalways(elf_State *S, Tab tab, V key);
+Index elf_table_ensure(elf_State *S, Tab tab, V key);
 Index _table_arrayadd(elf_State *S, Tab tab, Value value);
 Value _table_arrayget(elf_State *S, Tab tab, Index index);
 Index _table_arraylen(Tab tab);
@@ -641,33 +606,50 @@ void *gcalloc(elf_State *S, GCType type, int size);
 
 
 
+// Todo, remove this? ...
 typedef struct Record Record;
 struct Record {
-	Bytec b;
+	Bytecode b;
 	V o, x, y;
 };
 
+// Todo, move to arena.h
+typedef struct
+{
+	u64 size, used;
+	u8 *data;
+}
+elf_Arena;
+
+
 typedef struct elf_State elf_State;
-struct elf_State {
+struct elf_State
+{
+	// Todo,
+	elf_Arena    arena_;
+	elf_Arena    scratch_arena_;
+	elf_Arena   *arena;
+	elf_Arena   *scratch_arena;
 
-	struct {
+	struct
+	{
 		Tab      globals;
-
 		// minimize usage of these!
 		Num     *numbers;
 		Int     *integers;
 	};
 
-	struct {
-		Proto           *protos;
+	struct
+	{
+		BytecodeFunction   *protos;
 
 		// todo: compress this
-		// todo: also, allocate per Proto_File?
-		char            **lines;
+		// todo: also, allocate per BytecodeFile?
+		char              **lines;
 
 
 		// todo: why is this a double pointer?
-		Proto_File      **files;
+		BytecodeFile      **files;
 
 
 
@@ -676,7 +658,7 @@ struct elf_State {
 		// I think we'll do our own memory management here, and once
 		// we run out of space we can either reallocate to get more, or
 		// if too fragmented do a copy and compact
-		Bytec           *bytebuf;
+		Bytecode        *bytebuf;
 		int              bytecur;
 	};
 

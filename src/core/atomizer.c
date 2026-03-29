@@ -20,7 +20,7 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 			string = target.x_str;
 		} else {
 			string = _new_empty_str(R,length);
-			copy_memory(string->text,text,length);
+			elf_copy_memory(string->text,text,length);
 			string->hash = hash;
 
 			elf_Integer i = heap_array_grow(registry->array,1);
@@ -31,7 +31,7 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 		}
 	} else {
 		string = _new_empty_str(R,length);
-		copy_memory(string->text,text,length);
+		elf_copy_memory(string->text,text,length);
 		string->hash = hash;
 	}
 }

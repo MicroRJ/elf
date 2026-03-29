@@ -5,7 +5,6 @@
 #define FORMAT_CHAR '%'
 
 #define KEYWORDDEF(_)       \
-_(ELF      ,"elf"         ) \
 _(JSON     ,"json"        ) \
 _(DEFAULT  ,"default"     ) \
 _(LOAD     ,"load"        ) \
@@ -51,12 +50,7 @@ _(ENDOFFILE     , "eof"         ) \
 _(THIS          , "this"        ) \
 /* end */
 
-/* === Binary Operators ======================
-	Only binary operators are defined here
-	for the parser to generate code for binary
-	expression parsing.
-	===========================================
-*/
+// Todo, remove this, no one cares ...
 #define BOPDEF(_) \
 _(     POW, "**", 12) \
 _(     MUL,  "*", 11) _( DIV,  "/",  11) _(MOD, "%", 11) \
@@ -70,25 +64,25 @@ _(  BIT_OR,  "|",  5) \
 _( BIT_XOR,  "^",  4) \
 _( LOG_AND, "&&",  3) _( LOG_OR, "||",  2) \
 _( NIL_AND, "!!",  3) _( NIL_OR, "??",  2) \
-_(ELLIPSIS,"...",  1) _(DOT_DOT, "..",  1) \
+_(ELLIPSIS,"...",  1)                      \
 /* end */
 
 
-#define TOKENDEF(_)                 \
-_(INTEGER            ,"int")        \
-_(NUMBER             ,"num")        \
-_(STRING             ,"str")        \
-_(FORMAT_STRING      ,"fmt")        \
-_(LETTER             ,"chr")        \
-_(WORD               ,"word")       \
-_(TILDE              ,"~")          \
-_(MINUS_MINUS        ,"--")         \
-_(PLUS_PLUS          ,"++")         \
-_(QMARK              ,"?")          \
-_(EXCLAMATION_MARK   ,"!")          \
-_(ARROW              ,"->")         \
-_(HARD_ARROW         ,"-->")        \
-_(BIND               ,":=")         \
+#define ELF_TOKEN_XDEF(_)            \
+_(INTEGER            ,"int")         \
+_(NUMBER             ,"num")         \
+_(STRING             ,"str")         \
+_(FORMAT_STRING      ,"fmt")         \
+_(LETTER             ,"chr")         \
+_(IDENTIFIER         ,"identifier")  \
+_(TILDE              ,"~")           \
+_(MINUS_MINUS        ,"--")          \
+_(PLUS_PLUS          ,"++")          \
+_(QMARK              ,"?")           \
+_(EXCLAMATION_MARK   ,"!")           \
+_(ARROW              ,"->")          \
+_(HARD_ARROW         ,"-->")         \
+_(BIND               ,":=")          \
 _(HARD_BIND           ,"::=")        \
 _(STATIC_BIND         ,"::")         \
 _(ASSIGN              ,"=")          \
@@ -111,13 +105,13 @@ _(PAREN_RIGHT         ,")")          \
 
 typedef enum
 {
-	TK_NONE = 0,
-#define TKITEM(NAME,_) XFUSE(TK_,NAME),
-#define OPITEM(NAME,_,__) XFUSE(TK_,NAME),
-#define MCITEM(NAME,_) XFUSE(TK_M_,NAME),
+	TOK_NONE = 0,
+#define TKITEM(NAME,_) XFUSE(TOK_,NAME),
+#define OPITEM(NAME,_,__) XFUSE(TOK_,NAME),
+#define MCITEM(NAME,_) XFUSE(TOK_M_,NAME),
 	KEYWORDDEF(TKITEM)
 	MACRODEF(MCITEM)
-	TOKENDEF(TKITEM)
+	ELF_TOKEN_XDEF(TKITEM)
 	BOPDEF(OPITEM)
 #undef TKITEM
 #undef MCITEM
@@ -141,7 +135,7 @@ global TokenDesc g_token_metadata_table[] =
 #define OPITEM(_,SYM,PRC) {SYM,PRC},
 	KEYWORDDEF(TKITEM)
 	MACRODEF(TKITEM)
-	TOKENDEF(TKITEM)
+	ELF_TOKEN_XDEF(TKITEM)
 	BOPDEF(OPITEM)
 };
 
@@ -157,6 +151,7 @@ typedef struct
 		Source    line;
 		Source    curs;
 		Source    cursor;
+		Source    site;
 	};
 	unsigned int eol: 1;
 	union {

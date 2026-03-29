@@ -95,12 +95,12 @@ unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int size);
 
 int sys_make_dir(const char *path);
 FILE_HANDLE sys_get_std_file(int std);
-FILE_HANDLE sys_open_file(const char *name, int access, int options);
+FILE_HANDLE elf_platform_access_file(const char *name, int access, int options);
 bool sys_delete_file(const char *name);
-void sys_close_file(FILE_HANDLE file);
+void elf_platform_close_file(FILE_HANDLE file);
 elf_i64 sys_move_file_cursor(FILE_HANDLE file, int relativeto, elf_i64 dist);
-elf_i64 sys_size_file(FILE_HANDLE file);
-elf_i64 sys_read_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
+elf_i64 elf_platform_get_file_size(FILE_HANDLE file);
+elf_i64 elf_platform_read_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
 elf_i64 sys_write_file(FILE_HANDLE file, void *buf, elf_i64 zbuf);
 // windows will do file buffering by default
 void sys_flush_file(FILE_HANDLE file);

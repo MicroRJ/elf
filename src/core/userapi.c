@@ -9,7 +9,28 @@
 #include "logging.c"
 #include "internal_types.h"
 #include "internal_helpers.h"
-#include "elf_compiler.h"
+#include "compiler.h"
+#include "arena.c"
+
+
+
+ELF_PUBLIC elf_State *elf_create_state()
+{
+	// Todo,
+	elf_Arena arena = elf_create_arena(0);
+	elf_Arena scratch_arena = elf_create_arena(0);
+
+	elf_State *state = elf_arena_push_zero(& arena, sizeof(*state));
+
+	state->arena_ = arena;
+	state->scratch_arena_ = scratch_arena;
+
+	state->arena = & state->arena_;
+	state->scratch_arena = & state->scratch_arena_;
+
+	_initstate(state);
+	return state;
+}
 
 
 
@@ -74,9 +95,6 @@ void elf_push_textl(elf_State *S, const char *text, int len) {
 }
 
 
-
-
-
 int elf_pushcodefile(elf_State *S, const char *name, const char *text) {
 	// todo: why is make_file doing file io
 	ASSERT(name);
@@ -95,27 +113,13 @@ int elf_pushcodefile(elf_State *S, const char *name, const char *text) {
 	return proto_index >= 0;
 }
 
-
-
-
-
-
-elf_pubapi
-elf_State *elf_new() {
-	elf_State *inter = calloc(1, sizeof(*inter));
-	_initstate(inter);
-	return inter;
-}
-
-
-
-elf_pubapi
+// Todo, remove this!
+ELF_PUBLIC
 void elf_pushglobals(elf_State *S) {
 	pushtab(S, S->globals);
 }
 
-
-
+// Todo, remove this!
 void elf_setfield(elf_State *S) {
 	V tab = S->stack_ptr[-3];
 	V key = S->stack_ptr[-2];
@@ -126,8 +130,7 @@ void elf_setfield(elf_State *S) {
 	S->stack_ptr -= 2;
 }
 
-
-
+// Todo, remove this!
 void elf_arrayadd(elf_State *S) {
 	V tab = S->stack_ptr[-2];
 	V val = S->stack_ptr[-1];
@@ -137,8 +140,7 @@ void elf_arrayadd(elf_State *S) {
 	S->stack_ptr -= 1;
 }
 
-
-
+// Todo, remove this!
 void elf_arrayget(elf_State *S) {
 	V tab = S->stack_ptr[-2];
 	V idx = S->stack_ptr[-1];

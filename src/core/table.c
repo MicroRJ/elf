@@ -287,13 +287,9 @@ Value _table_getornil(elf_State *S, Tab tab, Value key) {
 	return value;
 }
 
-//
-//
-//
-//
-
-static Index _table_getalways(elf_State *S, Tab table, Value key) {
-	Index index = _table_tryresize(S, table, key);
+static Index elf_table_ensure(elf_State *state, Tab table, Value key)
+{
+	Index index = _table_tryresize(state, table, key);
 	ASSERT(index != FIND_ENTRY_FAILED);
 
 	Entry *entry = & table->entries[index];

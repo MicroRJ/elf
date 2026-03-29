@@ -8,15 +8,15 @@
 
 
 #if defined(__EMSCRIPTEN__)
-   #define elf_pubapi  EMSCRIPTEN_KEEPALIVE
+   #define ELF_PUBLIC  EMSCRIPTEN_KEEPALIVE
    #define ELF_EXPORT  EMSCRIPTEN_KEEPALIVE
 #else
    #define ELF_EXPORT __declspec(dllexport)
 
    #if defined(BUILD_STATIC)
-      #define elf_pubapi static
+      #define ELF_PUBLIC static
    #else
-      #define elf_pubapi
+      #define ELF_PUBLIC
    #endif
 #endif
 
@@ -83,7 +83,7 @@ typedef enum {
 
 
 
-elf_State *elf_new();
+elf_State *elf_create_state();
 void elf_end(elf_State *);
 
 

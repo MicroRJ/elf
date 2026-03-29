@@ -573,7 +573,7 @@ ELF_FUNCTION(l_sys_open_file) {
 		mode = SYS_CREATE_ALWAYS;
 	}
 
-	Sys file = sys_open_file(name, flags, mode);
+	Sys file = elf_platform_access_file(name, flags, mode);
 
 	if (ELF_HISINVALID(file)) {
 		pushnil(S);
@@ -604,7 +604,7 @@ ELF_FUNCTION(l_sys_open_file) {
 ELF_FUNCTION(l_sys_close_file) {
 	Sys file = loadsys(S, 1);
 	if (file) {
-		sys_close_file(file);
+		elf_platform_close_file(file);
 	}
 	return 0;
 }
@@ -631,7 +631,7 @@ ELF_FUNCTION(l_sys_close_file) {
 
 ELF_FUNCTION(l_sys_get_file_size) {
 	Sys file = loadsys(S, 1);
-	pushint(S, sys_size_file(file));
+	pushint(S, elf_platform_get_file_size(file));
 	return 1;
 }
 
@@ -680,7 +680,7 @@ ELF_FUNCTION(l_sys_read_file) {
 	if (is_string_type(loadtype(S, 1)))
 	{
 		name = loadtext(S, 1);
-		file = sys_open_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+		file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 	}
 	else if (tissys(loadtype(S, 1)))
 	{
@@ -695,17 +695,17 @@ ELF_FUNCTION(l_sys_read_file) {
 		size = loadint(S, 2);
 	}
 	if (size < 0) {
-		size = sys_size_file(file);
+		size = elf_platform_get_file_size(file);
 	}
 
 	if (file != ELF_HINVALID)
 	{
 		// todo:
 		Str contents = _new_empty_str(S, size);
-		read = sys_read_file(file, contents->text, size);
+		read = elf_platform_read_file(file, contents->text, size);
 
 		if (name) {
-			sys_close_file(file);
+			elf_platform_close_file(file);
 		}
 
 		// -->
@@ -727,7 +727,7 @@ static Sys load_file(elf_State *S, int x, int *close) {
 	}
 	else {
 		const char *name = loadtext(S, 1);
-		file = sys_open_file(name, SYS_OPEN_WRITE, SYS_CREATE_ALWAYS);
+		file = elf_platform_access_file(name, SYS_OPEN_WRITE, SYS_CREATE_ALWAYS);
 		*close = true;
 	}
 	return file;
@@ -747,7 +747,7 @@ ELF_FUNCTION(l_sys_write_file) {
 		sys_write_file(file, mem, zmem);
 
 		if (close) {
-			sys_close_file(file);
+			elf_platform_close_file(file);
 		}
 	}
 
@@ -760,9 +760,9 @@ ELF_FUNCTION(l_sys_write_file_to_file) {
 	Sys dst = loadsys(S, 1);
 	Sys src = loadsys(S, 2);
 
-	int size = sys_size_file(src);
+	int size = elf_platform_get_file_size(src);
 	char *heapbuf = malloc(size);
-	sys_read_file(src, heapbuf, size);
+	elf_platform_read_file(src, heapbuf, size);
 	sys_write_file(dst, heapbuf, size);
 	free(heapbuf);
 	return 1;

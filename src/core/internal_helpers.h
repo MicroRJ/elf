@@ -32,12 +32,12 @@ static inline void swap_values(V *x, V *y)
 
 static inline void vmove(V *dst, V src)
 {
-	copy_memory(dst, &src, sizeof(src));
+	elf_copy_memory(dst, &src, sizeof(src));
 }
 
 static inline void copy_values(V *dst, V *src, int num)
 {
-	copy_memory(dst, src, num * sizeof(*src));
+	elf_copy_memory(dst, src, num * sizeof(*src));
 }
 
 static inline void zero_values(V *dst, int num)
@@ -135,8 +135,6 @@ static inline void to_str(V *v, Str x) {
 	v->tag=ELF_TSTRING;
 	set_obj(v, x);
 }
-
-
 
 static inline void to_tab(V *v, Tab x) {
 	v->tag=ELF_TTABLE;

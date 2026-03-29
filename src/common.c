@@ -13,7 +13,7 @@ static inline void *zero_memory(void *mem, int len) {
 }
 
 
-static inline void *copy_memory(void *dst, void const *src, int len) {
+static inline void *elf_copy_memory(void *dst, void const *src, int len) {
 	memcpy(dst, src, len);
 	return dst;
 }
@@ -205,7 +205,7 @@ char *copy_text2(int length, char const *text) {
 		length = text_l(text);
 	}
 	char *result = malloc(length+1);
-	copy_memory(result,text,length);
+	elf_copy_memory(result,text,length);
 	result[length]=0;
 	return result;
 }

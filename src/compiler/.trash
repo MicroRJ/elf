@@ -1,0 +1,1354 @@
+
+static u32 elf_parse_expr_list(Parser *par)
+{
+	u32 nargs = 0;
+	do
+	{
+		AstRef v = parse_expr(par, 0);
+		if (notree(v)) goto esc;
+		++ nargs;
+		push_ast(par, v);
+	}
+	while (pick_token(par, TOK_COMMA));
+
+	esc:
+	return nargs;
+}
+
+// Todo, can we just remove this ?
+static AstRef elf_parse_tuple_expr(Parser *par)
+{
+	Token tok = par->tok;
+	u32 nargs = elf_parse_expr_list(par);
+	AstRef expr;
+	if (nargs > 1) {
+		AstRef *args = pop_ast_array(par, nargs);
+		expr = create_tuple_expr_ast(par, tok.site, args, nargs);
+	} else {
+		expr = PopTree(par);
+	}
+	return expr;
+}
+
+
+//
+// todo:
+//	Aside from arguments, other contracts are enforced on store,
+// i: int = 1
+//
+// So there could be dedicated store instructions that enforce
+// that contract or extend the current one!
+//
+//
+
+// todo: we can't switch blocks to generate type rule validation
+typedef struct Param Param;
+struct Param
+{
+	AstRef  tree;
+	Token   rule;
+};
+
+typedef struct
+{
+	const char *name;
+	TypeRule    rule;
+}
+NameRule;
+
+// todo: string map!
+static const NameRule typerules[] = {
+	{"int"         , TRULE_INTEGER  },
+	{"num"         , TRULE_NUMBER   },
+	{"numeric"     , TRULE_NUMERIC  },
+	{"callable"    , TRULE_CALLABLE },
+	{"str"         , TRULE_STRING   },
+	{"buf"         , TRULE_BUFFER   },
+	{"non_nil"     , TRULE_NONNIL   },
+};
+
+// Todo, interning!
+static void gen_typerule(Parser *par, AstRef memory, Token tok)
+{
+#if 0
+	for (int i = 0; i < COUNTOF(typerules); ++ i)
+	{
+		if (text_eq(typerules[i].name, tok.text))
+		{
+			AstRef v = tree_enforce(par, tok.line, memory, typerules[i].rule);
+			PushBlockStat(par, v);
+			break;
+		}
+	}
+#endif
+}
+
+			// AstRef v = create_ast(parser, tok.line, TREE_WHILE_LOOP);
+			// v->loop.pred = pred;
+			// v->loop.body = body;
+			// v->loop.c = loop.continues;
+			// v->loop.b = loop.breaks;
+			// PushBlockStat(parser, v);
+			// success = true;
+
+
+#if 0
+		case TOK_CONTINUE:
+		{
+			consume_token(parser);
+
+			AstRef v = Y_NULL;
+
+			if (!tok.eol)
+			{
+				v = parse_expr(parser, 0);
+				if (iserror(v)) goto _err;
+			}
+
+			Loop *loop = checkloop(parser, tok.line, v);
+			v = tree_goto(parser, tok.line);
+			if (tok.type == TOK_CONTINUE) {
+				heap_array_add(loop->continues, v);
+			}
+			else {
+				heap_array_add(loop->breaks, v);
+			}
+			PushBlockStat(parser, v);
+			success = true;
+		}
+		break;
+#endif
+
+#if 0
+static void tree_chain_prepend(TreeChain *v, Ast *r)
+{
+	ASSERT(!r->next);
+
+	if (!v->head)
+	{
+		v->head = v->tail = r;
+	}
+	else
+	{
+		r->next = v->head;
+		v->head = r;
+	}
+
+	++ v->tally;
+}
+
+static void tree_chain_add(TreeChain *v, Ast *r)
+{
+	ASSERT(!r->next);
+
+	if (!v->head)
+	{
+		v->head = v->tail = r;
+	}
+	else
+	{
+		v->tail = v->tail->next = r;
+	}
+
+	++ v->tally;
+}
+
+static AstRef tree_get_next(AstRef tr)
+{
+	return tr->next;
+}
+#endif
+
+
+
+#if 0
+static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef *values, AstRef body)
+{
+
+	ASSERT(expr);
+	ASSERT(index);
+	ASSERT(values);
+	ASSERT(body);
+
+
+	Token tok = parser->tok;
+
+
+	// caller must have created a loop!
+	Loop *loop = checkloop(parser, tok.line, Y_NULL);
+
+
+	AstRef v;
+
+	ASSERT(expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX);
+
+	AstRef rangelo = Y_NULL, rangehi = Y_NULL;
+	AstRef prebody = Y_NULL;
+
+	if (expr->kind == AST_RANGE_INDEX) {
+		ASSERT(expr->x != Y_NULL);
+		ASSERT(expr->y != Y_NULL);
+
+		AstRef array = expr->x;
+		AstRef range = expr->y;
+		ASSERT(range->kind == AST_RANGE);
+
+		rangelo = range->x;
+		rangehi = range->y;
+
+		begin_block(parser);
+		{
+			FOR_ARRAY(i, values) {
+				// todo: special multi-index instruction?
+				v = tree_index(parser, tok.line, array, index, i);
+				v = tree_store(parser, tok.line, values[i], v);
+				PushBlockStat(parser, v);
+			}
+		}
+		prebody = close_block(parser);
+
+		rangelo = range->x, rangehi = range->y;
+
+		if (rangelo == Y_NULL) rangelo = tree_int(parser, range->site, 0);
+		if (rangehi == Y_NULL) rangehi = tree_length(parser, range->site, array);
+	}
+	// RANGE
+	else {
+		// value same as index
+		index = values[0];
+
+		begin_block(parser);
+		{
+			for(int i=1; i<heap_array_length(values); ++ i) {
+				v = tree_add_int(parser, tok.line, index, i);
+				v = tree_store(parser, tok.line, values[i], v);
+				PushBlockStat(parser, v);
+			}
+		}
+		prebody = close_block(parser);
+
+		rangelo = expr->x, rangehi = expr->y;
+
+		if(rangelo == Y_NULL) rangelo = tree_int(parser,tok.line,0);
+		// todo: if we don't have an upper bound replace condition entirely
+		if(rangehi == Y_NULL) rangehi = tree_int(parser,tok.line,UINT_MAX);
+	}
+
+
+	ASSERT(rangelo != Y_NULL);
+	ASSERT(rangehi != Y_NULL);
+
+
+	// initialize index
+	v = tree_store(parser,tok.line,index,rangelo);
+	PushBlockStat(parser, v);
+
+	// generate predicate
+	AstRef pred = tree_less_than(parser, tok.line, index, rangehi);
+
+	// what to do after the loop body's
+	AstRef probody = tree_add_int_store(parser, tok.line, index, heap_array_length(values));
+
+
+
+	// todo: instead of generating all this crap, just have
+	// label instructions! that we can reference!
+	v = create_ast(parser, tok.line, TREE_WHILE_LOOP);
+	v->loop.pred    = pred;
+	v->loop.body    = body;
+	v->loop.prebody = prebody;
+	v->loop.probody = probody;
+	v->loop.c       = loop->continues;
+	v->loop.b       = loop->breaks;
+	return v;
+}
+
+// todo: check for references to loop decls, which are likely errors!
+static AstRef *parse_for_steps(Parser *par, int elem)
+{
+	AstRef *s = 0;
+
+	do
+	{
+		Token tok = par->tok;
+
+		AstRef v;
+		if (pick_token(par, TOK_PAREN_LEFT))
+		{
+			v = elf_parse_tuple_expr(par);
+			take_tok_pair(par, TOK_PAREN_RIGHT, tok);
+		}
+		else
+		{
+			v = elf_parse_tuple_expr(par);
+		}
+		if (notree(v)) goto esc;
+
+		heap_array_add(s, v);
+
+	} while (pick_token(par, TOK_SEMI_COLON));
+
+	esc:
+	return s;
+}
+
+static int parse_for(Parser *parser) {
+	int noerror = true;
+
+	begin_block(parser);
+
+
+	Token tok = take_token(parser,TOK_FOR);
+
+	// todo: can we unify with regular statements?
+	// a function that just returns a list of stores,
+	// and then we desugar them? and that way is just
+	// the one function?
+	Token *names = parse_decl_names(parser);
+
+
+	int status = ENTITY_TAG_ASSIGNED;
+
+	if (pick_token(parser, TOK_HARD_BIND)) {
+
+		status |= ENTITY_TAG_CONSTANT;
+	}
+
+	else if (pick_token(parser, TOK_BIND)) {
+	}
+
+	// todo: for compatibility!
+	else if (pick_token(parser, TOK_ASSIGN)) {
+
+		push_warning(parser, ERROR_SYNTAX_DEPRECATION, tok.line, "consider using ':=' instead!");
+	}
+
+
+	AstRef *steps = parse_for_steps(parser, heap_array_length(names));
+
+	take_token(parser, TOK_QMARK);
+
+	AstRef *values = 0;
+
+	for (int i=0; i<heap_array_length(names); ++i) {
+		Token name = names[i];
+
+		AstRef v = tree_memory(parser, name.line, tree_nop(parser, name.line));
+		PushBlockStat(parser, v);
+
+		heap_array_add(values, v);
+
+		parser_bind(parser, name.line
+		, ENTITY_TAG_REFERENCED|ENTITY_TAG_ASSIGNED|ENTITY_BIT_FORLOOP
+		, name.text, v);
+	}
+
+
+
+	// todo: generate conditionally, per step?
+	AstRef index_ = tree_memory(parser,tok.line,tree_nop(parser,tok.line));
+	PushBlockStat(parser,index_);
+
+	// begin a new loop
+	Loop *loop = begin_loop(parser);
+	loop->index  = index_;
+	loop->values = values;
+
+	// todo: ensure success!
+	AstRef body = parse_stat(parser);
+
+
+	AstRef v;
+	// generate loops or stores for each step
+	FOR_ARRAY(i, steps)
+	{
+		AstRef step = steps[i];
+
+		// create a new block for each step
+		begin_block(parser);
+
+		// check if the step translates into a loop
+		if (step->kind == AST_RANGE || step->kind == AST_RANGE_INDEX)
+		{
+			v = build_range_loop(parser, step, index_, values, body);
+			PushBlockStat(parser, v);
+		}
+		// DESUGAR EXPRESSION
+		else if (step->kind == AST_TUPLE_EXPR)
+		{
+			AstRef index = index_;
+
+			// todo: we shouldn't even have to do this!
+			v = tree_store(parser, tok.line, index, tree_int(parser, tok.line, 0));
+			PushBlockStat(parser, v);
+
+			ASSERT(v->n >= 2);
+
+			AstRef k = step->x;
+			for (u32 i = 0; i < heap_array_length(values); ++ i)
+			{
+				if (k)
+				{
+					v = k;
+					k = k->next;
+				}
+				else
+				{
+					v = tree_nil(parser, tok.line);
+					warning_excess_rvalue(parser, values[i]);
+				}
+
+				v = tree_store(parser, tok.line, values[i], v);
+				PushBlockStat(parser, v);
+			}
+
+			PushBlockStat(parser, body);
+		}
+		// SINGLE EXPRESSION
+		else
+		{
+			AstRef index = index_;
+			AstRef value = values[0];
+
+			// todo: we shouldn't even have to do this!
+			v = tree_store(parser, tok.line, index, tree_int(parser, tok.line, 0));
+			PushBlockStat(parser, v);
+
+			v = tree_store(parser, tok.line, value, step);
+			PushBlockStat(parser, v);
+			PushBlockStat(parser, body);
+
+			// todo: break and continue should move on to the next
+			// step!
+			if (loop->continues || loop->breaks) {
+
+				FOR_ARRAY(i, loop->continues){
+					parser_dialog(parser
+					,  loop->continues[i]->site,"breaks and continues are only for ranges");
+				}
+
+				FOR_ARRAY(i, loop->breaks){
+					parser_dialog(parser
+					, loop->breaks[i]->site,"breaks and continues are only for ranges");
+				}
+
+				reporterror(parser->inter, 0, "invalid syntax");
+			}
+		}
+
+
+		// end block for this step and add to parent block
+		v = close_block(parser);
+		PushBlockStat(parser,v);
+	}
+
+
+	close_loop(parser);
+
+	v = close_block(parser);
+	PushBlockStat(parser, v);
+
+	esc:
+	return noerror;
+}
+#endif
+
+
+
+#if 0
+static void checkstoreto(Parser *par, Source line, AstRef tree){
+
+	if (tree <= 0) {
+		parser_dialog(par, line, "invalid l-value for store");
+	}
+
+	EntityId e = identify_tree(par, tree);
+
+	if (e != NO_ENTITY) {
+		if (par->entities[e].tags & ENTITY_TAG_CONSTANT) {
+			parser_dialog(par, line
+			,	"reassignment of constant entity");
+			parser_dialog(par, par->entities[e].line
+			,	"see declaration");
+		}
+	}
+}
+#endif
+
+#if 0
+// todo: this double evaluates the operands
+// of the condition expression!
+static void parse_assert(Parser *parser)
+{
+	Token tok = take_token(parser, TOK_M_ASSERT);
+
+	AstRef cond = parse_expr(parser, 0);
+
+	TreeChain args = {};
+	tree_chain_add(&args, cond);
+
+	Stringer sb = {};
+
+	// todo: also, what's the point of doing any of this...
+	switch (cond->kind)
+	{
+		case AST_NOT_EQ:   sb_writetext(&sb, "(% != %) is false"); goto _bcase;
+		case AST_EQ:    sb_writetext(&sb, "(% == %) is false"); goto _bcase;
+		case AST_OR:    sb_writetext(&sb, "(% || %) is false"); goto _bcase;
+		case AST_LESS_THAN:    sb_writetext(&sb, "(% < %) is false"); goto _bcase;
+		case AST_GREATER_THAN_EQ:    sb_writetext(&sb, "(% > %) is false"); goto _bcase;
+		case AST_GREATER_THAN_EQ:  sb_writetext(&sb, "(% >= %) is false"); goto _bcase;
+		case AST_LESS_THAN_EQ:  sb_writetext(&sb, "(% <= %) is false"); goto _bcase;
+
+		default: {
+
+			parser_dialog(parser, tok.line, "expression not supported for #assert");
+			goto esc;
+
+			_bcase:
+			// todo: leak! sb cannot be freed because trees still use
+			// char *
+			AstRef tformatstr = create_str_ast(parser, tok.line, sb.buf);
+
+			AstRef tcallformat = tree_callcoreapi3(parser, tok.line
+			, BUILTIN_FORMAT, tformatstr, cond->x, cond->y);
+
+			tree_chain_add(&args, tcallformat);
+		} break;
+	}
+
+	AstRef v = tree_callcoreapi(parser, tok.line, BUILTIN_ASSERT, args);
+	PushBlockStat(parser, v);
+	esc:
+	return;
+}
+
+// Todo, can we return a new tree instead of mutating the existing one?
+static void rewrite_lhs(Parser *par, AstRef lhs)
+{
+	if (lhs->kind == AST_FIELD || lhs->kind == AST_INDEX)
+	{
+		// already memory
+		if (lhs->x->kind != TREE_MEMORY)
+		{
+			AstRef v = tree_memory(par, lhs->x->site, lhs->x);
+			PushBlockStat(par, v);
+
+			lhs->x = v;
+		}
+	}
+}
+
+static TreeChain parse_rhs(Parser *parser, u32 num_lhs, AstType empty)
+{
+	TreeChain rhs = {};
+
+	do
+	{
+		if (pick_token(parser, TOK_ELLIPSIS))
+		{
+			// helper message
+			if (rhs.tally >= num_lhs)
+			{
+				parser_dialog(parser, parser->tok.site
+				, "redundant ellipsis, enough r-values already!");
+			}
+
+			// '...' with no previous y's just means fill everything with nil,
+			// which is what happens by default
+			if (rhs.tally)
+			{
+				AstRef r = rhs.tail;
+				for (u32 i=rhs.tally; i<num_lhs; ++i)
+				{
+					tree_chain_add(&rhs, r);
+				}
+			}
+
+
+			// helper message
+			if (peek_tok(parser, TOK_COMMA))
+			{
+				parser_dialog(parser, parser->tok.site
+				, "'...': terminates the expression list");
+			}
+			break;
+		}
+
+		AstRef v = parse_expr(parser, 0);
+		if (notree(v)) break;
+
+		tree_chain_add(&rhs, v);
+
+		if (rhs.tally > num_lhs)
+		{
+			parser_dialog(parser, parser->tok.site
+			, "warning: excess right hand side value");
+		}
+	}
+	while (pick_token(parser, TOK_COMMA));
+
+	// fill with nil
+	for (u32 i=rhs.tally; i<num_lhs; ++i)
+	{
+		tree_chain_add(&rhs, tree_nullary(parser, parser->tok.site, empty));
+	}
+	return rhs;
+}
+
+static AstRef *complete_lhs(Parser *parser, Token *names) {
+	AstRef *l = 0;
+
+	// convert all names to storage targets
+	for (int i=0; i<heap_array_length(names); ++i) {
+		char *name = names[i].text;
+		AstRef v=nametolval(parser, names[i].line, name);
+		if (v==Y_ERROR) goto _err;
+		heap_array_add(l, v);
+	}
+
+	// parse additional expressions
+	do {
+		AstRef v = parse_expr(parser, 0);
+		if (notree(v)) goto _err;
+
+		heap_array_add(l, v);
+	} while (pick_token(parser, TOK_COMMA));
+
+
+	_err:
+	return l;
+}
+
+#endif
+
+#if 0
+static int parse_expr_stat(Parser *parser) {
+
+	int success = false;
+
+	Token tok = parser->tok;
+
+	// Todo, remove dynamic array use!
+	Token *names = parse_decl_names(parser);
+
+	// this is a declaration
+	if (peek_tok(parser, TOK_BIND) || peek_tok(parser, TOK_HARD_BIND))
+	{
+		if (heap_array_length(names) <= 0)
+		{
+			push_error(parser, ERROR_INVALID_DECL, tok.line
+			, "invalid declaration, left hand side is not a name");
+		}
+
+		EntityTags status = ENTITY_TAG_ASSIGNED;
+
+		if (pick_token(parser, TOK_HARD_BIND))
+		{
+			status |= ENTITY_TAG_CONSTANT;
+		}
+		else
+		{
+			take_token(parser, TOK_BIND);
+		}
+
+		TreeChain rhs = parse_rhs(parser, heap_array_length(names), TREE_NOP);
+		ASSERT(rhs.tally >= heap_array_length(names));
+
+		//
+		// Todo:
+		// Reason for memory tree taking an initializer is to
+		// evaluate the initializer without first allocating
+		// memory for the memory tree, which is what happens
+		// if you do memory tree and then a store.
+		// Getting rid of the initializer however, would make
+		// this neater because the path for decls and stores
+		// would merge.
+		// ---
+		// Could we make the generator, simply not allocate the memory
+		// until it is first used or stored to?
+		//
+		// note that we only bind the lhs once we've parsed
+		// the rhs!
+		//
+		AstRef next_rhs = rhs.head;
+		for (int i = 0; i < heap_array_length(names); ++ i)
+		{
+			char *name = names[i].text;
+
+			int rem = heap_array_length(names) - i;
+
+			AstRef v = tree_memory2(parser, names[i].line, next_rhs, rem);
+			PushBlockStat(parser, v);
+
+			parser_bind(parser, names[i].line, status, name, v);
+			next_rhs = next_rhs->next;
+		}
+
+		success = true;
+	}
+	// not a decl
+	else {
+
+		AstRef *lhs = complete_lhs(parser, names);
+		TreeChain rhs = {};
+
+		tok = parser->tok;
+
+		if (heap_array_length(lhs) <= 0) {
+			goto _err;
+		}
+
+		if (pick_token(parser,TOK_ASSIGN)){
+		}
+		else if (pick_token(parser,TOK_NIL_ASSIGN)){
+		}
+		else if (token_rank_from_type(tok.type) > 0){
+			consume_token(parser);
+			take_token(parser, TOK_ASSIGN);
+		}
+		else {
+			goto _regularexpr;
+		}
+
+		for (int i = 0; i < heap_array_length(lhs); ++ i) {
+			checkstoreto(parser, tok.line, lhs[i]);
+		}
+
+
+		rhs = parse_rhs(parser, heap_array_length(lhs), AST_NIL_LITERAL);
+		ASSERT(rhs.tally >= heap_array_length(lhs));
+
+
+		// regular store
+		if (tok.type == TOK_ASSIGN)
+		{
+			AstRef next_rhs = rhs.head;
+			for (int i=0; i<heap_array_length(lhs); ++i)
+			{
+				MEMORY_SCOPE(parser)
+				{
+					AstRef v = tree_store(parser, tok.line, lhs[i], next_rhs);
+					PushBlockStat(parser, v);
+				}
+
+				next_rhs = next_rhs->next;
+			}
+		}
+		else if (tok.type == TOK_NIL_ASSIGN)
+		{
+			AstRef next_rhs = rhs.head;
+			for (int i=0; i<heap_array_length(lhs); ++i)
+			{
+				MEMORY_SCOPE(parser)
+				{
+					rewrite_lhs(parser, lhs[i]);
+
+					AstRef c = elf_new_binary_expr_tree(parser, tok.line, AST_EQ, lhs[i], tree_nil(parser, tok.line));
+					AstRef s = tree_store(parser, tok.line, lhs[i], next_rhs);
+					AstRef v = elf_new_if_stat_tree(parser, tok.line, c, s, 0);
+					PushBlockStat(parser, v);
+				}
+				next_rhs = next_rhs->next;
+			}
+		}
+		else if (token_rank_from_type(tok.type) > 0)
+		{
+			//
+			// if we got here it means that we attempted to
+			// parse an expression that looked like a binary
+			// operator, e.g '+''=', but it turned out to be
+			// an assignment, so the parser returned the left
+			// hand side expression but didn't take the token.
+			//
+			AstRef next_rhs = rhs.head;
+			for (int i = 0; i < heap_array_length(lhs); ++ i)
+			{
+				MEMORY_SCOPE(parser)
+				{
+					rewrite_lhs(parser, lhs[i]);
+
+					AstRef o = elf_new_binary_expr_tree(parser, tok.line, tree_kind_from_token_type(tok.type), lhs[i], next_rhs);
+					AstRef v = tree_store(parser, tok.line, lhs[i], o);
+					PushBlockStat(parser, v);
+				}
+				next_rhs = next_rhs->next;
+			}
+		}
+		else
+		{
+			_regularexpr:
+			// if they're regular expressions, just add them to the
+			// block and the generator will figure out whether
+			// to keep them or not
+			FOR_ARRAY(i, lhs)
+			{
+				// top-level memory trees mean "allocate" memory, there's
+				// no way to "reference" memory, either way, prune it.
+				if (lhs[i]->kind != TREE_MEMORY)
+				{
+					PushBlockStat(parser, lhs[i]);
+				}
+			}
+		}
+
+		success = true;
+		free_heap_array(lhs);
+
+		// not a decl branch
+	}
+
+	free_heap_array(names);
+
+	_err:
+	return success;
+}
+#endif
+
+
+
+#if 0
+	FuncParams params = parse_function_params(parser);
+	function->ast_function.arity = params.arity;
+	function->ast_function.variadic = params.variadic;
+
+	// todo: remove! or optional?
+	pick_token(parser,TOK_QMARK);
+
+	if (peek_tok(parser,TOK_CURLY_LEFT))
+	{
+		parse_stat(parser);
+
+		// Todo, only if the block doesn't have a return already
+		// Todo, "new" relies on this behavior, which is weird ...
+		EntityId this_id = identify_name(parser, "this");
+		ASSERT(this_id != -1);
+
+		Entity this_en = parser->entities[this_id];
+		AstRef this_rf = tree_proxy(parser, tok.line, this_en.tree);
+
+		AstRef v = ELF_NewReturnUnaryTree(parser, tok.line, this_rf);
+		PushBlockStat(parser, v);
+	}
+	// direct return
+	else if (pick_token(parser, TOK_HARD_ARROW))
+	{
+		u32 nargs = elf_parse_expr_list(parser);
+		AstRef *args = pop_ast_array(parser, nargs);
+		AstRef v = elf_new_return_stat_tree(parser, tok.site, args, nargs);
+		PushBlockStat(parser,v);
+	}
+	else {
+		push_error(parser, ERROR_MISSING_FUNCTION_BODY
+		, parser->tok.line, "missing function body, expected '{' or '-->'");
+	}
+
+	AstRef body = close_block(parser);
+	function->ast_function.body = body;
+	parser->function = enc;
+#endif
+
+
+
+#if 0
+typedef struct
+{
+	u32 arity;
+	b32 variadic;
+}
+FuncParams;
+
+static FuncParams parse_function_params(Parser *par)
+{
+	u32 arity = 1;
+	b32 variadic = false;
+
+	Token tok = take_token(par, TOK_PAREN_LEFT);
+
+	Param *params = 0;
+
+	// add implicit 'this'
+	add_this_param(par, tok.line);
+
+	if (!peek_tok(par,TOK_PAREN_RIGHT)) do
+	{
+
+		if (pick_token(par, TOK_ELLIPSIS))
+		{
+			variadic = true;
+
+			if (!peek_tok(par, TOK_PAREN_RIGHT))
+			{
+				parser_dialog(par, par->tok.line, "expected ')' after '...', you may not have more parameters after '...'");
+			}
+			break;
+		}
+
+
+		Token name = take_token(par, TOK_IDENTIFIER);
+
+		AstRef pmem = tree_memory(par, name.line, tree_nop(par, name.line));
+		PushBlockStat(par, pmem);
+
+		Token rule = {};
+
+		if (pick_token(par, TOK_COLON))
+		{
+			rule = take_token(par, TOK_IDENTIFIER);
+		}
+
+		// Todo, use arena!
+		Param param = (Param){ pmem, rule };
+		heap_array_add(params, param);
+		++ arity;
+
+		parser_bind(par, name.line
+		, ENTITY_TAG_ASSIGNED | ENTITY_BIT_PARAMETER
+		, name.text, pmem);
+
+	} while (pick_token(par,TOK_COMMA));
+
+	for (int i = 1; i < arity; ++ i)
+	{
+		Param p = params[i-1];
+		gen_typerule(par, p.tree, p.rule);
+	}
+
+	free_heap_array(params);
+
+	take_token(par,TOK_PAREN_RIGHT);
+
+	FuncParams func_params = {};
+	func_params.arity = arity;
+	func_params.variadic = variadic;
+	return func_params;
+}
+#endif
+
+
+
+#if 0
+static Loop *checkloop(Parser *parser, Source line, AstRef name)
+{
+	Loop *loop = get_loop(parser, name);
+	if (!loop) {
+		push_error_not_in_a_loop(parser, line);
+	}
+	return loop;
+}
+
+static void PushBlockStat(Parser *par, AstRef v)
+{
+	Block *bl = & par->block;
+	if (~bl->status & BLOCK_ENDED)
+	{
+		push_ast(par, v);
+		if (v->kind == AST_RETURN) {
+			bl->status |= BLOCK_HASRET;
+		}
+		if (v->kind == AST_RETURN || v->kind == TREE_GOTO) {
+			bl->status |= BLOCK_ENDED;
+		}
+	}
+	else
+	{
+		push_error_block_ended_expr_ignored(par, v);
+	}
+}
+
+static void begin_block(Parser *par) {
+	if (par->block_index >= COUNTOF(par->block_stack)) {
+		parser_dialog(par, par->tok.line, "block nesting too deep");
+		reporterror(par->R, -1, "block nesting too deep");
+	}
+
+	ASSERT(par->block_index < COUNTOF(par->block_stack));
+
+	par->block_stack[par->block_index ++] = par->block;
+	par->block = (Block){};
+
+	begin_scope(par);
+}
+
+// --- Todo, fix-defer logic ---
+// Defer statements must execute right after any block-terminating instruction.
+// Who does this better, parser as sugar-coating or generator ?
+static AstRef close_block(Parser *parser)
+{
+	ASSERT(parser->block_index > 0);
+
+	close_scope(parser);
+
+	Block bl = parser->block;
+
+	parser->block = parser->block_stack[-- parser->block_index];
+
+	//	FOR_ARRAY(i, bl.defers)
+	//	{
+	//		tree_chain_add(&bl.body, bl.defers[i]);
+	//	}
+
+	return create_block_ast(parser, parser->tok.site, bl.stats, bl.nstats);
+}
+
+static AstRef close_memory_region(Parser *par)
+{
+	AstRef bl = close_block(par);
+	PushBlockStat(par, bl);
+	return bl;
+}
+
+// begin a new memory block, closes the memory block and adds to the
+// parent block
+#define MEMORY_SCOPE(par) SCOPED_PAIR(begin_block(par),close_memory_region(par))
+
+
+
+// todo: we could just store the entity id within the
+// tree, because now all entities point their own trees...
+static int identify_tree(Parser *par, AstRef tree) {
+	int id;
+
+	for (id=par->entity_index-1; id >= 0; --id)
+	{
+		Entity en=par->entities[id];
+
+		if (en.tree==tree)
+		{
+			return id;
+		}
+	}
+	return NO_ENTITY;
+}
+
+
+// todo: can we at-least hash the name?
+static int identify_name(Parser *par, char *name) {
+
+	int id;
+	for (id=par->entity_index-1; id>=0; --id)
+	{
+		Entity en=par->entities[id];
+
+		if (text_eq(en.name,name))
+		{
+			par->entities[id].tags |= ENTITY_TAG_REFERENCED;
+			return id;
+		}
+	}
+	return NO_ENTITY;
+}
+
+
+
+static EntityId parser_bind(Parser *parser, Source line, int flags, char *name, AstRef tree) {
+	{
+		EntityId id = identify_name(parser, name);
+
+		if (id != NO_ENTITY) {
+
+			Entity en = parser->entities[id];
+
+			if (en.kind == ENTITY_DIRECTORY) {
+				parser_dialog(parser,line,"'%s': name is reserved for symbol directory",name);
+			}
+
+			// declared within the same scope
+			if (en.scope == parser->scope) {
+				parser_dialog(parser, line, "'%s': is already declared", name);
+			}
+			// declared outside of this function
+			else if (en.scope >= parser->function->ast_function.scope) {
+				parser_dialog(parser, line, "'%s': this declaration shadows another one", name);
+			}
+		}
+	}
+
+	// todo: ensure that all parameters are generated one after the other
+	// and we could even increment the arity of this function here whenever
+	// we see a param but that's crazy work
+	ASSERT(parser->entity_index < MAX_ENTITIES);
+	EntityId id = parser->entity_index ++;
+	Entity *entity = & parser->entities[id];
+	entity->kind = ENTITY_LOCAL_DECLARATION;
+	entity->tags = flags;
+	entity->scope = parser->scope;
+	entity->tree = tree;
+	entity->name = name;
+	entity->line = line;
+	return id;
+}
+
+static void add_this_param(Parser *parser, Source line) {
+	AstRef y = tree_nop(parser, line);
+
+	AstRef x = tree_memory(parser, line, y);
+	PushBlockStat(parser, x);
+
+	parser_bind(parser, line
+	, ENTITY_BIT_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED
+	, "this", x);
+}
+
+
+static AstRef tree_from_identifier(Parser *parser, Source line, char *name, b32 lval)
+{
+	AstRef v = Y_NULL;
+
+	EntityId id = identify_name(parser, name);
+
+	if (id != NO_ENTITY)
+	{
+		Entity entity = parser->entities[id];
+
+		if (!lval)
+		{
+			if (~entity.tags & ENTITY_TAG_ASSIGNED)
+			{
+				parser_dialog(parser, parser->tok.line, "warning: usage of possibly unassigned variable");
+			}
+		}
+
+
+		// check if we have to capture this thing
+		AstRef enc = parser->function;
+
+		if (entity.scope < enc->ast_function.scope)
+		{
+			i32 index = -1;
+
+			// Check if we've captured this already
+			FOR_ARRAY(i, enc->ast_function.capts)
+			{
+				if (enc->ast_function.capts[i] == entity.tree)
+				{
+					index = i;
+					break;
+				}
+			}
+
+			// Capture it if not
+			if (index == -1)
+			{
+				index = heap_array_length(enc->ast_function.capts);
+				heap_array_add(enc->ast_function.capts, entity.tree);
+			}
+
+			v = tree_closure_value(parser, line, index);
+
+			// goto next function
+			enc = enc->ast_function.enc;
+
+			if (entity.scope < enc->ast_function.scope)
+			{
+				parser_dialog(parser, line, "cannot capture?");
+			}
+
+		}
+		else
+		{
+			v = tree_proxy(parser, line, entity.tree);
+		}
+
+	}
+	else
+	{
+		// todo: we can only do this after we implement directories
+		// because otherwise all of our libs break!
+		// parser_dialog(parser, line, "undeclared identifier, if this is a global use the 'global' keyword or declare a global");
+		v = tree_global_symbol(parser, line, name);
+	}
+	return v;
+}
+
+
+
+static AstRef nametorval(Parser *parser, Source line, char *name) {
+	return tree_from_identifier(parser, line, name, false);
+}
+
+static AstRef nametolval(Parser *parser, Source line, char *name) {
+	return tree_from_identifier(parser, line, name, true);
+}
+
+#endif
+
+
+
+#if 0
+static void begin_scope(Parser *par) {
+	ASSERT(par->scope_index < COUNTOF(par->scope_stack));
+	par->scope_stack[par->scope_index ++] = par->entity_index;
+	par->scope ++;
+}
+
+
+
+static void close_scope(Parser *par) {
+	ASSERT(par->scope_index > 0);
+
+	int new_index = par->scope_stack[-- par->scope_index];
+
+	for (int i=par->entity_index-1; i>=new_index; --i)
+	{
+		if (~par->entities[i].tags & ENTITY_TAG_REFERENCED)
+		{
+			// todo: in release mode, ignore these entities, in test mode keep them
+			push_warning(par, ERROR_UNREFERENCED_ENTITY, par->entities[i].line
+			, "warning: unreferenced entity");
+		}
+	}
+
+	ASSERT(new_index <= par->entity_index);
+
+	par->entity_index = new_index;
+	par->scope --;
+}
+
+static Loop *begin_loop(Parser *parser)
+{
+	ASSERT(parser->loop_index < COUNTOF(parser->loop_stack));
+	Loop *loop = & parser->loop_stack[parser->loop_index ++];
+	zero_memory(loop, sizeof(* loop));
+	return loop;
+}
+
+static void close_loop(Parser *parser)
+{
+	ASSERT(parser->loop_index > 0);
+	-- parser->loop_index;
+}
+
+static Loop *get_loop(Parser *parser, AstRef name)
+{
+	// no loop
+	// todo: rename to loop counter instead!
+	if (parser->loop_index < 1) {
+		return 0;
+	}
+
+	Loop *loop = parser->loop_stack + parser->loop_index - 1;
+
+	// this top one
+	if (name == Y_NULL) {
+		return loop;
+	}
+
+	// find loop
+	while (loop > parser->loop_stack) {
+		if (loop->name == name) {
+			return loop;
+		}
+	}
+
+	return 0;
+}
+#endif
+
+
+#if 0
+// decl-names ::= <identifier-list> (('=' or ':=' or '::=') <expr>) *
+static u32 parse_decl_names(Parser *par)
+{
+	u32 num = 0;
+	while (peek_tok(par, TOK_IDENTIFIER) && peek_prox_tok(par, TOK_COMMA))
+	{
+		Ast *name = parse_ident_expr(par);
+		push_ast(par, name);
+		++ num;
+
+		take_token(par, TOK_COMMA);
+	}
+
+	//
+	if (peek_tok(par, TOK_IDENTIFIER) && (peek_prox_tok(par, TOK_BIND) || peek_prox_tok(par, TOK_HARD_BIND) || peek_prox_tok(par, TOK_ASSIGN)))
+	{
+		Ast *name = parse_ident_expr(par);
+		push_ast(par, name);
+		++ num;
+	}
+
+	return num;
+}
+#endif
+
+#if 0
+static AstRef parse_expr_stat(Parser *parser)
+{
+	AstRef stat = 0;
+
+	u32 ntargs = parse_decl_names(parser);
+
+	Token tok = parser->tok;
+	if ((tok.type == TOK_BIND) || (tok.type == TOK_HARD_BIND))
+	{
+		consume_token(parser);
+		u32 tags = 0;
+		if (tok.type == TOK_HARD_BIND) {
+			tags |= ENTITY_TAG_CONSTANT;
+		}
+
+		AstRef *names = pop_ast_array(parser, ntargs);
+
+		u32 nexprs = elf_parse_expr_list(parser);
+		AstRef *exprs = pop_ast_array(parser, nexprs);
+
+		stat = elf_new_decl_stat_tree(parser, tok.site, tags, names, ntargs, exprs, nexprs);
+	}
+	else
+	{
+		do
+		{
+			AstRef expr = parse_expr(parser, 0);
+			if (notree(expr)) break;
+			push_ast(parser, expr);
+			++ ntargs;
+		}
+		while (pick_token(parser, TOK_COMMA));
+
+		AstRef *targs = pop_ast_array(parser, ntargs);
+
+		Token tok = parser->tok;
+		if (pick_token(parser, TOK_ASSIGN))
+		{
+			u32 nexprs = elf_parse_expr_list(parser);
+			AstRef *exprs = pop_ast_array(parser, nexprs);
+			stat = elf_new_assign_stat_tree(parser, tok.site, targs, ntargs, exprs, nexprs);
+		}
+		else
+		{
+			stat = elf_new_comma_expr_tree(parser, tok.site, targs, ntargs);
+		}
+	}
+
+	esc:
+	return stat;
+}
+#endif
+
+
+// Todo, remove!
+typedef enum DataType
+{
+	NT_NON = 0,
+	NT_ANY, NT_SYS,
+	NT_NIL, NT_BOL, NT_INT, NT_NUM,
+	NT_OBJ, NT_TAB, NT_FUN, NT_STR
+}
+DataType;
+
+// Todo, remove!
+#define TREECHAIN_EMPTY ((TreeChain){ 0 })
+
+// Todo, remove!
+typedef struct TreeChain TreeChain;
+struct TreeChain
+{
+	Ast *head;
+	Ast *tail;
+	int  tally;
+};
+
+
+// Todo, remove!
+#define AST_FOR(N, S) for (Ast *N = S; N; N = (N)->next)

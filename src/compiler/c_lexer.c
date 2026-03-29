@@ -21,18 +21,18 @@
 
 /* todo: binary search or something goofy */
 static TokenType text_is_word_or_macro(char *name) {
-#define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_M_,NAME);
+#define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TOK_M_,NAME);
 	MACRODEF(MCITEM)
 #undef MCITEM
-	return TK_WORD;
+	return TOK_IDENTIFIER;
 }
 
 /* todo: speed! */
 static TokenType check_keyword(char *name) {
-	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TK_,NAME);
+	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TOK_,NAME);
 	KEYWORDDEF(KWITEM)
 	#undef KWITEM
-	return TK_WORD;
+	return TOK_IDENTIFIER;
 }
 
 //
@@ -229,7 +229,7 @@ static Token lex_token(Parser *parser) {
 
 	retry:
 	Token token = {};
-	token.type = TK_NONE;
+	token.type = TOK_NONE;
 	token.line = parser->cursor;
 
 	switch (*parser->cursor) {
@@ -237,14 +237,14 @@ static Token lex_token(Parser *parser) {
 		case 'A'...'Z': case 'a'...'z': case '_': {
 			if (parser->cursor[0] == 'f' && parser->cursor[1] == '"') {
 				parser->cursor ++;
-				token.type = TK_FORMAT_STRING;
+				token.type = TOK_FORMAT_STRING;
 				goto strcase;
 			}
 
 			int length = lex_identifier(parser, parser->tempbuf, sizeof(parser->tempbuf) - 1);
 
 			token.type = check_keyword(parser->tempbuf);
-			if (token.type == TK_WORD) {
+			if (token.type == TOK_IDENTIFIER) {
 				// todo: proper string allocator
 				// todo: leak!
 				token.text = copy_text2(length, parser->tempbuf);
@@ -257,7 +257,7 @@ static Token lex_token(Parser *parser) {
 		{
 			i64 x = lex_integer(parser);
 
-			token.type    = TK_INTEGER;
+			token.type    = TOK_INTEGER;
 			token.integer = x;
 
 			// post-decimal part, ensure we don't match a ".."
@@ -267,7 +267,7 @@ static Token lex_token(Parser *parser) {
 
 				f64 y = lex_fractional(parser);
 
-				token.type   = TK_NUMBER;
+				token.type   = TOK_NUMBER;
 				token.number = x + y;
 			}
 		}
@@ -277,7 +277,7 @@ static Token lex_token(Parser *parser) {
 			MOVE();
 
 			// todo!!: come back to this!
-			token.type = TK_LETTER;
+			token.type = TOK_LETTER;
 			do {
 				token.integer = pick_esc_char(parser);
 				// MOVE();
@@ -305,7 +305,7 @@ static Token lex_token(Parser *parser) {
 						heap_array_add(buffer,'\n');
 					} else {
 						// don't check for format
-						if (token.type != TK_FORMAT_STRING) goto escchar;
+						if (token.type != TOK_FORMAT_STRING) goto escchar;
 
 						// todo: make it so that we can escape the formatting
 						if (POS0() == FORMAT_CHAR && POS1() == '{') {
@@ -339,8 +339,8 @@ static Token lex_token(Parser *parser) {
 			// of constant pool with intering, use the atomizer
 			// that way we avoid going thru the GC, if during
 			// parsing we figure out the thing is dead, we dealloc it
-			if (!needsformatting || token.type != TK_FORMAT_STRING) {
-				token.type = TK_STRING;
+			if (!needsformatting || token.type != TOK_FORMAT_STRING) {
+				token.type = TOK_STRING;
 			}
 			token.text = copy_text2(length,buffer);
 			free_heap_array(buffer);
@@ -348,16 +348,16 @@ static Token lex_token(Parser *parser) {
 		case '.': {
 
 			MOVE();
-			token.type = TK_DOT;
+			token.type = TOK_DOT;
 
 			// todo: so there's no difference between "..." and ".."
 			if (PICK('.')) {
-				token.type = TK_DOT_DOT;
+				token.type = TOK_ELLIPSIS;
 				if (PICK('.')) {
-					token.type = TK_DOT_DOT;
+					token.type = TOK_ELLIPSIS;
 				}
 			} else if (is_digit_chr(POS0())) {
-				token.type = TK_NUMBER;
+				token.type = TOK_NUMBER;
 				token.number = lex_fractional(parser);
 			}
 		} break;
@@ -365,25 +365,25 @@ static Token lex_token(Parser *parser) {
 			MOVE();
 			lex_identifier(parser, parser->tempbuf, sizeof(parser->tempbuf) - 1);
 			token.type = text_is_word_or_macro(parser->tempbuf);
-			if (token.type == TK_M_ENDOFFILE) {
-				token.type = TK_NONE;
-			} else if (token.type==TK_M_FILE_NAME) {
-				token.type = TK_STRING;
+			if (token.type == TOK_M_ENDOFFILE) {
+				token.type = TOK_NONE;
+			} else if (token.type==TOK_M_FILE_NAME) {
+				token.type = TOK_STRING;
 				token.text = parser->name;
-			} else if (token.type == TK_M_LINE_NUMBER) {
+			} else if (token.type == TOK_M_LINE_NUMBER) {
 				// todo: get this from the source location!
 				__debugbreak();
 
-				token.type = TK_INTEGER;
+				token.type = TOK_INTEGER;
 				token.integer = -1;
-			} else if (token.type == TK_WORD) {
+			} else if (token.type == TOK_IDENTIFIER) {
 				parser_dialog(parser,token.line,"unrecognized macro");
 			} else {
 				/* let parser handle this */
 			}
 		} break;
 		case '\0': {
-			token.type = TK_NONE;
+			token.type = TOK_NONE;
 		} break;
 		case ' ': case '\t': {
 			MOVE();
@@ -411,7 +411,7 @@ static Token lex_token(Parser *parser) {
 
 		case '/': {
 			MOVE();
-			token.type = TK_DIV;
+			token.type = TOK_DIV;
 			if (PICK('*')) {
 				for (;;) {
 					/* handle lines */
@@ -455,46 +455,46 @@ static Token lex_token(Parser *parser) {
 #define LEX2(A,X,B,Y)     CASE(A, X, PICK(B), Y, 0, 0,       0, 0, 0, 0)
 #define LEX3(A,X,B,Y,C,Z) CASE(A, X, PICK(B), Y, 0, 0, PICK(C), Z, 0, 0)
 
-		CASE('[', TK_SQUARE_LEFT
-		, 		PICK('['), TK_SQUARE_SQUARE_LEFT, 0, 0
+		CASE('[', TOK_SQUARE_LEFT
+		, 		PICK('['), TOK_SQUARE_SQUARE_LEFT, 0, 0
 		, 		0,                             0, 0, 0);
-		CASE(']', TK_SQUARE_RIGHT
-		, 		PICK(']'), TK_SQUARE_SQUARE_RIGHT, 0, 0
+		CASE(']', TOK_SQUARE_RIGHT
+		, 		PICK(']'), TOK_SQUARE_SQUARE_RIGHT, 0, 0
 		, 		0,                              0, 0, 0);
 
 
-		CASE('<', TK_LT
-		, 	 PICK('='), TK_LTEQ, 0, 0
-		,   PICK('<'), TK_SHL,  0, 0)
+		CASE('<', TOK_LT
+		, 	 PICK('='), TOK_LTEQ, 0, 0
+		,   PICK('<'), TOK_SHL,  0, 0)
 
-		CASE(':', TK_COLON
-		, 	 PICK(':'), TK_STATIC_BIND, PICK('='), TK_HARD_BIND
-		,   PICK('='),       TK_BIND ,         0,            0)
+		CASE(':', TOK_COLON
+		, 	 PICK(':'), TOK_STATIC_BIND, PICK('='), TOK_HARD_BIND
+		,   PICK('='),       TOK_BIND ,         0,            0)
 
-		CASE('-', TK_SUB
-		, 	 PICK('-'), TK_MINUS_MINUS, PICK('>'), TK_HARD_ARROW
-		,   PICK('>'),       TK_ARROW,         0,             0)
+		CASE('-', TOK_SUB
+		, 	 PICK('-'), TOK_MINUS_MINUS, PICK('>'), TOK_HARD_ARROW
+		,   PICK('>'),       TOK_ARROW,         0,             0)
 
 
-		LEX3('>',TK_GT                , '=', TK_GTEQ    , '>', TK_SHR);
-		LEX3('?',TK_QMARK             , '?', TK_NIL_OR  , '=', TK_NIL_ASSIGN);
-		LEX3('!',TK_EXCLAMATION_MARK  , '!', TK_NIL_AND , '=', TK_NEQ);
+		LEX3('>',TOK_GT                , '=', TOK_GTEQ    , '>', TOK_SHR);
+		LEX3('?',TOK_QMARK             , '?', TOK_NIL_OR  , '=', TOK_NIL_ASSIGN);
+		LEX3('!',TOK_EXCLAMATION_MARK  , '!', TOK_NIL_AND , '=', TOK_NEQ);
 
-		LEX2('|', TK_BIT_OR  , '|', TK_LOG_OR);
-		LEX2('&', TK_BIT_AND , '&', TK_LOG_AND);
-		LEX2('=', TK_ASSIGN  , '=', TK_EQ);
-		LEX2('*', TK_MUL     , '*', TK_POW);
+		LEX2('|', TOK_BIT_OR  , '|', TOK_LOG_OR);
+		LEX2('&', TOK_BIT_AND , '&', TOK_LOG_AND);
+		LEX2('=', TOK_ASSIGN  , '=', TOK_EQ);
+		LEX2('*', TOK_MUL     , '*', TOK_POW);
 
-		LEX1('(', TK_PAREN_LEFT);
-		LEX1(')', TK_PAREN_RIGHT);
-		LEX1('{', TK_CURLY_LEFT);
-		LEX1('}', TK_CURLY_RIGHT);
-		LEX1(',', TK_COMMA);
-		LEX1('%', TK_MOD);
-		LEX1('^', TK_BIT_XOR);
-		LEX1('+', TK_ADD);
-		LEX1('~', TK_TILDE);
-		LEX1(';', TK_SEMI_COLON);
+		LEX1('(', TOK_PAREN_LEFT);
+		LEX1(')', TOK_PAREN_RIGHT);
+		LEX1('{', TOK_CURLY_LEFT);
+		LEX1('}', TOK_CURLY_RIGHT);
+		LEX1(',', TOK_COMMA);
+		LEX1('%', TOK_MOD);
+		LEX1('^', TOK_BIT_XOR);
+		LEX1('+', TOK_ADD);
+		LEX1('~', TOK_TILDE);
+		LEX1(';', TOK_SEMI_COLON);
 	}
 
 	esc: ;
