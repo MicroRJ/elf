@@ -206,8 +206,8 @@ typedef enum {
 	TRULE_TABLE    = TBIT_TABLE,
 	TRULE_BUFFER   = TBIT_BUFFER,
 	//
-	TRULE_GENERIC  = TBIT_ALLMASK,
-	TRULE_NONNIL   = TRULE_GENERIC & ~TBIT_NIL,
+	TYPE_RULE_ANYTHING  = TBIT_ALLMASK,
+	TRULE_NONNIL   = TYPE_RULE_ANYTHING & ~TBIT_NIL,
 
 	TRULE_OBJECT   = TBIT_USER|TBIT_CLOSURE|TBIT_STRING|TBIT_TABLE|TBIT_BUFFER,
 
@@ -232,9 +232,9 @@ struct elf_Value {
 		i64         x_int;
 		f64         x_num;
 		Sys         x_sys;
-		Ref         x_obj;
+		GCRef         x_obj;
 		Tab         x_tab;
-		Str         x_str;
+		GCStr         x_str;
 		Fun         x_proc;
 		Closure     x_closure;
 		Buf         x_buf;
@@ -282,67 +282,31 @@ typedef struct {
 } IndexValue, Entry;
 STATIC_ASSERT(sizeof(IndexValue) == 24);
 
-
-
-
 STATIC_ASSERT(offsetof(RankValue, value) == offsetof(IndexValue,   key));
 STATIC_ASSERT(offsetof(RankValue,  rank) == offsetof(IndexValue, index));
 
 
-
-
-
-
-
-
-
-
-
-
-#define NODE_REACHABLE      1
+#define GC_TAG_REACHABLE      1
 #define NODE_READONLY       2
 #define NODE_NOCHILDREN     4
 #define NODE_DEBUGTRAP      8
 
-
-
-
-
-struct GCNode {
-	unsigned char       type;
-	unsigned char     status;
-	unsigned short      size;
-	u32             debugsrc;
-	Ref                 next;
-	Tab                 meta;
+struct GCNode
+{
+	u8          type;
+	u8        status;
+	u16         size;
+	Table      *meta;
 };
 
+static int markreadonly(elf_State *S, GCRef ref);
 
-
-static int markreadonly(elf_State *S, Ref ref);
-
-
-
-
-
-
-
-
-
-
-
-struct elf_Closure {
-	GCNode obj;
-	short      proto_index;
-	short      extra;
-	BytecodeFunction      proto;
-	Value      captures[];
+struct elf_Closure
+{
+	GCNode                obj;
+	BytecodeFunction function;
+	Value            captures[];
 };
-
-
-
-
-
 
 struct elf_Table {
 	GCNode      obj;
@@ -449,20 +413,20 @@ struct elf_String {
 	i32 	       length;
 
 	// todo: ensure 16 byte aligned
+	union
+	{
 	char        text[1];
+	char        data[1];
+	};
 };
 
 
-
-
-
-
-Str _new_empty_str(elf_State *, int length);
-Str _string_newl(elf_State *, char const *text, int length);
-Str _string_new(elf_State *, const char *text);
-int         strl(Str str);
-const char *strt(Str str);
-Hash        strh(Str str);
+GCStr new_empty_string(elf_State *, u32 size);
+GCStr new_string_from_data_size(elf_State *, const char *data, int size);
+GCStr new_string_from_data(elf_State *, const char *data);
+int         strl(GCStr str);
+const char *strt(GCStr str);
+Hash        strh(GCStr str);
 
 
 
@@ -566,45 +530,34 @@ struct Stack_Frame {
 
 
 
-typedef enum {
-	GC_OBJ = 0,
-	GC_CLS,
-	GC_STR,
-	GC_TAB,
-	GC_BUF,
-} GCType;
+typedef enum
+{
+	GC_OBJECT = 0,
+	GC_CLOSURE,
+	GC_STRING,
+	GC_TABLE,
+	GC_BUFFER,
+}
+GCType;
 
+#define GC_MEM_THRESHOLD_MIN ((elf_i64) MEGABYTES(1))
+#define GC_MEM_THRESHOLD_MAX ((elf_i64) GIGABYTES(1))
+#define GC_OBJ_THRESHOLD_MIN ((elf_i64) ((512) * 1))
+#define GC_OBJ_THRESHOLD_MAX ((elf_i64) ((512) * 1))
 
-
-
-#define	GC_MEM_THRESHOLD_MIN ((elf_i64) MEGABYTES(1))
-#define	GC_MEM_THRESHOLD_MAX ((elf_i64) GIGABYTES(1))
-#define	GC_OBJ_THRESHOLD_MIN ((elf_i64) ((512) * 1))
-#define	GC_OBJ_THRESHOLD_MAX ((elf_i64) ((512) * 1))
-
-
-//
-// todo: custom allocator
-//
 typedef struct GCState GCState;
-struct GCState {
-	int         state;
-	Int         memcounter;
-	Int         memthreshold;
-	Int         objcounter;
-	Int         objthreshold;
-	GCMem       head;
-	GCRef       tail;
+struct GCState
+{
+	u32         state;
+	u32         memory_counter;
+	u32         memory_thresh;
+	u32         counter;
+	u32         counter_thresh;
+	GCRef      *references1;
+	GCRef      *references2;
 };
 
-
-
-
-static int markreachable(elf_State *S, Ref ref);
-void *gcalloc(elf_State *S, GCType type, int size);
-
-
-
+void *collector_alloc(elf_State *state, GCType type, u32 size);
 
 // Todo, remove this? ...
 typedef struct Record Record;
@@ -663,7 +616,7 @@ struct elf_State
 	};
 
 
-	GCState      gc;
+	GCState      collector_state;
 
 	struct {
 		V           *stack;

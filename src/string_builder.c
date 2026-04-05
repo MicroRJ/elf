@@ -9,11 +9,13 @@
 #include <malloc.h>
 
 
-typedef struct {
+typedef struct
+{
 	int   max;
 	int   min;
 	char *buf;
-} Stringer;
+}
+Stringer;
 
 //
 //

@@ -4,7 +4,7 @@
 
 // if < 0 then an error occurred, otherwise, if success, the result is an index into
 // the proto-array where you can get the prototype and execute it as a closure
-int elf_makefile(elf_State *S, const char *name);
+BytecodeFunction elf_makefile(elf_State *S, const char *name);
 
 
 // " parses a constant expression "

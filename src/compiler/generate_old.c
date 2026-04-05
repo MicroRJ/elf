@@ -20,7 +20,7 @@ static int instr_from_tree_kind(int kind);
 // todo: interning
 static int add_const_int(elf_State *S, elf_Integer i)
 {
-	Index index = heap_array_grow(S->integers, 1);
+	Index index = dynamic_array_allocate(S->integers, 1);
 	S->integers[index] = i;
 	return index;
 }
@@ -28,7 +28,7 @@ static int add_const_int(elf_State *S, elf_Integer i)
 // todo: interning
 static int add_const_num(elf_State *S, elf_Number i)
 {
-	Index index = heap_array_grow(S->numbers, 1);
+	Index index = dynamic_array_allocate(S->numbers, 1);
 	S->numbers[index] = i;
 	return index;
 }
@@ -629,7 +629,7 @@ static int to_mem(Parser *parser, AstRef id, int dst, int ndst) {
 		case TREE_GLOBAL: {
 			if (ndst<1) goto esc;
 			if (dst<0) dst=req_mem(parser);
-			emit_bytexy(parser,line,BYTECODE_LOADGLOBAL,dst,tree.expr_global);
+			emit_bytexy(parser,line,BYTECODE_GETGLOBAL,dst,tree.expr_global);
 		} break;
 
 
@@ -666,12 +666,12 @@ static int to_mem(Parser *parser, AstRef id, int dst, int ndst) {
 			// todo: add to constant pool and create new GETKSTR instruction
 			// todo: also add dedicated get str field instruction, which is
 			// the common case for field accesses!
-			Str str = _string_new(S, tree.expr_str);
+			GCStr str = new_string_from_data(S, tree.expr_str);
 
-			int yy = heap_array_grow(S->globals->array, 1);
+			int yy = dynamic_array_allocate(S->globals->array, 1);
 			to_str(&S->globals->array[yy], str);
 
-			emit_bytexy(parser,line,BYTECODE_LOADGLOBAL,dst,yy);
+			emit_bytexy(parser,line,BYTECODE_GETGLOBAL,dst,yy);
 		} break;
 
 		case AST_TABLE:{
@@ -855,7 +855,7 @@ AstRef desugar_range_expr(Parser *fs, AstRef x, int flags) {
 	switch (node.kind) {
 		case IR_INDEX: case IR_FIELD: {
 			xx=desugar_range_expr(fs,node.x,flags&~EXPR_LHS);
-			return elf_new_binary_expr_tree(fs,node.site,node.kind,xx,node.y);
+			return create_binary_expr_ast(fs,node.site,node.kind,xx,node.y);
 		}
 		case IR_RANGE_INDEX: {
 			ASSERT(get_tree_kind(fs,node.y) == IR_RANGE);

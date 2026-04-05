@@ -215,14 +215,6 @@ enum {
    ELF_GC_GETSTATE = 255,
 };
 
-/* returns the prior state of the GC */
-int elf_gcstate(elf_State *, int state);
-
-
-
-
-
-
 
 #endif
 /*

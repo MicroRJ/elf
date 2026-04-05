@@ -14,9 +14,9 @@ typedef enum
 	ENTITY_TAG_REFERENCED  = 1 << 0,
 	ENTITY_TAG_CONSTANT    = 1 << 1,
 	ENTITY_TAG_ASSIGNED    = 1 << 2,
-	ENTITY_BIT_PARAMETER   = 1 << 3,
-	ENTITY_BIT_FORLOOP     = 1 << 4,
-	ENTITY_BIT_STATIC      = 1 << 5,
+	ENTITY_TAG_PARAMETER   = 1 << 3,
+	ENTITY_TAG_FORLOOP     = 1 << 4,
+	ENTITY_TAG_STATIC      = 1 << 5,
 }
 EntityTags;
 
@@ -42,12 +42,35 @@ typedef struct
 }
 Entity;
 
+typedef enum
+{
+	FUNCTION_VARIADIC = 1,
+}
+GenFunctionTags;
+
 typedef struct
 {
-	AstRef ast;
-	u32    function_id;
+	// Todo
+	char    *name;
+	Source   site;
+	TypeRule type;
+	AstRef   expr;
+	u32      tags;
+	//
+	u32      slot;
 }
-FunctionGenEntry;
+GenFunctionParam;
+
+typedef struct
+{
+	Source              site;
+	GenFunctionTags     tags;
+	u32                arity;
+	AstRef              body;
+	GenFunctionParam *params;
+	AstRef      function_ast;
+}
+GenFunction;
 
 typedef struct
 {
@@ -62,9 +85,11 @@ typedef struct
 	// Todo, we need an off-loadable bytecode module ...
 	elf_State *state;
 
-	// Todo,
-	FunctionGenEntry *entries;
-	i32              nentries;
+	GenFunction *functions;
+	u32           num_functions;
+	u32           max_functions;
+
+	u32 bytecode_function_offset_in_module;
 
 	Entity     entities[MAX_ENTITIES];
 	EntityId   entity_index;

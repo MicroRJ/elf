@@ -217,7 +217,7 @@ ELF_FUNCTION(l_table_delete) {
 	}
 	else {
 
-		pushnil(S);
+		push_nil(S);
 
 	}
 	return 1;
@@ -316,7 +316,7 @@ ELF_FUNCTION(l_find_aliases) {
 	Tab tab = loadtable(S, 0);
 	V   key = loadvalue(S, 1);
 
-	Tab res = pushnewtable(S);
+	Tab res = push_new_table(S);
 
 	if (!is_nil(key)) {
 
@@ -400,7 +400,7 @@ ELF_FUNCTION(l_table_merge) {
 
 	Index slot;
 
-	Tab sum = pushnewtable(S);
+	Tab sum = push_new_table(S);
 
 	for (int i = 0; i < nargs; ++ i) {
 		Tab merger = loadtable(S, i);
@@ -444,7 +444,7 @@ ELF_FUNCTION(l_table_fork) {
 		reporterror(S, NO_BYTE, "argument is nil");
 	}
 
-	pushnewtable(S);
+	push_new_table(S);
 
 	Index i;
 	for (i = 0; i < tab->ntotal; ++i) {
@@ -543,7 +543,7 @@ ELF_FUNCTION(l_array_slice) {
 	if (nargs >= 2) x = loadindex(S, 0, tab);
 	if (nargs >= 3) y = loadindex(S, 1, tab);
 
-	Tab slice = pushnewtable(S);
+	Tab slice = push_new_table(S);
 	while (x < y) {
 		heap_array_add(slice->array, tab->array[x ++]);
 	}
@@ -641,7 +641,7 @@ ELF_FUNCTION(l_array_merge) {
 ELF_FUNCTION(l_array_clone) {
 	Tab tab = loadtable(S, 0);
 
-	Table *clone = pushnewtable(S);
+	Table *clone = push_new_table(S);
 
 	// todo: hello????? memcpy?
 	Index i;
@@ -693,7 +693,7 @@ ELF_FUNCTION(l_array_reverse) {
 ELF_FUNCTION(l_table_get_pairs) {
 	Tab tab = loadtable(S, 0);
 
-	Tab res = pushnewtable(S);
+	Tab res = push_new_table(S);
 
 	Index i;
 	for (i = 0; i < tab->nentries; ++ i) {
@@ -733,7 +733,7 @@ ELF_FUNCTION(l_table_ordered_pairs)
 
 
 	Tab tab = loadtable(S, 0);
-	Tab res = pushnewtable(S);
+	Tab res = push_new_table(S);
 
 	Index nen = tab->nentries;
 	Entry *es = tab->entries;
@@ -807,7 +807,7 @@ ELF_FUNCTION(l_array_rank)
 	RankValue *rv = malloc(l * sizeof(*rv));
 
 	Value __rank;
-	to_str(&__rank, _string_new(S, "__rank"));
+	to_str(&__rank, new_string_from_data(S, "__rank"));
 
 	for (i=0; i<l; ++i) {
 		Value value = tab->array[i];

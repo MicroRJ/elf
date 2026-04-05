@@ -8,7 +8,7 @@
 // Note, for all intents and purposes this works like a regular stack!
 //
 
-static void ELF_DestroyArena(elf_Arena *arena)
+static void elf_destroy_arena(elf_Arena *arena)
 {
 	sys_virtual_free(arena->data);
 	zero_memory(arena, sizeof(*arena));

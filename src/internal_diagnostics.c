@@ -224,7 +224,7 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, BCPos id, Bytecod
 	if (BYTECODE_OP(b) == BYTECODE_LOADKNUM) {
 		fprintf(io," #%f",M->numbers[BYTECODE_ARGY(b)]);
 	} else
-	if (BYTECODE_OP(b) == BYTECODE_LOADGLOBAL) {
+	if (BYTECODE_OP(b) == BYTECODE_GETGLOBAL) {
 		elf_Value val = M->globals->array[BYTECODE_ARGY(b)];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells

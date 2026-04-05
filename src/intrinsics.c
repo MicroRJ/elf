@@ -193,7 +193,7 @@ static inline Tab _get_metatable(elf_State *S, V v) {
 		case ELF_TTABLE:
 		case ELF_TUSER:
 		case ELF_TCLOSURE: {
-			metatable = as_ref(v)->meta;
+			metatable = reference_from_value(v)->meta;
 		} break;
 
 		case ELF_TNUMBER: {
@@ -273,10 +273,10 @@ static int metaintrin(elf_State *S, int intrin, V *x, V y, V z) {
 
 
 	// todo: !!!
-	Str name = _string_new(S, intrin2s[intrin]);
+	GCStr name = new_string_from_data(S, intrin2s[intrin]);
 
 
-	Ref ref = as_ref(y);
+	GCRef ref = reference_from_value(y);
 
 	if (!ref->meta) {
 		reporterrorf(S, NO_BYTE, "'%s': missing meta-table", strt(name));
@@ -345,7 +345,7 @@ static inline void v__##NAME (elf_State *S, V *x, V y, V z)                   \
 			to_int(x, __##NAME##_i(as_int(y), as_int(z)));                       \
 		}                                                                       \
 	}                                                                          \
-	else if (is_ref(y)) {                                                      \
+	else if (value_is_reference(y)) {                                                      \
 		metaintrin(S, INTRIN__##NAME, x, y, z);                                 \
 	}                                                                          \
 	else {                                                                     \
@@ -369,7 +369,7 @@ static inline void v__##NAME(elf_State *S, V *x, V y, V z) {     \
 			to_int(x, __##NAME(as_int(y), as_int(z)));              \
 		}                                                          \
 	}                                                             \
-	else if (is_ref(y)) {                                         \
+	else if (value_is_reference(y)) {                                         \
 		goto _err;                                                 \
 	}                                                             \
 	else {                                                        \

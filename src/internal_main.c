@@ -43,6 +43,8 @@
 
 #include "intrinsics.c"
 
+#include "arena.c"
+
 
 #include "l_math.c"
 #include "l_core.c"
@@ -60,7 +62,7 @@
 
 
 
-int callclosure(elf_State *S, Closure closure, int nargs, int nrets);
+int call_closure(elf_State *S, Closure closure, int nargs, int nrets);
 
 
 
@@ -87,53 +89,58 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 	}
 }
 
-void _initstate(elf_State *S) {
-	// todo: we over rely on the virtual memory system
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	// todo: to be removed
-	{
-		S->frame_stack_max = GIGABYTES(1) / sizeof(*S->frame_stack);
-		S->frame_stack = sys_virtual_alloc(sizeof(*S->frame_stack) * S->frame_stack_max);
-	}
+ELF_PUBLIC elf_State *elf_create_state()
+{
+	elf_Arena arena = elf_create_arena(0);
+	elf_Arena scratch_arena = elf_create_arena(0);
 
-	{
-		S->stack_max = GIGABYTES(1) / sizeof(*S->stack);
-		S->stack = sys_virtual_alloc(sizeof(*S->stack) * S->stack_max);
-		S->stack_ptr = S->stack;
-	}
+	elf_State *state = elf_arena_push_zero(& arena, sizeof(*state));
 
-	{
-		// todo: isn't there a way to create native circular buffer using
-		// some form of paged addressing
-		S->record_max = 1024;
-		S->record_min = 0;
-		S->record = sys_virtual_alloc(sizeof(*S->record) * S->record_max);
-	}
+	state->arena_ = arena;
+	state->scratch_arena_ = scratch_arena;
 
-	S->gc.memthreshold = GC_MEM_THRESHOLD_MIN;
-	S->gc.objthreshold = GC_OBJ_THRESHOLD_MIN;
-	S->gc.tail = & S->gc.head;
+	state->arena = & state->arena_;
+	state->scratch_arena = & state->scratch_arena_;
 
+	state->frame_stack_max = 4096;
+	state->frame_stack = elf_arena_push_zero(state->arena, sizeof(* state->frame_stack) * state->frame_stack_max);
 
-	// it literally doesn't matter, but technically, framebase-1
-	// is where the function is at, we don't have one, so nil.
-	pushnil(S);
+	state->stack_max = 4096;
+	state->stack = elf_arena_push_zero(state->arena, sizeof(*state->stack) * state->stack_max);
+	state->stack_ptr = state->stack;
 
-	S->frame.framebase = S->stack;
-	S->frame.framesize = 16;
+	state->record_max = 1024;
+	state->record_min = 0;
+	state->record = elf_arena_push_zero(state->arena, sizeof(*state->record) * state->record_max);
 
-	// todo: metatables should be per module?
-	S->metatables.string = pushnewtable(S);
-	install(S, 0, string_metafuncs, COUNTOF(string_metafuncs));
+	// Todo, just allocate this dynamically ...
+	u32 max_references = 1 << 10 << 2;
 
-	S->metatables.table = pushnewtable(S);
-	install(S, 0, l_table, COUNTOF(l_table));
+	state->collector_state.memory_thresh = GC_MEM_THRESHOLD_MIN;
+	state->collector_state.counter_thresh = GC_OBJ_THRESHOLD_MIN;
 
+	state->collector_state.references1 = elf_arena_push_zero(state->arena, sizeof(*state->collector_state.references1) * max_references);
+	state->collector_state.references2 = elf_arena_push_zero(state->arena, sizeof(*state->collector_state.references1) * max_references);
 
-	S->metatables.buffer = pushnewtable(S);
-	install(S, 0, l_buffer, COUNTOF(l_buffer));
+	// this is to match the frame setup of a typical function ...
+	push_nil(state);
 
-	// S->strings = pushnewtable(S);
+	state->frame.framebase = state->stack;
+	state->frame.framesize = 16;
+
+	state->metatables.string = push_new_table(state);
+	install(state, 0, l_string, COUNTOF(l_string));
+
+	state->metatables.table = push_new_table(state);
+	install(state, 0, l_table, COUNTOF(l_table));
+
+	state->metatables.buffer = push_new_table(state);
+	install(state, 0, l_buffer, COUNTOF(l_buffer));
+
+	// state->strings = push_new_table(state);
 
 	// todo: builtin intrinsics
 	static elf_Binding lib_base[] = {
@@ -141,34 +148,28 @@ void _initstate(elf_State *S) {
 		{"iton", l_core_iton},
 	};
 
-	S->globals = pushnewtable(S);
-	install(S,"elf.sockets",  l_sockets  , COUNTOF(l_sockets));
-	install(S,           0 ,  lib_base   , COUNTOF(lib_base));
-	install(S,           0 ,  lib_math   , COUNTOF(lib_math));
-	install(S, "elf"       ,  l_core     , COUNTOF(l_core));
-	install(S, "elf"       ,  lib_random , COUNTOF(lib_random));
-	install(S, "elf"       ,  l_sys      , COUNTOF(l_sys));
+	state->globals = push_new_table(state);
+	install(state,"elf.sockets",  l_sockets  , COUNTOF(l_sockets));
+	install(state,           0 ,  lib_base   , COUNTOF(lib_base));
+	install(state,           0 ,  lib_math   , COUNTOF(lib_math));
+	install(state, "elf"       ,  l_core     , COUNTOF(l_core));
+	install(state, "elf"       ,  lib_random , COUNTOF(lib_random));
+	install(state, "elf"       ,  l_sys      , COUNTOF(l_sys));
 
 
-	ASSERT(stack2index(S) < S->frame.framesize);
+	ASSERT(stack2index(state) < state->frame.framesize);
 
-	setstackptr(S, S->frame.framebase + S->frame.framesize);
+	setstackptr(state, state->frame.framebase + state->frame.framesize);
+
+	return state;
 }
 
-
-
-
-
-
-
-
-
-
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // nrets would not matter for the frame size because returns are pushed
 // regardless
-static inline int callfunction(elf_State *S, elf_Function function, int nargs, int nrets)
+static inline int call_function(elf_State *S, elf_Function function, int nargs, int nrets)
 {
 	V *framebase = S->stack_ptr - nargs;
 	V *reference = framebase;
@@ -225,23 +226,27 @@ static inline int callfunction(elf_State *S, elf_Function function, int nargs, i
 
 
 
-int elf_tailcall(elf_State *S, int nargs, int nrets) {
+int elf_tailcall(elf_State *state, int nargs, int nrets)
+{
+	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
 
-	int frame_index = S->frame_index;
+	u32 frame_index = state->frame_index;
 
-	V value = S->stack_ptr[- nargs - 1];
+	Value value = state->stack_ptr[- nargs - 1];
 
-	if (is_closure(value)) {
-		nrets = callclosure(S, as_closure(value), nargs, nrets);
+	if (is_closure(value))
+	{
+		nrets = call_closure(state, closure_from_value(value), nargs, nrets);
 	}
-	else if(is_function(value)) {
-		nrets = callfunction(S, as_function(value), nargs, nrets);
+	else if(is_function(value))
+	{
+		nrets = call_function(state, function_from_value(value), nargs, nrets);
 	}
 	else {
-		reporterrorf(S, NO_BYTE, "'%s': __call expects callable value", tag2s[value.tag]);
+		reporterrorf(state, NO_BYTE, "'%s': __call expects callable value", tag2s[value.tag]);
 	}
 
-	ASSERT(S->frame_index == frame_index);
+	ASSERT(state->frame_index == frame_index);
 
 	return nrets;
 }
@@ -343,22 +348,19 @@ so they only work within that function ya heard */
 		Interpreter Function
 ======================================================== */
 
-
-
-
 // update the given frame to match the given closure's needs
 static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Closure *closure, int nargs, int nrets)
 {
-	BytecodeFunction proto = closure->proto;
+	BytecodeFunction function = closure->function;
 
-	// todo: do not grow frame size less we care about vargs
-	int framesize = nargs < proto.stacksize ? proto.stacksize : nargs;
+	// todo: do not grow frame size unless we care about vargs
+	u32 framesize = nargs < function.stacksize ? function.stacksize : nargs;
 
 
 	// todo: don't do this here, because when we call prepframeforclosure
 	// from the closure, we have to increment the stackpointer to account
 	// for this, when we already know this information
-	// this should be done in callclosure which is outward facing!
+	// this should be done in call_closure which is outward facing!
 	V *framebase = S->stack_ptr - nargs;
 
 
@@ -366,10 +368,10 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 
 	// Do we care about excess args? And do we have any?
 	// todo: unlikely
-	if (proto.variadic && nargs > proto.arity) {
+	if (function.variadic && nargs > function.arity) {
 		reference += nargs;
-		framesize += proto.arity;
-		copy_values(reference, framebase, proto.arity);
+		framesize += function.arity;
+		copy_values(reference, framebase, function.arity);
 	}
 
 
@@ -377,7 +379,7 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 
 	// prevent the collector from tripping on possibly garbage values
 	// clear the remaining stack space
-	zero_values(reference + MIN(proto.arity, nargs), framesize - MIN(proto.arity, nargs) - (reference - framebase));
+	zero_values(reference + MIN(function.arity, nargs), framesize - MIN(function.arity, nargs) - (reference - framebase));
 
 
 	frame->framesize = framesize;
@@ -385,12 +387,12 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 	frame->reference = reference;
 	frame->nargs = nargs;
 	frame->nrets = nrets;
-	frame->arity = proto.arity;
-	frame->variadic = proto.variadic;
-	frame->bytes = proto.bytes;
-	frame->bytec = proto.numbytes;
+	frame->arity = function.arity;
+	frame->variadic = function.variadic;
+	frame->bytes = function.bytes;
+	frame->bytec = function.numbytes;
 	frame->closureenv = closure->captures;
-	frame->closuresize = proto.ncaptures;
+	frame->closuresize = function.ncaptures;
 	frame->nextinstr = 0;
 
 	// todo: this will zero too!
@@ -442,7 +444,7 @@ static void _tracerecords(elf_State *S, u32 x) {
 
 // todo: outward facing root call should not write results to the function,
 // this is only bytecode stuff!
-int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
+int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 	Tab globals = S->globals;
 
@@ -466,7 +468,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 		Bytecode byte = S->bytebuf[minstr];
 
-		// printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
+		printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
 
 		#define by byte
 
@@ -493,7 +495,7 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 					S->frame_stack[S->frame_index ++] = frame;
 
 					// update frame for new closure
-					prepframeforclosure(S, &frame, as_closure(xx), by.b_y, by.b_z);
+					prepframeforclosure(S, &frame, closure_from_value(xx), by.b_y, by.b_z);
 
 
 					// track the number of sub-frames locally
@@ -506,13 +508,13 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 					// avoid having to do this.
 					S->frame_stack[S->frame_index ++] = frame;
 
-					callfunction(S, as_function(xx), by.b_y, by.b_z);
+					call_function(S, function_from_value(xx), by.b_y, by.b_z);
 
 					// note how we don't store nor restore S->frame, so
 					// from this point onwards, S->frame will no longer
 					// reflect the state of our local frame, we need to
 					// ensure that when we exit the function, no-one assumes
-					// that S->frame is the frame of callclosure
+					// that S->frame is the frame of call_closure
 					S->frame_index --;
 
 					// restore stack pointer
@@ -588,15 +590,16 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 			} VMBREAK;
 
 
-			VMCASE(BYTECODE_LOADGLOBAL) {
+			VMCASE(BYTECODE_GETGLOBAL) {
 				vmove(&LoadX(), global_y());
 				_pushrec1(S, byte, LoadX(), global_y());
 			} VMBREAK;
 
-			VMCASE(BYTECODE_SETGLOBAL) {
+			VMCASE(BYTECODE_SETGLOBAL)
+			{
 				vmove(&global_x(), LoadY());
-				_pushrec1(S, byte, global_x(), LoadY());
-			} VMBREAK;
+			}
+			VMBREAK;
 
 			VMCASE(BYTECODE_RELOAD) {
 				V x = LoadY();
@@ -604,10 +607,12 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 				_pushrec1(S, byte, LoadX(), x);
 			} VMBREAK;
 
-			VMCASE(BYTECODE_LOADCVAL) {
+			VMCASE(BYTECODE_LOADCVAL)
+			{
 				ASSERT(WITHIN(BYTECODE_ARGY(byte), 0, frame.closuresize));
 				vmove(&LoadX(), frame.closureenv[by.b_y]);
-			} VMBREAK;
+			}
+			VMBREAK;
 
 			VMCASE(BYTECODE_GETMETAFIELD)
 			{
@@ -685,25 +690,25 @@ int callclosure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 			} VMBREAK;
 
-			case BYTECODE_CLOSURE: {
+			case BYTECODE_CLOSURE:
+			{
 				ASSERT(WITHIN(BYTECODE_ARGY(byte), 0, heap_array_length(S->protos)));
 
-				int proto_index = BYTECODE_ARGY(byte);
+				u32 proto_index = BYTECODE_ARGY(byte);
 
-				BytecodeFunction proto = S->protos[proto_index];
+				BytecodeFunction function = S->protos[proto_index];
 
 				Closure closure;
 
-				int size = sizeof(*closure) + sizeof(closure->captures[0]) * proto.ncaptures;
+				u32 size = sizeof(*closure) + sizeof(closure->captures[0]) * function.ncaptures;
 
-				closure = (Closure) gcalloc(S, GC_CLS, size);
-				closure->proto_index = proto_index;
-				closure->proto = proto;
-				copy_values(closure->captures, &LoadX(), proto.ncaptures);
+				closure = (Closure) collector_alloc(S, GC_CLOSURE, size);
+				closure->function = function;
+				copy_values(closure->captures, &LoadX(), function.ncaptures);
 
 				to_cls(&LoadX(), closure);
-			} break;
-
+			}
+			break;
 
 			case BYTECODE_TABLE: {
 

@@ -14,26 +14,6 @@
 
 
 
-ELF_PUBLIC elf_State *elf_create_state()
-{
-	// Todo,
-	elf_Arena arena = elf_create_arena(0);
-	elf_Arena scratch_arena = elf_create_arena(0);
-
-	elf_State *state = elf_arena_push_zero(& arena, sizeof(*state));
-
-	state->arena_ = arena;
-	state->scratch_arena_ = scratch_arena;
-
-	state->arena = & state->arena_;
-	state->scratch_arena = & state->scratch_arena_;
-
-	_initstate(state);
-	return state;
-}
-
-
-
 
 void elf_error(elf_State *S, int error, const char *format, ...) {
 	va_list vargs;
@@ -59,14 +39,14 @@ const char *elf_loadtext(elf_State *S, int x) {
 
 
 const char *elf_loadtextl(elf_State *S, int x, int *l) {
-	Str str = loadstr(S, x);
+	GCStr str = loadstr(S, x);
 	if (l) *l = str->length;
 	return str->text;
 }
 
 
 
-void elf_push_nil(elf_State *S)                  { pushnil(S);    }
+void elf_push_nil(elf_State *S)                  { push_nil(S);    }
 void elf_pushint(elf_State *S, elf_Integer   x) { pushint(S, x); }
 void elf_push_num(elf_State *S, elf_Number    x) { pushnum(S, x); }
 void elf_pushfun(elf_State *S, elf_Function  x) { pushfun(S, x); }
@@ -75,7 +55,7 @@ void elf_pushsys(elf_State *S, elf_Handle    x) { pushsys(S, x); }
 
 
 void elf_pushtab(elf_State *S) {
-	pushnewtable(S);
+	push_new_table(S);
 }
 
 
@@ -85,32 +65,23 @@ void elf_pushtext(elf_State *S, const char *text) {
 	pushtext(S, text);
 }
 
-
-
-
-
-
-void elf_push_textl(elf_State *S, const char *text, int len) {
+void elf_push_textl(elf_State *S, const char *text, int len)
+{
 	pushtext2(S, text, len);
 }
 
-
-int elf_pushcodefile(elf_State *S, const char *name, const char *text) {
-	// todo: why is make_file doing file io
+// Todo, we need to remove file io from here entirely ...
+int elf_pushcodefile(elf_State *state, const char *name, const char *text)
+{
 	ASSERT(name);
-	int proto_index = elf_makefile(S, name);
 
-	if (proto_index >= 0) {
-		Closure closure = gcalloc(S, GC_CLS, sizeof(*closure));
-		closure->proto_index = proto_index;
-		closure->proto = S->protos[proto_index];
-		pushcls(S, closure);
-	}
-	else {
-		pushnil(S);
-	}
+	BytecodeFunction function = elf_makefile(state, name);
 
-	return proto_index >= 0;
+	Closure closure = collector_alloc(state, GC_CLOSURE, sizeof(*closure));
+	closure->function = function;
+	push_closure(state, closure);
+
+	return 0;
 }
 
 // Todo, remove this!

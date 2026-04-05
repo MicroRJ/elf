@@ -64,7 +64,7 @@ static inline void _table_init(elf_State *S, Tab table, Index nentries) {
 //
 
 Tab newtable2(elf_State *S, Index nentries) {
-	Tab table = gcalloc(S, GC_TAB, sizeof(*table));
+	Tab table = collector_alloc(S, GC_TABLE, sizeof(*table));
 	table->obj.meta = S->metatables.table;
 
 	_table_init(S, table, nentries);
@@ -297,7 +297,7 @@ static Index elf_table_ensure(elf_State *state, Tab table, Value key)
 	// there's nothing here, so use up the slot
 	if (isdead(entry->key)) {
 
-		index = heap_array_grow(table->array, 1);
+		index = dynamic_array_allocate(table->array, 1);
 		to_nil(&table->array[index]);
 
 		entry->key = key;
@@ -321,7 +321,7 @@ static Index elf_table_ensure(elf_State *state, Tab table, Value key)
 //
 
 Index _table_bindtoindex(elf_State *S, Tab table, Value key, Index index) {
-	checkwrite(S, (Ref) table);
+	checkwrite(S, (GCRef) table);
 
 	Index entry_index = _table_tryresize(S, table, key);
 	ASSERT(entry_index != FIND_ENTRY_FAILED);
@@ -346,7 +346,7 @@ Index _table_bindtoindex(elf_State *S, Tab table, Value key, Index index) {
 //
 
 Index tableset(elf_State *S, Tab table, Val key, Val value) {
-	checkwrite(S, (Ref) table);
+	checkwrite(S, (GCRef) table);
 
 	Index index = _table_tryresize(S, table, key);
 	ASSERT(index != FIND_ENTRY_FAILED);
@@ -354,7 +354,7 @@ Index tableset(elf_State *S, Tab table, Val key, Val value) {
 	Entry *entry = table->entries + index;
 
 	if (isdead(entry->key)) {
-		index = heap_array_grow(table->array, 1);
+		index = dynamic_array_allocate(table->array, 1);
 		entry->key = key;
 		entry->idx = index;
 		table->fillcounter ++;
@@ -390,8 +390,8 @@ Index _table_arraylen(Tab tab) {
 //
 
 Index _table_arrayadd(elf_State *S, Tab tab, V v) {
-	checkwrite(S, (Ref) tab);
-	Index index = heap_array_grow(tab->array, 1);
+	checkwrite(S, (GCRef) tab);
+	Index index = dynamic_array_allocate(tab->array, 1);
 	tab->array[index] = v;
 	return index;
 }

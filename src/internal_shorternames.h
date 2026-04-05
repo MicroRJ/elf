@@ -44,15 +44,13 @@ typedef elf_Integer Int;
 typedef elf_Number  Num;
 
 
-typedef GCNode  GCMem;
 typedef GCNode *GCRef;
-typedef GCNode *Ref;
 
 
 typedef elf_Table    Table;
 typedef elf_Table   *Tab;
 
-typedef elf_String  *Str;
+typedef elf_String  *GCStr;
 typedef elf_Closure *Closure;
 
 

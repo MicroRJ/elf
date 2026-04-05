@@ -1,17 +1,17 @@
 
 #define NO_JUMP (-0)
 
-typedef i32 MemorySlot;
+typedef i32 GenMemorySlot;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static MemorySlot allocate_slots(BytecodeGen *, u32 num);
+static GenMemorySlot allocate_slots(BytecodeGen *, u32 num);
 static int allocate_slot(BytecodeGen *);
 static i32 get_expr_mem(BytecodeGen *, AstRef expr);
 static int expr_to_any_mem(BytecodeGen *, AstRef expr);
-static MemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, MemorySlot slots, u32 nslots);
+static GenMemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, GenMemorySlot slots, u32 nslots);
 static int get_mem_state(BytecodeGen *);
 static void push_mem_state_(BytecodeGen *);
 static void pop_mem_state_(BytecodeGen *);
@@ -34,7 +34,7 @@ static void add_else_clause(BytecodeGen *, Source site, JBuf *s);
 static void add_then_clause(BytecodeGen *, Source site, JBuf *s);
 static void close_if(BytecodeGen *, Source site, JBuf *s);
 static int emit_jump(BytecodeGen *, Source site, int dst);
-static int emit_byte(BytecodeGen *, Source site, Bytecode byte);
+static int emit_bytecode(BytecodeGen *, Source site, Bytecode byte);
 static int emit_bytex(BytecodeGen *, Source site, int k, int x);
 static int emit_bytexy(BytecodeGen *, Source site, int k, int x, int y);
 static int emit_bytexyz(BytecodeGen *, Source site, int k, int x, int y, int z);
@@ -125,7 +125,7 @@ static inline BCPos *emit_jump_if_false(BytecodeGen *fs, jumpS *js, AstRef id)
 static inline int *emit_jump_if_not_nil(BytecodeGen *parser, Source site, jumpS *js, AstRef id)
 {
 	__debugbreak();
-	// return emit_jump_if_false(parser,js,elf_new_binary_expr_tree(parser,site,AST_EQ,id,tree_nil(parser,site)));
+	// return emit_jump_if_false(parser,js,create_binary_expr_ast(parser,site,AST_EQ,id,tree_nil(parser,site)));
 	return 0;
 }
 
@@ -133,7 +133,7 @@ static inline int *emit_jump_if_not_nil(BytecodeGen *parser, Source site, jumpS 
 static inline int *emit_jump_if_nil(BytecodeGen *parser, Source site, jumpS *js, AstRef id)
 {
 	__debugbreak();
-	// return emit_jump_if_true(parser,js,elf_new_binary_expr_tree(parser,site,AST_EQ,id,tree_nil(parser,site)));
+	// return emit_jump_if_true(parser,js,create_binary_expr_ast(parser,site,AST_EQ,id,tree_nil(parser,site)));
 	return 0;
 }
 
@@ -208,12 +208,18 @@ void close_if(BytecodeGen *fs, Source site, JBuf *s)
 	}
 }
 
-static int emit_byte(BytecodeGen *parser, Source site, Bytecode byte)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Todo, instead here we need to pass in a bytecode buffer, we can use a temporary fixed sized
+// buffer because all instructions emitted are relative to the current function, once the thing is
+// done, we emit the instructions to the real module buffer, which should make this not dependent
+// on the main state
+static int emit_bytecode(BytecodeGen *gen, Source site, Bytecode byte)
 {
-	elf_State *state = parser->state;
+	elf_State *state = gen->state;
 	heap_array_add(state->lines, site);
 	heap_array_add(state->bytebuf, byte);
-	printf("%s\n", Static_StrFromBytecode[byte.b_k]);
 	return state->bytecur ++;
 }
 
@@ -222,7 +228,7 @@ static int emit_bytex(BytecodeGen *C, Source site, int k, int x)
 	Bytecode byte=BYTECODE_XXX(k,x);
 	ASSERT(BYTECODE_OP(byte)==k);
 	ASSERT(BYTECODE_ARGX(byte)==x);
-	return emit_byte(C,site,byte);
+	return emit_bytecode(C,site,byte);
 }
 
 static int emit_bytexy(BytecodeGen *C, Source site, int k, int x, int y)
@@ -231,7 +237,7 @@ static int emit_bytexy(BytecodeGen *C, Source site, int k, int x, int y)
 	ASSERT(BYTECODE_OP(byte)==k);
 	ASSERT(BYTECODE_ARGX(byte)==x);
 	ASSERT(BYTECODE_ARGY(byte)==y);
-	return emit_byte(C,site,byte);
+	return emit_bytecode(C,site,byte);
 }
 
 static int emit_bytexyz(BytecodeGen *C, Source site, int k, int x, int y, int z)
@@ -241,7 +247,7 @@ static int emit_bytexyz(BytecodeGen *C, Source site, int k, int x, int y, int z)
 	ASSERT(BYTECODE_ARGX(byte)==x);
 	ASSERT(BYTECODE_ARGY(byte)==y);
 	ASSERT(BYTECODE_ARGZ(byte)==z);
-	return emit_byte(C,site,byte);
+	return emit_bytecode(C,site,byte);
 }
 
 static void patch_jump2(BytecodeGen *parser, BCPos src, BCPos dst)
@@ -294,7 +300,7 @@ static void patch_jumps(BytecodeGen *par, BCPos *js) {
 // Todo, interning ...
 static int add_const_int(elf_State *state, i64 i)
 {
-	Index index = heap_array_grow(state->integers, 1);
+	Index index = dynamic_array_allocate(state->integers, 1);
 	state->integers[index] = i;
 	return index;
 }
@@ -302,7 +308,7 @@ static int add_const_int(elf_State *state, i64 i)
 // Todo, interning ...
 static int add_const_num(elf_State *state, f64 i)
 {
-	Index index = heap_array_grow(state->numbers, 1);
+	Index index = dynamic_array_allocate(state->numbers, 1);
 	state->numbers[index] = i;
 	return index;
 }
@@ -322,12 +328,12 @@ static u32 emit_load_constant_num(BytecodeGen *gen, Source site, u32 dest, f64 n
 // Todo, this should have been a string from the start!
 static u32 emit_load_constant_str(BytecodeGen *gen, Source site, u32 dest, char *data)
 {
-	Str str = _string_new(gen->state, data);
+	GCStr str = new_string_from_data(gen->state, data);
 
-	u32 index = heap_array_grow(gen->state->globals->array, 1);
+	u32 index = dynamic_array_allocate(gen->state->globals->array, 1);
 	to_str(&gen->state->globals->array[index], str);
 
-	return emit_bytexy(gen, site, BYTECODE_LOADGLOBAL, dest, index);
+	return emit_bytexy(gen, site, BYTECODE_GETGLOBAL, dest, index);
 }
 
 static u32 emit_load_nil(BytecodeGen *gen, Source site, u32 dest)
@@ -335,3 +341,102 @@ static u32 emit_load_nil(BytecodeGen *gen, Source site, u32 dest)
 	return emit_bytexy(gen, site, BYTECODE_LOADNIL, dest, 0);
 }
 
+static u32 emit_get_global_bytecode(BytecodeGen *gen, Source site, u32 dest, u32 global_index)
+{
+	return emit_bytexy(gen, site, BYTECODE_GETGLOBAL, dest, global_index);
+}
+
+static u32 emit_reload_bytecode(BytecodeGen *gen, Source site, u32 dst, u32 src)
+{
+	return emit_bytexy(gen, site, BYTECODE_RELOAD, dst, src);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static Value get_global_value_from_index(elf_State *state, u32 global_index)
+{
+	return state->globals->array[global_index];
+}
+
+static void print_value_basic_shallow(Value value)
+{
+	switch (value.tag)
+	{
+		case ELF_TNIL:        printf("nil"                      ); break;
+		case ELF_TINTEGER:    printf("%lli"  , value.x_int      ); break;
+		case ELF_TNUMBER:     printf("%f"    , value.x_num      ); break;
+		case ELF_THANDLE:     printf("h%llX" , value.x_int      ); break;
+		case ELF_TSTRING:     printf("%s"    , value.x_str->data); break;
+		case ELF_TCLOSURE:    printf("C()"); break;
+		case ELF_TFUNCTION:   printf("F()"); break;
+		case ELF_TBUFFER:     printf("B()"); break;
+		case ELF_TTABLE:      printf("T()"); break;
+		default:              printf("(?)"); break;
+	}
+}
+
+void print_bytecode_function(elf_State *state, BytecodeFunction function)
+{
+	Bytecode *bytecode_buffer = state->bytebuf;
+	printf("FUNCTION:\n");
+	printf("  .variadic   = %s\n", function.variadic ? "true" : "false");
+	printf("  .arity      = %i\n", function.arity);
+	printf("  .ncaptures  = %i\n", function.ncaptures);
+	printf("  .stacksize  = %i\n", function.stacksize);
+	printf("  .numbytes   = %i\n", function.numbytes);
+	printf("  .bytes      = %i\n", function.bytes);
+	printf("BODY:\n");
+
+	for (u32 i = 0; i < function.numbytes; ++ i)
+	{
+		Bytecode byte = bytecode_buffer[i];
+		printf("  ");
+		switch (byte.b_k)
+		{
+			case BYTECODE_RELOAD:
+			{
+				printf("r%i = load(r%i)", byte.b_x, byte.b_y);
+			}
+			break;
+			case BYTECODE_LOADKINT:
+			{
+				printf("r%i = int %lli", byte.b_x, state->integers[byte.b_y]);
+			}
+			break;
+			case BYTECODE_CALL:
+			{
+				printf("r%i = call(nargs=%i, nrets=%i)", byte.b_x, byte.b_y, byte.b_z);
+			}
+			break;
+			case BYTECODE_GETGLOBAL:
+			{
+				printf("r%i = load(g%i)", byte.b_x, byte.b_y);
+				Value value = get_global_value_from_index(state, byte.b_y);
+				printf(" // ");
+				print_value_basic_shallow(value);
+			}
+			break;
+			case BYTECODE_CLOSURE:
+			{
+				printf("r%i = closure(func_id=%i)", byte.b_x, byte.b_y);
+			}
+			break;
+			case BYTECODE_SETGLOBAL:
+			{
+				printf("g%i = load(r%i)", byte.b_x, byte.b_y);
+			}
+			break;
+			default:
+			{
+				printf("%s", Static_StrFromBytecode[byte.b_k]);
+			}
+			break;
+		}
+		printf("\n");
+	}
+	printf("END\n");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

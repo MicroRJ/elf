@@ -18,7 +18,7 @@ ELF_FUNCTION(l_str_length) {
 
 
 ELF_FUNCTION(l_str_get_hash) {
-	Str str = loadstr(S, 0);
+	GCStr str = loadstr(S, 0);
 	pushint(S, str->hash);
 	return 1;
 }
@@ -35,7 +35,7 @@ ELF_FUNCTION(l_str_idx) {
 
 
 ELF_FUNCTION(l_str_slice) {
-	Str str = loadstr(S, 0);
+	GCStr str = loadstr(S, 0);
 	// todo: out of bounds check
 	int lo = loadint(S, 2);
 	int hi = loadint(S, 3);
@@ -79,7 +79,7 @@ ELF_FUNCTION(l_str_find) {
 	const char *p = loadtext(S, 1);
 
 	// return a list
-	pushnewtable(S);
+	push_new_table(S);
 
 	Stringer sb = {};
 
@@ -112,7 +112,7 @@ ELF_FUNCTION(l_str_find) {
 ELF_FUNCTION(l_str_split_by_lines) {
 	const char *s = loadtext(S, 0);
 
-	pushnewtable(S);
+	push_new_table(S);
 
 	Stringer sb = {};
 
@@ -145,7 +145,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 	const char *s = loadtext(S, 0);
 	int chr = loadint(S, 1);
 
-	Tab splits = pushnewtable(S);
+	Tab splits = push_new_table(S);
 
 	Stringer sb = {};
 
@@ -159,7 +159,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 			s ++;
 		}
 
-		Str split = _string_newl(S, sb.buf, sb.min);
+		GCStr split = new_string_from_data_size(S, sb.buf, sb.min);
 		V value;
 		to_str(&value, split);
 
@@ -176,7 +176,7 @@ ELF_FUNCTION(l_str_split_by_char) {
 
 
 ELF_FUNCTION(l_str_lowercase) {
-	Str str = loadstr(S, 0);
+	GCStr str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_lowercase(str->text[i]);
@@ -189,7 +189,7 @@ ELF_FUNCTION(l_str_lowercase) {
 
 
 ELF_FUNCTION(l_str_uppercase) {
-	Str str = loadstr(S, 0);
+	GCStr str = loadstr(S, 0);
 	char *temp = malloc(str->length + 1);
 	for (int i = 0; i < str->length; ++ i) {
 		temp[i] = chr_to_uppercase(str->text[i]);
@@ -201,7 +201,7 @@ ELF_FUNCTION(l_str_uppercase) {
 
 
 
-elf_Binding string_metafuncs[] = {
+elf_Binding l_string[] = {
 	{ "length"          , l_str_length         },
 	{ "match"           , l_str_match          },
 	{ "uppercase"       , l_str_uppercase      },

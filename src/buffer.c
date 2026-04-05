@@ -3,7 +3,7 @@
 //
 
 Buf new_buffer(elf_State *S, Index min, Index max) {
-	Buf buf = gcalloc(S, GC_BUF, sizeof(*buf));
+	Buf buf = collector_alloc(S, GC_BUFFER, sizeof(*buf));
 	if (S) setmeta(buf, S->metatables.buffer);
 
 	if (max == 0) max = 1;
@@ -109,7 +109,7 @@ ELF_FUNCTION(l_buf_insert_char) {
 
 ELF_FUNCTION(l_buf_append) {
 	Buf buf = loadbuf(S, 0);
-	Str str = loadstr(S, 1);
+	GCStr str = loadstr(S, 1);
 
 	int len = strl(str);
 	const char *src = strt(str);
@@ -129,7 +129,7 @@ ELF_FUNCTION(l_buf_append) {
 ELF_FUNCTION(l_buf_insert) {
 
 	Buf buf = loadbuf(S, 0);
-	Str str = loadstr(S, 1);
+	GCStr str = loadstr(S, 1);
 	int zstr = strl(str);
 	const char *src = strt(str);
 

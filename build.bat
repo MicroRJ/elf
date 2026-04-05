@@ -4,14 +4,14 @@
 @ECHO OFF
 @SET SRCIN=               ^
 src/platform/system.c     ^
-src/core/internal_main.c  ^
-src/core/userapi.c        ^
+src/internal_main.c       ^
+src/userapi.c             ^
 src/compiler/compiler.c
 
 @SET INC= ^
 /Isrc ^
+/Isrc/libs    ^
 /Isrc/platform ^
-/Isrc/core ^
 /Isrc/compiler ^
 /Iinclude ^
 /Istb

@@ -307,8 +307,6 @@ static AstRef *pop_ast_array(Parser *par, u32 ntrees)
 
 static AstRef elf_parse_file(Parser *par)
 {
-	par->nfunctions ++;
-
 	Token tok = par->tok;
 	u32 nstats = 0;
 	while (!peek_tok(par, TOK_NONE))
@@ -323,14 +321,8 @@ static AstRef elf_parse_file(Parser *par)
 	AstRef *stats = pop_ast_array(par, nstats);
 	AstRef body = create_block_ast(par, tok.site, stats, nstats);
 
-	AstRef file_function = create_function_ast(par, tok.site, 0, 0, 1, body);
-	par->functions[0] = file_function;
-
-	// Todo,
-	AstRef tree = create_file_ast(par, tok.site, par->functions, par->nfunctions);
-	tree->ast_file.stats = stats;
-	tree->ast_file.nstats = nstats;
-	return tree;
+	AstRef file_ast = create_file_ast(par, tok.site, body);
+	return file_ast;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -345,9 +337,7 @@ static AstRef elf_parse_function(Parser *par)
 	}
 	else NO_CODE;
 
-	b32 poly = 0;
-	u32 arity = 0;
-	u32 para = 0;
+	u32 nparams = 0;
 	take_token(par, TOK_PAREN_LEFT);
 	if (!peek_tok(par, TOK_PAREN_RIGHT)) do
 	{
@@ -356,7 +346,7 @@ static AstRef elf_parse_function(Parser *par)
 		{
 			AstRef param = elf_new_ellipsis_tree(par, tok.site);
 			push_ast(par, param);
-			++ poly;
+			++ nparams;
 		}
 		else
 		{
@@ -369,20 +359,18 @@ static AstRef elf_parse_function(Parser *par)
 			if (pick_token(par, TOK_ASSIGN)) {
 				expr = parse_expr(par, 0);
 			}
-			AstRef param = elf_new_function_param_tree(par, tok.site, name, type, expr);
+			AstRef param = create_param_ast(par, tok.site, name, type, expr);
 			push_ast(par, param);
-			++ arity;
+			++ nparams;
 		}
 	}
 	while (pick_token(par, TOK_COMMA));
 	take_token(par, TOK_PAREN_RIGHT);
 
-	AstRef *params = pop_ast_array(par, arity + poly);
-
+	AstRef *params = pop_ast_array(par, nparams);
 	AstRef body = parse_stat(par);
 
-	AstRef function = create_function_ast(par, tok.site, params, arity, poly, body);
-	par->functions[par->nfunctions ++] = function;
+	AstRef function = create_function_ast(par, tok.site, params, nparams, body);
 	return function;
 }
 
@@ -406,7 +394,7 @@ static AstRef parse_tuple_expr(Parser *par)
 	if (nargs)
 	{
 		AstRef *args = pop_ast_array(par, nargs);
-		tuple = create_tuple_expr_ast(par, tok.site, args, nargs);
+		tuple = create_tuple_ast(par, tok.site, args, nargs);
 	}
 	return tuple;
 }
@@ -628,7 +616,7 @@ static AstRef elf_parse_unary_expr(Parser *parser)
 		{
 			consume_token(parser);
 			v=parse_subexpr(parser,0,10000);
-			v=elf_new_binary_expr_tree(parser,tok.line,AST_SUB,tree_int(parser,tok.line,0),v);
+			v=create_binary_expr_ast(parser,tok.line,AST_SUB,tree_int(parser,tok.line,0),v);
 		}
 		break;
 		case TOK_ADD:
@@ -652,7 +640,7 @@ static AstRef elf_parse_unary_expr(Parser *parser)
 
 				// todo:
 				V json = popvalue(parser->inter);
-				int index = heap_array_grow(parser->inter->globals->array, 1);
+				int index = dynamic_array_allocate(parser->inter->globals->array, 1);
 				parser->inter->globals->array[index] = json;
 
 
@@ -892,7 +880,7 @@ static u32 elf_parse_call_args(Parser *par)
 			// Todo, what the heck were we doing here?
 			// --------------------------------------
 			// desugar tuple expressions
-			//	if (x->kind == AST_TUPLE_EXPR)
+			//	if (x->kind == AST_TUPLE)
 			//	{
 			//		// Todo, just append the tuple now that we have both x and y, which are the start and end parts
 			//		for (AstRef i = x->x; i; )
@@ -948,7 +936,7 @@ static AstRef parse_field_postfix(Parser *par, AstRef x)
 		while (pick_token(par, TOK_COMMA));
 
 		AstRef *args = pop_ast_array(par, nargs);
-		x = create_tuple_expr_ast(par, tok.site, args, nargs);
+		x = create_tuple_ast(par, tok.site, args, nargs);
 		take_token(par, TOK_PAREN_RIGHT);
 	}
 	// todo: for this return a new table with the fields x and y from 'table'
@@ -975,7 +963,7 @@ static AstRef parse_indirect_postfix(Parser *par, AstRef v)
 		if (iserror(x)) goto _err;
 
 		// A [ B . (y, x) ] -> A [ B . y , B . x ]
-		if (x->kind == AST_TUPLE_EXPR)
+		if (x->kind == AST_TUPLE)
 		{
 			__debugbreak();
 			//	for (AstRef i = x->x; i; i = i->next)
@@ -1052,7 +1040,7 @@ static AstRef ELF_ParsePostfixExpr(Parser *parser, int flags)
 			{
 				u32 nargs = elf_parse_call_args(parser);
 				AstRef *args = pop_ast_array(parser, nargs);
-				v = elf_new_call_expr_tree(parser, tok.site, v, args, nargs);
+				v = create_call_ast(parser, tok.site, v, args, nargs);
 			}
 			break;
 
@@ -1112,7 +1100,7 @@ static AstRef parse_subexpr(Parser *parser, int flags, int rank)
 			//	}
 		}
 
-		x = elf_new_binary_expr_tree(parser, tok.line, tree_kind_from_token_type(tok.type), x, y);
+		x = create_binary_expr_ast(parser, tok.line, tree_kind_from_token_type(tok.type), x, y);
 
 		if (y == Y_NULL) goto esc;
 	}
@@ -1399,7 +1387,7 @@ static int parse_constexpr(Parser *parser) {
 		} break;
 		case TOK_NIL: {
 			consume_token(parser);
-			pushnil(parser->R);
+			push_nil(parser->R);
 			ret = 1;
 		} break;
 		case TOK_STRING: {
@@ -1410,7 +1398,7 @@ static int parse_constexpr(Parser *parser) {
 		case TOK_CURLY_LEFT: {
 			consume_token(parser);
 
-			Tab tab = pushnewtable(parser->R);
+			Tab tab = push_new_table(parser->R);
 			int tablestk = stack2index(parser->R) - 1;
 
 
@@ -1461,7 +1449,7 @@ static int parse_constexpr(Parser *parser) {
 		} break;
 		default: {
 			errorcase:
-			pushnil(parser->R);
+			push_nil(parser->R);
 			parser_dialog(parser,tok.line,"not a constant expression");
 		} break;
 	}
@@ -1472,7 +1460,7 @@ static int parse_constexpr(Parser *parser) {
 
 static int parse_json_array(Parser *parser){
 	int noerr = true;
-	pushnewtable(parser->inter);
+	push_new_table(parser->inter);
 
 	take_token(parser, TOK_SQUARE_LEFT);
 
@@ -1495,7 +1483,7 @@ static int parse_json_array(Parser *parser){
 
 static int parse_json_object(Parser *parser) {
 	int noerr = true;
-	pushnewtable(parser->inter);
+	push_new_table(parser->inter);
 
 	take_token(parser,TOK_CURLY_LEFT);
 	if (!peek_tok(parser,TOK_CURLY_RIGHT)) do {
@@ -1542,7 +1530,7 @@ static int parse_json_value(Parser *parser)
 			parse_json_array(parser);
 		} break;
 		default: {
-			pushnil(parser->inter);
+			push_nil(parser->inter);
 			parser_dialog(parser, tok.line, "invalid json value");
 			success = false;
 		} break;

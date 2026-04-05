@@ -20,7 +20,7 @@ _(JE,              XY       , "je")               \
 _(JNE,             XY       , "jne")              \
 _(RET,             XY       , "ret")              \
 _(LOADCVAL,        XY       , "getupval")         \
-_(LOADGLOBAL,      XY       , "getglobal")        \
+_(GETGLOBAL,       XY       , "getglobal")        \
 _(LOADKNUM,        XY       , "getnum")           \
 _(LOADKINT,        XY       , "getint")           \
 _(LOADNIL,         XXX      , "getnil")           \

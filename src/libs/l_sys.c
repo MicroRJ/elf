@@ -62,7 +62,7 @@ ELF_FUNCTION(l_sys_sleep) {
 
 
 ELF_FUNCTION(l_sys_get_parent_path) {
-	Str p = loadstr(S, 1);
+	GCStr p = loadstr(S, 1);
 	int n = 1;
 	if (nargs >= 3) {
 		n = loadint(S, 2);
@@ -103,7 +103,7 @@ static char *slice_path(char *p, int *l, int n) {
 }
 
 ELF_FUNCTION(l_sys_slice_path) {
-	Str p = loadstr(S, 1);
+	GCStr p = loadstr(S, 1);
 	int n = 1;
 	if (nargs > 2) {
 		n = loadint(S, 2);
@@ -152,7 +152,7 @@ ELF_FUNCTION(l_sys_slice_path) {
 //
 
 ELF_FUNCTION(l_sys_get_file_name) {
-	Str p = loadstr(S, 1);
+	GCStr p = loadstr(S, 1);
 	const char *s = strt(p);
 	const char *e = strt(p) + strl(p);
 	const char *d = e;
@@ -183,7 +183,7 @@ ELF_FUNCTION(l_sys_get_file_name) {
 //
 
 ELF_FUNCTION(l_sys_get_file_extension) {
-	Str p = loadstr(S, 1);
+	GCStr p = loadstr(S, 1);
 	const char *s = strt(p);
 	const char *e = strt(p) + strl(p);
 	while (e > s && e[-1] != '\\' && e[-1] != '/' && e[-1] != '.') e --;
@@ -239,7 +239,7 @@ ELF_FUNCTION(l_sys_get_file_times) {
 	sys_time_file(file, &times);
 
 	// todo: set fields directly
-	Tab tab = pushnewtable(S);
+	Tab tab = push_new_table(S);
 	elf_pushtext(S, "created");  elf_pushint(S, times.create.time); elf_setfield(S);
 	elf_pushtext(S, "access");   elf_pushint(S, times.access.time); elf_setfield(S);
 	elf_pushtext(S, "write");    elf_pushint(S, times.write.time);  elf_setfield(S);
@@ -271,7 +271,7 @@ ELF_FUNCTION(l_sys_file_time_to_system_time) {
 	SYSTEM_TIME systemtime;
 	sys_file_time_to_system_time(&filetime, &systemtime);
 
-	pushnewtable(S);
+	push_new_table(S);
 
 	pushtext(S, "year");
 	pushint(S, systemtime.year);
@@ -326,7 +326,7 @@ ELF_FUNCTION(l_sys_load_dll) {
 	Sys dll = sys_load_dll(name);
 
 	if (dll != 0) pushsys(S, dll);
-	else          pushnil(S);
+	else          push_nil(S);
 	return 1;
 }
 
@@ -353,7 +353,7 @@ ELF_FUNCTION(l_sys_get_dll_fn) {
 
 	Fun fun = (Fun) sys_get_dll_fn(dll, name);
 	if (fun != 0) pushfun(S,fun);
-	else          pushnil(S);
+	else          push_nil(S);
 	return 1;
 }
 
@@ -389,7 +389,7 @@ static void pathlist(elf_State *S, FILE_VISITOR *visitor, Tab list, int recurse)
 			goto _prox;
 		}
 
-		Str s = _string_new(S, visitor->pb.path);
+		GCStr s = new_string_from_data(S, visitor->pb.path);
 
 		V v;
 		to_str(&v, s);
@@ -474,7 +474,7 @@ ELF_FUNCTION(l_sys_get_path_list) {
 		recurse = loadint(S, 2);
 	}
 
-	Tab list = pushnewtable(S);
+	Tab list = push_new_table(S);
 
 	FILE_VISITOR *visi = calloc(1, sizeof(*visi));
 
@@ -576,7 +576,7 @@ ELF_FUNCTION(l_sys_open_file) {
 	Sys file = elf_platform_access_file(name, flags, mode);
 
 	if (ELF_HISINVALID(file)) {
-		pushnil(S);
+		push_nil(S);
 	}
 	else {
 		pushsys(S, file);
@@ -701,7 +701,7 @@ ELF_FUNCTION(l_sys_read_file) {
 	if (file != ELF_HINVALID)
 	{
 		// todo:
-		Str contents = _new_empty_str(S, size);
+		GCStr contents = new_empty_string(S, size);
 		read = elf_platform_read_file(file, contents->text, size);
 
 		if (name) {
@@ -713,7 +713,7 @@ ELF_FUNCTION(l_sys_read_file) {
 	}
 	else {
 		// -->
-		pushnil(S);
+		push_nil(S);
 	}
 
 	return 1;

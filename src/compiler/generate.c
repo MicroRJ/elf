@@ -1,9 +1,13 @@
 
 
+// more meaningful ...
+#define IMPLICIT_PARAM_INDEX 0
+#define IMPLICIT_PARAM_COUNT 1
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static MemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, MemorySlot slots, u32 nslots);
+static GenMemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, GenMemorySlot slots, u32 nslots);
 static void generate_ast_stat(BytecodeGen *gen, AstRef stat);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,7 +126,7 @@ static Entity *decl_entity(BytecodeGen *gen, Source site, EntityType type, u32 t
 //		PushBlockStat(parser, x);
 //
 //		decl_entity(parser, line
-//		, ENTITY_BIT_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED
+//		, ENTITY_TAG_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED
 //		, "this", x);
 //	}
 
@@ -216,26 +220,46 @@ static BytecodeGen *elf_create_bytecode_generator(elf_State *state, elf_Arena *a
 	gen->arena = arena;
 	gen->scratch_arena = arena;
 	gen->scratch_parser = elf_alloc_parser(state, arena);
+
+	// Todo, dude ...
+	u32 max_functions = 1024;
+	gen->functions = elf_arena_push_zero(arena, sizeof(*gen->functions) * max_functions);
+	gen->max_functions = max_functions;
 	return gen;
 }
 
-static BytecodeFunction elf_generate_ast_function(BytecodeGen *gen, AstRef ast)
+static BytecodeFunction generate_bytecode_function(BytecodeGen *gen, GenFunction function)
 {
 	u32 bytepos = 0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	u32 arity = ast->ast_function.arity + 1;
-	AstRef body = ast->ast_function.body;
+	u32 arity = function.arity;
+	AstRef body = function.body;
+	b32 variadic = (function.tags & FUNCTION_VARIADIC) != 0;
+	GenFunctionParam *params = function.params;
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	generate_ast_stat(gen, body);
+	ENTITY_SCOPE(gen)
+	{
+		MEMORY_STATE_SCOPE(gen)
+		{
+			decl_entity(gen, 0, ENTITY_DIRECTORY, ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED|ENTITY_TAG_ASSIGNED, "elf");
+
+			for (u32 i = 0; i < function.arity; ++ i)
+			{
+				Entity *en = decl_entity(gen, params[i].site, ENTITY_LOCAL_DECLARATION, params[i].tags, params[i].name);
+				en->slot = allocate_slot(gen);
+			}
+			generate_ast_stat(gen, body);
+		}
+	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	BytecodeFunction bytecode_function =
 	{
 		.bytes     = bytepos,
 		.arity     = arity,
-		.variadic  = ast->ast_function.variadic,
+		.variadic  = variadic,
 		.numbytes  = gen->state->bytecur - bytepos,
 		.ncaptures = gen->ncaptures,
 		.stacksize = gen->memory_usage,
@@ -243,44 +267,59 @@ static BytecodeFunction elf_generate_ast_function(BytecodeGen *gen, AstRef ast)
 	return bytecode_function;
 }
 
-static BytecodeFunction elf_generate_ast_file(BytecodeGen *gen, AstRef ast)
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static GenFunction *add_generate_function(BytecodeGen *gen, Source site, GenFunctionTags tags, u32 arity, AstRef body)
 {
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	AstRef *functions = ast->ast_file.functions;
-	u32 nfunctions = ast->ast_file.nfunctions;
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// implicit this
+	ASSERT(arity >= IMPLICIT_PARAM_COUNT);
 
-	begin_scope(gen);
-	decl_entity(gen, 0, ENTITY_DIRECTORY, ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED|ENTITY_TAG_ASSIGNED, "elf");
+	ASSERT(gen->num_functions < gen->max_functions);
+	GenFunction *function = & gen->functions[gen->num_functions ++];
+	function->site = site;
+	function->tags = tags;
+	function->arity = arity;
+	function->body = body;
+
+	// Todo, 'this' is to be replaced with just '.'
+	function->params = elf_arena_push_zero(gen->arena, sizeof(*function->params) * arity);
+	function->params[0].name = "this";
+	function->params[0].type = TYPE_RULE_ANYTHING;
+	function->params[0].tags = ENTITY_TAG_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED;
+
+	return function;
+}
+
+static AstRef preprocess_ast_stat_for_generation(BytecodeGen *gen, AstRef stat);
+static BytecodeFunction elf_generate_ast_file(BytecodeGen *gen, AstRef file)
+{
+	GenFunction *gen_file_function = add_generate_function(gen, 0, FUNCTION_VARIADIC, IMPLICIT_PARAM_COUNT, 0);
+
+	AstRef new_file_body = preprocess_ast_stat_for_generation(gen, file->ast_file.body);
+	gen_file_function->site = new_file_body->site;
+	gen_file_function->body = new_file_body;
+
+	// allocate bytecode functions within the dynamic module ...
+	u32 bytecode_function_offset_in_module = dynamic_array_allocate(gen->state->protos, gen->num_functions);
+	BytecodeFunction *first_bytecode_function = gen->state->protos + bytecode_function_offset_in_module;
+
+	gen->bytecode_function_offset_in_module = bytecode_function_offset_in_module;
 
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	gen->nentries = nfunctions;
-	gen->entries = elf_arena_push_zero(gen->scratch_arena, sizeof(*gen->entries) * nfunctions);
-
-	// Todo, ...
-	u32 first_function_id = heap_array_grow(gen->state->protos, nfunctions);
-
-	for (u32 i = 1; i < nfunctions; ++ i)
+	for (u32 i = 0; i < gen->num_functions; ++ i)
 	{
-		gen->entries[i].ast = functions[i];
-		gen->entries[i].function_id = first_function_id + i;
-	}
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		BytecodeFunction bytecode_function = generate_bytecode_function(gen, gen->functions[i]);
+		first_bytecode_function[i] = bytecode_function;
 
-
-	for (u32 i = 0; i < nfunctions; ++ i)
-	{
-		BytecodeFunction bytecode_function = elf_generate_ast_function(gen, functions[i]);
-		gen->state->protos[first_function_id + i] = bytecode_function;
+		print_bytecode_function(gen->state, bytecode_function);
 
 		ASSERT(gen->memory_state == 0);
 		ASSERT(gen->memory_state_index == 0);
 		gen->memory_usage = 0;
 	}
 
-	close_scope(gen);
-	return gen->state->protos[first_function_id];
+	return * first_bytecode_function;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,12 +352,12 @@ static void field_expr_to_global_identifier(AstRef expr, char *buffer)
 		AstRef x = expr->ast_binary_expr.x;
 		AstRef y = expr->ast_binary_expr.y;
 		field_expr_to_global_identifier(x, buffer);
-		strcpy(buffer, ".");
+		strcat(buffer, ".");
 		field_expr_to_global_identifier(y, buffer);
 	}
 	else if (expr->kind == AST_IDENT)
 	{
-		strcpy(buffer, expr->ast_ident_expr);
+		strcat(buffer, expr->ast_ident_expr);
 	}
 	else
 	{
@@ -329,42 +368,209 @@ static void field_expr_to_global_identifier(AstRef expr, char *buffer)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static AstRef rewrite_ast_expr(BytecodeGen *gen, AstRef expr)
+static AstRef preprocess_ast_expr_for_generation(BytecodeGen *gen, AstRef expr)
 {
-	AstRef rewr = expr;
+	AstRef new_expr = expr;
+
 	switch (expr->kind)
 	{
-		case AST_FIELD:
-		{
-			if (is_field_expr_actually_a_global__hack(expr))
-			{
-				char name[256];
-				field_expr_to_global_identifier(expr, name);
-
-				rewr = create_ident_ast(gen->scratch_parser, expr->site, name);
-			}
-		}
-		break;
+		case AST_INTEGER_LITERAL:
+		case AST_NUMBER_LITERAL:
+		case AST_STRING_LITERAL:
 		case AST_IDENT:
 		{
 		}
 		break;
+
+		case AST_FUNCTION:
+		{
+			AstRef *params = expr->ast_function.params;
+			u32    nparams = expr->ast_function.nparams;
+			AstRef    body = expr->ast_function.body;
+
+			// Implicit this ...
+			u32 arity = IMPLICIT_PARAM_COUNT + nparams;
+			GenFunctionTags tags = 0;
+			if (nparams > 0 && params[nparams - 1]->kind == AST_ELLIPSIS) {
+				tags |= FUNCTION_VARIADIC;
+				arity -= 1;
+			}
+
+			GenFunction *gen_function = add_generate_function(gen, expr->site, tags, arity, body);
+			gen_function->function_ast = expr;
+
+			for (u32 i = IMPLICIT_PARAM_INDEX + 1; i < nparams; ++ i)
+			{
+				AstRef param = params[i];
+				check_ast_type(param, AST_FUNCTION_PARAM);
+				check_ast_type(param->ast_function_param.name, AST_IDENT);
+				gen_function->params[i].name = param->ast_function_param.name->ast_ident_expr;
+				gen_function->params[i].site = param->ast_function_param.name->site;
+				gen_function->params[i].tags = ENTITY_TAG_PARAMETER;
+			}
+		}
+		break;
+
+		case AST_CALL:
+		{
+			AstRef func = expr->ast_call_expr.expr;
+			AstRef *args = expr->ast_call_expr.args;
+			u32 nargs = expr->ast_call_expr.nargs;
+
+			AstRef new_func = preprocess_ast_expr_for_generation(gen, func);
+
+			AstRef *new_args = elf_arena_push(gen->arena, sizeof(*new_args) * nargs);
+			for (u32 i = 0; i < nargs; ++ i) {
+				new_args[i] = preprocess_ast_expr_for_generation(gen, args[i]);
+			}
+
+			new_expr = create_call_ast(gen->scratch_parser, expr->site, new_func, new_args, nargs);
+		}
+		break;
+
+		case AST_TUPLE:
+		{
+			AstRef *args = expr->ast_tuple_expr.args;
+			u32 nargs = expr->ast_tuple_expr.nargs;
+
+			AstRef *new_args = elf_arena_push(gen->arena, sizeof(*new_args) * nargs);
+			for (u32 i = 0; i < nargs; ++ i) {
+				new_args[i] = preprocess_ast_expr_for_generation(gen, args[i]);
+			}
+
+			new_expr = create_tuple_ast(gen->scratch_parser, expr->site, new_args, nargs);
+		}
+		break;
+
+		case AST_META_FIELD:
+		{
+			AstRef x = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.x);
+			AstRef y = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.y);
+			new_expr = create_binary_expr_ast(gen->scratch_parser, expr->site, expr->kind, x, y);
+		}
+		break;
+
+		case AST_FIELD:
+		{
+			if (is_field_expr_actually_a_global__hack(expr))
+			{
+				// Todo, dude use atoms!
+				char name[256] = {0};
+				field_expr_to_global_identifier(expr, name);
+
+				char *copy = elf_arena_push_copy(gen->arena, strlen(name) + 1, name);
+
+				new_expr = create_ident_ast(gen->scratch_parser, expr->site, copy);
+			}
+			else
+			{
+				AstRef x = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.x);
+				AstRef y = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.y);
+				new_expr = create_binary_expr_ast(gen->scratch_parser, expr->site, expr->kind, x, y);
+			}
+		}
+		break;
+
+		case AST_GREATER_THAN_EQ:
+		{
+			AstRef x = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.x);
+			AstRef y = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.y);
+			new_expr = create_binary_expr_ast(gen->scratch_parser, expr->site, AST_LESS_THAN_EQ, y, x);
+		}
+		break;
+
+		case AST_GREATER_THAN:
+		{
+			AstRef x = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.x);
+			AstRef y = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.y);
+			new_expr = create_binary_expr_ast(gen->scratch_parser, expr->site, AST_LESS_THAN, y, x);
+		}
+		break;
+
+		case AST_ASSIGN:
+
+		case AST_LESS_THAN_EQ:
+		case AST_LESS_THAN:
+		case AST_EQ:
+		case AST_NOT_EQ:
+		case AST_DIV:
+		case AST_MUL:
+		case AST_MOD:
+		case AST_SUB:
+		case AST_ADD:
+		case AST_POW:
+		case AST_SHIFT_LEFT:
+		case AST_SHIFT_RIGHT:
+		case AST_BITWISE_XOR:
+		case AST_BITWISE_AND:
+		case AST_BITWISE_OR:
+		{
+			AstRef x = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.x);
+			AstRef y = preprocess_ast_expr_for_generation(gen, expr->ast_binary_expr.y);
+			new_expr = create_binary_expr_ast(gen->scratch_parser, expr->site, expr->kind, x, y);
+		}
+		break;
 		default:
 		{
+			ASSERT(!"Internal Error!");
 		}
 		break;
 	}
-	return rewr;
+	return new_expr;
+}
+
+static AstRef preprocess_ast_stat_for_generation(BytecodeGen *gen, AstRef stat)
+{
+	AstRef new_stat = stat;
+
+	switch (stat->kind)
+	{
+		case AST_BLOCK_STAT:
+		{
+			AstRef *stats = stat->ast_block_stat.stats;
+			u32 nstats = stat->ast_block_stat.nstats;
+
+			AstRef *new_block_stats = elf_arena_push_zero(gen->arena, sizeof(*new_block_stats) * nstats);
+
+			for (u32 i = 0; i < nstats; ++ i)
+			{
+				new_block_stats[i] = preprocess_ast_stat_for_generation(gen, stats[i]);
+			}
+
+			new_stat = create_block_ast(gen->scratch_parser, stat->site, new_block_stats, nstats);
+		}
+		break;
+
+		case AST_ASSIGN:
+		{
+
+		}
+		break;
+
+		case AST_DECL_STAT:
+		{
+
+		}
+		break;
+
+		default:
+		{
+			new_stat = preprocess_ast_expr_for_generation(gen, stat);
+		}
+		break;
+	}
+
+	return new_stat;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static MemorySlot allocate_slots(BytecodeGen *gen, u32 nslots)
+static GenMemorySlot allocate_slots(BytecodeGen *gen, u32 nslots)
 {
 	ASSERT(nslots != 0);
 	ASSERT(gen->memory_state + nslots < _countof(gen->memory_slots));
-	MemorySlot mem = gen->memory_state;
+	GenMemorySlot mem = gen->memory_state;
 	gen->memory_state += nslots;
 	if (gen->memory_usage < gen->memory_state) {
 		gen->memory_usage = gen->memory_state;
@@ -377,7 +583,7 @@ static int allocate_slot(BytecodeGen *gen)
 	return allocate_slots(gen, 1);
 }
 
-static int get_mem_state(BytecodeGen *par)
+static int gen_get_stack_ptr(BytecodeGen *par)
 {
 	return par->memory_state;
 }
@@ -385,7 +591,7 @@ static int get_mem_state(BytecodeGen *par)
 static void push_mem_state_(BytecodeGen *par)
 {
 	ASSERT(par->memory_state_index < _countof(par->memory_state_stack));
-	par->memory_state_stack[par->memory_state_index ++] = get_mem_state(par);
+	par->memory_state_stack[par->memory_state_index ++] = gen_get_stack_ptr(par);
 }
 
 static void pop_mem_state_(BytecodeGen *par)
@@ -417,7 +623,7 @@ static i32 get_expr_mem(BytecodeGen *par, AstRef expr)
 
 static int expr_to_any_mem(BytecodeGen *gen, AstRef expr)
 {
-	MemorySlot slot = NO_SLOT;
+	GenMemorySlot slot = NO_SLOT;
 	if (expr->kind == AST_IDENT)
 	{
 		Entity *en = identify_name(gen, expr->ast_ident_expr);
@@ -432,7 +638,7 @@ static int expr_to_any_mem(BytecodeGen *gen, AstRef expr)
 	return slot;
 }
 
-static MemorySlot generate_call_expr(BytecodeGen *gen, AstRef ast, MemorySlot slots, u32 nslots)
+static GenMemorySlot generate_call_expr(BytecodeGen *gen, AstRef ast, GenMemorySlot slots, u32 nslots)
 {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	AstRef expr = ast->ast_call_expr.expr;
@@ -440,7 +646,7 @@ static MemorySlot generate_call_expr(BytecodeGen *gen, AstRef ast, MemorySlot sl
 	u32 nargs = ast->ast_call_expr.nargs;
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	u32 mem = get_mem_state(gen);
+	u32 mem = gen_get_stack_ptr(gen);
 	MEMORY_STATE_SCOPE(gen)
 	{
 		u32 rx, ry;
@@ -449,7 +655,7 @@ static MemorySlot generate_call_expr(BytecodeGen *gen, AstRef ast, MemorySlot sl
 			check_ast_type(expr, AST_META_FIELD);
 			check_ast_type(expr->ast_binary_expr.y, AST_IDENT);
 
-			MemorySlot ry = allocate_slots(gen, 1);
+			GenMemorySlot ry = allocate_slots(gen, 1);
 			emit_load_constant_str(gen, expr->ast_binary_expr.y->site, ry, expr->ast_binary_expr.y->ast_ident_expr);
 
 			// the object becomes 'this'
@@ -462,7 +668,7 @@ static MemorySlot generate_call_expr(BytecodeGen *gen, AstRef ast, MemorySlot sl
 			check_ast_type(expr, AST_FIELD);
 			check_ast_type(expr->ast_binary_expr.y, AST_IDENT);
 
-			MemorySlot ry = allocate_slots(gen, 1);
+			GenMemorySlot ry = allocate_slots(gen, 1);
 			emit_load_constant_str(gen, expr->ast_binary_expr.y->site, ry, expr->ast_binary_expr.y->ast_ident_expr);
 
 			// the object becomes 'this'
@@ -540,54 +746,81 @@ static u32 bytecode_type_from_ast_expr_type(AstType type)
 	return BYTECODE_HALT;
 }
 
-static MemorySlot generate_binary_ast_expr(BytecodeGen *gen, AstRef expr, MemorySlot slots, u32 nslots)
+static GenMemorySlot generate_binary_ast_expr(BytecodeGen *gen, AstRef expr, GenMemorySlot slots, u32 nslots)
 {
-	MemorySlot rx, ry;
-	if (expr->kind == AST_GREATER_THAN_EQ)
+	GenMemorySlot rx, ry;
+	MEMORY_STATE_SCOPE(gen)
 	{
-		MEMORY_STATE_SCOPE(gen)
-		{
-			rx = expr_to_any_mem(gen, expr->ast_binary_expr.y);
-			ry = expr_to_any_mem(gen, expr->ast_binary_expr.x);
-		}
-		if (nslots < 1) goto esc;
-		if (slots < 0) slots = allocate_slot(gen);
-
-		emit_bytexyz(gen, expr->site, BYTECODE_LTEQ, slots, rx, ry);
+		rx = expr_to_any_mem(gen, expr->ast_binary_expr.x);
+		ry = expr_to_any_mem(gen, expr->ast_binary_expr.y);
 	}
-	else if (expr->kind == AST_GREATER_THAN_EQ)
-	{
-		MEMORY_STATE_SCOPE(gen)
-		{
-			rx = expr_to_any_mem(gen, expr->ast_binary_expr.y);
-			ry = expr_to_any_mem(gen, expr->ast_binary_expr.x);
-		}
-		if (nslots < 1) goto esc;
-		if (slots < 0) slots = allocate_slot(gen);
-
-		emit_bytexyz(gen, expr->site, BYTECODE_LT, slots, rx, ry);
-	}
-	else
-	{
-		MEMORY_STATE_SCOPE(gen)
-		{
-			rx = expr_to_any_mem(gen, expr->ast_binary_expr.x);
-			ry = expr_to_any_mem(gen, expr->ast_binary_expr.y);
-		}
-		if (nslots < 1) goto esc;
-		if (slots < 0) slots = allocate_slot(gen);
-		emit_bytexyz(gen, expr->site, bytecode_type_from_ast_expr_type(expr->kind), slots, rx, ry);
-	}
-
+	if (nslots < 1) goto esc;
+	if (slots < 0) slots = allocate_slot(gen);
+	emit_bytexyz(gen, expr->site, bytecode_type_from_ast_expr_type(expr->kind), slots, rx, ry);
 	esc:
 	return slots;
 }
 
-static MemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, MemorySlot slots, u32 nslots)
+static GenMemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, GenMemorySlot slots, u32 nslots)
 {
 	Source site = expr->site;
 	switch (expr->kind)
 	{
+		case AST_FUNCTION:
+		{
+			if (nslots < 1) goto esc;
+
+			// Todo, we could have just assigned an id to each function ast to remove this lookup entirely ...
+			u32 bytecode_function_id = -1;
+			for (u32 i = 0; i < gen->num_functions; ++ i)
+			{
+				if (expr == gen->functions[i].function_ast)
+				{
+					bytecode_function_id = gen->bytecode_function_offset_in_module + i;
+					break;
+				}
+			}
+			ASSERT(bytecode_function_id != -1);
+
+			if (slots < 0) slots = allocate_slot(gen);
+
+			u32 stack_ptr = gen_get_stack_ptr(gen);
+
+			emit_bytexy(gen, site, BYTECODE_CLOSURE, stack_ptr, bytecode_function_id);
+
+			if (stack_ptr != slots) {
+				emit_bytexy(gen, expr->site, BYTECODE_RELOAD, slots, stack_ptr);
+			}
+		}
+		break;
+
+		case AST_IDENT:
+		{
+			if (nslots < 1) goto esc;
+			if (slots < 0) slots = allocate_slot(gen);
+
+			Entity *en = identify_name(gen, expr->ast_ident_expr);
+
+			// Todo, dude remove this !!?
+			if (en == 0)
+			{
+				V v;
+				to_str(&v, new_string_from_data(gen->state, expr->ast_ident_expr));
+				GenMemorySlot global_index = elf_table_ensure(gen->state, gen->state->globals, v);
+
+				emit_get_global_bytecode(gen, expr->site, slots, global_index);
+			}
+			else if (en->type == ENTITY_LOCAL_DECLARATION)
+			{
+				emit_reload_bytecode(gen, expr->site, slots, en->slot);
+			}
+			else
+			{
+				ASSERT(!"Undeclared Identifier");
+			}
+		}
+		break;
+
 		case AST_INTEGER_LITERAL:
 		{
 			if (nslots < 1) goto esc;
@@ -623,7 +856,7 @@ static MemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, MemorySlot sl
 
 		// Todo, this is a bit of a special case, because we don't have enough context to handle tuples
 		// by themselves,
-		case AST_TUPLE_EXPR:
+		case AST_TUPLE:
 		{
 			u32 nargs = expr->ast_tuple_expr.nargs;
 			AstRef *args = expr->ast_tuple_expr.args;
@@ -637,24 +870,7 @@ static MemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, MemorySlot sl
 
 		case AST_FIELD:
 		{
-			if (is_field_expr_actually_a_global__hack(expr))
-			{
-				if (nslots < 1) goto esc;
-				if (slots < 0) slots = allocate_slots(gen, 1);
-
-				char name[256];
-				field_expr_to_global_identifier(expr, name);
-
-				V v;
-				to_str(&v, _string_new(gen->state, name));
-				u32 global_index = elf_table_ensure(gen->state, gen->state->globals, v);
-
-				emit_bytexy(gen, expr->site, BYTECODE_LOADGLOBAL, slots, global_index);
-			}
-			else
-			{
-				ASSERT(!"Error");
-			}
+			ASSERT(!"Error");
 		}
 		break;
 
@@ -702,9 +918,9 @@ static void generate_ast_assign_stat(BytecodeGen *gen, Source site, AstRef dest,
 		switch (dest->kind)
 		{
 			// i, j, k = 1, ...  SAME AS i = 1, j = 1, k = 1
-			case AST_TUPLE_EXPR:
+			case AST_TUPLE:
 			{
-				check_ast_type(expr, AST_TUPLE_EXPR);
+				check_ast_type(expr, AST_TUPLE);
 
 				u32 nargs = dest->ast_tuple_expr.nargs;
 				for (u32 i = 0; i < nargs; ++ i)
@@ -733,18 +949,19 @@ static void generate_ast_assign_stat(BytecodeGen *gen, Source site, AstRef dest,
 				if (en == 0)
 				{
 					V v;
-					to_str(&v, _string_new(gen->state, dest->ast_ident_expr));
-					MemorySlot rx = elf_table_ensure(gen->state, gen->state->globals, v);
+					to_str(&v, new_string_from_data(gen->state, dest->ast_ident_expr));
+					GenMemorySlot rx = elf_table_ensure(gen->state, gen->state->globals, v);
 
-					MemorySlot ry = expr_to_any_mem(gen, expr);
+
+					GenMemorySlot ry = expr_to_any_mem(gen, expr);
 					emit_bytexy(gen, dest->site, BYTECODE_SETGLOBAL, rx, ry);
 				}
 				else if (en->type == ENTITY_LOCAL_DECLARATION)
 				{
-					MemorySlot rx = en->slot;
+					GenMemorySlot rx = en->slot;
 					ASSERT(rx != NO_SLOT);
 
-					MemorySlot ry = generate_ast_expr(gen, expr, rx, 1);
+					GenMemorySlot ry = generate_ast_expr(gen, expr, rx, 1);
 					ASSERT(ry == rx);
 				}
 				else
@@ -756,42 +973,25 @@ static void generate_ast_assign_stat(BytecodeGen *gen, Source site, AstRef dest,
 
 			case AST_FIELD:
 			{
+				AstRef field_left = dest->ast_binary_expr.x;
+				AstRef field_name = dest->ast_binary_expr.y;
+				check_ast_type(field_name, AST_IDENT);
 
-				if (is_field_expr_actually_a_global__hack(dest))
-				{
-					char name[1024];
-					field_expr_to_global_identifier(dest, name);
+				GenMemorySlot rz = expr_to_any_mem(gen, expr);
+				GenMemorySlot rx = expr_to_any_mem(gen, field_left);
 
-					V v;
-					to_str(&v, _string_new(gen->state, name));
-					Index rx = elf_table_ensure(gen->state, gen->state->globals, v);
+				GenMemorySlot ry = allocate_slots(gen, 1);
+				emit_load_constant_str(gen, field_name->site, ry, field_name->ast_ident_expr);
 
-					MemorySlot ry = expr_to_any_mem(gen, expr);
-					emit_bytexy(gen, dest->site, BYTECODE_SETGLOBAL, rx, ry);
-				}
-				else
-				{
-					AstRef x = dest->ast_binary_expr.x;
-					AstRef y = dest->ast_binary_expr.y;
-					check_ast_type(y, AST_IDENT);
-
-					MemorySlot rz = expr_to_any_mem(gen, expr);
-
-					MemorySlot rx = expr_to_any_mem(gen, x);
-					MemorySlot ry = allocate_slots(gen, 1);
-					emit_load_constant_str(gen, y->site, ry, y->ast_ident_expr);
-
-					// MemorySlot ry = expr_to_any_mem(gen, dest->ast_binary_expr.y);
-					emit_bytexyz(gen, site, BYTECODE_SETFIELD, rx, ry, rz);
-				}
+				emit_bytexyz(gen, site, BYTECODE_SETFIELD, rx, ry, rz);
 			}
 			break;
 
 			case AST_INDEX:
 			{
-				MemorySlot rz = expr_to_any_mem(gen, expr);
-				MemorySlot rx = expr_to_any_mem(gen, dest->ast_binary_expr.x);
-				MemorySlot ry = expr_to_any_mem(gen, dest->ast_binary_expr.y);
+				GenMemorySlot rz = expr_to_any_mem(gen, expr);
+				GenMemorySlot rx = expr_to_any_mem(gen, dest->ast_binary_expr.x);
+				GenMemorySlot ry = expr_to_any_mem(gen, dest->ast_binary_expr.y);
 				emit_bytexyz(gen, site, BYTECODE_SETINDEX, rx, ry, rz);
 			}
 			break;
@@ -839,11 +1039,11 @@ static void generate_ast_stat(BytecodeGen *gen, AstRef stat)
 		}
 		break;
 
-		case AST_ASSIGN_STAT:
+		case AST_ASSIGN:
 		{
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			AstRef dest = stat->ast_assign_stat.x;
-			AstRef expr = stat->ast_assign_stat.y;
+			AstRef dest = stat->ast_binary_expr.x;
+			AstRef expr = stat->ast_binary_expr.y;
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			generate_ast_assign_stat(gen, stat->site, dest, expr);
@@ -858,8 +1058,8 @@ static void generate_ast_stat(BytecodeGen *gen, AstRef stat)
 			AstRef type = stat->ast_decl_stat.type;
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-			check_ast_type(name_tuple, AST_TUPLE_EXPR);
-			check_ast_type(expr_tuple, AST_TUPLE_EXPR);
+			check_ast_type(name_tuple, AST_TUPLE);
+			check_ast_type(expr_tuple, AST_TUPLE);
 
 			u32 nslots = name_tuple->ast_tuple_expr.nargs;
 

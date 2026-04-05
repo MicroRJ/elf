@@ -56,7 +56,7 @@ _(AST_XOR_ASSIGN          , "xor_assign")                 \
 _(AST_SHL_ASSIGN          , "shl_assign")                 \
 _(AST_SHR_ASSIGN          , "shr_assign")                 \
 _(AST_NIL_ASSIGN          , "nil_assign")                 \
-_(AST_ASSIGN_STAT         , "assign_stat")                \
+_(AST_ASSIGN         , "assign_stat")                \
 \
 _(AST_FILE                , "file")                       \
 \
@@ -71,7 +71,7 @@ _(AST_STRING_LITERAL      , "string_literal")             \
 _(AST_CALL                , "call")                       \
 _(AST_META_CALL           , "meta_call")                  \
 \
-_(AST_TUPLE_EXPR               , "tuple")                      \
+_(AST_TUPLE               , "tuple")                      \
 \
 _(AST_FUNCTION            , "function")                   \
 _(AST_FUNCTION_PARAM      , "function_param")             \
@@ -144,19 +144,15 @@ struct Ast
 
 		struct
 		{
-			AstRef *functions;
-			u32    nfunctions;
-			AstRef *stats;
-			u32    nstats;
+			AstRef body;
 		}
 		ast_file;
 
 		struct
 		{
 			AstRef *params;
-			u32      arity;
+			u32    nparams;
 			AstRef    body;
-			b32   variadic;
 		}
 		ast_function;
 
@@ -166,7 +162,7 @@ struct Ast
 			AstRef type;
 			AstRef expr;
 		}
-		tree_function_param;
+		ast_function_param;
 
 		struct
 		{
@@ -176,15 +172,7 @@ struct Ast
 		}
 		ast_decl_stat;
 
-		struct
-		{
-			b32      tags;
-			AstRef *names;
-			AstRef *exprs;
-			u32    nnames;
-			u32    nexprs;
-		}
-		tree_func_param;
+		AstRef tree_unary_expr;
 
 		struct
 		{
@@ -192,8 +180,6 @@ struct Ast
 			AstRef y;
 		}
 		ast_binary_expr;
-
-		AstRef tree_unary_expr;
 
 		struct
 		{
@@ -277,13 +263,6 @@ struct Ast
 			AstRef expr;
 		}
 		tree_break_stat;
-
-		struct
-		{
-			AstRef x;
-			AstRef y;
-		}
-		ast_assign_stat;
 	};
 };
 

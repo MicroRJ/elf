@@ -25,11 +25,11 @@ typedef struct {
 #define ARRAY_SET_MIN(D,N) ((D != 0) ? ARRAY_MIN(D)=(N) : 0)
 #define heap_array_length ARRAY_GET_MIN
 #define free_heap_array(D) ((D != 0) ? free(&ARRAY(D)), 0 : 0)
-#define heap_array_grow(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
+#define dynamic_array_allocate(D,N) (array_allocate((void**)&(D),sizeof(*D),N,N))
 
 #define FOR_ARRAY(N,D) for (int N = 0; N < heap_array_length(D); N += 1)
 
-#define heap_array_add(d,v) do { int __x__ = heap_array_grow(d, 1); (d)[__x__] = (v); } while(0)
+#define heap_array_add(d,v) do { int __x__ = dynamic_array_allocate(d, 1); (d)[__x__] = (v); } while(0)
 
 
 

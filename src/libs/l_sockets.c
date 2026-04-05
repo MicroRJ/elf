@@ -233,7 +233,7 @@ ELF_PUBLIC int netlib_recv(elf_State *R) {
 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {
 		if (message.length != 0) {
 			elf_Integer length = message.length;
-			elf_String *obj = _new_empty_str(R,length);
+			elf_String *obj = new_empty_string(R,length);
 			elf_push_string_raw(R,obj);
 			char *cursor = obj->c;
 			do {

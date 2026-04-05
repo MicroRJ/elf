@@ -2,20 +2,20 @@
 // See Copyright Notice In elf.h
 //
 
-static inline void checktrap(elf_State *S, Ref ref)
+static inline void check_trap_reference(elf_State *state, GCRef reference)
 {
-	if (ref->status & NODE_DEBUGTRAP)
+	if (reference->status & NODE_DEBUGTRAP)
 	{
-		reporterrorf(S, ref->debugsrc, "'%p': trapped object found", ref);
+		reporterrorf(state, -1, "'%p': trapped object found", reference);
 	}
 }
 
-static inline bool is_readonly(Ref ref)
+static inline bool is_readonly(GCRef ref)
 {
 	return ref->status & NODE_READONLY;
 }
 
-static void checkwrite(elf_State *S, Ref ref)
+static void checkwrite(elf_State *S, GCRef ref)
 {
 	if (is_readonly(ref))
 	{
@@ -80,7 +80,7 @@ static inline void zero_values(V *dst, int num)
 #define iskey(v) (!is_nil(v) && !vistomb(v))
 #define is_numeric(v) (is_num(v) || is_int(v))
 #define is_callable(v) (is_closure(v) || is_function(v))
-#define is_ref(v) (tisobject((v).tag))
+#define value_is_reference(v) (tisobject((v).tag))
 
 
 // ** assumes the value is either an integer or a number **
@@ -93,13 +93,13 @@ static inline void zero_values(V *dst, int num)
 #define tag_of(v) ((v).tag)
 #define as_int(v) ((v).x_int)
 #define as_num(v) ((v).x_num)
-#define as_ref(v) ((v).x_obj)
+#define reference_from_value(v) ((v).x_obj)
 #define as_string(v) ((v).x_str)
 #define as_buffer(v) ((v).x_buf)
 #define as_table(v) ((v).x_tab)
 #define vgetsys(v) ((v).x_sys)
-#define as_closure(v) ((v).x_closure)
-#define as_function(v) ((v).x_proc)
+#define closure_from_value(v) ((v).x_closure)
+#define function_from_value(v) ((v).x_proc)
 
 
 #define vtag2s(v) tag2s[tag_of(v)]
@@ -131,7 +131,7 @@ static inline void *checknullptrobj(void *obj) {
 
 
 
-static inline void to_str(V *v, Str x) {
+static inline void to_str(V *v, GCStr x) {
 	v->tag=ELF_TSTRING;
 	set_obj(v, x);
 }
@@ -239,7 +239,7 @@ do { \
 
 
 
-static inline void pushnil(elf_State *S) {
+static inline void push_nil(elf_State *S) {
 	to_nil(S->stack_ptr);
 	pushstackunsafe(S);
 }
@@ -284,14 +284,14 @@ static inline void pushsys(elf_State *S, Sys x) {
 
 
 
-static inline void pushcls(elf_State *S, Closure x) {
+static inline void push_closure(elf_State *S, Closure x) {
 	to_cls(S->stack_ptr, x);
 	pushstackunsafe(S);
 }
 
 
 
-static inline void pushstr(elf_State *S, Str x) {
+static inline void pushstr(elf_State *S, GCStr x) {
 	ASSERT(x != 0);
 	to_str(S->stack_ptr, x);
 	pushstackunsafe(S);
@@ -418,7 +418,7 @@ static inline Buf loadbuf(elf_State *S, int x)
 
 
 
-static inline Str loadstr(elf_State *S, int x)
+static inline GCStr loadstr(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_str(v)) return as_string(v);
@@ -493,10 +493,10 @@ static inline V loadcallable(elf_State *S, int x) {
 
 
 
-static inline Ref loadref(elf_State *S, int x)
+static inline GCRef load_reference(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
-	if (is_ref(v)) return as_ref(v);
+	if (value_is_reference(v)) return reference_from_value(v);
 	// if (is_nil(v)) return 0;
 	loadtypeerror(S, TRULE_OBJECT, x);
 	return 0;
@@ -561,8 +561,8 @@ static inline void *loadmem(elf_State *S, int x, Int *zmem) {
 
 
 
-static inline Str pushtext(elf_State *S, char const *text) {
-	Str str = _string_new(S, text);
+static inline GCStr pushtext(elf_State *S, char const *text) {
+	GCStr str = new_string_from_data(S, text);
 	pushstr(S, str);
 	return str;
 }
@@ -571,8 +571,8 @@ static inline Str pushtext(elf_State *S, char const *text) {
 
 
 
-static inline Str pushtext2(elf_State *S, char const *text, int length) {
-	Str str = _string_newl(S, text, length);
+static inline GCStr pushtext2(elf_State *S, char const *text, int length) {
+	GCStr str = new_string_from_data_size(S, text, length);
 	pushstr(S, str);
 	return str;
 }
@@ -581,7 +581,7 @@ static inline Str pushtext2(elf_State *S, char const *text, int length) {
 
 
 
-static inline Tab pushnewtable(elf_State *S) {
+static inline Tab push_new_table(elf_State *S) {
 	Tab tab = new_table(S);
 	pushtab(S, tab);
 	return tab;

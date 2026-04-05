@@ -23,7 +23,7 @@ static AstRef elf_parse_tuple_expr(Parser *par)
 	AstRef expr;
 	if (nargs > 1) {
 		AstRef *args = pop_ast_array(par, nargs);
-		expr = create_tuple_expr_ast(par, tok.site, args, nargs);
+		expr = create_tuple_ast(par, tok.site, args, nargs);
 	} else {
 		expr = PopTree(par);
 	}
@@ -339,7 +339,7 @@ static int parse_for(Parser *parser) {
 		heap_array_add(values, v);
 
 		parser_bind(parser, name.line
-		, ENTITY_TAG_REFERENCED|ENTITY_TAG_ASSIGNED|ENTITY_BIT_FORLOOP
+		, ENTITY_TAG_REFERENCED|ENTITY_TAG_ASSIGNED|ENTITY_TAG_FORLOOP
 		, name.text, v);
 	}
 
@@ -374,7 +374,7 @@ static int parse_for(Parser *parser) {
 			PushBlockStat(parser, v);
 		}
 		// DESUGAR EXPRESSION
-		else if (step->kind == AST_TUPLE_EXPR)
+		else if (step->kind == AST_TUPLE)
 		{
 			AstRef index = index_;
 
@@ -744,7 +744,7 @@ static int parse_expr_stat(Parser *parser) {
 				{
 					rewrite_lhs(parser, lhs[i]);
 
-					AstRef c = elf_new_binary_expr_tree(parser, tok.line, AST_EQ, lhs[i], tree_nil(parser, tok.line));
+					AstRef c = create_binary_expr_ast(parser, tok.line, AST_EQ, lhs[i], tree_nil(parser, tok.line));
 					AstRef s = tree_store(parser, tok.line, lhs[i], next_rhs);
 					AstRef v = elf_new_if_stat_tree(parser, tok.line, c, s, 0);
 					PushBlockStat(parser, v);
@@ -768,7 +768,7 @@ static int parse_expr_stat(Parser *parser) {
 				{
 					rewrite_lhs(parser, lhs[i]);
 
-					AstRef o = elf_new_binary_expr_tree(parser, tok.line, tree_kind_from_token_type(tok.type), lhs[i], next_rhs);
+					AstRef o = create_binary_expr_ast(parser, tok.line, tree_kind_from_token_type(tok.type), lhs[i], next_rhs);
 					AstRef v = tree_store(parser, tok.line, lhs[i], o);
 					PushBlockStat(parser, v);
 				}
@@ -903,7 +903,7 @@ static FuncParams parse_function_params(Parser *par)
 		++ arity;
 
 		parser_bind(par, name.line
-		, ENTITY_TAG_ASSIGNED | ENTITY_BIT_PARAMETER
+		, ENTITY_TAG_ASSIGNED | ENTITY_TAG_PARAMETER
 		, name.text, pmem);
 
 	} while (pick_token(par,TOK_COMMA));
@@ -1086,7 +1086,7 @@ static void add_this_param(Parser *parser, Source line) {
 	PushBlockStat(parser, x);
 
 	parser_bind(parser, line
-	, ENTITY_BIT_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED
+	, ENTITY_TAG_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED
 	, "this", x);
 }
 
