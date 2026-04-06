@@ -119,18 +119,6 @@ static Entity *decl_entity(BytecodeGen *gen, Source site, EntityType type, u32 t
 	return en;
 }
 
-//	static void add_this_param(Parser *parser, Source line) {
-//		AstRef y = tree_nop(parser, line);
-//
-//		AstRef x = tree_memory(parser, line, y);
-//		PushBlockStat(parser, x);
-//
-//		decl_entity(parser, line
-//		, ENTITY_TAG_PARAMETER|ENTITY_TAG_ASSIGNED|ENTITY_TAG_CONSTANT|ENTITY_TAG_REFERENCED
-//		, "this", x);
-//	}
-
-
 // static AstRef tree_from_identifier(Parser *parser, Source line, char *name, b32 lval)
 // {
 // 	AstRef v = Y_NULL;
@@ -200,15 +188,6 @@ static Entity *decl_entity(BytecodeGen *gen, Source site, EntityType type, u32 t
 // 	}
 // 	return v;
 // }
-
-// static AstRef nametorval(Parser *parser, Source line, char *name) {
-// 	return tree_from_identifier(parser, line, name, false);
-// }
-
-// static AstRef nametolval(Parser *parser, Source line, char *name) {
-// 	return tree_from_identifier(parser, line, name, true);
-// }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -538,12 +517,6 @@ static AstRef preprocess_ast_stat_for_generation(BytecodeGen *gen, AstRef stat)
 			}
 
 			new_stat = create_block_ast(gen->scratch_parser, stat->site, new_block_stats, nstats);
-		}
-		break;
-
-		case AST_ASSIGN:
-		{
-
 		}
 		break;
 

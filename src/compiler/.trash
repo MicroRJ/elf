@@ -1313,7 +1313,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		{
 			u32 nexprs = elf_parse_expr_list(parser);
 			AstRef *exprs = pop_ast_array(parser, nexprs);
-			stat = elf_new_assign_stat_tree(parser, tok.site, targs, ntargs, exprs, nexprs);
+			stat = create_assign_ast(parser, tok.site, targs, ntargs, exprs, nexprs);
 		}
 		else
 		{

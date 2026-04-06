@@ -1149,7 +1149,7 @@ static AstRef parse_expr_stat(Parser *parser)
 			consume_token(parser);
 
 			AstRef y = parse_tuple_expr(parser);
-			x = elf_new_assign_stat_tree(parser, tok.site, x, y);
+			x = create_assign_ast(parser, tok.site, x, y);
 		}
 		break;
 #if 0
@@ -1164,7 +1164,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		{
 			// Todo,
 			AstRef y = parse_tuple_expr(parser);
-			x = elf_new_assign_stat_tree(parser, tok.site, x, y);
+			x = create_assign_ast(parser, tok.site, x, y);
 		}
 		break;
 #endif
