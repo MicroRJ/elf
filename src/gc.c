@@ -141,7 +141,7 @@ static u32 mark_reachable(elf_State *state, GCRef reference)
 		{
 			Closure closure = (Closure) reference;
 
-			for (u32 i = 0; i < closure->function.ncaptures; ++ i)
+			for (u32 i = 0; i < closure->function.captures; ++ i)
 			{
 				if (value_is_reference(closure->captures[i]))
 				{

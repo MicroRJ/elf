@@ -45,6 +45,7 @@
 
 #include "arena.c"
 
+#include "runtime_error.c"
 
 #include "l_math.c"
 #include "l_core.c"
@@ -89,6 +90,20 @@ static void install(elf_State *S, char *prefix, const elf_Binding *lib, int num)
 	}
 }
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Note that the stack has to be cleared ... Because otherwise the GC trips ...
+static inline void set_stack_pointer(elf_State *state, Value *pointer)
+{
+	if (pointer > state->stack_ptr) {
+		zero_values(state->stack_ptr, pointer - state->stack_ptr);
+	}
+
+	state->stack_ptr = pointer;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -105,11 +120,13 @@ ELF_PUBLIC elf_State *elf_create_state()
 	state->arena = & state->arena_;
 	state->scratch_arena = & state->scratch_arena_;
 
-	state->frame_stack_max = 4096;
-	state->frame_stack = elf_arena_push_zero(state->arena, sizeof(* state->frame_stack) * state->frame_stack_max);
+	u32 frame_stack_size = 4096;
+	state->frame_stack_size = frame_stack_size;
+	state->frame_stack = elf_arena_push_zero(state->arena, sizeof(* state->frame_stack) * frame_stack_size);
 
-	state->stack_max = 4096;
-	state->stack = elf_arena_push_zero(state->arena, sizeof(*state->stack) * state->stack_max);
+	u32 stack_size = 4096;
+	state->stack_size = stack_size;
+	state->stack = elf_arena_push_zero(state->arena, sizeof(*state->stack) * stack_size);
 	state->stack_ptr = state->stack;
 
 	state->record_max = 1024;
@@ -159,7 +176,7 @@ ELF_PUBLIC elf_State *elf_create_state()
 
 	ASSERT(stack2index(state) < state->frame.framesize);
 
-	setstackptr(state, state->frame.framebase + state->frame.framesize);
+	set_stack_pointer(state, state->frame.framebase + state->frame.framesize);
 
 	return state;
 }
@@ -167,14 +184,12 @@ ELF_PUBLIC elf_State *elf_create_state()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// nrets would not matter for the frame size because returns are pushed
-// regardless
-static inline int call_function(elf_State *S, elf_Function function, int nargs, int nrets)
+static inline u32 call_function(elf_State *S, elf_Function function, u32 nargs, u32 nrets)
 {
-	V *framebase = S->stack_ptr - nargs;
-	V *reference = framebase;
+	Value *framebase = S->stack_ptr - nargs;
+	Value *reference = framebase;
 
-	int framesize = nargs;
+	u32 framesize = nargs;
 
 	S->frame.framebase = framebase;
 	S->frame.reference = reference;
@@ -183,13 +198,13 @@ static inline int call_function(elf_State *S, elf_Function function, int nargs, 
 	S->frame.nrets = nrets;
 
 
-	setstackptr(S, framebase + framesize);
+	set_stack_pointer(S, framebase + framesize);
 
 
 
-	int ncallrets = function(S, nargs, nrets);
+	u32 ncallrets = function(S, nargs, nrets);
 
-	int npushrets = S->stack_ptr - framebase - framesize;
+	u32 npushrets = S->stack_ptr - framebase - framesize;
 
 
 	// Ensure that the number of returns is consistent with the stack state.
@@ -219,20 +234,13 @@ static inline int call_function(elf_State *S, elf_Function function, int nargs, 
 	return ntruerets;
 }
 
-
-
-
-
-
-
-
-int elf_tailcall(elf_State *state, int nargs, int nrets)
+u32 elf_do_tail_call(elf_State *state, u32 nargs, u32 nrets)
 {
 	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
 
 	u32 frame_index = state->frame_index;
 
-	Value value = state->stack_ptr[- nargs - 1];
+	Value value = * (state->stack_ptr - nargs - 1);
 
 	if (is_closure(value))
 	{
@@ -242,8 +250,9 @@ int elf_tailcall(elf_State *state, int nargs, int nrets)
 	{
 		nrets = call_function(state, function_from_value(value), nargs, nrets);
 	}
-	else {
-		reporterrorf(state, NO_BYTE, "'%s': __call expects callable value", tag2s[value.tag]);
+	else
+	{
+		report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, "'%s' cannot be called", tag2s[value.tag]);
 	}
 
 	ASSERT(state->frame_index == frame_index);
@@ -251,61 +260,41 @@ int elf_tailcall(elf_State *state, int nargs, int nrets)
 	return nrets;
 }
 
-
-
-
-
-
-static inline void pushstackframe(elf_State *S) {
-	ASSERT(S->frame_index < S->frame_stack_max);
-	S->frame_stack[S->frame_index ++] = S->frame;
+static inline void push_stack_frame(elf_State *state)
+{
+	ASSERT(state->frame_index < state->frame_stack_size);
+	state->frame_stack[state->frame_index ++] = state->frame;
 }
 
-
-static inline void pullstackframe(elf_State *S) {
-	ASSERT(S->frame_index > 0);
-	S->frame = S->frame_stack[-- S->frame_index];
+static inline void pop_stack_frame(elf_State *state)
+{
+	ASSERT(state->frame_index > 0);
+	state->frame = state->frame_stack[-- state->frame_index];
 }
 
-
-int elf_call(elf_State *S, int nargs, int nrets)
+u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
 {
 	if (nargs < 1) {
-		reporterrorf(S, -1, "'call': expects at least one argument, got: %i", nargs);
+		report_runtime_error(state, RUNTIME_ERROR_INVALID_ARGUMENT_COUNT, "invalid number of arguments, expected at least one");
 	}
 
-	pushstackframe(S);
+	push_stack_frame(state);
 
-	nrets = elf_tailcall(S, nargs, nrets);
+	nrets = elf_do_tail_call(state, nargs, nrets);
 
-	pullstackframe(S);
+	pop_stack_frame(state);
 	return nrets;
 }
 
-
-
-
-
-
-
-
-
 static inline Array check_array(elf_State *S, V v) {
-	typecheck(S, v, ELF_TTABLE);
-	return as_table(v)->array;
+	typecheck(S, v, ELF_VALUE_TYPE_TABLE);
+	return table_from_value(v)->array;
 }
-
-
-
-
-
-
-
 
 // todo: onlycheck index type, _table_arrayset and _table_arrayget
 // already check the index
 static inline Index check_index(elf_State *S, V v, Index l) {
-	typecheck(S, v, ELF_TINTEGER);
+	typecheck(S, v, ELF_VALUE_TYPE_INTEGER);
 
 	Index index = as_int(v);
 
@@ -320,17 +309,8 @@ static inline Index check_index(elf_State *S, V v, Index l) {
 	return index;
 }
 
-
-
-
-
-
-
-
-
-/* all these are macros for generating the interpreter
-so they only work within that function ya heard */
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define VMCASE(OPCODE) case OPCODE:
 #define VMBREAK break
@@ -343,21 +323,15 @@ so they only work within that function ya heard */
 #define LoadZ() (frame.reference[by.b_z])
 
 
-
-/* =====================================================
-		Interpreter Function
-======================================================== */
-
-// update the given frame to match the given closure's needs
-static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Closure *closure, int nargs, int nrets)
+static inline void init_stack_frame_for_closure(elf_State *S, StackFrame *frame, elf_Closure *closure, int nargs, int nrets)
 {
 	BytecodeFunction function = closure->function;
 
 	// todo: do not grow frame size unless we care about vargs
-	u32 framesize = nargs < function.stacksize ? function.stacksize : nargs;
+	u32 framesize = nargs < function.stack_size ? function.stack_size : nargs;
 
 
-	// todo: don't do this here, because when we call prepframeforclosure
+	// todo: don't do this here, because when we call init_stack_frame_for_closure
 	// from the closure, we have to increment the stackpointer to account
 	// for this, when we already know this information
 	// this should be done in call_closure which is outward facing!
@@ -389,14 +363,14 @@ static inline void prepframeforclosure(elf_State *S, Stack_Frame *frame, elf_Clo
 	frame->nrets = nrets;
 	frame->arity = function.arity;
 	frame->variadic = function.variadic;
-	frame->bytes = function.bytes;
-	frame->bytec = function.numbytes;
+	frame->bytes = function.offset;
+	frame->bytec = function.length;
 	frame->closureenv = closure->captures;
-	frame->closuresize = function.ncaptures;
+	frame->closuresize = function.captures;
 	frame->nextinstr = 0;
 
 	// todo: this will zero too!
-	setstackptr(S, framebase + framesize);
+	set_stack_pointer(S, framebase + framesize);
 }
 
 
@@ -411,13 +385,14 @@ static inline void _pushrec(elf_State *S, Bytecode b, V o, V x, V y)
 	rec->y = y;
 }
 
+#if 0
 static void _tracerecords(elf_State *S, u32 x) {
 	u32 mask = S->record_max - 1;
 	for (u32 i = S->record_min - 1; i >= 0; -- i) {
 		Record *rec = & S->record[i & mask];
 		Bytecode b = rec->b;
 
-		switch (b.b_k) {
+		switch (b.b_type) {
 			case BYTECODE_LT:
 			case BYTECODE_LTEQ:
 			case BYTECODE_EQ:
@@ -434,33 +409,29 @@ static void _tracerecords(elf_State *S, u32 x) {
 			case BYTECODE_BIT_OR: {
 				if (b.b_x == x) {
 					printf("instr write to: \n");
-					printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[b.b_k], b.b_x, b.b_y, b.b_z);
+					printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[b.b_type], b.b_x, b.b_y, b.b_z);
 				}
 			} break;
 		}
 	}
 }
-
+#endif
 
 // todo: outward facing root call should not write results to the function,
 // this is only bytecode stuff!
-int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
+int call_closure(elf_State *S, Closure closure, int nargs, int nrets)
+{
+	StackFrame frame;
+	init_stack_frame_for_closure(S, &frame, closure, nargs, nrets);
 
-	Tab globals = S->globals;
-
-
-	Stack_Frame frame;
-	prepframeforclosure(S, &frame, closure, nargs, nrets);
-
-
-	V *frameroot = frame.framebase;
+	Table *globals = S->globals;
+	Value *frameroot = frame.framebase;
 
 	int subframecounter = 0;
-	int loopcounter     = 0;
-
 
 	V xx,yy,zz;
-	while (frame.nextinstr < frame.bytec) {
+	while (frame.nextinstr < frame.bytec)
+	{
 		BCPos instr = frame.nextinstr ++;
 
 		BCPos minstr = frame.bytes + instr;
@@ -468,16 +439,17 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 		Bytecode byte = S->bytebuf[minstr];
 
-		printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[byte.b_k], byte.b_x, byte.b_y, byte.b_z);
+		printf("%s(%i, %i, %i)\n", Static_StrFromBytecode[byte.b_type], byte.b_x, byte.b_y, byte.b_z);
 
 		#define by byte
 
 
-		switch (BYTECODE_OP(byte)) {
+		switch (BYTECODE_TYPE(byte)) {
 
 			VMCASE(BYTECODE_NOP)
 			{
-			} VMBREAK;
+			}
+			VMBREAK;
 
 			VMCASE(BYTECODE_CALL)
 			{
@@ -489,25 +461,16 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 				xx = LoadX();
 
-				if (is_closure(xx)) {
+				// Note, push frame regardless of function type
+				S->frame_stack[S->frame_index ++] = frame;
+				if (is_closure(xx))
+				{
+					init_stack_frame_for_closure(S, &frame, closure_from_value(xx), by.b_y, by.b_z);
 
-					// save our frame, this is restored on return instruction
-					S->frame_stack[S->frame_index ++] = frame;
-
-					// update frame for new closure
-					prepframeforclosure(S, &frame, closure_from_value(xx), by.b_y, by.b_z);
-
-
-					// track the number of sub-frames locally
 					subframecounter ++;
 				}
-				else if (is_function(xx)) {
-
-					// we only do this to make our frame visible to
-					// the core API, eventually maybe remove this to
-					// avoid having to do this.
-					S->frame_stack[S->frame_index ++] = frame;
-
+				else if (is_function(xx))
+				{
 					call_function(S, function_from_value(xx), by.b_y, by.b_z);
 
 					// note how we don't store nor restore S->frame, so
@@ -518,7 +481,7 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 					S->frame_index --;
 
 					// restore stack pointer
-					setstackptr(S, frame.framebase + frame.framesize);
+					set_stack_pointer(S, frame.framebase + frame.framesize);
 				}
 				else {
 					reporterrorf(S, -1, "cannot call '%s'", tag2s[xx.tag]);
@@ -527,7 +490,7 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 				ASSERT(S->stack_ptr == frame.framebase + frame.framesize);
 			} VMBREAK;
 
-			VMCASE(BYTECODE_RET) {
+			VMCASE(BYTECODE_RETURN) {
 				nrets = MIN(by.b_y, frame.nrets);
 
 				// returns are placed right on the function
@@ -537,7 +500,7 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 				if (subframecounter) {
 					frame = S->frame_stack[-- S->frame_index];
 
-					setstackptr(S, frame.framebase + frame.framesize);
+					set_stack_pointer(S, frame.framebase + frame.framesize);
 
 					subframecounter --;
 				}
@@ -548,7 +511,7 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 				}
 			} VMBREAK;
 
-			case BYTECODE_J: {
+			case BYTECODE_JUMP: {
 
 				int dst = BYTECODE_ARGX(byte);
 				frame.nextinstr = instr + dst;
@@ -658,7 +621,8 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 			} break;
 
-			case BYTECODE_SETFIELD: {
+			VMCASE(BYTECODE_SETFIELD)
+			{
 				xx=LoadX(), yy=LoadY(), zz=LoadZ();
 
 				if (is_tab(xx)) {
@@ -675,22 +639,16 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 				else {
 					reporterrorf(S, minstr, "attempted to set field of '%s' value", tag2s[xx.tag]);
 				}
-			} break;
+			}
+			VMBREAK;
 
-
-			// todo: replace with table intrinsics!
-			// _table_arraylen
-			// _table_arrayset
-			// _table_arrayget
-
-
-			VMCASE(BYTECODE_ENFORCE) {
-
+			VMCASE(BYTECODE_ENFORCE)
+			{
 				typerulecheck(S, LoadX(), by.b_y);
+			}
+			VMBREAK;
 
-			} VMBREAK;
-
-			case BYTECODE_CLOSURE:
+			VMCASE(BYTECODE_CLOSURE)
 			{
 				ASSERT(WITHIN(BYTECODE_ARGY(byte), 0, heap_array_length(S->protos)));
 
@@ -700,158 +658,176 @@ int call_closure(elf_State *S, Closure closure, int nargs, int nrets) {
 
 				Closure closure;
 
-				u32 size = sizeof(*closure) + sizeof(closure->captures[0]) * function.ncaptures;
+				u32 size = sizeof(*closure) + sizeof(closure->captures[0]) * function.captures;
 
 				closure = (Closure) collector_alloc(S, GC_CLOSURE, size);
 				closure->function = function;
-				copy_values(closure->captures, &LoadX(), function.ncaptures);
+				copy_values(closure->captures, &LoadX(), function.captures);
 
 				to_cls(&LoadX(), closure);
 			}
-			break;
+			VMBREAK;
 
-			case BYTECODE_TABLE: {
-
-				elf_Table *tab = new_table(S);
+			VMCASE(BYTECODE_TABLE)
+			{
+				Table *tab = new_table(S);
 				to_tab(&LoadX(), tab);
-
-			} break;
+			}
+			VMBREAK;
 
 
 			VMCASE(BYTECODE_GETLENGTH)
 			{
 				Array array  = check_array(S, LoadY());
 				to_int(&LoadX(), heap_array_length(array));
-			} VMBREAK;
+			}
+			VMBREAK;
 
 
-			VMCASE(BYTECODE_ARRAYADD) {
+			VMCASE(BYTECODE_ARRAYADD)
+			{
 				Value table = LoadX();
 				Value value = LoadY();
-				typecheck(S, table, ELF_TTABLE);
-				_table_arrayadd(S, as_table(table), value);
-			} VMBREAK;
+				typecheck(S, table, ELF_VALUE_TYPE_TABLE);
+				_table_arrayadd(S, table_from_value(table), value);
+			}
+			VMBREAK;
 
-
-
-			case BYTECODE_N2I:
+			VMCASE(BYTECODE_N2I)
 			{
 				to_int(&LoadX(), num_to_int(LoadY()));
-			} break;
+			}
+			VMBREAK;
 
-			case BYTECODE_I2N:
+			VMCASE(BYTECODE_I2N)
 			{
 				to_num(&LoadX(), int_to_num(LoadY()));
-			} break;
+			}
+			VMBREAK;
 
-
-			VMCASE(BYTECODE_BIT_NOT) {
-
+			VMCASE(BYTECODE_BIT_NOT)
+			{
 				V x = LoadY();
-				typecheck(S, x, ELF_TINTEGER);
+				typecheck(S, x, ELF_VALUE_TYPE_INTEGER);
 
 				V o;
 				to_int(&o, ~ as_int(x));
 
 				vmove(&LoadX(), o);
+			}
+			VMBREAK;
 
-				_pushrec1(S, byte, o, x);
-			} VMBREAK;
-
-			VMCASE(BYTECODE_EQ) {
+			VMCASE(BYTECODE_EQ)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__eq(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_NEQ) {
+			VMCASE(BYTECODE_NEQ)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__neq(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_LT) {
+			VMCASE(BYTECODE_LT)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__lt(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_LTEQ) {
+			VMCASE(BYTECODE_LTEQ)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__lteq(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_POW) {
+			VMCASE(BYTECODE_POW)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__pow(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_MOD) {
+			VMCASE(BYTECODE_MOD)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__mod(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_MUL) {
+			VMCASE(BYTECODE_MUL)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__mul(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_DIV) {
+			VMCASE(BYTECODE_DIV)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__div(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_ADD) {
+			VMCASE(BYTECODE_ADD)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__add(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_SUB) {
+			VMCASE(BYTECODE_SUB)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__sub(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_BIT_XOR) {
+			VMCASE(BYTECODE_BIT_XOR)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__eor(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_BIT_SHL) {
+			VMCASE(BYTECODE_BIT_SHL)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__shl(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_BIT_SHR) {
+			VMCASE(BYTECODE_BIT_SHR)
+			{
 				V x = LoadY(), y = LoadZ();
 				v__shr(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_BIT_AND) {
-				V x = LoadY(), y = LoadZ();
+			VMCASE(BYTECODE_BIT_AND)
+			{
+				Value x = LoadY(), y = LoadZ();
 				v__and(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
-			VMCASE(BYTECODE_BIT_OR) {
-				V x = LoadY(), y = LoadZ();
+			VMCASE(BYTECODE_BIT_OR)
+			{
+				Value x = LoadY(), y = LoadZ();
 				v__ior(S, &LoadX(), x, y);
-				_pushrec(S, byte, LoadX(), x, y);
-			} VMBREAK;
+			}
+			VMBREAK;
 
 
-			default: {
-				reporterrorf(S, minstr, "unsupported instruction: %s", Static_StrFromBytecode[BYTECODE_OP(byte)]);
-			} break;
+			default:
+			{
+				report_runtime_error(S, RUNTIME_ERROR_UNKNOWN_BYTECODE, "'%s' unknown bytecode", Static_StrFromBytecode[BYTECODE_TYPE(byte)]);
+			}
+			break;
 		}
 	}
 

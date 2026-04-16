@@ -126,7 +126,6 @@ enum { true = 1, false = 0 };
 typedef int BCPos;
 #define NO_BYTE (-1)
 
-
 #include "bytecode.h"
 
 
@@ -139,19 +138,21 @@ extern const char *tag2s[];
 extern const char *Static_StrFromBytecode[];
 
 // Todo, how do va-args functions work again?
+// ------------------------------------------------------------
 // if a function is variadic it just means it won't overwrite
 // the additional arguments, so add '...' to your functions if
 // you care about those!
 // and storage for other flags
+//
 typedef struct BytecodeFunction BytecodeFunction;
 struct BytecodeFunction
 {
-	u8    variadic;
-	u8       arity;
-	u8   ncaptures;
-	u16  stacksize;
-	u16   numbytes;
-	u32      bytes;
+	u8     variadic;
+	u8        arity;
+	u8     captures;
+	u16  stack_size;
+	u16      length;
+	u32      offset;
 };
 
 // Todo, just keep name as an atom, in case of error, attempt to load the file or lookup in a cache or something ...
@@ -177,19 +178,19 @@ struct BytecodeFile
 
 
 typedef enum {
-	TBIT_NIL       = 1 << ELF_TNIL,
-	TBIT_TOMB      = 1 << ELF_TTOMB,
-	TBIT_NUMBER    = 1 << ELF_TNUMBER,
-	TBIT_INTEGER   = 1 << ELF_TINTEGER,
-	TBIT_HANDLE    = 1 << ELF_THANDLE,
-	TBIT_FUNCTION  = 1 << ELF_TFUNCTION,
-	TBIT_USER      = 1 << ELF_TUSER,
-	TBIT_CLOSURE   = 1 << ELF_TCLOSURE,
-	TBIT_STRING    = 1 << ELF_TSTRING,
-	TBIT_TABLE     = 1 << ELF_TTABLE,
-	TBIT_BUFFER    = 1 << ELF_TBUFFER,
+	TBIT_NIL       = 1 << ELF_VALUE_TYPE_NIL,
+	TBIT_TOMB      = 1 << ELF_VALUE_TYPE_TOMB,
+	TBIT_NUMBER    = 1 << ELF_VALUE_TYPE_NUMBER,
+	TBIT_INTEGER   = 1 << ELF_VALUE_TYPE_INTEGER,
+	TBIT_HANDLE    = 1 << ELF_VALUE_TYPE_HANDLE,
+	TBIT_FUNCTION  = 1 << ELF_VALUE_TYPE_CFUNCTION,
+	TBIT_USER      = 1 << ELF_VALUE_TYPE_USER_OBJECT,
+	TBIT_CLOSURE   = 1 << ELF_VALUE_TYPE_CLOSURE,
+	TBIT_STRING    = 1 << ELF_VALUE_TYPE_STRING,
+	TBIT_TABLE     = 1 << ELF_VALUE_TYPE_TABLE,
+	TBIT_BUFFER    = 1 << ELF_VALUE_TYPE_BUFFER,
 	//
-	TBIT_ALLMASK   = (1 << ELF_TCOUNT_) - 1,
+	TBIT_ALLMASK   = (1 << ELF_VALUE_TYPE_COUNT_) - 1,
 } TypeBit;
 
 typedef enum {
@@ -218,7 +219,7 @@ typedef enum {
 } TypeRule;
 
 
-#define NIL_VALUE ((Value) { ELF_TNIL })
+#define NIL_VALUE ((Value) { ELF_VALUE_TYPE_NIL })
 
 #define VALUE_READONLY 2
 
@@ -440,8 +441,8 @@ Hash        strh(GCStr str);
 // so we can pack lots of frame info there.
 //
 //
-typedef struct Stack_Frame Stack_Frame;
-struct Stack_Frame {
+typedef struct StackFrame StackFrame;
+struct StackFrame {
 
 	// the start of this frame on the stack right after the function
 	V            *framebase;
@@ -578,70 +579,58 @@ elf_Arena;
 typedef struct elf_State elf_State;
 struct elf_State
 {
-	// Todo,
 	elf_Arena    arena_;
 	elf_Arena    scratch_arena_;
 	elf_Arena   *arena;
 	elf_Arena   *scratch_arena;
 
+	// Todo, make this a separate struct called, BytecodeProgram, contains
+	// all the information needed to run a bytecode program ... and can be
+	// off-loaded
 	struct
 	{
-		Tab      globals;
-		// minimize usage of these!
-		Num     *numbers;
-		Int     *integers;
-	};
-
-	struct
-	{
+		// Todo, compress site buffer
+		// Todo, the site buffer should be per bytecode file?
+		// Todo, make bytecode file be a single pointer array, wtf
+		Num                *numbers;
+		Int                *integers;
 		BytecodeFunction   *protos;
-
-		// todo: compress this
-		// todo: also, allocate per BytecodeFile?
 		char              **lines;
-
-
-		// todo: why is this a double pointer?
 		BytecodeFile      **files;
-
-
-
-		// todo: I don't know how long we'll manage with just the one
-		// buffer, especially with people loading stuff at runtime,
-		// I think we'll do our own memory management here, and once
-		// we run out of space we can either reallocate to get more, or
-		// if too fragmented do a copy and compact
-		Bytecode        *bytebuf;
-		int              bytecur;
+		Bytecode           *bytebuf;
 	};
 
+	struct
+	{
+	   GCState      collector_state;
 
-	GCState      collector_state;
+		Table       *globals;
 
-	struct {
-		V           *stack;
-		V           *stack_ptr;
-		int          stack_max;
+		u32          stack_size;
+		Value       *stack_ptr;
+		Value       *stack;
 
 		u32          record_min;
 		u32          record_max;
 		Record      *record;
 
+		int          frame_stack_size;
+		StackFrame  *frame_stack;
 		int          frame_index;
-		int          frame_stack_max;
-		Stack_Frame *frame_stack;
-		Stack_Frame  frame;
+		StackFrame   frame;
 
 		BCPos        byte;
 	};
 
-	struct {
+	struct
+	{
 		Tab integer;
 		Tab number;
 		Tab string;
 		Tab table;
 		Tab buffer;
-	} metatables;
+	}
+	metatables;
 };
 
 void _initstate(elf_State *);

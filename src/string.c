@@ -21,7 +21,7 @@ GCStr new_string_from_data_size(elf_State *S, char const *text, int length) {
 	str->length = length;
 	str->text[length] = 0;
 	str->hash = hash_textl(text, length);
-	elf_copy_memory(str->text, text, length);
+	copy_memory(str->text, text, length);
 	return str;
 }
 

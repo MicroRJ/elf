@@ -188,19 +188,19 @@ static inline Tab _get_metatable(elf_State *S, V v) {
 
 	switch (v.tag) {
 
-		case ELF_TBUFFER:
-		case ELF_TSTRING:
-		case ELF_TTABLE:
-		case ELF_TUSER:
-		case ELF_TCLOSURE: {
+		case ELF_VALUE_TYPE_BUFFER:
+		case ELF_VALUE_TYPE_STRING:
+		case ELF_VALUE_TYPE_TABLE:
+		case ELF_VALUE_TYPE_USER_OBJECT:
+		case ELF_VALUE_TYPE_CLOSURE: {
 			metatable = reference_from_value(v)->meta;
 		} break;
 
-		case ELF_TNUMBER: {
+		case ELF_VALUE_TYPE_NUMBER: {
 			metatable = S->metatables.number;
 		} break;
 
-		case ELF_TINTEGER: {
+		case ELF_VALUE_TYPE_INTEGER: {
 			metatable = S->metatables.integer;
 		} break;
 
@@ -232,11 +232,11 @@ static inline void _get_field(elf_State *S, V *x, V y, V z) {
 
 	switch (y.tag) {
 
-		case ELF_TTABLE: {
-			*x = _table_getornil(S, as_table(y), z);
+		case ELF_VALUE_TYPE_TABLE: {
+			*x = _table_getornil(S, table_from_value(y), z);
 		} break;
 
-		case ELF_TSTRING: {
+		case ELF_VALUE_TYPE_STRING: {
 
 			const char *text = strt(as_string(y));
 

@@ -260,7 +260,7 @@ ELF_FUNCTION(l_core_load_file) {
 	for (int i = 2; i < nargs; ++ i) {
 		loadpush(S, i);
 	}
-	nrets = elf_tailcall(S, nargs - 1, nrets);
+	nrets = elf_do_tail_call(S, nargs - 1, nrets);
 	return nrets;
 }
 
@@ -367,15 +367,15 @@ static int tabletostr(Stringer *sb, Tab tab, bool flags) {
 
 static int valuetostr(Stringer *sb, V v, bool flags) {
 	switch (v.tag) {
-		case ELF_TNIL:        return sb_writetextf(sb, "nil"                  );
-		case ELF_TINTEGER:    return sb_writetextf(sb, "%lli"  , v.x_int      );
-		case ELF_TNUMBER:     return sb_writetextf(sb, "%f"    , v.x_num      );
-		case ELF_THANDLE:     return sb_writetextf(sb, "h%llX" , v.x_int      );
-		case ELF_TSTRING:     return sb_writetextf(sb, "%s"    , v.x_str->text);
-		case ELF_TCLOSURE:    return sb_writetextf(sb, "C()");
-		case ELF_TFUNCTION:   return sb_writetextf(sb, "F()");
-		case ELF_TBUFFER:     return   sb_writebuf(sb, as_buffer(v));
-		case ELF_TTABLE:      return    tabletostr(sb, as_table(v), flags);
+		case ELF_VALUE_TYPE_NIL:        return sb_writetextf(sb, "nil"                  );
+		case ELF_VALUE_TYPE_INTEGER:    return sb_writetextf(sb, "%lli"  , v.x_int      );
+		case ELF_VALUE_TYPE_NUMBER:     return sb_writetextf(sb, "%f"    , v.x_num      );
+		case ELF_VALUE_TYPE_HANDLE:     return sb_writetextf(sb, "h%llX" , v.x_int      );
+		case ELF_VALUE_TYPE_STRING:     return sb_writetextf(sb, "%s"    , v.x_str->text);
+		case ELF_VALUE_TYPE_CLOSURE:    return sb_writetextf(sb, "C()");
+		case ELF_VALUE_TYPE_CFUNCTION:   return sb_writetextf(sb, "F()");
+		case ELF_VALUE_TYPE_BUFFER:     return   sb_writebuf(sb, as_buffer(v));
+		case ELF_VALUE_TYPE_TABLE:      return    tabletostr(sb, table_from_value(v), flags);
 		default: return sb_writetextf(sb,"(?)");
 	}
 }
@@ -561,7 +561,7 @@ int core_lib_include(elf_State *R) {
 	IndexValue entry;
 	FOR_RANGE(i,0,globals->ntotal) {
 		entry=globals->slots[i];
-		if (entry.key.tag == ELF_TSTRING) {
+		if (entry.key.tag == ELF_VALUE_TYPE_STRING) {
 			char *sym = in_sym_dir(dir,entry.key.x_str->text);
 			if (*sym != '.') continue;
 			elf_String *ref = new_string_from_data(R,sym);

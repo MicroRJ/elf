@@ -50,7 +50,7 @@ static void printsourcelocator(char *name, char *source, char *cursor, BCPos ins
 	, line_number
 	, char_index
 	, instr
-	, Static_StrFromBytecode[BYTECODE_OP(byte)]);
+	, Static_StrFromBytecode[BYTECODE_TYPE(byte)]);
 
 	printf("|\n");
 	printf("| %.*s\n",line_length,line_start);
@@ -62,7 +62,7 @@ void printcallstack(elf_State *S) {
 
 	for(int i=1; i<S->frame_index; i++)
 	{
-		Stack_Frame *frame = & S->frame_stack[i];
+		StackFrame *frame = & S->frame_stack[i];
 		BCPos instr = frame->bytes + frame->nextinstr;
 
 		int id = findfileforinstr(S, instr);
@@ -205,31 +205,31 @@ static void fpf_byte(FILE *io, elf_Module *M, elf_Integer fid, BCPos id, Bytecod
 	}
 
 	fprintf(io,"%04i\t%s"
-	, id,Static_StrFromBytecode[BYTECODE_OP(b)]);
+	, id,Static_StrFromBytecode[BYTECODE_TYPE(b)]);
 
-	if (get_byte_class(BYTECODE_OP(b)) == BYTECODE_CLASS_XYZ) {
+	if (get_byte_class(BYTECODE_TYPE(b)) == BYTECODE_CLASS_XYZ) {
 		fprintf(io,"(x=%i,y=%i,z=%i)",BYTECODE_ARGX(b),BYTECODE_ARGY(b),BYTECODE_ARGZ(b));
-	} else if (get_byte_class(BYTECODE_OP(b)) == BYTECODE_CLASS_XY) {
+	} else if (get_byte_class(BYTECODE_TYPE(b)) == BYTECODE_CLASS_XY) {
 		fprintf(io,"(x=%i,y=%i)",BYTECODE_ARGX(b),BYTECODE_ARGY(b));
 	} else {
 		fprintf(io,"(x=%i)",BYTECODE_ARGX(b));
 	}
 
-	if (BYTECODE_OP(b) == BYTECODE_TYPEGUARD) {
+	if (BYTECODE_TYPE(b) == BYTECODE_TYPEGUARD) {
 		fprintf(io," #%s",tag2s[BYTECODE_ARGY(b)]);
 	} else
-	if (BYTECODE_OP(b) == BYTECODE_LOADKINT) {
+	if (BYTECODE_TYPE(b) == BYTECODE_LOADKINT) {
 		fprintf(io," #%lli",M->integers[BYTECODE_ARGY(b)]);
 	} else
-	if (BYTECODE_OP(b) == BYTECODE_LOADKNUM) {
+	if (BYTECODE_TYPE(b) == BYTECODE_LOADKNUM) {
 		fprintf(io," #%f",M->numbers[BYTECODE_ARGY(b)]);
 	} else
-	if (BYTECODE_OP(b) == BYTECODE_GETGLOBAL) {
+	if (BYTECODE_TYPE(b) == BYTECODE_GETGLOBAL) {
 		elf_Value val = M->globals->array[BYTECODE_ARGY(b)];
 		fprintf(io,"  // %s ",tag2s[val.tag]);
 		/* todo: just pass in a flag to val fpf that tells
 		it to shorten the thing for printing purposes */
-		if ((val.tag==ELF_TSTRING)||(val.tag==ELF_TNUMBER)||(val.tag==ELF_TINTEGER)) {
+		if ((val.tag==ELF_VALUE_TYPE_STRING)||(val.tag==ELF_VALUE_TYPE_NUMBER)||(val.tag==ELF_VALUE_TYPE_INTEGER)) {
 			// fpf_value(io,val,1);
 		}
 	}

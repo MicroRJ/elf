@@ -32,12 +32,12 @@ static inline void swap_values(V *x, V *y)
 
 static inline void vmove(V *dst, V src)
 {
-	elf_copy_memory(dst, &src, sizeof(src));
+	copy_memory(dst, &src, sizeof(src));
 }
 
 static inline void copy_values(V *dst, V *src, int num)
 {
-	elf_copy_memory(dst, src, num * sizeof(*src));
+	copy_memory(dst, src, num * sizeof(*src));
 }
 
 static inline void zero_values(V *dst, int num)
@@ -48,33 +48,33 @@ static inline void zero_values(V *dst, int num)
 #define getmeta(o) ((o)->obj.meta)
 #define setmeta(o, m) ((o)->obj.meta = (m))
 
-#define tisobject(tag) ((tag) >= ELF_TUSER)
-#define tisdead(v) ((v) == ELF_TNIL || (v) == ELF_TTOMB)
-#define tisnil(v) ((v) == ELF_TNIL)
-#define tisnum(v) ((v) == ELF_TNUMBER)
-#define tisint(v) ((v) == ELF_TINTEGER)
-#define tistab(v) ((v) == ELF_TTABLE)
-#define is_string_type(v) ((v) == ELF_TSTRING)
-#define tisusr(v) ((v) == ELF_TUSER)
-#define tisfnc(v) ((v) == ELF_TFUNCTION)
-#define tiscls(v) ((v) == ELF_TCLOSURE)
-#define tissys(v) ((v) == ELF_THANDLE)
+#define tisobject(tag) ((tag) >= ELF_VALUE_TYPE_USER_OBJECT)
+#define tisdead(v) ((v) == ELF_VALUE_TYPE_NIL || (v) == ELF_VALUE_TYPE_TOMB)
+#define tisnil(v) ((v) == ELF_VALUE_TYPE_NIL)
+#define tisnum(v) ((v) == ELF_VALUE_TYPE_NUMBER)
+#define tisint(v) ((v) == ELF_VALUE_TYPE_INTEGER)
+#define tistab(v) ((v) == ELF_VALUE_TYPE_TABLE)
+#define is_string_type(v) ((v) == ELF_VALUE_TYPE_STRING)
+#define tisusr(v) ((v) == ELF_VALUE_TYPE_USER_OBJECT)
+#define tisfnc(v) ((v) == ELF_VALUE_TYPE_CFUNCTION)
+#define tiscls(v) ((v) == ELF_VALUE_TYPE_CLOSURE)
+#define tissys(v) ((v) == ELF_VALUE_TYPE_HANDLE)
 #define is_numeric_type(v) (tisnum(v) || tisint(v))
 #define tiscallable(v) (tiscls(v) || tisfnc(v))
 
 
 // nullptr should never happen! it should be converted to nil
-#define is_nil(v) ((v).tag == ELF_TNIL)
-#define vistomb(v) ((v).tag == ELF_TTOMB)
-#define is_num(v) ((v).tag == ELF_TNUMBER)
-#define is_int(v) ((v).tag == ELF_TINTEGER)
-#define is_tab(v) ((v).tag == ELF_TTABLE)
-#define is_str(v) ((v).tag == ELF_TSTRING)
-#define is_buf(v) ((v).tag == ELF_TBUFFER)
-#define isusr(v) ((v).tag == ELF_TUSER)
-#define is_function(v) ((v).tag == ELF_TFUNCTION)
-#define is_closure(v) ((v).tag == ELF_TCLOSURE)
-#define issys(v) ((v).tag == ELF_THANDLE)
+#define is_nil(v) ((v).tag == ELF_VALUE_TYPE_NIL)
+#define vistomb(v) ((v).tag == ELF_VALUE_TYPE_TOMB)
+#define is_num(v) ((v).tag == ELF_VALUE_TYPE_NUMBER)
+#define is_int(v) ((v).tag == ELF_VALUE_TYPE_INTEGER)
+#define is_tab(v) ((v).tag == ELF_VALUE_TYPE_TABLE)
+#define is_str(v) ((v).tag == ELF_VALUE_TYPE_STRING)
+#define is_buf(v) ((v).tag == ELF_VALUE_TYPE_BUFFER)
+#define isusr(v) ((v).tag == ELF_VALUE_TYPE_USER_OBJECT)
+#define is_function(v) ((v).tag == ELF_VALUE_TYPE_CFUNCTION)
+#define is_closure(v) ((v).tag == ELF_VALUE_TYPE_CLOSURE)
+#define issys(v) ((v).tag == ELF_VALUE_TYPE_HANDLE)
 
 #define isdead(v) (is_nil(v) || vistomb(v))
 #define iskey(v) (!is_nil(v) && !vistomb(v))
@@ -96,7 +96,7 @@ static inline void zero_values(V *dst, int num)
 #define reference_from_value(v) ((v).x_obj)
 #define as_string(v) ((v).x_str)
 #define as_buffer(v) ((v).x_buf)
-#define as_table(v) ((v).x_tab)
+#define table_from_value(v) ((v).x_tab)
 #define vgetsys(v) ((v).x_sys)
 #define closure_from_value(v) ((v).x_closure)
 #define function_from_value(v) ((v).x_proc)
@@ -119,10 +119,10 @@ static inline void *checknullptrobj(void *obj) {
 
 
 
-#define to_nil(v)   ((v)->tag=ELF_TNIL     , (v)->x_int=0)
-#define to_int(v,x) ((v)->tag=ELF_TINTEGER , (v)->x_int=x)
-#define to_num(v,x) ((v)->tag=ELF_TNUMBER  , (v)->x_num=x)
-#define to_sys(v,x) ((v)->tag=ELF_THANDLE  , (v)->x_sys=x)
+#define to_nil(v)   ((v)->tag=ELF_VALUE_TYPE_NIL     , (v)->x_int=0)
+#define to_int(v,x) ((v)->tag=ELF_VALUE_TYPE_INTEGER , (v)->x_int=x)
+#define to_num(v,x) ((v)->tag=ELF_VALUE_TYPE_NUMBER  , (v)->x_num=x)
+#define to_sys(v,x) ((v)->tag=ELF_VALUE_TYPE_HANDLE  , (v)->x_sys=x)
 
 
 
@@ -132,26 +132,26 @@ static inline void *checknullptrobj(void *obj) {
 
 
 static inline void to_str(V *v, GCStr x) {
-	v->tag=ELF_TSTRING;
+	v->tag=ELF_VALUE_TYPE_STRING;
 	set_obj(v, x);
 }
 
 static inline void to_tab(V *v, Tab x) {
-	v->tag=ELF_TTABLE;
+	v->tag=ELF_VALUE_TYPE_TABLE;
 	set_obj(v, x);
 }
 
 
 
 static inline void to_fun(V *v, Fun x) {
-	v->tag=ELF_TFUNCTION;
+	v->tag=ELF_VALUE_TYPE_CFUNCTION;
 	set_obj(v, x);
 }
 
 
 
 static inline void to_cls(V *v, Closure x) {
-	v->tag=ELF_TCLOSURE;
+	v->tag=ELF_VALUE_TYPE_CLOSURE;
 	set_obj(v, x);
 }
 
@@ -159,7 +159,7 @@ static inline void to_cls(V *v, Closure x) {
 
 
 static inline void to_buf(V *v, Buf x) {
-	v->tag=ELF_TBUFFER;
+	v->tag=ELF_VALUE_TYPE_BUFFER;
 	set_obj(v, x);
 }
 
@@ -192,18 +192,6 @@ static inline void checkloadindex(elf_State *S, int x)
 
 
 
-// has to be cleared because we don't know what was there before!
-static inline void setstackptr(elf_State *S, V *ptr) {
-	if (ptr > S->stack_ptr) {
-		zero_values(S->stack_ptr, ptr - S->stack_ptr);
-	}
-
-	S->stack_ptr = ptr;
-}
-
-
-
-
 
 
 // todo: we rely on virtual address space to reserve a large memory range
@@ -215,7 +203,7 @@ static inline void setstackptr(elf_State *S, V *ptr) {
 #define pushstacksafe(S) \
 do { \
 	\
-	if (((S)->stack_ptr - (S)->stack) >= S->stack_max) { \
+	if (((S)->stack_ptr - (S)->stack) >= S->stack_size) { \
 		reporterrorf(S, -1, "ran out of stack space"); \
 	} \
 	\
@@ -391,7 +379,7 @@ static inline bool popbool(elf_State *S)
 {
 	V v = popvalue(S);
 	if (is_nil(v)) return false;
-	typecheck(S, v, ELF_TINTEGER);
+	typecheck(S, v, ELF_VALUE_TYPE_INTEGER);
 	return as_int(v);
 }
 
@@ -399,7 +387,7 @@ static inline bool popbool(elf_State *S)
 static inline Int popint(elf_State *S)
 {
 	V v = popvalue(S);
-	typecheck(S, v, ELF_TINTEGER);
+	typecheck(S, v, ELF_VALUE_TYPE_INTEGER);
 	return as_int(v);
 }
 
@@ -411,7 +399,7 @@ static inline Buf loadbuf(elf_State *S, int x)
 	V v = loadvalue(S, x);
 	if (is_buf(v)) return as_buffer(v);
 	// if (is_nil(v)) return 0;
-	loadtypeerror(S, ELF_TBUFFER, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_BUFFER, x);
 	return 0;
 }
 
@@ -423,7 +411,7 @@ static inline GCStr loadstr(elf_State *S, int x)
 	V v = loadvalue(S, x);
 	if (is_str(v)) return as_string(v);
 	// if (is_nil(v)) return 0;
-	loadtypeerror(S, ELF_TSTRING, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_STRING, x);
 	return 0;
 }
 
@@ -436,7 +424,7 @@ static inline Int loadsys(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (issys(v)) return vgetsys(v);
-	loadtypeerror(S, ELF_THANDLE, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_HANDLE, x);
 	return 0;
 }
 
@@ -449,7 +437,7 @@ static inline Int loadint(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_numeric(v)) return num_to_int(v);
-	loadtypeerror(S, ELF_TINTEGER, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_INTEGER, x);
 	return 0;
 }
 
@@ -462,7 +450,7 @@ static inline Num loadnum(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
 	if (is_numeric(v)) return int_to_num(v);
-	loadtypeerror(S, ELF_TNUMBER, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_NUMBER, x);
 	return 0;
 }
 
@@ -511,9 +499,9 @@ static inline GCRef load_reference(elf_State *S, int x)
 static inline Tab loadtable(elf_State *S, int x)
 {
 	V v = loadvalue(S, x);
-	if (is_tab(v)) return as_table(v);
+	if (is_tab(v)) return table_from_value(v);
 	// if (is_nil(v)) return 0;
-	loadtypeerror(S, ELF_TTABLE, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_TABLE, x);
 	return 0;
 }
 
@@ -531,7 +519,7 @@ static inline const char *loadtext(elf_State *S, int x)
 	// todo: we allow nil here...
 	if (is_nil(v)) return 0;
 
-	loadtypeerror(S, ELF_TSTRING, x);
+	loadtypeerror(S, ELF_VALUE_TYPE_STRING, x);
 	return 0;
 }
 

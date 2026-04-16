@@ -2,15 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-
-// todo: unary operator and keyword isnil
-// if table isnil == isnil table ? {
-//
-// }
-// todo: experiment with pack16, pack32, pack64 macros,
-// I think they could be useful!
-
-
 // todo: avoid using these macros, they're ugly
 #define POS0() (parser->cursor[0])
 #define POS1() (parser->cursor[1])
@@ -19,16 +10,17 @@
 #define PICK(xx) ((POS0() == (xx)) ? (MOVEN(1), 1) : 0)
 
 
-/* todo: binary search or something goofy */
-static TokenType text_is_word_or_macro(char *name) {
-#define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TOK_M_,NAME);
+// Todo, bruh !
+static TokenType text_is_word_or_macro(char *name)
+{
+#define MCITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TOK_,NAME);
 	MACRODEF(MCITEM)
 #undef MCITEM
 	return TOK_IDENTIFIER;
 }
 
-/* todo: speed! */
-static TokenType check_keyword(char *name) {
+static TokenType check_keyword(char *name)
+{
 	#define KWITEM(NAME,SYM) if (text_eq(SYM,name)) return XFUSE(TOK_,NAME);
 	KEYWORDDEF(KWITEM)
 	#undef KWITEM
@@ -38,8 +30,9 @@ static TokenType check_keyword(char *name) {
 //
 // todo: we already have one of these somewhere, recycle!
 //
-static void parser_dialog(Parser *parser, char *line, char const *fmt, ...) {
-	line = line ? line : parser->tok.line;
+static void parser_dialog(Parser *parser, Source site, char const *fmt, ...)
+{
+	site = site ? site : parser->tok.site;
 
 	// | attempted to get field of
 	//
@@ -50,7 +43,7 @@ static void parser_dialog(Parser *parser, char *line, char const *fmt, ...) {
 	// |
 
 	char *lineloc;
-	int linenum = get_source_info(parser->source,line,&lineloc);
+	int linenum = get_source_info(parser->source,site,&lineloc);
 
 	/* skip initial blank characters for optimal gimmicky */
 	while (*lineloc == '\t' || *lineloc == ' ') {
@@ -59,10 +52,10 @@ static void parser_dialog(Parser *parser, char *line, char const *fmt, ...) {
 
 	char u[0x40];
 
-	int underline = line - lineloc;
+	int underline = site - lineloc;
 	if (underline >= sizeof(u)) {
 		underline = sizeof(u) - 1;
-		lineloc = line - underline;
+		lineloc = site - underline;
 	}
 
 	int linelen = 0;
@@ -84,7 +77,7 @@ static void parser_dialog(Parser *parser, char *line, char const *fmt, ...) {
 		stbsp_vsnprintf(b,sizeof(b),fmt,v);
 		va_end(v);
 		char *filename = parser->name;
-		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_Integer)(1+line-lineloc),b);
+		printf("%s [%i:%lli]: %s\n",filename,linenum,(elf_Integer)(1+site-lineloc),b);
 	}
 	printf("| %.*s\n",linelen,lineloc);
 	printf("| %.*s\n",underline+1,u);
@@ -191,12 +184,6 @@ static int lex_identifier(Parser *parser, char *buf, int cap) {
 	return len;
 }
 
-
-
-
-
-
-
 static int pick_empty_chars(Parser *parser) {
 	int lines = 0;
 	retry:
@@ -219,41 +206,45 @@ static int pick_empty_chars(Parser *parser) {
 	return lines;
 }
 
-
-
-
-//
-// todo: would it be faster to just do all the tokens in one go?
-//
-static Token lex_token(Parser *parser) {
-
+static Token lex_token(Parser *parser)
+{
 	retry:
 	Token token = {};
 	token.type = TOK_NONE;
-	token.line = parser->cursor;
+	token.site = parser->cursor;
 
-	switch (*parser->cursor) {
-
-		case 'A'...'Z': case 'a'...'z': case '_': {
+	switch (*parser->cursor)
+	{
+		case'A':case'B':case'C':case'D':case'E':case'F':case'G':case'H':case'I':case'J':case'K':case'L':case'M':
+		case'N':case'O':case'P':case'Q':case'R':case'S':case'T':case'U':case'V':case'W':case'X':case'Y':case'Z':
+		case'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':case'i':case'j':case'k':case'l':case'm':
+		case'n':case'o':case'p':case'q':case'r':case's':case't':case'u':case'v':case'w':case'x':case'y':case'z':
+		case'_':
+		{
+			// Todo, can this be done in the parser?
 			if (parser->cursor[0] == 'f' && parser->cursor[1] == '"') {
 				parser->cursor ++;
 				token.type = TOK_FORMAT_STRING;
 				goto strcase;
 			}
 
-			int length = lex_identifier(parser, parser->tempbuf, sizeof(parser->tempbuf) - 1);
+			char buffer[1024];
 
-			token.type = check_keyword(parser->tempbuf);
-			if (token.type == TOK_IDENTIFIER) {
-				// todo: proper string allocator
-				// todo: leak!
-				token.text = copy_text2(length, parser->tempbuf);
+			u32 length = lex_identifier(parser, buffer, sizeof(buffer) - 1);
+
+			token.type = check_keyword(buffer);
+
+			// Todo, proper allocator ...
+			if (token.type == TOK_IDENTIFIER)
+			{
+				token.text = copy_text2(length, buffer);
 			}
 
-		} break;
-
+		}
+		break;
 		// Todo, handle exponent notation!
-		case '0'...'9':
+		case '0':case '1':case '2':case '3':case '4':
+		case '5':case '6':case '7':case '8':case '9':
 		{
 			i64 x = lex_integer(parser);
 
@@ -345,26 +336,16 @@ static Token lex_token(Parser *parser) {
 			token.text = copy_text2(length,buffer);
 			free_heap_array(buffer);
 		} break;
-		case '.': {
 
-			MOVE();
-			token.type = TOK_DOT;
+		case '#':
+		{
+			char buffer[128];
 
-			// todo: so there's no difference between "..." and ".."
-			if (PICK('.')) {
-				token.type = TOK_ELLIPSIS;
-				if (PICK('.')) {
-					token.type = TOK_ELLIPSIS;
-				}
-			} else if (is_digit_chr(POS0())) {
-				token.type = TOK_NUMBER;
-				token.number = lex_fractional(parser);
-			}
-		} break;
-		case '#': {
-			MOVE();
-			lex_identifier(parser, parser->tempbuf, sizeof(parser->tempbuf) - 1);
-			token.type = text_is_word_or_macro(parser->tempbuf);
+			++ parser->cursor;
+
+			lex_identifier(parser, buffer, sizeof(buffer) - 1);
+
+			token.type = text_is_word_or_macro(buffer);
 			if (token.type == TOK_M_ENDOFFILE) {
 				token.type = TOK_NONE;
 			} else if (token.type==TOK_M_FILE_NAME) {
@@ -381,33 +362,30 @@ static Token lex_token(Parser *parser) {
 			} else {
 				/* let parser handle this */
 			}
-		} break;
+		}
+		break;
+
+
 		case '\0': {
 			token.type = TOK_NONE;
 		} break;
+
 		case ' ': case '\t': {
 			MOVE();
 		} goto retry;
+
 		case '\n': {
 			MOVE();
 			//	parser->line_pos = parser->cursor;
 			//	parser->line_num += 1;
 		} goto retry;
+
 		case '\r': {
 			MOVE();
 			PICK('\n');
 			//	parser->line_pos = parser->cursor;
 			//	parser->line_num += 1;
 		} goto retry;
-		//	case ';': {
-		//		MOVE();
-		//		while (POS0() != 0 && !is_eol_chr(POS0())) {
-		//			MOVE();
-		//		}
-		//		goto retry;
-		//	} break;
-
-
 
 		case '/': {
 			MOVE();
@@ -444,57 +422,193 @@ static Token lex_token(Parser *parser) {
 			}
 		} break;
 
+		case '.':
+		{
+			++ parser->cursor;
+			token.type = TOK_DOT;
 
-		#define ROW(A, X, B, Y) if (A) { token.type = X; if (B) { token.type = Y; } }
+			// Todo, settle on either ... or ..
+			if (* parser->cursor == '.') {
+				++ parser->cursor;
+				token.type = TOK_ELLIPSIS;
+				if (* parser->cursor == '.') {
+					++ parser->cursor;
+					token.type = TOK_ELLIPSIS;
+				}
+			}
+			// Todo, could this just be done in the parser or no?
+			else if (is_digit_chr(POS0())) {
+				token.type = TOK_NUMBER;
+				token.number = lex_fractional(parser);
+			}
+		}
+		break;
+		case '[': {
+			token.type = TOK_SQUARE_LEFT;
+			++ parser->cursor;
+		} break;
+		case ']': {
+			token.type = TOK_SQUARE_RIGHT;
+			++ parser->cursor;
+		} break;
+		case '<': {
+			token.type = TOK_LT;
+			++ parser->cursor;
+			if (* parser->cursor == '=') {
+				token.type = TOK_LTEQ;
+				++ parser->cursor;
+			}
+			else if (* parser->cursor == '<') {
+				token.type = TOK_SHL;
+				++ parser->cursor;
+			}
+		} break;
+		case ':': {
+			token.type = TOK_COLON;
+			++ parser->cursor;
+			if (* parser->cursor == ':') {
+				token.type = TOK_STATIC_BIND;
+				++ parser->cursor;
+				if (* parser->cursor == '=') {
+					token.type = TOK_HARD_BIND;
+					++ parser->cursor;
+				}
+			}
+			else if (* parser->cursor == '=') {
+				token.type = TOK_BIND;
+				++ parser->cursor;
+			}
+		} break;
 
-		#define COL(A, X, B, Y, C, Z, D, W) ROW(A, X, B, Y) else ROW(C, Z, D, W)
+		case '-': {
+			token.type = TOK_SUB;
+			++ parser->cursor;
+			if (* parser->cursor == '-') {
+				token.type = TOK_MINUS_MINUS;
+				++ parser->cursor;
+				if (* parser->cursor == '>') {
+					token.type = TOK_LONG_ARROW;
+					++ parser->cursor;
+				}
+			}
+			else if (* parser->cursor == '>') {
+				token.type = TOK_ARROW;
+				++ parser->cursor;
+			}
+		} break;
 
-		#define CASE(A, TA, B, TB, BB, TBB, C, TC, CC, TCC) case (A): { MOVE(); token.type = TA; COL(B, TB, BB, TBB, C, TC, CC, TCC) } break;
-
-#define LEX1(A,X)         CASE(A, X,       0, 0, 0, 0,       0, 0, 0, 0)
-#define LEX2(A,X,B,Y)     CASE(A, X, PICK(B), Y, 0, 0,       0, 0, 0, 0)
-#define LEX3(A,X,B,Y,C,Z) CASE(A, X, PICK(B), Y, 0, 0, PICK(C), Z, 0, 0)
-
-		CASE('[', TOK_SQUARE_LEFT
-		, 		PICK('['), TOK_SQUARE_SQUARE_LEFT, 0, 0
-		, 		0,                             0, 0, 0);
-		CASE(']', TOK_SQUARE_RIGHT
-		, 		PICK(']'), TOK_SQUARE_SQUARE_RIGHT, 0, 0
-		, 		0,                              0, 0, 0);
-
-
-		CASE('<', TOK_LT
-		, 	 PICK('='), TOK_LTEQ, 0, 0
-		,   PICK('<'), TOK_SHL,  0, 0)
-
-		CASE(':', TOK_COLON
-		, 	 PICK(':'), TOK_STATIC_BIND, PICK('='), TOK_HARD_BIND
-		,   PICK('='),       TOK_BIND ,         0,            0)
-
-		CASE('-', TOK_SUB
-		, 	 PICK('-'), TOK_MINUS_MINUS, PICK('>'), TOK_HARD_ARROW
-		,   PICK('>'),       TOK_ARROW,         0,             0)
-
-
-		LEX3('>',TOK_GT                , '=', TOK_GTEQ    , '>', TOK_SHR);
-		LEX3('?',TOK_QMARK             , '?', TOK_NIL_OR  , '=', TOK_NIL_ASSIGN);
-		LEX3('!',TOK_EXCLAMATION_MARK  , '!', TOK_NIL_AND , '=', TOK_NEQ);
-
-		LEX2('|', TOK_BIT_OR  , '|', TOK_LOG_OR);
-		LEX2('&', TOK_BIT_AND , '&', TOK_LOG_AND);
-		LEX2('=', TOK_ASSIGN  , '=', TOK_EQ);
-		LEX2('*', TOK_MUL     , '*', TOK_POW);
-
-		LEX1('(', TOK_PAREN_LEFT);
-		LEX1(')', TOK_PAREN_RIGHT);
-		LEX1('{', TOK_CURLY_LEFT);
-		LEX1('}', TOK_CURLY_RIGHT);
-		LEX1(',', TOK_COMMA);
-		LEX1('%', TOK_MOD);
-		LEX1('^', TOK_BIT_XOR);
-		LEX1('+', TOK_ADD);
-		LEX1('~', TOK_TILDE);
-		LEX1(';', TOK_SEMI_COLON);
+		case '>': {
+			token.type = TOK_GT;
+			++ parser->cursor;
+			if (* parser->cursor == '=') {
+				token.type = TOK_GTEQ;
+				++ parser->cursor;
+			}
+			else if (* parser->cursor == '>') {
+				token.type = TOK_SHR;
+				++ parser->cursor;
+			}
+		} break;
+		case '?': {
+			token.type = TOK_QMARK;
+			++ parser->cursor;
+			if (* parser->cursor == '?') {
+				token.type = TOK_NIL_OR;
+				++ parser->cursor;
+			}
+			else if (* parser->cursor == '=') {
+				token.type = TOK_NIL_ASSIGN;
+				++ parser->cursor;
+			}
+		} break;
+		case '!': {
+			token.type = TOK_EXCLAMATION_MARK;
+			++ parser->cursor;
+			if (* parser->cursor == '!') {
+				token.type = TOK_NIL_AND;
+				++ parser->cursor;
+			}
+			else if (* parser->cursor == '=') {
+				token.type = TOK_NEQ;
+				++ parser->cursor;
+			}
+		} break;
+		case '|': {
+			token.type = TOK_BIT_OR;
+			++ parser->cursor;
+			if (* parser->cursor == '|') {
+				token.type = TOK_LOG_OR;
+				++ parser->cursor;
+			}
+		} break;
+		case '&': {
+			token.type = TOK_BIT_AND;
+			++ parser->cursor;
+			if (* parser->cursor == '&') {
+				token.type = TOK_LOG_AND;
+				++ parser->cursor;
+			}
+		} break;
+		case '=': {
+			token.type = TOK_ASSIGN;
+			++ parser->cursor;
+			if (* parser->cursor == '=') {
+				token.type = TOK_EQ;
+				++ parser->cursor;
+			}
+		} break;
+		case '*': {
+			token.type = TOK_MUL;
+			++ parser->cursor;
+			if (* parser->cursor == '*') {
+				token.type = TOK_POW;
+				++ parser->cursor;
+			}
+		} break;
+		case '(': {
+			token.type = TOK_LEFT_PAREN;
+			++ parser->cursor;
+		} break;
+		case ')': {
+			token.type = TOK_PAREN_RIGHT;
+			++ parser->cursor;
+		} break;
+		case '{': {
+			token.type = TOK_LEFT_BRACE;
+			++ parser->cursor;
+		} break;
+		case '}': {
+			token.type = TOK_RIGHT_BRACE;
+			++ parser->cursor;
+		} break;
+		case ',': {
+			token.type = TOK_COMMA;
+			++ parser->cursor;
+		} break;
+		case '%': {
+			token.type = TOK_MOD;
+			++ parser->cursor;
+		} break;
+		case '^': {
+			token.type = TOK_BIT_XOR;
+			++ parser->cursor;
+		} break;
+		case '+': {
+			token.type = TOK_ADD;
+			++ parser->cursor;
+			if (* parser->cursor == '=') {
+				token.type = TOK_ADD_ASSIGN;
+				++ parser->cursor;
+			}
+		} break;
+		case '~': {
+			token.type = TOK_TILDE;
+			++ parser->cursor;
+		} break;
+		case ';': {
+			token.type = TOK_SEMICOLON;
+			++ parser->cursor;
+		} break;
 	}
 
 	esc: ;

@@ -4,6 +4,8 @@
 
 
 
+#define Static_Data static
+
 // common macro definitions
 #if defined(__EMSCRIPTEN__)
    #define THREAD static
@@ -82,6 +84,6 @@ static bool text_eq(char const *x, char const *y);
 static char *copy_text2(int length, char const *string);
 static char *thread_format_v(char const *format, va_list v);
 
-static char *tempvpf(char const *format, va_list vargs);
-static char *temppf(char const *format, ...);
-#define tpf temppf
+static char *temporary_format_v(char const *format, va_list vargs);
+static char *temporay_format(char const *format, ...);
+#define tpf temporay_format

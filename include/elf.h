@@ -50,33 +50,38 @@ typedef struct {
    elf_Function  function;
 } elf_Binding;
 
-
-
-
-
-typedef enum {
-   // the value is nil
-   ELF_TNIL = 0,
-   // the value is a tombstone, should not be seen outside
-   // of table code
-   ELF_TTOMB,
-   // the value is a 64 - bit floating point number
-   ELF_TNUMBER,
-   // the value is a 64 - bit integer
-   ELF_TINTEGER,
-   // the value is a non-arithmetic 64 - bit integer
-   ELF_THANDLE,
-   // the value is a 4 component 32 - bit vector
-   ELF_TVEC4,
-
-   ELF_TFUNCTION,
-   ELF_TUSER,
-   ELF_TCLOSURE,
-   ELF_TTABLE,
-   ELF_TSTRING,
-   ELF_TBUFFER,
-   ELF_TCOUNT_,
-} elf_Tag;
+//
+//	ELF_VALUE_TYPE_NIL:
+// the value is nil
+//	ELF_VALUE_TYPE_TOMB:
+// the value is a tombstone, should not be seen outside
+// of table code
+//	ELF_VALUE_TYPE_NUMBER:
+// the value is a 64 - bit floating point number
+//	ELF_VALUE_TYPE_INTEGER:
+// the value is a 64 - bit integer
+//	ELF_VALUE_TYPE_HANDLE:
+// the value is a non-arithmetic 64 - bit integer
+//	ELF_VALUE_TYPE_VECTOR:
+// the value is a 4 component 32 - bit vector
+//
+typedef enum
+{
+   ELF_VALUE_TYPE_NIL = 0,
+   ELF_VALUE_TYPE_TOMB,
+   ELF_VALUE_TYPE_NUMBER,
+   ELF_VALUE_TYPE_INTEGER,
+   ELF_VALUE_TYPE_HANDLE,
+   ELF_VALUE_TYPE_VECTOR,
+   ELF_VALUE_TYPE_CFUNCTION,
+   ELF_VALUE_TYPE_USER_OBJECT,
+   ELF_VALUE_TYPE_CLOSURE,
+   ELF_VALUE_TYPE_TABLE,
+   ELF_VALUE_TYPE_STRING,
+   ELF_VALUE_TYPE_BUFFER,
+   ELF_VALUE_TYPE_COUNT_,
+}
+ELF_ValueType;
 
 
 
@@ -121,8 +126,8 @@ void elf_end(elf_State *);
 //
 //
 //
-int elf_call(elf_State *, int nargs, int nrets);
-int elf_tailcall(elf_State *, int nargs, int nrets);
+elf_u32 elf_call(elf_State *, elf_u32 nargs, elf_u32 nrets);
+elf_u32 elf_do_tail_call(elf_State *, elf_u32 nargs, elf_u32 nrets);
 
 void elf_setfield(elf_State *);
 void elf_arrayadd(elf_State *);
@@ -191,8 +196,8 @@ int elf_pushcodefile(elf_State *S, const char *name, const char *text);
 
 
 
-elf_Tag elf_loadtype(elf_State *, int x);
-elf_Tag elf_loadpush(elf_State *, int x);
+ELF_ValueType elf_loadtype(elf_State *, int x);
+ELF_ValueType elf_loadpush(elf_State *, int x);
 const char *elf_loadtext(elf_State *, int x);
 const char *elf_loadtextl(elf_State *, int x, int *l);
 elf_Number elf_load_num(elf_State *, int x);

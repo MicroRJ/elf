@@ -1,11 +1,192 @@
 
+
+
+#if 0
+		case TOK_M_INDEX:
+		{
+			consume_token(parser);
+
+			// todo: handle operand '#index(<loop-name>)'
+			Loop *loop = checkloop(parser, tok.site, Y_NULL);
+
+			v = loop->index;
+			ASSERT(v != Y_NULL);
+		}
+		break;
+
+		case TOK_M_VALUE:
+		{
+			consume_token(parser);
+
+			// todo: handle operand '#index(<loop-name>)'
+			Loop *loop = checkloop(parser, tok.site, Y_NULL);
+
+			int index = 0;
+
+			if (peek_tok(parser, TOK_SQUARE_LEFT)) {
+
+				Token index_token = take_token(parser, TOK_INTEGER);
+				index = index_token.integer;
+
+				take_token(parser, TOK_SQUARE_RIGHT);
+			}
+
+			if (index >= heap_array_length(loop->values)) {
+				reporterror(parser->R, -1, "invalid index");
+			}
+
+			v = loop->values[index];
+
+			ASSERT(v != Y_NULL);
+		}
+		break;
+
+		case TOK_M_GETMEM:
+		{
+			consume_token(parser);
+			v=parse_subexpr(parser,0,10000);
+			v=create_unary_expr_ast(parser, tok.site,TREE_DEBUG_GET_MEMORY,v);
+		}
+		break;
+
+		case TOK_M_GETEXPR:
+		{
+			consume_token(parser);
+			v=parse_subexpr(parser,0,10000);
+			v=create_unary_expr_ast(parser, tok.site,TREE_DEBUG_GET_EXPRESSION_NAME,v);
+		}
+		break;
+#endif
+#if 0
+		// the global keyword tells the parser that a name is a global
+		case TOK_GLOBAL: {
+			consume_token(parser);
+			if (pick_token(parser, TOK_LEFT_PAREN)){
+				Token name=take_token(parser, TOK_IDENTIFIER);
+				v=tree_global_symbol(parser, name.site, name.text);
+				take_token(parser, TOK_LEFT_PAREN);
+			} else {
+				Token name=take_token(parser, TOK_IDENTIFIER);
+				v=tree_global_symbol(parser, name.site, name.text);
+			}
+		} break;
+#endif
+#if 0
+		case TOK_JSON:
+		{
+			//
+			//	todo: we need some constant pool, for now we
+			// add to globals...
+			//
+
+			Token tok = take_token(parser,TOK_JSON);
+
+			int noerr = parse_json_object(parser);
+			if (noerr) {
+
+				// todo:
+				V json = popvalue(parser->inter);
+				int index = dynamic_array_allocate(parser->inter->globals->array, 1);
+				parser->inter->globals->array[index] = json;
+
+
+				v = tree_global(parser, tok.site, index);
+			}
+		}
+		break;
+#endif
+#if 0
+		case TOK_ELF:
+		{
+			char sym[256] = {};
+
+			// elf is a keyword!
+			consume_token(parser);
+
+			if (!peek_tok_inl(parser, TOK_DOT))
+			{
+				parser_dialog(parser, tok.site, "incomplete symbol, expected '.' on the same line as 'elf'. Did you mean to use 'elf'? This is a reserved keyword and it refers to the elf directory.");
+			}
+			strcat(sym,"elf");
+
+			take_token(parser, TOK_DOT);
+
+			do
+			{
+				get_token_inline(parser, TOK_IDENTIFIER);
+				strcat(sym,".");
+				strcat(sym,parser->tok_prev.text);
+			}
+			while(pick_tok_inl(parser,TOK_DOT));
+
+			v = tree_global_symbol(parser, tok.site,sym);
+		}
+		break;
+#endif
+#if 0
+		case TOK_FORMAT_STRING: {
+			consume_token(parser);
+
+			// todo: leak!
+			// the format string can only get shorter
+			char *heapbuf = malloc(strlen(tok.text) + 1);
+			char *write = heapbuf;
+
+			v = create_str_ast(parser, tok.site,heapbuf);
+
+			TreeChain args = {};
+			tree_chain_add(&args, v);
+
+			char *old_cursor;
+			Token old_tok,old_tok_prev,old_tok_prox;
+			// save lexing state
+			old_cursor = parser->cursor;
+			old_tok = parser->tok;
+			old_tok_prev = parser->tok_prev;
+			old_tok_prox = parser->tok_prox;
+
+			char *format = tok.text;
+			while (*format) {
+				while (*format && *format != FORMAT_CHAR) {
+					*write ++ = *format ++;
+				}
+				if (*format == FORMAT_CHAR) {
+					*write ++ = *format ++;
+					if (*format == '{') {
+						elf_reposition_parser(parser, format);
+						if (!pick_token(parser, TOK_LEFT_BRACE)) {
+							parser_dialog(parser, 0, "expected '{'");
+						}
+						v = parse_expr(parser, 0);
+						tree_chain_add(&args, v);
+						if (!pick_token(parser, TOK_RIGHT_BRACE)) {
+							parser_dialog(parser, 0, "expected '}'");
+						}
+						ASSERT(*parser->tok_prev.site == '}');
+						// use the previous token + 1 because the parser
+						// skips white space after each token
+						format = parser->tok_prev.site + 1;
+					}
+				}
+			}
+			*write ++ = '\0';
+
+			// restore lexing state
+			parser->cursor = old_cursor;
+			parser->tok = old_tok;
+			parser->tok_prev = old_tok_prev;
+			parser->tok_prox = old_tok_prox;
+
+			v = tree_callcoreapi(parser, tok.site, BUILTIN_FORMAT, args);
+		} break;
+#endif
 static u32 elf_parse_expr_list(Parser *par)
 {
 	u32 nargs = 0;
 	do
 	{
 		AstRef v = parse_expr(par, 0);
-		if (notree(v)) goto esc;
+		if (check_error_ast(v)) goto esc;
 		++ nargs;
 		push_ast(par, v);
 	}
@@ -209,7 +390,7 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 
 		rangelo = range->x, rangehi = range->y;
 
-		if (rangelo == Y_NULL) rangelo = tree_int(parser, range->site, 0);
+		if (rangelo == Y_NULL) rangelo = create_int_ast(parser, range->site, 0);
 		if (rangehi == Y_NULL) rangehi = tree_length(parser, range->site, array);
 	}
 	// RANGE
@@ -229,9 +410,9 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 
 		rangelo = expr->x, rangehi = expr->y;
 
-		if(rangelo == Y_NULL) rangelo = tree_int(parser,tok.line,0);
+		if(rangelo == Y_NULL) rangelo = create_int_ast(parser,tok.line,0);
 		// todo: if we don't have an upper bound replace condition entirely
-		if(rangehi == Y_NULL) rangehi = tree_int(parser,tok.line,UINT_MAX);
+		if(rangehi == Y_NULL) rangehi = create_int_ast(parser,tok.line,UINT_MAX);
 	}
 
 
@@ -273,7 +454,7 @@ static AstRef *parse_for_steps(Parser *par, int elem)
 		Token tok = par->tok;
 
 		AstRef v;
-		if (pick_token(par, TOK_PAREN_LEFT))
+		if (pick_token(par, TOK_LEFT_PAREN))
 		{
 			v = elf_parse_tuple_expr(par);
 			take_tok_pair(par, TOK_PAREN_RIGHT, tok);
@@ -282,11 +463,11 @@ static AstRef *parse_for_steps(Parser *par, int elem)
 		{
 			v = elf_parse_tuple_expr(par);
 		}
-		if (notree(v)) goto esc;
+		if (check_error_ast(v)) goto esc;
 
 		heap_array_add(s, v);
 
-	} while (pick_token(par, TOK_SEMI_COLON));
+	} while (pick_token(par, TOK_SEMICOLON));
 
 	esc:
 	return s;
@@ -379,7 +560,7 @@ static int parse_for(Parser *parser) {
 			AstRef index = index_;
 
 			// todo: we shouldn't even have to do this!
-			v = tree_store(parser, tok.line, index, tree_int(parser, tok.line, 0));
+			v = tree_store(parser, tok.line, index, create_int_ast(parser, tok.line, 0));
 			PushBlockStat(parser, v);
 
 			ASSERT(v->n >= 2);
@@ -394,7 +575,7 @@ static int parse_for(Parser *parser) {
 				}
 				else
 				{
-					v = tree_nil(parser, tok.line);
+					v = create_nil_ast(parser, tok.line);
 					warning_excess_rvalue(parser, values[i]);
 				}
 
@@ -411,7 +592,7 @@ static int parse_for(Parser *parser) {
 			AstRef value = values[0];
 
 			// todo: we shouldn't even have to do this!
-			v = tree_store(parser, tok.line, index, tree_int(parser, tok.line, 0));
+			v = tree_store(parser, tok.line, index, create_int_ast(parser, tok.line, 0));
 			PushBlockStat(parser, v);
 
 			v = tree_store(parser, tok.line, value, step);
@@ -576,7 +757,7 @@ static TreeChain parse_rhs(Parser *parser, u32 num_lhs, AstType empty)
 		}
 
 		AstRef v = parse_expr(parser, 0);
-		if (notree(v)) break;
+		if (check_error_ast(v)) break;
 
 		tree_chain_add(&rhs, v);
 
@@ -610,7 +791,7 @@ static AstRef *complete_lhs(Parser *parser, Token *names) {
 	// parse additional expressions
 	do {
 		AstRef v = parse_expr(parser, 0);
-		if (notree(v)) goto _err;
+		if (check_error_ast(v)) goto _err;
 
 		heap_array_add(l, v);
 	} while (pick_token(parser, TOK_COMMA));
@@ -744,7 +925,7 @@ static int parse_expr_stat(Parser *parser) {
 				{
 					rewrite_lhs(parser, lhs[i]);
 
-					AstRef c = create_binary_expr_ast(parser, tok.line, AST_EQ, lhs[i], tree_nil(parser, tok.line));
+					AstRef c = create_binary_expr_ast(parser, tok.line, AST_EQ, lhs[i], create_nil_ast(parser, tok.line));
 					AstRef s = tree_store(parser, tok.line, lhs[i], next_rhs);
 					AstRef v = elf_new_if_stat_tree(parser, tok.line, c, s, 0);
 					PushBlockStat(parser, v);
@@ -768,7 +949,7 @@ static int parse_expr_stat(Parser *parser) {
 				{
 					rewrite_lhs(parser, lhs[i]);
 
-					AstRef o = create_binary_expr_ast(parser, tok.line, tree_kind_from_token_type(tok.type), lhs[i], next_rhs);
+					AstRef o = create_binary_expr_ast(parser, tok.line, ast_type_from_token_type(tok.type), lhs[i], next_rhs);
 					AstRef v = tree_store(parser, tok.line, lhs[i], o);
 					PushBlockStat(parser, v);
 				}
@@ -815,7 +996,7 @@ static int parse_expr_stat(Parser *parser) {
 	// todo: remove! or optional?
 	pick_token(parser,TOK_QMARK);
 
-	if (peek_tok(parser,TOK_CURLY_LEFT))
+	if (peek_tok(parser,TOK_LEFT_BRACE))
 	{
 		parse_stat(parser);
 
@@ -831,7 +1012,7 @@ static int parse_expr_stat(Parser *parser) {
 		PushBlockStat(parser, v);
 	}
 	// direct return
-	else if (pick_token(parser, TOK_HARD_ARROW))
+	else if (pick_token(parser, TOK_LONG_ARROW))
 	{
 		u32 nargs = elf_parse_expr_list(parser);
 		AstRef *args = pop_ast_array(parser, nargs);
@@ -863,7 +1044,7 @@ static FuncParams parse_function_params(Parser *par)
 	u32 arity = 1;
 	b32 variadic = false;
 
-	Token tok = take_token(par, TOK_PAREN_LEFT);
+	Token tok = take_token(par, TOK_LEFT_PAREN);
 
 	Param *params = 0;
 
@@ -1300,7 +1481,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		do
 		{
 			AstRef expr = parse_expr(parser, 0);
-			if (notree(expr)) break;
+			if (check_error_ast(expr)) break;
 			push_ast(parser, expr);
 			++ ntargs;
 		}

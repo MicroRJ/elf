@@ -172,26 +172,26 @@ static int unparse(elf_State *S, Stringer *sb, V v, int level) {
 
 	switch (v.tag)
 	{
-		case ELF_TNIL: {
+		case ELF_VALUE_TYPE_NIL: {
 			sb_writetextf(sb, "nil");
 		} break;
 
-		case ELF_TINTEGER:  {
+		case ELF_VALUE_TYPE_INTEGER:  {
 			sb_writetextf(sb, "%lli", v.x_int);
 		} break;
 
-		case ELF_TNUMBER: {
+		case ELF_VALUE_TYPE_NUMBER: {
 			sb_writetextf(sb, "%f", v.x_num);
 		} break;
 
-		case ELF_TSTRING: {
+		case ELF_VALUE_TYPE_STRING: {
 			sb_writechar(sb, '"');
 			sb_writetextesc(sb, strt(as_string(v)));
 			sb_writechar(sb, '"');
 		} break;
 
-		case ELF_TTABLE: {
-			tableunparse(S, sb, as_table(v), level);
+		case ELF_VALUE_TYPE_TABLE: {
+			tableunparse(S, sb, table_from_value(v), level);
 		} break;
 
 		default: noerror = false;

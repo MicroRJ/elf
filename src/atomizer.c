@@ -15,12 +15,12 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 		elf_Integer slot = elf_table_try_text(registry,text,length,hash);
 		ASSERT(slot != -1);
 		IndexValue entry = registry->slots[slot];
-		if (entry.key.tag != ELF_TNIL) {
+		if (entry.key.tag != ELF_VALUE_TYPE_NIL) {
 			elf_Value target = registry->array[registry->slots[slot].idx];
 			string = target.x_str;
 		} else {
 			string = new_empty_string(R,length);
-			elf_copy_memory(string->text,text,length);
+			copy_memory(string->text,text,length);
 			string->hash = hash;
 
 			elf_Integer i = dynamic_array_allocate(registry->array,1);
@@ -31,7 +31,7 @@ static elf_String *elf_atomize(elf_State *inter, char *text, int length) {
 		}
 	} else {
 		string = new_empty_string(R,length);
-		elf_copy_memory(string->text,text,length);
+		copy_memory(string->text,text,length);
 		string->hash = hash;
 	}
 }

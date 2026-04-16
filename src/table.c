@@ -94,7 +94,7 @@ Tab new_table(elf_State *R) {
 //
 
 static inline Hash _table_hashvalue(V *v) {
-	if (v->tag == ELF_TSTRING) {
+	if (v->tag == ELF_VALUE_TYPE_STRING) {
 		return strh(v->x_str);
 	}
 	return hash64(v->x_i64);
@@ -116,7 +116,7 @@ static inline bool _table_veq(V x, V y) {
 	}
 
 	if (x.tag == y.tag) {
-		if(x.tag == ELF_TSTRING) {
+		if(x.tag == ELF_VALUE_TYPE_STRING) {
 			return streq(as_string(x), as_string(y));
 		}
 	}
@@ -170,10 +170,10 @@ static inline Index _table_findentry_internal(Entry *entries, Index nentries, Va
 
 		Value tabkey = entries[tail].key;
 
-		if (tabkey.tag == ELF_TNIL) {
+		if (tabkey.tag == ELF_VALUE_TYPE_NIL) {
 			return tail;
 		}
-		else if (tabkey.tag != ELF_TTOMB) {
+		else if (tabkey.tag != ELF_VALUE_TYPE_TOMB) {
 			if (_table_veq(tabkey, key)) {
 				return tail;
 			}

@@ -190,7 +190,7 @@ ELF_FUNCTION(l_table_delete) {
 
 	Index slot = _table_findentry_internal(tab->entries, tab->nentries, key);
 
-	if ((slot >= 0) && (entries[slot].key.tag != ELF_TNIL) && (entries[slot].key.tag != ELF_TTOMB)) {
+	if ((slot >= 0) && (entries[slot].key.tag != ELF_VALUE_TYPE_NIL) && (entries[slot].key.tag != ELF_VALUE_TYPE_TOMB)) {
 
 		Index index = entries[slot].index;
 
@@ -199,8 +199,8 @@ ELF_FUNCTION(l_table_delete) {
 
 			// disable
 			if (en->index == index) {
-				if (en->key.tag != ELF_TNIL) {
-					en->key.tag = ELF_TTOMB;
+				if (en->key.tag != ELF_VALUE_TYPE_NIL) {
+					en->key.tag = ELF_VALUE_TYPE_TOMB;
 				}
 			}
 			else {
@@ -823,9 +823,9 @@ ELF_FUNCTION(l_array_rank)
 		}
 		else {
 			V v = _table_arrayget(S, tab, i);
-			typecheck(S, v, ELF_TTABLE);
-			Value r = _table_getornil(S, as_table(v), __rank);
-			typecheck(S, r, ELF_TINTEGER);
+			typecheck(S, v, ELF_VALUE_TYPE_TABLE);
+			Value r = _table_getornil(S, table_from_value(v), __rank);
+			typecheck(S, r, ELF_VALUE_TYPE_INTEGER);
 			rank = as_int(r);
 		}
 

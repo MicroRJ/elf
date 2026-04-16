@@ -18,7 +18,7 @@
 void elf_error(elf_State *S, int error, const char *format, ...) {
 	va_list vargs;
 	va_start(vargs, format);
-	char *message = tempvpf(format, vargs);
+	char *message = temporary_format_v(format, vargs);
 	va_end(vargs);
 	reporterror(S, -1, message);
 }
@@ -95,9 +95,9 @@ void elf_setfield(elf_State *S) {
 	V tab = S->stack_ptr[-3];
 	V key = S->stack_ptr[-2];
 	V val = S->stack_ptr[-1];
-	typecheck(S, tab, ELF_TTABLE);
+	typecheck(S, tab, ELF_VALUE_TYPE_TABLE);
 
-	tableset(S, as_table(tab), key, val);
+	tableset(S, table_from_value(tab), key, val);
 	S->stack_ptr -= 2;
 }
 
@@ -105,9 +105,9 @@ void elf_setfield(elf_State *S) {
 void elf_arrayadd(elf_State *S) {
 	V tab = S->stack_ptr[-2];
 	V val = S->stack_ptr[-1];
-	typecheck(S, tab, ELF_TTABLE);
+	typecheck(S, tab, ELF_VALUE_TYPE_TABLE);
 
-	_table_arrayadd(S, as_table(tab), val);
+	_table_arrayadd(S, table_from_value(tab), val);
 	S->stack_ptr -= 1;
 }
 
@@ -115,10 +115,10 @@ void elf_arrayadd(elf_State *S) {
 void elf_arrayget(elf_State *S) {
 	V tab = S->stack_ptr[-2];
 	V idx = S->stack_ptr[-1];
-	typecheck(S, tab, ELF_TTABLE);
-	typecheck(S, idx, ELF_TINTEGER);
+	typecheck(S, tab, ELF_VALUE_TYPE_TABLE);
+	typecheck(S, idx, ELF_VALUE_TYPE_INTEGER);
 
-	V v = as_table(tab)->array[as_int(idx)];
+	V v = table_from_value(tab)->array[as_int(idx)];
 	S->stack_ptr[-1] = v;
 }
 

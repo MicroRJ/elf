@@ -13,7 +13,7 @@ static inline void *zero_memory(void *mem, int len) {
 }
 
 
-static inline void *elf_copy_memory(void *dst, void const *src, int len) {
+static inline void *copy_memory(void *dst, void const *src, int len) {
 	memcpy(dst, src, len);
 	return dst;
 }
@@ -175,6 +175,7 @@ bool elf_cstrhasprefix(char *str, char *prefix) {
 }
 #endif
 
+// Todo, remove
 bool text_eql(char const *x, char const *y, int n) {
 	for (int i = 0; i < n; i += 1) {
 		if (x[i] != y[i]) {
@@ -184,8 +185,7 @@ bool text_eql(char const *x, char const *y, int n) {
 	return 1;
 }
 
-
-
+// Todo, remove
 static bool text_eq(char const *x, char const *y) {
 	if (x == y) {
 		return 1;
@@ -197,20 +197,16 @@ static bool text_eq(char const *x, char const *y) {
 	return (lx == ly) && text_eql(x,y,lx);
 }
 
-
-
-// todo: deprecated!
+// Todo, remove
 char *copy_text2(int length, char const *text) {
 	if (length <= 0) {
 		length = text_l(text);
 	}
 	char *result = malloc(length+1);
-	elf_copy_memory(result,text,length);
+	copy_memory(result,text,length);
 	result[length]=0;
 	return result;
 }
-
-
 
 static char *thread_format_v(char const *format, va_list v) {
 	int length = stbsp_vsnprintf(NULL, 0, format, v);
@@ -219,20 +215,16 @@ static char *thread_format_v(char const *format, va_list v) {
 	return text;
 }
 
-
-
-static char *tempvpf(char const *format, va_list vargs) {
-	char *text = thread_format_v(format,vargs);
+static char *temporary_format_v(char const *format, va_list vargs) {
+	char *text = thread_format_v(format, vargs);
 	return text;
 }
 
-
-
-static char *temppf(char const *format, ...) {
+static char *temporay_format(char const *format, ...) {
 	va_list vargs;
 	va_start(vargs, format);
 
-	char *text = tempvpf(format, vargs);
+	char *text = temporary_format_v(format, vargs);
 
 	va_end(vargs);
 	return text;

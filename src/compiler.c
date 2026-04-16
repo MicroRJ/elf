@@ -20,7 +20,7 @@
 
 
 #include "logging.c"
-#include "c_lexer.c"
+#include "lexer.c"
 #include "arena.c"
 #include "ast.c"
 #include "parse.c"

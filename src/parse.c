@@ -5,45 +5,33 @@
 // Todo, remove dynamic array usage!
 //
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#define tok2s(type) (static__str_from_token_type[type])
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static AstRef elf_parse_unary_expr(Parser *parser);
+static AstRef parse_unary_expr(Parser *parser);
 static AstRef parse_expr(Parser *parser, int flags);
 static AstRef parse_subexpr(Parser *parser, int flags, int rank);
-static AstRef ELF_ParsePostfixExpr(Parser *parser, int flags);
-static AstRef elf_parse_table_expr(Parser *parser);
+static AstRef parse_postfix_expr(Parser *parser, int flags);
+static AstRef parse_table_expr(Parser *parser);
 static AstRef parse_ident_expr(Parser *par);
 static AstRef parse_stat(Parser *parser);
-// the result is pushed onto the stack
-// static int parse_json_object(Parser *parser);
-// static int parse_json_value(Parser *parser);
-// static int parse_constexpr(Parser *parser);
 static u32 elf_parse_expr_list(Parser *parser);
 static AstRef elf_parse_if_stat(Parser *parser);
 static bool parse_for(Parser *parser);
 static u32 elf_parse_call_args(Parser *par);
-// static void PushBlockStat(Parser *parser, AstRef id);
-// static void add_this_param(Parser *parser, Source line);
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define tok2s(type) (g_token_metadata_table[type].name)
-
-static int token_rank_from_type(int type)
-{
-	return g_token_metadata_table[type].rank;
-}
-
-static int tree_kind_from_token_type(int tok)
+static AstType binary_ast_expr_type_from_token_type(TokenType tok)
 {
 	switch (tok)
 	{
-		case TOK_ELLIPSIS:   return AST_RANGE;
+		case TOK_ELLIPSIS:  return AST_RANGE;
 		case TOK_LOG_AND:   return AST_AND;
 		case TOK_LOG_OR:    return AST_OR;
 		case TOK_NIL_OR:    return AST_NIL_OR;
@@ -56,7 +44,7 @@ static int tree_kind_from_token_type(int tok)
 		case TOK_MOD:       return AST_MOD;
 		case TOK_NEQ:       return AST_NOT_EQ;
 		case TOK_EQ:        return AST_EQ;
-		case TOK_GT:        return AST_GREATER_THAN_EQ;
+		case TOK_GT:        return AST_GREATER_THAN;
 		case TOK_GTEQ:      return AST_GREATER_THAN_EQ;
 		case TOK_LT:        return AST_LESS_THAN;
 		case TOK_LTEQ:      return AST_LESS_THAN_EQ;
@@ -65,11 +53,55 @@ static int tree_kind_from_token_type(int tok)
 		case TOK_BIT_XOR:   return AST_BITWISE_XOR;
 		case TOK_BIT_OR:    return AST_BITWISE_OR;
 		case TOK_BIT_AND:   return AST_BITWISE_AND;
-		default:           return AST_NONE;
+		case TOK_COMMA:     return AST_COMMA_EXPR;
+		default:            return AST_NONE;
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static AstType precedence_from_binary_ast_expr_type(AstType type)
+{
+	switch (type)
+	{
+		case AST_POW:             return 13 + 1;
+		case AST_MUL:
+		case AST_DIV:
+		case AST_MOD:             return 12 + 1;
+		case AST_ADD:
+		case AST_SUB:             return 11 + 1;
+		case AST_SHIFT_LEFT:
+		case AST_SHIFT_RIGHT:     return 10 + 1;
+		case AST_LESS_THAN:
+		case AST_LESS_THAN_EQ:
+		case AST_GREATER_THAN:
+		case AST_GREATER_THAN_EQ: return  9 + 1;
+		case AST_EQ:
+		case AST_NOT_EQ:          return  8 + 1;
+		case AST_BITWISE_AND:     return  7 + 1;
+		case AST_BITWISE_XOR:     return  6 + 1;
+		case AST_BITWISE_OR:      return  5 + 1;
+		case AST_AND:
+		case AST_NIL_AND:         return  4 + 1;
+		case AST_OR:
+		case AST_NIL_OR:          return  3 + 1;
+		case AST_RANGE:           return  2 + 1;
+
+		case AST_COMMA_EXPR:      return  1 + 1;
+
+		case AST_ADD_ASSIGN:      return  1;
+		case AST_SUB_ASSIGN:      return  1;
+		case AST_MUL_ASSIGN:      return  1;
+		case AST_DIV_ASSIGN:      return  1;
+		case AST_MOD_ASSIGN:      return  1;
+		case AST_XOR_ASSIGN:      return  1;
+		case AST_SHL_ASSIGN:      return  1;
+		case AST_SHR_ASSIGN:      return  1;
+		case AST_NIL_ASSIGN:      return  1;
+		case AST_ASSIGN:          return  1;
+
+		default:                  return  0;
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -111,22 +143,22 @@ typedef enum
 }
 Error;
 
-#define push_error(par, err, line, fmt, ...) push_error_(par, SEVERITY_FATAL, err, line, fmt, __VA_ARGS__)
-#define push_warning(par, err, line, fmt, ...) push_error_(par, SEVERITY_WARNING, err, line, fmt, __VA_ARGS__)
-#define push_note(par, err, line, fmt, ...) push_error_(par, SEVERITY_NOTE, err, line, fmt, __VA_ARGS__)
+#define push_error(par, err, line, fmt, ...) push_parse_error_(par, SEVERITY_FATAL, err, line, fmt, __VA_ARGS__)
+#define push_warning(par, err, line, fmt, ...) push_parse_error_(par, SEVERITY_WARNING, err, line, fmt, __VA_ARGS__)
+#define push_note(par, err, line, fmt, ...) push_parse_error_(par, SEVERITY_NOTE, err, line, fmt, __VA_ARGS__)
 
-static void push_error_(Parser *par, Severity severity, Error error, Source line, const char *format, ...)
+static void push_parse_error_(Parser *par, Severity severity, Error error, Source line, const char *format, ...)
 {
-	if (!line) line = par->tok.line;
+	if (!line) line = par->tok.site;
 
 	va_list vargs;
 	va_start(vargs, format);
-	char *message = tempvpf(format, vargs);
+	char *message = temporary_format_v(format, vargs);
 	va_end(vargs);
 
 	parser_dialog(par, line, message);
 	if (severity >= SEVERITY_FATAL) {
-		reporterror(par->S, -1, message);
+		reporterror(par->state, -1, message);
 	}
 }
 
@@ -137,14 +169,14 @@ static void warning_excess_rvalue(Parser *parser, AstRef v)
 
 static void push_error_unexpected_token(Parser *parser, Token tok)
 {
-	push_error(parser, ERROR_UNEXPECTED_TOKEN, tok.line, "unexpected token");
+	push_error(parser, ERROR_UNEXPECTED_TOKEN, tok.site, "unexpected token");
 }
 
 static void push_error_expected_token(Parser *parser, Token tok, int expected)
 {
 	const char *message = tpf("got token: '%s', expected: '%s'", tok2s(tok.type), tok2s(expected));
 
-	push_error(parser, ERROR_EXPECTED_TOKEN, tok.line, message);
+	push_error(parser, ERROR_EXPECTED_TOKEN, tok.site, message);
 }
 
 static void push_error_expected_token_pair(Parser *parser, Token tok, int expected, Token pair)
@@ -152,9 +184,9 @@ static void push_error_expected_token_pair(Parser *parser, Token tok, int expect
 	const char *message = tpf("got token: '%s', expected: '%s'", tok2s(tok.type), tok2s(expected));
 
 	// todo: push note
-	parser_dialog(parser, pair.line, "note: pair started here");
+	parser_dialog(parser, pair.site, "note: pair started here");
 
-	push_error(parser, ERROR_EXPECTED_TOKEN, tok.line, message);
+	push_error(parser, ERROR_EXPECTED_TOKEN, tok.site, message);
 }
 
 static void push_error_not_in_a_loop(Parser *parser, Source line)
@@ -190,17 +222,14 @@ static void elf_destroy_parser(Parser *parser)
 
 static Parser *elf_alloc_parser(elf_State *state, elf_Arena *arena)
 {
-	u32 tree_stack_size = 4096;
+	u32 ast_stack_size = 4096;
 	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
 	parser->state = state;
 	parser->arena = arena;
 
-	parser->tree_stack = elf_arena_push_zero(arena, sizeof(*parser->tree_stack) * tree_stack_size);
-	parser->tree_stack_size = tree_stack_size;
-	parser->tree_stack_index = 0;
-
-	u32 function_buffer_size = 1024;
-	parser->functions = elf_arena_push_zero(arena, sizeof(*parser->functions) * function_buffer_size);
+	parser->ast_stack = elf_arena_push_zero(arena, sizeof(*parser->ast_stack) * ast_stack_size);
+	parser->ast_stack_size = ast_stack_size;
+	parser->ast_stack_index = 0;
 	return parser;
 }
 
@@ -212,8 +241,7 @@ static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char 
 	ASSERT(name != 0);
 	ASSERT(data != 0);
 	Parser *parser = elf_alloc_parser(state, arena);
-	ASSERT(strlen(name) < sizeof(parser->name));
-	elf_copy_memory(parser->name, name, strlen(name) + 1);
+	parser->name = elf_arena_push_string_data_copy(arena, 0, name);
 	parser->source = (char *) data;
 	elf_reposition_parser(parser, (char *) data);
 	return parser;
@@ -228,12 +256,11 @@ static Token consume_token(Parser *par)
 	return tok;
 }
 
-static void elf_reposition_parser(Parser *parser, char *cursor)
+static void elf_reposition_parser(Parser *par, char *cursor)
 {
-	parser->cursor = cursor;
-	// so that I don't forget to do this!
-	consume_token(parser);
-	consume_token(parser);
+	par->cursor = cursor;
+	consume_token(par);
+	consume_token(par);
 }
 
 static inline bool peek_tok(Parser *par, int type) {
@@ -248,57 +275,44 @@ static inline bool pick_token(Parser *par, int type) {
 	return false;
 }
 
-static Token take_token(Parser *parser, int type) {
-	Token tok = parser->tok;
+static Token take_token(Parser *par, TokenType type) {
+	Token tok = par->tok;
 
-	if (!pick_token(parser, type)) {
-		push_error_expected_token(parser, parser->tok, type);
+	if (!pick_token(par, type)) {
+		push_error_expected_token(par, par->tok, type);
 	}
 
 	return tok;
 }
 
-static inline bool peek_prox_tok(Parser *parser, int type) {
-	return parser->tok_prox.type == type;
+static inline bool peek_prox_tok(Parser *par, TokenType type) {
+	return par->tok_prox.type == type;
 }
 
-// todo: to be deprecated! explicit new line token!
-static bool peek_tok_inl(Parser *parser, int k) {
-	return peek_tok(parser,k) && parser->tok_prev.eol != 1;
-}
+// static bool peek_tok_inl(Parser *par, TokenType type) {
+// 	return peek_tok(par, type) && par->tok_prev.eol != 1;
+// }
 
-// todo: to be deprecated! explicit new line token!
-static bool pick_tok_inl(Parser *parser, int k) {
-	return peek_tok_inl(parser,k) && (consume_token(parser), 1);
-}
+// static bool pick_tok_inl(Parser *par, TokenType type) {
+// 	return peek_tok_inl(par, type) && (consume_token(par), 1);
+// }
 
-// todo: to be deprecated! explicit new line token!
-static Token get_token_inline(Parser *parser, int type) {
-	Token tok = parser->tok;
-
-	if (!pick_tok_inl(parser, type)) {
-		push_error_expected_token(parser, parser->tok, type);
-	}
-
-	return tok;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void push_ast(Parser *par, AstRef tree)
 {
-	ASSERT(par->tree_stack_index < par->tree_stack_size);
-	par->tree_stack[par->tree_stack_index ++] = tree;
+	ASSERT(par->ast_stack_index < par->ast_stack_size);
+	par->ast_stack[par->ast_stack_index ++] = tree;
 }
 
-// Todo, what if instead here we actually returned an AstArray *?
-// struct AstArray { u64 size; Ast *asts[] };
-static AstRef *pop_ast_array(Parser *par, u32 ntrees)
+// Todo, instead return an AstArray directly ...
+static AstRef *pop_ast_array(Parser *par, u32 nargs)
 {
-	ASSERT(par->tree_stack_index >= ntrees);
-	par->tree_stack_index -= ntrees;
-	AstRef *copy = elf_arena_push_copy(par->arena, sizeof(*copy) * ntrees, par->tree_stack + par->tree_stack_index);
+	ASSERT(par->ast_stack_index >= nargs);
+	par->ast_stack_index -= nargs;
+	AstRef *copy = elf_arena_push_copy(par->arena, sizeof(*copy) * nargs, par->ast_stack + par->ast_stack_index);
 	return copy;
 }
 
@@ -312,7 +326,7 @@ static AstRef elf_parse_file(Parser *par)
 	while (!peek_tok(par, TOK_NONE))
 	{
 		Ast *stat = parse_stat(par);
-		if (notree(stat)) break;
+		if (check_error_ast(stat)) break;
 
 		push_ast(par, stat);
 		++ nstats;
@@ -328,7 +342,7 @@ static AstRef elf_parse_file(Parser *par)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static AstRef elf_parse_function(Parser *par)
+static AstRef parse_function(Parser *par)
 {
 	Token tok = par->tok;
 
@@ -338,13 +352,13 @@ static AstRef elf_parse_function(Parser *par)
 	else NO_CODE;
 
 	u32 nparams = 0;
-	take_token(par, TOK_PAREN_LEFT);
+	take_token(par, TOK_LEFT_PAREN);
 	if (!peek_tok(par, TOK_PAREN_RIGHT)) do
 	{
 		Token tok = par->tok;
 		if (pick_token(par, TOK_ELLIPSIS))
 		{
-			AstRef param = elf_new_ellipsis_tree(par, tok.site);
+			AstRef param = create_ellipsis_ast(par, tok.site);
 			push_ast(par, param);
 			++ nparams;
 		}
@@ -402,11 +416,11 @@ static AstRef parse_tuple_expr(Parser *par)
 static AstRef parse_semicolon_expr(Parser *par)
 {
 	AstRef x = parse_tuple_expr(par);
-	while (peek_tok(par, TOK_SEMI_COLON))
+	while (peek_tok(par, TOK_SEMICOLON))
 	{
 		Token tok = consume_token(par);
 		AstRef y = parse_tuple_expr(par);
-		x = elf_new_semi_colon_expr_tree(par, tok.site, x, y);
+		x = create_for_loop_expr_ast(par, tok.site, x, y);
 	}
 	return x;
 }
@@ -417,14 +431,14 @@ static AstRef parse_semicolon_expr(Parser *par)
 //
 //  elf.load_file(<file-name>)
 //
-static AstRef elf_parse_load_stat(Parser *par)
+static AstRef parse_load_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_LOAD);
 
 	u32 nargs = elf_parse_call_args(par);
 	AstRef *args = pop_ast_array(par, nargs);
 
-	AstRef v = tree_callcoreapi(par, tok.line, BUILTIN_LOADFILE, args, nargs);
+	AstRef v = tree_callcoreapi(par, tok.site, BUILTIN_LOADFILE, args, nargs);
 	return v;
 }
 
@@ -435,23 +449,23 @@ static AstRef elf_parse_load_stat(Parser *par)
 //
 // --> elf.set_meta({},Vector2):__new(x,y)
 //
-static AstRef parse_new(Parser *par)
+static AstRef parse_new_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_NEW);
 
-	AstRef call_expr = ELF_ParsePostfixExpr(par, 0);
+	AstRef call_expr = parse_postfix_expr(par, 0);
 	// Todo, proper error handling!
 	if (call_expr->kind != AST_CALL) {
-		parser_dialog(par, tok.line, "invalid expression");
+		parser_dialog(par, tok.site, "invalid expression");
 	}
 	// Todo, just have a bultin for doing this!
 	AstRef meta = call_expr->ast_call_expr.expr;
 	AstRef *args = call_expr->ast_call_expr.args;
 	u32 nargs = call_expr->ast_call_expr.nargs;
 
-	AstRef table = elf_new_table_expr_tree(par, tok.line, 0, 0);
-	table = tree_callcoreapi2(par, tok.line, BUILTIN_SETMETA, table, meta);
-	AstRef v = ELF_NewMetaCallTree(par, meta->site, table, "__new", args, nargs);
+	AstRef table = elf_new_table_expr_tree(par, tok.site, 0, 0);
+	table = tree_callcoreapi2(par, tok.site, BUILTIN_SETMETA, table, meta);
+	AstRef v = create_meta_call_ast(par, meta->site, table, "__new", args, nargs);
 	return v;
 }
 
@@ -477,7 +491,7 @@ static AstRef parse_ident_expr(Parser *par)
 	return create_ident_ast(par, tok.site, tok.text);
 }
 
-static AstRef elf_parse_unary_expr(Parser *parser)
+static AstRef parse_unary_expr(Parser *parser)
 {
 	Token tok = parser->tok;
 
@@ -487,7 +501,7 @@ static AstRef elf_parse_unary_expr(Parser *parser)
 		case TOK_ELLIPSIS:
 		{
 			consume_token(parser);
-			v = elf_new_ellipsis_tree(parser, tok.site);
+			v = create_ellipsis_ast(parser, tok.site);
 		}
 		break;
 		case TOK_IDENTIFIER:
@@ -498,270 +512,94 @@ static AstRef elf_parse_unary_expr(Parser *parser)
 		case TOK_NIL:
 		{
 			consume_token(parser);
-			v = tree_nil(parser,tok.line);
+			v = create_nil_ast(parser, tok.site);
 		}
 		break;
-		case TOK_TRUE:{
+		case TOK_TRUE:
+		{
 			consume_token(parser);
-			v = tree_int(parser,tok.line,1);
+			v = create_int_ast(parser, tok.site,1);
 		}
 		break;
 		case TOK_FALSE:
 		{
 			consume_token(parser);
-			v = tree_int(parser,tok.line,0);
+			v = create_int_ast(parser, tok.site,0);
 		}
 		break;
 		case TOK_LETTER:
 		case TOK_INTEGER:
 		{
 			consume_token(parser);
-			v = tree_int(parser,tok.line,tok.integer);
+			v = create_int_ast(parser, tok.site,tok.integer);
 		}
 		break;
 		case TOK_NUMBER:
 		{
 			consume_token(parser);
-			v = tree_num(parser,tok.line,tok.number);
+			v = create_num_ast(parser, tok.site, tok.number);
 		}
 		break;
 		case TOK_STRING:
 		{
 			consume_token(parser);
-			v = create_str_ast(parser,tok.line,tok.text);
+			v = create_str_ast(parser, tok.site, tok.text);
 		}
 		break;
-
-
-
-#if 0
-		case TOK_M_INDEX:
-		{
-			consume_token(parser);
-
-			// todo: handle operand '#index(<loop-name>)'
-			Loop *loop = checkloop(parser, tok.line, Y_NULL);
-
-			v = loop->index;
-			ASSERT(v != Y_NULL);
-		}
-		break;
-
-		case TOK_M_VALUE:
-		{
-			consume_token(parser);
-
-			// todo: handle operand '#index(<loop-name>)'
-			Loop *loop = checkloop(parser, tok.line, Y_NULL);
-
-			int index = 0;
-
-			if (peek_tok(parser, TOK_SQUARE_LEFT)) {
-
-				Token index_token = take_token(parser, TOK_INTEGER);
-				index = index_token.integer;
-
-				take_token(parser, TOK_SQUARE_RIGHT);
-			}
-
-			if (index >= heap_array_length(loop->values)) {
-				reporterror(parser->R, -1, "invalid index");
-			}
-
-			v = loop->values[index];
-
-			ASSERT(v != Y_NULL);
-		}
-		break;
-
-		case TOK_M_GETMEM:
-		{
-			consume_token(parser);
-			v=parse_subexpr(parser,0,10000);
-			v=elf_new_unary_tree(parser,tok.line,TREE_DEBUG_GET_MEMORY,v);
-		}
-		break;
-
-		case TOK_M_GETEXPR:
-		{
-			consume_token(parser);
-			v=parse_subexpr(parser,0,10000);
-			v=elf_new_unary_tree(parser,tok.line,TREE_DEBUG_GET_EXPRESSION_NAME,v);
-		}
-		break;
-#endif
-
 		case TOK_TILDE:
 		{
 			consume_token(parser);
 			v = parse_subexpr(parser, 0, 10000);
-			v = elf_new_unary_tree(parser, tok.site, AST_BITWISE_NOT, v);
+			v = create_unary_expr_ast(parser, tok.site, AST_BITWISE_NOT, v);
 		}
 		break;
-
-		// the global keyword tells the parser that a name is a global
-		case TOK_GLOBAL: {
-			consume_token(parser);
-			if (pick_token(parser, TOK_PAREN_LEFT)){
-				Token name=take_token(parser, TOK_IDENTIFIER);
-				v=tree_global_symbol(parser, name.line, name.text);
-				take_token(parser, TOK_PAREN_LEFT);
-			} else {
-				Token name=take_token(parser, TOK_IDENTIFIER);
-				v=tree_global_symbol(parser, name.line, name.text);
-			}
-		} break;
-
 		case TOK_SUB:
 		{
 			consume_token(parser);
-			v=parse_subexpr(parser,0,10000);
-			v=create_binary_expr_ast(parser,tok.line,AST_SUB,tree_int(parser,tok.line,0),v);
+			// Todo, dedicated ast
+			v = parse_subexpr(parser, 0, 10000);
+			v = create_binary_expr_ast(parser, tok.site, AST_SUB, create_int_ast(parser, tok.site, 0), v);
 		}
 		break;
 		case TOK_ADD:
 		{
 			consume_token(parser);
-			v = parse_subexpr(parser,0,10000);
+			v = parse_subexpr(parser, 0, 10000);
 		}
 		break;
-#if 0
-		case TOK_JSON:
+		case TOK_NEW:
 		{
-			//
-			//	todo: we need some constant pool, for now we
-			// add to globals...
-			//
-
-			Token tok = take_token(parser,TOK_JSON);
-
-			int noerr = parse_json_object(parser);
-			if (noerr) {
-
-				// todo:
-				V json = popvalue(parser->inter);
-				int index = dynamic_array_allocate(parser->inter->globals->array, 1);
-				parser->inter->globals->array[index] = json;
-
-
-				v = tree_global(parser, tok.line, index);
-			}
+			v = parse_new_expr(parser);
 		}
 		break;
-#endif
-		case TOK_NEW: {
-			v = parse_new(parser);
-		} break;
-		case TOK_LOAD: {
-			v = elf_parse_load_stat(parser);
-		} break;
-
-		case TOK_CURLY_LEFT: {
-			v = elf_parse_table_expr(parser);
-		} break;
-
-#if 0
-		case TOK_ELF:
+		case TOK_LOAD:
 		{
-			char sym[256] = {};
-
-			// elf is a keyword!
-			consume_token(parser);
-
-			if (!peek_tok_inl(parser, TOK_DOT))
-			{
-				parser_dialog(parser, tok.site, "incomplete symbol, expected '.' on the same line as 'elf'. Did you mean to use 'elf'? This is a reserved keyword and it refers to the elf directory.");
-			}
-			strcat(sym,"elf");
-
-			take_token(parser, TOK_DOT);
-
-			do
-			{
-				get_token_inline(parser, TOK_IDENTIFIER);
-				strcat(sym,".");
-				strcat(sym,parser->tok_prev.text);
-			}
-			while(pick_tok_inl(parser,TOK_DOT));
-
-			v = tree_global_symbol(parser,tok.line,sym);
+			v = parse_load_expr(parser);
 		}
 		break;
-#endif
+		case TOK_LEFT_BRACE:
+		{
+			v = parse_table_expr(parser);
+		}
+		break;
 
-		case TOK_PAREN_LEFT: {
+		case TOK_LEFT_PAREN:
+		{
 			consume_token(parser);
-			if (!peek_tok(parser,TOK_PAREN_RIGHT)) {
-				v=parse_expr(parser,0);
+			if (!peek_tok(parser, TOK_PAREN_RIGHT))
+			{
+				v = parse_expr(parser,0);
 			}
-			take_token(parser,TOK_PAREN_RIGHT);
-		} break;
-
+			take_token(parser, TOK_PAREN_RIGHT);
+		}
+		break;
 		case TOK_FUNCTION:
 		case TOK_FUN:
 		{
-			v = elf_parse_function(parser);
+			v = parse_function(parser);
 		}
 		break;
 
-#if 0
-		case TOK_FORMAT_STRING: {
-			consume_token(parser);
-
-			// todo: leak!
-			// the format string can only get shorter
-			char *heapbuf = malloc(strlen(tok.text) + 1);
-			char *write = heapbuf;
-
-			v = create_str_ast(parser,tok.line,heapbuf);
-
-			TreeChain args = {};
-			tree_chain_add(&args, v);
-
-			char *old_cursor;
-			Token old_tok,old_tok_prev,old_tok_prox;
-			// save lexing state
-			old_cursor = parser->cursor;
-			old_tok = parser->tok;
-			old_tok_prev = parser->tok_prev;
-			old_tok_prox = parser->tok_prox;
-
-			char *format = tok.text;
-			while (*format) {
-				while (*format && *format != FORMAT_CHAR) {
-					*write ++ = *format ++;
-				}
-				if (*format == FORMAT_CHAR) {
-					*write ++ = *format ++;
-					if (*format == '{') {
-						elf_reposition_parser(parser, format);
-						if (!pick_token(parser, TOK_CURLY_LEFT)) {
-							parser_dialog(parser, 0, "expected '{'");
-						}
-						v = parse_expr(parser, 0);
-						tree_chain_add(&args, v);
-						if (!pick_token(parser, TOK_CURLY_RIGHT)) {
-							parser_dialog(parser, 0, "expected '}'");
-						}
-						ASSERT(*parser->tok_prev.line == '}');
-						// use the previous token + 1 because the parser
-						// skips white space after each token
-						format = parser->tok_prev.line + 1;
-					}
-				}
-			}
-			*write ++ = '\0';
-
-			// restore lexing state
-			parser->cursor = old_cursor;
-			parser->tok = old_tok;
-			parser->tok_prev = old_tok_prev;
-			parser->tok_prox = old_tok_prox;
-
-			v = tree_callcoreapi(parser, tok.line, BUILTIN_FORMAT, args);
-		} break;
-#endif
-		// it's ok
 		default: ;
 	}
 
@@ -770,15 +608,15 @@ static AstRef elf_parse_unary_expr(Parser *parser)
 }
 
 // Todo, multi-stores
-static AstRef elf_parse_table_expr(Parser *par)
+static AstRef parse_table_expr(Parser *par)
 {
-	Token tok = take_token(par, TOK_CURLY_LEFT);
+	Token tok = take_token(par, TOK_LEFT_BRACE);
 	Token table_tok = tok;
 
 	AstRef x, y;
 
 	u32 nargs = 0;
-	while (!peek_tok(par, TOK_NONE) && !peek_tok(par, TOK_CURLY_RIGHT))
+	while (!peek_tok(par, TOK_NONE) && !peek_tok(par, TOK_RIGHT_BRACE))
 	{
 		x = Y_NULL, y = Y_NULL;
 
@@ -787,13 +625,13 @@ static AstRef elf_parse_table_expr(Parser *par)
 		{
 			take_token(par, TOK_IDENTIFIER);
 
-			x = create_str_ast(par, tok.line, tok.text);
-			if (notree(x)) goto _err_ii;
+			x = create_str_ast(par, tok.site, tok.text);
+			if (check_error_ast(x)) goto _err_ii;
 
 			take_token(par, TOK_ASSIGN);
 
 			y = parse_expr(par, 0);
-			if (notree(y)) goto _err_ii;
+			if (check_error_ast(y)) goto _err_ii;
 
 			check_tree(par, x->site, x);
 			check_tree(par, y->site, y);
@@ -801,24 +639,24 @@ static AstRef elf_parse_table_expr(Parser *par)
 		else if (pick_token(par, TOK_SQUARE_LEFT))
 		{
 			x = parse_expr(par,0);
-			if (notree(x)) goto _err_ii;
+			if (check_error_ast(x)) goto _err_ii;
 
 			take_token(par, TOK_SQUARE_RIGHT);
 
 			take_token(par, TOK_ASSIGN);
 
 			y = parse_expr(par, 0);
-			if (notree(y)) goto _err_ii;
+			if (check_error_ast(y)) goto _err_ii;
 		}
 		else
 		{
 			x = y = parse_expr(par,0);
-			if (notree(x)) goto _err_ii;
+			if (check_error_ast(x)) goto _err_ii;
 
 			if (pick_token(par, TOK_ASSIGN))
 			{
 				y = parse_expr(par, 0);
-				if (notree(y)) goto _err_ii;
+				if (check_error_ast(y)) goto _err_ii;
 			}
 			else
 			{
@@ -835,7 +673,7 @@ static AstRef elf_parse_table_expr(Parser *par)
 		pick_token(par, TOK_COMMA);
 	}
 
-	take_token(par, TOK_CURLY_RIGHT);
+	take_token(par, TOK_RIGHT_BRACE);
 
 	AstRef *args = pop_ast_array(par, nargs);
 	AstRef table = elf_new_table_expr_tree(par, table_tok.site, args, nargs);
@@ -845,7 +683,7 @@ static AstRef elf_parse_table_expr(Parser *par)
 	return Y_NULL;
 
 	_err_ii:
-	push_error_invalid_field_initializer(par, tok.line, y);
+	push_error_invalid_field_initializer(par, tok.site, y);
 	return Y_NULL;
 }
 
@@ -853,12 +691,12 @@ static u32 elf_parse_call_args(Parser *par)
 {
 	u32 nargs = 0;
 
-	if (peek_tok(par, TOK_CURLY_LEFT))
+	if (peek_tok(par, TOK_LEFT_BRACE))
 	{
-		AstRef expr = elf_parse_table_expr(par);
+		AstRef expr = parse_table_expr(par);
 		push_ast(par, expr);
 	}
-	else if (pick_token(par, TOK_PAREN_LEFT))
+	else if (pick_token(par, TOK_LEFT_PAREN))
 	{
 		pick_token(par, TOK_COMMA);
 
@@ -867,7 +705,7 @@ static u32 elf_parse_call_args(Parser *par)
 
 			if (peek_tok(par, TOK_PAREN_RIGHT))
 			{
-				push_error(par, ERROR_EXCESS_COMMA, par->tok_prev.line, "excess comma");
+				push_error(par, ERROR_EXCESS_COMMA, par->tok_prev.site, "excess comma");
 			}
 			if (peek_tok(par, TOK_COMMA))
 			{
@@ -875,7 +713,7 @@ static u32 elf_parse_call_args(Parser *par)
 			}
 
 			AstRef x = parse_expr(par, 0);
-			if (notree(x)) goto esc;
+			if (check_error_ast(x)) goto esc;
 
 			// Todo, what the heck were we doing here?
 			// --------------------------------------
@@ -906,7 +744,7 @@ static u32 elf_parse_call_args(Parser *par)
 	else
 	{
 		AstRef expr = parse_expr(par, 0);
-		if (notree(expr)) goto esc;
+		if (check_error_ast(expr)) goto esc;
 		push_ast(par, expr);
 		++ nargs;
 	}
@@ -921,7 +759,7 @@ static AstRef parse_field_postfix(Parser *par, AstRef x)
 
 	// Todo, why do we do this?
 	// <expr>.(x,y) -> (<expr>.x, <expr>.y)
-	if (pick_token(par, TOK_PAREN_LEFT))
+	if (pick_token(par, TOK_LEFT_PAREN))
 	{
 		u32 nargs = 0;
 		do
@@ -941,7 +779,7 @@ static AstRef parse_field_postfix(Parser *par, AstRef x)
 	}
 	// todo: for this return a new table with the fields x and y from 'table'
 	// table.{x,y}
-	else if (pick_token(par, TOK_CURLY_LEFT))
+	else if (pick_token(par, TOK_LEFT_BRACE))
 	{
 		NO_CODE;
 	}
@@ -968,18 +806,18 @@ static AstRef parse_indirect_postfix(Parser *par, AstRef v)
 			__debugbreak();
 			//	for (AstRef i = x->x; i; i = i->next)
 			//	{
-			//		v = elf_new_field_expr_tree(par, tok.line, v, i);
+			//		v = elf_new_field_expr_tree(par, tok.site, v, i);
 			//		if (iserror(v)) goto _err;
 			//	}
 		}
 		else if (x->kind == AST_RANGE)
 		{
-			v = tree_ranged_index(par,tok.line, v, x);
+			v = tree_ranged_index(par,tok.site, v, x);
 			if (iserror(v)) goto _err;
 		}
 		else
 		{
-			v = elf_new_field_expr_tree(par,tok.line, v, x);
+			v = elf_new_field_expr_tree(par,tok.site, v, x);
 			if (iserror(v)) goto _err;
 		}
 	}
@@ -991,15 +829,17 @@ static AstRef parse_indirect_postfix(Parser *par, AstRef v)
 	return v;
 }
 
-static AstRef ELF_ParsePostfixExpr(Parser *parser, int flags)
+static AstRef parse_postfix_expr(Parser *parser, int flags)
 {
 
 	Token tok = parser->tok;
 
-	AstRef v = elf_parse_unary_expr(parser);
-	if (notree(v)) goto esc;
+	AstRef v = parse_unary_expr(parser);
+	if (check_error_ast(v)) goto esc;
 
-	while (parser->tok.type != TOK_NONE && !parser->tok_prev.eol) {
+	// Todo, instead, just check the line numbers dude ...
+	while (parser->tok.type != TOK_NONE && !parser->tok_prev.eol)
+	{
 		tok = parser->tok;
 
 		switch (tok.type) {
@@ -1009,18 +849,14 @@ static AstRef ELF_ParsePostfixExpr(Parser *parser, int flags)
 				v = parse_field_postfix(parser, v);
 			}
 			break;
-			case TOK_SQUARE_SQUARE_LEFT:
-			{
-				take_token(parser,TOK_SQUARE_SQUARE_LEFT);
-				AstRef x = parse_expr(parser, 0);
-				v = tree_index(parser,tok.line, v, x);
-				take_token(parser,TOK_SQUARE_SQUARE_RIGHT);
-			}
-			break;
-			/* todo: make this nil safe, so [0,0] shouldn't
-			fail if item at 0 is nil, we should have a separate
-			instruction for getfield, which is like getfieldoptional
-			or something to avoid having to generate additional code */
+			//	case TOK_SQUARE_SQUARE_LEFT:
+			//	{
+			//		take_token(parser,TOK_SQUARE_SQUARE_LEFT);
+			//		AstRef x = parse_expr(parser, 0);
+			//		v = tree_index(parser, tok.site, v, x);
+			//		take_token(parser,TOK_SQUARE_SQUARE_RIGHT);
+			//	}
+			//	break;
 			case TOK_SQUARE_LEFT:
 			{
 				v = parse_indirect_postfix(parser, v);
@@ -1029,86 +865,54 @@ static AstRef ELF_ParsePostfixExpr(Parser *parser, int flags)
 			case TOK_COLON:
 			{
 				consume_token(parser);
-				Token name = take_token(parser,TOK_IDENTIFIER);
+				Token name = take_token(parser, TOK_IDENTIFIER);
 				AstRef y = create_str_ast(parser, name.site, name.text);
-				v = tree_meta_field(parser, tok.site, v, y);
+				v = create_meta_field_ast(parser, tok.site, v, y);
 			}
 			break;
-
-			case TOK_CURLY_LEFT:
-			case TOK_PAREN_LEFT:
+			case TOK_LEFT_BRACE:
+			case TOK_LEFT_PAREN:
 			{
 				u32 nargs = elf_parse_call_args(parser);
 				AstRef *args = pop_ast_array(parser, nargs);
 				v = create_call_ast(parser, tok.site, v, args, nargs);
 			}
 			break;
-
 			default: goto esc;
 		}
 	}
 
-	esc:;
+	esc:
 	return v;
 }
 
-static AstRef parse_subexpr(Parser *parser, int flags, int rank)
+static AstRef parse_subexpr(Parser *parser, int flags, int upper_precedence)
 {
 	Token tok = parser->tok;
 
-	AstRef x,y;
+	AstRef x = parse_postfix_expr(parser, 0);
+	if (check_error_ast(x)) goto esc;
 
-	if (peek_tok(parser, TOK_ELLIPSIS))
+	for(;;)
 	{
-		x = Y_NULL;
-		// empty range
-		// ... <y>
-		goto parsey;
-	}
-	else
-	{
-		x = ELF_ParsePostfixExpr(parser, 0);
-		if (x == Y_NULL) goto esc;
-
-		//	if (x->type == NT_NON) {
-		//		parser_dialog(parser, x->site, "invalid data type");
-		//		goto esc;
-		//	}
-	}
-
-	for(;;) {
-		parsey:
-
 		tok = parser->tok;
 
-		int prio = token_rank_from_type(tok.type);
-		if (prio <= rank) goto esc;
+		AstType ast_type = binary_ast_expr_type_from_token_type(tok.type);
+		if (ast_type == AST_NONE) break;
 
-		// assign is not an expression, quit now and let
-		// the caller handle it
-		if (parser->tok_prox.type == TOK_ASSIGN) {
-			goto esc;
-		}
+		u32 inner_precedence = precedence_from_binary_ast_expr_type(ast_type);
+		if (inner_precedence <= upper_precedence) break;
 
 		consume_token(parser);
 
-		y = parse_subexpr(parser, 0, prio);
-		if (tok.type != TOK_ELLIPSIS) {
-			//	if (!y || y->type == NT_NON) {
-			//		parser_dialog(parser, tok.line, "invalid right operand");
-			//		goto esc;
-			//	}
-		}
-
-		x = create_binary_expr_ast(parser, tok.line, tree_kind_from_token_type(tok.type), x, y);
-
-		if (y == Y_NULL) goto esc;
+		AstRef y = parse_subexpr(parser, 0, inner_precedence);
+		x = create_binary_expr_ast(parser, tok.site, ast_type, x, y);
+		if (check_error_ast(y)) break;
 	}
 
 	esc:
 	return x;
 }
-
 
 static AstRef parse_expr(Parser *parser, int flags)
 {
@@ -1118,8 +922,10 @@ static AstRef parse_expr(Parser *parser, int flags)
 		case TOK_NONE:
 		case TOK_FOR:
 		case TOK_WHILE:
-		case TOK_COMMA:
-		case TOK_PAREN_RIGHT: case TOK_CURLY_RIGHT: case TOK_SQUARE_RIGHT:
+		case TOK_PAREN_RIGHT:
+		case TOK_RIGHT_BRACE:
+
+		case TOK_SQUARE_RIGHT:
 		{
 			return Y_NULL;
 		}
@@ -1187,7 +993,7 @@ static AstRef parse_stat(Parser *parser)
 	switch (tok.type)
 	{
 		case TOK_NONE:
-		case TOK_CURLY_RIGHT:
+		case TOK_RIGHT_BRACE:
 		case TOK_PAREN_RIGHT:
 		case TOK_THEN:
 		case TOK_ELSE:
@@ -1214,7 +1020,7 @@ static AstRef parse_stat(Parser *parser)
 		break;
 
 		case TOK_RET:
-		case TOK_HARD_ARROW:
+		case TOK_LONG_ARROW:
 		{
 			consume_token(parser);
 
@@ -1241,19 +1047,19 @@ static AstRef parse_stat(Parser *parser)
 		}
 		break;
 
-		case TOK_CURLY_LEFT:
+		case TOK_LEFT_BRACE:
 		{
 			u32 nstats = 0;
-			take_token(parser, TOK_CURLY_LEFT);
-			while (!peek_tok(parser, TOK_NONE) && !peek_tok(parser, TOK_CURLY_RIGHT))
+			take_token(parser, TOK_LEFT_BRACE);
+			while (!peek_tok(parser, TOK_NONE) && !peek_tok(parser, TOK_RIGHT_BRACE))
 			{
 				Ast *stat = parse_stat(parser);
-				if (notree(stat)) break;
+				if (check_error_ast(stat)) break;
 
 				push_ast(parser, stat);
 				++ nstats;
 			}
-			take_token(parser, TOK_CURLY_RIGHT);
+			take_token(parser, TOK_RIGHT_BRACE);
 
 			AstRef *stats = pop_ast_array(parser, nstats);
 			tree = create_block_ast(parser, tok.site, stats, nstats);
@@ -1272,7 +1078,7 @@ static AstRef parse_stat(Parser *parser)
 			AstRef body = parse_stat(parser);
 			if (iserror(body)) goto _err;
 
-			tree = elf_new_while_stat_tree(parser, tok.site, pred, body);
+			tree = create_while_ast(parser, tok.site, pred, body);
 		}
 		break;
 
@@ -1331,7 +1137,7 @@ static AstRef elf_parse_if_stat(Parser *par)
 		else_clause = parse_stat(par);
 	}
 
-	AstRef stat = elf_new_if_stat_tree(par, tok.line, pred, true_clause, else_clause);
+	AstRef stat = elf_new_if_stat_tree(par, tok.site, pred, true_clause, else_clause);
 	return stat;
 }
 
@@ -1346,7 +1152,7 @@ static int parse_constexpr(Parser *parser) {
 static void checkstk(Parser *parser, int state) {
 	int index = parser->R->stack_ptr - parser->R->stack;
 	if (index != state) {
-		parser_dialog(parser, parser->tok.line, "internal error, invalid stack state");
+		parser_dialog(parser, parser->tok.site, "internal error, invalid stack state");
 		reporterror(parser->R, NO_BYTE, "internal error, invalid stack state");
 	}
 }
@@ -1362,7 +1168,7 @@ static int parse_constexpr(Parser *parser) {
 			consume_token(parser);
 			if (peek_tok(parser, TOK_NUMBER)) goto numcase;
 			else if (peek_tok(parser, TOK_INTEGER)) goto intcase;
-			parser_dialog(parser, parser->tok.line, "expected integer or number after '-'");
+			parser_dialog(parser, parser->tok.site, "expected integer or number after '-'");
 			goto errorcase;
 		} break;
 		case TOK_TRUE: {
@@ -1395,14 +1201,14 @@ static int parse_constexpr(Parser *parser) {
 			pushtext(parser->R, tok.text);
 			ret = 1;
 		} break;
-		case TOK_CURLY_LEFT: {
+		case TOK_LEFT_BRACE: {
 			consume_token(parser);
 
 			Tab tab = push_new_table(parser->R);
 			int tablestk = stack2index(parser->R) - 1;
 
 
-			while(!peek_tok(parser,TOK_NONE) && !peek_tok(parser,TOK_CURLY_RIGHT)) {
+			while(!peek_tok(parser,TOK_NONE) && !peek_tok(parser,TOK_RIGHT_BRACE)) {
 
 				// push key (or value)
 				// interpret words as raw key names not as entities
@@ -1413,7 +1219,7 @@ static int parse_constexpr(Parser *parser) {
 				else {
 					ret = parse_constexpr(parser);
 					// todo: instead attempt to do some error recovery
-					if (notree(ret)) goto esc;
+					if (check_error_ast(ret)) goto esc;
 				}
 
 				if (pick_token(parser, TOK_ASSIGN)) {
@@ -1439,7 +1245,7 @@ static int parse_constexpr(Parser *parser) {
 
 				pick_token(parser,TOK_COMMA);
 			}
-			take_token(parser,TOK_CURLY_RIGHT);
+			take_token(parser,TOK_RIGHT_BRACE);
 
 			checkstk(parser, tablestk + 1);
 			ret = 1;
@@ -1450,7 +1256,7 @@ static int parse_constexpr(Parser *parser) {
 		default: {
 			errorcase:
 			push_nil(parser->R);
-			parser_dialog(parser,tok.line,"not a constant expression");
+			parser_dialog(parser, tok.site,"not a constant expression");
 		} break;
 	}
 
@@ -1485,8 +1291,8 @@ static int parse_json_object(Parser *parser) {
 	int noerr = true;
 	push_new_table(parser->inter);
 
-	take_token(parser,TOK_CURLY_LEFT);
-	if (!peek_tok(parser,TOK_CURLY_RIGHT)) do {
+	take_token(parser,TOK_LEFT_BRACE);
+	if (!peek_tok(parser,TOK_RIGHT_BRACE)) do {
 
 		Token tok = take_token(parser, TOK_STRING);
 		pushtext(parser->inter, tok.text);
@@ -1500,7 +1306,7 @@ static int parse_json_object(Parser *parser) {
 	} while (pick_token(parser,TOK_COMMA));
 
 
-	take_token(parser,TOK_CURLY_RIGHT);
+	take_token(parser,TOK_RIGHT_BRACE);
 	esc:
 	return noerr;
 }
@@ -1523,7 +1329,7 @@ static int parse_json_value(Parser *parser)
 			consume_token(parser);
 			pushnum(parser->inter, tok.number);
 		} break;
-		case TOK_CURLY_LEFT: {
+		case TOK_LEFT_BRACE: {
 			parse_json_object(parser);
 		} break;
 		case TOK_SQUARE_LEFT: {
@@ -1531,7 +1337,7 @@ static int parse_json_value(Parser *parser)
 		} break;
 		default: {
 			push_nil(parser->inter);
-			parser_dialog(parser, tok.line, "invalid json value");
+			parser_dialog(parser, tok.site, "invalid json value");
 			success = false;
 		} break;
 	}

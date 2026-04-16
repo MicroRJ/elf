@@ -177,7 +177,7 @@ static BytecodeFunction k_do_proto(Parser *parser, AstRef tree)
 	};
 
 	// todo: come back to this
-	// ASSERT(BYTECODE_OP(S->bytes[S->bytecur-1]) == BYTECODE_RET);
+	// ASSERT(BYTECODE_TYPE(S->bytes[S->bytecur-1]) == BYTECODE_RETURN);
 
 	ASSERT(parser->memory_state == 0);
 	ASSERT(parser->memory_state_index == 0);
@@ -242,7 +242,7 @@ static void k_do_store(Parser *parser, Source cur, AstRef x, AstRef y)
 			{
 
 				parser_dialog(parser, cur
-				, "internal error: invalid l-value, got: %s", tree2s[tx.kind]);
+				, "internal error: invalid l-value, got: %s", Static_StrFromAstType[tx.kind]);
 
 				ASSERT(!"error");
 			}
@@ -398,7 +398,7 @@ static void k_do_tree(Parser *parser, AstRef id)
 				ASSERT(r == i ++);
 			}
 
-			emit_bytexy(parser, tree.site, BYTECODE_RET, mem, nrets);
+			emit_bytexy(parser, tree.site, BYTECODE_RETURN, mem, nrets);
 		}
 		break;
 
@@ -590,13 +590,13 @@ static int to_mem(Parser *parser, AstRef id, int dst, int ndst) {
 			{
 				parser_dialog(parser, tree.x->site, "no memory assigned to this thing");
 			}
-			dst = to_mem(parser,tree_int(parser,tree.site,mem),dst,ndst);
+			dst = to_mem(parser,create_int_ast(parser,tree.site,mem),dst,ndst);
 		}
 		break;
 
 		case TREE_DEBUG_GET_EXPRESSION_NAME:
 		{
-			char *expr = tree2s[tree.x->kind];
+			char *expr = Static_StrFromAstType[tree.x->kind];
 			dst = to_mem(parser, create_str_ast(parser, tree.site, expr), dst, ndst);
 		}
 		break;
@@ -682,9 +682,9 @@ static int to_mem(Parser *parser, AstRef id, int dst, int ndst) {
 			// todo: can we remove jumpS?
 			jumpS e = {0};
 			int *js;
-			dst=to_mem(parser,tree_int(parser,line,0),dst,1);
+			dst=to_mem(parser,create_int_ast(parser,line,0),dst,1);
 			js=emit_jump_if_false(parser,&e,id);
-			dst=to_mem(parser,tree_int(parser,line,1),dst,1);
+			dst=to_mem(parser,create_int_ast(parser,line,1),dst,1);
 			patch_jumps(parser,js);
 			free_heap_array(js);
 		} break;
@@ -790,7 +790,7 @@ static int to_mem(Parser *parser, AstRef id, int dst, int ndst) {
 
 		default: {
 			push_error(parser, INTERNAL_ERROR_INVALID_TREE
-			,	line,	"invalid tree (%s)",	tree2s[tree.kind]);
+			,	line,	"invalid tree (%s)",	Static_StrFromAstType[tree.kind]);
 			NO_CODE;
 		}
 	}
@@ -878,8 +878,8 @@ AstRef desugar_range_expr(Parser *fs, AstRef x, int flags) {
 			AstRef lo,hi;
 			lo=get_tree(fs,node.y).x;
 			hi=get_tree(fs,node.y).y;
-			if (lo==Y_NULL) lo=tree_int(fs,line,0);
-			if (hi==Y_NULL) hi=ELF_NewMetaCallTree(fs,line,array,0,"length");
+			if (lo==Y_NULL) lo=create_int_ast(fs,line,0);
+			if (hi==Y_NULL) hi=create_meta_call_ast(fs,line,array,0,"length");
 
 			begin_range_loop(fs,line,index,lo,hi);
 			value_reg=any_reg_deprecated(fs,value);

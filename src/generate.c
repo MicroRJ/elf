@@ -1,32 +1,38 @@
 
 
-// more meaningful ...
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #define IMPLICIT_PARAM_INDEX 0
 #define IMPLICIT_PARAM_COUNT 1
 
+#define NO_SLOT (-1)
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static GenMemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, GenMemorySlot slots, u32 nslots);
 static void generate_ast_stat(BytecodeGen *gen, AstRef stat);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-#define NO_SLOT (-1)
 
 typedef enum
 {
 	GENERATION_ERROR_GENERIC = 0,
-	ERROR_UNREFERENCED_ENTITY,
+	GENERATION_ERROR_INTERNAL,
+	GENERATION_ERROR_UNREFERENCED_ENTITY,
 	GENERATION_ERROR_INVALID_LVALUE,
 	GENERATION_ERROR_INVALID_EXPRESSION,
+	GENERATION_ERROR_UNDECLARED_IDENTIFIER,
 }
 GenerationError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define report_generation_error(gen, error, site, format, ...) report_generation_error_(gen, error, site, temppf(format, __VA_ARGS__))
+#define report_generation_error(gen, error, site, format, ...) report_generation_error_(gen, error, site, temporay_format(format, __VA_ARGS__))
 static void report_generation_error_(BytecodeGen *gen, GenerationError error, Source site, const char *message)
 {
 	printf("generation error: %s\n", message);
@@ -61,7 +67,7 @@ static void close_scope(BytecodeGen *par)
 	for (i32 i = par->entity_index - 1; i >= new_entity_index; -- i)
 	{
 		if (~par->entities[i].tags & ENTITY_TAG_REFERENCED) {
-			report_generation_error(par, ERROR_UNREFERENCED_ENTITY, par->entities[i].site, "warning: unreferenced entity");
+			report_generation_error(par, GENERATION_ERROR_UNREFERENCED_ENTITY, par->entities[i].site, "warning: unreferenced entity");
 		}
 	}
 
@@ -204,19 +210,24 @@ static BytecodeGen *elf_create_bytecode_generator(elf_State *state, elf_Arena *a
 	u32 max_functions = 1024;
 	gen->functions = elf_arena_push_zero(arena, sizeof(*gen->functions) * max_functions);
 	gen->max_functions = max_functions;
+
+
+	u32 bytecode_buffer_capacity = 1 << 13;
+	gen->bytecode_buffer.bytecode = elf_arena_push_zero(arena, sizeof(*gen->bytecode_buffer.bytecode) * bytecode_buffer_capacity);
+	gen->bytecode_buffer.capacity = bytecode_buffer_capacity;
+	gen->bytecode_buffer.position = 0;
 	return gen;
 }
 
 static BytecodeFunction generate_bytecode_function(BytecodeGen *gen, GenFunction function)
 {
-	u32 bytepos = 0;
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	u32 arity = function.arity;
 	AstRef body = function.body;
-	b32 variadic = (function.tags & FUNCTION_VARIADIC) != 0;
 	GenFunctionParam *params = function.params;
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	b32 variadic = !! (function.tags & FUNCTION_VARIADIC);
+
+	ASSERT(gen->bytecode_buffer.position == 0);
+
 
 	ENTITY_SCOPE(gen)
 	{
@@ -233,16 +244,27 @@ static BytecodeFunction generate_bytecode_function(BytecodeGen *gen, GenFunction
 		}
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	emit_return_bytecode(gen, body->site, 0, 0);
+
+
+	u32 function_length = gen->bytecode_buffer.position;
+	u32 function_offset = dynamic_array_allocate(gen->state->bytebuf, function_length);
+	copy_memory(gen->state->bytebuf + function_offset, gen->bytecode_buffer.bytecode, sizeof(* gen->bytecode_buffer.bytecode) * function_length);
+
+
 	BytecodeFunction bytecode_function =
 	{
-		.bytes     = bytepos,
-		.arity     = arity,
-		.variadic  = variadic,
-		.numbytes  = gen->state->bytecur - bytepos,
-		.ncaptures = gen->ncaptures,
-		.stacksize = gen->memory_usage,
+		.variadic   = variadic,
+		.arity      = arity,
+		.offset     = function_offset,
+		.length     = function_length,
+		.captures   = gen->ncaptures,
+		.stack_size = gen->memory_usage,
 	};
+
+	// reset bytecode buffer
+	gen->bytecode_buffer.position = 0;
+
 	return bytecode_function;
 }
 
@@ -375,18 +397,24 @@ static AstRef preprocess_ast_expr_for_generation(BytecodeGen *gen, AstRef expr)
 				arity -= 1;
 			}
 
-			GenFunction *gen_function = add_generate_function(gen, expr->site, tags, arity, body);
+
+			GenFunction *gen_function = add_generate_function(gen, expr->site, tags, arity, 0);
 			gen_function->function_ast = expr;
 
 			for (u32 i = IMPLICIT_PARAM_INDEX + 1; i < nparams; ++ i)
 			{
 				AstRef param = params[i];
 				check_ast_type(param, AST_FUNCTION_PARAM);
-				check_ast_type(param->ast_function_param.name, AST_IDENT);
-				gen_function->params[i].name = param->ast_function_param.name->ast_ident_expr;
-				gen_function->params[i].site = param->ast_function_param.name->site;
+
+				AstRef param_name = param->ast_function_param.name;
+				check_ast_type(param_name, AST_IDENT);
+
+				gen_function->params[i].name = param_name->ast_ident_expr;
+				gen_function->params[i].site = param_name->site;
 				gen_function->params[i].tags = ENTITY_TAG_PARAMETER;
 			}
+
+			gen_function->body = preprocess_ast_stat_for_generation(gen, body);
 		}
 		break;
 
@@ -491,6 +519,7 @@ static AstRef preprocess_ast_expr_for_generation(BytecodeGen *gen, AstRef expr)
 		break;
 		default:
 		{
+			report_generation_error(gen, GENERATION_ERROR_INTERNAL, "'%s' is not an expression", Static_StrFromAstType[expr->kind]);
 			ASSERT(!"Internal Error!");
 		}
 		break;
@@ -504,6 +533,17 @@ static AstRef preprocess_ast_stat_for_generation(BytecodeGen *gen, AstRef stat)
 
 	switch (stat->kind)
 	{
+		case AST_WHILE:
+		{
+			AstRef pred = stat->ast_while_stat.pred;
+			AstRef body = stat->ast_while_stat.body;
+
+			AstRef new_pred = preprocess_ast_expr_for_generation(gen, pred);
+			AstRef new_body = preprocess_ast_stat_for_generation(gen, body);
+
+			new_stat = create_while_ast(gen->scratch_parser, stat->site, new_pred, new_body);
+		}
+		break;
 		case AST_BLOCK_STAT:
 		{
 			AstRef *stats = stat->ast_block_stat.stats;
@@ -789,6 +829,7 @@ static GenMemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, GenMemoryS
 			}
 			else
 			{
+				report_generation_error(gen, GENERATION_ERROR_UNDECLARED_IDENTIFIER, expr->site, "'%s' is an undeclared identifier", expr->ast_ident_expr);
 				ASSERT(!"Undeclared Identifier");
 			}
 		}
@@ -873,7 +914,7 @@ static GenMemorySlot generate_ast_expr(BytecodeGen *gen, AstRef expr, GenMemoryS
 		{
 
 			report_generation_error(gen, GENERATION_ERROR_INVALID_EXPRESSION, expr->site
-			, "invalid expression, got: %s", tree2s[expr->kind]);
+			, "invalid expression, got: %s", Static_StrFromAstType[expr->kind]);
 
 			ASSERT(!"Error!");
 		}
@@ -981,7 +1022,7 @@ static void generate_ast_assign_stat(BytecodeGen *gen, Source site, AstRef dest,
 			default:
 			{
 				report_generation_error(gen, GENERATION_ERROR_INVALID_LVALUE, dest->site
-				, "invalid l-value, got: %s", tree2s[dest->kind]);
+				, "invalid l-value, got: %s", Static_StrFromAstType[dest->kind]);
 			}
 			break;
 		}
@@ -992,6 +1033,31 @@ static void generate_ast_stat(BytecodeGen *gen, AstRef stat)
 {
 	switch (stat->kind)
 	{
+		case AST_WHILE:
+		{
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			AstRef pred = stat->ast_while_stat.pred;
+			AstRef body = stat->ast_while_stat.body;
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+			MEMORY_STATE_SCOPE(gen)
+			{
+				u32 entry = gen->bytecode_buffer.position;
+
+				jumpS js = {0};
+				emit_jump_if_false(gen, &js, pred);
+
+				generate_ast_stat(gen, body);
+
+				emit_jump(gen, body->site, entry);
+
+				patch_jumps(gen, js.f);
+				free_heap_array(js.f);
+				js.f = 0;
+			}
+		}
+		break;
+
 		case AST_BLOCK_STAT:
 		{
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1072,5 +1138,163 @@ static void generate_ast_stat(BytecodeGen *gen, AstRef stat)
 			}
 		}
 		break;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static int emit_branch_if(BytecodeGen *gen, jumpS *js, b32 if_true, AstRef expr)
+{
+	int jmp;
+	switch (expr->kind)
+	{
+		case AST_AND:
+		{
+			emit_jump_if_false(gen, js, expr->ast_binary_expr.x);
+			jmp = emit_branch_if(gen, js, if_true, expr->ast_binary_expr.y);
+		}
+		break;
+		case AST_OR:
+		{
+			emit_jump_if_true(gen, js, expr->ast_binary_expr.x);
+			jmp = emit_branch_if(gen, js, if_true, expr->ast_binary_expr.y);
+		}
+		break;
+		default:
+		{
+			u32 mem;
+			MEMORY_STATE_SCOPE(gen)
+			{
+				mem = expr_to_any_mem(gen,expr);
+			}
+			if (if_true)
+			{
+				jmp=emit_bytexy(gen,expr->site,BYTECODE_JNZ,NO_JUMP,mem);
+				heap_array_add(js->t,jmp);
+			}
+			else
+			{
+				jmp=emit_bytexy(gen,expr->site,BYTECODE_JZ,NO_JUMP,mem);
+				heap_array_add(js->f,jmp);
+			}
+		} break;
+	}
+	return jmp;
+}
+
+static inline int emit_branch_if_false(BytecodeGen *parser, jumpS *js, AstRef id)
+{
+	return emit_branch_if(parser,js,0,id);
+}
+
+static inline int emit_branch_if_true(BytecodeGen *parser, jumpS *js, AstRef id)
+{
+	return emit_branch_if(parser,js,1,id);
+}
+
+/* similar to branch if true, but additionally all false jumps converge here */
+static inline BCPos *emit_jump_if_true(BytecodeGen *fs, jumpS *js, AstRef id)
+{
+	emit_branch_if_true(fs,js,id);
+	patch_jumps(fs,js->f);
+	free_heap_array(js->f);
+	js->f = 0;
+	return js->t;
+}
+
+static inline BCPos *emit_jump_if_false(BytecodeGen *fs, jumpS *js, AstRef id)
+{
+	emit_branch_if_false(fs,js,id);
+	patch_jumps(fs,js->t);
+	free_heap_array(js->t);
+	js->t = 0;
+	return js->f;
+}
+
+// todo: dedicated instructions?
+static inline int *emit_jump_if_not_nil(BytecodeGen *parser, Source site, jumpS *js, AstRef id)
+{
+	__debugbreak();
+	// return emit_jump_if_false(parser,js,create_binary_expr_ast(parser,site,AST_EQ,id,create_nil_ast(parser,site)));
+	return 0;
+}
+
+// todo: dedicated instructions?
+static inline int *emit_jump_if_nil(BytecodeGen *parser, Source site, jumpS *js, AstRef id)
+{
+	__debugbreak();
+	// return emit_jump_if_true(parser,js,create_binary_expr_ast(parser,site,AST_EQ,id,create_nil_ast(parser,site)));
+	return 0;
+}
+
+static void begin_if(BytecodeGen *parser, Source site, JBuf *jb, AstRef x, int if_true)
+{
+	jumpS js = {0};
+	emit_branch_if(parser,&js,if_true,x);
+	if (if_true) {
+		ASSERT(js.t != 0);
+		patch_jumps(parser,js.f);
+		free_heap_array(js.f);
+		js.f = 0;
+		jb->jz = js.t;
+	} else {
+		ASSERT(js.f != 0);
+		patch_jumps(parser,js.t);
+		free_heap_array(js.t);
+		js.t = 0;
+		jb->jz = js.f;
+	}
+}
+
+/* closes previous conditional block by emitting
+escape jump, patches previous jz (jump if false)
+list to enter this block. */
+void add_else_clause(BytecodeGen *fs, Source site, JBuf *s) {
+	ASSERT(s->jz != 0);
+	int j = emit_jump(fs,site,-1);
+	heap_array_add(s->j,j);
+
+	patch_jumps(fs,s->jz);
+	free_heap_array(s->jz);
+	s->jz = 0;
+}
+
+
+
+static void add_elif_clause(BytecodeGen *parser, Source site, JBuf *s, AstRef x) {
+	add_else_clause(parser,site,s);
+	begin_if(parser,site,s,x,0);
+}
+
+
+
+static void add_then_clause(BytecodeGen *parser, Source site, JBuf *s) {
+	/* we don't need to close the previous block, it can just fall
+	through to our branch, do collect all the other exit jumps and
+	tie them to this branch block, naturally we don't need to add
+	an exit jump since else and elif or closeif will terminate
+	this block, multiple then blocks are simply chained together
+	naturally. (can't believe I used the word natuarally twice)
+	---
+	(Can't believe you misspelled naturally) */
+	patch_jumps(parser,s->j);
+	free_heap_array(s->j);
+	s->j = 0;
+}
+
+void close_if(BytecodeGen *fs, Source site, JBuf *s)
+{
+	/* collect missing else branch */
+	if (s->jz != 0) {
+		patch_jumps(fs,s->jz);
+		free_heap_array(s->jz);
+		s->jz = 0;
+	}
+	/* collect missing then branch */
+	if (s->j != 0) {
+		patch_jumps(fs,s->j);
+		free_heap_array(s->j);
+		s->j = 0;
 	}
 }

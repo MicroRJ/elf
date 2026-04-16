@@ -9,6 +9,46 @@ enum
 
 
 
+// Todo, remove dynamic arrays!
+typedef struct
+{
+	int *t,*f;
+}
+jumpS;
+
+
+// Todo, remove dynamic arrays!
+typedef struct JBuf
+{
+	BCPos *jz;
+	/* list of exit jump instructions from each consecutive block to be patched */
+	BCPos *j;
+}
+JBuf;
+
+// typedef enum
+// {
+// 	BLOCK_ENDED  = 1,
+// 	BLOCK_HASRET = 2,
+// }
+// BlockBits;
+
+// typedef struct Block Block;
+// struct Block
+// {
+// 	BlockBits  status;
+// 	AstRef     *stats;
+// 	u32        nstats;
+// };
+
+// typedef struct Loop Loop;
+// struct Loop {
+// 	AstRef *breaks;
+// 	AstRef *continues;
+// 	AstRef  index, *values;
+// 	AstRef  name;
+// };
+
 typedef enum
 {
 	ENTITY_TAG_REFERENCED  = 1 << 0,
@@ -74,6 +114,21 @@ GenFunction;
 
 typedef struct
 {
+	Bytecode *bytecode;
+	u32       capacity;
+	u32       position;
+}
+BytecodeBuffer;
+
+typedef struct
+{
+	u32   index;
+	BCPos stack[32];
+}
+PatchBuf;
+
+typedef struct
+{
 	elf_Arena *arena;
 	elf_Arena *scratch_arena;
 
@@ -86,10 +141,12 @@ typedef struct
 	elf_State *state;
 
 	GenFunction *functions;
-	u32           num_functions;
-	u32           max_functions;
+	u32          num_functions;
+	u32          max_functions;
 
 	u32 bytecode_function_offset_in_module;
+
+	BytecodeBuffer bytecode_buffer;
 
 	Entity     entities[MAX_ENTITIES];
 	EntityId   entity_index;
@@ -103,6 +160,9 @@ typedef struct
 	i32 	     memory_state_stack[256];
 	i32 	     memory_state_index;
 	AstRef     memory_slots[256];
+
+	PatchBuf   t_patch_buf;
+	PatchBuf   f_patch_buf;
 
 	// BytecodeBuffer *bytecode_buffer;
 }

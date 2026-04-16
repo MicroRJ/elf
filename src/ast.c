@@ -3,12 +3,10 @@
 //
 
 
-// Todo, put this somewhere proper!
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static char *tree2s[] =
+static char *Static_StrFromAstType[] =
 {
 #define AST_XPAND(ENUM, NAME) #ENUM,
 	AST_XDEF(AST_XPAND)
@@ -32,7 +30,7 @@ static AstRef tree_nullary(Parser *par, Source site, AstType kind)
 	return tree;
 }
 
-static AstRef elf_new_unary_tree(Parser *par, Source site, AstType kind, AstRef x)
+static AstRef create_unary_expr_ast(Parser *par, Source site, AstType kind, AstRef x)
 {
 	AstRef tree = create_ast(par, site, kind);
 	tree->tree_unary_expr = x;
@@ -52,12 +50,12 @@ static AstRef create_binary_expr_ast(Parser *par, Source site, AstType kind, Ast
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-static AstRef tree_nil(Parser *par, Source site)
+static AstRef create_nil_ast(Parser *par, Source site)
 {
 	return tree_nullary(par, site, AST_NIL_LITERAL);
 }
 
-static AstRef tree_int(Parser *par, Source site, i64 i)
+static AstRef create_int_ast(Parser *par, Source site, i64 i)
 {
 	AstRef v;
 	v = tree_nullary(par, site, AST_INTEGER_LITERAL);
@@ -65,7 +63,7 @@ static AstRef tree_int(Parser *par, Source site, i64 i)
 	return v;
 }
 
-static AstRef tree_num(Parser *par, Source site, f64 n)
+static AstRef create_num_ast(Parser *par, Source site, f64 n)
 {
 	AstRef v;
 	v=tree_nullary(par, site, AST_NUMBER_LITERAL);
@@ -108,7 +106,7 @@ static AstRef create_tuple_ast(Parser *par, Source site, AstRef *args, u32 nargs
 }
 
 
-static AstRef elf_new_ellipsis_tree(Parser *par, Source site)
+static AstRef create_ellipsis_ast(Parser *par, Source site)
 {
 	AstRef tree = create_ast(par, site, AST_ELLIPSIS);
 	return tree;
@@ -122,7 +120,7 @@ static AstRef elf_new_ellipsis_tree(Parser *par, Source site)
 // {
 // 	ASSERT(rem >= 0);
 
-// 	AstRef v = elf_new_unary_tree(par, site, TREE_MEMORY, x);
+// 	AstRef v = create_unary_expr_ast(par, site, TREE_MEMORY, x);
 // 	v->tree_memory.mem =  -1;
 // 	v->tree_memory.rem = rem;
 // 	return v;
@@ -135,14 +133,15 @@ static AstRef elf_new_ellipsis_tree(Parser *par, Source site)
 
 // static inline AstRef tree_proxy(Parser *par, Source site, AstRef x)
 // {
-// 	return elf_new_unary_tree(par, site, TREE_PROXY, x);
+// 	return create_unary_expr_ast(par, site, TREE_PROXY, x);
 // }
 
 // static inline AstRef tree_proxy1(Parser *par, AstRef x)
 // {
-// 	return elf_new_unary_tree(par, x->site, TREE_PROXY, x);
+// 	return create_unary_expr_ast(par, x->site, TREE_PROXY, x);
 // }
 
+#if 0
 static AstRef tree_global(Parser *par, Source site, int x)
 {
 	AstRef v = tree_nullary(par, site, TREE_GLOBAL);
@@ -153,17 +152,19 @@ static AstRef tree_global(Parser *par, Source site, int x)
 // todo: we should already have the GCStr by now...
 static AstRef tree_global_symbol(Parser *par, Source site, const char *name)
 {
-	V v;
-	to_str(&v, new_string_from_data(par->inter, name));
-	Index x = elf_table_ensure(par->R, par->inter->globals, v);
+	Value v;
+	to_str(&v, new_string_from_data(par->state, name));
+
+	Index x = elf_table_ensure(par->R, par->state->globals, v);
 
 	ASSERT(x != -1);
 	return tree_global(par, site, x);
 }
+#endif
 
 static AstRef tree_enforce(Parser *par, Source site, AstRef x, TypeRule rule)
 {
-	AstRef v = elf_new_unary_tree(par, site, TREE_ENFORCE, x);
+	AstRef v = create_unary_expr_ast(par, site, TREE_ENFORCE, x);
 	v->rule = rule;
 	return v;
 }
@@ -183,7 +184,7 @@ static AstRef tree_enforce(Parser *par, Source site, AstRef x, TypeRule rule)
 
 //	static AstRef tree_add_int(Parser *par, Source site, AstRef x, Int y)
 //	{
-//		return tree_add(par, site, x, tree_int(par, site, y));
+//		return tree_add(par, site, x, create_int_ast(par, site, y));
 //	}
 
 // todo: intrinsic!
@@ -195,7 +196,7 @@ static AstRef tree_enforce(Parser *par, Source site, AstRef x, TypeRule rule)
 
 static AstRef tree_length(Parser *par, Source site, AstRef x)
 {
-	return elf_new_unary_tree(par, site, AST_LENGTH_INTRINSIC, x);
+	return create_unary_expr_ast(par, site, AST_LENGTH_INTRINSIC, x);
 }
 
 // Note, offset is an additional constant offset ...
@@ -221,10 +222,10 @@ static AstRef tree_less_than(Parser *par, Source site, AstRef x, AstRef y)
 
 static AstRef tree_eq_nil(Parser *par, Source site, AstRef x)
 {
-	return create_binary_expr_ast(par,site,AST_EQ,x,tree_nil(par,site));
+	return create_binary_expr_ast(par,site,AST_EQ,x,create_nil_ast(par,site));
 }
 
-static AstRef tree_meta_field(Parser *par, Source site, AstRef x, AstRef y)
+static AstRef create_meta_field_ast(Parser *par, Source site, AstRef x, AstRef y)
 {
 	return create_binary_expr_ast(par,site,AST_META_FIELD,x,y);
 }
@@ -275,23 +276,26 @@ static AstRef create_call_ast(Parser *par, Source site, AstRef expr, AstRef *arg
 	return tree;
 }
 
+#if 0
 static AstRef elf_new_comma_expr_tree(Parser *par, Source site, AstRef x, AstRef y)
 {
 	AstRef tree = create_binary_expr_ast(par, site, AST_COMMA_EXPR, x, y);
 	return tree;
 }
+#endif
 
-static AstRef elf_new_semi_colon_expr_tree(Parser *par, Source site, AstRef x, AstRef y)
+// Todo, just make this a tuple ...
+static AstRef create_for_loop_expr_ast(Parser *par, Source site, AstRef x, AstRef y)
 {
-	AstRef tree = create_binary_expr_ast(par, site, AST_SEMI_COLON_EXPR, x, y);
+	AstRef tree = create_binary_expr_ast(par, site, AST_SEMICOLON_EXPR, x, y);
 	return tree;
 }
 
 
 // Todo, remove (char *) usage from here!??
-static AstRef ELF_NewMetaCallTree(Parser *par, Source site, AstRef expr, char *name, AstRef *args, u32 nargs)
+static AstRef create_meta_call_ast(Parser *par, Source site, AstRef expr, char *name, AstRef *args, u32 nargs)
 {
-	expr = tree_meta_field(par, site, expr, create_str_ast(par, site, name));
+	expr = create_meta_field_ast(par, site, expr, create_str_ast(par, site, name));
 	return create_call_ast(par, site, expr, args, nargs);
 }
 
@@ -365,11 +369,11 @@ static AstRef create_file_ast(Parser *par, Source site, AstRef body)
 	return tree;
 }
 
-static AstRef elf_new_while_stat_tree(Parser *par, Source site, AstRef pred, AstRef body)
+static AstRef create_while_ast(Parser *par, Source site, AstRef pred, AstRef body)
 {
 	AstRef tree = create_ast(par, site, AST_WHILE);
-	tree->tree_while_stat.pred = pred;
-	tree->tree_while_stat.body = body;
+	tree->ast_while_stat.pred = pred;
+	tree->ast_while_stat.body = body;
 	return tree;
 }
 
@@ -587,8 +591,8 @@ void print_ast(Printer *pr, AstRef tree)
 		case AST_WHILE:
 		{
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			AstRef pred = tree->tree_while_stat.pred;
-			AstRef body = tree->tree_while_stat.body;
+			AstRef pred = tree->ast_while_stat.pred;
+			AstRef body = tree->ast_while_stat.body;
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			PRINT(pr, "while ");
@@ -805,7 +809,7 @@ void print_ast(Printer *pr, AstRef tree)
 		}
 		break;
 
-		case AST_SEMI_COLON_EXPR:
+		case AST_SEMICOLON_EXPR:
 		{
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			AstRef x = tree->ast_binary_expr.x;

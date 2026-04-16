@@ -9,8 +9,7 @@
 // undeclared identifier
 #define Y_UNIDENT ((AstRef) (-2))
 
-#define istree(t) ((t) > 0)
-#define notree(t) ((t) <= 0)
+#define check_error_ast(t) ((t) <= 0)
 #define iserror(t) ((t) < 0)
 
 
@@ -45,8 +44,6 @@ _(AST_BITWISE_NOT         , "bitwise_not")                \
 \
 _(AST_ERROR               , "error")                      \
 \
-_(AST_COMMA_EXPR          , "comma_expr")                 \
-\
 _(AST_ADD_ASSIGN          , "add_assign")                 \
 _(AST_SUB_ASSIGN          , "sub_assign")                 \
 _(AST_MUL_ASSIGN          , "mul_assign")                 \
@@ -56,7 +53,7 @@ _(AST_XOR_ASSIGN          , "xor_assign")                 \
 _(AST_SHL_ASSIGN          , "shl_assign")                 \
 _(AST_SHR_ASSIGN          , "shr_assign")                 \
 _(AST_NIL_ASSIGN          , "nil_assign")                 \
-_(AST_ASSIGN         , "assign_stat")                \
+_(AST_ASSIGN              , "assign")                     \
 \
 _(AST_FILE                , "file")                       \
 \
@@ -85,7 +82,10 @@ _(AST_META_FIELD          , "meta_field")                 \
 _(AST_NIL_LITERAL         , "nil_literal")                \
 _(AST_IF                  , "if")                         \
 _(AST_FOR                 , "for")                        \
-_(AST_SEMI_COLON_EXPR     , "semi_colon_expr")            \
+\
+_(AST_SEMICOLON_EXPR      , "semicolon_expr")             \
+_(AST_COMMA_EXPR          , "comma_expr")                 \
+\
 _(AST_WHILE               , "while")                      \
 _(AST_BREAK               , "break")                      \
 _(AST_CONTINUE            , "continue")                   \
@@ -121,7 +121,14 @@ typedef enum
 }
 AstType;
 
-
+// Todo, we could use an AstArray structure since we have that pattern all over the place,
+// something like:
+typedef struct
+{
+	u32    nargs;
+	AstRef *args;
+}
+AstArray;
 
 
 struct Ast
@@ -243,7 +250,7 @@ struct Ast
 			AstRef pred;
 			AstRef body;
 		}
-		tree_while_stat;
+		ast_while_stat;
 
 		struct
 		{

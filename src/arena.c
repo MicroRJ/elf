@@ -41,9 +41,19 @@ static void *elf_arena_push_zero(elf_Arena *arena, u64 size)
 	return data;
 }
 
-static void *elf_arena_push_copy(elf_Arena *arena, u64 size, void *copy)
+static void *elf_arena_push_copy(elf_Arena *arena, u64 size, const void *data)
 {
-	void *data = elf_arena_push(arena, size);
-	elf_copy_memory(data, copy, size);
-	return data;
+	void *copy = elf_arena_push(arena, size);
+	copy_memory(copy, data, size);
+	return copy;
+}
+
+static char *elf_arena_push_string_data_copy(elf_Arena *arena, u64 size, const char *data)
+{
+	if (size == 0) {
+		size = strlen(data);
+	}
+	void *copy = elf_arena_push(arena, size + 1);
+	copy_memory(copy, data, size + 1);
+	return copy;
 }

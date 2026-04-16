@@ -54,7 +54,7 @@ typedef elf_String  *GCStr;
 typedef elf_Closure *Closure;
 
 
-typedef elf_Tag     Tag;
+typedef ELF_ValueType     Tag;
 
 
 typedef elf_u8  u8;
