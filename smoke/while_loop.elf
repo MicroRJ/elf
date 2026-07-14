@@ -1,0 +1,4 @@
+while flag ? {
+	x = 1
+}
+ret 2

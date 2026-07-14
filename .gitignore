@@ -1,6 +1,6 @@
 .vs
 .vscode/*
-buid/*
+build/*
 *.ilk
 *.exe
 *.pdb

@@ -1,0 +1,25 @@
+data := json {
+	"name": "elf",
+	"count": 3,
+	"ok": true,
+	"nope": false,
+	"none": null,
+	"items": [1, 2, {"nested": "yes"}],
+	"escaped": "a\nb",
+	"unicode": "\u263A"
+}
+
+test_assert(data.name == "elf")
+test_assert(data.count == 3)
+test_assert(data.ok == 1)
+test_assert(data.nope == 0)
+test_assert(data.none == nil)
+
+test_assert(data.items[0] == 1)
+test_assert(data.items[1] == 2)
+test_assert(data.items[2].nested == "yes")
+
+test_assert(data.escaped == "a\nb")
+test_assert(data.unicode == "\u263A")
+
+ret 321

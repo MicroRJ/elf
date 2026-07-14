@@ -2,849 +2,665 @@
 // See Copyright Notice In elf.h
 //
 
-
-//
-// TIMING
-//
-
-
-
-static inline elf_f64 get_performance_counter_elapsed_s(elf_i64 time) {
-	return (sys_get_performance_counter() - time) / (elf_f64) sys_get_performance_counter_frequency();
+static inline f64 performance_counter_elapsed_s(i64 start)
+{
+	return (sys_get_performance_counter() - start) / (f64)sys_get_performance_counter_frequency();
 }
 
-
-
-ELF_FUNCTION(l_sys_get_performance_counter) {
-	elf_pushint(S, sys_get_performance_counter());
-	return 1;
+static elf_Atom *load_atom_arg(elf_State *state, u32 index)
+{
+	elf_Value value = load_value(state, index);
+	check_value_type(state, value, ELF_VALUE_TYPE_ATOM);
+	return value_as_atom(value);
 }
 
-
-
-ELF_FUNCTION(l_sys_get_performance_counter_frequency) {
-	elf_pushint(S, sys_get_performance_counter_frequency());
-	return 1;
+static const char *load_atom_text_arg(elf_State *state, u32 index)
+{
+	return elf_atom_data(load_atom_arg(state, index));
 }
 
-
-
-ELF_FUNCTION(l_sys_get_performance_counter_elapsed_s) {
-	Time time = loadint(S, 1);
-	elf_push_num(S, get_performance_counter_elapsed_s(time));
-	return 1;
+static i64 load_integer_arg(elf_State *state, u32 index)
+{
+	elf_Value value = load_value(state, index);
+	check_value_type_rule(state, value, TRULE_NUMERIC);
+	return value_to_integer(value);
 }
 
-
-
-ELF_FUNCTION(l_sys_get_performance_counter_elapsed_ms) {
-	Time time = loadint(S, 1);
-	elf_push_num(S, get_performance_counter_elapsed_s(time) * 1000);
-	return 1;
+static elf_Handle load_handle_arg(elf_State *state, u32 index)
+{
+	elf_Value value = load_value(state, index);
+	check_value_type(state, value, ELF_VALUE_TYPE_HANDLE);
+	return value_as_handle(value);
 }
 
+static void push_atom_data(elf_State *state, const char *data, u32 size)
+{
+	push_value(state, value_from_atom(elf_atom_from_data_size(state, data, size)));
+}
 
+static elf_Value atom_value_from_text(elf_State *state, const char *text)
+{
+	return value_from_atom(elf_atom_from_data(state, text));
+}
 
-ELF_FUNCTION(l_sys_sleep) {
-	sys_sleep(loadint(S, 1));
+static void table_set_integer_field(elf_State *state, elf_Table *table, const char *name, i64 value)
+{
+	elf_table_set(state, table, atom_value_from_text(state, name), value_from_integer(value));
+}
+
+static void push_optional_handle(elf_State *state, elf_Handle handle)
+{
+	if (ELF_IS_HANDLE_INVALID(handle)) {
+		push_value(state, value_nil());
+	}
+	else {
+		push_value(state, value_from_handle(handle));
+	}
+}
+
+static b32 parse_file_open_mode(elf_State *state, const char *mode_text, i32 *flags, i32 *creation_mode)
+{
+	*flags = 0;
+
+	for (const char *cursor = mode_text; *cursor; ++cursor)
+	{
+		if (*cursor == 'r') {
+			*flags |= SYS_OPEN_READ;
+		}
+		else if (*cursor == 'w') {
+			*flags |= SYS_OPEN_WRITE;
+		}
+		else if (*cursor == 'b') {
+		}
+		else {
+			report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "unrecognized file open mode");
+			return false;
+		}
+	}
+
+	*creation_mode = SYS_OPEN_EXISTING;
+	if (*flags & SYS_OPEN_WRITE) {
+		*creation_mode = SYS_CREATE_ALWAYS;
+	}
+
+	return true;
+}
+
+static const char *path_last_separator(const char *begin, const char *end)
+{
+	for (const char *cursor = end; cursor > begin; --cursor)
+	{
+		char c = cursor[-1];
+		if (c == '\\' || c == '/') {
+			return cursor - 1;
+		}
+	}
+
 	return 0;
 }
 
+static char *slice_path_part(char *data, i32 *size, i32 count)
+{
+	char *end = data + *size;
 
+	if (count < 0)
+	{
+		while (count ++)
+		{
+			--end;
+			while (end > data && end[-1] != '\\' && end[-1] != '/') {
+				--end;
+			}
+		}
 
-//
-// PATHS
-//
+		*size -= (i32)(end - data);
+		return end;
+	}
 
+	char *slice_end = data;
+	while (count --)
+	{
+		do {
+			++slice_end;
+		} while (slice_end < end && *slice_end != '\\' && *slice_end != '/');
+	}
 
+	*size = (i32)(slice_end - data);
+	return data;
+}
 
+static void append_visited_paths(elf_State *state, FILE_VISITOR *visitor, elf_Table *paths, i32 recurse)
+{
+	elf_Handle dir = sys_find_first_file(visitor);
+	if (!dir) {
+		return;
+	}
 
+	for (;;)
+	{
+		const char *name = visitor->pb.name;
+		b32 is_relative_marker =
+			(name[0] == '.' && name[1] == 0) ||
+			(name[0] == '.' && name[1] == '.' && name[2] == 0);
 
+		if (visitor->type != FILE_TYPE_SYMLINK && !is_relative_marker)
+		{
+			elf_Atom *atom = elf_atom_from_data(state, visitor->pb.path);
+			elf_array_add(state, paths, value_from_atom(atom));
 
-ELF_FUNCTION(l_sys_get_parent_path) {
-	GCStr p = loadstr(S, 1);
-	int n = 1;
+			if (visitor->type == FILE_TYPE_FOLDER && recurse > 0) {
+				append_visited_paths(state, visitor, paths, recurse - 1);
+			}
+		}
+
+		if (!sys_find_next_file(dir, visitor)) {
+			break;
+		}
+	}
+}
+
+ELF_FUNCTION(lib_sys_get_performance_counter)
+{
+	elf_State *state = S;
+	push_value(state, value_from_integer(sys_get_performance_counter()));
+	return 1;
+}
+
+ELF_FUNCTION(lib_sys_get_performance_counter_frequency)
+{
+	elf_State *state = S;
+	push_value(state, value_from_integer(sys_get_performance_counter_frequency()));
+	return 1;
+}
+
+ELF_FUNCTION(lib_sys_get_performance_counter_elapsed_s)
+{
+	elf_State *state = S;
+	i64 start = load_integer_arg(state, 1);
+	push_value(state, value_from_number(performance_counter_elapsed_s(start)));
+	return 1;
+}
+
+ELF_FUNCTION(lib_sys_get_performance_counter_elapsed_ms)
+{
+	elf_State *state = S;
+	i64 start = load_integer_arg(state, 1);
+	push_value(state, value_from_number(performance_counter_elapsed_s(start) * 1000));
+	return 1;
+}
+
+ELF_FUNCTION(lib_sys_sleep)
+{
+	elf_State *state = S;
+	sys_sleep(load_integer_arg(state, 1));
+	return 0;
+}
+
+ELF_FUNCTION(lib_sys_get_parent_path)
+{
+	elf_State *state = S;
+	elf_Atom *path = load_atom_arg(state, 1);
+	i32 levels = 1;
+
 	if (nargs >= 3) {
-		n = loadint(S, 2);
+		levels = (i32)load_integer_arg(state, 2);
 	}
 
-	const char *s = strt(p);
-	const char *e = strt(p) + strl(p);
-
-	while (n -- > 0) {
-		do e --; while(e > s && *e != '\\' && *e != '/');
+	const char *begin = elf_atom_data(path);
+	const char *end = begin + elf_atom_size(path);
+	for (i32 i = 0; i < levels && end > begin; ++i)
+	{
+		const char *separator = path_last_separator(begin, end);
+		end = separator ? separator : begin;
 	}
 
-	pushtext2(S, s, e - s);
-
+	push_atom_data(state, begin, (u32)(end - begin));
 	return 1;
 }
 
+ELF_FUNCTION(lib_sys_slice_path)
+{
+	elf_State *state = S;
+	elf_Atom *path = load_atom_arg(state, 1);
+	i32 count = 1;
 
-static char *slice_path(char *p, int *l, int n) {
-	char *e = p + *l;
-
-	if (n < 0) {
-		while (n ++) {
-			e --;
-			while (e > p && e[-1] != '\\' && e[-1] != '/') e --;
-		}
-		*l = *l - (e - p);
-		return e;
-	}
-	else {
-		char *s = p;
-		while (n --) {
-			do s ++; while (s < e && *s != '\\' && *s != '/');
-		}
-		*l = s - p;
-		return p;
-	}
-}
-
-ELF_FUNCTION(l_sys_slice_path) {
-	GCStr p = loadstr(S, 1);
-	int n = 1;
 	if (nargs > 2) {
-		n = loadint(S, 2);
+		count = (i32)load_integer_arg(state, 2);
 	}
 
-	int l = strl(p);
-	char *s = slice_path((char *) strt(p), &l, n);
+	i32 size = (i32)elf_atom_size(path);
+	char *data = slice_path_part((char *)elf_atom_data(path), &size, count);
 
-	if (nargs > 3) {
-		n = loadint(S, 3);
-		s = slice_path(s, &l, n);
+	if (nargs > 3)
+	{
+		count = (i32)load_integer_arg(state, 3);
+		data = slice_path_part(data, &size, count);
 	}
 
-	pushtext2(S, s, l);
+	push_atom_data(state, data, (u32)size);
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_get_file_name)
+{
+	elf_State *state = S;
+	elf_Atom *path = load_atom_arg(state, 1);
+	const char *begin = elf_atom_data(path);
+	const char *end = begin + elf_atom_size(path);
+	const char *extension = end;
 
+	while (end > begin && *end != '\\' && *end != '/' && *end != '.') {
+		--end;
+	}
 
+	if (*end == '.') {
+		extension = end;
+	}
 
-//
-// some      -> some
-// some.name -> some
-//           ->
-//
-// .../some.name -> some
-// .../some      -> some
-// .../          ->
-//
-//
+	while (end > begin && end[-1] != '\\' && end[-1] != '/') {
+		--end;
+	}
 
-ELF_FUNCTION(l_sys_get_file_name) {
-	GCStr p = loadstr(S, 1);
-	const char *s = strt(p);
-	const char *e = strt(p) + strl(p);
-	const char *d = e;
-
-	while (e > s && *e != '\\' && *e != '/' && *e != '.') e --;
-	if (*e == '.') d = e;
-	while (e > s && e[-1] != '\\' && e[-1] != '/') e --;
-
-	pushtext2(S, e, d - e);
+	push_atom_data(state, end, (u32)(extension - end));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_get_file_extension)
+{
+	elf_State *state = S;
+	elf_Atom *path = load_atom_arg(state, 1);
+	const char *begin = elf_atom_data(path);
+	const char *end = begin + elf_atom_size(path);
 
-ELF_FUNCTION(l_sys_get_file_extension) {
-	GCStr p = loadstr(S, 1);
-	const char *s = strt(p);
-	const char *e = strt(p) + strl(p);
-	while (e > s && e[-1] != '\\' && e[-1] != '/' && e[-1] != '.') e --;
-	pushtext2(S, e, strl(p) - (e - strt(p)));
+	while (end > begin && end[-1] != '\\' && end[-1] != '/' && end[-1] != '.') {
+		--end;
+	}
+
+	push_atom_data(state, end, (u32)(elf_atom_size(path) - (end - begin)));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-ELF_FUNCTION(l_sys_create_directory) {
-	const char *path = loadtext(S, 1);
-	int noerr = sys_make_dir(path);
-	elf_pushint(S, noerr);
+ELF_FUNCTION(lib_sys_create_directory)
+{
+	elf_State *state = S;
+	const char *path = load_atom_text_arg(state, 1);
+	push_value(state, value_from_integer(sys_make_dir(path)));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_delete_file)
+{
+	elf_State *state = S;
+	const char *path = load_atom_text_arg(state, 1);
+	push_value(state, value_from_integer(sys_delete_file(path)));
+	return 1;
+}
 
-ELF_FUNCTION(l_sys_get_file_times) {
-	Sys file = loadsys(S, 1);
+ELF_FUNCTION(lib_sys_get_file_times)
+{
+	elf_State *state = S;
+	elf_Handle file = load_handle_arg(state, 1);
 
 	FILE_TIMES times;
 	sys_time_file(file, &times);
 
-	// todo: set fields directly
-	Tab tab = push_new_table(S);
-	elf_pushtext(S, "created");  elf_pushint(S, times.create.time); elf_setfield(S);
-	elf_pushtext(S, "access");   elf_pushint(S, times.access.time); elf_setfield(S);
-	elf_pushtext(S, "write");    elf_pushint(S, times.write.time);  elf_setfield(S);
+	elf_Table *table = elf_table_new(state);
+	table_set_integer_field(state, table, "created", times.create.time);
+	table_set_integer_field(state, table, "access", times.access.time);
+	table_set_integer_field(state, table, "write", times.write.time);
+
+	push_value(state, value_from_table(table));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-ELF_FUNCTION(l_sys_file_time_to_system_time) {
-
-	Time time = loadint(S, 1);
-	FILE_TIME filetime = { .time = time };
+ELF_FUNCTION(lib_sys_file_time_to_system_time)
+{
+	elf_State *state = S;
+	FILE_TIME filetime = { .time = load_integer_arg(state, 1) };
 
 	SYSTEM_TIME systemtime;
 	sys_file_time_to_system_time(&filetime, &systemtime);
 
-	push_new_table(S);
+	elf_Table *table = elf_table_new(state);
+	table_set_integer_field(state, table, "year", systemtime.year);
+	table_set_integer_field(state, table, "month", systemtime.month);
+	table_set_integer_field(state, table, "dayofweek", systemtime.dayofweek);
+	table_set_integer_field(state, table, "day", systemtime.day);
+	table_set_integer_field(state, table, "hour", systemtime.hour);
+	table_set_integer_field(state, table, "minute", systemtime.minute);
+	table_set_integer_field(state, table, "second", systemtime.second);
+	table_set_integer_field(state, table, "milliseconds", systemtime.milliseconds);
 
-	pushtext(S, "year");
-	pushint(S, systemtime.year);
-	elf_setfield(S);
-	pushtext(S, "month");
-	pushint(S, systemtime.month);
-	elf_setfield(S);
-	pushtext(S, "dayofweek");
-	pushint(S, systemtime.dayofweek);
-	elf_setfield(S);
-	pushtext(S, "day");
-	pushint(S, systemtime.day);
-	elf_setfield(S);
-	pushtext(S, "hour");
-	pushint(S, systemtime.hour);
-	elf_setfield(S);
-	pushtext(S, "minute");
-	pushint(S, systemtime.minute);
-	elf_setfield(S);
-	pushtext(S, "second");
-	pushint(S, systemtime.second);
-	elf_setfield(S);
-	pushtext(S, "milliseconds");
-	pushint(S, systemtime.milliseconds);
-	elf_setfield(S);
-	return 1;
-}
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-//
-// name: the name of the dynamic library in
-// the file system
-//
-ELF_FUNCTION(l_sys_load_dll) {
-	const char *name = loadtext(S, 1);
-
-	Sys dll = sys_load_dll(name);
-
-	if (dll != 0) pushsys(S, dll);
-	else          push_nil(S);
+	push_value(state, value_from_table(table));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-ELF_FUNCTION(l_sys_get_dll_fn) {
-	Sys dll = loadsys(S, 1);
-	const char *name = loadtext(S, 2);
-
-	Fun fun = (Fun) sys_get_dll_fn(dll, name);
-	if (fun != 0) pushfun(S,fun);
-	else          push_nil(S);
+ELF_FUNCTION(lib_sys_load_dll)
+{
+	elf_State *state = S;
+	const char *name = load_atom_text_arg(state, 1);
+	push_optional_handle(state, sys_load_dll(name));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_get_dll_fn)
+{
+	elf_State *state = S;
+	elf_Handle dll = load_handle_arg(state, 1);
+	const char *name = load_atom_text_arg(state, 2);
 
-static void pathlist(elf_State *S, FILE_VISITOR *visitor, Tab list, int recurse) {
-
-	Sys dir = sys_find_first_file(visitor);
-	if (!dir) goto esc;
-
-	for (;;)
-	{
-		if (visitor->type == FILE_TYPE_SYMLINK) {
-			goto _prox;
-		}
-
-		if (visitor->pb.type != PATH_NAME) {
-			goto _prox;
-		}
-
-		GCStr s = new_string_from_data(S, visitor->pb.path);
-
-		V v;
-		to_str(&v, s);
-
-		_table_arrayadd(S, list, v);
-
-		if (visitor->type == FILE_TYPE_FOLDER) {
-			if (recurse > 0) {
-				pathlist(S, visitor, list, recurse - 1);
-			}
-		}
-
-		_prox:
-		if (!sys_find_next_file(dir, visitor)) {
-			goto esc;
-		}
+	elf_Function function = (elf_Function) sys_get_dll_fn(dll, name);
+	if (function) {
+		push_value(state, value_from_function(function));
+	}
+	else {
+		push_value(state, value_nil());
 	}
 
-	esc: ;
+	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_get_file_tree)
+{
+	elf_State *state = S;
+	load_atom_text_arg(state, 1);
 
-ELF_FUNCTION(l_sys_get_file_tree) {
+	push_value(state, value_nil());
+	return 1;
+}
 
-	const char *path = loadtext(S, 1);
+ELF_FUNCTION(lib_sys_get_path_list)
+{
+	elf_State *state = S;
+	const char *path = load_atom_text_arg(state, 1);
+	u32 recurse = 0;
 
-	int recurse = 0;
 	if (nargs >= 3) {
-		recurse = loadint(S, 2);
+		recurse = load_integer_arg(state, 2);
 	}
 
-	// filetree(S, path, recurse);
+	elf_Table *paths = elf_table_new(state);
+	Scratch scratch = get_scratch();
+	FILE_VISITOR visitor = {};
+	visitor.pb = path_new_stack(scratch.arena, 32768);
 
-	elf_push_nil(S);
+	path_push(&visitor.pb, path);
+	append_visited_paths(state, &visitor, paths, recurse);
+	end_scratch(scratch);
+
+	push_value(state, value_from_table(paths));
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-
-//
-// returns all child paths including folders
-// todo: add filters!
-//
-ELF_FUNCTION(l_sys_get_path_list) {
-
-	const char *path = loadtext(S, 1);
-
-	int recurse = 0;
-	if (nargs >= 3) {
-		recurse = loadint(S, 2);
-	}
-
-	Tab list = push_new_table(S);
-
-	FILE_VISITOR *visi = calloc(1, sizeof(*visi));
-
-	pb_push(&visi->pb, path);
-	pathlist(S, visi, list, recurse);
-
-	// todo:
-	free(visi->pb.sb.buf);
-	free(visi);
-	return 1;
-}
-
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//	todo: remove this!
-//
-//
-//
-
-ELF_FUNCTION(l_sys_open_temp_file) {
-	FILE *file = {0};
+ELF_FUNCTION(lib_sys_open_temp_file)
+{
+	elf_State *state = S;
+	FILE *file = 0;
 #if defined(PLATFORM_WEB)
 	file = tmpfile();
 #else
 	tmpfile_s(&file);
 #endif
-	elf_pushsys(S,(Sys)file);
+	push_optional_handle(state, (elf_Handle)file);
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_open_file)
+{
+	elf_State *state = S;
+	const char *name = load_atom_text_arg(state, 1);
+	const char *mode_text = load_atom_text_arg(state, 2);
 
-ELF_FUNCTION(l_sys_delete_file) {
-	char const *path = loadtext(S, 1);
-	int ok = sys_delete_file(path);
-	elf_pushint(S, ok);
+	i32 flags = 0;
+	i32 creation_mode = SYS_OPEN_EXISTING;
+	if (!parse_file_open_mode(state, mode_text, &flags, &creation_mode)) {
+		push_value(state, value_nil());
+		return 1;
+	}
+
+	elf_Handle file = elf_platform_access_file(name, flags, creation_mode);
+	push_optional_handle(state, file);
 	return 1;
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+ELF_FUNCTION(lib_sys_close_file)
+{
+	elf_State *state = S;
+	elf_Handle file = load_handle_arg(state, 1);
 
-ELF_FUNCTION(l_sys_open_file) {
-	const char *name = loadtext(S, 1);
-	const char *text = loadtext(S, 2);
-
-	int flags;
-	for (flags = 0; *text; text ++) {
-		if      (*text == 'r') flags |= SYS_OPEN_READ;
-		else if (*text == 'w') flags |= SYS_OPEN_WRITE;
-		else if (*text == 'b') flags |= 0;
-		else reporterror(S, NO_BYTE, "unrecognized flag");
-	}
-
-	int mode = SYS_OPEN_EXISTING;
-	if (flags & SYS_OPEN_WRITE) {
-		mode = SYS_CREATE_ALWAYS;
-	}
-
-	Sys file = elf_platform_access_file(name, flags, mode);
-
-	if (ELF_HISINVALID(file)) {
-		push_nil(S);
-	}
-	else {
-		pushsys(S, file);
-	}
-	return 1;
-}
-
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-ELF_FUNCTION(l_sys_close_file) {
-	Sys file = loadsys(S, 1);
-	if (file) {
+	if (!ELF_IS_HANDLE_INVALID(file)) {
 		elf_platform_close_file(file);
 	}
+
 	return 0;
 }
 
+ELF_FUNCTION(lib_sys_get_file_size)
+{
+	elf_State *state = S;
+	elf_Handle file = load_handle_arg(state, 1);
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
+	if (ELF_IS_HANDLE_INVALID(file)) {
+		push_value(state, value_nil());
+	}
+	else {
+		push_value(state, value_from_integer(elf_platform_get_file_size(file)));
+	}
 
-
-
-ELF_FUNCTION(l_sys_get_file_size) {
-	Sys file = loadsys(S, 1);
-	pushint(S, elf_platform_get_file_size(file));
 	return 1;
 }
 
+ELF_FUNCTION(lib_sys_move_file_cursor)
+{
+	elf_State *state = S;
+	elf_Handle file = load_handle_arg(state, 1);
+	i32 relative_to = (i32)load_integer_arg(state, 2);
+	i32 distance = (i32)load_integer_arg(state, 3);
 
-
-ELF_FUNCTION(l_sys_move_file_cursor) {
-	Sys file = loadsys(S, 1);
-	Int relativeto = loadint(S, 2);
-	Int distance = loadint(S, 3);
-	pushint(S, sys_move_file_cursor(file, relativeto, distance));
+	push_value(state, value_from_integer(sys_move_file_cursor(file, relative_to, distance)));
 	return 1;
 }
 
+ELF_FUNCTION(lib_sys_read_console)
+{
+	elf_State *state = S;
+	i32 buffer_size = (i32)load_integer_arg(state, 1);
+	Scratch scratch = get_scratch();
+	char *buffer = arena_push_zero(scratch.arena, buffer_size + 1);
+	i32 read = sys_read_console(SYS_STD_INPUT, buffer, buffer_size);
 
-
-// todo: should take a buffer
-ELF_FUNCTION(l_sys_read_console) {
-	int zbuf = loadint(S, 1);
-	char *buf = calloc(1, zbuf + 1);
-	int ret = sys_read_console(SYS_STD_INPUT, buf, zbuf);
-	pushtext(S, buf);
+	push_atom_data(state, buffer, read);
+	end_scratch(scratch);
 	return 1;
 }
 
+ELF_FUNCTION(lib_sys_read_file)
+{
+	elf_State *state = S;
+	elf_Value file_arg = load_value(state, 1);
+	elf_Handle file = ELF_HINVALID;
+	b32 should_close = false;
 
-
-//
-// @doc sys.read_file(name or handle, size) -> contents
-//
-//
-//	todo: read_file returns a string, instead the user should
-// pass in a buffer, we read the file into the buffer!
-//
-//
-//	.read_file(file)
-//	.read_file(file, size)
-//
-ELF_FUNCTION(l_sys_read_file) {
-
-	int size = -1;
-	int read = 0;
-
-	Sys file = ELF_HINVALID;
-	const char *name = 0;
-
-	if (is_string_type(loadtype(S, 1)))
+	if (value_is_atom(file_arg))
 	{
-		name = loadtext(S, 1);
+		const char *name = elf_atom_data(value_as_atom(file_arg));
 		file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+		should_close = true;
 	}
-	else if (tissys(loadtype(S, 1)))
+	else if (value_is_handle(file_arg))
 	{
-		file = loadsys(S, 1);
+		file = value_as_handle(file_arg);
 	}
-	else {
-		loadrulecheck(S, 1, TRULE_STRING|TRULE_HANDLE);
+	else
+	{
+		check_value_type_rule(state, file_arg, TRULE_ATOM | TRULE_HANDLE);
 	}
 
+	if (ELF_IS_HANDLE_INVALID(file)) {
+		push_value(state, value_nil());
+		return 1;
+	}
 
+	i32 size = -1;
 	if (nargs > 2) {
-		size = loadint(S, 2);
+		size = (i32)load_integer_arg(state, 2);
 	}
+
 	if (size < 0) {
-		size = elf_platform_get_file_size(file);
+		size = (i32)elf_platform_get_file_size(file);
 	}
 
-	if (file != ELF_HINVALID)
+	Scratch scratch = get_scratch();
+	char *buffer = arena_push(scratch.arena, size + 1);
+	i32 read = elf_platform_read_file(file, buffer, size);
+	buffer[read] = 0;
+
+	if (should_close) {
+		elf_platform_close_file(file);
+	}
+
+	push_atom_data(state, buffer, read);
+	end_scratch(scratch);
+	return 1;
+}
+
+ELF_FUNCTION(lib_sys_write_file)
+{
+	elf_State *state = S;
+	elf_Value file_arg = load_value(state, 1);
+	elf_Handle file = ELF_HINVALID;
+	b32 should_close = false;
+
+	if (value_is_handle(file_arg))
 	{
-		// todo:
-		GCStr contents = new_empty_string(S, size);
-		read = elf_platform_read_file(file, contents->text, size);
-
-		if (name) {
-			elf_platform_close_file(file);
-		}
-
-		// -->
-		pushstr(S, contents);
+		file = value_as_handle(file_arg);
 	}
-	else {
-		// -->
-		push_nil(S);
-	}
-
-	return 1;
-}
-
-static Sys load_file(elf_State *S, int x, int *close) {
-	Sys file;
-	if (tissys(loadtype(S, 1))) {
-		file = loadsys(S, 1);
-		*close = false;
-	}
-	else {
-		const char *name = loadtext(S, 1);
+	else
+	{
+		check_value_type(state, file_arg, ELF_VALUE_TYPE_ATOM);
+		const char *name = elf_atom_data(value_as_atom(file_arg));
 		file = elf_platform_access_file(name, SYS_OPEN_WRITE, SYS_CREATE_ALWAYS);
-		*close = true;
+		should_close = true;
 	}
-	return file;
+
+	if (ELF_IS_HANDLE_INVALID(file)) {
+		push_value(state, value_from_integer(false));
+		return 1;
+	}
+
+	elf_Value data = load_value(state, 2);
+	check_value_type(state, data, ELF_VALUE_TYPE_ATOM);
+
+	i32 size = value_as_atom(data)->size;
+	void *memory = value_as_atom(data)->data;
+
+	sys_write_file(file, memory, size);
+
+	if (should_close) {
+		elf_platform_close_file(file);
+	}
+
+	push_value(state, value_from_integer(true));
+	return 1;
 }
 
-ELF_FUNCTION(l_sys_write_file) {
+ELF_FUNCTION(lib_sys_write_file_to_file)
+{
+	elf_State *state = S;
+	elf_Handle dst = load_handle_arg(state, 1);
+	elf_Handle src = load_handle_arg(state, 2);
+	i32 size = (i32)elf_platform_get_file_size(src);
 
-	const char *name = 0;
-
-	int close;
-	Sys file = load_file(S, 1, &close);
-
-	if (file != ELF_HINVALID) {
-		Int zmem;
-		void *mem = loadmem(S, 2, &zmem);
-
-		sys_write_file(file, mem, zmem);
-
-		if (close) {
-			elf_platform_close_file(file);
-		}
-	}
+	Scratch scratch = get_scratch();
+	char *buffer = arena_push(scratch.arena, size);
+	elf_platform_read_file(src, buffer, size);
+	sys_write_file(dst, buffer, size);
+	end_scratch(scratch);
 
 	return 0;
 }
 
-
-// todo:
-ELF_FUNCTION(l_sys_write_file_to_file) {
-	Sys dst = loadsys(S, 1);
-	Sys src = loadsys(S, 2);
-
-	int size = elf_platform_get_file_size(src);
-	char *heapbuf = malloc(size);
-	elf_platform_read_file(src, heapbuf, size);
-	sys_write_file(dst, heapbuf, size);
-	free(heapbuf);
+ELF_FUNCTION(lib_sys_change_work_dir)
+{
+	elf_State *state = S;
+	const char *path = load_atom_text_arg(state, 1);
+	push_value(state, value_from_integer(sys_set_work_dir(path)));
 	return 1;
 }
 
-
-
-ELF_FUNCTION(l_sys_change_work_dir) {
-	int noerr = sys_set_work_dir(loadtext(S, 1));
-	pushint(S, noerr);
+ELF_FUNCTION(lib_sys_get_work_dir)
+{
+	elf_State *state = S;
+	char buffer[256];
+	sys_get_work_dir(buffer, sizeof(buffer));
+	push_value(state, atom_value_from_text(state, buffer));
 	return 1;
 }
 
-
-
-ELF_FUNCTION(l_sys_get_work_dir) {
-	char buf[256];
-	sys_get_work_dir(buf, sizeof(buf));
-	pushtext(S, buf);
+ELF_FUNCTION(lib_sys_create_process)
+{
+	elf_State *state = S;
+	const char *command = load_atom_text_arg(state, 1);
+	push_optional_handle(state, sys_create_process(0, command));
 	return 1;
 }
 
-
-// process
-ELF_FUNCTION(l_sys_create_process) {
-	const char *text = loadtext(S, 1);
-	Sys process = sys_create_process(0, text);
-	pushsys(S, process);
-	return 1;
-}
-
-
-ELF_FUNCTION(l_sys_exit_this_process) {
-	sys_exit_this_process(loadint(S, 1));
+ELF_FUNCTION(lib_sys_exit_this_process)
+{
+	elf_State *state = S;
+	sys_exit_this_process((i32)load_integer_arg(state, 1));
 	return 0;
 }
 
-ELF_FUNCTION(l_sys_get_this_process_id) {
-	int id = sys_get_this_process_id();
-	elf_pushint(S, id);
+ELF_FUNCTION(lib_sys_get_this_process_id)
+{
+	elf_State *state = S;
+	push_value(state, value_from_integer(sys_get_this_process_id()));
 	return 1;
 }
-
 
 static const elf_Binding l_sys[] = {
-	{"load_dll",                  l_sys_load_dll                  },
-	{"get_dll_fn",                l_sys_get_dll_fn                },
+	{"load_dll",                 lib_sys_load_dll},
+	{"get_dll_fn",               lib_sys_get_dll_fn},
 
-	{"get_file_tree",             l_sys_get_file_tree             },
-	{"get_path_list",             l_sys_get_path_list             },
+	{"get_file_tree",            lib_sys_get_file_tree},
+	{"get_path_list",            lib_sys_get_path_list},
 
-	{"open_temp_file",            l_sys_open_temp_file            },
-	{"open_file",                 l_sys_open_file                 },
-	{"close_file",                l_sys_close_file                },
-	{"get_file_size",             l_sys_get_file_size             },
-	{"read_file",                 l_sys_read_file                 },
-	{"read_console",              l_sys_read_console              },
-	{"move_file_cursor",          l_sys_move_file_cursor          },
-	{"write_file",                l_sys_write_file                },
-	{"write_file_to_file",        l_sys_write_file_to_file        },
-	{"change_work_dir",           l_sys_change_work_dir           },
-	{"get_work_dir",              l_sys_get_work_dir              },
+	{"open_temp_file",           lib_sys_open_temp_file},
+	{"open_file",                lib_sys_open_file},
+	{"close_file",               lib_sys_close_file},
+	{"get_file_size",            lib_sys_get_file_size},
+	{"read_file",                lib_sys_read_file},
+	{"read_console",             lib_sys_read_console},
+	{"move_file_cursor",         lib_sys_move_file_cursor},
+	{"write_file",               lib_sys_write_file},
+	{"write_file_to_file",       lib_sys_write_file_to_file},
+	{"change_work_dir",          lib_sys_change_work_dir},
+	{"get_work_dir",             lib_sys_get_work_dir},
 
-	{"get_file_times",            l_sys_get_file_times            },
-	{"file_time_to_system_time",  l_sys_file_time_to_system_time  },
-	{"sleep",                     l_sys_sleep                     },
+	{"get_file_times",           lib_sys_get_file_times},
+	{"file_time_to_system_time", lib_sys_file_time_to_system_time},
+	{"sleep",                    lib_sys_sleep},
 
-	{"slice_path",                l_sys_slice_path                },
-	{"get_file_name",             l_sys_get_file_name             },
-	{"get_file_extension",        l_sys_get_file_extension        },
-	{"get_parent_path",           l_sys_get_parent_path           },
+	{"slice_path",               lib_sys_slice_path},
+	{"get_file_name",            lib_sys_get_file_name},
+	{"get_file_extension",       lib_sys_get_file_extension},
+	{"get_parent_path",          lib_sys_get_parent_path},
 
-	{"create_directory",          l_sys_create_directory          },
-	{"delete_file",               l_sys_delete_file               },
+	{"create_directory",         lib_sys_create_directory},
+	{"delete_file",              lib_sys_delete_file},
 
-	{"create_process",            l_sys_create_process            },
-	{"get_process_id",            l_sys_get_this_process_id       },
-	{"exit",                      l_sys_exit_this_process         },
+	{"create_process",           lib_sys_create_process},
+	{"get_process_id",           lib_sys_get_this_process_id},
+	{"exit",                     lib_sys_exit_this_process},
 
-
-	{"get_perf_counter",      l_sys_get_performance_counter             },
-	{"get_perf_frequency",    l_sys_get_performance_counter_frequency   },
-	{"get_perf_elapsed_s",    l_sys_get_performance_counter_elapsed_s   },
-	{"get_perf_elapsed_ms",   l_sys_get_performance_counter_elapsed_ms  },
+	{"get_perf_counter",         lib_sys_get_performance_counter},
+	{"get_perf_frequency",       lib_sys_get_performance_counter_frequency},
+	{"get_perf_elapsed_s",       lib_sys_get_performance_counter_elapsed_s},
+	{"get_perf_elapsed_ms",      lib_sys_get_performance_counter_elapsed_ms},
 };
+
+static elf_Table *elf_lib_sys(elf_State *state)
+{
+	return new_binding_table(state, l_sys, ARRAY_COUNT(l_sys));
+}

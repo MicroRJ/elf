@@ -1,0 +1,53 @@
+b = 1
+c = 2
+
+{
+	a := b + c
+	test_assert(a == 3)
+	test_assert(#get_mem(a) == 1)
+}
+
+first := fun(a, ...) {
+	local := 1
+
+	test_assert(#get_mem(a) == 1)
+	test_assert(#get_mem(local) == 2)
+
+	ret #get_mem(a) * 10 + #get_mem(local)
+}
+
+second := fun(a) {
+	test_assert(#get_mem(a) == 1)
+	ret a
+}
+
+test_assert(#get_mem(first) == 1)
+test_assert(#get_mem(second) == 2)
+test_assert(first(9, 8) == 12)
+test_assert(second(30, 40) == 30)
+
+{
+	block_a := 100
+	test_assert(#get_mem(block_a) == 3)
+}
+
+{
+	block_b := 200
+	test_assert(#get_mem(block_b) == 3)
+}
+
+after_blocks := 300
+test_assert(#get_mem(after_blocks) == 3)
+
+{
+	b := 1
+	c := 2
+	a := (b + c) + (b + c)
+
+	test_assert(a == 6)
+	test_assert(#get_mem(b) == 4)
+	test_assert(#get_mem(c) == 5)
+	test_assert(#get_mem(a) == 6)
+}
+
+ret #get_mem(first) * 100 + #get_mem(second) * 10 + #get_mem(after_blocks)

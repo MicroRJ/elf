@@ -1,0 +1,13 @@
+fib := fun(n) {
+	if n < 2 ? {
+		ret n
+	}
+
+	ret recurse(n - 1) + recurse(n - 2)
+}
+
+test_assert(fib(0) == 0)
+test_assert(fib(1) == 1)
+test_assert(fib(6) == 8)
+
+ret fib(10)

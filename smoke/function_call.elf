@@ -1,0 +1,5 @@
+add := fun(a, b) {
+	ret a + b
+}
+
+ret add(2, 3)

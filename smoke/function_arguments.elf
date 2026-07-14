@@ -1,0 +1,5 @@
+probe := fun(a, b) {
+	ret elf.nargs() * 100 + elf.arg(1) * 10 + elf.arg(2)
+}
+
+ret probe(4, 5)

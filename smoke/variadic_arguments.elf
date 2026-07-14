@@ -1,0 +1,13 @@
+sum := fun(a, ...) {
+	test_assert(elf.nargs() == 5)
+	test_assert(elf.nvargs() == 3)
+	test_assert(elf.arg(1) == 4)
+	test_assert(elf.arg(4) == 7)
+	test_assert(elf.varg(0) == 5)
+	test_assert(elf.varg(2) == 7)
+	test_assert(elf.varg(3) == nil)
+	ret a * 100 + elf.nvargs() * 10 + elf.varg(1)
+}
+
+test_assert(sum != nil)
+ret sum(4, 5, 6, 7)

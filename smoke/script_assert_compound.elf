@@ -1,0 +1,29 @@
+x := 10
+x += 5
+test_assert(x == 15)
+x -= 3
+test_assert(x == 12)
+x *= 4
+test_assert(x == 48)
+x /= 6
+test_assert(x == 8)
+x %= 5
+test_assert(x == 3)
+x ^= 6
+test_assert(x == 5)
+x <<= 2
+test_assert(x == 20)
+x >>= 1
+test_assert(x == 10)
+
+t := { value = 4, [0] = 7 }
+t.value += 6
+test_assert(t.value == 10)
+t.[0] *= 3
+test_assert(t.[0] == 21)
+
+arr := {9}
+arr[0] -= 4
+test_assert(arr[0] == 5)
+
+ret x + t.value + t.[0] + arr[0]

@@ -1,0 +1,8 @@
+t := {
+	id = 37,
+	check = fun(x) {
+		ret elf.nargs() * 100 + elf.arg(0).id + elf.arg(1)
+	}
+}
+
+ret t.check(5)

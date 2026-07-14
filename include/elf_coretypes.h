@@ -20,21 +20,34 @@ typedef unsigned long long int elf_u64;
 typedef double 			       elf_f64;
 typedef float  			       elf_f32;
 
+enum { true = 1, false = 0 };
+
+typedef elf_u8  u8;
+typedef elf_u16 u16;
+typedef elf_u32 u32;
+typedef elf_u64 u64;
+
+typedef elf_i8  i8;
+typedef elf_i16 i16;
+typedef elf_i32 i32;
+typedef elf_i64 i64;
+typedef elf_f64 f64;
+typedef elf_i32 b32;
+
 typedef elf_i64  elf_Integer;
 typedef elf_f64  elf_Number;
 typedef elf_i32  elf_Error;
 
 typedef elf_u32  elf_Hash;
-typedef elf_i64  elf_Index;
 typedef elf_u64  elf_Time;
 typedef elf_u64  elf_Handle;
 
-#define ELF_HINVALID  ((elf_Handle) -1)
+#define ELF_HINVALID  ((elf_Handle) 0)
 #define ELF_HTAGFILE  1
 #define ELF_HTAGDLIB  1
 #define ELF_HTAGINVA  255
 
 #define ELF_HTAG(H)   ((H) >> ((sizeof(elf_Handle)-1)<<3))
-#define ELF_HISINVALID(H) ((H) == ELF_HINVALID)
+#define ELF_IS_HANDLE_INVALID(H) ((H) == ELF_HINVALID)
 
 

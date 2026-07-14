@@ -1,0 +1,35 @@
+i := 0
+sum := 0
+
+while i < 10 ? {
+	i += 1
+
+	if i == 3 ? {
+		continue
+	}
+
+	if i == 7 ? {
+		break
+	}
+
+	sum += i
+}
+
+test_assert(sum == 18)
+
+range_sum := 0
+for j := 0 ... 8 ? {
+	if j == 2 ? {
+		continue
+	}
+
+	if j == 6 ? {
+		break
+	}
+
+	range_sum += j
+}
+
+test_assert(range_sum == 13)
+
+ret sum * 100 + range_sum

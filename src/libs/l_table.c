@@ -4,81 +4,20 @@
 
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static inline void remove_array_part(Value *values, Index index, Index num)
+static u32 load_array_index_arg(elf_State *S, int arg, elf_Table *table)
 {
-	// Todo, can we just not use heap array for this ...
-	HArray *array = d_array_raw(values);
-	memmove(values + index, values + index + num, (array->min - index - num) * sizeof(*values));
-	array->min -= num;
+	elf_Value value = load_value(S, arg);
+	check_value_type(S, value, ELF_VALUE_TYPE_INTEGER);
+	return check_array_index(S, NO_BYTE, value_as_integer(value), elf_array_len(table));
 }
-
-static Index loadindex(elf_State *S, int x, Tab tab)
-{
-	Index index = loadint(S, x);
-	if (index < 0) index += heap_array_length(tab->array);
-
-	if (index < 0 || index >= heap_array_length(tab->array)) {
-		reporterrorf(S, -1, "'%lli': index out of bounds", index);
-	}
-	return index;
-}
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
 
 ELF_FUNCTION(l_table_make_field_readonly) {
-	Tab tab = loadtable(S, 0);
-	_table_markfieldreadonly(S, tab, loadvalue(S, 1));
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_table_mark_field_readonly(S, tab, load_value(S, 1));
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_get_meta) {
-	Tab tab = loadtable(S, 0);
-	pushtab(S, getmeta(tab));
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_set_meta) {
-	Tab tab = loadtable(S, 0);
-	Tab meta = loadtable(S, 1);
-	setmeta(tab, meta);
-	pushtab(S, meta);
-	return 1;
-}
-
-
-
 
 
 
@@ -95,7 +34,9 @@ ELF_FUNCTION(l_table_set_meta) {
 
 
 ELF_FUNCTION(l_table_clear) {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 	// todo: we can't do this!
 	// table_clear(tab);
 	return 0;
@@ -111,13 +52,15 @@ ELF_FUNCTION(l_table_clear) {
 //
 
 ELF_FUNCTION(l_table_clear_entries) {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 	tab->fillcounter = 0;
 	memset(tab->entries, 0, tab->nentries * sizeof(*tab->entries));
 	// todo: we can't do this!
 	// table_clear_entries(tab);
 
-	pushtab(S, tab);
+	push_table(S, tab);
 	return 1;
 }
 
@@ -129,9 +72,11 @@ ELF_FUNCTION(l_table_clear_entries) {
 
 
 ELF_FUNCTION(l_table_contains) {
-	Tab tab = loadtable(S, 0);
-	Val key = loadvalue(S, 1);
-	pushint(S, _table_contains(S, tab, key));
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value key = load_value(S, 1);
+	push_value(S, value_from_integer(elf_table_contains(S, tab, key)));
 	return 1;
 }
 
@@ -146,8 +91,10 @@ ELF_FUNCTION(l_table_contains) {
 
 
 ELF_FUNCTION(l_table_get_collisions) {
-	Tab tab = loadtable(S, 0);
-	pushint(S, tab->ndebug);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	push_value(S, value_from_integer(tab->ndebug));
 	return 1;
 }
 
@@ -175,49 +122,44 @@ ELF_FUNCTION(l_table_get_collisions) {
 
 // @doc
 // :delete(key) -> any
-// the key and all aliases are deleted, the index is also deleted,
+// the key and all aliases are deleted, the u32 is also deleted,
 // order is preserved and other fields are adjusted.
 //
 ELF_FUNCTION(l_table_delete) {
-	Tab tab = loadtable(S, 0);
-	Val key = loadvalue(S, 1);
-
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value key = load_value(S, 1);
 
 	Entry *entries = tab->entries;
-	Value *values = tab->values;
-	HArray *array = d_array_raw(values);
 
+	u32 slot = table_find_slot(tab->entries, tab->nentries, key);
 
-	Index slot = _table_findentry_internal(tab->entries, tab->nentries, key);
+	if (slot != TABLE_SLOT_NOT_FOUND && entry_is_key(entries[slot])) {
 
-	if ((slot >= 0) && (entries[slot].key.tag != ELF_VALUE_TYPE_NIL) && (entries[slot].key.tag != ELF_VALUE_TYPE_TOMB)) {
-
-		Index index = entries[slot].index;
+		u32 index = entry_index(entries[slot]);
 
 		Entry *en;
 		for (en=tab->entries; en<tab->entries+tab->nentries; ++en) {
 
-			// disable
-			if (en->index == index) {
-				if (en->key.tag != ELF_VALUE_TYPE_NIL) {
-					en->key.tag = ELF_VALUE_TYPE_TOMB;
+			if (entry_is_key(*en)) {
+				u32 en_index = entry_index(*en);
+				if (en_index == index) {
+					entry_set_tomb(en);
 				}
-			}
-			else {
-				// fixup index
-				en->index -= en->index > index;
+				else {
+					entry_set_index(en, en_index - (en_index > index));
+				}
 			}
 
 		}
 
-
-		pushvalueunsafe(S, values[index]);
-
-		remove_array_part(values, index, 1);
+		push_value(S, elf_array_get(S, tab, index));
+		elf_array_remove(S, tab, index, 1);
 	}
 	else {
 
-		push_nil(S);
+		push_value(S, value_nil());
 
 	}
 	return 1;
@@ -235,8 +177,8 @@ ELF_FUNCTION(l_table_delete) {
 
 
 
-static inline void tablebind(elf_State *S, Tab tab, V key, Index index) {
-	_table_bindtoindex(S, tab, key, index);
+static inline void tablebind(elf_State *S, elf_Table *tab, elf_Value key, u32 index) {
+	elf_table_bind_to_index(S, tab, key, index);
 }
 
 
@@ -267,10 +209,12 @@ static inline void tablebind(elf_State *S, Tab tab, V key, Index index) {
 // creates a new one entry of the given 'new_key' that
 // points to where 'existing_key' points to
 ELF_FUNCTION(l_table_alias) {
-	Tab tab = loadtable(S, 0);
-	V x = loadvalue(S, 1);
-	V y = loadvalue(S, 2);
-	tablealias(S, tab, x, y);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value x = load_value(S, 1);
+	elf_Value y = load_value(S, 2);
+	elf_table_alias(S, tab, x, y);
 	return 0;
 }
 
@@ -289,8 +233,10 @@ ELF_FUNCTION(l_table_alias) {
 
 
 ELF_FUNCTION(l_table_bind) {
-	Tab tab = loadtable(S, 0);
-	tablebind(S, tab, loadvalue(S, 1), loadindex(S, 2, tab));
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	tablebind(S, tab, load_value(S, 1), load_array_index_arg(S, 2, tab));
 	return 0;
 }
 
@@ -313,30 +259,32 @@ ELF_FUNCTION(l_table_bind) {
 // finds all the aliases of the given 'key' including the
 // key itself
 ELF_FUNCTION(l_find_aliases) {
-	Tab tab = loadtable(S, 0);
-	V   key = loadvalue(S, 1);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value   key = load_value(S, 1);
 
-	Tab res = push_new_table(S);
+	elf_Table * res = elf_push_new_table(S);
 
-	if (!is_nil(key)) {
+	if (!value_is_nil(key)) {
 
-		Index i=_table_tryresize(S, tab, key);
+		u32 i=table_find_slot_for_write(S, tab, key);
 
 		if (i > 0) {
 
-			IndexValue entry=tab->entries[i];
+			Entry entry=tab->entries[i];
 
-			if (!isdead(entry.key)) {
+			if (!entry_is_dead(entry)) {
 
-				for (i = 0; i < tab->ntotal; ++i) {
+				for (i = 0; i < tab->nentries; ++i) {
 					/* we also include ourselves */
 
-					IndexValue alias=tab->entries[i];
+					Entry alias=tab->entries[i];
 
-					if (isdead(alias.key)) continue;
-					if (alias.idx != entry.idx) continue;
+					if (entry_is_dead(alias)) continue;
+					if (entry_index(alias) != entry_index(entry)) continue;
 
-					_table_arrayadd(S, tab, alias.key);
+					elf_array_add(S, tab, entry_key_value(alias));
 				}
 			}
 		}
@@ -357,21 +305,23 @@ ELF_FUNCTION(l_find_aliases) {
 
 
 
-// @doc returns an array containg all the keys for this table
+// @doc returns an elf_Value * containg all the keys for this table
 ELF_FUNCTION(l_table_get_keys) {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 
-	elf_pushtab(S);
+	elf_push_new_table(S);
 
-	Index i;
-	for (i = 0; i < tab->ntotal; i ++) {
-		IndexValue entry = tab->slots[i];
+	u32 i;
+	for (i = 0; i < tab->nentries; i ++) {
+		Entry entry = tab->entries[i];
 		// omit non-keys
-		if (isdead(entry.key)) {
+		if (entry_is_dead(entry)) {
 			continue;
 		}
 
-		pushvalueunsafe(S, entry.key);
+		push_value(S, entry_key_value(entry));
 		elf_arrayadd(S);
 	}
 	return 1;
@@ -398,20 +348,22 @@ ELF_FUNCTION(l_table_get_keys) {
 // * to creating a clone of the table, but additionally, loose values are lost.
 ELF_FUNCTION(l_table_merge) {
 
-	Index slot;
+	u32 slot;
 
-	Tab sum = push_new_table(S);
+	elf_Table * sum = elf_push_new_table(S);
 
 	for (int i = 0; i < nargs; ++ i) {
-		Tab merger = loadtable(S, i);
-		for (slot = 0; slot < merger->ntotal; ++ slot) {
-			IndexValue entry = merger->entries[slot];
+		elf_Value merger_value = load_value(S, i);
+		check_value_type(S, merger_value, ELF_VALUE_TYPE_TABLE);
+		elf_Table * merger = value_as_table(merger_value);
+		for (slot = 0; slot < merger->nentries; ++ slot) {
+			Entry entry = merger->entries[slot];
 
-			if (isdead(entry.key)) continue;
+			if (entry_is_dead(entry)) continue;
 
 			// todo:
-			pushvalueunsafe(S, entry.key);
-			pushvalueunsafe(S, merger->array[entry.idx]);
+			push_value(S, entry_key_value(entry));
+			push_value(S, elf_array_get(S, merger, entry_index(entry)));
 			elf_setfield(S);
 		}
 	}
@@ -437,26 +389,31 @@ ELF_FUNCTION(l_table_merge) {
 
 
 ELF_FUNCTION(l_table_fork) {
-	Tab tab = loadtable(S, 0);
-	Tab sub = loadtable(S, 1);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value sub_value = load_value(S, 1);
+	check_value_type(S, sub_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table * sub = value_as_table(sub_value);
 
 	if (sub == 0) {
-		reporterror(S, NO_BYTE, "argument is nil");
+		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "argument is nil");
 	}
 
-	push_new_table(S);
+	elf_push_new_table(S);
 
-	Index i;
-	for (i = 0; i < tab->ntotal; ++i) {
+	u32 i;
+	for (i = 0; i < tab->nentries; ++i) {
 
-		IndexValue entry = tab->entries[i];
+		Entry entry = tab->entries[i];
 
-		if (isdead(entry.key)) continue;
-		if (_table_contains(S, sub, entry.key)) continue;
+		if (entry_is_dead(entry)) continue;
+		elf_Value key = entry_key_value(entry);
+		if (elf_table_contains(S, sub, key)) continue;
 
 		// todo: remove this!
-		pushvalueunsafe(S, entry.key);
-		pushvalueunsafe(S, tab->array[entry.idx]);
+		push_value(S, key);
+		push_value(S, elf_array_get(S, tab, entry_index(entry)));
 		elf_setfield(S);
 	}
 
@@ -464,60 +421,70 @@ ELF_FUNCTION(l_table_fork) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DIRECT ARRAY FUNCTIONS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DIRECT elf_Value * FUNCTIONS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ELF_FUNCTION(l_array_length)
 {
-	Tab tab = loadtable(S, 0);
-	pushint(S, heap_array_length(tab->array));
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	push_value(S, value_from_integer(elf_array_len(tab)));
 	return 1;
 }
 
 ELF_FUNCTION(l_array_index)
 {
-	Tab tab = loadtable(S, 0);
-	Index idx = loadindex(S, 1, tab);
-	pushvalueunsafe(S, tab->array[idx]);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	u32 idx = load_array_index_arg(S, 1, tab);
+	push_value(S, elf_array_get(S, tab, idx));
 	return 1;
 }
 
 // @doc: returns the index of the first added item
 ELF_FUNCTION(l_array_add)
 {
-	Table *table = loadtable(S, 0);
-	Value value = loadvalue(S, 1);
-	Index index = _table_arrayadd(S, table, value);
-	pushint(S, index);
+	elf_Value table_value = load_value(S, 0);
+	check_value_type(S, table_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *table = value_as_table(table_value);
+	elf_Value value = load_value(S, 1);
+	u32 index = elf_array_add(S, table, value);
+	push_value(S, value_from_integer(index));
 
 	for (int i = 2; i < nargs; i++)
 	{
-		value = loadvalue(S, i);
-		_table_arrayadd(S, table, value);
+		value = load_value(S, i);
+		elf_array_add(S, table, value);
 	}
 
 	return 1;
 }
 
-// :repl(index, value)
-//		@index to replace with @value
+// :repl(u32, value)
+//		@u32 to replace with @elf_Value
 ELF_FUNCTION(l_array_repl) {
-	Tab   tab = loadtable(S, 0);
-	Index idx = loadindex(S, 1, tab);
-	V     val = loadvalue(S, 2);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	u32 idx = load_array_index_arg(S, 1, tab);
+	elf_Value value = load_value(S, 2);
 
 	// todo: barrier
-	tab->array[idx] = val;
+	elf_array_set(S, tab, idx, value);
 	return 0;
 }
 
 ELF_FUNCTION(l_array_swap)
 {
-	Tab tab = loadtable(S, 0);
-	Index x = loadindex(S, 1, tab);
-	Index y = loadindex(S, 2, tab);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	u32 x = load_array_index_arg(S, 1, tab);
+	u32 y = load_array_index_arg(S, 2, tab);
 
-	swap_values(&tab->array[x], &tab->array[y]);
+	elf_array_swap(S, tab, x, y);
 	return 0;
 }
 
@@ -536,27 +503,31 @@ ELF_FUNCTION(l_array_swap)
 
 
 ELF_FUNCTION(l_array_slice) {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 
-	Index x = 0;
-	Index y = heap_array_length(tab->array);
-	if (nargs >= 2) x = loadindex(S, 0, tab);
-	if (nargs >= 3) y = loadindex(S, 1, tab);
+	u32 x = 0;
+	u32 y = elf_array_len(tab);
+	if (nargs >= 2) x = load_array_index_arg(S, 0, tab);
+	if (nargs >= 3) y = load_array_index_arg(S, 1, tab);
 
-	Tab slice = push_new_table(S);
+	elf_Table * slice = elf_push_new_table(S);
 	while (x < y) {
-		heap_array_add(slice->array, tab->array[x ++]);
+		elf_array_add(S, slice, elf_array_get(S, tab, x ++));
 	}
 	return 1;
 }
 
 ELF_FUNCTION(l_array_remove) {
-	Tab tab = loadtable(S, 0);
-	Index index = loadindex(S, 1, tab);
-	Index num = 1;
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	u32 index = load_array_index_arg(S, 1, tab);
+	u32 num = 1;
 
-	pushvalueunsafe(S, tab->values[index]);
-	remove_array_part(tab->values, index, num);
+	push_value(S, elf_array_get(S, tab, index));
+	elf_array_remove(S, tab, index, num);
 
 	return 1;
 }
@@ -579,19 +550,40 @@ ELF_FUNCTION(l_array_remove) {
 // { 1, 2, 3, 4 }:trim( 2) == 2
 // { 1, 2, 3, 4 }:trim( 1) == 1
 ELF_FUNCTION(l_array_trim) {
-	Tab tab = loadtable(S, 0);
-	int num = loadint(S, 1);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value num_value = load_value(S, 1);
+	check_value_type(S, num_value, ELF_VALUE_TYPE_INTEGER);
+	i64 num = value_as_integer(num_value);
+	u32 len = elf_array_len(tab);
 
-	HArray *darr = d_array_raw(tab->values);
+	if (num == 0) {
+		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "array trim count cannot be zero");
+	}
 
 	if (num < 0) {
-		darr->min += num;
-		pushvalueunsafe(S, tab->values[darr->min]);
+		u32 count = (u32)-num;
+		if (count > len) {
+			report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1
+			,	"array trim out of bounds: count %u, length %u"
+			,	count, len);
+		}
+
+		u32 index = len - count;
+		push_value(S, elf_array_get(S, tab, index));
+		elf_array_remove(S, tab, index, count);
 	}
 	else {
-		pushvalueunsafe(S, tab->values[num - 1]);
-		darr->min -= num;
-		memmove(tab->values, tab->values + num, darr->min * sizeof(* tab->values));
+		u32 count = (u32)num;
+		if (count > len) {
+			report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1
+			,	"array trim out of bounds: count %u, length %u"
+			,	count, len);
+		}
+
+		push_value(S, elf_array_get(S, tab, count - 1));
+		elf_array_remove(S, tab, 0, count);
 	}
 	return 1;
 }
@@ -609,18 +601,22 @@ ELF_FUNCTION(l_array_trim) {
 
 
 ELF_FUNCTION(l_array_merge) {
-	Tab sum = loadtable(S, 0);
-	pushtab(S, sum);
+	elf_Value sum_value = load_value(S, 0);
+	check_value_type(S, sum_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table * sum = value_as_table(sum_value);
+	push_table(S, sum);
 
-	Index i, j;
+	u32 i, j;
 
 	for (i = 1; i < nargs; ++ i) {
-		Tab tab = loadtable(S, i);
+		elf_Value tab_value = load_value(S, i);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 
-		for (j = 0; j < _table_arraylen(tab); ++ j) {
+		for (j = 0; j < elf_array_len(tab); ++ j) {
 
-			Value v = _table_arrayget(S, tab, j);
-			_table_arrayadd(S, sum, v);
+			elf_Value value = elf_array_get(S, tab, j);
+			elf_array_add(S, sum, value);
 
 		}
 	}
@@ -639,14 +635,16 @@ ELF_FUNCTION(l_array_merge) {
 
 // todo: deep copy!
 ELF_FUNCTION(l_array_clone) {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 
-	Table *clone = push_new_table(S);
+	elf_Table *clone = elf_push_new_table(S);
 
 	// todo: hello????? memcpy?
-	Index i;
-	for (i=0; i<heap_array_length(tab->array); ++i) {
-		heap_array_add(clone->array, tab->array[i]);
+	u32 i;
+	for (i=0; i<elf_array_len(tab); ++i) {
+		elf_array_add(S, clone, elf_array_get(S, tab, i));
 	}
 	return 1;
 }
@@ -664,14 +662,14 @@ ELF_FUNCTION(l_array_clone) {
 
 ELF_FUNCTION(l_array_reverse) {
 
-	Tab tab = loadtable(S, 0);
-	Index n = heap_array_length(tab->array);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	u32 n = elf_array_len(tab);
 
-	V *array = tab->array;
-
-	Index i;
+	u32 i;
 	for (i = 0; i < n >> 1; i += 1) {
-		swap_values(&array[i], &array[n-1-i]);
+		elf_array_swap(S, tab, i, n - 1 - i);
 	}
 	return 0;
 }
@@ -691,22 +689,24 @@ ELF_FUNCTION(l_array_reverse) {
 
 
 ELF_FUNCTION(l_table_get_pairs) {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 
-	Tab res = push_new_table(S);
+	elf_Table * res = elf_push_new_table(S);
 
-	Index i;
+	u32 i;
 	for (i = 0; i < tab->nentries; ++ i) {
 		Entry entry = tab->entries[i];
 
 		// omit non-keys
-		if (isdead(entry.key)) {
+		if (entry_is_dead(entry)) {
 			continue;
 		}
 
 		// todo: prealloc!
-		heap_array_add(res->array, entry.key);
-		heap_array_add(res->array, tab->array[entry.index]);
+		elf_array_add(S, res, entry_key_value(entry));
+		elf_array_add(S, res, elf_array_get(S, tab, entry_index(entry)));
 	}
 	return 1;
 }
@@ -727,33 +727,30 @@ ELF_FUNCTION(l_table_get_pairs) {
 
 ELF_FUNCTION(l_table_ordered_pairs)
 {
-	STATIC_ASSERT(sizeof(RankValue) == sizeof(IndexValue));
-	STATIC_ASSERT(offsetof(RankValue, value) == offsetof(IndexValue,   key));
-	STATIC_ASSERT(offsetof(RankValue,  rank) == offsetof(IndexValue, index));
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Table * res = elf_push_new_table(S);
 
-
-	Tab tab = loadtable(S, 0);
-	Tab res = push_new_table(S);
-
-	Index nen = tab->nentries;
+	u32 nen = tab->nentries;
 	Entry *es = tab->entries;
 
 	// todo: optional ranking
 	RankValue *rv = malloc(nen * sizeof(*rv));
-	memcpy(rv, es, nen * sizeof(*rv));
-	rank(rv, rv + nen);
+	for (u32 i = 0; i < nen; ++ i) {
+		rv[i].rank = entry_index(es[i]);
+		rv[i].value = entry_key_value(es[i]);
+	}
+	rank_values(rv, rv + nen);
 
-
-	Value *arr = new_heap_array(sizeof(*arr), tab->fillcounter * 2);
-	res->array = arr;
 
 	// todo: can unrolling help a bit since we're fetching from
 	// two buffers or will the compiler figure this out?
-	Index c, i;
-	for(c=0, i=0; i<nen; ++i) {
-		if (!isdead(rv[i].value)) {
-			arr[c ++] = rv[i].value;
-			arr[c ++] = tab->array[rv[i].rank];
+	u32 i;
+	for(i=0; i<nen; ++i) {
+		if (!value_is_dead(rv[i].value)) {
+			elf_array_add(S, res, rv[i].value);
+			elf_array_add(S, res, elf_array_get(S, tab, rv[i].rank));
 		}
 	}
 
@@ -764,83 +761,91 @@ ELF_FUNCTION(l_table_ordered_pairs)
 
 // todo: should this return a new table or no?
 ELF_FUNCTION(l_array_filter) {
-	Tab tab = loadtable(S, 0);
-	V filter = loadrulecheck(S, 1, TRULE_CALLABLE);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value filter = load_value(S, 1);
+	check_value_type_rule(S, filter, TRULE_CALLABLE);
 
-	V *new_array = 0;
-
-	Index l = heap_array_length(tab->array);
-	Index i;
+	u32 l = elf_array_len(tab);
+	u32 i;
+	u32 write_index = 0;
 
 	for (i=0; i<l; ++i) {
-		Value value = tab->array[i];
-		pushvalueunsafe(S, filter);
-		pushthis(S);
-		pushvalueunsafe(S, value);
+		elf_Value value = elf_array_get(S, tab, i);
+		push_value(S, filter);
+		push_value(S, load_value(S, 0));
+		push_value(S, value);
 		elf_call(S, 2, 1);
-		int keep = popint(S);
+		elf_Value keep_value = pop_value(S);
+		check_value_type(S, keep_value, ELF_VALUE_TYPE_INTEGER);
+		int keep = value_as_integer(keep_value);
 		if (keep) {
-			heap_array_add(new_array, value);
+			elf_array_set(S, tab, write_index ++, value);
 		}
 	}
 
-	// todo:
-	free_heap_array(tab->array);
-
-	tab->array = new_array;
+	if (write_index < l) {
+		elf_array_remove(S, tab, write_index, l - write_index);
+	}
 
 	// return self
-	pushtab(S, tab);
+	push_table(S, tab);
 	return 1;
 }
 
 ELF_FUNCTION(l_array_rank)
 {
-	Tab tab = loadtable(S, 0);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
 
-	V fn;
+	elf_Value fn;
 	if (nargs > 1) {
-		fn = loadrulecheck(S, 1, TRULE_CALLABLE);
+		fn = load_value(S, 1);
+		check_value_type_rule(S, fn, TRULE_CALLABLE);
 	}
 
-	Index i, l = heap_array_length(tab->array);
+	u32 i, l = elf_array_len(tab);
 	RankValue *rv = malloc(l * sizeof(*rv));
 
-	Value __rank;
-	to_str(&__rank, new_string_from_data(S, "__rank"));
+	elf_Value __rank;
+	__rank = value_from_atom(elf_atom_from_data(S, "__rank"));
 
 	for (i=0; i<l; ++i) {
-		Value value = tab->array[i];
+		elf_Value value = elf_array_get(S, tab, i);
 
-		Index rank;
+		i64 rank;
 		if (nargs > 1) {
 			// todo: elf_call doesn't have to write the results where the function is at!
-			pushvalueunsafe(S, fn);
-			pushthis(S);
-			pushvalueunsafe(S, value);
+			push_value(S, fn);
+			push_value(S, load_value(S, 0));
+			push_value(S, value);
 			elf_call(S, 2, 1);
-			rank = popint(S);
+			elf_Value rank_value = pop_value(S);
+			check_value_type(S, rank_value, ELF_VALUE_TYPE_INTEGER);
+			rank = value_as_integer(rank_value);
 		}
 		else {
-			V v = _table_arrayget(S, tab, i);
-			typecheck(S, v, ELF_VALUE_TYPE_TABLE);
-			Value r = _table_getornil(S, table_from_value(v), __rank);
-			typecheck(S, r, ELF_VALUE_TYPE_INTEGER);
-			rank = as_int(r);
+			elf_Value value = elf_array_get(S, tab, i);
+			check_value_type(S, value, ELF_VALUE_TYPE_TABLE);
+			elf_Value r = elf_table_get_or_nil(S, value_as_table(value), __rank);
+			check_value_type(S, r, ELF_VALUE_TYPE_INTEGER);
+			rank = value_as_integer(r);
 		}
 
 		rv[i].rank  = rank;
 		rv[i].value = value;
 	}
 
-	rank(rv, rv + l);
+	rank_values(rv, rv + l);
 
 	for (i=0; i<l; ++i) {
-		tab->array[i]=rv[i].value;
+		elf_array_set(S, tab, i, rv[i].value);
 	}
 	free(rv);
 
-	pushtab(S, tab);
+	push_table(S, tab);
 	return 1;
 }
 
@@ -852,14 +857,16 @@ ELF_FUNCTION(l_array_rank)
 
 
 
-static inline Index callsortfn(elf_State *S, V fn, V a, V b) {
-	pushvalueunsafe(S, fn);
-	pushthis(S);
-	pushvalueunsafe(S, a);
-	pushvalueunsafe(S, b);
+static inline i64 callsortfn(elf_State *S, elf_Value fn, elf_Value a, elf_Value b) {
+	push_value(S, fn);
+	push_value(S, load_value(S, 0));
+	push_value(S, a);
+	push_value(S, b);
 	// todo: why is the result placed where the function is at!
 	elf_call(S, 3, 1);
-	return popint(S);
+	elf_Value result = pop_value(S);
+	check_value_type(S, result, ELF_VALUE_TYPE_INTEGER);
+	return value_as_integer(result);
 }
 
 
@@ -873,27 +880,29 @@ static inline Index callsortfn(elf_State *S, V fn, V a, V b) {
 
 
 
-static void quicksort(elf_State *S, V fn, V *head, V *tail) {
+static void quicksort(elf_State *S, elf_Value fn, elf_Table *tab, u32 head, u32 tail) {
 
 	retry:
-	if (tail-head <= 1) return;
+	if (tail - head <= 1) return;
 
-	V pivo = *head;
+	elf_Value pivo = elf_array_get(S, tab, head);
 
-	V *lt = head + 0;
-	V *gt = tail - 1;
-	V *i  = head + 1;
+	u32 lt = head;
+	u32 gt = tail - 1;
+	u32 i  = head + 1;
 
 	while (i <= gt) {
 
-		Index c = callsortfn(S, fn, *i, pivo);
+		i64 c = callsortfn(S, fn, elf_array_get(S, tab, i), pivo);
 
 		if (c < 0) {
-			swap_values(i, lt ++);
+			elf_array_swap(S, tab, i, lt);
+			lt ++;
 			i ++;
 		}
 		else if (c > 0) {
-			swap_values(i, gt --);
+			elf_array_swap(S, tab, i, gt);
+			gt --;
 		}
 		else {
 			i ++;
@@ -901,12 +910,12 @@ static void quicksort(elf_State *S, V fn, V *head, V *tail) {
 	}
 
 	if (lt - head < tail - i) {
-		quicksort(S, fn, head, lt);
+		quicksort(S, fn, tab, head, lt);
 		head = i;
 		goto retry;
 	}
 	else {
-		quicksort(S, fn, i, tail);
+		quicksort(S, fn, tab, i, tail);
 		tail = lt;
 		goto retry;
 	}
@@ -921,10 +930,13 @@ static void quicksort(elf_State *S, V fn, V *head, V *tail) {
 
 
 ELF_FUNCTION(l_array_sort) {
-	Tab tab = loadtable(S, 0);
-	V fun = loadcallable(S, 1);
-	quicksort(S, fun, tab->array, tab->array + heap_array_length(tab->array));
-	pushtab(S, tab);
+	elf_Value tab_value = load_value(S, 0);
+	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
+	elf_Table *tab = value_as_table(tab_value);
+	elf_Value fun = load_value(S, 1);
+	check_value_type_rule(S, fun, TRULE_CALLABLE);
+	quicksort(S, fun, tab, 0, elf_array_len(tab));
+	push_table(S, tab);
 	return 1;
 }
 
@@ -938,10 +950,6 @@ ELF_FUNCTION(l_array_sort) {
 
 
 static const elf_Binding l_table[] = {
-	// object
-	{"get_meta"     , l_table_get_meta         },
-	{"set_meta"     , l_table_set_meta         },
-
 	// table
 	{"clear",         l_table_clear            },
 	{"clear_entries", l_table_clear_entries    },
@@ -967,7 +975,7 @@ static const elf_Binding l_table[] = {
 	// aware of both
 	{"delete"       , l_table_delete       },
 
-	// array part
+	// elf_Value * part
 	{"sort"         , l_array_sort         },
 	{"rank"         , l_array_rank         },
 	{"filter"       , l_array_filter       },
@@ -986,3 +994,8 @@ static const elf_Binding l_table[] = {
 	{"clone_array"  , l_array_clone        },
 	{"slice"        , l_array_slice        },
 };
+
+static elf_Table *elf_lib_table(elf_State *state)
+{
+	return new_binding_table(state, l_table, ARRAY_COUNT(l_table));
+}

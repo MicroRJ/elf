@@ -30,6 +30,10 @@ void sys_console_print(int type, char *message) {
 	emscripten_log(type, message);
 }
 
+void sys_enable_console_colors(void)
+{
+}
+
 
 int sys_get_last_error() {
 	return 0;
@@ -168,14 +172,14 @@ int sys_find_next_file(FILE_VISITOR *visitor) {
 			bool isdir = (entry->d_type & DT_DIR) != 0;
 			elf_Value *top = GET_TOP(R);
 
-			elf_String *name = elf_new_string(R,entry->d_name);
-			elf_String *path = elf_new_string(R,tpf("%s/%s",dir->c,entry->d_name));
+			elf_Atom *name = elf_atom_from_data(R,entry->d_name);
+			elf_Atom *path = elf_atom_from_data(R,tpf("%s/%s",dir->c,entry->d_name));
 			elf_StackId base = elf_push_closure_raw(R,cls);
 			elf_Table *file = elf_new_table(R);
 
-			elf_tsets_str(file,elf_new_string(R,"name"),name);
-			elf_tsets_str(file,elf_new_string(R,"path"),path);
-			elf_tsets_int(file,elf_new_string(R,"isdir"),isdir);
+			elf_tsets_str(file,elf_atom_from_data(R,"name"),name);
+			elf_tsets_str(file,elf_atom_from_data(R,"path"),path);
+			elf_tsets_int(file,elf_atom_from_data(R,"isdir"),isdir);
 			int r = elf_call(R,base,1,1);
 			if ((r > 0) && isdir && f_checkint(R,base)) {
 				core_lib_enumerate_folder_(R,path,cls);

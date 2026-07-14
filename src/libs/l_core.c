@@ -7,80 +7,72 @@
 
 
 
-ELF_FUNCTION(l_core_new_buffer) {
-	Buf buf = new_buffer(S, 0, 0);
-	pushbuf(S, buf);
-	return 1;
-}
-
-
-
-
-
-
-
 
 
 // todo: (readonly ?= true)
 ELF_FUNCTION(l_core_get_obj_pointer) {
-	pushint(S, (Int) load_reference(S, 1));
+	elf_Value value = load_value(S, 1);
+	check_value_type_rule(S, value, TRULE_OBJECT);
+	push_value(S, value_from_integer((i64)value_as_object(value)));
 	return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static u32 mark_readonly(elf_State *S, GCRef reference);
+static u32 mark_readonly(elf_State *S, elf_Object * reference);
 
-static u32 mark_table_readonly(elf_State *state, Table *table)
+static u32 mark_table_readonly(elf_State *state, elf_Table *table)
 {
-	u32 counter = 0;
+	u32 reference_count = 0;
 
 	for (u32 i = 0; i < table->nentries; ++ i)
 	{
-		if (value_is_reference(table->entries[i].key))
+		elf_Value key = entry_key_value(table->entries[i]);
+		if (value_is_object(key))
 		{
-			counter += mark_readonly(state, reference_from_value(table->entries[i].key));
+			reference_count += mark_readonly(state, value_as_object(key));
 		}
 	}
 
-	for (u32 i = 0; i < heap_array_length(table->array); ++ i)
+	for (u32 i = 0; i < elf_array_len(table); ++ i)
 	{
-		if (value_is_reference(table->array[i]))
+		elf_Value value = elf_array_get(state, table, i);
+		if (value_is_object(value))
 		{
-			counter += mark_readonly(state, reference_from_value(table->array[i]));
+			reference_count += mark_readonly(state, value_as_object(value));
 		}
 	}
-	return counter;
+	return reference_count;
 }
 
-static u32 mark_readonly(elf_State *S, GCRef reference)
+static u32 mark_readonly(elf_State *S, elf_Object * reference)
 {
 	ASSERT(reference);
 
-	u32 counter = 0;
-	if (~reference->status & NODE_READONLY)
+	u32 reference_count = 0;
+	if (~reference->status & ELF_OBJECT_READONLY)
 	{
-		reference->status |= NODE_READONLY;
+		reference->status |= ELF_OBJECT_READONLY;
 
-		counter = 1;
+		reference_count = 1;
 
-		if (reference->type == GC_TABLE)
+		if (reference->type == ELF_OBJECT_TABLE)
 		{
-			counter += mark_table_readonly(S, (Table *) reference);
+			reference_count += mark_table_readonly(S, (elf_Table *) reference);
 		}
 	}
-	return counter;
+	return reference_count;
 }
 
 // todo: (readonly ?= true)
 ELF_FUNCTION(l_core_mark_readonly)
 {
-	loadrulecheck(S, 1, TRULE_OBJECT);
-
-	GCRef ref = load_reference(S, 1);
-	u32 counter = mark_readonly(S, ref);
-	pushint(S, counter);
+	elf_Value value = load_value(S, 1);
+	check_value_type_rule(S, value, TRULE_OBJECT);
+	elf_Object * ref = value_as_object(value);
+	u32 reference_count = mark_readonly(S, ref);
+	push_value(S, value_from_integer(reference_count));
 	return 1;
 }
 
@@ -89,13 +81,13 @@ ELF_FUNCTION(l_core_mark_readonly)
 
 ELF_FUNCTION(l_core_get_mem_counter)
 {
-	pushint(S, S->collector_state.memory_counter);
+	push_value(S, value_from_integer(S->gc_live_bytes));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_get_obj_counter)
 {
-	pushint(S, S->collector_state.counter);
+	push_value(S, value_from_integer(S->gc_reference_count));
 	return 1;
 }
 
@@ -103,10 +95,15 @@ ELF_FUNCTION(l_core_get_obj_counter)
 
 // todo: this might be temporary!
 ELF_FUNCTION(l_core_assert) {
-	Int cond = loadint(S, 1);
-	const char *errmsg = loadtext(S, 2);
+	elf_Value cond_value = load_value(S, 1);
+	check_value_type_rule(S, cond_value, TRULE_NUMERIC);
+	i64 cond = value_to_integer(cond_value);
+
+	elf_Value error_value = load_value(S, 2);
+	check_value_type(S, error_value, ELF_VALUE_TYPE_ATOM);
+	const char *errmsg = elf_atom_data(value_as_atom(error_value));
 	if (!cond) {
-		reporterrorf(S, -1, "assertion triggered: %s", errmsg);
+		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "assertion triggered: %s", errmsg);
 	}
 	return 0;
 }
@@ -134,53 +131,67 @@ ELF_FUNCTION(l_core_assert) {
 // todo: doing this with functions, requires other code to compromise,
 // because we get the information from the caller's call frame
 ELF_FUNCTION(l_core_nvargs) {
-	int n = caller(S).nargs - caller(S).arity;
+	if (!caller(S).variadic) {
+		push_value(S, value_from_integer(0));
+		return 1;
+	}
+
+	i64 n = caller(S).nargs - caller(S).arity;
 	if (n < 0) n = 0;
-	pushint(S, n);
+	push_value(S, value_from_integer(n));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_core_varg) {
-	int i = loadint(S, 1);
-	int n = caller(S).nargs;
-	int a = caller(S).arity;
+	if (!caller(S).variadic) {
+		push_value(S, value_nil());
+		return 1;
+	}
 
-	int nvargs = n - a;
+	elf_Value index_value = load_value(S, 1);
+	check_value_type_rule(S, index_value, TRULE_NUMERIC);
+	i64 i = value_to_integer(index_value);
+	i64 n = caller(S).nargs;
+	i64 a = caller(S).arity;
+
+	i64 nvargs = n - a;
 	if (nvargs < 0) nvargs = 0;
 
 	if (i >= nvargs) {
-		push_nil(S);
+		push_value(S, value_nil());
 	} else {
-		V v = caller(S).framebase[a + i];
-		pushvalueunsafe(S, v);
+		elf_Value value = caller(S).framebase[a + i];
+		push_value(S, value);
 	}
 	return 1;
 }
 
 
 ELF_FUNCTION(l_core_nrets) {
-	int n = caller(S).nrets;
-	pushint(S, n);
+	i64 n = caller(S).nrets;
+	push_value(S, value_from_integer(n));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_core_nargs) {
-	int n = caller(S).nargs;
-	pushint(S, n);
+	i64 n = caller(S).nargs;
+	push_value(S, value_from_integer(n));
 	return 1;
 }
 
 
 ELF_FUNCTION(l_core_arg) {
-	int i = loadint(S, 1);
-	int n = caller(S).nargs;
+	elf_Value index_value = load_value(S, 1);
+	check_value_type_rule(S, index_value, TRULE_NUMERIC);
+	i64 i = value_to_integer(index_value);
+	i64 n = caller(S).nargs;
 	if (i >= n) {
-		push_nil(S);
+		push_value(S, value_nil());
 	} else {
-		V v = caller(S).framebase[i];
-		pushvalueunsafe(S, v);
+		elf_Value value = caller(S).framebase[i];
+		push_value(S, value);
 	}
 	return 1;
 }
@@ -194,56 +205,51 @@ ELF_FUNCTION(l_core_arg) {
 
 
 ELF_FUNCTION(l_core_get_meta) {
-	Tab t = loadtable(S, 1);
-	Tab m = getmeta(t);
-	pushtab(S, m);
+	elf_Value value = load_value(S, 1);
+	elf_Table *meta = elf_get_type_metatable(S, value);
+	if (meta) {
+		push_table(S, meta);
+	}
+	else {
+		elf_push_nil(S);
+	}
 	return 1;
 }
 
-
-// result is the object we passed in
-ELF_FUNCTION(l_core_set_meta) {
-	Tab t = loadtable(S, 1);
-	Tab m = loadtable(S, 2);
-	setmeta(t, m);
-	pushtab(S, t);
-	return 1;
-}
-
-ELF_FUNCTION(l_core_is_string) {
-	pushint(S, is_string_type(loadtype(S, 1)));
+ELF_FUNCTION(l_core_is_atom) {
+	push_value(S, value_from_integer(elf_value_type_is_atom(value_type(load_value(S, 1)))));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_is_numeric) {
-	pushint(S, is_numeric_type(loadtype(S, 1)));
+	push_value(S, value_from_integer(elf_value_type_is_numeric(value_type(load_value(S, 1)))));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_tagof) {
-	pushtext(S, tag2s[loadtype(S, 1)]);
+	push_value(S, value_from_atom(elf_atom_from_data(S, value_type_name(value_type(load_value(S, 1))))));
 	return 1;
 }
 
 
 
 ELF_FUNCTION(l_core_iton) {
-	V v = loadvalue(S, 1);
-	if (!is_numeric(v)) {
-		reporterrorf(S, -1, "expected numeric value, instead got %s", tag2s[tag_of(v)]);
+	elf_Value value = load_value(S, 1);
+	if (!value_is_numeric(value)) {
+		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "expected numeric value, instead got %s", value_type_name(value_type(value)));
 	}
-	pushnum(S, int_to_num(v));
+	push_value(S, value_from_number(value_to_number(value)));
 	return 1;
 }
 
 
 
 ELF_FUNCTION(l_core_ntoi) {
-	V v = loadvalue(S, 1);
-	if (!is_numeric(v)) {
-		reporterrorf(S, -1, "expected numeric value, instead got %s", tag2s[tag_of(v)]);
+	elf_Value value = load_value(S, 1);
+	if (!value_is_numeric(value)) {
+		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "expected numeric value, instead got %s", value_type_name(value_type(value)));
 	}
-	pushint(S, num_to_int(v));
+	push_value(S, value_from_integer(value_to_integer(value)));
 	return 1;
 }
 
@@ -251,14 +257,16 @@ ELF_FUNCTION(l_core_ntoi) {
 
 // todo: support handles!
 ELF_FUNCTION(l_core_load_file) {
-	int ok = elf_pushcodefile(S, loadtext(S, 1), 0);
+	elf_Value name_value = load_value(S, 1);
+	check_value_type(S, name_value, ELF_VALUE_TYPE_ATOM);
+	i64 ok = elf_push_code_file(S, elf_atom_data(value_as_atom(name_value)));
 	if (!ok) {
 		return 0;
 	}
-	loadpush(S, 0);
+	push_value(S, load_value(S, 0));
 	// we need to move the arguments down!
-	for (int i = 2; i < nargs; ++ i) {
-		loadpush(S, i);
+	for (i64 i = 2; i < nargs; ++ i) {
+		push_value(S, load_value(S, i));
 	}
 	nrets = elf_do_tail_call(S, nargs - 1, nrets);
 	return nrets;
@@ -269,8 +277,8 @@ ELF_FUNCTION(l_core_load_file) {
 
 // todo: support handles!
 ELF_FUNCTION(l_core_load_expr) {
-	//	elf_pushcodefile(S, loadtext(S, 1), true);
-	//	pushthis(S);
+	//	elf_push_code_source(S, ..., source);
+	//	push_value(S, load_value(S, 0));
 	//	return elf_call(S, 1, nrets);
 	// todo:!
 	__debugbreak();
@@ -280,8 +288,11 @@ ELF_FUNCTION(l_core_load_expr) {
 
 
 ELF_FUNCTION(l_core_const_expr) {
-	const char *contents = loadtext(S, 1);
-	elf_pushconstexpr(S, "no name", contents);
+	elf_Value contents_value = load_value(S, 1);
+	check_value_type(S, contents_value, ELF_VALUE_TYPE_ATOM);
+	const char *contents = elf_atom_data(value_as_atom(contents_value));
+	SourceBuffer source = {(char *)contents, strlen(contents)};
+	elf_push_constant_expr(S, "no name", source);
 	return 1;
 }
 
@@ -289,19 +300,23 @@ ELF_FUNCTION(l_core_const_expr) {
 
 // todo: also accept a file handle directly!
 ELF_FUNCTION(l_core_load_json) {
-	const char *name = loadtext(S, 1);
+	elf_Value name_value = load_value(S, 1);
+	check_value_type(S, name_value, ELF_VALUE_TYPE_ATOM);
+	const char *name = elf_atom_data(value_as_atom(name_value));
 
-	Handle file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN);
-	if (!file) {
+	elf_Handle file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+	if (ELF_IS_HANDLE_INVALID(file)) {
 		elf_push_nil(S);
 		goto esc;
 	}
-	unsigned int size = elf_platform_get_file_size(file);
-	char *heapbuf = malloc(size);
+	u64 size = elf_platform_get_file_size(file);
+	char *heapbuf = malloc(size + 1);
 	elf_platform_read_file(file, heapbuf, size);
+	heapbuf[size] = 0;
 	elf_platform_close_file(file);
 
-	elf_load_json(S, name, heapbuf);
+	SourceBuffer source = {heapbuf, size};
+	elf_push_json(S, name, source);
 
 	free(heapbuf);
 
@@ -311,174 +326,139 @@ ELF_FUNCTION(l_core_load_json) {
 
 
 
-// todo: this should instead return a string!?
+// todo: this should instead return a atom!?
 ELF_FUNCTION(l_core_unparse) {
-	Sys file = loadsys(S, 1);
-	V value = loadvalue(S, 2);
+	elf_Value file_value = load_value(S, 1);
+	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
+	elf_Handle file = value_as_handle(file_value);
+	elf_Value value = load_value(S, 2);
 
-	Stringer sb = {};
-	int ok = unparse(S, &sb, value, 0);
+	Scratch scratch = get_scratch();
+	char *start = arena_push(scratch.arena, 0);
+	b32 ok = serialize_value(S, scratch.arena, value, 0);
+	char *end = arena_push_zero(scratch.arena, 1);
 
 	if (ok) {
-		sys_write_file(file, sb.buf, sb.min);
+		sys_write_file(file, start, (i32)(end - start));
 	}
 
-	free(sb.buf);
+	end_scratch(scratch);
 
-	pushint(S, ok);
+	push_value(S, value_from_integer(ok));
 	return 1;
-}
-
-//
-// FORMATTING
-//
-//
-//	todo: terrible at that
-//
-
-
-static int valuetostr(Stringer *sb, V v, bool flags);
-
-
-// todo: this is slow! if we pre-rank entries for large tables
-// it should be much better!
-static int tabletostr(Stringer *sb, Tab tab, bool flags) {
-	sb_writetext(sb, "{");
-
-	Index i,j,n;
-	for (i = 0; i < _table_arraylen(tab); ++ i) {
-		if (i != 0) sb_writetext(sb, ", ");
-
-		for (j = 0, n = 0; j < tab->ntotal; ++j) {
-			IndexValue en = tab->entries[j];
-
-			if (isdead(en.key)) continue;
-			if (en.idx != i) continue;
-
-			if (n ++ != 0) sb_writetext(sb, ", ");
-			valuetostr(sb, en.key, 1);
-		}
-		if (n != 0) sb_writetext(sb, " = ");
-		valuetostr(sb, tab->array[i], 1);
-	}
-	sb_writetext(sb, "}");
-	return true;
-}
-
-static int valuetostr(Stringer *sb, V v, bool flags) {
-	switch (v.tag) {
-		case ELF_VALUE_TYPE_NIL:        return sb_writetextf(sb, "nil"                  );
-		case ELF_VALUE_TYPE_INTEGER:    return sb_writetextf(sb, "%lli"  , v.x_int      );
-		case ELF_VALUE_TYPE_NUMBER:     return sb_writetextf(sb, "%f"    , v.x_num      );
-		case ELF_VALUE_TYPE_HANDLE:     return sb_writetextf(sb, "h%llX" , v.x_int      );
-		case ELF_VALUE_TYPE_STRING:     return sb_writetextf(sb, "%s"    , v.x_str->text);
-		case ELF_VALUE_TYPE_CLOSURE:    return sb_writetextf(sb, "C()");
-		case ELF_VALUE_TYPE_CFUNCTION:   return sb_writetextf(sb, "F()");
-		case ELF_VALUE_TYPE_BUFFER:     return   sb_writebuf(sb, as_buffer(v));
-		case ELF_VALUE_TYPE_TABLE:      return    tabletostr(sb, table_from_value(v), flags);
-		default: return sb_writetextf(sb,"(?)");
-	}
 }
 
 //
 // todo: handle escape sequences
 // todo: make it actually handle format specifiers!
 //
-// @doc: takes a format string similar to that of a c printf
+// @doc: takes a format atom similar to that of a c printf
 // function, the type does not have to be specified
 //
 ELF_FUNCTION(l_core_format) {
 
-	int index = 1;
-	const char *format = loadtext(S, index ++);
+	i64 index = 1;
+	elf_Value format_value = load_value(S, index ++);
+	check_value_type(S, format_value, ELF_VALUE_TYPE_ATOM);
+	const char *format = elf_atom_data(value_as_atom(format_value));
 
-	Stringer sb = {};
+	Scratch scratch = get_scratch();
+	char *start = arena_push(scratch.arena, 0);
 	while (*format) {
 
 		while (*format && *format != '%') {
-			// todo: preallocate a small buffer to avoid
-			// one call per char
-			sb_writechar(&sb, *format ++);
+			arena_push_char(scratch.arena, *format ++);
 		}
 
 		if (*format == '%') {
 			if (index >= nargs) {
-				reporterror(S, NO_BYTE, "not enough arguments to format string!");
+				report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "not enough arguments to format atom!");
 			}
 			format += 1;
 
 			// todo:
-			V value = loadvalue(S, index ++);
-			valuetostr(&sb, value, 0);
+			elf_Value value = load_value(S, index ++);
+			print_value(scratch.arena, value);
 		}
 	}
 
-	pushtext2(S, sb.buf, sb.min);
-	free(sb.buf);
+	char *end = arena_push_zero(scratch.arena, 1);
+	push_value(S, value_from_atom(elf_atom_from_data_size(S, start, (u32)(end - start))));
+	end_scratch(scratch);
 	return 1;
 }
 
 ELF_FUNCTION(l_core_print) {
-	Stringer sb = {};
-	for (int i = 1; i < nargs; i ++) {
-		valuetostr(&sb, loadvalue(S,i),0);
+	Scratch scratch = get_scratch();
+	char *start = arena_push(scratch.arena, 0);
+	for (i64 i = 1; i < nargs; i ++) {
+		print_value(scratch.arena, load_value(S,i));
 	}
+	char *end = arena_push_zero(scratch.arena, 1);
+	u32 size = (u32)(end - start);
 
-	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
-	sys_write_file(file, sb.buf, sb.min);
-	free(sb.buf);
+	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
+	sys_write_file(file, start, size);
 
-	pushint(S, sb.min);
+	end_scratch(scratch);
+	push_value(S, value_from_integer(size));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_printl_csv) {
-	Stringer sb = {};
-	for (int i = 1; i < nargs; i ++) {
-		if (i != 1) sb_writetext(&sb, ", ");
-		valuetostr(&sb, loadvalue(S,i),0);
+	Scratch scratch = get_scratch();
+	char *start = arena_push(scratch.arena, 0);
+	for (i64 i = 1; i < nargs; i ++) {
+		if (i != 1) arena_push_text(scratch.arena, ", ");
+		print_value(scratch.arena, load_value(S,i));
 	}
-	sb_writechar(&sb, '\n');
+	arena_push_char(scratch.arena, '\n');
+	char *end = arena_push_zero(scratch.arena, 1);
+	u32 size = (u32)(end - start);
 
-	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
-	sys_write_file(file, sb.buf, sb.min);
-	free(sb.buf);
+	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
+	sys_write_file(file, start, size);
 
-	pushint(S, sb.min);
+	end_scratch(scratch);
+	push_value(S, value_from_integer(size));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_printl) {
-	Stringer sb = {};
-	for (int i = 1; i < nargs; i ++) {
-		valuetostr(&sb, loadvalue(S,i),0);
+	Scratch scratch = get_scratch();
+	char *start = arena_push(scratch.arena, 0);
+	for (i64 i = 1; i < nargs; i ++) {
+		print_value(scratch.arena, load_value(S,i));
 	}
-	sb_writetextf(&sb, "\n");
+	arena_push_char(scratch.arena, '\n');
+	char *end = arena_push_zero(scratch.arena, 1);
+	u32 size = (u32)(end - start);
 
-	Sys file = sys_get_std_file(SYS_STD_OUTPUT);
-	sys_write_file(file, sb.buf, sb.min);
-	free(sb.buf);
+	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
+	sys_write_file(file, start, size);
 
-	pushint(S, sb.min);
+	end_scratch(scratch);
+	push_value(S, value_from_integer(size));
 	return 1;
 }
 
-//
-// todo: can we deprecate this? who cares about this anymore?
-// we can use buffers... and the user can just write to file.
-//
 ELF_FUNCTION(l_core_fprintl) {
-	Handle file = loadsys(S, 1);
+	elf_Value file_value = load_value(S, 1);
+	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
+	elf_Handle file = value_as_handle(file_value);
 
-	Stringer sb = {};
-	for (int i = 2; i < nargs; i ++) {
-		valuetostr(&sb, loadvalue(S, i), 0);
+	Scratch scratch = get_scratch();
+	char *start = arena_push(scratch.arena, 0);
+	for (i64 i = 2; i < nargs; i ++) {
+		print_value(scratch.arena, load_value(S, i));
 	}
-	pushint(S, sb.min);
+	char *end = arena_push_zero(scratch.arena, 1);
+	u32 size = (u32)(end - start);
+	push_value(S, value_from_integer(size));
 
-	sys_write_file(file, sb.buf, sb.min);
+	sys_write_file(file, start, size);
 
-	free(sb.buf);
+	end_scratch(scratch);
 	return 1;
 }
 
@@ -487,11 +467,9 @@ ELF_FUNCTION(l_core_fprintl) {
 
 const static elf_Binding l_core[] = {
 	{"get_meta",        l_core_get_meta        },
-	{"set_meta",        l_core_set_meta        },
 	{"mark_readonly",   l_core_mark_readonly   },
 
 	{"assert",          l_core_assert          },
-	{"new_buffer",      l_core_new_buffer      },
 
 	{"get_mem_counter", l_core_get_mem_counter },
 	{"get_obj_counter", l_core_get_obj_counter },
@@ -505,8 +483,8 @@ const static elf_Binding l_core[] = {
 
 	{"tagof",           l_core_tagof           },
 
-	{"is_str",          l_core_is_string       },
-	{"is_numeric",      l_core_is_numeric      },
+	{"value_is_atom",          l_core_is_atom       },
+	{"value_is_numeric",      l_core_is_numeric      },
 
 	{"iton",            l_core_iton            },
 	{"ntoi",            l_core_ntoi            },
@@ -528,6 +506,11 @@ const static elf_Binding l_core[] = {
 	{"pf"    ,     l_core_printl           },
 };
 
+static elf_Table *elf_lib_core(elf_State *state)
+{
+	return new_binding_table(state, l_core, ARRAY_COUNT(l_core));
+}
+
 
 #if 0
 static char *in_sym_dir(char *dir, char *sym) {
@@ -543,29 +526,32 @@ static char *in_sym_dir(char *dir, char *sym) {
 /* the dot is added so that symbols like elf.math.floor
 are not mistaken with table accesses when shortened,
 math.floor != .math.floor */
-int core_lib_include(elf_State *R) {
+i64 core_lib_include(elf_State *R) {
 	elf_check_num_args(R,".include",1,"(the directory to include to add to the global directory)");
-	char *dir = loadtext(R, 1);
-	int plen = text_l(dir);
+	elf_Value dir_value = load_value(R, 1);
+	check_value_type(R, dir_value, ELF_VALUE_TYPE_ATOM);
+	char *dir = value_as_atom(dir_value)->data;
+	i64 plen = (i64)strlen(dir);
 	/* accumulate all symbols here first to
 	avoid faulting under repeating patterns:
 	elf.ray.elf.ray could include the symbol
 	many more times when the new key is added
-	as we traverse the array. the new key is
+	as we traverse the elf_Value *. the new key is
 	encountered and we keep repeating the
 	process... this would override the previous
-	value and result in erroneous behavior.
+	elf_Value and result in erroneous behavior.
 	todo: */
 
 	elf_Table *globals = R->globals;
-	IndexValue entry;
-	FOR_RANGE(i,0,globals->ntotal) {
-		entry=globals->slots[i];
-		if (entry.key.tag == ELF_VALUE_TYPE_STRING) {
-			char *sym = in_sym_dir(dir,entry.key.x_str->text);
+	Entry entry;
+	FOR_RANGE(i,0,globals->nentries) {
+		entry=globals->entries[i];
+		elf_Value key = entry_key_value(entry);
+		if (value_is_atom(key)) {
+			char *sym = in_sym_dir(dir, key.x_atom->data);
 			if (*sym != '.') continue;
-			elf_String *ref = new_string_from_data(R,sym);
-			tableset(globals,VALUE_STRING(ref),globals->array[entry.idx]);
+			elf_Atom *ref = elf_atom_from_data(R,sym);
+			elf_table_set(R, globals, VALUE_ATOM(ref), elf_array_get(R, globals, entry_index(entry)));
 		}
 	}
 	return 0;

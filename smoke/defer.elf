@@ -1,0 +1,57 @@
+order := 0
+
+{
+	defer order = order * 10 + 1
+	defer order = order * 10 + 2
+}
+
+test_assert(order == 21)
+
+side = 1
+return_before_defer := fun() {
+	defer side = 3
+	ret side
+}
+
+value := return_before_defer()
+test_assert(value == 1)
+test_assert(side == 3)
+
+loop_log := 0
+i := 0
+
+while i < 10 ? {
+	i += 1
+	defer loop_log = loop_log * 10 + i
+
+	if i == 2 ? {
+		continue
+	}
+
+	if i == 4 ? {
+		break
+	}
+}
+
+test_assert(loop_log == 1234)
+
+nested_trace = 0
+outer := fun() {
+	defer nested_trace += 100
+
+	inner := fun() {
+		defer nested_trace += 10
+		ret 7
+	}
+
+	result := inner()
+	test_assert(result == 7)
+	test_assert(nested_trace == 10)
+	ret result
+}
+
+outer_result := outer()
+test_assert(outer_result == 7)
+test_assert(nested_trace == 110)
+
+ret order * 100000 + value * 10000 + side * 1000 + loop_log + nested_trace

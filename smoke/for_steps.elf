@@ -1,0 +1,40 @@
+sum := 0
+count := 0
+last := 0
+
+for i := 1; 2; 3 ? {
+	sum += i
+	count += 1
+	last = i
+}
+
+test_assert(sum == 6)
+test_assert(count == 3)
+test_assert(last == 3)
+
+mixed_sum := 0
+mixed_count := 0
+mixed_last := 0
+
+for i := 0 ... 10; 10 ? {
+	mixed_sum += i
+	mixed_count += 1
+	mixed_last = i
+}
+
+test_assert(mixed_sum == 55)
+test_assert(mixed_count == 11)
+test_assert(mixed_last == 10)
+
+pair_sum := 0
+pair_count := 0
+
+for i, j := 1, 2; 3, 4 ? {
+	pair_sum += i + j
+	pair_count += 1
+}
+
+test_assert(pair_sum == 10)
+test_assert(pair_count == 2)
+
+ret sum + mixed_sum + pair_sum

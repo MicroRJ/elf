@@ -1,0 +1,66 @@
+t := {
+	x = 1,
+	["asdasdsd"] = 2,
+	"foo" = 3,
+	[7] = 70,
+	10,
+	20,
+	30,
+}
+
+test_assert(t.x == 1)
+test_assert(t.["x"] == 1)
+test_assert(t.["asdasdsd"] == 2)
+test_assert(t.foo == 3)
+test_assert(t.["foo"] == 3)
+test_assert(t.[7] == 70)
+
+t.y = 4
+test_assert(t.y == 4)
+test_assert(t.["y"] == 4)
+
+t.["z"] = 5
+test_assert(t.z == 5)
+test_assert(t.["z"] == 5)
+
+t.[8] = 80
+test_assert(t.[8] == 80)
+
+arr := {10, 20, 30}
+test_assert(arr[0] == 10)
+test_assert(arr[1] == 20)
+test_assert(arr[2] == 30)
+
+arr[1] = 22
+test_assert(arr[1] == 22)
+test_assert(arr[0] == 10)
+test_assert(arr[2] == 30)
+
+nested := {
+	child = {
+		name = "elf",
+	}
+}
+
+test_assert(nested.child.name == "elf")
+test_assert(nested.["child"].["name"] == "elf")
+
+nested_array := {
+	child = {1, 2}
+}
+
+test_assert(nested_array.child[0] == 1)
+test_assert(nested_array.["child"][1] == 2)
+
+target := { base = 34 }
+table_meta := elf.get_meta(target)
+table_meta.answer = 42
+table_meta.add = fun(x) {
+	ret elf.arg(0).base + x
+}
+
+test_assert(target:answer == 42)
+test_assert(target:add(8) == 42)
+test_assert(elf.get_meta(target).answer == 42)
+
+ret 123

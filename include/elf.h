@@ -25,6 +25,7 @@
 
 
 typedef struct elf_State   elf_State;
+typedef struct elf_Table elf_Table;
 
 
 #include "elf_coretypes.h"
@@ -50,12 +51,16 @@ typedef struct {
    elf_Function  function;
 } elf_Binding;
 
+typedef struct
+{
+   char    *data;
+   elf_u64  size;
+}
+elf_SourceBuffer;
+
 //
 //	ELF_VALUE_TYPE_NIL:
 // the value is nil
-//	ELF_VALUE_TYPE_TOMB:
-// the value is a tombstone, should not be seen outside
-// of table code
 //	ELF_VALUE_TYPE_NUMBER:
 // the value is a 64 - bit floating point number
 //	ELF_VALUE_TYPE_INTEGER:
@@ -68,7 +73,6 @@ typedef struct {
 typedef enum
 {
    ELF_VALUE_TYPE_NIL = 0,
-   ELF_VALUE_TYPE_TOMB,
    ELF_VALUE_TYPE_NUMBER,
    ELF_VALUE_TYPE_INTEGER,
    ELF_VALUE_TYPE_HANDLE,
@@ -77,8 +81,7 @@ typedef enum
    ELF_VALUE_TYPE_USER_OBJECT,
    ELF_VALUE_TYPE_CLOSURE,
    ELF_VALUE_TYPE_TABLE,
-   ELF_VALUE_TYPE_STRING,
-   ELF_VALUE_TYPE_BUFFER,
+   ELF_VALUE_TYPE_ATOM,
    ELF_VALUE_TYPE_COUNT_,
 }
 ELF_ValueType;
@@ -146,9 +149,9 @@ void elf_error(elf_State *, int error, const char *message, ...);
 void elf_push_nil(elf_State *);
 void elf_pushint(elf_State *, elf_Integer);
 void elf_push_num(elf_State *, elf_Number);
-void elf_pushtab(elf_State *);
-void elf_pushtext(elf_State *, const char *);
-void elf_push_textl(elf_State *, const char *, int length);
+elf_Table *elf_push_new_table(elf_State *);
+void elf_push_atom_text(elf_State *, const char *);
+void elf_push_atom_text_size(elf_State *, const char *, int length);
 void elf_pushfun(elf_State *, elf_Function);
 void elf_pushsys(elf_State *, elf_Handle);
 
@@ -170,36 +173,22 @@ void elf_pushglobals(elf_State *);
 
 
 
-// The following is true for
-//
-// elf_pushconstexpr
-// elf_pushcodefile
-//
-// If no text  is provided then name indicates the file to load
-// the text from.
-//
-// If text is provided, then name is simply used for printouts.
-//
-//	The integer result indicates success.
-//
+// Push a constant expression onto the stack, value is on the stack.
+int elf_push_constant_expr(elf_State *S, const char *name, elf_SourceBuffer source);
 
+int elf_push_json(elf_State *S, const char *name, elf_SourceBuffer source);
 
-// push a constant expression onto the stack, value is on the stack.
-int elf_pushconstexpr(elf_State *S, const char *name, const char *text);
-
-
-
-// push an executable script onto the stack, closure is on the stack.
-int elf_pushcodefile(elf_State *S, const char *name, const char *text);
+// Push an executable script onto the stack, closure is on the stack.
+int elf_push_code_source(elf_State *S, const char *name, elf_SourceBuffer source);
+int elf_push_code_file(elf_State *S, const char *name);
 
 
 
 
 
 ELF_ValueType elf_loadtype(elf_State *, int x);
-ELF_ValueType elf_loadpush(elf_State *, int x);
-const char *elf_loadtext(elf_State *, int x);
-const char *elf_loadtextl(elf_State *, int x, int *l);
+const char *elf_load_atom_text(elf_State *, int x);
+const char *elf_load_atom_textl(elf_State *, int x, int *l);
 elf_Number elf_load_num(elf_State *, int x);
 elf_Integer elf_loadint(elf_State *, int x);
 elf_Handle elf_loadsys(elf_State *, int x);

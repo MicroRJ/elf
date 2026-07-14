@@ -118,6 +118,7 @@ void sys_virtual_free(void *memory);
 for instance, for web,
 LOG = console.log, ERROR = console.err */
 void sys_console_print(int type, char *message);
+void sys_enable_console_colors(void);
 
 
 /* triggers the debugger for this program,
@@ -168,7 +169,7 @@ typedef struct {
 	// info along with the name
 	int          type;
 	int          size;
-	Path_Builder pb;
+	Path_Stack pb;
 } FILE_VISITOR;
 
 

@@ -1,0 +1,28 @@
+path := "build/sys_smoke_test.txt"
+missing := "build/sys_smoke_missing.txt"
+sys := elf.sys
+
+sys.delete_file(path)
+sys.delete_file(missing)
+
+test_assert(sys.read_file(missing) == nil)
+
+test_assert(sys.write_file(path, "hello sys") == 1)
+test_assert(sys.read_file(path) == "hello sys")
+test_assert(sys.read_file(path, 5) == "hello")
+
+file := sys.open_file(path, "r")
+test_assert(file != nil)
+test_assert(sys.get_file_size(file) == 9)
+test_assert(sys.read_file(file) == "hello sys")
+sys.close_file(file)
+
+test_assert(sys.get_file_name("some/path/name.ext") == "name")
+test_assert(sys.get_file_extension("some/path/name.ext") == "ext")
+test_assert(sys.get_parent_path("some/path/name.ext") == "some/path")
+test_assert(sys.slice_path("some/path/name.ext", 2) == "some/path")
+
+test_assert(sys.delete_file(path) == 1)
+test_assert(sys.read_file(path) == nil)
+
+ret 77

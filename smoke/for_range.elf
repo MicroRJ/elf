@@ -1,0 +1,81 @@
+sum := 0
+count := 0
+saw_end := 0
+
+for i := 0 ... 24 ? {
+	sum += i
+	count += 1
+	if i == 24 ? {
+		saw_end = 1
+	}
+}
+
+test_assert(sum == 276)
+test_assert(count == 24)
+test_assert(saw_end == 0)
+
+triple_sum := 0
+triple_count := 0
+last_i := -1
+last_j := -1
+last_k := -1
+
+for i, j, k := 0 ... 24 ? {
+	triple_sum += i + j + k
+	triple_count += 1
+	last_i = i
+	last_j = j
+	last_k = k
+}
+
+test_assert(triple_sum == 276)
+test_assert(triple_count == 8)
+test_assert(last_i == 21)
+test_assert(last_j == 22)
+test_assert(last_k == 23)
+
+values := {5, 7, 11, 13, 17, 19}
+value_sum := 0
+value_count := 0
+
+for value := values[0 ... 6] ? {
+	value_sum += value
+	value_count += 1
+}
+
+test_assert(value_sum == 72)
+test_assert(value_count == 6)
+
+pair_sum := 0
+pair_count := 0
+last_a := -1
+last_b := -1
+
+for a, b := values[0 ... 6] ? {
+	pair_sum += a * 10 + b
+	pair_count += 1
+	last_a = a
+	last_b = b
+}
+
+test_assert(pair_sum == 369)
+test_assert(pair_count == 3)
+test_assert(last_a == 17)
+test_assert(last_b == 19)
+
+elf.source_calls = 0
+elf.cached_values = values
+get_values := fun() {
+	elf.source_calls += 1
+	ret elf.cached_values
+}
+
+cached_sum := 0
+for item := get_values()[0 ... 3] ? {
+	cached_sum += item
+}
+
+test_assert(cached_sum == 23)
+test_assert(elf.source_calls == 1)
+
+ret sum

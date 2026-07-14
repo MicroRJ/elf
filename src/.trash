@@ -1,4 +1,89 @@
 
+// ---------------------------------------------------------
+// Well, this comment is weird ...
+// ---------------------------------------------------------
+// It is Friday, April 24.
+// I am lonely, and heart-broken.
+// I've never felt this bad in my life.
+// I am trying so hard, to not burst into tears ...
+// I wish it would be over ...
+// It's hard to do what you love, when it doesn't love you back ...
+// What good is hope, if it's the last thing that dies ...
+// And here I am, still ... Hoping ... For someone, to help ...
+// ---------------------------------------------------------
+
+// par->entities[id].tags |= ENTITY_TAG_REFERENCED;
+
+// static IRRef tree_from_identifier(Parser *parser, Source line, char *name, b32 lval)
+// {
+// 	IRRef v = NULL_AST;
+
+// 	EntityId id = identify_name(parser, name);
+
+// 	if (id != NO_ENTITY)
+// 	{
+// 		Entity entity = parser->entities[id];
+
+// 		if (!lval)
+// 		{
+// 			if (~entity.tags & ENTITY_TAG_ASSIGNED)
+// 			{
+// 				parser_dialog(parser, parser->tok.line, "warning: usage of possibly unassigned variable");
+// 			}
+// 		}
+
+
+// 		// check if we have to capture this thing
+// 		IRRef enc = parser->function;
+
+// 		if (entity.scope < enc->ast_function.scope)
+// 		{
+// 			i32 index = -1;
+
+// 			// Check if we've captured this already
+// 			FOR_ARRAY(i, enc->ast_function.capts)
+// 			{
+// 				if (enc->ast_function.capts[i] == entity.tree)
+// 				{
+// 					index = i;
+// 					break;
+// 				}
+// 			}
+
+// 			// Capture it if not
+// 			if (index == -1)
+// 			{
+// 				index = heap_array_length(enc->ast_function.capts);
+// 				heap_array_add(enc->ast_function.capts, entity.tree);
+// 			}
+
+// 			v = tree_closure_value(parser, line, index);
+
+// 			// goto next function
+// 			enc = enc->ast_function.enc;
+
+// 			if (entity.scope < enc->ast_function.scope)
+// 			{
+// 				parser_dialog(parser, line, "cannot capture?");
+// 			}
+
+// 		}
+// 		else
+// 		{
+// 			v = tree_proxy(parser, line, entity.tree);
+// 		}
+
+// 	}
+// 	else
+// 	{
+// 		// todo: we can only do this after we implement directories
+// 		// because otherwise all of our libs break!
+// 		// parser_dialog(parser, line, "undeclared identifier, if this is a global use the 'global' keyword or declare a global");
+// 		v = tree_global_symbol(parser, line, name);
+// 	}
+// 	return v;
+// }
+
 
 
 #if 0
@@ -7,10 +92,10 @@
 			consume_token(parser);
 
 			// todo: handle operand '#index(<loop-name>)'
-			Loop *loop = checkloop(parser, tok.site, Y_NULL);
+			Loop *loop = checkloop(parser, tok.site, NULL_AST);
 
 			v = loop->index;
-			ASSERT(v != Y_NULL);
+			ASSERT(v != NULL_AST);
 		}
 		break;
 
@@ -19,7 +104,7 @@
 			consume_token(parser);
 
 			// todo: handle operand '#index(<loop-name>)'
-			Loop *loop = checkloop(parser, tok.site, Y_NULL);
+			Loop *loop = checkloop(parser, tok.site, NULL_AST);
 
 			int index = 0;
 
@@ -37,7 +122,7 @@
 
 			v = loop->values[index];
 
-			ASSERT(v != Y_NULL);
+			ASSERT(v != NULL_AST);
 		}
 		break;
 
@@ -45,7 +130,7 @@
 		{
 			consume_token(parser);
 			v=parse_subexpr(parser,0,10000);
-			v=create_unary_expr_ast(parser, tok.site,TREE_DEBUG_GET_MEMORY,v);
+			v=create_unary_ast(parser, tok.site,TREE_DEBUG_GET_MEMORY,v);
 		}
 		break;
 
@@ -53,7 +138,7 @@
 		{
 			consume_token(parser);
 			v=parse_subexpr(parser,0,10000);
-			v=create_unary_expr_ast(parser, tok.site,TREE_DEBUG_GET_EXPRESSION_NAME,v);
+			v=create_unary_ast(parser, tok.site,TREE_DEBUG_GET_EXPRESSION_NAME,v);
 		}
 		break;
 #endif
@@ -278,7 +363,7 @@ static void gen_typerule(Parser *par, AstRef memory, Token tok)
 		{
 			consume_token(parser);
 
-			AstRef v = Y_NULL;
+			AstRef v = NULL_AST;
 
 			if (!tok.eol)
 			{
@@ -356,19 +441,19 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 
 
 	// caller must have created a loop!
-	Loop *loop = checkloop(parser, tok.line, Y_NULL);
+	Loop *loop = checkloop(parser, tok.line, NULL_AST);
 
 
 	AstRef v;
 
 	ASSERT(expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX);
 
-	AstRef rangelo = Y_NULL, rangehi = Y_NULL;
-	AstRef prebody = Y_NULL;
+	AstRef rangelo = NULL_AST, rangehi = NULL_AST;
+	AstRef prebody = NULL_AST;
 
 	if (expr->kind == AST_RANGE_INDEX) {
-		ASSERT(expr->x != Y_NULL);
-		ASSERT(expr->y != Y_NULL);
+		ASSERT(expr->x != NULL_AST);
+		ASSERT(expr->y != NULL_AST);
 
 		AstRef array = expr->x;
 		AstRef range = expr->y;
@@ -390,8 +475,8 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 
 		rangelo = range->x, rangehi = range->y;
 
-		if (rangelo == Y_NULL) rangelo = create_int_ast(parser, range->site, 0);
-		if (rangehi == Y_NULL) rangehi = tree_length(parser, range->site, array);
+		if (rangelo == NULL_AST) rangelo = create_int_ast(parser, range->site, 0);
+		if (rangehi == NULL_AST) rangehi = tree_length(parser, range->site, array);
 	}
 	// RANGE
 	else {
@@ -401,7 +486,7 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 		begin_block(parser);
 		{
 			for(int i=1; i<heap_array_length(values); ++ i) {
-				v = tree_add_int(parser, tok.line, index, i);
+				v = create_add_int_ast(parser, tok.line, index, i);
 				v = tree_store(parser, tok.line, values[i], v);
 				PushBlockStat(parser, v);
 			}
@@ -410,14 +495,14 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 
 		rangelo = expr->x, rangehi = expr->y;
 
-		if(rangelo == Y_NULL) rangelo = create_int_ast(parser,tok.line,0);
+		if(rangelo == NULL_AST) rangelo = create_int_ast(parser,tok.line,0);
 		// todo: if we don't have an upper bound replace condition entirely
-		if(rangehi == Y_NULL) rangehi = create_int_ast(parser,tok.line,UINT_MAX);
+		if(rangehi == NULL_AST) rangehi = create_int_ast(parser,tok.line,UINT_MAX);
 	}
 
 
-	ASSERT(rangelo != Y_NULL);
-	ASSERT(rangehi != Y_NULL);
+	ASSERT(rangelo != NULL_AST);
+	ASSERT(rangehi != NULL_AST);
 
 
 	// initialize index
@@ -425,10 +510,10 @@ static AstRef build_range_loop(Parser *parser, AstRef expr, AstRef index, AstRef
 	PushBlockStat(parser, v);
 
 	// generate predicate
-	AstRef pred = tree_less_than(parser, tok.line, index, rangehi);
+	AstRef pred = create_less_than_ast(parser, tok.line, index, rangehi);
 
 	// what to do after the loop body's
-	AstRef probody = tree_add_int_store(parser, tok.line, index, heap_array_length(values));
+	AstRef probody = create_add_int_store_ast(parser, tok.line, index, heap_array_length(values));
 
 
 
@@ -772,7 +857,7 @@ static TreeChain parse_rhs(Parser *parser, u32 num_lhs, AstType empty)
 	// fill with nil
 	for (u32 i=rhs.tally; i<num_lhs; ++i)
 	{
-		tree_chain_add(&rhs, tree_nullary(parser, parser->tok.site, empty));
+		tree_chain_add(&rhs, create_nullary_ast(parser, parser->tok.site, empty));
 	}
 	return rhs;
 }
@@ -925,9 +1010,9 @@ static int parse_expr_stat(Parser *parser) {
 				{
 					rewrite_lhs(parser, lhs[i]);
 
-					AstRef c = create_binary_expr_ast(parser, tok.line, AST_EQ, lhs[i], create_nil_ast(parser, tok.line));
+					AstRef c = create_binary_ast(parser, tok.line, AST_EQ, lhs[i], create_nil_ast(parser, tok.line));
 					AstRef s = tree_store(parser, tok.line, lhs[i], next_rhs);
-					AstRef v = elf_new_if_stat_tree(parser, tok.line, c, s, 0);
+					AstRef v = create_if_ast(parser, tok.line, c, s, 0);
 					PushBlockStat(parser, v);
 				}
 				next_rhs = next_rhs->next;
@@ -949,7 +1034,7 @@ static int parse_expr_stat(Parser *parser) {
 				{
 					rewrite_lhs(parser, lhs[i]);
 
-					AstRef o = create_binary_expr_ast(parser, tok.line, ast_type_from_token_type(tok.type), lhs[i], next_rhs);
+					AstRef o = create_binary_ast(parser, tok.line, ast_type_from_token_type(tok.type), lhs[i], next_rhs);
 					AstRef v = tree_store(parser, tok.line, lhs[i], o);
 					PushBlockStat(parser, v);
 				}
@@ -1016,7 +1101,7 @@ static int parse_expr_stat(Parser *parser) {
 	{
 		u32 nargs = elf_parse_expr_list(parser);
 		AstRef *args = pop_ast_array(parser, nargs);
-		AstRef v = elf_new_return_stat_tree(parser, tok.site, args, nargs);
+		AstRef v = create_return_ast(parser, tok.site, args, nargs);
 		PushBlockStat(parser,v);
 	}
 	else {
@@ -1137,7 +1222,7 @@ static void PushBlockStat(Parser *par, AstRef v)
 	}
 }
 
-static void begin_block(Parser *par) {
+static void f(Parser *par) {
 	if (par->block_index >= COUNTOF(par->block_stack)) {
 		parser_dialog(par, par->tok.line, "block nesting too deep");
 		reporterror(par->R, -1, "block nesting too deep");
@@ -1274,7 +1359,7 @@ static void add_this_param(Parser *parser, Source line) {
 
 static AstRef tree_from_identifier(Parser *parser, Source line, char *name, b32 lval)
 {
-	AstRef v = Y_NULL;
+	AstRef v = NULL_AST;
 
 	EntityId id = identify_name(parser, name);
 
@@ -1411,7 +1496,7 @@ static Loop *get_loop(Parser *parser, AstRef name)
 	Loop *loop = parser->loop_stack + parser->loop_index - 1;
 
 	// this top one
-	if (name == Y_NULL) {
+	if (name == NULL_AST) {
 		return loop;
 	}
 
@@ -1474,7 +1559,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		u32 nexprs = elf_parse_expr_list(parser);
 		AstRef *exprs = pop_ast_array(parser, nexprs);
 
-		stat = elf_new_decl_stat_tree(parser, tok.site, tags, names, ntargs, exprs, nexprs);
+		stat = create_decl_ast(parser, tok.site, tags, names, ntargs, exprs, nexprs);
 	}
 	else
 	{

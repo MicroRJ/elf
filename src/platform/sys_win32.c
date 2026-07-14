@@ -6,7 +6,46 @@
 #pragma comment(lib,"Ws2_32")
 #define WIN32_LEAN_AND_MEAN
 
-#include "winconfig.h"
+// todo: should probably just define the functions I want to use instead!
+#define NOGDICAPMASKS //     - CC_*, LC_*, PC_*, CP_*, TC_*, RC_
+#define NOVIRTUALKEYCODES // - VK_*
+#define NOWINMESSAGES //     - WM_*, EM_*, LB_*, CB_*
+#define NOWINSTYLES //       - WS_*, CS_*, ES_*, LBS_*, SBS_*, CBS_*
+#define NOSYSMETRICS //      - SM_*
+#define NOMENUS //           - MF_*
+#define NOICONS //           - IDI_*
+#define NOKEYSTATES //       - MK_*
+#define NOSYSCOMMANDS //     - SC_*
+#define NORASTEROPS //       - Binary and Tertiary raster ops
+#define NOSHOWWINDOW //      - SW_*
+#define OEMRESOURCE //       - OEM Resource values
+#define NOATOM //            - Atom Manager routines
+#define NOCLIPBOARD //       - Clipboard routines
+#define NOCOLOR //           - Screen colors
+#define NOCTLMGR //          - Control and Dialog routines
+#define NODRAWTEXT //        - DrawText() and DT_*
+#define NOGDI //             - All GDI defines and routines
+#define NOKERNEL //          - All KERNEL defines and routines
+#define NOUSER //            - All USER defines and routines
+#define NONLS //             - All NLS defines and routines
+#define NOMB //              - MB_* and MessageBox()
+#define NOMEMMGR //          - GMEM_*, LMEM_*, GHND, LHND, associated routines
+#define NOMETAFILE //        - typedef METAFILEPICT
+#define NOMINMAX //          - Macros min(a,b) and max(a,b)
+#define NOMSG //             - typedef MSG and associated routines
+#define NOOPENFILE //        - OpenFile(), OemToAnsi, AnsiToOem, and OF_*
+#define NOSCROLL //          - SB_* and scrolling routines
+#define NOSERVICE //         - All Service Controller routines, SERVICE_ equates, etc.
+#define NOSOUND //           - Sound driver routines
+#define NOTEXTMETRIC //      - typedef TEXTMETRIC and associated routines
+#define NOWH //              - SetWindowsHook and WH_*
+#define NOWINOFFSETS //      - GWL_*, GCL_*, associated routines
+#define NOCOMM //            - COMM driver routines
+#define NOKANJI //           - Kanji support stuff.
+#define NOHELP //            - Help engine interface.
+#define NOPROFILER //        - Profiler interface.
+#define NODEFERWINDOWPOS //  - DeferWindowPos routines
+#define NOMCX //             - Modem Configuration Extensions
 
 #include <windows.h>
 #include <Windowsx.h>
@@ -18,7 +57,7 @@
 
 
 #include "elf_coretypes.h"
-#include "subsystem.h"
+#include "base.h"
 #include "system.h"
 
 
@@ -43,7 +82,21 @@ FILE_HANDLE sys_get_std_file(int std) {
 	return 0;
 }
 
+static void sys_enable_console_colors_for_file(FILE_HANDLE file)
+{
+	DWORD mode = 0;
+	if (file && file != INVALID_HANDLE_VALUE && GetConsoleMode(file, &mode))
+	{
+		mode |= ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+		SetConsoleMode(file, mode);
+	}
+}
 
+void sys_enable_console_colors(void)
+{
+	sys_enable_console_colors_for_file(GetStdHandle(STD_OUTPUT_HANDLE));
+	sys_enable_console_colors_for_file(GetStdHandle(STD_ERROR_HANDLE));
+}
 
 unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int zbuf) {
 	DWORD read;
@@ -123,6 +176,9 @@ FILE_HANDLE elf_platform_access_file(const char *name, int flags, int mode) {
 	}
 
 	FILE_HANDLE hfile = CreateFileA(name, os_flags, os_sharing_flags, NULL, os_mode, 0, NULL);
+	if (hfile == INVALID_HANDLE_VALUE) {
+		return 0;
+	}
 	return hfile;
 }
 
@@ -148,9 +204,9 @@ void sys_file_time_to_system_time(FILE_TIME *filetime, SYSTEM_TIME *systimeout) 
 
 #if 0
 int lib_core_shell(elf_State *R) {
-	char *verb = elf_loadtext(R,0);
-	char *file = elf_loadtext(R,1);
-	char *args = elf_loadtext(R,2);
+	char *verb = elf_load_atom_text(R,0);
+	char *file = elf_load_atom_text(R,1);
+	char *args = elf_load_atom_text(R,2);
 
 	int success = (INT_PTR) ShellExecute(NULL,verb,file,args,NULL,10) > 32;
 	elf_pushint(R,success);
@@ -168,11 +224,11 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
-	GetDiskFreeSpaceA(elf_loadtext(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	elf_tsets_int(info,new_string_from_data(R,"SectorsPerCluster"),SectorsPerCluster);
-	elf_tsets_int(info,new_string_from_data(R,"BytesPerSector"),BytesPerSector);
-	elf_tsets_int(info,new_string_from_data(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
-	elf_tsets_int(info,new_string_from_data(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
+	GetDiskFreeSpaceA(elf_load_atom_text(R,0),&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
+	elf_tsets_int(info,elf_atom_from_data(R,"SectorsPerCluster"),SectorsPerCluster);
+	elf_tsets_int(info,elf_atom_from_data(R,"BytesPerSector"),BytesPerSector);
+	elf_tsets_int(info,elf_atom_from_data(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
+	elf_tsets_int(info,elf_atom_from_data(R,"TotalNumberOfClusters"),TotalNumberOfClusters);
 #else
 	elf_ldebug("this function is not implemented for this platform");
 #endif
@@ -186,23 +242,23 @@ int core_lib_list_volumes(elf_State *R) {
 	char buffer[MAX_PATH];
 	HANDLE handle = FindFirstVolumeA(buffer,MAX_PATH);
 
-	elf_String *name = 0;
+	elf_Atom *name = 0;
 	if (handle != INVALID_HANDLE_VALUE) do {
 
 		elf_Table *volume = elf_new_table(R);
-		name = elf_new_string(R,buffer);
+		name = elf_atom_from_data(R,buffer);
 
 		elf_tsets_tab(list,name,volume);
 
-		elf_tsets_str(volume,new_string_from_data(R,"name"),name);
+		elf_tsets_str(volume,elf_atom_from_data(R,"name"),name);
 
 		elf_Table *path_names = elf_new_table(R);
-		elf_tsets_tab(volume,new_string_from_data(R,"path_names"),path_names);
+		elf_tsets_tab(volume,elf_atom_from_data(R,"path_names"),path_names);
 
-		if (GetVolumePathNamesForVolumeNameA(name->text,buffer,MAX_PATH,NULL)) {
+		if (GetVolumePathNamesForVolumeNameA(name->data,buffer,MAX_PATH,NULL)) {
 			char *cursor = buffer;
 			while (*cursor != '\0') {
-				_table_arrayadd(path_names,VALUE_STRING(new_string_from_data(R,buffer)));
+				elf_array_add(R, path_names, VALUE_ATOM(elf_atom_from_data(R,buffer)));
 				cursor += strlen(cursor) + 1;
 			}
 		}
@@ -228,7 +284,7 @@ bool sys_debugger() {
 // todo: make this legit, it should be the other way around!
 #include "logging.c"
 void sys_console_print(int type, char *message) {
-	elf_log(type,"%s",message);
+	// elf_log(type,"%s",message);
 }
 
 
@@ -320,7 +376,7 @@ static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 		visitor->type = FILE_TYPE_FOLDER;
 	}
 	visitor->size = info->nFileSizeLow;
-	pb_push(&visitor->pb, info->cFileName);
+	path_push(&visitor->pb, info->cFileName);
 }
 
 
@@ -331,16 +387,12 @@ void sys_find_close(FILE_HANDLE hand) {
 
 
 
-FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor) {
-
-	// insert some temporary stuff for windows path matching
-	sb_writetext(&visitor->pb.sb, "\\*");
-
+FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor)
+{
+	path_push(&visitor->pb, "*");
 	WIN32_FIND_DATAA info;
 	FILE_HANDLE hand = FindFirstFileA(visitor->pb.path, &info);
-
-	// pop what we inserted
-	sb_regress(&visitor->pb.sb, 2);
+	path_pop(&visitor->pb);
 
 	int result = hand != INVALID_HANDLE_VALUE;
 	if (result) {
@@ -353,7 +405,7 @@ FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor) {
 
 int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	// pull the path from before
-	pb_pull(&visitor->pb);
+	path_pop(&visitor->pb);
 
 	WIN32_FIND_DATAA info;
 	int noerr = FindNextFileA(hand, &info);

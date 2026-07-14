@@ -31,7 +31,9 @@ static u32 xorshift32(u32 x) {
 
 
 ELF_FUNCTION(l_rand_seed) {
-	global_random_state = loadint(S, 1);
+	elf_Value seed = load_value(S, 1);
+	check_value_type_rule(S, seed, TRULE_NUMERIC);
+	global_random_state = value_to_integer(seed);
 	return 1;
 }
 
@@ -49,10 +51,15 @@ ELF_FUNCTION(l_rand_random) {
 
 
 
-static elf_Binding lib_random[] = {
+static const elf_Binding lib_random[] = {
 	{"random_seed", l_rand_seed  },
 	{"random", l_rand_random }
 };
+
+static elf_Table *elf_lib_random(elf_State *state)
+{
+	return new_binding_table(state, lib_random, ARRAY_COUNT(lib_random));
+}
 
 
 
