@@ -304,12 +304,11 @@ ELF_FUNCTION(lib_sys_get_file_times)
 	FILE_TIMES times;
 	sys_time_file(file, &times);
 
-	elf_Table *table = elf_table_new(state);
+	elf_Table *table = elf_push_new_table(state);
 	table_set_integer_field(state, table, "created", times.create.time);
 	table_set_integer_field(state, table, "access", times.access.time);
 	table_set_integer_field(state, table, "write", times.write.time);
 
-	push_value(state, value_from_table(table));
 	return 1;
 }
 
@@ -321,7 +320,7 @@ ELF_FUNCTION(lib_sys_file_time_to_system_time)
 	SYSTEM_TIME systemtime;
 	sys_file_time_to_system_time(&filetime, &systemtime);
 
-	elf_Table *table = elf_table_new(state);
+	elf_Table *table = elf_push_new_table(state);
 	table_set_integer_field(state, table, "year", systemtime.year);
 	table_set_integer_field(state, table, "month", systemtime.month);
 	table_set_integer_field(state, table, "dayofweek", systemtime.dayofweek);
@@ -331,7 +330,6 @@ ELF_FUNCTION(lib_sys_file_time_to_system_time)
 	table_set_integer_field(state, table, "second", systemtime.second);
 	table_set_integer_field(state, table, "milliseconds", systemtime.milliseconds);
 
-	push_value(state, value_from_table(table));
 	return 1;
 }
 
@@ -379,7 +377,7 @@ ELF_FUNCTION(lib_sys_get_path_list)
 		recurse = load_integer_arg(state, 2);
 	}
 
-	elf_Table *paths = elf_table_new(state);
+	elf_Table *paths = elf_push_new_table(state);
 	Scratch scratch = get_scratch();
 	FILE_VISITOR visitor = {};
 	visitor.pb = path_new_stack(scratch.arena, 32768);
@@ -388,7 +386,6 @@ ELF_FUNCTION(lib_sys_get_path_list)
 	append_visited_paths(state, &visitor, paths, recurse);
 	end_scratch(scratch);
 
-	push_value(state, value_from_table(paths));
 	return 1;
 }
 

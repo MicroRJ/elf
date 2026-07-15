@@ -107,8 +107,8 @@ struct elf_Table
 	elf_Value  *array;
 };
 
-elf_Table *elf_table_new_sized(elf_State *S, u32 nentries);
-elf_Table *elf_table_new(elf_State *S);
+elf_Table *elf_table_new_unrooted_sized(elf_State *S, u32 nentries);
+elf_Table *elf_table_new_unrooted(elf_State *S);
 
 u32 elf_table_set(elf_State *S, elf_Table *tab, elf_Value key, elf_Value value);
 elf_Value elf_table_get_or_nil(elf_State *S, elf_Table *tab, elf_Value key);

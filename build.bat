@@ -2,7 +2,17 @@
 @REM see elf-lang/elven @ github
 
 @ECHO OFF
-@SET SRCIN=    ^
+@SETLOCAL
+
+@SET TARGET=%1
+@SET FLAGS=
+@IF "%TARGET%"=="" SET TARGET=all
+@IF /I NOT "%TARGET%"=="all" IF /I NOT "%TARGET%"=="lib" (
+	@SET TARGET=all
+	@SET FLAGS=%1
+)
+
+@SET SRCIN= ^
 src/base/base.c ^
 src/platform/system.c ^
 src/core/value/value.c ^
@@ -12,24 +22,22 @@ src/core/core.c ^
 src/compiler/compiler.c ^
 src/api/userapi.c
 
-@SET INC=      ^
-/Isrc                         ^
-/Isrc/base                    ^
-/Isrc/api                     ^
-/Isrc/core                    ^
-/Isrc/core/table              ^
-/Isrc/core/atom               ^
-/Isrc/platform                ^
-/Isrc/vm                      ^
-/Isrc/libs                    ^
-/Isrc/compiler                ^
-/Isrc/compiler/frontend       ^
-/Isrc/compiler/middle         ^
-/Isrc/compiler/backend        ^
-/Iinclude                     ^
+@SET INC= ^
+/Isrc ^
+/Isrc/base ^
+/Isrc/api ^
+/Isrc/core ^
+/Isrc/core/table ^
+/Isrc/core/atom ^
+/Isrc/platform ^
+/Isrc/vm ^
+/Isrc/libs ^
+/Isrc/compiler ^
+/Isrc/compiler/frontend ^
+/Isrc/compiler/middle ^
+/Isrc/compiler/backend ^
+/Iinclude ^
 /Istb
-
-@SET FLAGS=%1
 
 if not exist build mkdir build
 
@@ -38,6 +46,8 @@ if errorlevel 1 exit /b %errorlevel%
 
 lib /nologo /out:build\elf.lib build\base.obj build\system.obj build\value.obj build\bytecode.obj build\bytecode_debug.obj build\core.obj build\compiler.obj build\userapi.obj
 if errorlevel 1 exit /b %errorlevel%
+
+if /I "%TARGET%"=="lib" exit /b 0
 
 clang-cl /nologo -Od -Zi %FLAGS% tools\tests.c %INC% -D_DEBUG -DPLATFORM_DESKTOP /Fo:build\tests.obj /Fe:build\tests.exe /Fd:build\tests.pdb /link build\elf.lib /PDB:build\tests.pdb /ILK:build\tests.ilk
 if errorlevel 1 exit /b %errorlevel%

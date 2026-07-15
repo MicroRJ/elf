@@ -209,7 +209,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			case BC_TABLE: {
-				*result_slot = value_from_table(elf_table_new(state));
+				*result_slot = value_from_table(elf_table_new_unrooted(state));
 			} break;
 
 			case BC_CLOSURE: {
@@ -275,7 +275,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "atoms are readonly, you may not change them");
 				}
 				else {
-					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' elf_Value", value_type_name(table.type));
+					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' value", value_type_name(table.type));
 				}
 			} break;
 

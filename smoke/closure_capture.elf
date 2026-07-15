@@ -1,0 +1,39 @@
+make_adder := fun(base) {
+	ret fun(value) {
+		ret base + value
+	}
+}
+
+add_10 := make_adder(10)
+test_assert(add_10(5) == 15)
+
+x := 3
+read_x := fun() {
+	ret x
+}
+x = 9
+test_assert(read_x() == 3)
+
+make_reader := fun(x) {
+	mid := fun() {
+		ret fun() {
+			ret x
+		}
+	}
+	ret mid()
+}
+
+read_4 := make_reader(4)
+test_assert(read_4() == 4)
+
+make_sum := fun(a, b, c) {
+	returned := fun(d) {
+		ret a + b + c + d
+	}
+	ret returned
+}
+
+sum := make_sum(1, 2, 3)
+test_assert(sum(4) == 10)
+
+ret add_10(7) * 1000 + read_x() * 100 + read_4() * 10 + sum(4)

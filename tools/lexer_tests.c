@@ -3,7 +3,7 @@ static Parser lexer_test_parser(elf_State *state, const char *source)
 	Parser parser = {};
 	parser.state = state;
 	parser.name = elf_atom_from_data(state, "lexer_tests");
-	SourceBuffer source_buffer = {(char *)source, (u64)strlen(source)};
+	elf_StrSlice source_buffer = {(char *)source, (u64)strlen(source)};
 	lexer_init(&parser.lexer, state, parser.name, source_buffer);
 	return parser;
 }

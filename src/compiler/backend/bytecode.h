@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#include "base.h"
+
 
 #define BC_XDEF(_)               \
 _(HALT,            "halt")             \

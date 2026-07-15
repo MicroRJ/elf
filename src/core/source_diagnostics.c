@@ -15,7 +15,7 @@ static u64 source_slice_column(SourceSite site)
 	return 1 + (u64)(site.data - site.line_start);
 }
 
-static Source source_slice_line_end(SourceSite site, elf_SourceBuffer source)
+static Source source_slice_line_end(SourceSite site, elf_StrSlice source)
 {
 	Source line_end = site.line_start;
 	Source source_end = source.data ? source.data + source.size : 0;
@@ -36,7 +36,7 @@ static Source source_slice_line_end(SourceSite site, elf_SourceBuffer source)
 	return line_end;
 }
 
-static void print_source_slice_marker(SourceSite site, elf_SourceBuffer source)
+static void print_source_slice_marker(SourceSite site, elf_StrSlice source)
 {
 	if (!source_slice_is_valid(site)) {
 		log_line(LOG_LEVEL_ERROR, "| source information could not be found");

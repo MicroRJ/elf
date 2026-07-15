@@ -90,6 +90,11 @@ static void test_vm_variadic_arguments(void)
 	vm_expect_int("smoke/variadic_arguments.elf", 436, "vm exposes variadic arguments");
 }
 
+static void test_vm_closure_capture(void)
+{
+	vm_expect_int("smoke/closure_capture.elf", 17350, "vm runs closures with captured values");
+}
+
 static void test_vm_get_mem_macro(void)
 {
 	vm_expect_int("smoke/get_mem.elf", 123, "vm reports local memory slots");
@@ -103,6 +108,11 @@ static void test_vm_method_this(void)
 static void test_vm_script_assertions(void)
 {
 	vm_expect_int("smoke/script_assert_assignments.elf", 99, "vm runs script-side assignment assertions");
+}
+
+static void test_vm_script_logical_decl(void)
+{
+	vm_expect_int("smoke/script_assert_logical_decl.elf", 42, "vm runs logical expression declarations");
 }
 
 static void test_vm_script_table_assertions(void)
@@ -173,9 +183,11 @@ static void run_vm_tests(void)
 	test_vm_function_call();
 	test_vm_function_arguments();
 	test_vm_variadic_arguments();
+	test_vm_closure_capture();
 	test_vm_get_mem_macro();
 	test_vm_method_this();
 	test_vm_script_assertions();
+	test_vm_script_logical_decl();
 	test_vm_script_table_assertions();
 	test_vm_script_compound_assertions();
 	test_vm_script_json_assertions();

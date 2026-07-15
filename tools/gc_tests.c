@@ -2,7 +2,7 @@ static void force_gc_allocations(elf_State *state, u32 count)
 {
 	for (u32 i = 0; i < count; ++i) {
 		state->gc_next_cycle_bytes = 1;
-		elf_table_new(state);
+		elf_table_new_unrooted(state);
 	}
 }
 
@@ -35,9 +35,9 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 	elf_Value value_key = test_key_atom(state, "value");
 
 	for (u32 i = 0; i < 128; ++i) {
-		elf_Table *child = elf_table_new(state);
+		elf_Table *child = elf_push_new_table(state);
 		elf_Value child_value = {};
-	child_value = value_from_table(child);
+		child_value = value_from_table(child);
 
 		elf_table_set(state, child, value_key, test_value_int(1000 + i));
 		elf_array_add(state, root, child_value);

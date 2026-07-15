@@ -1,6 +1,6 @@
 static LowerContext *ir_test_lower_source(elf_State *state, Arena *arena, const char *source_text)
 {
-	SourceBuffer source = {(char *)source_text, (u64)strlen(source_text)};
+	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Parser *parser = elf_create_parser(state, arena, "ir_tests", source);
 	AstRef file = elf_parse_file(parser);
 
@@ -246,7 +246,7 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	IR main_body = ctx->functions[0].body;
 	IR memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
 	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION, "function expression lowers to function ir");
-	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_function != 1) {
+	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_function.index != 1) {
 		test_fail("function ir points at nested function");
 	}
 

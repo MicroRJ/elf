@@ -2,12 +2,17 @@
 #define IMPLICIT_PARAM_INDEX 0
 #define IMPLICIT_PARAM_COUNT 1
 
+typedef struct Entity Entity;
+
 typedef struct
 {
 	SourceSite         site;
 	b32            variadic;
 	u32                arity;
 	IR               body;
+	IR              *captures;
+	u32              capture_count;
+	Entity         **capture_entities;
 }
 FunctionIR;
 
@@ -61,8 +66,16 @@ typedef struct
 LoopLabels;
 
 typedef struct LowerContext LowerContext;
+typedef struct FunctionLowerContext FunctionLowerContext;
 
-typedef struct
+struct FunctionLowerContext
+{
+	FunctionLowerContext *parent;
+	FunctionIR          *function;
+	EntityId             scope_start;
+};
+
+typedef struct Entity
 {
 	EntityType    type;
 	EntityTags    tags;
@@ -91,6 +104,7 @@ struct LowerContext
 	FunctionIR *functions;
 	u32         num_functions;
 	u32         max_functions;
+	FunctionLowerContext *function;
 
 	Entity     entities[MAX_ENTITIES];
 	EntityId   scope_start;

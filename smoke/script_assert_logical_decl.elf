@@ -1,0 +1,13 @@
+new_x := 10
+new_y := 20
+apple_x := 10
+apple_y := 20
+
+eating := new_x == apple_x && new_y == apple_y
+test_assert(eating == 1)
+
+apple_y = 21
+eating = new_x == apple_x && new_y == apple_y
+test_assert(eating == 0)
+
+ret 42

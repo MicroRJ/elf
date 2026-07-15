@@ -82,18 +82,19 @@ ELF_FUNCTION(l_sockets_send)
 {
 	SOCKET sock = elf_loadsys(S, 1);
 
-	i32 size;
-	const char *text = elf_load_atom_textl(S, 2, &size);
+	Scratch scratch = get_scratch();
+	elf_StrSlice text = elf_load_atom_copy(S, 2, scratch.arena);
 
 	AtomPacket *packet;
-	u32 packet_size = sizeof(*packet) + size;
+	u32 packet_size = sizeof(*packet) + (u32)text.size;
 	packet = malloc(packet_size);
-	packet->size = size;
-	memcpy(packet->data, text, size);
+	packet->size = (u32)text.size;
+	memcpy(packet->data, text.data, text.size);
 
 	send(sock, (char *) packet, packet_size, 0);
 
 	free(packet);
+	end_scratch(scratch);
 
 	return 0;
 }
@@ -126,13 +127,13 @@ static elf_Table *elf_lib_sockets(elf_State *state)
 
 
 #if 0
-ELF_PUBLIC int netlib_close(elf_State *R) {
+int netlib_close(elf_State *R) {
 	WSACleanup();
 	return 0;
 }
 
 
-ELF_PUBLIC int netlib_listen(elf_State *R) {
+int netlib_listen(elf_State *R) {
 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 	int error = listen(handle,SOMAXCONN);
 	elf_pushint(R,error!=SOCKET_ERROR);
@@ -140,7 +141,7 @@ ELF_PUBLIC int netlib_listen(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_accept(elf_State *R) {
+int netlib_accept(elf_State *R) {
 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 	SOCKET client = accept(handle,NULL,NULL);
 	elf_pushsys(R,(elf_Handle)client);
@@ -148,7 +149,7 @@ ELF_PUBLIC int netlib_accept(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_pollclient(elf_State *R) {
+int netlib_pollclient(elf_State *R) {
 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 	fd_set ready;
 	FD_ZERO(&ready);
@@ -164,7 +165,7 @@ ELF_PUBLIC int netlib_pollclient(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_tcpserver(elf_State *R) {
+int netlib_tcpserver(elf_State *R) {
 	elf_Value addrname_value = load_value(R, 0);
 	elf_Value addrport_value = load_value(R, 1);
 	check_value_type(R, addrname_value, ELF_VALUE_TYPE_ATOM);
@@ -191,7 +192,7 @@ ELF_PUBLIC int netlib_tcpserver(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_tcpclient(elf_State *R) {
+int netlib_tcpclient(elf_State *R) {
 	elf_Value addrname_value = load_value(R, 0);
 	elf_Value addrport_value = load_value(R, 1);
 	check_value_type(R, addrname_value, ELF_VALUE_TYPE_ATOM);
@@ -218,7 +219,7 @@ ELF_PUBLIC int netlib_tcpclient(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_send(elf_State *R) {
+int netlib_send(elf_State *R) {
 	/* todo: make this a class? */
 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 	elf_Value payload_value = load_value(R, 1);
@@ -233,7 +234,7 @@ ELF_PUBLIC int netlib_send(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_ioctl(elf_State *R) {
+int netlib_ioctl(elf_State *R) {
 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 	long mode = 1;
 	int error = ioctlsocket(socket,FIONBIO,&mode);
@@ -242,7 +243,7 @@ ELF_PUBLIC int netlib_ioctl(elf_State *R) {
 }
 
 
-ELF_PUBLIC int netlib_recv(elf_State *R) {
+int netlib_recv(elf_State *R) {
 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 	LMSG message = {0};
 	if (recv(socket,(char*)&message,sizeof(message),0) != -1) {

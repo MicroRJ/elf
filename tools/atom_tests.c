@@ -32,10 +32,22 @@ static void test_atom_size_limited_interning(elf_State *state)
 	expect_same_atom(first, third, "size-limited atom ignores trailing data");
 }
 
+static void test_atom_public_text_helpers(elf_State *state)
+{
+	elf_Atom *atom = elf_atom_from_data(state, "copy.me");
+
+	elf_Scratch scratch = elf_get_scratch();
+	elf_StrSlice copy = elf_atom_copy_text(scratch.arena, atom);
+	if (copy.size != 7 || strcmp(copy.data, "copy.me") != 0) {
+		test_fail("atom copy returns arena-owned c string");
+	}
+	elf_end_scratch(scratch);
+}
+
 static void force_atom_gc(elf_State *state)
 {
 	state->gc_next_cycle_bytes = 1;
-	elf_table_new(state);
+	elf_table_new_unrooted(state);
 }
 
 static u32 test_atom_hash_data(const char *data, u32 size)
@@ -143,6 +155,7 @@ static void run_atom_tests(elf_State *state)
 {
 	test_atom_interned_identity(state);
 	test_atom_size_limited_interning(state);
+	test_atom_public_text_helpers(state);
 	test_atom_stack_roots_survive_gc();
 	test_atom_unrooted_values_are_swept();
 	test_atom_bucket_unlinks_dead_collisions();

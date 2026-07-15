@@ -1,4 +1,4 @@
-#include "elf_coretypes.h"
+#include "elf.h"
 #include <string.h>
 #include "base.h"
 #include "system.h"

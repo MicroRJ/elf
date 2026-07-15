@@ -163,6 +163,14 @@ elf_State *elf_create_state()
 	return state;
 }
 
+void elf_destroy_state(elf_State *state)
+{
+	if (state)
+	{
+		destroy_arena(&state->arena);
+	}
+}
+
 static int run_bytecode_frame(elf_State *state, StackFrame frame);
 #include "vm/call.c"
 #include "vm/vm.c"

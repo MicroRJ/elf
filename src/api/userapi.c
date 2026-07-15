@@ -51,20 +51,11 @@ elf_Handle elf_loadsys(elf_State *S, int x)
 
 
 
-const char *elf_load_atom_text(elf_State *S, int x) {
+elf_StrSlice elf_load_atom_copy(elf_State *S, int x, elf_Arena *arena)
+{
 	elf_Value value = load_value(S, x);
 	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	return elf_atom_data(value_as_atom(value));
-}
-
-
-
-const char *elf_load_atom_textl(elf_State *S, int x, int *l) {
-	elf_Value value = load_value(S, x);
-	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom * str = value_as_atom(value);
-	if (l) *l = str->size;
-	return str->data;
+	return elf_atom_copy_text(arena, value_as_atom(value));
 }
 
 
@@ -78,7 +69,7 @@ void elf_pushsys(elf_State *S, elf_Handle    x) { push_value(S, value_from_handl
 
 
 elf_Table *elf_push_new_table(elf_State *S) {
-	elf_Table *table = elf_table_new(S);
+	elf_Table *table = elf_table_new_unrooted(S);
 	push_table(S, table);
 	return table;
 }
@@ -95,9 +86,9 @@ void elf_push_atom_text_size(elf_State *S, const char *text, int len)
 	push_value(S, value_from_atom(elf_atom_from_data_size(S, text, len)));
 }
 
-static SourceBuffer source_buffer_from_file(elf_State *state, const char *name)
+static elf_StrSlice source_buffer_from_file(elf_State *state, const char *name)
 {
-	SourceBuffer source = {};
+	elf_StrSlice source = {};
 	elf_Handle file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 	if (!ELF_IS_HANDLE_INVALID(file))
 	{
@@ -113,7 +104,7 @@ static SourceBuffer source_buffer_from_file(elf_State *state, const char *name)
 	return source;
 }
 
-int elf_push_code_source(elf_State *state, const char *name, SourceBuffer source)
+int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	ASSERT(name);
 	ASSERT(source.data);
@@ -130,7 +121,7 @@ int elf_push_code_file(elf_State *state, const char *name)
 {
 	ASSERT(name);
 
-	SourceBuffer source = source_buffer_from_file(state, name);
+	elf_StrSlice source = source_buffer_from_file(state, name);
 	if (!source.data)
 	{
 		push_value(state, value_nil());
@@ -146,22 +137,20 @@ int elf_push_code_file(elf_State *state, const char *name)
 	return true;
 }
 
-int elf_push_constant_expr(elf_State *state, const char *name, SourceBuffer source)
+int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
 {
 	ASSERT(name);
 	ASSERT(source.data);
 	return elf_push_constant_expr_source(state, name, source);
 }
 
-int elf_push_json(elf_State *state, const char *name, SourceBuffer source)
+int elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 {
 	ASSERT(name);
 	ASSERT(source.data);
 	return elf_push_json_source(state, name, source);
 }
 
-// Todo, remove this!
-ELF_PUBLIC
 void elf_pushglobals(elf_State *S) {
 	push_table(S, S->globals);
 }

@@ -291,7 +291,7 @@ ELF_FUNCTION(l_core_const_expr) {
 	elf_Value contents_value = load_value(S, 1);
 	check_value_type(S, contents_value, ELF_VALUE_TYPE_ATOM);
 	const char *contents = elf_atom_data(value_as_atom(contents_value));
-	SourceBuffer source = {(char *)contents, strlen(contents)};
+	elf_StrSlice source = {(char *)contents, strlen(contents)};
 	elf_push_constant_expr(S, "no name", source);
 	return 1;
 }
@@ -315,7 +315,7 @@ ELF_FUNCTION(l_core_load_json) {
 	heapbuf[size] = 0;
 	elf_platform_close_file(file);
 
-	SourceBuffer source = {heapbuf, size};
+	elf_StrSlice source = {heapbuf, size};
 	elf_push_json(S, name, source);
 
 	free(heapbuf);

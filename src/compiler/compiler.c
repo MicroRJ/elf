@@ -45,7 +45,7 @@ void elf_init_compiler_atoms(elf_State *state)
 #undef INTERN_MACRO_ATOM
 }
 
-int elf_push_json_source(elf_State *state, const char *name, SourceBuffer source)
+int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = get_scratch();
 	u32 saved_gc_mode = state->gc_mode;
@@ -59,7 +59,7 @@ int elf_push_json_source(elf_State *state, const char *name, SourceBuffer source
 	return result;
 }
 
-int elf_push_constant_expr_source(elf_State *state, const char *name, SourceBuffer source)
+int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = get_scratch();
 	u32 saved_gc_mode = state->gc_mode;
@@ -109,7 +109,7 @@ static BytecodeFunction *reserve_bytecode_functions(elf_State *state, u32 count)
 	return state->bytecode_functions + index;
 }
 
-BytecodeFunction elf_compile_source(elf_State *state, char const *name, SourceBuffer source)
+BytecodeFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice source)
 {
 	ASSERT(name);
 	ASSERT(source.data);
@@ -146,7 +146,7 @@ BytecodeFunction elf_compile_source(elf_State *state, char const *name, SourceBu
 		bytecode_function->arity            = function.arity;
 		bytecode_function->offset           = bytecode_offset;
 		bytecode_function->length           = gen->bytecode_buffer.position;
-		bytecode_function->captures         = 0;
+		bytecode_function->captures         = function.capture_count;
 		bytecode_function->stack_size       = gen->memory_usage.slot;
 		bytecode_function->source_map       = source_map;
 		bytecode_function->source_map_count = gen->source_map_buffer.count;

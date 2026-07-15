@@ -63,7 +63,7 @@ static void table_array_remove_unchecked(elf_Table *table, u32 index, u32 count)
 	value_zero_many(table->array + table->count, count);
 }
 
-elf_Table *elf_table_new_sized(elf_State *state, u32 nentries)
+elf_Table *elf_table_new_unrooted_sized(elf_State *state, u32 nentries)
 {
 	elf_Table *table = gc_alloc(state, ELF_OBJECT_TABLE, sizeof(*table));
 
@@ -71,9 +71,9 @@ elf_Table *elf_table_new_sized(elf_State *state, u32 nentries)
 	return table;
 }
 
-elf_Table *elf_table_new(elf_State *state)
+elf_Table *elf_table_new_unrooted(elf_State *state)
 {
-	return elf_table_new_sized(state, TABLE_INITIAL_ENTRY_COUNT);
+	return elf_table_new_unrooted_sized(state, TABLE_INITIAL_ENTRY_COUNT);
 }
 
 static inline u32 rehash(u64 hash) {

@@ -163,6 +163,15 @@ const char *elf_atom_data(elf_Atom *atom)
 	return atom->data;
 }
 
+elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_Atom *atom)
+{
+	elf_StrSlice copy = {};
+	copy.data = elf_arena_push_data(arena, atom->data, atom->size);
+	copy.size = atom->size;
+	elf_arena_push_zero(arena, 1);
+	return copy;
+}
+
 u32 elf_atom_hash(elf_Atom *atom)
 {
 	return atom->hash;

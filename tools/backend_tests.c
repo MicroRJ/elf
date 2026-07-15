@@ -10,7 +10,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	BackendCompileResult result = {};
 	result.state = elf_create_state();
 
-	SourceBuffer source = {};
+	elf_StrSlice source = {};
 	elf_Handle file = elf_platform_access_file(path, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 	if (file)
 	{
@@ -33,7 +33,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 	BackendCompileResult result = {};
 	result.state = elf_create_state();
 
-	SourceBuffer source = {};
+	elf_StrSlice source = {};
 	source.data = (char *)source_text;
 	source.size = (u64)strlen(source_text);
 

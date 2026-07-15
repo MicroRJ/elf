@@ -121,7 +121,6 @@ struct IR_Node
 	{
 		u32      ir_global;
 		u32      ir_capture;
-		u32      ir_function;
 		u32      ir_label;
 
 		elf_Atom *atom;
@@ -143,6 +142,13 @@ struct IR_Node
 			IR_Array args;
 		}
 		ir_call;
+
+		struct
+		{
+			u32      index;
+			IR_Array captures;
+		}
+		ir_function;
 
 		struct
 		{

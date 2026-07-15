@@ -26,6 +26,11 @@ test_assert(t.["z"] == 5)
 t.[8] = 80
 test_assert(t.[8] == 80)
 
+i := 7
+test_assert(t.[i] == 70)
+t.[i] = 77
+test_assert(t.[7] == 77)
+
 arr := {10, 20, 30}
 test_assert(arr[0] == 10)
 test_assert(arr[1] == 20)

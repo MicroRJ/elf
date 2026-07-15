@@ -6,9 +6,9 @@
 
 static const char *token_type_name(TokenType type)
 {
-	static const char *names[] =
+	static const char *names[TOK_COUNT_] =
 	{
-#define XPAND(ENUM, NAME) NAME,
+#define XPAND(ENUM, NAME) [TOK_##ENUM] = NAME,
 		TOKEN_XDEF(XPAND)
 #undef XPAND
 	};
@@ -54,7 +54,7 @@ static b32 is_identifier_continue(char c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static void lexer_init(Lexer *lexer, elf_State *state, elf_Atom *name, SourceBuffer source)
+static void lexer_init(Lexer *lexer, elf_State *state, elf_Atom *name, elf_StrSlice source)
 {
 	lexer->state = state;
 	lexer->name = name;
@@ -107,7 +107,7 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 	,	source_slice_column(site)
 	,	message);
 
-	elf_SourceBuffer source = lexer->source;
+	elf_StrSlice source = lexer->source;
 	print_source_slice_marker(site, source);
 	end_scratch(scratch);
 }

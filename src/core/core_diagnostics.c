@@ -93,7 +93,7 @@ static void print_runtime_source_location(RuntimeSourceLocation location)
 	, bytecode_type_name(BC_TYPE(location.byte)));
 
 	log_line(LOG_LEVEL_INFO, "|");
-	elf_SourceBuffer source = {};
+	elf_StrSlice source = {};
 	if (function && function->source_data) {
 		source.data = function->source_data;
 		source.size = function->source_size;

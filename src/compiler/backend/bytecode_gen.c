@@ -334,6 +334,31 @@ static GenMemory generate_nil_or_ir_expr(BytecodeGen *gen, IR expr, GenMemory sl
 	return slots;
 }
 
+static GenMemory generate_logical_ir_expr(BytecodeGen *gen, IR expr, GenMemory slots, u32 nslots)
+{
+	if (nslots < 1) {
+		return slots;
+	}
+
+	slots = ensure_result_slot(gen, slots);
+	emit_load_constant_int(gen, expr->site, slots, 0);
+
+	GenMemory memory_checkpoint = gen_memory_save(gen);
+	jumpS jumps = {};
+	emit_condition_branch(gen, &jumps, 0, expr);
+	gen_memory_restore(gen, memory_checkpoint);
+
+	patch_jumps(gen, &jumps.t);
+	jump_list_clear(&jumps.t);
+
+	emit_load_constant_int(gen, expr->site, slots, 1);
+
+	patch_jumps(gen, &jumps.f);
+	jump_list_clear(&jumps.f);
+
+	return slots;
+}
+
 static GenMemory generate_table_ir_expr(BytecodeGen *gen, IR expr, GenMemory slots, u32 nslots)
 {
 	if (nslots < 1) {
@@ -388,8 +413,47 @@ static GenMemory generate_ir_expr(BytecodeGen *gen, IR expr, GenMemory slots, u3
 			}
 
 			slots = ensure_result_slot(gen, slots);
-			u32 bytecode_function_id = gen->bytecode_function_base + expr->ir_function;
-			emit_bytexy(gen, site, BC_CLOSURE, gen_memory_index(slots), bytecode_function_id);
+
+			u32 bytecode_function_id = gen->bytecode_function_base + expr->ir_function.index;
+
+			IR_Array captures = expr->ir_function.captures;
+			if (captures.count == 0)
+			{
+				emit_bytexy(gen, site, BC_CLOSURE, gen_memory_index(slots), bytecode_function_id);
+			}
+			else
+			{
+				GenMemory memory_checkpoint = gen_memory_save(gen);
+				GenMemory first_capture_slot = memory_checkpoint;
+				// Capture values must end up in consecutive slots for BC_CLOSURE
+				// to copy. Let each capture expression allocate normally so short
+				// lived temporaries can be reused, but keep the result slot out of
+				// it: it may be an existing local, and evaluating captures could
+				// overwrite live values before the closure has copied them.
+				for (u32 i = 0; i < captures.count; ++ i)
+				{
+					GenMemory next_capture_slot = generate_ir_expr(gen, captures.items[i], NO_MEMORY, 1);
+					ASSERT(gen_memory_is_valid(next_capture_slot));
+					ASSERT(first_capture_slot.slot + i == next_capture_slot.slot);
+				}
+
+				emit_bytexy(gen, site, BC_CLOSURE, gen_memory_index(first_capture_slot), bytecode_function_id);
+				if (first_capture_slot.slot != slots.slot) {
+					emit_reload_bytecode(gen, site, slots, first_capture_slot);
+				}
+				gen_memory_restore(gen, memory_checkpoint);
+			}
+		}
+		break;
+
+		case IR_CAPTURE:
+		{
+			if (nslots < 1) {
+				return slots;
+			}
+
+			slots = ensure_result_slot(gen, slots);
+			emit_bytexy(gen, site, BC_LOADCVAL, gen_memory_index(slots), expr->ir_capture);
 		}
 		break;
 
@@ -537,6 +601,13 @@ static GenMemory generate_ir_expr(BytecodeGen *gen, IR expr, GenMemory slots, u3
 		case IR_NIL_OR:
 		{
 			slots = generate_nil_or_ir_expr(gen, expr, slots, nslots);
+		}
+		break;
+
+		case IR_AND:
+		case IR_OR:
+		{
+			slots = generate_logical_ir_expr(gen, expr, slots, nslots);
 		}
 		break;
 

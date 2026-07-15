@@ -119,6 +119,38 @@ static void test_scratch_regression(void)
 	expect_arena_u64(outer.arena->in_use, outer_start, "scratch outer regresses cursor");
 }
 
+static void test_public_arena_api(void)
+{
+	elf_Arena *arena = elf_create_arena(KILOBYTES(1));
+	char *start = elf_arena_push(arena, 0);
+
+	elf_arena_push_text(arena, "pub");
+	elf_arena_push_char(arena, '-');
+	elf_arena_pushf(arena, "%d", 7);
+	char *end = elf_arena_push_zero(arena, 1);
+
+	expect_arena_text(start, "pub-7", 5, "public arena append helpers compose text");
+	expect_arena_u64((u64)(end - start), 5, "public arena explicit terminator starts after text");
+
+	elf_destroy_arena(arena);
+}
+
+static void test_public_scratch_api(void)
+{
+	elf_Scratch scratch = elf_get_scratch();
+	elf_Arena *arena = scratch.arena;
+
+	char *first = elf_arena_push_text(arena, "temporary");
+	elf_end_scratch(scratch);
+
+	elf_Scratch next = elf_get_scratch();
+	char *second = elf_arena_push_text(next.arena, "temporary");
+	if (first != second) {
+		test_fail("public scratch regresses cursor");
+	}
+	elf_end_scratch(next);
+}
+
 static void run_arena_tests(void)
 {
 	test_arena_push_and_reserve();
@@ -126,4 +158,6 @@ static void run_arena_tests(void)
 	test_arena_text_char_repeat();
 	test_arena_pushf();
 	test_scratch_regression();
+	test_public_arena_api();
+	test_public_scratch_api();
 }

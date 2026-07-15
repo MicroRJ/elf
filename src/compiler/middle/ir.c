@@ -82,13 +82,20 @@ static IR create_load_global_ir(LowerContext *ctx, SourceSite site, u32 slot)
 static IR create_function_ir(LowerContext *ctx, SourceSite site, u32 function_index)
 {
 	IR ir = create_ir(ctx, site, IR_FUNCTION);
-	ir->ir_function = function_index;
+	ir->ir_function.index = function_index;
 	return ir;
 }
 
 static IR create_recurse_ir(LowerContext *ctx, SourceSite site)
 {
 	return create_nullary_ir(ctx, site, IR_RECURSE);
+}
+
+static IR create_capture_ir(LowerContext *ctx, SourceSite site, u32 capture_index)
+{
+	IR ir = create_ir(ctx, site, IR_CAPTURE);
+	ir->ir_capture = capture_index;
+	return ir;
 }
 
 static IR create_if_ir(LowerContext *ctx, SourceSite site, IR pred, IR true_clause, IR else_clause)
@@ -337,7 +344,7 @@ static void print_ir(Printer *pr, IR ir)
 
 		case IR_FUNCTION:
 		{
-			PRINT(pr, "function[%u]", ir->ir_function);
+			PRINT(pr, "function[%u]", ir->ir_function.index);
 		}
 		break;
 

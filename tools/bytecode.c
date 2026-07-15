@@ -7,7 +7,7 @@
 #include "compiler.h"
 #include "bytecode_debug.h"
 
-static b32 read_source_file(elf_State *state, const char *path, SourceBuffer *source)
+static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *source)
 {
 	elf_Handle file = elf_platform_access_file(path, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 	if (!file) {
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 	}
 
 	elf_State *state = elf_create_state();
-	SourceBuffer source = {};
+	elf_StrSlice source = {};
 	if (!read_source_file(state, path, &source))
 	{
 		fprintf(stderr, "bytecode: could not load '%s'\n", path);

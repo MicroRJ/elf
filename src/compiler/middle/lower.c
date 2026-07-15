@@ -86,7 +86,7 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 	}
 
 	if (source_slice_is_valid(site)) {
-		print_source_slice_marker(site, (elf_SourceBuffer){});
+		print_source_slice_marker(site, (elf_StrSlice){});
 	}
 
 	end_scratch(scratch);
@@ -231,6 +231,49 @@ static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType typ
 	return en;
 }
 
+static u32 capture_entity_in_function(LowerContext *ctx, FunctionLowerContext *function_ctx, Entity *entity, SourceSite site)
+{
+	FunctionIR *function = function_ctx->function;
+	for (u32 i = 0; i < function->capture_count; ++ i)
+	{
+		if (function->capture_entities[i] == entity) {
+			return i;
+		}
+	}
+
+	ASSERT(function->capture_count < 255);
+	u32 capture_index = function->capture_count++;
+	function->capture_entities[capture_index] = entity;
+
+	IR source = 0;
+	FunctionLowerContext *parent = function_ctx->parent;
+	if (parent && entity->scope_start < parent->scope_start)
+	{
+		u32 parent_capture = capture_entity_in_function(ctx, parent, entity, site);
+		source = create_capture_ir(ctx, site, parent_capture);
+	}
+	else
+	{
+		source = create_load_local_ir(ctx, site, entity->memory_ir);
+	}
+
+	function->captures[capture_index] = source;
+	entity->tags |= ENTITY_TAG_REFERENCED;
+	return capture_index;
+}
+
+static IR load_entity_ir(LowerContext *ctx, SourceSite site, Entity *entity)
+{
+	entity->tags |= ENTITY_TAG_REFERENCED;
+	if (ctx->function && entity->scope_start < ctx->function->scope_start)
+	{
+		u32 capture_index = capture_entity_in_function(ctx, ctx->function, entity, site);
+		return create_capture_ir(ctx, site, capture_index);
+	}
+
+	return create_load_local_ir(ctx, site, entity->memory_ir);
+}
+
 static u32 create_ir_label(LowerContext *ctx)
 {
 	return ctx->label_count ++;
@@ -265,7 +308,15 @@ static void elf_lower_ast_file(LowerContext *ctx, AstRef file)
 {
 	FunctionIR *main_fn = add_function_ir(ctx, file->site, true, IMPLICIT_PARAM_COUNT, 0);
 
+	FunctionLowerContext main_function_ctx = {};
+	main_function_ctx.function = main_fn;
+	main_function_ctx.scope_start = ctx->scope_start;
+	main_function_ctx.parent = 0;
+
+	FunctionLowerContext *outer_function = ctx->function;
+	ctx->function = &main_function_ctx;
 	main_fn->body = lower_ast_to_ir_block(ctx, file->file.body);
+	ctx->function = outer_function;
 }
 
 static FunctionIR *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 arity, IR body)
@@ -278,6 +329,9 @@ static FunctionIR *add_function_ir(LowerContext *ctx, SourceSite site, b32 varia
 	function->variadic = variadic;
 	function->arity = arity;
 	function->body = body;
+	function->captures = arena_push_zero(ctx->arena, sizeof(*function->captures) * 255);
+	function->capture_entities = arena_push_zero(ctx->arena, sizeof(*function->capture_entities) * 255);
+	function->capture_count = 0;
 
 	return function;
 }
@@ -383,8 +437,7 @@ static IR lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 			}
 			else if (en->type == ENTITY_LOCAL_DECLARATION)
 			{
-				en->tags |= ENTITY_TAG_REFERENCED;
-				ir = create_load_local_ir(ctx, expr->site, en->memory_ir);
+				ir = load_entity_ir(ctx, expr->site, en);
 			}
 			else
 			{
@@ -447,13 +500,7 @@ static IR lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 			AstRef y = expr->binary.y;
 
 			IR x_ir = lower_ast_expr_to_ir(ctx, x);
-			IR y_ir;
-			if (y->kind == AST_IDENT) {
-				y_ir = create_atom_ir(ctx, y->site, y->atom);
-			}
-			else {
-				y_ir = lower_ast_expr_to_ir(ctx, y);
-			}
+			IR y_ir = lower_ast_expr_to_ir(ctx, y);
 
 			ir = create_binary_ir(ctx, expr->site, IR_FIELD, x_ir, y_ir);
 		}
@@ -487,10 +534,17 @@ static IR lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 			u32 function_index = function_index_from_ptr(ctx, function);
 
 			EntityScope function_scope = get_entity_scope(ctx);
+			FunctionLowerContext function_ctx = {};
+			function_ctx.parent = ctx->function;
+			function_ctx.function = function;
+			function_ctx.scope_start = ctx->scope_start;
+
+			FunctionLowerContext *outer_function = ctx->function;
 			u32 outer_defer_count = ctx->defer_count;
 			u32 outer_defer_scope_start = ctx->defer_scope_start;
 			u32 outer_function_defer_start = ctx->function_defer_start;
 			u32 outer_loop_count = ctx->loop_count;
+			ctx->function = &function_ctx;
 			ctx->defer_scope_start = outer_defer_count;
 			ctx->function_defer_start = outer_defer_count;
 			ctx->loop_count = 0;
@@ -518,13 +572,20 @@ static IR lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 			function->body = lower_ast_to_ir_block(ctx, expr->function.body);
 
+			ctx->function = outer_function;
 			ctx->loop_count = outer_loop_count;
 			ctx->defer_count = outer_defer_count;
 			ctx->defer_scope_start = outer_defer_scope_start;
 			ctx->function_defer_start = outer_function_defer_start;
 			set_entity_scope(ctx, function_scope);
 
+			IR_Array captures = {};
+			captures.count = function->capture_count;
+			captures.items = arena_push_copy(ctx->arena
+			,	sizeof(*captures.items) * captures.count, function->captures);
+
 			ir = create_function_ir(ctx, expr->site, function_index);
+			ir->ir_function.captures = captures;
 		}
 		break;
 
@@ -681,14 +742,15 @@ static IR lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, 
 			push_ir_block(items, receiver_memory);
 			IR receiver_load = create_load_local_ir(ctx, x->site, receiver_memory);
 
-			IR name;
-			if (y->kind == AST_IDENT) {
-				name = create_atom_ir(ctx, y->site, y->atom);
+			IR key_load = lower_ast_expr_to_ir(ctx, y);
+			if (y->kind != AST_STRING_LITERAL)
+			{
+				IR key_memory = create_local_ir(ctx, y->site, key_load);
+				push_ir_block(items, key_memory);
+				key_load = create_load_local_ir(ctx, y->site, key_memory);
 			}
-			else {
-				name = lower_ast_expr_to_ir(ctx, y);
-			}
-			ir = create_binary_ir(ctx, expr->site, IR_FIELD, receiver_load, name);
+
+			ir = create_binary_ir(ctx, expr->site, IR_FIELD, receiver_load, key_load);
 		}
 		break;
 

@@ -1,216 +1,137 @@
-//
-// See Copyright Notice Below.
-//
-#ifndef _elf_lang_
-#define _elf_lang_
+#ifndef ELF_H
+#define ELF_H
 
+#include <stdarg.h>
 
-
-
-#if defined(__EMSCRIPTEN__)
-   #define ELF_PUBLIC  EMSCRIPTEN_KEEPALIVE
-   #define ELF_EXPORT  EMSCRIPTEN_KEEPALIVE
-#else
-   #define ELF_EXPORT __declspec(dllexport)
-
-   #if defined(BUILD_STATIC)
-      #define ELF_PUBLIC static
-   #else
-      #define ELF_PUBLIC
-   #endif
+#if !defined(HAS_BOOL)
+typedef signed int bool;
 #endif
 
+typedef signed char        elf_i8;
+typedef unsigned char      elf_u8;
+typedef signed short       elf_i16;
+typedef unsigned short     elf_u16;
+typedef signed int         elf_i32;
+typedef unsigned int       elf_u32;
+typedef signed long long   elf_i64;
+typedef unsigned long long elf_u64;
+typedef float              elf_f32;
+typedef double             elf_f64;
+typedef elf_i32            elf_b32;
 
+typedef elf_i64 elf_Integer;
+typedef elf_f64 elf_Number;
+typedef elf_u64 elf_Handle;
 
+#define ELF_HINVALID ((elf_Handle)0)
+#define ELF_IS_HANDLE_INVALID(H) ((H) == ELF_HINVALID)
 
-
-typedef struct elf_State   elf_State;
+typedef struct elf_State elf_State;
 typedef struct elf_Table elf_Table;
-
-
-#include "elf_coretypes.h"
-
-
-
-/*
-* Standard elf function signature:
-* nargs: the number of arguments
-* nrets: the number of expected results
-*/
-#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
-typedef ELF_FUNCTION(* elf_Function);
-
-
-
-
-//
-// this is just a helper struct for creating libraries
-//
-typedef struct {
-   char         *name;
-   elf_Function  function;
-} elf_Binding;
+typedef struct elf_Atom elf_Atom;
 
 typedef struct
 {
-   char    *data;
-   elf_u64  size;
+	char   *data;
+	elf_u64 size;
 }
-elf_SourceBuffer;
+elf_StrSlice;
 
-//
-//	ELF_VALUE_TYPE_NIL:
-// the value is nil
-//	ELF_VALUE_TYPE_NUMBER:
-// the value is a 64 - bit floating point number
-//	ELF_VALUE_TYPE_INTEGER:
-// the value is a 64 - bit integer
-//	ELF_VALUE_TYPE_HANDLE:
-// the value is a non-arithmetic 64 - bit integer
-//	ELF_VALUE_TYPE_VECTOR:
-// the value is a 4 component 32 - bit vector
-//
+typedef struct elf_Arena elf_Arena;
+typedef struct
+{
+	elf_Arena *arena;
+	elf_u64    regress;
+}
+elf_Scratch;
+
+#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
+typedef ELF_FUNCTION(*elf_Function);
+
+typedef struct
+{
+	char         *name;
+	elf_Function function;
+}
+elf_Binding;
+
 typedef enum
 {
-   ELF_VALUE_TYPE_NIL = 0,
-   ELF_VALUE_TYPE_NUMBER,
-   ELF_VALUE_TYPE_INTEGER,
-   ELF_VALUE_TYPE_HANDLE,
-   ELF_VALUE_TYPE_VECTOR,
-   ELF_VALUE_TYPE_CFUNCTION,
-   ELF_VALUE_TYPE_USER_OBJECT,
-   ELF_VALUE_TYPE_CLOSURE,
-   ELF_VALUE_TYPE_TABLE,
-   ELF_VALUE_TYPE_ATOM,
-   ELF_VALUE_TYPE_COUNT_,
+	ELF_VALUE_TYPE_NIL = 0,
+	ELF_VALUE_TYPE_NUMBER,
+	ELF_VALUE_TYPE_INTEGER,
+	ELF_VALUE_TYPE_HANDLE,
+	ELF_VALUE_TYPE_VECTOR,
+	ELF_VALUE_TYPE_CFUNCTION,
+	ELF_VALUE_TYPE_USER_OBJECT,
+	ELF_VALUE_TYPE_CLOSURE,
+	ELF_VALUE_TYPE_TABLE,
+	ELF_VALUE_TYPE_ATOM,
+	ELF_VALUE_TYPE_COUNT_,
 }
 ELF_ValueType;
 
+typedef enum
+{
+	ELF_GC_ACTIVE = 0,
+	ELF_GC_PAUSED,
+	ELF_GC_GETSTATE = 255,
+}
+elf_GCMode;
 
+elf_State *elf_create_state(void);
+void elf_destroy_state(elf_State *state);
 
+elf_Arena *elf_create_arena(elf_u64 initial_reserve);
+void elf_destroy_arena(elf_Arena *arena);
+void *elf_arena_push(elf_Arena *arena, elf_u64 size);
+void *elf_arena_push_zero(elf_Arena *arena, elf_u64 size);
+void *elf_arena_push_copy(elf_Arena *arena, elf_u64 size, const void *data);
+char *elf_arena_push_data(elf_Arena *arena, const void *data, elf_u64 size);
+char *elf_arena_push_text(elf_Arena *arena, const char *text);
+char *elf_arena_push_char(elf_Arena *arena, char chr);
+void elf_arena_push_repeat(elf_Arena *arena, char chr, elf_u32 count);
+char *elf_arena_pushfv(elf_Arena *arena, const char *format, va_list args);
+char *elf_arena_pushf(elf_Arena *arena, const char *format, ...);
 
+elf_Scratch elf_get_scratch(void);
+void elf_end_scratch(elf_Scratch scratch);
 
+elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
+elf_u32 elf_do_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 
-elf_State *elf_create_state();
-void elf_end(elf_State *);
+void elf_error(elf_State *state, int error, const char *message, ...);
 
+void elf_push_nil(elf_State *state);
+void elf_pushint(elf_State *state, elf_Integer value);
+void elf_push_num(elf_State *state, elf_Number value);
+void elf_pushfun(elf_State *state, elf_Function function);
+void elf_pushsys(elf_State *state, elf_Handle handle);
+void elf_push_atom_text(elf_State *state, const char *text);
+void elf_push_atom_text_size(elf_State *state, const char *text, int length);
+void *elf_pushuser(elf_State *state, int size);
+elf_Table *elf_push_new_table(elf_State *state);
 
+void elf_pushglobals(elf_State *state);
+void elf_setfield(elf_State *state);
+void elf_arrayadd(elf_State *state);
+void elf_arrayget(elf_State *state);
 
+int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
+int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
+int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
+int elf_push_code_file(elf_State *state, const char *name);
 
-//
-//
-//	todo: the results are placed starting where the function is at,
-// but this is pending, due to internal bytecode limitations,
-// the user facing API should be able to leave the function
-// on the stack and the results below it.
-//
-//
-// To call a function:
-// Push the function and push the 'this' arg, then push
-// additional arguments.
-// * nargs does not include the closure.
-// * 'this' can be nil.
-//
-//  elf_pushfun(...)
-//  elf_push_nil(...)
-//  elf_call()
-//
-//  The result is the number of returns,
-//  the stack pointer is below the return values, you can pop them.
-//
-//     STACK LAYOUT:
-//
-//     | PRE-CALL | POST-CALL
-//  0  |  FUNC    | RET 0
-//  1  | 'THIS'   | RET 1
-//  2  |  ARG-0   | RET 2
-//  3  |  ARG-1   | RET 3
-//  N  |  ARG-N   | RET N
-//
-//
-//
-elf_u32 elf_call(elf_State *, elf_u32 nargs, elf_u32 nrets);
-elf_u32 elf_do_tail_call(elf_State *, elf_u32 nargs, elf_u32 nrets);
+ELF_ValueType elf_loadtype(elf_State *state, int index);
+elf_StrSlice elf_load_atom_copy(elf_State *state, int index, elf_Arena *arena);
+elf_Number elf_load_num(elf_State *state, int index);
+elf_Integer elf_loadint(elf_State *state, int index);
+elf_Handle elf_loadsys(elf_State *state, int index);
 
-void elf_setfield(elf_State *);
-void elf_arrayadd(elf_State *);
-void elf_arrayget(elf_State *);
-
-
-
-
-void elf_error(elf_State *, int error, const char *message, ...);
-
-
-#define elf_pushbool(S, x) elf_pushint(S, x)
-#define elf_pushtrue(S) elf_pushbool(S, 1)
-#define elf_pushfalse(S) elf_pushbool(S, 0)
-
-void elf_push_nil(elf_State *);
-void elf_pushint(elf_State *, elf_Integer);
-void elf_push_num(elf_State *, elf_Number);
-elf_Table *elf_push_new_table(elf_State *);
-void elf_push_atom_text(elf_State *, const char *);
-void elf_push_atom_text_size(elf_State *, const char *, int length);
-void elf_pushfun(elf_State *, elf_Function);
-void elf_pushsys(elf_State *, elf_Handle);
-
-
-// allocates managed memory, the result is visible
-// in the form of an USER object.
-// You must provide a table on the stack that is the
-// meta-table for this object.
-void *elf_pushuser(elf_State *S, int size);
-
-
-
-
-
-// push the globals table onto the stack
-void elf_pushglobals(elf_State *);
-
-
-
-
-
-// Push a constant expression onto the stack, value is on the stack.
-int elf_push_constant_expr(elf_State *S, const char *name, elf_SourceBuffer source);
-
-int elf_push_json(elf_State *S, const char *name, elf_SourceBuffer source);
-
-// Push an executable script onto the stack, closure is on the stack.
-int elf_push_code_source(elf_State *S, const char *name, elf_SourceBuffer source);
-int elf_push_code_file(elf_State *S, const char *name);
-
-
-
-
-
-ELF_ValueType elf_loadtype(elf_State *, int x);
-const char *elf_load_atom_text(elf_State *, int x);
-const char *elf_load_atom_textl(elf_State *, int x, int *l);
-elf_Number elf_load_num(elf_State *, int x);
-elf_Integer elf_loadint(elf_State *, int x);
-elf_Handle elf_loadsys(elf_State *, int x);
-
-
-
-
-
-
-
-
-/* garbage collector */
-
-enum {
-   ELF_GC_ACTIVE = 0,
-   ELF_GC_PAUSED,
-   /* get the state of the garbage collector, not a valid state */
-   ELF_GC_GETSTATE = 255,
-};
-
+elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_Atom *atom);
 
 #endif
+
 /*
 ** Copyright (C) 2023-2025 Dayan Rodriguez
 **
@@ -232,4 +153,3 @@ enum {
 ** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ** SOFTWARE.
 */
-
