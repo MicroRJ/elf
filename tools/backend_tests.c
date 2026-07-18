@@ -122,6 +122,29 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 	}
 }
 
+static void backend_expect_min_conditional_jumps(BackendCompileResult result, u32 min_count, const char *label)
+{
+	u32 count = backend_count_bytecode(result, BC_JZ) + backend_count_bytecode(result, BC_JNZ);
+	if (count < min_count) {
+		test_fail(label);
+	}
+}
+
+static void backend_expect_jump_counts(
+	BackendCompileResult result,
+	u32 expected_jz,
+	u32 expected_jnz,
+	u32 expected_jump,
+	const char *label)
+{
+	if (backend_count_bytecode(result, BC_JZ) != expected_jz ||
+		backend_count_bytecode(result, BC_JNZ) != expected_jnz ||
+		backend_count_bytecode(result, BC_JUMP) != expected_jump)
+	{
+		test_fail(label);
+	}
+}
+
 static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_backward_jumps, const char *label)
 {
 	u32 backward_jumps = 0;
@@ -170,12 +193,8 @@ static void test_backend_short_circuit_and(void)
 {
 	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_and.elf");
 
-	if (backend_count_bytecode(result, BC_JZ) != 2) {
-		test_fail("&& emits one false jump per operand");
-	}
-	if (backend_count_bytecode(result, BC_JNZ) != 0) {
-		test_fail("&& does not emit true short-circuit jumps");
-	}
+	backend_expect_min_conditional_jumps(result, 2, "&& emits conditional jumps for short-circuiting");
+	backend_expect_jump_counts(result, 2, 0, 0, "&& emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "&& does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "&& patches condition jumps forward");
 }
@@ -184,12 +203,8 @@ static void test_backend_short_circuit_or(void)
 {
 	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_or.elf");
 
-	if (backend_count_bytecode(result, BC_JNZ) != 1) {
-		test_fail("|| emits true short-circuit jump for first operand");
-	}
-	if (backend_count_bytecode(result, BC_JZ) != 1) {
-		test_fail("|| emits false jump for final operand");
-	}
+	backend_expect_min_conditional_jumps(result, 2, "|| emits conditional jumps for short-circuiting");
+	backend_expect_jump_counts(result, 1, 1, 0, "|| emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "|| does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "|| patches condition jumps forward");
 }
@@ -198,12 +213,8 @@ static void test_backend_short_circuit_nested_and_or(void)
 {
 	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_nested_and_or.elf");
 
-	if (backend_count_bytecode(result, BC_JZ) != 2) {
-		test_fail("nested a && (b || c) emits two false jumps");
-	}
-	if (backend_count_bytecode(result, BC_JNZ) != 1) {
-		test_fail("nested a && (b || c) emits one true short-circuit jump");
-	}
+	backend_expect_min_conditional_jumps(result, 3, "nested a && (b || c) emits conditional jumps for short-circuiting");
+	backend_expect_jump_counts(result, 2, 1, 0, "nested a && (b || c) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "nested a && (b || c) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "nested a && (b || c) patches jumps forward");
 }
@@ -212,12 +223,8 @@ static void test_backend_short_circuit_nested_or_and(void)
 {
 	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_nested_or_and.elf");
 
-	if (backend_count_bytecode(result, BC_JNZ) != 1) {
-		test_fail("nested a || (b && c) emits one true short-circuit jump");
-	}
-	if (backend_count_bytecode(result, BC_JZ) != 2) {
-		test_fail("nested a || (b && c) emits two false jumps");
-	}
+	backend_expect_min_conditional_jumps(result, 3, "nested a || (b && c) emits conditional jumps for short-circuiting");
+	backend_expect_jump_counts(result, 2, 1, 0, "nested a || (b && c) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "nested a || (b && c) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "nested a || (b && c) patches jumps forward");
 }
@@ -226,12 +233,8 @@ static void test_backend_short_circuit_mixed_groups(void)
 {
 	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_mixed_groups.elf");
 
-	if (backend_count_bytecode(result, BC_JNZ) != 2) {
-		test_fail("mixed (a || b) && (c || d) emits two true short-circuit jumps");
-	}
-	if (backend_count_bytecode(result, BC_JZ) != 2) {
-		test_fail("mixed (a || b) && (c || d) emits two false jumps");
-	}
+	backend_expect_min_conditional_jumps(result, 4, "mixed (a || b) && (c || d) emits conditional jumps for short-circuiting");
+	backend_expect_jump_counts(result, 2, 2, 0, "mixed (a || b) && (c || d) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "mixed (a || b) && (c || d) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "mixed (a || b) && (c || d) patches jumps forward");
 }
@@ -259,6 +262,7 @@ static void test_backend_while_short_circuit_loop(void)
 	if (backend_count_bytecode(result, BC_JUMP) != 1) {
 		test_fail("while short-circuit predicate emits one loop-back jump");
 	}
+	backend_expect_jump_counts(result, 2, 0, 1, "while short-circuit predicate emits optimal jump shape");
 	backend_expect_loop_jumps(result, 1, "while short-circuit patches exit and loop-back jumps");
 }
 
@@ -327,6 +331,40 @@ static void test_backend_local_initializer_reuses_result_slot(void)
 	}
 }
 
+static void test_backend_if_else_restores_stack_top(void)
+{
+	elf_State *state = elf_create_state();
+	Scratch scratch = get_scratch();
+	LowerContext *ctx = elf_create_lower_context(state, scratch.arena);
+	SourceSite site = {};
+
+	Ir pred = create_int_ir(ctx, site, 0);
+	Ir true_clause = create_local_ir(ctx, site, create_int_ir(ctx, site, 11));
+	Ir else_clause = create_local_ir(ctx, site, create_int_ir(ctx, site, 22));
+	Ir if_ir = create_if_ir(ctx, site, pred, true_clause, else_clause);
+	Ir after_if = create_local_ir(ctx, site, create_int_ir(ctx, site, 33));
+
+	IRArrayBuilder stats = begin_ir_array_builder(ctx);
+	push_ir_block(&stats, if_ir);
+	push_ir_block(&stats, after_if);
+	Ir body = create_block_ir(ctx, site, end_ir_array_builder(&stats));
+
+	IrFunction function = {};
+	function.site = site;
+	function.variadic = true;
+	function.arity = IMPLICIT_PARAM_COUNT;
+	function.body = body;
+
+	BcGen *gen = bg_create(state, scratch.arena, 0);
+	generate_bytecode_function(gen, &function);
+
+	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {
+		test_fail("if/else restores stack top before following statement");
+	}
+
+	end_scratch(scratch);
+}
+
 static void test_backend_formats_bytecode_function(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -363,5 +401,6 @@ static void run_backend_tests(void)
 	test_backend_range_for_loop_shape();
 	test_backend_range_for_collection_call_is_hoisted();
 	test_backend_local_initializer_reuses_result_slot();
+	test_backend_if_else_restores_stack_top();
 	test_backend_formats_bytecode_function();
 }

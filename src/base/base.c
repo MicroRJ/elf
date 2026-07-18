@@ -6,3 +6,4 @@
 #include "arena.c"
 #include "path.c"
 #include "matcher.c"
+#include "profiler.c"

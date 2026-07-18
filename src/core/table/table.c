@@ -91,44 +91,75 @@ static inline u32 hash64(u64 u) {
 	return rehash(hash);
 }
 
-static inline u32 table_hash_value(elf_Value *value)
+static inline u32 table_hash_key(u64 key, u32 type)
 {
-	u32 type_hash = (u32)value->type * 0x9E3779B1u;
-	if (value->type == ELF_VALUE_TYPE_ATOM) {
-		return elf_atom_hash(value->x_atom) ^ type_hash;
+	u32 type_hash = type * 0x9E3779B1u;
+	if (type == ELF_VALUE_TYPE_ATOM) {
+		return elf_atom_hash((elf_Atom *)key) ^ type_hash;
 	}
 
-	return hash64(value->x_i64) ^ type_hash;
+	return hash64(key) ^ type_hash;
 }
 
-static inline bool table_entry_key_equal(Entry entry, elf_Value key)
+static inline Entry *table_find_entry(Entry *entries, u32 nentries, elf_Value key)
 {
-	if (entry_type(entry) != key.type) {
-		return false;
-	}
+	PROF_ADD(PROF_COUNTER_TABLE_LOOKUP, 1);
 
-	return entry.key == (u64)key.x_i64;
+	u64 key_bits = (u64)key.x_i64;
+	u64 type_bits = (u64)key.type << ENTRY_TYPE_SHIFT;
+	u32 hash = table_hash_key(key_bits, key.type);
+	u32 head = hash & (nentries - 1);
+	u32 slot = head;
+
+	do {
+		PROF_ADD(PROF_COUNTER_TABLE_PROBE, 1);
+
+		Entry *entry = entries + slot;
+		u64 data = entry->data;
+
+		if ((data & ENTRY_TYPE_MASK) == 0) {
+			PROF_ADD(PROF_COUNTER_TABLE_MISS, 1);
+			return 0;
+		}
+
+		if ((data & ENTRY_TYPE_MASK) == type_bits && entry->key == key_bits) {
+			PROF_ADD(PROF_COUNTER_TABLE_HIT, 1);
+			return entry;
+		}
+
+		slot = (slot + 1) & (nentries - 1);
+	} while (slot != head);
+
+	return 0;
 }
 
 static inline u32 table_find_slot(Entry *entries, u32 nentries, elf_Value key)
 {
-	u32 hash = table_hash_value(&key);
+	PROF_ADD(PROF_COUNTER_TABLE_LOOKUP, 1);
+
+	u64 key_bits = (u64)key.x_i64;
+	u64 type_bits = (u64)key.type << ENTRY_TYPE_SHIFT;
+	u32 hash = table_hash_key(key_bits, key.type);
 	u32 head = hash & (nentries - 1);
 	u32 slot = head;
-	u32 step = 1;
 
 	do {
+		PROF_ADD(PROF_COUNTER_TABLE_PROBE, 1);
+
 		Entry entry = entries[slot];
+		u64 data = entry.data;
 
-		if (entry_is_nil(entry)) {
+		if ((data & ENTRY_TYPE_MASK) == 0) {
+			PROF_ADD(PROF_COUNTER_TABLE_MISS, 1);
 			return slot;
 		}
 
-		if (!entry_is_tomb(entry) && table_entry_key_equal(entry, key)) {
+		if ((data & ENTRY_TYPE_MASK) == type_bits && entry.key == key_bits) {
+			PROF_ADD(PROF_COUNTER_TABLE_HIT, 1);
 			return slot;
 		}
 
-		slot = (slot + step) & (nentries - 1);
+		slot = (slot + 1) & (nentries - 1);
 	} while (slot != head);
 
 	return TABLE_SLOT_NOT_FOUND;
@@ -175,8 +206,8 @@ static inline u32 table_find_slot_for_write(elf_State *state, elf_Table *table, 
 
 bool elf_table_contains(elf_State *state, elf_Table *table, elf_Value key)
 {
-	u32 slot = table_find_slot_for_write(state, table, key);
-	return slot != TABLE_SLOT_NOT_FOUND && entry_is_key(table->entries[slot]);
+	(void)state;
+	return table_find_entry(table->entries, table->nentries, key) != 0;
 }
 
 void elf_table_alias(elf_State *state, elf_Table *table, elf_Value key, elf_Value alias)
@@ -196,12 +227,12 @@ elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *table, elf_Value key
 {
 	(void)state;
 
-	u32 slot = table_find_slot(table->entries, table->nentries, key);
-	if (slot == TABLE_SLOT_NOT_FOUND || !entry_is_key(table->entries[slot])) {
+	Entry *entry = table_find_entry(table->entries, table->nentries, key);
+	if (!entry) {
 		return NIL_VALUE;
 	}
 
-	return table->array[entry_index(table->entries[slot])];
+	return table->array[entry_index(*entry)];
 }
 
 u32 elf_table_ensure(elf_State *state, elf_Table *table, elf_Value key)

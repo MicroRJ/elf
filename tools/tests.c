@@ -25,6 +25,8 @@
 #include "parse_json.c"
 #include "ir.c"
 #include "lower.c"
+#include "bytecode_gen.h"
+#include "bytecode_gen.c"
 
 static int test_failures;
 
@@ -55,6 +57,8 @@ int main(void)
 	setvbuf(stdout, 0, _IONBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
 
+	prof_begin_frame();
+
 	elf_State *state = elf_create_state();
 
 	run_atom_tests(state);
@@ -72,6 +76,8 @@ int main(void)
 	run_backend_tests();
 	run_vm_tests();
 	run_smoke_tests();
+
+	prof_dump();
 
 	if (test_failures) {
 		fprintf(stderr, "tests failed: %d\n", test_failures);

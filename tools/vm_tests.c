@@ -11,10 +11,10 @@ ELF_FUNCTION(vm_test_assert)
 
 static void vm_test_install_bindings(elf_State *state)
 {
-	elf_pushglobals(state);
-	elf_push_atom_text(state, "test_assert");
-	elf_pushfun(state, vm_test_assert);
-	elf_setfield(state);
+	elf_push_env(state);
+	elf_push_cstr(state, "test_assert");
+	elf_push_fun(state, vm_test_assert);
+	elf_tab_set(state);
 	pop_value(state);
 }
 

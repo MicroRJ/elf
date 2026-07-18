@@ -9,14 +9,14 @@
 
 static volatile elf_Integer bench_sink;
 
-static elf_i64 bench_now(void)
+static i64 bench_now(void)
 {
 	return sys_get_performance_counter();
 }
 
-static double bench_elapsed_s(elf_i64 start)
+static double bench_elapsed_s(i64 start)
 {
-	elf_i64 elapsed = sys_get_performance_counter() - start;
+	i64 elapsed = sys_get_performance_counter() - start;
 	return elapsed / (double) sys_get_performance_counter_frequency();
 }
 
@@ -45,7 +45,7 @@ static void bench_report(const char *name, u32 iterations, double seconds)
 
 static double bench_table_get(elf_State *state, elf_Table *table, elf_Value *keys, u32 key_count, u32 iterations)
 {
-	elf_i64 start = bench_now();
+	i64 start = bench_now();
 
 	for (u32 i = 0; i < iterations; ++i) {
 		elf_Value value = elf_table_get_or_nil(state, table, keys[i & (key_count - 1)]);
@@ -84,6 +84,8 @@ int main(void)
 		ITERATIONS = 5000000,
 	};
 
+	prof_begin_frame();
+
 	elf_State *state = elf_create_state();
 
 	elf_Value *atom_hit_keys = calloc(KEY_COUNT, sizeof(*atom_hit_keys));
@@ -98,11 +100,36 @@ int main(void)
 	fill_int_table(state, int_table, int_hit_keys, int_miss_keys, KEY_COUNT);
 
 	printf("table lookup benchmarks (%u keys, %u iterations each)\n", KEY_COUNT, ITERATIONS);
-	bench_report("atom hit", ITERATIONS, bench_table_get(state, atom_table, atom_hit_keys, KEY_COUNT, ITERATIONS));
-	bench_report("atom miss", ITERATIONS, bench_table_get(state, atom_table, atom_miss_keys, KEY_COUNT, ITERATIONS));
-	bench_report("integer hit", ITERATIONS, bench_table_get(state, int_table, int_hit_keys, KEY_COUNT, ITERATIONS));
-	bench_report("integer miss", ITERATIONS, bench_table_get(state, int_table, int_miss_keys, KEY_COUNT, ITERATIONS));
+
+	double atom_hit_seconds = 0;
+	PROF_BLOCK("bench.table.atom_hit")
+	{
+		atom_hit_seconds = bench_table_get(state, atom_table, atom_hit_keys, KEY_COUNT, ITERATIONS);
+	}
+	bench_report("atom hit", ITERATIONS, atom_hit_seconds);
+
+	double atom_miss_seconds = 0;
+	PROF_BLOCK("bench.table.atom_miss")
+	{
+		atom_miss_seconds = bench_table_get(state, atom_table, atom_miss_keys, KEY_COUNT, ITERATIONS);
+	}
+	bench_report("atom miss", ITERATIONS, atom_miss_seconds);
+
+	double integer_hit_seconds = 0;
+	PROF_BLOCK("bench.table.integer_hit")
+	{
+		integer_hit_seconds = bench_table_get(state, int_table, int_hit_keys, KEY_COUNT, ITERATIONS);
+	}
+	bench_report("integer hit", ITERATIONS, integer_hit_seconds);
+
+	double integer_miss_seconds = 0;
+	PROF_BLOCK("bench.table.integer_miss")
+	{
+		integer_miss_seconds = bench_table_get(state, int_table, int_miss_keys, KEY_COUNT, ITERATIONS);
+	}
+	bench_report("integer miss", ITERATIONS, integer_miss_seconds);
 
 	printf("sink: %lld\n", bench_sink);
+	prof_dump();
 	return 0;
 }

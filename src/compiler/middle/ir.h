@@ -7,18 +7,18 @@ typedef struct
 {
 	i32 slot;
 }
-GenMemory;
+BcSlot;
 
-#define NO_MEMORY ((GenMemory) { -1 })
+#define NO_MEMORY ((BcSlot) { -1 })
 
-static inline b32 gen_memory_is_valid(GenMemory memory)
+static inline b32 bc_slot_is_valid(BcSlot memory)
 {
 	return memory.slot >= 0;
 }
 
-static inline i32 gen_memory_index(GenMemory memory)
+static inline i32 gen_memory_index(BcSlot memory)
 {
-	ASSERT(gen_memory_is_valid(memory));
+	ASSERT(bc_slot_is_valid(memory));
 	return memory.slot;
 }
 
@@ -96,130 +96,138 @@ typedef enum
 #undef IR_XPAND
 	IR_COUNT_,
 }
-IRKind;
+IrKind;
 
-static const char *ir_kind_name(IRKind kind);
+static const char *ir_kind_name(IrKind kind);
 
-typedef struct IR_Node IR_Node;
-typedef IR_Node *IR;
-
+typedef struct IrNode IrNode;
+typedef IrNode *Ir;
 
 typedef struct
 {
-	IR *items;
-	u32    count;
+	Ir *items;
+	u32 count;
 }
-IR_Array;
+IrArray;
 
-
-struct IR_Node
+struct IrNode
 {
-	IRKind kind;
+	IrKind kind;
 	SourceSite site;
-
 	union
 	{
 		u32      ir_global;
 		u32      ir_capture;
-		u32      ir_label;
+		struct
+		{
+			u32 bytecode_label;
+			b32 has_bytecode_label;
+		}
+		ir_label;
 
 		elf_Atom *atom;
 		i64      ir_int;
 		f64      ir_num;
 
-		IR ir_unary;
+		Ir ir_unary;
 
 		struct
 		{
-			IR x;
-			IR y;
+			Ir x;
+			Ir y;
 		}
 		ir_binary;
 
 		struct
 		{
-			IR   expr;
-			IR_Array args;
+			Ir   expr;
+			IrArray args;
 		}
 		ir_call;
 
 		struct
 		{
 			u32      index;
-			IR_Array captures;
+			IrArray captures;
 		}
 		ir_function;
 
 		struct
 		{
-			IR        pred;
-			IR true_clause;
-			IR else_clause;
+			Ir        pred;
+			Ir true_clause;
+			Ir else_clause;
 		}
 		ir_if;
 
 		struct
 		{
 			// Todo, replace with *args, nargs
-			IR expr;
+			Ir expr;
 		}
 		ir_return;
 
 		struct
 		{
-			IR_Array stats;
+			IrArray stats;
 		}
 		ir_block;
 
 		struct
 		{
-			IR_Array stats;
-			IR       value;
+			IrArray stats;
+			Ir       value;
 		}
 		ir_expr_block;
 
 		struct
 		{
-			IR pred;
-			u32   label;
+			Ir pred;
+			Ir label;
 		}
 		ir_jump_if_false;
 
 		struct
 		{
-			IR expr;
+			Ir label;
+		}
+		ir_jump;
+
+		struct
+		{
+			Ir expr;
 		}
 		ir_continue;
 
 		struct
 		{
-			IR expr;
+			Ir expr;
 		}
 		ir_break;
 
 		struct
 		{
-			IR   expr;
-			GenMemory slot;
+			Ir   expr;
+			BcSlot slot;
 		}
 		ir_local;
 
 		struct
 		{
-			IR local;
+			Ir local;
 		}
 		ir_load_local;
 	};
 };
 
-static IR_Node ir_error_sentinel =
+static IrNode ir_error_sentinel =
 {
 	.kind = IR_ERROR,
 };
 
 #define ERROR_IR (&ir_error_sentinel)
 
-static inline b32 ir_is_error(IR ir)
+static inline b32 ir_is_error(Ir ir)
 {
 	return ir == ERROR_IR;
 }

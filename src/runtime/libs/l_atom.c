@@ -117,7 +117,7 @@ ELF_FUNCTION(l_atom_split_by_lines) {
 
 		char *end = arena_push_zero(scratch.arena, 1);
 		push_value(S, value_from_atom(elf_atom_from_data_size(S, start, (u32)(end - start))));
-		elf_arrayadd(S);
+		elf_arr_add(S);
 
 		scratch.arena->in_use = start_pos;
 	}

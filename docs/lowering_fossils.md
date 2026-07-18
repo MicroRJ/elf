@@ -49,15 +49,15 @@ function->body = lower_block(body);
 Open questions:
 - Should function bodies lower in their own entity scope or function scope object?
 - Should captures be detected during lowering or during a separate closure pass?
-- Should generated functions reference AST nodes, IR nodes, or stable function IDs?
+- Should generated functions reference AST nodes, Ir nodes, or stable function IDs?
 
 ## Tuple Expression Lowering
 
-Old direction: tuple expressions wanted to lower to tuple IR for multi-return and
+Old direction: tuple expressions wanted to lower to tuple Ir for multi-return and
 multi-assignment support, but no stable `IR_TUPLE` exists yet.
 
 Open questions:
-- Is tuple IR a real runtime value or just a lowering-time multi-value list?
+- Is tuple Ir a real runtime value or just a lowering-time multi-value list?
 - Should `ret a, b` become one `IR_RETURN` with an array of values?
 - Should assignment lowering own arity matching, nil-fill, and ellipsis expansion?
 
@@ -67,8 +67,8 @@ Old code had placeholders for `for`, `break`, and `continue` lowering.
 The current active path lowers `while` directly to `IR_LOOP`.
 
 Recommended future shape:
-- Add `IR_BREAK` and `IR_CONTINUE` as real control-flow IR.
-- Lower range `for` either to canonical loop IR or through a dedicated desugar pass
+- Add `IR_BREAK` and `IR_CONTINUE` as real control-flow Ir.
+- Lower range `for` either to canonical loop Ir or through a dedicated desugar pass
   that still uses `AstContext` instead of a dummy parser.
 
 ## JSON Parser

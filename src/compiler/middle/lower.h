@@ -9,12 +9,20 @@ typedef struct
 	SourceSite         site;
 	b32            variadic;
 	u32                arity;
-	IR               body;
-	IR              *captures;
+	Ir               body;
+	Ir              *captures;
 	u32              capture_count;
 	Entity         **capture_entities;
 }
-FunctionIR;
+IrFunction;
+
+typedef struct
+{
+	IrFunction *functions;
+	u32         function_count;
+	u32         entry_index;
+}
+IrModule;
 
 // Todo, dude!
 enum
@@ -59,8 +67,8 @@ DeferScope;
 
 typedef struct
 {
-	u32 continue_label;
-	u32 break_label;
+	Ir continue_label;
+	Ir break_label;
 	u32 defer_start;
 }
 LoopLabels;
@@ -71,7 +79,7 @@ typedef struct FunctionLowerContext FunctionLowerContext;
 struct FunctionLowerContext
 {
 	FunctionLowerContext *parent;
-	FunctionIR          *function;
+	IrFunction          *function;
 	EntityId             scope_start;
 };
 
@@ -82,7 +90,7 @@ typedef struct Entity
 	u32          scope_start;
 	elf_Atom     *name;
 	SourceSite   site;
-	IR         memory_ir;
+	Ir         memory_ir;
 }
 Entity;
 
@@ -93,7 +101,7 @@ struct LowerContext
 	elf_Atom    *source_name;
 	u32          ir_stack_size;
 	u32          ir_stack_index;
-	IR       *ir_stack;
+	Ir       *ir_stack;
 
 	AstRef      *defer_stack;
 	u32          defer_stack_size;
@@ -101,7 +109,7 @@ struct LowerContext
 	u32          defer_scope_start;
 	u32          function_defer_start;
 
-	FunctionIR *functions;
+	IrFunction *functions;
 	u32         num_functions;
 	u32         max_functions;
 	FunctionLowerContext *function;
@@ -110,7 +118,6 @@ struct LowerContext
 	EntityId   scope_start;
 	EntityId   scope_end;
 
-	u32        label_count;
 	LoopLabels loop_stack[64];
 	u32        loop_count;
 };

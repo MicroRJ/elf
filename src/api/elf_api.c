@@ -26,23 +26,23 @@ void elf_error(elf_State *S, int error, const char *format, ...) {
 
 
 
-ELF_ValueType elf_loadtype(elf_State *S, int x) { return value_type(load_value(S, x)); }
+elf_ValueType elf_arg_type(elf_State *S, int x) { return value_type(load_value(S, x)); }
 
-elf_Number elf_load_num(elf_State *S, int x)
+elf_Number elf_arg_num(elf_State *S, int x)
 {
 	elf_Value value = load_value(S, x);
 	check_value_type_rule(S, value, TRULE_NUMERIC);
 	return value_to_number(value);
 }
 
-elf_Integer elf_loadint(elf_State *S, int x)
+elf_Integer elf_arg_int(elf_State *S, int x)
 {
 	elf_Value value = load_value(S, x);
 	check_value_type_rule(S, value, TRULE_NUMERIC);
 	return value_to_integer(value);
 }
 
-elf_Handle elf_loadsys(elf_State *S, int x)
+elf_Handle elf_arg_hnd(elf_State *S, int x)
 {
 	elf_Value value = load_value(S, x);
 	check_value_type(S, value, ELF_VALUE_TYPE_HANDLE);
@@ -51,7 +51,7 @@ elf_Handle elf_loadsys(elf_State *S, int x)
 
 
 
-elf_StrSlice elf_load_atom_copy(elf_State *S, int x, elf_Arena *arena)
+elf_StrSlice elf_arg_str_copy(elf_State *S, int x, elf_Arena *arena)
 {
 	elf_Value value = load_value(S, x);
 	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
@@ -61,10 +61,10 @@ elf_StrSlice elf_load_atom_copy(elf_State *S, int x, elf_Arena *arena)
 
 
 void elf_push_nil(elf_State *S)                  { push_value(S, value_nil());    }
-void elf_pushint(elf_State *S, elf_Integer   x) { push_value(S, value_from_integer(x)); }
+void elf_push_int(elf_State *S, elf_Integer   x) { push_value(S, value_from_integer(x)); }
 void elf_push_num(elf_State *S, elf_Number    x) { push_value(S, value_from_number(x)); }
-void elf_pushfun(elf_State *S, elf_Function  x) { push_value(S, value_from_function(x)); }
-void elf_pushsys(elf_State *S, elf_Handle    x) { push_value(S, value_from_handle(x)); }
+void elf_push_fun(elf_State *S, elf_Function  x) { push_value(S, value_from_function(x)); }
+void elf_push_hnd(elf_State *S, elf_Handle    x) { push_value(S, value_from_handle(x)); }
 
 
 
@@ -77,11 +77,11 @@ elf_Table *elf_push_new_table(elf_State *S) {
 
 
 
-void elf_push_atom_text(elf_State *S, const char *text) {
+void elf_push_cstr(elf_State *S, const char *text) {
 	push_value(S, value_from_atom(elf_atom_from_data(S, text)));
 }
 
-void elf_push_atom_text_size(elf_State *S, const char *text, int len)
+void elf_push_str(elf_State *S, const char *text, int len)
 {
 	push_value(S, value_from_atom(elf_atom_from_data_size(S, text, len)));
 }
@@ -151,12 +151,12 @@ int elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 	return elf_push_json_source(state, name, source);
 }
 
-void elf_pushglobals(elf_State *S) {
+void elf_push_env(elf_State *S) {
 	push_table(S, S->globals);
 }
 
 // Todo, remove this!
-void elf_setfield(elf_State *S) {
+void elf_tab_set(elf_State *S) {
 	elf_Value tab = S->stack_ptr[-3];
 	elf_Value key = S->stack_ptr[-2];
 	elf_Value value = S->stack_ptr[-1];
@@ -167,7 +167,7 @@ void elf_setfield(elf_State *S) {
 }
 
 // Todo, remove this!
-void elf_arrayadd(elf_State *S) {
+void elf_arr_add(elf_State *S) {
 	elf_Value tab = S->stack_ptr[-2];
 	elf_Value value = S->stack_ptr[-1];
 	check_value_type(S, tab, ELF_VALUE_TYPE_TABLE);
@@ -177,7 +177,7 @@ void elf_arrayadd(elf_State *S) {
 }
 
 // Todo, remove this!
-void elf_arrayget(elf_State *S) {
+void elf_arr_get(elf_State *S) {
 	elf_Value tab = S->stack_ptr[-2];
 	elf_Value idx = S->stack_ptr[-1];
 	check_value_type(S, tab, ELF_VALUE_TYPE_TABLE);

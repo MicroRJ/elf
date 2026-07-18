@@ -56,13 +56,13 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 	return table;
 }
 
-#include "l_math.c"
-#include "l_core.c"
-#include "l_sys.c"
-#include "l_table.c"
-#include "l_atom.c"
-#include "l_random.c"
-#include "l_sockets.c"
+#include "runtime/libs/l_math.c"
+#include "runtime/libs/l_core.c"
+#include "runtime/libs/l_sys.c"
+#include "runtime/libs/l_table.c"
+#include "runtime/libs/l_atom.c"
+#include "runtime/libs/l_random.c"
+#include "runtime/libs/l_sockets.c"
 
 static void init_bytecode_program_storage(elf_State *state)
 {
@@ -172,5 +172,5 @@ void elf_destroy_state(elf_State *state)
 }
 
 static int run_bytecode_frame(elf_State *state, StackFrame frame);
-#include "vm/call.c"
-#include "vm/vm.c"
+#include "runtime/vm/call.c"
+#include "runtime/vm/vm.c"

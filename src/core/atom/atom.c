@@ -55,17 +55,23 @@ static void atom_state_resize(elf_State *state)
 
 static elf_Atom *atom_find(elf_State *state, const char *data, u32 size, u32 hash)
 {
+	PROF_ADD(PROF_COUNTER_ATOM_LOOKUP, 1);
+
 	if (!state->atom_bucket_count) {
+		PROF_ADD(PROF_COUNTER_ATOM_MISS, 1);
 		return 0;
 	}
 
 	u32 bucket_index = atom_bucket_index(state, hash);
 	for (elf_Atom *atom = state->atom_buckets[bucket_index]; atom; atom = atom->next) {
+		PROF_ADD(PROF_COUNTER_ATOM_PROBE, 1);
 		if (atom->hash == hash && atom->size == size && !memcmp(atom->data, data, size)) {
+			PROF_ADD(PROF_COUNTER_ATOM_HIT, 1);
 			return atom;
 		}
 	}
 
+	PROF_ADD(PROF_COUNTER_ATOM_MISS, 1);
 	return 0;
 }
 

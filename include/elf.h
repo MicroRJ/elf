@@ -69,7 +69,7 @@ typedef enum
 	ELF_VALUE_TYPE_ATOM,
 	ELF_VALUE_TYPE_COUNT_,
 }
-ELF_ValueType;
+elf_ValueType;
 
 typedef enum
 {
@@ -103,30 +103,29 @@ elf_u32 elf_do_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 void elf_error(elf_State *state, int error, const char *message, ...);
 
 void elf_push_nil(elf_State *state);
-void elf_pushint(elf_State *state, elf_Integer value);
+void elf_push_int(elf_State *state, elf_Integer value);
 void elf_push_num(elf_State *state, elf_Number value);
-void elf_pushfun(elf_State *state, elf_Function function);
-void elf_pushsys(elf_State *state, elf_Handle handle);
-void elf_push_atom_text(elf_State *state, const char *text);
-void elf_push_atom_text_size(elf_State *state, const char *text, int length);
-void *elf_pushuser(elf_State *state, int size);
+void elf_push_fun(elf_State *state, elf_Function function);
+void elf_push_hnd(elf_State *state, elf_Handle handle);
+void elf_push_cstr(elf_State *state, const char *data);
+void elf_push_str(elf_State *state, const char *data, int size);
 elf_Table *elf_push_new_table(elf_State *state);
 
-void elf_pushglobals(elf_State *state);
-void elf_setfield(elf_State *state);
-void elf_arrayadd(elf_State *state);
-void elf_arrayget(elf_State *state);
+void elf_push_env(elf_State *state);
+void elf_tab_set(elf_State *state);
+void elf_arr_add(elf_State *state);
+void elf_arr_get(elf_State *state);
 
 int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_code_file(elf_State *state, const char *name);
 
-ELF_ValueType elf_loadtype(elf_State *state, int index);
-elf_StrSlice elf_load_atom_copy(elf_State *state, int index, elf_Arena *arena);
-elf_Number elf_load_num(elf_State *state, int index);
-elf_Integer elf_loadint(elf_State *state, int index);
-elf_Handle elf_loadsys(elf_State *state, int index);
+elf_ValueType elf_arg_type(elf_State *state, int index);
+elf_StrSlice  elf_arg_str_copy(elf_State *state, int index, elf_Arena *arena);
+elf_Number    elf_arg_num(elf_State *state, int index);
+elf_Integer   elf_arg_int(elf_State *state, int index);
+elf_Handle    elf_arg_hnd(elf_State *state, int index);
 
 elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_Atom *atom);
 

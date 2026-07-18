@@ -84,7 +84,12 @@ int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int
 {
 	StackFrame frame;
 	prepare_closure_stack_frame(state, &frame, closure, nargs, nrets);
-	return run_bytecode_frame(state, frame);
+	int result = 0;
+	PROF_BLOCK("vm.run_bytecode_frame")
+	{
+		result = run_bytecode_frame(state, frame);
+	}
+	return result;
 }
 
 u32 elf_do_tail_call(elf_State *state, u32 nargs, u32 nrets)

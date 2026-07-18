@@ -322,7 +322,7 @@ ELF_FUNCTION(l_table_get_keys) {
 		}
 
 		push_value(S, entry_key_value(entry));
-		elf_arrayadd(S);
+		elf_arr_add(S);
 	}
 	return 1;
 }
@@ -364,7 +364,7 @@ ELF_FUNCTION(l_table_merge) {
 			// todo:
 			push_value(S, entry_key_value(entry));
 			push_value(S, elf_array_get(S, merger, entry_index(entry)));
-			elf_setfield(S);
+			elf_tab_set(S);
 		}
 	}
 
@@ -414,7 +414,7 @@ ELF_FUNCTION(l_table_fork) {
 		// todo: remove this!
 		push_value(S, key);
 		push_value(S, elf_array_get(S, tab, entry_index(entry)));
-		elf_setfield(S);
+		elf_tab_set(S);
 	}
 
 	return 1;

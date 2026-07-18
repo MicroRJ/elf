@@ -35,7 +35,7 @@ ELF_FUNCTION(l_sockets_new_udp_server)
 	u_long mode = 1;
 	ioctlsocket(sock, FIONBIO, &mode);
 
-	elf_pushsys(S, sock);
+	elf_push_hnd(S, sock);
 	return 1;
 }
 
@@ -50,13 +50,13 @@ ELF_FUNCTION(l_sockets_new_udp_client)
 
 	connect(sock, (struct sockaddr *) &addr, sizeof(addr));
 
-	elf_pushsys(S, sock);
+	elf_push_hnd(S, sock);
 	return 1;
 }
 
 ELF_FUNCTION(l_sockets_receive)
 {
-	SOCKET sock = elf_loadsys(S, 1);
+	SOCKET sock = elf_arg_hnd(S, 1);
 
 	char buffer[512];
 
@@ -68,7 +68,7 @@ ELF_FUNCTION(l_sockets_receive)
 	if (bytes > 0)
 	{
 		AtomPacket *packet = (AtomPacket *) buffer;
-		elf_push_atom_text_size(S, packet->data, packet->size);
+		elf_push_str(S, packet->data, packet->size);
 	}
 	else
 	{
@@ -80,10 +80,10 @@ ELF_FUNCTION(l_sockets_receive)
 
 ELF_FUNCTION(l_sockets_send)
 {
-	SOCKET sock = elf_loadsys(S, 1);
+	SOCKET sock = elf_arg_hnd(S, 1);
 
 	Scratch scratch = get_scratch();
-	elf_StrSlice text = elf_load_atom_copy(S, 2, scratch.arena);
+	elf_StrSlice text = elf_arg_str_copy(S, 2, scratch.arena);
 
 	AtomPacket *packet;
 	u32 packet_size = sizeof(*packet) + (u32)text.size;
@@ -136,7 +136,7 @@ int netlib_close(elf_State *R) {
 int netlib_listen(elf_State *R) {
 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 	int error = listen(handle,SOMAXCONN);
-	elf_pushint(R,error!=SOCKET_ERROR);
+	elf_push_int(R,error!=SOCKET_ERROR);
 	return 1;
 }
 
@@ -144,7 +144,7 @@ int netlib_listen(elf_State *R) {
 int netlib_accept(elf_State *R) {
 	SOCKET handle = (SOCKET) f_checkhand(R,0);
 	SOCKET client = accept(handle,NULL,NULL);
-	elf_pushsys(R,(elf_Handle)client);
+	elf_push_hnd(R,(elf_Handle)client);
 	return 1;
 }
 
@@ -159,7 +159,7 @@ int netlib_pollclient(elf_State *R) {
    if (FD_ISSET(handle,&ready)) {
       SOCKET client = accept(handle,NULL,NULL);
       ASSERT(client != INVALID_SOCKET);
-		elf_pushsys(R,(elf_Handle)client);
+		elf_push_hnd(R,(elf_Handle)client);
    } else elf_push_nil(R);
 	return 1;
 }
@@ -185,7 +185,7 @@ int netlib_tcpserver(elf_State *R) {
 	SOCKET thesocket = socket(addrinfo->ai_family,addrinfo->ai_socktype,addrinfo->ai_protocol);
 	int error = bind(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 	if(error != SOCKET_ERROR) {
-		elf_pushsys(R,(elf_Handle)thesocket);
+		elf_push_hnd(R,(elf_Handle)thesocket);
 	} else elf_push_nil(R);
 
 	return 1;
@@ -213,7 +213,7 @@ int netlib_tcpclient(elf_State *R) {
 
 	int error = connect(thesocket,addrinfo->ai_addr,addrinfo->ai_addrlen);
 	if(error != SOCKET_ERROR) {
-		elf_pushsys(R,(elf_Handle)thesocket);
+		elf_push_hnd(R,(elf_Handle)thesocket);
 	} else elf_push_nil(R);
 	return 1;
 }
@@ -229,7 +229,7 @@ int netlib_send(elf_State *R) {
 	elf_Integer sent = 0;
 	sent += send(socket,(char*)&message,sizeof(message),0);
 	sent += send(socket,payload->data,payload->size,0);
-	elf_pushint(R,sent);
+	elf_push_int(R,sent);
 	return 1;
 }
 
@@ -238,7 +238,7 @@ int netlib_ioctl(elf_State *R) {
 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 	long mode = 1;
 	int error = ioctlsocket(socket,FIONBIO,&mode);
-	elf_pushint(R,error == 0);
+	elf_push_int(R,error == 0);
 	return 1;
 }
 

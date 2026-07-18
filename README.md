@@ -6,19 +6,19 @@ games, and media tools.
 The project is in active recovery and redesign. The current compiler pipeline is:
 
 ```text
-source -> lexer -> AST -> IR -> bytecode -> VM
+source -> lexer -> AST -> Ir -> bytecode -> VM
 ```
 
 ## Current Shape
 
 - Hand-written lexer and parser.
-- AST lowering into an explicit IR.
-- Bytecode generation from IR.
+- AST lowering into an explicit Ir.
+- Bytecode generation from Ir.
 - Stack-based runtime with bytecode closures.
 - Tables as the primary compound data structure.
 - Interned atoms for identifiers and string-like immutable text.
 - Mark/sweep GC for tables, closures, and atoms.
-- Core libraries under `src/libs`.
+- Runtime libraries under `src/runtime/libs`.
 - Smoke tests and focused C tests under `tools` and `smoke`.
 
 ## Build
@@ -73,11 +73,11 @@ build\benchmarks.exe
 ```text
 include/     public headers
 src/base/    internal base utilities
-src/core/    state, GC, values, atoms, tables, diagnostics
-src/compiler frontend, IR lowering, bytecode generation
-src/vm/      calls and bytecode dispatch
-src/libs/    built-in libraries
 src/platform platform-specific helpers
+src/diagnostics logging and source/runtime error printing
+src/core/    state, GC, values, atoms, tables
+src/compiler frontend, Ir lowering, bytecode generation
+src/runtime VM dispatch, calls, and built-in libraries
 tools/       test harnesses, runner, bytecode dumper, benchmarks
 smoke/       elf scripts used by smoke tests
 docs/        grammar and design notes worth keeping

@@ -205,12 +205,12 @@ void sys_file_time_to_system_time(FILE_TIME *filetime, SYSTEM_TIME *systimeout) 
 #if 0
 int lib_core_shell(elf_State *R) {
 	Scratch scratch = get_scratch();
-	elf_StrSlice verb = elf_load_atom_copy(R, 0, scratch.arena);
-	elf_StrSlice file = elf_load_atom_copy(R, 1, scratch.arena);
-	elf_StrSlice args = elf_load_atom_copy(R, 2, scratch.arena);
+	elf_StrSlice verb = elf_arg_str_copy(R, 0, scratch.arena);
+	elf_StrSlice file = elf_arg_str_copy(R, 1, scratch.arena);
+	elf_StrSlice args = elf_arg_str_copy(R, 2, scratch.arena);
 
 	int success = (INT_PTR)ShellExecute(NULL, verb.data, file.data, args.data, NULL, 10) > 32;
-	elf_pushint(R,success);
+	elf_push_int(R,success);
 	end_scratch(scratch);
 	return 1;
 }
@@ -227,7 +227,7 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
 	Scratch scratch = get_scratch();
-	elf_StrSlice path = elf_load_atom_copy(R, 0, scratch.arena);
+	elf_StrSlice path = elf_arg_str_copy(R, 0, scratch.arena);
 	GetDiskFreeSpaceA(path.data,&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
 	end_scratch(scratch);
 	elf_tsets_int(info,elf_atom_from_data(R,"SectorsPerCluster"),SectorsPerCluster);

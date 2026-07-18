@@ -7,7 +7,7 @@
 #include "system.h"
 #include "core.h"
 
-const char *value_type_name(ELF_ValueType type)
+const char *value_type_name(elf_ValueType type)
 {
 	static const char *names[] =
 	{

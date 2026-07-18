@@ -20,9 +20,9 @@ static inline u32 entry_index(Entry entry)
 	return (u32)(entry.data & ENTRY_INDEX_MASK);
 }
 
-static inline ELF_ValueType entry_type(Entry entry)
+static inline elf_ValueType entry_type(Entry entry)
 {
-	return (ELF_ValueType)((entry.data & ENTRY_TYPE_MASK) >> ENTRY_TYPE_SHIFT);
+	return (elf_ValueType)((entry.data & ENTRY_TYPE_MASK) >> ENTRY_TYPE_SHIFT);
 }
 
 static inline u32 entry_state(Entry entry)
@@ -60,7 +60,7 @@ static inline void entry_set_index(Entry *entry, u32 index)
 	entry->data = (entry->data & ~ENTRY_INDEX_MASK) | index;
 }
 
-static inline void entry_set_type(Entry *entry, ELF_ValueType type)
+static inline void entry_set_type(Entry *entry, elf_ValueType type)
 {
 	entry->data = (entry->data & ~ENTRY_TYPE_MASK) | ((u64)type << ENTRY_TYPE_SHIFT);
 }
