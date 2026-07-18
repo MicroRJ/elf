@@ -132,7 +132,7 @@ static void test_vm_script_json_assertions(void)
 
 static void test_vm_script_sys_assertions(void)
 {
-	vm_expect_int("smoke/script_assert_sys.elf", 77, "vm runs script-side sys assertions");
+	vm_expect_int("smoke/script_assert_sys.elf", 77, "vm runs script-side path and filesystem assertions");
 }
 
 static void test_vm_for_range(void)

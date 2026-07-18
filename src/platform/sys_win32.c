@@ -420,15 +420,107 @@ int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	return noerr;
 }
 
-// Todo, args must actually be writeable
 elf_Handle sys_create_process(char const *file, char const *args)
 {
 	STARTUPINFO startupinfo = {sizeof(startupinfo)};
 	PROCESS_INFORMATION processinfo = {0};
 
-	CreateProcess(file,(char*)args,NULL,NULL,FALSE,0,NULL,NULL,&startupinfo,&processinfo);
-	//	WaitForSingleObject(processinfo.hProcess, INFINITE);
-	//	CloseHandle(processinfo.hProcess);
-	//	CloseHandle(processinfo.hThread);
-	return 0;
+	Scratch scratch = get_scratch();
+	char *command_line = arena_push_text(scratch.arena, args);
+	arena_push_char(scratch.arena, 0);
+	b32 started = CreateProcessA(file, command_line, NULL, NULL, FALSE, 0, NULL, NULL,
+		&startupinfo, &processinfo);
+	end_scratch(scratch);
+
+	if (!started) return 0;
+	CloseHandle(processinfo.hThread);
+	return (elf_Handle)processinfo.hProcess;
+}
+
+static void sys_drain_process_pipe(HANDLE pipe, Arena *output)
+{
+	for (;;)
+	{
+		DWORD available = 0;
+		if (!PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL) || available == 0) return;
+
+		DWORD request = MIN(available, 64 * 1024);
+		char *data = arena_push(output, request);
+		DWORD read = 0;
+		if (!ReadFile(pipe, data, request, &read, NULL)) {
+			output->in_use -= request;
+			return;
+		}
+		output->in_use -= request - read;
+	}
+}
+
+Sys_Process_Result sys_run_process(const char *command_line, Arena *standard_output,
+	Arena *standard_error)
+{
+	Sys_Process_Result result = {.exit_code = -1};
+	SECURITY_ATTRIBUTES security = {
+		.nLength = sizeof(security),
+		.bInheritHandle = TRUE,
+	};
+	HANDLE stdout_read = 0;
+	HANDLE stdout_write = 0;
+	HANDLE stderr_read = 0;
+	HANDLE stderr_write = 0;
+	PROCESS_INFORMATION process = {0};
+
+	if (!CreatePipe(&stdout_read, &stdout_write, &security, 0) ||
+		!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) ||
+		!CreatePipe(&stderr_read, &stderr_write, &security, 0) ||
+		!SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0))
+	{
+		result.error_code = GetLastError();
+		goto cleanup;
+	}
+
+	STARTUPINFOA startup = {sizeof(startup)};
+	startup.dwFlags = STARTF_USESTDHANDLES;
+	startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+	startup.hStdOutput = stdout_write;
+	startup.hStdError = stderr_write;
+
+	Scratch scratch = get_scratch();
+	char *mutable_command_line = arena_push_text(scratch.arena, command_line);
+	arena_push_char(scratch.arena, 0);
+	result.started = CreateProcessA(NULL, mutable_command_line, NULL, NULL, TRUE,
+		CREATE_NO_WINDOW, NULL, NULL, &startup, &process);
+	if (!result.started) result.error_code = GetLastError();
+	end_scratch(scratch);
+
+	CloseHandle(stdout_write);
+	stdout_write = 0;
+	CloseHandle(stderr_write);
+	stderr_write = 0;
+
+	if (!result.started) goto cleanup;
+	CloseHandle(process.hThread);
+	process.hThread = 0;
+
+	for (;;)
+	{
+		sys_drain_process_pipe(stdout_read, standard_output);
+		sys_drain_process_pipe(stderr_read, standard_error);
+		if (WaitForSingleObject(process.hProcess, 1) == WAIT_OBJECT_0) break;
+	}
+
+	sys_drain_process_pipe(stdout_read, standard_output);
+	sys_drain_process_pipe(stderr_read, standard_error);
+
+	DWORD exit_code = 0;
+	if (GetExitCodeProcess(process.hProcess, &exit_code)) result.exit_code = (i32)exit_code;
+	else result.error_code = GetLastError();
+
+cleanup:
+	if (process.hThread) CloseHandle(process.hThread);
+	if (process.hProcess) CloseHandle(process.hProcess);
+	if (stdout_read) CloseHandle(stdout_read);
+	if (stdout_write) CloseHandle(stdout_write);
+	if (stderr_read) CloseHandle(stderr_read);
+	if (stderr_write) CloseHandle(stderr_write);
+	return result;
 }

@@ -58,11 +58,15 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 
 #include "runtime/libs/l_math.c"
 #include "runtime/libs/l_core.c"
-#include "runtime/libs/l_sys.c"
+#include "runtime/libs/l_native.c"
+#include "runtime/libs/l_path.c"
+#include "runtime/libs/l_fs.c"
+#include "runtime/libs/l_process.c"
+#include "runtime/libs/l_os.c"
+#include "runtime/libs/l_time.c"
 #include "runtime/libs/l_table.c"
 #include "runtime/libs/l_atom.c"
 #include "runtime/libs/l_random.c"
-#include "runtime/libs/l_sockets.c"
 
 static void init_bytecode_program_storage(elf_State *state)
 {
@@ -135,8 +139,11 @@ static void bootstrap_standard_libraries(elf_State *state)
 	elf_Table *elf_table = elf_lib_core(state);
 	table_set_atom_table(state, elf_table, "math", elf_lib_math(state));
 	table_set_atom_table(state, elf_table, "random", elf_lib_random(state));
-	table_set_atom_table(state, elf_table, "sys", elf_lib_sys(state));
-	table_set_atom_table(state, elf_table, "sockets", elf_lib_sockets(state));
+	table_set_atom_table(state, elf_table, "path", elf_lib_path(state));
+	table_set_atom_table(state, elf_table, "fs", elf_lib_fs(state));
+	table_set_atom_table(state, elf_table, "process", elf_lib_process(state));
+	table_set_atom_table(state, elf_table, "os", elf_lib_os(state));
+	table_set_atom_table(state, elf_table, "time", elf_lib_time(state));
 
 	state->globals = elf_push_new_table(state);
 	table_set_atom_table(state, state->globals, "elf", elf_table);

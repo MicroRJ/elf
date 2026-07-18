@@ -1,28 +1,52 @@
 path := "build/sys_smoke_test.txt"
 missing := "build/sys_smoke_missing.txt"
-sys := elf.sys
+fs := elf.fs
+path_lib := elf.path
 
-sys.delete_file(path)
-sys.delete_file(missing)
+fs.remove(path)
+fs.remove(missing)
 
-test_assert(sys.read_file(missing) == nil)
+test_assert(fs.read(missing) == nil)
+test_assert(fs.exists(missing) == 0)
 
-test_assert(sys.write_file(path, "hello sys") == 1)
-test_assert(sys.read_file(path) == "hello sys")
-test_assert(sys.read_file(path, 5) == "hello")
+test_assert(fs.write(path, "hello fs") == 1)
+test_assert(fs.read(path) == "hello fs")
+test_assert(fs.exists(path) == 1)
 
-file := sys.open_file(path, "r")
-test_assert(file != nil)
-test_assert(sys.get_file_size(file) == 9)
-test_assert(sys.read_file(file) == "hello sys")
-sys.close_file(file)
+info := fs.stat(path)
+test_assert(info != nil)
+test_assert(info.size == 8)
 
-test_assert(sys.get_file_name("some/path/name.ext") == "name")
-test_assert(sys.get_file_extension("some/path/name.ext") == "ext")
-test_assert(sys.get_parent_path("some/path/name.ext") == "some/path")
-test_assert(sys.slice_path("some/path/name.ext", 2) == "some/path")
+test_assert(path_lib.join("some/path", "name.ext") == "some/path/name.ext")
+test_assert(path_lib.filename("some/path/name.ext") == "name.ext")
+test_assert(path_lib.stem("some/path/name.ext") == "name")
+test_assert(path_lib.extension("some/path/name.ext") == "ext")
+test_assert(path_lib.parent("some/path/name.ext") == "some/path")
 
-test_assert(sys.delete_file(path) == 1)
-test_assert(sys.read_file(path) == nil)
+run := elf.process.run("cmd /d /c echo process-output")
+test_assert(run.started == 1)
+test_assert(run.success == 1)
+test_assert(run.exit_code == 0)
+test_assert(run.stdout != "")
+test_assert(run.stderr == "")
+test_assert(run.error == nil)
+
+error_run := elf.process.run("cmd /d /c echo process-error 1>&2")
+test_assert(error_run.started == 1)
+test_assert(error_run.stderr != "")
+
+failed_run := elf.process.run("cmd /d /c exit 7")
+test_assert(failed_run.started == 1)
+test_assert(failed_run.success == 0)
+test_assert(failed_run.exit_code == 7)
+
+missing_run := elf.process.run("elf_missing_process_7f31.exe")
+test_assert(missing_run.started == 0)
+test_assert(missing_run.success == 0)
+test_assert(missing_run.error_code != 0)
+test_assert(missing_run.error != nil)
+
+test_assert(fs.remove(path) == 1)
+test_assert(fs.read(path) == nil)
 
 ret 77

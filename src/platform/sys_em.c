@@ -110,7 +110,16 @@ elf_Handle sys_load_dll(char const *name) {
 
 
 void *sys_get_dll_fn(elf_Handle dll, char const *name) {
-	return (void *) dlsym(dll,name);
+        return (void *) dlsym(dll,name);
+}
+
+Sys_Process_Result sys_run_process(const char *command_line, struct Arena *standard_output,
+                                   struct Arena *standard_error)
+{
+        (void)command_line;
+        (void)standard_output;
+        (void)standard_error;
+        return (Sys_Process_Result){.exit_code = -1, .error_code = -1};
 }
 
 

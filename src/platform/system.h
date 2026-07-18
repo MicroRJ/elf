@@ -45,11 +45,19 @@ typedef union {
 } _FILE_TIME;
 
 typedef struct {
-	FILE_TIME create;
-	FILE_TIME write;
-	// read / write or ran
-	FILE_TIME access;
+        FILE_TIME create;
+        FILE_TIME write;
+        // read / write or ran
+        FILE_TIME access;
 } FILE_TIMES;
+
+struct Arena;
+
+typedef struct Sys_Process_Result {
+        elf_b32 started;
+        elf_i32 exit_code;
+        elf_i32 error_code;
+} Sys_Process_Result;
 
 enum {
 	// create a new file or truncate the existing one
@@ -152,6 +160,8 @@ int sys_get_last_error();
 void sys_get_error_msg(int error, char *buff, int len);
 
 elf_Handle sys_create_process(char const *file, char const *args);
+Sys_Process_Result sys_run_process(const char *command_line, struct Arena *standard_output,
+                                  struct Arena *standard_error);
 
 enum {
 	FILE_TYPE_FILE    = 0,
