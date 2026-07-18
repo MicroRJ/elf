@@ -18,7 +18,7 @@ struct elf_Value
 		elf_Handle x_sys;
 		elf_Object *x_obj;
 		elf_Table *x_tab;
-		elf_Atom *x_atom;
+		elf_String *x_atom;
 		elf_Function x_proc;
 		elf_Closure *x_closure;
 		void *x_ptr;
@@ -96,7 +96,7 @@ static inline i64 value_as_integer(elf_Value value)          { return value.x_in
 static inline f64 value_as_number(elf_Value value)           { return value.x_num; }
 static inline elf_Handle value_as_handle(elf_Value value)    { return value.x_sys; }
 static inline elf_Object *value_as_object(elf_Value value)   { return value.x_obj; }
-static inline elf_Atom *value_as_atom(elf_Value value)       { return value.x_atom; }
+static inline elf_String *value_as_atom(elf_Value value)       { return value.x_atom; }
 static inline elf_Table *value_as_table(elf_Value value)     { return value.x_tab; }
 static inline elf_Closure *value_as_closure(elf_Value value) { return value.x_closure; }
 static inline elf_Function value_as_function(elf_Value value){ return value.x_proc; }
@@ -162,7 +162,7 @@ static inline elf_Value value_from_handle(elf_Handle handle)
 	return value;
 }
 
-static inline elf_Value value_from_atom(elf_Atom *atom)
+static inline elf_Value value_from_atom(elf_String *atom)
 {
 	ASSERT(atom != 0);
 	elf_Value value = {};

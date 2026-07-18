@@ -172,8 +172,8 @@ int sys_find_next_file(FILE_VISITOR *visitor) {
 			bool isdir = (entry->d_type & DT_DIR) != 0;
 			elf_Value *top = GET_TOP(R);
 
-			elf_Atom *name = elf_atom_from_data(R,entry->d_name);
-			elf_Atom *path = elf_atom_from_data(R,tpf("%s/%s",dir->c,entry->d_name));
+			elf_String *name = elf_atom_from_data(R,entry->d_name);
+			elf_String *path = elf_atom_from_data(R,tpf("%s/%s",dir->c,entry->d_name));
 			elf_StackId base = elf_push_closure_raw(R,cls);
 			elf_Table *file = elf_new_table(R);
 

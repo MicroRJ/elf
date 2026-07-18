@@ -2,7 +2,7 @@
 static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void bg_emit_stat(BcGen *gen, Ir stat);
 static void generate_bytecode_function(BcGen *gen, IrFunction *function);
-static BytecodeFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_Atom *source_name);
+static BytecodeFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
 static void define_bytecode_label(BcGen *gen, u32 label);
 static void emit_jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void emit_jump_if_false_to_label(BcGen *gen, SourceSite site, Ir pred, u32 label);
@@ -226,7 +226,7 @@ static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number
 	return emit_xy_bc(gen, site, BC_LOADKNUM, gen_memory_index(dest), index);
 }
 
-static u32 emit_load_str_bc(BcGen *gen, SourceSite site, BcSlot dest, elf_Atom *atom)
+static u32 emit_load_str_bc(BcGen *gen, SourceSite site, BcSlot dest, elf_String *atom)
 {
 	elf_Value value = value_from_atom(atom);
 	u32 index = elf_array_add(gen->state, gen->state->globals, value);
@@ -404,13 +404,13 @@ static BytecodeFunction *reserve_bytecode_functions(elf_State *state, u32 count)
 //		u32                nfuncs;
 //		BcFunction         *funcs;
 //		elf_StrSlice       source;
-//		elf_Atom          *source_name;
+//		elf_String          *source_name;
 //		SourceMapEntry    *source_map;
 //	}
 //
 //
 //
-static BytecodeFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_Atom *source_name)
+static BytecodeFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
 {
 	ASSERT(module.functions);
 	ASSERT(module.function_count > 0);

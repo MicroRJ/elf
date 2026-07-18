@@ -28,7 +28,7 @@ typedef struct
 SourceMapEntry;
 
 typedef struct elf_Object  elf_Object;
-typedef struct elf_Atom    elf_Atom;
+typedef struct elf_String    elf_String;
 typedef struct elf_Closure elf_Closure;
 typedef struct elf_Value   elf_Value;
 
@@ -51,7 +51,7 @@ struct BytecodeFunction
 	u32             source_map_count;
 	char           *source_data;
 	u32             source_size;
-	elf_Atom       *source_name;
+	elf_String       *source_name;
 };
 
 struct elf_Closure
@@ -125,7 +125,7 @@ struct elf_State
 
 	u32        atom_count;
 	u32        atom_bucket_count;
-	elf_Atom **atom_buckets;
+	elf_String **atom_buckets;
 
 	struct
 	{
@@ -136,6 +136,14 @@ struct elf_State
 	}
 	metatables;
 };
+
+/* Internal stack-based table helpers. */
+elf_Table *elf_push_new_table(elf_State *state);
+void elf_push_env(elf_State *state);
+void elf_tab_set(elf_State *state);
+void elf_arr_add(elf_State *state);
+void elf_arr_get(elf_State *state);
+elf_StrSlice elf_arg_str_copy(elf_State *state, int index, Arena *arena);
 
 typedef enum
 {

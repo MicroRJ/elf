@@ -550,7 +550,7 @@ i64 core_lib_include(elf_State *R) {
 		if (value_is_atom(key)) {
 			char *sym = in_sym_dir(dir, key.x_atom->data);
 			if (*sym != '.') continue;
-			elf_Atom *ref = elf_atom_from_data(R,sym);
+			elf_String *ref = elf_atom_from_data(R,sym);
 			elf_table_set(R, globals, VALUE_ATOM(ref), elf_array_get(R, globals, entry_index(entry)));
 		}
 	}

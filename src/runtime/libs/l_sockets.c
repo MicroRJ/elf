@@ -170,8 +170,8 @@ int netlib_tcpserver(elf_State *R) {
 	elf_Value addrport_value = load_value(R, 1);
 	check_value_type(R, addrname_value, ELF_VALUE_TYPE_ATOM);
 	check_value_type(R, addrport_value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom *addrnameS = value_as_atom(addrname_value);
-	elf_Atom *addrportS = value_as_atom(addrport_value);
+	elf_String *addrnameS = value_as_atom(addrname_value);
+	elf_String *addrportS = value_as_atom(addrport_value);
 	char *addrname = addrnameS ? addrnameS->data : 0;
 	char *addrport = addrportS ? addrportS->data : 0;
 	ADDRINFOA idealaddr = {0};
@@ -197,8 +197,8 @@ int netlib_tcpclient(elf_State *R) {
 	elf_Value addrport_value = load_value(R, 1);
 	check_value_type(R, addrname_value, ELF_VALUE_TYPE_ATOM);
 	check_value_type(R, addrport_value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom *addrnameS = value_as_atom(addrname_value);
-	elf_Atom *addrportS = value_as_atom(addrport_value);
+	elf_String *addrnameS = value_as_atom(addrname_value);
+	elf_String *addrportS = value_as_atom(addrport_value);
 	char *addrname = addrnameS ? addrnameS->data : 0;
 	char *addrport = addrportS ? addrportS->data : 0;
 	ADDRINFOA idealaddr = {0};
@@ -224,7 +224,7 @@ int netlib_send(elf_State *R) {
 	SOCKET socket = (SOCKET) f_checkhand(R,0);
 	elf_Value payload_value = load_value(R, 1);
 	check_value_type(R, payload_value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom *payload = value_as_atom(payload_value);
+	elf_String *payload = value_as_atom(payload_value);
 	LMSG message = { payload->size };
 	elf_Integer sent = 0;
 	sent += send(socket,(char*)&message,sizeof(message),0);

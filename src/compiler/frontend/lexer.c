@@ -19,7 +19,7 @@ static const char *token_type_name(TokenType type)
 	return names[type];
 }
 
-static TokenType atom_is_word_or_macro(elf_Atom *atom)
+static TokenType atom_is_word_or_macro(elf_String *atom)
 {
 	switch (atom->id) {
 #define MCITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
@@ -29,7 +29,7 @@ static TokenType atom_is_word_or_macro(elf_Atom *atom)
 	}
 }
 
-static TokenType check_keyword(elf_Atom *atom)
+static TokenType check_keyword(elf_String *atom)
 {
 	switch (atom->id) {
 #define KWITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
@@ -54,7 +54,7 @@ static b32 is_identifier_continue(char c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static void lexer_init(Lexer *lexer, elf_State *state, elf_Atom *name, elf_StrSlice source)
+static void lexer_init(Lexer *lexer, elf_State *state, elf_String *name, elf_StrSlice source)
 {
 	lexer->state = state;
 	lexer->name = name;
@@ -405,7 +405,7 @@ static u32 lex_identifier(char **cursor, char *buffer)
 	return (u32)(out - buffer);
 }
 
-static elf_Atom *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 is_format, TokenType *type)
+static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 is_format, TokenType *type)
 {
 	char *cur = *cursor;
 	Scratch scratch = get_scratch();
@@ -472,7 +472,7 @@ static elf_Atom *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 is
 	else {
 		*type = TOK_FORMAT_STRING;
 	}
-	elf_Atom *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
+	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
 
 	*cursor = cur;
 	end_scratch(scratch);
@@ -509,7 +509,7 @@ retry:
 			Scratch scratch = get_scratch();
 			char *buffer = arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 			u32 size = lex_identifier(&cur, buffer);
-			elf_Atom *atom = elf_atom_from_data_size(lexer->state, buffer, size);
+			elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
 
 			token.type = check_keyword(atom);
 			if (token.type == TOK_IDENTIFIER) {
@@ -568,7 +568,7 @@ retry:
 			{
 				buffer[0] = '#';
 				u32 size = 1 + lex_identifier(&cur, buffer + 1);
-				elf_Atom *atom = elf_atom_from_data_size(lexer->state, buffer, size);
+				elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
 
 				token.type = atom_is_word_or_macro(atom);
 				if (token.type == TOK_M_ENDOFFILE) {

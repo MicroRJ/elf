@@ -193,7 +193,7 @@ static void emit_defer_range(LowerContext *ctx, IRArrayBuilder *items, u32 start
 	}
 }
 
-static Entity *entity_from_name(LowerContext *ctx, elf_Atom *name)
+static Entity *entity_from_name(LowerContext *ctx, elf_String *name)
 {
 	for (i32 i = ctx->scope_end - 1; i >= 0; -- i)
 	{
@@ -205,7 +205,7 @@ static Entity *entity_from_name(LowerContext *ctx, elf_Atom *name)
 	return 0;
 }
 
-static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, elf_Atom *name)
+static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, elf_String *name)
 {
 	Entity *en = entity_from_name(ctx, name);
 	const char *text = elf_atom_data(name);
@@ -427,7 +427,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_IDENT:
 		{
-			elf_Atom *ident = expr->atom;
+			elf_String *ident = expr->atom;
 			const char *ident_text = elf_atom_data(ident);
 
 			Entity *en = entity_from_name(ctx, ident);

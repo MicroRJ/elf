@@ -34,15 +34,15 @@ static u32 atom_bucket_index(elf_State *state, u32 hash)
 static void atom_state_resize(elf_State *state)
 {
 	u32 old_bucket_count = state->atom_bucket_count;
-	elf_Atom **old_buckets = state->atom_buckets;
+	elf_String **old_buckets = state->atom_buckets;
 
 	state->atom_bucket_count <<= 1;
 	state->atom_buckets = calloc(state->atom_bucket_count, sizeof(*state->atom_buckets));
 
 	for (u32 i = 0; i < old_bucket_count; ++i) {
-		elf_Atom *atom = old_buckets[i];
+		elf_String *atom = old_buckets[i];
 		while (atom) {
-			elf_Atom *next = atom->next;
+			elf_String *next = atom->next;
 			u32 bucket_index = atom_bucket_index(state, atom->hash);
 			atom->next = state->atom_buckets[bucket_index];
 			state->atom_buckets[bucket_index] = atom;
@@ -53,7 +53,7 @@ static void atom_state_resize(elf_State *state)
 	free(old_buckets);
 }
 
-static elf_Atom *atom_find(elf_State *state, const char *data, u32 size, u32 hash)
+static elf_String *atom_find(elf_State *state, const char *data, u32 size, u32 hash)
 {
 	PROF_ADD(PROF_COUNTER_ATOM_LOOKUP, 1);
 
@@ -63,7 +63,7 @@ static elf_Atom *atom_find(elf_State *state, const char *data, u32 size, u32 has
 	}
 
 	u32 bucket_index = atom_bucket_index(state, hash);
-	for (elf_Atom *atom = state->atom_buckets[bucket_index]; atom; atom = atom->next) {
+	for (elf_String *atom = state->atom_buckets[bucket_index]; atom; atom = atom->next) {
 		PROF_ADD(PROF_COUNTER_ATOM_PROBE, 1);
 		if (atom->hash == hash && atom->size == size && !memcmp(atom->data, data, size)) {
 			PROF_ADD(PROF_COUNTER_ATOM_HIT, 1);
@@ -75,7 +75,7 @@ static elf_Atom *atom_find(elf_State *state, const char *data, u32 size, u32 has
 	return 0;
 }
 
-static void atom_insert(elf_State *state, elf_Atom *atom)
+static void atom_insert(elf_State *state, elf_String *atom)
 {
 	atom_state_init(state);
 
@@ -97,9 +97,9 @@ static void atom_remove_dead(elf_State *state)
 
 	u32 counter = 0;
 	for (u32 i = 0; i < state->atom_bucket_count; ++i) {
-		elf_Atom **link = state->atom_buckets + i;
+		elf_String **link = state->atom_buckets + i;
 		while (*link) {
-			elf_Atom *atom = *link;
+			elf_String *atom = *link;
 			if (atom->obj.status & ELF_OBJECT_REACHABLE) {
 				counter++;
 				link = &atom->next;
@@ -113,14 +113,14 @@ static void atom_remove_dead(elf_State *state)
 	state->atom_count = counter;
 }
 
-elf_Atom *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 size, u16 id)
+elf_String *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 size, u16 id)
 {
 	ASSERT(state);
 	ASSERT(data);
 	ASSERT(size <= 0xffff);
 
 	u32 hash = atom_hash_data(data, size);
-	elf_Atom *interned = atom_find(state, data, size, hash);
+	elf_String *interned = atom_find(state, data, size, hash);
 	if (interned) {
 		ASSERT(!id || !interned->id || interned->id == id);
 		if (id && !interned->id) {
@@ -131,7 +131,7 @@ elf_Atom *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 siz
 
 	atom_state_init(state);
 
-	elf_Atom *atom = gc_alloc(state, ELF_OBJECT_ATOM, sizeof(*atom) + size + 1);
+	elf_String *atom = gc_alloc(state, ELF_OBJECT_ATOM, sizeof(*atom) + size + 1);
 	atom->hash = hash;
 	atom->id = id;
 	atom->size = (u16)size;
@@ -142,48 +142,48 @@ elf_Atom *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 siz
 	return atom;
 }
 
-elf_Atom *elf_atom_from_data_size(elf_State *state, const char *data, u32 size)
+elf_String *elf_atom_from_data_size(elf_State *state, const char *data, u32 size)
 {
 	return elf_atom_from_data_size_id(state, data, size, 0);
 }
 
-elf_Atom *elf_atom_from_data(elf_State *state, const char *data)
+elf_String *elf_atom_from_data(elf_State *state, const char *data)
 {
 	ASSERT(data);
 	return elf_atom_from_data_size(state, data, (u32)strlen(data));
 }
 
-elf_Atom *elf_atom_from_data_id(elf_State *state, const char *data, u16 id)
+elf_String *elf_atom_from_data_id(elf_State *state, const char *data, u16 id)
 {
 	ASSERT(data);
 	return elf_atom_from_data_size_id(state, data, (u32)strlen(data), id);
 }
 
-u32 elf_atom_size(elf_Atom *atom)
+u32 elf_atom_size(elf_String *atom)
 {
 	return atom->size;
 }
 
-const char *elf_atom_data(elf_Atom *atom)
+const char *elf_atom_data(elf_String *atom)
 {
 	return atom->data;
 }
 
-elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_Atom *atom)
+elf_StrSlice elf_atom_copy_text(Arena *arena, elf_String *atom)
 {
 	elf_StrSlice copy = {};
-	copy.data = elf_arena_push_data(arena, atom->data, atom->size);
+	copy.data = arena_push_data(arena, atom->data, atom->size);
 	copy.size = atom->size;
-	elf_arena_push_zero(arena, 1);
+	arena_push_zero(arena, 1);
 	return copy;
 }
 
-u32 elf_atom_hash(elf_Atom *atom)
+u32 elf_atom_hash(elf_String *atom)
 {
 	return atom->hash;
 }
 
-b32 elf_atoms_equal(elf_Atom *left, elf_Atom *right)
+b32 elf_atoms_equal(elf_String *left, elf_String *right)
 {
 	return left == right;
 }

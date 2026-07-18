@@ -4,16 +4,19 @@
 #ifndef ARENA_H
 #define ARENA_H
 
-typedef elf_Arena Arena;
-typedef elf_Scratch Scratch;
-
-struct elf_Arena
+typedef struct Arena
 {
 	u64 size;
 	u64 in_reserve;
 	u64 in_use;
 	u8 *data;
-};
+} Arena;
+
+typedef struct Scratch
+{
+	Arena *arena;
+	u64 regress;
+} Scratch;
 
 Arena create_arena(u64 initial_reserve);
 void destroy_arena(Arena *arena);

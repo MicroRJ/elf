@@ -128,7 +128,7 @@ struct Ast
 
 	union
 	{
-		elf_Atom *atom;
+		elf_String *atom;
 		i64      integer_value;
 		f64      number_value;
 

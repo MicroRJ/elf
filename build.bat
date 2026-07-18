@@ -4,6 +4,9 @@
 @ECHO OFF
 @SETLOCAL
 
+@CALL vcvars64 >nul
+@IF ERRORLEVEL 1 EXIT /B %ERRORLEVEL%
+
 @SET TARGET=%1
 @SET FLAGS=
 @IF "%TARGET%"=="" SET TARGET=all
@@ -50,7 +53,7 @@ if errorlevel 1 exit /b %errorlevel%
 lib /nologo /out:build\elf.lib build\base.obj build\system.obj build\value.obj build\bytecode.obj build\bytecode_debug.obj build\core.obj build\compiler.obj build\elf_api.obj
 if errorlevel 1 exit /b %errorlevel%
 
-if /I "%TARGET%"=="lib" exit /b 0
+if /I "%TARGET%"=="lib" goto :eof
 
 clang-cl /nologo -Od -Zi %FLAGS% tools\tests.c %INC% -D_DEBUG -DPLATFORM_DESKTOP /Fobuild\tests.obj /Fe:build\tests.exe /Fd:build\tests.pdb /link build\elf.lib /PDB:build\tests.pdb /ILK:build\tests.ilk
 if errorlevel 1 exit /b %errorlevel%

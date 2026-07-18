@@ -11,7 +11,8 @@ struct elf_Object
 {
 	u8    type;
 	u8    status;
-	u16   unused;
+	u8    external_refs;
+	u8    unused;
 	u32   size;
 };
 

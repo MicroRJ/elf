@@ -88,7 +88,7 @@ typedef struct Entity
 	EntityType    type;
 	EntityTags    tags;
 	u32          scope_start;
-	elf_Atom     *name;
+	elf_String     *name;
 	SourceSite   site;
 	Ir         memory_ir;
 }
@@ -98,7 +98,7 @@ struct LowerContext
 {
 	elf_State   *state;
 	Arena       *arena;
-	elf_Atom    *source_name;
+	elf_String    *source_name;
 	u32          ir_stack_size;
 	u32          ir_stack_index;
 	Ir       *ir_stack;

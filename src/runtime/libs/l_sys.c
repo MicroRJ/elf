@@ -7,7 +7,7 @@ static inline f64 performance_counter_elapsed_s(i64 start)
 	return (sys_get_performance_counter() - start) / (f64)sys_get_performance_counter_frequency();
 }
 
-static elf_Atom *load_atom_arg(elf_State *state, u32 index)
+static elf_String *load_atom_arg(elf_State *state, u32 index)
 {
 	elf_Value value = load_value(state, index);
 	check_value_type(state, value, ELF_VALUE_TYPE_ATOM);
@@ -145,7 +145,7 @@ static void append_visited_paths(elf_State *state, FILE_VISITOR *visitor, elf_Ta
 
 		if (visitor->type != FILE_TYPE_SYMLINK && !is_relative_marker)
 		{
-			elf_Atom *atom = elf_atom_from_data(state, visitor->pb.path);
+			elf_String *atom = elf_atom_from_data(state, visitor->pb.path);
 			elf_array_add(state, paths, value_from_atom(atom));
 
 			if (visitor->type == FILE_TYPE_FOLDER && recurse > 0) {
@@ -199,7 +199,7 @@ ELF_FUNCTION(lib_sys_sleep)
 ELF_FUNCTION(lib_sys_get_parent_path)
 {
 	elf_State *state = S;
-	elf_Atom *path = load_atom_arg(state, 1);
+	elf_String *path = load_atom_arg(state, 1);
 	i32 levels = 1;
 
 	if (nargs >= 3) {
@@ -221,7 +221,7 @@ ELF_FUNCTION(lib_sys_get_parent_path)
 ELF_FUNCTION(lib_sys_slice_path)
 {
 	elf_State *state = S;
-	elf_Atom *path = load_atom_arg(state, 1);
+	elf_String *path = load_atom_arg(state, 1);
 	i32 count = 1;
 
 	if (nargs > 2) {
@@ -244,7 +244,7 @@ ELF_FUNCTION(lib_sys_slice_path)
 ELF_FUNCTION(lib_sys_get_file_name)
 {
 	elf_State *state = S;
-	elf_Atom *path = load_atom_arg(state, 1);
+	elf_String *path = load_atom_arg(state, 1);
 	const char *begin = elf_atom_data(path);
 	const char *end = begin + elf_atom_size(path);
 	const char *extension = end;
@@ -268,7 +268,7 @@ ELF_FUNCTION(lib_sys_get_file_name)
 ELF_FUNCTION(lib_sys_get_file_extension)
 {
 	elf_State *state = S;
-	elf_Atom *path = load_atom_arg(state, 1);
+	elf_String *path = load_atom_arg(state, 1);
 	const char *begin = elf_atom_data(path);
 	const char *end = begin + elf_atom_size(path);
 

@@ -51,11 +51,18 @@ elf_Handle elf_arg_hnd(elf_State *S, int x)
 
 
 
-elf_StrSlice elf_arg_str_copy(elf_State *S, int x, elf_Arena *arena)
+elf_StrSlice elf_arg_str_copy(elf_State *S, int x, Arena *arena)
 {
 	elf_Value value = load_value(S, x);
 	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
 	return elf_atom_copy_text(arena, value_as_atom(value));
+}
+
+elf_String *elf_arg_str(elf_State *S, int x)
+{
+	elf_Value value = load_value(S, x);
+	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
+	return value_as_atom(value);
 }
 
 
@@ -74,6 +81,52 @@ elf_Table *elf_push_new_table(elf_State *S) {
 	return table;
 }
 
+elf_Table *elf_retain_table(elf_Table *table)
+{
+	if (!table) return 0;
+	ASSERT(table->obj.type == ELF_OBJECT_TABLE);
+	ASSERT(table->obj.external_refs != (u8)-1);
+	table->obj.external_refs += 1;
+	return table;
+}
+
+void elf_release_table(elf_Table *table)
+{
+	if (!table) return;
+	ASSERT(table->obj.type == ELF_OBJECT_TABLE);
+	ASSERT(table->obj.external_refs > 0);
+	table->obj.external_refs -= 1;
+}
+
+elf_String *elf_retain_str(elf_String *string)
+{
+	if (!string) return 0;
+	ASSERT(string->obj.type == ELF_OBJECT_ATOM);
+	ASSERT(string->obj.external_refs != (u8)-1);
+	string->obj.external_refs += 1;
+	return string;
+}
+
+void elf_release_str(elf_String *string)
+{
+	if (!string) return;
+	ASSERT(string->obj.type == ELF_OBJECT_ATOM);
+	ASSERT(string->obj.external_refs > 0);
+	string->obj.external_refs -= 1;
+}
+
+const char *elf_str_data(const elf_String *string)
+{
+	ASSERT(string);
+	return string->data;
+}
+
+elf_u32 elf_str_size(const elf_String *string)
+{
+	ASSERT(string);
+	return string->size;
+}
+
 
 
 
@@ -84,6 +137,62 @@ void elf_push_cstr(elf_State *S, const char *text) {
 void elf_push_str(elf_State *S, const char *text, int len)
 {
 	push_value(S, value_from_atom(elf_atom_from_data_size(S, text, len)));
+}
+
+static elf_ValueView value_view(elf_Value value)
+{
+	elf_ValueView view = {};
+	view.type = value_type(value);
+	switch (view.type)
+	{
+		case ELF_VALUE_TYPE_INTEGER: view.as.integer = value_as_integer(value); break;
+		case ELF_VALUE_TYPE_NUMBER:  view.as.number = value_as_number(value); break;
+		case ELF_VALUE_TYPE_HANDLE:  view.as.handle = value_as_handle(value); break;
+		case ELF_VALUE_TYPE_TABLE:   view.as.table = value_as_table(value); break;
+		case ELF_VALUE_TYPE_ATOM:
+			view.as.string = value_as_atom(value);
+			break;
+		default: break;
+	}
+	return view;
+}
+
+elf_ValueView elf_peek_value(elf_State *state, elf_u32 depth)
+{
+	ASSERT(state);
+	ASSERT((elf_u64)(state->stack_ptr - state->stack) > depth);
+	return value_view(state->stack_ptr[-1 - (i32)depth]);
+}
+
+void elf_pop_values(elf_State *state, elf_u32 count)
+{
+	ASSERT(state);
+	ASSERT((elf_u64)(state->stack_ptr - state->stack) >= count);
+	state->stack_ptr -= count;
+}
+
+elf_u32 elf_table_length(const elf_Table *table)
+{
+	ASSERT(table);
+	return table->count;
+}
+
+elf_ValueView elf_get_field(elf_State *state, elf_Table *table,
+	const char *field)
+{
+	ASSERT(state);
+	ASSERT(table);
+	ASSERT(field);
+	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
+	return value_view(elf_table_get_or_nil(state, table, key));
+}
+
+elf_ValueView elf_get_index(elf_State *state, elf_Table *table,
+	elf_u32 index)
+{
+	ASSERT(state);
+	ASSERT(table);
+	return value_view(elf_array_get(state, table, index));
 }
 
 static elf_StrSlice source_buffer_from_file(elf_State *state, const char *name)

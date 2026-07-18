@@ -81,7 +81,7 @@ BytecodeFunction elf_compile_source(elf_State *state, char const *name, elf_StrS
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
-	elf_Atom *source_name = elf_atom_from_data(state, name);
+	elf_String *source_name = elf_atom_from_data(state, name);
 
 	Parser *parser = elf_create_parser(state, scratch.arena, name, source);
 	AstRef ast_file;

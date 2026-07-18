@@ -32,14 +32,14 @@ static inline u32 vm_check_index(elf_State *state, int instr, elf_Value value, u
 	return check_array_index(state, instr, value_as_integer(value), count);
 }
 
-static inline elf_Atom *vm_add_values_to_str(elf_State *state, elf_Value left, elf_Value right)
+static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left, elf_Value right)
 {
 	Scratch scratch = get_scratch();
 	char *join_start = arena_push(scratch.arena, 0);
 	print_value(scratch.arena, left);
 	print_value(scratch.arena, right);
 	char *join_end = arena_push_zero(scratch.arena, 1);
-	elf_Atom *atom = elf_atom_from_data_size(state, join_start, (u32)(join_end - join_start));
+	elf_String *atom = elf_atom_from_data_size(state, join_start, (u32)(join_end - join_start));
 	end_scratch(scratch);
 	return atom;
 }

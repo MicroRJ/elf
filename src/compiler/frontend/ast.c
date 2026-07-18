@@ -79,7 +79,7 @@ static AstRef create_num_ast(Parser *par, SourceSite site, f64 n)
 	return value;
 }
 
-static AstRef create_atom_ast(Parser *par, SourceSite site, elf_Atom *atom)
+static AstRef create_atom_ast(Parser *par, SourceSite site, elf_String *atom)
 {
 	AstRef value = create_nullary_ast(par, site, AST_STRING_LITERAL);
 	value->atom = atom;
@@ -156,7 +156,7 @@ static AstRef create_if_ast(Parser *par, SourceSite site, AstRef pred, AstRef tr
 	return value;
 }
 
-static AstRef create_ident_ast(Parser *par, SourceSite site, elf_Atom *atom)
+static AstRef create_ident_ast(Parser *par, SourceSite site, elf_String *atom)
 {
 	AstRef tree = create_ast(par, site, AST_IDENT);
 	tree->atom = atom;
@@ -176,7 +176,7 @@ static AstRef create_dotted_ident_ast(Parser *par, SourceSite site, const char *
 			u32 segment_size = (u32)(cursor - segment);
 			ASSERT(segment_size != 0);
 
-			elf_Atom *atom = elf_atom_from_data_size(par->state, segment, segment_size);
+			elf_String *atom = elf_atom_from_data_size(par->state, segment, segment_size);
 			AstRef part = create_ident_ast(par, site, atom);
 			if (expr) {
 				expr = create_field_ast(par, site, expr, part);

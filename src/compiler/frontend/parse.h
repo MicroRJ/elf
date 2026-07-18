@@ -9,7 +9,7 @@ typedef struct Parser Parser;
 typedef struct
 {
 	elf_State    *state;
-	elf_Atom     *name;
+	elf_String     *name;
 	elf_StrSlice source;
 	char        *cursor;
 	u32          line_index;
@@ -21,7 +21,7 @@ struct Parser
 {
 	Arena         *arena;
 	elf_State     *state;
-	elf_Atom      *name;
+	elf_String      *name;
 	Lexer          lexer;
 	Token          tok,tok_prev,tok_prox;
 	AstContext     ast;

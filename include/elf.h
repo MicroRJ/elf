@@ -1,8 +1,6 @@
 #ifndef ELF_H
 #define ELF_H
 
-#include <stdarg.h>
-
 #if !defined(HAS_BOOL)
 typedef signed int bool;
 #endif
@@ -28,7 +26,7 @@ typedef elf_u64 elf_Handle;
 
 typedef struct elf_State elf_State;
 typedef struct elf_Table elf_Table;
-typedef struct elf_Atom elf_Atom;
+typedef struct elf_String elf_String;
 
 typedef struct
 {
@@ -36,14 +34,6 @@ typedef struct
 	elf_u64 size;
 }
 elf_StrSlice;
-
-typedef struct elf_Arena elf_Arena;
-typedef struct
-{
-	elf_Arena *arena;
-	elf_u64    regress;
-}
-elf_Scratch;
 
 #define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
 typedef ELF_FUNCTION(*elf_Function);
@@ -67,9 +57,24 @@ typedef enum
 	ELF_VALUE_TYPE_CLOSURE,
 	ELF_VALUE_TYPE_TABLE,
 	ELF_VALUE_TYPE_ATOM,
+	ELF_VALUE_TYPE_STRING = ELF_VALUE_TYPE_ATOM,
 	ELF_VALUE_TYPE_COUNT_,
 }
 elf_ValueType;
+
+typedef struct
+{
+	elf_ValueType type;
+	union
+	{
+		elf_Integer  integer;
+		elf_Number   number;
+		elf_Handle   handle;
+		elf_String  *string;
+		elf_Table   *table;
+	} as;
+}
+elf_ValueView;
 
 typedef enum
 {
@@ -81,21 +86,6 @@ elf_GCMode;
 
 elf_State *elf_create_state(void);
 void elf_destroy_state(elf_State *state);
-
-elf_Arena *elf_create_arena(elf_u64 initial_reserve);
-void elf_destroy_arena(elf_Arena *arena);
-void *elf_arena_push(elf_Arena *arena, elf_u64 size);
-void *elf_arena_push_zero(elf_Arena *arena, elf_u64 size);
-void *elf_arena_push_copy(elf_Arena *arena, elf_u64 size, const void *data);
-char *elf_arena_push_data(elf_Arena *arena, const void *data, elf_u64 size);
-char *elf_arena_push_text(elf_Arena *arena, const char *text);
-char *elf_arena_push_char(elf_Arena *arena, char chr);
-void elf_arena_push_repeat(elf_Arena *arena, char chr, elf_u32 count);
-char *elf_arena_pushfv(elf_Arena *arena, const char *format, va_list args);
-char *elf_arena_pushf(elf_Arena *arena, const char *format, ...);
-
-elf_Scratch elf_get_scratch(void);
-void elf_end_scratch(elf_Scratch scratch);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 elf_u32 elf_do_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
@@ -109,12 +99,20 @@ void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_hnd(elf_State *state, elf_Handle handle);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, int size);
-elf_Table *elf_push_new_table(elf_State *state);
 
-void elf_push_env(elf_State *state);
-void elf_tab_set(elf_State *state);
-void elf_arr_add(elf_State *state);
-void elf_arr_get(elf_State *state);
+elf_ValueView elf_peek_value(elf_State *state, elf_u32 depth);
+void elf_pop_values(elf_State *state, elf_u32 count);
+
+elf_String *elf_retain_str(elf_String *string);
+void elf_release_str(elf_String *string);
+const char *elf_str_data(const elf_String *string);
+elf_u32 elf_str_size(const elf_String *string);
+
+elf_Table *elf_retain_table(elf_Table *table);
+void elf_release_table(elf_Table *table);
+elf_u32 elf_table_length(const elf_Table *table);
+elf_ValueView elf_get_field(elf_State *state, elf_Table *table, const char *field);
+elf_ValueView elf_get_index(elf_State *state, elf_Table *table, elf_u32 index);
 
 int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
@@ -122,12 +120,10 @@ int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source
 int elf_push_code_file(elf_State *state, const char *name);
 
 elf_ValueType elf_arg_type(elf_State *state, int index);
-elf_StrSlice  elf_arg_str_copy(elf_State *state, int index, elf_Arena *arena);
+elf_String   *elf_arg_str(elf_State *state, int index);
 elf_Number    elf_arg_num(elf_State *state, int index);
 elf_Integer   elf_arg_int(elf_State *state, int index);
 elf_Handle    elf_arg_hnd(elf_State *state, int index);
-
-elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_Atom *atom);
 
 #endif
 

@@ -147,7 +147,7 @@ static void test_lexer_keywords_and_identifiers(elf_State *state)
 	expect_token_type(identifier, TOK_IDENTIFIER, "lex identifier near keyword");
 	expect_token_atom(identifier, "true_value", "identifier atom payload");
 
-	elf_Atom *keyword = elf_atom_from_data(state, "true");
+	elf_String *keyword = elf_atom_from_data(state, "true");
 	if (keyword->id != TOK_TRUE) {
 		test_fail("keyword atom keeps token id");
 	}
@@ -165,7 +165,7 @@ static void test_lexer_macros(elf_State *state)
 	expect_token_type(file_name, TOK_STRING, "lex #file_name macro");
 	expect_token_atom(file_name, "lexer_tests", "#file_name atom payload");
 
-	elf_Atom *macro = elf_atom_from_data(state, "#int");
+	elf_String *macro = elf_atom_from_data(state, "#int");
 	if (macro->id != TOK_M_INT) {
 		test_fail("macro atom keeps token id");
 	}

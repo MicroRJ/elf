@@ -37,7 +37,7 @@ ELF_FUNCTION(l_atom_idx) {
 ELF_FUNCTION(l_atom_slice) {
 	elf_Value value = load_value(S, 0);
 	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom *str = value_as_atom(value);
+	elf_String *str = value_as_atom(value);
 	// todo: out of bounds check
 	elf_Value lo_value = load_value(S, 2);
 	check_value_type_rule(S, lo_value, TRULE_NUMERIC);
@@ -60,7 +60,7 @@ ELF_FUNCTION(l_atom_join) {
 	}
 	char *end = arena_push_zero(scratch.arena, 1);
 
-	elf_Atom *atom = elf_atom_from_data_size(S, start, end - start);
+	elf_String *atom = elf_atom_from_data_size(S, start, end - start);
 	push_value(S, value_from_atom(atom));
 	end_scratch(scratch);
 	return 1;
@@ -156,7 +156,7 @@ ELF_FUNCTION(l_atom_split_by_char) {
 		}
 
 		char *end = arena_push_zero(scratch.arena, 1);
-		elf_Atom * split = elf_atom_from_data_size(S, start, (u32)(end - start));
+		elf_String * split = elf_atom_from_data_size(S, start, (u32)(end - start));
 		elf_Value value;
 		value = value_from_atom(split);
 
@@ -199,7 +199,7 @@ char chr_to_uppercase(char x) {
 ELF_FUNCTION(l_atom_lowercase) {
 	elf_Value value = load_value(S, 0);
 	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom *str = value_as_atom(value);
+	elf_String *str = value_as_atom(value);
 	char *temp = malloc(str->size + 1);
 	for (int i = 0; i < str->size; ++ i) {
 		temp[i] = chr_to_lowercase(str->data[i]);
@@ -214,7 +214,7 @@ ELF_FUNCTION(l_atom_lowercase) {
 ELF_FUNCTION(l_atom_uppercase) {
 	elf_Value value = load_value(S, 0);
 	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	elf_Atom *str = value_as_atom(value);
+	elf_String *str = value_as_atom(value);
 	char *temp = malloc(str->size + 1);
 	for (int i = 0; i < str->size; ++ i) {
 		temp[i] = chr_to_uppercase(str->data[i]);

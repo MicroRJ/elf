@@ -247,7 +247,7 @@ int core_lib_list_volumes(elf_State *R) {
 	char buffer[MAX_PATH];
 	HANDLE handle = FindFirstVolumeA(buffer,MAX_PATH);
 
-	elf_Atom *name = 0;
+	elf_String *name = 0;
 	if (handle != INVALID_HANDLE_VALUE) do {
 
 		elf_Table *volume = elf_new_table(R);

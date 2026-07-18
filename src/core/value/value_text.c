@@ -74,7 +74,7 @@ static b32 value_can_source(elf_Value value)
 	}
 }
 
-static void atom_to_source(Arena *arena, elf_Atom *atom)
+static void atom_to_source(Arena *arena, elf_String *atom)
 {
 	arena_push_char(arena, '"');
 

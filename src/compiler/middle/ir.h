@@ -125,7 +125,7 @@ struct IrNode
 		}
 		ir_label;
 
-		elf_Atom *atom;
+		elf_String *atom;
 		i64      ir_int;
 		f64      ir_num;
 
