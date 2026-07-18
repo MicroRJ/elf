@@ -102,7 +102,7 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 	arena_push_zero(scratch.arena, 1);
 
 	log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu]: %s"
-	,	elf_atom_data(lexer->name)
+	,	atom_data(lexer->name)
 	,	site.line_index
 	,	source_slice_column(site)
 	,	message);

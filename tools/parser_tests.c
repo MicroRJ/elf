@@ -61,7 +61,7 @@ static void expect_ast_kind(AstRef ast, AstType kind, const char *label)
 
 static void expect_ast_atom(AstRef ast, const char *text, const char *label)
 {
-	if (!ast || !ast->atom || strcmp(elf_atom_data(ast->atom), text) != 0) {
+	if (!ast || !ast->atom || strcmp(atom_data(ast->atom), text) != 0) {
 		test_fail(label);
 	}
 }

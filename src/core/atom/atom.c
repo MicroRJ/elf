@@ -18,6 +18,7 @@ static inline u32 atom_hash_data(const char *data, u32 size)
 	return hash;
 }
 
+// TODO(RJ) call this at state init time!!
 static void atom_state_init(elf_State *state)
 {
 	if (!state->atom_bucket_count) {
@@ -159,12 +160,12 @@ elf_String *elf_atom_from_data_id(elf_State *state, const char *data, u16 id)
 	return elf_atom_from_data_size_id(state, data, (u32)strlen(data), id);
 }
 
-u32 elf_atom_size(elf_String *atom)
+u32 atom_size(elf_String *atom)
 {
 	return atom->size;
 }
 
-const char *elf_atom_data(elf_String *atom)
+const char *atom_data(elf_String *atom)
 {
 	return atom->data;
 }
@@ -178,12 +179,12 @@ elf_StrSlice elf_atom_copy_text(Arena *arena, elf_String *atom)
 	return copy;
 }
 
-u32 elf_atom_hash(elf_String *atom)
+u32 atom_hash(elf_String *atom)
 {
 	return atom->hash;
 }
 
-b32 elf_atoms_equal(elf_String *left, elf_String *right)
+b32 atoms_equal(elf_String *left, elf_String *right)
 {
 	return left == right;
 }

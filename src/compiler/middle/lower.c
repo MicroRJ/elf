@@ -54,7 +54,7 @@ static void report_lowering_error(LowerContext *ctx, LoweringError error, Source
 	va_end(args);
 	arena_push_zero(scratch.arena, 1);
 
-	const char *source_name = ctx && ctx->source_name ? elf_atom_data(ctx->source_name) : "<unknown>";
+	const char *source_name = ctx && ctx->source_name ? atom_data(ctx->source_name) : "<unknown>";
 	if (site.line_index) {
 		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] lowering error: %s"
 		, source_name, site.line_index, source_slice_column(site), message);
@@ -76,7 +76,7 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 	va_end(args);
 	arena_push_zero(scratch.arena, 1);
 
-	const char *source_name = ctx && ctx->source_name ? elf_atom_data(ctx->source_name) : "<unknown>";
+	const char *source_name = ctx && ctx->source_name ? atom_data(ctx->source_name) : "<unknown>";
 	if (site.line_index) {
 		log_linef(LOG_LEVEL_WARNING, "%s [%u:%llu] lowering warning: %s"
 		, source_name, site.line_index, source_slice_column(site), message);
@@ -208,7 +208,7 @@ static Entity *entity_from_name(LowerContext *ctx, elf_String *name)
 static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, elf_String *name)
 {
 	Entity *en = entity_from_name(ctx, name);
-	const char *text = elf_atom_data(name);
+	const char *text = atom_data(name);
 	if (en)
 	{
 		if (en->type == ENTITY_DIRECTORY) {
@@ -428,7 +428,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 		case AST_IDENT:
 		{
 			elf_String *ident = expr->atom;
-			const char *ident_text = elf_atom_data(ident);
+			const char *ident_text = atom_data(ident);
 
 			Entity *en = entity_from_name(ctx, ident);
 

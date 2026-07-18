@@ -59,7 +59,7 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	}
 
 	if (value_is_atom(left)) {
-		return elf_atoms_equal(value_as_atom(left), value_as_atom(right));
+		return atoms_equal(value_as_atom(left), value_as_atom(right));
 	}
 
 	return value_as_integer(left) == value_as_integer(right);
@@ -235,7 +235,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 					} break;
 
 					case ELF_VALUE_TYPE_ATOM: {
-						const char *text = elf_atom_data(value_as_atom(object));
+						const char *text = atom_data(value_as_atom(object));
 
 						if (value_is_integer(field)) {
 							i64 index = value_as_integer(field);

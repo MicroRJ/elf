@@ -101,7 +101,7 @@ ELF_FUNCTION(l_core_assert) {
 
 	elf_Value error_value = load_value(S, 2);
 	check_value_type(S, error_value, ELF_VALUE_TYPE_ATOM);
-	const char *errmsg = elf_atom_data(value_as_atom(error_value));
+	const char *errmsg = atom_data(value_as_atom(error_value));
 	if (!cond) {
 		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "assertion triggered: %s", errmsg);
 	}
@@ -259,7 +259,7 @@ ELF_FUNCTION(l_core_ntoi) {
 ELF_FUNCTION(l_core_load_file) {
 	elf_Value name_value = load_value(S, 1);
 	check_value_type(S, name_value, ELF_VALUE_TYPE_ATOM);
-	i64 ok = elf_push_code_file(S, elf_atom_data(value_as_atom(name_value)));
+	i64 ok = elf_push_code_file(S, atom_data(value_as_atom(name_value)));
 	if (!ok) {
 		return 0;
 	}
@@ -290,7 +290,7 @@ ELF_FUNCTION(l_core_load_expr) {
 ELF_FUNCTION(l_core_const_expr) {
 	elf_Value contents_value = load_value(S, 1);
 	check_value_type(S, contents_value, ELF_VALUE_TYPE_ATOM);
-	const char *contents = elf_atom_data(value_as_atom(contents_value));
+	const char *contents = atom_data(value_as_atom(contents_value));
 	elf_StrSlice source = {(char *)contents, strlen(contents)};
 	elf_push_constant_expr(S, "no name", source);
 	return 1;
@@ -302,7 +302,7 @@ ELF_FUNCTION(l_core_const_expr) {
 ELF_FUNCTION(l_core_load_json) {
 	elf_Value name_value = load_value(S, 1);
 	check_value_type(S, name_value, ELF_VALUE_TYPE_ATOM);
-	const char *name = elf_atom_data(value_as_atom(name_value));
+	const char *name = atom_data(value_as_atom(name_value));
 
 	elf_Handle file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
 	if (ELF_IS_HANDLE_INVALID(file)) {
@@ -360,7 +360,7 @@ ELF_FUNCTION(l_core_format) {
 	i64 index = 1;
 	elf_Value format_value = load_value(S, index ++);
 	check_value_type(S, format_value, ELF_VALUE_TYPE_ATOM);
-	const char *format = elf_atom_data(value_as_atom(format_value));
+	const char *format = atom_data(value_as_atom(format_value));
 
 	Scratch scratch = get_scratch();
 	char *start = arena_push(scratch.arena, 0);

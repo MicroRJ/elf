@@ -142,7 +142,7 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 		site = parser->tok.site;
 	}
 
-	const char *source_name = parser && parser->name ? elf_atom_data(parser->name) : "<unknown>";
+	const char *source_name = parser && parser->name ? atom_data(parser->name) : "<unknown>";
 	const char *severity_name = severity >= SEVERITY_FATAL ? "error" :
 		severity == SEVERITY_WARNING ? "warning" : "note";
 

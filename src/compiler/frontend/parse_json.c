@@ -6,7 +6,7 @@ static AstRef parse_json_ast_value(Parser *parser);
 
 static b32 json_token_is_null(Token token)
 {
-	return token.type == TOK_IDENTIFIER && strcmp(elf_atom_data(token.atom), "null") == 0;
+	return token.type == TOK_IDENTIFIER && strcmp(atom_data(token.atom), "null") == 0;
 }
 
 static void json_expect_separator_or_end(Parser *parser, TokenType end, const char *message, b32 *done)

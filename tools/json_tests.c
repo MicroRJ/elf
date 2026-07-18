@@ -15,7 +15,7 @@ static void json_expect_int(elf_Value value, i64 expected, const char *label)
 
 static void json_expect_atom(elf_Value value, const char *expected, const char *label)
 {
-	if (!value_is_atom(value) || strcmp(elf_atom_data(value_as_atom(value)), expected) != 0)
+	if (!value_is_atom(value) || strcmp(atom_data(value_as_atom(value)), expected) != 0)
 	{
 		fprintf(stderr, "FAIL: %s expected atom '%s'\n", label, expected);
 		test_failures += 1;

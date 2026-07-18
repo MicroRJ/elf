@@ -235,7 +235,7 @@ static void print_ir(Printer *pr, Ir ir)
 		break;
 		case IR_ATOM:
 		{
-			const char *data = elf_atom_data(ir->atom);
+			const char *data = atom_data(ir->atom);
 			PRINT(pr, "\"%s\"", data);
 		}
 		break;

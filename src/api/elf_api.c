@@ -49,15 +49,6 @@ elf_Handle elf_arg_hnd(elf_State *S, int x)
 	return value_as_handle(value);
 }
 
-
-
-elf_StrSlice elf_arg_str_copy(elf_State *S, int x, Arena *arena)
-{
-	elf_Value value = load_value(S, x);
-	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	return elf_atom_copy_text(arena, value_as_atom(value));
-}
-
 elf_String *elf_arg_str(elf_State *S, int x)
 {
 	elf_Value value = load_value(S, x);
@@ -65,15 +56,11 @@ elf_String *elf_arg_str(elf_State *S, int x)
 	return value_as_atom(value);
 }
 
-
-
 void elf_push_nil(elf_State *S)                  { push_value(S, value_nil());    }
 void elf_push_int(elf_State *S, elf_Integer   x) { push_value(S, value_from_integer(x)); }
 void elf_push_num(elf_State *S, elf_Number    x) { push_value(S, value_from_number(x)); }
 void elf_push_fun(elf_State *S, elf_Function  x) { push_value(S, value_from_function(x)); }
 void elf_push_hnd(elf_State *S, elf_Handle    x) { push_value(S, value_from_handle(x)); }
-
-
 
 elf_Table *elf_push_new_table(elf_State *S) {
 	elf_Table *table = elf_table_new_unrooted(S);

@@ -18,7 +18,7 @@ static void format_value_shallow(Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_INTEGER:   arena_pushf(arena, "%lli", value_as_integer(value)); break;
 		case ELF_VALUE_TYPE_NUMBER:    arena_pushf(arena, "%f", value.x_num); break;
 		case ELF_VALUE_TYPE_HANDLE:    arena_pushf(arena, "h%llX", value.x_int); break;
-		case ELF_VALUE_TYPE_ATOM:      arena_pushf(arena, "%s", elf_atom_data(value_as_atom(value))); break;
+		case ELF_VALUE_TYPE_ATOM:      arena_pushf(arena, "%s", atom_data(value_as_atom(value))); break;
 		case ELF_VALUE_TYPE_CLOSURE:   arena_push_text(arena, "closure"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: arena_push_text(arena, "function"); break;
 		case ELF_VALUE_TYPE_TABLE:     arena_push_text(arena, "table"); break;
@@ -232,7 +232,7 @@ static void format_bytecode_instr(elf_State *state, Arena *arena, u32 index, Byt
 char *format_bytecode_function(elf_State *state, Arena *arena, BytecodeFunction function)
 {
 	char *start = arena_push(arena, 0);
-	const char *source_name = function.source_name ? elf_atom_data(function.source_name) : "<unknown>";
+	const char *source_name = function.source_name ? atom_data(function.source_name) : "<unknown>";
 
 	arena_push_text(arena, "bytecode function\n");
 	arena_pushf(arena, "  source      = %s\n", source_name);

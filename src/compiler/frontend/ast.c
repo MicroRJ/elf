@@ -432,7 +432,7 @@ static void print_ast(Printer *pr, AstRef tree)
 		break;
 		case AST_IDENT:
 		{
-			PRINT(pr, "%s", elf_atom_data(tree->atom));
+			PRINT(pr, "%s", atom_data(tree->atom));
 		}
 		break;
 		case AST_NIL_LITERAL:
@@ -442,7 +442,7 @@ static void print_ast(Printer *pr, AstRef tree)
 		break;
 		case AST_STRING_LITERAL:
 		{
-			PRINT(pr, "\"%s\"", elf_atom_data(tree->atom));
+			PRINT(pr, "\"%s\"", atom_data(tree->atom));
 		}
 		break;
 		case AST_INTEGER_LITERAL:

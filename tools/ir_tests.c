@@ -67,7 +67,7 @@ static void expect_ir_i64(Ir ir, i64 value, const char *label)
 
 static void expect_ir_atom(Ir ir, const char *text, const char *label)
 {
-	if (!ir || ir->kind != IR_ATOM || !ir->atom || strcmp(elf_atom_data(ir->atom), text) != 0) {
+	if (!ir || ir->kind != IR_ATOM || !ir->atom || strcmp(atom_data(ir->atom), text) != 0) {
 		test_fail(label);
 	}
 }

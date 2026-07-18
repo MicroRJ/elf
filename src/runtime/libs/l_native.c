@@ -11,7 +11,7 @@ static elf_String *lib_load_string(elf_State *state, u32 index)
 
 static const char *lib_load_cstr(elf_State *state, u32 index)
 {
-	return elf_atom_data(lib_load_string(state, index));
+	return atom_data(lib_load_string(state, index));
 }
 
 static i64 lib_load_integer(elf_State *state, u32 index)

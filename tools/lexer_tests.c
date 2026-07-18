@@ -34,8 +34,8 @@ static void expect_token_atom(Token token, const char *text, const char *label)
 		return;
 	}
 
-	const char *data = elf_atom_data(token.atom);
-	u32 size = elf_atom_size(token.atom);
+	const char *data = atom_data(token.atom);
+	u32 size = atom_size(token.atom);
 	u32 expected_size = (u32)strlen(text);
 
 	if (size != expected_size || memcmp(data, text, expected_size) != 0) {
@@ -52,8 +52,8 @@ static void expect_token_atom_bytes(Token token, const char *data, u32 size, con
 		return;
 	}
 
-	const char *actual = elf_atom_data(token.atom);
-	u32 actual_size = elf_atom_size(token.atom);
+	const char *actual = atom_data(token.atom);
+	u32 actual_size = atom_size(token.atom);
 	if (actual_size != size || memcmp(actual, data, size) != 0) {
 		fprintf(stderr, "FAIL: %s expected %u atom bytes, got %u\n", label, size, actual_size);
 		test_failures += 1;

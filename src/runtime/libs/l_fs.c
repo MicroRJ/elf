@@ -51,9 +51,9 @@ ELF_FUNCTION(lib_fs_write)
 		return 1;
 	}
 
-	i64 written = sys_write_file(file, (void *)elf_atom_data(data), elf_atom_size(data));
+	i64 written = sys_write_file(file, (void *)atom_data(data), atom_size(data));
 	elf_platform_close_file(file);
-	push_value(state, value_from_integer(written == elf_atom_size(data)));
+	push_value(state, value_from_integer(written == atom_size(data)));
 	return 1;
 }
 

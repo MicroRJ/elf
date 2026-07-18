@@ -72,7 +72,7 @@ static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr
 static void print_runtime_source_location(RuntimeSourceLocation location)
 {
 	BytecodeFunction *function = location.function;
-	const char *name = function && function->source_name ? elf_atom_data(function->source_name) : 0;
+	const char *name = function && function->source_name ? atom_data(function->source_name) : 0;
 	if (!name) {
 		name = "<unknown>";
 	}

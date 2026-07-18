@@ -17,8 +17,8 @@ ELF_FUNCTION(lib_path_parent)
 	elf_State *state = S;
 	elf_String *path = lib_load_string(state, 1);
 	i32 levels = nargs > 2 ? (i32)lib_load_integer(state, 2) : 1;
-	const char *begin = elf_atom_data(path);
-	const char *end = begin + elf_atom_size(path);
+	const char *begin = atom_data(path);
+	const char *end = begin + atom_size(path);
 
 	while (levels-- > 0 && end > begin)
 	{
@@ -34,8 +34,8 @@ ELF_FUNCTION(lib_path_filename)
 {
 	elf_State *state = S;
 	elf_String *path = lib_load_string(state, 1);
-	const char *begin = elf_atom_data(path);
-	const char *end = begin + elf_atom_size(path);
+	const char *begin = atom_data(path);
+	const char *end = begin + atom_size(path);
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
 	lib_push_string(state, name, (u32)(end - name));
@@ -46,8 +46,8 @@ ELF_FUNCTION(lib_path_stem)
 {
 	elf_State *state = S;
 	elf_String *path = lib_load_string(state, 1);
-	const char *begin = elf_atom_data(path);
-	const char *end = begin + elf_atom_size(path);
+	const char *begin = atom_data(path);
+	const char *end = begin + atom_size(path);
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
 	const char *extension = end;
@@ -68,8 +68,8 @@ ELF_FUNCTION(lib_path_extension)
 {
 	elf_State *state = S;
 	elf_String *path = lib_load_string(state, 1);
-	const char *begin = elf_atom_data(path);
-	const char *end = begin + elf_atom_size(path);
+	const char *begin = atom_data(path);
+	const char *end = begin + atom_size(path);
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
 	const char *extension = end;
@@ -91,10 +91,10 @@ ELF_FUNCTION(lib_path_join)
 	elf_State *state = S;
 	elf_String *left = lib_load_string(state, 1);
 	elf_String *right = lib_load_string(state, 2);
-	const char *left_data = elf_atom_data(left);
-	const char *right_data = elf_atom_data(right);
-	u32 left_size = elf_atom_size(left);
-	u32 right_size = elf_atom_size(right);
+	const char *left_data = atom_data(left);
+	const char *right_data = atom_data(right);
+	u32 left_size = atom_size(left);
+	u32 right_size = atom_size(right);
 	b32 needs_separator = left_size > 0 && right_size > 0;
 
 	if (needs_separator) {
