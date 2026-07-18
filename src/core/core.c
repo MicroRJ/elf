@@ -65,7 +65,7 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 #include "runtime/libs/l_os.c"
 #include "runtime/libs/l_time.c"
 #include "runtime/libs/l_table.c"
-#include "runtime/libs/l_atom.c"
+#include "runtime/libs/l_string.c"
 #include "runtime/libs/l_random.c"
 
 static void init_bytecode_program_storage(elf_State *state)
@@ -131,7 +131,7 @@ static void reserve_bootstrap_frame_stack_space(elf_State *state)
 
 static void bootstrap_standard_libraries(elf_State *state)
 {
-	state->metatables.atom = elf_lib_atom(state);
+	state->metatables.atom = elf_lib_string(state);
 	state->metatables.integer = elf_push_new_table(state);
 	state->metatables.number = elf_push_new_table(state);
 	state->metatables.table = elf_lib_table(state);

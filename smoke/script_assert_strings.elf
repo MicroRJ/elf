@@ -1,0 +1,48 @@
+test_assert("hello":length() == 5)
+test_assert("hello":size() == 5)
+test_assert("hello":byte(0) == 104)
+test_assert("hello":byte(-1) == 111)
+
+test_assert("abcdef":slice(1, 4) == "bcd")
+test_assert("abcdef":slice(3) == "def")
+test_assert("abcdef":slice(-3) == "def")
+test_assert("abcdef":slice(2, 2) == "")
+
+test_assert("build/main.obj":starts_with("build/"))
+test_assert("build/main.obj":ends_with(".obj"))
+test_assert("build/main.obj":contains("main"))
+test_assert("build/main.obj":find("main") == 6)
+test_assert("aaaa":find("aa", 1) == 1)
+test_assert("build/main.obj":find("missing") == nil)
+test_assert("abc":find("") == 0)
+
+parts := "a,,b,":split(",")
+test_assert(parts:length() == 4)
+test_assert(parts[0] == "a")
+test_assert(parts[1] == "")
+test_assert(parts[2] == "b")
+test_assert(parts[3] == "")
+
+empty_parts := "":split(",")
+test_assert(empty_parts:length() == 1)
+test_assert(empty_parts[0] == "")
+
+lines := "first\r\n\r\nthird\n":lines()
+test_assert(lines:length() == 3)
+test_assert(lines[0] == "first")
+test_assert(lines[1] == "")
+test_assert(lines[2] == "third")
+
+test_assert(" \t hello \r\n":trim() == "hello")
+test_assert("AbC123":lower() == "abc123")
+test_assert("AbC123":upper() == "ABC123")
+test_assert("one two one":replace("one", "1") == "1 two 1")
+test_assert("aaaa":replace("aa", "b") == "bb")
+test_assert("ab":repeat(3) == "ababab")
+test_assert("ab":repeat(0) == "")
+
+test_assert(",":join({"a", "", "c"}) == "a,,c")
+test_assert("/":join({}) == "")
+test_assert("/":join({"only"}) == "only")
+
+ret 88

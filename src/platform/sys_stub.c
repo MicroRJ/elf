@@ -10,7 +10,7 @@
 
 
 
-bool sys_debugger() {
+b32 sys_debugger() {
 	emscripten_debugger();
 	return 1;
 }
@@ -178,7 +178,7 @@ int sys_find_next_file(FILE_VISITOR *visitor) {
 			if (elf_is_virtual_file_name(entry->d_name)) {
 				continue;
 			}
-			bool isdir = (entry->d_type & DT_DIR) != 0;
+			b32 isdir = (entry->d_type & DT_DIR) != 0;
 			elf_Value *top = GET_TOP(R);
 
 			elf_String *name = elf_atom_from_data(R,entry->d_name);

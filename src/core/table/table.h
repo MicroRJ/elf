@@ -114,7 +114,7 @@ u32 elf_table_set(elf_State *S, elf_Table *tab, elf_Value key, elf_Value value);
 elf_Value elf_table_get_or_nil(elf_State *S, elf_Table *tab, elf_Value key);
 u32 elf_table_ensure(elf_State *S, elf_Table *tab, elf_Value key);
 u32 elf_table_bind_to_index(elf_State *S, elf_Table *tab, elf_Value key, u32 index);
-bool elf_table_contains(elf_State *S, elf_Table *tab, elf_Value key);
+b32 elf_table_contains(elf_State *S, elf_Table *tab, elf_Value key);
 void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias);
 
 u32 elf_array_add(elf_State *S, elf_Table *tab, elf_Value value);

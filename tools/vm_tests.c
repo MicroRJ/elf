@@ -135,6 +135,11 @@ static void test_vm_script_sys_assertions(void)
 	vm_expect_int("smoke/script_assert_sys.elf", 77, "vm runs script-side path and filesystem assertions");
 }
 
+static void test_vm_script_string_assertions(void)
+{
+	vm_expect_int("smoke/script_assert_strings.elf", 88, "vm runs counted string library assertions");
+}
+
 static void test_vm_for_range(void)
 {
 	vm_expect_int("smoke/for_range.elf", 276, "vm runs half-open range for loop");
@@ -192,6 +197,7 @@ static void run_vm_tests(void)
 	test_vm_script_compound_assertions();
 	test_vm_script_json_assertions();
 	test_vm_script_sys_assertions();
+	test_vm_script_string_assertions();
 	test_vm_for_range();
 	test_vm_for_steps();
 	test_vm_break_continue();

@@ -204,7 +204,7 @@ static inline u32 table_find_slot_for_write(elf_State *state, elf_Table *table, 
 	return slot;
 }
 
-bool elf_table_contains(elf_State *state, elf_Table *table, elf_Value key)
+b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key)
 {
 	(void)state;
 	return table_find_entry(table->entries, table->nentries, key) != 0;

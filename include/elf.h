@@ -1,9 +1,6 @@
 #ifndef ELF_H
 #define ELF_H
 
-#if !defined(HAS_BOOL)
-typedef signed int bool;
-#endif
 
 typedef signed char        elf_i8;
 typedef unsigned char      elf_u8;

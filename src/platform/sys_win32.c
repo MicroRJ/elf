@@ -129,7 +129,7 @@ int sys_make_dir(const char *path) {
 }
 
 
-bool sys_delete_file(const char *path) {
+b32 sys_delete_file(const char *path) {
 	return DeleteFile(path);
 }
 
@@ -281,7 +281,7 @@ int core_lib_list_volumes(elf_State *R) {
 
 
 
-bool sys_debugger() {
+b32 sys_debugger() {
 	DebugBreak();
 	return 1;
 }

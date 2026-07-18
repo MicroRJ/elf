@@ -21,7 +21,7 @@ elf_String *elf_atom_from_data_id(elf_State *state, const char *data, u16 id);
 u32 elf_atom_size(elf_String *atom);
 const char *elf_atom_data(elf_String *atom);
 u32 elf_atom_hash(elf_String *atom);
-bool elf_atoms_equal(elf_String *left, elf_String *right);
+b32 elf_atoms_equal(elf_String *left, elf_String *right);
 elf_StrSlice elf_atom_copy_text(Arena *arena, elf_String *atom);
 
 #endif

@@ -104,7 +104,7 @@ unsigned int sys_read_console(FILE_HANDLE file, char *buf, unsigned int size);
 int sys_make_dir(const char *path);
 FILE_HANDLE sys_get_std_file(int std);
 FILE_HANDLE elf_platform_access_file(const char *name, int access, int options);
-bool sys_delete_file(const char *name);
+b32 sys_delete_file(const char *name);
 void elf_platform_close_file(FILE_HANDLE file);
 elf_i64 sys_move_file_cursor(FILE_HANDLE file, int relativeto, elf_i64 dist);
 elf_i64 elf_platform_get_file_size(FILE_HANDLE file);
@@ -132,7 +132,7 @@ void sys_enable_console_colors(void);
 /* triggers the debugger for this program,
 returns whether a debugger was successfully
 attached */
-bool sys_debugger();
+b32 sys_debugger();
 
 
 void sys_sleep(elf_i64 ms);
