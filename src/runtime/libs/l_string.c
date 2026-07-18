@@ -150,6 +150,16 @@ ELF_FUNCTION(l_string_contains)
 	return 1;
 }
 
+ELF_FUNCTION(l_string_glob_match)
+{
+	elf_String *string = string_receiver(S);
+	elf_String *pattern = lib_load_string(S, 1);
+	b32 matches = matcher_match_sized(atom_data(string), atom_size(string),
+		atom_data(pattern), atom_size(pattern));
+	push_value(S, value_from_integer(matches));
+	return 1;
+}
+
 ELF_FUNCTION(l_string_split)
 {
 	elf_String *string = string_receiver(S);
@@ -326,6 +336,7 @@ static const elf_Binding l_string[] = {
 	{"starts_with", l_string_starts_with},
 	{"ends_with",   l_string_ends_with},
 	{"contains",    l_string_contains},
+	{"glob_match",  l_string_glob_match},
 	{"find",        l_string_find},
 	{"split",       l_string_split},
 	{"lines",       l_string_lines},

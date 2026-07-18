@@ -1,0 +1,70 @@
+array := {10, 20, 30}
+test_assert(array:length() == 3)
+test_assert(array:add(40, 50) == 3)
+test_assert(array:pop() == 50)
+test_assert(array:insert(1, 15)[1] == 15)
+test_assert(array:remove(2) == 20)
+test_assert(array:get(-1) == 40)
+test_assert(array:set(-1, 41)[3] == 41)
+
+slice := array:slice(1, 3)
+test_assert(slice:length() == 2)
+test_assert(slice[0] == 15)
+test_assert(slice[1] == 30)
+
+extended := {1}:extend({2, 3}, {4})
+test_assert(extended:length() == 4)
+test_assert(extended:reverse()[0] == 4)
+
+mapped := {2, 3, 4}:map(fun(value, index) {
+	ret value * 10 + index
+})
+test_assert(mapped[0] == 20)
+test_assert(mapped[2] == 42)
+
+filtered := {1, 2, 3, 4}:filter(fun(value, index) {
+	ret value > 2
+})
+test_assert(filtered:length() == 2)
+test_assert(filtered[0] == 3)
+
+sorted := {3, 1, 2}:sort(fun(left, right) {
+	ret left - right
+})
+test_assert(sorted[0] == 1)
+test_assert(sorted[2] == 3)
+
+table := { first = 10, second = 20 }
+test_assert(table:has("first"))
+test_assert(table:delete("first") == 10)
+test_assert(table:has("first") == 0)
+test_assert(table.second == 20)
+
+table.third = 30
+clone := table:clone()
+test_assert(clone.second == 20)
+test_assert(clone.third == 30)
+
+merged := table:merge({ second = 22, fourth = 40 })
+test_assert(merged.second == 22)
+test_assert(merged.fourth == 40)
+test_assert(table.second == 20)
+
+keys := table:keys()
+values := table:values()
+pairs := table:pairs()
+test_assert(keys:length() == 2)
+test_assert(values:length() == 2)
+test_assert(pairs:length() == 2)
+test_assert(pairs[0]:length() == 2)
+
+mixed := { named = 7, 8, 9 }
+mixed:remove(0)
+test_assert(mixed:has("named") == 0)
+test_assert(mixed[0] == 8)
+
+table:clear()
+test_assert(table:length() == 0)
+test_assert(table:has("second") == 0)
+
+ret 144

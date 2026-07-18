@@ -210,6 +210,41 @@ b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key)
 	return table_find_entry(table->entries, table->nentries, key) != 0;
 }
 
+b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Value *removed)
+{
+	checkwrite(state, (elf_Object *)table);
+
+	Entry *entry = table_find_entry(table->entries, table->nentries, key);
+	if (!entry) {
+		if (removed) *removed = value_nil();
+		return false;
+	}
+
+	u32 index = entry_index(*entry);
+	if (removed) *removed = table->array[index];
+
+	for (u32 i = 0; i < table->nentries; ++i)
+	{
+		Entry *current = table->entries + i;
+		if (!entry_is_key(*current)) continue;
+		u32 current_index = entry_index(*current);
+		if (current_index == index) entry_set_tomb(current);
+		else if (current_index > index) entry_set_index(current, current_index - 1);
+	}
+
+	table_array_remove_unchecked(table, index, 1);
+	return true;
+}
+
+void elf_table_clear(elf_State *state, elf_Table *table)
+{
+	checkwrite(state, (elf_Object *)table);
+	value_zero_many(table->array, table->count);
+	memset(table->entries, 0, table->nentries * sizeof(*table->entries));
+	table->count = 0;
+	table->fillcounter = 0;
+}
+
 void elf_table_alias(elf_State *state, elf_Table *table, elf_Value key, elf_Value alias)
 {
 	u32 key_slot = table_find_slot_for_write(state, table, key);
@@ -317,7 +352,39 @@ void elf_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
 		,	index, count, table->count);
 	}
 
+	u32 end = index + count;
+	for (u32 i = 0; i < table->nentries; ++i)
+	{
+		Entry *entry = table->entries + i;
+		if (!entry_is_key(*entry)) continue;
+		u32 entry_at = entry_index(*entry);
+		if (entry_at >= index && entry_at < end) entry_set_tomb(entry);
+		else if (entry_at >= end) entry_set_index(entry, entry_at - count);
+	}
+
 	table_array_remove_unchecked(table, index, count);
+}
+
+u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value value)
+{
+	checkwrite(state, (elf_Object *)table);
+	if (index > table->count) {
+		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+			"array insert index %u is out of bounds for length %u", index, table->count);
+	}
+
+	table_array_reserve(table, table->count + 1);
+	memmove(table->array + index + 1, table->array + index,
+		(table->count - index) * sizeof(*table->array));
+	for (u32 i = 0; i < table->nentries; ++i) {
+		Entry *entry = table->entries + i;
+		if (entry_is_key(*entry) && entry_index(*entry) >= index) {
+			entry_set_index(entry, entry_index(*entry) + 1);
+		}
+	}
+	table->array[index] = value;
+	table->count += 1;
+	return index;
 }
 
 void elf_array_swap(elf_State *state, elf_Table *table, u32 left, u32 right)

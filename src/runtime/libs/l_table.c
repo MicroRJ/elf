@@ -1,998 +1,379 @@
 //
-// See Copyright Notice In elf.h
+// Tables are Elf's single map/array collection. The array operations work on
+// the table's ordered value storage; map fields retain their slot bindings.
 //
 
-
-
-static u32 load_array_index_arg(elf_State *S, int arg, elf_Table *table)
+static elf_Table *table_receiver(elf_State *state)
 {
-	elf_Value value = load_value(S, arg);
-	check_value_type(S, value, ELF_VALUE_TYPE_INTEGER);
-	return check_array_index(S, NO_BYTE, value_as_integer(value), elf_array_len(table));
+	elf_Value value = load_value(state, 0);
+	check_value_type(state, value, ELF_VALUE_TYPE_TABLE);
+	return value_as_table(value);
 }
 
-ELF_FUNCTION(l_table_make_field_readonly) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_table_mark_field_readonly(S, tab, load_value(S, 1));
-	return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_clear) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	// todo: we can't do this!
-	// table_clear(tab);
-	return 0;
-}
-
-//
-//
-//
-//
-//
-//
-//
-//
-
-ELF_FUNCTION(l_table_clear_entries) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	tab->fillcounter = 0;
-	memset(tab->entries, 0, tab->nentries * sizeof(*tab->entries));
-	// todo: we can't do this!
-	// table_clear_entries(tab);
-
-	push_table(S, tab);
-	return 1;
-}
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_contains) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value key = load_value(S, 1);
-	push_value(S, value_from_integer(elf_table_contains(S, tab, key)));
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_get_collisions) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	push_value(S, value_from_integer(tab->ndebug));
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// @doc
-// :delete(key) -> any
-// the key and all aliases are deleted, the u32 is also deleted,
-// order is preserved and other fields are adjusted.
-//
-ELF_FUNCTION(l_table_delete) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value key = load_value(S, 1);
-
-	Entry *entries = tab->entries;
-
-	u32 slot = table_find_slot(tab->entries, tab->nentries, key);
-
-	if (slot != TABLE_SLOT_NOT_FOUND && entry_is_key(entries[slot])) {
-
-		u32 index = entry_index(entries[slot]);
-
-		Entry *en;
-		for (en=tab->entries; en<tab->entries+tab->nentries; ++en) {
-
-			if (entry_is_key(*en)) {
-				u32 en_index = entry_index(*en);
-				if (en_index == index) {
-					entry_set_tomb(en);
-				}
-				else {
-					entry_set_index(en, en_index - (en_index > index));
-				}
-			}
-
-		}
-
-		push_value(S, elf_array_get(S, tab, index));
-		elf_array_remove(S, tab, index, 1);
+static b32 table_normalize_index(elf_State *state, i64 index, u32 length,
+	b32 allow_end, u32 *result)
+{
+	if (index < 0) index += length;
+	i64 upper = allow_end ? length : (i64)length - 1;
+	if (index < 0 || index > upper)
+	{
+		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+			"array index %lld is out of bounds for length %u", index, length);
+		return false;
 	}
-	else {
+	*result = (u32)index;
+	return true;
+}
 
-		push_value(S, value_nil());
+static elf_Value table_call(elf_State *state, elf_Value function,
+	elf_Table *receiver, elf_Value a, elf_Value b, b32 pass_b)
+{
+	push_value(state, function);
+	push_table(state, receiver);
+	push_value(state, a);
+	if (pass_b) push_value(state, b);
+	elf_call(state, pass_b ? 3 : 2, 1);
+	return pop_value(state);
+}
 
-	}
+ELF_FUNCTION(l_table_length)
+{
+	push_value(S, value_from_integer(elf_array_len(table_receiver(S))));
 	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-static inline void tablebind(elf_State *S, elf_Table *tab, elf_Value key, u32 index) {
-	elf_table_bind_to_index(S, tab, key, index);
+ELF_FUNCTION(l_table_has)
+{
+	push_value(S, value_from_integer(elf_table_contains(S, table_receiver(S), load_value(S, 1))));
+	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// @doc
-// :alias(existing_key, new_key) -> (none)
-// creates a new one entry of the given 'new_key' that
-// points to where 'existing_key' points to
-ELF_FUNCTION(l_table_alias) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value x = load_value(S, 1);
-	elf_Value y = load_value(S, 2);
-	elf_table_alias(S, tab, x, y);
-	return 0;
+ELF_FUNCTION(l_table_delete)
+{
+	elf_Value removed = value_nil();
+	elf_table_delete(S, table_receiver(S), load_value(S, 1), &removed);
+	push_value(S, removed);
+	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_bind) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	tablebind(S, tab, load_value(S, 1), load_array_index_arg(S, 2, tab));
-	return 0;
+ELF_FUNCTION(l_table_clear)
+{
+	elf_Table *table = table_receiver(S);
+	elf_table_clear(S, table);
+	push_table(S, table);
+	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// @doc
-// :find_aliases(key) -> table
-// finds all the aliases of the given 'key' including the
-// key itself
-ELF_FUNCTION(l_find_aliases) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value   key = load_value(S, 1);
-
-	elf_Table * res = elf_push_new_table(S);
-
-	if (!value_is_nil(key)) {
-
-		u32 i=table_find_slot_for_write(S, tab, key);
-
-		if (i > 0) {
-
-			Entry entry=tab->entries[i];
-
-			if (!entry_is_dead(entry)) {
-
-				for (i = 0; i < tab->nentries; ++i) {
-					/* we also include ourselves */
-
-					Entry alias=tab->entries[i];
-
-					if (entry_is_dead(alias)) continue;
-					if (entry_index(alias) != entry_index(entry)) continue;
-
-					elf_array_add(S, tab, entry_key_value(alias));
-				}
+ELF_FUNCTION(l_table_keys)
+{
+	elf_Table *table = table_receiver(S);
+	elf_Table *result = elf_push_new_table(S);
+	for (u32 value_index = 0; value_index < table->count; ++value_index) {
+		for (u32 slot = 0; slot < table->nentries; ++slot) {
+			Entry entry = table->entries[slot];
+			if (entry_is_key(entry) && entry_index(entry) == value_index) {
+				elf_array_add(S, result, entry_key_value(entry));
 			}
 		}
 	}
 	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-// @doc returns an elf_Value * containg all the keys for this table
-ELF_FUNCTION(l_table_get_keys) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-
-	elf_push_new_table(S);
-
-	u32 i;
-	for (i = 0; i < tab->nentries; i ++) {
-		Entry entry = tab->entries[i];
-		// omit non-keys
-		if (entry_is_dead(entry)) {
-			continue;
-		}
-
-		push_value(S, entry_key_value(entry));
-		elf_arr_add(S);
+ELF_FUNCTION(l_table_values)
+{
+	elf_Table *table = table_receiver(S);
+	elf_Table *result = elf_push_new_table(S);
+	for (u32 i = 0; i < table->count; ++i) {
+		elf_array_add(S, result, table->array[i]);
 	}
 	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-//
-// todo: all these functions that return a new table should inherit
-// the parent's metatable
-//
-// @doc :table_merge
-// merges all the tables passed in, keys are not overwritten
-// * - this works per entry, so loose values aren't kept
-// * - if no additional tables are passed in then this is equivalent
-// * to creating a clone of the table, but additionally, loose values are lost.
-ELF_FUNCTION(l_table_merge) {
-
-	u32 slot;
-
-	elf_Table * sum = elf_push_new_table(S);
-
-	for (int i = 0; i < nargs; ++ i) {
-		elf_Value merger_value = load_value(S, i);
-		check_value_type(S, merger_value, ELF_VALUE_TYPE_TABLE);
-		elf_Table * merger = value_as_table(merger_value);
-		for (slot = 0; slot < merger->nentries; ++ slot) {
-			Entry entry = merger->entries[slot];
-
-			if (entry_is_dead(entry)) continue;
-
-			// todo:
-			push_value(S, entry_key_value(entry));
-			push_value(S, elf_array_get(S, merger, entry_index(entry)));
-			elf_tab_set(S);
+ELF_FUNCTION(l_table_pairs)
+{
+	elf_Table *table = table_receiver(S);
+	elf_Table *result = elf_push_new_table(S);
+	for (u32 value_index = 0; value_index < table->count; ++value_index)
+	{
+		for (u32 slot = 0; slot < table->nentries; ++slot)
+		{
+			Entry entry = table->entries[slot];
+			if (!entry_is_key(entry) || entry_index(entry) != value_index) continue;
+			elf_Table *pair = elf_table_new_unrooted(S);
+			elf_array_add(S, pair, entry_key_value(entry));
+			elf_array_add(S, pair, table->array[value_index]);
+			elf_array_add(S, result, value_from_table(pair));
 		}
 	}
-
 	return 1;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_fork) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value sub_value = load_value(S, 1);
-	check_value_type(S, sub_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table * sub = value_as_table(sub_value);
-
-	if (sub == 0) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "argument is nil");
-	}
-
-	elf_push_new_table(S);
-
-	u32 i;
-	for (i = 0; i < tab->nentries; ++i) {
-
-		Entry entry = tab->entries[i];
-
-		if (entry_is_dead(entry)) continue;
-		elf_Value key = entry_key_value(entry);
-		if (elf_table_contains(S, sub, key)) continue;
-
-		// todo: remove this!
-		push_value(S, key);
-		push_value(S, elf_array_get(S, tab, entry_index(entry)));
-		elf_tab_set(S);
-	}
-
-	return 1;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DIRECT elf_Value * FUNCTIONS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-ELF_FUNCTION(l_array_length)
+static elf_Table *table_clone(elf_State *state, elf_Table *source)
 {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	push_value(S, value_from_integer(elf_array_len(tab)));
-	return 1;
+	elf_Table *result = elf_table_new_unrooted(state);
+	for (u32 i = 0; i < source->count; ++i) {
+		elf_array_add(state, result, source->array[i]);
+	}
+	for (u32 i = 0; i < source->nentries; ++i) {
+		Entry entry = source->entries[i];
+		if (entry_is_key(entry)) {
+			elf_table_bind_to_index(state, result, entry_key_value(entry), entry_index(entry));
+		}
+	}
+	return result;
 }
 
-ELF_FUNCTION(l_array_index)
+ELF_FUNCTION(l_table_clone)
 {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	u32 idx = load_array_index_arg(S, 1, tab);
-	push_value(S, elf_array_get(S, tab, idx));
+	push_table(S, table_clone(S, table_receiver(S)));
 	return 1;
 }
 
-// @doc: returns the index of the first added item
+ELF_FUNCTION(l_table_merge)
+{
+	elf_Table *result = table_clone(S, table_receiver(S));
+	push_table(S, result);
+	for (int arg = 1; arg < nargs; ++arg)
+	{
+		elf_Value source_value = load_value(S, arg);
+		check_value_type(S, source_value, ELF_VALUE_TYPE_TABLE);
+		elf_Table *source = value_as_table(source_value);
+		for (u32 i = 0; i < source->nentries; ++i) {
+			Entry entry = source->entries[i];
+			if (entry_is_key(entry)) {
+				elf_table_set(S, result, entry_key_value(entry), source->array[entry_index(entry)]);
+			}
+		}
+	}
+	return 1;
+}
+
+ELF_FUNCTION(l_array_get)
+{
+	elf_Table *table = table_receiver(S);
+	u32 index = 0;
+	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &index)) return 0;
+	push_value(S, elf_array_get(S, table, index));
+	return 1;
+}
+
+ELF_FUNCTION(l_array_set)
+{
+	elf_Table *table = table_receiver(S);
+	u32 index = 0;
+	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &index)) return 0;
+	elf_array_set(S, table, index, load_value(S, 2));
+	push_table(S, table);
+	return 1;
+}
+
 ELF_FUNCTION(l_array_add)
 {
-	elf_Value table_value = load_value(S, 0);
-	check_value_type(S, table_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *table = value_as_table(table_value);
-	elf_Value value = load_value(S, 1);
-	u32 index = elf_array_add(S, table, value);
-	push_value(S, value_from_integer(index));
-
-	for (int i = 2; i < nargs; i++)
-	{
-		value = load_value(S, i);
-		elf_array_add(S, table, value);
+	elf_Table *table = table_receiver(S);
+	u32 first = table->count;
+	for (int arg = 1; arg < nargs; ++arg) {
+		elf_array_add(S, table, load_value(S, arg));
 	}
-
+	push_value(S, value_from_integer(first));
 	return 1;
 }
 
-// :repl(u32, value)
-//		@u32 to replace with @elf_Value
-ELF_FUNCTION(l_array_repl) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	u32 idx = load_array_index_arg(S, 1, tab);
-	elf_Value value = load_value(S, 2);
+ELF_FUNCTION(l_array_insert)
+{
+	elf_Table *table = table_receiver(S);
+	u32 index = 0;
+	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, true, &index)) return 0;
+	elf_array_insert(S, table, index, load_value(S, 2));
+	push_table(S, table);
+	return 1;
+}
 
-	// todo: barrier
-	elf_array_set(S, tab, idx, value);
-	return 0;
+ELF_FUNCTION(l_array_pop)
+{
+	elf_Table *table = table_receiver(S);
+	if (table->count == 0) {
+		push_value(S, value_nil());
+		return 1;
+	}
+	elf_Value value = table->array[table->count - 1];
+	elf_array_remove(S, table, table->count - 1, 1);
+	push_value(S, value);
+	return 1;
+}
+
+ELF_FUNCTION(l_array_remove)
+{
+	elf_Table *table = table_receiver(S);
+	u32 index = 0;
+	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &index)) return 0;
+	u32 count = 1;
+	if (nargs > 2) {
+		i64 requested = lib_load_integer(S, 2);
+		if (requested < 0 || (u64)requested > table->count - index) {
+			report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+				"array remove count %lld is out of bounds", requested);
+			return 0;
+		}
+		count = (u32)requested;
+	}
+	elf_Value first = table->array[index];
+	elf_array_remove(S, table, index, count);
+	push_value(S, first);
+	return 1;
+}
+
+ELF_FUNCTION(l_array_slice)
+{
+	elf_Table *table = table_receiver(S);
+	u32 first = 0;
+	u32 end = table->count;
+	if (nargs > 1 && !table_normalize_index(S, lib_load_integer(S, 1), table->count, true, &first)) return 0;
+	if (nargs > 2 && !table_normalize_index(S, lib_load_integer(S, 2), table->count, true, &end)) return 0;
+	if (end < first) {
+		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+			"array slice end %u precedes start %u", end, first);
+		return 0;
+	}
+	elf_Table *result = elf_push_new_table(S);
+	for (u32 i = first; i < end; ++i) elf_array_add(S, result, table->array[i]);
+	return 1;
+}
+
+ELF_FUNCTION(l_array_extend)
+{
+	elf_Table *table = table_receiver(S);
+	for (int arg = 1; arg < nargs; ++arg)
+	{
+		elf_Value source_value = load_value(S, arg);
+		check_value_type(S, source_value, ELF_VALUE_TYPE_TABLE);
+		elf_Table *source = value_as_table(source_value);
+		u32 count = source->count;
+		for (u32 i = 0; i < count; ++i) elf_array_add(S, table, source->array[i]);
+	}
+	push_table(S, table);
+	return 1;
 }
 
 ELF_FUNCTION(l_array_swap)
 {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	u32 x = load_array_index_arg(S, 1, tab);
-	u32 y = load_array_index_arg(S, 2, tab);
-
-	elf_array_swap(S, tab, x, y);
-	return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_array_slice) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-
-	u32 x = 0;
-	u32 y = elf_array_len(tab);
-	if (nargs >= 2) x = load_array_index_arg(S, 0, tab);
-	if (nargs >= 3) y = load_array_index_arg(S, 1, tab);
-
-	elf_Table * slice = elf_push_new_table(S);
-	while (x < y) {
-		elf_array_add(S, slice, elf_array_get(S, tab, x ++));
-	}
+	elf_Table *table = table_receiver(S);
+	u32 left = 0;
+	u32 right = 0;
+	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &left)) return 0;
+	if (!table_normalize_index(S, lib_load_integer(S, 2), table->count, false, &right)) return 0;
+	elf_array_swap(S, table, left, right);
+	push_table(S, table);
 	return 1;
 }
 
-ELF_FUNCTION(l_array_remove) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	u32 index = load_array_index_arg(S, 1, tab);
-	u32 num = 1;
-
-	push_value(S, elf_array_get(S, tab, index));
-	elf_array_remove(S, tab, index, num);
-
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-// todo: maybe it should return the trimmed elements,
-// to make consistent with :slice
-// { 1, 2, 3, 4 }:trim(-2) == 3
-// { 1, 2, 3, 4 }:trim(-1) == 4
-// { 1, 2, 3, 4 }:trim( 2) == 2
-// { 1, 2, 3, 4 }:trim( 1) == 1
-ELF_FUNCTION(l_array_trim) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value num_value = load_value(S, 1);
-	check_value_type(S, num_value, ELF_VALUE_TYPE_INTEGER);
-	i64 num = value_as_integer(num_value);
-	u32 len = elf_array_len(tab);
-
-	if (num == 0) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "array trim count cannot be zero");
-	}
-
-	if (num < 0) {
-		u32 count = (u32)-num;
-		if (count > len) {
-			report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1
-			,	"array trim out of bounds: count %u, length %u"
-			,	count, len);
-		}
-
-		u32 index = len - count;
-		push_value(S, elf_array_get(S, tab, index));
-		elf_array_remove(S, tab, index, count);
-	}
-	else {
-		u32 count = (u32)num;
-		if (count > len) {
-			report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1
-			,	"array trim out of bounds: count %u, length %u"
-			,	count, len);
-		}
-
-		push_value(S, elf_array_get(S, tab, count - 1));
-		elf_array_remove(S, tab, 0, count);
-	}
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_array_merge) {
-	elf_Value sum_value = load_value(S, 0);
-	check_value_type(S, sum_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table * sum = value_as_table(sum_value);
-	push_table(S, sum);
-
-	u32 i, j;
-
-	for (i = 1; i < nargs; ++ i) {
-		elf_Value tab_value = load_value(S, i);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-
-		for (j = 0; j < elf_array_len(tab); ++ j) {
-
-			elf_Value value = elf_array_get(S, tab, j);
-			elf_array_add(S, sum, value);
-
-		}
-	}
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-// todo: deep copy!
-ELF_FUNCTION(l_array_clone) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-
-	elf_Table *clone = elf_push_new_table(S);
-
-	// todo: hello????? memcpy?
-	u32 i;
-	for (i=0; i<elf_array_len(tab); ++i) {
-		elf_array_add(S, clone, elf_array_get(S, tab, i));
-	}
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_array_reverse) {
-
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	u32 n = elf_array_len(tab);
-
-	u32 i;
-	for (i = 0; i < n >> 1; i += 1) {
-		elf_array_swap(S, tab, i, n - 1 - i);
-	}
-	return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_get_pairs) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-
-	elf_Table * res = elf_push_new_table(S);
-
-	u32 i;
-	for (i = 0; i < tab->nentries; ++ i) {
-		Entry entry = tab->entries[i];
-
-		// omit non-keys
-		if (entry_is_dead(entry)) {
-			continue;
-		}
-
-		// todo: prealloc!
-		elf_array_add(S, res, entry_key_value(entry));
-		elf_array_add(S, res, elf_array_get(S, tab, entry_index(entry)));
-	}
-	return 1;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_table_ordered_pairs)
+ELF_FUNCTION(l_array_reverse)
 {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Table * res = elf_push_new_table(S);
-
-	u32 nen = tab->nentries;
-	Entry *es = tab->entries;
-
-	// todo: optional ranking
-	RankValue *rv = malloc(nen * sizeof(*rv));
-	for (u32 i = 0; i < nen; ++ i) {
-		rv[i].rank = entry_index(es[i]);
-		rv[i].value = entry_key_value(es[i]);
+	elf_Table *table = table_receiver(S);
+	for (u32 i = 0; i < table->count / 2; ++i) {
+		elf_array_swap(S, table, i, table->count - i - 1);
 	}
-	rank_values(rv, rv + nen);
-
-
-	// todo: can unrolling help a bit since we're fetching from
-	// two buffers or will the compiler figure this out?
-	u32 i;
-	for(i=0; i<nen; ++i) {
-		if (!value_is_dead(rv[i].value)) {
-			elf_array_add(S, res, rv[i].value);
-			elf_array_add(S, res, elf_array_get(S, tab, rv[i].rank));
-		}
-	}
-
-	free(rv);
-
+	push_table(S, table);
 	return 1;
 }
 
-// todo: should this return a new table or no?
-ELF_FUNCTION(l_array_filter) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value filter = load_value(S, 1);
-	check_value_type_rule(S, filter, TRULE_CALLABLE);
-
-	u32 l = elf_array_len(tab);
-	u32 i;
-	u32 write_index = 0;
-
-	for (i=0; i<l; ++i) {
-		elf_Value value = elf_array_get(S, tab, i);
-		push_value(S, filter);
-		push_value(S, load_value(S, 0));
-		push_value(S, value);
-		elf_call(S, 2, 1);
-		elf_Value keep_value = pop_value(S);
-		check_value_type(S, keep_value, ELF_VALUE_TYPE_INTEGER);
-		int keep = value_as_integer(keep_value);
-		if (keep) {
-			elf_array_set(S, tab, write_index ++, value);
-		}
-	}
-
-	if (write_index < l) {
-		elf_array_remove(S, tab, write_index, l - write_index);
-	}
-
-	// return self
-	push_table(S, tab);
-	return 1;
-}
-
-ELF_FUNCTION(l_array_rank)
+ELF_FUNCTION(l_array_map)
 {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-
-	elf_Value fn;
-	if (nargs > 1) {
-		fn = load_value(S, 1);
-		check_value_type_rule(S, fn, TRULE_CALLABLE);
+	elf_Table *table = table_receiver(S);
+	elf_Value function = load_value(S, 1);
+	check_value_type_rule(S, function, TRULE_CALLABLE);
+	elf_Table *result = elf_push_new_table(S);
+	for (u32 i = 0; i < table->count; ++i) {
+		elf_Value mapped = table_call(S, function, table, table->array[i], value_from_integer(i), true);
+		elf_array_add(S, result, mapped);
 	}
-
-	u32 i, l = elf_array_len(tab);
-	RankValue *rv = malloc(l * sizeof(*rv));
-
-	elf_Value __rank;
-	__rank = value_from_atom(elf_atom_from_data(S, "__rank"));
-
-	for (i=0; i<l; ++i) {
-		elf_Value value = elf_array_get(S, tab, i);
-
-		i64 rank;
-		if (nargs > 1) {
-			// todo: elf_call doesn't have to write the results where the function is at!
-			push_value(S, fn);
-			push_value(S, load_value(S, 0));
-			push_value(S, value);
-			elf_call(S, 2, 1);
-			elf_Value rank_value = pop_value(S);
-			check_value_type(S, rank_value, ELF_VALUE_TYPE_INTEGER);
-			rank = value_as_integer(rank_value);
-		}
-		else {
-			elf_Value value = elf_array_get(S, tab, i);
-			check_value_type(S, value, ELF_VALUE_TYPE_TABLE);
-			elf_Value r = elf_table_get_or_nil(S, value_as_table(value), __rank);
-			check_value_type(S, r, ELF_VALUE_TYPE_INTEGER);
-			rank = value_as_integer(r);
-		}
-
-		rv[i].rank  = rank;
-		rv[i].value = value;
-	}
-
-	rank_values(rv, rv + l);
-
-	for (i=0; i<l; ++i) {
-		elf_array_set(S, tab, i, rv[i].value);
-	}
-	free(rv);
-
-	push_table(S, tab);
 	return 1;
 }
 
+ELF_FUNCTION(l_array_filter)
+{
+	elf_Table *table = table_receiver(S);
+	elf_Value function = load_value(S, 1);
+	check_value_type_rule(S, function, TRULE_CALLABLE);
+	elf_Table *result = elf_push_new_table(S);
+	for (u32 i = 0; i < table->count; ++i) {
+		elf_Value keep = table_call(S, function, table, table->array[i], value_from_integer(i), true);
+		check_value_type(S, keep, ELF_VALUE_TYPE_INTEGER);
+		if (value_as_integer(keep)) elf_array_add(S, result, table->array[i]);
+	}
+	return 1;
+}
 
-
-
-
-
-
-
-
-static inline i64 callsortfn(elf_State *S, elf_Value fn, elf_Value a, elf_Value b) {
-	push_value(S, fn);
-	push_value(S, load_value(S, 0));
-	push_value(S, a);
-	push_value(S, b);
-	// todo: why is the result placed where the function is at!
-	elf_call(S, 3, 1);
-	elf_Value result = pop_value(S);
-	check_value_type(S, result, ELF_VALUE_TYPE_INTEGER);
+static i64 table_compare(elf_State *state, elf_Value function, elf_Table *table,
+	elf_Value left, elf_Value right)
+{
+	elf_Value result = table_call(state, function, table, left, right, true);
+	check_value_type(state, result, ELF_VALUE_TYPE_INTEGER);
 	return value_as_integer(result);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-static void quicksort(elf_State *S, elf_Value fn, elf_Table *tab, u32 head, u32 tail) {
-
-	retry:
-	if (tail - head <= 1) return;
-
-	elf_Value pivo = elf_array_get(S, tab, head);
-
-	u32 lt = head;
-	u32 gt = tail - 1;
-	u32 i  = head + 1;
-
-	while (i <= gt) {
-
-		i64 c = callsortfn(S, fn, elf_array_get(S, tab, i), pivo);
-
-		if (c < 0) {
-			elf_array_swap(S, tab, i, lt);
-			lt ++;
-			i ++;
+static void table_quicksort(elf_State *state, elf_Value function, elf_Table *table,
+	u32 first, u32 end)
+{
+	while (end - first > 1)
+	{
+		elf_Value pivot = table->array[first];
+		u32 lower = first;
+		u32 upper = end - 1;
+		u32 i = first + 1;
+		while (i <= upper) {
+			i64 order = table_compare(state, function, table, table->array[i], pivot);
+			if (order < 0) elf_array_swap(state, table, i++, lower++);
+			else if (order > 0) elf_array_swap(state, table, i, upper--);
+			else ++i;
 		}
-		else if (c > 0) {
-			elf_array_swap(S, tab, i, gt);
-			gt --;
+		if (lower - first < end - i) {
+			table_quicksort(state, function, table, first, lower);
+			first = i;
+		} else {
+			table_quicksort(state, function, table, i, end);
+			end = lower;
 		}
-		else {
-			i ++;
-		}
-	}
-
-	if (lt - head < tail - i) {
-		quicksort(S, fn, tab, head, lt);
-		head = i;
-		goto retry;
-	}
-	else {
-		quicksort(S, fn, tab, i, tail);
-		tail = lt;
-		goto retry;
 	}
 }
 
-
-
-
-
-
-
-
-
-ELF_FUNCTION(l_array_sort) {
-	elf_Value tab_value = load_value(S, 0);
-	check_value_type(S, tab_value, ELF_VALUE_TYPE_TABLE);
-	elf_Table *tab = value_as_table(tab_value);
-	elf_Value fun = load_value(S, 1);
-	check_value_type_rule(S, fun, TRULE_CALLABLE);
-	quicksort(S, fun, tab, 0, elf_array_len(tab));
-	push_table(S, tab);
+ELF_FUNCTION(l_array_sort)
+{
+	elf_Table *table = table_receiver(S);
+	elf_Value function = load_value(S, 1);
+	check_value_type_rule(S, function, TRULE_CALLABLE);
+	table_quicksort(S, function, table, 0, table->count);
+	push_table(S, table);
 	return 1;
 }
 
-
-
-
-
-
-
-
-
-
 static const elf_Binding l_table[] = {
-	// table
-	{"clear",         l_table_clear            },
-	{"clear_entries", l_table_clear_entries    },
-
-	{"ordered_pairs" , l_table_ordered_pairs   },
-	{"get_pairs"     , l_table_get_pairs       },
-
-	{"make_field_readonly", l_table_make_field_readonly },
-
-	{"haskey"       , l_table_contains         },
-	{"collisions"   , l_table_get_collisions   },
-	{"get_keys"     , l_table_get_keys         },
-	{"find_aliases" , l_find_aliases           },
-
-
-	{"alias"        , l_table_alias            },
-	{"bind"         , l_table_bind             },
-
-
-	{"merge"        , l_table_merge            },
-	{"fork"         , l_table_fork             },
-
-	// aware of both
-	{"delete"       , l_table_delete       },
-
-	// elf_Value * part
-	{"sort"         , l_array_sort         },
-	{"rank"         , l_array_rank         },
-	{"filter"       , l_array_filter       },
-
-
-	{"array_remove" , l_array_remove       },
-	{"trim"         , l_array_trim         },
-	{"swap"         , l_array_swap         },
-	{"length"       , l_array_length       },
-	{"tally"        , l_array_length       },
-	{"add"          , l_array_add          },
-	{"idx"          , l_array_index        },
-	{"repl"         , l_array_repl         },
-	{"reverse"      , l_array_reverse      },
-	{"merge_array"  , l_array_merge        },
-	{"clone_array"  , l_array_clone        },
-	{"slice"        , l_array_slice        },
+	{"length",  l_table_length},
+	{"size",    l_table_length},
+	{"has",     l_table_has},
+	{"haskey",  l_table_has},
+	{"delete",  l_table_delete},
+	{"clear",   l_table_clear},
+	{"keys",    l_table_keys},
+	{"values",  l_table_values},
+	{"pairs",   l_table_pairs},
+	{"clone",   l_table_clone},
+	{"merge",   l_table_merge},
+	{"get",     l_array_get},
+	{"idx",     l_array_get},
+	{"set",     l_array_set},
+	{"repl",    l_array_set},
+	{"add",     l_array_add},
+	{"push",    l_array_add},
+	{"insert",  l_array_insert},
+	{"pop",     l_array_pop},
+	{"remove",  l_array_remove},
+	{"slice",   l_array_slice},
+	{"extend",  l_array_extend},
+	{"swap",    l_array_swap},
+	{"reverse", l_array_reverse},
+	{"map",     l_array_map},
+	{"filter",  l_array_filter},
+	{"sort",    l_array_sort},
 };
 
 static elf_Table *elf_lib_table(elf_State *state)
