@@ -13,19 +13,6 @@
 #include "compiler.h"
 
 
-void elf_error(elf_State *S, int error, const char *format, ...) {
-	va_list vargs;
-	va_start(vargs, format);
-	Scratch scratch = get_scratch();
-	char *message = arena_pushfv(scratch.arena, format, vargs);
-	va_end(vargs);
-	arena_push_zero(scratch.arena, 1);
-	report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "%s", message);
-	end_scratch(scratch);
-}
-
-
-
 elf_ValueType elf_arg_type(elf_State *S, int x) { return value_type(load_value(S, x)); }
 
 elf_Number elf_arg_num(elf_State *S, int x)
@@ -204,7 +191,7 @@ int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source
 {
 	ASSERT(name);
 	ASSERT(source.data);
-	BytecodeFunction function = elf_compile_source(state, name, source);
+	BcFunction function = elf_compile_source(state, name, source);
 
 	elf_Closure * closure = gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;
@@ -224,7 +211,7 @@ int elf_push_code_file(elf_State *state, const char *name)
 		return false;
 	}
 
-	BytecodeFunction function = elf_compile_source(state, name, source);
+	BcFunction function = elf_compile_source(state, name, source);
 
 	elf_Closure * closure = gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;

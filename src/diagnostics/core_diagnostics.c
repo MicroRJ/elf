@@ -13,17 +13,17 @@ static const char *runtime_error_type_names[] =
 
 typedef struct
 {
-	BytecodeFunction *function;
+	BcFunction *function;
 	SourceSite       site;
 	int              instr;
 	Bytecode          byte;
 }
 RuntimeSourceLocation;
 
-static BytecodeFunction *find_function_for_instr(elf_State *S, int byte)
+static BcFunction *find_function_for_instr(elf_State *S, int byte)
 {
 	for (u32 i = 0; i < S->bytecode_function_count; ++ i) {
-		BytecodeFunction *function = &S->bytecode_functions[i];
+		BcFunction *function = &S->bytecode_functions[i];
 		if (byte >= function->offset && byte < function->offset + function->length) {
 			return function;
 		}
@@ -31,7 +31,7 @@ static BytecodeFunction *find_function_for_instr(elf_State *S, int byte)
 	return 0;
 }
 
-static SourceSite find_source_for_instr(BytecodeFunction *function, int instr)
+static SourceSite find_source_for_instr(BcFunction *function, int instr)
 {
 	for (u32 i = 0; i < function->source_map_count; ++ i) {
 		SourceMapEntry entry = function->source_map[i];
@@ -71,7 +71,7 @@ static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr
 
 static void print_runtime_source_location(RuntimeSourceLocation location)
 {
-	BytecodeFunction *function = location.function;
+	BcFunction *function = location.function;
 	const char *name = function && function->source_name ? atom_data(function->source_name) : 0;
 	if (!name) {
 		name = "<unknown>";

@@ -38,8 +38,8 @@ typedef struct elf_Value   elf_Value;
 #include "atom/atom.h"
 #include "table/table.h"
 
-typedef struct BytecodeFunction BytecodeFunction;
-struct BytecodeFunction
+typedef struct BcFunction BcFunction;
+struct BcFunction
 {
 	b32          variadic;
 	u8              arity;
@@ -57,7 +57,7 @@ struct BytecodeFunction
 struct elf_Closure
 {
 	elf_Object              obj;
-	BytecodeFunction   function;
+	BcFunction   function;
 	elf_Value        captures[];
 };
 
@@ -92,7 +92,7 @@ struct elf_State
 		i64                *integer_constants;
 		u32                 integer_constant_count;
 		u32                 integer_constant_capacity;
-		BytecodeFunction  *bytecode_functions;
+		BcFunction  *bytecode_functions;
 		u32                bytecode_function_count;
 		u32                bytecode_function_capacity;
 		Bytecode           *bytecode;

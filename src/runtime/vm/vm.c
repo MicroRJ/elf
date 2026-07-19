@@ -65,7 +65,7 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static elf_Closure * vm_new_closure(elf_State *state, BytecodeFunction function, elf_Value *captures)
+static elf_Closure * vm_new_closure(elf_State *state, BcFunction function, elf_Value *captures)
 {
 	elf_Closure * closure;
 	u32 size = sizeof(*closure) + sizeof(closure->captures[0]) * function.captures;
@@ -216,7 +216,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 				ASSERT(byte.b_y >= 0);
 				ASSERT((u32)byte.b_y < state->bytecode_function_count);
 
-				BytecodeFunction function = state->bytecode_functions[byte.b_y];
+				BcFunction function = state->bytecode_functions[byte.b_y];
 				elf_Closure * new_closure = vm_new_closure(state, function, result_slot);
 				*result_slot = value_from_closure(new_closure);
 			} break;

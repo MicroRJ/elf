@@ -72,7 +72,7 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 	return result;
 }
 
-BytecodeFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice source)
+BcFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice source)
 {
 	ASSERT(name);
 	ASSERT(source.data);
@@ -98,7 +98,7 @@ BytecodeFunction elf_compile_source(elf_State *state, char const *name, elf_StrS
 		ir_module = elf_lower_ast_file(ctx, ast_file);
 	}
 
-	BytecodeFunction file_entry = bg_generate_module(state, scratch.arena, ir_module, source, source_name);
+	BcFunction file_entry = bg_generate_module(state, scratch.arena, ir_module, source, source_name);
 
 	state->gc_mode = saved_gc_mode;
 	end_scratch(scratch);

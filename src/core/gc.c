@@ -131,7 +131,7 @@ static u32 gc_mark_bytecode_functions(elf_State *state)
 
 	for (u32 i = 0; i < state->bytecode_function_count; ++i)
 	{
-		BytecodeFunction *function = state->bytecode_functions + i;
+		BcFunction *function = state->bytecode_functions + i;
 		if (function->source_name) {
 			marked_count += gc_mark_reachable(state, (elf_Object *)function->source_name);
 		}

@@ -229,7 +229,7 @@ static void format_bytecode_instr(elf_State *state, Arena *arena, u32 index, Byt
 	arena_push_char(arena, '\n');
 }
 
-char *format_bytecode_function(elf_State *state, Arena *arena, BytecodeFunction function)
+char *format_bytecode_function(elf_State *state, Arena *arena, BcFunction function)
 {
 	char *start = arena_push(arena, 0);
 	const char *source_name = function.source_name ? atom_data(function.source_name) : "<unknown>";
@@ -255,7 +255,7 @@ char *format_bytecode_function(elf_State *state, Arena *arena, BytecodeFunction 
 	return start;
 }
 
-void print_bytecode_function(elf_State *state, BytecodeFunction function)
+void print_bytecode_function(elf_State *state, BcFunction function)
 {
 	Scratch scratch = get_scratch();
 	char *text = format_bytecode_function(state, scratch.arena, function);

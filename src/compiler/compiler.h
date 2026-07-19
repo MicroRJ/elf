@@ -4,7 +4,7 @@
 
 typedef elf_StrSlice elf_StrSlice;
 
-BytecodeFunction elf_compile_source(elf_State *state, const char *name, elf_StrSlice source);
+BcFunction elf_compile_source(elf_State *state, const char *name, elf_StrSlice source);
 
 void elf_init_compiler_atoms(elf_State *state);
 

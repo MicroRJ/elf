@@ -1,7 +1,7 @@
 typedef struct
 {
 	elf_State       *state;
-	BytecodeFunction function;
+	BcFunction function;
 }
 BackendCompileResult;
 
@@ -59,7 +59,7 @@ static u32 backend_count_bytecode(BackendCompileResult result, BytecodeType type
 	return count;
 }
 
-static SourceMapEntry *backend_find_source_map_entry(BytecodeFunction *function, u32 byte)
+static SourceMapEntry *backend_find_source_map_entry(BcFunction *function, u32 byte)
 {
 	for (u32 i = 0; i < function->source_map_count; ++ i) {
 		SourceMapEntry *entry = &function->source_map[i];
@@ -73,7 +73,7 @@ static SourceMapEntry *backend_find_source_map_entry(BytecodeFunction *function,
 static void test_backend_source_map(void)
 {
 	BackendCompileResult result = backend_test_compile_file("smoke/return_add.elf");
-	BytecodeFunction *function = &result.function;
+	BcFunction *function = &result.function;
 	if (!function->source_name || !function->source_data || function->source_size == 0) {
 		test_fail("backend stores source data on bytecode function");
 		return;

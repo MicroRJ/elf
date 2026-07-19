@@ -7,7 +7,7 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
 
-	BytecodeFunction function = closure->function;
+	BcFunction function = closure->function;
 	u32 argument_count = (u32)nargs;
 	u32 frame_size = MAX(argument_count, function.stack_size);
 
