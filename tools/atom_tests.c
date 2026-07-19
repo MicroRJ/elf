@@ -37,19 +37,19 @@ static void test_atom_public_text_helpers(elf_State *state)
 {
 	elf_String *atom = elf_atom_from_data(state, "copy.me");
 
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	elf_StrSlice copy = elf_atom_copy_text(scratch.arena, atom);
 	if (copy.size != 7 || strcmp(copy.data, "copy.me") != 0) {
 		test_fail("atom copy returns arena-owned c string");
 	}
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 #endif
 
 static void force_atom_gc(elf_State *state)
 {
 	state->gc_next_cycle_bytes = 1;
-	elf_table_new_unrooted(state);
+	elf_new_table_rogue(state);
 }
 
 static u32 test_atom_hash_data(const char *data, u32 size)

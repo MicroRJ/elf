@@ -173,13 +173,13 @@ static void parser_errorf(Parser *parser, Error error, SourceSite site, const ch
 {
 	va_list args;
 	va_start(args, format);
-	Scratch scratch = get_scratch();
-	char *message = arena_pushfv(scratch.arena, format, args);
+	elf_Scratch scratch = elf_get_scratch();
+	char *message = elf_arena_pushfv(scratch.arena, format, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1);
+	elf_arena_push_zero(scratch.arena, 1);
 
 	parser_error(parser, error, site, message);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 
 static void parser_unexpected_token(Parser *parser, Token token)
@@ -204,9 +204,9 @@ static b32 ast_is_missing_or_error(AstRef ast)
 	return !ast || ast_is_error(ast);
 }
 
-static Parser *elf_alloc_parser(elf_State *state, Arena *arena)
+static Parser *elf_alloc_parser(elf_State *state, elf_Arena *arena)
 {
-	Parser *parser = arena_push_zero(arena, sizeof(*parser));
+	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
 	parser->state = state;
 	parser->arena = arena;
 
@@ -216,7 +216,7 @@ static Parser *elf_alloc_parser(elf_State *state, Arena *arena)
 
 static void reposition_parser(Parser *parser, char *cursor);
 
-static Parser *elf_create_parser(elf_State *state, Arena *arena, const char *name, elf_StrSlice source)
+static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source)
 {
 	ASSERT(state != 0);
 	ASSERT(name != 0);
@@ -288,7 +288,7 @@ static AstRef *pop_ast_array(Parser *par, u32 nargs)
 {
 	ASSERT(par->ast.stack_index >= nargs);
 	par->ast.stack_index -= nargs;
-	AstRef *copy = arena_push_copy(par->ast.arena, sizeof(*copy) * nargs, par->ast.stack + par->ast.stack_index);
+	AstRef *copy = elf_arena_push_copy(par->ast.arena, sizeof(*copy) * nargs, par->ast.stack + par->ast.stack_index);
 	return copy;
 }
 
@@ -1272,7 +1272,7 @@ static b32 eval_constexpr_ast(Parser *parser, AstRef ast, elf_Value *out)
 
 		case AST_TABLE:
 		{
-			elf_Table *table = elf_table_new_unrooted(parser->state);
+			elf_Table *table = elf_new_table_rogue(parser->state);
 			for (u32 i = 0; i < ast->table.nargs; ++ i)
 			{
 				AstRef entry_ast = ast->table.args[i];

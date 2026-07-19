@@ -97,7 +97,7 @@ Entity;
 struct LowerContext
 {
 	elf_State   *state;
-	Arena       *arena;
+	elf_Arena       *arena;
 	elf_String    *source_name;
 	u32          ir_stack_size;
 	u32          ir_stack_index;

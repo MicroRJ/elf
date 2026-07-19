@@ -65,7 +65,7 @@ static void test_vm_return_table(void)
 	}
 
 	elf_Table *table = value_as_table(value);
-	if (elf_array_len(table) != 2) {
+	if (elf_array_length(table) != 2) {
 		test_fail("vm table literal stores field and array values");
 	}
 }

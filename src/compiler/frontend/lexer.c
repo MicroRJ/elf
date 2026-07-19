@@ -93,13 +93,13 @@ static SourceSite lexer_source_site(Lexer *lexer, Source data)
 
 static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...)
 {
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 
 	va_list args;
 	va_start(args, fmt);
-	char *message = arena_pushfv(scratch.arena, fmt, args);
+	char *message = elf_arena_pushfv(scratch.arena, fmt, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1);
+	elf_arena_push_zero(scratch.arena, 1);
 
 	log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu]: %s"
 	,	atom_data(lexer->name)
@@ -109,7 +109,7 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 
 	elf_StrSlice source = lexer->source;
 	print_source_slice_marker(site, source);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 
 static b32 lexer_is_hex_digit(char c)
@@ -408,8 +408,8 @@ static u32 lex_identifier(char **cursor, char *buffer)
 static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 is_format, TokenType *type)
 {
 	char *cur = *cursor;
-	Scratch scratch = get_scratch();
-	char *buffer = arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+	elf_Scratch scratch = elf_get_scratch();
+	char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 	char *out = buffer;
 	b32 needs_formatting = false;
 	b32 is_block = cur[0] == '"' && cur[1] == '"' && cur[2] == '"';
@@ -475,7 +475,7 @@ static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 
 	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
 
 	*cursor = cur;
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return atom;
 }
 
@@ -506,8 +506,8 @@ retry:
 				break;
 			}
 
-			Scratch scratch = get_scratch();
-			char *buffer = arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+			elf_Scratch scratch = elf_get_scratch();
+			char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 			u32 size = lex_identifier(&cur, buffer);
 			elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
 
@@ -516,7 +516,7 @@ retry:
 				token.atom = atom;
 			}
 
-			end_scratch(scratch);
+			elf_end_scratch(scratch);
 		} break;
 
 		case '0': case '1': case '2': case '3': case '4':
@@ -555,8 +555,8 @@ retry:
 
 		case '#':
 		{
-			Scratch scratch = get_scratch();
-			char *buffer = arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+			elf_Scratch scratch = elf_get_scratch();
+			char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 			cur += 1;
 
 			if (!is_identifier_start(*cur))
@@ -587,7 +587,7 @@ retry:
 				}
 			}
 
-			end_scratch(scratch);
+			elf_end_scratch(scratch);
 		} break;
 
 		case '\0':

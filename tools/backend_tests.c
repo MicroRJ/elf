@@ -15,7 +15,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	if (file)
 	{
 		u64 size = elf_platform_get_file_size(file);
-		char *data = arena_push(&result.state->arena, size + 16);
+		char *data = elf_arena_push(&result.state->arena, size + 16);
 		zero_memory(data + size, 16);
 		elf_platform_read_file(file, data, (u32)size);
 		elf_platform_close_file(file);
@@ -370,7 +370,7 @@ static void test_backend_logical_expr_delays_result_slot(void)
 static void test_backend_if_else_restores_stack_top(void)
 {
 	elf_State *state = elf_create_state();
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	LowerContext *ctx = elf_create_lower_context(state, scratch.arena);
 	SourceSite site = {};
 
@@ -398,7 +398,7 @@ static void test_backend_if_else_restores_stack_top(void)
 		test_fail("if/else restores stack top before following statement");
 	}
 
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 
 static void test_backend_formats_bytecode_function(void)
@@ -407,7 +407,7 @@ static void test_backend_formats_bytecode_function(void)
 		"x := 41\n"
 		"ret x + 1\n");
 
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	char *text = format_bytecode_function(result.state, scratch.arena, result.function);
 	if (!strstr(text, "bytecode function")) {
 		test_fail("bytecode formatter prints function header");
@@ -421,7 +421,7 @@ static void test_backend_formats_bytecode_function(void)
 	if (!strstr(text, "return")) {
 		test_fail("bytecode formatter prints return bytecode");
 	}
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 
 static void run_backend_tests(void)

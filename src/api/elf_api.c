@@ -29,13 +29,6 @@ elf_Integer elf_arg_int(elf_State *S, int x)
 	return value_to_integer(value);
 }
 
-elf_Handle elf_arg_hnd(elf_State *S, int x)
-{
-	elf_Value value = load_value(S, x);
-	check_value_type(S, value, ELF_VALUE_TYPE_HANDLE);
-	return value_as_handle(value);
-}
-
 elf_String *elf_arg_str(elf_State *S, int x)
 {
 	elf_Value value = load_value(S, x);
@@ -47,10 +40,9 @@ void elf_push_nil(elf_State *S)                  { push_value(S, value_nil());  
 void elf_push_int(elf_State *S, elf_Integer   x) { push_value(S, value_from_integer(x)); }
 void elf_push_num(elf_State *S, elf_Number    x) { push_value(S, value_from_number(x)); }
 void elf_push_fun(elf_State *S, elf_Function  x) { push_value(S, value_from_function(x)); }
-void elf_push_hnd(elf_State *S, elf_Handle    x) { push_value(S, value_from_handle(x)); }
 
 elf_Table *elf_push_new_table(elf_State *S) {
-	elf_Table *table = elf_table_new_unrooted(S);
+	elf_Table *table = elf_new_table_rogue(S);
 	push_table(S, table);
 	return table;
 }
@@ -121,7 +113,6 @@ static elf_ValueView value_view(elf_Value value)
 	{
 		case ELF_VALUE_TYPE_INTEGER: view.as.integer = value_as_integer(value); break;
 		case ELF_VALUE_TYPE_NUMBER:  view.as.number = value_as_number(value); break;
-		case ELF_VALUE_TYPE_HANDLE:  view.as.handle = value_as_handle(value); break;
 		case ELF_VALUE_TYPE_TABLE:   view.as.table = value_as_table(value); break;
 		case ELF_VALUE_TYPE_ATOM:
 			view.as.string = value_as_atom(value);
@@ -176,7 +167,7 @@ static elf_StrSlice source_buffer_from_file(elf_State *state, const char *name)
 	if (!ELF_IS_HANDLE_INVALID(file))
 	{
 		u64 size = elf_platform_get_file_size(file);
-		char *data = arena_push(&state->arena, size + 16);
+		char *data = elf_arena_push(&state->arena, size + 16);
 		zero_memory(data + size, 16);
 		elf_platform_read_file(file, data, (u32)size);
 		elf_platform_close_file(file);

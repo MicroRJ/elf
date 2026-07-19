@@ -1,6 +1,6 @@
 static void expect_match_tail(const char *text, const char *pattern, i32 expected_tail, const char *label)
 {
-	const char *tail = matcher_match(text, pattern);
+	const char *tail = elf_glob_match(text, pattern);
 	if (!tail || tail != text + expected_tail)
 	{
 		fprintf(stderr, "FAIL: %s expected tail %d, got %td\n",
@@ -11,7 +11,7 @@ static void expect_match_tail(const char *text, const char *pattern, i32 expecte
 
 static void expect_no_match(const char *text, const char *pattern, const char *label)
 {
-	if (matcher_match(text, pattern))
+	if (elf_glob_match(text, pattern))
 	{
 		fprintf(stderr, "FAIL: %s expected no match for text '%s' pattern '%s'\n",
 			label, text, pattern);

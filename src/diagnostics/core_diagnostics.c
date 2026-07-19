@@ -161,12 +161,12 @@ void report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, c
 {
 	va_list args;
 	va_start(args, format);
-	Scratch scratch = get_scratch();
-	char *message = arena_pushfv(scratch.arena, format, args);
+	elf_Scratch scratch = elf_get_scratch();
+	char *message = elf_arena_pushfv(scratch.arena, format, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1);
+	elf_arena_push_zero(scratch.arena, 1);
 
 	report_runtime_error_message(state, error, instr, message);
 
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }

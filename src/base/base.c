@@ -1,5 +1,4 @@
 #include "elf.h"
-#include <string.h>
 #include "base.h"
 #include "system.h"
 

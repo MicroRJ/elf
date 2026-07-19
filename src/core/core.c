@@ -71,28 +71,28 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 static void init_bytecode_program_storage(elf_State *state)
 {
 	state->bytecode_function_capacity = 4096;
-	state->bytecode_functions = arena_push_zero(&state->arena
+	state->bytecode_functions = elf_arena_push_zero(&state->arena
 	,	sizeof(*state->bytecode_functions) * state->bytecode_function_capacity);
 
 	state->bytecode_capacity = 1 << 20;
-	state->bytecode = arena_push_zero(&state->arena, sizeof(*state->bytecode) * state->bytecode_capacity);
+	state->bytecode = elf_arena_push_zero(&state->arena, sizeof(*state->bytecode) * state->bytecode_capacity);
 
 	state->integer_constant_capacity = 1 << 16;
-	state->integer_constants = arena_push_zero(&state->arena
+	state->integer_constants = elf_arena_push_zero(&state->arena
 	,	sizeof(*state->integer_constants) * state->integer_constant_capacity);
 
 	state->number_constant_capacity = 1 << 16;
-	state->number_constants = arena_push_zero(&state->arena
+	state->number_constants = elf_arena_push_zero(&state->arena
 	,	sizeof(*state->number_constants) * state->number_constant_capacity);
 }
 
 static void init_runtime_storage(elf_State *state)
 {
 	state->frame_stack_size = 4096;
-	state->frame_stack = arena_push_zero(&state->arena, sizeof(*state->frame_stack) * state->frame_stack_size);
+	state->frame_stack = elf_arena_push_zero(&state->arena, sizeof(*state->frame_stack) * state->frame_stack_size);
 
 	state->stack_size = 4096;
-	state->stack = arena_push_zero(&state->arena, sizeof(*state->stack) * state->stack_size);
+	state->stack = elf_arena_push_zero(&state->arena, sizeof(*state->stack) * state->stack_size);
 	state->stack_ptr = state->stack;
 }
 
@@ -159,9 +159,9 @@ static void bootstrap_state(elf_State *state)
 
 elf_State *elf_create_state()
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 
-	elf_State *state = arena_push_zero(&arena, sizeof(*state));
+	elf_State *state = elf_arena_push_zero(&arena, sizeof(*state));
 	state->arena = arena;
 
 	init_state_storage(state);
@@ -174,7 +174,7 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
-		destroy_arena(&state->arena);
+		elf_arena_destroy(&state->arena);
 	}
 }
 

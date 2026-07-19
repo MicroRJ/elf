@@ -1,4 +1,4 @@
-static void expect_path_text(Path_Stack *stack, const char *expected, const char *label)
+static void expect_path_text(elf_PathStack *stack, const char *expected, const char *label)
 {
 	if (!stack->path || strcmp(stack->path, expected) != 0) {
 		fprintf(stderr, "FAIL: %s expected '%s', got '%s'\n",
@@ -7,7 +7,7 @@ static void expect_path_text(Path_Stack *stack, const char *expected, const char
 	}
 }
 
-static void expect_path_state(Path_Stack *stack, i32 segments, const char *name, const char *label)
+static void expect_path_state(elf_PathStack *stack, i32 segments, const char *name, const char *label)
 {
 	if (stack->segs != segments || strcmp(stack->name, name) != 0)
 	{
@@ -19,53 +19,53 @@ static void expect_path_state(Path_Stack *stack, i32 segments, const char *name,
 
 static void test_path_push_pull(void)
 {
-	Arena arena = create_arena(0);
-	Path_Stack stack = path_new_stack(&arena, 256);
+	elf_Arena arena = elf_arena_create(0);
+	elf_PathStack stack = elf_alloc_path_stack(&arena, 256);
 
-	path_push(&stack, "root");
+	elf_path_push(&stack, "root");
 	expect_path_text(&stack, "root", "path stack pushes first segment");
 	expect_path_state(&stack, 1, "root", "path stack tracks first segment");
 
-	path_push(&stack, "child");
+	elf_path_push(&stack, "child");
 	expect_path_text(&stack, "root\\child", "path stack joins child segment");
 	expect_path_state(&stack, 2, "child", "path stack tracks child segment");
 
-	path_pop(&stack);
+	elf_path_pop(&stack);
 	expect_path_text(&stack, "root", "path stack pulls child segment");
 	expect_path_state(&stack, 1, "root", "path stack restores previous segment");
 
-	path_pop(&stack);
+	elf_path_pop(&stack);
 	expect_path_text(&stack, "", "path stack pulls final segment");
 	expect_path_state(&stack, 0, "", "path stack resets after final pull");
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_path_dot_names(void)
 {
-	Arena arena = create_arena(0);
-	Path_Stack stack = path_new_stack(&arena, 256);
+	elf_Arena arena = elf_arena_create(0);
+	elf_PathStack stack = elf_alloc_path_stack(&arena, 256);
 
-	path_push(&stack, ".");
+	elf_path_push(&stack, ".");
 	expect_path_state(&stack, 1, ".", "path stack tracks current segment name");
 
-	path_pop(&stack);
-	path_push(&stack, "..");
+	elf_path_pop(&stack);
+	elf_path_push(&stack, "..");
 	expect_path_state(&stack, 1, "..", "path stack tracks parent segment name");
 
-	path_pop(&stack);
-	path_push(&stack, ".config");
+	elf_path_pop(&stack);
+	elf_path_push(&stack, ".config");
 	expect_path_state(&stack, 1, ".config", "path stack tracks dotted segment names");
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_path_growth_stress(void)
 {
 	enum { SEGMENT_COUNT = 512 };
 
-	Arena arena = create_arena(0);
-	Path_Stack stack = path_new_stack(&arena, 32768);
+	elf_Arena arena = elf_arena_create(0);
+	elf_PathStack stack = elf_alloc_path_stack(&arena, 32768);
 	char expected[32768] = {};
 	i32 expected_size = 0;
 
@@ -81,7 +81,7 @@ static void test_path_growth_stress(void)
 		i32 written = snprintf(expected + expected_size, sizeof(expected) - expected_size, "%s", segment);
 		expected_size += written;
 
-		path_push(&stack, segment);
+		elf_path_push(&stack, segment);
 	}
 
 	expect_path_text(&stack, expected, "path stack grows across many pushes");
@@ -89,7 +89,7 @@ static void test_path_growth_stress(void)
 
 	for (i32 i = SEGMENT_COUNT - 1; i >= 0; --i)
 	{
-		path_pop(&stack);
+		elf_path_pop(&stack);
 
 		if (i == 0)
 		{
@@ -117,7 +117,7 @@ static void test_path_growth_stress(void)
 	}
 
 	expect_path_state(&stack, 0, "", "path stack ends stress pull empty");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void run_path_tests(void)

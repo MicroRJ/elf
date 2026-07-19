@@ -22,6 +22,6 @@ u32 atom_size(elf_String *atom);
 const char *atom_data(elf_String *atom);
 u32 atom_hash(elf_String *atom);
 b32 atoms_equal(elf_String *left, elf_String *right);
-elf_StrSlice elf_atom_copy_text(Arena *arena, elf_String *atom);
+elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_String *atom);
 
 #endif

@@ -13,7 +13,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_bytecode_function(BcGen *gen, IrFunction *function);
-static BcFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
+static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -38,10 +38,10 @@ static void report_generation_error(BcGen *gen, GenerationError error, SourceSit
 
 	va_list args;
 	va_start(args, format);
-	Scratch scratch = get_scratch();
-	char *message = arena_pushfv(scratch.arena, format, args);
+	elf_Scratch scratch = elf_get_scratch();
+	char *message = elf_arena_pushfv(scratch.arena, format, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1);
+	elf_arena_push_zero(scratch.arena, 1);
 
 	if (site.line_index) {
 		log_linef(LOG_LEVEL_ERROR, "generation error:%u: %s", site.line_index, message);
@@ -49,7 +49,7 @@ static void report_generation_error(BcGen *gen, GenerationError error, SourceSit
 	else {
 		log_linef(LOG_LEVEL_ERROR, "generation error: %s", message);
 	}
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	ASSERT(!"Generation Error");
 }
 
@@ -295,20 +295,20 @@ static BcSlot ensure_slot(BcGen *gen, BcSlot slot)
 }
 
 /* main */
-static BcGen *bg_create(elf_State *state, Arena *arena, u32 bytecode_function_base)
+static BcGen *bg_create(elf_State *state, elf_Arena *arena, u32 bytecode_function_base)
 {
-	BcGen *gen = arena_push_zero(arena, sizeof(*gen));
+	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
 	gen->state = state;
 	gen->arena = arena;
 	gen->bytecode_function_base = bytecode_function_base;
 
 	u32 bytecode_capacity = 1 << 13;
-	gen->bytecode = arena_push_zero(arena, sizeof(*gen->bytecode) * bytecode_capacity);
+	gen->bytecode = elf_arena_push_zero(arena, sizeof(*gen->bytecode) * bytecode_capacity);
 	gen->bytecode_capacity = bytecode_capacity;
 	gen->bytecode_count = 0;
 
 	u32 source_map_capacity = 1 << 13;
-	gen->source_map_buffer.entries = arena_push_zero(arena, sizeof(*gen->source_map_buffer.entries) * source_map_capacity);
+	gen->source_map_buffer.entries = elf_arena_push_zero(arena, sizeof(*gen->source_map_buffer.entries) * source_map_capacity);
 	gen->source_map_buffer.capacity = source_map_capacity;
 	gen->source_map_buffer.count = 0;
 	return gen;
@@ -345,14 +345,14 @@ static void generate_bytecode_function(BcGen *gen, IrFunction *function)
 	}
 }
 
-static SourceMapEntry *copy_source_map(Arena *arena, SourceMapEntry *entries, u32 count, u32 bytecode_offset)
+static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries, u32 count, u32 bytecode_offset)
 {
 	if (count == 0)
 	{
 		return 0;
 	}
 
-	SourceMapEntry *source_map = arena_push(arena, sizeof(*source_map) * count);
+	SourceMapEntry *source_map = elf_arena_push(arena, sizeof(*source_map) * count);
 	for (u32 i = 0; i < count; ++ i)
 	{
 		SourceMapEntry entry = entries[i];
@@ -372,7 +372,7 @@ static BcFunction *reserve_bytecode_functions(elf_State *state, u32 count)
 	return state->bytecode_functions + index;
 }
 
-static BcFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
+static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
 {
 	ASSERT(module.functions);
 	ASSERT(module.function_count > 0);

@@ -1,4 +1,4 @@
-static LowerContext *ir_test_lower_source(elf_State *state, Arena *arena, const char *source_text)
+static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, const char *source_text)
 {
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Parser *parser = elf_create_parser(state, arena, "ir_tests", source);
@@ -81,7 +81,7 @@ static void expect_load_local(Ir ir, Ir local, const char *label)
 
 static void test_ir_lowers_declaration_expression(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := 1 + 2 * 3");
 	Ir body = ir_test_main_body(ctx);
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "lower declaration to local");
@@ -92,12 +92,12 @@ static void test_ir_lowers_declaration_expression(elf_State *state)
 	expect_ir_kind(expr->ir_binary.y, IR_MUL, "lower multiply rhs");
 	expect_ir_i64(expr->ir_binary.y->ir_binary.x, 2, "lower multiply lhs");
 	expect_ir_i64(expr->ir_binary.y->ir_binary.y, 3, "lower multiply rhs");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_assignment_to_local(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := 1\nx = 2");
 	Ir body = ir_test_main_body(ctx);
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "lower local declaration");
@@ -105,12 +105,12 @@ static void test_ir_lowers_assignment_to_local(elf_State *state)
 
 	expect_load_local(store ? store->ir_binary.x : 0, memory, "assignment destination loads local");
 	expect_ir_i64(store->ir_binary.y, 2, "assignment expression lowered");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_atoms_and_globals(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret \"hello\"\nret foo");
 	Ir body = ir_test_main_body(ctx);
 
@@ -119,12 +119,12 @@ static void test_ir_lowers_atoms_and_globals(elf_State *state)
 
 	Ir ret_global = ir_test_body_stat(body, 1, IR_RETURN, "lower global return");
 	expect_ir_kind(ret_global->ir_return.expr, IR_LOAD_GLOBAL, "identifier without local lowers to global load");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_field_and_call(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret obj.name\nmake {x = 1}");
 	Ir body = ir_test_main_body(ctx);
 
@@ -146,12 +146,12 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 		: 0;
 	expect_ir_kind(table_local, IR_LOCAL, "table expression block creates table local");
 	expect_ir_kind(table_local ? table_local->ir_local.expr : 0, IR_TABLE, "table expression block creates table ir");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_if_else(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "if flag ? { ret 1 } else { ret 2 }");
 	Ir body = ir_test_main_body(ctx);
 	Ir ir_if = ir_test_body_stat(body, 0, IR_IF, "lower if statement");
@@ -159,12 +159,12 @@ static void test_ir_lowers_if_else(elf_State *state)
 	expect_ir_kind(ir_if->ir_if.pred, IR_LOAD_GLOBAL, "if predicate lowers to global load");
 	expect_ir_kind(ir_if->ir_if.true_clause, IR_BLOCK, "if true clause lowers to block");
 	expect_ir_kind(ir_if->ir_if.else_clause, IR_BLOCK, "if else clause lowers to block");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_while(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "while flag ? { x = 1 }");
 	Ir body = ir_test_main_body(ctx);
 	Ir loop = ir_test_body_stat(body, 0, IR_BLOCK, "while lowers to label block");
@@ -179,12 +179,12 @@ static void test_ir_lowers_while(elf_State *state)
 	Ir store = ir_test_body_stat(loop_body, 0, IR_STORE, "while body lowers statements");
 	expect_ir_kind(store->ir_binary.x, IR_LOAD_GLOBAL, "while body assignment destination");
 	expect_ir_i64(store->ir_binary.y, 1, "while body assignment value");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_nil_assign(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := nil\nx ?= 1");
 	Ir body = ir_test_main_body(ctx);
 
@@ -204,12 +204,12 @@ static void test_ir_lowers_nil_assign(elf_State *state)
 	if (ir_if && ir_if->ir_if.else_clause) {
 		test_fail("nil assignment has no else clause");
 	}
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "obj := nil\nobj.child.name ?= 1");
 	Ir body = ir_test_main_body(ctx);
 
@@ -235,17 +235,17 @@ static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 	expect_ir_kind(store_field, IR_FIELD, "field nil assignment store writes final field");
 	expect_load_local(store_field ? store_field->ir_binary.x : 0, receiver_memory, "field nil assignment store reuses receiver temp");
 	expect_ir_i64(store ? store->ir_binary.y : 0, 1, "field nil assignment store value");
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_function_expression(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "add := fun(a, b) { ret a + b }");
 
 	if (!ctx || ctx->num_functions != 2) {
 		test_fail("function expression adds bytecode function");
-		destroy_arena(&arena);
+		elf_arena_destroy(&arena);
 		return;
 	}
 
@@ -276,12 +276,12 @@ static void test_ir_lowers_function_expression(elf_State *state)
 		test_fail("second param uses frame slot 2");
 	}
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_ir_lowers_get_mem_macro(elf_State *state)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := 1\nret #get_mem(x)");
 	Ir body = ir_test_main_body(ctx);
 
@@ -291,7 +291,7 @@ static void test_ir_lowers_get_mem_macro(elf_State *state)
 	expect_ir_kind(get_mem, IR_GET_MEM, "get_mem lowers to get_mem ir");
 	expect_load_local(get_mem ? get_mem->ir_unary : 0, memory, "get_mem targets local load");
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void run_ir_tests(elf_State *state)

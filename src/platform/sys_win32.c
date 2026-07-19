@@ -204,14 +204,14 @@ void sys_file_time_to_system_time(FILE_TIME *filetime, SYSTEM_TIME *systimeout) 
 
 #if 0
 int lib_core_shell(elf_State *R) {
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	elf_StrSlice verb = elf_arg_str_copy(R, 0, scratch.arena);
 	elf_StrSlice file = elf_arg_str_copy(R, 1, scratch.arena);
 	elf_StrSlice args = elf_arg_str_copy(R, 2, scratch.arena);
 
 	int success = (INT_PTR)ShellExecute(NULL, verb.data, file.data, args.data, NULL, 10) > 32;
 	elf_push_int(R,success);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 
@@ -226,10 +226,10 @@ int core_lib_get_disk_info(elf_State *R) {
 	DWORD BytesPerSector;
 	DWORD NumberOfFreeClusters;
 	DWORD TotalNumberOfClusters;
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	elf_StrSlice path = elf_arg_str_copy(R, 0, scratch.arena);
 	GetDiskFreeSpaceA(path.data,&SectorsPerCluster,&BytesPerSector,&NumberOfFreeClusters,&TotalNumberOfClusters);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	elf_tsets_int(info,elf_atom_from_data(R,"SectorsPerCluster"),SectorsPerCluster);
 	elf_tsets_int(info,elf_atom_from_data(R,"BytesPerSector"),BytesPerSector);
 	elf_tsets_int(info,elf_atom_from_data(R,"NumberOfFreeClusters"),NumberOfFreeClusters);
@@ -381,7 +381,7 @@ static inline void pushfiledata(FILE_VISITOR *visitor, WIN32_FIND_DATAA *info) {
 		visitor->type = FILE_TYPE_FOLDER;
 	}
 	visitor->size = info->nFileSizeLow;
-	path_push(&visitor->pb, info->cFileName);
+	elf_path_push(&visitor->pb, info->cFileName);
 }
 
 
@@ -394,10 +394,10 @@ void sys_find_close(FILE_HANDLE hand) {
 
 FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor)
 {
-	path_push(&visitor->pb, "*");
+	elf_path_push(&visitor->pb, "*");
 	WIN32_FIND_DATAA info;
 	FILE_HANDLE hand = FindFirstFileA(visitor->pb.path, &info);
-	path_pop(&visitor->pb);
+	elf_path_pop(&visitor->pb);
 
 	int result = hand != INVALID_HANDLE_VALUE;
 	if (result) {
@@ -410,7 +410,7 @@ FILE_HANDLE sys_find_first_file(FILE_VISITOR *visitor)
 
 int sys_find_next_file(FILE_HANDLE hand, FILE_VISITOR *visitor) {
 	// pull the path from before
-	path_pop(&visitor->pb);
+	elf_path_pop(&visitor->pb);
 
 	WIN32_FIND_DATAA info;
 	int noerr = FindNextFileA(hand, &info);
@@ -425,19 +425,19 @@ elf_Handle sys_create_process(char const *file, char const *args)
 	STARTUPINFO startupinfo = {sizeof(startupinfo)};
 	PROCESS_INFORMATION processinfo = {0};
 
-	Scratch scratch = get_scratch();
-	char *command_line = arena_push_text(scratch.arena, args);
-	arena_push_char(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *command_line = elf_arena_push_text(scratch.arena, args);
+	elf_arena_push_char(scratch.arena, 0);
 	b32 started = CreateProcessA(file, command_line, NULL, NULL, FALSE, 0, NULL, NULL,
 		&startupinfo, &processinfo);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 
 	if (!started) return 0;
 	CloseHandle(processinfo.hThread);
 	return (elf_Handle)processinfo.hProcess;
 }
 
-static void sys_drain_process_pipe(HANDLE pipe, Arena *output)
+static void sys_drain_process_pipe(HANDLE pipe, elf_Arena *output)
 {
 	for (;;)
 	{
@@ -445,7 +445,7 @@ static void sys_drain_process_pipe(HANDLE pipe, Arena *output)
 		if (!PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL) || available == 0) return;
 
 		DWORD request = MIN(available, 64 * 1024);
-		char *data = arena_push(output, request);
+		char *data = elf_arena_push(output, request);
 		DWORD read = 0;
 		if (!ReadFile(pipe, data, request, &read, NULL)) {
 			output->in_use -= request;
@@ -455,8 +455,8 @@ static void sys_drain_process_pipe(HANDLE pipe, Arena *output)
 	}
 }
 
-Sys_Process_Result sys_run_process(const char *command_line, Arena *standard_output,
-	Arena *standard_error)
+Sys_Process_Result sys_run_process(const char *command_line, elf_Arena *standard_output,
+	elf_Arena *standard_error)
 {
 	Sys_Process_Result result = {.exit_code = -1};
 	SECURITY_ATTRIBUTES security = {
@@ -484,13 +484,13 @@ Sys_Process_Result sys_run_process(const char *command_line, Arena *standard_out
 	startup.hStdOutput = stdout_write;
 	startup.hStdError = stderr_write;
 
-	Scratch scratch = get_scratch();
-	char *mutable_command_line = arena_push_text(scratch.arena, command_line);
-	arena_push_char(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *mutable_command_line = elf_arena_push_text(scratch.arena, command_line);
+	elf_arena_push_char(scratch.arena, 0);
 	result.started = CreateProcessA(NULL, mutable_command_line, NULL, NULL, TRUE,
 		CREATE_NO_WINDOW, NULL, NULL, &startup, &process);
 	if (!result.started) result.error_code = GetLastError();
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 
 	CloseHandle(stdout_write);
 	stdout_write = 0;

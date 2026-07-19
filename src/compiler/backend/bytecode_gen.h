@@ -24,7 +24,7 @@ SourceMapBuffer;
 typedef struct
 {
 	elf_State      *state;
-	Arena          *arena;
+	elf_Arena          *arena;
 	Bytecode       *bytecode;
 	u32             bytecode_capacity;
 	u32             bytecode_count;

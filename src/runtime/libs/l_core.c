@@ -35,7 +35,7 @@ static u32 mark_table_readonly(elf_State *state, elf_Table *table)
 		}
 	}
 
-	for (u32 i = 0; i < elf_array_len(table); ++ i)
+	for (u32 i = 0; i < elf_array_length(table); ++ i)
 	{
 		elf_Value value = elf_array_get(state, table, i);
 		if (value_is_object(value))
@@ -327,24 +327,27 @@ ELF_FUNCTION(l_core_load_json) {
 
 
 // todo: this should instead return a atom!?
-ELF_FUNCTION(l_core_unparse) {
+ELF_FUNCTION(l_core_unparse)
+{
+#if 0
 	elf_Value file_value = load_value(S, 1);
 	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
 	elf_Handle file = value_as_handle(file_value);
 	elf_Value value = load_value(S, 2);
 
-	Scratch scratch = get_scratch();
-	char *start = arena_push(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *start = elf_arena_push(scratch.arena, 0);
 	b32 ok = serialize_value(S, scratch.arena, value, 0);
-	char *end = arena_push_zero(scratch.arena, 1);
+	char *end = elf_arena_push_zero(scratch.arena, 1);
 
 	if (ok) {
 		sys_write_file(file, start, (i32)(end - start));
 	}
 
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 
 	push_value(S, value_from_integer(ok));
+#endif
 	return 1;
 }
 
@@ -362,12 +365,12 @@ ELF_FUNCTION(l_core_format) {
 	check_value_type(S, format_value, ELF_VALUE_TYPE_ATOM);
 	const char *format = atom_data(value_as_atom(format_value));
 
-	Scratch scratch = get_scratch();
-	char *start = arena_push(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *start = elf_arena_push(scratch.arena, 0);
 	while (*format) {
 
 		while (*format && *format != '%') {
-			arena_push_char(scratch.arena, *format ++);
+			elf_arena_push_char(scratch.arena, *format ++);
 		}
 
 		if (*format == '%') {
@@ -382,88 +385,68 @@ ELF_FUNCTION(l_core_format) {
 		}
 	}
 
-	char *end = arena_push_zero(scratch.arena, 1);
+	char *end = elf_arena_push_zero(scratch.arena, 1);
 	push_value(S, value_from_atom(elf_atom_from_data_size(S, start, (u32)(end - start))));
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 
 ELF_FUNCTION(l_core_print) {
-	Scratch scratch = get_scratch();
-	char *start = arena_push(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 1; i < nargs; i ++) {
 		print_value(scratch.arena, load_value(S,i));
 	}
-	char *end = arena_push_zero(scratch.arena, 1);
+	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);
 
 	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
 	sys_write_file(file, start, size);
 
-	end_scratch(scratch);
-	push_value(S, value_from_integer(size));
-	return 1;
-}
-
-ELF_FUNCTION(l_core_printl_csv) {
-	Scratch scratch = get_scratch();
-	char *start = arena_push(scratch.arena, 0);
-	for (i64 i = 1; i < nargs; i ++) {
-		if (i != 1) arena_push_text(scratch.arena, ", ");
-		print_value(scratch.arena, load_value(S,i));
-	}
-	arena_push_char(scratch.arena, '\n');
-	char *end = arena_push_zero(scratch.arena, 1);
-	u32 size = (u32)(end - start);
-
-	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
-	sys_write_file(file, start, size);
-
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	push_value(S, value_from_integer(size));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_printl) {
-	Scratch scratch = get_scratch();
-	char *start = arena_push(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 1; i < nargs; i ++) {
 		print_value(scratch.arena, load_value(S,i));
 	}
-	arena_push_char(scratch.arena, '\n');
-	char *end = arena_push_zero(scratch.arena, 1);
+	elf_arena_push_char(scratch.arena, '\n');
+	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);
 
 	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
 	sys_write_file(file, start, size);
 
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	push_value(S, value_from_integer(size));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_fprintl) {
+#if 0
 	elf_Value file_value = load_value(S, 1);
 	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
 	elf_Handle file = value_as_handle(file_value);
 
-	Scratch scratch = get_scratch();
-	char *start = arena_push(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 2; i < nargs; i ++) {
 		print_value(scratch.arena, load_value(S, i));
 	}
-	char *end = arena_push_zero(scratch.arena, 1);
+	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);
 	push_value(S, value_from_integer(size));
 
 	sys_write_file(file, start, size);
 
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
+#endif
 	return 1;
 }
-
-
-
 
 const static elf_Binding l_core[] = {
 	{"get_meta",        l_core_get_meta        },
@@ -497,7 +480,6 @@ const static elf_Binding l_core[] = {
 
 	{"format",          l_core_format     },
 	{"printl",          l_core_printl     },
-	{"printl_csv",      l_core_printl_csv },
 	{"print",           l_core_print      },
 
 	// todo: deprecated?

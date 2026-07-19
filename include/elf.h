@@ -16,10 +16,6 @@ typedef elf_i32            elf_b32;
 
 typedef elf_i64 elf_Integer;
 typedef elf_f64 elf_Number;
-typedef elf_u64 elf_Handle;
-
-#define ELF_HINVALID ((elf_Handle)0)
-#define ELF_IS_HANDLE_INVALID(H) ((H) == ELF_HINVALID)
 
 typedef struct elf_State elf_State;
 typedef struct elf_Table elf_Table;
@@ -47,8 +43,6 @@ typedef enum
 	ELF_VALUE_TYPE_NIL = 0,
 	ELF_VALUE_TYPE_NUMBER,
 	ELF_VALUE_TYPE_INTEGER,
-	ELF_VALUE_TYPE_HANDLE,
-	ELF_VALUE_TYPE_VECTOR,
 	ELF_VALUE_TYPE_CFUNCTION,
 	ELF_VALUE_TYPE_USER_OBJECT,
 	ELF_VALUE_TYPE_CLOSURE,
@@ -66,7 +60,6 @@ typedef struct
 	{
 		elf_Integer  integer;
 		elf_Number   number;
-		elf_Handle   handle;
 		elf_String  *string;
 		elf_Table   *table;
 	} as;
@@ -91,7 +84,6 @@ void elf_push_nil(elf_State *state);
 void elf_push_int(elf_State *state, elf_Integer value);
 void elf_push_num(elf_State *state, elf_Number value);
 void elf_push_fun(elf_State *state, elf_Function function);
-void elf_push_hnd(elf_State *state, elf_Handle handle);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, int size);
 
@@ -118,7 +110,6 @@ elf_ValueType elf_arg_type(elf_State *state, int index);
 elf_String   *elf_arg_str(elf_State *state, int index);
 elf_Number    elf_arg_num(elf_State *state, int index);
 elf_Integer   elf_arg_int(elf_State *state, int index);
-elf_Handle    elf_arg_hnd(elf_State *state, int index);
 
 #endif
 

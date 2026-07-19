@@ -1,6 +1,6 @@
 static AstRef parser_test_parse_file(elf_State *state, const char *source_text)
 {
-	Arena arena = create_arena(0);
+	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Parser *parser = elf_create_parser(state, &arena, "parser_tests", source);
 	AstRef file = elf_parse_file(parser);

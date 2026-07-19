@@ -10,23 +10,23 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *block, AstRe
 static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr);
 static Ir lower_ast_to_ir_block(LowerContext *ctx, AstRef stat);
 
-static LowerContext *elf_create_lower_context(elf_State *state, Arena *arena)
+static LowerContext *elf_create_lower_context(elf_State *state, elf_Arena *arena)
 {
-	LowerContext *ctx = arena_push_zero(arena, sizeof(*ctx));
+	LowerContext *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
 	ctx->arena = arena;
 	ctx->state = state;
 
 	u32 max_functions = 1024;
-	ctx->functions = arena_push_zero(arena, sizeof(*ctx->functions) * max_functions);
+	ctx->functions = elf_arena_push_zero(arena, sizeof(*ctx->functions) * max_functions);
 	ctx->max_functions = max_functions;
 
 	u32 ir_stack_size = 4096;
-	ctx->ir_stack = arena_push_zero(arena, sizeof(*ctx->ir_stack) * ir_stack_size);
+	ctx->ir_stack = elf_arena_push_zero(arena, sizeof(*ctx->ir_stack) * ir_stack_size);
 	ctx->ir_stack_size = ir_stack_size;
 	ctx->ir_stack_index = 0;
 
 	u32 defer_stack_size = 4096;
-	ctx->defer_stack = arena_push_zero(arena, sizeof(*ctx->defer_stack) * defer_stack_size);
+	ctx->defer_stack = elf_arena_push_zero(arena, sizeof(*ctx->defer_stack) * defer_stack_size);
 	ctx->defer_stack_size = defer_stack_size;
 	ctx->defer_count = 0;
 	ctx->defer_scope_start = 0;
@@ -49,10 +49,10 @@ static void report_lowering_error(LowerContext *ctx, LoweringError error, Source
 
 	va_list args;
 	va_start(args, format);
-	Scratch scratch = get_scratch();
-	char *message = arena_pushfv(scratch.arena, format, args);
+	elf_Scratch scratch = elf_get_scratch();
+	char *message = elf_arena_pushfv(scratch.arena, format, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1);
+	elf_arena_push_zero(scratch.arena, 1);
 
 	const char *source_name = ctx && ctx->source_name ? atom_data(ctx->source_name) : "<unknown>";
 	if (site.line_index) {
@@ -62,7 +62,7 @@ static void report_lowering_error(LowerContext *ctx, LoweringError error, Source
 	else {
 		log_linef(LOG_LEVEL_ERROR, "%s [?] lowering error: %s", source_name, message);
 	}
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 
 static void report_lowering_warning(LowerContext *ctx, LoweringError error, SourceSite site, const char *format, ...)
@@ -71,10 +71,10 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 
 	va_list args;
 	va_start(args, format);
-	Scratch scratch = get_scratch();
-	char *message = arena_pushfv(scratch.arena, format, args);
+	elf_Scratch scratch = elf_get_scratch();
+	char *message = elf_arena_pushfv(scratch.arena, format, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1);
+	elf_arena_push_zero(scratch.arena, 1);
 
 	const char *source_name = ctx && ctx->source_name ? atom_data(ctx->source_name) : "<unknown>";
 	if (site.line_index) {
@@ -89,7 +89,7 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 		print_source_slice_marker(site, (elf_StrSlice){});
 	}
 
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 }
 
 static AstRef check_ast_type(AstRef ast, AstType type)
@@ -129,7 +129,7 @@ static IrArray end_ir_array_builder(IRArrayBuilder *block)
 	ctx->ir_stack_index -= block->count;
 	IrArray items = {};
 	items.count = block->count;
-	items.items = arena_push_copy(ctx->arena
+	items.items = elf_arena_push_copy(ctx->arena
 	,	sizeof(*items.items) * items.count, ctx->ir_stack + ctx->ir_stack_index);
 
 	ASSERT(ctx->ir_stack_index == block->start);
@@ -333,8 +333,8 @@ static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 varia
 	function->variadic = variadic;
 	function->arity = arity;
 	function->body = body;
-	function->captures = arena_push_zero(ctx->arena, sizeof(*function->captures) * 255);
-	function->capture_entities = arena_push_zero(ctx->arena, sizeof(*function->capture_entities) * 255);
+	function->captures = elf_arena_push_zero(ctx->arena, sizeof(*function->captures) * 255);
+	function->capture_entities = elf_arena_push_zero(ctx->arena, sizeof(*function->capture_entities) * 255);
 	function->capture_count = 0;
 
 	return function;
@@ -518,7 +518,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 			Ir ir_func = lower_ast_expr_to_ir(ctx, func);
 
-			Ir *ir_args = arena_push(ctx->arena, sizeof(*ir_args) * nargs);
+			Ir *ir_args = elf_arena_push(ctx->arena, sizeof(*ir_args) * nargs);
 			for (u32 i = 0; i < nargs; ++ i) {
 				ir_args[i] = lower_ast_expr_to_ir(ctx, args[i]);
 			}
@@ -585,7 +585,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 			IrArray captures = {};
 			captures.count = function->capture_count;
-			captures.items = arena_push_copy(ctx->arena
+			captures.items = elf_arena_push_copy(ctx->arena
 			,	sizeof(*captures.items) * captures.count, function->captures);
 
 			ir = create_function_ir(ctx, expr->site, function_index);
@@ -876,7 +876,7 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, AstRef stat, AstRef 
 		collection_local = create_local_ir(ctx, collection_expr->site, collection);
 	}
 
-	Ir *var_locals = arena_push(ctx->arena, sizeof(*var_locals) * nvars);
+	Ir *var_locals = elf_arena_push(ctx->arena, sizeof(*var_locals) * nvars);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		AstRef name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
@@ -1209,7 +1209,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 				break;
 			}
 
-			Ir *values = arena_push(ctx->arena, sizeof(*values) * nargs);
+			Ir *values = elf_arena_push(ctx->arena, sizeof(*values) * nargs);
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				SourceSite site = stat->site;

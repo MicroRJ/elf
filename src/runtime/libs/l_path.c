@@ -103,14 +103,14 @@ ELF_FUNCTION(lib_path_join)
 		needs_separator = last != '/' && last != '\\' && first != '/' && first != '\\';
 	}
 
-	Scratch scratch = get_scratch();
-	char *result = arena_push(scratch.arena, left_size + right_size + needs_separator);
+	elf_Scratch scratch = elf_get_scratch();
+	char *result = elf_arena_push(scratch.arena, left_size + right_size + needs_separator);
 	memcpy(result, left_data, left_size);
 	u32 at = left_size;
 	if (needs_separator) result[at++] = '/';
 	memcpy(result + at, right_data, right_size);
 	lib_push_string(state, result, at + right_size);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 

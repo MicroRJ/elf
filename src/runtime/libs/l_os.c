@@ -5,12 +5,12 @@
 ELF_FUNCTION(lib_os_cwd)
 {
 	elf_State *state = S;
-	Scratch scratch = get_scratch();
-	char *buffer = arena_push_zero(scratch.arena, 32768);
+	elf_Scratch scratch = elf_get_scratch();
+	char *buffer = elf_arena_push_zero(scratch.arena, 32768);
 	int size = sys_get_work_dir(buffer, 32768);
 	if (size <= 0) push_value(state, value_nil());
 	else push_value(state, lib_string_value(state, buffer));
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 

@@ -11,17 +11,15 @@ struct elf_Value
 	u8  status;
 	u16 unused;
 	union {
-		i64 x_i64;
-		struct { i32 x_i32, y_i32; };
-		i64 x_int;
-		f64 x_num;
-		elf_Handle x_sys;
-		elf_Object *x_obj;
-		elf_Table *x_tab;
-		elf_String *x_atom;
-		elf_Function x_proc;
-		elf_Closure *x_closure;
-		void *x_ptr;
+		i64           x_i64;
+		i64           x_int;
+		f64           x_num;
+		elf_Object   *x_obj;
+		elf_Table    *x_tab;
+		elf_String   *x_atom;
+		elf_Function  x_proc;
+		elf_Closure  *x_closure;
+		void         *x_ptr;
 	};
 };
 
@@ -48,7 +46,6 @@ static inline b32 elf_value_type_is_table(elf_ValueType type)    { return type =
 static inline b32 elf_value_type_is_user(elf_ValueType type)     { return type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 elf_value_type_is_function(elf_ValueType type) { return type == ELF_VALUE_TYPE_CFUNCTION; }
 static inline b32 elf_value_type_is_closure(elf_ValueType type)  { return type == ELF_VALUE_TYPE_CLOSURE; }
-static inline b32 elf_value_type_is_handle(elf_ValueType type)   { return type == ELF_VALUE_TYPE_HANDLE; }
 
 static inline b32 elf_value_type_is_numeric(elf_ValueType type)
 {
@@ -72,7 +69,6 @@ static inline b32 value_is_table(elf_Value value)    { return value.type == ELF_
 static inline b32 value_is_user(elf_Value value)     { return value.type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 value_is_function(elf_Value value) { return value.type == ELF_VALUE_TYPE_CFUNCTION; }
 static inline b32 value_is_closure(elf_Value value)  { return value.type == ELF_VALUE_TYPE_CLOSURE; }
-static inline b32 value_is_handle(elf_Value value)   { return value.type == ELF_VALUE_TYPE_HANDLE; }
 
 static inline b32 value_is_dead(elf_Value value) { return value_is_nil(value); }
 static inline b32 value_is_key(elf_Value value)  { return !value_is_nil(value); }
@@ -94,7 +90,6 @@ static inline b32 value_is_object(elf_Value value)
 
 static inline i64 value_as_integer(elf_Value value)          { return value.x_int; }
 static inline f64 value_as_number(elf_Value value)           { return value.x_num; }
-static inline elf_Handle value_as_handle(elf_Value value)    { return value.x_sys; }
 static inline elf_Object *value_as_object(elf_Value value)   { return value.x_obj; }
 static inline elf_String *value_as_atom(elf_Value value)       { return value.x_atom; }
 static inline elf_Table *value_as_table(elf_Value value)     { return value.x_tab; }
@@ -151,14 +146,6 @@ static inline elf_Value value_from_number(f64 number)
 	elf_Value value = {};
 	value.type = ELF_VALUE_TYPE_NUMBER;
 	value.x_num = number;
-	return value;
-}
-
-static inline elf_Value value_from_handle(elf_Handle handle)
-{
-	elf_Value value = {};
-	value.type = ELF_VALUE_TYPE_HANDLE;
-	value.x_sys = handle;
 	return value;
 }
 

@@ -19,7 +19,7 @@ Lexer;
 
 struct Parser
 {
-	Arena         *arena;
+	elf_Arena         *arena;
 	elf_State     *state;
 	elf_String      *name;
 	Lexer          lexer;

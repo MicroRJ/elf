@@ -1,8 +1,8 @@
 //
 // See Copyright Notice In elf.h
 //
-#ifndef BASE_H
-#define BASE_H
+#ifndef ELF_BASE_H
+#define ELF_BASE_H
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,7 +16,7 @@
 enum
 {
 	false = 0,
-	true = 1,
+	true  = 1,
 };
 #endif
 
@@ -31,6 +31,10 @@ typedef elf_i64 i64;
 typedef elf_f32 f32;
 typedef elf_f64 f64;
 typedef elf_b32 b32;
+
+typedef elf_u64 elf_Handle;
+#define ELF_HINVALID ((elf_Handle)0)
+#define ELF_IS_HANDLE_INVALID(H) ((H) == ELF_HINVALID)
 
 #define __FUNC__ __func__
 

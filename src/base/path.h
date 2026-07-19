@@ -1,8 +1,8 @@
 //
 // See Copyright Notice In elf.h
 //
-#ifndef PATH_H
-#define PATH_H
+#ifndef ELF_PATH_H
+#define ELF_PATH_H
 
 #ifndef PATH_BUILDER
 #define PATH_BUILDER
@@ -16,11 +16,10 @@ typedef struct
 	short segs;
 	char *name;
 }
-Path_Stack;
+elf_PathStack;
 
-Path_Stack path_new_stack(Arena *arena, u32 capacity);
-void path_push_raw(Path_Stack *pb, const char *text);
-void path_pop(Path_Stack *pb);
-void path_push(Path_Stack *pb, const char *name);
+elf_PathStack elf_alloc_path_stack(elf_Arena *arena, u32 capacity);
+void elf_path_pop(elf_PathStack *path);
+void elf_path_push(elf_PathStack *path, const char *name);
 
 #endif

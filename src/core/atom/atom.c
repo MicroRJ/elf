@@ -170,12 +170,12 @@ const char *atom_data(elf_String *atom)
 	return atom->data;
 }
 
-elf_StrSlice elf_atom_copy_text(Arena *arena, elf_String *atom)
+elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_String *atom)
 {
 	elf_StrSlice copy = {};
-	copy.data = arena_push_data(arena, atom->data, atom->size);
+	copy.data = elf_arena_push_data(arena, atom->data, atom->size);
 	copy.size = atom->size;
-	arena_push_zero(arena, 1);
+	elf_arena_push_zero(arena, 1);
 	return copy;
 }
 

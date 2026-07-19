@@ -1,6 +1,12 @@
 #ifndef ELF_CORE_TABLE_H
 #define ELF_CORE_TABLE_H
 
+#define ENTRY_INDEX_MASK       0x00000000FFFFFFFFull
+#define ENTRY_TYPE_SHIFT       32
+#define ENTRY_TYPE_MASK        0x000000FF00000000ull
+#define ENTRY_READONLY_BIT     0x0000010000000000ull
+#define ENTRY_TOMB_TYPE        0xFFu
+
 typedef struct
 {
 	u64 key;
@@ -9,11 +15,42 @@ typedef struct
 Entry;
 STATIC_ASSERT(sizeof(Entry) == 16);
 
-#define ENTRY_INDEX_MASK       0x00000000FFFFFFFFull
-#define ENTRY_TYPE_SHIFT       32
-#define ENTRY_TYPE_MASK        0x000000FF00000000ull
-#define ENTRY_READONLY_BIT     0x0000010000000000ull
-#define ENTRY_TOMB_TYPE        0xFFu
+
+struct elf_Table
+{
+	elf_Object      obj;
+	u32         ndebug;
+	u32         fillcounter;
+	u32         nentries;
+	Entry      *entries;
+	u32         count;
+	u32         capacity;
+	elf_Value  *array;
+};
+
+elf_Table *elf_new_table_rogue2(elf_State *state, u32 nentries);
+elf_Table *elf_new_table_rogue(elf_State *state);
+
+u32 elf_table_set(elf_State *state, elf_Table *tab, elf_Value key, elf_Value value);
+elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *tab, elf_Value key);
+u32 elf_table_ensure(elf_State *state, elf_Table *tab, elf_Value key);
+u32 elf_table_bind_to_index(elf_State *state, elf_Table *tab, elf_Value key, u32 index);
+b32 elf_table_contains(elf_State *state, elf_Table *tab, elf_Value key);
+b32 elf_table_delete(elf_State *state, elf_Table *tab, elf_Value key, elf_Value *removed);
+void elf_table_clear(elf_State *state, elf_Table *tab);
+void elf_table_alias(elf_State *state, elf_Table *tab, elf_Value key, elf_Value alias);
+
+u32 elf_array_add(elf_State *state, elf_Table *tab, elf_Value value);
+u32 elf_array_insert(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
+elf_Value elf_array_get(elf_State *state, elf_Table *tab, u32 index);
+void elf_array_set(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
+void elf_array_remove(elf_State *state, elf_Table *tab, u32 index, u32 count);
+void elf_array_swap(elf_State *state, elf_Table *tab, u32 left, u32 right);
+u32 elf_array_length(elf_Table *tab);
+
+void elf_table_mark_field_readonly(elf_State *state, elf_Table *tab, elf_Value field);
+
+
 
 static inline u32 entry_index(Entry entry)
 {
@@ -94,39 +131,5 @@ static inline elf_Value entry_key_value(Entry entry)
 	value.x_i64 = (i64)entry.key;
 	return value;
 }
-
-struct elf_Table
-{
-	elf_Object      obj;
-	u32         ndebug;
-	u32         fillcounter;
-	u32         nentries;
-	Entry      *entries;
-	u32         count;
-	u32         capacity;
-	elf_Value  *array;
-};
-
-elf_Table *elf_table_new_unrooted_sized(elf_State *S, u32 nentries);
-elf_Table *elf_table_new_unrooted(elf_State *S);
-
-u32 elf_table_set(elf_State *S, elf_Table *tab, elf_Value key, elf_Value value);
-elf_Value elf_table_get_or_nil(elf_State *S, elf_Table *tab, elf_Value key);
-u32 elf_table_ensure(elf_State *S, elf_Table *tab, elf_Value key);
-u32 elf_table_bind_to_index(elf_State *S, elf_Table *tab, elf_Value key, u32 index);
-b32 elf_table_contains(elf_State *S, elf_Table *tab, elf_Value key);
-b32 elf_table_delete(elf_State *S, elf_Table *tab, elf_Value key, elf_Value *removed);
-void elf_table_clear(elf_State *S, elf_Table *tab);
-void elf_table_alias(elf_State *S, elf_Table *tab, elf_Value key, elf_Value alias);
-
-u32 elf_array_add(elf_State *S, elf_Table *tab, elf_Value value);
-u32 elf_array_insert(elf_State *S, elf_Table *tab, u32 index, elf_Value value);
-elf_Value elf_array_get(elf_State *S, elf_Table *tab, u32 index);
-void elf_array_set(elf_State *S, elf_Table *tab, u32 index, elf_Value value);
-void elf_array_remove(elf_State *S, elf_Table *tab, u32 index, u32 count);
-void elf_array_swap(elf_State *S, elf_Table *tab, u32 left, u32 right);
-u32 elf_array_len(elf_Table *tab);
-
-void elf_table_mark_field_readonly(elf_State *S, elf_Table *tab, elf_Value field);
 
 #endif

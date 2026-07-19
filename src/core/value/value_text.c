@@ -4,14 +4,14 @@
 
 #include "value_text.h"
 
-static void table_to_text(Arena *arena, elf_Table *table)
+static void table_to_text(elf_Arena *arena, elf_Table *table)
 {
-	arena_push_text(arena, "{");
+	elf_arena_push_text(arena, "{");
 
-	for (u32 i = 0; i < elf_array_len(table); ++ i)
+	for (u32 i = 0; i < elf_array_length(table); ++ i)
 	{
 		if (i != 0) {
-			arena_push_text(arena, ", ");
+			elf_arena_push_text(arena, ", ");
 		}
 
 		u32 key_count = 0;
@@ -23,39 +23,38 @@ static void table_to_text(Arena *arena, elf_Table *table)
 			}
 
 			if (key_count++ != 0) {
-				arena_push_text(arena, ", ");
+				elf_arena_push_text(arena, ", ");
 			}
 			print_value(arena, entry_key_value(entry));
 		}
 
 		if (key_count != 0) {
-			arena_push_text(arena, " = ");
+			elf_arena_push_text(arena, " = ");
 		}
 		print_value(arena, elf_array_get(0, table, i));
 	}
 
-	arena_push_text(arena, "}");
+	elf_arena_push_text(arena, "}");
 }
 
-void print_value(Arena *arena, elf_Value value)
+void print_value(elf_Arena *arena, elf_Value value)
 {
 	switch (value.type)
 	{
-		case ELF_VALUE_TYPE_NIL:       arena_push_text(arena, "nil"); break;
-		case ELF_VALUE_TYPE_INTEGER:   arena_pushf(arena, "%lli", value_as_integer(value)); break;
-		case ELF_VALUE_TYPE_NUMBER:    arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_HANDLE:    arena_pushf(arena, "h%llX", value.x_int); break;
-		case ELF_VALUE_TYPE_ATOM:      arena_push_data(arena, value.x_atom->data, value.x_atom->size); break;
-		case ELF_VALUE_TYPE_CLOSURE:   arena_push_text(arena, "C()"); break;
-		case ELF_VALUE_TYPE_CFUNCTION: arena_push_text(arena, "F()"); break;
+		case ELF_VALUE_TYPE_NIL:       elf_arena_push_text(arena, "nil"); break;
+		case ELF_VALUE_TYPE_INTEGER:   elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
+		case ELF_VALUE_TYPE_NUMBER:    elf_arena_pushf(arena, "%f", value.x_num); break;
+		case ELF_VALUE_TYPE_ATOM:      elf_arena_push_data(arena, value.x_atom->data, value.x_atom->size); break;
+		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "C()"); break;
+		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "F()"); break;
 		case ELF_VALUE_TYPE_TABLE:     table_to_text(arena, value_as_table(value)); break;
-		default:                       arena_push_text(arena, "(?)"); break;
+		default:                       elf_arena_push_text(arena, "(?)"); break;
 	}
 }
 
-static void source_indent(Arena *arena, u32 indent)
+static void source_indent(elf_Arena *arena, u32 indent)
 {
-	arena_push_repeat(arena, '\t', indent);
+	elf_arena_push_nchar(arena, '\t', indent);
 }
 
 static b32 value_can_source(elf_Value value)
@@ -74,28 +73,28 @@ static b32 value_can_source(elf_Value value)
 	}
 }
 
-static void atom_to_source(Arena *arena, elf_String *atom)
+static void atom_to_source(elf_Arena *arena, elf_String *atom)
 {
-	arena_push_char(arena, '"');
+	elf_arena_push_char(arena, '"');
 
 	const char *data = atom->data;
 	for (u32 i = 0; i < atom->size; ++ i)
 	{
 		switch (data[i])
 		{
-			case '\\': arena_push_text(arena, "\\\\"); break;
-			case '"':  arena_push_text(arena, "\\\""); break;
-			case '\n': arena_push_text(arena, "\\n");  break;
-			case '\r': arena_push_text(arena, "\\r");  break;
-			case '\t': arena_push_text(arena, "\\t");  break;
-			default:   arena_push_char(arena, data[i]); break;
+			case '\\': elf_arena_push_text(arena, "\\\\"); break;
+			case '"':  elf_arena_push_text(arena, "\\\""); break;
+			case '\n': elf_arena_push_text(arena, "\\n");  break;
+			case '\r': elf_arena_push_text(arena, "\\r");  break;
+			case '\t': elf_arena_push_text(arena, "\\t");  break;
+			default:   elf_arena_push_char(arena, data[i]); break;
 		}
 	}
 
-	arena_push_char(arena, '"');
+	elf_arena_push_char(arena, '"');
 }
 
-static b32 table_slot_keys_to_source(elf_State *state, Arena *arena, elf_Table *table, u32 slot, u32 indent, b32 *needs_separator)
+static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 slot, u32 indent, b32 *needs_separator)
 {
 	b32 emitted_key = false;
 	elf_Value value = elf_array_get(state, table, slot);
@@ -115,10 +114,10 @@ static b32 table_slot_keys_to_source(elf_State *state, Arena *arena, elf_Table *
 			continue;
 		}
 
-		arena_push_text(arena, *needs_separator ? ",\n" : "\n");
+		elf_arena_push_text(arena, *needs_separator ? ",\n" : "\n");
 		source_indent(arena, indent + 1);
 		serialize_value(state, arena, key, indent + 1);
-		arena_push_text(arena, " = ");
+		elf_arena_push_text(arena, " = ");
 		serialize_value(state, arena, value, indent + 1);
 
 		*needs_separator = true;
@@ -128,12 +127,12 @@ static b32 table_slot_keys_to_source(elf_State *state, Arena *arena, elf_Table *
 	return emitted_key;
 }
 
-static b32 table_to_source(elf_State *state, Arena *arena, elf_Table *table, u32 indent)
+static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 indent)
 {
-	arena_push_text(arena, "{");
+	elf_arena_push_text(arena, "{");
 
 	b32 needs_separator = false;
-	for (u32 i = 0; i < elf_array_len(table); ++ i)
+	for (u32 i = 0; i < elf_array_length(table); ++ i)
 	{
 		elf_Value value = elf_array_get(state, table, i);
 		if (!value_can_source(value)) {
@@ -145,7 +144,7 @@ static b32 table_to_source(elf_State *state, Arena *arena, elf_Table *table, u32
 			continue;
 		}
 
-		arena_push_text(arena, needs_separator ? ",\n" : "\n");
+		elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
 		source_indent(arena, indent + 1);
 		serialize_value(state, arena, value, indent + 1);
 		needs_separator = true;
@@ -153,33 +152,33 @@ static b32 table_to_source(elf_State *state, Arena *arena, elf_Table *table, u32
 
 	if (needs_separator)
 	{
-		arena_push_text(arena, "\n");
+		elf_arena_push_text(arena, "\n");
 		source_indent(arena, indent);
 	}
 
-	arena_push_text(arena, "}");
+	elf_arena_push_text(arena, "}");
 	return true;
 }
 
-b32 serialize_value(elf_State *state, Arena *arena, elf_Value value, u32 indent)
+b32 serialize_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent)
 {
 	switch (value.type)
 	{
 		case ELF_VALUE_TYPE_NIL:
 		{
-			arena_push_text(arena, "nil");
+			elf_arena_push_text(arena, "nil");
 		}
 		break;
 
 		case ELF_VALUE_TYPE_INTEGER:
 		{
-			arena_pushf(arena, "%lli", value_as_integer(value));
+			elf_arena_pushf(arena, "%lli", value_as_integer(value));
 		}
 		break;
 
 		case ELF_VALUE_TYPE_NUMBER:
 		{
-			arena_pushf(arena, "%f", value.x_num);
+			elf_arena_pushf(arena, "%f", value.x_num);
 		}
 		break;
 

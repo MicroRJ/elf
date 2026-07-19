@@ -38,7 +38,7 @@ static elf_Value table_call(elf_State *state, elf_Value function,
 
 ELF_FUNCTION(l_table_length)
 {
-	push_value(S, value_from_integer(elf_array_len(table_receiver(S))));
+	push_value(S, value_from_integer(elf_array_length(table_receiver(S))));
 	return 1;
 }
 
@@ -99,7 +99,7 @@ ELF_FUNCTION(l_table_pairs)
 		{
 			Entry entry = table->entries[slot];
 			if (!entry_is_key(entry) || entry_index(entry) != value_index) continue;
-			elf_Table *pair = elf_table_new_unrooted(S);
+			elf_Table *pair = elf_new_table_rogue(S);
 			elf_array_add(S, pair, entry_key_value(entry));
 			elf_array_add(S, pair, table->array[value_index]);
 			elf_array_add(S, result, value_from_table(pair));
@@ -110,7 +110,7 @@ ELF_FUNCTION(l_table_pairs)
 
 static elf_Table *table_clone(elf_State *state, elf_Table *source)
 {
-	elf_Table *result = elf_table_new_unrooted(state);
+	elf_Table *result = elf_new_table_rogue(state);
 	for (u32 i = 0; i < source->count; ++i) {
 		elf_array_add(state, result, source->array[i]);
 	}

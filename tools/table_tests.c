@@ -102,7 +102,7 @@ static void test_table_array_operations(elf_State *state)
 	expect_index(a, 0, "first array add u32");
 	expect_index(b, 1, "second array add u32");
 	expect_index(c, 2, "third array add u32");
-	expect_index(elf_array_len(table), 3, "array length after adds");
+	expect_index(elf_array_length(table), 3, "array length after adds");
 
 	expect_int(elf_array_get(state, table, 0), 7, "array get 0");
 	expect_int(elf_array_get(state, table, 1), 8, "array get 1");
@@ -121,7 +121,7 @@ static void test_table_field_and_array_share_storage(elf_State *state)
 
 	expect_index(field_slot, 0, "field storage starts at slot 0");
 	expect_index(array_slot, 1, "array append follows field storage");
-	expect_index(elf_array_len(table), 2, "array length reflects shared storage");
+	expect_index(elf_array_length(table), 2, "array length reflects shared storage");
 	expect_int(elf_array_get(state, table, field_slot), 1, "field elf_Value lives in storage elf_Value *");
 	expect_int(elf_array_get(state, table, array_slot), 2, "array elf_Value lives in storage elf_Value *");
 }

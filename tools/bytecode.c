@@ -15,7 +15,7 @@ static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *so
 	}
 
 	u64 size = elf_platform_get_file_size(file);
-	char *data = arena_push(&state->arena, size + 16);
+	char *data = elf_arena_push(&state->arena, size + 16);
 	zero_memory(data + size, 16);
 	elf_platform_read_file(file, data, (u32)size);
 	elf_platform_close_file(file);

@@ -82,7 +82,7 @@ struct StackFrame
 typedef struct elf_State elf_State;
 struct elf_State
 {
-	Arena    arena;
+	elf_Arena    arena;
 
 	struct
 	{
@@ -143,7 +143,7 @@ void elf_push_env(elf_State *state);
 void elf_tab_set(elf_State *state);
 void elf_arr_add(elf_State *state);
 void elf_arr_get(elf_State *state);
-elf_StrSlice elf_arg_str_copy(elf_State *state, int index, Arena *arena);
+elf_StrSlice elf_arg_str_copy(elf_State *state, int index, elf_Arena *arena);
 
 typedef enum
 {

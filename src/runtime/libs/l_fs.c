@@ -30,13 +30,13 @@ ELF_FUNCTION(lib_fs_read)
 		return 1;
 	}
 
-	Scratch scratch = get_scratch();
-	char *data = arena_push(scratch.arena, (u64)file_size + 1);
+	elf_Scratch scratch = elf_get_scratch();
+	char *data = elf_arena_push(scratch.arena, (u64)file_size + 1);
 	i64 size = elf_platform_read_file(file, data, file_size);
 	elf_platform_close_file(file);
 	if (size < 0) size = 0;
 	lib_push_string(state, data, (u32)size);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 

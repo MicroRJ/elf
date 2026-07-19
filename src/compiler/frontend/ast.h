@@ -114,7 +114,7 @@ AstArray;
 
 typedef struct
 {
-	Arena *arena;
+	elf_Arena *arena;
 	u32        stack_size;
 	u32        stack_index;
 	AstRef    *stack;

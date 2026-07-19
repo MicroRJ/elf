@@ -17,13 +17,13 @@ static const char *ast_type_name(AstType type)
 	return names[type];
 }
 
-static AstContext create_ast_context(Arena *arena)
+static AstContext create_ast_context(elf_Arena *arena)
 {
 	u32 stack_size = 4096;
 
 	AstContext ast = {};
 	ast.arena = arena;
-	ast.stack = arena_push_zero(arena, sizeof(*ast.stack) * stack_size);
+	ast.stack = elf_arena_push_zero(arena, sizeof(*ast.stack) * stack_size);
 	ast.stack_size = stack_size;
 	ast.stack_index = 0;
 	return ast;
@@ -31,7 +31,7 @@ static AstContext create_ast_context(Arena *arena)
 
 static AstRef create_ast(Parser *par, SourceSite site, AstType kind)
 {
-	Ast *tree = arena_push_zero(par->ast.arena, sizeof(*tree));
+	Ast *tree = elf_arena_push_zero(par->ast.arena, sizeof(*tree));
 	tree->site = site;
 	tree->kind = kind;
 	return tree;

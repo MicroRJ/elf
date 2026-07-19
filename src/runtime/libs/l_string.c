@@ -154,7 +154,7 @@ ELF_FUNCTION(l_string_glob_match)
 {
 	elf_String *string = string_receiver(S);
 	elf_String *pattern = lib_load_string(S, 1);
-	b32 matches = matcher_match_sized(atom_data(string), atom_size(string),
+	b32 matches = elf_glob_match_sized(atom_data(string), atom_size(string),
 		atom_data(pattern), atom_size(pattern));
 	push_value(S, value_from_integer(matches));
 	return 1;
@@ -228,11 +228,11 @@ ELF_FUNCTION(l_string_lower)
 {
 	elf_String *string = string_receiver(S);
 	u32 size = atom_size(string);
-	Scratch scratch = get_scratch();
-	u8 *result = arena_push(scratch.arena, size);
+	elf_Scratch scratch = elf_get_scratch();
+	u8 *result = elf_arena_push(scratch.arena, size);
 	for (u32 i = 0; i < size; ++i) result[i] = string_to_lower((u8)atom_data(string)[i]);
 	string_push(S, (char *)result, size);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 
@@ -240,11 +240,11 @@ ELF_FUNCTION(l_string_upper)
 {
 	elf_String *string = string_receiver(S);
 	u32 size = atom_size(string);
-	Scratch scratch = get_scratch();
-	u8 *result = arena_push(scratch.arena, size);
+	elf_Scratch scratch = elf_get_scratch();
+	u8 *result = elf_arena_push(scratch.arena, size);
 	for (u32 i = 0; i < size; ++i) result[i] = string_to_upper((u8)atom_data(string)[i]);
 	string_push(S, (char *)result, size);
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 
@@ -264,21 +264,21 @@ ELF_FUNCTION(l_string_replace)
 		return 0;
 	}
 
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	u32 start = 0;
 	for (;;)
 	{
 		const char *found = string_find_data(text, size, old_data, old_size, start);
 		if (!found) break;
 		u32 at = (u32)(found - text);
-		arena_push_data(scratch.arena, text + start, at - start);
-		arena_push_data(scratch.arena, atom_data(replacement), atom_size(replacement));
+		elf_arena_push_data(scratch.arena, text + start, at - start);
+		elf_arena_push_data(scratch.arena, atom_data(replacement), atom_size(replacement));
 		start = at + old_size;
 	}
-	arena_push_data(scratch.arena, text + start, size - start);
+	elf_arena_push_data(scratch.arena, text + start, size - start);
 	string_push(S, (char *)scratch.arena->data + scratch.regress,
 		(u32)(scratch.arena->in_use - scratch.regress));
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 
@@ -294,12 +294,12 @@ ELF_FUNCTION(l_string_repeat)
 		return 0;
 	}
 
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	for (i64 i = 0; i < count; ++i) {
-		arena_push_data(scratch.arena, atom_data(string), size);
+		elf_arena_push_data(scratch.arena, atom_data(string), size);
 	}
 	string_push(S, (char *)scratch.arena->data + scratch.regress, (u32)(count * size));
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 
@@ -309,22 +309,22 @@ ELF_FUNCTION(l_string_join)
 	elf_Value parts_value = load_value(S, 1);
 	check_value_type(S, parts_value, ELF_VALUE_TYPE_TABLE);
 	elf_Table *parts = value_as_table(parts_value);
-	u32 count = elf_array_len(parts);
-	Scratch scratch = get_scratch();
+	u32 count = elf_array_length(parts);
+	elf_Scratch scratch = elf_get_scratch();
 
 	for (u32 i = 0; i < count; ++i)
 	{
 		elf_Value part_value = elf_array_get(S, parts, i);
 		check_value_type(S, part_value, ELF_VALUE_TYPE_ATOM);
 		elf_String *part = value_as_atom(part_value);
-		if (i > 0) arena_push_data(scratch.arena,
+		if (i > 0) elf_arena_push_data(scratch.arena,
 			atom_data(separator), atom_size(separator));
-		arena_push_data(scratch.arena, atom_data(part), atom_size(part));
+		elf_arena_push_data(scratch.arena, atom_data(part), atom_size(part));
 	}
 
 	string_push(S, (char *)scratch.arena->data + scratch.regress,
 		(u32)(scratch.arena->in_use - scratch.regress));
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return 1;
 }
 

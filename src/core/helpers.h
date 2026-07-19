@@ -2,14 +2,14 @@
 // See Copyright Notice In elf.h
 //
 
-static inline elf_Table *elf_get_type_metatable(elf_State *S, elf_Value value)
+static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value value)
 {
 	switch (value.type)
 	{
-		case ELF_VALUE_TYPE_ATOM:    return S->metatables.atom;
-		case ELF_VALUE_TYPE_TABLE:   return S->metatables.table;
-		case ELF_VALUE_TYPE_NUMBER:  return S->metatables.number;
-		case ELF_VALUE_TYPE_INTEGER: return S->metatables.integer;
+		case ELF_VALUE_TYPE_ATOM:    return state->metatables.atom;
+		case ELF_VALUE_TYPE_TABLE:   return state->metatables.table;
+		case ELF_VALUE_TYPE_NUMBER:  return state->metatables.number;
+		case ELF_VALUE_TYPE_INTEGER: return state->metatables.integer;
 		default:                     return 0;
 	}
 }
@@ -21,7 +21,6 @@ typedef enum
 	TBIT_NIL      = 1 << ELF_VALUE_TYPE_NIL,
 	TBIT_NUMBER   = 1 << ELF_VALUE_TYPE_NUMBER,
 	TBIT_INTEGER  = 1 << ELF_VALUE_TYPE_INTEGER,
-	TBIT_HANDLE   = 1 << ELF_VALUE_TYPE_HANDLE,
 	TBIT_FUNCTION = 1 << ELF_VALUE_TYPE_CFUNCTION,
 	TBIT_USER     = 1 << ELF_VALUE_TYPE_USER_OBJECT,
 	TBIT_CLOSURE  = 1 << ELF_VALUE_TYPE_CLOSURE,
@@ -38,7 +37,6 @@ typedef enum
 	TRULE_NIL      = TBIT_NIL,
 	TRULE_NUMBER   = TBIT_NUMBER,
 	TRULE_INTEGER  = TBIT_INTEGER,
-	TRULE_HANDLE   = TBIT_HANDLE,
 	TRULE_FUNCTION = TBIT_FUNCTION,
 	TRULE_USER     = TBIT_USER,
 	TRULE_CLOSURE  = TBIT_CLOSURE,

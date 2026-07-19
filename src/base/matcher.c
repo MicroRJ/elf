@@ -27,7 +27,7 @@ static b32 matcher_match_range(const char *text, u32 text_size,
 	return matcher_match_range(text + 1, text_size - 1, pattern + 1, pattern_size - 1);
 }
 
-b32 matcher_match_sized(const char *text, u32 text_size, const char *pattern, u32 pattern_size)
+b32 elf_glob_match_sized(const char *text, u32 text_size, const char *pattern, u32 pattern_size)
 {
 	u32 start = 0;
 	for (u32 i = 0; i <= pattern_size; ++i)
@@ -47,7 +47,7 @@ static const char *matcher_text_end(const char *text)
 	return text;
 }
 
-const char *matcher_match(const char *text, const char *pattern)
+const char *elf_glob_match(const char *text, const char *pattern)
 {
 	do {
 		const char *tail = matcher_match_one(text, pattern);

@@ -19,7 +19,7 @@ static const char *ir_kind_name(IrKind kind)
 
 static Ir create_ir(LowerContext *ctx, SourceSite site, IrKind kind)
 {
-	IrNode *ir = arena_push_zero(ctx->arena, sizeof(*ir));
+	IrNode *ir = elf_arena_push_zero(ctx->arena, sizeof(*ir));
 	ir->kind = kind;
 	ir->site = site;
 	return ir;

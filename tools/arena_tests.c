@@ -19,29 +19,29 @@ static void expect_arena_text(const char *actual, const char *expected, u64 size
 
 static void test_arena_push_and_reserve(void)
 {
-	Arena arena = create_arena(KILOBYTES(1));
+	elf_Arena arena = elf_arena_create(KILOBYTES(1));
 
-	char *start = arena_push(&arena, 0);
-	char *reserved = arena_reserve(&arena, 16);
+	char *start = elf_arena_push(&arena, 0);
+	char *reserved = elf_arena_reserve(&arena, 16);
 	expect_arena_u64(arena.in_use, 0, "arena reserve does not commit bytes");
 	if (reserved != start) {
 		test_fail("arena reserve returns current cursor");
 	}
 
-	char *pushed = arena_push(&arena, 16);
+	char *pushed = elf_arena_push(&arena, 16);
 	if (pushed != start) {
 		test_fail("arena push returns current cursor");
 	}
 	expect_arena_u64(arena.in_use, 16, "arena push advances cursor");
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_arena_zero_copy_and_data(void)
 {
-	Arena arena = create_arena(KILOBYTES(1));
+	elf_Arena arena = elf_arena_create(KILOBYTES(1));
 
-	char *zero = arena_push_zero(&arena, 4);
+	char *zero = elf_arena_push_zero(&arena, 4);
 	for (u32 i = 0; i < 4; ++i) {
 		if (zero[i] != 0) {
 			test_fail("arena push zero clears memory");
@@ -50,25 +50,25 @@ static void test_arena_zero_copy_and_data(void)
 	}
 
 	char source[] = {'a', 'b', 'c', 0};
-	char *copy = arena_push_copy(&arena, sizeof(source), source);
+	char *copy = elf_arena_push_copy(&arena, sizeof(source), source);
 	expect_arena_text(copy, source, sizeof(source), "arena push copy copies bytes");
 
-	char *data = arena_push_data(&arena, "xyz", 3);
+	char *data = elf_arena_push_data(&arena, "xyz", 3);
 	expect_arena_text(data, "xyz", 3, "arena push data copies unterminated bytes");
 	expect_arena_u64(arena.in_use, 4 + sizeof(source) + 3, "arena copy helpers advance by byte count");
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_arena_text_char_repeat(void)
 {
-	Arena arena = create_arena(KILOBYTES(1));
-	char *start = arena_push(&arena, 0);
+	elf_Arena arena = elf_arena_create(KILOBYTES(1));
+	char *start = elf_arena_push(&arena, 0);
 
-	arena_push_text(&arena, "elf");
-	arena_push_char(&arena, '-');
-	arena_push_repeat(&arena, 'x', 3);
-	char *end = arena_push_zero(&arena, 1);
+	elf_arena_push_text(&arena, "elf");
+	elf_arena_push_char(&arena, '-');
+	elf_arena_push_nchar(&arena, 'x', 3);
+	char *end = elf_arena_push_zero(&arena, 1);
 
 	expect_arena_text(start, "elf-xxx", 7, "arena text char repeat append in order");
 	expect_arena_u64((u64)(end - start), 7, "arena explicit terminator starts after appended text");
@@ -76,46 +76,46 @@ static void test_arena_text_char_repeat(void)
 		test_fail("arena explicit terminator produces c string");
 	}
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_arena_pushf(void)
 {
-	Arena arena = create_arena(KILOBYTES(1));
-	char *start = arena_push(&arena, 0);
+	elf_Arena arena = elf_arena_create(KILOBYTES(1));
+	char *start = elf_arena_push(&arena, 0);
 
-	char *first = arena_pushf(&arena, "%s:%d", "hp", 42);
+	char *first = elf_arena_pushf(&arena, "%s:%d", "hp", 42);
 	expect_arena_u64(arena.in_use, 5, "arena pushf advances by formatted byte count only");
 	if (first != start || strcmp(first, "hp:42") != 0) {
 		test_fail("arena pushf writes formatted text");
 	}
 
-	arena_push_text(&arena, "|");
-	arena_pushf(&arena, "%.2f", 1.5);
-	char *end = arena_push_zero(&arena, 1);
+	elf_arena_push_text(&arena, "|");
+	elf_arena_pushf(&arena, "%.2f", 1.5);
+	char *end = elf_arena_push_zero(&arena, 1);
 
 	if (strcmp(start, "hp:42|1.50") != 0) {
 		test_fail("arena pushf composes with later arena appends");
 	}
 	expect_arena_u64((u64)(end - start), 10, "arena pushf composed text size");
 
-	destroy_arena(&arena);
+	elf_arena_destroy(&arena);
 }
 
 static void test_scratch_regression(void)
 {
-	Scratch outer = get_scratch();
+	elf_Scratch outer = elf_get_scratch();
 	u64 outer_start = outer.arena->in_use;
-	arena_push_text(outer.arena, "outer");
+	elf_arena_push_text(outer.arena, "outer");
 
-	Scratch inner = get_scratch();
+	elf_Scratch inner = elf_get_scratch();
 	u64 inner_start = inner.arena->in_use;
-	arena_push_text(inner.arena, "inner");
+	elf_arena_push_text(inner.arena, "inner");
 	expect_arena_u64(inner.arena->in_use, inner_start + 5, "scratch inner advances cursor");
-	end_scratch(inner);
+	elf_end_scratch(inner);
 	expect_arena_u64(outer.arena->in_use, inner_start, "scratch inner regresses cursor");
 
-	end_scratch(outer);
+	elf_end_scratch(outer);
 	expect_arena_u64(outer.arena->in_use, outer_start, "scratch outer regresses cursor");
 }
 

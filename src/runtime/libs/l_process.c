@@ -5,8 +5,8 @@
 ELF_FUNCTION(lib_process_run)
 {
 	elf_State *state = S;
-	Arena standard_output = create_arena(0);
-	Arena standard_error = create_arena(0);
+	elf_Arena standard_output = elf_arena_create(0);
+	elf_Arena standard_error = elf_arena_create(0);
 	Sys_Process_Result process = sys_run_process(lib_load_cstr(state, 1),
 		&standard_output, &standard_error);
 
@@ -30,8 +30,8 @@ ELF_FUNCTION(lib_process_run)
 		lib_set_nil_field(state, result, "error");
 	}
 
-	destroy_arena(&standard_output);
-	destroy_arena(&standard_error);
+	elf_arena_destroy(&standard_output);
+	elf_arena_destroy(&standard_error);
 	return 1;
 }
 

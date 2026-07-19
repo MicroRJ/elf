@@ -2,7 +2,7 @@ static void force_gc_allocations(elf_State *state, u32 count)
 {
 	for (u32 i = 0; i < count; ++i) {
 		state->gc_next_cycle_bytes = 1;
-		elf_table_new_unrooted(state);
+		elf_new_table_rogue(state);
 	}
 }
 

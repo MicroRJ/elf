@@ -46,7 +46,7 @@ void elf_init_compiler_atoms(elf_State *state)
 
 int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source)
 {
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
@@ -54,13 +54,13 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 	int result = parse_json_value(parser);
 
 	state->gc_mode = saved_gc_mode;
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return result;
 }
 
 int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source)
 {
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
@@ -68,7 +68,7 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 	int result = parse_constexpr(parser);
 
 	state->gc_mode = saved_gc_mode;
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return result;
 }
 
@@ -77,7 +77,7 @@ BcFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice s
 	ASSERT(name);
 	ASSERT(source.data);
 
-	Scratch scratch = get_scratch();
+	elf_Scratch scratch = elf_get_scratch();
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
@@ -101,6 +101,6 @@ BcFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice s
 	BcFunction file_entry = bg_generate_module(state, scratch.arena, ir_module, source, source_name);
 
 	state->gc_mode = saved_gc_mode;
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return file_entry;
 }

@@ -51,7 +51,7 @@ typedef struct {
         FILE_TIME access;
 } FILE_TIMES;
 
-struct Arena;
+struct elf_Arena;
 
 typedef struct Sys_Process_Result {
         elf_b32 started;
@@ -160,8 +160,8 @@ int sys_get_last_error();
 void sys_get_error_msg(int error, char *buff, int len);
 
 elf_Handle sys_create_process(char const *file, char const *args);
-Sys_Process_Result sys_run_process(const char *command_line, struct Arena *standard_output,
-                                  struct Arena *standard_error);
+Sys_Process_Result sys_run_process(const char *command_line, struct elf_Arena *standard_output,
+                                  struct elf_Arena *standard_error);
 
 enum {
 	FILE_TYPE_FILE    = 0,
@@ -179,7 +179,7 @@ typedef struct {
 	// info along with the name
 	int          type;
 	int          size;
-	Path_Stack pb;
+	elf_PathStack pb;
 } FILE_VISITOR;
 
 

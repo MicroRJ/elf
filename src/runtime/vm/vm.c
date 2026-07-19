@@ -34,13 +34,13 @@ static inline u32 vm_check_index(elf_State *state, int instr, elf_Value value, u
 
 static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left, elf_Value right)
 {
-	Scratch scratch = get_scratch();
-	char *join_start = arena_push(scratch.arena, 0);
+	elf_Scratch scratch = elf_get_scratch();
+	char *join_start = elf_arena_push(scratch.arena, 0);
 	print_value(scratch.arena, left);
 	print_value(scratch.arena, right);
-	char *join_end = arena_push_zero(scratch.arena, 1);
+	char *join_end = elf_arena_push_zero(scratch.arena, 1);
 	elf_String *atom = elf_atom_from_data_size(state, join_start, (u32)(join_end - join_start));
-	end_scratch(scratch);
+	elf_end_scratch(scratch);
 	return atom;
 }
 
@@ -209,7 +209,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			case BC_TABLE: {
-				*result_slot = value_from_table(elf_table_new_unrooted(state));
+				*result_slot = value_from_table(elf_new_table_rogue(state));
 			} break;
 
 			case BC_CLOSURE: {
@@ -281,13 +281,13 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 
 			case BC_GETINDEX: {
 				elf_Table *array = vm_check_array(state, *left_slot);
-				u32 index = vm_check_index(state, byte_index, *right_slot, elf_array_len(array));
+				u32 index = vm_check_index(state, byte_index, *right_slot, elf_array_length(array));
 				value_copy(result_slot, elf_array_get(state, array, index));
 			} break;
 
 			case BC_SETINDEX: {
 				elf_Table *array = vm_check_array(state, *result_slot);
-				u32 index = vm_check_index(state, byte_index, *left_slot, elf_array_len(array));
+				u32 index = vm_check_index(state, byte_index, *left_slot, elf_array_length(array));
 				elf_array_set(state, array, index, *right_slot);
 			} break;
 
@@ -298,7 +298,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 
 			case BC_GETLENGTH: {
 				elf_Table *array = vm_check_array(state, *left_slot);
-				*result_slot = value_from_integer(elf_array_len(array));
+				*result_slot = value_from_integer(elf_array_length(array));
 			} break;
 
 			case BC_GETMETAFIELD: {

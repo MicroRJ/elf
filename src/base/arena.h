@@ -4,36 +4,38 @@
 #ifndef ARENA_H
 #define ARENA_H
 
-typedef struct Arena
+typedef struct elf_Arena
 {
 	u64 size;
 	u64 in_reserve;
 	u64 in_use;
 	u8 *data;
-} Arena;
+}
+elf_Arena;
 
-typedef struct Scratch
+typedef struct elf_Scratch
 {
-	Arena *arena;
+	elf_Arena *arena;
 	u64 regress;
-} Scratch;
+}
+elf_Scratch;
 
-Arena create_arena(u64 initial_reserve);
-void destroy_arena(Arena *arena);
+elf_Arena elf_arena_create(u64 initial_reserve);
+void elf_arena_destroy(elf_Arena *arena);
 
-void *arena_reserve(Arena *arena, u64 size);
-void *arena_push(Arena *arena, u64 size);
-void *arena_push_zero(Arena *arena, u64 size);
-void *arena_push_copy(Arena *arena, u64 size, const void *data);
-char *arena_push_data(Arena *arena, const void *data, u64 size);
-char *arena_push_text(Arena *arena, const char *text);
-char *arena_push_char(Arena *arena, char chr);
-void arena_push_repeat(Arena *arena, char chr, u32 count);
+void *elf_arena_reserve(elf_Arena *arena, u64 size);
+void *elf_arena_push(elf_Arena *arena, u64 size);
+void *elf_arena_push_zero(elf_Arena *arena, u64 size);
+void *elf_arena_push_copy(elf_Arena *arena, u64 size, const void *data);
+char *elf_arena_push_data(elf_Arena *arena, const void *data, u64 size);
+char *elf_arena_push_text(elf_Arena *arena, const char *text);
+char *elf_arena_push_char(elf_Arena *arena, char chr);
+void elf_arena_push_nchar(elf_Arena *arena, char chr, u32 count);
 
-char *arena_pushfv(Arena *arena, const char *format, va_list args);
-char *arena_pushf(Arena *arena, const char *format, ...);
+char *elf_arena_pushfv(elf_Arena *arena, const char *format, va_list args);
+char *elf_arena_pushf(elf_Arena *arena, const char *format, ...);
 
-Scratch get_scratch(void);
-void end_scratch(Scratch scratch);
+elf_Scratch elf_get_scratch(void);
+void elf_end_scratch(elf_Scratch scratch);
 
 #endif
