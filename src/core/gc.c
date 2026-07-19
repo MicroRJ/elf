@@ -87,7 +87,7 @@ static u32 gc_mark_stack(elf_State *state)
 	u32 marked_count = 0;
 	for (elf_Value *ptr = state->stack; ptr < state->stack_ptr; ++ ptr)
 	{
-		if (elf_value_type_is_object(ptr->type))
+		if (type_is_object(ptr->type))
 		{
 			marked_count += gc_mark_reachable(state, ptr->x_obj);
 		}

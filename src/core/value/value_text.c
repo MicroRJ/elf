@@ -25,19 +25,19 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 			if (key_count++ != 0) {
 				elf_arena_push_text(arena, ", ");
 			}
-			print_value(arena, entry_key_value(entry));
+			elf_print_value(arena, entry_key_value(entry));
 		}
 
 		if (key_count != 0) {
 			elf_arena_push_text(arena, " = ");
 		}
-		print_value(arena, elf_array_get(0, table, i));
+		elf_print_value(arena, elf_array_get(0, table, i));
 	}
 
 	elf_arena_push_text(arena, "}");
 }
 
-void print_value(elf_Arena *arena, elf_Value value)
+void elf_print_value(elf_Arena *arena, elf_Value value)
 {
 	switch (value.type)
 	{
@@ -116,9 +116,9 @@ static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Tab
 
 		elf_arena_push_text(arena, *needs_separator ? ",\n" : "\n");
 		source_indent(arena, indent + 1);
-		serialize_value(state, arena, key, indent + 1);
+		elf_unparse_value(state, arena, key, indent + 1);
 		elf_arena_push_text(arena, " = ");
-		serialize_value(state, arena, value, indent + 1);
+		elf_unparse_value(state, arena, value, indent + 1);
 
 		*needs_separator = true;
 		emitted_key = true;
@@ -146,7 +146,7 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 
 		elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
 		source_indent(arena, indent + 1);
-		serialize_value(state, arena, value, indent + 1);
+		elf_unparse_value(state, arena, value, indent + 1);
 		needs_separator = true;
 	}
 
@@ -160,7 +160,7 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	return true;
 }
 
-b32 serialize_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent)
+b32 elf_unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent)
 {
 	switch (value.type)
 	{

@@ -18,7 +18,6 @@
 @SET SRCIN= ^
 src/base/base.c ^
 src/platform/platform.c ^
-src/core/value/value.c ^
 src/compiler/backend/bytecode.c ^
 src/compiler/backend/bytecode_debug.c ^
 src/core/core.c ^

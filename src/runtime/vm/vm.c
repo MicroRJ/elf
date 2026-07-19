@@ -36,8 +36,8 @@ static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left,
 {
 	elf_Scratch scratch = elf_get_scratch();
 	char *join_start = elf_arena_push(scratch.arena, 0);
-	print_value(scratch.arena, left);
-	print_value(scratch.arena, right);
+	elf_print_value(scratch.arena, left);
+	elf_print_value(scratch.arena, right);
 	char *join_end = elf_arena_push_zero(scratch.arena, 1);
 	elf_String *atom = elf_atom_from_data_size(state, join_start, (u32)(join_end - join_start));
 	elf_end_scratch(scratch);

@@ -1,7 +1,7 @@
 static char *test_serialize_to_text(elf_State *state, elf_Arena *arena, elf_Value value)
 {
 	char *start = elf_arena_push(arena, 0);
-	if (!serialize_value(state, arena, value, 0)) {
+	if (!elf_unparse_value(state, arena, value, 0)) {
 		test_fail("serialize accepts value");
 	}
 	elf_arena_push_zero(arena, 1);

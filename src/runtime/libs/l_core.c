@@ -217,12 +217,12 @@ ELF_FUNCTION(l_core_get_meta) {
 }
 
 ELF_FUNCTION(l_core_is_atom) {
-	push_value(S, value_from_integer(elf_value_type_is_atom(value_type(load_value(S, 1)))));
+	push_value(S, value_from_integer(value_is_atom(load_value(S, 1))));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_is_numeric) {
-	push_value(S, value_from_integer(elf_value_type_is_numeric(value_type(load_value(S, 1)))));
+	push_value(S, value_from_integer(value_is_numeric(load_value(S, 1))));
 	return 1;
 }
 
@@ -337,7 +337,7 @@ ELF_FUNCTION(l_core_unparse)
 
 	elf_Scratch scratch = elf_get_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
-	b32 ok = serialize_value(S, scratch.arena, value, 0);
+	b32 ok = elf_unparse_value(S, scratch.arena, value, 0);
 	char *end = elf_arena_push_zero(scratch.arena, 1);
 
 	if (ok) {
@@ -381,7 +381,7 @@ ELF_FUNCTION(l_core_format) {
 
 			// todo:
 			elf_Value value = load_value(S, index ++);
-			print_value(scratch.arena, value);
+			elf_print_value(scratch.arena, value);
 		}
 	}
 
@@ -395,7 +395,7 @@ ELF_FUNCTION(l_core_print) {
 	elf_Scratch scratch = elf_get_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 1; i < nargs; i ++) {
-		print_value(scratch.arena, load_value(S,i));
+		elf_print_value(scratch.arena, load_value(S,i));
 	}
 	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);
@@ -412,7 +412,7 @@ ELF_FUNCTION(l_core_printl) {
 	elf_Scratch scratch = elf_get_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 1; i < nargs; i ++) {
-		print_value(scratch.arena, load_value(S,i));
+		elf_print_value(scratch.arena, load_value(S,i));
 	}
 	elf_arena_push_char(scratch.arena, '\n');
 	char *end = elf_arena_push_zero(scratch.arena, 1);
@@ -435,7 +435,7 @@ ELF_FUNCTION(l_core_fprintl) {
 	elf_Scratch scratch = elf_get_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 2; i < nargs; i ++) {
-		print_value(scratch.arena, load_value(S, i));
+		elf_print_value(scratch.arena, load_value(S, i));
 	}
 	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);

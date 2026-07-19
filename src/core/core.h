@@ -86,20 +86,19 @@ struct elf_State
 
 	struct
 	{
-		f64                *number_constants;
-		u32                 number_constant_count;
-		u32                 number_constant_capacity;
-		i64                *integer_constants;
-		u32                 integer_constant_count;
-		u32                 integer_constant_capacity;
-		BcFunction  *bytecode_functions;
-		u32                bytecode_function_count;
-		u32                bytecode_function_capacity;
-		Bytecode           *bytecode;
-		u32                bytecode_count;
-		u32                bytecode_capacity;
+		f64          *number_constants;
+		u32           number_constant_count;
+		u32           number_constant_capacity;
+		i64          *integer_constants;
+		u32           integer_constant_count;
+		u32           integer_constant_capacity;
+		BcFunction   *bytecode_functions;
+		u32           bytecode_function_count;
+		u32           bytecode_function_capacity;
+		Bytecode     *bytecode;
+		u32           bytecode_count;
+		u32           bytecode_capacity;
 	};
-
 	struct
 	{
 		u32          gc_mode;
@@ -109,7 +108,9 @@ struct elf_State
 		u32          gc_reference_capacity;
 		elf_Object **gc_references;
 		elf_Object **gc_scratch_references;
-
+	};
+	struct
+	{
 		elf_Table   *globals;
 
 		u32          stack_size;
@@ -122,11 +123,12 @@ struct elf_State
 		StackFrame   frame;
 		u64          byte;
 	};
-
-	u32        atom_count;
-	u32        atom_bucket_count;
-	elf_String **atom_buckets;
-
+	struct
+	{
+		u32          atom_count;
+		u32          atom_bucket_count;
+		elf_String **atom_buckets;
+	};
 	struct
 	{
 		elf_Table *integer;
