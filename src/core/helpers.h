@@ -14,7 +14,7 @@ static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value valu
 	}
 }
 
-#define get_num_args(S) ((S)->frame.nargs)
+#define get_num_args(state) ((state)->frame.nargs)
 
 typedef enum
 {

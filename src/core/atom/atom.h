@@ -18,6 +18,8 @@ elf_String *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 s
 
 static inline u32 atom_size(elf_String *atom)
 {
+	// TODO(RJ) no need to store additional size!
+	ASSERT(atom->obj.size - sizeof(* atom) - 1 == atom->size);
 	return atom->size;
 }
 

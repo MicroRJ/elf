@@ -13,6 +13,25 @@
 #include "compiler.h"
 
 
+const char *elf_str_data(elf_String *atom) {
+	return atom_data(atom);
+}
+
+u32 elf_str_size(elf_String *atom) {
+	return atom_size(atom);
+}
+
+u32 elf_str_hash(elf_String *atom) {
+	return atom_hash(atom);
+}
+
+b32 elf_str_equal(elf_String *left, elf_String *right) {
+	return atoms_equal(left, right);
+}
+
+
+
+
 elf_ValueType elf_arg_type(elf_State *S, int x) { return value_type(load_value(S, x)); }
 
 elf_Number elf_arg_num(elf_State *S, int x)
@@ -80,21 +99,6 @@ void elf_release_str(elf_String *string)
 	ASSERT(string->obj.external_refs > 0);
 	string->obj.external_refs -= 1;
 }
-
-const char *elf_str_data(const elf_String *string)
-{
-	ASSERT(string);
-	return string->data;
-}
-
-elf_u32 elf_str_size(const elf_String *string)
-{
-	ASSERT(string);
-	return string->size;
-}
-
-
-
 
 void elf_push_cstr(elf_State *S, const char *text) {
 	push_value(S, value_from_atom(elf_atom_from_data(S, text)));

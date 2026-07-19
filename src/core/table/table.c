@@ -18,7 +18,6 @@ static void checkwrite(elf_State *state, elf_Object *reference)
 
 static inline void table_init(elf_Table *table, u32 nentries)
 {
-	table->ndebug = 0;
 	table->fillcounter = 0;
 	table->entries = calloc(1, nentries * sizeof(*table->entries));
 	table->nentries = nentries;
@@ -73,7 +72,7 @@ elf_Table *elf_new_table_rogue2(elf_State *state, u32 nentries)
 
 elf_Table *elf_new_table_rogue(elf_State *state)
 {
-	return elf_new_table_rogue2(state, TABLE_INITIAL_ENTRY_COUNT);
+	return elf_new_table_rogue2(state, 4);
 }
 
 static inline u32 rehash(u64 hash) {
@@ -206,7 +205,6 @@ static inline u32 table_find_slot_for_write(elf_State *state, elf_Table *table, 
 
 b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key)
 {
-	(void)state;
 	return table_find_entry(table->entries, table->nentries, key) != 0;
 }
 

@@ -18,14 +18,13 @@ STATIC_ASSERT(sizeof(Entry) == 16);
 
 struct elf_Table
 {
-	elf_Object      obj;
-	u32         ndebug;
-	u32         fillcounter;
-	u32         nentries;
-	Entry      *entries;
-	u32         count;
-	u32         capacity;
-	elf_Value  *array;
+	elf_Object        obj;
+	u32       fillcounter;
+	u32          nentries;
+	Entry        *entries;
+	u32          capacity;
+	u32             count;
+	elf_Value      *array;
 };
 
 elf_Table *elf_new_table_rogue2(elf_State *state, u32 nentries);

@@ -90,10 +90,12 @@ void elf_push_str(elf_State *state, const char *data, int size);
 elf_ValueView elf_peek_value(elf_State *state, elf_u32 depth);
 void elf_pop_values(elf_State *state, elf_u32 count);
 
+// Todo, we may want to pass in the state for the public API
 elf_String *elf_retain_str(elf_String *string);
 void elf_release_str(elf_String *string);
-const char *elf_str_data(const elf_String *string);
-elf_u32 elf_str_size(const elf_String *string);
+const char *elf_str_data(elf_String *string);
+elf_u32 elf_str_size(elf_String *string);
+elf_u32 elf_str_hash(elf_String *string);
 
 elf_Table *elf_retain_table(elf_Table *table);
 void elf_release_table(elf_Table *table);
