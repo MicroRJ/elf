@@ -11,17 +11,6 @@ BcSlot;
 
 #define NO_MEMORY ((BcSlot) { -1 })
 
-static inline b32 bc_slot_is_valid(BcSlot memory)
-{
-	return memory.slot >= 0;
-}
-
-static inline i32 gen_memory_index(BcSlot memory)
-{
-	ASSERT(bc_slot_is_valid(memory));
-	return memory.slot;
-}
-
 
 #define IR_XDEF(_)                                       \
 _(IR_NONE                , "none")                       \

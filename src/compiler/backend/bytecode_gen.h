@@ -32,7 +32,7 @@ typedef struct
 	u32             bytecode_function_base;
 	u32             stack_size;
 	u32             stack_top;
-	BytecodeLabel   labels[1024];
+	BytecodeLabel   labels[4096];
 	u32             label_count;
 	BytecodeJumpPatch jump_patches[4096];
 	u32               jump_patch_count;

@@ -1,11 +1,24 @@
 
-static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
+static inline b32 bc_slot_is_valid(BcSlot memory)
+{
+	return memory.slot >= 0;
+}
+
+static inline i32 unwrap_slot(BcSlot memory)
+{
+	ASSERT(bc_slot_is_valid(memory));
+	return memory.slot;
+}
+
+static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_bytecode_function(BcGen *gen, IrFunction *function);
 static BcFunction bg_generate_module(elf_State *state, Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
+static void jump_if_expr_true(BcGen *gen, Ir expr, u32 true_label);
+static void jump_if_expr_false(BcGen *gen, Ir expr, u32 false_label);
 
 typedef enum
 {
@@ -202,46 +215,46 @@ static u32 emit_jump_bc(BcGen *gen, SourceSite site)
 static u32 emit_jump_if_bc(BcGen *gen, SourceSite site, BytecodeType type, BcSlot pred)
 {
 	ASSERT(type == BC_JZ || type == BC_JNZ);
-	return emit_xy_bc(gen, site, type, 0, gen_memory_index(pred));
+	return emit_xy_bc(gen, site, type, 0, unwrap_slot(pred));
 }
 
 static u32 emit_load_int_bc(BcGen *gen, SourceSite site, BcSlot dest, i64 integer)
 {
 	u32 index = add_const_int(gen->state, integer);
-	return emit_xy_bc(gen, site, BC_LOADKINT, gen_memory_index(dest), index);
+	return emit_xy_bc(gen, site, BC_LOADKINT, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number)
 {
 	u32 index = add_const_num(gen->state, number);
-	return emit_xy_bc(gen, site, BC_LOADKNUM, gen_memory_index(dest), index);
+	return emit_xy_bc(gen, site, BC_LOADKNUM, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_str_bc(BcGen *gen, SourceSite site, BcSlot dest, elf_String *atom)
 {
 	elf_Value value = value_from_atom(atom);
 	u32 index = elf_array_add(gen->state, gen->state->globals, value);
-	return emit_xy_bc(gen, site, BC_GETGLOBAL, gen_memory_index(dest), index);
+	return emit_xy_bc(gen, site, BC_GETGLOBAL, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_nil_bc(BcGen *gen, SourceSite site, BcSlot dest)
 {
-	return emit_xy_bc(gen, site, BC_LOADNIL, gen_memory_index(dest), 0);
+	return emit_xy_bc(gen, site, BC_LOADNIL, unwrap_slot(dest), 0);
 }
 
 static u32 emit_load_glb_bc(BcGen *gen, SourceSite site, BcSlot dest, u32 global_index)
 {
-	return emit_xy_bc(gen, site, BC_GETGLOBAL, gen_memory_index(dest), global_index);
+	return emit_xy_bc(gen, site, BC_GETGLOBAL, unwrap_slot(dest), global_index);
 }
 
 static u32 emit_reload_bc(BcGen *gen, SourceSite site, BcSlot dst, BcSlot src)
 {
-	return emit_xy_bc(gen, site, BC_RELOAD, gen_memory_index(dst), gen_memory_index(src));
+	return emit_xy_bc(gen, site, BC_RELOAD, unwrap_slot(dst), unwrap_slot(src));
 }
 
 static u32 emit_return_bc(BcGen *gen, SourceSite site, BcSlot out, u32 nout)
 {
-	i32 slot_index = nout ? gen_memory_index(out) : 0;
+	i32 slot_index = nout ? unwrap_slot(out) : 0;
 	return emit_xy_bc(gen, site, BC_RETURN, slot_index, nout);
 }
 
@@ -263,7 +276,7 @@ static void restore_slots(BcGen *bg, BcSlot stack_top)
 	bg->stack_top = stack_top.slot;
 }
 
-static BcSlot bg_push_stack(BcGen *gen)
+static BcSlot alloc_slot(BcGen *gen)
 {
 	BcSlot stack_top = {gen->stack_top};
 	gen->stack_top += 1;
@@ -276,7 +289,7 @@ static BcSlot bg_push_stack(BcGen *gen)
 static BcSlot ensure_slot(BcGen *gen, BcSlot slot)
 {
 	if (!bc_slot_is_valid(slot)) {
-		slot = bg_push_stack(gen);
+		slot = alloc_slot(gen);
 	}
 	return slot;
 }
@@ -407,7 +420,7 @@ static BcSlot ensure_expr_memory(BcGen *gen, Ir expr)
 		slot = local->ir_local.slot;
 	}
 	else {
-		slot = bg_emit_expr(gen, expr, NO_MEMORY, 1);
+		slot = emit_expr(gen, expr, NO_MEMORY, 1);
 	}
 
 	ASSERT(bc_slot_is_valid(slot));
@@ -421,7 +434,7 @@ static BcSlot bg_emit_new_table_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 	}
 
 	out = ensure_slot(gen, out);
-	emit_xy_bc(gen, expr->site, BC_TABLE, gen_memory_index(out), 0);
+	emit_xy_bc(gen, expr->site, BC_TABLE, unwrap_slot(out), 0);
 	return out;
 }
 
@@ -439,28 +452,28 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 		{
 			bg_check_type(expr->ir_binary.y, IR_ATOM);
 
-			expr_slot = bg_emit_expr(gen, expr->ir_binary.y, NO_MEMORY, 1);
-			this_slot = bg_emit_expr(gen, expr->ir_binary.x, NO_MEMORY, 1);
+			expr_slot = emit_expr(gen, expr->ir_binary.y, NO_MEMORY, 1);
+			this_slot = emit_expr(gen, expr->ir_binary.x, NO_MEMORY, 1);
 
 			emit_xyz_bc(gen, expr->site, BC_GETMETAFIELD
-			,	gen_memory_index(expr_slot), gen_memory_index(this_slot), gen_memory_index(expr_slot));
+			,	unwrap_slot(expr_slot), unwrap_slot(this_slot), unwrap_slot(expr_slot));
 		}
 		else if (expr->kind == IR_FIELD)
 		{
 			bg_check_type(expr->ir_binary.y, IR_ATOM);
 
-			expr_slot = bg_emit_expr(gen, expr->ir_binary.y, NO_MEMORY, 1);
-			this_slot = bg_emit_expr(gen, expr->ir_binary.x, NO_MEMORY, 1);
+			expr_slot = emit_expr(gen, expr->ir_binary.y, NO_MEMORY, 1);
+			this_slot = emit_expr(gen, expr->ir_binary.x, NO_MEMORY, 1);
 
 			emit_xyz_bc(gen, expr->site, BC_GETFIELD
-			,	gen_memory_index(expr_slot), gen_memory_index(this_slot), gen_memory_index(expr_slot));
+			,	unwrap_slot(expr_slot), unwrap_slot(this_slot), unwrap_slot(expr_slot));
 		}
 		else
 		{
-			expr_slot = bg_emit_expr(gen, expr, NO_MEMORY, 1);
-			this_slot = bg_push_stack(gen);
+			expr_slot = emit_expr(gen, expr, NO_MEMORY, 1);
+			this_slot = alloc_slot(gen);
 
-			emit_xy_bc(gen, ir->site, BC_RELOAD, gen_memory_index(this_slot), 0);
+			emit_xy_bc(gen, ir->site, BC_RELOAD, unwrap_slot(this_slot), 0);
 		}
 
 		ASSERT(expr_slot.slot == stack_top.slot + 0);
@@ -468,13 +481,13 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 
 		for (u32 i = 0; i < nargs; ++ i)
 		{
-			BcSlot arg_slot = bg_emit_expr(gen, args.items[i], NO_MEMORY, 1);
+			BcSlot arg_slot = emit_expr(gen, args.items[i], NO_MEMORY, 1);
 			ASSERT(arg_slot.slot == stack_top.slot + 2 + (i32)i);
 		}
 	}
 	restore_slots(gen, stack_top);
 
-	emit_xyz_bc(gen, expr->site, BC_CALL, gen_memory_index(stack_top), nargs + 1, nout);
+	emit_xyz_bc(gen, expr->site, BC_CALL, unwrap_slot(stack_top), nargs + 1, nout);
 
 	if (nout < 1) {
 		return out;
@@ -515,6 +528,9 @@ static u32 bc_op(IrKind type)
 		case IR_SHIFT_LEFT:        return BC_BIT_SHL;
 		case IR_SHIFT_RIGHT:       return BC_BIT_SHR;
 		case IR_BITWISE_XOR:       return BC_BIT_XOR;
+		case IR_INDEX:             return BC_GETINDEX;
+		case IR_FIELD:             return BC_GETFIELD;
+		case IR_META_FIELD:        return BC_GETMETAFIELD;
 		default: NO_CODE;
 	}
 
@@ -535,7 +551,7 @@ static BcSlot bg_emit_binary_expr(BcGen *bg, Ir expr, BcSlot out, u32 nout)
 
 	out = ensure_slot(bg, out);
 	emit_xyz_bc(bg, expr->site, bc_op(expr->kind)
-	,	gen_memory_index(out), gen_memory_index(left_slot), gen_memory_index(right_slot));
+	,	unwrap_slot(out), unwrap_slot(left_slot), unwrap_slot(right_slot));
 	return out;
 }
 
@@ -550,68 +566,49 @@ static BcSlot bg_emit_unary_expr(BcGen *bg, Ir expr, u32 bytecode_type, BcSlot o
 	restore_slots(bg, memory_checkpoint);
 
 	out = ensure_slot(bg, out);
-	emit_xy_bc(bg, expr->site, bytecode_type, gen_memory_index(out), gen_memory_index(value_slot));
+	emit_xy_bc(bg, expr->site, bytecode_type, unwrap_slot(out), unwrap_slot(value_slot));
 	return out;
 }
 
-static BcSlot bg_emit_index_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
+static BcSlot emit_truthy_or_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 {
-	if (nout < 1) {
-		return out;
-	}
+	BcSlot memory_checkpoint;
+	BcSlot temp_slot;
+	u32 done_label;
 
-	BcSlot memory_checkpoint = mark_slots(gen);
-	BcSlot array_slot = ensure_expr_memory(gen, expr->ir_binary.x);
-	BcSlot index_slot = ensure_expr_memory(gen, expr->ir_binary.y);
+	if (nout < 1) return out;
+
+	out = emit_expr(gen, expr->ir_binary.x, out, 1);
+	memory_checkpoint = mark_slots(gen);
+	temp_slot = alloc_slot(gen);
+	emit_load_nil_bc(gen, expr->site, temp_slot);
+	emit_xyz_bc(gen, expr->site, BC_EQ,	unwrap_slot(temp_slot), unwrap_slot(temp_slot), unwrap_slot(out));
+	done_label = create_label(gen);
+	jump_if_false_slot_to_label(gen, expr->site, temp_slot, done_label);
 	restore_slots(gen, memory_checkpoint);
-
-	out = ensure_slot(gen, out);
-	emit_xyz_bc(gen, expr->site, BC_GETINDEX
-	,	gen_memory_index(out), gen_memory_index(array_slot), gen_memory_index(index_slot));
-	return out;
-}
-
-static BcSlot bg_emit_field_expr(BcGen *gen, Ir expr, u32 bytecode_type, BcSlot out, u32 nout)
-{
-	if (nout < 1) {
-		return out;
-	}
-
-	BcSlot memory_checkpoint = mark_slots(gen);
-	BcSlot object_slot = ensure_expr_memory(gen, expr->ir_binary.x);
-	BcSlot field_slot = ensure_expr_memory(gen, expr->ir_binary.y);
-	restore_slots(gen, memory_checkpoint);
-
-	out = ensure_slot(gen, out);
-	emit_xyz_bc(gen, expr->site, bytecode_type
-	,	gen_memory_index(out), gen_memory_index(object_slot), gen_memory_index(field_slot));
-	return out;
-}
-
-// x ?? y
-static BcSlot bg_emit_nilor_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
-{
-	if (nout < 1) {
-		return out;
-	}
-
-	out = ensure_slot(gen, out);
-	bg_emit_expr(gen, expr->ir_binary.x, out, 1);
-
-	BcSlot memory_checkpoint = mark_slots(gen);
-	BcSlot nil_slot = bg_push_stack(gen);
-	BcSlot eq_nil_slot = bg_push_stack(gen);
-	emit_load_nil_bc(gen, expr->site, nil_slot);
-	emit_xyz_bc(gen, expr->site, BC_EQ
-	,	gen_memory_index(eq_nil_slot), gen_memory_index(out), gen_memory_index(nil_slot));
-
-	u32 done_label = create_label(gen);
-	jump_if_false_slot_to_label(gen, expr->site, eq_nil_slot, done_label);
-	restore_slots(gen, memory_checkpoint);
-
-	bg_emit_expr(gen, expr->ir_binary.y, out, 1);
-
+	emit_expr(gen, expr->ir_binary.y, out, 1);
 	define_label(gen, done_label);
+	return out;
+}
+
+static BcSlot emit_logical_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
+{
+	u32 false_label;
+	u32 done_label;
+
+	if (nout < 1) return out;
+
+	false_label = create_label(gen);
+  	done_label = create_label(gen);
+
+	jump_if_expr_false(gen, expr, false_label);
+	out = ensure_slot(gen, out);
+	emit_load_int_bc(gen, expr->site, out, 1);
+	jump_to_label(gen, expr->site, done_label);
+	define_label(gen, false_label);
+	emit_load_int_bc(gen, expr->site, out, 0);
+	define_label(gen, done_label);
+
 	return out;
 }
 
@@ -626,10 +623,6 @@ static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred
 	u32 jump = emit_jump_if_bc(gen, site, BC_JZ, pred);
 	record_jump_patch(gen, jump, label);
 }
-
-
-static void jump_if_expr_true(BcGen *gen, Ir expr, u32 true_label);
-static void jump_if_expr_false(BcGen *gen, Ir expr, u32 false_label);
 
 static void jump_if_expr_false(BcGen *gen, Ir expr, u32 false_label)
 {
@@ -693,30 +686,6 @@ static void jump_if_expr_true(BcGen *gen, Ir expr, u32 true_label)
 	}
 }
 
-static BcSlot bc_emit_logical_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
-{
-	if (nout < 1) {
-		return out;
-	}
-
-	out = ensure_slot(gen, out);
-	emit_load_int_bc(gen, expr->site, out, 0);
-
-	BcSlot memory_checkpoint = mark_slots(gen);
-	u32 false_label = create_label(gen);
-	u32 done_label = create_label(gen);
-	jump_if_expr_false(gen, expr, false_label);
-	restore_slots(gen, memory_checkpoint);
-
-	emit_load_int_bc(gen, expr->site, out, 1);
-	jump_to_label(gen, expr->site, done_label);
-
-	define_label(gen, false_label);
-	define_label(gen, done_label);
-
-	return out;
-}
-
 static BcSlot do_expr_block(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 {
 	IrArray stats = expr->ir_expr_block.stats;
@@ -737,13 +706,13 @@ static BcSlot do_expr_block(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 	for (u32 i = 0; i < stats.count; ++ i) {
 		do_stat(gen, stats.items[i]);
 	}
-	BcSlot final_slot = bg_emit_expr(gen, value, out, 1);
+	BcSlot final_slot = emit_expr(gen, value, out, 1);
 	ASSERT(final_slot.slot == out.slot);
 	restore_slots(gen, memory_checkpoint);
 	return out;
 }
 
-static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
+static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 {
 	SourceSite site = expr->site;
 	switch (expr->kind)
@@ -766,25 +735,21 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 			IrArray captures = expr->ir_function.captures;
 			if (captures.count == 0)
 			{
-				emit_xy_bc(gen, site, BC_CLOSURE, gen_memory_index(out), bytecode_function_id);
+				emit_xy_bc(gen, site, BC_CLOSURE, unwrap_slot(out), bytecode_function_id);
 			}
 			else
 			{
 				BcSlot memory_checkpoint = mark_slots(gen);
 				BcSlot first_capture_slot = memory_checkpoint;
-				// Capture values must end up in consecutive out for BC_CLOSURE
-				// to copy. Let each capture expression allocate normally so short
-				// lived temporaries can be reused, but keep the result slot out of
-				// it: it may be an existing local, and evaluating captures could
-				// overwrite live values before the closure has copied them.
+
 				for (u32 i = 0; i < captures.count; ++ i)
 				{
-					BcSlot next_capture_slot = bg_emit_expr(gen, captures.items[i], NO_MEMORY, 1);
+					BcSlot next_capture_slot = emit_expr(gen, captures.items[i], NO_MEMORY, 1);
 					ASSERT(bc_slot_is_valid(next_capture_slot));
 					ASSERT(first_capture_slot.slot + i == next_capture_slot.slot);
 				}
 
-				emit_xy_bc(gen, site, BC_CLOSURE, gen_memory_index(first_capture_slot), bytecode_function_id);
+				emit_xy_bc(gen, site, BC_CLOSURE, unwrap_slot(first_capture_slot), bytecode_function_id);
 				if (first_capture_slot.slot != out.slot) {
 					emit_reload_bc(gen, site, out, first_capture_slot);
 				}
@@ -800,7 +765,7 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 			}
 
 			out = ensure_slot(gen, out);
-			emit_xy_bc(gen, site, BC_LOADCVAL, gen_memory_index(out), expr->ir_capture);
+			emit_xy_bc(gen, site, BC_LOADCVAL, unwrap_slot(out), expr->ir_capture);
 		}
 		break;
 
@@ -811,7 +776,7 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 			}
 
 			out = ensure_slot(gen, out);
-			emit_xy_bc(gen, site, BC_CURRENT_CLOSURE, gen_memory_index(out), 0);
+			emit_xy_bc(gen, site, BC_CURRENT_CLOSURE, unwrap_slot(out), 0);
 		}
 		break;
 
@@ -855,7 +820,7 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 			bg_check_type(local, IR_LOCAL);
 			ASSERT(bc_slot_is_valid(local->ir_local.slot));
 
-			emit_load_int_bc(gen, expr->site, out, gen_memory_index(local->ir_local.slot));
+			emit_load_int_bc(gen, expr->site, out, unwrap_slot(local->ir_local.slot));
 		}
 		break;
 
@@ -909,24 +874,6 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 		}
 		break;
 
-		case IR_INDEX:
-		{
-			out = bg_emit_index_expr(gen, expr, out, nout);
-		}
-		break;
-
-		case IR_FIELD:
-		{
-			out = bg_emit_field_expr(gen, expr, BC_GETFIELD, out, nout);
-		}
-		break;
-
-		case IR_META_FIELD:
-		{
-			out = bg_emit_field_expr(gen, expr, BC_GETMETAFIELD, out, nout);
-		}
-		break;
-
 		case IR_TABLE:
 		{
 			out = bg_emit_new_table_expr(gen, expr, out, nout);
@@ -947,14 +894,14 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 
 		case IR_NIL_OR:
 		{
-			out = bg_emit_nilor_expr(gen, expr, out, nout);
+			out = emit_truthy_or_expr(gen, expr, out, nout);
 		}
 		break;
 
 		case IR_AND:
 		case IR_OR:
 		{
-			out = bc_emit_logical_expr(gen, expr, out, nout);
+			out = emit_logical_expr(gen, expr, out, nout);
 		}
 		break;
 
@@ -970,6 +917,9 @@ static BcSlot bg_emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 		case IR_POW:
 		case IR_SHIFT_LEFT:
 		case IR_SHIFT_RIGHT:
+		case IR_INDEX:
+		case IR_FIELD:
+		case IR_META_FIELD:
 		case IR_BITWISE_XOR:
 		case IR_BITWISE_AND:
 		case IR_BITWISE_OR:
@@ -1005,7 +955,7 @@ static void bg_emit_store(BcGen *gen, SourceSite site, Ir dest, Ir expr)
 				BcSlot dest_slot = local->ir_local.slot;
 				ASSERT(bc_slot_is_valid(dest_slot));
 
-				BcSlot final_slot = bg_emit_expr(gen, expr, dest_slot, 1);
+				BcSlot final_slot = emit_expr(gen, expr, dest_slot, 1);
 				ASSERT(final_slot.slot == dest_slot.slot);
 			}
 			break;
@@ -1015,7 +965,7 @@ static void bg_emit_store(BcGen *gen, SourceSite site, Ir dest, Ir expr)
 				u32 dest_slot = dest->ir_global;
 
 				BcSlot expr_slot = ensure_expr_memory(gen, expr);
-				emit_xy_bc(gen, dest->site, BC_SETGLOBAL, dest_slot, gen_memory_index(expr_slot));
+				emit_xy_bc(gen, dest->site, BC_SETGLOBAL, dest_slot, unwrap_slot(expr_slot));
 			}
 			break;
 
@@ -1026,7 +976,7 @@ static void bg_emit_store(BcGen *gen, SourceSite site, Ir dest, Ir expr)
 				BcSlot field_slot = ensure_expr_memory(gen, dest->ir_binary.y);
 
 				emit_xyz_bc(gen, site, BC_SETFIELD
-				,	gen_memory_index(object_slot), gen_memory_index(field_slot), gen_memory_index(value_slot));
+				,	unwrap_slot(object_slot), unwrap_slot(field_slot), unwrap_slot(value_slot));
 			}
 			break;
 
@@ -1036,7 +986,7 @@ static void bg_emit_store(BcGen *gen, SourceSite site, Ir dest, Ir expr)
 				BcSlot array_slot = ensure_expr_memory(gen, dest->ir_binary.x);
 				BcSlot index_slot = ensure_expr_memory(gen, dest->ir_binary.y);
 				emit_xyz_bc(gen, site, BC_SETINDEX
-				,	gen_memory_index(array_slot), gen_memory_index(index_slot), gen_memory_index(value_slot));
+				,	unwrap_slot(array_slot), unwrap_slot(index_slot), unwrap_slot(value_slot));
 			}
 			break;
 
@@ -1066,12 +1016,12 @@ static void do_stat(BcGen *gen, Ir stat)
 			ASSERT(!bc_slot_is_valid(slot));
 			if (stat->ir_local.expr)
 			{
-				slot = bg_emit_expr(gen, stat->ir_local.expr, NO_MEMORY, 1);
+				slot = emit_expr(gen, stat->ir_local.expr, NO_MEMORY, 1);
 				ASSERT(bc_slot_is_valid(slot));
 			}
 			else
 			{
-				slot = bg_push_stack(gen);
+				slot = alloc_slot(gen);
 			}
 
 			stat->ir_local.slot = slot;
@@ -1089,7 +1039,7 @@ static void do_stat(BcGen *gen, Ir stat)
 			BcSlot memory_checkpoint = mark_slots(gen);
 			BcSlot table_slot = ensure_expr_memory(gen, stat->ir_binary.x);
 			BcSlot value_slot = ensure_expr_memory(gen, stat->ir_binary.y);
-			emit_xy_bc(gen, stat->site, BC_ARRAYADD, gen_memory_index(table_slot), gen_memory_index(value_slot));
+			emit_xy_bc(gen, stat->site, BC_ARRAYADD, unwrap_slot(table_slot), unwrap_slot(value_slot));
 			restore_slots(gen, memory_checkpoint);
 		}
 		break;
@@ -1181,7 +1131,7 @@ static void do_stat(BcGen *gen, Ir stat)
 		default:
 		{
 			BcSlot memory_checkpoint = mark_slots(gen);
-			bg_emit_expr(gen, stat, NO_MEMORY, 0);
+			emit_expr(gen, stat, NO_MEMORY, 0);
 			restore_slots(gen, memory_checkpoint);
 		}
 		break;

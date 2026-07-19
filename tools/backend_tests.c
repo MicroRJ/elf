@@ -331,6 +331,42 @@ static void test_backend_local_initializer_reuses_result_slot(void)
 	}
 }
 
+static void test_backend_truthy_or_reuses_left_result_slot(void)
+{
+	BackendCompileResult result = backend_test_compile_source(
+		"b := 1\n"
+		"c := 2\n"
+		"a := ((b + c) + (b + c)) ?? 99\n"
+		"ret a\n");
+
+	if (result.function.stack_size != 5) {
+		test_fail("truthy-or initializer adopts left expression result slot");
+	}
+}
+
+static void test_backend_logical_expr_delays_result_slot(void)
+{
+	BackendCompileResult and_result = backend_test_compile_source(
+		"b := 1\n"
+		"c := 2\n"
+		"a := ((b + c) + (b + c)) && 1\n"
+		"ret a\n");
+
+	if (and_result.function.stack_size != 5) {
+		test_fail("logical-and initializer delays boolean result slot allocation");
+	}
+
+	BackendCompileResult or_result = backend_test_compile_source(
+		"b := 1\n"
+		"c := 2\n"
+		"a := ((b + c) + (b + c)) || 0\n"
+		"ret a\n");
+
+	if (or_result.function.stack_size != 5) {
+		test_fail("logical-or initializer delays boolean result slot allocation");
+	}
+}
+
 static void test_backend_if_else_restores_stack_top(void)
 {
 	elf_State *state = elf_create_state();
@@ -401,6 +437,8 @@ static void run_backend_tests(void)
 	test_backend_range_for_loop_shape();
 	test_backend_range_for_collection_call_is_hoisted();
 	test_backend_local_initializer_reuses_result_slot();
+	test_backend_truthy_or_reuses_left_result_slot();
+	test_backend_logical_expr_delays_result_slot();
 	test_backend_if_else_restores_stack_top();
 	test_backend_formats_bytecode_function();
 }
