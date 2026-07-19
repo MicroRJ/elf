@@ -7,7 +7,7 @@ ELF_FUNCTION(lib_process_run)
 	elf_State *state = S;
 	elf_Arena standard_output = elf_arena_create(0);
 	elf_Arena standard_error = elf_arena_create(0);
-	Sys_Process_Result process = sys_run_process(lib_load_cstr(state, 1),
+	elf_PlatformProcessResult process = elf_platform_run_process(lib_load_cstr(state, 1),
 		&standard_output, &standard_error);
 
 	elf_Table *result = elf_push_new_table(state);
@@ -23,7 +23,7 @@ ELF_FUNCTION(lib_process_run)
 	if (process.error_code)
 	{
 		char error[1024] = {0};
-		sys_get_error_msg(process.error_code, error, sizeof(error));
+		elf_platform_error_message(process.error_code, error, sizeof(error));
 		lib_set_string_field(state, result, "error", error, (u32)strlen(error));
 	}
 	else {
@@ -37,13 +37,13 @@ ELF_FUNCTION(lib_process_run)
 
 ELF_FUNCTION(lib_process_id)
 {
-	push_value(S, value_from_integer(sys_get_this_process_id()));
+	push_value(S, value_from_integer(elf_platform_process_id()));
 	return 1;
 }
 
 ELF_FUNCTION(lib_process_exit)
 {
-	sys_exit_this_process((i32)lib_load_integer(S, 1));
+	elf_platform_exit_process((i32)lib_load_integer(S, 1));
 	return 0;
 }
 

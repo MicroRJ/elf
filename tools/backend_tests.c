@@ -11,10 +11,10 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	result.state = elf_create_state();
 
 	elf_StrSlice source = {};
-	elf_Handle file = elf_platform_access_file(path, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+	elf_PlatformFile file = elf_platform_open_file(path, ELF_PLATFORM_OPEN_READ, ELF_PLATFORM_OPEN_EXISTING);
 	if (file)
 	{
-		u64 size = elf_platform_get_file_size(file);
+		u64 size = elf_platform_file_size(file);
 		char *data = elf_arena_push(&result.state->arena, size + 16);
 		zero_memory(data + size, 16);
 		elf_platform_read_file(file, data, (u32)size);

@@ -56,14 +56,14 @@ TypeRule;
 static inline void check_value_type(elf_State *S, elf_Value value, int type)
 {
 	if (value.type != type) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "type error, expected '%s', got '%s'", value_type_name(type), value_type_name(value.type));
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "type error, expected '%s', got '%s'", value_type_name(type), value_type_name(value.type));
 	}
 }
 
 static inline void check_value_type_rule(elf_State *S, elf_Value value, TypeRule rule)
 {
 	if (~rule & 1 << value.type) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "type rule violation, got '%s'", value_type_name(value.type));
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "type rule violation, got '%s'", value_type_name(value.type));
 	}
 }
 
@@ -78,13 +78,13 @@ static inline u32 check_array_index(elf_State *state, int instr, i64 index, u32 
 	{
 		if (resolved != index)
 		{
-			report_runtime_error(state, RUNTIME_ERROR_GENERIC, instr
+			elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, instr
 			,	"array index out of bounds: index %lli resolved to %lli, length %lli"
 			,	index, resolved, count);
 		}
 		else
 		{
-			report_runtime_error(state, RUNTIME_ERROR_GENERIC, instr
+			elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, instr
 			,	"array index out of bounds: index %lli, length %lli"
 			,	index, count);
 		}
@@ -120,7 +120,7 @@ static inline elf_Value pop_value(elf_State *S)
 static inline elf_Value load_value(elf_State *S, int x)
 {
 	if (x < 0 || x >= get_num_args(S)) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "invalid argument index: %i, got: %i", x, get_num_args(S));
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "invalid argument index: %i, got: %i", x, get_num_args(S));
 	}
 	return S->frame.framebase[x];
 }

@@ -3,7 +3,7 @@
 #include "elf.h"
 
 #include "base.h"
-#include "system.h"
+#include "platform.h"
 #include "core.h"
 #include "helpers.h"
 
@@ -11,13 +11,13 @@ static volatile elf_Integer bench_sink;
 
 static i64 bench_now(void)
 {
-	return sys_get_performance_counter();
+	return elf_platform_counter();
 }
 
 static double bench_elapsed_s(i64 start)
 {
-	i64 elapsed = sys_get_performance_counter() - start;
-	return elapsed / (double) sys_get_performance_counter_frequency();
+	i64 elapsed = elf_platform_counter() - start;
+	return elapsed / (double) elf_platform_counter_frequency();
 }
 
 static elf_Value bench_atom_key(elf_State *state, const char *text)

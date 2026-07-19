@@ -78,7 +78,7 @@ elf_State *elf_create_state(void);
 void elf_destroy_state(elf_State *state);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
-elf_u32 elf_do_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
+elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 
 void elf_push_nil(elf_State *state);
 void elf_push_int(elf_State *state, elf_Integer value);

@@ -1,6 +1,6 @@
 #include "elf.h"
 #include "base.h"
-#include "system.h"
+#include "platform.h"
 
 #include "arena.c"
 #include "path.c"

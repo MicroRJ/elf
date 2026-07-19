@@ -41,7 +41,7 @@ static b32 string_normalize_index(elf_State *state, i64 index, u32 size,
 	i64 upper = allow_end ? size : (i64)size - 1;
 	if (index < 0 || index > upper)
 	{
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"string index %lld is out of bounds for length %u", index, size);
 		return false;
 	}
@@ -91,7 +91,7 @@ ELF_FUNCTION(l_string_slice)
 	if (nargs > 2 && !string_normalize_index(S, lib_load_integer(S, 2), size, true, &end)) return 0;
 	if (end < first)
 	{
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"string slice end %u precedes start %u", end, first);
 		return 0;
 	}
@@ -170,7 +170,7 @@ ELF_FUNCTION(l_string_split)
 	u32 separator_size = atom_size(separator);
 	if (separator_size == 0)
 	{
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"string split separator cannot be empty");
 		return 0;
 	}
@@ -259,7 +259,7 @@ ELF_FUNCTION(l_string_replace)
 	u32 old_size = atom_size(old);
 	if (old_size == 0)
 	{
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"string replacement target cannot be empty");
 		return 0;
 	}
@@ -289,7 +289,7 @@ ELF_FUNCTION(l_string_repeat)
 	u32 size = atom_size(string);
 	if (count < 0 || (u64)count * size > UINT_MAX)
 	{
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"invalid string repeat count %lld", count);
 		return 0;
 	}

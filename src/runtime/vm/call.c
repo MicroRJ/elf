@@ -64,7 +64,7 @@ static u32 call_native_function(elf_State *state, elf_Function function, u32 nar
 
 	if (returned_count < 0 || pushed_count < returned_count)
 	{
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE
 		,	"invalid number of returns from function: %i, however the function pushed: %i"
 		,	returned_count, pushed_count);
 	}
@@ -80,7 +80,7 @@ static u32 call_native_function(elf_State *state, elf_Function function, u32 nar
 	return copied_return_count;
 }
 
-int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int nrets)
+static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int nrets)
 {
 	StackFrame frame;
 	prepare_closure_stack_frame(state, &frame, closure, nargs, nrets);
@@ -92,7 +92,7 @@ int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int
 	return result;
 }
 
-u32 elf_do_tail_call(elf_State *state, u32 nargs, u32 nrets)
+u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)
 {
 	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
 
@@ -109,7 +109,7 @@ u32 elf_do_tail_call(elf_State *state, u32 nargs, u32 nrets)
 	}
 	else
 	{
-		report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, NO_BYTE, "'%s' cannot be called", value_type_name(value.type));
+		elf_report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, NO_BYTE, "'%s' cannot be called", value_type_name(value.type));
 	}
 
 	ASSERT(state->frame_index == frame_index);
@@ -131,11 +131,11 @@ static inline void pop_stack_frame(elf_State *state)
 u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
 {
 	if (nargs < 1) {
-		report_runtime_error(state, RUNTIME_ERROR_INVALID_ARGUMENT_COUNT, NO_BYTE, "invalid number of arguments, expected at least one");
+		elf_report_runtime_error(state, RUNTIME_ERROR_INVALID_ARGUMENT_COUNT, NO_BYTE, "invalid number of arguments, expected at least one");
 	}
 
 	push_stack_frame(state);
-	nrets = elf_do_tail_call(state, nargs, nrets);
+	nrets = elf_tail_call(state, nargs, nrets);
 	pop_stack_frame(state);
 	return nrets;
 }

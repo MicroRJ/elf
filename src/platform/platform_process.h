@@ -1,0 +1,31 @@
+//
+// See Copyright Notice In elf.h
+//
+
+#ifndef ELF_PLATFORM_PROCESS_H
+#define ELF_PLATFORM_PROCESS_H
+
+#include "platform_types.h"
+
+typedef struct elf_PlatformProcessResult
+{
+	b32 started;
+	i32 exit_code;
+	i32 error_code;
+}
+elf_PlatformProcessResult;
+
+b32 elf_platform_debug_break(void);
+int elf_platform_process_id(void);
+void elf_platform_exit_process(int errorcode);
+
+int elf_platform_work_dir(char *buf, int bufsize);
+int elf_platform_set_work_dir(const char *buf);
+
+int elf_platform_last_error(void);
+void elf_platform_error_message(int error, char *buffer, int size);
+
+elf_PlatformFile elf_platform_create_process(const char *file, const char *args);
+elf_PlatformProcessResult elf_platform_run_process(const char *command_line, elf_Arena *standard_output, elf_Arena *standard_error);
+
+#endif

@@ -4,7 +4,7 @@
 
 #include "elf.h"
 #include "base.h"
-#include "system.h"
+#include "platform.h"
 #include "core.h"
 
 const char *value_type_name(elf_ValueType type)

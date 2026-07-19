@@ -32,9 +32,6 @@ typedef elf_f32 f32;
 typedef elf_f64 f64;
 typedef elf_b32 b32;
 
-typedef elf_u64 elf_Handle;
-#define ELF_HINVALID ((elf_Handle)0)
-#define ELF_IS_HANDLE_INVALID(H) ((H) == ELF_HINVALID)
 
 #define __FUNC__ __func__
 

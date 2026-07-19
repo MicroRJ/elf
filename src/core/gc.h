@@ -28,6 +28,6 @@ elf_ObjectType;
 #define ELF_GC_NEXT_MIN ((u32)MEGABYTES(1))
 #define ELF_GC_NEXT_MAX ((u32)GIGABYTES(1))
 
-void *gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
+void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 
 #endif

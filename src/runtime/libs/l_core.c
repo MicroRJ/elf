@@ -103,7 +103,7 @@ ELF_FUNCTION(l_core_assert) {
 	check_value_type(S, error_value, ELF_VALUE_TYPE_ATOM);
 	const char *errmsg = atom_data(value_as_atom(error_value));
 	if (!cond) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "assertion triggered: %s", errmsg);
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "assertion triggered: %s", errmsg);
 	}
 	return 0;
 }
@@ -236,7 +236,7 @@ ELF_FUNCTION(l_core_tagof) {
 ELF_FUNCTION(l_core_iton) {
 	elf_Value value = load_value(S, 1);
 	if (!value_is_numeric(value)) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "expected numeric value, instead got %s", value_type_name(value_type(value)));
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "expected numeric value, instead got %s", value_type_name(value_type(value)));
 	}
 	push_value(S, value_from_number(value_to_number(value)));
 	return 1;
@@ -247,7 +247,7 @@ ELF_FUNCTION(l_core_iton) {
 ELF_FUNCTION(l_core_ntoi) {
 	elf_Value value = load_value(S, 1);
 	if (!value_is_numeric(value)) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "expected numeric value, instead got %s", value_type_name(value_type(value)));
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "expected numeric value, instead got %s", value_type_name(value_type(value)));
 	}
 	push_value(S, value_from_integer(value_to_integer(value)));
 	return 1;
@@ -268,7 +268,7 @@ ELF_FUNCTION(l_core_load_file) {
 	for (i64 i = 2; i < nargs; ++ i) {
 		push_value(S, load_value(S, i));
 	}
-	nrets = elf_do_tail_call(S, nargs - 1, nrets);
+	nrets = elf_tail_call(S, nargs - 1, nrets);
 	return nrets;
 }
 
@@ -304,12 +304,12 @@ ELF_FUNCTION(l_core_load_json) {
 	check_value_type(S, name_value, ELF_VALUE_TYPE_ATOM);
 	const char *name = atom_data(value_as_atom(name_value));
 
-	elf_Handle file = elf_platform_access_file(name, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+	elf_PlatformFile file = elf_platform_open_file(name, ELF_PLATFORM_OPEN_READ, ELF_PLATFORM_OPEN_EXISTING);
 	if (ELF_IS_HANDLE_INVALID(file)) {
 		elf_push_nil(S);
 		goto esc;
 	}
-	u64 size = elf_platform_get_file_size(file);
+	u64 size = elf_platform_file_size(file);
 	char *heapbuf = malloc(size + 1);
 	elf_platform_read_file(file, heapbuf, size);
 	heapbuf[size] = 0;
@@ -332,7 +332,7 @@ ELF_FUNCTION(l_core_unparse)
 #if 0
 	elf_Value file_value = load_value(S, 1);
 	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
-	elf_Handle file = value_as_handle(file_value);
+	elf_PlatformFile file = value_as_handle(file_value);
 	elf_Value value = load_value(S, 2);
 
 	elf_Scratch scratch = elf_get_scratch();
@@ -341,7 +341,7 @@ ELF_FUNCTION(l_core_unparse)
 	char *end = elf_arena_push_zero(scratch.arena, 1);
 
 	if (ok) {
-		sys_write_file(file, start, (i32)(end - start));
+		elf_platform_write_file(file, start, (i32)(end - start));
 	}
 
 	elf_end_scratch(scratch);
@@ -375,7 +375,7 @@ ELF_FUNCTION(l_core_format) {
 
 		if (*format == '%') {
 			if (index >= nargs) {
-				report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "not enough arguments to format atom!");
+				elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "not enough arguments to format atom!");
 			}
 			format += 1;
 
@@ -400,8 +400,8 @@ ELF_FUNCTION(l_core_print) {
 	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);
 
-	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
-	sys_write_file(file, start, size);
+	elf_PlatformFile file = elf_platform_std_file(ELF_PLATFORM_STD_OUTPUT);
+	elf_platform_write_file(file, start, size);
 
 	elf_end_scratch(scratch);
 	push_value(S, value_from_integer(size));
@@ -418,8 +418,8 @@ ELF_FUNCTION(l_core_printl) {
 	char *end = elf_arena_push_zero(scratch.arena, 1);
 	u32 size = (u32)(end - start);
 
-	elf_Handle file = sys_get_std_file(SYS_STD_OUTPUT);
-	sys_write_file(file, start, size);
+	elf_PlatformFile file = elf_platform_std_file(ELF_PLATFORM_STD_OUTPUT);
+	elf_platform_write_file(file, start, size);
 
 	elf_end_scratch(scratch);
 	push_value(S, value_from_integer(size));
@@ -430,7 +430,7 @@ ELF_FUNCTION(l_core_fprintl) {
 #if 0
 	elf_Value file_value = load_value(S, 1);
 	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
-	elf_Handle file = value_as_handle(file_value);
+	elf_PlatformFile file = value_as_handle(file_value);
 
 	elf_Scratch scratch = elf_get_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
@@ -441,7 +441,7 @@ ELF_FUNCTION(l_core_fprintl) {
 	u32 size = (u32)(end - start);
 	push_value(S, value_from_integer(size));
 
-	sys_write_file(file, start, size);
+	elf_platform_write_file(file, start, size);
 
 	elf_end_scratch(scratch);
 #endif

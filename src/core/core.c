@@ -18,7 +18,7 @@
 
 #include "elf.h"
 #include "base.h"
-#include "system.h"
+#include "platform.h"
 
 #include "logging.c"
 
@@ -149,8 +149,15 @@ static void bootstrap_standard_libraries(elf_State *state)
 	table_set_atom_table(state, state->globals, "elf", elf_table);
 }
 
+void init_atoms(elf_State *state)
+{
+	state->atom_bucket_count = ELF_ATOM_INITIAL_EXTENT;
+	state->atom_buckets = calloc(state->atom_bucket_count, sizeof(*state->atom_buckets));
+}
+
 static void bootstrap_state(elf_State *state)
 {
+	init_atoms(state);
 	elf_init_compiler_atoms(state);
 	bootstrap_base_frame(state);
 	bootstrap_standard_libraries(state);

@@ -2,20 +2,16 @@
 // See Copyright Notice In elf.h
 //
 
-
-// emscripten includes
 #include <sys/types.h>
 #include <dlfcn.h>
 #include <dirent.h>
 
-
-
-b32 sys_debugger() {
+b32 elf_platform_debug_break() {
 	emscripten_debugger();
 	return 1;
 }
 
-void sys_console_print(int type, char *message) {
+void elf_platform_console_print(int type, char *message) {
 	switch (type) {
 		case LOG_KDEBUG: case LOG_KINFO: {
 			type = EM_LOG_CONSOLE;
@@ -30,40 +26,40 @@ void sys_console_print(int type, char *message) {
 	emscripten_log(type, message);
 }
 
-void sys_enable_console_colors(void)
+void elf_platform_enable_console_colors(void)
 {
 }
 
 
-int sys_get_last_error() {
+int elf_platform_last_error() {
 	return 0;
 }
 
 
-void sys_get_error_msg(int error, char *buf, int len) {
+void elf_platform_error_message(int error, char *buf, int len) {
 }
 
-void *sys_virtual_alloc(elf_i64 length) {
+void *elf_platform_virtual_alloc(elf_i64 length) {
 	return 0;
 }
 
-void sys_virtual_dealloc(void *memory) {
+void elf_platform_virtual_free(void *memory) {
 	return 0;
 }
 
 
-void sys_sleep(elf_Integer ms) {
+void elf_platform_sleep(elf_Integer ms) {
 	emscripten_sleep(ms);
 }
 
 
-elf_i64 sys_get_performance_counter_frequency() {
+elf_i64 elf_platform_counter_frequency() {
 	/* todo: where does it say this */
 	return 1000;
 }
 
 
-elf_i64 sys_get_performance_counter() {
+elf_i64 elf_platform_counter() {
 	return emscripten_get_now();
 }
 
@@ -73,17 +69,17 @@ int sys_get_my_name(int length, char *buffer) {
 }
 
 
-int sys_get_my_pid() {
+int elf_platform_process_id() {
 	return 0;
 }
 
 
-int sys_get_work_dir(int length, char *buffer) {
+int elf_platform_work_dir(int length, char *buffer) {
 	return 0;
 }
 
 
-int sys_set_work_dir(char *buffer) {
+int elf_platform_set_work_dir(char *buffer) {
 	return !chdir(buffer);
 }
 
@@ -91,42 +87,42 @@ int sys_set_work_dir(char *buffer) {
 // void emscripten_dlopen(const char *filename, int flags, void* user_data, em_dlopen_callback onsuccess, em_arg_callback_func onerror);
 
 
-elf_Handle sys_load_dll(char const *name) {
+elf_PlatformFile elf_platform_load_dll(char const *name) {
 #if 0
 	em_promise_t promise = emscripten_dlopen_promise(name,RTLD_LAZY);
 	em_settled_result_t result = emscripten_promise_await(promise);
 	emscripten_promise_destroy(promise);
-	return (elf_Handle) result.value;
+	return (elf_PlatformFile) result.value;
 #endif
 	void *handle = dlopen(name,RTLD_LAZY);
 
 	if (handle == 0) {
-		sys_console_print(LOG_KERROR,"the following is a system error:");
-		sys_console_print(LOG_KERROR, dlerror());
-		sys_console_print(LOG_KERROR, "end");
+		elf_platform_console_print(LOG_KERROR,"the following is a system error:");
+		elf_platform_console_print(LOG_KERROR, dlerror());
+		elf_platform_console_print(LOG_KERROR, "end");
 	}
-	return (elf_Handle) handle;
+	return (elf_PlatformFile) handle;
 }
 
 
-void *sys_get_dll_fn(elf_Handle dll, char const *name) {
+void *elf_platform_dll_symbol(elf_PlatformFile dll, char const *name) {
         return (void *) dlsym(dll,name);
 }
 
-Sys_Process_Result sys_run_process(const char *command_line, struct elf_Arena *standard_output,
+elf_PlatformProcessResult elf_platform_run_process(const char *command_line, struct elf_Arena *standard_output,
                                    struct elf_Arena *standard_error)
 {
         (void)command_line;
         (void)standard_output;
         (void)standard_error;
-        return (Sys_Process_Result){.exit_code = -1, .error_code = -1};
+        return (elf_PlatformProcessResult){.exit_code = -1, .error_code = -1};
 }
 
 
 
 
 
-static inline void em_dirent_to_file_data(FILE_VISITOR *visitor, dirent *info) {
+static inline void em_dirent_to_file_data(elf_PlatformFileIter *visitor, dirent *info) {
 	int isdir = () != 0;
 
 	if (is_file_name_empty(info->d_name)) {
@@ -140,7 +136,7 @@ static inline void em_dirent_to_file_data(FILE_VISITOR *visitor, dirent *info) {
 	CopyMemory(visitor->name, info->d_name, sizeof(info->d_name));
 }
 
-int sys_find_first_file(FILE_VISITOR *visitor, char *const path) {
+int elf_platform_find_first_file(elf_PlatformFileIter *visitor, char *const path) {
 
 	DIR *dir = opendir(path);
 	visitor->hand = dir;
@@ -157,7 +153,7 @@ int sys_find_first_file(FILE_VISITOR *visitor, char *const path) {
 	return entry != 0;
 }
 
-int sys_find_next_file(FILE_VISITOR *visitor) {
+int elf_platform_find_next_file(elf_PlatformFileIter *visitor) {
 	struct dirent *entry = readdir(dir);
 	if (entry) {
 		em_dirent_to_file_data(visitor, entry);

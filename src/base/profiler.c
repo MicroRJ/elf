@@ -104,7 +104,7 @@ ProfScope prof_scope_begin(void *id, const char *name)
 		field->depth = (u32)prof_thread.stack_count;
 	}
 
-	i64 start = sys_get_performance_counter();
+	i64 start = elf_platform_counter();
 	ProfEntry *entry = prof_thread.stack + prof_thread.stack_count++;
 	entry->field = field;
 	entry->start = start;
@@ -125,7 +125,7 @@ void prof_scope_end(ProfScope *scope)
 	ProfEntry entry = prof_thread.stack[--prof_thread.stack_count];
 	ASSERT(entry.field == (ProfField *)scope->field);
 
-	i64 end = sys_get_performance_counter();
+	i64 end = elf_platform_counter();
 	entry.field->ticks += end - entry.start;
 	scope->active = false;
 }
@@ -156,7 +156,7 @@ static void prof_sort_fields(ProfField **fields, u32 count)
 
 void prof_dump(void)
 {
-	i64 frequency = sys_get_performance_counter_frequency();
+	i64 frequency = elf_platform_counter_frequency();
 	ProfField *fields[PROF_MAX_FIELDS];
 	u32 count = 0;
 

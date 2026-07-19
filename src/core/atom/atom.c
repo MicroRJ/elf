@@ -18,15 +18,6 @@ static inline u32 atom_hash_data(const char *data, u32 size)
 	return hash;
 }
 
-// TODO(RJ) call this at state init time!!
-static void atom_state_init(elf_State *state)
-{
-	if (!state->atom_bucket_count) {
-		state->atom_bucket_count = ELF_ATOM_INITIAL_EXTENT;
-		state->atom_buckets = calloc(state->atom_bucket_count, sizeof(*state->atom_buckets));
-	}
-}
-
 static u32 atom_bucket_index(elf_State *state, u32 hash)
 {
 	return hash & (state->atom_bucket_count - 1);
@@ -78,8 +69,6 @@ static elf_String *atom_find(elf_State *state, const char *data, u32 size, u32 h
 
 static void atom_insert(elf_State *state, elf_String *atom)
 {
-	atom_state_init(state);
-
 	if (state->atom_count * ELF_ATOM_MAX_LOAD_DENOMINATOR >= state->atom_bucket_count * ELF_ATOM_MAX_LOAD_NUMERATOR) {
 		atom_state_resize(state);
 	}
@@ -130,9 +119,7 @@ elf_String *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 s
 		return interned;
 	}
 
-	atom_state_init(state);
-
-	elf_String *atom = gc_alloc(state, ELF_OBJECT_ATOM, sizeof(*atom) + size + 1);
+	elf_String *atom = elf_gc_alloc(state, ELF_OBJECT_ATOM, sizeof(*atom) + size + 1);
 	atom->hash = hash;
 	atom->id = id;
 	atom->size = (u16)size;
@@ -143,48 +130,5 @@ elf_String *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 s
 	return atom;
 }
 
-elf_String *elf_atom_from_data_size(elf_State *state, const char *data, u32 size)
-{
-	return elf_atom_from_data_size_id(state, data, size, 0);
-}
 
-elf_String *elf_atom_from_data(elf_State *state, const char *data)
-{
-	ASSERT(data);
-	return elf_atom_from_data_size(state, data, (u32)strlen(data));
-}
 
-elf_String *elf_atom_from_data_id(elf_State *state, const char *data, u16 id)
-{
-	ASSERT(data);
-	return elf_atom_from_data_size_id(state, data, (u32)strlen(data), id);
-}
-
-u32 atom_size(elf_String *atom)
-{
-	return atom->size;
-}
-
-const char *atom_data(elf_String *atom)
-{
-	return atom->data;
-}
-
-elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_String *atom)
-{
-	elf_StrSlice copy = {};
-	copy.data = elf_arena_push_data(arena, atom->data, atom->size);
-	copy.size = atom->size;
-	elf_arena_push_zero(arena, 1);
-	return copy;
-}
-
-u32 atom_hash(elf_String *atom)
-{
-	return atom->hash;
-}
-
-b32 atoms_equal(elf_String *left, elf_String *right)
-{
-	return left == right;
-}

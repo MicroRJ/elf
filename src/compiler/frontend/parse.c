@@ -160,7 +160,7 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 
 	print_source_slice_marker(site, parser->lexer.source);
 	if (severity >= SEVERITY_FATAL) {
-		report_runtime_error(parser->state, RUNTIME_ERROR_GENERIC, -1, "%s", message);
+		elf_report_runtime_error(parser->state, RUNTIME_ERROR_GENERIC, -1, "%s", message);
 	}
 }
 

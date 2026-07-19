@@ -12,7 +12,7 @@
 static void checkwrite(elf_State *state, elf_Object *reference)
 {
 	if (reference->status & ELF_OBJECT_READONLY) {
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "attempted to write to readonly object");
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "attempted to write to readonly object");
 	}
 }
 
@@ -65,7 +65,7 @@ static void table_array_remove_unchecked(elf_Table *table, u32 index, u32 count)
 
 elf_Table *elf_new_table_rogue2(elf_State *state, u32 nentries)
 {
-	elf_Table *table = gc_alloc(state, ELF_OBJECT_TABLE, sizeof(*table));
+	elf_Table *table = elf_gc_alloc(state, ELF_OBJECT_TABLE, sizeof(*table));
 
 	table_init(table, nentries);
 	return table;
@@ -198,7 +198,7 @@ static inline u32 table_find_slot_for_write(elf_State *state, elf_Table *table, 
 
 	u32 slot = table_find_slot(table->entries, table->nentries, key);
 	if (slot == TABLE_SLOT_NOT_FOUND) {
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "'%s': internal error, table slot lookup failed", value_type_name(key.type));
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "'%s': internal error, table slot lookup failed", value_type_name(key.type));
 	}
 
 	return slot;
@@ -347,7 +347,7 @@ void elf_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
 	checkwrite(state, (elf_Object *)table);
 
 	if (index > table->count || count > table->count - index) {
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE
 		,	"array range out of bounds: index %u, count %u, length %u"
 		,	index, count, table->count);
 	}
@@ -369,7 +369,7 @@ u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value va
 {
 	checkwrite(state, (elf_Object *)table);
 	if (index > table->count) {
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"array insert index %u is out of bounds for length %u", index, table->count);
 	}
 
@@ -397,7 +397,7 @@ void elf_table_mark_field_readonly(elf_State *state, elf_Table *table, elf_Value
 {
 	u32 slot = table_find_slot(table->entries, table->nentries, field);
 	if (slot == TABLE_SLOT_NOT_FOUND || !entry_is_key(table->entries[slot])) {
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "no such field!");
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "no such field!");
 	}
 
 	entry_mark_readonly(&table->entries[slot]);

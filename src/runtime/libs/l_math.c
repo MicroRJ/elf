@@ -7,7 +7,7 @@
 
 
 #define checknumargs(S, n, x) do \
-{ if ((n) != (x)) report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "wrong number of arguments: %i, expected %i instead", n - 1, x - 1); \
+{ if ((n) != (x)) elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "wrong number of arguments: %i, expected %i instead", n - 1, x - 1); \
 } while(0)
 
 

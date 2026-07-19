@@ -4,18 +4,18 @@
 
 static void vm_error_invalid_operands(elf_State *state, BytecodeType op, elf_Value left, elf_Value right)
 {
-	report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "%s: invalid operands '%s' and '%s'",
+	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "%s: invalid operands '%s' and '%s'",
 		bytecode_type_name(op), value_type_name(left.type), value_type_name(right.type));
 }
 
 static void vm_error_cannot_call(elf_State *state, elf_Value value)
 {
-	report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "cannot call '%s'", value_type_name(value.type));
+	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "cannot call '%s'", value_type_name(value.type));
 }
 
 static void vm_error_invalid_field_arguments(elf_State *state, elf_Value object, elf_Value field)
 {
-	report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "cannot get field '%s' from '%s'",
+	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "cannot get field '%s' from '%s'",
 		value_type_name(field.type),
 		value_type_name(object.type));
 }
@@ -65,13 +65,15 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static elf_Closure * vm_new_closure(elf_State *state, BcFunction function, elf_Value *captures)
+static elf_Closure *vm_new_closure(elf_State *state, BcFunction function, elf_Value *captures)
 {
-	elf_Closure * closure;
-	u32 size = sizeof(*closure) + sizeof(closure->captures[0]) * function.captures;
-	closure = (elf_Closure *)gc_alloc(state, ELF_OBJECT_CLOSURE, size);
+	elf_Closure *closure;
+	u32 size;
 
+	size = sizeof(*closure) + sizeof(* closure->captures) * function.captures;
+	closure = (elf_Closure *) elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
 	closure->function = function;
+
 	value_copy_many(closure->captures, captures, function.captures);
 	return closure;
 }
@@ -226,7 +228,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 				elf_Value field = *right_slot;
 
 				if (value_is_nil(field)) {
-					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid field");
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid field");
 				}
 
 				switch (object.type) {
@@ -263,19 +265,19 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 
 				if (value_is_table(table)) {
 					if (value_is_nil(key)) {
-						report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "key is nil...");
+						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "key is nil...");
 					}
 
 					elf_table_set(state, value_as_table(table), key, value);
 				}
 				else if (value_is_user(table)) {
-					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "overload not implemented");
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "overload not implemented");
 				}
 				else if (value_is_atom(table)) {
-					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "atoms are readonly, you may not change them");
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "atoms are readonly, you may not change them");
 				}
 				else {
-					report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' value", value_type_name(table.type));
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' value", value_type_name(table.type));
 				}
 			} break;
 
@@ -306,7 +308,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 				elf_Table *metatable = elf_get_type_metatable(state, value);
 
 				if (!metatable) {
-					report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "'%s': required metatable for metafield lookup", value_type_name(value.type));
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "'%s': required metatable for metafield lookup", value_type_name(value.type));
 				}
 
 				value_copy(result_slot, elf_table_get_or_nil(state, metatable, *right_slot));
@@ -526,7 +528,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			default: {
-				report_runtime_error(state, RUNTIME_ERROR_UNKNOWN_BYTECODE, NO_BYTE, "'%s' unknown bytecode", bytecode_type_name(byte.b_type));
+				elf_report_runtime_error(state, RUNTIME_ERROR_UNKNOWN_BYTECODE, NO_BYTE, "'%s' unknown bytecode", bytecode_type_name(byte.b_type));
 			} break;
 		}
 	}

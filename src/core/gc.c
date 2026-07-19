@@ -24,7 +24,7 @@ static void gc_ensure_reference_capacity(elf_State *state)
 	state->gc_reference_capacity = new_capacity;
 }
 
-void *gc_alloc(elf_State *state, elf_ObjectType type, u32 size)
+void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size)
 {
 	state->gc_live_bytes += size;
 
@@ -199,7 +199,7 @@ void gc_check(elf_State *state)
 	gc_update_next_cycle(state);
 
 	if (state->gc_live_bytes > state->gc_next_cycle_bytes) {
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "out of memory, %uMB allocated, %uMB threshold"
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "out of memory, %uMB allocated, %uMB threshold"
 		, state->gc_live_bytes / MEGABYTES(1)
 		, state->gc_next_cycle_bytes / MEGABYTES(1));
 	}

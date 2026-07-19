@@ -12,7 +12,7 @@
 
 #include "elf.h"
 #include "base.h"
-#include "system.h"
+#include "platform.h"
 #include "core.h"
 #include "helpers.h"
 #include "compiler.h"

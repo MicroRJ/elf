@@ -136,7 +136,7 @@ static void abort_after_runtime_error(void)
 	__debugbreak();
 #else
 	log_line(LOG_LEVEL_FATAL, "elf is exiting...");
-	sys_exit_this_process(0);
+	elf_platform_exit_process(0);
 #endif
 }
 
@@ -157,7 +157,7 @@ void elf_print_current_runtime_source_location(elf_State *state)
 	print_runtime_call_stack(state);
 }
 
-void report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...)
+void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);

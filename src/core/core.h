@@ -155,5 +155,5 @@ typedef enum
 }
 RuntimeErrorType;
 
-void report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
+void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
 void elf_print_current_runtime_source_location(elf_State *state);

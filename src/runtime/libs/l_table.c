@@ -17,7 +17,7 @@ static b32 table_normalize_index(elf_State *state, i64 index, u32 length,
 	i64 upper = allow_end ? length : (i64)length - 1;
 	if (index < 0 || index > upper)
 	{
-		report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"array index %lld is out of bounds for length %u", index, length);
 		return false;
 	}
@@ -210,7 +210,7 @@ ELF_FUNCTION(l_array_remove)
 	if (nargs > 2) {
 		i64 requested = lib_load_integer(S, 2);
 		if (requested < 0 || (u64)requested > table->count - index) {
-			report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+			elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
 				"array remove count %lld is out of bounds", requested);
 			return 0;
 		}
@@ -230,7 +230,7 @@ ELF_FUNCTION(l_array_slice)
 	if (nargs > 1 && !table_normalize_index(S, lib_load_integer(S, 1), table->count, true, &first)) return 0;
 	if (nargs > 2 && !table_normalize_index(S, lib_load_integer(S, 2), table->count, true, &end)) return 0;
 	if (end < first) {
-		report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"array slice end %u precedes start %u", end, first);
 		return 0;
 	}

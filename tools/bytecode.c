@@ -2,19 +2,19 @@
 
 #include "elf.h"
 #include "base.h"
-#include "system.h"
+#include "platform.h"
 #include "core.h"
 #include "compiler.h"
 #include "bytecode_debug.h"
 
 static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *source)
 {
-	elf_Handle file = elf_platform_access_file(path, SYS_OPEN_READ, SYS_OPEN_EXISTING);
+	elf_PlatformFile file = elf_platform_open_file(path, ELF_PLATFORM_OPEN_READ, ELF_PLATFORM_OPEN_EXISTING);
 	if (!file) {
 		return 0;
 	}
 
-	u64 size = elf_platform_get_file_size(file);
+	u64 size = elf_platform_file_size(file);
 	char *data = elf_arena_push(&state->arena, size + 16);
 	zero_memory(data + size, 16);
 	elf_platform_read_file(file, data, (u32)size);

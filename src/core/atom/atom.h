@@ -14,14 +14,43 @@ struct elf_String
 	char        data[1];
 };
 
-elf_String *elf_atom_from_data_size(elf_State *state, const char *data, u32 size);
-elf_String *elf_atom_from_data(elf_State *state, const char *data);
 elf_String *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 size, u16 id);
-elf_String *elf_atom_from_data_id(elf_State *state, const char *data, u16 id);
-u32 atom_size(elf_String *atom);
-const char *atom_data(elf_String *atom);
-u32 atom_hash(elf_String *atom);
-b32 atoms_equal(elf_String *left, elf_String *right);
-elf_StrSlice elf_atom_copy_text(elf_Arena *arena, elf_String *atom);
+
+static inline u32 atom_size(elf_String *atom)
+{
+	return atom->size;
+}
+
+static inline const char *atom_data(elf_String *atom)
+{
+	return atom->data;
+}
+
+static inline u32 atom_hash(elf_String *atom)
+{
+	return atom->hash;
+}
+
+static inline b32 atoms_equal(elf_String *left, elf_String *right)
+{
+	return left == right;
+}
+
+static elf_String *elf_atom_from_data_size(elf_State *state, const char *data, u32 size)
+{
+	return elf_atom_from_data_size_id(state, data, size, 0);
+}
+
+static elf_String *elf_atom_from_data(elf_State *state, const char *data)
+{
+	ASSERT(data);
+	return elf_atom_from_data_size(state, data, (u32)strlen(data));
+}
+
+static elf_String *elf_atom_from_data_id(elf_State *state, const char *data, u16 id)
+{
+	ASSERT(data);
+	return elf_atom_from_data_size_id(state, data, (u32)strlen(data), id);
+}
 
 #endif
