@@ -43,7 +43,7 @@ elf_PlatformFile elf_platform_create_process(const char *file, const char *args)
 	STARTUPINFOA startup = {sizeof(startup)};
 	PROCESS_INFORMATION process = {0};
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *command_line = elf_arena_push_text(scratch.arena, args);
 	elf_arena_push_char(scratch.arena, 0);
 	b32 started = CreateProcessA(file, command_line, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &process);
@@ -100,7 +100,7 @@ elf_PlatformProcessResult elf_platform_run_process(const char *command_line, elf
 	startup.hStdOutput = stdout_write;
 	startup.hStdError = stderr_write;
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *mutable_command_line = elf_arena_push_text(scratch.arena, command_line);
 	elf_arena_push_char(scratch.arena, 0);
 	result.started = CreateProcessA(NULL, mutable_command_line, NULL, NULL, TRUE,

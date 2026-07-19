@@ -104,11 +104,11 @@ static void test_arena_pushf(void)
 
 static void test_scratch_regression(void)
 {
-	elf_Scratch outer = elf_get_scratch();
+	elf_Scratch outer = elf_begin_scratch();
 	u64 outer_start = outer.arena->in_use;
 	elf_arena_push_text(outer.arena, "outer");
 
-	elf_Scratch inner = elf_get_scratch();
+	elf_Scratch inner = elf_begin_scratch();
 	u64 inner_start = inner.arena->in_use;
 	elf_arena_push_text(inner.arena, "inner");
 	expect_arena_u64(inner.arena->in_use, inner_start + 5, "scratch inner advances cursor");

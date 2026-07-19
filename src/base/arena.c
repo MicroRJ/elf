@@ -8,7 +8,7 @@
 
 static _Thread_local elf_Arena scratch_arena;
 
-elf_Scratch elf_get_scratch(void)
+elf_Scratch elf_begin_scratch(void)
 {
 	if (!scratch_arena.data) {
 		scratch_arena = elf_arena_create(0);

@@ -256,7 +256,7 @@ char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunction fu
 
 void print_bytecode_function(elf_State *state, BcFunction function)
 {
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *text = format_bytecode_function(state, scratch.arena, function);
 	printf("%s", text);
 	elf_end_scratch(scratch);

@@ -335,7 +335,7 @@ ELF_FUNCTION(l_core_unparse)
 	elf_PlatformFile file = value_as_handle(file_value);
 	elf_Value value = load_value(S, 2);
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	b32 ok = elf_unparse_value(S, scratch.arena, value, 0);
 	char *end = elf_arena_push_zero(scratch.arena, 1);
@@ -365,7 +365,7 @@ ELF_FUNCTION(l_core_format) {
 	check_value_type(S, format_value, ELF_VALUE_TYPE_ATOM);
 	const char *format = atom_data(value_as_atom(format_value));
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	while (*format) {
 
@@ -392,7 +392,7 @@ ELF_FUNCTION(l_core_format) {
 }
 
 ELF_FUNCTION(l_core_print) {
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 1; i < nargs; i ++) {
 		elf_print_value(scratch.arena, load_value(S,i));
@@ -409,7 +409,7 @@ ELF_FUNCTION(l_core_print) {
 }
 
 ELF_FUNCTION(l_core_printl) {
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 1; i < nargs; i ++) {
 		elf_print_value(scratch.arena, load_value(S,i));
@@ -432,7 +432,7 @@ ELF_FUNCTION(l_core_fprintl) {
 	check_value_type(S, file_value, ELF_VALUE_TYPE_HANDLE);
 	elf_PlatformFile file = value_as_handle(file_value);
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *start = elf_arena_push(scratch.arena, 0);
 	for (i64 i = 2; i < nargs; i ++) {
 		elf_print_value(scratch.arena, load_value(S, i));

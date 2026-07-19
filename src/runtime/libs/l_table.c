@@ -1,5 +1,5 @@
 //
-// Tables are Elf's single map/array collection. The array operations work on
+// Tables are elf's single map/array collection. The array operations work on
 // the table's ordered value storage; map fields retain their slot bindings.
 //
 

@@ -1,7 +1,6 @@
 #ifndef ELF_H
 #define ELF_H
 
-
 typedef signed char        elf_i8;
 typedef unsigned char      elf_u8;
 typedef signed short       elf_i16;
@@ -76,6 +75,9 @@ elf_GCMode;
 
 elf_State *elf_create_state(void);
 void elf_destroy_state(elf_State *state);
+void elf_set_user_data(elf_State *state, void *user_data);
+void *elf_get_user_data(elf_State *state);
+void elf_register_library(elf_State *state, const char *name, const elf_Binding *bindings, elf_u32 count);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
@@ -102,6 +104,8 @@ void elf_release_table(elf_Table *table);
 elf_u32 elf_table_length(const elf_Table *table);
 elf_ValueView elf_get_field(elf_State *state, elf_Table *table, const char *field);
 elf_ValueView elf_get_index(elf_State *state, elf_Table *table, elf_u32 index);
+elf_b32 elf_table_next(elf_Table *table, elf_u32 *cursor, elf_ValueView *key, elf_ValueView *value);
+void elf_push_field(elf_State *state, elf_Table *table, const char *field);
 
 int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
@@ -110,6 +114,7 @@ int elf_push_code_file(elf_State *state, const char *name);
 
 elf_ValueType elf_arg_type(elf_State *state, int index);
 elf_String   *elf_arg_str(elf_State *state, int index);
+elf_Table    *elf_arg_table(elf_State *state, int index);
 elf_Number    elf_arg_num(elf_State *state, int index);
 elf_Integer   elf_arg_int(elf_State *state, int index);
 

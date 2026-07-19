@@ -93,7 +93,7 @@ static SourceSite lexer_source_site(Lexer *lexer, Source data)
 
 static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...)
 {
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 
 	va_list args;
 	va_start(args, fmt);
@@ -408,7 +408,7 @@ static u32 lex_identifier(char **cursor, char *buffer)
 static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 is_format, TokenType *type)
 {
 	char *cur = *cursor;
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 	char *out = buffer;
 	b32 needs_formatting = false;
@@ -506,7 +506,7 @@ retry:
 				break;
 			}
 
-			elf_Scratch scratch = elf_get_scratch();
+			elf_Scratch scratch = elf_begin_scratch();
 			char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 			u32 size = lex_identifier(&cur, buffer);
 			elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
@@ -555,7 +555,7 @@ retry:
 
 		case '#':
 		{
-			elf_Scratch scratch = elf_get_scratch();
+			elf_Scratch scratch = elf_begin_scratch();
 			char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 			cur += 1;
 

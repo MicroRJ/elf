@@ -1,4 +1,4 @@
-# Elf Grammar
+# elf Grammar
 
 This is the current parser grammar, not the final language design. The lexer
 still reserves a few old or future-facing words and tokens; this file only
@@ -125,7 +125,7 @@ for i, j, k := 0 ... 24 ? { ... }
 
 ## JSON
 
-`json` parses a JSON value directly into the same table/value AST used by Elf
+`json` parses a JSON value directly into the same table/value AST used by elf
 constant expressions.
 
 ```ebnf

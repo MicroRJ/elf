@@ -34,7 +34,7 @@ ELF_FUNCTION(l_rand_seed) {
 	elf_Value seed = load_value(S, 1);
 	check_value_type_rule(S, seed, TRULE_NUMERIC);
 	global_random_state = value_to_integer(seed);
-	return 1;
+	return 0;
 }
 
 

@@ -23,14 +23,22 @@ source -> lexer -> AST -> Ir -> bytecode -> VM
 
 ## Build
 
-On Windows, initialize the Visual Studio environment and run:
+With Bob on `PATH`:
+
+```bat
+bob
+bob test
+```
+
+The legacy batch build is also available. On Windows, initialize the Visual
+Studio environment and run:
 
 ```bat
 vcvars64
 build.bat
 ```
 
-Build output is written to `build`.
+Bob_Build output is written to `build`.
 
 The build currently produces:
 

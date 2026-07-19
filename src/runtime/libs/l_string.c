@@ -228,7 +228,7 @@ ELF_FUNCTION(l_string_lower)
 {
 	elf_String *string = string_receiver(S);
 	u32 size = atom_size(string);
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	u8 *result = elf_arena_push(scratch.arena, size);
 	for (u32 i = 0; i < size; ++i) result[i] = string_to_lower((u8)atom_data(string)[i]);
 	string_push(S, (char *)result, size);
@@ -240,7 +240,7 @@ ELF_FUNCTION(l_string_upper)
 {
 	elf_String *string = string_receiver(S);
 	u32 size = atom_size(string);
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	u8 *result = elf_arena_push(scratch.arena, size);
 	for (u32 i = 0; i < size; ++i) result[i] = string_to_upper((u8)atom_data(string)[i]);
 	string_push(S, (char *)result, size);
@@ -264,7 +264,7 @@ ELF_FUNCTION(l_string_replace)
 		return 0;
 	}
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	u32 start = 0;
 	for (;;)
 	{
@@ -294,7 +294,7 @@ ELF_FUNCTION(l_string_repeat)
 		return 0;
 	}
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	for (i64 i = 0; i < count; ++i) {
 		elf_arena_push_data(scratch.arena, atom_data(string), size);
 	}
@@ -310,7 +310,7 @@ ELF_FUNCTION(l_string_join)
 	check_value_type(S, parts_value, ELF_VALUE_TYPE_TABLE);
 	elf_Table *parts = value_as_table(parts_value);
 	u32 count = elf_array_length(parts);
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 
 	for (u32 i = 0; i < count; ++i)
 	{

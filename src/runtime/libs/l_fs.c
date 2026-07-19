@@ -30,7 +30,7 @@ ELF_FUNCTION(lib_fs_read)
 		return 1;
 	}
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *data = elf_arena_push(scratch.arena, (u64)file_size + 1);
 	i64 size = elf_platform_read_file(file, data, file_size);
 	elf_platform_close_file(file);

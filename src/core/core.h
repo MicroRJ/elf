@@ -83,6 +83,7 @@ typedef struct elf_State elf_State;
 struct elf_State
 {
 	elf_Arena    arena;
+	void        *user_data;
 
 	struct
 	{

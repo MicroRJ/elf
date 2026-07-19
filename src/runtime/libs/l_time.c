@@ -17,8 +17,7 @@ ELF_FUNCTION(lib_time_frequency)
 ELF_FUNCTION(lib_time_elapsed)
 {
 	i64 start = lib_load_integer(S, 1);
-	f64 elapsed = (elf_platform_counter() - start) /
-		(f64)elf_platform_counter_frequency();
+	f64 elapsed = (elf_platform_counter() - start) / (f64) elf_platform_counter_frequency();
 	push_value(S, value_from_number(elapsed));
 	return 1;
 }

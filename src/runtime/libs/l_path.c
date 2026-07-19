@@ -103,7 +103,7 @@ ELF_FUNCTION(lib_path_join)
 		needs_separator = last != '/' && last != '\\' && first != '/' && first != '\\';
 	}
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *result = elf_arena_push(scratch.arena, left_size + right_size + needs_separator);
 	memcpy(result, left_data, left_size);
 	u32 at = left_size;

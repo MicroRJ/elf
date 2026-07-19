@@ -173,7 +173,7 @@ static void parser_errorf(Parser *parser, Error error, SourceSite site, const ch
 {
 	va_list args;
 	va_start(args, format);
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *message = elf_arena_pushfv(scratch.arena, format, args);
 	va_end(args);
 	elf_arena_push_zero(scratch.arena, 1);

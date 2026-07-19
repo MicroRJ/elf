@@ -370,7 +370,7 @@ static void test_backend_logical_expr_delays_result_slot(void)
 static void test_backend_if_else_restores_stack_top(void)
 {
 	elf_State *state = elf_create_state();
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	LowerContext *ctx = elf_create_lower_context(state, scratch.arena);
 	SourceSite site = {};
 
@@ -407,7 +407,7 @@ static void test_backend_formats_bytecode_function(void)
 		"x := 41\n"
 		"ret x + 1\n");
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	char *text = format_bytecode_function(result.state, scratch.arena, result.function);
 	if (!strstr(text, "bytecode function")) {
 		test_fail("bytecode formatter prints function header");

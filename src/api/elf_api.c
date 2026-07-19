@@ -55,6 +55,40 @@ elf_String *elf_arg_str(elf_State *S, int x)
 	return value_as_atom(value);
 }
 
+elf_Table *elf_arg_table(elf_State *S, int x)
+{
+	elf_Value value = load_value(S, x);
+	check_value_type(S, value, ELF_VALUE_TYPE_TABLE);
+	return value_as_table(value);
+}
+
+void elf_set_user_data(elf_State *state, void *user_data)
+{
+	ASSERT(state);
+	state->user_data = user_data;
+}
+
+void *elf_get_user_data(elf_State *state)
+{
+	ASSERT(state);
+	return state->user_data;
+}
+
+void elf_register_library(elf_State *state, const char *name, const elf_Binding *bindings, elf_u32 count)
+{
+	ASSERT(state);
+	ASSERT(name);
+	ASSERT(bindings || count == 0);
+	elf_Table *library = elf_new_table_rogue(state);
+	for (u32 i = 0; i < count; ++i)
+	{
+		elf_Value key = value_from_atom(elf_atom_from_data(state, bindings[i].name));
+		elf_table_set(state, library, key, value_from_function(bindings[i].function));
+	}
+	elf_Value key = value_from_atom(elf_atom_from_data(state, name));
+	elf_table_set(state, state->globals, key, value_from_table(library));
+}
+
 void elf_push_nil(elf_State *S)                  { push_value(S, value_nil());    }
 void elf_push_int(elf_State *S, elf_Integer   x) { push_value(S, value_from_integer(x)); }
 void elf_push_num(elf_State *S, elf_Number    x) { push_value(S, value_from_number(x)); }
@@ -162,6 +196,39 @@ elf_ValueView elf_get_index(elf_State *state, elf_Table *table,
 	ASSERT(state);
 	ASSERT(table);
 	return value_view(elf_array_get(state, table, index));
+}
+
+elf_b32 elf_table_next(elf_Table *table, elf_u32 *cursor, elf_ValueView *key, elf_ValueView *value)
+{
+	ASSERT(table);
+	ASSERT(cursor);
+	ASSERT(key);
+	ASSERT(value);
+
+	while (*cursor < table->count)
+	{
+		u32 value_index = (*cursor)++;
+		for (u32 slot = 0; slot < table->nentries; ++slot)
+		{
+			Entry entry = table->entries[slot];
+			if (entry_is_key(entry) && entry_index(entry) == value_index)
+			{
+				*key = value_view(entry_key_value(entry));
+				*value = value_view(table->array[value_index]);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void elf_push_field(elf_State *state, elf_Table *table, const char *field)
+{
+	ASSERT(state);
+	ASSERT(table);
+	ASSERT(field);
+	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
+	push_value(state, elf_table_get_or_nil(state, table, key));
 }
 
 static elf_StrSlice source_buffer_from_file(elf_State *state, const char *name)

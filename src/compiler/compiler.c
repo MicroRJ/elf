@@ -46,7 +46,7 @@ void elf_init_compiler_atoms(elf_State *state)
 
 int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source)
 {
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
@@ -60,7 +60,7 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 
 int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source)
 {
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
@@ -77,7 +77,7 @@ BcFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice s
 	ASSERT(name);
 	ASSERT(source.data);
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 

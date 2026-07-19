@@ -37,7 +37,7 @@ static void test_atom_public_text_helpers(elf_State *state)
 {
 	elf_String *atom = elf_atom_from_data(state, "copy.me");
 
-	elf_Scratch scratch = elf_get_scratch();
+	elf_Scratch scratch = elf_begin_scratch();
 	elf_StrSlice copy = elf_atom_copy_text(scratch.arena, atom);
 	if (copy.size != 7 || strcmp(copy.data, "copy.me") != 0) {
 		test_fail("atom copy returns arena-owned c string");

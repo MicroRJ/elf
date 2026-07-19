@@ -1,0 +1,146 @@
+cc := "clang-cl"
+lib := "lib"
+
+sources := {
+	{ name = "base",           path = "src/base/base.c" },
+	{ name = "platform",       path = "src/platform/win32/platform_win32.c" },
+	{ name = "value",          path = "src/core/value/value.c" },
+	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
+	{ name = "bytecode_debug", path = "src/compiler/backend/bytecode_debug.c" },
+	{ name = "core",           path = "src/core/core.c" },
+	{ name = "compiler",       path = "src/compiler/compiler.c" },
+	{ name = "elf_api",        path = "src/api/elf_api.c" },
+}
+
+include_dirs := {
+	"src",
+	"src/base",
+	"src/api",
+	"src/core",
+	"src/diagnostics",
+	"src/core/value",
+	"src/core/table",
+	"src/core/atom",
+	"src/platform",
+	"src/runtime",
+	"src/runtime/vm",
+	"src/runtime/libs",
+	"src/compiler",
+	"src/compiler/frontend",
+	"src/compiler/middle",
+	"src/compiler/backend",
+	"include",
+	"stb",
+}
+
+join := fun(values) {
+	result := ""
+	for value := values[0 ... values:length()] ? { result += " " + value }
+	ret result
+}
+
+include_options := ""
+for directory := include_dirs[0 ... include_dirs:length()] ? {
+	include_options += " /I" + directory
+}
+
+compile_options := " /nologo /Od /Zi /D_DEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes"
+
+prepare := {
+	name = "prepare build directory",
+	command_line = "cmd /c if not exist build\\obj mkdir build\\obj",
+	inputs = {},
+	outputs = { "build/obj" },
+	include_dirs = {},
+	dependencies = {},
+}
+
+compile_source := fun(options) {
+	object := "build/obj/" + options.name + ".obj"
+	pdb := "build/obj/" + options.name + ".pdb"
+	task := {
+		name = "compile " + options.name,
+		command_line = cc + compile_options + include_options + " /c " + options.source + " /Fo" + object + " /Fd" + pdb,
+		inputs = { options.source },
+		outputs = { object },
+		include_dirs = include_dirs,
+		dependencies = { prepare },
+	}
+	ret { task = task, object = object }
+}
+
+compile_tasks := {}
+objects := {}
+for source := sources[0 ... sources:length()] ? {
+	compiled := compile_source({
+		name = source.name,
+		source = source.path,
+	})
+	compile_tasks:add(compiled.task)
+	objects:add(compiled.object)
+}
+
+build_library := {
+	name = "archive elf.lib",
+	command_line = lib + " /nologo /out:build\\elf.lib" + join(objects),
+	inputs = objects,
+	outputs = { "build/elf.lib" },
+	include_dirs = {},
+	dependencies = compile_tasks,
+}
+
+compile_tool := fun(options) {
+	object := "build/obj/tool_" + options.output + ".obj"
+	executable := "build/" + options.output + ".exe"
+	compile_pdb := "build/obj/tool_" + options.output + ".pdb"
+	link_pdb := "build/" + options.output + ".pdb"
+	ilk := "build/" + options.output + ".ilk"
+	task := {
+		name = "build " + options.name,
+		command_line = cc + compile_options + include_options + " " + options.source + " /Fo" + object + " /Fe:" + executable +
+			" /Fd:" + compile_pdb + " /link build\\elf.lib /PDB:" + link_pdb + " /ILK:" + ilk,
+		inputs = { options.source, "build/elf.lib" },
+		outputs = { executable },
+		include_dirs = include_dirs,
+		dependencies = { build_library },
+	}
+	ret task
+}
+
+build_tests := compile_tool({ name = "tests", source = "tools/tests.c", output = "tests" })
+build_benchmarks := compile_tool({ name = "benchmarks", source = "tools/benchmarks.c", output = "benchmarks" })
+build_bytecode := compile_tool({ name = "bytecode tool", source = "tools/bytecode.c", output = "bytecode" })
+build_runner := compile_tool({ name = "elf runner", source = "tools/elf.c", output = "elf" })
+
+run_tests := {
+	name = "run Elf tests",
+	command_line = "build\\tests.exe",
+	inputs = { "build/tests.exe" },
+	outputs = {},
+	include_dirs = {},
+	dependencies = { build_tests },
+}
+
+options := {
+	workers = 4,
+	verbosity = 0,
+}
+
+entries := {}
+
+entries.lib = fun() {
+	ret bob.build({ targets = { build_library }, options = options })
+}
+
+entries.build = fun() {
+	ret bob.build({
+		targets = { build_tests, build_benchmarks, build_bytecode, build_runner },
+		options = options,
+	})
+}
+
+entries.test = fun() {
+	ret bob.build({ targets = { run_tests }, options = options })
+}
+
+ret entries
