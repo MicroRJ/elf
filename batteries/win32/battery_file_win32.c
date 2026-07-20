@@ -1,5 +1,5 @@
 //
-// See Copyright Notice In elf.h
+// Optional Win32 filesystem support.
 //
 
 elf_PlatformFile elf_platform_open_file(const char *name, int flags, int mode)

@@ -3,6 +3,7 @@
 #include "elf.h"
 #include "base.h"
 #include "platform.h"
+#include "battery_file.h"
 #include "core.h"
 #include "compiler.h"
 #include "bytecode_debug.h"

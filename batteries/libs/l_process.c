@@ -1,5 +1,5 @@
 //
-// Process execution and process-local control.
+// Optional process execution and process-local control.
 //
 
 ELF_FUNCTION(lib_process_run)

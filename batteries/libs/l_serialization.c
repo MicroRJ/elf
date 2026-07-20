@@ -1,5 +1,5 @@
 //
-// Serialization operations.
+// Optional file-backed serialization operations.
 //
 
 ELF_FUNCTION(l_serialization_load_json_file)

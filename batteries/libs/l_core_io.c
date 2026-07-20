@@ -1,5 +1,5 @@
 //
-// Basic standard output operations.
+// Optional standard output operations.
 //
 
 static int core_print_values(elf_State *state, int nargs, b32 newline)

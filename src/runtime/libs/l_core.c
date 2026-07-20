@@ -5,7 +5,6 @@
 #include "l_core_values.c"
 #include "l_core_calls.c"
 #include "l_core_compile.c"
-#include "l_core_io.c"
 
 static const elf_Binding l_core[] = {
 	{"assert",       l_core_assert},
@@ -25,14 +24,7 @@ static const elf_Binding l_core[] = {
 	{"nargs",        l_core_nargs},
 	{"arg",          l_core_arg},
 
-	{"load_file",    l_core_load_file},
 	{"const_expr",   l_core_const_expr},
-
-	{"print",        l_core_print},
-	{"println",      l_core_println},
-
-	// Compatibility spelling. Prefer println in new code.
-	{"printl",       l_core_println},
 };
 
 static elf_Table *elf_lib_core(elf_State *state)

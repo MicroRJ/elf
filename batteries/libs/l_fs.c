@@ -1,5 +1,5 @@
 //
-// High-level filesystem operations.
+// Optional filesystem operations.
 //
 
 static b32 fs_get_file_info(const char *path, elf_PlatformFileInfo *info)

@@ -2,9 +2,11 @@
 #include <string.h>
 
 #include "elf.h"
+#include "elf_batteries.h"
 
 #include "base.h"
 #include "platform.h"
+#include "battery_file.h"
 #include "core.h"
 #include "helpers.h"
 #include "compiler.h"
@@ -59,6 +61,7 @@ int main(void)
 	prof_begin_capture();
 
 	elf_State *state = elf_create_state();
+	elf_open_batteries(state);
 	if (strcmp(elf_version(), ELF_VERSION) != 0) {
 		test_fail("public Elf version matches the linked runtime");
 	}

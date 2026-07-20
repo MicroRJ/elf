@@ -67,11 +67,7 @@ elf_Table *elf_push_new_table(elf_State *state)
 #include "runtime/libs/l_native.c"
 #include "runtime/libs/l_core.c"
 #include "runtime/libs/l_debug.c"
-#include "runtime/libs/l_serialization.c"
 #include "runtime/libs/l_path.c"
-#include "runtime/libs/l_fs.c"
-#include "runtime/libs/l_process.c"
-#include "runtime/libs/l_time.c"
 #include "runtime/libs/l_table.c"
 #include "runtime/libs/l_string.c"
 #include "runtime/libs/l_random.c"
@@ -149,12 +145,8 @@ static void bootstrap_standard_libraries(elf_State *state)
 	elf_Table *elf_table = elf_lib_core(state);
 	table_set_atom_table(state, elf_table, "math", elf_lib_math(state));
 	table_set_atom_table(state, elf_table, "debug", elf_lib_debug(state));
-	table_set_atom_table(state, elf_table, "serialization", elf_lib_serialization(state));
 	table_set_atom_table(state, elf_table, "random", elf_lib_random(state));
 	table_set_atom_table(state, elf_table, "path", elf_lib_path(state));
-	table_set_atom_table(state, elf_table, "fs", elf_lib_fs(state));
-	table_set_atom_table(state, elf_table, "process", elf_lib_process(state));
-	table_set_atom_table(state, elf_table, "time", elf_lib_time(state));
 
 	state->globals = elf_push_new_table(state);
 	table_set_atom_table(state, state->globals, "elf", elf_table);

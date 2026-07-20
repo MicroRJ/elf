@@ -1,5 +1,5 @@
 //
-// Timing and sleeping.
+// Optional script-visible timing and sleeping.
 //
 
 ELF_FUNCTION(lib_time_counter)

@@ -2,10 +2,10 @@
 // See Copyright Notice In elf.h
 //
 
-#ifndef ELF_PLATFORM_FILE_H
-#define ELF_PLATFORM_FILE_H
+#ifndef ELF_BATTERY_FILE_H
+#define ELF_BATTERY_FILE_H
 
-#include "platform_types.h"
+#include "battery_platform_types.h"
 
 typedef enum
 {

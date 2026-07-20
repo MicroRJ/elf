@@ -54,21 +54,6 @@
 #include "base.h"
 #include "platform.h"
 
-STATIC_ASSERT(sizeof(elf_PlatformFile) >= sizeof(HANDLE));
-
-static HANDLE win32_handle(elf_PlatformFile file)
-{
-	return (HANDLE)(uintptr_t)file;
-}
-
-static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
-{
-	return (elf_PlatformFile)(uintptr_t)handle;
-}
-
-#include "platform_console_win32.c"
-#include "platform_file_win32.c"
+#include "platform_debug_win32.c"
 #include "platform_memory_win32.c"
 #include "platform_time_win32.c"
-#include "platform_process_win32.c"
-#include "platform_dll_win32.c"

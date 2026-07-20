@@ -41,47 +41,12 @@ void elf_push_str(elf_State *state, const char *text, int length)
 	push_value(state, value_from_atom(elf_atom_from_data_size(state, text, length)));
 }
 
-static elf_StrSlice source_buffer_from_file(elf_State *state, const char *name)
-{
-	elf_StrSlice source = {};
-	elf_PlatformFile file = elf_platform_open_file(name, ELF_PLATFORM_OPEN_READ, ELF_PLATFORM_OPEN_EXISTING);
-	if (!ELF_IS_HANDLE_INVALID(file))
-	{
-		u64 size = elf_platform_file_size(file);
-		char *data = elf_arena_push(&state->arena, size + 16);
-		zero_memory(data + size, 16);
-		elf_platform_read_file(file, data, (u32)size);
-		elf_platform_close_file(file);
-
-		source.data = data;
-		source.size = size;
-	}
-	return source;
-}
-
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	ASSERT(name);
 	ASSERT(source.data);
 	BcFunction function = elf_compile_source(state, name, source);
 
-	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-	closure->function = function;
-	push_value(state, value_from_closure(closure));
-	return true;
-}
-
-int elf_push_code_file(elf_State *state, const char *name)
-{
-	ASSERT(name);
-	elf_StrSlice source = source_buffer_from_file(state, name);
-	if (!source.data)
-	{
-		push_value(state, value_nil());
-		return false;
-	}
-
-	BcFunction function = elf_compile_source(state, name, source);
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;
 	push_value(state, value_from_closure(closure));

@@ -1,21 +1,10 @@
 //
-// See Copyright Notice In elf.h
+// Optional Win32 process support.
 //
-
-b32 elf_platform_debug_break(void)
-{
-	DebugBreak();
-	return true;
-}
 
 int elf_platform_process_id(void)
 {
 	return GetCurrentProcessId();
-}
-
-void elf_platform_exit_process(int errorcode)
-{
-	ExitProcess(errorcode);
 }
 
 int elf_platform_work_dir(char *buf, int bufsize)

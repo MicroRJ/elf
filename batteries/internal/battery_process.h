@@ -2,10 +2,10 @@
 // See Copyright Notice In elf.h
 //
 
-#ifndef ELF_PLATFORM_PROCESS_H
-#define ELF_PLATFORM_PROCESS_H
+#ifndef ELF_BATTERY_PROCESS_H
+#define ELF_BATTERY_PROCESS_H
 
-#include "platform_types.h"
+#include "battery_platform_types.h"
 
 typedef struct elf_PlatformProcessResult
 {
@@ -15,9 +15,7 @@ typedef struct elf_PlatformProcessResult
 }
 elf_PlatformProcessResult;
 
-b32 elf_platform_debug_break(void);
 int elf_platform_process_id(void);
-void elf_platform_exit_process(int errorcode);
 
 int elf_platform_work_dir(char *buf, int bufsize);
 int elf_platform_set_work_dir(const char *buf);

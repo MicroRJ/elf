@@ -68,7 +68,6 @@ void elf_push_str(elf_State *state, const char *data, int size);
 int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
-int elf_push_code_file(elf_State *state, const char *name);
 
 elf_i32 elf_get_top(elf_State *state);
 elf_i32 elf_arg_count(elf_State *state);

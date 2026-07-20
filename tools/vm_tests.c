@@ -20,6 +20,7 @@ static void vm_test_install_bindings(elf_State *state)
 static elf_Value vm_test_run_file(const char *path)
 {
 	elf_State *state = elf_create_state();
+	elf_open_batteries(state);
 	vm_test_install_bindings(state);
 	elf_push_code_file(state, path);
 	elf_push_nil(state);

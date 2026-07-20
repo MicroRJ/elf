@@ -45,6 +45,8 @@ include_dirs := {
 	"src/compiler/frontend",
 	"src/compiler/middle",
 	"src/compiler/backend",
+	"batteries",
+	"batteries/internal",
 	"include",
 	"stb",
 }
@@ -61,13 +63,15 @@ source_specs := {
 }
 
 tool_specs := {
-	{ name = "tests",         source = "tools/tests.c",      output = "tests" },
-	{ name = "benchmarks",    source = "tools/benchmarks.c", output = "benchmarks" },
-	{ name = "bytecode tool", source = "tools/bytecode.c",   output = "bytecode" },
-	{ name = "elf runner",    source = "tools/elf.c",        output = "elf" },
+	{ name = "core tests",    source = "tools/core_tests.c", output = "core_tests", batteries = 0 },
+	{ name = "tests",         source = "tools/tests.c",      output = "tests",      batteries = 1 },
+	{ name = "benchmarks",    source = "tools/benchmarks.c", output = "benchmarks", batteries = 0 },
+	{ name = "bytecode tool", source = "tools/bytecode.c",   output = "bytecode",   batteries = 1 },
+	{ name = "elf runner",    source = "tools/elf.c",        output = "elf",        batteries = 1 },
 }
 
 run_specs := {
+	{ name = "run core tests", tool = "core_tests" },
 	{ name = "run Elf tests", tool = "tests" },
 }
 
@@ -137,19 +141,27 @@ create_library_task := fun(spec, compiled_sources) {
 	}
 }
 
-compile_tool := fun(spec, library_task, include_options) {
+compile_tool := fun(spec, library_task, batteries, include_options) {
 	object := f"build/obj/tool_${spec.output}.obj"
 	executable := f"build/${spec.output}.exe"
 	compile_pdb := f"build/obj/tool_${spec.output}.pdb"
 	link_pdb := f"build/${spec.output}.pdb"
 	ilk := f"build/${spec.output}.ilk"
+	link_inputs := ""
+	inputs := { spec.source, project.library.output }
+	dependencies := { library_task }
+	if spec.batteries ? {
+		link_inputs = f" ${batteries.object}"
+		inputs:add(batteries.object)
+		dependencies:add(batteries.task)
+	}
 	task := {
 		name = f"build ${spec.name}",
-		command_line = f"${project.compiler}${project.compile_options}${include_options} ${spec.source} /Fo${object} /Fe:${executable} /Fd:${compile_pdb} /link ${project.library.output} /PDB:${link_pdb} /ILK:${ilk}",
-		inputs = { spec.source, project.library.output },
+		command_line = f"${project.compiler}${project.compile_options}${include_options} ${spec.source} /Fo${object} /Fe:${executable} /Fd:${compile_pdb} /link ${project.library.output}${link_inputs} /PDB:${link_pdb} /ILK:${ilk}",
+		inputs = inputs,
 		outputs = { executable },
 		include_dirs = include_dirs,
-		dependencies = { library_task },
+		dependencies = dependencies,
 	}
 	ret {
 		output = spec.output,
@@ -158,14 +170,14 @@ compile_tool := fun(spec, library_task, include_options) {
 	}
 }
 
-process_tools := fun(specs, library_task, include_options) {
+process_tools := fun(specs, library_task, batteries, include_options) {
 	result := {
 		tasks = {},
 		tools = {},
 	}
 
 	for spec := specs[...] ? {
-		compiled := compile_tool(spec, library_task, include_options)
+		compiled := compile_tool(spec, library_task, batteries, include_options)
 		result.tasks:add(compiled.task)
 		result.tools:add(compiled)
 	}
@@ -204,7 +216,8 @@ include_options := make_include_options(include_dirs)
 prepare_task := create_prepare_task(project.prepare)
 compiled_sources := process_sources(source_specs, prepare_task, include_options)
 library_task := create_library_task(project.library, compiled_sources)
-compiled_tools := process_tools(tool_specs, library_task, include_options)
+batteries := compile_source({ name = "batteries", path = "batteries/batteries.c" }, prepare_task, include_options)
+compiled_tools := process_tools(tool_specs, library_task, batteries, include_options)
 run_tasks := process_runs(run_specs, compiled_tools)
 
 

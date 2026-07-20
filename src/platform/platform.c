@@ -4,7 +4,7 @@
 
 
 #if defined(PLATFORM_WEB)
-	#include "sys_em.c"
+	#include "em/platform_em.c"
 #elif defined(PLATFORM_DESKTOP)
 	#include "win32/platform_win32.c"
 #else

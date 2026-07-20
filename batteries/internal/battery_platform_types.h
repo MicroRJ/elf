@@ -2,8 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
-#ifndef ELF_PLATFORM_TYPES_H
-#define ELF_PLATFORM_TYPES_H
+#ifndef ELF_BATTERY_PLATFORM_TYPES_H
+#define ELF_BATTERY_PLATFORM_TYPES_H
 
 #include "base.h"
 

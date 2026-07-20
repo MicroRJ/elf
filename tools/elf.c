@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "elf.h"
+#include "elf_batteries.h"
 
 int main(int argc, char **argv)
 {
@@ -22,6 +23,7 @@ int main(int argc, char **argv)
 	}
 
 	elf_State *state = elf_create_state();
+	elf_open_batteries(state);
 	if (!elf_push_code_file(state, path))
 	{
 		fprintf(stderr, "elf: could not load '%s'\n", path);
