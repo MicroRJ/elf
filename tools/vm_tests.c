@@ -11,11 +11,10 @@ ELF_FUNCTION(vm_test_assert)
 
 static void vm_test_install_bindings(elf_State *state)
 {
-	elf_push_env(state);
-	elf_push_cstr(state, "test_assert");
 	elf_push_fun(state, vm_test_assert);
-	elf_tab_set(state);
-	pop_value(state);
+	if (!elf_stack_set_global(state, "test_assert")) {
+		test_fail("VM test binding registration");
+	}
 }
 
 static elf_Value vm_test_run_file(const char *path)

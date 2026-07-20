@@ -84,7 +84,7 @@ int main(void)
 		ITERATIONS = 5000000,
 	};
 
-	prof_begin_frame();
+	prof_begin_capture();
 
 	elf_State *state = elf_create_state();
 

@@ -19,32 +19,55 @@ typedef enum
 }
 ProfCounter;
 
-#if ELF_PROFILE
+typedef struct
+{
+	const char *name;
+	const char *file;
+	u32         line;
+}
+ProfSite;
 
 typedef struct
 {
 	void *field;
-	i64   start;
+	u32   stack_index;
 	b32   active;
 }
 ProfScope;
 
-void prof_begin_frame(void);
+#if ELF_PROFILE
+
+void prof_begin_capture(void);
 void prof_dump(void);
-ProfScope prof_scope_begin(void *id, const char *name);
+ProfScope prof_scope_begin(ProfSite *site);
 void prof_scope_end(ProfScope *scope);
 void prof_add_counter(ProfCounter counter, i64 value);
 
 #define PROF_JOIN_(a, b) a##b
 #define PROF_JOIN(a, b) PROF_JOIN_(a, b)
-#define PROF_BLOCK_(name, line) static u8 PROF_JOIN(prof_id_, line); for (ProfScope PROF_JOIN(prof_scope_, line) = prof_scope_begin(&PROF_JOIN(prof_id_, line), name); PROF_JOIN(prof_scope_, line).active; prof_scope_end(&PROF_JOIN(prof_scope_, line)))
+#define PROF_SITE(name) { name, __FILE__, __LINE__ }
+
+#define PROF_BLOCK_(name, id) \
+	static ProfSite PROF_JOIN(prof_site_, id) = PROF_SITE(name); \
+	for (ProfScope PROF_JOIN(prof_scope_, id) = prof_scope_begin(&PROF_JOIN(prof_site_, id)); \
+		PROF_JOIN(prof_scope_, id).active; \
+		prof_scope_end(&PROF_JOIN(prof_scope_, id)))
+
+#if defined(__COUNTER__)
+#define PROF_BLOCK(name) PROF_BLOCK_(name, __COUNTER__)
+#else
 #define PROF_BLOCK(name) PROF_BLOCK_(name, __LINE__)
+#endif
 #define PROF_ADD(counter, value) prof_add_counter(counter, value)
 
 #else
 
-#define prof_begin_frame() ((void)0)
+#define prof_begin_capture() ((void)0)
 #define prof_dump() ((void)0)
+#define prof_scope_begin(site) ((ProfScope) {0})
+#define prof_scope_end(scope) ((void)0)
+#define prof_add_counter(counter, value) ((void)0)
+#define PROF_SITE(name) { name, __FILE__, __LINE__ }
 #define PROF_BLOCK(name) if (1)
 #define PROF_ADD(counter, value) ((void)0)
 

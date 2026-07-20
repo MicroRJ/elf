@@ -2,9 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include <stdarg.h>
-#include <string.h>
-
 #include "elf.h"
 #include "base.h"
 #include "platform.h"
@@ -15,55 +12,6 @@
 const char *elf_version(void)
 {
 	return ELF_VERSION;
-}
-
-const char *elf_str_data(elf_String *atom) {
-	return atom_data(atom);
-}
-
-u32 elf_str_size(elf_String *atom) {
-	return atom_size(atom);
-}
-
-u32 elf_str_hash(elf_String *atom) {
-	return atom_hash(atom);
-}
-
-b32 elf_str_equal(elf_String *left, elf_String *right) {
-	return atoms_equal(left, right);
-}
-
-
-
-
-elf_ValueType elf_arg_type(elf_State *S, int x) { return value_type(load_value(S, x)); }
-
-elf_Number elf_arg_num(elf_State *S, int x)
-{
-	elf_Value value = load_value(S, x);
-	check_value_type_rule(S, value, TRULE_NUMERIC);
-	return value_to_number(value);
-}
-
-elf_Integer elf_arg_int(elf_State *S, int x)
-{
-	elf_Value value = load_value(S, x);
-	check_value_type_rule(S, value, TRULE_NUMERIC);
-	return value_to_integer(value);
-}
-
-elf_String *elf_arg_str(elf_State *S, int x)
-{
-	elf_Value value = load_value(S, x);
-	check_value_type(S, value, ELF_VALUE_TYPE_ATOM);
-	return value_as_atom(value);
-}
-
-elf_Table *elf_arg_table(elf_State *S, int x)
-{
-	elf_Value value = load_value(S, x);
-	check_value_type(S, value, ELF_VALUE_TYPE_TABLE);
-	return value_as_table(value);
 }
 
 void elf_set_user_data(elf_State *state, void *user_data)
@@ -78,21 +26,6 @@ void *elf_get_user_data(elf_State *state)
 	return state->user_data;
 }
 
-void elf_register_library(elf_State *state, const char *name, const elf_Binding *bindings, elf_u32 count)
-{
-	ASSERT(state);
-	ASSERT(name);
-	ASSERT(bindings || count == 0);
-	elf_Table *library = elf_new_table_rogue(state);
-	for (u32 i = 0; i < count; ++i)
-	{
-		elf_Value key = value_from_atom(elf_atom_from_data(state, bindings[i].name));
-		elf_table_set(state, library, key, value_from_function(bindings[i].function));
-	}
-	elf_Value key = value_from_atom(elf_atom_from_data(state, name));
-	elf_table_set(state, state->globals, key, value_from_table(library));
-}
-
 void elf_push_nil(elf_State *S)                  { push_value(S, value_nil());    }
 void elf_push_int(elf_State *S, elf_Integer   x) { push_value(S, value_from_integer(x)); }
 void elf_push_num(elf_State *S, elf_Number    x) { push_value(S, value_from_number(x)); }
@@ -104,40 +37,6 @@ elf_Table *elf_push_new_table(elf_State *S) {
 	return table;
 }
 
-elf_Table *elf_retain_table(elf_Table *table)
-{
-	if (!table) return 0;
-	ASSERT(table->obj.type == ELF_OBJECT_TABLE);
-	ASSERT(table->obj.external_refs != (u8)-1);
-	table->obj.external_refs += 1;
-	return table;
-}
-
-void elf_release_table(elf_Table *table)
-{
-	if (!table) return;
-	ASSERT(table->obj.type == ELF_OBJECT_TABLE);
-	ASSERT(table->obj.external_refs > 0);
-	table->obj.external_refs -= 1;
-}
-
-elf_String *elf_retain_str(elf_String *string)
-{
-	if (!string) return 0;
-	ASSERT(string->obj.type == ELF_OBJECT_ATOM);
-	ASSERT(string->obj.external_refs != (u8)-1);
-	string->obj.external_refs += 1;
-	return string;
-}
-
-void elf_release_str(elf_String *string)
-{
-	if (!string) return;
-	ASSERT(string->obj.type == ELF_OBJECT_ATOM);
-	ASSERT(string->obj.external_refs > 0);
-	string->obj.external_refs -= 1;
-}
-
 void elf_push_cstr(elf_State *S, const char *text) {
 	push_value(S, value_from_atom(elf_atom_from_data(S, text)));
 }
@@ -145,94 +44,6 @@ void elf_push_cstr(elf_State *S, const char *text) {
 void elf_push_str(elf_State *S, const char *text, int len)
 {
 	push_value(S, value_from_atom(elf_atom_from_data_size(S, text, len)));
-}
-
-static elf_ValueView value_view(elf_Value value)
-{
-	elf_ValueView view = {};
-	view.type = value_type(value);
-	switch (view.type)
-	{
-		case ELF_VALUE_TYPE_INTEGER: view.as.integer = value_as_integer(value); break;
-		case ELF_VALUE_TYPE_NUMBER:  view.as.number = value_as_number(value); break;
-		case ELF_VALUE_TYPE_TABLE:   view.as.table = value_as_table(value); break;
-		case ELF_VALUE_TYPE_ATOM:
-			view.as.string = value_as_atom(value);
-			break;
-		default: break;
-	}
-	return view;
-}
-
-elf_ValueView elf_peek_value(elf_State *state, elf_u32 depth)
-{
-	ASSERT(state);
-	ASSERT((elf_u64)(state->stack_ptr - state->stack) > depth);
-	return value_view(state->stack_ptr[-1 - (i32)depth]);
-}
-
-void elf_pop_values(elf_State *state, elf_u32 count)
-{
-	ASSERT(state);
-	ASSERT((elf_u64)(state->stack_ptr - state->stack) >= count);
-	state->stack_ptr -= count;
-}
-
-elf_u32 elf_table_length(const elf_Table *table)
-{
-	ASSERT(table);
-	return table->count;
-}
-
-elf_ValueView elf_get_field(elf_State *state, elf_Table *table,
-	const char *field)
-{
-	ASSERT(state);
-	ASSERT(table);
-	ASSERT(field);
-	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
-	return value_view(elf_table_get_or_nil(state, table, key));
-}
-
-elf_ValueView elf_get_index(elf_State *state, elf_Table *table,
-	elf_u32 index)
-{
-	ASSERT(state);
-	ASSERT(table);
-	return value_view(elf_array_get(state, table, index));
-}
-
-elf_b32 elf_table_next(elf_Table *table, elf_u32 *cursor, elf_ValueView *key, elf_ValueView *value)
-{
-	ASSERT(table);
-	ASSERT(cursor);
-	ASSERT(key);
-	ASSERT(value);
-
-	while (*cursor < table->count)
-	{
-		u32 value_index = (*cursor)++;
-		for (u32 slot = 0; slot < table->nentries; ++slot)
-		{
-			Entry entry = table->entries[slot];
-			if (entry_is_key(entry) && entry_index(entry) == value_index)
-			{
-				*key = value_view(entry_key_value(entry));
-				*value = value_view(table->array[value_index]);
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-void elf_push_field(elf_State *state, elf_Table *table, const char *field)
-{
-	ASSERT(state);
-	ASSERT(table);
-	ASSERT(field);
-	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
-	push_value(state, elf_table_get_or_nil(state, table, key));
 }
 
 static elf_StrSlice source_buffer_from_file(elf_State *state, const char *name)
@@ -298,40 +109,4 @@ int elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 	ASSERT(name);
 	ASSERT(source.data);
 	return elf_push_json_source(state, name, source);
-}
-
-void elf_push_env(elf_State *S) {
-	push_table(S, S->globals);
-}
-
-// Todo, remove this!
-void elf_tab_set(elf_State *S) {
-	elf_Value tab = S->stack_ptr[-3];
-	elf_Value key = S->stack_ptr[-2];
-	elf_Value value = S->stack_ptr[-1];
-	check_value_type(S, tab, ELF_VALUE_TYPE_TABLE);
-
-	elf_table_set(S, value_as_table(tab), key, value);
-	S->stack_ptr -= 2;
-}
-
-// Todo, remove this!
-void elf_arr_add(elf_State *S) {
-	elf_Value tab = S->stack_ptr[-2];
-	elf_Value value = S->stack_ptr[-1];
-	check_value_type(S, tab, ELF_VALUE_TYPE_TABLE);
-
-	elf_array_add(S, value_as_table(tab), value);
-	S->stack_ptr -= 1;
-}
-
-// Todo, remove this!
-void elf_arr_get(elf_State *S) {
-	elf_Value tab = S->stack_ptr[-2];
-	elf_Value idx = S->stack_ptr[-1];
-	check_value_type(S, tab, ELF_VALUE_TYPE_TABLE);
-	check_value_type(S, idx, ELF_VALUE_TYPE_INTEGER);
-
-	elf_Value value = elf_array_get(S, value_as_table(tab), value_as_integer(idx));
-	S->stack_ptr[-1] = value;
 }

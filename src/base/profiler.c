@@ -5,11 +5,12 @@
 
 typedef struct
 {
-	void       *id;
-	const char *name;
-	i64         ticks;
-	u32         calls;
-	u32         depth;
+	ProfSite *site;
+	i64       inclusive_ticks;
+	i64       self_ticks;
+	i64       minimum_ticks;
+	i64       maximum_ticks;
+	u32       calls;
 }
 ProfField;
 
@@ -17,6 +18,7 @@ typedef struct
 {
 	ProfField *field;
 	i64        start;
+	i64        child_ticks;
 }
 ProfEntry;
 
@@ -27,6 +29,7 @@ typedef struct
 	ProfEntry stack[PROF_MAX_STACK];
 	i32       stack_count;
 	i64       counters[PROF_COUNTER_COUNT_];
+	i64       begin_ticks;
 }
 ProfThread;
 
@@ -59,22 +62,22 @@ static u32 prof_hash_ptr(void *ptr)
 	return (u32)value;
 }
 
-static ProfField *prof_find_field(void *id, const char *name)
+static ProfField *prof_find_field(ProfSite *site)
 {
-	ASSERT(id != 0);
+	ASSERT(site != 0);
+	ASSERT(site->name != 0);
 
 	u32 mask = PROF_MAX_FIELDS - 1;
-	u32 slot = prof_hash_ptr(id) & mask;
+	u32 slot = prof_hash_ptr(site) & mask;
 	for (u32 miss = 0; miss < PROF_MAX_FIELDS; ++miss)
 	{
 		ProfField *field = prof_thread.fields + slot;
-		if (!field->id)
+		if (!field->site)
 		{
-			field->id = id;
-			field->name = name;
+			field->site = site;
 			return field;
 		}
-		if (field->id == id) {
+		if (field->site == site) {
 			return field;
 		}
 		slot = (slot + 1) & mask;
@@ -84,13 +87,14 @@ static ProfField *prof_find_field(void *id, const char *name)
 	return prof_thread.fields;
 }
 
-void prof_begin_frame(void)
+void prof_begin_capture(void)
 {
 	zero_memory(&prof_thread, sizeof(prof_thread));
 	prof_thread.enabled = true;
+	prof_thread.begin_ticks = elf_platform_counter();
 }
 
-ProfScope prof_scope_begin(void *id, const char *name)
+ProfScope prof_scope_begin(ProfSite *site)
 {
 	ProfScope scope = {};
 	if (!prof_thread.enabled) {
@@ -98,19 +102,17 @@ ProfScope prof_scope_begin(void *id, const char *name)
 	}
 
 	ASSERT(prof_thread.stack_count < PROF_MAX_STACK);
-	ProfField *field = prof_find_field(id, name);
+	ProfField *field = prof_find_field(site);
 	field->calls += 1;
-	if (field->calls == 1) {
-		field->depth = (u32)prof_thread.stack_count;
-	}
 
-	i64 start = elf_platform_counter();
-	ProfEntry *entry = prof_thread.stack + prof_thread.stack_count++;
+	u32 stack_index = (u32)prof_thread.stack_count++;
+	ProfEntry *entry = prof_thread.stack + stack_index;
 	entry->field = field;
-	entry->start = start;
+	entry->start = elf_platform_counter();
+	entry->child_ticks = 0;
 
 	scope.field = field;
-	scope.start = start;
+	scope.stack_index = stack_index;
 	scope.active = true;
 	return scope;
 }
@@ -122,11 +124,23 @@ void prof_scope_end(ProfScope *scope)
 	}
 
 	ASSERT(prof_thread.stack_count > 0);
+	ASSERT(scope->stack_index == (u32)(prof_thread.stack_count - 1));
 	ProfEntry entry = prof_thread.stack[--prof_thread.stack_count];
 	ASSERT(entry.field == (ProfField *)scope->field);
 
-	i64 end = elf_platform_counter();
-	entry.field->ticks += end - entry.start;
+	i64 elapsed = elf_platform_counter() - entry.start;
+	i64 self = elapsed - entry.child_ticks;
+	entry.field->inclusive_ticks += elapsed;
+	entry.field->self_ticks += self;
+	if (entry.field->calls == 1 || elapsed < entry.field->minimum_ticks) {
+		entry.field->minimum_ticks = elapsed;
+	}
+	if (elapsed > entry.field->maximum_ticks) {
+		entry.field->maximum_ticks = elapsed;
+	}
+	if (prof_thread.stack_count) {
+		prof_thread.stack[prof_thread.stack_count - 1].child_ticks += elapsed;
+	}
 	scope->active = false;
 }
 
@@ -145,7 +159,7 @@ static void prof_sort_fields(ProfField **fields, u32 count)
 	{
 		ProfField *field = fields[i];
 		u32 j = i;
-		while (j > 0 && fields[j - 1]->ticks < field->ticks)
+		while (j > 0 && fields[j - 1]->self_ticks < field->self_ticks)
 		{
 			fields[j] = fields[j - 1];
 			j -= 1;
@@ -156,20 +170,26 @@ static void prof_sort_fields(ProfField **fields, u32 count)
 
 void prof_dump(void)
 {
+	if (!prof_thread.enabled) {
+		return;
+	}
+	ASSERT(prof_thread.stack_count == 0);
+	i64 end_ticks = elf_platform_counter();
 	i64 frequency = elf_platform_counter_frequency();
 	ProfField *fields[PROF_MAX_FIELDS];
 	u32 count = 0;
 
 	for (u32 i = 0; i < PROF_MAX_FIELDS; ++i)
 	{
-		if (prof_thread.fields[i].id && prof_thread.fields[i].calls) {
+		if (prof_thread.fields[i].site && prof_thread.fields[i].calls) {
 			fields[count++] = prof_thread.fields + i;
 		}
 	}
 
 	prof_sort_fields(fields, count);
 
-	fprintf(stderr, "\n-- profiler counters --\n");
+	f64 captured_ms = 1000.0 * (f64)(end_ticks - prof_thread.begin_ticks) / (f64)frequency;
+	fprintf(stderr, "\n-- profiler counters (%.3f ms captured) --\n", captured_ms);
 	for (u32 i = 0; i < PROF_COUNTER_COUNT_; ++i)
 	{
 		if (prof_thread.counters[i]) {
@@ -177,18 +197,27 @@ void prof_dump(void)
 		}
 	}
 
-	fprintf(stderr, "\n-- profiler timings --\n");
+	fprintf(stderr, "\n-- profiler timings (sorted by self time) --\n");
+	fprintf(stderr, "%-34s %10s %10s %10s %10s %10s %8s  %s\n"
+	, "scope", "total ms", "self ms", "avg us", "min us", "max us", "calls", "location");
 	for (u32 i = 0; i < count; ++i)
 	{
 		ProfField *field = fields[i];
-		f64 ms = 1000.0 * (f64)field->ticks / (f64)frequency;
-		f64 avg_us = field->calls ? (ms * 1000.0) / (f64)field->calls : 0;
-		fprintf(stderr, "%*s%-40s %8.3f ms  %8.3f us/call  x%u\n"
-		,	field->depth * 2, ""
-		,	field->name
-		,	ms
-		,	avg_us
-		,	field->calls);
+		f64 inclusive_ms = 1000.0 * (f64)field->inclusive_ticks / (f64)frequency;
+		f64 self_ms = 1000.0 * (f64)field->self_ticks / (f64)frequency;
+		f64 average_us = field->calls ? (inclusive_ms * 1000.0) / (f64)field->calls : 0;
+		f64 minimum_us = 1000000.0 * (f64)field->minimum_ticks / (f64)frequency;
+		f64 maximum_us = 1000000.0 * (f64)field->maximum_ticks / (f64)frequency;
+		fprintf(stderr, "%-34s %10.3f %10.3f %10.3f %10.3f %10.3f %8u  %s:%u\n"
+		, field->site->name
+		, inclusive_ms
+		, self_ms
+		, average_us
+		, minimum_us
+		, maximum_us
+		, field->calls
+		, field->site->file
+		, field->site->line);
 	}
 }
 

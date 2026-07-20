@@ -58,7 +58,7 @@ int main(void)
 	setvbuf(stdout, 0, _IONBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
 
-	prof_begin_frame();
+	prof_begin_capture();
 
 	elf_State *state = elf_create_state();
 	if (strcmp(elf_version(), ELF_VERSION) != 0) {

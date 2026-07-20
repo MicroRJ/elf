@@ -3,6 +3,13 @@
 
 typedef struct elf_State elf_State;
 
+typedef enum
+{
+	ELF_GC_ACTIVE = 0,
+	ELF_GC_PAUSED,
+}
+elf_GCMode;
+
 
 #define ELF_OBJECT_REACHABLE      1
 #define ELF_OBJECT_READONLY       2
@@ -11,8 +18,7 @@ struct elf_Object
 {
 	u8    type;
 	u8    status;
-	u8    external_refs;
-	u8    unused;
+	u16   unused;
 	u32   size;
 };
 

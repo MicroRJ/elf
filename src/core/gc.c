@@ -95,20 +95,6 @@ static u32 gc_mark_stack(elf_State *state)
 	return marked_count;
 }
 
-static u32 gc_mark_external_refs(elf_State *state)
-{
-	u32 marked_count = 0;
-	for (u32 i = 0; i < state->gc_reference_count; ++i)
-	{
-		elf_Object *reference = state->gc_references[i];
-		if (reference->external_refs)
-		{
-			marked_count += gc_mark_reachable(state, reference);
-		}
-	}
-	return marked_count;
-}
-
 static u32 gc_mark_interned_ids(elf_State *state)
 {
 	u32 marked_count = 0;
@@ -167,7 +153,6 @@ static u32 gc_collect(elf_State *state)
 	if (state->api_references) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->api_references);
 	}
-	marked_count += gc_mark_external_refs(state);
 	marked_count += gc_mark_metatables(state);
 	marked_count += gc_mark_interned_ids(state);
 	marked_count += gc_mark_bytecode_functions(state);

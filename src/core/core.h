@@ -28,7 +28,8 @@ typedef struct
 SourceMapEntry;
 
 typedef struct elf_Object  elf_Object;
-typedef struct elf_String    elf_String;
+typedef struct elf_String  elf_String;
+typedef struct elf_Table   elf_Table;
 typedef struct elf_Closure elf_Closure;
 typedef struct elf_Value   elf_Value;
 
@@ -60,6 +61,13 @@ struct elf_Closure
 	BcFunction   function;
 	elf_Value        captures[];
 };
+
+typedef struct
+{
+	char         *name;
+	elf_Function function;
+}
+elf_Binding;
 
 
 typedef struct StackFrame StackFrame;
@@ -142,13 +150,8 @@ struct elf_State
 	metatables;
 };
 
-/* Internal stack-based table helpers. */
+/* Internal constructors used by the runtime and its tests. */
 elf_Table *elf_push_new_table(elf_State *state);
-void elf_push_env(elf_State *state);
-void elf_tab_set(elf_State *state);
-void elf_arr_add(elf_State *state);
-void elf_arr_get(elf_State *state);
-elf_StrSlice elf_arg_str_copy(elf_State *state, int index, elf_Arena *arena);
 
 typedef enum
 {
