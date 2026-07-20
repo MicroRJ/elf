@@ -4,9 +4,9 @@ typedef struct
 	u32           start;
 	u32           count;
 }
-IRArrayBuilder;
+Ir_Array_Bld;
 
-static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *block, Ast stat);
+static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *block, Ast stat);
 static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr);
 static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
 
@@ -101,16 +101,16 @@ static Ast check_ast_type(Ast ast, AstType type)
 	return ast;
 }
 
-static IRArrayBuilder begin_ir_array_builder(LowerContext *ctx)
+static Ir_Array_Bld begin_ir_array_builder(LowerContext *ctx)
 {
-	IRArrayBuilder block = {};
+	Ir_Array_Bld block = {};
 	block.ctx = ctx;
 	block.start = ctx->ir_stack_index;
 	block.count = 0;
 	return block;
 }
 
-static void push_ir_block(IRArrayBuilder *block, Ir ir)
+static void push_ir_block(Ir_Array_Bld *block, Ir ir)
 {
 	LowerContext *ctx = block->ctx;
 	ASSERT(ctx);
@@ -120,7 +120,7 @@ static void push_ir_block(IRArrayBuilder *block, Ir ir)
 	block->count += 1;
 }
 
-static IrArray end_ir_array_builder(IRArrayBuilder *block)
+static IrArray end_ir_array_builder(Ir_Array_Bld *block)
 {
 	LowerContext *ctx = block->ctx;
 	ASSERT(ctx);
@@ -183,7 +183,7 @@ static void push_defer_stat(LowerContext *ctx, Ast stat)
 	ctx->defer_stack[ctx->defer_count++] = stat;
 }
 
-static void emit_defer_range(LowerContext *ctx, IRArrayBuilder *items, u32 start)
+static void emit_defer_range(LowerContext *ctx, Ir_Array_Bld *items, u32 start)
 {
 	ASSERT(start <= ctx->defer_count);
 	for (u32 i = ctx->defer_count; i > start; --i)
@@ -640,7 +640,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			Ast *args = expr->table.args;
 			u32 nargs = expr->table.nargs;
 
-			IRArrayBuilder table_items = begin_ir_array_builder(ctx);
+			Ir_Array_Bld table_items = begin_ir_array_builder(ctx);
 			Ir table_local = create_local_ir(ctx, expr->site, create_table_ir(ctx, expr->site));
 			push_ir_block(&table_items, table_local);
 
@@ -742,7 +742,7 @@ static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat)
 		return ERROR_IR;
 	}
 
-	IRArrayBuilder block_items = begin_ir_array_builder(ctx);
+	Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
 	if (stat->kind == AST_BLOCK_STAT)
 	{
 		EntityScope scope = get_entity_scope(ctx);
@@ -766,7 +766,7 @@ static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat)
 	return ir;
 }
 
-static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, Ast expr)
+static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, Ir_Array_Bld *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -823,7 +823,7 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, 
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.nargs;
 
@@ -970,7 +970,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	Ir iterator_less_than_range_end = create_binary_ir(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = create_jump_if_false_ir(ctx, range->site, iterator_less_than_range_end, break_label);
 
-	IRArrayBuilder loop_items = begin_ir_array_builder(ctx);
+	Ir_Array_Bld loop_items = begin_ir_array_builder(ctx);
 	push_ir_block(&loop_items, start_label);
 	push_ir_block(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
@@ -1008,7 +1008,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	IrArray loop_stats = end_ir_array_builder(&loop_items);
 	Ir loop = create_block_ir(ctx, stat->site, loop_stats);
 
-	IRArrayBuilder block_items = begin_ir_array_builder(ctx);
+	Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
 	if (collection_local) {
 		push_ir_block(&block_items, collection_local);
 	}
@@ -1070,7 +1070,7 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 	}
 
 	EntityScope scope = get_entity_scope(ctx);
-	IRArrayBuilder block_items = begin_ir_array_builder(ctx);
+	Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
 	lower_ast_stat_to_ir(ctx, &block_items, init);
 
 	Ir condition_label = create_label_ir(ctx, stat->site);
@@ -1089,7 +1089,7 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 	Ir exit_jump = create_jump_if_false_ir(ctx, stat->for_stat.pred->site, pred, break_label);
 	Ir step = lower_ast_to_ir_block(ctx, stat->for_stat.step);
 
-	IRArrayBuilder loop_items = begin_ir_array_builder(ctx);
+	Ir_Array_Bld loop_items = begin_ir_array_builder(ctx);
 	push_ir_block(&loop_items, condition_label);
 	push_ir_block(&loop_items, exit_jump);
 	push_ir_block(&loop_items, body);
@@ -1106,7 +1106,7 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast stat)
+static Ir lower_compound_assign_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast stat)
 {
 	Ast dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
@@ -1134,7 +1134,7 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, 
 	return create_store_ir(ctx, stat->site, dest_ir, value_ir);
 }
 
-static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast stat)
+static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast stat)
 {
 	if (!stat || ast_is_error(stat))
 	{
@@ -1181,7 +1181,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast s
 			Ir pred_ir = lower_ast_expr_to_ir(ctx, pred);
 			Ir jump_if_false = create_jump_if_false_ir(ctx, pred->site, pred_ir, break_label);
 
-			IRArrayBuilder loop_items = begin_ir_array_builder(ctx);
+			Ir_Array_Bld loop_items = begin_ir_array_builder(ctx);
 			push_ir_block(&loop_items, start_label);
 			push_ir_block(&loop_items, jump_if_false);
 			push_ir_block(&loop_items, body_ir);
@@ -1213,7 +1213,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast s
 			Ast *stats = stat->block.stats;
 			u32 nstats = stat->block.nstats;
 
-			IRArrayBuilder block_items = begin_ir_array_builder(ctx);
+			Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
 
 			EntityScope scope = get_entity_scope(ctx);
 			DeferScope defer_scope = get_defer_scope(ctx);
@@ -1345,7 +1345,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast s
 				Ir value_ir = lower_ast_expr_to_ir(ctx, expr_ast);
 				Ir store_ir = create_store_ir(ctx, stat->site, dest_ir, value_ir);
 
-				IRArrayBuilder true_items = begin_ir_array_builder(ctx);
+				Ir_Array_Bld true_items = begin_ir_array_builder(ctx);
 				push_ir_block(&true_items, store_ir);
 				IrArray true_stats = end_ir_array_builder(&true_items);
 				Ir true_clause = create_block_ir(ctx, stat->site, true_stats);

@@ -1,0 +1,63 @@
+elf.assert(1)
+elf.assert(1, "numeric assertions remain supported")
+
+test_assert(elf.type_of(nil) == "nil")
+test_assert(elf.type_of(7) == "integer")
+test_assert(elf.type_of(7.5) == "number")
+test_assert(elf.type_of("elf") == "string")
+test_assert(elf.type_of({}) == "table")
+
+test_assert(elf.is_atom("elf"))
+test_assert(elf.is_atom(7) == 0)
+test_assert(elf.is_numeric(7))
+test_assert(elf.is_numeric(7.5))
+test_assert(elf.is_numeric("7") == 0)
+test_assert(elf.type_of(elf.to_number(7)) == "number")
+test_assert(elf.to_integer(7.75) == 7)
+
+child := {}
+root := { child }
+root.self = root
+test_assert(elf.freeze(root) == root)
+test_assert(elf.is_readonly(root))
+test_assert(elf.is_readonly(child))
+
+probe := fun(a, ...) {
+	test_assert(elf.nargs() == 4)
+	test_assert(elf.nvargs() == 2)
+	test_assert(elf.nrets() == 0)
+	test_assert(elf.arg(-1) == nil)
+	test_assert(elf.arg(4) == nil)
+	test_assert(elf.varg(-1) == nil)
+	test_assert(elf.varg(2) == nil)
+	test_assert(elf.arg(1) == 10)
+	test_assert(elf.varg(0) == 20)
+	test_assert(elf.varg(1) == 30)
+}
+probe(10, 20, 30)
+
+test_assert(elf.const_expr("42") == 42)
+test_assert(elf.load_file("smoke/core_lib_loaded.elf", 41) == 42)
+
+document := elf.serialization.load_json_file("smoke/core_lib_data.json")
+test_assert(document.answer == 42)
+test_assert(document.items[0] == 3)
+test_assert(document.items[2] == 8)
+test_assert(elf.serialization.load_json_file("smoke/does_not_exist.json") == nil)
+
+test_assert(elf.type_of(elf.debug.memory_bytes()) == "integer")
+test_assert(elf.type_of(elf.debug.object_count()) == "integer")
+
+test_assert(elf.load_expr == nil)
+test_assert(elf.unparse == nil)
+test_assert(elf.format == nil)
+test_assert(elf.fprint == nil)
+test_assert(elf.fpf == nil)
+test_assert(elf.pf == nil)
+test_assert(elf.get_obj_pointer == nil)
+
+test_assert(elf.print("") == 0)
+test_assert(elf.println("") == 1)
+test_assert(elf.printl("") == 1)
+
+ret 4242

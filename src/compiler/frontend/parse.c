@@ -474,7 +474,7 @@ static Ast parse_load_expr(Parser *par)
 	u32 nargs = parse_call_args(par);
 	Ast *args = pop_ast_array(par, nargs);
 
-	Ast value = create_core_api_call_ast(par, tok.site, BUILTIN_LOADFILE, args, nargs);
+	Ast value = create_load_file_call_ast(par, tok.site, args, nargs);
 	return value;
 }
 

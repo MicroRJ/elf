@@ -1,0 +1,2152 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"cur",
+				"cursor"
+			],
+			[
+				"TOK_FORMS",
+				"TOK_FORMAT_STRING_END"
+			],
+			[
+				"LEMODE",
+				"LEXER_MODE_FORMAT_STRING"
+			],
+			[
+				"scrip",
+				"scripts"
+			],
+			[
+				"scope",
+				"profile_scope_begin"
+			],
+			[
+				"scra",
+				"scratch"
+			],
+			[
+				"def",
+				"default_atoms"
+			],
+			[
+				"asp",
+				"ast_span_join"
+			],
+			[
+				"decl",
+				"lower_decl"
+			],
+			[
+				"Source",
+				"JasSourceSpan"
+			],
+			[
+				"Jas",
+				"JasAst"
+			],
+			[
+				"in",
+				"inst"
+			],
+			[
+				"star",
+				"starts"
+			],
+			[
+				"st",
+				"stats"
+			],
+			[
+				"si",
+				"size_t"
+			],
+			[
+				"LineINde",
+				"Buf_LineIndexFromPosition"
+			],
+			[
+				"ESS",
+				"ES_State"
+			],
+			[
+				"botline",
+				"bot_line_index"
+			],
+			[
+				"topline",
+				"top_line_index"
+			],
+			[
+				"sele",
+				"selection"
+			],
+			[
+				"slein",
+				"selection_min_index"
+			],
+			[
+				"Buf_LineFrom",
+				"Buf_OuterLineFromIndex"
+			],
+			[
+				"MaxINde",
+				"Buf_GetMaxLineIndexInclusive"
+			],
+			[
+				"GetCur",
+				"ES_GetCursor"
+			],
+			[
+				"curs",
+				"cursors"
+			],
+			[
+				"SS",
+				"SearchState"
+			],
+			[
+				"NONE",
+				"SEARCH_NONE"
+			],
+			[
+				"COmm",
+				"Command"
+			],
+			[
+				"GetSave",
+				"Buf_GetSavePathStr"
+			],
+			[
+				"linear",
+				"line_array"
+			],
+			[
+				"PushCop",
+				"Arena_PushCopy"
+			],
+			[
+				"use",
+				"user_str"
+			],
+			[
+				"id",
+				"Static__buf_id"
+			],
+			[
+				"bufar",
+				"Static__buf_array"
+			],
+			[
+				"sc",
+				"scratch_arena"
+			],
+			[
+				"SAre",
+				"Static__arena_array"
+			],
+			[
+				"index",
+				"Static__scratch_arena_index"
+			],
+			[
+				"GetS",
+				"Arena_GetScratchRotate"
+			],
+			[
+				"cn",
+				"candidates"
+			],
+			[
+				"Cop",
+				"Str_PushCopy"
+			],
+			[
+				"texs",
+				"text_str"
+			],
+			[
+				"gly",
+				"glyph"
+			],
+			[
+				"glyh",
+				"glyphs"
+			],
+			[
+				"glyp",
+				"glyphs"
+			],
+			[
+				"off",
+				"offset"
+			],
+			[
+				"piece",
+				"pieces"
+			],
+			[
+				"Clus",
+				"Str_Cluster"
+			],
+			[
+				"BOX_",
+				"BOX__DEBUGBREAK_LAYOUT"
+			],
+			[
+				"StrFrmo",
+				"Str_FromAtom"
+			],
+			[
+				"active",
+				"entity_count_active"
+			],
+			[
+				"BufSave",
+				"Buf__Save"
+			],
+			[
+				"bufocu",
+				"Static__buf_count"
+			],
+			[
+				"ncu",
+				"ncursors"
+			],
+			[
+				"ncur",
+				"ncursors1"
+			],
+			[
+				"FLush",
+				"Buf__FlushActiveTransaction"
+			],
+			[
+				"Shift",
+				"ES_ShiftCursor"
+			],
+			[
+				"GetCu",
+				"ES_GetCursor"
+			],
+			[
+				"Advace",
+				"ES_AdvanceCursorAnchorAndOffset"
+			],
+			[
+				"redocou",
+				"transaction_redo_count"
+			],
+			[
+				"size",
+				"sizeof"
+			],
+			[
+				"BegiNTrans",
+				"ES_BeginTransaction"
+			],
+			[
+				"batch",
+				"undo_batch"
+			],
+			[
+				"transac",
+				"transaction_count"
+			],
+			[
+				"mai",
+				"maia"
+			],
+			[
+				"LienINde",
+				"Buf_LineIndexFromPosition"
+			],
+			[
+				"GPU",
+				"GPU_H"
+			],
+			[
+				"COmmA",
+				"CommandArgs"
+			],
+			[
+				"func",
+				"function"
+			],
+			[
+				"pagete",
+				"page_texture_array"
+			],
+			[
+				"pages",
+				"run_pages"
+			],
+			[
+				"Font_Glyp",
+				"Font_RasterGlyph"
+			],
+			[
+				"EnsureinV",
+				"ES__EnsureInValidState"
+			],
+			[
+				"Cur",
+				"Buf_Cursor"
+			],
+			[
+				"Cache",
+				"Doc_ViewportCache"
+			],
+			[
+				"target",
+				"target_line_index"
+			],
+			[
+				"Viewpor",
+				"Doc_ViewportState"
+			],
+			[
+				"LineFrom",
+				"Buf_InnerLineFromIndex"
+			],
+			[
+				"StyleSP",
+				"Text_StyleSpan"
+			],
+			[
+				"ArePush",
+				"Arena_PushSize"
+			],
+			[
+				"text_s",
+				"text_str"
+			],
+			[
+				"viewpo",
+				"min_viewport_index"
+			],
+			[
+				"lyt",
+				"text_lyts"
+			],
+			[
+				"reb",
+				"rebase"
+			],
+			[
+				"Insert",
+				"ES_InsertStrCmd"
+			],
+			[
+				"ACT_SAVE_",
+				"ACT_SAVE_ACTIVE_BUFFER"
+			],
+			[
+				"Cmds",
+				"Static__cmds"
+			],
+			[
+				"ProBuf",
+				"Static__SearchProvider_Buffer"
+			],
+			[
+				"guter",
+				"editor_gutter_box"
+			],
+			[
+				"SetCu",
+				"ES_SetCursors"
+			],
+			[
+				"undo_",
+				"undo_data_arena"
+			],
+			[
+				"REplace",
+				"Buf__ReplaceBytes_NoUndo"
+			],
+			[
+				"ES_SetCur",
+				"ES_SetCursors"
+			],
+			[
+				"BH",
+				"Buf_Handle"
+			],
+			[
+				"SetCur",
+				"ES_SetCursorAnchor"
+			],
+			[
+				"us",
+				"use_pixel_snapping"
+			],
+			[
+				"charr",
+				"chars_regular"
+			],
+			[
+				"charre",
+				"chars_oversampled"
+			],
+			[
+				"sr",
+				"src_x"
+			],
+			[
+				"ove",
+				"oversample_w"
+			],
+			[
+				"Text",
+				"Text_ColorSpan_Builder"
+			],
+			[
+				"HND",
+				"HWND"
+			],
+			[
+				"TOK_DI",
+				"TOK_IDENTIFIER"
+			],
+			[
+				"siz",
+				"size"
+			],
+			[
+				"MOve",
+				"Buf_Move"
+			],
+			[
+				"BMove",
+				"Buf_MoveType"
+			],
+			[
+				"acov",
+				"active_move_arena"
+			],
+			[
+				"Slice",
+				"Buf_Slice"
+			],
+			[
+				"PAS",
+				"PATH_SLASH2"
+			],
+			[
+				"PSL",
+				"PATH_SLASH1"
+			],
+			[
+				"Sear",
+				"Search_Ctx"
+			],
+			[
+				"Measure",
+				"Search__List_MeasureFn"
+			],
+			[
+				"Build",
+				"Search__BuildSearchEntryBox"
+			],
+			[
+				"StrFrom",
+				"Str_FromDataSize"
+			],
+			[
+				"InsSt",
+				"ES_InsertStrCmd"
+			],
+			[
+				"ES_INs",
+				"ES_InsertStr"
+			],
+			[
+				"ES_SetCursorA",
+				"ES_SetCursorAnchorAndOffset"
+			],
+			[
+				"of",
+				"offset"
+			],
+			[
+				"safes",
+				"safe_sele"
+			],
+			[
+				"stat",
+				"status_box"
+			],
+			[
+				"edig",
+				"editor_gutter_box"
+			],
+			[
+				"windob",
+				"window_box_t"
+			],
+			[
+				"theme",
+				"theme_t"
+			],
+			[
+				"INTEGER",
+				"VALUE_INTEGER"
+			],
+			[
+				"Resize",
+				"Table__Resize"
+			],
+			[
+				"FUNC",
+				"TABLE_FUNCTION"
+			],
+			[
+				"TV",
+				"TValue"
+			],
+			[
+				"PrinT",
+				"PrintTableBody"
+			],
+			[
+				"printt",
+				"PrintIndent"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "docs/grammar.md",
+			"settings":
+			{
+				"buffer_size": 12606,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "elf.sublime-project",
+			"settings":
+			{
+				"buffer_size": 45,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "elf.sublime-workspace",
+			"settings":
+			{
+				"buffer_size": 33226,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "# elf\n\n`elf` is a small scripting language and runtime for experiments, prototypes,\ngames, and media tools.\n\n\nThe current syntax and language behavior are documented in\n[docs/grammar.md](docs/grammar.md).\n\n## Current Shape\n\n- Hand-written lexer and parser.\n- AST lowering into an explicit Ir.\n- Bytecode generation from Ir.\n- Stack-based runtime with bytecode closures.\n- Tables as the primary compound data structure.\n- Interned atoms for identifiers and string-like immutable text.\n- Mark/sweep GC for tables, closures, and atoms.\n- Runtime libraries under `src/runtime/libs`.\n- Smoke tests and focused C tests under `tools` and `smoke`.\n\n## Build\n\nWith Bob on `PATH`:\n\n```bat\nbob\nbob test\n```\n\nThe legacy batch build is also available. On Windows, initialize the Visual\nStudio environment and run:\n\n```bat\nvcvars64\nbuild.bat\n```\n\nBob_Build output is written to `build`.\n\nThe build currently produces:\n\n- `build\\elf.lib`\n- `build\\tests.exe`\n- `build\\benchmarks.exe`\n- `build\\bytecode.exe`\n- `build\\elf.exe`\n\n## Test\n\nRun the full test harness with:\n\n```bat\nbuild\\tests.exe\n```\n\nRun a script file with:\n\n```bat\nbuild\\elf.exe path\\to\\file.elf\n```\n\nIf no file is provided, `build\\elf.exe` runs `main.elf`.\n\nDump bytecode for a script with:\n\n```bat\nbuild\\bytecode.exe path\\to\\file.elf\n```\n\nRun table lookup benchmarks with:\n\n```bat\nbuild\\benchmarks.exe\n```\n\n## Layout\n\n```text\ninclude/     public headers\nsrc/base/    internal base utilities\nsrc/platform platform-specific helpers\nsrc/diagnostics logging and source/runtime error printing\nsrc/core/    state, GC, values, atoms, tables\nsrc/compiler frontend, Ir lowering, bytecode generation\nsrc/runtime VM dispatch, calls, and built-in libraries\ntools/       test harnesses, runner, bytecode dumper, benchmarks\nsmoke/       elf scripts used by smoke tests\ndocs/        grammar and design notes worth keeping\n```\n\n## Notes\n\nThis is not stable software yet. Syntax, internals, and APIs are still moving\nquickly while the language architecture settles.\n",
+			"file": "README.md",
+			"file_size": 2232,
+			"file_write_time": 134289995892122840,
+			"settings":
+			{
+				"buffer_size": 1998,
+				"line_ending": "Windows"
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"lcosa",
+				"File: Close All"
+			],
+			[
+				"save",
+				"File: Save All"
+			],
+			[
+				"closa",
+				"File: Close All"
+			],
+			[
+				"ren",
+				"Rename File"
+			],
+			[
+				"clsoa",
+				"File: Close All"
+			],
+			[
+				"Save",
+				"File: Save All"
+			],
+			[
+				"reinde",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"ssjson",
+				"Set Syntax: JSON"
+			],
+			[
+				"sav",
+				"File: Save All"
+			],
+			[
+				"losa",
+				"File: Close All"
+			],
+			[
+				"asave",
+				"Haxe: Restart Server"
+			],
+			[
+				"ss:C",
+				"Set Syntax: C"
+			],
+			[
+				"sve",
+				"Set Syntax: Java Server Page (JSP)"
+			],
+			[
+				"reidne",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"ssC:",
+				"Set Syntax: C"
+			],
+			[
+				"setting",
+				"Preferences: Settings"
+			],
+			[
+				"save as",
+				"Project: Save As"
+			],
+			[
+				"rne",
+				"Rename File"
+			],
+			[
+				"statusb",
+				"View: Toggle Status Bar"
+			],
+			[
+				"status",
+				"Indexing Status"
+			],
+			[
+				"sapve",
+				"Set Syntax: Java Properties"
+			],
+			[
+				"ave",
+				"File: Save All"
+			],
+			[
+				"title",
+				"Convert Case: Title Case"
+			],
+			[
+				"sae",
+				"Set Syntax: ASP"
+			],
+			[
+				"ssave",
+				"Set Syntax: Java Properties"
+			],
+			[
+				"riende",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"lower",
+				"Convert Case: Lower Case"
+			],
+			[
+				"assave",
+				"Haxe: Restart Server"
+			],
+			[
+				"settings",
+				"Preferences: Settings"
+			],
+			[
+				"wr",
+				"Word Wrap: Toggle"
+			],
+			[
+				"wrap",
+				"Word Wrap: Toggle"
+			],
+			[
+				"bropac",
+				"Preferences: Browse Packages"
+			],
+			[
+				"install",
+				"Haxelib: Install library"
+			],
+			[
+				"upper",
+				"Convert Case: Upper Case"
+			],
+			[
+				"case",
+				"Convert Case: Swap Case"
+			],
+			[
+				"togglestat",
+				"View: Toggle Status Bar"
+			],
+			[
+				"Asave",
+				"Haxe: Restart Server"
+			],
+			[
+				"Sve",
+				"Snippet: Vector For Loop"
+			],
+			[
+				"viewpac",
+				"View Package File"
+			],
+			[
+				"viewpack",
+				"View Package File"
+			],
+			[
+				"view",
+				"View Package File"
+			],
+			[
+				"colorsc",
+				"UI: Select Color Scheme"
+			],
+			[
+				"theme",
+				"UI: Select Theme"
+			],
+			[
+				"viewp",
+				"View Package File"
+			],
+			[
+				"clo",
+				"File: Close All"
+			],
+			[
+				"sas",
+				"Set Syntax: AppleScript"
+			],
+			[
+				"clos",
+				"File: Close All"
+			],
+			[
+				"ke",
+				"Preferences: Key Bindings"
+			],
+			[
+				"sstext",
+				"Set Syntax: Plain Text"
+			],
+			[
+				"cloa",
+				"File: Close All"
+			],
+			[
+				"asve",
+				"Set Syntax: Java Server Page (JSP)"
+			],
+			[
+				"convetosp",
+				"Indentation: Convert to Spaces"
+			],
+			[
+				"sstex",
+				"Set Syntax: Plain Text"
+			],
+			[
+				"sslua",
+				"Set Syntax: Lua"
+			],
+			[
+				"ssl",
+				"Set Syntax: Lua"
+			],
+			[
+				"ssla",
+				"Set Syntax: LaTeX"
+			],
+			[
+				"clso",
+				"File: Close All"
+			],
+			[
+				"ssC",
+				"Set Syntax: C"
+			],
+			[
+				"reidn",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"",
+				"Bookmarks: Toggle"
+			],
+			[
+				"sa",
+				"File: Save All"
+			],
+			[
+				"reind",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"sce",
+				"Set Syntax: C"
+			],
+			[
+				"convertospa",
+				"Indentation: Convert to Spaces"
+			],
+			[
+				"irende",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"cloas",
+				"File: Close All"
+			],
+			[
+				"spave",
+				"Snippet: Read File Into Vector"
+			],
+			[
+				"s:C",
+				"Set Syntax: C"
+			],
+			[
+				"rinde",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"color",
+				"UI: Select Color Scheme"
+			],
+			[
+				"package",
+				"Preferences: Browse Packages"
+			],
+			[
+				"saave",
+				"Set Syntax: Java Properties"
+			],
+			[
+				"low",
+				"Convert Case: Lower Case"
+			],
+			[
+				"upp",
+				"Convert Case: Upper Case"
+			],
+			[
+				"savc",
+				"Set Syntax: Objective-C"
+			],
+			[
+				"remove",
+				"Haxelib: Remove library"
+			],
+			[
+				"renam",
+				"Rename File"
+			],
+			[
+				"bro",
+				"Preferences: Browse Packages"
+			],
+			[
+				"pack",
+				"Preferences: Browse Packages"
+			],
+			[
+				"ssxml",
+				"Set Syntax: XML"
+			],
+			[
+				"thee",
+				"UI: Select Theme"
+			],
+			[
+				"rena",
+				"Rename File"
+			],
+			[
+				"sspla",
+				"Set Syntax: Plain Text"
+			],
+			[
+				"ssp",
+				"Set Syntax: Python"
+			],
+			[
+				"refer",
+				"Preferences: Settings"
+			],
+			[
+				"sspy",
+				"Set Syntax: Python"
+			],
+			[
+				"ssmake",
+				"Set Syntax: Makefile"
+			],
+			[
+				"lcos",
+				"File: Close All"
+			],
+			[
+				"sort",
+				"Sort Lines"
+			],
+			[
+				"prefer",
+				"Preferences: Settings"
+			],
+			[
+				"re",
+				"Rename File"
+			],
+			[
+				"ss:",
+				"Set Syntax: Jai"
+			],
+			[
+				"r",
+				"Rename File"
+			],
+			[
+				"einde",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"SAVE",
+				"File: Save All"
+			],
+			[
+				"plain",
+				"Set Syntax: Plain Text"
+			],
+			[
+				"space",
+				"Indentation: Convert to Spaces"
+			],
+			[
+				"renm",
+				"Rename File"
+			],
+			[
+				"lua",
+				"Set Syntax: Lua"
+			],
+			[
+				"ssc:",
+				"Set Syntax: C"
+			],
+			[
+				"rnem",
+				"Rename File"
+			],
+			[
+				"clsa",
+				"Haxe: New Class"
+			],
+			[
+				"conveto",
+				"Indentation: Convert to Spaces"
+			],
+			[
+				"sag",
+				"Set Syntax: Bourne Again Shell (bash)"
+			],
+			[
+				"slua",
+				"Set Syntax: Lua"
+			],
+			[
+				"sace",
+				"Set Syntax: Clojure"
+			],
+			[
+				"rien",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"rein",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"rinede",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"renma",
+				"Rename File"
+			],
+			[
+				"reine",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"redein",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"togg",
+				"View: Toggle Tabs"
+			],
+			[
+				"erinde",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"CLOSA",
+				"File: Close All"
+			],
+			[
+				"toggle ta",
+				"View: Toggle Tabs"
+			],
+			[
+				"converto",
+				"Indentation: Convert to Spaces"
+			],
+			[
+				"saaave",
+				"Set Syntax: Java Properties"
+			],
+			[
+				"saev",
+				"File: Save All"
+			],
+			[
+				"saasd",
+				"Set Syntax: Git Rebase Todo"
+			],
+			[
+				"ss:C ",
+				"Set Syntax: C"
+			],
+			[
+				"irnede",
+				"Indentation: Reindent Lines"
+			],
+			[
+				"rnea",
+				"Rename File"
+			],
+			[
+				"pre",
+				"Preferences: Settings"
+			],
+			[
+				"clll",
+				"Bookmarks: Clear All"
+			],
+			[
+				"ssjs",
+				"Set Syntax: JavaScript"
+			],
+			[
+				"sshtml",
+				"Set Syntax: HTML"
+			],
+			[
+				"read",
+				"gruvbox: Readme"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 379.0,
+		"history":
+		[
+			"(1 << 15) * 32 / 1024 / 1024",
+			"(1 << 15) * 32 / 1024",
+			"(1 << 15) * 32",
+			"1 << 15",
+			"1 << 14",
+			"1 << 10",
+			"(1 << 20) >> 5",
+			"1 << 20",
+			"255 * 0.35",
+			"1 << 14",
+			"1 << 13",
+			"1 << 12",
+			"1 << 14",
+			"1 << 10",
+			"7 / 60",
+			"1 / 0.15",
+			"60 / 0.15",
+			"60 / (60 * 0.15)",
+			"60 * 0.15",
+			"0xEB",
+			"512 / 24",
+			"chr(65 + 25)",
+			"chr(65 + 26)",
+			"chr(65)",
+			"chr('A')",
+			"chr",
+			"'A'",
+			"0.1098 * 255",
+			"0.08235 * 255",
+			"0.08235 * 255.f",
+			"0.00392 * 255f",
+			"0.00392 * 255",
+			"bin(~ 0x80)",
+			"bin(0x80)",
+			"bin(~0x80 - 1)",
+			"bin(~0x80 + 1)",
+			"bin(~0x80)",
+			"hex(~0x80)",
+			"bin(0xF4)",
+			"bin(0xF8)",
+			"bin(0xEF)",
+			"bin(0xED)",
+			"bin(0xE0)",
+			"bin(0xEF)",
+			"bin(0xF8)",
+			"bin(0xDF)",
+			"0x80",
+			"0xC0",
+			"128 + 64",
+			"0xA0",
+			"0xE0",
+			"0xE0 - 32",
+			"0x80",
+			"0xC0",
+			"0b110",
+			"224 + 16",
+			"0xE0",
+			"0xC0",
+			"0xC)",
+			"128 + 64",
+			"16 * 8",
+			"0x80",
+			"128 + 64 +32",
+			"128 + 64",
+			"bin(0x80)",
+			"0x80",
+			"0b110",
+			"hex(240)",
+			"hex(248)",
+			"128 + 64 + 32 + 16 + 8",
+			"128 + 64 + 32 + 16",
+			"hex(224)",
+			"128 + 64 + 32",
+			"128 + 64",
+			"Welcome",
+			"1 << 13",
+			"1 << 14",
+			"1 << 10 << 4",
+			"pow(6, 3) + pow(6, 2)",
+			"pow(6, 3)",
+			"pow(6, 4)",
+			"pow(6, 3) + pow(6, 2) + pow(6, 1)",
+			"pow(6, 3) + pow(6, 2)",
+			"pow(6, 3)",
+			"pow(6, 4)",
+			"pow(6, 3)",
+			"pow(6, 2)",
+			"pow(6, 1)",
+			"pow(1, 6)",
+			"720 / 6 / 6 / 6",
+			"720 / 6 / 6",
+			"720 / 6",
+			"720 % 6",
+			"math.log(6, 720)",
+			"math.log(720, 6)",
+			"import math",
+			"math.log(720, 6)",
+			"log(720, )",
+			"6 * 5 * 4 * 3 * 2 * 1",
+			"10 * 9 * 8 * 7 * 6 * 5 * 4 * 3 * 2 * 1",
+			"pow(2, 3) * 4",
+			"pow(2, 5)",
+			"512 * 8",
+			"0.6667 - 0.5",
+			"1/0.6667 + 0.01",
+			"1/0.6667 + 0.1",
+			"1/0.6667",
+			"1/0.1667",
+			"bin((1|2|4) - 1)",
+			"bin(1|2|4)",
+			"bin(4-1)",
+			"bin(4)",
+			"bin(2)",
+			"-1 - -1",
+			"-4 - -4",
+			"-2 - 2",
+			"2 - -2",
+			"-2 - 2",
+			"-2 - -2",
+			"-1 + -1",
+			"21 - 12",
+			"1024 * 0.75",
+			"1024 * 0.8750",
+			"1024 * 0.1250",
+			"1/0.1250",
+			"256/1024",
+			"1 / 0.0035",
+			"1/0.0244"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": true,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/C/work/MicroRJ/elf",
+		"/C/work/MicroRJ/elf/docs",
+		"/C/work/MicroRJ/elf/src"
+	],
+	"file_history":
+	[
+		"/C/work/MicroRJ/elf/src/compiler/frontend/parse.c",
+		"/C/work/MicroRJ/elf/src/compiler/middle/lower.c",
+		"/C/work/MicroRJ/elf/tools/backend_tests.c",
+		"/C/work/MicroRJ/elf/smoke/c_for.elf",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/ast.c",
+		"/C/work/MicroRJ/elf/src/.trash",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/parser.h",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/ast.h",
+		"/C/work/MicroRJ/elf/smoke/interpolated_strings.elf",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/lexer.c",
+		"/C/work/MicroRJ/elf/src/compiler/compiler.c",
+		"/C/work/MicroRJ/elf/tools/tests.c",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/parse_json.c",
+		"/C/work/MicroRJ/elf/src/compiler/middle/lower.h",
+		"/C/work/MicroRJ/elf/tools/ir_tests.c",
+		"/C/work/MicroRJ/elf/tools/parser_tests.c",
+		"/C/work/MicroRJ/elf/src/runtime/libs/l_table.c",
+		"/C/work/MicroRJ/elf/src/runtime/libs/l_fs.c",
+		"/C/work/MicroRJ/elf/tools/lexer_tests.c",
+		"/C/work/MicroRJ/elf/main.elf",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/parse.h",
+		"/C/work/MicroRJ/elf/include/elf.h",
+		"/C/work/MicroRJ/elf/src/base/arena.h",
+		"/C/work/MicroRJ/elf/src/compiler/frontend/token.h",
+		"/C/work/MicroRJ/bob/build.elf",
+		"/C/work/MicroRJ/bob/tests/tests.c",
+		"/C/work/MicroRJ/bob/example/main.c",
+		"/C/work/MicroRJ/bob/src/scripts/elf_adapter.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_table.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_random.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_time.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_fs.c",
+		"/C/work/MicroRJ/bob/README.md",
+		"/C/work/MicroRJ/bob/bob.sublime-project",
+		"/C/work/MicroRJ/bob/elf/src/core/table/table.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/parse.c",
+		"/C/work/MicroRJ/bob/src/bob_main.c",
+		"/C/work/MicroRJ/bob/src/profiler.c",
+		"/C/work/MicroRJ/bob/src/frontends/frontend.c",
+		"/C/work/MicroRJ/bob/src/lib/bob.h",
+		"/C/work/MicroRJ/bob/elf/include/elf.h",
+		"/C/work/MicroRJ/bob/src/frontends/elf_adapter.c",
+		"/C/work/MicroRJ/bob/src/bob.c",
+		"/C/work/MicroRJ/bob/src/bob.h",
+		"/C/work/MicroRJ/bob/src/script_internal.h",
+		"/C/work/MicroRJ/bob/elf/src/api/elf_api.c",
+		"/C/work/MicroRJ/bob/about/ABOUT.txt",
+		"/C/work/MicroRJ/bob/src/base.h",
+		"/C/work/MicroRJ/bob/build.bat",
+		"/C/work/MicroRJ/bob/src/profiler.h",
+		"/C/work/MicroRJ/bob/src/bob_builder.c",
+		"/C/work/MicroRJ/bob/src/logger.c",
+		"/C/work/MicroRJ/bob/src/bob_runtime.c",
+		"/C/work/MicroRJ/bob/src/platform/win32/win32_thread.c",
+		"/C/work/MicroRJ/bob/src/platform/platform.h",
+		"/C/work/MicroRJ/bob/.sublime-project",
+		"/C/work/MicroRJ/bob/src/logger.h",
+		"/C/work/MicroRJ/bob/src/builder.h",
+		"/C/work/MicroRJ/bob/.gitignore",
+		"/C/work/MicroRJ/bob/elf/README.md",
+		"/C/work/MicroRJ/bob/src/elf_adapter.c",
+		"/C/work/MicroRJ/bob/src/executor.c",
+		"/C/work/MicroRJ/bob/src/elf_adapter.h",
+		"/C/work/MicroRJ/bob/src/executor.h",
+		"/C/work/MicroRJ/bob/elf/docs/grammar.md",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_os.c",
+		"/C/work/MicroRJ/bob/src/vcvars_cache.c",
+		"/C/work/MicroRJ/bob/src/platform/win32_time.inc",
+		"/C/work/MicroRJ/bob/src/platform/win32_memory.c",
+		"/C/work/MicroRJ/bob/src/platform_win32.c",
+		"/C/work/MicroRJ/bob/src/platform.h",
+		"/C/work/MicroRJ/bob/elf/src/base/arena.c",
+		"/C/work/MicroRJ/bob/elf/src/base/arena.h",
+		"/C/work/MicroRJ/bob/elf/src/compiler/compiler.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/backend/bytecode_debug.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/backend/bytecode_gen.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/lexer.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/middle/lower.c",
+		"/C/work/MicroRJ/bob/elf/src/diagnostics/core_diagnostics.c",
+		"/C/work/MicroRJ/bob/elf/src/platform/win32/platform_process_win32.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_core.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_path.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_string.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/vm/vm.c",
+		"/C/work/MicroRJ/bob/elf/tools/arena_tests.c",
+		"/C/work/MicroRJ/bob/elf/tools/atom_tests.c",
+		"/C/work/MicroRJ/bob/elf/tools/backend_tests.c",
+		"/C/work/MicroRJ/bob/src/c_include_scan.c",
+		"/C/work/MicroRJ/bob/src/base.c",
+		"/C/work/MicroRJ/bob/src/vcvars_cache.h",
+		"/C/work/MicroRJ/bob/elf/tools/table_tests.c",
+		"/C/work/MicroRJ/bob/elf/docs/lowering_fossils.md",
+		"/C/work/MicroRJ/bob/example/tasks.elf",
+		"/C/work/MicroRJ/bob/elf/src/base/matcher.c",
+		"/C/work/MicroRJ/bob/elf/src/core/atom/atom.h",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/ast.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/parse_json.c",
+		"/C/work/MicroRJ/bob/elf/src/compiler/middle/ir.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_native.c",
+		"/C/work/MicroRJ/bob/elf/tools/ir_tests.c",
+		"/C/work/MicroRJ/bob/elf/tools/json_tests.c",
+		"/C/work/MicroRJ/bob/elf/tools/lexer_tests.c",
+		"/C/work/MicroRJ/bob/elf/tools/parser_tests.c",
+		"/C/work/MicroRJ/bob/elf/src/core/atom/atom.c",
+		"/C/work/MicroRJ/bob/elf/src/core/table/table.h",
+		"/C/work/MicroRJ/bob/elf/src/platform/sys_em.c",
+		"/C/work/MicroRJ/bob/elf/src/platform/sys_stub.c",
+		"/C/work/MicroRJ/bob/elf/src/platform/sys_win32.c",
+		"/C/work/MicroRJ/bob/elf/src/platform/system.h",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_math.c",
+		"/C/work/MicroRJ/bob/elf/smoke/script_assert_sys.elf",
+		"/C/work/MicroRJ/bob/example/tasks1.elf",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/ast.h",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/parse.h",
+		"/C/work/MicroRJ/bob/elf/src/compiler/frontend/token.h",
+		"/C/work/MicroRJ/bob/elf/src/compiler/middle/ir.h",
+		"/C/work/MicroRJ/bob/elf/src/compiler/middle/lower.h",
+		"/C/work/MicroRJ/bob/elf/src/core/core.h",
+		"/C/work/MicroRJ/bob/elf/src/core/gc.c",
+		"/C/work/MicroRJ/bob/elf/src/core/value/value.h",
+		"/C/work/MicroRJ/bob/elf/src/core/value/value_text.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_atom.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_sockets.c",
+		"/C/work/MicroRJ/bob/elf/src/runtime/libs/l_sys.c",
+		"/C/work/MicroRJ/bob/elf/tools/gc_tests.c",
+		"/C/work/MicroRJ/bob/src/graph.c",
+		"/C/work/MicroRJ/bob/src/graph.h",
+		"/C/work/MicroRJ/bob/elf_adapter.c"
+	],
+	"find":
+	{
+		"height": 66.0
+	},
+	"find_in_files":
+	{
+		"height": 353.0,
+		"where_history":
+		[
+			"-.trash",
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": true,
+		"find_history":
+		[
+			"IRArrayBuilder",
+			"goto _err;",
+			"take_token",
+			"parse_for",
+			"_list",
+			"parse.h",
+			"parser.h",
+			"perser.h",
+			"AstRef",
+			"Ast",
+			"lexer.",
+			"in_block",
+			"LEXER_MODE_STRING",
+			"depth",
+			"cur += 1;",
+			";   cur += 1;",
+			"\t\t\t\t\t",
+			"LexerMode",
+			"in_string_expr",
+			"string_start",
+			"identifer",
+			"format_string",
+			"FORMAT",
+			"in_string_expr",
+			"is_block",
+			"escape",
+			"lex_string_part",
+			"source_site_from_ptr",
+			"string_ended",
+			"} break;",
+			"escape",
+			"TOK_FORMAT"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"Ir_Array_Bld",
+			"parser.h",
+			"Ast",
+			"Ast_T"
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": true,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 2,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "docs/grammar.md",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 12606,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2348,
+								2348
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Markdown/Markdown.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 1947.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "elf.sublime-project",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 45,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/JavaScript/JSON.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "elf.sublime-workspace",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 33226,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 16997.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "README.md",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1998,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								110,
+								169
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Markdown/Markdown.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 39.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 31.0
+	},
+	"input":
+	{
+		"height": 232.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": false,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "elf.sublime-project",
+	"replace":
+	{
+		"height": 58.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"readme",
+				"README.md"
+			],
+			[
+				"lower",
+				"src\\compiler\\middle\\lower.c"
+			],
+			[
+				"parse.c",
+				"src\\compiler\\frontend\\parse.c"
+			],
+			[
+				"cfor",
+				"smoke\\c_for.elf"
+			],
+			[
+				"lower.",
+				"src\\compiler\\middle\\lower.c"
+			],
+			[
+				"lower.c",
+				"src\\compiler\\middle\\lower.c"
+			],
+			[
+				"pase.c",
+				"src\\compiler\\frontend\\parse.c"
+			],
+			[
+				"trash",
+				"src\\.trash"
+			],
+			[
+				"interpolate",
+				"smoke\\interpolated_strings.elf"
+			],
+			[
+				"ast",
+				"src\\compiler\\frontend\\ast.c"
+			],
+			[
+				"parse.h",
+				"src\\compiler\\frontend\\parser.h"
+			],
+			[
+				"parse",
+				"src\\compiler\\frontend\\parse.h"
+			],
+			[
+				"lexer.c",
+				"src\\compiler\\frontend\\lexer.c"
+			],
+			[
+				"par",
+				"src\\compiler\\frontend\\parse.h"
+			],
+			[
+				"lete",
+				"tools\\lexer_tests.c"
+			],
+			[
+				"lfs",
+				"src\\runtime\\libs\\l_fs.c"
+			],
+			[
+				"ltable",
+				"src\\runtime\\libs\\l_table.c"
+			],
+			[
+				"test",
+				"tools\\tests.c"
+			],
+			[
+				"token.h",
+				"src\\compiler\\frontend\\token.h"
+			],
+			[
+				"main.elf",
+				"main.elf"
+			],
+			[
+				"main",
+				"main.elf"
+			],
+			[
+				"toke",
+				"src\\compiler\\frontend\\token.h"
+			],
+			[
+				"elf.h",
+				"include\\elf.h"
+			],
+			[
+				"lexer",
+				"tools\\lexer_tests.c"
+			],
+			[
+				"build.elf",
+				"build.elf"
+			],
+			[
+				"elf",
+				"elf\\include\\elf.h"
+			],
+			[
+				"bobcore",
+				"src\\lib\\bob_core.c"
+			],
+			[
+				"elfad",
+				"src\\scripts\\elf_adapter.c"
+			],
+			[
+				"ltime",
+				"elf\\src\\runtime\\libs\\l_time.c"
+			],
+			[
+				"lrand",
+				"elf\\src\\runtime\\libs\\l_random.c"
+			],
+			[
+				"read",
+				"README.md"
+			],
+			[
+				"build",
+				"build.elf"
+			],
+			[
+				"ltabl",
+				"elf\\src\\runtime\\libs\\l_table.c"
+			],
+			[
+				"projec",
+				"bob.sublime-project"
+			],
+			[
+				"builde.",
+				"build.elf"
+			],
+			[
+				"bobmain",
+				"src\\bob_main.c"
+			],
+			[
+				"bob.c",
+				"src\\bob.c"
+			],
+			[
+				"elfada",
+				"src\\frontends\\elf_adapter.c"
+			],
+			[
+				"bob.h",
+				"src\\bob.h"
+			],
+			[
+				"prof",
+				"src\\profiler.c"
+			],
+			[
+				"profiler",
+				"src\\profiler.c"
+			],
+			[
+				"profiler.c",
+				"src\\profiler.c"
+			],
+			[
+				"base",
+				"src\\base.h"
+			],
+			[
+				"profi",
+				"src\\profiler.h"
+			],
+			[
+				"bobrun",
+				"src\\bob_runtime.c"
+			],
+			[
+				"bas",
+				"src\\base.h"
+			],
+			[
+				"bobrune",
+				"src\\bob_runtime.c"
+			],
+			[
+				"pla",
+				"src\\platform\\platform.h"
+			],
+			[
+				"builder",
+				"src\\bob_builder.c"
+			],
+			[
+				"bob",
+				"src\\bob.h"
+			],
+			[
+				"builder.",
+				"src\\bob_builder.c"
+			],
+			[
+				"plat",
+				"src\\platform\\platform.h"
+			],
+			[
+				"bo.h",
+				"src\\bob.h"
+			],
+			[
+				"adapter",
+				"src\\elf_adapter.c"
+			],
+			[
+				"exe",
+				"src\\executor.c"
+			],
+			[
+				"exec",
+				"src\\executor.h"
+			],
+			[
+				"l_",
+				"elf\\src\\runtime\\libs\\l_os.c"
+			],
+			[
+				"ada",
+				"src\\elf_adapter.c"
+			],
+			[
+				"plawin32",
+				"src\\platform_win32.c"
+			],
+			[
+				"ex",
+				"src\\executor.c"
+			],
+			[
+				"vc",
+				"src\\vcvars_cache.c"
+			],
+			[
+				"base.c",
+				"src\\base.c"
+			],
+			[
+				"base.h",
+				"src\\base.h"
+			],
+			[
+				"arnea",
+				"elf\\src\\base\\arena.h"
+			],
+			[
+				"vcvar",
+				"src\\vcvars_cache.c"
+			],
+			[
+				"tab",
+				"elf\\tools\\table_tests.c"
+			],
+			[
+				"arena",
+				"elf\\src\\base\\arena.h"
+			],
+			[
+				"arena.h",
+				"elf\\src\\base\\arena.h"
+			],
+			[
+				"test.c",
+				"tests\\tests.c"
+			],
+			[
+				"platform",
+				"src\\platform_win32.c"
+			],
+			[
+				"log",
+				"src\\logger.h"
+			],
+			[
+				"exc",
+				"src\\executor.c"
+			],
+			[
+				"example",
+				"example\\tasks.elf"
+			],
+			[
+				"matcher",
+				"elf\\src\\base\\matcher.c"
+			],
+			[
+				"atomte",
+				"elf\\tools\\atom_tests.c"
+			],
+			[
+				"string.c",
+				"elf\\src\\core\\atom\\string.c"
+			],
+			[
+				"string",
+				"elf\\src\\core\\atom\\string.h"
+			],
+			[
+				"bas.c",
+				"src\\base.c"
+			],
+			[
+				"string.h",
+				"elf\\src\\core\\atom\\string.h"
+			],
+			[
+				"atom.c",
+				"elf\\src\\core\\atom\\atom.c"
+			],
+			[
+				"atom.h",
+				"elf\\src\\core\\atom\\atom.h"
+			],
+			[
+				"match",
+				"elf\\src\\base\\matcher.c"
+			],
+			[
+				"lmathc",
+				"elf\\src\\runtime\\libs\\l_math.c"
+			],
+			[
+				"tests .elf",
+				"elf\\smoke\\script_assert_sys.elf"
+			],
+			[
+				"build.",
+				"build.bat"
+			],
+			[
+				"gra",
+				"src\\graph.h"
+			],
+			[
+				"graph",
+				"src\\graph.c"
+			],
+			[
+				"cinc",
+				"src\\c_include_scan.c"
+			],
+			[
+				"cin",
+				"src\\c_include_scan.c"
+			],
+			[
+				"logger.c",
+				"src\\logger.c"
+			],
+			[
+				"logger",
+				"src\\logger.h"
+			],
+			[
+				"main.c",
+				"example\\main.c"
+			],
+			[
+				"grap.c",
+				"src\\graph.c"
+			],
+			[
+				".elf",
+				"elf\\main.elf"
+			],
+			[
+				"task",
+				"example\\tasks1.tab"
+			],
+			[
+				"tasks",
+				"example\\tasks.tab"
+			],
+			[
+				"mainc.",
+				"main.c"
+			],
+			[
+				"grap",
+				"graph.h"
+			],
+			[
+				"chan",
+				"CHANGELOG.txt"
+			],
+			[
+				"interna",
+				"src\\nes65_core\\nes65_core_internal.h"
+			],
+			[
+				"nescore",
+				"src\\nes65_core\\nes65_core.h"
+			],
+			[
+				"nes",
+				"src\\nes65\\nes.h"
+			],
+			[
+				"apuh.",
+				"src\\nes65\\core\\apu.h"
+			],
+			[
+				"cpu.h",
+				"src\\nes65\\core\\cpu.h"
+			],
+			[
+				"necore",
+				"src\\nes65_core\\nes65_core.h"
+			],
+			[
+				"bui",
+				"build.bat"
+			],
+			[
+				"buid",
+				"build.bat"
+			],
+			[
+				"ppu",
+				"src\\nes65\\core\\ppu.c"
+			],
+			[
+				"nes.c",
+				"src\\nes65\\nes.c"
+			],
+			[
+				"neapi",
+				"src\\nes65\\nes_api.h"
+			],
+			[
+				"root.c",
+				"src\\df\\root.c"
+			],
+			[
+				"backend",
+				"src\\backend\\backend_x64.c"
+			],
+			[
+				"ir.h",
+				"src\\middle\\ir.h"
+			],
+			[
+				"types",
+				"src\\types.h"
+			],
+			[
+				"type.c",
+				"src\\middle\\lower_type.c"
+			],
+			[
+				"lowertype",
+				"src\\middle\\lower_type.c"
+			],
+			[
+				"lowert",
+				"src\\middle\\lower_type.c"
+			],
+			[
+				"atom",
+				"tests\\atom_tests.c"
+			],
+			[
+				"lowertpy",
+				"src\\middle\\lower_type.c"
+			],
+			[
+				"type",
+				"tests\\fixtures\\types.jas"
+			],
+			[
+				"lwoer.c",
+				"src\\middle\\lower.c"
+			],
+			[
+				"intern",
+				"src\\jasper_internal.h"
+			],
+			[
+				"lower.h",
+				"src\\middle\\lower.h"
+			],
+			[
+				"fib",
+				"tests\\fixtures\\fib.jas"
+			],
+			[
+				"STOR",
+				"STORY.txt"
+			],
+			[
+				"size",
+				"tests\\fixtures\\backend_size_of.jas"
+			],
+			[
+				"main.ir",
+				"dump\\main.ir"
+			],
+			[
+				"mainir",
+				"dump\\main.ir"
+			]
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"",
+				"C:\\work\\MicroRJ\\bob\\bob.sublime-project"
+			]
+		],
+		"width": 380.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": false,
+	"side_bar_visible": true,
+	"side_bar_width": 308.0,
+	"status_bar_visible": false,
+	"template_settings":
+	{
+	}
+}

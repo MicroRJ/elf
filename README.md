@@ -9,6 +9,9 @@ The project is in active recovery and redesign. The current compiler pipeline is
 source -> lexer -> AST -> Ir -> bytecode -> VM
 ```
 
+The current syntax and language behavior are documented in
+[docs/grammar.md](docs/grammar.md).
+
 ## Current Shape
 
 - Hand-written lexer and parser.

@@ -145,6 +145,11 @@ static void test_vm_script_table_lib_assertions(void)
 	vm_expect_int("smoke/script_assert_table_lib.elf", 144, "vm runs table library assertions");
 }
 
+static void test_vm_core_library_assertions(void)
+{
+	vm_expect_int("smoke/script_assert_core_lib.elf", 4242, "vm runs core library assertions");
+}
+
 static void test_vm_for_range(void)
 {
 	vm_expect_int("smoke/for_range.elf", 276, "vm runs half-open range for loop");
@@ -212,6 +217,7 @@ static void run_vm_tests(void)
 	test_vm_script_sys_assertions();
 	test_vm_script_string_assertions();
 	test_vm_script_table_lib_assertions();
+	test_vm_core_library_assertions();
 	test_vm_for_range();
 	test_vm_c_for();
 	test_vm_break_continue();

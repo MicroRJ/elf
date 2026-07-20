@@ -57,8 +57,10 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 }
 
 #include "runtime/libs/l_math.c"
-#include "runtime/libs/l_core.c"
 #include "runtime/libs/l_native.c"
+#include "runtime/libs/l_core.c"
+#include "runtime/libs/l_debug.c"
+#include "runtime/libs/l_serialization.c"
 #include "runtime/libs/l_path.c"
 #include "runtime/libs/l_fs.c"
 #include "runtime/libs/l_process.c"
@@ -131,6 +133,8 @@ static void reserve_bootstrap_frame_stack_space(elf_State *state)
 
 static void bootstrap_standard_libraries(elf_State *state)
 {
+	elf_Value *stack_checkpoint = state->stack_ptr;
+
 	state->metatables.atom = elf_lib_string(state);
 	state->metatables.integer = elf_push_new_table(state);
 	state->metatables.number = elf_push_new_table(state);
@@ -138,6 +142,8 @@ static void bootstrap_standard_libraries(elf_State *state)
 
 	elf_Table *elf_table = elf_lib_core(state);
 	table_set_atom_table(state, elf_table, "math", elf_lib_math(state));
+	table_set_atom_table(state, elf_table, "debug", elf_lib_debug(state));
+	table_set_atom_table(state, elf_table, "serialization", elf_lib_serialization(state));
 	table_set_atom_table(state, elf_table, "random", elf_lib_random(state));
 	table_set_atom_table(state, elf_table, "path", elf_lib_path(state));
 	table_set_atom_table(state, elf_table, "fs", elf_lib_fs(state));
@@ -147,6 +153,13 @@ static void bootstrap_standard_libraries(elf_State *state)
 
 	state->globals = elf_push_new_table(state);
 	table_set_atom_table(state, state->globals, "elf", elf_table);
+
+	// The library constructors push each table while building the graph. Only
+	// the globals table needs to remain on the stack as its GC root; every
+	// standard library is reachable through globals, while metatables have
+	// dedicated roots in the collector.
+	state->stack_ptr = stack_checkpoint;
+	push_table(state, state->globals);
 }
 
 void init_atoms(elf_State *state)

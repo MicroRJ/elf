@@ -161,7 +161,20 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 
 	elf_Table *elf_table = value_as_table(elf_value);
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "print")), "elf.print is a field function");
+	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "println")), "elf.println is a field function");
 	expect_nil(elf_table_get_or_nil(state, state->globals, test_key_atom(state, "elf.print")), "flattened elf.print global is absent");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "load_expr")), "broken elf.load_expr binding is absent");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "unparse")), "broken elf.unparse binding is absent");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "format")), "obsolete elf.format binding is absent");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "get_obj_pointer")), "raw object pointer binding is absent");
+
+	elf_Value debug_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "debug"));
+	expect_table_value(debug_value, "elf.debug is a table");
+	expect_function_value(elf_table_get_or_nil(state, value_as_table(debug_value), test_key_atom(state, "memory_bytes")), "elf.debug.memory_bytes is a field function");
+
+	elf_Value serialization_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "serialization"));
+	expect_table_value(serialization_value, "elf.serialization is a table");
+	expect_function_value(elf_table_get_or_nil(state, value_as_table(serialization_value), test_key_atom(state, "load_json_file")), "elf.serialization.load_json_file is a field function");
 
 	elf_Value math_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "math"));
 	expect_table_value(math_value, "elf.math is a table");
