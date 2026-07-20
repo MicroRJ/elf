@@ -24,10 +24,8 @@
 
 #include "core.h"
 #include "helpers.h"
-#include "rank.h"
 #include "source_diagnostics.c"
 #include "core_diagnostics.c"
-#include "rank.c"
 
 #include "atom/atom.c"
 #include "table/table.c"
@@ -63,14 +61,12 @@ elf_Table *elf_push_new_table(elf_State *state)
 	return table;
 }
 
-#include "runtime/libs/l_math.c"
-#include "runtime/libs/l_native.c"
-#include "runtime/libs/l_core.c"
-#include "runtime/libs/l_debug.c"
-#include "runtime/libs/l_path.c"
-#include "runtime/libs/l_table.c"
-#include "runtime/libs/l_string.c"
-#include "runtime/libs/l_random.c"
+#include "libs/l_math.c"
+#include "libs/l_native.c"
+#include "libs/l_core.c"
+#include "libs/l_debug.c"
+#include "libs/l_table.c"
+#include "libs/l_string.c"
 
 static void init_bytecode_program_storage(elf_State *state)
 {
@@ -145,8 +141,6 @@ static void bootstrap_standard_libraries(elf_State *state)
 	elf_Table *elf_table = elf_lib_core(state);
 	table_set_atom_table(state, elf_table, "math", elf_lib_math(state));
 	table_set_atom_table(state, elf_table, "debug", elf_lib_debug(state));
-	table_set_atom_table(state, elf_table, "random", elf_lib_random(state));
-	table_set_atom_table(state, elf_table, "path", elf_lib_path(state));
 
 	state->globals = elf_push_new_table(state);
 	table_set_atom_table(state, state->globals, "elf", elf_table);
@@ -198,5 +192,5 @@ void elf_destroy_state(elf_State *state)
 }
 
 static int run_bytecode_frame(elf_State *state, StackFrame frame);
-#include "runtime/vm/call.c"
-#include "runtime/vm/vm.c"
+#include "call.c"
+#include "vm.c"

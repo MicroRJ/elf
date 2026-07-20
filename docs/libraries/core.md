@@ -8,7 +8,7 @@ elf.println("Hello, Elf")
 type := elf.type_of(value)
 ```
 
-Its implementation is registered in `src/runtime/libs/l_core.c` and split by
+Its implementation is registered in `src/core/libs/l_core.c` and split by
 responsibility among the neighboring `l_core_*.c` files.
 
 ## API summary

@@ -150,7 +150,7 @@ struct elf_State
 	metatables;
 };
 
-/* Internal constructors used by the runtime and its tests. */
+/* Internal constructors used by core and its tests. */
 elf_Table *elf_push_new_table(elf_State *state);
 
 typedef enum

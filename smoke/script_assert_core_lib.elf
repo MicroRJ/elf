@@ -58,8 +58,8 @@ for path := paths[...] ? {
 test_assert(found_basic)
 test_assert(elf.fs.get_paths("smoke/does-not-exist") == nil)
 
-flat_paths := elf.fs.get_paths("src/runtime", 0)
-recursive_paths := elf.fs.get_paths("src/runtime", 1)
+flat_paths := elf.fs.get_paths("src/core", 0)
+recursive_paths := elf.fs.get_paths("src/core", 1)
 found_flat_l_string := 0
 found_recursive_l_string := 0
 for path := flat_paths[...] ? {
@@ -74,7 +74,7 @@ test_assert(elf.fs.get_paths("smoke", -1) == nil)
 test_assert(elf.fs.get_paths("smoke", 33) == nil)
 
 iteration := { count = 0, found_l_string = 0 }
-iteration_count := elf.fs.for_each_path("src/runtime", 1, fun(path) {
+iteration_count := elf.fs.for_each_path("src/core", 1, fun(path) {
 	iteration.count += 1
 	if elf.path.filename(path) == "l_string.c" ? { iteration.found_l_string = 1 }
 })

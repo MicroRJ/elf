@@ -14,9 +14,9 @@ static const char *path_last_separator(const char *begin, const char *end)
 
 ELF_FUNCTION(lib_path_parent)
 {
-	elf_State *state = S;
-	elf_String *path = lib_load_string(state, 1);
-	i32 levels = nargs > 2 ? (i32)lib_load_integer(state, 2) : 1;
+	lib_check_arg_count(S, "path.parent", nargs, 1, 2);
+	elf_String *path = lib_load_string(S, 1);
+	i32 levels = nargs > 2 ? (i32)lib_load_integer(S, 2) : 1;
 	const char *begin = atom_data(path);
 	const char *end = begin + atom_size(path);
 
@@ -26,26 +26,26 @@ ELF_FUNCTION(lib_path_parent)
 		end = separator ? separator : begin;
 	}
 
-	lib_push_string(state, begin, (u32)(end - begin));
+	lib_push_string(S, begin, (u32)(end - begin));
 	return 1;
 }
 
 ELF_FUNCTION(lib_path_filename)
 {
-	elf_State *state = S;
-	elf_String *path = lib_load_string(state, 1);
+	lib_check_arg_count(S, "path.filename", nargs, 1, 1);
+	elf_String *path = lib_load_string(S, 1);
 	const char *begin = atom_data(path);
 	const char *end = begin + atom_size(path);
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
-	lib_push_string(state, name, (u32)(end - name));
+	lib_push_string(S, name, (u32)(end - name));
 	return 1;
 }
 
 ELF_FUNCTION(lib_path_stem)
 {
-	elf_State *state = S;
-	elf_String *path = lib_load_string(state, 1);
+	lib_check_arg_count(S, "path.stem", nargs, 1, 1);
+	elf_String *path = lib_load_string(S, 1);
 	const char *begin = atom_data(path);
 	const char *end = begin + atom_size(path);
 	const char *separator = path_last_separator(begin, end);
@@ -54,20 +54,21 @@ ELF_FUNCTION(lib_path_stem)
 
 	for (const char *cursor = end; cursor > name; --cursor)
 	{
-		if (cursor[-1] == '.') {
+		if (cursor[-1] == '.')
+		{
 			extension = cursor - 1;
 			break;
 		}
 	}
 
-	lib_push_string(state, name, (u32)(extension - name));
+	lib_push_string(S, name, (u32)(extension - name));
 	return 1;
 }
 
 ELF_FUNCTION(lib_path_extension)
 {
-	elf_State *state = S;
-	elf_String *path = lib_load_string(state, 1);
+	lib_check_arg_count(S, "path.extension", nargs, 1, 1);
+	elf_String *path = lib_load_string(S, 1);
 	const char *begin = atom_data(path);
 	const char *end = begin + atom_size(path);
 	const char *separator = path_last_separator(begin, end);
@@ -76,28 +77,30 @@ ELF_FUNCTION(lib_path_extension)
 
 	for (const char *cursor = end; cursor > name; --cursor)
 	{
-		if (cursor[-1] == '.') {
+		if (cursor[-1] == '.')
+		{
 			extension = cursor;
 			break;
 		}
 	}
 
-	lib_push_string(state, extension, (u32)(end - extension));
+	lib_push_string(S, extension, (u32)(end - extension));
 	return 1;
 }
 
 ELF_FUNCTION(lib_path_join)
 {
-	elf_State *state = S;
-	elf_String *left = lib_load_string(state, 1);
-	elf_String *right = lib_load_string(state, 2);
+	lib_check_arg_count(S, "path.join", nargs, 2, 2);
+	elf_String *left = lib_load_string(S, 1);
+	elf_String *right = lib_load_string(S, 2);
 	const char *left_data = atom_data(left);
 	const char *right_data = atom_data(right);
 	u32 left_size = atom_size(left);
 	u32 right_size = atom_size(right);
 	b32 needs_separator = left_size > 0 && right_size > 0;
 
-	if (needs_separator) {
+	if (needs_separator)
+	{
 		char last = left_data[left_size - 1];
 		char first = right_data[0];
 		needs_separator = last != '/' && last != '\\' && first != '/' && first != '\\';
@@ -109,7 +112,7 @@ ELF_FUNCTION(lib_path_join)
 	u32 at = left_size;
 	if (needs_separator) result[at++] = '/';
 	memcpy(result + at, right_data, right_size);
-	lib_push_string(state, result, at + right_size);
+	lib_push_string(S, result, at + right_size);
 	elf_end_scratch(scratch);
 	return 1;
 }

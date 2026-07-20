@@ -47,7 +47,7 @@ static elf_Table *battery_new_binding_table(elf_State *state,
 	return table;
 }
 
-// The moved library sources use the runtime constructor spelling. Keep that
+// The core library sources use the constructor spelling. Keep that
 // helper local to the batteries translation unit.
 #define new_binding_table battery_new_binding_table
 
@@ -56,12 +56,14 @@ static elf_Table *battery_new_binding_table(elf_State *state,
 #include "win32/battery_process_win32.c"
 #include "win32/battery_time_win32.c"
 
-#include "../src/runtime/libs/l_native.c"
+#include "../src/core/libs/l_native.c"
 #include "libs/l_core_io.c"
 #include "libs/l_load_file.c"
 #include "libs/l_serialization.c"
 #include "libs/l_fs.c"
+#include "libs/l_path.c"
 #include "libs/l_process.c"
+#include "libs/l_random.c"
 #include "libs/l_time.c"
 
 static elf_StrSlice battery_source_buffer_from_file(elf_State *state, const char *name)
@@ -126,7 +128,9 @@ void elf_open_batteries(elf_State *state)
 
 	battery_set_table(state, root, "serialization", elf_lib_serialization(state));
 	battery_set_table(state, root, "fs", elf_lib_fs(state));
+	battery_set_table(state, root, "path", elf_lib_path(state));
 	battery_set_table(state, root, "process", elf_lib_process(state));
+	battery_set_table(state, root, "random", elf_lib_random(state));
 	battery_set_table(state, root, "time", elf_lib_time(state));
 	battery_set_function(state, root, "load_file", l_core_load_file);
 	battery_set_function(state, root, "print", l_core_print);
