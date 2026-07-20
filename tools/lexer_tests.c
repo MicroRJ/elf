@@ -284,6 +284,89 @@ static void test_lexer_strings(elf_State *state)
 	expect_token_atom(plain_format, "plain", "format prefix plain atom payload");
 }
 
+static void test_lexer_format_string_parts(elf_State *state)
+{
+	Parser multiple = lexer_test_parser(state, "f\"a %{one} b %{two} c\"");
+	lexer_prime(&multiple);
+
+	Token multiple_start = lexer_next(&multiple);
+	expect_token_type(multiple_start, TOK_STRING_START, "lex multiple interpolation string start");
+	expect_token_atom(multiple_start, "a ", "multiple interpolation leading text");
+
+	Token one = lexer_next(&multiple);
+	expect_token_type(one, TOK_IDENTIFIER, "lex first interpolation expression");
+	expect_token_atom(one, "one", "first interpolation identifier");
+
+	Token multiple_part = lexer_next(&multiple);
+	expect_token_type(multiple_part, TOK_STRING_PART, "lex text between interpolations");
+	expect_token_atom(multiple_part, " b ", "multiple interpolation middle text");
+
+	Token two = lexer_next(&multiple);
+	expect_token_type(two, TOK_IDENTIFIER, "lex second interpolation expression");
+	expect_token_atom(two, "two", "second interpolation identifier");
+
+	Token multiple_end = lexer_next(&multiple);
+	expect_token_type(multiple_end, TOK_STRING_END, "lex multiple interpolation string end");
+	expect_token_atom(multiple_end, " c", "multiple interpolation trailing text");
+	expect_token_type(lexer_next(&multiple), TOK_NONE, "multiple interpolation consumes complete string");
+
+	Parser empty_parts = lexer_test_parser(state, "f\"%{first}%{second}\"");
+	lexer_prime(&empty_parts);
+
+	Token empty_start = lexer_next(&empty_parts);
+	expect_token_type(empty_start, TOK_STRING_START, "lex interpolation at start of string");
+	expect_token_atom(empty_start, "", "empty leading format text");
+	expect_token_atom(lexer_next(&empty_parts), "first", "first adjacent interpolation identifier");
+
+	Token empty_part = lexer_next(&empty_parts);
+	expect_token_type(empty_part, TOK_STRING_PART, "lex adjacent interpolation boundary");
+	expect_token_atom(empty_part, "", "empty text between interpolations");
+	expect_token_atom(lexer_next(&empty_parts), "second", "second adjacent interpolation identifier");
+
+	Token empty_end = lexer_next(&empty_parts);
+	expect_token_type(empty_end, TOK_STRING_END, "lex interpolation at end of string");
+	expect_token_atom(empty_end, "", "empty trailing format text");
+
+	Parser block = lexer_test_parser(state, "f\"\"\"top %{value}\r\nbottom\"\"\"");
+	lexer_prime(&block);
+
+	Token block_start = lexer_next(&block);
+	expect_token_type(block_start, TOK_STRING_START, "lex format string block start");
+	expect_token_atom(block_start, "top ", "format string block leading text");
+	expect_token_atom(lexer_next(&block), "value", "format string block interpolation identifier");
+
+	Token block_end = lexer_next(&block);
+	expect_token_type(block_end, TOK_STRING_END, "lex format string block end");
+	expect_token_atom(block_end, "\nbottom", "format string block normalizes newline");
+
+	Parser string_expr = lexer_test_parser(state, "f\"value %{\"text\"} done\"");
+	lexer_prime(&string_expr);
+
+	expect_token_type(lexer_next(&string_expr), TOK_STRING_START, "lex string expression format start");
+	Token inner_string = lexer_next(&string_expr);
+	expect_token_type(inner_string, TOK_STRING, "lex ordinary string inside interpolation");
+	expect_token_atom(inner_string, "text", "ordinary string interpolation payload");
+	Token string_expr_end = lexer_next(&string_expr);
+	expect_token_type(string_expr_end, TOK_STRING_END, "lex string expression format end");
+	expect_token_atom(string_expr_end, " done", "string expression trailing text");
+
+	Parser nested_braces = lexer_test_parser(state, "f\"value %{call({1, 2})} done\"");
+	lexer_prime(&nested_braces);
+
+	expect_token_type(lexer_next(&nested_braces), TOK_STRING_START, "lex nested brace format start");
+	expect_token_type(lexer_next(&nested_braces), TOK_IDENTIFIER, "lex call in interpolation");
+	expect_token_type(lexer_next(&nested_braces), TOK_LEFT_PAREN, "lex call opening parenthesis in interpolation");
+	expect_token_type(lexer_next(&nested_braces), TOK_LEFT_BRACE, "lex nested opening brace in interpolation");
+	expect_token_type(lexer_next(&nested_braces), TOK_INTEGER, "lex first nested table value");
+	expect_token_type(lexer_next(&nested_braces), TOK_COMMA, "lex nested table comma");
+	expect_token_type(lexer_next(&nested_braces), TOK_INTEGER, "lex second nested table value");
+	expect_token_type(lexer_next(&nested_braces), TOK_RIGHT_BRACE, "lex nested closing brace in interpolation");
+	expect_token_type(lexer_next(&nested_braces), TOK_PAREN_RIGHT, "lex call closing parenthesis in interpolation");
+	Token nested_end = lexer_next(&nested_braces);
+	expect_token_type(nested_end, TOK_STRING_END, "lex nested brace format end");
+	expect_token_atom(nested_end, " done", "nested brace format trailing text");
+}
+
 static void test_lexer_line_slices(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "alpha\n  beta\r\n\"gamma\"");
@@ -388,6 +471,7 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_keywords_and_identifiers(state);
 	test_lexer_macros(state);
 	test_lexer_strings(state);
+	test_lexer_format_string_parts(state);
 	test_lexer_line_slices(state);
 	test_lexer_line_tracking_through_skipped_text(state);
 	test_lexer_numbers(state);

@@ -6,6 +6,23 @@
 
 typedef struct Parser Parser;
 
+typedef enum
+{
+	LEXER_MODE_NORMAL = 0,
+	LEXER_MODE_INTERPOLATION,
+}
+LexerModeType;
+
+typedef struct
+{
+	LexerModeType           type;
+	i32                    depth;
+	char           *string_start;
+	char    *interpolation_start;
+	b32          is_block_string;
+}
+LexerMode;
+
 typedef struct
 {
 	elf_State        *state;
@@ -15,11 +32,9 @@ typedef struct
 	u32          line_index;
 	char        *line_start;
 
-	char    *in_expr_start;
-	char    *in_string_start;
-	b32      in_string_block;
-	b32      in_string_expr;
-	b32      in_string;
+	LexerMode mode_stack[16];
+	u32       mode_index;
+	LexerMode mode;
 }
 Lexer;
 

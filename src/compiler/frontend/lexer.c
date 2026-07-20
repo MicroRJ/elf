@@ -383,7 +383,7 @@ static u64 lex_integer(Lexer *lexer, char **cursor)
 	*cursor = cur;
 	return integer;
 
-invalid_base:
+	invalid_base:
 	*cursor = cur;
 	log_source_error(lexer, source_site_from_ptr(lexer, cur - 1), "invalid base '%llu' for digit", base);
 	return integer;
@@ -553,28 +553,29 @@ static Token lex_token(Lexer *lexer)
 	char *cur = lexer->cursor;
 	Token token;
 
-retry:
+	retry:
 	token = (Token){0};
 	token.type = TOK_NONE;
 	token.site = lexer_source_site(lexer, cur);
 
-	if (lexer->in_string_expr && *cur == '}')
+	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && *cur == '}' && lexer->mode.depth >= 1) {
+		lexer->mode.depth --;
+	}
+	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && *cur == '}' && lexer->mode.depth == 0)
 	{
-		lexer->in_string_expr -= 1;
+		if (lexer->mode_index == 0) {
+			log_source_error(lexer, source_site_from_ptr(lexer, lexer->mode.string_start), "invalid interpolated string");
+		}
 
 		cur += 1;
 		b32 ended;
-		token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->in_string_start), lexer->in_string_block, &ended);
+		token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->mode.string_start), lexer->mode.is_block_string, &ended);
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
-		if (ended && lexer->in_string_expr) {
-			log_source_error(lexer, source_site_from_ptr(lexer, lexer->in_expr_start), "unterminated interpolation");
+		if (!ended) {
+			lexer->mode.depth = 1;
+			lexer->mode.interpolation_start = cur;
 		}
-
-		lexer->in_string_block = ! ended;
-		lexer->in_string       = ! ended;
-		if (!ended) lexer->in_expr_start = cur;
-
 		goto update_lexer;
 	}
 
@@ -592,25 +593,29 @@ retry:
 		{
 			if (* cur == 'f' && cur[1] == '"')
 			{
-				if (lexer->in_string) {
-					log_source_error(lexer, source_site_from_ptr(lexer, cur), "nesting of format strings is not supported yet");
+				if (lexer->mode_index >= ARRAY_COUNT(lexer->mode_stack)) {
+					log_source_error(lexer, source_site_from_ptr(lexer, cur), "too many interpolated strings, limit: %i", ARRAY_COUNT(lexer->mode_stack));
+					return token;
 				}
-				else
+
+				char *string_start = cur;
+
+				b32 is_block = cur[2] == '"' && cur[3] == '"';
+				cur += 2 + is_block * 2;
+
+				b32 ended;
+				token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, string_start), is_block, &ended);
+				token.type = ended ? TOK_STRING : TOK_STRING_START;
+				if (!ended)
 				{
-					lexer->in_string_start = cur;
-
-					b32 in_block = cur[2] == '"' && cur[3] == '"';
-					cur += 2 + in_block * 2;
-
-					b32 ended;
-					token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->in_string_start), in_block, &ended);
-					token.type = ended ? TOK_STRING : TOK_STRING_START;
-					lexer->in_string = !ended;
-					lexer->in_string_block = !ended && in_block;
-					lexer->in_string_expr = !ended;
-					if (!ended) lexer->in_expr_start = cur;
-					break;
+					lexer->mode_stack[lexer->mode_index ++] = lexer->mode;
+					lexer->mode.type = LEXER_MODE_INTERPOLATION;
+					lexer->mode.interpolation_start = cur;
+					lexer->mode.string_start = string_start;
+					lexer->mode.is_block_string = is_block;
+					lexer->mode.depth = 1;
 				}
+				break;
 			}
 			else
 			{
@@ -688,7 +693,7 @@ retry:
 				else if (token.type == TOK_M_LINE_NUMBER) {
 					token.type = TOK_INTEGER;
 					token.integer_magnitude = lexer->line_index;
-					}
+				}
 				else if (token.type == TOK_IDENTIFIER) {
 					log_source_error(lexer, token.site, "unrecognized macro");
 				}
@@ -729,9 +734,26 @@ retry:
 		case ']': token.type = TOK_SQUARE_RIGHT; cur += 1; break;
 		case '(': token.type = TOK_LEFT_PAREN;   cur += 1; break;
 		case ')': token.type = TOK_PAREN_RIGHT;  cur += 1; break;
-		case '{': token.type = TOK_LEFT_BRACE;   cur += 1; break;
 		case ',': token.type = TOK_COMMA;        cur += 1; break;
-		case '}': token.type = TOK_RIGHT_BRACE;  cur += 1; break;
+
+		case '{':
+		{
+			cur += 1;
+			token.type = TOK_LEFT_BRACE;
+			if (lexer->mode.type == LEXER_MODE_INTERPOLATION) {
+				lexer->mode.depth ++;
+			}
+		}
+		break;
+		case '}':
+		{
+			cur += 1;
+			token.type = TOK_RIGHT_BRACE;
+			if (lexer->mode.type == LEXER_MODE_INTERPOLATION) {
+				lexer->mode.depth --;
+			}
+		}
+		break;
 
 		case '%':
 		{
