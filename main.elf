@@ -1,1 +1,2 @@
-printf("Hello, World!")
+elf.printl("false: ", false)
+elf.printl("Hello, World!")

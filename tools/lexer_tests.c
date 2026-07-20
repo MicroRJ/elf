@@ -269,9 +269,15 @@ static void test_lexer_strings(elf_State *state)
 	Parser format = lexer_test_parser(state, "f\"hello %{name}\" f\"plain\"");
 	lexer_prime(&format);
 
-	Token format_string = lexer_next(&format);
-	expect_token_type(format_string, TOK_FORMAT_STRING, "lex format string");
-	expect_token_atom(format_string, "hello %{name}", "format string atom payload");
+	Token string_start = lexer_next(&format);
+	expect_token_type(string_start, TOK_STRING_START, "lex string start");
+	expect_token_atom(string_start, "hello ", "hello");
+	Token identifer = lexer_next(&format);
+	expect_token_type(identifer, TOK_IDENTIFIER, "lex interpolation identifer");
+	expect_token_atom(identifer, "name", "name");
+	Token string_end = lexer_next(&format);
+	expect_token_type(string_end, TOK_STRING_END, "lex interpolation string_end");
+	expect_token_atom(string_end, "", "");
 
 	Token plain_format = lexer_next(&format);
 	expect_token_type(plain_format, TOK_STRING, "lex format prefix without formatting as string");

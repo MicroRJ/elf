@@ -55,6 +55,9 @@ _(INTEGER             , "int")         \
 _(NUMBER              , "num")         \
 _(STRING              , "str")         \
 _(FORMAT_STRING       , "fmt")         \
+_(STRING_START        , "str_start")   \
+_(STRING_PART         , "str_part")    \
+_(STRING_END          , "str_end")     \
 _(LETTER              , "chr")         \
 _(IDENTIFIER          , "idn")         \
 _(TILDE               , "~"  )         \

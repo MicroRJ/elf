@@ -409,14 +409,14 @@ static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 
 {
 	char *cur = *cursor;
 	elf_Scratch scratch = elf_begin_scratch();
-	char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+	char *buffer = elf_arena_reserve(scratch.arena, lexer_scratch_capacity(lexer));
 	char *out = buffer;
-	b32 needs_formatting = false;
 	b32 is_block = cur[0] == '"' && cur[1] == '"' && cur[2] == '"';
 
 	cur += is_block ? 3 : 1;
 
-	for (;;) {
+	for (;;)
+	{
 		if (*cur == 0) {
 			log_source_error(lexer, site, is_block ? "unterminated string block" : "unterminated string");
 			break;
@@ -451,7 +451,6 @@ static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 
 			*out++ = '\n';
 		}
 		else if (is_format && cur[0] == FORMAT_CHAR && cur[1] == '{') {
-			needs_formatting = true;
 			*out++ = *cur++;
 			*out++ = *cur++;
 		}
@@ -466,14 +465,84 @@ static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 
 
 	*out = 0;
 
-	if (!needs_formatting || !is_format) {
+	if (!is_format) {
 		*type = TOK_STRING;
 	}
 	else {
 		*type = TOK_FORMAT_STRING;
 	}
-	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
 
+	escape:
+	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
+	*cursor = cur;
+	elf_end_scratch(scratch);
+	return atom;
+}
+
+
+static elf_String *lex_string_part(Lexer *lexer, char **cursor, SourceSite site, b32 in_block, b32 *ended)
+{
+	*ended = false;
+
+	char *cur = *cursor;
+	elf_Scratch scratch = elf_begin_scratch();
+	char *buffer = elf_arena_reserve(scratch.arena, lexer_scratch_capacity(lexer));
+	char *out = buffer;
+
+	for (;;)
+	{
+		if (*cur == 0) {
+			log_source_error(lexer, site, in_block ? "unterminated string block" : "unterminated string");
+			break;
+		}
+
+		if (in_block && cur[0] == '"' && cur[1] == '"' && cur[2] == '"') {
+			cur += 3;
+			*ended = true;
+			break;
+		}
+
+		if (!in_block && *cur == '"') {
+			cur += 1;
+			*ended = true;
+			break;
+		}
+
+		if (cur[0] == FORMAT_CHAR && cur[1] == '{') {
+			cur += 2;
+			break;
+		}
+
+		if (!in_block && (*cur == '\n' || *cur == '\r')) {
+			log_source_error(lexer, source_site_from_ptr(lexer, cur), "newline in string; use \\n or a string block");
+			break;
+		}
+
+		if (*cur == '\r') {
+			cur += 1;
+			if (*cur == '\n') {
+				cur += 1;
+			}
+			lexer_advance_line(lexer, cur);
+			*out++ = '\n';
+		}
+		else if (*cur == '\n') {
+			cur += 1;
+			lexer_advance_line(lexer, cur);
+			*out++ = '\n';
+		}
+		else if (*cur == '\\') {
+			u32 codepoint = lex_escape_codepoint(lexer, &cur, site);
+			out = write_utf8(out, codepoint);
+		}
+		else {
+			*out++ = *cur++;
+		}
+	}
+
+	*out = 0;
+
+	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
 	*cursor = cur;
 	elf_end_scratch(scratch);
 	return atom;
@@ -489,7 +558,28 @@ retry:
 	token.type = TOK_NONE;
 	token.site = lexer_source_site(lexer, cur);
 
-	switch (*cur) {
+	if (lexer->in_string_expr && *cur == '}')
+	{
+		lexer->in_string_expr -= 1;
+
+		cur += 1;
+		b32 ended;
+		token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->in_string_start), lexer->in_string_block, &ended);
+		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
+
+		if (ended && lexer->in_string_expr) {
+			log_source_error(lexer, source_site_from_ptr(lexer, lexer->in_expr_start), "unterminated interpolation");
+		}
+
+		lexer->in_string_block = ! ended;
+		lexer->in_string       = ! ended;
+		if (!ended) lexer->in_expr_start = cur;
+
+		goto update_lexer;
+	}
+
+	switch (*cur)
+	{
 		case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
 		case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
 		case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
@@ -500,23 +590,40 @@ retry:
 		case 'v': case 'w': case 'x': case 'y': case 'z':
 		case '_':
 		{
-			if (cur[0] == 'f' && cur[1] == '"') {
-				cur += 1;
-				token.atom = lex_string(lexer, &cur, token.site, true, &token.type);
-				break;
+			if (* cur == 'f' && cur[1] == '"')
+			{
+				if (lexer->in_string) {
+					log_source_error(lexer, source_site_from_ptr(lexer, cur), "nesting of format strings is not supported yet");
+				}
+				else
+				{
+					lexer->in_string_start = cur;
+
+					b32 in_block = cur[2] == '"' && cur[3] == '"';
+					cur += 2 + in_block * 2;
+
+					b32 ended;
+					token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->in_string_start), in_block, &ended);
+					token.type = ended ? TOK_STRING : TOK_STRING_START;
+					lexer->in_string = !ended;
+					lexer->in_string_block = !ended && in_block;
+					lexer->in_string_expr = !ended;
+					if (!ended) lexer->in_expr_start = cur;
+					break;
+				}
 			}
-
-			elf_Scratch scratch = elf_begin_scratch();
-			char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
-			u32 size = lex_identifier(&cur, buffer);
-			elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
-
-			token.type = check_keyword(atom);
-			if (token.type == TOK_IDENTIFIER) {
-				token.atom = atom;
+			else
+			{
+				elf_Scratch scratch = elf_begin_scratch();
+				char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+				u32 size = lex_identifier(&cur, buffer);
+				elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
+				token.type = check_keyword(atom);
+				if (token.type == TOK_IDENTIFIER) {
+					token.atom = atom;
+				}
+				elf_end_scratch(scratch);
 			}
-
-			elf_end_scratch(scratch);
 		} break;
 
 		case '0': case '1': case '2': case '3': case '4':
@@ -620,11 +727,12 @@ retry:
 
 		case '[': token.type = TOK_SQUARE_LEFT;  cur += 1; break;
 		case ']': token.type = TOK_SQUARE_RIGHT; cur += 1; break;
-		case '(': token.type = TOK_LEFT_PAREN;  cur += 1; break;
-		case ')': token.type = TOK_PAREN_RIGHT; cur += 1; break;
-		case '{': token.type = TOK_LEFT_BRACE;  cur += 1; break;
-		case '}': token.type = TOK_RIGHT_BRACE; cur += 1; break;
-		case ',': token.type = TOK_COMMA;       cur += 1; break;
+		case '(': token.type = TOK_LEFT_PAREN;   cur += 1; break;
+		case ')': token.type = TOK_PAREN_RIGHT;  cur += 1; break;
+		case '{': token.type = TOK_LEFT_BRACE;   cur += 1; break;
+		case ',': token.type = TOK_COMMA;        cur += 1; break;
+		case '}': token.type = TOK_RIGHT_BRACE;  cur += 1; break;
+
 		case '%':
 		{
 			cur += 1;
@@ -851,6 +959,7 @@ retry:
 			}
 		} break;
 
+		// snuck
 		case '+':
 		{
 			cur += 1;
@@ -876,7 +985,6 @@ retry:
 	while (*cur == ' ' || *cur == '\t') {
 		cur += 1;
 	}
-
 	if (cur[0] == '/' && (cur[1] == '/' || cur[1] == '*')) {
 		token.eol = 1;
 	}
@@ -884,6 +992,7 @@ retry:
 		token.eol = 1;
 	}
 
+	update_lexer:
 	lexer->cursor = cur;
 	return token;
 }

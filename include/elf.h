@@ -104,7 +104,10 @@ void elf_release_table(elf_Table *table);
 elf_u32 elf_table_length(const elf_Table *table);
 elf_ValueView elf_get_field(elf_State *state, elf_Table *table, const char *field);
 elf_ValueView elf_get_index(elf_State *state, elf_Table *table, elf_u32 index);
+
+// Todo, remove this?
 elf_b32 elf_table_next(elf_Table *table, elf_u32 *cursor, elf_ValueView *key, elf_ValueView *value);
+// Todo, remove this!
 void elf_push_field(elf_State *state, elf_Table *table, const char *field);
 
 int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
