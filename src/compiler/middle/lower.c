@@ -832,9 +832,9 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *item
 		Ast expr = expr_tuple->tuple.args[i];
 		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
 		{
-			const char *message = "range expressions cannot be used as declaration values; use them as the single step in a for loop";
+			const char *message = "range expressions cannot be used as declaration values; use a range for loop";
 			if (entity_tags & ENTITY_TAG_FORLOOP) {
-				message = "range for steps must be a single expression; write `for name := start ... end ?` or `for name := values[start ... end] ?`";
+				message = "range for loops require one range expression";
 			}
 
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, message);
@@ -874,7 +874,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *item
 	return nvars;
 }
 
-static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast range_expr)
+static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast range_expr)
 {
 	Ast collection_expr = 0;
 	Ast range = range_expr;
@@ -939,7 +939,7 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	loop_labels.break_label = break_label;
 	loop_labels.defer_start = ctx->defer_count;
 	push_loop_labels(ctx, loop_labels);
-	Ir body = lower_ast_to_ir_block(ctx, stat->for_stat.body);
+	Ir body = lower_ast_to_ir_block(ctx, stat->for_range_stat.body);
 	pop_loop_labels(ctx);
 
 	Ir load_iterator_local = create_load_local_ir(ctx, first_name->site, iterator_local);
@@ -1004,82 +1004,83 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	return ir;
 }
 
-static Ir lower_ast_for_value_step_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast expr_tuple)
+static Ir lower_ast_for_range_to_ir(LowerContext *ctx, Ast stat)
 {
-	if (expr_tuple->tuple.nargs != name_tuple->tuple.nargs)
-	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, stat->site, "for value steps require one value per variable");
-		return ERROR_IR;
-	}
-
-	EntityScope scope = get_entity_scope(ctx);
-
-	IRArrayBuilder block_items = begin_ir_array_builder(ctx);
-	u32 nlocals = lower_local_decl_tuples_to_ir(ctx, &block_items, name_tuple, expr_tuple, ENTITY_TAG_FORLOOP);
-
-	Ir body = lower_ast_to_ir_block(ctx, stat->for_stat.body);
-	push_ir_block(&block_items, body);
-
-	ASSERT(block_items.count == nlocals + 1);
-	IrArray stats = end_ir_array_builder(&block_items);
-	Ir ir = create_block_ir(ctx, stat->site, stats);
-	set_entity_scope(ctx, scope);
-	return ir;
-}
-
-static Ir lower_ast_for_step_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast expr_tuple)
-{
-	if (expr_tuple->tuple.nargs == 1)
-	{
-		Ast expr = expr_tuple->tuple.args[0];
-		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
-		{
-			return lower_ast_for_range_step_to_ir(ctx, stat, name_tuple, expr);
-		}
-	}
-
-	return lower_ast_for_value_step_to_ir(ctx, stat, name_tuple, expr_tuple);
-}
-
-static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
-{
-	Ast decl = check_ast_type(stat->for_stat.decl, AST_DECL_STAT);
+	Ast decl = check_ast_type(stat->for_range_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid for-loop declaration");
+		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
 	Ast name_tuple = check_ast_type(decl->decl.name, AST_TUPLE);
-	Ast for_steps = check_ast_type(decl->decl.expr, AST_FOR_STEPS);
-	if (ast_is_error(name_tuple) || ast_is_error(for_steps))
+	Ast expr_tuple = check_ast_type(decl->decl.expr, AST_TUPLE);
+	if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid for-loop declaration");
+		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
-	if (name_tuple->tuple.nargs == 0 || for_steps->for_steps.nargs == 0)
+	if (name_tuple->tuple.nargs == 0 || expr_tuple->tuple.nargs != 1)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, stat->site, "for loops require variables and at least one step");
+		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
 		return ERROR_IR;
 	}
 
-	IRArrayBuilder step_items = begin_ir_array_builder(ctx);
-	for (u32 i = 0; i < for_steps->for_steps.nargs; ++ i)
+	Ast range = expr_tuple->tuple.args[0];
+	if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 	{
-		Ast expr_tuple = check_ast_type(for_steps->for_steps.args[i], AST_TUPLE);
-		if (ast_is_error(expr_tuple))
-		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, for_steps->site, "expected for-loop step tuple");
-			push_ir_block(&step_items, ERROR_IR);
-			continue;
-		}
-
-		push_ir_block(&step_items, lower_ast_for_step_to_ir(ctx, stat, name_tuple, expr_tuple));
+		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
+		return ERROR_IR;
 	}
 
-	IrArray steps = end_ir_array_builder(&step_items);
-	return create_block_ir(ctx, stat->site, steps);
+	return lower_ast_for_range_expr_to_ir(ctx, stat, name_tuple, range);
+}
+
+static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
+{
+	Ast init = check_ast_type(stat->for_stat.init, AST_DECL_STAT);
+	if (ast_is_error(init))
+	{
+		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
+		return ERROR_IR;
+	}
+
+	EntityScope scope = get_entity_scope(ctx);
+	IRArrayBuilder block_items = begin_ir_array_builder(ctx);
+	lower_ast_stat_to_ir(ctx, &block_items, init);
+
+	Ir condition_label = create_label_ir(ctx, stat->site);
+	Ir continue_label = create_label_ir(ctx, stat->for_stat.step->site);
+	Ir break_label = create_label_ir(ctx, stat->site);
+
+	LoopLabels loop_labels = {};
+	loop_labels.continue_label = continue_label;
+	loop_labels.break_label = break_label;
+	loop_labels.defer_start = ctx->defer_count;
+	push_loop_labels(ctx, loop_labels);
+	Ir body = lower_ast_to_ir_block(ctx, stat->for_stat.body);
+	pop_loop_labels(ctx);
+
+	Ir pred = lower_ast_expr_to_ir(ctx, stat->for_stat.pred);
+	Ir exit_jump = create_jump_if_false_ir(ctx, stat->for_stat.pred->site, pred, break_label);
+	Ir step = lower_ast_to_ir_block(ctx, stat->for_stat.step);
+
+	IRArrayBuilder loop_items = begin_ir_array_builder(ctx);
+	push_ir_block(&loop_items, condition_label);
+	push_ir_block(&loop_items, exit_jump);
+	push_ir_block(&loop_items, body);
+	push_ir_block(&loop_items, continue_label);
+	push_ir_block(&loop_items, step);
+	push_ir_block(&loop_items, create_jump_ir(ctx, stat->site, condition_label));
+	push_ir_block(&loop_items, break_label);
+	IrArray loop_stats = end_ir_array_builder(&loop_items);
+	push_ir_block(&block_items, create_block_ir(ctx, stat->site, loop_stats));
+
+	IrArray stats = end_ir_array_builder(&block_items);
+	Ir ir = create_block_ir(ctx, stat->site, stats);
+	set_entity_scope(ctx, scope);
+	return ir;
 }
 
 static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast stat)
@@ -1173,6 +1174,13 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast s
 		case AST_FOR:
 		{
 			Ir ir = lower_ast_for_to_ir(ctx, stat);
+			push_ir_block(items, ir);
+		}
+		break;
+
+		case AST_FOR_RANGE:
+		{
+			Ir ir = lower_ast_for_range_to_ir(ctx, stat);
 			push_ir_block(items, ir);
 		}
 		break;

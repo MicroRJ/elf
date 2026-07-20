@@ -72,8 +72,7 @@ _(AST_META_FIELD          , "meta_field")                 \
 _(AST_NIL_LITERAL         , "nil_literal")                \
 _(AST_IF                  , "if")                         \
 _(AST_FOR                 , "for")                        \
-\
-_(AST_FOR_STEPS           , "for_steps")                  \
+_(AST_FOR_RANGE           , "for_range")                  \
 _(AST_COMMA_EXPR          , "comma_expr")                 \
 \
 _(AST_WHILE               , "while")                      \
@@ -184,13 +183,6 @@ struct Ast_T
 
 		struct
 		{
-			Ast *args;
-			u32    nargs;
-		}
-		for_steps;
-
-		struct
-		{
 			Ast  expr;
 			Ast *args;
 			u32    nargs;
@@ -248,10 +240,19 @@ struct Ast_T
 
 		struct
 		{
-			Ast decl;
+			Ast init;
+			Ast pred;
+			Ast step;
 			Ast body;
 		}
 		for_stat;
+
+		struct
+		{
+			Ast decl;
+			Ast body;
+		}
+		for_range_stat;
 
 		struct
 		{

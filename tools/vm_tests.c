@@ -150,9 +150,9 @@ static void test_vm_for_range(void)
 	vm_expect_int("smoke/for_range.elf", 276, "vm runs half-open range for loop");
 }
 
-static void test_vm_for_steps(void)
+static void test_vm_c_for(void)
 {
-	vm_expect_int("smoke/for_steps.elf", 71, "vm runs replicated for steps");
+	vm_expect_int("smoke/c_for.elf", 103, "vm runs C-style for loops");
 }
 
 static void test_vm_break_continue(void)
@@ -213,7 +213,7 @@ static void run_vm_tests(void)
 	test_vm_script_string_assertions();
 	test_vm_script_table_lib_assertions();
 	test_vm_for_range();
-	test_vm_for_steps();
+	test_vm_c_for();
 	test_vm_break_continue();
 	test_vm_loop_slots();
 	test_vm_defer();

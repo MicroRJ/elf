@@ -167,16 +167,16 @@ static void test_parser_if_else_blocks(elf_State *state)
 	expect_ast_i64(value, 1, "parse return integer");
 }
 
-static void test_parser_for_identifier_tuple(elf_State *state)
+static void test_parser_for_loops(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "for key, value := 0 ... 4 ? {}");
-	Ast loop = parser_test_stat(file, 0, AST_FOR, "parse for statement");
+	Ast loop = parser_test_stat(file, 0, AST_FOR_RANGE, "parse range for statement");
 	if (!loop) {
 		return;
 	}
 
-	Ast decl = loop->for_stat.decl;
-	expect_ast_kind(decl, AST_DECL_STAT, "for statement stores declaration");
+	Ast decl = loop->for_range_stat.decl;
+	expect_ast_kind(decl, AST_DECL_STAT, "range for statement stores declaration");
 	if (!decl) {
 		return;
 	}
@@ -190,6 +190,21 @@ static void test_parser_for_identifier_tuple(elf_State *state)
 	if (decl->decl.name->tuple.nargs != 2) {
 		test_fail("for declaration contains only its identifier list");
 	}
+	Ast range = parser_test_tuple_item(decl->decl.expr, 0, AST_RANGE,
+		"range for declaration stores one range expression");
+	expect_ast_i64(range ? range->binary.x : 0, 0, "range for stores range start");
+	expect_ast_i64(range ? range->binary.y : 0, 4, "range for stores range end");
+
+	file = parser_test_parse_file(state, "for i := 0; i < 10; i += 1 ? {}");
+	loop = parser_test_stat(file, 0, AST_FOR, "parse C-style for statement");
+	if (!loop) {
+		return;
+	}
+
+	expect_ast_kind(loop->for_stat.init, AST_DECL_STAT, "C-style for stores initializer");
+	expect_ast_kind(loop->for_stat.pred, AST_LESS_THAN, "C-style for stores predicate");
+	expect_ast_kind(loop->for_stat.step, AST_ADD_ASSIGN, "C-style for stores update statement");
+	expect_ast_kind(loop->for_stat.body, AST_BLOCK_STAT, "C-style for stores body");
 }
 
 static void test_parser_call_with_table_argument(elf_State *state)
@@ -325,7 +340,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_string_atoms(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);
-	test_parser_for_identifier_tuple(state);
+	test_parser_for_loops(state);
 	test_parser_call_with_table_argument(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);

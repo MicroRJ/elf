@@ -442,25 +442,6 @@ static Ast parse_optional_tuple_expr(Parser *par)
 	return parse_tuple_expr(par);
 }
 
-static Ast parse_for_steps_expr(Parser *par)
-{
-	Token tok = par->tok;
-	u32 nargs = 0;
-
-	do
-	{
-		Ast tuple = parse_tuple_expr(par);
-		if (ast_is_missing_or_error(tuple)) return ERROR_AST;
-
-		push_ast(par, tuple);
-		++ nargs;
-	}
-	while (pick_token(par, TOK_SEMICOLON));
-
-	Ast *args = pop_ast_array(par, nargs);
-	return create_for_steps_ast(par, tok.site, args, nargs);
-}
-
 static Ast parse_for_identifier_tuple(Parser *parser)
 {
 	Token start = parser->tok;
@@ -1236,18 +1217,59 @@ static Ast parse_stat(Parser *parser)
 				take_token(parser, TOK_HARD_BIND);
 			}
 
-			Ast expr = parse_for_steps_expr(parser);
-			if (ast_is_error(expr)) {
+			Ast init_expr = parse_tuple_expr(parser);
+			if (ast_is_missing_or_error(init_expr)) {
 				return ERROR_AST;
 			}
-			Ast decl = create_decl_ast(parser, tok.site, 0, name, expr);
-			take_token(parser, TOK_QMARK);
-			Ast body = parse_stat(parser);
-			if (ast_is_missing_or_error(body)) {
-				return ERROR_AST;
-			}
+			Ast init = create_decl_ast(parser, tok.site, 0, name, init_expr);
 
-			tree = create_for_ast(parser, tok.site, decl, body);
+			if (pick_token(parser, TOK_QMARK))
+			{
+				if (init_expr->tuple.nargs != 1)
+				{
+					parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site,
+						"range for loops require exactly one expression on the right-hand side");
+					return ERROR_AST;
+				}
+
+				Ast range = init_expr->tuple.args[0];
+				if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
+				{
+					parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site,
+						"range for loops require a range or ranged index expression");
+					return ERROR_AST;
+				}
+
+				Ast body = parse_stat(parser);
+				if (ast_is_missing_or_error(body)) {
+					return ERROR_AST;
+				}
+
+				tree = create_for_range_ast(parser, tok.site, init, body);
+			}
+			else
+			{
+				take_token(parser, TOK_SEMICOLON);
+
+				Ast pred = parse_expr(parser);
+				if (ast_is_missing_or_error(pred)) {
+					return ERROR_AST;
+				}
+				take_token(parser, TOK_SEMICOLON);
+
+				Ast step = parse_expr_stat(parser);
+				if (ast_is_missing_or_error(step)) {
+					return ERROR_AST;
+				}
+				take_token(parser, TOK_QMARK);
+
+				Ast body = parse_stat(parser);
+				if (ast_is_missing_or_error(body)) {
+					return ERROR_AST;
+				}
+
+				tree = create_for_ast(parser, tok.site, init, pred, step, body);
+			}
 		}
 		break;
 

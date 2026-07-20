@@ -220,14 +220,6 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u3
 	return tree;
 }
 
-static Ast create_for_steps_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
-{
-	Ast tree = create_ast(par, site, AST_FOR_STEPS);
-	tree->for_steps.args = args;
-	tree->for_steps.nargs = nargs;
-	return tree;
-}
-
 static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 {
 	Ast tree = create_ast(par, site, AST_RETURN);
@@ -258,11 +250,21 @@ static Ast create_while_ast(Parser *par, SourceSite site, Ast pred, Ast body)
 	return tree;
 }
 
-static Ast create_for_ast(Parser *par, SourceSite site, Ast decl, Ast body)
+static Ast create_for_ast(Parser *par, SourceSite site, Ast init, Ast pred, Ast step, Ast body)
 {
 	Ast tree = create_ast(par, site, AST_FOR);
-	tree->for_stat.decl = decl;
+	tree->for_stat.init = init;
+	tree->for_stat.pred = pred;
+	tree->for_stat.step = step;
 	tree->for_stat.body = body;
+	return tree;
+}
+
+static Ast create_for_range_ast(Parser *par, SourceSite site, Ast decl, Ast body)
+{
+	Ast tree = create_ast(par, site, AST_FOR_RANGE);
+	tree->for_range_stat.decl = decl;
+	tree->for_range_stat.body = body;
 	return tree;
 }
 
@@ -556,15 +558,22 @@ static void print_ast(Printer *pr, Ast tree)
 
 		case AST_FOR:
 		{
-
-			Ast decl = tree->for_stat.decl;
-			Ast body = tree->for_stat.body;
-
-
 			PRINT(pr, "for ");
-			print_ast(pr, decl);
+			print_ast(pr, tree->for_stat.init);
+			PRINT(pr, "; ");
+			print_ast(pr, tree->for_stat.pred);
+			PRINT(pr, "; ");
+			print_ast(pr, tree->for_stat.step);
 			PRINT(pr, " ? ");
-			print_ast(pr, body);
+			print_ast(pr, tree->for_stat.body);
+		}
+		break;
+		case AST_FOR_RANGE:
+		{
+			PRINT(pr, "for ");
+			print_ast(pr, tree->for_range_stat.decl);
+			PRINT(pr, " ? ");
+			print_ast(pr, tree->for_range_stat.body);
 		}
 		break;
 
@@ -743,17 +752,6 @@ static void print_ast(Printer *pr, Ast tree)
 		}
 		break;
 
-		case AST_FOR_STEPS:
-		{
-			for (u32 i = 0; i < tree->for_steps.nargs; ++ i)
-			{
-				if (i != 0) {
-					PRINT(pr, "; ");
-				}
-				print_ast(pr, tree->for_steps.args[i]);
-			}
-		}
-		break;
 		case AST_RETURN:
 		{
 			PRINT(pr, "ret");

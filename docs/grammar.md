@@ -16,12 +16,16 @@ statement     ::= block
                 | "break" expr?
                 | "continue" expr?
                 | "while" expr "?" statement
-                | "for" identifier_list for_bind for_steps "?" statement
+                | range_for
+                | c_for
                 | "if" if_tail
                 | expr_statement
 
 identifier_list ::= identifier ("," identifier)*
 for_bind      ::= ":=" | "::="
+range_for     ::= "for" identifier_list for_bind tuple_expr "?" statement
+c_for         ::= "for" identifier_list for_bind tuple_expr
+                  ";" expr ";" expr_statement "?" statement
 if_tail       ::= expr "?" statement (("elif" if_tail) | ("else" statement))?
 ```
 
@@ -37,7 +41,6 @@ assignment_op   ::= ":=" | "::=" | "=" | "?="
                   | "^=" | "<<=" | ">>="
 
 tuple_expr      ::= expr ("," expr)*
-for_steps       ::= tuple_expr (";" tuple_expr)*
 
 expr            ::= binary_expr
 binary_expr     ::= postfix_expr (binary_op binary_expr)*
@@ -106,32 +109,39 @@ table.[expr]       // hash field by computed key
 table.(a, b, c)    // field projection tuple: table.a, table.b, table.c
 ```
 
-## For Steps
+## For Loops
 
 The left side of a `for` header is an identifier list, not a general tuple
 expression. This makes invalid headers such as `for 1 := ...` and
 `for a + b := ...` parser errors instead of deferring that validation to
 lowering.
 
-`for_steps` are semicolon-separated steps. Each step is parsed as a tuple
-expression, then lowered according to the AST shape:
+There are two distinct `for` forms. A range loop has no semicolons:
 
 ```text
 for i := 0 ... 24 ? { ... }          // range step
 for i := values[0 ... 24] ? { ... }  // array range step
-for i := 1; 2; 3 ? { ... }           // repeated value steps
-for i, j := 1, 2; 3, 4 ? { ... }     // repeated tuple-value steps
 ```
 
-A value step runs the body once and must produce exactly one value per loop
-identifier. Steps execute from left to right, so value and range steps may be
-mixed in the same loop.
+Its right-hand tuple must contain exactly one expression, and that expression
+must be a range or ranged index. The parser represents this form as an
+`AST_FOR_RANGE`.
 
-Numeric ranges are half-open. For a multi-identifier range, each iteration
-consumes consecutive values and advances the iterator by the identifier count:
+A C-style loop has an initializer, predicate, and update separated by
+semicolons:
 
-For a multi-name range declaration, each name receives an offset from the same
-iterator, and the iterator advances by the number of names:
+```text
+for i := 0; i < 10; i += 1 ? { ... }
+```
+
+The initializer declares the loop identifiers from its right-hand tuple. The
+predicate is checked before every iteration. The update runs after the body;
+`continue` also transfers control to the update. The parser represents this
+form as an `AST_FOR`.
+
+Numeric ranges are half-open. For a multi-name range declaration, each name
+receives an offset from the same iterator, and the iterator advances by the
+number of names:
 
 ```text
 for i, j, k := 0 ... 24 ? { ... }
