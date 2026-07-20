@@ -226,7 +226,7 @@ not present. `elf_stack_set_global` consumes the top value on success.
 Use `elf_Ref` when native state must hold an Elf value across calls:
 
 ```c
-elf_Ref task = elf_create_ref(S, table_index);
+elf_Ref task = elf_stack_create_ref(S, table_index);
 if (task == ELF_NO_REF) {
     /* invalid index, nil value, or exhausted reference identifiers */
 }
@@ -235,7 +235,7 @@ if (elf_push_ref(S, task)) {
     /* the referenced value is now at -1 and rooted on the stack */
 }
 
-elf_release_ref(S, task);
+elf_stack_release_ref(S, task);
 ```
 
 References belong to the `elf_State` that created them. They are opaque integer

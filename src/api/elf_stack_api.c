@@ -245,7 +245,7 @@ elf_b32 elf_stack_set_global(elf_State *state, const char *name)
 	return true;
 }
 
-elf_Ref elf_create_ref(elf_State *state, elf_i32 index)
+elf_Ref elf_stack_create_ref(elf_State *state, elf_i32 index)
 {
 	elf_Value *value = stack_slot(state, index);
 	if (!value || value_is_nil(*value) || state->api_next_reference == 0) return ELF_NO_REF;
@@ -263,7 +263,7 @@ elf_b32 elf_push_ref(elf_State *state, elf_Ref reference)
 	return true;
 }
 
-elf_b32 elf_release_ref(elf_State *state, elf_Ref reference)
+elf_b32 elf_stack_release_ref(elf_State *state, elf_Ref reference)
 {
 	if (reference == ELF_NO_REF) return false;
 	return elf_table_delete(state, state->api_references, value_from_integer(reference), 0);

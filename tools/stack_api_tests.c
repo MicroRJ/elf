@@ -63,7 +63,7 @@ static void test_stack_api_tables_and_refs(elf_State *state)
 	}
 	elf_stack_pop(state, 1);
 
-	elf_Ref reference = elf_create_ref(state, table);
+	elf_Ref reference = elf_stack_create_ref(state, table);
 	if (reference == ELF_NO_REF) {
 		test_fail("stack API creates a state-owned reference");
 	}
@@ -98,7 +98,7 @@ static void test_stack_api_tables_and_refs(elf_State *state)
 	}
 	elf_stack_pop(state, 1);
 
-	if (!elf_release_ref(state, reference) || elf_push_ref(state, reference)) {
+	if (!elf_stack_release_ref(state, reference) || elf_push_ref(state, reference)) {
 		test_fail("stack API releases state-owned references");
 	}
 	elf_push_nil(state);

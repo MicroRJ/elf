@@ -164,9 +164,9 @@ elf_b32 elf_stack_equal(elf_State *state, elf_i32 left, elf_i32 right);
 void elf_stack_get_global(elf_State *state, const char *name);
 elf_b32 elf_stack_set_global(elf_State *state, const char *name);
 
-elf_Ref elf_create_ref(elf_State *state, elf_i32 index);
+elf_Ref elf_stack_create_ref(elf_State *state, elf_i32 index);
 elf_b32 elf_push_ref(elf_State *state, elf_Ref reference);
-elf_b32 elf_release_ref(elf_State *state, elf_Ref reference);
+elf_b32 elf_stack_release_ref(elf_State *state, elf_Ref reference);
 
 #endif
 
