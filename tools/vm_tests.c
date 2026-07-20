@@ -178,6 +178,14 @@ static void test_vm_atom_join(void)
 	}
 }
 
+static void test_vm_interpolated_strings(void)
+{
+	elf_Value value = vm_test_run_file("smoke/interpolated_strings.elf");
+	if (!value_is_atom(value) || strcmp(value_as_atom(value)->data, "score9") != 0) {
+		test_fail("vm evaluates interpolated strings");
+	}
+}
+
 static void test_vm_fib(void)
 {
 	vm_expect_int("smoke/fib.elf", 55, "vm runs recursive fibonacci");
@@ -210,5 +218,6 @@ static void run_vm_tests(void)
 	test_vm_loop_slots();
 	test_vm_defer();
 	test_vm_atom_join();
+	test_vm_interpolated_strings();
 	test_vm_fib();
 }

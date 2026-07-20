@@ -97,6 +97,60 @@ static void test_parser_string_atoms(elf_State *state)
 	expect_ast_atom(string, "hello", "string ast stores atom");
 }
 
+static void test_parser_interpolated_strings(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state,
+		"message := f\"hello ${name}, count ${count + 1}\"");
+	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse interpolated string declaration");
+	Ast string = parser_test_tuple_item(decl->decl.expr, 0, AST_INTERPOLATED_STRING,
+		"parse interpolated string expression");
+	if (!string) {
+		return;
+	}
+
+	AstArray parts = string->interpolated_string;
+	if (parts.nargs != 5) {
+		test_fail("interpolated string keeps alternating text and expression parts");
+		return;
+	}
+	expect_ast_kind(parts.args[0], AST_STRING_LITERAL, "interpolated string starts with text");
+	expect_ast_atom(parts.args[0], "hello ", "interpolated string leading text");
+	expect_ast_kind(parts.args[1], AST_IDENT, "interpolated string keeps first expression");
+	expect_ast_atom(parts.args[1], "name", "interpolated string first expression identifier");
+	expect_ast_kind(parts.args[2], AST_STRING_LITERAL, "interpolated string keeps middle text");
+	expect_ast_atom(parts.args[2], ", count ", "interpolated string middle text payload");
+	expect_ast_kind(parts.args[3], AST_ADD, "interpolated string parses full binary expression");
+	expect_ast_kind(parts.args[3]->binary.x, AST_IDENT, "interpolated binary expression lhs");
+	expect_ast_i64(parts.args[3]->binary.y, 1, "interpolated binary expression rhs");
+	expect_ast_kind(parts.args[4], AST_STRING_LITERAL, "interpolated string ends with text");
+	expect_ast_atom(parts.args[4], "", "interpolated string keeps empty trailing text");
+
+	file = parser_test_parse_file(state, "ret f\"outer ${f\"inner ${value}\"}\"");
+	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse nested interpolated string return");
+	Ast outer = parser_test_tuple_item(ret->return_stat.expr, 0, AST_INTERPOLATED_STRING,
+		"parse outer interpolated string");
+	if (!outer || outer->interpolated_string.nargs != 3) {
+		test_fail("outer interpolated string keeps nested expression");
+		return;
+	}
+	Ast inner = outer->interpolated_string.args[1];
+	expect_ast_kind(inner, AST_INTERPOLATED_STRING, "interpolated expression can contain interpolated string");
+	if (inner && inner->interpolated_string.nargs == 3) {
+		expect_ast_atom(inner->interpolated_string.args[0], "inner ", "nested interpolated leading text");
+		expect_ast_atom(inner->interpolated_string.args[1], "value", "nested interpolated expression");
+		expect_ast_atom(inner->interpolated_string.args[2], "", "nested interpolated trailing text");
+	}
+	else {
+		test_fail("nested interpolated string keeps three parts");
+	}
+
+	file = parser_test_parse_file(state, "ret f\"plain\"");
+	ret = parser_test_stat(file, 0, AST_RETURN, "parse plain format-prefixed string return");
+	Ast plain = parser_test_tuple_item(ret->return_stat.expr, 0, AST_STRING_LITERAL,
+		"format prefix without interpolation remains string literal");
+	expect_ast_atom(plain, "plain", "plain format-prefixed string payload");
+}
+
 static void test_parser_if_else_blocks(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "if flag ? { ret 1 } else { ret nil }");
@@ -244,6 +298,7 @@ static void run_parser_tests(elf_State *state)
 {
 	test_parser_decl_precedence_and_atoms(state);
 	test_parser_string_atoms(state);
+	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);
 	test_parser_call_with_table_argument(state);
 	test_parser_nil_assign(state);

@@ -150,14 +150,19 @@ json_array      ::= "[" (json_value ("," json_value)*)? "]"
 integer         ::= decimal_integer | "0b" binary_digits | "0x" hex_digits
 number          ::= integer "." decimal_digits
 character       ::= "'" escaped_codepoint "'"
-string          ::= quoted_string | string_block
+string          ::= quoted_string | string_block | formatted_string | formatted_string_block
 quoted_string   ::= '"' escaped_codepoint* '"'
 string_block    ::= '"""' escaped_codepoint* '"""'
+formatted_string       ::= 'f"' formatted_part* '"'
+formatted_string_block ::= 'f"""' formatted_part* '"""'
+formatted_part         ::= escaped_codepoint | interpolation
+interpolation          ::= "${" expression "}"
 ```
 
 Single-line strings cannot contain raw newlines. String blocks can contain raw
-newlines. Escapes currently include the C-style escapes, `\xNN`, `\uNNNN`, and
-`\U00NNNNNN`.
+newlines. Formatted strings evaluate each `${expression}` and concatenate its
+text representation. Escapes currently include the C-style escapes, `\xNN`,
+`\uNNNN`, and `\U00NNNNNN`.
 
 ## Operators
 
@@ -185,4 +190,4 @@ expressions.
 
 The lexer still recognizes some tokens that are not accepted by the parser as
 language grammar yet, including `try`, `catch`, `finally`, `do`, `enum`,
-`global`, `default`, `->`, `++`, `--`, `!`, and format-string tokens.
+`global`, `default`, `->`, `++`, `--`, and `!`.

@@ -1,0 +1,12 @@
+name := "elf"
+count := 2
+nested := f"inner ${count + 1}"
+
+test_assert(f"hello ${name} ${count + 1}" == "hello elf 3")
+test_assert(f"${name}${count}" == "elf2")
+test_assert(f"outer ${nested}" == "outer inner 3")
+test_assert(f"""line
+${name}
+done""" == "line\nelf\ndone")
+
+ret f"score${count + 7}"

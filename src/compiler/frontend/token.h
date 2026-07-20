@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#define FORMAT_CHAR '%'
+#define FORMAT_CHAR '$'
 
 #define KEYWORDDEF(_)       \
 _(JSON     ,"json"        ) \

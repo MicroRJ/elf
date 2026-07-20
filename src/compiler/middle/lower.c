@@ -419,6 +419,42 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 		}
 		break;
 
+		case AST_INTERPOLATED_STRING:
+		{
+			Ast *parts = expr->interpolated_string.args;
+			u32 nparts = expr->interpolated_string.nargs;
+			if (nparts < 3 || (nparts & 1) == 0)
+			{
+				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site,
+					"interpolated string must contain alternating text and expression parts");
+				ir = ERROR_IR;
+				break;
+			}
+
+			ir = 0;
+			for (u32 i = 0; i < nparts; ++ i)
+			{
+				Ast part = parts[i];
+				if (!part || ((i & 1) == 0 && part->kind != AST_STRING_LITERAL))
+				{
+					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site,
+						"invalid interpolated string part at index %u", i);
+					ir = ERROR_IR;
+					break;
+				}
+
+				Ir part_ir = lower_ast_expr_to_ir(ctx, part);
+				if (!part_ir || part_ir == ERROR_IR)
+				{
+					ir = ERROR_IR;
+					break;
+				}
+
+				ir = ir ? create_binary_ir(ctx, part->site, IR_ADD, ir, part_ir) : part_ir;
+			}
+		}
+		break;
+
 		case AST_NIL_LITERAL:
 		{
 			ir = create_nil_ir(ctx, expr->site);

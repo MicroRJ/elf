@@ -122,6 +122,38 @@ static void test_ir_lowers_atoms_and_globals(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
+static void test_ir_lowers_interpolated_string(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena,
+		"name := \"elf\"\nret f\"hello ${name} ${2 + 3}\"");
+	Ir body = ir_test_main_body(ctx);
+	Ir name_local = ir_test_body_stat(body, 0, IR_LOCAL, "lower interpolated string local");
+	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "lower interpolated string return");
+	Ir trailing = ret ? ret->ir_return.expr : 0;
+
+	expect_ir_kind(trailing, IR_ADD, "interpolated string lowers final text join");
+	expect_ir_atom(trailing ? trailing->ir_binary.y : 0, "", "interpolated string lowers empty trailing text");
+
+	Ir numeric = trailing ? trailing->ir_binary.x : 0;
+	expect_ir_kind(numeric, IR_ADD, "interpolated string lowers numeric expression join");
+	expect_ir_kind(numeric ? numeric->ir_binary.y : 0, IR_ADD, "interpolated string preserves binary expression");
+	expect_ir_i64(numeric && numeric->ir_binary.y ? numeric->ir_binary.y->ir_binary.x : 0, 2,
+		"interpolated numeric expression lhs");
+	expect_ir_i64(numeric && numeric->ir_binary.y ? numeric->ir_binary.y->ir_binary.y : 0, 3,
+		"interpolated numeric expression rhs");
+
+	Ir space = numeric ? numeric->ir_binary.x : 0;
+	expect_ir_kind(space, IR_ADD, "interpolated string lowers middle text join");
+	expect_ir_atom(space ? space->ir_binary.y : 0, " ", "interpolated string lowers middle text");
+
+	Ir name = space ? space->ir_binary.x : 0;
+	expect_ir_kind(name, IR_ADD, "interpolated string lowers identifier join");
+	expect_ir_atom(name ? name->ir_binary.x : 0, "hello ", "interpolated string lowers leading text");
+	expect_load_local(name ? name->ir_binary.y : 0, name_local, "interpolated string loads local expression");
+	elf_arena_destroy(&arena);
+}
+
 static void test_ir_lowers_field_and_call(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -299,6 +331,7 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_declaration_expression(state);
 	test_ir_lowers_assignment_to_local(state);
 	test_ir_lowers_atoms_and_globals(state);
+	test_ir_lowers_interpolated_string(state);
 	test_ir_lowers_field_and_call(state);
 	test_ir_lowers_if_else(state);
 	test_ir_lowers_while(state);

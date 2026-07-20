@@ -523,6 +523,50 @@ static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token toke
 	return create_int_ast(parser, sign.site, value);
 }
 
+static Ast parse_interpolated_string(Parser *parser)
+{
+	Token start = take_token(parser, TOK_STRING_START);
+	u32 stack_start = parser->ast.stack_index;
+	u32 nparts = 0;
+
+	push_ast(parser, create_atom_ast(parser, start.site, start.atom));
+	nparts += 1;
+
+	for (;;)
+	{
+		Ast expr = parse_expr(parser);
+		if (ast_is_missing_or_error(expr))
+		{
+			parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site,
+				"expected expression inside interpolated string");
+			parser->ast.stack_index = stack_start;
+			return ERROR_AST;
+		}
+		push_ast(parser, expr);
+		nparts += 1;
+
+		Token part = parser->tok;
+		if (part.type != TOK_STRING_PART && part.type != TOK_STRING_END)
+		{
+			parser_error(parser, ERROR_EXPECTED_TOKEN, part.site,
+				"expected the end of an interpolated expression");
+			parser->ast.stack_index = stack_start;
+			return ERROR_AST;
+		}
+
+		consume_token(parser);
+		push_ast(parser, create_atom_ast(parser, part.site, part.atom));
+		nparts += 1;
+
+		if (part.type == TOK_STRING_END) {
+			break;
+		}
+	}
+
+	Ast *parts = pop_ast_array(parser, nparts);
+	return create_interpolated_string_ast(parser, start.site, parts, nparts);
+}
+
 static Ast parse_unary_expr(Parser *parser)
 {
 	Token tok = parser->tok;
@@ -576,6 +620,11 @@ static Ast parse_unary_expr(Parser *parser)
 		{
 			consume_token(parser);
 			value = create_atom_ast(parser, tok.site, tok.atom);
+		}
+		break;
+		case TOK_STRING_START:
+		{
+			value = parse_interpolated_string(parser);
 		}
 		break;
 		case TOK_TILDE:

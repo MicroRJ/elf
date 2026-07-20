@@ -52,6 +52,7 @@ _(AST_DECL_STAT           , "stat_decl")                  \
 _(AST_NUMBER_LITERAL      , "number_literal")             \
 _(AST_INTEGER_LITERAL     , "integer_literal")            \
 _(AST_STRING_LITERAL      , "atom_literal")             \
+_(AST_INTERPOLATED_STRING , "interpolated_string")        \
 \
 _(AST_CALL                , "call")                       \
 _(AST_META_CALL           , "meta_call")                  \
