@@ -558,9 +558,6 @@ static Token lex_token(Lexer *lexer)
 	token.type = TOK_NONE;
 	token.site = lexer_source_site(lexer, cur);
 
-	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && *cur == '}' && lexer->mode.depth >= 1) {
-		lexer->mode.depth --;
-	}
 	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && *cur == '}' && lexer->mode.depth == 0)
 	{
 		if (lexer->mode_index == 0) {
@@ -573,7 +570,7 @@ static Token lex_token(Lexer *lexer)
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
 		if (!ended) {
-			lexer->mode.depth = 1;
+			lexer->mode.depth               = 0;
 			lexer->mode.interpolation_start = cur;
 		}
 		goto update_lexer;
@@ -613,7 +610,7 @@ static Token lex_token(Lexer *lexer)
 					lexer->mode.interpolation_start = cur;
 					lexer->mode.string_start = string_start;
 					lexer->mode.is_block_string = is_block;
-					lexer->mode.depth = 1;
+					lexer->mode.depth = 0;
 				}
 				break;
 			}
