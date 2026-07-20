@@ -1,3 +1,29 @@
+//
+// This is the build system I use. It's called 'bob'.
+//
+// Now, bob is _both_ a _library_, and a _cli_.
+//
+// The primary purpose of 'Bob' is to take a list of targets build
+// them efficiently, that's it.
+//
+// You can do this from any language that has access to bob.
+//
+// Now, the 'bob' 'cli' executes the a script (looks for build.elf by default),
+// the script returns an table of functions.
+//
+// Bob picks the function specified on the 'cli', if none, 'build' is default.
+// 'build' is just a regular elf function that gets executed.
+//
+// Now, bob also registers itself in the script as a library.
+// So the script can do 'bob.build({targets=..., options=...})'
+//
+// In summary, to build elf, we use elf, and we call a function to build
+// ourselves. It's mind mending.
+//
+// Mind that, since bob is completely standalone, it's baked in elf version
+// might be lag behind the active development one a bit.
+//
+
 cc := "clang-cl"
 lib := "lib"
 

@@ -60,6 +60,9 @@ int main(void)
 	prof_begin_frame();
 
 	elf_State *state = elf_create_state();
+	if (strcmp(elf_version(), ELF_VERSION) != 0) {
+		test_fail("public Elf version matches the linked runtime");
+	}
 
 	run_atom_tests(state);
 	run_table_tests(state);

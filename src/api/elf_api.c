@@ -12,6 +12,10 @@
 #include "helpers.h"
 #include "compiler.h"
 
+const char *elf_version(void)
+{
+	return ELF_VERSION;
+}
 
 const char *elf_str_data(elf_String *atom) {
 	return atom_data(atom);

@@ -1,13 +1,19 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "elf.h"
 
 int main(int argc, char **argv)
 {
 	const char *path = "main.elf";
+	if (argc == 2 && strcmp(argv[1], "--version") == 0)
+	{
+		printf("elf %s\n", elf_version());
+		return 0;
+	}
 	if (argc > 2)
 	{
-		fprintf(stderr, "usage: elf.exe [file]\n");
+		fprintf(stderr, "usage: elf.exe [file | --version]\n");
 		return 2;
 	}
 

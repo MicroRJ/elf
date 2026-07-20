@@ -1,6 +1,8 @@
 #ifndef ELF_H
 #define ELF_H
 
+#define ELF_VERSION "0.1.0-dev"
+
 typedef signed char        elf_i8;
 typedef unsigned char      elf_u8;
 typedef signed short       elf_i16;
@@ -75,6 +77,7 @@ elf_GCMode;
 
 elf_State *elf_create_state(void);
 void elf_destroy_state(elf_State *state);
+const char *elf_version(void);
 void elf_set_user_data(elf_State *state, void *user_data);
 void *elf_get_user_data(elf_State *state);
 void elf_register_library(elf_State *state, const char *name, const elf_Binding *bindings, elf_u32 count);
