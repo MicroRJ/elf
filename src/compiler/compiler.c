@@ -84,7 +84,7 @@ BcFunction elf_compile_source(elf_State *state, char const *name, elf_StrSlice s
 	elf_String *source_name = elf_atom_from_data(state, name);
 
 	Parser *parser = elf_create_parser(state, scratch.arena, name, source);
-	AstRef ast_file;
+	Ast ast_file;
 	PROF_BLOCK("compiler.parse")
 	{
 		ast_file = elf_parse_file(parser);

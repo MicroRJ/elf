@@ -7,16 +7,16 @@
 #define I64_MAX_MAGNITUDE 0x7fffffffffffffffull
 #define I64_MIN_MAGNITUDE 0x8000000000000000ull
 
-static AstRef parse_unary_expr(Parser *parser);
-static AstRef parse_expr(Parser *parser);
-static AstRef parse_subexpr(Parser *parser, u32 rank);
-static AstRef parse_postfix_expr(Parser *parser);
-static AstRef parse_table_expr(Parser *parser);
-static AstRef parse_ident_expr(Parser *parser);
-static AstRef parse_stat(Parser *parser);
-static AstRef parse_if_stat(Parser *parser);
-static AstRef parse_json_ast(Parser *parser);
-static AstRef parse_json_ast_value(Parser *parser);
+static Ast parse_unary_expr(Parser *parser);
+static Ast parse_expr(Parser *parser);
+static Ast parse_subexpr(Parser *parser, u32 rank);
+static Ast parse_postfix_expr(Parser *parser);
+static Ast parse_table_expr(Parser *parser);
+static Ast parse_ident_expr(Parser *parser);
+static Ast parse_stat(Parser *parser);
+static Ast parse_if_stat(Parser *parser);
+static Ast parse_json_ast(Parser *parser);
+static Ast parse_json_ast_value(Parser *parser);
 static u32 parse_call_args(Parser *parser);
 
 
@@ -199,7 +199,7 @@ static void parser_invalid_table_entry(Parser *parser, SourceSite site)
 	parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-static b32 ast_is_missing_or_error(AstRef ast)
+static b32 ast_is_missing_or_error(Ast ast)
 {
 	return !ast || ast_is_error(ast);
 }
@@ -277,29 +277,29 @@ static inline b32 peek_next_token(Parser *parser, TokenType type)
 }
 
 
-static void push_ast(Parser *par, AstRef tree)
+static void push_ast(Parser *par, Ast tree)
 {
 	ASSERT(par->ast.stack_index < par->ast.stack_size);
 	par->ast.stack[par->ast.stack_index ++] = tree;
 }
 
 // Todo, instead return an AstArray directly ...
-static AstRef *pop_ast_array(Parser *par, u32 nargs)
+static Ast *pop_ast_array(Parser *par, u32 nargs)
 {
 	ASSERT(par->ast.stack_index >= nargs);
 	par->ast.stack_index -= nargs;
-	AstRef *copy = elf_arena_push_copy(par->ast.arena, sizeof(*copy) * nargs, par->ast.stack + par->ast.stack_index);
+	Ast *copy = elf_arena_push_copy(par->ast.arena, sizeof(*copy) * nargs, par->ast.stack + par->ast.stack_index);
 	return copy;
 }
 
-static AstRef elf_parse_file(Parser *parser)
+static Ast elf_parse_file(Parser *parser)
 {
 	Token tok = parser->tok;
 	u32 nstats = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
 		Token before = parser->tok;
-		Ast *stat = parse_stat(parser);
+		Ast_T *stat = parse_stat(parser);
 		if (ast_is_error(stat)) {
 			return ERROR_AST;
 		}
@@ -318,21 +318,21 @@ static AstRef elf_parse_file(Parser *parser)
 		++ nstats;
 	}
 
-	AstRef *stats = pop_ast_array(parser, nstats);
-	AstRef body = create_block_ast(parser, tok.site, stats, nstats);
+	Ast *stats = pop_ast_array(parser, nstats);
+	Ast body = create_block_ast(parser, tok.site, stats, nstats);
 
-	AstRef file_ast = create_file_ast(parser, tok.site, body);
+	Ast file_ast = create_file_ast(parser, tok.site, body);
 	return file_ast;
 }
 
-static AstRef parse_function(Parser *par)
+static Ast parse_function(Parser *par)
 {
 	Token tok = par->tok;
 
 	take_token(par, TOK_FUN);
 
 	u32 nparams = 0;
-	AstRef variadic = 0;
+	Ast variadic = 0;
 	take_token(par, TOK_LEFT_PAREN);
 	if (!peek_token(par, TOK_PAREN_RIGHT))
 	{
@@ -351,9 +351,9 @@ static AstRef parse_function(Parser *par)
 			}
 			else
 			{
-				AstRef name = parse_ident_expr(par);
-				AstRef type = 0;
-				AstRef expr = 0;
+				Ast name = parse_ident_expr(par);
+				Ast type = 0;
+				Ast expr = 0;
 				if (pick_token(par, TOK_COLON))
 				{
 					type = parse_expr(par);
@@ -362,7 +362,7 @@ static AstRef parse_function(Parser *par)
 				{
 					expr = parse_expr(par);
 				}
-				AstRef param = create_param_ast(par, tok.site, name, type, expr);
+				Ast param = create_param_ast(par, tok.site, name, type, expr);
 				push_ast(par, param);
 				++ nparams;
 			}
@@ -374,15 +374,15 @@ static AstRef parse_function(Parser *par)
 	}
 	take_token(par, TOK_PAREN_RIGHT);
 
-	AstRef *params = pop_ast_array(par, nparams);
-	AstRef body = parse_stat(par);
+	Ast *params = pop_ast_array(par, nparams);
+	Ast body = parse_stat(par);
 	if (ast_is_missing_or_error(body))
 	{
 		parser_error(par, ERROR_MISSING_FUNCTION_BODY, par->tok.site, "expected function body");
 		return ERROR_AST;
 	}
 
-	AstRef function = create_function_ast(par, tok.site, params, nparams, variadic, body);
+	Ast function = create_function_ast(par, tok.site, params, nparams, variadic, body);
 	return function;
 }
 
@@ -410,13 +410,13 @@ static b32 token_ends_expression(TokenType type)
 	}
 }
 
-static AstRef parse_tuple_expr(Parser *par)
+static Ast parse_tuple_expr(Parser *par)
 {
 	Token tok = par->tok;
 	u32 nargs = 0;
 	do
 	{
-		AstRef expr = parse_expr(par);
+		Ast expr = parse_expr(par);
 		if (ast_is_error(expr)) {
 			return ERROR_AST;
 		}
@@ -425,16 +425,16 @@ static AstRef parse_tuple_expr(Parser *par)
 	}
 	while (pick_token(par, TOK_COMMA));
 
-	AstRef tuple = 0;
+	Ast tuple = 0;
 	if (nargs)
 	{
-		AstRef *args = pop_ast_array(par, nargs);
+		Ast *args = pop_ast_array(par, nargs);
 		tuple = create_tuple_ast(par, tok.site, args, nargs);
 	}
 	return tuple;
 }
 
-static AstRef parse_optional_tuple_expr(Parser *par)
+static Ast parse_optional_tuple_expr(Parser *par)
 {
 	if (token_ends_expression(par->tok.type)) {
 		return NULL_AST;
@@ -442,14 +442,14 @@ static AstRef parse_optional_tuple_expr(Parser *par)
 	return parse_tuple_expr(par);
 }
 
-static AstRef parse_for_steps_expr(Parser *par)
+static Ast parse_for_steps_expr(Parser *par)
 {
 	Token tok = par->tok;
 	u32 nargs = 0;
 
 	do
 	{
-		AstRef tuple = parse_tuple_expr(par);
+		Ast tuple = parse_tuple_expr(par);
 		if (ast_is_missing_or_error(tuple)) return ERROR_AST;
 
 		push_ast(par, tuple);
@@ -457,39 +457,39 @@ static AstRef parse_for_steps_expr(Parser *par)
 	}
 	while (pick_token(par, TOK_SEMICOLON));
 
-	AstRef *args = pop_ast_array(par, nargs);
+	Ast *args = pop_ast_array(par, nargs);
 	return create_for_steps_ast(par, tok.site, args, nargs);
 }
 
-static AstRef parse_load_expr(Parser *par)
+static Ast parse_load_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_LOAD);
 
 	u32 nargs = parse_call_args(par);
-	AstRef *args = pop_ast_array(par, nargs);
+	Ast *args = pop_ast_array(par, nargs);
 
-	AstRef value = create_core_api_call_ast(par, tok.site, BUILTIN_LOADFILE, args, nargs);
+	Ast value = create_core_api_call_ast(par, tok.site, BUILTIN_LOADFILE, args, nargs);
 	return value;
 }
 
-static AstRef parse_get_mem_expr(Parser *parser)
+static Ast parse_get_mem_expr(Parser *parser)
 {
 	Token tok = take_token(parser, TOK_M_GET_MEM);
 
 	take_token(parser, TOK_LEFT_PAREN);
-	AstRef expr = parse_expr(parser);
+	Ast expr = parse_expr(parser);
 	take_token(parser, TOK_PAREN_RIGHT);
 
 	return create_get_mem_ast(parser, tok.site, expr);
 }
 
-static AstRef parse_ident_expr(Parser *par)
+static Ast parse_ident_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_IDENTIFIER);
 	return create_ident_ast(par, tok.site, tok.atom);
 }
 
-static AstRef parse_positive_integer_literal(Parser *parser, Token token)
+static Ast parse_positive_integer_literal(Parser *parser, Token token)
 {
 	if (token.integer_magnitude > I64_MAX_MAGNITUDE)
 	{
@@ -502,7 +502,7 @@ static AstRef parse_positive_integer_literal(Parser *parser, Token token)
 	return create_int_ast(parser, token.site, (i64)token.integer_magnitude);
 }
 
-static AstRef parse_negative_integer_literal(Parser *parser, Token sign, Token token)
+static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token token)
 {
 	if (token.integer_magnitude > I64_MIN_MAGNITUDE)
 	{
@@ -523,11 +523,11 @@ static AstRef parse_negative_integer_literal(Parser *parser, Token sign, Token t
 	return create_int_ast(parser, sign.site, value);
 }
 
-static AstRef parse_unary_expr(Parser *parser)
+static Ast parse_unary_expr(Parser *parser)
 {
 	Token tok = parser->tok;
 
-	AstRef value = 0;
+	Ast value = 0;
 	switch (tok.type)
 	{
 		case TOK_ELLIPSIS:
@@ -667,11 +667,11 @@ static AstRef parse_unary_expr(Parser *parser)
 	return value;
 }
 
-static AstRef parse_table_entry(Parser *parser)
+static Ast parse_table_entry(Parser *parser)
 {
 	Token start = parser->tok;
-	AstRef key = NULL_AST;
-	AstRef value = NULL_AST;
+	Ast key = NULL_AST;
+	Ast value = NULL_AST;
 	b32 key_required = false;
 
 	if (peek_token(parser, TOK_IDENTIFIER) && peek_next_token(parser, TOK_ASSIGN))
@@ -712,14 +712,14 @@ static AstRef parse_table_entry(Parser *parser)
 	return create_table_entry_ast(parser, start.site, key, value);
 }
 
-static AstRef parse_table_expr(Parser *parser)
+static Ast parse_table_expr(Parser *parser)
 {
 	Token table_token = take_token(parser, TOK_LEFT_BRACE);
 
 	u32 nargs = 0;
 	while (!peek_token(parser, TOK_NONE) && !peek_token(parser, TOK_RIGHT_BRACE))
 	{
-		AstRef entry = parse_table_entry(parser);
+		Ast entry = parse_table_entry(parser);
 		if (ast_is_error(entry)) return ERROR_AST;
 
 		push_ast(parser, entry);
@@ -730,8 +730,8 @@ static AstRef parse_table_expr(Parser *parser)
 
 	take_token(parser, TOK_RIGHT_BRACE);
 
-	AstRef *args = pop_ast_array(parser, nargs);
-	AstRef table = create_table_ast(parser, table_token.site, args, nargs);
+	Ast *args = pop_ast_array(parser, nargs);
+	Ast table = create_table_ast(parser, table_token.site, args, nargs);
 	return table;
 }
 
@@ -741,7 +741,7 @@ static u32 parse_call_args(Parser *par)
 
 	if (peek_token(par, TOK_LEFT_BRACE))
 	{
-		AstRef expr = parse_table_expr(par);
+		Ast expr = parse_table_expr(par);
 		if (ast_is_missing_or_error(expr)) goto esc;
 
 		push_ast(par, expr);
@@ -764,7 +764,7 @@ static u32 parse_call_args(Parser *par)
 					parser_error(par, ERROR_EXCESS_COMMA, par->tok.site, "excess comma");
 				}
 
-				AstRef x = parse_expr(par);
+				Ast x = parse_expr(par);
 				if (ast_is_missing_or_error(x)) goto esc;
 
 				push_ast(par, x);
@@ -777,7 +777,7 @@ static u32 parse_call_args(Parser *par)
 	}
 	else
 	{
-		AstRef expr = parse_expr(par);
+		Ast expr = parse_expr(par);
 		if (ast_is_missing_or_error(expr)) goto esc;
 		push_ast(par, expr);
 		++ nargs;
@@ -787,7 +787,7 @@ static u32 parse_call_args(Parser *par)
 	return nargs;
 }
 
-static AstRef parse_field_postfix(Parser *par, AstRef left)
+static Ast parse_field_postfix(Parser *par, Ast left)
 {
 	Token tok = take_token(par, TOK_DOT);
 
@@ -797,14 +797,14 @@ static AstRef parse_field_postfix(Parser *par, AstRef left)
 		do
 		{
 			Token name = take_token(par, TOK_IDENTIFIER);
-			AstRef right = create_atom_ast(par, name.site, name.atom);
-			AstRef value = create_field_ast(par, tok.site, left, right);
+			Ast right = create_atom_ast(par, name.site, name.atom);
+			Ast value = create_field_ast(par, tok.site, left, right);
 			push_ast(par, value);
 			++ nargs;
 		}
 		while (pick_token(par, TOK_COMMA));
 
-		AstRef *args = pop_ast_array(par, nargs);
+		Ast *args = pop_ast_array(par, nargs);
 		left = create_tuple_ast(par, tok.site, args, nargs);
 		take_token(par, TOK_PAREN_RIGHT);
 	}
@@ -815,7 +815,7 @@ static AstRef parse_field_postfix(Parser *par, AstRef left)
 	}
 	else if (pick_token(par, TOK_SQUARE_LEFT))
 	{
-		AstRef right = parse_expr(par);
+		Ast right = parse_expr(par);
 		if (ast_is_missing_or_error(right)) {
 			return ERROR_AST;
 		}
@@ -825,19 +825,19 @@ static AstRef parse_field_postfix(Parser *par, AstRef left)
 	else
 	{
 		Token name = take_token(par, TOK_IDENTIFIER);
-		AstRef right = create_atom_ast(par, name.site, name.atom);
+		Ast right = create_atom_ast(par, name.site, name.atom);
 		left = create_field_ast(par, tok.site, left, right);
 	}
 	return left;
 }
 
-static AstRef parse_array_index_postfix(Parser *par, AstRef value)
+static Ast parse_array_index_postfix(Parser *par, Ast value)
 {
 	Token tok = take_token(par, TOK_SQUARE_LEFT);
 
 	do
 	{
-		AstRef index = parse_expr(par);
+		Ast index = parse_expr(par);
 		if (ast_is_missing_or_error(index)) goto _err;
 
 		if (index->kind == AST_TUPLE)
@@ -866,11 +866,11 @@ static AstRef parse_array_index_postfix(Parser *par, AstRef value)
 	return ERROR_AST;
 }
 
-static AstRef parse_postfix_expr(Parser *parser)
+static Ast parse_postfix_expr(Parser *parser)
 {
 	Token tok = parser->tok;
 
-	AstRef value = parse_unary_expr(parser);
+	Ast value = parse_unary_expr(parser);
 	if (ast_is_error(value)) goto esc;
 
 	while (parser->tok.type != TOK_NONE && !parser->tok_prev.eol)
@@ -895,7 +895,7 @@ static AstRef parse_postfix_expr(Parser *parser)
 			{
 				consume_token(parser);
 				Token name = take_token(parser, TOK_IDENTIFIER);
-				AstRef y = create_atom_ast(parser, name.site, name.atom);
+				Ast y = create_atom_ast(parser, name.site, name.atom);
 				value = create_meta_field_ast(parser, tok.site, value, y);
 			}
 			break;
@@ -904,7 +904,7 @@ static AstRef parse_postfix_expr(Parser *parser)
 			case TOK_LEFT_PAREN:
 			{
 				u32 nargs = parse_call_args(parser);
-				AstRef *args = pop_ast_array(parser, nargs);
+				Ast *args = pop_ast_array(parser, nargs);
 				value = create_call_ast(parser, tok.site, value, args, nargs);
 			}
 			break;
@@ -917,11 +917,11 @@ static AstRef parse_postfix_expr(Parser *parser)
 	return value;
 }
 
-static AstRef parse_subexpr(Parser *parser, u32 upper_precedence)
+static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 {
 	Token tok = parser->tok;
 
-	AstRef x = parse_postfix_expr(parser);
+	Ast x = parse_postfix_expr(parser);
 	if (ast_is_error(x)) goto esc;
 
 	for (;;)
@@ -936,7 +936,7 @@ static AstRef parse_subexpr(Parser *parser, u32 upper_precedence)
 
 		consume_token(parser);
 
-		AstRef y = parse_subexpr(parser, inner_precedence);
+		Ast y = parse_subexpr(parser, inner_precedence);
 		if (ast_is_missing_or_error(y))
 		{
 			parser_error(parser, ERROR_INVALID_EXPRESSION, tok.site, "expected expression after binary operator");
@@ -951,14 +951,14 @@ static AstRef parse_subexpr(Parser *parser, u32 upper_precedence)
 	return x;
 }
 
-static AstRef parse_expr(Parser *parser)
+static Ast parse_expr(Parser *parser)
 {
 	return parse_subexpr(parser, 0);
 }
 
-static AstRef parse_expr_stat(Parser *parser)
+static Ast parse_expr_stat(Parser *parser)
 {
-	AstRef x = parse_tuple_expr(parser);
+	Ast x = parse_tuple_expr(parser);
 	if (ast_is_error(x)) {
 		return ERROR_AST;
 	}
@@ -973,7 +973,7 @@ static AstRef parse_expr_stat(Parser *parser)
 	{
 		consume_token(parser);
 
-		AstRef y = parse_tuple_expr(parser);
+		Ast y = parse_tuple_expr(parser);
 		if (ast_is_missing_or_error(y)) {
 			return ERROR_AST;
 		}
@@ -987,7 +987,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			AstRef y = parse_tuple_expr(parser);
+			Ast y = parse_tuple_expr(parser);
 			if (ast_is_missing_or_error(y)) {
 				return ERROR_AST;
 			}
@@ -998,7 +998,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			AstRef y = parse_tuple_expr(parser);
+			Ast y = parse_tuple_expr(parser);
 			if (ast_is_missing_or_error(y)) {
 				return ERROR_AST;
 			}
@@ -1009,7 +1009,7 @@ static AstRef parse_expr_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			AstRef y = parse_tuple_expr(parser);
+			Ast y = parse_tuple_expr(parser);
 			if (ast_is_missing_or_error(y)) {
 				return ERROR_AST;
 			}
@@ -1024,10 +1024,10 @@ static AstRef parse_expr_stat(Parser *parser)
 	return x;
 }
 
-static AstRef parse_stat(Parser *parser)
+static Ast parse_stat(Parser *parser)
 {
 	Token tok = parser->tok;
-	AstRef tree = 0;
+	Ast tree = 0;
 
 	switch (tok.type)
 	{
@@ -1056,7 +1056,7 @@ static AstRef parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			AstRef expr = 0;
+			Ast expr = 0;
 			if (!tok.eol)
 			{
 				expr = parse_optional_tuple_expr(parser);
@@ -1071,7 +1071,7 @@ static AstRef parse_stat(Parser *parser)
 		case TOK_BREAK:
 		{
 			consume_token(parser);
-			AstRef expr = 0;
+			Ast expr = 0;
 			if (!tok.eol)
 			{
 				expr = parse_optional_tuple_expr(parser);
@@ -1086,7 +1086,7 @@ static AstRef parse_stat(Parser *parser)
 		case TOK_CONTINUE:
 		{
 			consume_token(parser);
-			AstRef expr = 0;
+			Ast expr = 0;
 			if (!tok.eol)
 			{
 				expr = parse_optional_tuple_expr(parser);
@@ -1105,7 +1105,7 @@ static AstRef parse_stat(Parser *parser)
 			while (!peek_token(parser, TOK_NONE) && !peek_token(parser, TOK_RIGHT_BRACE))
 			{
 				Token before = parser->tok;
-				Ast *stat = parse_stat(parser);
+				Ast_T *stat = parse_stat(parser);
 				if (ast_is_error(stat)) {
 					return ERROR_AST;
 				}
@@ -1125,7 +1125,7 @@ static AstRef parse_stat(Parser *parser)
 			}
 			take_token(parser, TOK_RIGHT_BRACE);
 
-			AstRef *stats = pop_ast_array(parser, nstats);
+			Ast *stats = pop_ast_array(parser, nstats);
 			tree = create_block_ast(parser, tok.site, stats, nstats);
 		}
 		break;
@@ -1134,12 +1134,12 @@ static AstRef parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			AstRef pred = parse_expr(parser);
+			Ast pred = parse_expr(parser);
 			if (ast_is_missing_or_error(pred)) return ERROR_AST;
 
 			take_token(parser, TOK_QMARK);
 
-			AstRef body = parse_stat(parser);
+			Ast body = parse_stat(parser);
 			if (ast_is_missing_or_error(body)) return ERROR_AST;
 
 			tree = create_while_ast(parser, tok.site, pred, body);
@@ -1150,7 +1150,7 @@ static AstRef parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			AstRef name = parse_tuple_expr(parser);
+			Ast name = parse_tuple_expr(parser);
 			if (ast_is_missing_or_error(name)) {
 				return ERROR_AST;
 			}
@@ -1162,13 +1162,13 @@ static AstRef parse_stat(Parser *parser)
 				take_token(parser, TOK_HARD_BIND);
 			}
 
-			AstRef expr = parse_for_steps_expr(parser);
+			Ast expr = parse_for_steps_expr(parser);
 			if (ast_is_error(expr)) {
 				return ERROR_AST;
 			}
-			AstRef decl = create_decl_ast(parser, tok.site, 0, name, expr);
+			Ast decl = create_decl_ast(parser, tok.site, 0, name, expr);
 			take_token(parser, TOK_QMARK);
-			AstRef body = parse_stat(parser);
+			Ast body = parse_stat(parser);
 			if (ast_is_missing_or_error(body)) {
 				return ERROR_AST;
 			}
@@ -1194,10 +1194,10 @@ static AstRef parse_stat(Parser *parser)
 	return tree;
 }
 
-static AstRef parse_if_stat(Parser *parser)
+static Ast parse_if_stat(Parser *parser)
 {
 	Token tok = parser->tok;
-	AstRef pred = parse_expr(parser);
+	Ast pred = parse_expr(parser);
 	if (ast_is_missing_or_error(pred)) {
 		return ERROR_AST;
 	}
@@ -1206,12 +1206,12 @@ static AstRef parse_if_stat(Parser *parser)
 		return ERROR_AST;
 	}
 
-	AstRef true_clause = parse_stat(parser);
+	Ast true_clause = parse_stat(parser);
 	if (ast_is_missing_or_error(true_clause)) {
 		return ERROR_AST;
 	}
 
-	AstRef else_clause = 0;
+	Ast else_clause = 0;
 	if (pick_token(parser, TOK_ELIF)) {
 		else_clause = parse_if_stat(parser);
 	}
@@ -1222,11 +1222,11 @@ static AstRef parse_if_stat(Parser *parser)
 		return ERROR_AST;
 	}
 
-	AstRef stat = create_if_ast(parser, tok.site, pred, true_clause, else_clause);
+	Ast stat = create_if_ast(parser, tok.site, pred, true_clause, else_clause);
 	return stat;
 }
 
-static b32 eval_constexpr_ast(Parser *parser, AstRef ast, elf_Value *out)
+static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 {
 	if (!ast)
 	{
@@ -1275,7 +1275,7 @@ static b32 eval_constexpr_ast(Parser *parser, AstRef ast, elf_Value *out)
 			elf_Table *table = elf_new_table_rogue(parser->state);
 			for (u32 i = 0; i < ast->table.nargs; ++ i)
 			{
-				AstRef entry_ast = ast->table.args[i];
+				Ast entry_ast = ast->table.args[i];
 				if (!entry_ast || entry_ast->kind != AST_TABLE_ENTRY)
 				{
 					parser_error(parser, ERROR_INVALID_EXPRESSION, ast->site, "invalid table constant");
@@ -1316,7 +1316,7 @@ static b32 eval_constexpr_ast(Parser *parser, AstRef ast, elf_Value *out)
 	}
 }
 
-static int push_constexpr_value(Parser *parser, AstRef ast)
+static int push_constexpr_value(Parser *parser, Ast ast)
 {
 	if (ast_is_error(ast))
 	{
@@ -1332,7 +1332,7 @@ static int push_constexpr_value(Parser *parser, AstRef ast)
 
 static int parse_constexpr(Parser *parser)
 {
-	AstRef ast = parse_tuple_expr(parser);
+	Ast ast = parse_tuple_expr(parser);
 	if (!peek_token(parser, TOK_NONE))
 	{
 		parser_unexpected_token(parser, parser->tok);

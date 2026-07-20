@@ -72,7 +72,7 @@ static void lexer_advance_line(Lexer *lexer, char *line_start)
 
 static SourceSite source_site_from_ptr(Lexer *lexer, Source data)
 {
-	if (data < lexer->line_start) data = lexer->line_start;
+	ASSERT(data);
 	ASSERT(data >= lexer->line_start);
 	SourceSite site;
 	site.data = data;

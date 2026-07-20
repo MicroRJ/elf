@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-static AstRef parse_json_ast_value(Parser *parser);
+static Ast parse_json_ast_value(Parser *parser);
 
 static b32 json_token_is_null(Token token)
 {
@@ -24,7 +24,7 @@ static void json_expect_separator_or_end(Parser *parser, TokenType end, const ch
 	}
 }
 
-static AstRef parse_json_ast_object(Parser *parser)
+static Ast parse_json_ast_object(Parser *parser)
 {
 	Token start = take_token(parser, TOK_LEFT_BRACE);
 
@@ -38,28 +38,28 @@ static AstRef parse_json_ast_object(Parser *parser)
 	while (!done && !peek_token(parser, TOK_NONE))
 	{
 		Token key_token = take_token(parser, TOK_STRING);
-		AstRef key = create_atom_ast(parser, key_token.site, key_token.atom);
+		Ast key = create_atom_ast(parser, key_token.site, key_token.atom);
 
 		take_token(parser, TOK_COLON);
 
-		AstRef value = parse_json_ast_value(parser);
+		Ast value = parse_json_ast_value(parser);
 		if (ast_is_error(value))
 		{
 			return ERROR_AST;
 		}
 
-		AstRef entry = create_table_entry_ast(parser, key_token.site, key, value);
+		Ast entry = create_table_entry_ast(parser, key_token.site, key, value);
 		push_ast(parser, entry);
 		nargs += 1;
 
 		json_expect_separator_or_end(parser, TOK_RIGHT_BRACE, "expected ',' or '}'", &done);
 	}
 
-	AstRef *args = pop_ast_array(parser, nargs);
+	Ast *args = pop_ast_array(parser, nargs);
 	return create_table_ast(parser, start.site, args, nargs);
 }
 
-static AstRef parse_json_ast_array(Parser *parser)
+static Ast parse_json_ast_array(Parser *parser)
 {
 	Token start = take_token(parser, TOK_SQUARE_LEFT);
 
@@ -72,24 +72,24 @@ static AstRef parse_json_ast_array(Parser *parser)
 	b32 done = false;
 	while (!done && !peek_token(parser, TOK_NONE))
 	{
-		AstRef value = parse_json_ast_value(parser);
+		Ast value = parse_json_ast_value(parser);
 		if (ast_is_error(value))
 		{
 			return ERROR_AST;
 		}
 
-		AstRef entry = create_table_entry_ast(parser, value->site, 0, value);
+		Ast entry = create_table_entry_ast(parser, value->site, 0, value);
 		push_ast(parser, entry);
 		nargs += 1;
 
 		json_expect_separator_or_end(parser, TOK_SQUARE_RIGHT, "expected ',' or ']'", &done);
 	}
 
-	AstRef *args = pop_ast_array(parser, nargs);
+	Ast *args = pop_ast_array(parser, nargs);
 	return create_table_ast(parser, start.site, args, nargs);
 }
 
-static AstRef parse_json_ast_number(Parser *parser)
+static Ast parse_json_ast_number(Parser *parser)
 {
 	Token sign = {};
 	b32 is_negative = false;
@@ -126,7 +126,7 @@ static AstRef parse_json_ast_number(Parser *parser)
 	}
 }
 
-static AstRef parse_json_ast_value(Parser *parser)
+static Ast parse_json_ast_value(Parser *parser)
 {
 	Token token = parser->tok;
 
@@ -181,9 +181,9 @@ static AstRef parse_json_ast_value(Parser *parser)
 	}
 }
 
-static AstRef parse_json_ast(Parser *parser)
+static Ast parse_json_ast(Parser *parser)
 {
-	AstRef ast = parse_json_ast_value(parser);
+	Ast ast = parse_json_ast_value(parser);
 	if (!peek_token(parser, TOK_NONE))
 	{
 		parser_unexpected_token(parser, parser->tok);
@@ -194,6 +194,6 @@ static AstRef parse_json_ast(Parser *parser)
 
 static int parse_json_value(Parser *parser)
 {
-	AstRef ast = parse_json_ast(parser);
+	Ast ast = parse_json_ast(parser);
 	return push_constexpr_value(parser, ast);
 }

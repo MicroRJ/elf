@@ -6,9 +6,9 @@ typedef struct
 }
 IRArrayBuilder;
 
-static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *block, AstRef stat);
-static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr);
-static Ir lower_ast_to_ir_block(LowerContext *ctx, AstRef stat);
+static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *block, Ast stat);
+static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr);
+static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
 
 static LowerContext *elf_create_lower_context(elf_State *state, elf_Arena *arena)
 {
@@ -92,7 +92,7 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 	elf_end_scratch(scratch);
 }
 
-static AstRef check_ast_type(AstRef ast, AstType type)
+static Ast check_ast_type(Ast ast, AstType type)
 {
 	if (!ast || ast_is_error(ast) || ast->kind != type) {
 		return ERROR_AST;
@@ -177,7 +177,7 @@ static void set_defer_scope(LowerContext *ctx, DeferScope scope)
 	ctx->defer_scope_start = scope.previous_defer_start;
 }
 
-static void push_defer_stat(LowerContext *ctx, AstRef stat)
+static void push_defer_stat(LowerContext *ctx, Ast stat)
 {
 	ASSERT(ctx->defer_count < ctx->defer_stack_size);
 	ctx->defer_stack[ctx->defer_count++] = stat;
@@ -188,7 +188,7 @@ static void emit_defer_range(LowerContext *ctx, IRArrayBuilder *items, u32 start
 	ASSERT(start <= ctx->defer_count);
 	for (u32 i = ctx->defer_count; i > start; --i)
 	{
-		AstRef deferred = ctx->defer_stack[i - 1];
+		Ast deferred = ctx->defer_stack[i - 1];
 		lower_ast_stat_to_ir(ctx, items, deferred);
 	}
 }
@@ -299,7 +299,7 @@ static LoopLabels current_loop_labels(LowerContext *ctx, SourceSite site)
 
 static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 arity, Ir body);
 
-static IrModule elf_lower_ast_file(LowerContext *ctx, AstRef file)
+static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 {
 	PROF_BLOCK("lower.file")
 	{
@@ -391,7 +391,7 @@ static IrKind ir_kind_from_compound_assign_ast_kind(AstType kind)
 	}
 }
 
-static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
+static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 {
 	if (!expr || ast_is_error(expr)) {
 		return ERROR_IR;
@@ -453,8 +453,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_META_FIELD:
 		{
-			AstRef x = expr->binary.x;
-			AstRef y = expr->binary.y;
+			Ast x = expr->binary.x;
+			Ast y = expr->binary.y;
 
 			Ir x_ir = lower_ast_expr_to_ir(ctx, x);
 			Ir y_ir = lower_ast_expr_to_ir(ctx, y);
@@ -465,8 +465,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_INDEX:
 		{
-			AstRef x = expr->binary.x;
-			AstRef y = expr->binary.y;
+			Ast x = expr->binary.x;
+			Ast y = expr->binary.y;
 
 			Ir x_ir = lower_ast_expr_to_ir(ctx, x);
 			Ir y_ir = lower_ast_expr_to_ir(ctx, y);
@@ -500,8 +500,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_FIELD:
 		{
-			AstRef x = expr->binary.x;
-			AstRef y = expr->binary.y;
+			Ast x = expr->binary.x;
+			Ast y = expr->binary.y;
 
 			Ir x_ir = lower_ast_expr_to_ir(ctx, x);
 			Ir y_ir = lower_ast_expr_to_ir(ctx, y);
@@ -512,8 +512,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_CALL:
 		{
-			AstRef func = expr->call.expr;
-			AstRef *args = expr->call.args;
+			Ast func = expr->call.expr;
+			Ast *args = expr->call.args;
 			u32 nargs = expr->call.nargs;
 
 			Ir ir_func = lower_ast_expr_to_ir(ctx, func);
@@ -529,7 +529,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_FUNCTION:
 		{
-			AstRef *params = expr->function.params;
+			Ast *params = expr->function.params;
 			u32 nparams = expr->function.nparams;
 			u32 arity = IMPLICIT_PARAM_COUNT + nparams;
 			b32 variadic = expr->function.variadic != 0;
@@ -555,13 +555,13 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 			for (u32 i = 0; i < nparams; ++i)
 			{
-				AstRef param = check_ast_type(params[i], AST_FUNCTION_PARAM);
+				Ast param = check_ast_type(params[i], AST_FUNCTION_PARAM);
 				if (ast_is_error(param)) {
 					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "expected function parameter");
 					continue;
 				}
 
-				AstRef name = check_ast_type(param->param.name, AST_IDENT);
+				Ast name = check_ast_type(param->param.name, AST_IDENT);
 				if (ast_is_error(name)) {
 					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, param->site, "expected function parameter name");
 					continue;
@@ -601,7 +601,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 		case AST_TABLE:
 		{
-			AstRef *args = expr->table.args;
+			Ast *args = expr->table.args;
 			u32 nargs = expr->table.nargs;
 
 			IRArrayBuilder table_items = begin_ir_array_builder(ctx);
@@ -610,7 +610,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
-				AstRef entry = check_ast_type(args[i], AST_TABLE_ENTRY);
+				Ast entry = check_ast_type(args[i], AST_TABLE_ENTRY);
 				if (ast_is_error(entry))
 				{
 					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, args[i]->site, "expected table entry");
@@ -618,8 +618,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 					continue;
 				}
 
-				AstRef key = entry->table_entry.key;
-				AstRef value = entry->table_entry.value;
+				Ast key = entry->table_entry.key;
+				Ast value = entry->table_entry.value;
 				Ir table = create_load_local_ir(ctx, entry->site, table_local);
 				Ir ir_value = lower_ast_expr_to_ir(ctx, value);
 				if (key)
@@ -700,7 +700,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, AstRef expr)
 	return ir;
 }
 
-static Ir lower_ast_to_ir_block(LowerContext *ctx, AstRef stat)
+static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat)
 {
 	if (!stat || ast_is_error(stat)) {
 		return ERROR_IR;
@@ -730,7 +730,7 @@ static Ir lower_ast_to_ir_block(LowerContext *ctx, AstRef stat)
 	return ir;
 }
 
-static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, AstRef expr)
+static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -738,8 +738,8 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, 
 	{
 		case AST_FIELD:
 		{
-			AstRef x = expr->binary.x;
-			AstRef y = expr->binary.y;
+			Ast x = expr->binary.x;
+			Ast y = expr->binary.y;
 
 			Ir receiver = lower_ast_expr_to_ir(ctx, x);
 			Ir receiver_memory = create_local_ir(ctx, x->site, receiver);
@@ -760,8 +760,8 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, 
 
 		case AST_INDEX:
 		{
-			AstRef x = expr->binary.x;
-			AstRef y = expr->binary.y;
+			Ast x = expr->binary.x;
+			Ast y = expr->binary.y;
 
 			Ir receiver = lower_ast_expr_to_ir(ctx, x);
 			Ir receiver_memory = create_local_ir(ctx, x->site, receiver);
@@ -787,13 +787,13 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IRArrayBuilder *items, 
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRef name_tuple, AstRef expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.nargs;
 
 	for (u32 i = 0; i < expr_tuple->tuple.nargs; ++ i)
 	{
-		AstRef expr = expr_tuple->tuple.args[i];
+		Ast expr = expr_tuple->tuple.args[i];
 		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
 		{
 			const char *message = "range expressions cannot be used as declaration values; use them as the single step in a for loop";
@@ -809,7 +809,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *item
 
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		AstRef name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
+		Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
@@ -820,7 +820,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *item
 		Ir value = 0;
 		if (i < expr_tuple->tuple.nargs)
 		{
-			AstRef expr = expr_tuple->tuple.args[i];
+			Ast expr = expr_tuple->tuple.args[i];
 			value = lower_ast_expr_to_ir(ctx, expr);
 		}
 		else
@@ -838,10 +838,10 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IRArrayBuilder *item
 	return nvars;
 }
 
-static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, AstRef stat, AstRef name_tuple, AstRef range_expr)
+static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast range_expr)
 {
-	AstRef collection_expr = 0;
-	AstRef range = range_expr;
+	Ast collection_expr = 0;
+	Ast range = range_expr;
 	if (range_expr && range_expr->kind == AST_RANGE_INDEX)
 	{
 		collection_expr = range_expr->binary.x;
@@ -857,7 +857,7 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, AstRef stat, AstRef 
 	EntityScope scope = get_entity_scope(ctx);
 
 	u32 nvars = name_tuple->tuple.nargs;
-	AstRef first_name = check_ast_type(name_tuple->tuple.args[0], AST_IDENT);
+	Ast first_name = check_ast_type(name_tuple->tuple.args[0], AST_IDENT);
 	if (ast_is_error(first_name))
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
@@ -879,7 +879,7 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, AstRef stat, AstRef 
 	Ir *var_locals = elf_arena_push(ctx->arena, sizeof(*var_locals) * nvars);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		AstRef name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
+		Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
@@ -916,7 +916,7 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, AstRef stat, AstRef 
 	push_ir_block(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		AstRef name = name_tuple->tuple.args[i];
+		Ast name = name_tuple->tuple.args[i];
 		Ir iterator_load = create_load_local_ir(ctx, name->site, iterator_local);
 		Ir value = iterator_load;
 		if (i != 0)
@@ -968,7 +968,7 @@ static Ir lower_ast_for_range_step_to_ir(LowerContext *ctx, AstRef stat, AstRef 
 	return ir;
 }
 
-static Ir lower_ast_for_value_step_to_ir(LowerContext *ctx, AstRef stat, AstRef name_tuple, AstRef expr_tuple)
+static Ir lower_ast_for_value_step_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast expr_tuple)
 {
 	if (expr_tuple->tuple.nargs != name_tuple->tuple.nargs)
 	{
@@ -991,11 +991,11 @@ static Ir lower_ast_for_value_step_to_ir(LowerContext *ctx, AstRef stat, AstRef 
 	return ir;
 }
 
-static Ir lower_ast_for_step_to_ir(LowerContext *ctx, AstRef stat, AstRef name_tuple, AstRef expr_tuple)
+static Ir lower_ast_for_step_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast expr_tuple)
 {
 	if (expr_tuple->tuple.nargs == 1)
 	{
-		AstRef expr = expr_tuple->tuple.args[0];
+		Ast expr = expr_tuple->tuple.args[0];
 		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
 		{
 			return lower_ast_for_range_step_to_ir(ctx, stat, name_tuple, expr);
@@ -1005,17 +1005,17 @@ static Ir lower_ast_for_step_to_ir(LowerContext *ctx, AstRef stat, AstRef name_t
 	return lower_ast_for_value_step_to_ir(ctx, stat, name_tuple, expr_tuple);
 }
 
-static Ir lower_ast_for_to_ir(LowerContext *ctx, AstRef stat)
+static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 {
-	AstRef decl = check_ast_type(stat->for_stat.decl, AST_DECL_STAT);
+	Ast decl = check_ast_type(stat->for_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid for-loop declaration");
 		return ERROR_IR;
 	}
 
-	AstRef name_tuple = check_ast_type(decl->decl.name, AST_TUPLE);
-	AstRef for_steps = check_ast_type(decl->decl.expr, AST_FOR_STEPS);
+	Ast name_tuple = check_ast_type(decl->decl.name, AST_TUPLE);
+	Ast for_steps = check_ast_type(decl->decl.expr, AST_FOR_STEPS);
 	if (ast_is_error(name_tuple) || ast_is_error(for_steps))
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid for-loop declaration");
@@ -1031,7 +1031,7 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, AstRef stat)
 	IRArrayBuilder step_items = begin_ir_array_builder(ctx);
 	for (u32 i = 0; i < for_steps->for_steps.nargs; ++ i)
 	{
-		AstRef expr_tuple = check_ast_type(for_steps->for_steps.args[i], AST_TUPLE);
+		Ast expr_tuple = check_ast_type(for_steps->for_steps.args[i], AST_TUPLE);
 		if (ast_is_error(expr_tuple))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, for_steps->site, "expected for-loop step tuple");
@@ -1046,10 +1046,10 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, AstRef stat)
 	return create_block_ir(ctx, stat->site, steps);
 }
 
-static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRef stat)
+static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast stat)
 {
-	AstRef dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
-	AstRef expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
+	Ast dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
+	Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
 	if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid compound assignment");
@@ -1065,8 +1065,8 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, 
 	IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
 	ASSERT(op != IR_NONE);
 
-	AstRef dest_ast = dest_tuple->tuple.args[0];
-	AstRef expr_ast = expr_tuple->tuple.args[0];
+	Ast dest_ast = dest_tuple->tuple.args[0];
+	Ast expr_ast = expr_tuple->tuple.args[0];
 
 	Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
 	Ir right_ir = lower_ast_expr_to_ir(ctx, expr_ast);
@@ -1074,7 +1074,7 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, IRArrayBuilder *items, 
 	return create_store_ir(ctx, stat->site, dest_ir, value_ir);
 }
 
-static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRef stat)
+static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, Ast stat)
 {
 	if (!stat || ast_is_error(stat))
 	{
@@ -1086,9 +1086,9 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 	{
 		case AST_IF:
 		{
-			AstRef pred = stat->if_stat.pred;
-			AstRef true_clause = stat->if_stat.true_clause;
-			AstRef else_clause = stat->if_stat.else_clause;
+			Ast pred = stat->if_stat.pred;
+			Ast true_clause = stat->if_stat.true_clause;
+			Ast else_clause = stat->if_stat.else_clause;
 
 			Ir pred_ir = lower_ast_expr_to_ir(ctx, pred);
 			Ir true_ir = lower_ast_to_ir_block(ctx, true_clause);
@@ -1104,8 +1104,8 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_WHILE:
 		{
-			AstRef pred = stat->while_stat.pred;
-			AstRef body = stat->while_stat.body;
+			Ast pred = stat->while_stat.pred;
+			Ast body = stat->while_stat.body;
 
 			Ir start_label = create_label_ir(ctx, stat->site);
 			Ir break_label = create_label_ir(ctx, stat->site);
@@ -1143,7 +1143,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_BLOCK_STAT:
 		{
-			AstRef *stats = stat->block.stats;
+			Ast *stats = stat->block.stats;
 			u32 nstats = stat->block.nstats;
 
 			IRArrayBuilder block_items = begin_ir_array_builder(ctx);
@@ -1167,8 +1167,8 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_DECL_STAT:
 		{
-			AstRef name_tuple = check_ast_type(stat->decl.name, AST_TUPLE);
-			AstRef expr_tuple = check_ast_type(stat->decl.expr, AST_TUPLE);
+			Ast name_tuple = check_ast_type(stat->decl.name, AST_TUPLE);
+			Ast expr_tuple = check_ast_type(stat->decl.expr, AST_TUPLE);
 			if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid declaration");
@@ -1187,8 +1187,8 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_ASSIGN:
 		{
-			AstRef dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
-			AstRef expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
+			Ast dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
+			Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid assignment");
@@ -1199,8 +1199,8 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 			u32 nargs = dest_tuple->tuple.nargs;
 			if (nargs == 1)
 			{
-				AstRef dest_ast = dest_tuple->tuple.args[0];
-				AstRef expr_ast = expr_tuple->tuple.nargs ? expr_tuple->tuple.args[0] : 0;
+				Ast dest_ast = dest_tuple->tuple.args[0];
+				Ast expr_ast = expr_tuple->tuple.nargs ? expr_tuple->tuple.args[0] : 0;
 
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
 				Ir expr_ir = expr_ast ? lower_ast_expr_to_ir(ctx, expr_ast) : create_nil_ir(ctx, dest_ast->site);
@@ -1215,7 +1215,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 				SourceSite site = stat->site;
 				Ir expr_ir;
 				if (i < expr_tuple->tuple.nargs) {
-					AstRef expr_ast = expr_tuple->tuple.args[i];
+					Ast expr_ast = expr_tuple->tuple.args[i];
 					site = expr_ast->site;
 					expr_ir = lower_ast_expr_to_ir(ctx, expr_ast);
 				}
@@ -1229,7 +1229,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
-				AstRef dest_ast = dest_tuple->tuple.args[i];
+				Ast dest_ast = dest_tuple->tuple.args[i];
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
 				Ir value_ir = create_load_local_ir(ctx, values[i]->site, values[i]);
 				Ir ir = create_store_ir(ctx, stat->site, dest_ir, value_ir);
@@ -1254,8 +1254,8 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_NIL_ASSIGN:
 		{
-			AstRef dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
-			AstRef expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
+			Ast dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
+			Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid nil assignment");
@@ -1269,8 +1269,8 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 					ASSERT(!"Error");
 				}
 
-				AstRef dest_ast = dest_tuple->tuple.args[i];
-				AstRef expr_ast = expr_tuple->tuple.args[i];
+				Ast dest_ast = dest_tuple->tuple.args[i];
+				Ast expr_ast = expr_tuple->tuple.args[i];
 
 				Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
 				Ir nil_ir = create_nil_ir(ctx, dest_ast->site);
@@ -1290,7 +1290,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_RETURN:
 		{
-			AstRef expr = stat->return_stat.expr;
+			Ast expr = stat->return_stat.expr;
 			Ir expr_ir = 0;
 			if (expr)
 			{
@@ -1337,7 +1337,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, IRArrayBuilder *items, AstRe
 
 		case AST_TUPLE:
 		{
-			AstRef *args = stat->tuple.args;
+			Ast *args = stat->tuple.args;
 			u32 nargs = stat->tuple.nargs;
 
 			for (u32 i = 0; i < nargs; ++ i)

@@ -2,9 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-typedef struct Ast Ast;
-typedef Ast *AstRef;
-
 #define AST_XDEF(_)                                       \
 _(AST_NONE                , "none")                       \
 \
@@ -90,6 +87,10 @@ _(AST_LENGTH_INTRINSIC    , "length_intrinsic")           \
 _(AST_GET_MEM             , "get_mem")                    \
 /* end */
 
+
+typedef struct Ast_T Ast_T;
+typedef Ast_T *Ast;
+
 typedef enum
 {
 #define AST_XPAND(ENUM, NAME) ENUM,
@@ -108,7 +109,7 @@ static const char *ast_type_name(AstType type);
 typedef struct
 {
 	u32    nargs;
-	AstRef *args;
+	Ast *args;
 }
 AstArray;
 
@@ -117,11 +118,11 @@ typedef struct
 	elf_Arena *arena;
 	u32        stack_size;
 	u32        stack_index;
-	AstRef    *stack;
+	Ast    *stack;
 }
 AstContext;
 
-struct Ast
+struct Ast_T
 {
 	AstType  kind;
 	SourceSite site;
@@ -129,150 +130,152 @@ struct Ast
 	union
 	{
 		elf_String *atom;
-		i64      integer_value;
-		f64      number_value;
+		i64         integer_value;
+		f64         number_value;
+		AstArray    interpolated_string;
 
 		struct
 		{
-			AstRef body;
+			Ast body;
 		}
 		file;
 
 		struct
 		{
-			AstRef *params;
+			Ast *params;
 			u32    nparams;
-			AstRef variadic;
-			AstRef    body;
+			Ast variadic;
+			Ast    body;
 		}
 		function;
 
 		struct
 		{
-			AstRef name;
-			AstRef type;
-			AstRef expr;
+			Ast name;
+			Ast type;
+			Ast expr;
 		}
 		param;
 
 		struct
 		{
-			AstRef name;
-			AstRef type;
-			AstRef expr;
+			Ast name;
+			Ast type;
+			Ast expr;
 		}
 		decl;
 
-		AstRef unary;
+		Ast unary;
 
 		struct
 		{
-			AstRef x;
-			AstRef y;
+			Ast x;
+			Ast y;
 		}
 		binary;
 
 		struct
 		{
-			AstRef *args;
+			Ast *args;
 			u32    nargs;
 		}
 		tuple;
 
 		struct
 		{
-			AstRef *args;
+			Ast *args;
 			u32    nargs;
 		}
 		for_steps;
 
 		struct
 		{
-			AstRef  expr;
-			AstRef *args;
+			Ast  expr;
+			Ast *args;
 			u32    nargs;
 		}
 		call;
 
 		struct
 		{
-			AstRef *args;
+			Ast *args;
 			u32    nargs;
 		}
 		table;
 
 		struct
 		{
-			AstRef key;
-			AstRef value;
+			Ast key;
+			Ast value;
 		}
 		table_entry;
 
 		struct
 		{
-			AstRef        pred;
-			AstRef true_clause;
-			AstRef else_clause;
-			AstRef then_clause;
+			Ast        pred;
+			Ast true_clause;
+			Ast else_clause;
+			Ast then_clause;
 		}
 		if_stat;
 
 		struct
 		{
-			AstRef expr;
+			Ast expr;
 		}
 		return_stat;
 
 		struct
 		{
-			AstRef *stats;
+			Ast *stats;
 			u32    nstats;
 		}
 		block;
 
 		struct
 		{
-			AstRef body;
+			Ast body;
 		}
 		defer_stat;
 
 		struct
 		{
-			AstRef pred;
-			AstRef body;
+			Ast pred;
+			Ast body;
 		}
 		while_stat;
 
 		struct
 		{
-			AstRef decl;
-			AstRef body;
+			Ast decl;
+			Ast body;
 		}
 		for_stat;
 
 		struct
 		{
-			AstRef expr;
+			Ast expr;
 		}
 		continue_stat;
 
 		struct
 		{
-			AstRef expr;
+			Ast expr;
 		}
 		break_stat;
+
 	};
 };
 
-static Ast ast_error_sentinel =
+static Ast_T ast_error_sentinel =
 {
 	.kind = AST_ERROR,
 };
 
-#define NULL_AST ((AstRef)0)
+#define NULL_AST ((Ast)0)
 #define ERROR_AST (&ast_error_sentinel)
 
-static inline b32 ast_is_error(AstRef ast)
+static inline b32 ast_is_error(Ast ast)
 {
 	return ast == ERROR_AST;
 }

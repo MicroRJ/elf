@@ -103,7 +103,7 @@ struct LowerContext
 	u32          ir_stack_index;
 	Ir       *ir_stack;
 
-	AstRef      *defer_stack;
+	Ast      *defer_stack;
 	u32          defer_stack_size;
 	u32          defer_count;
 	u32          defer_scope_start;
