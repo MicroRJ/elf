@@ -66,18 +66,8 @@ b32 elf_platform_delete_file(const char *name);
 int elf_platform_make_dir(const char *path);
 b32 elf_platform_get_file_info(const char *path, elf_PlatformFileInfo *info);
 
-#if defined(PATH_BUILDER)
-typedef struct
-{
-	int type;
-	int size;
-	elf_PathStack pb;
-}
-elf_PlatformFileIter;
-
-elf_PlatformFile elf_platform_find_first_file(elf_PlatformFileIter *iter);
-int elf_platform_find_next_file(elf_PlatformFile hand, elf_PlatformFileIter *iter);
-void elf_platform_find_close(elf_PlatformFile hand);
-#endif
+/* Platform implementations of the elf.fs path traversal bindings. */
+ELF_FUNCTION(elf_platform_fs_get_paths);
+ELF_FUNCTION(elf_platform_fs_for_each_path);
 
 #endif

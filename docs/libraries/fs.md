@@ -8,15 +8,17 @@ contents := elf.fs.read_text_file("settings.elf")
 exists := elf.fs.file_exists("settings.elf")
 ```
 
-The current API operates on regular files, text stored in Elf strings, single
-directories, and the process-wide working directory. It does not yet provide
-directory enumeration, recursive directory creation/removal, or binary files.
+The current API operates on regular files, text stored in Elf strings, immediate
+directory listings, single directories, and the process-wide working directory.
+It does not yet provide recursive directory creation/removal or binary files.
 
 ## API summary
 
 | Function | Result | Purpose |
 | --- | --- | --- |
 | `elf.fs.file_exists(path)` | integer boolean | Test whether a regular file exists. |
+| `elf.fs.get_paths(directory?, recursion_level?)` | table or `nil` | Return child paths, optionally recursively. |
+| `elf.fs.for_each_path(directory?, recursion_level?, callback)` | integer or `nil` | Call a function for each child path. |
 | `elf.fs.read_text_file(path)` | string or `nil` | Read a complete regular file into an Elf string. |
 | `elf.fs.write_text_file(path, text)` | integer boolean | Create or replace a text file. |
 | `elf.fs.get_file_info(path)` | table or `nil` | Read size and timestamp metadata for a regular file. |
@@ -101,6 +103,24 @@ been created or truncated. Append and atomic-replacement operations are not yet
 part of the API.
 
 ## Directories
+
+### `elf.fs.get_paths(directory?, recursion_level?)`
+
+Returns child paths of `directory` in an Elf table. A recursion level of `0`
+lists immediate children, `1` also lists their children, and so on up to `32`.
+The level defaults to `0`. The listing excludes `.` and `..` and has
+platform-defined ordering. It returns `nil` when the root directory cannot be
+opened or the recursion level is invalid. Omitting `directory` lists the
+current working directory.
+
+### `elf.fs.for_each_path(directory?, recursion_level?, callback)`
+
+Traverses paths with the same ordering, recursion levels, and exclusions as
+`get_paths`, but calls `callback(path)` instead of building a table. It returns
+the number of callbacks, or `nil` when the root directory cannot be opened or
+the arguments are invalid. The shorter forms `for_each_path(directory,
+callback)` and `for_each_path(callback)` use recursion level `0`; the latter
+also uses the current working directory.
 
 ### `elf.fs.create_directory(path)`
 

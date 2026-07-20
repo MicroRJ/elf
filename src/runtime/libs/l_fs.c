@@ -124,6 +124,8 @@ ELF_FUNCTION(lib_fs_set_working_directory)
 
 static const elf_Binding l_fs[] = {
 	{"file_exists",           lib_fs_file_exists},
+	{"get_paths",             elf_platform_fs_get_paths},
+	{"for_each_path",         elf_platform_fs_for_each_path},
 	{"read_text_file",        lib_fs_read_text_file},
 	{"write_text_file",       lib_fs_write_text_file},
 	{"get_file_info",         lib_fs_get_file_info},

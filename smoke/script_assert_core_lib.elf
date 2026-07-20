@@ -48,6 +48,41 @@ test_assert(elf.serialization.load_json_file("smoke/does_not_exist.json") == nil
 test_assert(elf.type_of(elf.debug.memory_bytes()) == "integer")
 test_assert(elf.type_of(elf.debug.object_count()) == "integer")
 
+test_assert(elf.fs.get_paths() != nil)
+paths := elf.fs.get_paths("smoke")
+test_assert(paths != nil)
+found_basic := 0
+for path := paths[...] ? {
+	if elf.path.filename(path) == "basic.elf" ? { found_basic = 1 }
+}
+test_assert(found_basic)
+test_assert(elf.fs.get_paths("smoke/does-not-exist") == nil)
+
+flat_paths := elf.fs.get_paths("src/runtime", 0)
+recursive_paths := elf.fs.get_paths("src/runtime", 1)
+found_flat_l_fs := 0
+found_recursive_l_fs := 0
+for path := flat_paths[...] ? {
+	if elf.path.filename(path) == "l_fs.c" ? { found_flat_l_fs = 1 }
+}
+for path := recursive_paths[...] ? {
+	if elf.path.filename(path) == "l_fs.c" ? { found_recursive_l_fs = 1 }
+}
+test_assert(found_flat_l_fs == 0)
+test_assert(found_recursive_l_fs)
+test_assert(elf.fs.get_paths("smoke", -1) == nil)
+test_assert(elf.fs.get_paths("smoke", 33) == nil)
+
+iteration := { count = 0, found_l_fs = 0 }
+iteration_count := elf.fs.for_each_path("src/runtime", 1, fun(path) {
+	iteration.count += 1
+	if elf.path.filename(path) == "l_fs.c" ? { iteration.found_l_fs = 1 }
+})
+test_assert(iteration_count == iteration.count)
+test_assert(iteration_count == recursive_paths:length())
+test_assert(iteration.found_l_fs)
+test_assert(elf.fs.for_each_path("smoke/does-not-exist", fun(path) {}) == nil)
+
 test_assert(elf.load_expr == nil)
 test_assert(elf.unparse == nil)
 test_assert(elf.format == nil)
