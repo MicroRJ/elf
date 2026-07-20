@@ -365,6 +365,84 @@ static void test_lexer_format_string_parts(elf_State *state)
 	Token nested_end = lexer_next(&nested_braces);
 	expect_token_type(nested_end, TOK_STRING_END, "lex nested brace format end");
 	expect_token_atom(nested_end, " done", "nested brace format trailing text");
+
+	Parser deeper_braces = lexer_test_parser(state, "f\"value %{{{1}}} done\"");
+	lexer_prime(&deeper_braces);
+
+	expect_token_type(lexer_next(&deeper_braces), TOK_STRING_START, "lex deeper brace format start");
+	expect_token_type(lexer_next(&deeper_braces), TOK_LEFT_BRACE, "lex outer nested opening brace");
+	expect_token_type(lexer_next(&deeper_braces), TOK_LEFT_BRACE, "lex inner nested opening brace");
+	expect_token_type(lexer_next(&deeper_braces), TOK_INTEGER, "lex deeply nested table value");
+	expect_token_type(lexer_next(&deeper_braces), TOK_RIGHT_BRACE, "lex inner nested closing brace");
+	expect_token_type(lexer_next(&deeper_braces), TOK_RIGHT_BRACE, "lex outer nested closing brace");
+	Token deeper_end = lexer_next(&deeper_braces);
+	expect_token_type(deeper_end, TOK_STRING_END, "lex deeper brace format end");
+	expect_token_atom(deeper_end, " done", "deeper brace format trailing text");
+
+	Parser operator_expr = lexer_test_parser(state, "f\"remainder %{value % 2}\"");
+	lexer_prime(&operator_expr);
+
+	expect_token_type(lexer_next(&operator_expr), TOK_STRING_START, "lex operator expression format start");
+	expect_token_type(lexer_next(&operator_expr), TOK_IDENTIFIER, "lex operator expression identifier");
+	expect_token_type(lexer_next(&operator_expr), TOK_MOD, "lex format character as modulus inside interpolation");
+	expect_token_type(lexer_next(&operator_expr), TOK_INTEGER, "lex operator expression operand");
+	expect_token_type(lexer_next(&operator_expr), TOK_STRING_END, "lex operator expression format end");
+
+	Parser comment_brace = lexer_test_parser(state, "f\"value %{call(/* } */ item)} done\"");
+	lexer_prime(&comment_brace);
+
+	expect_token_type(lexer_next(&comment_brace), TOK_STRING_START, "lex comment brace format start");
+	expect_token_type(lexer_next(&comment_brace), TOK_IDENTIFIER, "lex call before comment containing brace");
+	expect_token_type(lexer_next(&comment_brace), TOK_LEFT_PAREN, "lex opening parenthesis before comment containing brace");
+	expect_token_type(lexer_next(&comment_brace), TOK_IDENTIFIER, "ignore closing brace inside interpolation comment");
+	expect_token_type(lexer_next(&comment_brace), TOK_PAREN_RIGHT, "lex closing parenthesis after interpolation comment");
+	Token comment_end = lexer_next(&comment_brace);
+	expect_token_type(comment_end, TOK_STRING_END, "lex comment brace format end");
+	expect_token_atom(comment_end, " done", "comment brace format trailing text");
+
+	Parser restored = lexer_test_parser(state, "f\"formatted %{value}\" } next");
+	lexer_prime(&restored);
+
+	expect_token_type(lexer_next(&restored), TOK_STRING_START, "lex restored mode format start");
+	expect_token_type(lexer_next(&restored), TOK_IDENTIFIER, "lex restored mode interpolation value");
+	expect_token_type(lexer_next(&restored), TOK_STRING_END, "lex restored mode format end");
+	expect_token_type(lexer_next(&restored), TOK_RIGHT_BRACE, "restore normal mode after formatted string");
+	Token restored_next = lexer_next(&restored);
+	expect_token_type(restored_next, TOK_IDENTIFIER, "lex token after restored normal mode");
+	expect_token_atom(restored_next, "next", "token after restored normal mode payload");
+	expect_token_type(lexer_next(&restored), TOK_NONE, "restored mode source consumed completely");
+
+	Parser nested_format = lexer_test_parser(state, "f\"\"\"outer %{f\"inner %{value}\"} tail\"\"\"");
+	lexer_prime(&nested_format);
+
+	Token outer_start = lexer_next(&nested_format);
+	expect_token_type(outer_start, TOK_STRING_START, "lex outer format block start");
+	expect_token_atom(outer_start, "outer ", "outer format block leading text");
+	Token inner_start = lexer_next(&nested_format);
+	expect_token_type(inner_start, TOK_STRING_START, "lex nested format string start");
+	expect_token_atom(inner_start, "inner ", "nested format string leading text");
+	expect_token_type(lexer_next(&nested_format), TOK_IDENTIFIER, "lex nested format interpolation value");
+	Token inner_end = lexer_next(&nested_format);
+	expect_token_type(inner_end, TOK_STRING_END, "lex nested format string end");
+	expect_token_atom(inner_end, "", "nested format string trailing text");
+	Token outer_end = lexer_next(&nested_format);
+	expect_token_type(outer_end, TOK_STRING_END, "restore outer block format mode");
+	expect_token_atom(outer_end, " tail", "outer format block trailing text");
+	expect_token_type(lexer_next(&nested_format), TOK_NONE, "nested format source consumes outer delimiter");
+
+	Parser tracked_block = lexer_test_parser(state, "f\"\"\"first\n%{value}\nlast\"\"\"\nnext");
+	lexer_prime(&tracked_block);
+
+	Token tracked_start = lexer_next(&tracked_block);
+	expect_token_line(tracked_start, 1, "f\"\"\"first", "format block start line");
+	Token tracked_value = lexer_next(&tracked_block);
+	expect_token_line(tracked_value, 2, "%{value}", "format block interpolation line");
+	Token tracked_end = lexer_next(&tracked_block);
+	expect_token_type(tracked_end, TOK_STRING_END, "lex tracked format block end");
+	expect_token_line(tracked_end, 2, "%{value}", "format block end token begins at interpolation close");
+	Token tracked_next = lexer_next(&tracked_block);
+	expect_token_type(tracked_next, TOK_IDENTIFIER, "lex token after multiline format block");
+	expect_token_line(tracked_next, 4, "next", "line after multiline format block");
 }
 
 static void test_lexer_line_slices(elf_State *state)

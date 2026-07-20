@@ -72,6 +72,7 @@ static void lexer_advance_line(Lexer *lexer, char *line_start)
 
 static SourceSite source_site_from_ptr(Lexer *lexer, Source data)
 {
+	if (data < lexer->line_start) data = lexer->line_start;
 	ASSERT(data >= lexer->line_start);
 	SourceSite site;
 	site.data = data;
@@ -569,7 +570,14 @@ static Token lex_token(Lexer *lexer)
 		token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->mode.string_start), lexer->mode.is_block_string, &ended);
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
-		if (!ended) {
+		if (ended) {
+			if (lexer->mode_index <= 0) {
+				log_source_error(lexer, source_site_from_ptr(lexer, lexer->mode.string_start), "invalid interpolated string");
+				return token;
+			}
+			lexer->mode = lexer->mode_stack[-- lexer->mode_index];
+		}
+		else {
 			lexer->mode.depth               = 0;
 			lexer->mode.interpolation_start = cur;
 		}
