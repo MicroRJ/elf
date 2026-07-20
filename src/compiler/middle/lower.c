@@ -900,17 +900,40 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		return ERROR_IR;
 	}
 
-	Ir range_start = lower_ast_expr_to_ir(ctx, range->binary.x);
-	Ir range_end = lower_ast_expr_to_ir(ctx, range->binary.y);
-
-	Ir iterator_local = create_local_ir(ctx, range->binary.x->site, range_start);
-	Ir range_end_local = create_local_ir(ctx, range->binary.y->site, range_end);
 	Ir collection_local = 0;
 	if (collection_expr)
 	{
 		Ir collection = lower_ast_expr_to_ir(ctx, collection_expr);
 		collection_local = create_local_ir(ctx, collection_expr->site, collection);
 	}
+
+	Ast range_start_expr = range->binary.x;
+	Ast range_end_expr = range->binary.y;
+	SourceSite range_start_site = range_start_expr ? range_start_expr->site : range->site;
+	SourceSite range_end_site = range_end_expr ? range_end_expr->site : range->site;
+
+	Ir range_start = range_start_expr
+		? lower_ast_expr_to_ir(ctx, range_start_expr)
+		: create_int_ir(ctx, range_start_site, 0);
+	Ir range_end = 0;
+	if (range_end_expr) {
+		range_end = lower_ast_expr_to_ir(ctx, range_end_expr);
+	}
+	else if (collection_local)
+	{
+		Ir collection = create_load_local_ir(ctx, range_end_site, collection_local);
+		range_end = create_length_intrinsic_ir(ctx, range_end_site, collection);
+	}
+	else
+	{
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, range->site,
+			"an omitted range end requires an indexed collection");
+		set_entity_scope(ctx, scope);
+		return ERROR_IR;
+	}
+
+	Ir iterator_local = create_local_ir(ctx, range_start_site, range_start);
+	Ir range_end_local = create_local_ir(ctx, range_end_site, range_end);
 
 	Ir *var_locals = elf_arena_push(ctx->arena, sizeof(*var_locals) * nvars);
 	for (u32 i = 0; i < nvars; ++ i)
@@ -943,7 +966,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	pop_loop_labels(ctx);
 
 	Ir load_iterator_local = create_load_local_ir(ctx, first_name->site, iterator_local);
-	Ir load_range_end_local = create_load_local_ir(ctx, range_end->site, range_end_local);
+	Ir load_range_end_local = create_load_local_ir(ctx, range_end_site, range_end_local);
 	Ir iterator_less_than_range_end = create_binary_ir(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = create_jump_if_false_ir(ctx, range->site, iterator_less_than_range_end, break_label);
 
@@ -986,11 +1009,11 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	Ir loop = create_block_ir(ctx, stat->site, loop_stats);
 
 	IRArrayBuilder block_items = begin_ir_array_builder(ctx);
-	push_ir_block(&block_items, iterator_local);
-	push_ir_block(&block_items, range_end_local);
 	if (collection_local) {
 		push_ir_block(&block_items, collection_local);
 	}
+	push_ir_block(&block_items, iterator_local);
+	push_ir_block(&block_items, range_end_local);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		push_ir_block(&block_items, var_locals[i]);

@@ -49,9 +49,12 @@ postfix_expr    ::= unary_expr postfix*
 postfix         ::= "." identifier
                   | "." "[" expr "]"
                   | "." "(" identifier ("," identifier)* ")"
-                  | "[" expr ("," expr)* "]"
+                  | "[" index_expr ("," index_expr)* "]"
                   | ":" identifier
                   | call_args
+
+index_expr      ::= expr
+                  | expr? "..." expr?
 
 call_args       ::= table_expr
                   | "(" ","? (expr ("," expr)*)? ")"
@@ -150,6 +153,18 @@ for i, j, k := 0 ... 24 ? { ... }
 An indexed range such as `values[first ... last]` traverses that half-open
 slice. The collection and its endpoints are evaluated once before iteration.
 The loop body may be any statement, including a block.
+
+Indexed ranges may omit either endpoint. A missing lower bound defaults to
+zero, while a missing upper bound defaults to the cached collection's length:
+
+```text
+values[...]        // 0 ... values:length()
+values[5 ...]      // 5 ... values:length()
+values[... 10]     // 0 ... 10
+```
+
+These omitted-endpoint forms are range indexes; they are consumed by range
+loops and do not make a standalone range into a general runtime value.
 
 ## JSON
 

@@ -712,9 +712,13 @@ static void print_ast(Printer *pr, Ast tree)
 
 
 			PRINT(pr, "(");
-			print_ast(pr, x);
+			if (x) {
+				print_ast(pr, x);
+			}
 			PRINT(pr, "...");
-			print_ast(pr, y);
+			if (y) {
+				print_ast(pr, y);
+			}
 			PRINT(pr, ")");
 		}
 		break;

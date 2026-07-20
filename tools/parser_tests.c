@@ -259,6 +259,40 @@ static void test_parser_table_access_modes(elf_State *state)
 	expect_ast_atom(dot_field ? dot_field->binary.y : 0, "name", "dot field key identifier");
 }
 
+static void test_parser_open_range_indexes(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "ret t[...]\nret t[2 ...]\nret t[... 4]");
+
+	Ast full_ret = parser_test_stat(file, 0, AST_RETURN, "parse fully open range index return");
+	Ast full_index = parser_test_tuple_item(full_ret->return_stat.expr, 0, AST_RANGE_INDEX,
+		"fully open brackets parse as range index");
+	Ast full_range = full_index ? full_index->binary.y : 0;
+	expect_ast_kind(full_range, AST_RANGE, "fully open range index stores range");
+	if (full_range && (full_range->binary.x || full_range->binary.y)) {
+		test_fail("fully open range keeps both endpoints omitted");
+	}
+
+	Ast tail_ret = parser_test_stat(file, 1, AST_RETURN, "parse open-ended range index return");
+	Ast tail_index = parser_test_tuple_item(tail_ret->return_stat.expr, 0, AST_RANGE_INDEX,
+		"open-ended brackets parse as range index");
+	Ast tail_range = tail_index ? tail_index->binary.y : 0;
+	expect_ast_kind(tail_range, AST_RANGE, "open-ended range index stores range");
+	expect_ast_i64(tail_range ? tail_range->binary.x : 0, 2, "open-ended range keeps lower bound");
+	if (tail_range && tail_range->binary.y) {
+		test_fail("open-ended range keeps upper bound omitted");
+	}
+
+	Ast prefix_ret = parser_test_stat(file, 2, AST_RETURN, "parse open-start range index return");
+	Ast prefix_index = parser_test_tuple_item(prefix_ret->return_stat.expr, 0, AST_RANGE_INDEX,
+		"open-start brackets parse as range index");
+	Ast prefix_range = prefix_index ? prefix_index->binary.y : 0;
+	expect_ast_kind(prefix_range, AST_RANGE, "open-start range index stores range");
+	if (prefix_range && prefix_range->binary.x) {
+		test_fail("open-start range keeps lower bound omitted");
+	}
+	expect_ast_i64(prefix_range ? prefix_range->binary.y : 0, 4, "open-start range keeps upper bound");
+}
+
 static void test_parser_function_expression(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "add := fun(a, b) { ret a + b }");
@@ -344,6 +378,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_call_with_table_argument(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);
+	test_parser_open_range_indexes(state);
 	test_parser_function_expression(state);
 	test_parser_get_mem_macro(state);
 	test_parser_integer_literal_boundaries(state);

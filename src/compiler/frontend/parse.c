@@ -886,6 +886,9 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	return left;
 }
 
+// array_index_postfix ::= "[" index_expr ("," index_expr)* "]"
+// index_expr           ::= expr | expr? "..." expr?
+// Comma-separated indexes are chained: value[x, y] is value[x][y].
 static Ast parse_array_index_postfix(Parser *par, Ast value)
 {
 	Token tok = take_token(par, TOK_SQUARE_LEFT);
@@ -894,6 +897,16 @@ static Ast parse_array_index_postfix(Parser *par, Ast value)
 	{
 		Ast index = parse_expr(par);
 		if (ast_is_missing_or_error(index)) goto _err;
+		if (index->kind == AST_ELLIPSIS)
+		{
+			Ast right = 0;
+			if (!peek_token(par, TOK_SQUARE_RIGHT) && !peek_token(par, TOK_COMMA))
+			{
+				right = parse_expr(par);
+				if (ast_is_missing_or_error(right)) goto _err;
+			}
+			index = create_binary_ast(par, index->site, AST_RANGE, 0, right);
+		}
 
 		if (index->kind == AST_TUPLE)
 		{
@@ -991,8 +1004,13 @@ static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 
 		consume_token(parser);
 
-		Ast y = parse_subexpr(parser, inner_precedence);
-		if (ast_is_missing_or_error(y))
+		Ast y = 0;
+		if (ast_type != AST_RANGE ||
+			(!peek_token(parser, TOK_SQUARE_RIGHT) && !peek_token(parser, TOK_COMMA)))
+		{
+			y = parse_subexpr(parser, inner_precedence);
+		}
+		if (ast_is_missing_or_error(y) && !(ast_type == AST_RANGE && !y))
 		{
 			parser_error(parser, ERROR_INVALID_EXPRESSION, tok.site, "expected expression after binary operator");
 			x = ERROR_AST;
