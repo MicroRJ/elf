@@ -64,7 +64,6 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 #include "runtime/libs/l_path.c"
 #include "runtime/libs/l_fs.c"
 #include "runtime/libs/l_process.c"
-#include "runtime/libs/l_os.c"
 #include "runtime/libs/l_time.c"
 #include "runtime/libs/l_table.c"
 #include "runtime/libs/l_string.c"
@@ -148,7 +147,6 @@ static void bootstrap_standard_libraries(elf_State *state)
 	table_set_atom_table(state, elf_table, "path", elf_lib_path(state));
 	table_set_atom_table(state, elf_table, "fs", elf_lib_fs(state));
 	table_set_atom_table(state, elf_table, "process", elf_lib_process(state));
-	table_set_atom_table(state, elf_table, "os", elf_lib_os(state));
 	table_set_atom_table(state, elf_table, "time", elf_lib_time(state));
 
 	state->globals = elf_push_new_table(state);

@@ -4,6 +4,8 @@
 typedef struct elf_State elf_State;
 typedef struct elf_String elf_String;
 
+#define ELF_ATOM_MAX_SIZE 0xffffu
+
 struct elf_String
 {
 	elf_Object  obj;

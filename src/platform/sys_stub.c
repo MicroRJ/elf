@@ -74,12 +74,14 @@ int elf_platform_process_id() {
 }
 
 
-int elf_platform_work_dir(int length, char *buffer) {
+int elf_platform_work_dir(char *buffer, int length) {
+	(void)buffer;
+	(void)length;
 	return 0;
 }
 
 
-int elf_platform_set_work_dir(char *buffer) {
+int elf_platform_set_work_dir(const char *buffer) {
 	return !chdir(buffer);
 }
 

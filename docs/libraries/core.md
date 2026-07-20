@@ -253,4 +253,4 @@ API:
 - `elf.debug` — runtime diagnostic counters
 - `elf.serialization` — serialization and JSON loading
 - `elf.fs` — filesystem operations
-- `elf.math`, `elf.random`, `elf.path`, `elf.process`, `elf.os`, and `elf.time`
+- `elf.math`, `elf.random`, `elf.path`, `elf.process`, and `elf.time`

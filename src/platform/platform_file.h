@@ -7,14 +7,6 @@
 
 #include "platform_types.h"
 
-typedef struct
-{
-	elf_PlatformFileTime create;
-	elf_PlatformFileTime write;
-	elf_PlatformFileTime access;
-}
-elf_PlatformFileTimes;
-
 typedef enum
 {
 	ELF_PLATFORM_CREATE_ALWAYS,
@@ -52,6 +44,16 @@ typedef enum
 }
 elf_PlatformFileType;
 
+typedef struct
+{
+	elf_PlatformFileType type;
+	i64 size_bytes;
+	i64 created_unix_ms;
+	i64 accessed_unix_ms;
+	i64 modified_unix_ms;
+}
+elf_PlatformFileInfo;
+
 elf_PlatformFile elf_platform_open_file(const char *name, int access, int options);
 void elf_platform_close_file(elf_PlatformFile file);
 i64 elf_platform_file_size(elf_PlatformFile file);
@@ -62,8 +64,7 @@ void elf_platform_flush_file(elf_PlatformFile file);
 
 b32 elf_platform_delete_file(const char *name);
 int elf_platform_make_dir(const char *path);
-int elf_platform_file_times(elf_PlatformFile file, elf_PlatformFileTimes *times);
-void elf_platform_file_time_to_system_time(elf_PlatformFileTime *filetime, elf_PlatformSystemTime *system_time);
+b32 elf_platform_get_file_info(const char *path, elf_PlatformFileInfo *info);
 
 #if defined(PATH_BUILDER)
 typedef struct

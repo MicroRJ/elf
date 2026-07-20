@@ -55,8 +55,6 @@
 #include "platform.h"
 
 STATIC_ASSERT(sizeof(elf_PlatformFile) >= sizeof(HANDLE));
-STATIC_ASSERT(sizeof(elf_PlatformFileTime) == sizeof(FILETIME));
-STATIC_ASSERT(sizeof(elf_PlatformSystemTime) == sizeof(SYSTEMTIME));
 
 static HANDLE win32_handle(elf_PlatformFile file)
 {
@@ -66,16 +64,6 @@ static HANDLE win32_handle(elf_PlatformFile file)
 static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
 {
 	return (elf_PlatformFile)(uintptr_t)handle;
-}
-
-static FILETIME *win32_file_time(elf_PlatformFileTime *time)
-{
-	return (FILETIME *)time;
-}
-
-static SYSTEMTIME *win32_system_time(elf_PlatformSystemTime *time)
-{
-	return (SYSTEMTIME *)time;
 }
 
 #include "platform_console_win32.c"

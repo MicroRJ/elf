@@ -186,15 +186,22 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 
 	elf_Value fs_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "fs"));
 	expect_table_value(fs_value, "elf.fs is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(fs_value), test_key_atom(state, "read")), "elf.fs.read is a field function");
+	elf_Table *fs_table = value_as_table(fs_value);
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "file_exists")), "elf.fs.file_exists is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "read_text_file")), "elf.fs.read_text_file is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "write_text_file")), "elf.fs.write_text_file is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "get_file_info")), "elf.fs.get_file_info is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "create_directory")), "elf.fs.create_directory is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "remove_file")), "elf.fs.remove_file is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "get_working_directory")), "elf.fs.get_working_directory is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "set_working_directory")), "elf.fs.set_working_directory is a field function");
+	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "read")), "old elf.fs.read binding is absent");
 
 	elf_Value process_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "process"));
 	expect_table_value(process_value, "elf.process is a table");
 	expect_function_value(elf_table_get_or_nil(state, value_as_table(process_value), test_key_atom(state, "run")), "elf.process.run is a field function");
 
-	elf_Value os_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "os"));
-	expect_table_value(os_value, "elf.os is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(os_value), test_key_atom(state, "cwd")), "elf.os.cwd is a field function");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "os")), "empty elf.os library is absent");
 
 	elf_Value time_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "time"));
 	expect_table_value(time_value, "elf.time is a table");

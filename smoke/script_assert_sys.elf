@@ -3,19 +3,35 @@ missing := "build/sys_smoke_missing.txt"
 fs := elf.fs
 path_lib := elf.path
 
-fs.remove(path)
-fs.remove(missing)
+fs.remove_file(path)
+fs.remove_file(missing)
 
-test_assert(fs.read(missing) == nil)
-test_assert(fs.exists(missing) == 0)
+test_assert(fs.read_text_file(missing) == nil)
+test_assert(fs.file_exists(missing) == 0)
+test_assert(fs.file_exists("build") == 0)
 
-test_assert(fs.write(path, "hello fs") == 1)
-test_assert(fs.read(path) == "hello fs")
-test_assert(fs.exists(path) == 1)
+test_assert(fs.write_text_file(path, "hello fs") == 1)
+test_assert(fs.read_text_file(path) == "hello fs")
+test_assert(fs.file_exists(path) == 1)
 
-info := fs.stat(path)
+info := fs.get_file_info(path)
 test_assert(info != nil)
-test_assert(info.size == 8)
+test_assert(info.size_bytes == 8)
+test_assert(info.created_unix_ms > 0)
+test_assert(info.accessed_unix_ms > 0)
+test_assert(info.modified_unix_ms > 0)
+
+working_directory := fs.get_working_directory()
+test_assert(working_directory != nil)
+test_assert(fs.set_working_directory(working_directory) == 1)
+
+test_assert(fs.exists == nil)
+test_assert(fs.read == nil)
+test_assert(fs.write == nil)
+test_assert(fs.stat == nil)
+test_assert(fs.mkdir == nil)
+test_assert(fs.remove == nil)
+test_assert(elf.os == nil)
 
 test_assert(path_lib.join("some/path", "name.ext") == "some/path/name.ext")
 test_assert(path_lib.filename("some/path/name.ext") == "name.ext")
@@ -46,7 +62,7 @@ test_assert(missing_run.success == 0)
 test_assert(missing_run.error_code != 0)
 test_assert(missing_run.error != nil)
 
-test_assert(fs.remove(path) == 1)
-test_assert(fs.read(path) == nil)
+test_assert(fs.remove_file(path) == 1)
+test_assert(fs.read_text_file(path) == nil)
 
 ret 77

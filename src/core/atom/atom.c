@@ -107,7 +107,7 @@ elf_String *elf_atom_from_data_size_id(elf_State *state, const char *data, u32 s
 {
 	ASSERT(state);
 	ASSERT(data);
-	ASSERT(size <= 0xffff);
+	ASSERT(size <= ELF_ATOM_MAX_SIZE);
 
 	u32 hash = atom_hash_data(data, size);
 	elf_String *interned = atom_find(state, data, size, hash);

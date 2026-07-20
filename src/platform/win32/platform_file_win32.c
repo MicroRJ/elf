@@ -45,14 +45,14 @@ i64 elf_platform_file_size(elf_PlatformFile file)
 i64 elf_platform_read_file(elf_PlatformFile file, void *buf, i64 size)
 {
 	DWORD read = 0;
-	ReadFile(win32_handle(file), buf, (DWORD)size, &read, NULL);
+	if (!ReadFile(win32_handle(file), buf, (DWORD)size, &read, NULL)) return -1;
 	return read;
 }
 
 i64 elf_platform_write_file(elf_PlatformFile file, void *buf, i64 size)
 {
 	DWORD wrote = 0;
-	WriteFile(win32_handle(file), buf, (DWORD)size, &wrote, NULL);
+	if (!WriteFile(win32_handle(file), buf, (DWORD)size, &wrote, NULL)) return -1;
 	return wrote;
 }
 
@@ -84,14 +84,34 @@ b32 elf_platform_delete_file(const char *path)
 	return DeleteFileA(path);
 }
 
-int elf_platform_file_times(elf_PlatformFile file, elf_PlatformFileTimes *times)
+static i64 win32_file_time_to_unix_ms(FILETIME time)
 {
-	return GetFileTime(win32_handle(file), win32_file_time(&times->create), win32_file_time(&times->access), win32_file_time(&times->write));
+	ULARGE_INTEGER ticks;
+	ticks.LowPart = time.dwLowDateTime;
+	ticks.HighPart = time.dwHighDateTime;
+	const u64 unix_epoch_ticks = 116444736000000000ull;
+	if (ticks.QuadPart < unix_epoch_ticks) return 0;
+	return (i64)((ticks.QuadPart - unix_epoch_ticks) / 10000ull);
 }
 
-void elf_platform_file_time_to_system_time(elf_PlatformFileTime *filetime, elf_PlatformSystemTime *system_time)
+b32 elf_platform_get_file_info(const char *path, elf_PlatformFileInfo *info)
 {
-	FileTimeToSystemTime(win32_file_time(filetime), win32_system_time(system_time));
+	WIN32_FILE_ATTRIBUTE_DATA data;
+	if (!GetFileAttributesExA(path, GetFileExInfoStandard, &data)) return false;
+
+	info->type = ELF_PLATFORM_FILE;
+	if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) info->type = ELF_PLATFORM_SYMLINK;
+	else if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) info->type = ELF_PLATFORM_FOLDER;
+
+	ULARGE_INTEGER size;
+	size.LowPart = data.nFileSizeLow;
+	size.HighPart = data.nFileSizeHigh;
+	if (size.QuadPart > 0x7fffffffffffffffull) return false;
+	info->size_bytes = (i64)size.QuadPart;
+	info->created_unix_ms = win32_file_time_to_unix_ms(data.ftCreationTime);
+	info->accessed_unix_ms = win32_file_time_to_unix_ms(data.ftLastAccessTime);
+	info->modified_unix_ms = win32_file_time_to_unix_ms(data.ftLastWriteTime);
+	return true;
 }
 
 #if defined(PATH_BUILDER)

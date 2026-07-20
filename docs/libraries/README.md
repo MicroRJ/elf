@@ -11,5 +11,7 @@ current implementation rather than promising long-term compatibility.
 
 - [Core](core.md) — assertions, value inspection, conversions, caller
   introspection, source loading, and standard output.
+- [Filesystem](fs.md) — regular text files, metadata, directories, and the
+  process working directory.
 
-The filesystem and remaining sublibraries are not documented yet.
+The remaining sublibraries are not documented yet.
