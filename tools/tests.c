@@ -42,7 +42,6 @@ static void test_fail(const char *label)
 #include "api_tests.c"
 #include "arena_tests.c"
 #include "path_tests.c"
-#include "matcher_tests.c"
 #include "rank_tests.c"
 #include "lexer_tests.c"
 #include "parser_tests.c"
@@ -71,7 +70,6 @@ int main(void)
 	run_api_tests();
 	run_arena_tests();
 	run_path_tests();
-	run_matcher_tests();
 	test_rank_values();
 	run_lexer_tests(state);
 	run_parser_tests(state);

@@ -34,6 +34,45 @@ static const char *string_find_data(const char *text, u32 text_size,
 	return 0;
 }
 
+static b32 string_glob_match_range(const char *text, u32 text_size,
+	const char *pattern, u32 pattern_size)
+{
+	if (pattern_size == 0) return text_size == 0;
+
+	if (pattern[0] == '*')
+	{
+		while (pattern_size > 1 && pattern[1] == '*') {
+			++pattern;
+			--pattern_size;
+		}
+		if (pattern_size == 1) return true;
+		for (u32 i = 0; i <= text_size; ++i) {
+			if (string_glob_match_range(text + i, text_size - i,
+				pattern + 1, pattern_size - 1)) return true;
+		}
+		return false;
+	}
+
+	if (text_size == 0) return false;
+	if (pattern[0] != '?' && pattern[0] != text[0]) return false;
+	return string_glob_match_range(text + 1, text_size - 1,
+		pattern + 1, pattern_size - 1);
+}
+
+static b32 string_glob_match_data(const char *text, u32 text_size,
+	const char *pattern, u32 pattern_size)
+{
+	u32 start = 0;
+	for (u32 i = 0; i <= pattern_size; ++i)
+	{
+		if (i < pattern_size && pattern[i] != '|') continue;
+		if (string_glob_match_range(text, text_size,
+			pattern + start, i - start)) return true;
+		start = i + 1;
+	}
+	return false;
+}
+
 static b32 string_normalize_index(elf_State *state, i64 index, u32 size,
 	b32 allow_end, u32 *result)
 {
@@ -154,7 +193,7 @@ ELF_FUNCTION(l_string_glob_match)
 {
 	elf_String *string = string_receiver(S);
 	elf_String *pattern = lib_load_string(S, 1);
-	b32 matches = elf_glob_match_sized(atom_data(string), atom_size(string),
+	b32 matches = string_glob_match_data(atom_data(string), atom_size(string),
 		atom_data(pattern), atom_size(pattern));
 	push_value(S, value_from_integer(matches));
 	return 1;
