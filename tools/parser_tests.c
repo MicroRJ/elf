@@ -167,6 +167,31 @@ static void test_parser_if_else_blocks(elf_State *state)
 	expect_ast_i64(value, 1, "parse return integer");
 }
 
+static void test_parser_for_identifier_tuple(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "for key, value := 0 ... 4 ? {}");
+	Ast loop = parser_test_stat(file, 0, AST_FOR, "parse for statement");
+	if (!loop) {
+		return;
+	}
+
+	Ast decl = loop->for_stat.decl;
+	expect_ast_kind(decl, AST_DECL_STAT, "for statement stores declaration");
+	if (!decl) {
+		return;
+	}
+
+	Ast key = parser_test_tuple_item(decl->decl.name, 0, AST_IDENT,
+		"for declaration parses first identifier");
+	Ast value = parser_test_tuple_item(decl->decl.name, 1, AST_IDENT,
+		"for declaration parses second identifier");
+	expect_ast_atom(key, "key", "for declaration keeps first identifier");
+	expect_ast_atom(value, "value", "for declaration keeps second identifier");
+	if (decl->decl.name->tuple.nargs != 2) {
+		test_fail("for declaration contains only its identifier list");
+	}
+}
+
 static void test_parser_call_with_table_argument(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "make {x = 1, 2}");
@@ -300,6 +325,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_string_atoms(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);
+	test_parser_for_identifier_tuple(state);
 	test_parser_call_with_table_argument(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);

@@ -16,10 +16,11 @@ statement     ::= block
                 | "break" expr?
                 | "continue" expr?
                 | "while" expr "?" statement
-                | "for" tuple_expr for_bind for_steps "?" statement
+                | "for" identifier_list for_bind for_steps "?" statement
                 | "if" if_tail
                 | expr_statement
 
+identifier_list ::= identifier ("," identifier)*
 for_bind      ::= ":=" | "::="
 if_tail       ::= expr "?" statement (("elif" if_tail) | ("else" statement))?
 ```
@@ -107,14 +108,27 @@ table.(a, b, c)    // field projection tuple: table.a, table.b, table.c
 
 ## For Steps
 
-`for_steps` are semicolon-separated steps. Each step is currently parsed as a
-tuple expression, then lowered according to the AST shape:
+The left side of a `for` header is an identifier list, not a general tuple
+expression. This makes invalid headers such as `for 1 := ...` and
+`for a + b := ...` parser errors instead of deferring that validation to
+lowering.
+
+`for_steps` are semicolon-separated steps. Each step is parsed as a tuple
+expression, then lowered according to the AST shape:
 
 ```text
 for i := 0 ... 24 ? { ... }          // range step
 for i := values[0 ... 24] ? { ... }  // array range step
 for i := 1; 2; 3 ? { ... }           // repeated value steps
+for i, j := 1, 2; 3, 4 ? { ... }     // repeated tuple-value steps
 ```
+
+A value step runs the body once and must produce exactly one value per loop
+identifier. Steps execute from left to right, so value and range steps may be
+mixed in the same loop.
+
+Numeric ranges are half-open. For a multi-identifier range, each iteration
+consumes consecutive values and advances the iterator by the identifier count:
 
 For a multi-name range declaration, each name receives an offset from the same
 iterator, and the iterator advances by the number of names:
@@ -122,6 +136,10 @@ iterator, and the iterator advances by the number of names:
 ```text
 for i, j, k := 0 ... 24 ? { ... }
 ```
+
+An indexed range such as `values[first ... last]` traverses that half-open
+slice. The collection and its endpoints are evaluated once before iteration.
+The loop body may be any statement, including a block.
 
 ## JSON
 

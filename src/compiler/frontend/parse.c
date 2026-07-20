@@ -461,6 +461,31 @@ static Ast parse_for_steps_expr(Parser *par)
 	return create_for_steps_ast(par, tok.site, args, nargs);
 }
 
+static Ast parse_for_identifier_tuple(Parser *parser)
+{
+	Token start = parser->tok;
+	u32 stack_start = parser->ast.stack_index;
+	u32 nargs = 0;
+
+	do
+	{
+		if (!peek_token(parser, TOK_IDENTIFIER))
+		{
+			parser_expected_token(parser, parser->tok, TOK_IDENTIFIER);
+			parser->ast.stack_index = stack_start;
+			return ERROR_AST;
+		}
+
+		Ast name = parse_ident_expr(parser);
+		push_ast(parser, name);
+		++ nargs;
+	}
+	while (pick_token(parser, TOK_COMMA));
+
+	Ast *names = pop_ast_array(parser, nargs);
+	return create_tuple_ast(parser, start.site, names, nargs);
+}
+
 static Ast parse_load_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_LOAD);
@@ -1199,7 +1224,7 @@ static Ast parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			Ast name = parse_tuple_expr(parser);
+			Ast name = parse_for_identifier_tuple(parser);
 			if (ast_is_missing_or_error(name)) {
 				return ERROR_AST;
 			}
