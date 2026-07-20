@@ -9,7 +9,7 @@
 #define TABLE_SLOT_NOT_FOUND        ((u32)(-1))
 
 
-static void checkwrite(elf_State *state, elf_Object *reference)
+static void check_write(elf_State *state, elf_Object *reference)
 {
 	if (reference->status & ELF_OBJECT_READONLY) {
 		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "attempted to write to readonly object");
@@ -210,7 +210,7 @@ b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key)
 
 b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Value *removed)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 
 	Entry *entry = table_find_entry(table->entries, table->nentries, key);
 	if (!entry) {
@@ -236,7 +236,7 @@ b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Valu
 
 void elf_table_clear(elf_State *state, elf_Table *table)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 	value_zero_many(table->array, table->count);
 	memset(table->entries, 0, table->nentries * sizeof(*table->entries));
 	table->count = 0;
@@ -288,7 +288,7 @@ u32 elf_table_ensure(elf_State *state, elf_Table *table, elf_Value key)
 
 u32 elf_table_bind_to_index(elf_State *state, elf_Table *table, elf_Value key, u32 index)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 
 	check_array_index(state, NO_BYTE, index, table->count);
 
@@ -306,7 +306,7 @@ u32 elf_table_bind_to_index(elf_State *state, elf_Table *table, elf_Value key, u
 
 u32 elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value value)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 
 	u32 index = elf_table_ensure(state, table, key);
 	table->array[index] = value;
@@ -320,7 +320,7 @@ u32 elf_array_length(elf_Table *table)
 
 u32 elf_array_add(elf_State *state, elf_Table *table, elf_Value value)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 
 	table_array_reserve(table, table->count + 1);
 	u32 index = table->count++;
@@ -335,14 +335,14 @@ elf_Value elf_array_get(elf_State *state, elf_Table *table, u32 index)
 
 void elf_array_set(elf_State *state, elf_Table *table, u32 index, elf_Value value)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 
 	*table_array_slot(state, table, index) = value;
 }
 
 void elf_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 
 	if (index > table->count || count > table->count - index) {
 		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE
@@ -365,7 +365,7 @@ void elf_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
 
 u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value value)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 	if (index > table->count) {
 		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
 			"array insert index %u is out of bounds for length %u", index, table->count);
@@ -387,7 +387,7 @@ u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value va
 
 void elf_array_swap(elf_State *state, elf_Table *table, u32 left, u32 right)
 {
-	checkwrite(state, (elf_Object *)table);
+	check_write(state, (elf_Object *)table);
 	value_swap(table_array_slot(state, table, left), table_array_slot(state, table, right));
 }
 
@@ -400,24 +400,3 @@ void elf_table_mark_field_readonly(elf_State *state, elf_Table *table, elf_Value
 
 	entry_mark_readonly(&table->entries[slot]);
 }
-
-//
-// Note for myself:
-//
-// The hash-table implementations I know, mainly from stb, do something to hash
-// integer bits, and so I did the same thing.
-//
-// One day however I decided to get rid of it because in my head I couldn't see
-// how it could possibly make a difference. I mean, it's already an integer,
-// right?
-//
-// Then as I kept making games that relied more and more on integer lookups, I
-// started noticing unusually high CPU usage and significantly lower FPS.
-//
-// I don't remember exactly how I figured this out. I think maybe by stepping
-// through with the debugger and seeing how many hash misses an integer lookup
-// would get.
-//
-// So yes, integer hashing is crucial. The performance drop was because of all
-// the time spent doing lookups after all the misses.
-//
