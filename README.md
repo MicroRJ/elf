@@ -32,18 +32,27 @@ add_10 := make_adder(10)
 
 ## Build
 
-A batch file is provided that builds elf.
+The repository includes a Windows x64 Bob bootstrap executable. No separate
+Bob installation is required:
 
 ```bat
 build.bat
 ```
-You must have the developer environment setup.
 
-If you have 'Bob', just do:
+Arguments are passed through to Bob, so the test entry can be run with:
 
 ```bat
-bob
+build.bat test
 ```
+
+The bootstrap executable can also be invoked directly:
+
+```bat
+bootstrap\windows-x64\bob.exe
+```
+
+A compatible C compiler and linker are still required. If Bob is installed on
+`PATH`, invoking `bob` directly continues to work.
 
 ## More
 

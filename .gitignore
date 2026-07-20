@@ -4,6 +4,7 @@
 build/*
 *.ilk
 *.exe
+!bootstrap/windows-x64/bob.exe
 *.pdb
 *.obj
 *.asm
