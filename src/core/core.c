@@ -56,6 +56,13 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 	return table;
 }
 
+elf_Table *elf_push_new_table(elf_State *state)
+{
+	elf_Table *table = elf_new_table_rogue(state);
+	push_table(state, table);
+	return table;
+}
+
 #include "runtime/libs/l_math.c"
 #include "runtime/libs/l_native.c"
 #include "runtime/libs/l_core.c"
@@ -172,8 +179,8 @@ static void bootstrap_state(elf_State *state)
 	elf_init_compiler_atoms(state);
 	bootstrap_base_frame(state);
 	bootstrap_standard_libraries(state);
-	state->api_references = elf_new_table_rogue(state);
-	state->api_next_reference = 1;
+	state->ref_table = elf_new_table_rogue(state);
+	state->next_ref = 1;
 	reserve_bootstrap_frame_stack_space(state);
 }
 

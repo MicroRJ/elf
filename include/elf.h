@@ -2,7 +2,7 @@
 #define ELF_H
 
 #define ELF_VERSION "0.1.0-dev"
-#define ELF_STACK_API_VERSION 1
+#define ELF_API_VERSION 1
 
 typedef signed char        elf_i8;
 typedef unsigned char      elf_u8;
@@ -70,38 +70,38 @@ int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_code_file(elf_State *state, const char *name);
 
-elf_i32 elf_stack_get_top(elf_State *state);
-elf_i32 elf_stack_arg_count(elf_State *state);
-elf_i32 elf_stack_abs_index(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_is_valid(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_set_top(elf_State *state, elf_i32 top);
-elf_b32 elf_stack_pop(elf_State *state, elf_u32 count);
-elf_b32 elf_stack_push_value(elf_State *state, elf_i32 index);
+elf_i32 elf_get_top(elf_State *state);
+elf_i32 elf_arg_count(elf_State *state);
+elf_i32 elf_abs_index(elf_State *state, elf_i32 index);
+elf_b32 elf_is_valid(elf_State *state, elf_i32 index);
+elf_b32 elf_set_top(elf_State *state, elf_i32 top);
+elf_b32 elf_pop(elf_State *state, elf_u32 count);
+elf_b32 elf_push_value(elf_State *state, elf_i32 index);
 
-elf_ValueType elf_stack_type(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_is_nil(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_is_numeric(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_is_callable(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_to_int(elf_State *state, elf_i32 index, elf_Integer *value);
-elf_b32 elf_stack_to_num(elf_State *state, elf_i32 index, elf_Number *value);
-elf_b32 elf_stack_to_str(elf_State *state, elf_i32 index, elf_StrSlice *value);
+elf_ValueType elf_type(elf_State *state, elf_i32 index);
+elf_b32 elf_is_nil(elf_State *state, elf_i32 index);
+elf_b32 elf_is_numeric(elf_State *state, elf_i32 index);
+elf_b32 elf_is_callable(elf_State *state, elf_i32 index);
+elf_b32 elf_to_int(elf_State *state, elf_i32 index, elf_Integer *value);
+elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *value);
+elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *value);
 
-void elf_stack_new_table(elf_State *state);
-elf_b32 elf_stack_length(elf_State *state, elf_i32 index, elf_u32 *length);
-elf_b32 elf_stack_get_field(elf_State *state, elf_i32 index, const char *field);
-elf_b32 elf_stack_set_field(elf_State *state, elf_i32 index, const char *field);
-elf_b32 elf_stack_get_index(elf_State *state, elf_i32 index, elf_u32 element);
-elf_b32 elf_stack_set_index(elf_State *state, elf_i32 index, elf_u32 element);
-elf_b32 elf_stack_add(elf_State *state, elf_i32 index);
-elf_b32 elf_stack_next(elf_State *state, elf_i32 index, elf_u32 *cursor);
-elf_b32 elf_stack_equal(elf_State *state, elf_i32 left, elf_i32 right);
+void elf_new_table(elf_State *state);
+elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length);
+elf_b32 elf_get_field(elf_State *state, elf_i32 index, const char *field);
+elf_b32 elf_set_field(elf_State *state, elf_i32 index, const char *field);
+elf_b32 elf_get_index(elf_State *state, elf_i32 index, elf_u32 element);
+elf_b32 elf_set_index(elf_State *state, elf_i32 index, elf_u32 element);
+elf_b32 elf_append(elf_State *state, elf_i32 index);
+elf_b32 elf_next(elf_State *state, elf_i32 index, elf_u32 *cursor);
+elf_b32 elf_equal(elf_State *state, elf_i32 left, elf_i32 right);
 
-void elf_stack_get_global(elf_State *state, const char *name);
-elf_b32 elf_stack_set_global(elf_State *state, const char *name);
+void elf_get_global(elf_State *state, const char *name);
+elf_b32 elf_set_global(elf_State *state, const char *name);
 
-elf_Ref elf_stack_create_ref(elf_State *state, elf_i32 index);
+elf_Ref elf_create_ref(elf_State *state, elf_i32 index);
 elf_b32 elf_push_ref(elf_State *state, elf_Ref reference);
-elf_b32 elf_stack_release_ref(elf_State *state, elf_Ref reference);
+elf_b32 elf_release_ref(elf_State *state, elf_Ref reference);
 
 #endif
 

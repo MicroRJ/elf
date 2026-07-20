@@ -12,7 +12,7 @@ ELF_FUNCTION(vm_test_assert)
 static void vm_test_install_bindings(elf_State *state)
 {
 	elf_push_fun(state, vm_test_assert);
-	if (!elf_stack_set_global(state, "test_assert")) {
+	if (!elf_set_global(state, "test_assert")) {
 		test_fail("VM test binding registration");
 	}
 }

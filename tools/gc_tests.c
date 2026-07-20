@@ -69,14 +69,14 @@ static void test_gc_keeps_referenced_table_graph(void)
 {
 	elf_State *state = elf_create_state();
 	u32 baseline_count = state->gc_reference_count;
-	elf_i32 stack_checkpoint = elf_stack_get_top(state);
+	elf_i32 stack_checkpoint = elf_get_top(state);
 	elf_Table *root = elf_push_new_table(state);
 	elf_Table *child = elf_push_new_table(state);
 
 	elf_array_add(state, child, test_value_int(42));
 	elf_array_add(state, root, value_from_table(child));
-	elf_Ref reference = elf_stack_create_ref(state, -2);
-	elf_stack_set_top(state, stack_checkpoint);
+	elf_Ref reference = elf_create_ref(state, -2);
+	elf_set_top(state, stack_checkpoint);
 
 	force_gc_allocations(state, 256);
 	if (!elf_push_ref(state, reference)) {
@@ -89,8 +89,8 @@ static void test_gc_keeps_referenced_table_graph(void)
 	expect_int(elf_array_get(state, value_as_table(child_value), 0), 42,
 		"table reference preserves child contents");
 
-	elf_stack_pop(state, 1);
-	elf_stack_release_ref(state, reference);
+	elf_pop(state, 1);
+	elf_release_ref(state, reference);
 	force_gc_allocations(state, 256);
 	expect_gc_reference_count_below(state, baseline_count + 8,
 		"released table reference becomes collectible");
@@ -101,20 +101,20 @@ static void test_gc_keeps_referenced_string(void)
 	elf_State *state = elf_create_state();
 	u32 baseline_count = state->gc_reference_count;
 	elf_push_cstr(state, "externally rooted string");
-	elf_Ref reference = elf_stack_create_ref(state, -1);
-	elf_stack_pop(state, 1);
+	elf_Ref reference = elf_create_ref(state, -1);
+	elf_pop(state, 1);
 
 	force_gc_allocations(state, 256);
 	elf_StrSlice string = {};
 	if (!elf_push_ref(state, reference)
-	|| !elf_stack_to_str(state, -1, &string)
+	|| !elf_to_str(state, -1, &string)
 	|| string.size != 24
 	|| memcmp(string.data, "externally rooted string", 24) != 0) {
 		test_fail("string reference survives GC");
 	}
 
-	elf_stack_pop(state, 1);
-	elf_stack_release_ref(state, reference);
+	elf_pop(state, 1);
+	elf_release_ref(state, reference);
 	force_gc_allocations(state, 256);
 	expect_gc_reference_count_below(state, baseline_count + 8,
 		"released string reference becomes collectible");
