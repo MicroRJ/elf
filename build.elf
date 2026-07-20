@@ -58,6 +58,7 @@ source_specs := {
 	{ name = "core",           path = "src/core/core.c" },
 	{ name = "compiler",       path = "src/compiler/compiler.c" },
 	{ name = "elf_api",        path = "src/api/elf_api.c" },
+	{ name = "elf_stack_api",  path = "src/api/elf_stack_api.c" },
 }
 
 tool_specs := {

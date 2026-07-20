@@ -113,6 +113,8 @@ struct elf_State
 	struct
 	{
 		elf_Table   *globals;
+		elf_Table   *api_references;
+		u32          api_next_reference;
 
 		u32          stack_size;
 		elf_Value   *stack_ptr;

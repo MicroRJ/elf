@@ -164,6 +164,9 @@ static u32 gc_collect(elf_State *state)
 {
 	// Time time = prof_get_time();
 	u32 marked_count = gc_mark_stack(state);
+	if (state->api_references) {
+		marked_count += gc_mark_reachable(state, (elf_Object *)state->api_references);
+	}
 	marked_count += gc_mark_external_refs(state);
 	marked_count += gc_mark_metatables(state);
 	marked_count += gc_mark_interned_ids(state);

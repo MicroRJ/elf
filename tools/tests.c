@@ -39,6 +39,7 @@ static void test_fail(const char *label)
 #include "atom_tests.c"
 #include "table_tests.c"
 #include "gc_tests.c"
+#include "stack_api_tests.c"
 #include "arena_tests.c"
 #include "path_tests.c"
 #include "matcher_tests.c"
@@ -67,6 +68,7 @@ int main(void)
 	run_atom_tests(state);
 	run_table_tests(state);
 	run_gc_tests();
+	run_stack_api_tests();
 	run_arena_tests();
 	run_path_tests();
 	run_matcher_tests();
