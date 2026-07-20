@@ -562,24 +562,24 @@ static Token lex_token(Lexer *lexer)
 	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && *cur == '}' && lexer->mode.depth == 0)
 	{
 		if (lexer->mode_index == 0) {
-			log_source_error(lexer, source_site_from_ptr(lexer, lexer->mode.string_start), "invalid interpolated string");
+			log_source_error(lexer, lexer->mode.string_site, "invalid interpolated string");
 		}
 
 		cur += 1;
 		b32 ended;
-		token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, lexer->mode.string_start), lexer->mode.is_block_string, &ended);
+		token.atom = lex_string_part(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, &ended);
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
 		if (ended) {
 			if (lexer->mode_index <= 0) {
-				log_source_error(lexer, source_site_from_ptr(lexer, lexer->mode.string_start), "invalid interpolated string");
+				log_source_error(lexer, lexer->mode.string_site, "invalid interpolated string");
 				return token;
 			}
 			lexer->mode = lexer->mode_stack[-- lexer->mode_index];
 		}
 		else {
-			lexer->mode.depth               = 0;
-			lexer->mode.interpolation_start = cur;
+			lexer->mode.depth              = 0;
+			lexer->mode.interpolation_site = source_site_from_ptr(lexer, cur);
 		}
 		goto update_lexer;
 	}
@@ -603,20 +603,20 @@ static Token lex_token(Lexer *lexer)
 					return token;
 				}
 
-				char *string_start = cur;
+				SourceSite string_site = source_site_from_ptr(lexer, cur);
 
 				b32 is_block = cur[2] == '"' && cur[3] == '"';
 				cur += 2 + is_block * 2;
 
 				b32 ended;
-				token.atom = lex_string_part(lexer, &cur, source_site_from_ptr(lexer, string_start), is_block, &ended);
+				token.atom = lex_string_part(lexer, &cur, string_site, is_block, &ended);
 				token.type = ended ? TOK_STRING : TOK_STRING_START;
 				if (!ended)
 				{
 					lexer->mode_stack[lexer->mode_index ++] = lexer->mode;
 					lexer->mode.type = LEXER_MODE_INTERPOLATION;
-					lexer->mode.interpolation_start = cur;
-					lexer->mode.string_start = string_start;
+					lexer->mode.interpolation_site = source_site_from_ptr(lexer, cur);
+					lexer->mode.string_site = string_site;
 					lexer->mode.is_block_string = is_block;
 					lexer->mode.depth = 0;
 				}

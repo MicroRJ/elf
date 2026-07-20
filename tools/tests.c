@@ -10,7 +10,7 @@
 #include "compiler.h"
 #include "token.h"
 #include "ast.h"
-#include "parse.h"
+#include "parser.h"
 #include "ir.h"
 #include "lower.h"
 #include "bytecode_debug.h"

@@ -15,11 +15,11 @@ LexerModeType;
 
 typedef struct
 {
-	LexerModeType           type;
-	i32                    depth;
-	char           *string_start;
-	char    *interpolation_start;
-	b32          is_block_string;
+	LexerModeType type;
+	i32           depth;
+	SourceSite    string_site;
+	SourceSite    interpolation_site;
+	b32           is_block_string;
 }
 LexerMode;
 
