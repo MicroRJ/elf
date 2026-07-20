@@ -12,6 +12,9 @@ source -> lexer -> AST -> Ir -> bytecode -> VM
 The current syntax and language behavior are documented in
 [docs/grammar.md](docs/grammar.md).
 
+The standard-library reference begins at
+[docs/libraries/README.md](docs/libraries/README.md).
+
 ## Current Shape
 
 - Hand-written lexer and parser.
