@@ -2,11 +2,6 @@
 // Optional batteries for the official Windows host.
 //
 
-#define _CRT_SECURE_NO_WARNINGS
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-
-#include <windows.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,21 +11,6 @@
 #undef ELF_VERSION
 #include "elf_batteries.h"
 #include "battery_helpers.h"
-#include "battery_console.h"
-
-_Static_assert(sizeof(elf_PlatformFile) >= sizeof(HANDLE), "file handle is too small");
-
-static HANDLE win32_handle(elf_PlatformFile file)
-{
-	return (HANDLE)(uintptr_t)file;
-}
-
-static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
-{
-	return (elf_PlatformFile)(uintptr_t)handle;
-}
-
-#include "win32/battery_console_win32.c"
 
 #include "libs/l_core_io.c"
 #include "libs/l_load_file.c"

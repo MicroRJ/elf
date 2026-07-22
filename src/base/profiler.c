@@ -91,7 +91,7 @@ void prof_begin_capture(void)
 {
 	zero_memory(&prof_thread, sizeof(prof_thread));
 	prof_thread.enabled = true;
-	prof_thread.begin_ticks = elf_platform_counter();
+	prof_thread.begin_ticks = (i64)platform_counter();
 }
 
 ProfScope prof_scope_begin(ProfSite *site)
@@ -108,7 +108,7 @@ ProfScope prof_scope_begin(ProfSite *site)
 	u32 stack_index = (u32)prof_thread.stack_count++;
 	ProfEntry *entry = prof_thread.stack + stack_index;
 	entry->field = field;
-	entry->start = elf_platform_counter();
+	entry->start = (i64)platform_counter();
 	entry->child_ticks = 0;
 
 	scope.field = field;
@@ -128,7 +128,7 @@ void prof_scope_end(ProfScope *scope)
 	ProfEntry entry = prof_thread.stack[--prof_thread.stack_count];
 	ASSERT(entry.field == (ProfField *)scope->field);
 
-	i64 elapsed = elf_platform_counter() - entry.start;
+	i64 elapsed = (i64)platform_counter() - entry.start;
 	i64 self = elapsed - entry.child_ticks;
 	entry.field->inclusive_ticks += elapsed;
 	entry.field->self_ticks += self;
@@ -174,8 +174,8 @@ void prof_dump(void)
 		return;
 	}
 	ASSERT(prof_thread.stack_count == 0);
-	i64 end_ticks = elf_platform_counter();
-	i64 frequency = elf_platform_counter_frequency();
+	i64 end_ticks = (i64)platform_counter();
+	i64 frequency = (i64)platform_counter_frequency();
 	ProfField *fields[PROF_MAX_FIELDS];
 	u32 count = 0;
 

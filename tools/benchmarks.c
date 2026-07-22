@@ -11,13 +11,13 @@ static volatile elf_Integer bench_sink;
 
 static i64 bench_now(void)
 {
-	return elf_platform_counter();
+	return (i64)platform_counter();
 }
 
 static double bench_elapsed_s(i64 start)
 {
-	i64 elapsed = elf_platform_counter() - start;
-	return elapsed / (double) elf_platform_counter_frequency();
+	i64 elapsed = (i64)platform_counter() - start;
+	return elapsed / (double)platform_counter_frequency();
 }
 
 static elf_Value bench_atom_key(elf_State *state, const char *text)

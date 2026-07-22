@@ -17,7 +17,6 @@ include_dirs := {
 	"src/core/value",
 	"src/core/table",
 	"src/core/atom",
-	"src/platform",
 	"src/compiler",
 	"src/compiler/frontend",
 	"src/compiler/middle",
@@ -25,6 +24,7 @@ include_dirs := {
 	"batteries",
 	"batteries/internal",
 	"include",
+	"platform/include",
 	"stb",
 }
 
@@ -88,7 +88,6 @@ compile_source := fun(name, source, includes, dependency_includes) {
 
 elf_sources := {
 	{ name = "base",           path = "src/base/base.c" },
-	{ name = "platform",       path = "src/platform/win32/platform_win32.c" },
 	{ name = "value",          path = "src/core/value/value.c" },
 	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
 	{ name = "bytecode_debug", path = "src/compiler/backend/bytecode_debug.c" },

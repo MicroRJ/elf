@@ -40,7 +40,8 @@ static void log_write(LogLevel level, const char *message)
 	static b32 console_colors_enabled;
 	if (!console_colors_enabled)
 	{
-		elf_platform_enable_console_colors();
+		platform_enable_console_colors(PLATFORM_STANDARD_OUTPUT);
+		platform_enable_console_colors(PLATFORM_STANDARD_ERROR);
 		console_colors_enabled = 1;
 	}
 

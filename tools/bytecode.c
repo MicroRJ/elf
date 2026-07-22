@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 #include "elf.h"
-#include "../platform/include/platform.h"
 #include "base.h"
 #include "platform.h"
 #include "core.h"

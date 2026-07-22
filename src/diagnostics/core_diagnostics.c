@@ -133,10 +133,10 @@ static void print_runtime_error_location(RuntimeSourceLocation location)
 static void abort_after_runtime_error(void)
 {
 #if defined(_DEBUG) && defined(ELF_DEBUG_BREAK_ON_RUNTIME_ERROR)
-	elf_platform_debug_break();
+	platform_debug_break();
 #endif
 	log_line(LOG_LEVEL_FATAL, "elf is exiting...");
-	elf_platform_exit_process(1);
+	platform_exit_process(1);
 }
 
 static void report_runtime_error_message(elf_State *state, RuntimeErrorType error, int instr, const char *message)

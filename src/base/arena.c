@@ -28,7 +28,7 @@ void elf_end_scratch(elf_Scratch scratch)
 
 void elf_arena_destroy(elf_Arena *arena)
 {
-	elf_platform_virtual_free(arena->data);
+	platform_virtual_release(arena->data);
 }
 
 elf_Arena elf_arena_create(u64 reserve)
@@ -40,7 +40,11 @@ elf_Arena elf_arena_create(u64 reserve)
 	elf_Arena arena = {};
 	arena.size = reserve;
 	arena.in_reserve = reserve;
-	arena.data = elf_platform_virtual_alloc(reserve);
+	arena.data = platform_virtual_reserve(reserve);
+	if (arena.data && !platform_virtual_commit(arena.data, reserve)) {
+		platform_virtual_release(arena.data);
+		arena.data = NULL;
+	}
 	return arena;
 }
 
