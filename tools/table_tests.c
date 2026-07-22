@@ -44,7 +44,7 @@ static void expect_index(u32 value, u32 expected, const char *label)
 
 static void test_table_field_set_get(elf_State *state)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 
 	u32 first = elf_table_set(state, table, test_key_atom(state, "answer"), test_value_int(42));
 	expect_int(elf_table_get_or_nil(state, table, test_key_atom(state, "answer")), 42, "field get by equal atom key");
@@ -58,7 +58,7 @@ static void test_table_field_set_get(elf_State *state)
 
 static void test_table_integer_keys(elf_State *state)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 
 	for (u32 i = 0; i < 64; ++i) {
 		elf_table_set(state, table, test_key_int(i), test_value_int(i * 10));
@@ -71,7 +71,7 @@ static void test_table_integer_keys(elf_State *state)
 
 static void test_table_resize_stress(elf_State *state)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 	u32 initial_entries = table->nentries;
 	elf_Value keys[512] = {};
 
@@ -93,7 +93,7 @@ static void test_table_resize_stress(elf_State *state)
 
 static void test_table_array_operations(elf_State *state)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 
 	u32 a = elf_array_add(state, table, test_value_int(7));
 	u32 b = elf_array_add(state, table, test_value_int(8));
@@ -114,7 +114,7 @@ static void test_table_array_operations(elf_State *state)
 
 static void test_table_field_and_array_share_storage(elf_State *state)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 
 	u32 field_slot = elf_table_set(state, table, test_key_atom(state, "field"), test_value_int(1));
 	u32 array_slot = elf_array_add(state, table, test_value_int(2));
@@ -128,7 +128,7 @@ static void test_table_field_and_array_share_storage(elf_State *state)
 
 static void test_table_bind_to_index(elf_State *state)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 
 	u32 slot = elf_array_add(state, table, test_value_int(123));
 	u32 bound = elf_table_bind_to_index(state, table, test_key_atom(state, "bound"), slot);

@@ -30,12 +30,12 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 	elf_State *state = elf_create_state();
 	elf_Value *stack_checkpoint = state->stack_ptr;
 
-	elf_Table *root = elf_push_new_table(state);
+	elf_Table *root = push_new_table(state);
 	elf_Value child_key = test_key_atom(state, "child");
 	elf_Value value_key = test_key_atom(state, "value");
 
 	for (u32 i = 0; i < 128; ++i) {
-		elf_Table *child = elf_push_new_table(state);
+		elf_Table *child = push_new_table(state);
 		elf_Value child_value = {};
 		child_value = value_from_table(child);
 
@@ -70,8 +70,8 @@ static void test_gc_keeps_referenced_table_graph(void)
 	elf_State *state = elf_create_state();
 	u32 baseline_count = state->gc_reference_count;
 	elf_i32 stack_checkpoint = elf_get_top(state);
-	elf_Table *root = elf_push_new_table(state);
-	elf_Table *child = elf_push_new_table(state);
+	elf_Table *root = push_new_table(state);
+	elf_Table *child = push_new_table(state);
 
 	elf_array_add(state, child, test_value_int(42));
 	elf_array_add(state, root, value_from_table(child));

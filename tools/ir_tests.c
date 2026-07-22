@@ -108,6 +108,33 @@ static void test_ir_lowers_assignment_to_local(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
+static void ignore_expected_lowering_error(LogLevel level, const char *message, void *user)
+{
+	(void)level;
+	(void)message;
+	(void)user;
+}
+
+static void test_ir_rejects_assignment_to_constant(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "answer ::= 42\nanswer = 0");
+	log_set_hook(0, 0);
+
+	Ir body = ir_test_main_body(ctx);
+	ir_test_body_stat(body, 0, IR_LOCAL, "constant declaration lowers to local");
+	if (!body || body->kind != IR_BLOCK || body->ir_block.stats.count < 2 ||
+		body->ir_block.stats.items[1] != ERROR_IR)
+	{
+		test_fail("assignment to constant lowers to an error");
+	}
+	if (!ctx || !(ctx->entities[0].tags & ENTITY_TAG_CONSTANT)) {
+		test_fail("constant declaration tags its entity");
+	}
+	elf_arena_destroy(&arena);
+}
+
 static void test_ir_lowers_atoms_and_globals(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -330,6 +357,7 @@ static void run_ir_tests(elf_State *state)
 {
 	test_ir_lowers_declaration_expression(state);
 	test_ir_lowers_assignment_to_local(state);
+	test_ir_rejects_assignment_to_constant(state);
 	test_ir_lowers_atoms_and_globals(state);
 	test_ir_lowers_interpolated_string(state);
 	test_ir_lowers_field_and_call(state);

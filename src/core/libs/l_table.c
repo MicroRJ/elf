@@ -67,7 +67,7 @@ ELF_FUNCTION(l_table_clear)
 ELF_FUNCTION(l_table_keys)
 {
 	elf_Table *table = table_receiver(S);
-	elf_Table *result = elf_push_new_table(S);
+	elf_Table *result = push_new_table(S);
 	for (u32 value_index = 0; value_index < table->count; ++value_index) {
 		for (u32 slot = 0; slot < table->nentries; ++slot) {
 			Entry entry = table->entries[slot];
@@ -82,7 +82,7 @@ ELF_FUNCTION(l_table_keys)
 ELF_FUNCTION(l_table_values)
 {
 	elf_Table *table = table_receiver(S);
-	elf_Table *result = elf_push_new_table(S);
+	elf_Table *result = push_new_table(S);
 	for (u32 i = 0; i < table->count; ++i) {
 		elf_array_add(S, result, table->array[i]);
 	}
@@ -92,7 +92,7 @@ ELF_FUNCTION(l_table_values)
 ELF_FUNCTION(l_table_pairs)
 {
 	elf_Table *table = table_receiver(S);
-	elf_Table *result = elf_push_new_table(S);
+	elf_Table *result = push_new_table(S);
 	for (u32 value_index = 0; value_index < table->count; ++value_index)
 	{
 		for (u32 slot = 0; slot < table->nentries; ++slot)
@@ -234,7 +234,7 @@ ELF_FUNCTION(l_array_slice)
 			"array slice end %u precedes start %u", end, first);
 		return 0;
 	}
-	elf_Table *result = elf_push_new_table(S);
+	elf_Table *result = push_new_table(S);
 	for (u32 i = first; i < end; ++i) elf_array_add(S, result, table->array[i]);
 	return 1;
 }
@@ -281,7 +281,7 @@ ELF_FUNCTION(l_array_map)
 	elf_Table *table = table_receiver(S);
 	elf_Value function = load_value(S, 1);
 	check_value_type_rule(S, function, TRULE_CALLABLE);
-	elf_Table *result = elf_push_new_table(S);
+	elf_Table *result = push_new_table(S);
 	for (u32 i = 0; i < table->count; ++i) {
 		elf_Value mapped = table_call(S, function, table, table->array[i], value_from_integer(i), true);
 		elf_array_add(S, result, mapped);
@@ -294,7 +294,7 @@ ELF_FUNCTION(l_array_filter)
 	elf_Table *table = table_receiver(S);
 	elf_Value function = load_value(S, 1);
 	check_value_type_rule(S, function, TRULE_CALLABLE);
-	elf_Table *result = elf_push_new_table(S);
+	elf_Table *result = push_new_table(S);
 	for (u32 i = 0; i < table->count; ++i) {
 		elf_Value keep = table_call(S, function, table, table->array[i], value_from_integer(i), true);
 		check_value_type(S, keep, ELF_VALUE_TYPE_INTEGER);

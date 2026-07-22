@@ -1,17 +1,11 @@
 # Standard library
 
-Elf installs its standard libraries beneath the global `elf` table. Functions
-directly on that table form the core library. More focused libraries occupy
-their own fields, such as `elf.fs` and `elf.debug`.
+Most library functions live under `elf`. Tables and strings carry methods
+through their metatables.
 
-The library API is still evolving. These pages document the behavior of the
-current implementation rather than promising long-term compatibility.
+- [Core](core.md) — assertions, values, loading, and output.
+- [Filesystem](fs.md) — files, directories, and working paths.
+- [Tables](table.md) — arrays, maps, transforms, and sorting.
+- [Strings](string.md) — slicing, searching, globs, and rewriting.
 
-## Library reference
-
-- [Core](core.md) — assertions, value inspection, conversions, caller
-  introspection, source loading, and standard output.
-- [Filesystem](fs.md) — regular text files, metadata, directories, and the
-  process working directory.
-
-The remaining sublibraries are not documented yet.
+Everything here is still free to grow strange new branches.

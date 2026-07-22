@@ -70,6 +70,7 @@ typedef struct
 elf_Binding;
 
 
+// TODO(RJ) can we make this smaller
 typedef struct StackFrame StackFrame;
 struct StackFrame
 {
@@ -93,6 +94,12 @@ struct elf_State
 	elf_Arena    arena;
 	void        *user_data;
 
+	// TODO(RJ) this is the "bytecode module" but this is dynamic, the question is, when
+	// loading a file, do we first create an actual bytecode module, then inject into here?
+	// We definitely want the ability to compile elf into an executable - self-contained
+	// bytecode module.
+	// We still have to address the global question ... and I think that's a more pressing
+	// issue.
 	struct
 	{
 		f64          *number_constants;
@@ -149,9 +156,6 @@ struct elf_State
 	}
 	metatables;
 };
-
-/* Internal constructors used by core and its tests. */
-elf_Table *elf_push_new_table(elf_State *state);
 
 typedef enum
 {

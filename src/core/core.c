@@ -44,20 +44,13 @@ static void table_set_atom_table(elf_State *state, elf_Table *parent, const char
 
 static elf_Table *new_binding_table(elf_State *state, const elf_Binding *bindings, u32 count)
 {
-	elf_Table *table = elf_push_new_table(state);
+	elf_Table *table = push_new_table(state);
 	for (u32 i = 0; i < count; ++i)
 	{
 		elf_Value key = value_from_atom(elf_atom_from_data(state, bindings[i].name));
 		elf_Value value = value_from_function(bindings[i].function);
 		elf_table_set(state, table, key, value);
 	}
-	return table;
-}
-
-elf_Table *elf_push_new_table(elf_State *state)
-{
-	elf_Table *table = elf_new_table_rogue(state);
-	push_table(state, table);
 	return table;
 }
 
@@ -134,15 +127,15 @@ static void bootstrap_standard_libraries(elf_State *state)
 	elf_Value *stack_checkpoint = state->stack_ptr;
 
 	state->metatables.atom = elf_lib_string(state);
-	state->metatables.integer = elf_push_new_table(state);
-	state->metatables.number = elf_push_new_table(state);
+	state->metatables.integer = push_new_table(state);
+	state->metatables.number = push_new_table(state);
 	state->metatables.table = elf_lib_table(state);
 
 	elf_Table *elf_table = elf_lib_core(state);
 	table_set_atom_table(state, elf_table, "math", elf_lib_math(state));
 	table_set_atom_table(state, elf_table, "debug", elf_lib_debug(state));
 
-	state->globals = elf_push_new_table(state);
+	state->globals = push_new_table(state);
 	table_set_atom_table(state, state->globals, "elf", elf_table);
 
 	// The library constructors push each table while building the graph. Only

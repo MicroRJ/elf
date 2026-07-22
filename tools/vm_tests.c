@@ -1,7 +1,7 @@
 ELF_FUNCTION(vm_test_assert)
 {
 	elf_Value value = load_value(S, 1);
-	check_value_type_rule(S, value, TRULE_NUMERIC);
+	check_numeric(S, value);
 	if (!value_to_integer(value)) {
 		elf_print_current_runtime_source_location(S);
 		test_fail("script assertion failed");

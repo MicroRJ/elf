@@ -102,6 +102,13 @@ typedef enum
 }
 AstType;
 
+typedef enum
+{
+	AST_DECL_TAG_NONE     = 0,
+	AST_DECL_TAG_CONSTANT = 1 << 0,
+}
+AstDeclTags;
+
 static const char *ast_type_name(AstType type);
 
 // Todo, we could use an AstArray structure since we have that pattern all over the place,
@@ -159,6 +166,7 @@ struct Ast_T
 
 		struct
 		{
+			u32 tags;
 			Ast name;
 			Ast type;
 			Ast expr;

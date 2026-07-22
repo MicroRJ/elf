@@ -231,7 +231,7 @@ elf_b32 elf_push_value_text(elf_State *state, elf_i32 index)
 
 void elf_new_table(elf_State *state)
 {
-	elf_push_new_table(state);
+	push_new_table(state);
 }
 
 elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length)

@@ -93,8 +93,8 @@ int main(void)
 	elf_Value *int_hit_keys = calloc(KEY_COUNT, sizeof(*int_hit_keys));
 	elf_Value *int_miss_keys = calloc(KEY_COUNT, sizeof(*int_miss_keys));
 
-	elf_Table *atom_table = elf_push_new_table(state);
-	elf_Table *int_table = elf_push_new_table(state);
+	elf_Table *atom_table = push_new_table(state);
+	elf_Table *int_table = push_new_table(state);
 
 	fill_atom_table(state, atom_table, atom_hit_keys, atom_miss_keys, KEY_COUNT);
 	fill_int_table(state, int_table, int_hit_keys, int_miss_keys, KEY_COUNT);

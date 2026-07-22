@@ -89,6 +89,15 @@ static void test_parser_decl_precedence_and_atoms(elf_State *state)
 	expect_ast_i64(expr->binary.y->binary.y, 3, "parse multiply rhs integer");
 }
 
+static void test_parser_constant_declaration(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "answer ::= 42");
+	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse constant declaration");
+	if (decl && !(decl->decl.tags & AST_DECL_TAG_CONSTANT)) {
+		test_fail("hard bind marks declaration constant");
+	}
+}
+
 static void test_parser_string_atoms(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "name := \"hello\"");
@@ -371,6 +380,7 @@ static void test_parser_source_slices(elf_State *state)
 static void run_parser_tests(elf_State *state)
 {
 	test_parser_decl_precedence_and_atoms(state);
+	test_parser_constant_declaration(state);
 	test_parser_string_atoms(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);

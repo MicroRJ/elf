@@ -1,2 +1,6 @@
-elf.printl("false: ", false)
-elf.printl("Hello, World!")
+
+hello := fun() {
+	elf.printl("Hello, World!")
+}
+
+hello()

@@ -214,7 +214,7 @@ ELF_FUNCTION(l_string_split)
 		return 0;
 	}
 
-	elf_Table *parts = elf_push_new_table(S);
+	elf_Table *parts = push_new_table(S);
 	u32 start = 0;
 	for (;;)
 	{
@@ -233,7 +233,7 @@ ELF_FUNCTION(l_string_lines)
 	elf_String *string = string_receiver(S);
 	const char *text = atom_data(string);
 	u32 size = atom_size(string);
-	elf_Table *lines = elf_push_new_table(S);
+	elf_Table *lines = push_new_table(S);
 	u32 start = 0;
 	u32 at = 0;
 

@@ -278,6 +278,7 @@ static Ast create_defer_ast(Parser *par, SourceSite site, Ast body)
 static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast expr)
 {
 	Ast tree = create_ast(par, site, AST_DECL_STAT);
+	tree->decl.tags = tags;
 	tree->decl.name = name;
 	tree->decl.expr = expr;
 	return tree;
@@ -662,7 +663,7 @@ static void print_ast(Printer *pr, Ast tree)
 
 
 			print_ast(pr, name);
-			PRINT(pr, " := ");
+			PRINT(pr, tree->decl.tags & AST_DECL_TAG_CONSTANT ? " ::= " : " := ");
 			print_ast(pr, expr);
 		}
 		break;

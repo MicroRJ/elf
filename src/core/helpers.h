@@ -46,7 +46,6 @@ typedef enum
 	TYPE_RULE_ANYTHING = TBIT_ALLMASK,
 	TRULE_NONNIL       = TYPE_RULE_ANYTHING & ~TBIT_NIL,
 	TRULE_OBJECT       = TBIT_USER | TBIT_CLOSURE | TBIT_TABLE,
-	TRULE_NUMERIC      = TBIT_INTEGER | TBIT_NUMBER,
 	TRULE_CALLABLE     = TBIT_FUNCTION | TBIT_CLOSURE,
 
 	TRULE_COUNT,
@@ -64,6 +63,14 @@ static inline void check_value_type_rule(elf_State *S, elf_Value value, TypeRule
 {
 	if (~rule & 1 << value.type) {
 		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "type rule violation, got '%s'", value_type_name(value.type));
+	}
+}
+
+static inline void check_numeric(elf_State *state, elf_Value value)
+{
+	if (!value_is_numeric(value)) {
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1,
+			"type error, expected numeric, got '%s'", value_type_name(value.type));
 	}
 }
 
@@ -107,6 +114,13 @@ static inline void push_value(elf_State *S, elf_Value value)
 static inline void push_table(elf_State *S, elf_Table *table)
 {
 	push_value(S, value_from_table(table));
+}
+
+static inline elf_Table *push_new_table(elf_State *state)
+{
+	elf_Table *table = elf_new_table_rogue(state);
+	push_table(state, table);
+	return table;
 }
 
 static inline elf_Value pop_value(elf_State *S)

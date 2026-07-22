@@ -274,6 +274,21 @@ static Ir load_entity_ir(LowerContext *ctx, SourceSite site, Entity *entity)
 	return create_load_local_ir(ctx, site, entity->memory_ir);
 }
 
+static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
+{
+	if (!destination || destination->kind != AST_IDENT) return true;
+	Entity *entity = entity_from_name(ctx, destination->atom);
+	if (!entity) return true;
+	if (entity->tags & ENTITY_TAG_CONSTANT)
+	{
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site,
+			"'%s' is constant and cannot be assigned", atom_data(destination->atom));
+		return false;
+	}
+	entity->tags |= ENTITY_TAG_ASSIGNED;
+	return true;
+}
+
 static void push_loop_labels(LowerContext *ctx, LoopLabels labels)
 {
 	ASSERT(ctx->loop_count < ARRAY_COUNT(ctx->loop_stack));
@@ -874,7 +889,8 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, Ir_Array_Bld *items,
 	return nvars;
 }
 
-static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple, Ast range_expr)
+static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple,
+	Ast range_expr, u32 entity_tags)
 {
 	Ast collection_expr = 0;
 	Ast range = range_expr;
@@ -949,7 +965,8 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		Ir local = create_local_ir(ctx, name->site, 0);
 		var_locals[i] = local;
 
-		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_FORLOOP, name->atom);
+		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
+			ENTITY_TAG_FORLOOP | entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
@@ -1057,7 +1074,8 @@ static Ir lower_ast_for_range_to_ir(LowerContext *ctx, Ast stat)
 		return ERROR_IR;
 	}
 
-	return lower_ast_for_range_expr_to_ir(ctx, stat, name_tuple, range);
+	u32 entity_tags = decl->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
+	return lower_ast_for_range_expr_to_ir(ctx, stat, name_tuple, range, entity_tags);
 }
 
 static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
@@ -1127,6 +1145,7 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, Ir_Array_Bld *items, As
 
 	Ast dest_ast = dest_tuple->tuple.args[0];
 	Ast expr_ast = expr_tuple->tuple.args[0];
+	if (!mark_entity_assigned(ctx, dest_ast)) return ERROR_IR;
 
 	Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
 	Ir right_ir = lower_ast_expr_to_ir(ctx, expr_ast);
@@ -1243,12 +1262,13 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 				break;
 			}
 
+			u32 entity_tags = stat->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
 			lower_local_decl_tuples_to_ir(
 				ctx,
 				items,
 				name_tuple,
 				expr_tuple,
-				0);
+				entity_tags);
 		}
 		break;
 
@@ -1267,6 +1287,10 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			if (nargs == 1)
 			{
 				Ast dest_ast = dest_tuple->tuple.args[0];
+				if (!mark_entity_assigned(ctx, dest_ast)) {
+					push_ir_block(items, ERROR_IR);
+					break;
+				}
 				Ast expr_ast = expr_tuple->tuple.nargs ? expr_tuple->tuple.args[0] : 0;
 
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
@@ -1297,6 +1321,10 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				Ast dest_ast = dest_tuple->tuple.args[i];
+				if (!mark_entity_assigned(ctx, dest_ast)) {
+					push_ir_block(items, ERROR_IR);
+					continue;
+				}
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
 				Ir value_ir = create_load_local_ir(ctx, values[i]->site, values[i]);
 				Ir ir = create_store_ir(ctx, stat->site, dest_ir, value_ir);
@@ -1338,6 +1366,10 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 
 				Ast dest_ast = dest_tuple->tuple.args[i];
 				Ast expr_ast = expr_tuple->tuple.args[i];
+				if (!mark_entity_assigned(ctx, dest_ast)) {
+					push_ir_block(items, ERROR_IR);
+					continue;
+				}
 
 				Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
 				Ir nil_ir = create_nil_ir(ctx, dest_ast->site);

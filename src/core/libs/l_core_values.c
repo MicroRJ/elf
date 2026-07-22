@@ -42,7 +42,7 @@ ELF_FUNCTION(l_core_assert)
 {
 	lib_check_arg_count(S, "assert", nargs, 1, 2);
 	elf_Value condition = load_value(S, 1);
-	check_value_type_rule(S, condition, TRULE_NUMERIC);
+	check_numeric(S, condition);
 
 	const char *message = "assertion failed";
 	if (nargs > 2) message = lib_load_cstr(S, 2);
@@ -107,7 +107,7 @@ ELF_FUNCTION(l_core_to_number)
 {
 	lib_check_arg_count(S, "to_number", nargs, 1, 1);
 	elf_Value value = load_value(S, 1);
-	check_value_type_rule(S, value, TRULE_NUMERIC);
+	check_numeric(S, value);
 	push_value(S, value_from_number(value_to_number(value)));
 	return 1;
 }
@@ -116,7 +116,7 @@ ELF_FUNCTION(l_core_to_integer)
 {
 	lib_check_arg_count(S, "to_integer", nargs, 1, 1);
 	elf_Value value = load_value(S, 1);
-	check_value_type_rule(S, value, TRULE_NUMERIC);
+	check_numeric(S, value);
 	push_value(S, value_from_integer(value_to_integer(value)));
 	return 1;
 }

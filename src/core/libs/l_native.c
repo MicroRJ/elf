@@ -35,33 +35,6 @@ static const char *lib_load_cstr(elf_State *state, u32 index)
 static i64 lib_load_integer(elf_State *state, u32 index)
 {
 	elf_Value value = load_value(state, index);
-	check_value_type_rule(state, value, TRULE_NUMERIC);
+	check_numeric(state, value);
 	return value_to_integer(value);
-}
-
-static void lib_push_string(elf_State *state, const char *data, u32 size)
-{
-	push_value(state, value_from_atom(elf_atom_from_data_size(state, data, size)));
-}
-
-static elf_Value lib_string_value(elf_State *state, const char *text)
-{
-	return value_from_atom(elf_atom_from_data(state, text));
-}
-
-static void lib_set_integer_field(elf_State *state, elf_Table *table, const char *name, i64 value)
-{
-	elf_table_set(state, table, lib_string_value(state, name), value_from_integer(value));
-}
-
-static void lib_set_string_field(elf_State *state, elf_Table *table, const char *name,
-	const char *data, u32 size)
-{
-	elf_Value value = value_from_atom(elf_atom_from_data_size(state, data, size));
-	elf_table_set(state, table, lib_string_value(state, name), value);
-}
-
-static void lib_set_nil_field(elf_State *state, elf_Table *table, const char *name)
-{
-	elf_table_set(state, table, lib_string_value(state, name), value_nil());
 }

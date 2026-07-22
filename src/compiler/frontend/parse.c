@@ -1064,7 +1064,8 @@ static Ast parse_expr_stat(Parser *parser)
 			if (ast_is_missing_or_error(y)) {
 				return ERROR_AST;
 			}
-			x = create_decl_ast(parser, tok.site, 0, x, y);
+			u32 tags = tok.type == TOK_HARD_BIND ? AST_DECL_TAG_CONSTANT : AST_DECL_TAG_NONE;
+			x = create_decl_ast(parser, tok.site, tags, x, y);
 		}
 		break;
 		case TOK_ASSIGN:
@@ -1227,19 +1228,21 @@ static Ast parse_stat(Parser *parser)
 			if (ast_is_missing_or_error(name)) {
 				return ERROR_AST;
 			}
+			u32 decl_tags = AST_DECL_TAG_NONE;
 			if (pick_token(parser, TOK_BIND))
 			{
 			}
 			else
 			{
 				take_token(parser, TOK_HARD_BIND);
+				decl_tags |= AST_DECL_TAG_CONSTANT;
 			}
 
 			Ast init_expr = parse_tuple_expr(parser);
 			if (ast_is_missing_or_error(init_expr)) {
 				return ERROR_AST;
 			}
-			Ast init = create_decl_ast(parser, tok.site, 0, name, init_expr);
+			Ast init = create_decl_ast(parser, tok.site, decl_tags, name, init_expr);
 
 			if (pick_token(parser, TOK_QMARK))
 			{
