@@ -1,36 +1,10 @@
-//
-// Elf builds itself with Bob. Bob embeds a released Elf runtime, so this file
-// should remain compatible with the Elf version reported by `bob --version`.
-//
+compiler := "clang-cl"
+librarian := "lib"
+compile_options := " /nologo /Od /Zi /D_DEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes"
 
-
-// Data -----------------------------------------------------------------------
-
-project := {
-	compiler = "clang-cl",
-	librarian = "lib",
-	compile_options = " /nologo /Od /Zi /D_DEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes",
-
-	prepare = {
-		name = "prepare build directory",
-		directory = "build\\obj",
-		output = "build/obj",
-	},
-
-	library = {
-		name = "archive elf.lib",
-		output = "build/elf.lib",
-	},
-
-	batteries_library = {
-		name = "archive elf_batteries.lib",
-		output = "build/elf_batteries.lib",
-	},
-
-	build_options = {
-		workers = 4,
-		verbosity = 0,
-	},
+build_options := {
+	workers = 4,
+	verbosity = 0,
 }
 
 include_dirs := {
@@ -59,33 +33,6 @@ batteries_include_dirs := {
 	"batteries/internal",
 }
 
-source_specs := {
-	{ name = "base",           path = "src/base/base.c" },
-	{ name = "platform",       path = "src/platform/win32/platform_win32.c" },
-	{ name = "value",          path = "src/core/value/value.c" },
-	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
-	{ name = "bytecode_debug", path = "src/compiler/backend/bytecode_debug.c" },
-	{ name = "core",           path = "src/core/core.c" },
-	{ name = "compiler",       path = "src/compiler/compiler.c" },
-	{ name = "elf_api",        path = "src/api/elf_api.c" },
-}
-
-tool_specs := {
-	{ name = "core tests",    source = "tools/core_tests.c", output = "core_tests", batteries = 0 },
-	{ name = "tests",         source = "tools/tests.c",      output = "tests",      batteries = 1 },
-	{ name = "benchmarks",    source = "tools/benchmarks.c", output = "benchmarks", batteries = 0 },
-	{ name = "bytecode tool", source = "tools/bytecode.c",   output = "bytecode",   batteries = 1 },
-	{ name = "elf runner",    source = "tools/elf.c",        output = "elf",        batteries = 1 },
-}
-
-run_specs := {
-	{ name = "run core tests", tool = "core_tests" },
-	{ name = "run Elf tests", tool = "tests" },
-}
-
-
-// Processing -----------------------------------------------------------------
-
 join_arguments := fun(values) {
 	result := ""
 	for value := values[...] ? { result += f" ${value}" }
@@ -98,169 +45,151 @@ make_include_options := fun(directories) {
 	ret result
 }
 
-create_prepare_task := fun(spec) {
-	ret {
-		name = spec.name,
-		command_line = f"cmd /c if not exist ${spec.directory} mkdir ${spec.directory}",
-		inputs = {},
-		outputs = { spec.output },
-		include_dirs = {},
-		dependencies = {},
-	}
+include_options := make_include_options(include_dirs)
+batteries_include_options := make_include_options(batteries_include_dirs)
+
+prepare := {
+	name = "prepare build directory",
+	command_line = "cmd /c if not exist build\\obj mkdir build\\obj",
+	inputs = {},
+	outputs = { "build/obj" },
+	include_dirs = {},
+	dependencies = {},
 }
 
-compile_source := fun(spec, prepare_task, include_options, dependency_include_dirs) {
-	object := f"build/obj/${spec.name}.obj"
-	pdb := f"build/obj/${spec.name}.pdb"
+build_platform := {
+	name = "build platform library",
+	command_line = "cmd /c \"cd /d platform && ..\\bootstrap\\windows-x64\\bob.exe build.elf lib\"",
+	inputs = {
+		"platform/build.elf",
+		"platform/include/platform.h",
+		"platform/include/platform_types.h",
+		"platform/src/platform_win32.c",
+	},
+	outputs = { "platform/build/platform.lib" },
+	include_dirs = {},
+	dependencies = {},
+	transparent = true,
+}
+
+compile_source := fun(name, source, includes, dependency_includes) {
+	object := f"build/obj/${name}.obj"
 	task := {
-		name = f"compile ${spec.name}",
-		command_line = f"${project.compiler}${project.compile_options}${include_options} /c ${spec.path} /Fo${object} /Fd${pdb}",
-		inputs = { spec.path },
+		name = f"compile ${name}",
+		command_line = f"${compiler}${compile_options}${includes} /c ${source} /Fo${object} /Fdbuild/obj/${name}.pdb",
+		inputs = { source },
 		outputs = { object },
-		include_dirs = dependency_include_dirs,
-		dependencies = { prepare_task },
+		include_dirs = dependency_includes,
+		dependencies = { prepare },
 	}
 	ret { task = task, object = object }
 }
 
-process_sources := fun(specs, prepare_task, include_options) {
-	result := {
-		tasks = {},
-		objects = {},
-	}
-
-	for spec := specs[...] ? {
-		compiled := compile_source(spec, prepare_task, include_options, include_dirs)
-		result.tasks:add(compiled.task)
-		result.objects:add(compiled.object)
-	}
-
-	ret result
+elf_sources := {
+	{ name = "base",           path = "src/base/base.c" },
+	{ name = "platform",       path = "src/platform/win32/platform_win32.c" },
+	{ name = "value",          path = "src/core/value/value.c" },
+	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
+	{ name = "bytecode_debug", path = "src/compiler/backend/bytecode_debug.c" },
+	{ name = "core",           path = "src/core/core.c" },
+	{ name = "compiler",       path = "src/compiler/compiler.c" },
+	{ name = "elf_api",        path = "src/api/elf_api.c" },
 }
 
-create_library_task := fun(spec, compiled_sources) {
-	ret {
-		name = spec.name,
-		output = spec.output,
-		command_line = f"${project.librarian} /nologo /out:${spec.output}${join_arguments(compiled_sources.objects)}",
-		inputs = compiled_sources.objects,
-		outputs = { spec.output },
-		include_dirs = {},
-		dependencies = compiled_sources.tasks,
-	}
+elf_objects := {}
+elf_compile_tasks := {}
+for source := elf_sources[...] ? {
+	compiled := compile_source(source.name, source.path, include_options, include_dirs)
+	elf_objects:add(compiled.object)
+	elf_compile_tasks:add(compiled.task)
 }
 
-compile_tool := fun(spec, library_task, batteries, include_options) {
-	object := f"build/obj/tool_${spec.output}.obj"
-	executable := f"build/${spec.output}.exe"
-	compile_pdb := f"build/obj/tool_${spec.output}.pdb"
-	link_pdb := f"build/${spec.output}.pdb"
-	ilk := f"build/${spec.output}.ilk"
-	link_inputs := ""
-	inputs := { spec.source, project.library.output }
-	dependencies := { library_task }
-	if spec.batteries ? {
-		link_inputs = f" ${batteries.output}"
-		inputs:add(batteries.output)
-		dependencies:add(batteries)
+elf_library := {
+	name = "archive elf.lib",
+	command_line = f"${librarian} /nologo /out:build/elf.lib${join_arguments(elf_objects)}",
+	inputs = elf_objects,
+	outputs = { "build/elf.lib" },
+	include_dirs = {},
+	dependencies = elf_compile_tasks,
+}
+
+batteries := compile_source("batteries", "batteries/batteries.c", batteries_include_options, batteries_include_dirs)
+
+batteries_library := {
+	name = "archive elf_batteries.lib",
+	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object}",
+	inputs = { batteries.object },
+	outputs = { "build/elf_batteries.lib" },
+	include_dirs = {},
+	dependencies = { batteries.task },
+}
+
+build_tool := fun(name, source, output, uses_batteries) {
+	object := f"build/obj/tool_${output}.obj"
+	executable := f"build/${output}.exe"
+	inputs := { source, "build/elf.lib", "platform/build/platform.lib" }
+	dependencies := { elf_library, build_platform }
+	libraries := " build/elf.lib platform/build/platform.lib"
+	if uses_batteries ? {
+		inputs:add("build/elf_batteries.lib")
+		dependencies:add(batteries_library)
+		libraries += " build/elf_batteries.lib"
 	}
 	task := {
-		name = f"build ${spec.name}",
-		command_line = f"${project.compiler}${project.compile_options}${include_options} ${spec.source} /Fo${object} /Fe:${executable} /Fd:${compile_pdb} /link ${project.library.output}${link_inputs} /PDB:${link_pdb} /ILK:${ilk}",
+		name = f"build ${name}",
+		command_line = f"${compiler}${compile_options}${include_options} ${source} /Fo${object} /Fe:${executable} /Fd:build/obj/tool_${output}.pdb /link${libraries} /PDB:build/${output}.pdb /ILK:build/${output}.ilk",
 		inputs = inputs,
 		outputs = { executable },
 		include_dirs = include_dirs,
 		dependencies = dependencies,
 	}
-	ret {
-		output = spec.output,
-		executable = executable,
-		task = task,
-	}
+	ret { task = task, executable = executable }
 }
 
-process_tools := fun(specs, library_task, batteries, include_options) {
-	result := {
-		tasks = {},
-		tools = {},
-	}
+core_tests := build_tool("core tests", "tools/core_tests.c", "core_tests", false)
+tests := build_tool("tests", "tools/tests.c", "tests", true)
+benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false)
+bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true)
+elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true)
 
-	for spec := specs[...] ? {
-		compiled := compile_tool(spec, library_task, batteries, include_options)
-		result.tasks:add(compiled.task)
-		result.tools:add(compiled)
-	}
-
-	ret result
+run_core_tests := {
+	name = "run core tests",
+	command_line = core_tests.executable,
+	inputs = { core_tests.executable },
+	outputs = {},
+	include_dirs = {},
+	dependencies = { core_tests.task },
 }
 
-find_tool := fun(compiled_tools, output) {
-	for tool := compiled_tools.tools[...] ? {
-		if tool.output == output ? { ret tool }
-	}
-	ret nil
+run_tests := {
+	name = "run Elf tests",
+	command_line = tests.executable,
+	inputs = { tests.executable },
+	outputs = {},
+	include_dirs = {},
+	dependencies = { tests.task },
 }
-
-process_runs := fun(specs, compiled_tools) {
-	tasks := {}
-	for spec := specs[...] ? {
-		tool := find_tool(compiled_tools, spec.tool)
-		elf.assert(tool != nil, f"unknown tool '${spec.tool}' in run specification")
-		tasks:add({
-			name = spec.name,
-			command_line = tool.executable,
-			inputs = { tool.executable },
-			outputs = {},
-			include_dirs = {},
-			dependencies = { tool.task },
-		})
-	}
-	ret tasks
-}
-
-
-// Tasks ----------------------------------------------------------------------
-
-include_options := make_include_options(include_dirs)
-batteries_include_options := make_include_options(batteries_include_dirs)
-prepare_task := create_prepare_task(project.prepare)
-compiled_sources := process_sources(source_specs, prepare_task, include_options)
-library_task := create_library_task(project.library, compiled_sources)
-compiled_batteries := compile_source({
-	name = "batteries",
-	path = "batteries/batteries.c",
-	include_dirs = batteries_include_dirs,
-}, prepare_task, batteries_include_options, batteries_include_dirs)
-batteries_library_task := create_library_task(project.batteries_library, {
-	tasks = { compiled_batteries.task },
-	objects = { compiled_batteries.object },
-})
-compiled_tools := process_tools(tool_specs, library_task, batteries_library_task, include_options)
-run_tasks := process_runs(run_specs, compiled_tools)
-
-
-// Entries --------------------------------------------------------------------
 
 entries := {}
 
 entries.lib = fun() {
 	ret bob.build({
-		targets = { library_task, batteries_library_task },
-		options = project.build_options,
+		targets = { elf_library, batteries_library, build_platform },
+		options = build_options,
 	})
 }
 
 entries.build = fun() {
 	ret bob.build({
-		targets = compiled_tools.tasks,
-		options = project.build_options,
+		targets = { core_tests.task, tests.task, benchmarks.task, bytecode_tool.task, elf_runner.task },
+		options = build_options,
 	})
 }
 
 entries.test = fun() {
 	ret bob.build({
-		targets = run_tasks,
-		options = project.build_options,
+		targets = { run_core_tests, run_tests },
+		options = build_options,
 	})
 }
 
