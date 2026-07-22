@@ -6,7 +6,7 @@
 
 #include "base.h"
 #include "platform.h"
-#include "battery_file.h"
+#include "../platform/include/platform.h"
 #include "core.h"
 #include "helpers.h"
 #include "compiler.h"

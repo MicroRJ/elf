@@ -17,7 +17,6 @@
 #include "elf_batteries.h"
 #include "battery_helpers.h"
 #include "battery_console.h"
-#include "battery_file.h"
 #include "battery_process.h"
 
 _Static_assert(sizeof(elf_PlatformFile) >= sizeof(HANDLE), "file handle is too small");
@@ -33,7 +32,6 @@ static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
 }
 
 #include "win32/battery_console_win32.c"
-#include "win32/battery_file_win32.c"
 #include "win32/battery_process_win32.c"
 
 #include "libs/l_core_io.c"
@@ -48,31 +46,26 @@ static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
 static elf_StrSlice battery_source_buffer_from_file(const char *name)
 {
 	elf_StrSlice source = {0};
-	elf_PlatformFile file = elf_platform_open_file(name,
-		ELF_PLATFORM_OPEN_READ, ELF_PLATFORM_OPEN_EXISTING);
-	if (ELF_IS_HANDLE_INVALID(file)) return source;
+	Platform_File_Info info;
+	if (!platform_get_file_info(name, &info) || info.is_directory || info.size > UINT_MAX) return source;
+	Platform_File file = platform_access_file(name, PLATFORM_FILE_OPEN_EXISTING, PLATFORM_FILE_READ | PLATFORM_FILE_SHARE_READ);
+	if (!platform_file_is_valid(file)) return source;
 
-	i64 file_size = elf_platform_file_size(file);
-	if (file_size < 0 || (u64)file_size > UINT_MAX)
-	{
-		elf_platform_close_file(file);
-		return source;
-	}
-
-	char *data = calloc(1, (size_t)file_size + 16);
+	char *data = calloc(1, (size_t)info.size + 16);
 	if (!data) {
-		elf_platform_close_file(file);
+		platform_close_file(file);
 		return source;
 	}
-	i64 read = elf_platform_read_file(file, data, file_size);
-	elf_platform_close_file(file);
-	if (read != file_size) {
+	U64 read = 0;
+	B32 success = platform_read_file(file, data, info.size, &read);
+	platform_close_file(file);
+	if (!success || read != info.size) {
 		free(data);
 		return source;
 	}
 
 	source.data = data;
-	source.size = (u64)file_size;
+	source.size = info.size;
 	return source;
 }
 
