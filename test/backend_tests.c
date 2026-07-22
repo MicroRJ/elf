@@ -76,7 +76,7 @@ static SourceMapEntry *backend_find_source_map_entry(BcFunction *function, u32 b
 
 static void test_backend_source_map(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/return_add.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/return_add.elf");
 	BcFunction *function = &result.function;
 	if (!function->source_name || !function->source_data || function->source_size == 0) {
 		test_fail("backend stores source data on bytecode function");
@@ -195,7 +195,7 @@ static i32 backend_find_first_bytecode(BackendCompileResult result, BytecodeType
 
 static void test_backend_short_circuit_and(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_and.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_and.elf");
 
 	backend_expect_min_conditional_jumps(result, 2, "&& emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 0, 0, "&& emits optimal short-circuit jump shape");
@@ -205,7 +205,7 @@ static void test_backend_short_circuit_and(void)
 
 static void test_backend_short_circuit_or(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_or.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_or.elf");
 
 	backend_expect_min_conditional_jumps(result, 2, "|| emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 1, 1, 0, "|| emits optimal short-circuit jump shape");
@@ -215,7 +215,7 @@ static void test_backend_short_circuit_or(void)
 
 static void test_backend_short_circuit_nested_and_or(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_nested_and_or.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_nested_and_or.elf");
 
 	backend_expect_min_conditional_jumps(result, 3, "nested a && (b || c) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a && (b || c) emits optimal short-circuit jump shape");
@@ -225,7 +225,7 @@ static void test_backend_short_circuit_nested_and_or(void)
 
 static void test_backend_short_circuit_nested_or_and(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_nested_or_and.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_nested_or_and.elf");
 
 	backend_expect_min_conditional_jumps(result, 3, "nested a || (b && c) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a || (b && c) emits optimal short-circuit jump shape");
@@ -235,7 +235,7 @@ static void test_backend_short_circuit_nested_or_and(void)
 
 static void test_backend_short_circuit_mixed_groups(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/short_circuit_mixed_groups.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_mixed_groups.elf");
 
 	backend_expect_min_conditional_jumps(result, 4, "mixed (a || b) && (c || d) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 2, 0, "mixed (a || b) && (c || d) emits optimal short-circuit jump shape");
@@ -245,7 +245,7 @@ static void test_backend_short_circuit_mixed_groups(void)
 
 static void test_backend_while_loop(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/while_loop.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/while_loop.elf");
 
 	if (backend_count_bytecode(result, BC_JZ) != 1) {
 		test_fail("while emits one loop-exit conditional jump");
@@ -258,7 +258,7 @@ static void test_backend_while_loop(void)
 
 static void test_backend_while_short_circuit_loop(void)
 {
-	BackendCompileResult result = backend_test_compile_file("smoke/while_short_circuit.elf");
+	BackendCompileResult result = backend_test_compile_file("test/smoke/while_short_circuit.elf");
 
 	if (backend_count_bytecode(result, BC_JZ) != 2) {
 		test_fail("while short-circuit predicate emits two false jumps");

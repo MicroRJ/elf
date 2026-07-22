@@ -146,8 +146,8 @@ build_tool := fun(name, source, output, uses_batteries) {
 	ret { task = task, executable = executable }
 }
 
-core_tests := build_tool("core tests", "tools/core_tests.c", "core_tests", false)
-tests := build_tool("tests", "tools/tests.c", "tests", true)
+core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false)
+tests := build_tool("tests", "test/tests.c", "tests", true)
 benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false)
 bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true)
 elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true)
