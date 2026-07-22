@@ -22,7 +22,7 @@ include_dirs := {
 	"src/compiler/middle",
 	"src/compiler/backend",
 	"batteries",
-	"batteries/internal",
+	"src/batteries/internal",
 	"include",
 	"platform/include",
 	"stb",
@@ -30,7 +30,7 @@ include_dirs := {
 
 batteries_include_dirs := {
 	"include",
-	"batteries/internal",
+	"src/batteries/internal",
 	"platform/include",
 }
 
@@ -113,7 +113,7 @@ elf_library := {
 	dependencies = elf_compile_tasks,
 }
 
-batteries := compile_source("batteries", "batteries/batteries.c", batteries_include_options, batteries_include_dirs)
+batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
 
 batteries_library := {
 	name = "archive elf_batteries.lib",
