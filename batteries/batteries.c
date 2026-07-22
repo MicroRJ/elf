@@ -17,7 +17,6 @@
 #include "elf_batteries.h"
 #include "battery_helpers.h"
 #include "battery_console.h"
-#include "battery_process.h"
 
 _Static_assert(sizeof(elf_PlatformFile) >= sizeof(HANDLE), "file handle is too small");
 
@@ -32,7 +31,6 @@ static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
 }
 
 #include "win32/battery_console_win32.c"
-#include "win32/battery_process_win32.c"
 
 #include "libs/l_core_io.c"
 #include "libs/l_load_file.c"
