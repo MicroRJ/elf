@@ -4,27 +4,27 @@
 
 ELF_FUNCTION(lib_time_counter)
 {
-	elf_push_int(S, battery_counter());
+	elf_push_int(S, (elf_Integer)platform_counter());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_frequency)
 {
-	elf_push_int(S, battery_counter_frequency());
+	elf_push_int(S, (elf_Integer)platform_counter_frequency());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_elapsed)
 {
 	i64 start = lib_load_integer(S, 1);
-	f64 elapsed = (battery_counter() - start) / (f64) battery_counter_frequency();
+	f64 elapsed = (platform_counter() - start) / (f64)platform_counter_frequency();
 	elf_push_num(S, elapsed);
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_sleep)
 {
-	elf_platform_sleep(lib_load_integer(S, 1));
+	platform_sleep((U64)lib_load_integer(S, 1));
 	return 0;
 }
 
