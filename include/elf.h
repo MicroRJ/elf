@@ -1,7 +1,7 @@
 #ifndef ELF_H
 #define ELF_H
 
-#define ELF_VERSION "0.1.0-dev"
+#define ELF_VERSION "0.2.0-dev"
 #define ELF_API_VERSION 1
 
 typedef signed char        elf_i8;
