@@ -1,7 +1,7 @@
 # Elf batteries
 
-This directory contains the optional official host libraries. Compile
-`batteries.c` alongside an embedding program and call:
+This directory contains the optional official host libraries. Include
+`elf_batteries.h`, link `elf_batteries.lib` alongside `elf.lib`, and call:
 
 ```c
 elf_State *state = elf_create_state();

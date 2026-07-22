@@ -22,6 +22,11 @@ project := {
 		output = "build/elf.lib",
 	},
 
+	batteries_library = {
+		name = "archive elf_batteries.lib",
+		output = "build/elf_batteries.lib",
+	},
+
 	build_options = {
 		workers = 4,
 		verbosity = 0,
@@ -131,6 +136,7 @@ process_sources := fun(specs, prepare_task, include_options) {
 create_library_task := fun(spec, compiled_sources) {
 	ret {
 		name = spec.name,
+		output = spec.output,
 		command_line = f"${project.librarian} /nologo /out:${spec.output}${join_arguments(compiled_sources.objects)}",
 		inputs = compiled_sources.objects,
 		outputs = { spec.output },
@@ -149,9 +155,9 @@ compile_tool := fun(spec, library_task, batteries, include_options) {
 	inputs := { spec.source, project.library.output }
 	dependencies := { library_task }
 	if spec.batteries ? {
-		link_inputs = f" ${batteries.object}"
-		inputs:add(batteries.object)
-		dependencies:add(batteries.task)
+		link_inputs = f" ${batteries.output}"
+		inputs:add(batteries.output)
+		dependencies:add(batteries)
 	}
 	task := {
 		name = f"build ${spec.name}",
@@ -214,8 +220,12 @@ include_options := make_include_options(include_dirs)
 prepare_task := create_prepare_task(project.prepare)
 compiled_sources := process_sources(source_specs, prepare_task, include_options)
 library_task := create_library_task(project.library, compiled_sources)
-batteries := compile_source({ name = "batteries", path = "batteries/batteries.c" }, prepare_task, include_options)
-compiled_tools := process_tools(tool_specs, library_task, batteries, include_options)
+compiled_batteries := compile_source({ name = "batteries", path = "batteries/batteries.c" }, prepare_task, include_options)
+batteries_library_task := create_library_task(project.batteries_library, {
+	tasks = { compiled_batteries.task },
+	objects = { compiled_batteries.object },
+})
+compiled_tools := process_tools(tool_specs, library_task, batteries_library_task, include_options)
 run_tasks := process_runs(run_specs, compiled_tools)
 
 
@@ -225,7 +235,7 @@ entries := {}
 
 entries.lib = fun() {
 	ret bob.build({
-		targets = { library_task },
+		targets = { library_task, batteries_library_task },
 		options = project.build_options,
 	})
 }
