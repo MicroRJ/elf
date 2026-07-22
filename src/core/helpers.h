@@ -93,8 +93,6 @@ static inline u32 check_array_index(elf_State *state, int instr, i64 index, u32 
 	return (u32)resolved;
 }
 
-#define stack2index(S) ((S)->stack_ptr - (S)->stack)
-
 static inline void push_stack(elf_State *S, elf_Value value)
 {
 	ASSERT(S->stack_ptr < S->stack + S->stack_size);
@@ -123,9 +121,4 @@ static inline elf_Value load_value(elf_State *S, int x)
 		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "invalid argument index: %i, got: %i", x, get_num_args(S));
 	}
 	return S->frame.framebase[x];
-}
-
-static inline elf_Value make_atom_value_from_data(elf_State *state, char *data)
-{
-	return value_from_atom(elf_atom_from_data(state, data));
 }

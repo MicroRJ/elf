@@ -121,7 +121,7 @@ static void bootstrap_base_frame(elf_State *state)
 
 static void reserve_bootstrap_frame_stack_space(elf_State *state)
 {
-	ASSERT(stack2index(state) < state->frame.framesize);
+	ASSERT((state->stack_ptr - state->stack) < state->frame.framesize);
 
 	elf_Value *stack_pointer = state->frame.framebase + state->frame.framesize;
 	ASSERT(stack_pointer >= state->stack_ptr);
