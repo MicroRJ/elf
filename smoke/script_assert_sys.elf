@@ -2,6 +2,19 @@ path := "build/sys_smoke_test.txt"
 missing := "build/sys_smoke_missing.txt"
 fs := elf.fs
 path_lib := elf.path
+env := elf.env
+
+env_name := "ELF_SMOKE_ENV_7F31"
+env.unset(env_name)
+test_assert(env.has(env_name) == 0)
+test_assert(env.get(env_name) == nil)
+test_assert(env.set(env_name, "hello env") == 1)
+test_assert(env.has(env_name) == 1)
+test_assert(env.get(env_name) == "hello env")
+test_assert(env.set(env_name, "") == 1)
+test_assert(env.get(env_name) == "")
+test_assert(env.unset(env_name) == 1)
+test_assert(env.get(env_name) == nil)
 
 fs.remove_file(path)
 fs.remove_file(missing)

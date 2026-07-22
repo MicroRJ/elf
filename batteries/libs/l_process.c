@@ -2,14 +2,12 @@
 // Optional process execution and process-local control.
 //
 
-static void read_process_stream(Platform_Process *process, elf_Buffer *buffer,
-	Platform_Process_Read_Result (*read_stream)(Platform_Process *, void *, U64), U32 *os_error)
+static void read_process_stream(Platform_Process *process, elf_Buffer *buffer, Platform_Process_Read_Result (*read_stream)(Platform_Process *, void *, U64), U32 *os_error)
 {
 	for (;;)
 	{
 		if (!buffer_reserve(buffer, 64 * 1024)) return;
-		Platform_Process_Read_Result read = read_stream(process,
-			buffer->data + buffer->size, 64 * 1024);
+		Platform_Process_Read_Result read = read_stream(process, buffer->data + buffer->size, 64 * 1024);
 		if (read.error) {
 			if (!*os_error) *os_error = read.os_error;
 			return;
@@ -52,10 +50,8 @@ ELF_FUNCTION(lib_process_run)
 	lib_set_integer_field(state, result, "started", process_started);
 	lib_set_integer_field(state, result, "exit_code", completed ? (i32)waited.exit_code : -1);
 	lib_set_integer_field(state, result, "error_code", os_error);
-	lib_set_string_field(state, result, "stdout", (char *)standard_output.data,
-		(u32)standard_output.size);
-	lib_set_string_field(state, result, "stderr", (char *)standard_error.data,
-		(u32)standard_error.size);
+	lib_set_string_field(state, result, "stdout", (char *)standard_output.data, (u32)standard_output.size);
+	lib_set_string_field(state, result, "stderr", (char *)standard_error.data, (u32)standard_error.size);
 
 	if (os_error)
 	{

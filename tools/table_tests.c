@@ -197,6 +197,14 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "set_working_directory")), "elf.fs.set_working_directory is a field function");
 	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "read")), "old elf.fs.read binding is absent");
 
+	elf_Value env_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "env"));
+	expect_table_value(env_value, "elf.env is a table");
+	elf_Table *env_table = value_as_table(env_value);
+	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_atom(state, "get")), "elf.env.get is a field function");
+	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_atom(state, "has")), "elf.env.has is a field function");
+	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_atom(state, "set")), "elf.env.set is a field function");
+	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_atom(state, "unset")), "elf.env.unset is a field function");
+
 	elf_Value process_value = elf_table_get_or_nil(state, elf_table, test_key_atom(state, "process"));
 	expect_table_value(process_value, "elf.process is a table");
 	expect_function_value(elf_table_get_or_nil(state, value_as_table(process_value), test_key_atom(state, "run")), "elf.process.run is a field function");

@@ -35,6 +35,7 @@ static elf_PlatformFile elf_platform_file_from_win32(HANDLE handle)
 #include "libs/l_core_io.c"
 #include "libs/l_load_file.c"
 #include "libs/l_serialization.c"
+#include "libs/l_env.c"
 #include "libs/l_fs.c"
 #include "libs/l_path.c"
 #include "libs/l_process.c"
@@ -93,6 +94,7 @@ void elf_open_batteries(elf_State *state)
 	if (elf_type(state, root) != ELF_VALUE_TYPE_TABLE) goto cleanup;
 
 	elf_lib_serialization(state); elf_set_field(state, root, "serialization");
+	elf_lib_env(state);           elf_set_field(state, root, "env");
 	elf_lib_fs(state);            elf_set_field(state, root, "fs");
 	elf_lib_path(state);          elf_set_field(state, root, "path");
 	elf_lib_process(state);       elf_set_field(state, root, "process");
