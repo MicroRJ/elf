@@ -172,37 +172,6 @@ static Ast create_ident_ast(Parser *par, SourceSite site, elf_String *atom)
 	return tree;
 }
 
-// Todo, remove
-static Ast create_dotted_ident_ast(Parser *par, SourceSite site, const char *text)
-{
-	const char *segment = text;
-	const char *cursor = text;
-	Ast expr = 0;
-	for (;; ++ cursor)
-	{
-		if (*cursor == '.' || *cursor == 0)
-		{
-			u32 segment_size = (u32)(cursor - segment);
-			ASSERT(segment_size != 0);
-
-			elf_String *atom = elf_atom_from_data_size(par->state, segment, segment_size);
-			Ast part = create_ident_ast(par, site, atom);
-			if (expr) {
-				expr = create_field_ast(par, site, expr, part);
-			}
-			else {
-				expr = part;
-			}
-
-			if (*cursor == 0) {
-				break;
-			}
-			segment = cursor + 1;
-		}
-	}
-	return expr;
-}
-
 static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 {
 	Ast tree = create_ast(par, site, AST_ASSIGN);
@@ -314,15 +283,6 @@ static Ast create_param_ast(Parser *par, SourceSite site, Ast name, Ast type, As
 	tree->param.name = name;
 	tree->param.type = type;
 	tree->param.expr = expr;
-	return tree;
-}
-
-// Keep the source-level load operation behind one construction point. A future
-// directory/symbol pass can replace this dotted lookup with a direct function.
-static Ast create_load_file_call_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
-{
-	Ast expr = create_dotted_ident_ast(par, site, "elf.load_file");
-	Ast tree = create_call_ast(par, site, expr, args, nargs);
 	return tree;
 }
 

@@ -467,17 +467,6 @@ static Ast parse_for_identifier_tuple(Parser *parser)
 	return create_tuple_ast(parser, start.site, names, nargs);
 }
 
-static Ast parse_load_expr(Parser *par)
-{
-	Token tok = take_token(par, TOK_LOAD);
-
-	u32 nargs = parse_call_args(par);
-	Ast *args = pop_ast_array(par, nargs);
-
-	Ast value = create_load_file_call_ast(par, tok.site, args, nargs);
-	return value;
-}
-
 static Ast parse_get_mem_expr(Parser *parser)
 {
 	Token tok = take_token(parser, TOK_M_GET_MEM);
@@ -659,11 +648,6 @@ static Ast parse_unary_expr(Parser *parser)
 		{
 			consume_token(parser);
 			value = parse_subexpr(parser, 10000);
-		}
-		break;
-		case TOK_LOAD:
-		{
-			value = parse_load_expr(parser);
 		}
 		break;
 		case TOK_JSON:

@@ -108,7 +108,7 @@ elf_b32 elf_release_ref(elf_State *state, elf_Ref reference);
 #endif
 
 /*
-** Copyright (C) 2023-2025 Dayan Rodriguez
+** Copyright (C) 2023 Dayan Rodriguez
 **
 ** Permission is hereby granted, free of charge, to any person obtaining a copy
 ** of this software and associated documentation files (the "Software"), to deal

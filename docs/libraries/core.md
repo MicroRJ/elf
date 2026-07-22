@@ -196,11 +196,6 @@ answer := elf.load_file("module.elf", 41)
 elf.assert(answer == 42)
 ```
 
-The language-level `load` construct currently lowers through this function.
-The call is intentionally isolated behind one AST construction point so that a
-future directory/symbol system can resolve it directly without a runtime
-`elf` table lookup.
-
 ### `elf.const_expr(source)`
 
 Parses one constant value from a string. Supported constant forms are:

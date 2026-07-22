@@ -7,7 +7,6 @@
 #define KEYWORDDEF(_)       \
 _(JSON     ,"json"        ) \
 _(DEFAULT  ,"default"     ) \
-_(LOAD     ,"load"        ) \
 _(FUN      ,"fun"         ) \
 _(NIL      ,"nil"         ) \
 _(TRUE     ,"true"        ) \

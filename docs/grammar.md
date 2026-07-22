@@ -313,8 +313,8 @@ defer {
 ## Loading Elf
 
 ```elf
-module := load "modules/colors.elf"
-answer := load("modules/answer.elf", 41)
+module := elf.load_file("modules/colors.elf")
+answer := elf.load_file("modules/answer.elf", 41)
 ```
 
 Loaded files can return values like functions.
