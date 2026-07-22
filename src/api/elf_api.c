@@ -8,6 +8,7 @@
 #include "core.h"
 #include "helpers.h"
 #include "compiler.h"
+#include "value_text.h"
 
 const char *elf_version(void)
 {
@@ -24,6 +25,12 @@ void *elf_get_user_data(elf_State *state)
 {
 	ASSERT(state);
 	return state->user_data;
+}
+
+void elf_error(elf_State *state, const char *message)
+{
+	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "%s",
+		message ? message : "host error");
 }
 
 void elf_push_nil(elf_State *state)                 { push_value(state, value_nil()); }
@@ -198,6 +205,27 @@ elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *result)
 	elf_String *string = value_as_atom(*value);
 	result->data = string->data;
 	result->size = string->size;
+	return true;
+}
+
+elf_b32 elf_to_cstr(elf_State *state, elf_i32 index, const char **result)
+{
+	elf_StrSlice string;
+	if (!result || !elf_to_str(state, index, &string)) return false;
+	*result = string.data;
+	return true;
+}
+
+elf_b32 elf_push_value_text(elf_State *state, elf_i32 index)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value) return false;
+	elf_Scratch scratch = elf_begin_scratch();
+	char *begin = elf_arena_push(scratch.arena, 0);
+	elf_print_value(scratch.arena, *value);
+	char *end = elf_arena_push(scratch.arena, 0);
+	elf_push_str(state, begin, (int)(end - begin));
+	elf_end_scratch(scratch);
 	return true;
 }
 

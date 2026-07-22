@@ -61,8 +61,8 @@ elf_Table *elf_push_new_table(elf_State *state)
 	return table;
 }
 
-#include "libs/l_math.c"
 #include "libs/l_native.c"
+#include "libs/l_math.c"
 #include "libs/l_core.c"
 #include "libs/l_debug.c"
 #include "libs/l_table.c"

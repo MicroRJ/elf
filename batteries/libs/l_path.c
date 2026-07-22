@@ -15,10 +15,10 @@ static const char *path_last_separator(const char *begin, const char *end)
 ELF_FUNCTION(lib_path_parent)
 {
 	lib_check_arg_count(S, "path.parent", nargs, 1, 2);
-	elf_String *path = lib_load_string(S, 1);
+	elf_StrSlice path = lib_load_string(S, 1);
 	i32 levels = nargs > 2 ? (i32)lib_load_integer(S, 2) : 1;
-	const char *begin = atom_data(path);
-	const char *end = begin + atom_size(path);
+	const char *begin = path.data;
+	const char *end = begin + path.size;
 
 	while (levels-- > 0 && end > begin)
 	{
@@ -33,9 +33,9 @@ ELF_FUNCTION(lib_path_parent)
 ELF_FUNCTION(lib_path_filename)
 {
 	lib_check_arg_count(S, "path.filename", nargs, 1, 1);
-	elf_String *path = lib_load_string(S, 1);
-	const char *begin = atom_data(path);
-	const char *end = begin + atom_size(path);
+	elf_StrSlice path = lib_load_string(S, 1);
+	const char *begin = path.data;
+	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
 	lib_push_string(S, name, (u32)(end - name));
@@ -45,9 +45,9 @@ ELF_FUNCTION(lib_path_filename)
 ELF_FUNCTION(lib_path_stem)
 {
 	lib_check_arg_count(S, "path.stem", nargs, 1, 1);
-	elf_String *path = lib_load_string(S, 1);
-	const char *begin = atom_data(path);
-	const char *end = begin + atom_size(path);
+	elf_StrSlice path = lib_load_string(S, 1);
+	const char *begin = path.data;
+	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
 	const char *extension = end;
@@ -68,9 +68,9 @@ ELF_FUNCTION(lib_path_stem)
 ELF_FUNCTION(lib_path_extension)
 {
 	lib_check_arg_count(S, "path.extension", nargs, 1, 1);
-	elf_String *path = lib_load_string(S, 1);
-	const char *begin = atom_data(path);
-	const char *end = begin + atom_size(path);
+	elf_StrSlice path = lib_load_string(S, 1);
+	const char *begin = path.data;
+	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
 	const char *extension = end;
@@ -91,12 +91,12 @@ ELF_FUNCTION(lib_path_extension)
 ELF_FUNCTION(lib_path_join)
 {
 	lib_check_arg_count(S, "path.join", nargs, 2, 2);
-	elf_String *left = lib_load_string(S, 1);
-	elf_String *right = lib_load_string(S, 2);
-	const char *left_data = atom_data(left);
-	const char *right_data = atom_data(right);
-	u32 left_size = atom_size(left);
-	u32 right_size = atom_size(right);
+	elf_StrSlice left = lib_load_string(S, 1);
+	elf_StrSlice right = lib_load_string(S, 2);
+	const char *left_data = left.data;
+	const char *right_data = right.data;
+	u32 left_size = (u32)left.size;
+	u32 right_size = (u32)right.size;
 	b32 needs_separator = left_size > 0 && right_size > 0;
 
 	if (needs_separator)
@@ -106,18 +106,21 @@ ELF_FUNCTION(lib_path_join)
 		needs_separator = last != '/' && last != '\\' && first != '/' && first != '\\';
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
-	char *result = elf_arena_push(scratch.arena, left_size + right_size + needs_separator);
+	char *result = malloc(left_size + right_size + needs_separator);
+	if (!result) {
+		elf_push_nil(S);
+		return 1;
+	}
 	memcpy(result, left_data, left_size);
 	u32 at = left_size;
 	if (needs_separator) result[at++] = '/';
 	memcpy(result + at, right_data, right_size);
 	lib_push_string(S, result, at + right_size);
-	elf_end_scratch(scratch);
+	free(result);
 	return 1;
 }
 
-static const elf_Binding l_path[] = {
+static const Battery_Binding l_path[] = {
 	{"join",      lib_path_join},
 	{"parent",    lib_path_parent},
 	{"filename",  lib_path_filename},
@@ -125,7 +128,7 @@ static const elf_Binding l_path[] = {
 	{"extension", lib_path_extension},
 };
 
-static elf_Table *elf_lib_path(elf_State *state)
+static void elf_lib_path(elf_State *state)
 {
-	return new_binding_table(state, l_path, ARRAY_COUNT(l_path));
+	new_binding_table(state, l_path, battery_array_count(sizeof(l_path), sizeof(l_path[0])));
 }

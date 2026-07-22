@@ -54,6 +54,11 @@ include_dirs := {
 	"stb",
 }
 
+batteries_include_dirs := {
+	"include",
+	"batteries/internal",
+}
+
 source_specs := {
 	{ name = "base",           path = "src/base/base.c" },
 	{ name = "platform",       path = "src/platform/win32/platform_win32.c" },
@@ -104,7 +109,7 @@ create_prepare_task := fun(spec) {
 	}
 }
 
-compile_source := fun(spec, prepare_task, include_options) {
+compile_source := fun(spec, prepare_task, include_options, dependency_include_dirs) {
 	object := f"build/obj/${spec.name}.obj"
 	pdb := f"build/obj/${spec.name}.pdb"
 	task := {
@@ -112,7 +117,7 @@ compile_source := fun(spec, prepare_task, include_options) {
 		command_line = f"${project.compiler}${project.compile_options}${include_options} /c ${spec.path} /Fo${object} /Fd${pdb}",
 		inputs = { spec.path },
 		outputs = { object },
-		include_dirs = include_dirs,
+		include_dirs = dependency_include_dirs,
 		dependencies = { prepare_task },
 	}
 	ret { task = task, object = object }
@@ -125,7 +130,7 @@ process_sources := fun(specs, prepare_task, include_options) {
 	}
 
 	for spec := specs[...] ? {
-		compiled := compile_source(spec, prepare_task, include_options)
+		compiled := compile_source(spec, prepare_task, include_options, include_dirs)
 		result.tasks:add(compiled.task)
 		result.objects:add(compiled.object)
 	}
@@ -217,10 +222,15 @@ process_runs := fun(specs, compiled_tools) {
 // Tasks ----------------------------------------------------------------------
 
 include_options := make_include_options(include_dirs)
+batteries_include_options := make_include_options(batteries_include_dirs)
 prepare_task := create_prepare_task(project.prepare)
 compiled_sources := process_sources(source_specs, prepare_task, include_options)
 library_task := create_library_task(project.library, compiled_sources)
-compiled_batteries := compile_source({ name = "batteries", path = "batteries/batteries.c" }, prepare_task, include_options)
+compiled_batteries := compile_source({
+	name = "batteries",
+	path = "batteries/batteries.c",
+	include_dirs = batteries_include_dirs,
+}, prepare_task, batteries_include_options, batteries_include_dirs)
 batteries_library_task := create_library_task(project.batteries_library, {
 	tasks = { compiled_batteries.task },
 	objects = { compiled_batteries.object },

@@ -7,6 +7,11 @@ int elf_platform_process_id(void)
 	return GetCurrentProcessId();
 }
 
+void battery_exit_process(int errorcode)
+{
+	ExitProcess((UINT)errorcode);
+}
+
 int elf_platform_work_dir(char *buf, int bufsize)
 {
 	return GetCurrentDirectoryA(bufsize, buf);
@@ -32,36 +37,33 @@ elf_PlatformFile elf_platform_create_process(const char *file, const char *args)
 	STARTUPINFOA startup = {sizeof(startup)};
 	PROCESS_INFORMATION process = {0};
 
-	elf_Scratch scratch = elf_begin_scratch();
-	char *command_line = elf_arena_push_text(scratch.arena, args);
-	elf_arena_push_char(scratch.arena, 0);
+	char *command_line = _strdup(args);
+	if (!command_line) return 0;
 	b32 started = CreateProcessA(file, command_line, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &process);
-	elf_end_scratch(scratch);
+	free(command_line);
 
 	if (!started) return 0;
 	CloseHandle(process.hThread);
 	return (elf_PlatformFile)process.hProcess;
 }
 
-static void elf_platform_drain_process_pipe(HANDLE pipe, elf_Arena *output)
+static void elf_platform_drain_process_pipe(HANDLE pipe, elf_Buffer *output)
 {
 	for (;;)
 	{
 		DWORD available = 0;
 		if (!PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL) || available == 0) return;
 
-		DWORD request = MIN(available, 64 * 1024);
-		char *data = elf_arena_push(output, request);
+		DWORD request = available < 64 * 1024 ? available : 64 * 1024;
+		if (!buffer_reserve(output, request)) return;
+		char *data = output->data + output->size;
 		DWORD read = 0;
-		if (!ReadFile(pipe, data, request, &read, NULL)) {
-			output->in_use -= request;
-			return;
-		}
-		output->in_use -= request - read;
+		if (!ReadFile(pipe, data, request, &read, NULL)) return;
+		output->size += read;
 	}
 }
 
-elf_PlatformProcessResult elf_platform_run_process(const char *command_line, elf_Arena *standard_output, elf_Arena *standard_error)
+elf_PlatformProcessResult elf_platform_run_process(const char *command_line, elf_Buffer *standard_output, elf_Buffer *standard_error)
 {
 	elf_PlatformProcessResult result = {.exit_code = -1};
 	SECURITY_ATTRIBUTES security = {
@@ -89,13 +91,15 @@ elf_PlatformProcessResult elf_platform_run_process(const char *command_line, elf
 	startup.hStdOutput = stdout_write;
 	startup.hStdError = stderr_write;
 
-	elf_Scratch scratch = elf_begin_scratch();
-	char *mutable_command_line = elf_arena_push_text(scratch.arena, command_line);
-	elf_arena_push_char(scratch.arena, 0);
+	char *mutable_command_line = _strdup(command_line);
+	if (!mutable_command_line) {
+		result.error_code = ERROR_NOT_ENOUGH_MEMORY;
+		goto esc;
+	}
 	result.started = CreateProcessA(NULL, mutable_command_line, NULL, NULL, TRUE,
 		CREATE_NO_WINDOW, NULL, NULL, &startup, &process);
 	if (!result.started) result.error_code = GetLastError();
-	elf_end_scratch(scratch);
+	free(mutable_command_line);
 
 	CloseHandle(stdout_write);
 	stdout_write = 0;

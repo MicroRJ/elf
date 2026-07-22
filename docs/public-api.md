@@ -61,6 +61,15 @@ static ELF_FUNCTION(host_list)
 Libraries are ordinary nested tables built with `elf_new_table` and
 `elf_set_field`, then published with `elf_set_global`.
 
+`elf_to_cstr` returns the same borrowed string data with a guaranteed trailing
+NUL for host APIs that require C strings. `elf_push_value_text` formats any
+stack value and pushes the resulting Elf string; the batteries use it to
+implement printing without accessing Elf's value representation.
+
+Native functions can report invalid arguments or host failures with
+`elf_error`. It enters Elf's normal runtime-error path and does not return to
+the native function.
+
 ## References
 
 An `elf_Ref` keeps a value alive after it leaves the stack:

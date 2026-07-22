@@ -5,7 +5,7 @@
 #ifndef ELF_BATTERY_PLATFORM_TYPES_H
 #define ELF_BATTERY_PLATFORM_TYPES_H
 
-#include "base.h"
+#include "battery_helpers.h"
 
 typedef elf_u64 elf_PlatformFile;
 typedef elf_u64 elf_PlatformProcess;

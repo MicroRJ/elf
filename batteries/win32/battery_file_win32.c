@@ -200,13 +200,17 @@ ELF_FUNCTION(elf_platform_fs_get_paths)
 
 	elf_new_table(S);
 	elf_i32 result = elf_abs_index(S, -1);
-	elf_Scratch scratch = elf_begin_scratch();
-	char *path = elf_arena_push(scratch.arena, WIN32_PATH_CAPACITY);
+	char *path = malloc(WIN32_PATH_CAPACITY);
+	if (!path) {
+		elf_pop(S, 1);
+		elf_push_nil(S);
+		return 1;
+	}
 	CopyMemory(path, root.data, (size_t)root.size);
 	u32 count = 0;
 	b32 success = win32_collect_paths(S, path, (u32)root.size,
 	(u32)recursion_level, result, false, &count);
-	elf_end_scratch(scratch);
+	free(path);
 	if (!success)
 	{
 		elf_pop(S, 1);
@@ -254,13 +258,16 @@ ELF_FUNCTION(elf_platform_fs_for_each_path)
 	}
 
 	callback = elf_abs_index(S, callback);
-	elf_Scratch scratch = elf_begin_scratch();
-	char *path = elf_arena_push(scratch.arena, WIN32_PATH_CAPACITY);
+	char *path = malloc(WIN32_PATH_CAPACITY);
+	if (!path) {
+		elf_push_nil(S);
+		return 1;
+	}
 	CopyMemory(path, root.data, (size_t)root.size);
 	u32 count = 0;
 	b32 success = win32_collect_paths(S, path, (u32)root.size,
 	(u32)recursion_level, callback, true, &count);
-	elf_end_scratch(scratch);
+	free(path);
 	if (success) elf_push_int(S, count);
 	else elf_push_nil(S);
 	return 1;

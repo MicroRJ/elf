@@ -54,6 +54,7 @@ void elf_destroy_state(elf_State *state);
 const char *elf_version(void);
 void elf_set_user_data(elf_State *state, void *user_data);
 void *elf_get_user_data(elf_State *state);
+void elf_error(elf_State *state, const char *message);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
@@ -84,6 +85,8 @@ elf_b32 elf_is_callable(elf_State *state, elf_i32 index);
 elf_b32 elf_to_int(elf_State *state, elf_i32 index, elf_Integer *value);
 elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *value);
 elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *value);
+elf_b32 elf_to_cstr(elf_State *state, elf_i32 index, const char **value);
+elf_b32 elf_push_value_text(elf_State *state, elf_i32 index);
 
 void elf_new_table(elf_State *state);
 elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length);

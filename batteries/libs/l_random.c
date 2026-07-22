@@ -27,12 +27,12 @@ ELF_FUNCTION(lib_random_random)
 	return 1;
 }
 
-static const elf_Binding l_random[] = {
+static const Battery_Binding l_random[] = {
 	{"random_seed", lib_random_seed},
 	{"random",      lib_random_random},
 };
 
-static elf_Table *elf_lib_random(elf_State *state)
+static void elf_lib_random(elf_State *state)
 {
-	return new_binding_table(state, l_random, ARRAY_COUNT(l_random));
+	new_binding_table(state, l_random, battery_array_count(sizeof(l_random), sizeof(l_random[0])));
 }

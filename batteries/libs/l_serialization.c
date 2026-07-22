@@ -21,13 +21,17 @@ ELF_FUNCTION(l_serialization_load_json_file)
 		return 1;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
-	char *data = elf_arena_push(scratch.arena, (u64)file_size + 1);
+	char *data = malloc((size_t)file_size + 1);
+	if (!data) {
+		elf_platform_close_file(file);
+		elf_push_nil(S);
+		return 1;
+	}
 	i64 size = elf_platform_read_file(file, data, file_size);
 	elf_platform_close_file(file);
 	if (size != file_size)
 	{
-		elf_end_scratch(scratch);
+		free(data);
 		elf_push_nil(S);
 		return 1;
 	}
@@ -35,15 +39,15 @@ ELF_FUNCTION(l_serialization_load_json_file)
 	data[size] = 0;
 	elf_StrSlice source = {data, (u64)size};
 	elf_push_json(S, name, source);
-	elf_end_scratch(scratch);
+	free(data);
 	return 1;
 }
 
-static const elf_Binding l_serialization[] = {
+static const Battery_Binding l_serialization[] = {
 	{"load_json_file", l_serialization_load_json_file},
 };
 
-static elf_Table *elf_lib_serialization(elf_State *state)
+static void elf_lib_serialization(elf_State *state)
 {
-	return new_binding_table(state, l_serialization, ARRAY_COUNT(l_serialization));
+	new_binding_table(state, l_serialization, battery_array_count(sizeof(l_serialization), sizeof(l_serialization[0])));
 }
