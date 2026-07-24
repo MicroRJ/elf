@@ -10,6 +10,30 @@ static b32 fs_get_file_info(const char *path, Platform_File_Info *info)
 	return platform_get_file_info(path, info) && !info->is_directory && !info->is_symbolic_link;
 }
 
+static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directories)
+{
+	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
+	Platform_File_Info info = {0};
+	b32 found = platform_get_file_info(lib_load_cstr(state, 1), &info);
+	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
+	return 1;
+}
+
+ELF_FUNCTION(lib_fs_exists)
+{
+	return fs_push_path_kind(S, nargs, true, true);
+}
+
+ELF_FUNCTION(lib_fs_is_file)
+{
+	return fs_push_path_kind(S, nargs, true, false);
+}
+
+ELF_FUNCTION(lib_fs_is_directory)
+{
+	return fs_push_path_kind(S, nargs, false, true);
+}
+
 ELF_FUNCTION(lib_fs_file_exists)
 {
 	lib_check_arg_count(S, "fs.file_exists", nargs, 1, 1);
@@ -92,10 +116,46 @@ ELF_FUNCTION(lib_fs_create_directory)
 	return 1;
 }
 
+ELF_FUNCTION(lib_fs_create_directories)
+{
+	lib_check_arg_count(S, "fs.create_directories", nargs, 1, 1);
+	elf_push_int(S, platform_create_directories(lib_load_cstr(S, 1)));
+	return 1;
+}
+
+static int fs_transfer_file(elf_State *state, int nargs, b32 move)
+{
+	lib_check_arg_count(state, move ? "fs.move_file" : "fs.copy_file", nargs, 2, 3);
+	const char *source = lib_load_cstr(state, 1);
+	const char *destination = lib_load_cstr(state, 2);
+	b32 overwrite = nargs == 4 ? (b32)lib_load_integer(state, 3) : true;
+	b32 success = move ? platform_move_file(source, destination, overwrite)
+	                   : platform_copy_file(source, destination, overwrite);
+	elf_push_int(state, success);
+	return 1;
+}
+
+ELF_FUNCTION(lib_fs_copy_file)
+{
+	return fs_transfer_file(S, nargs, false);
+}
+
+ELF_FUNCTION(lib_fs_move_file)
+{
+	return fs_transfer_file(S, nargs, true);
+}
+
 ELF_FUNCTION(lib_fs_remove_file)
 {
 	lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1);
 	elf_push_int(S, platform_remove_file(lib_load_cstr(S, 1)));
+	return 1;
+}
+
+ELF_FUNCTION(lib_fs_remove_directory)
+{
+	lib_check_arg_count(S, "fs.remove_directory", nargs, 1, 1);
+	elf_push_int(S, platform_remove_directory(lib_load_cstr(S, 1)));
 	return 1;
 }
 
@@ -249,6 +309,9 @@ ELF_FUNCTION(lib_fs_for_each_path)
 }
 
 static const Battery_Binding l_fs[] = {
+	{"exists",                lib_fs_exists},
+	{"is_file",               lib_fs_is_file},
+	{"is_directory",          lib_fs_is_directory},
 	{"file_exists",           lib_fs_file_exists},
 	{"get_paths",             lib_fs_get_paths},
 	{"for_each_path",         lib_fs_for_each_path},
@@ -256,7 +319,11 @@ static const Battery_Binding l_fs[] = {
 	{"write_text_file",       lib_fs_write_text_file},
 	{"get_file_info",         lib_fs_get_file_info},
 	{"create_directory",      lib_fs_create_directory},
+	{"create_directories",    lib_fs_create_directories},
+	{"copy_file",             lib_fs_copy_file},
+	{"move_file",             lib_fs_move_file},
 	{"remove_file",           lib_fs_remove_file},
+	{"remove_directory",      lib_fs_remove_directory},
 	{"get_working_directory", lib_fs_get_working_directory},
 	{"set_working_directory", lib_fs_set_working_directory},
 };
