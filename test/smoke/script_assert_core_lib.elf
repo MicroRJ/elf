@@ -15,6 +15,14 @@ test_assert(elf.is_numeric("7") == 0)
 test_assert(elf.type_of(elf.to_number(7)) == "number")
 test_assert(elf.to_integer(7.75) == 7)
 
+test_assert(elf.to_string(nil) == "nil")
+test_assert(elf.to_string(42) == "42")
+test_assert(elf.to_string(1.5) == "1.500000")
+test_assert(elf.to_string("elf") == "elf")
+string_table := { answer = 42, "elf" }
+test_assert(elf.to_string(string_table) == "{answer = 42, elf}")
+test_assert(elf.to_string(string_table) == "" + string_table)
+
 child := {}
 root := { child }
 root.self = root

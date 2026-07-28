@@ -162,6 +162,7 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	elf_Table *elf_table = value_as_table(elf_value);
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "print")), "elf.print is a field function");
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "println")), "elf.println is a field function");
+	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "to_string")), "elf.to_string is a field function");
 	expect_nil(elf_table_get_or_nil(state, state->globals, test_key_atom(state, "elf.print")), "flattened elf.print global is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "load_expr")), "broken elf.load_expr binding is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "unparse")), "broken elf.unparse binding is absent");

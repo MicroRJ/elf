@@ -20,6 +20,7 @@ responsibility among the neighboring `l_core_*.c` files.
 | `elf.freeze(value)` | value | Recursively make a table graph readonly. |
 | `elf.is_readonly(value)` | integer boolean | Test an object's readonly flag. |
 | `elf.type_of(value)` | string | Return the runtime type name. |
+| `elf.to_string(value)` | string | Convert a value to its display text. |
 | `elf.is_atom(value)` | integer boolean | Test whether a value is a string/atom. |
 | `elf.is_numeric(value)` | integer boolean | Test whether a value is an integer or number. |
 | `elf.to_number(value)` | number | Convert a numeric value to a floating-point number. |
@@ -141,6 +142,19 @@ i := elf.to_integer(7.75)  // i == 7
 ```
 
 These are representation conversions, not string parsers.
+
+### `elf.to_string(value)`
+
+Returns the same display text used by string interpolation, string-left
+addition, `elf.print`, and `elf.println`:
+
+```elf
+text := elf.to_string({ answer = 42 }) // "{answer = 42}"
+```
+
+The result is intended for display and diagnostics. It is not a
+round-trippable serialization format: strings inside tables are not quoted,
+and functions and closures use short display labels.
 
 ## Caller introspection
 

@@ -89,6 +89,13 @@ ELF_FUNCTION(l_core_type_of)
 	return 1;
 }
 
+ELF_FUNCTION(l_core_to_string)
+{
+	lib_check_arg_count(S, "to_string", nargs, 1, 1);
+	elf_push_value_text(S, 1);
+	return 1;
+}
+
 ELF_FUNCTION(l_core_is_atom)
 {
 	lib_check_arg_count(S, "is_atom", nargs, 1, 1);
