@@ -132,7 +132,7 @@ typedef struct
 {
 	TokenType    type;
 	SourceSite  site;
-	unsigned int eol: 1;
+	unsigned int line_break_before: 1;
 	union {
 		u64 integer_magnitude;
 		f64 number;

@@ -377,6 +377,61 @@ static void test_parser_source_slices(elf_State *state)
 	}
 }
 
+static void test_parser_line_boundaries(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "ret /* same */ 1\nret /* split\n*/ 2");
+
+	Ast first_return = parser_test_stat(file, 0, AST_RETURN, "same-line comment keeps return value");
+	Ast first_value = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_INTEGER_LITERAL,
+		"same-line comment return expression");
+	expect_ast_i64(first_value, 1, "same-line comment return value");
+
+	Ast second_return = parser_test_stat(file, 1, AST_RETURN, "multiline comment ends bare return");
+	if (second_return && second_return->return_stat.expr) {
+		test_fail("multiline comment return has no expression");
+	}
+
+	Ast after_return = parser_test_stat(file, 2, AST_TUPLE, "expression after multiline comment return");
+	Ast after_return_value = parser_test_tuple_item(after_return, 0, AST_INTEGER_LITERAL,
+		"expression after multiline comment return value");
+	expect_ast_i64(after_return_value, 2, "expression after multiline comment integer");
+
+	file = parser_test_parse_file(state, "ret 1 +\n2\nret 3\n+4");
+
+	first_return = parser_test_stat(file, 0, AST_RETURN, "operator before newline continues return");
+	Ast add = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_ADD,
+		"operator before newline additive expression");
+	expect_ast_i64(add ? add->binary.x : 0, 1, "continued addition left value");
+	expect_ast_i64(add ? add->binary.y : 0, 2, "continued addition right value");
+
+	second_return = parser_test_stat(file, 1, AST_RETURN, "operator after newline does not continue return");
+	Ast second_value = parser_test_tuple_item(second_return->return_stat.expr, 0, AST_INTEGER_LITERAL,
+		"operator after newline return expression");
+	expect_ast_i64(second_value, 3, "operator after newline return value");
+
+	Ast unary_statement = parser_test_stat(file, 2, AST_TUPLE, "operator after newline begins statement");
+	Ast unary_value = parser_test_tuple_item(unary_statement, 0, AST_INTEGER_LITERAL,
+		"operator after newline unary expression");
+	expect_ast_i64(unary_value, 4, "operator after newline unary value");
+
+	file = parser_test_parse_file(state, "ret \"\"\"one\ntwo\"\"\":trim()\nret target\n(value)");
+
+	first_return = parser_test_stat(file, 0, AST_RETURN, "postfix follows multiline token");
+	Ast call = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_CALL,
+		"postfix call follows multiline token");
+	expect_ast_kind(call ? call->call.expr : 0, AST_META_FIELD, "multiline token keeps metafield postfix");
+
+	second_return = parser_test_stat(file, 1, AST_RETURN, "newline ends postfix chain");
+	Ast target = parser_test_tuple_item(second_return->return_stat.expr, 0, AST_IDENT,
+		"newline postfix return expression");
+	expect_ast_atom(target, "target", "newline postfix return target");
+
+	Ast parenthesized = parser_test_stat(file, 2, AST_TUPLE, "parenthesized expression after postfix newline");
+	Ast parenthesized_value = parser_test_tuple_item(parenthesized, 0, AST_IDENT,
+		"parenthesized expression value");
+	expect_ast_atom(parenthesized_value, "value", "parenthesized expression atom");
+}
+
 static void run_parser_tests(elf_State *state)
 {
 	test_parser_decl_precedence_and_atoms(state);
@@ -393,4 +448,5 @@ static void run_parser_tests(elf_State *state)
 	test_parser_get_mem_macro(state);
 	test_parser_integer_literal_boundaries(state);
 	test_parser_source_slices(state);
+	test_parser_line_boundaries(state);
 }

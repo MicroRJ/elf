@@ -921,7 +921,7 @@ static Ast parse_postfix_expr(Parser *parser)
 	Ast value = parse_unary_expr(parser);
 	if (ast_is_error(value)) goto esc;
 
-	while (parser->tok.type != TOK_NONE && !parser->tok_prev.eol)
+	while (parser->tok.type != TOK_NONE && !parser->tok.line_break_before)
 	{
 		tok = parser->tok;
 
@@ -975,6 +975,7 @@ static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 	for (;;)
 	{
 		tok = parser->tok;
+		if (tok.line_break_before) break;
 
 		AstType ast_type = binary_ast_expr_type_from_token_type(tok.type);
 		if (ast_type == AST_NONE) break;
@@ -1111,7 +1112,7 @@ static Ast parse_stat(Parser *parser)
 			consume_token(parser);
 
 			Ast expr = 0;
-			if (!tok.eol)
+			if (!parser->tok.line_break_before)
 			{
 				expr = parse_optional_tuple_expr(parser);
 				if (ast_is_error(expr)) {
@@ -1126,7 +1127,7 @@ static Ast parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 			Ast expr = 0;
-			if (!tok.eol)
+			if (!parser->tok.line_break_before)
 			{
 				expr = parse_optional_tuple_expr(parser);
 				if (ast_is_error(expr)) {
@@ -1141,7 +1142,7 @@ static Ast parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 			Ast expr = 0;
-			if (!tok.eol)
+			if (!parser->tok.line_break_before)
 			{
 				expr = parse_optional_tuple_expr(parser);
 				if (ast_is_error(expr)) {

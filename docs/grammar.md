@@ -357,7 +357,9 @@ Method calls pass the value as `this`:
 items:add("new")
 
 handler := {
-	call = fun(value) ret value,
+	call = fun(value) {
+		ret value
+	},
 }
 handler.call("new")
 ```
@@ -484,6 +486,10 @@ literal          := "nil" | "true" | "false"
 Postfix chains must remain on the same line. A table immediately following a
 callable expression is a one-argument call; `make { name = "Ada" }` is
 equivalent to `make({ name = "Ada" })`.
+
+An operator at the end of a line continues the expression onto the next line.
+An operator beginning a new line starts a new statement because the preceding
+expression was already complete.
 
 Operator precedence is defined by the table in
 [Math and comparisons](#math-and-comparisons). Ranges are accepted only where

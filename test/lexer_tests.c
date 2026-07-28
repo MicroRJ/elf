@@ -111,6 +111,17 @@ static void expect_token_site_size(Token token, u32 size, const char *label)
 	}
 }
 
+static void expect_token_line_break(Token token, b32 expected, const char *label)
+{
+	if (!!token.line_break_before != !!expected) {
+		fprintf(stderr, "FAIL: %s expected line_break_before %u, got %u\n",
+			label,
+			!!expected,
+			!!token.line_break_before);
+		test_failures += 1;
+	}
+}
+
 static void expect_token_int(Token token, u64 expected, const char *label)
 {
 	if (token.integer_magnitude != expected) {
@@ -497,6 +508,50 @@ static void test_lexer_line_tracking_through_skipped_text(elf_State *state)
 	expect_token_line(next, 6, "next", "tracked token after string block line");
 }
 
+static void test_lexer_line_breaks(elf_State *state)
+{
+	const char *source = "alpha beta\n gamma /* same */ delta /* multi\n comment */ epsilon // line\n zeta";
+	Parser parser = lexer_test_parser(state, source);
+	lexer_prime(&parser);
+
+	Token alpha = lexer_next(&parser);
+	expect_token_line_break(alpha, false, "first token has no leading line break");
+
+	Token beta = lexer_next(&parser);
+	expect_token_line_break(beta, false, "spaces do not create a line break");
+
+	Token gamma = lexer_next(&parser);
+	expect_token_line_break(gamma, true, "newline marks the next token");
+
+	Token delta = lexer_next(&parser);
+	expect_token_line_break(delta, false, "same-line block comment does not create a line break");
+
+	Token epsilon = lexer_next(&parser);
+	expect_token_line_break(epsilon, true, "multiline block comment creates a line break");
+
+	Token zeta = lexer_next(&parser);
+	expect_token_line_break(zeta, true, "line comment newline marks the next token");
+
+	Parser block = lexer_test_parser(state, "\"\"\"one\ntwo\"\"\":trim\nnext");
+	lexer_prime(&block);
+
+	Token string = lexer_next(&block);
+	expect_token_type(string, TOK_STRING, "lex multiline token for line break test");
+	expect_token_line_break(string, false, "multiline token has no leading line break");
+
+	Token colon = lexer_next(&block);
+	expect_token_type(colon, TOK_COLON, "lex postfix after multiline token");
+	expect_token_line_break(colon, false, "newline inside token does not break following postfix");
+
+	Token trim = lexer_next(&block);
+	expect_token_type(trim, TOK_IDENTIFIER, "lex field after multiline token");
+	expect_token_line_break(trim, false, "same-line field has no leading line break");
+
+	Token next = lexer_next(&block);
+	expect_token_type(next, TOK_IDENTIFIER, "lex token on line after multiline token");
+	expect_token_line_break(next, true, "newline after multiline token marks next token");
+}
+
 static void test_lexer_numbers(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "123 0x10 0b101 18446744073709551615 .25 12.5");
@@ -556,6 +611,7 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_format_string_parts(state);
 	test_lexer_line_slices(state);
 	test_lexer_line_tracking_through_skipped_text(state);
+	test_lexer_line_breaks(state);
 	test_lexer_numbers(state);
 	test_lexer_operators(state);
 }

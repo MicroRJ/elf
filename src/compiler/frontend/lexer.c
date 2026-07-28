@@ -549,15 +549,94 @@ static elf_String *lex_string_part(Lexer *lexer, char **cursor, SourceSite site,
 	return atom;
 }
 
+static b32 lexer_skip_trivia(Lexer *lexer, char **cursor)
+{
+	char *cur = *cursor;
+	b32 line_break = false;
+
+	for (;;)
+	{
+		if (*cur == ' ' || *cur == '\t')
+		{
+			cur += 1;
+		}
+		else if (*cur == '\n')
+		{
+			cur += 1;
+			lexer_advance_line(lexer, cur);
+			line_break = true;
+		}
+		else if (*cur == '\r')
+		{
+			cur += 1;
+			if (*cur == '\n') {
+				cur += 1;
+			}
+			lexer_advance_line(lexer, cur);
+			line_break = true;
+		}
+		else if (cur[0] == '/' && cur[1] == '/')
+		{
+			cur += 2;
+			while (*cur && *cur != '\n' && *cur != '\r') {
+				cur += 1;
+			}
+		}
+		else if (cur[0] == '/' && cur[1] == '*')
+		{
+			SourceSite site = source_site_from_ptr(lexer, cur);
+			cur += 2;
+			for (;;)
+			{
+				if (!*cur)
+				{
+					log_source_error(lexer, site, "unterminated comment");
+					break;
+				}
+				if (cur[0] == '*' && cur[1] == '/')
+				{
+					cur += 2;
+					break;
+				}
+				if (*cur == '\n')
+				{
+					cur += 1;
+					lexer_advance_line(lexer, cur);
+					line_break = true;
+				}
+				else if (*cur == '\r')
+				{
+					cur += 1;
+					if (*cur == '\n') {
+						cur += 1;
+					}
+					lexer_advance_line(lexer, cur);
+					line_break = true;
+				}
+				else
+				{
+					cur += 1;
+				}
+			}
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	*cursor = cur;
+	return line_break;
+}
+
 static Token lex_token(Lexer *lexer)
 {
 	char *cur = lexer->cursor;
-	Token token;
-
-	retry:
-	token = (Token){0};
+	b32 line_break_before = lexer_skip_trivia(lexer, &cur);
+	Token token = {0};
 	token.type = TOK_NONE;
 	token.site = lexer_source_site(lexer, cur);
+	token.line_break_before = line_break_before;
 
 	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && *cur == '}' && lexer->mode.depth == 0)
 	{
@@ -712,29 +791,6 @@ static Token lex_token(Lexer *lexer)
 			token.type = TOK_NONE;
 		} break;
 
-		case ' ': case '\t':
-		{
-			cur += 1;
-			goto retry;
-		}
-
-		case '\n':
-		{
-			cur += 1;
-			lexer_advance_line(lexer, cur);
-			goto retry;
-		}
-
-		case '\r':
-		{
-			cur += 1;
-			if (*cur == '\n') {
-				cur += 1;
-			}
-			lexer_advance_line(lexer, cur);
-			goto retry;
-		}
-
 		case '[': token.type = TOK_SQUARE_LEFT;  cur += 1; break;
 		case ']': token.type = TOK_SQUARE_RIGHT; cur += 1; break;
 		case '(': token.type = TOK_LEFT_PAREN;   cur += 1; break;
@@ -789,38 +845,6 @@ static Token lex_token(Lexer *lexer)
 			if (*cur == '=') {
 				cur += 1;
 				token.type = TOK_DIV_ASSIGN;
-			}
-			else if (*cur == '*') {
-				cur += 1;
-				while (*cur) {
-					if (*cur == '*' && cur[1] == '/') {
-						cur += 2;
-						goto retry;
-					}
-					if (*cur == '\r') {
-						cur += 1;
-						if (*cur == '\n') {
-							cur += 1;
-						}
-						lexer_advance_line(lexer, cur);
-						continue;
-					}
-					if (*cur == '\n') {
-						cur += 1;
-						lexer_advance_line(lexer, cur);
-						continue;
-					}
-					cur += 1;
-				}
-
-				log_source_error(lexer, token.site, "unterminated comment");
-				goto retry;
-			}
-			else if (*cur == '/') {
-				while (*cur && *cur != '\n' && *cur != '\r') {
-					cur += 1;
-				}
-				goto retry;
 			}
 		} break;
 
@@ -1007,16 +1031,6 @@ static Token lex_token(Lexer *lexer)
 	token.site.size = (u32)(cur - token.site.data);
 	if (token.site.size == 0) {
 		token.site.size = 1;
-	}
-
-	while (*cur == ' ' || *cur == '\t') {
-		cur += 1;
-	}
-	if (cur[0] == '/' && (cur[1] == '/' || cur[1] == '*')) {
-		token.eol = 1;
-	}
-	else if (cur[0] == '\n' || cur[0] == '\r') {
-		token.eol = 1;
 	}
 
 	update_lexer:
