@@ -227,6 +227,8 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_table_value(random_value, "elf.random is a table");
 	expect_function_value(elf_table_get_or_nil(state, value_as_table(random_value), test_key_atom(state, "random")), "elf.random.random is a field function");
 
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_atom(state, "map_equal")), "table.map_equal is a method");
+
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_atom(state, "sockets")), "deleted elf.sockets library is absent");
 }
 

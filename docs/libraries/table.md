@@ -16,6 +16,29 @@ person:has("name")      // 1
 person:haskey("name")   // same as has
 ```
 
+Compare the keyed map portions of two tables recursively:
+
+```elf
+{name = "elf", 1}:map_equal({name = "elf", 2}) // 1
+```
+
+`map_equal` requires the same array-item count and live-entry count. Every live
+key on the left must exist on the right, and the values referenced by matching
+entries are compared recursively. Key insertion and backing storage order do
+not matter.
+
+Array slots without a live entry binding are not inspected, although they
+still contribute to the required item count. Aliases are ordinary live entries
+and must be present on both tables. Dead entries do not affect equality.
+Cycles and shared table references are supported; sharing layout does not
+affect equality.
+
+Scalar values follow ordinary Elf equality, so an integer and an equal
+floating-point number compare equal. Readonly state is not part of a table's
+value.
+
+The `==` operator remains an identity comparison for tables.
+
 Keys, values, and pairs come back as new tables:
 
 ```elf
@@ -115,7 +138,7 @@ The comparison returns a negative integer, zero, or a positive integer.
 ## Complete list
 
 ```text
-length size has haskey delete clear keys values pairs clone merge
+length size map_equal has haskey delete clear keys values pairs clone merge
 get idx set repl add push insert pop remove slice extend swap reverse
 map filter sort
 ```

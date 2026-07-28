@@ -67,4 +67,48 @@ table:clear()
 test_assert(table:length() == 0)
 test_assert(table:has("second") == 0)
 
+test_assert({1, 2, 3}:map_equal({1, 3, 2}))
+test_assert({1, 2}:map_equal({9, 8}))
+test_assert({1, 2}:map_equal({1, 2, 3}) == 0)
+test_assert({1}:map_equal(1) == 0)
+
+keyed_left := { answer = 42, "elf" }
+keyed_right := { answer = 42, "different array value" }
+test_assert(keyed_left:map_equal(keyed_right))
+test_assert(keyed_left:map_equal({ answer = 41, "elf" }) == 0)
+test_assert({ first = 1, second = 2 }:map_equal({ second = 2, first = 1 }))
+test_assert({ "var_1" = 1, "var_0" = 0 }:map_equal({ "var_0" = 0, "var_1" = 1 }))
+test_assert({ first = 1 }:map_equal({ second = 1 }) == 0)
+test_assert({ answer = 42 }:map_equal({42}) == 0)
+test_assert({ answer = 42, 7 }:map_equal({ answer = 42 }) == 0)
+
+dead_left := { keep = 1, remove = 2 }
+dead_left:delete("remove")
+test_assert(dead_left:map_equal({ keep = 1 }))
+
+mixed_left := { first = 1, 10, second = 2, 20 }
+mixed_right := { second = 2, 10, first = 1, 20 }
+test_assert(mixed_left:map_equal(mixed_right))
+test_assert(mixed_left:map_equal({ second = 2, 20, first = 1, 10 }))
+
+nested_left := { child = { value = 2, 10 } }
+nested_right := { child = { value = 2, 20 } }
+test_assert(nested_left:map_equal(nested_right))
+nested_right.child:add(30)
+test_assert(nested_left:map_equal(nested_right) == 0)
+nested_right.child:pop()
+nested_right.child.value = 3
+test_assert(nested_left:map_equal(nested_right) == 0)
+
+cycle_left := {}
+cycle_left.self = cycle_left
+cycle_right := {}
+cycle_right.self = cycle_right
+test_assert(cycle_left:map_equal(cycle_right))
+
+shared_child := { value = 7 }
+shared_left := { first = shared_child, second = shared_child }
+shared_right := { first = { value = 7 }, second = { value = 7 } }
+test_assert(shared_left:map_equal(shared_right))
+
 ret 144
