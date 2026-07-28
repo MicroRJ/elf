@@ -221,6 +221,13 @@ static void test_lexer_strings(elf_State *state)
 	expect_token_type(empty_string, TOK_STRING, "lex empty string");
 	expect_token_atom(empty_string, "", "empty string atom payload");
 
+	Parser interpolation_text = lexer_test_parser(state, "\"${name}\"");
+	lexer_prime(&interpolation_text);
+
+	Token interpolation_text_string = lexer_next(&interpolation_text);
+	expect_token_type(interpolation_text_string, TOK_STRING, "plain string keeps interpolation text");
+	expect_token_atom(interpolation_text_string, "${name}", "plain string interpolation text payload");
+
 	Parser escaped = lexer_test_parser(state, "\"a\\n\\\\b\"");
 	lexer_prime(&escaped);
 

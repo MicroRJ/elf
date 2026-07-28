@@ -406,15 +406,14 @@ static u32 lex_identifier(char **cursor, char *buffer)
 	return (u32)(out - buffer);
 }
 
-static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 is_format, TokenType *type)
+static elf_String *lex_string_segment(Lexer *lexer, char **cursor, SourceSite site, b32 is_block, b32 is_format, b32 *ended)
 {
+	if (ended) *ended = false;
+
 	char *cur = *cursor;
 	elf_Scratch scratch = elf_begin_scratch();
 	char *buffer = elf_arena_reserve(scratch.arena, lexer_scratch_capacity(lexer));
 	char *out = buffer;
-	b32 is_block = cur[0] == '"' && cur[1] == '"' && cur[2] == '"';
-
-	cur += is_block ? 3 : 1;
 
 	for (;;)
 	{
@@ -425,96 +424,22 @@ static elf_String *lex_string(Lexer *lexer, char **cursor, SourceSite site, b32 
 
 		if (is_block && cur[0] == '"' && cur[1] == '"' && cur[2] == '"') {
 			cur += 3;
+			if (ended) *ended = true;
 			break;
 		}
 
 		if (!is_block && *cur == '"') {
 			cur += 1;
+			if (ended) *ended = true;
 			break;
 		}
 
-		if (!is_block && (*cur == '\n' || *cur == '\r')) {
-			log_source_error(lexer, source_site_from_ptr(lexer, cur), "newline in string; use \\n or a string block");
-			break;
-		}
-
-		if (*cur == '\r') {
-			cur += 1;
-			if (*cur == '\n') {
-				cur += 1;
-			}
-			lexer_advance_line(lexer, cur);
-			*out++ = '\n';
-		}
-		else if (*cur == '\n') {
-			cur += 1;
-			lexer_advance_line(lexer, cur);
-			*out++ = '\n';
-		}
-		else if (is_format && cur[0] == FORMAT_CHAR && cur[1] == '{') {
-			*out++ = *cur++;
-			*out++ = *cur++;
-		}
-		else if (*cur == '\\') {
-			u32 codepoint = lex_escape_codepoint(lexer, &cur, site);
-			out = write_utf8(out, codepoint);
-		}
-		else {
-			*out++ = *cur++;
-		}
-	}
-
-	*out = 0;
-
-	if (!is_format) {
-		*type = TOK_STRING;
-	}
-	else {
-		*type = TOK_FORMAT_STRING;
-	}
-
-	escape:
-	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
-	*cursor = cur;
-	elf_end_scratch(scratch);
-	return atom;
-}
-
-
-static elf_String *lex_string_part(Lexer *lexer, char **cursor, SourceSite site, b32 in_block, b32 *ended)
-{
-	*ended = false;
-
-	char *cur = *cursor;
-	elf_Scratch scratch = elf_begin_scratch();
-	char *buffer = elf_arena_reserve(scratch.arena, lexer_scratch_capacity(lexer));
-	char *out = buffer;
-
-	for (;;)
-	{
-		if (*cur == 0) {
-			log_source_error(lexer, site, in_block ? "unterminated string block" : "unterminated string");
-			break;
-		}
-
-		if (in_block && cur[0] == '"' && cur[1] == '"' && cur[2] == '"') {
-			cur += 3;
-			*ended = true;
-			break;
-		}
-
-		if (!in_block && *cur == '"') {
-			cur += 1;
-			*ended = true;
-			break;
-		}
-
-		if (cur[0] == FORMAT_CHAR && cur[1] == '{') {
+		if (is_format && cur[0] == FORMAT_CHAR && cur[1] == '{') {
 			cur += 2;
 			break;
 		}
 
-		if (!in_block && (*cur == '\n' || *cur == '\r')) {
+		if (!is_block && (*cur == '\n' || *cur == '\r')) {
 			log_source_error(lexer, source_site_from_ptr(lexer, cur), "newline in string; use \\n or a string block");
 			break;
 		}
@@ -646,7 +571,7 @@ static Token lex_token(Lexer *lexer)
 
 		cur += 1;
 		b32 ended;
-		token.atom = lex_string_part(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, &ended);
+		token.atom = lex_string_segment(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, true, &ended);
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
 		if (ended) {
@@ -688,7 +613,7 @@ static Token lex_token(Lexer *lexer)
 				cur += 2 + is_block * 2;
 
 				b32 ended;
-				token.atom = lex_string_part(lexer, &cur, string_site, is_block, &ended);
+				token.atom = lex_string_segment(lexer, &cur, string_site, is_block, true, &ended);
 				token.type = ended ? TOK_STRING : TOK_STRING_START;
 				if (!ended)
 				{
@@ -746,7 +671,10 @@ static Token lex_token(Lexer *lexer)
 
 		case '"':
 		{
-			token.atom = lex_string(lexer, &cur, token.site, false, &token.type);
+			b32 is_block = cur[1] == '"' && cur[2] == '"';
+			cur += is_block ? 3 : 1;
+			token.atom = lex_string_segment(lexer, &cur, token.site, is_block, false, 0);
+			token.type = TOK_STRING;
 		} break;
 
 		case '#':
