@@ -69,13 +69,15 @@ decimal := 42
 binary := 0b101010
 hex := 0x2a
 fraction := 3.5
+scientific := 1.5e-2
 letter := 'E'
 text := "hello"
 ```
 
 Integers are signed 64-bit values. Number literals containing a decimal point
-are floating-point values. `true` and `false` are the integer values `1` and
-`0`; character literals are integer Unicode code points.
+or a decimal `e`/`E` exponent are floating-point values. `1.5e-2` means
+`1.5 * 10 ** -2`. `true` and `false` are the integer values `1` and `0`;
+character literals are integer Unicode code points.
 
 Comments come in two flavors:
 

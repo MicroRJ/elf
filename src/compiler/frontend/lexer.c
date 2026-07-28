@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#include <math.h>
+
 #include "source_diagnostics.c"
 
 static const char *token_type_name(TokenType type)
@@ -327,6 +329,42 @@ static f64 lex_fractional(char **cursor)
 	return value / scale;
 }
 
+static b32 lex_number_exponent(Lexer *lexer, char **cursor, f64 *value)
+{
+	char *cur = *cursor;
+	if (*cur != 'e' && *cur != 'E') return false;
+
+	SourceSite site = source_site_from_ptr(lexer, cur);
+	cur += 1;
+
+	b32 negative = false;
+	if (*cur == '+' || *cur == '-')
+	{
+		negative = *cur == '-';
+		cur += 1;
+	}
+
+	if (*cur < '0' || *cur > '9')
+	{
+		log_source_error(lexer, site, "expected digits after number exponent");
+		*cursor = cur;
+		return true;
+	}
+
+	f64 exponent = 0;
+	while ('0' <= *cur && *cur <= '9')
+	{
+		exponent = exponent * 10 + (*cur - '0');
+		cur += 1;
+	}
+
+	if (*value != 0) {
+		*value *= pow(10.0, negative ? -exponent : exponent);
+	}
+	*cursor = cur;
+	return true;
+}
+
 static u64 lex_integer(Lexer *lexer, char **cursor)
 {
 	char *cur = *cursor;
@@ -349,7 +387,10 @@ static u64 lex_integer(Lexer *lexer, char **cursor)
 	for (;;) {
 		u64 digit;
 
-		if ('A' <= *cur && *cur <= 'Z') {
+		if (base == 10 && (*cur == 'e' || *cur == 'E')) {
+			break;
+		}
+		else if ('A' <= *cur && *cur <= 'Z') {
 			digit = 10 + *cur++ - 'A';
 		}
 		else if ('a' <= *cur && *cur <= 'z') {
@@ -643,15 +684,26 @@ static Token lex_token(Lexer *lexer)
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
 		{
+			b32 is_decimal = !(cur[0] == '0' && (cur[1] == 'b' || cur[1] == 'x'));
 			u64 value = lex_integer(lexer, &cur);
 
 			token.type = TOK_INTEGER;
 			token.integer_magnitude = value;
 
-			if (cur[0] == '.' && cur[1] != '.') {
+			if (is_decimal && cur[0] == '.' && cur[1] != '.')
+			{
 				cur += 1;
 				token.type = TOK_NUMBER;
 				token.number = (f64)value + lex_fractional(&cur);
+			}
+			if (is_decimal)
+			{
+				f64 number = token.type == TOK_NUMBER ? token.number : (f64)value;
+				if (lex_number_exponent(lexer, &cur, &number))
+				{
+					token.type = TOK_NUMBER;
+					token.number = number;
+				}
 			}
 		} break;
 
@@ -791,6 +843,7 @@ static Token lex_token(Lexer *lexer)
 			else if ('0' <= *cur && *cur <= '9') {
 				token.type = TOK_NUMBER;
 				token.number = lex_fractional(&cur);
+				lex_number_exponent(lexer, &cur, &token.number);
 			}
 		} break;
 

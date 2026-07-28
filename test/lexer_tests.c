@@ -143,6 +143,14 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 	}
 }
 
+static void count_expected_exponent_error(LogLevel level, const char *message, void *user)
+{
+	(void)level;
+	if (strstr(message, "expected digits after number exponent")) {
+		*(u32 *)user += 1;
+	}
+}
+
 static void test_lexer_keywords_and_identifiers(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "true false if fun recurse true_value load");
@@ -561,7 +569,8 @@ static void test_lexer_line_breaks(elf_State *state)
 
 static void test_lexer_numbers(elf_State *state)
 {
-	Parser parser = lexer_test_parser(state, "123 0x10 0b101 18446744073709551615 .25 12.5");
+	Parser parser = lexer_test_parser(state,
+		"123 0x10 0b101 18446744073709551615 .25 12.5 1e3 1E3 1.5e2 1.5e-2 .5e+1 0e999999 0x1e3");
 	lexer_prime(&parser);
 
 	Token decimal = lexer_next(&parser);
@@ -587,6 +596,58 @@ static void test_lexer_numbers(elf_State *state)
 	Token fraction = lexer_next(&parser);
 	expect_token_type(fraction, TOK_NUMBER, "lex fractional number");
 	expect_token_number(fraction, 12.5, "fractional number value");
+
+	Token integer_exponent = lexer_next(&parser);
+	expect_token_type(integer_exponent, TOK_NUMBER, "lex integer coefficient exponent");
+	expect_token_number(integer_exponent, 1000, "integer coefficient exponent value");
+	expect_token_site_size(integer_exponent, 3, "integer coefficient exponent token size");
+
+	Token uppercase_exponent = lexer_next(&parser);
+	expect_token_type(uppercase_exponent, TOK_NUMBER, "lex uppercase exponent");
+	expect_token_number(uppercase_exponent, 1000, "uppercase exponent value");
+
+	Token fractional_exponent = lexer_next(&parser);
+	expect_token_type(fractional_exponent, TOK_NUMBER, "lex fractional coefficient exponent");
+	expect_token_number(fractional_exponent, 150, "fractional coefficient exponent value");
+
+	Token negative_exponent = lexer_next(&parser);
+	expect_token_type(negative_exponent, TOK_NUMBER, "lex negative exponent");
+	expect_token_number(negative_exponent, 0.015, "negative exponent value");
+	expect_token_site_size(negative_exponent, 6, "negative exponent token size");
+
+	Token positive_exponent = lexer_next(&parser);
+	expect_token_type(positive_exponent, TOK_NUMBER, "lex explicit positive exponent");
+	expect_token_number(positive_exponent, 5, "explicit positive exponent value");
+
+	Token zero_large_exponent = lexer_next(&parser);
+	expect_token_type(zero_large_exponent, TOK_NUMBER, "lex zero with large exponent");
+	expect_token_number(zero_large_exponent, 0, "zero with large exponent value");
+
+	Token hex_with_e = lexer_next(&parser);
+	expect_token_type(hex_with_e, TOK_INTEGER, "hexadecimal e remains a digit");
+	expect_token_int(hex_with_e, 0x1e3, "hexadecimal e digit value");
+
+	u32 exponent_errors = 0;
+	log_set_hook(count_expected_exponent_error, &exponent_errors);
+	Parser malformed = lexer_test_parser(state, "1e 2e+ 3E-");
+	lexer_prime(&malformed);
+
+	Token missing_exponent = lexer_next(&malformed);
+	expect_token_type(missing_exponent, TOK_NUMBER, "recover malformed exponent without digits");
+	expect_token_site_size(missing_exponent, 2, "malformed exponent token size");
+
+	Token missing_positive_exponent = lexer_next(&malformed);
+	expect_token_type(missing_positive_exponent, TOK_NUMBER, "recover malformed positive exponent");
+	expect_token_site_size(missing_positive_exponent, 3, "malformed positive exponent token size");
+
+	Token missing_negative_exponent = lexer_next(&malformed);
+	expect_token_type(missing_negative_exponent, TOK_NUMBER, "recover malformed negative exponent");
+	expect_token_site_size(missing_negative_exponent, 3, "malformed negative exponent token size");
+	log_set_hook(0, 0);
+
+	if (exponent_errors != 3) {
+		test_fail("malformed exponents report missing digits");
+	}
 }
 
 static void test_lexer_operators(elf_State *state)
