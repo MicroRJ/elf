@@ -144,7 +144,7 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 
 	const char *source_name = parser && parser->name ? atom_data(parser->name) : "<unknown>";
 	const char *severity_name = severity >= SEVERITY_FATAL ? "error" :
-		severity == SEVERITY_WARNING ? "warning" : "note";
+	severity == SEVERITY_WARNING ? "warning" : "note";
 
 	if (site.line_index) {
 		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] parser %s: %s"
@@ -334,44 +334,40 @@ static Ast parse_function(Parser *par)
 	u32 nparams = 0;
 	Ast variadic = 0;
 	take_token(par, TOK_LEFT_PAREN);
-	if (!peek_token(par, TOK_PAREN_RIGHT))
+	if (!peek_token(par, TOK_PAREN_RIGHT)) do
 	{
-		for (;;)
-		{
-			Token tok = par->tok;
-			if (pick_token(par, TOK_ELLIPSIS))
-			{
-				variadic = create_ellipsis_ast(par, tok.site);
-				if (pick_token(par, TOK_COMMA))
-				{
-					parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "variadic marker must be the final parameter");
-					continue;
-				}
-				break;
-			}
-			else
-			{
-				Ast name = parse_ident_expr(par);
-				Ast type = 0;
-				Ast expr = 0;
-				if (pick_token(par, TOK_COLON))
-				{
-					type = parse_expr(par);
-				}
-				if (pick_token(par, TOK_ASSIGN))
-				{
-					expr = parse_expr(par);
-				}
-				Ast param = create_param_ast(par, tok.site, name, type, expr);
-				push_ast(par, param);
-				++ nparams;
-			}
+		Token tok = par->tok;
 
-			if (!pick_token(par, TOK_COMMA)) {
-				break;
+		if (pick_token(par, TOK_ELLIPSIS))
+		{
+			variadic = create_ellipsis_ast(par, tok.site);
+			if (pick_token(par, TOK_COMMA))
+			{
+				parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "variadic marker must be the final parameter");
+				continue;
 			}
+			break;
 		}
-	}
+		else
+		{
+			Ast name = parse_ident_expr(par);
+			Ast type = 0;
+			Ast expr = 0;
+			if (pick_token(par, TOK_COLON))
+			{
+				type = parse_expr(par);
+			}
+			if (pick_token(par, TOK_ASSIGN))
+			{
+				expr = parse_expr(par);
+			}
+			Ast param = create_param_ast(par, tok.site, name, type, expr);
+			push_ast(par, param);
+			++ nparams;
+		}
+
+	} while(pick_token(par, TOK_COMMA));
+
 	take_token(par, TOK_PAREN_RIGHT);
 
 	Ast *params = pop_ast_array(par, nparams);
@@ -533,7 +529,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		if (ast_is_missing_or_error(expr))
 		{
 			parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site,
-				"expected expression inside interpolated string");
+			"expected expression inside interpolated string");
 			parser->ast.stack_index = stack_start;
 			return ERROR_AST;
 		}
@@ -544,7 +540,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		if (part.type != TOK_STRING_PART && part.type != TOK_STRING_END)
 		{
 			parser_error(parser, ERROR_EXPECTED_TOKEN, part.site,
-				"expected the end of an interpolated expression");
+			"expected the end of an interpolated expression");
 			parser->ast.stack_index = stack_start;
 			return ERROR_AST;
 		}
@@ -990,7 +986,7 @@ static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 
 		Ast y = 0;
 		if (ast_type != AST_RANGE ||
-			(!peek_token(parser, TOK_SQUARE_RIGHT) && !peek_token(parser, TOK_COMMA)))
+		(!peek_token(parser, TOK_SQUARE_RIGHT) && !peek_token(parser, TOK_COMMA)))
 		{
 			y = parse_subexpr(parser, inner_precedence);
 		}
@@ -1233,7 +1229,7 @@ static Ast parse_stat(Parser *parser)
 				if (init_expr->tuple.nargs != 1)
 				{
 					parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site,
-						"range for loops require exactly one expression on the right-hand side");
+					"range for loops require exactly one expression on the right-hand side");
 					return ERROR_AST;
 				}
 
@@ -1241,7 +1237,7 @@ static Ast parse_stat(Parser *parser)
 				if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 				{
 					parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site,
-						"range for loops require a range or ranged index expression");
+					"range for loops require a range or ranged index expression");
 					return ERROR_AST;
 				}
 

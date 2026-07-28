@@ -2,6 +2,10 @@
 
 Elf is still growing!
 
+This guide describes syntax that reaches the current compiler and calls out
+syntax that is only partially implemented. The parser and compiler are the
+authority when this document falls behind.
+
 ## First spell
 
 ```elf
@@ -39,6 +43,13 @@ answer ::= 42
 left, right := 10, 20
 ```
 
+Declarations, assignments, and returns may carry several values. Missing
+right-hand values become `nil`.
+
+```elf
+left, right = 10 // right becomes nil
+```
+
 The binding is constant, not the value behind it:
 
 ```elf
@@ -61,6 +72,10 @@ fraction := 3.5
 letter := 'E'
 text := "hello"
 ```
+
+Integers are signed 64-bit values. Number literals containing a decimal point
+are floating-point values. `true` and `false` are the integer values `1` and
+`0`; character literals are integer Unicode code points.
 
 Comments come in two flavors:
 
@@ -85,8 +100,8 @@ report := f"""name: ${name}
 score: ${score}"""
 ```
 
-Escapes include `\n`, `\r`, `\t`, `\\`, `\"`, `\xNN`, `\uNNNN`, and
-`\UNNNNNNNN`.
+Escapes include `\0`, `\a`, `\b`, `\f`, `\n`, `\r`, `\t`, `\v`, `\\`, `\/`,
+`\'`, `\"`, `\xNN`, `\uNNNN`, and `\UNNNNNNNN`.
 
 Strings have methods too:
 
@@ -106,11 +121,27 @@ numbers := {10, 20, 30}
 player := {
 	name = "Ada",
 	score = 100,
+	["favorite"] = "compiler",
+	[7] = "lucky",
 }
 
 key := "favorite"
 player.[key] = "compiler"
 ```
+
+Table entries have three forms:
+
+```elf
+values := {
+	10,                   // unkeyed array item
+	name = "Ada",         // identifier key; shorthand for ["name"] = "Ada"
+	[make_key()] = value, // computed key
+	"answer" = 42,        // expression key
+}
+```
+
+Commas between table entries are accepted and strongly preferred. The current
+parser also accepts adjacent entries without commas.
 
 Read them in the same shapes:
 
@@ -121,18 +152,34 @@ favorite := player.[key]
 name, score := player.(name, score)
 ```
 
+Plain brackets address the array by integer index. A dot followed by brackets
+performs keyed lookup with an arbitrary expression:
+
+```elf
+array_value := values[0]
+numeric_key := values.[0]
+dynamic_key := values.[key]
+```
+
+`value.name` is shorthand for `value.["name"]`. Consequently, `value[0]` and
+`value.[0]` are different operations.
+
 Indexes can chain:
 
 ```elf
 cell := matrix[row, column] // matrix[row][column]
 ```
 
-Table methods live behind `:`:
+Fields use `.`, while metatable fields use `:`:
 
 ```elf
+name := player.name
 numbers:add(40)
 last := numbers:pop()
 ```
+
+Calling either a field or metatable field passes the value on the left as the
+implicit receiver, `this`. Ordinary function calls receive `nil` as `this`.
 
 See the [table library](libraries/table.md) for the rest.
 
@@ -150,10 +197,14 @@ From tightest grip to loosest:
 &
 ^
 |
-&& !!
+&&
 || ??
 ...
 ```
+
+All binary operators currently associate from left to right, including `**`.
+Postfix operations and then unary operators bind tighter than the binary
+operators.
 
 Parentheses win arguments:
 
@@ -162,6 +213,9 @@ result := (2 + 3) * 4
 inside := value >= minimum && value < maximum
 chosen := preferred ?? fallback
 ```
+
+`&&` and `||` short-circuit and produce `0` or `1`. `??` returns its left
+operand unless it is `nil`; only then is the right operand evaluated.
 
 Unary operators are small and sharp:
 
@@ -256,13 +310,20 @@ double := fun(value) ret value * 2
 answer := add(20, 22)
 ```
 
-Parameters can carry a rule, a default, or a variadic tail:
+`=>` is not currently part of the grammar. The concise implemented form is
+`fun(value) ret expression`.
+
+The final parameter may be a variadic marker:
 
 ```elf
-draw := fun(sprite: Sprite, layer = 0, ...) {
+draw := fun(sprite, layer, ...) {
 	elf.println(sprite, " on layer ", layer)
 }
 ```
+
+Parameter annotations (`name: expression`) and defaults (`name = expression`)
+are accepted by the parser, but the compiler does not enforce or apply them
+yet. Do not rely on either form.
 
 `recurse` calls the function currently running:
 
@@ -294,7 +355,15 @@ Method calls pass the value as `this`:
 
 ```elf
 items:add("new")
+
+handler := {
+	call = fun(value) ret value,
+}
+handler.call("new")
 ```
+
+The `:` form reads a metatable field. The `.` form reads a field directly from
+the value. Both forms pass the left-hand value as `this` when called.
 
 ## Cleanup later
 
@@ -332,11 +401,112 @@ config := json {
 
 Objects and arrays become tables. `null` becomes `nil`.
 
-## A few odd tools
+## Syntax summary
 
-`...` by itself is the variadic value expression. `#get_mem(value)` exposes
-compiler memory IR for implementation work. Neither should be treated as
-settled design yet.
+This is a compact description of the implemented parser. It is descriptive,
+not a promise that every accepted edge case will remain part of Elf.
 
-The lexer also knows some words the parser does not use yet, including `try`,
-`catch`, `finally`, `enum`, and `global`. They are sketches, not promises.
+```text
+file             := statement*
+
+statement        := block
+                  | "defer" statement
+                  | "ret" tuple?
+                  | "break" tuple?
+                  | "continue" tuple?
+                  | while
+                  | for
+                  | if
+                  | statement_expression
+
+block            := "{" statement* "}"
+while            := "while" expression "?" statement
+if               := "if" expression "?" statement
+                    ("elif" expression "?" statement)*
+                    ("else" statement)?
+
+for              := "for" identifiers (":=" | "::=") tuple
+                    ("?" statement
+                    | ";" expression ";" statement_expression "?" statement)
+
+statement_expression
+                  := tuple statement_tail?
+
+statement_tail   := ":=" tuple
+                  | "::=" tuple
+                  | "=" tuple
+                  | "?=" tuple
+                  | compound_assign tuple
+
+compound_assign  := "+=" | "-=" | "*=" | "/=" | "%="
+                  | "^=" | "<<=" | ">>="
+
+tuple            := expression ("," expression)*
+identifiers      := identifier ("," identifier)*
+
+function         := "fun" "(" parameters? ")" statement
+parameters       := parameter ("," parameter)* ("," "...")?
+                  | "..."
+parameter        := identifier (":" expression)? ("=" expression)?
+
+table            := "{" (table_entry ","?)* "}"
+table_entry      := identifier "=" expression
+                  | "[" expression "]" "=" expression
+                  | expression ("=" expression)?
+
+postfix          := primary postfix_part*
+postfix_part     := "." identifier
+                  | ".[" expression "]"
+                  | ".(" identifiers ")"
+                  | "[" index ("," index)* "]"
+                  | ":" identifier
+                  | "(" arguments? ")"
+                  | table
+
+arguments        := expression ("," expression)*
+
+index            := expression
+                  | expression? "..." expression?
+
+primary          := literal
+                  | identifier
+                  | table
+                  | function
+                  | "recurse"
+                  | "json" json_value
+                  | "(" expression ")"
+                  | "#get_mem" "(" expression ")"
+
+literal          := "nil" | "true" | "false"
+                  | integer | number | character | string | format_string
+```
+
+Postfix chains must remain on the same line. A table immediately following a
+callable expression is a one-argument call; `make { name = "Ada" }` is
+equivalent to `make({ name = "Ada" })`.
+
+Operator precedence is defined by the table in
+[Math and comparisons](#math-and-comparisons). Ranges are accepted only where
+the compiler expects them: numeric range loops and ranged table iteration.
+
+## Partial and reserved syntax
+
+`#get_mem(value)` exposes compiler memory IR for implementation work.
+`#line_number` becomes the current source line and `#file_name` becomes the
+current source name.
+
+The following syntax is recognized but is not usable language functionality:
+
+- `!!` parses as a nil-aware binary operator but is not lowered.
+- `...` marks a variadic function or a range. A standalone `...` expression is
+  parsed but is not lowered as a variadic value.
+- Parameter annotations and default expressions are stored in the AST but
+  ignored by lowering.
+- Values following `break` and `continue` are stored in the AST but ignored by
+  lowering.
+- `try`, `catch`, `finally`, `enum`, `global`, `default`, `do`, and `then` are
+  reserved words without statement implementations.
+- `->`, `::`, `--`, and unary `!` are tokenized but not parsed into usable
+  expressions or statements.
+
+These are sketches, not promises.
