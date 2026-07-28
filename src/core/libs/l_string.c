@@ -138,6 +138,19 @@ ELF_FUNCTION(l_string_slice)
 	return 1;
 }
 
+ELF_FUNCTION(l_string_compare)
+{
+	elf_String *left = string_receiver(S);
+	elf_String *right = lib_load_string(S, 1);
+	u32 left_size = atom_size(left);
+	u32 right_size = atom_size(right);
+	u32 size = MIN(left_size, right_size);
+	int order = memcmp(atom_data(left), atom_data(right), size);
+	if (order == 0) order = (left_size > right_size) - (left_size < right_size);
+	push_value(S, value_from_integer((order > 0) - (order < 0)));
+	return 1;
+}
+
 ELF_FUNCTION(l_string_starts_with)
 {
 	elf_String *string = string_receiver(S);
@@ -372,6 +385,7 @@ static const elf_Binding l_string[] = {
 	{"size",        l_string_length},
 	{"byte",        l_string_byte},
 	{"slice",       l_string_slice},
+	{"compare",     l_string_compare},
 	{"starts_with", l_string_starts_with},
 	{"ends_with",   l_string_ends_with},
 	{"contains",    l_string_contains},

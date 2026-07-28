@@ -16,6 +16,18 @@ Strings are immutable byte strings. Their methods use `:`.
 Indexes count bytes. Negative indexes count from the end. Slice ends are
 exclusive.
 
+## Compare
+
+```elf
+"alpha":compare("alpha") // 0
+"alpha":compare("beta")  // -1
+"beta":compare("alpha")  // 1
+```
+
+`compare` performs a case-sensitive lexicographical comparison of unsigned
+bytes and returns exactly `-1`, `0`, or `1`. When one string is a prefix of the
+other, the shorter string sorts first.
+
 ## Find things
 
 ```elf
@@ -69,6 +81,6 @@ The target for `replace` and separator for `split` cannot be empty.
 ## Complete list
 
 ```text
-length size byte slice starts_with ends_with contains glob_match find
+length size byte slice compare starts_with ends_with contains glob_match find
 split lines trim lower upper replace repeat join
 ```
