@@ -8,9 +8,9 @@ contents := elf.fs.read_text_file("settings.elf")
 exists := elf.fs.file_exists("settings.elf")
 ```
 
-The current API operates on regular files, text stored in Elf strings, immediate
-directory listings, single directories, and the process-wide working directory.
-It does not yet provide recursive directory creation/removal or binary files.
+The current API operates on regular files, text stored in Elf strings, directory
+trees, and the process-wide working directory. It does not yet provide binary
+files.
 
 ## API summary
 
@@ -23,7 +23,12 @@ It does not yet provide recursive directory creation/removal or binary files.
 | `elf.fs.write_text_file(path, text)` | integer boolean | Create or replace a text file. |
 | `elf.fs.get_file_info(path)` | table or `nil` | Read size and timestamp metadata for a regular file. |
 | `elf.fs.create_directory(path)` | integer boolean | Create one directory. |
+| `elf.fs.create_directories(path)` | integer boolean | Create a directory and missing parents. |
+| `elf.fs.copy_file(source, destination, overwrite?)` | integer boolean | Copy a regular file. |
+| `elf.fs.move_file(source, destination, overwrite?)` | integer boolean | Move a regular file. |
 | `elf.fs.remove_file(path)` | integer boolean | Remove one regular file. |
+| `elf.fs.remove_directory(path)` | integer boolean | Remove one empty directory. |
+| `elf.fs.remove_tree(path)` | integer boolean | Recursively remove a directory tree. |
 | `elf.fs.get_working_directory()` | string or `nil` | Return the process working directory. |
 | `elf.fs.set_working_directory(path)` | integer boolean | Change the process working directory. |
 
@@ -125,23 +130,37 @@ also uses the current working directory.
 ### `elf.fs.create_directory(path)`
 
 Creates exactly one directory and returns an integer boolean indicating
-success. Missing parent directories are not created. The operation currently
-returns `0` if the directory already exists.
+success. Missing parent directories are not created. An existing directory is
+treated as success.
 
 ```elf
 elf.fs.create_directory("build/generated")
 ```
 
-A future `create_directories` operation can provide explicit recursive parent
-creation.
+### `elf.fs.create_directories(path)`
+
+Creates a directory and any missing parent directories. It returns `1` when the
+directory exists after the operation and `0` on failure.
 
 ### `elf.fs.remove_file(path)`
 
 Removes one regular file and returns an integer boolean indicating success. It
 does not remove directories and never performs recursive deletion.
 
-Directory removal will use separately named operations so recursive behavior
-cannot be triggered through an ambiguous `remove` function.
+### `elf.fs.remove_directory(path)`
+
+Removes one empty directory. It returns `1` when the directory was removed or
+was already missing, and `0` when it is nonempty or another error occurs.
+
+### `elf.fs.remove_tree(path)`
+
+Recursively removes a directory and everything below it. It returns `1` when
+the tree was removed or was already missing, and `0` on failure. A regular-file
+path is rejected; use `remove_file` for files. Directory symbolic links are
+removed as links and are never followed.
+
+Deletion is not transactional. If removing one descendant fails, descendants
+removed before that failure remain removed.
 
 ## Working directory
 

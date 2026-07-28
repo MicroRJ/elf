@@ -18,6 +18,8 @@ test_assert(env.get(env_name) == nil)
 
 fs.remove_file(path)
 fs.remove_file(missing)
+tree := "build/sys_smoke_tree"
+fs.remove_tree(tree)
 
 test_assert(fs.read_text_file(missing) == nil)
 test_assert(fs.file_exists(missing) == 0)
@@ -46,6 +48,13 @@ test_assert(info.modified_unix_ms > 0)
 working_directory := fs.get_working_directory()
 test_assert(working_directory != nil)
 test_assert(fs.set_working_directory(working_directory) == 1)
+
+test_assert(fs.create_directories(tree + "/nested") == 1)
+test_assert(fs.write_text_file(tree + "/nested/file.txt", "remove me") == 1)
+test_assert(fs.remove_directory(tree) == 0)
+test_assert(fs.remove_tree(tree) == 1)
+test_assert(fs.exists(tree) == 0)
+test_assert(fs.remove_tree(tree) == 1)
 
 test_assert(fs.read == nil)
 test_assert(fs.write == nil)

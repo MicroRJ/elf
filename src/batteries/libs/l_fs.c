@@ -159,6 +159,13 @@ ELF_FUNCTION(lib_fs_remove_directory)
 	return 1;
 }
 
+ELF_FUNCTION(lib_fs_remove_tree)
+{
+	lib_check_arg_count(S, "fs.remove_tree", nargs, 1, 1);
+	elf_push_int(S, platform_remove_tree(lib_load_cstr(S, 1)));
+	return 1;
+}
+
 ELF_FUNCTION(lib_fs_get_working_directory)
 {
 	lib_check_arg_count(S, "fs.get_working_directory", nargs, 0, 0);
@@ -324,6 +331,7 @@ static const Battery_Binding l_fs[] = {
 	{"move_file",             lib_fs_move_file},
 	{"remove_file",           lib_fs_remove_file},
 	{"remove_directory",      lib_fs_remove_directory},
+	{"remove_tree",           lib_fs_remove_tree},
 	{"get_working_directory", lib_fs_get_working_directory},
 	{"set_working_directory", lib_fs_set_working_directory},
 };

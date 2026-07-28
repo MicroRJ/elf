@@ -201,6 +201,7 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "move_file")), "elf.fs.move_file is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "remove_file")), "elf.fs.remove_file is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "remove_directory")), "elf.fs.remove_directory is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "remove_tree")), "elf.fs.remove_tree is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "get_working_directory")), "elf.fs.get_working_directory is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "set_working_directory")), "elf.fs.set_working_directory is a field function");
 	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_atom(state, "read")), "old elf.fs.read binding is absent");
