@@ -48,10 +48,10 @@ int main(int argc, char **argv)
 	}
 
 	elf_compile_source(state, path, source);
-	for (u32 i = 0; i < state->bytecode_function_count; ++ i)
+	for (u32 i = 0; i < state->module.bytecode_function_count; ++ i)
 	{
 		printf("function[%u]\n", i);
-		print_bytecode_function(state, state->bytecode_functions[i]);
+		print_bytecode_function(state, state->module.bytecode_functions[i]);
 	}
 
 	return 0;

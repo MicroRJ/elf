@@ -94,8 +94,8 @@ static void format_bytecode_instr(elf_State *state, elf_Arena *arena, u32 index,
 		case BC_LOADKNUM:
 		{
 			elf_arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && (u32)byte.b_y < state->number_constant_count) {
-				elf_arena_pushf(arena, " // %f", state->number_constants[byte.b_y]);
+			if (byte.b_y >= 0 && (u32)byte.b_y < state->module.number_constant_count) {
+				elf_arena_pushf(arena, " // %f", state->module.number_constants[byte.b_y]);
 			}
 		}
 		break;
@@ -103,8 +103,8 @@ static void format_bytecode_instr(elf_State *state, elf_Arena *arena, u32 index,
 		case BC_LOADKINT:
 		{
 			elf_arena_pushf(arena, "r%d = integer[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && (u32)byte.b_y < state->integer_constant_count) {
-				elf_arena_pushf(arena, " // %lli", state->integer_constants[byte.b_y]);
+			if (byte.b_y >= 0 && (u32)byte.b_y < state->module.integer_constant_count) {
+				elf_arena_pushf(arena, " // %lli", state->module.integer_constants[byte.b_y]);
 			}
 		}
 		break;
@@ -243,7 +243,7 @@ char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunction fu
 	elf_arena_pushf(arena, "  stack_size  = %u\n", function.stack_size);
 	elf_arena_push_text(arena, "body\n");
 
-	Bytecode *bytecode = state->bytecode + function.offset;
+	Bytecode *bytecode = state->module.bytecode + function.offset;
 	for (u32 i = 0; i < function.length; ++ i)
 	{
 		format_bytecode_instr(state, arena, i, bytecode[i]);

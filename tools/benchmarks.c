@@ -166,15 +166,16 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 static void bench_compile_repeatedly(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
+	elf_Module *module = &state->module;
 	u64 program_array_capacity =
-		(u64)state->bytecode_capacity * sizeof(*state->bytecode) +
-		(u64)state->bytecode_function_capacity * sizeof(*state->bytecode_functions) +
-		(u64)state->integer_constant_capacity * sizeof(*state->integer_constants) +
-		(u64)state->number_constant_capacity * sizeof(*state->number_constants);
-	u32 bytecode_before = state->bytecode_count;
-	u32 functions_before = state->bytecode_function_count;
-	u32 integer_constants_before = state->integer_constant_count;
-	u32 number_constants_before = state->number_constant_count;
+		(u64)module->bytecode_capacity * sizeof(*module->bytecode) +
+		(u64)module->bytecode_function_capacity * sizeof(*module->bytecode_functions) +
+		(u64)module->integer_constant_capacity * sizeof(*module->integer_constants) +
+		(u64)module->number_constant_capacity * sizeof(*module->number_constants);
+	u32 bytecode_before = module->bytecode_count;
+	u32 functions_before = module->bytecode_function_count;
+	u32 integer_constants_before = module->integer_constant_count;
+	u32 number_constants_before = module->number_constant_count;
 	u64 arena_before = state->arena.in_use;
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 
@@ -185,16 +186,16 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 		elf_pop(state, 1);
 	}
 	double seconds = bench_elapsed_s(start);
-	u32 bytecode_growth = state->bytecode_count - bytecode_before;
-	u32 function_growth = state->bytecode_function_count - functions_before;
-	u32 integer_constant_growth = state->integer_constant_count - integer_constants_before;
-	u32 number_constant_growth = state->number_constant_count - number_constants_before;
+	u32 bytecode_growth = module->bytecode_count - bytecode_before;
+	u32 function_growth = module->bytecode_function_count - functions_before;
+	u32 integer_constant_growth = module->integer_constant_count - integer_constants_before;
+	u32 number_constant_growth = module->number_constant_count - number_constants_before;
 	u64 source_map_growth = state->arena.in_use - arena_before;
 	u64 program_storage_growth =
-		(u64)bytecode_growth * sizeof(*state->bytecode) +
-		(u64)function_growth * sizeof(*state->bytecode_functions) +
-		(u64)integer_constant_growth * sizeof(*state->integer_constants) +
-		(u64)number_constant_growth * sizeof(*state->number_constants) +
+		(u64)bytecode_growth * sizeof(*module->bytecode) +
+		(u64)function_growth * sizeof(*module->bytecode_functions) +
+		(u64)integer_constant_growth * sizeof(*module->integer_constants) +
+		(u64)number_constant_growth * sizeof(*module->number_constants) +
 		source_map_growth;
 
 	bench_report("compile source", "compiles", iterations, seconds);

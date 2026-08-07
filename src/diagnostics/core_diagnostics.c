@@ -22,8 +22,8 @@ RuntimeSourceLocation;
 
 static BcFunction *find_function_for_instr(elf_State *S, int byte)
 {
-	for (u32 i = 0; i < S->bytecode_function_count; ++ i) {
-		BcFunction *function = &S->bytecode_functions[i];
+	for (u32 i = 0; i < S->module.bytecode_function_count; ++ i) {
+		BcFunction *function = &S->module.bytecode_functions[i];
 		if (byte >= function->offset && byte < function->offset + function->length) {
 			return function;
 		}
@@ -63,7 +63,7 @@ static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr
 	if (location.function)
 	{
 		location.site = find_source_for_instr(location.function, instr);
-		location.byte = state->bytecode[instr];
+		location.byte = state->module.bytecode[instr];
 	}
 
 	return location;

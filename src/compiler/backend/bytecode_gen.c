@@ -83,28 +83,28 @@ static void emit_source_map_entry(BcGen *gen, SourceSite site, u32 byte_position
 }
 
 /* dynamic module */
-static int add_const_int(elf_State *state, i64 i)
+static int add_const_int(elf_Module *module, i64 i)
 {
-	ASSERT(state->integer_constant_count < state->integer_constant_capacity);
-	u32 index = state->integer_constant_count++;
-	state->integer_constants[index] = i;
+	ASSERT(module->integer_constant_count < module->integer_constant_capacity);
+	u32 index = module->integer_constant_count++;
+	module->integer_constants[index] = i;
 	return index;
 }
 
-static int add_const_num(elf_State *state, f64 i)
+static int add_const_num(elf_Module *module, f64 i)
 {
-	ASSERT(state->number_constant_count < state->number_constant_capacity);
-	u32 index = state->number_constant_count++;
-	state->number_constants[index] = i;
+	ASSERT(module->number_constant_count < module->number_constant_capacity);
+	u32 index = module->number_constant_count++;
+	module->number_constants[index] = i;
 	return index;
 }
 
-static u32 append_bytecode(elf_State *state, Bytecode *bytecode, u32 count)
+static u32 append_bytecode(elf_Module *module, Bytecode *bytecode, u32 count)
 {
-	ASSERT(state->bytecode_count + count <= state->bytecode_capacity);
-	u32 offset = state->bytecode_count;
-	copy_memory(state->bytecode + offset, bytecode, sizeof(*bytecode) * count);
-	state->bytecode_count += count;
+	ASSERT(module->bytecode_count + count <= module->bytecode_capacity);
+	u32 offset = module->bytecode_count;
+	copy_memory(module->bytecode + offset, bytecode, sizeof(*bytecode) * count);
+	module->bytecode_count += count;
 	return offset;
 }
 
@@ -223,13 +223,13 @@ static u32 emit_jump_if_bc(BcGen *gen, SourceSite site, BytecodeType type, BcSlo
 
 static u32 emit_load_int_bc(BcGen *gen, SourceSite site, BcSlot dest, i64 integer)
 {
-	u32 index = add_const_int(gen->state, integer);
+	u32 index = add_const_int(&gen->state->module, integer);
 	return emit_xy_bc(gen, site, BC_LOADKINT, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number)
 {
-	u32 index = add_const_num(gen->state, number);
+	u32 index = add_const_num(&gen->state->module, number);
 	return emit_xy_bc(gen, site, BC_LOADKNUM, unwrap_slot(dest), index);
 }
 
@@ -366,13 +366,13 @@ static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries
 	return source_map;
 }
 
-static BcFunction *reserve_bytecode_functions(elf_State *state, u32 count)
+static BcFunction *reserve_bytecode_functions(elf_Module *module, u32 count)
 {
-	ASSERT(state->bytecode_function_count + count <= state->bytecode_function_capacity);
+	ASSERT(module->bytecode_function_count + count <= module->bytecode_function_capacity);
 
-	u32 index = state->bytecode_function_count;
-	state->bytecode_function_count += count;
-	return state->bytecode_functions + index;
+	u32 index = module->bytecode_function_count;
+	module->bytecode_function_count += count;
+	return module->bytecode_functions + index;
 }
 
 static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
@@ -381,8 +381,9 @@ static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModul
 	ASSERT(module.function_count > 0);
 	ASSERT(module.entry_index == 0);
 
-	u32 bytecode_function_base = state->bytecode_function_count;
-	BcFunction *bytecode_functions = reserve_bytecode_functions(state, module.function_count);
+	elf_Module *bytecode_module = &state->module;
+	u32 bytecode_function_base = bytecode_module->bytecode_function_count;
+	BcFunction *bytecode_functions = reserve_bytecode_functions(bytecode_module, module.function_count);
 
 	BcGen *gen = bg_create(state, arena, bytecode_function_base);
 	PROF_BLOCK("compiler.codegen")
@@ -393,7 +394,7 @@ static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModul
 			BcFunction *bytecode_function = bytecode_functions + i;
 			generate_bytecode_function(gen, function);
 
-			u32 bytecode_offset = append_bytecode(state, gen->bytecode, gen->bytecode_count);
+			u32 bytecode_offset = append_bytecode(bytecode_module, gen->bytecode, gen->bytecode_count);
 			SourceMapEntry *source_map = copy_source_map(&state->arena
 			,	gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
 

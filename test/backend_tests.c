@@ -47,7 +47,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 
 static Bytecode *backend_test_bytes(BackendCompileResult result)
 {
-	return result.state->bytecode + result.function.offset;
+	return result.state->module.bytecode + result.function.offset;
 }
 
 static u32 backend_count_bytecode(BackendCompileResult result, BytecodeType type)

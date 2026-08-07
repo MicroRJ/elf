@@ -90,7 +90,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 		int byte_index = frame.bytes + instr;
 		state->byte = byte_index;
 
-		Bytecode byte = state->bytecode[byte_index];
+		Bytecode byte = state->module.bytecode[byte_index];
 		elf_Value *result_slot = &frame.reference[byte.b_x];
 		elf_Value *left_slot = &frame.reference[byte.b_y];
 		elf_Value *right_slot = &frame.reference[byte.b_z];
@@ -182,11 +182,11 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			case BC_LOADKINT: {
-				*result_slot = value_from_integer(state->integer_constants[byte.b_y]);
+				*result_slot = value_from_integer(state->module.integer_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADKNUM: {
-				*result_slot = value_from_number(state->number_constants[byte.b_y]);
+				*result_slot = value_from_number(state->module.number_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADCVAL: {
@@ -216,9 +216,9 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 
 			case BC_CLOSURE: {
 				ASSERT(byte.b_y >= 0);
-				ASSERT((u32)byte.b_y < state->bytecode_function_count);
+				ASSERT((u32)byte.b_y < state->module.bytecode_function_count);
 
-				BcFunction function = state->bytecode_functions[byte.b_y];
+				BcFunction function = state->module.bytecode_functions[byte.b_y];
 				elf_Closure * new_closure = vm_new_closure(state, function, result_slot);
 				*result_slot = value_from_closure(new_closure);
 			} break;

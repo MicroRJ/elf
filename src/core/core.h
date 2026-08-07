@@ -55,6 +55,23 @@ struct BcFunction
 	elf_String       *source_name;
 };
 
+typedef struct elf_Module elf_Module;
+struct elf_Module
+{
+	f64          *number_constants;
+	u32           number_constant_count;
+	u32           number_constant_capacity;
+	i64          *integer_constants;
+	u32           integer_constant_count;
+	u32           integer_constant_capacity;
+	BcFunction   *bytecode_functions;
+	u32           bytecode_function_count;
+	u32           bytecode_function_capacity;
+	Bytecode     *bytecode;
+	u32           bytecode_count;
+	u32           bytecode_capacity;
+};
+
 struct elf_Closure
 {
 	elf_Object              obj;
@@ -93,28 +110,7 @@ struct elf_State
 {
 	elf_Arena    arena;
 	void        *user_data;
-
-	// TODO(RJ) this is the "bytecode module" but this is dynamic, the question is, when
-	// loading a file, do we first create an actual bytecode module, then inject into here?
-	// We definitely want the ability to compile elf into an executable - self-contained
-	// bytecode module.
-	// We still have to address the global question ... and I think that's a more pressing
-	// issue.
-	struct
-	{
-		f64          *number_constants;
-		u32           number_constant_count;
-		u32           number_constant_capacity;
-		i64          *integer_constants;
-		u32           integer_constant_count;
-		u32           integer_constant_capacity;
-		BcFunction   *bytecode_functions;
-		u32           bytecode_function_count;
-		u32           bytecode_function_capacity;
-		Bytecode     *bytecode;
-		u32           bytecode_count;
-		u32           bytecode_capacity;
-	};
+	elf_Module   module;
 	struct
 	{
 		u32          gc_mode;

@@ -63,20 +63,21 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 
 static void init_bytecode_program_storage(elf_State *state)
 {
-	state->bytecode_function_capacity = 4096;
-	state->bytecode_functions = elf_arena_push_zero(&state->arena
-	,	sizeof(*state->bytecode_functions) * state->bytecode_function_capacity);
+	elf_Module *module = &state->module;
+	module->bytecode_function_capacity = 4096;
+	module->bytecode_functions = elf_arena_push_zero(&state->arena
+	,	sizeof(*module->bytecode_functions) * module->bytecode_function_capacity);
 
-	state->bytecode_capacity = 1 << 20;
-	state->bytecode = elf_arena_push_zero(&state->arena, sizeof(*state->bytecode) * state->bytecode_capacity);
+	module->bytecode_capacity = 1 << 20;
+	module->bytecode = elf_arena_push_zero(&state->arena, sizeof(*module->bytecode) * module->bytecode_capacity);
 
-	state->integer_constant_capacity = 1 << 16;
-	state->integer_constants = elf_arena_push_zero(&state->arena
-	,	sizeof(*state->integer_constants) * state->integer_constant_capacity);
+	module->integer_constant_capacity = 1 << 16;
+	module->integer_constants = elf_arena_push_zero(&state->arena
+	,	sizeof(*module->integer_constants) * module->integer_constant_capacity);
 
-	state->number_constant_capacity = 1 << 16;
-	state->number_constants = elf_arena_push_zero(&state->arena
-	,	sizeof(*state->number_constants) * state->number_constant_capacity);
+	module->number_constant_capacity = 1 << 16;
+	module->number_constants = elf_arena_push_zero(&state->arena
+	,	sizeof(*module->number_constants) * module->number_constant_capacity);
 }
 
 static void init_runtime_storage(elf_State *state)
