@@ -114,8 +114,8 @@ struct StackFrame
 	elf_Value  *framebase;
 	elf_Value  *reference;
 	elf_Value *closureenv;
-	int         framesize;
-	int         nextinstr;
+	u32         framesize;
+	u32         nextinstr;
 	u8              nargs;
 	u8              nrets;
 	u8              arity;

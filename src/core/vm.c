@@ -100,6 +100,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 	while (frame.nextinstr < byte_count) {
 		int instr = frame.nextinstr++;
 		int byte_index = byte_offset + instr;
+		// Todo, remove this!
 		state->byte = byte_index;
 
 		Bytecode byte = code[instr];
