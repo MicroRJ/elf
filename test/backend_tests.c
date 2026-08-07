@@ -1,9 +1,14 @@
 typedef struct
 {
 	elf_State       *state;
-	BcFunction function;
+	BcFunctionRef function;
 }
 BackendCompileResult;
+
+static BcFunction *backend_test_function(BackendCompileResult result)
+{
+	return bc_function_from_ref(result.function);
+}
 
 static BackendCompileResult backend_test_compile_file(const char *path)
 {
@@ -47,14 +52,16 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 
 static Bytecode *backend_test_bytes(BackendCompileResult result)
 {
-	return result.state->module.bytecode + result.function.offset;
+	BcFunction *function = backend_test_function(result);
+	return result.function.module->bytecode + function->offset;
 }
 
 static u32 backend_count_bytecode(BackendCompileResult result, BytecodeType type)
 {
 	u32 count = 0;
+	BcFunction *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < result.function.length; ++ i)
+	for (u32 i = 0; i < function->length; ++ i)
 	{
 		if (bytes[i].b_type == type) {
 			count += 1;
@@ -77,7 +84,7 @@ static SourceMapEntry *backend_find_source_map_entry(BcFunction *function, u32 b
 static void test_backend_source_map(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/smoke/return_add.elf");
-	BcFunction *function = &result.function;
+	BcFunction *function = backend_test_function(result);
 	if (!function->source_name || !function->source_data || function->source_size == 0) {
 		test_fail("backend stores source data on bytecode function");
 		return;
@@ -87,8 +94,8 @@ static void test_backend_source_map(void)
 		return;
 	}
 
-	for (u32 i = 0; i < result.function.length; ++ i) {
-		u32 byte = result.function.offset + i;
+	for (u32 i = 0; i < function->length; ++ i) {
+		u32 byte = function->offset + i;
 		SourceMapEntry *entry = backend_find_source_map_entry(function, byte);
 		if (!entry || !entry->site.data || !entry->site.line_start || entry->site.size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
@@ -109,8 +116,9 @@ static void backend_expect_no_eager_logical_bytecode(BackendCompileResult result
 
 static void backend_expect_patched_forward_jumps(BackendCompileResult result, const char *label)
 {
+	BcFunction *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < result.function.length; ++ i)
+	for (u32 i = 0; i < function->length; ++ i)
 	{
 		Bytecode byte = bytes[i];
 		if (byte.b_type == BC_JUMP ||
@@ -118,7 +126,7 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 			byte.b_type == BC_JNZ)
 		{
 			i32 target = (i32)i + byte.b_x;
-			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)result.function.length) {
+			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->length) {
 				test_fail(label);
 				return;
 			}
@@ -152,14 +160,15 @@ static void backend_expect_jump_counts(
 static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_backward_jumps, const char *label)
 {
 	u32 backward_jumps = 0;
+	BcFunction *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < result.function.length; ++ i)
+	for (u32 i = 0; i < function->length; ++ i)
 	{
 		Bytecode byte = bytes[i];
 		if (byte.b_type == BC_JUMP)
 		{
 			i32 target = (i32)i + byte.b_x;
-			if (byte.b_x >= 0 || target < 0 || target >= (i32)result.function.length) {
+			if (byte.b_x >= 0 || target < 0 || target >= (i32)function->length) {
 				test_fail(label);
 				return;
 			}
@@ -169,7 +178,7 @@ static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_
 			byte.b_type == BC_JNZ)
 		{
 			i32 target = (i32)i + byte.b_x;
-			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)result.function.length) {
+			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->length) {
 				test_fail(label);
 				return;
 			}
@@ -183,8 +192,9 @@ static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_
 
 static i32 backend_find_first_bytecode(BackendCompileResult result, BytecodeType type)
 {
+	BcFunction *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < result.function.length; ++ i)
+	for (u32 i = 0; i < function->length; ++ i)
 	{
 		if (bytes[i].b_type == type) {
 			return i;
@@ -330,7 +340,7 @@ static void test_backend_local_initializer_reuses_result_slot(void)
 		"a := (b + c) + (b + c)\n"
 		"ret a\n");
 
-	if (result.function.stack_size != 5) {
+	if (backend_test_function(result)->stack_size != 5) {
 		test_fail("local initializer adopts expression result slot");
 	}
 }
@@ -343,7 +353,7 @@ static void test_backend_truthy_or_reuses_left_result_slot(void)
 		"a := ((b + c) + (b + c)) ?? 99\n"
 		"ret a\n");
 
-	if (result.function.stack_size != 5) {
+	if (backend_test_function(result)->stack_size != 5) {
 		test_fail("truthy-or initializer adopts left expression result slot");
 	}
 }
@@ -356,7 +366,7 @@ static void test_backend_logical_expr_delays_result_slot(void)
 		"a := ((b + c) + (b + c)) && 1\n"
 		"ret a\n");
 
-	if (and_result.function.stack_size != 5) {
+	if (backend_test_function(and_result)->stack_size != 5) {
 		test_fail("logical-and initializer delays boolean result slot allocation");
 	}
 
@@ -366,7 +376,7 @@ static void test_backend_logical_expr_delays_result_slot(void)
 		"a := ((b + c) + (b + c)) || 0\n"
 		"ret a\n");
 
-	if (or_result.function.stack_size != 5) {
+	if (backend_test_function(or_result)->stack_size != 5) {
 		test_fail("logical-or initializer delays boolean result slot allocation");
 	}
 }

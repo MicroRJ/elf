@@ -65,17 +65,25 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static elf_Closure *vm_new_closure(elf_State *state, BcFunction function, elf_Value *captures)
+static elf_Closure *vm_new_closure(elf_State *state, BcFunctionRef function_ref, elf_Value *captures)
 {
-	elf_Closure *closure;
-	u32 size;
+	BcFunction *function = bc_function_from_ref(function_ref);
+	u32 size = sizeof(elf_Closure) + sizeof(elf_Value) * function->captures;
+	elf_Closure *closure = (elf_Closure *)elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
+	closure->function = function_ref;
 
-	size = sizeof(*closure) + sizeof(* closure->captures) * function.captures;
-	closure = (elf_Closure *) elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
-	closure->function = function;
-
-	value_copy_many(closure->captures, captures, function.captures);
+	value_copy_many(closure->captures, captures, function->captures);
 	return closure;
+}
+
+static inline void vm_activate_frame(elf_State *state, StackFrame *frame, int *byte_offset, int *byte_count, const Bytecode **code)
+{
+	ASSERT(frame->module && frame->function);
+	*byte_offset = frame->function->offset;
+	*byte_count = frame->function->length;
+	*code = frame->module->bytecode + *byte_offset;
+	state->active_module = frame->module;
+	state->active_function = frame->function;
 }
 
 static int run_bytecode_frame(elf_State *state, StackFrame frame)
@@ -84,13 +92,17 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 	elf_Value *root_frame = frame.framebase;
 	int nrets = frame.nrets;
 	i32 subframe_count = 0;
+	int byte_offset;
+	int byte_count;
+	const Bytecode *code;
+	vm_activate_frame(state, &frame, &byte_offset, &byte_count, &code);
 
-	while (frame.nextinstr < frame.bytec) {
+	while (frame.nextinstr < byte_count) {
 		int instr = frame.nextinstr++;
-		int byte_index = frame.bytes + instr;
+		int byte_index = byte_offset + instr;
 		state->byte = byte_index;
 
-		Bytecode byte = state->module.bytecode[byte_index];
+		Bytecode byte = code[instr];
 		elf_Value *result_slot = &frame.reference[byte.b_x];
 		elf_Value *left_slot = &frame.reference[byte.b_y];
 		elf_Value *right_slot = &frame.reference[byte.b_z];
@@ -110,10 +122,13 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 				state->frame_stack[state->frame_index++] = frame;
 				if (value_is_closure(callee)) {
 					prepare_closure_stack_frame(state, &frame, value_as_closure(callee), byte.b_y, byte.b_z);
+					vm_activate_frame(state, &frame, &byte_offset, &byte_count, &code);
 					subframe_count++;
 				}
 				else if (value_is_function(callee)) {
 					call_native_function(state, value_as_function(callee), byte.b_y, byte.b_z);
+					state->active_module = frame.module;
+					state->active_function = frame.function;
 					state->frame_index--;
 					elf_Value *stack_pointer = frame.framebase + frame.framesize;
 					if (stack_pointer > state->stack_ptr) {
@@ -135,6 +150,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 				ASSERT(state->frame_index > 0);
 				if (subframe_count) {
 					frame = state->frame_stack[--state->frame_index];
+					vm_activate_frame(state, &frame, &byte_offset, &byte_count, &code);
 					elf_Value *stack_pointer = frame.framebase + frame.framesize;
 					if (stack_pointer > state->stack_ptr) {
 						value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
@@ -182,11 +198,11 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			case BC_LOADKINT: {
-				*result_slot = value_from_integer(state->module.integer_constants[byte.b_y]);
+				*result_slot = value_from_integer(frame.module->integer_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADKNUM: {
-				*result_slot = value_from_number(state->module.number_constants[byte.b_y]);
+				*result_slot = value_from_number(frame.module->number_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADCVAL: {
@@ -216,9 +232,12 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 
 			case BC_CLOSURE: {
 				ASSERT(byte.b_y >= 0);
-				ASSERT((u32)byte.b_y < state->module.bytecode_function_count);
+				BcFunctionRef function = {
+					.module = frame.module,
+					.index  = (u32)byte.b_y,
+				};
+				ASSERT(bc_function_ref_is_valid(function));
 
-				BcFunction function = state->module.bytecode_functions[byte.b_y];
 				elf_Closure * new_closure = vm_new_closure(state, function, result_slot);
 				*result_slot = value_from_closure(new_closure);
 			} break;

@@ -210,8 +210,9 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		if (reference->type == ELF_OBJECT_CLOSURE)
 		{
 			elf_Closure * closure = (elf_Closure *) reference;
+			BcFunction *function = bc_function_from_ref(closure->function);
 
-			for (u32 i = 0; i < closure->function.captures; ++ i)
+			for (u32 i = 0; i < function->captures; ++ i)
 			{
 				if (value_is_object(closure->captures[i]))
 				{

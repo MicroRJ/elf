@@ -72,11 +72,29 @@ struct elf_Module
 	u32           bytecode_capacity;
 };
 
+typedef struct BcFunctionRef BcFunctionRef;
+struct BcFunctionRef
+{
+	elf_Module *module;
+	u32          index;
+};
+
+static inline b32 bc_function_ref_is_valid(BcFunctionRef function)
+{
+	return function.module && function.index < function.module->bytecode_function_count;
+}
+
+static inline BcFunction *bc_function_from_ref(BcFunctionRef function)
+{
+	ASSERT(bc_function_ref_is_valid(function));
+	return function.module->bytecode_functions + function.index;
+}
+
 struct elf_Closure
 {
-	elf_Object              obj;
-	BcFunction   function;
-	elf_Value        captures[];
+	elf_Object         obj;
+	BcFunctionRef function;
+	elf_Value     captures[];
 };
 
 typedef struct
@@ -91,20 +109,19 @@ elf_Binding;
 typedef struct StackFrame StackFrame;
 struct StackFrame
 {
+	elf_Module *module;
+	BcFunction *function;
 	elf_Value  *framebase;
+	elf_Value  *reference;
+	elf_Value *closureenv;
+	int         framesize;
+	int         nextinstr;
 	u8              nargs;
 	u8              nrets;
 	u8              arity;
 	u8           variadic;
-	int             bytes;
-	int             bytec;
-	int         framesize;
-	int         nextinstr;
-	elf_Value  *reference;
-	elf_Value *closureenv;
 	u8        closuresize;
 };
-
 typedef struct elf_State elf_State;
 struct elf_State
 {
@@ -136,6 +153,8 @@ struct elf_State
 		u64          frame_index;
 		StackFrame   frame;
 		u64          byte;
+		elf_Module   *active_module;
+		BcFunction   *active_function;
 	};
 	struct
 	{

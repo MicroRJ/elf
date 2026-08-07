@@ -52,7 +52,8 @@ int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source
 {
 	ASSERT(name);
 	ASSERT(source.data);
-	BcFunction function = elf_compile_source(state, name, source);
+	BcFunctionRef function = elf_compile_source(state, name, source);
+	ASSERT(bc_function_from_ref(function)->captures == 0);
 
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;

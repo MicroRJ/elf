@@ -16,7 +16,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_bytecode_function(BcGen *gen, IrFunction *function);
-static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
+static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -375,7 +375,7 @@ static BcFunction *reserve_bytecode_functions(elf_Module *module, u32 count)
 	return module->bytecode_functions + index;
 }
 
-static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
+static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
 {
 	ASSERT(module.functions);
 	ASSERT(module.function_count > 0);
@@ -412,7 +412,10 @@ static BcFunction bg_generate_module(elf_State *state, elf_Arena *arena, IrModul
 		}
 	}
 
-	return bytecode_functions[module.entry_index];
+	return (BcFunctionRef) {
+		.module = bytecode_module,
+		.index  = bytecode_function_base + module.entry_index,
+	};
 }
 
 static BcSlot ensure_expr_memory(BcGen *gen, Ir expr)

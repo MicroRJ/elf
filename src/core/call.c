@@ -7,36 +7,36 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
 
-	BcFunction function = closure->function;
+	BcFunction *function = bc_function_from_ref(closure->function);
 	u32 argument_count = (u32)nargs;
-	u32 frame_size = MAX(argument_count, function.stack_size);
+	u32 frame_size = MAX(argument_count, function->stack_size);
 
 	elf_Value *frame_base = state->stack_ptr - argument_count;
 	elf_Value *reference = frame_base;
 
-	if (function.variadic && argument_count > function.arity)
+	if (function->variadic && argument_count > function->arity)
 	{
 		reference += argument_count;
-		frame_size += function.arity;
-		value_copy_many(reference, frame_base, function.arity);
+		frame_size += function->arity;
+		value_copy_many(reference, frame_base, function->arity);
 	}
 
-	u32 copied_arg_count = MIN(function.arity, argument_count);
+	u32 copied_arg_count = MIN(function->arity, argument_count);
 	u32 clear_start = (u32)(reference - frame_base) + copied_arg_count;
 	ASSERT(clear_start <= frame_size);
 	value_zero_many(frame_base + clear_start, frame_size - clear_start);
 
+	frame->module = closure->function.module;
+	frame->function = function;
 	frame->framesize = frame_size;
 	frame->framebase = frame_base;
 	frame->reference = reference;
 	frame->nargs = nargs;
 	frame->nrets = nrets;
-	frame->arity = function.arity;
-	frame->variadic = function.variadic;
-	frame->bytes = function.offset;
-	frame->bytec = function.length;
+	frame->arity = function->arity;
+	frame->variadic = function->variadic;
 	frame->closureenv = closure->captures;
-	frame->closuresize = function.captures;
+	frame->closuresize = function->captures;
 	frame->nextinstr = 0;
 
 	elf_Value *stack_pointer = frame_base + frame_size;

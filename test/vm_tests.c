@@ -196,6 +196,36 @@ static void test_vm_fib(void)
 	vm_expect_int("test/smoke/fib.elf", 55, "vm runs recursive fibonacci");
 }
 
+static void test_vm_compiled_closure_keeps_function_identity(void)
+{
+	elf_State *state = elf_create_state();
+	char first_source_text[] = "ret fun() { ret 11 }";
+	char second_source_text[] = "ret fun() { ret 22 }";
+	elf_StrSlice first_source = {first_source_text, sizeof(first_source_text) - 1};
+	elf_StrSlice second_source = {second_source_text, sizeof(second_source_text) - 1};
+
+	elf_push_code_source(state, "first", first_source);
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_Ref first = elf_create_ref(state, -1);
+	elf_pop(state, 1);
+
+	elf_push_code_source(state, "second", second_source);
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_pop(state, 1);
+
+	elf_push_ref(state, first);
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_Integer result = 0;
+	if (!elf_to_int(state, -1, &result) || result != 11) {
+		test_fail("compiled closure retains its module/function identity");
+	}
+
+	elf_destroy_state(state);
+}
+
 static void run_vm_tests(void)
 {
 	test_vm_return_int();
@@ -226,4 +256,5 @@ static void run_vm_tests(void)
 	test_vm_atom_join();
 	test_vm_interpolated_strings();
 	test_vm_fib();
+	test_vm_compiled_closure_keeps_function_identity();
 }

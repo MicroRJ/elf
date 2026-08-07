@@ -51,7 +51,11 @@ int main(int argc, char **argv)
 	for (u32 i = 0; i < state->module.bytecode_function_count; ++ i)
 	{
 		printf("function[%u]\n", i);
-		print_bytecode_function(state, state->module.bytecode_functions[i]);
+		BcFunctionRef function = {
+			.module = &state->module,
+			.index  = i,
+		};
+		print_bytecode_function(state, function);
 	}
 
 	return 0;

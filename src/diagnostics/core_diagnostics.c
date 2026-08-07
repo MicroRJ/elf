@@ -20,17 +20,6 @@ typedef struct
 }
 RuntimeSourceLocation;
 
-static BcFunction *find_function_for_instr(elf_State *S, int byte)
-{
-	for (u32 i = 0; i < S->module.bytecode_function_count; ++ i) {
-		BcFunction *function = &S->module.bytecode_functions[i];
-		if (byte >= function->offset && byte < function->offset + function->length) {
-			return function;
-		}
-	}
-	return 0;
-}
-
 static SourceSite find_source_for_instr(BcFunction *function, int instr)
 {
 	for (u32 i = 0; i < function->source_map_count; ++ i) {
@@ -50,23 +39,30 @@ static const char *runtime_error_type_name(RuntimeErrorType error)
 	return "runtime";
 }
 
+static RuntimeSourceLocation runtime_source_location_for_function(elf_Module *module, BcFunction *function, int instr)
+{
+	RuntimeSourceLocation location = {};
+	location.instr = instr;
+	if (!module || !function) {
+		return location;
+	}
+
+	if (instr >= (int)function->offset && instr < (int)(function->offset + function->length))
+	{
+		location.function = function;
+		location.site = find_source_for_instr(function, instr);
+		location.byte = module->bytecode[instr];
+	}
+
+	return location;
+}
+
 static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr)
 {
 	if (instr == NO_BYTE) {
 		instr = state->byte;
 	}
-
-	RuntimeSourceLocation location = {};
-	location.instr = instr;
-	location.function = find_function_for_instr(state, instr);
-
-	if (location.function)
-	{
-		location.site = find_source_for_instr(location.function, instr);
-		location.byte = state->module.bytecode[instr];
-	}
-
-	return location;
+	return runtime_source_location_for_function(state->active_module, state->active_function, instr);
 }
 
 static void print_runtime_source_location(RuntimeSourceLocation location)
@@ -112,8 +108,9 @@ static b32 print_runtime_call_stack(elf_State *state)
 	for (u64 i = 1; i < state->frame_index; ++i)
 	{
 		StackFrame *frame = &state->frame_stack[i];
-		int instr = frame->bytes + frame->nextinstr;
-		RuntimeSourceLocation location = runtime_source_location(state, instr);
+		if (!frame->module || !frame->function) continue;
+		int instr = frame->function->offset + frame->nextinstr;
+		RuntimeSourceLocation location = runtime_source_location_for_function(frame->module, frame->function, instr);
 		if (location.function) {
 			print_runtime_source_location(location);
 		}
