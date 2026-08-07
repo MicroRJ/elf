@@ -1,4 +1,8 @@
 //
+// See Copyright Notice In elf.h
+//
+
+//
 // Core assertions, reflection, and value conversions.
 //
 

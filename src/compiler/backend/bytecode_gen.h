@@ -1,3 +1,6 @@
+//
+// See Copyright Notice In elf.h
+//
 
 typedef struct
 {

@@ -1,6 +1,7 @@
 compiler := "clang-cl"
 librarian := "lib"
 compile_options := " /nologo /Od /Zi /D_DEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes"
+benchmark_compile_options := " /nologo /O2 /Zi /DNDEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes"
 
 build_options := {
 	workers = 4,
@@ -73,17 +74,21 @@ build_platform := {
 	transparent = true,
 }
 
-compile_source := fun(name, source, includes, dependency_includes) {
+compile_source_options := fun(name, source, includes, dependency_includes, options) {
 	object := f"build/obj/${name}.obj"
 	task := {
 		name = f"compile ${name}",
-		command_line = f"${compiler}${compile_options}${includes} /c ${source} /Fo${object} /Fdbuild/obj/${name}.pdb",
+		command_line = f"${compiler}${options}${includes} /c ${source} /Fo${object} /Fdbuild/obj/${name}.pdb",
 		inputs = { source },
 		outputs = { object },
 		include_dirs = dependency_includes,
 		dependencies = { prepare },
 	}
 	ret { task = task, object = object }
+}
+
+compile_source := fun(name, source, includes, dependency_includes) {
+	ret compile_source_options(name, source, includes, dependency_includes, compile_options)
 }
 
 elf_sources := {
@@ -111,6 +116,23 @@ elf_library := {
 	outputs = { "build/elf.lib" },
 	include_dirs = {},
 	dependencies = elf_compile_tasks,
+}
+
+benchmark_elf_objects := {}
+benchmark_elf_compile_tasks := {}
+for source := elf_sources[...] ? {
+	compiled := compile_source_options(f"benchmark_${source.name}", source.path, include_options, include_dirs, benchmark_compile_options)
+	benchmark_elf_objects:add(compiled.object)
+	benchmark_elf_compile_tasks:add(compiled.task)
+}
+
+benchmark_elf_library := {
+	name = "archive optimized elf benchmark library",
+	command_line = f"${librarian} /nologo /out:build/elf_benchmark.lib${join_arguments(benchmark_elf_objects)}",
+	inputs = benchmark_elf_objects,
+	outputs = { "build/elf_benchmark.lib" },
+	include_dirs = {},
+	dependencies = benchmark_elf_compile_tasks,
 }
 
 batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
@@ -152,6 +174,15 @@ benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false
 bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true)
 elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true)
 
+optimized_benchmarks := {
+	name = "build optimized benchmarks",
+	command_line = f"${compiler}${benchmark_compile_options}${include_options} tools/benchmarks.c /Fobuild/obj/tool_benchmarks_opt.obj /Fe:build/benchmarks_opt.exe /Fd:build/obj/tool_benchmarks_opt.pdb /link build/elf_benchmark.lib platform/build/platform.lib /PDB:build/benchmarks_opt.pdb /ILK:build/benchmarks_opt.ilk",
+	inputs = { "tools/benchmarks.c", "build/elf_benchmark.lib", "platform/build/platform.lib" },
+	outputs = { "build/benchmarks_opt.exe" },
+	include_dirs = include_dirs,
+	dependencies = { benchmark_elf_library, build_platform },
+}
+
 run_core_tests := {
 	name = "run core tests",
 	command_line = core_tests.executable,
@@ -168,6 +199,15 @@ run_tests := {
 	outputs = {},
 	include_dirs = {},
 	dependencies = { tests.task },
+}
+
+run_optimized_benchmarks := {
+	name = "run optimized benchmarks",
+	command_line = "build/benchmarks_opt.exe",
+	inputs = { "build/benchmarks_opt.exe" },
+	outputs = {},
+	include_dirs = {},
+	dependencies = { optimized_benchmarks },
 }
 
 entries := {}
@@ -189,6 +229,13 @@ entries.build = fun() {
 entries.test = fun() {
 	ret bob.build({
 		targets = { run_core_tests, run_tests },
+		options = build_options,
+	})
+}
+
+entries.benchmark = fun() {
+	ret bob.build({
+		targets = { run_optimized_benchmarks },
 		options = build_options,
 	})
 }

@@ -1,4 +1,8 @@
 //
+// See Copyright Notice In elf.h
+//
+
+//
 // Shared helpers for native standard-library bindings.
 //
 

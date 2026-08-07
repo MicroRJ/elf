@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "elf.h"
 
@@ -7,7 +9,15 @@
 #include "core.h"
 #include "helpers.h"
 
-static volatile elf_Integer bench_sink;
+static volatile elf_Integer bench_integer_sink;
+static volatile elf_Number bench_number_sink;
+
+static void bench_require(b32 condition, const char *message)
+{
+	if (condition) return;
+	fprintf(stderr, "benchmark error: %s\n", message);
+	exit(EXIT_FAILURE);
+}
 
 static i64 bench_now(void)
 {
@@ -34,25 +44,166 @@ static elf_Value bench_int_key(elf_Integer integer)
 	return value;
 }
 
-static void bench_report(const char *name, u32 iterations, double seconds)
+static void bench_report(const char *name, const char *unit, u32 iterations, double seconds)
 {
-	double ns_per_lookup = (seconds * 1000000000.0) / iterations;
-	double lookups_per_s = iterations / seconds;
+	double ns_per_iteration = (seconds * 1000000000.0) / iterations;
+	double iterations_per_s = iterations / seconds;
 
-	printf("%-24s %10u lookups  %9.3f ms  %8.2f ns/lookup  %10.0f lookups/s\n",
-		name, iterations, seconds * 1000.0, ns_per_lookup, lookups_per_s);
+	printf("%-24s %10u %-10s %9.3f ms  %8.2f ns/%-7s %10.0f/s\n",
+		name, iterations, unit, seconds * 1000.0, ns_per_iteration, unit, iterations_per_s);
 }
 
 static double bench_table_get(elf_State *state, elf_Table *table, elf_Value *keys, u32 key_count, u32 iterations)
 {
+	elf_Integer sink = 0;
 	i64 start = bench_now();
 
 	for (u32 i = 0; i < iterations; ++i) {
 		elf_Value value = elf_table_get_or_nil(state, table, keys[i & (key_count - 1)]);
-		bench_sink += value.x_int;
+		sink += value.x_int;
 	}
 
-	return bench_elapsed_s(start);
+	double seconds = bench_elapsed_s(start);
+	bench_integer_sink += sink;
+	return seconds;
+}
+
+static int bench_compare_seconds(const void *left, const void *right)
+{
+	double x = *(const double *)left;
+	double y = *(const double *)right;
+	return (x > y) - (x < y);
+}
+
+static double bench_median(double *samples, u32 count)
+{
+	qsort(samples, count, sizeof(*samples), bench_compare_seconds);
+	return samples[count / 2];
+}
+
+static elf_Ref bench_compile_program(elf_State *state, const char *name, const char *source)
+{
+	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
+	bench_require(elf_push_code_source(state, name, text), "could not compile benchmark source");
+	elf_push_nil(state);
+	bench_require(elf_call(state, 1, 1) == 1, "benchmark file did not return one value");
+	bench_require(elf_is_callable(state, -1), "benchmark file did not return a function");
+	elf_Ref program = elf_create_ref(state, -1);
+	bench_require(program != ELF_NO_REF, "could not retain benchmark function");
+	elf_pop(state, 1);
+	return program;
+}
+
+static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 iterations, elf_Integer expected)
+{
+	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
+	elf_push_nil(state);
+	elf_push_int(state, iterations);
+	i64 start = bench_now();
+	u32 result_count = elf_call(state, 2, 1);
+	double seconds = bench_elapsed_s(start);
+	bench_require(result_count == 1, "benchmark function did not return one value");
+	elf_Integer result = 0;
+	bench_require(elf_to_int(state, -1, &result), "benchmark result was not an integer");
+	bench_require(result == expected, "benchmark returned the wrong integer result");
+	bench_integer_sink += result;
+	elf_pop(state, 1);
+	return seconds;
+}
+
+static double bench_run_number_program(elf_State *state, elf_Ref program, u32 iterations, elf_Number expected)
+{
+	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
+	elf_push_nil(state);
+	elf_push_int(state, iterations);
+	i64 start = bench_now();
+	u32 result_count = elf_call(state, 2, 1);
+	double seconds = bench_elapsed_s(start);
+	bench_require(result_count == 1, "benchmark function did not return one value");
+	elf_Number result = 0;
+	bench_require(elf_type(state, -1) == ELF_VALUE_TYPE_NUMBER, "benchmark result did not use the number path");
+	bench_require(elf_to_num(state, -1, &result), "benchmark result was not a number");
+	bench_require(result == expected, "benchmark returned the wrong number result");
+	bench_number_sink += result;
+	elf_pop(state, 1);
+	return seconds;
+}
+
+static void bench_vm_integer_program(const char *name, const char *source, u32 iterations, elf_Integer expected)
+{
+	enum { SAMPLE_COUNT = 7 };
+	double samples[SAMPLE_COUNT];
+	elf_State *state = elf_create_state();
+	elf_Ref program = bench_compile_program(state, name, source);
+	bench_run_integer_program(state, program, iterations, expected);
+
+	for (u32 i = 0; i < SAMPLE_COUNT; ++i) {
+		samples[i] = bench_run_integer_program(state, program, iterations, expected);
+	}
+
+	bench_report(name, "iterations", iterations, bench_median(samples, SAMPLE_COUNT));
+	elf_release_ref(state, program);
+	elf_destroy_state(state);
+}
+
+static void bench_vm_number_program(const char *name, const char *source, u32 iterations, elf_Number expected)
+{
+	enum { SAMPLE_COUNT = 7 };
+	double samples[SAMPLE_COUNT];
+	elf_State *state = elf_create_state();
+	elf_Ref program = bench_compile_program(state, name, source);
+	bench_run_number_program(state, program, iterations, expected);
+
+	for (u32 i = 0; i < SAMPLE_COUNT; ++i) {
+		samples[i] = bench_run_number_program(state, program, iterations, expected);
+	}
+
+	bench_report(name, "iterations", iterations, bench_median(samples, SAMPLE_COUNT));
+	elf_release_ref(state, program);
+	elf_destroy_state(state);
+}
+
+static void bench_compile_repeatedly(const char *source, u32 iterations)
+{
+	elf_State *state = elf_create_state();
+	u64 program_array_capacity =
+		(u64)state->bytecode_capacity * sizeof(*state->bytecode) +
+		(u64)state->bytecode_function_capacity * sizeof(*state->bytecode_functions) +
+		(u64)state->integer_constant_capacity * sizeof(*state->integer_constants) +
+		(u64)state->number_constant_capacity * sizeof(*state->number_constants);
+	u32 bytecode_before = state->bytecode_count;
+	u32 functions_before = state->bytecode_function_count;
+	u32 integer_constants_before = state->integer_constant_count;
+	u32 number_constants_before = state->number_constant_count;
+	u64 arena_before = state->arena.in_use;
+	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
+
+	i64 start = bench_now();
+	for (u32 i = 0; i < iterations; ++i)
+	{
+		bench_require(elf_push_code_source(state, "benchmark.compile", text), "could not compile benchmark source");
+		elf_pop(state, 1);
+	}
+	double seconds = bench_elapsed_s(start);
+	u32 bytecode_growth = state->bytecode_count - bytecode_before;
+	u32 function_growth = state->bytecode_function_count - functions_before;
+	u32 integer_constant_growth = state->integer_constant_count - integer_constants_before;
+	u32 number_constant_growth = state->number_constant_count - number_constants_before;
+	u64 source_map_growth = state->arena.in_use - arena_before;
+	u64 program_storage_growth =
+		(u64)bytecode_growth * sizeof(*state->bytecode) +
+		(u64)function_growth * sizeof(*state->bytecode_functions) +
+		(u64)integer_constant_growth * sizeof(*state->integer_constants) +
+		(u64)number_constant_growth * sizeof(*state->number_constants) +
+		source_map_growth;
+
+	bench_report("compile source", "compiles", iterations, seconds);
+	printf("  growth: %u bytecodes, %u functions, %u integer constants, %u number constants\n",
+		bytecode_growth, function_growth, integer_constant_growth, number_constant_growth);
+	printf("  logical program storage: %llu bytes (%llu bytes of source maps)\n",
+		program_storage_growth, source_map_growth);
+	printf("  preallocated program arrays per state: %llu bytes\n", program_array_capacity);
+	elf_destroy_state(state);
 }
 
 static void fill_atom_table(elf_State *state, elf_Table *table, elf_Value *hit_keys, elf_Value *miss_keys, u32 count)
@@ -82,7 +233,65 @@ int main(void)
 	enum {
 		KEY_COUNT = 4096,
 		ITERATIONS = 5000000,
+		VM_ITERATIONS = 1000000,
+		CLOSURE_ITERATIONS = 100000,
+		COMPILE_ITERATIONS = 500,
 	};
+	static const char dispatch_source[] =
+		"ret fun(n) {\n"
+		"\tacc := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tacc += i\n"
+		"\t\tacc -= i\n"
+		"\t\tacc += i\n"
+		"\t\tacc -= i\n"
+		"\t\tacc += 1\n"
+		"\t}\n"
+		"\tret acc\n"
+		"}\n";
+	static const char call_source[] =
+		"ret fun(n) {\n"
+		"\tstep := fun(value) { ret value + 1 }\n"
+		"\tvalue := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tvalue = step(value)\n"
+		"\t}\n"
+		"\tret value\n"
+		"}\n";
+	static const char integer_constant_source[] =
+		"ret fun(n) {\n"
+		"\tacc := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tacc += i + 3\n"
+		"\t\tacc += i + 5\n"
+		"\t\tacc += i + 7\n"
+		"\t\tacc += i + 11\n"
+		"\t\tacc += i + 13\n"
+		"\t\tacc += i + 17\n"
+		"\t\tacc += i + 19\n"
+		"\t\tacc += i + 23\n"
+		"\t}\n"
+		"\tret acc\n"
+		"}\n";
+	static const char number_constant_source[] =
+		"ret fun(n) {\n"
+		"\tvalue := 0.0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tvalue += 1.25\n"
+		"\t\tvalue += 2.5\n"
+		"\t\tvalue -= 0.75\n"
+		"\t}\n"
+		"\tret value\n"
+		"}\n";
+	static const char closure_source[] =
+		"ret fun(n) {\n"
+		"\tresult := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tcurrent := fun() { ret i }\n"
+		"\t\tresult += current() - i + 1\n"
+		"\t}\n"
+		"\tret result\n"
+		"}\n";
 
 	prof_begin_capture();
 
@@ -106,30 +315,42 @@ int main(void)
 	{
 		atom_hit_seconds = bench_table_get(state, atom_table, atom_hit_keys, KEY_COUNT, ITERATIONS);
 	}
-	bench_report("atom hit", ITERATIONS, atom_hit_seconds);
+	bench_report("atom hit", "lookups", ITERATIONS, atom_hit_seconds);
 
 	double atom_miss_seconds = 0;
 	PROF_BLOCK("bench.table.atom_miss")
 	{
 		atom_miss_seconds = bench_table_get(state, atom_table, atom_miss_keys, KEY_COUNT, ITERATIONS);
 	}
-	bench_report("atom miss", ITERATIONS, atom_miss_seconds);
+	bench_report("atom miss", "lookups", ITERATIONS, atom_miss_seconds);
 
 	double integer_hit_seconds = 0;
 	PROF_BLOCK("bench.table.integer_hit")
 	{
 		integer_hit_seconds = bench_table_get(state, int_table, int_hit_keys, KEY_COUNT, ITERATIONS);
 	}
-	bench_report("integer hit", ITERATIONS, integer_hit_seconds);
+	bench_report("integer hit", "lookups", ITERATIONS, integer_hit_seconds);
 
 	double integer_miss_seconds = 0;
 	PROF_BLOCK("bench.table.integer_miss")
 	{
 		integer_miss_seconds = bench_table_get(state, int_table, int_miss_keys, KEY_COUNT, ITERATIONS);
 	}
-	bench_report("integer miss", ITERATIONS, integer_miss_seconds);
+	bench_report("integer miss", "lookups", ITERATIONS, integer_miss_seconds);
 
-	printf("sink: %lld\n", bench_sink);
+	printf("\nVM benchmarks (median of 7 measured runs after one warmup)\n");
+	bench_vm_integer_program("VM dispatch", dispatch_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("function calls", call_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("integer constants", integer_constant_source, VM_ITERATIONS,
+		4ll * VM_ITERATIONS * (VM_ITERATIONS - 1ll) + 98ll * VM_ITERATIONS);
+	bench_vm_number_program("number constants", number_constant_source, VM_ITERATIONS, 3.0 * VM_ITERATIONS);
+	bench_vm_integer_program("closure create/call", closure_source, CLOSURE_ITERATIONS, CLOSURE_ITERATIONS);
+
+	printf("\nCompiler and storage benchmark\n");
+	bench_compile_repeatedly(closure_source, COMPILE_ITERATIONS);
+
+	printf("sinks: %lld %.3f\n", bench_integer_sink, bench_number_sink);
 	prof_dump();
+	elf_destroy_state(state);
 	return 0;
 }

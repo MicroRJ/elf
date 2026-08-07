@@ -1,3 +1,6 @@
+//
+// See Copyright Notice In elf.h
+//
 
 #define IMPLICIT_PARAM_INDEX 0
 #define IMPLICIT_PARAM_COUNT 1

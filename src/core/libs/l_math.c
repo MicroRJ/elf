@@ -2,6 +2,10 @@
 // See Copyright Notice In elf.h
 //
 
+//
+// See Copyright Notice In elf.h
+//
+
 static elf_Value math_load_numeric(elf_State *state, int index)
 {
 	elf_Value value = load_value(state, index);

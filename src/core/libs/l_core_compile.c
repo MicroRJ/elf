@@ -1,4 +1,8 @@
 //
+// See Copyright Notice In elf.h
+//
+
+//
 // Compiler-backed core operations.
 //
 

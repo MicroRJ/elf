@@ -1,3 +1,6 @@
+//
+// See Copyright Notice In elf.h
+//
 
 static inline b32 bc_slot_is_valid(BcSlot memory)
 {

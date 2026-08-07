@@ -384,10 +384,10 @@ static void test_backend_if_else_restores_stack_top(void)
 	Ir if_ir = create_if_ir(ctx, site, pred, true_clause, else_clause);
 	Ir after_if = create_local_ir(ctx, site, create_int_ir(ctx, site, 33));
 
-	Ir_Array_Bld stats = begin_ir_array_builder(ctx);
-	push_ir_block(&stats, if_ir);
-	push_ir_block(&stats, after_if);
-	Ir body = create_block_ir(ctx, site, end_ir_array_builder(&stats));
+	IrFrame stats = begin_ir_frame(ctx);
+	push_ir(&stats, if_ir);
+	push_ir(&stats, after_if);
+	Ir body = create_block_ir(ctx, site, close_ir_frame(&stats));
 
 	IrFunction function = {};
 	function.site = site;

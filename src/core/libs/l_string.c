@@ -1,4 +1,8 @@
 //
+// See Copyright Notice In elf.h
+//
+
+//
 // Immutable counted byte strings. Case conversion is ASCII-only.
 //
 

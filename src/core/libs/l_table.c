@@ -1,4 +1,8 @@
 //
+// See Copyright Notice In elf.h
+//
+
+//
 // Tables are elf's single map/array collection. The array operations work on
 // the table's ordered value storage; map fields retain their slot bindings.
 //

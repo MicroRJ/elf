@@ -1,4 +1,8 @@
 //
+// See Copyright Notice In elf.h
+//
+
+//
 // Runtime diagnostics. These are intentionally kept out of the root API.
 //
 

@@ -1,8 +1,7 @@
 //
 //	See Copyright Notice In elf.h
 //
-// Source -> AST
-//
+
 
 #define I64_MAX_MAGNITUDE 0x7fffffffffffffffull
 #define I64_MIN_MAGNITUDE 0x8000000000000000ull

@@ -1,12 +1,16 @@
+//
+// See Copyright Notice In elf.h
+//
+
 typedef struct
 {
 	LowerContext *ctx;
 	u32           start;
 	u32           count;
 }
-Ir_Array_Bld;
+IrFrame;
 
-static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *block, Ast stat);
+static void lower_ast_stat_to_ir(IrFrame *block, Ast stat);
 static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr);
 static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
 
@@ -56,11 +60,11 @@ static void report_lowering_error(LowerContext *ctx, LoweringError error, Source
 
 	const char *source_name = ctx && ctx->source_name ? atom_data(ctx->source_name) : "<unknown>";
 	if (site.line_index) {
-		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] lowering error: %s"
+		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] error: %s"
 		, source_name, site.line_index, source_slice_column(site), message);
 	}
 	else {
-		log_linef(LOG_LEVEL_ERROR, "%s [?] lowering error: %s", source_name, message);
+		log_linef(LOG_LEVEL_ERROR, "%s [?] error: %s", source_name, message);
 	}
 	elf_end_scratch(scratch);
 }
@@ -78,11 +82,11 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 
 	const char *source_name = ctx && ctx->source_name ? atom_data(ctx->source_name) : "<unknown>";
 	if (site.line_index) {
-		log_linef(LOG_LEVEL_WARNING, "%s [%u:%llu] lowering warning: %s"
+		log_linef(LOG_LEVEL_WARNING, "%s [%u:%llu] warning: %s"
 		, source_name, site.line_index, source_slice_column(site), message);
 	}
 	else {
-		log_linef(LOG_LEVEL_WARNING, "%s [?] lowering warning: %s", source_name, message);
+		log_linef(LOG_LEVEL_WARNING, "%s [?] warning: %s", source_name, message);
 	}
 
 	if (source_slice_is_valid(site)) {
@@ -101,39 +105,39 @@ static Ast check_ast_type(Ast ast, AstType type)
 	return ast;
 }
 
-static Ir_Array_Bld begin_ir_array_builder(LowerContext *ctx)
+static IrFrame begin_ir_frame(LowerContext *ctx)
 {
-	Ir_Array_Bld block = {};
+	IrFrame block = {};
 	block.ctx = ctx;
 	block.start = ctx->ir_stack_index;
 	block.count = 0;
 	return block;
 }
 
-static void push_ir_block(Ir_Array_Bld *block, Ir ir)
+static void push_ir(IrFrame *stack, Ir ir)
 {
-	LowerContext *ctx = block->ctx;
+	LowerContext *ctx = stack->ctx;
 	ASSERT(ctx);
-	ASSERT(ctx->ir_stack_index == block->start + block->count);
+	ASSERT(ctx->ir_stack_index == stack->start + stack->count);
 	ASSERT(ctx->ir_stack_index < ctx->ir_stack_size);
 	ctx->ir_stack[ctx->ir_stack_index++] = ir;
-	block->count += 1;
+	stack->count += 1;
 }
 
-static IrArray end_ir_array_builder(Ir_Array_Bld *block)
+static IrArray close_ir_frame(IrFrame *frame)
 {
-	LowerContext *ctx = block->ctx;
+	LowerContext *ctx = frame->ctx;
 	ASSERT(ctx);
-	ASSERT(ctx->ir_stack_index == block->start + block->count);
+	ASSERT(ctx->ir_stack_index == frame->start + frame->count);
 
-	ctx->ir_stack_index -= block->count;
+	ctx->ir_stack_index -= frame->count;
+
 	IrArray items = {};
-	items.count = block->count;
-	items.items = elf_arena_push_copy(ctx->arena
-	,	sizeof(*items.items) * items.count, ctx->ir_stack + ctx->ir_stack_index);
+	items.count = frame->count;
+	items.items = elf_arena_push_copy(ctx->arena, sizeof(*items.items) * items.count, ctx->ir_stack + ctx->ir_stack_index);
 
-	ASSERT(ctx->ir_stack_index == block->start);
-	block->count = 0;
+	ASSERT(ctx->ir_stack_index == frame->start);
+	frame->count = 0;
 	return items;
 }
 
@@ -183,13 +187,13 @@ static void push_defer_stat(LowerContext *ctx, Ast stat)
 	ctx->defer_stack[ctx->defer_count++] = stat;
 }
 
-static void emit_defer_range(LowerContext *ctx, Ir_Array_Bld *items, u32 start)
+static void emit_defer_range(LowerContext *ctx, IrFrame *items, u32 start)
 {
 	ASSERT(start <= ctx->defer_count);
 	for (u32 i = ctx->defer_count; i > start; --i)
 	{
 		Ast deferred = ctx->defer_stack[i - 1];
-		lower_ast_stat_to_ir(ctx, items, deferred);
+		lower_ast_stat_to_ir(items, deferred);
 	}
 }
 
@@ -655,9 +659,9 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			Ast *args = expr->table.args;
 			u32 nargs = expr->table.nargs;
 
-			Ir_Array_Bld table_items = begin_ir_array_builder(ctx);
+			IrFrame table_items = begin_ir_frame(ctx);
 			Ir table_local = create_local_ir(ctx, expr->site, create_table_ir(ctx, expr->site));
-			push_ir_block(&table_items, table_local);
+			push_ir(&table_items, table_local);
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
@@ -665,7 +669,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				if (ast_is_error(entry))
 				{
 					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, args[i]->site, "expected table entry");
-					push_ir_block(&table_items, ERROR_IR);
+					push_ir(&table_items, ERROR_IR);
 					continue;
 				}
 
@@ -677,16 +681,16 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				{
 					Ir ir_key = lower_ast_expr_to_ir(ctx, key);
 					Ir field = create_binary_ir(ctx, entry->site, IR_FIELD, table, ir_key);
-					push_ir_block(&table_items, create_store_ir(ctx, entry->site, field, ir_value));
+					push_ir(&table_items, create_store_ir(ctx, entry->site, field, ir_value));
 				}
 				else
 				{
-					push_ir_block(&table_items, create_array_add_ir(ctx, entry->site, table, ir_value));
+					push_ir(&table_items, create_array_add_ir(ctx, entry->site, table, ir_value));
 				}
 			}
 
 			Ir value = create_load_local_ir(ctx, expr->site, table_local);
-			IrArray stats = end_ir_array_builder(&table_items);
+			IrArray stats = close_ir_frame(&table_items);
 			ir = create_expr_block_ir(ctx, expr->site, stats, value);
 		}
 		break;
@@ -757,14 +761,14 @@ static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat)
 		return ERROR_IR;
 	}
 
-	Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
+	IrFrame block_items = begin_ir_frame(ctx);
 	if (stat->kind == AST_BLOCK_STAT)
 	{
 		EntityScope scope = get_entity_scope(ctx);
 		DeferScope defer_scope = get_defer_scope(ctx);
 		for (u32 i = 0; i < stat->block.nstats; ++ i)
 		{
-			lower_ast_stat_to_ir(ctx, &block_items, stat->block.stats[i]);
+			lower_ast_stat_to_ir(&block_items, stat->block.stats[i]);
 		}
 		emit_defer_range(ctx, &block_items, ctx->defer_scope_start);
 		set_defer_scope(ctx, defer_scope);
@@ -772,16 +776,16 @@ static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat)
 	}
 	else
 	{
-		lower_ast_stat_to_ir(ctx, &block_items, stat);
+		lower_ast_stat_to_ir(&block_items, stat);
 	}
 
 	ASSERT(ctx->ir_stack_index == block_items.start + block_items.count);
-	IrArray instr = end_ir_array_builder(&block_items);
+	IrArray instr = close_ir_frame(&block_items);
 	Ir ir = create_block_ir(ctx, stat->site, instr);
 	return ir;
 }
 
-static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, Ir_Array_Bld *items, Ast expr)
+static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IrFrame *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -794,14 +798,14 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, Ir_Array_Bld *items, As
 
 			Ir receiver = lower_ast_expr_to_ir(ctx, x);
 			Ir receiver_memory = create_local_ir(ctx, x->site, receiver);
-			push_ir_block(items, receiver_memory);
+			push_ir(items, receiver_memory);
 			Ir receiver_load = create_load_local_ir(ctx, x->site, receiver_memory);
 
 			Ir key_load = lower_ast_expr_to_ir(ctx, y);
 			if (y->kind != AST_STRING_LITERAL)
 			{
 				Ir key_memory = create_local_ir(ctx, y->site, key_load);
-				push_ir_block(items, key_memory);
+				push_ir(items, key_memory);
 				key_load = create_load_local_ir(ctx, y->site, key_memory);
 			}
 
@@ -816,12 +820,12 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, Ir_Array_Bld *items, As
 
 			Ir receiver = lower_ast_expr_to_ir(ctx, x);
 			Ir receiver_memory = create_local_ir(ctx, x->site, receiver);
-			push_ir_block(items, receiver_memory);
+			push_ir(items, receiver_memory);
 			Ir receiver_load = create_load_local_ir(ctx, x->site, receiver_memory);
 
 			Ir key = lower_ast_expr_to_ir(ctx, y);
 			Ir key_memory = create_local_ir(ctx, y->site, key);
-			push_ir_block(items, key_memory);
+			push_ir(items, key_memory);
 			Ir key_load = create_load_local_ir(ctx, y->site, key_memory);
 
 			ir = create_index_ir(ctx, expr->site, receiver_load, key_load);
@@ -838,7 +842,7 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, Ir_Array_Bld *items, As
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.nargs;
 
@@ -853,7 +857,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, Ir_Array_Bld *items,
 			}
 
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, message);
-			push_ir_block(items, ERROR_IR);
+			push_ir(items, ERROR_IR);
 			return 1;
 		}
 	}
@@ -864,7 +868,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, Ir_Array_Bld *items,
 		if (ast_is_error(name))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
-			push_ir_block(items, ERROR_IR);
+			push_ir(items, ERROR_IR);
 			return 1;
 		}
 
@@ -880,7 +884,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, Ir_Array_Bld *items,
 		}
 
 		Ir local = create_local_ir(ctx, name->site, value);
-		push_ir_block(items, local);
+		push_ir(items, local);
 
 		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 		entity->memory_ir = local;
@@ -987,9 +991,9 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	Ir iterator_less_than_range_end = create_binary_ir(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = create_jump_if_false_ir(ctx, range->site, iterator_less_than_range_end, break_label);
 
-	Ir_Array_Bld loop_items = begin_ir_array_builder(ctx);
-	push_ir_block(&loop_items, start_label);
-	push_ir_block(&loop_items, exit_jump);
+	IrFrame loop_items = begin_ir_frame(ctx);
+	push_ir(&loop_items, start_label);
+	push_ir(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = name_tuple->tuple.args[i];
@@ -1008,7 +1012,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		}
 
 		Ir var_dest = create_load_local_ir(ctx, name->site, var_locals[i]);
-		push_ir_block(&loop_items, create_store_ir(ctx, name->site, var_dest, value));
+		push_ir(&loop_items, create_store_ir(ctx, name->site, var_dest, value));
 	}
 
 	Ir iterator_load_for_add = create_load_local_ir(ctx, first_name->site, iterator_local);
@@ -1017,27 +1021,27 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	Ir iterator_dest = create_load_local_ir(ctx, first_name->site, iterator_local);
 	Ir increment = create_store_ir(ctx, first_name->site, iterator_dest, next_value);
 
-	push_ir_block(&loop_items, body);
-	push_ir_block(&loop_items, continue_label);
-	push_ir_block(&loop_items, increment);
-	push_ir_block(&loop_items, create_jump_ir(ctx, first_name->site, start_label));
-	push_ir_block(&loop_items, break_label);
-	IrArray loop_stats = end_ir_array_builder(&loop_items);
+	push_ir(&loop_items, body);
+	push_ir(&loop_items, continue_label);
+	push_ir(&loop_items, increment);
+	push_ir(&loop_items, create_jump_ir(ctx, first_name->site, start_label));
+	push_ir(&loop_items, break_label);
+	IrArray loop_stats = close_ir_frame(&loop_items);
 	Ir loop = create_block_ir(ctx, stat->site, loop_stats);
 
-	Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
+	IrFrame block_items = begin_ir_frame(ctx);
 	if (collection_local) {
-		push_ir_block(&block_items, collection_local);
+		push_ir(&block_items, collection_local);
 	}
-	push_ir_block(&block_items, iterator_local);
-	push_ir_block(&block_items, range_end_local);
+	push_ir(&block_items, iterator_local);
+	push_ir(&block_items, range_end_local);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		push_ir_block(&block_items, var_locals[i]);
+		push_ir(&block_items, var_locals[i]);
 	}
-	push_ir_block(&block_items, loop);
+	push_ir(&block_items, loop);
 
-	IrArray stats = end_ir_array_builder(&block_items);
+	IrArray stats = close_ir_frame(&block_items);
 	Ir ir = create_block_ir(ctx, stat->site, stats);
 
 	set_entity_scope(ctx, scope);
@@ -1088,8 +1092,8 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 	}
 
 	EntityScope scope = get_entity_scope(ctx);
-	Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
-	lower_ast_stat_to_ir(ctx, &block_items, init);
+	IrFrame block_items = begin_ir_frame(ctx);
+	lower_ast_stat_to_ir(&block_items, init);
 
 	Ir condition_label = create_label_ir(ctx, stat->site);
 	Ir continue_label = create_label_ir(ctx, stat->for_stat.step->site);
@@ -1107,24 +1111,24 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 	Ir exit_jump = create_jump_if_false_ir(ctx, stat->for_stat.pred->site, pred, break_label);
 	Ir step = lower_ast_to_ir_block(ctx, stat->for_stat.step);
 
-	Ir_Array_Bld loop_items = begin_ir_array_builder(ctx);
-	push_ir_block(&loop_items, condition_label);
-	push_ir_block(&loop_items, exit_jump);
-	push_ir_block(&loop_items, body);
-	push_ir_block(&loop_items, continue_label);
-	push_ir_block(&loop_items, step);
-	push_ir_block(&loop_items, create_jump_ir(ctx, stat->site, condition_label));
-	push_ir_block(&loop_items, break_label);
-	IrArray loop_stats = end_ir_array_builder(&loop_items);
-	push_ir_block(&block_items, create_block_ir(ctx, stat->site, loop_stats));
+	IrFrame loop_items = begin_ir_frame(ctx);
+	push_ir(&loop_items, condition_label);
+	push_ir(&loop_items, exit_jump);
+	push_ir(&loop_items, body);
+	push_ir(&loop_items, continue_label);
+	push_ir(&loop_items, step);
+	push_ir(&loop_items, create_jump_ir(ctx, stat->site, condition_label));
+	push_ir(&loop_items, break_label);
+	IrArray loop_stats = close_ir_frame(&loop_items);
+	push_ir(&block_items, create_block_ir(ctx, stat->site, loop_stats));
 
-	IrArray stats = end_ir_array_builder(&block_items);
+	IrArray stats = close_ir_frame(&block_items);
 	Ir ir = create_block_ir(ctx, stat->site, stats);
 	set_entity_scope(ctx, scope);
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast stat)
+static Ir lower_compound_assign_to_ir(LowerContext *ctx, IrFrame *items, Ast stat)
 {
 	Ast dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
@@ -1153,11 +1157,13 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, Ir_Array_Bld *items, As
 	return create_store_ir(ctx, stat->site, dest_ir, value_ir);
 }
 
-static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast stat)
+static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 {
+	LowerContext *ctx = items->ctx;
+
 	if (!stat || ast_is_error(stat))
 	{
-		push_ir_block(items, ERROR_IR);
+		push_ir(items, ERROR_IR);
 		return;
 	}
 
@@ -1177,7 +1183,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			}
 
 			Ir ir = create_if_ir(ctx, stat->site, pred_ir, true_ir, else_ir);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1200,30 +1206,30 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			Ir pred_ir = lower_ast_expr_to_ir(ctx, pred);
 			Ir jump_if_false = create_jump_if_false_ir(ctx, pred->site, pred_ir, break_label);
 
-			Ir_Array_Bld loop_items = begin_ir_array_builder(ctx);
-			push_ir_block(&loop_items, start_label);
-			push_ir_block(&loop_items, jump_if_false);
-			push_ir_block(&loop_items, body_ir);
-			push_ir_block(&loop_items, create_jump_ir(ctx, stat->site, start_label));
-			push_ir_block(&loop_items, break_label);
+			IrFrame loop_items = begin_ir_frame(ctx);
+			push_ir(&loop_items, start_label);
+			push_ir(&loop_items, jump_if_false);
+			push_ir(&loop_items, body_ir);
+			push_ir(&loop_items, create_jump_ir(ctx, stat->site, start_label));
+			push_ir(&loop_items, break_label);
 
-			IrArray loop_stats = end_ir_array_builder(&loop_items);
+			IrArray loop_stats = close_ir_frame(&loop_items);
 			Ir ir = create_block_ir(ctx, stat->site, loop_stats);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
 		case AST_FOR:
 		{
 			Ir ir = lower_ast_for_to_ir(ctx, stat);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
 		case AST_FOR_RANGE:
 		{
 			Ir ir = lower_ast_for_range_to_ir(ctx, stat);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1232,22 +1238,22 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			Ast *stats = stat->block.stats;
 			u32 nstats = stat->block.nstats;
 
-			Ir_Array_Bld block_items = begin_ir_array_builder(ctx);
+			IrFrame block_items = begin_ir_frame(items->ctx);
 
 			EntityScope scope = get_entity_scope(ctx);
 			DeferScope defer_scope = get_defer_scope(ctx);
 			for (u32 i = 0; i < nstats; ++ i)
 			{
-				lower_ast_stat_to_ir(ctx, &block_items, stats[i]);
+				lower_ast_stat_to_ir(&block_items, stats[i]);
 			}
 			emit_defer_range(ctx, &block_items, ctx->defer_scope_start);
 			set_defer_scope(ctx, defer_scope);
 			set_entity_scope(ctx, scope);
 
 			ASSERT(ctx->ir_stack_index == block_items.start + block_items.count);
-			IrArray ir_stats = end_ir_array_builder(&block_items);
+			IrArray ir_stats = close_ir_frame(&block_items);
 			Ir ir = create_block_ir(ctx, stat->site, ir_stats);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1258,7 +1264,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid declaration");
-				push_ir_block(items, ERROR_IR);
+				push_ir(items, ERROR_IR);
 				break;
 			}
 
@@ -1279,7 +1285,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid assignment");
-				push_ir_block(items, ERROR_IR);
+				push_ir(items, ERROR_IR);
 				break;
 			}
 
@@ -1288,7 +1294,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			{
 				Ast dest_ast = dest_tuple->tuple.args[0];
 				if (!mark_entity_assigned(ctx, dest_ast)) {
-					push_ir_block(items, ERROR_IR);
+					push_ir(items, ERROR_IR);
 					break;
 				}
 				Ast expr_ast = expr_tuple->tuple.nargs ? expr_tuple->tuple.args[0] : 0;
@@ -1296,7 +1302,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
 				Ir expr_ir = expr_ast ? lower_ast_expr_to_ir(ctx, expr_ast) : create_nil_ir(ctx, dest_ast->site);
 				Ir ir = create_store_ir(ctx, stat->site, dest_ir, expr_ir);
-				push_ir_block(items, ir);
+				push_ir(items, ir);
 				break;
 			}
 
@@ -1315,20 +1321,20 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 				}
 
 				values[i] = create_local_ir(ctx, site, expr_ir);
-				push_ir_block(items, values[i]);
+				push_ir(items, values[i]);
 			}
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				Ast dest_ast = dest_tuple->tuple.args[i];
 				if (!mark_entity_assigned(ctx, dest_ast)) {
-					push_ir_block(items, ERROR_IR);
+					push_ir(items, ERROR_IR);
 					continue;
 				}
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
 				Ir value_ir = create_load_local_ir(ctx, values[i]->site, values[i]);
 				Ir ir = create_store_ir(ctx, stat->site, dest_ir, value_ir);
-				push_ir_block(items, ir);
+				push_ir(items, ir);
 			}
 		}
 		break;
@@ -1343,7 +1349,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 		case AST_SHR_ASSIGN:
 		{
 			Ir ir = lower_compound_assign_to_ir(ctx, items, stat);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1354,7 +1360,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid nil assignment");
-				push_ir_block(items, ERROR_IR);
+				push_ir(items, ERROR_IR);
 				break;
 			}
 
@@ -1367,7 +1373,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 				Ast dest_ast = dest_tuple->tuple.args[i];
 				Ast expr_ast = expr_tuple->tuple.args[i];
 				if (!mark_entity_assigned(ctx, dest_ast)) {
-					push_ir_block(items, ERROR_IR);
+					push_ir(items, ERROR_IR);
 					continue;
 				}
 
@@ -1377,12 +1383,12 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 				Ir value_ir = lower_ast_expr_to_ir(ctx, expr_ast);
 				Ir store_ir = create_store_ir(ctx, stat->site, dest_ir, value_ir);
 
-				Ir_Array_Bld true_items = begin_ir_array_builder(ctx);
-				push_ir_block(&true_items, store_ir);
-				IrArray true_stats = end_ir_array_builder(&true_items);
+				IrFrame true_items = begin_ir_frame(ctx);
+				push_ir(&true_items, store_ir);
+				IrArray true_stats = close_ir_frame(&true_items);
 				Ir true_clause = create_block_ir(ctx, stat->site, true_stats);
 				Ir ir = create_if_ir(ctx, stat->site, pred_ir, true_clause, 0);
-				push_ir_block(items, ir);
+				push_ir(items, ir);
 			}
 		}
 		break;
@@ -1401,12 +1407,12 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			if (expr_ir && ctx->defer_count > 0)
 			{
 				Ir return_value = create_local_ir(ctx, stat->site, expr_ir);
-				push_ir_block(items, return_value);
+				push_ir(items, return_value);
 				expr_ir = create_load_local_ir(ctx, stat->site, return_value);
 			}
 			emit_defer_range(ctx, items, ctx->function_defer_start);
 			Ir ir = create_return_ir(ctx, stat->site, expr_ir);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1415,7 +1421,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			LoopLabels loop_labels = current_loop_labels(ctx, stat->site);
 			emit_defer_range(ctx, items, loop_labels.defer_start);
 			Ir ir = create_jump_ir(ctx, stat->site, loop_labels.break_label);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1424,7 +1430,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			LoopLabels loop_labels = current_loop_labels(ctx, stat->site);
 			emit_defer_range(ctx, items, loop_labels.defer_start);
 			Ir ir = create_jump_ir(ctx, stat->site, loop_labels.continue_label);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 
@@ -1442,7 +1448,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				Ir ir = lower_ast_expr_to_ir(ctx, args[i]);
-				push_ir_block(items, ir);
+				push_ir(items, ir);
 			}
 		}
 		break;
@@ -1450,7 +1456,7 @@ static void lower_ast_stat_to_ir(LowerContext *ctx, Ir_Array_Bld *items, Ast sta
 		default:
 		{
 			Ir ir = lower_ast_expr_to_ir(ctx, stat);
-			push_ir_block(items, ir);
+			push_ir(items, ir);
 		}
 		break;
 	}

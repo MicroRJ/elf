@@ -4,53 +4,52 @@
 
 #include "base.h"
 
-
-#define BC_XDEF(_)               \
-_(HALT,            "halt")             \
-_(NOP,             "nop")              \
-_(JUMP,            "jump")             \
-_(JZ,              "jz")               \
-_(JNZ,             "jnz")              \
-_(JE,              "je")               \
-_(JNE,             "jne")              \
-_(RETURN,          "return")           \
-_(LOADCVAL,        "getupval")         \
-_(GETGLOBAL,       "getglobal")        \
-_(LOADKNUM,        "getnum")           \
-_(LOADKINT,        "getint")           \
-_(LOADNIL,         "getnil")           \
-_(RELOAD,          "reload")           \
-_(CURRENT_CLOSURE, "current_closure")  \
-_(GETINDEX,        "getindex")         \
-_(GETMETAFIELD,    "getmetafield")     \
-_(GETLENGTH,       "getlength")        \
-_(GETFIELD,        "getfield")         \
-_(SETGLOBAL,       "setglobal")        \
-_(SETFIELD,        "setfield")         \
-_(SETINDEX,        "setindex")         \
-_(ARRAYADD,        "arrayadd")         \
-_(CALL,            "call")             \
-_(TABLE,           "new_table")        \
-_(CLOSURE,         "new_closure")      \
-_(ENFORCE,         "enforce")          \
-_(LT,              "lt")               \
-_(LTEQ,            "lteq")             \
-_(EQ,              "eq")               \
-_(NEQ,             "neq")              \
-_(MUL,             "mul")              \
-_(DIV,             "div")              \
-_(ADD,             "add")              \
-_(SUB,             "sub")              \
-_(MOD,             "mod")              \
-_(POW,             "pow")              \
-_(BIT_SHL,         "shl")              \
-_(BIT_SHR,         "shr")              \
-_(BIT_XOR,         "xor")              \
-_(BIT_OR,          "or")               \
-_(BIT_AND,         "and")              \
-_(BIT_NOT,         "not")              \
-_(I2N,             "i2n")              \
-_(N2I,             "n2i")              \
+#define BC_XDEF(X)                        \
+	X(HALT,            "halt")             \
+	X(NOP,             "nop")              \
+	X(JUMP,            "jump")             \
+	X(JZ,              "jz")               \
+	X(JNZ,             "jnz")              \
+	X(JE,              "je")               \
+	X(JNE,             "jne")              \
+	X(RETURN,          "return")           \
+	X(LOADCVAL,        "getupval")         \
+	X(GETGLOBAL,       "getglobal")        \
+	X(LOADKNUM,        "getnum")           \
+	X(LOADKINT,        "getint")           \
+	X(LOADNIL,         "getnil")           \
+	X(RELOAD,          "reload")           \
+	X(CURRENT_CLOSURE, "current_closure")  \
+	X(GETINDEX,        "getindex")         \
+	X(GETMETAFIELD,    "getmetafield")     \
+	X(GETLENGTH,       "getlength")        \
+	X(GETFIELD,        "getfield")         \
+	X(SETGLOBAL,       "setglobal")        \
+	X(SETFIELD,        "setfield")         \
+	X(SETINDEX,        "setindex")         \
+	X(ARRAYADD,        "arrayadd")         \
+	X(CALL,            "call")             \
+	X(TABLE,           "new_table")        \
+	X(CLOSURE,         "new_closure")      \
+	X(ENFORCE,         "enforce")          \
+	X(LT,              "lt")               \
+	X(LTEQ,            "lteq")             \
+	X(EQ,              "eq")               \
+	X(NEQ,             "neq")              \
+	X(MUL,             "mul")              \
+	X(DIV,             "div")              \
+	X(ADD,             "add")              \
+	X(SUB,             "sub")              \
+	X(MOD,             "mod")              \
+	X(POW,             "pow")              \
+	X(BIT_SHL,         "shl")              \
+	X(BIT_SHR,         "shr")              \
+	X(BIT_XOR,         "xor")              \
+	X(BIT_OR,          "or")               \
+	X(BIT_AND,         "and")              \
+	X(BIT_NOT,         "not")              \
+	X(I2N,             "i2n")              \
+	X(N2I,             "n2i")              \
 /* end */
 
 
@@ -65,15 +64,13 @@ BytecodeType;
 
 const char *bytecode_type_name(BytecodeType type);
 
-// Todo,
+// TODO(RJ) improve the size of it!
 typedef struct
 {
 	BytecodeType b_type;
 	i16 b_x, b_y, b_z;
 }
 Bytecode;
-
-
 
 #define BC_XYZ(K,X,Y,Z) (Bytecode){K, X, Y, Z}
 #define BC_XYY(K,X,Y)    BC_XYZ(K,X,Y,0)

@@ -1,3 +1,7 @@
+//
+// See Copyright Notice In elf.h
+//
+
 #ifndef ELF_CORE_VALUE_H
 #define ELF_CORE_VALUE_H
 
