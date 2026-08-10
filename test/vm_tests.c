@@ -18,15 +18,29 @@ VmNestedCallContext;
 ELF_FUNCTION(vm_test_nested_call_preserves_context)
 {
 	VmNestedCallContext *context = elf_get_user_data(S);
-	elf_Module *active_module = S->active_module;
-	BcFunction *active_function = S->active_function;
-	u64 active_byte = S->byte;
-	b32 preserved = context && elf_push_ref(S, context->callback);
+	StackFrame *native_frame_pointer = S->frame;
+	StackFrame native_frame = *S->frame;
+	StackFrame *caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
+	elf_Module *caller_module = caller ? caller->module : 0;
+	BcFunction *caller_function = caller ? caller->function : 0;
+	u32 caller_instruction = caller ? caller->instruction : 0;
+	b32 preserved = context && !native_frame.module && !native_frame.function && caller_module && caller_function;
+	if (preserved)
+	{
+		u32 byte_index = caller_function->offset + caller_instruction;
+		preserved = BC_TYPE(caller_module->bytecode[byte_index]) == BC_CALL && elf_push_ref(S, context->callback);
+	}
 	if (preserved)
 	{
 		elf_push_nil(S);
 		elf_call(S, 1, 0);
-		preserved = S->active_module == active_module && S->active_function == active_function && S->byte == active_byte;
+		StackFrame *restored_caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
+		preserved = S->frame == native_frame_pointer &&
+			S->frame->framebase == native_frame.framebase && S->frame->reference == native_frame.reference &&
+			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs && S->frame->nrets == native_frame.nrets &&
+			!S->frame->module && !S->frame->function && restored_caller &&
+			restored_caller->module == caller_module && restored_caller->function == caller_function &&
+			restored_caller->instruction == caller_instruction;
 	}
 	elf_push_int(S, preserved);
 	return 1;

@@ -8,12 +8,18 @@
 
 static StackFrame *core_caller_frame(elf_State *state)
 {
-	if (state->frame_index == 0)
+	if (state->frame == state->frame_stack)
 	{
 		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1,
 			"caller introspection requires a bytecode caller");
 	}
-	return &state->frame_stack[state->frame_index - 1];
+	StackFrame *caller = state->frame - 1;
+	if (!caller->module || !caller->function)
+	{
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1,
+			"caller introspection requires a bytecode caller");
+	}
+	return caller;
 }
 
 ELF_FUNCTION(l_core_nvargs)

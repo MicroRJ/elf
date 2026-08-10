@@ -110,14 +110,14 @@ struct StackFrame
 	BcFunction *function;
 	elf_Value  *framebase;
 	elf_Value  *reference;
-	elf_Value *closureenv;
+	elf_Value   *captures;
 	u32         framesize;
-	u32         nextinstr;
+	u32         instruction;
 	u8              nargs;
 	u8              nrets;
 	u8              arity;
 	u8           variadic;
-	u8        closuresize;
+	u8          ncaptures;
 };
 typedef struct elf_State elf_State;
 struct elf_State
@@ -147,11 +147,7 @@ struct elf_State
 
 		u64          frame_stack_size;
 		StackFrame  *frame_stack;
-		u64          frame_index;
-		StackFrame   frame;
-		u64          byte;
-		elf_Module   *active_module;
-		BcFunction   *active_function;
+		StackFrame  *frame;
 	};
 	struct
 	{

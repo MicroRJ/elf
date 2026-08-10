@@ -14,7 +14,7 @@ static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value valu
 	}
 }
 
-#define get_num_args(state) ((state)->frame.nargs)
+#define get_num_args(state) ((state)->frame->nargs)
 
 typedef enum
 {
@@ -134,5 +134,5 @@ static inline elf_Value load_value(elf_State *S, int x)
 	if (x < 0 || x >= get_num_args(S)) {
 		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, -1, "invalid argument index: %i, got: %i", x, get_num_args(S));
 	}
-	return S->frame.framebase[x];
+	return S->frame->framebase[x];
 }

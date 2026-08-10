@@ -59,12 +59,22 @@ static RuntimeSourceLocation runtime_source_location_for_function(elf_Module *mo
 	return location;
 }
 
+static StackFrame *runtime_current_bytecode_frame(elf_State *state)
+{
+	for (StackFrame *frame = state->frame;; --frame)
+	{
+		if (frame->module && frame->function) return frame;
+		if (frame == state->frame_stack) break;
+	}
+	return 0;
+}
+
 static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr)
 {
-	if (instr == NO_BYTE) {
-		instr = state->byte;
-	}
-	return runtime_source_location_for_function(state->active_module, state->active_function, instr);
+	StackFrame *frame = runtime_current_bytecode_frame(state);
+	if (!frame) return (RuntimeSourceLocation) {};
+	if (instr == NO_BYTE) instr = frame->function->offset + frame->instruction;
+	return runtime_source_location_for_function(frame->module, frame->function, instr);
 }
 
 static void print_runtime_source_location(RuntimeSourceLocation location)
@@ -103,22 +113,21 @@ static void print_runtime_source_location(RuntimeSourceLocation location)
 
 static b32 print_runtime_call_stack(elf_State *state)
 {
-	if (state->frame_index <= 1) {
-		return false;
-	}
-
-	log_line(LOG_LEVEL_INFO, "call stack:");
-	for (u64 i = 1; i < state->frame_index; ++i)
+	StackFrame *current = runtime_current_bytecode_frame(state);
+	b32 printed = false;
+	for (StackFrame *frame = state->frame; frame > state->frame_stack;)
 	{
-		StackFrame *frame = &state->frame_stack[i];
-		if (!frame->module || !frame->function) continue;
-		int instr = frame->function->offset + frame->nextinstr;
+		frame--;
+		if (frame == current || !frame->module || !frame->function) continue;
+		if (!printed) log_line(LOG_LEVEL_INFO, "call stack:");
+		printed = true;
+		int instr = frame->function->offset + frame->instruction;
 		RuntimeSourceLocation location = runtime_source_location_for_function(frame->module, frame->function, instr);
 		if (location.function) {
 			print_runtime_source_location(location);
 		}
 	}
-	return true;
+	return printed;
 }
 
 static void print_runtime_error_location(RuntimeSourceLocation location)

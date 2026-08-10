@@ -35,9 +35,9 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	frame->nrets = nrets;
 	frame->arity = function->arity;
 	frame->variadic = function->variadic;
-	frame->closureenv = closure->captures;
-	frame->closuresize = function->captures;
-	frame->nextinstr = 0;
+	frame->captures = closure->captures;
+	frame->ncaptures = function->captures;
+	frame->instruction = 0;
 
 	elf_Value *stack_pointer = frame_base + frame_size;
 	ASSERT(stack_pointer >= state->stack_ptr);
@@ -49,11 +49,13 @@ static u32 call_native_function(elf_State *state, elf_Function function, u32 nar
 	elf_Value *frame_base = state->stack_ptr - nargs;
 	u32 frame_size = nargs;
 
-	state->frame.framebase = frame_base;
-	state->frame.reference = frame_base;
-	state->frame.framesize = frame_size;
-	state->frame.nargs = nargs;
-	state->frame.nrets = nrets;
+	*state->frame = (StackFrame) {
+		.framebase = frame_base,
+		.reference = frame_base,
+		.framesize = frame_size,
+		.nargs = nargs,
+		.nrets = nrets,
+	};
 
 	// Native calls run directly above their arguments, so framebase + framesize
 	// is exactly the current stack pointer. There is no frame slack to zero here.
@@ -82,12 +84,11 @@ static u32 call_native_function(elf_State *state, elf_Function function, u32 nar
 
 static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int nrets)
 {
-	StackFrame frame;
-	prepare_closure_stack_frame(state, &frame, closure, nargs, nrets);
+	prepare_closure_stack_frame(state, state->frame, closure, nargs, nrets);
 	int result = 0;
 	PROF_BLOCK("vm.run_bytecode_frame")
 	{
-		result = run_bytecode_frame(state, frame);
+		result = run_bytecode_frame(state);
 	}
 	return result;
 }
@@ -96,7 +97,7 @@ u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)
 {
 	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
 
-	u32 frame_index = state->frame_index;
+	StackFrame *frame = state->frame;
 	elf_Value value = *(state->stack_ptr - nargs - 1);
 
 	if (value_is_closure(value))
@@ -112,20 +113,20 @@ u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)
 		elf_report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, NO_BYTE, "'%s' cannot be called", value_type_name(value.type));
 	}
 
-	ASSERT(state->frame_index == frame_index);
+	ASSERT(state->frame == frame);
 	return nrets;
 }
 
 static inline void push_stack_frame(elf_State *state)
 {
-	ASSERT(state->frame_index < state->frame_stack_size);
-	state->frame_stack[state->frame_index++] = state->frame;
+	ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
+	state->frame++;
 }
 
 static inline void pop_stack_frame(elf_State *state)
 {
-	ASSERT(state->frame_index > 0);
-	state->frame = state->frame_stack[--state->frame_index];
+	ASSERT(state->frame > state->frame_stack);
+	state->frame--;
 }
 
 u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
@@ -133,15 +134,14 @@ u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
 	if (nargs < 1) {
 		elf_report_runtime_error(state, RUNTIME_ERROR_INVALID_ARGUMENT_COUNT, NO_BYTE, "invalid number of arguments, expected at least one");
 	}
+	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
+	elf_Value callee = *(state->stack_ptr - nargs - 1);
+	if (!value_is_callable(callee)) {
+		elf_report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, NO_BYTE, "'%s' cannot be called", value_type_name(callee.type));
+	}
 
-	elf_Module *saved_active_module = state->active_module;
-	BcFunction *saved_active_function = state->active_function;
-	u64 saved_byte = state->byte;
 	push_stack_frame(state);
 	nrets = elf_tail_call(state, nargs, nrets);
 	pop_stack_frame(state);
-	state->active_module = saved_active_module;
-	state->active_function = saved_active_function;
-	state->byte = saved_byte;
 	return nrets;
 }

@@ -77,7 +77,7 @@ int elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 
 static elf_i32 frame_floor(elf_State *state)
 {
-	return state->frame.framesize;
+	return state->frame->framesize;
 }
 
 static elf_Value *value_at(elf_State *state, elf_i32 index)
@@ -85,7 +85,7 @@ static elf_Value *value_at(elf_State *state, elf_i32 index)
 	elf_i32 top = elf_get_top(state);
 	elf_i32 absolute = index < 0 ? top + index : index;
 	if (absolute < 0 || absolute >= top) return 0;
-	return state->frame.framebase + absolute;
+	return state->frame->framebase + absolute;
 }
 
 static elf_b32 table_at(elf_State *state, elf_i32 index, elf_Table **table)
@@ -108,12 +108,12 @@ static elf_b32 values_equal(elf_Value left, elf_Value right)
 
 elf_i32 elf_get_top(elf_State *state)
 {
-	return (elf_i32)(state->stack_ptr - state->frame.framebase);
+	return (elf_i32)(state->stack_ptr - state->frame->framebase);
 }
 
 elf_i32 elf_arg_count(elf_State *state)
 {
-	return state->frame.nargs;
+	return state->frame->nargs;
 }
 
 elf_i32 elf_abs_index(elf_State *state, elf_i32 index)
@@ -130,7 +130,7 @@ elf_b32 elf_is_valid(elf_State *state, elf_i32 index)
 elf_b32 elf_set_top(elf_State *state, elf_i32 top)
 {
 	elf_i32 current = elf_get_top(state);
-	if (top < frame_floor(state) || state->frame.framebase + top > state->stack + state->stack_size) {
+	if (top < frame_floor(state) || state->frame->framebase + top > state->stack + state->stack_size) {
 		return false;
 	}
 	while (current < top) {
@@ -138,8 +138,8 @@ elf_b32 elf_set_top(elf_State *state, elf_i32 top)
 		current += 1;
 	}
 	if (current > top) {
-		value_zero_many(state->frame.framebase + top, current - top);
-		state->stack_ptr = state->frame.framebase + top;
+		value_zero_many(state->frame->framebase + top, current - top);
+		state->stack_ptr = state->frame->framebase + top;
 	}
 	return true;
 }
@@ -255,7 +255,7 @@ elf_b32 elf_get_field(elf_State *state, elf_i32 index, const char *field)
 elf_b32 elf_set_field(elf_State *state, elf_i32 index, const char *field)
 {
 	elf_Table *table;
-	if (!field || state->stack_ptr <= state->frame.framebase + frame_floor(state)
+	if (!field || state->stack_ptr <= state->frame->framebase + frame_floor(state)
 	|| !table_at(state, index, &table)) return false;
 	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
 	elf_Value value = pop_value(state);
@@ -274,7 +274,7 @@ elf_b32 elf_get_index(elf_State *state, elf_i32 index, elf_u32 element)
 elf_b32 elf_set_index(elf_State *state, elf_i32 index, elf_u32 element)
 {
 	elf_Table *table;
-	if (state->stack_ptr <= state->frame.framebase + frame_floor(state)
+	if (state->stack_ptr <= state->frame->framebase + frame_floor(state)
 	|| !table_at(state, index, &table) || element > table->count) return false;
 	elf_Value value = pop_value(state);
 	if (element == table->count) elf_array_add(state, table, value);
@@ -285,7 +285,7 @@ elf_b32 elf_set_index(elf_State *state, elf_i32 index, elf_u32 element)
 elf_b32 elf_append(elf_State *state, elf_i32 index)
 {
 	elf_Table *table;
-	if (state->stack_ptr <= state->frame.framebase + frame_floor(state)
+	if (state->stack_ptr <= state->frame->framebase + frame_floor(state)
 	|| !table_at(state, index, &table)) return false;
 	elf_array_add(state, table, pop_value(state));
 	return true;
@@ -329,7 +329,7 @@ void elf_get_global(elf_State *state, const char *name)
 
 elf_b32 elf_set_global(elf_State *state, const char *name)
 {
-	if (!name || state->stack_ptr <= state->frame.framebase + frame_floor(state)) return false;
+	if (!name || state->stack_ptr <= state->frame->framebase + frame_floor(state)) return false;
 	elf_Value key = value_from_atom(elf_atom_from_data(state, name));
 	elf_table_set(state, state->globals, key, pop_value(state));
 	return true;

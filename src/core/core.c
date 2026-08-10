@@ -65,6 +65,7 @@ static void init_runtime_storage(elf_State *state)
 {
 	state->frame_stack_size = 4096;
 	state->frame_stack = elf_arena_push_zero(&state->arena, sizeof(*state->frame_stack) * state->frame_stack_size);
+	state->frame = state->frame_stack;
 
 	state->stack_size = 4096;
 	state->stack = elf_arena_push_zero(&state->arena, sizeof(*state->stack) * state->stack_size);
@@ -89,15 +90,15 @@ static void bootstrap_base_frame(elf_State *state)
 {
 	push_value(state, value_nil());
 
-	state->frame.framebase = state->stack;
-	state->frame.framesize = 16;
+	state->frame->framebase = state->stack;
+	state->frame->framesize = 16;
 }
 
 static void reserve_bootstrap_frame_stack_space(elf_State *state)
 {
-	ASSERT((state->stack_ptr - state->stack) < state->frame.framesize);
+	ASSERT((state->stack_ptr - state->stack) < state->frame->framesize);
 
-	elf_Value *stack_pointer = state->frame.framebase + state->frame.framesize;
+	elf_Value *stack_pointer = state->frame->framebase + state->frame->framesize;
 	ASSERT(stack_pointer >= state->stack_ptr);
 	value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
 	state->stack_ptr = stack_pointer;
@@ -165,6 +166,6 @@ void elf_destroy_state(elf_State *state)
 	}
 }
 
-static int run_bytecode_frame(elf_State *state, StackFrame frame);
+static int run_bytecode_frame(elf_State *state);
 #include "call.c"
 #include "vm.c"

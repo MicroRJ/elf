@@ -76,37 +76,37 @@ static elf_Closure *vm_new_closure(elf_State *state, BcFunctionRef function_ref,
 	return closure;
 }
 
-static inline void vm_activate_frame(elf_State *state, StackFrame *frame, int *byte_offset, int *byte_count, const Bytecode **code)
-{
-	ASSERT(frame->module && frame->function);
-	*byte_offset = frame->function->offset;
-	*byte_count = frame->function->length;
-	*code = frame->module->bytecode + *byte_offset;
-	state->active_module = frame->module;
-	state->active_function = frame->function;
-}
-
-static int run_bytecode_frame(elf_State *state, StackFrame frame)
+static int run_bytecode_frame(elf_State *state)
 {
 	elf_Table *globals = state->globals;
-	elf_Value *root_frame = frame.framebase;
-	int nrets = frame.nrets;
-	i32 subframe_count = 0;
-	int byte_offset;
-	int byte_count;
-	const Bytecode *code;
-	vm_activate_frame(state, &frame, &byte_offset, &byte_count, &code);
+	StackFrame *root_frame = state->frame;
+	int nrets = state->frame->nrets;
 
-	while (frame.nextinstr < byte_count) {
-		int instr = frame.nextinstr++;
+activate_frame:
+	StackFrame *frame = state->frame;
+	ASSERT(frame->module && frame->function);
+	elf_Module *module = frame->module;
+	BcFunction *function = frame->function;
+	elf_Value *framebase = frame->framebase;
+	elf_Value *reference = frame->reference;
+	elf_Value *captures = frame->captures;
+	u32 instruction = frame->instruction;
+	u8 frame_nrets = frame->nrets;
+	u8 ncaptures = frame->ncaptures;
+	int byte_offset = function->offset;
+	int byte_count = function->length;
+	const Bytecode *code = module->bytecode + byte_offset;
+
+	while (instruction < byte_count) {
+		int instr = instruction;
+		int next_instruction = instr + 1;
 		int byte_index = byte_offset + instr;
-		// Todo, remove this!
-		state->byte = byte_index;
+		frame->instruction = instruction;
 
 		Bytecode byte = code[instr];
-		elf_Value *result_slot = &frame.reference[byte.b_x];
-		elf_Value *left_slot = &frame.reference[byte.b_y];
-		elf_Value *right_slot = &frame.reference[byte.b_z];
+		elf_Value *result_slot = &reference[byte.b_x];
+		elf_Value *left_slot = &reference[byte.b_y];
+		elf_Value *right_slot = &reference[byte.b_z];
 
 		switch (byte.b_type) {
 			case BC_HALT: {
@@ -118,79 +118,79 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 
 			case BC_CALL: {
 				elf_Value callee = *result_slot;
-				state->stack_ptr = frame.reference + byte.b_x + byte.b_y + 1;
+				state->stack_ptr = reference + byte.b_x + byte.b_y + 1;
 
-				state->frame_stack[state->frame_index++] = frame;
 				if (value_is_closure(callee)) {
-					prepare_closure_stack_frame(state, &frame, value_as_closure(callee), byte.b_y, byte.b_z);
-					vm_activate_frame(state, &frame, &byte_offset, &byte_count, &code);
-					subframe_count++;
+					push_stack_frame(state);
+					prepare_closure_stack_frame(state, state->frame, value_as_closure(callee), byte.b_y, byte.b_z);
+					ASSERT(state->stack_ptr == state->frame->framebase + state->frame->framesize);
+					goto activate_frame;
 				}
 				else if (value_is_function(callee)) {
+					push_stack_frame(state);
 					call_native_function(state, value_as_function(callee), byte.b_y, byte.b_z);
-					state->active_module = frame.module;
-					state->active_function = frame.function;
-					state->frame_index--;
-					elf_Value *stack_pointer = frame.framebase + frame.framesize;
+					pop_stack_frame(state);
+					state->frame->instruction++;
+					elf_Value *stack_pointer = state->frame->framebase + state->frame->framesize;
 					if (stack_pointer > state->stack_ptr) {
 						value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
 					}
 					state->stack_ptr = stack_pointer;
+					ASSERT(state->stack_ptr == state->frame->framebase + state->frame->framesize);
+					goto activate_frame;
 				}
 				else {
 					vm_error_cannot_call(state, callee);
 				}
-
-				ASSERT(state->stack_ptr == frame.framebase + frame.framesize);
 			} break;
 
 			case BC_RETURN: {
-				nrets = MIN(byte.b_y, frame.nrets);
-				value_copy_many(frame.framebase - 1, frame.reference + byte.b_x, nrets);
+				nrets = MIN(byte.b_y, frame_nrets);
+				value_copy_many(framebase - 1, reference + byte.b_x, nrets);
 
-				ASSERT(state->frame_index > 0);
-				if (subframe_count) {
-					frame = state->frame_stack[--state->frame_index];
-					vm_activate_frame(state, &frame, &byte_offset, &byte_count, &code);
-					elf_Value *stack_pointer = frame.framebase + frame.framesize;
+				ASSERT(state->frame >= root_frame);
+				if (state->frame != root_frame) {
+					pop_stack_frame(state);
+					state->frame->instruction++;
+					elf_Value *stack_pointer = state->frame->framebase + state->frame->framesize;
 					if (stack_pointer > state->stack_ptr) {
 						value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
 					}
 					state->stack_ptr = stack_pointer;
-					subframe_count--;
+					goto activate_frame;
 				}
 				else {
-					ASSERT(frame.framebase == root_frame);
-					state->stack_ptr = frame.framebase - 1 + nrets;
+					ASSERT(framebase == root_frame->framebase);
+					state->stack_ptr = framebase - 1 + nrets;
 					goto exit;
 				}
 			} break;
 
 			case BC_JUMP: {
-				frame.nextinstr = instr + byte.b_x;
+				next_instruction = instr + byte.b_x;
 			} break;
 
 			case BC_JZ: {
 				if (value_as_integer(*left_slot) == 0) {
-					frame.nextinstr = instr + byte.b_x;
+					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_JNZ: {
 				if (value_as_integer(*left_slot) != 0) {
-					frame.nextinstr = instr + byte.b_x;
+					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_JE: {
 				if (vm_values_equal(*left_slot, *right_slot)) {
-					frame.nextinstr = instr + byte.b_x;
+					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_JNE: {
 				if (!vm_values_equal(*left_slot, *right_slot)) {
-					frame.nextinstr = instr + byte.b_x;
+					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
@@ -199,16 +199,16 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			case BC_LOADKINT: {
-				*result_slot = value_from_integer(frame.module->integer_constants[byte.b_y]);
+				*result_slot = value_from_integer(module->integer_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADKNUM: {
-				*result_slot = value_from_number(frame.module->number_constants[byte.b_y]);
+				*result_slot = value_from_number(module->number_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADCVAL: {
-				ASSERT(byte.b_y >= 0 && byte.b_y < frame.closuresize);
-				value_copy(result_slot, frame.closureenv[byte.b_y]);
+				ASSERT(byte.b_y >= 0 && byte.b_y < ncaptures);
+				value_copy(result_slot, captures[byte.b_y]);
 			} break;
 
 			case BC_RELOAD: {
@@ -216,7 +216,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			} break;
 
 			case BC_CURRENT_CLOSURE: {
-				value_copy(result_slot, frame.framebase[-1]);
+				value_copy(result_slot, framebase[-1]);
 			} break;
 
 			case BC_GETGLOBAL: {
@@ -234,7 +234,7 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 			case BC_CLOSURE: {
 				ASSERT(byte.b_y >= 0);
 				BcFunctionRef function = {
-					.module = frame.module,
+					.module = module,
 					.index  = (u32)byte.b_y,
 				};
 				ASSERT(bc_function_ref_is_valid(function));
@@ -551,7 +551,9 @@ static int run_bytecode_frame(elf_State *state, StackFrame frame)
 				elf_report_runtime_error(state, RUNTIME_ERROR_UNKNOWN_BYTECODE, NO_BYTE, "'%s' unknown bytecode", bytecode_type_name(byte.b_type));
 			} break;
 		}
+		instruction = next_instruction;
 	}
+	frame->instruction = instruction;
 
 exit:
 	return nrets;
