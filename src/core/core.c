@@ -61,25 +61,6 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 #include "libs/l_table.c"
 #include "libs/l_string.c"
 
-static void init_bytecode_program_storage(elf_State *state)
-{
-	elf_Module *module = &state->module;
-	module->bytecode_function_capacity = 4096;
-	module->bytecode_functions = elf_arena_push_zero(&state->arena
-	,	sizeof(*module->bytecode_functions) * module->bytecode_function_capacity);
-
-	module->bytecode_capacity = 1 << 20;
-	module->bytecode = elf_arena_push_zero(&state->arena, sizeof(*module->bytecode) * module->bytecode_capacity);
-
-	module->integer_constant_capacity = 1 << 16;
-	module->integer_constants = elf_arena_push_zero(&state->arena
-	,	sizeof(*module->integer_constants) * module->integer_constant_capacity);
-
-	module->number_constant_capacity = 1 << 16;
-	module->number_constants = elf_arena_push_zero(&state->arena
-	,	sizeof(*module->number_constants) * module->number_constant_capacity);
-}
-
 static void init_runtime_storage(elf_State *state)
 {
 	state->frame_stack_size = 4096;
@@ -100,7 +81,6 @@ static void init_gc_storage(elf_State *state)
 
 static void init_state_storage(elf_State *state)
 {
-	init_bytecode_program_storage(state);
 	init_runtime_storage(state);
 	init_gc_storage(state);
 }

@@ -85,8 +85,9 @@ static void test_backend_source_map(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/smoke/return_add.elf");
 	BcFunction *function = backend_test_function(result);
-	if (!function->source_name || !function->source_data || function->source_size == 0) {
-		test_fail("backend stores source data on bytecode function");
+	elf_Module *module = result.function.module;
+	if (!module->source_name || !module->source_data || module->source_size == 0) {
+		test_fail("backend stores source data on compiled module");
 		return;
 	}
 	if (function->source_map_count == 0) {
@@ -102,6 +103,53 @@ static void test_backend_source_map(void)
 			return;
 		}
 	}
+}
+
+static void test_backend_module_owns_source(void)
+{
+	static const char expected[] = "value := 41\nret value + 1\n";
+	u32 source_size = sizeof(expected) - 1;
+	char *source_data = malloc(source_size);
+	copy_memory(source_data, expected, source_size);
+
+	elf_State *state = elf_create_state();
+	elf_StrSlice source = {source_data, source_size};
+	BcFunctionRef entry = elf_compile_source(state, "owned_source", source);
+	elf_Module *module = entry.module;
+	if (module->source_data == source_data) {
+		test_fail("compiled module does not borrow caller source memory");
+		free(source_data);
+		elf_destroy_state(state);
+		return;
+	}
+
+	zero_memory(source_data, source_size);
+	free(source_data);
+	if (module->source_size != source_size || memcmp(module->source_data, expected, source_size) != 0) {
+		test_fail("compiled module retains an owned source copy");
+	}
+
+	size_t source_begin = (size_t)module->source_data;
+	size_t source_end = source_begin + module->source_size;
+	for (u32 function_index = 0; function_index < module->bytecode_function_count; ++function_index)
+	{
+		BcFunction *function = module->bytecode_functions + function_index;
+		for (u32 map_index = 0; map_index < function->source_map_count; ++map_index)
+		{
+			SourceSite site = function->source_map[map_index].site;
+			size_t site_data = (size_t)site.data;
+			size_t line_start = (size_t)site.line_start;
+			if (site_data < source_begin || site_data > source_end ||
+				line_start < source_begin || line_start > source_end || site.size > source_end - site_data)
+			{
+				test_fail("source maps point into module-owned source memory");
+				elf_destroy_state(state);
+				return;
+			}
+		}
+	}
+
+	elf_destroy_state(state);
 }
 
 static void backend_expect_no_eager_logical_bytecode(BackendCompileResult result, const char *label)
@@ -405,7 +453,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.arity = IMPLICIT_PARAM_COUNT;
 	function.body = body;
 
-	BcGen *gen = bg_create(state, scratch.arena, 0);
+	BcGen *gen = bg_create(state, scratch.arena, 1);
 	generate_bytecode_function(gen, &function);
 
 	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {
@@ -441,6 +489,7 @@ static void test_backend_formats_bytecode_function(void)
 static void run_backend_tests(void)
 {
 	test_backend_source_map();
+	test_backend_module_owns_source();
 	test_backend_short_circuit_and();
 	test_backend_short_circuit_or();
 	test_backend_short_circuit_nested_and_or();

@@ -50,26 +50,23 @@ struct BcFunction
 	u32            offset;
 	SourceMapEntry *source_map;
 	u32             source_map_count;
-	char           *source_data;
-	u32             source_size;
-	elf_String       *source_name;
 };
 
 typedef struct elf_Module elf_Module;
 struct elf_Module
 {
+	elf_Module            *next;
+	elf_String      *source_name;
+	char            *source_data;
+	u32              source_size;
 	f64          *number_constants;
 	u32           number_constant_count;
-	u32           number_constant_capacity;
 	i64          *integer_constants;
 	u32           integer_constant_count;
-	u32           integer_constant_capacity;
 	BcFunction   *bytecode_functions;
 	u32           bytecode_function_count;
-	u32           bytecode_function_capacity;
 	Bytecode     *bytecode;
 	u32           bytecode_count;
-	u32           bytecode_capacity;
 };
 
 typedef struct BcFunctionRef BcFunctionRef;
@@ -127,7 +124,7 @@ struct elf_State
 {
 	elf_Arena    arena;
 	void        *user_data;
-	elf_Module   module;
+	elf_Module  *modules;
 	struct
 	{
 		u32          gc_mode;

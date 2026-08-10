@@ -26,17 +26,35 @@ SourceMapBuffer;
 
 typedef struct
 {
-	elf_State      *state;
-	elf_Arena          *arena;
-	Bytecode       *bytecode;
-	u32             bytecode_capacity;
-	u32             bytecode_count;
-	SourceMapBuffer source_map_buffer;
-	u32             bytecode_function_base;
-	u32             stack_size;
-	u32             stack_top;
-	BytecodeLabel   labels[4096];
-	u32             label_count;
+	Bytecode   *bytecode;
+	u32         bytecode_capacity;
+	u32         bytecode_count;
+	BcFunction *functions;
+	u32         function_count;
+	i64        *integer_constants;
+	u32         integer_constant_capacity;
+	u32         integer_constant_count;
+	f64        *number_constants;
+	u32         number_constant_capacity;
+	u32         number_constant_count;
+}
+BcModuleBuilder;
+
+typedef struct
+{
+	elf_State        *state;
+	elf_Arena        *arena;
+	BcModuleBuilder   module;
+	Bytecode         *bytecode;
+	u32               bytecode_capacity;
+	u32               bytecode_count;
+	SourceMapBuffer   source_map_buffer;
+	u32               stack_size;
+	u32               stack_top;
+	// TODO(RJ) fixed arrays!
+	BytecodeLabel     labels[4096];
+	u32               label_count;
+	// TODO(RJ) fixed arrays!
 	BytecodeJumpPatch jump_patches[4096];
 	u32               jump_patch_count;
 }

@@ -233,7 +233,7 @@ char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunctionRef
 	BcFunction *function = bc_function_from_ref(function_ref);
 	elf_Module *module = function_ref.module;
 	char *start = elf_arena_push(arena, 0);
-	const char *source_name = function->source_name ? atom_data(function->source_name) : "<unknown>";
+	const char *source_name = module->source_name ? atom_data(module->source_name) : "<unknown>";
 
 	elf_arena_push_text(arena, "bytecode function\n");
 	elf_arena_pushf(arena, "  source      = %s\n", source_name);

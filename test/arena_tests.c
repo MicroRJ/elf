@@ -79,6 +79,19 @@ static void test_arena_text_char_repeat(void)
 	elf_arena_destroy(&arena);
 }
 
+static void test_arena_align(void)
+{
+	elf_Arena arena = elf_arena_create(KILOBYTES(1));
+	elf_arena_push(&arena, 3);
+	elf_arena_align(&arena, 8);
+	void *aligned = elf_arena_push(&arena, 8);
+	if ((u64)((u8 *)aligned - arena.data) & 7) {
+		test_fail("arena align advances to the requested boundary");
+	}
+	expect_arena_u64(arena.in_use, 16, "arena aligned allocation advances past padding");
+	elf_arena_destroy(&arena);
+}
+
 static void test_arena_pushf(void)
 {
 	elf_Arena arena = elf_arena_create(KILOBYTES(1));
@@ -124,6 +137,7 @@ static void run_arena_tests(void)
 	test_arena_push_and_reserve();
 	test_arena_zero_copy_and_data();
 	test_arena_text_char_repeat();
+	test_arena_align();
 	test_arena_pushf();
 	test_scratch_regression();
 }

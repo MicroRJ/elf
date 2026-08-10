@@ -72,6 +72,15 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 	return result;
 }
 
+static elf_StrSlice persist_compiled_source(elf_State *state, elf_StrSlice source)
+{
+	if (source.size > 0xffffffffu) abort();
+	u64 storage_size = (source.size + 16 + 7) & ~(u64)7;
+	char *data = elf_arena_push_zero(&state->arena, storage_size);
+	copy_memory(data, source.data, source.size);
+	return (elf_StrSlice) {data, source.size};
+}
+
 BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlice source)
 {
 	ASSERT(name);
@@ -81,9 +90,15 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
+	elf_arena_align(&state->arena, 8);
+	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
+	elf_StrSlice owned_source = persist_compiled_source(state, source);
 	elf_String *source_name = elf_atom_from_data(state, name);
+	module->source_name = source_name;
+	module->source_data = owned_source.data;
+	module->source_size = (u32)owned_source.size;
 
-	Parser *parser = elf_create_parser(state, scratch.arena, name, source);
+	Parser *parser = elf_create_parser(state, scratch.arena, name, owned_source);
 	Ast ast_file;
 	PROF_BLOCK("compiler.parse")
 	{
@@ -98,7 +113,9 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 		ir_module = elf_lower_ast_file(ctx, ast_file);
 	}
 
-	BcFunctionRef file_entry = bg_generate_module(state, scratch.arena, ir_module, source, source_name);
+	BcFunctionRef file_entry = bg_generate_module(state, scratch.arena, module, ir_module);
+	module->next = state->modules;
+	state->modules = module;
 
 	state->gc_mode = saved_gc_mode;
 	elf_end_scratch(scratch);

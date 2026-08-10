@@ -47,12 +47,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	elf_compile_source(state, path, source);
-	for (u32 i = 0; i < state->module.bytecode_function_count; ++ i)
+	BcFunctionRef entry = elf_compile_source(state, path, source);
+	elf_Module *module = entry.module;
+	for (u32 i = 0; i < module->bytecode_function_count; ++ i)
 	{
 		printf("function[%u]\n", i);
 		BcFunctionRef function = {
-			.module = &state->module,
+			.module = module,
 			.index  = i,
 		};
 		print_bytecode_function(state, function);

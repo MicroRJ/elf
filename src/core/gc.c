@@ -111,15 +111,13 @@ static u32 gc_mark_interned_ids(elf_State *state)
 	return marked_count;
 }
 
-static u32 gc_mark_bytecode_functions(elf_State *state)
+static u32 gc_mark_modules(elf_State *state)
 {
 	u32 marked_count = 0;
 
-	for (u32 i = 0; i < state->module.bytecode_function_count; ++i)
-	{
-		BcFunction *function = state->module.bytecode_functions + i;
-		if (function->source_name) {
-			marked_count += gc_mark_reachable(state, (elf_Object *)function->source_name);
+	for (elf_Module *module = state->modules; module; module = module->next) {
+		if (module->source_name) {
+			marked_count += gc_mark_reachable(state, (elf_Object *)module->source_name);
 		}
 	}
 
@@ -155,7 +153,7 @@ static u32 gc_collect(elf_State *state)
 	}
 	marked_count += gc_mark_metatables(state);
 	marked_count += gc_mark_interned_ids(state);
-	marked_count += gc_mark_bytecode_functions(state);
+	marked_count += gc_mark_modules(state);
 	u32 freed_count = gc_sweep(state);
 	// elf_f64 took = prof_time_diff_ms(time);
 	// elf_ldebug("marked: %i, freed: %i, took: %.4fMS", marked_count, freed_count, took);

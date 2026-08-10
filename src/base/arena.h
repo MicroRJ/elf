@@ -24,6 +24,7 @@ elf_Arena elf_arena_create(u64 initial_reserve);
 void elf_arena_destroy(elf_Arena *arena);
 
 void *elf_arena_reserve(elf_Arena *arena, u64 size);
+void elf_arena_align(elf_Arena *arena, u64 alignment);
 void *elf_arena_push(elf_Arena *arena, u64 size);
 void *elf_arena_push_zero(elf_Arena *arena, u64 size);
 void *elf_arena_push_copy(elf_Arena *arena, u64 size, const void *data);

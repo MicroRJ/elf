@@ -50,12 +50,20 @@ elf_Arena elf_arena_create(u64 reserve)
 
 void *elf_arena_reserve(elf_Arena *arena, u64 size)
 {
+	if (size > arena->size - arena->in_use) abort();
 	if (arena->in_use + size >= arena->in_reserve) {
 		arena->in_reserve = arena->in_use + size;
 		ASSERT(arena->in_reserve <= arena->size);
 	}
 	void *data = arena->data + arena->in_use;
 	return data;
+}
+
+void elf_arena_align(elf_Arena *arena, u64 alignment)
+{
+	ASSERT(alignment && !(alignment & (alignment - 1)));
+	u64 padding = (alignment - (arena->in_use & (alignment - 1))) & (alignment - 1);
+	if (padding) elf_arena_push_zero(arena, padding);
 }
 
 void *elf_arena_push(elf_Arena *arena, u64 size)

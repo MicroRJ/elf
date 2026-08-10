@@ -13,6 +13,7 @@ static const char *runtime_error_type_names[] =
 
 typedef struct
 {
+	elf_Module *module;
 	BcFunction *function;
 	SourceSite       site;
 	int              instr;
@@ -49,6 +50,7 @@ static RuntimeSourceLocation runtime_source_location_for_function(elf_Module *mo
 
 	if (instr >= (int)function->offset && instr < (int)(function->offset + function->length))
 	{
+		location.module = module;
 		location.function = function;
 		location.site = find_source_for_instr(function, instr);
 		location.byte = module->bytecode[instr];
@@ -67,8 +69,9 @@ static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr
 
 static void print_runtime_source_location(RuntimeSourceLocation location)
 {
+	elf_Module *module = location.module;
 	BcFunction *function = location.function;
-	const char *name = function && function->source_name ? atom_data(function->source_name) : 0;
+	const char *name = module && module->source_name ? atom_data(module->source_name) : 0;
 	if (!name) {
 		name = "<unknown>";
 	}
@@ -90,9 +93,9 @@ static void print_runtime_source_location(RuntimeSourceLocation location)
 
 	log_line(LOG_LEVEL_INFO, "|");
 	elf_StrSlice source = {};
-	if (function && function->source_data) {
-		source.data = function->source_data;
-		source.size = function->source_size;
+	if (module && module->source_data) {
+		source.data = module->source_data;
+		source.size = module->source_size;
 	}
 	print_source_slice_marker(location.site, source);
 	log_line(LOG_LEVEL_INFO, "|");

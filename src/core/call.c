@@ -134,8 +134,14 @@ u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
 		elf_report_runtime_error(state, RUNTIME_ERROR_INVALID_ARGUMENT_COUNT, NO_BYTE, "invalid number of arguments, expected at least one");
 	}
 
+	elf_Module *saved_active_module = state->active_module;
+	BcFunction *saved_active_function = state->active_function;
+	u64 saved_byte = state->byte;
 	push_stack_frame(state);
 	nrets = elf_tail_call(state, nargs, nrets);
 	pop_stack_frame(state);
+	state->active_module = saved_active_module;
+	state->active_function = saved_active_function;
+	state->byte = saved_byte;
 	return nrets;
 }

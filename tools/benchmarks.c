@@ -166,44 +166,43 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 static void bench_compile_repeatedly(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
-	elf_Module *module = &state->module;
-	u64 program_array_capacity =
-		(u64)module->bytecode_capacity * sizeof(*module->bytecode) +
-		(u64)module->bytecode_function_capacity * sizeof(*module->bytecode_functions) +
-		(u64)module->integer_constant_capacity * sizeof(*module->integer_constants) +
-		(u64)module->number_constant_capacity * sizeof(*module->number_constants);
-	u32 bytecode_before = module->bytecode_count;
-	u32 functions_before = module->bytecode_function_count;
-	u32 integer_constants_before = module->integer_constant_count;
-	u32 number_constants_before = module->number_constant_count;
+	bench_require(state->modules == 0, "new state preallocates compiled modules");
 	u64 arena_before = state->arena.in_use;
+	u64 bytecode_count = 0;
+	u64 function_count = 0;
+	u64 integer_constant_count = 0;
+	u64 number_constant_count = 0;
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 
 	i64 start = bench_now();
 	for (u32 i = 0; i < iterations; ++i)
 	{
+		elf_Module *previous_module = state->modules;
 		bench_require(elf_push_code_source(state, "benchmark.compile", text), "could not compile benchmark source");
+		elf_Module *module = state->modules;
+		bench_require(module && module != previous_module, "compile did not publish a distinct module");
+		bench_require(value_as_closure(state->stack_ptr[-1])->function.index == 0, "module entry is not local");
+		bytecode_count += module->bytecode_count;
+		function_count += module->bytecode_function_count;
+		integer_constant_count += module->integer_constant_count;
+		number_constant_count += module->number_constant_count;
 		elf_pop(state, 1);
 	}
 	double seconds = bench_elapsed_s(start);
-	u32 bytecode_growth = module->bytecode_count - bytecode_before;
-	u32 function_growth = module->bytecode_function_count - functions_before;
-	u32 integer_constant_growth = module->integer_constant_count - integer_constants_before;
-	u32 number_constant_growth = module->number_constant_count - number_constants_before;
-	u64 source_map_growth = state->arena.in_use - arena_before;
-	u64 program_storage_growth =
-		(u64)bytecode_growth * sizeof(*module->bytecode) +
-		(u64)function_growth * sizeof(*module->bytecode_functions) +
-		(u64)integer_constant_growth * sizeof(*module->integer_constants) +
-		(u64)number_constant_growth * sizeof(*module->number_constants) +
-		source_map_growth;
+	u64 retained_arena_storage = state->arena.in_use - arena_before;
+	u64 array_storage =
+		bytecode_count * sizeof(Bytecode) +
+		function_count * sizeof(BcFunction) +
+		integer_constant_count * sizeof(i64) +
+		number_constant_count * sizeof(f64);
+	u64 non_array_arena_storage = retained_arena_storage - array_storage;
 
 	bench_report("compile source", "compiles", iterations, seconds);
-	printf("  growth: %u bytecodes, %u functions, %u integer constants, %u number constants\n",
-		bytecode_growth, function_growth, integer_constant_growth, number_constant_growth);
-	printf("  logical program storage: %llu bytes (%llu bytes of source maps)\n",
-		program_storage_growth, source_map_growth);
-	printf("  preallocated program arrays per state: %llu bytes\n", program_array_capacity);
+	printf("  growth: %llu bytecodes, %llu functions, %llu integer constants, %llu number constants\n",
+		bytecode_count, function_count, integer_constant_count, number_constant_count);
+	printf("  retained state-arena storage: %llu bytes (%llu bytes outside finalized arrays)\n",
+		retained_arena_storage, non_array_arena_storage);
+	printf("  preallocated compiled-program arrays per state: 0 bytes\n");
 	elf_destroy_state(state);
 }
 

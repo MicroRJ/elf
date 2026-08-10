@@ -16,7 +16,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_bytecode_function(BcGen *gen, IrFunction *function);
-static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name);
+static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -82,26 +82,58 @@ static void emit_source_map_entry(BcGen *gen, SourceSite site, u32 byte_position
 	entry->site = site;
 }
 
-/* dynamic module */
-static int add_const_int(elf_Module *module, i64 i)
+/* module builder */
+#define BC_MODULE_OPERAND_COUNT_MAX (1u << 15)
+
+static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size)
 {
-	ASSERT(module->integer_constant_count < module->integer_constant_capacity);
+	if (required_count <= *capacity) return items;
+
+	u32 new_capacity = *capacity ? *capacity : 64;
+	while (new_capacity < required_count)
+	{
+		ASSERT(new_capacity <= 0x7fffffffu);
+		new_capacity *= 2;
+	}
+
+	elf_arena_align(arena, 8);
+	void *new_items = elf_arena_push(arena, item_size * new_capacity);
+	if (count) copy_memory(new_items, items, item_size * count);
+	*capacity = new_capacity;
+	return new_items;
+}
+
+static int add_const_int(BcGen *gen, i64 i)
+{
+	BcModuleBuilder *module = &gen->module;
+	if (module->integer_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
+	module->integer_constants = grow_module_array(gen->arena, module->integer_constants
+	, module->integer_constant_count, &module->integer_constant_capacity
+	, module->integer_constant_count + 1, sizeof(*module->integer_constants));
 	u32 index = module->integer_constant_count++;
 	module->integer_constants[index] = i;
 	return index;
 }
 
-static int add_const_num(elf_Module *module, f64 i)
+static int add_const_num(BcGen *gen, f64 i)
 {
-	ASSERT(module->number_constant_count < module->number_constant_capacity);
+	BcModuleBuilder *module = &gen->module;
+	if (module->number_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
+	module->number_constants = grow_module_array(gen->arena, module->number_constants
+	, module->number_constant_count, &module->number_constant_capacity
+	, module->number_constant_count + 1, sizeof(*module->number_constants));
 	u32 index = module->number_constant_count++;
 	module->number_constants[index] = i;
 	return index;
 }
 
-static u32 append_bytecode(elf_Module *module, Bytecode *bytecode, u32 count)
+static u32 append_bytecode(BcGen *gen, Bytecode *bytecode, u32 count)
 {
-	ASSERT(module->bytecode_count + count <= module->bytecode_capacity);
+	BcModuleBuilder *module = &gen->module;
+	ASSERT(module->bytecode_count <= 0xffffffffu - count);
+	module->bytecode = grow_module_array(gen->arena, module->bytecode
+	, module->bytecode_count, &module->bytecode_capacity
+	, module->bytecode_count + count, sizeof(*module->bytecode));
 	u32 offset = module->bytecode_count;
 	copy_memory(module->bytecode + offset, bytecode, sizeof(*bytecode) * count);
 	module->bytecode_count += count;
@@ -223,13 +255,13 @@ static u32 emit_jump_if_bc(BcGen *gen, SourceSite site, BytecodeType type, BcSlo
 
 static u32 emit_load_int_bc(BcGen *gen, SourceSite site, BcSlot dest, i64 integer)
 {
-	u32 index = add_const_int(&gen->state->module, integer);
+	u32 index = add_const_int(gen, integer);
 	return emit_xy_bc(gen, site, BC_LOADKINT, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number)
 {
-	u32 index = add_const_num(&gen->state->module, number);
+	u32 index = add_const_num(gen, number);
 	return emit_xy_bc(gen, site, BC_LOADKNUM, unwrap_slot(dest), index);
 }
 
@@ -298,19 +330,25 @@ static BcSlot ensure_slot(BcGen *gen, BcSlot slot)
 }
 
 /* main */
-static BcGen *bg_create(elf_State *state, elf_Arena *arena, u32 bytecode_function_base)
+static BcGen *bg_create(elf_State *state, elf_Arena *arena, u32 function_count)
 {
+	if (!function_count || function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
+	elf_arena_align(arena, 8);
 	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
 	gen->state = state;
 	gen->arena = arena;
-	gen->bytecode_function_base = bytecode_function_base;
+	elf_arena_align(arena, 8);
+	gen->module.functions = elf_arena_push_zero(arena, sizeof(*gen->module.functions) * function_count);
+	gen->module.function_count = function_count;
 
 	u32 bytecode_capacity = 1 << 13;
+	elf_arena_align(arena, 8);
 	gen->bytecode = elf_arena_push_zero(arena, sizeof(*gen->bytecode) * bytecode_capacity);
 	gen->bytecode_capacity = bytecode_capacity;
 	gen->bytecode_count = 0;
 
 	u32 source_map_capacity = 1 << 13;
+	elf_arena_align(arena, 8);
 	gen->source_map_buffer.entries = elf_arena_push_zero(arena, sizeof(*gen->source_map_buffer.entries) * source_map_capacity);
 	gen->source_map_buffer.capacity = source_map_capacity;
 	gen->source_map_buffer.count = 0;
@@ -355,6 +393,7 @@ static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries
 		return 0;
 	}
 
+	elf_arena_align(arena, 8);
 	SourceMapEntry *source_map = elf_arena_push(arena, sizeof(*source_map) * count);
 	for (u32 i = 0; i < count; ++ i)
 	{
@@ -366,36 +405,63 @@ static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries
 	return source_map;
 }
 
-static BcFunction *reserve_bytecode_functions(elf_Module *module, u32 count)
+static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilder *builder)
 {
-	ASSERT(module->bytecode_function_count + count <= module->bytecode_function_capacity);
+	ASSERT(!module->bytecode && !module->bytecode_functions);
+	ASSERT(builder->function_count > 0);
 
-	u32 index = module->bytecode_function_count;
-	module->bytecode_function_count += count;
-	return module->bytecode_functions + index;
+	module->bytecode_count = builder->bytecode_count;
+	elf_arena_align(&state->arena, 8);
+	module->bytecode = elf_arena_push_copy(&state->arena
+	, sizeof(*module->bytecode) * module->bytecode_count, builder->bytecode);
+
+	module->integer_constant_count = builder->integer_constant_count;
+	if (module->integer_constant_count) {
+		elf_arena_align(&state->arena, 8);
+		module->integer_constants = elf_arena_push_copy(&state->arena
+		, sizeof(*module->integer_constants) * module->integer_constant_count, builder->integer_constants);
+	}
+
+	module->number_constant_count = builder->number_constant_count;
+	if (module->number_constant_count) {
+		elf_arena_align(&state->arena, 8);
+		module->number_constants = elf_arena_push_copy(&state->arena
+		, sizeof(*module->number_constants) * module->number_constant_count, builder->number_constants);
+	}
+
+	module->bytecode_function_count = builder->function_count;
+	elf_arena_align(&state->arena, 8);
+	module->bytecode_functions = elf_arena_push_copy(&state->arena
+	, sizeof(*module->bytecode_functions) * module->bytecode_function_count, builder->functions);
+
+	for (u32 i = 0; i < module->bytecode_function_count; ++i)
+	{
+		BcFunction *function = module->bytecode_functions + i;
+		if (function->source_map_count) {
+			elf_arena_align(&state->arena, 8);
+			function->source_map = elf_arena_push_copy(&state->arena
+			, sizeof(*function->source_map) * function->source_map_count, function->source_map);
+		}
+	}
 }
 
-static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, IrModule module, elf_StrSlice source, elf_String *source_name)
+static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module)
 {
-	ASSERT(module.functions);
-	ASSERT(module.function_count > 0);
-	ASSERT(module.entry_index == 0);
+	ASSERT(ir_module.functions);
+	ASSERT(ir_module.function_count > 0);
+	ASSERT(ir_module.entry_index == 0);
 
-	elf_Module *bytecode_module = &state->module;
-	u32 bytecode_function_base = bytecode_module->bytecode_function_count;
-	BcFunction *bytecode_functions = reserve_bytecode_functions(bytecode_module, module.function_count);
-
-	BcGen *gen = bg_create(state, arena, bytecode_function_base);
+	BcGen *gen = bg_create(state, arena, ir_module.function_count);
 	PROF_BLOCK("compiler.codegen")
 	{
-		for (u32 i = 0; i < module.function_count; ++ i)
+		for (u32 i = 0; i < ir_module.function_count; ++ i)
 		{
-			IrFunction *function = module.functions + i;
-			BcFunction *bytecode_function = bytecode_functions + i;
+			IrFunction *function = ir_module.functions + i;
+			BcFunction *bytecode_function = gen->module.functions + i;
 			generate_bytecode_function(gen, function);
 
-			u32 bytecode_offset = append_bytecode(bytecode_module, gen->bytecode, gen->bytecode_count);
-			SourceMapEntry *source_map = copy_source_map(&state->arena
+			u32 bytecode_offset = append_bytecode(gen, gen->bytecode, gen->bytecode_count);
+			SourceMapEntry *source_map = copy_source_map(arena
 			,	gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
 
 			bytecode_function->variadic         = function->variadic;
@@ -406,15 +472,13 @@ static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, IrMo
 			bytecode_function->stack_size       = gen->stack_size;
 			bytecode_function->source_map       = source_map;
 			bytecode_function->source_map_count = gen->source_map_buffer.count;
-			bytecode_function->source_data      = source.data;
-			bytecode_function->source_size      = (u32)source.size;
-			bytecode_function->source_name      = source_name;
 		}
 	}
+	finalize_module(state, module, &gen->module);
 
 	return (BcFunctionRef) {
-		.module = bytecode_module,
-		.index  = bytecode_function_base + module.entry_index,
+		.module = module,
+		.index  = ir_module.entry_index,
 	};
 }
 
@@ -737,7 +801,8 @@ static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 
 			out = ensure_slot(gen, out);
 
-			u32 bytecode_function_id = gen->bytecode_function_base + expr->ir_function.index;
+			u32 bytecode_function_id = expr->ir_function.index;
+			ASSERT(bytecode_function_id < gen->module.function_count);
 
 			IrArray captures = expr->ir_function.captures;
 			if (captures.count == 0)
