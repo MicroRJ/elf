@@ -2,6 +2,7 @@
 .vscode/*
 *.sublime-workspace
 build/*
+.bob/
 *.ilk
 *.exe
 !bootstrap/windows-x64/bob.exe
