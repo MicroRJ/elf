@@ -638,6 +638,11 @@ static Ast parse_unary_expr(Parser *parser)
 				Token integer = consume_token(parser);
 				value = parse_negative_integer_literal(parser, tok, integer);
 			}
+			else if (peek_token(parser, TOK_NUMBER))
+			{
+				Token number = consume_token(parser);
+				value = create_num_ast(parser, tok.site, -number.number);
+			}
 			else
 			{
 				value = parse_subexpr(parser, 10000);

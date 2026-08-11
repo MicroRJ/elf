@@ -220,11 +220,122 @@ static void test_api_source_diagnostics(elf_State *state)
 	elf_set_top(state, checkpoint);
 }
 
+static void test_api_value_source(elf_State *state)
+{
+	elf_i32 checkpoint = elf_get_top(state);
+	elf_new_table(state);
+	elf_i32 root = elf_abs_index(state, -1);
+
+	elf_push_cstr(state, "Orbiter");
+	elf_set_field(state, root, "name");
+	elf_Number expected_scale = -0.12345678901234567;
+	elf_push_num(state, expected_scale);
+	elf_set_field(state, root, "scale");
+	char escaped_text[] = {'a', '\0', '\a', '\b', '\f', '\v', 'z'};
+	elf_push_str(state, escaped_text, sizeof(escaped_text));
+	elf_set_field(state, root, "escaped");
+	elf_new_table(state);
+	elf_i32 panels = elf_abs_index(state, -1);
+	elf_push_int(state, 3);
+	elf_append(state, panels);
+	elf_push_value(state, panels);
+	elf_set_field(state, root, "panels");
+	elf_pop(state, 1);
+
+	if (!elf_push_value_source(state, root)) {
+		test_fail("API serializes a config table to source");
+		elf_set_top(state, checkpoint);
+		return;
+	}
+	elf_StrSlice source = {};
+	if (!elf_to_str(state, -1, &source)
+	|| !elf_push_constant_expr(state, "roundtrip.elf", source)) {
+		test_fail("API value source parses as a constant expression");
+		elf_set_top(state, checkpoint);
+		return;
+	}
+
+	if (!elf_get_field(state, -1, "name")) {
+		test_fail("round-tripped table contains string field");
+	}
+	else
+	{
+		elf_StrSlice name = {};
+		if (!elf_to_str(state, -1, &name) || !api_slice_matches(name, "Orbiter")) {
+			test_fail("round-tripped string field keeps its value");
+		}
+		elf_pop(state, 1);
+	}
+	if (!elf_get_field(state, -1, "scale")) {
+		test_fail("round-tripped table contains number field");
+	}
+	else
+	{
+		elf_Number scale = 0;
+		if (!elf_to_num(state, -1, &scale) || scale != expected_scale) {
+			test_fail("round-tripped number field keeps its value");
+		}
+		elf_pop(state, 1);
+	}
+	if (!elf_get_field(state, -1, "escaped")) {
+		test_fail("round-tripped table contains escaped string field");
+	}
+	else
+	{
+		elf_StrSlice escaped = {};
+		if (!elf_to_str(state, -1, &escaped)
+		|| escaped.size != sizeof(escaped_text)
+		|| memcmp(escaped.data, escaped_text, sizeof(escaped_text)) != 0) {
+			test_fail("round-tripped escaped string keeps every byte");
+		}
+		elf_pop(state, 1);
+	}
+	if (!elf_get_field(state, -1, "panels")) {
+		test_fail("round-tripped table contains nested table");
+	}
+	else
+	{
+		elf_u32 length = 0;
+		elf_Integer panel = 0;
+		elf_b32 got_length = elf_length(state, -1, &length);
+		elf_b32 got_panel = elf_get_index(state, -1, 0);
+		if (!got_length || length != 1
+		|| !got_panel
+		|| !elf_to_int(state, -1, &panel) || panel != 3) {
+			test_fail("round-tripped nested table keeps its values");
+		}
+		if (got_panel) elf_pop(state, 1);
+		elf_pop(state, 1);
+	}
+	elf_set_top(state, checkpoint);
+
+	elf_new_table(state);
+	root = elf_abs_index(state, -1);
+	elf_push_fun(state, test_api_callback);
+	elf_set_field(state, root, "callback");
+	elf_i32 top = elf_get_top(state);
+	if (elf_push_value_source(state, root) || elf_get_top(state) != top) {
+		test_fail("unsupported nested values fail serialization transactionally");
+	}
+	elf_set_top(state, checkpoint);
+
+	elf_new_table(state);
+	root = elf_abs_index(state, -1);
+	elf_push_value(state, root);
+	elf_set_field(state, root, "self");
+	top = elf_get_top(state);
+	if (elf_push_value_source(state, root) || elf_get_top(state) != top) {
+		test_fail("cyclic tables fail serialization transactionally");
+	}
+	elf_set_top(state, checkpoint);
+}
+
 static void run_api_tests(void)
 {
 	elf_State *state = elf_create_state();
 	test_api_call_addressing(state);
 	test_api_tables_and_refs(state);
 	test_api_source_diagnostics(state);
+	test_api_value_source(state);
 	elf_destroy_state(state);
 }

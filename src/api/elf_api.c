@@ -239,6 +239,24 @@ elf_b32 elf_push_value_text(elf_State *state, elf_i32 index)
 	return true;
 }
 
+elf_b32 elf_push_value_source(elf_State *state, elf_i32 index)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value) return false;
+
+	elf_Scratch scratch = elf_begin_scratch();
+	char *begin = elf_arena_push(scratch.arena, 0);
+	b32 result = elf_unparse_value(state, scratch.arena, *value, 0);
+	if (result)
+	{
+		char *end = elf_arena_push(scratch.arena, 0);
+		ASSERT(end - begin <= 0x7fffffff);
+		elf_push_str(state, begin, (int)(end - begin));
+	}
+	elf_end_scratch(scratch);
+	return result;
+}
+
 void elf_new_table(elf_State *state)
 {
 	push_new_table(state);

@@ -108,6 +108,8 @@ elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *value);
 elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *value);
 elf_b32 elf_to_cstr(elf_State *state, elf_i32 index, const char **value);
 elf_b32 elf_push_value_text(elf_State *state, elf_i32 index);
+// Pushes constant-expression source for a supported acyclic data value.
+elf_b32 elf_push_value_source(elf_State *state, elf_i32 index);
 
 void elf_new_table(elf_State *state);
 elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length);
