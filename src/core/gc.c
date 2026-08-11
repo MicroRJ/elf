@@ -119,6 +119,9 @@ static u32 gc_mark_modules(elf_State *state)
 		if (module->source_name) {
 			marked_count += gc_mark_reachable(state, (elf_Object *)module->source_name);
 		}
+		for (u32 i = 0; i < module->atom_count; ++ i) {
+			marked_count += gc_mark_reachable(state, (elf_Object *)module->atoms[i]);
+		}
 	}
 
 	return marked_count;

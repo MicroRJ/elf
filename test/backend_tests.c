@@ -453,7 +453,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.arity = IMPLICIT_PARAM_COUNT;
 	function.body = body;
 
-	BcGen *gen = bg_create(state, scratch.arena, 1);
+	BcGen *gen = bg_create(scratch.arena, 1);
 	generate_function(gen, &function);
 
 	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {

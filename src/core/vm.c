@@ -210,6 +210,10 @@ activate_frame:
 				*vm_slot(reference, byte.b_x) = value_from_number(module->number_constants[byte.b_y]);
 			} break;
 
+			case BC_LOADKATOM: {
+				*vm_slot(reference, byte.b_x) = value_from_atom(module->atoms[byte.b_y]);
+			} break;
+
 			case BC_LOADCVAL: {
 				ASSERT(byte.b_y >= 0 && byte.b_y < ncaptures);
 				value_copy(vm_slot(reference, byte.b_x), captures[byte.b_y]);

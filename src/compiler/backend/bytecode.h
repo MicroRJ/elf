@@ -15,6 +15,7 @@
 	X(RETURN,          "return")           \
 	X(LOADCVAL,        "getupval")         \
 	X(GETGLOBAL,       "getglobal")        \
+	X(LOADKATOM,       "getatom")          \
 	X(LOADKNUM,        "getnum")           \
 	X(LOADKINT,        "getint")           \
 	X(LOADNIL,         "getnil")           \

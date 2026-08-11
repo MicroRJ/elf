@@ -425,6 +425,46 @@ static void test_vm_module_builder_grows_constant_arrays(void)
 	elf_destroy_state(state);
 }
 
+static void test_vm_module_owns_atom_constants(void)
+{
+	elf_State *state = elf_create_state();
+	u32 global_count = elf_array_length(state->globals);
+	char source_text[] = "ret {\"same\", \"same\", \"other\"}";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (!elf_push_code_source(state, "module-atoms", source)) {
+		test_fail("module atom source compiles");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_Module *module = value_as_closure(state->stack_ptr[-1])->function.module;
+	if (module->atom_count != 2 || strcmp(atom_data(module->atoms[0]), "same") != 0 ||
+		strcmp(atom_data(module->atoms[1]), "other") != 0)
+	{
+		test_fail("module stores deduplicated atom constants");
+	}
+	if (elf_array_length(state->globals) != global_count) {
+		test_fail("atom constants do not consume global slots");
+	}
+
+	force_gc_allocations(state, 256);
+	if (strcmp(atom_data(module->atoms[0]), "same") != 0 || strcmp(atom_data(module->atoms[1]), "other") != 0) {
+		test_fail("module atom constants survive GC");
+	}
+
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_Table *result = value_as_table(state->stack_ptr[-1]);
+	if (elf_array_length(result) != 3 || !atoms_equal(value_as_atom(elf_array_get(state, result, 0)), module->atoms[0]) ||
+		!atoms_equal(value_as_atom(elf_array_get(state, result, 1)), module->atoms[0]) ||
+		!atoms_equal(value_as_atom(elf_array_get(state, result, 2)), module->atoms[1]))
+	{
+		test_fail("VM loads atom constants from their module");
+	}
+
+	elf_destroy_state(state);
+}
+
 static void run_vm_tests(void)
 {
 	test_vm_return_int();
@@ -458,4 +498,5 @@ static void run_vm_tests(void)
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
 	test_vm_module_builder_grows_constant_arrays();
+	test_vm_module_owns_atom_constants();
 }

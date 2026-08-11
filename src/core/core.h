@@ -59,6 +59,8 @@ struct elf_Module
 	elf_String      *source_name;
 	char            *source_data;
 	u32              source_size;
+	elf_String     **atoms;
+	u32              atom_count;
 	f64          *number_constants;
 	u32           number_constant_count;
 	i64          *integer_constants;

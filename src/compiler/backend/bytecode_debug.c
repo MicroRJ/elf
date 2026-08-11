@@ -100,6 +100,15 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		}
 		break;
 
+		case BC_LOADKATOM:
+		{
+			elf_arena_pushf(arena, "r%d = atom[%d]", byte.b_x, byte.b_y);
+			if (byte.b_y >= 0 && (u32)byte.b_y < module->atom_count) {
+				elf_arena_pushf(arena, " // %s", atom_data(module->atoms[byte.b_y]));
+			}
+		}
+		break;
+
 		case BC_LOADKINT:
 		{
 			elf_arena_pushf(arena, "r%d = integer[%d]", byte.b_x, byte.b_y);

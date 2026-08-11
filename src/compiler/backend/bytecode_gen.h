@@ -31,6 +31,9 @@ typedef struct
 	u32         bytecode_count;
 	BcFunction *functions;
 	u32         function_count;
+	elf_String **atoms;
+	u32         atom_capacity;
+	u32         atom_count;
 	i64        *integer_constants;
 	u32         integer_constant_capacity;
 	u32         integer_constant_count;
@@ -42,7 +45,6 @@ BcModuleBuilder;
 
 typedef struct
 {
-	elf_State        *state;
 	elf_Arena        *arena;
 	BcModuleBuilder   module;
 	Bytecode         *bytecode;
