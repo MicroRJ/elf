@@ -15,8 +15,8 @@ static inline i32 unwrap_slot(BcSlot memory)
 
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
-static void generate_bytecode_function(BcGen *gen, IrFunction *function);
-static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module);
+static void generate_function(BcGen *gen, IrFunction *function);
+static BcFunctionRef generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -355,7 +355,7 @@ static BcGen *bg_create(elf_State *state, elf_Arena *arena, u32 function_count)
 	return gen;
 }
 
-static void generate_bytecode_function(BcGen *gen, IrFunction *function)
+static void generate_function(BcGen *gen, IrFunction *function)
 {
 	ASSERT(function);
 
@@ -445,7 +445,7 @@ static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilde
 	}
 }
 
-static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module)
+static BcFunctionRef generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module)
 {
 	ASSERT(ir_module.functions);
 	ASSERT(ir_module.function_count > 0);
@@ -456,22 +456,21 @@ static BcFunctionRef bg_generate_module(elf_State *state, elf_Arena *arena, elf_
 	{
 		for (u32 i = 0; i < ir_module.function_count; ++ i)
 		{
-			IrFunction *function = ir_module.functions + i;
-			BcFunction *bytecode_function = gen->module.functions + i;
-			generate_bytecode_function(gen, function);
+			IrFunction *ir_function = ir_module.functions + i;
+			BcFunction *bc_function = gen->module.functions + i;
+			generate_function(gen, ir_function);
 
 			u32 bytecode_offset = append_bytecode(gen, gen->bytecode, gen->bytecode_count);
-			SourceMapEntry *source_map = copy_source_map(arena
-			,	gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
+			SourceMapEntry *source_map = copy_source_map(arena, gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
 
-			bytecode_function->variadic         = function->variadic;
-			bytecode_function->arity            = function->arity;
-			bytecode_function->offset           = bytecode_offset;
-			bytecode_function->length           = gen->bytecode_count;
-			bytecode_function->captures         = function->capture_count;
-			bytecode_function->stack_size       = gen->stack_size;
-			bytecode_function->source_map       = source_map;
-			bytecode_function->source_map_count = gen->source_map_buffer.count;
+			bc_function->variadic         = ir_function->variadic;
+			bc_function->arity            = ir_function->arity;
+			bc_function->offset           = bytecode_offset;
+			bc_function->length           = gen->bytecode_count;
+			bc_function->captures         = ir_function->capture_count;
+			bc_function->stack_size       = gen->stack_size;
+			bc_function->source_map       = source_map;
+			bc_function->source_map_count = gen->source_map_buffer.count;
 		}
 	}
 	finalize_module(state, module, &gen->module);

@@ -1269,12 +1269,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 			}
 
 			u32 entity_tags = stat->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
-			lower_local_decl_tuples_to_ir(
-				ctx,
-				items,
-				name_tuple,
-				expr_tuple,
-				entity_tags);
+			lower_local_decl_tuples_to_ir(ctx, items, name_tuple, expr_tuple, entity_tags);
 		}
 		break;
 

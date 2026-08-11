@@ -454,7 +454,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.body = body;
 
 	BcGen *gen = bg_create(state, scratch.arena, 1);
-	generate_bytecode_function(gen, &function);
+	generate_function(gen, &function);
 
 	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {
 		test_fail("if/else restores stack top before following statement");

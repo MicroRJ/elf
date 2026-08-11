@@ -76,6 +76,12 @@ static elf_Closure *vm_new_closure(elf_State *state, BcFunctionRef function_ref,
 	return closure;
 }
 
+static inline elf_Value *vm_slot(elf_Value *reference, i16 index)
+{
+	ASSERT(index >= 0);
+	return reference + index;
+}
+
 static int run_bytecode_frame(elf_State *state)
 {
 	elf_Table *globals = state->globals;
@@ -104,9 +110,6 @@ activate_frame:
 		frame->instruction = instruction;
 
 		Bytecode byte = code[instr];
-		elf_Value *result_slot = &reference[byte.b_x];
-		elf_Value *left_slot = &reference[byte.b_y];
-		elf_Value *right_slot = &reference[byte.b_z];
 
 		switch (byte.b_type) {
 			case BC_HALT: {
@@ -117,7 +120,8 @@ activate_frame:
 			} break;
 
 			case BC_CALL: {
-				elf_Value callee = *result_slot;
+				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
+				elf_Value callee = reference[byte.b_x];
 				state->stack_ptr = reference + byte.b_x + byte.b_y + 1;
 
 				if (value_is_closure(callee)) {
@@ -146,7 +150,7 @@ activate_frame:
 
 			case BC_RETURN: {
 				nrets = MIN(byte.b_y, frame_nrets);
-				value_copy_many(framebase - 1, reference + byte.b_x, nrets);
+				if (nrets) value_copy_many(framebase - 1, vm_slot(reference, byte.b_x), nrets);
 
 				ASSERT(state->frame >= root_frame);
 				if (state->frame != root_frame) {
@@ -171,64 +175,64 @@ activate_frame:
 			} break;
 
 			case BC_JZ: {
-				if (value_as_integer(*left_slot) == 0) {
+				if (value_as_integer(*vm_slot(reference, byte.b_y)) == 0) {
 					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_JNZ: {
-				if (value_as_integer(*left_slot) != 0) {
+				if (value_as_integer(*vm_slot(reference, byte.b_y)) != 0) {
 					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_JE: {
-				if (vm_values_equal(*left_slot, *right_slot)) {
+				if (vm_values_equal(*vm_slot(reference, byte.b_y), *vm_slot(reference, byte.b_z))) {
 					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_JNE: {
-				if (!vm_values_equal(*left_slot, *right_slot)) {
+				if (!vm_values_equal(*vm_slot(reference, byte.b_y), *vm_slot(reference, byte.b_z))) {
 					next_instruction = instr + byte.b_x;
 				}
 			} break;
 
 			case BC_LOADNIL: {
-				*result_slot = value_nil();
+				*vm_slot(reference, byte.b_x) = value_nil();
 			} break;
 
 			case BC_LOADKINT: {
-				*result_slot = value_from_integer(module->integer_constants[byte.b_y]);
+				*vm_slot(reference, byte.b_x) = value_from_integer(module->integer_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADKNUM: {
-				*result_slot = value_from_number(module->number_constants[byte.b_y]);
+				*vm_slot(reference, byte.b_x) = value_from_number(module->number_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADCVAL: {
 				ASSERT(byte.b_y >= 0 && byte.b_y < ncaptures);
-				value_copy(result_slot, captures[byte.b_y]);
+				value_copy(vm_slot(reference, byte.b_x), captures[byte.b_y]);
 			} break;
 
 			case BC_RELOAD: {
-				value_copy(result_slot, *left_slot);
+				value_copy(vm_slot(reference, byte.b_x), *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_CURRENT_CLOSURE: {
-				value_copy(result_slot, framebase[-1]);
+				value_copy(vm_slot(reference, byte.b_x), framebase[-1]);
 			} break;
 
 			case BC_GETGLOBAL: {
-				value_copy(result_slot, elf_array_get(state, globals, byte.b_y));
+				value_copy(vm_slot(reference, byte.b_x), elf_array_get(state, globals, byte.b_y));
 			} break;
 
 			case BC_SETGLOBAL: {
-				elf_array_set(state, globals, byte.b_x, *left_slot);
+				elf_array_set(state, globals, byte.b_x, *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_TABLE: {
-				*result_slot = value_from_table(elf_new_table_rogue(state));
+				*vm_slot(reference, byte.b_x) = value_from_table(elf_new_table_rogue(state));
 			} break;
 
 			case BC_CLOSURE: {
@@ -239,13 +243,15 @@ activate_frame:
 				};
 				ASSERT(bc_function_ref_is_valid(function));
 
-				elf_Closure * new_closure = vm_new_closure(state, function, result_slot);
-				*result_slot = value_from_closure(new_closure);
+				elf_Value *result = vm_slot(reference, byte.b_x);
+				elf_Closure *new_closure = vm_new_closure(state, function, result);
+				*result = value_from_closure(new_closure);
 			} break;
 
 			case BC_GETFIELD: {
-				elf_Value object = *left_slot;
-				elf_Value field = *right_slot;
+				elf_Value *result = vm_slot(reference, byte.b_x);
+				elf_Value object = *vm_slot(reference, byte.b_y);
+				elf_Value field = *vm_slot(reference, byte.b_z);
 
 				if (value_is_nil(field)) {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid field");
@@ -253,7 +259,7 @@ activate_frame:
 
 				switch (object.type) {
 					case ELF_VALUE_TYPE_TABLE: {
-						*result_slot = elf_table_get_or_nil(state, value_as_table(object), field);
+						*result = elf_table_get_or_nil(state, value_as_table(object), field);
 					} break;
 
 					case ELF_VALUE_TYPE_ATOM: {
@@ -261,11 +267,11 @@ activate_frame:
 
 						if (value_is_integer(field)) {
 							i64 index = value_as_integer(field);
-							*result_slot = value_from_integer(text[index]);
+							*result = value_from_integer(text[index]);
 						}
 						else if (value_is_atom(field)) {
 							// Todo, impl!
-							*result_slot = value_nil();
+							*result = value_nil();
 						}
 						else {
 							vm_error_invalid_field_arguments(state, object, field);
@@ -279,9 +285,9 @@ activate_frame:
 			} break;
 
 			case BC_SETFIELD: {
-				elf_Value table = *result_slot;
-				elf_Value key = *left_slot;
-				elf_Value value = *right_slot;
+				elf_Value table = *vm_slot(reference, byte.b_x);
+				elf_Value key = *vm_slot(reference, byte.b_y);
+				elf_Value value = *vm_slot(reference, byte.b_z);
 
 				if (value_is_table(table)) {
 					if (value_is_nil(key)) {
@@ -302,67 +308,68 @@ activate_frame:
 			} break;
 
 			case BC_GETINDEX: {
-				elf_Table *array = vm_check_array(state, *left_slot);
-				u32 index = vm_check_index(state, byte_index, *right_slot, elf_array_length(array));
-				value_copy(result_slot, elf_array_get(state, array, index));
+				elf_Table *array = vm_check_array(state, *vm_slot(reference, byte.b_y));
+				u32 index = vm_check_index(state, byte_index, *vm_slot(reference, byte.b_z), elf_array_length(array));
+				value_copy(vm_slot(reference, byte.b_x), elf_array_get(state, array, index));
 			} break;
 
 			case BC_SETINDEX: {
-				elf_Table *array = vm_check_array(state, *result_slot);
-				u32 index = vm_check_index(state, byte_index, *left_slot, elf_array_length(array));
-				elf_array_set(state, array, index, *right_slot);
+				elf_Table *array = vm_check_array(state, *vm_slot(reference, byte.b_x));
+				u32 index = vm_check_index(state, byte_index, *vm_slot(reference, byte.b_y), elf_array_length(array));
+				elf_array_set(state, array, index, *vm_slot(reference, byte.b_z));
 			} break;
 
 			case BC_ARRAYADD: {
-				check_value_type(state, *result_slot, ELF_VALUE_TYPE_TABLE);
-				elf_array_add(state, value_as_table(*result_slot), *left_slot);
+				elf_Value array = *vm_slot(reference, byte.b_x);
+				check_value_type(state, array, ELF_VALUE_TYPE_TABLE);
+				elf_array_add(state, value_as_table(array), *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_GETLENGTH: {
-				elf_Table *array = vm_check_array(state, *left_slot);
-				*result_slot = value_from_integer(elf_array_length(array));
+				elf_Table *array = vm_check_array(state, *vm_slot(reference, byte.b_y));
+				*vm_slot(reference, byte.b_x) = value_from_integer(elf_array_length(array));
 			} break;
 
 			case BC_GETMETAFIELD: {
-				elf_Value value = *left_slot;
+				elf_Value value = *vm_slot(reference, byte.b_y);
 				elf_Table *metatable = elf_get_type_metatable(state, value);
 
 				if (!metatable) {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "'%s': required metatable for metafield lookup", value_type_name(value.type));
 				}
 
-				value_copy(result_slot, elf_table_get_or_nil(state, metatable, *right_slot));
+				value_copy(vm_slot(reference, byte.b_x), elf_table_get_or_nil(state, metatable, *vm_slot(reference, byte.b_z)));
 			} break;
 
 			case BC_ENFORCE: {
-				check_value_type_rule(state, *result_slot, byte.b_y);
+				check_value_type_rule(state, *vm_slot(reference, byte.b_x), byte.b_y);
 			} break;
 
 			case BC_I2N: {
-				*result_slot = value_from_number(value_to_number(*left_slot));
+				*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(*vm_slot(reference, byte.b_y)));
 			} break;
 
 			case BC_N2I: {
-				*result_slot = value_from_integer(value_to_integer(*left_slot));
+				*vm_slot(reference, byte.b_x) = value_from_integer(value_to_integer(*vm_slot(reference, byte.b_y)));
 			} break;
 
 			case BC_EQ: {
-				*result_slot = value_from_integer(vm_values_equal(*left_slot, *right_slot));
+				*vm_slot(reference, byte.b_x) = value_from_integer(vm_values_equal(*vm_slot(reference, byte.b_y), *vm_slot(reference, byte.b_z)));
 			} break;
 
 			case BC_NEQ: {
-				*result_slot = value_from_integer(!vm_values_equal(*left_slot, *right_slot));
+				*vm_slot(reference, byte.b_x) = value_from_integer(!vm_values_equal(*vm_slot(reference, byte.b_y), *vm_slot(reference, byte.b_z)));
 			} break;
 
 			case BC_LT: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_integer(value_to_number(left) < value_to_number(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_to_number(left) < value_to_number(right));
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) < value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) < value_as_integer(right));
 					}
 				}
 				else {
@@ -371,14 +378,14 @@ activate_frame:
 			} break;
 
 			case BC_LTEQ: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_integer(value_to_number(left) <= value_to_number(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_to_number(left) <= value_to_number(right));
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) <= value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) <= value_as_integer(right));
 					}
 				}
 				else {
@@ -387,17 +394,17 @@ activate_frame:
 			} break;
 
 			case BC_ADD: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_atom(left)) {
-					*result_slot = value_from_atom(vm_add_values_to_str(state, left, right));
+					*vm_slot(reference, byte.b_x) = value_from_atom(vm_add_values_to_str(state, left, right));
 				}
 				else if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_number(value_to_number(left) + value_to_number(right));
+						*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(left) + value_to_number(right));
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) + value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) + value_as_integer(right));
 					}
 				}
 				else {
@@ -406,14 +413,14 @@ activate_frame:
 			} break;
 
 			case BC_SUB: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_number(value_to_number(left) - value_to_number(right));
+						*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(left) - value_to_number(right));
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) - value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) - value_as_integer(right));
 					}
 				}
 				else {
@@ -422,14 +429,14 @@ activate_frame:
 			} break;
 
 			case BC_MUL: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_number(value_to_number(left) * value_to_number(right));
+						*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(left) * value_to_number(right));
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) * value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) * value_as_integer(right));
 					}
 				}
 				else {
@@ -438,14 +445,14 @@ activate_frame:
 			} break;
 
 			case BC_DIV: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_number(value_to_number(left) / value_to_number(right));
+						*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(left) / value_to_number(right));
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) / value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) / value_as_integer(right));
 					}
 				}
 				else {
@@ -454,16 +461,16 @@ activate_frame:
 			} break;
 
 			case BC_MOD: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
 						f64 left_number = value_to_number(left);
 						f64 right_number = value_to_number(right);
-						*result_slot = value_from_number(left_number - ((i64)(left_number / right_number)) * right_number);
+						*vm_slot(reference, byte.b_x) = value_from_number(left_number - ((i64)(left_number / right_number)) * right_number);
 					}
 					else {
-						*result_slot = value_from_integer(value_as_integer(left) % value_as_integer(right));
+						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) % value_as_integer(right));
 					}
 				}
 				else {
@@ -472,14 +479,14 @@ activate_frame:
 			} break;
 
 			case BC_POW: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*result_slot = value_from_number(pow(value_to_number(left), value_to_number(right)));
+						*vm_slot(reference, byte.b_x) = value_from_number(pow(value_to_number(left), value_to_number(right)));
 					}
 					else {
-						*result_slot = value_from_integer((i64)pow(value_as_integer(left), value_as_integer(right)));
+						*vm_slot(reference, byte.b_x) = value_from_integer((i64)pow(value_as_integer(left), value_as_integer(right)));
 					}
 				}
 				else {
@@ -488,15 +495,16 @@ activate_frame:
 			} break;
 
 			case BC_BIT_NOT: {
-				check_value_type(state, *left_slot, ELF_VALUE_TYPE_INTEGER);
-				*result_slot = value_from_integer(~value_as_integer(*left_slot));
+				elf_Value value = *vm_slot(reference, byte.b_y);
+				check_value_type(state, value, ELF_VALUE_TYPE_INTEGER);
+				*vm_slot(reference, byte.b_x) = value_from_integer(~value_as_integer(value));
 			} break;
 
 			case BC_BIT_AND: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*result_slot = value_from_integer(value_as_integer(left) & value_as_integer(right));
+					*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) & value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BIT_AND, left, right);
@@ -504,10 +512,10 @@ activate_frame:
 			} break;
 
 			case BC_BIT_OR: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*result_slot = value_from_integer(value_as_integer(left) | value_as_integer(right));
+					*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) | value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BIT_OR, left, right);
@@ -515,10 +523,10 @@ activate_frame:
 			} break;
 
 			case BC_BIT_XOR: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*result_slot = value_from_integer(value_as_integer(left) ^ value_as_integer(right));
+					*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) ^ value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BIT_XOR, left, right);
@@ -526,10 +534,10 @@ activate_frame:
 			} break;
 
 			case BC_BIT_SHL: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*result_slot = value_from_integer(value_as_integer(left) << value_as_integer(right));
+					*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) << value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BIT_SHL, left, right);
@@ -537,10 +545,10 @@ activate_frame:
 			} break;
 
 			case BC_BIT_SHR: {
-				elf_Value left = *left_slot;
-				elf_Value right = *right_slot;
+				elf_Value left = *vm_slot(reference, byte.b_y);
+				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*result_slot = value_from_integer(value_as_integer(left) >> value_as_integer(right));
+					*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) >> value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BIT_SHR, left, right);

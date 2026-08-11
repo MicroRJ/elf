@@ -9,21 +9,23 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 
 	BcFunction *function = bc_function_from_ref(closure->function);
 	u32 argument_count = (u32)nargs;
-	u32 frame_size = MAX(argument_count, function->stack_size);
-
 	elf_Value *frame_base = state->stack_ptr - argument_count;
+	u32 register_offset = 0;
+	u32 frame_size = MAX(argument_count, function->stack_size);
 	elf_Value *reference = frame_base;
 
 	if (function->variadic && argument_count > function->arity)
 	{
-		reference += argument_count;
-		frame_size += function->arity;
+		register_offset = argument_count;
+		frame_size = argument_count + function->stack_size;
+		reference += register_offset;
 		value_copy_many(reference, frame_base, function->arity);
 	}
 
 	u32 copied_arg_count = MIN(function->arity, argument_count);
 	u32 clear_start = (u32)(reference - frame_base) + copied_arg_count;
 	ASSERT(clear_start <= frame_size);
+	ASSERT(register_offset + function->stack_size <= frame_size);
 	value_zero_many(frame_base + clear_start, frame_size - clear_start);
 
 	frame->module = closure->function.module;

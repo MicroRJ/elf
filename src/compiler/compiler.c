@@ -113,7 +113,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 		ir_module = elf_lower_ast_file(ctx, ast_file);
 	}
 
-	BcFunctionRef file_entry = bg_generate_module(state, scratch.arena, module, ir_module);
+	BcFunctionRef file_entry = generate_module(state, scratch.arena, module, ir_module);
 	module->next = state->modules;
 	state->modules = module;
 
