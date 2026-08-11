@@ -158,8 +158,11 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 	}
 
 	print_source_slice_marker(site, parser->lexer.source);
-	if (severity >= SEVERITY_FATAL) {
-		elf_report_runtime_error(parser->state, RUNTIME_ERROR_GENERIC, -1, "%s", message);
+	if (severity >= SEVERITY_FATAL)
+	{
+		parser->failed = true;
+		elf_Status status = parser->error_status != ELF_STATUS_OK ? parser->error_status : ELF_STATUS_PARSE_ERROR;
+		elf_diagnostic_set(parser->state, status, source_name, site, message);
 	}
 }
 
@@ -222,6 +225,7 @@ static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char 
 	ASSERT(source.data != 0);
 	Parser *parser = elf_alloc_parser(state, arena);
 	parser->name = elf_atom_from_data(state, name);
+	parser->error_status = ELF_STATUS_PARSE_ERROR;
 	lexer_init(&parser->lexer, state, parser->name, source);
 	reposition_parser(parser, source.data);
 	return parser;
@@ -293,12 +297,14 @@ static Ast *pop_ast_array(Parser *par, u32 nargs)
 
 static Ast elf_parse_file(Parser *parser)
 {
+	if (parser_has_failed(parser)) return ERROR_AST;
 	Token tok = parser->tok;
 	u32 nstats = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
 		Token before = parser->tok;
 		Ast_T *stat = parse_stat(parser);
+		if (parser_has_failed(parser)) return ERROR_AST;
 		if (ast_is_error(stat)) {
 			return ERROR_AST;
 		}
@@ -1415,21 +1421,21 @@ static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 
 static int push_constexpr_value(Parser *parser, Ast ast)
 {
-	if (ast_is_error(ast))
-	{
-		push_value(parser->state, value_nil());
-		return false;
-	}
+	if (ast_is_error(ast) || parser_has_failed(parser)) return false;
 
+	parser->error_status = ELF_STATUS_EVALUATION_ERROR;
 	elf_Value value = {};
 	b32 ok = eval_constexpr_ast(parser, ast, &value);
-	push_value(parser->state, ok ? value : value_nil());
-	return ok;
+	if (!ok || parser_has_failed(parser)) return false;
+	push_value(parser->state, value);
+	return true;
 }
 
 static int parse_constexpr(Parser *parser)
 {
+	if (parser_has_failed(parser)) return false;
 	Ast ast = parse_tuple_expr(parser);
+	if (parser_has_failed(parser)) return false;
 	if (!peek_token(parser, TOK_NONE))
 	{
 		parser_unexpected_token(parser, parser->tok);

@@ -18,6 +18,22 @@ static ELF_FUNCTION(test_api_callback)
 	return 1;
 }
 
+static elf_b32 api_slice_matches(elf_StrSlice slice, const char *text)
+{
+	elf_u64 size = (elf_u64)strlen(text);
+	return slice.size == size && memcmp(slice.data, text, size) == 0;
+}
+
+static elf_b32 api_slice_contains(elf_StrSlice slice, const char *text)
+{
+	elf_u64 size = (elf_u64)strlen(text);
+	if (size > slice.size) return false;
+	for (elf_u64 i = 0; i <= slice.size - size; ++ i) {
+		if (memcmp(slice.data + i, text, size) == 0) return true;
+	}
+	return false;
+}
+
 static void test_api_call_addressing(elf_State *state)
 {
 	elf_i32 checkpoint = elf_get_top(state);
@@ -106,10 +122,109 @@ static void test_api_tables_and_refs(elf_State *state)
 	elf_set_top(state, checkpoint);
 }
 
+static void test_api_source_diagnostics(elf_State *state)
+{
+	elf_i32 checkpoint = elf_get_top(state);
+	elf_push_int(state, 77);
+	elf_i32 sentinel_top = elf_get_top(state);
+
+	char invalid_constant_text[] = "{\n  answer = runtime_value,\n}";
+	elf_StrSlice invalid_constant = {invalid_constant_text, sizeof(invalid_constant_text) - 1};
+	if (elf_push_constant_expr(state, "invalid-constant.elf", invalid_constant)) {
+		test_fail("API rejects a non-constant expression");
+	}
+	if (elf_get_top(state) != sentinel_top) {
+		test_fail("failed constant expression leaves the stack unchanged");
+	}
+	elf_Integer sentinel = 0;
+	if (!elf_to_int(state, -1, &sentinel) || sentinel != 77) {
+		test_fail("failed constant expression preserves existing stack values");
+	}
+
+	elf_Diagnostic diagnostic = {};
+	if (!elf_get_diagnostic(state, &diagnostic)
+	|| diagnostic.status != ELF_STATUS_EVALUATION_ERROR
+	|| !api_slice_matches(diagnostic.source_name, "invalid-constant.elf")
+	|| diagnostic.line != 2
+	|| diagnostic.column != 12
+	|| !api_slice_contains(diagnostic.message, "not a constant expression")) {
+		test_fail("API reports constant-expression diagnostics");
+	}
+
+	char invalid_string_text[] = "\"\\q\"";
+	elf_StrSlice invalid_string = {invalid_string_text, sizeof(invalid_string_text) - 1};
+	if (elf_push_constant_expr(state, "invalid-string.elf", invalid_string)) {
+		test_fail("API rejects lexer errors");
+	}
+	if (elf_get_top(state) != sentinel_top) {
+		test_fail("lexer failure leaves the stack unchanged");
+	}
+	if (!elf_get_diagnostic(state, &diagnostic)
+	|| diagnostic.status != ELF_STATUS_LEX_ERROR
+	|| !api_slice_matches(diagnostic.source_name, "invalid-string.elf")) {
+		test_fail("API preserves the first lexer diagnostic");
+	}
+
+	char valid_constant_text[] = "42";
+	elf_StrSlice valid_constant = {valid_constant_text, sizeof(valid_constant_text) - 1};
+	if (!elf_push_constant_expr(state, "valid-constant.elf", valid_constant)) {
+		test_fail("API parses valid source after a failed constant expression");
+	}
+	elf_Integer constant = 0;
+	if (!elf_to_int(state, -1, &constant) || constant != 42) {
+		test_fail("API returns a valid constant after a failed parse");
+	}
+	if (elf_get_diagnostic(state, &diagnostic)) {
+		test_fail("successful source parsing clears the previous diagnostic");
+	}
+	elf_pop(state, 1);
+
+	elf_Module *module_checkpoint = state->modules;
+	elf_u64 arena_checkpoint = state->arena.in_use;
+	char invalid_code_text[] = "answer := 1 +";
+	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
+	if (elf_push_code_source(state, "invalid-code.elf", invalid_code)) {
+		test_fail("API rejects malformed code source");
+	}
+	if (elf_get_top(state) != sentinel_top) {
+		test_fail("failed code compilation leaves the stack unchanged");
+	}
+	if (state->modules != module_checkpoint || state->arena.in_use != arena_checkpoint) {
+		test_fail("failed code compilation publishes no partial module");
+	}
+	if (!elf_get_diagnostic(state, &diagnostic)
+	|| diagnostic.status != ELF_STATUS_PARSE_ERROR
+	|| !api_slice_matches(diagnostic.source_name, "invalid-code.elf")) {
+		test_fail("API reports code parser diagnostics");
+	}
+
+	char valid_code_text[] = "ret 42";
+	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
+	if (!elf_push_code_source(state, "valid-code.elf", valid_code)) {
+		test_fail("API compiles valid code after a failed parse");
+	}
+	else
+	{
+		elf_push_nil(state);
+		elf_call(state, 1, 1);
+		elf_Integer result = 0;
+		if (!elf_to_int(state, -1, &result) || result != 42) {
+			test_fail("code compiled after a failed parse executes correctly");
+		}
+		elf_pop(state, 1);
+	}
+	if (elf_get_diagnostic(state, &diagnostic)) {
+		test_fail("successful code compilation clears the previous diagnostic");
+	}
+
+	elf_set_top(state, checkpoint);
+}
+
 static void run_api_tests(void)
 {
 	elf_State *state = elf_create_state();
 	test_api_call_addressing(state);
 	test_api_tables_and_refs(state);
+	test_api_source_diagnostics(state);
 	elf_destroy_state(state);
 }

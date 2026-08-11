@@ -162,6 +162,7 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
+		free(state->diagnostic_storage);
 		elf_arena_destroy(&state->arena);
 	}
 }

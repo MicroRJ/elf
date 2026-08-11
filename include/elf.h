@@ -31,6 +31,26 @@ typedef struct
 }
 elf_StrSlice;
 
+typedef enum
+{
+	ELF_STATUS_OK = 0,
+	ELF_STATUS_LEX_ERROR,
+	ELF_STATUS_PARSE_ERROR,
+	ELF_STATUS_EVALUATION_ERROR,
+}
+elf_Status;
+
+typedef struct
+{
+	elf_Status   status;
+	// Source name and message remain valid until the next source operation or state destruction.
+	elf_StrSlice source_name;
+	elf_StrSlice message;
+	elf_u32      line;
+	elf_u64      column;
+}
+elf_Diagnostic;
+
 #define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
 typedef ELF_FUNCTION(*elf_Function);
 
@@ -55,6 +75,7 @@ const char *elf_version(void);
 void elf_set_user_data(elf_State *state, void *user_data);
 void *elf_get_user_data(elf_State *state);
 void elf_error(elf_State *state, const char *message);
+elf_b32 elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);

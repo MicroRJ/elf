@@ -194,6 +194,8 @@ static Ast parse_json_ast(Parser *parser)
 
 static int parse_json_value(Parser *parser)
 {
+	if (parser_has_failed(parser)) return false;
 	Ast ast = parse_json_ast(parser);
+	if (parser_has_failed(parser)) return false;
 	return push_constexpr_value(parser, ast);
 }

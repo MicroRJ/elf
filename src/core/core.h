@@ -55,12 +55,12 @@ struct BcFunction
 typedef struct elf_Module elf_Module;
 struct elf_Module
 {
-	elf_Module            *next;
-	elf_String      *source_name;
-	char            *source_data;
-	u32              source_size;
-	elf_String     **atoms;
-	u32              atom_count;
+	elf_Module   *next;
+	elf_String   *source_name;
+	char         *source_data;
+	u32           source_size;
+	elf_String  **atoms;
+	u32           atom_count;
 	f64          *number_constants;
 	u32           number_constant_count;
 	i64          *integer_constants;
@@ -127,6 +127,9 @@ struct elf_State
 	elf_Arena    arena;
 	void        *user_data;
 	elf_Module  *modules;
+	elf_Diagnostic diagnostic;
+	char          *diagnostic_storage;
+	u64            diagnostic_storage_capacity;
 	struct
 	{
 		u32          gc_mode;
@@ -179,3 +182,5 @@ RuntimeErrorType;
 
 void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
 void elf_print_current_runtime_source_location(elf_State *state);
+void elf_diagnostic_clear(elf_State *state);
+void elf_diagnostic_set(elf_State *state, elf_Status status, const char *source_name, SourceSite site, const char *message);

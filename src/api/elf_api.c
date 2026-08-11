@@ -33,6 +33,14 @@ void elf_error(elf_State *state, const char *message)
 		message ? message : "host error");
 }
 
+elf_b32 elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic)
+{
+	ASSERT(state);
+	if (!diagnostic) return false;
+	*diagnostic = state->diagnostic;
+	return diagnostic->status != ELF_STATUS_OK;
+}
+
 void elf_push_nil(elf_State *state)                 { push_value(state, value_nil()); }
 void elf_push_int(elf_State *state, elf_Integer x)  { push_value(state, value_from_integer(x)); }
 void elf_push_num(elf_State *state, elf_Number x)   { push_value(state, value_from_number(x)); }
@@ -53,6 +61,7 @@ int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source
 	ASSERT(name);
 	ASSERT(source.data);
 	BcFunctionRef function = elf_compile_source(state, name, source);
+	if (!bc_function_ref_is_valid(function)) return false;
 	ASSERT(bc_function_from_ref(function)->captures == 0);
 
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
