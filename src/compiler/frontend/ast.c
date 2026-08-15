@@ -78,10 +78,10 @@ static Ast create_num_ast(Parser *par, SourceSite site, f64 n)
 	return value;
 }
 
-static Ast create_atom_ast(Parser *par, SourceSite site, elf_String *atom)
+static Ast create_string_ast(Parser *par, SourceSite site, elf_String *string)
 {
 	Ast value = create_nullary_ast(par, site, AST_STRING_LITERAL);
-	value->atom = atom;
+	value->string = string;
 	return value;
 }
 
@@ -165,10 +165,10 @@ static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause
 	return value;
 }
 
-static Ast create_ident_ast(Parser *par, SourceSite site, elf_String *atom)
+static Ast create_ident_ast(Parser *par, SourceSite site, elf_String *string)
 {
 	Ast tree = create_ast(par, site, AST_IDENT);
-	tree->atom = atom;
+	tree->string = string;
 	return tree;
 }
 
@@ -379,7 +379,7 @@ static void print_ast(Printer *pr, Ast tree)
 		break;
 		case AST_IDENT:
 		{
-			PRINT(pr, "%s", atom_data(tree->atom));
+			PRINT(pr, "%s", string_data(tree->string));
 		}
 		break;
 		case AST_NIL_LITERAL:
@@ -389,7 +389,7 @@ static void print_ast(Printer *pr, Ast tree)
 		break;
 		case AST_STRING_LITERAL:
 		{
-			PRINT(pr, "\"%s\"", atom_data(tree->atom));
+			PRINT(pr, "\"%s\"", string_data(tree->string));
 		}
 		break;
 		case AST_INTERPOLATED_STRING:

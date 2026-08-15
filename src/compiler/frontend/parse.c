@@ -141,7 +141,7 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 		site = parser->tok.site;
 	}
 
-	const char *source_name = parser && parser->name ? atom_data(parser->name) : "<unknown>";
+	const char *source_name = parser && parser->name ? string_data(parser->name) : "<unknown>";
 	const char *severity_name = severity >= SEVERITY_FATAL ? "error" :
 	severity == SEVERITY_WARNING ? "warning" : "note";
 
@@ -224,7 +224,7 @@ static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char 
 	ASSERT(name != 0);
 	ASSERT(source.data != 0);
 	Parser *parser = elf_alloc_parser(state, arena);
-	parser->name = elf_atom_from_data(state, name);
+	parser->name = elf_string_from_data(state, name);
 	parser->error_status = ELF_STATUS_PARSE_ERROR;
 	lexer_init(&parser->lexer, state, parser->name, source);
 	reposition_parser(parser, source.data);
@@ -482,7 +482,7 @@ static Ast parse_get_mem_expr(Parser *parser)
 static Ast parse_ident_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_IDENTIFIER);
-	return create_ident_ast(par, tok.site, tok.atom);
+	return create_ident_ast(par, tok.site, tok.string);
 }
 
 static Ast parse_positive_integer_literal(Parser *parser, Token token)
@@ -525,7 +525,7 @@ static Ast parse_interpolated_string(Parser *parser)
 	u32 stack_start = parser->ast.stack_index;
 	u32 nparts = 0;
 
-	push_ast(parser, create_atom_ast(parser, start.site, start.atom));
+	push_ast(parser, create_string_ast(parser, start.site, start.string));
 	nparts += 1;
 
 	for (;;)
@@ -551,7 +551,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 
 		consume_token(parser);
-		push_ast(parser, create_atom_ast(parser, part.site, part.atom));
+		push_ast(parser, create_string_ast(parser, part.site, part.string));
 		nparts += 1;
 
 		if (part.type == TOK_STRING_END) {
@@ -615,7 +615,7 @@ static Ast parse_unary_expr(Parser *parser)
 		case TOK_STRING:
 		{
 			consume_token(parser);
-			value = create_atom_ast(parser, tok.site, tok.atom);
+			value = create_string_ast(parser, tok.site, tok.string);
 		}
 		break;
 		case TOK_STRING_START:
@@ -724,7 +724,7 @@ static Ast parse_table_entry(Parser *parser)
 		Token name = consume_token(parser);
 		take_token(parser, TOK_ASSIGN);
 
-		key = create_atom_ast(parser, name.site, name.atom);
+		key = create_string_ast(parser, name.site, name.string);
 		value = parse_expr(parser);
 		key_required = true;
 	}
@@ -842,7 +842,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 		do
 		{
 			Token name = take_token(par, TOK_IDENTIFIER);
-			Ast right = create_atom_ast(par, name.site, name.atom);
+			Ast right = create_string_ast(par, name.site, name.string);
 			Ast value = create_field_ast(par, tok.site, left, right);
 			push_ast(par, value);
 			++ nargs;
@@ -870,7 +870,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	else
 	{
 		Token name = take_token(par, TOK_IDENTIFIER);
-		Ast right = create_atom_ast(par, name.site, name.atom);
+		Ast right = create_string_ast(par, name.site, name.string);
 		left = create_field_ast(par, tok.site, left, right);
 	}
 	return left;
@@ -953,7 +953,7 @@ static Ast parse_postfix_expr(Parser *parser)
 			{
 				consume_token(parser);
 				Token name = take_token(parser, TOK_IDENTIFIER);
-				Ast y = create_atom_ast(parser, name.site, name.atom);
+				Ast y = create_string_ast(parser, name.site, name.string);
 				value = create_meta_field_ast(parser, tok.site, value, y);
 			}
 			break;
@@ -1374,7 +1374,7 @@ static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 
 		case AST_STRING_LITERAL:
 		{
-			*out = value_from_atom(ast->atom);
+			*out = value_from_string(ast->string);
 			return true;
 		}
 

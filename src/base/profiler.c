@@ -43,10 +43,10 @@ static const char *prof_counter_name(ProfCounter counter)
 		case PROF_COUNTER_TABLE_PROBE:  return "table.probe";
 		case PROF_COUNTER_TABLE_HIT:    return "table.hit";
 		case PROF_COUNTER_TABLE_MISS:   return "table.miss";
-		case PROF_COUNTER_ATOM_LOOKUP:  return "atom.lookup";
-		case PROF_COUNTER_ATOM_PROBE:   return "atom.probe";
-		case PROF_COUNTER_ATOM_HIT:     return "atom.hit";
-		case PROF_COUNTER_ATOM_MISS:    return "atom.miss";
+		case PROF_COUNTER_STRING_LOOKUP: return "string.lookup";
+		case PROF_COUNTER_STRING_PROBE:  return "string.probe";
+		case PROF_COUNTER_STRING_HIT:    return "string.hit";
+		case PROF_COUNTER_STRING_MISS:   return "string.miss";
 		default:                        return "unknown";
 	}
 }

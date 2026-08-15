@@ -30,10 +30,10 @@ static double bench_elapsed_s(i64 start)
 	return elapsed / (double)platform_counter_frequency();
 }
 
-static elf_Value bench_atom_key(elf_State *state, const char *text)
+static elf_Value bench_string_key(elf_State *state, const char *text)
 {
 	elf_Value value = {};
-	value = value_from_atom(elf_atom_from_data(state, text));
+	value = value_from_string(elf_string_from_data(state, text));
 	return value;
 }
 
@@ -206,16 +206,16 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 	elf_destroy_state(state);
 }
 
-static void fill_atom_table(elf_State *state, elf_Table *table, elf_Value *hit_keys, elf_Value *miss_keys, u32 count)
+static void fill_string_table(elf_State *state, elf_Table *table, elf_Value *hit_keys, elf_Value *miss_keys, u32 count)
 {
 	for (u32 i = 0; i < count; ++i) {
 		char name[64];
 		snprintf(name, sizeof(name), "field.%u", i);
-		hit_keys[i] = bench_atom_key(state, name);
+		hit_keys[i] = bench_string_key(state, name);
 		elf_table_set(state, table, hit_keys[i], bench_int_key(i));
 
 		snprintf(name, sizeof(name), "missing.%u", i);
-		miss_keys[i] = bench_atom_key(state, name);
+		miss_keys[i] = bench_string_key(state, name);
 	}
 }
 
@@ -297,32 +297,32 @@ int main(void)
 
 	elf_State *state = elf_create_state();
 
-	elf_Value *atom_hit_keys = calloc(KEY_COUNT, sizeof(*atom_hit_keys));
-	elf_Value *atom_miss_keys = calloc(KEY_COUNT, sizeof(*atom_miss_keys));
+	elf_Value *string_hit_keys = calloc(KEY_COUNT, sizeof(*string_hit_keys));
+	elf_Value *string_miss_keys = calloc(KEY_COUNT, sizeof(*string_miss_keys));
 	elf_Value *int_hit_keys = calloc(KEY_COUNT, sizeof(*int_hit_keys));
 	elf_Value *int_miss_keys = calloc(KEY_COUNT, sizeof(*int_miss_keys));
 
-	elf_Table *atom_table = push_new_table(state);
+	elf_Table *string_table = push_new_table(state);
 	elf_Table *int_table = push_new_table(state);
 
-	fill_atom_table(state, atom_table, atom_hit_keys, atom_miss_keys, KEY_COUNT);
+	fill_string_table(state, string_table, string_hit_keys, string_miss_keys, KEY_COUNT);
 	fill_int_table(state, int_table, int_hit_keys, int_miss_keys, KEY_COUNT);
 
 	printf("table lookup benchmarks (%u keys, %u iterations each)\n", KEY_COUNT, ITERATIONS);
 
-	double atom_hit_seconds = 0;
-	PROF_BLOCK("bench.table.atom_hit")
+	double string_hit_seconds = 0;
+	PROF_BLOCK("bench.table.string_hit")
 	{
-		atom_hit_seconds = bench_table_get(state, atom_table, atom_hit_keys, KEY_COUNT, ITERATIONS);
+		string_hit_seconds = bench_table_get(state, string_table, string_hit_keys, KEY_COUNT, ITERATIONS);
 	}
-	bench_report("atom hit", "lookups", ITERATIONS, atom_hit_seconds);
+	bench_report("string hit", "lookups", ITERATIONS, string_hit_seconds);
 
-	double atom_miss_seconds = 0;
-	PROF_BLOCK("bench.table.atom_miss")
+	double string_miss_seconds = 0;
+	PROF_BLOCK("bench.table.string_miss")
 	{
-		atom_miss_seconds = bench_table_get(state, atom_table, atom_miss_keys, KEY_COUNT, ITERATIONS);
+		string_miss_seconds = bench_table_get(state, string_table, string_miss_keys, KEY_COUNT, ITERATIONS);
 	}
-	bench_report("atom miss", "lookups", ITERATIONS, atom_miss_seconds);
+	bench_report("string miss", "lookups", ITERATIONS, string_miss_seconds);
 
 	double integer_hit_seconds = 0;
 	PROF_BLOCK("bench.table.integer_hit")

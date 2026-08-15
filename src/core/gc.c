@@ -51,7 +51,7 @@ static u32 gc_sweep(elf_State *state)
 	u32 survivor_count = 0;
 	u32 freed_count = 0;
 
-	atom_remove_dead(state);
+	string_remove_dead(state);
 
 	for (u32 i = 0; i < state->gc_reference_count; ++ i)
 	{
@@ -99,11 +99,11 @@ static u32 gc_mark_interned_ids(elf_State *state)
 {
 	u32 marked_count = 0;
 
-	for (u32 i = 0; i < state->atom_bucket_count; ++i)
+	for (u32 i = 0; i < state->string_bucket_count; ++i)
 	{
-		for (elf_String *atom = state->atom_buckets[i]; atom; atom = atom->next) {
-			if (atom->id) {
-				marked_count += gc_mark_reachable(state, (elf_Object *)atom);
+		for (elf_String *string = state->string_buckets[i]; string; string = string->next) {
+			if (string->id) {
+				marked_count += gc_mark_reachable(state, (elf_Object *)string);
 			}
 		}
 	}
@@ -119,8 +119,8 @@ static u32 gc_mark_modules(elf_State *state)
 		if (module->source_name) {
 			marked_count += gc_mark_reachable(state, (elf_Object *)module->source_name);
 		}
-		for (u32 i = 0; i < module->atom_count; ++ i) {
-			marked_count += gc_mark_reachable(state, (elf_Object *)module->atoms[i]);
+		for (u32 i = 0; i < module->string_count; ++ i) {
+			marked_count += gc_mark_reachable(state, (elf_Object *)module->strings[i]);
 		}
 	}
 
@@ -131,8 +131,8 @@ static u32 gc_mark_metatables(elf_State *state)
 {
 	u32 marked_count = 0;
 
-	if (state->metatables.atom) {
-		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.atom);
+	if (state->metatables.string) {
+		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.string);
 	}
 	if (state->metatables.table) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.table);
@@ -225,7 +225,7 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		{
 			marked_count += gc_mark_table(state, (elf_Table *) reference);
 		}
-		else if (reference->type == ELF_OBJECT_ATOM)
+		else if (reference->type == ELF_OBJECT_STRING)
 		{
 		}
 	}

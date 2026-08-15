@@ -39,9 +39,9 @@ static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left,
 	elf_print_value(scratch.arena, left);
 	elf_print_value(scratch.arena, right);
 	char *join_end = elf_arena_push_zero(scratch.arena, 1);
-	elf_String *atom = elf_atom_from_data_size(state, join_start, (u32)(join_end - join_start));
+	elf_String *string = elf_string_from_data_size(state, join_start, (u32)(join_end - join_start));
 	elf_end_scratch(scratch);
-	return atom;
+	return string;
 }
 
 static inline b32 vm_values_equal(elf_Value left, elf_Value right)
@@ -58,8 +58,8 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 		return false;
 	}
 
-	if (value_is_atom(left)) {
-		return atoms_equal(value_as_atom(left), value_as_atom(right));
+	if (value_is_string(left)) {
+		return strings_equal(value_as_string(left), value_as_string(right));
 	}
 
 	return value_as_integer(left) == value_as_integer(right);
@@ -210,8 +210,8 @@ activate_frame:
 				*vm_slot(reference, byte.b_x) = value_from_number(module->number_constants[byte.b_y]);
 			} break;
 
-			case BC_LOADKATOM: {
-				*vm_slot(reference, byte.b_x) = value_from_atom(module->atoms[byte.b_y]);
+			case BC_LOADKSTRING: {
+				*vm_slot(reference, byte.b_x) = value_from_string(module->strings[byte.b_y]);
 			} break;
 
 			case BC_LOADCVAL: {
@@ -266,14 +266,14 @@ activate_frame:
 						*result = elf_table_get_or_nil(state, value_as_table(object), field);
 					} break;
 
-					case ELF_VALUE_TYPE_ATOM: {
-						const char *text = atom_data(value_as_atom(object));
+					case ELF_VALUE_TYPE_STRING: {
+						const char *text = string_data(value_as_string(object));
 
 						if (value_is_integer(field)) {
 							i64 index = value_as_integer(field);
 							*result = value_from_integer(text[index]);
 						}
-						else if (value_is_atom(field)) {
+						else if (value_is_string(field)) {
 							// Todo, impl!
 							*result = value_nil();
 						}
@@ -303,8 +303,8 @@ activate_frame:
 				else if (value_is_user(table)) {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "overload not implemented");
 				}
-				else if (value_is_atom(table)) {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "atoms are readonly, you may not change them");
+				else if (value_is_string(table)) {
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "strings are readonly, you may not change them");
 				}
 				else {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' value", value_type_name(table.type));
@@ -400,8 +400,8 @@ activate_frame:
 			case BC_ADD: {
 				elf_Value left = *vm_slot(reference, byte.b_y);
 				elf_Value right = *vm_slot(reference, byte.b_z);
-				if (value_is_atom(left)) {
-					*vm_slot(reference, byte.b_x) = value_from_atom(vm_add_values_to_str(state, left, right));
+				if (value_is_string(left)) {
+					*vm_slot(reference, byte.b_x) = value_from_string(vm_add_values_to_str(state, left, right));
 				}
 				else if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {

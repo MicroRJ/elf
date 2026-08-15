@@ -48,12 +48,12 @@ void elf_push_fun(elf_State *state, elf_Function x) { push_value(state, value_fr
 
 void elf_push_cstr(elf_State *state, const char *text)
 {
-	push_value(state, value_from_atom(elf_atom_from_data(state, text)));
+	push_value(state, value_from_string(elf_string_from_data(state, text)));
 }
 
 void elf_push_str(elf_State *state, const char *text, int length)
 {
-	push_value(state, value_from_atom(elf_atom_from_data_size(state, text, length)));
+	push_value(state, value_from_string(elf_string_from_data_size(state, text, length)));
 }
 
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
@@ -111,7 +111,7 @@ static elf_b32 values_equal(elf_Value left, elf_Value right)
 		return value_to_number(left) == value_to_number(right);
 	}
 	if (value_type(left) != value_type(right)) return false;
-	if (value_is_atom(left)) return atoms_equal(value_as_atom(left), value_as_atom(right));
+	if (value_is_string(left)) return strings_equal(value_as_string(left), value_as_string(right));
 	return left.x_i64 == right.x_i64;
 }
 
@@ -211,8 +211,8 @@ elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *result)
 elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *result)
 {
 	elf_Value *value = value_at(state, index);
-	if (!value || !value_is_atom(*value) || !result) return false;
-	elf_String *string = value_as_atom(*value);
+	if (!value || !value_is_string(*value) || !result) return false;
+	elf_String *string = value_as_string(*value);
 	result->data = string->data;
 	result->size = string->size;
 	return true;
@@ -274,7 +274,7 @@ elf_b32 elf_get_field(elf_State *state, elf_i32 index, const char *field)
 {
 	elf_Table *table;
 	if (!field || !table_at(state, index, &table)) return false;
-	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
+	elf_Value key = value_from_string(elf_string_from_data(state, field));
 	push_value(state, elf_table_get_or_nil(state, table, key));
 	return true;
 }
@@ -284,7 +284,7 @@ elf_b32 elf_set_field(elf_State *state, elf_i32 index, const char *field)
 	elf_Table *table;
 	if (!field || state->stack_ptr <= state->frame->framebase + frame_floor(state)
 	|| !table_at(state, index, &table)) return false;
-	elf_Value key = value_from_atom(elf_atom_from_data(state, field));
+	elf_Value key = value_from_string(elf_string_from_data(state, field));
 	elf_Value value = pop_value(state);
 	elf_table_set(state, table, key, value);
 	return true;
@@ -350,14 +350,14 @@ void elf_get_global(elf_State *state, const char *name)
 		push_value(state, value_nil());
 		return;
 	}
-	elf_Value key = value_from_atom(elf_atom_from_data(state, name));
+	elf_Value key = value_from_string(elf_string_from_data(state, name));
 	push_value(state, elf_table_get_or_nil(state, state->globals, key));
 }
 
 elf_b32 elf_set_global(elf_State *state, const char *name)
 {
 	if (!name || state->stack_ptr <= state->frame->framebase + frame_floor(state)) return false;
-	elf_Value key = value_from_atom(elf_atom_from_data(state, name));
+	elf_Value key = value_from_string(elf_string_from_data(state, name));
 	elf_table_set(state, state->globals, key, pop_value(state));
 	return true;
 }

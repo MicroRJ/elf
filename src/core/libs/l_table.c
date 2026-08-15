@@ -124,8 +124,8 @@ static b32 table_values_map_equal(Table_Map_Equal_Context *context, elf_Value le
 		return value_as_integer(left) == value_as_integer(right);
 	}
 	if (value_type(left) != value_type(right)) return false;
-	if (value_is_atom(left)) {
-		return atoms_equal(value_as_atom(left), value_as_atom(right));
+	if (value_is_string(left)) {
+		return strings_equal(value_as_string(left), value_as_string(right));
 	}
 	if (value_is_table(left)) {
 		return tables_map_equal(context, value_as_table(left), value_as_table(right));

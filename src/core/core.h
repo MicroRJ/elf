@@ -36,7 +36,7 @@ typedef struct elf_Value   elf_Value;
 #include "value/value.h"
 
 #include "gc.h"
-#include "atom/atom.h"
+#include "string/elf_string.h"
 #include "table/table.h"
 
 typedef struct BcFunction BcFunction;
@@ -59,8 +59,8 @@ struct elf_Module
 	elf_String   *source_name;
 	char         *source_data;
 	u32           source_size;
-	elf_String  **atoms;
-	u32           atom_count;
+	elf_String  **strings;
+	u32           string_count;
 	f64          *number_constants;
 	u32           number_constant_count;
 	i64          *integer_constants;
@@ -156,15 +156,15 @@ struct elf_State
 	};
 	struct
 	{
-		u32          atom_count;
-		u32          atom_bucket_count;
-		elf_String **atom_buckets;
+		u32          string_count;
+		u32          string_bucket_count;
+		elf_String **string_buckets;
 	};
 	struct
 	{
 		elf_Table *integer;
 		elf_Table *number;
-		elf_Table *atom;
+		elf_Table *string;
 		elf_Table *table;
 	}
 	metatables;

@@ -31,8 +31,8 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 	elf_Value *stack_checkpoint = state->stack_ptr;
 
 	elf_Table *root = push_new_table(state);
-	elf_Value child_key = test_key_atom(state, "child");
-	elf_Value value_key = test_key_atom(state, "value");
+	elf_Value child_key = test_key_string(state, "child");
+	elf_Value value_key = test_key_string(state, "value");
 
 	for (u32 i = 0; i < 128; ++i) {
 		elf_Table *child = push_new_table(state);

@@ -31,9 +31,9 @@ typedef struct
 	u32         bytecode_count;
 	BcFunction *functions;
 	u32         function_count;
-	elf_String **atoms;
-	u32         atom_capacity;
-	u32         atom_count;
+	elf_String **strings;
+	u32         string_capacity;
+	u32         string_count;
 	i64        *integer_constants;
 	u32         integer_constant_capacity;
 	u32         integer_constant_count;

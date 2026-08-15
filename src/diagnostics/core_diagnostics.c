@@ -121,7 +121,7 @@ static void print_runtime_source_location(RuntimeSourceLocation location)
 {
 	elf_Module *module = location.module;
 	BcFunction *function = location.function;
-	const char *name = module && module->source_name ? atom_data(module->source_name) : 0;
+	const char *name = module && module->source_name ? string_data(module->source_name) : 0;
 	if (!name) {
 		name = "<unknown>";
 	}

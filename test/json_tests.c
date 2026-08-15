@@ -1,6 +1,6 @@
-static elf_Value json_test_atom_key(elf_State *state, const char *text)
+static elf_Value json_test_string_key(elf_State *state, const char *text)
 {
-	return value_from_atom(elf_atom_from_data(state, text));
+	return value_from_string(elf_string_from_data(state, text));
 }
 
 static void json_expect_int(elf_Value value, i64 expected, const char *label)
@@ -13,11 +13,11 @@ static void json_expect_int(elf_Value value, i64 expected, const char *label)
 	}
 }
 
-static void json_expect_atom(elf_Value value, const char *expected, const char *label)
+static void json_expect_string(elf_Value value, const char *expected, const char *label)
 {
-	if (!value_is_atom(value) || strcmp(atom_data(value_as_atom(value)), expected) != 0)
+	if (!value_is_string(value) || strcmp(string_data(value_as_string(value)), expected) != 0)
 	{
-		fprintf(stderr, "FAIL: %s expected atom '%s'\n", label, expected);
+		fprintf(stderr, "FAIL: %s expected string '%s'\n", label, expected);
 		test_failures += 1;
 	}
 }
@@ -50,7 +50,7 @@ static void test_constexpr_table_literal(elf_State *state)
 		return;
 	}
 
-	json_expect_int(elf_table_get_or_nil(state, table, json_test_atom_key(state, "answer")), 42, "constant expression atom field");
+	json_expect_int(elf_table_get_or_nil(state, table, json_test_string_key(state, "answer")), 42, "constant expression string field");
 	json_expect_int(elf_table_get_or_nil(state, table, value_from_integer(7)), 8, "constant expression integer field");
 	json_expect_int(elf_array_get(state, table, 2), 9, "constant expression array value");
 
@@ -87,16 +87,16 @@ static void test_json_to_table_value(elf_State *state)
 		return;
 	}
 
-	json_expect_atom(elf_table_get_or_nil(state, root, json_test_atom_key(state, "name")), "elf", "json string field");
-	json_expect_int(elf_table_get_or_nil(state, root, json_test_atom_key(state, "count")), 3, "json integer field");
-	json_expect_int(elf_table_get_or_nil(state, root, json_test_atom_key(state, "ok")), 1, "json true field");
+	json_expect_string(elf_table_get_or_nil(state, root, json_test_string_key(state, "name")), "elf", "json string field");
+	json_expect_int(elf_table_get_or_nil(state, root, json_test_string_key(state, "count")), 3, "json integer field");
+	json_expect_int(elf_table_get_or_nil(state, root, json_test_string_key(state, "ok")), 1, "json true field");
 
-	if (!value_is_nil(elf_table_get_or_nil(state, root, json_test_atom_key(state, "none"))))
+	if (!value_is_nil(elf_table_get_or_nil(state, root, json_test_string_key(state, "none"))))
 	{
 		test_fail("json null field");
 	}
 
-	elf_Table *items = json_expect_table(elf_table_get_or_nil(state, root, json_test_atom_key(state, "items")), "json array field");
+	elf_Table *items = json_expect_table(elf_table_get_or_nil(state, root, json_test_string_key(state, "items")), "json array field");
 	if (items)
 	{
 		json_expect_int(elf_array_get(state, items, 0), 1, "json array first");
@@ -105,11 +105,11 @@ static void test_json_to_table_value(elf_State *state)
 		elf_Table *nested = json_expect_table(elf_array_get(state, items, 2), "json nested object");
 		if (nested)
 		{
-			json_expect_atom(elf_table_get_or_nil(state, nested, json_test_atom_key(state, "nested")), "yes", "json nested field");
+			json_expect_string(elf_table_get_or_nil(state, nested, json_test_string_key(state, "nested")), "yes", "json nested field");
 		}
 	}
 
-	json_expect_atom(elf_table_get_or_nil(state, root, json_test_atom_key(state, "escaped")), "a\nb", "json escaped string");
+	json_expect_string(elf_table_get_or_nil(state, root, json_test_string_key(state, "escaped")), "a\nb", "json escaped string");
 
 	if ((u32)(state->stack_ptr - state->stack) != stack_index)
 	{

@@ -17,7 +17,7 @@ static void format_value_shallow(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_NIL:       elf_arena_push_text(arena, "nil"); break;
 		case ELF_VALUE_TYPE_INTEGER:   elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
 		case ELF_VALUE_TYPE_NUMBER:    elf_arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_ATOM:      elf_arena_pushf(arena, "%s", atom_data(value_as_atom(value))); break;
+		case ELF_VALUE_TYPE_STRING:    elf_arena_pushf(arena, "%s", string_data(value_as_string(value))); break;
 		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "closure"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "function"); break;
 		case ELF_VALUE_TYPE_TABLE:     elf_arena_push_text(arena, "table"); break;
@@ -100,11 +100,11 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		}
 		break;
 
-		case BC_LOADKATOM:
+		case BC_LOADKSTRING:
 		{
-			elf_arena_pushf(arena, "r%d = atom[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && (u32)byte.b_y < module->atom_count) {
-				elf_arena_pushf(arena, " // %s", atom_data(module->atoms[byte.b_y]));
+			elf_arena_pushf(arena, "r%d = string[%d]", byte.b_x, byte.b_y);
+			if (byte.b_y >= 0 && (u32)byte.b_y < module->string_count) {
+				elf_arena_pushf(arena, " // %s", string_data(module->strings[byte.b_y]));
 			}
 		}
 		break;
@@ -242,7 +242,7 @@ char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunctionRef
 	BcFunction *function = bc_function_from_ref(function_ref);
 	elf_Module *module = function_ref.module;
 	char *start = elf_arena_push(arena, 0);
-	const char *source_name = module->source_name ? atom_data(module->source_name) : "<unknown>";
+	const char *source_name = module->source_name ? string_data(module->source_name) : "<unknown>";
 
 	elf_arena_push_text(arena, "bytecode function\n");
 	elf_arena_pushf(arena, "  source      = %s\n", source_name);

@@ -93,8 +93,8 @@ static inline u32 hash64(u64 u) {
 static inline u32 table_hash_key(u64 key, u32 type)
 {
 	u32 type_hash = type * 0x9E3779B1u;
-	if (type == ELF_VALUE_TYPE_ATOM) {
-		return atom_hash((elf_String *)key) ^ type_hash;
+	if (type == ELF_VALUE_TYPE_STRING) {
+		return string_hash((elf_String *)key) ^ type_hash;
 	}
 
 	return hash64(key) ^ type_hash;

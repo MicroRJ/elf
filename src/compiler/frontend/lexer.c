@@ -21,9 +21,9 @@ static const char *token_type_name(TokenType type)
 	return names[type];
 }
 
-static TokenType atom_is_word_or_macro(elf_String *atom)
+static TokenType string_is_word_or_macro(elf_String *string)
 {
-	switch (atom->id) {
+	switch (string->id) {
 #define MCITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
 		MACRODEF(MCITEM)
 #undef MCITEM
@@ -31,9 +31,9 @@ static TokenType atom_is_word_or_macro(elf_String *atom)
 	}
 }
 
-static TokenType check_keyword(elf_String *atom)
+static TokenType check_keyword(elf_String *string)
 {
-	switch (atom->id) {
+	switch (string->id) {
 #define KWITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
 		KEYWORDDEF(KWITEM)
 #undef KWITEM
@@ -104,10 +104,10 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 	va_end(args);
 	elf_arena_push_zero(scratch.arena, 1);
 	lexer->failed = true;
-	elf_diagnostic_set(lexer->state, ELF_STATUS_LEX_ERROR, atom_data(lexer->name), site, message);
+	elf_diagnostic_set(lexer->state, ELF_STATUS_LEX_ERROR, string_data(lexer->name), site, message);
 
 	log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu]: %s"
-	,	atom_data(lexer->name)
+	,	string_data(lexer->name)
 	,	site.line_index
 	,	source_slice_column(site)
 	,	message);
@@ -511,10 +511,10 @@ static elf_String *lex_string_segment(Lexer *lexer, char **cursor, SourceSite si
 
 	*out = 0;
 
-	elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, (u32)(out - buffer));
+	elf_String *string = elf_string_from_data_size(lexer->state, buffer, (u32)(out - buffer));
 	*cursor = cur;
 	elf_end_scratch(scratch);
-	return atom;
+	return string;
 }
 
 static b32 lexer_skip_trivia(Lexer *lexer, char **cursor)
@@ -614,7 +614,7 @@ static Token lex_token(Lexer *lexer)
 
 		cur += 1;
 		b32 ended;
-		token.atom = lex_string_segment(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, true, &ended);
+		token.string = lex_string_segment(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, true, &ended);
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
 		if (ended) {
@@ -656,7 +656,7 @@ static Token lex_token(Lexer *lexer)
 				cur += 2 + is_block * 2;
 
 				b32 ended;
-				token.atom = lex_string_segment(lexer, &cur, string_site, is_block, true, &ended);
+				token.string = lex_string_segment(lexer, &cur, string_site, is_block, true, &ended);
 				token.type = ended ? TOK_STRING : TOK_STRING_START;
 				if (!ended)
 				{
@@ -674,10 +674,10 @@ static Token lex_token(Lexer *lexer)
 				elf_Scratch scratch = elf_begin_scratch();
 				char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 				u32 size = lex_identifier(&cur, buffer);
-				elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
-				token.type = check_keyword(atom);
+				elf_String *string = elf_string_from_data_size(lexer->state, buffer, size);
+				token.type = check_keyword(string);
 				if (token.type == TOK_IDENTIFIER) {
-					token.atom = atom;
+					token.string = string;
 				}
 				elf_end_scratch(scratch);
 			}
@@ -727,7 +727,7 @@ static Token lex_token(Lexer *lexer)
 		{
 			b32 is_block = cur[1] == '"' && cur[2] == '"';
 			cur += is_block ? 3 : 1;
-			token.atom = lex_string_segment(lexer, &cur, token.site, is_block, false, 0);
+			token.string = lex_string_segment(lexer, &cur, token.site, is_block, false, 0);
 			token.type = TOK_STRING;
 		} break;
 
@@ -746,15 +746,15 @@ static Token lex_token(Lexer *lexer)
 			{
 				buffer[0] = '#';
 				u32 size = 1 + lex_identifier(&cur, buffer + 1);
-				elf_String *atom = elf_atom_from_data_size(lexer->state, buffer, size);
+				elf_String *string = elf_string_from_data_size(lexer->state, buffer, size);
 
-				token.type = atom_is_word_or_macro(atom);
+				token.type = string_is_word_or_macro(string);
 				if (token.type == TOK_M_ENDOFFILE) {
 					token.type = TOK_NONE;
 				}
 				else if (token.type == TOK_M_FILE_NAME) {
 					token.type = TOK_STRING;
-					token.atom = lexer->name;
+					token.string = lexer->name;
 				}
 				else if (token.type == TOK_M_LINE_NUMBER) {
 					token.type = TOK_INTEGER;

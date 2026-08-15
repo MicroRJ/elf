@@ -24,15 +24,15 @@ static void test_serialize_scalars(elf_State *state)
 {
 	expect_serialize_text(state, value_nil(), "nil", "serialize nil");
 	expect_serialize_text(state, value_from_integer(42), "42", "serialize integer");
-	expect_serialize_text(state, value_from_atom(elf_atom_from_data(state, "a\"b\\c\n")), "\"a\\\"b\\\\c\\n\"", "serialize escaped atom");
+	expect_serialize_text(state, value_from_string(elf_string_from_data(state, "a\"b\\c\n")), "\"a\\\"b\\\\c\\n\"", "serialize escaped string");
 }
 
 static void test_serialize_table(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
 	elf_array_add(state, table, value_from_integer(10));
-	elf_array_add(state, table, value_from_atom(elf_atom_from_data(state, "row")));
-	elf_table_set(state, table, value_from_atom(elf_atom_from_data(state, "answer")), value_from_integer(42));
+	elf_array_add(state, table, value_from_string(elf_string_from_data(state, "row")));
+	elf_table_set(state, table, value_from_string(elf_string_from_data(state, "answer")), value_from_integer(42));
 
 	const char *expected =
 		"{\n"

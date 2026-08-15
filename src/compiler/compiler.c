@@ -33,15 +33,15 @@
 #include "lower.c"
 #include "bytecode_gen.c"
 
-void elf_init_compiler_atoms(elf_State *state)
+void elf_init_compiler_strings(elf_State *state)
 {
-#define INTERN_KEYWORD_ATOM(NAME, TEXT) elf_atom_from_data_id(state, TEXT, XFUSE(TOK_, NAME));
-	KEYWORDDEF(INTERN_KEYWORD_ATOM)
-#undef INTERN_KEYWORD_ATOM
+#define INTERN_KEYWORD_STRING(NAME, TEXT) elf_string_from_data_id(state, TEXT, XFUSE(TOK_, NAME));
+	KEYWORDDEF(INTERN_KEYWORD_STRING)
+#undef INTERN_KEYWORD_STRING
 
-#define INTERN_MACRO_ATOM(NAME, TEXT) elf_atom_from_data_id(state, "#" TEXT, XFUSE(TOK_, NAME));
-	MACRODEF(INTERN_MACRO_ATOM)
-#undef INTERN_MACRO_ATOM
+#define INTERN_MACRO_STRING(NAME, TEXT) elf_string_from_data_id(state, "#" TEXT, XFUSE(TOK_, NAME));
+	MACRODEF(INTERN_MACRO_STRING)
+#undef INTERN_MACRO_STRING
 }
 
 static void restore_source_stack(elf_State *state, elf_Value *checkpoint)
@@ -111,7 +111,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	elf_arena_align(&state->arena, 8);
 	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
 	elf_StrSlice owned_source = persist_compiled_source(state, source);
-	elf_String *source_name = elf_atom_from_data(state, name);
+	elf_String *source_name = elf_string_from_data(state, name);
 	module->source_name = source_name;
 	module->source_data = owned_source.data;
 	module->source_size = (u32)owned_source.size;

@@ -27,7 +27,7 @@
 #include "source_diagnostics.c"
 #include "core_diagnostics.c"
 
-#include "atom/atom.c"
+#include "string/elf_string.c"
 #include "table/table.c"
 
 #include "gc.c"
@@ -35,9 +35,9 @@
 
 #include "compiler.h"
 
-static void table_set_atom_table(elf_State *state, elf_Table *parent, const char *name, elf_Table *table)
+static void table_set_string_table(elf_State *state, elf_Table *parent, const char *name, elf_Table *table)
 {
-	elf_Value key = value_from_atom(elf_atom_from_data(state, name));
+	elf_Value key = value_from_string(elf_string_from_data(state, name));
 	elf_Value value = value_from_table(table);
 	elf_table_set(state, parent, key, value);
 }
@@ -47,7 +47,7 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 	elf_Table *table = push_new_table(state);
 	for (u32 i = 0; i < count; ++i)
 	{
-		elf_Value key = value_from_atom(elf_atom_from_data(state, bindings[i].name));
+		elf_Value key = value_from_string(elf_string_from_data(state, bindings[i].name));
 		elf_Value value = value_from_function(bindings[i].function);
 		elf_table_set(state, table, key, value);
 	}
@@ -108,17 +108,17 @@ static void bootstrap_standard_libraries(elf_State *state)
 {
 	elf_Value *stack_checkpoint = state->stack_ptr;
 
-	state->metatables.atom = elf_lib_string(state);
+	state->metatables.string = elf_lib_string(state);
 	state->metatables.integer = push_new_table(state);
 	state->metatables.number = push_new_table(state);
 	state->metatables.table = elf_lib_table(state);
 
 	elf_Table *elf_table = elf_lib_core(state);
-	table_set_atom_table(state, elf_table, "math", elf_lib_math(state));
-	table_set_atom_table(state, elf_table, "debug", elf_lib_debug(state));
+	table_set_string_table(state, elf_table, "math", elf_lib_math(state));
+	table_set_string_table(state, elf_table, "debug", elf_lib_debug(state));
 
 	state->globals = push_new_table(state);
-	table_set_atom_table(state, state->globals, "elf", elf_table);
+	table_set_string_table(state, state->globals, "elf", elf_table);
 
 	// The library constructors push each table while building the graph. Only
 	// the globals table needs to remain on the stack as its GC root; every
@@ -128,16 +128,16 @@ static void bootstrap_standard_libraries(elf_State *state)
 	push_table(state, state->globals);
 }
 
-void init_atoms(elf_State *state)
+void init_strings(elf_State *state)
 {
-	state->atom_bucket_count = ELF_ATOM_INITIAL_EXTENT;
-	state->atom_buckets = calloc(state->atom_bucket_count, sizeof(*state->atom_buckets));
+	state->string_bucket_count = ELF_STRING_INITIAL_EXTENT;
+	state->string_buckets = calloc(state->string_bucket_count, sizeof(*state->string_buckets));
 }
 
 static void bootstrap_state(elf_State *state)
 {
-	init_atoms(state);
-	elf_init_compiler_atoms(state);
+	init_strings(state);
+	elf_init_compiler_strings(state);
 	bootstrap_base_frame(state);
 	bootstrap_standard_libraries(state);
 	state->ref_table = elf_new_table_rogue(state);

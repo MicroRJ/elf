@@ -65,9 +65,9 @@ static void expect_ir_i64(Ir ir, i64 value, const char *label)
 	}
 }
 
-static void expect_ir_atom(Ir ir, const char *text, const char *label)
+static void expect_ir_string(Ir ir, const char *text, const char *label)
 {
-	if (!ir || ir->kind != IR_ATOM || !ir->atom || strcmp(atom_data(ir->atom), text) != 0) {
+	if (!ir || ir->kind != IR_STRING || !ir->string || strcmp(string_data(ir->string), text) != 0) {
 		test_fail(label);
 	}
 }
@@ -135,14 +135,14 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
-static void test_ir_lowers_atoms_and_globals(elf_State *state)
+static void test_ir_lowers_strings_and_globals(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret \"hello\"\nret foo");
 	Ir body = ir_test_main_body(ctx);
 
-	Ir ret_atom = ir_test_body_stat(body, 0, IR_RETURN, "lower atom return");
-	expect_ir_atom(ret_atom->ir_return.expr, "hello", "string literal lowers to atom ir");
+	Ir ret_string = ir_test_body_stat(body, 0, IR_RETURN, "lower string return");
+	expect_ir_string(ret_string->ir_return.expr, "hello", "string literal lowers to string ir");
 
 	Ir ret_global = ir_test_body_stat(body, 1, IR_RETURN, "lower global return");
 	expect_ir_kind(ret_global->ir_return.expr, IR_LOAD_GLOBAL, "identifier without local lowers to global load");
@@ -160,7 +160,7 @@ static void test_ir_lowers_interpolated_string(elf_State *state)
 	Ir trailing = ret ? ret->ir_return.expr : 0;
 
 	expect_ir_kind(trailing, IR_ADD, "interpolated string lowers final text join");
-	expect_ir_atom(trailing ? trailing->ir_binary.y : 0, "", "interpolated string lowers empty trailing text");
+	expect_ir_string(trailing ? trailing->ir_binary.y : 0, "", "interpolated string lowers empty trailing text");
 
 	Ir numeric = trailing ? trailing->ir_binary.x : 0;
 	expect_ir_kind(numeric, IR_ADD, "interpolated string lowers numeric expression join");
@@ -172,11 +172,11 @@ static void test_ir_lowers_interpolated_string(elf_State *state)
 
 	Ir space = numeric ? numeric->ir_binary.x : 0;
 	expect_ir_kind(space, IR_ADD, "interpolated string lowers middle text join");
-	expect_ir_atom(space ? space->ir_binary.y : 0, " ", "interpolated string lowers middle text");
+	expect_ir_string(space ? space->ir_binary.y : 0, " ", "interpolated string lowers middle text");
 
 	Ir name = space ? space->ir_binary.x : 0;
 	expect_ir_kind(name, IR_ADD, "interpolated string lowers identifier join");
-	expect_ir_atom(name ? name->ir_binary.x : 0, "hello ", "interpolated string lowers leading text");
+	expect_ir_string(name ? name->ir_binary.x : 0, "hello ", "interpolated string lowers leading text");
 	expect_load_local(name ? name->ir_binary.y : 0, name_local, "interpolated string loads local expression");
 	elf_arena_destroy(&arena);
 }
@@ -191,7 +191,7 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 	Ir field = ret->ir_return.expr;
 	expect_ir_kind(field, IR_FIELD, "field access lowers to field ir");
 	expect_ir_kind(field->ir_binary.x, IR_LOAD_GLOBAL, "field object lowers to global load");
-	expect_ir_atom(field->ir_binary.y, "name", "field key lowers to atom ir");
+	expect_ir_string(field->ir_binary.y, "name", "field key lowers to string ir");
 
 	Ir call = ir_test_body_stat(body, 1, IR_CALL, "lower call expression statement");
 	expect_ir_kind(call->ir_call.expr, IR_LOAD_GLOBAL, "call callee lowers to global load");
@@ -279,14 +279,14 @@ static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 	Ir receiver_expr = receiver_memory ? receiver_memory->ir_local.expr : 0;
 	expect_ir_kind(receiver_expr, IR_FIELD, "field nil assignment temp stores receiver field");
 	expect_load_local(receiver_expr ? receiver_expr->ir_binary.x : 0, object_memory, "field nil assignment receiver starts from object local");
-	expect_ir_atom(receiver_expr ? receiver_expr->ir_binary.y : 0, "child", "field nil assignment receiver field name");
+	expect_ir_string(receiver_expr ? receiver_expr->ir_binary.y : 0, "child", "field nil assignment receiver field name");
 
 	Ir pred = ir_if ? ir_if->ir_if.pred : 0;
 	expect_ir_kind(pred, IR_EQ, "field nil assignment predicate compares against nil");
 	Ir pred_field = pred ? pred->ir_binary.x : 0;
 	expect_ir_kind(pred_field, IR_FIELD, "field nil assignment predicate reads final field");
 	expect_load_local(pred_field ? pred_field->ir_binary.x : 0, receiver_memory, "field nil assignment predicate reuses receiver temp");
-	expect_ir_atom(pred_field ? pred_field->ir_binary.y : 0, "name", "field nil assignment final field name");
+	expect_ir_string(pred_field ? pred_field->ir_binary.y : 0, "name", "field nil assignment final field name");
 
 	Ir true_clause = ir_if ? ir_if->ir_if.true_clause : 0;
 	Ir store = ir_test_body_stat(true_clause, 0, IR_STORE, "field nil assignment true clause stores value");
@@ -358,7 +358,7 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_declaration_expression(state);
 	test_ir_lowers_assignment_to_local(state);
 	test_ir_rejects_assignment_to_constant(state);
-	test_ir_lowers_atoms_and_globals(state);
+	test_ir_lowers_strings_and_globals(state);
 	test_ir_lowers_interpolated_string(state);
 	test_ir_lowers_field_and_call(state);
 	test_ir_lowers_if_else(state);

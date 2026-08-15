@@ -136,7 +136,7 @@ typedef struct
 	union {
 		u64 integer_magnitude;
 		f64 number;
-		elf_String *atom;
+		elf_String *string;
 	};
 }
 Token;

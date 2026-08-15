@@ -6,7 +6,7 @@ static Ast parse_json_ast_value(Parser *parser);
 
 static b32 json_token_is_null(Token token)
 {
-	return token.type == TOK_IDENTIFIER && strcmp(atom_data(token.atom), "null") == 0;
+	return token.type == TOK_IDENTIFIER && strcmp(string_data(token.string), "null") == 0;
 }
 
 static void json_expect_separator_or_end(Parser *parser, TokenType end, const char *message, b32 *done)
@@ -38,7 +38,7 @@ static Ast parse_json_ast_object(Parser *parser)
 	while (!done && !peek_token(parser, TOK_NONE))
 	{
 		Token key_token = take_token(parser, TOK_STRING);
-		Ast key = create_atom_ast(parser, key_token.site, key_token.atom);
+		Ast key = create_string_ast(parser, key_token.site, key_token.string);
 
 		take_token(parser, TOK_COLON);
 
@@ -145,7 +145,7 @@ static Ast parse_json_ast_value(Parser *parser)
 		case TOK_STRING:
 		{
 			consume_token(parser);
-			return create_atom_ast(parser, token.site, token.atom);
+			return create_string_ast(parser, token.site, token.string);
 		}
 
 		case TOK_INTEGER:

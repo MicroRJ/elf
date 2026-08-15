@@ -89,7 +89,7 @@ ELF_FUNCTION(l_core_type_of)
 {
 	lib_check_arg_count(S, "type_of", nargs, 1, 1);
 	const char *name = value_type_name(value_type(load_value(S, 1)));
-	push_value(S, value_from_atom(elf_atom_from_data(S, name)));
+	push_value(S, value_from_string(elf_string_from_data(S, name)));
 	return 1;
 }
 
@@ -100,10 +100,10 @@ ELF_FUNCTION(l_core_to_string)
 	return 1;
 }
 
-ELF_FUNCTION(l_core_is_atom)
+ELF_FUNCTION(l_core_is_string)
 {
-	lib_check_arg_count(S, "is_atom", nargs, 1, 1);
-	push_value(S, value_from_integer(value_is_atom(load_value(S, 1))));
+	lib_check_arg_count(S, "is_string", nargs, 1, 1);
+	push_value(S, value_from_integer(value_is_string(load_value(S, 1))));
 	return 1;
 }
 

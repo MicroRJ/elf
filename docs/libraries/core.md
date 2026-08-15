@@ -21,7 +21,7 @@ responsibility among the neighboring `l_core_*.c` files.
 | `elf.is_readonly(value)` | integer boolean | Test an object's readonly flag. |
 | `elf.type_of(value)` | string | Return the runtime type name. |
 | `elf.to_string(value)` | string | Convert a value to its display text. |
-| `elf.is_atom(value)` | integer boolean | Test whether a value is a string/atom. |
+| `elf.is_string(value)` | integer boolean | Test whether a value is a string. |
 | `elf.is_numeric(value)` | integer boolean | Test whether a value is an integer or number. |
 | `elf.to_number(value)` | number | Convert a numeric value to a floating-point number. |
 | `elf.to_integer(value)` | integer | Convert a numeric value to an integer. |
@@ -63,7 +63,7 @@ The default error message is `"assertion failed"`.
 Returns the metatable shared by all values of the supplied runtime type.
 Metatables currently exist for:
 
-- strings/atoms
+- strings
 - tables
 - integers
 - numbers
@@ -114,19 +114,19 @@ Returns one of the current runtime type names:
 | `nil` | `"nil"` |
 | integer | `"integer"` |
 | floating-point number | `"number"` |
-| string/atom | `"string"` |
+| string | `"string"` |
 | table | `"table"` |
 | native function | `"function"` |
 | Elf closure | `"closure"` |
 | user object | `"resource"` |
 
-### `elf.is_atom(value)` and `elf.is_numeric(value)`
+### `elf.is_string(value)` and `elf.is_numeric(value)`
 
 These predicates return integer booleans (`0` or `1`). `is_numeric` accepts
 both the integer and floating-point number representations.
 
 ```elf
-elf.assert(elf.is_atom("text"))
+elf.assert(elf.is_string("text"))
 elf.assert(elf.is_numeric(42))
 elf.assert(elf.is_numeric(3.5))
 ```

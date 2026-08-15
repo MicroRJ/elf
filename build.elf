@@ -17,7 +17,7 @@ include_dirs := {
 	"src/core/libs",
 	"src/core/value",
 	"src/core/table",
-	"src/core/atom",
+	"src/core/string",
 	"src/compiler",
 	"src/compiler/frontend",
 	"src/compiler/middle",

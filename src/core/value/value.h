@@ -20,7 +20,7 @@ struct elf_Value
 		f64           x_num;
 		elf_Object   *x_obj;
 		elf_Table    *x_tab;
-		elf_String   *x_atom;
+		elf_String   *x_string;
 		elf_Function  x_proc;
 		elf_Closure  *x_closure;
 		void         *x_ptr;
@@ -34,13 +34,13 @@ static inline b32 type_is_object(elf_ValueType type)
 	return type == ELF_VALUE_TYPE_USER_OBJECT
 	||     type == ELF_VALUE_TYPE_CLOSURE
 	||     type == ELF_VALUE_TYPE_TABLE
-	||     type == ELF_VALUE_TYPE_ATOM;
+	||     type == ELF_VALUE_TYPE_STRING;
 }
 
 static inline b32 type_is_nil(elf_ValueType type)      { return type == ELF_VALUE_TYPE_NIL; }
 static inline b32 type_is_number(elf_ValueType type)   { return type == ELF_VALUE_TYPE_NUMBER; }
 static inline b32 type_is_integer(elf_ValueType type)  { return type == ELF_VALUE_TYPE_INTEGER; }
-static inline b32 type_is_atom(elf_ValueType type)     { return type == ELF_VALUE_TYPE_ATOM; }
+static inline b32 type_is_string(elf_ValueType type)   { return type == ELF_VALUE_TYPE_STRING; }
 static inline b32 type_is_table(elf_ValueType type)    { return type == ELF_VALUE_TYPE_TABLE; }
 static inline b32 type_is_user(elf_ValueType type)     { return type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 type_is_function(elf_ValueType type) { return type == ELF_VALUE_TYPE_CFUNCTION; }
@@ -61,7 +61,7 @@ static inline elf_ValueType value_type(elf_Value value) { return value.type; }
 static inline b32 value_is_nil(elf_Value value)      { return value.type == ELF_VALUE_TYPE_NIL; }
 static inline b32 value_is_number(elf_Value value)   { return value.type == ELF_VALUE_TYPE_NUMBER; }
 static inline b32 value_is_integer(elf_Value value)  { return value.type == ELF_VALUE_TYPE_INTEGER; }
-static inline b32 value_is_atom(elf_Value value)     { return value.type == ELF_VALUE_TYPE_ATOM; }
+static inline b32 value_is_string(elf_Value value)   { return value.type == ELF_VALUE_TYPE_STRING; }
 static inline b32 value_is_table(elf_Value value)    { return value.type == ELF_VALUE_TYPE_TABLE; }
 static inline b32 value_is_user(elf_Value value)     { return value.type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 value_is_function(elf_Value value) { return value.type == ELF_VALUE_TYPE_CFUNCTION; }
@@ -85,7 +85,7 @@ static inline b32 value_is_object(elf_Value value)
 static inline i64 value_as_integer(elf_Value value)          { return value.x_int; }
 static inline f64 value_as_number(elf_Value value)           { return value.x_num; }
 static inline elf_Object *value_as_object(elf_Value value)   { return value.x_obj; }
-static inline elf_String *value_as_atom(elf_Value value)       { return value.x_atom; }
+static inline elf_String *value_as_string(elf_Value value)   { return value.x_string; }
 static inline elf_Table *value_as_table(elf_Value value)     { return value.x_tab; }
 static inline elf_Closure *value_as_closure(elf_Value value) { return value.x_closure; }
 static inline elf_Function value_as_function(elf_Value value){ return value.x_proc; }
@@ -143,12 +143,12 @@ static inline elf_Value value_from_number(f64 number)
 	return value;
 }
 
-static inline elf_Value value_from_atom(elf_String *atom)
+static inline elf_Value value_from_string(elf_String *string)
 {
-	ASSERT(atom != 0);
+	ASSERT(string != 0);
 	elf_Value value = {};
-	value.type = ELF_VALUE_TYPE_ATOM;
-	value.x_atom = atom;
+	value.type = ELF_VALUE_TYPE_STRING;
+	value.x_string = string;
 	return value;
 }
 
@@ -189,7 +189,7 @@ static const char *value_type_name(elf_ValueType type)
 		[ELF_VALUE_TYPE_USER_OBJECT] = "resource",
 		[ELF_VALUE_TYPE_CFUNCTION]   = "function",
 		[ELF_VALUE_TYPE_CLOSURE]     = "closure",
-		[ELF_VALUE_TYPE_ATOM]        = "string",
+		[ELF_VALUE_TYPE_STRING]      = "string",
 		[ELF_VALUE_TYPE_TABLE]       = "table",
 	};
 

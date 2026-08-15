@@ -44,7 +44,7 @@
 	X(AST_DECL_STAT           , "stat_decl")                  \
 	X(AST_NUMBER_LITERAL      , "number_literal")             \
 	X(AST_INTEGER_LITERAL     , "integer_literal")            \
-	X(AST_STRING_LITERAL      , "atom_literal")               \
+	X(AST_STRING_LITERAL      , "string_literal")             \
 	X(AST_INTERPOLATED_STRING , "interpolated_string")        \
 	X(AST_CALL                , "call")                       \
 	X(AST_META_CALL           , "meta_call")                  \
@@ -121,7 +121,7 @@ struct Ast_T
 
 	union
 	{
-		elf_String *atom;
+		elf_String *string;
 		i64         integer_value;
 		f64         number_value;
 		AstArray    interpolated_string;

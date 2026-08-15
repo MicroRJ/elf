@@ -44,7 +44,7 @@ void elf_print_value(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_NIL:       elf_arena_push_text(arena, "nil"); break;
 		case ELF_VALUE_TYPE_INTEGER:   elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
 		case ELF_VALUE_TYPE_NUMBER:    elf_arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_ATOM:      elf_arena_push_data(arena, value.x_atom->data, value.x_atom->size); break;
+		case ELF_VALUE_TYPE_STRING:    elf_arena_push_data(arena, value.x_string->data, value.x_string->size); break;
 		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "C()"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "F()"); break;
 		case ELF_VALUE_TYPE_TABLE:     table_to_text(arena, value_as_table(value)); break;
@@ -83,12 +83,12 @@ static b32 number_to_source(elf_Arena *arena, f64 number)
 	return true;
 }
 
-static void atom_to_source(elf_Arena *arena, elf_String *atom)
+static void string_to_source(elf_Arena *arena, elf_String *string)
 {
 	elf_arena_push_char(arena, '"');
 
-	const char *data = atom->data;
-	for (u32 i = 0; i < atom->size; ++ i)
+	const char *data = string->data;
+	for (u32 i = 0; i < string->size; ++ i)
 	{
 		switch (data[i])
 		{
@@ -197,9 +197,9 @@ static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u3
 			return number_to_source(arena, value.x_num);
 		}
 
-		case ELF_VALUE_TYPE_ATOM:
+		case ELF_VALUE_TYPE_STRING:
 		{
-			atom_to_source(arena, value_as_atom(value));
+			string_to_source(arena, value_as_string(value));
 		}
 		break;
 

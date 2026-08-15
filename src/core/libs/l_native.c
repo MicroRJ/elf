@@ -27,13 +27,13 @@ static void lib_check_arg_count(elf_State *state, const char *name, int nargs, i
 static elf_String *lib_load_string(elf_State *state, u32 index)
 {
 	elf_Value value = load_value(state, index);
-	check_value_type(state, value, ELF_VALUE_TYPE_ATOM);
-	return value_as_atom(value);
+	check_value_type(state, value, ELF_VALUE_TYPE_STRING);
+	return value_as_string(value);
 }
 
 static const char *lib_load_cstr(elf_State *state, u32 index)
 {
-	return atom_data(lib_load_string(state, index));
+	return string_data(lib_load_string(state, index));
 }
 
 static i64 lib_load_integer(elf_State *state, u32 index)

@@ -6,7 +6,7 @@ static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value valu
 {
 	switch (value.type)
 	{
-		case ELF_VALUE_TYPE_ATOM:    return state->metatables.atom;
+		case ELF_VALUE_TYPE_STRING:  return state->metatables.string;
 		case ELF_VALUE_TYPE_TABLE:   return state->metatables.table;
 		case ELF_VALUE_TYPE_NUMBER:  return state->metatables.number;
 		case ELF_VALUE_TYPE_INTEGER: return state->metatables.integer;
@@ -24,7 +24,7 @@ typedef enum
 	TBIT_FUNCTION = 1 << ELF_VALUE_TYPE_CFUNCTION,
 	TBIT_USER     = 1 << ELF_VALUE_TYPE_USER_OBJECT,
 	TBIT_CLOSURE  = 1 << ELF_VALUE_TYPE_CLOSURE,
-	TBIT_ATOM     = 1 << ELF_VALUE_TYPE_ATOM,
+	TBIT_STRING   = 1 << ELF_VALUE_TYPE_STRING,
 	TBIT_TABLE    = 1 << ELF_VALUE_TYPE_TABLE,
 
 	TBIT_ALLMASK  = (1 << ELF_VALUE_TYPE_COUNT_) - 1,
@@ -40,7 +40,7 @@ typedef enum
 	TRULE_FUNCTION = TBIT_FUNCTION,
 	TRULE_USER     = TBIT_USER,
 	TRULE_CLOSURE  = TBIT_CLOSURE,
-	TRULE_ATOM     = TBIT_ATOM,
+	TRULE_STRING   = TBIT_STRING,
 	TRULE_TABLE    = TBIT_TABLE,
 
 	TYPE_RULE_ANYTHING = TBIT_ALLMASK,

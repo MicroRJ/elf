@@ -212,18 +212,18 @@ static void test_vm_defer(void)
 	vm_expect_int("test/smoke/defer.elf", 2114344, "vm runs deferred statements");
 }
 
-static void test_vm_atom_join(void)
+static void test_vm_string_join(void)
 {
-	elf_Value value = vm_test_run_file("test/smoke/script_assert_atom_join.elf");
-	if (!value_is_atom(value) || strcmp(value_as_atom(value)->data, "score9") != 0) {
-		test_fail("vm joins atom lhs with formatted rhs");
+	elf_Value value = vm_test_run_file("test/smoke/script_assert_string_join.elf");
+	if (!value_is_string(value) || strcmp(value_as_string(value)->data, "score9") != 0) {
+		test_fail("vm joins string lhs with formatted rhs");
 	}
 }
 
 static void test_vm_interpolated_strings(void)
 {
 	elf_Value value = vm_test_run_file("test/smoke/interpolated_strings.elf");
-	if (!value_is_atom(value) || strcmp(value_as_atom(value)->data, "score9") != 0) {
+	if (!value_is_string(value) || strcmp(value_as_string(value)->data, "score9") != 0) {
 		test_fail("vm evaluates interpolated strings");
 	}
 }
@@ -310,8 +310,8 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	}
 
 	force_gc_allocations(state, 256);
-	if (!first_module->source_name || strcmp(atom_data(first_module->source_name), "first") != 0 ||
-		!second_module->source_name || strcmp(atom_data(second_module->source_name), "second") != 0)
+	if (!first_module->source_name || strcmp(string_data(first_module->source_name), "first") != 0 ||
+		!second_module->source_name || strcmp(string_data(second_module->source_name), "second") != 0)
 	{
 		test_fail("compiled module source names survive GC");
 	}
@@ -425,41 +425,41 @@ static void test_vm_module_builder_grows_constant_arrays(void)
 	elf_destroy_state(state);
 }
 
-static void test_vm_module_owns_atom_constants(void)
+static void test_vm_module_owns_string_constants(void)
 {
 	elf_State *state = elf_create_state();
 	u32 global_count = elf_array_length(state->globals);
 	char source_text[] = "ret {\"same\", \"same\", \"other\"}";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (!elf_push_code_source(state, "module-atoms", source)) {
-		test_fail("module atom source compiles");
+	if (!elf_push_code_source(state, "module-strings", source)) {
+		test_fail("module string source compiles");
 		elf_destroy_state(state);
 		return;
 	}
 
 	elf_Module *module = value_as_closure(state->stack_ptr[-1])->function.module;
-	if (module->atom_count != 2 || strcmp(atom_data(module->atoms[0]), "same") != 0 ||
-		strcmp(atom_data(module->atoms[1]), "other") != 0)
+	if (module->string_count != 2 || strcmp(string_data(module->strings[0]), "same") != 0 ||
+		strcmp(string_data(module->strings[1]), "other") != 0)
 	{
-		test_fail("module stores deduplicated atom constants");
+		test_fail("module stores deduplicated string constants");
 	}
 	if (elf_array_length(state->globals) != global_count) {
-		test_fail("atom constants do not consume global slots");
+		test_fail("string constants do not consume global slots");
 	}
 
 	force_gc_allocations(state, 256);
-	if (strcmp(atom_data(module->atoms[0]), "same") != 0 || strcmp(atom_data(module->atoms[1]), "other") != 0) {
-		test_fail("module atom constants survive GC");
+	if (strcmp(string_data(module->strings[0]), "same") != 0 || strcmp(string_data(module->strings[1]), "other") != 0) {
+		test_fail("module string constants survive GC");
 	}
 
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Table *result = value_as_table(state->stack_ptr[-1]);
-	if (elf_array_length(result) != 3 || !atoms_equal(value_as_atom(elf_array_get(state, result, 0)), module->atoms[0]) ||
-		!atoms_equal(value_as_atom(elf_array_get(state, result, 1)), module->atoms[0]) ||
-		!atoms_equal(value_as_atom(elf_array_get(state, result, 2)), module->atoms[1]))
+	if (elf_array_length(result) != 3 || !strings_equal(value_as_string(elf_array_get(state, result, 0)), module->strings[0]) ||
+		!strings_equal(value_as_string(elf_array_get(state, result, 1)), module->strings[0]) ||
+		!strings_equal(value_as_string(elf_array_get(state, result, 2)), module->strings[1]))
 	{
-		test_fail("VM loads atom constants from their module");
+		test_fail("VM loads string constants from their module");
 	}
 
 	elf_destroy_state(state);
@@ -492,11 +492,11 @@ static void run_vm_tests(void)
 	test_vm_break_continue();
 	test_vm_loop_slots();
 	test_vm_defer();
-	test_vm_atom_join();
+	test_vm_string_join();
 	test_vm_interpolated_strings();
 	test_vm_fib();
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
 	test_vm_module_builder_grows_constant_arrays();
-	test_vm_module_owns_atom_constants();
+	test_vm_module_owns_string_constants();
 }

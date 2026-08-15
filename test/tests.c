@@ -35,7 +35,7 @@ static void test_fail(const char *label)
 	test_failures += 1;
 }
 
-#include "atom_tests.c"
+#include "string_tests.c"
 #include "table_tests.c"
 #include "gc_tests.c"
 #include "api_tests.c"
@@ -62,7 +62,7 @@ int main(void)
 		test_fail("public Elf version matches the linked runtime");
 	}
 
-	run_atom_tests(state);
+	run_string_tests(state);
 	run_table_tests(state);
 	run_gc_tests();
 	run_api_tests();
