@@ -100,6 +100,11 @@ static inline u32 check_array_index(elf_State *state, int instr, i64 index, u32 
 	return (u32)resolved;
 }
 
+static elf_i32 frame_size(elf_State *state)
+{
+	return state->frame->framesize;
+}
+
 static inline void push_stack(elf_State *S, elf_Value value)
 {
 	ASSERT(S->stack_ptr < S->stack + S->stack_size);

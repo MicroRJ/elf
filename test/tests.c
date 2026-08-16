@@ -8,6 +8,7 @@
 #include "platform.h"
 #include "core.h"
 #include "helpers.h"
+#include "atom.h"
 #include "compiler.h"
 #include "token.h"
 #include "ast.h"
@@ -17,7 +18,10 @@
 #include "bytecode_debug.h"
 #include "table.h"
 #include "value_text.h"
+
+// Compiler sources included by the unity tests.
 #include "logging.c"
+#include "atom.c"
 #include "lexer.c"
 #include "ast.c"
 #include "parse.c"

@@ -1,7 +1,7 @@
 static ELF_FUNCTION(test_api_callback)
 {
 	elf_StrSlice receiver = {};
-	elf_Integer argument = 0;
+	elf_Int argument = 0;
 
 	if (elf_arg_count(S) != 2) {
 		test_fail("API callback argument count includes this");
@@ -42,7 +42,7 @@ static void test_api_call_addressing(elf_State *state)
 	elf_push_int(state, 41);
 	elf_call(state, 2, 1);
 
-	elf_Integer result = 0;
+	elf_Int result = 0;
 	if (!elf_to_int(state, -1, &result) || result != 42) {
 		test_fail("API native callback result");
 	}
@@ -64,7 +64,7 @@ static void test_api_tables_and_refs(elf_State *state)
 	if (!elf_get_field(state, table, "answer")) {
 		test_fail("API gets a field");
 	}
-	elf_Integer answer = 0;
+	elf_Int answer = 0;
 	if (!elf_to_int(state, -1, &answer) || answer != 42) {
 		test_fail("API field preserves its type");
 	}
@@ -136,7 +136,7 @@ static void test_api_source_diagnostics(elf_State *state)
 	if (elf_get_top(state) != sentinel_top) {
 		test_fail("failed constant expression leaves the stack unchanged");
 	}
-	elf_Integer sentinel = 0;
+	elf_Int sentinel = 0;
 	if (!elf_to_int(state, -1, &sentinel) || sentinel != 77) {
 		test_fail("failed constant expression preserves existing stack values");
 	}
@@ -170,7 +170,7 @@ static void test_api_source_diagnostics(elf_State *state)
 	if (!elf_push_constant_expr(state, "valid-constant.elf", valid_constant)) {
 		test_fail("API parses valid source after a failed constant expression");
 	}
-	elf_Integer constant = 0;
+	elf_Int constant = 0;
 	if (!elf_to_int(state, -1, &constant) || constant != 42) {
 		test_fail("API returns a valid constant after a failed parse");
 	}
@@ -207,7 +207,7 @@ static void test_api_source_diagnostics(elf_State *state)
 	{
 		elf_push_nil(state);
 		elf_call(state, 1, 1);
-		elf_Integer result = 0;
+		elf_Int result = 0;
 		if (!elf_to_int(state, -1, &result) || result != 42) {
 			test_fail("code compiled after a failed parse executes correctly");
 		}
@@ -228,7 +228,7 @@ static void test_api_value_source(elf_State *state)
 
 	elf_push_cstr(state, "Orbiter");
 	elf_set_field(state, root, "name");
-	elf_Number expected_scale = -0.12345678901234567;
+	elf_Num expected_scale = -0.12345678901234567;
 	elf_push_num(state, expected_scale);
 	elf_set_field(state, root, "scale");
 	char escaped_text[] = {'a', '\0', '\a', '\b', '\f', '\v', 'z'};
@@ -271,7 +271,7 @@ static void test_api_value_source(elf_State *state)
 	}
 	else
 	{
-		elf_Number scale = 0;
+		elf_Num scale = 0;
 		if (!elf_to_num(state, -1, &scale) || scale != expected_scale) {
 			test_fail("round-tripped number field keeps its value");
 		}
@@ -296,7 +296,7 @@ static void test_api_value_source(elf_State *state)
 	else
 	{
 		elf_u32 length = 0;
-		elf_Integer panel = 0;
+		elf_Int panel = 0;
 		elf_b32 got_length = elf_length(state, -1, &length);
 		elf_b32 got_panel = elf_get_index(state, -1, 0);
 		if (!got_length || length != 1

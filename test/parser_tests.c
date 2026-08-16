@@ -59,9 +59,9 @@ static void expect_ast_kind(Ast ast, AstType kind, const char *label)
 	}
 }
 
-static void expect_ast_string(Ast ast, const char *text, const char *label)
+static void expect_ast_atom(Ast ast, const char *text, const char *label)
 {
-	if (!ast || !ast->string || strcmp(string_data(ast->string), text) != 0) {
+	if (!ast || !ast->atom || strcmp(atom_data(ast->atom), text) != 0) {
 		test_fail(label);
 	}
 }
@@ -79,7 +79,7 @@ static void test_parser_decl_precedence_and_strings(elf_State *state)
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse declaration statement");
 
 	Ast name = parser_test_tuple_item(decl->decl.name, 0, AST_IDENT, "parse declaration name");
-	expect_ast_string(name, "x", "identifier ast stores string");
+	expect_ast_atom(name, "x", "identifier ast stores atom");
 
 	Ast expr = parser_test_tuple_item(decl->decl.expr, 0, AST_ADD, "parse additive expression");
 	expect_ast_kind(expr->binary.x, AST_INTEGER_LITERAL, "parse add lhs");
@@ -103,7 +103,7 @@ static void test_parser_string_strings(elf_State *state)
 	Ast file = parser_test_parse_file(state, "name := \"hello\"");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse string declaration");
 	Ast string = parser_test_tuple_item(decl->decl.expr, 0, AST_STRING_LITERAL, "parse string literal");
-	expect_ast_string(string, "hello", "string ast stores string");
+	expect_ast_atom(string, "hello", "string ast stores string");
 }
 
 static void test_parser_interpolated_strings(elf_State *state)
@@ -123,16 +123,16 @@ static void test_parser_interpolated_strings(elf_State *state)
 		return;
 	}
 	expect_ast_kind(parts.args[0], AST_STRING_LITERAL, "interpolated string starts with text");
-	expect_ast_string(parts.args[0], "hello ", "interpolated string leading text");
+	expect_ast_atom(parts.args[0], "hello ", "interpolated string leading text");
 	expect_ast_kind(parts.args[1], AST_IDENT, "interpolated string keeps first expression");
-	expect_ast_string(parts.args[1], "name", "interpolated string first expression identifier");
+	expect_ast_atom(parts.args[1], "name", "interpolated string first expression identifier");
 	expect_ast_kind(parts.args[2], AST_STRING_LITERAL, "interpolated string keeps middle text");
-	expect_ast_string(parts.args[2], ", count ", "interpolated string middle text payload");
+	expect_ast_atom(parts.args[2], ", count ", "interpolated string middle text payload");
 	expect_ast_kind(parts.args[3], AST_ADD, "interpolated string parses full binary expression");
 	expect_ast_kind(parts.args[3]->binary.x, AST_IDENT, "interpolated binary expression lhs");
 	expect_ast_i64(parts.args[3]->binary.y, 1, "interpolated binary expression rhs");
 	expect_ast_kind(parts.args[4], AST_STRING_LITERAL, "interpolated string ends with text");
-	expect_ast_string(parts.args[4], "", "interpolated string keeps empty trailing text");
+	expect_ast_atom(parts.args[4], "", "interpolated string keeps empty trailing text");
 
 	file = parser_test_parse_file(state, "ret f\"outer ${f\"inner ${value}\"}\"");
 	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse nested interpolated string return");
@@ -145,9 +145,9 @@ static void test_parser_interpolated_strings(elf_State *state)
 	Ast inner = outer->interpolated_string.args[1];
 	expect_ast_kind(inner, AST_INTERPOLATED_STRING, "interpolated expression can contain interpolated string");
 	if (inner && inner->interpolated_string.nargs == 3) {
-		expect_ast_string(inner->interpolated_string.args[0], "inner ", "nested interpolated leading text");
-		expect_ast_string(inner->interpolated_string.args[1], "value", "nested interpolated expression");
-		expect_ast_string(inner->interpolated_string.args[2], "", "nested interpolated trailing text");
+		expect_ast_atom(inner->interpolated_string.args[0], "inner ", "nested interpolated leading text");
+		expect_ast_atom(inner->interpolated_string.args[1], "value", "nested interpolated expression");
+		expect_ast_atom(inner->interpolated_string.args[2], "", "nested interpolated trailing text");
 	}
 	else {
 		test_fail("nested interpolated string keeps three parts");
@@ -157,7 +157,7 @@ static void test_parser_interpolated_strings(elf_State *state)
 	ret = parser_test_stat(file, 0, AST_RETURN, "parse plain format-prefixed string return");
 	Ast plain = parser_test_tuple_item(ret->return_stat.expr, 0, AST_STRING_LITERAL,
 		"format prefix without interpolation remains string literal");
-	expect_ast_string(plain, "plain", "plain format-prefixed string payload");
+	expect_ast_atom(plain, "plain", "plain format-prefixed string payload");
 }
 
 static void test_parser_if_else_blocks(elf_State *state)
@@ -166,7 +166,7 @@ static void test_parser_if_else_blocks(elf_State *state)
 	Ast stat = parser_test_stat(file, 0, AST_IF, "parse if statement");
 
 	expect_ast_kind(stat->if_stat.pred, AST_IDENT, "parse if predicate");
-	expect_ast_string(stat->if_stat.pred, "flag", "parse if predicate string");
+	expect_ast_atom(stat->if_stat.pred, "flag", "parse if predicate string");
 	expect_ast_kind(stat->if_stat.true_clause, AST_BLOCK_STAT, "parse if true block");
 	expect_ast_kind(stat->if_stat.else_clause, AST_BLOCK_STAT, "parse if else block");
 
@@ -194,8 +194,8 @@ static void test_parser_for_loops(elf_State *state)
 		"for declaration parses first identifier");
 	Ast value = parser_test_tuple_item(decl->decl.name, 1, AST_IDENT,
 		"for declaration parses second identifier");
-	expect_ast_string(key, "key", "for declaration keeps first identifier");
-	expect_ast_string(value, "value", "for declaration keeps second identifier");
+	expect_ast_atom(key, "key", "for declaration keeps first identifier");
+	expect_ast_atom(value, "value", "for declaration keeps second identifier");
 	if (decl->decl.name->tuple.nargs != 2) {
 		test_fail("for declaration contains only its identifier list");
 	}
@@ -223,7 +223,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
 	expect_ast_kind(call->call.expr, AST_IDENT, "parse call callee");
-	expect_ast_string(call->call.expr, "make", "parse call callee string");
+	expect_ast_atom(call->call.expr, "make", "parse call callee string");
 	if (call->call.nargs != 1) {
 		test_fail("table call shorthand counts argument");
 		return;
@@ -242,7 +242,7 @@ static void test_parser_nil_assign(elf_State *state)
 	Ast stat = parser_test_stat(file, 0, AST_NIL_ASSIGN, "parse nil assignment statement");
 
 	Ast name = parser_test_tuple_item(stat->binary.x, 0, AST_IDENT, "parse nil assignment destination");
-	expect_ast_string(name, "x", "nil assignment destination stores string");
+	expect_ast_atom(name, "x", "nil assignment destination stores atom");
 
 	Ast expr = parser_test_tuple_item(stat->binary.y, 0, AST_INTEGER_LITERAL, "parse nil assignment expression");
 	expect_ast_i64(expr, 1, "nil assignment expression value");
@@ -261,11 +261,11 @@ static void test_parser_table_access_modes(elf_State *state)
 	Ast computed_field = parser_test_tuple_item(computed_ret->return_stat.expr, 0, AST_FIELD, "dot brackets parse as computed field");
 	expect_ast_kind(computed_field ? computed_field->binary.x : 0, AST_IDENT, "computed field keeps receiver");
 	expect_ast_kind(computed_field ? computed_field->binary.y : 0, AST_IDENT, "computed field keeps key expression");
-	expect_ast_string(computed_field ? computed_field->binary.y : 0, "key", "computed field key identifier");
+	expect_ast_atom(computed_field ? computed_field->binary.y : 0, "key", "computed field key identifier");
 
 	Ast dot_ret = parser_test_stat(file, 2, AST_RETURN, "parse dot field return");
 	Ast dot_field = parser_test_tuple_item(dot_ret->return_stat.expr, 0, AST_FIELD, "dot identifier parses as field");
-	expect_ast_string(dot_field ? dot_field->binary.y : 0, "name", "dot field key identifier");
+	expect_ast_atom(dot_field ? dot_field->binary.y : 0, "name", "dot field key identifier");
 }
 
 static void test_parser_open_range_indexes(elf_State *state)
@@ -320,8 +320,8 @@ static void test_parser_function_expression(elf_State *state)
 	Ast second_param = function->function.params[1];
 	expect_ast_kind(first_param, AST_FUNCTION_PARAM, "parse first function param");
 	expect_ast_kind(second_param, AST_FUNCTION_PARAM, "parse second function param");
-	expect_ast_string(first_param ? first_param->param.name : 0, "a", "first function param name");
-	expect_ast_string(second_param ? second_param->param.name : 0, "b", "second function param name");
+	expect_ast_atom(first_param ? first_param->param.name : 0, "a", "first function param name");
+	expect_ast_atom(second_param ? second_param->param.name : 0, "b", "second function param name");
 	expect_ast_kind(function->function.body, AST_BLOCK_STAT, "function body parses as block");
 
 	file = parser_test_parse_file(state, "collect := fun(a, ...) { ret elf.varg(0) }");
@@ -336,7 +336,7 @@ static void test_parser_function_expression(elf_State *state)
 		return;
 	}
 
-	expect_ast_string(function->function.params[0] ? function->function.params[0]->param.name : 0, "a", "variadic function named parameter");
+	expect_ast_atom(function->function.params[0] ? function->function.params[0]->param.name : 0, "a", "variadic function named parameter");
 	expect_ast_kind(function->function.variadic, AST_ELLIPSIS, "function tracks variadic marker separately");
 }
 
@@ -347,7 +347,7 @@ static void test_parser_get_mem_macro(elf_State *state)
 	Ast expr = parser_test_tuple_item(ret->return_stat.expr, 0, AST_GET_MEM, "parse get_mem macro expression");
 
 	expect_ast_kind(expr ? expr->unary : 0, AST_IDENT, "get_mem keeps target expression");
-	expect_ast_string(expr ? expr->unary : 0, "x", "get_mem target string");
+	expect_ast_atom(expr ? expr->unary : 0, "x", "get_mem target string");
 }
 
 static void test_parser_integer_literal_boundaries(elf_State *state)
@@ -424,12 +424,12 @@ static void test_parser_line_boundaries(elf_State *state)
 	second_return = parser_test_stat(file, 1, AST_RETURN, "newline ends postfix chain");
 	Ast target = parser_test_tuple_item(second_return->return_stat.expr, 0, AST_IDENT,
 		"newline postfix return expression");
-	expect_ast_string(target, "target", "newline postfix return target");
+	expect_ast_atom(target, "target", "newline postfix return target");
 
 	Ast parenthesized = parser_test_stat(file, 2, AST_TUPLE, "parenthesized expression after postfix newline");
 	Ast parenthesized_value = parser_test_tuple_item(parenthesized, 0, AST_IDENT,
 		"parenthesized expression value");
-	expect_ast_string(parenthesized_value, "value", "parenthesized expression string");
+	expect_ast_atom(parenthesized_value, "value", "parenthesized expression string");
 }
 
 static void run_parser_tests(elf_State *state)

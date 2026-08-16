@@ -323,7 +323,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
-	elf_Integer result = 0;
+	elf_Int result = 0;
 	if (!elf_to_int(state, -1, &result) || result != 111) {
 		test_fail("compiled closure retains its module/function identity");
 	}
@@ -384,7 +384,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 
-	elf_Integer preserved = 0;
+	elf_Int preserved = 0;
 	if (!elf_to_int(state, -1, &preserved) || preserved != 1) {
 		test_fail("nested host call preserves the caller diagnostic context");
 	}
@@ -425,7 +425,7 @@ static void test_vm_module_builder_grows_constant_arrays(void)
 	elf_destroy_state(state);
 }
 
-static void test_vm_module_owns_string_constants(void)
+static void test_vm_module_converts_atom_constants(void)
 {
 	elf_State *state = elf_create_state();
 	u32 global_count = elf_array_length(state->globals);
@@ -441,7 +441,7 @@ static void test_vm_module_owns_string_constants(void)
 	if (module->string_count != 2 || strcmp(string_data(module->strings[0]), "same") != 0 ||
 		strcmp(string_data(module->strings[1]), "other") != 0)
 	{
-		test_fail("module stores deduplicated string constants");
+		test_fail("module converts deduplicated atom constants to strings");
 	}
 	if (elf_array_length(state->globals) != global_count) {
 		test_fail("string constants do not consume global slots");
@@ -498,5 +498,5 @@ static void run_vm_tests(void)
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
 	test_vm_module_builder_grows_constant_arrays();
-	test_vm_module_owns_string_constants();
+	test_vm_module_converts_atom_constants();
 }

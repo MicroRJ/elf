@@ -121,7 +121,7 @@ struct Ast_T
 
 	union
 	{
-		elf_String *string;
+		elf_Atom *atom;
 		i64         integer_value;
 		f64         number_value;
 		AstArray    interpolated_string;

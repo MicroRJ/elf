@@ -57,7 +57,7 @@ static elf_String *string_find(elf_State *state, const char *data, u32 size, u32
 	u32 bucket_index = string_bucket_index(state, hash);
 	for (elf_String *string = state->string_buckets[bucket_index]; string; string = string->next) {
 		PROF_ADD(PROF_COUNTER_STRING_PROBE, 1);
-		if (string->hash == hash && string->size == size && !memcmp(string->data, data, size)) {
+		if (string->hash == hash && string_size(string) == size && !memcmp(string->data, data, size)) {
 			PROF_ADD(PROF_COUNTER_STRING_HIT, 1);
 			return string;
 		}
@@ -103,7 +103,7 @@ static void string_remove_dead(elf_State *state)
 	state->string_count = counter;
 }
 
-elf_String *elf_string_from_data_size_id(elf_State *state, const char *data, u32 size, u16 id)
+elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size)
 {
 	ASSERT(state);
 	ASSERT(data);
@@ -111,18 +111,11 @@ elf_String *elf_string_from_data_size_id(elf_State *state, const char *data, u32
 
 	u32 hash = string_hash_data(data, size);
 	elf_String *interned = string_find(state, data, size, hash);
-	if (interned) {
-		ASSERT(!id || !interned->id || interned->id == id);
-		if (id && !interned->id) {
-			interned->id = id;
-		}
-		return interned;
-	}
+	if (interned) return interned;
 
-	elf_String *string = elf_gc_alloc(state, ELF_OBJECT_STRING, sizeof(*string) + size + 1);
+	u32 allocation_size = ELF_STRING_HEADER_SIZE + size + 1;
+	elf_String *string = elf_gc_alloc(state, ELF_OBJECT_STRING, allocation_size);
 	string->hash = hash;
-	string->id = id;
-	string->size = (u16)size;
 	copy_memory(string->data, data, size);
 	string->data[size] = 0;
 

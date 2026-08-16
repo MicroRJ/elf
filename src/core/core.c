@@ -137,7 +137,6 @@ void init_strings(elf_State *state)
 static void bootstrap_state(elf_State *state)
 {
 	init_strings(state);
-	elf_init_compiler_strings(state);
 	bootstrap_base_frame(state);
 	bootstrap_standard_libraries(state);
 	state->ref_table = elf_new_table_rogue(state);

@@ -44,7 +44,7 @@ void elf_print_value(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_NIL:       elf_arena_push_text(arena, "nil"); break;
 		case ELF_VALUE_TYPE_INTEGER:   elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
 		case ELF_VALUE_TYPE_NUMBER:    elf_arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_STRING:    elf_arena_push_data(arena, value.x_string->data, value.x_string->size); break;
+		case ELF_VALUE_TYPE_STRING:    elf_arena_push_data(arena, value.x_string->data, string_size(value.x_string)); break;
 		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "C()"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "F()"); break;
 		case ELF_VALUE_TYPE_TABLE:     table_to_text(arena, value_as_table(value)); break;
@@ -88,7 +88,7 @@ static void string_to_source(elf_Arena *arena, elf_String *string)
 	elf_arena_push_char(arena, '"');
 
 	const char *data = string->data;
-	for (u32 i = 0; i < string->size; ++ i)
+	for (u32 i = 0; i < string_size(string); ++ i)
 	{
 		switch (data[i])
 		{

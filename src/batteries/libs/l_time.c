@@ -4,13 +4,13 @@
 
 ELF_FUNCTION(lib_time_counter)
 {
-	elf_push_int(S, (elf_Integer)platform_counter());
+	elf_push_int(S, (elf_Int)platform_counter());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_frequency)
 {
-	elf_push_int(S, (elf_Integer)platform_counter_frequency());
+	elf_push_int(S, (elf_Int)platform_counter_frequency());
 	return 1;
 }
 

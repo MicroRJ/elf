@@ -30,6 +30,9 @@ static void test_string_size_limited_interning(elf_State *state)
 
 	expect_same_string(first, second, "size-limited string matches exact text");
 	expect_same_string(first, third, "size-limited string ignores trailing data");
+	if (string_size(first) != 3 || first->obj.size != ELF_STRING_HEADER_SIZE + 4) {
+		test_fail("string length derives from object allocation size");
+	}
 }
 
 #if 0
@@ -137,22 +140,6 @@ static void test_string_bucket_unlinks_dead_collisions(void)
 	state->stack_ptr = stack_checkpoint;
 }
 
-static void test_string_keyword_ids_survive_gc(void)
-{
-	elf_State *state = elf_create_state();
-
-	elf_String *keyword = elf_string_from_data(state, "true");
-	u16 keyword_id = keyword->id;
-
-	force_string_gc(state);
-
-	elf_String *again = elf_string_from_data(state, "true");
-	expect_same_string(keyword, again, "keyword string survives GC");
-	if (again->id != keyword_id || keyword_id == 0) {
-		test_fail("keyword string keeps token id after GC");
-	}
-}
-
 static void run_string_tests(elf_State *state)
 {
 	test_string_interned_identity(state);
@@ -161,5 +148,4 @@ static void run_string_tests(elf_State *state)
 	test_string_stack_roots_survive_gc();
 	test_string_unrooted_values_are_swept();
 	test_string_bucket_unlinks_dead_collisions();
-	test_string_keyword_ids_survive_gc();
 }

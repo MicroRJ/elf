@@ -65,10 +65,10 @@ static Ir create_num_ir(LowerContext *ctx, SourceSite site, f64 n)
 	return ir;
 }
 
-static Ir create_string_ir(LowerContext *ctx, SourceSite site, elf_String *string)
+static Ir create_atom_ir(LowerContext *ctx, SourceSite site, elf_Atom *atom)
 {
-	Ir ir = create_nullary_ir(ctx, site, IR_STRING);
-	ir->string = string;
+	Ir ir = create_nullary_ir(ctx, site, IR_ATOM);
+	ir->atom = atom;
 	return ir;
 }
 
@@ -233,9 +233,9 @@ static void print_ir(Printer *pr, Ir ir)
 			PRINT(pr, "(error)");
 		}
 		break;
-		case IR_STRING:
+		case IR_ATOM:
 		{
-			const char *data = string_data(ir->string);
+			const char *data = atom_data(ir->atom);
 			PRINT(pr, "\"%s\"", data);
 		}
 		break;

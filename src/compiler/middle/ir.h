@@ -47,7 +47,7 @@ _(IR_EXPR_BLOCK          , "expr_block")                 \
 \
 _(IR_NUMBER              , "number")                     \
 _(IR_INTEGER             , "integer")                    \
-_(IR_STRING              , "string")                     \
+_(IR_ATOM                , "atom")                       \
 _(IR_NIL                 , "nil")                        \
 \
 _(IR_CALL                , "call")                       \
@@ -114,7 +114,7 @@ struct IrNode
 		}
 		ir_label;
 
-		elf_String *string;
+		elf_Atom *atom;
 		i64      ir_int;
 		f64      ir_num;
 

@@ -27,6 +27,7 @@ typedef struct
 {
 	elf_State        *state;
 	elf_String        *name;
+	AtomTable        *atoms;
 	elf_StrSlice     source;
 	char            *cursor;
 	u32              line_index;
@@ -44,6 +45,7 @@ struct Parser
 	elf_Arena  *arena;
 	elf_State  *state;
 	elf_String *name;
+	AtomTable   atoms;
 	Lexer       lexer;
 	Token       tok,tok_prev,tok_prox;
 	AstContext  ast;

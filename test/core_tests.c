@@ -12,7 +12,7 @@ int main(void)
 	if (!elf_push_code_source(state, "core_tests", source)) return 2;
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
-	elf_Integer result = 0;
+	elf_Int result = 0;
 	if (!elf_to_int(state, -1, &result) || result != 42) return 3;
 
 	elf_destroy_state(state);

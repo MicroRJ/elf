@@ -92,7 +92,7 @@ static const char *lib_load_cstr(elf_State *state, u32 index)
 
 static i64 lib_load_integer(elf_State *state, u32 index)
 {
-	elf_Integer value = 0;
+	elf_Int value = 0;
 	if (!elf_to_int(state, (elf_i32)index, &value)) {
 		elf_error(state, "expected integer argument");
 	}

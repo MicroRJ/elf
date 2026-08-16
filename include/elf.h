@@ -4,30 +4,38 @@
 #define ELF_VERSION "0.2.0-dev"
 #define ELF_API_VERSION 1
 
-typedef signed char        elf_i8;
-typedef unsigned char      elf_u8;
-typedef signed short       elf_i16;
-typedef unsigned short     elf_u16;
-typedef signed int         elf_i32;
-typedef unsigned int       elf_u32;
-typedef signed long long   elf_i64;
-typedef unsigned long long elf_u64;
-typedef float              elf_f32;
-typedef double             elf_f64;
-typedef elf_i32            elf_b32;
+#include <stdint.h>
 
-typedef elf_i64 elf_Integer;
-typedef elf_f64 elf_Number;
+typedef int8_t      elf_i8;
+typedef uint8_t     elf_u8;
+typedef int16_t     elf_i16;
+typedef uint16_t    elf_u16;
+typedef int32_t     elf_i32;
+typedef uint32_t    elf_u32;
+typedef int64_t     elf_i64;
+typedef uint64_t    elf_u64;
+typedef float       elf_f32;
+typedef double      elf_f64;
+typedef elf_i32     elf_b32;
+
+// slightly more readable semantic boolean type
+typedef elf_b32 elf_Bool;
+typedef elf_i32 elf_Index;
+typedef size_t  elf_Size;
+typedef elf_i64 elf_Int;
+typedef elf_f64 elf_Num;
+
+// TODO(RJ) wrap this in a proper type!
 typedef elf_u32 elf_Ref;
 
-#define ELF_NO_REF ((elf_Ref)0)
+#define ELF_NO_REF ((elf_Ref)(0))
 
 typedef struct elf_State elf_State;
 
 typedef struct
 {
-	char   *data;
-	elf_u64 size;
+	char    *data;
+	elf_Size size;
 }
 elf_StrSlice;
 
@@ -74,58 +82,58 @@ const char *elf_version(void);
 void elf_set_user_data(elf_State *state, void *user_data);
 void *elf_get_user_data(elf_State *state);
 void elf_error(elf_State *state, const char *message);
-elf_b32 elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic);
+elf_Bool elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 
 void elf_push_nil(elf_State *state);
-void elf_push_int(elf_State *state, elf_Integer value);
-void elf_push_num(elf_State *state, elf_Number value);
+void elf_push_int(elf_State *state, elf_Int value);
+void elf_push_num(elf_State *state, elf_Num value);
 void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_cstr(elf_State *state, const char *data);
-void elf_push_str(elf_State *state, const char *data, int size);
+void elf_push_str(elf_State *state, const char *data, elf_Size size);
 
 int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
 
-elf_i32 elf_get_top(elf_State *state);
-elf_i32 elf_arg_count(elf_State *state);
-elf_i32 elf_abs_index(elf_State *state, elf_i32 index);
-elf_b32 elf_is_valid(elf_State *state, elf_i32 index);
-elf_b32 elf_set_top(elf_State *state, elf_i32 top);
-elf_b32 elf_pop(elf_State *state, elf_u32 count);
-elf_b32 elf_push_value(elf_State *state, elf_i32 index);
+elf_u32 elf_arg_count(elf_State *state);
+elf_Index elf_get_top(elf_State *state);
+elf_Index elf_abs_index(elf_State *state, elf_Index index);
+elf_Bool elf_is_valid(elf_State *state, elf_Index index);
+elf_Bool elf_set_top(elf_State *state, elf_Index top);
+elf_Bool elf_pop(elf_State *state, elf_u32 count);
+elf_Bool elf_push_value(elf_State *state, elf_Index index);
 
-elf_ValueType elf_type(elf_State *state, elf_i32 index);
-elf_b32 elf_is_nil(elf_State *state, elf_i32 index);
-elf_b32 elf_is_numeric(elf_State *state, elf_i32 index);
-elf_b32 elf_is_callable(elf_State *state, elf_i32 index);
-elf_b32 elf_to_int(elf_State *state, elf_i32 index, elf_Integer *value);
-elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *value);
-elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *value);
-elf_b32 elf_to_cstr(elf_State *state, elf_i32 index, const char **value);
-elf_b32 elf_push_value_text(elf_State *state, elf_i32 index);
+elf_ValueType elf_type(elf_State *state, elf_Index index);
+elf_Bool elf_is_nil(elf_State *state, elf_Index index);
+elf_Bool elf_is_numeric(elf_State *state, elf_Index index);
+elf_Bool elf_is_callable(elf_State *state, elf_Index index);
+elf_Bool elf_to_int(elf_State *state, elf_Index index, elf_Int *value);
+elf_Bool elf_to_num(elf_State *state, elf_Index index, elf_Num *value);
+elf_Bool elf_to_str(elf_State *state, elf_Index index, elf_StrSlice *value);
+elf_Bool elf_to_cstr(elf_State *state, elf_Index index, const char **value);
+elf_Bool elf_push_value_text(elf_State *state, elf_Index index);
 // Pushes constant-expression source for a supported acyclic data value.
-elf_b32 elf_push_value_source(elf_State *state, elf_i32 index);
+elf_Bool elf_push_value_source(elf_State *state, elf_Index index);
 
 void elf_new_table(elf_State *state);
-elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length);
-elf_b32 elf_get_field(elf_State *state, elf_i32 index, const char *field);
-elf_b32 elf_set_field(elf_State *state, elf_i32 index, const char *field);
-elf_b32 elf_get_index(elf_State *state, elf_i32 index, elf_u32 element);
-elf_b32 elf_set_index(elf_State *state, elf_i32 index, elf_u32 element);
-elf_b32 elf_append(elf_State *state, elf_i32 index);
-elf_b32 elf_next(elf_State *state, elf_i32 index, elf_u32 *cursor);
-elf_b32 elf_equal(elf_State *state, elf_i32 left, elf_i32 right);
+elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length);
+elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field);
+elf_Bool elf_set_field(elf_State *state, elf_Index index, const char *field);
+elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element);
+elf_Bool elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
+elf_Bool elf_append(elf_State *state, elf_Index index);
+elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor);
+elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right);
 
 void elf_get_global(elf_State *state, const char *name);
-elf_b32 elf_set_global(elf_State *state, const char *name);
+elf_Bool elf_set_global(elf_State *state, const char *name);
 
-elf_Ref elf_create_ref(elf_State *state, elf_i32 index);
-elf_b32 elf_push_ref(elf_State *state, elf_Ref reference);
-elf_b32 elf_release_ref(elf_State *state, elf_Ref reference);
+elf_Ref elf_create_ref(elf_State *state, elf_Index index);
+elf_Bool elf_push_ref(elf_State *state, elf_Ref reference);
+elf_Bool elf_release_ref(elf_State *state, elf_Ref reference);
 
 #endif
 

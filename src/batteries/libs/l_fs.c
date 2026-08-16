@@ -248,7 +248,7 @@ ELF_FUNCTION(lib_fs_get_paths)
 		elf_push_nil(S);
 		return 1;
 	}
-	elf_Integer recursion_level = 0;
+	elf_Int recursion_level = 0;
 	if ((nargs == 3 && !elf_to_int(S, 2, &recursion_level)) || recursion_level < 0 || recursion_level > ELF_FS_MAX_RECURSION) {
 		elf_push_nil(S);
 		return 1;
@@ -280,7 +280,7 @@ ELF_FUNCTION(lib_fs_for_each_path)
 		return 1;
 	}
 	elf_StrSlice root = {".", 1};
-	elf_Integer recursion_level = 0;
+	elf_Int recursion_level = 0;
 	elf_i32 callback = 1;
 	if (nargs >= 3) {
 		if (!elf_to_str(S, 1, &root)) {

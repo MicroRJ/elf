@@ -127,19 +127,19 @@ static int add_const_num(BcGen *gen, f64 i)
 	return index;
 }
 
-static int add_string(BcGen *gen, elf_String *string)
+static int add_atom(BcGen *gen, elf_Atom *atom)
 {
 	BcModuleBuilder *module = &gen->module;
-	for (u32 i = 0; i < module->string_count; ++ i) {
-		if (module->strings[i] == string) return i;
+	for (u32 i = 0; i < module->atom_count; ++ i) {
+		if (module->atoms[i] == atom) return i;
 	}
 
-	if (module->string_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->strings = grow_module_array(gen->arena, module->strings
-	, module->string_count, &module->string_capacity
-	, module->string_count + 1, sizeof(*module->strings));
-	u32 index = module->string_count++;
-	module->strings[index] = string;
+	if (module->atom_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
+	module->atoms = grow_module_array(gen->arena, module->atoms
+	, module->atom_count, &module->atom_capacity
+	, module->atom_count + 1, sizeof(*module->atoms));
+	u32 index = module->atom_count++;
+	module->atoms[index] = atom;
 	return index;
 }
 
@@ -281,9 +281,9 @@ static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number
 	return emit_xy_bc(gen, site, BC_LOADKNUM, unwrap_slot(dest), index);
 }
 
-static u32 emit_load_string_bc(BcGen *gen, SourceSite site, BcSlot dest, elf_String *string)
+static u32 emit_load_atom_bc(BcGen *gen, SourceSite site, BcSlot dest, elf_Atom *atom)
 {
-	u32 index = add_string(gen, string);
+	u32 index = add_atom(gen, atom);
 	return emit_xy_bc(gen, site, BC_LOADKSTRING, unwrap_slot(dest), index);
 }
 
@@ -443,11 +443,13 @@ static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilde
 		, sizeof(*module->number_constants) * module->number_constant_count, builder->number_constants);
 	}
 
-	module->string_count = builder->string_count;
+	module->string_count = builder->atom_count;
 	if (module->string_count) {
 		elf_arena_align(&state->arena, 8);
-		module->strings = elf_arena_push_copy(&state->arena
-		, sizeof(*module->strings) * module->string_count, builder->strings);
+		module->strings = elf_arena_push(&state->arena, sizeof(*module->strings) * module->string_count);
+		for (u32 i = 0; i < module->string_count; ++i) {
+			module->strings[i] = elf_string_from_atom(state, builder->atoms[i]);
+		}
 	}
 
 	module->bytecode_function_count = builder->function_count;
@@ -541,7 +543,7 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 		BcSlot expr_slot;
 		if (expr->kind == IR_META_FIELD)
 		{
-			bg_check_type(expr->ir_binary.y, IR_STRING);
+			bg_check_type(expr->ir_binary.y, IR_ATOM);
 
 			expr_slot = emit_expr(gen, expr->ir_binary.y, NO_MEMORY, 1);
 			this_slot = emit_expr(gen, expr->ir_binary.x, NO_MEMORY, 1);
@@ -551,7 +553,7 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 		}
 		else if (expr->kind == IR_FIELD)
 		{
-			bg_check_type(expr->ir_binary.y, IR_STRING);
+			bg_check_type(expr->ir_binary.y, IR_ATOM);
 
 			expr_slot = emit_expr(gen, expr->ir_binary.y, NO_MEMORY, 1);
 			this_slot = emit_expr(gen, expr->ir_binary.x, NO_MEMORY, 1);
@@ -938,14 +940,14 @@ static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 		}
 		break;
 
-		case IR_STRING:
+		case IR_ATOM:
 		{
 			if (nout < 1) {
 				return out;
 			}
 
 			out = ensure_slot(gen, out);
-			emit_load_string_bc(gen, expr->site, out, expr->string);
+			emit_load_atom_bc(gen, expr->site, out, expr->atom);
 		}
 		break;
 

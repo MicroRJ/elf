@@ -21,9 +21,9 @@ static const char *token_type_name(TokenType type)
 	return names[type];
 }
 
-static TokenType string_is_word_or_macro(elf_String *string)
+static TokenType atom_is_word_or_macro(elf_Atom *atom)
 {
-	switch (string->id) {
+	switch (atom->id) {
 #define MCITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
 		MACRODEF(MCITEM)
 #undef MCITEM
@@ -31,9 +31,9 @@ static TokenType string_is_word_or_macro(elf_String *string)
 	}
 }
 
-static TokenType check_keyword(elf_String *string)
+static TokenType check_keyword(elf_Atom *atom)
 {
-	switch (string->id) {
+	switch (atom->id) {
 #define KWITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
 		KEYWORDDEF(KWITEM)
 #undef KWITEM
@@ -56,10 +56,11 @@ static b32 is_identifier_continue(char c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static void lexer_init(Lexer *lexer, elf_State *state, elf_String *name, elf_StrSlice source)
+static void lexer_init(Lexer *lexer, elf_State *state, elf_String *name, AtomTable *atoms, elf_StrSlice source)
 {
 	lexer->state = state;
 	lexer->name = name;
+	lexer->atoms = atoms;
 	lexer->source = source;
 	lexer->cursor = source.data;
 	lexer->line_index = 1;
@@ -433,30 +434,26 @@ static u64 lex_integer(Lexer *lexer, char **cursor)
 	return integer;
 }
 
-static u32 lex_identifier(char **cursor, char *buffer)
+static u32 lex_identifier(char **cursor)
 {
 	char *cur = *cursor;
-	char *out = buffer;
+	char *start = cur;
 
 	ASSERT(is_identifier_start(*cur));
-	do {
-		*out++ = *cur++;
-	}
+	do { cur += 1; }
 	while (is_identifier_continue(*cur));
 
-	*out = 0;
 	*cursor = cur;
-	return (u32)(out - buffer);
+	return (u32)(cur - start);
 }
 
-static elf_String *lex_string_segment(Lexer *lexer, char **cursor, SourceSite site, b32 is_block, b32 is_format, b32 *ended)
+static elf_Atom *lex_string_segment(Lexer *lexer, char **cursor, SourceSite site, b32 is_block, b32 is_format, b32 *ended)
 {
 	if (ended) *ended = false;
 
 	char *cur = *cursor;
-	elf_Scratch scratch = elf_begin_scratch();
-	char *buffer = elf_arena_reserve(scratch.arena, lexer_scratch_capacity(lexer));
-	char *out = buffer;
+	elf_Atom *candidate = atom_table_begin(lexer->atoms, (u32)lexer_scratch_capacity(lexer));
+	char *out = candidate->data;
 
 	for (;;)
 	{
@@ -509,12 +506,9 @@ static elf_String *lex_string_segment(Lexer *lexer, char **cursor, SourceSite si
 		}
 	}
 
-	*out = 0;
-
-	elf_String *string = elf_string_from_data_size(lexer->state, buffer, (u32)(out - buffer));
+	elf_Atom *atom = atom_table_end(lexer->atoms, candidate, (u32)(out - candidate->data));
 	*cursor = cur;
-	elf_end_scratch(scratch);
-	return string;
+	return atom;
 }
 
 static b32 lexer_skip_trivia(Lexer *lexer, char **cursor)
@@ -614,7 +608,7 @@ static Token lex_token(Lexer *lexer)
 
 		cur += 1;
 		b32 ended;
-		token.string = lex_string_segment(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, true, &ended);
+		token.atom = lex_string_segment(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, true, &ended);
 		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
 
 		if (ended) {
@@ -656,7 +650,7 @@ static Token lex_token(Lexer *lexer)
 				cur += 2 + is_block * 2;
 
 				b32 ended;
-				token.string = lex_string_segment(lexer, &cur, string_site, is_block, true, &ended);
+				token.atom = lex_string_segment(lexer, &cur, string_site, is_block, true, &ended);
 				token.type = ended ? TOK_STRING : TOK_STRING_START;
 				if (!ended)
 				{
@@ -671,15 +665,13 @@ static Token lex_token(Lexer *lexer)
 			}
 			else
 			{
-				elf_Scratch scratch = elf_begin_scratch();
-				char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
-				u32 size = lex_identifier(&cur, buffer);
-				elf_String *string = elf_string_from_data_size(lexer->state, buffer, size);
-				token.type = check_keyword(string);
+				char *start = cur;
+				u32 size = lex_identifier(&cur);
+				elf_Atom *atom = atom_from_data_size(lexer->atoms, start, size);
+				token.type = check_keyword(atom);
 				if (token.type == TOK_IDENTIFIER) {
-					token.string = string;
+					token.atom = atom;
 				}
-				elf_end_scratch(scratch);
 			}
 		} break;
 
@@ -727,14 +719,12 @@ static Token lex_token(Lexer *lexer)
 		{
 			b32 is_block = cur[1] == '"' && cur[2] == '"';
 			cur += is_block ? 3 : 1;
-			token.string = lex_string_segment(lexer, &cur, token.site, is_block, false, 0);
+			token.atom = lex_string_segment(lexer, &cur, token.site, is_block, false, 0);
 			token.type = TOK_STRING;
 		} break;
 
 		case '#':
 		{
-			elf_Scratch scratch = elf_begin_scratch();
-			char *buffer = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
 			cur += 1;
 
 			if (!is_identifier_start(*cur))
@@ -744,17 +734,17 @@ static Token lex_token(Lexer *lexer)
 			}
 			else
 			{
-				buffer[0] = '#';
-				u32 size = 1 + lex_identifier(&cur, buffer + 1);
-				elf_String *string = elf_string_from_data_size(lexer->state, buffer, size);
+				lex_identifier(&cur);
+				u32 size = (u32)(cur - token.site.data);
+				elf_Atom *atom = atom_from_data_size(lexer->atoms, token.site.data, size);
 
-				token.type = string_is_word_or_macro(string);
+				token.type = atom_is_word_or_macro(atom);
 				if (token.type == TOK_M_ENDOFFILE) {
 					token.type = TOK_NONE;
 				}
 				else if (token.type == TOK_M_FILE_NAME) {
 					token.type = TOK_STRING;
-					token.string = lexer->name;
+					token.atom = atom_from_data_size(lexer->atoms, string_data(lexer->name), string_size(lexer->name));
 				}
 				else if (token.type == TOK_M_LINE_NUMBER) {
 					token.type = TOK_INTEGER;
@@ -764,8 +754,6 @@ static Token lex_token(Lexer *lexer)
 					log_source_error(lexer, token.site, "unrecognized macro");
 				}
 			}
-
-			elf_end_scratch(scratch);
 		} break;
 
 		case '\0':

@@ -15,6 +15,7 @@
 #include "platform.h"
 #include "core.h"
 #include "helpers.h"
+#include "atom.h"
 #include "compiler.h"
 #include "token.h"
 #include "ast.h"
@@ -24,6 +25,7 @@
 #include "lower.h"
 
 #include "logging.c"
+#include "atom.c"
 #include "lexer.c"
 #include "ast.c"
 #include "parse.c"
@@ -32,17 +34,6 @@
 #include "ir.c"
 #include "lower.c"
 #include "bytecode_gen.c"
-
-void elf_init_compiler_strings(elf_State *state)
-{
-#define INTERN_KEYWORD_STRING(NAME, TEXT) elf_string_from_data_id(state, TEXT, XFUSE(TOK_, NAME));
-	KEYWORDDEF(INTERN_KEYWORD_STRING)
-#undef INTERN_KEYWORD_STRING
-
-#define INTERN_MACRO_STRING(NAME, TEXT) elf_string_from_data_id(state, "#" TEXT, XFUSE(TOK_, NAME));
-	MACRODEF(INTERN_MACRO_STRING)
-#undef INTERN_MACRO_STRING
-}
 
 static void restore_source_stack(elf_State *state, elf_Value *checkpoint)
 {

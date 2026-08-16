@@ -95,22 +95,6 @@ static u32 gc_mark_stack(elf_State *state)
 	return marked_count;
 }
 
-static u32 gc_mark_interned_ids(elf_State *state)
-{
-	u32 marked_count = 0;
-
-	for (u32 i = 0; i < state->string_bucket_count; ++i)
-	{
-		for (elf_String *string = state->string_buckets[i]; string; string = string->next) {
-			if (string->id) {
-				marked_count += gc_mark_reachable(state, (elf_Object *)string);
-			}
-		}
-	}
-
-	return marked_count;
-}
-
 static u32 gc_mark_modules(elf_State *state)
 {
 	u32 marked_count = 0;
@@ -155,7 +139,6 @@ static u32 gc_collect(elf_State *state)
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->ref_table);
 	}
 	marked_count += gc_mark_metatables(state);
-	marked_count += gc_mark_interned_ids(state);
 	marked_count += gc_mark_modules(state);
 	u32 freed_count = gc_sweep(state);
 	// elf_f64 took = prof_time_diff_ms(time);

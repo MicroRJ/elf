@@ -218,6 +218,19 @@ static Parser *elf_alloc_parser(elf_State *state, elf_Arena *arena)
 
 static void reposition_parser(Parser *parser, char *cursor);
 
+static void init_parser_atoms(Parser *parser)
+{
+	atom_table_init(&parser->atoms, parser->arena);
+
+#define INTERN_KEYWORD_ATOM(NAME, TEXT) atom_from_data_id(&parser->atoms, TEXT, XFUSE(TOK_, NAME));
+	KEYWORDDEF(INTERN_KEYWORD_ATOM)
+#undef INTERN_KEYWORD_ATOM
+
+#define INTERN_MACRO_ATOM(NAME, TEXT) atom_from_data_id(&parser->atoms, "#" TEXT, XFUSE(TOK_, NAME));
+	MACRODEF(INTERN_MACRO_ATOM)
+#undef INTERN_MACRO_ATOM
+}
+
 static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source)
 {
 	ASSERT(state != 0);
@@ -225,8 +238,9 @@ static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char 
 	ASSERT(source.data != 0);
 	Parser *parser = elf_alloc_parser(state, arena);
 	parser->name = elf_string_from_data(state, name);
+	init_parser_atoms(parser);
 	parser->error_status = ELF_STATUS_PARSE_ERROR;
-	lexer_init(&parser->lexer, state, parser->name, source);
+	lexer_init(&parser->lexer, state, parser->name, &parser->atoms, source);
 	reposition_parser(parser, source.data);
 	return parser;
 }
@@ -482,7 +496,7 @@ static Ast parse_get_mem_expr(Parser *parser)
 static Ast parse_ident_expr(Parser *par)
 {
 	Token tok = take_token(par, TOK_IDENTIFIER);
-	return create_ident_ast(par, tok.site, tok.string);
+	return create_ident_ast(par, tok.site, tok.atom);
 }
 
 static Ast parse_positive_integer_literal(Parser *parser, Token token)
@@ -525,7 +539,7 @@ static Ast parse_interpolated_string(Parser *parser)
 	u32 stack_start = parser->ast.stack_index;
 	u32 nparts = 0;
 
-	push_ast(parser, create_string_ast(parser, start.site, start.string));
+	push_ast(parser, create_atom_ast(parser, start.site, start.atom));
 	nparts += 1;
 
 	for (;;)
@@ -551,7 +565,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 
 		consume_token(parser);
-		push_ast(parser, create_string_ast(parser, part.site, part.string));
+		push_ast(parser, create_atom_ast(parser, part.site, part.atom));
 		nparts += 1;
 
 		if (part.type == TOK_STRING_END) {
@@ -615,7 +629,7 @@ static Ast parse_unary_expr(Parser *parser)
 		case TOK_STRING:
 		{
 			consume_token(parser);
-			value = create_string_ast(parser, tok.site, tok.string);
+			value = create_atom_ast(parser, tok.site, tok.atom);
 		}
 		break;
 		case TOK_STRING_START:
@@ -724,7 +738,7 @@ static Ast parse_table_entry(Parser *parser)
 		Token name = consume_token(parser);
 		take_token(parser, TOK_ASSIGN);
 
-		key = create_string_ast(parser, name.site, name.string);
+		key = create_atom_ast(parser, name.site, name.atom);
 		value = parse_expr(parser);
 		key_required = true;
 	}
@@ -842,7 +856,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 		do
 		{
 			Token name = take_token(par, TOK_IDENTIFIER);
-			Ast right = create_string_ast(par, name.site, name.string);
+			Ast right = create_atom_ast(par, name.site, name.atom);
 			Ast value = create_field_ast(par, tok.site, left, right);
 			push_ast(par, value);
 			++ nargs;
@@ -870,7 +884,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	else
 	{
 		Token name = take_token(par, TOK_IDENTIFIER);
-		Ast right = create_string_ast(par, name.site, name.string);
+		Ast right = create_atom_ast(par, name.site, name.atom);
 		left = create_field_ast(par, tok.site, left, right);
 	}
 	return left;
@@ -953,7 +967,7 @@ static Ast parse_postfix_expr(Parser *parser)
 			{
 				consume_token(parser);
 				Token name = take_token(parser, TOK_IDENTIFIER);
-				Ast y = create_string_ast(parser, name.site, name.string);
+				Ast y = create_atom_ast(parser, name.site, name.atom);
 				value = create_meta_field_ast(parser, tok.site, value, y);
 			}
 			break;
@@ -1374,7 +1388,7 @@ static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 
 		case AST_STRING_LITERAL:
 		{
-			*out = value_from_string(ast->string);
+			*out = value_from_string(elf_string_from_atom(parser->state, ast->atom));
 			return true;
 		}
 

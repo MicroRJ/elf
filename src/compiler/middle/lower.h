@@ -91,7 +91,7 @@ typedef struct Entity
 	EntityType    type;
 	EntityTags    tags;
 	u32          scope_start;
-	elf_String     *name;
+	elf_Atom       *name;
 	SourceSite   site;
 	Ir         memory_ir;
 }

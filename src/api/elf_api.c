@@ -33,7 +33,7 @@ void elf_error(elf_State *state, const char *message)
 		message ? message : "host error");
 }
 
-elf_b32 elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic)
+elf_Bool elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic)
 {
 	ASSERT(state);
 	if (!diagnostic) return false;
@@ -41,19 +41,19 @@ elf_b32 elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic)
 	return diagnostic->status != ELF_STATUS_OK;
 }
 
-void elf_push_nil(elf_State *state)                 { push_value(state, value_nil()); }
-void elf_push_int(elf_State *state, elf_Integer x)  { push_value(state, value_from_integer(x)); }
-void elf_push_num(elf_State *state, elf_Number x)   { push_value(state, value_from_number(x)); }
+void elf_push_nil(elf_State *state)                 { push_value(state, value_nil());            }
+void elf_push_int(elf_State *state, elf_Int x)      { push_value(state, value_from_integer(x));  }
+void elf_push_num(elf_State *state, elf_Num x)      { push_value(state, value_from_number(x));   }
 void elf_push_fun(elf_State *state, elf_Function x) { push_value(state, value_from_function(x)); }
 
-void elf_push_cstr(elf_State *state, const char *text)
+void elf_push_cstr(elf_State *state, const char *data)
 {
-	push_value(state, value_from_string(elf_string_from_data(state, text)));
+	push_value(state, value_from_string(elf_string_from_data(state, data)));
 }
 
-void elf_push_str(elf_State *state, const char *text, int length)
+void elf_push_str(elf_State *state, const char *data, elf_Size size)
 {
-	push_value(state, value_from_string(elf_string_from_data_size(state, text, length)));
+	push_value(state, value_from_string(elf_string_from_data_size(state, data, size)));
 }
 
 int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
@@ -84,20 +84,15 @@ int elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 	return elf_push_json_source(state, name, source);
 }
 
-static elf_i32 frame_floor(elf_State *state)
+static elf_Value *value_at(elf_State *state, elf_Index index)
 {
-	return state->frame->framesize;
-}
-
-static elf_Value *value_at(elf_State *state, elf_i32 index)
-{
-	elf_i32 top = elf_get_top(state);
-	elf_i32 absolute = index < 0 ? top + index : index;
+	elf_Index top = elf_get_top(state);
+	elf_Index absolute = index < 0 ? top + index : index;
 	if (absolute < 0 || absolute >= top) return 0;
 	return state->frame->framebase + absolute;
 }
 
-static elf_b32 table_at(elf_State *state, elf_i32 index, elf_Table **table)
+static elf_Bool table_at(elf_State *state, elf_Index index, elf_Table **table)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value || !value_is_table(*value)) return false;
@@ -105,7 +100,7 @@ static elf_b32 table_at(elf_State *state, elf_i32 index, elf_Table **table)
 	return true;
 }
 
-static elf_b32 values_equal(elf_Value left, elf_Value right)
+static elf_Bool values_equal(elf_Value left, elf_Value right)
 {
 	if (value_is_numeric(left) && value_is_numeric(right)) {
 		return value_to_number(left) == value_to_number(right);
@@ -115,31 +110,31 @@ static elf_b32 values_equal(elf_Value left, elf_Value right)
 	return left.x_i64 == right.x_i64;
 }
 
-elf_i32 elf_get_top(elf_State *state)
+elf_Index elf_get_top(elf_State *state)
 {
-	return (elf_i32)(state->stack_ptr - state->frame->framebase);
+	return (elf_Index)(state->stack_ptr - state->frame->framebase);
 }
 
-elf_i32 elf_arg_count(elf_State *state)
+elf_u32 elf_arg_count(elf_State *state)
 {
 	return state->frame->nargs;
 }
 
-elf_i32 elf_abs_index(elf_State *state, elf_i32 index)
+elf_Index elf_abs_index(elf_State *state, elf_Index index)
 {
-	elf_i32 absolute = index < 0 ? elf_get_top(state) + index : index;
+	elf_Index absolute = index < 0 ? elf_get_top(state) + index : index;
 	return elf_is_valid(state, absolute) ? absolute : -1;
 }
 
-elf_b32 elf_is_valid(elf_State *state, elf_i32 index)
+elf_Bool elf_is_valid(elf_State *state, elf_Index index)
 {
 	return value_at(state, index) != 0;
 }
 
-elf_b32 elf_set_top(elf_State *state, elf_i32 top)
+elf_Bool elf_set_top(elf_State *state, elf_Index top)
 {
-	elf_i32 current = elf_get_top(state);
-	if (top < frame_floor(state) || state->frame->framebase + top > state->stack + state->stack_size) {
+	elf_Index current = elf_get_top(state);
+	if (top < frame_size(state) || state->frame->framebase + top > state->stack + state->stack_size) {
 		return false;
 	}
 	while (current < top) {
@@ -153,14 +148,14 @@ elf_b32 elf_set_top(elf_State *state, elf_i32 top)
 	return true;
 }
 
-elf_b32 elf_pop(elf_State *state, elf_u32 count)
+elf_Bool elf_pop(elf_State *state, elf_u32 count)
 {
-	elf_i32 top = elf_get_top(state);
-	if (count > (elf_u32)(top - frame_floor(state))) return false;
-	return elf_set_top(state, top - (elf_i32)count);
+	elf_Index top = elf_get_top(state);
+	if (count > (elf_u32)(top - frame_size(state))) return false;
+	return elf_set_top(state, top - (elf_Index) count);
 }
 
-elf_b32 elf_push_value(elf_State *state, elf_i32 index)
+elf_Bool elf_push_value(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return false;
@@ -168,31 +163,31 @@ elf_b32 elf_push_value(elf_State *state, elf_i32 index)
 	return true;
 }
 
-elf_ValueType elf_type(elf_State *state, elf_i32 index)
+elf_ValueType elf_type(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	return value ? value_type(*value) : ELF_VALUE_TYPE_COUNT_;
 }
 
-elf_b32 elf_is_nil(elf_State *state, elf_i32 index)
+elf_Bool elf_is_nil(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	return value && value_is_nil(*value);
 }
 
-elf_b32 elf_is_numeric(elf_State *state, elf_i32 index)
+elf_Bool elf_is_numeric(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	return value && value_is_numeric(*value);
 }
 
-elf_b32 elf_is_callable(elf_State *state, elf_i32 index)
+elf_Bool elf_is_callable(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	return value && value_is_callable(*value);
 }
 
-elf_b32 elf_to_int(elf_State *state, elf_i32 index, elf_Integer *result)
+elf_Bool elf_to_int(elf_State *state, elf_Index index, elf_Int *result)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value || !value_is_integer(*value) || !result) return false;
@@ -200,7 +195,7 @@ elf_b32 elf_to_int(elf_State *state, elf_i32 index, elf_Integer *result)
 	return true;
 }
 
-elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *result)
+elf_Bool elf_to_num(elf_State *state, elf_Index index, elf_Num *result)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value || !value_is_numeric(*value) || !result) return false;
@@ -208,17 +203,17 @@ elf_b32 elf_to_num(elf_State *state, elf_i32 index, elf_Number *result)
 	return true;
 }
 
-elf_b32 elf_to_str(elf_State *state, elf_i32 index, elf_StrSlice *result)
+elf_Bool elf_to_str(elf_State *state, elf_Index index, elf_StrSlice *result)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value || !value_is_string(*value) || !result) return false;
 	elf_String *string = value_as_string(*value);
 	result->data = string->data;
-	result->size = string->size;
+	result->size = string_size(string);
 	return true;
 }
 
-elf_b32 elf_to_cstr(elf_State *state, elf_i32 index, const char **result)
+elf_Bool elf_to_cstr(elf_State *state, elf_Index index, const char **result)
 {
 	elf_StrSlice string;
 	if (!result || !elf_to_str(state, index, &string)) return false;
@@ -226,7 +221,7 @@ elf_b32 elf_to_cstr(elf_State *state, elf_i32 index, const char **result)
 	return true;
 }
 
-elf_b32 elf_push_value_text(elf_State *state, elf_i32 index)
+elf_Bool elf_push_value_text(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return false;
@@ -239,7 +234,7 @@ elf_b32 elf_push_value_text(elf_State *state, elf_i32 index)
 	return true;
 }
 
-elf_b32 elf_push_value_source(elf_State *state, elf_i32 index)
+elf_Bool elf_push_value_source(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return false;
@@ -262,7 +257,7 @@ void elf_new_table(elf_State *state)
 	push_new_table(state);
 }
 
-elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length)
+elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length)
 {
 	elf_Table *table;
 	if (!length || !table_at(state, index, &table)) return false;
@@ -270,7 +265,7 @@ elf_b32 elf_length(elf_State *state, elf_i32 index, elf_u32 *length)
 	return true;
 }
 
-elf_b32 elf_get_field(elf_State *state, elf_i32 index, const char *field)
+elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field)
 {
 	elf_Table *table;
 	if (!field || !table_at(state, index, &table)) return false;
@@ -279,10 +274,10 @@ elf_b32 elf_get_field(elf_State *state, elf_i32 index, const char *field)
 	return true;
 }
 
-elf_b32 elf_set_field(elf_State *state, elf_i32 index, const char *field)
+elf_Bool elf_set_field(elf_State *state, elf_Index index, const char *field)
 {
 	elf_Table *table;
-	if (!field || state->stack_ptr <= state->frame->framebase + frame_floor(state)
+	if (!field || state->stack_ptr <= state->frame->framebase + frame_size(state)
 	|| !table_at(state, index, &table)) return false;
 	elf_Value key = value_from_string(elf_string_from_data(state, field));
 	elf_Value value = pop_value(state);
@@ -290,7 +285,7 @@ elf_b32 elf_set_field(elf_State *state, elf_i32 index, const char *field)
 	return true;
 }
 
-elf_b32 elf_get_index(elf_State *state, elf_i32 index, elf_u32 element)
+elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element)
 {
 	elf_Table *table;
 	if (!table_at(state, index, &table)) return false;
@@ -298,10 +293,10 @@ elf_b32 elf_get_index(elf_State *state, elf_i32 index, elf_u32 element)
 	return true;
 }
 
-elf_b32 elf_set_index(elf_State *state, elf_i32 index, elf_u32 element)
+elf_Bool elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 {
 	elf_Table *table;
-	if (state->stack_ptr <= state->frame->framebase + frame_floor(state)
+	if (state->stack_ptr <= state->frame->framebase + frame_size(state)
 	|| !table_at(state, index, &table) || element > table->count) return false;
 	elf_Value value = pop_value(state);
 	if (element == table->count) elf_array_add(state, table, value);
@@ -309,16 +304,16 @@ elf_b32 elf_set_index(elf_State *state, elf_i32 index, elf_u32 element)
 	return true;
 }
 
-elf_b32 elf_append(elf_State *state, elf_i32 index)
+elf_Bool elf_append(elf_State *state, elf_Index index)
 {
 	elf_Table *table;
-	if (state->stack_ptr <= state->frame->framebase + frame_floor(state)
+	if (state->stack_ptr <= state->frame->framebase + frame_size(state)
 	|| !table_at(state, index, &table)) return false;
 	elf_array_add(state, table, pop_value(state));
 	return true;
 }
 
-elf_b32 elf_next(elf_State *state, elf_i32 index, elf_u32 *cursor)
+elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)
 {
 	elf_Table *table;
 	if (!cursor || !table_at(state, index, &table) || *cursor >= table->count) return false;
@@ -337,7 +332,7 @@ elf_b32 elf_next(elf_State *state, elf_i32 index, elf_u32 *cursor)
 	return true;
 }
 
-elf_b32 elf_equal(elf_State *state, elf_i32 left, elf_i32 right)
+elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right)
 {
 	elf_Value *left_value = value_at(state, left);
 	elf_Value *right_value = value_at(state, right);
@@ -354,15 +349,15 @@ void elf_get_global(elf_State *state, const char *name)
 	push_value(state, elf_table_get_or_nil(state, state->globals, key));
 }
 
-elf_b32 elf_set_global(elf_State *state, const char *name)
+elf_Bool elf_set_global(elf_State *state, const char *name)
 {
-	if (!name || state->stack_ptr <= state->frame->framebase + frame_floor(state)) return false;
+	if (!name || state->stack_ptr <= state->frame->framebase + frame_size(state)) return false;
 	elf_Value key = value_from_string(elf_string_from_data(state, name));
 	elf_table_set(state, state->globals, key, pop_value(state));
 	return true;
 }
 
-elf_Ref elf_create_ref(elf_State *state, elf_i32 index)
+elf_Ref elf_create_ref(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value || value_is_nil(*value) || state->next_ref == 0) return ELF_NO_REF;
@@ -371,7 +366,7 @@ elf_Ref elf_create_ref(elf_State *state, elf_i32 index)
 	return reference;
 }
 
-elf_b32 elf_push_ref(elf_State *state, elf_Ref reference)
+elf_Bool elf_push_ref(elf_State *state, elf_Ref reference)
 {
 	if (reference == ELF_NO_REF) return false;
 	elf_Value key = value_from_integer(reference);
@@ -380,7 +375,7 @@ elf_b32 elf_push_ref(elf_State *state, elf_Ref reference)
 	return true;
 }
 
-elf_b32 elf_release_ref(elf_State *state, elf_Ref reference)
+elf_Bool elf_release_ref(elf_State *state, elf_Ref reference)
 {
 	if (reference == ELF_NO_REF) return false;
 	return elf_table_delete(state, state->ref_table, value_from_integer(reference), 0);

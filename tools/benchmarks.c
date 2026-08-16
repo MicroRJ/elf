@@ -9,8 +9,8 @@
 #include "core.h"
 #include "helpers.h"
 
-static volatile elf_Integer bench_integer_sink;
-static volatile elf_Number bench_number_sink;
+static volatile elf_Int bench_integer_sink;
+static volatile elf_Num bench_number_sink;
 
 static void bench_require(b32 condition, const char *message)
 {
@@ -37,7 +37,7 @@ static elf_Value bench_string_key(elf_State *state, const char *text)
 	return value;
 }
 
-static elf_Value bench_int_key(elf_Integer integer)
+static elf_Value bench_int_key(elf_Int integer)
 {
 	elf_Value value = {};
 	value = value_from_integer(integer);
@@ -55,7 +55,7 @@ static void bench_report(const char *name, const char *unit, u32 iterations, dou
 
 static double bench_table_get(elf_State *state, elf_Table *table, elf_Value *keys, u32 key_count, u32 iterations)
 {
-	elf_Integer sink = 0;
+	elf_Int sink = 0;
 	i64 start = bench_now();
 
 	for (u32 i = 0; i < iterations; ++i) {
@@ -94,7 +94,7 @@ static elf_Ref bench_compile_program(elf_State *state, const char *name, const c
 	return program;
 }
 
-static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 iterations, elf_Integer expected)
+static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 iterations, elf_Int expected)
 {
 	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
 	elf_push_nil(state);
@@ -103,7 +103,7 @@ static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 i
 	u32 result_count = elf_call(state, 2, 1);
 	double seconds = bench_elapsed_s(start);
 	bench_require(result_count == 1, "benchmark function did not return one value");
-	elf_Integer result = 0;
+	elf_Int result = 0;
 	bench_require(elf_to_int(state, -1, &result), "benchmark result was not an integer");
 	bench_require(result == expected, "benchmark returned the wrong integer result");
 	bench_integer_sink += result;
@@ -111,7 +111,7 @@ static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 i
 	return seconds;
 }
 
-static double bench_run_number_program(elf_State *state, elf_Ref program, u32 iterations, elf_Number expected)
+static double bench_run_number_program(elf_State *state, elf_Ref program, u32 iterations, elf_Num expected)
 {
 	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
 	elf_push_nil(state);
@@ -120,7 +120,7 @@ static double bench_run_number_program(elf_State *state, elf_Ref program, u32 it
 	u32 result_count = elf_call(state, 2, 1);
 	double seconds = bench_elapsed_s(start);
 	bench_require(result_count == 1, "benchmark function did not return one value");
-	elf_Number result = 0;
+	elf_Num result = 0;
 	bench_require(elf_type(state, -1) == ELF_VALUE_TYPE_NUMBER, "benchmark result did not use the number path");
 	bench_require(elf_to_num(state, -1, &result), "benchmark result was not a number");
 	bench_require(result == expected, "benchmark returned the wrong number result");
@@ -129,7 +129,7 @@ static double bench_run_number_program(elf_State *state, elf_Ref program, u32 it
 	return seconds;
 }
 
-static void bench_vm_integer_program(const char *name, const char *source, u32 iterations, elf_Integer expected)
+static void bench_vm_integer_program(const char *name, const char *source, u32 iterations, elf_Int expected)
 {
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];
@@ -146,7 +146,7 @@ static void bench_vm_integer_program(const char *name, const char *source, u32 i
 	elf_destroy_state(state);
 }
 
-static void bench_vm_number_program(const char *name, const char *source, u32 iterations, elf_Number expected)
+static void bench_vm_number_program(const char *name, const char *source, u32 iterations, elf_Num expected)
 {
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];

@@ -5,14 +5,14 @@ static elf_Value test_key_string(elf_State *state, const char *text)
 	return value;
 }
 
-static elf_Value test_key_int(elf_Integer integer)
+static elf_Value test_key_int(elf_Int integer)
 {
 	elf_Value value = {};
 	value = value_from_integer(integer);
 	return value;
 }
 
-static elf_Value test_value_int(elf_Integer integer)
+static elf_Value test_value_int(elf_Int integer)
 {
 	return test_key_int(integer);
 }
@@ -24,7 +24,7 @@ static void expect_nil(elf_Value value, const char *label)
 	}
 }
 
-static void expect_int(elf_Value value, elf_Integer expected, const char *label)
+static void expect_int(elf_Value value, elf_Int expected, const char *label)
 {
 	if (value.type != ELF_VALUE_TYPE_INTEGER || value.x_int != expected) {
 		fprintf(stderr, "FAIL: %s expected int %lld, got tag %d elf_Value %lld\n",

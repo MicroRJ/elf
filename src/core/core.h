@@ -96,6 +96,7 @@ struct elf_Closure
 	elf_Value     captures[];
 };
 
+// TODO(RJ) remove this!
 typedef struct
 {
 	char         *name;
@@ -103,33 +104,35 @@ typedef struct
 }
 elf_Binding;
 
-
 // TODO(RJ) can we make this smaller
 typedef struct StackFrame StackFrame;
 struct StackFrame
 {
-	elf_Module *module;
-	BcFunction *function;
-	elf_Value  *framebase;
-	elf_Value  *reference;
-	elf_Value   *captures;
-	u32         framesize;
+	elf_Module      *module;
+	BcFunction    *function;
+	elf_Value    *framebase;
+	elf_Value    *reference;
+	elf_Value     *captures;
+	u32           framesize;
 	u32         instruction;
-	u8              nargs;
-	u8              nrets;
-	u8              arity;
-	u8           variadic;
-	u8          ncaptures;
+	u8                nargs;
+	u8                nrets;
+	u8                arity;
+	u8             variadic;
+	u8            ncaptures;
 };
 typedef struct elf_State elf_State;
 struct elf_State
 {
-	elf_Arena    arena;
-	void        *user_data;
-	elf_Module  *modules;
+	elf_Arena      arena;
+	void          *user_data;
+
+	elf_Module    *modules;
+
 	elf_Diagnostic diagnostic;
 	char          *diagnostic_storage;
 	u64            diagnostic_storage_capacity;
+
 	struct
 	{
 		u32          gc_mode;

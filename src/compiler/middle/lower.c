@@ -197,7 +197,7 @@ static void emit_defer_range(LowerContext *ctx, IrFrame *items, u32 start)
 	}
 }
 
-static Entity *entity_from_name(LowerContext *ctx, elf_String *name)
+static Entity *entity_from_name(LowerContext *ctx, elf_Atom *name)
 {
 	for (i32 i = ctx->scope_end - 1; i >= 0; -- i)
 	{
@@ -209,17 +209,17 @@ static Entity *entity_from_name(LowerContext *ctx, elf_String *name)
 	return 0;
 }
 
-static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, elf_String *name)
+static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, elf_Atom *name)
 {
 	Entity *en = entity_from_name(ctx, name);
-	const char *text = string_data(name);
+	const char *name_data = atom_data(name);
 	if (en)
 	{
 		if (en->type == ENTITY_DIRECTORY) {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': a directory with this name already exists", text);
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': a directory with this name already exists", name_data);
 		}
 		if (en->scope_start == ctx->scope_start) {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", text);
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
 		}
 	}
 
@@ -281,12 +281,12 @@ static Ir load_entity_ir(LowerContext *ctx, SourceSite site, Entity *entity)
 static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) return true;
-	Entity *entity = entity_from_name(ctx, destination->string);
+	Entity *entity = entity_from_name(ctx, destination->atom);
 	if (!entity) return true;
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site,
-			"'%s' is constant and cannot be assigned", string_data(destination->string));
+			"'%s' is constant and cannot be assigned", atom_data(destination->atom));
 		return false;
 	}
 	entity->tags |= ENTITY_TAG_ASSIGNED;
@@ -434,7 +434,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 		case AST_STRING_LITERAL:
 		{
-			ir = create_string_ir(ctx, expr->site, expr->string);
+			ir = create_atom_ir(ctx, expr->site, expr->atom);
 		}
 		break;
 
@@ -482,14 +482,14 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 		case AST_IDENT:
 		{
-			elf_String *ident = expr->string;
-			const char *ident_text = string_data(ident);
+			elf_Atom *ident = expr->atom;
+			const char *ident_text = atom_data(ident);
 
 			Entity *en = entity_from_name(ctx, ident);
 
 			if (en == 0)
 			{
-				elf_Value value = value_from_string(expr->string);
+				elf_Value value = value_from_string(elf_string_from_atom(ctx->state, expr->atom));
 				u32 global_index = elf_table_ensure(ctx->state, ctx->state->globals, value);
 
 				ir = create_load_global_ir(ctx, expr->site, global_index);
@@ -625,7 +625,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				Ir param_memory = create_local_ir(ctx, name->site, 0);
 				param_memory->ir_local.slot = (BcSlot){(i32)(IMPLICIT_PARAM_COUNT + i)};
 
-				Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->string);
+				Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
 				entity->memory_ir = param_memory;
 			}
 
@@ -886,7 +886,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 		Ir local = create_local_ir(ctx, name->site, value);
 		push_ir(items, local);
 
-		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->string);
+		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
@@ -970,7 +970,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		var_locals[i] = local;
 
 		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
-			ENTITY_TAG_FORLOOP | entity_tags, name->string);
+			ENTITY_TAG_FORLOOP | entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
