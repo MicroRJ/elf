@@ -19,8 +19,6 @@ struct elf_String
 #define ELF_STRING_HEADER_SIZE ((u32)offsetof(elf_String, data))
 #define ELF_STRING_MAX_SIZE    (0xffffffffu - ELF_STRING_HEADER_SIZE - 1)
 
-elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
-
 static inline u32 string_size(elf_String *string)
 {
 	ASSERT(string);
@@ -43,6 +41,7 @@ static inline b32 strings_equal(elf_String *left, elf_String *right)
 	return left == right;
 }
 
+elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 static inline elf_String *elf_string_from_data(elf_State *state, const char *data)
 {
 	ASSERT(data);
