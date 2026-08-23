@@ -223,11 +223,11 @@ static void init_parser_atoms(Parser *parser)
 	atom_table_init(&parser->atoms, parser->arena);
 
 #define INTERN_KEYWORD_ATOM(NAME, TEXT) atom_from_data_id(&parser->atoms, TEXT, XFUSE(TOK_, NAME));
-	KEYWORDDEF(INTERN_KEYWORD_ATOM)
+	KEYWORD_DEFINITIONS(INTERN_KEYWORD_ATOM)
 #undef INTERN_KEYWORD_ATOM
 
 #define INTERN_MACRO_ATOM(NAME, TEXT) atom_from_data_id(&parser->atoms, "#" TEXT, XFUSE(TOK_, NAME));
-	MACRODEF(INTERN_MACRO_ATOM)
+	MACRO_DEFINITIONS(INTERN_MACRO_ATOM)
 #undef INTERN_MACRO_ATOM
 }
 

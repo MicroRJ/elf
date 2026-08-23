@@ -65,7 +65,7 @@ static Ir create_num_ir(LowerContext *ctx, SourceSite site, f64 n)
 	return ir;
 }
 
-static Ir create_atom_ir(LowerContext *ctx, SourceSite site, elf_Atom *atom)
+static Ir create_atom_ir(LowerContext *ctx, SourceSite site, Atom *atom)
 {
 	Ir ir = create_nullary_ir(ctx, site, IR_ATOM);
 	ir->atom = atom;

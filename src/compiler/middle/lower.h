@@ -5,7 +5,7 @@
 #define IMPLICIT_PARAM_INDEX 0
 #define IMPLICIT_PARAM_COUNT 1
 
-typedef struct Entity Entity;
+typedef struct ScopeEntity ScopeEntity;
 
 typedef struct
 {
@@ -15,7 +15,7 @@ typedef struct
 	Ir               body;
 	Ir              *captures;
 	u32              capture_count;
-	Entity         **capture_entities;
+	ScopeEntity         **capture_entities;
 }
 IrFunction;
 
@@ -77,47 +77,47 @@ typedef struct
 LoopLabels;
 
 typedef struct LowerContext LowerContext;
-typedef struct FunctionLowerContext FunctionLowerContext;
+typedef struct FnLowerScope FnLowerScope;
 
-struct FunctionLowerContext
+struct FnLowerScope
 {
-	FunctionLowerContext *parent;
-	IrFunction          *function;
-	EntityId             scope_start;
+	FnLowerScope *parent;
+	IrFunction   *function;
+	EntityId      scope_start;
 };
 
-typedef struct Entity
+typedef struct ScopeEntity
 {
-	EntityType    type;
-	EntityTags    tags;
+	EntityType   type;
+	EntityTags   tags;
 	u32          scope_start;
-	elf_Atom       *name;
+	Atom    *name;
 	SourceSite   site;
-	Ir         memory_ir;
+	Ir           memory_ir;
 }
-Entity;
+ScopeEntity;
 
 struct LowerContext
 {
 	elf_State   *state;
-	elf_Arena       *arena;
-	elf_String    *source_name;
+	elf_Arena   *arena;
+	elf_String  *source_name;
 	u32          ir_stack_size;
 	u32          ir_stack_index;
-	Ir       *ir_stack;
+	Ir          *ir_stack;
 
-	Ast      *defer_stack;
-	u32          defer_stack_size;
-	u32          defer_count;
-	u32          defer_scope_start;
-	u32          function_defer_start;
+	Ast        *defer_stack;
+	u32         defer_stack_size;
+	u32         defer_count;
+	u32         defer_scope_start;
+	u32         function_defer_start;
 
-	IrFunction *functions;
-	u32         num_functions;
-	u32         max_functions;
-	FunctionLowerContext *function;
+	IrFunction           *functions;
+	u32                   num_functions;
+	u32                   max_functions;
+	FnLowerScope *function;
 
-	Entity     entities[MAX_ENTITIES];
+	ScopeEntity     entities[MAX_ENTITIES];
 	EntityId   scope_start;
 	EntityId   scope_end;
 

@@ -5,68 +5,68 @@
 #ifndef ELF_COMPILER_ATOM_H
 #define ELF_COMPILER_ATOM_H
 
-typedef struct elf_Atom elf_Atom;
-typedef struct AtomTable AtomTable;
+typedef struct Atom Atom;
+typedef struct Atom_Table Atom_Table;
 
-struct elf_Atom
+struct Atom
 {
-	elf_Atom *next;
-	u32       hash;
-	u32       size;
-	u16       id;
-	char      data[1];
+	Atom   *next;
+	u32     hash;
+	u32     size;
+	u16     id;
+	char    data[1];
 };
 
-struct AtomTable
+struct Atom_Table
 {
 	elf_Arena  *arena;
-	elf_Atom **buckets;
+	Atom      **buckets;
 	u32         bucket_count;
 	u32         count;
 };
 
-static inline u32 atom_size(elf_Atom *atom)
+static inline u32 atom_size(Atom *atom)
 {
 	return atom->size;
 }
 
-static inline const char *atom_data(elf_Atom *atom)
+static inline const char *atom_data(Atom *atom)
 {
 	return atom->data;
 }
 
-static inline u32 atom_hash(elf_Atom *atom)
+static inline u32 atom_hash(Atom *atom)
 {
 	return atom->hash;
 }
 
-static inline b32 atoms_equal(elf_Atom *left, elf_Atom *right)
+static inline b32 atoms_equal(Atom *left, Atom *right)
 {
 	return left == right;
 }
 
-static void atom_table_init(AtomTable *table, elf_Arena *arena);
-static elf_Atom *atom_from_data_size_id(AtomTable *table, const char *data, u32 size, u16 id);
-static elf_Atom *atom_table_begin(AtomTable *table, u32 capacity);
-static elf_Atom *atom_table_end(AtomTable *table, elf_Atom *candidate, u32 size);
+static void atom_table_init(Atom_Table *table, elf_Arena *arena);
+static Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id);
+static Atom *atom_table_begin(Atom_Table *table, u32 capacity);
+static Atom *atom_table_end(Atom_Table *table, Atom *candidate, u32 size);
 
-static inline elf_Atom *atom_from_data_size(AtomTable *table, const char *data, u32 size)
+static inline Atom *atom_from_data_size(Atom_Table *table, const char *data, u32 size)
 {
 	return atom_from_data_size_id(table, data, size, 0);
 }
 
-static inline elf_Atom *atom_from_data(AtomTable *table, const char *data)
+static inline Atom *atom_from_data(Atom_Table *table, const char *data)
 {
 	ASSERT(data);
 	return atom_from_data_size(table, data, (u32)strlen(data));
 }
 
-static inline elf_Atom *atom_from_data_id(AtomTable *table, const char *data, u16 id)
+static inline Atom *atom_from_data_id(Atom_Table *table, const char *data, u16 id)
 {
 	ASSERT(data);
 	return atom_from_data_size_id(table, data, (u32)strlen(data), id);
 }
 
-static elf_String *elf_string_from_atom(elf_State *state, elf_Atom *atom);
+static elf_String *elf_string_from_atom(elf_State *state, Atom *atom);
 
 #endif

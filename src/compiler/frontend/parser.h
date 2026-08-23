@@ -6,6 +6,7 @@
 
 typedef struct Parser Parser;
 
+// TODO(RJ): this literally bothers me!
 typedef enum
 {
 	LEXER_MODE_NORMAL = 0,
@@ -13,6 +14,7 @@ typedef enum
 }
 LexerModeType;
 
+// TODO(RJ): this literally bothers me!
 typedef struct
 {
 	LexerModeType type;
@@ -27,7 +29,7 @@ typedef struct
 {
 	elf_State        *state;
 	elf_String        *name;
-	AtomTable        *atoms;
+	Atom_Table        *atoms;
 	elf_StrSlice     source;
 	char            *cursor;
 	u32              line_index;
@@ -45,7 +47,7 @@ struct Parser
 	elf_Arena  *arena;
 	elf_State  *state;
 	elf_String *name;
-	AtomTable   atoms;
+	Atom_Table   atoms;
 	Lexer       lexer;
 	Token       tok,tok_prev,tok_prox;
 	AstContext  ast;

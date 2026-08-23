@@ -4,123 +4,123 @@
 
 #define FORMAT_CHAR '$'
 
-#define KEYWORDDEF(_)       \
-_(JSON     ,"json"        ) \
-_(DEFAULT  ,"default"     ) \
-_(FUN      ,"fun"         ) \
-_(NIL      ,"nil"         ) \
-_(TRUE     ,"true"        ) \
-_(FALSE    ,"false"       ) \
-_(ENUM     ,"enum"        ) \
-_(TRY      ,"try"         ) \
-_(CATCH    ,"catch"       ) \
-_(FINALLY  ,"finally"     ) \
-_(DO       ,"do"          ) \
-_(WHILE    ,"while"       ) \
-_(BREAK    ,"break"       ) \
-_(CONTINUE ,"continue"    ) \
-_(FOR      ,"for"         ) \
-_(DEFER    ,"defer"       ) \
-_(RET      ,"ret"         ) \
-_(RECURSE  ,"recurse"     ) \
-_(IF       ,"if"          ) \
-_(ELSE     ,"else"        ) \
-_(ELIF     ,"elif"        ) \
-_(THEN     ,"then"        ) \
-_(GLOBAL   ,"global"      ) \
-/* end */
+#define KEYWORD_DEFINITIONS(X) \
+	X(JSON     ,"json"        ) \
+	X(DEFAULT  ,"default"     ) \
+	X(FUN      ,"fun"         ) \
+	X(NIL      ,"nil"         ) \
+	X(TRUE     ,"true"        ) \
+	X(FALSE    ,"false"       ) \
+	X(ENUM     ,"enum"        ) \
+	X(TRY      ,"try"         ) \
+	X(CATCH    ,"catch"       ) \
+	X(FINALLY  ,"finally"     ) \
+	X(DO       ,"do"          ) \
+	X(WHILE    ,"while"       ) \
+	X(BREAK    ,"break"       ) \
+	X(CONTINUE ,"continue"    ) \
+	X(FOR      ,"for"         ) \
+	X(DEFER    ,"defer"       ) \
+	X(RET      ,"ret"         ) \
+	X(RECURSE  ,"recurse"     ) \
+	X(IF       ,"if"          ) \
+	X(ELSE     ,"else"        ) \
+	X(ELIF     ,"elif"        ) \
+	X(THEN     ,"then"        ) \
+	X(GLOBAL   ,"global"      ) \
+// END
 
-#define MACRODEF(_)                 \
-_(M_LINE_NUMBER   , "line_number" ) \
-_(M_LINE_CHAR     , "line_char"   ) \
-_(M_FILE_NAME     , "file_name"   ) \
-_(M_ASSERT        , "assert"      ) \
-_(M_INT           , "int"         ) \
-_(M_NUM           , "num"         ) \
-_(M_LEVEL         , "level"       ) \
-_(M_GET_MEM       , "get_mem"     ) \
-_(M_GETEXPR       , "getexpr"     ) \
-_(M_INDEX         , "index"       ) \
-_(M_VALUE         , "elf_Value"       ) \
-_(M_ARRAY         , "elf_Value *"       ) \
-_(M_FIELD         , "field"       ) \
-_(M_ENDOFFILE     , "eof"         ) \
-_(M_THIS          , "this"        ) \
-/* end */
+#define MACRO_DEFINITIONS(X)           \
+	X(M_LINE_NUMBER   , "line_number" ) \
+	X(M_LINE_CHAR     , "line_char"   ) \
+	X(M_FILE_NAME     , "file_name"   ) \
+	X(M_ASSERT        , "assert"      ) \
+	X(M_INT           , "int"         ) \
+	X(M_NUM           , "num"         ) \
+	X(M_LEVEL         , "level"       ) \
+	X(M_GET_MEM       , "get_mem"     ) \
+	X(M_GETEXPR       , "getexpr"     ) \
+	X(M_INDEX         , "index"       ) \
+	X(M_VALUE         , "value"       ) \
+	X(M_ARRAY         , "array"       ) \
+	X(M_FIELD         , "field"       ) \
+	X(M_ENDOFFILE     , "eof"         ) \
+	X(M_THIS          , "this"        ) \
+// END
 
-
-#define TOKEN_XDEF(_)                  \
-_(INTEGER             , "int")         \
-_(NUMBER              , "num")         \
-_(STRING              , "str")         \
-_(FORMAT_STRING       , "fmt")         \
-_(STRING_START        , "str_start")   \
-_(STRING_PART         , "str_part")    \
-_(STRING_END          , "str_end")     \
-_(LETTER              , "chr")         \
-_(IDENTIFIER          , "idn")         \
-_(TILDE               , "~"  )         \
-_(MINUS_MINUS         , "--" )         \
-_(PLUS_PLUS           , "++" )         \
-_(QMARK               , "?"  )         \
-_(EXCLAMATION_MARK    , "!"  )         \
-_(ARROW               , "->" )         \
-_(BIND                , ":=" )         \
-_(HARD_BIND           , "::=")         \
-_(STATIC_BIND         , "::" )         \
-_(ASSIGN              , "="  )         \
-_(NIL_ASSIGN          , "?=" )         \
-_(COLON               , ":"  )         \
-_(COLON2              , "::" )         \
-_(SEMICOLON           , ";"  )         \
-_(COMMA               , ","  )         \
-_(DOT                 , "."  )         \
-_(SQUARE_LEFT         , "["  )         \
-_(SQUARE_RIGHT        , "]"  )         \
-_(LEFT_BRACE          , "{"  )         \
-_(RIGHT_BRACE         , "}"  )         \
-_(LEFT_PAREN          , "("  )         \
-_(PAREN_RIGHT         , ")"  )         \
-_(POW                 , "**" )         \
-_(MUL                 , "*"  )         \
-_(MUL_ASSIGN          , "*=" )         \
-_(DIV                 , "/"  )         \
-_(DIV_ASSIGN          , "/=" )         \
-_(MOD                 , "%"  )         \
-_(MOD_ASSIGN          , "%=" )         \
-_(ADD                 , "+"  )         \
-_(ADD_ASSIGN          , "+=" )         \
-_(SUB                 , "-"  )         \
-_(SUB_ASSIGN          , "-=" )         \
-_(SHR                 , ">>" )         \
-_(SHR_ASSIGN          , ">>=" )        \
-_(SHL                 , "<<" )         \
-_(SHL_ASSIGN          , "<<=" )        \
-_(LT                  , "<"  )         \
-_(LTEQ                , "<=" )         \
-_(GT                  , ">"  )         \
-_(GTEQ                , ">=" )         \
-_(EQ                  , "==" )         \
-_(NEQ                 , "!=" )         \
-_(BIT_AND             , "&"  )         \
-_(BIT_OR              , "|"  )         \
-_(BIT_XOR             , "^"  )         \
-_(XOR_ASSIGN          , "^=" )         \
-_(LOG_AND             , "&&" )         \
-_(LOG_OR              , "||" )         \
-_(NIL_AND             , "!!" )         \
-_(NIL_OR              , "??" )         \
-_(ELLIPSIS            ,"..." )         \
-KEYWORDDEF(_)                          \
-MACRODEF(_)                            \
-// END /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+// TODO(RJ): I am not satisfied with formatted strings being done in the lexer, it just
+// feels off!
+#define TOKEN_DEFINITIONS(X)              \
+	X(INTEGER             , "int")         \
+	X(NUMBER              , "num")         \
+	X(STRING              , "str")         \
+	X(FORMAT_STRING       , "fmt")         \
+	X(STRING_START        , "str_start")   \
+	X(STRING_PART         , "str_part")    \
+	X(STRING_END          , "str_end")     \
+	X(LETTER              , "chr")         \
+	X(IDENTIFIER          , "idn")         \
+	X(TILDE               , "~"  )         \
+	X(MINUS_MINUS         , "--" )         \
+	X(PLUS_PLUS           , "++" )         \
+	X(QMARK               , "?"  )         \
+	X(EXCLAMATION_MARK    , "!"  )         \
+	X(ARROW               , "->" )         \
+	X(BIND                , ":=" )         \
+	X(HARD_BIND           , "::=")         \
+	X(STATIC_BIND         , "::" )         \
+	X(ASSIGN              , "="  )         \
+	X(NIL_ASSIGN          , "?=" )         \
+	X(COLON               , ":"  )         \
+	X(COLON2              , "::" )         \
+	X(SEMICOLON           , ";"  )         \
+	X(COMMA               , ","  )         \
+	X(DOT                 , "."  )         \
+	X(SQUARE_LEFT         , "["  )         \
+	X(SQUARE_RIGHT        , "]"  )         \
+	X(LEFT_BRACE          , "{"  )         \
+	X(RIGHT_BRACE         , "}"  )         \
+	X(LEFT_PAREN          , "("  )         \
+	X(PAREN_RIGHT         , ")"  )         \
+	X(POW                 , "**" )         \
+	X(MUL                 , "*"  )         \
+	X(MUL_ASSIGN          , "*=" )         \
+	X(DIV                 , "/"  )         \
+	X(DIV_ASSIGN          , "/=" )         \
+	X(MOD                 , "%"  )         \
+	X(MOD_ASSIGN          , "%=" )         \
+	X(ADD                 , "+"  )         \
+	X(ADD_ASSIGN          , "+=" )         \
+	X(SUB                 , "-"  )         \
+	X(SUB_ASSIGN          , "-=" )         \
+	X(SHR                 , ">>" )         \
+	X(SHR_ASSIGN          , ">>=" )        \
+	X(SHL                 , "<<" )         \
+	X(SHL_ASSIGN          , "<<=" )        \
+	X(LT                  , "<"  )         \
+	X(LTEQ                , "<=" )         \
+	X(GT                  , ">"  )         \
+	X(GTEQ                , ">=" )         \
+	X(EQ                  , "==" )         \
+	X(NEQ                 , "!=" )         \
+	X(BIT_AND             , "&"  )         \
+	X(BIT_OR              , "|"  )         \
+	X(BIT_XOR             , "^"  )         \
+	X(XOR_ASSIGN          , "^=" )         \
+	X(LOG_AND             , "&&" )         \
+	X(LOG_OR              , "||" )         \
+	X(NIL_AND             , "!!" )         \
+	X(NIL_OR              , "??" )         \
+	X(ELLIPSIS            ,"..." )         \
+	KEYWORD_DEFINITIONS(X)                 \
+	MACRO_DEFINITIONS(X)                   \
+// END
 
 typedef enum
 {
 	TOK_NONE = 0,
 #define XPAND(ENUM, NAME) TOK_##ENUM,
-	TOKEN_XDEF(XPAND)
+	TOKEN_DEFINITIONS(XPAND)
 #undef XPAND
 	TOK_COUNT_,
 }
@@ -136,7 +136,7 @@ typedef struct
 	union {
 		u64 integer_magnitude;
 		f64 number;
-		elf_Atom *atom;
+		Atom *atom;
 	};
 }
 Token;

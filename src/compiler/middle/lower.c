@@ -197,11 +197,11 @@ static void emit_defer_range(LowerContext *ctx, IrFrame *items, u32 start)
 	}
 }
 
-static Entity *entity_from_name(LowerContext *ctx, elf_Atom *name)
+static ScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
 {
 	for (i32 i = ctx->scope_end - 1; i >= 0; -- i)
 	{
-		Entity *en = & ctx->entities[i];
+		ScopeEntity *en = & ctx->entities[i];
 		if (en->name == name) {
 			return en;
 		}
@@ -209,9 +209,9 @@ static Entity *entity_from_name(LowerContext *ctx, elf_Atom *name)
 	return 0;
 }
 
-static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, elf_Atom *name)
+static ScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
 {
-	Entity *en = entity_from_name(ctx, name);
+	ScopeEntity *en = entity_from_name(ctx, name);
 	const char *name_data = atom_data(name);
 	if (en)
 	{
@@ -235,7 +235,7 @@ static Entity *declare_entity(LowerContext *ctx, SourceSite site, EntityType typ
 	return en;
 }
 
-static u32 capture_entity_in_function(LowerContext *ctx, FunctionLowerContext *function_ctx, Entity *entity, SourceSite site)
+static u32 capture_entity_in_function(LowerContext *ctx, FnLowerScope *function_ctx, ScopeEntity *entity, SourceSite site)
 {
 	IrFunction *function = function_ctx->function;
 	for (u32 i = 0; i < function->capture_count; ++ i)
@@ -250,7 +250,7 @@ static u32 capture_entity_in_function(LowerContext *ctx, FunctionLowerContext *f
 	function->capture_entities[capture_index] = entity;
 
 	Ir source = 0;
-	FunctionLowerContext *parent = function_ctx->parent;
+	FnLowerScope *parent = function_ctx->parent;
 	if (parent && entity->scope_start < parent->scope_start)
 	{
 		u32 parent_capture = capture_entity_in_function(ctx, parent, entity, site);
@@ -266,7 +266,7 @@ static u32 capture_entity_in_function(LowerContext *ctx, FunctionLowerContext *f
 	return capture_index;
 }
 
-static Ir load_entity_ir(LowerContext *ctx, SourceSite site, Entity *entity)
+static Ir load_entity_ir(LowerContext *ctx, SourceSite site, ScopeEntity *entity)
 {
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	if (ctx->function && entity->scope_start < ctx->function->scope_start)
@@ -281,7 +281,7 @@ static Ir load_entity_ir(LowerContext *ctx, SourceSite site, Entity *entity)
 static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) return true;
-	Entity *entity = entity_from_name(ctx, destination->atom);
+	ScopeEntity *entity = entity_from_name(ctx, destination->atom);
 	if (!entity) return true;
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
@@ -324,12 +324,12 @@ static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 	{
 		IrFunction *main_fn = add_function_ir(ctx, file->site, true, IMPLICIT_PARAM_COUNT, 0);
 
-		FunctionLowerContext main_function_ctx = {};
+		FnLowerScope main_function_ctx = {};
 		main_function_ctx.function = main_fn;
 		main_function_ctx.scope_start = ctx->scope_start;
 		main_function_ctx.parent = 0;
 
-		FunctionLowerContext *outer_function = ctx->function;
+		FnLowerScope *outer_function = ctx->function;
 		ctx->function = &main_function_ctx;
 		main_fn->body = lower_ast_to_ir_block(ctx, file->file.body);
 		ctx->function = outer_function;
@@ -482,10 +482,10 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 		case AST_IDENT:
 		{
-			elf_Atom *ident = expr->atom;
+			Atom *ident = expr->atom;
 			const char *ident_text = atom_data(ident);
 
-			Entity *en = entity_from_name(ctx, ident);
+			ScopeEntity *en = entity_from_name(ctx, ident);
 
 			if (en == 0)
 			{
@@ -593,12 +593,12 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			u32 function_index = function_index_from_ptr(ctx, function);
 
 			EntityScope function_scope = get_entity_scope(ctx);
-			FunctionLowerContext function_ctx = {};
+			FnLowerScope function_ctx = {};
 			function_ctx.parent = ctx->function;
 			function_ctx.function = function;
 			function_ctx.scope_start = ctx->scope_start;
 
-			FunctionLowerContext *outer_function = ctx->function;
+			FnLowerScope *outer_function = ctx->function;
 			u32 outer_defer_count = ctx->defer_count;
 			u32 outer_defer_scope_start = ctx->defer_scope_start;
 			u32 outer_function_defer_start = ctx->function_defer_start;
@@ -625,7 +625,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				Ir param_memory = create_local_ir(ctx, name->site, 0);
 				param_memory->ir_local.slot = (BcSlot){(i32)(IMPLICIT_PARAM_COUNT + i)};
 
-				Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
+				ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
 				entity->memory_ir = param_memory;
 			}
 
@@ -886,7 +886,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 		Ir local = create_local_ir(ctx, name->site, value);
 		push_ir(items, local);
 
-		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+		ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
@@ -969,7 +969,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		Ir local = create_local_ir(ctx, name->site, 0);
 		var_locals[i] = local;
 
-		Entity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
+		ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
 			ENTITY_TAG_FORLOOP | entity_tags, name->atom);
 		entity->memory_ir = local;
 	}

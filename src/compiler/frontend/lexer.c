@@ -11,7 +11,7 @@ static const char *token_type_name(TokenType type)
 	static const char *names[TOK_COUNT_] =
 	{
 #define XPAND(ENUM, NAME) [TOK_##ENUM] = NAME,
-		TOKEN_XDEF(XPAND)
+		TOKEN_DEFINITIONS(XPAND)
 #undef XPAND
 	};
 
@@ -21,21 +21,21 @@ static const char *token_type_name(TokenType type)
 	return names[type];
 }
 
-static TokenType atom_is_word_or_macro(elf_Atom *atom)
+static TokenType atom_is_word_or_macro(Atom *atom)
 {
 	switch (atom->id) {
 #define MCITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
-		MACRODEF(MCITEM)
+		MACRO_DEFINITIONS(MCITEM)
 #undef MCITEM
 		default: return TOK_IDENTIFIER;
 	}
 }
 
-static TokenType check_keyword(elf_Atom *atom)
+static TokenType check_keyword(Atom *atom)
 {
 	switch (atom->id) {
 #define KWITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
-		KEYWORDDEF(KWITEM)
+		KEYWORD_DEFINITIONS(KWITEM)
 #undef KWITEM
 		default: return TOK_IDENTIFIER;
 	}
@@ -56,7 +56,7 @@ static b32 is_identifier_continue(char c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static void lexer_init(Lexer *lexer, elf_State *state, elf_String *name, AtomTable *atoms, elf_StrSlice source)
+static void lexer_init(Lexer *lexer, elf_State *state, elf_String *name, Atom_Table *atoms, elf_StrSlice source)
 {
 	lexer->state = state;
 	lexer->name = name;
@@ -447,12 +447,12 @@ static u32 lex_identifier(char **cursor)
 	return (u32)(cur - start);
 }
 
-static elf_Atom *lex_string_segment(Lexer *lexer, char **cursor, SourceSite site, b32 is_block, b32 is_format, b32 *ended)
+static Atom *lex_string_segment(Lexer *lexer, char **cursor, SourceSite site, b32 is_block, b32 is_format, b32 *ended)
 {
 	if (ended) *ended = false;
 
 	char *cur = *cursor;
-	elf_Atom *candidate = atom_table_begin(lexer->atoms, (u32)lexer_scratch_capacity(lexer));
+	Atom *candidate = atom_table_begin(lexer->atoms, (u32)lexer_scratch_capacity(lexer));
 	char *out = candidate->data;
 
 	for (;;)
@@ -506,7 +506,7 @@ static elf_Atom *lex_string_segment(Lexer *lexer, char **cursor, SourceSite site
 		}
 	}
 
-	elf_Atom *atom = atom_table_end(lexer->atoms, candidate, (u32)(out - candidate->data));
+	Atom *atom = atom_table_end(lexer->atoms, candidate, (u32)(out - candidate->data));
 	*cursor = cur;
 	return atom;
 }
@@ -667,7 +667,7 @@ static Token lex_token(Lexer *lexer)
 			{
 				char *start = cur;
 				u32 size = lex_identifier(&cur);
-				elf_Atom *atom = atom_from_data_size(lexer->atoms, start, size);
+				Atom *atom = atom_from_data_size(lexer->atoms, start, size);
 				token.type = check_keyword(atom);
 				if (token.type == TOK_IDENTIFIER) {
 					token.atom = atom;
@@ -736,7 +736,7 @@ static Token lex_token(Lexer *lexer)
 			{
 				lex_identifier(&cur);
 				u32 size = (u32)(cur - token.site.data);
-				elf_Atom *atom = atom_from_data_size(lexer->atoms, token.site.data, size);
+				Atom *atom = atom_from_data_size(lexer->atoms, token.site.data, size);
 
 				token.type = atom_is_word_or_macro(atom);
 				if (token.type == TOK_M_ENDOFFILE) {

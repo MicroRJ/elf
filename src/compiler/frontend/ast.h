@@ -96,11 +96,10 @@ AstDeclTags;
 
 static const char *ast_type_name(AstType type);
 
-// Todo, we could use an AstArray structure since we have that pattern all over the place,
-// something like:
+// TODO(RJ): use this consistently throughout!
 typedef struct
 {
-	u32    nargs;
+	u32 nargs;
 	Ast *args;
 }
 AstArray;
@@ -121,7 +120,7 @@ struct Ast_T
 
 	union
 	{
-		elf_Atom *atom;
+		Atom *atom;
 		i64         integer_value;
 		f64         number_value;
 		AstArray    interpolated_string;

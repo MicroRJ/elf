@@ -78,7 +78,7 @@ static Ast create_num_ast(Parser *par, SourceSite site, f64 n)
 	return value;
 }
 
-static Ast create_atom_ast(Parser *par, SourceSite site, elf_Atom *atom)
+static Ast create_atom_ast(Parser *par, SourceSite site, Atom *atom)
 {
 	Ast value = create_nullary_ast(par, site, AST_STRING_LITERAL);
 	value->atom = atom;
@@ -165,7 +165,7 @@ static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause
 	return value;
 }
 
-static Ast create_ident_ast(Parser *par, SourceSite site, elf_Atom *atom)
+static Ast create_ident_ast(Parser *par, SourceSite site, Atom *atom)
 {
 	Ast tree = create_ast(par, site, AST_IDENT);
 	tree->atom = atom;

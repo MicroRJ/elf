@@ -127,7 +127,7 @@ static int add_const_num(BcGen *gen, f64 i)
 	return index;
 }
 
-static int add_atom(BcGen *gen, elf_Atom *atom)
+static int add_atom(BcGen *gen, Atom *atom)
 {
 	BcModuleBuilder *module = &gen->module;
 	for (u32 i = 0; i < module->atom_count; ++ i) {
@@ -281,7 +281,7 @@ static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number
 	return emit_xy_bc(gen, site, BC_LOADKNUM, unwrap_slot(dest), index);
 }
 
-static u32 emit_load_atom_bc(BcGen *gen, SourceSite site, BcSlot dest, elf_Atom *atom)
+static u32 emit_load_atom_bc(BcGen *gen, SourceSite site, BcSlot dest, Atom *atom)
 {
 	u32 index = add_atom(gen, atom);
 	return emit_xy_bc(gen, site, BC_LOADKSTRING, unwrap_slot(dest), index);

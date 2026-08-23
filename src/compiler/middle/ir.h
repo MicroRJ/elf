@@ -2,7 +2,9 @@
 // See Copyright Notice In elf.h
 //
 
-
+// TODO(RJ), I think the better long term choice is just to keep a stack based
+// ir -> memory map, which would make the IR truly immutable and also allow
+// us to reuse it, which is not a real need, but whatever right ...
 typedef struct
 {
 	i32 slot;
@@ -12,68 +14,55 @@ BcSlot;
 #define NO_MEMORY ((BcSlot) { -1 })
 
 
-#define IR_XDEF(_)                                       \
-_(IR_NONE                , "none")                       \
-\
-_(IR_ERROR               , "error")                      \
-\
-_(IR_AND                 , "and")                        \
-_(IR_OR                  , "or")                         \
-_(IR_NIL_OR              , "nil_or")                     \
-_(IR_ADD                 , "add")                        \
-_(IR_SUB                 , "sub")                        \
-_(IR_MUL                 , "mul")                        \
-_(IR_DIV                 , "div")                        \
-_(IR_POW                 , "pow")                        \
-_(IR_MOD                 , "mod")                        \
-_(IR_EQ                  , "eq")                         \
-_(IR_NOT_EQ              , "not_eq")                     \
-_(IR_LESS_THAN           , "less_than")                  \
-_(IR_LESS_THAN_EQ        , "less_than_eq")               \
-_(IR_SHIFT_LEFT          , "shift_left")                 \
-_(IR_SHIFT_RIGHT         , "shift_right")                \
-_(IR_BITWISE_AND         , "bitwise_and")                \
-_(IR_BITWISE_OR          , "bitwise_or")                 \
-_(IR_BITWISE_XOR         , "bitwise_xor")                \
-_(IR_BITWISE_NOT         , "bitwise_not")                \
-\
-_(IR_STORE               , "store")                      \
-_(IR_ARRAY_ADD           , "array_add")                  \
-\
-_(IR_IF                  , "if")                         \
-\
-_(IR_BLOCK               , "block_stat")                 \
-_(IR_EXPR_BLOCK          , "expr_block")                 \
-\
-_(IR_NUMBER              , "number")                     \
-_(IR_INTEGER             , "integer")                    \
-_(IR_ATOM                , "atom")                       \
-_(IR_NIL                 , "nil")                        \
-\
-_(IR_CALL                , "call")                       \
-_(IR_META_CALL           , "meta_call")                  \
-\
-_(IR_TABLE               , "table")                      \
-\
-_(IR_INDEX               , "index")                      \
-_(IR_FIELD               , "field")                      \
-_(IR_META_FIELD          , "meta_field")                 \
-_(IR_LABEL               , "label")                      \
-_(IR_JUMP                , "jump")                       \
-_(IR_JUMP_IF_FALSE       , "jump_if_false")              \
-\
-_(IR_RETURN              , "return")                     \
-\
-_(IR_LENGTH_INTRINSIC    , "length_intrinsic")           \
-_(IR_GET_MEM             , "get_mem")                    \
-\
-_(IR_FUNCTION            , "function")                   \
-_(IR_RECURSE             , "recurse")                    \
-\
-_(IR_LOCAL               , "local")                      \
-_(IR_LOAD_LOCAL          , "load_local")                 \
-_(IR_LOAD_GLOBAL         , "load_global")                \
-_(IR_CAPTURE             , "capture")                    \
+#define IR_XDEF(X)                                          \
+	X(IR_NONE                , "none")                       \
+	X(IR_ERROR               , "error")                      \
+	X(IR_AND                 , "and")                        \
+	X(IR_OR                  , "or")                         \
+	X(IR_NIL_OR              , "nil_or")                     \
+	X(IR_ADD                 , "add")                        \
+	X(IR_SUB                 , "sub")                        \
+	X(IR_MUL                 , "mul")                        \
+	X(IR_DIV                 , "div")                        \
+	X(IR_POW                 , "pow")                        \
+	X(IR_MOD                 , "mod")                        \
+	X(IR_EQ                  , "eq")                         \
+	X(IR_NOT_EQ              , "not_eq")                     \
+	X(IR_LESS_THAN           , "less_than")                  \
+	X(IR_LESS_THAN_EQ        , "less_than_eq")               \
+	X(IR_SHIFT_LEFT          , "shift_left")                 \
+	X(IR_SHIFT_RIGHT         , "shift_right")                \
+	X(IR_BITWISE_AND         , "bitwise_and")                \
+	X(IR_BITWISE_OR          , "bitwise_or")                 \
+	X(IR_BITWISE_XOR         , "bitwise_xor")                \
+	X(IR_BITWISE_NOT         , "bitwise_not")                \
+	X(IR_STORE               , "store")                      \
+	X(IR_ARRAY_ADD           , "array_add")                  \
+	X(IR_IF                  , "if")                         \
+	X(IR_BLOCK               , "block_stat")                 \
+	X(IR_EXPR_BLOCK          , "expr_block")                 \
+	X(IR_NUMBER              , "number")                     \
+	X(IR_INTEGER             , "integer")                    \
+	X(IR_ATOM                , "atom")                       \
+	X(IR_NIL                 , "nil")                        \
+	X(IR_CALL                , "call")                       \
+	X(IR_META_CALL           , "meta_call")                  \
+	X(IR_TABLE               , "table")                      \
+	X(IR_INDEX               , "index")                      \
+	X(IR_FIELD               , "field")                      \
+	X(IR_META_FIELD          , "meta_field")                 \
+	X(IR_LABEL               , "label")                      \
+	X(IR_JUMP                , "jump")                       \
+	X(IR_JUMP_IF_FALSE       , "jump_if_false")              \
+	X(IR_RETURN              , "return")                     \
+	X(IR_LENGTH_INTRINSIC    , "length_intrinsic")           \
+	X(IR_GET_MEM             , "get_mem")                    \
+	X(IR_FUNCTION            , "function")                   \
+	X(IR_RECURSE             , "recurse")                    \
+	X(IR_LOCAL               , "local")                      \
+	X(IR_LOAD_LOCAL          , "load_local")                 \
+	X(IR_LOAD_GLOBAL         , "load_global")                \
+	X(IR_CAPTURE             , "capture")                    \
 /* end */
 
 typedef enum
@@ -107,14 +96,16 @@ struct IrNode
 	{
 		u32      ir_global;
 		u32      ir_capture;
+
 		struct
 		{
+			// TODO(RJ): consider removing this from the IR! to keep it pure and immutable!
 			u32 bytecode_label;
 			b32 has_bytecode_label;
 		}
 		ir_label;
 
-		elf_Atom *atom;
+		Atom *atom;
 		i64      ir_int;
 		f64      ir_num;
 
@@ -151,7 +142,6 @@ struct IrNode
 
 		struct
 		{
-			// Todo, replace with *args, nargs
 			Ir expr;
 		}
 		ir_return;
@@ -196,7 +186,8 @@ struct IrNode
 
 		struct
 		{
-			Ir   expr;
+			Ir     expr;
+			// TODO(RJ): consider removing this from the IR! to keep it pure and immutable!
 			BcSlot slot;
 		}
 		ir_local;
