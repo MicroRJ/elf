@@ -1,24 +1,15 @@
-# elf
+# Elf
 
-`elf` is a small, minimal, C-Like scripting language.
+Elf is a small, bytecode-interpreted scripting language designed to complement C.
+It combines familiar control flow and zero-based indexing with table-centered data,
+closures, and a compact native embedding API.
 
-The project is in active development, and it is not meant for
-production use.
+Elf is currently `0.2.0-dev`. The language is useful in my own projects, but its syntax,
+API, and module model are still evolving. It should be treated as experimental rather
+than production-ready.
 
-See ```docs\``` for an overview of the technical aspects.
-
-```
-sum := 0
-count := 0
-saw_end := 0
-
-for i := 0 ... 24 ? {
-	sum += i
-	count += 1
-	if i == 24 ? {
-		saw_end = 1
-	}
-}
+```elf
+numbers := {10, 20, 30}
 
 make_adder := fun(base) {
 	ret fun(value) {
@@ -26,37 +17,89 @@ make_adder := fun(base) {
 	}
 }
 
-add_10 := make_adder(10)
+add_ten := make_adder(10)
 
+for number := numbers[...] ? {
+	print(add_ten(number))
+}
 ```
 
-## Build
+## Why Elf?
 
-The repository includes a Windows x64 Bob bootstrap executable. No separate
-Bob installation is required:
+C remains the host language. Elf handles the parts of a native program that benefit
+from dynamic values and short iteration cycles: configuration, build descriptions,
+automation, strings, and nested data.
+
+The project currently provides:
+
+- a lexer and parser with source-located diagnostics;
+- AST-to-IR lowering and a bytecode backend;
+- a slot-based virtual machine with first-class functions and closures;
+- one table representation for array, map, and record-like data;
+- a stack-based C API for embedding and native functions; and
+- optional filesystem, path, process, environment, serialization, random, and time
+  libraries.
+
+Bob uses Elf as its build-description language, and Orbiter uses Elf programs for its
+build and game-library configuration.
+
+## Documentation
+
+- [Project overview and design](docs/about.md)
+- [Language guide](docs/grammar.md)
+- [C embedding API](docs/public-api.md)
+- [Standard libraries](docs/libraries/README.md)
+
+## Building
+
+The supported build environment is Windows x64. You need:
+
+- Git;
+- `clang-cl`; and
+- Microsoft's `lib.exe` librarian.
+
+Clone the repository with its platform-layer submodule:
 
 ```bat
-build.bat
+git clone --recursive https://github.com/MicroRJ/elf.git
+cd elf
 ```
 
-Arguments are passed through to Bob, so the test entry can be run with:
+If the repository is already cloned, initialize the submodule with:
 
 ```bat
+git submodule update --init --recursive
+```
+
+The repository includes a Windows x64 Bob bootstrap executable, so Bob does not need to
+be installed separately.
+
+```bat
+build.bat build
 build.bat test
 ```
 
-The bootstrap executable can also be invoked directly:
+Additional entries build the static libraries or run optimized benchmarks:
 
 ```bat
-bootstrap\windows-x64\bob.exe
+build.bat lib
+build.bat benchmark
 ```
 
-A compatible C compiler and linker are still required. If Bob is installed on
-`PATH`, invoking `bob` directly continues to work.
+Build products are written beneath `build/`. Passing no entry to `build.bat` uses Bob's
+default entry.
 
-## More
+## Repository layout
 
-Syntax, internals, and APIs are still moving quickly while the language
-architecture settles.
+- `include/` — public C headers
+- `src/compiler/` — lexer, parser, AST, IR, and bytecode generation
+- `src/core/` — runtime values, tables, strings, VM, GC, and core libraries
+- `src/batteries/` — optional host-facing libraries
+- `test/` — C unit tests and end-to-end Elf programs
+- `tools/` — runner, bytecode inspector, and benchmarks
+
+## License
+
+Elf is available under the [MIT License](LICENSE).
 
 
