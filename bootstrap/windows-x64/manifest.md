@@ -2,10 +2,10 @@
 
 - Target: `windows-x64`
 - Bob version: `0.2.0-dev`
-- Bob source commit: `2ec2435ea99cb57a8bf69b1dba145d9727585841`
+- Bob source commit: `61a33b78fd61f636746f62045e1c3fffd67642af`
 - Embedded Elf version: `0.2.0-dev`
-- Embedded Elf commit: `4f537e136fc1a00c61ce6b4862a60d2c4c01e5d5`
+- Embedded Elf commit: `cfc4fe4c80ee079267d6d0a7e850d24120c24074`
 - Platform version: `0.1.0-dev`
-- Platform commit: `ffdbfcae0cf277b76ab97d173dfabf37be57c739`
-- Executable size: `1,447,424` bytes
-- SHA-256: `229F693E746A7F736E03A3DAEF839345180453C0AAA75B53D7DDAF78F77F4C27`
+- Platform commit: `a1491f1511a145ba9ff3f0659ee606b6e9ae99ea`
+- Executable size: `1,457,152` bytes
+- SHA-256: `D98381EA5ABEADC6524E8695631170891C7DF5868567D1E2FE2F7795D94A1924`
