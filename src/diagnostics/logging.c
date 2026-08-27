@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#include "elf_os.h"
+
 typedef enum
 {
 	LOG_LEVEL_INFO = 0,
@@ -40,8 +42,8 @@ static void log_write(LogLevel level, const char *message)
 	static b32 console_colors_enabled;
 	if (!console_colors_enabled)
 	{
-		platform_enable_console_colors(PLATFORM_STANDARD_OUTPUT);
-		platform_enable_console_colors(PLATFORM_STANDARD_ERROR);
+		elf_os_enable_console_colors(ELF_OS_STANDARD_OUTPUT);
+		elf_os_enable_console_colors(ELF_OS_STANDARD_ERROR);
 		console_colors_enabled = 1;
 	}
 

@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#include "elf_os.h"
+
 static const char *runtime_error_type_names[] =
 {
 	[RUNTIME_ERROR_NONE]                   = "none",
@@ -182,10 +184,10 @@ static void print_runtime_error_location(RuntimeSourceLocation location)
 static void abort_after_runtime_error(void)
 {
 #if defined(_DEBUG) && defined(ELF_DEBUG_BREAK_ON_RUNTIME_ERROR)
-	platform_debug_break();
+	elf_os_debug_break();
 #endif
 	log_line(LOG_LEVEL_FATAL, "elf is exiting...");
-	platform_exit_process(1);
+	elf_os_exit_process(1);
 }
 
 static void report_runtime_error_message(elf_State *state, RuntimeErrorType error, int instr, const char *message)

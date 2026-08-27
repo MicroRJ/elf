@@ -18,7 +18,6 @@
 
 #include "elf.h"
 #include "base.h"
-#include "platform.h"
 
 #include "logging.c"
 

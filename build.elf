@@ -12,6 +12,7 @@ include_dirs := {
 	"src",
 	"src/base",
 	"src/api",
+	"src/os",
 	"src/core",
 	"src/diagnostics",
 	"src/core/libs",
@@ -92,6 +93,7 @@ compile_source := fun(name, source, includes, dependency_includes) {
 }
 
 elf_sources := {
+	{ name = "os_core",        path = "src/os/elf_os_core_win32.c" },
 	{ name = "base",           path = "src/base/base.c" },
 	{ name = "value",          path = "src/core/value/value.c" },
 	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
@@ -146,12 +148,17 @@ batteries_library := {
 	dependencies = { batteries.task },
 }
 
-build_tool := fun(name, source, output, uses_batteries) {
+build_tool := fun(name, source, output, uses_batteries, uses_platform) {
 	object := f"build/obj/tool_${output}.obj"
 	executable := f"build/${output}.exe"
-	inputs := { source, "build/elf.lib", "platform/build/platform.lib" }
-	dependencies := { elf_library, build_platform }
-	libraries := " build/elf.lib platform/build/platform.lib"
+	inputs := { source, "build/elf.lib" }
+	dependencies := { elf_library }
+	libraries := " build/elf.lib"
+	if uses_platform ? {
+		inputs:add("platform/build/platform.lib")
+		dependencies:add(build_platform)
+		libraries += " platform/build/platform.lib"
+	}
 	if uses_batteries ? {
 		inputs:add("build/elf_batteries.lib")
 		dependencies:add(batteries_library)
@@ -168,11 +175,11 @@ build_tool := fun(name, source, output, uses_batteries) {
 	ret { task = task, executable = executable }
 }
 
-core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false)
-tests := build_tool("tests", "test/tests.c", "tests", true)
-benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false)
-bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true)
-elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true)
+core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false, false)
+tests := build_tool("tests", "test/tests.c", "tests", true, true)
+benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false, true)
+bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true, true)
+elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true, true)
 
 optimized_benchmarks := {
 	name = "build optimized benchmarks",
