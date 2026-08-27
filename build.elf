@@ -139,15 +139,16 @@ benchmark_elf_library := {
 }
 
 batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
-os_services := compile_source("os_services", "src/os/elf_os_services_win32.c", batteries_include_options, batteries_include_dirs)
+os_services := compile_source("os_services", "src/os/elf_os_services.c", batteries_include_options, batteries_include_dirs)
+os_services_win32 := compile_source("os_services_win32", "src/os/elf_os_services_win32.c", batteries_include_options, batteries_include_dirs)
 
 batteries_library := {
 	name = "archive elf_batteries.lib",
-	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object} ${os_services.object}",
-	inputs = { batteries.object, os_services.object },
+	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object} ${os_services.object} ${os_services_win32.object}",
+	inputs = { batteries.object, os_services.object, os_services_win32.object },
 	outputs = { "build/elf_batteries.lib" },
 	include_dirs = {},
-	dependencies = { batteries.task, os_services.task },
+	dependencies = { batteries.task, os_services.task, os_services_win32.task },
 }
 
 build_tool := fun(name, source, output, uses_batteries, uses_platform) {
