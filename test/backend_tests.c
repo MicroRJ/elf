@@ -1,3 +1,9 @@
+//
+// See Copyright Notice In elf.h
+//
+
+#include "elf_os_services.h"
+
 typedef struct
 {
 	elf_State       *state;
@@ -16,17 +22,17 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	result.state = elf_create_state();
 
 	elf_StrSlice source = {};
-	Platform_File_Info info;
-	Platform_File file = {0};
-	if (platform_get_file_info(path, &info) && !info.is_directory) file = platform_access_file(path, PLATFORM_FILE_OPEN_EXISTING, PLATFORM_FILE_READ | PLATFORM_FILE_SHARE_READ);
-	if (platform_file_is_valid(file))
+	elf_OS_FileInfo info;
+	elf_OS_File file = {0};
+	if (elf_os_get_file_info(path, &info) && !info.is_directory) file = elf_os_open_file_read(path);
+	if (elf_os_file_is_valid(file))
 	{
 		u64 size = info.size;
 		char *data = elf_arena_push(&result.state->arena, size + 16);
 		zero_memory(data + size, 16);
-		U64 read = 0;
-		B32 success = platform_read_file(file, data, size, &read);
-		platform_close_file(file);
+		elf_u64 read = 0;
+		elf_b32 success = elf_os_read_file(file, data, size, &read);
+		elf_os_close_file(file);
 		if (!success || read != size) size = 0;
 
 		source.data = data;

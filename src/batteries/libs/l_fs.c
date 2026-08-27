@@ -2,19 +2,21 @@
 // Optional filesystem operations.
 //
 
+#include "elf_os_services.h"
+
 #define ELF_FS_MAX_RECURSION 32
 #define ELF_PATH_CAPACITY 32768
 
-static b32 fs_get_file_info(const char *path, Platform_File_Info *info)
+static b32 fs_get_file_info(const char *path, elf_OS_FileInfo *info)
 {
-	return platform_get_file_info(path, info) && !info->is_directory && !info->is_symbolic_link;
+	return elf_os_get_file_info(path, info) && !info->is_directory && !info->is_symbolic_link;
 }
 
 static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directories)
 {
 	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
-	Platform_File_Info info = {0};
-	b32 found = platform_get_file_info(lib_load_cstr(state, 1), &info);
+	elf_OS_FileInfo info = {0};
+	b32 found = elf_os_get_file_info(lib_load_cstr(state, 1), &info);
 	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
 	return 1;
 }
@@ -37,7 +39,7 @@ ELF_FUNCTION(lib_fs_is_directory)
 ELF_FUNCTION(lib_fs_file_exists)
 {
 	lib_check_arg_count(S, "fs.file_exists", nargs, 1, 1);
-	Platform_File_Info info = {0};
+	elf_OS_FileInfo info = {0};
 	elf_push_int(S, fs_get_file_info(lib_load_cstr(S, 1), &info));
 	return 1;
 }
@@ -46,25 +48,25 @@ ELF_FUNCTION(lib_fs_read_text_file)
 {
 	lib_check_arg_count(S, "fs.read_text_file", nargs, 1, 1);
 	const char *path = lib_load_cstr(S, 1);
-	Platform_File_Info info = {0};
+	elf_OS_FileInfo info = {0};
 	if (!fs_get_file_info(path, &info) || info.size > INT_MAX) {
 		elf_push_nil(S);
 		return 1;
 	}
-	Platform_File file = platform_access_file(path, PLATFORM_FILE_OPEN_EXISTING, PLATFORM_FILE_READ | PLATFORM_FILE_SHARE_READ);
-	if (!platform_file_is_valid(file)) {
+	elf_OS_File file = elf_os_open_file_read(path);
+	if (!elf_os_file_is_valid(file)) {
 		elf_push_nil(S);
 		return 1;
 	}
 	char *data = malloc((size_t)info.size + 1);
 	if (!data) {
-		platform_close_file(file);
+		elf_os_close_file(file);
 		elf_push_nil(S);
 		return 1;
 	}
-	U64 size = 0;
-	B32 read = platform_read_file(file, data, info.size, &size);
-	platform_close_file(file);
+	elf_u64 size = 0;
+	elf_b32 read = elf_os_read_file(file, data, info.size, &size);
+	elf_os_close_file(file);
 	if (!read || size != info.size) {
 		free(data);
 		elf_push_nil(S);
@@ -80,14 +82,14 @@ ELF_FUNCTION(lib_fs_write_text_file)
 	lib_check_arg_count(S, "fs.write_text_file", nargs, 2, 2);
 	const char *path = lib_load_cstr(S, 1);
 	elf_StrSlice data = lib_load_string(S, 2);
-	Platform_File file = platform_access_file(path, PLATFORM_FILE_CREATE_ALWAYS, PLATFORM_FILE_WRITE);
-	if (!platform_file_is_valid(file)) {
+	elf_OS_File file = elf_os_create_file(path);
+	if (!elf_os_file_is_valid(file)) {
 		elf_push_int(S, false);
 		return 1;
 	}
-	U64 written = 0;
-	B32 success = platform_write_file(file, data.data, data.size, &written) && written == data.size;
-	platform_close_file(file);
+	elf_u64 written = 0;
+	elf_b32 success = elf_os_write_file(file, data.data, data.size, &written) && written == data.size;
+	elf_os_close_file(file);
 	elf_push_int(S, success);
 	return 1;
 }
@@ -95,7 +97,7 @@ ELF_FUNCTION(lib_fs_write_text_file)
 ELF_FUNCTION(lib_fs_get_file_info)
 {
 	lib_check_arg_count(S, "fs.get_file_info", nargs, 1, 1);
-	Platform_File_Info info = {0};
+	elf_OS_FileInfo info = {0};
 	if (!fs_get_file_info(lib_load_cstr(S, 1), &info) || info.size > INT64_MAX) {
 		elf_push_nil(S);
 		return 1;

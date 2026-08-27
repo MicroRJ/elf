@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <platform.h>
+#include "elf_os_services.h"
 
 #undef ELF_VERSION
 #include "elf_batteries.h"
@@ -25,19 +26,19 @@
 static elf_StrSlice battery_source_buffer_from_file(const char *name)
 {
 	elf_StrSlice source = {0};
-	Platform_File_Info info;
-	if (!platform_get_file_info(name, &info) || info.is_directory || info.size > UINT_MAX) return source;
-	Platform_File file = platform_access_file(name, PLATFORM_FILE_OPEN_EXISTING, PLATFORM_FILE_READ | PLATFORM_FILE_SHARE_READ);
-	if (!platform_file_is_valid(file)) return source;
+	elf_OS_FileInfo info;
+	if (!elf_os_get_file_info(name, &info) || info.is_directory || info.size > UINT_MAX) return source;
+	elf_OS_File file = elf_os_open_file_read(name);
+	if (!elf_os_file_is_valid(file)) return source;
 
 	char *data = calloc(1, (size_t)info.size + 16);
 	if (!data) {
-		platform_close_file(file);
+		elf_os_close_file(file);
 		return source;
 	}
-	U64 read = 0;
-	B32 success = platform_read_file(file, data, info.size, &read);
-	platform_close_file(file);
+	elf_u64 read = 0;
+	elf_b32 success = elf_os_read_file(file, data, info.size, &read);
+	elf_os_close_file(file);
 	if (!success || read != info.size) {
 		free(data);
 		return source;
