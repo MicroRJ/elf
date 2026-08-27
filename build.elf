@@ -32,6 +32,7 @@ include_dirs := {
 
 batteries_include_dirs := {
 	"include",
+	"src/os",
 	"src/batteries/internal",
 	"platform/include",
 }
@@ -138,14 +139,15 @@ benchmark_elf_library := {
 }
 
 batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
+os_services := compile_source("os_services", "src/os/elf_os_services_win32.c", batteries_include_options, batteries_include_dirs)
 
 batteries_library := {
 	name = "archive elf_batteries.lib",
-	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object}",
-	inputs = { batteries.object },
+	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object} ${os_services.object}",
+	inputs = { batteries.object, os_services.object },
 	outputs = { "build/elf_batteries.lib" },
 	include_dirs = {},
-	dependencies = { batteries.task },
+	dependencies = { batteries.task, os_services.task },
 }
 
 build_tool := fun(name, source, output, uses_batteries, uses_platform) {
@@ -177,17 +179,17 @@ build_tool := fun(name, source, output, uses_batteries, uses_platform) {
 
 core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false, false)
 tests := build_tool("tests", "test/tests.c", "tests", true, true)
-benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false, true)
+benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false, false)
 bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true, true)
 elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true, true)
 
 optimized_benchmarks := {
 	name = "build optimized benchmarks",
-	command_line = f"${compiler}${benchmark_compile_options}${include_options} tools/benchmarks.c /Fobuild/obj/tool_benchmarks_opt.obj /Fe:build/benchmarks_opt.exe /Fd:build/obj/tool_benchmarks_opt.pdb /link build/elf_benchmark.lib platform/build/platform.lib /PDB:build/benchmarks_opt.pdb /ILK:build/benchmarks_opt.ilk",
-	inputs = { "tools/benchmarks.c", "build/elf_benchmark.lib", "platform/build/platform.lib" },
+	command_line = f"${compiler}${benchmark_compile_options}${include_options} tools/benchmarks.c /Fobuild/obj/tool_benchmarks_opt.obj /Fe:build/benchmarks_opt.exe /Fd:build/obj/tool_benchmarks_opt.pdb /link build/elf_benchmark.lib /PDB:build/benchmarks_opt.pdb /ILK:build/benchmarks_opt.ilk",
+	inputs = { "tools/benchmarks.c", "build/elf_benchmark.lib" },
 	outputs = { "build/benchmarks_opt.exe" },
 	include_dirs = include_dirs,
-	dependencies = { benchmark_elf_library, build_platform },
+	dependencies = { benchmark_elf_library },
 }
 
 run_core_tests := {

@@ -5,7 +5,7 @@
 #include "elf.h"
 
 #include "base.h"
-#include "platform.h"
+#include "elf_os.h"
 #include "core.h"
 #include "helpers.h"
 
@@ -21,13 +21,13 @@ static void bench_require(b32 condition, const char *message)
 
 static i64 bench_now(void)
 {
-	return (i64)platform_counter();
+	return (i64)elf_os_counter();
 }
 
 static double bench_elapsed_s(i64 start)
 {
-	i64 elapsed = (i64)platform_counter() - start;
-	return elapsed / (double)platform_counter_frequency();
+	i64 elapsed = (i64)elf_os_counter() - start;
+	return elapsed / (double)elf_os_counter_frequency();
 }
 
 static elf_Value bench_string_key(elf_State *state, const char *text)

@@ -2,6 +2,8 @@
 // Optional standard output operations.
 //
 
+#include "elf_os_services.h"
+
 static int core_print_values(elf_State *state, int nargs, b32 newline)
 {
 	i64 size = 0;
@@ -10,14 +12,12 @@ static int core_print_values(elf_State *state, int nargs, b32 newline)
 		if (!elf_push_value_text(state, index)) continue;
 		elf_StrSlice text = {0};
 		if (elf_to_str(state, -1, &text)) {
-			Platform_Write_Result write = platform_write_console(PLATFORM_STANDARD_OUTPUT, text.data, text.size);
-			size += (i64)write.size;
+			size += (i64)elf_os_write_console(ELF_OS_STANDARD_OUTPUT, text.data, text.size);
 		}
 		elf_pop(state, 1);
 	}
 	if (newline) {
-		Platform_Write_Result write = platform_write_console(PLATFORM_STANDARD_OUTPUT, "\n", 1);
-		size += (i64)write.size;
+		size += (i64)elf_os_write_console(ELF_OS_STANDARD_OUTPUT, "\n", 1);
 	}
 
 	elf_push_int(state, size);

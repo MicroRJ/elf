@@ -1,30 +1,32 @@
 //
-// Optional script-visible timing and sleeping.
+// See Copyright Notice In elf.h
 //
+
+#include "elf_os_services.h"
 
 ELF_FUNCTION(lib_time_counter)
 {
-	elf_push_int(S, (elf_Int)platform_counter());
+	elf_push_int(S, (elf_Int)elf_os_counter());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_frequency)
 {
-	elf_push_int(S, (elf_Int)platform_counter_frequency());
+	elf_push_int(S, (elf_Int)elf_os_counter_frequency());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_elapsed)
 {
 	i64 start = lib_load_integer(S, 1);
-	f64 elapsed = (platform_counter() - start) / (f64)platform_counter_frequency();
+	f64 elapsed = (elf_os_counter() - start) / (f64)elf_os_counter_frequency();
 	elf_push_num(S, elapsed);
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_sleep)
 {
-	platform_sleep((U64)lib_load_integer(S, 1));
+	elf_os_sleep((elf_u64)lib_load_integer(S, 1));
 	return 0;
 }
 
