@@ -279,14 +279,14 @@ and the bundled libraries. The current Windows x64 test suite passes with
 ## Real usage
 
 I have used elf in my own work for roughly three years. Its most substantial current
-consumer is Bob, rather than a collection of isolated language examples.
+consumer is Manny, rather than a collection of isolated language examples.
 
-Bob is the clearest example of the intended C-and-elf relationship. Bob's parallel task
+Manny is the clearest example of the intended C-and-elf relationship. Manny's parallel task
 scheduler, dependency tracking, and incremental build engine are written in C. Its build
 descriptions are ordinary elf programs that construct task graphs from tables,
 functions, loops, and strings.
 
-Orbiter uses Bob and elf for its build description. It also stores its game-library
+Orbiter uses Manny and elf for its build description. It also stores its game-library
 configuration as elf tables, replacing a separate configuration format with the same
 language already used by the build. Broader runtime scripting in Orbiter and Apollo is
 planned rather than complete.

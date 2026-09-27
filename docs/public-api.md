@@ -3,7 +3,7 @@
 > Elf is still early. This describes the current embedding model, not a
 > compatibility promise. `include/elf.h` remains the source of truth.
 
-Elf uses a stack API because hosts such as Bob exchange arbitrary values,
+Elf uses a stack API because hosts such as Manny exchange arbitrary values,
 nested tables, and functions with scripts. Generic stack operations avoid a
 growing matrix of typed table functions. Values on the stack are also visible
 to the garbage collector without exposing runtime object pointers to the host.

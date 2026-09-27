@@ -3,9 +3,10 @@
 *.sublime-workspace
 build/*
 .bob/
+.manny/
 *.ilk
 *.exe
-!bootstrap/windows-x64/bob.exe
+!bootstrap/windows-x64/manny.exe
 *.pdb
 *.obj
 *.asm

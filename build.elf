@@ -63,7 +63,7 @@ prepare := {
 
 build_platform := {
 	name = "build platform library",
-	command_line = "cmd /c \"cd /d platform && ..\\bootstrap\\windows-x64\\bob.exe build.elf lib\"",
+	command_line = "cmd /c \"cd /d platform && ..\\bootstrap\\windows-x64\\manny.exe build.elf lib\"",
 	inputs = {
 		"platform/build.elf",
 		"platform/include/platform.h",
@@ -223,28 +223,28 @@ run_optimized_benchmarks := {
 entries := {}
 
 entries.lib = fun() {
-	ret bob.build({
+	ret manny.build({
 		targets = { elf_library, batteries_library, build_platform },
 		options = build_options,
 	})
 }
 
 entries.build = fun() {
-	ret bob.build({
+	ret manny.build({
 		targets = { core_tests.task, tests.task, benchmarks.task, bytecode_tool.task, elf_runner.task },
 		options = build_options,
 	})
 }
 
 entries.test = fun() {
-	ret bob.build({
+	ret manny.build({
 		targets = { run_core_tests, run_tests },
 		options = build_options,
 	})
 }
 
 entries.benchmark = fun() {
-	ret bob.build({
+	ret manny.build({
 		targets = { run_optimized_benchmarks },
 		options = build_options,
 	})
