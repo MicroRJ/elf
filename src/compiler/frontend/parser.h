@@ -27,10 +27,11 @@ typedef struct
 {
 	Compiler          *compiler;
 	Atom_Table        *atoms;
-	elf_StrSlice     source;
-	char            *cursor;
+	SourceBuffer      source;
+	const char       *cursor;
+	const char       *end;
 	u32              line_index;
-	char            *line_start;
+	const char       *line_start;
 	b32              failed;
 
 	LexerMode mode_stack[16];

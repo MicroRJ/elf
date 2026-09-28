@@ -40,7 +40,18 @@ Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, 
 	compiler->state = state;
 	compiler->arena = arena;
 	compiler->source_name = name;
-	compiler->source = source;
+	compiler->source.data = source.data;
+	if (source.size > 0xffffffffu) {
+		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
+			(SourceSite) {}, "source exceeds the 32-bit size limit");
+	}
+	else if (source.size && memchr(source.data, 0, source.size)) {
+		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
+			(SourceSite) {}, "source contains a NUL byte");
+	}
+	else {
+		compiler->source.size = (u32)source.size;
+	}
 	return compiler;
 }
 
@@ -157,8 +168,11 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
-	Parser *parser = elf_create_parser(compiler);
-	int result = parse_json_value(parser);
+	int result = 0;
+	if (!compiler->error_count) {
+		Parser *parser = elf_create_parser(compiler);
+		result = parse_json_value(parser);
+	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
 	else ASSERT(state->stack_ptr == stack_checkpoint + 1);
 
@@ -176,8 +190,11 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 
-	Parser *parser = elf_create_parser(compiler);
-	int result = parse_constexpr(parser);
+	int result = 0;
+	if (!compiler->error_count) {
+		Parser *parser = elf_create_parser(compiler);
+		result = parse_constexpr(parser);
+	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
 	else ASSERT(state->stack_ptr == stack_checkpoint + 1);
 
@@ -187,13 +204,12 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 	return result;
 }
 
-static elf_StrSlice persist_compiled_source(elf_State *state, elf_StrSlice source)
+static char *persist_compiled_source(elf_State *state, SourceBuffer source)
 {
-	if (source.size > 0xffffffffu) abort();
-	u64 storage_size = (source.size + 16 + 7) & ~(u64)7;
+	u64 storage_size = ((u64)source.size + 1 + 7) & ~(u64)7;
 	char *data = elf_arena_push_zero(&state->arena, storage_size);
 	copy_memory(data, source.data, source.size);
-	return (elf_StrSlice) {data, source.size};
+	return data;
 }
 
 BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlice source, elf_CompileReport *report)
@@ -207,15 +223,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	Compiler *compiler = compiler_create(state, scratch.arena, name, source);
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
-
-	elf_arena_align(&state->arena, 8);
-	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
-	elf_StrSlice owned_source = persist_compiled_source(state, source);
-	elf_String *source_name = elf_string_from_data(state, name);
-	module->source_name = source_name;
-	module->source_data = owned_source.data;
-	module->source_size = (u32)owned_source.size;
-	compiler->source = owned_source;
+	if (compiler->error_count) goto done;
 
 	Parser *parser = elf_create_parser(compiler);
 	Ast ast_file;
@@ -244,14 +252,23 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 		goto done;
 	}
 
-	file_entry = generate_module(compiler, module, ir_module);
+	elf_Module generated_module = {};
+	file_entry = generate_module(compiler, &generated_module, ir_module);
 	if (!bc_function_ref_is_valid(file_entry) || compiler->error_count) {
 		file_entry = (BcFunctionRef) {};
 		state->arena.in_use = arena_checkpoint;
 		goto done;
 	}
+
+	elf_arena_align(&state->arena, 8);
+	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
+	*module = generated_module;
+	module->source_name = elf_string_from_data(state, name);
+	module->source_data = persist_compiled_source(state, compiler->source);
+	module->source_size = compiler->source.size;
 	module->next = state->modules;
 	state->modules = module;
+	file_entry.module = module;
 
 done:
 	compiler_finish_report(compiler, report);

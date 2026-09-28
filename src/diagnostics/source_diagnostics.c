@@ -15,7 +15,7 @@ static u64 source_slice_column(SourceSite site)
 	return 1 + (u64)(site.offset - site.line_offset);
 }
 
-static u32 source_slice_line_end(SourceSite site, elf_StrSlice source)
+static u32 source_slice_line_end(SourceSite site, SourceBuffer source)
 {
 	u32 line_end = site.line_offset;
 	while ((elf_Size)line_end < source.size &&
@@ -26,7 +26,7 @@ static u32 source_slice_line_end(SourceSite site, elf_StrSlice source)
 	return line_end;
 }
 
-static void print_source_slice_marker(SourceSite site, elf_StrSlice source)
+static void print_source_slice_marker(SourceSite site, SourceBuffer source)
 {
 	if (!source_slice_is_valid(site) || !source.data ||
 		(elf_Size)site.offset > source.size || (elf_Size)site.line_offset > source.size)

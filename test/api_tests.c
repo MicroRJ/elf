@@ -182,6 +182,44 @@ static void test_api_source_diagnostics(elf_State *state)
 		test_fail("invalid source arguments produce no compiler diagnostics");
 	}
 
+	char bounded_constant_text[] = {'4', '2'};
+	elf_StrSlice bounded_constant = {bounded_constant_text, sizeof(bounded_constant_text)};
+	if (elf_push_constant_expr(state, "bounded-constant.elf", bounded_constant, &report) != ELF_ERROR_NONE) {
+		test_fail("API accepts a source slice without trailing storage");
+	}
+	elf_Int bounded_value = 0;
+	if (!elf_to_int(state, -1, &bounded_value) || bounded_value != 42) {
+		test_fail("bounded source slice compiles completely");
+	}
+	elf_destroy_compile_report(&report);
+	elf_pop(state, 1);
+
+	char nul_source_text[] = {'4', 0, '2'};
+	elf_StrSlice nul_source = {nul_source_text, sizeof(nul_source_text)};
+	if (elf_push_constant_expr(state, "nul-source.elf", nul_source, &report)
+	!= ELF_ERROR_COMPILATION_FAILED) {
+		test_fail("API rejects embedded NUL source bytes");
+	}
+	if (elf_get_top(state) != sentinel_top || report.error_count != 1 ||
+		report.diagnostics[0].phase != ELF_DIAGNOSTIC_PHASE_LEXER ||
+		!api_slice_contains(report.diagnostics[0].message, "NUL byte")) {
+		test_fail("embedded NUL failure returns a lexer diagnostic");
+	}
+	elf_destroy_compile_report(&report);
+
+#if SIZE_MAX > UINT32_MAX
+	elf_StrSlice oversized_source = {bounded_constant_text, (elf_Size)UINT32_MAX + 1};
+	if (elf_push_constant_expr(state, "oversized-source.elf", oversized_source, &report)
+	!= ELF_ERROR_COMPILATION_FAILED) {
+		test_fail("API rejects source larger than its internal representation");
+	}
+	if (elf_get_top(state) != sentinel_top || report.error_count != 1 ||
+		!api_slice_contains(report.diagnostics[0].message, "32-bit size limit")) {
+		test_fail("oversized source failure returns a compiler diagnostic");
+	}
+	elf_destroy_compile_report(&report);
+#endif
+
 	char invalid_constant_text[] = "{\n  answer = runtime_value,\n}";
 	elf_StrSlice invalid_constant = {invalid_constant_text, sizeof(invalid_constant_text) - 1};
 	if (elf_push_constant_expr(state, "invalid-constant.elf", invalid_constant, &report)

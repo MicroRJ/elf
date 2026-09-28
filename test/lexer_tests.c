@@ -1,13 +1,18 @@
-static Parser lexer_test_parser(elf_State *state, const char *source)
+static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 size)
 {
 	Parser parser = {};
-	elf_StrSlice source_buffer = {(char *)source, (u64)strlen(source)};
+	elf_StrSlice source_buffer = {(char *)source, size};
 	parser.compiler = compiler_create(state, &state->arena, "lexer_tests", source_buffer);
 	parser.arena = &state->arena;
 	parser.phase = ELF_DIAGNOSTIC_PHASE_PARSER;
 	init_parser_atoms(&parser);
 	lexer_init(&parser.lexer, parser.compiler, &parser.atoms);
 	return parser;
+}
+
+static Parser lexer_test_parser(elf_State *state, const char *source)
+{
+	return lexer_test_parser_slice(state, source, (u32)strlen(source));
 }
 
 static void lexer_prime(Parser *parser)
@@ -665,6 +670,32 @@ static void test_lexer_operators(elf_State *state)
 	expect_token_type(lexer_next(&parser), TOK_SHR_ASSIGN, "lex >>=");
 }
 
+static void test_lexer_bounded_source(elf_State *state)
+{
+	char string_source[] = {'"', 'o', 'k', '"'};
+	Parser string_parser = lexer_test_parser_slice(state, string_source, sizeof(string_source));
+	lexer_prime(&string_parser);
+	Token string = lexer_next(&string_parser);
+	expect_token_type(string, TOK_STRING, "lex bounded string");
+	expect_token_atom(string, "ok", "bounded string payload");
+	expect_token_type(lexer_next(&string_parser), TOK_NONE, "bounded string reaches slice end");
+
+	char operator_source[] = {'.'};
+	Parser operator_parser = lexer_test_parser_slice(state, operator_source, sizeof(operator_source));
+	lexer_prime(&operator_parser);
+	expect_token_type(lexer_next(&operator_parser), TOK_DOT, "bounded operator lookahead");
+	expect_token_type(lexer_next(&operator_parser), TOK_NONE, "bounded operator reaches slice end");
+
+	char comment_source[] = {'/', '*'};
+	Parser comment_parser = lexer_test_parser_slice(state, comment_source, sizeof(comment_source));
+	lexer_prime(&comment_parser);
+	expect_token_type(lexer_next(&comment_parser), TOK_NONE, "bounded unterminated comment reaches slice end");
+	if (comment_parser.compiler->error_count != 1) {
+		test_fail("bounded unterminated comment reports an error");
+	}
+	compiler_finish_report(comment_parser.compiler, 0);
+}
+
 static void run_lexer_tests(elf_State *state)
 {
 	test_lexer_keywords_and_identifiers(state);
@@ -676,4 +707,5 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_line_breaks(state);
 	test_lexer_numbers(state);
 	test_lexer_operators(state);
+	test_lexer_bounded_source(state);
 }

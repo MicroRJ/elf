@@ -8,7 +8,12 @@
 
 #include "bytecode.h"
 
-typedef char *Source;
+typedef struct
+{
+	const char *data;
+	u32         size;
+}
+SourceBuffer;
 
 typedef struct
 {

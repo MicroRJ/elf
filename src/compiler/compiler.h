@@ -10,7 +10,7 @@ struct Compiler
 	elf_State      *state;
 	elf_Arena      *arena;
 	const char     *source_name;
-	elf_StrSlice    source;
+	SourceBuffer    source;
 	elf_Diagnostic *diagnostics;
 	u32             diagnostic_count;
 	u32             diagnostic_capacity;

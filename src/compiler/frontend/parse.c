@@ -188,7 +188,7 @@ static Parser *elf_alloc_parser(Compiler *compiler)
 	return parser;
 }
 
-static void reposition_parser(Parser *parser, char *cursor);
+static void reposition_parser(Parser *parser, const char *cursor);
 
 static void init_parser_atoms(Parser *parser)
 {
@@ -226,7 +226,7 @@ static Token consume_token(Parser *par)
 	return par->tok_prev;
 }
 
-static void reposition_parser(Parser *par, char *cursor)
+static void reposition_parser(Parser *par, const char *cursor)
 {
 	par->lexer.cursor = cursor;
 	par->lexer.line_index = 1;
