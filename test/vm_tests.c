@@ -15,6 +15,13 @@ typedef struct
 }
 VmNestedCallContext;
 
+typedef struct
+{
+	elf_State *state;
+	elf_Value  value;
+}
+VmRunResult;
+
 ELF_FUNCTION(vm_test_nested_call_preserves_context)
 {
 	VmNestedCallContext *context = elf_get_user_data(S);
@@ -54,7 +61,7 @@ static void vm_test_install_bindings(elf_State *state)
 	}
 }
 
-static elf_Value vm_test_run_file(const char *path)
+static VmRunResult vm_test_run_file(const char *path)
 {
 	elf_State *state = elf_create_state();
 	elf_open_batteries(state);
@@ -62,17 +69,18 @@ static elf_Value vm_test_run_file(const char *path)
 	elf_push_code_file(state, path);
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
-	return state->stack_ptr[-1];
+	return (VmRunResult){state, state->stack_ptr[-1]};
 }
 
 static void vm_expect_int(const char *path, i64 expected, const char *label)
 {
-	elf_Value value = vm_test_run_file(path);
-	if (!value_is_integer(value) || value_as_integer(value) != expected) {
+	VmRunResult result = vm_test_run_file(path);
+	if (!value_is_integer(result.value) || value_as_integer(result.value) != expected) {
 		fprintf(stderr, "FAIL: %s expected int %lld, got tag %d value %lld\n",
-			label, expected, value_type(value), value_as_integer(value));
+			label, expected, value_type(result.value), value_as_integer(result.value));
 		test_failures += 1;
 	}
+	elf_destroy_state(result.state);
 }
 
 static void test_vm_return_int(void)
@@ -87,24 +95,23 @@ static void test_vm_integer_add(void)
 
 static void test_vm_return_nil(void)
 {
-	elf_Value value = vm_test_run_file("test/smoke/return_nil.elf");
-	if (!value_is_nil(value)) {
+	VmRunResult result = vm_test_run_file("test/smoke/return_nil.elf");
+	if (!value_is_nil(result.value)) {
 		test_fail("vm returns nil value");
 	}
+	elf_destroy_state(result.state);
 }
 
 static void test_vm_return_table(void)
 {
-	elf_Value value = vm_test_run_file("test/smoke/return_table.elf");
-	if (!value_is_table(value)) {
+	VmRunResult result = vm_test_run_file("test/smoke/return_table.elf");
+	if (!value_is_table(result.value)) {
 		test_fail("vm returns table value");
-		return;
 	}
-
-	elf_Table *table = value_as_table(value);
-	if (elf_array_length(table) != 2) {
+	else if (elf_array_length(value_as_table(result.value)) != 2) {
 		test_fail("vm table literal stores field and array values");
 	}
+	elf_destroy_state(result.state);
 }
 
 static void test_vm_nil_assign(void)
@@ -214,18 +221,20 @@ static void test_vm_defer(void)
 
 static void test_vm_string_join(void)
 {
-	elf_Value value = vm_test_run_file("test/smoke/script_assert_string_join.elf");
-	if (!value_is_string(value) || strcmp(value_as_string(value)->data, "score9") != 0) {
+	VmRunResult result = vm_test_run_file("test/smoke/script_assert_string_join.elf");
+	if (!value_is_string(result.value) || strcmp(value_as_string(result.value)->data, "score9") != 0) {
 		test_fail("vm joins string lhs with formatted rhs");
 	}
+	elf_destroy_state(result.state);
 }
 
 static void test_vm_interpolated_strings(void)
 {
-	elf_Value value = vm_test_run_file("test/smoke/interpolated_strings.elf");
-	if (!value_is_string(value) || strcmp(value_as_string(value)->data, "score9") != 0) {
+	VmRunResult result = vm_test_run_file("test/smoke/interpolated_strings.elf");
+	if (!value_is_string(result.value) || strcmp(value_as_string(result.value)->data, "score9") != 0) {
 		test_fail("vm evaluates interpolated strings");
 	}
+	elf_destroy_state(result.state);
 }
 
 static void test_vm_fib(void)

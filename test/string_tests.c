@@ -81,6 +81,7 @@ static void test_string_stack_roots_survive_gc(void)
 	expect_same_string(interned, again, "stack rooted string survives GC");
 
 	state->stack_ptr = stack_checkpoint;
+	elf_destroy_state(state);
 }
 
 static void test_string_unrooted_values_are_swept(void)
@@ -102,6 +103,7 @@ static void test_string_unrooted_values_are_swept(void)
 		,	state->string_count);
 		test_failures += 1;
 	}
+	elf_destroy_state(state);
 }
 
 static void test_string_bucket_unlinks_dead_collisions(void)
@@ -129,6 +131,7 @@ static void test_string_bucket_unlinks_dead_collisions(void)
 	if (collisions < 8) {
 		test_fail("string collision test generated enough colliding strings");
 		state->stack_ptr = stack_checkpoint;
+		elf_destroy_state(state);
 		return;
 	}
 
@@ -138,6 +141,7 @@ static void test_string_bucket_unlinks_dead_collisions(void)
 	expect_same_string(root, again, "bucket GC keeps rooted string behind dead collisions");
 
 	state->stack_ptr = stack_checkpoint;
+	elf_destroy_state(state);
 }
 
 static void run_string_tests(elf_State *state)

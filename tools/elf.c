@@ -27,10 +27,12 @@ int main(int argc, char **argv)
 	if (!elf_push_code_file(state, path))
 	{
 		fprintf(stderr, "elf: could not load '%s'\n", path);
+		elf_destroy_state(state);
 		return 1;
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 0);
+	elf_destroy_state(state);
 
 	return 0;
 }

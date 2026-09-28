@@ -44,6 +44,7 @@ int main(int argc, char **argv)
 	if (!read_source_file(state, path, &source))
 	{
 		fprintf(stderr, "bytecode: could not load '%s'\n", path);
+		elf_destroy_state(state);
 		return 1;
 	}
 
@@ -58,6 +59,7 @@ int main(int argc, char **argv)
 		};
 		print_bytecode_function(state, function);
 	}
+	elf_destroy_state(state);
 
 	return 0;
 }

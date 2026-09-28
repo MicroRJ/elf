@@ -23,6 +23,7 @@ static void test_gc_sweeps_unreachable_tables(void)
 	force_gc_allocations(state, 256);
 
 	expect_gc_reference_count_below(state, baseline_count + 8, "GC sweeps unreachable table allocations");
+	elf_destroy_state(state);
 }
 
 static void test_gc_keeps_stack_rooted_table_graph(void)
@@ -63,6 +64,7 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 
 	state->stack_ptr = stack_checkpoint;
 	force_gc_allocations(state, 256);
+	elf_destroy_state(state);
 }
 
 static void test_gc_keeps_referenced_table_graph(void)
@@ -81,6 +83,7 @@ static void test_gc_keeps_referenced_table_graph(void)
 	force_gc_allocations(state, 256);
 	if (!elf_push_ref(state, reference)) {
 		test_fail("table reference survives GC");
+		elf_destroy_state(state);
 		return;
 	}
 	root = value_as_table(state->stack_ptr[-1]);
@@ -94,6 +97,7 @@ static void test_gc_keeps_referenced_table_graph(void)
 	force_gc_allocations(state, 256);
 	expect_gc_reference_count_below(state, baseline_count + 8,
 		"released table reference becomes collectible");
+	elf_destroy_state(state);
 }
 
 static void test_gc_keeps_referenced_string(void)
@@ -118,6 +122,26 @@ static void test_gc_keeps_referenced_string(void)
 	force_gc_allocations(state, 256);
 	expect_gc_reference_count_below(state, baseline_count + 8,
 		"released string reference becomes collectible");
+	elf_destroy_state(state);
+}
+
+static void test_state_create_destroy_repeatedly(void)
+{
+	for (u32 i = 0; i < 64; ++i)
+	{
+		elf_State *state = elf_create_state();
+		elf_new_table(state);
+		elf_push_cstr(state, "value");
+		elf_set_field(state, -2, "key");
+
+		char source_text[] = "ret {answer = 42, text = \"elf\"}";
+		elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+		if (!elf_push_code_source(state, "lifecycle", source)) {
+			test_fail("state lifecycle source compiles");
+		}
+
+		elf_destroy_state(state);
+	}
 }
 
 static void run_gc_tests(void)
@@ -126,4 +150,5 @@ static void run_gc_tests(void)
 	test_gc_keeps_stack_rooted_table_graph();
 	test_gc_keeps_referenced_table_graph();
 	test_gc_keeps_referenced_string();
+	test_state_create_destroy_repeatedly();
 }

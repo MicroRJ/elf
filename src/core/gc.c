@@ -5,6 +5,27 @@
 static void gc_check(elf_State *state);
 static u32 gc_mark_reachable(elf_State *state, elf_Object * reference);
 
+static void gc_free_object(elf_Object *reference)
+{
+	if (reference->type == ELF_OBJECT_TABLE)
+	{
+		free(((elf_Table *) reference)->entries);
+		free(((elf_Table *) reference)->array);
+	}
+
+	free(reference);
+}
+
+static void gc_destroy_all(elf_State *state)
+{
+	for (u32 i = 0; i < state->gc_reference_count; ++i) {
+		gc_free_object(state->gc_references[i]);
+	}
+
+	free(state->gc_references);
+	free(state->gc_scratch_references);
+}
+
 static void gc_ensure_reference_capacity(elf_State *state)
 {
 	if (state->gc_reference_count < state->gc_reference_capacity) {
@@ -66,13 +87,7 @@ static u32 gc_sweep(elf_State *state)
 			freed_count ++;
 			state->gc_live_bytes -= reference->size;
 
-			if (reference->type == ELF_OBJECT_TABLE)
-			{
-				free(((elf_Table *) reference)->entries);
-				free(((elf_Table *) reference)->array);
-			}
-
-			free(reference);
+			gc_free_object(reference);
 		}
 	}
 

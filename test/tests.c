@@ -81,6 +81,7 @@ int main(void)
 	run_smoke_tests();
 
 	prof_dump();
+	elf_destroy_state(state);
 
 	if (test_failures) {
 		fprintf(stderr, "tests failed: %d\n", test_failures);

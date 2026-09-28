@@ -160,6 +160,8 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
+		gc_destroy_all(state);
+		free(state->string_buckets);
 		free(state->diagnostic_storage);
 		elf_arena_destroy(&state->arena);
 	}

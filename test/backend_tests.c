@@ -62,6 +62,11 @@ static Bytecode *backend_test_bytes(BackendCompileResult result)
 	return result.function.module->bytecode + function->offset;
 }
 
+static void backend_test_destroy(BackendCompileResult result)
+{
+	elf_destroy_state(result.state);
+}
+
 static u32 backend_count_bytecode(BackendCompileResult result, BytecodeType type)
 {
 	u32 count = 0;
@@ -94,11 +99,11 @@ static void test_backend_source_map(void)
 	elf_Module *module = result.function.module;
 	if (!module->source_name || !module->source_data || module->source_size == 0) {
 		test_fail("backend stores source data on compiled module");
-		return;
+		goto done;
 	}
 	if (function->source_map_count == 0) {
 		test_fail("backend emits source map entries");
-		return;
+		goto done;
 	}
 
 	for (u32 i = 0; i < function->length; ++ i) {
@@ -106,9 +111,12 @@ static void test_backend_source_map(void)
 		SourceMapEntry *entry = backend_find_source_map_entry(function, byte);
 		if (!entry || !entry->site.data || !entry->site.line_start || entry->site.size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
-			return;
+			goto done;
 		}
 	}
+
+done:
+	backend_test_destroy(result);
 }
 
 static void test_backend_module_owns_source(void)
@@ -265,6 +273,7 @@ static void test_backend_short_circuit_and(void)
 	backend_expect_jump_counts(result, 2, 0, 0, "&& emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "&& does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "&& patches condition jumps forward");
+	backend_test_destroy(result);
 }
 
 static void test_backend_short_circuit_or(void)
@@ -275,6 +284,7 @@ static void test_backend_short_circuit_or(void)
 	backend_expect_jump_counts(result, 1, 1, 0, "|| emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "|| does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "|| patches condition jumps forward");
+	backend_test_destroy(result);
 }
 
 static void test_backend_short_circuit_nested_and_or(void)
@@ -285,6 +295,7 @@ static void test_backend_short_circuit_nested_and_or(void)
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a && (b || c) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "nested a && (b || c) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "nested a && (b || c) patches jumps forward");
+	backend_test_destroy(result);
 }
 
 static void test_backend_short_circuit_nested_or_and(void)
@@ -295,6 +306,7 @@ static void test_backend_short_circuit_nested_or_and(void)
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a || (b && c) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "nested a || (b && c) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "nested a || (b && c) patches jumps forward");
+	backend_test_destroy(result);
 }
 
 static void test_backend_short_circuit_mixed_groups(void)
@@ -305,6 +317,7 @@ static void test_backend_short_circuit_mixed_groups(void)
 	backend_expect_jump_counts(result, 2, 2, 0, "mixed (a || b) && (c || d) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "mixed (a || b) && (c || d) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "mixed (a || b) && (c || d) patches jumps forward");
+	backend_test_destroy(result);
 }
 
 static void test_backend_while_loop(void)
@@ -318,6 +331,7 @@ static void test_backend_while_loop(void)
 		test_fail("while emits one loop-back jump");
 	}
 	backend_expect_loop_jumps(result, 1, "while patches exit and loop-back jumps");
+	backend_test_destroy(result);
 }
 
 static void test_backend_while_short_circuit_loop(void)
@@ -332,6 +346,7 @@ static void test_backend_while_short_circuit_loop(void)
 	}
 	backend_expect_jump_counts(result, 2, 0, 1, "while short-circuit predicate emits optimal jump shape");
 	backend_expect_loop_jumps(result, 1, "while short-circuit patches exit and loop-back jumps");
+	backend_test_destroy(result);
 }
 
 static void test_backend_range_for_loop_shape(void)
@@ -359,6 +374,7 @@ static void test_backend_range_for_loop_shape(void)
 		test_fail("range for does not nil-initialize loop variables");
 	}
 	backend_expect_loop_jumps(result, 1, "range for patches exit and loop-back jumps");
+	backend_test_destroy(result);
 }
 
 static void test_backend_range_for_collection_call_is_hoisted(void)
@@ -384,6 +400,7 @@ static void test_backend_range_for_collection_call_is_hoisted(void)
 		test_fail("range collection call happens before loop condition");
 	}
 	backend_expect_loop_jumps(result, 1, "collection range for patches exit and loop-back jumps");
+	backend_test_destroy(result);
 }
 
 static void test_backend_local_initializer_reuses_result_slot(void)
@@ -397,6 +414,7 @@ static void test_backend_local_initializer_reuses_result_slot(void)
 	if (backend_test_function(result)->stack_size != 5) {
 		test_fail("local initializer adopts expression result slot");
 	}
+	backend_test_destroy(result);
 }
 
 static void test_backend_truthy_or_reuses_left_result_slot(void)
@@ -410,6 +428,7 @@ static void test_backend_truthy_or_reuses_left_result_slot(void)
 	if (backend_test_function(result)->stack_size != 5) {
 		test_fail("truthy-or initializer adopts left expression result slot");
 	}
+	backend_test_destroy(result);
 }
 
 static void test_backend_logical_expr_delays_result_slot(void)
@@ -433,6 +452,8 @@ static void test_backend_logical_expr_delays_result_slot(void)
 	if (backend_test_function(or_result)->stack_size != 5) {
 		test_fail("logical-or initializer delays boolean result slot allocation");
 	}
+	backend_test_destroy(and_result);
+	backend_test_destroy(or_result);
 }
 
 static void test_backend_if_else_restores_stack_top(void)
@@ -467,6 +488,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	}
 
 	elf_end_scratch(scratch);
+	elf_destroy_state(state);
 }
 
 static void test_backend_formats_bytecode_function(void)
@@ -490,6 +512,7 @@ static void test_backend_formats_bytecode_function(void)
 		test_fail("bytecode formatter prints return bytecode");
 	}
 	elf_end_scratch(scratch);
+	backend_test_destroy(result);
 }
 
 static void run_backend_tests(void)
