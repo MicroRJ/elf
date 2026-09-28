@@ -4,6 +4,7 @@
 #define ELF_VERSION "0.2.0-dev"
 #define ELF_API_VERSION 1
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef int8_t      elf_i8;

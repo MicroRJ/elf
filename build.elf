@@ -52,6 +52,12 @@ make_include_options := fun(directories) {
 include_options := make_include_options(include_dirs)
 batteries_include_options := make_include_options(batteries_include_dirs)
 
+public_include_dirs := {
+	"include",
+}
+
+public_include_options := make_include_options(public_include_dirs)
+
 prepare := {
 	name = "prepare build directory",
 	command_line = "cmd /c if not exist build\\obj mkdir build\\obj",
@@ -141,6 +147,7 @@ benchmark_elf_library := {
 batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
 os_services := compile_source("os_services", "src/os/elf_os_services.c", batteries_include_options, batteries_include_dirs)
 os_services_win32 := compile_source("os_services_win32", "src/os/elf_os_services_win32.c", batteries_include_options, batteries_include_dirs)
+public_header_test := compile_source("public_header_test", "test/public_header_compile_test.c", public_include_options, public_include_dirs)
 
 batteries_library := {
 	name = "archive elf_batteries.lib",
@@ -231,14 +238,14 @@ entries.lib = fun() {
 
 entries.build = fun() {
 	ret manny.build({
-		targets = { core_tests.task, tests.task, benchmarks.task, bytecode_tool.task, elf_runner.task },
+		targets = { public_header_test.task, core_tests.task, tests.task, benchmarks.task, bytecode_tool.task, elf_runner.task },
 		options = build_options,
 	})
 }
 
 entries.test = fun() {
 	ret manny.build({
-		targets = { run_core_tests, run_tests },
+		targets = { public_header_test.task, run_core_tests, run_tests },
 		options = build_options,
 	})
 }
