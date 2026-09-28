@@ -2,17 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-// TODO(RJ): investigate performance and design trade-offs of lazy hashing.
-// Not sure that we may want to introduce additional logic & complexity to
-// support lazy hashing in extremely hot paths.
-// Given the typical use case, is it OK to just pay the hash cost once
-// for every string at creation time, even for large strings?
-// Are very large strings really that common?
-// Will we have dedicated large storage containers regardless, that relieve string
-// building pressure?
-// How expensive is hashing really, compared to the permanent added cost of the additional
-// logic added for the entirety of the runtime?
-
 #define ELF_STRING_INITIAL_EXTENT       8192u
 #define ELF_STRING_MAX_LOAD_NUMERATOR   3u
 #define ELF_STRING_MAX_LOAD_DENOMINATOR 4u

@@ -147,7 +147,6 @@ static Atom *atom_table_end(Atom_Table *table, Atom *candidate, u32 size)
 	return atom;
 }
 
-// TODO(RJ): remove this from here?!
 static elf_String *elf_string_from_atom(elf_State *state, Atom *atom)
 {
 	ASSERT(atom);

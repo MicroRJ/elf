@@ -27,7 +27,6 @@ typedef struct
 }
 IrModule;
 
-// Todo, dude!
 enum
 {
 	MAX_ENTITIES = 4096

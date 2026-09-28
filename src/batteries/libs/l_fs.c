@@ -176,7 +176,6 @@ ELF_FUNCTION(lib_fs_get_working_directory)
 		return 1;
 	}
 
-	// TODO(RJ) remove heap allocation use scratch!
 	char *buffer = malloc((size_t)query.required_capacity);
 	if (!buffer) {
 		elf_push_nil(S);

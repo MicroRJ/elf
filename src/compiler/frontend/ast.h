@@ -96,7 +96,6 @@ AstDeclTags;
 
 static const char *ast_type_name(AstType type);
 
-// TODO(RJ): use this consistently throughout!
 typedef struct
 {
 	u32 nargs;

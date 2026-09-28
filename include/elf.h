@@ -25,7 +25,6 @@ typedef size_t  elf_Size;
 typedef elf_i64 elf_Int;
 typedef elf_f64 elf_Num;
 
-// TODO(RJ) wrap this in a proper type!
 typedef elf_u32 elf_Ref;
 
 #define ELF_NO_REF ((elf_Ref)(0))

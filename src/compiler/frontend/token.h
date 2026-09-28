@@ -48,8 +48,6 @@
 	X(M_THIS          , "this"        ) \
 // END
 
-// TODO(RJ): I am not satisfied with formatted strings being done in the lexer, it just
-// feels off!
 #define TOKEN_DEFINITIONS(X)              \
 	X(INTEGER             , "int")         \
 	X(NUMBER              , "num")         \

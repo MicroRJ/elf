@@ -274,7 +274,6 @@ activate_frame:
 							*result = value_from_integer(text[index]);
 						}
 						else if (value_is_string(field)) {
-							// Todo, impl!
 							*result = value_nil();
 						}
 						else {

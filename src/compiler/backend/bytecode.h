@@ -65,7 +65,6 @@ BytecodeType;
 
 const char *bytecode_type_name(BytecodeType type);
 
-// TODO(RJ) improve the size of it!
 typedef struct
 {
 	BytecodeType b_type;

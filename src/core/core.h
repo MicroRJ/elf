@@ -96,7 +96,6 @@ struct elf_Closure
 	elf_Value     captures[];
 };
 
-// TODO(RJ) remove this!
 typedef struct
 {
 	char         *name;
@@ -104,7 +103,6 @@ typedef struct
 }
 elf_Binding;
 
-// TODO(RJ) can we make this smaller
 typedef struct StackFrame StackFrame;
 struct StackFrame
 {

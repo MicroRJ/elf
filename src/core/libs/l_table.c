@@ -86,8 +86,6 @@ static void table_map_equal_add_pair(Table_Map_Equal_Context *context, elf_Table
 // * Each entry must be found, each entry must match, each value of each entry must match. Ordering
 // does not matter.
 //
-// Todo, should the table store the number of live entries?
-//
 static b32 tables_map_equal(Table_Map_Equal_Context *context, elf_Table *left, elf_Table *right)
 {
 	for (u32 i = 0; i < context->count; ++i)

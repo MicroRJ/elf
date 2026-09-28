@@ -300,7 +300,6 @@ static void push_ast(Parser *par, Ast tree)
 	par->ast.stack[par->ast.stack_index ++] = tree;
 }
 
-// Todo, instead return an AstArray directly ...
 static Ast *pop_ast_array(Parser *par, u32 nargs)
 {
 	ASSERT(par->ast.stack_index >= nargs);

@@ -53,10 +53,8 @@ typedef struct
 	SourceMapBuffer   source_map_buffer;
 	u32               stack_size;
 	u32               stack_top;
-	// TODO(RJ) fixed arrays!
 	BytecodeLabel     labels[4096];
 	u32               label_count;
-	// TODO(RJ) fixed arrays!
 	BytecodeJumpPatch jump_patches[4096];
 	u32               jump_patch_count;
 }

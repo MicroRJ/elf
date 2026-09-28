@@ -2,9 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-// TODO(RJ), I think the better long term choice is just to keep a stack based
-// ir -> memory map, which would make the IR truly immutable and also allow
-// us to reuse it, which is not a real need, but whatever right ...
 typedef struct
 {
 	i32 slot;
@@ -99,7 +96,6 @@ struct IrNode
 
 		struct
 		{
-			// TODO(RJ): consider removing this from the IR! to keep it pure and immutable!
 			u32 bytecode_label;
 			b32 has_bytecode_label;
 		}
@@ -187,7 +183,6 @@ struct IrNode
 		struct
 		{
 			Ir     expr;
-			// TODO(RJ): consider removing this from the IR! to keep it pure and immutable!
 			BcSlot slot;
 		}
 		ir_local;
