@@ -170,10 +170,21 @@ static void test_api_source_diagnostics(elf_State *state)
 	elf_i32 checkpoint = elf_get_top(state);
 	elf_push_int(state, 77);
 	elf_i32 sentinel_top = elf_get_top(state);
+	elf_StrSlice missing_source = {};
+	if (elf_push_constant_expr(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
+	|| elf_push_json(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
+	|| elf_push_code_source(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
+	|| elf_get_top(state) != sentinel_top) {
+		test_fail("invalid source arguments preserve the stack");
+	}
+	elf_Diagnostic diagnostic = {};
+	if (elf_get_diagnostic(state, &diagnostic)) {
+		test_fail("invalid source arguments clear stale diagnostics");
+	}
 
 	char invalid_constant_text[] = "{\n  answer = runtime_value,\n}";
 	elf_StrSlice invalid_constant = {invalid_constant_text, sizeof(invalid_constant_text) - 1};
-	if (elf_push_constant_expr(state, "invalid-constant.elf", invalid_constant)) {
+	if (elf_push_constant_expr(state, "invalid-constant.elf", invalid_constant) != ELF_ERROR_EVALUATION) {
 		test_fail("API rejects a non-constant expression");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -184,7 +195,6 @@ static void test_api_source_diagnostics(elf_State *state)
 		test_fail("failed constant expression preserves existing stack values");
 	}
 
-	elf_Diagnostic diagnostic = {};
 	if (!elf_get_diagnostic(state, &diagnostic)
 	|| diagnostic.code != ELF_ERROR_EVALUATION
 	|| !api_slice_matches(diagnostic.source_name, "invalid-constant.elf")
@@ -196,7 +206,7 @@ static void test_api_source_diagnostics(elf_State *state)
 
 	char invalid_string_text[] = "\"\\q\"";
 	elf_StrSlice invalid_string = {invalid_string_text, sizeof(invalid_string_text) - 1};
-	if (elf_push_constant_expr(state, "invalid-string.elf", invalid_string)) {
+	if (elf_push_constant_expr(state, "invalid-string.elf", invalid_string) != ELF_ERROR_LEX) {
 		test_fail("API rejects lexer errors");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -210,7 +220,7 @@ static void test_api_source_diagnostics(elf_State *state)
 
 	char valid_constant_text[] = "42";
 	elf_StrSlice valid_constant = {valid_constant_text, sizeof(valid_constant_text) - 1};
-	if (!elf_push_constant_expr(state, "valid-constant.elf", valid_constant)) {
+	if (elf_push_constant_expr(state, "valid-constant.elf", valid_constant) != ELF_ERROR_NONE) {
 		test_fail("API parses valid source after a failed constant expression");
 	}
 	elf_Int constant = 0;
@@ -226,7 +236,7 @@ static void test_api_source_diagnostics(elf_State *state)
 	elf_u64 arena_checkpoint = state->arena.in_use;
 	char invalid_code_text[] = "answer := 1 +";
 	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
-	if (elf_push_code_source(state, "invalid-code.elf", invalid_code)) {
+	if (elf_push_code_source(state, "invalid-code.elf", invalid_code) != ELF_ERROR_PARSE) {
 		test_fail("API rejects malformed code source");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -243,7 +253,7 @@ static void test_api_source_diagnostics(elf_State *state)
 
 	char valid_code_text[] = "ret 42";
 	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
-	if (!elf_push_code_source(state, "valid-code.elf", valid_code)) {
+	if (elf_push_code_source(state, "valid-code.elf", valid_code) != ELF_ERROR_NONE) {
 		test_fail("API compiles valid code after a failed parse");
 	}
 	else
@@ -292,7 +302,7 @@ static void test_api_value_source(elf_State *state)
 	}
 	elf_StrSlice source = {};
 	if (!elf_to_str(state, -1, &source)
-	|| !elf_push_constant_expr(state, "roundtrip.elf", source)) {
+	|| elf_push_constant_expr(state, "roundtrip.elf", source) != ELF_ERROR_NONE) {
 		test_fail("API value source parses as a constant expression");
 		elf_set_top(state, checkpoint);
 		return;

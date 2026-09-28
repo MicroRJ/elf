@@ -55,32 +55,49 @@ void elf_push_str(elf_State *state, const char *data, elf_Size size)
 	push_value(state, value_from_string(elf_string_from_data_size(state, data, size)));
 }
 
-int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
+static elf_ErrorCode source_error_or(elf_State *state, elf_ErrorCode fallback)
 {
-	ASSERT(name);
-	ASSERT(source.data);
+	return state->diagnostic.code != ELF_ERROR_NONE ? state->diagnostic.code : fallback;
+}
+
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
+{
+	if (!name || !source.data) {
+		elf_diagnostic_clear(state);
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
 	BcFunctionRef function = elf_compile_source(state, name, source);
-	if (!bc_function_ref_is_valid(function)) return false;
+	if (!bc_function_ref_is_valid(function)) return source_error_or(state, ELF_ERROR_PARSE);
 	ASSERT(bc_function_from_ref(function)->captures == 0);
 
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;
 	push_value(state, value_from_closure(closure));
-	return true;
+	return ELF_ERROR_NONE;
 }
 
-int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
+elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
 {
-	ASSERT(name);
-	ASSERT(source.data);
-	return elf_push_constant_expr_source(state, name, source);
+	if (!name || !source.data) {
+		elf_diagnostic_clear(state);
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
+	if (!elf_push_constant_expr_source(state, name, source)) {
+		return source_error_or(state, ELF_ERROR_EVALUATION);
+	}
+	return ELF_ERROR_NONE;
 }
 
-int elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
+elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 {
-	ASSERT(name);
-	ASSERT(source.data);
-	return elf_push_json_source(state, name, source);
+	if (!name || !source.data) {
+		elf_diagnostic_clear(state);
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
+	if (!elf_push_json_source(state, name, source)) {
+		return source_error_or(state, ELF_ERROR_PARSE);
+	}
+	return ELF_ERROR_NONE;
 }
 
 static elf_Value *value_at(elf_State *state, elf_Index index)

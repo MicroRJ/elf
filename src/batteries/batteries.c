@@ -61,9 +61,9 @@ int elf_push_code_file(elf_State *state, const char *name)
 		elf_push_nil(state);
 		return false;
 	}
-	int result = elf_push_code_source(state, name, source);
+	elf_ErrorCode result = elf_push_code_source(state, name, source);
 	free(source.data);
-	return result;
+	return result == ELF_ERROR_NONE;
 }
 
 void elf_open_batteries(elf_State *state)

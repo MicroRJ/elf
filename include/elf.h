@@ -101,9 +101,9 @@ void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, elf_Size size);
 
-int elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
-int elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
-int elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
+elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
+elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
 
 elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);

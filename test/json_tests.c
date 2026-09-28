@@ -37,8 +37,8 @@ static void test_constexpr_table_literal(elf_State *state)
 	u32 stack_index = (u32)(state->stack_ptr - state->stack);
 	const char *text = "{ answer = 42, [7] = 8, 9 }";
 	elf_StrSlice source = {(char *)text, (u64)strlen(text)};
-	int ok = elf_push_constant_expr(state, "constexpr-test", source);
-	if (!ok)
+	elf_ErrorCode error = elf_push_constant_expr(state, "constexpr-test", source);
+	if (error != ELF_ERROR_NONE)
 	{
 		test_fail("constant expression table parses");
 		return;
@@ -74,8 +74,8 @@ static void test_json_to_table_value(elf_State *state)
 
 	u32 stack_index = (u32)(state->stack_ptr - state->stack);
 	elf_StrSlice source = {(char *)text, (u64)strlen(text)};
-	int ok = elf_push_json(state, "json-test", source);
-	if (!ok)
+	elf_ErrorCode error = elf_push_json(state, "json-test", source);
+	if (error != ELF_ERROR_NONE)
 	{
 		test_fail("json parses");
 		return;

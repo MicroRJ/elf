@@ -13,7 +13,7 @@ int main(void)
 
 	char source_text[] = "ret 42";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (!elf_push_code_source(state, "core_tests", source)) {
+	if (elf_push_code_source(state, "core_tests", source) != ELF_ERROR_NONE) {
 		result_code = 2;
 		goto done;
 	}

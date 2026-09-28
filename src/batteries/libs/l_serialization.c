@@ -36,7 +36,7 @@ ELF_FUNCTION(l_serialization_load_json_file)
 
 	data[size] = 0;
 	elf_StrSlice source = {data, size};
-	elf_push_json(S, name, source);
+	if (elf_push_json(S, name, source) != ELF_ERROR_NONE) elf_push_nil(S);
 	free(data);
 	return 1;
 }
