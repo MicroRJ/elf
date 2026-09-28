@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="elf is a small, consistent scripting language built to live inside C programs.">
+	<title>elf</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<header>
+		<div class="page">
+			<div class="main-column">
+				<h1><a href="./">elf</a><span>small, consistent, simple</span></h1>
+			</div>
+		</div>
+	</header>
+
+	<nav class="small" aria-label="Mobile navigation">
+		<div>
+			<a href="https://github.com/MicroRJ/elf/blob/master/docs/grammar.md">language guide</a>
+			<span> · </span>
+			<a href="https://github.com/MicroRJ/elf/blob/master/docs/public-api.md">embedding</a>
+			<span> · </span>
+			<a href="https://github.com/MicroRJ/elf">github</a>
+		</div>
+	</nav>
+
+	<div class="page content">
+		<nav class="big" aria-label="Documentation">
+			<h2>language</h2>
+			<ul>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/grammar.md">Syntax</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/grammar.md#values">Values</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/string.md">Strings</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/table.md">Tables</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/grammar.md#functions">Functions</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/grammar.md#choices">Control Flow</a></li>
+			</ul>
+
+			<h2>libraries</h2>
+			<ul>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/core.md">Core</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/table.md">Table</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/string.md">String</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/fs.md">Filesystem</a></li>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/libraries/env.md">Environment</a></li>
+			</ul>
+
+			<h2>reference</h2>
+			<ul>
+				<li><a href="https://github.com/MicroRJ/elf/blob/master/docs/public-api.md">Embedding</a></li>
+				<li><a href="https://github.com/MicroRJ/elf">Source</a></li>
+			</ul>
+		</nav>
+
+		<main>
+			<p>It has familiar syntax, first-class functions, and one table type for indexed and keyed data.</p>
+
+			<pre><code><span class="variable">project</span> := {
+	<span class="property">name</span> = <span class="string">"manny"</span>,
+	<span class="property">sources</span> = {<span class="string">"src/main.c"</span>, <span class="string">"src/build.c"</span>},
+}
+
+<span class="variable">objects</span> := project.sources:<span class="call">map</span>(<span class="keyword">fun</span>(source) {
+	<span class="keyword">ret</span> source:<span class="call">replace</span>(<span class="string">".c"</span>, <span class="string">".obj"</span>)
+})</code></pre>
+
+			<p><strong>elf is consistent.</strong> Arrays, maps, and records are different ways of using the same table value.</p>
+
+			<pre><code><span class="variable">color</span> := {<span class="string">"red"</span>, <span class="string">"green"</span>, <span class="string">"blue"</span>}
+color.<span class="property">name</span> = <span class="string">"primary"</span>
+color.[<span class="number">200</span>] = <span class="string">"ok"</span>
+
+color[<span class="number">0</span>]    <span class="comment">// "red"</span>
+color.<span class="property">name</span>  <span class="comment">// "primary"</span>
+color.[<span class="number">200</span>] <span class="comment">// "ok"</span></code></pre>
+
+			<p><strong>elf is embeddable.</strong> The core is a static library with a public C API for compiling source, calling functions, and exchanging values.</p>
+
+			<p><strong>elf is practical.</strong> Optional batteries provide files, paths, processes, environments, serialization, time, and randomness.</p>
+
+			<hr>
+
+			<p>Read the <a href="https://github.com/MicroRJ/elf/blob/master/docs/grammar.md">language guide</a>, learn how to <a href="https://github.com/MicroRJ/elf/blob/master/docs/public-api.md">embed elf</a>, or find the project <a href="https://github.com/MicroRJ/elf">on GitHub</a>.</p>
+		</main>
+	</div>
+
+	<footer>
+		<div class="page">
+			<p>elf lives <a href="https://github.com/MicroRJ/elf">on GitHub</a> · 0.2.0-dev</p>
+		</div>
+	</footer>
+</body>
+</html>

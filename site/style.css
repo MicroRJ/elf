@@ -1,0 +1,313 @@
+:root {
+	--header-height: 8em;
+	--font: "IBM Plex Mono", Consolas, monospace;
+	--te-white: #f5f5f5;
+	--te-black: #0f0e12;
+	--te-grey-100: #e5e5e5;
+	--te-grey-200: #ccc;
+	--te-grey-300: #b2b2b2;
+	--te-grey-600: #767676;
+	--te-grey-900: #4d4d4d;
+	--te-grey-1000: #272727;
+	--te-blue: #0071bb;
+	--te-green: #006837;
+	--te-orange: #f05a24;
+	--te-red: #b81d13;
+	--te-yellow: #fab413;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body,
+code,
+h1,
+h2,
+p,
+pre,
+html {
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body {
+	min-height: 100%;
+}
+
+body {
+	background: #fff;
+	color: var(--te-black);
+	font: 19px/30px var(--font);
+	font-weight: 400;
+	-webkit-font-smoothing: antialiased;
+}
+
+.page {
+	width: 800px;
+	min-height: calc(100% - 16.75em);
+	margin: 0 auto;
+}
+
+.page::after {
+	display: table;
+	clear: both;
+	content: "";
+}
+
+.main-column,
+main {
+	position: relative;
+	width: 560px;
+}
+
+header {
+	background: #fff;
+}
+
+header .page {
+	height: var(--header-height);
+	min-height: 0;
+}
+
+header .main-column {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	align-items: center;
+}
+
+header h1 {
+	display: flex;
+	flex-direction: column;
+	font: 600 58px var(--font);
+	letter-spacing: -2px;
+	line-height: 1;
+}
+
+header h1 span {
+	margin-top: 10px;
+	color: var(--te-grey-600);
+	font-size: 17px;
+	font-weight: 400;
+	letter-spacing: 0;
+	line-height: 1.25;
+}
+
+header a {
+	color: var(--te-black);
+}
+
+a {
+	color: var(--te-blue);
+	cursor: pointer;
+	text-decoration: none;
+	transition: color 0.2s;
+}
+
+a:hover {
+	color: var(--te-orange);
+}
+
+nav.big {
+	float: right;
+	width: 160px;
+	margin-top: 2em;
+}
+
+nav h2 {
+	margin: 0;
+	color: var(--te-grey-900);
+	font: 600 15px var(--font);
+	letter-spacing: 1px;
+	text-transform: uppercase;
+}
+
+nav ul {
+	margin: 6px 0 20px;
+	padding: 0;
+}
+
+nav li {
+	margin: 0 0 4px;
+	color: var(--te-grey-300);
+	font: 400 17px/1.45 var(--font);
+	list-style: none;
+}
+
+nav.small {
+	display: none;
+}
+
+main {
+	float: left;
+	margin-top: 2em;
+}
+
+main h2 {
+	max-width: 16em;
+	margin: 24px 0 0;
+	color: var(--te-blue);
+	font: 500 28px/1.4 var(--font);
+}
+
+p {
+	margin: 10px 0;
+}
+
+p + p {
+	margin-top: 20px;
+}
+
+pre {
+	overflow: auto;
+	margin: 18px 0;
+	padding: 1em;
+	border: 0;
+	border-radius: 6px;
+	background: var(--te-white);
+	color: var(--te-grey-1000);
+	font: 16px/1.55 var(--font);
+	font-weight: 500;
+	white-space: pre-wrap;
+	tab-size: 4;
+}
+
+.keyword {
+	color: var(--te-red);
+}
+
+.string {
+	color: var(--te-green);
+}
+
+.number {
+	color: var(--te-orange);
+}
+
+.variable,
+.call {
+	color: var(--te-blue);
+}
+
+.property {
+	color: var(--te-grey-900);
+	font-weight: 600;
+}
+
+.comment {
+	color: var(--te-grey-600);
+	font-style: italic;
+}
+
+hr {
+	height: 1px;
+	margin: 1em 0;
+	padding: 0;
+	border: 0;
+	border-top: 1px solid var(--te-grey-100);
+}
+
+footer {
+	margin-top: 4em;
+	padding: 20px 0 40px;
+	border-top: 1px solid var(--te-black);
+	background: var(--te-black);
+	color: var(--te-grey-200);
+	font: 16px var(--font);
+	text-align: center;
+}
+
+footer .page {
+	min-height: 0;
+}
+
+footer a {
+	color: var(--te-yellow);
+}
+
+@media (max-width: 839px) {
+	.page {
+		width: 720px;
+	}
+
+	.main-column,
+	main {
+		width: 504px;
+	}
+
+	nav.big {
+		width: 144px;
+	}
+}
+
+@media (max-width: 759px) {
+	.page {
+		width: 640px;
+	}
+
+	.main-column,
+	main {
+		width: 448px;
+	}
+
+	nav.big {
+		width: 128px;
+	}
+}
+
+@media (max-width: 679px) {
+	.page {
+		width: 560px;
+	}
+
+	.main-column,
+	main {
+		width: 392px;
+	}
+
+	nav.big {
+		width: 112px;
+	}
+}
+
+@media (max-width: 639px) {
+	.page {
+		width: 100%;
+	}
+
+	.main-column,
+	main {
+		width: 100%;
+		padding: 0 20px;
+	}
+
+	header h1 {
+		font-size: 38px;
+	}
+
+	header .main-column {
+		justify-content: flex-start;
+	}
+
+	nav.big {
+		display: none;
+	}
+
+	nav.small {
+		display: block;
+		padding: 16px 20px;
+		background: var(--te-grey-100);
+		text-align: center;
+	}
+
+	main {
+		float: none;
+	}
+
+	footer {
+		padding-right: 20px;
+		padding-left: 20px;
+	}
+}

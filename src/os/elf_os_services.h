@@ -69,8 +69,7 @@ elf_OS_DirectoryStatus;
 elf_u64 elf_os_write_console(elf_OS_StandardStream stream, const void *data, elf_u64 size);
 void elf_os_sleep(elf_u64 milliseconds);
 
-elf_b32 elf_path_builder_init(elf_PathBuilder *path, char *storage, elf_u64 capacity,
-	const char *root, elf_u64 root_size);
+elf_b32 elf_path_builder_init(elf_PathBuilder *path, char *storage, elf_u64 capacity, const char *root, elf_u64 root_size);
 elf_PathMark elf_path_mark(const elf_PathBuilder *path);
 elf_b32 elf_path_push(elf_PathBuilder *path, const char *component, elf_u64 component_size);
 void elf_path_pop(elf_PathBuilder *path, elf_PathMark mark);
