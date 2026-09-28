@@ -40,7 +40,7 @@ The project currently provides:
 - optional filesystem, path, process, environment, serialization, random, and time
   libraries.
 
-Bob uses Elf as its build-description language, and Orbiter uses Elf programs for its
+Manny uses Elf as its build-description language, and Orbiter uses Elf programs for its
 build and game-library configuration.
 
 ## Documentation
@@ -71,7 +71,7 @@ If the repository is already cloned, initialize the submodule with:
 git submodule update --init --recursive
 ```
 
-The repository includes a Windows x64 Bob bootstrap executable, so Bob does not need to
+The repository includes a Windows x64 Manny bootstrap executable, so Manny does not need to
 be installed separately.
 
 ```bat
@@ -86,7 +86,7 @@ build.bat lib
 build.bat benchmark
 ```
 
-Build products are written beneath `build/`. Passing no entry to `build.bat` uses Bob's
+Build products are written beneath `build/`. Passing no entry to `build.bat` uses Manny's
 default entry.
 
 ## Repository layout
