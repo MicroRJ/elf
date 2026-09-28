@@ -76,22 +76,21 @@ static SourceSite source_site_from_ptr(Lexer *lexer, Source data)
 {
 	ASSERT(data);
 	ASSERT(data >= lexer->line_start);
-	SourceSite site;
-	site.data = data;
-	site.size = 1;
-	site.line_start = lexer->line_start;
-	site.line_index = lexer->line_index;
-	return site;
+	u64 offset = (u64)(data - lexer->source.data);
+	u64 line_offset = (u64)(lexer->line_start - lexer->source.data);
+	ASSERT(offset <= 0xffffffffu);
+	ASSERT(line_offset <= 0xffffffffu);
+	return (SourceSite) {
+		.offset = (u32)offset,
+		.size = 1,
+		.line_offset = (u32)line_offset,
+		.line_index = lexer->line_index,
+	};
 }
 
 static SourceSite lexer_source_site(Lexer *lexer, Source data)
 {
-	SourceSite site;
-	site.data = data;
-	site.size = 1;
-	site.line_start = lexer->line_start;
-	site.line_index = lexer->line_index;
-	return site;
+	return source_site_from_ptr(lexer, data);
 }
 
 static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...)
@@ -721,8 +720,9 @@ static Token lex_token(Lexer *lexer)
 			else
 			{
 				lex_identifier(&cur);
-				u32 size = (u32)(cur - token.site.data);
-				Atom *atom = atom_from_data_size(lexer->atoms, token.site.data, size);
+				char *token_data = lexer->source.data + token.site.offset;
+				u32 size = (u32)(cur - token_data);
+				Atom *atom = atom_from_data_size(lexer->atoms, token_data, size);
 
 				token.type = atom_is_word_or_macro(atom);
 				if (token.type == TOK_M_ENDOFFILE) {
@@ -986,7 +986,7 @@ static Token lex_token(Lexer *lexer)
 		} break;
 	}
 
-	token.site.size = (u32)(cur - token.site.data);
+	token.site.size = (u32)(cur - (lexer->source.data + token.site.offset));
 	if (token.site.size == 0) {
 		token.site.size = 1;
 	}

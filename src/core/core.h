@@ -12,10 +12,10 @@ typedef char *Source;
 
 typedef struct
 {
-	char *data;
-	u32   size;
-	char *line_start;
-	u32   line_index;
+	u32 offset;
+	u32 size;
+	u32 line_offset;
+	u32 line_index;
 }
 SourceSite;
 

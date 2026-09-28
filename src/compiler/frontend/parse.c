@@ -128,7 +128,7 @@ static void parser_report(Parser *parser, elf_DiagnosticSeverity severity, Error
 {
 	(void)error;
 
-	if (!site.data) {
+	if (!source_slice_is_valid(site)) {
 		site = parser->tok.site;
 	}
 
@@ -147,7 +147,7 @@ static void parser_error(Parser *parser, Error error, SourceSite site, const cha
 static void parser_errorf(Parser *parser, Error error, SourceSite site, const char *format, ...)
 {
 	(void)error;
-	if (!site.data) site = parser->tok.site;
+	if (!source_slice_is_valid(site)) site = parser->tok.site;
 	va_list args;
 	va_start(args, format);
 	compiler_reportv(parser->compiler, ELF_DIAGNOSTIC_ERROR, parser->phase, site, format, args);
@@ -298,7 +298,7 @@ static Ast elf_parse_file(Parser *parser)
 			parser_unexpected_token(parser, before);
 			return ERROR_AST;
 		}
-		if (before.site.data == parser->tok.site.data && before.type == parser->tok.type)
+		if (before.site.offset == parser->tok.site.offset && before.type == parser->tok.type)
 		{
 			parser_error(parser, ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading statement");
 			return ERROR_AST;
@@ -1164,7 +1164,7 @@ static Ast parse_stat(Parser *parser)
 					parser_unexpected_token(parser, before);
 					return ERROR_AST;
 				}
-				if (before.site.data == parser->tok.site.data && before.type == parser->tok.type)
+				if (before.site.offset == parser->tok.site.offset && before.type == parser->tok.type)
 				{
 					parser_error(parser, ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading block statement");
 					return ERROR_AST;

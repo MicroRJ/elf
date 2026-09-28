@@ -4,58 +4,53 @@
 
 static b32 source_slice_is_valid(SourceSite site)
 {
-	return site.data != 0 && site.line_start != 0;
+	return site.line_index != 0 && site.line_offset <= site.offset;
 }
 
 static u64 source_slice_column(SourceSite site)
 {
-	if (!source_slice_is_valid(site) || site.data < site.line_start) {
+	if (!source_slice_is_valid(site)) {
 		return 0;
 	}
-	return 1 + (u64)(site.data - site.line_start);
+	return 1 + (u64)(site.offset - site.line_offset);
 }
 
-static Source source_slice_line_end(SourceSite site, elf_StrSlice source)
+static u32 source_slice_line_end(SourceSite site, elf_StrSlice source)
 {
-	Source line_end = site.line_start;
-	Source source_end = source.data ? source.data + source.size : 0;
-
-	if (source_end)
+	u32 line_end = site.line_offset;
+	while ((elf_Size)line_end < source.size &&
+		source.data[line_end] != '\r' && source.data[line_end] != '\n')
 	{
-		while (line_end < source_end && *line_end != '\r' && *line_end != '\n') {
-			++line_end;
-		}
+		++line_end;
 	}
-	else
-	{
-		while (*line_end && *line_end != '\r' && *line_end != '\n') {
-			++line_end;
-		}
-	}
-
 	return line_end;
 }
 
 static void print_source_slice_marker(SourceSite site, elf_StrSlice source)
 {
-	if (!source_slice_is_valid(site)) {
+	if (!source_slice_is_valid(site) || !source.data ||
+		(elf_Size)site.offset > source.size || (elf_Size)site.line_offset > source.size)
+	{
 		log_line(LOG_LEVEL_ERROR, "| source information could not be found");
 		return;
 	}
 
-	Source line_start = site.line_start;
-	Source line_end = source_slice_line_end(site, source);
+	u32 line_start_offset = site.line_offset;
+	u32 line_end_offset = source_slice_line_end(site, source);
 
-	while (line_start < site.data && line_start < line_end && (*line_start == '\t' || *line_start == ' ')) {
-		++line_start;
+	while (line_start_offset < site.offset && line_start_offset < line_end_offset &&
+		(source.data[line_start_offset] == '\t' || source.data[line_start_offset] == ' '))
+	{
+		++line_start_offset;
 	}
 
-	if (site.data < line_start) {
-		line_start = site.line_start;
+	if (site.offset < line_start_offset) {
+		line_start_offset = site.line_offset;
 	}
 
-	u64 column = (u64)(site.data - line_start);
-	u64 line_size = (u64)(line_end - line_start);
+	const char *line_start = source.data + line_start_offset;
+	u64 column = (u64)(site.offset - line_start_offset);
+	u64 line_size = (u64)(line_end_offset - line_start_offset);
 	u32 highlight_size = site.size ? site.size : 1;
 
 	enum { MARKER_CAPACITY = 256 };

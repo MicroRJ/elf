@@ -47,9 +47,9 @@ static void report_generation_error(BcGen *gen, GenerationError error, SourceSit
 
 static b32 source_slice_equal(SourceSite left, SourceSite right)
 {
-	return left.data == right.data &&
+	return left.offset == right.offset &&
 		left.size == right.size &&
-		left.line_start == right.line_start &&
+		left.line_offset == right.line_offset &&
 		left.line_index == right.line_index;
 }
 

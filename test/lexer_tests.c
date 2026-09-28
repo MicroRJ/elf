@@ -63,21 +63,22 @@ static void expect_token_atom_bytes(Token token, const char *data, u32 size, con
 	}
 }
 
-static void expect_token_line(Token token, u32 index, const char *text, const char *label)
+static void expect_token_line(Parser *parser, Token token, u32 index, const char *text, const char *label)
 {
 	u32 expected_size = (u32)strlen(text);
+	const char *line_start = parser->lexer.source.data + token.site.line_offset;
+	const char *source_end = parser->lexer.source.data + parser->lexer.source.size;
 
 	u32 line_size = 0;
-	while (token.site.line_start[line_size] &&
-		token.site.line_start[line_size] != '\n' &&
-		token.site.line_start[line_size] != '\r')
+	while (line_start + line_size < source_end &&
+		line_start[line_size] != '\n' && line_start[line_size] != '\r')
 	{
 		line_size += 1;
 	}
 
 	if (token.site.line_index != index ||
 		line_size != expected_size ||
-		memcmp(token.site.line_start, text, expected_size) != 0)
+		memcmp(line_start, text, expected_size) != 0)
 	{
 		fprintf(stderr, "FAIL: %s expected line %u '%s', got line %u '%.*s'\n",
 			label,
@@ -85,14 +86,14 @@ static void expect_token_line(Token token, u32 index, const char *text, const ch
 			text,
 			token.site.line_index,
 			(i32)line_size,
-			token.site.line_start);
+			line_start);
 		test_failures += 1;
 	}
 }
 
 static void expect_token_site(Parser *parser, Token token, u64 offset, const char *label)
 {
-	u64 actual = (u64)(token.site.data - parser->lexer.source.data);
+	u64 actual = token.site.offset;
 
 	if (actual != offset) {
 		fprintf(stderr, "FAIL: %s expected site offset %llu, got %llu\n",
@@ -460,15 +461,15 @@ static void test_lexer_format_string_parts(elf_State *state)
 	lexer_prime(&tracked_block);
 
 	Token tracked_start = lexer_next(&tracked_block);
-	expect_token_line(tracked_start, 1, "f\"\"\"first", "format block start line");
+	expect_token_line(&tracked_block, tracked_start, 1, "f\"\"\"first", "format block start line");
 	Token tracked_value = lexer_next(&tracked_block);
-	expect_token_line(tracked_value, 2, "${value}", "format block interpolation line");
+	expect_token_line(&tracked_block, tracked_value, 2, "${value}", "format block interpolation line");
 	Token tracked_end = lexer_next(&tracked_block);
 	expect_token_type(tracked_end, TOK_STRING_END, "lex tracked format block end");
-	expect_token_line(tracked_end, 2, "${value}", "format block end token begins at interpolation close");
+	expect_token_line(&tracked_block, tracked_end, 2, "${value}", "format block end token begins at interpolation close");
 	Token tracked_next = lexer_next(&tracked_block);
 	expect_token_type(tracked_next, TOK_IDENTIFIER, "lex token after multiline format block");
-	expect_token_line(tracked_next, 4, "next", "line after multiline format block");
+	expect_token_line(&tracked_block, tracked_next, 4, "next", "line after multiline format block");
 }
 
 static void test_lexer_line_slices(elf_State *state)
@@ -480,19 +481,19 @@ static void test_lexer_line_slices(elf_State *state)
 	expect_token_type(alpha, TOK_IDENTIFIER, "lex line slice first token");
 	expect_token_site(&parser, alpha, 0, "first token site");
 	expect_token_site_size(alpha, 5, "first token site size");
-	expect_token_line(alpha, 1, "alpha", "first token line slice");
+	expect_token_line(&parser, alpha, 1, "alpha", "first token line slice");
 
 	Token beta = lexer_next(&parser);
 	expect_token_type(beta, TOK_IDENTIFIER, "lex line slice second token");
 	expect_token_site(&parser, beta, 8, "second token site");
 	expect_token_site_size(beta, 4, "second token site size");
-	expect_token_line(beta, 2, "  beta", "second token line slice");
+	expect_token_line(&parser, beta, 2, "  beta", "second token line slice");
 
 	Token gamma = lexer_next(&parser);
 	expect_token_type(gamma, TOK_STRING, "lex line slice string token");
 	expect_token_site(&parser, gamma, 14, "string token site");
 	expect_token_site_size(gamma, 7, "string token site size");
-	expect_token_line(gamma, 3, "\"gamma\"", "string token line slice");
+	expect_token_line(&parser, gamma, 3, "\"gamma\"", "string token line slice");
 }
 
 static void test_lexer_line_tracking_through_skipped_text(elf_State *state)
@@ -504,19 +505,19 @@ static void test_lexer_line_tracking_through_skipped_text(elf_State *state)
 	Token alpha = lexer_next(&parser);
 	expect_token_type(alpha, TOK_IDENTIFIER, "lex tracked first token");
 	expect_token_site(&parser, alpha, 0, "tracked first token site");
-	expect_token_line(alpha, 1, "alpha", "tracked first token line");
+	expect_token_line(&parser, alpha, 1, "alpha", "tracked first token line");
 
 	Token block = lexer_next(&parser);
 	expect_token_type(block, TOK_STRING, "lex tracked string block token");
 	expect_token_site(&parser, block, 27, "tracked string block site");
 	expect_token_site_size(block, 13, "tracked string block site size");
-	expect_token_line(block, 4, "\"\"\"one", "tracked string block starting line");
+	expect_token_line(&parser, block, 4, "\"\"\"one", "tracked string block starting line");
 	expect_token_atom(block, "one\ntwo", "tracked string block payload");
 
 	Token next = lexer_next(&parser);
 	expect_token_type(next, TOK_IDENTIFIER, "lex tracked token after string block");
 	expect_token_site(&parser, next, 41, "tracked token after string block site");
-	expect_token_line(next, 6, "next", "tracked token after string block line");
+	expect_token_line(&parser, next, 6, "next", "tracked token after string block line");
 }
 
 static void test_lexer_line_breaks(elf_State *state)

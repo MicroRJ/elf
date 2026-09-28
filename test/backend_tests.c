@@ -109,7 +109,7 @@ static void test_backend_source_map(void)
 	for (u32 i = 0; i < function->length; ++ i) {
 		u32 byte = function->offset + i;
 		SourceMapEntry *entry = backend_find_source_map_entry(function, byte);
-		if (!entry || !entry->site.data || !entry->site.line_start || entry->site.size == 0) {
+		if (!entry || !source_slice_is_valid(entry->site) || entry->site.size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
 			goto done;
 		}
@@ -143,20 +143,16 @@ static void test_backend_module_owns_source(void)
 		test_fail("compiled module retains an owned source copy");
 	}
 
-	size_t source_begin = (size_t)module->source_data;
-	size_t source_end = source_begin + module->source_size;
 	for (u32 function_index = 0; function_index < module->bytecode_function_count; ++function_index)
 	{
 		BcFunction *function = module->bytecode_functions + function_index;
 		for (u32 map_index = 0; map_index < function->source_map_count; ++map_index)
 		{
 			SourceSite site = function->source_map[map_index].site;
-			size_t site_data = (size_t)site.data;
-			size_t line_start = (size_t)site.line_start;
-			if (site_data < source_begin || site_data > source_end ||
-				line_start < source_begin || line_start > source_end || site.size > source_end - site_data)
+			if (!source_slice_is_valid(site) || site.offset > module->source_size ||
+				site.line_offset > module->source_size || site.size > module->source_size - site.offset)
 			{
-				test_fail("source maps point into module-owned source memory");
+				test_fail("source map offsets fit module-owned source memory");
 				elf_destroy_state(state);
 				return;
 			}
