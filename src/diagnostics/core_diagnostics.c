@@ -13,46 +13,6 @@ static const char *runtime_error_type_names[] =
 	[RUNTIME_ERROR_UNKNOWN_BYTECODE]       = "bytecode",
 };
 
-void elf_diagnostic_clear(elf_State *state)
-{
-	ASSERT(state);
-	state->diagnostic = (elf_Diagnostic) {};
-}
-
-void elf_diagnostic_set(elf_State *state, elf_ErrorCode code, const char *source_name, SourceSite site, const char *message)
-{
-	ASSERT(state);
-	ASSERT(code != ELF_ERROR_NONE);
-	if (state->diagnostic.code != ELF_ERROR_NONE) return;
-
-	if (!source_name) source_name = "<unknown>";
-	if (!message) message = "unknown error";
-	u64 source_name_size = strlen(source_name);
-	u64 message_size = strlen(message);
-	u64 required_size = source_name_size + 1 + message_size + 1;
-	if (required_size > state->diagnostic_storage_capacity)
-	{
-		u64 capacity = state->diagnostic_storage_capacity ? state->diagnostic_storage_capacity : 256;
-		while (capacity < required_size) capacity *= 2;
-		state->diagnostic_storage = realloc(state->diagnostic_storage, capacity);
-		ASSERT(state->diagnostic_storage);
-		state->diagnostic_storage_capacity = capacity;
-	}
-
-	char *source_name_copy = state->diagnostic_storage;
-	copy_memory(source_name_copy, source_name, source_name_size + 1);
-	char *message_copy = source_name_copy + source_name_size + 1;
-	copy_memory(message_copy, message, message_size + 1);
-
-	state->diagnostic = (elf_Diagnostic) {
-		.code = code,
-		.source_name = {source_name_copy, source_name_size},
-		.message = {message_copy, message_size},
-		.line = site.line_index,
-		.column = source_slice_column(site),
-	};
-}
-
 typedef struct
 {
 	elf_Module *module;

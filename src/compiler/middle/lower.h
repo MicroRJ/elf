@@ -98,9 +98,9 @@ ScopeEntity;
 
 struct LowerContext
 {
+	Compiler    *compiler;
 	elf_State   *state;
 	elf_Arena   *arena;
-	elf_String  *source_name;
 	u32          ir_stack_size;
 	u32          ir_stack_index;
 	Ir          *ir_stack;

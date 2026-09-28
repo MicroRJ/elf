@@ -16,7 +16,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_function(BcGen *gen, IrFunction *function);
-static BcFunctionRef generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module);
+static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -36,24 +36,13 @@ GenerationError;
 
 static void report_generation_error(BcGen *gen, GenerationError error, SourceSite site, const char *format, ...)
 {
-	(void)gen;
 	(void)error;
 
 	va_list args;
 	va_start(args, format);
-	elf_Scratch scratch = elf_begin_scratch();
-	char *message = elf_arena_pushfv(scratch.arena, format, args);
+	compiler_reportv(gen->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_BYTECODE,
+		site, format, args);
 	va_end(args);
-	elf_arena_push_zero(scratch.arena, 1);
-
-	if (site.line_index) {
-		log_linef(LOG_LEVEL_ERROR, "generation error:%u: %s", site.line_index, message);
-	}
-	else {
-		log_linef(LOG_LEVEL_ERROR, "generation error: %s", message);
-	}
-	elf_end_scratch(scratch);
-	ASSERT(!"Generation Error");
 }
 
 static b32 source_slice_equal(SourceSite left, SourceSite right)
@@ -345,11 +334,13 @@ static BcSlot ensure_slot(BcGen *gen, BcSlot slot)
 }
 
 /* main */
-static BcGen *bg_create(elf_Arena *arena, u32 function_count)
+static BcGen *bg_create(Compiler *compiler, u32 function_count)
 {
+	elf_Arena *arena = compiler->arena;
 	if (!function_count || function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
 	elf_arena_align(arena, 8);
 	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
+	gen->compiler = compiler;
 	gen->arena = arena;
 	elf_arena_align(arena, 8);
 	gen->module.functions = elf_arena_push_zero(arena, sizeof(*gen->module.functions) * function_count);
@@ -468,13 +459,15 @@ static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilde
 	}
 }
 
-static BcFunctionRef generate_module(elf_State *state, elf_Arena *arena, elf_Module *module, IrModule ir_module)
+static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module)
 {
+	elf_State *state = compiler->state;
+	elf_Arena *arena = compiler->arena;
 	ASSERT(ir_module.functions);
 	ASSERT(ir_module.function_count > 0);
 	ASSERT(ir_module.entry_index == 0);
 
-	BcGen *gen = bg_create(arena, ir_module.function_count);
+	BcGen *gen = bg_create(compiler, ir_module.function_count);
 	PROF_BLOCK("compiler.codegen")
 	{
 		for (u32 i = 0; i < ir_module.function_count; ++ i)
@@ -496,6 +489,7 @@ static BcFunctionRef generate_module(elf_State *state, elf_Arena *arena, elf_Mod
 			bc_function->source_map_count = gen->source_map_buffer.count;
 		}
 	}
+	if (compiler->error_count) return (BcFunctionRef) {};
 	finalize_module(state, module, &gen->module);
 
 	return (BcFunctionRef) {

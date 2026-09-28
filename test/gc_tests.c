@@ -136,7 +136,7 @@ static void test_state_create_destroy_repeatedly(void)
 
 		char source_text[] = "ret {answer = 42, text = \"elf\"}";
 		elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-		if (elf_push_code_source(state, "lifecycle", source) != ELF_ERROR_NONE) {
+		if (elf_push_code_source(state, "lifecycle", source, 0) != ELF_ERROR_NONE) {
 			test_fail("state lifecycle source compiles");
 		}
 

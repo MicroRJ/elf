@@ -49,22 +49,47 @@ typedef enum
 	ELF_ERROR_STACK_UNDERFLOW,
 	ELF_ERROR_OUT_OF_RANGE,
 	ELF_ERROR_READONLY,
-	ELF_ERROR_LEX,
-	ELF_ERROR_PARSE,
-	ELF_ERROR_EVALUATION,
+	ELF_ERROR_COMPILATION_FAILED,
 }
 elf_ErrorCode;
 
+typedef enum
+{
+	ELF_DIAGNOSTIC_NOTE = 0,
+	ELF_DIAGNOSTIC_WARNING,
+	ELF_DIAGNOSTIC_ERROR,
+}
+elf_DiagnosticSeverity;
+
+typedef enum
+{
+	ELF_DIAGNOSTIC_PHASE_LEXER = 0,
+	ELF_DIAGNOSTIC_PHASE_PARSER,
+	ELF_DIAGNOSTIC_PHASE_EVALUATION,
+	ELF_DIAGNOSTIC_PHASE_LOWERING,
+	ELF_DIAGNOSTIC_PHASE_BYTECODE,
+}
+elf_DiagnosticPhase;
+
 typedef struct
 {
-	elf_ErrorCode code;
-	// Source name and message remain valid until the next source operation or state destruction.
-	elf_StrSlice source_name;
-	elf_StrSlice message;
-	elf_u32      line;
-	elf_u64      column;
+	elf_DiagnosticSeverity severity;
+	elf_DiagnosticPhase    phase;
+	elf_StrSlice           source_name;
+	elf_StrSlice           message;
+	elf_u32                line;
+	elf_u64                column;
 }
 elf_Diagnostic;
+
+typedef struct
+{
+	const elf_Diagnostic *diagnostics;
+	elf_Size              diagnostic_count;
+	elf_Size              error_count;
+	elf_Size              warning_count;
+}
+elf_CompileReport;
 
 #define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
 typedef ELF_FUNCTION(*elf_Function);
@@ -89,7 +114,6 @@ const char *elf_version(void);
 void elf_set_user_data(elf_State *state, void *user_data);
 void *elf_get_user_data(elf_State *state);
 void elf_error(elf_State *state, const char *message);
-elf_Bool elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic);
 
 elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
 elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
@@ -101,9 +125,10 @@ void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, elf_Size size);
 
-elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
-elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
-elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
+elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
+elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
+void elf_destroy_compile_report(elf_CompileReport *report);
 
 elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);

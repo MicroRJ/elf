@@ -84,7 +84,7 @@ static double bench_median(double *samples, u32 count)
 static elf_Ref bench_compile_program(elf_State *state, const char *name, const char *source)
 {
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
-	bench_require(elf_push_code_source(state, name, text) == ELF_ERROR_NONE, "could not compile benchmark source");
+	bench_require(elf_push_code_source(state, name, text, 0) == ELF_ERROR_NONE, "could not compile benchmark source");
 	elf_push_nil(state);
 	bench_require(elf_call(state, 1, 1) == 1, "benchmark file did not return one value");
 	bench_require(elf_is_callable(state, -1), "benchmark file did not return a function");
@@ -178,7 +178,7 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 	for (u32 i = 0; i < iterations; ++i)
 	{
 		elf_Module *previous_module = state->modules;
-		bench_require(elf_push_code_source(state, "benchmark.compile", text) == ELF_ERROR_NONE, "could not compile benchmark source");
+		bench_require(elf_push_code_source(state, "benchmark.compile", text, 0) == ELF_ERROR_NONE, "could not compile benchmark source");
 		elf_Module *module = state->modules;
 		bench_require(module && module != previous_module, "compile did not publish a distinct module");
 		bench_require(value_as_closure(state->stack_ptr[-1])->function.index == 0, "module entry is not local");

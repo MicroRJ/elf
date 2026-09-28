@@ -1,12 +1,12 @@
 static Parser lexer_test_parser(elf_State *state, const char *source)
 {
 	Parser parser = {};
-	parser.state = state;
-	parser.arena = &state->arena;
-	parser.name = elf_string_from_data(state, "lexer_tests");
-	init_parser_atoms(&parser);
 	elf_StrSlice source_buffer = {(char *)source, (u64)strlen(source)};
-	lexer_init(&parser.lexer, state, parser.name, &parser.atoms, source_buffer);
+	parser.compiler = compiler_create(state, &state->arena, "lexer_tests", source_buffer);
+	parser.arena = &state->arena;
+	parser.phase = ELF_DIAGNOSTIC_PHASE_PARSER;
+	init_parser_atoms(&parser);
+	lexer_init(&parser.lexer, parser.compiler, &parser.atoms);
 	return parser;
 }
 
@@ -146,14 +146,6 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 	}
 }
 
-static void count_expected_exponent_error(LogLevel level, const char *message, void *user)
-{
-	(void)level;
-	if (strstr(message, "expected digits after number exponent")) {
-		*(u32 *)user += 1;
-	}
-}
-
 static void test_lexer_keywords_and_identifiers(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "true false if fun recurse true_value load");
@@ -217,6 +209,7 @@ static void test_lexer_macros(elf_State *state)
 	Token identifier = lexer_next(&invalid);
 	expect_token_type(identifier, TOK_IDENTIFIER, "identifier after invalid macro is preserved");
 	expect_token_atom(identifier, "abc", "identifier after invalid macro payload");
+	compiler_finish_report(invalid.compiler, 0);
 }
 
 static void test_lexer_strings(elf_State *state)
@@ -630,8 +623,6 @@ static void test_lexer_numbers(elf_State *state)
 	expect_token_type(hex_with_e, TOK_INTEGER, "hexadecimal e remains a digit");
 	expect_token_int(hex_with_e, 0x1e3, "hexadecimal e digit value");
 
-	u32 exponent_errors = 0;
-	log_set_hook(count_expected_exponent_error, &exponent_errors);
 	Parser malformed = lexer_test_parser(state, "1e 2e+ 3E-");
 	lexer_prime(&malformed);
 
@@ -646,11 +637,10 @@ static void test_lexer_numbers(elf_State *state)
 	Token missing_negative_exponent = lexer_next(&malformed);
 	expect_token_type(missing_negative_exponent, TOK_NUMBER, "recover malformed negative exponent");
 	expect_token_site_size(missing_negative_exponent, 3, "malformed negative exponent token size");
-	log_set_hook(0, 0);
-
-	if (exponent_errors != 3) {
+	if (malformed.compiler->error_count != 3) {
 		test_fail("malformed exponents report missing digits");
 	}
+	compiler_finish_report(malformed.compiler, 0);
 }
 
 static void test_lexer_operators(elf_State *state)

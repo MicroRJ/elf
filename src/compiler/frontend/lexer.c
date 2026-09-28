@@ -56,15 +56,14 @@ static b32 is_identifier_continue(char c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static void lexer_init(Lexer *lexer, elf_State *state, elf_String *name, Atom_Table *atoms, elf_StrSlice source)
+static void lexer_init(Lexer *lexer, Compiler *compiler, Atom_Table *atoms)
 {
-	lexer->state = state;
-	lexer->name = name;
+	lexer->compiler = compiler;
 	lexer->atoms = atoms;
-	lexer->source = source;
-	lexer->cursor = source.data;
+	lexer->source = compiler->source;
+	lexer->cursor = compiler->source.data;
 	lexer->line_index = 1;
-	lexer->line_start = source.data;
+	lexer->line_start = compiler->source.data;
 }
 
 static void lexer_advance_line(Lexer *lexer, char *line_start)
@@ -97,25 +96,12 @@ static SourceSite lexer_source_site(Lexer *lexer, Source data)
 
 static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...)
 {
-	elf_Scratch scratch = elf_begin_scratch();
-
 	va_list args;
 	va_start(args, fmt);
-	char *message = elf_arena_pushfv(scratch.arena, fmt, args);
+	compiler_reportv(lexer->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
+		site, fmt, args);
 	va_end(args);
-	elf_arena_push_zero(scratch.arena, 1);
 	lexer->failed = true;
-	elf_diagnostic_set(lexer->state, ELF_ERROR_LEX, string_data(lexer->name), site, message);
-
-	log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu]: %s"
-	,	string_data(lexer->name)
-	,	site.line_index
-	,	source_slice_column(site)
-	,	message);
-
-	elf_StrSlice source = lexer->source;
-	print_source_slice_marker(site, source);
-	elf_end_scratch(scratch);
 }
 
 static b32 lexer_is_hex_digit(char c)
@@ -744,7 +730,8 @@ static Token lex_token(Lexer *lexer)
 				}
 				else if (token.type == TOK_M_FILE_NAME) {
 					token.type = TOK_STRING;
-					token.atom = atom_from_data_size(lexer->atoms, string_data(lexer->name), string_size(lexer->name));
+					token.atom = atom_from_data_size(lexer->atoms, lexer->compiler->source_name,
+						strlen(lexer->compiler->source_name));
 				}
 				else if (token.type == TOK_M_LINE_NUMBER) {
 					token.type = TOK_INTEGER;

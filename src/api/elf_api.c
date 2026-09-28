@@ -32,14 +32,6 @@ void elf_error(elf_State *state, const char *message)
 		message ? message : "host error");
 }
 
-elf_Bool elf_get_diagnostic(elf_State *state, elf_Diagnostic *diagnostic)
-{
-	ASSERT(state);
-	if (!diagnostic) return false;
-	*diagnostic = state->diagnostic;
-	return diagnostic->code != ELF_ERROR_NONE;
-}
-
 void elf_push_nil(elf_State *state)                 { push_value(state, value_nil());            }
 void elf_push_int(elf_State *state, elf_Int x)      { push_value(state, value_from_integer(x));  }
 void elf_push_num(elf_State *state, elf_Num x)      { push_value(state, value_from_number(x));   }
@@ -55,19 +47,31 @@ void elf_push_str(elf_State *state, const char *data, elf_Size size)
 	push_value(state, value_from_string(elf_string_from_data_size(state, data, size)));
 }
 
-static elf_ErrorCode source_error_or(elf_State *state, elf_ErrorCode fallback)
+static void clear_compile_report(elf_CompileReport *report)
 {
-	return state->diagnostic.code != ELF_ERROR_NONE ? state->diagnostic.code : fallback;
+	if (report) *report = (elf_CompileReport) {};
 }
 
-elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
+void elf_destroy_compile_report(elf_CompileReport *report)
+{
+	if (!report) return;
+	elf_Diagnostic *diagnostics = (elf_Diagnostic *)report->diagnostics;
+	for (elf_Size i = 0; i < report->diagnostic_count; ++i) {
+		free(diagnostics[i].source_name.data);
+		free(diagnostics[i].message.data);
+	}
+	free(diagnostics);
+	*report = (elf_CompileReport) {};
+}
+
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report)
 {
 	if (!name || !source.data) {
-		elf_diagnostic_clear(state);
+		clear_compile_report(report);
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	BcFunctionRef function = elf_compile_source(state, name, source);
-	if (!bc_function_ref_is_valid(function)) return source_error_or(state, ELF_ERROR_PARSE);
+	BcFunctionRef function = elf_compile_source(state, name, source, report);
+	if (!bc_function_ref_is_valid(function)) return ELF_ERROR_COMPILATION_FAILED;
 	ASSERT(bc_function_from_ref(function)->captures == 0);
 
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
@@ -76,26 +80,26 @@ elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSl
 	return ELF_ERROR_NONE;
 }
 
-elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
+elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report)
 {
 	if (!name || !source.data) {
-		elf_diagnostic_clear(state);
+		clear_compile_report(report);
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	if (!elf_push_constant_expr_source(state, name, source)) {
-		return source_error_or(state, ELF_ERROR_EVALUATION);
+	if (!elf_push_constant_expr_source(state, name, source, report)) {
+		return ELF_ERROR_COMPILATION_FAILED;
 	}
 	return ELF_ERROR_NONE;
 }
 
-elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
+elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report)
 {
 	if (!name || !source.data) {
-		elf_diagnostic_clear(state);
+		clear_compile_report(report);
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	if (!elf_push_json_source(state, name, source)) {
-		return source_error_or(state, ELF_ERROR_PARSE);
+	if (!elf_push_json_source(state, name, source, report)) {
+		return ELF_ERROR_COMPILATION_FAILED;
 	}
 	return ELF_ERROR_NONE;
 }

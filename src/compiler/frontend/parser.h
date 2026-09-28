@@ -25,8 +25,7 @@ LexerMode;
 
 typedef struct
 {
-	elf_State        *state;
-	elf_String        *name;
+	Compiler          *compiler;
 	Atom_Table        *atoms;
 	elf_StrSlice     source;
 	char            *cursor;
@@ -43,13 +42,12 @@ Lexer;
 struct Parser
 {
 	elf_Arena  *arena;
-	elf_State  *state;
-	elf_String *name;
+	Compiler   *compiler;
 	Atom_Table   atoms;
 	Lexer       lexer;
 	Token       tok,tok_prev,tok_prox;
 	AstContext  ast;
-	elf_ErrorCode error_code;
+	elf_DiagnosticPhase phase;
 	b32         failed;
 };
 

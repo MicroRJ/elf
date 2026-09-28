@@ -39,7 +39,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 		source.size = size;
 	}
 
-	result.function = elf_compile_source(result.state, path, source);
+	result.function = elf_compile_source(result.state, path, source, 0);
 	return result;
 }
 
@@ -52,7 +52,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 	source.data = (char *)source_text;
 	source.size = (u64)strlen(source_text);
 
-	result.function = elf_compile_source(result.state, "backend_tests", source);
+	result.function = elf_compile_source(result.state, "backend_tests", source, 0);
 	return result;
 }
 
@@ -128,7 +128,7 @@ static void test_backend_module_owns_source(void)
 
 	elf_State *state = elf_create_state();
 	elf_StrSlice source = {source_data, source_size};
-	BcFunctionRef entry = elf_compile_source(state, "owned_source", source);
+	BcFunctionRef entry = elf_compile_source(state, "owned_source", source, 0);
 	elf_Module *module = entry.module;
 	if (module->source_data == source_data) {
 		test_fail("compiled module does not borrow caller source memory");
@@ -460,7 +460,8 @@ static void test_backend_if_else_restores_stack_top(void)
 {
 	elf_State *state = elf_create_state();
 	elf_Scratch scratch = elf_begin_scratch();
-	LowerContext *ctx = elf_create_lower_context(state, scratch.arena);
+	Compiler *compiler = compiler_create(state, scratch.arena, "backend_tests", (elf_StrSlice) {});
+	LowerContext *ctx = elf_create_lower_context(compiler);
 	SourceSite site = {};
 
 	Ir pred = create_int_ir(ctx, site, 0);
@@ -480,13 +481,14 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.arity = IMPLICIT_PARAM_COUNT;
 	function.body = body;
 
-	BcGen *gen = bg_create(scratch.arena, 1);
+	BcGen *gen = bg_create(compiler, 1);
 	generate_function(gen, &function);
 
 	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {
 		test_fail("if/else restores stack top before following statement");
 	}
 
+	compiler_finish_report(compiler, 0);
 	elf_end_scratch(scratch);
 	elf_destroy_state(state);
 }

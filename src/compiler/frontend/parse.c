@@ -97,15 +97,6 @@ static AstType precedence_from_binary_ast_expr_type(AstType type)
 
 typedef enum
 {
-	SEVERITY_NONCHALANT = 0,
-	SEVERITY_NOTE,
-	SEVERITY_WARNING,
-	SEVERITY_FATAL,
-}
-Severity;
-
-typedef enum
-{
 	ERROR_NONE = 0,
 
 	INTERNAL_ERROR_INVALID_TREE,
@@ -133,7 +124,7 @@ typedef enum
 }
 Error;
 
-static void parser_report(Parser *parser, Severity severity, Error error, SourceSite site, const char *message)
+static void parser_report(Parser *parser, elf_DiagnosticSeverity severity, Error error, SourceSite site, const char *message)
 {
 	(void)error;
 
@@ -141,47 +132,27 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 		site = parser->tok.site;
 	}
 
-	const char *source_name = parser && parser->name ? string_data(parser->name) : "<unknown>";
-	const char *severity_name = severity >= SEVERITY_FATAL ? "error" :
-	severity == SEVERITY_WARNING ? "warning" : "note";
-
-	if (site.line_index) {
-		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] parser %s: %s"
-		,	source_name
-		,	site.line_index
-		,	source_slice_column(site)
-		,	severity_name
-		,	message);
-	}
-	else {
-		log_linef(LOG_LEVEL_ERROR, "%s [?] parser %s: %s", source_name, severity_name, message);
-	}
-
-	print_source_slice_marker(site, parser->lexer.source);
-	if (severity >= SEVERITY_FATAL)
+	compiler_report(parser->compiler, severity, parser->phase, site, "%s", message);
+	if (severity == ELF_DIAGNOSTIC_ERROR)
 	{
 		parser->failed = true;
-		elf_ErrorCode code = parser->error_code != ELF_ERROR_NONE ? parser->error_code : ELF_ERROR_PARSE;
-		elf_diagnostic_set(parser->state, code, source_name, site, message);
 	}
 }
 
 static void parser_error(Parser *parser, Error error, SourceSite site, const char *message)
 {
-	parser_report(parser, SEVERITY_FATAL, error, site, message);
+	parser_report(parser, ELF_DIAGNOSTIC_ERROR, error, site, message);
 }
 
 static void parser_errorf(Parser *parser, Error error, SourceSite site, const char *format, ...)
 {
+	(void)error;
+	if (!site.data) site = parser->tok.site;
 	va_list args;
 	va_start(args, format);
-	elf_Scratch scratch = elf_begin_scratch();
-	char *message = elf_arena_pushfv(scratch.arena, format, args);
+	compiler_reportv(parser->compiler, ELF_DIAGNOSTIC_ERROR, parser->phase, site, format, args);
 	va_end(args);
-	elf_arena_push_zero(scratch.arena, 1);
-
-	parser_error(parser, error, site, message);
-	elf_end_scratch(scratch);
+	parser->failed = true;
 }
 
 static void parser_unexpected_token(Parser *parser, Token token)
@@ -206,10 +177,11 @@ static b32 ast_is_missing_or_error(Ast ast)
 	return !ast || ast_is_error(ast);
 }
 
-static Parser *elf_alloc_parser(elf_State *state, elf_Arena *arena)
+static Parser *elf_alloc_parser(Compiler *compiler)
 {
+	elf_Arena *arena = compiler->arena;
 	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
-	parser->state = state;
+	parser->compiler = compiler;
 	parser->arena = arena;
 
 	parser->ast = create_ast_context(arena);
@@ -231,17 +203,17 @@ static void init_parser_atoms(Parser *parser)
 #undef INTERN_MACRO_ATOM
 }
 
-static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source)
+static Parser *elf_create_parser(Compiler *compiler)
 {
-	ASSERT(state != 0);
-	ASSERT(name != 0);
-	ASSERT(source.data != 0);
-	Parser *parser = elf_alloc_parser(state, arena);
-	parser->name = elf_string_from_data(state, name);
+	ASSERT(compiler != 0);
+	ASSERT(compiler->state != 0);
+	ASSERT(compiler->source_name != 0);
+	ASSERT(compiler->source.data != 0);
+	Parser *parser = elf_alloc_parser(compiler);
 	init_parser_atoms(parser);
-	parser->error_code = ELF_ERROR_PARSE;
-	lexer_init(&parser->lexer, state, parser->name, &parser->atoms, source);
-	reposition_parser(parser, source.data);
+	parser->phase = ELF_DIAGNOSTIC_PHASE_PARSER;
+	lexer_init(&parser->lexer, compiler, &parser->atoms);
+	reposition_parser(parser, compiler->source.data);
 	return parser;
 }
 
@@ -1387,13 +1359,13 @@ static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 
 		case AST_STRING_LITERAL:
 		{
-			*out = value_from_string(elf_string_from_atom(parser->state, ast->atom));
+			*out = value_from_string(elf_string_from_atom(parser->compiler->state, ast->atom));
 			return true;
 		}
 
 		case AST_TABLE:
 		{
-			elf_Table *table = elf_new_table_rogue(parser->state);
+			elf_Table *table = elf_new_table_rogue(parser->compiler->state);
 			for (u32 i = 0; i < ast->table.nargs; ++ i)
 			{
 				Ast entry_ast = ast->table.args[i];
@@ -1416,11 +1388,11 @@ static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 					{
 						return false;
 					}
-					elf_table_set(parser->state, table, key, value);
+					elf_table_set(parser->compiler->state, table, key, value);
 				}
 				else
 				{
-					elf_array_add(parser->state, table, value);
+					elf_array_add(parser->compiler->state, table, value);
 				}
 			}
 
@@ -1441,11 +1413,11 @@ static int push_constexpr_value(Parser *parser, Ast ast)
 {
 	if (ast_is_error(ast) || parser_has_failed(parser)) return false;
 
-	parser->error_code = ELF_ERROR_EVALUATION;
+	parser->phase = ELF_DIAGNOSTIC_PHASE_EVALUATION;
 	elf_Value value = {};
 	b32 ok = eval_constexpr_ast(parser, ast, &value);
 	if (!ok || parser_has_failed(parser)) return false;
-	push_value(parser->state, value);
+	push_value(parser->compiler->state, value);
 	return true;
 }
 

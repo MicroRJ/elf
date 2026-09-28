@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	BcFunctionRef entry = elf_compile_source(state, path, source);
+	BcFunctionRef entry = elf_compile_source(state, path, source, 0);
 	elf_Module *module = entry.module;
 	for (u32 i = 0; i < module->bytecode_function_count; ++ i)
 	{

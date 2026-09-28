@@ -14,11 +14,13 @@ static void lower_ast_stat_to_ir(IrFrame *block, Ast stat);
 static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr);
 static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
 
-static LowerContext *elf_create_lower_context(elf_State *state, elf_Arena *arena)
+static LowerContext *elf_create_lower_context(Compiler *compiler)
 {
+	elf_Arena *arena = compiler->arena;
 	LowerContext *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
+	ctx->compiler = compiler;
 	ctx->arena = arena;
-	ctx->state = state;
+	ctx->state = compiler->state;
 
 	u32 max_functions = 1024;
 	ctx->functions = elf_arena_push_zero(arena, sizeof(*ctx->functions) * max_functions);
@@ -53,20 +55,9 @@ static void report_lowering_error(LowerContext *ctx, LoweringError error, Source
 
 	va_list args;
 	va_start(args, format);
-	elf_Scratch scratch = elf_begin_scratch();
-	char *message = elf_arena_pushfv(scratch.arena, format, args);
+	compiler_reportv(ctx->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LOWERING,
+		site, format, args);
 	va_end(args);
-	elf_arena_push_zero(scratch.arena, 1);
-
-	const char *source_name = ctx && ctx->source_name ? string_data(ctx->source_name) : "<unknown>";
-	if (site.line_index) {
-		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] error: %s"
-		, source_name, site.line_index, source_slice_column(site), message);
-	}
-	else {
-		log_linef(LOG_LEVEL_ERROR, "%s [?] error: %s", source_name, message);
-	}
-	elf_end_scratch(scratch);
 }
 
 static void report_lowering_warning(LowerContext *ctx, LoweringError error, SourceSite site, const char *format, ...)
@@ -75,25 +66,9 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 
 	va_list args;
 	va_start(args, format);
-	elf_Scratch scratch = elf_begin_scratch();
-	char *message = elf_arena_pushfv(scratch.arena, format, args);
+	compiler_reportv(ctx->compiler, ELF_DIAGNOSTIC_WARNING, ELF_DIAGNOSTIC_PHASE_LOWERING,
+		site, format, args);
 	va_end(args);
-	elf_arena_push_zero(scratch.arena, 1);
-
-	const char *source_name = ctx && ctx->source_name ? string_data(ctx->source_name) : "<unknown>";
-	if (site.line_index) {
-		log_linef(LOG_LEVEL_WARNING, "%s [%u:%llu] warning: %s"
-		, source_name, site.line_index, source_slice_column(site), message);
-	}
-	else {
-		log_linef(LOG_LEVEL_WARNING, "%s [?] warning: %s", source_name, message);
-	}
-
-	if (source_slice_is_valid(site)) {
-		print_source_slice_marker(site, (elf_StrSlice){});
-	}
-
-	elf_end_scratch(scratch);
 }
 
 static Ast check_ast_type(Ast ast, AstType type)

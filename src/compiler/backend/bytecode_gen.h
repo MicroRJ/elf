@@ -45,6 +45,7 @@ BcModuleBuilder;
 
 typedef struct
 {
+	Compiler         *compiler;
 	elf_Arena        *arena;
 	BcModuleBuilder   module;
 	Bytecode         *bytecode;
