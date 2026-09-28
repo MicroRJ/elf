@@ -56,7 +56,7 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 static void vm_test_install_bindings(elf_State *state)
 {
 	elf_push_fun(state, vm_test_assert);
-	if (!elf_set_global(state, "test_assert")) {
+	if (elf_set_global(state, "test_assert") != ELF_ERROR_NONE) {
 		test_fail("VM test binding registration");
 	}
 }
@@ -378,7 +378,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 
 	elf_set_user_data(state, &context);
 	elf_push_fun(state, vm_test_nested_call_preserves_context);
-	if (!elf_set_global(state, "context_probe")) {
+	if (elf_set_global(state, "context_probe") != ELF_ERROR_NONE) {
 		test_fail("nested context probe binding registration");
 	}
 

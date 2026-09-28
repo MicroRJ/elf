@@ -32,8 +32,8 @@ here instead of scattering `TODO` comments through the source.
   - Make `elf.h` self-contained by including the header that defines `size_t`.
   - Make borrowed string data const and document every pointer's ownership and
     lifetime.
-  - Use `elf_Bool` consistently for Boolean results and add an explicit invalid
-    value type for failed lookups.
+  - Use `elf_Bool` only for Boolean results, `elf_ErrorCode` for fallible
+    mutations, and add an explicit invalid value type for failed lookups.
   - Decide whether `elf_Ref` should remain an integer handle or become a stronger
     public type.
   - Define the compatibility meaning of `ELF_API_VERSION`, or remove it until a

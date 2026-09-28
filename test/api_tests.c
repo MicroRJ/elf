@@ -46,7 +46,7 @@ static void test_api_call_addressing(elf_State *state)
 	if (!elf_to_int(state, -1, &result) || result != 42) {
 		test_fail("API native callback result");
 	}
-	if (!elf_set_top(state, checkpoint)) {
+	if (elf_set_top(state, checkpoint) != ELF_ERROR_NONE) {
 		test_fail("API restores host checkpoint");
 	}
 }
@@ -58,7 +58,7 @@ static void test_api_tables_and_refs(elf_State *state)
 	elf_i32 table = elf_abs_index(state, -1);
 
 	elf_push_int(state, 42);
-	if (!elf_set_field(state, table, "answer")) {
+	if (elf_set_field(state, table, "answer") != ELF_ERROR_NONE) {
 		test_fail("API sets a generic field value");
 	}
 	if (!elf_get_field(state, table, "answer")) {
@@ -71,7 +71,7 @@ static void test_api_tables_and_refs(elf_State *state)
 	elf_pop(state, 1);
 
 	elf_push_cstr(state, "first");
-	if (!elf_append(state, table)) {
+	if (elf_append(state, table) != ELF_ERROR_NONE) {
 		test_fail("API appends a generic array value");
 	}
 	if (!elf_get_index(state, table, 2) || !elf_is_nil(state, -1)) {
@@ -105,7 +105,8 @@ static void test_api_tables_and_refs(elf_State *state)
 		test_fail("API iterates array and keyed table entries");
 	}
 
-	if (!elf_push_value(state, -1) || !elf_set_global(state, "api_test")) {
+	if (elf_push_value(state, -1) != ELF_ERROR_NONE
+	|| elf_set_global(state, "api_test") != ELF_ERROR_NONE) {
 		test_fail("API writes a global from the stack");
 	}
 	elf_get_global(state, "api_test");
@@ -114,11 +115,53 @@ static void test_api_tables_and_refs(elf_State *state)
 	}
 	elf_pop(state, 1);
 
-	if (!elf_release_ref(state, reference) || elf_push_ref(state, reference)) {
+	if (elf_release_ref(state, reference) != ELF_ERROR_NONE || elf_push_ref(state, reference)) {
 		test_fail("API releases state-owned references");
 	}
 	elf_push_nil(state);
 	elf_set_global(state, "api_test");
+	elf_set_top(state, checkpoint);
+}
+
+static void test_api_mutation_errors(elf_State *state)
+{
+	elf_Index checkpoint = elf_get_top(state);
+	if (elf_pop(state, 1) != ELF_ERROR_STACK_UNDERFLOW) {
+		test_fail("API reports stack underflow");
+	}
+	if (elf_push_value(state, elf_get_top(state)) != ELF_ERROR_INVALID_INDEX) {
+		test_fail("API reports invalid stack indices");
+	}
+	if (elf_set_top(state, -1) != ELF_ERROR_OUT_OF_RANGE) {
+		test_fail("API reports invalid stack tops");
+	}
+	if (elf_release_ref(state, ELF_NO_REF) != ELF_ERROR_INVALID_REFERENCE) {
+		test_fail("API reports invalid references");
+	}
+
+	elf_push_int(state, 7);
+	elf_Index value_top = elf_get_top(state);
+	if (elf_set_field(state, checkpoint, "field") != ELF_ERROR_TYPE_MISMATCH
+	|| elf_get_top(state) != value_top) {
+		test_fail("API type errors preserve the value being written");
+	}
+	elf_set_top(state, checkpoint);
+
+	elf_new_table(state);
+	elf_Index table_index = elf_abs_index(state, -1);
+	elf_push_int(state, 9);
+	value_top = elf_get_top(state);
+	if (elf_set_index(state, table_index, 1) != ELF_ERROR_OUT_OF_RANGE
+	|| elf_get_top(state) != value_top) {
+		test_fail("API bounds errors preserve the value being written");
+	}
+
+	elf_Table *table = value_as_table(state->frame->framebase[table_index]);
+	table->obj.status |= ELF_OBJECT_READONLY;
+	if (elf_set_field(state, table_index, "field") != ELF_ERROR_READONLY
+	|| elf_get_top(state) != value_top) {
+		test_fail("API readonly errors preserve the value being written");
+	}
 	elf_set_top(state, checkpoint);
 }
 
@@ -143,7 +186,7 @@ static void test_api_source_diagnostics(elf_State *state)
 
 	elf_Diagnostic diagnostic = {};
 	if (!elf_get_diagnostic(state, &diagnostic)
-	|| diagnostic.status != ELF_STATUS_EVALUATION_ERROR
+	|| diagnostic.code != ELF_ERROR_EVALUATION
 	|| !api_slice_matches(diagnostic.source_name, "invalid-constant.elf")
 	|| diagnostic.line != 2
 	|| diagnostic.column != 12
@@ -160,7 +203,7 @@ static void test_api_source_diagnostics(elf_State *state)
 		test_fail("lexer failure leaves the stack unchanged");
 	}
 	if (!elf_get_diagnostic(state, &diagnostic)
-	|| diagnostic.status != ELF_STATUS_LEX_ERROR
+	|| diagnostic.code != ELF_ERROR_LEX
 	|| !api_slice_matches(diagnostic.source_name, "invalid-string.elf")) {
 		test_fail("API preserves the first lexer diagnostic");
 	}
@@ -193,7 +236,7 @@ static void test_api_source_diagnostics(elf_State *state)
 		test_fail("failed code compilation publishes no partial module");
 	}
 	if (!elf_get_diagnostic(state, &diagnostic)
-	|| diagnostic.status != ELF_STATUS_PARSE_ERROR
+	|| diagnostic.code != ELF_ERROR_PARSE
 	|| !api_slice_matches(diagnostic.source_name, "invalid-code.elf")) {
 		test_fail("API reports code parser diagnostics");
 	}
@@ -335,6 +378,7 @@ static void run_api_tests(void)
 	elf_State *state = elf_create_state();
 	test_api_call_addressing(state);
 	test_api_tables_and_refs(state);
+	test_api_mutation_errors(state);
 	test_api_source_diagnostics(state);
 	test_api_value_source(state);
 	elf_destroy_state(state);

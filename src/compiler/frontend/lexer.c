@@ -105,7 +105,7 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 	va_end(args);
 	elf_arena_push_zero(scratch.arena, 1);
 	lexer->failed = true;
-	elf_diagnostic_set(lexer->state, ELF_STATUS_LEX_ERROR, string_data(lexer->name), site, message);
+	elf_diagnostic_set(lexer->state, ELF_ERROR_LEX, string_data(lexer->name), site, message);
 
 	log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu]: %s"
 	,	string_data(lexer->name)

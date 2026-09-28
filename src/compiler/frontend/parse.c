@@ -161,8 +161,8 @@ static void parser_report(Parser *parser, Severity severity, Error error, Source
 	if (severity >= SEVERITY_FATAL)
 	{
 		parser->failed = true;
-		elf_Status status = parser->error_status != ELF_STATUS_OK ? parser->error_status : ELF_STATUS_PARSE_ERROR;
-		elf_diagnostic_set(parser->state, status, source_name, site, message);
+		elf_ErrorCode code = parser->error_code != ELF_ERROR_NONE ? parser->error_code : ELF_ERROR_PARSE;
+		elf_diagnostic_set(parser->state, code, source_name, site, message);
 	}
 }
 
@@ -239,7 +239,7 @@ static Parser *elf_create_parser(elf_State *state, elf_Arena *arena, const char 
 	Parser *parser = elf_alloc_parser(state, arena);
 	parser->name = elf_string_from_data(state, name);
 	init_parser_atoms(parser);
-	parser->error_status = ELF_STATUS_PARSE_ERROR;
+	parser->error_code = ELF_ERROR_PARSE;
 	lexer_init(&parser->lexer, state, parser->name, &parser->atoms, source);
 	reposition_parser(parser, source.data);
 	return parser;
@@ -1441,7 +1441,7 @@ static int push_constexpr_value(Parser *parser, Ast ast)
 {
 	if (ast_is_error(ast) || parser_has_failed(parser)) return false;
 
-	parser->error_status = ELF_STATUS_EVALUATION_ERROR;
+	parser->error_code = ELF_ERROR_EVALUATION;
 	elf_Value value = {};
 	b32 ok = eval_constexpr_ast(parser, ast, &value);
 	if (!ok || parser_has_failed(parser)) return false;

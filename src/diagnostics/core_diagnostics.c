@@ -19,11 +19,11 @@ void elf_diagnostic_clear(elf_State *state)
 	state->diagnostic = (elf_Diagnostic) {};
 }
 
-void elf_diagnostic_set(elf_State *state, elf_Status status, const char *source_name, SourceSite site, const char *message)
+void elf_diagnostic_set(elf_State *state, elf_ErrorCode code, const char *source_name, SourceSite site, const char *message)
 {
 	ASSERT(state);
-	ASSERT(status != ELF_STATUS_OK);
-	if (state->diagnostic.status != ELF_STATUS_OK) return;
+	ASSERT(code != ELF_ERROR_NONE);
+	if (state->diagnostic.code != ELF_ERROR_NONE) return;
 
 	if (!source_name) source_name = "<unknown>";
 	if (!message) message = "unknown error";
@@ -45,7 +45,7 @@ void elf_diagnostic_set(elf_State *state, elf_Status status, const char *source_
 	copy_memory(message_copy, message, message_size + 1);
 
 	state->diagnostic = (elf_Diagnostic) {
-		.status = status,
+		.code = code,
 		.source_name = {source_name_copy, source_name_size},
 		.message = {message_copy, message_size},
 		.line = site.line_index,

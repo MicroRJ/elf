@@ -40,16 +40,23 @@ elf_StrSlice;
 
 typedef enum
 {
-	ELF_STATUS_OK = 0,
-	ELF_STATUS_LEX_ERROR,
-	ELF_STATUS_PARSE_ERROR,
-	ELF_STATUS_EVALUATION_ERROR,
+	ELF_ERROR_NONE = 0,
+	ELF_ERROR_INVALID_ARGUMENT,
+	ELF_ERROR_INVALID_INDEX,
+	ELF_ERROR_INVALID_REFERENCE,
+	ELF_ERROR_TYPE_MISMATCH,
+	ELF_ERROR_STACK_UNDERFLOW,
+	ELF_ERROR_OUT_OF_RANGE,
+	ELF_ERROR_READONLY,
+	ELF_ERROR_LEX,
+	ELF_ERROR_PARSE,
+	ELF_ERROR_EVALUATION,
 }
-elf_Status;
+elf_ErrorCode;
 
 typedef struct
 {
-	elf_Status   status;
+	elf_ErrorCode code;
 	// Source name and message remain valid until the next source operation or state destruction.
 	elf_StrSlice source_name;
 	elf_StrSlice message;
@@ -101,9 +108,9 @@ elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);
 elf_Index elf_abs_index(elf_State *state, elf_Index index);
 elf_Bool elf_is_valid(elf_State *state, elf_Index index);
-elf_Bool elf_set_top(elf_State *state, elf_Index top);
-elf_Bool elf_pop(elf_State *state, elf_u32 count);
-elf_Bool elf_push_value(elf_State *state, elf_Index index);
+elf_ErrorCode elf_set_top(elf_State *state, elf_Index top);
+elf_ErrorCode elf_pop(elf_State *state, elf_u32 count);
+elf_ErrorCode elf_push_value(elf_State *state, elf_Index index);
 
 elf_ValueType elf_type(elf_State *state, elf_Index index);
 elf_Bool elf_is_nil(elf_State *state, elf_Index index);
@@ -120,19 +127,19 @@ elf_Bool elf_push_value_source(elf_State *state, elf_Index index);
 void elf_new_table(elf_State *state);
 elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length);
 elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field);
-elf_Bool elf_set_field(elf_State *state, elf_Index index, const char *field);
+elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field);
 elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element);
-elf_Bool elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
-elf_Bool elf_append(elf_State *state, elf_Index index);
+elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
+elf_ErrorCode elf_append(elf_State *state, elf_Index index);
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor);
 elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right);
 
 void elf_get_global(elf_State *state, const char *name);
-elf_Bool elf_set_global(elf_State *state, const char *name);
+elf_ErrorCode elf_set_global(elf_State *state, const char *name);
 
 elf_Ref elf_create_ref(elf_State *state, elf_Index index);
 elf_Bool elf_push_ref(elf_State *state, elf_Ref reference);
-elf_Bool elf_release_ref(elf_State *state, elf_Ref reference);
+elf_ErrorCode elf_release_ref(elf_State *state, elf_Ref reference);
 
 #endif
 

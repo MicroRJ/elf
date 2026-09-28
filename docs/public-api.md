@@ -23,7 +23,9 @@ work and restore it afterward:
 ```c
 elf_i32 checkpoint = elf_get_top(S);
 /* Work with stack values. */
-elf_set_top(S, checkpoint);
+if (elf_set_top(S, checkpoint) != ELF_ERROR_NONE) {
+	/* checkpoint was outside the current frame */
+}
 ```
 
 Use `elf_abs_index` before pushing values above a table:
@@ -33,11 +35,15 @@ elf_new_table(S);
 elf_i32 table = elf_abs_index(S, -1);
 
 elf_push_int(S, 4);
-elf_set_field(S, table, "workers");
+if (elf_set_field(S, table, "workers") != ELF_ERROR_NONE) {
+	/* the integer remains on the stack */
+}
 ```
 
 Set and add operations consume the top value. Get operations push their result,
-using `nil` for a missing field or index.
+using `nil` for a missing field or index. Fallible mutations return
+`ELF_ERROR_NONE` on success or a specific `elf_ErrorCode` on failure. A failed
+mutation does not consume or otherwise change stack values.
 
 ## Native functions
 
@@ -83,7 +89,9 @@ if (elf_push_ref(S, reference)) {
 	elf_pop(S, 1);
 }
 
-elf_release_ref(S, reference);
+if (elf_release_ref(S, reference) != ELF_ERROR_NONE) {
+	/* reference was already released or invalid */
+}
 ```
 
 References belong to the state that created them and must be released. String

@@ -49,7 +49,7 @@ struct Parser
 	Lexer       lexer;
 	Token       tok,tok_prev,tok_prox;
 	AstContext  ast;
-	elf_Status  error_status;
+	elf_ErrorCode error_code;
 	b32         failed;
 };
 

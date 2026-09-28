@@ -114,8 +114,8 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	}
 	if (parser_has_failed(parser) || ast_is_error(ast_file))
 	{
-		if (state->diagnostic.status == ELF_STATUS_OK) {
-			elf_diagnostic_set(state, ELF_STATUS_PARSE_ERROR, name, (SourceSite) {}, "failed to parse source");
+		if (state->diagnostic.code == ELF_ERROR_NONE) {
+			elf_diagnostic_set(state, ELF_ERROR_PARSE, name, (SourceSite) {}, "failed to parse source");
 		}
 		state->arena.in_use = arena_checkpoint;
 		goto done;
