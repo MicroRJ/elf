@@ -5,7 +5,9 @@ on:
     branches:
       - master
     paths:
+      - "docs/**"
       - "site/**"
+      - "build.elf"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -23,10 +25,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Install pandoc
+        uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Build website
+        run: .\bootstrap\windows-x64\manny.exe build.elf site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -34,7 +42,7 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: site
+          path: build/site
 
       - name: Deploy
         id: deployment

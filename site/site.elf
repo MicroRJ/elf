@@ -1,0 +1,46 @@
+prepare := {
+	name = "prepare website directories",
+	command_line = "cmd /d /c \"if not exist build\\site mkdir build\\site & if not exist build\\site\\libraries mkdir build\\site\\libraries\"",
+	inputs = {},
+	outputs = { "build/site", "build/site/libraries" },
+	include_dirs = {},
+	dependencies = {},
+}
+
+targets := {}
+for asset := { "index.html", "style.css", ".nojekyll" }[...] ? {
+	copy := {
+		name = f"copy website asset ${asset}",
+		command_line = f"cmd /d /c copy /Y site\\${asset} build\\site\\${asset} >nul",
+		inputs = { f"site/${asset}" },
+		outputs = { f"build/site/${asset}" },
+		include_dirs = {},
+		dependencies = { prepare },
+	}
+	targets:add(copy)
+}
+
+documentation_paths := elf.fs.get_paths("docs", 1)
+elf.assert(elf.type_of(documentation_paths) == "table", "could not list documentation sources")
+
+for source := documentation_paths[...] ? {
+	if source:ends_with(".md") ? {
+		relative := source:slice(5, -3):replace("\\", "/")
+		if relative:ends_with("/README") ? { relative = relative:slice(0, -6) + "index" }
+		output := f"build/site/${relative}.html"
+		root := ""
+		if relative:contains("/") ? { root = "../" }
+
+		generate := {
+			name = f"generate ${relative} documentation",
+			command_line = f"pandoc ${source} --from=gfm+yaml_metadata_block --to=html5 --standalone --syntax-highlighting=none --wrap=none --lua-filter=site/pandoc.lua --template=site/article.html --variable=root=${root} --output=${output}",
+			inputs = { source, "site/article.html", "site/pandoc.lua", "site/style.css" },
+			outputs = { output },
+			include_dirs = {},
+			dependencies = { prepare },
+		}
+		targets:add(generate)
+	}
+}
+
+ret targets

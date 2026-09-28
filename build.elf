@@ -227,6 +227,9 @@ run_optimized_benchmarks := {
 	dependencies = { optimized_benchmarks },
 }
 
+site_targets := elf.load_file("site/site.elf")
+elf.assert(elf.type_of(site_targets) == "table", "site/site.elf must return its targets")
+
 entries := {}
 
 entries.lib = fun() {
@@ -253,6 +256,13 @@ entries.test = fun() {
 entries.benchmark = fun() {
 	ret manny.build({
 		targets = { run_optimized_benchmarks },
+		options = build_options,
+	})
+}
+
+entries.site = fun() {
+	ret manny.build({
+		targets = site_targets,
 		options = build_options,
 	})
 }

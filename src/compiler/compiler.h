@@ -4,6 +4,7 @@
 
 typedef struct Compiler Compiler;
 
+// TODO(RJ): these are inward facing!
 struct Compiler
 {
 	elf_State      *state;
@@ -17,11 +18,10 @@ struct Compiler
 	u32             warning_count;
 };
 
+// TODO(RJ): these are inward facing!
 Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source);
-void compiler_report(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase,
-	SourceSite site, const char *format, ...);
-void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase,
-	SourceSite site, const char *format, va_list args);
+void compiler_report(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase, SourceSite site, const char *format, ...);
+void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase, SourceSite site, const char *format, va_list args);
 void compiler_finish_report(Compiler *compiler, elf_CompileReport *report);
 
 BcFunctionRef elf_compile_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
