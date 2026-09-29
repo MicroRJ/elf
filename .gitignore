@@ -4,6 +4,7 @@
 build/*
 .bob/
 .manny/
+lab/
 *.ilk
 *.exe
 !bootstrap/windows-x64/manny.exe
