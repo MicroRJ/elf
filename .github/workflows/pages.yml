@@ -8,6 +8,10 @@ on:
       - "docs/**"
       - "site/**"
       - "build.elf"
+      - "project.elf"
+      - "bootstrap/windows-x64/**"
+      - "dayan-core"
+      - ".gitmodules"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -29,6 +33,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - name: Install pandoc
         uses: r-lib/actions/setup-pandoc@v2
