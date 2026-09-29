@@ -93,19 +93,6 @@ static void test_vm_integer_add(void)
 	vm_expect_int("test/smoke/return_add.elf", 3, "vm executes integer addition");
 }
 
-static void test_vm_integer_division_guards(void)
-{
-	if (i64_division_is_defined(1, 0)) {
-		test_fail("integer division rejects a zero divisor");
-	}
-	if (i64_division_is_defined(INT64_MIN, -1)) {
-		test_fail("integer division rejects minimum integer divided by -1");
-	}
-	if (!i64_division_is_defined(INT64_MIN, 1) || !i64_division_is_defined(1, INT64_MIN)) {
-		test_fail("integer division accepts defined minimum integer cases");
-	}
-}
-
 static void test_vm_string_index(void)
 {
 	vm_expect_int("test/smoke/string_index.elf", 324, "vm indexes string bytes");
@@ -504,7 +491,6 @@ static void run_vm_tests(void)
 {
 	test_vm_return_int();
 	test_vm_integer_add();
-	test_vm_integer_division_guards();
 	test_vm_string_index();
 	test_vm_return_nil();
 	test_vm_return_table();

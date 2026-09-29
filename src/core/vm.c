@@ -460,7 +460,7 @@ activate_frame:
 						if (divisor == 0) {
 							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "integer division by zero");
 						}
-						if (!i64_division_is_defined(dividend, divisor)) {
+						if (dividend == INT64_MIN && divisor == -1) {
 							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
 								"integer division overflow: minimum integer divided by -1");
 						}
