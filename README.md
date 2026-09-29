@@ -1,10 +1,10 @@
-# Elf
+# elf
 
-Elf is a small, bytecode-interpreted scripting language designed to complement C.
+elf is a small, bytecode-interpreted scripting language designed to complement C.
 It combines familiar control flow and zero-based indexing with table-centered data,
 closures, and a compact native embedding API.
 
-Elf is currently `0.2.0-dev`. The language is useful in my own projects, but its syntax,
+elf is currently `0.2.0-dev`. The language is useful in my own projects, but its syntax,
 API, and module model are still evolving. It should be treated as experimental rather
 than production-ready.
 
@@ -24,9 +24,9 @@ for number := numbers[...] ? {
 }
 ```
 
-## Why Elf?
+## Why elf?
 
-C remains the host language. Elf handles the parts of a native program that benefit
+C remains the host language. elf handles the parts of a native program that benefit
 from dynamic values and short iteration cycles: configuration, build descriptions,
 automation, strings, and nested data.
 
@@ -40,7 +40,7 @@ The project currently provides:
 - optional filesystem, path, process, environment, serialization, random, and time
   libraries.
 
-Manny uses Elf as its build-description language, and Orbiter uses Elf programs for its
+Manny uses elf as its build-description language, and Orbiter uses elf programs for its
 build and game-library configuration.
 
 ## Documentation
@@ -95,11 +95,11 @@ default entry.
 - `src/compiler/` — lexer, parser, AST, IR, and bytecode generation
 - `src/core/` — runtime values, tables, strings, VM, GC, and core libraries
 - `src/batteries/` — optional host-facing libraries
-- `test/` — C unit tests and end-to-end Elf programs
+- `test/` — C unit tests and end-to-end elf programs
 - `tools/` — runner, bytecode inspector, and benchmarks
 
 ## License
 
-Elf is available under the [MIT License](LICENSE).
+elf is available under the [MIT License](LICENSE).
 
 

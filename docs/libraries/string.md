@@ -69,8 +69,8 @@ path := "/":join({"src", "core", "vm.c"})
 
 ```elf
 "  hello \n":trim()                  // "hello"
-"Elf":lower()                        // "elf"
-"Elf":upper()                        // "ELF"
+"elf":lower()                        // "elf"
+"elf":upper()                        // "ELF"
 "one two one":replace("one", "1") // "1 two 1"
 "ha":repeat(3)                       // "hahaha"
 ```

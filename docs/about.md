@@ -1,4 +1,4 @@
-# About Elf
+# About elf
 
 elf is a small, bytecode-interpreted scripting language designed to complement C.
 It combines C-like control flow and zero-based indexing with a table-centered data
@@ -335,6 +335,6 @@ language.
 
 ## Further reading
 
-- [Elf by example](grammar.md)
+- [elf by example](grammar.md)
 - [C API](public-api.md)
 - [Standard library](libraries/README.md)

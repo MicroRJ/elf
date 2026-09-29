@@ -1,16 +1,16 @@
-# Elf C API
+# elf C API
 
-> Elf is still early. This describes the current embedding model, not a
+> elf is still early. This describes the current embedding model, not a
 > compatibility promise. `include/elf.h` remains the source of truth.
 
-Elf uses a stack API because hosts such as Manny exchange arbitrary values,
+elf uses a stack API because hosts such as Manny exchange arbitrary values,
 nested tables, and functions with scripts. Generic stack operations avoid a
 growing matrix of typed table functions. Values on the stack are also visible
 to the garbage collector without exposing runtime object pointers to the host.
 
 ## Addressing
 
-Elf retains its zero-based frame convention:
+elf retains its zero-based frame convention:
 
 - `0` is the receiver, or `this`.
 - `1` is the first explicit argument.
@@ -69,11 +69,11 @@ Libraries are ordinary nested tables built with `elf_new_table` and
 
 `elf_to_cstr` returns the same borrowed string data with a guaranteed trailing
 NUL for host APIs that require C strings. `elf_push_value_text` formats any
-stack value and pushes the resulting Elf string; the batteries use it to
-implement printing without accessing Elf's value representation.
+stack value and pushes the resulting elf string; the batteries use it to
+implement printing without accessing elf's value representation.
 
 Native functions can report invalid arguments or host failures with
-`elf_error`. It enters Elf's normal runtime-error path and does not return to
+`elf_error`. It enters elf's normal runtime-error path and does not return to
 the native function.
 
 ## References
@@ -99,4 +99,4 @@ slices returned by `elf_to_str` are borrowed; copy their bytes if they
 must outlive the stack value or its reference.
 
 The API does not yet provide protected execution. Runtime failures still use
-Elf's existing fatal error path.
+elf's existing fatal error path.

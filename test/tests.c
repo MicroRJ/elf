@@ -62,7 +62,7 @@ int main(void)
 	elf_State *state = elf_create_state();
 	elf_open_batteries(state);
 	if (strcmp(elf_version(), ELF_VERSION) != 0) {
-		test_fail("public Elf version matches the linked runtime");
+		test_fail("public elf version matches the linked runtime");
 	}
 
 	run_string_tests(state);

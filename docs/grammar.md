@@ -1,6 +1,6 @@
-# Elf by example
+# elf by example
 
-Elf is still growing!
+elf is still growing!
 
 This guide describes syntax that reaches the current compiler and calls out
 syntax that is only partially implemented. The parser and compiler are the
@@ -383,7 +383,7 @@ defer {
 }
 ```
 
-## Loading Elf
+## Loading elf
 
 ```elf
 module := elf.load_file("modules/colors.elf")
@@ -408,7 +408,7 @@ Objects and arrays become tables. `null` becomes `nil`.
 ## Syntax summary
 
 This is a compact description of the implemented parser. It is descriptive,
-not a promise that every accepted edge case will remain part of Elf.
+not a promise that every accepted edge case will remain part of elf.
 
 ```text
 file             := statement*

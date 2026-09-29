@@ -33,7 +33,7 @@ and must be present on both tables. Dead entries do not affect equality.
 Cycles and shared table references are supported; sharing layout does not
 affect equality.
 
-Scalar values follow ordinary Elf equality, so an integer and an equal
+Scalar values follow ordinary elf equality, so an integer and an equal
 floating-point number compare equal. Readonly state is not part of a table's
 value.
 

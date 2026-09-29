@@ -4,7 +4,7 @@ The core library consists of the functions stored directly on the global
 `elf` table:
 
 ```elf
-elf.println("Hello, Elf")
+elf.println("Hello, elf")
 type := elf.type_of(value)
 ```
 
@@ -30,7 +30,7 @@ responsibility among the neighboring `l_core_*.c` files.
 | `elf.varg(index)` | value or `nil` | Read one of the caller's variadic arguments. |
 | `elf.nvargs()` | integer | Return the caller's variadic argument count. |
 | `elf.nrets()` | integer | Return how many results the caller's call site requested. |
-| `elf.load_file(path, arguments...)` | loaded file results | Compile and tail-call an Elf source file. |
+| `elf.load_file(path, arguments...)` | loaded file results | Compile and tail-call an elf source file. |
 | `elf.const_expr(source)` | value | Parse a value composed only of constant syntax. |
 | `elf.print(values...)` | integer | Print values and return the bytes written. |
 | `elf.println(values...)` | integer | Print values followed by a newline. |
@@ -117,7 +117,7 @@ Returns one of the current runtime type names:
 | string | `"string"` |
 | table | `"table"` |
 | native function | `"function"` |
-| Elf closure | `"closure"` |
+| elf closure | `"closure"` |
 | user object | `"resource"` |
 
 ### `elf.is_string(value)` and `elf.is_numeric(value)`
@@ -161,7 +161,7 @@ and functions and closures use short display labels.
 The caller functions inspect the bytecode function that invoked them. They are
 low-level facilities used to implement variadic functions and methods.
 
-Every Elf call has an implicit receiver at argument index `0`. An ordinary
+Every elf call has an implicit receiver at argument index `0`. An ordinary
 function call normally receives `nil` there; a method call receives its `this`
 value. Explicit parameters begin at index `1`. Consequently, `nargs()` includes
 the implicit receiver.
@@ -187,7 +187,7 @@ variadic arguments and also returns `nil` when out of range.
 of values requested by the caller's call site; a call used only as a statement
 requests zero results.
 
-Caller introspection requires an Elf bytecode caller. Calling these functions
+Caller introspection requires an elf bytecode caller. Calling these functions
 directly from a host/native context without one is a runtime error.
 
 ## Loading and constant data
@@ -225,7 +225,7 @@ answer := elf.const_expr("42")
 options := elf.const_expr("{ width = 320, title = \"demo\" }")
 ```
 
-This function does not evaluate operators or general Elf code. For example,
+This function does not evaluate operators or general elf code. For example,
 `elf.const_expr("40 + 2")` is currently an error rather than a request to
 constant-fold the addition.
 

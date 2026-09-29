@@ -447,22 +447,24 @@ activate_frame:
 				}
 			} break;
 
-			case BC_DIV: {
+			case BC_DIV:
+			{
 				elf_Value left = *vm_slot(reference, byte.b_y);
 				elf_Value right = *vm_slot(reference, byte.b_z);
 				if (value_is_numeric(left) && value_is_numeric(right)) {
-					if (value_is_number(left) || value_is_number(right)) {
+					if (value_is_number(left) || value_is_number(right))
+					{
 						*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(left) / value_to_number(right));
 					}
-					else {
+					else
+					{
 						i64 dividend = value_as_integer(left);
 						i64 divisor = value_as_integer(right);
 						if (divisor == 0) {
 							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "integer division by zero");
 						}
 						if (dividend == INT64_MIN && divisor == -1) {
-							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
-								"integer division overflow: minimum integer divided by -1");
+							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "integer division overflow: minimum integer divided by -1");
 						}
 						*vm_slot(reference, byte.b_x) = value_from_integer(dividend / divisor);
 					}
