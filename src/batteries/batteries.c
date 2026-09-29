@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include <dayan.h>
-#include "elf_os_services.h"
 
 #undef ELF_VERSION
 #include "elf_batteries.h"
@@ -26,20 +25,21 @@
 static elf_StrSlice battery_source_buffer_from_file(const char *name)
 {
 	elf_StrSlice source = {0};
-	elf_OS_FileInfo info;
-	if (!elf_os_get_file_info(name, &info) || info.is_directory || info.size > UINT_MAX) return source;
-	elf_OS_File file = elf_os_open_file_read(name);
-	if (!elf_os_file_is_valid(file)) return source;
+	day_File_Info info;
+	if (day_get_file_info(day_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
+	day_File file;
+	if (day_access_file(day_string_from_cstring(name), DAY_FILE_OPEN_EXISTING,
+		DAY_FILE_READ | DAY_FILE_SHARE_READ, &file).error) return source;
 
 	char *data = calloc(1, (size_t)info.size + 16);
 	if (!data) {
-		elf_os_close_file(file);
+		day_close_file(file);
 		return source;
 	}
-	elf_u64 read = 0;
-	elf_b32 success = elf_os_read_file(file, data, info.size, &read);
-	elf_os_close_file(file);
-	if (!success || read != info.size) {
+	day_u64 read = 0;
+	day_Result read_result = day_read_file(file, data, info.size, &read);
+	day_close_file(file);
+	if (read_result.error || read != info.size) {
 		free(data);
 		return source;
 	}

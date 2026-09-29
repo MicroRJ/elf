@@ -12,7 +12,6 @@ include_dirs := {
 	"src",
 	"src/base",
 	"src/api",
-	"src/os",
 	"src/core",
 	"src/diagnostics",
 	"src/core/libs",
@@ -32,7 +31,6 @@ include_dirs := {
 
 batteries_include_dirs := {
 	"include",
-	"src/os",
 	"src/batteries/internal",
 	"dayan-core/include",
 }
@@ -94,7 +92,6 @@ compile_source := fun(name, source, includes, dependency_includes) {
 }
 
 elf_sources := {
-	{ name = "os_core",        path = "src/os/elf_os_core_win32.c" },
 	{ name = "base",           path = "src/base/base.c" },
 	{ name = "value",          path = "src/core/value/value.c" },
 	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
@@ -139,30 +136,23 @@ benchmark_elf_library := {
 }
 
 batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
-os_services := compile_source("os_services", "src/os/elf_os_services.c", batteries_include_options, batteries_include_dirs)
-os_services_win32 := compile_source("os_services_win32", "src/os/elf_os_services_win32.c", batteries_include_options, batteries_include_dirs)
 public_header_test := compile_source("public_header_test", "test/public_header_compile_test.c", public_include_options, public_include_dirs)
 
 batteries_library := {
 	name = "archive elf_batteries.lib",
-	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object} ${os_services.object} ${os_services_win32.object}",
-	inputs = { batteries.object, os_services.object, os_services_win32.object },
+	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object}",
+	inputs = { batteries.object },
 	outputs = { "build/elf_batteries.lib" },
 	include_dirs = {},
-	dependencies = { batteries.task, os_services.task, os_services_win32.task },
+	dependencies = { batteries.task },
 }
 
-build_tool := fun(name, source, output, uses_batteries, uses_dayan) {
+build_tool := fun(name, source, output, uses_batteries) {
 	object := f"build/obj/tool_${output}.obj"
 	executable := f"build/${output}.exe"
-	inputs := { source, "build/elf.lib" }
-	dependencies := { elf_library }
-	libraries := " build/elf.lib"
-	if uses_dayan ? {
-		inputs:add("dayan-core/build/dayan.lib")
-		dependencies:add(build_dayan)
-		libraries += " dayan-core/build/dayan.lib"
-	}
+	inputs := { source, "build/elf.lib", "dayan-core/build/dayan.lib" }
+	dependencies := { elf_library, build_dayan }
+	libraries := " build/elf.lib dayan-core/build/dayan.lib"
 	if uses_batteries ? {
 		inputs:add("build/elf_batteries.lib")
 		dependencies:add(batteries_library)
@@ -179,19 +169,19 @@ build_tool := fun(name, source, output, uses_batteries, uses_dayan) {
 	ret { task = task, executable = executable }
 }
 
-core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false, false)
-tests := build_tool("tests", "test/tests.c", "tests", true, true)
-benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false, false)
-bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true, true)
-elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true, true)
+core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false)
+tests := build_tool("tests", "test/tests.c", "tests", true)
+benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false)
+bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true)
+elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true)
 
 optimized_benchmarks := {
 	name = "build optimized benchmarks",
-	command_line = f"${compiler}${benchmark_compile_options}${include_options} tools/benchmarks.c /Fobuild/obj/tool_benchmarks_opt.obj /Fe:build/benchmarks_opt.exe /Fd:build/obj/tool_benchmarks_opt.pdb /link build/elf_benchmark.lib /PDB:build/benchmarks_opt.pdb /ILK:build/benchmarks_opt.ilk",
-	inputs = { "tools/benchmarks.c", "build/elf_benchmark.lib" },
+	command_line = f"${compiler}${benchmark_compile_options}${include_options} tools/benchmarks.c /Fobuild/obj/tool_benchmarks_opt.obj /Fe:build/benchmarks_opt.exe /Fd:build/obj/tool_benchmarks_opt.pdb /link build/elf_benchmark.lib dayan-core/build/dayan.lib /PDB:build/benchmarks_opt.pdb /ILK:build/benchmarks_opt.ilk",
+	inputs = { "tools/benchmarks.c", "build/elf_benchmark.lib", "dayan-core/build/dayan.lib" },
 	outputs = { "build/benchmarks_opt.exe" },
 	include_dirs = include_dirs,
-	dependencies = { benchmark_elf_library },
+	dependencies = { benchmark_elf_library, build_dayan },
 }
 
 run_core_tests := {

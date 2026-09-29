@@ -2,20 +2,19 @@
 // Optional filesystem operations.
 //
 
-#include "elf_os_services.h"
-
 #define ELF_FS_MAX_RECURSION 32
 
-static b32 fs_get_file_info(const char *path, elf_OS_FileInfo *info)
+static b32 fs_get_file_info(const char *path, day_File_Info *info)
 {
-	return elf_os_get_file_info(path, info) && !info->is_directory && !info->is_symbolic_link;
+	return !day_get_file_info(day_string_from_cstring(path), info).error &&
+		!info->is_directory && !info->is_symbolic_link;
 }
 
 static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directories)
 {
 	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
-	elf_OS_FileInfo info = {0};
-	b32 found = elf_os_get_file_info(lib_load_cstr(state, 1), &info);
+	day_File_Info info = {0};
+	b32 found = !day_get_file_info(day_string_from_cstring(lib_load_cstr(state, 1)), &info).error;
 	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
 	return 1;
 }
@@ -38,7 +37,7 @@ ELF_FUNCTION(lib_fs_is_directory)
 ELF_FUNCTION(lib_fs_file_exists)
 {
 	lib_check_arg_count(S, "fs.file_exists", nargs, 1, 1);
-	elf_OS_FileInfo info = {0};
+	day_File_Info info = {0};
 	elf_push_int(S, fs_get_file_info(lib_load_cstr(S, 1), &info));
 	return 1;
 }
@@ -47,26 +46,27 @@ ELF_FUNCTION(lib_fs_read_text_file)
 {
 	lib_check_arg_count(S, "fs.read_text_file", nargs, 1, 1);
 	const char *path = lib_load_cstr(S, 1);
-	elf_OS_FileInfo info = {0};
+	day_File_Info info = {0};
 	if (!fs_get_file_info(path, &info) || info.size > INT_MAX) {
 		elf_push_nil(S);
 		return 1;
 	}
-	elf_OS_File file = elf_os_open_file_read(path);
-	if (!elf_os_file_is_valid(file)) {
+	day_File file;
+	if (day_access_file(day_string_from_cstring(path), DAY_FILE_OPEN_EXISTING,
+		DAY_FILE_READ | DAY_FILE_SHARE_READ, &file).error) {
 		elf_push_nil(S);
 		return 1;
 	}
 	char *data = malloc((size_t)info.size + 1);
 	if (!data) {
-		elf_os_close_file(file);
+		day_close_file(file);
 		elf_push_nil(S);
 		return 1;
 	}
-	elf_u64 size = 0;
-	elf_b32 read = elf_os_read_file(file, data, info.size, &size);
-	elf_os_close_file(file);
-	if (!read || size != info.size) {
+	day_u64 size = 0;
+	day_Result read = day_read_file(file, data, info.size, &size);
+	day_close_file(file);
+	if (read.error || size != info.size) {
 		free(data);
 		elf_push_nil(S);
 		return 1;
@@ -81,14 +81,16 @@ ELF_FUNCTION(lib_fs_write_text_file)
 	lib_check_arg_count(S, "fs.write_text_file", nargs, 2, 2);
 	const char *path = lib_load_cstr(S, 1);
 	elf_StrSlice data = lib_load_string(S, 2);
-	elf_OS_File file = elf_os_create_file(path);
-	if (!elf_os_file_is_valid(file)) {
+	day_File file;
+	if (day_access_file(day_string_from_cstring(path), DAY_FILE_CREATE_ALWAYS,
+		DAY_FILE_WRITE, &file).error) {
 		elf_push_int(S, false);
 		return 1;
 	}
-	elf_u64 written = 0;
-	elf_b32 success = elf_os_write_file(file, data.data, data.size, &written) && written == data.size;
-	elf_os_close_file(file);
+	day_u64 written = 0;
+	day_Result write = day_write_file(file, data.data, data.size, &written);
+	b32 success = !write.error && written == data.size;
+	day_close_file(file);
 	elf_push_int(S, success);
 	return 1;
 }
@@ -96,7 +98,7 @@ ELF_FUNCTION(lib_fs_write_text_file)
 ELF_FUNCTION(lib_fs_get_file_info)
 {
 	lib_check_arg_count(S, "fs.get_file_info", nargs, 1, 1);
-	elf_OS_FileInfo info = {0};
+	day_File_Info info = {0};
 	if (!fs_get_file_info(lib_load_cstr(S, 1), &info) || info.size > INT64_MAX) {
 		elf_push_nil(S);
 		return 1;
@@ -113,14 +115,14 @@ ELF_FUNCTION(lib_fs_get_file_info)
 ELF_FUNCTION(lib_fs_create_directory)
 {
 	lib_check_arg_count(S, "fs.create_directory", nargs, 1, 1);
-	elf_push_int(S, elf_os_create_directory(lib_load_cstr(S, 1)));
+	elf_push_int(S, !day_create_directory(day_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_create_directories)
 {
 	lib_check_arg_count(S, "fs.create_directories", nargs, 1, 1);
-	elf_push_int(S, elf_os_create_directories(lib_load_cstr(S, 1)));
+	elf_push_int(S, !day_create_directories(day_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
@@ -130,8 +132,10 @@ static int fs_transfer_file(elf_State *state, int nargs, b32 move)
 	const char *source = lib_load_cstr(state, 1);
 	const char *destination = lib_load_cstr(state, 2);
 	b32 overwrite = nargs == 4 ? (b32)lib_load_integer(state, 3) : true;
-	b32 success = move ? elf_os_move_file(source, destination, overwrite)
-	                   : elf_os_copy_file(source, destination, overwrite);
+	day_Result transfer = move ? day_move_file(day_string_from_cstring(source),
+		day_string_from_cstring(destination), overwrite) : day_copy_file(day_string_from_cstring(source),
+		day_string_from_cstring(destination), overwrite);
+	b32 success = !transfer.error;
 	elf_push_int(state, success);
 	return 1;
 }
@@ -149,65 +153,62 @@ ELF_FUNCTION(lib_fs_move_file)
 ELF_FUNCTION(lib_fs_remove_file)
 {
 	lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1);
-	elf_push_int(S, elf_os_remove_file(lib_load_cstr(S, 1)));
+	elf_push_int(S, !day_remove_file(day_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_directory)
 {
 	lib_check_arg_count(S, "fs.remove_directory", nargs, 1, 1);
-	elf_push_int(S, elf_os_remove_directory(lib_load_cstr(S, 1)));
+	elf_push_int(S, !day_remove_directory(day_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_tree)
 {
 	lib_check_arg_count(S, "fs.remove_tree", nargs, 1, 1);
-	elf_push_int(S, elf_os_remove_tree(lib_load_cstr(S, 1)));
+	elf_push_int(S, !day_remove_tree(day_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_get_working_directory)
 {
 	lib_check_arg_count(S, "fs.get_working_directory", nargs, 0, 0);
-	elf_OS_StringResult query = elf_os_get_current_directory(NULL, 0);
-	if (!query.success || query.required_capacity > INT_MAX) {
+	day_Scratch scratch = day_begin_scratch();
+	day_String directory;
+	if (day_get_current_directory(scratch.arena, &directory).error || directory.size > INT_MAX) {
+		day_end_scratch(scratch);
 		elf_push_nil(S);
 		return 1;
 	}
-
-	char *buffer = malloc((size_t)query.required_capacity);
-	if (!buffer) {
-		elf_push_nil(S);
-		return 1;
-	}
-	elf_OS_StringResult read = elf_os_get_current_directory(buffer, query.required_capacity);
-	if (!read.success) elf_push_nil(S);
-	else lib_push_string(S, buffer, (u32)read.size);
-	free(buffer);
+	lib_push_string(S, directory.data, (u32)directory.size);
+	day_end_scratch(scratch);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_set_working_directory)
 {
 	lib_check_arg_count(S, "fs.set_working_directory", nargs, 1, 1);
-	elf_push_int(S, elf_os_set_current_directory(lib_load_cstr(S, 1)));
+	elf_push_int(S, !day_set_current_directory(day_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
-static b32 fs_collect_paths(elf_State *state, elf_PathBuilder *path, u32 recursion_level,
+static b32 fs_collect_paths(elf_State *state, day_Path_Builder *path, u32 recursion_level,
 	elf_i32 output, b32 call_each, u32 *count)
 {
-	elf_OS_Directory directory;
-	elf_OS_DirectoryEntry entry;
-	elf_OS_DirectoryStatus status = elf_os_find_first_file(path, &directory, &entry);
-	if (status == ELF_OS_DIRECTORY_ERROR) return false;
-	while (status == ELF_OS_DIRECTORY_ENTRY)
+	day_Directory directory;
+	day_Directory_Entry entry;
+	day_Directory_Status status;
+	if (day_find_first_file(path, &directory, &entry, &status).error) return false;
+	while (status == DAY_DIRECTORY_ENTRY)
 	{
-		elf_PathMark mark = elf_path_mark(path);
-		if (!elf_path_push(path, entry.name, entry.name_size))
+		day_Path_Mark mark = day_path_mark(path);
+		if (!day_path_push(path, entry.name))
 		{
-			status = elf_os_find_next_file(&directory, &entry);
+			if (day_find_next_file(&directory, &entry, &status).error) {
+				day_close_directory(&directory);
+				return false;
+			}
 			continue;
 		}
 		if (call_each) {
@@ -225,11 +226,13 @@ static b32 fs_collect_paths(elf_State *state, elf_PathBuilder *path, u32 recursi
 		{
 			fs_collect_paths(state, path, recursion_level - 1, output, call_each, count);
 		}
-		elf_path_pop(path, mark);
-		status = elf_os_find_next_file(&directory, &entry);
+		day_path_pop(path, mark);
+		if (day_find_next_file(&directory, &entry, &status).error) {
+			day_close_directory(&directory);
+			return false;
+		}
 	}
-	elf_os_close_directory(&directory);
-	return status == ELF_OS_DIRECTORY_END;
+	return !day_close_directory(&directory).error && status == DAY_DIRECTORY_END;
 }
 
 ELF_FUNCTION(lib_fs_get_paths)
@@ -240,7 +243,7 @@ ELF_FUNCTION(lib_fs_get_paths)
 		return 1;
 	}
 	elf_StrSlice root = {".", 1};
-	if ((nargs >= 2 && !elf_to_str(S, 1, &root)) || root.size == 0 || root.size >= ELF_OS_PATH_CAPACITY) {
+	if ((nargs >= 2 && !elf_to_str(S, 1, &root)) || root.size == 0 || root.size >= DAY_PATH_CAPACITY) {
 		elf_push_nil(S);
 		return 1;
 	}
@@ -251,9 +254,9 @@ ELF_FUNCTION(lib_fs_get_paths)
 	}
 	elf_new_table(S);
 	elf_i32 result = elf_abs_index(S, -1);
-	char storage[ELF_OS_PATH_CAPACITY];
-	elf_PathBuilder path;
-	if (!elf_path_builder_init(&path, storage, sizeof(storage), root.data, root.size)) {
+	char storage[DAY_PATH_CAPACITY];
+	day_Path_Builder path;
+	if (!day_path_builder_init(&path, storage, sizeof(storage), day_string_from_data(root.data, root.size))) {
 		elf_pop(S, 1);
 		elf_push_nil(S);
 		return 1;
@@ -291,14 +294,14 @@ ELF_FUNCTION(lib_fs_for_each_path)
 		}
 		callback = 3;
 	}
-	if (root.size == 0 || root.size >= ELF_OS_PATH_CAPACITY || recursion_level < 0 || recursion_level > ELF_FS_MAX_RECURSION || !elf_is_callable(S, callback)) {
+	if (root.size == 0 || root.size >= DAY_PATH_CAPACITY || recursion_level < 0 || recursion_level > ELF_FS_MAX_RECURSION || !elf_is_callable(S, callback)) {
 		elf_push_nil(S);
 		return 1;
 	}
 	callback = elf_abs_index(S, callback);
-	char storage[ELF_OS_PATH_CAPACITY];
-	elf_PathBuilder path;
-	if (!elf_path_builder_init(&path, storage, sizeof(storage), root.data, root.size)) {
+	char storage[DAY_PATH_CAPACITY];
+	day_Path_Builder path;
+	if (!day_path_builder_init(&path, storage, sizeof(storage), day_string_from_data(root.data, root.size))) {
 		elf_push_nil(S);
 		return 1;
 	}

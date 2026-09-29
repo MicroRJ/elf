@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#include "elf_os.h"
+#include <dayan.h>
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
@@ -30,7 +30,7 @@ void elf_end_scratch(elf_Scratch scratch)
 
 void elf_arena_destroy(elf_Arena *arena)
 {
-	elf_os_virtual_release(arena->data);
+	day_virtual_release(arena->data, arena->size);
 }
 
 elf_Arena elf_arena_create(u64 reserve)
@@ -42,9 +42,9 @@ elf_Arena elf_arena_create(u64 reserve)
 	elf_Arena arena = {};
 	arena.size = reserve;
 	arena.in_reserve = reserve;
-	arena.data = elf_os_virtual_reserve(reserve);
-	if (arena.data && !elf_os_virtual_commit(arena.data, reserve)) {
-		elf_os_virtual_release(arena.data);
+	arena.data = day_virtual_reserve(reserve);
+	if (arena.data && !day_virtual_commit(arena.data, reserve)) {
+		day_virtual_release(arena.data, reserve);
 		arena.data = NULL;
 	}
 	return arena;
