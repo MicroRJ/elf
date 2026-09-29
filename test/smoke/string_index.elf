@@ -1,0 +1,7 @@
+text := "foo"
+
+test_assert(text[0] == 'f')
+test_assert(text[1] == 'o')
+test_assert(text[-1] == 'o')
+
+ret text[0] + text[1] + text[-1]

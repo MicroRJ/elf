@@ -266,21 +266,6 @@ activate_frame:
 						*result = elf_table_get_or_nil(state, value_as_table(object), field);
 					} break;
 
-					case ELF_VALUE_TYPE_STRING: {
-						const char *text = string_data(value_as_string(object));
-
-						if (value_is_integer(field)) {
-							i64 index = value_as_integer(field);
-							*result = value_from_integer(text[index]);
-						}
-						else if (value_is_string(field)) {
-							*result = value_nil();
-						}
-						else {
-							vm_error_invalid_field_arguments(state, object, field);
-						}
-					} break;
-
 					default: {
 						vm_error_invalid_field_arguments(state, object, field);
 					} break;
@@ -311,9 +296,24 @@ activate_frame:
 			} break;
 
 			case BC_GETINDEX: {
-				elf_Table *array = vm_check_array(state, *vm_slot(reference, byte.b_y));
-				u32 index = vm_check_index(state, byte_index, *vm_slot(reference, byte.b_z), elf_array_length(array));
-				value_copy(vm_slot(reference, byte.b_x), elf_array_get(state, array, index));
+				elf_Value object = *vm_slot(reference, byte.b_y);
+				elf_Value index_value = *vm_slot(reference, byte.b_z);
+				elf_Value *result = vm_slot(reference, byte.b_x);
+
+				if (value_is_table(object)) {
+					elf_Table *table = value_as_table(object);
+					u32 index = vm_check_index(state, byte_index, index_value, elf_array_length(table));
+					value_copy(result, elf_array_get(state, table, index));
+				}
+				else if (value_is_string(object)) {
+					elf_String *string = value_as_string(object);
+					u32 index = vm_check_index(state, byte_index, index_value, string_size(string));
+					*result = value_from_integer((u8)string_data(string)[index]);
+				}
+				else {
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+						"cannot index '%s' value", value_type_name(object.type));
+				}
 			} break;
 
 			case BC_SETINDEX: {

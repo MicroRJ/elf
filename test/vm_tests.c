@@ -93,6 +93,11 @@ static void test_vm_integer_add(void)
 	vm_expect_int("test/smoke/return_add.elf", 3, "vm executes integer addition");
 }
 
+static void test_vm_string_index(void)
+{
+	vm_expect_int("test/smoke/string_index.elf", 324, "vm indexes string bytes");
+}
+
 static void test_vm_return_nil(void)
 {
 	VmRunResult result = vm_test_run_file("test/smoke/return_nil.elf");
@@ -486,6 +491,7 @@ static void run_vm_tests(void)
 {
 	test_vm_return_int();
 	test_vm_integer_add();
+	test_vm_string_index();
 	test_vm_return_nil();
 	test_vm_return_table();
 	test_vm_nil_assign();

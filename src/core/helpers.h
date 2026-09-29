@@ -86,13 +86,13 @@ static inline u32 check_array_index(elf_State *state, int instr, i64 index, u32 
 		if (resolved != index)
 		{
 			elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, instr
-			,	"array index out of bounds: index %lli resolved to %lli, length %lli"
+			,	"array index out of bounds: index %lli resolved to %lli, length %u"
 			,	index, resolved, count);
 		}
 		else
 		{
 			elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, instr
-			,	"array index out of bounds: index %lli, length %lli"
+			,	"array index out of bounds: index %lli, length %u"
 			,	index, count);
 		}
 	}
