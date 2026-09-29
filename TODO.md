@@ -6,6 +6,8 @@ here instead of scattering `TODO` comments through the source.
 
 ## Release readiness
 
+- Move to dayan's base types entirely!
+
 - [x] Make state destruction complete and leak-free.
   - Free every GC object, including table entry and array storage.
   - Free both GC reference arrays, the interned-string bucket array, diagnostic
