@@ -4,9 +4,48 @@ This is the single project backlog. Top-level checkboxes describe outcomes; the
 indented bullets record scope and acceptance criteria. Keep implementation notes
 here instead of scattering `TODO` comments through the source.
 
+## Correctness and safety
+
+- [ ] Make every numeric bytecode operation defined.
+  - Detect signed overflow in integer addition, subtraction, and multiplication.
+  - Reject integer remainder by zero and `INT64_MIN % -1` before evaluating it.
+  - Define shift semantics, reject invalid shift counts, and avoid signed left-shift
+    overflow and implementation-defined right shifts.
+  - Replace the floating-point remainder's integer conversion with `fmod()` and
+    define its zero and non-finite behavior.
+  - Implement integer exponentiation without an out-of-range floating-point-to-
+    integer conversion.
+  - Add boundary tests, including subprocess rejection tests while runtime errors
+    still terminate the process, and run them under an undefined-behavior sanitizer.
+
+- [ ] Replace fixed runtime stack assertions with checked behavior.
+  - Grow or report exhaustion of the value stack and call-frame stack.
+  - Validate frame sizes, recursion depth, native-call stack effects, and bytecode
+    register accesses without relying on debug-only assertions.
+
+- [ ] Preserve table key/value associations during positional reordering.
+  - Define whether keys travel with values or reordering is rejected for keyed
+    tables; `swap`, `reverse`, and `sort` must never silently rebind fields.
+  - Test mixed keyed/positional tables through both the C API and elf libraries.
+
+- [ ] Define table mutation during iteration and callbacks.
+  - Cover direct iteration plus `map`, `filter`, and comparator callbacks.
+  - Either reject structural mutation or give each operation explicit snapshot
+    semantics; `filter` must append the same value that its callback tested.
+
+- [ ] Make recursive value formatting cycle-safe.
+  - Detect repeated tables while printing and emit a stable cycle marker instead
+    of overflowing the C stack.
+  - Cover self-cycles and mutually recursive tables in logging and string joins.
+
+- [ ] Fix optional overwrite handling in `fs.copy_file` and `fs.move_file`.
+  - Read the third argument when `nargs == 3`; the current `nargs == 4` check makes
+    the documented option unreachable.
+  - Test both overwrite modes for copy and move.
+
 ## Release readiness
 
-- Move to dayan's base types entirely!
+- [ ] Use dayan's base types internally instead of maintaining duplicate aliases.
 
 - [x] Make state destruction complete and leak-free.
   - Free every GC object, including table entry and array storage.
@@ -24,24 +63,21 @@ here instead of scattering `TODO` comments through the source.
 
 - [ ] Turn user-controlled limits into diagnostics rather than assertions or
   process aborts.
-  - Reject source and strings that do not fit the runtime's 32-bit size fields.
   - Handle limits on constants, functions, captures, stack slots, jump distance,
     labels, jump patches, scopes/entities, and interpolation nesting.
   - Replace fixed compiler arrays where a practical dynamic representation exists;
     otherwise report the limit precisely and test it.
 
 - [ ] Stabilize the public C API before documenting it as a contract.
-  - Make `elf.h` self-contained by including the header that defines `size_t`.
   - Make borrowed string data const and document every pointer's ownership and
     lifetime.
-  - Use `elf_Bool` only for Boolean results, `elf_ErrorCode` for fallible
-    mutations, and add an explicit invalid value type for failed lookups.
+  - Add an explicit invalid value type for failed lookups instead of using the
+    internal count sentinel.
   - Decide whether `elf_Ref` should remain an integer handle or become a stronger
     public type.
   - Define the compatibility meaning of `ELF_API_VERSION`, or remove it until a
     stable contract exists.
-  - Review names, result types, failure behavior, and stack effects as one API;
-    compile-test the public headers without internal headers.
+  - Review names, result types, failure behavior, and stack effects as one API.
 
 - [ ] Define and enforce the supported language surface.
   - Audit every keyword, token, parsed AST form, lowering case, and bytecode path.
@@ -52,12 +88,7 @@ here instead of scattering `TODO` comments through the source.
     return `nil` for a parsed operation with no implementation.
   - Add success or rejection tests before describing a construct in the grammar.
 
-- [ ] Remove the `platform` submodule dependency.
-  - Add the required environment, process, process-ID, exit, and OS-error services
-    to elf's OS layer.
-  - Migrate the environment and process batteries, tests, and tools.
-  - Remove platform includes, library/build tasks, and the submodule after the last
-    caller is gone.
+- [x] Replace the `platform` submodule with `dayan-core`.
 
 - [ ] Establish reproducible debug and release builds.
   - Build core, batteries, and the CLI in both configurations.
@@ -91,6 +122,17 @@ here instead of scattering `TODO` comments through the source.
 
 ## Engineering follow-ups
 
+- [ ] Repair table hash maintenance under deletion-heavy workloads.
+  - Reuse tombstones for insertion and keep the occupied-slot count accurate
+    across deletion and rehashing.
+  - Add churn tests that repeatedly insert and delete without unbounded growth.
+
+- [ ] Remove avoidable quadratic table-library paths.
+  - Improve keyed deletion and `keys`/`pairs` traversal after table correctness is
+    settled, and avoid allocating a new table for every pair where practical.
+  - Replace the first-element quicksort pivot or use a robust library sort for
+    already sorted and reverse-sorted inputs.
+
 - [ ] Separate immutable IR from bytecode-generation state.
   - Move bytecode labels and assigned local slots out of IR nodes if IR reuse,
     inspection, or concurrent compilation is a real requirement.
@@ -103,6 +145,8 @@ here instead of scattering `TODO` comments through the source.
     fixed nesting stack or give it a checked limit.
 
 - [ ] Clarify internal module boundaries.
+  - Keep `Compiler` storage and stage-only reporting helpers private to the compiler
+    module, and represent its source name as an owned or counted string.
   - Move atom-to-runtime-string conversion out of the atom-table implementation.
   - Replace `elf_Binding` only as part of a clearer native-library registration
     boundary, not as a standalone rename.

@@ -19,7 +19,6 @@ static const char *ast_type_name(AstType type)
 
 static AstContext create_ast_context(elf_Arena *arena)
 {
-	// TODO(RJ): make this reasonable!
 	u32 stack_size = 4096;
 
 	AstContext ast = {};
