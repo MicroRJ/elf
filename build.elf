@@ -1,7 +1,7 @@
 compiler := "clang-cl"
 librarian := "lib"
-compile_options := " /nologo /Od /Zi /D_DEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes"
-benchmark_compile_options := " /nologo /O2 /Zi /DNDEBUG /DPLATFORM_DESKTOP -fcolor-diagnostics -fansi-escape-codes"
+compile_options := " /nologo /Od /Zi /D_DEBUG -fcolor-diagnostics -fansi-escape-codes"
+benchmark_compile_options := " /nologo /O2 /Zi /DNDEBUG -fcolor-diagnostics -fansi-escape-codes"
 
 build_options := {
 	workers = 4,
@@ -26,7 +26,7 @@ include_dirs := {
 	"batteries",
 	"src/batteries/internal",
 	"include",
-	"platform/include",
+	"dayan-core/include",
 	"stb",
 }
 
@@ -34,7 +34,7 @@ batteries_include_dirs := {
 	"include",
 	"src/os",
 	"src/batteries/internal",
-	"platform/include",
+	"dayan-core/include",
 }
 
 join_arguments := fun(values) {
@@ -67,16 +67,35 @@ prepare := {
 	dependencies = {},
 }
 
-build_platform := {
-	name = "build platform library",
-	command_line = "cmd /c \"cd /d platform && ..\\bootstrap\\windows-x64\\manny.exe build.elf lib\"",
+build_dayan := {
+	name = "build Dayan library",
+	command_line = "cmd /c \"cd /d dayan-core && ..\\bootstrap\\windows-x64\\manny.exe build.elf lib\"",
 	inputs = {
-		"platform/build.elf",
-		"platform/include/platform.h",
-		"platform/include/platform_types.h",
-		"platform/src/platform_win32.c",
+		"dayan-core/build.elf",
+		"dayan-core/include/dayan.h",
+		"dayan-core/src/dayan.c",
+		"dayan-core/src/dayan_memory.c",
+		"dayan-core/src/dayan_memory.h",
+		"dayan-core/src/win32/dayan_memory.c",
+		"dayan-core/src/dayan_file.c",
+		"dayan-core/src/win32/dayan_file.c",
+		"dayan-core/src/dayan_path.c",
+		"dayan-core/src/win32/dayan_path.c",
+		"dayan-core/src/dayan_env.c",
+		"dayan-core/src/win32/dayan_env.c",
+		"dayan-core/src/dayan_process.c",
+		"dayan-core/src/win32/dayan_process.c",
+		"dayan-core/src/dayan_thread.c",
+		"dayan-core/src/win32/dayan_thread.c",
+		"dayan-core/src/dayan_time.c",
+		"dayan-core/src/win32/dayan_time.c",
+		"dayan-core/src/dayan_console.c",
+		"dayan-core/src/win32/dayan_console.c",
+		"dayan-core/src/dayan_error.c",
+		"dayan-core/src/win32/dayan_error.c",
+		"dayan-core/src/win32/dayan_win32.h",
 	},
-	outputs = { "platform/build/platform.lib" },
+	outputs = { "dayan-core/build/dayan.lib" },
 	include_dirs = {},
 	dependencies = {},
 	transparent = true,
@@ -158,16 +177,16 @@ batteries_library := {
 	dependencies = { batteries.task, os_services.task, os_services_win32.task },
 }
 
-build_tool := fun(name, source, output, uses_batteries, uses_platform) {
+build_tool := fun(name, source, output, uses_batteries, uses_dayan) {
 	object := f"build/obj/tool_${output}.obj"
 	executable := f"build/${output}.exe"
 	inputs := { source, "build/elf.lib" }
 	dependencies := { elf_library }
 	libraries := " build/elf.lib"
-	if uses_platform ? {
-		inputs:add("platform/build/platform.lib")
-		dependencies:add(build_platform)
-		libraries += " platform/build/platform.lib"
+	if uses_dayan ? {
+		inputs:add("dayan-core/build/dayan.lib")
+		dependencies:add(build_dayan)
+		libraries += " dayan-core/build/dayan.lib"
 	}
 	if uses_batteries ? {
 		inputs:add("build/elf_batteries.lib")
@@ -234,7 +253,7 @@ entries := {}
 
 entries.lib = fun() {
 	ret manny.build({
-		targets = { elf_library, batteries_library, build_platform },
+		targets = { elf_library, batteries_library, build_dayan },
 		options = build_options,
 	})
 }

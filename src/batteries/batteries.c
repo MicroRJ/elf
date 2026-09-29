@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <platform.h>
+#include <dayan.h>
 #include "elf_os_services.h"
 
 #undef ELF_VERSION

@@ -2,55 +2,61 @@
 // Process environment variables.
 //
 
-static Platform_Environment_Result query_environment(elf_State *state, const char *name)
+static day_Result query_environment(day_Arena *arena, const char *name, day_String *value)
 {
-	Platform_Environment_Result result = platform_get_environment(name, NULL, 0);
-	if (result.error) elf_error(state, "unable to read environment variable");
-	return result;
+	return day_get_env_field(arena, day_string_from_cstring(name), value);
 }
 
 ELF_FUNCTION(lib_env_get)
 {
 	lib_check_arg_count(S, "env.get", nargs, 1, 1);
 	const char *name = lib_load_cstr(S, 1);
-	Platform_Environment_Result query = query_environment(S, name);
-	if (!query.found) {
+	day_Scratch scratch = day_begin_scratch();
+	day_String value;
+	day_Result query = query_environment(scratch.arena, name, &value);
+	if (query.error != DAY_ERROR_NONE && query.error != DAY_ERROR_NOT_FOUND) {
+		day_end_scratch(scratch);
+		elf_error(S, "unable to read environment variable");
+	}
+	if (query.error == DAY_ERROR_NOT_FOUND) {
+		day_end_scratch(scratch);
 		elf_push_nil(S);
 		return 1;
 	}
-	char *value = malloc((size_t)query.required_capacity);
-	if (!value) elf_error(S, "unable to allocate environment variable");
-	Platform_Environment_Result read = platform_get_environment(name, value, query.required_capacity);
-	if (read.error) {
-		free(value);
-		elf_error(S, "unable to read environment variable");
-	}
-	lib_push_string(S, value, (u32)read.size);
-	free(value);
+	lib_push_string(S, value.data, (u32)value.size);
+	day_end_scratch(scratch);
 	return 1;
 }
 
 ELF_FUNCTION(lib_env_has)
 {
 	lib_check_arg_count(S, "env.has", nargs, 1, 1);
-	Platform_Environment_Result result = query_environment(S, lib_load_cstr(S, 1));
-	elf_push_int(S, result.found);
+	day_Scratch scratch = day_begin_scratch();
+	day_String value;
+	day_Result result = query_environment(scratch.arena, lib_load_cstr(S, 1), &value);
+	if (result.error != DAY_ERROR_NONE && result.error != DAY_ERROR_NOT_FOUND) {
+		day_end_scratch(scratch);
+		elf_error(S, "unable to read environment variable");
+	}
+	day_end_scratch(scratch);
+	elf_push_int(S, result.error != DAY_ERROR_NOT_FOUND);
 	return 1;
 }
 
 ELF_FUNCTION(lib_env_set)
 {
 	lib_check_arg_count(S, "env.set", nargs, 2, 2);
-	Platform_Result result = platform_set_environment(lib_load_cstr(S, 1), lib_load_cstr(S, 2));
-	elf_push_int(S, result.error == PLATFORM_ERROR_NONE);
+	day_Result result = day_set_env_field(day_string_from_cstring(lib_load_cstr(S, 1)),
+		day_string_from_cstring(lib_load_cstr(S, 2)));
+	elf_push_int(S, result.error == DAY_ERROR_NONE);
 	return 1;
 }
 
 ELF_FUNCTION(lib_env_unset)
 {
 	lib_check_arg_count(S, "env.unset", nargs, 1, 1);
-	Platform_Result result = platform_set_environment(lib_load_cstr(S, 1), NULL);
-	elf_push_int(S, result.error == PLATFORM_ERROR_NONE);
+	day_Result result = day_remove_env_field(day_string_from_cstring(lib_load_cstr(S, 1)));
+	elf_push_int(S, result.error == DAY_ERROR_NONE);
 	return 1;
 }
 
