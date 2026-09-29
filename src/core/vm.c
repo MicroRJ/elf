@@ -455,7 +455,16 @@ activate_frame:
 						*vm_slot(reference, byte.b_x) = value_from_number(value_to_number(left) / value_to_number(right));
 					}
 					else {
-						*vm_slot(reference, byte.b_x) = value_from_integer(value_as_integer(left) / value_as_integer(right));
+						i64 dividend = value_as_integer(left);
+						i64 divisor = value_as_integer(right);
+						if (divisor == 0) {
+							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "integer division by zero");
+						}
+						if (!i64_division_is_defined(dividend, divisor)) {
+							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+								"integer division overflow: minimum integer divided by -1");
+						}
+						*vm_slot(reference, byte.b_x) = value_from_integer(dividend / divisor);
 					}
 				}
 				else {

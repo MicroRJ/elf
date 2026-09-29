@@ -74,6 +74,11 @@ static inline void check_numeric(elf_State *state, elf_Value value)
 	}
 }
 
+static inline b32 i64_division_is_defined(i64 dividend, i64 divisor)
+{
+	return divisor != 0 && !(dividend == INT64_MIN && divisor == -1);
+}
+
 static inline u32 check_array_index(elf_State *state, int instr, i64 index, u32 count)
 {
 	i64 resolved = index;
