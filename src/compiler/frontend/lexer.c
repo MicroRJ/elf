@@ -65,6 +65,24 @@ static b32 is_identifier_continue(char c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
+static b32 lexer_is_hex_digit(char c)
+{
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static u32 lexer_hex_digit(char c)
+{
+	if (c >= '0' && c <= '9')
+	{
+		return (u32)(c - '0');
+	}
+	if (c >= 'a' && c <= 'f')
+	{
+		return 10 + (u32)(c - 'a');
+	}
+	return 10 + (u32)(c - 'A');
+}
+
 static void lexer_init(Lexer *lexer, Compiler *compiler, Atom_Table *atoms)
 {
 	lexer->compiler = compiler;
@@ -92,10 +110,10 @@ static SourceSite source_site_from_ptr(Lexer *lexer, const char *data)
 	ASSERT(offset <= 0xffffffffu);
 	ASSERT(line_offset <= 0xffffffffu);
 	return (SourceSite) {
-		.offset = (u32)offset,
-		.size = 1,
-		.line_offset = (u32)line_offset,
-		.line_index = lexer->line_index,
+		.offset      = (u32) offset,
+		.size        = 1,
+		.line_offset = (u32) line_offset,
+		.line_index  = lexer->line_index,
 	};
 }
 
@@ -108,28 +126,9 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 {
 	va_list args;
 	va_start(args, fmt);
-	compiler_reportv(lexer->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
-		site, fmt, args);
+	compiler_reportv(lexer->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER, site, fmt, args);
 	va_end(args);
 	lexer->failed = true;
-}
-
-static b32 lexer_is_hex_digit(char c)
-{
-	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
-
-static u32 lexer_hex_digit(char c)
-{
-	if (c >= '0' && c <= '9')
-	{
-		return (u32)(c - '0');
-	}
-	if (c >= 'a' && c <= 'f')
-	{
-		return 10 + (u32)(c - 'a');
-	}
-	return 10 + (u32)(c - 'A');
 }
 
 static b32 lexer_parse_hex_codepoint(Lexer *lexer, const char **cursor, u32 digits, SourceSite site, u32 *out)
@@ -779,8 +778,7 @@ static Token lex_token(Lexer *lexer)
 				}
 				else if (token.type == TOK_M_FILE_NAME) {
 					token.type = TOK_STRING;
-					token.atom = atom_from_data_size(lexer->atoms, lexer->compiler->source_name,
-						strlen(lexer->compiler->source_name));
+					token.atom = atom_from_data_size(lexer->atoms, lexer->compiler->source_name, strlen(lexer->compiler->source_name));
 				}
 				else if (token.type == TOK_M_LINE_NUMBER) {
 					token.type = TOK_INTEGER;
@@ -1006,6 +1004,10 @@ static Token lex_token(Lexer *lexer)
 			if (lexer_peek(lexer, cur, 0) == '=') {
 				cur += 1;
 				token.type = TOK_EQ;
+			}
+			else if (lexer_peek(lexer, cur, 0) == '>') {
+				cur += 1;
+				token.type = TOK_RET;
 			}
 		} break;
 

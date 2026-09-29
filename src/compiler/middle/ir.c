@@ -6,9 +6,9 @@ static const char *ir_kind_name(IrKind kind)
 {
 	static const char *names[] =
 	{
-#define IR_XPAND(ENUM, NAME) #ENUM,
-		IR_XDEF(IR_XPAND)
-#undef IR_XPAND
+#define EXPAND(ENUM, NAME) #ENUM,
+		IR_DEFINITIONS(EXPAND)
+#undef EXPAND
 	};
 
 	if ((u32)kind >= IR_COUNT_) {

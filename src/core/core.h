@@ -124,6 +124,7 @@ struct StackFrame
 	u8             variadic;
 	u8            ncaptures;
 };
+
 typedef struct elf_State elf_State;
 struct elf_State
 {

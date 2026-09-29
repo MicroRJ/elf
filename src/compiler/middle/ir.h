@@ -10,8 +10,7 @@ BcSlot;
 
 #define NO_MEMORY ((BcSlot) { -1 })
 
-
-#define IR_XDEF(X)                                          \
+#define IR_DEFINITIONS(X)                                   \
 	X(IR_NONE                , "none")                       \
 	X(IR_ERROR               , "error")                      \
 	X(IR_AND                 , "and")                        \
@@ -64,11 +63,11 @@ BcSlot;
 
 typedef enum
 {
-#define IR_XPAND(ENUM, NAME) ENUM,
 
-	IR_XDEF(IR_XPAND)
+#define EXPAND(ENUM, NAME) ENUM,
+	IR_DEFINITIONS(EXPAND)
+#undef EXPAND
 
-#undef IR_XPAND
 	IR_COUNT_,
 }
 IrKind;

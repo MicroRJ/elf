@@ -19,6 +19,7 @@ static const char *ast_type_name(AstType type)
 
 static AstContext create_ast_context(elf_Arena *arena)
 {
+	// TODO(RJ): make this reasonable!
 	u32 stack_size = 4096;
 
 	AstContext ast = {};
@@ -448,7 +449,7 @@ static void print_ast(Printer *pr, Ast tree)
 		{
 
 			Ast *params    = tree->function.params;
-			u32     nparams   = tree->function.nparams;
+			u32  nparams   = tree->function.nparams;
 			Ast  variadic  = tree->function.variadic;
 			Ast  body      = tree->function.body;
 
