@@ -1,0 +1,158 @@
+dayan := elf.load_file("dayan-core/project.elf")
+dayan.root = "dayan-core"
+
+internal_include_directories := {
+	"src",
+	"src/base",
+	"src/api",
+	"src/core",
+	"src/diagnostics",
+	"src/core/libs",
+	"src/core/value",
+	"src/core/table",
+	"src/core/string",
+	"src/compiler",
+	"src/compiler/frontend",
+	"src/compiler/middle",
+	"src/compiler/backend",
+	"batteries",
+	"src/batteries/internal",
+	"stb",
+}
+
+library := {
+	kind = "static_library",
+	name = "elf",
+	sources = {
+		"src/base/base.c",
+		"src/core/value/value.c",
+		"src/compiler/backend/bytecode.c",
+		"src/compiler/backend/bytecode_debug.c",
+		"src/core/core.c",
+		"src/compiler/compiler.c",
+		"src/api/elf_api.c",
+	},
+	private_include_directories = internal_include_directories,
+	public_include_directories = {
+		"include",
+	},
+	dependencies = {
+		dayan,
+	},
+}
+
+batteries := {
+	kind = "static_library",
+	name = "elf_batteries",
+	sources = {
+		"src/batteries/batteries.c",
+	},
+	private_include_directories = {
+		"src/batteries/internal",
+	},
+	dependencies = {
+		library,
+	},
+}
+
+public_header_test := {
+	kind = "static_library",
+	name = "public_header_test",
+	sources = { "test/public_header_compile_test.c" },
+	private_include_directories = { "include" },
+}
+
+core_tests := {
+	kind = "executable",
+	name = "core_tests",
+	sources = { "test/core_tests.c" },
+	private_include_directories = internal_include_directories,
+	dependencies = { library },
+}
+
+run_core_tests := {
+	kind = "run",
+	name = "run core tests",
+	target = core_tests,
+}
+
+tests := {
+	kind = "executable",
+	name = "tests",
+	sources = { "test/tests.c" },
+	private_include_directories = internal_include_directories,
+	dependencies = { batteries },
+}
+
+run_tests := {
+	kind = "run",
+	name = "run elf tests",
+	target = tests,
+}
+
+benchmarks := {
+	kind = "executable",
+	name = "benchmarks",
+	sources = { "tools/benchmarks.c" },
+	private_include_directories = internal_include_directories,
+	dependencies = { library },
+}
+
+benchmark_library := library:clone()
+benchmark_library.name = "elf_benchmark"
+benchmark_library.compile_options = { "/O2", "/DNDEBUG", "/U_DEBUG" }
+
+optimized_benchmarks := {
+	kind = "executable",
+	name = "benchmarks_opt",
+	sources = { "tools/benchmarks.c" },
+	private_include_directories = internal_include_directories,
+	compile_options = { "/O2", "/DNDEBUG", "/U_DEBUG" },
+	dependencies = { benchmark_library },
+}
+
+run_optimized_benchmarks := {
+	kind = "run",
+	name = "run optimized benchmarks",
+	target = optimized_benchmarks,
+}
+
+bytecode_tool := {
+	kind = "executable",
+	name = "bytecode",
+	sources = { "tools/bytecode.c" },
+	private_include_directories = internal_include_directories,
+	dependencies = { batteries },
+}
+
+elf_runner := {
+	kind = "executable",
+	name = "elf",
+	sources = { "tools/elf.c" },
+	private_include_directories = internal_include_directories,
+	dependencies = { batteries },
+}
+
+ret {
+	name = "elf",
+	root = ".",
+	subprojects = {
+		dayan = dayan,
+	},
+	default_target = batteries,
+	targets = {
+		library = library,
+		batteries = batteries,
+		public_header_test = public_header_test,
+		core_tests = core_tests,
+		run_core_tests = run_core_tests,
+		tests = tests,
+		run_tests = run_tests,
+		benchmarks = benchmarks,
+		benchmark_library = benchmark_library,
+		optimized_benchmarks = optimized_benchmarks,
+		run_optimized_benchmarks = run_optimized_benchmarks,
+		bytecode_tool = bytecode_tool,
+		elf_runner = elf_runner,
+	},
+}

@@ -1,254 +1,54 @@
-compiler := "clang-cl"
-librarian := "lib"
-compile_options := " /nologo /Od /Zi /D_DEBUG -fcolor-diagnostics -fansi-escape-codes"
-benchmark_compile_options := " /nologo /O2 /Zi /DNDEBUG -fcolor-diagnostics -fansi-escape-codes"
-
-build_options := {
-	workers = 4,
-	verbosity = 0,
-}
-
-include_dirs := {
-	"src",
-	"src/base",
-	"src/api",
-	"src/core",
-	"src/diagnostics",
-	"src/core/libs",
-	"src/core/value",
-	"src/core/table",
-	"src/core/string",
-	"src/compiler",
-	"src/compiler/frontend",
-	"src/compiler/middle",
-	"src/compiler/backend",
-	"batteries",
-	"src/batteries/internal",
-	"include",
-	"dayan-core/include",
-	"stb",
-}
-
-batteries_include_dirs := {
-	"include",
-	"src/batteries/internal",
-	"dayan-core/include",
-}
-
-join_arguments := fun(values) {
-	result := ""
-	for value := values[...] ? { result += f" ${value}" }
-	ret result
-}
-
-make_include_options := fun(directories) {
-	result := ""
-	for directory := directories[...] ? { result += f" /I${directory}" }
-	ret result
-}
-
-include_options := make_include_options(include_dirs)
-batteries_include_options := make_include_options(batteries_include_dirs)
-
-public_include_dirs := {
-	"include",
-}
-
-public_include_options := make_include_options(public_include_dirs)
-
-prepare := {
-	name = "prepare build directory",
-	command_line = "cmd /c if not exist build\\obj mkdir build\\obj",
-	inputs = {},
-	outputs = { "build/obj" },
-	include_dirs = {},
-	dependencies = {},
-}
-
-dayan_module := elf.load_file("dayan-core/dayan.elf")
-dayan_graph := dayan_module.create({
-	root = "dayan-core",
-	output_directory = "dayan-core/build",
-	compiler = compiler,
-	librarian = librarian,
+project := elf.load_file("project.elf")
+tasks := elf.load_file("bootstrap/windows-x64/c.elf").project_to_tasks(project, {
+	output_directory = "build",
+	compile_options = { "/Od", "/Zi", "/D_DEBUG", "-fcolor-diagnostics", "-fansi-escape-codes" },
 })
-build_dayan := dayan_graph.library.task
-
-compile_source_options := fun(name, source, includes, dependency_includes, options) {
-	object := f"build/obj/${name}.obj"
-	task := {
-		name = f"compile ${name}",
-		command_line = f"${compiler}${options}${includes} /c ${source} /Fo${object} /Fdbuild/obj/${name}.pdb",
-		inputs = { source },
-		outputs = { object },
-		include_dirs = dependency_includes,
-		dependencies = { prepare },
-	}
-	ret { task = task, object = object }
-}
-
-compile_source := fun(name, source, includes, dependency_includes) {
-	ret compile_source_options(name, source, includes, dependency_includes, compile_options)
-}
-
-elf_sources := {
-	{ name = "base",           path = "src/base/base.c" },
-	{ name = "value",          path = "src/core/value/value.c" },
-	{ name = "bytecode",       path = "src/compiler/backend/bytecode.c" },
-	{ name = "bytecode_debug", path = "src/compiler/backend/bytecode_debug.c" },
-	{ name = "core",           path = "src/core/core.c" },
-	{ name = "compiler",       path = "src/compiler/compiler.c" },
-	{ name = "elf_api",        path = "src/api/elf_api.c" },
-}
-
-elf_objects := {}
-elf_compile_tasks := {}
-for source := elf_sources[...] ? {
-	compiled := compile_source(source.name, source.path, include_options, include_dirs)
-	elf_objects:add(compiled.object)
-	elf_compile_tasks:add(compiled.task)
-}
-
-elf_library := {
-	name = "archive elf.lib",
-	command_line = f"${librarian} /nologo /out:build/elf.lib${join_arguments(elf_objects)}",
-	inputs = elf_objects,
-	outputs = { "build/elf.lib" },
-	include_dirs = {},
-	dependencies = elf_compile_tasks,
-}
-
-benchmark_elf_objects := {}
-benchmark_elf_compile_tasks := {}
-for source := elf_sources[...] ? {
-	compiled := compile_source_options(f"benchmark_${source.name}", source.path, include_options, include_dirs, benchmark_compile_options)
-	benchmark_elf_objects:add(compiled.object)
-	benchmark_elf_compile_tasks:add(compiled.task)
-}
-
-benchmark_elf_library := {
-	name = "archive optimized elf benchmark library",
-	command_line = f"${librarian} /nologo /out:build/elf_benchmark.lib${join_arguments(benchmark_elf_objects)}",
-	inputs = benchmark_elf_objects,
-	outputs = { "build/elf_benchmark.lib" },
-	include_dirs = {},
-	dependencies = benchmark_elf_compile_tasks,
-}
-
-batteries := compile_source("batteries", "src/batteries/batteries.c", batteries_include_options, batteries_include_dirs)
-public_header_test := compile_source("public_header_test", "test/public_header_compile_test.c", public_include_options, public_include_dirs)
-
-batteries_library := {
-	name = "archive elf_batteries.lib",
-	command_line = f"${librarian} /nologo /out:build/elf_batteries.lib ${batteries.object}",
-	inputs = { batteries.object },
-	outputs = { "build/elf_batteries.lib" },
-	include_dirs = {},
-	dependencies = { batteries.task },
-}
-
-build_tool := fun(name, source, output, uses_batteries) {
-	object := f"build/obj/tool_${output}.obj"
-	executable := f"build/${output}.exe"
-	inputs := { source, "build/elf.lib", "dayan-core/build/dayan.lib" }
-	dependencies := { elf_library, build_dayan }
-	libraries := " build/elf.lib dayan-core/build/dayan.lib"
-	if uses_batteries ? {
-		inputs:add("build/elf_batteries.lib")
-		dependencies:add(batteries_library)
-		libraries += " build/elf_batteries.lib"
-	}
-	task := {
-		name = f"build ${name}",
-		command_line = f"${compiler}${compile_options}${include_options} ${source} /Fo${object} /Fe:${executable} /Fd:build/obj/tool_${output}.pdb /link${libraries} /PDB:build/${output}.pdb /ILK:build/${output}.ilk",
-		inputs = inputs,
-		outputs = { executable },
-		include_dirs = include_dirs,
-		dependencies = dependencies,
-	}
-	ret { task = task, executable = executable }
-}
-
-core_tests := build_tool("core tests", "test/core_tests.c", "core_tests", false)
-tests := build_tool("tests", "test/tests.c", "tests", true)
-benchmarks := build_tool("benchmarks", "tools/benchmarks.c", "benchmarks", false)
-bytecode_tool := build_tool("bytecode tool", "tools/bytecode.c", "bytecode", true)
-elf_runner := build_tool("elf runner", "tools/elf.c", "elf", true)
-
-optimized_benchmarks := {
-	name = "build optimized benchmarks",
-	command_line = f"${compiler}${benchmark_compile_options}${include_options} tools/benchmarks.c /Fobuild/obj/tool_benchmarks_opt.obj /Fe:build/benchmarks_opt.exe /Fd:build/obj/tool_benchmarks_opt.pdb /link build/elf_benchmark.lib dayan-core/build/dayan.lib /PDB:build/benchmarks_opt.pdb /ILK:build/benchmarks_opt.ilk",
-	inputs = { "tools/benchmarks.c", "build/elf_benchmark.lib", "dayan-core/build/dayan.lib" },
-	outputs = { "build/benchmarks_opt.exe" },
-	include_dirs = include_dirs,
-	dependencies = { benchmark_elf_library, build_dayan },
-}
-
-run_core_tests := {
-	name = "run core tests",
-	command_line = core_tests.executable,
-	inputs = { core_tests.executable },
-	outputs = {},
-	include_dirs = {},
-	dependencies = { core_tests.task },
-}
-
-run_tests := {
-	name = "run elf tests",
-	command_line = tests.executable,
-	inputs = { tests.executable },
-	outputs = {},
-	include_dirs = {},
-	dependencies = { tests.task },
-}
-
-run_optimized_benchmarks := {
-	name = "run optimized benchmarks",
-	command_line = "build/benchmarks_opt.exe",
-	inputs = { "build/benchmarks_opt.exe" },
-	outputs = {},
-	include_dirs = {},
-	dependencies = { optimized_benchmarks },
-}
 
 site_targets := elf.load_file("site/site.elf")
 elf.assert(elf.type_of(site_targets) == "table", "site/site.elf must return its targets")
 
+options := {
+	workers = 4,
+	verbosity = 0,
+}
+
 entries := {}
 
 entries.lib = fun() {
-	ret manny.build({
-		targets = { elf_library, batteries_library, build_dayan },
-		options = build_options,
-	})
+	ret manny.build({ targets = { tasks.default_task }, options = options })
 }
 
 entries.build = fun() {
 	ret manny.build({
-		targets = { public_header_test.task, core_tests.task, tests.task, benchmarks.task, bytecode_tool.task, elf_runner.task },
-		options = build_options,
+		targets = {
+			tasks.targets.public_header_test,
+			tasks.targets.core_tests,
+			tasks.targets.tests,
+			tasks.targets.benchmarks,
+			tasks.targets.bytecode_tool,
+			tasks.targets.elf_runner,
+		},
+		options = options,
 	})
 }
 
 entries.test = fun() {
 	ret manny.build({
-		targets = { public_header_test.task, run_core_tests, run_tests },
-		options = build_options,
+		targets = {
+			tasks.targets.public_header_test,
+			tasks.targets.run_core_tests,
+			tasks.targets.run_tests,
+		},
+		options = options,
 	})
 }
 
 entries.benchmark = fun() {
-	ret manny.build({
-		targets = { run_optimized_benchmarks },
-		options = build_options,
-	})
+	ret manny.build({ targets = { tasks.targets.run_optimized_benchmarks }, options = options })
 }
 
 entries.site = fun() {
-	ret manny.build({
-		targets = site_targets,
-		options = build_options,
-	})
+	ret manny.build({ targets = site_targets, options = options })
 }
 
 ret entries
