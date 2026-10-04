@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#include <dayan.h>
+#include <dy.h>
 
 typedef struct
 {
@@ -22,19 +22,19 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	result.state = elf_create_state();
 
 	elf_StrSlice source = {};
-	day_File_Info info;
-	day_File file = {0};
-	if (!day_get_file_info(day_string_from_cstring(path), &info).error && !info.is_directory)
-		day_access_file(day_string_from_cstring(path), DAY_FILE_OPEN_EXISTING,
-			DAY_FILE_READ | DAY_FILE_SHARE_READ, &file);
-	if (day_file_is_valid(file))
+	dy_File_Info info;
+	dy_File file = {0};
+	if (!dy_get_file_info(dy_string_from_cstring(path), &info).error && !info.is_directory)
+		dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
+			DY_FILE_READ | DY_FILE_SHARE_READ, &file);
+	if (dy_file_is_valid(file))
 	{
 		u64 size = info.size;
 		char *data = elf_arena_push(&result.state->arena, size + 16);
 		zero_memory(data + size, 16);
-		day_u64 read = 0;
-		day_Result read_result = day_read_file(file, data, size, &read);
-		day_close_file(file);
+		dy_u64 read = 0;
+		dy_Result read_result = dy_read_file(file, data, size, &read);
+		dy_close_file(file);
 		if (read_result.error || read != size) size = 0;
 
 		source.data = data;

@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#include <dayan.h>
+#include <dy.h>
 
 static const char *runtime_error_type_names[] =
 {
@@ -144,10 +144,10 @@ static void print_runtime_error_location(RuntimeSourceLocation location)
 static void abort_after_runtime_error(void)
 {
 #if defined(_DEBUG) && defined(ELF_DEBUG_BREAK_ON_RUNTIME_ERROR)
-	day_debug_break();
+	dy_debug_break();
 #endif
 	log_line(LOG_LEVEL_FATAL, "elf is exiting...");
-	day_exit_process(1);
+	dy_exit_process(1);
 }
 
 static void report_runtime_error_message(elf_State *state, RuntimeErrorType error, int instr, const char *message)

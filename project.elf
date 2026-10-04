@@ -1,5 +1,5 @@
-dayan := elf.load_file("dayan-core/project.elf")
-dayan.root = "dayan-core"
+dy := elf.load_file("dy-core/project.elf")
+dy.root = "dy-core"
 
 internal_include_directories := {
 	"src",
@@ -37,7 +37,7 @@ library := {
 		"include",
 	},
 	dependencies = {
-		dayan,
+		dy,
 	},
 }
 
@@ -137,7 +137,7 @@ ret {
 	name = "elf",
 	root = ".",
 	subprojects = {
-		dayan = dayan,
+		dy = dy,
 	},
 	default_target = batteries,
 	targets = {

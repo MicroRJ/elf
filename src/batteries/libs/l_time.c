@@ -4,27 +4,27 @@
 
 ELF_FUNCTION(lib_time_counter)
 {
-	elf_push_int(S, (elf_Int)day_counter());
+	elf_push_int(S, (elf_Int)dy_counter());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_frequency)
 {
-	elf_push_int(S, (elf_Int)day_counter_frequency());
+	elf_push_int(S, (elf_Int)dy_counter_frequency());
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_elapsed)
 {
 	i64 start = lib_load_integer(S, 1);
-	f64 elapsed = (day_counter() - start) / (f64)day_counter_frequency();
+	f64 elapsed = (dy_counter() - start) / (f64)dy_counter_frequency();
 	elf_push_num(S, elapsed);
 	return 1;
 }
 
 ELF_FUNCTION(lib_time_sleep)
 {
-	day_sleep((day_u64)lib_load_integer(S, 1));
+	dy_sleep((dy_u64)lib_load_integer(S, 1));
 	return 0;
 }
 

@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#include <dayan.h>
+#include <dy.h>
 
 typedef enum
 {
@@ -42,8 +42,8 @@ static void log_write(LogLevel level, const char *message)
 	static b32 console_colors_enabled;
 	if (!console_colors_enabled)
 	{
-		day_enable_console_colors(DAY_STANDARD_OUTPUT);
-		day_enable_console_colors(DAY_STANDARD_ERROR);
+		dy_enable_console_colors(DY_STANDARD_OUTPUT);
+		dy_enable_console_colors(DY_STANDARD_ERROR);
 		console_colors_enabled = 1;
 	}
 

@@ -10,7 +10,7 @@ on:
       - "build.elf"
       - "project.elf"
       - "bootstrap/windows-x64/**"
-      - "dayan-core"
+      - "dy-core"
       - ".gitmodules"
       - ".github/workflows/pages.yml"
   workflow_dispatch:

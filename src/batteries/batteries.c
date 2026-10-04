@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <dayan.h>
+#include <dy.h>
 
 #undef ELF_VERSION
 #include "elf_batteries.h"
@@ -25,20 +25,20 @@
 static elf_StrSlice battery_source_buffer_from_file(const char *name)
 {
 	elf_StrSlice source = {0};
-	day_File_Info info;
-	if (day_get_file_info(day_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
-	day_File file;
-	if (day_access_file(day_string_from_cstring(name), DAY_FILE_OPEN_EXISTING,
-		DAY_FILE_READ | DAY_FILE_SHARE_READ, &file).error) return source;
+	dy_File_Info info;
+	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
+	dy_File file;
+	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
+		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return source;
 
 	char *data = calloc(1, (size_t)info.size + 16);
 	if (!data) {
-		day_close_file(file);
+		dy_close_file(file);
 		return source;
 	}
-	day_u64 read = 0;
-	day_Result read_result = day_read_file(file, data, info.size, &read);
-	day_close_file(file);
+	dy_u64 read = 0;
+	dy_Result read_result = dy_read_file(file, data, info.size, &read);
+	dy_close_file(file);
 	if (read_result.error || read != info.size) {
 		free(data);
 		return source;

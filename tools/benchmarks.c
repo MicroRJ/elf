@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "elf.h"
-#include <dayan.h>
+#include <dy.h>
 
 #include "base.h"
 #include "core.h"
@@ -21,13 +21,13 @@ static void bench_require(b32 condition, const char *message)
 
 static i64 bench_now(void)
 {
-	return (i64)day_counter();
+	return (i64)dy_counter();
 }
 
 static double bench_elapsed_s(i64 start)
 {
-	i64 elapsed = (i64)day_counter() - start;
-	return elapsed / (double)day_counter_frequency();
+	i64 elapsed = (i64)dy_counter() - start;
+	return elapsed / (double)dy_counter_frequency();
 }
 
 static elf_Value bench_string_key(elf_State *state, const char *text)

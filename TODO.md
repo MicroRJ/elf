@@ -45,7 +45,7 @@ here instead of scattering `TODO` comments through the source.
 
 ## Release readiness
 
-- [ ] Use dayan's base types internally instead of maintaining duplicate aliases.
+- [ ] Use dy's base types internally instead of maintaining duplicate aliases.
 
 - [x] Make state destruction complete and leak-free.
   - Free every GC object, including table entry and array storage.
@@ -88,7 +88,7 @@ here instead of scattering `TODO` comments through the source.
     return `nil` for a parsed operation with no implementation.
   - Add success or rejection tests before describing a construct in the grammar.
 
-- [x] Replace the `platform` submodule with `dayan-core`.
+- [x] Replace the `platform` submodule with `dy-core`.
 
 - [ ] Establish reproducible debug and release builds.
   - Build core, batteries, and the CLI in both configurations.

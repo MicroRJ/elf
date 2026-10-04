@@ -1,3 +1,3 @@
-[submodule "dayan-core"]
-	path = dayan-core
-	url = https://github.com/MicroRJ/dayan-core.git
+[submodule "dy-core"]
+	path = dy-core
+	url = https://github.com/MicroRJ/dy-core.git
