@@ -25,7 +25,7 @@ static Token lexer_next(Parser *parser)
 	return lex_token(&parser->lexer);
 }
 
-static void expect_token_type(Token token, TokenType type, const char *label)
+static void expect_token_type(Token token, Token_Type type, const char *label)
 {
 	if (token.type != type) {
 		fprintf(stderr, "FAIL: %s expected token %s, got %s\n",
@@ -359,6 +359,15 @@ static void test_lexer_format_string_parts(elf_State *state)
 	expect_token_type(empty_end, TOK_STRING_END, "lex interpolation at end of string");
 	expect_token_atom(empty_end, "", "empty trailing format text");
 
+	Parser many_parts = lexer_test_parser(state,
+		"f\"${a}${b}${c}${d}${e}${f}${g}${h}${i}${j}\"");
+	lexer_prime(&many_parts);
+	u32 many_part_count = 0;
+	while (lexer_next(&many_parts).type != TOK_NONE) many_part_count += 1;
+	if (many_part_count != 21) {
+		test_fail("formatted string grows the lexer token buffer");
+	}
+
 	Parser block = lexer_test_parser(state, "f\"\"\"top ${value}\r\nbottom\"\"\"");
 	lexer_prime(&block);
 
@@ -370,6 +379,21 @@ static void test_lexer_format_string_parts(elf_State *state)
 	Token block_end = lexer_next(&block);
 	expect_token_type(block_end, TOK_STRING_END, "lex format string block end");
 	expect_token_atom(block_end, "\nbottom", "format string block normalizes newline");
+
+	Parser backtick_block = lexer_test_parser(state, "f```<a href=\"${url}\">${label}</a>```");
+	lexer_prime(&backtick_block);
+
+	Token backtick_start = lexer_next(&backtick_block);
+	expect_token_type(backtick_start, TOK_STRING_START, "lex backtick format block start");
+	expect_token_atom(backtick_start, "<a href=\"", "backtick block keeps double quotes");
+	expect_token_atom(lexer_next(&backtick_block), "url", "backtick block first interpolation");
+	Token backtick_part = lexer_next(&backtick_block);
+	expect_token_type(backtick_part, TOK_STRING_PART, "lex backtick format block part");
+	expect_token_atom(backtick_part, "\">", "backtick block middle text");
+	expect_token_atom(lexer_next(&backtick_block), "label", "backtick block second interpolation");
+	Token backtick_end = lexer_next(&backtick_block);
+	expect_token_type(backtick_end, TOK_STRING_END, "lex backtick format block end");
+	expect_token_atom(backtick_end, "</a>", "backtick block trailing text");
 
 	Parser string_expr = lexer_test_parser(state, "f\"value ${\"text\"} done\"");
 	lexer_prime(&string_expr);

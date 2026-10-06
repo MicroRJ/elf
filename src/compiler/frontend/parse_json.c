@@ -9,7 +9,7 @@ static b32 json_token_is_null(Token token)
 	return token.type == TOK_IDENTIFIER && strcmp(atom_data(token.atom), "null") == 0;
 }
 
-static void json_expect_separator_or_end(Parser *parser, TokenType end, const char *message, b32 *done)
+static void json_expect_separator_or_end(Parser *parser, Token_Type end, const char *message, b32 *done)
 {
 	if (pick_token(parser, end))
 	{

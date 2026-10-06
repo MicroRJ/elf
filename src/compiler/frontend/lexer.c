@@ -6,7 +6,7 @@
 
 #include "source_diagnostics.c"
 
-static const char *token_type_name(TokenType type)
+static const char *token_type_name(Token_Type type)
 {
 	static const char *names[TOK_COUNT_] =
 	{
@@ -21,7 +21,7 @@ static const char *token_type_name(TokenType type)
 	return names[type];
 }
 
-static TokenType atom_is_word_or_macro(Atom *atom)
+static Token_Type atom_is_word_or_macro(Atom *atom)
 {
 	switch (atom->id) {
 #define MCITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
@@ -31,7 +31,7 @@ static TokenType atom_is_word_or_macro(Atom *atom)
 	}
 }
 
-static TokenType check_keyword(Atom *atom)
+static Token_Type check_keyword(Atom *atom)
 {
 	switch (atom->id) {
 #define KWITEM(NAME, SYM) case XFUSE(TOK_, NAME): return XFUSE(TOK_, NAME);
@@ -48,11 +48,11 @@ static u32 lexer_scratch_capacity(Lexer *lexer)
 
 enum { LEXER_EOF = -1 };
 
-static int lexer_peek(Lexer *lexer, const char *cursor, u32 lookahead)
+static inline int lexer_peek(Lexer *lexer, const char *cursor, u32 offset)
 {
 	ASSERT(cursor >= lexer->source.data && cursor <= lexer->end);
 	u64 remaining = (u64)(lexer->end - cursor);
-	return lookahead < remaining ? (u8)cursor[lookahead] : LEXER_EOF;
+	return offset < remaining ? (u8)cursor[offset] : LEXER_EOF;
 }
 
 static b32 is_identifier_start(char c)
@@ -92,6 +92,7 @@ static void lexer_init(Lexer *lexer, Compiler *compiler, Atom_Table *atoms)
 	lexer->end = compiler->source.data + compiler->source.size;
 	lexer->line_index = 1;
 	lexer->line_start = compiler->source.data;
+	lexer->tokens = (Lexer_TokenFIFO){0};
 }
 
 static void lexer_advance_line(Lexer *lexer, const char *line_start)
@@ -470,7 +471,7 @@ static u32 lex_identifier(Lexer *lexer, const char **cursor)
 	return (u32)(cur - start);
 }
 
-static Atom *lex_string_segment(Lexer *lexer, const char **cursor, SourceSite site, b32 is_block, b32 is_format, b32 *ended)
+static Atom *lex_string_segment(Lexer *lexer, const char **cursor, SourceSite site, char quote, b32 is_block, b32 is_format, b32 *ended)
 {
 	if (ended) *ended = false;
 
@@ -491,13 +492,13 @@ static Atom *lex_string_segment(Lexer *lexer, const char **cursor, SourceSite si
 			continue;
 		}
 
-		if (is_block && current == '"' && lexer_peek(lexer, cur, 1) == '"' && lexer_peek(lexer, cur, 2) == '"') {
+		if (is_block && current == quote && lexer_peek(lexer, cur, 1) == quote && lexer_peek(lexer, cur, 2) == quote) {
 			cur += 3;
 			if (ended) *ended = true;
 			break;
 		}
 
-		if (!is_block && current == '"') {
+		if (!is_block && current == quote) {
 			cur += 1;
 			if (ended) *ended = true;
 			break;
@@ -623,39 +624,104 @@ static b32 lexer_skip_trivia(Lexer *lexer, const char **cursor)
 	return line_break;
 }
 
-static Token lex_token(Lexer *lexer)
+// TODO(RJ): proper allocation!
+static void lexer_tokens_push(Lexer_TokenFIFO *tokens, elf_Arena *arena, Token token)
 {
+	if (tokens->count >= tokens->capacity)
+	{
+		u32 capacity = tokens->capacity ? tokens->capacity * 2 : 16;
+		Token *items = elf_arena_push(arena, sizeof(*items) * capacity);
+		if (tokens->count) copy_memory(items, tokens->items, sizeof(*items) * tokens->count);
+		tokens->items = items;
+		tokens->capacity = capacity;
+	}
+	tokens->items[tokens->count ++] = token;
+}
+
+static Token lex_token(Lexer *lexer);
+
+static void lexer_format_string(Lexer *lexer, const char **cursor, Token opening, char quote, b32 is_block)
+{
+	Lexer worker = *lexer;
+	worker.cursor = *cursor;
+	worker.tokens = (Lexer_TokenFIFO){0};
+
+	u32 interpolation_count = 0;
+	SourceSite part_site = opening.site;
+	b32 line_break_before = opening.line_break_before;
+
+	for (;;)
+	{
+		const char *cur = worker.cursor;
+		b32 ended = false;
+		Atom *atom = lex_string_segment(&worker, &cur, opening.site, quote, is_block, true, &ended);
+		worker.cursor = cur;
+
+		Token part = {
+			.type = ended
+				? (interpolation_count ? TOK_STRING_END : TOK_STRING)
+				: (interpolation_count ? TOK_STRING_PART : TOK_STRING_START),
+			.site = part_site,
+			.line_break_before = line_break_before,
+			.atom = atom,
+		};
+		part.site.size = (u32)(cur - (worker.source.data + part.site.offset));
+		if (part.site.size == 0) part.site.size = 1;
+		lexer_tokens_push(&lexer->tokens, lexer->atoms->arena, part);
+
+		if (ended || cur >= worker.end) break;
+		interpolation_count += 1;
+
+		u32 brace_depth = 0;
+		Token closing = {0};
+		for (;;)
+		{
+			Token token = lex_token(&worker);
+			if (token.type == TOK_NONE)
+			{
+				if (!worker.failed) {
+					log_source_error(&worker, opening.site, "unterminated interpolated expression");
+				}
+				break;
+			}
+
+			if (token.type == TOK_RIGHT_BRACE && brace_depth == 0)
+			{
+				closing = token;
+				break;
+			}
+
+			lexer_tokens_push(&lexer->tokens, lexer->atoms->arena, token);
+			if (token.type == TOK_LEFT_BRACE) brace_depth += 1;
+			else if (token.type == TOK_RIGHT_BRACE) brace_depth -= 1;
+		}
+
+		if (closing.type == TOK_NONE) break;
+		part_site = closing.site;
+		line_break_before = closing.line_break_before;
+	}
+
+	*cursor = worker.cursor;
+	lexer->cursor = worker.cursor;
+	lexer->line_index = worker.line_index;
+	lexer->line_start = worker.line_start;
+	lexer->failed = lexer->failed || worker.failed;
+
+	ASSERT(lexer->tokens.count);
+}
+
+static void lex(Lexer *lexer)
+{
+	ASSERT(lexer->tokens.index == lexer->tokens.count);
+	lexer->tokens.index = 0;
+	lexer->tokens.count = 0;
+
 	const char *cur = lexer->cursor;
 	b32 line_break_before = lexer_skip_trivia(lexer, &cur);
 	Token token = {0};
 	token.type = TOK_NONE;
 	token.site = lexer_source_site(lexer, cur);
 	token.line_break_before = line_break_before;
-
-	if (lexer->mode.type == LEXER_MODE_INTERPOLATION && lexer_peek(lexer, cur, 0) == '}' && lexer->mode.depth == 0)
-	{
-		if (lexer->mode_index == 0) {
-			log_source_error(lexer, lexer->mode.string_site, "invalid interpolated string");
-		}
-
-		cur += 1;
-		b32 ended;
-		token.atom = lex_string_segment(lexer, &cur, lexer->mode.string_site, lexer->mode.is_block_string, true, &ended);
-		token.type = ended ? TOK_STRING_END : TOK_STRING_PART;
-
-		if (ended) {
-			if (lexer->mode_index <= 0) {
-				log_source_error(lexer, lexer->mode.string_site, "invalid interpolated string");
-				return token;
-			}
-			lexer->mode = lexer->mode_stack[-- lexer->mode_index];
-		}
-		else {
-			lexer->mode.depth              = 0;
-			lexer->mode.interpolation_site = source_site_from_ptr(lexer, cur);
-		}
-		goto update_lexer;
-	}
 
 	switch (lexer_peek(lexer, cur, 0))
 	{
@@ -669,31 +735,13 @@ static Token lex_token(Lexer *lexer)
 		case 'v': case 'w': case 'x': case 'y': case 'z':
 		case '_':
 		{
-			if (lexer_peek(lexer, cur, 0) == 'f' && lexer_peek(lexer, cur, 1) == '"')
+			u32 quote = lexer_peek(lexer, cur, 1);
+			if (lexer_peek(lexer, cur, 0) == 'f' && (quote == '"' || quote == '`'))
 			{
-				if (lexer->mode_index >= ARRAY_COUNT(lexer->mode_stack)) {
-					log_source_error(lexer, source_site_from_ptr(lexer, cur), "too many interpolated strings, limit: %i", ARRAY_COUNT(lexer->mode_stack));
-					return token;
-				}
-
-				SourceSite string_site = source_site_from_ptr(lexer, cur);
-
-				b32 is_block = lexer_peek(lexer, cur, 2) == '"' && lexer_peek(lexer, cur, 3) == '"';
+				b32 is_block = lexer_peek(lexer, cur, 2) == quote && lexer_peek(lexer, cur, 3) == quote;
 				cur += 2 + is_block * 2;
-
-				b32 ended;
-				token.atom = lex_string_segment(lexer, &cur, string_site, is_block, true, &ended);
-				token.type = ended ? TOK_STRING : TOK_STRING_START;
-				if (!ended)
-				{
-					lexer->mode_stack[lexer->mode_index ++] = lexer->mode;
-					lexer->mode.type = LEXER_MODE_INTERPOLATION;
-					lexer->mode.interpolation_site = source_site_from_ptr(lexer, cur);
-					lexer->mode.string_site = string_site;
-					lexer->mode.is_block_string = is_block;
-					lexer->mode.depth = 0;
-				}
-				break;
+				lexer_format_string(lexer, &cur, token, (char)quote, is_block);
+				return;
 			}
 			else
 			{
@@ -710,8 +758,7 @@ static Token lex_token(Lexer *lexer)
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
 		{
-			b32 is_decimal = !(lexer_peek(lexer, cur, 0) == '0' &&
-				(lexer_peek(lexer, cur, 1) == 'b' || lexer_peek(lexer, cur, 1) == 'x'));
+			b32 is_decimal = !(lexer_peek(lexer, cur, 0) == '0' && (lexer_peek(lexer, cur, 1) == 'b' || lexer_peek(lexer, cur, 1) == 'x'));
 			u64 value = lex_integer(lexer, &cur);
 
 			token.type = TOK_INTEGER;
@@ -748,11 +795,13 @@ static Token lex_token(Lexer *lexer)
 			}
 		} break;
 
+		case '`':
 		case '"':
 		{
-			b32 is_block = lexer_peek(lexer, cur, 1) == '"' && lexer_peek(lexer, cur, 2) == '"';
+			char quote = lexer_peek(lexer, cur, 0);
+			b32 is_block = lexer_peek(lexer, cur, 1) == quote && lexer_peek(lexer, cur, 2) == quote;
 			cur += is_block ? 3 : 1;
-			token.atom = lex_string_segment(lexer, &cur, token.site, is_block, false, 0);
+			token.atom = lex_string_segment(lexer, &cur, token.site, quote, is_block, false, 0);
 			token.type = TOK_STRING;
 		} break;
 
@@ -807,24 +856,8 @@ static Token lex_token(Lexer *lexer)
 		case ')': token.type = TOK_PAREN_RIGHT;  cur += 1; break;
 		case ',': token.type = TOK_COMMA;        cur += 1; break;
 
-		case '{':
-		{
-			cur += 1;
-			token.type = TOK_LEFT_BRACE;
-			if (lexer->mode.type == LEXER_MODE_INTERPOLATION) {
-				lexer->mode.depth ++;
-			}
-		}
-		break;
-		case '}':
-		{
-			cur += 1;
-			token.type = TOK_RIGHT_BRACE;
-			if (lexer->mode.type == LEXER_MODE_INTERPOLATION) {
-				lexer->mode.depth --;
-			}
-		}
-		break;
+		case '{': token.type = TOK_LEFT_BRACE;  cur += 1; break;
+		case '}': token.type = TOK_RIGHT_BRACE; cur += 1; break;
 
 		case '%':
 		{
@@ -1016,12 +1049,12 @@ static Token lex_token(Lexer *lexer)
 			cur += 1;
 			token.type = TOK_MUL;
 			if (lexer_peek(lexer, cur, 0) == '=') {
-				cur += 1;
 				token.type = TOK_MUL_ASSIGN;
+				cur += 1;
 			}
 			else if (lexer_peek(lexer, cur, 0) == '*') {
-				cur += 1;
 				token.type = TOK_POW;
+				cur += 1;
 			}
 		} break;
 
@@ -1048,7 +1081,13 @@ static Token lex_token(Lexer *lexer)
 		token.site.size = 1;
 	}
 
-	update_lexer:
 	lexer->cursor = cur;
-	return token;
+	lexer_tokens_push(&lexer->tokens, lexer->atoms->arena, token);
+}
+
+static Token lex_token(Lexer *lexer)
+{
+	if (lexer->tokens.index == lexer->tokens.count) lex(lexer);
+	ASSERT(lexer->tokens.index < lexer->tokens.count);
+	return lexer->tokens.items[lexer->tokens.index ++];
 }

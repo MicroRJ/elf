@@ -122,18 +122,19 @@ typedef enum
 #undef XPAND
 	TOK_COUNT_,
 }
-TokenType;
+Token_Type;
 
-static const char *token_type_name(TokenType type);
+static const char *token_type_name(Token_Type type);
 
 typedef struct
 {
-	TokenType    type;
+	Token_Type  type;
 	SourceSite  site;
-	unsigned int line_break_before: 1;
-	union {
-		u64 integer_magnitude;
-		f64 number;
+	b32         line_break_before;
+	union
+	{
+		u64   integer_magnitude;
+		f64   number;
 		Atom *atom;
 	};
 }

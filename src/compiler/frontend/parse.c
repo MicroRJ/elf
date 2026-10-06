@@ -19,7 +19,7 @@ static Ast parse_json_ast_value(Parser *parser);
 static u32 parse_call_args(Parser *parser);
 
 
-static AstType binary_ast_expr_type_from_token_type(TokenType type)
+static AstType binary_ast_expr_type_from_token_type(Token_Type type)
 {
 	switch (type)
 	{
@@ -49,7 +49,7 @@ static AstType binary_ast_expr_type_from_token_type(TokenType type)
 	}
 }
 
-static AstType compound_assign_ast_type_from_token_type(TokenType type)
+static AstType compound_assign_ast_type_from_token_type(Token_Type type)
 {
 	switch (type)
 	{
@@ -161,7 +161,7 @@ static void parser_unexpected_token(Parser *parser, Token token)
 	,	"unexpected token '%s'", token_type_name(token.type));
 }
 
-static void parser_expected_token(Parser *parser, Token token, TokenType expected)
+static void parser_expected_token(Parser *parser, Token token, Token_Type expected)
 {
 	parser_errorf(parser, ERROR_EXPECTED_TOKEN, token.site
 	,	"expected '%s', got '%s'", token_type_name(expected), token_type_name(token.type));
@@ -235,12 +235,12 @@ static void reposition_parser(Parser *par, const char *cursor)
 	consume_token(par);
 }
 
-static inline b32 peek_token(Parser *parser, TokenType type)
+static inline b32 peek_token(Parser *parser, Token_Type type)
 {
 	return parser->tok.type == type;
 }
 
-static inline b32 pick_token(Parser *parser, TokenType type)
+static inline b32 pick_token(Parser *parser, Token_Type type)
 {
 	if (peek_token(parser, type)) {
 		consume_token(parser);
@@ -249,7 +249,7 @@ static inline b32 pick_token(Parser *parser, TokenType type)
 	return false;
 }
 
-static Token take_token(Parser *parser, TokenType type)
+static Token take_token(Parser *parser, Token_Type type)
 {
 	Token tok = parser->tok;
 
@@ -260,7 +260,7 @@ static Token take_token(Parser *parser, TokenType type)
 	return tok;
 }
 
-static inline b32 peek_next_token(Parser *parser, TokenType type)
+static inline b32 peek_next_token(Parser *parser, Token_Type type)
 {
 	return parser->tok_prox.type == type;
 }
@@ -372,7 +372,7 @@ static Ast parse_function(Parser *par)
 	return function;
 }
 
-static b32 token_ends_expression(TokenType type)
+static b32 token_ends_expression(Token_Type type)
 {
 	switch (type)
 	{

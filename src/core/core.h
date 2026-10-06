@@ -8,29 +8,7 @@
 
 #include "bytecode.h"
 
-typedef struct
-{
-	const char *data;
-	u32         size;
-}
-SourceBuffer;
-
-typedef struct
-{
-	u32 offset;
-	u32 size;
-	u32 line_offset;
-	u32 line_index;
-}
-SourceSite;
-
-typedef struct
-{
-	u32        byte_start;
-	u32        byte_end;
-	SourceSite site;
-}
-SourceMapEntry;
+#include "source.h"
 
 typedef struct elf_Object  elf_Object;
 typedef struct elf_String  elf_String;
@@ -44,6 +22,7 @@ typedef struct elf_Value   elf_Value;
 #include "string/elf_string.h"
 #include "table/table.h"
 
+// TODO(RJ): this needs to be defined else-where!
 typedef struct BcFunction BcFunction;
 struct BcFunction
 {
