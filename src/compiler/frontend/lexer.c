@@ -55,32 +55,19 @@ static inline int lexer_peek(Lexer *lexer, const char *cursor, u32 offset)
 	return offset < remaining ? (u8)cursor[offset] : LEXER_EOF;
 }
 
-static b32 is_identifier_start(char c)
+static b32 is_identifier_start(u32 c)
 {
 	return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_';
 }
 
-static b32 is_identifier_continue(char c)
+static b32 is_identifier_continue(u32 c)
 {
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static b32 lexer_is_hex_digit(char c)
+static b32 lexer_is_hex_digit(u32 c)
 {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
-
-static u32 lexer_hex_digit(char c)
-{
-	if (c >= '0' && c <= '9')
-	{
-		return (u32)(c - '0');
-	}
-	if (c >= 'a' && c <= 'f')
-	{
-		return 10 + (u32)(c - 'a');
-	}
-	return 10 + (u32)(c - 'A');
 }
 
 static void lexer_init(Lexer *lexer, Compiler *compiler, Atom_Table *atoms)
@@ -130,6 +117,13 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 	compiler_reportv(lexer->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER, site, fmt, args);
 	va_end(args);
 	lexer->failed = true;
+}
+
+static u32 lexer_hex_digit(u32 c)
+{
+	if (c >= '0' && c <= '9') return  0 + (u32)(c - '0');
+	if (c >= 'a' && c <= 'f') return 10 + (u32)(c - 'a');
+	return 10 + (u32)(c - 'A');
 }
 
 static b32 lexer_parse_hex_codepoint(Lexer *lexer, const char **cursor, u32 digits, SourceSite site, u32 *out)

@@ -79,4 +79,15 @@ test_assert(",":join({"a", "", "c"}) == "a,,c")
 test_assert("/":join({}) == "")
 test_assert("/":join({"only"}) == "only")
 
-ret 88
+test_assert("    alpha\n      beta":dedent() == "alpha\n  beta")
+test_assert("\n    alpha\n        beta\n    gamma\n":dedent() == "alpha\n    beta\ngamma")
+test_assert("  alpha\n    \n  beta":dedent() == "alpha\n\nbeta")
+test_assert("  alpha\r\n  beta":dedent() == "alpha\r\nbeta")
+test_assert("plain":dedent() == "plain")
+
+dedent_name := "elf"
+test_assert(f"""
+    hello ${dedent_name}
+""":dedent() == "hello elf")
+
+ret 94

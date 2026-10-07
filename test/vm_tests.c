@@ -186,7 +186,7 @@ static void test_vm_script_sys_assertions(void)
 
 static void test_vm_script_string_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_strings.elf", 88, "vm runs counted string library assertions");
+	vm_expect_int("test/smoke/script_assert_strings.elf", 94, "vm runs counted string library assertions");
 }
 
 static void test_vm_script_table_lib_assertions(void)

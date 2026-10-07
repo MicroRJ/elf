@@ -1,6 +1,1 @@
-
-hello := fun() {
-	elf.printl("Hello, World!")
-}
-
-hello()
+elf.println("Hello, World!")

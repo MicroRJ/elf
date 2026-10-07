@@ -69,6 +69,7 @@ path := "/":join({"src", "core", "vm.c"})
 
 ```elf
 "  hello \n":trim()                  // "hello"
+"    one\n      two":dedent()         // "one\n  two"
 "elf":lower()                        // "elf"
 "elf":upper()                        // "ELF"
 "one two one":replace("one", "1") // "1 two 1"
@@ -78,9 +79,23 @@ path := "/":join({"src", "core", "vm.c"})
 Case conversion is ASCII-only. `replace` changes every non-overlapping match.
 The target for `replace` and separator for `split` cannot be empty.
 
+`dedent` removes one blank first and last line, then removes the exact space/tab
+prefix shared by every non-blank line. It runs after interpolation because it
+operates on the final string value.
+
+```elf
+name := "elf"
+text := f"""
+    hello ${name}
+        indented
+""":dedent()
+
+assert(text == "hello elf\n    indented")
+```
+
 ## Complete list
 
 ```text
 length size byte slice compare starts_with ends_with contains glob_match find
-split lines trim lower upper replace repeat join
+split lines trim dedent lower upper replace repeat join
 ```
