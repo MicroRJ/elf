@@ -43,6 +43,10 @@ entries.test = fun() {
 	})
 }
 
+entries.optimized = fun() {
+	ret manny.build({ targets = { tasks.targets.optimized_library }, options = options })
+}
+
 entries.benchmark = fun() {
 	ret manny.build({ targets = { tasks.targets.run_optimized_benchmarks }, options = options })
 }
