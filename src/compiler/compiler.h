@@ -3,7 +3,6 @@
 //
 
 typedef struct Compiler Compiler;
-typedef struct StaticModule StaticModule;
 
 struct Compiler
 {
@@ -17,7 +16,6 @@ struct Compiler
 	u32             error_count;
 	u32             warning_count;
 	b32             log_diagnostics;
-	StaticModule    *static_module;
 };
 
 Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source);

@@ -50,8 +50,41 @@ typedef enum
 	ENTITY_INVALID = 0,
 	ENTITY_DIRECTORY,
 	ENTITY_LOCAL_DECLARATION,
+	ENTITY_STATIC_DECLARATION,
 }
 EntityType;
+
+typedef enum
+{
+	STATIC_SYMBOL_UNRESOLVED,
+	STATIC_SYMBOL_RESOLVING,
+	STATIC_SYMBOL_RESOLVED,
+}
+StaticSymbolState;
+
+typedef enum
+{
+	STATIC_VALUE_INVALID,
+	STATIC_VALUE_NIL,
+	STATIC_VALUE_INTEGER,
+	STATIC_VALUE_NUMBER,
+	STATIC_VALUE_STRING,
+	STATIC_VALUE_FUNCTION,
+}
+StaticValueKind;
+
+typedef struct
+{
+	StaticValueKind kind;
+	union
+	{
+		i64   integer;
+		f64   number;
+		Atom *string;
+		Ir    function;
+	};
+}
+StaticValue;
 
 typedef u32 EntityId;
 
@@ -83,6 +116,7 @@ struct FnLowerScope
 	FnLowerScope *parent;
 	IrFunction   *function;
 	EntityId      scope_start;
+	b32           is_static;
 };
 
 typedef struct ScopeEntity
@@ -93,6 +127,9 @@ typedef struct ScopeEntity
 	Atom    *name;
 	SourceSite   site;
 	Ir           memory_ir;
+	Ast          static_expr;
+	StaticSymbolState static_state;
+	StaticValue  static_value;
 }
 ScopeEntity;
 

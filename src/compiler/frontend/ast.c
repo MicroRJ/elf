@@ -204,11 +204,10 @@ static Ast create_block_ast(Parser *par, SourceSite site, Ast *stats, u32 nstats
 	return tree;
 }
 
-static Ast create_file_ast(Parser *par, SourceSite site, Ast body, AstArray static_decls)
+static Ast create_file_ast(Parser *par, SourceSite site, Ast body)
 {
 	Ast tree = create_ast(par, site, AST_FILE);
 	tree->file.body = body;
-	tree->file.static_decls = static_decls;
 	return tree;
 }
 

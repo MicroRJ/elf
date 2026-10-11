@@ -340,6 +340,97 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
+static void test_ir_lowers_static_forward_reference(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: 42\nret first");
+	Ir body = ir_test_main_body(ctx);
+	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static declarations emit no runtime statements");
+	expect_ir_i64(ret ? ret->ir_return.expr : 0, 42, "static forward reference resolves to literal ir");
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_lowers_block_static_scope(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nlocal :: later\nlater :: 48\nx := local * 2\n}\nret root");
+	Ir body = ir_test_main_body(ctx);
+	Ir nested = ir_test_body_stat(body, 0, IR_BLOCK, "nested static scope lowers to runtime block");
+	Ir local = ir_test_body_stat(nested, 0, IR_LOCAL, "nested static declarations emit no runtime statements");
+	Ir mul = local ? local->ir_local.expr : 0;
+	expect_ir_kind(mul, IR_MUL, "nested static value participates in runtime expression");
+	expect_ir_i64(mul ? mul->ir_binary.x : 0, 48, "nested static forward reference resolves in its block");
+	expect_ir_i64(mul ? mul->ir_binary.y : 0, 2, "nested runtime expression keeps rhs");
+	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "outer static remains visible after nested scope");
+	expect_ir_i64(ret ? ret->ir_return.expr : 0, 7, "nested static scope does not replace outer binding");
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "foo :: fun() { ret bar() }\nbar :: fun() { ret foo() }\nret foo");
+	if (!ctx || ctx->num_functions != 3)
+	{
+		test_fail("mutually recursive statics lower two functions");
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	Ir main_ret = ir_test_body_stat(ctx->functions[0].body, 0, IR_RETURN, "main returns static function");
+	Ir foo_value = main_ret ? main_ret->ir_return.expr : 0;
+	expect_ir_kind(foo_value, IR_FUNCTION, "static function lowers directly to function ir");
+	if (foo_value && foo_value->ir_function.index != 1) {
+		test_fail("main static function value points to foo");
+	}
+
+	Ir foo_ret = ir_test_body_stat(ctx->functions[1].body, 0, IR_RETURN, "foo lowers return");
+	Ir foo_call = foo_ret ? foo_ret->ir_return.expr : 0;
+	expect_ir_kind(foo_call, IR_CALL, "foo calls bar");
+	Ir bar_value = foo_call ? foo_call->ir_call.expr : 0;
+	expect_ir_kind(bar_value, IR_FUNCTION, "foo resolves bar statically");
+	if (bar_value && bar_value->ir_function.index != 2) {
+		test_fail("foo points to bar function");
+	}
+
+	Ir bar_ret = ir_test_body_stat(ctx->functions[2].body, 0, IR_RETURN, "bar lowers return");
+	Ir bar_call = bar_ret ? bar_ret->ir_return.expr : 0;
+	expect_ir_kind(bar_call, IR_CALL, "bar calls foo");
+	Ir recursive_foo = bar_call ? bar_call->ir_call.expr : 0;
+	expect_ir_kind(recursive_foo, IR_FUNCTION, "bar resolves foo statically");
+	if (recursive_foo && recursive_foo->ir_function.index != 1) {
+		test_fail("bar points back to foo function");
+	}
+	if (ctx->functions[1].capture_count || ctx->functions[2].capture_count) {
+		test_fail("static function references do not create captures");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_rejects_static_cycle(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: first\nret first");
+	log_set_hook(0, 0);
+	if (!ctx || ctx->compiler->error_count != 1) {
+		test_fail("static cycle reports one lowering error");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_rejects_static_function_runtime_capture(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "outer := 1\n{\nf :: fun() { ret outer }\nret f\n}");
+	log_set_hook(0, 0);
+	if (!ctx || ctx->compiler->error_count != 1) {
+		test_fail("static function cannot capture a runtime local");
+	}
+	elf_arena_destroy(&arena);
+}
+
 static void test_ir_lowers_get_mem_macro(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -368,5 +459,10 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_nil_assign(state);
 	test_ir_lowers_nil_assign_field_once(state);
 	test_ir_lowers_function_expression(state);
+	test_ir_lowers_static_forward_reference(state);
+	test_ir_lowers_block_static_scope(state);
+	test_ir_lowers_mutually_recursive_static_functions(state);
+	test_ir_rejects_static_cycle(state);
+	test_ir_rejects_static_function_runtime_capture(state);
 	test_ir_lowers_get_mem_macro(state);
 }

@@ -127,8 +127,7 @@ struct Ast_T
 
 		struct
 		{
-			Ast      body;
-			AstArray static_decls;
+			Ast body;
 		}
 		file;
 

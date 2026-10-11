@@ -515,6 +515,22 @@ static void test_backend_formats_bytecode_function(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_compiles_static_functions(void)
+{
+	BackendCompileResult result = backend_test_compile_source(
+		"foo :: fun() { ret bar() }\n"
+		"bar :: fun() { ret foo() }\n"
+		"ret foo\n");
+
+	if (!bc_function_ref_is_valid(result.function)) {
+		test_fail("backend compiles mutually recursive static functions");
+	}
+	else if (result.function.module->bytecode_function_count != 3) {
+		test_fail("backend emits both mutually recursive static functions");
+	}
+	backend_test_destroy(result);
+}
+
 static void run_backend_tests(void)
 {
 	test_backend_source_map();
@@ -533,4 +549,5 @@ static void run_backend_tests(void)
 	test_backend_logical_expr_delays_result_slot();
 	test_backend_if_else_restores_stack_top();
 	test_backend_formats_bytecode_function();
+	test_backend_compiles_static_functions();
 }

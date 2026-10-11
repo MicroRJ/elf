@@ -257,6 +257,26 @@ static void test_vm_fib(void)
 	vm_expect_int("test/smoke/fib.elf", 55, "vm runs recursive fibonacci");
 }
 
+static void test_vm_static_function(void)
+{
+	elf_State *state = elf_create_state();
+	char source_text[] = "answer :: fun() { ret 42 }\nret answer()";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (elf_push_code_source(state, "static-function", source, 0) != ELF_ERROR_NONE)
+	{
+		test_fail("static function source compiles");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	if (!value_is_integer(state->stack_ptr[-1]) || value_as_integer(state->stack_ptr[-1]) != 42) {
+		test_fail("static function executes through the VM");
+	}
+	elf_destroy_state(state);
+}
+
 static void test_vm_compiled_closure_keeps_function_identity(void)
 {
 	elf_State *state = elf_create_state();
@@ -530,6 +550,7 @@ static void run_vm_tests(void)
 	test_vm_string_join();
 	test_vm_interpolated_strings();
 	test_vm_fib();
+	test_vm_static_function();
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
 	test_vm_module_builder_grows_constant_arrays();

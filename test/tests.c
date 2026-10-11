@@ -12,7 +12,6 @@
 #include "token.h"
 #include "ast.h"
 #include "parser.h"
-#include "static_module.h"
 #include "ir.h"
 #include "lower.h"
 #include "bytecode_debug.h"
@@ -26,7 +25,6 @@
 #include "ast.c"
 #include "parse.c"
 #include "parse_json.c"
-#include "static_module.c"
 #include "ir.c"
 #include "lower.c"
 #include "bytecode_gen.h"
@@ -47,7 +45,6 @@ static void test_fail(const char *label)
 #include "arena_tests.c"
 #include "lexer_tests.c"
 #include "parser_tests.c"
-#include "static_module_tests.c"
 #include "json_tests.c"
 #include "unparse_tests.c"
 #include "ir_tests.c"
@@ -75,7 +72,6 @@ int main(void)
 	run_arena_tests();
 	run_lexer_tests(state);
 	run_parser_tests(state);
-	run_static_module_tests(state);
 	run_json_tests(state);
 	run_unparse_tests(state);
 	run_ir_tests(state);
