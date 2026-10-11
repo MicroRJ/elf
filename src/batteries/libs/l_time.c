@@ -22,6 +22,12 @@ ELF_FUNCTION(lib_time_elapsed)
 	return 1;
 }
 
+ELF_FUNCTION(lib_time_unix_ms)
+{
+	elf_push_int(S, (elf_Int)dy_unix_time_ms());
+	return 1;
+}
+
 ELF_FUNCTION(lib_time_sleep)
 {
 	dy_sleep((dy_u64)lib_load_integer(S, 1));
@@ -32,6 +38,7 @@ static const Battery_Binding l_time[] = {
 	{"counter",   lib_time_counter},
 	{"frequency", lib_time_frequency},
 	{"elapsed",   lib_time_elapsed},
+	{"unix_ms",   lib_time_unix_ms},
 	{"sleep",     lib_time_sleep},
 };
 

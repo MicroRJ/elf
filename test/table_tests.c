@@ -243,6 +243,7 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	elf_Value time_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "time"));
 	expect_table_value(time_value, "elf.time is a table");
 	expect_function_value(elf_table_get_or_nil(state, value_as_table(time_value), test_key_string(state, "elapsed")), "elf.time.elapsed is a field function");
+	expect_function_value(elf_table_get_or_nil(state, value_as_table(time_value), test_key_string(state, "unix_ms")), "elf.time.unix_ms is a field function");
 
 	elf_Value random_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "random"));
 	expect_table_value(random_value, "elf.random is a table");

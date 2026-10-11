@@ -4,6 +4,10 @@ fs := elf.fs
 path_lib := elf.path
 env := elf.env
 
+unix_ms := elf.time.unix_ms()
+test_assert(elf.type_of(unix_ms) == "integer")
+test_assert(unix_ms > 0)
+
 env_name := "ELF_SMOKE_ENV_7F31"
 env.unset(env_name)
 test_assert(env.has(env_name) == 0)
