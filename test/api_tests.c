@@ -123,6 +123,18 @@ static void test_api_tables_and_refs(elf_State *state)
 	elf_set_top(state, checkpoint);
 }
 
+static void test_api_string_length(elf_State *state)
+{
+	elf_Index checkpoint = elf_get_top(state);
+	elf_push_str(state, "elf\0lang", 8);
+	elf_u32 length = 0;
+	if (!elf_length(state, -1, &length) || length != 8)
+	{
+		test_fail("API reads string byte length");
+	}
+	elf_set_top(state, checkpoint);
+}
+
 static void test_api_errors(elf_State *state)
 {
 	elf_Index checkpoint = elf_get_top(state);
@@ -650,6 +662,7 @@ static void run_api_tests(void)
 	elf_State *state = elf_create_state();
 	test_api_call_addressing(state);
 	test_api_tables_and_refs(state);
+	test_api_string_length(state);
 	test_api_errors(state);
 	test_api_buffers(state);
 	test_api_user_objects(state);

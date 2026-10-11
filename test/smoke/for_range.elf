@@ -99,4 +99,13 @@ for item := get_values()[... 3] ? {
 test_assert(prefix_sum == 23)
 test_assert(elf.source_calls == 4)
 
+string_sum := 0
+string_count := 0
+for byte := "Elf"[...] ? {
+	string_sum += byte
+	string_count += 1
+}
+test_assert(string_sum == 279)
+test_assert(string_count == 3)
+
 ret sum

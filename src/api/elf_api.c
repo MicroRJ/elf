@@ -389,11 +389,12 @@ void elf_new_table(elf_State *state)
 elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length)
 {
 	elf_Value *value = value_at(state, index);
-	if (!length || !value) return false;
-	if (value_is_table(*value)) *length = elf_array_length(value_as_table(*value));
-	else if (value_is_buffer(*value)) *length = value_as_buffer(*value)->size;
-	else return false;
-	return true;
+	elf_Bool result = false;
+	if (length && value)
+	{
+		result = value_length(*value, length);
+	}
+	return result;
 }
 
 elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field)

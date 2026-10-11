@@ -26,6 +26,32 @@ static inline const char *value_name(elf_Value value)
 	return value_type_name(value.type);
 }
 
+static inline b32 value_length(elf_Value value, u32 *length)
+{
+	b32 result = true;
+	if (!length)
+	{
+		result = false;
+	}
+	else if (value_is_table(value))
+	{
+		*length = elf_array_length(value_as_table(value));
+	}
+	else if (value_is_string(value))
+	{
+		*length = string_size(value_as_string(value));
+	}
+	else if (value_is_buffer(value))
+	{
+		*length = value_as_buffer(value)->size;
+	}
+	else
+	{
+		result = false;
+	}
+	return result;
+}
+
 #define get_num_args(state) ((state)->frame->nargs)
 
 typedef enum

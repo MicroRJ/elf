@@ -20,12 +20,6 @@ static void vm_error_invalid_field_arguments(elf_State *state, elf_Value object,
 		value_type_name(object.type));
 }
 
-static inline elf_Table *vm_check_array(elf_State *state, elf_Value value)
-{
-	check_value_type(state, value, ELF_VALUE_TYPE_TABLE);
-	return value_as_table(value);
-}
-
 static inline u32 vm_check_index(elf_State *state, int instr, elf_Value value, u32 count)
 {
 	check_value_type(state, value, ELF_VALUE_TYPE_INTEGER);
@@ -369,8 +363,16 @@ activate_frame:
 			} break;
 
 			case BC_GETLENGTH: {
-				elf_Table *array = vm_check_array(state, *vm_slot(reference, byte.b_y));
-				*vm_slot(reference, byte.b_x) = value_from_integer(elf_array_length(array));
+				elf_Value value = *vm_slot(reference, byte.b_y);
+				u32 length = 0;
+				if (value_length(value, &length))
+				{
+					*vm_slot(reference, byte.b_x) = value_from_integer(length);
+				}
+				else
+				{
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "cannot get length of '%s' value", value_type_name(value.type));
+				}
 			} break;
 
 			case BC_GETMETAFIELD: {
