@@ -70,7 +70,6 @@
 	X(ASSIGN              , "="  )         \
 	X(NIL_ASSIGN          , "?=" )         \
 	X(COLON               , ":"  )         \
-	X(COLON2              , "::" )         \
 	X(SEMICOLON           , ";"  )         \
 	X(COMMA               , ","  )         \
 	X(DOT                 , "."  )         \

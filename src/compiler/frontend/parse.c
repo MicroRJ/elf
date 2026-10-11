@@ -1044,6 +1044,23 @@ static Ast parse_expr_stat(Parser *parser)
 
 	switch (parser->tok.type)
 	{
+		case TOK_STATIC_BIND:
+		{
+			consume_token(parser);
+
+			if (x->tuple.nargs != 1 || x->tuple.args[0]->kind != AST_IDENT)
+			{
+				parser_error(parser, ERROR_INVALID_STATEMENT, x->site, "static declaration name must be an identifier");
+				return ERROR_AST;
+			}
+
+			Ast y = parse_expr(parser);
+			if (ast_is_missing_or_error(y)) {
+				return ERROR_AST;
+			}
+			x = create_static_decl_ast(parser, tok.site, x->tuple.args[0], y);
+		}
+		break;
 		case TOK_BIND:
 		case TOK_HARD_BIND:
 		{

@@ -675,11 +675,12 @@ static void test_lexer_numbers(elf_State *state)
 
 static void test_lexer_operators(elf_State *state)
 {
-	Parser parser = lexer_test_parser(state, ":= ::= -> ?? !! ... += -= *= /= %= ^= <<= >>=");
+	Parser parser = lexer_test_parser(state, ":= ::= :: -> ?? !! ... += -= *= /= %= ^= <<= >>=");
 	lexer_prime(&parser);
 
 	expect_token_type(lexer_next(&parser), TOK_BIND, "lex :=");
 	expect_token_type(lexer_next(&parser), TOK_HARD_BIND, "lex ::=");
+	expect_token_type(lexer_next(&parser), TOK_STATIC_BIND, "lex ::");
 	expect_token_type(lexer_next(&parser), TOK_ARROW, "lex ->");
 	expect_token_type(lexer_next(&parser), TOK_NIL_OR, "lex ??");
 	expect_token_type(lexer_next(&parser), TOK_NIL_AND, "lex !!");

@@ -100,6 +100,21 @@ static void test_parser_constant_declaration(elf_State *state)
 	}
 }
 
+static void test_parser_static_declaration(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "answer :: 40 + 2");
+	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse static declaration");
+	if (!decl) {
+		return;
+	}
+
+	expect_ast_kind(decl->static_decl.name, AST_IDENT, "static declaration stores identifier");
+	expect_ast_atom(decl->static_decl.name, "answer", "static declaration identifier name");
+	expect_ast_kind(decl->static_decl.expr, AST_ADD, "static declaration stores expression");
+	expect_ast_i64(decl->static_decl.expr->binary.x, 40, "static declaration expression lhs");
+	expect_ast_i64(decl->static_decl.expr->binary.y, 2, "static declaration expression rhs");
+}
+
 static void test_parser_string_strings(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "name := \"hello\"");
@@ -438,6 +453,7 @@ static void run_parser_tests(elf_State *state)
 {
 	test_parser_decl_precedence_and_strings(state);
 	test_parser_constant_declaration(state);
+	test_parser_static_declaration(state);
 	test_parser_string_strings(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);

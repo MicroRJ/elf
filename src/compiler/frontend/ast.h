@@ -42,6 +42,7 @@
 	X(AST_BLOCK_STAT          , "block_stat")                 \
 	X(AST_DEFER_STAT          , "defer_stat")                 \
 	X(AST_DECL_STAT           , "stat_decl")                  \
+	X(AST_STATIC_DECL         , "static_decl")                \
 	X(AST_NUMBER_LITERAL      , "number_literal")             \
 	X(AST_INTEGER_LITERAL     , "integer_literal")            \
 	X(AST_STRING_LITERAL      , "string_literal")             \
@@ -155,6 +156,13 @@ struct Ast_T
 			Ast expr;
 		}
 		decl;
+
+		struct
+		{
+			Ast name;
+			Ast expr;
+		}
+		static_decl;
 
 		Ast unary;
 

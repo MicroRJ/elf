@@ -253,6 +253,14 @@ static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast
 	return tree;
 }
 
+static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast expr)
+{
+	Ast tree = create_ast(par, site, AST_STATIC_DECL);
+	tree->static_decl.name = name;
+	tree->static_decl.expr = expr;
+	return tree;
+}
+
 static Ast create_break_ast(Parser *par, SourceSite site, Ast expr)
 {
 	Ast tree = create_ast(par, site, AST_BREAK);
@@ -625,6 +633,14 @@ static void print_ast(Printer *pr, Ast tree)
 			print_ast(pr, name);
 			PRINT(pr, tree->decl.tags & AST_DECL_TAG_CONSTANT ? " ::= " : " := ");
 			print_ast(pr, expr);
+		}
+		break;
+
+		case AST_STATIC_DECL:
+		{
+			print_ast(pr, tree->static_decl.name);
+			PRINT(pr, " :: ");
+			print_ast(pr, tree->static_decl.expr);
 		}
 		break;
 
