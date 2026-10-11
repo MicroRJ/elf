@@ -10,6 +10,7 @@ SourceBuffer;
 
 typedef struct
 {
+	u32 module;
 	u32 offset;
 	u32 size;
 	u32 line_offset;

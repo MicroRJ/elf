@@ -108,12 +108,11 @@ static AstType precedence_from_binary_ast_expr_type(AstType type)
 	}
 }
 
+// TODO(RJ): audit these and prob put use globally defined compiler diagnostics error codes or something instead!
 typedef enum
 {
 	ERROR_NONE = 0,
-
 	INTERNAL_ERROR_INVALID_TREE,
-
 	ERROR_UNEXPECTED_TOKEN,
 	ERROR_INVALID_EXPRESSION,
 	ERROR_EXPECTED_TOKEN,
@@ -132,8 +131,6 @@ typedef enum
 	// ERROR_UNREFERENCED_ENTITY,
 	ERROR_EXCESS_RVALUE,
 	ERROR_INVALID_STATEMENT,
-
-	EC_INTERNAL_CANNOT_CAPTURE_NO_MEMORY,
 }
 Error;
 
@@ -190,43 +187,30 @@ static b32 ast_is_missing_or_error(Ast ast)
 	return !ast || ast_is_error(ast);
 }
 
-static Parser *elf_alloc_parser(Compiler *compiler)
-{
-	elf_Arena *arena = compiler->arena;
-	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
-	parser->compiler = compiler;
-	parser->arena = arena;
-
-	parser->ast = create_ast_context(arena);
-	return parser;
-}
-
-static void reposition_parser(Parser *parser, const char *cursor);
-
-static void init_parser_atoms(Parser *parser)
-{
-	atom_table_init(&parser->atoms, parser->arena);
-
-#define INTERN_KEYWORD_ATOM(NAME, TEXT) atom_from_data_id(&parser->atoms, TEXT, XFUSE(TOK_, NAME));
-	KEYWORD_DEFINITIONS(INTERN_KEYWORD_ATOM)
-#undef INTERN_KEYWORD_ATOM
-
-#define INTERN_MACRO_ATOM(NAME, TEXT) atom_from_data_id(&parser->atoms, "#" TEXT, XFUSE(TOK_, NAME));
-	MACRO_DEFINITIONS(INTERN_MACRO_ATOM)
-#undef INTERN_MACRO_ATOM
-}
-
-static Parser *elf_create_parser(Compiler *compiler)
+static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 {
 	ASSERT(compiler != 0);
 	ASSERT(compiler->state != 0);
-	ASSERT(compiler->source_name != 0);
-	ASSERT(compiler->source.data != 0);
-	Parser *parser = elf_alloc_parser(compiler);
-	init_parser_atoms(parser);
+	ASSERT(module < compiler->module_count);
+	Com_Module *source_module = compiler->modules + module;
+	ASSERT(source_module->name != 0);
+	ASSERT(source_module->source.data != 0);
+
+	elf_Arena *arena = compiler->arena;
+	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
+	parser->compiler = compiler;
+	parser->module = module;
+	parser->atoms = compiler->atoms;
+	parser->arena = arena;
+	parser->ast = create_ast_context(arena);
+
 	parser->phase = ELF_DIAGNOSTIC_PHASE_PARSER;
-	lexer_init(&parser->lexer, compiler, &parser->atoms);
-	reposition_parser(parser, compiler->source.data);
+	lexer_init(&parser->lexer, compiler, module);
+	parser->lexer.cursor = source_module->source.data;
+	parser->lexer.line_index = 1;
+	parser->lexer.line_start = source_module->source.data;
+	consume_token(parser);
+	consume_token(parser);
 	return parser;
 }
 
@@ -237,15 +221,6 @@ static Token consume_token(Parser *par)
 	par->tok = par->tok_prox;
 	par->tok_prox = token;
 	return par->tok_prev;
-}
-
-static void reposition_parser(Parser *par, const char *cursor)
-{
-	par->lexer.cursor = cursor;
-	par->lexer.line_index = 1;
-	par->lexer.line_start = cursor;
-	consume_token(par);
-	consume_token(par);
 }
 
 static inline b32 peek_token(Parser *parser, Token_Type type)

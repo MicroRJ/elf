@@ -23,7 +23,7 @@
 #include "atom.c"
 #include "lexer.c"
 #include "ast.c"
-#include "parse.c"
+#include "parser.c"
 #include "parse_json.c"
 #include "ir.c"
 #include "lower.c"

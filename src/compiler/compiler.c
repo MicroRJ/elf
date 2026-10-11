@@ -27,32 +27,67 @@
 #include "atom.c"
 #include "lexer.c"
 #include "ast.c"
-#include "parse.c"
+#include "parser.c"
 #include "parse_json.c"
 
 #include "ir.c"
 #include "lower.c"
 #include "bytecode_gen.c"
 
+static Com_ModuleId compiler_add_module(Compiler *compiler, const char *name, elf_StrSlice source)
+{
+	if (compiler->module_count == compiler->module_capacity)
+	{
+		u32 capacity = compiler->module_capacity ? compiler->module_capacity * 2 : 4;
+		Com_Module *modules = elf_arena_push_zero(compiler->arena, sizeof(*modules) * capacity);
+		if (compiler->module_count) {
+			copy_memory(modules, compiler->modules, sizeof(*modules) * compiler->module_count);
+		}
+		compiler->modules = modules;
+		compiler->module_capacity = capacity;
+	}
+
+	Com_ModuleId module_id = compiler->module_count++;
+	Com_Module *module = compiler->modules + module_id;
+	module->name = atom_from_data(compiler->atoms, name ? name : "<unknown>");
+	module->source.data = source.data;
+	if (source.size > 0xffffffffu)
+	{
+		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER, (SourceSite) { .module = module_id }, "source exceeds the 32-bit size limit");
+	}
+	else if (source.size && memchr(source.data, 0, source.size))
+	{
+		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER, (SourceSite) { .module = module_id }, "source contains a NUL byte");
+	}
+	else
+	{
+		module->source.size = (u32)source.size;
+	}
+	return module_id;
+}
+
+static void init_atoms(Compiler *compiler)
+{
+#define INTERN_KEYWORD_ATOM(NAME, TEXT) atom_from_data_id(compiler->atoms, TEXT, XFUSE(TOK_, NAME));
+	KEYWORD_DEFINITIONS(INTERN_KEYWORD_ATOM)
+#undef INTERN_KEYWORD_ATOM
+
+#define INTERN_MACRO_ATOM(NAME, TEXT) atom_from_data_id(compiler->atoms, "#" TEXT, XFUSE(TOK_, NAME));
+	MACRO_DEFINITIONS(INTERN_MACRO_ATOM)
+#undef INTERN_MACRO_ATOM
+}
+
 Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source)
 {
 	Compiler *compiler = elf_arena_push_zero(arena, sizeof(*compiler));
 	compiler->state = state;
 	compiler->arena = arena;
-	compiler->source_name = name;
+	compiler->atoms = elf_arena_push_zero(arena, sizeof(*compiler->atoms));
+	atom_table_init(compiler->atoms, arena);
+	init_atoms(compiler);
 	compiler->log_diagnostics = true;
-	compiler->source.data = source.data;
-	if (source.size > 0xffffffffu) {
-		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
-			(SourceSite) {}, "source exceeds the 32-bit size limit");
-	}
-	else if (source.size && memchr(source.data, 0, source.size)) {
-		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
-			(SourceSite) {}, "source contains a NUL byte");
-	}
-	else {
-		compiler->source.size = (u32)source.size;
-	}
+	compiler_add_module(compiler, name, source);
+	ASSERT(compiler->module_count == 1);
 	return compiler;
 }
 
@@ -81,7 +116,9 @@ void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_D
 	ASSERT(message);
 	vsnprintf(message, (u64)message_size + 1, format, args);
 
-	const char *source_name = compiler->source_name ? compiler->source_name : "<unknown>";
+	Com_ModuleId module_id = site.module < compiler->module_count ? site.module : 0;
+	Com_Module *source_module = compiler->modules + module_id;
+	const char *source_name = atom_data(source_module->name);
 	elf_Diagnostic *diagnostic = compiler->diagnostics + compiler->diagnostic_count++;
 	*diagnostic = (elf_Diagnostic) {
 		.severity = severity,
@@ -108,7 +145,7 @@ void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_D
 		else {
 			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message);
 		}
-		if (source_slice_is_valid(site)) print_source_slice_marker(site, compiler->source);
+		if (source_slice_is_valid(site)) print_source_slice_marker(site, source_module->source);
 	}
 }
 
@@ -180,7 +217,7 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 
 	int result = 0;
 	if (!compiler->error_count) {
-		Parser *parser = elf_create_parser(compiler);
+		Parser *parser = parser_create(compiler, 0);
 		result = parse_json_value(parser);
 	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
@@ -202,7 +239,7 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 
 	int result = 0;
 	if (!compiler->error_count) {
-		Parser *parser = elf_create_parser(compiler);
+		Parser *parser = parser_create(compiler, 0);
 		result = parse_constexpr(parser);
 	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
@@ -235,7 +272,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	state->gc_mode = ELF_GC_PAUSED;
 	if (compiler->error_count) goto done;
 
-	Parser *parser = elf_create_parser(compiler);
+	Parser *parser = parser_create(compiler, 0);
 	Ast ast_file;
 	PROF_BLOCK("compiler.parse")
 	{
@@ -273,9 +310,10 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	elf_arena_align(&state->arena, 8);
 	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
 	*module = generated_module;
-	module->source_name = elf_string_from_data(state, name);
-	module->source_data = persist_compiled_source(state, compiler->source);
-	module->source_size = compiler->source.size;
+	Com_Module *root_module = compiler->modules;
+	module->source_name = elf_string_from_atom(state, root_module->name);
+	module->source_data = persist_compiled_source(state, root_module->source);
+	module->source_size = root_module->source.size;
 	module->next = state->modules;
 	state->modules = module;
 	file_entry.module = module;

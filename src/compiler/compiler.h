@@ -3,19 +3,29 @@
 //
 
 typedef struct Compiler Compiler;
+typedef u32 Com_ModuleId;
+
+typedef struct
+{
+	struct Atom *name;
+	SourceBuffer source;
+}
+Com_Module;
 
 struct Compiler
 {
-	elf_State      *state;
-	elf_Arena      *arena;
-	const char     *source_name;
-	SourceBuffer    source;
-	elf_Diagnostic *diagnostics;
-	u32             diagnostic_count;
-	u32             diagnostic_capacity;
-	u32             error_count;
-	u32             warning_count;
-	b32             log_diagnostics;
+	elf_State         *state;
+	elf_Arena         *arena;
+	struct Atom_Table *atoms;
+	Com_Module        *modules;
+	u32                module_count;
+	u32                module_capacity;
+	elf_Diagnostic    *diagnostics;
+	u32                diagnostic_count;
+	u32                diagnostic_capacity;
+	u32                error_count;
+	u32                warning_count;
+	b32                log_diagnostics;
 };
 
 Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source);

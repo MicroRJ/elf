@@ -3,7 +3,7 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(state, &arena, "parser_tests", source);
-	Parser *parser = elf_create_parser(compiler);
+	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
 	compiler_finish_report(compiler, 0);
 	return file;

@@ -4,9 +4,10 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 	elf_StrSlice source_buffer = {(char *)source, size};
 	parser.compiler = compiler_create(state, &state->arena, "lexer_tests", source_buffer);
 	parser.arena = &state->arena;
+	parser.module = 0;
+	parser.atoms = parser.compiler->atoms;
 	parser.phase = ELF_DIAGNOSTIC_PHASE_PARSER;
-	init_parser_atoms(&parser);
-	lexer_init(&parser.lexer, parser.compiler, &parser.atoms);
+	lexer_init(&parser.lexer, parser.compiler, parser.module);
 	return parser;
 }
 
@@ -17,7 +18,7 @@ static Parser lexer_test_parser(elf_State *state, const char *source)
 
 static void lexer_prime(Parser *parser)
 {
-	parser->lexer.atoms = &parser->atoms;
+	parser->lexer.atoms = parser->atoms;
 }
 
 static Token lexer_next(Parser *parser)
@@ -171,7 +172,7 @@ static void test_lexer_keywords_and_identifiers(elf_State *state)
 	expect_token_type(load, TOK_IDENTIFIER, "load is an ordinary identifier");
 	expect_token_atom(load, "load", "load identifier atom payload");
 
-	Atom *keyword = atom_from_data(&parser.atoms, "true");
+	Atom *keyword = atom_from_data(parser.atoms, "true");
 	if (keyword->id != TOK_TRUE) {
 		test_fail("keyword atom keeps token id");
 	}
@@ -189,7 +190,7 @@ static void test_lexer_macros(elf_State *state)
 	expect_token_type(file_name, TOK_STRING, "lex #file_name macro");
 	expect_token_atom(file_name, "lexer_tests", "#file_name string payload");
 
-	Atom *macro = atom_from_data(&parser.atoms, "#int");
+	Atom *macro = atom_from_data(parser.atoms, "#int");
 	if (macro->id != TOK_M_INT) {
 		test_fail("macro atom keeps token id");
 	}
@@ -695,6 +696,28 @@ static void test_lexer_operators(elf_State *state)
 	expect_token_type(lexer_next(&parser), TOK_SHR_ASSIGN, "lex >>=");
 }
 
+static void test_lexer_compiler_module(elf_State *state)
+{
+	Parser parser = lexer_test_parser(state, "value");
+	Compiler *compiler = parser.compiler;
+	if (compiler->module_count != 1) {
+		test_fail("compiler creates one root module");
+	}
+
+	Com_Module *module = compiler->modules;
+	if (module->name != atom_from_data(compiler->atoms, "lexer_tests")) {
+		test_fail("compiler module name uses shared atom table");
+	}
+	if (module->source.data != parser.lexer.source.data || module->source.size != parser.lexer.source.size) {
+		test_fail("lexer reads its compiler module source");
+	}
+
+	Token token = lexer_next(&parser);
+	if (token.site.module != 0) {
+		test_fail("lexer source sites retain compiler module index");
+	}
+}
+
 static void test_lexer_bounded_source(elf_State *state)
 {
 	char string_source[] = {'"', 'o', 'k', '"'};
@@ -732,5 +755,6 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_line_breaks(state);
 	test_lexer_numbers(state);
 	test_lexer_operators(state);
+	test_lexer_compiler_module(state);
 	test_lexer_bounded_source(state);
 }
