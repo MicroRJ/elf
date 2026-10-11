@@ -14,12 +14,17 @@ typedef struct elf_Object  elf_Object;
 typedef struct elf_String  elf_String;
 typedef struct elf_Table   elf_Table;
 typedef struct elf_Closure elf_Closure;
+typedef struct elf_ByteBuffer elf_ByteBuffer;
+typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Value   elf_Value;
 
 #include "value/value.h"
 
+#include "memory.h"
 #include "gc.h"
 #include "string/elf_string.h"
+#include "buffer/elf_buffer.h"
+#include "user/elf_user_object.h"
 #include "table/table.h"
 
 // TODO(RJ): this needs to be defined else-where!
@@ -115,18 +120,33 @@ struct elf_State
 	struct
 	{
 		u32          gc_mode;
-		u32          gc_live_bytes;
-		u32          gc_next_cycle_bytes;
+		u64          gc_live_bytes;
+		u64          gc_peak_live_bytes;
+		u64          gc_next_cycle_bytes;
 		u32          gc_reference_count;
 		u32          gc_reference_capacity;
 		elf_Object **gc_references;
 		elf_Object **gc_scratch_references;
+		u64          gc_allocated_objects;
+		u64          gc_allocated_bytes;
+		u64          gc_allocated_by_type[ELF_OBJECT_COUNT];
+		u64          gc_freed_objects;
+		u64          gc_freed_bytes;
+		u64          gc_collection_count;
+		u64          gc_collection_time_ns;
+		u64          gc_last_collection_time_ns;
+		u64          gc_max_collection_time_ns;
 	};
 	struct
 	{
 		elf_Table   *globals;
 		elf_Table   *ref_table;
 		u32          next_ref;
+		u64          vm_closure_calls;
+		u64          vm_native_calls;
+		u64          vm_instructions;
+		u64          vm_max_stack_slots;
+		u64          vm_max_call_depth;
 
 		u32          stack_size;
 		elf_Value   *stack_ptr;
@@ -148,6 +168,7 @@ struct elf_State
 		elf_Table *number;
 		elf_Table *string;
 		elf_Table *table;
+		elf_Table *buffer;
 	}
 	metatables;
 };

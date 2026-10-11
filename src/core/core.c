@@ -26,7 +26,10 @@
 #include "source_diagnostics.c"
 #include "core_diagnostics.c"
 
+#include "memory.c"
 #include "string/elf_string.c"
+#include "buffer/elf_buffer.c"
+#include "user/elf_user_object.c"
 #include "table/table.c"
 
 #include "gc.c"
@@ -56,9 +59,12 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 #include "libs/l_native.c"
 #include "libs/l_math.c"
 #include "libs/l_core.c"
-#include "libs/l_debug.c"
+#include "libs/l_gc.c"
+#include "libs/l_json.c"
+#include "libs/l_vm.c"
 #include "libs/l_table.c"
 #include "libs/l_string.c"
+#include "libs/l_buffer.c"
 
 static void init_runtime_storage(elf_State *state)
 {
@@ -75,8 +81,11 @@ static void init_gc_storage(elf_State *state)
 {
 	state->gc_next_cycle_bytes = ELF_GC_NEXT_MIN;
 	state->gc_reference_capacity = 4096;
-	state->gc_references = calloc(state->gc_reference_capacity, sizeof(*state->gc_references));
-	state->gc_scratch_references = calloc(state->gc_reference_capacity, sizeof(*state->gc_scratch_references));
+	u64 reference_bytes = (u64)state->gc_reference_capacity * sizeof(*state->gc_references);
+	state->gc_references = elf_alloc_zero(state, reference_bytes);
+	state->gc_scratch_references = elf_alloc_zero(state, reference_bytes);
+	ASSERT(state->gc_references != 0);
+	ASSERT(state->gc_scratch_references != 0);
 }
 
 static void init_state_storage(elf_State *state)
@@ -101,6 +110,7 @@ static void reserve_bootstrap_frame_stack_space(elf_State *state)
 	ASSERT(stack_pointer >= state->stack_ptr);
 	value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
 	state->stack_ptr = stack_pointer;
+	vm_record_stack_usage(state);
 }
 
 static void bootstrap_standard_libraries(elf_State *state)
@@ -111,10 +121,16 @@ static void bootstrap_standard_libraries(elf_State *state)
 	state->metatables.integer = push_new_table(state);
 	state->metatables.number = push_new_table(state);
 	state->metatables.table = elf_lib_table(state);
+	state->metatables.buffer = elf_lib_buffer(state);
 
 	elf_Table *elf_table = elf_lib_core(state);
+	elf_table_set(state, elf_table,
+		value_from_string(elf_string_from_data(state, "buffer")),
+		value_from_function(l_buffer_new));
 	table_set_string_table(state, elf_table, "math", elf_lib_math(state));
-	table_set_string_table(state, elf_table, "debug", elf_lib_debug(state));
+	table_set_string_table(state, elf_table, "gc", elf_lib_gc(state));
+	table_set_string_table(state, elf_table, "json", elf_lib_json(state));
+	table_set_string_table(state, elf_table, "vm", elf_lib_vm(state));
 
 	state->globals = push_new_table(state);
 	table_set_string_table(state, state->globals, "elf", elf_table);
@@ -130,7 +146,9 @@ static void bootstrap_standard_libraries(elf_State *state)
 void init_strings(elf_State *state)
 {
 	state->string_bucket_count = ELF_STRING_INITIAL_EXTENT;
-	state->string_buckets = calloc(state->string_bucket_count, sizeof(*state->string_buckets));
+	state->string_buckets = elf_alloc_zero(state,
+		(u64)state->string_bucket_count * sizeof(*state->string_buckets));
+	ASSERT(state->string_buckets != 0);
 }
 
 static void bootstrap_state(elf_State *state)
@@ -161,7 +179,8 @@ void elf_destroy_state(elf_State *state)
 	if (state)
 	{
 		gc_destroy_all(state);
-		free(state->string_buckets);
+		elf_free(state, state->string_buckets,
+			(u64)state->string_bucket_count * sizeof(*state->string_buckets));
 		elf_arena_destroy(&state->arena);
 	}
 }

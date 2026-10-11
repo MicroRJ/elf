@@ -32,12 +32,29 @@ typedef elf_u32 elf_Ref;
 
 typedef struct elf_State elf_State;
 
+typedef void elf_UserObjectDestructor(elf_State *state, void *data);
+
+typedef struct elf_UserType
+{
+	const char *name;
+	elf_UserObjectDestructor *destroy;
+}
+elf_UserType;
+
 typedef struct
 {
 	char    *data;
 	elf_Size size;
 }
 elf_StrSlice;
+
+typedef struct
+{
+	elf_u8  *data;
+	elf_Size size;
+	elf_Size capacity;
+}
+elf_BufferView;
 
 typedef enum
 {
@@ -104,6 +121,8 @@ typedef enum
 	ELF_VALUE_TYPE_CLOSURE,
 	ELF_VALUE_TYPE_TABLE,
 	ELF_VALUE_TYPE_STRING,
+	ELF_VALUE_TYPE_ERROR,
+	ELF_VALUE_TYPE_BUFFER,
 	ELF_VALUE_TYPE_COUNT_,
 }
 elf_ValueType;
@@ -124,6 +143,10 @@ void elf_push_num(elf_State *state, elf_Num value);
 void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, elf_Size size);
+void elf_push_error(elf_State *state, const char *message);
+elf_ErrorCode elf_push_buffer(elf_State *state, elf_Size capacity);
+elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
+	elf_Index metatable, elf_Size size, void **data);
 
 elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
 elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
@@ -142,10 +165,15 @@ elf_ValueType elf_type(elf_State *state, elf_Index index);
 elf_Bool elf_is_nil(elf_State *state, elf_Index index);
 elf_Bool elf_is_numeric(elf_State *state, elf_Index index);
 elf_Bool elf_is_callable(elf_State *state, elf_Index index);
+elf_Bool elf_is_error(elf_State *state, elf_Index index);
+elf_Bool elf_is_buffer(elf_State *state, elf_Index index);
+elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type);
 elf_Bool elf_to_int(elf_State *state, elf_Index index, elf_Int *value);
 elf_Bool elf_to_num(elf_State *state, elf_Index index, elf_Num *value);
 elf_Bool elf_to_str(elf_State *state, elf_Index index, elf_StrSlice *value);
 elf_Bool elf_to_cstr(elf_State *state, elf_Index index, const char **value);
+elf_Bool elf_to_buffer(elf_State *state, elf_Index index, elf_BufferView *value);
+void *elf_to_user_object(elf_State *state, elf_Index index, const elf_UserType *type);
 elf_Bool elf_push_value_text(elf_State *state, elf_Index index);
 // Pushes constant-expression source for a supported acyclic data value.
 elf_Bool elf_push_value_source(elf_State *state, elf_Index index);
@@ -157,6 +185,11 @@ elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field
 elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_append(elf_State *state, elf_Index index);
+elf_ErrorCode elf_buffer_reserve(elf_State *state, elf_Index index, elf_Size capacity);
+elf_ErrorCode elf_buffer_resize(elf_State *state, elf_Index index, elf_Size size);
+elf_ErrorCode elf_buffer_append(elf_State *state, elf_Index index, const void *data, elf_Size size);
+elf_ErrorCode elf_buffer_patch(elf_State *state, elf_Index index, elf_Size position,
+	elf_Size delete_size, const void *data, elf_Size insert_size);
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor);
 elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right);
 

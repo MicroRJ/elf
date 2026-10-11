@@ -47,6 +47,7 @@ Table_Map_Equal_Pair;
 
 typedef struct
 {
+	elf_State           *state;
 	Table_Map_Equal_Pair *pairs;
 	u32                    count;
 	u32                 capacity;
@@ -69,7 +70,9 @@ static void table_map_equal_add_pair(Table_Map_Equal_Context *context, elf_Table
 	if (context->count == context->capacity)
 	{
 		u32 capacity = context->capacity ? context->capacity * 2 : 16;
-		Table_Map_Equal_Pair *pairs = realloc(context->pairs, capacity * sizeof(*context->pairs));
+		Table_Map_Equal_Pair *pairs = elf_realloc(context->state, context->pairs,
+			(u64)context->capacity * sizeof(*context->pairs),
+			(u64)capacity * sizeof(*context->pairs));
 		ASSERT(pairs != 0);
 		context->pairs = pairs;
 		context->capacity = capacity;
@@ -148,9 +151,10 @@ ELF_FUNCTION(l_table_map_equal)
 		return 1;
 	}
 
-	Table_Map_Equal_Context context = {0};
+	Table_Map_Equal_Context context = {.state = S};
 	b32 equal = tables_map_equal(&context, left, value_as_table(right_value));
-	free(context.pairs);
+	elf_free(S, context.pairs,
+		(u64)context.capacity * sizeof(*context.pairs));
 	push_value(S, value_from_integer(equal));
 	return 1;
 }

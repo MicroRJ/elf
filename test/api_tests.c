@@ -123,6 +123,217 @@ static void test_api_tables_and_refs(elf_State *state)
 	elf_set_top(state, checkpoint);
 }
 
+static void test_api_errors(elf_State *state)
+{
+	elf_Index checkpoint = elf_get_top(state);
+	elf_push_error(state, "host failure");
+	elf_Index error = elf_abs_index(state, -1);
+
+	if (elf_type(state, error) != ELF_VALUE_TYPE_ERROR || !elf_is_error(state, error)) {
+		test_fail("API creates a tagged error value");
+	}
+	if (!elf_get_field(state, error, "message")) {
+		test_fail("API gets an error field");
+	}
+	else
+	{
+		elf_StrSlice message = {};
+		if (!elf_to_str(state, -1, &message) || !api_slice_matches(message, "host failure")) {
+			test_fail("API error retains its message");
+		}
+		elf_pop(state, 1);
+	}
+
+	elf_push_cstr(state, "host");
+	if (elf_set_field(state, error, "kind") != ELF_ERROR_NONE
+	|| !elf_get_field(state, error, "kind")) {
+		test_fail("API populates structured error fields");
+	}
+	else
+	{
+		elf_StrSlice kind = {};
+		if (!elf_to_str(state, -1, &kind) || !api_slice_matches(kind, "host")) {
+			test_fail("API structured error field retains its value");
+		}
+		elf_pop(state, 1);
+	}
+
+	if (!elf_push_value_text(state, error)) {
+		test_fail("API formats an error value");
+	}
+	else
+	{
+		elf_StrSlice text = {};
+		if (!elf_to_str(state, -1, &text) || !api_slice_matches(text, "host failure")) {
+			test_fail("API formats an error using its message");
+		}
+		elf_pop(state, 1);
+	}
+	elf_Index top = elf_get_top(state);
+	if (elf_push_value_source(state, error) || elf_get_top(state) != top) {
+		test_fail("API rejects errors as constant-expression source");
+	}
+
+	elf_u32 length = 0;
+	if (elf_length(state, error, &length)) {
+		test_fail("API does not expose an error as an array table");
+	}
+	elf_new_table(state);
+	if (elf_is_error(state, -1)) {
+		test_fail("API distinguishes ordinary tables from errors");
+	}
+	elf_set_top(state, checkpoint);
+}
+
+static void test_api_buffers(elf_State *state)
+{
+	elf_Index checkpoint = elf_get_top(state);
+	if (elf_push_buffer(state, 3) != ELF_ERROR_NONE || !elf_is_buffer(state, -1)) {
+		test_fail("API pushes a buffer value");
+	}
+	else
+	{
+		elf_Index host_buffer = elf_abs_index(state, -1);
+		if (elf_buffer_append(state, host_buffer, "abc", 3) != ELF_ERROR_NONE ||
+			elf_buffer_reserve(state, host_buffer, 16) != ELF_ERROR_NONE) {
+			test_fail("API grows and appends to a buffer");
+		}
+		elf_BufferView view = {};
+		if (!elf_to_buffer(state, host_buffer, &view) || view.size != 3 ||
+			view.capacity < 16 || memcmp(view.data, "abc", 3) != 0) {
+			test_fail("API exposes buffer storage");
+		}
+		if (elf_buffer_resize(state, host_buffer, 5) != ELF_ERROR_NONE ||
+			!elf_to_buffer(state, host_buffer, &view) || view.size != 5 ||
+			view.data[3] != 0 || view.data[4] != 0) {
+			test_fail("API resizes and zero-fills a buffer");
+		}
+		if (elf_buffer_resize(state, host_buffer, 3) != ELF_ERROR_NONE ||
+			elf_buffer_patch(state, host_buffer, 1, 1, "XYZ", 3) != ELF_ERROR_NONE ||
+			!elf_to_buffer(state, host_buffer, &view) || view.size != 5 ||
+			memcmp(view.data, "aXYZc", 5) != 0) {
+			test_fail("API patches a buffer range");
+		}
+	}
+	elf_set_top(state, checkpoint);
+
+	char source_data[] = "ret elf.buffer(4):append(\"ok\")";
+	elf_StrSlice source = {source_data, sizeof(source_data) - 1};
+	if (elf_push_code_source(state, "api-buffer", source, 0) != ELF_ERROR_NONE)
+	{
+		test_fail("API buffer source compiles");
+		elf_set_top(state, checkpoint);
+		return;
+	}
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_Index buffer = elf_abs_index(state, -1);
+	if (elf_type(state, buffer) != ELF_VALUE_TYPE_BUFFER || !elf_is_buffer(state, buffer)) {
+		test_fail("API identifies a buffer value");
+	}
+	elf_u32 length = 0;
+	if (!elf_length(state, buffer, &length) || length != 2) {
+		test_fail("API reads buffer length");
+	}
+	elf_Int byte = 0;
+	if (!elf_get_index(state, buffer, 1) || !elf_to_int(state, -1, &byte) || byte != 'k') {
+		test_fail("API reads a buffer byte");
+	}
+	else elf_pop(state, 1);
+
+	elf_push_int(state, 'n');
+	if (elf_set_index(state, buffer, 1) != ELF_ERROR_NONE ||
+		!elf_get_index(state, buffer, 1) || !elf_to_int(state, -1, &byte) || byte != 'n') {
+		test_fail("API writes a buffer byte");
+	}
+	else elf_pop(state, 1);
+
+	if (!elf_push_value_text(state, buffer)) {
+		test_fail("API formats a buffer value");
+	}
+	else
+	{
+		elf_StrSlice text = {};
+		if (!elf_to_str(state, -1, &text) || !api_slice_matches(text, "buffer(2)")) {
+			test_fail("API buffer display includes its length");
+		}
+		elf_pop(state, 1);
+	}
+	elf_Index top = elf_get_top(state);
+	if (elf_push_value_source(state, buffer) || elf_get_top(state) != top) {
+		test_fail("API rejects buffers as constant-expression source");
+	}
+	elf_set_top(state, checkpoint);
+}
+
+static u32 api_user_object_destroyed;
+
+static void test_api_user_object_destroy(elf_State *state, void *data)
+{
+	(void)state;
+	if (*(elf_u64 *)data != 0x123456789abcdef0ull) {
+		test_fail("API user object destructor receives its payload");
+	}
+	api_user_object_destroyed += 1;
+}
+
+static const elf_UserType test_api_user_type = {
+	.name = "api_test_object",
+	.destroy = test_api_user_object_destroy,
+};
+
+static const elf_UserType test_api_other_user_type = {
+	.name = "api_test_other",
+};
+
+static void test_api_user_objects(elf_State *state)
+{
+	elf_Index checkpoint = elf_get_top(state);
+	elf_new_table(state);
+	elf_Index metatable = elf_abs_index(state, -1);
+	elf_push_int(state, 42);
+	elf_set_field(state, metatable, "answer");
+
+	void *data = 0;
+	if (elf_push_user_object(state, &test_api_user_type, metatable,
+		sizeof(elf_u64), &data) != ELF_ERROR_NONE || !data) {
+		test_fail("API creates a user object");
+		elf_set_top(state, checkpoint);
+		return;
+	}
+	*(elf_u64 *)data = 0x123456789abcdef0ull;
+	elf_Index object = elf_abs_index(state, -1);
+	if (elf_type(state, object) != ELF_VALUE_TYPE_USER_OBJECT ||
+		!elf_is_user_object(state, object, &test_api_user_type) ||
+		elf_is_user_object(state, object, &test_api_other_user_type) ||
+		elf_to_user_object(state, object, &test_api_user_type) != data ||
+		elf_to_user_object(state, object, &test_api_other_user_type)) {
+		test_fail("API identifies nominal user object types");
+	}
+
+	elf_Ref reference = elf_create_ref(state, object);
+	elf_set_top(state, checkpoint);
+	force_gc_allocations(state, 32);
+	if (api_user_object_destroyed != 0 || !elf_push_ref(state, reference)) {
+		test_fail("referenced user object and metatable survive GC");
+	}
+	else
+	{
+		elf_UserObject *user = value_as_user(state->stack_ptr[-1]);
+		elf_Value answer = elf_table_get_or_nil(state, user->metatable,
+			test_key_string(state, "answer"));
+		if (!value_is_integer(answer) || value_as_integer(answer) != 42)
+			test_fail("user object retains its instance metatable");
+		elf_pop(state, 1);
+	}
+	elf_release_ref(state, reference);
+	force_gc_allocations(state, 32);
+	if (api_user_object_destroyed != 1) {
+		test_fail("unreachable user object runs its destructor exactly once");
+	}
+	elf_set_top(state, checkpoint);
+}
+
 static void test_api_mutation_errors(elf_State *state)
 {
 	elf_Index checkpoint = elf_get_top(state);
@@ -439,6 +650,9 @@ static void run_api_tests(void)
 	elf_State *state = elf_create_state();
 	test_api_call_addressing(state);
 	test_api_tables_and_refs(state);
+	test_api_errors(state);
+	test_api_buffers(state);
+	test_api_user_objects(state);
 	test_api_mutation_errors(state);
 	test_api_source_diagnostics(state);
 	test_api_value_source(state);

@@ -56,6 +56,7 @@ BcSlot;
 	X(IR_FUNCTION            , "function")                   \
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_LOCAL               , "local")                      \
+	X(IR_MULTI_LOCAL         , "multi_local")                \
 	X(IR_LOAD_LOCAL          , "load_local")                 \
 	X(IR_LOAD_GLOBAL         , "load_global")                \
 	X(IR_CAPTURE             , "capture")                    \
@@ -103,6 +104,7 @@ struct IrNode
 		Atom *atom;
 		i64      ir_int;
 		f64      ir_num;
+		u8 ir_table_shape;
 
 		Ir ir_unary;
 
@@ -185,6 +187,13 @@ struct IrNode
 			BcSlot slot;
 		}
 		ir_local;
+
+		struct
+		{
+			Ir expr;
+			IrArray locals;
+		}
+		ir_multi_local;
 
 		struct
 		{

@@ -16,17 +16,19 @@ static void check_write(elf_State *state, elf_Object *reference)
 	}
 }
 
-static inline void table_init(elf_Table *table, u32 nentries)
+static inline void table_init(elf_State *state, elf_Table *table, u32 nentries)
 {
 	table->fillcounter = 0;
-	table->entries = calloc(1, nentries * sizeof(*table->entries));
+	u64 entry_bytes = (u64)nentries * sizeof(*table->entries);
+	table->entries = elf_alloc_zero(state, entry_bytes);
+	ASSERT(table->entries != 0);
 	table->nentries = nentries;
 	table->array = 0;
 	table->count = 0;
 	table->capacity = 0;
 }
 
-static void table_array_reserve(elf_Table *table, u32 min_capacity)
+static void table_array_reserve(elf_State *state, elf_Table *table, u32 min_capacity)
 {
 	if (table->capacity >= min_capacity) {
 		return;
@@ -37,7 +39,10 @@ static void table_array_reserve(elf_Table *table, u32 min_capacity)
 		capacity <<= 1;
 	}
 
-	table->array = realloc(table->array, capacity * sizeof(*table->array));
+	elf_Value *array = elf_realloc(state, table->array,
+		(u64)table->capacity * sizeof(*table->array),
+		(u64)capacity * sizeof(*table->array));
+	table->array = array;
 	ASSERT(table->array != 0);
 
 	value_zero_many(table->array + table->capacity, capacity - table->capacity);
@@ -66,7 +71,7 @@ elf_Table *elf_new_table_rogue2(elf_State *state, u32 nentries)
 {
 	elf_Table *table = elf_gc_alloc(state, ELF_OBJECT_TABLE, sizeof(*table));
 
-	table_init(table, nentries);
+	table_init(state, table, nentries);
 	return table;
 }
 
@@ -164,7 +169,7 @@ static inline u32 table_find_slot(Entry *entries, u32 nentries, elf_Value key)
 	return TABLE_SLOT_NOT_FOUND;
 }
 
-static void table_resize_if_needed(elf_Table *table)
+static void table_resize_if_needed(elf_State *state, elf_Table *table)
 {
 	if (table->nentries * TABLE_MAX_LOAD_NUMERATOR >= table->fillcounter * TABLE_MAX_LOAD_DENOMINATOR) {
 		return;
@@ -172,7 +177,9 @@ static void table_resize_if_needed(elf_Table *table)
 
 	elf_Table resized = *table;
 	resized.nentries = table->nentries << 1;
-	resized.entries = calloc(1, resized.nentries * sizeof(*resized.entries));
+	resized.entries = elf_alloc_zero(state,
+		(u64)resized.nentries * sizeof(*resized.entries));
+	ASSERT(resized.entries != 0);
 
 	for (u32 i = 0; i < table->nentries; ++i) {
 		Entry entry = table->entries[i];
@@ -184,7 +191,8 @@ static void table_resize_if_needed(elf_Table *table)
 		}
 	}
 
-	free(table->entries);
+	elf_free(state, table->entries,
+		(u64)table->nentries * sizeof(*table->entries));
 	table->nentries = resized.nentries;
 	table->entries = resized.entries;
 }
@@ -193,7 +201,7 @@ static inline u32 table_find_slot_for_write(elf_State *state, elf_Table *table, 
 {
 	ASSERT(table != 0);
 
-	table_resize_if_needed(table);
+	table_resize_if_needed(state, table);
 
 	u32 slot = table_find_slot(table->entries, table->nentries, key);
 	if (slot == TABLE_SLOT_NOT_FOUND) {
@@ -277,7 +285,7 @@ u32 elf_table_ensure(elf_State *state, elf_Table *table, elf_Value key)
 		return entry_index(*entry);
 	}
 
-	table_array_reserve(table, table->count + 1);
+	table_array_reserve(state, table, table->count + 1);
 	u32 index = table->count++;
 	table->array[index] = value_nil();
 
@@ -322,7 +330,7 @@ u32 elf_array_add(elf_State *state, elf_Table *table, elf_Value value)
 {
 	check_write(state, (elf_Object *)table);
 
-	table_array_reserve(table, table->count + 1);
+	table_array_reserve(state, table, table->count + 1);
 	u32 index = table->count++;
 	table->array[index] = value;
 	return index;
@@ -371,7 +379,7 @@ u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value va
 			"array insert index %u is out of bounds for length %u", index, table->count);
 	}
 
-	table_array_reserve(table, table->count + 1);
+	table_array_reserve(state, table, table->count + 1);
 	memmove(table->array + index + 1, table->array + index,
 		(table->count - index) * sizeof(*table->array));
 	for (u32 i = 0; i < table->nentries; ++i) {

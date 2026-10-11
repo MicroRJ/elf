@@ -5,25 +5,40 @@
 static void gc_check(elf_State *state);
 static u32 gc_mark_reachable(elf_State *state, elf_Object * reference);
 
-static void gc_free_object(elf_Object *reference)
+static void gc_free_object(elf_State *state, elf_Object *reference)
 {
 	if (reference->type == ELF_OBJECT_TABLE)
 	{
-		free(((elf_Table *) reference)->entries);
-		free(((elf_Table *) reference)->array);
+		elf_Table *table = (elf_Table *)reference;
+		elf_free(state, table->entries,
+			(u64)table->nentries * sizeof(*table->entries));
+		elf_free(state, table->array,
+			(u64)table->capacity * sizeof(*table->array));
+	}
+	else if (reference->type == ELF_OBJECT_BUFFER)
+	{
+		elf_ByteBuffer *buffer = (elf_ByteBuffer *)reference;
+		elf_free(state, buffer->data, buffer->capacity);
+	}
+	else if (reference->type == ELF_OBJECT_USER)
+	{
+		elf_UserObject *user = (elf_UserObject *)reference;
+		if (user->type && user->type->destroy) user->type->destroy(state, user->data);
 	}
 
-	free(reference);
+	elf_free(state, reference, reference->size);
 }
 
 static void gc_destroy_all(elf_State *state)
 {
 	for (u32 i = 0; i < state->gc_reference_count; ++i) {
-		gc_free_object(state->gc_references[i]);
+		gc_free_object(state, state->gc_references[i]);
 	}
 
-	free(state->gc_references);
-	free(state->gc_scratch_references);
+	elf_free(state, state->gc_references,
+		(u64)state->gc_reference_capacity * sizeof(*state->gc_references));
+	elf_free(state, state->gc_scratch_references,
+		(u64)state->gc_reference_capacity * sizeof(*state->gc_scratch_references));
 }
 
 static void gc_ensure_reference_capacity(elf_State *state)
@@ -35,8 +50,12 @@ static void gc_ensure_reference_capacity(elf_State *state)
 	u32 old_capacity = state->gc_reference_capacity;
 	u32 new_capacity = old_capacity ? old_capacity << 1 : 4096;
 
-	state->gc_references = realloc(state->gc_references, sizeof(*state->gc_references) * new_capacity);
-	state->gc_scratch_references = realloc(state->gc_scratch_references, sizeof(*state->gc_scratch_references) * new_capacity);
+	state->gc_references = elf_realloc(state, state->gc_references,
+		(u64)sizeof(*state->gc_references) * old_capacity,
+		(u64)sizeof(*state->gc_references) * new_capacity);
+	state->gc_scratch_references = elf_realloc(state, state->gc_scratch_references,
+		(u64)sizeof(*state->gc_scratch_references) * old_capacity,
+		(u64)sizeof(*state->gc_scratch_references) * new_capacity);
 	ASSERT(state->gc_references != 0);
 	ASSERT(state->gc_scratch_references != 0);
 
@@ -47,14 +66,17 @@ static void gc_ensure_reference_capacity(elf_State *state)
 
 void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size)
 {
-	state->gc_live_bytes += size;
+	ASSERT((u32)type < ELF_OBJECT_COUNT);
+	state->gc_allocated_objects += 1;
+	state->gc_allocated_by_type[type] += 1;
 
 	if (state->gc_mode == ELF_GC_ACTIVE)
 	{
 		gc_check(state);
 	}
 
-	elf_Object * reference = calloc(size, 1);
+	elf_Object * reference = elf_alloc_zero(state, size);
+	ASSERT(reference != 0);
 	reference->status = 0;
 	reference->type   = type;
 	reference->size   = size;
@@ -85,9 +107,9 @@ static u32 gc_sweep(elf_State *state)
 		else
 		{
 			freed_count ++;
-			state->gc_live_bytes -= reference->size;
+			state->gc_freed_objects += 1;
 
-			gc_free_object(reference);
+			gc_free_object(state, reference);
 		}
 	}
 
@@ -142,6 +164,9 @@ static u32 gc_mark_metatables(elf_State *state)
 	if (state->metatables.integer) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.integer);
 	}
+	if (state->metatables.buffer) {
+		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.buffer);
+	}
 
 	return marked_count;
 }
@@ -163,7 +188,9 @@ static u32 gc_collect(elf_State *state)
 
 static void gc_update_next_cycle(elf_State *state)
 {
-	u32 next_cycle_bytes = state->gc_live_bytes * 2;
+	u64 next_cycle_bytes = state->gc_live_bytes > ELF_GC_NEXT_MAX / 2
+		? ELF_GC_NEXT_MAX
+		: state->gc_live_bytes * 2;
 	if (next_cycle_bytes < ELF_GC_NEXT_MIN) {
 		next_cycle_bytes = ELF_GC_NEXT_MIN;
 	}
@@ -180,13 +207,23 @@ void gc_check(elf_State *state)
 	}
 
 	u32 previous_reference_count = state->gc_reference_count;
+	state->gc_collection_count += 1;
+	u64 start = dy_counter();
 	u32 freed_count = gc_collect(state);
+	u64 elapsed_ticks = dy_counter() - start;
+	u64 frequency = dy_counter_frequency();
+	u64 elapsed_ns = frequency
+		? (u64)((f64)elapsed_ticks * 1000000000.0 / (f64)frequency)
+		: 0;
+	state->gc_collection_time_ns += elapsed_ns;
+	state->gc_last_collection_time_ns = elapsed_ns;
+	state->gc_max_collection_time_ns = MAX(state->gc_max_collection_time_ns, elapsed_ns);
 	ASSERT(freed_count <= previous_reference_count);
 
 	gc_update_next_cycle(state);
 
 	if (state->gc_live_bytes > state->gc_next_cycle_bytes) {
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "out of memory, %uMB allocated, %uMB threshold"
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "out of memory, %lluMB allocated, %lluMB threshold"
 		, state->gc_live_bytes / MEGABYTES(1)
 		, state->gc_next_cycle_bytes / MEGABYTES(1));
 	}
@@ -225,6 +262,15 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		}
 		else if (reference->type == ELF_OBJECT_STRING)
 		{
+		}
+		else if (reference->type == ELF_OBJECT_BUFFER)
+		{
+		}
+		else if (reference->type == ELF_OBJECT_USER)
+		{
+			elf_UserObject *user = (elf_UserObject *)reference;
+			if (user->metatable)
+				marked_count += gc_mark_reachable(state, (elf_Object *)user->metatable);
 		}
 	}
 	return marked_count;

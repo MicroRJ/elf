@@ -13,6 +13,7 @@
 #include "battery_helpers.h"
 
 #include "libs/l_core_io.c"
+#include "libs/l_io.c"
 #include "libs/l_load_file.c"
 #include "libs/l_serialization.c"
 #include "libs/l_env.c"
@@ -22,7 +23,7 @@
 #include "libs/l_random.c"
 #include "libs/l_time.c"
 
-static elf_StrSlice battery_source_buffer_from_file(const char *name)
+static elf_StrSlice battery_source_buffer_from_file(elf_State *state, const char *name)
 {
 	elf_StrSlice source = {0};
 	dy_File_Info info;
@@ -31,7 +32,8 @@ static elf_StrSlice battery_source_buffer_from_file(const char *name)
 	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
 		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return source;
 
-	char *data = calloc(1, (size_t)info.size + 16);
+	u64 allocation_size = info.size + 16;
+	char *data = elf_alloc_zero(state, allocation_size);
 	if (!data) {
 		dy_close_file(file);
 		return source;
@@ -40,7 +42,7 @@ static elf_StrSlice battery_source_buffer_from_file(const char *name)
 	dy_Result read_result = dy_read_file(file, data, info.size, &read);
 	dy_close_file(file);
 	if (read_result.error || read != info.size) {
-		free(data);
+		elf_free(state, data, allocation_size);
 		return source;
 	}
 
@@ -55,14 +57,14 @@ int elf_push_code_file(elf_State *state, const char *name)
 		elf_push_nil(state);
 		return false;
 	}
-	elf_StrSlice source = battery_source_buffer_from_file(name);
+	elf_StrSlice source = battery_source_buffer_from_file(state, name);
 	if (!source.data)
 	{
 		elf_push_nil(state);
 		return false;
 	}
 	elf_ErrorCode result = elf_push_code_source(state, name, source, 0);
-	free(source.data);
+	elf_free(state, source.data, source.size + 16);
 	return result == ELF_ERROR_NONE;
 }
 
@@ -81,6 +83,7 @@ void elf_open_batteries(elf_State *state)
 	elf_lib_process(state);       elf_set_field(state, root, "process");
 	elf_lib_random(state);        elf_set_field(state, root, "random");
 	elf_lib_time(state);          elf_set_field(state, root, "time");
+	elf_lib_io(state);            elf_set_field(state, root, "io");
 	elf_push_fun(state, l_core_load_file); elf_set_field(state, root, "load_file");
 	elf_push_fun(state, l_core_print);     elf_set_field(state, root, "print");
 	elf_push_fun(state, l_core_println);   elf_set_field(state, root, "println");

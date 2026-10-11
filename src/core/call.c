@@ -6,6 +6,7 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 {
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
+	state->vm_closure_calls += 1;
 
 	BcFunction *function = bc_function_from_ref(closure->function);
 	u32 argument_count = (u32)nargs;
@@ -44,10 +45,12 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	elf_Value *stack_pointer = frame_base + frame_size;
 	ASSERT(stack_pointer >= state->stack_ptr);
 	state->stack_ptr = stack_pointer;
+	vm_record_stack_usage(state);
 }
 
 static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs, u32 nrets)
 {
+	state->vm_native_calls += 1;
 	elf_Value *frame_base = state->stack_ptr - nargs;
 	u32 frame_size = nargs;
 
@@ -123,6 +126,8 @@ static inline void push_stack_frame(elf_State *state)
 {
 	ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
 	state->frame++;
+	u64 depth = (u64)(state->frame - state->frame_stack);
+	state->vm_max_call_depth = MAX(state->vm_max_call_depth, depth);
 }
 
 static inline void pop_stack_frame(elf_State *state)

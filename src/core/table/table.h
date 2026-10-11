@@ -19,10 +19,19 @@ typedef struct
 Entry;
 STATIC_ASSERT(sizeof(Entry) == 16);
 
+typedef enum
+{
+	TABLE_JSON_SHAPE_NONE = 0,
+	TABLE_JSON_SHAPE_ARRAY,
+	TABLE_JSON_SHAPE_OBJECT,
+}
+TableJsonShape;
+
 
 struct elf_Table
 {
 	elf_Object        obj;
+	u8         json_shape;
 	u32       fillcounter;
 	u32          nentries;
 	Entry        *entries;

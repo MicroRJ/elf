@@ -21,6 +21,9 @@ static void format_value_shallow(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "closure"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "function"); break;
 		case ELF_VALUE_TYPE_TABLE:     elf_arena_push_text(arena, "table"); break;
+		case ELF_VALUE_TYPE_ERROR:     elf_arena_push_text(arena, "error"); break;
+		case ELF_VALUE_TYPE_BUFFER:    elf_arena_push_text(arena, "buffer"); break;
+		case ELF_VALUE_TYPE_USER_OBJECT: elf_arena_push_text(arena, "user object"); break;
 		default:                       elf_arena_push_text(arena, "?"); break;
 	}
 }
@@ -181,7 +184,7 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 
 		case BC_TABLE:
 		{
-			elf_arena_pushf(arena, "r%d = table", byte.b_x);
+			elf_arena_pushf(arena, "r%d = table shape=%d", byte.b_x, byte.b_y);
 		}
 		break;
 

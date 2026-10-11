@@ -28,10 +28,12 @@ struct elf_Object
 
 typedef enum
 {
-	ELF_OBJECT_BASE = 0,
+	ELF_OBJECT_USER = 0,
 	ELF_OBJECT_CLOSURE,
 	ELF_OBJECT_TABLE,
 	ELF_OBJECT_STRING,
+	ELF_OBJECT_BUFFER,
+	ELF_OBJECT_COUNT,
 }
 elf_ObjectType;
 

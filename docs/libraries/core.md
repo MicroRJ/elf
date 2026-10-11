@@ -254,12 +254,54 @@ elf.println()
 `elf.printl` is retained as a compatibility alias. New code should use
 `elf.println`.
 
+## Runtime counters
+
+### `elf.gc.counters([result])`
+
+Returns cumulative garbage-collector counters. If `result` is supplied, it is
+updated and returned instead of allocating another result table.
+
+```elf
+gc := {}
+elf.gc.counters(gc)
+```
+
+The table contains:
+
+- `allocated_objects`, `freed_objects`, and `live_objects`
+- `allocated_bytes`, `freed_bytes`, `live_bytes`, and `peak_live_bytes`
+- `allocated_closures`, `allocated_tables`, `allocated_strings`, and
+  `allocated_buffers`
+- `collections`
+- `collection_time_ns`, `last_collection_time_ns`, and
+  `max_collection_time_ns`
+
+The byte counters cover allocations associated with the Elf state and routed
+through its allocator. This includes GC objects, table hash and array capacity,
+buffer payload capacity, GC metadata, compiler temporaries, and official
+battery-library temporaries. Host-owned compile reports, state arenas,
+`dy-core`, and third-party allocations are separate allocation domains.
+Collection times are measured in nanoseconds.
+
+### `elf.vm.counters([result])`
+
+Returns cumulative virtual-machine counters, optionally reusing `result`:
+
+- `calls`, `closure_calls`, and `native_calls`
+- `instructions`
+- `max_stack_slots`
+- `max_call_depth`
+
+`calls` is the sum of closure and native calls. The maximum values cover the
+lifetime of the Elf state.
+
 ## Related libraries
 
 The following tables are installed beneath `elf`, but are not part of the core
 API:
 
-- `elf.debug` — runtime diagnostic counters
+- `elf.gc` — garbage-collector counters
+- `elf.vm` — virtual-machine execution counters
 - `elf.serialization` — serialization and JSON loading
 - `elf.fs` — filesystem operations
 - `elf.math`, `elf.random`, `elf.path`, `elf.process`, and `elf.time`

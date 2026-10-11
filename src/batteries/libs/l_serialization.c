@@ -18,7 +18,8 @@ ELF_FUNCTION(l_serialization_load_json_file)
 		return 1;
 	}
 
-	char *data = malloc((size_t)info.size + 1);
+	u64 allocation_size = info.size + 1;
+	char *data = elf_alloc(S, allocation_size);
 	if (!data) {
 		dy_close_file(file);
 		elf_push_nil(S);
@@ -28,7 +29,7 @@ ELF_FUNCTION(l_serialization_load_json_file)
 	dy_Result read = dy_read_file(file, data, info.size, &size);
 	dy_close_file(file);
 	if (read.error || size != info.size) {
-		free(data);
+		elf_free(S, data, allocation_size);
 		elf_push_nil(S);
 		return 1;
 	}
@@ -36,7 +37,7 @@ ELF_FUNCTION(l_serialization_load_json_file)
 	data[size] = 0;
 	elf_StrSlice source = {data, size};
 	if (elf_push_json(S, name, source, 0) != ELF_ERROR_NONE) elf_push_nil(S);
-	free(data);
+	elf_free(S, data, allocation_size);
 	return 1;
 }
 

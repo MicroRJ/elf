@@ -106,7 +106,13 @@ ELF_FUNCTION(lib_path_join)
 		needs_separator = last != '/' && last != '\\' && first != '/' && first != '\\';
 	}
 
-	char *result = malloc(left_size + right_size + needs_separator);
+	u64 result_size = (u64)left_size + right_size + needs_separator;
+	if (!result_size)
+	{
+		lib_push_string(S, "", 0);
+		return 1;
+	}
+	char *result = elf_alloc(S, result_size);
 	if (!result) {
 		elf_push_nil(S);
 		return 1;
@@ -116,7 +122,7 @@ ELF_FUNCTION(lib_path_join)
 	if (needs_separator) result[at++] = '/';
 	memcpy(result + at, right_data, right_size);
 	lib_push_string(S, result, at + right_size);
-	free(result);
+	elf_free(S, result, result_size);
 	return 1;
 }
 

@@ -18,6 +18,8 @@ static const elf_Binding l_core[] = {
 
 	{"type_of",      l_core_type_of},
 	{"to_string",    l_core_to_string},
+	{"error",        l_core_error},
+	{"is_error",     l_core_is_error},
 	{"is_string",    l_core_is_string},
 	{"is_numeric",   l_core_is_numeric},
 	{"to_number",    l_core_to_number},

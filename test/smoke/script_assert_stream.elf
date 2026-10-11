@@ -1,0 +1,36 @@
+status, reader, writer := elf.io.pipe()
+test_assert(status == elf.io.SUCCESS)
+test_assert(elf.type_of(reader) == "stream")
+test_assert(elf.type_of(writer) == "stream")
+test_assert(elf.metatable(reader) == elf.io.Stream)
+test_assert(elf.to_string(reader) == "stream()")
+test_assert(reader:is_closed() == 0)
+test_assert(writer:is_closed() == 0)
+
+count := 0
+status, count = writer:write("hello")
+test_assert(status == elf.io.SUCCESS)
+test_assert(count == 5)
+
+data := elf.buffer()
+status, count = reader:read(data, 64, elf.io.READ_AVAILABLE)
+test_assert(status == elf.io.SUCCESS)
+test_assert(count == 5)
+test_assert(data:to_string() == "hello")
+
+status, count = reader:read(data, 64, elf.io.READ_AVAILABLE)
+test_assert(status == elf.io.WOULD_BLOCK)
+test_assert(count == 0)
+test_assert(data:to_string() == "hello")
+
+test_assert(writer:close() == elf.io.SUCCESS)
+test_assert(writer:close() == elf.io.SUCCESS)
+test_assert(writer:is_closed())
+status, count = reader:read(data, 64, elf.io.READ_AVAILABLE)
+test_assert(status == elf.io.END_OF_STREAM)
+test_assert(count == 0)
+test_assert(data:to_string() == "hello")
+test_assert(reader:close() == elf.io.SUCCESS)
+test_assert(reader:is_closed())
+
+ret 8080

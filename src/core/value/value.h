@@ -21,6 +21,8 @@ struct elf_Value
 		elf_Object   *x_obj;
 		elf_Table    *x_tab;
 		elf_String   *x_string;
+		elf_ByteBuffer *x_buffer;
+		elf_UserObject *x_user;
 		elf_Function  x_proc;
 		elf_Closure  *x_closure;
 		void         *x_ptr;
@@ -34,7 +36,9 @@ static inline b32 type_is_object(elf_ValueType type)
 	return type == ELF_VALUE_TYPE_USER_OBJECT
 	||     type == ELF_VALUE_TYPE_CLOSURE
 	||     type == ELF_VALUE_TYPE_TABLE
-	||     type == ELF_VALUE_TYPE_STRING;
+	||     type == ELF_VALUE_TYPE_STRING
+	||     type == ELF_VALUE_TYPE_ERROR
+	||     type == ELF_VALUE_TYPE_BUFFER;
 }
 
 static inline b32 type_is_nil(elf_ValueType type)      { return type == ELF_VALUE_TYPE_NIL; }
@@ -42,6 +46,8 @@ static inline b32 type_is_number(elf_ValueType type)   { return type == ELF_VALU
 static inline b32 type_is_integer(elf_ValueType type)  { return type == ELF_VALUE_TYPE_INTEGER; }
 static inline b32 type_is_string(elf_ValueType type)   { return type == ELF_VALUE_TYPE_STRING; }
 static inline b32 type_is_table(elf_ValueType type)    { return type == ELF_VALUE_TYPE_TABLE; }
+static inline b32 type_is_error(elf_ValueType type)    { return type == ELF_VALUE_TYPE_ERROR; }
+static inline b32 type_is_buffer(elf_ValueType type)   { return type == ELF_VALUE_TYPE_BUFFER; }
 static inline b32 type_is_user(elf_ValueType type)     { return type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 type_is_function(elf_ValueType type) { return type == ELF_VALUE_TYPE_CFUNCTION; }
 static inline b32 type_is_closure(elf_ValueType type)  { return type == ELF_VALUE_TYPE_CLOSURE; }
@@ -63,6 +69,8 @@ static inline b32 value_is_number(elf_Value value)   { return value.type == ELF_
 static inline b32 value_is_integer(elf_Value value)  { return value.type == ELF_VALUE_TYPE_INTEGER; }
 static inline b32 value_is_string(elf_Value value)   { return value.type == ELF_VALUE_TYPE_STRING; }
 static inline b32 value_is_table(elf_Value value)    { return value.type == ELF_VALUE_TYPE_TABLE; }
+static inline b32 value_is_error(elf_Value value)    { return value.type == ELF_VALUE_TYPE_ERROR; }
+static inline b32 value_is_buffer(elf_Value value)   { return value.type == ELF_VALUE_TYPE_BUFFER; }
 static inline b32 value_is_user(elf_Value value)     { return value.type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 value_is_function(elf_Value value) { return value.type == ELF_VALUE_TYPE_CFUNCTION; }
 static inline b32 value_is_closure(elf_Value value)  { return value.type == ELF_VALUE_TYPE_CLOSURE; }
@@ -87,6 +95,9 @@ static inline f64 value_as_number(elf_Value value)           { return value.x_nu
 static inline elf_Object *value_as_object(elf_Value value)   { return value.x_obj; }
 static inline elf_String *value_as_string(elf_Value value)   { return value.x_string; }
 static inline elf_Table *value_as_table(elf_Value value)     { return value.x_tab; }
+static inline elf_Table *value_as_error(elf_Value value)     { return value.x_tab; }
+static inline elf_ByteBuffer *value_as_buffer(elf_Value value){ return value.x_buffer; }
+static inline elf_UserObject *value_as_user(elf_Value value)  { return value.x_user; }
 static inline elf_Closure *value_as_closure(elf_Value value) { return value.x_closure; }
 static inline elf_Function value_as_function(elf_Value value){ return value.x_proc; }
 
@@ -161,6 +172,33 @@ static inline elf_Value value_from_table(elf_Table *table)
 	return value;
 }
 
+static inline elf_Value value_from_error(elf_Table *info)
+{
+	ASSERT(info != 0);
+	elf_Value value = {};
+	value.type = ELF_VALUE_TYPE_ERROR;
+	value.x_tab = info;
+	return value;
+}
+
+static inline elf_Value value_from_buffer(elf_ByteBuffer *buffer)
+{
+	ASSERT(buffer != 0);
+	elf_Value value = {};
+	value.type = ELF_VALUE_TYPE_BUFFER;
+	value.x_buffer = buffer;
+	return value;
+}
+
+static inline elf_Value value_from_user(elf_UserObject *user)
+{
+	ASSERT(user != 0);
+	elf_Value value = {};
+	value.type = ELF_VALUE_TYPE_USER_OBJECT;
+	value.x_user = user;
+	return value;
+}
+
 static inline elf_Value value_from_function(elf_Function function)
 {
 	ASSERT(function != 0);
@@ -186,11 +224,13 @@ static const char *value_type_name(elf_ValueType type)
 		[ELF_VALUE_TYPE_NIL]         = "nil",
 		[ELF_VALUE_TYPE_NUMBER]      = "number",
 		[ELF_VALUE_TYPE_INTEGER]     = "integer",
-		[ELF_VALUE_TYPE_USER_OBJECT] = "resource",
+		[ELF_VALUE_TYPE_USER_OBJECT] = "user object",
 		[ELF_VALUE_TYPE_CFUNCTION]   = "function",
 		[ELF_VALUE_TYPE_CLOSURE]     = "closure",
 		[ELF_VALUE_TYPE_STRING]      = "string",
 		[ELF_VALUE_TYPE_TABLE]       = "table",
+		[ELF_VALUE_TYPE_ERROR]       = "error",
+		[ELF_VALUE_TYPE_BUFFER]      = "buffer",
 	};
 
 	if ((u32)type >= ELF_VALUE_TYPE_COUNT_ || !names[type]) {

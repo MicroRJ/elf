@@ -1,0 +1,73 @@
+buffer := elf.buffer(2)
+test_assert(elf.type_of(buffer) == "buffer")
+test_assert(elf.type_of(elf.metatable(buffer)) == "table")
+test_assert(buffer:length() == 0)
+test_assert(buffer:capacity() >= 2)
+
+test_assert(buffer:append("A\0C") == buffer)
+test_assert(buffer:length() == 3)
+test_assert(buffer[0] == 65)
+test_assert(buffer[1] == 0)
+test_assert(buffer[-1] == 67)
+test_assert(buffer:byte(-1) == 67)
+
+buffer[1] = 66
+test_assert(buffer:set(-1, 68) == buffer)
+test_assert(buffer:to_string() == "ABD")
+
+slice := buffer:slice(1)
+test_assert(elf.type_of(slice) == "buffer")
+test_assert(slice:to_string() == "BD")
+slice[0] = 69
+test_assert(slice:to_string() == "ED")
+test_assert(buffer:to_string() == "ABD")
+
+test_assert(buffer:reserve(64) == buffer)
+test_assert(buffer:capacity() >= 64)
+test_assert(buffer:length() == 3)
+test_assert(buffer:resize(5) == buffer)
+test_assert(buffer[3] == 0)
+test_assert(buffer[4] == 0)
+buffer[3] = 69
+buffer[4] = 70
+test_assert(buffer:to_string() == "ABDEF")
+
+test_assert(buffer:clear() == buffer)
+test_assert(buffer:length() == 0)
+test_assert(buffer:capacity() >= 64)
+test_assert(elf.to_string(buffer) == "buffer(0)")
+
+buffer:append("xy")
+buffer:append(buffer)
+test_assert(buffer:to_string() == "xyxy")
+
+patched := elf.buffer():append("abcdef")
+test_assert(patched:patch(2, 2, "XY") == patched)
+test_assert(patched:to_string() == "abXYef")
+patched:patch(2, 0, "-")
+test_assert(patched:to_string() == "ab-XYef")
+patched:patch(2, 1, "")
+test_assert(patched:to_string() == "abXYef")
+patched:patch(-2, 1, "Q")
+test_assert(patched:to_string() == "abXYQf")
+patched:patch(patched:length(), 0, "!")
+test_assert(patched:to_string() == "abXYQf!")
+
+self_patch := elf.buffer():append("abc")
+self_patch:patch(1, 1, self_patch)
+test_assert(self_patch:to_string() == "aabcc")
+
+replacement := elf.buffer():append("12")
+patched:patch(2, 2, replacement)
+test_assert(patched:to_string() == "ab12Qf!")
+
+empty := elf.buffer()
+test_assert(empty:length() == 0)
+test_assert(empty:capacity() == 0)
+test_assert(empty:to_string() == "")
+
+frozen := elf.freeze(elf.buffer():append("fixed"))
+test_assert(elf.is_readonly(frozen))
+test_assert(frozen:to_string() == "fixed")
+
+ret 5150

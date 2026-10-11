@@ -9,6 +9,8 @@
 #include "compiler.h"
 #include "value_text.h"
 
+static elf_Value *value_at(elf_State *state, elf_Index index);
+
 const char *elf_version(void)
 {
 	return ELF_VERSION;
@@ -47,6 +49,39 @@ void elf_push_str(elf_State *state, const char *data, elf_Size size)
 	push_value(state, value_from_string(elf_string_from_data_size(state, data, size)));
 }
 
+void elf_push_error(elf_State *state, const char *message)
+{
+	elf_Table *info = elf_new_table_rogue(state);
+	push_value(state, value_from_error(info));
+	elf_push_cstr(state, message ? message : "error");
+	elf_Value key = value_from_string(elf_string_from_data(state, "message"));
+	elf_table_set(state, info, key, pop_value(state));
+}
+
+elf_ErrorCode elf_push_buffer(elf_State *state, elf_Size capacity)
+{
+	if (!state) return ELF_ERROR_INVALID_ARGUMENT;
+	if (capacity > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
+	push_value(state, value_from_buffer(elf_buffer_new_object(state, (u32)capacity)));
+	return ELF_ERROR_NONE;
+}
+
+elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
+	elf_Index metatable, elf_Size size, void **data)
+{
+	if (data) *data = 0;
+	if (!state || !type || !type->name || !data) return ELF_ERROR_INVALID_ARGUMENT;
+	elf_Value *metatable_value = value_at(state, metatable);
+	if (!metatable_value) return ELF_ERROR_INVALID_INDEX;
+	if (!value_is_table(*metatable_value)) return ELF_ERROR_TYPE_MISMATCH;
+	if (size > UINT32_MAX - offsetof(elf_UserObject, data)) return ELF_ERROR_OUT_OF_RANGE;
+	elf_UserObject *user = elf_user_object_new(state, type,
+		value_as_table(*metatable_value), (u32)size);
+	push_value(state, value_from_user(user));
+	*data = user->data;
+	return ELF_ERROR_NONE;
+}
+
 static void clear_compile_report(elf_CompileReport *report)
 {
 	if (report) *report = (elf_CompileReport) {};
@@ -57,10 +92,13 @@ void elf_destroy_compile_report(elf_CompileReport *report)
 	if (!report) return;
 	elf_Diagnostic *diagnostics = (elf_Diagnostic *)report->diagnostics;
 	for (elf_Size i = 0; i < report->diagnostic_count; ++i) {
-		free(diagnostics[i].source_name.data);
-		free(diagnostics[i].message.data);
+		elf_free(0, diagnostics[i].source_name.data,
+			diagnostics[i].source_name.size + 1);
+		elf_free(0, diagnostics[i].message.data,
+			diagnostics[i].message.size + 1);
 	}
-	free(diagnostics);
+	elf_free(0, diagnostics,
+		report->diagnostic_count * sizeof(*diagnostics));
 	*report = (elf_CompileReport) {};
 }
 
@@ -120,12 +158,32 @@ static elf_Bool table_at(elf_State *state, elf_Index index, elf_Table **table)
 	return true;
 }
 
+static elf_Bool field_table_at(elf_State *state, elf_Index index, elf_Table **table)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value) return false;
+	if (value_is_table(*value)) *table = value_as_table(*value);
+	else if (value_is_error(*value)) *table = value_as_error(*value);
+	else return false;
+	return true;
+}
+
 static elf_ErrorCode table_at_for_write(elf_State *state, elf_Index index, elf_Table **table)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return ELF_ERROR_INVALID_INDEX;
 	if (!value_is_table(*value)) return ELF_ERROR_TYPE_MISMATCH;
 	*table = value_as_table(*value);
+	return ELF_ERROR_NONE;
+}
+
+static elf_ErrorCode field_table_at_for_write(elf_State *state, elf_Index index, elf_Table **table)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value) return ELF_ERROR_INVALID_INDEX;
+	if (value_is_table(*value)) *table = value_as_table(*value);
+	else if (value_is_error(*value)) *table = value_as_error(*value);
+	else return ELF_ERROR_TYPE_MISMATCH;
 	return ELF_ERROR_NONE;
 }
 
@@ -220,6 +278,24 @@ elf_Bool elf_is_callable(elf_State *state, elf_Index index)
 	return value && value_is_callable(*value);
 }
 
+elf_Bool elf_is_error(elf_State *state, elf_Index index)
+{
+	elf_Value *value = value_at(state, index);
+	return value && value_is_error(*value);
+}
+
+elf_Bool elf_is_buffer(elf_State *state, elf_Index index)
+{
+	elf_Value *value = value_at(state, index);
+	return value && value_is_buffer(*value);
+}
+
+elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type)
+{
+	elf_Value *value = value_at(state, index);
+	return value && value_is_user(*value) && (!type || value_as_user(*value)->type == type);
+}
+
 elf_Bool elf_to_int(elf_State *state, elf_Index index, elf_Int *result)
 {
 	elf_Value *value = value_at(state, index);
@@ -252,6 +328,26 @@ elf_Bool elf_to_cstr(elf_State *state, elf_Index index, const char **result)
 	if (!result || !elf_to_str(state, index, &string)) return false;
 	*result = string.data;
 	return true;
+}
+
+elf_Bool elf_to_buffer(elf_State *state, elf_Index index, elf_BufferView *result)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value || !value_is_buffer(*value) || !result) return false;
+	elf_ByteBuffer *buffer = value_as_buffer(*value);
+	result->data = buffer->data;
+	result->size = buffer->size;
+	result->capacity = buffer->capacity;
+	return true;
+}
+
+void *elf_to_user_object(elf_State *state, elf_Index index, const elf_UserType *type)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value || !value_is_user(*value)) return 0;
+	elf_UserObject *user = value_as_user(*value);
+	if (type && user->type != type) return 0;
+	return user->data;
 }
 
 elf_Bool elf_push_value_text(elf_State *state, elf_Index index)
@@ -292,16 +388,18 @@ void elf_new_table(elf_State *state)
 
 elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length)
 {
-	elf_Table *table;
-	if (!length || !table_at(state, index, &table)) return false;
-	*length = elf_array_length(table);
+	elf_Value *value = value_at(state, index);
+	if (!length || !value) return false;
+	if (value_is_table(*value)) *length = elf_array_length(value_as_table(*value));
+	else if (value_is_buffer(*value)) *length = value_as_buffer(*value)->size;
+	else return false;
 	return true;
 }
 
 elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field)
 {
 	elf_Table *table;
-	if (!field || !table_at(state, index, &table)) return false;
+	if (!field || !field_table_at(state, index, &table)) return false;
 	elf_Value key = value_from_string(elf_string_from_data(state, field));
 	push_value(state, elf_table_get_or_nil(state, table, key));
 	return true;
@@ -311,7 +409,7 @@ elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field
 {
 	elf_Table *table;
 	if (!field) return ELF_ERROR_INVALID_ARGUMENT;
-	elf_ErrorCode error = table_at_for_write(state, index, &table);
+	elf_ErrorCode error = field_table_at_for_write(state, index, &table);
 	if (error != ELF_ERROR_NONE) return error;
 	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
 	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
@@ -323,23 +421,50 @@ elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field
 
 elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element)
 {
-	elf_Table *table;
-	if (!table_at(state, index, &table)) return false;
-	push_value(state, element < table->count ? table->array[element] : value_nil());
+	elf_Value *value = value_at(state, index);
+	if (!value) return false;
+	if (value_is_table(*value))
+	{
+		elf_Table *table = value_as_table(*value);
+		push_value(state, element < table->count ? table->array[element] : value_nil());
+	}
+	else if (value_is_buffer(*value))
+	{
+		elf_ByteBuffer *buffer = value_as_buffer(*value);
+		if (element >= buffer->size) return false;
+		push_value(state, value_from_integer(buffer->data[element]));
+	}
+	else return false;
 	return true;
 }
 
 elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 {
-	elf_Table *table;
-	elf_ErrorCode error = table_at_for_write(state, index, &table);
-	if (error != ELF_ERROR_NONE) return error;
+	elf_Value *target = value_at(state, index);
+	if (!target) return ELF_ERROR_INVALID_INDEX;
 	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
-	if (element > table->count) return ELF_ERROR_OUT_OF_RANGE;
-	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
-	elf_Value value = pop_value(state);
-	if (element == table->count) elf_array_add(state, table, value);
-	else elf_array_set(state, table, element, value);
+	if (value_is_table(*target))
+	{
+		elf_Table *table = value_as_table(*target);
+		if (element > table->count) return ELF_ERROR_OUT_OF_RANGE;
+		if (table_is_readonly(table)) return ELF_ERROR_READONLY;
+		elf_Value value = pop_value(state);
+		if (element == table->count) elf_array_add(state, table, value);
+		else elf_array_set(state, table, element, value);
+	}
+	else if (value_is_buffer(*target))
+	{
+		elf_ByteBuffer *buffer = value_as_buffer(*target);
+		elf_Value value = state->stack_ptr[-1];
+		if (element >= buffer->size) return ELF_ERROR_OUT_OF_RANGE;
+		if (!value_is_integer(value)) return ELF_ERROR_TYPE_MISMATCH;
+		if (value_as_integer(value) < 0 || value_as_integer(value) > UINT8_MAX)
+			return ELF_ERROR_OUT_OF_RANGE;
+		if (buffer->obj.status & ELF_OBJECT_READONLY) return ELF_ERROR_READONLY;
+		pop_value(state);
+		buffer->data[element] = (u8)value_as_integer(value);
+	}
+	else return ELF_ERROR_TYPE_MISMATCH;
 	return ELF_ERROR_NONE;
 }
 
@@ -352,6 +477,67 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
 	elf_array_add(state, table, pop_value(state));
 	return ELF_ERROR_NONE;
+}
+
+static elf_ErrorCode mutable_buffer_at(elf_State *state, elf_Index index,
+	elf_ByteBuffer **result)
+{
+	elf_Value *value = value_at(state, index);
+	if (!value) return ELF_ERROR_INVALID_INDEX;
+	if (!value_is_buffer(*value)) return ELF_ERROR_TYPE_MISMATCH;
+	elf_ByteBuffer *buffer = value_as_buffer(*value);
+	if (buffer->obj.status & ELF_OBJECT_READONLY) return ELF_ERROR_READONLY;
+	*result = buffer;
+	return ELF_ERROR_NONE;
+}
+
+elf_ErrorCode elf_buffer_reserve(elf_State *state, elf_Index index, elf_Size capacity)
+{
+	elf_ByteBuffer *buffer;
+	if (capacity > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
+	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
+	if (error != ELF_ERROR_NONE) return error;
+	return elf_buffer_reserve_object(state, buffer, (u32)capacity) ?
+		ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
+}
+
+elf_ErrorCode elf_buffer_resize(elf_State *state, elf_Index index, elf_Size size)
+{
+	elf_ByteBuffer *buffer;
+	if (size > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
+	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
+	if (error != ELF_ERROR_NONE) return error;
+	return elf_buffer_resize_object(state, buffer, (u32)size) ?
+		ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
+}
+
+elf_ErrorCode elf_buffer_append(elf_State *state, elf_Index index,
+	const void *data, elf_Size size)
+{
+	elf_ByteBuffer *buffer;
+	if (!data && size) return ELF_ERROR_INVALID_ARGUMENT;
+	if (size > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
+	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
+	if (error != ELF_ERROR_NONE) return error;
+	if (size > UINT32_MAX - buffer->size) return ELF_ERROR_OUT_OF_RANGE;
+	return elf_buffer_append_object(state, buffer, data, (u32)size) ?
+		ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
+}
+
+elf_ErrorCode elf_buffer_patch(elf_State *state, elf_Index index, elf_Size position,
+	elf_Size delete_size, const void *data, elf_Size insert_size)
+{
+	elf_ByteBuffer *buffer;
+	if (!data && insert_size) return ELF_ERROR_INVALID_ARGUMENT;
+	if (position > UINT32_MAX || delete_size > UINT32_MAX || insert_size > UINT32_MAX)
+		return ELF_ERROR_OUT_OF_RANGE;
+	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
+	if (error != ELF_ERROR_NONE) return error;
+	if (position > buffer->size || delete_size > buffer->size - position ||
+		insert_size > UINT32_MAX - (buffer->size - delete_size))
+		return ELF_ERROR_OUT_OF_RANGE;
+	return elf_buffer_patch_object(state, buffer, (u32)position, (u32)delete_size,
+		data, (u32)insert_size) ? ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
 }
 
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)

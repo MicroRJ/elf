@@ -1,0 +1,295 @@
+//
+// JSON parsing and serialization.
+//
+
+typedef struct
+{
+	elf_State  *state;
+	char       *data;
+	u64         count;
+	u64      capacity;
+	const char *error;
+	elf_Table  *ancestors[256];
+}
+JsonWriter;
+
+static void json_push_error_value(elf_State *state, const char *message, const elf_Diagnostic *diagnostic)
+{
+	elf_Table *info = elf_new_table_rogue(state);
+	push_value(state, value_from_error(info));
+
+	elf_Value message_key = value_from_string(elf_string_from_data(state, "message"));
+	elf_Value message_value = value_from_string(elf_string_from_data(state, message ? message : "JSON error"));
+	elf_table_set(state, info, message_key, message_value);
+
+	if (diagnostic)
+	{
+		elf_Value line_key = value_from_string(elf_string_from_data(state, "line"));
+		elf_Value column_key = value_from_string(elf_string_from_data(state, "column"));
+		elf_table_set(state, info, line_key, value_from_integer(diagnostic->line));
+		elf_table_set(state, info, column_key, value_from_integer((i64)diagnostic->column));
+	}
+}
+
+static b32 json_writer_reserve(JsonWriter *writer, u64 additional)
+{
+	if (writer->error) return false;
+	if (additional > UINT64_MAX - writer->count)
+	{
+		writer->error = "JSON output is too large";
+		return false;
+	}
+
+	u64 required = writer->count + additional;
+	if (required <= writer->capacity) return true;
+
+	u64 capacity = writer->capacity ? writer->capacity : 256;
+	while (capacity < required)
+	{
+		if (capacity > UINT64_MAX / 2)
+		{
+			writer->error = "JSON output is too large";
+			return false;
+		}
+		capacity *= 2;
+	}
+	if (capacity > SIZE_MAX)
+	{
+		writer->error = "JSON output is too large";
+		return false;
+	}
+
+	char *data = elf_realloc(writer->state, writer->data,
+		writer->capacity, capacity);
+	if (!data)
+	{
+		writer->error = "could not allocate JSON output";
+		return false;
+	}
+	writer->data = data;
+	writer->capacity = capacity;
+	return true;
+}
+
+static void json_writer_append(JsonWriter *writer, const char *data, u64 size)
+{
+	if (!json_writer_reserve(writer, size)) return;
+	copy_memory(writer->data + writer->count, data, size);
+	writer->count += size;
+}
+
+static void json_writer_char(JsonWriter *writer, char character)
+{
+	json_writer_append(writer, &character, 1);
+}
+
+static void json_writer_string(JsonWriter *writer, elf_String *string)
+{
+	static const char hex[] = "0123456789abcdef";
+	json_writer_char(writer, '"');
+	const u8 *data = (const u8 *)string_data(string);
+	for (u32 i = 0; i < string_size(string) && !writer->error; ++i)
+	{
+		u8 byte = data[i];
+		switch (byte)
+		{
+			case '"': json_writer_append(writer, "\\\"", 2); break;
+			case '\\': json_writer_append(writer, "\\\\", 2); break;
+			case '\b': json_writer_append(writer, "\\b", 2); break;
+			case '\f': json_writer_append(writer, "\\f", 2); break;
+			case '\n': json_writer_append(writer, "\\n", 2); break;
+			case '\r': json_writer_append(writer, "\\r", 2); break;
+			case '\t': json_writer_append(writer, "\\t", 2); break;
+			default:
+			{
+				if (byte < 0x20)
+				{
+					char escape[] = {'\\', 'u', '0', '0', hex[byte >> 4], hex[byte & 15]};
+					json_writer_append(writer, escape, sizeof(escape));
+				}
+				else
+				{
+					json_writer_char(writer, (char)byte);
+				}
+			}
+			break;
+		}
+	}
+	json_writer_char(writer, '"');
+}
+
+static b32 json_table_index_has_key(elf_Table *table, u32 value_index)
+{
+	for (u32 i = 0; i < table->nentries; ++i)
+	{
+		Entry entry = table->entries[i];
+		if (entry_is_key(entry) && entry_index(entry) == value_index) return true;
+	}
+	return false;
+}
+
+static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth);
+
+static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
+{
+	if (depth >= ARRAY_COUNT(writer->ancestors))
+	{
+		writer->error = "JSON value exceeds the maximum nesting depth";
+		return;
+	}
+	for (u32 i = 0; i < depth; ++i)
+	{
+		if (writer->ancestors[i] == table)
+		{
+			writer->error = "cannot stringify a cyclic table";
+			return;
+		}
+	}
+	writer->ancestors[depth] = table;
+
+	u32 count = elf_array_length(table);
+	u32 keyed_values = 0;
+	for (u32 i = 0; i < count; ++i)
+	{
+		if (json_table_index_has_key(table, i)) keyed_values += 1;
+	}
+
+	TableJsonShape shape = (TableJsonShape)table->json_shape;
+	if (shape == TABLE_JSON_SHAPE_NONE)
+	{
+		shape = keyed_values ? TABLE_JSON_SHAPE_OBJECT : TABLE_JSON_SHAPE_ARRAY;
+		if (count == 0) shape = TABLE_JSON_SHAPE_OBJECT;
+	}
+
+	if (shape == TABLE_JSON_SHAPE_ARRAY)
+	{
+		if (keyed_values)
+		{
+			writer->error = "cannot stringify a table containing both fields and array values";
+			return;
+		}
+
+		json_writer_char(writer, '[');
+		for (u32 i = 0; i < count && !writer->error; ++i)
+		{
+			if (i) json_writer_char(writer, ',');
+			json_write_value(writer, table->array[i], depth + 1);
+		}
+		json_writer_char(writer, ']');
+		return;
+	}
+
+	if (keyed_values != count)
+	{
+		writer->error = "cannot stringify a table containing both fields and array values";
+		return;
+	}
+
+	json_writer_char(writer, '{');
+	b32 wrote_entry = false;
+	for (u32 value_index = 0; value_index < count && !writer->error; ++value_index)
+	{
+		for (u32 i = 0; i < table->nentries && !writer->error; ++i)
+		{
+			Entry entry = table->entries[i];
+			if (!entry_is_key(entry) || entry_index(entry) != value_index) continue;
+
+			elf_Value key = entry_key_value(entry);
+			if (!value_is_string(key))
+			{
+				writer->error = "JSON object keys must be strings";
+				break;
+			}
+			if (wrote_entry) json_writer_char(writer, ',');
+			wrote_entry = true;
+			json_writer_string(writer, value_as_string(key));
+			json_writer_char(writer, ':');
+			json_write_value(writer, table->array[value_index], depth + 1);
+		}
+	}
+	json_writer_char(writer, '}');
+}
+
+static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
+{
+	if (writer->error) return;
+
+	if (value_is_nil(value))
+	{
+		json_writer_append(writer, "null", 4);
+	}
+	else if (value_is_integer(value))
+	{
+		char number[32];
+		int size = snprintf(number, sizeof(number), "%lld", (long long)value_as_integer(value));
+		json_writer_append(writer, number, (u64)size);
+	}
+	else if (value_is_number(value))
+	{
+		f64 number_value = value_as_number(value);
+		if (!isfinite(number_value))
+		{
+			writer->error = "JSON cannot represent non-finite numbers";
+			return;
+		}
+		char number[64];
+		int size = snprintf(number, sizeof(number), "%.17g", number_value);
+		json_writer_append(writer, number, (u64)size);
+	}
+	else if (value_is_string(value))
+	{
+		json_writer_string(writer, value_as_string(value));
+	}
+	else if (value_is_table(value))
+	{
+		json_write_table(writer, value_as_table(value), depth);
+	}
+	else
+	{
+		writer->error = "value cannot be represented as JSON";
+	}
+}
+
+ELF_FUNCTION(l_json_parse)
+{
+	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
+	elf_String *text = lib_load_string(S, 1);
+	elf_StrSlice source = {(char *)string_data(text), string_size(text)};
+	elf_CompileReport report = {};
+	elf_ErrorCode result = elf_push_json(S, "<json>", source, &report);
+	if (result != ELF_ERROR_NONE)
+	{
+		const elf_Diagnostic *diagnostic = report.diagnostic_count ? report.diagnostics : 0;
+		const char *message = diagnostic ? diagnostic->message.data : "invalid JSON";
+		json_push_error_value(S, message, diagnostic);
+	}
+	elf_destroy_compile_report(&report);
+	return 1;
+}
+
+ELF_FUNCTION(l_json_stringify)
+{
+	lib_check_arg_count(S, "json.stringify", nargs, 1, 1);
+	JsonWriter writer = {.state = S};
+	json_write_value(&writer, load_value(S, 1), 0);
+	if (writer.error)
+	{
+		json_push_error_value(S, writer.error, 0);
+	}
+	else
+	{
+		elf_push_str(S, writer.data ? writer.data : "", writer.count);
+	}
+	elf_free(S, writer.data, writer.capacity);
+	return 1;
+}
+
+static const elf_Binding l_json[] = {
+	{"parse",     l_json_parse},
+	{"stringify", l_json_stringify},
+};
+
+static elf_Table *elf_lib_json(elf_State *state)
+{
+	return new_binding_table(state, l_json, ARRAY_COUNT(l_json));
+}

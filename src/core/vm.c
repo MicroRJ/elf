@@ -110,6 +110,7 @@ activate_frame:
 		frame->instruction = instruction;
 
 		Bytecode byte = code[instr];
+		state->vm_instructions += 1;
 
 		switch (byte.b_type) {
 			case BC_HALT: {
@@ -236,7 +237,9 @@ activate_frame:
 			} break;
 
 			case BC_TABLE: {
-				*vm_slot(reference, byte.b_x) = value_from_table(elf_new_table_rogue(state));
+				elf_Table *table = elf_new_table_rogue(state);
+				table->json_shape = (u8)byte.b_y;
+				*vm_slot(reference, byte.b_x) = value_from_table(table);
 			} break;
 
 			case BC_CLOSURE: {
@@ -266,6 +269,10 @@ activate_frame:
 						*result = elf_table_get_or_nil(state, value_as_table(object), field);
 					} break;
 
+					case ELF_VALUE_TYPE_ERROR: {
+						*result = elf_table_get_or_nil(state, value_as_error(object), field);
+					} break;
+
 					default: {
 						vm_error_invalid_field_arguments(state, object, field);
 					} break;
@@ -290,6 +297,9 @@ activate_frame:
 				else if (value_is_string(table)) {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "strings are readonly, you may not change them");
 				}
+				else if (value_is_error(table)) {
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "errors are readonly, you may not change them");
+				}
 				else {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' value", value_type_name(table.type));
 				}
@@ -310,6 +320,11 @@ activate_frame:
 					u32 index = vm_check_index(state, byte_index, index_value, string_size(string));
 					*result = value_from_integer((u8)string_data(string)[index]);
 				}
+				else if (value_is_buffer(object)) {
+					elf_ByteBuffer *buffer = value_as_buffer(object);
+					u32 index = vm_check_index(state, byte_index, index_value, buffer->size);
+					*result = value_from_integer(buffer->data[index]);
+				}
 				else {
 					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
 						"cannot index '%s' value", value_type_name(object.type));
@@ -317,9 +332,34 @@ activate_frame:
 			} break;
 
 			case BC_SETINDEX: {
-				elf_Table *array = vm_check_array(state, *vm_slot(reference, byte.b_x));
-				u32 index = vm_check_index(state, byte_index, *vm_slot(reference, byte.b_y), elf_array_length(array));
-				elf_array_set(state, array, index, *vm_slot(reference, byte.b_z));
+				elf_Value object = *vm_slot(reference, byte.b_x);
+				elf_Value index_value = *vm_slot(reference, byte.b_y);
+				elf_Value assigned = *vm_slot(reference, byte.b_z);
+				if (value_is_table(object))
+				{
+					elf_Table *array = value_as_table(object);
+					u32 index = vm_check_index(state, byte_index, index_value, elf_array_length(array));
+					elf_array_set(state, array, index, assigned);
+				}
+				else if (value_is_buffer(object))
+				{
+					elf_ByteBuffer *buffer = value_as_buffer(object);
+					u32 index = vm_check_index(state, byte_index, index_value, buffer->size);
+					check_value_type(state, assigned, ELF_VALUE_TYPE_INTEGER);
+					i64 value = value_as_integer(assigned);
+					if (value < 0 || value > UINT8_MAX)
+					{
+						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+							"buffer byte is out of range: %lld", value);
+					}
+					buffer_require_writable(state, buffer);
+					buffer->data[index] = (u8)value;
+				}
+				else
+				{
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+						"cannot assign through index of '%s' value", value_type_name(object.type));
+				}
 			} break;
 
 			case BC_ARRAYADD: {

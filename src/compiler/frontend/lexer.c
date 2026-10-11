@@ -743,9 +743,9 @@ static void lex(Lexer *lexer)
 				u32 size = lex_identifier(lexer, &cur);
 				Atom *atom = atom_from_data_size(lexer->atoms, start, size);
 				token.type = check_keyword(atom);
-				if (token.type == TOK_IDENTIFIER) {
-					token.atom = atom;
-				}
+				// Keep the spelling for keywords as well. Keywords remain reserved in
+				// expression position, but may be used as field names after '.'.
+				token.atom = atom;
 			}
 		} break;
 

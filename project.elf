@@ -49,6 +49,7 @@ batteries := {
 	},
 	private_include_directories = {
 		"src/batteries/internal",
+		"src/core",
 	},
 	dependencies = {
 		library,

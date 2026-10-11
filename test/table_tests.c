@@ -163,15 +163,29 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "print")), "elf.print is a field function");
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "println")), "elf.println is a field function");
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "to_string")), "elf.to_string is a field function");
+	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "error")), "elf.error is a field function");
+	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "is_error")), "elf.is_error is a field function");
 	expect_nil(elf_table_get_or_nil(state, state->globals, test_key_string(state, "elf.print")), "flattened elf.print global is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "load_expr")), "broken elf.load_expr binding is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "unparse")), "broken elf.unparse binding is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "format")), "obsolete elf.format binding is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "get_obj_pointer")), "raw object pointer binding is absent");
 
-	elf_Value debug_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "debug"));
-	expect_table_value(debug_value, "elf.debug is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(debug_value), test_key_string(state, "memory_bytes")), "elf.debug.memory_bytes is a field function");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "debug")), "redundant elf.debug table is absent");
+
+	elf_Value gc_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "gc"));
+	expect_table_value(gc_value, "elf.gc is a table");
+	expect_function_value(elf_table_get_or_nil(state, value_as_table(gc_value), test_key_string(state, "counters")), "elf.gc.counters is a field function");
+
+	elf_Value vm_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "vm"));
+	expect_table_value(vm_value, "elf.vm is a table");
+	expect_function_value(elf_table_get_or_nil(state, value_as_table(vm_value), test_key_string(state, "counters")), "elf.vm.counters is a field function");
+
+	elf_Value json_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "json"));
+	expect_table_value(json_value, "elf.json is a table");
+	elf_Table *json_table = value_as_table(json_value);
+	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "parse")), "elf.json.parse is a field function");
+	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "stringify")), "elf.json.stringify is a field function");
 
 	elf_Value serialization_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "serialization"));
 	expect_table_value(serialization_value, "elf.serialization is a table");
@@ -216,7 +230,13 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 
 	elf_Value process_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "process"));
 	expect_table_value(process_value, "elf.process is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(process_value), test_key_string(state, "run")), "elf.process.run is a field function");
+	elf_Table *process_table = value_as_table(process_value);
+	expect_function_value(elf_table_get_or_nil(state, process_table, test_key_string(state, "start")), "elf.process.start is a field function");
+	expect_table_value(elf_table_get_or_nil(state, process_table, test_key_string(state, "Process")), "elf.process.Process is a method table");
+
+	elf_Value io_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "io"));
+	expect_table_value(io_value, "elf.io is a table");
+	expect_function_value(elf_table_get_or_nil(state, value_as_table(io_value), test_key_string(state, "pipe")), "elf.io.pipe is a field function");
 
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "os")), "empty elf.os library is absent");
 

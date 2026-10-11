@@ -29,7 +29,9 @@ static void string_state_resize(elf_State *state)
 	elf_String **old_buckets = state->string_buckets;
 
 	state->string_bucket_count <<= 1;
-	state->string_buckets = calloc(state->string_bucket_count, sizeof(*state->string_buckets));
+	state->string_buckets = elf_alloc_zero(state,
+		(u64)state->string_bucket_count * sizeof(*state->string_buckets));
+	ASSERT(state->string_buckets != 0);
 
 	for (u32 i = 0; i < old_bucket_count; ++i) {
 		elf_String *string = old_buckets[i];
@@ -42,7 +44,8 @@ static void string_state_resize(elf_State *state)
 		}
 	}
 
-	free(old_buckets);
+	elf_free(state, old_buckets,
+		(u64)old_bucket_count * sizeof(*old_buckets));
 }
 
 static elf_String *string_find(elf_State *state, const char *data, u32 size, u32 hash)

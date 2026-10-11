@@ -10,8 +10,20 @@ static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value valu
 		case ELF_VALUE_TYPE_TABLE:   return state->metatables.table;
 		case ELF_VALUE_TYPE_NUMBER:  return state->metatables.number;
 		case ELF_VALUE_TYPE_INTEGER: return state->metatables.integer;
+		case ELF_VALUE_TYPE_BUFFER:  return state->metatables.buffer;
+		case ELF_VALUE_TYPE_USER_OBJECT: return value_as_user(value)->metatable;
 		default:                     return 0;
 	}
+}
+
+static inline const char *value_name(elf_Value value)
+{
+	if (value_is_user(value))
+	{
+		elf_UserObject *user = value_as_user(value);
+		if (user->type && user->type->name) return user->type->name;
+	}
+	return value_type_name(value.type);
 }
 
 #define get_num_args(state) ((state)->frame->nargs)
@@ -26,6 +38,8 @@ typedef enum
 	TBIT_CLOSURE  = 1 << ELF_VALUE_TYPE_CLOSURE,
 	TBIT_STRING   = 1 << ELF_VALUE_TYPE_STRING,
 	TBIT_TABLE    = 1 << ELF_VALUE_TYPE_TABLE,
+	TBIT_ERROR    = 1 << ELF_VALUE_TYPE_ERROR,
+	TBIT_BUFFER   = 1 << ELF_VALUE_TYPE_BUFFER,
 
 	TBIT_ALLMASK  = (1 << ELF_VALUE_TYPE_COUNT_) - 1,
 }
@@ -42,10 +56,12 @@ typedef enum
 	TRULE_CLOSURE  = TBIT_CLOSURE,
 	TRULE_STRING   = TBIT_STRING,
 	TRULE_TABLE    = TBIT_TABLE,
+	TRULE_ERROR    = TBIT_ERROR,
+	TRULE_BUFFER   = TBIT_BUFFER,
 
 	TYPE_RULE_ANYTHING = TBIT_ALLMASK,
 	TRULE_NONNIL       = TYPE_RULE_ANYTHING & ~TBIT_NIL,
-	TRULE_OBJECT       = TBIT_USER | TBIT_CLOSURE | TBIT_TABLE,
+	TRULE_OBJECT       = TBIT_USER | TBIT_CLOSURE | TBIT_TABLE | TBIT_ERROR | TBIT_BUFFER,
 	TRULE_CALLABLE     = TBIT_FUNCTION | TBIT_CLOSURE,
 
 	TRULE_COUNT,
@@ -105,10 +121,17 @@ static elf_i32 frame_size(elf_State *state)
 	return state->frame->framesize;
 }
 
+static inline void vm_record_stack_usage(elf_State *state)
+{
+	u64 slots = (u64)(state->stack_ptr - state->stack);
+	state->vm_max_stack_slots = MAX(state->vm_max_stack_slots, slots);
+}
+
 static inline void push_stack(elf_State *S, elf_Value value)
 {
 	ASSERT(S->stack_ptr < S->stack + S->stack_size);
 	*S->stack_ptr++ = value;
+	vm_record_stack_usage(S);
 }
 
 static inline void push_value(elf_State *S, elf_Value value)

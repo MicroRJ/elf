@@ -521,7 +521,7 @@ static BcSlot bg_emit_new_table_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 	}
 
 	out = ensure_slot(gen, out);
-	emit_xy_bc(gen, expr->site, BC_TABLE, unwrap_slot(out), 0);
+	emit_xy_bc(gen, expr->site, BC_TABLE, unwrap_slot(out), expr->ir_table_shape);
 	return out;
 }
 
@@ -580,7 +580,11 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 		return out;
 	}
 
-	out = ensure_slot(gen, out);
+	if (!bc_slot_is_valid(out))
+	{
+		out = alloc_slot(gen);
+		for (u32 i = 1; i < nout; ++i) alloc_slot(gen);
+	}
 
 	if (out.slot != stack_top.slot)
 	{
@@ -1113,6 +1117,22 @@ static void do_stat(BcGen *gen, Ir stat)
 			}
 
 			stat->ir_local.slot = slot;
+		}
+		break;
+
+		case IR_MULTI_LOCAL:
+		{
+			IrArray locals = stat->ir_multi_local.locals;
+			ASSERT(locals.count > 1);
+			BcSlot first = emit_expr(gen, stat->ir_multi_local.expr, NO_MEMORY, locals.count);
+			ASSERT(bc_slot_is_valid(first));
+			for (u32 i = 0; i < locals.count; ++i)
+			{
+				Ir local = locals.items[i];
+				ASSERT(local && local->kind == IR_LOCAL);
+				ASSERT(!bc_slot_is_valid(local->ir_local.slot));
+				local->ir_local.slot = (BcSlot){ first.slot + (i32)i };
+			}
 		}
 		break;
 

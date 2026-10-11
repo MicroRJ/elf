@@ -17,6 +17,19 @@ static Ast parse_if_stat(Parser *parser);
 static Ast parse_json_ast(Parser *parser);
 static Ast parse_json_ast_value(Parser *parser);
 static u32 parse_call_args(Parser *parser);
+static Token consume_token(Parser *parser);
+static Token take_token(Parser *parser, Token_Type type);
+
+static Token take_field_name(Parser *parser)
+{
+	Token token = parser->tok;
+	if (token.type == TOK_IDENTIFIER || (token.type >= TOK_JSON && token.type <= TOK_GLOBAL))
+	{
+		consume_token(parser);
+		return token;
+	}
+	return take_token(parser, TOK_IDENTIFIER);
+}
 
 
 static AstType binary_ast_expr_type_from_token_type(Token_Type type)
@@ -826,7 +839,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 		u32 nargs = 0;
 		do
 		{
-			Token name = take_token(par, TOK_IDENTIFIER);
+			Token name = take_field_name(par);
 			Ast right = create_atom_ast(par, name.site, name.atom);
 			Ast value = create_field_ast(par, tok.site, left, right);
 			push_ast(par, value);
@@ -854,7 +867,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	}
 	else
 	{
-		Token name = take_token(par, TOK_IDENTIFIER);
+		Token name = take_field_name(par);
 		Ast right = create_atom_ast(par, name.site, name.atom);
 		left = create_field_ast(par, tok.site, left, right);
 	}
@@ -937,7 +950,7 @@ static Ast parse_postfix_expr(Parser *parser)
 			case TOK_COLON:
 			{
 				consume_token(parser);
-				Token name = take_token(parser, TOK_IDENTIFIER);
+				Token name = take_field_name(parser);
 				Ast y = create_atom_ast(parser, name.site, name.atom);
 				value = create_meta_field_ast(parser, tok.site, value, y);
 			}
@@ -1366,6 +1379,7 @@ static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
 		case AST_TABLE:
 		{
 			elf_Table *table = elf_new_table_rogue(parser->compiler->state);
+			table->json_shape = ast->table.json_shape;
 			for (u32 i = 0; i < ast->table.nargs; ++ i)
 			{
 				Ast entry_ast = ast->table.args[i];

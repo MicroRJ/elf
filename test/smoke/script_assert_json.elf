@@ -22,4 +22,25 @@ test_assert(data.items[2].nested == "yes")
 test_assert(data.escaped == "a\nb")
 test_assert(data.unicode == "\u263A")
 
+parsed := elf.json.parse("{\"name\":\"elf\",\"items\":[1,2,null]}")
+test_assert(parsed.name == "elf")
+test_assert(parsed.items[0] == 1)
+test_assert(parsed.items[2] == nil)
+
+test_assert(elf.json.stringify(parsed) == "{\"name\":\"elf\",\"items\":[1,2,null]}")
+test_assert(elf.json.stringify(elf.json.parse("[]")) == "[]")
+test_assert(elf.json.stringify(elf.json.parse("{}")) == "{}")
+test_assert(elf.json.stringify(json []) == "[]")
+test_assert(elf.json.stringify(json {}) == "{}")
+test_assert(elf.json.stringify(nil) == "null")
+
+invalid := elf.json.parse("{")
+test_assert(elf.is_error(invalid))
+test_assert(invalid.line == 1)
+
+cyclic := {}
+cyclic.self = cyclic
+test_assert(elf.is_error(elf.json.stringify(cyclic)))
+test_assert(elf.is_error(elf.json.stringify(fun() {})))
+
 ret 321

@@ -40,6 +40,7 @@ Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, 
 	compiler->state = state;
 	compiler->arena = arena;
 	compiler->source_name = name;
+	compiler->log_diagnostics = true;
 	compiler->source.data = source.data;
 	if (source.size > 0xffffffffu) {
 		compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER,
@@ -61,7 +62,9 @@ void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_D
 	ASSERT(compiler);
 	if (compiler->diagnostic_count == compiler->diagnostic_capacity) {
 		u32 capacity = compiler->diagnostic_capacity ? compiler->diagnostic_capacity * 2 : 16;
-		elf_Diagnostic *diagnostics = realloc(compiler->diagnostics, sizeof(*diagnostics) * capacity);
+		elf_Diagnostic *diagnostics = elf_realloc(compiler->state, compiler->diagnostics,
+			(u64)sizeof(*diagnostics) * compiler->diagnostic_capacity,
+			(u64)sizeof(*diagnostics) * capacity);
 		ASSERT(diagnostics);
 		zero_memory(diagnostics + compiler->diagnostic_capacity,
 			sizeof(*diagnostics) * (capacity - compiler->diagnostic_capacity));
@@ -74,7 +77,7 @@ void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_D
 	int message_size = vsnprintf(0, 0, format, count_args);
 	va_end(count_args);
 	ASSERT(message_size >= 0);
-	char *message = malloc((u64)message_size + 1);
+	char *message = elf_alloc(compiler->state, (u64)message_size + 1);
 	ASSERT(message);
 	vsnprintf(message, (u64)message_size + 1, format, args);
 
@@ -92,18 +95,21 @@ void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_D
 	if (severity == ELF_DIAGNOSTIC_ERROR) compiler->error_count += 1;
 	else if (severity == ELF_DIAGNOSTIC_WARNING) compiler->warning_count += 1;
 
-	LogLevel level = severity == ELF_DIAGNOSTIC_ERROR ? LOG_LEVEL_ERROR :
-		severity == ELF_DIAGNOSTIC_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
-	const char *severity_name = severity == ELF_DIAGNOSTIC_ERROR ? "error" :
-		severity == ELF_DIAGNOSTIC_WARNING ? "warning" : "note";
-	if (site.line_index) {
-		log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index,
-			source_slice_column(site), severity_name, message);
+	if (compiler->log_diagnostics)
+	{
+		LogLevel level = severity == ELF_DIAGNOSTIC_ERROR ? LOG_LEVEL_ERROR :
+			severity == ELF_DIAGNOSTIC_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
+		const char *severity_name = severity == ELF_DIAGNOSTIC_ERROR ? "error" :
+			severity == ELF_DIAGNOSTIC_WARNING ? "warning" : "note";
+		if (site.line_index) {
+			log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index,
+				source_slice_column(site), severity_name, message);
+		}
+		else {
+			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message);
+		}
+		if (source_slice_is_valid(site)) print_source_slice_marker(site, compiler->source);
 	}
-	else {
-		log_linef(level, "%s [?] %s: %s", source_name, severity_name, message);
-	}
-	if (source_slice_is_valid(site)) print_source_slice_marker(site, compiler->source);
 }
 
 void compiler_report(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase,
@@ -117,7 +123,7 @@ void compiler_report(Compiler *compiler, elf_DiagnosticSeverity severity, elf_Di
 
 static char *copy_compile_report_text(elf_StrSlice text)
 {
-	char *copy = malloc(text.size + 1);
+	char *copy = elf_alloc(0, text.size + 1);
 	ASSERT(copy);
 	copy_memory(copy, text.data, text.size);
 	copy[text.size] = 0;
@@ -130,7 +136,8 @@ void compiler_finish_report(Compiler *compiler, elf_CompileReport *report)
 		*report = (elf_CompileReport) {};
 	}
 	if (report && compiler->diagnostic_count) {
-		elf_Diagnostic *diagnostics = calloc(compiler->diagnostic_count, sizeof(*diagnostics));
+		elf_Diagnostic *diagnostics = elf_alloc_zero(0,
+			(u64)compiler->diagnostic_count * sizeof(*diagnostics));
 		ASSERT(diagnostics);
 		for (u32 i = 0; i < compiler->diagnostic_count; ++i) {
 			diagnostics[i] = compiler->diagnostics[i];
@@ -145,9 +152,11 @@ void compiler_finish_report(Compiler *compiler, elf_CompileReport *report)
 		report->warning_count = compiler->warning_count;
 	}
 	for (u32 i = 0; i < compiler->diagnostic_count; ++i) {
-		free(compiler->diagnostics[i].message.data);
+		elf_free(compiler->state, compiler->diagnostics[i].message.data,
+			compiler->diagnostics[i].message.size + 1);
 	}
-	free(compiler->diagnostics);
+	elf_free(compiler->state, compiler->diagnostics,
+		(u64)compiler->diagnostic_capacity * sizeof(*compiler->diagnostics));
 	compiler->diagnostics = 0;
 	compiler->diagnostic_count = 0;
 	compiler->diagnostic_capacity = 0;
@@ -165,6 +174,7 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 	elf_Value *stack_checkpoint = state->stack_ptr;
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena, name, source);
+	compiler->log_diagnostics = report == 0;
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 

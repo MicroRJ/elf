@@ -157,6 +157,14 @@ static Ir create_local_ir(LowerContext *ctx, SourceSite site, Ir expr)
 	return ir;
 }
 
+static Ir create_multi_local_ir(LowerContext *ctx, SourceSite site, Ir expr, IrArray locals)
+{
+	Ir ir = create_ir(ctx, site, IR_MULTI_LOCAL);
+	ir->ir_multi_local.expr = expr;
+	ir->ir_multi_local.locals = locals;
+	return ir;
+}
+
 static Ir create_load_local_ir(LowerContext *ctx, SourceSite site, Ir local)
 {
 	ASSERT(local);
@@ -188,9 +196,11 @@ static Ir create_call_ir(LowerContext *ctx, SourceSite site, Ir expr, IrArray ar
 	return ir;
 }
 
-static Ir create_table_ir(LowerContext *ctx, SourceSite site)
+static Ir create_table_ir(LowerContext *ctx, SourceSite site, u8 json_shape)
 {
-	return create_nullary_ir(ctx, site, IR_TABLE);
+	Ir ir = create_nullary_ir(ctx, site, IR_TABLE);
+	ir->ir_table_shape = json_shape;
+	return ir;
 }
 
 static Ir create_index_ir(LowerContext *ctx, SourceSite site, Ir x, Ir y)

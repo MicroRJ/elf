@@ -2,6 +2,7 @@
 #define ELF_BATTERY_HELPERS_H
 
 #include "elf.h"
+#include "memory.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -36,22 +37,22 @@ static u32 battery_array_count(size_t size, size_t element_size)
 	return (u32)(size / element_size);
 }
 
-static b32 buffer_reserve(elf_Buffer *buffer, size_t additional)
+static b32 buffer_reserve(elf_State *state, elf_Buffer *buffer, size_t additional)
 {
 	if (additional <= buffer->capacity - buffer->size) return 1;
 	size_t required = buffer->size + additional;
 	size_t capacity = buffer->capacity ? buffer->capacity : 4096;
 	while (capacity < required) capacity *= 2;
-	char *data = realloc(buffer->data, capacity);
+	char *data = elf_realloc(state, buffer->data, buffer->capacity, capacity);
 	if (!data) return 0;
 	buffer->data = data;
 	buffer->capacity = capacity;
 	return 1;
 }
 
-static void buffer_destroy(elf_Buffer *buffer)
+static void buffer_destroy(elf_State *state, elf_Buffer *buffer)
 {
-	free(buffer->data);
+	elf_free(state, buffer->data, buffer->capacity);
 	*buffer = (elf_Buffer){0};
 }
 

@@ -31,7 +31,9 @@ static Ast parse_json_ast_object(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_RIGHT_BRACE))
 	{
-		return create_table_ast(parser, start.site, 0, 0);
+		Ast table = create_table_ast(parser, start.site, 0, 0);
+		table->table.json_shape = TABLE_JSON_SHAPE_OBJECT;
+		return table;
 	}
 
 	b32 done = false;
@@ -54,9 +56,16 @@ static Ast parse_json_ast_object(Parser *parser)
 
 		json_expect_separator_or_end(parser, TOK_RIGHT_BRACE, "expected ',' or '}'", &done);
 	}
+	if (!done)
+	{
+		parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected '}'");
+		return ERROR_AST;
+	}
 
 	Ast *args = pop_ast_array(parser, nargs);
-	return create_table_ast(parser, start.site, args, nargs);
+	Ast table = create_table_ast(parser, start.site, args, nargs);
+	table->table.json_shape = TABLE_JSON_SHAPE_OBJECT;
+	return table;
 }
 
 static Ast parse_json_ast_array(Parser *parser)
@@ -66,7 +75,9 @@ static Ast parse_json_ast_array(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_SQUARE_RIGHT))
 	{
-		return create_table_ast(parser, start.site, 0, 0);
+		Ast table = create_table_ast(parser, start.site, 0, 0);
+		table->table.json_shape = TABLE_JSON_SHAPE_ARRAY;
+		return table;
 	}
 
 	b32 done = false;
@@ -84,9 +95,16 @@ static Ast parse_json_ast_array(Parser *parser)
 
 		json_expect_separator_or_end(parser, TOK_SQUARE_RIGHT, "expected ',' or ']'", &done);
 	}
+	if (!done)
+	{
+		parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected ']'");
+		return ERROR_AST;
+	}
 
 	Ast *args = pop_ast_array(parser, nargs);
-	return create_table_ast(parser, start.site, args, nargs);
+	Ast table = create_table_ast(parser, start.site, args, nargs);
+	table->table.json_shape = TABLE_JSON_SHAPE_ARRAY;
+	return table;
 }
 
 static Ast parse_json_ast_number(Parser *parser)

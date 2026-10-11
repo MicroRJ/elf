@@ -15,6 +15,7 @@ struct Compiler
 	u32             diagnostic_capacity;
 	u32             error_count;
 	u32             warning_count;
+	b32             log_diagnostics;
 };
 
 Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, elf_StrSlice source);

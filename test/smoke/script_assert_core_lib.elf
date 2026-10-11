@@ -11,6 +11,27 @@ test_assert(1e-2 > 0 && 1e-2 < 1)
 test_assert(elf.type_of("elf") == "string")
 test_assert(elf.type_of({}) == "table")
 
+error_details := {
+	kind = "filesystem",
+	code = 2,
+}
+failure := elf.error("file not found", error_details)
+test_assert(elf.type_of(failure) == "error")
+test_assert(elf.is_error(failure))
+test_assert(elf.is_error(error_details) == 0)
+test_assert(failure.message == "file not found")
+test_assert(failure.kind == "filesystem")
+test_assert(failure.code == 2)
+test_assert(failure.missing == nil)
+test_assert(elf.to_string(failure) == "file not found")
+test_assert(elf.is_readonly(failure))
+error_details.kind = "changed"
+test_assert(failure.kind == "filesystem")
+return_error := fun() ret failure
+test_assert(return_error() == failure)
+error_holder := { failure }
+test_assert(error_holder[0].message == "file not found")
+
 test_assert(elf.is_string("elf"))
 test_assert(elf.is_string(7) == 0)
 test_assert(elf.is_numeric(7))
@@ -57,8 +78,68 @@ test_assert(document.items[0] == 3)
 test_assert(document.items[2] == 8)
 test_assert(elf.serialization.load_json_file("test/smoke/does_not_exist.json") == nil)
 
-test_assert(elf.type_of(elf.debug.memory_bytes()) == "integer")
-test_assert(elf.type_of(elf.debug.object_count()) == "integer")
+gc_counters := elf.gc.counters()
+test_assert(elf.type_of(gc_counters.allocated_objects) == "integer")
+test_assert(elf.type_of(gc_counters.allocated_bytes) == "integer")
+test_assert(elf.type_of(gc_counters.allocated_closures) == "integer")
+test_assert(elf.type_of(gc_counters.allocated_tables) == "integer")
+test_assert(elf.type_of(gc_counters.allocated_strings) == "integer")
+test_assert(elf.type_of(gc_counters.allocated_buffers) == "integer")
+test_assert(elf.type_of(gc_counters.freed_objects) == "integer")
+test_assert(elf.type_of(gc_counters.freed_bytes) == "integer")
+test_assert(elf.type_of(gc_counters.collections) == "integer")
+test_assert(elf.type_of(gc_counters.live_objects) == "integer")
+test_assert(elf.type_of(gc_counters.live_bytes) == "integer")
+test_assert(elf.type_of(gc_counters.peak_live_bytes) == "integer")
+test_assert(elf.type_of(gc_counters.collection_time_ns) == "integer")
+test_assert(elf.type_of(gc_counters.last_collection_time_ns) == "integer")
+test_assert(elf.type_of(gc_counters.max_collection_time_ns) == "integer")
+test_assert(gc_counters.peak_live_bytes >= gc_counters.live_bytes)
+test_assert(gc_counters.allocated_bytes - gc_counters.freed_bytes == gc_counters.live_bytes)
+allocated_objects := gc_counters.allocated_objects
+allocated_tables := gc_counters.allocated_tables
+allocated_bytes := gc_counters.allocated_bytes
+allocation_probe := {}
+gc_counters = elf.gc.counters(gc_counters)
+test_assert(gc_counters.allocated_objects > allocated_objects)
+test_assert(gc_counters.allocated_tables == allocated_tables + 2)
+test_assert(gc_counters.allocated_bytes > allocated_bytes)
+reused_objects := gc_counters.allocated_objects
+reused_tables := gc_counters.allocated_tables
+test_assert(elf.gc.counters(gc_counters) == gc_counters)
+test_assert(gc_counters.allocated_objects == reused_objects)
+test_assert(gc_counters.allocated_tables == reused_tables)
+test_assert(allocation_probe:length() == 0)
+
+vm_counters := elf.vm.counters()
+test_assert(elf.type_of(vm_counters.calls) == "integer")
+test_assert(elf.type_of(vm_counters.closure_calls) == "integer")
+test_assert(elf.type_of(vm_counters.native_calls) == "integer")
+test_assert(elf.type_of(vm_counters.instructions) == "integer")
+test_assert(elf.type_of(vm_counters.max_stack_slots) == "integer")
+test_assert(elf.type_of(vm_counters.max_call_depth) == "integer")
+test_assert(vm_counters.instructions > 0)
+test_assert(vm_counters.max_stack_slots > 0)
+test_assert(vm_counters.max_call_depth > 0)
+vm_counters = elf.vm.counters(vm_counters)
+vm_calls := vm_counters.calls
+vm_closure_calls := vm_counters.closure_calls
+vm_native_calls := vm_counters.native_calls
+vm_counters = elf.vm.counters(vm_counters)
+test_assert(vm_counters.calls == vm_calls + 1)
+test_assert(vm_counters.closure_calls == vm_closure_calls)
+test_assert(vm_counters.native_calls == vm_native_calls + 1)
+
+vm_counters = elf.vm.counters(vm_counters)
+vm_calls = vm_counters.calls
+vm_closure_calls = vm_counters.closure_calls
+vm_native_calls = vm_counters.native_calls
+vm_call_probe := fun() {}
+vm_call_probe()
+vm_counters = elf.vm.counters(vm_counters)
+test_assert(vm_counters.calls == vm_calls + 2)
+test_assert(vm_counters.closure_calls == vm_closure_calls + 1)
+test_assert(vm_counters.native_calls == vm_native_calls + 1)
 
 test_assert(elf.fs.get_paths() != nil)
 paths := elf.fs.get_paths("test/smoke")

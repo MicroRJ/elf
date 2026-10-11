@@ -635,7 +635,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			u32 nargs = expr->table.nargs;
 
 			IrFrame table_items = begin_ir_frame(ctx);
-			Ir table_local = create_local_ir(ctx, expr->site, create_table_ir(ctx, expr->site));
+			Ir table_local = create_local_ir(ctx, expr->site,
+				create_table_ir(ctx, expr->site, expr->table.json_shape));
 			push_ir(&table_items, table_local);
 
 			for (u32 i = 0; i < nargs; ++ i)
@@ -835,6 +836,32 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 			push_ir(items, ERROR_IR);
 			return 1;
 		}
+	}
+
+	if (nvars > 1 && expr_tuple->tuple.nargs == 1 &&
+		expr_tuple->tuple.args[0]->kind == AST_CALL)
+	{
+		Ir expr = lower_ast_expr_to_ir(ctx, expr_tuple->tuple.args[0]);
+		Ir *locals = elf_arena_push(ctx->arena, sizeof(*locals) * nvars);
+		for (u32 i = 0; i < nvars; ++i)
+		{
+			Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
+			if (ast_is_error(name))
+			{
+				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL,
+					name_tuple->site, "expected declaration name");
+				push_ir(items, ERROR_IR);
+				return 1;
+			}
+			Ir local = create_local_ir(ctx, name->site, 0);
+			locals[i] = local;
+			ScopeEntity *entity = declare_entity(ctx, name->site,
+				ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+			entity->memory_ir = local;
+		}
+		push_ir(items, create_multi_local_ir(ctx, expr_tuple->site, expr,
+			(IrArray){ .items = locals, .count = nvars }));
+		return nvars;
 	}
 
 	for (u32 i = 0; i < nvars; ++ i)
@@ -1276,22 +1303,35 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 				break;
 			}
 
+			// TODO(RJ): we don't need multi-local! could be done with the same mechanism!
 			Ir *values = elf_arena_push(ctx->arena, sizeof(*values) * nargs);
-			for (u32 i = 0; i < nargs; ++ i)
+			if (expr_tuple->tuple.nargs == 1 && expr_tuple->tuple.args[0]->kind == AST_CALL)
 			{
-				SourceSite site = stat->site;
-				Ir expr_ir;
-				if (i < expr_tuple->tuple.nargs) {
-					Ast expr_ast = expr_tuple->tuple.args[i];
-					site = expr_ast->site;
-					expr_ir = lower_ast_expr_to_ir(ctx, expr_ast);
+				Ast expr_ast = expr_tuple->tuple.args[0];
+				Ir expr_ir = lower_ast_expr_to_ir(ctx, expr_ast);
+				for (u32 i = 0; i < nargs; ++i) {
+					values[i] = create_local_ir(ctx, expr_ast->site, 0);
 				}
-				else {
-					expr_ir = create_nil_ir(ctx, site);
-				}
+				push_ir(items, create_multi_local_ir(ctx, expr_ast->site, expr_ir, (IrArray){ .items = values, .count = nargs }));
+			}
+			else
+			{
+				for (u32 i = 0; i < nargs; ++ i)
+				{
+					SourceSite site = stat->site;
+					Ir expr_ir;
+					if (i < expr_tuple->tuple.nargs) {
+						Ast expr_ast = expr_tuple->tuple.args[i];
+						site = expr_ast->site;
+						expr_ir = lower_ast_expr_to_ir(ctx, expr_ast);
+					}
+					else {
+						expr_ir = create_nil_ir(ctx, site);
+					}
 
-				values[i] = create_local_ir(ctx, site, expr_ir);
-				push_ir(items, values[i]);
+					values[i] = create_local_ir(ctx, site, expr_ir);
+					push_ir(items, values[i]);
+				}
 			}
 
 			for (u32 i = 0; i < nargs; ++ i)
