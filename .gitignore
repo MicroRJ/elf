@@ -4,6 +4,7 @@
 build/*
 .bob/
 .manny/
+.scratch/
 lab/
 *.ilk
 *.exe
