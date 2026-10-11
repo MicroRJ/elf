@@ -19,6 +19,7 @@
 #include "token.h"
 #include "ast.h"
 #include "parser.h"
+#include "static_module.h"
 #include "ir.h"
 #include "bytecode_gen.h"
 #include "lower.h"
@@ -30,6 +31,7 @@
 #include "parse.c"
 #include "parse_json.c"
 
+#include "static_module.c"
 #include "ir.c"
 #include "lower.c"
 #include "bytecode_gen.c"
@@ -247,6 +249,16 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 			compiler_report(compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_PARSER,
 				(SourceSite) {}, "failed to parse source");
 		}
+		state->arena.in_use = arena_checkpoint;
+		goto done;
+	}
+
+	PROF_BLOCK("compiler.static")
+	{
+		compiler->static_module = static_module_collect(compiler, ast_file);
+	}
+	if (compiler->error_count)
+	{
 		state->arena.in_use = arena_checkpoint;
 		goto done;
 	}

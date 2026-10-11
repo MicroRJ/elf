@@ -298,6 +298,9 @@ static Ast elf_parse_file(Parser *parser)
 	if (parser_has_failed(parser)) return ERROR_AST;
 	Token tok = parser->tok;
 	u32 nstats = 0;
+	Ast *static_decls = 0;
+	u32 nstatic_decls = 0;
+	u32 static_decl_capacity = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
 		Token before = parser->tok;
@@ -319,12 +322,27 @@ static Ast elf_parse_file(Parser *parser)
 
 		push_ast(parser, stat);
 		++ nstats;
+		if (stat->kind == AST_STATIC_DECL)
+		{
+			if (nstatic_decls == static_decl_capacity)
+			{
+				u32 capacity = static_decl_capacity ? static_decl_capacity * 2 : 8;
+				Ast *items = elf_arena_push(parser->ast.arena, sizeof(*items) * capacity);
+				if (nstatic_decls) {
+					copy_memory(items, static_decls, sizeof(*items) * nstatic_decls);
+				}
+				static_decls = items;
+				static_decl_capacity = capacity;
+			}
+			static_decls[nstatic_decls++] = stat;
+		}
 	}
 
 	Ast *stats = pop_ast_array(parser, nstats);
 	Ast body = create_block_ast(parser, tok.site, stats, nstats);
 
-	Ast file_ast = create_file_ast(parser, tok.site, body);
+	AstArray static_decl_array = { .nargs = nstatic_decls, .args = static_decls };
+	Ast file_ast = create_file_ast(parser, tok.site, body, static_decl_array);
 	return file_ast;
 }
 

@@ -113,6 +113,9 @@ static void test_parser_static_declaration(elf_State *state)
 	expect_ast_kind(decl->static_decl.expr, AST_ADD, "static declaration stores expression");
 	expect_ast_i64(decl->static_decl.expr->binary.x, 40, "static declaration expression lhs");
 	expect_ast_i64(decl->static_decl.expr->binary.y, 2, "static declaration expression rhs");
+	if (file->file.static_decls.nargs != 1 || file->file.static_decls.args[0] != decl) {
+		test_fail("file ast retains top-level static declarations");
+	}
 }
 
 static void test_parser_string_strings(elf_State *state)

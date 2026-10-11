@@ -127,16 +127,17 @@ struct Ast_T
 
 		struct
 		{
-			Ast body;
+			Ast      body;
+			AstArray static_decls;
 		}
 		file;
 
 		struct
 		{
 			Ast *params;
-			u32    nparams;
-			Ast variadic;
-			Ast    body;
+			u32 nparams;
+			Ast  variadic;
+			Ast  body;
 		}
 		function;
 
