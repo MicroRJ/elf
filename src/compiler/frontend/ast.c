@@ -98,7 +98,9 @@ static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast *par
 static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
 {
 	Ast value = create_nullary_ast(par, site, AST_IMPORT);
-	value->import_path = path;
+	value->import.path = path;
+	value->import.module = COM_MODULE_INVALID;
+	compiler_record_import(par->compiler, par->module, value);
 	return value;
 }
 
@@ -416,7 +418,7 @@ static void print_ast(Printer *pr, Ast tree)
 		break;
 		case AST_IMPORT:
 		{
-			PRINT(pr, "import \"%s\"", atom_data(tree->import_path));
+			PRINT(pr, "import \"%s\"", atom_data(tree->import.path));
 		}
 		break;
 		case AST_INTEGER_LITERAL:

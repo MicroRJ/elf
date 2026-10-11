@@ -122,10 +122,16 @@ struct Ast_T
 	union
 	{
 		Atom *atom;
-		Atom *import_path;
 		i64         integer_value;
 		f64         number_value;
 		AstArray    interpolated_string;
+
+		struct
+		{
+			Atom *path;
+			Com_ModuleId module;
+		}
+		import;
 
 		struct
 		{

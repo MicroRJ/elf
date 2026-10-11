@@ -2,7 +2,8 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 {
 	Parser parser = {};
 	elf_StrSlice source_buffer = {(char *)source, size};
-	parser.compiler = compiler_create(state, &state->arena, "lexer_tests", source_buffer);
+	parser.compiler = compiler_create(state, &state->arena);
+	compiler_add_root_module(parser.compiler, "lexer_tests", source_buffer);
 	parser.arena = &state->arena;
 	parser.module = 0;
 	parser.atoms = parser.compiler->atoms;

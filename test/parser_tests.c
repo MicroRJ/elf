@@ -2,7 +2,8 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(state, &arena, "parser_tests", source);
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_add_root_module(compiler, "parser_tests", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
 	compiler_finish_report(compiler, 0);
@@ -125,9 +126,105 @@ static void test_parser_import_expression(elf_State *state)
 
 	Ast import = decl->static_decl.expr;
 	expect_ast_kind(import, AST_IMPORT, "static declaration stores import expression");
-	if (!import || !import->import_path || strcmp(atom_data(import->import_path), "math.elf") != 0) {
+	if (!import || !import->import.path || strcmp(atom_data(import->import.path), "math.elf") != 0) {
 		test_fail("import expression stores path atom");
 	}
+	if (import && import->import.module != COM_MODULE_INVALID) {
+		test_fail("unresolved import starts with invalid module id");
+	}
+}
+
+typedef struct
+{
+	u32 call_count;
+}
+ParserTestModuleLoader;
+
+static b32 parser_test_module_loader(Com_ModuleLoadParams *params)
+{
+	ParserTestModuleLoader *loader = params->user_data;
+	loader->call_count += 1;
+	const char *path = atom_data(params->path);
+	const char *name = 0;
+	const char *canonical_path = 0;
+	const char *source = 0;
+	if (strcmp(path, "a.elf") == 0 || strcmp(path, "alias-a.elf") == 0)
+	{
+		name = "a";
+		canonical_path = "a.elf";
+		source = "b :: import \"b.elf\"";
+	}
+	else if (strcmp(path, "b.elf") == 0)
+	{
+		name = "b";
+		canonical_path = "b.elf";
+		source = "root :: import \"root.elf\"";
+	}
+	else if (strcmp(path, "root.elf") == 0)
+	{
+		name = "root";
+		canonical_path = "root.elf";
+		source = "";
+	}
+	else
+	{
+		return false;
+	}
+	params->name = atom_from_data(params->compiler->atoms, name);
+	params->canonical_path = atom_from_data(params->compiler->atoms, canonical_path);
+	params->source = (elf_StrSlice) {.data = (char *)source, .size = strlen(source)};
+	return true;
+}
+
+static void test_parser_module_discovery(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	const char *source_text = "a :: import \"a.elf\"\nalias :: import \"alias-a.elf\"";
+	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_add_root_module(compiler, "root.elf", source);
+	ParserTestModuleLoader loader = {};
+	compiler_set_module_loader(compiler, parser_test_module_loader, &loader);
+	if (!compiler_parse_modules(compiler)) {
+		test_fail("compiler parses imported module graph");
+		compiler_finish_report(compiler, 0);
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	if (compiler->module_count != 3) {
+		test_fail("module discovery deduplicates canonical paths");
+		compiler_finish_report(compiler, 0);
+		elf_arena_destroy(&arena);
+		return;
+	}
+	if (loader.call_count != 4) {
+		test_fail("module discovery visits every import expression");
+	}
+	for (Com_ModuleId module_id = 0; module_id < compiler->module_count; ++module_id)
+	{
+		if (!compiler->modules[module_id].ast || compiler->modules[module_id].ast->kind != AST_FILE) {
+			test_fail("module discovery stores every parsed AST");
+		}
+	}
+
+	Com_Module *root = compiler->modules + 0;
+	Com_Module *a = compiler->modules + 1;
+	Com_Module *b = compiler->modules + 2;
+	if (root->import_count != 2 || root->imports[0]->import.module != 1 || root->imports[1]->import.module != 1) {
+		test_fail("root imports resolve to deduplicated module id");
+	}
+	if (a->import_count != 1 || a->imports[0]->import.module != 2) {
+		test_fail("imported module resolves transitive import");
+	}
+	if (b->import_count != 1 || b->imports[0]->import.module != 0) {
+		test_fail("module discovery resolves import cycle to existing root");
+	}
+	if (a->imports[0]->site.module != 1 || b->imports[0]->site.module != 2) {
+		test_fail("imported AST source sites retain module ids");
+	}
+	compiler_finish_report(compiler, 0);
+	elf_arena_destroy(&arena);
 }
 
 static void test_parser_string_strings(elf_State *state)
@@ -470,6 +567,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_constant_declaration(state);
 	test_parser_static_declaration(state);
 	test_parser_import_expression(state);
+	test_parser_module_discovery(state);
 	test_parser_string_strings(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);
