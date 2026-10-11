@@ -185,6 +185,4 @@ void elf_destroy_state(elf_State *state)
 	}
 }
 
-static int run_bytecode_frame(elf_State *state);
-#include "call.c"
 #include "vm.c"
