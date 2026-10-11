@@ -596,6 +596,22 @@ static Ast parse_unary_expr(Parser *parser)
 			value = parse_interpolated_string(parser);
 		}
 		break;
+		case TOK_IMPORT:
+		{
+			consume_token(parser);
+			Token path = parser->tok;
+			if (path.type == TOK_STRING)
+			{
+				consume_token(parser);
+				value = create_import_ast(parser, tok.site, path.atom);
+			}
+			else
+			{
+				parser_error(parser, ERROR_EXPECTED_TOKEN, path.site, "expected a plain string after 'import'");
+				value = ERROR_AST;
+			}
+		}
+		break;
 		case TOK_TILDE:
 		{
 			consume_token(parser);

@@ -50,6 +50,7 @@ static Com_ModuleId compiler_add_module(Compiler *compiler, const char *name, el
 	Com_ModuleId module_id = compiler->module_count++;
 	Com_Module *module = compiler->modules + module_id;
 	module->name = atom_from_data(compiler->atoms, name ? name : "<unknown>");
+	module->canonical_path = module->name;
 	module->source.data = source.data;
 	if (source.size > 0xffffffffu)
 	{
@@ -89,6 +90,12 @@ Compiler *compiler_create(elf_State *state, elf_Arena *arena, const char *name, 
 	compiler_add_module(compiler, name, source);
 	ASSERT(compiler->module_count == 1);
 	return compiler;
+}
+
+void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data)
+{
+	compiler->module_loader = loader;
+	compiler->module_loader_data = user_data;
 }
 
 void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase,

@@ -115,6 +115,21 @@ static void test_parser_static_declaration(elf_State *state)
 	expect_ast_i64(decl->static_decl.expr->binary.y, 2, "static declaration expression rhs");
 }
 
+static void test_parser_import_expression(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "math :: import \"math.elf\"");
+	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse imported module declaration");
+	if (!decl) {
+		return;
+	}
+
+	Ast import = decl->static_decl.expr;
+	expect_ast_kind(import, AST_IMPORT, "static declaration stores import expression");
+	if (!import || !import->import_path || strcmp(atom_data(import->import_path), "math.elf") != 0) {
+		test_fail("import expression stores path atom");
+	}
+}
+
 static void test_parser_string_strings(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "name := \"hello\"");
@@ -454,6 +469,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_decl_precedence_and_strings(state);
 	test_parser_constant_declaration(state);
 	test_parser_static_declaration(state);
+	test_parser_import_expression(state);
 	test_parser_string_strings(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);

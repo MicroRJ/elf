@@ -47,6 +47,7 @@
 	X(AST_INTEGER_LITERAL     , "integer_literal")            \
 	X(AST_STRING_LITERAL      , "string_literal")             \
 	X(AST_INTERPOLATED_STRING , "interpolated_string")        \
+	X(AST_IMPORT              , "import")                     \
 	X(AST_CALL                , "call")                       \
 	X(AST_META_CALL           , "meta_call")                  \
 	X(AST_TUPLE               , "tuple")                      \
@@ -121,6 +122,7 @@ struct Ast_T
 	union
 	{
 		Atom *atom;
+		Atom *import_path;
 		i64         integer_value;
 		f64         number_value;
 		AstArray    interpolated_string;

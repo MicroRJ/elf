@@ -95,6 +95,13 @@ static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast *par
 	return value;
 }
 
+static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
+{
+	Ast value = create_nullary_ast(par, site, AST_IMPORT);
+	value->import_path = path;
+	return value;
+}
+
 static Ast create_table_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
 {
 	Ast tree = create_ast(par, site, AST_TABLE);
@@ -405,6 +412,11 @@ static void print_ast(Printer *pr, Ast tree)
 			PRINT(pr, "f[");
 			print_ast_list(pr, tree->interpolated_string.args, tree->interpolated_string.nargs);
 			PRINT(pr, "]");
+		}
+		break;
+		case AST_IMPORT:
+		{
+			PRINT(pr, "import \"%s\"", atom_data(tree->import_path));
 		}
 		break;
 		case AST_INTEGER_LITERAL:

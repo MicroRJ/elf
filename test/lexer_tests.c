@@ -155,13 +155,14 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 
 static void test_lexer_keywords_and_identifiers(elf_State *state)
 {
-	Parser parser = lexer_test_parser(state, "true false if fun recurse true_value load");
+	Parser parser = lexer_test_parser(state, "true false if fun import recurse true_value load");
 	lexer_prime(&parser);
 
 	expect_token_type(lexer_next(&parser), TOK_TRUE, "lex true keyword");
 	expect_token_type(lexer_next(&parser), TOK_FALSE, "lex false keyword");
 	expect_token_type(lexer_next(&parser), TOK_IF, "lex if keyword");
 	expect_token_type(lexer_next(&parser), TOK_FUN, "lex fun keyword");
+	expect_token_type(lexer_next(&parser), TOK_IMPORT, "lex import keyword");
 	expect_token_type(lexer_next(&parser), TOK_RECURSE, "lex recurse keyword");
 
 	Token identifier = lexer_next(&parser);
@@ -708,6 +709,9 @@ static void test_lexer_compiler_module(elf_State *state)
 	if (module->name != atom_from_data(compiler->atoms, "lexer_tests")) {
 		test_fail("compiler module name uses shared atom table");
 	}
+	if (module->canonical_path != module->name) {
+		test_fail("root module initially uses its name as canonical path");
+	}
 	if (module->source.data != parser.lexer.source.data || module->source.size != parser.lexer.source.size) {
 		test_fail("lexer reads its compiler module source");
 	}
@@ -715,6 +719,22 @@ static void test_lexer_compiler_module(elf_State *state)
 	Token token = lexer_next(&parser);
 	if (token.site.module != 0) {
 		test_fail("lexer source sites retain compiler module index");
+	}
+}
+
+static b32 test_module_loader(Com_ModuleLoadParams *params)
+{
+	(void)params;
+	return false;
+}
+
+static void test_compiler_module_loader_boundary(elf_State *state)
+{
+	Parser parser = lexer_test_parser(state, "value");
+	Compiler *compiler = parser.compiler;
+	compiler_set_module_loader(compiler, test_module_loader, &parser);
+	if (compiler->module_loader != test_module_loader || compiler->module_loader_data != &parser) {
+		test_fail("compiler stores module loader boundary");
 	}
 }
 
@@ -756,5 +776,6 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_numbers(state);
 	test_lexer_operators(state);
 	test_lexer_compiler_module(state);
+	test_compiler_module_loader_boundary(state);
 	test_lexer_bounded_source(state);
 }
