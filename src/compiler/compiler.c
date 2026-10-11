@@ -255,7 +255,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 
 	PROF_BLOCK("compiler.static")
 	{
-		compiler->static_module = static_module_collect(compiler, ast_file);
+		compiler->static_module = static_module_build(compiler, ast_file);
 	}
 	if (compiler->error_count)
 	{
