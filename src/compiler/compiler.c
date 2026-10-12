@@ -89,7 +89,7 @@ void compiler_set_log_messages(Compiler *compiler, b32 enabled)
 	compiler->log_messages = enabled;
 }
 
-void compiler_record_import(Compiler *compiler, Com_ModuleId module_id, Ast import_ast)
+b32 compiler_record_import(Compiler *compiler, Com_ModuleId module_id, Ast import_ast)
 {
 	ASSERT(module_id < compiler->module_count);
 	ASSERT(import_ast && import_ast->kind == AST_IMPORT);
@@ -98,6 +98,9 @@ void compiler_record_import(Compiler *compiler, Com_ModuleId module_id, Ast impo
 	{
 		u32 capacity = module->import_capacity ? module->import_capacity * 2 : 4;
 		Ast *imports = elf_arena_push_zero(compiler->arena, sizeof(*imports) * capacity);
+		if (!imports) {
+			return false;
+		}
 		if (module->import_count) {
 			copy_memory(imports, module->imports, sizeof(*imports) * module->import_count);
 		}
@@ -105,6 +108,7 @@ void compiler_record_import(Compiler *compiler, Com_ModuleId module_id, Ast impo
 		module->import_capacity = capacity;
 	}
 	module->imports[module->import_count++] = import_ast;
+	return true;
 }
 
 static Com_ModuleId compiler_find_module(Compiler *compiler, Atom *canonical_path)
@@ -230,9 +234,12 @@ b32 compiler_parse_modules(Compiler *compiler)
 		// TODO(RJ): the parser should take a scratch arena for scratch allocations, and arena
 		// for results
 		Parser *parser = parser_create(compiler, module_id);
+		if (!parser) {
+			return false;
+		}
 		Ast ast = elf_parse_file(parser);
 		compiler->modules[module_id].ast = ast;
-		if (parser_has_failed(parser) || ast_is_error(ast))
+		if (ast_is_error(ast))
 		{
 			if (compiler->report.error_count == 0) {
 				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.module = module_id}, "failed to parse source");
@@ -354,7 +361,9 @@ int compiler_push_json(Compiler *compiler)
 	int result = 0;
 	if (!compiler->report.error_count) {
 		Parser *parser = parser_create(compiler, 0);
-		result = parse_json_value(parser);
+		if (parser) {
+			result = parse_json_value(parser);
+		}
 	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
 	else ASSERT(state->stack_ptr == stack_checkpoint + 1);
@@ -385,7 +394,9 @@ int compiler_push_constant_expr(Compiler *compiler)
 	int result = 0;
 	if (!compiler->report.error_count) {
 		Parser *parser = parser_create(compiler, 0);
-		result = parse_constexpr(parser);
+		if (parser) {
+			result = parse_constexpr(parser);
+		}
 	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
 	else ASSERT(state->stack_ptr == stack_checkpoint + 1);

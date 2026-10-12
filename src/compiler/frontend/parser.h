@@ -44,10 +44,4 @@ struct Parser
 	AstContext          ast;
 	// TODO(RJ): why are we storing this here!?
 	Com_Phase phase;
-	b32                 failed;
 };
-
-static inline b32 parser_has_failed(Parser *parser)
-{
-	return parser->failed;
-}

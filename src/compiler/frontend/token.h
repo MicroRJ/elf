@@ -146,3 +146,13 @@ static inline b32 token_is_error(Token token)
 {
 	return token.type == TOK_ERROR;
 }
+
+static Token token_from_error(Com_Error error, SourceSite site)
+{
+	ASSERT(error != COM_ERROR_NONE);
+	Token token = {.type = TOK_ERROR, .site = site, .error = error};
+	if (token.site.size == 0) {
+		token.site.size = 1;
+	}
+	return token;
+}

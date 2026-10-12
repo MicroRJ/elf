@@ -309,8 +309,3 @@ static Ast ast_from_error(Com_Error error)
 	}
 }
 
-static b32 ast_is_missing_or_error(Ast ast)
-{
-	return !ast || ast_is_error(ast);
-}
-

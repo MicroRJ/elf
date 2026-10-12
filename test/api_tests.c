@@ -522,8 +522,8 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("failed code compilation publishes no partial module");
 	}
 	report = &compiler->report;
-	if (report->error_count < 2 || report->message_count < 2 || report->first->phase != COMPILER_PHASE_PARSER || report->first->site.module != 0) {
-		test_fail("compiler retains multiple code parser messages");
+	if (report->error_count != 1 || report->message_count != 1 || report->first->phase != COMPILER_PHASE_PARSER || report->first->site.module != 0) {
+		test_fail("compiler retains the terminal code parser message");
 	}
 	u32 linked_message_count = 0;
 	Com_Message *last_message = 0;

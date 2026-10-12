@@ -97,7 +97,7 @@ Compiler *compiler_create(elf_State *state, elf_Arena *arena);
 Com_ModuleId compiler_add_root_module(Compiler *compiler, const char *name, elf_StrSlice source);
 void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data);
 void compiler_set_log_messages(Compiler *compiler, b32 enabled);
-void compiler_record_import(Compiler *compiler, Com_ModuleId module, struct Ast_T *import);
+b32 compiler_record_import(Compiler *compiler, Com_ModuleId module, struct Ast_T *import);
 b32 compiler_parse_modules(Compiler *compiler);
 
 b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);

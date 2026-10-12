@@ -566,8 +566,59 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	compiler_add_root_module(compiler, "parser_lexer_error", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
-	if (file != ERROR_AST || parser->failed || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
-		test_fail("parser propagates a lexer error token without hidden failure state");
+	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
+		test_fail("parser propagates a lexer error token");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_parser_take_token_error(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	elf_StrSlice source = {(char *)"value", 5};
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, "parser_take_token_error", source);
+	Parser *parser = parser_create(compiler, 0);
+	Token token = take_token(parser, TOK_LEFT_PAREN);
+	if (!token_is_error(token) || token.error != COM_ERROR_SOURCE || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
+		test_fail("take token returns its source error");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_parser_take_token_oom(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	elf_StrSlice source = {(char *)"value", 5};
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, "parser_take_token_oom", source);
+	Parser *parser = parser_create(compiler, 0);
+	u64 capacity = arena.capacity;
+	arena.capacity = arena.used;
+	Token token = take_token(parser, TOK_LEFT_PAREN);
+	arena.capacity = capacity;
+	if (!token_is_error(token) || token.error != COM_ERROR_OOM || ast_from_token_error(token) != ERROR_OOM_AST || compiler->report.error_count != 0) {
+		test_fail("take token returns diagnostic allocation failure");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_parser_ast_oom(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	elf_StrSlice source = {(char *)"42", 2};
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, "parser_ast_oom", source);
+	Parser *parser = parser_create(compiler, 0);
+	u64 capacity = arena.capacity;
+	arena.capacity = arena.used;
+	Ast ast = parse_expr(parser);
+	arena.capacity = capacity;
+	if (ast != ERROR_OOM_AST || ast->error != COM_ERROR_OOM) {
+		test_fail("parser returns AST allocation failure");
 	}
 	elf_arena_destroy(&arena);
 }
@@ -593,4 +644,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_source_slices(state);
 	test_parser_line_boundaries(state);
 	test_parser_lexer_error_boundary(state);
+	test_parser_take_token_error(state);
+	test_parser_take_token_oom(state);
+	test_parser_ast_oom(state);
 }

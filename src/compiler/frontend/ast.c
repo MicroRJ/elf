@@ -32,6 +32,9 @@ static AstContext create_ast_context(elf_Arena *arena)
 static Ast create_ast(Parser *par, SourceSite site, AstType kind)
 {
 	Ast_T *tree = elf_arena_push_zero(par->ast.arena, sizeof(*tree));
+	if (!tree) {
+		return ERROR_OOM_AST;
+	}
 	tree->site = site;
 	tree->kind = kind;
 	return tree;
@@ -45,14 +48,29 @@ static Ast create_nullary_ast(Parser *par, SourceSite site, AstType kind)
 
 static Ast create_unary_ast(Parser *par, SourceSite site, AstType kind, Ast x)
 {
+	if (ast_is_error(x)) {
+		return x;
+	}
 	Ast tree = create_ast(par, site, kind);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->unary = x;
 	return tree;
 }
 
 static Ast create_binary_ast(Parser *par, SourceSite site, AstType kind, Ast x, Ast y)
 {
+	if (ast_is_error(x)) {
+		return x;
+	}
+	if (ast_is_error(y)) {
+		return y;
+	}
 	Ast tree = create_ast(par, site, kind);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->binary.x = x;
 	tree->binary.y = y;
 	return tree;
@@ -67,6 +85,9 @@ static Ast create_int_ast(Parser *par, SourceSite site, i64 i)
 {
 	Ast value;
 	value = create_nullary_ast(par, site, AST_INTEGER_LITERAL);
+	if (ast_is_error(value)) {
+		return value;
+	}
 	value->integer_value = i;
 	return value;
 }
@@ -74,6 +95,9 @@ static Ast create_int_ast(Parser *par, SourceSite site, i64 i)
 static Ast create_num_ast(Parser *par, SourceSite site, f64 n)
 {
 	Ast value = create_nullary_ast(par, site, AST_NUMBER_LITERAL);
+	if (ast_is_error(value)) {
+		return value;
+	}
 	value->number_value=n;
 	return value;
 }
@@ -81,6 +105,9 @@ static Ast create_num_ast(Parser *par, SourceSite site, f64 n)
 static Ast create_atom_ast(Parser *par, SourceSite site, Atom *atom)
 {
 	Ast value = create_nullary_ast(par, site, AST_STRING_LITERAL);
+	if (ast_is_error(value)) {
+		return value;
+	}
 	value->atom = atom;
 	return value;
 }
@@ -90,6 +117,9 @@ static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast *par
 	ASSERT(nparts >= 3);
 	ASSERT((nparts & 1) != 0);
 	Ast value = create_ast(par, site, AST_INTERPOLATED_STRING);
+	if (ast_is_error(value)) {
+		return value;
+	}
 	value->interpolated_string.args = parts;
 	value->interpolated_string.nargs = nparts;
 	return value;
@@ -98,15 +128,23 @@ static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast *par
 static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
 {
 	Ast value = create_nullary_ast(par, site, AST_IMPORT);
+	if (ast_is_error(value)) {
+		return value;
+	}
 	value->import.path = path;
 	value->import.module = COM_MODULE_INVALID;
-	compiler_record_import(par->compiler, par->module, value);
+	if (!compiler_record_import(par->compiler, par->module, value)) {
+		return ERROR_OOM_AST;
+	}
 	return value;
 }
 
 static Ast create_table_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
 {
 	Ast tree = create_ast(par, site, AST_TABLE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->table.args = args;
 	tree->table.nargs = nargs;
 	return tree;
@@ -114,7 +152,16 @@ static Ast create_table_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
 
 static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast value)
 {
+	if (ast_is_error(key)) {
+		return key;
+	}
+	if (ast_is_error(value)) {
+		return value;
+	}
 	Ast tree = create_ast(par, site, AST_TABLE_ENTRY);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->table_entry.key = key;
 	tree->table_entry.value = value;
 	return tree;
@@ -124,6 +171,9 @@ static Ast create_tuple_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
 {
 	ASSERT(nargs >= 1);
 	Ast tree = create_ast(par, site, AST_TUPLE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->tuple.args = args;
 	tree->tuple.nargs = nargs;
 	return tree;
@@ -167,7 +217,19 @@ static Ast create_meta_field_ast(Parser *par, SourceSite site, Ast x, Ast y)
 
 static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause, Ast else_clause)
 {
+	if (ast_is_error(pred)) {
+		return pred;
+	}
+	if (ast_is_error(true_clause)) {
+		return true_clause;
+	}
+	if (ast_is_error(else_clause)) {
+		return else_clause;
+	}
 	Ast value = create_ast(par, site, AST_IF);
+	if (ast_is_error(value)) {
+		return value;
+	}
 	value->if_stat.pred = pred;
 	value->if_stat.true_clause = true_clause;
 	value->if_stat.else_clause = else_clause;
@@ -177,13 +239,25 @@ static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause
 static Ast create_ident_ast(Parser *par, SourceSite site, Atom *atom)
 {
 	Ast tree = create_ast(par, site, AST_IDENT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->atom = atom;
 	return tree;
 }
 
 static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 {
+	if (ast_is_error(x)) {
+		return x;
+	}
+	if (ast_is_error(y)) {
+		return y;
+	}
 	Ast tree = create_ast(par, site, AST_ASSIGN);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->binary.x = x;
 	tree->binary.y = y;
 	return tree;
@@ -191,7 +265,13 @@ static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 
 static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u32 nargs)
 {
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_CALL);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->call.expr = expr;
 	tree->call.args = args;
 	tree->call.nargs = nargs;
@@ -200,7 +280,13 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u3
 
 static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 {
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_RETURN);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->return_stat.expr = expr;
 	return tree;
 }
@@ -208,6 +294,9 @@ static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 static Ast create_block_ast(Parser *par, SourceSite site, Ast *stats, u32 nstats)
 {
 	Ast tree = create_ast(par, site, AST_BLOCK_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->block.stats = stats;
 	tree->block.nstats = nstats;
 	return tree;
@@ -215,14 +304,29 @@ static Ast create_block_ast(Parser *par, SourceSite site, Ast *stats, u32 nstats
 
 static Ast create_file_ast(Parser *par, SourceSite site, Ast body)
 {
+	if (ast_is_error(body)) {
+		return body;
+	}
 	Ast tree = create_ast(par, site, AST_FILE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->file.body = body;
 	return tree;
 }
 
 static Ast create_while_ast(Parser *par, SourceSite site, Ast pred, Ast body)
 {
+	if (ast_is_error(pred)) {
+		return pred;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
 	Ast tree = create_ast(par, site, AST_WHILE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->while_stat.pred = pred;
 	tree->while_stat.body = body;
 	return tree;
@@ -230,7 +334,22 @@ static Ast create_while_ast(Parser *par, SourceSite site, Ast pred, Ast body)
 
 static Ast create_for_ast(Parser *par, SourceSite site, Ast init, Ast pred, Ast step, Ast body)
 {
+	if (ast_is_error(init)) {
+		return init;
+	}
+	if (ast_is_error(pred)) {
+		return pred;
+	}
+	if (ast_is_error(step)) {
+		return step;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
 	Ast tree = create_ast(par, site, AST_FOR);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->for_stat.init = init;
 	tree->for_stat.pred = pred;
 	tree->for_stat.step = step;
@@ -240,7 +359,16 @@ static Ast create_for_ast(Parser *par, SourceSite site, Ast init, Ast pred, Ast 
 
 static Ast create_for_range_ast(Parser *par, SourceSite site, Ast decl, Ast body)
 {
+	if (ast_is_error(decl)) {
+		return decl;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
 	Ast tree = create_ast(par, site, AST_FOR_RANGE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->for_range_stat.decl = decl;
 	tree->for_range_stat.body = body;
 	return tree;
@@ -248,14 +376,29 @@ static Ast create_for_range_ast(Parser *par, SourceSite site, Ast decl, Ast body
 
 static Ast create_defer_ast(Parser *par, SourceSite site, Ast body)
 {
+	if (ast_is_error(body)) {
+		return body;
+	}
 	Ast tree = create_ast(par, site, AST_DEFER_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->defer_stat.body = body;
 	return tree;
 }
 
 static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast expr)
 {
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_DECL_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->decl.tags = tags;
 	tree->decl.name = name;
 	tree->decl.expr = expr;
@@ -264,7 +407,16 @@ static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast
 
 static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast expr)
 {
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_STATIC_DECL);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->static_decl.name = name;
 	tree->static_decl.expr = expr;
 	return tree;
@@ -272,21 +424,42 @@ static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast ex
 
 static Ast create_break_ast(Parser *par, SourceSite site, Ast expr)
 {
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_BREAK);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->break_stat.expr = expr;
 	return tree;
 }
 
 static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 {
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_CONTINUE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->continue_stat.expr = expr;
 	return tree;
 }
 
 static Ast create_function_ast(Parser *par, SourceSite site, Ast *params, u32 nparams, Ast variadic, Ast body)
 {
+	if (ast_is_error(variadic)) {
+		return variadic;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
 	Ast tree = create_ast(par, site, AST_FUNCTION);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->function.params = params;
 	tree->function.nparams = nparams;
 	tree->function.variadic = variadic;
@@ -296,7 +469,19 @@ static Ast create_function_ast(Parser *par, SourceSite site, Ast *params, u32 np
 
 static Ast create_param_ast(Parser *par, SourceSite site, Ast name, Ast type, Ast expr)
 {
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(type)) {
+		return type;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
 	Ast tree = create_ast(par, site, AST_FUNCTION_PARAM);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
 	tree->param.name = name;
 	tree->param.type = type;
 	tree->param.expr = expr;

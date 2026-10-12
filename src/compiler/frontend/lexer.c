@@ -660,16 +660,6 @@ static Com_Error lexer_tokens_push(Lexer_TokenFIFO *tokens, elf_Arena *arena, To
 
 static Token lex_token(Lexer *lexer);
 
-static Token token_from_error(Com_Error error, SourceSite site)
-{
-	ASSERT(error != COM_ERROR_NONE);
-	Token token = {.type = TOK_ERROR, .site = site, .error = error};
-	if (token.site.size == 0) {
-		token.site.size = 1;
-	}
-	return token;
-}
-
 static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token opening, char quote, b32 is_block)
 {
 	Lexer worker = *lexer;
