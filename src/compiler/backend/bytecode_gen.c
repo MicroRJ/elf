@@ -223,7 +223,7 @@ static void patch_bytecode_labels(BcGen *gen)
 static int emit_bc(BcGen *gen, SourceSite site, Bytecode byte)
 {
 	ASSERT(gen->bytecode_count < gen->bytecode_capacity);
-	int position = gen->bytecode_count++;
+	int position = gen->bytecode_count ++;
 	gen->bytecode[position] = byte;
 	emit_source_map_entry(gen, site, position);
 	return position;
