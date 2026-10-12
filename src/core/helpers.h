@@ -41,6 +41,10 @@ static inline b32 value_length(elf_Value value, u32 *length)
 	{
 		*length = string_size(value_as_string(value));
 	}
+	else if (value_is_array(value))
+	{
+		*length = elf_array_length(value_as_array(value));
+	}
 	else if (value_is_buffer(value))
 	{
 		*length = value_as_buffer(value)->size;
@@ -66,6 +70,7 @@ typedef enum
 	TBIT_TABLE    = 1 << ELF_VALUE_TYPE_TABLE,
 	TBIT_ERROR    = 1 << ELF_VALUE_TYPE_ERROR,
 	TBIT_BUFFER   = 1 << ELF_VALUE_TYPE_BUFFER,
+	TBIT_ARRAY    = 1 << ELF_VALUE_TYPE_ARRAY,
 
 	TBIT_ALLMASK  = (1 << ELF_VALUE_TYPE_COUNT_) - 1,
 }
@@ -84,10 +89,11 @@ typedef enum
 	TRULE_TABLE    = TBIT_TABLE,
 	TRULE_ERROR    = TBIT_ERROR,
 	TRULE_BUFFER   = TBIT_BUFFER,
+	TRULE_ARRAY    = TBIT_ARRAY,
 
 	TYPE_RULE_ANYTHING = TBIT_ALLMASK,
 	TRULE_NONNIL       = TYPE_RULE_ANYTHING & ~TBIT_NIL,
-	TRULE_OBJECT       = TBIT_USER | TBIT_CLOSURE | TBIT_TABLE | TBIT_ERROR | TBIT_BUFFER,
+	TRULE_OBJECT       = TBIT_USER | TBIT_CLOSURE | TBIT_TABLE | TBIT_ERROR | TBIT_BUFFER | TBIT_ARRAY,
 	TRULE_CALLABLE     = TBIT_FUNCTION | TBIT_CLOSURE,
 
 	TRULE_COUNT,

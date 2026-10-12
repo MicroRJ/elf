@@ -68,6 +68,59 @@ static void test_gc_tracks_owned_storage(void)
 	elf_destroy_state(state);
 }
 
+static void test_gc_tracks_array_storage(void)
+{
+	elf_State *state = elf_create_state();
+	u64 starting_live = state->gc_live_bytes;
+	elf_Array *array = elf_array_new(state);
+	if (state->gc_live_bytes - starting_live != sizeof(*array))
+	{
+		test_fail("GC bytes include array object storage");
+	}
+
+	u64 before_items = state->gc_live_bytes;
+	elf_array_add(state, array, test_value_int(1));
+	u64 item_bytes = (u64)array->capacity * sizeof(*array->items);
+	if (state->gc_live_bytes - before_items != item_bytes)
+	{
+		test_fail("GC bytes include array item storage");
+	}
+
+	elf_destroy_state(state);
+}
+
+static void test_gc_keeps_stack_rooted_array_graph(void)
+{
+	elf_State *state = elf_create_state();
+	u32 baseline_count = state->gc_reference_count;
+	elf_Value *stack_checkpoint = state->stack_ptr;
+	elf_Array *root = elf_array_new(state);
+	push_value(state, value_from_array(root));
+	elf_Array *child = elf_array_new(state);
+	elf_array_add(state, root, value_from_array(child));
+	elf_array_add(state, child, value_from_string(elf_string_from_data(state, "array child")));
+
+	force_gc_allocations(state, 256);
+	elf_Value child_value = elf_array_get(state, root, 0);
+	if (!value_is_array(child_value))
+	{
+		test_fail("GC preserves rooted child array type");
+	}
+	else
+	{
+		elf_Value string_value = elf_array_get(state, value_as_array(child_value), 0);
+		if (!value_is_string(string_value) || string_size(value_as_string(string_value)) != 11 || memcmp(string_data(value_as_string(string_value)), "array child", 11) != 0)
+		{
+			test_fail("GC preserves rooted array contents");
+		}
+	}
+
+	state->stack_ptr = stack_checkpoint;
+	force_gc_allocations(state, 256);
+	expect_gc_reference_count_below(state, baseline_count + 8, "released array graph becomes collectible");
+	elf_destroy_state(state);
+}
+
 static void test_gc_sweeps_unreachable_tables(void)
 {
 	elf_State *state = elf_create_state();
@@ -259,6 +312,8 @@ static void test_state_create_destroy_repeatedly(void)
 static void run_gc_tests(void)
 {
 	test_gc_tracks_owned_storage();
+	test_gc_tracks_array_storage();
+	test_gc_keeps_stack_rooted_array_graph();
 	test_gc_sweeps_unreachable_tables();
 	test_gc_keeps_stack_rooted_table_graph();
 	test_gc_keeps_referenced_table_graph();

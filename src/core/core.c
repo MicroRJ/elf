@@ -30,6 +30,7 @@
 #include "string/elf_string.c"
 #include "buffer/elf_buffer.c"
 #include "user/elf_user_object.c"
+#include "array/array.c"
 #include "table/table.c"
 
 #include "gc.c"

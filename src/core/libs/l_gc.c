@@ -19,6 +19,7 @@ ELF_FUNCTION(l_gc_counters)
 	u64 allocated_tables = S->gc_allocated_by_type[ELF_OBJECT_TABLE];
 	u64 allocated_strings = S->gc_allocated_by_type[ELF_OBJECT_STRING];
 	u64 allocated_buffers = S->gc_allocated_by_type[ELF_OBJECT_BUFFER];
+	u64 allocated_arrays = S->gc_allocated_by_type[ELF_OBJECT_ARRAY];
 	u64 freed_objects = S->gc_freed_objects;
 	u64 freed_bytes = S->gc_freed_bytes;
 	u64 collections = S->gc_collection_count;
@@ -45,6 +46,7 @@ ELF_FUNCTION(l_gc_counters)
 	gc_set_counter(S, result, "allocated_tables", allocated_tables);
 	gc_set_counter(S, result, "allocated_strings", allocated_strings);
 	gc_set_counter(S, result, "allocated_buffers", allocated_buffers);
+	gc_set_counter(S, result, "allocated_arrays", allocated_arrays);
 	gc_set_counter(S, result, "freed_objects", freed_objects);
 	gc_set_counter(S, result, "freed_bytes", freed_bytes);
 	gc_set_counter(S, result, "collections", collections);

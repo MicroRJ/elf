@@ -8,6 +8,20 @@
 
 static u32 core_mark_readonly(elf_State *state, elf_Object *object);
 
+static u32 core_mark_array_readonly(elf_State *state, elf_Array *array)
+{
+	u32 count = 0;
+	for (u32 index = 0; index < array->count; ++index)
+	{
+		elf_Value value = array->items[index];
+		if (value_is_object(value))
+		{
+			count += core_mark_readonly(state, value_as_object(value));
+		}
+	}
+	return count;
+}
+
 static u32 core_mark_table_readonly(elf_State *state, elf_Table *table)
 {
 	u32 count = 0;
@@ -38,6 +52,10 @@ static u32 core_mark_readonly(elf_State *state, elf_Object *object)
 	if (object->type == ELF_OBJECT_TABLE)
 	{
 		count += core_mark_table_readonly(state, (elf_Table *)object);
+	}
+	else if (object->type == ELF_OBJECT_ARRAY)
+	{
+		count += core_mark_array_readonly(state, (elf_Array *)object);
 	}
 	return count;
 }

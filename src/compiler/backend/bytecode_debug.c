@@ -23,6 +23,7 @@ static void format_value_shallow(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_TABLE:     elf_arena_push_text(arena, "table"); break;
 		case ELF_VALUE_TYPE_ERROR:     elf_arena_push_text(arena, "error"); break;
 		case ELF_VALUE_TYPE_BUFFER:    elf_arena_push_text(arena, "buffer"); break;
+		case ELF_VALUE_TYPE_ARRAY:     elf_arena_push_text(arena, "array"); break;
 		case ELF_VALUE_TYPE_USER_OBJECT: elf_arena_push_text(arena, "user object"); break;
 		default:                       elf_arena_push_text(arena, "?"); break;
 	}

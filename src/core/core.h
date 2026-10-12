@@ -13,6 +13,7 @@
 typedef struct elf_Object  elf_Object;
 typedef struct elf_String  elf_String;
 typedef struct elf_Table   elf_Table;
+typedef struct elf_Array   elf_Array;
 typedef struct elf_Closure elf_Closure;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
@@ -25,6 +26,7 @@ typedef struct elf_Value   elf_Value;
 #include "string/elf_string.h"
 #include "buffer/elf_buffer.h"
 #include "user/elf_user_object.h"
+#include "array/array.h"
 #include "table/table.h"
 
 // TODO(RJ): this needs to be defined else-where!

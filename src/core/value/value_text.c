@@ -37,6 +37,20 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 	elf_arena_push_text(arena, "}");
 }
 
+static void array_to_text(elf_Arena *arena, elf_Array *array)
+{
+	elf_arena_push_text(arena, "[");
+	for (u32 i = 0; i < array->count; ++i)
+	{
+		if (i != 0)
+		{
+			elf_arena_push_text(arena, ", ");
+		}
+		elf_print_value(arena, array->items[i]);
+	}
+	elf_arena_push_text(arena, "]");
+}
+
 static elf_Value table_get_named_field(elf_Table *table, const char *name)
 {
 	u32 name_size = (u32)strlen(name);
@@ -76,6 +90,7 @@ void elf_print_value(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "C()"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "F()"); break;
 		case ELF_VALUE_TYPE_TABLE:     table_to_text(arena, value_as_table(value)); break;
+		case ELF_VALUE_TYPE_ARRAY:     array_to_text(arena, value_as_array(value)); break;
 		case ELF_VALUE_TYPE_ERROR:     error_to_text(arena, value_as_error(value)); break;
 		case ELF_VALUE_TYPE_BUFFER:    elf_arena_pushf(arena, "buffer(%u)", value_as_buffer(value)->size); break;
 		case ELF_VALUE_TYPE_USER_OBJECT: elf_arena_pushf(arena, "%s()", value_name(value)); break;
