@@ -508,7 +508,7 @@ static void test_api_source_compilation(elf_State *state)
 	elf_pop(state, 1);
 
 	elf_Module *module_checkpoint = state->modules;
-	elf_u64 arena_checkpoint = state->arena.in_use;
+	elf_u64 arena_checkpoint = state->arena.used;
 	char invalid_code_text[] = "answer := 1 +";
 	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-code.elf", invalid_code);
@@ -518,7 +518,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (elf_get_top(state) != sentinel_top) {
 		test_fail("failed code compilation leaves the stack unchanged");
 	}
-	if (state->modules != module_checkpoint || state->arena.in_use != arena_checkpoint) {
+	if (state->modules != module_checkpoint || state->arena.used != arena_checkpoint) {
 		test_fail("failed code compilation publishes no partial module");
 	}
 	report = &compiler->report;

@@ -167,7 +167,7 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
 	bench_require(state->modules == 0, "new state preallocates compiled modules");
-	u64 arena_before = state->arena.in_use;
+	u64 arena_before = state->arena.used;
 	u64 bytecode_count = 0;
 	u64 function_count = 0;
 	u64 integer_constant_count = 0;
@@ -189,7 +189,7 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 		elf_pop(state, 1);
 	}
 	double seconds = bench_elapsed_s(start);
-	u64 retained_arena_storage = state->arena.in_use - arena_before;
+	u64 retained_arena_storage = state->arena.used - arena_before;
 	u64 array_storage =
 		bytecode_count * sizeof(Bytecode) +
 		function_count * sizeof(BcFunction) +

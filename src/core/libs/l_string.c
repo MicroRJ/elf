@@ -442,8 +442,8 @@ ELF_FUNCTION(l_string_replace)
 		start = at + old_size;
 	}
 	elf_arena_push_data(scratch.arena, text + start, size - start);
-	string_push(S, (char *)scratch.arena->data + scratch.regress,
-		(u32)(scratch.arena->in_use - scratch.regress));
+	string_push(S, (char *)scratch.arena->data + scratch.restore_used,
+		(u32)(scratch.arena->used - scratch.restore_used));
 	elf_end_scratch(scratch);
 	return 1;
 }
@@ -464,7 +464,7 @@ ELF_FUNCTION(l_string_repeat)
 	for (i64 i = 0; i < count; ++i) {
 		elf_arena_push_data(scratch.arena, string_data(string), size);
 	}
-	string_push(S, (char *)scratch.arena->data + scratch.regress, (u32)(count * size));
+	string_push(S, (char *)scratch.arena->data + scratch.restore_used, (u32)(count * size));
 	elf_end_scratch(scratch);
 	return 1;
 }
@@ -488,8 +488,8 @@ ELF_FUNCTION(l_string_join)
 		elf_arena_push_data(scratch.arena, string_data(part), string_size(part));
 	}
 
-	string_push(S, (char *)scratch.arena->data + scratch.regress,
-		(u32)(scratch.arena->in_use - scratch.regress));
+	string_push(S, (char *)scratch.arena->data + scratch.restore_used,
+		(u32)(scratch.arena->used - scratch.restore_used));
 	elf_end_scratch(scratch);
 	return 1;
 }

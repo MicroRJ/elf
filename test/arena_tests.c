@@ -23,7 +23,7 @@ static void test_arena_push_and_reserve(void)
 
 	char *start = elf_arena_push(&arena, 0);
 	char *reserved = elf_arena_reserve(&arena, 16);
-	expect_arena_u64(arena.in_use, 0, "arena reserve does not commit bytes");
+	expect_arena_u64(arena.used, 0, "arena reserve does not consume bytes");
 	if (reserved != start) {
 		test_fail("arena reserve returns current cursor");
 	}
@@ -32,7 +32,7 @@ static void test_arena_push_and_reserve(void)
 	if (pushed != start) {
 		test_fail("arena push returns current cursor");
 	}
-	expect_arena_u64(arena.in_use, 16, "arena push advances cursor");
+	expect_arena_u64(arena.used, 16, "arena push advances cursor");
 
 	elf_arena_destroy(&arena);
 }
@@ -55,7 +55,7 @@ static void test_arena_zero_copy_and_data(void)
 
 	char *data = elf_arena_push_data(&arena, "xyz", 3);
 	expect_arena_text(data, "xyz", 3, "arena push data copies unterminated bytes");
-	expect_arena_u64(arena.in_use, 4 + sizeof(source) + 3, "arena copy helpers advance by byte count");
+	expect_arena_u64(arena.used, 4 + sizeof(source) + 3, "arena copy helpers advance by byte count");
 
 	elf_arena_destroy(&arena);
 }
@@ -83,12 +83,11 @@ static void test_arena_align(void)
 {
 	elf_Arena arena = elf_arena_create(KILOBYTES(1));
 	elf_arena_push(&arena, 3);
-	elf_arena_align(&arena, 8);
-	void *aligned = elf_arena_push(&arena, 8);
+	void *aligned = dy_arena_push(&arena, 8, 8);
 	if ((u64)((u8 *)aligned - arena.data) & 7) {
 		test_fail("arena align advances to the requested boundary");
 	}
-	expect_arena_u64(arena.in_use, 16, "arena aligned allocation advances past padding");
+	expect_arena_u64(arena.used, 16, "arena aligned allocation advances past padding");
 	elf_arena_destroy(&arena);
 }
 
@@ -98,7 +97,7 @@ static void test_arena_pushf(void)
 	char *start = elf_arena_push(&arena, 0);
 
 	char *first = elf_arena_pushf(&arena, "%s:%d", "hp", 42);
-	expect_arena_u64(arena.in_use, 5, "arena pushf advances by formatted byte count only");
+	expect_arena_u64(arena.used, 5, "arena pushf advances by formatted byte count only");
 	if (first != start || strcmp(first, "hp:42") != 0) {
 		test_fail("arena pushf writes formatted text");
 	}
@@ -118,18 +117,18 @@ static void test_arena_pushf(void)
 static void test_scratch_regression(void)
 {
 	elf_Scratch outer = elf_begin_scratch();
-	u64 outer_start = outer.arena->in_use;
+	u64 outer_start = outer.arena->used;
 	elf_arena_push_text(outer.arena, "outer");
 
 	elf_Scratch inner = elf_begin_scratch();
-	u64 inner_start = inner.arena->in_use;
+	u64 inner_start = inner.arena->used;
 	elf_arena_push_text(inner.arena, "inner");
-	expect_arena_u64(inner.arena->in_use, inner_start + 5, "scratch inner advances cursor");
+	expect_arena_u64(inner.arena->used, inner_start + 5, "scratch inner advances cursor");
 	elf_end_scratch(inner);
-	expect_arena_u64(outer.arena->in_use, inner_start, "scratch inner regresses cursor");
+	expect_arena_u64(outer.arena->used, inner_start, "scratch inner regresses cursor");
 
 	elf_end_scratch(outer);
-	expect_arena_u64(outer.arena->in_use, outer_start, "scratch outer regresses cursor");
+	expect_arena_u64(outer.arena->used, outer_start, "scratch outer regresses cursor");
 }
 
 static void test_scratch_exclusion(void)

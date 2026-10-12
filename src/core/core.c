@@ -181,7 +181,8 @@ void elf_destroy_state(elf_State *state)
 		gc_destroy_all(state);
 		elf_free(state, state->string_buckets,
 			(u64)state->string_bucket_count * sizeof(*state->string_buckets));
-		elf_arena_destroy(&state->arena);
+		elf_Arena arena = state->arena;
+		elf_arena_destroy(&arena);
 	}
 }
 

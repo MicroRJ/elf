@@ -404,7 +404,7 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 	ASSERT(compiler);
 	ASSERT(compiler->module_count);
 	elf_State *state = compiler->state;
-	u64 arena_checkpoint = state->arena.in_use;
+	u64 arena_checkpoint = state->arena.used;
 	BcFunctionRef file_entry = {};
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
@@ -416,7 +416,7 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 	}
 	if (compiler->report.error_count)
 	{
-		state->arena.in_use = arena_checkpoint;
+		state->arena.used = arena_checkpoint;
 		goto done;
 	}
 	Ast ast_file = compiler->modules[0].ast;
@@ -428,7 +428,7 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 		ir_module = elf_lower_ast_file(ctx, ast_file);
 	}
 	if (compiler->report.error_count) {
-		state->arena.in_use = arena_checkpoint;
+		state->arena.used = arena_checkpoint;
 		goto done;
 	}
 
@@ -436,7 +436,7 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 	file_entry = generate_module(compiler, &generated_module, ir_module);
 	if (!bc_function_ref_is_valid(file_entry) || compiler->report.error_count) {
 		file_entry = (BcFunctionRef) {};
-		state->arena.in_use = arena_checkpoint;
+		state->arena.used = arena_checkpoint;
 		goto done;
 	}
 
