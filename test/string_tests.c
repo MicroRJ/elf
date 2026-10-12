@@ -52,7 +52,7 @@ static void test_string_public_text_helpers(elf_State *state)
 static void force_string_gc(elf_State *state)
 {
 	state->gc_next_cycle_bytes = 1;
-	elf_new_table_rogue(state);
+	elf_table_new(state);
 }
 
 static u32 test_string_hash_data(const char *data, u32 size)

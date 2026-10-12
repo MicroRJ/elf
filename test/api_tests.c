@@ -81,7 +81,7 @@ static void test_api_tables_and_refs(elf_State *state)
 	}
 	elf_set_top(state, checkpoint);
 	state->gc_next_cycle_bytes = 1;
-	elf_new_table_rogue(state);
+	elf_table_new(state);
 	if (!elf_push_ref(state, reference)) {
 		test_fail("API reference survives leaving the stack");
 	}

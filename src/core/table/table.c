@@ -14,33 +14,13 @@ static void table_check_write(elf_State *state, elf_Table *table)
 	}
 }
 
-static u32 table_normalize_capacity(u32 capacity)
-{
-	u32 normalized = TABLE_INITIAL_CAPACITY;
-	while (normalized < capacity)
-	{
-		normalized <<= 1;
-	}
-	return normalized;
-}
-
-static void table_init(elf_State *state, elf_Table *table, u32 capacity)
-{
-	table->capacity = table_normalize_capacity(capacity);
-	table->entries = elf_alloc_zero(state, (u64)table->capacity * sizeof(*table->entries));
-	ASSERT(table->entries != 0);
-}
-
-elf_Table *elf_new_table_rogue2(elf_State *state, u32 capacity)
+elf_Table *elf_table_new(elf_State *state)
 {
 	elf_Table *table = elf_gc_alloc(state, ELF_OBJECT_TABLE, sizeof(*table));
-	table_init(state, table, capacity);
+	table->capacity = TABLE_INITIAL_CAPACITY;
+	table->entries = elf_alloc_zero(state, (u64)table->capacity * sizeof(*table->entries));
+	ASSERT(table->entries != 0);
 	return table;
-}
-
-elf_Table *elf_new_table_rogue(elf_State *state)
-{
-	return elf_new_table_rogue2(state, TABLE_INITIAL_CAPACITY);
 }
 
 static inline u32 rehash(u64 hash)

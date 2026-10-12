@@ -24,8 +24,7 @@ struct elf_Table
 	u32 occupied;
 };
 
-elf_Table *elf_new_table_rogue2(elf_State *state, u32 capacity);
-elf_Table *elf_new_table_rogue(elf_State *state);
+elf_Table *elf_table_new(elf_State *state);
 
 void elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value value);
 elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *table, elf_Value key);

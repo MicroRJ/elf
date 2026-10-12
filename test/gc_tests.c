@@ -2,7 +2,7 @@ static void force_gc_allocations(elf_State *state, u32 count)
 {
 	for (u32 i = 0; i < count; ++i) {
 		state->gc_next_cycle_bytes = 1;
-		elf_new_table_rogue(state);
+		elf_table_new(state);
 	}
 }
 
@@ -61,7 +61,7 @@ static void test_gc_tracks_owned_storage(void)
 
 	u64 collections = state->gc_collection_count;
 	state->gc_next_cycle_bytes = 1;
-	elf_new_table_rogue(state);
+	elf_table_new(state);
 	if (state->gc_collection_count != collections + 1 ||
 		state->gc_last_collection_time_ns > state->gc_collection_time_ns ||
 		state->gc_max_collection_time_ns < state->gc_last_collection_time_ns) {

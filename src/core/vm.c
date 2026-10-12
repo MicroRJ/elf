@@ -329,7 +329,7 @@ activate_frame:
 			} break;
 
 			case BC_TABLE: {
-				elf_Table *table = elf_new_table_rogue(state);
+				elf_Table *table = elf_table_new(state);
 				*vm_slot(reference, byte.b_x) = value_from_table(table);
 			} break;
 

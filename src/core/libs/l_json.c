@@ -15,7 +15,7 @@ JsonWriter;
 
 static void json_push_error_value(elf_State *state, const char *message, const Com_Message *compiler_message)
 {
-	elf_Table *info = elf_new_table_rogue(state);
+	elf_Table *info = elf_table_new(state);
 	push_value(state, value_from_error(info));
 
 	elf_Value message_key = value_from_string(elf_string_from_data(state, "message"));

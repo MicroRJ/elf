@@ -184,7 +184,7 @@ static inline void push_array(elf_State *state, elf_Array *array)
 
 static inline elf_Table *push_new_table(elf_State *state)
 {
-	elf_Table *table = elf_new_table_rogue(state);
+	elf_Table *table = elf_table_new(state);
 	push_table(state, table);
 	return table;
 }

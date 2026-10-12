@@ -388,7 +388,7 @@ static b32 compiler_eval_constexpr_ast(Compiler *compiler, Ast ast, elf_Value *o
 
 		case AST_TABLE:
 		{
-			elf_Table *table = elf_new_table_rogue(compiler->state);
+			elf_Table *table = elf_table_new(compiler->state);
 			for (u32 i = 0; i < ast->table.nargs; ++ i)
 			{
 				Ast entry_ast = ast->table.args[i];

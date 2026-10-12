@@ -51,7 +51,7 @@ void elf_push_str(elf_State *state, const char *data, elf_Size size)
 
 void elf_push_error(elf_State *state, const char *message)
 {
-	elf_Table *info = elf_new_table_rogue(state);
+	elf_Table *info = elf_table_new(state);
 	push_value(state, value_from_error(info));
 	elf_push_cstr(state, message ? message : "error");
 	elf_Value key = value_from_string(elf_string_from_data(state, "message"));

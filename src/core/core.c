@@ -158,7 +158,7 @@ static void bootstrap_state(elf_State *state)
 	init_strings(state);
 	bootstrap_base_frame(state);
 	bootstrap_standard_libraries(state);
-	state->ref_table = elf_new_table_rogue(state);
+	state->ref_table = elf_table_new(state);
 	state->next_ref = 1;
 	reserve_bootstrap_frame_stack_space(state);
 }

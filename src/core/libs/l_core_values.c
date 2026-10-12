@@ -136,7 +136,7 @@ ELF_FUNCTION(l_core_error)
 		details = value_as_table(details_value);
 	}
 
-	elf_Table *info = elf_new_table_rogue(S);
+	elf_Table *info = elf_table_new(S);
 	push_value(S, value_from_error(info));
 
 	if (details)
