@@ -10,10 +10,7 @@ static void gc_free_object(elf_State *state, elf_Object *reference)
 	if (reference->type == ELF_OBJECT_TABLE)
 	{
 		elf_Table *table = (elf_Table *)reference;
-		elf_free(state, table->entries,
-			(u64)table->nentries * sizeof(*table->entries));
-		elf_free(state, table->array,
-			(u64)table->capacity * sizeof(*table->array));
+		elf_free(state, table->entries, (u64)table->capacity * sizeof(*table->entries));
 	}
 	else if (reference->type == ELF_OBJECT_ARRAY)
 	{
@@ -322,7 +319,7 @@ static u32 gc_mark_table(elf_State *state, elf_Table *table)
 {
 	u32 marked_count = 0;
 
-	for(u32 i = 0; i < table->nentries; ++ i)
+	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
 		if (entry_is_key(entry))
@@ -332,14 +329,10 @@ static u32 gc_mark_table(elf_State *state, elf_Table *table)
 			{
 				marked_count += gc_mark_reachable(state, value_as_object(key));
 			}
-		}
-	}
-	for(u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
-	{
-		elf_Value value = elf_deprecated_array_get(state, table, i);
-		if (value_is_object(value))
-		{
-			marked_count += gc_mark_reachable(state, value_as_object(value));
+			if (value_is_object(entry.value))
+			{
+				marked_count += gc_mark_reachable(state, value_as_object(entry.value));
+			}
 		}
 	}
 	return marked_count;

@@ -51,23 +51,9 @@ static void test_serialize_array(elf_State *state)
 	pop_value(state);
 }
 
-static void test_serialize_rejects_unkeyed_table(elf_State *state)
-{
-	elf_Table *table = push_new_table(state);
-	elf_deprecated_array_add(state, table, value_from_integer(10));
-	elf_Arena arena = elf_arena_create(0);
-	if (elf_unparse_value(state, &arena, value_from_table(table), 0))
-	{
-		test_fail("serialize rejects table storage without keys");
-	}
-	elf_arena_destroy(&arena);
-	pop_value(state);
-}
-
 static void run_unparse_tests(elf_State *state)
 {
 	test_serialize_scalars(state);
 	test_serialize_table(state);
 	test_serialize_array(state);
-	test_serialize_rejects_unkeyed_table(state);
 }

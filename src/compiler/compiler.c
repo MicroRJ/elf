@@ -389,7 +389,6 @@ static b32 compiler_eval_constexpr_ast(Compiler *compiler, Ast ast, elf_Value *o
 		case AST_TABLE:
 		{
 			elf_Table *table = elf_new_table_rogue(compiler->state);
-			table->json_shape = ast->table.json_shape;
 			for (u32 i = 0; i < ast->table.nargs; ++ i)
 			{
 				Ast entry_ast = ast->table.args[i];
@@ -405,19 +404,17 @@ static b32 compiler_eval_constexpr_ast(Compiler *compiler, Ast ast, elf_Value *o
 					return false;
 				}
 
-				if (entry_ast->table_entry.key)
+				if (!entry_ast->table_entry.key)
 				{
-					elf_Value key = {};
-					if (!compiler_eval_constexpr_ast(compiler, entry_ast->table_entry.key, &key))
-					{
-						return false;
-					}
-					elf_table_set(compiler->state, table, key, value);
+					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, entry_ast->site, "invalid unkeyed table constant");
+					return false;
 				}
-				else
+				elf_Value key = {};
+				if (!compiler_eval_constexpr_ast(compiler, entry_ast->table_entry.key, &key))
 				{
-					elf_deprecated_array_add(compiler->state, table, value);
+					return false;
 				}
+				elf_table_set(compiler->state, table, key, value);
 			}
 
 			*out = value_from_table(table);

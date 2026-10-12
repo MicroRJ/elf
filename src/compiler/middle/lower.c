@@ -774,8 +774,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			u32 nargs = expr->table.nargs;
 
 			IrFrame table_items = begin_ir_frame(ctx);
-			Ir table_local = create_local_ir(ctx, expr->site,
-				create_table_ir(ctx, expr->site, expr->table.json_shape));
+			Ir table_local = create_local_ir(ctx, expr->site, create_table_ir(ctx, expr->site));
 			push_ir(&table_items, table_local);
 
 			for (u32 i = 0; i < nargs; ++ i)
@@ -792,16 +791,15 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				Ast value = entry->table_entry.value;
 				Ir table = create_load_local_ir(ctx, entry->site, table_local);
 				Ir ir_value = lower_ast_expr_to_ir(ctx, value);
-				if (key)
+				if (!key)
 				{
-					Ir ir_key = lower_ast_expr_to_ir(ctx, key);
-					Ir field = ir_new_binary(ctx, entry->site, IR_FIELD, table, ir_key);
-					push_ir(&table_items, create_store_ir(ctx, entry->site, field, ir_value));
+					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, entry->site, "expected keyed table entry");
+					push_ir(&table_items, ERROR_IR);
+					continue;
 				}
-				else
-				{
-					push_ir(&table_items, create_deprecated_array_add_ir(ctx, entry->site, table, ir_value));
-				}
+				Ir ir_key = lower_ast_expr_to_ir(ctx, key);
+				Ir field = ir_new_binary(ctx, entry->site, IR_FIELD, table, ir_key);
+				push_ir(&table_items, create_store_ir(ctx, entry->site, field, ir_value));
 			}
 
 			Ir value = create_load_local_ir(ctx, expr->site, table_local);

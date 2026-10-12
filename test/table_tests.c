@@ -46,11 +46,11 @@ static void test_table_field_set_get(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
 
-	u32 first = elf_table_set(state, table, test_key_string(state, "answer"), test_value_int(42));
+	elf_table_set(state, table, test_key_string(state, "answer"), test_value_int(42));
 	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "answer")), 42, "field get by equal string key");
 
-	u32 second = elf_table_set(state, table, test_key_string(state, "answer"), test_value_int(43));
-	expect_index(second, first, "field overwrite keeps storage slot");
+	elf_table_set(state, table, test_key_string(state, "answer"), test_value_int(43));
+	expect_index(table->count, 1, "field overwrite keeps one mapping");
 	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "answer")), 43, "field overwrite elf_Value");
 
 	expect_nil(elf_table_get_or_nil(state, table, test_key_string(state, "missing")), "missing field returns nil");
@@ -72,7 +72,7 @@ static void test_table_integer_keys(elf_State *state)
 static void test_table_resize_stress(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
-	u32 initial_entries = table->nentries;
+	u32 initial_capacity = table->capacity;
 	elf_Value keys[512] = {};
 
 	for (u32 i = 0; i < 512; ++i) {
@@ -82,7 +82,7 @@ static void test_table_resize_stress(elf_State *state)
 		elf_table_set(state, table, keys[i], test_value_int(i + 1000));
 	}
 
-	if (table->nentries <= initial_entries) {
+	if (table->capacity <= initial_capacity) {
 		test_fail("resize increased entry capacity");
 	}
 
@@ -91,53 +91,40 @@ static void test_table_resize_stress(elf_State *state)
 	}
 }
 
-static void test_table_array_operations(elf_State *state)
+static void test_table_delete_and_reuse_tombstones(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
-
-	u32 a = elf_deprecated_array_add(state, table, test_value_int(7));
-	u32 b = elf_deprecated_array_add(state, table, test_value_int(8));
-	u32 c = elf_deprecated_array_add(state, table, test_value_int(9));
-
-	expect_index(a, 0, "first array add u32");
-	expect_index(b, 1, "second array add u32");
-	expect_index(c, 2, "third array add u32");
-	expect_index(elf_deprecated_array_length(table), 3, "array length after adds");
-
-	expect_int(elf_deprecated_array_get(state, table, 0), 7, "array get 0");
-	expect_int(elf_deprecated_array_get(state, table, 1), 8, "array get 1");
-	expect_int(elf_deprecated_array_get(state, table, 2), 9, "array get 2");
-
-	elf_deprecated_array_set(state, table, 1, test_value_int(80));
-	expect_int(elf_deprecated_array_get(state, table, 1), 80, "array set");
-}
-
-static void test_table_field_and_array_share_storage(elf_State *state)
-{
-	elf_Table *table = push_new_table(state);
-
-	u32 field_slot = elf_table_set(state, table, test_key_string(state, "field"), test_value_int(1));
-	u32 array_slot = elf_deprecated_array_add(state, table, test_value_int(2));
-
-	expect_index(field_slot, 0, "field storage starts at slot 0");
-	expect_index(array_slot, 1, "array append follows field storage");
-	expect_index(elf_deprecated_array_length(table), 2, "array length reflects shared storage");
-	expect_int(elf_deprecated_array_get(state, table, field_slot), 1, "field elf_Value lives in storage elf_Value *");
-	expect_int(elf_deprecated_array_get(state, table, array_slot), 2, "array elf_Value lives in storage elf_Value *");
-}
-
-static void test_table_bind_to_index(elf_State *state)
-{
-	elf_Table *table = push_new_table(state);
-
-	u32 slot = elf_deprecated_array_add(state, table, test_value_int(123));
-	u32 bound = elf_table_bind_to_index(state, table, test_key_string(state, "bound"), slot);
-
-	expect_index(bound, slot, "bind returns requested slot");
-	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "bound")), 123, "bound key resolves to slot elf_Value");
-
-	elf_deprecated_array_set(state, table, slot, test_value_int(321));
-	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "bound")), 321, "bound key tracks slot mutation");
+	for (u32 i = 0; i < 128; ++i)
+	{
+		elf_table_set(state, table, test_key_int(i), test_value_int(i));
+	}
+	for (u32 i = 0; i < 128; i += 2)
+	{
+		elf_Value removed = value_nil();
+		if (!elf_table_delete(state, table, test_key_int(i), &removed))
+		{
+			test_fail("table deletes existing key");
+		}
+		expect_int(removed, i, "table delete returns removed value");
+	}
+	u32 capacity = table->capacity;
+	for (u32 i = 128; i < 192; ++i)
+	{
+		elf_table_set(state, table, test_key_int(i), test_value_int(i));
+	}
+	expect_index(table->count, 128, "table count tracks live mappings");
+	if (table->capacity != capacity)
+	{
+		test_fail("table reuses tombstones before growing");
+	}
+	for (u32 i = 1; i < 192; i += 2)
+	{
+		expect_int(elf_table_get_or_nil(state, table, test_key_int(i)), i, "table preserves entries across tombstone reuse");
+	}
+	for (u32 i = 128; i < 192; ++i)
+	{
+		expect_int(elf_table_get_or_nil(state, table, test_key_int(i)), i, "table finds entries inserted over tombstones");
+	}
 }
 
 static void expect_table_value(elf_Value value, const char *label)
@@ -251,7 +238,18 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_table_value(random_value, "elf.random is a table");
 	expect_function_value(elf_table_get_or_nil(state, value_as_table(random_value), test_key_string(state, "random")), "elf.random.random is a field function");
 
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "map_equal")), "table.map_equal is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "length")), "table.length is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "size")), "table.size is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "has")), "table.has is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "delete")), "table.delete is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clear")), "table.clear is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "keys")), "table.keys is a method");
+	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "map_equal")), "table.map_equal is absent");
+	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "haskey")), "table.haskey is absent");
+	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "values")), "table.values is absent");
+	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "pairs")), "table.pairs is absent");
+	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clone")), "table.clone is absent");
+	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "merge")), "table.merge is absent");
 
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "sockets")), "deleted elf.sockets library is absent");
 }
@@ -261,8 +259,6 @@ static void run_table_tests(elf_State *state)
 	test_table_field_set_get(state);
 	test_table_integer_keys(state);
 	test_table_resize_stress(state);
-	test_table_array_operations(state);
-	test_table_field_and_array_share_storage(state);
-	test_table_bind_to_index(state);
+	test_table_delete_and_reuse_tombstones(state);
 	test_runtime_elf_global_is_table(state);
 }

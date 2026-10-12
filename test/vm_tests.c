@@ -113,7 +113,7 @@ static void test_vm_return_table(void)
 	if (!value_is_table(result.value)) {
 		test_fail("vm returns table value");
 	}
-	else if (elf_deprecated_array_length(value_as_table(result.value)) != 2) {
+	else if (value_as_table(result.value)->count != 2) {
 		test_fail("vm table literal stores keyed values");
 	}
 	elf_destroy_state(result.state);

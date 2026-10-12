@@ -412,14 +412,14 @@ static void test_backend_array_bytecode(void)
 	{
 		test_fail("array indexed access emits generic index bytecodes");
 	}
-	if (backend_count_bytecode(result, BC_TABLE) != 0 || backend_count_bytecode(result, BC_DEPRECATED_ARRAYADD) != 0)
+	if (backend_count_bytecode(result, BC_TABLE) != 0)
 	{
 		test_fail("array literal does not emit table compatibility bytecodes");
 	}
 	backend_test_destroy(result);
 
 	result = backend_test_compile_source("ret {answer = 1}");
-	if (backend_count_bytecode(result, BC_TABLE) != 1 || backend_count_bytecode(result, BC_SETFIELD) != 1 || backend_count_bytecode(result, BC_DEPRECATED_ARRAYADD) != 0 || backend_count_bytecode(result, BC_ARRAYADD) != 0)
+	if (backend_count_bytecode(result, BC_TABLE) != 1 || backend_count_bytecode(result, BC_SETFIELD) != 1 || backend_count_bytecode(result, BC_ARRAYADD) != 0)
 	{
 		test_fail("keyed table literal emits only table field bytecodes");
 	}

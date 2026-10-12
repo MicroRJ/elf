@@ -177,12 +177,6 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		}
 		break;
 
-		case BC_DEPRECATED_ARRAYADD:
-		{
-			elf_arena_pushf(arena, "deprecated_arrayadd r%d, r%d", byte.b_x, byte.b_y);
-		}
-		break;
-
 		case BC_CALL:
 		{
 			elf_arena_pushf(arena, "call r%d nargs=%d nrets=%d", byte.b_x, byte.b_y, byte.b_z);
@@ -191,7 +185,7 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 
 		case BC_TABLE:
 		{
-			elf_arena_pushf(arena, "r%d = table shape=%d", byte.b_x, byte.b_y);
+			elf_arena_pushf(arena, "r%d = table", byte.b_x);
 		}
 		break;
 

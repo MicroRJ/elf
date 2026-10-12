@@ -118,16 +118,6 @@ static void json_writer_string(JsonWriter *writer, elf_String *string)
 	json_writer_char(writer, '"');
 }
 
-static b32 json_table_index_has_key(elf_Table *table, u32 value_index)
-{
-	for (u32 i = 0; i < table->nentries; ++i)
-	{
-		Entry entry = table->entries[i];
-		if (entry_is_key(entry) && entry_index(entry) == value_index) return true;
-	}
-	return false;
-}
-
 static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth);
 
 static b32 json_writer_enter_object(JsonWriter *writer, elf_Object *object, u32 depth)
@@ -156,65 +146,29 @@ static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
 		return;
 	}
 
-	u32 count = elf_deprecated_array_length(table);
-	u32 keyed_values = 0;
-	for (u32 i = 0; i < count; ++i)
-	{
-		if (json_table_index_has_key(table, i)) keyed_values += 1;
-	}
-
-	TableJsonShape shape = (TableJsonShape)table->json_shape;
-	if (shape == TABLE_JSON_SHAPE_NONE)
-	{
-		shape = keyed_values ? TABLE_JSON_SHAPE_OBJECT : TABLE_JSON_SHAPE_ARRAY;
-		if (count == 0) shape = TABLE_JSON_SHAPE_OBJECT;
-	}
-
-	if (shape == TABLE_JSON_SHAPE_ARRAY)
-	{
-		if (keyed_values)
-		{
-			writer->error = "cannot stringify a table containing both fields and array values";
-			return;
-		}
-
-		json_writer_char(writer, '[');
-		for (u32 i = 0; i < count && !writer->error; ++i)
-		{
-			if (i) json_writer_char(writer, ',');
-			json_write_value(writer, table->array[i], depth + 1);
-		}
-		json_writer_char(writer, ']');
-		return;
-	}
-
-	if (keyed_values != count)
-	{
-		writer->error = "cannot stringify a table containing both fields and array values";
-		return;
-	}
-
 	json_writer_char(writer, '{');
 	b32 wrote_entry = false;
-	for (u32 value_index = 0; value_index < count && !writer->error; ++value_index)
+	for (u32 i = 0; i < table->capacity && !writer->error; ++i)
 	{
-		for (u32 i = 0; i < table->nentries && !writer->error; ++i)
+		Entry entry = table->entries[i];
+		if (!entry_is_key(entry))
 		{
-			Entry entry = table->entries[i];
-			if (!entry_is_key(entry) || entry_index(entry) != value_index) continue;
-
-			elf_Value key = entry_key_value(entry);
-			if (!value_is_string(key))
-			{
-				writer->error = "JSON object keys must be strings";
-				break;
-			}
-			if (wrote_entry) json_writer_char(writer, ',');
-			wrote_entry = true;
-			json_writer_string(writer, value_as_string(key));
-			json_writer_char(writer, ':');
-			json_write_value(writer, table->array[value_index], depth + 1);
+			continue;
 		}
+		elf_Value key = entry_key_value(entry);
+		if (!value_is_string(key))
+		{
+			writer->error = "JSON object keys must be strings";
+			break;
+		}
+		if (wrote_entry)
+		{
+			json_writer_char(writer, ',');
+		}
+		wrote_entry = true;
+		json_writer_string(writer, value_as_string(key));
+		json_writer_char(writer, ':');
+		json_write_value(writer, entry.value, depth + 1);
 	}
 	json_writer_char(writer, '}');
 }

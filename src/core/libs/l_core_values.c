@@ -26,16 +26,22 @@ static u32 core_mark_table_readonly(elf_State *state, elf_Table *table)
 {
 	u32 count = 0;
 
-	for (u32 index = 0; index < table->nentries; ++index)
+	for (u32 index = 0; index < table->capacity; ++index)
 	{
-		elf_Value key = entry_key_value(table->entries[index]);
-		if (value_is_object(key)) count += core_mark_readonly(state, value_as_object(key));
-	}
-
-	for (u32 index = 0; index < elf_deprecated_array_length(table); ++index)
-	{
-		elf_Value value = elf_deprecated_array_get(state, table, index);
-		if (value_is_object(value)) count += core_mark_readonly(state, value_as_object(value));
+		Entry entry = table->entries[index];
+		if (!entry_is_key(entry))
+		{
+			continue;
+		}
+		elf_Value key = entry_key_value(entry);
+		if (value_is_object(key))
+		{
+			count += core_mark_readonly(state, value_as_object(key));
+		}
+		if (value_is_object(entry.value))
+		{
+			count += core_mark_readonly(state, value_as_object(entry.value));
+		}
 	}
 
 	return count;
@@ -135,11 +141,14 @@ ELF_FUNCTION(l_core_error)
 
 	if (details)
 	{
-		for (u32 i = 0; i < details->nentries; ++i)
+		for (u32 i = 0; i < details->capacity; ++i)
 		{
 			Entry entry = details->entries[i];
-			if (!entry_is_key(entry)) continue;
-			elf_table_set(S, info, entry_key_value(entry), elf_deprecated_array_get(S, details, entry_index(entry)));
+			if (!entry_is_key(entry))
+			{
+				continue;
+			}
+			elf_table_set(S, info, entry_key_value(entry), entry.value);
 		}
 	}
 

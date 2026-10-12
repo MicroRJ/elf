@@ -22,18 +22,21 @@ static void test_gc_tracks_owned_storage(void)
 	u64 starting_live = state->gc_live_bytes;
 
 	elf_Table *table = push_new_table(state);
-	u64 table_bytes = sizeof(*table) +
-		(u64)table->nentries * sizeof(*table->entries);
+	u64 table_bytes = sizeof(*table) + (u64)table->capacity * sizeof(*table->entries);
 	if (state->gc_allocated_bytes - starting_allocated != table_bytes ||
 		state->gc_live_bytes - starting_live != table_bytes) {
 		test_fail("GC bytes include table object and hash storage");
 	}
 
-	u64 before_array = state->gc_live_bytes;
-	elf_deprecated_array_add(state, table, test_value_int(1));
-	u64 array_bytes = (u64)table->capacity * sizeof(*table->array);
-	if (state->gc_live_bytes - before_array != array_bytes) {
-		test_fail("GC bytes include table array storage");
+	u32 initial_capacity = table->capacity;
+	u64 before_table_growth = state->gc_live_bytes;
+	for (u32 i = 0; i < 4; ++i)
+	{
+		elf_table_set(state, table, test_key_int(i), test_value_int(i));
+	}
+	u64 growth_bytes = (u64)(table->capacity - initial_capacity) * sizeof(*table->entries);
+	if (state->gc_live_bytes - before_table_growth != growth_bytes) {
+		test_fail("GC bytes include table hash growth");
 	}
 
 	u64 before_buffer = state->gc_live_bytes;
@@ -147,7 +150,6 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 		child_value = value_from_table(child);
 
 		elf_table_set(state, child, value_key, test_value_int(1000 + i));
-		elf_deprecated_array_add(state, root, child_value);
 		elf_table_set(state, root, test_key_int(i), child_value);
 	}
 
@@ -164,7 +166,7 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 		expect_int(elf_table_get_or_nil(state, child, value_key), 1000 + i, "GC preserves rooted child table contents");
 	}
 
-	elf_Value first_child = elf_deprecated_array_get(state, root, 0);
+	elf_Value first_child = elf_table_get_or_nil(state, root, test_key_int(0));
 	elf_table_set(state, root, child_key, first_child);
 	expect_table_value(elf_table_get_or_nil(state, root, child_key), "GC preserves rooted table field references");
 
@@ -181,8 +183,10 @@ static void test_gc_keeps_referenced_table_graph(void)
 	elf_Table *root = push_new_table(state);
 	elf_Table *child = push_new_table(state);
 
-	elf_deprecated_array_add(state, child, test_value_int(42));
-	elf_deprecated_array_add(state, root, value_from_table(child));
+	elf_Value child_key = test_key_string(state, "child");
+	elf_Value value_key = test_key_string(state, "value");
+	elf_table_set(state, child, value_key, test_value_int(42));
+	elf_table_set(state, root, child_key, value_from_table(child));
 	elf_Ref reference = elf_create_ref(state, -2);
 	elf_set_top(state, stack_checkpoint);
 
@@ -193,9 +197,9 @@ static void test_gc_keeps_referenced_table_graph(void)
 		return;
 	}
 	root = value_as_table(state->stack_ptr[-1]);
-	elf_Value child_value = elf_deprecated_array_get(state, root, 0);
+	elf_Value child_value = elf_table_get_or_nil(state, root, child_key);
 	expect_table_value(child_value, "table reference preserves child table");
-	expect_int(elf_deprecated_array_get(state, value_as_table(child_value), 0), 42,
+	expect_int(elf_table_get_or_nil(state, value_as_table(child_value), value_key), 42,
 		"table reference preserves child contents");
 
 	elf_pop(state, 1);

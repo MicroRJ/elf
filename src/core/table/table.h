@@ -5,78 +5,37 @@
 #ifndef ELF_CORE_TABLE_H
 #define ELF_CORE_TABLE_H
 
-#define ENTRY_INDEX_MASK       0x00000000FFFFFFFFull
-#define ENTRY_TYPE_SHIFT       32
-#define ENTRY_TYPE_MASK        0x000000FF00000000ull
-#define ENTRY_READONLY_BIT     0x0000010000000000ull
-#define ENTRY_TOMB_TYPE        0xFFu
+#define ENTRY_TOMB_TYPE 0xFFu
 
 typedef struct
 {
-	u64 key;
-	u64 data;
+	elf_Value key;
+	elf_Value value;
 }
 Entry;
-STATIC_ASSERT(sizeof(Entry) == 16);
-
-typedef enum
-{
-	TABLE_JSON_SHAPE_NONE = 0,
-	TABLE_JSON_SHAPE_ARRAY,
-	TABLE_JSON_SHAPE_OBJECT,
-}
-TableJsonShape;
-
+STATIC_ASSERT(sizeof(Entry) == 32);
 
 struct elf_Table
 {
-	elf_Object        obj;
-	u8         json_shape;
-	u32       fillcounter;
-	u32          nentries;
-	Entry        *entries;
-	u32          capacity;
-	u32             count;
-	elf_Value      *array;
+	elf_Object obj;
+	Entry *entries;
+	u32 capacity;
+	u32 count;
+	u32 occupied;
 };
 
-elf_Table *elf_new_table_rogue2(elf_State *state, u32 nentries);
+elf_Table *elf_new_table_rogue2(elf_State *state, u32 capacity);
 elf_Table *elf_new_table_rogue(elf_State *state);
 
-u32 elf_table_set(elf_State *state, elf_Table *tab, elf_Value key, elf_Value value);
-elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *tab, elf_Value key);
-u32 elf_table_ensure(elf_State *state, elf_Table *tab, elf_Value key);
-u32 elf_table_bind_to_index(elf_State *state, elf_Table *tab, elf_Value key, u32 index);
-b32 elf_table_contains(elf_State *state, elf_Table *tab, elf_Value key);
-b32 elf_table_delete(elf_State *state, elf_Table *tab, elf_Value key, elf_Value *removed);
-void elf_table_clear(elf_State *state, elf_Table *tab);
-void elf_table_alias(elf_State *state, elf_Table *tab, elf_Value key, elf_Value alias);
-
-u32 elf_deprecated_array_add(elf_State *state, elf_Table *tab, elf_Value value);
-u32 elf_deprecated_array_insert(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
-elf_Value elf_deprecated_array_get(elf_State *state, elf_Table *tab, u32 index);
-void elf_deprecated_array_set(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
-void elf_deprecated_array_remove(elf_State *state, elf_Table *tab, u32 index, u32 count);
-void elf_deprecated_array_swap(elf_State *state, elf_Table *tab, u32 left, u32 right);
-u32 elf_deprecated_array_length(elf_Table *tab);
-
-void elf_table_mark_field_readonly(elf_State *state, elf_Table *tab, elf_Value field);
-
-
-
-static inline u32 entry_index(Entry entry)
-{
-	return (u32)(entry.data & ENTRY_INDEX_MASK);
-}
+void elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value value);
+elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *table, elf_Value key);
+b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key);
+b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Value *removed);
+void elf_table_clear(elf_State *state, elf_Table *table);
 
 static inline elf_ValueType entry_type(Entry entry)
 {
-	return (elf_ValueType)((entry.data & ENTRY_TYPE_MASK) >> ENTRY_TYPE_SHIFT);
-}
-
-static inline u32 entry_state(Entry entry)
-{
-	return (u32)((entry.data & ENTRY_TYPE_MASK) >> ENTRY_TYPE_SHIFT);
+	return entry.key.type;
 }
 
 static inline b32 entry_is_nil(Entry entry)
@@ -86,7 +45,7 @@ static inline b32 entry_is_nil(Entry entry)
 
 static inline b32 entry_is_tomb(Entry entry)
 {
-	return entry_state(entry) == ENTRY_TOMB_TYPE;
+	return entry_type(entry) == ENTRY_TOMB_TYPE;
 }
 
 static inline b32 entry_is_dead(Entry entry)
@@ -99,49 +58,24 @@ static inline b32 entry_is_key(Entry entry)
 	return !entry_is_dead(entry);
 }
 
-static inline b32 entry_is_readonly(Entry entry)
-{
-	return (entry.data & ENTRY_READONLY_BIT) != 0;
-}
-
-static inline void entry_set_index(Entry *entry, u32 index)
-{
-	entry->data = (entry->data & ~ENTRY_INDEX_MASK) | index;
-}
-
-static inline void entry_set_type(Entry *entry, elf_ValueType type)
-{
-	entry->data = (entry->data & ~ENTRY_TYPE_MASK) | ((u64)type << ENTRY_TYPE_SHIFT);
-}
-
 static inline void entry_set_tomb(Entry *entry)
 {
-	entry->data = (entry->data & ~ENTRY_TYPE_MASK) | ((u64)ENTRY_TOMB_TYPE << ENTRY_TYPE_SHIFT);
+	entry->key = value_nil();
+	entry->key.type = (elf_ValueType)ENTRY_TOMB_TYPE;
+	entry->value = value_nil();
 }
 
-static inline void entry_mark_readonly(Entry *entry)
-{
-	entry->data |= ENTRY_READONLY_BIT;
-}
-
-static inline Entry entry_from_key_index(elf_Value key, u32 index)
+static inline Entry entry_from_key_value(elf_Value key, elf_Value value)
 {
 	Entry entry = {};
-	entry.key = (u64)key.x_i64;
-	entry.data = ((u64)key.type << ENTRY_TYPE_SHIFT) | index;
-	if (key.status & VALUE_READONLY) {
-		entry.data |= ENTRY_READONLY_BIT;
-	}
+	entry.key = key;
+	entry.value = value;
 	return entry;
 }
 
 static inline elf_Value entry_key_value(Entry entry)
 {
-	elf_Value value = {};
-	value.type = entry_type(entry);
-	value.status = entry_is_readonly(entry) ? VALUE_READONLY : 0;
-	value.x_i64 = (i64)entry.key;
-	return value;
+	return entry.key;
 }
 
 #endif

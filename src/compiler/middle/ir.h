@@ -33,7 +33,6 @@ BcSlot;
 	X(IR_BITWISE_XOR         , "bitwise_xor")                \
 	X(IR_BITWISE_NOT         , "bitwise_not")                \
 	X(IR_STORE               , "store")                      \
-	X(IR_DEPRECATED_ARRAY_ADD, "deprecated_array_add")       \
 	X(IR_ARRAY_ADD           , "array_add")                  \
 	X(IR_IF                  , "if")                         \
 	X(IR_BLOCK               , "block_stat")                 \
@@ -106,7 +105,6 @@ struct IrNode
 		Atom *atom;
 		i64      ir_int;
 		f64      ir_num;
-		u8 ir_table_shape;
 
 		Ir ir_unary;
 

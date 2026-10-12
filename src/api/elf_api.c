@@ -551,20 +551,21 @@ elf_ErrorCode elf_buffer_patch(elf_State *state, elf_Index index, elf_Size posit
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)
 {
 	elf_Table *table;
-	if (!cursor || !table_at(state, index, &table) || *cursor >= table->count) return false;
-
-	elf_u32 value_index = (*cursor)++;
-	elf_Value key = value_from_integer(value_index);
-	for (elf_u32 i = 0; i < table->nentries; ++i) {
-		Entry entry = table->entries[i];
-		if (entry_is_key(entry) && entry_index(entry) == value_index) {
-			key = entry_key_value(entry);
-			break;
+	if (!cursor || !table_at(state, index, &table))
+	{
+		return false;
+	}
+	while (*cursor < table->capacity)
+	{
+		Entry entry = table->entries[(*cursor)++];
+		if (entry_is_key(entry))
+		{
+			push_value(state, entry_key_value(entry));
+			push_value(state, entry.value);
+			return true;
 		}
 	}
-	push_value(state, key);
-	push_value(state, table->array[value_index]);
-	return true;
+	return false;
 }
 
 elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right)

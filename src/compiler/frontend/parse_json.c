@@ -42,7 +42,6 @@ static Ast parse_json_ast_object(Parser *parser)
 		if (ast_is_error(table)) {
 			return table;
 		}
-		table->table.json_shape = TABLE_JSON_SHAPE_OBJECT;
 		return table;
 	}
 
@@ -96,7 +95,6 @@ static Ast parse_json_ast_object(Parser *parser)
 	if (ast_is_error(table)) {
 		return table;
 	}
-	table->table.json_shape = TABLE_JSON_SHAPE_OBJECT;
 	return table;
 }
 

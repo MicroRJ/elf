@@ -96,11 +96,6 @@ static void test_json_to_table_value(elf_State *state)
 	{
 		return;
 	}
-	if (root->json_shape != TABLE_JSON_SHAPE_OBJECT)
-	{
-		test_fail("JSON object preserves its shape");
-	}
-
 	json_expect_string(elf_table_get_or_nil(state, root, json_test_string_key(state, "name")), "elf", "json string field");
 	json_expect_int(elf_table_get_or_nil(state, root, json_test_string_key(state, "count")), 3, "json integer field");
 	json_expect_int(elf_table_get_or_nil(state, root, json_test_string_key(state, "ok")), 1, "json true field");

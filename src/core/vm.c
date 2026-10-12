@@ -330,7 +330,6 @@ activate_frame:
 
 			case BC_TABLE: {
 				elf_Table *table = elf_new_table_rogue(state);
-				table->json_shape = (u8)byte.b_y;
 				*vm_slot(reference, byte.b_x) = value_from_table(table);
 			} break;
 
@@ -477,12 +476,6 @@ activate_frame:
 				elf_Value array = *vm_slot(reference, byte.b_x);
 				check_value_type(state, array, ELF_VALUE_TYPE_ARRAY);
 				elf_array_add(state, value_as_array(array), *vm_slot(reference, byte.b_y));
-			} break;
-
-			case BC_DEPRECATED_ARRAYADD: {
-				elf_Value table = *vm_slot(reference, byte.b_x);
-				check_value_type(state, table, ELF_VALUE_TYPE_TABLE);
-				elf_deprecated_array_add(state, value_as_table(table), *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_GETLENGTH: {

@@ -202,7 +202,6 @@ struct Ast_T
 		{
 			Ast *args;
 			u32    nargs;
-			u8 json_shape;
 		}
 		table;
 

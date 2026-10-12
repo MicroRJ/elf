@@ -521,7 +521,7 @@ static BcSlot bg_emit_new_table_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 	}
 
 	out = ensure_slot(gen, out);
-	emit_xy_bc(gen, expr->site, BC_TABLE, unwrap_slot(out), expr->ir_table_shape);
+	emit_x_bc(gen, expr->site, BC_TABLE, unwrap_slot(out));
 	return out;
 }
 
@@ -1157,16 +1157,6 @@ static void do_stat(BcGen *gen, Ir stat)
 		case IR_STORE:
 		{
 			bg_emit_store(gen, stat->site, stat->ir_binary.x, stat->ir_binary.y);
-		}
-		break;
-
-		case IR_DEPRECATED_ARRAY_ADD:
-		{
-			BcSlot memory_checkpoint = mark_slots(gen);
-			BcSlot table_slot = ensure_expr_memory(gen, stat->ir_binary.x);
-			BcSlot value_slot = ensure_expr_memory(gen, stat->ir_binary.y);
-			emit_xy_bc(gen, stat->site, BC_DEPRECATED_ARRAYADD, unwrap_slot(table_slot), unwrap_slot(value_slot));
-			restore_slots(gen, memory_checkpoint);
 		}
 		break;
 

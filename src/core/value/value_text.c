@@ -7,33 +7,21 @@
 static void table_to_text(elf_Arena *arena, elf_Table *table)
 {
 	elf_arena_push_text(arena, "{");
-
-	for (u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
+	u32 emitted = 0;
+	for (u32 i = 0; i < table->capacity; ++i)
 	{
-		if (i != 0) {
-			elf_arena_push_text(arena, ", ");
-		}
-
-		u32 key_count = 0;
-		for (u32 j = 0; j < table->nentries; ++ j)
+		Entry entry = table->entries[i];
+		if (entry_is_key(entry))
 		{
-			Entry entry = table->entries[j];
-			if (entry_is_dead(entry) || entry_index(entry) != i) {
-				continue;
-			}
-
-			if (key_count++ != 0) {
+			if (emitted++)
+			{
 				elf_arena_push_text(arena, ", ");
 			}
 			elf_print_value(arena, entry_key_value(entry));
-		}
-
-		if (key_count != 0) {
 			elf_arena_push_text(arena, " = ");
+			elf_print_value(arena, entry.value);
 		}
-		elf_print_value(arena, elf_deprecated_array_get(0, table, i));
 	}
-
 	elf_arena_push_text(arena, "}");
 }
 
@@ -54,15 +42,21 @@ static void array_to_text(elf_Arena *arena, elf_Array *array)
 static elf_Value table_get_named_field(elf_Table *table, const char *name)
 {
 	u32 name_size = (u32)strlen(name);
-	for (u32 i = 0; i < table->nentries; ++i)
+	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (!entry_is_key(entry)) continue;
+		if (!entry_is_key(entry))
+		{
+			continue;
+		}
 		elf_Value key = entry_key_value(entry);
-		if (!value_is_string(key)) continue;
+		if (!value_is_string(key))
+		{
+			continue;
+		}
 		elf_String *string = value_as_string(key);
 		if (string_size(string) == name_size && memcmp(string_data(string), name, name_size) == 0) {
-			return elf_deprecated_array_get(0, table, entry_index(entry));
+			return entry.value;
 		}
 	}
 	return value_nil();
@@ -173,32 +167,6 @@ static void string_to_source(elf_Arena *arena, elf_String *string)
 	elf_arena_push_char(arena, '"');
 }
 
-static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 slot, u32 indent, SourceValuePath *path, b32 *needs_separator, b32 *emitted_key)
-{
-	*emitted_key = false;
-	elf_Value value = elf_deprecated_array_get(state, table, slot);
-
-	for (u32 i = 0; i < table->nentries; ++ i)
-	{
-		Entry entry = table->entries[i];
-		if (entry_is_dead(entry) || entry_index(entry) != slot) {
-			continue;
-		}
-
-		elf_Value key = entry_key_value(entry);
-		elf_arena_push_text(arena, *needs_separator ? ",\n" : "\n");
-		source_indent(arena, indent + 1);
-		if (!unparse_value(state, arena, key, indent + 1, path)) return false;
-		elf_arena_push_text(arena, " = ");
-		if (!unparse_value(state, arena, value, indent + 1, path)) return false;
-
-		*needs_separator = true;
-		*emitted_key = true;
-	}
-
-	return true;
-}
-
 static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 indent, SourceValuePath *path)
 {
 	if (source_path_contains(path, (elf_Object *)table))
@@ -210,13 +178,23 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	elf_arena_push_text(arena, "{");
 
 	b32 needs_separator = false;
-	for (u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
+	for (u32 i = 0; i < table->capacity; ++i)
 	{
-		b32 emitted_key;
-		if (!table_slot_keys_to_source(state, arena, table, i, indent, &table_path, &needs_separator, &emitted_key)) return false;
-		if (!emitted_key)
+		Entry entry = table->entries[i];
+		if (entry_is_key(entry))
 		{
-			return false;
+			elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
+			source_indent(arena, indent + 1);
+			if (!unparse_value(state, arena, entry_key_value(entry), indent + 1, &table_path))
+			{
+				return false;
+			}
+			elf_arena_push_text(arena, " = ");
+			if (!unparse_value(state, arena, entry.value, indent + 1, &table_path))
+			{
+				return false;
+			}
+			needs_separator = true;
 		}
 	}
 

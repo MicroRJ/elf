@@ -29,7 +29,6 @@
 	X(SETFIELD,        "setfield")         \
 	X(SETINDEX,        "setindex")         \
 	X(ARRAYADD,        "arrayadd")         \
-	X(DEPRECATED_ARRAYADD, "deprecated_arrayadd") \
 	X(CALL,            "call")             \
 	X(TABLE,           "new_table")        \
 	X(ARRAY,           "new_array")        \
