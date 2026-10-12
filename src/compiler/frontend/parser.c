@@ -23,7 +23,7 @@ static Token take_token(Parser *parser, Token_Type type);
 static Ast ast_from_token_error(Token token)
 {
 	ASSERT(token_is_error(token));
-	return token.type == TOK_ERROR_OOM ? ERROR_OOM_AST : ERROR_AST;
+	return ast_from_error(token.error);
 }
 
 static Token take_field_name(Parser *parser)
@@ -551,7 +551,6 @@ static Ast parse_unary_expr(Parser *parser)
 	switch (tok.type)
 	{
 		case TOK_ERROR:
-		case TOK_ERROR_OOM:
 		{
 			value = ast_from_token_error(tok);
 		}
@@ -1116,7 +1115,6 @@ static Ast parse_stat(Parser *parser)
 	switch (tok.type)
 	{
 		case TOK_ERROR:
-		case TOK_ERROR_OOM:
 		{
 			return ast_from_token_error(tok);
 		}

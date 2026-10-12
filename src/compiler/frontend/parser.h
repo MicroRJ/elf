@@ -6,14 +6,6 @@
 
 typedef struct Parser Parser;
 
-typedef enum
-{
-	ERR_NONE = 0,
-	LEX_ERR_INVALID_SOURCE,
-	LEX_ERR_OOM,
-}
-LexErr;
-
 typedef struct
 {
 	Token *items;

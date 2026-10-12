@@ -121,7 +121,6 @@ static Ast parse_json_ast_number(Parser *parser)
 	switch (token.type)
 	{
 		case TOK_ERROR:
-		case TOK_ERROR_OOM:
 		{
 			return ast_from_token_error(token);
 		}
@@ -157,7 +156,6 @@ static Ast parse_json_ast_value(Parser *parser)
 	switch (token.type)
 	{
 		case TOK_ERROR:
-		case TOK_ERROR_OOM:
 		{
 			return ast_from_token_error(token);
 		}

@@ -51,7 +51,6 @@
 
 #define TOKEN_DEFINITIONS(X)              \
 	X(ERROR               , "error")       \
-	X(ERROR_OOM           , "error_oom")   \
 	X(INTEGER             , "int")         \
 	X(NUMBER              , "num")         \
 	X(STRING              , "str")         \
@@ -138,11 +137,12 @@ typedef struct
 		u64   integer_magnitude;
 		f64   number;
 		Atom *atom;
+		Com_Error error;
 	};
 }
 Token;
 
 static inline b32 token_is_error(Token token)
 {
-	return token.type == TOK_ERROR || token.type == TOK_ERROR_OOM;
+	return token.type == TOK_ERROR;
 }

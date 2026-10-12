@@ -5,7 +5,6 @@
 #define AST_XDEF(X)                                          \
 	X(AST_NONE                , "none")                       \
 	X(AST_ERROR               , "error")                      \
-	X(AST_ERROR_OOM           , "out_of_memory")              \
 	X(AST_FILE                , "file")                       \
 	X(AST_IDENT               , "identifier")                 \
 	X(AST_AND                 , "and")                        \
@@ -122,6 +121,7 @@ struct Ast_T
 
 	union
 	{
+		Com_Error error;
 		Atom *atom;
 		i64         integer_value;
 		f64         number_value;
@@ -281,11 +281,13 @@ struct Ast_T
 static Ast_T ast_error_sentinel =
 {
 	.kind = AST_ERROR,
+	.error = COM_ERROR_SOURCE,
 };
 
 static Ast_T ast_error_oom_sentinel =
 {
-	.kind = AST_ERROR_OOM,
+	.kind = AST_ERROR,
+	.error = COM_ERROR_OOM,
 };
 
 #define NULL_AST ((Ast)0)
@@ -294,7 +296,17 @@ static Ast_T ast_error_oom_sentinel =
 
 static inline b32 ast_is_error(Ast ast)
 {
-	return ast && (ast->kind == AST_ERROR || ast->kind == AST_ERROR_OOM);
+	return ast && ast->kind == AST_ERROR;
+}
+
+static Ast ast_from_error(Com_Error error)
+{
+	switch (error)
+	{
+		case COM_ERROR_SOURCE: return ERROR_AST;
+		case COM_ERROR_OOM: return ERROR_OOM_AST;
+		default: ASSERT(0); return ERROR_AST;
+	}
 }
 
 static b32 ast_is_missing_or_error(Ast ast)

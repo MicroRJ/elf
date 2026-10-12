@@ -7,6 +7,14 @@ typedef u32 Com_ModuleId;
 
 typedef enum
 {
+	COM_ERROR_NONE = 0,
+	COM_ERROR_SOURCE,
+	COM_ERROR_OOM,
+}
+Com_Error;
+
+typedef enum
+{
 	COMPILER_NOTE = 0,
 	COMPILER_WARNING,
 	COMPILER_ERROR,
