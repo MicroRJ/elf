@@ -42,6 +42,4 @@ struct Parser
 	// TODO(RJ): probably redundant now!
 	Token               tok,tok_prev,tok_prox;
 	AstContext          ast;
-	// TODO(RJ): why are we storing this here!?
-	Com_Phase phase;
 };

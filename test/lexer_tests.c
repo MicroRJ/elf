@@ -7,7 +7,6 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 	parser.arena = &state->arena;
 	parser.module = 0;
 	parser.atoms = parser.compiler->atoms;
-	parser.phase = COMPILER_PHASE_PARSER;
 	lexer_init(&parser.lexer, parser.compiler, parser.module);
 	return parser;
 }

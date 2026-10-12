@@ -342,6 +342,110 @@ b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, 
 	return result;
 }
 
+static b32 compiler_eval_constexpr_ast(Compiler *compiler, Ast ast, elf_Value *out)
+{
+	if (!ast)
+	{
+		*out = value_nil();
+		return true;
+	}
+
+	switch (ast->kind)
+	{
+		case AST_TUPLE:
+		{
+			if (ast->tuple.nargs != 1)
+			{
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "constant expression must produce one value");
+				return false;
+			}
+			return compiler_eval_constexpr_ast(compiler, ast->tuple.args[0], out);
+		}
+
+		case AST_NIL_LITERAL:
+		{
+			*out = value_nil();
+			return true;
+		}
+
+		case AST_INTEGER_LITERAL:
+		{
+			*out = value_from_integer(ast->integer_value);
+			return true;
+		}
+
+		case AST_NUMBER_LITERAL:
+		{
+			*out = value_from_number(ast->number_value);
+			return true;
+		}
+
+		case AST_STRING_LITERAL:
+		{
+			*out = value_from_string(elf_string_from_atom(compiler->state, ast->atom));
+			return true;
+		}
+
+		case AST_TABLE:
+		{
+			elf_Table *table = elf_new_table_rogue(compiler->state);
+			table->json_shape = ast->table.json_shape;
+			for (u32 i = 0; i < ast->table.nargs; ++ i)
+			{
+				Ast entry_ast = ast->table.args[i];
+				if (!entry_ast || entry_ast->kind != AST_TABLE_ENTRY)
+				{
+					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "invalid table constant");
+					return false;
+				}
+
+				elf_Value value = {};
+				if (!compiler_eval_constexpr_ast(compiler, entry_ast->table_entry.value, &value))
+				{
+					return false;
+				}
+
+				if (entry_ast->table_entry.key)
+				{
+					elf_Value key = {};
+					if (!compiler_eval_constexpr_ast(compiler, entry_ast->table_entry.key, &key))
+					{
+						return false;
+					}
+					elf_table_set(compiler->state, table, key, value);
+				}
+				else
+				{
+					elf_array_add(compiler->state, table, value);
+				}
+			}
+
+			*out = value_from_table(table);
+			return true;
+		}
+
+		default:
+		{
+			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "'%s' is not a constant expression", ast_type_name(ast->kind));
+			return false;
+		}
+	}
+}
+
+static b32 compiler_push_constexpr_ast(Compiler *compiler, Ast ast)
+{
+	if (ast_is_error(ast)) {
+		return false;
+	}
+
+	elf_Value value = {};
+	if (!compiler_eval_constexpr_ast(compiler, ast, &value)) {
+		return false;
+	}
+	push_value(compiler->state, value);
+	return true;
+}
+
 static void restore_source_stack(elf_State *state, elf_Value *checkpoint)
 {
 	ASSERT(checkpoint >= state->frame->framebase && checkpoint <= state->stack_ptr);
@@ -362,7 +466,7 @@ int compiler_push_json(Compiler *compiler)
 	if (!compiler->report.error_count) {
 		Parser *parser = parser_create(compiler, 0);
 		if (parser) {
-			result = parse_json_value(parser);
+			result = compiler_push_constexpr_ast(compiler, parse_json_ast(parser));
 		}
 	}
 	if (!result) restore_source_stack(state, stack_checkpoint);
@@ -395,7 +499,7 @@ int compiler_push_constant_expr(Compiler *compiler)
 	if (!compiler->report.error_count) {
 		Parser *parser = parser_create(compiler, 0);
 		if (parser) {
-			result = parse_constexpr(parser);
+			result = compiler_push_constexpr_ast(compiler, parse_constexpr(parser));
 		}
 	}
 	if (!result) restore_source_stack(state, stack_checkpoint);

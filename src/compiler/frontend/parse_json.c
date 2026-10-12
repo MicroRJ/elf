@@ -270,9 +270,3 @@ static Ast parse_json_ast(Parser *parser)
 	}
 	return ast;
 }
-
-static int parse_json_value(Parser *parser)
-{
-	Ast ast = parse_json_ast(parser);
-	return push_constexpr_value(parser, ast);
-}

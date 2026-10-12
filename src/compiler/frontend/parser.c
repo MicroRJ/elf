@@ -148,7 +148,7 @@ static Com_Error parser_report(Parser *parser, Com_Severity severity, Error erro
 		site = parser->tok.site;
 	}
 
-	b32 reported = compiler_report(parser->compiler, severity, parser->phase, site, "%s", message);
+	b32 reported = compiler_report(parser->compiler, severity, COMPILER_PHASE_PARSER, site, "%s", message);
 	return reported ? COM_ERROR_SOURCE : COM_ERROR_OOM;
 }
 
@@ -165,7 +165,7 @@ static Ast parser_errorf(Parser *parser, Error error, SourceSite site, const cha
 	}
 	va_list args;
 	va_start(args, format);
-	b32 reported = compiler_reportv(parser->compiler, COMPILER_ERROR, parser->phase, site, format, args);
+	b32 reported = compiler_reportv(parser->compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, format, args);
 	va_end(args);
 	return ast_from_error(reported ? COM_ERROR_SOURCE : COM_ERROR_OOM);
 }
@@ -191,7 +191,6 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 {
 	ASSERT(compiler != 0);
-	ASSERT(compiler->state != 0);
 	ASSERT(module < compiler->module_count);
 	Com_Module *source_module = compiler->modules + module;
 	ASSERT(source_module->name != 0);
@@ -211,7 +210,6 @@ static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 		return 0;
 	}
 
-	parser->phase = COMPILER_PHASE_PARSER;
 	lexer_init(&parser->lexer, compiler, module);
 	parser->lexer.cursor = source_module->source.data;
 	parser->lexer.line_index = 1;
@@ -1509,14 +1507,11 @@ static Ast parse_stat(Parser *parser)
 				return parser_error(parser, ERROR_INVALID_DECL, parser->tok.site, "expected for-loop declaration");
 			}
 			u32 decl_tags = AST_DECL_TAG_NONE;
-			if (pick_token(parser, TOK_BIND))
+			if (!pick_token(parser, TOK_BIND))
 			{
-			}
-			else
-			{
-				Token bind = take_token(parser, TOK_HARD_BIND);
-				if (token_is_error(bind)) {
-					return ast_from_token_error(bind);
+				Token hard_bind = take_token(parser, TOK_HARD_BIND);
+				if (token_is_error(hard_bind)) {
+					return ast_from_token_error(hard_bind);
 				}
 				decl_tags |= AST_DECL_TAG_CONSTANT;
 			}
@@ -1654,124 +1649,16 @@ static Ast parse_if_stat(Parser *parser)
 	return stat;
 }
 
-static b32 eval_constexpr_ast(Parser *parser, Ast ast, elf_Value *out)
-{
-	if (!ast)
-	{
-		*out = value_nil();
-		return true;
-	}
-
-	switch (ast->kind)
-	{
-		case AST_TUPLE:
-		{
-			if (ast->tuple.nargs != 1)
-			{
-				parser_error(parser, ERROR_INVALID_EXPRESSION, ast->site, "constant expression must produce one value");
-				return false;
-			}
-			return eval_constexpr_ast(parser, ast->tuple.args[0], out);
-		}
-
-		case AST_NIL_LITERAL:
-		{
-			*out = value_nil();
-			return true;
-		}
-
-		case AST_INTEGER_LITERAL:
-		{
-			*out = value_from_integer(ast->integer_value);
-			return true;
-		}
-
-		case AST_NUMBER_LITERAL:
-		{
-			*out = value_from_number(ast->number_value);
-			return true;
-		}
-
-		case AST_STRING_LITERAL:
-		{
-			*out = value_from_string(elf_string_from_atom(parser->compiler->state, ast->atom));
-			return true;
-		}
-
-		case AST_TABLE:
-		{
-			elf_Table *table = elf_new_table_rogue(parser->compiler->state);
-			table->json_shape = ast->table.json_shape;
-			for (u32 i = 0; i < ast->table.nargs; ++ i)
-			{
-				Ast entry_ast = ast->table.args[i];
-				if (!entry_ast || entry_ast->kind != AST_TABLE_ENTRY)
-				{
-					parser_error(parser, ERROR_INVALID_EXPRESSION, ast->site, "invalid table constant");
-					return false;
-				}
-
-				elf_Value value = {};
-				if (!eval_constexpr_ast(parser, entry_ast->table_entry.value, &value))
-				{
-					return false;
-				}
-
-				if (entry_ast->table_entry.key)
-				{
-					elf_Value key = {};
-					if (!eval_constexpr_ast(parser, entry_ast->table_entry.key, &key))
-					{
-						return false;
-					}
-					elf_table_set(parser->compiler->state, table, key, value);
-				}
-				else
-				{
-					elf_array_add(parser->compiler->state, table, value);
-				}
-			}
-
-			*out = value_from_table(table);
-			return true;
-		}
-
-		default:
-		{
-			parser_errorf(parser, ERROR_INVALID_EXPRESSION, ast->site
-			,	"'%s' is not a constant expression", ast_type_name(ast->kind));
-			return false;
-		}
-	}
-}
-
-static int push_constexpr_value(Parser *parser, Ast ast)
-{
-	if (ast_is_error(ast)) {
-		return false;
-	}
-
-	parser->phase = COMPILER_PHASE_EVALUATION;
-	elf_Value value = {};
-	b32 ok = eval_constexpr_ast(parser, ast, &value);
-	if (!ok) {
-		return false;
-	}
-	push_value(parser->compiler->state, value);
-	return true;
-}
-
-static int parse_constexpr(Parser *parser)
+static Ast parse_constexpr(Parser *parser)
 {
 	Ast ast = parse_tuple_expr(parser);
 	if (ast_is_error(ast)) {
-		return false;
+		return ast;
 	}
 	if (!peek_token(parser, TOK_NONE))
 	{
-		parser_unexpected_token(parser, parser->tok);
-		return false;
+		return parser_unexpected_token(parser, parser->tok);
 	}
-	return push_constexpr_value(parser, ast);
+	return ast;
 }
 
