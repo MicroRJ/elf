@@ -27,6 +27,7 @@
 #include "core_diagnostics.c"
 
 #include "memory.c"
+#include "globals.c"
 #include "string/elf_string.c"
 #include "buffer/elf_buffer.c"
 #include "user/elf_user_object.c"
@@ -94,6 +95,7 @@ static void init_state_storage(elf_State *state)
 {
 	init_runtime_storage(state);
 	init_gc_storage(state);
+	elf_globals_init(&state->globals, state);
 }
 
 static void bootstrap_base_frame(elf_State *state)
@@ -135,15 +137,12 @@ static void bootstrap_standard_libraries(elf_State *state)
 	table_set_string_table(state, elf_table, "json", elf_lib_json(state));
 	table_set_string_table(state, elf_table, "vm", elf_lib_vm(state));
 
-	state->globals = push_new_table(state);
-	table_set_string_table(state, state->globals, "elf", elf_table);
+	elf_StrSlice elf_name = {(char *)"elf", 3};
+	elf_globals_set_by_name(&state->globals, elf_name, value_from_table(elf_table));
 
-	// The library constructors push each table while building the graph. Only
-	// the globals table needs to remain on the stack as its GC root; every
-	// standard library is reachable through globals, while metatables have
-	// dedicated roots in the collector.
+	// The library constructors push each table while building the graph. The
+	// global store and metatables have dedicated roots in the collector.
 	state->stack_ptr = stack_checkpoint;
-	push_table(state, state->globals);
 }
 
 void init_strings(elf_State *state)
@@ -181,6 +180,7 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
+		elf_globals_destroy(&state->globals);
 		gc_destroy_all(state);
 		elf_free(state, state->string_buckets,
 			(u64)state->string_bucket_count * sizeof(*state->string_buckets));

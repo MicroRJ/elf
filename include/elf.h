@@ -19,7 +19,6 @@ typedef float       elf_f32;
 typedef double      elf_f64;
 typedef elf_i32     elf_b32;
 
-// slightly more readable semantic boolean type
 typedef elf_b32 elf_Bool;
 typedef elf_i32 elf_Index;
 typedef size_t  elf_Size;

@@ -156,7 +156,8 @@ static void expect_function_value(elf_Value value, const char *label)
 
 static void test_runtime_elf_global_is_table(elf_State *state)
 {
-	elf_Value elf_value = elf_table_get_or_nil(state, state->globals, test_key_string(state, "elf"));
+	elf_StrSlice elf_name = {(char *)"elf", 3};
+	elf_Value elf_value = elf_globals_get_by_name(&state->globals, elf_name);
 	expect_table_value(elf_value, "global elf is a table");
 
 	elf_Table *elf_table = value_as_table(elf_value);
@@ -165,7 +166,8 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "to_string")), "elf.to_string is a field function");
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "error")), "elf.error is a field function");
 	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "is_error")), "elf.is_error is a field function");
-	expect_nil(elf_table_get_or_nil(state, state->globals, test_key_string(state, "elf.print")), "flattened elf.print global is absent");
+	elf_StrSlice flat_print_name = {(char *)"elf.print", 9};
+	expect_nil(elf_globals_get_by_name(&state->globals, flat_print_name), "flattened elf.print global is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "load_expr")), "broken elf.load_expr binding is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "unparse")), "broken elf.unparse binding is absent");
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "format")), "obsolete elf.format binding is absent");

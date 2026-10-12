@@ -20,6 +20,7 @@ typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Value   elf_Value;
 
 #include "value/value.h"
+#include "globals.h"
 
 #include "memory.h"
 #include "gc.h"
@@ -141,7 +142,7 @@ struct elf_State
 	};
 	struct
 	{
-		elf_Table   *globals;
+		elf_Globals  globals;
 		elf_Table   *ref_table;
 		u32          next_ref;
 		u64          vm_closure_calls;

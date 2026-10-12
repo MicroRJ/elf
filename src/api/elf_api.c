@@ -580,17 +580,16 @@ void elf_get_global(elf_State *state, const char *name)
 		push_value(state, value_nil());
 		return;
 	}
-	elf_Value key = value_from_string(elf_string_from_data(state, name));
-	push_value(state, elf_table_get_or_nil(state, state->globals, key));
+	elf_StrSlice name_slice = {(char *)name, (u64)strlen(name)};
+	push_value(state, elf_globals_get_by_name(&state->globals, name_slice));
 }
 
 elf_ErrorCode elf_set_global(elf_State *state, const char *name)
 {
 	if (!name) return ELF_ERROR_INVALID_ARGUMENT;
 	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
-	if (table_is_readonly(state->globals)) return ELF_ERROR_READONLY;
-	elf_Value key = value_from_string(elf_string_from_data(state, name));
-	elf_table_set(state, state->globals, key, pop_value(state));
+	elf_StrSlice name_slice = {(char *)name, (u64)strlen(name)};
+	elf_globals_set_by_name(&state->globals, name_slice, pop_value(state));
 	return ELF_ERROR_NONE;
 }
 

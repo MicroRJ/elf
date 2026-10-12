@@ -42,6 +42,7 @@ static void test_fail(const char *label)
 #include "table_tests.c"
 #include "array_tests.c"
 #include "gc_tests.c"
+#include "globals_tests.c"
 #include "api_tests.c"
 #include "arena_tests.c"
 #include "lexer_tests.c"
@@ -70,6 +71,7 @@ int main(void)
 	run_table_tests(state);
 	run_array_tests();
 	run_gc_tests();
+	run_globals_tests(state);
 	run_api_tests();
 	run_arena_tests();
 	run_lexer_tests(state);

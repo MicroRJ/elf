@@ -663,8 +663,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 			if (en == 0)
 			{
-				elf_Value value = value_from_string(elf_string_from_atom(ctx->state, expr->atom));
-				u32 global_index = elf_table_ensure(ctx->state, ctx->state->globals, value);
+				elf_StrSlice name = {(char *)atom_data(expr->atom), atom_size(expr->atom)};
+				u32 global_index = elf_globals_ensure(&ctx->state->globals, name);
 
 				ir = create_load_global_ir(ctx, expr->site, global_index);
 			}
