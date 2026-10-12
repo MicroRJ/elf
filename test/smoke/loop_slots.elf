@@ -89,7 +89,7 @@ triple_array_sum := 0
 }
 
 {
-	values := {10, 20, 30, 40}
+	values := [10, 20, 30, 40]
 
 	for left, right := values[0 ... 4] ? {
 		test_assert(#get_mem(left) == 11)
@@ -108,7 +108,7 @@ triple_array_sum := 0
 }
 
 {
-	more_values := {1, 2, 3, 4, 5, 6}
+	more_values := [1, 2, 3, 4, 5, 6]
 
 	for x0, x1, x2 := more_values[0 ... 6] ? {
 		test_assert(#get_mem(x0) == 11)

@@ -29,7 +29,7 @@ error_details.kind = "changed"
 test_assert(failure.kind == "filesystem")
 return_error := fun() ret failure
 test_assert(return_error() == failure)
-error_holder := { failure }
+error_holder := [failure]
 test_assert(error_holder[0].message == "file not found")
 
 test_assert(elf.is_string("elf"))
@@ -44,12 +44,12 @@ test_assert(elf.to_string(nil) == "nil")
 test_assert(elf.to_string(42) == "42")
 test_assert(elf.to_string(1.5) == "1.500000")
 test_assert(elf.to_string("elf") == "elf")
-string_table := { answer = 42, "elf" }
-test_assert(elf.to_string(string_table) == "{answer = 42, elf}")
+string_table := { answer = 42 }
+test_assert(elf.to_string(string_table) == "{answer = 42}")
 test_assert(elf.to_string(string_table) == "" + string_table)
 
 child := {}
-root := { child }
+root := { child = child }
 root.self = root
 test_assert(elf.freeze(root) == root)
 test_assert(elf.is_readonly(root))

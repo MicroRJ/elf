@@ -45,7 +45,7 @@ static elf_Array *json_expect_array(elf_Value value, const char *label)
 static void test_constexpr_table_literal(elf_State *state)
 {
 	u32 stack_index = (u32)(state->stack_ptr - state->stack);
-	const char *text = "{ answer = 42, [7] = 8, 9 }";
+	const char *text = "{ answer = 42, [7] = 8, other = 9 }";
 	elf_StrSlice source = {(char *)text, (u64)strlen(text)};
 	elf_ErrorCode error = elf_push_constant_expr(state, "constexpr-test", source);
 	if (error != ELF_ERROR_NONE)
@@ -62,7 +62,7 @@ static void test_constexpr_table_literal(elf_State *state)
 
 	json_expect_int(elf_table_get_or_nil(state, table, json_test_string_key(state, "answer")), 42, "constant expression string field");
 	json_expect_int(elf_table_get_or_nil(state, table, value_from_integer(7)), 8, "constant expression integer field");
-	json_expect_int(elf_deprecated_array_get(state, table, 2), 9, "constant expression array value");
+	json_expect_int(elf_table_get_or_nil(state, table, json_test_string_key(state, "other")), 9, "constant expression second string field");
 
 	if ((u32)(state->stack_ptr - state->stack) != stack_index)
 	{

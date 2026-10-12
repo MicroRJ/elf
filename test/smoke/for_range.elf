@@ -34,7 +34,7 @@ test_assert(last_i == 21)
 test_assert(last_j == 22)
 test_assert(last_k == 23)
 
-values := {5, 7, 11, 13, 17, 19}
+values := [5, 7, 11, 13, 17, 19]
 value_sum := 0
 value_count := 0
 

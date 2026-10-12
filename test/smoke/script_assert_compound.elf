@@ -19,11 +19,11 @@ test_assert(x == 10)
 t := { value = 4, [0] = 7 }
 t.value += 6
 test_assert(t.value == 10)
-t.[0] *= 3
-test_assert(t.[0] == 21)
+t[0] *= 3
+test_assert(t[0] == 21)
 
-arr := {9}
+arr := [9]
 arr[0] -= 4
 test_assert(arr[0] == 5)
 
-ret x + t.value + t.[0] + arr[0]
+ret x + t.value + t[0] + arr[0]

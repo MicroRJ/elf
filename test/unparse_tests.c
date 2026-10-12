@@ -30,17 +30,37 @@ static void test_serialize_scalars(elf_State *state)
 static void test_serialize_table(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
-	elf_deprecated_array_add(state, table, value_from_integer(10));
-	elf_deprecated_array_add(state, table, value_from_string(elf_string_from_data(state, "row")));
 	elf_table_set(state, table, value_from_string(elf_string_from_data(state, "answer")), value_from_integer(42));
 
 	const char *expected =
 		"{\n"
-		"\t10,\n"
-		"\t\"row\",\n"
 		"\t\"answer\" = 42\n"
 		"}";
-	expect_serialize_text(state, value_from_table(table), expected, "serialize mixed table");
+	expect_serialize_text(state, value_from_table(table), expected, "serialize keyed table");
+	pop_value(state);
+}
+
+static void test_serialize_array(elf_State *state)
+{
+	elf_Array *array = push_new_array(state);
+	elf_array_add(state, array, value_from_integer(10));
+	elf_array_add(state, array, value_from_string(elf_string_from_data(state, "row")));
+
+	const char *expected = "[10, \"row\"]";
+	expect_serialize_text(state, value_from_array(array), expected, "serialize array");
+	pop_value(state);
+}
+
+static void test_serialize_rejects_unkeyed_table(elf_State *state)
+{
+	elf_Table *table = push_new_table(state);
+	elf_deprecated_array_add(state, table, value_from_integer(10));
+	elf_Arena arena = elf_arena_create(0);
+	if (elf_unparse_value(state, &arena, value_from_table(table), 0))
+	{
+		test_fail("serialize rejects table storage without keys");
+	}
+	elf_arena_destroy(&arena);
 	pop_value(state);
 }
 
@@ -48,4 +68,6 @@ static void run_unparse_tests(elf_State *state)
 {
 	test_serialize_scalars(state);
 	test_serialize_table(state);
+	test_serialize_array(state);
+	test_serialize_rejects_unkeyed_table(state);
 }

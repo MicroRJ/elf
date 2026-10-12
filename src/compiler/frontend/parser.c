@@ -838,7 +838,6 @@ static Ast parse_table_entry(Parser *parser)
 	Token start = parser->tok;
 	Ast key = NULL_AST;
 	Ast value = NULL_AST;
-	b32 key_required = false;
 
 	if (peek_token(parser, TOK_IDENTIFIER) && peek_next_token(parser, TOK_ASSIGN))
 	{
@@ -853,7 +852,6 @@ static Ast parse_table_entry(Parser *parser)
 			return key;
 		}
 		value = parse_expr(parser);
-		key_required = true;
 	}
 	else if (pick_token(parser, TOK_SQUARE_LEFT))
 	{
@@ -871,17 +869,20 @@ static Ast parse_table_entry(Parser *parser)
 		}
 
 		value = parse_expr(parser);
-		key_required = true;
 	}
 	else
 	{
-		value = parse_expr(parser);
-		if (pick_token(parser, TOK_ASSIGN))
+		key = parse_expr(parser);
+		if (ast_is_error(key))
 		{
-			key = value;
-			value = parse_expr(parser);
-			key_required = true;
+			return key;
 		}
+		Token assign = take_token(parser, TOK_ASSIGN);
+		if (token_is_error(assign))
+		{
+			return ast_from_token_error(assign);
+		}
+		value = parse_expr(parser);
 	}
 
 	if (ast_is_error(value)) {
@@ -890,7 +891,7 @@ static Ast parse_table_entry(Parser *parser)
 	if (ast_is_error(key)) {
 		return key;
 	}
-	if (!value || (key_required && !key))
+	if (!key || !value)
 	{
 		return parser_invalid_table_entry(parser, start.site);
 	}
@@ -1093,21 +1094,6 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	{
 		return parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "field table projection is not implemented");
 	}
-	else if (pick_token(par, TOK_SQUARE_LEFT))
-	{
-		Ast right = parse_expr(par);
-		if (ast_is_error(right)) {
-			return right;
-		}
-		if (!right) {
-			return parser_error(par, ERROR_INVALID_EXPRESSION, par->tok.site, "expected field expression");
-		}
-		Token closing = take_token(par, TOK_SQUARE_RIGHT);
-		if (token_is_error(closing)) {
-			return ast_from_token_error(closing);
-		}
-		left = create_field_ast(par, tok.site, left, right);
-	}
 	else
 	{
 		Token name = take_field_name(par);
@@ -1120,10 +1106,10 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	return left;
 }
 
-// array_index_postfix ::= "[" index_expr ("," index_expr)* "]"
-// index_expr           ::= expr | expr? "..." expr?
+// index_postfix ::= "[" index_expr ("," index_expr)* "]"
+// index_expr    ::= expr | expr? "..." expr?
 // Comma-separated indexes are chained: value[x, y] is value[x][y].
-static Ast parse_array_index_postfix(Parser *par, Ast value)
+static Ast parse_index_postfix(Parser *par, Ast value)
 {
 	Token tok = take_token(par, TOK_SQUARE_LEFT);
 	if (token_is_error(tok)) {
@@ -1207,7 +1193,7 @@ static Ast parse_postfix_expr(Parser *parser)
 
 			case TOK_SQUARE_LEFT:
 			{
-				value = parse_array_index_postfix(parser, value);
+				value = parse_index_postfix(parser, value);
 			}
 			break;
 

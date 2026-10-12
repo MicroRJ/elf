@@ -343,7 +343,7 @@ static void test_parser_for_loops(elf_State *state)
 
 static void test_parser_call_with_table_argument(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "make {x = 1, 2}");
+	Ast file = parser_test_parse_file(state, "make {x = 1, [2] = 3}");
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
@@ -403,22 +403,44 @@ static void test_parser_nil_assign(elf_State *state)
 
 static void test_parser_table_access_modes(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret t[0]\nret t.[key]\nret t.name");
+	Ast file = parser_test_parse_file(state, "ret t[0]\nret t[key]\nret t.name");
 
-	Ast array_ret = parser_test_stat(file, 0, AST_RETURN, "parse array index return");
-	Ast array_index = parser_test_tuple_item(array_ret->return_stat.expr, 0, AST_INDEX, "plain brackets parse as array index");
-	expect_ast_kind(array_index ? array_index->binary.x : 0, AST_IDENT, "array index keeps receiver");
-	expect_ast_i64(array_index ? array_index->binary.y : 0, 0, "array index keeps integer index");
+	Ast integer_ret = parser_test_stat(file, 0, AST_RETURN, "parse integer index return");
+	Ast integer_index = parser_test_tuple_item(integer_ret->return_stat.expr, 0, AST_INDEX, "plain brackets parse as an index");
+	expect_ast_kind(integer_index ? integer_index->binary.x : 0, AST_IDENT, "integer index keeps receiver");
+	expect_ast_i64(integer_index ? integer_index->binary.y : 0, 0, "integer index keeps key");
 
-	Ast computed_ret = parser_test_stat(file, 1, AST_RETURN, "parse computed field return");
-	Ast computed_field = parser_test_tuple_item(computed_ret->return_stat.expr, 0, AST_FIELD, "dot brackets parse as computed field");
-	expect_ast_kind(computed_field ? computed_field->binary.x : 0, AST_IDENT, "computed field keeps receiver");
-	expect_ast_kind(computed_field ? computed_field->binary.y : 0, AST_IDENT, "computed field keeps key expression");
-	expect_ast_atom(computed_field ? computed_field->binary.y : 0, "key", "computed field key identifier");
+	Ast computed_ret = parser_test_stat(file, 1, AST_RETURN, "parse computed index return");
+	Ast computed_index = parser_test_tuple_item(computed_ret->return_stat.expr, 0, AST_INDEX, "plain brackets accept a computed key");
+	expect_ast_kind(computed_index ? computed_index->binary.x : 0, AST_IDENT, "computed index keeps receiver");
+	expect_ast_kind(computed_index ? computed_index->binary.y : 0, AST_IDENT, "computed index keeps key expression");
+	expect_ast_atom(computed_index ? computed_index->binary.y : 0, "key", "computed index key identifier");
 
 	Ast dot_ret = parser_test_stat(file, 2, AST_RETURN, "parse dot field return");
 	Ast dot_field = parser_test_tuple_item(dot_ret->return_stat.expr, 0, AST_FIELD, "dot identifier parses as field");
 	expect_ast_atom(dot_field ? dot_field->binary.y : 0, "name", "dot field key identifier");
+}
+
+static void parser_expect_source_error(elf_State *state, const char *source_text, const char *label)
+{
+	elf_Arena arena = elf_arena_create(0);
+	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, "parser_source_error", source);
+	Parser *parser = parser_create(compiler, 0);
+	Ast file = elf_parse_file(parser);
+	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_PARSER)
+	{
+		test_fail(label);
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_parser_rejects_legacy_table_syntax(elf_State *state)
+{
+	parser_expect_source_error(state, "ret {1}", "parser rejects unkeyed table entries");
+	parser_expect_source_error(state, "ret table.[key]", "parser rejects dot bracket field access");
 }
 
 static void test_parser_open_range_indexes(elf_State *state)
@@ -666,6 +688,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_array_literals(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);
+	test_parser_rejects_legacy_table_syntax(state);
 	test_parser_open_range_indexes(state);
 	test_parser_function_expression(state);
 	test_parser_get_mem_macro(state);

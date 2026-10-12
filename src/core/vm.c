@@ -412,9 +412,11 @@ activate_frame:
 					value_copy(result, elf_array_get(state, array, index));
 				}
 				else if (value_is_table(object)) {
-					elf_Table *table = value_as_table(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_deprecated_array_length(table));
-					value_copy(result, elf_deprecated_array_get(state, table, index));
+					if (value_is_nil(index_value))
+					{
+						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid table key");
+					}
+					value_copy(result, elf_table_get_or_nil(state, value_as_table(object), index_value));
 				}
 				else if (value_is_string(object)) {
 					elf_String *string = value_as_string(object);
@@ -444,9 +446,11 @@ activate_frame:
 				}
 				else if (value_is_table(object))
 				{
-					elf_Table *table = value_as_table(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_deprecated_array_length(table));
-					elf_deprecated_array_set(state, table, index, assigned);
+					if (value_is_nil(index_value))
+					{
+						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid table key");
+					}
+					elf_table_set(state, value_as_table(object), index_value, assigned);
 				}
 				else if (value_is_buffer(object))
 				{

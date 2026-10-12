@@ -70,14 +70,10 @@ static void test_api_tables_and_refs(elf_State *state)
 	}
 	elf_pop(state, 1);
 
-	elf_push_cstr(state, "first");
-	if (elf_append(state, table) != ELF_ERROR_NONE) {
-		test_fail("API appends a generic array value");
+	if (elf_get_index(state, table, 0)) {
+		test_fail("API does not expose table storage as array indexes");
+		elf_pop(state, 1);
 	}
-	if (!elf_get_index(state, table, 2) || !elf_is_nil(state, -1)) {
-		test_fail("API missing array index produces nil");
-	}
-	elf_pop(state, 1);
 
 	elf_Ref reference = elf_create_ref(state, table);
 	if (reference == ELF_NO_REF) {
@@ -101,8 +97,8 @@ static void test_api_tables_and_refs(elf_State *state)
 		entries += 1;
 		elf_pop(state, 2);
 	}
-	if (entries != 2) {
-		test_fail("API iterates array and keyed table entries");
+	if (entries != 1) {
+		test_fail("API iterates keyed table entries");
 	}
 
 	if (elf_push_value(state, -1) != ELF_ERROR_NONE
@@ -448,9 +444,11 @@ static void test_api_mutation_errors(elf_State *state)
 	elf_Index table_index = elf_abs_index(state, -1);
 	elf_push_int(state, 9);
 	value_top = elf_get_top(state);
-	if (elf_set_index(state, table_index, 1) != ELF_ERROR_OUT_OF_RANGE
-	|| elf_get_top(state) != value_top) {
-		test_fail("API bounds errors preserve the value being written");
+	if (elf_set_index(state, table_index, 1) != ELF_ERROR_TYPE_MISMATCH || elf_get_top(state) != value_top) {
+		test_fail("API rejects indexed table mutation and preserves the value being written");
+	}
+	if (elf_append(state, table_index) != ELF_ERROR_TYPE_MISMATCH || elf_get_top(state) != value_top) {
+		test_fail("API rejects appending to tables and preserves the value being written");
 	}
 
 	elf_Table *table = value_as_table(state->frame->framebase[table_index]);

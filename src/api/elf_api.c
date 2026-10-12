@@ -411,11 +411,6 @@ elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element)
 		}
 		push_value(state, array->items[element]);
 	}
-	else if (value_is_table(*value))
-	{
-		elf_Table *table = value_as_table(*value);
-		push_value(state, element < table->count ? table->array[element] : value_nil());
-	}
 	else if (value_is_buffer(*value))
 	{
 		elf_ByteBuffer *buffer = value_as_buffer(*value);
@@ -452,15 +447,6 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 			elf_array_set(state, array, element, value);
 		}
 	}
-	else if (value_is_table(*target))
-	{
-		elf_Table *table = value_as_table(*target);
-		if (element > table->count) return ELF_ERROR_OUT_OF_RANGE;
-		if (table_is_readonly(table)) return ELF_ERROR_READONLY;
-		elf_Value value = pop_value(state);
-		if (element == table->count) elf_deprecated_array_add(state, table, value);
-		else elf_deprecated_array_set(state, table, element, value);
-	}
 	else if (value_is_buffer(*target))
 	{
 		elf_ByteBuffer *buffer = value_as_buffer(*target);
@@ -488,28 +474,16 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 	{
 		return ELF_ERROR_STACK_UNDERFLOW;
 	}
-	if (value_is_array(*target))
-	{
-		elf_Array *array = value_as_array(*target);
-		if (array_is_readonly(array))
-		{
-			return ELF_ERROR_READONLY;
-		}
-		elf_array_add(state, array, pop_value(state));
-	}
-	else if (value_is_table(*target))
-	{
-		elf_Table *table = value_as_table(*target);
-		if (table_is_readonly(table))
-		{
-			return ELF_ERROR_READONLY;
-		}
-		elf_deprecated_array_add(state, table, pop_value(state));
-	}
-	else
+	if (!value_is_array(*target))
 	{
 		return ELF_ERROR_TYPE_MISMATCH;
 	}
+	elf_Array *array = value_as_array(*target);
+	if (array_is_readonly(array))
+	{
+		return ELF_ERROR_READONLY;
+	}
+	elf_array_add(state, array, pop_value(state));
 	return ELF_ERROR_NONE;
 }
 

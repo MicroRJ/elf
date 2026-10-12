@@ -212,17 +212,12 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	b32 needs_separator = false;
 	for (u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
 	{
-		elf_Value value = elf_deprecated_array_get(state, table, i);
 		b32 emitted_key;
 		if (!table_slot_keys_to_source(state, arena, table, i, indent, &table_path, &needs_separator, &emitted_key)) return false;
-		if (emitted_key) {
-			continue;
+		if (!emitted_key)
+		{
+			return false;
 		}
-
-		elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
-		source_indent(arena, indent + 1);
-		if (!unparse_value(state, arena, value, indent + 1, &table_path)) return false;
-		needs_separator = true;
 	}
 
 	if (needs_separator)

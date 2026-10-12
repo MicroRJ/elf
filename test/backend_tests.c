@@ -378,7 +378,7 @@ static void test_backend_range_for_loop_shape(void)
 static void test_backend_range_for_collection_call_is_hoisted(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
-		"values := fun() { ret { 1, 2, 3 } }\n"
+		"values := fun() { ret [1, 2, 3] }\n"
 		"sum := 0\n"
 		"for item := values()[0 ... 3] ? {\n"
 		"	sum += item\n"
@@ -418,10 +418,10 @@ static void test_backend_array_bytecode(void)
 	}
 	backend_test_destroy(result);
 
-	result = backend_test_compile_source("ret {1}");
-	if (backend_count_bytecode(result, BC_TABLE) != 1 || backend_count_bytecode(result, BC_DEPRECATED_ARRAYADD) != 1 || backend_count_bytecode(result, BC_ARRAYADD) != 0)
+	result = backend_test_compile_source("ret {answer = 1}");
+	if (backend_count_bytecode(result, BC_TABLE) != 1 || backend_count_bytecode(result, BC_SETFIELD) != 1 || backend_count_bytecode(result, BC_DEPRECATED_ARRAYADD) != 0 || backend_count_bytecode(result, BC_ARRAYADD) != 0)
 	{
-		test_fail("positional table literal uses deprecated table append bytecode");
+		test_fail("keyed table literal emits only table field bytecodes");
 	}
 	backend_test_destroy(result);
 }
