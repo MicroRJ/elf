@@ -92,7 +92,7 @@ static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *ca
 	return new_items;
 }
 
-static int add_const_int(BcGen *gen, i64 i)
+static u32 add_const_int(BcGen *gen, i64 i)
 {
 	BcModuleBuilder *module = &gen->module;
 	if (module->integer_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
@@ -104,7 +104,7 @@ static int add_const_int(BcGen *gen, i64 i)
 	return index;
 }
 
-static int add_const_num(BcGen *gen, f64 i)
+static u32 add_const_num(BcGen *gen, f64 i)
 {
 	BcModuleBuilder *module = &gen->module;
 	if (module->number_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
@@ -116,7 +116,7 @@ static int add_const_num(BcGen *gen, f64 i)
 	return index;
 }
 
-static int add_atom(BcGen *gen, Atom *atom)
+static u32 add_atom(BcGen *gen, Atom *atom)
 {
 	BcModuleBuilder *module = &gen->module;
 	for (u32 i = 0; i < module->atom_count; ++ i) {
@@ -220,28 +220,28 @@ static void patch_bytecode_labels(BcGen *gen)
 	gen->jump_patch_count = 0;
 }
 
-static int emit_bc(BcGen *gen, SourceSite site, Bytecode byte)
+static u32 emit_bc(BcGen *gen, SourceSite site, Bytecode byte)
 {
 	ASSERT(gen->bytecode_count < gen->bytecode_capacity);
-	int position = gen->bytecode_count ++;
+	u32 position = gen->bytecode_count ++;
 	gen->bytecode[position] = byte;
 	emit_source_map_entry(gen, site, position);
 	return position;
 }
 
-static int emit_x_bc(BcGen *gen, SourceSite site, int k, int x)
+static u32 emit_x_bc(BcGen *gen, SourceSite site, BytecodeType k, i32 x)
 {
 	Bytecode byte = BC_XXX(k, x);
 	return emit_bc(gen, site, byte);
 }
 
-static int emit_xy_bc(BcGen *gen, SourceSite site, int k, int x, int y)
+static u32 emit_xy_bc(BcGen *gen, SourceSite site, BytecodeType k, i32 x, i32 y)
 {
 	Bytecode byte = BC_XYY(k,x,y);
 	return emit_bc(gen,site,byte);
 }
 
-static int emit_xyz_bc(BcGen *gen, SourceSite site, int k, int x, int y, int z)
+static u32 emit_xyz_bc(BcGen *gen, SourceSite site, BytecodeType k, i32 x, i32 y, i32 z)
 {
 	Bytecode byte = BC_XYZ(k, x, y, z);
 	return emit_bc(gen, site, byte);
@@ -599,7 +599,7 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 	return out;
 }
 
-static u32 bc_op(IrKind type)
+static BytecodeType bc_op(IrKind type)
 {
 	switch (type)
 	{
@@ -646,7 +646,7 @@ static BcSlot bg_emit_binary_expr(BcGen *bg, Ir expr, BcSlot out, u32 nout)
 	return out;
 }
 
-static BcSlot bg_emit_unary_expr(BcGen *bg, Ir expr, u32 bytecode_type, BcSlot out, u32 nout)
+static BcSlot bg_emit_unary_expr(BcGen *bg, Ir expr, BytecodeType bytecode_type, BcSlot out, u32 nout)
 {
 	if (nout < 1) {
 		return out;
