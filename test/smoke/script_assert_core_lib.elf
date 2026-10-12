@@ -144,6 +144,7 @@ test_assert(vm_counters.native_calls == vm_native_calls + 1)
 test_assert(elf.fs.get_paths() != nil)
 paths := elf.fs.get_paths("test/smoke")
 test_assert(paths != nil)
+test_assert(elf.type_of(paths) == "array")
 found_basic := 0
 for path := paths[...] ? {
 	if elf.path.filename(path) == "basic.elf" ? { found_basic = 1 }

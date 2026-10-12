@@ -184,12 +184,15 @@ ELF_FUNCTION(l_table_clear)
 ELF_FUNCTION(l_table_keys)
 {
 	elf_Table *table = table_receiver(S);
-	elf_Table *result = push_new_table(S);
-	for (u32 value_index = 0; value_index < table->count; ++value_index) {
-		for (u32 slot = 0; slot < table->nentries; ++slot) {
+	elf_Array *result = push_new_array(S);
+	for (u32 value_index = 0; value_index < table->count; ++value_index)
+	{
+		for (u32 slot = 0; slot < table->nentries; ++slot)
+		{
 			Entry entry = table->entries[slot];
-			if (entry_is_key(entry) && entry_index(entry) == value_index) {
-				elf_deprecated_array_add(S, result, entry_key_value(entry));
+			if (entry_is_key(entry) && entry_index(entry) == value_index)
+			{
+				elf_array_add(S, result, entry_key_value(entry));
 			}
 		}
 	}
@@ -199,9 +202,10 @@ ELF_FUNCTION(l_table_keys)
 ELF_FUNCTION(l_table_values)
 {
 	elf_Table *table = table_receiver(S);
-	elf_Table *result = push_new_table(S);
-	for (u32 i = 0; i < table->count; ++i) {
-		elf_deprecated_array_add(S, result, table->array[i]);
+	elf_Array *result = push_new_array(S);
+	for (u32 i = 0; i < table->count; ++i)
+	{
+		elf_array_add(S, result, table->array[i]);
 	}
 	return 1;
 }
@@ -209,17 +213,20 @@ ELF_FUNCTION(l_table_values)
 ELF_FUNCTION(l_table_pairs)
 {
 	elf_Table *table = table_receiver(S);
-	elf_Table *result = push_new_table(S);
+	elf_Array *result = push_new_array(S);
 	for (u32 value_index = 0; value_index < table->count; ++value_index)
 	{
 		for (u32 slot = 0; slot < table->nentries; ++slot)
 		{
 			Entry entry = table->entries[slot];
-			if (!entry_is_key(entry) || entry_index(entry) != value_index) continue;
-			elf_Table *pair = elf_new_table_rogue(S);
-			elf_deprecated_array_add(S, pair, entry_key_value(entry));
-			elf_deprecated_array_add(S, pair, table->array[value_index]);
-			elf_deprecated_array_add(S, result, value_from_table(pair));
+			if (!entry_is_key(entry) || entry_index(entry) != value_index)
+			{
+				continue;
+			}
+			elf_Array *pair = elf_array_new(S);
+			elf_array_add(S, pair, entry_key_value(entry));
+			elf_array_add(S, pair, table->array[value_index]);
+			elf_array_add(S, result, value_from_array(pair));
 		}
 	}
 	return 1;

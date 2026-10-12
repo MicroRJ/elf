@@ -103,14 +103,26 @@ static void source_indent(elf_Arena *arena, u32 indent)
 	elf_arena_push_nchar(arena, '\t', indent);
 }
 
-typedef struct SourceTablePath SourceTablePath;
-struct SourceTablePath
+typedef struct SourceValuePath SourceValuePath;
+struct SourceValuePath
 {
-	SourceTablePath *parent;
-	elf_Table       *table;
+	SourceValuePath *parent;
+	elf_Object      *object;
 };
 
-static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent, SourceTablePath *path);
+static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent, SourceValuePath *path);
+
+static b32 source_path_contains(SourceValuePath *path, elf_Object *object)
+{
+	for (SourceValuePath *at = path; at; at = at->parent)
+	{
+		if (at->object == object)
+		{
+			return true;
+		}
+	}
+	return false;
+}
 
 static b32 number_to_source(elf_Arena *arena, f64 number)
 {
@@ -161,7 +173,7 @@ static void string_to_source(elf_Arena *arena, elf_String *string)
 	elf_arena_push_char(arena, '"');
 }
 
-static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 slot, u32 indent, SourceTablePath *path, b32 *needs_separator, b32 *emitted_key)
+static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 slot, u32 indent, SourceValuePath *path, b32 *needs_separator, b32 *emitted_key)
 {
 	*emitted_key = false;
 	elf_Value value = elf_deprecated_array_get(state, table, slot);
@@ -187,12 +199,13 @@ static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Tab
 	return true;
 }
 
-static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 indent, SourceTablePath *path)
+static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 indent, SourceValuePath *path)
 {
-	for (SourceTablePath *at = path; at; at = at->parent) {
-		if (at->table == table) return false;
+	if (source_path_contains(path, (elf_Object *)table))
+	{
+		return false;
 	}
-	SourceTablePath table_path = {path, table};
+	SourceValuePath table_path = {path, (elf_Object *)table};
 
 	elf_arena_push_text(arena, "{");
 
@@ -222,7 +235,31 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	return true;
 }
 
-static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent, SourceTablePath *path)
+static b32 array_to_source(elf_State *state, elf_Arena *arena, elf_Array *array, u32 indent, SourceValuePath *path)
+{
+	if (source_path_contains(path, (elf_Object *)array))
+	{
+		return false;
+	}
+	SourceValuePath array_path = {path, (elf_Object *)array};
+
+	elf_arena_push_text(arena, "[");
+	for (u32 i = 0; i < array->count; ++i)
+	{
+		if (i != 0)
+		{
+			elf_arena_push_text(arena, ", ");
+		}
+		if (!unparse_value(state, arena, array->items[i], indent, &array_path))
+		{
+			return false;
+		}
+	}
+	elf_arena_push_text(arena, "]");
+	return true;
+}
+
+static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent, SourceValuePath *path)
 {
 	switch (value.type)
 	{
@@ -252,6 +289,11 @@ static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u3
 		case ELF_VALUE_TYPE_TABLE:
 		{
 			return table_to_source(state, arena, value_as_table(value), indent, path);
+		}
+
+		case ELF_VALUE_TYPE_ARRAY:
+		{
+			return array_to_source(state, arena, value_as_array(value), indent, path);
 		}
 
 		default:

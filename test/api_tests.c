@@ -123,6 +123,80 @@ static void test_api_tables_and_refs(elf_State *state)
 	elf_set_top(state, checkpoint);
 }
 
+static void test_api_arrays(elf_State *state)
+{
+	elf_i32 checkpoint = elf_get_top(state);
+	elf_new_array(state);
+	elf_i32 array_index = elf_abs_index(state, -1);
+	if (elf_type(state, array_index) != ELF_VALUE_TYPE_ARRAY)
+	{
+		test_fail("API creates an array");
+	}
+
+	elf_push_int(state, 10);
+	if (elf_append(state, array_index) != ELF_ERROR_NONE)
+	{
+		test_fail("API appends to an array");
+	}
+	elf_push_int(state, 20);
+	if (elf_set_index(state, array_index, 1) != ELF_ERROR_NONE)
+	{
+		test_fail("API set index appends at the array end");
+	}
+	elf_push_int(state, 15);
+	if (elf_set_index(state, array_index, 0) != ELF_ERROR_NONE)
+	{
+		test_fail("API set index replaces an array value");
+	}
+
+	elf_u32 length = 0;
+	elf_Int first = 0;
+	elf_Int second = 0;
+	if (!elf_length(state, array_index, &length) || length != 2)
+	{
+		test_fail("API reads array length");
+	}
+	if (!elf_get_index(state, array_index, 0) || !elf_to_int(state, -1, &first) || first != 15)
+	{
+		test_fail("API reads the replaced array value");
+	}
+	else
+	{
+		elf_pop(state, 1);
+	}
+	if (!elf_get_index(state, array_index, 1) || !elf_to_int(state, -1, &second) || second != 20)
+	{
+		test_fail("API reads the appended array value");
+	}
+	else
+	{
+		elf_pop(state, 1);
+	}
+	elf_i32 top = elf_get_top(state);
+	if (elf_get_index(state, array_index, 2) || elf_get_top(state) != top)
+	{
+		test_fail("API rejects an out-of-range array read transactionally");
+	}
+
+	elf_push_int(state, 30);
+	top = elf_get_top(state);
+	if (elf_set_index(state, array_index, 3) != ELF_ERROR_OUT_OF_RANGE || elf_get_top(state) != top)
+	{
+		test_fail("API rejects an out-of-range array write transactionally");
+	}
+	elf_pop(state, 1);
+
+	elf_Array *array = value_as_array(state->frame->framebase[array_index]);
+	array->obj.status |= ELF_OBJECT_READONLY;
+	elf_push_int(state, 30);
+	top = elf_get_top(state);
+	if (elf_append(state, array_index) != ELF_ERROR_READONLY || elf_get_top(state) != top)
+	{
+		test_fail("API rejects readonly array writes transactionally");
+	}
+	elf_set_top(state, checkpoint);
+}
+
 static void test_api_string_length(elf_State *state)
 {
 	elf_Index checkpoint = elf_get_top(state);
@@ -596,7 +670,7 @@ static void test_api_value_source(elf_State *state)
 	char escaped_text[] = {'a', '\0', '\a', '\b', '\f', '\v', 'z'};
 	elf_push_str(state, escaped_text, sizeof(escaped_text));
 	elf_set_field(state, root, "escaped");
-	elf_new_table(state);
+	elf_new_array(state);
 	elf_i32 panels = elf_abs_index(state, -1);
 	elf_push_int(state, 3);
 	elf_append(state, panels);
@@ -653,7 +727,7 @@ static void test_api_value_source(elf_State *state)
 		elf_pop(state, 1);
 	}
 	if (!elf_get_field(state, -1, "panels")) {
-		test_fail("round-tripped table contains nested table");
+		test_fail("round-tripped table contains nested array");
 	}
 	else
 	{
@@ -661,12 +735,14 @@ static void test_api_value_source(elf_State *state)
 		elf_Int panel = 0;
 		elf_b32 got_length = elf_length(state, -1, &length);
 		elf_b32 got_panel = elf_get_index(state, -1, 0);
-		if (!got_length || length != 1
-		|| !got_panel
-		|| !elf_to_int(state, -1, &panel) || panel != 3) {
-			test_fail("round-tripped nested table keeps its values");
+		if (elf_type(state, -2) != ELF_VALUE_TYPE_ARRAY || !got_length || length != 1 || !got_panel || !elf_to_int(state, -1, &panel) || panel != 3)
+		{
+			test_fail("round-tripped nested array keeps its values");
 		}
-		if (got_panel) elf_pop(state, 1);
+		if (got_panel)
+		{
+			elf_pop(state, 1);
+		}
 		elf_pop(state, 1);
 	}
 	elf_set_top(state, checkpoint);
@@ -690,6 +766,17 @@ static void test_api_value_source(elf_State *state)
 		test_fail("cyclic tables fail serialization transactionally");
 	}
 	elf_set_top(state, checkpoint);
+
+	elf_new_array(state);
+	root = elf_abs_index(state, -1);
+	elf_push_value(state, root);
+	elf_append(state, root);
+	top = elf_get_top(state);
+	if (elf_push_value_source(state, root) || elf_get_top(state) != top)
+	{
+		test_fail("cyclic arrays fail serialization transactionally");
+	}
+	elf_set_top(state, checkpoint);
 }
 
 static void run_api_tests(void)
@@ -697,6 +784,7 @@ static void run_api_tests(void)
 	elf_State *state = elf_create_state();
 	test_api_call_addressing(state);
 	test_api_tables_and_refs(state);
+	test_api_arrays(state);
 	test_api_string_length(state);
 	test_api_errors(state);
 	test_api_buffers(state);

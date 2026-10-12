@@ -110,12 +110,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_SQUARE_RIGHT))
 	{
-		Ast table = create_table_ast(parser, start.site, 0, 0);
-		if (ast_is_error(table)) {
-			return table;
-		}
-		table->table.json_shape = TABLE_JSON_SHAPE_ARRAY;
-		return table;
+		return create_array_ast(parser, start.site, 0, 0);
 	}
 
 	b32 done = false;
@@ -127,11 +122,7 @@ static Ast parse_json_ast_array(Parser *parser)
 			return value;
 		}
 
-		Ast entry = create_table_entry_ast(parser, value->site, 0, value);
-		if (ast_is_error(entry)) {
-			return entry;
-		}
-		if (!push_ast(parser, entry)) {
+		if (!push_ast(parser, value)) {
 			return ERROR_OOM_AST;
 		}
 		nargs += 1;
@@ -150,12 +141,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	if (nargs && !args) {
 		return ERROR_OOM_AST;
 	}
-	Ast table = create_table_ast(parser, start.site, args, nargs);
-	if (ast_is_error(table)) {
-		return table;
-	}
-	table->table.json_shape = TABLE_JSON_SHAPE_ARRAY;
-	return table;
+	return create_array_ast(parser, start.site, args, nargs);
 }
 
 static Ast parse_json_ast_number(Parser *parser)

@@ -32,6 +32,16 @@ static elf_Table *json_expect_table(elf_Value value, const char *label)
 	return value_as_table(value);
 }
 
+static elf_Array *json_expect_array(elf_Value value, const char *label)
+{
+	if (!value_is_array(value))
+	{
+		test_fail(label);
+		return 0;
+	}
+	return value_as_array(value);
+}
+
 static void test_constexpr_table_literal(elf_State *state)
 {
 	u32 stack_index = (u32)(state->stack_ptr - state->stack);
@@ -100,17 +110,13 @@ static void test_json_to_table_value(elf_State *state)
 		test_fail("json null field");
 	}
 
-	elf_Table *items = json_expect_table(elf_table_get_or_nil(state, root, json_test_string_key(state, "items")), "json array field");
+	elf_Array *items = json_expect_array(elf_table_get_or_nil(state, root, json_test_string_key(state, "items")), "json array field");
 	if (items)
 	{
-		if (items->json_shape != TABLE_JSON_SHAPE_ARRAY)
-		{
-			test_fail("JSON array preserves its shape");
-		}
-		json_expect_int(elf_deprecated_array_get(state, items, 0), 1, "json array first");
-		json_expect_int(elf_deprecated_array_get(state, items, 1), 2, "json array second");
+		json_expect_int(elf_array_get(state, items, 0), 1, "json array first");
+		json_expect_int(elf_array_get(state, items, 1), 2, "json array second");
 
-		elf_Table *nested = json_expect_table(elf_deprecated_array_get(state, items, 2), "json nested object");
+		elf_Table *nested = json_expect_table(elf_array_get(state, items, 2), "json nested object");
 		if (nested)
 		{
 			json_expect_string(elf_table_get_or_nil(state, nested, json_test_string_key(state, "nested")), "yes", "json nested field");

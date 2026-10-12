@@ -2,7 +2,7 @@
 #define ELF_H
 
 #define ELF_VERSION "0.2.0-dev"
-#define ELF_API_VERSION 1
+#define ELF_API_VERSION 2
 
 #include <stddef.h>
 #include <stdint.h>
@@ -141,6 +141,7 @@ elf_Bool elf_push_value_text(elf_State *state, elf_Index index);
 elf_Bool elf_push_value_source(elf_State *state, elf_Index index);
 
 void elf_new_table(elf_State *state);
+void elf_new_array(elf_State *state);
 elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length);
 elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field);
 elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field);

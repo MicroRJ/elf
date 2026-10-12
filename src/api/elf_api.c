@@ -145,15 +145,6 @@ static elf_Bool field_table_at(elf_State *state, elf_Index index, elf_Table **ta
 	return true;
 }
 
-static elf_ErrorCode table_at_for_write(elf_State *state, elf_Index index, elf_Table **table)
-{
-	elf_Value *value = value_at(state, index);
-	if (!value) return ELF_ERROR_INVALID_INDEX;
-	if (!value_is_table(*value)) return ELF_ERROR_TYPE_MISMATCH;
-	*table = value_as_table(*value);
-	return ELF_ERROR_NONE;
-}
-
 static elf_ErrorCode field_table_at_for_write(elf_State *state, elf_Index index, elf_Table **table)
 {
 	elf_Value *value = value_at(state, index);
@@ -167,6 +158,11 @@ static elf_ErrorCode field_table_at_for_write(elf_State *state, elf_Index index,
 static elf_Bool table_is_readonly(elf_Table *table)
 {
 	return (table->obj.status & ELF_OBJECT_READONLY) != 0;
+}
+
+static elf_Bool array_is_readonly(elf_Array *array)
+{
+	return (array->obj.status & ELF_OBJECT_READONLY) != 0;
 }
 
 static elf_Bool values_equal(elf_Value left, elf_Value right)
@@ -363,6 +359,11 @@ void elf_new_table(elf_State *state)
 	push_new_table(state);
 }
 
+void elf_new_array(elf_State *state)
+{
+	push_new_array(state);
+}
+
 elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length)
 {
 	elf_Value *value = value_at(state, index);
@@ -401,7 +402,16 @@ elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return false;
-	if (value_is_table(*value))
+	if (value_is_array(*value))
+	{
+		elf_Array *array = value_as_array(*value);
+		if (element >= array->count)
+		{
+			return false;
+		}
+		push_value(state, array->items[element]);
+	}
+	else if (value_is_table(*value))
 	{
 		elf_Table *table = value_as_table(*value);
 		push_value(state, element < table->count ? table->array[element] : value_nil());
@@ -421,7 +431,28 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 	elf_Value *target = value_at(state, index);
 	if (!target) return ELF_ERROR_INVALID_INDEX;
 	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
-	if (value_is_table(*target))
+	if (value_is_array(*target))
+	{
+		elf_Array *array = value_as_array(*target);
+		if (element > array->count)
+		{
+			return ELF_ERROR_OUT_OF_RANGE;
+		}
+		if (array_is_readonly(array))
+		{
+			return ELF_ERROR_READONLY;
+		}
+		elf_Value value = pop_value(state);
+		if (element == array->count)
+		{
+			elf_array_add(state, array, value);
+		}
+		else
+		{
+			elf_array_set(state, array, element, value);
+		}
+	}
+	else if (value_is_table(*target))
 	{
 		elf_Table *table = value_as_table(*target);
 		if (element > table->count) return ELF_ERROR_OUT_OF_RANGE;
@@ -448,12 +479,37 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 
 elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 {
-	elf_Table *table;
-	elf_ErrorCode error = table_at_for_write(state, index, &table);
-	if (error != ELF_ERROR_NONE) return error;
-	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
-	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
-	elf_deprecated_array_add(state, table, pop_value(state));
+	elf_Value *target = value_at(state, index);
+	if (!target)
+	{
+		return ELF_ERROR_INVALID_INDEX;
+	}
+	if (state->stack_ptr <= state->frame->framebase + frame_size(state))
+	{
+		return ELF_ERROR_STACK_UNDERFLOW;
+	}
+	if (value_is_array(*target))
+	{
+		elf_Array *array = value_as_array(*target);
+		if (array_is_readonly(array))
+		{
+			return ELF_ERROR_READONLY;
+		}
+		elf_array_add(state, array, pop_value(state));
+	}
+	else if (value_is_table(*target))
+	{
+		elf_Table *table = value_as_table(*target);
+		if (table_is_readonly(table))
+		{
+			return ELF_ERROR_READONLY;
+		}
+		elf_deprecated_array_add(state, table, pop_value(state));
+	}
+	else
+	{
+		return ELF_ERROR_TYPE_MISMATCH;
+	}
 	return ELF_ERROR_NONE;
 }
 

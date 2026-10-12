@@ -69,9 +69,9 @@ static elf_i32 battery_process_metatable(elf_State *state)
 static u32 battery_process_validate_arguments(elf_State *state, elf_i32 index)
 {
 	u32 count = 0;
-	if (elf_type(state, index) != ELF_VALUE_TYPE_TABLE || !elf_length(state, index, &count) || count == 0)
+	if (elf_type(state, index) != ELF_VALUE_TYPE_ARRAY || !elf_length(state, index, &count) || count == 0)
 	{
-		elf_error(state, "process.start expected a non-empty argument table");
+		elf_error(state, "process.start expected a non-empty argument array");
 	}
 	for (u32 argument_index = 0; argument_index < count; ++argument_index)
 	{

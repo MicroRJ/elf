@@ -53,9 +53,13 @@ test_assert(table.second == 20)
 keys := table:keys()
 values := table:values()
 pairs := table:pairs()
+test_assert(elf.type_of(keys) == "array")
+test_assert(elf.type_of(values) == "array")
+test_assert(elf.type_of(pairs) == "array")
 test_assert(keys:length() == 2)
 test_assert(values:length() == 2)
 test_assert(pairs:length() == 2)
+test_assert(elf.type_of(pairs[0]) == "array")
 test_assert(pairs[0]:length() == 2)
 
 mixed := { named = 7, 8, 9 }

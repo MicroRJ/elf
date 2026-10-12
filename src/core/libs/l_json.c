@@ -9,7 +9,7 @@ typedef struct
 	u64         count;
 	u64      capacity;
 	const char *error;
-	elf_Table  *ancestors[256];
+	elf_Object *ancestors[256];
 }
 JsonWriter;
 
@@ -130,22 +130,31 @@ static b32 json_table_index_has_key(elf_Table *table, u32 value_index)
 
 static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth);
 
-static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
+static b32 json_writer_enter_object(JsonWriter *writer, elf_Object *object, u32 depth)
 {
 	if (depth >= ARRAY_COUNT(writer->ancestors))
 	{
 		writer->error = "JSON value exceeds the maximum nesting depth";
-		return;
+		return false;
 	}
 	for (u32 i = 0; i < depth; ++i)
 	{
-		if (writer->ancestors[i] == table)
+		if (writer->ancestors[i] == object)
 		{
-			writer->error = "cannot stringify a cyclic table";
-			return;
+			writer->error = "cannot stringify a cyclic value";
+			return false;
 		}
 	}
-	writer->ancestors[depth] = table;
+	writer->ancestors[depth] = object;
+	return true;
+}
+
+static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
+{
+	if (!json_writer_enter_object(writer, (elf_Object *)table, depth))
+	{
+		return;
+	}
 
 	u32 count = elf_deprecated_array_length(table);
 	u32 keyed_values = 0;
@@ -210,6 +219,25 @@ static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
 	json_writer_char(writer, '}');
 }
 
+static void json_write_array(JsonWriter *writer, elf_Array *array, u32 depth)
+{
+	if (!json_writer_enter_object(writer, (elf_Object *)array, depth))
+	{
+		return;
+	}
+
+	json_writer_char(writer, '[');
+	for (u32 i = 0; i < array->count && !writer->error; ++i)
+	{
+		if (i)
+		{
+			json_writer_char(writer, ',');
+		}
+		json_write_value(writer, array->items[i], depth + 1);
+	}
+	json_writer_char(writer, ']');
+}
+
 static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
 {
 	if (writer->error) return;
@@ -243,6 +271,10 @@ static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
 	else if (value_is_table(value))
 	{
 		json_write_table(writer, value_as_table(value), depth);
+	}
+	else if (value_is_array(value))
+	{
+		json_write_array(writer, value_as_array(value), depth);
 	}
 	else
 	{

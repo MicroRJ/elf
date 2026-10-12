@@ -14,6 +14,7 @@ test_assert(data.count == 3)
 test_assert(data.ok == 1)
 test_assert(data.nope == 0)
 test_assert(data.none == nil)
+test_assert(elf.type_of(data.items) == "array")
 
 test_assert(data.items[0] == 1)
 test_assert(data.items[1] == 2)
@@ -24,6 +25,7 @@ test_assert(data.unicode == "\u263A")
 
 parsed := elf.json.parse("{\"name\":\"elf\",\"items\":[1,2,null]}")
 test_assert(parsed.name == "elf")
+test_assert(elf.type_of(parsed.items) == "array")
 test_assert(parsed.items[0] == 1)
 test_assert(parsed.items[2] == nil)
 
@@ -41,6 +43,9 @@ test_assert(invalid.line == 1)
 cyclic := {}
 cyclic.self = cyclic
 test_assert(elf.is_error(elf.json.stringify(cyclic)))
+cyclic_array := [nil]
+cyclic_array[0] = cyclic_array
+test_assert(elf.is_error(elf.json.stringify(cyclic_array)))
 test_assert(elf.is_error(elf.json.stringify(fun() {})))
 
 ret 321

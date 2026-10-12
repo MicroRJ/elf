@@ -253,7 +253,7 @@ ELF_FUNCTION(lib_fs_get_paths)
 		elf_push_nil(S);
 		return 1;
 	}
-	elf_new_table(S);
+	elf_new_array(S);
 	elf_i32 result = elf_abs_index(S, -1);
 	char storage[DY_PATH_CAPACITY];
 	dy_Path_Builder path;
