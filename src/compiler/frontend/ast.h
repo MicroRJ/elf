@@ -55,6 +55,7 @@
 	X(AST_FUNCTION_PARAM      , "function_param")             \
 	X(AST_RECURSE             , "recurse")                    \
 	X(AST_TABLE               , "table")                      \
+	X(AST_ARRAY               , "array")                      \
 	X(AST_TABLE_ENTRY         , "table_entry")                \
 	X(AST_INDEX               , "index")                      \
 	X(AST_FIELD               , "field")                      \
@@ -204,6 +205,8 @@ struct Ast_T
 			u8 json_shape;
 		}
 		table;
+
+		AstArray array;
 
 		struct
 		{

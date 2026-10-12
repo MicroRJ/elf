@@ -361,6 +361,34 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	}
 }
 
+static void test_parser_array_literals(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "ret []\nret [1, 2 + 3, [4]]\nret [5][0]");
+
+	Ast empty_ret = parser_test_stat(file, 0, AST_RETURN, "parse empty array return");
+	Ast empty = parser_test_tuple_item(empty_ret->return_stat.expr, 0, AST_ARRAY, "empty brackets parse as an array literal");
+	if (empty && empty->array.nargs != 0)
+	{
+		test_fail("empty array literal has no items");
+	}
+
+	Ast values_ret = parser_test_stat(file, 1, AST_RETURN, "parse populated array return");
+	Ast values = parser_test_tuple_item(values_ret->return_stat.expr, 0, AST_ARRAY, "populated brackets parse as an array literal");
+	if (!values || values->array.nargs != 3)
+	{
+		test_fail("array literal keeps all items");
+		return;
+	}
+	expect_ast_i64(values->array.args[0], 1, "array literal keeps first item");
+	expect_ast_kind(values->array.args[1], AST_ADD, "array literal keeps expression item");
+	expect_ast_kind(values->array.args[2], AST_ARRAY, "array literal keeps nested array");
+
+	Ast index_ret = parser_test_stat(file, 2, AST_RETURN, "parse array literal index return");
+	Ast index = parser_test_tuple_item(index_ret->return_stat.expr, 0, AST_INDEX, "array literal accepts index postfix");
+	expect_ast_kind(index ? index->binary.x : 0, AST_ARRAY, "array index keeps literal receiver");
+	expect_ast_i64(index ? index->binary.y : 0, 0, "array index keeps index expression");
+}
+
 static void test_parser_nil_assign(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "x ?= 1");
@@ -635,6 +663,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_if_else_blocks(state);
 	test_parser_for_loops(state);
 	test_parser_call_with_table_argument(state);
+	test_parser_array_literals(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);
 	test_parser_open_range_indexes(state);

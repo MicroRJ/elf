@@ -401,6 +401,31 @@ static void test_backend_range_for_collection_call_is_hoisted(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_array_bytecode(void)
+{
+	BackendCompileResult result = backend_test_compile_source("values := [1, 2, 3]\nvalues[1] = 9\nret values[1]");
+	if (backend_count_bytecode(result, BC_ARRAY) != 1 || backend_count_bytecode(result, BC_ARRAYADD) != 3)
+	{
+		test_fail("array literal emits array allocation and append bytecodes");
+	}
+	if (backend_count_bytecode(result, BC_SETINDEX) != 1 || backend_count_bytecode(result, BC_GETINDEX) != 1)
+	{
+		test_fail("array indexed access emits generic index bytecodes");
+	}
+	if (backend_count_bytecode(result, BC_TABLE) != 0 || backend_count_bytecode(result, BC_DEPRECATED_ARRAYADD) != 0)
+	{
+		test_fail("array literal does not emit table compatibility bytecodes");
+	}
+	backend_test_destroy(result);
+
+	result = backend_test_compile_source("ret {1}");
+	if (backend_count_bytecode(result, BC_TABLE) != 1 || backend_count_bytecode(result, BC_DEPRECATED_ARRAYADD) != 1 || backend_count_bytecode(result, BC_ARRAYADD) != 0)
+	{
+		test_fail("positional table literal uses deprecated table append bytecode");
+	}
+	backend_test_destroy(result);
+}
+
 static void test_backend_local_initializer_reuses_result_slot(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -544,6 +569,7 @@ static void run_backend_tests(void)
 	test_backend_while_short_circuit_loop();
 	test_backend_range_for_loop_shape();
 	test_backend_range_for_collection_call_is_hoisted();
+	test_backend_array_bytecode();
 	test_backend_local_initializer_reuses_result_slot();
 	test_backend_truthy_or_reuses_left_result_slot();
 	test_backend_logical_expr_delays_result_slot();

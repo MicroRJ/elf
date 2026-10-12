@@ -210,6 +210,30 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
+static void test_ir_lowers_array_literal(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret [1, 2]");
+	Ir body = ir_test_main_body(ctx);
+	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower array return");
+	Ir block = ret ? ret->ir_return.expr : 0;
+	expect_ir_kind(block, IR_EXPR_BLOCK, "array literal lowers to expression block");
+	if (!block || block->kind != IR_EXPR_BLOCK || block->ir_expr_block.stats.count != 3)
+	{
+		test_fail("array literal lowering emits allocation and item appends");
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	Ir local = block->ir_expr_block.stats.items[0];
+	expect_ir_kind(local, IR_LOCAL, "array literal stores allocation in a local");
+	expect_ir_kind(local ? local->ir_local.expr : 0, IR_ARRAY, "array literal allocates an array");
+	expect_ir_kind(block->ir_expr_block.stats.items[1], IR_ARRAY_ADD, "array literal appends first item");
+	expect_ir_kind(block->ir_expr_block.stats.items[2], IR_ARRAY_ADD, "array literal appends second item");
+	expect_load_local(block->ir_expr_block.value, local, "array literal returns allocated array");
+	elf_arena_destroy(&arena);
+}
+
 static void test_ir_lowers_if_else(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -454,6 +478,7 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_strings_and_globals(state);
 	test_ir_lowers_interpolated_string(state);
 	test_ir_lowers_field_and_call(state);
+	test_ir_lowers_array_literal(state);
 	test_ir_lowers_if_else(state);
 	test_ir_lowers_while(state);
 	test_ir_lowers_nil_assign(state);

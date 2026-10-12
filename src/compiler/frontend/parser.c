@@ -11,6 +11,7 @@ static Ast parse_expr(Parser *parser);
 static Ast parse_subexpr(Parser *parser, u32 rank);
 static Ast parse_postfix_expr(Parser *parser);
 static Ast parse_table_expr(Parser *parser);
+static Ast parse_array_expr(Parser *parser);
 static Ast parse_ident_expr(Parser *parser);
 static Ast parse_stat(Parser *parser);
 static Ast parse_if_stat(Parser *parser);
@@ -778,6 +779,11 @@ static Ast parse_unary_expr(Parser *parser)
 			value = parse_table_expr(parser);
 		}
 		break;
+		case TOK_SQUARE_LEFT:
+		{
+			value = parse_array_expr(parser);
+		}
+		break;
 
 		case TOK_LEFT_PAREN:
 		{
@@ -926,6 +932,48 @@ static Ast parse_table_expr(Parser *parser)
 	}
 	Ast table = create_table_ast(parser, table_token.site, args, nargs);
 	return table;
+}
+
+static Ast parse_array_expr(Parser *parser)
+{
+	Token array_token = take_token(parser, TOK_SQUARE_LEFT);
+	if (token_is_error(array_token))
+	{
+		return ast_from_token_error(array_token);
+	}
+
+	u32 count = 0;
+	while (!peek_token(parser, TOK_NONE) && !peek_token(parser, TOK_SQUARE_RIGHT))
+	{
+		Ast item = parse_expr(parser);
+		if (ast_is_error(item))
+		{
+			return item;
+		}
+		if (!item)
+		{
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected array item");
+		}
+		if (!push_ast(parser, item))
+		{
+			return ERROR_OOM_AST;
+		}
+		count += 1;
+		pick_token(parser, TOK_COMMA);
+	}
+
+	Token closing = take_token(parser, TOK_SQUARE_RIGHT);
+	if (token_is_error(closing))
+	{
+		return ast_from_token_error(closing);
+	}
+
+	Ast *items = pop_ast_array(parser, count);
+	if (count && !items)
+	{
+		return ERROR_OOM_AST;
+	}
+	return create_array_ast(parser, array_token.site, items, count);
 }
 
 static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)

@@ -33,6 +33,7 @@ BcSlot;
 	X(IR_BITWISE_XOR         , "bitwise_xor")                \
 	X(IR_BITWISE_NOT         , "bitwise_not")                \
 	X(IR_STORE               , "store")                      \
+	X(IR_DEPRECATED_ARRAY_ADD, "deprecated_array_add")       \
 	X(IR_ARRAY_ADD           , "array_add")                  \
 	X(IR_IF                  , "if")                         \
 	X(IR_BLOCK               , "block_stat")                 \
@@ -44,6 +45,7 @@ BcSlot;
 	X(IR_CALL                , "call")                       \
 	X(IR_META_CALL           , "meta_call")                  \
 	X(IR_TABLE               , "table")                      \
+	X(IR_ARRAY               , "array")                      \
 	X(IR_INDEX               , "index")                      \
 	X(IR_FIELD               , "field")                      \
 	X(IR_META_FIELD          , "meta_field")                 \

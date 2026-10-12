@@ -183,9 +183,14 @@ static Ir create_store_ir(LowerContext *ctx, SourceSite site, Ir x, Ir y)
 	return ir;
 }
 
-static Ir create_array_add_ir(LowerContext *ctx, SourceSite site, Ir table, Ir value)
+static Ir create_deprecated_array_add_ir(LowerContext *ctx, SourceSite site, Ir table, Ir value)
 {
-	return ir_new_binary(ctx, site, IR_ARRAY_ADD, table, value);
+	return ir_new_binary(ctx, site, IR_DEPRECATED_ARRAY_ADD, table, value);
+}
+
+static Ir create_array_add_ir(LowerContext *ctx, SourceSite site, Ir array, Ir value)
+{
+	return ir_new_binary(ctx, site, IR_ARRAY_ADD, array, value);
 }
 
 static Ir create_call_ir(LowerContext *ctx, SourceSite site, Ir expr, IrArray args)
@@ -201,6 +206,11 @@ static Ir create_table_ir(LowerContext *ctx, SourceSite site, u8 json_shape)
 	Ir ir = ir_new_nullary(ctx, site, IR_TABLE);
 	ir->ir_table_shape = json_shape;
 	return ir;
+}
+
+static Ir create_array_ir(LowerContext *ctx, SourceSite site)
+{
+	return ir_new_nullary(ctx, site, IR_ARRAY);
 }
 
 static Ir create_index_ir(LowerContext *ctx, SourceSite site, Ir x, Ir y)
@@ -369,6 +379,13 @@ static void print_ir(Printer *pr, Ir ir)
 		}
 		break;
 
+		case IR_ARRAY:
+		{
+			PRINT(pr, "array");
+		}
+		break;
+
+		case IR_DEPRECATED_ARRAY_ADD:
 		case IR_ARRAY_ADD:
 		{
 			print_ir(pr, ir->ir_binary.x);

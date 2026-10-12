@@ -119,6 +119,33 @@ static void test_vm_return_table(void)
 	elf_destroy_state(result.state);
 }
 
+static void test_vm_return_array(void)
+{
+	VmRunResult result = vm_test_run_file("test/smoke/return_array.elf");
+	if (!value_is_array(result.value))
+	{
+		test_fail("vm returns array value");
+	}
+	else
+	{
+		elf_Array *array = value_as_array(result.value);
+		if (elf_array_length(array) != 2 || !value_is_array(elf_array_get(result.state, array, 0)) || !value_is_array(elf_array_get(result.state, array, 1)))
+		{
+			test_fail("vm array literal preserves nested arrays");
+		}
+		else
+		{
+			elf_Array *values = value_as_array(elf_array_get(result.state, array, 0));
+			elf_Array *nested = value_as_array(elf_array_get(result.state, array, 1));
+			if (elf_array_length(values) != 3 || value_as_integer(elf_array_get(result.state, values, 1)) != 22 || value_as_integer(elf_array_get(result.state, nested, 0)) != 40)
+			{
+				test_fail("vm executes array indexing and assignment");
+			}
+		}
+	}
+	elf_destroy_state(result.state);
+}
+
 static void test_vm_nil_assign(void)
 {
 	vm_expect_int("test/smoke/nil_assign.elf", 42, "vm nil assignment stores fallback value");
@@ -524,6 +551,7 @@ static void run_vm_tests(void)
 	test_vm_string_index();
 	test_vm_return_nil();
 	test_vm_return_table();
+	test_vm_return_array();
 	test_vm_nil_assign();
 	test_vm_function_call();
 	test_vm_function_arguments();

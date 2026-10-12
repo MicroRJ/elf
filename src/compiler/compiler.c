@@ -424,6 +424,22 @@ static b32 compiler_eval_constexpr_ast(Compiler *compiler, Ast ast, elf_Value *o
 			return true;
 		}
 
+		case AST_ARRAY:
+		{
+			elf_Array *array = elf_array_new(compiler->state);
+			for (u32 i = 0; i < ast->array.nargs; ++i)
+			{
+				elf_Value value = {};
+				if (!compiler_eval_constexpr_ast(compiler, ast->array.args[i], &value))
+				{
+					return false;
+				}
+				elf_array_add(compiler->state, array, value);
+			}
+			*out = value_from_array(array);
+			return true;
+		}
+
 		default:
 		{
 			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "'%s' is not a constant expression", ast_type_name(ast->kind));

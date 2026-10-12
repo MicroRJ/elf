@@ -800,12 +800,31 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				}
 				else
 				{
-					push_ir(&table_items, create_array_add_ir(ctx, entry->site, table, ir_value));
+					push_ir(&table_items, create_deprecated_array_add_ir(ctx, entry->site, table, ir_value));
 				}
 			}
 
 			Ir value = create_load_local_ir(ctx, expr->site, table_local);
 			IrArray stats = close_ir_frame(&table_items);
+			ir = create_expr_block_ir(ctx, expr->site, stats, value);
+		}
+		break;
+
+		case AST_ARRAY:
+		{
+			IrFrame array_items = begin_ir_frame(ctx);
+			Ir array_local = create_local_ir(ctx, expr->site, create_array_ir(ctx, expr->site));
+			push_ir(&array_items, array_local);
+
+			for (u32 i = 0; i < expr->array.nargs; ++i)
+			{
+				Ir array = create_load_local_ir(ctx, expr->site, array_local);
+				Ir value = lower_ast_expr_to_ir(ctx, expr->array.args[i]);
+				push_ir(&array_items, create_array_add_ir(ctx, expr->array.args[i]->site, array, value));
+			}
+
+			Ir value = create_load_local_ir(ctx, expr->site, array_local);
+			IrArray stats = close_ir_frame(&array_items);
 			ir = create_expr_block_ir(ctx, expr->site, stats, value);
 		}
 		break;

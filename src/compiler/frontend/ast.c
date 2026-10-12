@@ -150,6 +150,18 @@ static Ast create_table_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
 	return tree;
 }
 
+static Ast create_array_ast(Parser *par, SourceSite site, Ast *items, u32 count)
+{
+	Ast tree = create_ast(par, site, AST_ARRAY);
+	if (ast_is_error(tree))
+	{
+		return tree;
+	}
+	tree->array.args = items;
+	tree->array.nargs = count;
+	return tree;
+}
+
 static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast value)
 {
 	if (ast_is_error(key)) {
@@ -897,6 +909,13 @@ static void print_ast(Printer *pr, Ast tree)
 			PRINT(pr, "{");
 			print_ast_list(pr, tree->table.args, tree->table.nargs);
 			PRINT(pr, "}");
+		}
+		break;
+		case AST_ARRAY:
+		{
+			PRINT(pr, "[");
+			print_ast_list(pr, tree->array.args, tree->array.nargs);
+			PRINT(pr, "]");
 		}
 		break;
 		case AST_TABLE_ENTRY:

@@ -431,6 +431,22 @@ static void test_api_source_compilation(elf_State *state)
 	elf_end_scratch(compiler_scratch);
 	elf_pop(state, 1);
 
+	char constant_array_text[] = "[1, 2, [3]]";
+	elf_StrSlice constant_array = {constant_array_text, sizeof(constant_array_text) - 1};
+	if (elf_push_constant_expr(state, "constant-array.elf", constant_array) != ELF_ERROR_NONE)
+	{
+		test_fail("API accepts a constant array expression");
+	}
+	else
+	{
+		elf_Value array_value = state->stack_ptr[-1];
+		if (!value_is_array(array_value) || elf_array_length(value_as_array(array_value)) != 3 || !value_is_array(elf_array_get(state, value_as_array(array_value), 2)))
+		{
+			test_fail("constant array expression preserves nested array values");
+		}
+		elf_pop(state, 1);
+	}
+
 	char nul_source_text[] = {'4', 0, '2'};
 	elf_StrSlice nul_source = {nul_source_text, sizeof(nul_source_text)};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "nul-source.elf", nul_source);
