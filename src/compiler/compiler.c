@@ -260,22 +260,33 @@ static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format
 	va_copy(count_args, args);
 	int message_size = vsnprintf(0, 0, format, count_args);
 	va_end(count_args);
-	ASSERT(message_size >= 0);
+	if (message_size < 0) {
+		return (elf_StrSlice) {0};
+	}
 	char *message = elf_arena_push(arena, (u64)message_size + 1);
+	if (!message) {
+		return (elf_StrSlice) {0};
+	}
 	vsnprintf(message, (u64)message_size + 1, format, args);
 	return (elf_StrSlice) {message, (u64)message_size};
 }
 
-void compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
+b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
 {
 	ASSERT(compiler);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
+	if (!message.data) {
+		return false;
+	}
 
 	Com_ModuleId module_id = site.module < compiler->module_count ? site.module : 0;
 	Com_Module *source_module = compiler->modules + module_id;
 	const char *source_name = atom_data(source_module->name);
 	elf_arena_align(compiler->arena, _Alignof(Com_Message));
 	Com_Message *compiler_message = elf_arena_push_zero(compiler->arena, sizeof(*compiler_message));
+	if (!compiler_message) {
+		return false;
+	}
 	compiler_message->severity = severity;
 	compiler_message->phase = phase;
 	compiler_message->site = site;
@@ -312,14 +323,16 @@ void compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase
 		}
 		if (source_slice_is_valid(site)) print_source_slice_marker(site, source_module->source);
 	}
+	return true;
 }
 
-void compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
+b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(compiler, severity, phase, site, format, args);
+	b32 result = compiler_reportv(compiler, severity, phase, site, format, args);
 	va_end(args);
+	return result;
 }
 
 static void restore_source_stack(elf_State *state, elf_Value *checkpoint)
@@ -410,11 +423,12 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 	state->gc_mode = ELF_GC_PAUSED;
 	if (compiler->report.error_count) goto done;
 
+	b32 parsed = false;
 	PROF_BLOCK("compiler.parse")
 	{
-		compiler_parse_modules(compiler);
+		parsed = compiler_parse_modules(compiler);
 	}
-	if (compiler->report.error_count)
+	if (!parsed || compiler->report.error_count)
 	{
 		state->arena.used = arena_checkpoint;
 		goto done;

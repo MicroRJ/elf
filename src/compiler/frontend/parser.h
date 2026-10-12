@@ -6,6 +6,14 @@
 
 typedef struct Parser Parser;
 
+typedef enum
+{
+	ERR_NONE = 0,
+	LEX_ERR_INVALID_SOURCE,
+	LEX_ERR_OOM,
+}
+LexErr;
+
 typedef struct
 {
 	Token *items;
@@ -27,7 +35,6 @@ typedef struct
 
 	u32               line_index;
 	const char       *line_start;
-	b32               failed;
 
 	Lexer_TokenFIFO   tokens;
 }
@@ -50,5 +57,5 @@ struct Parser
 
 static inline b32 parser_has_failed(Parser *parser)
 {
-	return parser->failed || parser->lexer.failed;
+	return parser->failed;
 }

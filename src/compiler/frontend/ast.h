@@ -5,6 +5,7 @@
 #define AST_XDEF(X)                                          \
 	X(AST_NONE                , "none")                       \
 	X(AST_ERROR               , "error")                      \
+	X(AST_ERROR_OOM           , "out_of_memory")              \
 	X(AST_FILE                , "file")                       \
 	X(AST_IDENT               , "identifier")                 \
 	X(AST_AND                 , "and")                        \
@@ -282,12 +283,18 @@ static Ast_T ast_error_sentinel =
 	.kind = AST_ERROR,
 };
 
+static Ast_T ast_error_oom_sentinel =
+{
+	.kind = AST_ERROR_OOM,
+};
+
 #define NULL_AST ((Ast)0)
 #define ERROR_AST (&ast_error_sentinel)
+#define ERROR_OOM_AST (&ast_error_oom_sentinel)
 
 static inline b32 ast_is_error(Ast ast)
 {
-	return ast && ast->kind == AST_ERROR;
+	return ast && (ast->kind == AST_ERROR || ast->kind == AST_ERROR_OOM);
 }
 
 static b32 ast_is_missing_or_error(Ast ast)

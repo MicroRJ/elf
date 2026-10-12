@@ -557,6 +557,21 @@ static void test_parser_line_boundaries(elf_State *state)
 	expect_ast_atom(parenthesized_value, "value", "parenthesized expression string");
 }
 
+static void test_parser_lexer_error_boundary(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	elf_StrSlice source = {(char *)"@ ignored", 9};
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, "parser_lexer_error", source);
+	Parser *parser = parser_create(compiler, 0);
+	Ast file = elf_parse_file(parser);
+	if (file != ERROR_AST || parser->failed || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
+		test_fail("parser propagates a lexer error token without hidden failure state");
+	}
+	elf_arena_destroy(&arena);
+}
+
 static void run_parser_tests(elf_State *state)
 {
 	test_parser_decl_precedence_and_strings(state);
@@ -577,4 +592,5 @@ static void run_parser_tests(elf_State *state)
 	test_parser_integer_literal_boundaries(state);
 	test_parser_source_slices(state);
 	test_parser_line_boundaries(state);
+	test_parser_lexer_error_boundary(state);
 }

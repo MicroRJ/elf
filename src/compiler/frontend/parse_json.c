@@ -47,7 +47,7 @@ static Ast parse_json_ast_object(Parser *parser)
 		Ast value = parse_json_ast_value(parser);
 		if (ast_is_error(value))
 		{
-			return ERROR_AST;
+			return value;
 		}
 
 		Ast entry = create_table_entry_ast(parser, key_token.site, key, value);
@@ -86,7 +86,7 @@ static Ast parse_json_ast_array(Parser *parser)
 		Ast value = parse_json_ast_value(parser);
 		if (ast_is_error(value))
 		{
-			return ERROR_AST;
+			return value;
 		}
 
 		Ast entry = create_table_entry_ast(parser, value->site, 0, value);
@@ -120,6 +120,12 @@ static Ast parse_json_ast_number(Parser *parser)
 	Token token = parser->tok;
 	switch (token.type)
 	{
+		case TOK_ERROR:
+		case TOK_ERROR_OOM:
+		{
+			return ast_from_token_error(token);
+		}
+
 		case TOK_INTEGER:
 		{
 			consume_token(parser);
@@ -150,6 +156,12 @@ static Ast parse_json_ast_value(Parser *parser)
 
 	switch (token.type)
 	{
+		case TOK_ERROR:
+		case TOK_ERROR_OOM:
+		{
+			return ast_from_token_error(token);
+		}
+
 		case TOK_LEFT_BRACE:
 		{
 			return parse_json_ast_object(parser);
@@ -202,6 +214,9 @@ static Ast parse_json_ast_value(Parser *parser)
 static Ast parse_json_ast(Parser *parser)
 {
 	Ast ast = parse_json_ast_value(parser);
+	if (ast_is_error(ast)) {
+		return ast;
+	}
 	if (!peek_token(parser, TOK_NONE))
 	{
 		parser_unexpected_token(parser, parser->tok);

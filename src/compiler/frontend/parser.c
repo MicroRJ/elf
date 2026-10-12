@@ -20,6 +20,12 @@ static u32 parse_call_args(Parser *parser);
 static Token consume_token(Parser *parser);
 static Token take_token(Parser *parser, Token_Type type);
 
+static Ast ast_from_token_error(Token token)
+{
+	ASSERT(token_is_error(token));
+	return token.type == TOK_ERROR_OOM ? ERROR_OOM_AST : ERROR_AST;
+}
+
 static Token take_field_name(Parser *parser)
 {
 	Token token = parser->tok;
@@ -211,7 +217,7 @@ static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 
 static Token consume_token(Parser *par)
 {
-	Token token = lex_token(&par->lexer);
+	Token token = token_is_error(par->tok_prox) ? par->tok_prox : lex_token(&par->lexer);
 	par->tok_prev = par->tok;
 	par->tok = par->tok_prox;
 	par->tok_prox = token;
@@ -236,7 +242,7 @@ static Token take_token(Parser *parser, Token_Type type)
 {
 	Token tok = parser->tok;
 
-	if (!pick_token(parser, type)) {
+	if (!token_is_error(tok) && !pick_token(parser, type)) {
 		parser_expected_token(parser, parser->tok, type);
 	}
 
@@ -266,15 +272,21 @@ static Ast *pop_ast_array(Parser *par, u32 nargs)
 static Ast elf_parse_file(Parser *parser)
 {
 	if (parser_has_failed(parser)) return ERROR_AST;
+	if (token_is_error(parser->tok)) {
+		return ast_from_token_error(parser->tok);
+	}
 	Token tok = parser->tok;
 	u32 nstats = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
+		if (token_is_error(parser->tok)) {
+			return ast_from_token_error(parser->tok);
+		}
 		Token before = parser->tok;
 		Ast_T *stat = parse_stat(parser);
 		if (parser_has_failed(parser)) return ERROR_AST;
 		if (ast_is_error(stat)) {
-			return ERROR_AST;
+			return stat;
 		}
 		if (!stat)
 		{
@@ -387,7 +399,7 @@ static Ast parse_tuple_expr(Parser *par)
 	{
 		Ast expr = parse_expr(par);
 		if (ast_is_error(expr)) {
-			return ERROR_AST;
+			return expr;
 		}
 		push_ast(par, expr);
 		++ nargs;
@@ -538,6 +550,12 @@ static Ast parse_unary_expr(Parser *parser)
 	Ast value = 0;
 	switch (tok.type)
 	{
+		case TOK_ERROR:
+		case TOK_ERROR_OOM:
+		{
+			value = ast_from_token_error(tok);
+		}
+		break;
 		case TOK_ELLIPSIS:
 		{
 			consume_token(parser);
@@ -1008,7 +1026,7 @@ static Ast parse_expr_stat(Parser *parser)
 {
 	Ast x = parse_tuple_expr(parser);
 	if (ast_is_error(x)) {
-		return ERROR_AST;
+		return x;
 	}
 	if (!x) {
 		parser_unexpected_token(parser, parser->tok);
@@ -1097,6 +1115,12 @@ static Ast parse_stat(Parser *parser)
 
 	switch (tok.type)
 	{
+		case TOK_ERROR:
+		case TOK_ERROR_OOM:
+		{
+			return ast_from_token_error(tok);
+		}
+
 		case TOK_NONE:
 		case TOK_RIGHT_BRACE:
 		case TOK_PAREN_RIGHT:

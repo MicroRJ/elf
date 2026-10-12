@@ -92,8 +92,8 @@ void compiler_set_log_messages(Compiler *compiler, b32 enabled);
 void compiler_record_import(Compiler *compiler, Com_ModuleId module, struct Ast_T *import);
 b32 compiler_parse_modules(Compiler *compiler);
 
-void compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
-void compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
+b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
+b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
 
 BcFunctionRef compiler_compile(Compiler *compiler);
 int compiler_push_constant_expr(Compiler *compiler);

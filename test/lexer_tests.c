@@ -201,23 +201,11 @@ static void test_lexer_macros(elf_State *state)
 	lexer_prime(&invalid);
 
 	Token bare_hash = lexer_next(&invalid);
-	expect_token_type(bare_hash, TOK_IDENTIFIER, "bare # reports invalid macro token");
+	expect_token_type(bare_hash, TOK_ERROR, "bare # returns an error token");
 	expect_token_site_size(bare_hash, 1, "bare # consumes only hash");
-
-	Token number = lexer_next(&invalid);
-	expect_token_type(number, TOK_INTEGER, "token after bare # is preserved");
-	expect_token_int(number, 123, "number after bare # value");
-
-	Token punct_hash = lexer_next(&invalid);
-	expect_token_type(punct_hash, TOK_IDENTIFIER, "# before punctuation reports invalid macro token");
-	expect_token_site_size(punct_hash, 1, "# before punctuation consumes only hash");
-
-	Token dot = lexer_next(&invalid);
-	expect_token_type(dot, TOK_DOT, "punctuation after invalid # is preserved");
-
-	Token identifier = lexer_next(&invalid);
-	expect_token_type(identifier, TOK_IDENTIFIER, "identifier after invalid macro is preserved");
-	expect_token_atom(identifier, "abc", "identifier after invalid macro payload");
+	if (invalid.compiler->report.error_count != 1) {
+		test_fail("invalid macro reports one error");
+	}
 }
 
 static void test_lexer_strings(elf_State *state)
@@ -655,22 +643,15 @@ static void test_lexer_numbers(elf_State *state)
 	expect_token_type(hex_with_e, TOK_INTEGER, "hexadecimal e remains a digit");
 	expect_token_int(hex_with_e, 0x1e3, "hexadecimal e digit value");
 
-	Parser malformed = lexer_test_parser(state, "1e 2e+ 3E-");
-	lexer_prime(&malformed);
-
-	Token missing_exponent = lexer_next(&malformed);
-	expect_token_type(missing_exponent, TOK_NUMBER, "recover malformed exponent without digits");
-	expect_token_site_size(missing_exponent, 2, "malformed exponent token size");
-
-	Token missing_positive_exponent = lexer_next(&malformed);
-	expect_token_type(missing_positive_exponent, TOK_NUMBER, "recover malformed positive exponent");
-	expect_token_site_size(missing_positive_exponent, 3, "malformed positive exponent token size");
-
-	Token missing_negative_exponent = lexer_next(&malformed);
-	expect_token_type(missing_negative_exponent, TOK_NUMBER, "recover malformed negative exponent");
-	expect_token_site_size(missing_negative_exponent, 3, "malformed negative exponent token size");
-	if (malformed.compiler->report.error_count != 3) {
-		test_fail("malformed exponents report missing digits");
+	const char *malformed_sources[] = {"1e", "2e+", "3E-"};
+	for (u32 i = 0; i < ARRAY_COUNT(malformed_sources); ++i)
+	{
+		Parser malformed = lexer_test_parser(state, malformed_sources[i]);
+		lexer_prime(&malformed);
+		expect_token_type(lexer_next(&malformed), TOK_ERROR, "malformed exponent returns an error token");
+		if (malformed.compiler->report.error_count != 1) {
+			test_fail("malformed exponent reports missing digits");
+		}
 	}
 }
 
@@ -756,10 +737,39 @@ static void test_lexer_bounded_source(elf_State *state)
 	char comment_source[] = {'/', '*'};
 	Parser comment_parser = lexer_test_parser_slice(state, comment_source, sizeof(comment_source));
 	lexer_prime(&comment_parser);
-	expect_token_type(lexer_next(&comment_parser), TOK_NONE, "bounded unterminated comment reaches slice end");
+	expect_token_type(lexer_next(&comment_parser), TOK_ERROR, "bounded unterminated comment returns an error token");
 	if (comment_parser.compiler->report.error_count != 1) {
 		test_fail("bounded unterminated comment reports an error");
 	}
+}
+
+static void test_lexer_out_of_memory(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	Compiler *compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	elf_StrSlice source = {(char *)"oom_identifier", 14};
+	compiler_add_root_module(compiler, "lexer_oom", source);
+	Lexer lexer = {};
+	lexer_init(&lexer, compiler, 0);
+	u64 capacity = arena.capacity;
+	arena.capacity = arena.used;
+	expect_token_type(lex_token(&lexer), TOK_ERROR_OOM, "atom allocation failure returns an OOM token");
+	arena.capacity = capacity;
+	elf_arena_destroy(&arena);
+
+	arena = elf_arena_create(0);
+	compiler = compiler_create(state, &arena);
+	compiler_set_log_messages(compiler, false);
+	source = (elf_StrSlice) {(char *)"@", 1};
+	compiler_add_root_module(compiler, "lexer_report_oom", source);
+	lexer = (Lexer) {};
+	lexer_init(&lexer, compiler, 0);
+	capacity = arena.capacity;
+	arena.capacity = arena.used;
+	expect_token_type(lex_token(&lexer), TOK_ERROR_OOM, "diagnostic allocation failure returns an OOM token");
+	arena.capacity = capacity;
+	elf_arena_destroy(&arena);
 }
 
 static void run_lexer_tests(elf_State *state)
@@ -776,4 +786,5 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_compiler_module(state);
 	test_compiler_module_loader_boundary(state);
 	test_lexer_bounded_source(state);
+	test_lexer_out_of_memory(state);
 }
