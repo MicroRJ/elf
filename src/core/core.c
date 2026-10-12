@@ -64,6 +64,7 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 #include "libs/l_json.c"
 #include "libs/l_vm.c"
 #include "libs/l_table.c"
+#include "libs/l_array.c"
 #include "libs/l_string.c"
 #include "libs/l_buffer.c"
 
@@ -122,6 +123,7 @@ static void bootstrap_standard_libraries(elf_State *state)
 	state->metatables.integer = push_new_table(state);
 	state->metatables.number = push_new_table(state);
 	state->metatables.table = elf_lib_table(state);
+	state->metatables.array = elf_lib_array(state);
 	state->metatables.buffer = elf_lib_buffer(state);
 
 	elf_Table *elf_table = elf_lib_core(state);

@@ -265,7 +265,7 @@ ELF_FUNCTION(l_table_merge)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_get)
+ELF_FUNCTION(l_deprecated_array_get)
 {
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
@@ -274,7 +274,7 @@ ELF_FUNCTION(l_array_get)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_set)
+ELF_FUNCTION(l_deprecated_array_set)
 {
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
@@ -284,7 +284,7 @@ ELF_FUNCTION(l_array_set)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_add)
+ELF_FUNCTION(l_deprecated_array_add)
 {
 	elf_Table *table = table_receiver(S);
 	u32 first = table->count;
@@ -295,7 +295,7 @@ ELF_FUNCTION(l_array_add)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_insert)
+ELF_FUNCTION(l_deprecated_array_insert)
 {
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
@@ -305,7 +305,7 @@ ELF_FUNCTION(l_array_insert)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_pop)
+ELF_FUNCTION(l_deprecated_array_pop)
 {
 	elf_Table *table = table_receiver(S);
 	if (table->count == 0) {
@@ -318,7 +318,7 @@ ELF_FUNCTION(l_array_pop)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_remove)
+ELF_FUNCTION(l_deprecated_array_remove)
 {
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
@@ -339,7 +339,7 @@ ELF_FUNCTION(l_array_remove)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_slice)
+ELF_FUNCTION(l_deprecated_array_slice)
 {
 	elf_Table *table = table_receiver(S);
 	u32 first = 0;
@@ -356,7 +356,7 @@ ELF_FUNCTION(l_array_slice)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_extend)
+ELF_FUNCTION(l_deprecated_array_extend)
 {
 	elf_Table *table = table_receiver(S);
 	for (int arg = 1; arg < nargs; ++arg)
@@ -371,7 +371,7 @@ ELF_FUNCTION(l_array_extend)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_swap)
+ELF_FUNCTION(l_deprecated_array_swap)
 {
 	elf_Table *table = table_receiver(S);
 	u32 left = 0;
@@ -383,7 +383,7 @@ ELF_FUNCTION(l_array_swap)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_reverse)
+ELF_FUNCTION(l_deprecated_array_reverse)
 {
 	elf_Table *table = table_receiver(S);
 	for (u32 i = 0; i < table->count / 2; ++i) {
@@ -393,7 +393,7 @@ ELF_FUNCTION(l_array_reverse)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_map)
+ELF_FUNCTION(l_deprecated_array_map)
 {
 	elf_Table *table = table_receiver(S);
 	elf_Value function = load_value(S, 1);
@@ -406,7 +406,7 @@ ELF_FUNCTION(l_array_map)
 	return 1;
 }
 
-ELF_FUNCTION(l_array_filter)
+ELF_FUNCTION(l_deprecated_array_filter)
 {
 	elf_Table *table = table_receiver(S);
 	elf_Value function = load_value(S, 1);
@@ -451,7 +451,7 @@ static void table_quicksort(elf_State *state, elf_Value function, elf_Table *tab
 	}
 }
 
-ELF_FUNCTION(l_array_sort)
+ELF_FUNCTION(l_deprecated_array_sort)
 {
 	elf_Table *table = table_receiver(S);
 	elf_Value function = load_value(S, 1);
@@ -474,22 +474,22 @@ static const elf_Binding l_table[] = {
 	{"pairs",   l_table_pairs},
 	{"clone",   l_table_clone},
 	{"merge",   l_table_merge},
-	{"get",     l_array_get},
-	{"idx",     l_array_get},
-	{"set",     l_array_set},
-	{"repl",    l_array_set},
-	{"add",     l_array_add},
-	{"push",    l_array_add},
-	{"insert",  l_array_insert},
-	{"pop",     l_array_pop},
-	{"remove",  l_array_remove},
-	{"slice",   l_array_slice},
-	{"extend",  l_array_extend},
-	{"swap",    l_array_swap},
-	{"reverse", l_array_reverse},
-	{"map",     l_array_map},
-	{"filter",  l_array_filter},
-	{"sort",    l_array_sort},
+	{"get",     l_deprecated_array_get},
+	{"idx",     l_deprecated_array_get},
+	{"set",     l_deprecated_array_set},
+	{"repl",    l_deprecated_array_set},
+	{"add",     l_deprecated_array_add},
+	{"push",    l_deprecated_array_add},
+	{"insert",  l_deprecated_array_insert},
+	{"pop",     l_deprecated_array_pop},
+	{"remove",  l_deprecated_array_remove},
+	{"slice",   l_deprecated_array_slice},
+	{"extend",  l_deprecated_array_extend},
+	{"swap",    l_deprecated_array_swap},
+	{"reverse", l_deprecated_array_reverse},
+	{"map",     l_deprecated_array_map},
+	{"filter",  l_deprecated_array_filter},
+	{"sort",    l_deprecated_array_sort},
 };
 
 static elf_Table *elf_lib_table(elf_State *state)

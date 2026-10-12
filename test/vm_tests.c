@@ -221,6 +221,11 @@ static void test_vm_script_table_lib_assertions(void)
 	vm_expect_int("test/smoke/script_assert_table_lib.elf", 144, "vm runs table library assertions");
 }
 
+static void test_vm_script_array_lib_assertions(void)
+{
+	vm_expect_int("test/smoke/script_assert_array_lib.elf", 145, "vm runs array library assertions");
+}
+
 static void test_vm_core_library_assertions(void)
 {
 	vm_expect_int("test/smoke/script_assert_core_lib.elf", 4242, "vm runs core library assertions");
@@ -567,6 +572,7 @@ static void run_vm_tests(void)
 	test_vm_script_sys_assertions();
 	test_vm_script_string_assertions();
 	test_vm_script_table_lib_assertions();
+	test_vm_script_array_lib_assertions();
 	test_vm_core_library_assertions();
 	test_vm_buffer_assertions();
 	test_vm_stream_assertions();

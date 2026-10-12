@@ -26,6 +26,11 @@ static void test_array_value(void)
 	{
 		test_fail("empty array value has zero length");
 	}
+	if (elf_get_type_metatable(state, value) != state->metatables.array)
+	{
+		test_fail("array value resolves the array metatable");
+	}
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.array, test_key_string(state, "length")), "array.length is a method");
 
 	elf_destroy_state(state);
 }

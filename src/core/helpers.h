@@ -8,6 +8,7 @@ static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value valu
 	{
 		case ELF_VALUE_TYPE_STRING:  return state->metatables.string;
 		case ELF_VALUE_TYPE_TABLE:   return state->metatables.table;
+		case ELF_VALUE_TYPE_ARRAY:   return state->metatables.array;
 		case ELF_VALUE_TYPE_NUMBER:  return state->metatables.number;
 		case ELF_VALUE_TYPE_INTEGER: return state->metatables.integer;
 		case ELF_VALUE_TYPE_BUFFER:  return state->metatables.buffer;
@@ -176,11 +177,23 @@ static inline void push_table(elf_State *S, elf_Table *table)
 	push_value(S, value_from_table(table));
 }
 
+static inline void push_array(elf_State *state, elf_Array *array)
+{
+	push_value(state, value_from_array(array));
+}
+
 static inline elf_Table *push_new_table(elf_State *state)
 {
 	elf_Table *table = elf_new_table_rogue(state);
 	push_table(state, table);
 	return table;
+}
+
+static inline elf_Array *push_new_array(elf_State *state)
+{
+	elf_Array *array = elf_array_new(state);
+	push_array(state, array);
+	return array;
 }
 
 static inline elf_Value pop_value(elf_State *S)

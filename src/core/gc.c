@@ -163,6 +163,9 @@ static u32 gc_mark_metatables(elf_State *state)
 	if (state->metatables.table) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.table);
 	}
+	if (state->metatables.array) {
+		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.array);
+	}
 	if (state->metatables.number) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.number);
 	}

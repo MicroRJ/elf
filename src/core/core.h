@@ -170,6 +170,7 @@ struct elf_State
 		elf_Table *number;
 		elf_Table *string;
 		elf_Table *table;
+		elf_Table *array;
 		elf_Table *buffer;
 	}
 	metatables;
