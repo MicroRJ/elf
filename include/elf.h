@@ -70,44 +70,6 @@ typedef enum
 }
 elf_ErrorCode;
 
-typedef enum
-{
-	ELF_DIAGNOSTIC_NOTE = 0,
-	ELF_DIAGNOSTIC_WARNING,
-	ELF_DIAGNOSTIC_ERROR,
-}
-elf_DiagnosticSeverity;
-
-typedef enum
-{
-	ELF_DIAGNOSTIC_PHASE_LEXER = 0,
-	ELF_DIAGNOSTIC_PHASE_PARSER,
-	ELF_DIAGNOSTIC_PHASE_EVALUATION,
-	ELF_DIAGNOSTIC_PHASE_LOWERING,
-	ELF_DIAGNOSTIC_PHASE_BYTECODE,
-}
-elf_DiagnosticPhase;
-
-typedef struct
-{
-	elf_DiagnosticSeverity severity;
-	elf_DiagnosticPhase    phase;
-	elf_StrSlice           source_name;
-	elf_StrSlice           message;
-	elf_u32                line;
-	elf_u64                column;
-}
-elf_Diagnostic;
-
-typedef struct
-{
-	const elf_Diagnostic *diagnostics;
-	elf_Size              diagnostic_count;
-	elf_Size              error_count;
-	elf_Size              warning_count;
-}
-elf_CompileReport;
-
 #define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
 typedef ELF_FUNCTION(*elf_Function);
 
@@ -148,10 +110,9 @@ elf_ErrorCode elf_push_buffer(elf_State *state, elf_Size capacity);
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data);
 
-elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
-elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
-elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
-void elf_destroy_compile_report(elf_CompileReport *report);
+elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
+elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
 
 elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);

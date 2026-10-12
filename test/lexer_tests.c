@@ -7,7 +7,7 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 	parser.arena = &state->arena;
 	parser.module = 0;
 	parser.atoms = parser.compiler->atoms;
-	parser.phase = ELF_DIAGNOSTIC_PHASE_PARSER;
+	parser.phase = COMPILER_PHASE_PARSER;
 	lexer_init(&parser.lexer, parser.compiler, parser.module);
 	return parser;
 }
@@ -218,7 +218,6 @@ static void test_lexer_macros(elf_State *state)
 	Token identifier = lexer_next(&invalid);
 	expect_token_type(identifier, TOK_IDENTIFIER, "identifier after invalid macro is preserved");
 	expect_token_atom(identifier, "abc", "identifier after invalid macro payload");
-	compiler_finish_report(invalid.compiler, 0);
 }
 
 static void test_lexer_strings(elf_State *state)
@@ -670,10 +669,9 @@ static void test_lexer_numbers(elf_State *state)
 	Token missing_negative_exponent = lexer_next(&malformed);
 	expect_token_type(missing_negative_exponent, TOK_NUMBER, "recover malformed negative exponent");
 	expect_token_site_size(missing_negative_exponent, 3, "malformed negative exponent token size");
-	if (malformed.compiler->error_count != 3) {
+	if (malformed.compiler->report.error_count != 3) {
 		test_fail("malformed exponents report missing digits");
 	}
-	compiler_finish_report(malformed.compiler, 0);
 }
 
 static void test_lexer_operators(elf_State *state)
@@ -759,10 +757,9 @@ static void test_lexer_bounded_source(elf_State *state)
 	Parser comment_parser = lexer_test_parser_slice(state, comment_source, sizeof(comment_source));
 	lexer_prime(&comment_parser);
 	expect_token_type(lexer_next(&comment_parser), TOK_NONE, "bounded unterminated comment reaches slice end");
-	if (comment_parser.compiler->error_count != 1) {
+	if (comment_parser.compiler->report.error_count != 1) {
 		test_fail("bounded unterminated comment reports an error");
 	}
-	compiler_finish_report(comment_parser.compiler, 0);
 }
 
 static void run_lexer_tests(elf_State *state)

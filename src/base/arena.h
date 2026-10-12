@@ -37,6 +37,7 @@ char *elf_arena_pushfv(elf_Arena *arena, const char *format, va_list args);
 char *elf_arena_pushf(elf_Arena *arena, const char *format, ...);
 
 elf_Scratch elf_begin_scratch(void);
+elf_Scratch elf_begin_scratch_excluding(elf_Arena *excluded);
 void elf_end_scratch(elf_Scratch scratch);
 
 #endif

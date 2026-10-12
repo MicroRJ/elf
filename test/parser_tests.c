@@ -6,7 +6,6 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 	compiler_add_root_module(compiler, "parser_tests", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
-	compiler_finish_report(compiler, 0);
 	return file;
 }
 
@@ -187,14 +186,12 @@ static void test_parser_module_discovery(elf_State *state)
 	compiler_set_module_loader(compiler, parser_test_module_loader, &loader);
 	if (!compiler_parse_modules(compiler)) {
 		test_fail("compiler parses imported module graph");
-		compiler_finish_report(compiler, 0);
 		elf_arena_destroy(&arena);
 		return;
 	}
 
 	if (compiler->module_count != 3) {
 		test_fail("module discovery deduplicates canonical paths");
-		compiler_finish_report(compiler, 0);
 		elf_arena_destroy(&arena);
 		return;
 	}
@@ -223,7 +220,6 @@ static void test_parser_module_discovery(elf_State *state)
 	if (a->imports[0]->site.module != 1 || b->imports[0]->site.module != 2) {
 		test_fail("imported AST source sites retain module ids");
 	}
-	compiler_finish_report(compiler, 0);
 	elf_arena_destroy(&arena);
 }
 

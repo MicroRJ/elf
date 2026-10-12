@@ -56,7 +56,7 @@ static void report_lowering_error(LowerContext *ctx, LoweringError error, Source
 
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LOWERING,
+	compiler_reportv(ctx->compiler, COMPILER_ERROR, COMPILER_PHASE_LOWERING,
 		site, format, args);
 	va_end(args);
 }
@@ -67,7 +67,7 @@ static void report_lowering_warning(LowerContext *ctx, LoweringError error, Sour
 
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->compiler, ELF_DIAGNOSTIC_WARNING, ELF_DIAGNOSTIC_PHASE_LOWERING,
+	compiler_reportv(ctx->compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING,
 		site, format, args);
 	va_end(args);
 }

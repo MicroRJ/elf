@@ -40,7 +40,7 @@ static void report_generation_error(BcGen *gen, GenerationError error, SourceSit
 
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(gen->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_BYTECODE,
+	compiler_reportv(gen->compiler, COMPILER_ERROR, COMPILER_PHASE_BYTECODE,
 		site, format, args);
 	va_end(args);
 }
@@ -489,7 +489,7 @@ static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrM
 			bc_function->source_map_count = gen->source_map_buffer.count;
 		}
 	}
-	if (compiler->error_count) return (BcFunctionRef) {};
+	if (compiler->report.error_count) return (BcFunctionRef) {};
 	finalize_module(state, module, &gen->module);
 
 	return (BcFunctionRef) {

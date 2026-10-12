@@ -105,48 +105,6 @@ static Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 siz
 	return atom;
 }
 
-static Atom *atom_table_begin(Atom_Table *table, u32 capacity)
-{
-	ASSERT(table);
-	atom_table_ensure_capacity(table);
-	elf_arena_align(table->arena, 8);
-	Atom *candidate = elf_arena_push(table->arena, sizeof(*candidate) + capacity + 1);
-	candidate->size = capacity;
-	return candidate;
-}
-
-static Atom *atom_table_end(Atom_Table *table, Atom *candidate, u32 size)
-{
-	ASSERT(table);
-	ASSERT(candidate);
-	u32 capacity = candidate->size;
-	ASSERT(size <= capacity);
-	u64 candidate_start = (u64)((u8 *)candidate - table->arena->data);
-	ASSERT(table->arena->in_use == candidate_start + sizeof(*candidate) + capacity + 1);
-
-	u32 hash = atom_hash_data(candidate->data, size);
-	Atom *existing = atom_table_find(table, candidate->data, size, hash);
-	if (existing)
-	{
-		table->arena->in_use = candidate_start;
-		return existing;
-	}
-
-	Atom *atom = candidate;
-	table->arena->in_use = candidate_start + sizeof(*atom) + size + 1;
-	atom->next = 0;
-	atom->hash = hash;
-	atom->size = size;
-	atom->id = 0;
-	atom->data[size] = 0;
-
-	u32 bucket_index = atom_bucket_index(table, hash);
-	atom->next = table->buckets[bucket_index];
-	table->buckets[bucket_index] = atom;
-	table->count += 1;
-	return atom;
-}
-
 static elf_String *elf_string_from_atom(elf_State *state, Atom *atom)
 {
 	ASSERT(atom);

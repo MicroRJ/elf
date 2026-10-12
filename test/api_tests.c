@@ -231,7 +231,7 @@ static void test_api_buffers(elf_State *state)
 
 	char source_data[] = "ret elf.buffer(4):append(\"ok\")";
 	elf_StrSlice source = {source_data, sizeof(source_data) - 1};
-	if (elf_push_code_source(state, "api-buffer", source, 0) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, "api-buffer", source) != ELF_ERROR_NONE)
 	{
 		test_fail("API buffer source compiles");
 		elf_set_top(state, checkpoint);
@@ -388,65 +388,78 @@ static void test_api_mutation_errors(elf_State *state)
 	elf_set_top(state, checkpoint);
 }
 
-static void test_api_source_diagnostics(elf_State *state)
+static Compiler *api_test_create_compiler(elf_State *state, elf_Scratch *scratch, const char *name, elf_StrSlice source)
+{
+	*scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(state, scratch->arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, name, source);
+	return compiler;
+}
+
+static void test_api_source_compilation(elf_State *state)
 {
 	elf_i32 checkpoint = elf_get_top(state);
 	elf_push_int(state, 77);
 	elf_i32 sentinel_top = elf_get_top(state);
 	elf_StrSlice missing_source = {};
-	elf_CompileReport report = {};
-	if (elf_push_constant_expr(state, 0, missing_source, &report) != ELF_ERROR_INVALID_ARGUMENT
-	|| elf_push_json(state, 0, missing_source, &report) != ELF_ERROR_INVALID_ARGUMENT
-	|| elf_push_code_source(state, 0, missing_source, &report) != ELF_ERROR_INVALID_ARGUMENT
+	if (elf_push_constant_expr(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
+	|| elf_push_json(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
+	|| elf_push_code_source(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
 	|| elf_get_top(state) != sentinel_top) {
 		test_fail("invalid source arguments preserve the stack");
 	}
-	if (report.diagnostic_count != 0) {
-		test_fail("invalid source arguments produce no compiler diagnostics");
+	char rejected_source_text[] = "1 +";
+	elf_StrSlice rejected_source = {rejected_source_text, sizeof(rejected_source_text) - 1};
+	if (elf_push_constant_expr(state, "rejected-source.elf", rejected_source) != ELF_ERROR_COMPILATION_FAILED || elf_get_top(state) != sentinel_top) {
+		test_fail("public compilation reports failure without compiler messages");
 	}
 
+	elf_Scratch compiler_scratch;
+	Compiler *compiler;
+	Com_Report *report;
 	char bounded_constant_text[] = {'4', '2'};
 	elf_StrSlice bounded_constant = {bounded_constant_text, sizeof(bounded_constant_text)};
-	if (elf_push_constant_expr(state, "bounded-constant.elf", bounded_constant, &report) != ELF_ERROR_NONE) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "bounded-constant.elf", bounded_constant);
+	if (!compiler_push_constant_expr(compiler)) {
 		test_fail("API accepts a source slice without trailing storage");
 	}
 	elf_Int bounded_value = 0;
 	if (!elf_to_int(state, -1, &bounded_value) || bounded_value != 42) {
 		test_fail("bounded source slice compiles completely");
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(compiler_scratch);
 	elf_pop(state, 1);
 
 	char nul_source_text[] = {'4', 0, '2'};
 	elf_StrSlice nul_source = {nul_source_text, sizeof(nul_source_text)};
-	if (elf_push_constant_expr(state, "nul-source.elf", nul_source, &report)
-	!= ELF_ERROR_COMPILATION_FAILED) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "nul-source.elf", nul_source);
+	if (compiler_push_constant_expr(compiler)) {
 		test_fail("API rejects embedded NUL source bytes");
 	}
-	if (elf_get_top(state) != sentinel_top || report.error_count != 1 ||
-		report.diagnostics[0].phase != ELF_DIAGNOSTIC_PHASE_LEXER ||
-		!api_slice_contains(report.diagnostics[0].message, "NUL byte")) {
-		test_fail("embedded NUL failure returns a lexer diagnostic");
+	report = &compiler->report;
+	if (elf_get_top(state) != sentinel_top || report->error_count != 1 || report->first->phase != COMPILER_PHASE_LEXER || !api_slice_contains(report->first->text, "NUL byte")) {
+		test_fail("embedded NUL failure returns a lexer message");
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(compiler_scratch);
 
 #if SIZE_MAX > UINT32_MAX
 	elf_StrSlice oversized_source = {bounded_constant_text, (elf_Size)UINT32_MAX + 1};
-	if (elf_push_constant_expr(state, "oversized-source.elf", oversized_source, &report)
-	!= ELF_ERROR_COMPILATION_FAILED) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "oversized-source.elf", oversized_source);
+	if (compiler_push_constant_expr(compiler)) {
 		test_fail("API rejects source larger than its internal representation");
 	}
-	if (elf_get_top(state) != sentinel_top || report.error_count != 1 ||
-		!api_slice_contains(report.diagnostics[0].message, "32-bit size limit")) {
-		test_fail("oversized source failure returns a compiler diagnostic");
+	report = &compiler->report;
+	if (elf_get_top(state) != sentinel_top || report->error_count != 1 || !api_slice_contains(report->first->text, "32-bit size limit")) {
+		test_fail("oversized source failure returns a compiler message");
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(compiler_scratch);
 #endif
 
 	char invalid_constant_text[] = "{\n  answer = runtime_value,\n}";
 	elf_StrSlice invalid_constant = {invalid_constant_text, sizeof(invalid_constant_text) - 1};
-	if (elf_push_constant_expr(state, "invalid-constant.elf", invalid_constant, &report)
-	!= ELF_ERROR_COMPILATION_FAILED) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-constant.elf", invalid_constant);
+	if (compiler_push_constant_expr(compiler)) {
 		test_fail("API rejects a non-constant expression");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -457,54 +470,49 @@ static void test_api_source_diagnostics(elf_State *state)
 		test_fail("failed constant expression preserves existing stack values");
 	}
 
-	if (report.error_count == 0 || report.diagnostic_count == 0
-	|| report.diagnostics[0].severity != ELF_DIAGNOSTIC_ERROR
-	|| report.diagnostics[0].phase != ELF_DIAGNOSTIC_PHASE_EVALUATION
-	|| !api_slice_matches(report.diagnostics[0].source_name, "invalid-constant.elf")
-	|| report.diagnostics[0].line != 2
-	|| report.diagnostics[0].column != 12
-	|| !api_slice_contains(report.diagnostics[0].message, "not a constant expression")) {
-		test_fail("API reports constant-expression diagnostics");
+	report = &compiler->report;
+	if (report->error_count == 0 || report->message_count == 0 || report->first->severity != COMPILER_ERROR || report->first->phase != COMPILER_PHASE_EVALUATION || report->first->site.module != 0 || report->first->site.line_index != 2 || source_slice_column(report->first->site) != 12 || !api_slice_contains(report->first->text, "not a constant expression")) {
+		test_fail("compiler reports constant-expression messages");
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(compiler_scratch);
 
 	char invalid_string_text[] = "\"\\q\"";
 	elf_StrSlice invalid_string = {invalid_string_text, sizeof(invalid_string_text) - 1};
-	if (elf_push_constant_expr(state, "invalid-string.elf", invalid_string, &report)
-	!= ELF_ERROR_COMPILATION_FAILED) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-string.elf", invalid_string);
+	if (compiler_push_constant_expr(compiler)) {
 		test_fail("API rejects lexer errors");
 	}
 	if (elf_get_top(state) != sentinel_top) {
 		test_fail("lexer failure leaves the stack unchanged");
 	}
-	if (report.error_count == 0 || report.diagnostic_count == 0
-	|| report.diagnostics[0].phase != ELF_DIAGNOSTIC_PHASE_LEXER
-	|| !api_slice_matches(report.diagnostics[0].source_name, "invalid-string.elf")) {
-		test_fail("API retains lexer diagnostics");
+	report = &compiler->report;
+	if (report->error_count == 0 || report->message_count == 0 || report->first->phase != COMPILER_PHASE_LEXER || report->first->site.module != 0) {
+		test_fail("compiler retains lexer messages");
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(compiler_scratch);
 
 	char valid_constant_text[] = "42";
 	elf_StrSlice valid_constant = {valid_constant_text, sizeof(valid_constant_text) - 1};
-	if (elf_push_constant_expr(state, "valid-constant.elf", valid_constant, &report) != ELF_ERROR_NONE) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "valid-constant.elf", valid_constant);
+	if (!compiler_push_constant_expr(compiler)) {
 		test_fail("API parses valid source after a failed constant expression");
 	}
 	elf_Int constant = 0;
 	if (!elf_to_int(state, -1, &constant) || constant != 42) {
 		test_fail("API returns a valid constant after a failed parse");
 	}
-	if (report.error_count != 0) {
+	if (compiler->report.error_count != 0) {
 		test_fail("successful source parsing has no errors");
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(compiler_scratch);
 	elf_pop(state, 1);
 
 	elf_Module *module_checkpoint = state->modules;
 	elf_u64 arena_checkpoint = state->arena.in_use;
 	char invalid_code_text[] = "answer := 1 +";
 	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
-	if (elf_push_code_source(state, "invalid-code.elf", invalid_code, &report)
-	!= ELF_ERROR_COMPILATION_FAILED) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-code.elf", invalid_code);
+	if (bc_function_ref_is_valid(compiler_compile(compiler))) {
 		test_fail("API rejects malformed code source");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -513,20 +521,35 @@ static void test_api_source_diagnostics(elf_State *state)
 	if (state->modules != module_checkpoint || state->arena.in_use != arena_checkpoint) {
 		test_fail("failed code compilation publishes no partial module");
 	}
-	if (report.error_count < 2 || report.diagnostic_count < 2
-	|| report.diagnostics[0].phase != ELF_DIAGNOSTIC_PHASE_PARSER
-	|| !api_slice_matches(report.diagnostics[0].source_name, "invalid-code.elf")) {
-		test_fail("API retains multiple code parser diagnostics");
+	report = &compiler->report;
+	if (report->error_count < 2 || report->message_count < 2 || report->first->phase != COMPILER_PHASE_PARSER || report->first->site.module != 0) {
+		test_fail("compiler retains multiple code parser messages");
 	}
-	elf_destroy_compile_report(&report);
+	u32 linked_message_count = 0;
+	Com_Message *last_message = 0;
+	for (Com_Message *message = report->first; message; message = message->next)
+	{
+		last_message = message;
+		linked_message_count += 1;
+	}
+	if (linked_message_count != report->message_count || last_message != report->last) {
+		test_fail("compiler report links every message in order");
+	}
+	elf_end_scratch(compiler_scratch);
 
 	char valid_code_text[] = "unused := 1\nret 42";
 	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
-	if (elf_push_code_source(state, "valid-code.elf", valid_code, &report) != ELF_ERROR_NONE) {
+	compiler = api_test_create_compiler(state, &compiler_scratch, "valid-code.elf", valid_code);
+	BcFunctionRef function = compiler_compile(compiler);
+	if (!bc_function_ref_is_valid(function)) {
 		test_fail("API compiles valid code after a failed parse");
 	}
 	else
 	{
+		ASSERT(bc_function_from_ref(function)->captures == 0);
+		elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
+		closure->function = function;
+		push_value(state, value_from_closure(closure));
 		elf_push_nil(state);
 		elf_call(state, 1, 1);
 		elf_Int result = 0;
@@ -535,15 +558,11 @@ static void test_api_source_diagnostics(elf_State *state)
 		}
 		elf_pop(state, 1);
 	}
-	if (report.error_count != 0 || report.warning_count != 1
-	|| report.diagnostic_count != 1
-	|| report.diagnostics[0].severity != ELF_DIAGNOSTIC_WARNING
-	|| report.diagnostics[0].phase != ELF_DIAGNOSTIC_PHASE_LOWERING
-	|| !api_slice_contains(report.diagnostics[0].message, "unreferenced entity")) {
-		test_fail("successful code compilation retains lowering warnings");
+	report = &compiler->report;
+	if (report->error_count != 0 || report->warning_count != 1 || report->message_count != 1 || report->first->severity != COMPILER_WARNING || report->first->phase != COMPILER_PHASE_LOWERING || !api_slice_contains(report->first->text, "unreferenced entity")) {
+		test_fail("successful compilation retains lowering warnings");
 	}
-	elf_destroy_compile_report(&report);
-
+	elf_end_scratch(compiler_scratch);
 	elf_set_top(state, checkpoint);
 }
 
@@ -576,7 +595,7 @@ static void test_api_value_source(elf_State *state)
 	}
 	elf_StrSlice source = {};
 	if (!elf_to_str(state, -1, &source)
-	|| elf_push_constant_expr(state, "roundtrip.elf", source, 0) != ELF_ERROR_NONE) {
+	|| elf_push_constant_expr(state, "roundtrip.elf", source) != ELF_ERROR_NONE) {
 		test_fail("API value source parses as a constant expression");
 		elf_set_top(state, checkpoint);
 		return;
@@ -667,7 +686,7 @@ static void run_api_tests(void)
 	test_api_buffers(state);
 	test_api_user_objects(state);
 	test_api_mutation_errors(state);
-	test_api_source_diagnostics(state);
+	test_api_source_compilation(state);
 	test_api_value_source(state);
 	elf_destroy_state(state);
 }

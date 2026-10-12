@@ -5,6 +5,44 @@
 typedef struct Compiler Compiler;
 typedef u32 Com_ModuleId;
 
+typedef enum
+{
+	COMPILER_NOTE = 0,
+	COMPILER_WARNING,
+	COMPILER_ERROR,
+}
+Com_Severity;
+
+typedef enum
+{
+	COMPILER_PHASE_LEXER = 0,
+	COMPILER_PHASE_PARSER,
+	COMPILER_PHASE_EVALUATION,
+	COMPILER_PHASE_LOWERING,
+	COMPILER_PHASE_BYTECODE,
+}
+Com_Phase;
+
+typedef struct Com_Message Com_Message;
+struct Com_Message
+{
+	Com_Message *next;
+	Com_Severity severity;
+	Com_Phase phase;
+	SourceSite site;
+	elf_StrSlice text;
+};
+
+typedef struct
+{
+	Com_Message *first;
+	Com_Message *last;
+	u32 message_count;
+	u32 error_count;
+	u32 warning_count;
+}
+Com_Report;
+
 #define COM_MODULE_INVALID ((Com_ModuleId)-1)
 
 typedef struct
@@ -43,23 +81,24 @@ struct Compiler
 	u32                module_capacity;
 	Com_ModuleLoader  *module_loader;
 	void              *module_loader_data;
-	elf_Diagnostic    *diagnostics;
-	u32                diagnostic_count;
-	u32                diagnostic_capacity;
-	u32                error_count;
-	u32                warning_count;
-	b32                log_diagnostics;
+	Com_Report         report;
+	b32                log_messages;
 };
 
 Compiler *compiler_create(elf_State *state, elf_Arena *arena);
 Com_ModuleId compiler_add_root_module(Compiler *compiler, const char *name, elf_StrSlice source);
 void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data);
+void compiler_set_log_messages(Compiler *compiler, b32 enabled);
 void compiler_record_import(Compiler *compiler, Com_ModuleId module, struct Ast_T *import);
 b32 compiler_parse_modules(Compiler *compiler);
-void compiler_report(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase, SourceSite site, const char *format, ...);
-void compiler_reportv(Compiler *compiler, elf_DiagnosticSeverity severity, elf_DiagnosticPhase phase, SourceSite site, const char *format, va_list args);
-void compiler_finish_report(Compiler *compiler, elf_CompileReport *report);
 
-BcFunctionRef elf_compile_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
-int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
-int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report);
+void compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
+void compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
+
+BcFunctionRef compiler_compile(Compiler *compiler);
+int compiler_push_constant_expr(Compiler *compiler);
+int compiler_push_json(Compiler *compiler);
+
+BcFunctionRef elf_compile_source(elf_State *state, const char *name, elf_StrSlice source);
+int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source);
+int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source);

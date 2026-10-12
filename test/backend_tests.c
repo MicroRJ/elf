@@ -41,7 +41,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 		source.size = size;
 	}
 
-	result.function = elf_compile_source(result.state, path, source, 0);
+	result.function = elf_compile_source(result.state, path, source);
 	return result;
 }
 
@@ -54,7 +54,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 	source.data = (char *)source_text;
 	source.size = (u64)strlen(source_text);
 
-	result.function = elf_compile_source(result.state, "backend_tests", source, 0);
+	result.function = elf_compile_source(result.state, "backend_tests", source);
 	return result;
 }
 
@@ -130,7 +130,7 @@ static void test_backend_module_owns_source(void)
 
 	elf_State *state = elf_create_state();
 	elf_StrSlice source = {source_data, source_size};
-	BcFunctionRef entry = elf_compile_source(state, "owned_source", source, 0);
+	BcFunctionRef entry = elf_compile_source(state, "owned_source", source);
 	elf_Module *module = entry.module;
 	if (module->source_data == source_data) {
 		test_fail("compiled module does not borrow caller source memory");
@@ -487,7 +487,6 @@ static void test_backend_if_else_restores_stack_top(void)
 		test_fail("if/else restores stack top before following statement");
 	}
 
-	compiler_finish_report(compiler, 0);
 	elf_end_scratch(scratch);
 	elf_destroy_state(state);
 }

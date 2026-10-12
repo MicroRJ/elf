@@ -8,17 +8,36 @@
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
-static _Thread_local elf_Arena scratch_arena;
+static _Thread_local elf_Arena scratch_arenas[2];
+
+static elf_Arena *get_scratch_arena(u32 index)
+{
+	elf_Arena *arena = scratch_arenas + index;
+	if (!arena->data) {
+		*arena = elf_arena_create(0);
+	}
+	return arena;
+}
 
 elf_Scratch elf_begin_scratch(void)
 {
-	if (!scratch_arena.data) {
-		scratch_arena = elf_arena_create(0);
-	}
-
+	elf_Arena *arena = get_scratch_arena(0);
 	elf_Scratch scratch;
-	scratch.arena = &scratch_arena;
-	scratch.regress = scratch_arena.in_use;
+	scratch.arena = arena;
+	scratch.regress = arena->in_use;
+	return scratch;
+}
+
+elf_Scratch elf_begin_scratch_excluding(elf_Arena *excluded)
+{
+	elf_Arena *arena = get_scratch_arena(0);
+	if (arena == excluded)
+	{
+		arena = get_scratch_arena(1);
+	}
+	elf_Scratch scratch;
+	scratch.arena = arena;
+	scratch.regress = arena->in_use;
 	return scratch;
 }
 

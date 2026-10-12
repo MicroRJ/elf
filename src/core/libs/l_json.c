@@ -13,7 +13,7 @@ typedef struct
 }
 JsonWriter;
 
-static void json_push_error_value(elf_State *state, const char *message, const elf_Diagnostic *diagnostic)
+static void json_push_error_value(elf_State *state, const char *message, const Com_Message *compiler_message)
 {
 	elf_Table *info = elf_new_table_rogue(state);
 	push_value(state, value_from_error(info));
@@ -22,12 +22,12 @@ static void json_push_error_value(elf_State *state, const char *message, const e
 	elf_Value message_value = value_from_string(elf_string_from_data(state, message ? message : "JSON error"));
 	elf_table_set(state, info, message_key, message_value);
 
-	if (diagnostic)
+	if (compiler_message)
 	{
 		elf_Value line_key = value_from_string(elf_string_from_data(state, "line"));
 		elf_Value column_key = value_from_string(elf_string_from_data(state, "column"));
-		elf_table_set(state, info, line_key, value_from_integer(diagnostic->line));
-		elf_table_set(state, info, column_key, value_from_integer((i64)diagnostic->column));
+		elf_table_set(state, info, line_key, value_from_integer(compiler_message->site.line_index));
+		elf_table_set(state, info, column_key, value_from_integer((i64)source_slice_column(compiler_message->site)));
 	}
 }
 
@@ -255,15 +255,17 @@ ELF_FUNCTION(l_json_parse)
 	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
 	elf_String *text = lib_load_string(S, 1);
 	elf_StrSlice source = {(char *)string_data(text), string_size(text)};
-	elf_CompileReport report = {};
-	elf_ErrorCode result = elf_push_json(S, "<json>", source, &report);
-	if (result != ELF_ERROR_NONE)
+	elf_Scratch scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(S, scratch.arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_module(compiler, "<json>", source);
+	if (!compiler_push_json(compiler))
 	{
-		const elf_Diagnostic *diagnostic = report.diagnostic_count ? report.diagnostics : 0;
-		const char *message = diagnostic ? diagnostic->message.data : "invalid JSON";
-		json_push_error_value(S, message, diagnostic);
+		const Com_Message *compiler_message = compiler->report.first;
+		const char *message = compiler_message ? compiler_message->text.data : "invalid JSON";
+		json_push_error_value(S, message, compiler_message);
 	}
-	elf_destroy_compile_report(&report);
+	elf_end_scratch(scratch);
 	return 1;
 }
 

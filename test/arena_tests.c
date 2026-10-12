@@ -132,6 +132,17 @@ static void test_scratch_regression(void)
 	expect_arena_u64(outer.arena->in_use, outer_start, "scratch outer regresses cursor");
 }
 
+static void test_scratch_exclusion(void)
+{
+	elf_Scratch first = elf_begin_scratch();
+	elf_Scratch second = elf_begin_scratch_excluding(first.arena);
+	if (first.arena == second.arena) {
+		test_fail("excluded scratch uses a distinct arena");
+	}
+	elf_end_scratch(second);
+	elf_end_scratch(first);
+}
+
 static void run_arena_tests(void)
 {
 	test_arena_push_and_reserve();
@@ -140,4 +151,5 @@ static void run_arena_tests(void)
 	test_arena_align();
 	test_arena_pushf();
 	test_scratch_regression();
+	test_scratch_exclusion();
 }

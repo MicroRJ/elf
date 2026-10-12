@@ -118,7 +118,7 @@ static void log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...
 {
 	va_list args;
 	va_start(args, fmt);
-	compiler_reportv(lexer->compiler, ELF_DIAGNOSTIC_ERROR, ELF_DIAGNOSTIC_PHASE_LEXER, site, fmt, args);
+	compiler_reportv(lexer->compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, fmt, args);
 	va_end(args);
 	lexer->failed = true;
 }
@@ -474,8 +474,9 @@ static Atom *lex_string_segment(Lexer *lexer, const char **cursor, SourceSite si
 	if (ended) *ended = false;
 
 	const char *cur = *cursor;
-	Atom *candidate = atom_table_begin(lexer->atoms, lexer_scratch_capacity(lexer));
-	char *out = candidate->data;
+	elf_Scratch scratch = elf_begin_scratch_excluding(lexer->compiler->arena);
+	char *text = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+	char *out = text;
 
 	for (;;)
 	{
@@ -535,7 +536,8 @@ static Atom *lex_string_segment(Lexer *lexer, const char **cursor, SourceSite si
 		}
 	}
 
-	Atom *atom = atom_table_end(lexer->atoms, candidate, (u32)(out - candidate->data));
+	Atom *atom = atom_from_data_size(lexer->atoms, text, (u32)(out - text));
+	elf_end_scratch(scratch);
 	*cursor = cur;
 	return atom;
 }

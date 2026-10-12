@@ -108,7 +108,7 @@ static AstType precedence_from_binary_ast_expr_type(AstType type)
 	}
 }
 
-// TODO(RJ): audit these and prob put use globally defined compiler diagnostics error codes or something instead!
+// TODO(RJ): audit these and use globally defined compiler message codes.
 typedef enum
 {
 	ERROR_NONE = 0,
@@ -134,7 +134,7 @@ typedef enum
 }
 Error;
 
-static void parser_report(Parser *parser, elf_DiagnosticSeverity severity, Error error, SourceSite site, const char *message)
+static void parser_report(Parser *parser, Com_Severity severity, Error error, SourceSite site, const char *message)
 {
 	(void)error;
 
@@ -143,7 +143,7 @@ static void parser_report(Parser *parser, elf_DiagnosticSeverity severity, Error
 	}
 
 	compiler_report(parser->compiler, severity, parser->phase, site, "%s", message);
-	if (severity == ELF_DIAGNOSTIC_ERROR)
+	if (severity == COMPILER_ERROR)
 	{
 		parser->failed = true;
 	}
@@ -151,7 +151,7 @@ static void parser_report(Parser *parser, elf_DiagnosticSeverity severity, Error
 
 static void parser_error(Parser *parser, Error error, SourceSite site, const char *message)
 {
-	parser_report(parser, ELF_DIAGNOSTIC_ERROR, error, site, message);
+	parser_report(parser, COMPILER_ERROR, error, site, message);
 }
 
 static void parser_errorf(Parser *parser, Error error, SourceSite site, const char *format, ...)
@@ -160,7 +160,7 @@ static void parser_errorf(Parser *parser, Error error, SourceSite site, const ch
 	if (!source_slice_is_valid(site)) site = parser->tok.site;
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(parser->compiler, ELF_DIAGNOSTIC_ERROR, parser->phase, site, format, args);
+	compiler_reportv(parser->compiler, COMPILER_ERROR, parser->phase, site, format, args);
 	va_end(args);
 	parser->failed = true;
 }
@@ -204,7 +204,7 @@ static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 	parser->arena = arena;
 	parser->ast = create_ast_context(arena);
 
-	parser->phase = ELF_DIAGNOSTIC_PHASE_PARSER;
+	parser->phase = COMPILER_PHASE_PARSER;
 	lexer_init(&parser->lexer, compiler, module);
 	parser->lexer.cursor = source_module->source.data;
 	parser->lexer.line_index = 1;
@@ -1435,7 +1435,7 @@ static int push_constexpr_value(Parser *parser, Ast ast)
 {
 	if (ast_is_error(ast) || parser_has_failed(parser)) return false;
 
-	parser->phase = ELF_DIAGNOSTIC_PHASE_EVALUATION;
+	parser->phase = COMPILER_PHASE_EVALUATION;
 	elf_Value value = {};
 	b32 ok = eval_constexpr_ast(parser, ast, &value);
 	if (!ok || parser_has_failed(parser)) return false;

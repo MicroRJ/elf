@@ -82,33 +82,12 @@ elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	return ELF_ERROR_NONE;
 }
 
-static void clear_compile_report(elf_CompileReport *report)
-{
-	if (report) *report = (elf_CompileReport) {};
-}
-
-void elf_destroy_compile_report(elf_CompileReport *report)
-{
-	if (!report) return;
-	elf_Diagnostic *diagnostics = (elf_Diagnostic *)report->diagnostics;
-	for (elf_Size i = 0; i < report->diagnostic_count; ++i) {
-		elf_free(0, diagnostics[i].source_name.data,
-			diagnostics[i].source_name.size + 1);
-		elf_free(0, diagnostics[i].message.data,
-			diagnostics[i].message.size + 1);
-	}
-	elf_free(0, diagnostics,
-		report->diagnostic_count * sizeof(*diagnostics));
-	*report = (elf_CompileReport) {};
-}
-
-elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report)
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	if (!name || !source.data) {
-		clear_compile_report(report);
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	BcFunctionRef function = elf_compile_source(state, name, source, report);
+	BcFunctionRef function = elf_compile_source(state, name, source);
 	if (!bc_function_ref_is_valid(function)) return ELF_ERROR_COMPILATION_FAILED;
 	ASSERT(bc_function_from_ref(function)->captures == 0);
 
@@ -118,25 +97,23 @@ elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSl
 	return ELF_ERROR_NONE;
 }
 
-elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report)
+elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
 {
 	if (!name || !source.data) {
-		clear_compile_report(report);
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	if (!elf_push_constant_expr_source(state, name, source, report)) {
+	if (!elf_push_constant_expr_source(state, name, source)) {
 		return ELF_ERROR_COMPILATION_FAILED;
 	}
 	return ELF_ERROR_NONE;
 }
 
-elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source, elf_CompileReport *report)
+elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
 {
 	if (!name || !source.data) {
-		clear_compile_report(report);
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	if (!elf_push_json_source(state, name, source, report)) {
+	if (!elf_push_json_source(state, name, source)) {
 		return ELF_ERROR_COMPILATION_FAILED;
 	}
 	return ELF_ERROR_NONE;

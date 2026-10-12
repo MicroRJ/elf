@@ -8,7 +8,6 @@ static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, co
 
 	LowerContext *ctx = elf_create_lower_context(compiler);
 	IrModule module = elf_lower_ast_file(ctx, file);
-	compiler_finish_report(compiler, 0);
 	if (module.functions != ctx->functions ||
 		module.function_count != ctx->num_functions ||
 		module.entry_index != 0)
@@ -414,7 +413,7 @@ static void test_ir_rejects_static_cycle(elf_State *state)
 	log_set_hook(ignore_expected_lowering_error, 0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: first\nret first");
 	log_set_hook(0, 0);
-	if (!ctx || ctx->compiler->error_count != 1) {
+	if (!ctx || ctx->compiler->report.error_count != 1) {
 		test_fail("static cycle reports one lowering error");
 	}
 	elf_arena_destroy(&arena);
@@ -426,7 +425,7 @@ static void test_ir_rejects_static_function_runtime_capture(elf_State *state)
 	log_set_hook(ignore_expected_lowering_error, 0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "outer := 1\n{\nf :: fun() { ret outer }\nret f\n}");
 	log_set_hook(0, 0);
-	if (!ctx || ctx->compiler->error_count != 1) {
+	if (!ctx || ctx->compiler->report.error_count != 1) {
 		test_fail("static function cannot capture a runtime local");
 	}
 	elf_arena_destroy(&arena);

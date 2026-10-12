@@ -44,7 +44,7 @@ struct Parser
 	Token               tok,tok_prev,tok_prox;
 	AstContext          ast;
 	// TODO(RJ): why are we storing this here!?
-	elf_DiagnosticPhase phase;
+	Com_Phase phase;
 	b32                 failed;
 };
 
