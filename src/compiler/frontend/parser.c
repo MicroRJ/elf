@@ -182,11 +182,6 @@ static void parser_invalid_table_entry(Parser *parser, SourceSite site)
 	parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-static b32 ast_is_missing_or_error(Ast ast)
-{
-	return !ast || ast_is_error(ast);
-}
-
 static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 {
 	ASSERT(compiler != 0);

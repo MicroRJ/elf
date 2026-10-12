@@ -290,3 +290,8 @@ static inline b32 ast_is_error(Ast ast)
 	return ast && ast->kind == AST_ERROR;
 }
 
+static b32 ast_is_missing_or_error(Ast ast)
+{
+	return !ast || ast_is_error(ast);
+}
+

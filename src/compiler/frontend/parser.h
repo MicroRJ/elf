@@ -18,7 +18,7 @@ Lexer_TokenFIFO;
 typedef struct
 {
 	Compiler         *compiler;
-	Com_ModuleId   module;
+	Com_ModuleId      module;
 	Atom_Table       *atoms;
 	SourceBuffer      source;
 

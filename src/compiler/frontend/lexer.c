@@ -98,8 +98,8 @@ static SourceSite source_site_from_ptr(Lexer *lexer, const char *data)
 	ASSERT(data <= lexer->end);
 	u64 offset = (u64)(data - lexer->source.data);
 	u64 line_offset = (u64)(lexer->line_start - lexer->source.data);
-	ASSERT(offset <= 0xffffffffu);
-	ASSERT(line_offset <= 0xffffffffu);
+	ASSERT(offset <= UINT32_MAX);
+	ASSERT(line_offset <= UINT32_MAX);
 	return (SourceSite) {
 		.module      = lexer->module,
 		.offset      = (u32) offset,
