@@ -631,8 +631,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				Ast part = parts[i];
 				if (!part || ((i & 1) == 0 && part->kind != AST_STRING_LITERAL))
 				{
-					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site,
-						"invalid interpolated string part at index %u", i);
+					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
 					ir = ERROR_IR;
 					break;
 				}
@@ -644,7 +643,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 					break;
 				}
 
-				ir = ir ? create_binary_ir(ctx, part->site, IR_ADD, ir, part_ir) : part_ir;
+				ir = ir ? ir_new_binary(ctx, part->site, IR_ADD, ir, part_ir) : part_ir;
 			}
 		}
 		break;
@@ -689,7 +688,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			Ir x_ir = lower_ast_expr_to_ir(ctx, x);
 			Ir y_ir = lower_ast_expr_to_ir(ctx, y);
 
-			ir = create_binary_ir(ctx, expr->site, IR_META_FIELD, x_ir, y_ir);
+			ir = ir_new_binary(ctx, expr->site, IR_META_FIELD, x_ir, y_ir);
 		}
 		break;
 
@@ -736,7 +735,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			Ir x_ir = lower_ast_expr_to_ir(ctx, x);
 			Ir y_ir = lower_ast_expr_to_ir(ctx, y);
 
-			ir = create_binary_ir(ctx, expr->site, IR_FIELD, x_ir, y_ir);
+			ir = ir_new_binary(ctx, expr->site, IR_FIELD, x_ir, y_ir);
 		}
 		break;
 
@@ -796,7 +795,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				if (key)
 				{
 					Ir ir_key = lower_ast_expr_to_ir(ctx, key);
-					Ir field = create_binary_ir(ctx, entry->site, IR_FIELD, table, ir_key);
+					Ir field = ir_new_binary(ctx, entry->site, IR_FIELD, table, ir_key);
 					push_ir(&table_items, create_store_ir(ctx, entry->site, field, ir_value));
 				}
 				else
@@ -822,7 +821,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 		{
 			Ir x = lower_ast_expr_to_ir(ctx, expr->binary.x);
 			Ir y = lower_ast_expr_to_ir(ctx, expr->binary.y);
-			ir = create_binary_ir(ctx, expr->site, IR_LESS_THAN_EQ, y, x);
+			ir = ir_new_binary(ctx, expr->site, IR_LESS_THAN_EQ, y, x);
 		}
 		break;
 
@@ -830,7 +829,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 		{
 			Ir x = lower_ast_expr_to_ir(ctx, expr->binary.x);
 			Ir y = lower_ast_expr_to_ir(ctx, expr->binary.y);
-			ir = create_binary_ir(ctx, expr->site, IR_LESS_THAN, y, x);
+			ir = ir_new_binary(ctx, expr->site, IR_LESS_THAN, y, x);
 		}
 		break;
 
@@ -857,7 +856,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			Ir x = lower_ast_expr_to_ir(ctx, expr->binary.x);
 			Ir y = lower_ast_expr_to_ir(ctx, expr->binary.y);
 			IrKind ir_kind = ir_kind_from_ast_kind(expr->kind);
-			ir = create_binary_ir(ctx, expr->site, ir_kind, x, y);
+			ir = ir_new_binary(ctx, expr->site, ir_kind, x, y);
 		}
 		break;
 		default:
@@ -982,7 +981,7 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IrFrame *items, Ast exp
 				key_load = create_load_local_ir(ctx, y->site, key_memory);
 			}
 
-			ir = create_binary_ir(ctx, expr->site, IR_FIELD, receiver_load, key_load);
+			ir = ir_new_binary(ctx, expr->site, IR_FIELD, receiver_load, key_load);
 		}
 		break;
 
@@ -1183,7 +1182,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 
 	Ir load_iterator_local = create_load_local_ir(ctx, first_name->site, iterator_local);
 	Ir load_range_end_local = create_load_local_ir(ctx, range_end_site, range_end_local);
-	Ir iterator_less_than_range_end = create_binary_ir(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
+	Ir iterator_less_than_range_end = ir_new_binary(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = create_jump_if_false_ir(ctx, range->site, iterator_less_than_range_end, break_label);
 
 	IrFrame loop_items = begin_ir_frame(ctx);
@@ -1197,7 +1196,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		if (i != 0)
 		{
 			Ir offset = create_int_ir(ctx, name->site, i);
-			value = create_binary_ir(ctx, name->site, IR_ADD, iterator_load, offset);
+			value = ir_new_binary(ctx, name->site, IR_ADD, iterator_load, offset);
 		}
 
 		if (collection_local)
@@ -1212,7 +1211,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 
 	Ir iterator_load_for_add = create_load_local_ir(ctx, first_name->site, iterator_local);
 	Ir stride = create_int_ir(ctx, first_name->site, nvars);
-	Ir next_value = create_binary_ir(ctx, first_name->site, IR_ADD, iterator_load_for_add, stride);
+	Ir next_value = ir_new_binary(ctx, first_name->site, IR_ADD, iterator_load_for_add, stride);
 	Ir iterator_dest = create_load_local_ir(ctx, first_name->site, iterator_local);
 	Ir increment = create_store_ir(ctx, first_name->site, iterator_dest, next_value);
 
@@ -1348,7 +1347,7 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, IrFrame *items, Ast sta
 
 	Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
 	Ir right_ir = lower_ast_expr_to_ir(ctx, expr_ast);
-	Ir value_ir = create_binary_ir(ctx, stat->site, op, dest_ir, right_ir);
+	Ir value_ir = ir_new_binary(ctx, stat->site, op, dest_ir, right_ir);
 	return create_store_ir(ctx, stat->site, dest_ir, value_ir);
 }
 
@@ -1571,7 +1570,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 
 				Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
 				Ir nil_ir = create_nil_ir(ctx, dest_ast->site);
-				Ir pred_ir = create_binary_ir(ctx, stat->site, IR_EQ, dest_ir, nil_ir);
+				Ir pred_ir = ir_new_binary(ctx, stat->site, IR_EQ, dest_ir, nil_ir);
 				Ir value_ir = lower_ast_expr_to_ir(ctx, expr_ast);
 				Ir store_ir = create_store_ir(ctx, stat->site, dest_ir, value_ir);
 

@@ -190,7 +190,7 @@ struct IrNode
 
 		struct
 		{
-			Ir expr;
+			Ir        expr;
 			IrArray locals;
 		}
 		ir_multi_local;
