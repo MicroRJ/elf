@@ -8,7 +8,7 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 {
 	elf_arena_push_text(arena, "{");
 
-	for (u32 i = 0; i < elf_array_length(table); ++ i)
+	for (u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
 	{
 		if (i != 0) {
 			elf_arena_push_text(arena, ", ");
@@ -31,7 +31,7 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 		if (key_count != 0) {
 			elf_arena_push_text(arena, " = ");
 		}
-		elf_print_value(arena, elf_array_get(0, table, i));
+		elf_print_value(arena, elf_deprecated_array_get(0, table, i));
 	}
 
 	elf_arena_push_text(arena, "}");
@@ -48,7 +48,7 @@ static elf_Value table_get_named_field(elf_Table *table, const char *name)
 		if (!value_is_string(key)) continue;
 		elf_String *string = value_as_string(key);
 		if (string_size(string) == name_size && memcmp(string_data(string), name, name_size) == 0) {
-			return elf_array_get(0, table, entry_index(entry));
+			return elf_deprecated_array_get(0, table, entry_index(entry));
 		}
 	}
 	return value_nil();
@@ -149,7 +149,7 @@ static void string_to_source(elf_Arena *arena, elf_String *string)
 static b32 table_slot_keys_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 slot, u32 indent, SourceTablePath *path, b32 *needs_separator, b32 *emitted_key)
 {
 	*emitted_key = false;
-	elf_Value value = elf_array_get(state, table, slot);
+	elf_Value value = elf_deprecated_array_get(state, table, slot);
 
 	for (u32 i = 0; i < table->nentries; ++ i)
 	{
@@ -182,9 +182,9 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	elf_arena_push_text(arena, "{");
 
 	b32 needs_separator = false;
-	for (u32 i = 0; i < elf_array_length(table); ++ i)
+	for (u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
 	{
-		elf_Value value = elf_array_get(state, table, i);
+		elf_Value value = elf_deprecated_array_get(state, table, i);
 		b32 emitted_key;
 		if (!table_slot_keys_to_source(state, arena, table, i, indent, &table_path, &needs_separator, &emitted_key)) return false;
 		if (emitted_key) {

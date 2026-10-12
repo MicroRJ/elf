@@ -52,13 +52,13 @@ b32 elf_table_delete(elf_State *state, elf_Table *tab, elf_Value key, elf_Value 
 void elf_table_clear(elf_State *state, elf_Table *tab);
 void elf_table_alias(elf_State *state, elf_Table *tab, elf_Value key, elf_Value alias);
 
-u32 elf_array_add(elf_State *state, elf_Table *tab, elf_Value value);
-u32 elf_array_insert(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
-elf_Value elf_array_get(elf_State *state, elf_Table *tab, u32 index);
-void elf_array_set(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
-void elf_array_remove(elf_State *state, elf_Table *tab, u32 index, u32 count);
-void elf_array_swap(elf_State *state, elf_Table *tab, u32 left, u32 right);
-u32 elf_array_length(elf_Table *tab);
+u32 elf_deprecated_array_add(elf_State *state, elf_Table *tab, elf_Value value);
+u32 elf_deprecated_array_insert(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
+elf_Value elf_deprecated_array_get(elf_State *state, elf_Table *tab, u32 index);
+void elf_deprecated_array_set(elf_State *state, elf_Table *tab, u32 index, elf_Value value);
+void elf_deprecated_array_remove(elf_State *state, elf_Table *tab, u32 index, u32 count);
+void elf_deprecated_array_swap(elf_State *state, elf_Table *tab, u32 left, u32 right);
+u32 elf_deprecated_array_length(elf_Table *tab);
 
 void elf_table_mark_field_readonly(elf_State *state, elf_Table *tab, elf_Value field);
 

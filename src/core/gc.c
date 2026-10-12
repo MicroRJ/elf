@@ -292,9 +292,9 @@ static u32 gc_mark_table(elf_State *state, elf_Table *table)
 			}
 		}
 	}
-	for(u32 i = 0; i < elf_array_length(table); ++ i)
+	for(u32 i = 0; i < elf_deprecated_array_length(table); ++ i)
 	{
-		elf_Value value = elf_array_get(state, table, i);
+		elf_Value value = elf_deprecated_array_get(state, table, i);
 		if (value_is_object(value))
 		{
 			marked_count += gc_mark_reachable(state, value_as_object(value));

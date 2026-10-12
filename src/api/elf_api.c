@@ -427,8 +427,8 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 		if (element > table->count) return ELF_ERROR_OUT_OF_RANGE;
 		if (table_is_readonly(table)) return ELF_ERROR_READONLY;
 		elf_Value value = pop_value(state);
-		if (element == table->count) elf_array_add(state, table, value);
-		else elf_array_set(state, table, element, value);
+		if (element == table->count) elf_deprecated_array_add(state, table, value);
+		else elf_deprecated_array_set(state, table, element, value);
 	}
 	else if (value_is_buffer(*target))
 	{
@@ -453,7 +453,7 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 	if (error != ELF_ERROR_NONE) return error;
 	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
 	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
-	elf_array_add(state, table, pop_value(state));
+	elf_deprecated_array_add(state, table, pop_value(state));
 	return ELF_ERROR_NONE;
 }
 

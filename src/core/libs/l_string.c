@@ -19,7 +19,7 @@ static void string_push(elf_State *state, const char *data, u32 size)
 static void string_array_add(elf_State *state, elf_Table *array, const char *data, u32 size)
 {
 	elf_String *string = elf_string_from_data_size(state, data, size);
-	elf_array_add(state, array, value_from_string(string));
+	elf_deprecated_array_add(state, array, value_from_string(string));
 }
 
 static const char *string_find_data(const char *text, u32 text_size,
@@ -475,12 +475,12 @@ ELF_FUNCTION(l_string_join)
 	elf_Value parts_value = load_value(S, 1);
 	check_value_type(S, parts_value, ELF_VALUE_TYPE_TABLE);
 	elf_Table *parts = value_as_table(parts_value);
-	u32 count = elf_array_length(parts);
+	u32 count = elf_deprecated_array_length(parts);
 	elf_Scratch scratch = elf_begin_scratch();
 
 	for (u32 i = 0; i < count; ++i)
 	{
-		elf_Value part_value = elf_array_get(S, parts, i);
+		elf_Value part_value = elf_deprecated_array_get(S, parts, i);
 		check_value_type(S, part_value, ELF_VALUE_TYPE_STRING);
 		elf_String *part = value_as_string(part_value);
 		if (i > 0) elf_arena_push_data(scratch.arena,

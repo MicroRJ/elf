@@ -18,9 +18,9 @@ static u32 core_mark_table_readonly(elf_State *state, elf_Table *table)
 		if (value_is_object(key)) count += core_mark_readonly(state, value_as_object(key));
 	}
 
-	for (u32 index = 0; index < elf_array_length(table); ++index)
+	for (u32 index = 0; index < elf_deprecated_array_length(table); ++index)
 	{
-		elf_Value value = elf_array_get(state, table, index);
+		elf_Value value = elf_deprecated_array_get(state, table, index);
 		if (value_is_object(value)) count += core_mark_readonly(state, value_as_object(value));
 	}
 
@@ -121,7 +121,7 @@ ELF_FUNCTION(l_core_error)
 		{
 			Entry entry = details->entries[i];
 			if (!entry_is_key(entry)) continue;
-			elf_table_set(S, info, entry_key_value(entry), elf_array_get(S, details, entry_index(entry)));
+			elf_table_set(S, info, entry_key_value(entry), elf_deprecated_array_get(S, details, entry_index(entry)));
 		}
 	}
 

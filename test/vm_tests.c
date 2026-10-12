@@ -113,7 +113,7 @@ static void test_vm_return_table(void)
 	if (!value_is_table(result.value)) {
 		test_fail("vm returns table value");
 	}
-	else if (elf_array_length(value_as_table(result.value)) != 2) {
+	else if (elf_deprecated_array_length(value_as_table(result.value)) != 2) {
 		test_fail("vm table literal stores field and array values");
 	}
 	elf_destroy_state(result.state);
@@ -470,7 +470,7 @@ static void test_vm_module_builder_grows_constant_arrays(void)
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
-	if (!value_is_table(state->stack_ptr[-1]) || elf_array_length(value_as_table(state->stack_ptr[-1])) != 160) {
+	if (!value_is_table(state->stack_ptr[-1]) || elf_deprecated_array_length(value_as_table(state->stack_ptr[-1])) != 160) {
 		test_fail("grown module constant arrays execute correctly");
 	}
 
@@ -480,7 +480,7 @@ static void test_vm_module_builder_grows_constant_arrays(void)
 static void test_vm_module_converts_atom_constants(void)
 {
 	elf_State *state = elf_create_state();
-	u32 global_count = elf_array_length(state->globals);
+	u32 global_count = elf_deprecated_array_length(state->globals);
 	char source_text[] = "ret {\"same\", \"same\", \"other\"}";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
 	if (elf_push_code_source(state, "module-strings", source) != ELF_ERROR_NONE) {
@@ -495,7 +495,7 @@ static void test_vm_module_converts_atom_constants(void)
 	{
 		test_fail("module converts deduplicated atom constants to strings");
 	}
-	if (elf_array_length(state->globals) != global_count) {
+	if (elf_deprecated_array_length(state->globals) != global_count) {
 		test_fail("string constants do not consume global slots");
 	}
 
@@ -507,9 +507,9 @@ static void test_vm_module_converts_atom_constants(void)
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Table *result = value_as_table(state->stack_ptr[-1]);
-	if (elf_array_length(result) != 3 || !strings_equal(value_as_string(elf_array_get(state, result, 0)), module->strings[0]) ||
-		!strings_equal(value_as_string(elf_array_get(state, result, 1)), module->strings[0]) ||
-		!strings_equal(value_as_string(elf_array_get(state, result, 2)), module->strings[1]))
+	if (elf_deprecated_array_length(result) != 3 || !strings_equal(value_as_string(elf_deprecated_array_get(state, result, 0)), module->strings[0]) ||
+		!strings_equal(value_as_string(elf_deprecated_array_get(state, result, 1)), module->strings[0]) ||
+		!strings_equal(value_as_string(elf_deprecated_array_get(state, result, 2)), module->strings[1]))
 	{
 		test_fail("VM loads string constants from their module");
 	}

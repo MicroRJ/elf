@@ -35,7 +35,7 @@ static inline b32 value_length(elf_Value value, u32 *length)
 	}
 	else if (value_is_table(value))
 	{
-		*length = elf_array_length(value_as_table(value));
+		*length = elf_deprecated_array_length(value_as_table(value));
 	}
 	else if (value_is_string(value))
 	{

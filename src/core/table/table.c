@@ -321,12 +321,12 @@ u32 elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value v
 	return index;
 }
 
-u32 elf_array_length(elf_Table *table)
+u32 elf_deprecated_array_length(elf_Table *table)
 {
 	return table->count;
 }
 
-u32 elf_array_add(elf_State *state, elf_Table *table, elf_Value value)
+u32 elf_deprecated_array_add(elf_State *state, elf_Table *table, elf_Value value)
 {
 	check_write(state, (elf_Object *)table);
 
@@ -336,19 +336,19 @@ u32 elf_array_add(elf_State *state, elf_Table *table, elf_Value value)
 	return index;
 }
 
-elf_Value elf_array_get(elf_State *state, elf_Table *table, u32 index)
+elf_Value elf_deprecated_array_get(elf_State *state, elf_Table *table, u32 index)
 {
 	return *table_array_slot(state, table, index);
 }
 
-void elf_array_set(elf_State *state, elf_Table *table, u32 index, elf_Value value)
+void elf_deprecated_array_set(elf_State *state, elf_Table *table, u32 index, elf_Value value)
 {
 	check_write(state, (elf_Object *)table);
 
 	*table_array_slot(state, table, index) = value;
 }
 
-void elf_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
+void elf_deprecated_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
 {
 	check_write(state, (elf_Object *)table);
 
@@ -371,7 +371,7 @@ void elf_array_remove(elf_State *state, elf_Table *table, u32 index, u32 count)
 	table_array_remove_unchecked(table, index, count);
 }
 
-u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value value)
+u32 elf_deprecated_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value value)
 {
 	check_write(state, (elf_Object *)table);
 	if (index > table->count) {
@@ -393,7 +393,7 @@ u32 elf_array_insert(elf_State *state, elf_Table *table, u32 index, elf_Value va
 	return index;
 }
 
-void elf_array_swap(elf_State *state, elf_Table *table, u32 left, u32 right)
+void elf_deprecated_array_swap(elf_State *state, elf_Table *table, u32 left, u32 right)
 {
 	check_write(state, (elf_Object *)table);
 	value_swap(table_array_slot(state, table, left), table_array_slot(state, table, right));

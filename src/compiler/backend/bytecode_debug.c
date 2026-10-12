@@ -30,13 +30,13 @@ static void format_value_shallow(elf_Arena *arena, elf_Value value)
 
 static void format_global_value(elf_State *state, elf_Arena *arena, u32 index)
 {
-	if (index >= elf_array_length(state->globals))
+	if (index >= elf_deprecated_array_length(state->globals))
 	{
 		elf_arena_push_text(arena, "<bad-global>");
 		return;
 	}
 
-	format_value_shallow(arena, elf_array_get(state, state->globals, index));
+	format_value_shallow(arena, elf_deprecated_array_get(state, state->globals, index));
 }
 
 static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Arena *arena, u32 index, Bytecode byte)

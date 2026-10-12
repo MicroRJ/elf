@@ -30,7 +30,7 @@ static void test_gc_tracks_owned_storage(void)
 	}
 
 	u64 before_array = state->gc_live_bytes;
-	elf_array_add(state, table, test_value_int(1));
+	elf_deprecated_array_add(state, table, test_value_int(1));
 	u64 array_bytes = (u64)table->capacity * sizeof(*table->array);
 	if (state->gc_live_bytes - before_array != array_bytes) {
 		test_fail("GC bytes include table array storage");
@@ -94,7 +94,7 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 		child_value = value_from_table(child);
 
 		elf_table_set(state, child, value_key, test_value_int(1000 + i));
-		elf_array_add(state, root, child_value);
+		elf_deprecated_array_add(state, root, child_value);
 		elf_table_set(state, root, test_key_int(i), child_value);
 	}
 
@@ -111,7 +111,7 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 		expect_int(elf_table_get_or_nil(state, child, value_key), 1000 + i, "GC preserves rooted child table contents");
 	}
 
-	elf_Value first_child = elf_array_get(state, root, 0);
+	elf_Value first_child = elf_deprecated_array_get(state, root, 0);
 	elf_table_set(state, root, child_key, first_child);
 	expect_table_value(elf_table_get_or_nil(state, root, child_key), "GC preserves rooted table field references");
 
@@ -128,8 +128,8 @@ static void test_gc_keeps_referenced_table_graph(void)
 	elf_Table *root = push_new_table(state);
 	elf_Table *child = push_new_table(state);
 
-	elf_array_add(state, child, test_value_int(42));
-	elf_array_add(state, root, value_from_table(child));
+	elf_deprecated_array_add(state, child, test_value_int(42));
+	elf_deprecated_array_add(state, root, value_from_table(child));
 	elf_Ref reference = elf_create_ref(state, -2);
 	elf_set_top(state, stack_checkpoint);
 
@@ -140,9 +140,9 @@ static void test_gc_keeps_referenced_table_graph(void)
 		return;
 	}
 	root = value_as_table(state->stack_ptr[-1]);
-	elf_Value child_value = elf_array_get(state, root, 0);
+	elf_Value child_value = elf_deprecated_array_get(state, root, 0);
 	expect_table_value(child_value, "table reference preserves child table");
-	expect_int(elf_array_get(state, value_as_table(child_value), 0), 42,
+	expect_int(elf_deprecated_array_get(state, value_as_table(child_value), 0), 42,
 		"table reference preserves child contents");
 
 	elf_pop(state, 1);

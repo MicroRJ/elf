@@ -321,11 +321,11 @@ activate_frame:
 			} break;
 
 			case BC_GETGLOBAL: {
-				value_copy(vm_slot(reference, byte.b_x), elf_array_get(state, globals, byte.b_y));
+				value_copy(vm_slot(reference, byte.b_x), elf_deprecated_array_get(state, globals, byte.b_y));
 			} break;
 
 			case BC_SETGLOBAL: {
-				elf_array_set(state, globals, byte.b_x, *vm_slot(reference, byte.b_y));
+				elf_deprecated_array_set(state, globals, byte.b_x, *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_TABLE: {
@@ -404,8 +404,8 @@ activate_frame:
 
 				if (value_is_table(object)) {
 					elf_Table *table = value_as_table(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_array_length(table));
-					value_copy(result, elf_array_get(state, table, index));
+					u32 index = vm_check_index(state, byte_index, index_value, elf_deprecated_array_length(table));
+					value_copy(result, elf_deprecated_array_get(state, table, index));
 				}
 				else if (value_is_string(object)) {
 					elf_String *string = value_as_string(object);
@@ -430,8 +430,8 @@ activate_frame:
 				if (value_is_table(object))
 				{
 					elf_Table *array = value_as_table(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_array_length(array));
-					elf_array_set(state, array, index, assigned);
+					u32 index = vm_check_index(state, byte_index, index_value, elf_deprecated_array_length(array));
+					elf_deprecated_array_set(state, array, index, assigned);
 				}
 				else if (value_is_buffer(object))
 				{
@@ -457,7 +457,7 @@ activate_frame:
 			case BC_ARRAYADD: {
 				elf_Value array = *vm_slot(reference, byte.b_x);
 				check_value_type(state, array, ELF_VALUE_TYPE_TABLE);
-				elf_array_add(state, value_as_table(array), *vm_slot(reference, byte.b_y));
+				elf_deprecated_array_add(state, value_as_table(array), *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_GETLENGTH: {

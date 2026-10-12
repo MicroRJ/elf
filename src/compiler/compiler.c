@@ -416,7 +416,7 @@ static b32 compiler_eval_constexpr_ast(Compiler *compiler, Ast ast, elf_Value *o
 				}
 				else
 				{
-					elf_array_add(compiler->state, table, value);
+					elf_deprecated_array_add(compiler->state, table, value);
 				}
 			}
 

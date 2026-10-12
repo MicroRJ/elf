@@ -147,7 +147,7 @@ static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
 	}
 	writer->ancestors[depth] = table;
 
-	u32 count = elf_array_length(table);
+	u32 count = elf_deprecated_array_length(table);
 	u32 keyed_values = 0;
 	for (u32 i = 0; i < count; ++i)
 	{

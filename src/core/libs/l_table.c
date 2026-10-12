@@ -136,7 +136,7 @@ static b32 table_values_map_equal(Table_Map_Equal_Context *context, elf_Value le
 
 ELF_FUNCTION(l_table_length)
 {
-	push_value(S, value_from_integer(elf_array_length(table_receiver(S))));
+	push_value(S, value_from_integer(elf_deprecated_array_length(table_receiver(S))));
 	return 1;
 }
 
@@ -189,7 +189,7 @@ ELF_FUNCTION(l_table_keys)
 		for (u32 slot = 0; slot < table->nentries; ++slot) {
 			Entry entry = table->entries[slot];
 			if (entry_is_key(entry) && entry_index(entry) == value_index) {
-				elf_array_add(S, result, entry_key_value(entry));
+				elf_deprecated_array_add(S, result, entry_key_value(entry));
 			}
 		}
 	}
@@ -201,7 +201,7 @@ ELF_FUNCTION(l_table_values)
 	elf_Table *table = table_receiver(S);
 	elf_Table *result = push_new_table(S);
 	for (u32 i = 0; i < table->count; ++i) {
-		elf_array_add(S, result, table->array[i]);
+		elf_deprecated_array_add(S, result, table->array[i]);
 	}
 	return 1;
 }
@@ -217,9 +217,9 @@ ELF_FUNCTION(l_table_pairs)
 			Entry entry = table->entries[slot];
 			if (!entry_is_key(entry) || entry_index(entry) != value_index) continue;
 			elf_Table *pair = elf_new_table_rogue(S);
-			elf_array_add(S, pair, entry_key_value(entry));
-			elf_array_add(S, pair, table->array[value_index]);
-			elf_array_add(S, result, value_from_table(pair));
+			elf_deprecated_array_add(S, pair, entry_key_value(entry));
+			elf_deprecated_array_add(S, pair, table->array[value_index]);
+			elf_deprecated_array_add(S, result, value_from_table(pair));
 		}
 	}
 	return 1;
@@ -229,7 +229,7 @@ static elf_Table *table_clone(elf_State *state, elf_Table *source)
 {
 	elf_Table *result = elf_new_table_rogue(state);
 	for (u32 i = 0; i < source->count; ++i) {
-		elf_array_add(state, result, source->array[i]);
+		elf_deprecated_array_add(state, result, source->array[i]);
 	}
 	for (u32 i = 0; i < source->nentries; ++i) {
 		Entry entry = source->entries[i];
@@ -270,7 +270,7 @@ ELF_FUNCTION(l_array_get)
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
 	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &index)) return 0;
-	push_value(S, elf_array_get(S, table, index));
+	push_value(S, elf_deprecated_array_get(S, table, index));
 	return 1;
 }
 
@@ -279,7 +279,7 @@ ELF_FUNCTION(l_array_set)
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
 	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &index)) return 0;
-	elf_array_set(S, table, index, load_value(S, 2));
+	elf_deprecated_array_set(S, table, index, load_value(S, 2));
 	push_table(S, table);
 	return 1;
 }
@@ -289,7 +289,7 @@ ELF_FUNCTION(l_array_add)
 	elf_Table *table = table_receiver(S);
 	u32 first = table->count;
 	for (int arg = 1; arg < nargs; ++arg) {
-		elf_array_add(S, table, load_value(S, arg));
+		elf_deprecated_array_add(S, table, load_value(S, arg));
 	}
 	push_value(S, value_from_integer(first));
 	return 1;
@@ -300,7 +300,7 @@ ELF_FUNCTION(l_array_insert)
 	elf_Table *table = table_receiver(S);
 	u32 index = 0;
 	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, true, &index)) return 0;
-	elf_array_insert(S, table, index, load_value(S, 2));
+	elf_deprecated_array_insert(S, table, index, load_value(S, 2));
 	push_table(S, table);
 	return 1;
 }
@@ -313,7 +313,7 @@ ELF_FUNCTION(l_array_pop)
 		return 1;
 	}
 	elf_Value value = table->array[table->count - 1];
-	elf_array_remove(S, table, table->count - 1, 1);
+	elf_deprecated_array_remove(S, table, table->count - 1, 1);
 	push_value(S, value);
 	return 1;
 }
@@ -334,7 +334,7 @@ ELF_FUNCTION(l_array_remove)
 		count = (u32)requested;
 	}
 	elf_Value first = table->array[index];
-	elf_array_remove(S, table, index, count);
+	elf_deprecated_array_remove(S, table, index, count);
 	push_value(S, first);
 	return 1;
 }
@@ -352,7 +352,7 @@ ELF_FUNCTION(l_array_slice)
 		return 0;
 	}
 	elf_Table *result = push_new_table(S);
-	for (u32 i = first; i < end; ++i) elf_array_add(S, result, table->array[i]);
+	for (u32 i = first; i < end; ++i) elf_deprecated_array_add(S, result, table->array[i]);
 	return 1;
 }
 
@@ -365,7 +365,7 @@ ELF_FUNCTION(l_array_extend)
 		check_value_type(S, source_value, ELF_VALUE_TYPE_TABLE);
 		elf_Table *source = value_as_table(source_value);
 		u32 count = source->count;
-		for (u32 i = 0; i < count; ++i) elf_array_add(S, table, source->array[i]);
+		for (u32 i = 0; i < count; ++i) elf_deprecated_array_add(S, table, source->array[i]);
 	}
 	push_table(S, table);
 	return 1;
@@ -378,7 +378,7 @@ ELF_FUNCTION(l_array_swap)
 	u32 right = 0;
 	if (!table_normalize_index(S, lib_load_integer(S, 1), table->count, false, &left)) return 0;
 	if (!table_normalize_index(S, lib_load_integer(S, 2), table->count, false, &right)) return 0;
-	elf_array_swap(S, table, left, right);
+	elf_deprecated_array_swap(S, table, left, right);
 	push_table(S, table);
 	return 1;
 }
@@ -387,7 +387,7 @@ ELF_FUNCTION(l_array_reverse)
 {
 	elf_Table *table = table_receiver(S);
 	for (u32 i = 0; i < table->count / 2; ++i) {
-		elf_array_swap(S, table, i, table->count - i - 1);
+		elf_deprecated_array_swap(S, table, i, table->count - i - 1);
 	}
 	push_table(S, table);
 	return 1;
@@ -401,7 +401,7 @@ ELF_FUNCTION(l_array_map)
 	elf_Table *result = push_new_table(S);
 	for (u32 i = 0; i < table->count; ++i) {
 		elf_Value mapped = table_call(S, function, table, table->array[i], value_from_integer(i), true);
-		elf_array_add(S, result, mapped);
+		elf_deprecated_array_add(S, result, mapped);
 	}
 	return 1;
 }
@@ -415,7 +415,7 @@ ELF_FUNCTION(l_array_filter)
 	for (u32 i = 0; i < table->count; ++i) {
 		elf_Value keep = table_call(S, function, table, table->array[i], value_from_integer(i), true);
 		check_value_type(S, keep, ELF_VALUE_TYPE_INTEGER);
-		if (value_as_integer(keep)) elf_array_add(S, result, table->array[i]);
+		if (value_as_integer(keep)) elf_deprecated_array_add(S, result, table->array[i]);
 	}
 	return 1;
 }
@@ -437,8 +437,8 @@ static void table_quicksort(elf_State *state, elf_Value function, elf_Table *tab
 		u32 i = first + 1;
 		while (i <= upper) {
 			i64 order = table_compare(state, function, table, table->array[i], pivot);
-			if (order < 0) elf_array_swap(state, table, i++, lower++);
-			else if (order > 0) elf_array_swap(state, table, i, upper--);
+			if (order < 0) elf_deprecated_array_swap(state, table, i++, lower++);
+			else if (order > 0) elf_deprecated_array_swap(state, table, i, upper--);
 			else ++i;
 		}
 		if (lower - first < end - i) {

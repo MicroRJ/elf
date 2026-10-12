@@ -52,7 +52,7 @@ static void test_constexpr_table_literal(elf_State *state)
 
 	json_expect_int(elf_table_get_or_nil(state, table, json_test_string_key(state, "answer")), 42, "constant expression string field");
 	json_expect_int(elf_table_get_or_nil(state, table, value_from_integer(7)), 8, "constant expression integer field");
-	json_expect_int(elf_array_get(state, table, 2), 9, "constant expression array value");
+	json_expect_int(elf_deprecated_array_get(state, table, 2), 9, "constant expression array value");
 
 	if ((u32)(state->stack_ptr - state->stack) != stack_index)
 	{
@@ -107,10 +107,10 @@ static void test_json_to_table_value(elf_State *state)
 		{
 			test_fail("JSON array preserves its shape");
 		}
-		json_expect_int(elf_array_get(state, items, 0), 1, "json array first");
-		json_expect_int(elf_array_get(state, items, 1), 2, "json array second");
+		json_expect_int(elf_deprecated_array_get(state, items, 0), 1, "json array first");
+		json_expect_int(elf_deprecated_array_get(state, items, 1), 2, "json array second");
 
-		elf_Table *nested = json_expect_table(elf_array_get(state, items, 2), "json nested object");
+		elf_Table *nested = json_expect_table(elf_deprecated_array_get(state, items, 2), "json nested object");
 		if (nested)
 		{
 			json_expect_string(elf_table_get_or_nil(state, nested, json_test_string_key(state, "nested")), "yes", "json nested field");

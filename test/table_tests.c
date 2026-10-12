@@ -95,21 +95,21 @@ static void test_table_array_operations(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
 
-	u32 a = elf_array_add(state, table, test_value_int(7));
-	u32 b = elf_array_add(state, table, test_value_int(8));
-	u32 c = elf_array_add(state, table, test_value_int(9));
+	u32 a = elf_deprecated_array_add(state, table, test_value_int(7));
+	u32 b = elf_deprecated_array_add(state, table, test_value_int(8));
+	u32 c = elf_deprecated_array_add(state, table, test_value_int(9));
 
 	expect_index(a, 0, "first array add u32");
 	expect_index(b, 1, "second array add u32");
 	expect_index(c, 2, "third array add u32");
-	expect_index(elf_array_length(table), 3, "array length after adds");
+	expect_index(elf_deprecated_array_length(table), 3, "array length after adds");
 
-	expect_int(elf_array_get(state, table, 0), 7, "array get 0");
-	expect_int(elf_array_get(state, table, 1), 8, "array get 1");
-	expect_int(elf_array_get(state, table, 2), 9, "array get 2");
+	expect_int(elf_deprecated_array_get(state, table, 0), 7, "array get 0");
+	expect_int(elf_deprecated_array_get(state, table, 1), 8, "array get 1");
+	expect_int(elf_deprecated_array_get(state, table, 2), 9, "array get 2");
 
-	elf_array_set(state, table, 1, test_value_int(80));
-	expect_int(elf_array_get(state, table, 1), 80, "array set");
+	elf_deprecated_array_set(state, table, 1, test_value_int(80));
+	expect_int(elf_deprecated_array_get(state, table, 1), 80, "array set");
 }
 
 static void test_table_field_and_array_share_storage(elf_State *state)
@@ -117,26 +117,26 @@ static void test_table_field_and_array_share_storage(elf_State *state)
 	elf_Table *table = push_new_table(state);
 
 	u32 field_slot = elf_table_set(state, table, test_key_string(state, "field"), test_value_int(1));
-	u32 array_slot = elf_array_add(state, table, test_value_int(2));
+	u32 array_slot = elf_deprecated_array_add(state, table, test_value_int(2));
 
 	expect_index(field_slot, 0, "field storage starts at slot 0");
 	expect_index(array_slot, 1, "array append follows field storage");
-	expect_index(elf_array_length(table), 2, "array length reflects shared storage");
-	expect_int(elf_array_get(state, table, field_slot), 1, "field elf_Value lives in storage elf_Value *");
-	expect_int(elf_array_get(state, table, array_slot), 2, "array elf_Value lives in storage elf_Value *");
+	expect_index(elf_deprecated_array_length(table), 2, "array length reflects shared storage");
+	expect_int(elf_deprecated_array_get(state, table, field_slot), 1, "field elf_Value lives in storage elf_Value *");
+	expect_int(elf_deprecated_array_get(state, table, array_slot), 2, "array elf_Value lives in storage elf_Value *");
 }
 
 static void test_table_bind_to_index(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
 
-	u32 slot = elf_array_add(state, table, test_value_int(123));
+	u32 slot = elf_deprecated_array_add(state, table, test_value_int(123));
 	u32 bound = elf_table_bind_to_index(state, table, test_key_string(state, "bound"), slot);
 
 	expect_index(bound, slot, "bind returns requested slot");
 	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "bound")), 123, "bound key resolves to slot elf_Value");
 
-	elf_array_set(state, table, slot, test_value_int(321));
+	elf_deprecated_array_set(state, table, slot, test_value_int(321));
 	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "bound")), 321, "bound key tracks slot mutation");
 }
 
