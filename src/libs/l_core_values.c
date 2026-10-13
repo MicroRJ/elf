@@ -29,11 +29,11 @@ static u32 core_mark_table_readonly(elf_State *state, elf_Table *table)
 	for (u32 index = 0; index < table->capacity; ++index)
 	{
 		Entry entry = table->entries[index];
-		if (!entry_is_key(entry))
+		if (!elf_table_entry_is_key(entry))
 		{
 			continue;
 		}
-		elf_Value key = entry_key_value(entry);
+		elf_Value key = elf_table_entry_key(entry);
 		if (value_is_object(key))
 		{
 			count += core_mark_readonly(state, value_as_object(key));
@@ -144,11 +144,11 @@ ELF_FUNCTION(l_core_error)
 		for (u32 i = 0; i < details->capacity; ++i)
 		{
 			Entry entry = details->entries[i];
-			if (!entry_is_key(entry))
+			if (!elf_table_entry_is_key(entry))
 			{
 				continue;
 			}
-			elf_table_set(S, info, entry_key_value(entry), entry.value);
+			elf_table_set(S, info, elf_table_entry_key(entry), entry.value);
 		}
 	}
 

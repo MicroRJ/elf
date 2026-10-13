@@ -112,7 +112,7 @@ static void test_gc_keeps_stack_rooted_array_graph(void)
 	else
 	{
 		elf_Value string_value = elf_array_get(state, value_as_array(child_value), 0);
-		if (!value_is_string(string_value) || string_size(value_as_string(string_value)) != 11 || memcmp(string_data(value_as_string(string_value)), "array child", 11) != 0)
+		if (!value_is_string(string_value) || elf_string_size(value_as_string(string_value)) != 11 || memcmp(elf_string_data(value_as_string(string_value)), "array child", 11) != 0)
 		{
 			test_fail("GC preserves rooted array contents");
 		}

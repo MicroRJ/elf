@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#include "value_text.h"
+#include "elf_value_text.h"
 
 static void table_to_text(elf_Arena *arena, elf_Table *table)
 {
@@ -11,13 +11,13 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
 			if (emitted++)
 			{
 				elf_arena_push_text(arena, ", ");
 			}
-			elf_print_value(arena, entry_key_value(entry));
+			elf_print_value(arena, elf_table_entry_key(entry));
 			elf_arena_push_text(arena, " = ");
 			elf_print_value(arena, entry.value);
 		}
@@ -45,17 +45,17 @@ static elf_Value table_get_named_field(elf_Table *table, const char *name)
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (!entry_is_key(entry))
+		if (!elf_table_entry_is_key(entry))
 		{
 			continue;
 		}
-		elf_Value key = entry_key_value(entry);
+		elf_Value key = elf_table_entry_key(entry);
 		if (!value_is_string(key))
 		{
 			continue;
 		}
 		elf_String *string = value_as_string(key);
-		if (string_size(string) == name_size && memcmp(string_data(string), name, name_size) == 0) {
+		if (elf_string_size(string) == name_size && memcmp(elf_string_data(string), name, name_size) == 0) {
 			return entry.value;
 		}
 	}
@@ -66,7 +66,7 @@ static void error_to_text(elf_Arena *arena, elf_Table *info)
 {
 	elf_Value message = table_get_named_field(info, "message");
 	if (value_is_string(message)) {
-		elf_arena_push_data(arena, string_data(value_as_string(message)), string_size(value_as_string(message)));
+		elf_arena_push_data(arena, elf_string_data(value_as_string(message)), elf_string_size(value_as_string(message)));
 	}
 	else {
 		elf_arena_push_text(arena, "error");
@@ -80,7 +80,7 @@ void elf_print_value(elf_Arena *arena, elf_Value value)
 		case ELF_VALUE_TYPE_NIL:       elf_arena_push_text(arena, "nil"); break;
 		case ELF_VALUE_TYPE_INTEGER:   elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
 		case ELF_VALUE_TYPE_NUMBER:    elf_arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_STRING:    elf_arena_push_data(arena, value.x_string->data, string_size(value.x_string)); break;
+		case ELF_VALUE_TYPE_STRING:    elf_arena_push_data(arena, value.x_string->data, elf_string_size(value.x_string)); break;
 		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "C()"); break;
 		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "F()"); break;
 		case ELF_VALUE_TYPE_TABLE:     table_to_text(arena, value_as_table(value)); break;
@@ -140,7 +140,7 @@ static void string_to_source(elf_Arena *arena, elf_String *string)
 	elf_arena_push_char(arena, '"');
 
 	const char *data = string->data;
-	for (u32 i = 0; i < string_size(string); ++ i)
+	for (u32 i = 0; i < elf_string_size(string); ++ i)
 	{
 		switch (data[i])
 		{
@@ -181,11 +181,11 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
 			elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
 			source_indent(arena, indent + 1);
-			if (!unparse_value(state, arena, entry_key_value(entry), indent + 1, &table_path))
+			if (!unparse_value(state, arena, elf_table_entry_key(entry), indent + 1, &table_path))
 			{
 				return false;
 			}

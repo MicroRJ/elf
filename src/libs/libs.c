@@ -10,8 +10,8 @@
 #include <dy.h>
 
 #include "elf.h"
-#include "core.h"
-#include "helpers.h"
+#include "elf_core.h"
+#include "elf_helpers.h"
 #include "compiler.h"
 #include "lib_helpers.h"
 #include "libs.h"

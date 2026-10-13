@@ -4,8 +4,8 @@
 #include "elf.h"
 
 #include "base.h"
-#include "core.h"
-#include "helpers.h"
+#include "elf_core.h"
+#include "elf_helpers.h"
 #include "atom.h"
 #include "compiler.h"
 #include "token.h"
@@ -14,8 +14,7 @@
 #include "ir.h"
 #include "lower.h"
 #include "bytecode_debug.h"
-#include "table.h"
-#include "value_text.h"
+#include "elf_value_text.h"
 
 // Compiler sources included by the unity tests.
 #include "logging.c"

@@ -30,7 +30,7 @@ static void test_string_size_limited_interning(elf_State *state)
 
 	expect_same_string(first, second, "size-limited string matches exact text");
 	expect_same_string(first, third, "size-limited string ignores trailing data");
-	if (string_size(first) != 3 || first->obj.size != ELF_STRING_HEADER_SIZE + 4) {
+	if (elf_string_size(first) != 3 || first->obj.size != ELF_STRING_HEADER_SIZE + 4) {
 		test_fail("string length derives from object allocation size");
 	}
 }

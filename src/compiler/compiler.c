@@ -12,8 +12,8 @@
 
 #include "elf.h"
 #include "base.h"
-#include "core.h"
-#include "helpers.h"
+#include "elf_core.h"
+#include "elf_helpers.h"
 #include "atom.h"
 #include "compiler.h"
 #include "token.h"

@@ -22,21 +22,21 @@
 
 #include "logging.c"
 
-#include "core.h"
-#include "helpers.h"
+#include "elf_core.h"
+#include "elf_helpers.h"
 #include "source_diagnostics.c"
 #include "core_diagnostics.c"
 
-#include "memory.c"
-#include "globals.c"
-#include "string/elf_string.c"
-#include "buffer/elf_buffer.c"
-#include "user/elf_user_object.c"
-#include "array/array.c"
-#include "table/table.c"
+#include "elf_memory.c"
+#include "elf_globals.c"
+#include "elf_string.c"
+#include "elf_buffer.c"
+#include "elf_user_object.c"
+#include "elf_array.c"
+#include "elf_table.c"
 
-#include "gc.c"
-#include "value_text.c"
+#include "elf_gc.c"
+#include "elf_value_text.c"
 
 #include "compiler.h"
 #include "../libs/lib_helpers.h"
@@ -169,4 +169,4 @@ void elf_destroy_state(elf_State *state)
 	}
 }
 
-#include "vm.c"
+#include "elf_vm.c"

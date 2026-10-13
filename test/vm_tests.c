@@ -393,8 +393,8 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	}
 
 	force_gc_allocations(state, 256);
-	if (!first_module->source_name || strcmp(string_data(first_module->source_name), "first") != 0 ||
-		!second_module->source_name || strcmp(string_data(second_module->source_name), "second") != 0)
+	if (!first_module->source_name || strcmp(elf_string_data(first_module->source_name), "first") != 0 ||
+		!second_module->source_name || strcmp(elf_string_data(second_module->source_name), "second") != 0)
 	{
 		test_fail("compiled module source names survive GC");
 	}
@@ -521,8 +521,8 @@ static void test_vm_module_converts_atom_constants(void)
 	}
 
 	elf_Module *module = value_as_closure(state->stack_ptr[-1])->function.module;
-	if (module->string_count != 2 || strcmp(string_data(module->strings[0]), "same") != 0 ||
-		strcmp(string_data(module->strings[1]), "other") != 0)
+	if (module->string_count != 2 || strcmp(elf_string_data(module->strings[0]), "same") != 0 ||
+		strcmp(elf_string_data(module->strings[1]), "other") != 0)
 	{
 		test_fail("module converts deduplicated atom constants to strings");
 	}
@@ -531,14 +531,14 @@ static void test_vm_module_converts_atom_constants(void)
 	}
 
 	force_gc_allocations(state, 256);
-	if (strcmp(string_data(module->strings[0]), "same") != 0 || strcmp(string_data(module->strings[1]), "other") != 0) {
+	if (strcmp(elf_string_data(module->strings[0]), "same") != 0 || strcmp(elf_string_data(module->strings[1]), "other") != 0) {
 		test_fail("module string constants survive GC");
 	}
 
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Array *result = value_as_array(state->stack_ptr[-1]);
-	if (elf_array_length(result) != 3 || !strings_equal(value_as_string(elf_array_get(state, result, 0)), module->strings[0]) || !strings_equal(value_as_string(elf_array_get(state, result, 1)), module->strings[0]) || !strings_equal(value_as_string(elf_array_get(state, result, 2)), module->strings[1]))
+	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), module->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), module->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), module->strings[1]))
 	{
 		test_fail("VM loads string constants from their module");
 	}

@@ -4,5 +4,5 @@
 
 #include "elf.h"
 #include "base.h"
-#include "core.h"
+#include "elf_core.h"
 

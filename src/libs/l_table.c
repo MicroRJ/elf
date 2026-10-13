@@ -49,9 +49,9 @@ ELF_FUNCTION(l_table_clone)
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
-			elf_table_set(S, result, entry_key_value(entry), entry.value);
+			elf_table_set(S, result, elf_table_entry_key(entry), entry.value);
 		}
 	}
 	return 1;
@@ -65,9 +65,9 @@ ELF_FUNCTION(l_table_keys)
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
-			elf_array_add(S, result, entry_key_value(entry));
+			elf_array_add(S, result, elf_table_entry_key(entry));
 		}
 	}
 	return 1;

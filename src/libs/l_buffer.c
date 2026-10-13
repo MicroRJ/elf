@@ -103,8 +103,8 @@ ELF_FUNCTION(l_buffer_append)
 	if (value_is_string(source))
 	{
 		elf_String *string = value_as_string(source);
-		data = string_data(string);
-		size = string_size(string);
+		data = elf_string_data(string);
+		size = elf_string_size(string);
 	}
 	else if (value_is_buffer(source))
 	{
@@ -137,8 +137,8 @@ ELF_FUNCTION(l_buffer_patch)
 	if (value_is_string(replacement))
 	{
 		elf_String *string = value_as_string(replacement);
-		data = string_data(string);
-		insert_size = string_size(string);
+		data = elf_string_data(string);
+		insert_size = elf_string_size(string);
 	}
 	else if (value_is_buffer(replacement))
 	{

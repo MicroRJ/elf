@@ -15,7 +15,7 @@ static void json_expect_int(elf_Value value, i64 expected, const char *label)
 
 static void json_expect_string(elf_Value value, const char *expected, const char *label)
 {
-	if (!value_is_string(value) || strcmp(string_data(value_as_string(value)), expected) != 0)
+	if (!value_is_string(value) || strcmp(elf_string_data(value_as_string(value)), expected) != 0)
 	{
 		fprintf(stderr, "FAIL: %s expected string '%s'\n", label, expected);
 		test_failures += 1;

@@ -60,7 +60,7 @@ static elf_String *string_find(elf_State *state, const char *data, u32 size, u32
 	u32 bucket_index = string_bucket_index(state, hash);
 	for (elf_String *string = state->string_buckets[bucket_index]; string; string = string->next) {
 		PROF_ADD(PROF_COUNTER_STRING_PROBE, 1);
-		if (string->hash == hash && string_size(string) == size && !memcmp(string->data, data, size)) {
+		if (string->hash == hash && elf_string_size(string) == size && !memcmp(string->data, data, size)) {
 			PROF_ADD(PROF_COUNTER_STRING_HIT, 1);
 			return string;
 		}

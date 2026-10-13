@@ -41,12 +41,12 @@ static elf_String *lib_load_string(elf_State *state, u32 index)
 static elf_StrSlice lib_load_string_slice(elf_State *state, u32 index)
 {
 	elf_String *value = lib_load_string(state, index);
-	return (elf_StrSlice){ .data = (char *)string_data(value), .size = string_size(value) };
+	return (elf_StrSlice){ .data = (char *)elf_string_data(value), .size = elf_string_size(value) };
 }
 
 static const char *lib_load_cstr(elf_State *state, u32 index)
 {
-	return string_data(lib_load_string(state, index));
+	return elf_string_data(lib_load_string(state, index));
 }
 
 static i64 lib_load_integer(elf_State *state, u32 index)

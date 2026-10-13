@@ -40,7 +40,7 @@ static inline b32 value_length(elf_Value value, u32 *length)
 	}
 	else if (value_is_string(value))
 	{
-		*length = string_size(value_as_string(value));
+		*length = elf_string_size(value_as_string(value));
 	}
 	else if (value_is_array(value))
 	{

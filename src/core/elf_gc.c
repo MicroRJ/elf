@@ -322,9 +322,9 @@ static u32 gc_mark_table(elf_State *state, elf_Table *table)
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
-			elf_Value key = entry_key_value(entry);
+			elf_Value key = elf_table_entry_key(entry);
 			if (value_is_object(key))
 			{
 				marked_count += gc_mark_reachable(state, value_as_object(key));

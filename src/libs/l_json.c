@@ -89,8 +89,8 @@ static void json_writer_string(JsonWriter *writer, elf_String *string)
 {
 	static const char hex[] = "0123456789abcdef";
 	json_writer_char(writer, '"');
-	const u8 *data = (const u8 *)string_data(string);
-	for (u32 i = 0; i < string_size(string) && !writer->error; ++i)
+	const u8 *data = (const u8 *)elf_string_data(string);
+	for (u32 i = 0; i < elf_string_size(string) && !writer->error; ++i)
 	{
 		u8 byte = data[i];
 		switch (byte)
@@ -153,11 +153,11 @@ static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
 	for (u32 i = 0; i < table->capacity && !writer->error; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (!entry_is_key(entry))
+		if (!elf_table_entry_is_key(entry))
 		{
 			continue;
 		}
-		elf_Value key = entry_key_value(entry);
+		elf_Value key = elf_table_entry_key(entry);
 		if (!value_is_string(key))
 		{
 			writer->error = "JSON object keys must be strings";
@@ -242,7 +242,7 @@ ELF_FUNCTION(l_json_parse)
 {
 	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
 	elf_String *text = lib_load_string(S, 1);
-	elf_StrSlice source = {(char *)string_data(text), string_size(text)};
+	elf_StrSlice source = {(char *)elf_string_data(text), elf_string_size(text)};
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(S, scratch.arena);
 	compiler_set_log_messages(compiler, false);

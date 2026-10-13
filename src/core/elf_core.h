@@ -85,6 +85,9 @@ struct elf_String
 	char        data[];
 };
 
+#define ELF_STRING_HEADER_SIZE ((u32)offsetof(elf_String, data))
+#define ELF_STRING_MAX_SIZE    (UINT32_MAX - ELF_STRING_HEADER_SIZE - 1)
+
 struct elf_ByteBuffer
 {
 	elf_Object obj;
@@ -118,6 +121,16 @@ typedef struct
 }
 Entry;
 STATIC_ASSERT(sizeof(Entry) == 32);
+
+static inline b32 elf_table_entry_is_key(Entry entry)
+{
+	return entry.key.type != ELF_VALUE_TYPE_NIL && entry.key.type != ENTRY_TOMB_TYPE;
+}
+
+static inline elf_Value elf_table_entry_key(Entry entry)
+{
+	return entry.key;
+}
 
 struct elf_Table
 {
@@ -290,6 +303,34 @@ void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 
+static inline u32 elf_string_size(elf_String *string)
+{
+	ASSERT(string);
+	ASSERT(string->obj.size >= ELF_STRING_HEADER_SIZE + 1);
+	return string->obj.size - ELF_STRING_HEADER_SIZE - 1;
+}
+
+static inline const char *elf_string_data(elf_String *string)
+{
+	return string->data;
+}
+
+static inline u32 elf_string_hash(elf_String *string)
+{
+	return string->hash;
+}
+
+static inline b32 elf_string_equal(elf_String *left, elf_String *right)
+{
+	return left == right;
+}
+
+static inline elf_String *elf_string_from_data(elf_State *state, const char *data)
+{
+	ASSERT(data);
+	return elf_string_from_data_size(state, data, (u32)strlen(data));
+}
+
 elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity);
 b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capacity);
 b32 elf_buffer_resize_object(elf_State *state, elf_ByteBuffer *buffer, u32 size);
@@ -326,9 +367,7 @@ void elf_globals_set_by_slot(elf_Globals *globals, u32 slot, elf_Value value);
 void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
 void elf_print_current_runtime_source_location(elf_State *state);
 
-#include "value/value.h"
-#include "string/elf_string.h"
-#include "table/table.h"
+#include "elf_value.h"
 
 static inline b32 bc_function_ref_is_valid(BcFunctionRef function)
 {

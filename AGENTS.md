@@ -13,18 +13,18 @@ before changing the language or VM for them.
 storage, GC state, interned strings, globals, references, metatables, loaded
 runtime modules, the value stack, call frames, and VM counters.
 
-`src/core/core.c` is intentionally a unity translation unit for the runtime.
+`src/core/elf_core.c` is intentionally a unity translation unit for the runtime.
 The optimized build currently uses `/O2` without LTCG, so splitting hot runtime
 code into separate translation units can remove useful inlining. `vm.c` owns the
 bytecode interpreter plus all call and frame machinery; there is deliberately
-no separate `call.c`. `core.c` owns runtime creation/destruction and assembles
+no separate `call.c`. `elf_core.c` owns runtime creation/destruction and assembles
 the runtime implementation. Do not split the VM into its own translation unit
 without explicit approval and before/after benchmarks.
 
-`src/core/helpers.h` currently contains shared, cross-type runtime operations
+`src/core/elf_helpers.h` currently contains shared, cross-type runtime operations
 that need complete runtime types and should inline into consumers. For example,
 `value_length` supports tables, strings, and buffers; string length is a byte
-length. Keep representation predicates and conversions in `value/value.h`, and
+length. Keep representation predicates and conversions in `elf_value.h`, and
 avoid duplicating cross-type semantics independently in the VM and public API.
 
 Error is a distinct value tag whose payload is a pointer to a table containing

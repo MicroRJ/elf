@@ -151,7 +151,7 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	}
 
 	if (value_is_string(left)) {
-		return strings_equal(value_as_string(left), value_as_string(right));
+		return elf_string_equal(value_as_string(left), value_as_string(right));
 	}
 
 	return value_as_integer(left) == value_as_integer(right);
@@ -419,8 +419,8 @@ activate_frame:
 				}
 				else if (value_is_string(object)) {
 					elf_String *string = value_as_string(object);
-					u32 index = vm_check_index(state, byte_index, index_value, string_size(string));
-					*result = value_from_integer((u8)string_data(string)[index]);
+					u32 index = vm_check_index(state, byte_index, index_value, elf_string_size(string));
+					*result = value_from_integer((u8)elf_string_data(string)[index]);
 				}
 				else if (value_is_buffer(object)) {
 					elf_ByteBuffer *buffer = value_as_buffer(object);

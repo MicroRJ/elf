@@ -3,7 +3,7 @@
 #include "elf.h"
 #include <dy.h>
 #include "base.h"
-#include "core.h"
+#include "elf_core.h"
 #include "compiler.h"
 #include "bytecode_debug.h"
 

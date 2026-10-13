@@ -4,10 +4,10 @@
 
 #include "elf.h"
 #include "base.h"
-#include "core.h"
-#include "helpers.h"
+#include "elf_core.h"
+#include "elf_helpers.h"
 #include "compiler.h"
-#include "value_text.h"
+#include "elf_value_text.h"
 
 static elf_Value *value_at(elf_State *state, elf_Index index);
 
@@ -171,7 +171,7 @@ static elf_Bool values_equal(elf_Value left, elf_Value right)
 		return value_to_number(left) == value_to_number(right);
 	}
 	if (value_type(left) != value_type(right)) return false;
-	if (value_is_string(left)) return strings_equal(value_as_string(left), value_as_string(right));
+	if (value_is_string(left)) return elf_string_equal(value_as_string(left), value_as_string(right));
 	return left.x_i64 == right.x_i64;
 }
 
@@ -291,7 +291,7 @@ elf_Bool elf_to_str(elf_State *state, elf_Index index, elf_StrSlice *result)
 	if (!value || !value_is_string(*value) || !result) return false;
 	elf_String *string = value_as_string(*value);
 	result->data = string->data;
-	result->size = string_size(string);
+	result->size = elf_string_size(string);
 	return true;
 }
 
@@ -558,9 +558,9 @@ elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)
 	while (*cursor < table->capacity)
 	{
 		Entry entry = table->entries[(*cursor)++];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
-			push_value(state, entry_key_value(entry));
+			push_value(state, elf_table_entry_key(entry));
 			push_value(state, entry.value);
 			return true;
 		}

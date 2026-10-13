@@ -70,7 +70,7 @@ static inline u32 table_hash_key(u64 key, u32 type)
 	u32 type_hash = type * 0x9E3779B1u;
 	if (type == ELF_VALUE_TYPE_STRING)
 	{
-		return string_hash((elf_String *)key) ^ type_hash;
+		return elf_string_hash((elf_String *)key) ^ type_hash;
 	}
 	return hash64(key) ^ type_hash;
 }
@@ -136,9 +136,9 @@ static void table_resize(elf_State *state, elf_Table *table, u32 capacity)
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
 		Entry entry = table->entries[i];
-		if (entry_is_key(entry))
+		if (elf_table_entry_is_key(entry))
 		{
-			Entry *destination = table_find_entry_for_write(entries, capacity, entry_key_value(entry));
+			Entry *destination = table_find_entry_for_write(entries, capacity, elf_table_entry_key(entry));
 			*destination = entry;
 		}
 	}
@@ -185,7 +185,7 @@ void elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value 
 	}
 	table_ensure_capacity(state, table);
 	Entry *entry = table_find_entry_for_write(table->entries, table->capacity, key);
-	if (entry_is_key(*entry))
+	if (elf_table_entry_is_key(*entry))
 	{
 		entry->value = value;
 	}
