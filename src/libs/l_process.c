@@ -155,7 +155,12 @@ static void lib_process_load_options(elf_State *state, elf_i32 index, dy_Process
 	elf_get_field(state, index, "hide_window");
 	if (!elf_is_nil(state, -1))
 	{
-		options->hide_window = lib_load_stack_integer(state, elf_abs_index(state, -1)) != 0;
+		elf_Int hide_window = 0;
+		if (!elf_to_int(state, elf_abs_index(state, -1), &hide_window))
+		{
+			elf_error(state, "expected integer value");
+		}
+		options->hide_window = hide_window != 0;
 	}
 	elf_pop(state, 1);
 }

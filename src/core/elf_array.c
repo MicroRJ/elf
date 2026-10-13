@@ -101,5 +101,9 @@ u32 elf_array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value va
 void elf_array_swap(elf_State *state, elf_Array *array, u32 left, u32 right)
 {
 	array_check_write(state, array);
-	value_swap(array_slot(state, array, left), array_slot(state, array, right));
+	elf_Value *left_slot = array_slot(state, array, left);
+	elf_Value *right_slot = array_slot(state, array, right);
+	elf_Value temporary = *left_slot;
+	*left_slot = *right_slot;
+	*right_slot = temporary;
 }

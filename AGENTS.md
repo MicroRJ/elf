@@ -24,7 +24,7 @@ without explicit approval and before/after benchmarks.
 `src/core/elf_helpers.h` currently contains shared, cross-type runtime operations
 that need complete runtime types and should inline into consumers. For example,
 `value_length` supports tables, strings, and buffers; string length is a byte
-length. Keep representation predicates and conversions in `elf_value.h`, and
+length. Keep representation predicates and conversions in `elf_helpers.h`, and
 avoid duplicating cross-type semantics independently in the VM and public API.
 
 Error is a distinct value tag whose payload is a pointer to a table containing

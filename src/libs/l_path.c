@@ -26,7 +26,7 @@ ELF_FUNCTION(lib_path_parent)
 		end = separator ? separator : begin;
 	}
 
-	lib_push_string(S, begin, (u32)(end - begin));
+	elf_push_str(S, begin, (int)(end - begin));
 	return 1;
 }
 
@@ -38,7 +38,7 @@ ELF_FUNCTION(lib_path_filename)
 	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
 	const char *name = separator ? separator + 1 : begin;
-	lib_push_string(S, name, (u32)(end - name));
+	elf_push_str(S, name, (int)(end - name));
 	return 1;
 }
 
@@ -61,7 +61,7 @@ ELF_FUNCTION(lib_path_stem)
 		}
 	}
 
-	lib_push_string(S, name, (u32)(extension - name));
+	elf_push_str(S, name, (int)(extension - name));
 	return 1;
 }
 
@@ -84,7 +84,7 @@ ELF_FUNCTION(lib_path_extension)
 		}
 	}
 
-	lib_push_string(S, extension, (u32)(end - extension));
+	elf_push_str(S, extension, (int)(end - extension));
 	return 1;
 }
 
@@ -109,7 +109,7 @@ ELF_FUNCTION(lib_path_join)
 	u64 result_size = (u64)left_size + right_size + needs_separator;
 	if (!result_size)
 	{
-		lib_push_string(S, "", 0);
+		elf_push_str(S, "", 0);
 		return 1;
 	}
 	char *result = elf_alloc(S, result_size);
@@ -121,7 +121,7 @@ ELF_FUNCTION(lib_path_join)
 	u32 at = left_size;
 	if (needs_separator) result[at++] = '/';
 	memcpy(result + at, right_data, right_size);
-	lib_push_string(S, result, at + right_size);
+	elf_push_str(S, result, (int)(at + right_size));
 	elf_free(S, result, result_size);
 	return 1;
 }

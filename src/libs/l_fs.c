@@ -72,7 +72,7 @@ ELF_FUNCTION(lib_fs_read_text_file)
 		elf_push_nil(S);
 		return 1;
 	}
-	lib_push_string(S, data, (u32)size);
+	elf_push_str(S, data, (int)size);
 	elf_free(S, data, allocation_size);
 	return 1;
 }
@@ -182,7 +182,7 @@ ELF_FUNCTION(lib_fs_get_working_directory)
 		elf_push_nil(S);
 		return 1;
 	}
-	lib_push_string(S, directory.data, (u32)directory.size);
+	elf_push_str(S, directory.data, (int)directory.size);
 	dy_end_scratch(scratch);
 	return 1;
 }

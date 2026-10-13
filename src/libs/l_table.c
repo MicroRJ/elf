@@ -51,7 +51,7 @@ ELF_FUNCTION(l_table_clone)
 		Entry entry = table->entries[i];
 		if (elf_table_entry_is_key(entry))
 		{
-			elf_table_set(S, result, elf_table_entry_key(entry), entry.value);
+			elf_table_set(S, result, entry.key, entry.value);
 		}
 	}
 	return 1;
@@ -67,7 +67,7 @@ ELF_FUNCTION(l_table_keys)
 		Entry entry = table->entries[i];
 		if (elf_table_entry_is_key(entry))
 		{
-			elf_array_add(S, result, elf_table_entry_key(entry));
+			elf_array_add(S, result, entry.key);
 		}
 	}
 	return 1;

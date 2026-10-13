@@ -17,7 +17,7 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 			{
 				elf_arena_push_text(arena, ", ");
 			}
-			elf_print_value(arena, elf_table_entry_key(entry));
+			elf_print_value(arena, entry.key);
 			elf_arena_push_text(arena, " = ");
 			elf_print_value(arena, entry.value);
 		}
@@ -49,7 +49,7 @@ static elf_Value table_get_named_field(elf_Table *table, const char *name)
 		{
 			continue;
 		}
-		elf_Value key = elf_table_entry_key(entry);
+		elf_Value key = entry.key;
 		if (!value_is_string(key))
 		{
 			continue;
@@ -185,7 +185,7 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 		{
 			elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
 			source_indent(arena, indent + 1);
-			if (!unparse_value(state, arena, elf_table_entry_key(entry), indent + 1, &table_path))
+			if (!unparse_value(state, arena, entry.key, indent + 1, &table_path))
 			{
 				return false;
 			}

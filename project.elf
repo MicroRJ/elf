@@ -26,7 +26,6 @@ library := {
 	name = "elf",
 	sources = [
 		"src/base/base.c",
-		"src/core/elf_value.c",
 		"src/compiler/backend/bytecode.c",
 		"src/compiler/backend/bytecode_debug.c",
 		"src/core/elf_core.c",

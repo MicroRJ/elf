@@ -157,7 +157,7 @@ static void json_write_table(JsonWriter *writer, elf_Table *table, u32 depth)
 		{
 			continue;
 		}
-		elf_Value key = elf_table_entry_key(entry);
+		elf_Value key = entry.key;
 		if (!value_is_string(key))
 		{
 			writer->error = "JSON object keys must be strings";

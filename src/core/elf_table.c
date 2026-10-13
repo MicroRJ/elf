@@ -70,7 +70,7 @@ static inline u32 table_hash_key(u64 key, u32 type)
 	u32 type_hash = type * 0x9E3779B1u;
 	if (type == ELF_VALUE_TYPE_STRING)
 	{
-		return elf_string_hash((elf_String *)key) ^ type_hash;
+		return ((elf_String *)key)->hash ^ type_hash;
 	}
 	return hash64(key) ^ type_hash;
 }
@@ -138,7 +138,7 @@ static void table_resize(elf_State *state, elf_Table *table, u32 capacity)
 		Entry entry = table->entries[i];
 		if (elf_table_entry_is_key(entry))
 		{
-			Entry *destination = table_find_entry_for_write(entries, capacity, elf_table_entry_key(entry));
+			Entry *destination = table_find_entry_for_write(entries, capacity, entry.key);
 			*destination = entry;
 		}
 	}

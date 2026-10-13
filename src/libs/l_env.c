@@ -23,7 +23,7 @@ ELF_FUNCTION(lib_env_get)
 		elf_push_nil(S);
 		return 1;
 	}
-	lib_push_string(S, value.data, (u32)value.size);
+	elf_push_str(S, value.data, (int)value.size);
 	dy_end_scratch(scratch);
 	return 1;
 }

@@ -23,7 +23,6 @@
 #include "logging.c"
 
 #include "elf_core.h"
-#include "elf_helpers.h"
 #include "source_diagnostics.c"
 #include "core_diagnostics.c"
 
@@ -39,7 +38,6 @@
 #include "elf_value_text.c"
 
 #include "compiler.h"
-#include "../libs/lib_helpers.h"
 #include "../libs/l_math.c"
 #include "../libs/l_core.c"
 #include "../libs/l_gc.c"
@@ -109,12 +107,10 @@ static void bootstrap_standard_libraries(elf_State *state)
 	state->metatables.buffer = elf_lib_buffer(state);
 
 	elf_Table *elf_table = elf_lib_core(state);
-	elf_table_set(state, elf_table,
-		value_from_string(elf_string_from_data(state, "buffer")),
-		value_from_function(l_buffer_new));
-	table_set_string_table(state, elf_table, "math", elf_lib_math(state));
-	table_set_string_table(state, elf_table, "gc", elf_lib_gc(state));
-	table_set_string_table(state, elf_table, "vm", elf_lib_vm(state));
+	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "buffer")), value_from_function(l_buffer_new));
+	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "math")), value_from_table(elf_lib_math(state)));
+	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "gc")), value_from_table(elf_lib_gc(state)));
+	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "vm")), value_from_table(elf_lib_vm(state)));
 
 	elf_StrSlice elf_name = {(char *)"elf", 3};
 	elf_globals_set_by_name(&state->globals, elf_name, value_from_table(elf_table));

@@ -5,7 +5,6 @@
 #include "elf.h"
 #include "base.h"
 #include "elf_core.h"
-#include "elf_helpers.h"
 #include "compiler.h"
 #include "elf_value_text.h"
 
@@ -200,7 +199,7 @@ elf_ErrorCode elf_set_top(elf_State *state, elf_Index top)
 {
 	elf_Index current = elf_get_top(state);
 	elf_Index capacity = (elf_Index)(state->stack + state->stack_size - state->frame->framebase);
-	if (top < frame_size(state) || top > capacity) return ELF_ERROR_OUT_OF_RANGE;
+	if (top < (elf_i32)state->frame->framesize || top > capacity) return ELF_ERROR_OUT_OF_RANGE;
 	while (current < top) {
 		push_value(state, value_nil());
 		current += 1;
@@ -215,7 +214,7 @@ elf_ErrorCode elf_set_top(elf_State *state, elf_Index top)
 elf_ErrorCode elf_pop(elf_State *state, elf_u32 count)
 {
 	elf_Index top = elf_get_top(state);
-	if (count > (elf_u32)(top - frame_size(state))) return ELF_ERROR_STACK_UNDERFLOW;
+	if (count > (elf_u32)(top - (elf_i32)state->frame->framesize)) return ELF_ERROR_STACK_UNDERFLOW;
 	return elf_set_top(state, top - (elf_Index) count);
 }
 
@@ -390,7 +389,7 @@ elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field
 	if (!field) return ELF_ERROR_INVALID_ARGUMENT;
 	elf_ErrorCode error = field_table_at_for_write(state, index, &table);
 	if (error != ELF_ERROR_NONE) return error;
-	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
+	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
 	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
 	elf_Value key = value_from_string(elf_string_from_data(state, field));
 	elf_Value value = pop_value(state);
@@ -425,7 +424,7 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 {
 	elf_Value *target = value_at(state, index);
 	if (!target) return ELF_ERROR_INVALID_INDEX;
-	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
+	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
 	if (value_is_array(*target))
 	{
 		elf_Array *array = value_as_array(*target);
@@ -470,7 +469,7 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 	{
 		return ELF_ERROR_INVALID_INDEX;
 	}
-	if (state->stack_ptr <= state->frame->framebase + frame_size(state))
+	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize)
 	{
 		return ELF_ERROR_STACK_UNDERFLOW;
 	}
@@ -560,7 +559,7 @@ elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)
 		Entry entry = table->entries[(*cursor)++];
 		if (elf_table_entry_is_key(entry))
 		{
-			push_value(state, elf_table_entry_key(entry));
+			push_value(state, entry.key);
 			push_value(state, entry.value);
 			return true;
 		}
@@ -588,7 +587,7 @@ void elf_get_global(elf_State *state, const char *name)
 elf_ErrorCode elf_set_global(elf_State *state, const char *name)
 {
 	if (!name) return ELF_ERROR_INVALID_ARGUMENT;
-	if (state->stack_ptr <= state->frame->framebase + frame_size(state)) return ELF_ERROR_STACK_UNDERFLOW;
+	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
 	elf_StrSlice name_slice = {(char *)name, (u64)strlen(name)};
 	elf_globals_set_by_name(&state->globals, name_slice, pop_value(state));
 	return ELF_ERROR_NONE;

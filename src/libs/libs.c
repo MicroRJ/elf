@@ -11,9 +11,7 @@
 
 #include "elf.h"
 #include "elf_core.h"
-#include "elf_helpers.h"
 #include "compiler.h"
-#include "lib_helpers.h"
 #include "libs.h"
 
 #include "l_core_io.c"

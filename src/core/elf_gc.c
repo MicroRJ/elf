@@ -324,7 +324,7 @@ static u32 gc_mark_table(elf_State *state, elf_Table *table)
 		Entry entry = table->entries[i];
 		if (elf_table_entry_is_key(entry))
 		{
-			elf_Value key = elf_table_entry_key(entry);
+			elf_Value key = entry.key;
 			if (value_is_object(key))
 			{
 				marked_count += gc_mark_reachable(state, value_as_object(key));

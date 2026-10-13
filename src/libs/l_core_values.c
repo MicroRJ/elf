@@ -33,7 +33,7 @@ static u32 core_mark_table_readonly(elf_State *state, elf_Table *table)
 		{
 			continue;
 		}
-		elf_Value key = elf_table_entry_key(entry);
+		elf_Value key = entry.key;
 		if (value_is_object(key))
 		{
 			count += core_mark_readonly(state, value_as_object(key));
@@ -148,7 +148,7 @@ ELF_FUNCTION(l_core_error)
 			{
 				continue;
 			}
-			elf_table_set(S, info, elf_table_entry_key(entry), entry.value);
+			elf_table_set(S, info, entry.key, entry.value);
 		}
 	}
 
