@@ -60,7 +60,7 @@ ELF_FUNCTION(lib_env_unset)
 	return 1;
 }
 
-static const Battery_Binding l_env[] = {
+static const Lib_Binding l_env[] = {
 	{"get",   lib_env_get},
 	{"has",   lib_env_has},
 	{"set",   lib_env_set},
@@ -69,5 +69,5 @@ static const Battery_Binding l_env[] = {
 
 static void elf_lib_env(elf_State *state)
 {
-	new_binding_table(state, l_env, battery_array_count(sizeof(l_env), sizeof(l_env[0])));
+	new_binding_table(state, l_env, lib_array_count(sizeof(l_env), sizeof(l_env[0])));
 }

@@ -1,5 +1,5 @@
-#ifndef ELF_BATTERY_HELPERS_H
-#define ELF_BATTERY_HELPERS_H
+#ifndef ELF_LIB_HELPERS_H
+#define ELF_LIB_HELPERS_H
 
 #include "elf.h"
 #include "memory.h"
@@ -17,12 +17,12 @@ typedef elf_i64 i64;
 typedef elf_u64 u64;
 typedef elf_f64 f64;
 
-typedef struct Battery_Binding
+typedef struct Lib_Binding
 {
 	const char *name;
 	elf_Function function;
 }
-Battery_Binding;
+Lib_Binding;
 
 typedef struct elf_Buffer
 {
@@ -32,7 +32,7 @@ typedef struct elf_Buffer
 }
 elf_Buffer;
 
-static u32 battery_array_count(size_t size, size_t element_size)
+static u32 lib_array_count(size_t size, size_t element_size)
 {
 	return (u32)(size / element_size);
 }
@@ -125,7 +125,7 @@ static void lib_set_nil_field(elf_State *state, elf_i32 table, const char *name)
 	elf_set_field(state, table, name);
 }
 
-static void new_binding_table(elf_State *state, const Battery_Binding *bindings, u32 count)
+static void new_binding_table(elf_State *state, const Lib_Binding *bindings, u32 count)
 {
 	elf_new_table(state);
 	elf_i32 table = elf_abs_index(state, -1);

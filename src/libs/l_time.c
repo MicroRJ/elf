@@ -34,7 +34,7 @@ ELF_FUNCTION(lib_time_sleep)
 	return 0;
 }
 
-static const Battery_Binding l_time[] = {
+static const Lib_Binding l_time[] = {
 	{"counter",   lib_time_counter},
 	{"frequency", lib_time_frequency},
 	{"elapsed",   lib_time_elapsed},
@@ -44,5 +44,5 @@ static const Battery_Binding l_time[] = {
 
 static void elf_lib_time(elf_State *state)
 {
-	new_binding_table(state, l_time, battery_array_count(sizeof(l_time), sizeof(l_time[0])));
+	new_binding_table(state, l_time, lib_array_count(sizeof(l_time), sizeof(l_time[0])));
 }

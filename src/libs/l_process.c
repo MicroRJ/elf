@@ -2,38 +2,38 @@
 // Processes backed by dy-core.
 //
 
-typedef enum Battery_Process_State
+typedef enum Lib_Process_State
 {
-	BATTERY_PROCESS_RUNNING,
-	BATTERY_PROCESS_EXITED,
-	BATTERY_PROCESS_FAILURE,
+	LIB_PROCESS_RUNNING,
+	LIB_PROCESS_EXITED,
+	LIB_PROCESS_FAILURE,
 }
-Battery_Process_State;
+Lib_Process_State;
 
-typedef struct Battery_Process
+typedef struct Lib_Process
 {
 	dy_Process process;
 }
-Battery_Process;
+Lib_Process;
 
-static void battery_process_destroy(elf_State *state, void *data)
+static void lib_process_destroy(elf_State *state, void *data)
 {
 	(void)state;
-	Battery_Process *process = data;
+	Lib_Process *process = data;
 	if (dy_process_is_valid(process->process))
 	{
 		dy_process_close(&process->process);
 	}
 }
 
-static const elf_UserType battery_process_type = {
+static const elf_UserType lib_process_type = {
 	.name = "process",
-	.destroy = battery_process_destroy,
+	.destroy = lib_process_destroy,
 };
 
-static Battery_Process *battery_process_receiver(elf_State *state)
+static Lib_Process *lib_process_receiver(elf_State *state)
 {
-	Battery_Process *process = elf_to_user_object(state, 0, &battery_process_type);
+	Lib_Process *process = elf_to_user_object(state, 0, &lib_process_type);
 	if (!process)
 	{
 		elf_error(state, "expected process receiver");
@@ -41,10 +41,10 @@ static Battery_Process *battery_process_receiver(elf_State *state)
 	return process;
 }
 
-static Battery_Process *battery_push_process(elf_State *state, elf_i32 metatable, dy_Process process)
+static Lib_Process *lib_push_process(elf_State *state, elf_i32 metatable, dy_Process process)
 {
-	Battery_Process *result = 0;
-	elf_ErrorCode error = elf_push_user_object(state, &battery_process_type, metatable, sizeof(*result), (void **)&result);
+	Lib_Process *result = 0;
+	elf_ErrorCode error = elf_push_user_object(state, &lib_process_type, metatable, sizeof(*result), (void **)&result);
 	if (error != ELF_ERROR_NONE)
 	{
 		dy_process_close(&process);
@@ -54,7 +54,7 @@ static Battery_Process *battery_push_process(elf_State *state, elf_i32 metatable
 	return result;
 }
 
-static elf_i32 battery_process_metatable(elf_State *state)
+static elf_i32 lib_process_metatable(elf_State *state)
 {
 	elf_get_global(state, "elf");
 	b32 has_process = elf_get_field(state, -1, "process");
@@ -66,7 +66,7 @@ static elf_i32 battery_process_metatable(elf_State *state)
 	return elf_abs_index(state, -1);
 }
 
-static u32 battery_process_validate_arguments(elf_State *state, elf_i32 index)
+static u32 lib_process_validate_arguments(elf_State *state, elf_i32 index)
 {
 	u32 count = 0;
 	if (elf_type(state, index) != ELF_VALUE_TYPE_ARRAY || !elf_length(state, index, &count))
@@ -86,7 +86,7 @@ static u32 battery_process_validate_arguments(elf_State *state, elf_i32 index)
 	return count;
 }
 
-static dy_String_Array battery_process_load_arguments(elf_State *state, elf_i32 index, u32 count, dy_Arena *arena)
+static dy_String_Array lib_process_load_arguments(elf_State *state, elf_i32 index, u32 count, dy_Arena *arena)
 {
 	dy_String_Array arguments = {0};
 	if (count != 0)
@@ -108,7 +108,7 @@ static dy_String_Array battery_process_load_arguments(elf_State *state, elf_i32 
 	return arguments;
 }
 
-static void battery_process_load_string_option(elf_State *state, elf_i32 options_index, const char *name, dy_String *value)
+static void lib_process_load_string_option(elf_State *state, elf_i32 options_index, const char *name, dy_String *value)
 {
 	elf_StrSlice string = {0};
 	elf_get_field(state, options_index, name);
@@ -123,12 +123,12 @@ static void battery_process_load_string_option(elf_State *state, elf_i32 options
 	elf_pop(state, 1);
 }
 
-static void battery_process_load_stream_option(elf_State *state, elf_i32 options_index, const char *name, dy_Stream **stream)
+static void lib_process_load_stream_option(elf_State *state, elf_i32 options_index, const char *name, dy_Stream **stream)
 {
 	elf_get_field(state, options_index, name);
 	if (!elf_is_nil(state, -1))
 	{
-		Battery_Stream *value = elf_to_user_object(state, -1, &battery_stream_type);
+		Lib_Stream *value = elf_to_user_object(state, -1, &lib_stream_type);
 		if (!value)
 		{
 			elf_error(state, "process stream option must be a stream");
@@ -142,16 +142,16 @@ static void battery_process_load_stream_option(elf_State *state, elf_i32 options
 	elf_pop(state, 1);
 }
 
-static void battery_process_load_options(elf_State *state, elf_i32 index, dy_Process_Start_Options *options)
+static void lib_process_load_options(elf_State *state, elf_i32 index, dy_Process_Start_Options *options)
 {
 	if (elf_type(state, index) != ELF_VALUE_TYPE_TABLE)
 	{
 		elf_error(state, "process.start options must be a table");
 	}
-	battery_process_load_string_option(state, index, "working_directory", &options->working_directory);
-	battery_process_load_stream_option(state, index, "stdin", &options->standard_input);
-	battery_process_load_stream_option(state, index, "stdout", &options->standard_output);
-	battery_process_load_stream_option(state, index, "stderr", &options->standard_error);
+	lib_process_load_string_option(state, index, "working_directory", &options->working_directory);
+	lib_process_load_stream_option(state, index, "stdin", &options->standard_input);
+	lib_process_load_stream_option(state, index, "stdout", &options->standard_output);
+	lib_process_load_stream_option(state, index, "stderr", &options->standard_error);
 	elf_get_field(state, index, "hide_window");
 	if (!elf_is_nil(state, -1))
 	{
@@ -160,22 +160,22 @@ static void battery_process_load_options(elf_State *state, elf_i32 index, dy_Pro
 	elf_pop(state, 1);
 }
 
-static int battery_push_process_state(elf_State *state, dy_Result result, dy_Process_Status process_state, dy_u32 exit_code)
+static int lib_push_process_state(elf_State *state, dy_Result result, dy_Process_Status process_state, dy_u32 exit_code)
 {
 	int return_count = 1;
 	if (result.error != DY_ERROR_NONE)
 	{
-		elf_push_int(state, BATTERY_PROCESS_FAILURE);
+		elf_push_int(state, LIB_PROCESS_FAILURE);
 	}
 	else if (process_state == DY_PROCESS_EXITED)
 	{
-		elf_push_int(state, BATTERY_PROCESS_EXITED);
+		elf_push_int(state, LIB_PROCESS_EXITED);
 		elf_push_int(state, (elf_Int)exit_code);
 		return_count = 2;
 	}
 	else
 	{
-		elf_push_int(state, BATTERY_PROCESS_RUNNING);
+		elf_push_int(state, LIB_PROCESS_RUNNING);
 	}
 	return return_count;
 }
@@ -186,18 +186,18 @@ ELF_FUNCTION(l_process_start)
 	elf_StrSlice executable_value = lib_load_string(S, 1);
 	dy_String executable = { .data = executable_value.data, .size = executable_value.size };
 	elf_i32 arguments_index = nargs > 2 ? elf_abs_index(S, 2) : 0;
-	u32 argument_count = nargs > 2 ? battery_process_validate_arguments(S, arguments_index) : 0;
+	u32 argument_count = nargs > 2 ? lib_process_validate_arguments(S, arguments_index) : 0;
 	elf_i32 options_index = nargs > 3 ? elf_abs_index(S, 3) : 0;
-	elf_i32 metatable = battery_process_metatable(S);
+	elf_i32 metatable = lib_process_metatable(S);
 	dy_Scratch scratch = dy_begin_scratch();
-	dy_String_Array arguments = battery_process_load_arguments(S, arguments_index, argument_count, scratch.arena);
+	dy_String_Array arguments = lib_process_load_arguments(S, arguments_index, argument_count, scratch.arena);
 	dy_Process_Start_Options options = {
 		.executable = executable,
 		.arguments = arguments,
 	};
 	if (nargs > 3)
 	{
-		battery_process_load_options(S, options_index, &options);
+		lib_process_load_options(S, options_index, &options);
 	}
 	dy_Process process = {0};
 	dy_Result result = { .error = DY_ERROR_OUT_OF_MEMORY };
@@ -206,11 +206,11 @@ ELF_FUNCTION(l_process_start)
 		result = dy_process_start(options, &process);
 	}
 	dy_end_scratch(scratch);
-	elf_push_int(S, battery_io_status(result.error));
+	elf_push_int(S, lib_io_status(result.error));
 	int return_count = 1;
 	if (result.error == DY_ERROR_NONE)
 	{
-		battery_push_process(S, metatable, process);
+		lib_push_process(S, metatable, process);
 		return_count = 2;
 	}
 	return return_count;
@@ -219,7 +219,7 @@ ELF_FUNCTION(l_process_start)
 ELF_FUNCTION(l_process_poll)
 {
 	lib_check_arg_count(S, "process.poll", nargs, 0, 0);
-	Battery_Process *process = battery_process_receiver(S);
+	Lib_Process *process = lib_process_receiver(S);
 	dy_Process_Status process_state = DY_PROCESS_RUNNING;
 	dy_u32 exit_code = 0;
 	dy_Result result = { .error = DY_ERROR_INVALID_ARGUMENT };
@@ -227,13 +227,13 @@ ELF_FUNCTION(l_process_poll)
 	{
 		result = dy_process_poll(process->process, &process_state, &exit_code);
 	}
-	return battery_push_process_state(S, result, process_state, exit_code);
+	return lib_push_process_state(S, result, process_state, exit_code);
 }
 
 ELF_FUNCTION(l_process_wait)
 {
 	lib_check_arg_count(S, "process.wait", nargs, 0, 1);
-	Battery_Process *process = battery_process_receiver(S);
+	Lib_Process *process = lib_process_receiver(S);
 	dy_u32 milliseconds = DY_WAIT_INFINITE;
 	if (nargs > 1)
 	{
@@ -251,13 +251,13 @@ ELF_FUNCTION(l_process_wait)
 	{
 		result = dy_process_wait(process->process, milliseconds, &process_state, &exit_code);
 	}
-	return battery_push_process_state(S, result, process_state, exit_code);
+	return lib_push_process_state(S, result, process_state, exit_code);
 }
 
 ELF_FUNCTION(l_process_kill)
 {
 	lib_check_arg_count(S, "process.kill", nargs, 1, 1);
-	Battery_Process *process = battery_process_receiver(S);
+	Lib_Process *process = lib_process_receiver(S);
 	i64 value = lib_load_integer(S, 1);
 	if (value < 0 || (u64)value > UINT32_MAX)
 	{
@@ -268,27 +268,27 @@ ELF_FUNCTION(l_process_kill)
 	{
 		result = dy_process_kill(process->process, (dy_u32)value);
 	}
-	elf_push_int(S, battery_io_status(result.error));
+	elf_push_int(S, lib_io_status(result.error));
 	return 1;
 }
 
 ELF_FUNCTION(l_process_close)
 {
 	lib_check_arg_count(S, "process.close", nargs, 0, 0);
-	Battery_Process *process = battery_process_receiver(S);
+	Lib_Process *process = lib_process_receiver(S);
 	dy_Result result = {0};
 	if (dy_process_is_valid(process->process))
 	{
 		result = dy_process_close(&process->process);
 	}
-	elf_push_int(S, battery_io_status(result.error));
+	elf_push_int(S, lib_io_status(result.error));
 	return 1;
 }
 
 ELF_FUNCTION(l_process_is_closed)
 {
 	lib_check_arg_count(S, "process.is_closed", nargs, 0, 0);
-	Battery_Process *process = battery_process_receiver(S);
+	Lib_Process *process = lib_process_receiver(S);
 	elf_push_int(S, !dy_process_is_valid(process->process));
 	return 1;
 }
@@ -312,7 +312,7 @@ ELF_FUNCTION(lib_process_exit)
 	return 0;
 }
 
-static const Battery_Binding l_process_methods[] = {
+static const Lib_Binding l_process_methods[] = {
 	{"poll",      l_process_poll},
 	{"wait",      l_process_wait},
 	{"kill",      l_process_kill},
@@ -320,7 +320,7 @@ static const Battery_Binding l_process_methods[] = {
 	{"is_closed", l_process_is_closed},
 };
 
-static const Battery_Binding l_process[] = {
+static const Lib_Binding l_process[] = {
 	{"start", l_process_start},
 	{"id",    lib_process_id},
 	{"exit",  lib_process_exit},
@@ -328,11 +328,11 @@ static const Battery_Binding l_process[] = {
 
 static void elf_lib_process(elf_State *state)
 {
-	new_binding_table(state, l_process, battery_array_count(sizeof(l_process), sizeof(l_process[0])));
+	new_binding_table(state, l_process, lib_array_count(sizeof(l_process), sizeof(l_process[0])));
 	elf_i32 process = elf_abs_index(state, -1);
-	new_binding_table(state, l_process_methods, battery_array_count(sizeof(l_process_methods), sizeof(l_process_methods[0])));
+	new_binding_table(state, l_process_methods, lib_array_count(sizeof(l_process_methods), sizeof(l_process_methods[0])));
 	elf_set_field(state, process, "Process");
-	lib_set_integer_field(state, process, "RUNNING", BATTERY_PROCESS_RUNNING);
-	lib_set_integer_field(state, process, "EXITED", BATTERY_PROCESS_EXITED);
-	lib_set_integer_field(state, process, "FAILURE", BATTERY_PROCESS_FAILURE);
+	lib_set_integer_field(state, process, "RUNNING", LIB_PROCESS_RUNNING);
+	lib_set_integer_field(state, process, "EXITED", LIB_PROCESS_EXITED);
+	lib_set_integer_field(state, process, "FAILURE", LIB_PROCESS_FAILURE);
 }

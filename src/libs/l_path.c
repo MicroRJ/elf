@@ -126,7 +126,7 @@ ELF_FUNCTION(lib_path_join)
 	return 1;
 }
 
-static const Battery_Binding l_path[] = {
+static const Lib_Binding l_path[] = {
 	{"join",      lib_path_join},
 	{"parent",    lib_path_parent},
 	{"filename",  lib_path_filename},
@@ -136,5 +136,5 @@ static const Battery_Binding l_path[] = {
 
 static void elf_lib_path(elf_State *state)
 {
-	new_binding_table(state, l_path, battery_array_count(sizeof(l_path), sizeof(l_path[0])));
+	new_binding_table(state, l_path, lib_array_count(sizeof(l_path), sizeof(l_path[0])));
 }

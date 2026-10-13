@@ -7,7 +7,7 @@ internal_include_directories := [
 	"src/api",
 	"src/core",
 	"src/diagnostics",
-	"src/core/libs",
+	"src/libs",
 	"src/core/value",
 	"src/core/table",
 	"src/core/string",
@@ -15,8 +15,6 @@ internal_include_directories := [
 	"src/compiler/frontend",
 	"src/compiler/middle",
 	"src/compiler/backend",
-	"batteries",
-	"src/batteries/internal",
 	"stb",
 ]
 
@@ -35,6 +33,7 @@ library := {
 		"src/compiler/backend/bytecode.c",
 		"src/compiler/backend/bytecode_debug.c",
 		"src/core/core.c",
+		"src/libs/libs.c",
 		"src/compiler/compiler.c",
 		"src/api/elf_api.c",
 	],
@@ -44,21 +43,6 @@ library := {
 	],
 	dependencies = [
 		dy,
-	],
-}
-
-batteries := {
-	kind = "static_library",
-	name = "elf_batteries",
-	sources = [
-		"src/batteries/batteries.c",
-	],
-	private_include_directories = [
-		"src/batteries/internal",
-		"src/core",
-	],
-	dependencies = [
-		library,
 	],
 }
 
@@ -88,7 +72,7 @@ tests := {
 	name = "tests",
 	sources = [ "test/tests.c" ],
 	private_include_directories = internal_include_directories,
-	dependencies = [ batteries ],
+	dependencies = [ library ],
 }
 
 run_tests := {
@@ -129,7 +113,7 @@ bytecode_tool := {
 	name = "bytecode",
 	sources = [ "tools/bytecode.c" ],
 	private_include_directories = internal_include_directories,
-	dependencies = [ batteries ],
+	dependencies = [ library ],
 }
 
 elf_runner := {
@@ -137,7 +121,7 @@ elf_runner := {
 	name = "elf",
 	sources = [ "tools/elf.c" ],
 	private_include_directories = internal_include_directories,
-	dependencies = [ batteries ],
+	dependencies = [ library ],
 }
 
 ret {
@@ -146,10 +130,9 @@ ret {
 	subprojects = {
 		dy = dy,
 	},
-	default_target = batteries,
+	default_target = library,
 	targets = {
 		library = library,
-		batteries = batteries,
 		public_header_test = public_header_test,
 		core_tests = core_tests,
 		run_core_tests = run_core_tests,

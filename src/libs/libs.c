@@ -1,5 +1,5 @@
 //
-// Optional batteries for the official Windows host.
+// Standard host libraries.
 //
 
 #include <limits.h>
@@ -8,22 +8,22 @@
 
 #include <dy.h>
 
-#undef ELF_VERSION
-#include "elf_batteries.h"
-#include "battery_helpers.h"
+#include "elf.h"
+#include "lib_helpers.h"
+#include "libs.h"
 
-#include "libs/l_core_io.c"
-#include "libs/l_io.c"
-#include "libs/l_load_file.c"
-#include "libs/l_serialization.c"
-#include "libs/l_env.c"
-#include "libs/l_fs.c"
-#include "libs/l_path.c"
-#include "libs/l_process.c"
-#include "libs/l_random.c"
-#include "libs/l_time.c"
+#include "l_core_io.c"
+#include "l_io.c"
+#include "l_load_file.c"
+#include "l_serialization.c"
+#include "l_env.c"
+#include "l_fs.c"
+#include "l_path.c"
+#include "l_process.c"
+#include "l_random.c"
+#include "l_time.c"
 
-static elf_StrSlice battery_source_buffer_from_file(elf_State *state, const char *name)
+static elf_StrSlice lib_source_buffer_from_file(elf_State *state, const char *name)
 {
 	elf_StrSlice source = {0};
 	dy_File_Info info;
@@ -51,13 +51,13 @@ static elf_StrSlice battery_source_buffer_from_file(elf_State *state, const char
 	return source;
 }
 
-int elf_push_code_file(elf_State *state, const char *name)
+elf_Bool elf_push_code_file(elf_State *state, const char *name)
 {
 	if (!name) {
 		elf_push_nil(state);
 		return false;
 	}
-	elf_StrSlice source = battery_source_buffer_from_file(state, name);
+	elf_StrSlice source = lib_source_buffer_from_file(state, name);
 	if (!source.data)
 	{
 		elf_push_nil(state);
@@ -68,7 +68,7 @@ int elf_push_code_file(elf_State *state, const char *name)
 	return result == ELF_ERROR_NONE;
 }
 
-void elf_open_batteries(elf_State *state)
+void elf_open_libraries(elf_State *state)
 {
 	if (!state) return;
 	elf_i32 checkpoint = elf_get_top(state);

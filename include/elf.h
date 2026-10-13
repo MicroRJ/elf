@@ -113,6 +113,7 @@ elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
 elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
 elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
+elf_Bool elf_push_code_file(elf_State *state, const char *name);
 
 elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);

@@ -18,6 +18,7 @@
 
 #include "elf.h"
 #include "base.h"
+#include "libs.h"
 
 #include "logging.c"
 
@@ -58,16 +59,16 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 	return table;
 }
 
-#include "libs/l_native.c"
-#include "libs/l_math.c"
-#include "libs/l_core.c"
-#include "libs/l_gc.c"
-#include "libs/l_json.c"
-#include "libs/l_vm.c"
-#include "libs/l_table.c"
-#include "libs/l_array.c"
-#include "libs/l_string.c"
-#include "libs/l_buffer.c"
+#include "../libs/l_native.c"
+#include "../libs/l_math.c"
+#include "../libs/l_core.c"
+#include "../libs/l_gc.c"
+#include "../libs/l_json.c"
+#include "../libs/l_vm.c"
+#include "../libs/l_table.c"
+#include "../libs/l_array.c"
+#include "../libs/l_string.c"
+#include "../libs/l_buffer.c"
 
 static void init_runtime_storage(elf_State *state)
 {
@@ -172,6 +173,7 @@ elf_State *elf_create_state()
 
 	init_state_storage(state);
 	bootstrap_state(state);
+	elf_open_libraries(state);
 
 	return state;
 }

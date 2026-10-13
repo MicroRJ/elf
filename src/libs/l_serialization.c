@@ -41,11 +41,11 @@ ELF_FUNCTION(l_serialization_load_json_file)
 	return 1;
 }
 
-static const Battery_Binding l_serialization[] = {
+static const Lib_Binding l_serialization[] = {
 	{"load_json_file", l_serialization_load_json_file},
 };
 
 static void elf_lib_serialization(elf_State *state)
 {
-	new_binding_table(state, l_serialization, battery_array_count(sizeof(l_serialization), sizeof(l_serialization[0])));
+	new_binding_table(state, l_serialization, lib_array_count(sizeof(l_serialization), sizeof(l_serialization[0])));
 }

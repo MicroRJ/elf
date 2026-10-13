@@ -313,7 +313,7 @@ ELF_FUNCTION(lib_fs_for_each_path)
 	return 1;
 }
 
-static const Battery_Binding l_fs[] = {
+static const Lib_Binding l_fs[] = {
 	{"exists",                lib_fs_exists},
 	{"is_file",               lib_fs_is_file},
 	{"is_directory",          lib_fs_is_directory},
@@ -336,5 +336,5 @@ static const Battery_Binding l_fs[] = {
 
 static void elf_lib_fs(elf_State *state)
 {
-	new_binding_table(state, l_fs, battery_array_count(sizeof(l_fs), sizeof(l_fs[0])));
+	new_binding_table(state, l_fs, lib_array_count(sizeof(l_fs), sizeof(l_fs[0])));
 }

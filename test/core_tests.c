@@ -5,7 +5,7 @@ int main(void)
 	int result_code = 0;
 	elf_State *state = elf_create_state();
 	elf_get_global(state, "elf");
-	if (!elf_get_field(state, -1, "fs") || !elf_is_nil(state, -1)) {
+	if (!elf_get_field(state, -1, "fs") || elf_type(state, -1) != ELF_VALUE_TYPE_TABLE) {
 		result_code = 1;
 		goto done;
 	}
