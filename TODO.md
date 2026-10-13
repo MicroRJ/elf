@@ -57,9 +57,22 @@ here instead of scattering `TODO` comments through the source.
 - [ ] Add a protected runtime-call boundary.
   - Runtime failures in elf code or native functions must unwind to the host
     instead of terminating the process.
+  - Remove `RuntimeErrorType`; it currently supplies only fatal diagnostic labels,
+    and nearly every call site uses `RUNTIME_ERROR_GENERIC`.
+  - Represent recoverable runtime failures with the existing structured Error
+    value. Keep `elf_ErrorCode` for immediate C API operation status rather than
+    treating it as a competing runtime error representation.
+  - Separate ordinary runtime failures such as bad operands, invalid calls,
+    bounds errors, and readonly writes from genuine internal panics such as
+    unknown bytecode or violated VM invariants.
+  - Give out-of-memory failure a non-allocating path; constructing an Error table
+    cannot itself be required to succeed under memory exhaustion.
   - Return a status and a durable diagnostic, while restoring the stack and call
     frames to a documented state.
   - Cover failures raised by bytecode, core libraries, and `elf_error()`.
+  - Do not merely make `elf_report_runtime_error()` return: existing callers rely
+    on it being non-returning and may continue with invalid state. Convert helpers,
+    VM operations, and native-function boundaries to propagate failure first.
 
 - [ ] Turn user-controlled limits into diagnostics rather than assertions or
   process aborts.

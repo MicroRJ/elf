@@ -69,9 +69,9 @@ static elf_i32 battery_process_metatable(elf_State *state)
 static u32 battery_process_validate_arguments(elf_State *state, elf_i32 index)
 {
 	u32 count = 0;
-	if (elf_type(state, index) != ELF_VALUE_TYPE_ARRAY || !elf_length(state, index, &count) || count == 0)
+	if (elf_type(state, index) != ELF_VALUE_TYPE_ARRAY || !elf_length(state, index, &count))
 	{
-		elf_error(state, "process.start expected a non-empty argument array");
+		elf_error(state, "process.start expected an argument array");
 	}
 	for (u32 argument_index = 0; argument_index < count; ++argument_index)
 	{
@@ -89,7 +89,10 @@ static u32 battery_process_validate_arguments(elf_State *state, elf_i32 index)
 static dy_String_Array battery_process_load_arguments(elf_State *state, elf_i32 index, u32 count, dy_Arena *arena)
 {
 	dy_String_Array arguments = {0};
-	arguments.items = dy_arena_push(arena, sizeof(*arguments.items) * count, _Alignof(dy_String));
+	if (count != 0)
+	{
+		arguments.items = dy_arena_push(arena, sizeof(*arguments.items) * count, _Alignof(dy_String));
+	}
 	if (arguments.items)
 	{
 		arguments.count = count;
@@ -179,20 +182,26 @@ static int battery_push_process_state(elf_State *state, dy_Result result, dy_Pro
 
 ELF_FUNCTION(l_process_start)
 {
-	lib_check_arg_count(S, "process.start", nargs, 1, 2);
-	elf_i32 arguments_index = elf_abs_index(S, 1);
-	u32 argument_count = battery_process_validate_arguments(S, arguments_index);
-	dy_Process_Start_Options options = {0};
-	if (nargs > 2)
-	{
-		battery_process_load_options(S, elf_abs_index(S, 2), &options);
-	}
+	lib_check_arg_count(S, "process.start", nargs, 1, 3);
+	elf_StrSlice executable_value = lib_load_string(S, 1);
+	dy_String executable = { .data = executable_value.data, .size = executable_value.size };
+	elf_i32 arguments_index = nargs > 2 ? elf_abs_index(S, 2) : 0;
+	u32 argument_count = nargs > 2 ? battery_process_validate_arguments(S, arguments_index) : 0;
+	elf_i32 options_index = nargs > 3 ? elf_abs_index(S, 3) : 0;
 	elf_i32 metatable = battery_process_metatable(S);
 	dy_Scratch scratch = dy_begin_scratch();
-	options.arguments = battery_process_load_arguments(S, arguments_index, argument_count, scratch.arena);
+	dy_String_Array arguments = battery_process_load_arguments(S, arguments_index, argument_count, scratch.arena);
+	dy_Process_Start_Options options = {
+		.executable = executable,
+		.arguments = arguments,
+	};
+	if (nargs > 3)
+	{
+		battery_process_load_options(S, options_index, &options);
+	}
 	dy_Process process = {0};
 	dy_Result result = { .error = DY_ERROR_OUT_OF_MEMORY };
-	if (options.arguments.items)
+	if (argument_count == 0 || arguments.items)
 	{
 		result = dy_process_start(options, &process);
 	}

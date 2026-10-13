@@ -1,11 +1,11 @@
 project := elf.load_file("project.elf")
-tasks := elf.load_file("bootstrap/windows-x64/c.elf").project_to_tasks(project, {
+tasks := manny.load("c").project_to_tasks(project, {
 	output_directory = "build",
-	compile_options = { "/Od", "/Zi", "/D_DEBUG", "-fcolor-diagnostics", "-fansi-escape-codes" },
+	compile_options = [ "/Od", "/Zi", "/D_DEBUG", "-fcolor-diagnostics", "-fansi-escape-codes" ],
 })
 
 site_targets := elf.load_file("site/site.elf")
-elf.assert(elf.type_of(site_targets) == "table", "site/site.elf must return its targets")
+elf.assert(elf.type_of(site_targets) == "array", "site/site.elf must return its targets")
 
 options := {
 	workers = 4,
@@ -15,40 +15,40 @@ options := {
 entries := {}
 
 entries.lib = fun() {
-	ret manny.build({ targets = { tasks.default_task }, options = options })
+	ret manny.build({ targets = [ tasks.default_task ], options = options })
 }
 
 entries.build = fun() {
 	ret manny.build({
-		targets = {
+		targets = [
 			tasks.targets.public_header_test,
 			tasks.targets.core_tests,
 			tasks.targets.tests,
 			tasks.targets.benchmarks,
 			tasks.targets.bytecode_tool,
 			tasks.targets.elf_runner,
-		},
+		],
 		options = options,
 	})
 }
 
 entries.test = fun() {
 	ret manny.build({
-		targets = {
+		targets = [
 			tasks.targets.public_header_test,
 			tasks.targets.run_core_tests,
 			tasks.targets.run_tests,
-		},
+		],
 		options = options,
 	})
 }
 
 entries.optimized = fun() {
-	ret manny.build({ targets = { tasks.targets.optimized_library }, options = options })
+	ret manny.build({ targets = [ tasks.targets.optimized_library ], options = options })
 }
 
 entries.benchmark = fun() {
-	ret manny.build({ targets = { tasks.targets.run_optimized_benchmarks }, options = options })
+	ret manny.build({ targets = [ tasks.targets.run_optimized_benchmarks ], options = options })
 }
 
 entries.site = fun() {

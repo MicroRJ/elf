@@ -165,6 +165,8 @@ struct elf_State
 		u32          string_bucket_count;
 		elf_String **string_buckets;
 	};
+
+	// TODO(RJ): should we just allow the user to add metatables to their things?
 	struct
 	{
 		elf_Table *integer;
@@ -177,6 +179,7 @@ struct elf_State
 	metatables;
 };
 
+// TODO(RJ): remove this!
 typedef enum
 {
 	RUNTIME_ERROR_NONE = 0,

@@ -3,7 +3,7 @@
 
 @REM Always build from the repository root so paths in build.elf are stable.
 @PUSHD "%~dp0"
-@"%~dp0bootstrap\windows-x64\manny.exe" %*
+@manny %*
 @SET "ELF_BUILD_EXIT=%ERRORLEVEL%"
 @POPD
 
