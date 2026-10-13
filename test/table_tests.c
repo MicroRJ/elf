@@ -175,10 +175,8 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	elf_Table *json_table = value_as_table(json_value);
 	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "parse")), "elf.json.parse is a field function");
 	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "stringify")), "elf.json.stringify is a field function");
-
-	elf_Value serialization_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "serialization"));
-	expect_table_value(serialization_value, "elf.serialization is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(serialization_value), test_key_string(state, "load_json_file")), "elf.serialization.load_json_file is a field function");
+	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "load_file")), "elf.json.load_file is a field function");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "serialization")), "elf.serialization is not installed");
 
 	elf_Value math_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "math"));
 	expect_table_value(math_value, "elf.math is a table");

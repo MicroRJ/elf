@@ -3,6 +3,7 @@
 //
 
 #include <limits.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,13 +13,14 @@
 #include "core.h"
 #include "helpers.h"
 #include "memory.h"
+#include "compiler.h"
 #include "lib_helpers.h"
 #include "libs.h"
 
 #include "l_core_io.c"
 #include "l_io.c"
 #include "l_load_file.c"
-#include "l_serialization.c"
+#include "l_json.c"
 #include "l_env.c"
 #include "l_fs.c"
 #include "l_path.c"
@@ -30,20 +32,20 @@ static elf_StrSlice lib_source_buffer_from_file(elf_State *state, const char *na
 {
 	elf_StrSlice source = {0};
 	dy_File_Info info;
-	if (dy_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
+	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
 	dy_File file;
-	if (dy_file_open(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
+	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
 		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return source;
 
 	u64 allocation_size = info.size + 16;
 	char *data = elf_alloc_zero(state, allocation_size);
 	if (!data) {
-		dy_file_close(file);
+		dy_close_file(file);
 		return source;
 	}
 	dy_u64 read = 0;
-	dy_Result read_result = dy_file_read(file, data, info.size, &read);
-	dy_file_close(file);
+	dy_Result read_result = dy_read_file(file, data, info.size, &read);
+	dy_close_file(file);
 	if (read_result.error || read != info.size) {
 		elf_free(state, data, allocation_size);
 		return source;
@@ -79,7 +81,7 @@ void elf_open_libraries(elf_State *state)
 	elf_i32 root = elf_abs_index(state, -1);
 	if (elf_type(state, root) != ELF_VALUE_TYPE_TABLE) goto cleanup;
 
-	elf_lib_serialization(state); elf_set_field(state, root, "serialization");
+	elf_lib_json(state);          elf_set_field(state, root, "json");
 	elf_lib_env(state);           elf_set_field(state, root, "env");
 	elf_lib_fs(state);            elf_set_field(state, root, "fs");
 	elf_lib_path(state);          elf_set_field(state, root, "path");

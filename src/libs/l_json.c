@@ -24,10 +24,12 @@ static void json_push_error_value(elf_State *state, const char *message, const C
 
 	if (compiler_message)
 	{
+		SourceSite site = compiler_message->site;
+		i64 column = site.line_index && site.line_offset <= site.offset ? 1 + (i64)(site.offset - site.line_offset) : 0;
 		elf_Value line_key = value_from_string(elf_string_from_data(state, "line"));
 		elf_Value column_key = value_from_string(elf_string_from_data(state, "column"));
-		elf_table_set(state, info, line_key, value_from_integer(compiler_message->site.line_index));
-		elf_table_set(state, info, column_key, value_from_integer((i64)source_slice_column(compiler_message->site)));
+		elf_table_set(state, info, line_key, value_from_integer(site.line_index));
+		elf_table_set(state, info, column_key, value_from_integer(column));
 	}
 }
 
@@ -272,9 +274,57 @@ ELF_FUNCTION(l_json_stringify)
 	return 1;
 }
 
+ELF_FUNCTION(l_json_load_file)
+{
+	lib_check_arg_count(S, "json.load_file", nargs, 1, 1);
+	const char *name = lib_load_cstr(S, 1);
+	dy_File_Info info;
+	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > INT_MAX)
+	{
+		elf_push_nil(S);
+		return 1;
+	}
+
+	dy_File file;
+	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
+	{
+		elf_push_nil(S);
+		return 1;
+	}
+
+	u64 allocation_size = info.size + 1;
+	char *data = elf_alloc(S, allocation_size);
+	if (!data)
+	{
+		dy_close_file(file);
+		elf_push_nil(S);
+		return 1;
+	}
+
+	dy_u64 size = 0;
+	dy_Result read = dy_read_file(file, data, info.size, &size);
+	dy_close_file(file);
+	if (read.error || size != info.size)
+	{
+		elf_free(S, data, allocation_size);
+		elf_push_nil(S);
+		return 1;
+	}
+
+	data[size] = 0;
+	elf_StrSlice source = {data, size};
+	if (elf_push_json(S, name, source) != ELF_ERROR_NONE)
+	{
+		elf_push_nil(S);
+	}
+	elf_free(S, data, allocation_size);
+	return 1;
+}
+
 static const elf_Binding l_json[] = {
 	{"parse",     l_json_parse},
 	{"stringify", l_json_stringify},
+	{"load_file", l_json_load_file},
 };
 
 static elf_Table *elf_lib_json(elf_State *state)

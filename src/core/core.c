@@ -43,7 +43,6 @@
 #include "../libs/l_math.c"
 #include "../libs/l_core.c"
 #include "../libs/l_gc.c"
-#include "../libs/l_json.c"
 #include "../libs/l_vm.c"
 #include "../libs/l_table.c"
 #include "../libs/l_array.c"
@@ -115,7 +114,6 @@ static void bootstrap_standard_libraries(elf_State *state)
 		value_from_function(l_buffer_new));
 	table_set_string_table(state, elf_table, "math", elf_lib_math(state));
 	table_set_string_table(state, elf_table, "gc", elf_lib_gc(state));
-	table_set_string_table(state, elf_table, "json", elf_lib_json(state));
 	table_set_string_table(state, elf_table, "vm", elf_lib_vm(state));
 
 	elf_StrSlice elf_name = {(char *)"elf", 3};

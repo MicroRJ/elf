@@ -6,7 +6,7 @@
 
 static b32 fs_get_file_info(const char *path, dy_File_Info *info)
 {
-	return !dy_file_info(dy_string_from_cstring(path), info).error &&
+	return !dy_get_file_info(dy_string_from_cstring(path), info).error &&
 		!info->is_directory && !info->is_symbolic_link;
 }
 
@@ -14,7 +14,7 @@ static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directo
 {
 	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
 	dy_File_Info info = {0};
-	b32 found = !dy_file_info(dy_string_from_cstring(lib_load_cstr(state, 1)), &info).error;
+	b32 found = !dy_get_file_info(dy_string_from_cstring(lib_load_cstr(state, 1)), &info).error;
 	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
 	return 1;
 }
@@ -52,7 +52,7 @@ ELF_FUNCTION(lib_fs_read_text_file)
 		return 1;
 	}
 	dy_File file;
-	if (dy_file_open(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
+	if (dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
 		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) {
 		elf_push_nil(S);
 		return 1;
@@ -60,13 +60,13 @@ ELF_FUNCTION(lib_fs_read_text_file)
 	u64 allocation_size = info.size + 1;
 	char *data = elf_alloc(S, allocation_size);
 	if (!data) {
-		dy_file_close(file);
+		dy_close_file(file);
 		elf_push_nil(S);
 		return 1;
 	}
 	dy_u64 size = 0;
-	dy_Result read = dy_file_read(file, data, info.size, &size);
-	dy_file_close(file);
+	dy_Result read = dy_read_file(file, data, info.size, &size);
+	dy_close_file(file);
 	if (read.error || size != info.size) {
 		elf_free(S, data, allocation_size);
 		elf_push_nil(S);
@@ -83,15 +83,15 @@ ELF_FUNCTION(lib_fs_write_text_file)
 	const char *path = lib_load_cstr(S, 1);
 	elf_StrSlice data = lib_load_string_slice(S, 2);
 	dy_File file;
-	if (dy_file_open(dy_string_from_cstring(path), DY_FILE_CREATE_ALWAYS,
+	if (dy_access_file(dy_string_from_cstring(path), DY_FILE_CREATE_ALWAYS,
 		DY_FILE_WRITE, &file).error) {
 		elf_push_int(S, false);
 		return 1;
 	}
 	dy_u64 written = 0;
-	dy_Result write = dy_file_write(file, data.data, data.size, &written);
+	dy_Result write = dy_write_file(file, data.data, data.size, &written);
 	b32 success = !write.error && written == data.size;
-	dy_file_close(file);
+	dy_close_file(file);
 	elf_push_int(S, success);
 	return 1;
 }
@@ -116,14 +116,14 @@ ELF_FUNCTION(lib_fs_get_file_info)
 ELF_FUNCTION(lib_fs_create_directory)
 {
 	lib_check_arg_count(S, "fs.create_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_fs_create_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_create_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_create_directories)
 {
 	lib_check_arg_count(S, "fs.create_directories", nargs, 1, 1);
-	elf_push_int(S, !dy_fs_create_directories(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_create_directories(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
@@ -133,8 +133,8 @@ static int fs_transfer_file(elf_State *state, int nargs, b32 move)
 	const char *source = lib_load_cstr(state, 1);
 	const char *destination = lib_load_cstr(state, 2);
 	b32 overwrite = nargs == 4 ? (b32)lib_load_integer(state, 3) : true;
-	dy_Result transfer = move ? dy_fs_move(dy_string_from_cstring(source),
-		dy_string_from_cstring(destination), overwrite) : dy_fs_copy(dy_string_from_cstring(source),
+	dy_Result transfer = move ? dy_move_file(dy_string_from_cstring(source),
+		dy_string_from_cstring(destination), overwrite) : dy_copy_file(dy_string_from_cstring(source),
 		dy_string_from_cstring(destination), overwrite);
 	b32 success = !transfer.error;
 	elf_push_int(state, success);
@@ -154,43 +154,43 @@ ELF_FUNCTION(lib_fs_move_file)
 ELF_FUNCTION(lib_fs_remove_file)
 {
 	lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1);
-	elf_push_int(S, !dy_fs_remove_file(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_remove_file(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_directory)
 {
 	lib_check_arg_count(S, "fs.remove_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_fs_remove_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_remove_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_tree)
 {
 	lib_check_arg_count(S, "fs.remove_tree", nargs, 1, 1);
-	elf_push_int(S, !dy_fs_remove_tree(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_remove_tree(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_get_working_directory)
 {
 	lib_check_arg_count(S, "fs.get_working_directory", nargs, 0, 0);
-	dy_Scratch scratch = dy_scratch_begin();
+	dy_Scratch scratch = dy_begin_scratch();
 	dy_String directory;
-	if (dy_path_current_directory(scratch.arena, &directory).error || directory.size > INT_MAX) {
-		dy_scratch_end(scratch);
+	if (dy_get_current_directory(scratch.arena, &directory).error || directory.size > INT_MAX) {
+		dy_end_scratch(scratch);
 		elf_push_nil(S);
 		return 1;
 	}
 	lib_push_string(S, directory.data, (u32)directory.size);
-	dy_scratch_end(scratch);
+	dy_end_scratch(scratch);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_set_working_directory)
 {
 	lib_check_arg_count(S, "fs.set_working_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_path_set_current_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_set_current_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
 	return 1;
 }
 
@@ -200,14 +200,14 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 	dy_Directory directory;
 	dy_Directory_Entry entry;
 	dy_Directory_Status status;
-	if (dy_directory_find_first(path, &directory, &entry, &status).error) return false;
+	if (dy_find_first_file(path, &directory, &entry, &status).error) return false;
 	while (status == DY_DIRECTORY_ENTRY)
 	{
 		dy_Path_Mark mark = dy_path_mark(path);
 		if (!dy_path_push(path, entry.name))
 		{
-			if (dy_directory_find_next(&directory, &entry, &status).error) {
-				dy_directory_close(&directory);
+			if (dy_find_next_file(&directory, &entry, &status).error) {
+				dy_close_directory(&directory);
 				return false;
 			}
 			continue;
@@ -228,12 +228,12 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 			fs_collect_paths(state, path, recursion_level - 1, output, call_each, count);
 		}
 		dy_path_pop(path, mark);
-		if (dy_directory_find_next(&directory, &entry, &status).error) {
-			dy_directory_close(&directory);
+		if (dy_find_next_file(&directory, &entry, &status).error) {
+			dy_close_directory(&directory);
 			return false;
 		}
 	}
-	return !dy_directory_close(&directory).error && status == DY_DIRECTORY_END;
+	return !dy_close_directory(&directory).error && status == DY_DIRECTORY_END;
 }
 
 ELF_FUNCTION(lib_fs_get_paths)
