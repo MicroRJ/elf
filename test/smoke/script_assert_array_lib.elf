@@ -9,6 +9,18 @@ test_assert(array:remove(2) == 20)
 test_assert(array:get(-1) == 40)
 test_assert(array:set(-1, 41)[3] == 41)
 
+shared := { value = 1 }
+source := [10, shared]
+clone := source:clone()
+test_assert(clone != source)
+test_assert(clone:length() == 2)
+test_assert(clone[0] == 10)
+test_assert(clone[1] == shared)
+clone:set(0, 20)
+clone:add(30)
+test_assert(source[0] == 10)
+test_assert(source:length() == 2)
+
 slice := array:slice(1, 3)
 test_assert(elf.type_of(slice) == "array")
 test_assert(slice:length() == 2)

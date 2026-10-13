@@ -31,6 +31,7 @@ static void test_array_value(void)
 		test_fail("array value resolves the array metatable");
 	}
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.array, test_key_string(state, "length")), "array.length is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.array, test_key_string(state, "clone")), "array.clone is a method");
 
 	elf_destroy_state(state);
 }

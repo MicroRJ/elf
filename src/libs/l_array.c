@@ -173,6 +173,18 @@ ELF_FUNCTION(l_array_slice)
 	return 1;
 }
 
+ELF_FUNCTION(l_array_clone)
+{
+	lib_check_arg_count(S, "array.clone", nargs, 0, 0);
+	elf_Array *array = array_receiver(S);
+	elf_Array *result = push_new_array(S);
+	for (u32 i = 0; i < array->count; ++i)
+	{
+		elf_array_add(S, result, array->items[i]);
+	}
+	return 1;
+}
+
 ELF_FUNCTION(l_array_extend)
 {
 	elf_Array *array = array_receiver(S);
@@ -325,6 +337,7 @@ static const elf_Binding l_array[] = {
 	{"pop",     l_array_pop},
 	{"remove",  l_array_remove},
 	{"slice",   l_array_slice},
+	{"clone",   l_array_clone},
 	{"extend",  l_array_extend},
 	{"swap",    l_array_swap},
 	{"reverse", l_array_reverse},

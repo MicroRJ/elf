@@ -241,12 +241,12 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "has")), "table.has is a method");
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "delete")), "table.delete is a method");
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clear")), "table.clear is a method");
+	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clone")), "table.clone is a method");
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "keys")), "table.keys is a method");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "map_equal")), "table.map_equal is absent");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "haskey")), "table.haskey is absent");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "values")), "table.values is absent");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "pairs")), "table.pairs is absent");
-	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clone")), "table.clone is absent");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "merge")), "table.merge is absent");
 
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "sockets")), "deleted elf.sockets library is absent");

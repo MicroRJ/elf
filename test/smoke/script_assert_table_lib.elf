@@ -16,12 +16,22 @@ test_assert(table:has("nil_value"))
 test_assert(table:delete("nil_value") == nil)
 test_assert(table:has("nil_value") == 0)
 
+shared := [1]
+source := { value = 10, shared = shared }
+clone := source:clone()
+test_assert(clone != source)
+test_assert(clone.value == 10)
+test_assert(clone.shared == shared)
+clone.value = 20
+clone.extra = 30
+test_assert(source.value == 10)
+test_assert(source:has("extra") == 0)
+
 table_meta := elf.metatable(table)
 test_assert(table_meta.map_equal == nil)
 test_assert(table_meta.haskey == nil)
 test_assert(table_meta.values == nil)
 test_assert(table_meta.pairs == nil)
-test_assert(table_meta.clone == nil)
 test_assert(table_meta.merge == nil)
 
 test_assert(table:clear() == table)

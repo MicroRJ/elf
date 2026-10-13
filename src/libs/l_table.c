@@ -41,6 +41,22 @@ ELF_FUNCTION(l_table_clear)
 	return 1;
 }
 
+ELF_FUNCTION(l_table_clone)
+{
+	lib_check_arg_count(S, "table.clone", nargs, 0, 0);
+	elf_Table *table = table_receiver(S);
+	elf_Table *result = push_new_table(S);
+	for (u32 i = 0; i < table->capacity; ++i)
+	{
+		Entry entry = table->entries[i];
+		if (entry_is_key(entry))
+		{
+			elf_table_set(S, result, entry_key_value(entry), entry.value);
+		}
+	}
+	return 1;
+}
+
 ELF_FUNCTION(l_table_keys)
 {
 	lib_check_arg_count(S, "table.keys", nargs, 0, 0);
@@ -63,6 +79,7 @@ static const elf_Binding l_table[] = {
 	{"has",    l_table_has},
 	{"delete", l_table_delete},
 	{"clear",  l_table_clear},
+	{"clone",  l_table_clone},
 	{"keys",   l_table_keys},
 };
 
