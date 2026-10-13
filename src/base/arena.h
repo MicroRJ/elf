@@ -11,12 +11,12 @@ typedef dy_Scratch elf_Scratch;
 
 #define elf_arena_create dy_arena_create
 #define elf_arena_destroy dy_arena_destroy
-#define elf_arena_reserve dy_arena_reserve
+#define elf_arena_reserve dy_arena_alloc
 #define elf_arena_align(arena, alignment) ((void)dy_arena_push((arena), 0, (alignment)))
 
 static inline void *elf_arena_push(elf_Arena *arena, u64 size)
 {
-	void *result = dy_arena_reserve(arena, size);
+	void *result = dy_arena_alloc(arena, size);
 	if (result) {
 		arena->used += size;
 	}
@@ -47,8 +47,8 @@ static inline void *elf_arena_push_copy(elf_Arena *arena, u64 size, const void *
 #define elf_arena_push_nchar dy_arena_push_nchar
 #define elf_arena_pushfv dy_arena_pushfv
 #define elf_arena_pushf dy_arena_pushf
-#define elf_begin_scratch dy_begin_scratch
-#define elf_begin_scratch_excluding dy_begin_different_scratch
-#define elf_end_scratch dy_end_scratch
+#define elf_begin_scratch dy_scratch_begin
+#define elf_begin_scratch_excluding dy_scratch_begin_excluding
+#define elf_end_scratch dy_scratch_end
 
 #endif

@@ -9,6 +9,9 @@
 #include <dy.h>
 
 #include "elf.h"
+#include "core.h"
+#include "helpers.h"
+#include "memory.h"
 #include "lib_helpers.h"
 #include "libs.h"
 
@@ -27,20 +30,20 @@ static elf_StrSlice lib_source_buffer_from_file(elf_State *state, const char *na
 {
 	elf_StrSlice source = {0};
 	dy_File_Info info;
-	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
+	if (dy_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
 	dy_File file;
-	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
+	if (dy_file_open(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
 		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return source;
 
 	u64 allocation_size = info.size + 16;
 	char *data = elf_alloc_zero(state, allocation_size);
 	if (!data) {
-		dy_close_file(file);
+		dy_file_close(file);
 		return source;
 	}
 	dy_u64 read = 0;
-	dy_Result read_result = dy_read_file(file, data, info.size, &read);
-	dy_close_file(file);
+	dy_Result read_result = dy_file_read(file, data, info.size, &read);
+	dy_file_close(file);
 	if (read_result.error || read != info.size) {
 		elf_free(state, data, allocation_size);
 		return source;

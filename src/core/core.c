@@ -39,27 +39,7 @@
 #include "value_text.c"
 
 #include "compiler.h"
-
-static void table_set_string_table(elf_State *state, elf_Table *parent, const char *name, elf_Table *table)
-{
-	elf_Value key = value_from_string(elf_string_from_data(state, name));
-	elf_Value value = value_from_table(table);
-	elf_table_set(state, parent, key, value);
-}
-
-static elf_Table *new_binding_table(elf_State *state, const elf_Binding *bindings, u32 count)
-{
-	elf_Table *table = push_new_table(state);
-	for (u32 i = 0; i < count; ++i)
-	{
-		elf_Value key = value_from_string(elf_string_from_data(state, bindings[i].name));
-		elf_Value value = value_from_function(bindings[i].function);
-		elf_table_set(state, table, key, value);
-	}
-	return table;
-}
-
-#include "../libs/l_native.c"
+#include "../libs/lib_helpers.h"
 #include "../libs/l_math.c"
 #include "../libs/l_core.c"
 #include "../libs/l_gc.c"

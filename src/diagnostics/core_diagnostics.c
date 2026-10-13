@@ -147,7 +147,7 @@ static void abort_after_runtime_error(void)
 	dy_debug_break();
 #endif
 	log_line(LOG_LEVEL_FATAL, "elf is exiting...");
-	dy_exit_process(1);
+	dy_process_exit(1);
 }
 
 static void report_runtime_error_message(elf_State *state, RuntimeErrorType error, int instr, const char *message)

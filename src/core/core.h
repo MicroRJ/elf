@@ -88,13 +88,6 @@ struct elf_Closure
 	elf_Value     captures[];
 };
 
-typedef struct
-{
-	char         *name;
-	elf_Function function;
-}
-elf_Binding;
-
 typedef struct StackFrame StackFrame;
 struct StackFrame
 {

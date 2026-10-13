@@ -259,14 +259,14 @@ ELF_FUNCTION(l_io_stderr)
 	return lib_push_standard_stream(S, DY_STANDARD_ERROR);
 }
 
-static const Lib_Binding l_stream[] = {
+static const elf_Binding l_stream[] = {
 	{"read",      l_stream_read},
 	{"write",     l_stream_write},
 	{"close",     l_stream_close},
 	{"is_closed", l_stream_is_closed},
 };
 
-static const Lib_Binding l_io[] = {
+static const elf_Binding l_io[] = {
 	{"pipe",   l_io_pipe},
 	{"stdin",  l_io_stdin},
 	{"stdout", l_io_stdout},
@@ -275,9 +275,9 @@ static const Lib_Binding l_io[] = {
 
 static void elf_lib_io(elf_State *state)
 {
-	new_binding_table(state, l_io, lib_array_count(sizeof(l_io), sizeof(l_io[0])));
+	new_binding_table(state, l_io, ARRAY_COUNT(l_io));
 	elf_i32 io = elf_abs_index(state, -1);
-	new_binding_table(state, l_stream, lib_array_count(sizeof(l_stream), sizeof(l_stream[0])));
+	new_binding_table(state, l_stream, ARRAY_COUNT(l_stream));
 	elf_set_field(state, io, "Stream");
 	lib_set_integer_field(state, io, "SUCCESS", LIB_IO_SUCCESS);
 	lib_set_integer_field(state, io, "WOULD_BLOCK", LIB_IO_WOULD_BLOCK);

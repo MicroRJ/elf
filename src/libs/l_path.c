@@ -15,7 +15,7 @@ static const char *path_last_separator(const char *begin, const char *end)
 ELF_FUNCTION(lib_path_parent)
 {
 	lib_check_arg_count(S, "path.parent", nargs, 1, 2);
-	elf_StrSlice path = lib_load_string(S, 1);
+	elf_StrSlice path = lib_load_string_slice(S, 1);
 	i32 levels = nargs > 2 ? (i32)lib_load_integer(S, 2) : 1;
 	const char *begin = path.data;
 	const char *end = begin + path.size;
@@ -33,7 +33,7 @@ ELF_FUNCTION(lib_path_parent)
 ELF_FUNCTION(lib_path_filename)
 {
 	lib_check_arg_count(S, "path.filename", nargs, 1, 1);
-	elf_StrSlice path = lib_load_string(S, 1);
+	elf_StrSlice path = lib_load_string_slice(S, 1);
 	const char *begin = path.data;
 	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
@@ -45,7 +45,7 @@ ELF_FUNCTION(lib_path_filename)
 ELF_FUNCTION(lib_path_stem)
 {
 	lib_check_arg_count(S, "path.stem", nargs, 1, 1);
-	elf_StrSlice path = lib_load_string(S, 1);
+	elf_StrSlice path = lib_load_string_slice(S, 1);
 	const char *begin = path.data;
 	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
@@ -68,7 +68,7 @@ ELF_FUNCTION(lib_path_stem)
 ELF_FUNCTION(lib_path_extension)
 {
 	lib_check_arg_count(S, "path.extension", nargs, 1, 1);
-	elf_StrSlice path = lib_load_string(S, 1);
+	elf_StrSlice path = lib_load_string_slice(S, 1);
 	const char *begin = path.data;
 	const char *end = begin + path.size;
 	const char *separator = path_last_separator(begin, end);
@@ -91,8 +91,8 @@ ELF_FUNCTION(lib_path_extension)
 ELF_FUNCTION(lib_path_join)
 {
 	lib_check_arg_count(S, "path.join", nargs, 2, 2);
-	elf_StrSlice left = lib_load_string(S, 1);
-	elf_StrSlice right = lib_load_string(S, 2);
+	elf_StrSlice left = lib_load_string_slice(S, 1);
+	elf_StrSlice right = lib_load_string_slice(S, 2);
 	const char *left_data = left.data;
 	const char *right_data = right.data;
 	u32 left_size = (u32)left.size;
@@ -126,7 +126,7 @@ ELF_FUNCTION(lib_path_join)
 	return 1;
 }
 
-static const Lib_Binding l_path[] = {
+static const elf_Binding l_path[] = {
 	{"join",      lib_path_join},
 	{"parent",    lib_path_parent},
 	{"filename",  lib_path_filename},
@@ -136,5 +136,5 @@ static const Lib_Binding l_path[] = {
 
 static void elf_lib_path(elf_State *state)
 {
-	new_binding_table(state, l_path, lib_array_count(sizeof(l_path), sizeof(l_path[0])));
+	new_binding_table(state, l_path, ARRAY_COUNT(l_path));
 }

@@ -155,7 +155,7 @@ static void lib_process_load_options(elf_State *state, elf_i32 index, dy_Process
 	elf_get_field(state, index, "hide_window");
 	if (!elf_is_nil(state, -1))
 	{
-		options->hide_window = lib_load_integer(state, (u32)elf_abs_index(state, -1)) != 0;
+		options->hide_window = lib_load_stack_integer(state, elf_abs_index(state, -1)) != 0;
 	}
 	elf_pop(state, 1);
 }
@@ -183,13 +183,13 @@ static int lib_push_process_state(elf_State *state, dy_Result result, dy_Process
 ELF_FUNCTION(l_process_start)
 {
 	lib_check_arg_count(S, "process.start", nargs, 1, 3);
-	elf_StrSlice executable_value = lib_load_string(S, 1);
+	elf_StrSlice executable_value = lib_load_string_slice(S, 1);
 	dy_String executable = { .data = executable_value.data, .size = executable_value.size };
 	elf_i32 arguments_index = nargs > 2 ? elf_abs_index(S, 2) : 0;
 	u32 argument_count = nargs > 2 ? lib_process_validate_arguments(S, arguments_index) : 0;
 	elf_i32 options_index = nargs > 3 ? elf_abs_index(S, 3) : 0;
 	elf_i32 metatable = lib_process_metatable(S);
-	dy_Scratch scratch = dy_begin_scratch();
+	dy_Scratch scratch = dy_scratch_begin();
 	dy_String_Array arguments = lib_process_load_arguments(S, arguments_index, argument_count, scratch.arena);
 	dy_Process_Start_Options options = {
 		.executable = executable,
@@ -205,7 +205,7 @@ ELF_FUNCTION(l_process_start)
 	{
 		result = dy_process_start(options, &process);
 	}
-	dy_end_scratch(scratch);
+	dy_scratch_end(scratch);
 	elf_push_int(S, lib_io_status(result.error));
 	int return_count = 1;
 	if (result.error == DY_ERROR_NONE)
@@ -296,7 +296,7 @@ ELF_FUNCTION(l_process_is_closed)
 ELF_FUNCTION(lib_process_id)
 {
 	lib_check_arg_count(S, "process.id", nargs, 0, 0);
-	elf_push_int(S, (elf_i64)dy_current_process_id());
+	elf_push_int(S, (elf_i64)dy_process_current_id());
 	return 1;
 }
 
@@ -308,11 +308,11 @@ ELF_FUNCTION(lib_process_exit)
 	{
 		elf_error(S, "process exit code is out of range");
 	}
-	dy_exit_process((dy_i32)exit_code);
+	dy_process_exit((dy_i32)exit_code);
 	return 0;
 }
 
-static const Lib_Binding l_process_methods[] = {
+static const elf_Binding l_process_methods[] = {
 	{"poll",      l_process_poll},
 	{"wait",      l_process_wait},
 	{"kill",      l_process_kill},
@@ -320,7 +320,7 @@ static const Lib_Binding l_process_methods[] = {
 	{"is_closed", l_process_is_closed},
 };
 
-static const Lib_Binding l_process[] = {
+static const elf_Binding l_process[] = {
 	{"start", l_process_start},
 	{"id",    lib_process_id},
 	{"exit",  lib_process_exit},
@@ -328,9 +328,9 @@ static const Lib_Binding l_process[] = {
 
 static void elf_lib_process(elf_State *state)
 {
-	new_binding_table(state, l_process, lib_array_count(sizeof(l_process), sizeof(l_process[0])));
+	new_binding_table(state, l_process, ARRAY_COUNT(l_process));
 	elf_i32 process = elf_abs_index(state, -1);
-	new_binding_table(state, l_process_methods, lib_array_count(sizeof(l_process_methods), sizeof(l_process_methods[0])));
+	new_binding_table(state, l_process_methods, ARRAY_COUNT(l_process_methods));
 	elf_set_field(state, process, "Process");
 	lib_set_integer_field(state, process, "RUNNING", LIB_PROCESS_RUNNING);
 	lib_set_integer_field(state, process, "EXITED", LIB_PROCESS_EXITED);
