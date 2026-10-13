@@ -30,7 +30,6 @@ static inline b32 strings_equal(elf_String *left, elf_String *right)
 	return left == right;
 }
 
-elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 static inline elf_String *elf_string_from_data(elf_State *state, const char *data)
 {
 	ASSERT(data);

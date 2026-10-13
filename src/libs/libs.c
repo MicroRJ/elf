@@ -12,7 +12,6 @@
 #include "elf.h"
 #include "core.h"
 #include "helpers.h"
-#include "memory.h"
 #include "compiler.h"
 #include "lib_helpers.h"
 #include "libs.h"

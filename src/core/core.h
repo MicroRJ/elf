@@ -109,6 +109,8 @@ struct elf_Array
 	elf_Value *items;
 };
 
+#define ENTRY_TOMB_TYPE 0xFFu
+
 typedef struct
 {
 	elf_Value key;
@@ -263,14 +265,69 @@ struct elf_State
 	metatables;
 };
 
+// TODO(RJ): remove this!
+typedef enum
+{
+	RUNTIME_ERROR_NONE = 0,
+	RUNTIME_ERROR_GENERIC,
+	RUNTIME_ERROR_EXPECTS_CALLABLE,
+	RUNTIME_ERROR_INVALID_ARGUMENT_COUNT,
+	RUNTIME_ERROR_UNKNOWN_BYTECODE
+}
+RuntimeErrorType;
+
+#define ELF_OBJECT_REACHABLE 1
+#define ELF_OBJECT_READONLY  2
+#define ELF_GC_NEXT_MIN ((u32)MEGABYTES(1))
+#define ELF_GC_NEXT_MAX ((u32)GIGABYTES(1))
+
+void *elf_alloc(elf_State *state, elf_u64 size);
+void *elf_alloc_zero(elf_State *state, elf_u64 size);
+void *elf_realloc(elf_State *state, void *memory, elf_u64 old_size, elf_u64 new_size);
+void elf_free(elf_State *state, void *memory, elf_u64 size);
+
+void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
+
+elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
+
+elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity);
+b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capacity);
+b32 elf_buffer_resize_object(elf_State *state, elf_ByteBuffer *buffer, u32 size);
+b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const void *data, u32 size);
+b32 elf_buffer_patch_object(elf_State *state, elf_ByteBuffer *buffer, u32 position, u32 delete_size, const void *data, u32 insert_size);
+
+elf_UserObject *elf_user_object_new(elf_State *state, const elf_UserType *type, elf_Table *metatable, u32 size);
+
+elf_Array *elf_array_new(elf_State *state);
+u32 elf_array_add(elf_State *state, elf_Array *array, elf_Value value);
+u32 elf_array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value value);
+elf_Value elf_array_get(elf_State *state, elf_Array *array, u32 index);
+void elf_array_set(elf_State *state, elf_Array *array, u32 index, elf_Value value);
+void elf_array_remove(elf_State *state, elf_Array *array, u32 index, u32 count);
+void elf_array_swap(elf_State *state, elf_Array *array, u32 left, u32 right);
+u32 elf_array_length(elf_Array *array);
+
+elf_Table *elf_table_new(elf_State *state);
+void elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value value);
+elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *table, elf_Value key);
+b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key);
+b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Value *removed);
+void elf_table_clear(elf_State *state, elf_Table *table);
+
+void elf_globals_init(elf_Globals *globals, elf_State *state);
+void elf_globals_destroy(elf_Globals *globals);
+b32 elf_globals_find(elf_Globals *globals, elf_StrSlice name, u32 *slot);
+u32 elf_globals_ensure(elf_Globals *globals, elf_StrSlice name);
+elf_Value elf_globals_get_by_name(elf_Globals *globals, elf_StrSlice name);
+void elf_globals_set_by_name(elf_Globals *globals, elf_StrSlice name, elf_Value value);
+elf_Value elf_globals_get_by_slot(elf_Globals *globals, u32 slot);
+void elf_globals_set_by_slot(elf_Globals *globals, u32 slot, elf_Value value);
+
+void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
+void elf_print_current_runtime_source_location(elf_State *state);
+
 #include "value/value.h"
-#include "globals.h"
-#include "memory.h"
-#include "gc.h"
 #include "string/elf_string.h"
-#include "buffer/elf_buffer.h"
-#include "user/elf_user_object.h"
-#include "array/array.h"
 #include "table/table.h"
 
 static inline b32 bc_function_ref_is_valid(BcFunctionRef function)
@@ -283,19 +340,5 @@ static inline BcFunction *bc_function_from_ref(BcFunctionRef function)
 	ASSERT(bc_function_ref_is_valid(function));
 	return function.module->bytecode_functions + function.index;
 }
-
-// TODO(RJ): remove this!
-typedef enum
-{
-	RUNTIME_ERROR_NONE = 0,
-	RUNTIME_ERROR_GENERIC,
-	RUNTIME_ERROR_EXPECTS_CALLABLE,
-	RUNTIME_ERROR_INVALID_ARGUMENT_COUNT,
-	RUNTIME_ERROR_UNKNOWN_BYTECODE
-}
-RuntimeErrorType;
-
-void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
-void elf_print_current_runtime_source_location(elf_State *state);
 
 #endif

@@ -6,6 +6,31 @@
 #define TABLE_MAX_LOAD_NUMERATOR 3u
 #define TABLE_MAX_LOAD_DENOMINATOR 4u
 
+static inline b32 entry_is_nil(Entry entry)
+{
+	return entry.key.type == ELF_VALUE_TYPE_NIL;
+}
+
+static inline b32 entry_is_tomb(Entry entry)
+{
+	return entry.key.type == ENTRY_TOMB_TYPE;
+}
+
+static inline void entry_set_tomb(Entry *entry)
+{
+	entry->key = value_nil();
+	entry->key.type = (elf_ValueType)ENTRY_TOMB_TYPE;
+	entry->value = value_nil();
+}
+
+static inline Entry entry_from_key_value(elf_Value key, elf_Value value)
+{
+	Entry entry = {};
+	entry.key = key;
+	entry.value = value;
+	return entry;
+}
+
 static void table_check_write(elf_State *state, elf_Table *table)
 {
 	if (table->obj.status & ELF_OBJECT_READONLY)
