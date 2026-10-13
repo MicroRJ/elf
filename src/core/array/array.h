@@ -5,14 +5,6 @@
 #ifndef ELF_CORE_ARRAY_H
 #define ELF_CORE_ARRAY_H
 
-struct elf_Array
-{
-	elf_Object obj;
-	u32 capacity;
-	u32 count;
-	elf_Value *items;
-};
-
 elf_Array *elf_array_new(elf_State *state);
 u32 elf_array_add(elf_State *state, elf_Array *array, elf_Value value);
 u32 elf_array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value value);

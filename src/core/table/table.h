@@ -7,23 +7,6 @@
 
 #define ENTRY_TOMB_TYPE 0xFFu
 
-typedef struct
-{
-	elf_Value key;
-	elf_Value value;
-}
-Entry;
-STATIC_ASSERT(sizeof(Entry) == 32);
-
-struct elf_Table
-{
-	elf_Object obj;
-	Entry *entries;
-	u32 capacity;
-	u32 count;
-	u32 occupied;
-};
-
 elf_Table *elf_table_new(elf_State *state);
 
 void elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value value);

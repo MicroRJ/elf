@@ -3,8 +3,6 @@
 
 #include "elf.h"
 
-typedef struct elf_State elf_State;
-
 void *elf_alloc(elf_State *state, elf_u64 size);
 void *elf_alloc_zero(elf_State *state, elf_u64 size);
 void *elf_realloc(elf_State *state, void *memory, elf_u64 old_size, elf_u64 new_size);

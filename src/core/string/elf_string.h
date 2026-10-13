@@ -5,17 +5,6 @@
 #ifndef ELF_CORE_STRING_H
 #define ELF_CORE_STRING_H
 
-typedef struct elf_State elf_State;
-typedef struct elf_String elf_String;
-
-struct elf_String
-{
-	elf_Object  obj;
-	elf_String *next;
-	u32         hash;
-	char        data[];
-};
-
 #define ELF_STRING_HEADER_SIZE ((u32)offsetof(elf_String, data))
 #define ELF_STRING_MAX_SIZE    (0xffffffffu - ELF_STRING_HEADER_SIZE - 1)
 

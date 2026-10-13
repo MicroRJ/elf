@@ -8,30 +8,6 @@
 #define NIL_VALUE ((elf_Value) { ELF_VALUE_TYPE_NIL })
 #define VALUE_READONLY 2
 
-typedef struct elf_Value elf_Value;
-struct elf_Value
-{
-	u8  type;
-	u8  status;
-	u16 unused;
-	union {
-		i64           x_i64;
-		i64           x_int;
-		f64           x_num;
-		elf_Object   *x_obj;
-		elf_Table    *x_tab;
-		elf_Array    *x_array;
-		elf_String   *x_string;
-		elf_ByteBuffer *x_buffer;
-		elf_UserObject *x_user;
-		elf_Function  x_proc;
-		elf_Closure  *x_closure;
-		void         *x_ptr;
-	};
-};
-
-STATIC_ASSERT(sizeof(elf_Value) == 16);
-
 static inline b32 type_is_object(elf_ValueType type)
 {
 	return type == ELF_VALUE_TYPE_USER_OBJECT
