@@ -39,6 +39,7 @@
 
 #include "compiler.h"
 #include "../libs/l_math.c"
+#include "../libs/l_number.c"
 #include "../libs/l_core.c"
 #include "../libs/l_gc.c"
 #include "../libs/l_vm.c"
@@ -101,7 +102,7 @@ static void bootstrap_standard_libraries(elf_State *state)
 
 	state->metatables.string = elf_lib_string(state);
 	state->metatables.integer = push_new_table(state);
-	state->metatables.number = push_new_table(state);
+	state->metatables.number = elf_lib_number(state);
 	state->metatables.table = elf_lib_table(state);
 	state->metatables.array = elf_lib_array(state);
 	state->metatables.buffer = elf_lib_buffer(state);

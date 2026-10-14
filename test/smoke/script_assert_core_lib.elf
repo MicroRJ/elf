@@ -44,6 +44,13 @@ test_assert(elf.to_string(nil) == "nil")
 test_assert(elf.to_string(42) == "42")
 test_assert(elf.to_string(1.5) == "1.500000")
 test_assert(elf.to_string("elf") == "elf")
+number := 12.345
+test_assert(number:fmt(".00") == "12")
+test_assert(number:fmt(".02") == "12.35")
+test_assert(1.5:fmt(".02") == "1.50")
+test_assert((-0.0):fmt(".02") == "-0.00")
+test_assert(elf.is_error(number:fmt("2")))
+test_assert(elf.is_error(number:fmt(".100")))
 string_table := { answer = 42 }
 test_assert(elf.to_string(string_table) == "{answer = 42}")
 test_assert(elf.to_string(string_table) == "" + string_table)
