@@ -502,7 +502,9 @@ static void test_backend_if_else_restores_stack_top(void)
 	IrFunction function = {};
 	function.site = site;
 	function.variadic = true;
-	function.arity = IMPLICIT_PARAM_COUNT;
+	Ir params[] = { create_local_ir(ctx, site, 0) };
+	function.params = params;
+	function.param_count = ARRAY_COUNT(params);
 	function.body = body;
 
 	BcGen *gen = bg_create(compiler, 1);
@@ -556,6 +558,25 @@ static void test_backend_compiles_static_functions(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_emits_parameter_type_enforcement(void)
+{
+	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
+	if (!bc_function_ref_is_valid(result.function) || result.function.module->bytecode_function_count != 2)
+	{
+		test_fail("backend compiles typed function parameters");
+	}
+	else
+	{
+		BcFunction *function = result.function.module->bytecode_functions + 1;
+		Bytecode *bytes = result.function.module->bytecode + function->offset;
+		if (function->length < 2 || bytes[0].b_type != BC_ENFORCE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_ENFORCE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
+		{
+			test_fail("backend emits parameter type enforcement at function entry");
+		}
+	}
+	backend_test_destroy(result);
+}
+
 static void run_backend_tests(void)
 {
 	test_backend_source_map();
@@ -576,4 +597,5 @@ static void run_backend_tests(void)
 	test_backend_if_else_restores_stack_top();
 	test_backend_formats_bytecode_function();
 	test_backend_compiles_static_functions();
+	test_backend_emits_parameter_type_enforcement();
 }

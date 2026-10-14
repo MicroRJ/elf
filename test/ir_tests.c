@@ -326,7 +326,7 @@ static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 static void test_ir_lowers_function_expression(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "add := fun(a, b) { ret a + b }");
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "add := fun(a: int, b: num) { ret a + b }");
 
 	if (!ctx || ctx->num_functions != 2) {
 		test_fail("function expression adds bytecode function");
@@ -342,8 +342,8 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	}
 
 	IrFunction *function = &ctx->functions[1];
-	if (function->arity != IMPLICIT_PARAM_COUNT + 2) {
-		test_fail("function arity includes implicit this and params");
+	if (function->param_count != IMPLICIT_PARAM_COUNT + 2) {
+		test_fail("function parameter count includes implicit this and source params");
 	}
 
 	Ir body = function->body;
@@ -354,13 +354,30 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	expect_ir_kind(add ? add->ir_binary.y : 0, IR_LOAD_LOCAL, "second param lowers to local load");
 	Ir first_param = add && add->ir_binary.x ? add->ir_binary.x->ir_load_local.local : 0;
 	Ir second_param = add && add->ir_binary.y ? add->ir_binary.y->ir_load_local.local : 0;
-	if (first_param && first_param->ir_local.slot.slot != 1) {
-		test_fail("first param uses frame slot 1");
+	Ir implicit_param = function->params[IMPLICIT_PARAM_INDEX];
+	expect_ir_kind(implicit_param, IR_LOCAL, "function creates implicit this parameter local");
+	if (function->param_count != IMPLICIT_PARAM_COUNT + 2 || function->params[IMPLICIT_PARAM_COUNT] != first_param || function->params[IMPLICIT_PARAM_COUNT + 1] != second_param) {
+		test_fail("function retains its implicit and source parameter locals");
 	}
-	if (second_param && second_param->ir_local.slot.slot != 2) {
-		test_fail("second param uses frame slot 2");
+	if (!implicit_param || !first_param || !second_param || bc_slot_is_valid(implicit_param->ir_local.slot) || bc_slot_is_valid(first_param->ir_local.slot) || bc_slot_is_valid(second_param->ir_local.slot)) {
+		test_fail("lowering leaves parameter frame slots unassigned");
+	}
+	if (!implicit_param || !first_param || !second_param || implicit_param->type_rule != TRULE_NONE || first_param->type_rule != TRULE_INTEGER || second_param->type_rule != TRULE_NUMBER) {
+		test_fail("function parameter locals retain runtime type rules");
 	}
 
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_rejects_unknown_parameter_type(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "probe := fun(value: mystery) { ret value }\nret probe");
+	log_set_hook(0, 0);
+	if (!ctx || ctx->compiler->report.error_count != 1) {
+		test_fail("unknown function parameter type reports one lowering error");
+	}
 	elf_arena_destroy(&arena);
 }
 
@@ -484,6 +501,7 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_nil_assign(state);
 	test_ir_lowers_nil_assign_field_once(state);
 	test_ir_lowers_function_expression(state);
+	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);
 	test_ir_lowers_block_static_scope(state);
 	test_ir_lowers_mutually_recursive_static_functions(state);

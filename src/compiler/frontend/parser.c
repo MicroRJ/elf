@@ -370,7 +370,7 @@ static Ast parse_function(Parser *par, Token fun_tok)
 			Ast expr = 0;
 			if (pick_token(par, TOK_COLON))
 			{
-				type = parse_expr(par);
+				type = parse_ident_expr(par);
 				if (ast_is_error(type)) {
 					return type;
 				}

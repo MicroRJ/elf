@@ -173,11 +173,11 @@ static void emit_defer_range(LowerContext *ctx, IrFrame *items, u32 start)
 	}
 }
 
-static ScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
+static LwScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
 {
 	for (i32 i = ctx->scope_end - 1; i >= 0; -- i)
 	{
-		ScopeEntity *en = & ctx->entities[i];
+		LwScopeEntity *en = & ctx->entities[i];
 		if (en->name == name) {
 			return en;
 		}
@@ -185,9 +185,9 @@ static ScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
 	return 0;
 }
 
-static ScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
+static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
 {
-	ScopeEntity *en = entity_from_name(ctx, name);
+	LwScopeEntity *en = entity_from_name(ctx, name);
 	const char *name_data = atom_data(name);
 	if (en)
 	{
@@ -211,9 +211,9 @@ static ScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityTyp
 	return en;
 }
 
-static b32 evaluate_static_entity(LowerContext *ctx, ScopeEntity *entity);
+static b32 evaluate_static_entity(LowerContext *ctx, LwScopeEntity *entity);
 
-static b32 evaluate_static_expr(LowerContext *ctx, ScopeEntity *owner, Ast expr, StaticValue *out)
+static b32 evaluate_static_expr(LowerContext *ctx, LwScopeEntity *owner, Ast expr, StaticValue *out)
 {
 	b32 result = true;
 	switch (expr->kind)
@@ -254,7 +254,7 @@ static b32 evaluate_static_expr(LowerContext *ctx, ScopeEntity *owner, Ast expr,
 
 		case AST_IDENT:
 		{
-			ScopeEntity *referenced = entity_from_name(ctx, expr->atom);
+			LwScopeEntity *referenced = entity_from_name(ctx, expr->atom);
 			if (!referenced || referenced->type != ENTITY_STATIC_DECLARATION)
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
@@ -281,7 +281,7 @@ static b32 evaluate_static_expr(LowerContext *ctx, ScopeEntity *owner, Ast expr,
 	return result;
 }
 
-static b32 evaluate_static_entity(LowerContext *ctx, ScopeEntity *entity)
+static b32 evaluate_static_entity(LowerContext *ctx, LwScopeEntity *entity)
 {
 	ASSERT(entity && entity->type == ENTITY_STATIC_DECLARATION);
 	b32 result = entity->static_value.kind != STATIC_VALUE_INVALID;
@@ -314,7 +314,7 @@ static Ir static_value_to_ir(LowerContext *ctx, SourceSite site, StaticValue val
 	return ir;
 }
 
-static u32 capture_entity_in_function(LowerContext *ctx, FnLowerScope *function_ctx, ScopeEntity *entity, SourceSite site)
+static u32 capture_entity_in_function(LowerContext *ctx, LwScopeFunction *function_ctx, LwScopeEntity *entity, SourceSite site)
 {
 	IrFunction *function = function_ctx->function;
 	for (u32 i = 0; i < function->capture_count; ++ i)
@@ -329,7 +329,7 @@ static u32 capture_entity_in_function(LowerContext *ctx, FnLowerScope *function_
 	function->capture_entities[capture_index] = entity;
 
 	Ir source = 0;
-	FnLowerScope *parent = function_ctx->parent;
+	LwScopeFunction *parent = function_ctx->parent;
 	if (parent && entity->scope_start < parent->scope_start)
 	{
 		u32 parent_capture = capture_entity_in_function(ctx, parent, entity, site);
@@ -345,7 +345,7 @@ static u32 capture_entity_in_function(LowerContext *ctx, FnLowerScope *function_
 	return capture_index;
 }
 
-static Ir load_entity_ir(LowerContext *ctx, SourceSite site, ScopeEntity *entity)
+static Ir load_entity_ir(LowerContext *ctx, SourceSite site, LwScopeEntity *entity)
 {
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	if (entity->type == ENTITY_STATIC_DECLARATION)
@@ -356,7 +356,7 @@ static Ir load_entity_ir(LowerContext *ctx, SourceSite site, ScopeEntity *entity
 		return ERROR_IR;
 	}
 
-	for (FnLowerScope *function = ctx->function; function && entity->scope_start < function->scope_start; function = function->parent)
+	for (LwScopeFunction *function = ctx->function; function && entity->scope_start < function->scope_start; function = function->parent)
 	{
 		if (function->is_static)
 		{
@@ -377,7 +377,7 @@ static Ir load_entity_ir(LowerContext *ctx, SourceSite site, ScopeEntity *entity
 static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) return true;
-	ScopeEntity *entity = entity_from_name(ctx, destination->atom);
+	LwScopeEntity *entity = entity_from_name(ctx, destination->atom);
 	if (!entity) return true;
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
@@ -412,7 +412,7 @@ static LoopLabels current_loop_labels(LowerContext *ctx, SourceSite site)
 	return ctx->loop_stack[ctx->loop_count - 1];
 }
 
-static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 arity, Ir body);
+static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body);
 
 static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 {
@@ -420,12 +420,12 @@ static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 	{
 		IrFunction *main_fn = add_function_ir(ctx, file->site, true, IMPLICIT_PARAM_COUNT, 0);
 
-		FnLowerScope main_function_ctx = {};
+		LwScopeFunction main_function_ctx = {};
 		main_function_ctx.function = main_fn;
 		main_function_ctx.scope_start = ctx->scope_start;
 		main_function_ctx.parent = 0;
 
-		FnLowerScope *outer_function = ctx->function;
+		LwScopeFunction *outer_function = ctx->function;
 		ctx->function = &main_function_ctx;
 		main_fn->body = lower_ast_to_ir_block(ctx, file->file.body);
 		ctx->function = outer_function;
@@ -438,16 +438,18 @@ static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 	return module;
 }
 
-static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 arity, Ir body)
+static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body)
 {
-	ASSERT(arity >= IMPLICIT_PARAM_COUNT);
+	ASSERT(param_count >= IMPLICIT_PARAM_COUNT);
 
 	ASSERT(ctx->num_functions < ctx->max_functions);
 	IrFunction *function = & ctx->functions[ctx->num_functions ++];
 	function->site = site;
 	function->variadic = variadic;
-	function->arity = arity;
 	function->body = body;
+	function->param_count = param_count;
+	function->params = elf_arena_push_zero(ctx->arena, sizeof(*function->params) * function->param_count);
+	function->params[IMPLICIT_PARAM_INDEX] = create_local_ir(ctx, site, 0);
 	function->captures = elf_arena_push_zero(ctx->arena, sizeof(*function->captures) * 255);
 	function->capture_entities = elf_arena_push_zero(ctx->arena, sizeof(*function->capture_entities) * 255);
 	function->capture_count = 0;
@@ -464,10 +466,21 @@ static u32 function_index_from_ptr(LowerContext *ctx, IrFunction *function)
 
 static Ir create_ast_function_value_ir(LowerContext *ctx, Ast expr)
 {
-	u32 arity = IMPLICIT_PARAM_COUNT + expr->function.nparams;
-	IrFunction *function = add_function_ir(ctx, expr->site, expr->function.variadic != 0, arity, 0);
+	u32 param_count = IMPLICIT_PARAM_COUNT + expr->function.nparams;
+	IrFunction *function = add_function_ir(ctx, expr->site, expr->function.variadic != 0, param_count, 0);
 	u32 function_index = function_index_from_ptr(ctx, function);
 	return create_function_ir(ctx, expr->site, function_index);
+}
+
+static TypeRule type_rule_from_atom(Atom *atom)
+{
+	switch (atom->id)
+	{
+#define TYPE_NAME_RULE(NAME, TEXT, RULE) case ATOM_TYPE_NAME_##NAME: return RULE;
+		TYPE_NAME_DEFINITIONS(TYPE_NAME_RULE)
+#undef TYPE_NAME_RULE
+		default: return TRULE_NONE;
+	}
 }
 
 static void lower_ast_function_body(LowerContext *ctx, Ast expr, Ir ir, b32 is_static)
@@ -479,13 +492,13 @@ static void lower_ast_function_body(LowerContext *ctx, Ast expr, Ir ir, b32 is_s
 	u32 nparams = expr->function.nparams;
 
 	EntityScope function_scope = get_entity_scope(ctx);
-	FnLowerScope function_ctx = {};
+	LwScopeFunction function_ctx = {};
 	function_ctx.parent = ctx->function;
 	function_ctx.function = function;
 	function_ctx.scope_start = ctx->scope_start;
 	function_ctx.is_static = is_static;
 
-	FnLowerScope *outer_function = ctx->function;
+	LwScopeFunction *outer_function = ctx->function;
 	u32 outer_defer_count = ctx->defer_count;
 	u32 outer_defer_scope_start = ctx->defer_scope_start;
 	u32 outer_function_defer_start = ctx->function_defer_start;
@@ -512,9 +525,30 @@ static void lower_ast_function_body(LowerContext *ctx, Ast expr, Ir ir, b32 is_s
 		}
 
 		Ir param_memory = create_local_ir(ctx, name->site, 0);
-		param_memory->ir_local.slot = (BcSlot){(i32)(IMPLICIT_PARAM_COUNT + i)};
+		function->params[IMPLICIT_PARAM_COUNT + i] = param_memory;
+		Ast type = param->param.type;
+		if (type)
+		{
+			type = check_ast_type(type, AST_IDENT);
+			if (ast_is_error(type))
+			{
+				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, param->site, "expected function parameter type name");
+			}
+			else
+			{
+				TypeRule rule = type_rule_from_atom(type->atom);
+				if (rule == TRULE_NONE)
+				{
+					report_lowering_error(ctx, LOWERING_ERROR_GENERIC, type->site, "'%s' is not a known type name", atom_data(type->atom));
+				}
+				else
+				{
+					param_memory->type_rule = rule;
+				}
+			}
+		}
 
-		ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
+		LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
 		entity->memory_ir = param_memory;
 	}
 
@@ -659,7 +693,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			Atom *ident = expr->atom;
 			const char *ident_text = atom_data(ident);
 
-			ScopeEntity *en = entity_from_name(ctx, ident);
+			LwScopeEntity *en = entity_from_name(ctx, ident);
 
 			if (en == 0)
 			{
@@ -902,7 +936,7 @@ static void declare_block_static_entities(LowerContext *ctx, Ast block)
 				continue;
 			}
 
-			ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_STATIC_DECLARATION, ENTITY_TAG_STATIC | ENTITY_TAG_CONSTANT, name->atom);
+			LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_STATIC_DECLARATION, ENTITY_TAG_STATIC | ENTITY_TAG_CONSTANT, name->atom);
 			entity->static_expr = declaration->static_decl.expr;
 		}
 	}
@@ -912,7 +946,7 @@ static void evaluate_block_static_entities(LowerContext *ctx, EntityId start, En
 {
 	for (EntityId i = start; i < end; ++i)
 	{
-		ScopeEntity *entity = ctx->entities + i;
+		LwScopeEntity *entity = ctx->entities + i;
 		if (entity->type == ENTITY_STATIC_DECLARATION && entity->static_expr->kind == AST_FUNCTION)
 		{
 			entity->static_value.kind = STATIC_VALUE_FUNCTION;
@@ -923,7 +957,7 @@ static void evaluate_block_static_entities(LowerContext *ctx, EntityId start, En
 
 	for (EntityId i = start; i < end; ++i)
 	{
-		ScopeEntity *entity = ctx->entities + i;
+		LwScopeEntity *entity = ctx->entities + i;
 		if (entity->type == ENTITY_STATIC_DECLARATION) {
 			evaluate_static_entity(ctx, entity);
 		}
@@ -931,7 +965,7 @@ static void evaluate_block_static_entities(LowerContext *ctx, EntityId start, En
 
 	for (EntityId i = start; i < end; ++i)
 	{
-		ScopeEntity *entity = ctx->entities + i;
+		LwScopeEntity *entity = ctx->entities + i;
 		if (entity->type == ENTITY_STATIC_DECLARATION && entity->static_expr->kind == AST_FUNCTION) {
 			lower_ast_function_body(ctx, entity->static_expr, entity->static_value.function, true);
 		}
@@ -1066,7 +1100,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 			}
 			Ir local = create_local_ir(ctx, name->site, 0);
 			locals[i] = local;
-			ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+			LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 			entity->memory_ir = local;
 		}
 		push_ir(items, create_multi_local_ir(ctx, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
@@ -1097,7 +1131,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 		Ir local = create_local_ir(ctx, name->site, value);
 		push_ir(items, local);
 
-		ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+		LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
@@ -1180,7 +1214,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 		Ir local = create_local_ir(ctx, name->site, 0);
 		var_locals[i] = local;
 
-		ScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
+		LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
 			ENTITY_TAG_FORLOOP | entity_tags, name->atom);
 		entity->memory_ir = local;
 	}

@@ -63,6 +63,10 @@ static void init_atoms(Compiler *compiler)
 #define INTERN_MACRO_ATOM(NAME, TEXT) atom_from_data_id(compiler->atoms, "#" TEXT, XFUSE(TOK_, NAME));
 	MACRO_DEFINITIONS(INTERN_MACRO_ATOM)
 #undef INTERN_MACRO_ATOM
+
+#define INTERN_TYPE_NAME_ATOM(NAME, TEXT, RULE) atom_from_data_id(compiler->atoms, TEXT, XFUSE(ATOM_TYPE_NAME_, NAME));
+	TYPE_NAME_DEFINITIONS(INTERN_TYPE_NAME_ATOM)
+#undef INTERN_TYPE_NAME_ATOM
 }
 
 Compiler *compiler_create(elf_State *state, elf_Arena *arena)

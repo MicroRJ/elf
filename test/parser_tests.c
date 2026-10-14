@@ -479,7 +479,7 @@ static void test_parser_open_range_indexes(elf_State *state)
 
 static void test_parser_function_expression(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "add := fun(a, b) { ret a + b }");
+	Ast file = parser_test_parse_file(state, "add := fun(a: int, b: str) { ret a + b }");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration");
 	Ast function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression");
 
@@ -497,6 +497,8 @@ static void test_parser_function_expression(elf_State *state)
 	expect_ast_kind(second_param, AST_FUNCTION_PARAM, "parse second function param");
 	expect_ast_atom(first_param ? first_param->param.name : 0, "a", "first function param name");
 	expect_ast_atom(second_param ? second_param->param.name : 0, "b", "second function param name");
+	expect_ast_atom(first_param ? first_param->param.type : 0, "int", "first function param type");
+	expect_ast_atom(second_param ? second_param->param.type : 0, "str", "second function param type");
 	expect_ast_kind(function->function.body, AST_BLOCK_STAT, "function body parses as block");
 
 	file = parser_test_parse_file(state, "collect := fun(a, ...) { ret elf.varg(0) }");
@@ -513,6 +515,8 @@ static void test_parser_function_expression(elf_State *state)
 
 	expect_ast_atom(function->function.params[0] ? function->function.params[0]->param.name : 0, "a", "variadic function named parameter");
 	expect_ast_kind(function->function.variadic, AST_ELLIPSIS, "function tracks variadic marker separately");
+
+	parser_expect_source_error(state, "ret fun(value: str | int) { ret value }", "function parameter type requires one identifier");
 }
 
 static void test_parser_get_mem_macro(elf_State *state)

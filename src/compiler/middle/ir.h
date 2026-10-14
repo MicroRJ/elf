@@ -90,6 +90,7 @@ struct IrNode
 {
 	IrKind kind;
 	SourceSite site;
+	TypeRule type_rule;
 	union
 	{
 		u32      ir_global;

@@ -5,17 +5,18 @@
 #define IMPLICIT_PARAM_INDEX 0
 #define IMPLICIT_PARAM_COUNT 1
 
-typedef struct ScopeEntity ScopeEntity;
+typedef struct LwScopeEntity LwScopeEntity;
 
 typedef struct
 {
 	SourceSite         site;
 	b32            variadic;
-	u32                arity;
 	Ir               body;
+	Ir              *params;
+	u32              param_count;
 	Ir              *captures;
 	u32              capture_count;
-	ScopeEntity         **capture_entities;
+	LwScopeEntity         **capture_entities;
 }
 IrFunction;
 
@@ -109,17 +110,17 @@ typedef struct
 LoopLabels;
 
 typedef struct LowerContext LowerContext;
-typedef struct FnLowerScope FnLowerScope;
+typedef struct LwScopeFunction LwScopeFunction;
 
-struct FnLowerScope
+struct LwScopeFunction
 {
-	FnLowerScope *parent;
-	IrFunction   *function;
-	EntityId      scope_start;
-	b32           is_static;
+	LwScopeFunction *parent;
+	IrFunction      *function;
+	EntityId         scope_start;
+	b32              is_static;
 };
 
-typedef struct ScopeEntity
+typedef struct LwScopeEntity
 {
 	EntityType   type;
 	EntityTags   tags;
@@ -131,7 +132,7 @@ typedef struct ScopeEntity
 	StaticSymbolState static_state;
 	StaticValue  static_value;
 }
-ScopeEntity;
+LwScopeEntity;
 
 struct LowerContext
 {
@@ -151,9 +152,9 @@ struct LowerContext
 	IrFunction           *functions;
 	u32                   num_functions;
 	u32                   max_functions;
-	FnLowerScope *function;
+	LwScopeFunction *function;
 
-	ScopeEntity     entities[MAX_ENTITIES];
+	LwScopeEntity     entities[MAX_ENTITIES];
 	EntityId   scope_start;
 	EntityId   scope_end;
 

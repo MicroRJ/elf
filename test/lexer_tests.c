@@ -155,7 +155,7 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 
 static void test_lexer_keywords_and_identifiers(elf_State *state)
 {
-	Parser parser = lexer_test_parser(state, "true false if fun import recurse true_value load");
+	Parser parser = lexer_test_parser(state, "true false if fun import recurse true_value load int str arr");
 	lexer_prime(&parser);
 
 	expect_token_type(lexer_next(&parser), TOK_TRUE, "lex true keyword");
@@ -172,6 +172,24 @@ static void test_lexer_keywords_and_identifiers(elf_State *state)
 	Token load = lexer_next(&parser);
 	expect_token_type(load, TOK_IDENTIFIER, "load is an ordinary identifier");
 	expect_token_atom(load, "load", "load identifier atom payload");
+
+	Token integer_type = lexer_next(&parser);
+	expect_token_type(integer_type, TOK_IDENTIFIER, "int type name remains an identifier");
+	if (!integer_type.atom || integer_type.atom->id != ATOM_TYPE_NAME_INT) {
+		test_fail("int type name atom keeps its type id");
+	}
+
+	Token string_type = lexer_next(&parser);
+	expect_token_type(string_type, TOK_IDENTIFIER, "str type name remains an identifier");
+	if (!string_type.atom || string_type.atom->id != ATOM_TYPE_NAME_STR) {
+		test_fail("str type name atom keeps its type id");
+	}
+
+	Token array_type = lexer_next(&parser);
+	expect_token_type(array_type, TOK_IDENTIFIER, "arr type name remains an identifier");
+	if (!array_type.atom || array_type.atom->id != ATOM_TYPE_NAME_ARR) {
+		test_fail("arr type name atom keeps its type id");
+	}
 
 	Atom *keyword = atom_from_data(parser.atoms, "true");
 	if (keyword->id != TOK_TRUE) {

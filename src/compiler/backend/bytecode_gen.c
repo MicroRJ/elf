@@ -368,14 +368,24 @@ static void generate_function(BcGen *gen, IrFunction *function)
 	{
 		gen->bytecode_count           =0;
 		gen->source_map_buffer.count  =0;
-		gen->stack_size               =function->arity;
-		gen->stack_top                =function->arity;
+		gen->stack_size               =function->param_count;
+		gen->stack_top                =function->param_count;
 		zero_memory(gen->labels, sizeof(gen->labels));
 		gen->label_count              = 0;
 		gen->jump_patch_count         = 0;
 
 		Ir body = function->body;
 		ASSERT(gen->bytecode_count == 0);
+		for (u32 i = 0; i < function->param_count; ++i)
+		{
+			Ir param = function->params[i];
+			ASSERT(param && param->kind == IR_LOCAL);
+			ASSERT(!bc_slot_is_valid(param->ir_local.slot));
+			param->ir_local.slot = (BcSlot){(i32)i};
+			if (param->type_rule != TRULE_NONE) {
+				emit_xy_bc(gen, param->site, BC_ENFORCE, unwrap_slot(param->ir_local.slot), param->type_rule);
+			}
+		}
 
 		BcSlot memory_checkpoint = mark_slots(gen);
 		do_stat(gen, body);
@@ -480,7 +490,7 @@ static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrM
 			SourceMapEntry *source_map = copy_source_map(arena, gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
 
 			bc_function->variadic         = ir_function->variadic;
-			bc_function->arity            = ir_function->arity;
+			bc_function->arity            = ir_function->param_count;
 			bc_function->offset           = bytecode_offset;
 			bc_function->length           = gen->bytecode_count;
 			bc_function->captures         = ir_function->capture_count;
