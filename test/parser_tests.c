@@ -126,6 +126,20 @@ static void test_parser_static_declaration(elf_State *state)
 	expect_ast_i64(decl->static_decl.expr->binary.y, 2, "static declaration expression rhs");
 }
 
+static void test_parser_exported_static_declaration(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "export answer :: 42");
+	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse exported static declaration");
+	if (!decl) {
+		return;
+	}
+	if (!decl->static_decl.exported) {
+		test_fail("export marks static declaration");
+	}
+	expect_ast_atom(decl->static_decl.name, "answer", "exported declaration identifier name");
+	expect_ast_i64(decl->static_decl.expr, 42, "exported declaration expression");
+}
+
 static void test_parser_import_expression(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "math :: import \"math.elf\"");
@@ -719,6 +733,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_measure_operator(state);
 	test_parser_constant_declaration(state);
 	test_parser_static_declaration(state);
+	test_parser_exported_static_declaration(state);
 	test_parser_import_expression(state);
 	test_parser_module_discovery(state);
 	test_parser_missing_import(state);

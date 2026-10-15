@@ -1454,6 +1454,20 @@ static Ast parse_stat(Parser *parser)
 		}
 		break;
 
+		case TOK_EXPORT:
+		{
+			consume_token(parser);
+			tree = parse_expr_stat(parser);
+			if (ast_is_error(tree)) {
+				return tree;
+			}
+			if (!tree || tree->kind != AST_STATIC_DECL) {
+				return parser_error(parser, ERROR_INVALID_STATEMENT, tok.site, "'export' must be followed by a static declaration");
+			}
+			tree->static_decl.exported = true;
+		}
+		break;
+
 		case TOK_RET:
 		{
 			consume_token(parser);

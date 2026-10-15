@@ -667,7 +667,7 @@ static void test_api_source_compilation(elf_State *state)
 static void test_api_module_compilation(elf_State *state)
 {
 	elf_Scratch compiler_scratch = {};
-	char valid_text[] = "foo :: fun() { ret bar() }\nbar :: fun() { ret foo() }";
+	char valid_text[] = "export foo :: fun() { ret bar() }\nexport bar :: fun() { ret foo() }";
 	elf_StrSlice valid_source = {valid_text, sizeof(valid_text) - 1};
 	Compiler *compiler = api_test_create_compiler(state, &compiler_scratch, "valid-module.elf", valid_source);
 	Com_Module *output = compiler_compile(compiler, compiler_scratch.arena, COM_UNIT_MODULE);

@@ -1,2 +1,2 @@
 default_size :: 42
-make :: fun(required, size = default_size, label = "elf") { ret required }
+export make :: fun(required, size = default_size, label = "elf") { ret required }

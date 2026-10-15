@@ -155,13 +155,14 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 
 static void test_lexer_keywords_and_identifiers(elf_State *state)
 {
-	Parser parser = lexer_test_parser(state, "true false if fun import recurse true_value load int str arr");
+	Parser parser = lexer_test_parser(state, "true false if fun export import recurse true_value load int str arr");
 	lexer_prime(&parser);
 
 	expect_token_type(lexer_next(&parser), TOK_TRUE, "lex true keyword");
 	expect_token_type(lexer_next(&parser), TOK_FALSE, "lex false keyword");
 	expect_token_type(lexer_next(&parser), TOK_IF, "lex if keyword");
 	expect_token_type(lexer_next(&parser), TOK_FUN, "lex fun keyword");
+	expect_token_type(lexer_next(&parser), TOK_EXPORT, "lex export keyword");
 	expect_token_type(lexer_next(&parser), TOK_IMPORT, "lex import keyword");
 	expect_token_type(lexer_next(&parser), TOK_RECURSE, "lex recurse keyword");
 

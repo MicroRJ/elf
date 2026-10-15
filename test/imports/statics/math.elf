@@ -1,2 +1,2 @@
 offset :: 2
-add :: fun(value) { ret value + offset }
+export add :: fun(value) { ret value + offset }

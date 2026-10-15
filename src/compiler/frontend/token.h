@@ -8,6 +8,7 @@
 	X(JSON     ,"json"        ) \
 	X(DEFAULT  ,"default"     ) \
 	X(FUN      ,"fun"         ) \
+	X(EXPORT   ,"export"      ) \
 	X(IMPORT   ,"import"      ) \
 	X(NIL      ,"nil"         ) \
 	X(TRUE     ,"true"        ) \

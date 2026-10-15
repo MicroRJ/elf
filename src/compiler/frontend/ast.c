@@ -873,6 +873,9 @@ static void print_ast(Printer *pr, Ast tree)
 
 		case AST_STATIC_DECL:
 		{
+			if (tree->static_decl.exported) {
+				PRINT(pr, "export ");
+			}
 			print_ast(pr, tree->static_decl.name);
 			PRINT(pr, " :: ");
 			print_ast(pr, tree->static_decl.expr);

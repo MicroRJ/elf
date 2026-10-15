@@ -648,6 +648,15 @@ static void test_backend_calls_imported_static_function(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_rejects_private_imported_static(void)
+{
+	BackendCompileResult result = backend_test_compile_file("test/imports/statics/private_root.elf");
+	if (bc_function_ref_is_valid(result.function)) {
+		test_fail("imported namespace hides private static declarations");
+	}
+	backend_test_destroy(result);
+}
+
 static void test_backend_emits_direct_static_recurse_call(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -738,6 +747,7 @@ static void run_backend_tests(void)
 	test_backend_compiles_static_functions();
 	test_backend_emits_direct_static_call();
 	test_backend_calls_imported_static_function();
+	test_backend_rejects_private_imported_static();
 	test_backend_emits_direct_static_recurse_call();
 	test_backend_materializes_static_recurse_value();
 	test_backend_emits_parameter_type_enforcement();

@@ -162,7 +162,7 @@ typedef struct
 }
 Com_StaticValue;
 
-// One top-level declaration exported by a compiler source.
+// One top-level compile-time declaration owned by a compiler source.
 typedef struct
 {
 	struct Atom    *name;
@@ -172,10 +172,11 @@ typedef struct
 	Com_StaticState state;
 	Com_StaticValue value;
 	b32 referenced;
+	b32 exported;
 }
 Com_StaticSymbol;
 
-// The exported static namespace belonging to one compiler source.
+// All compile-time declarations belonging to one compiler source.
 typedef struct
 {
 	Com_StaticSymbol *symbols;
@@ -184,7 +185,7 @@ typedef struct
 Com_StaticScope;
 
 // One source file taking part in a compilation. The compiler owns its copied
-// text, parsed AST, imports, and exported static namespace.
+// text, parsed AST, imports, and compile-time declarations.
 typedef struct
 {
 	struct Atom *name;
@@ -194,7 +195,7 @@ typedef struct
 	struct Ast_T **imports;
 	u32 import_count;
 	u32 import_capacity;
-	Com_StaticScope exports;
+	Com_StaticScope statics;
 }
 Com_Source;
 

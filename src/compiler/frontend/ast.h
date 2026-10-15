@@ -170,6 +170,7 @@ struct Ast_T
 
 		struct
 		{
+			b32 exported;
 			Ast name;
 			Ast expr;
 		}

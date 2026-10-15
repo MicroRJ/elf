@@ -367,7 +367,7 @@ b32 compiler_parse_sources(Compiler *compiler)
 Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
 {
 	ASSERT(source < compiler->source_count);
-	Com_StaticScope *scope = &compiler->sources[source].exports;
+	Com_StaticScope *scope = &compiler->sources[source].statics;
 	for (u32 i = 0; i < scope->symbol_count; ++i)
 	{
 		Com_StaticSymbol *symbol = scope->symbols + i;
@@ -376,6 +376,12 @@ Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_Sou
 		}
 	}
 	return 0;
+}
+
+static Com_StaticSymbol *compiler_exported_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
+{
+	Com_StaticSymbol *symbol = compiler_static_symbol_from_source(compiler, source, name);
+	return symbol && symbol->exported ? symbol : 0;
 }
 
 static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast ast, b32 is_entry, b32 is_static)
@@ -460,7 +466,7 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 			}
 			else
 			{
-				Com_StaticSymbol *symbol = compiler_static_symbol_from_source(compiler, receiver.source, member->atom);
+				Com_StaticSymbol *symbol = compiler_exported_symbol_from_source(compiler, receiver.source, member->atom);
 				if (!symbol)
 				{
 					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, member->site, "'%s' is not exported by the imported source", atom_data(member->atom));
@@ -619,12 +625,12 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
 		Com_Source *compiler_source = compiler->sources + source;
-		compiler_source->exports = (Com_StaticScope) {};
+		compiler_source->statics = (Com_StaticScope) {};
 		Ast file = compiler_source->ast;
 		ASSERT(file && file->kind == AST_FILE);
 		Ast body = file->file.body;
 		ASSERT(body && body->kind == AST_BLOCK_STAT);
-		Com_StaticScope *scope = &compiler_source->exports;
+		Com_StaticScope *scope = &compiler_source->statics;
 		if (body->block.nstats) {
 			scope->symbols = elf_arena_push_zero(compiler->arena, sizeof(*scope->symbols) * body->block.nstats);
 		}
@@ -657,6 +663,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 			symbol->site = name->site;
 			symbol->expr = declaration->static_decl.expr;
 			symbol->source = source;
+			symbol->exported = declaration->static_decl.exported;
 			if (symbol->expr->kind == AST_FUNCTION)
 			{
 				planned_function_count += 1;
@@ -676,7 +683,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
-		Com_StaticScope *scope = &compiler->sources[source].exports;
+		Com_StaticScope *scope = &compiler->sources[source].statics;
 		for (u32 i = 0; i < scope->symbol_count; ++i)
 		{
 			Com_StaticSymbol *symbol = scope->symbols + i;
@@ -691,7 +698,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 	ASSERT(compiler->function_count == compiler->function_capacity);
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
-		Com_StaticScope *scope = &compiler->sources[source].exports;
+		Com_StaticScope *scope = &compiler->sources[source].statics;
 		for (u32 i = 0; i < scope->symbol_count; ++i) {
 			compiler_evaluate_static_symbol(compiler, scope->symbols + i);
 		}
@@ -709,11 +716,11 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId source)
 {
 	ASSERT(source < compiler->source_count);
-	Com_StaticScope *scope = &compiler->sources[source].exports;
+	Com_StaticScope *scope = &compiler->sources[source].statics;
 	for (u32 i = 0; i < scope->symbol_count; ++i)
 	{
 		Com_StaticSymbol *symbol = scope->symbols + i;
-		if (!symbol->referenced) {
+		if (!symbol->referenced && !symbol->exported) {
 			compiler_report(compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING, symbol->site, "unreferenced entity");
 		}
 	}
