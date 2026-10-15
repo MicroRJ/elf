@@ -699,10 +699,16 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 	u32 declared_param_count = function->param_count - IMPLICIT_PARAM_COUNT;
 	u32 argument_count = call.nargs;
 	b32 has_trailing_function = call.trailing_function != 0;
-	b32 reserve_final_parameter = has_trailing_function && !ir_function->variadic && declared_param_count > 0;
+	if (has_trailing_function && ir_function->variadic)
+	{
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call.trailing_function->site, "trailing closures cannot call variadic functions");
+		*failed = true;
+		return (IrArray) {};
+	}
+	b32 reserve_final_parameter = has_trailing_function && declared_param_count > 0;
 	u32 bind_param_count = declared_param_count - reserve_final_parameter;
 	u32 capacity = argument_count + has_trailing_function;
-	u32 minimum_capacity = declared_param_count + (has_trailing_function && ir_function->variadic);
+	u32 minimum_capacity = declared_param_count;
 	if (capacity < minimum_capacity) {
 		capacity = minimum_capacity;
 	}
@@ -710,7 +716,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 	if (capacity) {
 		result.items = elf_arena_push(ctx->module->arena, sizeof(*result.items) * capacity);
 	}
-	if (has_trailing_function && !ir_function->variadic && declared_param_count == 0)
+	if (has_trailing_function && declared_param_count == 0)
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call.trailing_function->site, "trailing closure requires a final function parameter");
 		*failed = true;
@@ -789,7 +795,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 		}
 		*failed = true;
 	}
-	if (has_trailing_function && (ir_function->variadic || declared_param_count > 0))
+	if (has_trailing_function && declared_param_count > 0)
 	{
 		Ir argument_ir = lower_ast_expr_to_ir(ctx, call.trailing_function);
 		result.items[result.count++] = argument_ir;
