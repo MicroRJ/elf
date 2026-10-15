@@ -437,7 +437,7 @@ static void test_ir_resolves_static_function_defaults(elf_State *state)
 	}
 
 	Com_Function *function = compiler->functions + make->value.function;
-	if (function->source != 1 || function->param_count != 3) {
+	if (function->source != 1 || function->param_count != IMPLICIT_PARAM_COUNT + 3) {
 		test_fail("static function descriptor retains source and parameters");
 	}
 	else

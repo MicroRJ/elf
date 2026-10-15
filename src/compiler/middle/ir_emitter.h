@@ -2,9 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#define IMPLICIT_PARAM_INDEX 0
-#define IMPLICIT_PARAM_COUNT 1
-
 typedef struct IrEntity IrEntity;
 typedef struct IrFunction IrFunction;
 
@@ -132,25 +129,26 @@ struct IrModuleEmitter
 struct IrFunctionEmitter
 {
 	IrModuleEmitter *module;
-	u32          ir_stack_size;
-	u32          ir_stack_index;
-	Ir          *ir_stack;
+	u32              ir_stack_size;
+	u32              ir_stack_index;
+	Ir              *ir_stack;
 
-	Ast        *defer_stack;
-	u32         defer_stack_size;
-	u32         defer_count;
-	u32         defer_scope_start;
-	u32         function_defer_start;
+	Ast             *defer_stack;
+	u32              defer_stack_size;
+	u32              defer_count;
+	u32              defer_scope_start;
+	u32              function_defer_start;
+
+	IrEntityId       scope_start;
+	IrEntityId       scope_end;
+	u32              scope_depth;
+
+	Com_SourceId     current_source;
 
 	LwScopeFunction *function;
 
-	IrEntity     entities[MAX_ENTITIES];
-	IrEntityId   scope_start;
-	IrEntityId   scope_end;
-	u32        scope_depth;
+	u32              loop_count;
 
-	Com_SourceId current_source;
-
-	LoopLabels loop_stack[64];
-	u32        loop_count;
+	IrEntity         entities[MAX_ENTITIES];
+	LoopLabels       loop_stack[64];
 };

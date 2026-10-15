@@ -379,6 +379,20 @@ Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_Sou
 
 static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast ast, b32 is_entry, b32 is_static)
 {
+	ASSERT(ast);
+	b32 variadic = true;
+	u32 param_count = IMPLICIT_PARAM_COUNT;
+	if (!is_entry)
+	{
+		ASSERT(ast->kind == AST_FUNCTION);
+		variadic = ast->function.variadic != 0;
+		param_count += ast->function.nparams;
+	}
+	else
+	{
+		ASSERT(ast->kind == AST_FILE);
+	}
+
 	if (compiler->function_count == compiler->function_capacity)
 	{
 		u32 capacity = compiler->function_capacity ? compiler->function_capacity * 2 : 16;
@@ -395,6 +409,8 @@ static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast as
 		.ast = ast,
 		.source = source,
 		.index = index,
+		.param_count = param_count,
+		.variadic = variadic,
 		.is_entry = is_entry,
 		.is_static = is_static,
 	};
@@ -564,13 +580,15 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 	ASSERT(function->ast && function->ast->kind == AST_FUNCTION);
 
 	Ast ast = function->ast;
-	function->param_count = ast->function.nparams;
-	if (function->param_count) {
-		function->params = elf_arena_push_zero(compiler->arena, sizeof(*function->params) * function->param_count);
+	u32 declared_param_count = ast->function.nparams;
+	ASSERT(function->param_count == IMPLICIT_PARAM_COUNT + declared_param_count);
+	if (declared_param_count)
+	{
+		function->params = elf_arena_push_zero(compiler->arena, sizeof(*function->params) * declared_param_count);
 	}
 
 	b32 result = true;
-	for (u32 i = 0; i < function->param_count; ++i)
+	for (u32 i = 0; i < declared_param_count; ++i)
 	{
 		Ast param = ast->function.params[i];
 		if (!param || ast_is_error(param) || param->kind != AST_FUNCTION_PARAM || !param->param.name || param->param.name->kind != AST_IDENT)

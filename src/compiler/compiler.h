@@ -208,8 +208,9 @@ typedef struct
 }
 Com_FunctionParameter;
 
-// One function planned by the compiler before IR generation. Entry functions
-// point at an AST file; static functions also own their resolved signature.
+// One function planned by the compiler before IR generation. param_count is
+// the complete VM arity including implicit parameters; params describes only
+// the parameters declared by a static function.
 typedef struct
 {
 	struct Ast_T *ast;
@@ -217,6 +218,7 @@ typedef struct
 	Com_SourceId source;
 	u32 index;
 	u32 param_count;
+	b32 variadic;
 	b32 is_entry;
 	b32 is_static;
 }

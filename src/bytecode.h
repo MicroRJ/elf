@@ -5,6 +5,10 @@
 #ifndef ELF_BYTECODE_H
 #define ELF_BYTECODE_H
 
+// Every bytecode function receives its implicit receiver in parameter slot zero.
+#define IMPLICIT_PARAM_INDEX 0
+#define IMPLICIT_PARAM_COUNT 1
+
 #include "elf.h"
 #include "base.h"
 #include "source.h"

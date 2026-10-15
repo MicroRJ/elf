@@ -35,9 +35,9 @@ static IrModuleEmitter *ir_create_module_emitter(Compiler *compiler)
 		Ast ast = input->ast;
 		IrFunction *function = emitter->module.functions + i;
 		function->site = ast->site;
-		function->variadic = input->is_entry || ast->function.variadic != 0;
+		function->variadic = input->variadic;
 		function->is_static = input->is_static;
-		function->param_count = input->is_entry ? IMPLICIT_PARAM_COUNT : IMPLICIT_PARAM_COUNT + ast->function.nparams;
+		function->param_count = input->param_count;
 		ASSERT(input->index == i);
 	}
 	emitter->module.function_count = compiler->function_count;
@@ -642,7 +642,9 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 
 	Com_Function *function = ctx->module->compiler->functions + callee->ir_function.index;
 	IrFunction *ir_function = ctx->module->module.functions + callee->ir_function.index;
-	u32 capacity = call->call.nargs > function->param_count ? call->call.nargs : function->param_count;
+	ASSERT(function->param_count >= IMPLICIT_PARAM_COUNT);
+	u32 declared_param_count = function->param_count - IMPLICIT_PARAM_COUNT;
+	u32 capacity = call->call.nargs > declared_param_count ? call->call.nargs : declared_param_count;
 	IrArray result = {};
 	if (capacity) {
 		result.items = elf_arena_push(ctx->module->arena, sizeof(*result.items) * capacity);
@@ -653,7 +655,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 	while (argument_index < call->call.nargs && call->call.args[argument_index]->kind != AST_NAMED_ARGUMENT)
 	{
 		Ast argument = call->call.args[argument_index];
-		if (parameter_index >= function->param_count && !ir_function->variadic)
+		if (parameter_index >= declared_param_count && !ir_function->variadic)
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
 			*failed = true;
@@ -670,7 +672,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 		parameter_index += 1;
 	}
 
-	while (parameter_index < function->param_count)
+	while (parameter_index < declared_param_count)
 	{
 		Com_FunctionParameter *parameter = function->params + parameter_index;
 		Ast argument = argument_index < call->call.nargs ? call->call.args[argument_index] : 0;
