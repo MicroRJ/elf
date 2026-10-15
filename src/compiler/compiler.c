@@ -477,7 +477,7 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 	return result;
 }
 
-static b32 compiler_evaluate_static_expr(Compiler *compiler, Com_StaticSymbol *owner, Ast expr, Com_StaticValue *out)
+static b32 compiler_evaluate_static_expr(Compiler *compiler, Com_SourceId source, Ast expr, Com_StaticValue *out)
 {
 	b32 result = true;
 	switch (expr->kind)
@@ -509,18 +509,11 @@ static b32 compiler_evaluate_static_expr(Compiler *compiler, Com_StaticSymbol *o
 		}
 		break;
 
-		case AST_FUNCTION:
-		{
-			ASSERT(owner->value.kind == COM_STATIC_FUNCTION);
-			*out = owner->value;
-		}
-		break;
-
 		case AST_IDENT:
 		case AST_IMPORT:
 		case AST_FIELD:
 		{
-			Com_StaticLookup lookup = compiler_lookup_static_expr(compiler, owner->source, expr, out);
+			Com_StaticLookup lookup = compiler_lookup_static_expr(compiler, source, expr, out);
 			if (lookup == COM_STATIC_LOOKUP_NONE)
 			{
 				if (expr->kind == AST_IDENT) {
@@ -559,8 +552,50 @@ static b32 compiler_evaluate_static_symbol(Compiler *compiler, Com_StaticSymbol 
 	else if (symbol->state == COM_STATIC_UNRESOLVED)
 	{
 		symbol->state = COM_STATIC_RESOLVING;
-		result = compiler_evaluate_static_expr(compiler, symbol, symbol->expr, &symbol->value);
+		result = compiler_evaluate_static_expr(compiler, symbol->source, symbol->expr, &symbol->value);
 		symbol->state = COM_STATIC_RESOLVED;
+	}
+	return result;
+}
+
+static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function *function)
+{
+	ASSERT(function->is_static);
+	ASSERT(function->ast && function->ast->kind == AST_FUNCTION);
+
+	Ast ast = function->ast;
+	function->param_count = ast->function.nparams;
+	if (function->param_count) {
+		function->params = elf_arena_push_zero(compiler->arena, sizeof(*function->params) * function->param_count);
+	}
+
+	b32 result = true;
+	for (u32 i = 0; i < function->param_count; ++i)
+	{
+		Ast param = ast->function.params[i];
+		if (!param || ast_is_error(param) || param->kind != AST_FUNCTION_PARAM || !param->param.name || param->param.name->kind != AST_IDENT)
+		{
+			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "expected static function parameter");
+			result = false;
+			continue;
+		}
+
+		Com_FunctionParameter *resolved = function->params + i;
+		resolved->name = param->param.name->atom;
+		resolved->site = param->site;
+		if (param->param.expr)
+		{
+			resolved->has_default = true;
+			if (!compiler_evaluate_static_expr(compiler, function->source, param->param.expr, &resolved->default_value)) {
+				result = false;
+			}
+			else if (resolved->default_value.kind == COM_STATIC_NAMESPACE)
+			{
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, param->param.expr->site, "default for parameter '%s' cannot be an imported namespace", atom_data(resolved->name));
+				resolved->default_value.kind = COM_STATIC_INVALID;
+				result = false;
+			}
+		}
 	}
 	return result;
 }
@@ -637,6 +672,13 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 		Com_StaticScope *scope = compiler->static_scopes + source;
 		for (u32 i = 0; i < scope->symbol_count; ++i) {
 			compiler_evaluate_static_symbol(compiler, scope->symbols + i);
+		}
+	}
+	for (u32 i = 0; i < compiler->function_count; ++i)
+	{
+		Com_Function *function = compiler->functions + i;
+		if (function->is_static) {
+			compiler_resolve_function_parameters(compiler, function);
 		}
 	}
 	return compiler->report.error_count == 0;

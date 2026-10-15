@@ -197,13 +197,26 @@ typedef struct
 }
 Com_StaticScope;
 
+// One declared parameter in a statically resolved function signature. Default
+// expressions are reduced to compiler values in the declaration's source.
+typedef struct
+{
+	struct Atom *name;
+	SourceSite site;
+	b32 has_default;
+	Com_StaticValue default_value;
+}
+Com_FunctionParameter;
+
 // One function planned by the compiler before IR generation. Entry functions
-// point at an AST file; static functions point at an AST function expression.
+// point at an AST file; static functions also own their resolved signature.
 typedef struct
 {
 	struct Ast_T *ast;
+	Com_FunctionParameter *params;
 	Com_SourceId source;
 	u32 index;
+	u32 param_count;
 	b32 is_entry;
 	b32 is_static;
 }

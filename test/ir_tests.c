@@ -405,6 +405,71 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
+static void test_ir_resolves_static_function_defaults(elf_State *state)
+{
+	(void)state;
+	elf_Arena arena = elf_arena_create(0);
+	Compiler *compiler = compiler_create(&arena);
+	compiler_add_root_file(compiler, "test/imports/defaults/root.elf");
+	b32 parsed = compiler_parse_sources(compiler);
+	b32 resolved = parsed && compiler_resolve_statics(compiler, COM_UNIT_FUNCTION);
+	if (!resolved || compiler->source_count != 2)
+	{
+		test_fail("compiler resolves imported static function defaults");
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	Com_StaticSymbol *make = 0;
+	Com_StaticScope *config_scope = compiler->static_scopes + 1;
+	for (u32 i = 0; i < config_scope->symbol_count; ++i)
+	{
+		Com_StaticSymbol *symbol = config_scope->symbols + i;
+		if (strcmp(atom_data(symbol->name), "make") == 0) {
+			make = symbol;
+		}
+	}
+	if (!make || make->value.kind != COM_STATIC_FUNCTION || make->value.function >= compiler->function_count)
+	{
+		test_fail("imported static function has a resolved function descriptor");
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	Com_Function *function = compiler->functions + make->value.function;
+	if (function->source != 1 || function->param_count != 3) {
+		test_fail("static function descriptor retains source and parameters");
+	}
+	else
+	{
+		Com_FunctionParameter *required = function->params + 0;
+		Com_FunctionParameter *size = function->params + 1;
+		Com_FunctionParameter *label = function->params + 2;
+		if (required->has_default || required->default_value.kind != COM_STATIC_INVALID) {
+			test_fail("required static parameter has no resolved default");
+		}
+		if (!size->has_default || size->default_value.kind != COM_STATIC_INTEGER || size->default_value.integer != 42) {
+			test_fail("static parameter default resolves in declaration source");
+		}
+		if (!label->has_default || label->default_value.kind != COM_STATIC_STRING || strcmp(atom_data(label->default_value.string), "elf") != 0) {
+			test_fail("literal static parameter default is retained");
+		}
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_rejects_runtime_static_function_default(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "bad :: fun(value = runtime_default()) { ret value }\nret bad");
+	log_set_hook(0, 0);
+	if (!ctx || ctx->module->compiler->report.error_count != 1 || ctx->module->compiler->report.first->phase != COMPILER_PHASE_EVALUATION) {
+		test_fail("runtime static function default reports one evaluation error");
+	}
+	elf_arena_destroy(&arena);
+}
+
 static void test_ir_lowers_local_shadow_of_file_static(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -523,6 +588,8 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_function_expression(state);
 	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);
+	test_ir_resolves_static_function_defaults(state);
+	test_ir_rejects_runtime_static_function_default(state);
 	test_ir_lowers_local_shadow_of_file_static(state);
 	test_ir_lowers_mutually_recursive_static_functions(state);
 	test_ir_rejects_static_cycle(state);
