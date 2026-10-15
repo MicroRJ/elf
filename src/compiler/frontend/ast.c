@@ -300,22 +300,15 @@ static Ast create_carg_call_ast(Parser *par, SourceSite site, Ast left, Ast carg
 		return carg;
 	}
 
-	Ast expr = left;
-	Ast *args = 0;
-	u32 nargs = 0;
-	if (left && left->kind == AST_CALL && !left->call.carg)
+	if (left->kind != AST_CALL || left->call.carg)
 	{
-		expr = left->call.expr;
-		args = left->call.args;
-		nargs = left->call.nargs;
+		left = create_call_ast(par, site, left, 0, 0);
+		if (ast_is_error(left)) {
+			return left;
+		}
 	}
-
-	Ast tree = create_call_ast(par, site, expr, args, nargs);
-	if (ast_is_error(tree)) {
-		return tree;
-	}
-	tree->call.carg = carg;
-	return tree;
+	left->call.carg = carg;
+	return left;
 }
 
 static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
