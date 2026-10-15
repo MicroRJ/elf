@@ -526,7 +526,8 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.body = body;
 
 	BcModuleBuilder *module = create_bc_module_builder(compiler, 1);
-	generate_function(module, &function);
+	BcGen *gen = create_bc_gen(module);
+	generate_function(gen, &function);
 	if (module->generated_function_count != 1) {
 		test_fail("function generation appends one bytecode function to its module");
 	}

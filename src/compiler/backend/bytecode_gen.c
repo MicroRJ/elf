@@ -15,14 +15,14 @@ static inline i32 unwrap_slot(BcSlot memory)
 
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
-static void generate_function(BcModuleBuilder *module, IrFunction *function);
+static void generate_function(BcGen *gen, IrFunction *function);
 static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
 static void jump_if_expr_true(BcGen *gen, Ir expr, u32 true_label);
 static void jump_if_expr_false(BcGen *gen, Ir expr, u32 false_label);
-static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries, u32 count, u32 bytecode_offset);
+static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries, u32 count);
 
 typedef enum
 {
@@ -130,24 +130,14 @@ static u32 add_atom(BcModuleBuilder *module, Atom *atom)
 	return index;
 }
 
-static u32 append_bytecode(BcModuleBuilder *module, Bytecode *bytecode, u32 count)
-{
-	ASSERT(module->bytecode_count <= 0xffffffffu - count);
-	module->bytecode = grow_module_array(module->arena, module->bytecode
-	, module->bytecode_count, &module->bytecode_capacity
-	, module->bytecode_count + count, sizeof(*module->bytecode));
-	u32 offset = module->bytecode_count;
-	copy_memory(module->bytecode + offset, bytecode, sizeof(*bytecode) * count);
-	module->bytecode_count += count;
-	return offset;
-}
-
 #define BC_LABEL_INVALID     ((u32)-1)
 
 /* emitters */
 static void patch_jump_to_position(BcGen *gen, u32 source_position, u32 target_position)
 {
-	Bytecode source_bytecode = gen->bytecode[source_position];
+	BcModuleBuilder *module = gen->module;
+	ASSERT(source_position < module->bytecode_count);
+	Bytecode source_bytecode = module->bytecode[source_position];
 
 	i32 relative_distance = (i32)target_position - (i32)source_position;
 	ASSERT(relative_distance >= -32768 && relative_distance <= 32767);
@@ -156,13 +146,13 @@ static void patch_jump_to_position(BcGen *gen, u32 source_position, u32 target_p
 	{
 		case BC_JUMP:
 		{
-			gen->bytecode[source_position] = BC_XXX(BC_TYPE(source_bytecode), relative_distance);
+			module->bytecode[source_position] = BC_XXX(BC_TYPE(source_bytecode), relative_distance);
 		}
 		break;
 		case BC_JZ:
 		case BC_JNZ:
 		{
-			gen->bytecode[source_position] = BC_XYZ(BC_TYPE(source_bytecode), relative_distance, BC_ARGY(source_bytecode), BC_ARGZ(source_bytecode));
+			module->bytecode[source_position] = BC_XYZ(BC_TYPE(source_bytecode), relative_distance, BC_ARGY(source_bytecode), BC_ARGZ(source_bytecode));
 		}
 		break;
 		default: NO_CODE;
@@ -219,9 +209,11 @@ static void patch_bytecode_labels(BcGen *gen)
 
 static u32 emit_bc(BcGen *gen, SourceSite site, Bytecode byte)
 {
-	ASSERT(gen->bytecode_count < gen->bytecode_capacity);
-	u32 position = gen->bytecode_count ++;
-	gen->bytecode[position] = byte;
+	BcModuleBuilder *module = gen->module;
+	ASSERT(module->bytecode_count < 0xffffffffu);
+	module->bytecode = grow_module_array(module->arena, module->bytecode, module->bytecode_count, &module->bytecode_capacity, module->bytecode_count + 1, sizeof(*module->bytecode));
+	u32 position = module->bytecode_count++;
+	module->bytecode[position] = byte;
 	emit_source_map_entry(gen, site, position);
 	return position;
 }
@@ -346,10 +338,6 @@ static BcModuleBuilder *create_bc_module_builder(Compiler *compiler, u32 functio
 	module->compiler = compiler;
 	module->arena = arena;
 
-	elf_arena_align(arena, 8);
-	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
-	gen->module = module;
-	module->function_gen = gen;
 	if (function_count)
 	{
 		elf_arena_align(arena, 8);
@@ -359,28 +347,36 @@ static BcModuleBuilder *create_bc_module_builder(Compiler *compiler, u32 functio
 
 	u32 bytecode_capacity = 1 << 13;
 	elf_arena_align(arena, 8);
-	gen->bytecode = elf_arena_push_zero(arena, sizeof(*gen->bytecode) * bytecode_capacity);
-	gen->bytecode_capacity = bytecode_capacity;
-	gen->bytecode_count = 0;
+	module->bytecode = elf_arena_push_zero(arena, sizeof(*module->bytecode) * bytecode_capacity);
+	module->bytecode_capacity = bytecode_capacity;
+	module->bytecode_count = 0;
+	return module;
+}
 
+static BcGen *create_bc_gen(BcModuleBuilder *module)
+{
+	ASSERT(module);
+	elf_Arena *arena = module->arena;
+	elf_arena_align(arena, 8);
+	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
+	gen->module = module;
 	u32 source_map_capacity = 1 << 13;
 	elf_arena_align(arena, 8);
 	gen->source_map_buffer.entries = elf_arena_push_zero(arena, sizeof(*gen->source_map_buffer.entries) * source_map_capacity);
 	gen->source_map_buffer.capacity = source_map_capacity;
 	gen->source_map_buffer.count = 0;
-	return module;
+	return gen;
 }
 
-static void generate_function(BcModuleBuilder *module, IrFunction *function)
+static void generate_function(BcGen *gen, IrFunction *function)
 {
-	ASSERT(module && module->function_gen);
+	ASSERT(gen && gen->module);
 	ASSERT(function);
-	BcGen *gen = module->function_gen;
-	ASSERT(gen->module == module);
+	BcModuleBuilder *module = gen->module;
 
 	PROF_BLOCK("bytecode.generate_function")
 	{
-		gen->bytecode_count           =0;
+		u32 bytecode_start = module->bytecode_count;
 		gen->source_map_buffer.count  =0;
 		gen->stack_size               =function->param_count;
 		gen->stack_top                =function->param_count;
@@ -389,7 +385,6 @@ static void generate_function(BcModuleBuilder *module, IrFunction *function)
 		gen->jump_patch_count         = 0;
 
 		Ir body = function->body;
-		ASSERT(gen->bytecode_count == 0);
 		for (u32 i = 0; i < function->param_count; ++i)
 		{
 			Ir param = function->params[i];
@@ -405,8 +400,7 @@ static void generate_function(BcModuleBuilder *module, IrFunction *function)
 		do_stat(gen, body);
 		restore_slots(gen, memory_checkpoint);
 
-		if (gen->bytecode_count == 0 ||
-			BC_TYPE(gen->bytecode[gen->bytecode_count - 1]) != BC_RETURN)
+		if (module->bytecode_count == bytecode_start || BC_TYPE(module->bytecode[module->bytecode_count - 1]) != BC_RETURN)
 		{
 			emit_return_bc(gen, body->site, NO_MEMORY, 0);
 		}
@@ -415,13 +409,12 @@ static void generate_function(BcModuleBuilder *module, IrFunction *function)
 
 		ASSERT(module->generated_function_count < module->function_count);
 		BcFunction *bc_function = module->functions + module->generated_function_count++;
-		u32 bytecode_offset = append_bytecode(module, gen->bytecode, gen->bytecode_count);
-		SourceMapEntry *source_map = copy_source_map(module->arena, gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
+		SourceMapEntry *source_map = copy_source_map(module->arena, gen->source_map_buffer.entries, gen->source_map_buffer.count);
 
 		bc_function->variadic         = function->variadic;
 		bc_function->arity            = function->param_count;
-		bc_function->offset           = bytecode_offset;
-		bc_function->length           = gen->bytecode_count;
+		bc_function->offset           = bytecode_start;
+		bc_function->length           = module->bytecode_count - bytecode_start;
 		bc_function->captures         = function->capture_count;
 		bc_function->stack_size       = gen->stack_size;
 		bc_function->source_map       = source_map;
@@ -429,7 +422,7 @@ static void generate_function(BcModuleBuilder *module, IrFunction *function)
 	}
 }
 
-static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries, u32 count, u32 bytecode_offset)
+static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries, u32 count)
 {
 	if (count == 0)
 	{
@@ -440,10 +433,7 @@ static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries
 	SourceMapEntry *source_map = elf_arena_push(arena, sizeof(*source_map) * count);
 	for (u32 i = 0; i < count; ++ i)
 	{
-		SourceMapEntry entry = entries[i];
-		entry.byte_start += bytecode_offset;
-		entry.byte_end   += bytecode_offset;
-		source_map[i] = entry;
+		source_map[i] = entries[i];
 	}
 	return source_map;
 }
@@ -587,12 +577,13 @@ static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Modu
 	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
 
 	BcModuleBuilder *builder = create_bc_module_builder(compiler, ir_module.function_count);
+	BcGen *gen = create_bc_gen(builder);
 	PROF_BLOCK("compiler.codegen")
 	{
 		for (u32 i = 0; i < ir_module.function_count; ++ i)
 		{
 			IrFunction *ir_function = ir_module.functions + i;
-			generate_function(builder, ir_function);
+			generate_function(gen, ir_function);
 		}
 	}
 	ASSERT(builder->generated_function_count == builder->function_count);
@@ -1423,7 +1414,7 @@ static void define_label(BcGen *gen, u32 label)
 	ASSERT(!target->defined);
 
 	target->defined = true;
-	target->position = gen->bytecode_count;
+	target->position = gen->module->bytecode_count;
 }
 
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label)
