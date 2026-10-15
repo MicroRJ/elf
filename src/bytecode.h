@@ -96,21 +96,28 @@ BytecodeType;
 
 const char *bytecode_type_name(BytecodeType type);
 
+// One fixed-width VM instruction. The fourth operand uses padding that already
+// existed after z, so adding it does not make an instruction any larger.
 typedef struct
 {
 	BytecodeType b_type;
 	i16 b_x, b_y, b_z;
+	u8 b_w;
 }
 Bytecode;
 
-#define BC_XYZ(K,X,Y,Z) (Bytecode){K, X, Y, Z}
-#define BC_XYY(K,X,Y)    BC_XYZ(K,X,Y,0)
-#define BC_XXX(K,X)      BC_XYZ(K,X,0,0)
+STATIC_ASSERT(sizeof(Bytecode) == 12);
+
+#define BC_XYZW(K,X,Y,Z,W) (Bytecode){.b_type = (K), .b_w = (u8)(W), .b_x = (X), .b_y = (Y), .b_z = (Z)}
+#define BC_XYZ(K,X,Y,Z)     BC_XYZW(K,X,Y,Z,0)
+#define BC_XYY(K,X,Y)       BC_XYZ(K,X,Y,0)
+#define BC_XXX(K,X)         BC_XYZ(K,X,0,0)
 
 #define BC_TYPE(B)      (B).b_type
 #define BC_ARGX(B)      (B).b_x
 #define BC_ARGY(B)      (B).b_y
 #define BC_ARGZ(B)      (B).b_z
+#define BC_ARGW(B)      (B).b_w
 
 // One executable bytecode function. Its bytecode and constant indices are
 // relative to the module that owns it.
