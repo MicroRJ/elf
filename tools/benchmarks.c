@@ -7,13 +7,16 @@
 
 #include "base.h"
 #include "elf_core.h"
+#include "compiler.h"
 
 static volatile elf_Int bench_integer_sink;
 static volatile elf_Num bench_number_sink;
 
 static void bench_require(b32 condition, const char *message)
 {
-	if (condition) return;
+	if (condition) {
+		return;
+	}
 	fprintf(stderr, "benchmark error: %s\n", message);
 	exit(EXIT_FAILURE);
 }
@@ -162,13 +165,14 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 	elf_destroy_state(state);
 }
 
-static void bench_compile_repeatedly(const char *source, u32 iterations)
+static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
 	bench_require(state->modules == 0, "new state preallocates compiled modules");
 	u64 arena_before = state->arena.used;
 	u64 bytecode_count = 0;
 	u64 function_count = 0;
+	u64 string_count = 0;
 	u64 integer_constant_count = 0;
 	u64 number_constant_count = 0;
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
@@ -183,6 +187,7 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 		bench_require(value_as_closure(state->stack_ptr[-1])->function.index == 0, "module entry is not local");
 		bytecode_count += module->bytecode_count;
 		function_count += module->bytecode_function_count;
+		string_count += module->string_count;
 		integer_constant_count += module->integer_constant_count;
 		number_constant_count += module->number_constant_count;
 		elf_pop(state, 1);
@@ -192,16 +197,40 @@ static void bench_compile_repeatedly(const char *source, u32 iterations)
 	u64 array_storage =
 		bytecode_count * sizeof(Bytecode) +
 		function_count * sizeof(BcFunction) +
+		string_count * sizeof(elf_String *) +
 		integer_constant_count * sizeof(i64) +
 		number_constant_count * sizeof(f64);
 	u64 non_array_arena_storage = retained_arena_storage - array_storage;
 
-	bench_report("compile source", "compiles", iterations, seconds);
-	printf("  growth: %llu bytecodes, %llu functions, %llu integer constants, %llu number constants\n",
-		bytecode_count, function_count, integer_constant_count, number_constant_count);
+	bench_report("compile + load script", "loads", iterations, seconds);
+	printf("  growth: %llu bytecodes, %llu functions, %llu strings, %llu integer constants, %llu number constants\n",
+		bytecode_count, function_count, string_count, integer_constant_count, number_constant_count);
 	printf("  retained state-arena storage: %llu bytes (%llu bytes outside finalized arrays)\n",
 		retained_arena_storage, non_array_arena_storage);
 	printf("  preallocated compiled-program arrays per state: 0 bytes\n");
+	elf_destroy_state(state);
+}
+
+static void bench_compile_and_load_modules(const char *source, u32 iterations)
+{
+	elf_State *state = elf_create_state();
+	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
+
+	i64 start = bench_now();
+	for (u32 i = 0; i < iterations; ++i)
+	{
+		elf_Scratch scratch = elf_begin_scratch();
+		Compiler *compiler = compiler_create(state, scratch.arena);
+		compiler_set_log_messages(compiler, false);
+		compiler_add_root_module(compiler, "benchmark.module", text);
+		Com_Output output = compiler_compile(compiler, COM_UNIT_MODULE);
+		bench_require(output.module != 0, "could not compile benchmark module");
+		bench_require(!bc_function_ref_is_valid(output.entry), "static module unexpectedly has an entry function");
+		elf_end_scratch(scratch);
+	}
+	double seconds = bench_elapsed_s(start);
+
+	bench_report("compile + load module", "loads", iterations, seconds);
 	elf_destroy_state(state);
 }
 
@@ -291,6 +320,41 @@ int main(void)
 		"\t}\n"
 		"\tret result\n"
 		"}\n";
+	static const char global_read_source[] =
+		"benchmark_global = 1\n"
+		"ret fun(n) {\n"
+		"\tresult := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tresult += benchmark_global\n"
+		"\t}\n"
+		"\tret result\n"
+		"}\n";
+	static const char global_write_source[] =
+		"ret fun(n) {\n"
+		"\tbenchmark_global = 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tbenchmark_global = i + 1\n"
+		"\t}\n"
+		"\tret benchmark_global\n"
+		"}\n";
+	static const char string_constant_source[] =
+		"ret fun(n) {\n"
+		"\tresult := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tif \"module string\" == \"module string\" ? { result += 1 }\n"
+		"\t}\n"
+		"\tret result\n"
+		"}\n";
+	static const char script_compile_source[] =
+		"benchmark_load_global = \"loaded\"\n"
+		"helper := fun(value) { ret value + 1.25 }\n"
+		"ret helper(7)\n";
+	static const char module_compile_source[] =
+		"set_value :: fun(value) {\n"
+		"\tbenchmark_module_global = value\n"
+		"\tret \"linked\"\n"
+		"}\n"
+		"calculate :: fun(value) { ret value + 1.25 + 7 }\n";
 
 	prof_begin_capture();
 
@@ -340,13 +404,17 @@ int main(void)
 	printf("\nVM benchmarks (median of 7 measured runs after one warmup)\n");
 	bench_vm_integer_program("VM dispatch", dispatch_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("function calls", call_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("global reads", global_read_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("global writes", global_write_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("string constants", string_constant_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("integer constants", integer_constant_source, VM_ITERATIONS,
 		4ll * VM_ITERATIONS * (VM_ITERATIONS - 1ll) + 98ll * VM_ITERATIONS);
 	bench_vm_number_program("number constants", number_constant_source, VM_ITERATIONS, 3.0 * VM_ITERATIONS);
 	bench_vm_integer_program("closure create/call", closure_source, CLOSURE_ITERATIONS, CLOSURE_ITERATIONS);
 
-	printf("\nCompiler and storage benchmark\n");
-	bench_compile_repeatedly(closure_source, COMPILE_ITERATIONS);
+	printf("\nCompiler, loading, and storage benchmarks\n");
+	bench_compile_and_load_scripts(script_compile_source, COMPILE_ITERATIONS);
+	bench_compile_and_load_modules(module_compile_source, COMPILE_ITERATIONS);
 
 	printf("sinks: %lld %.3f\n", bench_integer_sink, bench_number_sink);
 	prof_dump();
