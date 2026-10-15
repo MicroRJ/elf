@@ -298,16 +298,17 @@ static Ir static_value_to_ir(IrFunctionEmitter *ctx, SourceSite site, Com_Static
 
 static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *function_ctx, IrEntity *entity, SourceSite site)
 {
-	for (u32 i = 0; i < function_ctx->capture_count; ++ i)
+	u32 capture_index = 0;
+	for (LwCapture *capture = function_ctx->first_capture; capture; capture = capture->next)
 	{
-		if (function_ctx->capture_entities[i] == entity) {
-			return i;
+		if (capture->entity == entity) {
+			return capture_index;
 		}
+		capture_index += 1;
 	}
 
 	ASSERT(function_ctx->capture_count < 255);
-	u32 capture_index = function_ctx->capture_count ++;
-	function_ctx->capture_entities[capture_index] = entity;
+	ASSERT(capture_index == function_ctx->capture_count);
 
 	Ir source = 0;
 	LwScopeFunction *parent = function_ctx->parent;
@@ -321,7 +322,17 @@ static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *f
 		source = create_load_local_ir(ctx, site, entity->memory_ir);
 	}
 
-	function_ctx->captures[capture_index] = source;
+	LwCapture *capture = elf_arena_push_zero(ctx->module->arena, sizeof(*capture));
+	capture->entity = entity;
+	capture->source = source;
+	if (function_ctx->last_capture) {
+		function_ctx->last_capture->next = capture;
+	}
+	else {
+		function_ctx->first_capture = capture;
+	}
+	function_ctx->last_capture = capture;
+	function_ctx->capture_count += 1;
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	return capture_index;
 }
@@ -476,8 +487,6 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 	LwScopeFunction function_ctx = {};
 	function_ctx.parent = ctx->function;
 	function_ctx.function = function;
-	function_ctx.captures = elf_arena_push_zero(ctx->module->arena, sizeof(*function_ctx.captures) * 255);
-	function_ctx.capture_entities = elf_arena_push_zero(ctx->module->arena, sizeof(*function_ctx.capture_entities) * 255);
 	function_ctx.scope_start = ctx->scope_start;
 
 	LwScopeFunction *outer_function = ctx->function;
@@ -545,7 +554,16 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 
 	IrArray captures = {};
 	captures.count = function_ctx.capture_count;
-	captures.items = elf_arena_push_copy(ctx->module->arena, sizeof(*captures.items) * captures.count, function_ctx.captures);
+	if (captures.count) {
+		captures.items = elf_arena_push(ctx->module->arena, sizeof(*captures.items) * captures.count);
+	}
+	u32 capture_index = 0;
+	for (LwCapture *capture = function_ctx.first_capture; capture; capture = capture->next)
+	{
+		ASSERT(capture_index < captures.count);
+		captures.items[capture_index++] = capture->source;
+	}
+	ASSERT(capture_index == captures.count);
 	ir->ir_function.captures = captures;
 	function->capture_count = function_ctx.capture_count;
 

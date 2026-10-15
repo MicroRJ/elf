@@ -97,13 +97,23 @@ LoopLabels;
 typedef struct IrModuleEmitter IrModuleEmitter;
 typedef struct IrFunctionEmitter IrFunctionEmitter;
 typedef struct LwScopeFunction LwScopeFunction;
+typedef struct LwCapture LwCapture;
+
+// One capture discovered while lowering a function body. The list exists only
+// until its ordered source expressions are copied into an IR function value.
+struct LwCapture
+{
+	LwCapture *next;
+	IrEntity  *entity;
+	Ir         source;
+};
 
 struct LwScopeFunction
 {
 	LwScopeFunction *parent;
 	IrFunction      *function;
-	Ir             *captures;
-	IrEntity      **capture_entities;
+	LwCapture       *first_capture;
+	LwCapture       *last_capture;
 	u32              capture_count;
 	IrEntityId       scope_start;
 };
