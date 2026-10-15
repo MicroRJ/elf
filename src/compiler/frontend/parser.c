@@ -13,6 +13,7 @@ static Ast parse_postfix_expr(Parser *parser);
 static Ast parse_table_expr(Parser *parser);
 static Ast parse_array_expr(Parser *parser);
 static Ast parse_ident_expr(Parser *parser);
+static Ast parse_call_argument(Parser *parser);
 static Ast parse_stat(Parser *parser);
 static Ast parse_if_stat(Parser *parser);
 static Ast parse_json_ast(Parser *parser);
@@ -1016,7 +1017,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 					return parser_error(par, ERROR_EXCESS_COMMA, par->tok.site, "excess comma");
 				}
 
-				Ast x = parse_expr(par);
+				Ast x = parse_call_argument(par);
 				if (ast_is_error(x)) {
 					par->ast.stack_index = stack_start;
 					return x;
@@ -1047,6 +1048,33 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 		return ERROR_OOM_AST;
 	}
 	return create_call_ast(par, site, callee, args, nargs);
+}
+
+static Ast parse_call_argument(Parser *parser)
+{
+	if (peek_token(parser, TOK_IDENTIFIER) && peek_next_token(parser, TOK_ASSIGN))
+	{
+		Token name_token = consume_token(parser);
+		Token assign = take_token(parser, TOK_ASSIGN);
+		if (token_is_error(assign)) {
+			return ast_from_token_error(assign);
+		}
+
+		Ast name = create_ident_ast(parser, name_token.site, name_token.atom);
+		if (ast_is_error(name)) {
+			return name;
+		}
+		Ast expr = parse_expr(parser);
+		if (ast_is_error(expr)) {
+			return expr;
+		}
+		if (!expr) {
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, assign.site, "expected named argument expression");
+		}
+		return create_named_argument_ast(parser, name_token.site, name, expr);
+	}
+
+	return parse_expr(parser);
 }
 
 static Ast parse_field_postfix(Parser *par, Ast left)

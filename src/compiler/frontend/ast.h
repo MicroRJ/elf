@@ -49,6 +49,7 @@
 	X(AST_INTERPOLATED_STRING , "interpolated_string")        \
 	X(AST_IMPORT              , "import")                     \
 	X(AST_CALL                , "call")                       \
+	X(AST_NAMED_ARGUMENT      , "named_argument")             \
 	X(AST_META_CALL           , "meta_call")                  \
 	X(AST_TUPLE               , "tuple")                      \
 	X(AST_FUNCTION            , "function")                   \
@@ -197,6 +198,13 @@ struct Ast_T
 			u32    nargs;
 		}
 		call;
+
+		struct
+		{
+			Ast name;
+			Ast expr;
+		}
+		named_argument;
 
 		struct
 		{

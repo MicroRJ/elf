@@ -335,6 +335,35 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	}
 }
 
+static void test_parser_named_call_arguments(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "build(1, width = 20 + 2, title = make(\"ok\"))");
+	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse named call argument statement tuple");
+	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call with named arguments");
+	if (!call || call->call.nargs != 3) {
+		test_fail("named and positional call arguments share the call argument list");
+		return;
+	}
+
+	expect_ast_i64(call->call.args[0], 1, "positional argument remains an expression");
+	Ast width = call->call.args[1];
+	expect_ast_kind(width, AST_NAMED_ARGUMENT, "parse first named argument");
+	if (width && width->kind == AST_NAMED_ARGUMENT)
+	{
+		expect_ast_kind(width->named_argument.name, AST_IDENT, "named argument stores identifier name");
+		expect_ast_atom(width->named_argument.name, "width", "named argument stores name text");
+		expect_ast_kind(width->named_argument.expr, AST_ADD, "named argument stores full value expression");
+	}
+
+	Ast title = call->call.args[2];
+	expect_ast_kind(title, AST_NAMED_ARGUMENT, "parse second named argument");
+	if (title && title->kind == AST_NAMED_ARGUMENT)
+	{
+		expect_ast_atom(title->named_argument.name, "title", "second named argument stores name text");
+		expect_ast_kind(title->named_argument.expr, AST_CALL, "named argument value may be a call");
+	}
+}
+
 static void test_parser_array_literals(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "ret []\nret [1, 2 + 3, [4]]\nret [5][0]");
@@ -664,6 +693,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_if_else_blocks(state);
 	test_parser_for_loops(state);
 	test_parser_call_with_table_argument(state);
+	test_parser_named_call_arguments(state);
 	test_parser_array_literals(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);

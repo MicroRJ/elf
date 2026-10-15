@@ -290,6 +290,23 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u3
 	return tree;
 }
 
+static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
+{
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = create_ast(par, site, AST_NAMED_ARGUMENT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->named_argument.name = name;
+	tree->named_argument.expr = expr;
+	return tree;
+}
+
 static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 {
 	if (ast_is_error(expr)) {
@@ -831,6 +848,13 @@ static void print_ast(Printer *pr, Ast tree)
 			PRINT(pr, "(");
 			print_ast_list(pr, args, nargs);
 			PRINT(pr, ")");
+		}
+		break;
+		case AST_NAMED_ARGUMENT:
+		{
+			print_ast(pr, tree->named_argument.name);
+			PRINT(pr, " = ");
+			print_ast(pr, tree->named_argument.expr);
 		}
 		break;
 
