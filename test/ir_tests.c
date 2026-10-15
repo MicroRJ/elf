@@ -386,6 +386,9 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: 42\nret first");
+	if (!ctx || ctx->source_scope_count != 1 || ctx->current_source != 0 || ctx->source_scopes[0].static_count != 2) {
+		test_fail("lowering stores root static symbols in source scope zero");
+	}
 	Ir body = ir_test_main_body(ctx);
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static declarations emit no runtime statements");
 	expect_ir_i64(ret ? ret->ir_return.expr : 0, 42, "static forward reference resolves to literal ir");

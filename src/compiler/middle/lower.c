@@ -15,9 +15,9 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr);
 static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
 static Ir lower_ast_file_body_to_ir(LowerContext *ctx, Ast stat);
 static Ir lower_ast_function_to_ir(LowerContext *ctx, Ast expr);
-static void declare_file_statics(LowerContext *ctx, Ast block);
-static void evaluate_file_statics(LowerContext *ctx);
-static void report_unreferenced_file_statics(LowerContext *ctx);
+static void declare_source_statics(LowerContext *ctx, Ast block);
+static void evaluate_source_statics(LowerContext *ctx);
+static void report_unreferenced_source_statics(LowerContext *ctx);
 
 static LowerContext *elf_create_lower_context(Compiler *compiler)
 {
@@ -25,6 +25,9 @@ static LowerContext *elf_create_lower_context(Compiler *compiler)
 	LowerContext *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
 	ctx->compiler = compiler;
 	ctx->arena = arena;
+	ctx->source_scope_count = compiler->source_count;
+	ctx->source_scopes = elf_arena_push_zero(arena, sizeof(*ctx->source_scopes) * ctx->source_scope_count);
+	ctx->current_source = 0;
 
 	u32 max_functions = 1024;
 	ctx->functions = elf_arena_push_zero(arena, sizeof(*ctx->functions) * max_functions);
@@ -216,13 +219,20 @@ static LwScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
 	return 0;
 }
 
-static LwFileStatic *file_static_from_name(LowerContext *ctx, Atom *name)
+static LwSourceScope *current_source_scope(LowerContext *ctx)
 {
-	for (u32 i = 0; i < ctx->file_static_count; ++i)
+	ASSERT(ctx->current_source < ctx->source_scope_count);
+	return ctx->source_scopes + ctx->current_source;
+}
+
+static LwStaticSymbol *static_symbol_from_name(LowerContext *ctx, Atom *name)
+{
+	LwSourceScope *scope = current_source_scope(ctx);
+	for (u32 i = 0; i < scope->static_count; ++i)
 	{
-		LwFileStatic *file_static = ctx->file_statics + i;
-		if (file_static->name == name) {
-			return file_static;
+		LwStaticSymbol *symbol = scope->statics + i;
+		if (symbol->name == name) {
+			return symbol;
 		}
 	}
 	return 0;
@@ -241,7 +251,7 @@ static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityT
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
 		}
 	}
-	else if (ctx->scope_depth == 1 && ctx->function && !ctx->function->parent && file_static_from_name(ctx, name)) {
+	else if (ctx->scope_depth == 1 && ctx->function && !ctx->function->parent && static_symbol_from_name(ctx, name)) {
 		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
 	}
 
@@ -257,9 +267,9 @@ static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityT
 	return en;
 }
 
-static b32 evaluate_file_static(LowerContext *ctx, LwFileStatic *file_static);
+static b32 evaluate_static_symbol(LowerContext *ctx, LwStaticSymbol *symbol);
 
-static b32 evaluate_static_expr(LowerContext *ctx, LwFileStatic *owner, Ast expr, StaticValue *out)
+static b32 evaluate_static_expr(LowerContext *ctx, LwStaticSymbol *owner, Ast expr, StaticValue *out)
 {
 	b32 result = true;
 	switch (expr->kind)
@@ -300,7 +310,7 @@ static b32 evaluate_static_expr(LowerContext *ctx, LwFileStatic *owner, Ast expr
 
 		case AST_IDENT:
 		{
-			LwFileStatic *referenced = file_static_from_name(ctx, expr->atom);
+			LwStaticSymbol *referenced = static_symbol_from_name(ctx, expr->atom);
 			if (!referenced)
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
@@ -309,7 +319,7 @@ static b32 evaluate_static_expr(LowerContext *ctx, LwFileStatic *owner, Ast expr
 			else
 			{
 				referenced->referenced = true;
-				result = evaluate_file_static(ctx, referenced);
+				result = evaluate_static_symbol(ctx, referenced);
 				if (result) {
 					*out = referenced->value;
 				}
@@ -327,20 +337,20 @@ static b32 evaluate_static_expr(LowerContext *ctx, LwFileStatic *owner, Ast expr
 	return result;
 }
 
-static b32 evaluate_file_static(LowerContext *ctx, LwFileStatic *file_static)
+static b32 evaluate_static_symbol(LowerContext *ctx, LwStaticSymbol *symbol)
 {
-	ASSERT(file_static);
-	b32 result = file_static->value.kind != STATIC_VALUE_INVALID;
-	if (file_static->state == STATIC_SYMBOL_RESOLVING)
+	ASSERT(symbol);
+	b32 result = symbol->value.kind != STATIC_VALUE_INVALID;
+	if (symbol->state == STATIC_SYMBOL_RESOLVING)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, file_static->site, "cyclic static definition for '%s'", atom_data(file_static->name));
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, symbol->site, "cyclic static definition for '%s'", atom_data(symbol->name));
 		result = false;
 	}
-	else if (file_static->state == STATIC_SYMBOL_UNRESOLVED)
+	else if (symbol->state == STATIC_SYMBOL_UNRESOLVED)
 	{
-		file_static->state = STATIC_SYMBOL_RESOLVING;
-		result = evaluate_static_expr(ctx, file_static, file_static->expr, &file_static->value);
-		file_static->state = STATIC_SYMBOL_RESOLVED;
+		symbol->state = STATIC_SYMBOL_RESOLVING;
+		result = evaluate_static_expr(ctx, symbol, symbol->expr, &symbol->value);
+		symbol->state = STATIC_SYMBOL_RESOLVED;
 	}
 	return result;
 }
@@ -409,7 +419,7 @@ static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
 	LwScopeEntity *entity = entity_from_name(ctx, destination->atom);
 	if (!entity)
 	{
-		if (file_static_from_name(ctx, destination->atom))
+		if (static_symbol_from_name(ctx, destination->atom))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
 			return false;
@@ -453,6 +463,8 @@ static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 varia
 
 static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 {
+	ASSERT(file->site.source < ctx->source_scope_count);
+	ctx->current_source = file->site.source;
 	PROF_BLOCK("lower.function")
 	{
 		IrFunction *main_fn = add_function_ir(ctx, file->site, true, IMPLICIT_PARAM_COUNT, 0);
@@ -464,10 +476,10 @@ static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 
 		LwScopeFunction *outer_function = ctx->function;
 		ctx->function = &main_function_ctx;
-		declare_file_statics(ctx, file->file.body);
-		evaluate_file_statics(ctx);
+		declare_source_statics(ctx, file->file.body);
+		evaluate_source_statics(ctx);
 		main_fn->body = lower_ast_file_body_to_ir(ctx, file->file.body);
-		report_unreferenced_file_statics(ctx);
+		report_unreferenced_source_statics(ctx);
 		ctx->function = outer_function;
 	}
 
@@ -483,6 +495,8 @@ static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 
 static IrModule elf_lower_ast_module(LowerContext *ctx, Ast file)
 {
+	ASSERT(file->site.source < ctx->source_scope_count);
+	ctx->current_source = file->site.source;
 	PROF_BLOCK("lower.module")
 	{
 		Ast body = file->file.body;
@@ -495,8 +509,8 @@ static IrModule elf_lower_ast_module(LowerContext *ctx, Ast file)
 			}
 		}
 
-		declare_file_statics(ctx, body);
-		evaluate_file_statics(ctx);
+		declare_source_statics(ctx, body);
+		evaluate_source_statics(ctx);
 	}
 
 	IrModule module = {};
@@ -773,12 +787,12 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 			}
 			else
 			{
-				LwFileStatic *file_static = file_static_from_name(ctx, ident);
-				if (file_static)
+				LwStaticSymbol *symbol = static_symbol_from_name(ctx, ident);
+				if (symbol)
 				{
-					file_static->referenced = true;
-					if (evaluate_file_static(ctx, file_static)) {
-						ir = static_value_to_ir(ctx, expr->site, file_static->value);
+					symbol->referenced = true;
+					if (evaluate_static_symbol(ctx, symbol)) {
+						ir = static_value_to_ir(ctx, expr->site, symbol->value);
 					}
 					else {
 						ir = ERROR_IR;
@@ -1008,13 +1022,14 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 	return ir;
 }
 
-static void declare_file_statics(LowerContext *ctx, Ast block)
+static void declare_source_statics(LowerContext *ctx, Ast block)
 {
 	ASSERT(block && block->kind == AST_BLOCK_STAT);
-	ASSERT(ctx->file_static_count == 0);
-	ctx->file_static_capacity = block->block.nstats;
-	if (ctx->file_static_capacity) {
-		ctx->file_statics = elf_arena_push_zero(ctx->arena, sizeof(*ctx->file_statics) * ctx->file_static_capacity);
+	LwSourceScope *scope = current_source_scope(ctx);
+	ASSERT(scope->static_count == 0);
+	u32 capacity = block->block.nstats;
+	if (capacity) {
+		scope->statics = elf_arena_push_zero(ctx->arena, sizeof(*scope->statics) * capacity);
 	}
 
 	for (u32 i = 0; i < block->block.nstats; ++i)
@@ -1029,56 +1044,58 @@ static void declare_file_statics(LowerContext *ctx, Ast block)
 				continue;
 			}
 
-			if (file_static_from_name(ctx, name->atom))
+			if (static_symbol_from_name(ctx, name->atom))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, name->site, "'%s': is already declared", atom_data(name->atom));
 				continue;
 			}
 
-			ASSERT(ctx->file_static_count < ctx->file_static_capacity);
-			LwFileStatic *file_static = ctx->file_statics + ctx->file_static_count++;
-			file_static->name = name->atom;
-			file_static->site = name->site;
-			file_static->expr = declaration->static_decl.expr;
+			ASSERT(scope->static_count < capacity);
+			LwStaticSymbol *symbol = scope->statics + scope->static_count++;
+			symbol->name = name->atom;
+			symbol->site = name->site;
+			symbol->expr = declaration->static_decl.expr;
 		}
 	}
 }
 
-static void evaluate_file_statics(LowerContext *ctx)
+static void evaluate_source_statics(LowerContext *ctx)
 {
-	for (u32 i = 0; i < ctx->file_static_count; ++i)
+	LwSourceScope *scope = current_source_scope(ctx);
+	for (u32 i = 0; i < scope->static_count; ++i)
 	{
-		LwFileStatic *file_static = ctx->file_statics + i;
-		if (file_static->expr->kind == AST_FUNCTION)
+		LwStaticSymbol *symbol = scope->statics + i;
+		if (symbol->expr->kind == AST_FUNCTION)
 		{
-			file_static->value.kind = STATIC_VALUE_FUNCTION;
-			file_static->value.function = create_ast_function_value_ir(ctx, file_static->expr);
-			ctx->functions[file_static->value.function->ir_function.index].is_static = true;
-			file_static->state = STATIC_SYMBOL_RESOLVED;
+			symbol->value.kind = STATIC_VALUE_FUNCTION;
+			symbol->value.function = create_ast_function_value_ir(ctx, symbol->expr);
+			ctx->functions[symbol->value.function->ir_function.index].is_static = true;
+			symbol->state = STATIC_SYMBOL_RESOLVED;
 		}
 	}
 
-	for (u32 i = 0; i < ctx->file_static_count; ++i)
+	for (u32 i = 0; i < scope->static_count; ++i)
 	{
-		evaluate_file_static(ctx, ctx->file_statics + i);
+		evaluate_static_symbol(ctx, scope->statics + i);
 	}
 
-	for (u32 i = 0; i < ctx->file_static_count; ++i)
+	for (u32 i = 0; i < scope->static_count; ++i)
 	{
-		LwFileStatic *file_static = ctx->file_statics + i;
-		if (file_static->expr->kind == AST_FUNCTION) {
-			lower_ast_function_body(ctx, file_static->expr, file_static->value.function);
+		LwStaticSymbol *symbol = scope->statics + i;
+		if (symbol->expr->kind == AST_FUNCTION) {
+			lower_ast_function_body(ctx, symbol->expr, symbol->value.function);
 		}
 	}
 }
 
-static void report_unreferenced_file_statics(LowerContext *ctx)
+static void report_unreferenced_source_statics(LowerContext *ctx)
 {
-	for (u32 i = 0; i < ctx->file_static_count; ++i)
+	LwSourceScope *scope = current_source_scope(ctx);
+	for (u32 i = 0; i < scope->static_count; ++i)
 	{
-		LwFileStatic *file_static = ctx->file_statics + i;
-		if (!file_static->referenced) {
-			report_lowering_warning(ctx, LOWERING_ERROR_UNREFERENCED_ENTITY, file_static->site, "unreferenced entity");
+		LwStaticSymbol *symbol = scope->statics + i;
+		if (!symbol->referenced) {
+			report_lowering_warning(ctx, LOWERING_ERROR_UNREFERENCED_ENTITY, symbol->site, "unreferenced entity");
 		}
 	}
 }

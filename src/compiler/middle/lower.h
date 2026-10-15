@@ -138,6 +138,7 @@ typedef struct LwScopeEntity
 }
 LwScopeEntity;
 
+// One static declaration tracked while its source is being lowered.
 typedef struct
 {
 	Atom             *name;
@@ -147,7 +148,16 @@ typedef struct
 	StaticValue       value;
 	b32               referenced;
 }
-LwFileStatic;
+LwStaticSymbol;
+
+// The static namespace for one compiler source. Its array index is the
+// corresponding Com_SourceId.
+typedef struct
+{
+	LwStaticSymbol *statics;
+	u32             static_count;
+}
+LwSourceScope;
 
 struct LowerContext
 {
@@ -176,9 +186,9 @@ struct LowerContext
 	EntityId   scope_end;
 	u32        scope_depth;
 
-	LwFileStatic *file_statics;
-	u32           file_static_count;
-	u32           file_static_capacity;
+	LwSourceScope *source_scopes;
+	u32            source_scope_count;
+	Com_SourceId   current_source;
 
 	LoopLabels loop_stack[64];
 	u32        loop_count;
