@@ -112,19 +112,19 @@ typedef struct
 	elf_Arena *arena;
 	u32        stack_size;
 	u32        stack_index;
-	Ast    *stack;
+	Ast       *stack;
 }
 AstContext;
 
 struct Ast_T
 {
-	AstType  kind;
+	AstType    kind;
 	SourceSite site;
 
 	union
 	{
-		Com_Error error;
-		Atom *atom;
+		Com_Error   error;
+		Atom       *atom;
 		i64         integer_value;
 		f64         number_value;
 		AstArray    interpolated_string;
@@ -318,4 +318,3 @@ static Ast ast_from_error(Com_Error error)
 		default: ASSERT(0); return ERROR_AST;
 	}
 }
-

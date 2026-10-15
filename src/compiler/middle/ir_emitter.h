@@ -5,12 +5,49 @@
 #define IMPLICIT_PARAM_INDEX 0
 #define IMPLICIT_PARAM_COUNT 1
 
-typedef struct LwScopeEntity LwScopeEntity;
-
+typedef struct IrEntity IrEntity;
 typedef struct IrFunction IrFunction;
 
-// One lowered function. Static functions may be called by module-relative
-// index unless their body needs an actual closure value.
+
+enum
+{
+	MAX_ENTITIES = 4096
+};
+
+#define NO_ENTITY 0xDEADBEEF
+
+typedef enum
+{
+	ENTITY_INVALID = 0,
+	// TODO(RJ): to be removed!
+	ENTITY_DIRECTORY,
+	ENTITY_LOCAL_DECLARATION,
+}
+IrEntityType;
+
+typedef enum
+{
+	ENTITY_TAG_REFERENCED  = 1 << 0,
+	ENTITY_TAG_CONSTANT    = 1 << 1,
+	ENTITY_TAG_ASSIGNED    = 1 << 2,
+	ENTITY_TAG_PARAMETER   = 1 << 3,
+	ENTITY_TAG_FORLOOP     = 1 << 4,
+}
+IrEntityTags;
+
+typedef u32 IrEntityId;
+
+typedef struct IrEntity
+{
+	IrEntityType  type;
+	IrEntityTags  tags;
+	u32           scope_start;
+	Atom         *name;
+	SourceSite    site;
+	Ir            memory_ir;
+}
+IrEntity;
+
 struct IrFunction
 {
 	SourceSite      site;
@@ -21,7 +58,7 @@ struct IrFunction
 	u32             param_count;
 	Ir             *captures;
 	u32             capture_count;
-	LwScopeEntity **capture_entities;
+	IrEntity      **capture_entities;
 };
 
 // One lowered compilation unit. Global indices are still module-local here and
@@ -33,41 +70,15 @@ typedef struct
 	Atom      **globals;
 	u32         global_count;
 	b32         has_entry;
+	// TODO(RJ): just make index zero be the entry function!
 	u32         entry_index;
 }
 IrModule;
 
-enum
-{
-	MAX_ENTITIES = 4096
-};
-
-#define NO_ENTITY 0xDEADBEEF
-
-typedef enum
-{
-	ENTITY_TAG_REFERENCED  = 1 << 0,
-	ENTITY_TAG_CONSTANT    = 1 << 1,
-	ENTITY_TAG_ASSIGNED    = 1 << 2,
-	ENTITY_TAG_PARAMETER   = 1 << 3,
-	ENTITY_TAG_FORLOOP     = 1 << 4,
-}
-EntityTags;
-
-typedef enum
-{
-	ENTITY_INVALID = 0,
-	ENTITY_DIRECTORY,
-	ENTITY_LOCAL_DECLARATION,
-}
-EntityType;
-
-typedef u32 EntityId;
-
 typedef struct
 {
-	EntityId previous_scope_start;
-	u32      previous_scope_depth;
+	IrEntityId previous_scope_start;
+	u32        previous_scope_depth;
 }
 EntityScope;
 
@@ -93,19 +104,8 @@ struct LwScopeFunction
 {
 	LwScopeFunction *parent;
 	IrFunction      *function;
-	EntityId         scope_start;
+	IrEntityId         scope_start;
 };
-
-typedef struct LwScopeEntity
-{
-	EntityType   type;
-	EntityTags   tags;
-	u32          scope_start;
-	Atom    *name;
-	SourceSite   site;
-	Ir           memory_ir;
-}
-LwScopeEntity;
 
 // Owns the module-wide IR arrays shared by every function emitter.
 struct IrModuleEmitter
@@ -133,9 +133,9 @@ struct IrFunctionEmitter
 
 	LwScopeFunction *function;
 
-	LwScopeEntity     entities[MAX_ENTITIES];
-	EntityId   scope_start;
-	EntityId   scope_end;
+	IrEntity     entities[MAX_ENTITIES];
+	IrEntityId   scope_start;
+	IrEntityId   scope_end;
 	u32        scope_depth;
 
 	Com_SourceId current_source;

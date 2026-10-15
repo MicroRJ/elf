@@ -179,10 +179,10 @@ Com_StaticValue;
 // One top-level declaration exported by a compiler source.
 typedef struct
 {
-	struct Atom *name;
-	SourceSite site;
-	struct Ast_T *expr;
-	Com_SourceId source;
+	struct Atom    *name;
+	SourceSite      site;
+	struct Ast_T   *expr;
+	Com_SourceId    source;
 	Com_StaticState state;
 	Com_StaticValue value;
 	b32 referenced;

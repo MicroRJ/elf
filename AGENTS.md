@@ -56,6 +56,15 @@ permission to complete prerequisite language or architectural work.
 
 ## Code Style
 
+Use the project's string types for string data. Use `dy_String` for ordinary
+borrowed text and names inside the implementation, `elf_StrSlice` at public ELF
+API boundaries, `Atom *` for interned compiler names and paths, `Com_String` for
+strings owned by compiled output, and `elf_String *` for runtime strings. Do not
+introduce `const char *` parameters or fields for ordinary string data, especially
+when the implementation immediately calls `strlen`. Reserve raw C strings for
+string literals, format strings, and direct CRT, platform, or external C API
+boundaries that specifically require null termination; convert at that boundary.
+
 Always use braces for `if` statements and `for` loops, including single-line
 bodies.
 

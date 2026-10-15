@@ -163,7 +163,7 @@ static void patch_jump_to_position(BcFunctionEmitter *emitter, u32 source_positi
 	}
 }
 
-static BytecodeLabel *get_bytecode_label(BcFunctionEmitter *emitter, u32 label)
+static BcLabel *get_bytecode_label(BcFunctionEmitter *emitter, u32 label)
 {
 	ASSERT(label < ARRAY_COUNT(emitter->labels));
 	return &emitter->labels[label];
@@ -194,7 +194,7 @@ static void record_jump_patch(BcFunctionEmitter *emitter, u32 bytecode_position,
 	ASSERT(label != BC_LABEL_INVALID);
 	ASSERT(emitter->jump_patch_count < ARRAY_COUNT(emitter->jump_patches));
 
-	BytecodeJumpPatch *patch = emitter->jump_patches + emitter->jump_patch_count++;
+	BcJumpPatch *patch = emitter->jump_patches + emitter->jump_patch_count++;
 	patch->bytecode_position = bytecode_position;
 	patch->label = label;
 }
@@ -203,8 +203,8 @@ static void patch_bytecode_labels(BcFunctionEmitter *emitter)
 {
 	for (u32 i = 0; i < emitter->jump_patch_count; ++ i)
 	{
-		BytecodeJumpPatch patch = emitter->jump_patches[i];
-		BytecodeLabel *label = get_bytecode_label(emitter, patch.label);
+		BcJumpPatch patch = emitter->jump_patches[i];
+		BcLabel *label = get_bytecode_label(emitter, patch.label);
 		ASSERT(label->defined);
 		patch_jump_to_position(emitter, patch.bytecode_position, (u32)label->position);
 	}
@@ -1387,7 +1387,7 @@ static void emit_stat(BcFunctionEmitter *emitter, Ir stat)
 
 static void define_label(BcFunctionEmitter *emitter, u32 label)
 {
-	BytecodeLabel *target = get_bytecode_label(emitter, label);
+	BcLabel *target = get_bytecode_label(emitter, label);
 	ASSERT(!target->defined);
 
 	target->defined = true;

@@ -184,7 +184,7 @@ static EntityScope get_entity_scope(IrFunctionEmitter *ctx)
 
 static void set_entity_scope(IrFunctionEmitter *ctx, EntityScope scope)
 {
-	EntityId current_start = ctx->scope_start;
+	IrEntityId current_start = ctx->scope_start;
 	for (i32 i = ctx->scope_end - 1; i >= (i32)current_start; -- i)
 	{
 		if (~ctx->entities[i].tags & ENTITY_TAG_REFERENCED) {
@@ -230,11 +230,11 @@ static void emit_defer_range(IrFunctionEmitter *ctx, IrFrame *items, u32 start)
 	}
 }
 
-static LwScopeEntity *entity_from_name(IrFunctionEmitter *ctx, Atom *name)
+static IrEntity *entity_from_name(IrFunctionEmitter *ctx, Atom *name)
 {
 	for (i32 i = ctx->scope_end - 1; i >= 0; -- i)
 	{
-		LwScopeEntity *en = & ctx->entities[i];
+		IrEntity *en = & ctx->entities[i];
 		if (en->name == name) {
 			return en;
 		}
@@ -247,9 +247,9 @@ static Com_StaticSymbol *static_symbol_from_name(IrFunctionEmitter *ctx, Atom *n
 	return compiler_static_symbol_from_source(ctx->module->compiler, ctx->current_source, name);
 }
 
-static LwScopeEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
+static IrEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, IrEntityType type, u32 tags, Atom *name)
 {
-	LwScopeEntity *en = entity_from_name(ctx, name);
+	IrEntity *en = entity_from_name(ctx, name);
 	const char *name_data = atom_data(name);
 	if (en)
 	{
@@ -296,7 +296,7 @@ static Ir static_value_to_ir(IrFunctionEmitter *ctx, SourceSite site, Com_Static
 	return ir;
 }
 
-static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *function_ctx, LwScopeEntity *entity, SourceSite site)
+static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *function_ctx, IrEntity *entity, SourceSite site)
 {
 	IrFunction *function = function_ctx->function;
 	for (u32 i = 0; i < function->capture_count; ++ i)
@@ -327,7 +327,7 @@ static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *f
 	return capture_index;
 }
 
-static Ir load_entity_ir(IrFunctionEmitter *ctx, SourceSite site, LwScopeEntity *entity)
+static Ir load_entity_ir(IrFunctionEmitter *ctx, SourceSite site, IrEntity *entity)
 {
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	if (ctx->function && entity->scope_start < ctx->function->scope_start)
@@ -342,7 +342,7 @@ static Ir load_entity_ir(IrFunctionEmitter *ctx, SourceSite site, LwScopeEntity 
 static b32 mark_entity_assigned(IrFunctionEmitter *ctx, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) return true;
-	LwScopeEntity *entity = entity_from_name(ctx, destination->atom);
+	IrEntity *entity = entity_from_name(ctx, destination->atom);
 	if (!entity)
 	{
 		if (static_symbol_from_name(ctx, destination->atom))
@@ -533,7 +533,7 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 			}
 		}
 
-		LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
+		IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
 		entity->memory_ir = param_memory;
 	}
 
@@ -779,7 +779,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 		{
 			Atom *ident = expr->atom;
 
-			LwScopeEntity *en = entity_from_name(ctx, ident);
+			IrEntity *en = entity_from_name(ctx, ident);
 
 			if (en && en->type == ENTITY_LOCAL_DECLARATION)
 			{
@@ -1192,7 +1192,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 			}
 			Ir local = create_local_ir(ctx, name->site, 0);
 			locals[i] = local;
-			LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+			IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 			entity->memory_ir = local;
 		}
 		push_ir(items, create_multi_local_ir(ctx, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
@@ -1223,7 +1223,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 		Ir local = create_local_ir(ctx, name->site, value);
 		push_ir(items, local);
 
-		LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+		IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
@@ -1306,7 +1306,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 		Ir local = create_local_ir(ctx, name->site, 0);
 		var_locals[i] = local;
 
-		LwScopeEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
+		IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
 			ENTITY_TAG_FORLOOP | entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
