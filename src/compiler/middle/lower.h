@@ -42,7 +42,6 @@ typedef enum
 	ENTITY_TAG_ASSIGNED    = 1 << 2,
 	ENTITY_TAG_PARAMETER   = 1 << 3,
 	ENTITY_TAG_FORLOOP     = 1 << 4,
-	ENTITY_TAG_STATIC      = 1 << 5,
 }
 EntityTags;
 
@@ -51,7 +50,6 @@ typedef enum
 	ENTITY_INVALID = 0,
 	ENTITY_DIRECTORY,
 	ENTITY_LOCAL_DECLARATION,
-	ENTITY_STATIC_DECLARATION,
 }
 EntityType;
 
@@ -92,6 +90,7 @@ typedef u32 EntityId;
 typedef struct
 {
 	EntityId previous_scope_start;
+	u32      previous_scope_depth;
 }
 EntityScope;
 
@@ -117,7 +116,6 @@ struct LwScopeFunction
 	LwScopeFunction *parent;
 	IrFunction      *function;
 	EntityId         scope_start;
-	b32              is_static;
 };
 
 typedef struct LwScopeEntity
@@ -128,11 +126,19 @@ typedef struct LwScopeEntity
 	Atom    *name;
 	SourceSite   site;
 	Ir           memory_ir;
-	Ast          static_expr;
-	StaticSymbolState static_state;
-	StaticValue  static_value;
 }
 LwScopeEntity;
+
+typedef struct
+{
+	Atom             *name;
+	SourceSite        site;
+	Ast               expr;
+	StaticSymbolState state;
+	StaticValue       value;
+	b32               referenced;
+}
+LwFileStatic;
 
 struct LowerContext
 {
@@ -157,6 +163,11 @@ struct LowerContext
 	LwScopeEntity     entities[MAX_ENTITIES];
 	EntityId   scope_start;
 	EntityId   scope_end;
+	u32        scope_depth;
+
+	LwFileStatic *file_statics;
+	u32           file_static_count;
+	u32           file_static_capacity;
 
 	LoopLabels loop_stack[64];
 	u32        loop_count;

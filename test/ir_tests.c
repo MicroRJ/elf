@@ -391,19 +391,19 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
-static void test_ir_lowers_block_static_scope(elf_State *state)
+static void test_ir_lowers_local_shadow_of_file_static(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nlocal :: later\nlater :: 48\nx := local * 2\n}\nret root");
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nroot := 48\nx := root * 2\n}\nret root");
 	Ir body = ir_test_main_body(ctx);
-	Ir nested = ir_test_body_stat(body, 0, IR_BLOCK, "nested static scope lowers to runtime block");
-	Ir local = ir_test_body_stat(nested, 0, IR_LOCAL, "nested static declarations emit no runtime statements");
+	Ir nested = ir_test_body_stat(body, 0, IR_BLOCK, "nested local scope lowers to runtime block");
+	Ir local = ir_test_body_stat(nested, 1, IR_LOCAL, "nested local declaration is retained");
 	Ir mul = local ? local->ir_local.expr : 0;
-	expect_ir_kind(mul, IR_MUL, "nested static value participates in runtime expression");
-	expect_ir_i64(mul ? mul->ir_binary.x : 0, 48, "nested static forward reference resolves in its block");
+	expect_ir_kind(mul, IR_MUL, "nested local participates in runtime expression");
+	expect_load_local(mul ? mul->ir_binary.x : 0, ir_test_body_stat(nested, 0, IR_LOCAL, "nested local shadows file static"), "nested local shadows file static");
 	expect_ir_i64(mul ? mul->ir_binary.y : 0, 2, "nested runtime expression keeps rhs");
 	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "outer static remains visible after nested scope");
-	expect_ir_i64(ret ? ret->ir_return.expr : 0, 7, "nested static scope does not replace outer binding");
+	expect_ir_i64(ret ? ret->ir_return.expr : 0, 7, "nested local does not replace file static");
 	elf_arena_destroy(&arena);
 }
 
@@ -460,14 +460,14 @@ static void test_ir_rejects_static_cycle(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
-static void test_ir_rejects_static_function_runtime_capture(elf_State *state)
+static void test_ir_rejects_non_file_static_declarations(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	log_set_hook(ignore_expected_lowering_error, 0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "outer := 1\n{\nf :: fun() { ret outer }\nret f\n}");
+	LowerContext *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nlocal :: 48\n}\nholder := fun() {\ninside :: 1\n}\nret root");
 	log_set_hook(0, 0);
-	if (!ctx || ctx->compiler->report.error_count != 1) {
-		test_fail("static function cannot capture a runtime local");
+	if (!ctx || ctx->compiler->report.error_count != 2) {
+		test_fail("static declarations outside file scope report lowering errors");
 	}
 	elf_arena_destroy(&arena);
 }
@@ -503,9 +503,9 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_function_expression(state);
 	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);
-	test_ir_lowers_block_static_scope(state);
+	test_ir_lowers_local_shadow_of_file_static(state);
 	test_ir_lowers_mutually_recursive_static_functions(state);
 	test_ir_rejects_static_cycle(state);
-	test_ir_rejects_static_function_runtime_capture(state);
+	test_ir_rejects_non_file_static_declarations(state);
 	test_ir_lowers_get_mem_macro(state);
 }
