@@ -132,8 +132,8 @@ static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
 		return value;
 	}
 	value->import.path = path;
-	value->import.module = COM_MODULE_INVALID;
-	if (!compiler_record_import(par->compiler, par->module, value)) {
+	value->import.source = COM_SOURCE_INVALID;
+	if (!compiler_record_import(par->compiler, par->source_id, value)) {
 		return ERROR_OOM_AST;
 	}
 	return value;

@@ -222,7 +222,7 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 		elf_Scratch scratch = elf_begin_scratch();
 		Compiler *compiler = compiler_create(state, scratch.arena);
 		compiler_set_log_messages(compiler, false);
-		compiler_add_root_module(compiler, "benchmark.module", text);
+		compiler_add_root_source(compiler, "benchmark.module", text);
 		Com_Output output = compiler_compile(compiler, COM_UNIT_MODULE);
 		bench_require(output.module != 0, "could not compile benchmark module");
 		bench_require(!bc_function_ref_is_valid(output.entry), "static module unexpectedly has an entry function");

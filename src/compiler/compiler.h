@@ -3,7 +3,7 @@
 //
 
 typedef struct Compiler Compiler;
-typedef u32 Com_ModuleId;
+typedef u32 Com_SourceId;
 
 typedef enum
 {
@@ -51,12 +51,14 @@ typedef struct
 }
 Com_Report;
 
-#define COM_MODULE_INVALID ((Com_ModuleId)-1)
+#define COM_SOURCE_INVALID ((Com_SourceId)-1)
 
+// Request and response shared with the host's module loader. The compiler
+// supplies the import context and path; the loader returns identity and source.
 typedef struct
 {
 	Compiler *compiler;
-	Com_ModuleId importer;
+	Com_SourceId importer;
 	struct Atom *path;
 	void *user_data;
 	struct Atom *name;
@@ -67,6 +69,8 @@ Com_ModuleLoadParams;
 
 typedef b32 Com_ModuleLoader(Com_ModuleLoadParams *params);
 
+// One source file taking part in a compilation. The compiler owns its copied
+// text, parsed AST, and the imports discovered while parsing it.
 typedef struct
 {
 	struct Atom *name;
@@ -77,7 +81,7 @@ typedef struct
 	u32 import_count;
 	u32 import_capacity;
 }
-Com_Module;
+Com_Source;
 
 typedef struct
 {
@@ -93,14 +97,16 @@ typedef enum
 }
 Com_UnitType;
 
+// Owns one compilation session: its sources, atoms, diagnostics, and temporary
+// syntax and lowering data all share the caller-provided arena.
 struct Compiler
 {
 	elf_State         *state;
 	elf_Arena         *arena;
 	struct Atom_Table *atoms;
-	Com_Module        *modules;
-	u32                module_count;
-	u32                module_capacity;
+	Com_Source        *sources;
+	u32                source_count;
+	u32                source_capacity;
 	Com_ModuleLoader  *module_loader;
 	void              *module_loader_data;
 	Com_Report         report;
@@ -108,11 +114,11 @@ struct Compiler
 };
 
 Compiler *compiler_create(elf_State *state, elf_Arena *arena);
-Com_ModuleId compiler_add_root_module(Compiler *compiler, const char *name, elf_StrSlice source);
+Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source);
 void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data);
 void compiler_set_log_messages(Compiler *compiler, b32 enabled);
-b32 compiler_record_import(Compiler *compiler, Com_ModuleId module, struct Ast_T *import);
-b32 compiler_parse_modules(Compiler *compiler);
+b32 compiler_record_import(Compiler *compiler, Com_SourceId source, struct Ast_T *import);
+b32 compiler_parse_sources(Compiler *compiler);
 
 b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);

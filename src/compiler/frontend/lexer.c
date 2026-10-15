@@ -71,18 +71,18 @@ static b32 lexer_is_hex_digit(u32 c)
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-static void lexer_init(Lexer *lexer, Compiler *compiler, Com_ModuleId module)
+static void lexer_init(Lexer *lexer, Compiler *compiler, Com_SourceId source_id)
 {
-	ASSERT(module < compiler->module_count);
-	Com_Module *source_module = compiler->modules + module;
+	ASSERT(source_id < compiler->source_count);
+	Com_Source *source = compiler->sources + source_id;
 	lexer->compiler = compiler;
-	lexer->module = module;
+	lexer->source_id = source_id;
 	lexer->atoms = compiler->atoms;
-	lexer->source = source_module->source;
-	lexer->cursor = source_module->source.data;
-	lexer->end = source_module->source.data + source_module->source.size;
+	lexer->source = source->source;
+	lexer->cursor = source->source.data;
+	lexer->end = source->source.data + source->source.size;
 	lexer->line_index = 1;
-	lexer->line_start = source_module->source.data;
+	lexer->line_start = source->source.data;
 	lexer->tokens = (Lexer_TokenFIFO){0};
 }
 
@@ -102,7 +102,7 @@ static SourceSite source_site_from_ptr(Lexer *lexer, const char *data)
 	ASSERT(offset <= UINT32_MAX);
 	ASSERT(line_offset <= UINT32_MAX);
 	return (SourceSite) {
-		.module      = lexer->module,
+		.source      = lexer->source_id,
 		.offset      = (u32) offset,
 		.size        = 1,
 		.line_offset = (u32) line_offset,
@@ -908,7 +908,7 @@ static Com_Error lex(Lexer *lexer)
 					}
 					else if (token.type == TOK_M_FILE_NAME) {
 						token.type = TOK_STRING;
-						token.atom = lexer->compiler->modules[lexer->module].name;
+						token.atom = lexer->compiler->sources[lexer->source_id].name;
 					}
 					else if (token.type == TOK_M_LINE_NUMBER) {
 						token.type = TOK_INTEGER;

@@ -18,7 +18,7 @@ Lexer_TokenFIFO;
 typedef struct
 {
 	Compiler         *compiler;
-	Com_ModuleId      module;
+	Com_SourceId      source_id;
 	Atom_Table       *atoms;
 	SourceBuffer      source;
 
@@ -36,7 +36,7 @@ struct Parser
 {
 	elf_Arena          *arena;
 	Compiler           *compiler;
-	Com_ModuleId        module;
+	Com_SourceId        source_id;
 	Atom_Table         *atoms;
 	Lexer               lexer;
 	// TODO(RJ): probably redundant now!

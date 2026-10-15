@@ -3,7 +3,7 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(state, &arena);
-	compiler_add_root_module(compiler, "parser_tests", source);
+	compiler_add_root_source(compiler, "parser_tests", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
 	return file;
@@ -128,8 +128,8 @@ static void test_parser_import_expression(elf_State *state)
 	if (!import || !import->import.path || strcmp(atom_data(import->import.path), "math.elf") != 0) {
 		test_fail("import expression stores path atom");
 	}
-	if (import && import->import.module != COM_MODULE_INVALID) {
-		test_fail("unresolved import starts with invalid module id");
+	if (import && import->import.source != COM_SOURCE_INVALID) {
+		test_fail("unresolved import starts with invalid source id");
 	}
 }
 
@@ -181,16 +181,16 @@ static void test_parser_module_discovery(elf_State *state)
 	const char *source_text = "a :: import \"a.elf\"\nalias :: import \"alias-a.elf\"";
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(state, &arena);
-	compiler_add_root_module(compiler, "root.elf", source);
+	compiler_add_root_source(compiler, "root.elf", source);
 	ParserTestModuleLoader loader = {};
 	compiler_set_module_loader(compiler, parser_test_module_loader, &loader);
-	if (!compiler_parse_modules(compiler)) {
+	if (!compiler_parse_sources(compiler)) {
 		test_fail("compiler parses imported module graph");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	if (compiler->module_count != 3) {
+	if (compiler->source_count != 3) {
 		test_fail("module discovery deduplicates canonical paths");
 		elf_arena_destroy(&arena);
 		return;
@@ -198,27 +198,27 @@ static void test_parser_module_discovery(elf_State *state)
 	if (loader.call_count != 4) {
 		test_fail("module discovery visits every import expression");
 	}
-	for (Com_ModuleId module_id = 0; module_id < compiler->module_count; ++module_id)
+	for (Com_SourceId source_id = 0; source_id < compiler->source_count; ++source_id)
 	{
-		if (!compiler->modules[module_id].ast || compiler->modules[module_id].ast->kind != AST_FILE) {
-			test_fail("module discovery stores every parsed AST");
+		if (!compiler->sources[source_id].ast || compiler->sources[source_id].ast->kind != AST_FILE) {
+			test_fail("module discovery stores every parsed source AST");
 		}
 	}
 
-	Com_Module *root = compiler->modules + 0;
-	Com_Module *a = compiler->modules + 1;
-	Com_Module *b = compiler->modules + 2;
-	if (root->import_count != 2 || root->imports[0]->import.module != 1 || root->imports[1]->import.module != 1) {
-		test_fail("root imports resolve to deduplicated module id");
+	Com_Source *root = compiler->sources + 0;
+	Com_Source *a = compiler->sources + 1;
+	Com_Source *b = compiler->sources + 2;
+	if (root->import_count != 2 || root->imports[0]->import.source != 1 || root->imports[1]->import.source != 1) {
+		test_fail("root imports resolve to deduplicated source id");
 	}
-	if (a->import_count != 1 || a->imports[0]->import.module != 2) {
+	if (a->import_count != 1 || a->imports[0]->import.source != 2) {
 		test_fail("imported module resolves transitive import");
 	}
-	if (b->import_count != 1 || b->imports[0]->import.module != 0) {
+	if (b->import_count != 1 || b->imports[0]->import.source != 0) {
 		test_fail("module discovery resolves import cycle to existing root");
 	}
-	if (a->imports[0]->site.module != 1 || b->imports[0]->site.module != 2) {
-		test_fail("imported AST source sites retain module ids");
+	if (a->imports[0]->site.source != 1 || b->imports[0]->site.source != 2) {
+		test_fail("imported AST source sites retain source ids");
 	}
 	elf_arena_destroy(&arena);
 }
@@ -427,7 +427,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, "parser_source_error", source);
+	compiler_add_root_source(compiler, "parser_source_error", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_PARSER)
@@ -617,7 +617,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	elf_StrSlice source = {(char *)"@ ignored", 9};
 	Compiler *compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, "parser_lexer_error", source);
+	compiler_add_root_source(compiler, "parser_lexer_error", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
@@ -632,7 +632,7 @@ static void test_parser_take_token_error(elf_State *state)
 	elf_StrSlice source = {(char *)"value", 5};
 	Compiler *compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, "parser_take_token_error", source);
+	compiler_add_root_source(compiler, "parser_take_token_error", source);
 	Parser *parser = parser_create(compiler, 0);
 	Token token = take_token(parser, TOK_LEFT_PAREN);
 	if (!token_is_error(token) || token.error != COM_ERROR_SOURCE || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
@@ -647,7 +647,7 @@ static void test_parser_take_token_oom(elf_State *state)
 	elf_StrSlice source = {(char *)"value", 5};
 	Compiler *compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, "parser_take_token_oom", source);
+	compiler_add_root_source(compiler, "parser_take_token_oom", source);
 	Parser *parser = parser_create(compiler, 0);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
@@ -665,7 +665,7 @@ static void test_parser_ast_oom(elf_State *state)
 	elf_StrSlice source = {(char *)"42", 2};
 	Compiler *compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, "parser_ast_oom", source);
+	compiler_add_root_source(compiler, "parser_ast_oom", source);
 	Parser *parser = parser_create(compiler, 0);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;

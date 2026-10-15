@@ -131,7 +131,7 @@ struct Ast_T
 		struct
 		{
 			Atom *path;
-			Com_ModuleId module;
+			Com_SourceId source;
 		}
 		import;
 

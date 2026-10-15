@@ -189,13 +189,13 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
+static Parser *parser_create(Compiler *compiler, Com_SourceId source_id)
 {
 	ASSERT(compiler != 0);
-	ASSERT(module < compiler->module_count);
-	Com_Module *source_module = compiler->modules + module;
-	ASSERT(source_module->name != 0);
-	ASSERT(source_module->source.data != 0);
+	ASSERT(source_id < compiler->source_count);
+	Com_Source *source = compiler->sources + source_id;
+	ASSERT(source->name != 0);
+	ASSERT(source->source.data != 0);
 
 	elf_Arena *arena = compiler->arena;
 	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
@@ -203,7 +203,7 @@ static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 		return 0;
 	}
 	parser->compiler = compiler;
-	parser->module = module;
+	parser->source_id = source_id;
 	parser->atoms = compiler->atoms;
 	parser->arena = arena;
 	parser->ast = create_ast_context(arena);
@@ -211,10 +211,10 @@ static Parser *parser_create(Compiler *compiler, Com_ModuleId module)
 		return 0;
 	}
 
-	lexer_init(&parser->lexer, compiler, module);
-	parser->lexer.cursor = source_module->source.data;
+	lexer_init(&parser->lexer, compiler, source_id);
+	parser->lexer.cursor = source->source.data;
 	parser->lexer.line_index = 1;
-	parser->lexer.line_start = source_module->source.data;
+	parser->lexer.line_start = source->source.data;
 	consume_token(parser);
 	consume_token(parser);
 	return parser;

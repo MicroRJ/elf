@@ -465,7 +465,7 @@ static Compiler *api_test_create_compiler(elf_State *state, elf_Scratch *scratch
 	*scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch->arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, name, source);
+	compiler_add_root_source(compiler, name, source);
 	return compiler;
 }
 
@@ -559,7 +559,7 @@ static void test_api_source_compilation(elf_State *state)
 	}
 
 	report = &compiler->report;
-	if (report->error_count == 0 || report->message_count == 0 || report->first->severity != COMPILER_ERROR || report->first->phase != COMPILER_PHASE_EVALUATION || report->first->site.module != 0 || report->first->site.line_index != 2 || source_slice_column(report->first->site) != 12 || !api_slice_contains(report->first->text, "not a constant expression")) {
+	if (report->error_count == 0 || report->message_count == 0 || report->first->severity != COMPILER_ERROR || report->first->phase != COMPILER_PHASE_EVALUATION || report->first->site.source != 0 || report->first->site.line_index != 2 || source_slice_column(report->first->site) != 12 || !api_slice_contains(report->first->text, "not a constant expression")) {
 		test_fail("compiler reports constant-expression messages");
 	}
 	elf_end_scratch(compiler_scratch);
@@ -574,7 +574,7 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("lexer failure leaves the stack unchanged");
 	}
 	report = &compiler->report;
-	if (report->error_count == 0 || report->message_count == 0 || report->first->phase != COMPILER_PHASE_LEXER || report->first->site.module != 0) {
+	if (report->error_count == 0 || report->message_count == 0 || report->first->phase != COMPILER_PHASE_LEXER || report->first->site.source != 0) {
 		test_fail("compiler retains lexer messages");
 	}
 	elf_end_scratch(compiler_scratch);
@@ -611,7 +611,7 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("failed code compilation publishes no partial module");
 	}
 	report = &compiler->report;
-	if (report->error_count != 1 || report->message_count != 1 || report->first->phase != COMPILER_PHASE_PARSER || report->first->site.module != 0) {
+	if (report->error_count != 1 || report->message_count != 1 || report->first->phase != COMPILER_PHASE_PARSER || report->first->site.source != 0) {
 		test_fail("compiler retains the terminal code parser message");
 	}
 	u32 linked_message_count = 0;

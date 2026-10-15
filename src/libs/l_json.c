@@ -246,7 +246,7 @@ ELF_FUNCTION(l_json_parse)
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(S, scratch.arena);
 	compiler_set_log_messages(compiler, false);
-	compiler_add_root_module(compiler, "<json>", source);
+	compiler_add_root_source(compiler, "<json>", source);
 	if (!compiler_push_json(compiler))
 	{
 		const Com_Message *compiler_message = compiler->report.first;

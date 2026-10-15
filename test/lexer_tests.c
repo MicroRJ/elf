@@ -3,11 +3,11 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 	Parser parser = {};
 	elf_StrSlice source_buffer = {(char *)source, size};
 	parser.compiler = compiler_create(state, &state->arena);
-	compiler_add_root_module(parser.compiler, "lexer_tests", source_buffer);
+	compiler_add_root_source(parser.compiler, "lexer_tests", source_buffer);
 	parser.arena = &state->arena;
-	parser.module = 0;
+	parser.source_id = 0;
 	parser.atoms = parser.compiler->atoms;
-	lexer_init(&parser.lexer, parser.compiler, parser.module);
+	lexer_init(&parser.lexer, parser.compiler, parser.source_id);
 	return parser;
 }
 
@@ -697,28 +697,28 @@ static void test_lexer_operators(elf_State *state)
 	expect_token_type(lexer_next(&parser), TOK_SHR_ASSIGN, "lex >>=");
 }
 
-static void test_lexer_compiler_module(elf_State *state)
+static void test_lexer_compiler_source(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "value");
 	Compiler *compiler = parser.compiler;
-	if (compiler->module_count != 1) {
-		test_fail("compiler creates one root module");
+	if (compiler->source_count != 1) {
+		test_fail("compiler creates one root source");
 	}
 
-	Com_Module *module = compiler->modules;
-	if (module->name != atom_from_data(compiler->atoms, "lexer_tests")) {
-		test_fail("compiler module name uses shared atom table");
+	Com_Source *source = compiler->sources;
+	if (source->name != atom_from_data(compiler->atoms, "lexer_tests")) {
+		test_fail("compiler source name uses shared atom table");
 	}
-	if (module->canonical_path != module->name) {
-		test_fail("root module initially uses its name as canonical path");
+	if (source->canonical_path != source->name) {
+		test_fail("root source initially uses its name as canonical path");
 	}
-	if (module->source.data != parser.lexer.source.data || module->source.size != parser.lexer.source.size) {
-		test_fail("lexer reads its compiler module source");
+	if (source->source.data != parser.lexer.source.data || source->source.size != parser.lexer.source.size) {
+		test_fail("lexer reads its compiler source");
 	}
 
 	Token token = lexer_next(&parser);
-	if (token.site.module != 0) {
-		test_fail("lexer source sites retain compiler module index");
+	if (token.site.source != 0) {
+		test_fail("lexer source sites retain compiler source index");
 	}
 }
 
@@ -769,7 +769,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	Compiler *compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
 	elf_StrSlice source = {(char *)"oom_identifier", 14};
-	compiler_add_root_module(compiler, "lexer_oom", source);
+	compiler_add_root_source(compiler, "lexer_oom", source);
 	Lexer lexer = {};
 	lexer_init(&lexer, compiler, 0);
 	u64 capacity = arena.capacity;
@@ -786,7 +786,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	compiler = compiler_create(state, &arena);
 	compiler_set_log_messages(compiler, false);
 	source = (elf_StrSlice) {(char *)"@", 1};
-	compiler_add_root_module(compiler, "lexer_report_oom", source);
+	compiler_add_root_source(compiler, "lexer_report_oom", source);
 	lexer = (Lexer) {};
 	lexer_init(&lexer, compiler, 0);
 	capacity = arena.capacity;
@@ -811,7 +811,7 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_line_breaks(state);
 	test_lexer_numbers(state);
 	test_lexer_operators(state);
-	test_lexer_compiler_module(state);
+	test_lexer_compiler_source(state);
 	test_compiler_module_loader_boundary(state);
 	test_lexer_bounded_source(state);
 	test_lexer_out_of_memory(state);

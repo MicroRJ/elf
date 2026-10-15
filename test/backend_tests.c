@@ -484,7 +484,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	elf_State *state = elf_create_state();
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
-	compiler_add_root_module(compiler, "backend_tests", (elf_StrSlice) {});
+	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
 	LowerContext *ctx = elf_create_lower_context(compiler);
 	SourceSite site = {};
 
@@ -547,7 +547,7 @@ static void test_backend_generates_module_without_entry(void)
 	elf_State *state = elf_create_state();
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
-	compiler_add_root_module(compiler, "backend_tests", (elf_StrSlice) {});
+	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
 	elf_Module module = {};
 	BcFunctionRef entry = {};
 	if (!generate_module(compiler, &module, (IrModule) {}, &entry)) {

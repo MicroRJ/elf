@@ -33,25 +33,25 @@
 #include "lower.c"
 #include "bytecode_gen.c"
 
-static Com_ModuleId compiler_append_module(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
+static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
 {
-	if (compiler->module_count == compiler->module_capacity)
+	if (compiler->source_count == compiler->source_capacity)
 	{
-		u32 capacity = compiler->module_capacity ? compiler->module_capacity * 2 : 4;
-		Com_Module *modules = elf_arena_push_zero(compiler->arena, sizeof(*modules) * capacity);
-		if (compiler->module_count) {
-			copy_memory(modules, compiler->modules, sizeof(*modules) * compiler->module_count);
+		u32 capacity = compiler->source_capacity ? compiler->source_capacity * 2 : 4;
+		Com_Source *sources = elf_arena_push_zero(compiler->arena, sizeof(*sources) * capacity);
+		if (compiler->source_count) {
+			copy_memory(sources, compiler->sources, sizeof(*sources) * compiler->source_count);
 		}
-		compiler->modules = modules;
-		compiler->module_capacity = capacity;
+		compiler->sources = sources;
+		compiler->source_capacity = capacity;
 	}
 
-	Com_ModuleId module_id = compiler->module_count++;
-	Com_Module *module = compiler->modules + module_id;
-	module->name = name;
-	module->canonical_path = canonical_path;
-	module->source = source;
-	return module_id;
+	Com_SourceId source_id = compiler->source_count++;
+	Com_Source *compiler_source = compiler->sources + source_id;
+	compiler_source->name = name;
+	compiler_source->canonical_path = canonical_path;
+	compiler_source->source = source;
+	return source_id;
 }
 
 static void init_atoms(Compiler *compiler)
@@ -92,42 +92,42 @@ void compiler_set_log_messages(Compiler *compiler, b32 enabled)
 	compiler->log_messages = enabled;
 }
 
-b32 compiler_record_import(Compiler *compiler, Com_ModuleId module_id, Ast import_ast)
+b32 compiler_record_import(Compiler *compiler, Com_SourceId source_id, Ast import_ast)
 {
-	ASSERT(module_id < compiler->module_count);
+	ASSERT(source_id < compiler->source_count);
 	ASSERT(import_ast && import_ast->kind == AST_IMPORT);
-	Com_Module *module = compiler->modules + module_id;
-	if (module->import_count == module->import_capacity)
+	Com_Source *source = compiler->sources + source_id;
+	if (source->import_count == source->import_capacity)
 	{
-		u32 capacity = module->import_capacity ? module->import_capacity * 2 : 4;
+		u32 capacity = source->import_capacity ? source->import_capacity * 2 : 4;
 		Ast *imports = elf_arena_push_zero(compiler->arena, sizeof(*imports) * capacity);
 		if (!imports) {
 			return false;
 		}
-		if (module->import_count) {
-			copy_memory(imports, module->imports, sizeof(*imports) * module->import_count);
+		if (source->import_count) {
+			copy_memory(imports, source->imports, sizeof(*imports) * source->import_count);
 		}
-		module->imports = imports;
-		module->import_capacity = capacity;
+		source->imports = imports;
+		source->import_capacity = capacity;
 	}
-	module->imports[module->import_count++] = import_ast;
+	source->imports[source->import_count++] = import_ast;
 	return true;
 }
 
-static Com_ModuleId compiler_find_module(Compiler *compiler, Atom *canonical_path)
+static Com_SourceId compiler_find_source(Compiler *compiler, Atom *canonical_path)
 {
-	Com_ModuleId result = COM_MODULE_INVALID;
-	for (Com_ModuleId module_id = 0; module_id < compiler->module_count; ++module_id)
+	Com_SourceId result = COM_SOURCE_INVALID;
+	for (Com_SourceId source_id = 0; source_id < compiler->source_count; ++source_id)
 	{
-		if (compiler->modules[module_id].canonical_path == canonical_path) {
-			result = module_id;
+		if (compiler->sources[source_id].canonical_path == canonical_path) {
+			result = source_id;
 			break;
 		}
 	}
 	return result;
 }
 
-static SourceBuffer compiler_copy_module_source(Compiler *compiler, elf_StrSlice source)
+static SourceBuffer compiler_copy_source(Compiler *compiler, elf_StrSlice source)
 {
 	ASSERT(source.size <= 0xffffffffu);
 	char *data = elf_arena_push(compiler->arena, source.size + 1);
@@ -138,12 +138,12 @@ static SourceBuffer compiler_copy_module_source(Compiler *compiler, elf_StrSlice
 	return (SourceBuffer) {.data = data, .size = (u32)source.size};
 }
 
-static Com_ModuleId compiler_register_module(Compiler *compiler, Com_ModuleLoadParams *params, SourceSite site)
+static Com_SourceId compiler_register_source(Compiler *compiler, Com_ModuleLoadParams *params, SourceSite site)
 {
 	ASSERT(params->canonical_path);
-	Com_ModuleId module_id = compiler_find_module(compiler, params->canonical_path);
-	if (module_id != COM_MODULE_INVALID) {
-		return module_id;
+	Com_SourceId source_id = compiler_find_source(compiler, params->canonical_path);
+	if (source_id != COM_SOURCE_INVALID) {
+		return source_id;
 	}
 
 	b32 source_is_oversized = params->source.size > UINT32_MAX;
@@ -151,11 +151,11 @@ static Com_ModuleId compiler_register_module(Compiler *compiler, Com_ModuleLoadP
 	b32 source_has_nul = !source_is_oversized && !source_is_invalid && params->source.size && memchr(params->source.data, 0, params->source.size);
 	if (source_is_oversized || source_is_invalid || source_has_nul)
 	{
-		if (compiler->module_count == 0)
+		if (compiler->source_count == 0)
 		{
 			Atom *name = params->name ? params->name : params->canonical_path;
-			module_id = compiler_append_module(compiler, name, params->canonical_path, (SourceBuffer) {.data = params->source.data});
-			site.module = module_id;
+			source_id = compiler_append_source(compiler, name, params->canonical_path, (SourceBuffer) {.data = params->source.data});
+			site.source = source_id;
 		}
 		if (source_is_oversized) {
 			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source exceeds the 32-bit size limit");
@@ -166,34 +166,34 @@ static Com_ModuleId compiler_register_module(Compiler *compiler, Com_ModuleLoadP
 		else {
 			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source contains a NUL byte");
 		}
-		return COM_MODULE_INVALID;
+		return COM_SOURCE_INVALID;
 	}
 
 	Atom *name = params->name ? params->name : params->canonical_path;
-	SourceBuffer source = compiler_copy_module_source(compiler, params->source);
-	return compiler_append_module(compiler, name, params->canonical_path, source);
+	SourceBuffer source = compiler_copy_source(compiler, params->source);
+	return compiler_append_source(compiler, name, params->canonical_path, source);
 }
 
-Com_ModuleId compiler_add_root_module(Compiler *compiler, const char *name, elf_StrSlice source)
+Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source)
 {
-	ASSERT(compiler->module_count == 0);
-	Atom *module_name = atom_from_data(compiler->atoms, name ? name : "<unknown>");
+	ASSERT(compiler->source_count == 0);
+	Atom *source_name = atom_from_data(compiler->atoms, name ? name : "<unknown>");
 	Com_ModuleLoadParams params = {
 		.compiler = compiler,
-		.importer = COM_MODULE_INVALID,
-		.path = module_name,
-		.name = module_name,
-		.canonical_path = module_name,
+		.importer = COM_SOURCE_INVALID,
+		.path = source_name,
+		.name = source_name,
+		.canonical_path = source_name,
 		.source = source,
 	};
-	Com_ModuleId module_id = compiler_register_module(compiler, &params, (SourceSite) {});
-	ASSERT(module_id == COM_MODULE_INVALID || module_id == 0);
-	return module_id;
+	Com_SourceId source_id = compiler_register_source(compiler, &params, (SourceSite) {});
+	ASSERT(source_id == COM_SOURCE_INVALID || source_id == 0);
+	return source_id;
 }
 
-static b32 compiler_resolve_import(Compiler *compiler, Com_ModuleId importer, Ast import_ast)
+static b32 compiler_resolve_import(Compiler *compiler, Com_SourceId importer, Ast import_ast)
 {
-	ASSERT(importer < compiler->module_count);
+	ASSERT(importer < compiler->source_count);
 	ASSERT(import_ast && import_ast->kind == AST_IMPORT);
 	b32 result = false;
 	if (!compiler->module_loader)
@@ -218,10 +218,10 @@ static b32 compiler_resolve_import(Compiler *compiler, Com_ModuleId importer, As
 		}
 		else
 		{
-			Com_ModuleId module_id = compiler_register_module(compiler, &params, import_ast->site);
-			if (module_id != COM_MODULE_INVALID)
+			Com_SourceId source_id = compiler_register_source(compiler, &params, import_ast->site);
+			if (source_id != COM_SOURCE_INVALID)
 			{
-				import_ast->import.module = module_id;
+				import_ast->import.source = source_id;
 				result = true;
 			}
 		}
@@ -229,33 +229,33 @@ static b32 compiler_resolve_import(Compiler *compiler, Com_ModuleId importer, As
 	return result;
 }
 
-b32 compiler_parse_modules(Compiler *compiler)
+b32 compiler_parse_sources(Compiler *compiler)
 {
 	b32 result = true;
-	for (Com_ModuleId module_id = 0; result && module_id < compiler->module_count; ++module_id)
+	for (Com_SourceId source_id = 0; result && source_id < compiler->source_count; ++source_id)
 	{
 		// TODO(RJ): the parser should take a scratch arena for scratch allocations, and arena
 		// for results
-		Parser *parser = parser_create(compiler, module_id);
+		Parser *parser = parser_create(compiler, source_id);
 		if (!parser) {
 			return false;
 		}
 		Ast ast = elf_parse_file(parser);
-		compiler->modules[module_id].ast = ast;
+		compiler->sources[source_id].ast = ast;
 		if (ast_is_error(ast))
 		{
 			if (compiler->report.error_count == 0) {
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.module = module_id}, "failed to parse source");
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.source = source_id}, "failed to parse source");
 			}
 			result = false;
 		}
 		else
 		{
-			Ast *imports = compiler->modules[module_id].imports;
-			u32 import_count = compiler->modules[module_id].import_count;
+			Ast *imports = compiler->sources[source_id].imports;
+			u32 import_count = compiler->sources[source_id].import_count;
 			for (u32 i = 0; i < import_count; ++i)
 			{
-				if (!compiler_resolve_import(compiler, module_id, imports[i])) {
+				if (!compiler_resolve_import(compiler, source_id, imports[i])) {
 					result = false;
 				}
 			}
@@ -289,9 +289,9 @@ b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase,
 		return false;
 	}
 
-	Com_ModuleId module_id = site.module < compiler->module_count ? site.module : 0;
-	Com_Module *source_module = compiler->modules + module_id;
-	const char *source_name = atom_data(source_module->name);
+	Com_SourceId source_id = site.source < compiler->source_count ? site.source : 0;
+	Com_Source *source = compiler->sources + source_id;
+	const char *source_name = atom_data(source->name);
 	elf_arena_align(compiler->arena, _Alignof(Com_Message));
 	Com_Message *compiler_message = elf_arena_push_zero(compiler->arena, sizeof(*compiler_message));
 	if (!compiler_message) {
@@ -331,7 +331,7 @@ b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase,
 		else {
 			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message.data);
 		}
-		if (source_slice_is_valid(site)) print_source_slice_marker(site, source_module->source);
+		if (source_slice_is_valid(site)) print_source_slice_marker(site, source->source);
 	}
 	return true;
 }
@@ -472,7 +472,7 @@ static void restore_source_stack(elf_State *state, elf_Value *checkpoint)
 int compiler_push_json(Compiler *compiler)
 {
 	ASSERT(compiler);
-	ASSERT(compiler->module_count);
+	ASSERT(compiler->source_count);
 	elf_State *state = compiler->state;
 	elf_Value *stack_checkpoint = state->stack_ptr;
 	u32 saved_gc_mode = state->gc_mode;
@@ -496,7 +496,7 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 {
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
-	compiler_add_root_module(compiler, name, source);
+	compiler_add_root_source(compiler, name, source);
 	int result = compiler_push_json(compiler);
 	elf_end_scratch(scratch);
 	return result;
@@ -505,7 +505,7 @@ int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source
 int compiler_push_constant_expr(Compiler *compiler)
 {
 	ASSERT(compiler);
-	ASSERT(compiler->module_count);
+	ASSERT(compiler->source_count);
 	elf_State *state = compiler->state;
 	elf_Value *stack_checkpoint = state->stack_ptr;
 	u32 saved_gc_mode = state->gc_mode;
@@ -529,7 +529,7 @@ int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSli
 {
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
-	compiler_add_root_module(compiler, name, source);
+	compiler_add_root_source(compiler, name, source);
 	int result = compiler_push_constant_expr(compiler);
 	elf_end_scratch(scratch);
 	return result;
@@ -546,7 +546,7 @@ static char *persist_compiled_source(elf_State *state, SourceBuffer source)
 Com_Output compiler_compile(Compiler *compiler, Com_UnitType unit_type)
 {
 	ASSERT(compiler);
-	ASSERT(compiler->module_count);
+	ASSERT(compiler->source_count);
 	ASSERT(unit_type == COM_UNIT_FUNCTION || unit_type == COM_UNIT_MODULE);
 	elf_State *state = compiler->state;
 	u64 arena_checkpoint = state->arena.used;
@@ -558,14 +558,14 @@ Com_Output compiler_compile(Compiler *compiler, Com_UnitType unit_type)
 	b32 parsed = false;
 	PROF_BLOCK("compiler.parse")
 	{
-		parsed = compiler_parse_modules(compiler);
+		parsed = compiler_parse_sources(compiler);
 	}
 	if (!parsed || compiler->report.error_count)
 	{
 		state->arena.used = arena_checkpoint;
 		goto done;
 	}
-	Ast ast_file = compiler->modules[0].ast;
+	Ast ast_file = compiler->sources[0].ast;
 
 	LowerContext *ctx = elf_create_lower_context(compiler);
 	IrModule ir_module;
@@ -593,10 +593,10 @@ Com_Output compiler_compile(Compiler *compiler, Com_UnitType unit_type)
 	elf_arena_align(&state->arena, 8);
 	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
 	*module = generated_module;
-	Com_Module *root_module = compiler->modules;
-	module->source_name = elf_string_from_atom(state, root_module->name);
-	module->source_data = persist_compiled_source(state, root_module->source);
-	module->source_size = root_module->source.size;
+	Com_Source *root_source = compiler->sources;
+	module->source_name = elf_string_from_atom(state, root_source->name);
+	module->source_data = persist_compiled_source(state, root_source->source);
+	module->source_size = root_source->source.size;
 	module->next = state->modules;
 	state->modules = module;
 	output.module = module;
@@ -617,7 +617,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	ASSERT(source.data);
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
-	compiler_add_root_module(compiler, name, source);
+	compiler_add_root_source(compiler, name, source);
 	Com_Output output = compiler_compile(compiler, COM_UNIT_FUNCTION);
 	elf_end_scratch(scratch);
 	return output.entry;
