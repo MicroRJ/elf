@@ -569,8 +569,6 @@ static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Modu
 	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
 
 	BcGen *gen = bg_create(compiler, ir_module.function_count);
-	gen->ir_functions = ir_module.functions;
-	gen->ir_function_count = ir_module.function_count;
 	PROF_BLOCK("compiler.codegen")
 	{
 		for (u32 i = 0; i < ir_module.function_count; ++ i)
@@ -670,6 +668,7 @@ static BcSlot bg_finish_call(BcGen *gen, Ir ir, BcSlot call_slot, BcSlot out, u3
 
 static BcSlot bg_emit_dynamic_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 {
+	ASSERT(ir->ir_call.type == IR_CALL_DYNAMIC);
 	Ir expr = ir->ir_call.expr;
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
@@ -721,22 +720,14 @@ static BcSlot bg_emit_dynamic_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 	return bg_finish_call(gen, ir, stack_top, out, nout);
 }
 
-static b32 bg_can_emit_direct_call(BcGen *gen, Ir expr)
-{
-	if (expr->kind != IR_FUNCTION || expr->ir_function.index >= gen->ir_function_count) {
-		return false;
-	}
-
-	IrFunction *function = gen->ir_functions + expr->ir_function.index;
-	return function->is_static && function->capture_count == 0;
-}
-
 static BcSlot bg_emit_direct_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 {
 	Ir function = ir->ir_call.expr;
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
-	ASSERT(bg_can_emit_direct_call(gen, function));
+	ASSERT(ir->ir_call.type == IR_CALL_DIRECT);
+	ASSERT(function->kind == IR_FUNCTION);
+	ASSERT(function->ir_function.index < gen->module.function_count);
 	ASSERT(nout <= 0xff);
 
 	BcSlot stack_top = mark_slots(gen);
@@ -1122,11 +1113,14 @@ static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 
 		case IR_CALL:
 		{
-			if (bg_can_emit_direct_call(gen, expr->ir_call.expr)) {
+			if (expr->ir_call.type == IR_CALL_DIRECT) {
 				out = bg_emit_direct_call(gen, expr, out, nout);
 			}
-			else {
+			else if (expr->ir_call.type == IR_CALL_DYNAMIC) {
 				out = bg_emit_dynamic_call(gen, expr, out, nout);
+			}
+			else {
+				NO_CODE;
 			}
 		}
 		break;

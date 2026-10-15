@@ -188,9 +188,12 @@ static Ir create_array_add_ir(LowerContext *ctx, SourceSite site, Ir array, Ir v
 	return ir_new_binary(ctx, site, IR_ARRAY_ADD, array, value);
 }
 
-static Ir create_call_ir(LowerContext *ctx, SourceSite site, Ir expr, IrArray args)
+static Ir create_call_ir(LowerContext *ctx, SourceSite site, IrCallType type, Ir expr, IrArray args)
 {
+	ASSERT(type == IR_CALL_DYNAMIC || type == IR_CALL_DIRECT);
+	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_FUNCTION));
 	Ir ir = ir_alloc(ctx, site, IR_CALL);
+	ir->ir_call.type = type;
 	ir->ir_call.expr = expr;
 	ir->ir_call.args = args;
 	return ir;

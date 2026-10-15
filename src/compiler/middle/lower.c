@@ -701,6 +701,19 @@ static IrKind ir_kind_from_compound_assign_ast_kind(AstType kind)
 	}
 }
 
+static IrCallType call_type_from_callee(LowerContext *ctx, Ir callee)
+{
+	IrCallType type = IR_CALL_DYNAMIC;
+	if (callee && callee->kind == IR_FUNCTION && callee->ir_function.index < ctx->num_functions)
+	{
+		IrFunction *function = ctx->functions + callee->ir_function.index;
+		if (function->is_static && function->capture_count == 0) {
+			type = IR_CALL_DIRECT;
+		}
+	}
+	return type;
+}
+
 static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 {
 	if (!expr || ast_is_error(expr)) {
@@ -879,7 +892,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				ir_args[i] = lower_ast_expr_to_ir(ctx, args[i]);
 			}
 
-			ir = create_call_ir(ctx, expr->site, ir_func, (IrArray) { .items = ir_args, .count = nargs });
+			IrCallType call_type = call_type_from_callee(ctx, ir_func);
+			ir = create_call_ir(ctx, expr->site, call_type, ir_func, (IrArray) { .items = ir_args, .count = nargs });
 		}
 		break;
 

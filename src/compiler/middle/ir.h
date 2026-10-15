@@ -86,6 +86,14 @@ typedef struct
 }
 IrArray;
 
+// Whether a call resolves to a module-local function or needs a runtime callee.
+typedef enum
+{
+	IR_CALL_DYNAMIC,
+	IR_CALL_DIRECT,
+}
+IrCallType;
+
 struct IrNode
 {
 	IrKind kind;
@@ -118,8 +126,9 @@ struct IrNode
 
 		struct
 		{
-			Ir   expr;
-			IrArray args;
+			IrCallType type;
+			Ir         expr;
+			IrArray    args;
 		}
 		ir_call;
 

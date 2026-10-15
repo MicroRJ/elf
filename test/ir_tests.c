@@ -197,6 +197,9 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 	expect_ir_atom(field->ir_binary.y, "name", "field key lowers to atom ir");
 
 	Ir call = ir_test_body_stat(body, 1, IR_CALL, "lower call expression statement");
+	if (call && call->ir_call.type != IR_CALL_DYNAMIC) {
+		test_fail("runtime callee lowers to a dynamic call");
+	}
 	expect_ir_kind(call->ir_call.expr, IR_LOAD_GLOBAL, "call callee lowers to global load");
 	if (call && call->ir_call.args.count != 1) {
 		test_fail("call keeps one table argument");
@@ -432,6 +435,9 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 	Ir foo_ret = ir_test_body_stat(ctx->functions[1].body, 0, IR_RETURN, "foo lowers return");
 	Ir foo_call = foo_ret ? foo_ret->ir_return.expr : 0;
 	expect_ir_kind(foo_call, IR_CALL, "foo calls bar");
+	if (foo_call && foo_call->ir_call.type != IR_CALL_DIRECT) {
+		test_fail("static foo-to-bar call lowers as direct");
+	}
 	Ir bar_value = foo_call ? foo_call->ir_call.expr : 0;
 	expect_ir_kind(bar_value, IR_FUNCTION, "foo resolves bar statically");
 	if (bar_value && bar_value->ir_function.index != 2) {
@@ -441,6 +447,9 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 	Ir bar_ret = ir_test_body_stat(ctx->functions[2].body, 0, IR_RETURN, "bar lowers return");
 	Ir bar_call = bar_ret ? bar_ret->ir_return.expr : 0;
 	expect_ir_kind(bar_call, IR_CALL, "bar calls foo");
+	if (bar_call && bar_call->ir_call.type != IR_CALL_DIRECT) {
+		test_fail("static bar-to-foo call lowers as direct");
+	}
 	Ir recursive_foo = bar_call ? bar_call->ir_call.expr : 0;
 	expect_ir_kind(recursive_foo, IR_FUNCTION, "bar resolves foo statically");
 	if (recursive_foo && recursive_foo->ir_function.index != 1) {
