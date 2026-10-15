@@ -25,7 +25,6 @@ static LowerContext *elf_create_lower_context(Compiler *compiler)
 	LowerContext *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
 	ctx->compiler = compiler;
 	ctx->arena = arena;
-	ctx->state = compiler->state;
 
 	u32 max_functions = 1024;
 	ctx->functions = elf_arena_push_zero(arena, sizeof(*ctx->functions) * max_functions);
@@ -43,6 +42,31 @@ static LowerContext *elf_create_lower_context(Compiler *compiler)
 	ctx->defer_scope_start = 0;
 
 	return ctx;
+}
+
+static u32 add_global_symbol(LowerContext *ctx, Atom *name)
+{
+	for (u32 i = 0; i < ctx->global_count; ++i)
+	{
+		if (ctx->globals[i] == name) {
+			return i;
+		}
+	}
+
+	if (ctx->global_count == ctx->global_capacity)
+	{
+		u32 capacity = ctx->global_capacity ? ctx->global_capacity * 2 : 16;
+		Atom **globals = elf_arena_push(ctx->arena, sizeof(*globals) * capacity);
+		if (ctx->globals) {
+			memcpy(globals, ctx->globals, sizeof(*globals) * ctx->global_count);
+		}
+		ctx->globals = globals;
+		ctx->global_capacity = capacity;
+	}
+
+	u32 index = ctx->global_count++;
+	ctx->globals[index] = name;
+	return index;
 }
 
 typedef enum
@@ -450,6 +474,8 @@ static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 	IrModule module = {};
 	module.functions = ctx->functions;
 	module.function_count = ctx->num_functions;
+	module.globals = ctx->globals;
+	module.global_count = ctx->global_count;
 	module.has_entry = true;
 	module.entry_index = 0;
 	return module;
@@ -476,6 +502,8 @@ static IrModule elf_lower_ast_module(LowerContext *ctx, Ast file)
 	IrModule module = {};
 	module.functions = ctx->functions;
 	module.function_count = ctx->num_functions;
+	module.globals = ctx->globals;
+	module.global_count = ctx->global_count;
 	return module;
 }
 
@@ -758,8 +786,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 				}
 				else
 				{
-					elf_StrSlice name = {(char *)atom_data(expr->atom), atom_size(expr->atom)};
-					u32 global_index = elf_globals_ensure(&ctx->state->globals, name);
+					u32 global_index = add_global_symbol(ctx, expr->atom);
 					ir = create_load_global_ir(ctx, expr->site, global_index);
 				}
 			}

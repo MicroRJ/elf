@@ -20,10 +20,14 @@ typedef struct
 }
 IrFunction;
 
+// One lowered compilation unit. Global indices are still module-local here and
+// are resolved to runtime slots only when the compiled module is linked.
 typedef struct
 {
 	IrFunction *functions;
 	u32         function_count;
+	Atom      **globals;
+	u32         global_count;
 	b32         has_entry;
 	u32         entry_index;
 }
@@ -144,7 +148,6 @@ LwFileStatic;
 struct LowerContext
 {
 	Compiler    *compiler;
-	elf_State   *state;
 	elf_Arena   *arena;
 	u32          ir_stack_size;
 	u32          ir_stack_index;
@@ -160,6 +163,9 @@ struct LowerContext
 	u32                   num_functions;
 	u32                   max_functions;
 	LwScopeFunction *function;
+	Atom                **globals;
+	u32                   global_count;
+	u32                   global_capacity;
 
 	LwScopeEntity     entities[MAX_ENTITIES];
 	EntityId   scope_start;

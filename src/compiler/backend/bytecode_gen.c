@@ -16,7 +16,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_function(BcGen *gen, IrFunction *function);
-static b32 generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module, BcFunctionRef *entry);
+static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -423,63 +423,141 @@ static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries
 	return source_map;
 }
 
-static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilder *builder)
+static Com_String copy_compiled_string(elf_Arena *arena, const char *data, u32 size)
 {
-	ASSERT(!module->bytecode && !module->bytecode_functions);
+	char *copy = elf_arena_push(arena, size + 1);
+	if (size) {
+		copy_memory(copy, data, size);
+	}
+	copy[size] = 0;
+	return (Com_String) {.data = copy, .size = size};
+}
+
+static Com_String copy_compiled_atom(elf_Arena *arena, Atom *atom)
+{
+	return copy_compiled_string(arena, atom_data(atom), atom_size(atom));
+}
+
+static u32 find_builder_atom(BcModuleBuilder *builder, Atom *atom)
+{
+	for (u32 i = 0; i < builder->atom_count; ++i)
+	{
+		if (builder->atoms[i] == atom) {
+			return i;
+		}
+	}
+	ASSERT(!"module global atom is missing from the string table");
+	return 0;
+}
+
+static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module, BcModuleBuilder *builder)
+{
+	ASSERT(!module->bytecode && !module->functions);
+
+	module->source_count = compiler->source_count;
+	module->root_source = 0;
+	if (module->source_count)
+	{
+		elf_arena_align(output_arena, 8);
+		module->sources = elf_arena_push_zero(output_arena, sizeof(*module->sources) * module->source_count);
+		for (u32 i = 0; i < module->source_count; ++i)
+		{
+			Com_Source *source = compiler->sources + i;
+			Com_ModuleSource *output_source = module->sources + i;
+			output_source->name = copy_compiled_atom(output_arena, source->name);
+			output_source->canonical_path = copy_compiled_atom(output_arena, source->canonical_path);
+			Com_String source_text = copy_compiled_string(output_arena, source->source.data, source->source.size);
+			output_source->source = (SourceBuffer) {.data = source_text.data, .size = source_text.size};
+		}
+	}
 
 	module->bytecode_count = builder->bytecode_count;
 	if (module->bytecode_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->bytecode = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode) * module->bytecode_count, builder->bytecode);
+		elf_arena_align(output_arena, 8);
+		module->bytecode = elf_arena_push_copy(output_arena, sizeof(*module->bytecode) * module->bytecode_count, builder->bytecode);
 	}
 
 	module->integer_constant_count = builder->integer_constant_count;
-	if (module->integer_constant_count) {
-		elf_arena_align(&state->arena, 8);
-		module->integer_constants = elf_arena_push_copy(&state->arena
-		, sizeof(*module->integer_constants) * module->integer_constant_count, builder->integer_constants);
+	if (module->integer_constant_count)
+	{
+		elf_arena_align(output_arena, 8);
+		module->integer_constants = elf_arena_push_copy(output_arena, sizeof(*module->integer_constants) * module->integer_constant_count, builder->integer_constants);
 	}
 
 	module->number_constant_count = builder->number_constant_count;
-	if (module->number_constant_count) {
-		elf_arena_align(&state->arena, 8);
-		module->number_constants = elf_arena_push_copy(&state->arena
-		, sizeof(*module->number_constants) * module->number_constant_count, builder->number_constants);
+	if (module->number_constant_count)
+	{
+		elf_arena_align(output_arena, 8);
+		module->number_constants = elf_arena_push_copy(output_arena, sizeof(*module->number_constants) * module->number_constant_count, builder->number_constants);
 	}
 
 	module->string_count = builder->atom_count;
-	if (module->string_count) {
-		elf_arena_align(&state->arena, 8);
-		module->strings = elf_arena_push(&state->arena, sizeof(*module->strings) * module->string_count);
+	if (module->string_count)
+	{
+		elf_arena_align(output_arena, 8);
+		module->strings = elf_arena_push_zero(output_arena, sizeof(*module->strings) * module->string_count);
 		for (u32 i = 0; i < module->string_count; ++i) {
-			module->strings[i] = elf_string_from_atom(state, builder->atoms[i]);
+			module->strings[i] = copy_compiled_atom(output_arena, builder->atoms[i]);
 		}
 	}
 
-	module->bytecode_function_count = builder->function_count;
-	if (module->bytecode_function_count)
+	module->global_count = ir_module.global_count;
+	if (module->global_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->bytecode_functions = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, builder->functions);
-	}
-
-	for (u32 i = 0; i < module->bytecode_function_count; ++i)
-	{
-		BcFunction *function = module->bytecode_functions + i;
-		if (function->source_map_count) {
-			elf_arena_align(&state->arena, 8);
-			function->source_map = elf_arena_push_copy(&state->arena
-			, sizeof(*function->source_map) * function->source_map_count, function->source_map);
+		module->globals = elf_arena_push_zero(output_arena, sizeof(*module->globals) * module->global_count);
+		for (u32 i = 0; i < module->global_count; ++i) {
+			module->globals[i].name = find_builder_atom(builder, ir_module.globals[i]);
 		}
 	}
+
+	for (u32 i = 0; i < module->bytecode_count; ++i)
+	{
+		BytecodeType type = BC_TYPE(module->bytecode[i]);
+		if (type == BC_GETGLOBAL || type == BC_SETGLOBAL) {
+			module->global_relocation_count += 1;
+		}
+	}
+	if (module->global_relocation_count)
+	{
+		module->global_relocations = elf_arena_push_zero(output_arena, sizeof(*module->global_relocations) * module->global_relocation_count);
+		u32 relocation_index = 0;
+		for (u32 i = 0; i < module->bytecode_count; ++i)
+		{
+			Bytecode bytecode = module->bytecode[i];
+			BytecodeType type = BC_TYPE(bytecode);
+			if (type == BC_GETGLOBAL || type == BC_SETGLOBAL)
+			{
+				u32 global_index = type == BC_GETGLOBAL ? (u32)BC_ARGY(bytecode) : (u32)BC_ARGX(bytecode);
+				ASSERT(global_index < module->global_count);
+				module->global_relocations[relocation_index++] = (Com_GlobalRelocation) {.bytecode_index = i, .global_index = global_index};
+			}
+		}
+		ASSERT(relocation_index == module->global_relocation_count);
+	}
+
+	module->function_count = builder->function_count;
+	if (module->function_count)
+	{
+		elf_arena_align(output_arena, 8);
+		module->functions = elf_arena_push_copy(output_arena, sizeof(*module->functions) * module->function_count, builder->functions);
+	}
+	for (u32 i = 0; i < module->function_count; ++i)
+	{
+		BcFunction *function = module->functions + i;
+		if (function->source_map_count)
+		{
+			elf_arena_align(output_arena, 8);
+			function->source_map = elf_arena_push_copy(output_arena, sizeof(*function->source_map) * function->source_map_count, function->source_map);
+		}
+	}
+
+	module->has_entry = ir_module.has_entry;
+	module->entry_index = ir_module.entry_index;
 }
 
-static b32 generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module, BcFunctionRef *entry)
+static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module)
 {
-	ASSERT(entry);
-	*entry = (BcFunctionRef) {};
-	elf_State *state = compiler->state;
 	elf_Arena *arena = compiler->arena;
 	ASSERT(ir_module.functions || ir_module.function_count == 0);
 	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
@@ -506,14 +584,14 @@ static b32 generate_module(Compiler *compiler, elf_Module *module, IrModule ir_m
 			bc_function->source_map_count = gen->source_map_buffer.count;
 		}
 	}
-	if (compiler->report.error_count) return false;
-	finalize_module(state, module, &gen->module);
-
-	if (ir_module.has_entry)
-	{
-		entry->module = module;
-		entry->index = ir_module.entry_index;
+	if (compiler->report.error_count) {
+		return false;
 	}
+	for (u32 i = 0; i < ir_module.global_count; ++i)
+	{
+		add_atom(gen, ir_module.globals[i]);
+	}
+	finalize_module(compiler, output_arena, module, ir_module, &gen->module);
 	return true;
 }
 

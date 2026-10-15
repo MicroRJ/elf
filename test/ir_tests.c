@@ -1,7 +1,7 @@
 static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, const char *source_text)
 {
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(state, arena);
+	Compiler *compiler = compiler_create(arena);
 	compiler_add_root_source(compiler, "ir_tests", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);

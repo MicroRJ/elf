@@ -2,7 +2,7 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_tests", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
@@ -180,7 +180,7 @@ static void test_parser_module_discovery(elf_State *state)
 	elf_Arena arena = elf_arena_create(0);
 	const char *source_text = "a :: import \"a.elf\"\nalias :: import \"alias-a.elf\"";
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "root.elf", source);
 	ParserTestModuleLoader loader = {};
 	compiler_set_module_loader(compiler, parser_test_module_loader, &loader);
@@ -425,7 +425,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_source_error", source);
 	Parser *parser = parser_create(compiler, 0);
@@ -615,7 +615,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)"@ ignored", 9};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_lexer_error", source);
 	Parser *parser = parser_create(compiler, 0);
@@ -630,7 +630,7 @@ static void test_parser_take_token_error(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)"value", 5};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_take_token_error", source);
 	Parser *parser = parser_create(compiler, 0);
@@ -645,7 +645,7 @@ static void test_parser_take_token_oom(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)"value", 5};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_take_token_oom", source);
 	Parser *parser = parser_create(compiler, 0);
@@ -663,7 +663,7 @@ static void test_parser_ast_oom(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	elf_StrSlice source = {(char *)"42", 2};
-	Compiler *compiler = compiler_create(state, &arena);
+	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_ast_oom", source);
 	Parser *parser = parser_create(compiler, 0);

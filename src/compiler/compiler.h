@@ -147,13 +147,6 @@ typedef struct
 }
 Com_Module;
 
-typedef struct
-{
-	elf_Module    *module;
-	BcFunctionRef entry;
-}
-Com_Output;
-
 typedef enum
 {
 	COM_UNIT_FUNCTION,
@@ -162,10 +155,10 @@ typedef enum
 Com_UnitType;
 
 // Owns one compilation session: its sources, atoms, diagnostics, and temporary
-// syntax and lowering data all share the caller-provided arena.
+// syntax and lowering data all share the caller-provided arena. It deliberately
+// has no elf_State; runtime work belongs to evaluation or module linking.
 struct Compiler
 {
-	elf_State         *state;
 	elf_Arena         *arena;
 	struct Atom_Table *atoms;
 	Com_Source        *sources;
@@ -177,7 +170,7 @@ struct Compiler
 	b32                log_messages;
 };
 
-Compiler *compiler_create(elf_State *state, elf_Arena *arena);
+Compiler *compiler_create(elf_Arena *arena);
 Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source);
 void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data);
 void compiler_set_log_messages(Compiler *compiler, b32 enabled);
@@ -187,9 +180,12 @@ b32 compiler_parse_sources(Compiler *compiler);
 b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
 
-Com_Output compiler_compile(Compiler *compiler, Com_UnitType unit_type);
-int compiler_push_constant_expr(Compiler *compiler);
-int compiler_push_json(Compiler *compiler);
+Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type);
+// Copies a compiled module into one runtime, interns its strings, and resolves
+// its module-local globals without modifying the compiler output.
+elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module);
+int compiler_push_constant_expr(Compiler *compiler, elf_State *state);
+int compiler_push_json(Compiler *compiler, elf_State *state);
 
 BcFunctionRef elf_compile_source(elf_State *state, const char *name, elf_StrSlice source);
 int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source);
