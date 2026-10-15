@@ -298,17 +298,16 @@ static Ir static_value_to_ir(IrFunctionEmitter *ctx, SourceSite site, Com_Static
 
 static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *function_ctx, IrEntity *entity, SourceSite site)
 {
-	IrFunction *function = function_ctx->function;
-	for (u32 i = 0; i < function->capture_count; ++ i)
+	for (u32 i = 0; i < function_ctx->capture_count; ++ i)
 	{
-		if (function->capture_entities[i] == entity) {
+		if (function_ctx->capture_entities[i] == entity) {
 			return i;
 		}
 	}
 
-	ASSERT(function->capture_count < 255);
-	u32 capture_index = function->capture_count ++;
-	function->capture_entities[capture_index] = entity;
+	ASSERT(function_ctx->capture_count < 255);
+	u32 capture_index = function_ctx->capture_count ++;
+	function_ctx->capture_entities[capture_index] = entity;
 
 	Ir source = 0;
 	LwScopeFunction *parent = function_ctx->parent;
@@ -322,7 +321,7 @@ static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *f
 		source = create_load_local_ir(ctx, site, entity->memory_ir);
 	}
 
-	function->captures[capture_index] = source;
+	function_ctx->captures[capture_index] = source;
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	return capture_index;
 }
@@ -418,13 +417,9 @@ static void initialize_function_ir(IrFunctionEmitter *ctx, IrFunction *function)
 {
 	ASSERT(function->param_count >= IMPLICIT_PARAM_COUNT);
 	ASSERT(!function->params);
-	ASSERT(!function->captures);
-	ASSERT(!function->capture_entities);
 
 	function->params = elf_arena_push_zero(ctx->module->arena, sizeof(*function->params) * function->param_count);
 	function->params[IMPLICIT_PARAM_INDEX] = create_local_ir(ctx, function->site, 0);
-	function->captures = elf_arena_push_zero(ctx->module->arena, sizeof(*function->captures) * 255);
-	function->capture_entities = elf_arena_push_zero(ctx->module->arena, sizeof(*function->capture_entities) * 255);
 	function->capture_count = 0;
 }
 
@@ -481,6 +476,8 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 	LwScopeFunction function_ctx = {};
 	function_ctx.parent = ctx->function;
 	function_ctx.function = function;
+	function_ctx.captures = elf_arena_push_zero(ctx->module->arena, sizeof(*function_ctx.captures) * 255);
+	function_ctx.capture_entities = elf_arena_push_zero(ctx->module->arena, sizeof(*function_ctx.capture_entities) * 255);
 	function_ctx.scope_start = ctx->scope_start;
 
 	LwScopeFunction *outer_function = ctx->function;
@@ -547,9 +544,10 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 	set_entity_scope(ctx, function_scope);
 
 	IrArray captures = {};
-	captures.count = function->capture_count;
-	captures.items = elf_arena_push_copy(ctx->module->arena, sizeof(*captures.items) * captures.count, function->captures);
+	captures.count = function_ctx.capture_count;
+	captures.items = elf_arena_push_copy(ctx->module->arena, sizeof(*captures.items) * captures.count, function_ctx.captures);
 	ir->ir_function.captures = captures;
+	function->capture_count = function_ctx.capture_count;
 
 }
 

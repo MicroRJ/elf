@@ -56,9 +56,7 @@ struct IrFunction
 	Ir              body;
 	Ir             *params;
 	u32             param_count;
-	Ir             *captures;
 	u32             capture_count;
-	IrEntity      **capture_entities;
 };
 
 // One lowered compilation unit. Global indices are still module-local here and
@@ -104,7 +102,10 @@ struct LwScopeFunction
 {
 	LwScopeFunction *parent;
 	IrFunction      *function;
-	IrEntityId         scope_start;
+	Ir             *captures;
+	IrEntity      **capture_entities;
+	u32              capture_count;
+	IrEntityId       scope_start;
 };
 
 // Owns the module-wide IR arrays shared by every function emitter.
