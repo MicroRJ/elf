@@ -2,12 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include "elf.h"
-#include "base.h"
-#include "elf_core.h"
-#include "compiler.h"
-#include "elf_value_text.h"
-
 static elf_Value *value_at(elf_State *state, elf_Index index);
 
 const char *elf_version(void)

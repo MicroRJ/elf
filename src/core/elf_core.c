@@ -296,3 +296,4 @@ void elf_destroy_state(elf_State *state)
 }
 
 #include "elf_vm.c"
+#include "elf_api.c"
