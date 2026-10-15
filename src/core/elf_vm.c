@@ -2,13 +2,14 @@
 // See Copyright Notice In elf.h
 //
 
-static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs, int nrets)
+static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, BcFunctionRef function_ref, elf_Value *captures, int nargs, int nrets)
 {
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
 	state->vm_closure_calls += 1;
 
-	BcFunction *function = bc_function_from_ref(closure->function);
+	BcFunction *function = bc_function_from_ref(function_ref);
+	ASSERT(captures || function->captures == 0);
 	u32 argument_count = (u32)nargs;
 	elf_Value *frame_base = state->stack_ptr - argument_count;
 	u32 register_offset = 0;
@@ -29,7 +30,7 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	ASSERT(register_offset + function->stack_size <= frame_size);
 	value_zero_many(frame_base + clear_start, frame_size - clear_start);
 
-	frame->module = closure->function.module;
+	frame->module = function_ref.module;
 	frame->function = function;
 	frame->framesize = frame_size;
 	frame->framebase = frame_base;
@@ -38,7 +39,7 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	frame->nrets = nrets;
 	frame->arity = function->arity;
 	frame->variadic = function->variadic;
-	frame->captures = closure->captures;
+	frame->captures = captures;
 	frame->ncaptures = function->captures;
 	frame->instruction = 0;
 
@@ -46,6 +47,11 @@ static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *fra
 	ASSERT(stack_pointer >= state->stack_ptr);
 	state->stack_ptr = stack_pointer;
 	vm_record_stack_usage(state);
+}
+
+static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs, int nrets)
+{
+	prepare_bytecode_stack_frame(state, frame, closure->function, closure->captures, nargs, nrets);
 }
 
 static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs, u32 nrets)
@@ -212,7 +218,7 @@ activate_frame:
 			case BC_NOP: {
 			} break;
 
-			case BC_CALL: {
+			case BC_DYNAMIC_CALL: {
 				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
 				elf_Value callee = reference[byte.b_x];
 				state->stack_ptr = reference + byte.b_x + byte.b_y + 1;
@@ -239,6 +245,23 @@ activate_frame:
 				else {
 					vm_error_cannot_call(state, callee);
 				}
+			} break;
+
+			case BC_CALL: {
+				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
+				ASSERT(byte.b_y >= 0);
+				BcFunctionRef function_ref = {
+					.module = module,
+					.index = (u32)byte.b_y,
+				};
+				ASSERT(bc_function_ref_is_valid(function_ref));
+				ASSERT(bc_function_from_ref(function_ref)->captures == 0);
+				reference[byte.b_x] = value_nil();
+				state->stack_ptr = reference + byte.b_x + byte.b_z + 1;
+				push_stack_frame(state);
+				prepare_bytecode_stack_frame(state, state->frame, function_ref, 0, byte.b_z, byte.b_w);
+				ASSERT(state->stack_ptr == state->frame->framebase + state->frame->framesize);
+				goto activate_frame;
 			} break;
 
 			case BC_RETURN: {

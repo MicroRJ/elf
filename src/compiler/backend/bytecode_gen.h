@@ -47,6 +47,8 @@ typedef struct
 {
 	Compiler         *compiler;
 	elf_Arena        *arena;
+	struct IrFunction *ir_functions;
+	u32               ir_function_count;
 	BcModuleBuilder   module;
 	Bytecode         *bytecode;
 	u32               bytecode_capacity;

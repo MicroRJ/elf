@@ -287,6 +287,15 @@ int main(void)
 		"\t}\n"
 		"\tret value\n"
 		"}\n";
+	static const char static_call_source[] =
+		"step :: fun(value) { ret value + 1 }\n"
+		"ret fun(n) {\n"
+		"\tvalue := 0\n"
+		"\tfor i := 0; i < n; i += 1 ? {\n"
+		"\t\tvalue = step(value)\n"
+		"\t}\n"
+		"\tret value\n"
+		"}\n";
 	static const char integer_constant_source[] =
 		"ret fun(n) {\n"
 		"\tacc := 0\n"
@@ -405,6 +414,7 @@ int main(void)
 	printf("\nVM benchmarks (median of 7 measured runs after one warmup)\n");
 	bench_vm_integer_program("VM dispatch", dispatch_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("function calls", call_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("static function calls", static_call_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("global reads", global_read_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("global writes", global_write_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("string constants", string_constant_source, VM_ITERATIONS, VM_ITERATIONS);

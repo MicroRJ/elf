@@ -380,7 +380,7 @@ static void test_backend_range_for_loop_shape(void)
 	if (backend_count_bytecode(result, BC_JUMP) != 1) {
 		test_fail("range for emits one loop-back jump");
 	}
-	if (backend_count_bytecode(result, BC_CALL) != 0) {
+	if (backend_count_bytecode(result, BC_CALL) != 0 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
 		test_fail("plain range for does not emit calls");
 	}
 	if (backend_count_bytecode(result, BC_GETINDEX) != 0) {
@@ -403,14 +403,14 @@ static void test_backend_range_for_collection_call_is_hoisted(void)
 		"}\n"
 		"ret sum\n");
 
-	if (backend_count_bytecode(result, BC_CALL) != 1) {
+	if (backend_count_bytecode(result, BC_DYNAMIC_CALL) != 1) {
 		test_fail("range collection expression is evaluated once before the loop");
 	}
 	if (backend_count_bytecode(result, BC_GETINDEX) != 1) {
 		test_fail("single-variable collection range for emits one indexed load in loop body");
 	}
 
-	i32 call = backend_find_first_bytecode(result, BC_CALL);
+	i32 call = backend_find_first_bytecode(result, BC_DYNAMIC_CALL);
 	i32 loop_exit = backend_find_first_bytecode(result, BC_JZ);
 	if (call < 0 || loop_exit < 0 || call >= loop_exit) {
 		test_fail("range collection call happens before loop condition");
@@ -593,6 +593,44 @@ static void test_backend_compiles_static_functions(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_emits_direct_static_call(void)
+{
+	BackendCompileResult result = backend_test_compile_source(
+		"add :: fun(a, b) { ret a + b }\n"
+		"ret add(2, 3)\n");
+
+	if (backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+		test_fail("static function call emits one direct call");
+	}
+	if (backend_count_bytecode(result, BC_CLOSURE) != 0) {
+		test_fail("direct static function call does not allocate a closure");
+	}
+
+	i32 call_index = backend_find_first_bytecode(result, BC_CALL);
+	if (call_index >= 0) {
+		Bytecode call = backend_test_bytes(result)[call_index];
+		if (call.b_y < 0 || (u32)call.b_y >= result.function.module->bytecode_function_count || call.b_z != 3 || call.b_w != 1) {
+			test_fail("direct static call encodes function, argument, and return counts");
+		}
+	}
+	backend_test_destroy(result);
+}
+
+static void test_backend_keeps_recurse_calls_dynamic(void)
+{
+	BackendCompileResult result = backend_test_compile_source(
+		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
+		"ret count(3)\n");
+
+	if (backend_count_bytecode(result, BC_CALL) != 0 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 1) {
+		test_fail("static function using recurse is called dynamically");
+	}
+	if (backend_count_bytecode(result, BC_CLOSURE) != 1) {
+		test_fail("static function using recurse retains its closure");
+	}
+	backend_test_destroy(result);
+}
+
 static void test_backend_emits_parameter_type_enforcement(void)
 {
 	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
@@ -633,5 +671,7 @@ static void run_backend_tests(void)
 	test_backend_formats_bytecode_function();
 	test_backend_generates_module_without_entry();
 	test_backend_compiles_static_functions();
+	test_backend_emits_direct_static_call();
+	test_backend_keeps_recurse_calls_dynamic();
 	test_backend_emits_parameter_type_enforcement();
 }

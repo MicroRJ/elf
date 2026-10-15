@@ -7,18 +7,23 @@
 
 typedef struct LwScopeEntity LwScopeEntity;
 
-typedef struct
+typedef struct IrFunction IrFunction;
+
+// One lowered function. Static functions may be called by module-relative
+// index unless their body needs an actual closure value.
+struct IrFunction
 {
-	SourceSite         site;
-	b32            variadic;
-	Ir               body;
-	Ir              *params;
-	u32              param_count;
-	Ir              *captures;
-	u32              capture_count;
-	LwScopeEntity         **capture_entities;
-}
-IrFunction;
+	SourceSite      site;
+	b32             variadic;
+	b32             is_static;
+	b32             requires_closure;
+	Ir              body;
+	Ir             *params;
+	u32             param_count;
+	Ir             *captures;
+	u32             capture_count;
+	LwScopeEntity **capture_entities;
+};
 
 // One lowered compilation unit. Global indices are still module-local here and
 // are resolved to runtime slots only when the compiled module is linked.

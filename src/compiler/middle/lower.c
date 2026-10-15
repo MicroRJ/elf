@@ -877,6 +877,8 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 		case AST_RECURSE:
 		{
+			ASSERT(ctx->function && ctx->function->function);
+			ctx->function->function->requires_closure = true;
 			ir = create_recurse_ir(ctx, expr->site);
 		}
 		break;
@@ -1045,6 +1047,7 @@ static void evaluate_file_statics(LowerContext *ctx)
 		{
 			file_static->value.kind = STATIC_VALUE_FUNCTION;
 			file_static->value.function = create_ast_function_value_ir(ctx, file_static->expr);
+			ctx->functions[file_static->value.function->ir_function.index].is_static = true;
 			file_static->state = STATIC_SYMBOL_RESOLVED;
 		}
 	}

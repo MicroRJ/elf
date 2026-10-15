@@ -35,7 +35,7 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	if (preserved)
 	{
 		u32 byte_index = caller_function->offset + caller_instruction;
-		preserved = BC_TYPE(caller_module->bytecode[byte_index]) == BC_CALL && elf_push_ref(S, context->callback);
+		preserved = BC_TYPE(caller_module->bytecode[byte_index]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
 	}
 	if (preserved)
 	{
@@ -304,6 +304,26 @@ static void test_vm_static_function(void)
 	elf_call(state, 1, 1);
 	if (!value_is_integer(state->stack_ptr[-1]) || value_as_integer(state->stack_ptr[-1]) != 42) {
 		test_fail("static function executes through the VM");
+	}
+	elf_destroy_state(state);
+}
+
+static void test_vm_static_recurse_function(void)
+{
+	elf_State *state = elf_create_state();
+	char source_text[] = "count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\nret count(3)";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (elf_push_code_source(state, "static-recurse-function", source) != ELF_ERROR_NONE)
+	{
+		test_fail("static recurse function source compiles");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	if (!value_is_integer(state->stack_ptr[-1]) || value_as_integer(state->stack_ptr[-1]) != 0) {
+		test_fail("static function using recurse executes through its closure");
 	}
 	elf_destroy_state(state);
 }
@@ -582,6 +602,7 @@ static void run_vm_tests(void)
 	test_vm_interpolated_strings();
 	test_vm_fib();
 	test_vm_static_function();
+	test_vm_static_recurse_function();
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
 	test_vm_module_builder_grows_constant_arrays();

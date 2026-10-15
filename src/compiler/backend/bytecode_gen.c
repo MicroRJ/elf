@@ -247,6 +247,12 @@ static u32 emit_xyz_bc(BcGen *gen, SourceSite site, BytecodeType k, i32 x, i32 y
 	return emit_bc(gen, site, byte);
 }
 
+static u32 emit_xyzw_bc(BcGen *gen, SourceSite site, BytecodeType k, i32 x, i32 y, i32 z, i32 w)
+{
+	Bytecode byte = BC_XYZW(k, x, y, z, w);
+	return emit_bc(gen, site, byte);
+}
+
 static u32 emit_jump_bc(BcGen *gen, SourceSite site)
 {
 	return emit_x_bc(gen, site, BC_JUMP, 0);
@@ -563,6 +569,8 @@ static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Modu
 	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
 
 	BcGen *gen = bg_create(compiler, ir_module.function_count);
+	gen->ir_functions = ir_module.functions;
+	gen->ir_function_count = ir_module.function_count;
 	PROF_BLOCK("compiler.codegen")
 	{
 		for (u32 i = 0; i < ir_module.function_count; ++ i)
@@ -634,13 +642,39 @@ static BcSlot bg_emit_new_array_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 	return out;
 }
 
-static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
+static BcSlot bg_finish_call(BcGen *gen, Ir ir, BcSlot call_slot, BcSlot out, u32 nout)
+{
+	if (nout < 1) {
+		return out;
+	}
+
+	if (!bc_slot_is_valid(out))
+	{
+		out = alloc_slot(gen);
+		for (u32 i = 1; i < nout; ++i) {
+			alloc_slot(gen);
+		}
+	}
+
+	if (out.slot != call_slot.slot)
+	{
+		if (nout > 1) {
+			report_generation_error(gen, GENERATION_ERROR_GENERIC, ir->site, "multi-returns are not fully supported yet!");
+		}
+
+		emit_reload_bc(gen, ir->site, out, call_slot);
+	}
+
+	return out;
+}
+
+static BcSlot bg_emit_dynamic_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 {
 	Ir expr = ir->ir_call.expr;
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
 
-	BcSlot stack_top = mark_slots(gen);;
+	BcSlot stack_top = mark_slots(gen);
 	{
 		BcSlot this_slot;
 		BcSlot expr_slot;
@@ -683,29 +717,46 @@ static BcSlot bg_emit_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 	}
 	restore_slots(gen, stack_top);
 
-	emit_xyz_bc(gen, expr->site, BC_CALL, unwrap_slot(stack_top), nargs + 1, nout);
+	emit_xyz_bc(gen, expr->site, BC_DYNAMIC_CALL, unwrap_slot(stack_top), nargs + 1, nout);
+	return bg_finish_call(gen, ir, stack_top, out, nout);
+}
 
-	if (nout < 1) {
-		return out;
+static b32 bg_can_emit_direct_call(BcGen *gen, Ir expr)
+{
+	if (expr->kind != IR_FUNCTION || expr->ir_function.index >= gen->ir_function_count) {
+		return false;
 	}
 
-	if (!bc_slot_is_valid(out))
-	{
-		out = alloc_slot(gen);
-		for (u32 i = 1; i < nout; ++i) alloc_slot(gen);
-	}
+	IrFunction *function = gen->ir_functions + expr->ir_function.index;
+	return function->is_static && !function->requires_closure && function->capture_count == 0;
+}
 
-	if (out.slot != stack_top.slot)
+static BcSlot bg_emit_direct_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
+{
+	Ir function = ir->ir_call.expr;
+	IrArray args = ir->ir_call.args;
+	u32 nargs = args.count;
+	ASSERT(bg_can_emit_direct_call(gen, function));
+	ASSERT(nout <= 0xff);
+
+	BcSlot stack_top = mark_slots(gen);
 	{
-		if (nout > 1)
+		BcSlot call_slot = alloc_slot(gen);
+		ASSERT(call_slot.slot == stack_top.slot);
+		BcSlot this_slot = alloc_slot(gen);
+		ASSERT(this_slot.slot == stack_top.slot + 1);
+		emit_xy_bc(gen, ir->site, BC_RELOAD, unwrap_slot(this_slot), 0);
+
+		for (u32 i = 0; i < nargs; ++i)
 		{
-			report_generation_error(gen, GENERATION_ERROR_GENERIC, expr->site, "multi-returns are not fully supported yet!");
+			BcSlot arg_slot = emit_expr(gen, args.items[i], NO_MEMORY, 1);
+			ASSERT(arg_slot.slot == stack_top.slot + 2 + (i32)i);
 		}
-
-		emit_reload_bc(gen, expr->site, out, stack_top);
 	}
+	restore_slots(gen, stack_top);
 
-	return out;
+	emit_xyzw_bc(gen, ir->site, BC_CALL, unwrap_slot(stack_top), function->ir_function.index, nargs + 1, nout);
+	return bg_finish_call(gen, ir, stack_top, out, nout);
 }
 
 static BytecodeType bc_op(IrKind type)
@@ -1071,7 +1122,12 @@ static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 
 		case IR_CALL:
 		{
-			out = bg_emit_call(gen, expr, out, nout);
+			if (bg_can_emit_direct_call(gen, expr->ir_call.expr)) {
+				out = bg_emit_direct_call(gen, expr, out, nout);
+			}
+			else {
+				out = bg_emit_dynamic_call(gen, expr, out, nout);
+			}
 		}
 		break;
 

@@ -42,8 +42,7 @@ static void format_global_value(elf_State *state, elf_Arena *arena, u32 index)
 
 static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Arena *arena, u32 index, Bytecode byte)
 {
-	elf_arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d  "
-		, index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z);
+	elf_arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
 
 	switch (byte.b_type)
 	{
@@ -177,9 +176,15 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		}
 		break;
 
+		case BC_DYNAMIC_CALL:
+		{
+			elf_arena_pushf(arena, "dynamic_call r%d nargs=%d nrets=%d", byte.b_x, byte.b_y, byte.b_z);
+		}
+		break;
+
 		case BC_CALL:
 		{
-			elf_arena_pushf(arena, "call r%d nargs=%d nrets=%d", byte.b_x, byte.b_y, byte.b_z);
+			elf_arena_pushf(arena, "call function[%d] base=r%d nargs=%d nrets=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
 		}
 		break;
 

@@ -59,6 +59,7 @@ STATIC_ASSERT(TRULE_ALL <= 0x7fff);
 	X(SETFIELD,        "setfield")         \
 	X(SETINDEX,        "setindex")         \
 	X(ARRAYADD,        "arrayadd")         \
+	X(DYNAMIC_CALL,    "dynamic_call")     \
 	X(CALL,            "call")             \
 	X(TABLE,           "new_table")        \
 	X(ARRAY,           "new_array")        \
