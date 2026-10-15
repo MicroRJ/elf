@@ -624,9 +624,9 @@ static void test_backend_emits_direct_static_call(void)
 static void test_backend_lowers_trailing_closure(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
-		"apply :: fun(value, callback) { ret callback(value) }\n"
+		"apply :: fun(value, increment = 1, callback) { ret callback(value + increment) }\n"
 		"offset := 1\n"
-		"ret apply(value = 41) -> (value) { ret value + offset }\n");
+		"ret apply(value = 40) -> (value) { ret value + offset }\n");
 	if (!bc_function_ref_is_valid(result.function))
 	{
 		test_fail("trailing closure compiles");

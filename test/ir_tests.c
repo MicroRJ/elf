@@ -519,6 +519,9 @@ static void test_ir_rejects_invalid_static_call_arguments(elf_State *state)
 		"target :: fun(value = 1) { ret value }\nret target(value = 1, value = 2)",
 		"target :: fun(value) { ret value }\nret target(1, 2)",
 		"target := fun(value) { ret value }\nret target(value = 1)",
+		"target := fun(callback) { ret callback() }\nret target -> { ret 1 }",
+		"target :: fun(callback) { ret callback() }\nret target(callback = fun() { ret 1 }) -> { ret 2 }",
+		"target :: fun() { ret 1 }\nret target -> { ret 2 }",
 	};
 	const char *labels[] =
 	{
@@ -529,6 +532,9 @@ static void test_ir_rejects_invalid_static_call_arguments(elf_State *state)
 		"static call rejects duplicated named arguments",
 		"static call rejects excess positional arguments",
 		"dynamic call rejects named arguments",
+		"dynamic call rejects trailing closures",
+		"static call rejects naming the trailing closure parameter twice",
+		"static call rejects a trailing closure without a final parameter",
 	};
 
 	log_set_hook(ignore_expected_lowering_error, 0);
