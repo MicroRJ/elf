@@ -62,40 +62,6 @@ typedef enum
 }
 EntityType;
 
-typedef enum
-{
-	STATIC_SYMBOL_UNRESOLVED,
-	STATIC_SYMBOL_RESOLVING,
-	STATIC_SYMBOL_RESOLVED,
-}
-StaticSymbolState;
-
-typedef enum
-{
-	STATIC_VALUE_INVALID,
-	STATIC_VALUE_NIL,
-	STATIC_VALUE_INTEGER,
-	STATIC_VALUE_NUMBER,
-	STATIC_VALUE_STRING,
-	STATIC_VALUE_FUNCTION,
-	STATIC_VALUE_NAMESPACE,
-}
-StaticValueKind;
-
-typedef struct
-{
-	StaticValueKind kind;
-	union
-	{
-		i64   integer;
-		f64   number;
-		Atom *string;
-		Ir    function;
-		Com_SourceId source;
-	};
-}
-StaticValue;
-
 typedef u32 EntityId;
 
 typedef struct
@@ -140,29 +106,6 @@ typedef struct LwScopeEntity
 }
 LwScopeEntity;
 
-// One top-level static declaration exported by a compiler source. The source
-// id lets evaluation temporarily enter the declaration's own namespace.
-typedef struct
-{
-	Atom             *name;
-	SourceSite        site;
-	Ast               expr;
-	Com_SourceId      source;
-	StaticSymbolState state;
-	StaticValue       value;
-	b32               referenced;
-}
-LwStaticSymbol;
-
-// The exported static namespace for one compiler source. For now every
-// top-level static declaration is visible to sources that import it.
-typedef struct
-{
-	LwStaticSymbol *statics;
-	u32             static_count;
-}
-LwSourceScope;
-
 struct LowerContext
 {
 	Compiler    *compiler;
@@ -190,9 +133,7 @@ struct LowerContext
 	EntityId   scope_end;
 	u32        scope_depth;
 
-	LwSourceScope *source_scopes;
-	u32            source_scope_count;
-	Com_SourceId   current_source;
+	Com_SourceId current_source;
 
 	LoopLabels loop_stack[64];
 	u32        loop_count;

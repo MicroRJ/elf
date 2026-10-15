@@ -140,6 +140,83 @@ typedef enum
 }
 Com_UnitType;
 
+typedef enum
+{
+	COM_STATIC_UNRESOLVED,
+	COM_STATIC_RESOLVING,
+	COM_STATIC_RESOLVED,
+}
+Com_StaticState;
+
+typedef enum
+{
+	COM_STATIC_INVALID,
+	COM_STATIC_NIL,
+	COM_STATIC_INTEGER,
+	COM_STATIC_NUMBER,
+	COM_STATIC_STRING,
+	COM_STATIC_FUNCTION,
+	COM_STATIC_NAMESPACE,
+}
+Com_StaticValueKind;
+
+// One value produced while resolving a compile-time declaration. Functions
+// use their stable compiler function index; namespaces use a source index.
+typedef struct
+{
+	Com_StaticValueKind kind;
+	union
+	{
+		i64 integer;
+		f64 number;
+		struct Atom *string;
+		u32 function;
+		Com_SourceId source;
+	};
+}
+Com_StaticValue;
+
+// One top-level declaration exported by a compiler source.
+typedef struct
+{
+	struct Atom *name;
+	SourceSite site;
+	struct Ast_T *expr;
+	Com_SourceId source;
+	Com_StaticState state;
+	Com_StaticValue value;
+	b32 referenced;
+}
+Com_StaticSymbol;
+
+// The exported static namespace belonging to one compiler source.
+typedef struct
+{
+	Com_StaticSymbol *symbols;
+	u32 symbol_count;
+}
+Com_StaticScope;
+
+// One function planned by the compiler before IR generation. Entry functions
+// point at an AST file; static functions point at an AST function expression.
+typedef struct
+{
+	struct Ast_T *ast;
+	Com_SourceId source;
+	u32 index;
+	b32 is_entry;
+	b32 is_static;
+}
+Com_Function;
+
+typedef enum
+{
+	COM_STATIC_LOOKUP_NONE,
+	COM_STATIC_LOOKUP_VALUE,
+	COM_STATIC_LOOKUP_ERROR,
+}
+Com_StaticLookup;
+
 // Owns one compilation session: its sources, atoms, diagnostics, and temporary
 // syntax and lowering data all share the caller-provided arena. Runtime work is
 // outside this type.
@@ -150,6 +227,11 @@ struct Compiler
 	Com_Source        *sources;
 	u32                source_count;
 	u32                source_capacity;
+	Com_StaticScope   *static_scopes;
+	u32                static_scope_count;
+	Com_Function      *functions;
+	u32                function_count;
+	u32                function_capacity;
 	Com_Report         report;
 	b32                log_messages;
 };
@@ -160,6 +242,10 @@ Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path);
 void compiler_set_log_messages(Compiler *compiler, b32 enabled);
 b32 compiler_record_import(Compiler *compiler, Com_SourceId source, struct Ast_T *import);
 b32 compiler_parse_sources(Compiler *compiler);
+b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type);
+Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, struct Atom *name);
+Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId source, struct Ast_T *expr, Com_StaticValue *out);
+void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId source);
 
 b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);

@@ -5,6 +5,8 @@ static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, co
 	compiler_add_root_source(compiler, "ir_tests", source);
 	Parser *parser = parser_create(compiler, 0);
 	Ast file = elf_parse_file(parser);
+	compiler->sources[0].ast = file;
+	compiler_resolve_statics(compiler, COM_UNIT_FUNCTION);
 
 	LowerContext *ctx = elf_create_lower_context(compiler);
 	IrModule module = elf_lower_ast_function(ctx, file);
@@ -389,7 +391,7 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: 42\nret first");
-	if (!ctx || ctx->source_scope_count != 1 || ctx->current_source != 0 || ctx->source_scopes[0].static_count != 2) {
+	if (!ctx || ctx->compiler->static_scope_count != 1 || ctx->current_source != 0 || ctx->compiler->static_scopes[0].symbol_count != 2) {
 		test_fail("lowering stores root static symbols in source scope zero");
 	}
 	Ir body = ir_test_main_body(ctx);

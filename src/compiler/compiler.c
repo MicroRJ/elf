@@ -363,6 +363,298 @@ b32 compiler_parse_sources(Compiler *compiler)
 	return result;
 }
 
+Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
+{
+	ASSERT(source < compiler->static_scope_count);
+	Com_StaticScope *scope = compiler->static_scopes + source;
+	for (u32 i = 0; i < scope->symbol_count; ++i)
+	{
+		Com_StaticSymbol *symbol = scope->symbols + i;
+		if (symbol->name == name) {
+			return symbol;
+		}
+	}
+	return 0;
+}
+
+static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast ast, b32 is_entry, b32 is_static)
+{
+	if (compiler->function_count == compiler->function_capacity)
+	{
+		u32 capacity = compiler->function_capacity ? compiler->function_capacity * 2 : 16;
+		Com_Function *functions = elf_arena_push_zero(compiler->arena, sizeof(*functions) * capacity);
+		if (compiler->function_count) {
+			copy_memory(functions, compiler->functions, sizeof(*functions) * compiler->function_count);
+		}
+		compiler->functions = functions;
+		compiler->function_capacity = capacity;
+	}
+
+	u32 index = compiler->function_count++;
+	compiler->functions[index] = (Com_Function) {
+		.ast = ast,
+		.source = source,
+		.index = index,
+		.is_entry = is_entry,
+		.is_static = is_static,
+	};
+	return index;
+}
+
+static b32 compiler_evaluate_static_symbol(Compiler *compiler, Com_StaticSymbol *symbol);
+
+Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId source, Ast expr, Com_StaticValue *out)
+{
+	Com_StaticLookup result = COM_STATIC_LOOKUP_NONE;
+	if (expr->kind == AST_IDENT)
+	{
+		Com_StaticSymbol *symbol = compiler_static_symbol_from_source(compiler, source, expr->atom);
+		if (symbol)
+		{
+			symbol->referenced = true;
+			if (compiler_evaluate_static_symbol(compiler, symbol))
+			{
+				*out = symbol->value;
+				result = COM_STATIC_LOOKUP_VALUE;
+			}
+			else {
+				result = COM_STATIC_LOOKUP_ERROR;
+			}
+		}
+	}
+	else if (expr->kind == AST_IMPORT)
+	{
+		if (expr->import.source < compiler->static_scope_count)
+		{
+			out->kind = COM_STATIC_NAMESPACE;
+			out->source = expr->import.source;
+			result = COM_STATIC_LOOKUP_VALUE;
+		}
+		else
+		{
+			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "import has no resolved source");
+			result = COM_STATIC_LOOKUP_ERROR;
+		}
+	}
+	else if (expr->kind == AST_FIELD)
+	{
+		Com_StaticValue receiver = {};
+		Com_StaticLookup receiver_result = compiler_lookup_static_expr(compiler, source, expr->binary.x, &receiver);
+		if (receiver_result == COM_STATIC_LOOKUP_ERROR) {
+			result = COM_STATIC_LOOKUP_ERROR;
+		}
+		else if (receiver_result == COM_STATIC_LOOKUP_VALUE && receiver.kind == COM_STATIC_NAMESPACE)
+		{
+			Ast member = expr->binary.y;
+			if (!member || member->kind != AST_STRING_LITERAL)
+			{
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "expected static namespace member name");
+				result = COM_STATIC_LOOKUP_ERROR;
+			}
+			else
+			{
+				Com_StaticSymbol *symbol = compiler_static_symbol_from_source(compiler, receiver.source, member->atom);
+				if (!symbol)
+				{
+					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, member->site, "'%s' is not exported by the imported source", atom_data(member->atom));
+					result = COM_STATIC_LOOKUP_ERROR;
+				}
+				else
+				{
+					symbol->referenced = true;
+					if (compiler_evaluate_static_symbol(compiler, symbol))
+					{
+						*out = symbol->value;
+						result = COM_STATIC_LOOKUP_VALUE;
+					}
+					else {
+						result = COM_STATIC_LOOKUP_ERROR;
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+static b32 compiler_evaluate_static_expr(Compiler *compiler, Com_StaticSymbol *owner, Ast expr, Com_StaticValue *out)
+{
+	b32 result = true;
+	switch (expr->kind)
+	{
+		case AST_NIL_LITERAL:
+		{
+			out->kind = COM_STATIC_NIL;
+		}
+		break;
+
+		case AST_INTEGER_LITERAL:
+		{
+			out->kind = COM_STATIC_INTEGER;
+			out->integer = expr->integer_value;
+		}
+		break;
+
+		case AST_NUMBER_LITERAL:
+		{
+			out->kind = COM_STATIC_NUMBER;
+			out->number = expr->number_value;
+		}
+		break;
+
+		case AST_STRING_LITERAL:
+		{
+			out->kind = COM_STATIC_STRING;
+			out->string = expr->atom;
+		}
+		break;
+
+		case AST_FUNCTION:
+		{
+			ASSERT(owner->value.kind == COM_STATIC_FUNCTION);
+			*out = owner->value;
+		}
+		break;
+
+		case AST_IDENT:
+		case AST_IMPORT:
+		case AST_FIELD:
+		{
+			Com_StaticLookup lookup = compiler_lookup_static_expr(compiler, owner->source, expr, out);
+			if (lookup == COM_STATIC_LOOKUP_NONE)
+			{
+				if (expr->kind == AST_IDENT) {
+					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
+				}
+				else {
+					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
+				}
+				result = false;
+			}
+			else if (lookup == COM_STATIC_LOOKUP_ERROR) {
+				result = false;
+			}
+		}
+		break;
+
+		default:
+		{
+			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
+			result = false;
+		}
+		break;
+	}
+	return result;
+}
+
+static b32 compiler_evaluate_static_symbol(Compiler *compiler, Com_StaticSymbol *symbol)
+{
+	ASSERT(symbol);
+	b32 result = symbol->value.kind != COM_STATIC_INVALID;
+	if (symbol->state == COM_STATIC_RESOLVING)
+	{
+		compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, symbol->site, "cyclic static definition for '%s'", atom_data(symbol->name));
+		result = false;
+	}
+	else if (symbol->state == COM_STATIC_UNRESOLVED)
+	{
+		symbol->state = COM_STATIC_RESOLVING;
+		result = compiler_evaluate_static_expr(compiler, symbol, symbol->expr, &symbol->value);
+		symbol->state = COM_STATIC_RESOLVED;
+	}
+	return result;
+}
+
+b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
+{
+	compiler->static_scope_count = compiler->source_count;
+	compiler->static_scopes = elf_arena_push_zero(compiler->arena, sizeof(*compiler->static_scopes) * compiler->static_scope_count);
+	compiler->functions = 0;
+	compiler->function_count = 0;
+	compiler->function_capacity = 0;
+	if (unit_type == COM_UNIT_FUNCTION) {
+		compiler_add_function(compiler, 0, compiler->sources[0].ast, true, false);
+	}
+
+	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
+	{
+		Ast file = compiler->sources[source].ast;
+		ASSERT(file && file->kind == AST_FILE);
+		Ast body = file->file.body;
+		ASSERT(body && body->kind == AST_BLOCK_STAT);
+		Com_StaticScope *scope = compiler->static_scopes + source;
+		if (body->block.nstats) {
+			scope->symbols = elf_arena_push_zero(compiler->arena, sizeof(*scope->symbols) * body->block.nstats);
+		}
+
+		for (u32 i = 0; i < body->block.nstats; ++i)
+		{
+			Ast declaration = body->block.stats[i];
+			if (declaration->kind != AST_STATIC_DECL)
+			{
+				if (unit_type == COM_UNIT_MODULE || source != 0) {
+					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "static module cannot contain executable top-level statements");
+				}
+				continue;
+			}
+
+			Ast name = declaration->static_decl.name;
+			if (!name || ast_is_error(name) || name->kind != AST_IDENT)
+			{
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "expected static declaration name");
+				continue;
+			}
+			if (compiler_static_symbol_from_source(compiler, source, name->atom))
+			{
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s': is already declared", atom_data(name->atom));
+				continue;
+			}
+
+			Com_StaticSymbol *symbol = scope->symbols + scope->symbol_count++;
+			symbol->name = name->atom;
+			symbol->site = name->site;
+			symbol->expr = declaration->static_decl.expr;
+			symbol->source = source;
+		}
+	}
+
+	for (Com_SourceId source = 0; source < compiler->static_scope_count; ++source)
+	{
+		Com_StaticScope *scope = compiler->static_scopes + source;
+		for (u32 i = 0; i < scope->symbol_count; ++i)
+		{
+			Com_StaticSymbol *symbol = scope->symbols + i;
+			if (symbol->expr->kind == AST_FUNCTION)
+			{
+				symbol->value.kind = COM_STATIC_FUNCTION;
+				symbol->value.function = compiler_add_function(compiler, source, symbol->expr, false, true);
+				symbol->state = COM_STATIC_RESOLVED;
+			}
+		}
+	}
+	for (Com_SourceId source = 0; source < compiler->static_scope_count; ++source)
+	{
+		Com_StaticScope *scope = compiler->static_scopes + source;
+		for (u32 i = 0; i < scope->symbol_count; ++i) {
+			compiler_evaluate_static_symbol(compiler, scope->symbols + i);
+		}
+	}
+	return compiler->report.error_count == 0;
+}
+
+void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId source)
+{
+	ASSERT(source < compiler->static_scope_count);
+	Com_StaticScope *scope = compiler->static_scopes + source;
+	for (u32 i = 0; i < scope->symbol_count; ++i)
+	{
+		Com_StaticSymbol *symbol = scope->symbols + i;
+		if (!symbol->referenced) {
+			compiler_report(compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING, symbol->site, "unreferenced entity");
+		}
+	}
+}
+
 static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format, va_list args)
 {
 	va_list count_args;
@@ -492,6 +784,9 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 	}
 	if (!parsed || compiler->report.error_count)
 	{
+		return module;
+	}
+	if (!compiler_resolve_statics(compiler, unit_type)) {
 		return module;
 	}
 	Ast ast_file = compiler->sources[0].ast;
