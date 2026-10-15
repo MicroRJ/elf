@@ -14,7 +14,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 }
 
 static BcSlot emit_expr(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32 nout);
-static void do_stat(BcFunctionEmitter *emitter, Ir stat);
+static void emit_stat(BcFunctionEmitter *emitter, Ir stat);
 static void emit_function(BcFunctionEmitter *emitter, IrFunction *function);
 static b32 emit_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module);
 static void define_label(BcFunctionEmitter *emitter, u32 label);
@@ -397,7 +397,7 @@ static void emit_function(BcFunctionEmitter *emitter, IrFunction *function)
 		}
 
 		BcSlot memory_checkpoint = mark_slots(emitter);
-		do_stat(emitter, body);
+		emit_stat(emitter, body);
 		restore_slots(emitter, memory_checkpoint);
 
 		if (module->bytecode_count == bytecode_start || BC_TYPE(module->bytecode[module->bytecode_count - 1]) != BC_RETURN)
@@ -934,7 +934,7 @@ static BcSlot do_expr_block(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32
 	{
 		BcSlot memory_checkpoint = mark_slots(emitter);
 		for (u32 i = 0; i < stats.count; ++ i) {
-			do_stat(emitter, stats.items[i]);
+			emit_stat(emitter, stats.items[i]);
 		}
 		restore_slots(emitter, memory_checkpoint);
 		return out;
@@ -943,7 +943,7 @@ static BcSlot do_expr_block(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32
 	out = ensure_slot(emitter, out);
 	BcSlot memory_checkpoint = mark_slots(emitter);
 	for (u32 i = 0; i < stats.count; ++ i) {
-		do_stat(emitter, stats.items[i]);
+		emit_stat(emitter, stats.items[i]);
 	}
 	BcSlot final_slot = emit_expr(emitter, value, out, 1);
 	ASSERT(final_slot.slot == out.slot);
@@ -1255,7 +1255,7 @@ static void emit_store(BcFunctionEmitter *emitter, SourceSite site, Ir dest, Ir 
 	restore_slots(emitter, memory_checkpoint);
 }
 
-static void do_stat(BcFunctionEmitter *emitter, Ir stat)
+static void emit_stat(BcFunctionEmitter *emitter, Ir stat)
 {
 	switch (stat->kind)
 	{
@@ -1342,7 +1342,7 @@ static void do_stat(BcFunctionEmitter *emitter, Ir stat)
 			{
 				for (u32 i = 0; i < stats.count; ++ i)
 				{
-					do_stat(emitter, stats.items[i]);
+					emit_stat(emitter, stats.items[i]);
 				}
 			}
 			restore_slots(emitter, memory_checkpoint);
@@ -1360,7 +1360,7 @@ static void do_stat(BcFunctionEmitter *emitter, Ir stat)
 
 			{
 				BcSlot true_memory = mark_slots(emitter);
-				do_stat(emitter, true_clause);
+				emit_stat(emitter, true_clause);
 				restore_slots(emitter, true_memory);
 			}
 
@@ -1372,7 +1372,7 @@ static void do_stat(BcFunctionEmitter *emitter, Ir stat)
 				BcSlot else_memory = mark_slots(emitter);
 				define_label(emitter, else_label);
 				restore_slots(emitter, else_memory);
-				do_stat(emitter, else_clause);
+				emit_stat(emitter, else_clause);
 				restore_slots(emitter, else_memory);
 				define_label(emitter, end_label);
 			}
