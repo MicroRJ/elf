@@ -525,9 +525,9 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.param_count = ARRAY_COUNT(params);
 	function.body = body;
 
-	BcModuleBuilder *module = create_bc_module_builder(compiler, 1);
-	BcGen *gen = create_bc_gen(module);
-	generate_function(gen, &function);
+	BcModuleBuilder *module = create_module_builder(compiler, 1);
+	BcFunctionEmitter *emitter = create_function_emitter(module);
+	emit_function(emitter, &function);
 	if (module->generated_function_count != 1) {
 		test_fail("function generation appends one bytecode function to its module");
 	}
@@ -571,7 +571,7 @@ static void test_backend_generates_module_without_entry(void)
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
 	Com_Module module = {};
-	if (!generate_module(compiler, scratch.arena, &module, (IrModule) {})) {
+	if (!emit_module(compiler, scratch.arena, &module, (IrModule) {})) {
 		test_fail("backend generates module without entry function");
 	}
 	if (module.has_entry || module.function_count || module.bytecode_count) {

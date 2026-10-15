@@ -24,7 +24,7 @@ typedef struct
 }
 SourceMapBuffer;
 
-typedef struct BcGen BcGen;
+typedef struct BcFunctionEmitter BcFunctionEmitter;
 
 // Accumulates module-wide bytecode, constants, strings, and function records.
 typedef struct
@@ -50,7 +50,7 @@ typedef struct
 BcModuleBuilder;
 
 // Temporary state for the one IR function currently being generated.
-struct BcGen
+struct BcFunctionEmitter
 {
 	BcModuleBuilder  *module;
 	SourceMapBuffer   source_map_buffer;

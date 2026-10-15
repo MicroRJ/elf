@@ -25,8 +25,8 @@
 #include "parse_json.c"
 #include "ir.c"
 #include "lower.c"
-#include "bytecode_gen.h"
-#include "bytecode_gen.c"
+#include "emitter.h"
+#include "emitter.c"
 
 static int test_failures;
 

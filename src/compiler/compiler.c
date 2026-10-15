@@ -20,7 +20,7 @@
 #include "ast.h"
 #include "parser.h"
 #include "ir.h"
-#include "bytecode_gen.h"
+#include "emitter.h"
 #include "lower.h"
 
 #include "logging.c"
@@ -32,7 +32,7 @@
 
 #include "ir.c"
 #include "lower.c"
-#include "bytecode_gen.c"
+#include "emitter.c"
 
 static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
 {
@@ -513,7 +513,7 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 
 	elf_arena_align(output_arena, 8);
 	module = elf_arena_push_zero(output_arena, sizeof(*module));
-	if (!generate_module(compiler, output_arena, module, ir_module) || compiler->report.error_count) {
+	if (!emit_module(compiler, output_arena, module, ir_module) || compiler->report.error_count) {
 		module = 0;
 	}
 	return module;
