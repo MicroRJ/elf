@@ -23,10 +23,14 @@ typedef struct elf_Closure    elf_Closure;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Module     elf_Module;
-typedef struct BcFunction     BcFunction;
+typedef struct Com_Module     Com_Module;
 typedef struct BcFunctionRef  BcFunctionRef;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
+
+// Copies a compiled module into one runtime, interns its strings, and resolves
+// its module-local globals without modifying the compiler output.
+elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module);
 
 typedef enum
 {
@@ -141,19 +145,6 @@ typedef struct
 	u32          count;
 }
 elf_Globals;
-
-// TODO(RJ): this needs to be defined else-where!
-struct BcFunction
-{
-	b32          variadic;
-	u8              arity;
-	u8           captures;
-	u16        stack_size;
-	u16            length;
-	u32            offset;
-	SourceMapEntry *source_map;
-	u32             source_map_count;
-};
 
 // A module keeps one compiler output together. Dynamically loaded code has its
 // own bytecode, functions, and constant pools, so for now their indices stay

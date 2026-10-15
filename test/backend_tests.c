@@ -16,6 +16,24 @@ static BcFunction *backend_test_function(BackendCompileResult result)
 	return bc_function_from_ref(result.function);
 }
 
+static BcFunctionRef backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
+{
+	elf_Scratch scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(scratch.arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_source(compiler, name, source);
+	Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION);
+	elf_Module *module = elf_link_module(state, compiled_module);
+	BcFunctionRef entry = {};
+	if (module && compiled_module->has_entry)
+	{
+		entry.module = module;
+		entry.index = compiled_module->entry_index;
+	}
+	elf_end_scratch(scratch);
+	return entry;
+}
+
 static BackendCompileResult backend_test_compile_file(const char *path)
 {
 	BackendCompileResult result = {};
@@ -41,7 +59,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 		source.size = size;
 	}
 
-	result.function = elf_compile_source(result.state, path, source);
+	result.function = backend_test_compile(result.state, path, source);
 	return result;
 }
 
@@ -54,7 +72,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 	source.data = (char *)source_text;
 	source.size = (u64)strlen(source_text);
 
-	result.function = elf_compile_source(result.state, "backend_tests", source);
+	result.function = backend_test_compile(result.state, "backend_tests", source);
 	return result;
 }
 
@@ -130,7 +148,7 @@ static void test_backend_module_owns_source(void)
 
 	elf_State *state = elf_create_state();
 	elf_StrSlice source = {source_data, source_size};
-	BcFunctionRef entry = elf_compile_source(state, "owned_source", source);
+	BcFunctionRef entry = backend_test_compile(state, "owned_source", source);
 	elf_Module *module = entry.module;
 	if (module->source_data == source_data) {
 		test_fail("compiled module does not borrow caller source memory");

@@ -476,15 +476,13 @@ static void test_api_source_compilation(elf_State *state)
 	elf_push_int(state, 77);
 	elf_i32 sentinel_top = elf_get_top(state);
 	elf_StrSlice missing_source = {};
-	if (elf_push_constant_expr(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
-	|| elf_push_json(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
-	|| elf_push_code_source(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
+	if (elf_push_code_source(state, 0, missing_source) != ELF_ERROR_INVALID_ARGUMENT
 	|| elf_get_top(state) != sentinel_top) {
 		test_fail("invalid source arguments preserve the stack");
 	}
 	char rejected_source_text[] = "1 +";
 	elf_StrSlice rejected_source = {rejected_source_text, sizeof(rejected_source_text) - 1};
-	if (elf_push_constant_expr(state, "rejected-source.elf", rejected_source) != ELF_ERROR_COMPILATION_FAILED || elf_get_top(state) != sentinel_top) {
+	if (lib_push_constant_expr(state, "rejected-source.elf", rejected_source) || elf_get_top(state) != sentinel_top) {
 		test_fail("public compilation reports failure without compiler messages");
 	}
 
@@ -494,7 +492,7 @@ static void test_api_source_compilation(elf_State *state)
 	char bounded_constant_text[] = {'4', '2'};
 	elf_StrSlice bounded_constant = {bounded_constant_text, sizeof(bounded_constant_text)};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "bounded-constant.elf", bounded_constant);
-	if (!compiler_push_constant_expr(compiler, state)) {
+	if (!lib_push_compiler_ast(state, compiler, compiler_parse_constant_expr(compiler))) {
 		test_fail("API accepts a source slice without trailing storage");
 	}
 	elf_Int bounded_value = 0;
@@ -506,7 +504,7 @@ static void test_api_source_compilation(elf_State *state)
 
 	char constant_array_text[] = "[1, 2, [3]]";
 	elf_StrSlice constant_array = {constant_array_text, sizeof(constant_array_text) - 1};
-	if (elf_push_constant_expr(state, "constant-array.elf", constant_array) != ELF_ERROR_NONE)
+	if (!lib_push_constant_expr(state, "constant-array.elf", constant_array))
 	{
 		test_fail("API accepts a constant array expression");
 	}
@@ -523,7 +521,7 @@ static void test_api_source_compilation(elf_State *state)
 	char nul_source_text[] = {'4', 0, '2'};
 	elf_StrSlice nul_source = {nul_source_text, sizeof(nul_source_text)};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "nul-source.elf", nul_source);
-	if (compiler_push_constant_expr(compiler, state)) {
+	if (lib_push_compiler_ast(state, compiler, compiler_parse_constant_expr(compiler))) {
 		test_fail("API rejects embedded NUL source bytes");
 	}
 	report = &compiler->report;
@@ -535,7 +533,7 @@ static void test_api_source_compilation(elf_State *state)
 #if SIZE_MAX > UINT32_MAX
 	elf_StrSlice oversized_source = {bounded_constant_text, (elf_Size)UINT32_MAX + 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "oversized-source.elf", oversized_source);
-	if (compiler_push_constant_expr(compiler, state)) {
+	if (lib_push_compiler_ast(state, compiler, compiler_parse_constant_expr(compiler))) {
 		test_fail("API rejects source larger than its internal representation");
 	}
 	report = &compiler->report;
@@ -548,7 +546,7 @@ static void test_api_source_compilation(elf_State *state)
 	char invalid_constant_text[] = "{\n  answer = runtime_value,\n}";
 	elf_StrSlice invalid_constant = {invalid_constant_text, sizeof(invalid_constant_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-constant.elf", invalid_constant);
-	if (compiler_push_constant_expr(compiler, state)) {
+	if (lib_push_compiler_ast(state, compiler, compiler_parse_constant_expr(compiler))) {
 		test_fail("API rejects a non-constant expression");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -568,7 +566,7 @@ static void test_api_source_compilation(elf_State *state)
 	char invalid_string_text[] = "\"\\q\"";
 	elf_StrSlice invalid_string = {invalid_string_text, sizeof(invalid_string_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-string.elf", invalid_string);
-	if (compiler_push_constant_expr(compiler, state)) {
+	if (lib_push_compiler_ast(state, compiler, compiler_parse_constant_expr(compiler))) {
 		test_fail("API rejects lexer errors");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -583,7 +581,7 @@ static void test_api_source_compilation(elf_State *state)
 	char valid_constant_text[] = "42";
 	elf_StrSlice valid_constant = {valid_constant_text, sizeof(valid_constant_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "valid-constant.elf", valid_constant);
-	if (!compiler_push_constant_expr(compiler, state)) {
+	if (!lib_push_compiler_ast(state, compiler, compiler_parse_constant_expr(compiler))) {
 		test_fail("API parses valid source after a failed constant expression");
 	}
 	elf_Int constant = 0;
@@ -809,7 +807,7 @@ static void test_api_value_source(elf_State *state)
 	}
 	elf_StrSlice source = {};
 	if (!elf_to_str(state, -1, &source)
-	|| elf_push_constant_expr(state, "roundtrip.elf", source) != ELF_ERROR_NONE) {
+	|| !lib_push_constant_expr(state, "roundtrip.elf", source)) {
 		test_fail("API value source parses as a constant expression");
 		elf_set_top(state, checkpoint);
 		return;

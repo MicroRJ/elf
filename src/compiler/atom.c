@@ -116,9 +116,3 @@ static Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 siz
 	table->count += 1;
 	return atom;
 }
-
-static elf_String *elf_string_from_atom(elf_State *state, Atom *atom)
-{
-	ASSERT(atom);
-	return elf_string_from_data_size(state, atom_data(atom), atom_size(atom));
-}

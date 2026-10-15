@@ -2,7 +2,37 @@
 // See Copyright Notice In elf.h
 //
 
+#ifndef ELF_BYTECODE_H
+#define ELF_BYTECODE_H
+
+#include "elf.h"
 #include "base.h"
+#include "source.h"
+
+// Type masks embedded in BC_ENFORCE instructions.
+typedef enum
+{
+	TRULE_NONE     = 0,
+	TRULE_NIL      = 1 << ELF_VALUE_TYPE_NIL,
+	TRULE_NUMBER   = 1 << ELF_VALUE_TYPE_NUMBER,
+	TRULE_INTEGER  = 1 << ELF_VALUE_TYPE_INTEGER,
+	TRULE_FUNCTION = 1 << ELF_VALUE_TYPE_CFUNCTION,
+	TRULE_USER     = 1 << ELF_VALUE_TYPE_USER_OBJECT,
+	TRULE_CLOSURE  = 1 << ELF_VALUE_TYPE_CLOSURE,
+	TRULE_TABLE    = 1 << ELF_VALUE_TYPE_TABLE,
+	TRULE_STRING   = 1 << ELF_VALUE_TYPE_STRING,
+	TRULE_ERROR    = 1 << ELF_VALUE_TYPE_ERROR,
+	TRULE_BUFFER   = 1 << ELF_VALUE_TYPE_BUFFER,
+	TRULE_ARRAY    = 1 << ELF_VALUE_TYPE_ARRAY,
+	TRULE_ALL      = (1 << ELF_VALUE_TYPE_COUNT_) - 1,
+	TRULE_NUMERIC  = TRULE_NUMBER | TRULE_INTEGER,
+	TRULE_NONNIL   = TRULE_ALL & ~TRULE_NIL,
+	TRULE_OBJECT   = (1 << ELF_VALUE_TYPE_USER_OBJECT) | (1 << ELF_VALUE_TYPE_CLOSURE) | (1 << ELF_VALUE_TYPE_TABLE) | (1 << ELF_VALUE_TYPE_ERROR) | (1 << ELF_VALUE_TYPE_BUFFER) | (1 << ELF_VALUE_TYPE_ARRAY),
+	TRULE_CALLABLE = (1 << ELF_VALUE_TYPE_CFUNCTION) | (1 << ELF_VALUE_TYPE_CLOSURE),
+}
+TypeRule;
+
+STATIC_ASSERT(TRULE_ALL <= 0x7fff);
 
 #define BC_XDEF(X)                        \
 	X(HALT,            "halt")             \
@@ -81,3 +111,20 @@ Bytecode;
 #define BC_ARGX(B)      (B).b_x
 #define BC_ARGY(B)      (B).b_y
 #define BC_ARGZ(B)      (B).b_z
+
+// One executable bytecode function. Its bytecode and constant indices are
+// relative to the module that owns it.
+typedef struct BcFunction
+{
+	b32          variadic;
+	u8              arity;
+	u8           captures;
+	u16        stack_size;
+	u16            length;
+	u32            offset;
+	SourceMapEntry *source_map;
+	u32             source_map_count;
+}
+BcFunction;
+
+#endif

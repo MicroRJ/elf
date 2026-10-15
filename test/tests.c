@@ -5,6 +5,7 @@
 
 #include "base.h"
 #include "elf_core.h"
+#include "libs.h"
 #include "atom.h"
 #include "compiler.h"
 #include "token.h"

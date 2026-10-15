@@ -12,7 +12,6 @@
 
 #include "elf.h"
 #include "base.h"
-#include "elf_core.h"
 #include "atom.h"
 #include "compiler.h"
 #include "token.h"
@@ -344,200 +343,34 @@ b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, 
 	return result;
 }
 
-static b32 compiler_eval_constexpr_ast(Compiler *compiler, elf_State *state, Ast ast, elf_Value *out)
-{
-	if (!ast)
-	{
-		*out = value_nil();
-		return true;
-	}
-
-	switch (ast->kind)
-	{
-		case AST_TUPLE:
-		{
-			if (ast->tuple.nargs != 1)
-			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "constant expression must produce one value");
-				return false;
-			}
-			return compiler_eval_constexpr_ast(compiler, state, ast->tuple.args[0], out);
-		}
-
-		case AST_NIL_LITERAL:
-		{
-			*out = value_nil();
-			return true;
-		}
-
-		case AST_INTEGER_LITERAL:
-		{
-			*out = value_from_integer(ast->integer_value);
-			return true;
-		}
-
-		case AST_NUMBER_LITERAL:
-		{
-			*out = value_from_number(ast->number_value);
-			return true;
-		}
-
-		case AST_STRING_LITERAL:
-		{
-			*out = value_from_string(elf_string_from_atom(state, ast->atom));
-			return true;
-		}
-
-		case AST_TABLE:
-		{
-			elf_Table *table = elf_table_new(state);
-			for (u32 i = 0; i < ast->table.nargs; ++ i)
-			{
-				Ast entry_ast = ast->table.args[i];
-				if (!entry_ast || entry_ast->kind != AST_TABLE_ENTRY)
-				{
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "invalid table constant");
-					return false;
-				}
-
-				elf_Value value = {};
-				if (!compiler_eval_constexpr_ast(compiler, state, entry_ast->table_entry.value, &value))
-				{
-					return false;
-				}
-
-				if (!entry_ast->table_entry.key)
-				{
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, entry_ast->site, "invalid unkeyed table constant");
-					return false;
-				}
-				elf_Value key = {};
-				if (!compiler_eval_constexpr_ast(compiler, state, entry_ast->table_entry.key, &key))
-				{
-					return false;
-				}
-				elf_table_set(state, table, key, value);
-			}
-
-			*out = value_from_table(table);
-			return true;
-		}
-
-		case AST_ARRAY:
-		{
-			elf_Array *array = elf_array_new(state);
-			for (u32 i = 0; i < ast->array.nargs; ++i)
-			{
-				elf_Value value = {};
-				if (!compiler_eval_constexpr_ast(compiler, state, ast->array.args[i], &value))
-				{
-					return false;
-				}
-				elf_array_add(state, array, value);
-			}
-			*out = value_from_array(array);
-			return true;
-		}
-
-		default:
-		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "'%s' is not a constant expression", ast_type_name(ast->kind));
-			return false;
-		}
-	}
-}
-
-static b32 compiler_push_constexpr_ast(Compiler *compiler, elf_State *state, Ast ast)
-{
-	if (ast_is_error(ast)) {
-		return false;
-	}
-
-	elf_Value value = {};
-	if (!compiler_eval_constexpr_ast(compiler, state, ast, &value)) {
-		return false;
-	}
-	push_value(state, value);
-	return true;
-}
-
-static void restore_source_stack(elf_State *state, elf_Value *checkpoint)
-{
-	ASSERT(checkpoint >= state->frame->framebase && checkpoint <= state->stack_ptr);
-	value_zero_many(checkpoint, state->stack_ptr - checkpoint);
-	state->stack_ptr = checkpoint;
-}
-
-int compiler_push_json(Compiler *compiler, elf_State *state)
+Ast compiler_parse_constant_expr(Compiler *compiler)
 {
 	ASSERT(compiler);
 	ASSERT(compiler->source_count);
-	elf_Value *stack_checkpoint = state->stack_ptr;
-	u32 saved_gc_mode = state->gc_mode;
-	state->gc_mode = ELF_GC_PAUSED;
-
-	int result = 0;
-	if (!compiler->report.error_count) {
+	Ast ast = ERROR_AST;
+	if (!compiler->report.error_count)
+	{
 		Parser *parser = parser_create(compiler, 0);
 		if (parser) {
-			result = compiler_push_constexpr_ast(compiler, state, parse_json_ast(parser));
+			ast = parse_constexpr(parser);
 		}
 	}
-	if (!result) restore_source_stack(state, stack_checkpoint);
-	else ASSERT(state->stack_ptr == stack_checkpoint + 1);
-
-	state->gc_mode = saved_gc_mode;
-	return result;
+	return ast;
 }
 
-int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source)
-{
-	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_add_root_source(compiler, name, source);
-	int result = compiler_push_json(compiler, state);
-	elf_end_scratch(scratch);
-	return result;
-}
-
-int compiler_push_constant_expr(Compiler *compiler, elf_State *state)
+Ast compiler_parse_json(Compiler *compiler)
 {
 	ASSERT(compiler);
 	ASSERT(compiler->source_count);
-	elf_Value *stack_checkpoint = state->stack_ptr;
-	u32 saved_gc_mode = state->gc_mode;
-	state->gc_mode = ELF_GC_PAUSED;
-
-	int result = 0;
-	if (!compiler->report.error_count) {
+	Ast ast = ERROR_AST;
+	if (!compiler->report.error_count)
+	{
 		Parser *parser = parser_create(compiler, 0);
 		if (parser) {
-			result = compiler_push_constexpr_ast(compiler, state, parse_constexpr(parser));
+			ast = parse_json_ast(parser);
 		}
 	}
-	if (!result) restore_source_stack(state, stack_checkpoint);
-	else ASSERT(state->stack_ptr == stack_checkpoint + 1);
-
-	state->gc_mode = saved_gc_mode;
-	return result;
-}
-
-int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source)
-{
-	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_add_root_source(compiler, name, source);
-	int result = compiler_push_constant_expr(compiler, state);
-	elf_end_scratch(scratch);
-	return result;
-}
-
-static char *copy_runtime_source(elf_State *state, SourceBuffer source)
-{
-	u64 storage_size = ((u64)source.size + 1 + 7) & ~(u64)7;
-	char *data = elf_arena_push_zero(&state->arena, storage_size);
-	copy_memory(data, source.data, source.size);
-	return data;
+	return ast;
 }
 
 Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type)
@@ -583,157 +416,4 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 		module = 0;
 	}
 	return module;
-}
-
-static b32 compiled_module_is_valid(const Com_Module *compiled_module)
-{
-	if (!compiled_module || !compiled_module->source_count || compiled_module->root_source >= compiled_module->source_count) {
-		return false;
-	}
-	if (compiled_module->has_entry && compiled_module->entry_index >= compiled_module->function_count) {
-		return false;
-	}
-	for (u32 i = 0; i < compiled_module->global_count; ++i)
-	{
-		if (compiled_module->globals[i].name >= compiled_module->string_count) {
-			return false;
-		}
-	}
-	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
-	{
-		Com_GlobalRelocation relocation = compiled_module->global_relocations[i];
-		if (relocation.bytecode_index >= compiled_module->bytecode_count || relocation.global_index >= compiled_module->global_count) {
-			return false;
-		}
-		BytecodeType type = BC_TYPE(compiled_module->bytecode[relocation.bytecode_index]);
-		if (type != BC_GETGLOBAL && type != BC_SETGLOBAL) {
-			return false;
-		}
-	}
-	return true;
-}
-
-elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
-{
-	ASSERT(state);
-	if (!compiled_module_is_valid(compiled_module)) {
-		return 0;
-	}
-
-	elf_Scratch scratch = elf_begin_scratch();
-	u32 *global_slots = elf_arena_push_zero(scratch.arena, sizeof(*global_slots) * compiled_module->global_count);
-	u32 next_new_slot = state->globals.count;
-	for (u32 i = 0; i < compiled_module->global_count; ++i)
-	{
-		Com_String name = compiled_module->strings[compiled_module->globals[i].name];
-		elf_StrSlice slice = {(char *)name.data, name.size};
-		u32 slot = 0;
-		if (!elf_globals_find(&state->globals, slice, &slot)) {
-			slot = next_new_slot++;
-		}
-		if (slot > 32767u)
-		{
-			elf_end_scratch(scratch);
-			return 0;
-		}
-		global_slots[i] = slot;
-	}
-
-	u32 saved_gc_mode = state->gc_mode;
-	state->gc_mode = ELF_GC_PAUSED;
-	for (u32 i = 0; i < compiled_module->global_count; ++i)
-	{
-		Com_String name = compiled_module->strings[compiled_module->globals[i].name];
-		global_slots[i] = elf_globals_ensure(&state->globals, (elf_StrSlice) {(char *)name.data, name.size});
-	}
-
-	elf_arena_align(&state->arena, 8);
-	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
-	Com_ModuleSource root_source = compiled_module->sources[compiled_module->root_source];
-	module->source_name = elf_string_from_data_size(state, root_source.name.data, root_source.name.size);
-	module->source_data = copy_runtime_source(state, root_source.source);
-	module->source_size = root_source.source.size;
-
-	module->string_count = compiled_module->string_count;
-	if (module->string_count)
-	{
-		elf_arena_align(&state->arena, 8);
-		module->strings = elf_arena_push_zero(&state->arena, sizeof(*module->strings) * module->string_count);
-		for (u32 i = 0; i < module->string_count; ++i)
-		{
-			Com_String string = compiled_module->strings[i];
-			module->strings[i] = elf_string_from_data_size(state, string.data, string.size);
-		}
-	}
-
-	module->integer_constant_count = compiled_module->integer_constant_count;
-	if (module->integer_constant_count)
-	{
-		elf_arena_align(&state->arena, 8);
-		module->integer_constants = elf_arena_push_copy(&state->arena, sizeof(*module->integer_constants) * module->integer_constant_count, compiled_module->integer_constants);
-	}
-	module->number_constant_count = compiled_module->number_constant_count;
-	if (module->number_constant_count)
-	{
-		elf_arena_align(&state->arena, 8);
-		module->number_constants = elf_arena_push_copy(&state->arena, sizeof(*module->number_constants) * module->number_constant_count, compiled_module->number_constants);
-	}
-	module->bytecode_count = compiled_module->bytecode_count;
-	if (module->bytecode_count)
-	{
-		elf_arena_align(&state->arena, 8);
-		module->bytecode = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode) * module->bytecode_count, compiled_module->bytecode);
-	}
-	module->bytecode_function_count = compiled_module->function_count;
-	if (module->bytecode_function_count)
-	{
-		elf_arena_align(&state->arena, 8);
-		module->bytecode_functions = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, compiled_module->functions);
-	}
-	for (u32 i = 0; i < module->bytecode_function_count; ++i)
-	{
-		BcFunction *function = module->bytecode_functions + i;
-		if (function->source_map_count)
-		{
-			elf_arena_align(&state->arena, 8);
-			function->source_map = elf_arena_push_copy(&state->arena, sizeof(*function->source_map) * function->source_map_count, function->source_map);
-		}
-	}
-	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
-	{
-		Com_GlobalRelocation relocation = compiled_module->global_relocations[i];
-		Bytecode *bytecode = module->bytecode + relocation.bytecode_index;
-		i16 slot = (i16)global_slots[relocation.global_index];
-		if (BC_TYPE(*bytecode) == BC_GETGLOBAL) {
-			bytecode->b_y = slot;
-		}
-		else {
-			bytecode->b_x = slot;
-		}
-	}
-
-	module->next = state->modules;
-	state->modules = module;
-	state->gc_mode = saved_gc_mode;
-	elf_end_scratch(scratch);
-	return module;
-}
-
-BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlice source)
-{
-	ASSERT(name);
-	ASSERT(source.data);
-	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_add_root_source(compiler, name, source);
-	Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION);
-	elf_Module *module = elf_link_module(state, compiled_module);
-	BcFunctionRef entry = {};
-	if (module && compiled_module->has_entry)
-	{
-		entry.module = module;
-		entry.index = compiled_module->entry_index;
-	}
-	elf_end_scratch(scratch);
-	return entry;
 }

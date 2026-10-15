@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#include "bytecode.h"
+
 typedef struct Compiler Compiler;
 typedef u32 Com_SourceId;
 
@@ -107,8 +109,8 @@ typedef struct
 }
 Com_GlobalSymbol;
 
-// Identifies bytecode whose module-local global index must be replaced with an
-// elf_State global slot when the compiled module is linked.
+// Identifies bytecode whose module-local global index must be replaced with a
+// runtime global slot when the compiled module is linked.
 typedef struct
 {
 	u32 bytecode_index;
@@ -116,9 +118,10 @@ typedef struct
 }
 Com_GlobalRelocation;
 
-// One complete, state-independent compiler output. All referenced storage
-// belongs to the module's output arena; nothing here points into an elf_State.
-typedef struct
+// One complete, runtime-independent compiler output. All referenced storage
+// belongs to the module's output arena.
+typedef struct Com_Module Com_Module;
+struct Com_Module
 {
 	Com_ModuleSource *sources;
 	u32               source_count;
@@ -144,8 +147,7 @@ typedef struct
 
 	b32 has_entry;
 	u32 entry_index;
-}
-Com_Module;
+};
 
 typedef enum
 {
@@ -155,8 +157,8 @@ typedef enum
 Com_UnitType;
 
 // Owns one compilation session: its sources, atoms, diagnostics, and temporary
-// syntax and lowering data all share the caller-provided arena. It deliberately
-// has no elf_State; runtime work belongs to evaluation or module linking.
+// syntax and lowering data all share the caller-provided arena. Runtime work is
+// outside this type.
 struct Compiler
 {
 	elf_Arena         *arena;
@@ -181,12 +183,5 @@ b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, 
 b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
 
 Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type);
-// Copies a compiled module into one runtime, interns its strings, and resolves
-// its module-local globals without modifying the compiler output.
-elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module);
-int compiler_push_constant_expr(Compiler *compiler, elf_State *state);
-int compiler_push_json(Compiler *compiler, elf_State *state);
-
-BcFunctionRef elf_compile_source(elf_State *state, const char *name, elf_StrSlice source);
-int elf_push_constant_expr_source(elf_State *state, const char *name, elf_StrSlice source);
-int elf_push_json_source(elf_State *state, const char *name, elf_StrSlice source);
+struct Ast_T *compiler_parse_constant_expr(Compiler *compiler);
+struct Ast_T *compiler_parse_json(Compiler *compiler);

@@ -27,6 +27,23 @@ static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *so
 	return 1;
 }
 
+static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
+{
+	elf_Scratch scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(scratch.arena);
+	compiler_add_root_source(compiler, name, source);
+	Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION);
+	elf_Module *module = elf_link_module(state, compiled_module);
+	BcFunctionRef entry = {};
+	if (module && compiled_module->has_entry)
+	{
+		entry.module = module;
+		entry.index = compiled_module->entry_index;
+	}
+	elf_end_scratch(scratch);
+	return entry;
+}
+
 int main(int argc, char **argv)
 {
 	const char *path = "main.elf";
@@ -49,7 +66,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	BcFunctionRef entry = elf_compile_source(state, path, source);
+	BcFunctionRef entry = compile_source(state, path, source);
 	elf_Module *module = entry.module;
 	for (u32 i = 0; i < module->bytecode_function_count; ++ i)
 	{

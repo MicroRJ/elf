@@ -110,8 +110,6 @@ elf_ErrorCode elf_push_buffer(elf_State *state, elf_Size capacity);
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data);
 
-elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source);
-elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source);
 elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
 elf_Bool elf_push_code_file(elf_State *state, const char *name);
 

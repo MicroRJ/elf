@@ -14,6 +14,8 @@
 #include "compiler.h"
 #include "libs.h"
 
+#include "l_compile.c"
+
 #include "l_core_io.c"
 #include "l_io.c"
 #include "l_load_file.c"

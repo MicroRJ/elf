@@ -247,7 +247,8 @@ ELF_FUNCTION(l_json_parse)
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "<json>", source);
-	if (!compiler_push_json(compiler, S))
+	Ast ast = compiler_parse_json(compiler);
+	if (!lib_push_compiler_ast(S, compiler, ast))
 	{
 		const Com_Message *compiler_message = compiler->report.first;
 		const char *message = compiler_message ? compiler_message->text.data : "invalid JSON";
@@ -313,7 +314,7 @@ ELF_FUNCTION(l_json_load_file)
 
 	data[size] = 0;
 	elf_StrSlice source = {data, size};
-	if (elf_push_json(S, name, source) != ELF_ERROR_NONE)
+	if (!lib_push_json(S, name, source))
 	{
 		elf_push_nil(S);
 	}

@@ -81,40 +81,35 @@ elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	return ELF_ERROR_NONE;
 }
 
+static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
+{
+	elf_Scratch scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(scratch.arena);
+	compiler_add_root_source(compiler, name, source);
+	Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION);
+	elf_Module *module = elf_link_module(state, compiled_module);
+	BcFunctionRef entry = {};
+	if (module && compiled_module->has_entry)
+	{
+		entry.module = module;
+		entry.index = compiled_module->entry_index;
+	}
+	elf_end_scratch(scratch);
+	return entry;
+}
+
 elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	if (!name || !source.data) {
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	BcFunctionRef function = elf_compile_source(state, name, source);
+	BcFunctionRef function = compile_source(state, name, source);
 	if (!bc_function_ref_is_valid(function)) return ELF_ERROR_COMPILATION_FAILED;
 	ASSERT(bc_function_from_ref(function)->captures == 0);
 
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;
 	push_value(state, value_from_closure(closure));
-	return ELF_ERROR_NONE;
-}
-
-elf_ErrorCode elf_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
-{
-	if (!name || !source.data) {
-		return ELF_ERROR_INVALID_ARGUMENT;
-	}
-	if (!elf_push_constant_expr_source(state, name, source)) {
-		return ELF_ERROR_COMPILATION_FAILED;
-	}
-	return ELF_ERROR_NONE;
-}
-
-elf_ErrorCode elf_push_json(elf_State *state, const char *name, elf_StrSlice source)
-{
-	if (!name || !source.data) {
-		return ELF_ERROR_INVALID_ARGUMENT;
-	}
-	if (!elf_push_json_source(state, name, source)) {
-		return ELF_ERROR_COMPILATION_FAILED;
-	}
 	return ELF_ERROR_NONE;
 }
 
