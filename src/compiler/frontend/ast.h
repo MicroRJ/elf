@@ -49,7 +49,6 @@
 	X(AST_INTERPOLATED_STRING , "interpolated_string")        \
 	X(AST_IMPORT              , "import")                     \
 	X(AST_CALL                , "call")                       \
-	X(AST_TRAILING_CALL       , "trailing_call")              \
 	X(AST_NAMED_ARGUMENT      , "named_argument")             \
 	X(AST_META_CALL           , "meta_call")                  \
 	X(AST_TUPLE               , "tuple")                      \
@@ -198,15 +197,9 @@ struct Ast_T
 			Ast  expr;
 			Ast *args;
 			u32    nargs;
+			Ast  carg;
 		}
 		call;
-
-		struct
-		{
-			Ast left;
-			Ast function;
-		}
-		trailing_call;
 
 		struct
 		{

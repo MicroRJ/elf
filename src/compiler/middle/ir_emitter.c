@@ -633,62 +633,14 @@ static IrCallType call_type_from_callee(IrFunctionEmitter *ctx, Ir callee)
 	return type;
 }
 
-typedef struct
-{
-	SourceSite site;
-	Ast callee;
-	Ast *args;
-	u32 nargs;
-	Ast trailing_function;
-}
-AstCallView;
-
 static b32 ast_is_call(Ast expr)
 {
-	return expr && (expr->kind == AST_CALL || expr->kind == AST_TRAILING_CALL);
+	return expr && expr->kind == AST_CALL;
 }
 
-static AstCallView ast_call_view(Ast expr)
+static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir callee, b32 *failed)
 {
-	ASSERT(ast_is_call(expr));
-	AstCallView view = {.site = expr->site};
-	if (expr->kind == AST_CALL)
-	{
-		view.callee = expr->call.expr;
-		view.args = expr->call.args;
-		view.nargs = expr->call.nargs;
-	}
-	else
-	{
-		Ast left = expr->trailing_call.left;
-		ASSERT(expr->trailing_call.function && expr->trailing_call.function->kind == AST_FUNCTION);
-		if (left && left->kind == AST_CALL)
-		{
-			view.callee = left->call.expr;
-			view.args = left->call.args;
-			view.nargs = left->call.nargs;
-		}
-		else {
-			view.callee = left;
-		}
-		view.trailing_function = expr->trailing_call.function;
-	}
-	return view;
-}
-
-static u32 ast_call_argument_count(AstCallView call)
-{
-	return call.nargs + (call.trailing_function != 0);
-}
-
-static Ast ast_call_argument(AstCallView call, u32 index)
-{
-	ASSERT(index < ast_call_argument_count(call));
-	return index < call.nargs ? call.args[index] : call.trailing_function;
-}
-
-static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView call, Ir callee, b32 *failed)
-{
+	ASSERT(call && call->kind == AST_CALL);
 	ASSERT(callee && callee->kind == IR_FUNCTION);
 	ASSERT(callee->ir_function.index < ctx->module->compiler->function_count);
 	ASSERT(callee->ir_function.index < ctx->module->module.function_count);
@@ -697,17 +649,17 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 	IrFunction *ir_function = ctx->module->module.functions + callee->ir_function.index;
 	ASSERT(function->param_count >= IMPLICIT_PARAM_COUNT);
 	u32 declared_param_count = function->param_count - IMPLICIT_PARAM_COUNT;
-	u32 argument_count = call.nargs;
-	b32 has_trailing_function = call.trailing_function != 0;
-	if (has_trailing_function && ir_function->variadic)
+	u32 argument_count = call->call.nargs;
+	b32 has_carg = call->call.carg != 0;
+	if (has_carg && ir_function->variadic)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call.trailing_function->site, "trailing closures cannot call variadic functions");
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->call.carg->site, "trailing closures cannot call variadic functions");
 		*failed = true;
 		return (IrArray) {};
 	}
-	b32 reserve_final_parameter = has_trailing_function && declared_param_count > 0;
+	b32 reserve_final_parameter = has_carg && declared_param_count > 0;
 	u32 bind_param_count = declared_param_count - reserve_final_parameter;
-	u32 capacity = argument_count + has_trailing_function;
+	u32 capacity = argument_count + has_carg;
 	u32 minimum_capacity = declared_param_count;
 	if (capacity < minimum_capacity) {
 		capacity = minimum_capacity;
@@ -716,17 +668,17 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 	if (capacity) {
 		result.items = elf_arena_push(ctx->module->arena, sizeof(*result.items) * capacity);
 	}
-	if (has_trailing_function && declared_param_count == 0)
+	if (has_carg && declared_param_count == 0)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call.trailing_function->site, "trailing closure requires a final function parameter");
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->call.carg->site, "trailing closure requires a final function parameter");
 		*failed = true;
 	}
 
 	u32 argument_index = 0;
 	u32 parameter_index = 0;
-	while (argument_index < argument_count && call.args[argument_index]->kind != AST_NAMED_ARGUMENT)
+	while (argument_index < argument_count && call->call.args[argument_index]->kind != AST_NAMED_ARGUMENT)
 	{
-		Ast argument = call.args[argument_index];
+		Ast argument = call->call.args[argument_index];
 		if (parameter_index >= bind_param_count && !ir_function->variadic)
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
@@ -747,7 +699,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 	while (parameter_index < bind_param_count)
 	{
 		Com_FunctionParameter *parameter = function->params + parameter_index;
-		Ast argument = argument_index < argument_count ? call.args[argument_index] : 0;
+		Ast argument = argument_index < argument_count ? call->call.args[argument_index] : 0;
 		if (argument && argument->kind != AST_NAMED_ARGUMENT)
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "positional arguments cannot follow named arguments");
@@ -775,7 +727,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 		}
 		else
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call.site, "required parameter '%s' was not provided", atom_data(parameter->name));
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->site, "required parameter '%s' was not provided", atom_data(parameter->name));
 			*failed = true;
 			parameter_index += 1;
 		}
@@ -783,7 +735,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 
 	if (argument_index < argument_count)
 	{
-		Ast argument = call.args[argument_index];
+		Ast argument = call->call.args[argument_index];
 		if (reserve_final_parameter && argument->kind == AST_NAMED_ARGUMENT && argument->named_argument.name->atom == function->params[declared_param_count - 1].name) {
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "final parameter '%s' is already supplied by the trailing closure", atom_data(argument->named_argument.name->atom));
 		}
@@ -795,9 +747,9 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, AstCallView c
 		}
 		*failed = true;
 	}
-	if (has_trailing_function && declared_param_count > 0)
+	if (has_carg && declared_param_count > 0)
 	{
-		Ir argument_ir = lower_ast_expr_to_ir(ctx, call.trailing_function);
+		Ir argument_ir = lower_ast_expr_to_ir(ctx, call->call.carg);
 		result.items[result.count++] = argument_ir;
 		if (!argument_ir || argument_ir == ERROR_IR) {
 			*failed = true;
@@ -977,23 +929,21 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 		break;
 
 		case AST_CALL:
-		case AST_TRAILING_CALL:
 		{
-			AstCallView call = ast_call_view(expr);
-			u32 nargs = ast_call_argument_count(call);
+			u32 nargs = expr->call.nargs;
 
-			Ir ir_func = lower_ast_expr_to_ir(ctx, call.callee);
+			Ir ir_func = lower_ast_expr_to_ir(ctx, expr->call.expr);
 			IrCallType call_type = call_type_from_callee(ctx, ir_func);
 			b32 failed = !ir_func || ir_func == ERROR_IR;
 			IrArray ir_args = {};
-			if (expr->kind == AST_TRAILING_CALL && call_type != IR_CALL_DIRECT)
+			if (expr->call.carg && call_type != IR_CALL_DIRECT)
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "trailing closures require a statically known function");
 				failed = true;
 			}
 			else if (call_type == IR_CALL_DIRECT)
 			{
-				ir_args = lower_direct_call_arguments(ctx, call, ir_func, &failed);
+				ir_args = lower_direct_call_arguments(ctx, expr, ir_func, &failed);
 			}
 			else
 			{
@@ -1002,7 +952,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 				}
 				for (u32 i = 0; i < nargs; ++i)
 				{
-					Ast argument = ast_call_argument(call, i);
+					Ast argument = expr->call.args[i];
 					if (argument->kind == AST_NAMED_ARGUMENT)
 					{
 						report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "named arguments require a statically known function");
@@ -1019,7 +969,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 				}
 			}
 
-			ir = failed ? ERROR_IR : create_call_ir(ctx, call.site, call_type, ir_func, ir_args);
+			ir = failed ? ERROR_IR : create_call_ir(ctx, expr->site, call_type, ir_func, ir_args);
 		}
 		break;
 

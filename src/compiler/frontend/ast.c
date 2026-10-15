@@ -287,23 +287,34 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u3
 	tree->call.expr = expr;
 	tree->call.args = args;
 	tree->call.nargs = nargs;
+	tree->call.carg = 0;
 	return tree;
 }
 
-static Ast create_trailing_call_ast(Parser *par, SourceSite site, Ast left, Ast function)
+static Ast create_carg_call_ast(Parser *par, SourceSite site, Ast left, Ast carg)
 {
 	if (ast_is_error(left)) {
 		return left;
 	}
-	if (ast_is_error(function)) {
-		return function;
+	if (ast_is_error(carg)) {
+		return carg;
 	}
-	Ast tree = create_ast(par, site, AST_TRAILING_CALL);
+
+	Ast expr = left;
+	Ast *args = 0;
+	u32 nargs = 0;
+	if (left && left->kind == AST_CALL && !left->call.carg)
+	{
+		expr = left->call.expr;
+		args = left->call.args;
+		nargs = left->call.nargs;
+	}
+
+	Ast tree = create_call_ast(par, site, expr, args, nargs);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->trailing_call.left = left;
-	tree->trailing_call.function = function;
+	tree->call.carg = carg;
 	return tree;
 }
 
@@ -855,37 +866,32 @@ static void print_ast(Printer *pr, Ast tree)
 
 		case AST_CALL:
 		{
-
 			Ast expr = tree->call.expr;
 			Ast *args = tree->call.args;
 			u32 nargs = tree->call.nargs;
-
-
 			print_ast(pr, expr);
 			PRINT(pr, "(");
 			print_ast_list(pr, args, nargs);
 			PRINT(pr, ")");
-		}
-		break;
-		case AST_TRAILING_CALL:
-		{
-			Ast function = tree->trailing_call.function;
-			print_ast(pr, tree->trailing_call.left);
-			PRINT(pr, " -> ");
-			if (function->function.nparams || function->function.variadic)
+			Ast carg = tree->call.carg;
+			if (carg)
 			{
-				PRINT(pr, "(");
-				print_ast_list(pr, function->function.params, function->function.nparams);
-				if (function->function.variadic)
+				PRINT(pr, " -> ");
+				if (carg->function.nparams || carg->function.variadic)
 				{
-					if (function->function.nparams) {
-						PRINT(pr, ", ");
+					PRINT(pr, "(");
+					print_ast_list(pr, carg->function.params, carg->function.nparams);
+					if (carg->function.variadic)
+					{
+						if (carg->function.nparams) {
+							PRINT(pr, ", ");
+						}
+						print_ast(pr, carg->function.variadic);
 					}
-					print_ast(pr, function->function.variadic);
+					PRINT(pr, ") ");
 				}
-				PRINT(pr, ") ");
+				print_ast(pr, carg->function.body);
 			}
-			print_ast(pr, function->function.body);
 		}
 		break;
 		case AST_NAMED_ARGUMENT:

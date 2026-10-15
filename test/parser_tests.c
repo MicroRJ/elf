@@ -376,32 +376,34 @@ static void test_parser_trailing_closures(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "run -> {}\nmap(2) -> (item: int, index) { ret item }");
 	Ast first_stat = parser_test_stat(file, 0, AST_TUPLE, "parse zero-parameter trailing closure tuple");
-	Ast first = parser_test_tuple_item(first_stat, 0, AST_TRAILING_CALL, "preserve zero-parameter trailing call");
+	Ast first = parser_test_tuple_item(first_stat, 0, AST_CALL, "trailing closure is part of call ast");
 	if (!first) {
 		return;
 	}
-	expect_ast_atom(first->trailing_call.left, "run", "trailing call keeps left expression");
-	Ast first_function = first->trailing_call.function;
-	expect_ast_kind(first_function, AST_FUNCTION, "trailing call stores implicit function");
+	expect_ast_atom(first->call.expr, "run", "trailing call keeps callee expression");
+	if (first->call.nargs != 0) {
+		test_fail("carg is not counted as an ordinary argument");
+	}
+	Ast first_function = first->call.carg;
+	expect_ast_kind(first_function, AST_FUNCTION, "trailing call stores carg function");
 	if (!first_function || first_function->function.nparams != 0) {
 		test_fail("omitted trailing closure parameters mean zero parameters");
 	}
 	expect_ast_kind(first_function ? first_function->function.body : 0, AST_BLOCK_STAT, "trailing closure stores block body");
 
 	Ast second_stat = parser_test_stat(file, 1, AST_TUPLE, "parse parameterized trailing closure tuple");
-	Ast second = parser_test_tuple_item(second_stat, 0, AST_TRAILING_CALL, "preserve parameterized trailing call");
+	Ast second = parser_test_tuple_item(second_stat, 0, AST_CALL, "parameterized trailing closure is part of call ast");
 	if (!second) {
 		return;
 	}
-	Ast left_call = second->trailing_call.left;
-	expect_ast_kind(left_call, AST_CALL, "trailing call preserves existing call");
-	if (!left_call || left_call->call.nargs != 1) {
+	expect_ast_atom(second->call.expr, "map", "trailing call preserves existing callee");
+	if (second->call.nargs != 1) {
 		test_fail("trailing call preserves existing arguments");
 	}
 	else {
-		expect_ast_i64(left_call->call.args[0], 2, "trailing call keeps existing argument");
+		expect_ast_i64(second->call.args[0], 2, "trailing call keeps existing argument");
 	}
-	Ast function = second->trailing_call.function;
+	Ast function = second->call.carg;
 	if (!function || function->kind != AST_FUNCTION || function->function.nparams != 2) {
 		test_fail("trailing closure preserves parameter list");
 	}

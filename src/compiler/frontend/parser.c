@@ -1274,7 +1274,7 @@ static Ast parse_postfix_expr(Parser *parser)
 			{
 				consume_token(parser);
 				Ast function = parse_function(parser, tok, true);
-				value = create_trailing_call_ast(parser, tok.site, value, function);
+				value = create_carg_call_ast(parser, tok.site, value, function);
 			}
 			break;
 
