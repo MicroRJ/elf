@@ -55,20 +55,6 @@ Com_Report;
 
 #define COM_SOURCE_INVALID ((Com_SourceId)-1)
 
-// One source file taking part in a compilation. The compiler owns its copied
-// text, parsed AST, and the imports discovered while parsing it.
-typedef struct
-{
-	struct Atom *name;
-	struct Atom *canonical_path;
-	SourceBuffer source;
-	struct Ast_T *ast;
-	struct Ast_T **imports;
-	u32 import_count;
-	u32 import_capacity;
-}
-Com_Source;
-
 // Raw text owned by the arena containing the compiled module.
 typedef struct
 {
@@ -197,6 +183,21 @@ typedef struct
 }
 Com_StaticScope;
 
+// One source file taking part in a compilation. The compiler owns its copied
+// text, parsed AST, imports, and exported static namespace.
+typedef struct
+{
+	struct Atom *name;
+	struct Atom *canonical_path;
+	SourceBuffer source;
+	struct Ast_T *ast;
+	struct Ast_T **imports;
+	u32 import_count;
+	u32 import_capacity;
+	Com_StaticScope exports;
+}
+Com_Source;
+
 // One declared parameter in a statically resolved function signature. Default
 // expressions are reduced to compiler values in the declaration's source.
 typedef struct
@@ -242,8 +243,6 @@ struct Compiler
 	Com_Source        *sources;
 	u32                source_count;
 	u32                source_capacity;
-	Com_StaticScope   *static_scopes;
-	u32                static_scope_count;
 	Com_Function      *functions;
 	u32                function_count;
 	u32                function_capacity;

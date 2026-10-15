@@ -366,8 +366,8 @@ b32 compiler_parse_sources(Compiler *compiler)
 
 Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
 {
-	ASSERT(source < compiler->static_scope_count);
-	Com_StaticScope *scope = compiler->static_scopes + source;
+	ASSERT(source < compiler->source_count);
+	Com_StaticScope *scope = &compiler->sources[source].exports;
 	for (u32 i = 0; i < scope->symbol_count; ++i)
 	{
 		Com_StaticSymbol *symbol = scope->symbols + i;
@@ -441,7 +441,7 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 	}
 	else if (expr->kind == AST_IMPORT)
 	{
-		if (expr->import.source < compiler->static_scope_count)
+		if (expr->import.source < compiler->source_count)
 		{
 			out->kind = COM_STATIC_NAMESPACE;
 			out->source = expr->import.source;
@@ -621,8 +621,6 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 
 b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 {
-	compiler->static_scope_count = compiler->source_count;
-	compiler->static_scopes = elf_arena_push_zero(compiler->arena, sizeof(*compiler->static_scopes) * compiler->static_scope_count);
 	compiler->functions = 0;
 	compiler->function_count = 0;
 	compiler->function_capacity = 0;
@@ -632,11 +630,13 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
-		Ast file = compiler->sources[source].ast;
+		Com_Source *compiler_source = compiler->sources + source;
+		compiler_source->exports = (Com_StaticScope) {};
+		Ast file = compiler_source->ast;
 		ASSERT(file && file->kind == AST_FILE);
 		Ast body = file->file.body;
 		ASSERT(body && body->kind == AST_BLOCK_STAT);
-		Com_StaticScope *scope = compiler->static_scopes + source;
+		Com_StaticScope *scope = &compiler_source->exports;
 		if (body->block.nstats) {
 			scope->symbols = elf_arena_push_zero(compiler->arena, sizeof(*scope->symbols) * body->block.nstats);
 		}
@@ -672,9 +672,9 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 		}
 	}
 
-	for (Com_SourceId source = 0; source < compiler->static_scope_count; ++source)
+	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
-		Com_StaticScope *scope = compiler->static_scopes + source;
+		Com_StaticScope *scope = &compiler->sources[source].exports;
 		for (u32 i = 0; i < scope->symbol_count; ++i)
 		{
 			Com_StaticSymbol *symbol = scope->symbols + i;
@@ -686,9 +686,9 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 			}
 		}
 	}
-	for (Com_SourceId source = 0; source < compiler->static_scope_count; ++source)
+	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
-		Com_StaticScope *scope = compiler->static_scopes + source;
+		Com_StaticScope *scope = &compiler->sources[source].exports;
 		for (u32 i = 0; i < scope->symbol_count; ++i) {
 			compiler_evaluate_static_symbol(compiler, scope->symbols + i);
 		}
@@ -705,8 +705,8 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 
 void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId source)
 {
-	ASSERT(source < compiler->static_scope_count);
-	Com_StaticScope *scope = compiler->static_scopes + source;
+	ASSERT(source < compiler->source_count);
+	Com_StaticScope *scope = &compiler->sources[source].exports;
 	for (u32 i = 0; i < scope->symbol_count; ++i)
 	{
 		Com_StaticSymbol *symbol = scope->symbols + i;

@@ -396,7 +396,7 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: 42\nret first");
-	if (!ctx || ctx->module->compiler->static_scope_count != 1 || ctx->current_source != 0 || ctx->module->compiler->static_scopes[0].symbol_count != 2) {
+	if (!ctx || ctx->module->compiler->source_count != 1 || ctx->current_source != 0 || ctx->module->compiler->sources[0].exports.symbol_count != 2) {
 		test_fail("lowering stores root static symbols in source scope zero");
 	}
 	Ir body = ir_test_main_body(ctx);
@@ -421,7 +421,7 @@ static void test_ir_resolves_static_function_defaults(elf_State *state)
 	}
 
 	Com_StaticSymbol *make = 0;
-	Com_StaticScope *config_scope = compiler->static_scopes + 1;
+	Com_StaticScope *config_scope = &compiler->sources[1].exports;
 	for (u32 i = 0; i < config_scope->symbol_count; ++i)
 	{
 		Com_StaticSymbol *symbol = config_scope->symbols + i;
