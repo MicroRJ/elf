@@ -12,7 +12,7 @@
 #include "ast.h"
 #include "parser.h"
 #include "ir.h"
-#include "lower.h"
+#include "ir_emitter.h"
 #include "bytecode_debug.h"
 #include "elf_value_text.h"
 
@@ -24,7 +24,7 @@
 #include "parser.c"
 #include "parse_json.c"
 #include "ir.c"
-#include "lower.c"
+#include "ir_emitter.c"
 #include "emitter.h"
 #include "emitter.c"
 

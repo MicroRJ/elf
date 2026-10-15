@@ -21,7 +21,7 @@
 #include "parser.h"
 #include "ir.h"
 #include "emitter.h"
-#include "lower.h"
+#include "ir_emitter.h"
 
 #include "logging.c"
 #include "atom.c"
@@ -31,7 +31,7 @@
 #include "parse_json.c"
 
 #include "ir.c"
-#include "lower.c"
+#include "ir_emitter.c"
 #include "emitter.c"
 
 static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
@@ -789,22 +789,21 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 	if (!compiler_resolve_statics(compiler, unit_type)) {
 		return module;
 	}
-	Ast ast_file = compiler->sources[0].ast;
-
-	LowerContext *ctx = elf_create_lower_context(compiler);
-	IrModule ir_module;
+	IrModuleEmitter *ir_module_emitter = ir_create_module_emitter(compiler);
+	IrFunctionEmitter *ir_function_emitter = ir_create_function_emitter(ir_module_emitter);
 	PROF_BLOCK("compiler.lower")
 	{
-		if (unit_type == COM_UNIT_FUNCTION) {
-			ir_module = elf_lower_ast_function(ctx, ast_file);
+		for (u32 i = 0; i < compiler->function_count; ++i) {
+			ir_emit_function(ir_function_emitter, compiler->functions + i);
 		}
-		else {
-			ir_module = elf_lower_ast_module(ctx, ast_file);
-		}
+	}
+	if (unit_type == COM_UNIT_FUNCTION) {
+		compiler_report_unreferenced_statics(compiler, 0);
 	}
 	if (compiler->report.error_count) {
 		return module;
 	}
+	IrModule ir_module = ir_module_emitter->module;
 
 	elf_arena_align(output_arena, 8);
 	module = elf_arena_push_zero(output_arena, sizeof(*module));

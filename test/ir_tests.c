@@ -1,4 +1,4 @@
-static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, const char *source_text)
+static IrFunctionEmitter *ir_test_lower_source(elf_State *state, elf_Arena *arena, const char *source_text)
 {
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(arena);
@@ -8,10 +8,15 @@ static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, co
 	compiler->sources[0].ast = file;
 	compiler_resolve_statics(compiler, COM_UNIT_FUNCTION);
 
-	LowerContext *ctx = elf_create_lower_context(compiler);
-	IrModule module = elf_lower_ast_function(ctx, file);
-	if (module.functions != ctx->functions ||
-		module.function_count != ctx->num_functions ||
+	IrModuleEmitter *module_emitter = ir_create_module_emitter(compiler);
+	IrFunctionEmitter *ctx = ir_create_function_emitter(module_emitter);
+	for (u32 i = 0; i < compiler->function_count; ++i) {
+		ir_emit_function(ctx, compiler->functions + i);
+	}
+	compiler_report_unreferenced_statics(compiler, 0);
+	IrModule module = module_emitter->module;
+	if (module.functions != ctx->module->module.functions ||
+		module.function_count != ctx->module->module.function_count ||
 		!module.has_entry ||
 		module.entry_index != 0)
 	{
@@ -20,16 +25,16 @@ static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, co
 	return ctx;
 }
 
-static IrFunction *ir_test_main_function(LowerContext *ctx)
+static IrFunction *ir_test_main_function(IrFunctionEmitter *ctx)
 {
-	if (!ctx || ctx->num_functions != 1) {
+	if (!ctx || ctx->module->module.function_count != 1) {
 		test_fail("lowering produced one main function");
 		return 0;
 	}
-	return &ctx->functions[0];
+	return &ctx->module->module.functions[0];
 }
 
-static Ir ir_test_main_body(LowerContext *ctx)
+static Ir ir_test_main_body(IrFunctionEmitter *ctx)
 {
 	IrFunction *function = ir_test_main_function(ctx);
 	if (!function) {
@@ -87,7 +92,7 @@ static void expect_load_local(Ir ir, Ir local, const char *label)
 static void test_ir_lowers_declaration_expression(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := 1 + 2 * 3");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "x := 1 + 2 * 3");
 	Ir body = ir_test_main_body(ctx);
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "lower declaration to local");
 
@@ -103,7 +108,7 @@ static void test_ir_lowers_declaration_expression(elf_State *state)
 static void test_ir_lowers_assignment_to_local(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := 1\nx = 2");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "x := 1\nx = 2");
 	Ir body = ir_test_main_body(ctx);
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "lower local declaration");
 	Ir store = ir_test_body_stat(body, 1, IR_STORE, "lower assignment to store");
@@ -124,7 +129,7 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	log_set_hook(ignore_expected_lowering_error, 0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "answer ::= 42\nanswer = 0");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "answer ::= 42\nanswer = 0");
 	log_set_hook(0, 0);
 
 	Ir body = ir_test_main_body(ctx);
@@ -143,7 +148,7 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 static void test_ir_lowers_strings_and_globals(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret \"hello\"\nret foo");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "ret \"hello\"\nret foo");
 	Ir body = ir_test_main_body(ctx);
 
 	Ir ret_string = ir_test_body_stat(body, 0, IR_RETURN, "lower string return");
@@ -157,7 +162,7 @@ static void test_ir_lowers_strings_and_globals(elf_State *state)
 static void test_ir_lowers_interpolated_string(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena,
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena,
 		"name := \"elf\"\nret f\"hello ${name} ${2 + 3}\"");
 	Ir body = ir_test_main_body(ctx);
 	Ir name_local = ir_test_body_stat(body, 0, IR_LOCAL, "lower interpolated string local");
@@ -189,7 +194,7 @@ static void test_ir_lowers_interpolated_string(elf_State *state)
 static void test_ir_lowers_field_and_call(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret obj.name\nmake {x = 1}");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "ret obj.name\nmake {x = 1}");
 	Ir body = ir_test_main_body(ctx);
 
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower field return");
@@ -219,7 +224,7 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 static void test_ir_lowers_array_literal(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "ret [1, 2]");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "ret [1, 2]");
 	Ir body = ir_test_main_body(ctx);
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower array return");
 	Ir block = ret ? ret->ir_return.expr : 0;
@@ -243,7 +248,7 @@ static void test_ir_lowers_array_literal(elf_State *state)
 static void test_ir_lowers_if_else(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "if flag ? { ret 1 } else { ret 2 }");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "if flag ? { ret 1 } else { ret 2 }");
 	Ir body = ir_test_main_body(ctx);
 	Ir ir_if = ir_test_body_stat(body, 0, IR_IF, "lower if statement");
 
@@ -256,7 +261,7 @@ static void test_ir_lowers_if_else(elf_State *state)
 static void test_ir_lowers_while(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "while flag ? { x = 1 }");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "while flag ? { x = 1 }");
 	Ir body = ir_test_main_body(ctx);
 	Ir loop = ir_test_body_stat(body, 0, IR_BLOCK, "while lowers to label block");
 
@@ -276,7 +281,7 @@ static void test_ir_lowers_while(elf_State *state)
 static void test_ir_lowers_nil_assign(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := nil\nx ?= 1");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "x := nil\nx ?= 1");
 	Ir body = ir_test_main_body(ctx);
 
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "nil assignment keeps declaration local");
@@ -301,7 +306,7 @@ static void test_ir_lowers_nil_assign(elf_State *state)
 static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "obj := nil\nobj.child.name ?= 1");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "obj := nil\nobj.child.name ?= 1");
 	Ir body = ir_test_main_body(ctx);
 
 	Ir object_memory = ir_test_body_stat(body, 0, IR_LOCAL, "field nil assignment keeps object declaration");
@@ -332,22 +337,22 @@ static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 static void test_ir_lowers_function_expression(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "add := fun(a: int, b: num) { ret a + b }");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "add := fun(a: int, b: num) { ret a + b }");
 
-	if (!ctx || ctx->num_functions != 2) {
+	if (!ctx || ctx->module->module.function_count != 2) {
 		test_fail("function expression adds bytecode function");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ir main_body = ctx->functions[0].body;
+	Ir main_body = ctx->module->module.functions[0].body;
 	Ir memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
 	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION, "function expression lowers to function ir");
 	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_function.index != 1) {
 		test_fail("function ir points at nested function");
 	}
 
-	IrFunction *function = &ctx->functions[1];
+	IrFunction *function = &ctx->module->module.functions[1];
 	if (function->param_count != IMPLICIT_PARAM_COUNT + 2) {
 		test_fail("function parameter count includes implicit this and source params");
 	}
@@ -379,9 +384,9 @@ static void test_ir_rejects_unknown_parameter_type(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	log_set_hook(ignore_expected_lowering_error, 0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "probe := fun(value: mystery) { ret value }\nret probe");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "probe := fun(value: mystery) { ret value }\nret probe");
 	log_set_hook(0, 0);
-	if (!ctx || ctx->compiler->report.error_count != 1) {
+	if (!ctx || ctx->module->compiler->report.error_count != 1) {
 		test_fail("unknown function parameter type reports one lowering error");
 	}
 	elf_arena_destroy(&arena);
@@ -390,8 +395,8 @@ static void test_ir_rejects_unknown_parameter_type(elf_State *state)
 static void test_ir_lowers_static_forward_reference(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: 42\nret first");
-	if (!ctx || ctx->compiler->static_scope_count != 1 || ctx->current_source != 0 || ctx->compiler->static_scopes[0].symbol_count != 2) {
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: 42\nret first");
+	if (!ctx || ctx->module->compiler->static_scope_count != 1 || ctx->current_source != 0 || ctx->module->compiler->static_scopes[0].symbol_count != 2) {
 		test_fail("lowering stores root static symbols in source scope zero");
 	}
 	Ir body = ir_test_main_body(ctx);
@@ -403,7 +408,7 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 static void test_ir_lowers_local_shadow_of_file_static(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nroot := 48\nx := root * 2\n}\nret root");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nroot := 48\nx := root * 2\n}\nret root");
 	Ir body = ir_test_main_body(ctx);
 	Ir nested = ir_test_body_stat(body, 0, IR_BLOCK, "nested local scope lowers to runtime block");
 	Ir local = ir_test_body_stat(nested, 1, IR_LOCAL, "nested local declaration is retained");
@@ -419,22 +424,22 @@ static void test_ir_lowers_local_shadow_of_file_static(elf_State *state)
 static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "foo :: fun() { ret bar() }\nbar :: fun() { ret foo() }\nret foo");
-	if (!ctx || ctx->num_functions != 3)
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "foo :: fun() { ret bar() }\nbar :: fun() { ret foo() }\nret foo");
+	if (!ctx || ctx->module->module.function_count != 3)
 	{
 		test_fail("mutually recursive statics lower two functions");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ir main_ret = ir_test_body_stat(ctx->functions[0].body, 0, IR_RETURN, "main returns static function");
+	Ir main_ret = ir_test_body_stat(ctx->module->module.functions[0].body, 0, IR_RETURN, "main returns static function");
 	Ir foo_value = main_ret ? main_ret->ir_return.expr : 0;
 	expect_ir_kind(foo_value, IR_FUNCTION, "static function lowers directly to function ir");
 	if (foo_value && foo_value->ir_function.index != 1) {
 		test_fail("main static function value points to foo");
 	}
 
-	Ir foo_ret = ir_test_body_stat(ctx->functions[1].body, 0, IR_RETURN, "foo lowers return");
+	Ir foo_ret = ir_test_body_stat(ctx->module->module.functions[1].body, 0, IR_RETURN, "foo lowers return");
 	Ir foo_call = foo_ret ? foo_ret->ir_return.expr : 0;
 	expect_ir_kind(foo_call, IR_CALL, "foo calls bar");
 	if (foo_call && foo_call->ir_call.type != IR_CALL_DIRECT) {
@@ -446,7 +451,7 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 		test_fail("foo points to bar function");
 	}
 
-	Ir bar_ret = ir_test_body_stat(ctx->functions[2].body, 0, IR_RETURN, "bar lowers return");
+	Ir bar_ret = ir_test_body_stat(ctx->module->module.functions[2].body, 0, IR_RETURN, "bar lowers return");
 	Ir bar_call = bar_ret ? bar_ret->ir_return.expr : 0;
 	expect_ir_kind(bar_call, IR_CALL, "bar calls foo");
 	if (bar_call && bar_call->ir_call.type != IR_CALL_DIRECT) {
@@ -457,7 +462,7 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 	if (recursive_foo && recursive_foo->ir_function.index != 1) {
 		test_fail("bar points back to foo function");
 	}
-	if (ctx->functions[1].capture_count || ctx->functions[2].capture_count) {
+	if (ctx->module->module.functions[1].capture_count || ctx->module->module.functions[2].capture_count) {
 		test_fail("static function references do not create captures");
 	}
 	elf_arena_destroy(&arena);
@@ -467,9 +472,9 @@ static void test_ir_rejects_static_cycle(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	log_set_hook(ignore_expected_lowering_error, 0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: first\nret first");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "first :: second\nsecond :: first\nret first");
 	log_set_hook(0, 0);
-	if (!ctx || ctx->compiler->report.error_count != 1) {
+	if (!ctx || ctx->module->compiler->report.error_count != 1) {
 		test_fail("static cycle reports one lowering error");
 	}
 	elf_arena_destroy(&arena);
@@ -479,9 +484,9 @@ static void test_ir_rejects_non_file_static_declarations(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	log_set_hook(ignore_expected_lowering_error, 0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nlocal :: 48\n}\nholder := fun() {\ninside :: 1\n}\nret root");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "root :: 7\n{\nlocal :: 48\n}\nholder := fun() {\ninside :: 1\n}\nret root");
 	log_set_hook(0, 0);
-	if (!ctx || ctx->compiler->report.error_count != 2) {
+	if (!ctx || ctx->module->compiler->report.error_count != 2) {
 		test_fail("static declarations outside file scope report lowering errors");
 	}
 	elf_arena_destroy(&arena);
@@ -490,7 +495,7 @@ static void test_ir_rejects_non_file_static_declarations(elf_State *state)
 static void test_ir_lowers_get_mem_macro(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	LowerContext *ctx = ir_test_lower_source(state, &arena, "x := 1\nret #get_mem(x)");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "x := 1\nret #get_mem(x)");
 	Ir body = ir_test_main_body(ctx);
 
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "get_mem keeps local declaration");

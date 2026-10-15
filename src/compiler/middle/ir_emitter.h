@@ -85,7 +85,8 @@ typedef struct
 }
 LoopLabels;
 
-typedef struct LowerContext LowerContext;
+typedef struct IrModuleEmitter IrModuleEmitter;
+typedef struct IrFunctionEmitter IrFunctionEmitter;
 typedef struct LwScopeFunction LwScopeFunction;
 
 struct LwScopeFunction
@@ -106,10 +107,20 @@ typedef struct LwScopeEntity
 }
 LwScopeEntity;
 
-struct LowerContext
+// Owns the module-wide IR arrays shared by every function emitter.
+struct IrModuleEmitter
 {
-	Compiler    *compiler;
-	elf_Arena   *arena;
+	Compiler  *compiler;
+	elf_Arena *arena;
+	IrModule   module;
+	u32        function_capacity;
+	u32        global_capacity;
+};
+
+// Temporary state used while emitting one function and any nested closures.
+struct IrFunctionEmitter
+{
+	IrModuleEmitter *module;
 	u32          ir_stack_size;
 	u32          ir_stack_index;
 	Ir          *ir_stack;
@@ -120,13 +131,7 @@ struct LowerContext
 	u32         defer_scope_start;
 	u32         function_defer_start;
 
-	IrFunction           *functions;
-	u32                   num_functions;
-	u32                   max_functions;
 	LwScopeFunction *function;
-	Atom                **globals;
-	u32                   global_count;
-	u32                   global_capacity;
 
 	LwScopeEntity     entities[MAX_ENTITIES];
 	EntityId   scope_start;

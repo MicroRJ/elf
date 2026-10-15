@@ -17,28 +17,28 @@ static const char *ir_kind_name(IrKind kind)
 	return names[kind];
 }
 
-static Ir ir_alloc(LowerContext *ctx, SourceSite site, IrKind kind)
+static Ir ir_alloc(IrFunctionEmitter *ctx, SourceSite site, IrKind kind)
 {
-	IrNode *ir = elf_arena_push_zero(ctx->arena, sizeof(*ir));
+	IrNode *ir = elf_arena_push_zero(ctx->module->arena, sizeof(*ir));
 	ir->kind = kind;
 	ir->site = site;
 	return ir;
 }
 
-static Ir ir_new_nullary(LowerContext *ctx, SourceSite site, IrKind kind)
+static Ir ir_new_nullary(IrFunctionEmitter *ctx, SourceSite site, IrKind kind)
 {
 	Ir ir = ir_alloc(ctx, site, kind);
 	return ir;
 }
 
-static Ir ir_new_unary(LowerContext *ctx, SourceSite site, IrKind kind, Ir x)
+static Ir ir_new_unary(IrFunctionEmitter *ctx, SourceSite site, IrKind kind, Ir x)
 {
 	Ir ir = ir_alloc(ctx, site, kind);
 	ir->ir_unary = x;
 	return ir;
 }
 
-static Ir ir_new_binary(LowerContext *ctx, SourceSite site, IrKind kind, Ir x, Ir y)
+static Ir ir_new_binary(IrFunctionEmitter *ctx, SourceSite site, IrKind kind, Ir x, Ir y)
 {
 	Ir ir = ir_alloc(ctx, site, kind);
 	ir->ir_binary.x = x;
@@ -46,59 +46,59 @@ static Ir ir_new_binary(LowerContext *ctx, SourceSite site, IrKind kind, Ir x, I
 	return ir;
 }
 
-static Ir create_nil_ir(LowerContext *ctx, SourceSite site)
+static Ir create_nil_ir(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_NIL);
 }
 
-static Ir create_int_ir(LowerContext *ctx, SourceSite site, i64 i)
+static Ir create_int_ir(IrFunctionEmitter *ctx, SourceSite site, i64 i)
 {
 	Ir ir = ir_new_nullary(ctx, site, IR_INTEGER);
 	ir->ir_int = i;
 	return ir;
 }
 
-static Ir create_num_ir(LowerContext *ctx, SourceSite site, f64 n)
+static Ir create_num_ir(IrFunctionEmitter *ctx, SourceSite site, f64 n)
 {
 	Ir ir = ir_new_nullary(ctx, site, IR_NUMBER);
 	ir->ir_num = n;
 	return ir;
 }
 
-static Ir create_atom_ir(LowerContext *ctx, SourceSite site, Atom *atom)
+static Ir create_atom_ir(IrFunctionEmitter *ctx, SourceSite site, Atom *atom)
 {
 	Ir ir = ir_new_nullary(ctx, site, IR_ATOM);
 	ir->atom = atom;
 	return ir;
 }
 
-static Ir create_load_global_ir(LowerContext *ctx, SourceSite site, u32 slot)
+static Ir create_load_global_ir(IrFunctionEmitter *ctx, SourceSite site, u32 slot)
 {
 	Ir ir = ir_alloc(ctx, site, IR_LOAD_GLOBAL);
 	ir->ir_global = slot;
 	return ir;
 }
 
-static Ir create_function_ir(LowerContext *ctx, SourceSite site, u32 function_index)
+static Ir create_function_ir(IrFunctionEmitter *ctx, SourceSite site, u32 function_index)
 {
 	Ir ir = ir_alloc(ctx, site, IR_FUNCTION);
 	ir->ir_function.index = function_index;
 	return ir;
 }
 
-static Ir create_recurse_ir(LowerContext *ctx, SourceSite site)
+static Ir create_recurse_ir(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_RECURSE);
 }
 
-static Ir create_capture_ir(LowerContext *ctx, SourceSite site, u32 capture_index)
+static Ir create_capture_ir(IrFunctionEmitter *ctx, SourceSite site, u32 capture_index)
 {
 	Ir ir = ir_alloc(ctx, site, IR_CAPTURE);
 	ir->ir_capture = capture_index;
 	return ir;
 }
 
-static Ir create_if_ir(LowerContext *ctx, SourceSite site, Ir pred, Ir true_clause, Ir else_clause)
+static Ir create_if_ir(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir true_clause, Ir else_clause)
 {
 	Ir ir = ir_alloc(ctx, site, IR_IF);
 	ir->ir_if.pred = pred;
@@ -107,13 +107,13 @@ static Ir create_if_ir(LowerContext *ctx, SourceSite site, Ir pred, Ir true_clau
 	return ir;
 }
 
-static Ir create_label_ir(LowerContext *ctx, SourceSite site)
+static Ir create_label_ir(IrFunctionEmitter *ctx, SourceSite site)
 {
 	Ir ir = ir_alloc(ctx, site, IR_LABEL);
 	return ir;
 }
 
-static Ir create_jump_ir(LowerContext *ctx, SourceSite site, Ir label)
+static Ir create_jump_ir(IrFunctionEmitter *ctx, SourceSite site, Ir label)
 {
 	ASSERT(label);
 	ASSERT(label->kind == IR_LABEL);
@@ -123,7 +123,7 @@ static Ir create_jump_ir(LowerContext *ctx, SourceSite site, Ir label)
 	return ir;
 }
 
-static Ir create_jump_if_false_ir(LowerContext *ctx, SourceSite site, Ir pred, Ir label)
+static Ir create_jump_if_false_ir(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir label)
 {
 	ASSERT(label);
 	ASSERT(label->kind == IR_LABEL);
@@ -134,14 +134,14 @@ static Ir create_jump_if_false_ir(LowerContext *ctx, SourceSite site, Ir pred, I
 	return ir;
 }
 
-static Ir create_block_ir(LowerContext *ctx, SourceSite site, IrArray stats)
+static Ir create_block_ir(IrFunctionEmitter *ctx, SourceSite site, IrArray stats)
 {
 	Ir ir = ir_alloc(ctx, site, IR_BLOCK);
 	ir->ir_block.stats = stats;
 	return ir;
 }
 
-static Ir create_expr_block_ir(LowerContext *ctx, SourceSite site, IrArray stats, Ir value)
+static Ir create_expr_block_ir(IrFunctionEmitter *ctx, SourceSite site, IrArray stats, Ir value)
 {
 	Ir ir = ir_alloc(ctx, site, IR_EXPR_BLOCK);
 	ir->ir_expr_block.stats = stats;
@@ -149,7 +149,7 @@ static Ir create_expr_block_ir(LowerContext *ctx, SourceSite site, IrArray stats
 	return ir;
 }
 
-static Ir create_local_ir(LowerContext *ctx, SourceSite site, Ir expr)
+static Ir create_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	Ir ir = ir_alloc(ctx, site, IR_LOCAL);
 	ir->ir_local.expr = expr;
@@ -157,7 +157,7 @@ static Ir create_local_ir(LowerContext *ctx, SourceSite site, Ir expr)
 	return ir;
 }
 
-static Ir create_multi_local_ir(LowerContext *ctx, SourceSite site, Ir expr, IrArray locals)
+static Ir create_multi_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr, IrArray locals)
 {
 	Ir ir = ir_alloc(ctx, site, IR_MULTI_LOCAL);
 	ir->ir_multi_local.expr = expr;
@@ -165,7 +165,7 @@ static Ir create_multi_local_ir(LowerContext *ctx, SourceSite site, Ir expr, IrA
 	return ir;
 }
 
-static Ir create_load_local_ir(LowerContext *ctx, SourceSite site, Ir local)
+static Ir create_load_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir local)
 {
 	ASSERT(local);
 	ASSERT(local->kind == IR_LOCAL);
@@ -175,7 +175,7 @@ static Ir create_load_local_ir(LowerContext *ctx, SourceSite site, Ir local)
 	return ir;
 }
 
-static Ir create_store_ir(LowerContext *ctx, SourceSite site, Ir x, Ir y)
+static Ir create_store_ir(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
 {
 	Ir ir = ir_alloc(ctx, site, IR_STORE);
 	ir->ir_binary.x = x;
@@ -183,12 +183,12 @@ static Ir create_store_ir(LowerContext *ctx, SourceSite site, Ir x, Ir y)
 	return ir;
 }
 
-static Ir create_array_add_ir(LowerContext *ctx, SourceSite site, Ir array, Ir value)
+static Ir create_array_add_ir(IrFunctionEmitter *ctx, SourceSite site, Ir array, Ir value)
 {
 	return ir_new_binary(ctx, site, IR_ARRAY_ADD, array, value);
 }
 
-static Ir create_call_ir(LowerContext *ctx, SourceSite site, IrCallType type, Ir expr, IrArray args)
+static Ir create_call_ir(IrFunctionEmitter *ctx, SourceSite site, IrCallType type, Ir expr, IrArray args)
 {
 	ASSERT(type == IR_CALL_DYNAMIC || type == IR_CALL_DIRECT);
 	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_FUNCTION));
@@ -199,32 +199,32 @@ static Ir create_call_ir(LowerContext *ctx, SourceSite site, IrCallType type, Ir
 	return ir;
 }
 
-static Ir create_table_ir(LowerContext *ctx, SourceSite site)
+static Ir create_table_ir(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_TABLE);
 }
 
-static Ir create_array_ir(LowerContext *ctx, SourceSite site)
+static Ir create_array_ir(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_ARRAY);
 }
 
-static Ir create_index_ir(LowerContext *ctx, SourceSite site, Ir x, Ir y)
+static Ir create_index_ir(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
 {
 	return ir_new_binary(ctx, site, IR_INDEX, x, y);
 }
 
-static Ir create_length_intrinsic_ir(LowerContext *ctx, SourceSite site, Ir expr)
+static Ir create_length_intrinsic_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	return ir_new_unary(ctx, site, IR_LENGTH_INTRINSIC, expr);
 }
 
-static Ir create_get_mem_ir(LowerContext *ctx, SourceSite site, Ir expr)
+static Ir create_get_mem_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	return ir_new_unary(ctx, site, IR_GET_MEM, expr);
 }
 
-static Ir create_return_ir(LowerContext *ctx, SourceSite site, Ir expr)
+static Ir create_return_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	Ir ir = ir_alloc(ctx, site, IR_RETURN);
 	ir->ir_return.expr = expr;

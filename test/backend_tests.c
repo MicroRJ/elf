@@ -503,7 +503,8 @@ static void test_backend_if_else_restores_stack_top(void)
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
-	LowerContext *ctx = elf_create_lower_context(compiler);
+	IrModuleEmitter *module_emitter = ir_create_module_emitter(compiler);
+	IrFunctionEmitter *ctx = ir_create_function_emitter(module_emitter);
 	SourceSite site = {};
 
 	Ir pred = create_int_ir(ctx, site, 0);

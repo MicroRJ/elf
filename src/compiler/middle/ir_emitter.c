@@ -4,32 +4,43 @@
 
 typedef struct
 {
-	LowerContext *ctx;
+	IrFunctionEmitter *ctx;
 	u32           start;
 	u32           count;
 }
 IrFrame;
 
 static void lower_ast_stat_to_ir(IrFrame *block, Ast stat);
-static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr);
-static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
-static Ir lower_ast_file_body_to_ir(LowerContext *ctx, Ast stat);
-static Ir lower_ast_function_to_ir(LowerContext *ctx, Ast expr);
-static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body);
-static u32 function_index_from_ptr(LowerContext *ctx, IrFunction *function);
-static void lower_ast_function_body(LowerContext *ctx, Ast expr, Ir ir);
+static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr);
+static Ir lower_ast_to_ir_block(IrFunctionEmitter *ctx, Ast stat);
+static Ir lower_ast_file_body_to_ir(IrFunctionEmitter *ctx, Ast stat);
+static Ir lower_ast_function_to_ir(IrFunctionEmitter *ctx, Ast expr);
+static IrFunction *add_function_ir(IrFunctionEmitter *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body);
+static u32 function_index_from_ptr(IrFunctionEmitter *ctx, IrFunction *function);
+static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir);
 
-static LowerContext *elf_create_lower_context(Compiler *compiler)
+static IrModuleEmitter *ir_create_module_emitter(Compiler *compiler)
 {
 	elf_Arena *arena = compiler->arena;
-	LowerContext *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
-	ctx->compiler = compiler;
-	ctx->arena = arena;
-	ctx->current_source = 0;
+	IrModuleEmitter *emitter = elf_arena_push_zero(arena, sizeof(*emitter));
+	emitter->compiler = compiler;
+	emitter->arena = arena;
+	emitter->function_capacity = 1024;
+	emitter->module.functions = elf_arena_push_zero(arena, sizeof(*emitter->module.functions) * emitter->function_capacity);
+	if (compiler->function_count && compiler->functions[0].is_entry)
+	{
+		emitter->module.has_entry = true;
+		emitter->module.entry_index = compiler->functions[0].index;
+	}
+	return emitter;
+}
 
-	u32 max_functions = 1024;
-	ctx->functions = elf_arena_push_zero(arena, sizeof(*ctx->functions) * max_functions);
-	ctx->max_functions = max_functions;
+static IrFunctionEmitter *ir_create_function_emitter(IrModuleEmitter *module)
+{
+	elf_Arena *arena = module->arena;
+	IrFunctionEmitter *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
+	ctx->module = module;
+	ctx->current_source = 0;
 
 	u32 ir_stack_size = 4096;
 	ctx->ir_stack = elf_arena_push_zero(arena, sizeof(*ctx->ir_stack) * ir_stack_size);
@@ -42,9 +53,9 @@ static LowerContext *elf_create_lower_context(Compiler *compiler)
 	ctx->defer_count = 0;
 	ctx->defer_scope_start = 0;
 
-	for (u32 i = 0; i < compiler->function_count; ++i)
+	for (u32 i = 0; i < module->compiler->function_count; ++i)
 	{
-		Com_Function *input = compiler->functions + i;
+		Com_Function *input = module->compiler->functions + i;
 		Ast ast = input->ast;
 		u32 param_count = input->is_entry ? IMPLICIT_PARAM_COUNT : IMPLICIT_PARAM_COUNT + ast->function.nparams;
 		b32 variadic = input->is_entry || ast->function.variadic != 0;
@@ -56,28 +67,28 @@ static LowerContext *elf_create_lower_context(Compiler *compiler)
 	return ctx;
 }
 
-static u32 add_global_symbol(LowerContext *ctx, Atom *name)
+static u32 add_global_symbol(IrFunctionEmitter *ctx, Atom *name)
 {
-	for (u32 i = 0; i < ctx->global_count; ++i)
+	for (u32 i = 0; i < ctx->module->module.global_count; ++i)
 	{
-		if (ctx->globals[i] == name) {
+		if (ctx->module->module.globals[i] == name) {
 			return i;
 		}
 	}
 
-	if (ctx->global_count == ctx->global_capacity)
+	if (ctx->module->module.global_count == ctx->module->global_capacity)
 	{
-		u32 capacity = ctx->global_capacity ? ctx->global_capacity * 2 : 16;
-		Atom **globals = elf_arena_push(ctx->arena, sizeof(*globals) * capacity);
-		if (ctx->globals) {
-			memcpy(globals, ctx->globals, sizeof(*globals) * ctx->global_count);
+		u32 capacity = ctx->module->global_capacity ? ctx->module->global_capacity * 2 : 16;
+		Atom **globals = elf_arena_push(ctx->module->arena, sizeof(*globals) * capacity);
+		if (ctx->module->module.globals) {
+			memcpy(globals, ctx->module->module.globals, sizeof(*globals) * ctx->module->module.global_count);
 		}
-		ctx->globals = globals;
-		ctx->global_capacity = capacity;
+		ctx->module->module.globals = globals;
+		ctx->module->global_capacity = capacity;
 	}
 
-	u32 index = ctx->global_count++;
-	ctx->globals[index] = name;
+	u32 index = ctx->module->module.global_count++;
+	ctx->module->module.globals[index] = name;
 	return index;
 }
 
@@ -90,24 +101,24 @@ typedef enum
 }
 LoweringError;
 
-static void report_lowering_error(LowerContext *ctx, LoweringError error, SourceSite site, const char *format, ...)
+static void report_lowering_error(IrFunctionEmitter *ctx, LoweringError error, SourceSite site, const char *format, ...)
 {
 	(void)error;
 
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->compiler, COMPILER_ERROR, COMPILER_PHASE_LOWERING,
+	compiler_reportv(ctx->module->compiler, COMPILER_ERROR, COMPILER_PHASE_LOWERING,
 		site, format, args);
 	va_end(args);
 }
 
-static void report_lowering_warning(LowerContext *ctx, LoweringError error, SourceSite site, const char *format, ...)
+static void report_lowering_warning(IrFunctionEmitter *ctx, LoweringError error, SourceSite site, const char *format, ...)
 {
 	(void)error;
 
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING,
+	compiler_reportv(ctx->module->compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING,
 		site, format, args);
 	va_end(args);
 }
@@ -121,7 +132,7 @@ static Ast check_ast_type(Ast ast, AstType type)
 	return ast;
 }
 
-static IrFrame begin_ir_frame(LowerContext *ctx)
+static IrFrame begin_ir_frame(IrFunctionEmitter *ctx)
 {
 	IrFrame block = {};
 	block.ctx = ctx;
@@ -132,7 +143,7 @@ static IrFrame begin_ir_frame(LowerContext *ctx)
 
 static void push_ir(IrFrame *stack, Ir ir)
 {
-	LowerContext *ctx = stack->ctx;
+	IrFunctionEmitter *ctx = stack->ctx;
 	ASSERT(ctx);
 	ASSERT(ctx->ir_stack_index == stack->start + stack->count);
 	ASSERT(ctx->ir_stack_index < ctx->ir_stack_size);
@@ -142,7 +153,7 @@ static void push_ir(IrFrame *stack, Ir ir)
 
 static IrArray close_ir_frame(IrFrame *frame)
 {
-	LowerContext *ctx = frame->ctx;
+	IrFunctionEmitter *ctx = frame->ctx;
 	ASSERT(ctx);
 	ASSERT(ctx->ir_stack_index == frame->start + frame->count);
 
@@ -150,14 +161,14 @@ static IrArray close_ir_frame(IrFrame *frame)
 
 	IrArray items = {};
 	items.count = frame->count;
-	items.items = elf_arena_push_copy(ctx->arena, sizeof(*items.items) * items.count, ctx->ir_stack + ctx->ir_stack_index);
+	items.items = elf_arena_push_copy(ctx->module->arena, sizeof(*items.items) * items.count, ctx->ir_stack + ctx->ir_stack_index);
 
 	ASSERT(ctx->ir_stack_index == frame->start);
 	frame->count = 0;
 	return items;
 }
 
-static EntityScope get_entity_scope(LowerContext *ctx)
+static EntityScope get_entity_scope(IrFunctionEmitter *ctx)
 {
 	EntityScope scope = {};
 	scope.previous_scope_start = ctx->scope_start;
@@ -168,7 +179,7 @@ static EntityScope get_entity_scope(LowerContext *ctx)
 	return scope;
 }
 
-static void set_entity_scope(LowerContext *ctx, EntityScope scope)
+static void set_entity_scope(IrFunctionEmitter *ctx, EntityScope scope)
 {
 	EntityId current_start = ctx->scope_start;
 	for (i32 i = ctx->scope_end - 1; i >= (i32)current_start; -- i)
@@ -186,7 +197,7 @@ static void set_entity_scope(LowerContext *ctx, EntityScope scope)
 	ctx->scope_depth = scope.previous_scope_depth;
 }
 
-static DeferScope get_defer_scope(LowerContext *ctx)
+static DeferScope get_defer_scope(IrFunctionEmitter *ctx)
 {
 	DeferScope scope = {};
 	scope.previous_defer_start = ctx->defer_scope_start;
@@ -194,19 +205,19 @@ static DeferScope get_defer_scope(LowerContext *ctx)
 	return scope;
 }
 
-static void set_defer_scope(LowerContext *ctx, DeferScope scope)
+static void set_defer_scope(IrFunctionEmitter *ctx, DeferScope scope)
 {
 	ctx->defer_count = ctx->defer_scope_start;
 	ctx->defer_scope_start = scope.previous_defer_start;
 }
 
-static void push_defer_stat(LowerContext *ctx, Ast stat)
+static void push_defer_stat(IrFunctionEmitter *ctx, Ast stat)
 {
 	ASSERT(ctx->defer_count < ctx->defer_stack_size);
 	ctx->defer_stack[ctx->defer_count++] = stat;
 }
 
-static void emit_defer_range(LowerContext *ctx, IrFrame *items, u32 start)
+static void emit_defer_range(IrFunctionEmitter *ctx, IrFrame *items, u32 start)
 {
 	ASSERT(start <= ctx->defer_count);
 	for (u32 i = ctx->defer_count; i > start; --i)
@@ -216,7 +227,7 @@ static void emit_defer_range(LowerContext *ctx, IrFrame *items, u32 start)
 	}
 }
 
-static LwScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
+static LwScopeEntity *entity_from_name(IrFunctionEmitter *ctx, Atom *name)
 {
 	for (i32 i = ctx->scope_end - 1; i >= 0; -- i)
 	{
@@ -228,12 +239,12 @@ static LwScopeEntity *entity_from_name(LowerContext *ctx, Atom *name)
 	return 0;
 }
 
-static Com_StaticSymbol *static_symbol_from_name(LowerContext *ctx, Atom *name)
+static Com_StaticSymbol *static_symbol_from_name(IrFunctionEmitter *ctx, Atom *name)
 {
-	return compiler_static_symbol_from_source(ctx->compiler, ctx->current_source, name);
+	return compiler_static_symbol_from_source(ctx->module->compiler, ctx->current_source, name);
 }
 
-static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
+static LwScopeEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
 {
 	LwScopeEntity *en = entity_from_name(ctx, name);
 	const char *name_data = atom_data(name);
@@ -262,7 +273,7 @@ static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityT
 	return en;
 }
 
-static Ir static_value_to_ir(LowerContext *ctx, SourceSite site, Com_StaticValue value)
+static Ir static_value_to_ir(IrFunctionEmitter *ctx, SourceSite site, Com_StaticValue value)
 {
 	Ir ir = ERROR_IR;
 	switch (value.kind)
@@ -282,7 +293,7 @@ static Ir static_value_to_ir(LowerContext *ctx, SourceSite site, Com_StaticValue
 	return ir;
 }
 
-static u32 capture_entity_in_function(LowerContext *ctx, LwScopeFunction *function_ctx, LwScopeEntity *entity, SourceSite site)
+static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *function_ctx, LwScopeEntity *entity, SourceSite site)
 {
 	IrFunction *function = function_ctx->function;
 	for (u32 i = 0; i < function->capture_count; ++ i)
@@ -313,7 +324,7 @@ static u32 capture_entity_in_function(LowerContext *ctx, LwScopeFunction *functi
 	return capture_index;
 }
 
-static Ir load_entity_ir(LowerContext *ctx, SourceSite site, LwScopeEntity *entity)
+static Ir load_entity_ir(IrFunctionEmitter *ctx, SourceSite site, LwScopeEntity *entity)
 {
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	if (ctx->function && entity->scope_start < ctx->function->scope_start)
@@ -325,7 +336,7 @@ static Ir load_entity_ir(LowerContext *ctx, SourceSite site, LwScopeEntity *enti
 	return create_load_local_ir(ctx, site, entity->memory_ir);
 }
 
-static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
+static b32 mark_entity_assigned(IrFunctionEmitter *ctx, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) return true;
 	LwScopeEntity *entity = entity_from_name(ctx, destination->atom);
@@ -348,19 +359,19 @@ static b32 mark_entity_assigned(LowerContext *ctx, Ast destination)
 	return true;
 }
 
-static void push_loop_labels(LowerContext *ctx, LoopLabels labels)
+static void push_loop_labels(IrFunctionEmitter *ctx, LoopLabels labels)
 {
 	ASSERT(ctx->loop_count < ARRAY_COUNT(ctx->loop_stack));
 	ctx->loop_stack[ctx->loop_count ++] = labels;
 }
 
-static void pop_loop_labels(LowerContext *ctx)
+static void pop_loop_labels(IrFunctionEmitter *ctx)
 {
 	ASSERT(ctx->loop_count > 0);
 	ctx->loop_count -= 1;
 }
 
-static LoopLabels current_loop_labels(LowerContext *ctx, SourceSite site)
+static LoopLabels current_loop_labels(IrFunctionEmitter *ctx, SourceSite site)
 {
 	if (ctx->loop_count == 0)
 	{
@@ -371,30 +382,15 @@ static LoopLabels current_loop_labels(LowerContext *ctx, SourceSite site)
 	return ctx->loop_stack[ctx->loop_count - 1];
 }
 
-static void lower_compiler_static_functions(LowerContext *ctx)
+static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 {
-	for (u32 i = 0; i < ctx->compiler->function_count; ++i)
+	ASSERT(input->index < ctx->module->module.function_count);
+	ctx->current_source = input->source;
+	if (input->is_entry)
 	{
-		Com_Function *input = ctx->compiler->functions + i;
-		if (input->is_static)
-		{
-			ctx->current_source = input->source;
-			Ir function = create_function_ir(ctx, input->ast->site, input->index);
-			lower_ast_function_body(ctx, input->ast, function);
-		}
-	}
-}
-
-static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
-{
-	ASSERT(file->site.source < ctx->compiler->source_count);
-	ctx->current_source = file->site.source;
-	PROF_BLOCK("lower.function")
-	{
-		lower_compiler_static_functions(ctx);
-		Com_Function *entry = ctx->compiler->functions;
-		ASSERT(entry->is_entry && entry->ast == file);
-		IrFunction *main_fn = ctx->functions + entry->index;
+		Ast file = input->ast;
+		ASSERT(file && file->kind == AST_FILE);
+		IrFunction *main_fn = ctx->module->module.functions + input->index;
 
 		LwScopeFunction main_function_ctx = {};
 		main_function_ctx.function = main_fn;
@@ -403,66 +399,44 @@ static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 
 		LwScopeFunction *outer_function = ctx->function;
 		ctx->function = &main_function_ctx;
-		ctx->current_source = file->site.source;
 		main_fn->body = lower_ast_file_body_to_ir(ctx, file->file.body);
-		compiler_report_unreferenced_statics(ctx->compiler, file->site.source);
 		ctx->function = outer_function;
 	}
-
-	IrModule module = {};
-	module.functions = ctx->functions;
-	module.function_count = ctx->num_functions;
-	module.globals = ctx->globals;
-	module.global_count = ctx->global_count;
-	module.has_entry = true;
-	module.entry_index = 0;
-	return module;
-}
-
-static IrModule elf_lower_ast_module(LowerContext *ctx, Ast file)
-{
-	ASSERT(file->site.source < ctx->compiler->source_count);
-	ctx->current_source = file->site.source;
-	PROF_BLOCK("lower.module")
+	else
 	{
-		lower_compiler_static_functions(ctx);
+		ASSERT(input->is_static && input->ast && input->ast->kind == AST_FUNCTION);
+		Ir function = create_function_ir(ctx, input->ast->site, input->index);
+		lower_ast_function_body(ctx, input->ast, function);
 	}
-
-	IrModule module = {};
-	module.functions = ctx->functions;
-	module.function_count = ctx->num_functions;
-	module.globals = ctx->globals;
-	module.global_count = ctx->global_count;
-	return module;
 }
 
-static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body)
+static IrFunction *add_function_ir(IrFunctionEmitter *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body)
 {
 	ASSERT(param_count >= IMPLICIT_PARAM_COUNT);
 
-	ASSERT(ctx->num_functions < ctx->max_functions);
-	IrFunction *function = & ctx->functions[ctx->num_functions ++];
+	ASSERT(ctx->module->module.function_count < ctx->module->function_capacity);
+	IrFunction *function = & ctx->module->module.functions[ctx->module->module.function_count ++];
 	function->site = site;
 	function->variadic = variadic;
 	function->body = body;
 	function->param_count = param_count;
-	function->params = elf_arena_push_zero(ctx->arena, sizeof(*function->params) * function->param_count);
+	function->params = elf_arena_push_zero(ctx->module->arena, sizeof(*function->params) * function->param_count);
 	function->params[IMPLICIT_PARAM_INDEX] = create_local_ir(ctx, site, 0);
-	function->captures = elf_arena_push_zero(ctx->arena, sizeof(*function->captures) * 255);
-	function->capture_entities = elf_arena_push_zero(ctx->arena, sizeof(*function->capture_entities) * 255);
+	function->captures = elf_arena_push_zero(ctx->module->arena, sizeof(*function->captures) * 255);
+	function->capture_entities = elf_arena_push_zero(ctx->module->arena, sizeof(*function->capture_entities) * 255);
 	function->capture_count = 0;
 
 	return function;
 }
 
-static u32 function_index_from_ptr(LowerContext *ctx, IrFunction *function)
+static u32 function_index_from_ptr(IrFunctionEmitter *ctx, IrFunction *function)
 {
-	ASSERT(function >= ctx->functions);
-	ASSERT(function < ctx->functions + ctx->num_functions);
-	return (u32)(function - ctx->functions);
+	ASSERT(function >= ctx->module->module.functions);
+	ASSERT(function < ctx->module->module.functions + ctx->module->module.function_count);
+	return (u32)(function - ctx->module->module.functions);
 }
 
-static Ir create_ast_function_value_ir(LowerContext *ctx, Ast expr)
+static Ir create_ast_function_value_ir(IrFunctionEmitter *ctx, Ast expr)
 {
 	u32 param_count = IMPLICIT_PARAM_COUNT + expr->function.nparams;
 	IrFunction *function = add_function_ir(ctx, expr->site, expr->function.variadic != 0, param_count, 0);
@@ -481,11 +455,11 @@ static TypeRule type_rule_from_atom(Atom *atom)
 	}
 }
 
-static void lower_ast_function_body(LowerContext *ctx, Ast expr, Ir ir)
+static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 {
 	ASSERT(ir && ir->kind == IR_FUNCTION);
-	ASSERT(ir->ir_function.index < ctx->num_functions);
-	IrFunction *function = ctx->functions + ir->ir_function.index;
+	ASSERT(ir->ir_function.index < ctx->module->module.function_count);
+	IrFunction *function = ctx->module->module.functions + ir->ir_function.index;
 	Ast *params = expr->function.params;
 	u32 nparams = expr->function.nparams;
 
@@ -560,12 +534,12 @@ static void lower_ast_function_body(LowerContext *ctx, Ast expr, Ir ir)
 
 	IrArray captures = {};
 	captures.count = function->capture_count;
-	captures.items = elf_arena_push_copy(ctx->arena, sizeof(*captures.items) * captures.count, function->captures);
+	captures.items = elf_arena_push_copy(ctx->module->arena, sizeof(*captures.items) * captures.count, function->captures);
 	ir->ir_function.captures = captures;
 
 }
 
-static Ir lower_ast_function_to_ir(LowerContext *ctx, Ast expr)
+static Ir lower_ast_function_to_ir(IrFunctionEmitter *ctx, Ast expr)
 {
 	Ir ir = create_ast_function_value_ir(ctx, expr);
 	lower_ast_function_body(ctx, expr, ir);
@@ -616,12 +590,12 @@ static IrKind ir_kind_from_compound_assign_ast_kind(AstType kind)
 	}
 }
 
-static IrCallType call_type_from_callee(LowerContext *ctx, Ir callee)
+static IrCallType call_type_from_callee(IrFunctionEmitter *ctx, Ir callee)
 {
 	IrCallType type = IR_CALL_DYNAMIC;
-	if (callee && callee->kind == IR_FUNCTION && callee->ir_function.index < ctx->num_functions)
+	if (callee && callee->kind == IR_FUNCTION && callee->ir_function.index < ctx->module->module.function_count)
 	{
-		IrFunction *function = ctx->functions + callee->ir_function.index;
+		IrFunction *function = ctx->module->module.functions + callee->ir_function.index;
 		if (function->is_static && function->capture_count == 0) {
 			type = IR_CALL_DIRECT;
 		}
@@ -629,7 +603,7 @@ static IrCallType call_type_from_callee(LowerContext *ctx, Ir callee)
 	return type;
 }
 
-static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
+static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 {
 	if (!expr || ast_is_error(expr)) {
 		return ERROR_IR;
@@ -780,7 +754,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 		case AST_FIELD:
 		{
 			Com_StaticValue value = {};
-			Com_StaticLookup lookup = compiler_lookup_static_expr(ctx->compiler, ctx->current_source, expr, &value);
+			Com_StaticLookup lookup = compiler_lookup_static_expr(ctx->module->compiler, ctx->current_source, expr, &value);
 			if (lookup == COM_STATIC_LOOKUP_VALUE) {
 				ir = static_value_to_ir(ctx, expr->site, value);
 			}
@@ -806,7 +780,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 			Ir ir_func = lower_ast_expr_to_ir(ctx, func);
 
-			Ir *ir_args = elf_arena_push(ctx->arena, sizeof(*ir_args) * nargs);
+			Ir *ir_args = elf_arena_push(ctx->module->arena, sizeof(*ir_args) * nargs);
 			for (u32 i = 0; i < nargs; ++ i) {
 				ir_args[i] = lower_ast_expr_to_ir(ctx, args[i]);
 			}
@@ -955,7 +929,7 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 	return ir;
 }
 
-static Ir lower_ast_block(LowerContext *ctx, Ast stat, b32 is_file_body)
+static Ir lower_ast_block(IrFunctionEmitter *ctx, Ast stat, b32 is_file_body)
 {
 	if (!stat || ast_is_error(stat)) {
 		return ERROR_IR;
@@ -988,18 +962,18 @@ static Ir lower_ast_block(LowerContext *ctx, Ast stat, b32 is_file_body)
 	return ir;
 }
 
-static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat)
+static Ir lower_ast_to_ir_block(IrFunctionEmitter *ctx, Ast stat)
 {
 	return lower_ast_block(ctx, stat, false);
 }
 
-static Ir lower_ast_file_body_to_ir(LowerContext *ctx, Ast stat)
+static Ir lower_ast_file_body_to_ir(IrFunctionEmitter *ctx, Ast stat)
 {
 	ASSERT(stat && stat->kind == AST_BLOCK_STAT);
 	return lower_ast_block(ctx, stat, true);
 }
 
-static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IrFrame *items, Ast expr)
+static Ir lower_ast_lvalue_to_ir_once(IrFunctionEmitter *ctx, IrFrame *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -1056,7 +1030,7 @@ static Ir lower_ast_lvalue_to_ir_once(LowerContext *ctx, IrFrame *items, Ast exp
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.nargs;
 
@@ -1079,7 +1053,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 	if (nvars > 1 && expr_tuple->tuple.nargs == 1 && expr_tuple->tuple.args[0]->kind == AST_CALL)
 	{
 		Ir expr = lower_ast_expr_to_ir(ctx, expr_tuple->tuple.args[0]);
-		Ir *locals = elf_arena_push(ctx->arena, sizeof(*locals) * nvars);
+		Ir *locals = elf_arena_push(ctx->module->arena, sizeof(*locals) * nvars);
 		for (u32 i = 0; i < nvars; ++i)
 		{
 			Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
@@ -1129,7 +1103,7 @@ static u32 lower_local_decl_tuples_to_ir(LowerContext *ctx, IrFrame *items, Ast 
 	return nvars;
 }
 
-static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_tuple,
+static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast name_tuple,
 	Ast range_expr, u32 entity_tags)
 {
 	Ast collection_expr = 0;
@@ -1191,7 +1165,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	Ir iterator_local = create_local_ir(ctx, range_start_site, range_start);
 	Ir range_end_local = create_local_ir(ctx, range_end_site, range_end);
 
-	Ir *var_locals = elf_arena_push(ctx->arena, sizeof(*var_locals) * nvars);
+	Ir *var_locals = elf_arena_push(ctx->module->arena, sizeof(*var_locals) * nvars);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
@@ -1284,7 +1258,7 @@ static Ir lower_ast_for_range_expr_to_ir(LowerContext *ctx, Ast stat, Ast name_t
 	return ir;
 }
 
-static Ir lower_ast_for_range_to_ir(LowerContext *ctx, Ast stat)
+static Ir lower_ast_for_range_to_ir(IrFunctionEmitter *ctx, Ast stat)
 {
 	Ast decl = check_ast_type(stat->for_range_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
@@ -1318,7 +1292,7 @@ static Ir lower_ast_for_range_to_ir(LowerContext *ctx, Ast stat)
 	return lower_ast_for_range_expr_to_ir(ctx, stat, name_tuple, range, entity_tags);
 }
 
-static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
+static Ir lower_ast_for_to_ir(IrFunctionEmitter *ctx, Ast stat)
 {
 	Ast init = check_ast_type(stat->for_stat.init, AST_DECL_STAT);
 	if (ast_is_error(init))
@@ -1364,7 +1338,7 @@ static Ir lower_ast_for_to_ir(LowerContext *ctx, Ast stat)
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(LowerContext *ctx, IrFrame *items, Ast stat)
+static Ir lower_compound_assign_to_ir(IrFunctionEmitter *ctx, IrFrame *items, Ast stat)
 {
 	Ast dest_tuple = check_ast_type(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
@@ -1395,7 +1369,7 @@ static Ir lower_compound_assign_to_ir(LowerContext *ctx, IrFrame *items, Ast sta
 
 static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 {
-	LowerContext *ctx = items->ctx;
+	IrFunctionEmitter *ctx = items->ctx;
 
 	if (!stat || ast_is_error(stat))
 	{
@@ -1527,7 +1501,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 			}
 
 			// TODO(RJ): we don't need multi-local! could be done with the same mechanism!
-			Ir *values = elf_arena_push(ctx->arena, sizeof(*values) * nargs);
+			Ir *values = elf_arena_push(ctx->module->arena, sizeof(*values) * nargs);
 			if (expr_tuple->tuple.nargs == 1 && expr_tuple->tuple.args[0]->kind == AST_CALL)
 			{
 				Ast expr_ast = expr_tuple->tuple.args[0];
