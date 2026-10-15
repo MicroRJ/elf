@@ -1,0 +1,2 @@
+a :: import "a.elf"
+alias :: import "./a.elf"

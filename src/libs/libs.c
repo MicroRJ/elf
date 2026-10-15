@@ -27,49 +27,40 @@
 #include "l_random.c"
 #include "l_time.c"
 
-static elf_StrSlice lib_source_buffer_from_file(elf_State *state, const char *name)
-{
-	elf_StrSlice source = {0};
-	dy_File_Info info;
-	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > UINT_MAX) return source;
-	dy_File file;
-	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING,
-		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return source;
-
-	u64 allocation_size = info.size + 16;
-	char *data = elf_alloc_zero(state, allocation_size);
-	if (!data) {
-		dy_close_file(file);
-		return source;
-	}
-	dy_u64 read = 0;
-	dy_Result read_result = dy_read_file(file, data, info.size, &read);
-	dy_close_file(file);
-	if (read_result.error || read != info.size) {
-		elf_free(state, data, allocation_size);
-		return source;
-	}
-
-	source.data = data;
-	source.size = info.size;
-	return source;
-}
-
 elf_Bool elf_push_code_file(elf_State *state, const char *name)
 {
 	if (!name) {
 		elf_push_nil(state);
 		return false;
 	}
-	elf_StrSlice source = lib_source_buffer_from_file(state, name);
-	if (!source.data)
+
+	elf_Scratch scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(scratch.arena);
+	Com_SourceId root = compiler_add_root_file(compiler, name);
+	b32 root_loaded = root != COM_SOURCE_INVALID;
+	Com_Module *compiled_module = root != COM_SOURCE_INVALID ? compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION) : 0;
+	elf_Module *module = elf_link_module(state, compiled_module);
+	BcFunctionRef entry = {};
+	if (module && compiled_module->has_entry)
 	{
-		elf_push_nil(state);
+		entry.module = module;
+		entry.index = compiled_module->entry_index;
+	}
+	elf_end_scratch(scratch);
+
+	if (!bc_function_ref_is_valid(entry))
+	{
+		if (!root_loaded) {
+			elf_push_nil(state);
+		}
 		return false;
 	}
-	elf_ErrorCode result = elf_push_code_source(state, name, source);
-	elf_free(state, source.data, source.size + 16);
-	return result == ELF_ERROR_NONE;
+
+	ASSERT(bc_function_from_ref(entry)->captures == 0);
+	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
+	closure->function = entry;
+	push_value(state, value_from_closure(closure));
+	return true;
 }
 
 void elf_open_libraries(elf_State *state)

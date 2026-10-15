@@ -133,57 +133,16 @@ static void test_parser_import_expression(elf_State *state)
 	}
 }
 
-typedef struct
-{
-	u32 call_count;
-}
-ParserTestModuleLoader;
-
-static b32 parser_test_module_loader(Com_ModuleLoadParams *params)
-{
-	ParserTestModuleLoader *loader = params->user_data;
-	loader->call_count += 1;
-	const char *path = atom_data(params->path);
-	const char *name = 0;
-	const char *canonical_path = 0;
-	const char *source = 0;
-	if (strcmp(path, "a.elf") == 0 || strcmp(path, "alias-a.elf") == 0)
-	{
-		name = "a";
-		canonical_path = "a.elf";
-		source = "b :: import \"b.elf\"";
-	}
-	else if (strcmp(path, "b.elf") == 0)
-	{
-		name = "b";
-		canonical_path = "b.elf";
-		source = "root :: import \"root.elf\"";
-	}
-	else if (strcmp(path, "root.elf") == 0)
-	{
-		name = "root";
-		canonical_path = "root.elf";
-		source = "";
-	}
-	else
-	{
-		return false;
-	}
-	params->name = atom_from_data(params->compiler->atoms, name);
-	params->canonical_path = atom_from_data(params->compiler->atoms, canonical_path);
-	params->source = (elf_StrSlice) {.data = (char *)source, .size = strlen(source)};
-	return true;
-}
-
 static void test_parser_module_discovery(elf_State *state)
 {
+	(void)state;
 	elf_Arena arena = elf_arena_create(0);
-	const char *source_text = "a :: import \"a.elf\"\nalias :: import \"alias-a.elf\"";
-	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "root.elf", source);
-	ParserTestModuleLoader loader = {};
-	compiler_set_module_loader(compiler, parser_test_module_loader, &loader);
+	if (compiler_add_root_file(compiler, "test/imports/discovery/root.elf") == COM_SOURCE_INVALID) {
+		test_fail("compiler loads root source file directly");
+		elf_arena_destroy(&arena);
+		return;
+	}
 	if (!compiler_parse_sources(compiler)) {
 		test_fail("compiler parses imported module graph");
 		elf_arena_destroy(&arena);
@@ -194,9 +153,6 @@ static void test_parser_module_discovery(elf_State *state)
 		test_fail("module discovery deduplicates canonical paths");
 		elf_arena_destroy(&arena);
 		return;
-	}
-	if (loader.call_count != 4) {
-		test_fail("module discovery visits every import expression");
 	}
 	for (Com_SourceId source_id = 0; source_id < compiler->source_count; ++source_id)
 	{
@@ -219,6 +175,24 @@ static void test_parser_module_discovery(elf_State *state)
 	}
 	if (a->imports[0]->site.source != 1 || b->imports[0]->site.source != 2) {
 		test_fail("imported AST source sites retain source ids");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_parser_missing_import(elf_State *state)
+{
+	(void)state;
+	elf_Arena arena = elf_arena_create(0);
+	Compiler *compiler = compiler_create(&arena);
+	compiler_set_log_messages(compiler, false);
+	const char *source_text = "missing :: import \"missing.elf\"";
+	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
+	compiler_add_root_source(compiler, "test/imports/discovery/missing-root.elf", source);
+	if (compiler_parse_sources(compiler)) {
+		test_fail("missing imported source fails module discovery");
+	}
+	if (compiler->report.error_count != 1) {
+		test_fail("missing imported source reports one compiler error");
 	}
 	elf_arena_destroy(&arena);
 }
@@ -684,6 +658,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_static_declaration(state);
 	test_parser_import_expression(state);
 	test_parser_module_discovery(state);
+	test_parser_missing_import(state);
 	test_parser_string_strings(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);

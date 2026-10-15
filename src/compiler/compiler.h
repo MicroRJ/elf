@@ -55,22 +55,6 @@ Com_Report;
 
 #define COM_SOURCE_INVALID ((Com_SourceId)-1)
 
-// Request and response shared with the host's module loader. The compiler
-// supplies the import context and path; the loader returns identity and source.
-typedef struct
-{
-	Compiler *compiler;
-	Com_SourceId importer;
-	struct Atom *path;
-	void *user_data;
-	struct Atom *name;
-	struct Atom *canonical_path;
-	elf_StrSlice source;
-}
-Com_ModuleLoadParams;
-
-typedef b32 Com_ModuleLoader(Com_ModuleLoadParams *params);
-
 // One source file taking part in a compilation. The compiler owns its copied
 // text, parsed AST, and the imports discovered while parsing it.
 typedef struct
@@ -166,15 +150,13 @@ struct Compiler
 	Com_Source        *sources;
 	u32                source_count;
 	u32                source_capacity;
-	Com_ModuleLoader  *module_loader;
-	void              *module_loader_data;
 	Com_Report         report;
 	b32                log_messages;
 };
 
 Compiler *compiler_create(elf_Arena *arena);
 Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source);
-void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data);
+Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path);
 void compiler_set_log_messages(Compiler *compiler, b32 enabled);
 b32 compiler_record_import(Compiler *compiler, Com_SourceId source, struct Ast_T *import);
 b32 compiler_parse_sources(Compiler *compiler);

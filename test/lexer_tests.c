@@ -722,22 +722,6 @@ static void test_lexer_compiler_source(elf_State *state)
 	}
 }
 
-static b32 test_module_loader(Com_ModuleLoadParams *params)
-{
-	(void)params;
-	return false;
-}
-
-static void test_compiler_module_loader_boundary(elf_State *state)
-{
-	Parser parser = lexer_test_parser(state, "value");
-	Compiler *compiler = parser.compiler;
-	compiler_set_module_loader(compiler, test_module_loader, &parser);
-	if (compiler->module_loader != test_module_loader || compiler->module_loader_data != &parser) {
-		test_fail("compiler stores module loader boundary");
-	}
-}
-
 static void test_lexer_bounded_source(elf_State *state)
 {
 	char string_source[] = {'"', 'o', 'k', '"'};
@@ -812,7 +796,6 @@ static void run_lexer_tests(elf_State *state)
 	test_lexer_numbers(state);
 	test_lexer_operators(state);
 	test_lexer_compiler_source(state);
-	test_compiler_module_loader_boundary(state);
 	test_lexer_bounded_source(state);
 	test_lexer_out_of_memory(state);
 }

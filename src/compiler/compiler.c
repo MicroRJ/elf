@@ -10,6 +10,8 @@
 #include <string.h>
 #include <assert.h>
 
+#include <dy.h>
+
 #include "elf.h"
 #include "base.h"
 #include "atom.h"
@@ -79,12 +81,6 @@ Compiler *compiler_create(elf_Arena *arena)
 	return compiler;
 }
 
-void compiler_set_module_loader(Compiler *compiler, Com_ModuleLoader *loader, void *user_data)
-{
-	compiler->module_loader = loader;
-	compiler->module_loader_data = user_data;
-}
-
 void compiler_set_log_messages(Compiler *compiler, b32 enabled)
 {
 	compiler->log_messages = enabled;
@@ -136,23 +132,23 @@ static SourceBuffer compiler_copy_source(Compiler *compiler, elf_StrSlice source
 	return (SourceBuffer) {.data = data, .size = (u32)source.size};
 }
 
-static Com_SourceId compiler_register_source(Compiler *compiler, Com_ModuleLoadParams *params, SourceSite site)
+static Com_SourceId compiler_register_source(Compiler *compiler, Atom *name, Atom *canonical_path, elf_StrSlice source_text, SourceSite site)
 {
-	ASSERT(params->canonical_path);
-	Com_SourceId source_id = compiler_find_source(compiler, params->canonical_path);
+	ASSERT(name);
+	ASSERT(canonical_path);
+	Com_SourceId source_id = compiler_find_source(compiler, canonical_path);
 	if (source_id != COM_SOURCE_INVALID) {
 		return source_id;
 	}
 
-	b32 source_is_oversized = params->source.size > UINT32_MAX;
-	b32 source_is_invalid = params->source.size && !params->source.data;
-	b32 source_has_nul = !source_is_oversized && !source_is_invalid && params->source.size && memchr(params->source.data, 0, params->source.size);
+	b32 source_is_oversized = source_text.size > UINT32_MAX;
+	b32 source_is_invalid = source_text.size && !source_text.data;
+	b32 source_has_nul = !source_is_oversized && !source_is_invalid && source_text.size && memchr(source_text.data, 0, source_text.size);
 	if (source_is_oversized || source_is_invalid || source_has_nul)
 	{
 		if (compiler->source_count == 0)
 		{
-			Atom *name = params->name ? params->name : params->canonical_path;
-			source_id = compiler_append_source(compiler, name, params->canonical_path, (SourceBuffer) {.data = params->source.data});
+			source_id = compiler_append_source(compiler, name, canonical_path, (SourceBuffer) {.data = source_text.data});
 			site.source = source_id;
 		}
 		if (source_is_oversized) {
@@ -167,24 +163,152 @@ static Com_SourceId compiler_register_source(Compiler *compiler, Com_ModuleLoadP
 		return COM_SOURCE_INVALID;
 	}
 
-	Atom *name = params->name ? params->name : params->canonical_path;
-	SourceBuffer source = compiler_copy_source(compiler, params->source);
-	return compiler_append_source(compiler, name, params->canonical_path, source);
+	SourceBuffer source = compiler_copy_source(compiler, source_text);
+	return compiler_append_source(compiler, name, canonical_path, source);
 }
 
 Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source)
 {
 	ASSERT(compiler->source_count == 0);
 	Atom *source_name = atom_from_data(compiler->atoms, name ? name : "<unknown>");
-	Com_ModuleLoadParams params = {
-		.compiler = compiler,
-		.importer = COM_SOURCE_INVALID,
-		.path = source_name,
-		.name = source_name,
-		.canonical_path = source_name,
-		.source = source,
-	};
-	Com_SourceId source_id = compiler_register_source(compiler, &params, (SourceSite) {});
+	Com_SourceId source_id = compiler_register_source(compiler, source_name, source_name, source, (SourceSite) {});
+	ASSERT(source_id == COM_SOURCE_INVALID || source_id == 0);
+	return source_id;
+}
+
+static b32 compiler_path_is_absolute(Atom *path)
+{
+	const char *data = atom_data(path);
+	u32 size = atom_size(path);
+	return (size && (data[0] == '/' || data[0] == '\\')) || (size >= 2 && data[1] == ':');
+}
+
+static Atom *compiler_resolve_source_path(Compiler *compiler, Atom *importer_path, Atom *requested_path)
+{
+	Atom *result = 0;
+	elf_Scratch scratch = elf_begin_scratch_excluding(compiler->arena);
+	dy_String requested = dy_string_from_data(atom_data(requested_path), atom_size(requested_path));
+	dy_String candidate = requested;
+	if (importer_path && !compiler_path_is_absolute(requested_path))
+	{
+		const char *importer_data = atom_data(importer_path);
+		u32 importer_size = atom_size(importer_path);
+		u32 directory_size = 0;
+		for (u32 i = importer_size; i > 0; --i)
+		{
+			if (importer_data[i - 1] == '/' || importer_data[i - 1] == '\\') {
+				directory_size = i > 1 ? i - 1 : 1;
+				break;
+			}
+		}
+
+		if (directory_size)
+		{
+			u64 capacity = (u64)directory_size + requested.size + 2;
+			char *storage = elf_arena_push(scratch.arena, capacity);
+			dy_Path_Builder builder;
+			if (storage && dy_path_builder_init(&builder, storage, capacity, dy_string_from_data(importer_data, directory_size)) && dy_path_push(&builder, requested)) {
+				candidate = dy_string_from_data(builder.data, builder.size);
+			}
+			else {
+				candidate = (dy_String) {0};
+			}
+		}
+	}
+
+	if (candidate.data && candidate.size)
+	{
+		dy_String canonical = {0};
+		if (!dy_get_absolute_path(scratch.arena, candidate, &canonical).error && canonical.size <= UINT32_MAX) {
+			result = atom_from_data_size(compiler->atoms, canonical.data, (u32)canonical.size);
+		}
+	}
+	elf_end_scratch(scratch);
+	return result;
+}
+
+static Com_SourceId compiler_load_source_file(Compiler *compiler, Atom *importer_path, Atom *requested_path, SourceSite site)
+{
+	Com_SourceId result = COM_SOURCE_INVALID;
+	Atom *canonical_path = compiler_resolve_source_path(compiler, importer_path, requested_path);
+	if (!canonical_path)
+	{
+		if (compiler->source_count == 0) {
+			site.source = compiler_append_source(compiler, requested_path, requested_path, (SourceBuffer) {});
+		}
+		compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "failed to resolve source path '%s'", atom_data(requested_path));
+	}
+	else
+	{
+		result = compiler_find_source(compiler, canonical_path);
+		if (result == COM_SOURCE_INVALID)
+		{
+			elf_Scratch scratch = elf_begin_scratch_excluding(compiler->arena);
+			dy_String path = dy_string_from_data(atom_data(canonical_path), atom_size(canonical_path));
+			dy_File_Info info = {0};
+			dy_File file = {0};
+			elf_StrSlice source = {0};
+			const char *error = 0;
+			if (dy_get_file_info(path, &info).error || info.is_directory) {
+				error = "could not find source file";
+			}
+			else if (info.size > UINT32_MAX) {
+				error = "source file exceeds the 32-bit size limit";
+			}
+			else if (dy_access_file(path, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) {
+				error = "could not open source file";
+			}
+			else
+			{
+				source.data = elf_arena_push(scratch.arena, info.size + 1);
+				if (!source.data) {
+					error = "out of memory while loading source file";
+				}
+				else
+				{
+					dy_u64 read = 0;
+					dy_Result read_result = dy_read_file(file, source.data, info.size, &read);
+					if (read_result.error || read != info.size) {
+						error = "could not read source file";
+					}
+					else {
+						source.data[info.size] = 0;
+						source.size = info.size;
+					}
+				}
+			}
+
+			if (dy_file_is_valid(file)) {
+				dy_close_file(file);
+			}
+			if (error)
+			{
+				if (compiler->source_count == 0) {
+					site.source = compiler_append_source(compiler, canonical_path, canonical_path, (SourceBuffer) {});
+				}
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "%s '%s'", error, atom_data(canonical_path));
+			}
+			else {
+				result = compiler_register_source(compiler, canonical_path, canonical_path, source, site);
+			}
+			elf_end_scratch(scratch);
+		}
+	}
+	return result;
+}
+
+Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path)
+{
+	ASSERT(compiler);
+	ASSERT(compiler->source_count == 0);
+	Com_SourceId source_id = COM_SOURCE_INVALID;
+	if (path)
+	{
+		Atom *requested_path = atom_from_data(compiler->atoms, path);
+		if (requested_path) {
+			source_id = compiler_load_source_file(compiler, 0, requested_path, (SourceSite) {});
+		}
+	}
 	ASSERT(source_id == COM_SOURCE_INVALID || source_id == 0);
 	return source_id;
 }
@@ -194,35 +318,12 @@ static b32 compiler_resolve_import(Compiler *compiler, Com_SourceId importer, As
 	ASSERT(importer < compiler->source_count);
 	ASSERT(import_ast && import_ast->kind == AST_IMPORT);
 	b32 result = false;
-	if (!compiler->module_loader)
+	Atom *importer_path = compiler->sources[importer].canonical_path;
+	Com_SourceId source_id = compiler_load_source_file(compiler, importer_path, import_ast->import.path, import_ast->site);
+	if (source_id != COM_SOURCE_INVALID)
 	{
-		compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, import_ast->site, "cannot import '%s': no module loader is configured", atom_data(import_ast->import.path));
-	}
-	else
-	{
-		Com_ModuleLoadParams params = {
-			.compiler = compiler,
-			.importer = importer,
-			.path = import_ast->import.path,
-			.user_data = compiler->module_loader_data,
-		};
-		if (!compiler->module_loader(&params))
-		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, import_ast->site, "failed to load module '%s'", atom_data(import_ast->import.path));
-		}
-		else if (!params.canonical_path)
-		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, import_ast->site, "module loader returned no canonical path for '%s'", atom_data(import_ast->import.path));
-		}
-		else
-		{
-			Com_SourceId source_id = compiler_register_source(compiler, &params, import_ast->site);
-			if (source_id != COM_SOURCE_INVALID)
-			{
-				import_ast->import.source = source_id;
-				result = true;
-			}
-		}
+		import_ast->import.source = source_id;
+		result = true;
 	}
 	return result;
 }
