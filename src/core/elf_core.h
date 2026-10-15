@@ -155,6 +155,9 @@ struct BcFunction
 	u32             source_map_count;
 };
 
+// A module keeps one compiler output together. Dynamically loaded code has its
+// own bytecode, functions, and constant pools, so for now their indices stay
+// module-relative. Relocating them into elf_State may be worth exploring later.
 struct elf_Module
 {
 	elf_Module   *next;
