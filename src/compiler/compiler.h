@@ -86,6 +86,13 @@ typedef struct
 }
 Com_Output;
 
+typedef enum
+{
+	COM_UNIT_FUNCTION,
+	COM_UNIT_MODULE,
+}
+Com_UnitType;
+
 struct Compiler
 {
 	elf_State         *state;
@@ -110,7 +117,7 @@ b32 compiler_parse_modules(Compiler *compiler);
 b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
 
-Com_Output compiler_compile(Compiler *compiler);
+Com_Output compiler_compile(Compiler *compiler, Com_UnitType unit_type);
 int compiler_push_constant_expr(Compiler *compiler);
 int compiler_push_json(Compiler *compiler);
 

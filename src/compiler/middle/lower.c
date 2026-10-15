@@ -427,9 +427,9 @@ static LoopLabels current_loop_labels(LowerContext *ctx, SourceSite site)
 
 static IrFunction *add_function_ir(LowerContext *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body);
 
-static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
+static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 {
-	PROF_BLOCK("lower.file")
+	PROF_BLOCK("lower.function")
 	{
 		IrFunction *main_fn = add_function_ir(ctx, file->site, true, IMPLICIT_PARAM_COUNT, 0);
 
@@ -452,6 +452,30 @@ static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 	module.function_count = ctx->num_functions;
 	module.has_entry = true;
 	module.entry_index = 0;
+	return module;
+}
+
+static IrModule elf_lower_ast_module(LowerContext *ctx, Ast file)
+{
+	PROF_BLOCK("lower.module")
+	{
+		Ast body = file->file.body;
+		ASSERT(body && body->kind == AST_BLOCK_STAT);
+		for (u32 i = 0; i < body->block.nstats; ++i)
+		{
+			Ast item = body->block.stats[i];
+			if (item->kind != AST_STATIC_DECL) {
+				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, item->site, "static module cannot contain executable top-level statements");
+			}
+		}
+
+		declare_file_statics(ctx, body);
+		evaluate_file_statics(ctx);
+	}
+
+	IrModule module = {};
+	module.functions = ctx->functions;
+	module.function_count = ctx->num_functions;
 	return module;
 }
 

@@ -7,7 +7,7 @@ static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, co
 	Ast file = elf_parse_file(parser);
 
 	LowerContext *ctx = elf_create_lower_context(compiler);
-	IrModule module = elf_lower_ast_file(ctx, file);
+	IrModule module = elf_lower_ast_function(ctx, file);
 	if (module.functions != ctx->functions ||
 		module.function_count != ctx->num_functions ||
 		!module.has_entry ||

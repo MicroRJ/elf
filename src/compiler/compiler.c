@@ -543,10 +543,11 @@ static char *persist_compiled_source(elf_State *state, SourceBuffer source)
 	return data;
 }
 
-Com_Output compiler_compile(Compiler *compiler)
+Com_Output compiler_compile(Compiler *compiler, Com_UnitType unit_type)
 {
 	ASSERT(compiler);
 	ASSERT(compiler->module_count);
+	ASSERT(unit_type == COM_UNIT_FUNCTION || unit_type == COM_UNIT_MODULE);
 	elf_State *state = compiler->state;
 	u64 arena_checkpoint = state->arena.used;
 	Com_Output output = {};
@@ -570,7 +571,12 @@ Com_Output compiler_compile(Compiler *compiler)
 	IrModule ir_module;
 	PROF_BLOCK("compiler.lower")
 	{
-		ir_module = elf_lower_ast_file(ctx, ast_file);
+		if (unit_type == COM_UNIT_FUNCTION) {
+			ir_module = elf_lower_ast_function(ctx, ast_file);
+		}
+		else {
+			ir_module = elf_lower_ast_module(ctx, ast_file);
+		}
 	}
 	if (compiler->report.error_count) {
 		state->arena.used = arena_checkpoint;
@@ -612,7 +618,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
 	compiler_add_root_module(compiler, name, source);
-	Com_Output output = compiler_compile(compiler);
+	Com_Output output = compiler_compile(compiler, COM_UNIT_FUNCTION);
 	elf_end_scratch(scratch);
 	return output.entry;
 }

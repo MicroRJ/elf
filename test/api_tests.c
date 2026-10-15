@@ -600,7 +600,7 @@ static void test_api_source_compilation(elf_State *state)
 	char invalid_code_text[] = "answer := 1 +";
 	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-code.elf", invalid_code);
-	Com_Output failed_output = compiler_compile(compiler);
+	Com_Output failed_output = compiler_compile(compiler, COM_UNIT_FUNCTION);
 	if (failed_output.module || bc_function_ref_is_valid(failed_output.entry)) {
 		test_fail("API rejects malformed code source");
 	}
@@ -629,7 +629,7 @@ static void test_api_source_compilation(elf_State *state)
 	char valid_code_text[] = "unused := 1\nret 42";
 	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "valid-code.elf", valid_code);
-	Com_Output output = compiler_compile(compiler);
+	Com_Output output = compiler_compile(compiler, COM_UNIT_FUNCTION);
 	BcFunctionRef function = output.entry;
 	if (!bc_function_ref_is_valid(function)) {
 		test_fail("API compiles valid code after a failed parse");
@@ -657,6 +657,42 @@ static void test_api_source_compilation(elf_State *state)
 	}
 	elf_end_scratch(compiler_scratch);
 	elf_set_top(state, checkpoint);
+}
+
+static void test_api_module_compilation(elf_State *state)
+{
+	elf_Scratch compiler_scratch = {};
+	char valid_text[] = "foo :: fun() { ret bar() }\nbar :: fun() { ret foo() }";
+	elf_StrSlice valid_source = {valid_text, sizeof(valid_text) - 1};
+	Compiler *compiler = api_test_create_compiler(state, &compiler_scratch, "valid-module.elf", valid_source);
+	Com_Output output = compiler_compile(compiler, COM_UNIT_MODULE);
+	if (!output.module || bc_function_ref_is_valid(output.entry)) {
+		test_fail("static module compilation returns a module without an entry function");
+	}
+	else if (output.module->bytecode_function_count != 2) {
+		test_fail("static module compilation retains top-level functions");
+	}
+	if (compiler->report.error_count || compiler->report.warning_count) {
+		test_fail("static module exports are not reported as unreferenced");
+	}
+	elf_end_scratch(compiler_scratch);
+
+	elf_Module *module_checkpoint = state->modules;
+	elf_u64 arena_checkpoint = state->arena.used;
+	char invalid_text[] = "answer :: 42\nret answer";
+	elf_StrSlice invalid_source = {invalid_text, sizeof(invalid_text) - 1};
+	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-module.elf", invalid_source);
+	output = compiler_compile(compiler, COM_UNIT_MODULE);
+	if (output.module || bc_function_ref_is_valid(output.entry)) {
+		test_fail("static module compilation rejects executable top-level statements");
+	}
+	if (compiler->report.error_count != 1 || !api_slice_contains(compiler->report.first->text, "executable top-level statements")) {
+		test_fail("static module compilation reports its top-level restriction");
+	}
+	if (state->modules != module_checkpoint || state->arena.used != arena_checkpoint) {
+		test_fail("failed static module compilation publishes no partial module");
+	}
+	elf_end_scratch(compiler_scratch);
 }
 
 static void test_api_value_source(elf_State *state)
@@ -794,6 +830,7 @@ static void run_api_tests(void)
 	test_api_user_objects(state);
 	test_api_mutation_errors(state);
 	test_api_source_compilation(state);
+	test_api_module_compilation(state);
 	test_api_value_source(state);
 	elf_destroy_state(state);
 }
