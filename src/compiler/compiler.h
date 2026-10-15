@@ -83,6 +83,70 @@ typedef struct
 }
 Com_Source;
 
+// Raw text owned by the arena containing the compiled module.
+typedef struct
+{
+	const char *data;
+	u32         size;
+}
+Com_String;
+
+// One source preserved in the compiled module for source maps and diagnostics.
+typedef struct
+{
+	Com_String   name;
+	Com_String   canonical_path;
+	SourceBuffer source;
+}
+Com_ModuleSource;
+
+// A global name referenced by the module. name indexes Com_Module.strings.
+typedef struct
+{
+	u32 name;
+}
+Com_GlobalSymbol;
+
+// Identifies bytecode whose module-local global index must be replaced with an
+// elf_State global slot when the compiled module is linked.
+typedef struct
+{
+	u32 bytecode_index;
+	u32 global_index;
+}
+Com_GlobalRelocation;
+
+// One complete, state-independent compiler output. All referenced storage
+// belongs to the module's output arena; nothing here points into an elf_State.
+typedef struct
+{
+	Com_ModuleSource *sources;
+	u32               source_count;
+	u32               root_source;
+
+	Com_String *strings;
+	u32         string_count;
+
+	Com_GlobalSymbol     *globals;
+	u32                   global_count;
+	Com_GlobalRelocation *global_relocations;
+	u32                   global_relocation_count;
+
+	i64 *integer_constants;
+	u32  integer_constant_count;
+	f64 *number_constants;
+	u32  number_constant_count;
+
+	BcFunction *functions;
+	u32         function_count;
+	Bytecode   *bytecode;
+	u32         bytecode_count;
+
+	b32 has_entry;
+	u32 entry_index;
+}
+Com_Module;
+
 typedef struct
 {
 	elf_Module    *module;
