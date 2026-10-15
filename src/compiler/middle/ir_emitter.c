@@ -617,6 +617,95 @@ static IrCallType call_type_from_callee(IrFunctionEmitter *ctx, Ir callee)
 	return type;
 }
 
+static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir callee, b32 *failed)
+{
+	ASSERT(call && call->kind == AST_CALL);
+	ASSERT(callee && callee->kind == IR_FUNCTION);
+	ASSERT(callee->ir_function.index < ctx->module->compiler->function_count);
+	ASSERT(callee->ir_function.index < ctx->module->module.function_count);
+
+	Com_Function *function = ctx->module->compiler->functions + callee->ir_function.index;
+	IrFunction *ir_function = ctx->module->module.functions + callee->ir_function.index;
+	u32 capacity = call->call.nargs > function->param_count ? call->call.nargs : function->param_count;
+	IrArray result = {};
+	if (capacity) {
+		result.items = elf_arena_push(ctx->module->arena, sizeof(*result.items) * capacity);
+	}
+
+	u32 argument_index = 0;
+	u32 parameter_index = 0;
+	while (argument_index < call->call.nargs && call->call.args[argument_index]->kind != AST_NAMED_ARGUMENT)
+	{
+		Ast argument = call->call.args[argument_index];
+		if (parameter_index >= function->param_count && !ir_function->variadic)
+		{
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
+			*failed = true;
+		}
+		else
+		{
+			Ir argument_ir = lower_ast_expr_to_ir(ctx, argument);
+			result.items[result.count++] = argument_ir;
+			if (!argument_ir || argument_ir == ERROR_IR) {
+				*failed = true;
+			}
+		}
+		argument_index += 1;
+		parameter_index += 1;
+	}
+
+	while (parameter_index < function->param_count)
+	{
+		Com_FunctionParameter *parameter = function->params + parameter_index;
+		Ast argument = argument_index < call->call.nargs ? call->call.args[argument_index] : 0;
+		if (argument && argument->kind != AST_NAMED_ARGUMENT)
+		{
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "positional arguments cannot follow named arguments");
+			*failed = true;
+			argument_index += 1;
+		}
+		else if (argument && argument->named_argument.name->atom == parameter->name)
+		{
+			Ir argument_ir = lower_ast_expr_to_ir(ctx, argument->named_argument.expr);
+			result.items[result.count++] = argument_ir;
+			if (!argument_ir || argument_ir == ERROR_IR) {
+				*failed = true;
+			}
+			argument_index += 1;
+			parameter_index += 1;
+		}
+		else if (parameter->has_default)
+		{
+			Ir argument_ir = static_value_to_ir(ctx, parameter->site, parameter->default_value);
+			result.items[result.count++] = argument_ir;
+			if (!argument_ir || argument_ir == ERROR_IR) {
+				*failed = true;
+			}
+			parameter_index += 1;
+		}
+		else
+		{
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->site, "required parameter '%s' was not provided", atom_data(parameter->name));
+			*failed = true;
+			parameter_index += 1;
+		}
+	}
+
+	if (argument_index < call->call.nargs)
+	{
+		Ast argument = call->call.args[argument_index];
+		if (argument->kind == AST_NAMED_ARGUMENT) {
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "named argument '%s' is unknown, duplicated, or out of order", atom_data(argument->named_argument.name->atom));
+		}
+		else {
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
+		}
+		*failed = true;
+	}
+
+	return result;
+}
+
 static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 {
 	if (!expr || ast_is_error(expr)) {
@@ -793,14 +882,38 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 			u32 nargs = expr->call.nargs;
 
 			Ir ir_func = lower_ast_expr_to_ir(ctx, func);
-
-			Ir *ir_args = elf_arena_push(ctx->module->arena, sizeof(*ir_args) * nargs);
-			for (u32 i = 0; i < nargs; ++ i) {
-				ir_args[i] = lower_ast_expr_to_ir(ctx, args[i]);
+			IrCallType call_type = call_type_from_callee(ctx, ir_func);
+			b32 failed = !ir_func || ir_func == ERROR_IR;
+			IrArray ir_args = {};
+			if (call_type == IR_CALL_DIRECT)
+			{
+				ir_args = lower_direct_call_arguments(ctx, expr, ir_func, &failed);
+			}
+			else
+			{
+				if (nargs) {
+					ir_args.items = elf_arena_push(ctx->module->arena, sizeof(*ir_args.items) * nargs);
+				}
+				for (u32 i = 0; i < nargs; ++i)
+				{
+					Ast argument = args[i];
+					if (argument->kind == AST_NAMED_ARGUMENT)
+					{
+						report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "named arguments require a statically known function");
+						failed = true;
+					}
+					else
+					{
+						Ir argument_ir = lower_ast_expr_to_ir(ctx, argument);
+						ir_args.items[ir_args.count++] = argument_ir;
+						if (!argument_ir || argument_ir == ERROR_IR) {
+							failed = true;
+						}
+					}
+				}
 			}
 
-			IrCallType call_type = call_type_from_callee(ctx, ir_func);
-			ir = create_call_ir(ctx, expr->site, call_type, ir_func, (IrArray) { .items = ir_args, .count = nargs });
+			ir = failed ? ERROR_IR : create_call_ir(ctx, expr->site, call_type, ir_func, ir_args);
 		}
 		break;
 

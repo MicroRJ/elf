@@ -458,6 +458,92 @@ static void test_ir_resolves_static_function_defaults(elf_State *state)
 	elf_arena_destroy(&arena);
 }
 
+static void test_ir_lowers_static_call_arguments(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "build :: fun(required, width = 20, title = \"elf\") { ret required }\nret build(1, title = \"custom\")");
+	if (!ctx || ctx->module->module.function_count != 2)
+	{
+		test_fail("static call argument lowering retains the target function");
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	Ir body = ctx->module->module.functions[0].body;
+	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static call lowers return");
+	Ir call = ret ? ret->ir_return.expr : 0;
+	expect_ir_kind(call, IR_CALL, "static call lowers call expression");
+	if (call && call->ir_call.type != IR_CALL_DIRECT) {
+		test_fail("static call arguments remain on a direct call");
+	}
+	if (!call || call->ir_call.args.count != 3)
+	{
+		test_fail("static call fills every declared parameter");
+	}
+	else
+	{
+		expect_ir_i64(call->ir_call.args.items[0], 1, "static call keeps positional argument");
+		expect_ir_i64(call->ir_call.args.items[1], 20, "static call fills skipped parameter default");
+		expect_ir_atom(call->ir_call.args.items[2], "custom", "static call lowers ordered named argument");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "collect :: fun(first, ...) { ret first }\nret collect(1, 2, 3)");
+	if (!ctx || ctx->module->compiler->report.error_count != 0 || ctx->module->module.function_count != 2)
+	{
+		test_fail("variadic static call accepts extra positional arguments");
+		elf_arena_destroy(&arena);
+		return;
+	}
+
+	Ir ret = ir_test_body_stat(ctx->module->module.functions[0].body, 0, IR_RETURN, "variadic static call lowers return");
+	Ir call = ret ? ret->ir_return.expr : 0;
+	if (!call || call->kind != IR_CALL || call->ir_call.type != IR_CALL_DIRECT || call->ir_call.args.count != 3) {
+		test_fail("variadic static call retains all positional arguments");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_rejects_invalid_static_call_arguments(elf_State *state)
+{
+	const char *sources[] =
+	{
+		"target :: fun(required, optional = 2) { ret required }\nret target()",
+		"target :: fun(first = 1, second = 2) { ret first }\nret target(second = 2, first = 1)",
+		"target :: fun(first = 1, second = 2) { ret first }\nret target(first = 1, 2)",
+		"target :: fun(value = 1) { ret value }\nret target(unknown = 2)",
+		"target :: fun(value = 1) { ret value }\nret target(value = 1, value = 2)",
+		"target :: fun(value) { ret value }\nret target(1, 2)",
+		"target := fun(value) { ret value }\nret target(value = 1)",
+	};
+	const char *labels[] =
+	{
+		"static call rejects missing required argument",
+		"static call rejects out-of-order named arguments",
+		"static call rejects positional arguments after named arguments",
+		"static call rejects unknown named arguments",
+		"static call rejects duplicated named arguments",
+		"static call rejects excess positional arguments",
+		"dynamic call rejects named arguments",
+	};
+
+	log_set_hook(ignore_expected_lowering_error, 0);
+	for (u32 i = 0; i < ARRAY_COUNT(sources); ++i)
+	{
+		elf_Arena arena = elf_arena_create(0);
+		IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, sources[i]);
+		if (!ctx || ctx->module->compiler->report.error_count != 1) {
+			test_fail(labels[i]);
+		}
+		elf_arena_destroy(&arena);
+	}
+	log_set_hook(0, 0);
+}
+
 static void test_ir_rejects_runtime_static_function_default(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -589,6 +675,9 @@ static void run_ir_tests(elf_State *state)
 	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);
 	test_ir_resolves_static_function_defaults(state);
+	test_ir_lowers_static_call_arguments(state);
+	test_ir_lowers_variadic_static_call_arguments(state);
+	test_ir_rejects_invalid_static_call_arguments(state);
 	test_ir_rejects_runtime_static_function_default(state);
 	test_ir_lowers_local_shadow_of_file_static(state);
 	test_ir_lowers_mutually_recursive_static_functions(state);

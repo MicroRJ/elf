@@ -308,6 +308,26 @@ static void test_vm_static_function(void)
 	elf_destroy_state(state);
 }
 
+static void test_vm_static_function_named_defaults(void)
+{
+	elf_State *state = elf_create_state();
+	char source_text[] = "combine :: fun(a, b = 20, c = 3) { ret a * 100 + b * 10 + c }\nret combine(4, c = 6)";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (elf_push_code_source(state, "static-function-named-defaults", source) != ELF_ERROR_NONE)
+	{
+		test_fail("static function named defaults compile");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	if (!value_is_integer(state->stack_ptr[-1]) || value_as_integer(state->stack_ptr[-1]) != 606) {
+		test_fail("static function named defaults execute through the VM");
+	}
+	elf_destroy_state(state);
+}
+
 static void test_vm_static_recurse_function(void)
 {
 	elf_State *state = elf_create_state();
@@ -602,6 +622,7 @@ static void run_vm_tests(void)
 	test_vm_interpolated_strings();
 	test_vm_fib();
 	test_vm_static_function();
+	test_vm_static_function_named_defaults();
 	test_vm_static_recurse_function();
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
