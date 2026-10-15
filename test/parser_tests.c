@@ -342,7 +342,14 @@ static void test_parser_for_loops(elf_State *state)
 
 static void test_parser_call_with_table_argument(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "make {x = 1, [2] = 3}");
+	(void)state;
+	elf_Arena arena = elf_arena_create(0);
+	char source_text[] = "make {x = 1, [2] = 3}";
+	Compiler *compiler = compiler_create(&arena);
+	compiler_set_log_messages(compiler, false);
+	compiler_add_root_source(compiler, "deprecated_table_call", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
+	Parser *parser = parser_create(compiler, 0);
+	Ast file = elf_parse_file(parser);
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
@@ -350,6 +357,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	expect_ast_atom(call->call.expr, "make", "parse call callee string");
 	if (call->call.nargs != 1) {
 		test_fail("table call shorthand counts argument");
+		elf_arena_destroy(&arena);
 		return;
 	}
 
@@ -357,6 +365,52 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	expect_ast_kind(table, AST_TABLE, "parse table argument");
 	if (table->table.nargs != 2) {
 		test_fail("table parser counts entries");
+	}
+	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->phase != COMPILER_PHASE_PARSER) {
+		test_fail("table call shorthand reports one parser deprecation warning");
+	}
+	elf_arena_destroy(&arena);
+}
+
+static void test_parser_trailing_closures(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "run -> {}\nmap(2) -> (item: int, index) { ret item }");
+	Ast first_stat = parser_test_stat(file, 0, AST_TUPLE, "parse zero-parameter trailing closure tuple");
+	Ast first = parser_test_tuple_item(first_stat, 0, AST_TRAILING_CALL, "preserve zero-parameter trailing call");
+	if (!first) {
+		return;
+	}
+	expect_ast_atom(first->trailing_call.left, "run", "trailing call keeps left expression");
+	Ast first_function = first->trailing_call.function;
+	expect_ast_kind(first_function, AST_FUNCTION, "trailing call stores implicit function");
+	if (!first_function || first_function->function.nparams != 0) {
+		test_fail("omitted trailing closure parameters mean zero parameters");
+	}
+	expect_ast_kind(first_function ? first_function->function.body : 0, AST_BLOCK_STAT, "trailing closure stores block body");
+
+	Ast second_stat = parser_test_stat(file, 1, AST_TUPLE, "parse parameterized trailing closure tuple");
+	Ast second = parser_test_tuple_item(second_stat, 0, AST_TRAILING_CALL, "preserve parameterized trailing call");
+	if (!second) {
+		return;
+	}
+	Ast left_call = second->trailing_call.left;
+	expect_ast_kind(left_call, AST_CALL, "trailing call preserves existing call");
+	if (!left_call || left_call->call.nargs != 1) {
+		test_fail("trailing call preserves existing arguments");
+	}
+	else {
+		expect_ast_i64(left_call->call.args[0], 2, "trailing call keeps existing argument");
+	}
+	Ast function = second->trailing_call.function;
+	if (!function || function->kind != AST_FUNCTION || function->function.nparams != 2) {
+		test_fail("trailing closure preserves parameter list");
+	}
+	else
+	{
+		Ast item = function->function.params[0];
+		expect_ast_atom(item->param.name, "item", "trailing closure keeps first parameter");
+		expect_ast_atom(item->param.type, "int", "trailing closure keeps parameter type");
+		expect_ast_atom(function->function.params[1]->param.name, "index", "trailing closure keeps second parameter");
 	}
 }
 
@@ -742,6 +796,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_if_else_blocks(state);
 	test_parser_for_loops(state);
 	test_parser_call_with_table_argument(state);
+	test_parser_trailing_closures(state);
 	test_parser_named_call_arguments(state);
 	test_parser_array_literals(state);
 	test_parser_nil_assign(state);

@@ -194,7 +194,7 @@ static void test_ir_lowers_interpolated_string(elf_State *state)
 static void test_ir_lowers_field_and_call(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
-	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "ret obj.name\nmake {x = 1}");
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "ret obj.name\nmake({x = 1})");
 	Ir body = ir_test_main_body(ctx);
 
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower field return");

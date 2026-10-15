@@ -290,6 +290,23 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u3
 	return tree;
 }
 
+static Ast create_trailing_call_ast(Parser *par, SourceSite site, Ast left, Ast function)
+{
+	if (ast_is_error(left)) {
+		return left;
+	}
+	if (ast_is_error(function)) {
+		return function;
+	}
+	Ast tree = create_ast(par, site, AST_TRAILING_CALL);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->trailing_call.left = left;
+	tree->trailing_call.function = function;
+	return tree;
+}
+
 static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
 {
 	if (ast_is_error(name)) {
@@ -848,6 +865,27 @@ static void print_ast(Printer *pr, Ast tree)
 			PRINT(pr, "(");
 			print_ast_list(pr, args, nargs);
 			PRINT(pr, ")");
+		}
+		break;
+		case AST_TRAILING_CALL:
+		{
+			Ast function = tree->trailing_call.function;
+			print_ast(pr, tree->trailing_call.left);
+			PRINT(pr, " -> ");
+			if (function->function.nparams || function->function.variadic)
+			{
+				PRINT(pr, "(");
+				print_ast_list(pr, function->function.params, function->function.nparams);
+				if (function->function.variadic)
+				{
+					if (function->function.nparams) {
+						PRINT(pr, ", ");
+					}
+					print_ast(pr, function->function.variadic);
+				}
+				PRINT(pr, ") ");
+			}
+			print_ast(pr, function->function.body);
 		}
 		break;
 		case AST_NAMED_ARGUMENT:
