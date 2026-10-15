@@ -878,8 +878,14 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 		case AST_RECURSE:
 		{
 			ASSERT(ctx->function && ctx->function->function);
-			ctx->function->function->requires_closure = true;
-			ir = create_recurse_ir(ctx, expr->site);
+			IrFunction *function = ctx->function->function;
+			if (function->is_static) {
+				u32 function_index = function_index_from_ptr(ctx, function);
+				ir = create_function_ir(ctx, expr->site, function_index);
+			}
+			else {
+				ir = create_recurse_ir(ctx, expr->site);
+			}
 		}
 		break;
 

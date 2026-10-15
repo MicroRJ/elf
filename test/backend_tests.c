@@ -616,17 +616,50 @@ static void test_backend_emits_direct_static_call(void)
 	backend_test_destroy(result);
 }
 
-static void test_backend_keeps_recurse_calls_dynamic(void)
+static void test_backend_emits_direct_static_recurse_call(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
 		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
 		"ret count(3)\n");
 
-	if (backend_count_bytecode(result, BC_CALL) != 0 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 1) {
-		test_fail("static function using recurse is called dynamically");
+	elf_Module *module = result.function.module;
+	u32 direct_calls = 0;
+	u32 dynamic_calls = 0;
+	u32 closures = 0;
+	for (u32 i = 0; i < module->bytecode_count; ++i) {
+		direct_calls += module->bytecode[i].b_type == BC_CALL;
+		dynamic_calls += module->bytecode[i].b_type == BC_DYNAMIC_CALL;
+		closures += module->bytecode[i].b_type == BC_CLOSURE;
 	}
-	if (backend_count_bytecode(result, BC_CLOSURE) != 1) {
-		test_fail("static function using recurse retains its closure");
+	if (direct_calls != 2 || dynamic_calls != 0) {
+		test_fail("static recurse and its caller emit direct calls");
+	}
+	if (closures != 0) {
+		test_fail("calling recurse in a static function does not allocate a closure");
+	}
+	backend_test_destroy(result);
+}
+
+static void test_backend_materializes_static_recurse_value(void)
+{
+	BackendCompileResult result = backend_test_compile_source(
+		"self :: fun() { ret recurse }\n"
+		"ret self()\n");
+
+	elf_Module *module = result.function.module;
+	u32 direct_calls = 0;
+	u32 dynamic_calls = 0;
+	u32 closures = 0;
+	for (u32 i = 0; i < module->bytecode_count; ++i) {
+		direct_calls += module->bytecode[i].b_type == BC_CALL;
+		dynamic_calls += module->bytecode[i].b_type == BC_DYNAMIC_CALL;
+		closures += module->bytecode[i].b_type == BC_CLOSURE;
+	}
+	if (direct_calls != 1 || dynamic_calls != 0) {
+		test_fail("calling a static function that returns recurse remains direct");
+	}
+	if (closures != 1) {
+		test_fail("using static recurse as a value materializes one closure");
 	}
 	backend_test_destroy(result);
 }
@@ -672,6 +705,7 @@ static void run_backend_tests(void)
 	test_backend_generates_module_without_entry();
 	test_backend_compiles_static_functions();
 	test_backend_emits_direct_static_call();
-	test_backend_keeps_recurse_calls_dynamic();
+	test_backend_emits_direct_static_recurse_call();
+	test_backend_materializes_static_recurse_value();
 	test_backend_emits_parameter_type_enforcement();
 }

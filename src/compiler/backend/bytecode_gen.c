@@ -728,7 +728,7 @@ static b32 bg_can_emit_direct_call(BcGen *gen, Ir expr)
 	}
 
 	IrFunction *function = gen->ir_functions + expr->ir_function.index;
-	return function->is_static && !function->requires_closure && function->capture_count == 0;
+	return function->is_static && function->capture_count == 0;
 }
 
 static BcSlot bg_emit_direct_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)

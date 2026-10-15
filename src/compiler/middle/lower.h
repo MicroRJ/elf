@@ -16,7 +16,6 @@ struct IrFunction
 	SourceSite      site;
 	b32             variadic;
 	b32             is_static;
-	b32             requires_closure;
 	Ir              body;
 	Ir             *params;
 	u32             param_count;
