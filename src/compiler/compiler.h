@@ -79,6 +79,13 @@ typedef struct
 }
 Com_Module;
 
+typedef struct
+{
+	elf_Module    *module;
+	BcFunctionRef entry;
+}
+Com_Output;
+
 struct Compiler
 {
 	elf_State         *state;
@@ -103,7 +110,7 @@ b32 compiler_parse_modules(Compiler *compiler);
 b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
 
-BcFunctionRef compiler_compile(Compiler *compiler);
+Com_Output compiler_compile(Compiler *compiler);
 int compiler_push_constant_expr(Compiler *compiler);
 int compiler_push_json(Compiler *compiler);
 

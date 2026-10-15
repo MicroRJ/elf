@@ -543,13 +543,13 @@ static char *persist_compiled_source(elf_State *state, SourceBuffer source)
 	return data;
 }
 
-BcFunctionRef compiler_compile(Compiler *compiler)
+Com_Output compiler_compile(Compiler *compiler)
 {
 	ASSERT(compiler);
 	ASSERT(compiler->module_count);
 	elf_State *state = compiler->state;
 	u64 arena_checkpoint = state->arena.used;
-	BcFunctionRef file_entry = {};
+	Com_Output output = {};
 	u32 saved_gc_mode = state->gc_mode;
 	state->gc_mode = ELF_GC_PAUSED;
 	if (compiler->report.error_count) goto done;
@@ -578,9 +578,8 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 	}
 
 	elf_Module generated_module = {};
-	file_entry = generate_module(compiler, &generated_module, ir_module);
-	if (!bc_function_ref_is_valid(file_entry) || compiler->report.error_count) {
-		file_entry = (BcFunctionRef) {};
+	BcFunctionRef entry = generate_module(compiler, &generated_module, ir_module);
+	if (!bc_function_ref_is_valid(entry) || compiler->report.error_count) {
 		state->arena.used = arena_checkpoint;
 		goto done;
 	}
@@ -594,11 +593,13 @@ BcFunctionRef compiler_compile(Compiler *compiler)
 	module->source_size = root_module->source.size;
 	module->next = state->modules;
 	state->modules = module;
-	file_entry.module = module;
+	entry.module = module;
+	output.module = module;
+	output.entry = entry;
 
 done:
 	state->gc_mode = saved_gc_mode;
-	return file_entry;
+	return output;
 }
 
 BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlice source)
@@ -608,7 +609,7 @@ BcFunctionRef elf_compile_source(elf_State *state, char const *name, elf_StrSlic
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(state, scratch.arena);
 	compiler_add_root_module(compiler, name, source);
-	BcFunctionRef file_entry = compiler_compile(compiler);
+	Com_Output output = compiler_compile(compiler);
 	elf_end_scratch(scratch);
-	return file_entry;
+	return output.entry;
 }

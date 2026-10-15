@@ -600,7 +600,8 @@ static void test_api_source_compilation(elf_State *state)
 	char invalid_code_text[] = "answer := 1 +";
 	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "invalid-code.elf", invalid_code);
-	if (bc_function_ref_is_valid(compiler_compile(compiler))) {
+	Com_Output failed_output = compiler_compile(compiler);
+	if (failed_output.module || bc_function_ref_is_valid(failed_output.entry)) {
 		test_fail("API rejects malformed code source");
 	}
 	if (elf_get_top(state) != sentinel_top) {
@@ -628,9 +629,13 @@ static void test_api_source_compilation(elf_State *state)
 	char valid_code_text[] = "unused := 1\nret 42";
 	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "valid-code.elf", valid_code);
-	BcFunctionRef function = compiler_compile(compiler);
+	Com_Output output = compiler_compile(compiler);
+	BcFunctionRef function = output.entry;
 	if (!bc_function_ref_is_valid(function)) {
 		test_fail("API compiles valid code after a failed parse");
+	}
+	else if (output.module != function.module) {
+		test_fail("compiler output retains the installed module");
 	}
 	else
 	{
