@@ -15,8 +15,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 
 static BcSlot emit_expr(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32 nout);
 static void emit_stat(BcFunctionEmitter *emitter, Ir stat);
-static void emit_function(BcFunctionEmitter *emitter, IrFunction *function);
-static b32 emit_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module);
+static void bc_emit_function(BcFunctionEmitter *emitter, IrFunction *function);
 static void define_label(BcFunctionEmitter *emitter, u32 label);
 static void jump_to_label(BcFunctionEmitter *emitter, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcFunctionEmitter *emitter, SourceSite site, BcSlot pred, u32 label);
@@ -72,7 +71,7 @@ static void emit_source_map_entry(BcFunctionEmitter *emitter, SourceSite site, u
 	entry->site = site;
 }
 
-/* module builder */
+/* module emitter */
 #define BC_MODULE_OPERAND_COUNT_MAX (1u << 15)
 
 static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size)
@@ -93,7 +92,7 @@ static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *ca
 	return new_items;
 }
 
-static u32 add_const_int(BcModuleBuilder *module, i64 i)
+static u32 add_const_int(BcModuleEmitter *module, i64 i)
 {
 	if (module->integer_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
 	module->integer_constants = grow_module_array(module->arena, module->integer_constants
@@ -104,7 +103,7 @@ static u32 add_const_int(BcModuleBuilder *module, i64 i)
 	return index;
 }
 
-static u32 add_const_num(BcModuleBuilder *module, f64 i)
+static u32 add_const_num(BcModuleEmitter *module, f64 i)
 {
 	if (module->number_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
 	module->number_constants = grow_module_array(module->arena, module->number_constants
@@ -115,7 +114,7 @@ static u32 add_const_num(BcModuleBuilder *module, f64 i)
 	return index;
 }
 
-static u32 add_atom(BcModuleBuilder *module, Atom *atom)
+static u32 add_atom(BcModuleEmitter *module, Atom *atom)
 {
 	for (u32 i = 0; i < module->atom_count; ++ i) {
 		if (module->atoms[i] == atom) return i;
@@ -130,12 +129,17 @@ static u32 add_atom(BcModuleBuilder *module, Atom *atom)
 	return index;
 }
 
+static void bc_add_global(BcModuleEmitter *module, Atom *name)
+{
+	add_atom(module, name);
+}
+
 #define BC_LABEL_INVALID     ((u32)-1)
 
 /* emitters */
 static void patch_jump_to_position(BcFunctionEmitter *emitter, u32 source_position, u32 target_position)
 {
-	BcModuleBuilder *module = emitter->module;
+	BcModuleEmitter *module = emitter->module;
 	ASSERT(source_position < module->bytecode_count);
 	Bytecode source_bytecode = module->bytecode[source_position];
 
@@ -209,7 +213,7 @@ static void patch_bytecode_labels(BcFunctionEmitter *emitter)
 
 static u32 emit_bc(BcFunctionEmitter *emitter, SourceSite site, Bytecode byte)
 {
-	BcModuleBuilder *module = emitter->module;
+	BcModuleEmitter *module = emitter->module;
 	ASSERT(module->bytecode_count < 0xffffffffu);
 	module->bytecode = grow_module_array(module->arena, module->bytecode, module->bytecode_count, &module->bytecode_capacity, module->bytecode_count + 1, sizeof(*module->bytecode));
 	u32 position = module->bytecode_count++;
@@ -329,12 +333,12 @@ static BcSlot ensure_slot(BcFunctionEmitter *emitter, BcSlot slot)
 }
 
 /* main */
-static BcModuleBuilder *create_module_builder(Compiler *compiler, u32 function_count)
+static BcModuleEmitter *bc_create_module_emitter(Compiler *compiler, u32 function_count)
 {
 	elf_Arena *arena = compiler->arena;
 	if (function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
 	elf_arena_align(arena, 8);
-	BcModuleBuilder *module = elf_arena_push_zero(arena, sizeof(*module));
+	BcModuleEmitter *module = elf_arena_push_zero(arena, sizeof(*module));
 	module->compiler = compiler;
 	module->arena = arena;
 
@@ -353,7 +357,7 @@ static BcModuleBuilder *create_module_builder(Compiler *compiler, u32 function_c
 	return module;
 }
 
-static BcFunctionEmitter *create_function_emitter(BcModuleBuilder *module)
+static BcFunctionEmitter *bc_create_function_emitter(BcModuleEmitter *module)
 {
 	ASSERT(module);
 	elf_Arena *arena = module->arena;
@@ -368,13 +372,13 @@ static BcFunctionEmitter *create_function_emitter(BcModuleBuilder *module)
 	return emitter;
 }
 
-static void emit_function(BcFunctionEmitter *emitter, IrFunction *function)
+static void bc_emit_function(BcFunctionEmitter *emitter, IrFunction *function)
 {
 	ASSERT(emitter && emitter->module);
 	ASSERT(function);
-	BcModuleBuilder *module = emitter->module;
+	BcModuleEmitter *module = emitter->module;
 
-	PROF_BLOCK("bytecode.emit_function")
+	PROF_BLOCK("bytecode.function")
 	{
 		u32 bytecode_start = module->bytecode_count;
 		emitter->source_map_buffer.count  =0;
@@ -453,11 +457,11 @@ static Com_String copy_compiled_atom(elf_Arena *arena, Atom *atom)
 	return copy_compiled_string(arena, atom_data(atom), atom_size(atom));
 }
 
-static u32 find_builder_atom(BcModuleBuilder *builder, Atom *atom)
+static u32 find_emitter_atom(BcModuleEmitter *emitter, Atom *atom)
 {
-	for (u32 i = 0; i < builder->atom_count; ++i)
+	for (u32 i = 0; i < emitter->atom_count; ++i)
 	{
-		if (builder->atoms[i] == atom) {
+		if (emitter->atoms[i] == atom) {
 			return i;
 		}
 	}
@@ -465,7 +469,7 @@ static u32 find_builder_atom(BcModuleBuilder *builder, Atom *atom)
 	return 0;
 }
 
-static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module, BcModuleBuilder *builder)
+static void bc_finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module, BcModuleEmitter *emitter)
 {
 	ASSERT(!module->bytecode && !module->functions);
 
@@ -486,34 +490,34 @@ static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Mod
 		}
 	}
 
-	module->bytecode_count = builder->bytecode_count;
+	module->bytecode_count = emitter->bytecode_count;
 	if (module->bytecode_count)
 	{
 		elf_arena_align(output_arena, 8);
-		module->bytecode = elf_arena_push_copy(output_arena, sizeof(*module->bytecode) * module->bytecode_count, builder->bytecode);
+		module->bytecode = elf_arena_push_copy(output_arena, sizeof(*module->bytecode) * module->bytecode_count, emitter->bytecode);
 	}
 
-	module->integer_constant_count = builder->integer_constant_count;
+	module->integer_constant_count = emitter->integer_constant_count;
 	if (module->integer_constant_count)
 	{
 		elf_arena_align(output_arena, 8);
-		module->integer_constants = elf_arena_push_copy(output_arena, sizeof(*module->integer_constants) * module->integer_constant_count, builder->integer_constants);
+		module->integer_constants = elf_arena_push_copy(output_arena, sizeof(*module->integer_constants) * module->integer_constant_count, emitter->integer_constants);
 	}
 
-	module->number_constant_count = builder->number_constant_count;
+	module->number_constant_count = emitter->number_constant_count;
 	if (module->number_constant_count)
 	{
 		elf_arena_align(output_arena, 8);
-		module->number_constants = elf_arena_push_copy(output_arena, sizeof(*module->number_constants) * module->number_constant_count, builder->number_constants);
+		module->number_constants = elf_arena_push_copy(output_arena, sizeof(*module->number_constants) * module->number_constant_count, emitter->number_constants);
 	}
 
-	module->string_count = builder->atom_count;
+	module->string_count = emitter->atom_count;
 	if (module->string_count)
 	{
 		elf_arena_align(output_arena, 8);
 		module->strings = elf_arena_push_zero(output_arena, sizeof(*module->strings) * module->string_count);
 		for (u32 i = 0; i < module->string_count; ++i) {
-			module->strings[i] = copy_compiled_atom(output_arena, builder->atoms[i]);
+			module->strings[i] = copy_compiled_atom(output_arena, emitter->atoms[i]);
 		}
 	}
 
@@ -522,7 +526,7 @@ static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Mod
 	{
 		module->globals = elf_arena_push_zero(output_arena, sizeof(*module->globals) * module->global_count);
 		for (u32 i = 0; i < module->global_count; ++i) {
-			module->globals[i].name = find_builder_atom(builder, ir_module.globals[i]);
+			module->globals[i].name = find_emitter_atom(emitter, ir_module.globals[i]);
 		}
 	}
 
@@ -551,11 +555,11 @@ static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Mod
 		ASSERT(relocation_index == module->global_relocation_count);
 	}
 
-	module->function_count = builder->function_count;
+	module->function_count = emitter->function_count;
 	if (module->function_count)
 	{
 		elf_arena_align(output_arena, 8);
-		module->functions = elf_arena_push_copy(output_arena, sizeof(*module->functions) * module->function_count, builder->functions);
+		module->functions = elf_arena_push_copy(output_arena, sizeof(*module->functions) * module->function_count, emitter->functions);
 	}
 	for (u32 i = 0; i < module->function_count; ++i)
 	{
@@ -569,33 +573,6 @@ static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Mod
 
 	module->has_entry = ir_module.has_entry;
 	module->entry_index = ir_module.entry_index;
-}
-
-static b32 emit_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module)
-{
-	ASSERT(ir_module.functions || ir_module.function_count == 0);
-	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
-
-	BcModuleBuilder *builder = create_module_builder(compiler, ir_module.function_count);
-	BcFunctionEmitter *emitter = create_function_emitter(builder);
-	PROF_BLOCK("compiler.emit")
-	{
-		for (u32 i = 0; i < ir_module.function_count; ++ i)
-		{
-			IrFunction *ir_function = ir_module.functions + i;
-			emit_function(emitter, ir_function);
-		}
-	}
-	ASSERT(builder->generated_function_count == builder->function_count);
-	if (compiler->report.error_count) {
-		return false;
-	}
-	for (u32 i = 0; i < ir_module.global_count; ++i)
-	{
-		add_atom(builder, ir_module.globals[i]);
-	}
-	finalize_module(compiler, output_arena, module, ir_module, builder);
-	return true;
 }
 
 static BcSlot ensure_expr_memory(BcFunctionEmitter *emitter, Ir expr)

@@ -25,8 +25,8 @@
 #include "parse_json.c"
 #include "ir.c"
 #include "ir_emitter.c"
-#include "emitter.h"
-#include "emitter.c"
+#include "bc_emitter.h"
+#include "bc_emitter.c"
 
 static int test_failures;
 

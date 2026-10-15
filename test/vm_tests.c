@@ -496,7 +496,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	elf_destroy_state(state);
 }
 
-static void test_vm_module_builder_grows_constant_arrays(void)
+static void test_vm_module_emitter_grows_constant_arrays(void)
 {
 	char source[4096];
 	u32 used = (u32)snprintf(source, sizeof(source), "ret [");
@@ -517,7 +517,7 @@ static void test_vm_module_builder_grows_constant_arrays(void)
 
 	elf_Module *module = value_as_closure(state->stack_ptr[-1])->function.module;
 	if (module->integer_constant_count <= 64 || module->number_constant_count <= 64) {
-		test_fail("module builder grows both constant arrays beyond their initial capacity");
+		test_fail("module emitter grows both constant arrays beyond their initial capacity");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
@@ -605,6 +605,6 @@ static void run_vm_tests(void)
 	test_vm_static_recurse_function();
 	test_vm_compiled_closure_keeps_function_identity();
 	test_vm_nested_host_call_preserves_diagnostics_context();
-	test_vm_module_builder_grows_constant_arrays();
+	test_vm_module_emitter_grows_constant_arrays();
 	test_vm_module_converts_atom_constants();
 }

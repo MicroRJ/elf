@@ -47,12 +47,12 @@ typedef struct
 	u32         number_constant_capacity;
 	u32         number_constant_count;
 }
-BcModuleBuilder;
+BcModuleEmitter;
 
 // Temporary state for the one IR function currently being generated.
 struct BcFunctionEmitter
 {
-	BcModuleBuilder  *module;
+	BcModuleEmitter  *module;
 	SourceMapBuffer   source_map_buffer;
 	u32               stack_size;
 	u32               stack_top;

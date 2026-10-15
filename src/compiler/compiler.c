@@ -20,7 +20,7 @@
 #include "ast.h"
 #include "parser.h"
 #include "ir.h"
-#include "emitter.h"
+#include "bc_emitter.h"
 #include "ir_emitter.h"
 
 #include "logging.c"
@@ -32,7 +32,7 @@
 
 #include "ir.c"
 #include "ir_emitter.c"
-#include "emitter.c"
+#include "bc_emitter.c"
 
 static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
 {
@@ -804,11 +804,27 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 		return module;
 	}
 	IrModule ir_module = ir_module_emitter->module;
+	ASSERT(ir_module.functions || ir_module.function_count == 0);
+	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
+
+	BcModuleEmitter *bc_module_emitter = bc_create_module_emitter(compiler, ir_module.function_count);
+	BcFunctionEmitter *bc_function_emitter = bc_create_function_emitter(bc_module_emitter);
+	PROF_BLOCK("compiler.emit")
+	{
+		for (u32 i = 0; i < ir_module.function_count; ++i) {
+			bc_emit_function(bc_function_emitter, ir_module.functions + i);
+		}
+	}
+	ASSERT(bc_module_emitter->generated_function_count == bc_module_emitter->function_count);
+	if (compiler->report.error_count) {
+		return module;
+	}
+	for (u32 i = 0; i < ir_module.global_count; ++i) {
+		bc_add_global(bc_module_emitter, ir_module.globals[i]);
+	}
 
 	elf_arena_align(output_arena, 8);
 	module = elf_arena_push_zero(output_arena, sizeof(*module));
-	if (!emit_module(compiler, output_arena, module, ir_module) || compiler->report.error_count) {
-		module = 0;
-	}
+	bc_finalize_module(compiler, output_arena, module, ir_module, bc_module_emitter);
 	return module;
 }
