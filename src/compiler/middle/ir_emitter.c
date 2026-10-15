@@ -15,6 +15,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr);
 static Ir lower_ast_to_ir_block(IrFunctionEmitter *ctx, Ast stat);
 static Ir lower_ast_file_body_to_ir(IrFunctionEmitter *ctx, Ast stat);
 static Ir lower_ast_function_to_ir(IrFunctionEmitter *ctx, Ast expr);
+static void initialize_function_ir(IrFunctionEmitter *ctx, IrFunction *function);
 static IrFunction *add_function_ir(IrFunctionEmitter *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body);
 static u32 function_index_from_ptr(IrFunctionEmitter *ctx, IrFunction *function);
 static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir);
@@ -27,6 +28,19 @@ static IrModuleEmitter *ir_create_module_emitter(Compiler *compiler)
 	emitter->arena = arena;
 	emitter->function_capacity = 1024;
 	emitter->module.functions = elf_arena_push_zero(arena, sizeof(*emitter->module.functions) * emitter->function_capacity);
+	ASSERT(compiler->function_count <= emitter->function_capacity);
+	for (u32 i = 0; i < compiler->function_count; ++i)
+	{
+		Com_Function *input = compiler->functions + i;
+		Ast ast = input->ast;
+		IrFunction *function = emitter->module.functions + i;
+		function->site = ast->site;
+		function->variadic = input->is_entry || ast->function.variadic != 0;
+		function->is_static = input->is_static;
+		function->param_count = input->is_entry ? IMPLICIT_PARAM_COUNT : IMPLICIT_PARAM_COUNT + ast->function.nparams;
+		ASSERT(input->index == i);
+	}
+	emitter->module.function_count = compiler->function_count;
 	if (compiler->function_count && compiler->functions[0].is_entry)
 	{
 		emitter->module.has_entry = true;
@@ -52,17 +66,6 @@ static IrFunctionEmitter *ir_create_function_emitter(IrModuleEmitter *module)
 	ctx->defer_stack_size = defer_stack_size;
 	ctx->defer_count = 0;
 	ctx->defer_scope_start = 0;
-
-	for (u32 i = 0; i < module->compiler->function_count; ++i)
-	{
-		Com_Function *input = module->compiler->functions + i;
-		Ast ast = input->ast;
-		u32 param_count = input->is_entry ? IMPLICIT_PARAM_COUNT : IMPLICIT_PARAM_COUNT + ast->function.nparams;
-		b32 variadic = input->is_entry || ast->function.variadic != 0;
-		IrFunction *function = add_function_ir(ctx, ast->site, variadic, param_count, 0);
-		ASSERT(function_index_from_ptr(ctx, function) == input->index);
-		function->is_static = input->is_static;
-	}
 
 	return ctx;
 }
@@ -385,21 +388,22 @@ static LoopLabels current_loop_labels(IrFunctionEmitter *ctx, SourceSite site)
 static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 {
 	ASSERT(input->index < ctx->module->module.function_count);
+	IrFunction *function = ctx->module->module.functions + input->index;
+	initialize_function_ir(ctx, function);
 	ctx->current_source = input->source;
 	if (input->is_entry)
 	{
 		Ast file = input->ast;
 		ASSERT(file && file->kind == AST_FILE);
-		IrFunction *main_fn = ctx->module->module.functions + input->index;
 
 		LwScopeFunction main_function_ctx = {};
-		main_function_ctx.function = main_fn;
+		main_function_ctx.function = function;
 		main_function_ctx.scope_start = ctx->scope_start;
 		main_function_ctx.parent = 0;
 
 		LwScopeFunction *outer_function = ctx->function;
 		ctx->function = &main_function_ctx;
-		main_fn->body = lower_ast_file_body_to_ir(ctx, file->file.body);
+		function->body = lower_ast_file_body_to_ir(ctx, file->file.body);
 		ctx->function = outer_function;
 	}
 	else
@@ -408,6 +412,20 @@ static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 		Ir function = create_function_ir(ctx, input->ast->site, input->index);
 		lower_ast_function_body(ctx, input->ast, function);
 	}
+}
+
+static void initialize_function_ir(IrFunctionEmitter *ctx, IrFunction *function)
+{
+	ASSERT(function->param_count >= IMPLICIT_PARAM_COUNT);
+	ASSERT(!function->params);
+	ASSERT(!function->captures);
+	ASSERT(!function->capture_entities);
+
+	function->params = elf_arena_push_zero(ctx->module->arena, sizeof(*function->params) * function->param_count);
+	function->params[IMPLICIT_PARAM_INDEX] = create_local_ir(ctx, function->site, 0);
+	function->captures = elf_arena_push_zero(ctx->module->arena, sizeof(*function->captures) * 255);
+	function->capture_entities = elf_arena_push_zero(ctx->module->arena, sizeof(*function->capture_entities) * 255);
+	function->capture_count = 0;
 }
 
 static IrFunction *add_function_ir(IrFunctionEmitter *ctx, SourceSite site, b32 variadic, u32 param_count, Ir body)
@@ -420,11 +438,7 @@ static IrFunction *add_function_ir(IrFunctionEmitter *ctx, SourceSite site, b32 
 	function->variadic = variadic;
 	function->body = body;
 	function->param_count = param_count;
-	function->params = elf_arena_push_zero(ctx->module->arena, sizeof(*function->params) * function->param_count);
-	function->params[IMPLICIT_PARAM_INDEX] = create_local_ir(ctx, site, 0);
-	function->captures = elf_arena_push_zero(ctx->module->arena, sizeof(*function->captures) * 255);
-	function->capture_entities = elf_arena_push_zero(ctx->module->arena, sizeof(*function->capture_entities) * 255);
-	function->capture_count = 0;
+	initialize_function_ir(ctx, function);
 
 	return function;
 }
