@@ -394,17 +394,7 @@ static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast as
 		ASSERT(ast->kind == AST_FILE);
 	}
 
-	if (compiler->function_count == compiler->function_capacity)
-	{
-		u32 capacity = compiler->function_capacity ? compiler->function_capacity * 2 : 16;
-		Com_Function *functions = elf_arena_push_zero(compiler->arena, sizeof(*functions) * capacity);
-		if (compiler->function_count) {
-			copy_memory(functions, compiler->functions, sizeof(*functions) * compiler->function_count);
-		}
-		compiler->functions = functions;
-		compiler->function_capacity = capacity;
-	}
-
+	ASSERT(compiler->function_count < compiler->function_capacity);
 	u32 index = compiler->function_count++;
 	compiler->functions[index] = (Com_Function) {
 		.ast = ast,
@@ -624,9 +614,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 	compiler->functions = 0;
 	compiler->function_count = 0;
 	compiler->function_capacity = 0;
-	if (unit_type == COM_UNIT_FUNCTION) {
-		compiler_add_function(compiler, 0, compiler->sources[0].ast, true, false);
-	}
+	u32 planned_function_count = unit_type == COM_UNIT_FUNCTION ? 1 : 0;
 
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
@@ -669,7 +657,21 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 			symbol->site = name->site;
 			symbol->expr = declaration->static_decl.expr;
 			symbol->source = source;
+			if (symbol->expr->kind == AST_FUNCTION)
+			{
+				planned_function_count += 1;
+			}
 		}
+	}
+
+	if (planned_function_count)
+	{
+		compiler->functions = elf_arena_push_zero(compiler->arena, sizeof(*compiler->functions) * planned_function_count);
+	}
+	compiler->function_capacity = planned_function_count;
+	if (unit_type == COM_UNIT_FUNCTION)
+	{
+		compiler_add_function(compiler, 0, compiler->sources[0].ast, true, false);
 	}
 
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
@@ -686,6 +688,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 			}
 		}
 	}
+	ASSERT(compiler->function_count == compiler->function_capacity);
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
 		Com_StaticScope *scope = &compiler->sources[source].exports;
