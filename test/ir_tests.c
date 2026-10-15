@@ -10,6 +10,7 @@ static LowerContext *ir_test_lower_source(elf_State *state, elf_Arena *arena, co
 	IrModule module = elf_lower_ast_file(ctx, file);
 	if (module.functions != ctx->functions ||
 		module.function_count != ctx->num_functions ||
+		!module.has_entry ||
 		module.entry_index != 0)
 	{
 		test_fail("lowering returns ir module rooted at function zero");

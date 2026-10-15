@@ -16,7 +16,7 @@ static inline i32 unwrap_slot(BcSlot memory)
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
 static void generate_function(BcGen *gen, IrFunction *function);
-static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module);
+static b32 generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module, BcFunctionRef *entry);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
@@ -337,13 +337,16 @@ static BcSlot ensure_slot(BcGen *gen, BcSlot slot)
 static BcGen *bg_create(Compiler *compiler, u32 function_count)
 {
 	elf_Arena *arena = compiler->arena;
-	if (!function_count || function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
+	if (function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
 	elf_arena_align(arena, 8);
 	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
 	gen->compiler = compiler;
 	gen->arena = arena;
-	elf_arena_align(arena, 8);
-	gen->module.functions = elf_arena_push_zero(arena, sizeof(*gen->module.functions) * function_count);
+	if (function_count)
+	{
+		elf_arena_align(arena, 8);
+		gen->module.functions = elf_arena_push_zero(arena, sizeof(*gen->module.functions) * function_count);
+	}
 	gen->module.function_count = function_count;
 
 	u32 bytecode_capacity = 1 << 13;
@@ -423,12 +426,13 @@ static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries
 static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilder *builder)
 {
 	ASSERT(!module->bytecode && !module->bytecode_functions);
-	ASSERT(builder->function_count > 0);
 
 	module->bytecode_count = builder->bytecode_count;
-	elf_arena_align(&state->arena, 8);
-	module->bytecode = elf_arena_push_copy(&state->arena
-	, sizeof(*module->bytecode) * module->bytecode_count, builder->bytecode);
+	if (module->bytecode_count)
+	{
+		elf_arena_align(&state->arena, 8);
+		module->bytecode = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode) * module->bytecode_count, builder->bytecode);
+	}
 
 	module->integer_constant_count = builder->integer_constant_count;
 	if (module->integer_constant_count) {
@@ -454,9 +458,11 @@ static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilde
 	}
 
 	module->bytecode_function_count = builder->function_count;
-	elf_arena_align(&state->arena, 8);
-	module->bytecode_functions = elf_arena_push_copy(&state->arena
-	, sizeof(*module->bytecode_functions) * module->bytecode_function_count, builder->functions);
+	if (module->bytecode_function_count)
+	{
+		elf_arena_align(&state->arena, 8);
+		module->bytecode_functions = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, builder->functions);
+	}
 
 	for (u32 i = 0; i < module->bytecode_function_count; ++i)
 	{
@@ -469,13 +475,14 @@ static void finalize_module(elf_State *state, elf_Module *module, BcModuleBuilde
 	}
 }
 
-static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module)
+static b32 generate_module(Compiler *compiler, elf_Module *module, IrModule ir_module, BcFunctionRef *entry)
 {
+	ASSERT(entry);
+	*entry = (BcFunctionRef) {};
 	elf_State *state = compiler->state;
 	elf_Arena *arena = compiler->arena;
-	ASSERT(ir_module.functions);
-	ASSERT(ir_module.function_count > 0);
-	ASSERT(ir_module.entry_index == 0);
+	ASSERT(ir_module.functions || ir_module.function_count == 0);
+	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
 
 	BcGen *gen = bg_create(compiler, ir_module.function_count);
 	PROF_BLOCK("compiler.codegen")
@@ -499,13 +506,15 @@ static BcFunctionRef generate_module(Compiler *compiler, elf_Module *module, IrM
 			bc_function->source_map_count = gen->source_map_buffer.count;
 		}
 	}
-	if (compiler->report.error_count) return (BcFunctionRef) {};
+	if (compiler->report.error_count) return false;
 	finalize_module(state, module, &gen->module);
 
-	return (BcFunctionRef) {
-		.module = module,
-		.index  = ir_module.entry_index,
-	};
+	if (ir_module.has_entry)
+	{
+		entry->module = module;
+		entry->index = ir_module.entry_index;
+	}
+	return true;
 }
 
 static BcSlot ensure_expr_memory(BcGen *gen, Ir expr)

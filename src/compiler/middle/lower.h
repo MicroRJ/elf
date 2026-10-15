@@ -24,6 +24,7 @@ typedef struct
 {
 	IrFunction *functions;
 	u32         function_count;
+	b32         has_entry;
 	u32         entry_index;
 }
 IrModule;

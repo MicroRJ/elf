@@ -450,6 +450,7 @@ static IrModule elf_lower_ast_file(LowerContext *ctx, Ast file)
 	IrModule module = {};
 	module.functions = ctx->functions;
 	module.function_count = ctx->num_functions;
+	module.has_entry = true;
 	module.entry_index = 0;
 	return module;
 }

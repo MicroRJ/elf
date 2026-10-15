@@ -542,6 +542,24 @@ static void test_backend_formats_bytecode_function(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_generates_module_without_entry(void)
+{
+	elf_State *state = elf_create_state();
+	elf_Scratch scratch = elf_begin_scratch();
+	Compiler *compiler = compiler_create(state, scratch.arena);
+	compiler_add_root_module(compiler, "backend_tests", (elf_StrSlice) {});
+	elf_Module module = {};
+	BcFunctionRef entry = {};
+	if (!generate_module(compiler, &module, (IrModule) {}, &entry)) {
+		test_fail("backend generates module without entry function");
+	}
+	if (bc_function_ref_is_valid(entry) || module.bytecode_function_count || module.bytecode_count) {
+		test_fail("module without entry contains no implicit executable code");
+	}
+	elf_end_scratch(scratch);
+	elf_destroy_state(state);
+}
+
 static void test_backend_compiles_static_functions(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -596,6 +614,7 @@ static void run_backend_tests(void)
 	test_backend_logical_expr_delays_result_slot();
 	test_backend_if_else_restores_stack_top();
 	test_backend_formats_bytecode_function();
+	test_backend_generates_module_without_entry();
 	test_backend_compiles_static_functions();
 	test_backend_emits_parameter_type_enforcement();
 }

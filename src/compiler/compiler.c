@@ -578,8 +578,8 @@ Com_Output compiler_compile(Compiler *compiler)
 	}
 
 	elf_Module generated_module = {};
-	BcFunctionRef entry = generate_module(compiler, &generated_module, ir_module);
-	if (!bc_function_ref_is_valid(entry) || compiler->report.error_count) {
+	BcFunctionRef entry = {};
+	if (!generate_module(compiler, &generated_module, ir_module, &entry) || compiler->report.error_count) {
 		state->arena.used = arena_checkpoint;
 		goto done;
 	}
@@ -593,9 +593,12 @@ Com_Output compiler_compile(Compiler *compiler)
 	module->source_size = root_module->source.size;
 	module->next = state->modules;
 	state->modules = module;
-	entry.module = module;
 	output.module = module;
-	output.entry = entry;
+	if (entry.module)
+	{
+		entry.module = module;
+		output.entry = entry;
+	}
 
 done:
 	state->gc_mode = saved_gc_mode;
