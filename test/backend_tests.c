@@ -620,6 +620,33 @@ static void test_backend_emits_direct_static_call(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_calls_imported_static_function(void)
+{
+	BackendCompileResult result = backend_test_compile_file("test/imports/statics/root.elf");
+	if (!bc_function_ref_is_valid(result.function))
+	{
+		test_fail("backend compiles imported static namespace");
+	}
+	else
+	{
+		if (result.function.module->bytecode_function_count != 2 || backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+			test_fail("imported static function emits a direct call");
+		}
+
+		elf_Closure *closure = elf_gc_alloc(result.state, ELF_OBJECT_CLOSURE, sizeof(*closure));
+		closure->function = result.function;
+		push_value(result.state, value_from_closure(closure));
+		elf_push_nil(result.state);
+		elf_call(result.state, 1, 1);
+		elf_Int value = 0;
+		if (!elf_to_int(result.state, -1, &value) || value != 42) {
+			test_fail("imported static function executes from its source namespace");
+		}
+		elf_pop(result.state, 1);
+	}
+	backend_test_destroy(result);
+}
+
 static void test_backend_emits_direct_static_recurse_call(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -709,6 +736,7 @@ static void run_backend_tests(void)
 	test_backend_generates_module_without_entry();
 	test_backend_compiles_static_functions();
 	test_backend_emits_direct_static_call();
+	test_backend_calls_imported_static_function();
 	test_backend_emits_direct_static_recurse_call();
 	test_backend_materializes_static_recurse_value();
 	test_backend_emits_parameter_type_enforcement();

@@ -16,7 +16,10 @@ static Ir lower_ast_to_ir_block(LowerContext *ctx, Ast stat);
 static Ir lower_ast_file_body_to_ir(LowerContext *ctx, Ast stat);
 static Ir lower_ast_function_to_ir(LowerContext *ctx, Ast expr);
 static void declare_source_statics(LowerContext *ctx, Ast block);
-static void evaluate_source_statics(LowerContext *ctx);
+static void prepare_source_static_functions(LowerContext *ctx);
+static void evaluate_source_static_values(LowerContext *ctx);
+static void lower_source_static_functions(LowerContext *ctx);
+static void lower_compilation_statics(LowerContext *ctx, Ast root, b32 root_is_static);
 static void report_unreferenced_source_statics(LowerContext *ctx);
 
 static LowerContext *elf_create_lower_context(Compiler *compiler)
@@ -225,9 +228,10 @@ static LwSourceScope *current_source_scope(LowerContext *ctx)
 	return ctx->source_scopes + ctx->current_source;
 }
 
-static LwStaticSymbol *static_symbol_from_name(LowerContext *ctx, Atom *name)
+static LwStaticSymbol *static_symbol_from_source(LowerContext *ctx, Com_SourceId source, Atom *name)
 {
-	LwSourceScope *scope = current_source_scope(ctx);
+	ASSERT(source < ctx->source_scope_count);
+	LwSourceScope *scope = ctx->source_scopes + source;
 	for (u32 i = 0; i < scope->static_count; ++i)
 	{
 		LwStaticSymbol *symbol = scope->statics + i;
@@ -236,6 +240,11 @@ static LwStaticSymbol *static_symbol_from_name(LowerContext *ctx, Atom *name)
 		}
 	}
 	return 0;
+}
+
+static LwStaticSymbol *static_symbol_from_name(LowerContext *ctx, Atom *name)
+{
+	return static_symbol_from_source(ctx, ctx->current_source, name);
 }
 
 static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityType type, u32 tags, Atom *name)
@@ -268,6 +277,90 @@ static LwScopeEntity *declare_entity(LowerContext *ctx, SourceSite site, EntityT
 }
 
 static b32 evaluate_static_symbol(LowerContext *ctx, LwStaticSymbol *symbol);
+
+typedef enum
+{
+	STATIC_LOOKUP_NONE,
+	STATIC_LOOKUP_VALUE,
+	STATIC_LOOKUP_ERROR,
+}
+StaticLookupResult;
+
+// Resolves identifiers and namespace fields without turning ordinary runtime
+// field expressions into compiler errors.
+static StaticLookupResult lookup_static_expr(LowerContext *ctx, Ast expr, StaticValue *out)
+{
+	StaticLookupResult result = STATIC_LOOKUP_NONE;
+	if (expr->kind == AST_IDENT)
+	{
+		LwStaticSymbol *symbol = static_symbol_from_name(ctx, expr->atom);
+		if (symbol)
+		{
+			symbol->referenced = true;
+			if (evaluate_static_symbol(ctx, symbol))
+			{
+				*out = symbol->value;
+				result = STATIC_LOOKUP_VALUE;
+			}
+			else {
+				result = STATIC_LOOKUP_ERROR;
+			}
+		}
+	}
+	else if (expr->kind == AST_IMPORT)
+	{
+		if (expr->import.source < ctx->source_scope_count)
+		{
+			out->kind = STATIC_VALUE_NAMESPACE;
+			out->source = expr->import.source;
+			result = STATIC_LOOKUP_VALUE;
+		}
+		else
+		{
+			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "import has no resolved source");
+			result = STATIC_LOOKUP_ERROR;
+		}
+	}
+	else if (expr->kind == AST_FIELD)
+	{
+		StaticValue receiver = {};
+		StaticLookupResult receiver_result = lookup_static_expr(ctx, expr->binary.x, &receiver);
+		if (receiver_result == STATIC_LOOKUP_ERROR) {
+			result = STATIC_LOOKUP_ERROR;
+		}
+		else if (receiver_result == STATIC_LOOKUP_VALUE && receiver.kind == STATIC_VALUE_NAMESPACE)
+		{
+			Ast member = expr->binary.y;
+			if (!member || member->kind != AST_STRING_LITERAL)
+			{
+				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "expected static namespace member name");
+				result = STATIC_LOOKUP_ERROR;
+			}
+			else
+			{
+				LwStaticSymbol *symbol = static_symbol_from_source(ctx, receiver.source, member->atom);
+				if (!symbol)
+				{
+					report_lowering_error(ctx, LOWERING_ERROR_GENERIC, member->site, "'%s' is not exported by the imported source", atom_data(member->atom));
+					result = STATIC_LOOKUP_ERROR;
+				}
+				else
+				{
+					symbol->referenced = true;
+					if (evaluate_static_symbol(ctx, symbol))
+					{
+						*out = symbol->value;
+						result = STATIC_LOOKUP_VALUE;
+					}
+					else {
+						result = STATIC_LOOKUP_ERROR;
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
 
 static b32 evaluate_static_expr(LowerContext *ctx, LwStaticSymbol *owner, Ast expr, StaticValue *out)
 {
@@ -309,20 +402,22 @@ static b32 evaluate_static_expr(LowerContext *ctx, LwStaticSymbol *owner, Ast ex
 		break;
 
 		case AST_IDENT:
+		case AST_IMPORT:
+		case AST_FIELD:
 		{
-			LwStaticSymbol *referenced = static_symbol_from_name(ctx, expr->atom);
-			if (!referenced)
+			StaticLookupResult lookup = lookup_static_expr(ctx, expr, out);
+			if (lookup == STATIC_LOOKUP_NONE)
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
+				if (expr->kind == AST_IDENT) {
+					report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
+				}
+				else {
+					report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
+				}
 				result = false;
 			}
-			else
-			{
-				referenced->referenced = true;
-				result = evaluate_static_symbol(ctx, referenced);
-				if (result) {
-					*out = referenced->value;
-				}
+			else if (lookup == STATIC_LOOKUP_ERROR) {
+				result = false;
 			}
 		}
 		break;
@@ -340,6 +435,8 @@ static b32 evaluate_static_expr(LowerContext *ctx, LwStaticSymbol *owner, Ast ex
 static b32 evaluate_static_symbol(LowerContext *ctx, LwStaticSymbol *symbol)
 {
 	ASSERT(symbol);
+	Com_SourceId outer_source = ctx->current_source;
+	ctx->current_source = symbol->source;
 	b32 result = symbol->value.kind != STATIC_VALUE_INVALID;
 	if (symbol->state == STATIC_SYMBOL_RESOLVING)
 	{
@@ -352,6 +449,7 @@ static b32 evaluate_static_symbol(LowerContext *ctx, LwStaticSymbol *symbol)
 		result = evaluate_static_expr(ctx, symbol, symbol->expr, &symbol->value);
 		symbol->state = STATIC_SYMBOL_RESOLVED;
 	}
+	ctx->current_source = outer_source;
 	return result;
 }
 
@@ -365,6 +463,11 @@ static Ir static_value_to_ir(LowerContext *ctx, SourceSite site, StaticValue val
 		case STATIC_VALUE_NUMBER:   ir = create_num_ir(ctx, site, value.number); break;
 		case STATIC_VALUE_STRING:   ir = create_atom_ir(ctx, site, value.string); break;
 		case STATIC_VALUE_FUNCTION: ir = value.function; break;
+		case STATIC_VALUE_NAMESPACE:
+		{
+			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "an imported namespace cannot be used as a runtime value");
+		}
+		break;
 		default: break;
 	}
 	return ir;
@@ -476,8 +579,8 @@ static IrModule elf_lower_ast_function(LowerContext *ctx, Ast file)
 
 		LwScopeFunction *outer_function = ctx->function;
 		ctx->function = &main_function_ctx;
-		declare_source_statics(ctx, file->file.body);
-		evaluate_source_statics(ctx);
+		lower_compilation_statics(ctx, file, false);
+		ctx->current_source = file->site.source;
 		main_fn->body = lower_ast_file_body_to_ir(ctx, file->file.body);
 		report_unreferenced_source_statics(ctx);
 		ctx->function = outer_function;
@@ -499,18 +602,7 @@ static IrModule elf_lower_ast_module(LowerContext *ctx, Ast file)
 	ctx->current_source = file->site.source;
 	PROF_BLOCK("lower.module")
 	{
-		Ast body = file->file.body;
-		ASSERT(body && body->kind == AST_BLOCK_STAT);
-		for (u32 i = 0; i < body->block.nstats; ++i)
-		{
-			Ast item = body->block.stats[i];
-			if (item->kind != AST_STATIC_DECL) {
-				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, item->site, "static module cannot contain executable top-level statements");
-			}
-		}
-
-		declare_source_statics(ctx, body);
-		evaluate_source_statics(ctx);
+		lower_compilation_statics(ctx, file, true);
 	}
 
 	IrModule module = {};
@@ -869,13 +961,22 @@ static Ir lower_ast_expr_to_ir(LowerContext *ctx, Ast expr)
 
 		case AST_FIELD:
 		{
-			Ast x = expr->binary.x;
-			Ast y = expr->binary.y;
-
-			Ir x_ir = lower_ast_expr_to_ir(ctx, x);
-			Ir y_ir = lower_ast_expr_to_ir(ctx, y);
-
-			ir = ir_new_binary(ctx, expr->site, IR_FIELD, x_ir, y_ir);
+			StaticValue value = {};
+			StaticLookupResult lookup = lookup_static_expr(ctx, expr, &value);
+			if (lookup == STATIC_LOOKUP_VALUE) {
+				ir = static_value_to_ir(ctx, expr->site, value);
+			}
+			else if (lookup == STATIC_LOOKUP_ERROR) {
+				ir = ERROR_IR;
+			}
+			else
+			{
+				Ast x = expr->binary.x;
+				Ast y = expr->binary.y;
+				Ir x_ir = lower_ast_expr_to_ir(ctx, x);
+				Ir y_ir = lower_ast_expr_to_ir(ctx, y);
+				ir = ir_new_binary(ctx, expr->site, IR_FIELD, x_ir, y_ir);
+			}
 		}
 		break;
 
@@ -1069,11 +1170,12 @@ static void declare_source_statics(LowerContext *ctx, Ast block)
 			symbol->name = name->atom;
 			symbol->site = name->site;
 			symbol->expr = declaration->static_decl.expr;
+			symbol->source = ctx->current_source;
 		}
 	}
 }
 
-static void evaluate_source_statics(LowerContext *ctx)
+static void prepare_source_static_functions(LowerContext *ctx)
 {
 	LwSourceScope *scope = current_source_scope(ctx);
 	for (u32 i = 0; i < scope->static_count; ++i)
@@ -1087,12 +1189,20 @@ static void evaluate_source_statics(LowerContext *ctx)
 			symbol->state = STATIC_SYMBOL_RESOLVED;
 		}
 	}
+}
 
+static void evaluate_source_static_values(LowerContext *ctx)
+{
+	LwSourceScope *scope = current_source_scope(ctx);
 	for (u32 i = 0; i < scope->static_count; ++i)
 	{
 		evaluate_static_symbol(ctx, scope->statics + i);
 	}
+}
 
+static void lower_source_static_functions(LowerContext *ctx)
+{
+	LwSourceScope *scope = current_source_scope(ctx);
 	for (u32 i = 0; i < scope->static_count; ++i)
 	{
 		LwStaticSymbol *symbol = scope->statics + i;
@@ -1100,6 +1210,46 @@ static void evaluate_source_statics(LowerContext *ctx)
 			lower_ast_function_body(ctx, symbol->expr, symbol->value.function);
 		}
 	}
+}
+
+static void lower_compilation_statics(LowerContext *ctx, Ast root, b32 root_is_static)
+{
+	for (Com_SourceId source = 0; source < ctx->source_scope_count; ++source)
+	{
+		Ast file = source == root->site.source ? root : ctx->compiler->sources[source].ast;
+		ASSERT(file && file->kind == AST_FILE);
+		Ast body = file->file.body;
+		ASSERT(body && body->kind == AST_BLOCK_STAT);
+		if (root_is_static || source != 0)
+		{
+			for (u32 i = 0; i < body->block.nstats; ++i)
+			{
+				Ast item = body->block.stats[i];
+				if (item->kind != AST_STATIC_DECL) {
+					report_lowering_error(ctx, LOWERING_ERROR_GENERIC, item->site, "static module cannot contain executable top-level statements");
+				}
+			}
+		}
+		ctx->current_source = source;
+		declare_source_statics(ctx, body);
+	}
+
+	for (Com_SourceId source = 0; source < ctx->source_scope_count; ++source)
+	{
+		ctx->current_source = source;
+		prepare_source_static_functions(ctx);
+	}
+	for (Com_SourceId source = 0; source < ctx->source_scope_count; ++source)
+	{
+		ctx->current_source = source;
+		evaluate_source_static_values(ctx);
+	}
+	for (Com_SourceId source = 0; source < ctx->source_scope_count; ++source)
+	{
+		ctx->current_source = source;
+		lower_source_static_functions(ctx);
+	}
+	ctx->current_source = 0;
 }
 
 static void report_unreferenced_source_statics(LowerContext *ctx)

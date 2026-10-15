@@ -78,6 +78,7 @@ typedef enum
 	STATIC_VALUE_NUMBER,
 	STATIC_VALUE_STRING,
 	STATIC_VALUE_FUNCTION,
+	STATIC_VALUE_NAMESPACE,
 }
 StaticValueKind;
 
@@ -90,6 +91,7 @@ typedef struct
 		f64   number;
 		Atom *string;
 		Ir    function;
+		Com_SourceId source;
 	};
 }
 StaticValue;
@@ -138,20 +140,22 @@ typedef struct LwScopeEntity
 }
 LwScopeEntity;
 
-// One static declaration tracked while its source is being lowered.
+// One top-level static declaration exported by a compiler source. The source
+// id lets evaluation temporarily enter the declaration's own namespace.
 typedef struct
 {
 	Atom             *name;
 	SourceSite        site;
 	Ast               expr;
+	Com_SourceId      source;
 	StaticSymbolState state;
 	StaticValue       value;
 	b32               referenced;
 }
 LwStaticSymbol;
 
-// The static namespace for one compiler source. Its array index is the
-// corresponding Com_SourceId.
+// The exported static namespace for one compiler source. For now every
+// top-level static declaration is visible to sources that import it.
 typedef struct
 {
 	LwStaticSymbol *statics;
