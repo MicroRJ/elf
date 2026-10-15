@@ -24,13 +24,21 @@ typedef struct
 }
 SourceMapBuffer;
 
+typedef struct BcGen BcGen;
+
+// Accumulates module-wide bytecode, constants, strings, and function records.
+// function_gen is reusable scratch for generating one function at a time.
 typedef struct
 {
+	Compiler   *compiler;
+	elf_Arena *arena;
+	BcGen      *function_gen;
 	Bytecode   *bytecode;
 	u32         bytecode_capacity;
 	u32         bytecode_count;
 	BcFunction *functions;
 	u32         function_count;
+	u32         generated_function_count;
 	Atom   **atoms;
 	u32          atom_capacity;
 	u32          atom_count;
@@ -43,11 +51,10 @@ typedef struct
 }
 BcModuleBuilder;
 
-typedef struct
+// Temporary state for the one IR function currently being generated.
+struct BcGen
 {
-	Compiler         *compiler;
-	elf_Arena        *arena;
-	BcModuleBuilder   module;
+	BcModuleBuilder  *module;
 	Bytecode         *bytecode;
 	u32               bytecode_capacity;
 	u32               bytecode_count;
@@ -58,5 +65,4 @@ typedef struct
 	u32               label_count;
 	BytecodeJumpPatch jump_patches[4096];
 	u32               jump_patch_count;
-}
-BcGen;
+};

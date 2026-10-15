@@ -15,13 +15,14 @@ static inline i32 unwrap_slot(BcSlot memory)
 
 static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout);
 static void do_stat(BcGen *gen, Ir stat);
-static void generate_function(BcGen *gen, IrFunction *function);
+static void generate_function(BcModuleBuilder *module, IrFunction *function);
 static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module);
 static void define_label(BcGen *gen, u32 label);
 static void jump_to_label(BcGen *gen, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcGen *gen, SourceSite site, BcSlot pred, u32 label);
 static void jump_if_expr_true(BcGen *gen, Ir expr, u32 true_label);
 static void jump_if_expr_false(BcGen *gen, Ir expr, u32 false_label);
+static SourceMapEntry *copy_source_map(elf_Arena *arena, SourceMapEntry *entries, u32 count, u32 bytecode_offset);
 
 typedef enum
 {
@@ -40,7 +41,7 @@ static void report_generation_error(BcGen *gen, GenerationError error, SourceSit
 
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(gen->compiler, COMPILER_ERROR, COMPILER_PHASE_BYTECODE,
+	compiler_reportv(gen->module->compiler, COMPILER_ERROR, COMPILER_PHASE_BYTECODE,
 		site, format, args);
 	va_end(args);
 }
@@ -92,11 +93,10 @@ static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *ca
 	return new_items;
 }
 
-static u32 add_const_int(BcGen *gen, i64 i)
+static u32 add_const_int(BcModuleBuilder *module, i64 i)
 {
-	BcModuleBuilder *module = &gen->module;
 	if (module->integer_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->integer_constants = grow_module_array(gen->arena, module->integer_constants
+	module->integer_constants = grow_module_array(module->arena, module->integer_constants
 	, module->integer_constant_count, &module->integer_constant_capacity
 	, module->integer_constant_count + 1, sizeof(*module->integer_constants));
 	u32 index = module->integer_constant_count++;
@@ -104,11 +104,10 @@ static u32 add_const_int(BcGen *gen, i64 i)
 	return index;
 }
 
-static u32 add_const_num(BcGen *gen, f64 i)
+static u32 add_const_num(BcModuleBuilder *module, f64 i)
 {
-	BcModuleBuilder *module = &gen->module;
 	if (module->number_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->number_constants = grow_module_array(gen->arena, module->number_constants
+	module->number_constants = grow_module_array(module->arena, module->number_constants
 	, module->number_constant_count, &module->number_constant_capacity
 	, module->number_constant_count + 1, sizeof(*module->number_constants));
 	u32 index = module->number_constant_count++;
@@ -116,15 +115,14 @@ static u32 add_const_num(BcGen *gen, f64 i)
 	return index;
 }
 
-static u32 add_atom(BcGen *gen, Atom *atom)
+static u32 add_atom(BcModuleBuilder *module, Atom *atom)
 {
-	BcModuleBuilder *module = &gen->module;
 	for (u32 i = 0; i < module->atom_count; ++ i) {
 		if (module->atoms[i] == atom) return i;
 	}
 
 	if (module->atom_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->atoms = grow_module_array(gen->arena, module->atoms
+	module->atoms = grow_module_array(module->arena, module->atoms
 	, module->atom_count, &module->atom_capacity
 	, module->atom_count + 1, sizeof(*module->atoms));
 	u32 index = module->atom_count++;
@@ -132,11 +130,10 @@ static u32 add_atom(BcGen *gen, Atom *atom)
 	return index;
 }
 
-static u32 append_bytecode(BcGen *gen, Bytecode *bytecode, u32 count)
+static u32 append_bytecode(BcModuleBuilder *module, Bytecode *bytecode, u32 count)
 {
-	BcModuleBuilder *module = &gen->module;
 	ASSERT(module->bytecode_count <= 0xffffffffu - count);
-	module->bytecode = grow_module_array(gen->arena, module->bytecode
+	module->bytecode = grow_module_array(module->arena, module->bytecode
 	, module->bytecode_count, &module->bytecode_capacity
 	, module->bytecode_count + count, sizeof(*module->bytecode));
 	u32 offset = module->bytecode_count;
@@ -266,19 +263,19 @@ static u32 emit_jump_if_bc(BcGen *gen, SourceSite site, BytecodeType type, BcSlo
 
 static u32 emit_load_int_bc(BcGen *gen, SourceSite site, BcSlot dest, i64 integer)
 {
-	u32 index = add_const_int(gen, integer);
+	u32 index = add_const_int(gen->module, integer);
 	return emit_xy_bc(gen, site, BC_LOADKINT, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_num_bc(BcGen *gen, SourceSite site, BcSlot dest, f64 number)
 {
-	u32 index = add_const_num(gen, number);
+	u32 index = add_const_num(gen->module, number);
 	return emit_xy_bc(gen, site, BC_LOADKNUM, unwrap_slot(dest), index);
 }
 
 static u32 emit_load_atom_bc(BcGen *gen, SourceSite site, BcSlot dest, Atom *atom)
 {
-	u32 index = add_atom(gen, atom);
+	u32 index = add_atom(gen->module, atom);
 	return emit_xy_bc(gen, site, BC_LOADKSTRING, unwrap_slot(dest), index);
 }
 
@@ -340,20 +337,25 @@ static BcSlot ensure_slot(BcGen *gen, BcSlot slot)
 }
 
 /* main */
-static BcGen *bg_create(Compiler *compiler, u32 function_count)
+static BcModuleBuilder *create_bc_module_builder(Compiler *compiler, u32 function_count)
 {
 	elf_Arena *arena = compiler->arena;
 	if (function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
 	elf_arena_align(arena, 8);
+	BcModuleBuilder *module = elf_arena_push_zero(arena, sizeof(*module));
+	module->compiler = compiler;
+	module->arena = arena;
+
+	elf_arena_align(arena, 8);
 	BcGen *gen = elf_arena_push_zero(arena, sizeof(*gen));
-	gen->compiler = compiler;
-	gen->arena = arena;
+	gen->module = module;
+	module->function_gen = gen;
 	if (function_count)
 	{
 		elf_arena_align(arena, 8);
-		gen->module.functions = elf_arena_push_zero(arena, sizeof(*gen->module.functions) * function_count);
+		module->functions = elf_arena_push_zero(arena, sizeof(*module->functions) * function_count);
 	}
-	gen->module.function_count = function_count;
+	module->function_count = function_count;
 
 	u32 bytecode_capacity = 1 << 13;
 	elf_arena_align(arena, 8);
@@ -366,12 +368,15 @@ static BcGen *bg_create(Compiler *compiler, u32 function_count)
 	gen->source_map_buffer.entries = elf_arena_push_zero(arena, sizeof(*gen->source_map_buffer.entries) * source_map_capacity);
 	gen->source_map_buffer.capacity = source_map_capacity;
 	gen->source_map_buffer.count = 0;
-	return gen;
+	return module;
 }
 
-static void generate_function(BcGen *gen, IrFunction *function)
+static void generate_function(BcModuleBuilder *module, IrFunction *function)
 {
+	ASSERT(module && module->function_gen);
 	ASSERT(function);
+	BcGen *gen = module->function_gen;
+	ASSERT(gen->module == module);
 
 	PROF_BLOCK("bytecode.generate_function")
 	{
@@ -407,6 +412,20 @@ static void generate_function(BcGen *gen, IrFunction *function)
 		}
 
 		patch_bytecode_labels(gen);
+
+		ASSERT(module->generated_function_count < module->function_count);
+		BcFunction *bc_function = module->functions + module->generated_function_count++;
+		u32 bytecode_offset = append_bytecode(module, gen->bytecode, gen->bytecode_count);
+		SourceMapEntry *source_map = copy_source_map(module->arena, gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
+
+		bc_function->variadic         = function->variadic;
+		bc_function->arity            = function->param_count;
+		bc_function->offset           = bytecode_offset;
+		bc_function->length           = gen->bytecode_count;
+		bc_function->captures         = function->capture_count;
+		bc_function->stack_size       = gen->stack_size;
+		bc_function->source_map       = source_map;
+		bc_function->source_map_count = gen->source_map_buffer.count;
 	}
 }
 
@@ -564,40 +583,27 @@ static void finalize_module(Compiler *compiler, elf_Arena *output_arena, Com_Mod
 
 static b32 generate_module(Compiler *compiler, elf_Arena *output_arena, Com_Module *module, IrModule ir_module)
 {
-	elf_Arena *arena = compiler->arena;
 	ASSERT(ir_module.functions || ir_module.function_count == 0);
 	ASSERT(!ir_module.has_entry || ir_module.entry_index < ir_module.function_count);
 
-	BcGen *gen = bg_create(compiler, ir_module.function_count);
+	BcModuleBuilder *builder = create_bc_module_builder(compiler, ir_module.function_count);
 	PROF_BLOCK("compiler.codegen")
 	{
 		for (u32 i = 0; i < ir_module.function_count; ++ i)
 		{
 			IrFunction *ir_function = ir_module.functions + i;
-			BcFunction *bc_function = gen->module.functions + i;
-			generate_function(gen, ir_function);
-
-			u32 bytecode_offset = append_bytecode(gen, gen->bytecode, gen->bytecode_count);
-			SourceMapEntry *source_map = copy_source_map(arena, gen->source_map_buffer.entries, gen->source_map_buffer.count, bytecode_offset);
-
-			bc_function->variadic         = ir_function->variadic;
-			bc_function->arity            = ir_function->param_count;
-			bc_function->offset           = bytecode_offset;
-			bc_function->length           = gen->bytecode_count;
-			bc_function->captures         = ir_function->capture_count;
-			bc_function->stack_size       = gen->stack_size;
-			bc_function->source_map       = source_map;
-			bc_function->source_map_count = gen->source_map_buffer.count;
+			generate_function(builder, ir_function);
 		}
 	}
+	ASSERT(builder->generated_function_count == builder->function_count);
 	if (compiler->report.error_count) {
 		return false;
 	}
 	for (u32 i = 0; i < ir_module.global_count; ++i)
 	{
-		add_atom(gen, ir_module.globals[i]);
+		add_atom(builder, ir_module.globals[i]);
 	}
-	finalize_module(compiler, output_arena, module, ir_module, &gen->module);
+	finalize_module(compiler, output_arena, module, ir_module, builder);
 	return true;
 }
 
@@ -727,7 +733,7 @@ static BcSlot bg_emit_direct_call(BcGen *gen, Ir ir, BcSlot out, u32 nout)
 	u32 nargs = args.count;
 	ASSERT(ir->ir_call.type == IR_CALL_DIRECT);
 	ASSERT(function->kind == IR_FUNCTION);
-	ASSERT(function->ir_function.index < gen->module.function_count);
+	ASSERT(function->ir_function.index < gen->module->function_count);
 	ASSERT(nout <= 0xff);
 
 	BcSlot stack_top = mark_slots(gen);
@@ -973,7 +979,7 @@ static BcSlot emit_expr(BcGen *gen, Ir expr, BcSlot out, u32 nout)
 			out = ensure_slot(gen, out);
 
 			u32 bytecode_function_id = expr->ir_function.index;
-			ASSERT(bytecode_function_id < gen->module.function_count);
+			ASSERT(bytecode_function_id < gen->module->function_count);
 
 			IrArray captures = expr->ir_function.captures;
 			if (captures.count == 0)

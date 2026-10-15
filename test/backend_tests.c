@@ -525,8 +525,11 @@ static void test_backend_if_else_restores_stack_top(void)
 	function.param_count = ARRAY_COUNT(params);
 	function.body = body;
 
-	BcGen *gen = bg_create(compiler, 1);
-	generate_function(gen, &function);
+	BcModuleBuilder *module = create_bc_module_builder(compiler, 1);
+	generate_function(module, &function);
+	if (module->generated_function_count != 1) {
+		test_fail("function generation appends one bytecode function to its module");
+	}
 
 	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {
 		test_fail("if/else restores stack top before following statement");
