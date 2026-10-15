@@ -254,3 +254,38 @@ static Ast parse_json_ast(Parser *parser)
 	}
 	return ast;
 }
+
+static Ast parse_jsonl_ast(Parser *parser)
+{
+	u32 count = 0;
+	SourceSite site = parser->tok.site;
+	while (!peek_token(parser, TOK_NONE))
+	{
+		u32 line_index = parser->tok.site.line_index;
+		Ast value = parse_json_ast_value(parser);
+		if (ast_is_error(value))
+		{
+			return value;
+		}
+		if (parser->tok_prev.site.line_index != line_index)
+		{
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
+		}
+		if (!peek_token(parser, TOK_NONE) && parser->tok.site.line_index == line_index)
+		{
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, parser->tok.site, "expected a line break after JSON value");
+		}
+		if (!push_ast(parser, value))
+		{
+			return ERROR_OOM_AST;
+		}
+		count += 1;
+	}
+
+	Ast *values = pop_ast_array(parser, count);
+	if (count && !values)
+	{
+		return ERROR_OOM_AST;
+	}
+	return create_array_ast(parser, site, values, count);
+}

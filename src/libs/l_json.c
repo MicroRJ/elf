@@ -275,31 +275,26 @@ ELF_FUNCTION(l_json_stringify)
 	return 1;
 }
 
-ELF_FUNCTION(l_json_load_file)
+static b32 json_read_file(elf_State *state, const char *name, elf_StrSlice *source, u64 *allocation_size)
 {
-	lib_check_arg_count(S, "json.load_file", nargs, 1, 1);
-	const char *name = lib_load_cstr(S, 1);
 	dy_File_Info info;
 	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > INT_MAX)
 	{
-		elf_push_nil(S);
-		return 1;
+		return false;
 	}
 
 	dy_File file;
 	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
 	{
-		elf_push_nil(S);
-		return 1;
+		return false;
 	}
 
-	u64 allocation_size = info.size + 1;
-	char *data = elf_alloc(S, allocation_size);
+	*allocation_size = info.size + 1;
+	char *data = elf_alloc(state, *allocation_size);
 	if (!data)
 	{
 		dy_close_file(file);
-		elf_push_nil(S);
-		return 1;
+		return false;
 	}
 
 	dy_u64 size = 0;
@@ -307,25 +302,52 @@ ELF_FUNCTION(l_json_load_file)
 	dy_close_file(file);
 	if (read.error || size != info.size)
 	{
-		elf_free(S, data, allocation_size);
-		elf_push_nil(S);
-		return 1;
+		elf_free(state, data, *allocation_size);
+		return false;
 	}
 
 	data[size] = 0;
-	elf_StrSlice source = {data, size};
-	if (!lib_push_json(S, name, source))
+	*source = (elf_StrSlice) {data, size};
+	return true;
+}
+
+static void json_push_loaded_file(elf_State *state, const char *name, b32 jsonl)
+{
+	elf_StrSlice source = {};
+	u64 allocation_size = 0;
+	if (!json_read_file(state, name, &source, &allocation_size))
 	{
-		elf_push_nil(S);
+		elf_push_nil(state);
+		return;
 	}
-	elf_free(S, data, allocation_size);
+
+	b32 loaded = jsonl ? lib_push_jsonl(state, name, source) : lib_push_json(state, name, source);
+	if (!loaded)
+	{
+		elf_push_nil(state);
+	}
+	elf_free(state, source.data, allocation_size);
+}
+
+ELF_FUNCTION(l_json_load_file)
+{
+	lib_check_arg_count(S, "json.load_file", nargs, 1, 1);
+	json_push_loaded_file(S, lib_load_cstr(S, 1), false);
+	return 1;
+}
+
+ELF_FUNCTION(l_json_load_jsonl)
+{
+	lib_check_arg_count(S, "json.load_jsonl", nargs, 1, 1);
+	json_push_loaded_file(S, lib_load_cstr(S, 1), true);
 	return 1;
 }
 
 static const elf_Binding l_json[] = {
-	{"parse",     l_json_parse},
-	{"stringify", l_json_stringify},
-	{"load_file", l_json_load_file},
+	{"parse",      l_json_parse},
+	{"stringify",  l_json_stringify},
+	{"load_file",  l_json_load_file},
+	{"load_jsonl", l_json_load_jsonl},
 };
 
 static elf_Table *elf_lib_json(elf_State *state)

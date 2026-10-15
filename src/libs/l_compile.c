@@ -131,12 +131,32 @@ elf_Bool lib_push_compiler_ast(elf_State *state, Compiler *compiler, Ast ast)
 	return result;
 }
 
-static b32 lib_push_parsed_source(elf_State *state, const char *name, elf_StrSlice source, b32 json)
+typedef enum
+{
+	LIB_PARSE_CONSTANT,
+	LIB_PARSE_JSON,
+	LIB_PARSE_JSONL,
+}
+LibParseType;
+
+static b32 lib_push_parsed_source(elf_State *state, const char *name, elf_StrSlice source, LibParseType type)
 {
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, name, source);
-	Ast ast = json ? compiler_parse_json(compiler) : compiler_parse_constant_expr(compiler);
+	Ast ast = ERROR_AST;
+	if (type == LIB_PARSE_JSON)
+	{
+		ast = compiler_parse_json(compiler);
+	}
+	else if (type == LIB_PARSE_JSONL)
+	{
+		ast = compiler_parse_jsonl(compiler);
+	}
+	else
+	{
+		ast = compiler_parse_constant_expr(compiler);
+	}
 	b32 result = lib_push_compiler_ast(state, compiler, ast);
 	elf_end_scratch(scratch);
 	return result;
@@ -144,10 +164,15 @@ static b32 lib_push_parsed_source(elf_State *state, const char *name, elf_StrSli
 
 elf_Bool lib_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
 {
-	return lib_push_parsed_source(state, name, source, false);
+	return lib_push_parsed_source(state, name, source, LIB_PARSE_CONSTANT);
 }
 
 elf_Bool lib_push_json(elf_State *state, const char *name, elf_StrSlice source)
 {
-	return lib_push_parsed_source(state, name, source, true);
+	return lib_push_parsed_source(state, name, source, LIB_PARSE_JSON);
+}
+
+elf_Bool lib_push_jsonl(elf_State *state, const char *name, elf_StrSlice source)
+{
+	return lib_push_parsed_source(state, name, source, LIB_PARSE_JSONL);
 }

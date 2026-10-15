@@ -268,3 +268,4 @@ b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase,
 Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type);
 struct Ast_T *compiler_parse_constant_expr(Compiler *compiler);
 struct Ast_T *compiler_parse_json(Compiler *compiler);
+struct Ast_T *compiler_parse_jsonl(Compiler *compiler);

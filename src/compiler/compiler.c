@@ -176,6 +176,7 @@ Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_
 	return source_id;
 }
 
+// TODO(RJ): dy-core :path addition!
 static b32 compiler_path_is_absolute(Atom *path)
 {
 	const char *data = atom_data(path);
@@ -821,6 +822,22 @@ Ast compiler_parse_json(Compiler *compiler)
 		Parser *parser = parser_create(compiler, 0);
 		if (parser) {
 			ast = parse_json_ast(parser);
+		}
+	}
+	return ast;
+}
+
+Ast compiler_parse_jsonl(Compiler *compiler)
+{
+	ASSERT(compiler);
+	ASSERT(compiler->source_count);
+	Ast ast = ERROR_AST;
+	if (!compiler->report.error_count)
+	{
+		Parser *parser = parser_create(compiler, 0);
+		if (parser)
+		{
+			ast = parse_jsonl_ast(parser);
 		}
 	}
 	return ast;

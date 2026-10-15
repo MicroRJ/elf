@@ -124,8 +124,76 @@ static void test_json_to_table_value(elf_State *state)
 	}
 }
 
+static void test_jsonl_to_array_value(elf_State *state)
+{
+	const char *text =
+		"{\"name\":\"first\",\"value\":1}\r\n"
+		"\r\n"
+		"[2,3]\n"
+		"null\n";
+	elf_StrSlice source = {(char *)text, (u64)strlen(text)};
+	if (!lib_push_jsonl(state, "jsonl-test", source))
+	{
+		test_fail("JSONL parses");
+		return;
+	}
+
+	elf_Array *lines = json_expect_array(pop_value(state), "JSONL returns an array");
+	if (!lines)
+	{
+		return;
+	}
+	if (elf_array_length(lines) != 3)
+	{
+		test_fail("JSONL ignores blank lines");
+		return;
+	}
+
+	elf_Table *first = json_expect_table(elf_array_get(state, lines, 0), "JSONL first row is a table");
+	if (first)
+	{
+		json_expect_string(elf_table_get_or_nil(state, first, json_test_string_key(state, "name")), "first", "JSONL first row string");
+		json_expect_int(elf_table_get_or_nil(state, first, json_test_string_key(state, "value")), 1, "JSONL first row integer");
+	}
+
+	elf_Array *second = json_expect_array(elf_array_get(state, lines, 1), "JSONL second row is an array");
+	if (second)
+	{
+		json_expect_int(elf_array_get(state, second, 0), 2, "JSONL nested array first value");
+		json_expect_int(elf_array_get(state, second, 1), 3, "JSONL nested array second value");
+	}
+	if (!value_is_nil(elf_array_get(state, lines, 2)))
+	{
+		test_fail("JSONL null row");
+	}
+}
+
+static void test_jsonl_rejects_invalid_record_boundaries(void)
+{
+	const char *sources[] = {
+		"1 2\n",
+		"{\"value\":\n1}\n",
+	};
+	for (u32 i = 0; i < ARRAY_COUNT(sources); ++i)
+	{
+		elf_Scratch scratch = elf_begin_scratch();
+		Compiler *compiler = compiler_create(scratch.arena);
+		compiler_set_log_messages(compiler, false);
+		elf_StrSlice source = {(char *)sources[i], (u64)strlen(sources[i])};
+		compiler_add_root_source(compiler, "invalid-jsonl", source);
+		Ast ast = compiler_parse_jsonl(compiler);
+		if (!ast_is_error(ast) || compiler->report.error_count != 1)
+		{
+			test_fail("JSONL rejects invalid record boundaries");
+		}
+		elf_end_scratch(scratch);
+	}
+}
+
 static void run_json_tests(elf_State *state)
 {
 	test_constexpr_table_literal(state);
 	test_json_to_table_value(state);
+	test_jsonl_to_array_value(state);
+	test_jsonl_rejects_invalid_record_boundaries();
 }
