@@ -501,16 +501,16 @@ activate_frame:
 				elf_array_add(state, value_as_array(array), *vm_slot(reference, byte.b_y));
 			} break;
 
-			case BC_GETLENGTH: {
+			case BC_MEASURE: {
 				elf_Value value = *vm_slot(reference, byte.b_y);
-				u32 length = 0;
-				if (value_length(value, &length))
+				u32 measure = 0;
+				if (value_measure(value, &measure))
 				{
-					*vm_slot(reference, byte.b_x) = value_from_integer(length);
+					*vm_slot(reference, byte.b_x) = value_from_integer(measure);
 				}
 				else
 				{
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "cannot get length of '%s' value", value_type_name(value.type));
+					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "cannot measure '%s' value", value_type_name(value.type));
 				}
 			} break;
 

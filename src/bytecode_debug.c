@@ -164,9 +164,9 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		}
 		break;
 
-		case BC_GETLENGTH:
+		case BC_MEASURE:
 		{
-			elf_arena_pushf(arena, "r%d = len(r%d)", byte.b_x, byte.b_y);
+			elf_arena_pushf(arena, "r%d = measure(r%d)", byte.b_x, byte.b_y);
 		}
 		break;
 

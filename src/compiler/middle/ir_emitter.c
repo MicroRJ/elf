@@ -849,10 +849,10 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 		}
 		break;
 
-		case AST_LENGTH_INTRINSIC:
+		case AST_MEASURE:
 		{
 			Ir expr_ir = lower_ast_expr_to_ir(ctx, expr->unary);
-			ir = create_length_intrinsic_ir(ctx, expr->site, expr_ir);
+			ir = create_measure_ir(ctx, expr->site, expr_ir);
 		}
 		break;
 
@@ -1297,7 +1297,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 	else if (collection_local)
 	{
 		Ir collection = create_load_local_ir(ctx, range_end_site, collection_local);
-		range_end = create_length_intrinsic_ir(ctx, range_end_site, collection);
+		range_end = create_measure_ir(ctx, range_end_site, collection);
 	}
 	else
 	{

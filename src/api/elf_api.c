@@ -364,7 +364,7 @@ elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length)
 	elf_Bool result = false;
 	if (length && value)
 	{
-		result = value_length(*value, length);
+		result = value_measure(*value, length);
 	}
 	return result;
 }

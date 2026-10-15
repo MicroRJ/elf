@@ -294,28 +294,32 @@ static inline const char *value_name(elf_Value value)
 	return value_type_name(value.type);
 }
 
-static inline b32 value_length(elf_Value value, u32 *length)
+static inline b32 value_measure(elf_Value value, u32 *measure)
 {
 	b32 result = true;
-	if (!length)
+	if (!measure)
 	{
 		result = false;
 	}
+	else if (value_is_nil(value))
+	{
+		*measure = 0;
+	}
 	else if (value_is_table(value))
 	{
-		*length = value_as_table(value)->count;
+		*measure = value_as_table(value)->count;
 	}
 	else if (value_is_string(value))
 	{
-		*length = elf_string_size(value_as_string(value));
+		*measure = elf_string_size(value_as_string(value));
 	}
 	else if (value_is_array(value))
 	{
-		*length = elf_array_length(value_as_array(value));
+		*measure = elf_array_length(value_as_array(value));
 	}
 	else if (value_is_buffer(value))
 	{
-		*length = value_as_buffer(value)->size;
+		*measure = value_as_buffer(value)->size;
 	}
 	else
 	{

@@ -214,9 +214,9 @@ static Ir create_index_ir(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
 	return ir_new_binary(ctx, site, IR_INDEX, x, y);
 }
 
-static Ir create_length_intrinsic_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
+static Ir create_measure_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
-	return ir_new_unary(ctx, site, IR_LENGTH_INTRINSIC, expr);
+	return ir_new_unary(ctx, site, IR_MEASURE, expr);
 }
 
 static Ir create_get_mem_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)

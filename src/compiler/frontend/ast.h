@@ -73,7 +73,7 @@
 	X(AST_RANGE_INDEX         , "range_index")                \
 	X(AST_ELLIPSIS            , "ellipsis")                   \
 	X(AST_RETURN              , "return")                     \
-	X(AST_LENGTH_INTRINSIC    , "length_intrinsic")           \
+	X(AST_MEASURE             , "measure")                    \
 	X(AST_GET_MEM             , "get_mem")                    \
 // END
 

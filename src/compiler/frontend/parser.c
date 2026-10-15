@@ -741,6 +741,16 @@ static Ast parse_unary_expr(Parser *parser)
 			}
 		}
 		break;
+		case TOK_MUL:
+		{
+			consume_token(parser);
+			value = parse_subexpr(parser, 10000);
+			if (!ast_is_error(value))
+			{
+				value = create_measure_ast(parser, tok.site, value);
+			}
+		}
+		break;
 		case TOK_SUB:
 		{
 			consume_token(parser);

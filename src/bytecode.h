@@ -57,7 +57,7 @@ STATIC_ASSERT(TRULE_ALL <= 0x7fff);
 	X(CURRENT_CLOSURE, "current_closure")  \
 	X(GETINDEX,        "getindex")         \
 	X(GETMETAFIELD,    "getmetafield")     \
-	X(GETLENGTH,       "getlength")        \
+	X(MEASURE,         "measure")          \
 	X(GETFIELD,        "getfield")         \
 	X(SETGLOBAL,       "setglobal")        \
 	X(SETFIELD,        "setfield")         \

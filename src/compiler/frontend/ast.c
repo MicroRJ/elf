@@ -197,9 +197,9 @@ static Ast create_ellipsis_ast(Parser *par, SourceSite site)
 	return tree;
 }
 
-static Ast create_length_ast(Parser *par, SourceSite site, Ast x)
+static Ast create_measure_ast(Parser *par, SourceSite site, Ast x)
 {
-	return create_unary_ast(par, site, AST_LENGTH_INTRINSIC, x);
+	return create_unary_ast(par, site, AST_MEASURE, x);
 }
 
 static Ast create_get_mem_ast(Parser *par, SourceSite site, Ast x)
@@ -983,9 +983,9 @@ static void print_ast(Printer *pr, Ast tree)
 			print_ast(pr, tree->unary);
 		}
 		break;
-		case AST_LENGTH_INTRINSIC:
+		case AST_MEASURE:
 		{
-			PRINT(pr, "#");
+			PRINT(pr, "*");
 			print_ast(pr, tree->unary);
 		}
 		break;

@@ -1117,9 +1117,9 @@ static BcSlot emit_expr(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32 nou
 		}
 		break;
 
-		case IR_LENGTH_INTRINSIC:
+		case IR_MEASURE:
 		{
-			out = emit_unary_expr(emitter, expr, BC_GETLENGTH, out, nout);
+			out = emit_unary_expr(emitter, expr, BC_MEASURE, out, nout);
 		}
 		break;
 

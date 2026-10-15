@@ -1,0 +1,13 @@
+values := [1, 2, 3]
+fields := {one = 1, two = 2}
+buffer := elf.buffer(4)
+buffer:append("abc")
+
+test_assert(*nil == 0)
+test_assert(*"hello" == 5)
+test_assert(*values == 3)
+test_assert(*fields == 2)
+test_assert(*buffer == 3)
+test_assert(*values * 2 == 6)
+
+ret *"hello" + *values + *fields + *buffer

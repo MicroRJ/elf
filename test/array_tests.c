@@ -22,7 +22,7 @@ static void test_array_value(void)
 	{
 		test_fail("array value has the array type");
 	}
-	if (!value_length(value, &length) || length != 0)
+	if (!value_measure(value, &length) || length != 0)
 	{
 		test_fail("empty array value has zero length");
 	}

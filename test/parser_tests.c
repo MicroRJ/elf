@@ -91,6 +91,17 @@ static void test_parser_decl_precedence_and_strings(elf_State *state)
 	expect_ast_i64(expr->binary.y->binary.y, 3, "parse multiply rhs integer");
 }
 
+static void test_parser_measure_operator(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "ret *items * 2");
+	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse measure return");
+	Ast multiply = parser_test_tuple_item(ret->return_stat.expr, 0, AST_MUL, "measure binds before multiplication");
+	Ast measure = multiply ? multiply->binary.x : 0;
+	expect_ast_kind(measure, AST_MEASURE, "parse measure expression");
+	expect_ast_atom(measure ? measure->unary : 0, "items", "measure keeps operand expression");
+	expect_ast_i64(multiply ? multiply->binary.y : 0, 2, "measure multiplication rhs");
+}
+
 static void test_parser_constant_declaration(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "answer ::= 42");
@@ -705,6 +716,7 @@ static void test_parser_ast_oom(elf_State *state)
 static void run_parser_tests(elf_State *state)
 {
 	test_parser_decl_precedence_and_strings(state);
+	test_parser_measure_operator(state);
 	test_parser_constant_declaration(state);
 	test_parser_static_declaration(state);
 	test_parser_import_expression(state);

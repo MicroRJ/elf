@@ -196,8 +196,16 @@ static void test_api_arrays(elf_State *state)
 static void test_api_string_length(elf_State *state)
 {
 	elf_Index checkpoint = elf_get_top(state);
+	elf_push_nil(state);
+	elf_u32 length = UINT32_MAX;
+	if (!elf_length(state, -1, &length) || length != 0)
+	{
+		test_fail("API measures nil as zero");
+	}
+	elf_pop(state, 1);
+
 	elf_push_str(state, "elf\0lang", 8);
-	elf_u32 length = 0;
+	length = 0;
 	if (!elf_length(state, -1, &length) || length != 8)
 	{
 		test_fail("API reads string byte length");

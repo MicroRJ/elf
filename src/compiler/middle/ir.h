@@ -52,7 +52,7 @@ BcSlot;
 	X(IR_JUMP                , "jump")                       \
 	X(IR_JUMP_IF_FALSE       , "jump_if_false")              \
 	X(IR_RETURN              , "return")                     \
-	X(IR_LENGTH_INTRINSIC    , "length_intrinsic")           \
+	X(IR_MEASURE             , "measure")                    \
 	X(IR_GET_MEM             , "get_mem")                    \
 	X(IR_FUNCTION            , "function")                   \
 	X(IR_RECURSE             , "recurse")                    \
