@@ -146,7 +146,7 @@ struct Ast_T
 		{
 			Ast *params;
 			u32 nparams;
-			Ast  variadic;
+			b32  variadic;
 			Ast  body;
 		}
 		function;

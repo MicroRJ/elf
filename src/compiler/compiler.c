@@ -871,9 +871,16 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 	{
 		return module;
 	}
-	if (!compiler_resolve_statics(compiler, unit_type)) {
+
+	PROF_BLOCK("compiler.resolve_statics")
+	{
+		parsed = compiler_resolve_statics(compiler, unit_type);
+	}
+	if (!parsed || compiler->report.error_count)
+	{
 		return module;
 	}
+
 	IrModuleEmitter *ir_module_emitter = ir_create_module_emitter(compiler);
 	IrFunctionEmitter *ir_function_emitter = ir_create_function_emitter(ir_module_emitter);
 	PROF_BLOCK("compiler.lower")

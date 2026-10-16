@@ -374,7 +374,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 
 static void test_parser_trailing_closures(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "run -> {}\nmap(2) -> (item: int, index) { ret item }");
+	Ast file = parser_test_parse_file(state, "run -> {}\nmap(2) -> (item: int, index) { ret item }\nrun -> elf.println(\"welcome\")");
 	Ast first_stat = parser_test_stat(file, 0, AST_TUPLE, "parse zero-parameter trailing closure tuple");
 	Ast first = parser_test_tuple_item(first_stat, 0, AST_CALL, "trailing closure is part of call ast");
 	if (!first) {
@@ -414,6 +414,10 @@ static void test_parser_trailing_closures(elf_State *state)
 		expect_ast_atom(item->param.type, "int", "trailing closure keeps parameter type");
 		expect_ast_atom(function->function.params[1]->param.name, "index", "trailing closure keeps second parameter");
 	}
+
+	Ast third_stat = parser_test_stat(file, 2, AST_TUPLE, "parse single-statement trailing closure tuple");
+	Ast third = parser_test_tuple_item(third_stat, 0, AST_CALL, "single-statement trailing closure is part of call ast");
+	expect_ast_kind(third && third->call.carg ? third->call.carg->function.body : 0, AST_TUPLE, "trailing closure stores single-statement body");
 }
 
 static void test_parser_named_call_arguments(elf_State *state)
@@ -620,7 +624,16 @@ static void test_parser_function_expression(elf_State *state)
 	}
 
 	expect_ast_atom(function->function.params[0] ? function->function.params[0]->param.name : 0, "a", "variadic function named parameter");
-	expect_ast_kind(function->function.variadic, AST_ELLIPSIS, "function tracks variadic marker separately");
+	if (!function->function.variadic) {
+		test_fail("function tracks variadic marker separately");
+	}
+
+	file = parser_test_parse_file(state, "callback := fun { ret 42 }");
+	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration without parameter list");
+	function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression without parameter list");
+	if (function && function->function.nparams != 0) {
+		test_fail("function without parameter list has no parameters");
+	}
 
 	parser_expect_source_error(state, "ret fun(value: str | int) { ret value }", "function parameter type requires one identifier");
 }

@@ -263,7 +263,6 @@ static inline b32 peek_next_token(Parser *parser, Token_Type type)
 	return parser->tok_prox.type == type;
 }
 
-
 static b32 push_ast(Parser *par, Ast tree)
 {
 	if (par->ast.stack_index == par->ast.stack_size)
@@ -333,85 +332,74 @@ static Ast elf_parse_file(Parser *parser)
 	return file_ast;
 }
 
-static Ast parse_function(Parser *par, Token marker, b32 allow_omitted_parameters)
+// <function> ::= ("fun" | "->") ["(" [<parameter-list>] ")"] <statement>
+// <parameter-list> ::= <parameter> {"," <parameter>} ["," "..."] | "..."
+// <parameter> ::= <identifier> [":" <identifier>] ["=" <expression>]
+static Ast parse_function(Parser *par, Token marker)
 {
 	ASSERT(marker.type == TOK_FUN || marker.type == TOK_ARROW);
 
+	u32 stack_start = par->ast.stack_index;
 	u32 param_count = 0;
-	Ast variadic = 0;
-	b32 has_parameter_list = pick_token(par, TOK_LEFT_PAREN);
-
-	if (!has_parameter_list && !allow_omitted_parameters)
+	AstArray params = {};
+	b32 variadic = false;
+	Ast error = 0;
+	if (pick_token(par, TOK_LEFT_PAREN))
 	{
-		Token left_paren = take_token(par, TOK_LEFT_PAREN);
-		return ast_from_token_error(left_paren);
-	}
-
-	if (has_parameter_list && !peek_token(par, TOK_PAREN_RIGHT)) do
-	{
-		Token tok = par->tok;
-
-		if (pick_token(par, TOK_ELLIPSIS))
+		if (!peek_token(par, TOK_PAREN_RIGHT)) do
 		{
-			variadic = create_ellipsis_ast(par, tok.site);
-			if (ast_is_error(variadic)) {
-				return variadic;
-			}
-			if (pick_token(par, TOK_COMMA))
+			Token tok = par->tok;
+			if (pick_token(par, TOK_ELLIPSIS))
 			{
-				return parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "variadic marker must be the final parameter");
-			}
-			break;
-		}
-		else
-		{
-			Ast name = parse_ident_expr(par);
-			if (ast_is_error(name)) {
-				return name;
-			}
-			Ast type = 0;
-			Ast expr = 0;
-			if (pick_token(par, TOK_COLON))
-			{
-				type = parse_ident_expr(par);
-				if (ast_is_error(type)) {
-					return type;
+				variadic = true;
+				if (pick_token(par, TOK_COMMA)) {
+					error = parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "variadic marker must be the final parameter");
 				}
 			}
-			if (pick_token(par, TOK_ASSIGN))
+			else
 			{
-				expr = parse_expr(par);
-				if (ast_is_error(expr)) {
-					return expr;
+				Ast name = parse_ident_expr(par);
+				Ast type = 0;
+				Ast expr = 0;
+				if (!ast_is_error(name) && pick_token(par, TOK_COLON)) {
+					type = parse_ident_expr(par);
+				}
+				if (!ast_is_error(name) && !ast_is_error(type) && pick_token(par, TOK_ASSIGN)) {
+					expr = parse_expr(par);
+				}
+				Ast param = create_param_ast(par, tok.site, name, type, expr);
+				if (ast_is_error(param)) {
+					error = param;
+				}
+				else if (!push_ast(par, param)) {
+					error = ERROR_OOM_AST;
+				}
+				else {
+					++param_count;
 				}
 			}
-			Ast param = create_param_ast(par, tok.site, name, type, expr);
-			if (ast_is_error(param)) {
-				return param;
+		} while (!error && pick_token(par, TOK_COMMA));
+
+		if (!error)
+		{
+			Token right_paren = take_token(par, TOK_PAREN_RIGHT);
+			if (token_is_error(right_paren)) {
+				error = ast_from_token_error(right_paren);
 			}
-			if (!push_ast(par, param)) {
-				return ERROR_OOM_AST;
-			}
-			++ param_count;
 		}
-
-	} while(pick_token(par, TOK_COMMA));
-
-	if (has_parameter_list)
+		if (!error && param_count)
+		{
+			params.args = pop_ast_array(par, param_count);
+			params.nargs = param_count;
+			if (!params.args) {
+				error = ERROR_OOM_AST;
+			}
+		}
+	}
+	if (error)
 	{
-		Token right_paren = take_token(par, TOK_PAREN_RIGHT);
-		if (token_is_error(right_paren)) {
-			return ast_from_token_error(right_paren);
-		}
-	}
-
-	Ast *params = pop_ast_array(par, param_count);
-	if (param_count && !params) {
-		return ERROR_OOM_AST;
-	}
-
-	if (marker.type == TOK_ARROW && !peek_token(par, TOK_LEFT_BRACE)) {
-		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, par->tok.site, "expected trailing closure body");
+		par->ast.stack_index = stack_start;
+		return error;
 	}
 
 	Ast body = parse_stat(par);
@@ -423,7 +411,7 @@ static Ast parse_function(Parser *par, Token marker, b32 allow_omitted_parameter
 		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, par->tok.site, "expected function body");
 	}
 
-	Ast function = create_function_ast(par, marker.site, params, param_count, variadic, body);
+	Ast function = create_function_ast(par, marker.site, params.args, params.nargs, variadic, body);
 	return function;
 }
 
@@ -827,7 +815,7 @@ static Ast parse_unary_expr(Parser *parser)
 		break;
 		case TOK_FUN:
 		{
-			value = parse_function(parser, consume_token(parser), false);
+			value = parse_function(parser, consume_token(parser));
 		}
 		break;
 		case TOK_RECURSE:
@@ -1273,7 +1261,7 @@ static Ast parse_postfix_expr(Parser *parser)
 			case TOK_ARROW:
 			{
 				consume_token(parser);
-				Ast function = parse_function(parser, tok, true);
+				Ast function = parse_function(parser, tok);
 				value = create_carg_call_ast(parser, tok.site, value, function);
 			}
 			break;

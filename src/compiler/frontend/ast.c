@@ -498,11 +498,8 @@ static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 	return tree;
 }
 
-static Ast create_function_ast(Parser *par, SourceSite site, Ast *params, u32 nparams, Ast variadic, Ast body)
+static Ast create_function_ast(Parser *par, SourceSite site, Ast *params, u32 nparams, b32 variadic, Ast body)
 {
-	if (ast_is_error(variadic)) {
-		return variadic;
-	}
 	if (ast_is_error(body)) {
 		return body;
 	}
@@ -706,7 +703,7 @@ static void print_ast(Printer *pr, Ast tree)
 
 			Ast *params    = tree->function.params;
 			u32  nparams   = tree->function.nparams;
-			Ast  variadic  = tree->function.variadic;
+			b32  variadic  = tree->function.variadic;
 			Ast  body      = tree->function.body;
 
 
@@ -717,7 +714,7 @@ static void print_ast(Printer *pr, Ast tree)
 				if (nparams) {
 					PRINT(pr, ", ");
 				}
-				print_ast(pr, variadic);
+				PRINT(pr, "...");
 			}
 			PRINT(pr, ")");
 			print_ast(pr, body);
@@ -879,7 +876,7 @@ static void print_ast(Printer *pr, Ast tree)
 						if (carg->function.nparams) {
 							PRINT(pr, ", ");
 						}
-						print_ast(pr, carg->function.variadic);
+						PRINT(pr, "...");
 					}
 					PRINT(pr, ") ");
 				}
