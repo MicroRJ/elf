@@ -117,13 +117,13 @@ static SourceSite lexer_source_site(Lexer *lexer, const char *data)
 	return source_site_from_ptr(lexer, data);
 }
 
-static Com_Error log_source_error(Lexer *lexer, SourceSite site, char const *fmt, ...)
+static Com_Status log_source_error(Lexer *lexer, Com_Error error, SourceSite site, char const *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	b32 reported = compiler_reportv(lexer->compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, fmt, args);
+	b32 reported = compiler_reportv(lexer->compiler, error, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, fmt, args);
 	va_end(args);
-	return reported ? COM_ERROR_SOURCE : COM_ERROR_OOM;
+	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
 static u32 lexer_hex_digit(u32 c)
@@ -133,7 +133,7 @@ static u32 lexer_hex_digit(u32 c)
 	return 10 + (u32)(c - 'A');
 }
 
-static Com_Error lexer_parse_hex_codepoint(Lexer *lexer, const char **cursor, u32 digits, SourceSite site, u32 *out)
+static Com_Status lexer_parse_hex_codepoint(Lexer *lexer, const char **cursor, u32 digits, SourceSite site, u32 *out)
 {
 	const char *cur = *cursor;
 	u32 codepoint = 0;
@@ -142,33 +142,33 @@ static Com_Error lexer_parse_hex_codepoint(Lexer *lexer, const char **cursor, u3
 		int digit = lexer_peek(lexer, cur, i);
 		if (digit == LEXER_EOF || !lexer_is_hex_digit((char)digit))
 		{
-			return log_source_error(lexer, site, "invalid unicode escape");
+			return log_source_error(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "invalid unicode escape");
 		}
 		codepoint = (codepoint << 4) | lexer_hex_digit((char)digit);
 	}
 
 	*cursor = cur + digits;
 	*out = codepoint;
-	return COM_ERROR_NONE;
+	return COM_STATUS_OK;
 }
 
-static Com_Error lexer_parse_unicode_escape(Lexer *lexer, const char **cursor, SourceSite site, u32 *out)
+static Com_Status lexer_parse_unicode_escape(Lexer *lexer, const char **cursor, SourceSite site, u32 *out)
 {
 	const char *cur = *cursor;
 	int kind_value = lexer_peek(lexer, cur, 0);
 	if (kind_value == LEXER_EOF)
 	{
-		return log_source_error(lexer, site, "unterminated unicode escape");
+		return log_source_error(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "unterminated unicode escape");
 	}
 	char kind = (char)kind_value;
 	cur += 1;
 	u32 codepoint = 0;
-	Com_Error error = COM_ERROR_NONE;
+	Com_Status error = COM_STATUS_OK;
 
 	if (kind == 'u')
 	{
 		error = lexer_parse_hex_codepoint(lexer, &cur, 4, site, &codepoint);
-		if (error != COM_ERROR_NONE)
+		if (error != COM_STATUS_OK)
 		{
 			*cursor = cur;
 			return error;
@@ -181,7 +181,7 @@ static Com_Error lexer_parse_unicode_escape(Lexer *lexer, const char **cursor, S
 				cur += 2;
 				u32 low = 0;
 				error = lexer_parse_hex_codepoint(lexer, &cur, 4, site, &low);
-				if (error != COM_ERROR_NONE)
+				if (error != COM_STATUS_OK)
 				{
 					*cursor = cur;
 					return error;
@@ -193,25 +193,25 @@ static Com_Error lexer_parse_unicode_escape(Lexer *lexer, const char **cursor, S
 				else
 				{
 					*cursor = cur;
-					return log_source_error(lexer, site, "invalid unicode surrogate pair");
+					return log_source_error(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "invalid unicode surrogate pair");
 				}
 			}
 			else
 			{
 				*cursor = cur;
-				return log_source_error(lexer, site, "missing unicode surrogate pair");
+				return log_source_error(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "missing unicode surrogate pair");
 			}
 		}
 		else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF)
 		{
 			*cursor = cur;
-			return log_source_error(lexer, site, "unexpected unicode low surrogate");
+			return log_source_error(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "unexpected unicode low surrogate");
 		}
 	}
 	else
 	{
 		error = lexer_parse_hex_codepoint(lexer, &cur, 8, site, &codepoint);
-		if (error != COM_ERROR_NONE)
+		if (error != COM_STATUS_OK)
 		{
 			*cursor = cur;
 			return error;
@@ -221,21 +221,21 @@ static Com_Error lexer_parse_unicode_escape(Lexer *lexer, const char **cursor, S
 	if (codepoint > 0x10FFFF)
 	{
 		*cursor = cur;
-		return log_source_error(lexer, site, "unicode codepoint out of range");
+		return log_source_error(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "unicode codepoint out of range");
 	}
 
 	*cursor = cur;
 	*out = codepoint;
-	return COM_ERROR_NONE;
+	return COM_STATUS_OK;
 }
 
-static Com_Error lex_escape_codepoint(Lexer *lexer, const char **cursor, SourceSite site, u32 *out)
+static Com_Status lex_escape_codepoint(Lexer *lexer, const char **cursor, SourceSite site, u32 *out)
 {
 	const char *cur = *cursor;
 	int first = lexer_peek(lexer, cur, 0);
 	if (first == LEXER_EOF)
 	{
-		return log_source_error(lexer, site, "unterminated escape sequence");
+		return log_source_error(lexer, COM_ERROR_UNTERMINATED_ESCAPE_SEQUENCE, site, "unterminated escape sequence");
 	}
 	u32 codepoint = (u8)first;
 	cur += 1;
@@ -244,7 +244,7 @@ static Com_Error lex_escape_codepoint(Lexer *lexer, const char **cursor, SourceS
 	{
 		*cursor = cur;
 		*out = codepoint;
-		return COM_ERROR_NONE;
+		return COM_STATUS_OK;
 	}
 
 	SourceSite escape_site = source_site_from_ptr(lexer, cur - 1);
@@ -252,11 +252,11 @@ static Com_Error lex_escape_codepoint(Lexer *lexer, const char **cursor, SourceS
 	if (escape_value == LEXER_EOF)
 	{
 		*cursor = cur;
-		return log_source_error(lexer, site, "unterminated escape sequence");
+		return log_source_error(lexer, COM_ERROR_UNTERMINATED_ESCAPE_SEQUENCE, site, "unterminated escape sequence");
 	}
 	char escape = (char)escape_value;
 	cur += 1;
-	Com_Error error = COM_ERROR_NONE;
+	Com_Status error = COM_STATUS_OK;
 	switch (escape)
 	{
 		case '"':  codepoint = '"';  break;
@@ -286,17 +286,17 @@ static Com_Error lex_escape_codepoint(Lexer *lexer, const char **cursor, SourceS
 
 		case '\0':
 		{
-			error = log_source_error(lexer, escape_site, "NUL byte in source");
+			error = log_source_error(lexer, COM_ERROR_NUL_BYTE_IN_SOURCE, escape_site, "NUL byte in source");
 		} break;
 
 		default:
 		{
-			error = log_source_error(lexer, escape_site, "invalid escape sequence");
+			error = log_source_error(lexer, COM_ERROR_INVALID_ESCAPE_SEQUENCE, escape_site, "invalid escape sequence");
 		} break;
 	}
 
 	*cursor = cur;
-	if (error == COM_ERROR_NONE) {
+	if (error == COM_STATUS_OK) {
 		*out = codepoint;
 	}
 	return error;
@@ -346,13 +346,13 @@ static f64 lex_fractional(Lexer *lexer, const char **cursor)
 	return value / scale;
 }
 
-static Com_Error lex_number_exponent(Lexer *lexer, const char **cursor, f64 *value, b32 *present)
+static Com_Status lex_number_exponent(Lexer *lexer, const char **cursor, f64 *value, b32 *present)
 {
 	const char *cur = *cursor;
 	int current = lexer_peek(lexer, cur, 0);
 	*present = current == 'e' || current == 'E';
 	if (!*present) {
-		return COM_ERROR_NONE;
+		return COM_STATUS_OK;
 	}
 
 	SourceSite site = source_site_from_ptr(lexer, cur);
@@ -370,7 +370,7 @@ static Com_Error lex_number_exponent(Lexer *lexer, const char **cursor, f64 *val
 	if (current < '0' || current > '9')
 	{
 		*cursor = cur;
-		return log_source_error(lexer, site, "expected digits after number exponent");
+		return log_source_error(lexer, COM_ERROR_INVALID_NUMBER_LITERAL, site, "expected digits after number exponent");
 	}
 
 	f64 exponent = 0;
@@ -384,10 +384,10 @@ static Com_Error lex_number_exponent(Lexer *lexer, const char **cursor, f64 *val
 		*value *= pow(10.0, negative ? -exponent : exponent);
 	}
 	*cursor = cur;
-	return COM_ERROR_NONE;
+	return COM_STATUS_OK;
 }
 
-static Com_Error lex_integer(Lexer *lexer, const char **cursor, u64 *out)
+static Com_Status lex_integer(Lexer *lexer, const char **cursor, u64 *out)
 {
 	const char *cur = *cursor;
 	u64 base = 10;
@@ -436,18 +436,18 @@ static Com_Error lex_integer(Lexer *lexer, const char **cursor, u64 *out)
 		if (integer > (max - digit) / base)
 		{
 			*cursor = cur;
-			return log_source_error(lexer, source_site_from_ptr(lexer, cur - 1), "integer literal exceeds u64 range");
+			return log_source_error(lexer, COM_ERROR_INTEGER_LITERAL_OVERFLOW, source_site_from_ptr(lexer, cur - 1), "integer literal exceeds u64 range");
 		}
 		integer = integer * base + digit;
 	}
 
 	*cursor = cur;
 	*out = integer;
-	return COM_ERROR_NONE;
+	return COM_STATUS_OK;
 
 	invalid_base:
 	*cursor = cur;
-	return log_source_error(lexer, source_site_from_ptr(lexer, cur - 1), "invalid base '%llu' for digit", base);
+	return log_source_error(lexer, COM_ERROR_INVALID_NUMBER_LITERAL, source_site_from_ptr(lexer, cur - 1), "invalid base '%llu' for digit", base);
 }
 
 static u32 lex_identifier(Lexer *lexer, const char **cursor)
@@ -463,7 +463,7 @@ static u32 lex_identifier(Lexer *lexer, const char **cursor)
 	return (u32)(cur - start);
 }
 
-static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSite site, char quote, b32 is_block, b32 is_format, b32 *ended, Atom **out_atom)
+static Com_Status lex_string_segment(Lexer *lexer, const char **cursor, SourceSite site, char quote, b32 is_block, b32 is_format, b32 *ended, Atom **out_atom)
 {
 	if (ended) {
 		*ended = false;
@@ -475,21 +475,21 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 	char *text = elf_arena_push(lexer->scratch_arena, lexer_scratch_capacity(lexer));
 	if (!text && lexer_scratch_capacity(lexer)) {
 		elf_arena_restore(lexer->scratch_arena, scratch_mark);
-		return COM_ERROR_OOM;
+		return COM_STATUS_OOM;
 	}
 	char *out = text;
-	Com_Error error = COM_ERROR_NONE;
+	Com_Status error = COM_STATUS_OK;
 
-	while (error == COM_ERROR_NONE)
+	while (error == COM_STATUS_OK)
 	{
 		int current = lexer_peek(lexer, cur, 0);
 		if (current == LEXER_EOF)
 		{
-			error = log_source_error(lexer, site, is_block ? "unterminated string block" : "unterminated string");
+			error = log_source_error(lexer, COM_ERROR_UNTERMINATED_STRING, site, is_block ? "unterminated string block" : "unterminated string");
 		}
 		else if (current == 0)
 		{
-			error = log_source_error(lexer, source_site_from_ptr(lexer, cur), "NUL byte in source");
+			error = log_source_error(lexer, COM_ERROR_NUL_BYTE_IN_SOURCE, source_site_from_ptr(lexer, cur), "NUL byte in source");
 		}
 		else if (is_block && current == quote && lexer_peek(lexer, cur, 1) == quote && lexer_peek(lexer, cur, 2) == quote)
 		{
@@ -514,7 +514,7 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 		}
 		else if (!is_block && (current == '\n' || current == '\r'))
 		{
-			error = log_source_error(lexer, source_site_from_ptr(lexer, cur), "newline in string; use \\n or a string block");
+			error = log_source_error(lexer, COM_ERROR_NEWLINE_IN_STRING, source_site_from_ptr(lexer, cur), "newline in string; use \\n or a string block");
 		}
 		else if (current == '\r')
 		{
@@ -534,7 +534,7 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 		{
 			u32 codepoint = 0;
 			error = lex_escape_codepoint(lexer, &cur, site, &codepoint);
-			if (error == COM_ERROR_NONE) {
+			if (error == COM_STATUS_OK) {
 				out = write_utf8(out, codepoint);
 			}
 		}
@@ -545,11 +545,11 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 		}
 	}
 
-	if (error == COM_ERROR_NONE)
+	if (error == COM_STATUS_OK)
 	{
 		*out_atom = atom_from_data_size(lexer->atoms, text, (u32)(out - text));
 		if (!*out_atom) {
-			error = COM_ERROR_OOM;
+			error = COM_STATUS_OOM;
 		}
 	}
 	elf_arena_restore(lexer->scratch_arena, scratch_mark);
@@ -557,13 +557,13 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 	return error;
 }
 
-static Com_Error lexer_skip_trivia(Lexer *lexer, const char **cursor, b32 *line_break)
+static Com_Status lexer_skip_trivia(Lexer *lexer, const char **cursor, b32 *line_break)
 {
 	const char *cur = *cursor;
 	*line_break = false;
-	Com_Error error = COM_ERROR_NONE;
+	Com_Status error = COM_STATUS_OK;
 
-	while (error == COM_ERROR_NONE)
+	while (error == COM_STATUS_OK)
 	{
 		int current = lexer_peek(lexer, cur, 0);
 		if (current == ' ' || current == '\t')
@@ -601,7 +601,7 @@ static Com_Error lexer_skip_trivia(Lexer *lexer, const char **cursor, b32 *line_
 				current = lexer_peek(lexer, cur, 0);
 				if (current == LEXER_EOF)
 				{
-					error = log_source_error(lexer, site, "unterminated comment");
+					error = log_source_error(lexer, COM_ERROR_UNTERMINATED_COMMENT, site, "unterminated comment");
 					break;
 				}
 				if (current == '*' && lexer_peek(lexer, cur, 1) == '/')
@@ -641,14 +641,14 @@ static Com_Error lexer_skip_trivia(Lexer *lexer, const char **cursor, b32 *line_
 }
 
 // TODO(RJ): proper allocation!
-static Com_Error lexer_tokens_push(Lexer_TokenFIFO *tokens, elf_Arena *arena, Token token)
+static Com_Status lexer_tokens_push(Lexer_TokenFIFO *tokens, elf_Arena *arena, Token token)
 {
 	if (tokens->count >= tokens->capacity)
 	{
 		u32 capacity = tokens->capacity ? tokens->capacity * 2 : 16;
 		Token *items = elf_arena_push(arena, sizeof(*items) * capacity);
 		if (!items) {
-			return COM_ERROR_OOM;
+			return COM_STATUS_OOM;
 		}
 		if (tokens->count) {
 			copy_memory(items, tokens->items, sizeof(*items) * tokens->count);
@@ -657,12 +657,12 @@ static Com_Error lexer_tokens_push(Lexer_TokenFIFO *tokens, elf_Arena *arena, To
 		tokens->capacity = capacity;
 	}
 	tokens->items[tokens->count++] = token;
-	return COM_ERROR_NONE;
+	return COM_STATUS_OK;
 }
 
 static Token lex_token(Lexer *lexer);
 
-static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token opening, char quote, b32 is_block)
+static Com_Status lexer_format_string(Lexer *lexer, const char **cursor, Token opening, char quote, b32 is_block)
 {
 	Lexer worker = *lexer;
 	worker.cursor = *cursor;
@@ -671,16 +671,16 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 	u32 interpolation_count = 0;
 	SourceSite part_site = opening.site;
 	b32 line_break_before = opening.line_break_before;
-	Com_Error error = COM_ERROR_NONE;
+	Com_Status error = COM_STATUS_OK;
 
-	while (error == COM_ERROR_NONE)
+	while (error == COM_STATUS_OK)
 	{
 		const char *cur = worker.cursor;
 		b32 ended = false;
 		Atom *atom = 0;
 		error = lex_string_segment(&worker, &cur, opening.site, quote, is_block, true, &ended, &atom);
 		worker.cursor = cur;
-		if (error != COM_ERROR_NONE) {
+		if (error != COM_STATUS_OK) {
 			break;
 		}
 
@@ -697,7 +697,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 			part.site.size = 1;
 		}
 		error = lexer_tokens_push(&lexer->tokens, lexer->scratch_arena, part);
-		if (error != COM_ERROR_NONE) {
+		if (error != COM_STATUS_OK) {
 			break;
 		}
 
@@ -713,12 +713,12 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 			Token token = lex_token(&worker);
 			if (token_is_error(token))
 			{
-				error = token.error;
+				error = token.status;
 				break;
 			}
 			if (token.type == TOK_NONE)
 			{
-				error = log_source_error(&worker, opening.site, "unterminated interpolated expression");
+				error = log_source_error(&worker, COM_ERROR_UNTERMINATED_INTERPOLATION, opening.site, "unterminated interpolated expression");
 				break;
 			}
 
@@ -729,7 +729,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 			}
 
 			error = lexer_tokens_push(&lexer->tokens, lexer->scratch_arena, token);
-			if (error != COM_ERROR_NONE) {
+			if (error != COM_STATUS_OK) {
 				break;
 			}
 			if (token.type == TOK_LEFT_BRACE) {
@@ -740,7 +740,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 			}
 		}
 
-		if (error != COM_ERROR_NONE || closing.type == TOK_NONE) {
+		if (error != COM_STATUS_OK || closing.type == TOK_NONE) {
 			break;
 		}
 		part_site = closing.site;
@@ -752,7 +752,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 	lexer->line_index = worker.line_index;
 	lexer->line_start = worker.line_start;
 
-	if (error != COM_ERROR_NONE)
+	if (error != COM_STATUS_OK)
 	{
 		lexer->tokens.index = 0;
 		lexer->tokens.count = 0;
@@ -764,7 +764,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 	return error;
 }
 
-static Com_Error lex(Lexer *lexer)
+static Com_Status lex(Lexer *lexer)
 {
 	ASSERT(lexer->tokens.index == lexer->tokens.count);
 	lexer->tokens.index = 0;
@@ -772,12 +772,12 @@ static Com_Error lex(Lexer *lexer)
 
 	const char *cur = lexer->cursor;
 	b32 line_break_before = false;
-	Com_Error error = lexer_skip_trivia(lexer, &cur, &line_break_before);
+	Com_Status error = lexer_skip_trivia(lexer, &cur, &line_break_before);
 	Token token = {0};
 	token.type = TOK_NONE;
 	token.site = lexer_source_site(lexer, cur);
 	token.line_break_before = line_break_before;
-	if (error != COM_ERROR_NONE) {
+	if (error != COM_STATUS_OK) {
 		lexer->cursor = cur;
 		return error;
 	}
@@ -809,7 +809,7 @@ static Com_Error lex(Lexer *lexer)
 				Atom *atom = atom_from_data_size(lexer->atoms, start, size);
 				if (!atom)
 				{
-					error = COM_ERROR_OOM;
+					error = COM_STATUS_OOM;
 				}
 				else
 				{
@@ -827,7 +827,7 @@ static Com_Error lex(Lexer *lexer)
 			b32 is_decimal = !(lexer_peek(lexer, cur, 0) == '0' && (lexer_peek(lexer, cur, 1) == 'b' || lexer_peek(lexer, cur, 1) == 'x'));
 			u64 value = 0;
 			error = lex_integer(lexer, &cur, &value);
-			if (error != COM_ERROR_NONE) {
+			if (error != COM_STATUS_OK) {
 				break;
 			}
 
@@ -845,7 +845,7 @@ static Com_Error lex(Lexer *lexer)
 				f64 number = token.type == TOK_NUMBER ? token.number : (f64)value;
 				b32 has_exponent = false;
 				error = lex_number_exponent(lexer, &cur, &number, &has_exponent);
-				if (error == COM_ERROR_NONE && has_exponent)
+				if (error == COM_STATUS_OK && has_exponent)
 				{
 					token.type = TOK_NUMBER;
 					token.number = number;
@@ -859,7 +859,7 @@ static Com_Error lex(Lexer *lexer)
 			token.type = TOK_LETTER;
 			u32 codepoint = 0;
 			error = lex_escape_codepoint(lexer, &cur, token.site, &codepoint);
-			if (error != COM_ERROR_NONE) {
+			if (error != COM_STATUS_OK) {
 				break;
 			}
 			token.integer_magnitude = codepoint;
@@ -868,7 +868,7 @@ static Com_Error lex(Lexer *lexer)
 				cur += 1;
 			}
 			else {
-				error = log_source_error(lexer, token.site, "invalid character constant, expected \"'\"");
+				error = log_source_error(lexer, COM_ERROR_INVALID_CHARACTER_CONSTANT, token.site, "invalid character constant, expected \"'\"");
 			}
 		} break;
 
@@ -879,7 +879,7 @@ static Com_Error lex(Lexer *lexer)
 			b32 is_block = lexer_peek(lexer, cur, 1) == quote && lexer_peek(lexer, cur, 2) == quote;
 			cur += is_block ? 3 : 1;
 			error = lex_string_segment(lexer, &cur, token.site, quote, is_block, false, 0, &token.atom);
-			if (error == COM_ERROR_NONE) {
+			if (error == COM_STATUS_OK) {
 				token.type = TOK_STRING;
 			}
 		} break;
@@ -890,7 +890,7 @@ static Com_Error lex(Lexer *lexer)
 
 			if (!is_identifier_start((char)lexer_peek(lexer, cur, 0)))
 			{
-				error = log_source_error(lexer, token.site, "expected macro name after '#'");
+				error = log_source_error(lexer, COM_ERROR_EXPECTED_MACRO_NAME, token.site, "expected macro name after '#'");
 			}
 			else
 			{
@@ -900,7 +900,7 @@ static Com_Error lex(Lexer *lexer)
 				Atom *atom = atom_from_data_size(lexer->atoms, token_data, size);
 				if (!atom)
 				{
-					error = COM_ERROR_OOM;
+					error = COM_STATUS_OOM;
 				}
 				else
 				{
@@ -917,7 +917,7 @@ static Com_Error lex(Lexer *lexer)
 						token.integer_magnitude = lexer->line_index;
 					}
 					else if (token.type == TOK_IDENTIFIER) {
-						error = log_source_error(lexer, token.site, "unrecognized macro");
+						error = log_source_error(lexer, COM_ERROR_UNRECOGNIZED_MACRO, token.site, "unrecognized macro");
 					}
 				}
 			}
@@ -930,7 +930,7 @@ static Com_Error lex(Lexer *lexer)
 
 		case '\0':
 		{
-			error = log_source_error(lexer, token.site, "NUL byte in source");
+			error = log_source_error(lexer, COM_ERROR_NUL_BYTE_IN_SOURCE, token.site, "NUL byte in source");
 			cur += 1;
 		} break;
 
@@ -1156,7 +1156,7 @@ static Com_Error lex(Lexer *lexer)
 
 		default:
 		{
-			error = log_source_error(lexer, token.site, "unexpected character");
+			error = log_source_error(lexer, COM_ERROR_UNEXPECTED_CHARACTER, token.site, "unexpected character");
 			cur += 1;
 		} break;
 	}
@@ -1167,7 +1167,7 @@ static Com_Error lex(Lexer *lexer)
 	}
 
 	lexer->cursor = cur;
-	if (error == COM_ERROR_NONE) {
+	if (error == COM_STATUS_OK) {
 		error = lexer_tokens_push(&lexer->tokens, lexer->scratch_arena, token);
 	}
 	return error;
@@ -1178,9 +1178,9 @@ static Token lex_token(Lexer *lexer)
 	if (lexer->tokens.index == lexer->tokens.count)
 	{
 		SourceSite site = lexer_source_site(lexer, lexer->cursor);
-		Com_Error error = lex(lexer);
-		if (error != COM_ERROR_NONE) {
-			return token_from_error(error, site);
+		Com_Status error = lex(lexer);
+		if (error != COM_STATUS_OK) {
+			return token_from_status(error, site);
 		}
 	}
 	ASSERT(lexer->tokens.index < lexer->tokens.count);

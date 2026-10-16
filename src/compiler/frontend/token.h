@@ -160,7 +160,7 @@ typedef struct
 		u64   integer_magnitude;
 		f64   number;
 		Atom *atom;
-		Com_Error error;
+		Com_Status status;
 	};
 }
 Token;
@@ -170,10 +170,10 @@ static inline b32 token_is_error(Token token)
 	return token.type == TOK_ERROR;
 }
 
-static Token token_from_error(Com_Error error, SourceSite site)
+static Token token_from_status(Com_Status status, SourceSite site)
 {
-	ASSERT(error != COM_ERROR_NONE);
-	Token token = {.type = TOK_ERROR, .site = site, .error = error};
+	ASSERT(status != COM_STATUS_OK);
+	Token token = {.type = TOK_ERROR, .site = site, .status = status};
 	if (token.site.size == 0) {
 		token.site.size = 1;
 	}

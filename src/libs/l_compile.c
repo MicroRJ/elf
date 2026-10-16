@@ -20,7 +20,7 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 		{
 			if (ast->tuple.count != 1)
 			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "constant expression must produce one value");
+				compiler_report(compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "constant expression must produce one value");
 				return false;
 			}
 			return lib_eval_constant_ast(state, compiler, ast->tuple.items[0], out);
@@ -58,7 +58,7 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 				Ast entry_ast = ast->table.items[i];
 				if (!entry_ast || entry_ast->kind != AST_TABLE_ENTRY)
 				{
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "invalid table constant");
+					compiler_report(compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "invalid table constant");
 					return false;
 				}
 
@@ -68,7 +68,7 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 				}
 				if (!entry_ast->table_entry.key)
 				{
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, entry_ast->site, "invalid unkeyed table constant");
+					compiler_report(compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, entry_ast->site, "invalid unkeyed table constant");
 					return false;
 				}
 
@@ -99,7 +99,7 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 
 		default:
 		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "expression is not a constant expression");
+			compiler_report(compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "expression is not a constant expression");
 			return false;
 		}
 	}

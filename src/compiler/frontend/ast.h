@@ -128,7 +128,7 @@ struct Ast_T
 
 	union
 	{
-		Com_Error   error;
+		Com_Status  status;
 		Atom       *atom;
 		i64         integer_value;
 		f64         number_value;
@@ -289,12 +289,12 @@ static inline b32 ast_is_error(Ast ast)
 	return ast && ast->kind == AST_ERROR;
 }
 
-static Ast ast_from_error(Com_Error error)
+static Ast ast_from_status(Com_Status status)
 {
-	switch (error)
+	switch (status)
 	{
-		case COM_ERROR_SOURCE: return ERROR_AST;
-		case COM_ERROR_OOM: return ERROR_OOM_AST;
+		case COM_STATUS_REPORTED: return ERROR_AST;
+		case COM_STATUS_OOM: return ERROR_OOM_AST;
 		default: ASSERT(0); return ERROR_AST;
 	}
 }

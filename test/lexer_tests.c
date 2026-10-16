@@ -222,12 +222,15 @@ static void test_lexer_macros(elf_State *state)
 
 	Token bare_hash = lexer_next(&invalid);
 	expect_token_type(bare_hash, TOK_ERROR, "bare # returns an error token");
-	if (bare_hash.error != COM_ERROR_SOURCE) {
+	if (bare_hash.status != COM_STATUS_REPORTED) {
 		test_fail("invalid macro retains its source error");
 	}
 	expect_token_site_size(bare_hash, 1, "bare # consumes only hash");
 	if (invalid.compiler->report.error_count != 1) {
 		test_fail("invalid macro reports one error");
+	}
+	if (!invalid.compiler->report.first || invalid.compiler->report.first->error != COM_ERROR_EXPECTED_MACRO_NAME) {
+		test_fail("invalid macro records its compiler error code");
 	}
 }
 
@@ -764,7 +767,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	arena.capacity = arena.used;
 	Token token = lex_token(&lexer);
 	expect_token_type(token, TOK_ERROR, "atom allocation failure returns an error token");
-	if (token.error != COM_ERROR_OOM) {
+	if (token.status != COM_STATUS_OOM) {
 		test_fail("atom allocation failure retains its OOM error");
 	}
 	arena.capacity = capacity;
@@ -783,7 +786,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	arena.capacity = arena.used;
 	token = lex_token(&lexer);
 	expect_token_type(token, TOK_ERROR, "diagnostic allocation failure returns an error token");
-	if (token.error != COM_ERROR_OOM) {
+	if (token.status != COM_STATUS_OOM) {
 		test_fail("diagnostic allocation failure retains its OOM error");
 	}
 	arena.capacity = capacity;

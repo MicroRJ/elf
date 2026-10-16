@@ -79,34 +79,19 @@ static u32 add_global_symbol(IrFunctionEmitter *ctx, Atom *name)
 	return index;
 }
 
-typedef enum
+static void report_lowering_error(IrFunctionEmitter *ctx, Com_Error error, SourceSite site, const char *format, ...)
 {
-	LOWERING_ERROR_GENERIC = 0,
-	LOWERING_ERROR_INTERNAL,
-	LOWERING_ERROR_UNREFERENCED_ENTITY,
-	LOWERING_ERROR_UNDECLARED_IDENTIFIER,
-}
-LoweringError;
-
-static void report_lowering_error(IrFunctionEmitter *ctx, LoweringError error, SourceSite site, const char *format, ...)
-{
-	(void)error;
-
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->module->compiler, COMPILER_ERROR, COMPILER_PHASE_LOWERING,
-		site, format, args);
+	compiler_reportv(ctx->module->compiler, error, COMPILER_ERROR, COMPILER_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 
-static void report_lowering_warning(IrFunctionEmitter *ctx, LoweringError error, SourceSite site, const char *format, ...)
+static void report_lowering_warning(IrFunctionEmitter *ctx, Com_Error error, SourceSite site, const char *format, ...)
 {
-	(void)error;
-
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->module->compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING,
-		site, format, args);
+	compiler_reportv(ctx->module->compiler, error, COMPILER_WARNING, COMPILER_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 
@@ -172,7 +157,7 @@ static void set_entity_scope(IrFunctionEmitter *ctx, EntityScope scope)
 	for (i32 i = ctx->scope_end - 1; i >= (i32)current_start; -- i)
 	{
 		if (~ctx->entities[i].tags & ENTITY_TAG_REFERENCED) {
-			report_lowering_warning(ctx, LOWERING_ERROR_UNREFERENCED_ENTITY, ctx->entities[i].site, "unreferenced entity");
+			report_lowering_warning(ctx, COM_ERROR_UNREFERENCED_ENTITY, ctx->entities[i].site, "unreferenced entity");
 		}
 	}
 
@@ -270,7 +255,7 @@ static IrEntity *declare_local_entity(IrFunctionEmitter *ctx, SourceSite site, u
 	{
 		b32 conflicts_with_file_static = en->type == ENTITY_STATIC_SYMBOL && ctx->scope_depth == 1 && ctx->function && !ctx->function->parent;
 		if (en->scope_start == ctx->scope_start || conflicts_with_file_static) {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
+			report_lowering_error(ctx, COM_ERROR_LOWERING, site, "'%s': is already declared", name_data);
 		}
 	}
 
@@ -298,7 +283,7 @@ static Ir static_value_to_ir(IrFunctionEmitter *ctx, SourceSite site, Com_Static
 		case COM_STATIC_FUNCTION: ir = ir_new_function(ctx, site, value.function); break;
 		case COM_STATIC_NAMESPACE:
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "an imported namespace cannot be used as a runtime value");
+			report_lowering_error(ctx, COM_ERROR_LOWERING, site, "an imported namespace cannot be used as a runtime value");
 		}
 		break;
 		default: break;
@@ -374,14 +359,14 @@ static b32 mark_entity_assigned(IrFunctionEmitter *ctx, Ast destination)
 	IrEntity *entity = entity_from_name(ctx, destination->atom);
 	if (entity && entity->type == ENTITY_STATIC_SYMBOL)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
+		report_lowering_error(ctx, COM_ERROR_LOWERING, destination->site, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
 		return false;
 	}
 	if (!entity) return true;
 	ASSERT(entity->type == ENTITY_LOCAL_DECLARATION);
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site,
+		report_lowering_error(ctx, COM_ERROR_LOWERING, destination->site,
 			"'%s' is constant and cannot be assigned", atom_data(destination->atom));
 		return false;
 	}
@@ -405,7 +390,7 @@ static LoopLabels current_loop_labels(IrFunctionEmitter *ctx, SourceSite site)
 {
 	if (ctx->loop_count == 0)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "break and continue must be inside a loop");
+		report_lowering_error(ctx, COM_ERROR_LOWERING, site, "break and continue must be inside a loop");
 		LoopLabels labels = {};
 		return labels;
 	}
@@ -515,14 +500,14 @@ static IrArray lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, IrFunct
 		Ast param = check_ast_type(params[i], AST_FUNCTION_PARAM);
 		if (ast_is_error(param))
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "expected function parameter");
+			report_lowering_error(ctx, COM_ERROR_INTERNAL, expr->site, "expected function parameter");
 			continue;
 		}
 
 		Ast name = check_ast_type(param->param.name, AST_IDENT);
 		if (ast_is_error(name))
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, param->site, "expected function parameter name");
+			report_lowering_error(ctx, COM_ERROR_INTERNAL, param->site, "expected function parameter name");
 			continue;
 		}
 
@@ -534,14 +519,14 @@ static IrArray lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, IrFunct
 			type = check_ast_type(type, AST_IDENT);
 			if (ast_is_error(type))
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, param->site, "expected function parameter type name");
+				report_lowering_error(ctx, COM_ERROR_INTERNAL, param->site, "expected function parameter type name");
 			}
 			else
 			{
 				TypeRule rule = type_rule_from_atom(type->atom);
 				if (rule == TRULE_NONE)
 				{
-					report_lowering_error(ctx, LOWERING_ERROR_GENERIC, type->site, "'%s' is not a known type name", atom_data(type->atom));
+					report_lowering_error(ctx, COM_ERROR_LOWERING, type->site, "'%s' is not a known type name", atom_data(type->atom));
 				}
 				else
 				{
@@ -664,7 +649,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 	b32 has_carg = call->call.carg != 0;
 	if (has_carg && ir_function->variadic)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->call.carg->site, "trailing closures cannot call variadic functions");
+		report_lowering_error(ctx, COM_ERROR_LOWERING, call->call.carg->site, "trailing closures cannot call variadic functions");
 		*failed = true;
 		return (IrArray) {};
 	}
@@ -681,7 +666,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 	}
 	if (has_carg && declared_param_count == 0)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->call.carg->site, "trailing closure requires a final function parameter");
+		report_lowering_error(ctx, COM_ERROR_LOWERING, call->call.carg->site, "trailing closure requires a final function parameter");
 		*failed = true;
 	}
 
@@ -692,7 +677,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 		Ast argument = call->call.args.items[argument_index];
 		if (parameter_index >= bind_param_count && !ir_function->variadic)
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
+			report_lowering_error(ctx, COM_ERROR_LOWERING, argument->site, "too many arguments for static function");
 			*failed = true;
 		}
 		else
@@ -713,7 +698,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 		Ast argument = argument_index < argument_count ? call->call.args.items[argument_index] : 0;
 		if (argument && argument->kind != AST_NAMED_ARGUMENT)
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "positional arguments cannot follow named arguments");
+			report_lowering_error(ctx, COM_ERROR_LOWERING, argument->site, "positional arguments cannot follow named arguments");
 			*failed = true;
 			argument_index += 1;
 		}
@@ -738,7 +723,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 		}
 		else
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, call->site, "required parameter '%s' was not provided", atom_data(parameter->name));
+			report_lowering_error(ctx, COM_ERROR_LOWERING, call->site, "required parameter '%s' was not provided", atom_data(parameter->name));
 			*failed = true;
 			parameter_index += 1;
 		}
@@ -748,13 +733,13 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 	{
 		Ast argument = call->call.args.items[argument_index];
 		if (reserve_final_parameter && argument->kind == AST_NAMED_ARGUMENT && argument->named_argument.name->atom == function->params[declared_param_count - 1].name) {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "final parameter '%s' is already supplied by the trailing closure", atom_data(argument->named_argument.name->atom));
+			report_lowering_error(ctx, COM_ERROR_LOWERING, argument->site, "final parameter '%s' is already supplied by the trailing closure", atom_data(argument->named_argument.name->atom));
 		}
 		else if (argument->kind == AST_NAMED_ARGUMENT) {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "named argument '%s' is unknown, duplicated, or out of order", atom_data(argument->named_argument.name->atom));
+			report_lowering_error(ctx, COM_ERROR_LOWERING, argument->site, "named argument '%s' is unknown, duplicated, or out of order", atom_data(argument->named_argument.name->atom));
 		}
 		else {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
+			report_lowering_error(ctx, COM_ERROR_LOWERING, argument->site, "too many arguments for static function");
 		}
 		*failed = true;
 	}
@@ -804,7 +789,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 			u32 nparts = expr->interpolated_string.count;
 			if (nparts < 3 || (nparts & 1) == 0)
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site,
+				report_lowering_error(ctx, COM_ERROR_INTERNAL, expr->site,
 					"interpolated string must contain alternating text and expression parts");
 				ir = ERROR_IR;
 				break;
@@ -816,7 +801,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 				Ast part = parts[i];
 				if (!part || ((i & 1) == 0 && part->kind != AST_STRING_LITERAL))
 				{
-					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
+					report_lowering_error(ctx, COM_ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
 					ir = ERROR_IR;
 					break;
 				}
@@ -890,7 +875,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 			Ir expr_ir = lower_ast_expr_to_ir(ctx, expr->unary);
 			if (!expr_ir || expr_ir->kind != IR_LOAD_LOCAL)
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site
+				report_lowering_error(ctx, COM_ERROR_LOWERING, expr->site
 				, "#get_mem expects a local or parameter expression");
 				ir = ERROR_IR;
 			}
@@ -933,7 +918,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 			IrArray ir_args = {};
 			if (expr->call.carg && call_type != IR_CALL_DIRECT)
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, "trailing closures require a statically known function");
+				report_lowering_error(ctx, COM_ERROR_LOWERING, expr->site, "trailing closures require a statically known function");
 				failed = true;
 			}
 			else if (call_type == IR_CALL_DIRECT)
@@ -950,7 +935,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 					Ast argument = expr->call.args.items[i];
 					if (argument->kind == AST_NAMED_ARGUMENT)
 					{
-						report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "named arguments require a statically known function");
+						report_lowering_error(ctx, COM_ERROR_LOWERING, argument->site, "named arguments require a statically known function");
 						failed = true;
 					}
 					else
@@ -1002,7 +987,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 				Ast entry = check_ast_type(args[i], AST_TABLE_ENTRY);
 				if (ast_is_error(entry))
 				{
-					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, args[i]->site, "expected table entry");
+					report_lowering_error(ctx, COM_ERROR_INTERNAL, args[i]->site, "expected table entry");
 					push_ir(&table_items, ERROR_IR);
 					continue;
 				}
@@ -1013,7 +998,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 				Ir ir_value = lower_ast_expr_to_ir(ctx, value);
 				if (!key)
 				{
-					report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, entry->site, "expected keyed table entry");
+					report_lowering_error(ctx, COM_ERROR_INTERNAL, entry->site, "expected keyed table entry");
 					push_ir(&table_items, ERROR_IR);
 					continue;
 				}
@@ -1049,7 +1034,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 
 		case AST_TABLE_ENTRY:
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
+			report_lowering_error(ctx, COM_ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
 			ir = ERROR_IR;
 		}
 		break;
@@ -1098,7 +1083,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 		break;
 		default:
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
+			report_lowering_error(ctx, COM_ERROR_INTERNAL, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
 			ir = ERROR_IR;
 		}
 		break;
@@ -1222,7 +1207,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 				message = "range for loops require one range expression";
 			}
 
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, expr->site, message);
+			report_lowering_error(ctx, COM_ERROR_LOWERING, expr->site, message);
 			push_ir(items, ERROR_IR);
 			return 1;
 		}
@@ -1237,7 +1222,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 			Ast name = check_ast_type(name_tuple->tuple.items[i], AST_IDENT);
 			if (ast_is_error(name))
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
+				report_lowering_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
 				push_ir(items, ERROR_IR);
 				return 1;
 			}
@@ -1255,7 +1240,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 		Ast name = check_ast_type(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
+			report_lowering_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
 			push_ir(items, ERROR_IR);
 			return 1;
 		}
@@ -1294,7 +1279,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 
 	if (!range || range->kind != AST_RANGE)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, stat->site, "range for loops require a range expression");
+		report_lowering_error(ctx, COM_ERROR_LOWERING, stat->site, "range for loops require a range expression");
 		return ERROR_IR;
 	}
 
@@ -1304,7 +1289,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 	Ast first_name = check_ast_type(name_tuple->tuple.items[0], AST_IDENT);
 	if (ast_is_error(first_name))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
 		return ERROR_IR;
 	}
 
@@ -1334,7 +1319,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 	}
 	else
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, range->site,
+		report_lowering_error(ctx, COM_ERROR_LOWERING, range->site,
 			"an omitted range end requires an indexed collection");
 		set_entity_scope(ctx, scope);
 		return ERROR_IR;
@@ -1349,7 +1334,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 		Ast name = check_ast_type(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
+			report_lowering_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
 			set_entity_scope(ctx, scope);
 			return ERROR_IR;
 		}
@@ -1440,7 +1425,7 @@ static Ir lower_ast_for_range_to_ir(IrFunctionEmitter *ctx, Ast stat)
 	Ast decl = check_ast_type(stat->for_range_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
@@ -1448,20 +1433,20 @@ static Ir lower_ast_for_range_to_ir(IrFunctionEmitter *ctx, Ast stat)
 	Ast expr_tuple = check_ast_type(decl->decl.expr, AST_TUPLE);
 	if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
 	if (name_tuple->tuple.count == 0 || expr_tuple->tuple.count != 1)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
 		return ERROR_IR;
 	}
 
 	Ast range = expr_tuple->tuple.items[0];
 	if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
 		return ERROR_IR;
 	}
 
@@ -1474,7 +1459,7 @@ static Ir lower_ast_for_to_ir(IrFunctionEmitter *ctx, Ast stat)
 	Ast init = check_ast_type(stat->for_stat.init, AST_DECL_STAT);
 	if (ast_is_error(init))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
 		return ERROR_IR;
 	}
 
@@ -1521,13 +1506,13 @@ static Ir lower_compound_assign_to_ir(IrFunctionEmitter *ctx, IrFrame *items, As
 	Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
 	if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid compound assignment");
+		report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid compound assignment");
 		return ERROR_IR;
 	}
 
 	if (dest_tuple->tuple.count != 1 || expr_tuple->tuple.count != 1)
 	{
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, stat->site, "compound assignment requires one destination and one value");
+		report_lowering_error(ctx, COM_ERROR_LOWERING, stat->site, "compound assignment requires one destination and one value");
 		return ERROR_IR;
 	}
 
@@ -1628,7 +1613,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 
 		case AST_STATIC_DECL:
 		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, stat->site, "static declaration must be at file level");
+			report_lowering_error(ctx, COM_ERROR_LOWERING, stat->site, "static declaration must be at file level");
 			push_ir(items, ERROR_IR);
 		}
 		break;
@@ -1639,7 +1624,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 			Ast expr_tuple = check_ast_type(stat->decl.expr, AST_TUPLE);
 			if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid declaration");
+				report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid declaration");
 				push_ir(items, ERROR_IR);
 				break;
 			}
@@ -1655,7 +1640,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 			Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid assignment");
+				report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid assignment");
 				push_ir(items, ERROR_IR);
 				break;
 			}
@@ -1743,7 +1728,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 			Ast expr_tuple = check_ast_type(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
-				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid nil assignment");
+				report_lowering_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid nil assignment");
 				push_ir(items, ERROR_IR);
 				break;
 			}

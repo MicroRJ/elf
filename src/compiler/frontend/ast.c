@@ -7,13 +7,13 @@
 Ast_T ast_error_sentinel =
 {
 	.kind = AST_ERROR,
-	.error = COM_ERROR_SOURCE,
+	.status = COM_STATUS_REPORTED,
 };
 
 Ast_T ast_error_oom_sentinel =
 {
 	.kind = AST_ERROR,
-	.error = COM_ERROR_OOM,
+	.status = COM_STATUS_OOM,
 };
 
 static Ast create_ast(Parser *par, SourceSite site, AstType kind)

@@ -150,13 +150,13 @@ static Com_SourceId compiler_register_source(Compiler *compiler, Atom *name, Ato
 			site.source = source_id;
 		}
 		if (source_is_oversized) {
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source exceeds the 32-bit size limit");
+			compiler_report(compiler, COM_ERROR_INVALID_SOURCE, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source exceeds the 32-bit size limit");
 		}
 		else if (source_is_invalid) {
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source data is null");
+			compiler_report(compiler, COM_ERROR_INVALID_SOURCE, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source data is null");
 		}
 		else {
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source contains a NUL byte");
+			compiler_report(compiler, COM_ERROR_INVALID_SOURCE, COMPILER_ERROR, COMPILER_PHASE_LEXER, site, "source contains a NUL byte");
 		}
 		return COM_SOURCE_INVALID;
 	}
@@ -235,7 +235,7 @@ static Com_SourceId compiler_load_source_file(Compiler *compiler, Atom *importer
 		if (compiler->source_count == 0) {
 			site.source = compiler_append_source(compiler, requested_path, requested_path, (SourceBuffer) {});
 		}
-		compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "failed to resolve source path '%s'", atom_data(requested_path));
+		compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "failed to resolve source path '%s'", atom_data(requested_path));
 	}
 	else
 	{
@@ -285,7 +285,7 @@ static Com_SourceId compiler_load_source_file(Compiler *compiler, Atom *importer
 				if (compiler->source_count == 0) {
 					site.source = compiler_append_source(compiler, canonical_path, canonical_path, (SourceBuffer) {});
 				}
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "%s '%s'", error, atom_data(canonical_path));
+				compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "%s '%s'", error, atom_data(canonical_path));
 			}
 			else {
 				result = compiler_register_source(compiler, canonical_path, canonical_path, source, site);
@@ -333,7 +333,7 @@ static b32 compiler_discover_source_imports(Compiler *compiler, Com_SourceId sou
 			Com_Import *import = compiler_append_import(compiler, source, import_ast->import.path, import_ast->site);
 			if (!import)
 			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, import_ast->site, "failed to record import");
+				compiler_report(compiler, COM_ERROR_IMPORT, COMPILER_ERROR, COMPILER_PHASE_PARSER, import_ast->site, "failed to record import");
 				result = false;
 			}
 			else
@@ -369,7 +369,7 @@ b32 compiler_parse_sources(Compiler *compiler)
 			if (ast_is_error(ast))
 			{
 				if (compiler->report.error_count == 0) {
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.source = source_id}, "failed to parse source");
+					compiler_report(compiler, COM_ERROR_PARSE_FAILED, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.source = source_id}, "failed to parse source");
 				}
 				result = false;
 			}
@@ -482,7 +482,7 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 		}
 		else
 		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "import has no resolved source");
+			compiler_report(compiler, COM_ERROR_IMPORT, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "import has no resolved source");
 			result = COM_STATIC_LOOKUP_ERROR;
 		}
 	}
@@ -498,7 +498,7 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 			Ast member = expr->binary.y;
 			if (!member || member->kind != AST_STRING_LITERAL)
 			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "expected static namespace member name");
+				compiler_report(compiler, COM_ERROR_STATIC_LOOKUP, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "expected static namespace member name");
 				result = COM_STATIC_LOOKUP_ERROR;
 			}
 			else
@@ -506,7 +506,7 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 				Com_StaticSymbol *symbol = compiler_exported_symbol_from_source(compiler, receiver.source, member->atom);
 				if (!symbol)
 				{
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, member->site, "'%s' is not exported by the imported source", atom_data(member->atom));
+					compiler_report(compiler, COM_ERROR_STATIC_LOOKUP, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, member->site, "'%s' is not exported by the imported source", atom_data(member->atom));
 					result = COM_STATIC_LOOKUP_ERROR;
 				}
 				else
@@ -567,10 +567,10 @@ static b32 compiler_evaluate_static_expr(Compiler *compiler, Com_SourceId source
 			if (lookup == COM_STATIC_LOOKUP_NONE)
 			{
 				if (expr->kind == AST_IDENT) {
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
+					compiler_report(compiler, COM_ERROR_STATIC_LOOKUP, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not a static symbol", atom_data(expr->atom));
 				}
 				else {
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
+					compiler_report(compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
 				}
 				result = false;
 			}
@@ -582,7 +582,7 @@ static b32 compiler_evaluate_static_expr(Compiler *compiler, Com_SourceId source
 
 		default:
 		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
+			compiler_report(compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
 			result = false;
 		}
 		break;
@@ -596,7 +596,7 @@ static b32 compiler_evaluate_static_symbol(Compiler *compiler, Com_StaticSymbol 
 	b32 result = symbol->value.kind != COM_STATIC_INVALID;
 	if (symbol->state == COM_STATIC_RESOLVING)
 	{
-		compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, symbol->site, "cyclic static definition for '%s'", atom_data(symbol->name));
+		compiler_report(compiler, COM_ERROR_CYCLIC_STATIC_DEFINITION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, symbol->site, "cyclic static definition for '%s'", atom_data(symbol->name));
 		result = false;
 	}
 	else if (symbol->state == COM_STATIC_UNRESOLVED)
@@ -626,7 +626,7 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 		Ast param = ast->function.params.items[i];
 		if (!param || ast_is_error(param) || param->kind != AST_FUNCTION_PARAM || !param->param.name || param->param.name->kind != AST_IDENT)
 		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "expected static function parameter");
+			compiler_report(compiler, COM_ERROR_INVALID_FUNCTION_PARAMETER, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "expected static function parameter");
 			result = false;
 			continue;
 		}
@@ -642,7 +642,7 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 			}
 			else if (resolved->default_value.kind == COM_STATIC_NAMESPACE)
 			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, param->param.expr->site, "default for parameter '%s' cannot be an imported namespace", atom_data(resolved->name));
+				compiler_report(compiler, COM_ERROR_INVALID_FUNCTION_PARAMETER, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, param->param.expr->site, "default for parameter '%s' cannot be an imported namespace", atom_data(resolved->name));
 				resolved->default_value.kind = COM_STATIC_INVALID;
 				result = false;
 			}
@@ -673,12 +673,12 @@ static Com_StaticScope compiler_extract_source_statics(Compiler *compiler, Com_S
 		Ast name = declaration->static_decl.name;
 		if (!name || ast_is_error(name) || name->kind != AST_IDENT)
 		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "expected static declaration name");
+			compiler_report(compiler, COM_ERROR_INVALID_STATIC_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "expected static declaration name");
 			continue;
 		}
 		if (compiler_static_symbol_from_scope(&result, name->atom))
 		{
-			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s': is already declared", atom_data(name->atom));
+			compiler_report(compiler, COM_ERROR_DUPLICATE_STATIC_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s': is already declared", atom_data(name->atom));
 			continue;
 		}
 
@@ -713,7 +713,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 			if (declaration->kind != AST_STATIC_DECL)
 			{
 				if (unit_type == COM_UNIT_MODULE || source != 0) {
-					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "static module cannot contain executable top-level statements");
+					compiler_report(compiler, COM_ERROR_EXECUTABLE_MODULE_STATEMENT, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "static module cannot contain executable top-level statements");
 				}
 				continue;
 			}
@@ -777,7 +777,7 @@ void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId sourc
 	{
 		Com_StaticSymbol *symbol = scope->symbols + i;
 		if (!symbol->referenced && !symbol->exported) {
-			compiler_report(compiler, COMPILER_WARNING, COMPILER_PHASE_LOWERING, symbol->site, "unreferenced entity");
+			compiler_report(compiler, COM_ERROR_UNREFERENCED_ENTITY, COMPILER_WARNING, COMPILER_PHASE_LOWERING, symbol->site, "unreferenced entity");
 		}
 	}
 }
@@ -800,9 +800,10 @@ static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format
 	return (elf_StrSlice) {message, (u64)message_size};
 }
 
-b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
+b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
 {
 	ASSERT(compiler);
+	ASSERT(error != COM_ERROR_NONE);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
 	if (!message.data) {
 		return false;
@@ -816,6 +817,7 @@ b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase,
 	if (!compiler_message) {
 		return false;
 	}
+	compiler_message->error = error;
 	compiler_message->severity = severity;
 	compiler_message->phase = phase;
 	compiler_message->site = site;
@@ -855,11 +857,11 @@ b32 compiler_reportv(Compiler *compiler, Com_Severity severity, Com_Phase phase,
 	return true;
 }
 
-b32 compiler_report(Compiler *compiler, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
+b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	b32 result = compiler_reportv(compiler, severity, phase, site, format, args);
+	b32 result = compiler_reportv(compiler, error, severity, phase, site, format, args);
 	va_end(args);
 	return result;
 }

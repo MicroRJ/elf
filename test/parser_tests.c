@@ -367,7 +367,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	if (table->table.count != 2) {
 		test_fail("table parser counts entries");
 	}
-	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->phase != COMPILER_PHASE_PARSER) {
+	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->error != COM_ERROR_SYNTAX_DEPRECATION || compiler->report.first->phase != COMPILER_PHASE_PARSER) {
 		test_fail("table call shorthand reports one parser deprecation warning");
 	}
 	elf_arena_destroy(&arena);
@@ -762,7 +762,7 @@ static void test_parser_take_token_error(elf_State *state)
 	parser_set_source(parser, 0);
 	Token token = take_token(parser, TOK_LEFT_PAREN);
 	parser_destroy(parser);
-	if (!token_is_error(token) || token.error != COM_ERROR_SOURCE || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
+	if (!token_is_error(token) || token.status != COM_STATUS_REPORTED || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
 		test_fail("take token returns its source error");
 	}
 	elf_arena_destroy(&arena);
@@ -782,7 +782,7 @@ static void test_parser_take_token_oom(elf_State *state)
 	Token token = take_token(parser, TOK_LEFT_PAREN);
 	arena.capacity = capacity;
 	parser_destroy(parser);
-	if (!token_is_error(token) || token.error != COM_ERROR_OOM || ast_from_token_error(token) != ERROR_OOM_AST || compiler->report.error_count != 0) {
+	if (!token_is_error(token) || token.status != COM_STATUS_OOM || ast_from_token_error(token) != ERROR_OOM_AST || compiler->report.error_count != 0) {
 		test_fail("take token returns diagnostic allocation failure");
 	}
 	elf_arena_destroy(&arena);
@@ -803,7 +803,7 @@ static void test_parser_ast_oom(elf_State *state)
 	Ast ast = parser_parse_constant_expr(parser);
 	arena.capacity = capacity;
 	parser_destroy(parser);
-	if (ast != ERROR_OOM_AST || ast->error != COM_ERROR_OOM) {
+	if (ast != ERROR_OOM_AST || ast->status != COM_STATUS_OOM) {
 		test_fail("parser returns AST allocation failure");
 	}
 	elf_arena_destroy(&arena);
