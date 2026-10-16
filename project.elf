@@ -30,6 +30,8 @@ library := {
 		"src/core/elf_core.c",
 		"src/libs/libs.c",
 		"src/compiler/compiler.c",
+		"src/compiler/middle/ir_emitter.c",
+		"src/compiler/backend/bc_emitter.c",
 	],
 	private_include_directories = internal_include_directories,
 	public_include_directories = [

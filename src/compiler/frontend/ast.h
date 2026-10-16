@@ -98,7 +98,20 @@ typedef enum
 }
 AstDeclTags;
 
-static const char *ast_type_name(AstType type);
+static inline const char *ast_type_name(AstType type)
+{
+	static const char *names[] =
+	{
+#define AST_XPAND(ENUM, NAME) #ENUM,
+		AST_XDEF(AST_XPAND)
+#undef AST_XPAND
+	};
+
+	if ((u32)type >= AST_COUNT_) {
+		return "AST_UNKNOWN";
+	}
+	return names[type];
+}
 
 typedef struct
 {

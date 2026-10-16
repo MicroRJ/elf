@@ -128,14 +128,12 @@ STATIC_ASSERT(sizeof(Bytecode) == 12);
 // relative to the module that owns it.
 typedef struct BcFunction
 {
-	b32          variadic;
-	u8              arity;
-	u8           captures;
-	u16        stack_size;
-	u16            length;
-	u32            offset;
-	SourceMapEntry *source_map;
-	u32             source_map_count;
+	b32                  variadic;
+	u8                      arity;
+	u8                   captures;
+	u16                stack_size;
+	u16                    length;
+	u32                    offset;
 }
 BcFunction;
 

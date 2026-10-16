@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+typedef struct Compiler Compiler;
+
 typedef struct
 {
 	i32 slot;
@@ -54,6 +56,7 @@ BcSlot;
 	X(IR_RETURN              , "return")                     \
 	X(IR_MEASURE             , "measure")                    \
 	X(IR_GET_MEM             , "get_mem")                    \
+	X(IR_FUNCTION            , "function")                   \
 	X(IR_CLOSURE             , "closure")                    \
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_LOCAL               , "local")                      \
@@ -74,7 +77,20 @@ typedef enum
 }
 IrKind;
 
-static const char *ir_kind_name(IrKind kind);
+static inline const char *ir_kind_name(IrKind kind)
+{
+	static const char *names[] =
+	{
+#define EXPAND(ENUM, NAME) #ENUM,
+		IR_DEFINITIONS(EXPAND)
+#undef EXPAND
+	};
+
+	if ((u32)kind >= IR_COUNT_) {
+		return "IR_UNKNOWN";
+	}
+	return names[kind];
+}
 
 typedef struct IrNode IrNode;
 typedef IrNode *Ir;
@@ -132,6 +148,12 @@ struct IrNode
 			IrArray    args;
 		}
 		ir_call;
+
+		struct
+		{
+			u32 index;
+		}
+		ir_function;
 
 		struct
 		{
@@ -225,4 +247,35 @@ static inline b32 ir_is_error(Ir ir)
 {
 	return ir == ERROR_IR;
 }
+
+typedef struct IrFunction IrFunction;
+
+struct IrFunction
+{
+	SourceSite site;
+	b32        variadic;
+	b32        is_static;
+	Ir         body;
+	Ir        *params;
+	u32        param_count;
+	u32        capture_count;
+};
+
+// One lowered compilation unit. Global indices are still module-local here and
+// are resolved to runtime slots only when the compiled module is linked.
+typedef struct
+{
+	Compiler   *compiler;
+	elf_Arena  *arena;
+	IrFunction *functions;
+	u32         function_count;
+	u32         function_capacity;
+	Atom      **globals;
+	u32         global_count;
+	u32         global_capacity;
+	b32         has_entry;
+	// TODO(RJ): just make index zero be the entry function!
+	u32         entry_index;
+}
+IrModule;
 

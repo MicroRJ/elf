@@ -10,17 +10,16 @@ static IrFunctionEmitter *ir_test_lower_source(elf_State *state, elf_Arena *aren
 	compiler->sources[0].ast = file;
 	compiler_resolve_statics(compiler, COM_UNIT_FUNCTION);
 
-	IrModuleEmitter *module_emitter = ir_create_module_emitter(compiler);
-	IrFunctionEmitter *ctx = ir_create_function_emitter(module_emitter);
+	IrModule *module = ir_new_module(compiler);
+	IrFunctionEmitter *ctx = ir_new_function_emitter(module);
 	for (u32 i = 0; i < compiler->function_count; ++i) {
 		ir_emit_function(ctx, compiler->functions + i);
 	}
 	compiler_report_unreferenced_statics(compiler, 0);
-	IrModule module = module_emitter->module;
-	if (module.functions != ctx->module->module.functions ||
-		module.function_count != ctx->module->module.function_count ||
-		!module.has_entry ||
-		module.entry_index != 0)
+	if (module->functions != ctx->module->functions ||
+		module->function_count != ctx->module->function_count ||
+		!module->has_entry ||
+		module->entry_index != 0)
 	{
 		test_fail("lowering returns ir module rooted at function zero");
 	}
@@ -29,11 +28,11 @@ static IrFunctionEmitter *ir_test_lower_source(elf_State *state, elf_Arena *aren
 
 static IrFunction *ir_test_main_function(IrFunctionEmitter *ctx)
 {
-	if (!ctx || ctx->module->module.function_count != 1) {
+	if (!ctx || ctx->module->function_count != 1) {
 		test_fail("lowering produced one main function");
 		return 0;
 	}
-	return &ctx->module->module.functions[0];
+	return &ctx->module->functions[0];
 }
 
 static Ir ir_test_main_body(IrFunctionEmitter *ctx)
@@ -341,20 +340,20 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	elf_Arena arena = elf_arena_create(0);
 	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "add := fun(a: int, b: num) { ret a + b }");
 
-	if (!ctx || ctx->module->module.function_count != 2) {
+	if (!ctx || ctx->module->function_count != 2) {
 		test_fail("function expression adds bytecode function");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ir main_body = ctx->module->module.functions[0].body;
+	Ir main_body = ctx->module->functions[0].body;
 	Ir memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
 	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_CLOSURE, "function expression lowers to closure ir");
 	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_closure.index != 1) {
 		test_fail("function ir points at nested function");
 	}
 
-	IrFunction *function = &ctx->module->module.functions[1];
+	IrFunction *function = &ctx->module->functions[1];
 	if (function->param_count != IMPLICIT_PARAM_COUNT + 2) {
 		test_fail("function parameter count includes implicit this and source params");
 	}
@@ -483,14 +482,14 @@ static void test_ir_lowers_static_call_arguments(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "build :: fun(required, width = 20, title = \"elf\") { ret required }\nret build(1, title = \"custom\")");
-	if (!ctx || ctx->module->module.function_count != 2)
+	if (!ctx || ctx->module->function_count != 2)
 	{
 		test_fail("static call argument lowering retains the target function");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ir body = ctx->module->module.functions[0].body;
+	Ir body = ctx->module->functions[0].body;
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static call lowers return");
 	Ir call = ret ? ret->ir_return.expr : 0;
 	expect_ir_kind(call, IR_CALL, "static call lowers call expression");
@@ -514,14 +513,14 @@ static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "collect :: fun(first, ...) { ret first }\nret collect(1, 2, 3)");
-	if (!ctx || ctx->module->compiler->report.error_count != 0 || ctx->module->module.function_count != 2)
+	if (!ctx || ctx->module->compiler->report.error_count != 0 || ctx->module->function_count != 2)
 	{
 		test_fail("variadic static call accepts extra positional arguments");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ir ret = ir_test_body_stat(ctx->module->module.functions[0].body, 0, IR_RETURN, "variadic static call lowers return");
+	Ir ret = ir_test_body_stat(ctx->module->functions[0].body, 0, IR_RETURN, "variadic static call lowers return");
 	Ir call = ret ? ret->ir_return.expr : 0;
 	if (!call || call->kind != IR_CALL || call->ir_call.type != IR_CALL_DIRECT || call->ir_call.args.count != 3) {
 		test_fail("variadic static call retains all positional arguments");
@@ -605,44 +604,44 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "foo :: fun() { ret bar() }\nbar :: fun() { ret foo() }\nret foo");
-	if (!ctx || ctx->module->module.function_count != 3)
+	if (!ctx || ctx->module->function_count != 3)
 	{
 		test_fail("mutually recursive statics lower two functions");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ir main_ret = ir_test_body_stat(ctx->module->module.functions[0].body, 0, IR_RETURN, "main returns static function");
+	Ir main_ret = ir_test_body_stat(ctx->module->functions[0].body, 0, IR_RETURN, "main returns static function");
 	Ir foo_value = main_ret ? main_ret->ir_return.expr : 0;
-	expect_ir_kind(foo_value, IR_CLOSURE, "static function lowers directly to closure ir");
-	if (foo_value && foo_value->ir_closure.index != 1) {
+	expect_ir_kind(foo_value, IR_FUNCTION, "static function lowers directly to function ir");
+	if (foo_value && foo_value->ir_function.index != 1) {
 		test_fail("main static function value points to foo");
 	}
 
-	Ir foo_ret = ir_test_body_stat(ctx->module->module.functions[1].body, 0, IR_RETURN, "foo lowers return");
+	Ir foo_ret = ir_test_body_stat(ctx->module->functions[1].body, 0, IR_RETURN, "foo lowers return");
 	Ir foo_call = foo_ret ? foo_ret->ir_return.expr : 0;
 	expect_ir_kind(foo_call, IR_CALL, "foo calls bar");
 	if (foo_call && foo_call->ir_call.type != IR_CALL_DIRECT) {
 		test_fail("static foo-to-bar call lowers as direct");
 	}
 	Ir bar_value = foo_call ? foo_call->ir_call.expr : 0;
-	expect_ir_kind(bar_value, IR_CLOSURE, "foo resolves bar statically");
-	if (bar_value && bar_value->ir_closure.index != 2) {
+	expect_ir_kind(bar_value, IR_FUNCTION, "foo resolves bar statically");
+	if (bar_value && bar_value->ir_function.index != 2) {
 		test_fail("foo points to bar function");
 	}
 
-	Ir bar_ret = ir_test_body_stat(ctx->module->module.functions[2].body, 0, IR_RETURN, "bar lowers return");
+	Ir bar_ret = ir_test_body_stat(ctx->module->functions[2].body, 0, IR_RETURN, "bar lowers return");
 	Ir bar_call = bar_ret ? bar_ret->ir_return.expr : 0;
 	expect_ir_kind(bar_call, IR_CALL, "bar calls foo");
 	if (bar_call && bar_call->ir_call.type != IR_CALL_DIRECT) {
 		test_fail("static bar-to-foo call lowers as direct");
 	}
 	Ir recursive_foo = bar_call ? bar_call->ir_call.expr : 0;
-	expect_ir_kind(recursive_foo, IR_CLOSURE, "bar resolves foo statically");
-	if (recursive_foo && recursive_foo->ir_closure.index != 1) {
+	expect_ir_kind(recursive_foo, IR_FUNCTION, "bar resolves foo statically");
+	if (recursive_foo && recursive_foo->ir_function.index != 1) {
 		test_fail("bar points back to foo function");
 	}
-	if (ctx->module->module.functions[1].capture_count || ctx->module->module.functions[2].capture_count) {
+	if (ctx->module->functions[1].capture_count || ctx->module->functions[2].capture_count) {
 		test_fail("static function references do not create captures");
 	}
 	elf_arena_destroy(&arena);

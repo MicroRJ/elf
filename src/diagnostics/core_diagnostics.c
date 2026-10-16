@@ -23,10 +23,10 @@ typedef struct
 }
 RuntimeSourceLocation;
 
-static SourceSite find_source_for_instr(BcFunction *function, int instr)
+static SourceSite find_source_for_instr(elf_Module *module, int instr)
 {
-	for (u32 i = 0; i < function->source_map_count; ++ i) {
-		SourceMapEntry entry = function->source_map[i];
+	for (u32 i = 0; i < module->source_map_count; ++ i) {
+		SourceMapEntry entry = module->source_map[i];
 		if (instr >= entry.byte_start && instr < entry.byte_end) {
 			return entry.site;
 		}
@@ -54,7 +54,7 @@ static RuntimeSourceLocation runtime_source_location_for_function(elf_Module *mo
 	{
 		location.module = module;
 		location.function = function;
-		location.site = find_source_for_instr(function, instr);
+		location.site = find_source_for_instr(module, instr);
 		location.byte = module->bytecode[instr];
 	}
 

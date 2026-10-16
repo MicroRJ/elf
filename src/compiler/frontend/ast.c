@@ -4,21 +4,6 @@
 
 // AST constructors are side-effect free beyond allocating and initializing the returned tree.
 
-static const char *ast_type_name(AstType type)
-{
-	static const char *names[] =
-	{
-#define AST_XPAND(ENUM, NAME) #ENUM,
-		AST_XDEF(AST_XPAND)
-#undef AST_XPAND
-	};
-
-	if ((u32)type >= AST_COUNT_) {
-		return "AST_UNKNOWN";
-	}
-	return names[type];
-}
-
 static Ast create_ast(Parser *par, SourceSite site, AstType kind)
 {
 	Ast_T *tree = elf_arena_push_zero(par->result_arena, sizeof(*tree));

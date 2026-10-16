@@ -3,7 +3,7 @@
 //
 
 typedef struct IrEntity IrEntity;
-typedef struct IrFunction IrFunction;
+typedef struct IrFunctionEmitter IrFunctionEmitter;
 
 enum
 {
@@ -45,31 +45,6 @@ typedef struct IrEntity
 }
 IrEntity;
 
-struct IrFunction
-{
-	SourceSite      site;
-	b32             variadic;
-	b32             is_static;
-	Ir              body;
-	Ir             *params;
-	u32             param_count;
-	u32             capture_count;
-};
-
-// One lowered compilation unit. Global indices are still module-local here and
-// are resolved to runtime slots only when the compiled module is linked.
-typedef struct
-{
-	IrFunction *functions;
-	u32         function_count;
-	Atom      **globals;
-	u32         global_count;
-	b32         has_entry;
-	// TODO(RJ): just make index zero be the entry function!
-	u32         entry_index;
-}
-IrModule;
-
 typedef struct
 {
 	IrEntityId previous_scope_start;
@@ -91,8 +66,6 @@ typedef struct
 }
 LoopLabels;
 
-typedef struct IrModuleEmitter IrModuleEmitter;
-typedef struct IrFunctionEmitter IrFunctionEmitter;
 typedef struct LwScopeFunction LwScopeFunction;
 typedef struct LwCapture LwCapture;
 
@@ -115,20 +88,10 @@ struct LwScopeFunction
 	IrEntityId       scope_start;
 };
 
-// Owns the module-wide IR arrays shared by every function emitter.
-struct IrModuleEmitter
-{
-	Compiler  *compiler;
-	elf_Arena *arena;
-	IrModule   module;
-	u32        function_capacity;
-	u32        global_capacity;
-};
-
 // Temporary state used while emitting one function and any nested closures.
 struct IrFunctionEmitter
 {
-	IrModuleEmitter *module;
+	IrModule         *module;
 	u32              ir_stack_size;
 	u32              ir_stack_index;
 	Ir              *ir_stack;
@@ -153,3 +116,6 @@ struct IrFunctionEmitter
 	IrEntity         entities[MAX_ENTITIES];
 	LoopLabels       loop_stack[64];
 };
+
+IrFunctionEmitter *ir_new_function_emitter(IrModule *module);
+void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input);

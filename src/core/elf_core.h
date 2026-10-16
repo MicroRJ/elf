@@ -165,6 +165,8 @@ struct elf_Module
 	u32           bytecode_function_count;
 	Bytecode     *bytecode;
 	u32           bytecode_count;
+	SourceMapEntry *source_map;
+	u32             source_map_count;
 };
 
 struct BcFunctionRef

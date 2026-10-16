@@ -2,20 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-static const char *ir_kind_name(IrKind kind)
-{
-	static const char *names[] =
-	{
-#define EXPAND(ENUM, NAME) #ENUM,
-		IR_DEFINITIONS(EXPAND)
-#undef EXPAND
-	};
-
-	if ((u32)kind >= IR_COUNT_) {
-		return "IR_UNKNOWN";
-	}
-	return names[kind];
-}
+// README: IR node constructors are named ir_new_<kind>.
 
 static Ir ir_alloc(IrFunctionEmitter *ctx, SourceSite site, IrKind kind)
 {
@@ -46,59 +33,72 @@ static Ir ir_new_binary(IrFunctionEmitter *ctx, SourceSite site, IrKind kind, Ir
 	return ir;
 }
 
-static Ir create_nil_ir(IrFunctionEmitter *ctx, SourceSite site)
+static Ir ir_new_nil(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_NIL);
 }
 
-static Ir create_int_ir(IrFunctionEmitter *ctx, SourceSite site, i64 i)
+static Ir ir_new_int(IrFunctionEmitter *ctx, SourceSite site, i64 i)
 {
 	Ir ir = ir_new_nullary(ctx, site, IR_INTEGER);
 	ir->ir_int = i;
 	return ir;
 }
 
-static Ir create_num_ir(IrFunctionEmitter *ctx, SourceSite site, f64 n)
+static Ir ir_new_num(IrFunctionEmitter *ctx, SourceSite site, f64 n)
 {
 	Ir ir = ir_new_nullary(ctx, site, IR_NUMBER);
 	ir->ir_num = n;
 	return ir;
 }
 
-static Ir create_atom_ir(IrFunctionEmitter *ctx, SourceSite site, Atom *atom)
+static Ir ir_new_atom(IrFunctionEmitter *ctx, SourceSite site, Atom *atom)
 {
 	Ir ir = ir_new_nullary(ctx, site, IR_ATOM);
 	ir->atom = atom;
 	return ir;
 }
 
-static Ir create_load_global_ir(IrFunctionEmitter *ctx, SourceSite site, u32 slot)
+static Ir ir_new_load_global(IrFunctionEmitter *ctx, SourceSite site, u32 slot)
 {
 	Ir ir = ir_alloc(ctx, site, IR_LOAD_GLOBAL);
 	ir->ir_global = slot;
 	return ir;
 }
 
-static Ir create_function_ir(IrFunctionEmitter *ctx, SourceSite site, u32 function_index)
+static Ir ir_new_function(IrFunctionEmitter *ctx, SourceSite site, u32 function_index)
 {
-	Ir ir = ir_alloc(ctx, site, IR_CLOSURE);
-	ir->ir_closure.index = function_index;
+	ASSERT(function_index < ctx->module->compiler->function_count);
+	ASSERT(function_index < ctx->module->function_count);
+	ASSERT(ctx->module->functions[function_index].is_static);
+	Ir ir = ir_alloc(ctx, site, IR_FUNCTION);
+	ir->ir_function.index = function_index;
 	return ir;
 }
 
-static Ir create_recurse_ir(IrFunctionEmitter *ctx, SourceSite site)
+static Ir ir_new_closure(IrFunctionEmitter *ctx, SourceSite site, u32 function_index, IrArray captures)
+{
+	ASSERT(function_index < ctx->module->function_count);
+	ASSERT(captures.count == ctx->module->functions[function_index].capture_count);
+	Ir ir = ir_alloc(ctx, site, IR_CLOSURE);
+	ir->ir_closure.index = function_index;
+	ir->ir_closure.captures = captures;
+	return ir;
+}
+
+static Ir ir_new_recurse(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_RECURSE);
 }
 
-static Ir create_capture_ir(IrFunctionEmitter *ctx, SourceSite site, u32 capture_index)
+static Ir ir_new_capture(IrFunctionEmitter *ctx, SourceSite site, u32 capture_index)
 {
 	Ir ir = ir_alloc(ctx, site, IR_CAPTURE);
 	ir->ir_capture = capture_index;
 	return ir;
 }
 
-static Ir create_if_ir(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir true_clause, Ir else_clause)
+static Ir ir_new_if(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir true_clause, Ir else_clause)
 {
 	Ir ir = ir_alloc(ctx, site, IR_IF);
 	ir->ir_if.pred = pred;
@@ -107,13 +107,13 @@ static Ir create_if_ir(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir true
 	return ir;
 }
 
-static Ir create_label_ir(IrFunctionEmitter *ctx, SourceSite site)
+static Ir ir_new_label(IrFunctionEmitter *ctx, SourceSite site)
 {
 	Ir ir = ir_alloc(ctx, site, IR_LABEL);
 	return ir;
 }
 
-static Ir create_jump_ir(IrFunctionEmitter *ctx, SourceSite site, Ir label)
+static Ir ir_new_jump(IrFunctionEmitter *ctx, SourceSite site, Ir label)
 {
 	ASSERT(label);
 	ASSERT(label->kind == IR_LABEL);
@@ -123,7 +123,7 @@ static Ir create_jump_ir(IrFunctionEmitter *ctx, SourceSite site, Ir label)
 	return ir;
 }
 
-static Ir create_jump_if_false_ir(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir label)
+static Ir ir_new_jump_if_false(IrFunctionEmitter *ctx, SourceSite site, Ir pred, Ir label)
 {
 	ASSERT(label);
 	ASSERT(label->kind == IR_LABEL);
@@ -134,14 +134,14 @@ static Ir create_jump_if_false_ir(IrFunctionEmitter *ctx, SourceSite site, Ir pr
 	return ir;
 }
 
-static Ir create_block_ir(IrFunctionEmitter *ctx, SourceSite site, IrArray stats)
+static Ir ir_new_block(IrFunctionEmitter *ctx, SourceSite site, IrArray stats)
 {
 	Ir ir = ir_alloc(ctx, site, IR_BLOCK);
 	ir->ir_block.stats = stats;
 	return ir;
 }
 
-static Ir create_expr_block_ir(IrFunctionEmitter *ctx, SourceSite site, IrArray stats, Ir value)
+static Ir ir_new_expr_block(IrFunctionEmitter *ctx, SourceSite site, IrArray stats, Ir value)
 {
 	Ir ir = ir_alloc(ctx, site, IR_EXPR_BLOCK);
 	ir->ir_expr_block.stats = stats;
@@ -149,7 +149,7 @@ static Ir create_expr_block_ir(IrFunctionEmitter *ctx, SourceSite site, IrArray 
 	return ir;
 }
 
-static Ir create_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
+static Ir ir_new_local(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	Ir ir = ir_alloc(ctx, site, IR_LOCAL);
 	ir->ir_local.expr = expr;
@@ -157,7 +157,7 @@ static Ir create_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 	return ir;
 }
 
-static Ir create_multi_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr, IrArray locals)
+static Ir ir_new_multi_local(IrFunctionEmitter *ctx, SourceSite site, Ir expr, IrArray locals)
 {
 	Ir ir = ir_alloc(ctx, site, IR_MULTI_LOCAL);
 	ir->ir_multi_local.expr = expr;
@@ -165,7 +165,7 @@ static Ir create_multi_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr
 	return ir;
 }
 
-static Ir create_load_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir local)
+static Ir ir_new_load_local(IrFunctionEmitter *ctx, SourceSite site, Ir local)
 {
 	ASSERT(local);
 	ASSERT(local->kind == IR_LOCAL);
@@ -175,7 +175,7 @@ static Ir create_load_local_ir(IrFunctionEmitter *ctx, SourceSite site, Ir local
 	return ir;
 }
 
-static Ir create_store_ir(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
+static Ir ir_new_store(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
 {
 	Ir ir = ir_alloc(ctx, site, IR_STORE);
 	ir->ir_binary.x = x;
@@ -183,15 +183,15 @@ static Ir create_store_ir(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
 	return ir;
 }
 
-static Ir create_array_add_ir(IrFunctionEmitter *ctx, SourceSite site, Ir array, Ir value)
+static Ir ir_new_array_add(IrFunctionEmitter *ctx, SourceSite site, Ir array, Ir value)
 {
 	return ir_new_binary(ctx, site, IR_ARRAY_ADD, array, value);
 }
 
-static Ir create_call_ir(IrFunctionEmitter *ctx, SourceSite site, IrCallType type, Ir expr, IrArray args)
+static Ir ir_new_call(IrFunctionEmitter *ctx, SourceSite site, IrCallType type, Ir expr, IrArray args)
 {
 	ASSERT(type == IR_CALL_DYNAMIC || type == IR_CALL_DIRECT);
-	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_CLOSURE));
+	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_FUNCTION));
 	Ir ir = ir_alloc(ctx, site, IR_CALL);
 	ir->ir_call.type = type;
 	ir->ir_call.expr = expr;
@@ -199,92 +199,110 @@ static Ir create_call_ir(IrFunctionEmitter *ctx, SourceSite site, IrCallType typ
 	return ir;
 }
 
-static Ir create_table_ir(IrFunctionEmitter *ctx, SourceSite site)
+static Ir ir_new_table(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_TABLE);
 }
 
-static Ir create_array_ir(IrFunctionEmitter *ctx, SourceSite site)
+static Ir ir_new_array(IrFunctionEmitter *ctx, SourceSite site)
 {
 	return ir_new_nullary(ctx, site, IR_ARRAY);
 }
 
-static Ir create_index_ir(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
+static Ir ir_new_index(IrFunctionEmitter *ctx, SourceSite site, Ir x, Ir y)
 {
 	return ir_new_binary(ctx, site, IR_INDEX, x, y);
 }
 
-static Ir create_measure_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
+static Ir ir_new_measure(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	return ir_new_unary(ctx, site, IR_MEASURE, expr);
 }
 
-static Ir create_get_mem_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
+static Ir ir_new_get_mem(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	return ir_new_unary(ctx, site, IR_GET_MEM, expr);
 }
 
-static Ir create_return_ir(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
+static Ir ir_new_return(IrFunctionEmitter *ctx, SourceSite site, Ir expr)
 {
 	Ir ir = ir_alloc(ctx, site, IR_RETURN);
 	ir->ir_return.expr = expr;
 	return ir;
 }
 
-static void print_ir(Printer *pr, Ir ir)
+typedef struct
+{
+	u32 indent;
+}
+IrPrinter;
+
+#define IR_PRINT(pr, text, ...) do { printf(text, __VA_ARGS__); } while (0)
+
+static void ir_print_new_line(IrPrinter *pr)
+{
+	IR_PRINT(pr, "\n");
+}
+
+static void ir_print_indent(IrPrinter *pr, i32 indent)
+{
+	pr->indent += indent;
+}
+
+static void print_ir(IrPrinter *pr, Ir ir)
 {
 	if (!ir) {
-		PRINT(pr, "(null)");
+		IR_PRINT(pr, "(null)");
 		return;
 	}
 	switch (ir->kind)
 	{
 		case IR_NONE:
 		{
-			PRINT(pr, "(none)");
+			IR_PRINT(pr, "(none)");
 		}
 		break;
 		case IR_ERROR:
 		{
-			PRINT(pr, "(error)");
+			IR_PRINT(pr, "(error)");
 		}
 		break;
 		case IR_ATOM:
 		{
 			const char *data = atom_data(ir->atom);
-			PRINT(pr, "\"%s\"", data);
+			IR_PRINT(pr, "\"%s\"", data);
 		}
 		break;
 		case IR_INTEGER:
 		{
 			i64 integer = ir->ir_int;
-			PRINT(pr, "%lli", integer);
+			IR_PRINT(pr, "%lli", integer);
 		}
 		break;
 		case IR_NUMBER:
 		{
 			f64 number = ir->ir_num;
-			PRINT(pr, "%f", number);
+			IR_PRINT(pr, "%f", number);
 		}
 		break;
 
 		case IR_LABEL:
 		{
-			PRINT(pr, "label %p", ir);
+			IR_PRINT(pr, "label %p", ir);
 		}
 		break;
 
 		case IR_JUMP:
 		{
-			PRINT(pr, "jump %p", ir->ir_jump.label);
+			IR_PRINT(pr, "jump %p", ir->ir_jump.label);
 		}
 		break;
 
 		case IR_JUMP_IF_FALSE:
 		{
-			PRINT(pr, "jump_if_false ");
+			IR_PRINT(pr, "jump_if_false ");
 			print_ir(pr, ir->ir_jump_if_false.pred);
-			PRINT(pr, ", %p", ir->ir_jump_if_false.label);
+			IR_PRINT(pr, ", %p", ir->ir_jump_if_false.label);
 		}
 		break;
 
@@ -293,12 +311,12 @@ static void print_ir(Printer *pr, Ir ir)
 			Ir pred = ir->ir_if.pred;
 			Ir true_clause = ir->ir_if.true_clause;
 			Ir else_clause = ir->ir_if.else_clause;
-			PRINT(pr, "if ");
+			IR_PRINT(pr, "if ");
 			print_ir(pr, pred);
-			PRINT(pr, "?");
+			IR_PRINT(pr, "?");
 			print_ir(pr, true_clause);
 			if (else_clause) {
-				PRINT(pr, "else ");
+				IR_PRINT(pr, "else ");
 				print_ir(pr, else_clause);
 			}
 		}
@@ -307,33 +325,33 @@ static void print_ir(Printer *pr, Ir ir)
 		case IR_BLOCK:
 		{
 			IrArray stats = ir->ir_block.stats;
-			PRINT(pr, "{");
-			elf_print_new_line(pr );
-			elf_print_indent(pr, +1);
+			IR_PRINT(pr, "{");
+			ir_print_new_line(pr );
+			ir_print_indent(pr, +1);
 			for (u32 i = 0; i < stats.count; ++ i)
 			{
 				print_ir(pr, stats.items[i]);
-				elf_print_new_line(pr);
+				ir_print_new_line(pr);
 			}
-			elf_print_indent(pr, -1);
-			PRINT(pr, "}");
+			ir_print_indent(pr, -1);
+			IR_PRINT(pr, "}");
 		}
 		break;
 
 		case IR_EXPR_BLOCK:
 		{
 			IrArray stats = ir->ir_expr_block.stats;
-			PRINT(pr, "expr ");
-			PRINT(pr, "{");
-			elf_print_new_line(pr);
-			elf_print_indent(pr, +1);
+			IR_PRINT(pr, "expr ");
+			IR_PRINT(pr, "{");
+			ir_print_new_line(pr);
+			ir_print_indent(pr, +1);
 			for (u32 i = 0; i < stats.count; ++ i)
 			{
 				print_ir(pr, stats.items[i]);
-				elf_print_new_line(pr);
+				ir_print_new_line(pr);
 			}
-			elf_print_indent(pr, -1);
-			PRINT(pr, "} => ");
+			ir_print_indent(pr, -1);
+			IR_PRINT(pr, "} => ");
 			print_ir(pr, ir->ir_expr_block.value);
 		}
 		break;
@@ -343,7 +361,7 @@ static void print_ir(Printer *pr, Ir ir)
 			Ir x = ir->ir_binary.x;
 			Ir y = ir->ir_binary.y;
 			print_ir(pr, x);
-			PRINT(pr, ".");
+			IR_PRINT(pr, ".");
 			print_ir(pr, y);
 		}
 		break;
@@ -353,38 +371,44 @@ static void print_ir(Printer *pr, Ir ir)
 			Ir expr = ir->ir_call.expr;
 			IrArray args = ir->ir_call.args;
 			print_ir(pr, expr);
-			PRINT(pr, "(");
+			IR_PRINT(pr, "(");
 			for (u32 i = 0; i < args.count; ++ i)
 			{
-				if (i != 0) PRINT(pr, ", ");
+				if (i != 0) IR_PRINT(pr, ", ");
 				print_ir(pr, args.items[i]);
 			}
-			PRINT(pr, ")");
+			IR_PRINT(pr, ")");
+		}
+		break;
+
+		case IR_FUNCTION:
+		{
+			IR_PRINT(pr, "function[%u]", ir->ir_function.index);
 		}
 		break;
 
 		case IR_CLOSURE:
 		{
-			PRINT(pr, "closure[%u]", ir->ir_closure.index);
+			IR_PRINT(pr, "closure[%u]", ir->ir_closure.index);
 		}
 		break;
 
 		case IR_TABLE:
 		{
-			PRINT(pr, "table");
+			IR_PRINT(pr, "table");
 		}
 		break;
 
 		case IR_ARRAY:
 		{
-			PRINT(pr, "array");
+			IR_PRINT(pr, "array");
 		}
 		break;
 
 		case IR_ARRAY_ADD:
 		{
 			print_ir(pr, ir->ir_binary.x);
-			PRINT(pr, "[] = ");
+			IR_PRINT(pr, "[] = ");
 			print_ir(pr, ir->ir_binary.y);
 		}
 		break;
@@ -394,7 +418,7 @@ static void print_ir(Printer *pr, Ir ir)
 			Ir x = ir->ir_binary.x;
 			Ir y = ir->ir_binary.y;
 			print_ir(pr, x);
-			PRINT(pr, " = ");
+			IR_PRINT(pr, " = ");
 			print_ir(pr, y);
 		}
 		break;
@@ -403,11 +427,11 @@ static void print_ir(Printer *pr, Ir ir)
 		{
 			Ir x = ir->ir_binary.x;
 			Ir y = ir->ir_binary.y;
-			PRINT(pr, "(");
+			IR_PRINT(pr, "(");
 			print_ir(pr, x);
-			PRINT(pr, " < ");
+			IR_PRINT(pr, " < ");
 			print_ir(pr, y);
-			PRINT(pr, ")");
+			IR_PRINT(pr, ")");
 		}
 		break;
 
@@ -415,11 +439,11 @@ static void print_ir(Printer *pr, Ir ir)
 		{
 			Ir x = ir->ir_binary.x;
 			Ir y = ir->ir_binary.y;
-			PRINT(pr, "(");
+			IR_PRINT(pr, "(");
 			print_ir(pr, x);
-			PRINT(pr, " + ");
+			IR_PRINT(pr, " + ");
 			print_ir(pr, y);
-			PRINT(pr, ")");
+			IR_PRINT(pr, ")");
 		}
 		break;
 
@@ -427,17 +451,17 @@ static void print_ir(Printer *pr, Ir ir)
 		{
 			Ir x = ir->ir_binary.x;
 			Ir y = ir->ir_binary.y;
-			PRINT(pr, "(");
+			IR_PRINT(pr, "(");
 			print_ir(pr, x);
-			PRINT(pr, " * ");
+			IR_PRINT(pr, " * ");
 			print_ir(pr, y);
-			PRINT(pr, ")");
+			IR_PRINT(pr, ")");
 		}
 		break;
 
 		default:
 		{
-			PRINT(pr, "(%s)", ir_kind_name(ir->kind));
+			IR_PRINT(pr, "(%s)", ir_kind_name(ir->kind));
 		}
 		break;
 	}

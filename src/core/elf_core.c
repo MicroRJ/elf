@@ -132,20 +132,16 @@ elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
 		elf_arena_align(&state->arena, 8);
 		module->bytecode = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode) * module->bytecode_count, compiled_module->bytecode);
 	}
+	module->source_map_count = compiled_module->source_map_count;
+	if (module->source_map_count)
+	{
+		module->source_map = dy_arena_push_copy(&state->arena, sizeof(*module->source_map) * module->source_map_count, 8, compiled_module->source_map);
+	}
 	module->bytecode_function_count = compiled_module->function_count;
 	if (module->bytecode_function_count)
 	{
 		elf_arena_align(&state->arena, 8);
 		module->bytecode_functions = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, compiled_module->functions);
-	}
-	for (u32 i = 0; i < module->bytecode_function_count; ++i)
-	{
-		BcFunction *function = module->bytecode_functions + i;
-		if (function->source_map_count)
-		{
-			elf_arena_align(&state->arena, 8);
-			function->source_map = elf_arena_push_copy(&state->arena, sizeof(*function->source_map) * function->source_map_count, function->source_map);
-		}
 	}
 	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
 	{

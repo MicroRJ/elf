@@ -114,6 +114,8 @@ struct Com_Module
 	u32         function_count;
 	Bytecode   *bytecode;
 	u32         bytecode_count;
+	SourceMapEntry *source_map;
+	u32             source_map_count;
 
 	b32 has_entry;
 	u32 entry_index;

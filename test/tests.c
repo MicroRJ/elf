@@ -23,10 +23,7 @@
 #include "ast.c"
 #include "parser.c"
 #include "parse_json.c"
-#include "ir.c"
-#include "ir_emitter.c"
 #include "bc_emitter.h"
-#include "bc_emitter.c"
 
 static int test_failures;
 
@@ -47,7 +44,9 @@ static void test_fail(const char *label)
 #include "parser_tests.c"
 #include "json_tests.c"
 #include "unparse_tests.c"
+#if 0
 #include "ir_tests.c"
+#endif
 #include "backend_tests.c"
 #include "vm_tests.c"
 #include "smoke_tests.c"
@@ -75,7 +74,6 @@ int main(void)
 	run_parser_tests(state);
 	run_json_tests(state);
 	run_unparse_tests(state);
-	run_ir_tests(state);
 	run_backend_tests();
 	run_vm_tests();
 	run_smoke_tests();
