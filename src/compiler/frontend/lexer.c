@@ -71,13 +71,15 @@ static b32 lexer_is_hex_digit(u32 c)
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-static void lexer_init(Lexer *lexer, Compiler *compiler, Com_SourceId source_id)
+static void lexer_init(Lexer *lexer, Compiler *compiler, Com_SourceId source_id, elf_Arena *scratch_arena)
 {
 	ASSERT(source_id < compiler->source_count);
+	ASSERT(scratch_arena);
 	Com_Source *source = compiler->sources + source_id;
 	lexer->compiler = compiler;
 	lexer->source_id = source_id;
 	lexer->atoms = compiler->atoms;
+	lexer->scratch_arena = scratch_arena;
 	lexer->source = source->source;
 	lexer->cursor = source->source.data;
 	lexer->end = source->source.data + source->source.size;
@@ -469,10 +471,10 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 	*out_atom = 0;
 
 	const char *cur = *cursor;
-	elf_Scratch scratch = elf_begin_scratch_excluding(lexer->compiler->arena);
-	char *text = elf_arena_push(scratch.arena, lexer_scratch_capacity(lexer));
+	u64 scratch_mark = elf_arena_mark(lexer->scratch_arena);
+	char *text = elf_arena_push(lexer->scratch_arena, lexer_scratch_capacity(lexer));
 	if (!text && lexer_scratch_capacity(lexer)) {
-		elf_end_scratch(scratch);
+		elf_arena_restore(lexer->scratch_arena, scratch_mark);
 		return COM_ERROR_OOM;
 	}
 	char *out = text;
@@ -550,7 +552,7 @@ static Com_Error lex_string_segment(Lexer *lexer, const char **cursor, SourceSit
 			error = COM_ERROR_OOM;
 		}
 	}
-	elf_end_scratch(scratch);
+	elf_arena_restore(lexer->scratch_arena, scratch_mark);
 	*cursor = cur;
 	return error;
 }
@@ -694,7 +696,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 		if (part.site.size == 0) {
 			part.site.size = 1;
 		}
-		error = lexer_tokens_push(&lexer->tokens, lexer->atoms->arena, part);
+		error = lexer_tokens_push(&lexer->tokens, lexer->scratch_arena, part);
 		if (error != COM_ERROR_NONE) {
 			break;
 		}
@@ -726,7 +728,7 @@ static Com_Error lexer_format_string(Lexer *lexer, const char **cursor, Token op
 				break;
 			}
 
-			error = lexer_tokens_push(&lexer->tokens, lexer->atoms->arena, token);
+			error = lexer_tokens_push(&lexer->tokens, lexer->scratch_arena, token);
 			if (error != COM_ERROR_NONE) {
 				break;
 			}
@@ -1166,7 +1168,7 @@ static Com_Error lex(Lexer *lexer)
 
 	lexer->cursor = cur;
 	if (error == COM_ERROR_NONE) {
-		error = lexer_tokens_push(&lexer->tokens, lexer->atoms->arena, token);
+		error = lexer_tokens_push(&lexer->tokens, lexer->scratch_arena, token);
 	}
 	return error;
 }

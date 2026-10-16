@@ -4,8 +4,10 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_tests", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	Ast file = elf_parse_file(parser);
+	parser_destroy(parser);
 	return file;
 }
 
@@ -345,8 +347,10 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "deprecated_table_call", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	Ast file = elf_parse_file(parser);
+	parser_destroy(parser);
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
@@ -513,8 +517,10 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_source_error", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	Ast file = elf_parse_file(parser);
+	parser_destroy(parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_PARSER)
 	{
 		test_fail(label);
@@ -734,8 +740,10 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_lexer_error", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	Ast file = elf_parse_file(parser);
+	parser_destroy(parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
 		test_fail("parser propagates a lexer error token");
 	}
@@ -749,8 +757,10 @@ static void test_parser_take_token_error(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_take_token_error", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	Token token = take_token(parser, TOK_LEFT_PAREN);
+	parser_destroy(parser);
 	if (!token_is_error(token) || token.error != COM_ERROR_SOURCE || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
 		test_fail("take token returns its source error");
 	}
@@ -764,11 +774,13 @@ static void test_parser_take_token_oom(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_take_token_oom", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
 	Token token = take_token(parser, TOK_LEFT_PAREN);
 	arena.capacity = capacity;
+	parser_destroy(parser);
 	if (!token_is_error(token) || token.error != COM_ERROR_OOM || ast_from_token_error(token) != ERROR_OOM_AST || compiler->report.error_count != 0) {
 		test_fail("take token returns diagnostic allocation failure");
 	}
@@ -782,11 +794,13 @@ static void test_parser_ast_oom(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, "parser_ast_oom", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
 	Ast ast = parse_expr(parser);
 	arena.capacity = capacity;
+	parser_destroy(parser);
 	if (ast != ERROR_OOM_AST || ast->error != COM_ERROR_OOM) {
 		test_fail("parser returns AST allocation failure");
 	}

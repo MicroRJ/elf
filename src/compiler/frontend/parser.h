@@ -20,6 +20,7 @@ typedef struct
 	Compiler         *compiler;
 	Com_SourceId      source_id;
 	Atom_Table       *atoms;
+	elf_Arena        *scratch_arena;
 	SourceBuffer      source;
 
 	const char       *cursor;
@@ -34,7 +35,8 @@ Lexer;
 
 struct Parser
 {
-	elf_Arena          *arena;
+	elf_Arena          *result_arena;
+	elf_Arena           scratch_arena;
 	Compiler           *compiler;
 	Com_SourceId        source_id;
 	Atom_Table         *atoms;

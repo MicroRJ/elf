@@ -21,7 +21,7 @@ static const char *ast_type_name(AstType type)
 
 static Ast create_ast(Parser *par, SourceSite site, AstType kind)
 {
-	Ast_T *tree = elf_arena_push_zero(par->arena, sizeof(*tree));
+	Ast_T *tree = elf_arena_push_zero(par->result_arena, sizeof(*tree));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}

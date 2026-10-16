@@ -190,36 +190,54 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-static Parser *parser_create(Compiler *compiler, Com_SourceId source_id)
+static Parser *parser_create(Compiler *compiler)
 {
 	ASSERT(compiler != 0);
-	ASSERT(source_id < compiler->source_count);
-	Com_Source *source = compiler->sources + source_id;
-	ASSERT(source->name != 0);
-	ASSERT(source->source.data != 0);
-
-	elf_Arena *arena = compiler->arena;
-	Parser *parser = elf_arena_push_zero(arena, sizeof(*parser));
+	Parser *parser = elf_arena_push_zero(compiler->arena, sizeof(*parser));
 	if (!parser) {
 		return 0;
 	}
 	parser->compiler = compiler;
-	parser->source_id = source_id;
 	parser->atoms = compiler->atoms;
-	parser->arena = arena;
-	parser->ast_stack_size = 4096;
-	parser->ast_stack = elf_arena_push_zero(arena, sizeof(*parser->ast_stack) * parser->ast_stack_size);
-	if (!parser->ast_stack) {
+	parser->result_arena = compiler->arena;
+	parser->scratch_arena = elf_arena_create(0);
+	if (!parser->scratch_arena.data) {
 		return 0;
 	}
-
-	lexer_init(&parser->lexer, compiler, source_id);
-	parser->lexer.cursor = source->source.data;
-	parser->lexer.line_index = 1;
-	parser->lexer.line_start = source->source.data;
-	consume_token(parser);
-	consume_token(parser);
 	return parser;
+}
+
+static void parser_destroy(Parser *parser)
+{
+	if (parser) {
+		elf_arena_destroy(&parser->scratch_arena);
+	}
+}
+
+static b32 parser_set_source(Parser *parser, Com_SourceId source_id)
+{
+	ASSERT(parser);
+	ASSERT(source_id < parser->compiler->source_count);
+	Com_Source *source = parser->compiler->sources + source_id;
+	ASSERT(source->name != 0);
+	ASSERT(source->source.data != 0);
+
+	elf_arena_reset(&parser->scratch_arena);
+	parser->source_id = source_id;
+	parser->tok = (Token) {};
+	parser->tok_prev = (Token) {};
+	parser->tok_prox = (Token) {};
+	parser->ast_stack_size = 4096;
+	parser->ast_stack_index = 0;
+	parser->ast_stack = elf_arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size);
+	if (!parser->ast_stack) {
+		return false;
+	}
+
+	lexer_init(&parser->lexer, parser->compiler, source_id, &parser->scratch_arena);
+	consume_token(parser);
+	consume_token(parser);
+	return true;
 }
 
 static Token consume_token(Parser *par)
@@ -269,7 +287,7 @@ static b32 push_ast(Parser *par, Ast tree)
 	if (par->ast_stack_index == par->ast_stack_size)
 	{
 		u32 stack_size = par->ast_stack_size ? par->ast_stack_size * 2 : 256;
-		Ast *stack = elf_arena_push(par->arena, sizeof(*stack) * stack_size);
+		Ast *stack = elf_arena_push(&par->scratch_arena, sizeof(*stack) * stack_size);
 		if (!stack) {
 			return false;
 		}
@@ -288,7 +306,7 @@ static AstArray pop_ast_array(Parser *par, u32 count)
 	ASSERT(par->ast_stack_index >= count);
 	par->ast_stack_index -= count;
 	AstArray result = {.count = count};
-	result.items = elf_arena_push_copy(par->arena, sizeof(*result.items) * count, par->ast_stack + par->ast_stack_index);
+	result.items = elf_arena_push_copy(par->result_arena, sizeof(*result.items) * count, par->ast_stack + par->ast_stack_index);
 	return result;
 }
 

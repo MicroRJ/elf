@@ -4,10 +4,11 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 	elf_StrSlice source_buffer = {(char *)source, size};
 	parser.compiler = compiler_create(&state->arena);
 	compiler_add_root_source(parser.compiler, "lexer_tests", source_buffer);
-	parser.arena = &state->arena;
+	parser.result_arena = &state->arena;
+	parser.scratch_arena = elf_arena_create(1024 * 1024);
 	parser.source_id = 0;
 	parser.atoms = parser.compiler->atoms;
-	lexer_init(&parser.lexer, parser.compiler, parser.source_id);
+	lexer_init(&parser.lexer, parser.compiler, parser.source_id, &parser.scratch_arena);
 	return parser;
 }
 
@@ -23,6 +24,7 @@ static void lexer_prime(Parser *parser)
 
 static Token lexer_next(Parser *parser)
 {
+	parser->lexer.scratch_arena = &parser->scratch_arena;
 	return lex_token(&parser->lexer);
 }
 
@@ -756,7 +758,8 @@ static void test_lexer_out_of_memory(elf_State *state)
 	elf_StrSlice source = {(char *)"oom_identifier", 14};
 	compiler_add_root_source(compiler, "lexer_oom", source);
 	Lexer lexer = {};
-	lexer_init(&lexer, compiler, 0);
+	elf_Arena scratch_arena = elf_arena_create(0);
+	lexer_init(&lexer, compiler, 0, &scratch_arena);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
 	Token token = lex_token(&lexer);
@@ -765,6 +768,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 		test_fail("atom allocation failure retains its OOM error");
 	}
 	arena.capacity = capacity;
+	elf_arena_destroy(&scratch_arena);
 	elf_arena_destroy(&arena);
 
 	arena = elf_arena_create(0);
@@ -773,7 +777,8 @@ static void test_lexer_out_of_memory(elf_State *state)
 	source = (elf_StrSlice) {(char *)"@", 1};
 	compiler_add_root_source(compiler, "lexer_report_oom", source);
 	lexer = (Lexer) {};
-	lexer_init(&lexer, compiler, 0);
+	scratch_arena = elf_arena_create(0);
+	lexer_init(&lexer, compiler, 0, &scratch_arena);
 	capacity = arena.capacity;
 	arena.capacity = arena.used;
 	token = lex_token(&lexer);
@@ -782,6 +787,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 		test_fail("diagnostic allocation failure retains its OOM error");
 	}
 	arena.capacity = capacity;
+	elf_arena_destroy(&scratch_arena);
 	elf_arena_destroy(&arena);
 }
 

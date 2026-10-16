@@ -11,6 +11,9 @@ typedef dy_Scratch elf_Scratch;
 
 #define elf_arena_create dy_arena_create
 #define elf_arena_destroy dy_arena_destroy
+#define elf_arena_reset dy_arena_reset
+#define elf_arena_mark dy_arena_mark
+#define elf_arena_restore dy_arena_restore
 #define elf_arena_reserve dy_arena_reserve
 #define elf_arena_align(arena, alignment) ((void)dy_arena_push((arena), 0, (alignment)))
 

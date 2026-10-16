@@ -3,8 +3,10 @@ static IrFunctionEmitter *ir_test_lower_source(elf_State *state, elf_Arena *aren
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(arena);
 	compiler_add_root_source(compiler, "ir_tests", source);
-	Parser *parser = parser_create(compiler, 0);
+	Parser *parser = parser_create(compiler);
+	parser_set_source(parser, 0);
 	Ast file = elf_parse_file(parser);
+	parser_destroy(parser);
 	compiler->sources[0].ast = file;
 	compiler_resolve_statics(compiler, COM_UNIT_FUNCTION);
 
