@@ -287,9 +287,10 @@ typedef enum
 }
 Com_StaticLookup;
 
-// Owns one compilation session: its sources, atoms, diagnostics, and temporary
-// syntax and lowering data all share the caller-provided arena. Runtime work is
-// outside this type.
+// NOTE(RJ):
+// This will remain only the shared stuff across compilation stages;
+// Error reporting sink, logging configurations apparently, compile wide allocations
+// and sources ...
 struct Compiler
 {
 	elf_Arena         *arena;

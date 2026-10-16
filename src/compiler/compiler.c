@@ -27,6 +27,8 @@
 #include "source_diagnostics.c"
 #include "atom.c"
 
+#if 0
+
 static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
 {
 	if (compiler->source_count == compiler->source_capacity)
@@ -1110,4 +1112,121 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 	BcModule *bc_module = bc_emit_module(ir_module);
 	module = compiler_package_module(compiler, output_arena, ir_module, bc_module);
 	return module;
+}
+#endif
+
+Compiler *compiler_create(elf_Arena *arena)
+{
+	Compiler *compiler = elf_arena_push_zero(arena, sizeof(*compiler));
+	if (compiler) {
+		compiler->arena = arena;
+	}
+	return compiler;
+}
+
+Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source)
+{
+	(void)compiler;
+	(void)name;
+	(void)source;
+	return COM_SOURCE_INVALID;
+}
+
+Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path)
+{
+	(void)compiler;
+	(void)path;
+	return COM_SOURCE_INVALID;
+}
+
+void compiler_set_log_messages(Compiler *compiler, b32 enabled)
+{
+	if (compiler) {
+		compiler->log_messages = enabled;
+	}
+}
+
+b32 compiler_parse_sources(Compiler *compiler)
+{
+	(void)compiler;
+	return false;
+}
+
+b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
+{
+	(void)compiler;
+	(void)unit_type;
+	return false;
+}
+
+Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
+{
+	(void)compiler;
+	(void)source;
+	(void)name;
+	return 0;
+}
+
+Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId source, Ast expr, Com_StaticValue *out)
+{
+	(void)compiler;
+	(void)source;
+	(void)expr;
+	(void)out;
+	return COM_STATIC_LOOKUP_NONE;
+}
+
+void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId source)
+{
+	(void)compiler;
+	(void)source;
+}
+
+b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
+{
+	(void)compiler;
+	(void)error;
+	(void)severity;
+	(void)phase;
+	(void)site;
+	(void)format;
+	(void)args;
+	return false;
+}
+
+b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
+{
+	(void)compiler;
+	(void)error;
+	(void)severity;
+	(void)phase;
+	(void)site;
+	(void)format;
+	return false;
+}
+
+Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type)
+{
+	(void)compiler;
+	(void)output_arena;
+	(void)unit_type;
+	return 0;
+}
+
+Ast compiler_parse_constant_expr(Compiler *compiler)
+{
+	(void)compiler;
+	return ERROR_AST;
+}
+
+Ast compiler_parse_json(Compiler *compiler)
+{
+	(void)compiler;
+	return ERROR_AST;
+}
+
+Ast compiler_parse_jsonl(Compiler *compiler)
+{
+	(void)compiler;
+	return ERROR_AST;
 }

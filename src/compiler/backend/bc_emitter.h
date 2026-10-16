@@ -11,14 +11,21 @@ BcGlobalRelocation;
 
 typedef struct
 {
+	const char *data;
+	u32         size;
+}
+BcString;
+
+typedef struct
+{
 	Bytecode           *bytecode;
 	u32                 bytecode_count;
 	SourceMapEntry     *source_map;
 	u32                 source_map_count;
 	BcFunction         *functions;
 	u32                 function_count;
-	Atom              **atoms;
-	u32                 atom_count;
+	BcString           *strings;
+	u32                 string_count;
 	i64                *integer_constants;
 	u32                 integer_constant_count;
 	f64                *number_constants;

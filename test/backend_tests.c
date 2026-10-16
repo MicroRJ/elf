@@ -575,6 +575,30 @@ static void test_backend_generates_module_without_entry(void)
 	elf_destroy_state(state);
 }
 
+static void test_backend_outputs_strings(void)
+{
+	elf_Arena arena = elf_arena_create(0);
+	const char text[] = "backend string";
+	Atom *atom = elf_arena_push_zero(&arena, sizeof(*atom) + sizeof(text));
+	atom->size = sizeof(text) - 1;
+	copy_memory(atom->data, text, sizeof(text));
+
+	IrNode string = {.kind = IR_ATOM, .atom = atom};
+	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &string};
+	IrFunction function = {.body = &return_string};
+	IrModule ir_module = {.arena = &arena, .functions = &function, .function_count = 1, .function_capacity = 1};
+
+	BcModule *module = bc_emit_module(&ir_module);
+	if (module->string_count != 1 || module->strings[0].size != sizeof(text) - 1 || memcmp(module->strings[0].data, text, sizeof(text))) {
+		test_fail("backend outputs owned bytecode strings");
+	}
+	if (module->strings[0].data == atom->data) {
+		test_fail("backend bytecode strings do not borrow compiler atoms");
+	}
+
+	elf_arena_destroy(&arena);
+}
+
 static void test_backend_compiles_static_functions(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -761,6 +785,7 @@ static void run_backend_tests(void)
 	test_backend_logical_expr_delays_result_slot();
 	test_backend_formats_bytecode_function();
 	test_backend_generates_module_without_entry();
+	test_backend_outputs_strings();
 	test_backend_compiles_static_functions();
 	test_backend_emits_direct_static_call();
 	test_backend_lowers_trailing_closure();

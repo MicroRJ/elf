@@ -377,6 +377,14 @@ static u32 find_emitter_atom(BcEmitter *emitter, Atom *atom)
 	return 0;
 }
 
+static BcString copy_emitter_string(elf_Arena *arena, Atom *atom)
+{
+	u32 size = atom_size(atom);
+	char *data = dy_arena_push_zero(arena, size + 1, 1);
+	copy_memory(data, atom_data(atom), size);
+	return (BcString) {.data = data, .size = size};
+}
+
 static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
 {
 	ASSERT(emitter->generated_function_count == emitter->function_count);
@@ -388,8 +396,14 @@ static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
 	module->source_map_count = emitter->source_map_count;
 	module->functions = emitter->functions;
 	module->function_count = emitter->function_count;
-	module->atoms = emitter->atoms;
-	module->atom_count = emitter->atom_count;
+	module->string_count = emitter->atom_count;
+	if (module->string_count)
+	{
+		module->strings = dy_arena_push_zero(arena, sizeof(*module->strings) * module->string_count, 8);
+		for (u32 i = 0; i < module->string_count; ++i) {
+			module->strings[i] = copy_emitter_string(arena, emitter->atoms[i]);
+		}
+	}
 	module->integer_constants = emitter->integer_constants;
 	module->integer_constant_count = emitter->integer_constant_count;
 	module->number_constants = emitter->number_constants;
