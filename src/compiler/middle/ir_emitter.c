@@ -513,9 +513,9 @@ static TypeRule type_rule_from_atom(Atom *atom)
 
 static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 {
-	ASSERT(ir && ir->kind == IR_FUNCTION);
-	ASSERT(ir->ir_function.index < ctx->module->module.function_count);
-	IrFunction *function = ctx->module->module.functions + ir->ir_function.index;
+	ASSERT(ir && ir->kind == IR_CLOSURE);
+	ASSERT(ir->ir_closure.index < ctx->module->module.function_count);
+	IrFunction *function = ctx->module->module.functions + ir->ir_closure.index;
 	Ast *params = expr->function.params.items;
 	u32 nparams = expr->function.params.count;
 
@@ -600,7 +600,7 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 		captures.items[capture_index++] = capture->source;
 	}
 	ASSERT(capture_index == captures.count);
-	ir->ir_function.captures = captures;
+	ir->ir_closure.captures = captures;
 	function->capture_count = function_ctx.capture_count;
 
 }
@@ -659,9 +659,9 @@ static IrKind ir_kind_from_compound_assign_ast_kind(AstType kind)
 static IrCallType call_type_from_callee(IrFunctionEmitter *ctx, Ir callee)
 {
 	IrCallType type = IR_CALL_DYNAMIC;
-	if (callee && callee->kind == IR_FUNCTION && callee->ir_function.index < ctx->module->module.function_count)
+	if (callee && callee->kind == IR_CLOSURE && callee->ir_closure.index < ctx->module->module.function_count)
 	{
-		IrFunction *function = ctx->module->module.functions + callee->ir_function.index;
+		IrFunction *function = ctx->module->module.functions + callee->ir_closure.index;
 		if (function->is_static && function->capture_count == 0) {
 			type = IR_CALL_DIRECT;
 		}
@@ -677,12 +677,12 @@ static b32 ast_is_call(Ast expr)
 static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir callee, b32 *failed)
 {
 	ASSERT(call && call->kind == AST_CALL);
-	ASSERT(callee && callee->kind == IR_FUNCTION);
-	ASSERT(callee->ir_function.index < ctx->module->compiler->function_count);
-	ASSERT(callee->ir_function.index < ctx->module->module.function_count);
+	ASSERT(callee && callee->kind == IR_CLOSURE);
+	ASSERT(callee->ir_closure.index < ctx->module->compiler->function_count);
+	ASSERT(callee->ir_closure.index < ctx->module->module.function_count);
 
-	Com_Function *function = ctx->module->compiler->functions + callee->ir_function.index;
-	IrFunction *ir_function = ctx->module->module.functions + callee->ir_function.index;
+	Com_Function *function = ctx->module->compiler->functions + callee->ir_closure.index;
+	IrFunction *ir_function = ctx->module->module.functions + callee->ir_closure.index;
 	ASSERT(function->param_count >= IMPLICIT_PARAM_COUNT);
 	u32 declared_param_count = function->param_count - IMPLICIT_PARAM_COUNT;
 	u32 argument_count = call->call.args.count;

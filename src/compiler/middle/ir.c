@@ -81,8 +81,8 @@ static Ir create_load_global_ir(IrFunctionEmitter *ctx, SourceSite site, u32 slo
 
 static Ir create_function_ir(IrFunctionEmitter *ctx, SourceSite site, u32 function_index)
 {
-	Ir ir = ir_alloc(ctx, site, IR_FUNCTION);
-	ir->ir_function.index = function_index;
+	Ir ir = ir_alloc(ctx, site, IR_CLOSURE);
+	ir->ir_closure.index = function_index;
 	return ir;
 }
 
@@ -191,7 +191,7 @@ static Ir create_array_add_ir(IrFunctionEmitter *ctx, SourceSite site, Ir array,
 static Ir create_call_ir(IrFunctionEmitter *ctx, SourceSite site, IrCallType type, Ir expr, IrArray args)
 {
 	ASSERT(type == IR_CALL_DYNAMIC || type == IR_CALL_DIRECT);
-	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_FUNCTION));
+	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_CLOSURE));
 	Ir ir = ir_alloc(ctx, site, IR_CALL);
 	ir->ir_call.type = type;
 	ir->ir_call.expr = expr;
@@ -363,9 +363,9 @@ static void print_ir(Printer *pr, Ir ir)
 		}
 		break;
 
-		case IR_FUNCTION:
+		case IR_CLOSURE:
 		{
-			PRINT(pr, "function[%u]", ir->ir_function.index);
+			PRINT(pr, "closure[%u]", ir->ir_closure.index);
 		}
 		break;
 

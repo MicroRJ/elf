@@ -5,7 +5,6 @@
 typedef struct IrEntity IrEntity;
 typedef struct IrFunction IrFunction;
 
-
 enum
 {
 	MAX_ENTITIES = 4096

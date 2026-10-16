@@ -349,8 +349,8 @@ static void test_ir_lowers_function_expression(elf_State *state)
 
 	Ir main_body = ctx->module->module.functions[0].body;
 	Ir memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
-	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION, "function expression lowers to function ir");
-	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_function.index != 1) {
+	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_CLOSURE, "function expression lowers to closure ir");
+	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_closure.index != 1) {
 		test_fail("function ir points at nested function");
 	}
 
@@ -614,8 +614,8 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 
 	Ir main_ret = ir_test_body_stat(ctx->module->module.functions[0].body, 0, IR_RETURN, "main returns static function");
 	Ir foo_value = main_ret ? main_ret->ir_return.expr : 0;
-	expect_ir_kind(foo_value, IR_FUNCTION, "static function lowers directly to function ir");
-	if (foo_value && foo_value->ir_function.index != 1) {
+	expect_ir_kind(foo_value, IR_CLOSURE, "static function lowers directly to closure ir");
+	if (foo_value && foo_value->ir_closure.index != 1) {
 		test_fail("main static function value points to foo");
 	}
 
@@ -626,8 +626,8 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 		test_fail("static foo-to-bar call lowers as direct");
 	}
 	Ir bar_value = foo_call ? foo_call->ir_call.expr : 0;
-	expect_ir_kind(bar_value, IR_FUNCTION, "foo resolves bar statically");
-	if (bar_value && bar_value->ir_function.index != 2) {
+	expect_ir_kind(bar_value, IR_CLOSURE, "foo resolves bar statically");
+	if (bar_value && bar_value->ir_closure.index != 2) {
 		test_fail("foo points to bar function");
 	}
 
@@ -638,8 +638,8 @@ static void test_ir_lowers_mutually_recursive_static_functions(elf_State *state)
 		test_fail("static bar-to-foo call lowers as direct");
 	}
 	Ir recursive_foo = bar_call ? bar_call->ir_call.expr : 0;
-	expect_ir_kind(recursive_foo, IR_FUNCTION, "bar resolves foo statically");
-	if (recursive_foo && recursive_foo->ir_function.index != 1) {
+	expect_ir_kind(recursive_foo, IR_CLOSURE, "bar resolves foo statically");
+	if (recursive_foo && recursive_foo->ir_closure.index != 1) {
 		test_fail("bar points back to foo function");
 	}
 	if (ctx->module->module.functions[1].capture_count || ctx->module->module.functions[2].capture_count) {

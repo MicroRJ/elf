@@ -789,6 +789,7 @@ void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId sourc
 	}
 }
 
+// TODO(RJ): remove we already have utils that do this
 static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format, va_list args)
 {
 	va_list count_args;

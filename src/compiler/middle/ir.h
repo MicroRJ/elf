@@ -54,7 +54,7 @@ BcSlot;
 	X(IR_RETURN              , "return")                     \
 	X(IR_MEASURE             , "measure")                    \
 	X(IR_GET_MEM             , "get_mem")                    \
-	X(IR_FUNCTION            , "function")                   \
+	X(IR_CLOSURE             , "closure")                    \
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_LOCAL               , "local")                      \
 	X(IR_MULTI_LOCAL         , "multi_local")                \
@@ -96,9 +96,10 @@ IrCallType;
 
 struct IrNode
 {
-	IrKind kind;
+	IrKind     kind;
 	SourceSite site;
-	TypeRule type_rule;
+	TypeRule   type_rule;
+
 	union
 	{
 		u32      ir_global;
@@ -112,8 +113,8 @@ struct IrNode
 		ir_label;
 
 		Atom *atom;
-		i64      ir_int;
-		f64      ir_num;
+		i64   ir_int;
+		f64   ir_num;
 
 		Ir ir_unary;
 
@@ -134,10 +135,10 @@ struct IrNode
 
 		struct
 		{
-			u32      index;
+			u32     index;
 			IrArray captures;
 		}
-		ir_function;
+		ir_closure;
 
 		struct
 		{

@@ -700,8 +700,8 @@ static BcSlot emit_direct_call(BcFunctionEmitter *emitter, Ir ir, BcSlot out, u3
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
 	ASSERT(ir->ir_call.type == IR_CALL_DIRECT);
-	ASSERT(function->kind == IR_FUNCTION);
-	ASSERT(function->ir_function.index < emitter->module->function_count);
+	ASSERT(function->kind == IR_CLOSURE);
+	ASSERT(function->ir_closure.index < emitter->module->function_count);
 	ASSERT(nout <= 0xff);
 
 	BcSlot stack_top = mark_slots(emitter);
@@ -720,7 +720,7 @@ static BcSlot emit_direct_call(BcFunctionEmitter *emitter, Ir ir, BcSlot out, u3
 	}
 	restore_slots(emitter, stack_top);
 
-	emit_xyzw_bc(emitter, ir->site, BC_CALL, unwrap_slot(stack_top), function->ir_function.index, nargs + 1, nout);
+	emit_xyzw_bc(emitter, ir->site, BC_CALL, unwrap_slot(stack_top), function->ir_closure.index, nargs + 1, nout);
 	return finish_call(emitter, ir, stack_top, out, nout);
 }
 
@@ -938,7 +938,7 @@ static BcSlot emit_expr(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32 nou
 			return out;
 		}
 
-		case IR_FUNCTION:
+		case IR_CLOSURE:
 		{
 			if (nout < 1) {
 				return out;
@@ -946,10 +946,10 @@ static BcSlot emit_expr(BcFunctionEmitter *emitter, Ir expr, BcSlot out, u32 nou
 
 			out = ensure_slot(emitter, out);
 
-			u32 bytecode_function_id = expr->ir_function.index;
+			u32 bytecode_function_id = expr->ir_closure.index;
 			ASSERT(bytecode_function_id < emitter->module->function_count);
 
-			IrArray captures = expr->ir_function.captures;
+			IrArray captures = expr->ir_closure.captures;
 			if (captures.count == 0)
 			{
 				emit_xy_bc(emitter, site, BC_CLOSURE, unwrap_slot(out), bytecode_function_id);
