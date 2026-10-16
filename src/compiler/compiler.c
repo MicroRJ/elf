@@ -86,26 +86,31 @@ void compiler_set_log_messages(Compiler *compiler, b32 enabled)
 	compiler->log_messages = enabled;
 }
 
-b32 compiler_record_import(Compiler *compiler, Com_SourceId source_id, Ast import_ast)
+static Com_Import *compiler_append_import(Compiler *compiler, Com_SourceId source_id, Atom *path, SourceSite site)
 {
 	ASSERT(source_id < compiler->source_count);
-	ASSERT(import_ast && import_ast->kind == AST_IMPORT);
+	ASSERT(path);
+	Com_Import *result = 0;
 	Com_Source *source = compiler->sources + source_id;
 	if (source->import_count == source->import_capacity)
 	{
 		u32 capacity = source->import_capacity ? source->import_capacity * 2 : 4;
-		Ast *imports = elf_arena_push_zero(compiler->arena, sizeof(*imports) * capacity);
-		if (!imports) {
-			return false;
+		Com_Import *imports = elf_arena_push_zero(compiler->arena, sizeof(*imports) * capacity);
+		if (imports)
+		{
+			if (source->import_count) {
+				copy_memory(imports, source->imports, sizeof(*imports) * source->import_count);
+			}
+			source->imports = imports;
+			source->import_capacity = capacity;
 		}
-		if (source->import_count) {
-			copy_memory(imports, source->imports, sizeof(*imports) * source->import_count);
-		}
-		source->imports = imports;
-		source->import_capacity = capacity;
 	}
-	source->imports[source->import_count++] = import_ast;
-	return true;
+	if (source->import_count < source->import_capacity)
+	{
+		result = source->imports + source->import_count++;
+		*result = (Com_Import) {.path = path, .site = site, .resolved_source = COM_SOURCE_INVALID};
+	}
+	return result;
 }
 
 static Com_SourceId compiler_find_source(Compiler *compiler, Atom *canonical_path)
@@ -314,17 +319,38 @@ Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path)
 	return source_id;
 }
 
-static b32 compiler_resolve_import(Compiler *compiler, Com_SourceId importer, Ast import_ast)
+static b32 compiler_discover_source_imports(Compiler *compiler, Com_SourceId source, Ast file)
 {
-	ASSERT(importer < compiler->source_count);
-	ASSERT(import_ast && import_ast->kind == AST_IMPORT);
-	b32 result = false;
-	Atom *importer_path = compiler->sources[importer].canonical_path;
-	Com_SourceId source_id = compiler_load_source_file(compiler, importer_path, import_ast->import.path, import_ast->site);
-	if (source_id != COM_SOURCE_INVALID)
+	ASSERT(source < compiler->source_count);
+	ASSERT(file && file->kind == AST_FILE);
+	Ast body = file->file.body;
+	ASSERT(body && body->kind == AST_BLOCK_STAT);
+	compiler->sources[source].imports = 0;
+	compiler->sources[source].import_count = 0;
+	compiler->sources[source].import_capacity = 0;
+	Atom *importer_path = compiler->sources[source].canonical_path;
+
+	b32 result = true;
+	for (u32 i = 0; i < body->block.count; ++i)
 	{
-		import_ast->import.source = source_id;
-		result = true;
+		Ast declaration = body->block.items[i];
+		if (declaration->kind == AST_STATIC_DECL && declaration->static_decl.expr->kind == AST_IMPORT)
+		{
+			Ast import_ast = declaration->static_decl.expr;
+			Com_Import *import = compiler_append_import(compiler, source, import_ast->import.path, import_ast->site);
+			if (!import)
+			{
+				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_PARSER, import_ast->site, "failed to record import");
+				result = false;
+			}
+			else
+			{
+				import->resolved_source = compiler_load_source_file(compiler, importer_path, import->path, import->site);
+				if (import->resolved_source == COM_SOURCE_INVALID) {
+					result = false;
+				}
+			}
+		}
 	}
 	return result;
 }
@@ -334,8 +360,7 @@ b32 compiler_parse_sources(Compiler *compiler)
 	b32 result = true;
 	for (Com_SourceId source_id = 0; result && source_id < compiler->source_count; ++source_id)
 	{
-		// TODO(RJ): the parser should take a scratch arena for scratch allocations, and arena
-		// for results
+		// TODO(RJ): the parser should take a scratch arena for scratch allocations, and an arena for results
 		Parser *parser = parser_create(compiler, source_id);
 		if (!parser) {
 			return false;
@@ -351,23 +376,14 @@ b32 compiler_parse_sources(Compiler *compiler)
 		}
 		else
 		{
-			Ast *imports = compiler->sources[source_id].imports;
-			u32 import_count = compiler->sources[source_id].import_count;
-			for (u32 i = 0; i < import_count; ++i)
-			{
-				if (!compiler_resolve_import(compiler, source_id, imports[i])) {
-					result = false;
-				}
-			}
+			result = compiler_discover_source_imports(compiler, source_id, ast);
 		}
 	}
 	return result;
 }
 
-Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
+static Com_StaticSymbol *compiler_static_symbol_from_scope(Com_StaticScope *scope, Atom *name)
 {
-	ASSERT(source < compiler->source_count);
-	Com_StaticScope *scope = &compiler->sources[source].statics;
 	for (u32 i = 0; i < scope->symbol_count; ++i)
 	{
 		Com_StaticSymbol *symbol = scope->symbols + i;
@@ -378,10 +394,30 @@ Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_Sou
 	return 0;
 }
 
+Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
+{
+	ASSERT(source < compiler->source_count);
+	return compiler_static_symbol_from_scope(&compiler->sources[source].statics, name);
+}
+
 static Com_StaticSymbol *compiler_exported_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
 {
 	Com_StaticSymbol *symbol = compiler_static_symbol_from_source(compiler, source, name);
 	return symbol && symbol->exported ? symbol : 0;
+}
+
+static Com_Import *compiler_import_from_source(Compiler *compiler, Com_SourceId source, Atom *path)
+{
+	ASSERT(source < compiler->source_count);
+	Com_Source *compiler_source = compiler->sources + source;
+	for (u32 i = 0; i < compiler_source->import_count; ++i)
+	{
+		Com_Import *import = compiler_source->imports + i;
+		if (import->path == path) {
+			return import;
+		}
+	}
+	return 0;
 }
 
 static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast ast)
@@ -394,7 +430,7 @@ static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast as
 	{
 		ASSERT(ast->kind == AST_FUNCTION);
 		variadic = ast->function.variadic != 0;
-		param_count += ast->function.nparams;
+		param_count += ast->function.params.count;
 	}
 	else
 	{
@@ -436,10 +472,11 @@ Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId so
 	}
 	else if (expr->kind == AST_IMPORT)
 	{
-		if (expr->import.source < compiler->source_count)
+		Com_Import *import = compiler_import_from_source(compiler, source, expr->import.path);
+		if (import && import->resolved_source < compiler->source_count)
 		{
 			out->kind = COM_STATIC_NAMESPACE;
-			out->source = expr->import.source;
+			out->source = import->resolved_source;
 			result = COM_STATIC_LOOKUP_VALUE;
 		}
 		else
@@ -575,7 +612,7 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 	ASSERT(function->ast && function->ast->kind == AST_FUNCTION);
 
 	Ast ast = function->ast;
-	u32 declared_param_count = ast->function.nparams;
+	u32 declared_param_count = ast->function.params.count;
 	ASSERT(function->param_count == IMPLICIT_PARAM_COUNT + declared_param_count);
 	if (declared_param_count)
 	{
@@ -585,7 +622,7 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 	b32 result = true;
 	for (u32 i = 0; i < declared_param_count; ++i)
 	{
-		Ast param = ast->function.params[i];
+		Ast param = ast->function.params.items[i];
 		if (!param || ast_is_error(param) || param->kind != AST_FUNCTION_PARAM || !param->param.name || param->param.name->kind != AST_IDENT)
 		{
 			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "expected static function parameter");
@@ -613,6 +650,47 @@ static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function
 	return result;
 }
 
+static Com_StaticScope compiler_extract_source_statics(Compiler *compiler, Com_SourceId source)
+{
+	Com_Source *compiler_source = compiler->sources + source;
+	Ast file = compiler_source->ast;
+	ASSERT(file && file->kind == AST_FILE);
+	Ast body = file->file.body;
+	ASSERT(body && body->kind == AST_BLOCK_STAT);
+
+	Com_StaticScope result = {};
+	if (body->block.count) {
+		result.symbols = elf_arena_push_zero(compiler->arena, sizeof(*result.symbols) * body->block.count);
+	}
+	for (u32 i = 0; i < body->block.count; ++i)
+	{
+		Ast declaration = body->block.items[i];
+		if (declaration->kind != AST_STATIC_DECL) {
+			continue;
+		}
+
+		Ast name = declaration->static_decl.name;
+		if (!name || ast_is_error(name) || name->kind != AST_IDENT)
+		{
+			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "expected static declaration name");
+			continue;
+		}
+		if (compiler_static_symbol_from_scope(&result, name->atom))
+		{
+			compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s': is already declared", atom_data(name->atom));
+			continue;
+		}
+
+		Com_StaticSymbol *symbol = result.symbols + result.symbol_count++;
+		symbol->name = name->atom;
+		symbol->site = name->site;
+		symbol->expr = declaration->static_decl.expr;
+		symbol->source = source;
+		symbol->exported = declaration->static_decl.exported;
+	}
+	return result;
+}
+
 b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 {
 	compiler->functions = 0;
@@ -623,19 +701,14 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
 	{
 		Com_Source *compiler_source = compiler->sources + source;
-		compiler_source->statics = (Com_StaticScope) {};
+		compiler_source->statics = compiler_extract_source_statics(compiler, source);
 		Ast file = compiler_source->ast;
 		ASSERT(file && file->kind == AST_FILE);
 		Ast body = file->file.body;
 		ASSERT(body && body->kind == AST_BLOCK_STAT);
-		Com_StaticScope *scope = &compiler_source->statics;
-		if (body->block.nstats) {
-			scope->symbols = elf_arena_push_zero(compiler->arena, sizeof(*scope->symbols) * body->block.nstats);
-		}
-
-		for (u32 i = 0; i < body->block.nstats; ++i)
+		for (u32 i = 0; i < body->block.count; ++i)
 		{
-			Ast declaration = body->block.stats[i];
+			Ast declaration = body->block.items[i];
 			if (declaration->kind != AST_STATIC_DECL)
 			{
 				if (unit_type == COM_UNIT_MODULE || source != 0) {
@@ -643,27 +716,11 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 				}
 				continue;
 			}
-
-			Ast name = declaration->static_decl.name;
-			if (!name || ast_is_error(name) || name->kind != AST_IDENT)
-			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, declaration->site, "expected static declaration name");
-				continue;
-			}
-			if (compiler_static_symbol_from_source(compiler, source, name->atom))
-			{
-				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s': is already declared", atom_data(name->atom));
-				continue;
-			}
-
-			Com_StaticSymbol *symbol = scope->symbols + scope->symbol_count++;
-			symbol->name = name->atom;
-			symbol->site = name->site;
-			symbol->expr = declaration->static_decl.expr;
-			symbol->source = source;
-			symbol->exported = declaration->static_decl.exported;
-			if (symbol->expr->kind == AST_FUNCTION)
-			{
+		}
+		for (u32 i = 0; i < compiler_source->statics.symbol_count; ++i)
+		{
+			Com_StaticSymbol *symbol = compiler_source->statics.symbols + i;
+			if (symbol->expr->kind == AST_FUNCTION) {
 				planned_function_count += 1;
 			}
 		}

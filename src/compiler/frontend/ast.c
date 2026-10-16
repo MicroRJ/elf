@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+// AST constructors are side-effect free beyond allocating and initializing the returned tree.
+
 static const char *ast_type_name(AstType type)
 {
 	static const char *names[] =
@@ -17,21 +19,9 @@ static const char *ast_type_name(AstType type)
 	return names[type];
 }
 
-static AstContext create_ast_context(elf_Arena *arena)
-{
-	u32 stack_size = 4096;
-
-	AstContext ast = {};
-	ast.arena = arena;
-	ast.stack = elf_arena_push_zero(arena, sizeof(*ast.stack) * stack_size);
-	ast.stack_size = stack_size;
-	ast.stack_index = 0;
-	return ast;
-}
-
 static Ast create_ast(Parser *par, SourceSite site, AstType kind)
 {
-	Ast_T *tree = elf_arena_push_zero(par->ast.arena, sizeof(*tree));
+	Ast_T *tree = elf_arena_push_zero(par->arena, sizeof(*tree));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}
@@ -112,16 +102,15 @@ static Ast create_atom_ast(Parser *par, SourceSite site, Atom *atom)
 	return value;
 }
 
-static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast *parts, u32 nparts)
+static Ast create_interpolated_string_ast(Parser *par, SourceSite site, AstArray parts)
 {
-	ASSERT(nparts >= 3);
-	ASSERT((nparts & 1) != 0);
+	ASSERT(parts.count >= 3);
+	ASSERT((parts.count & 1) != 0);
 	Ast value = create_ast(par, site, AST_INTERPOLATED_STRING);
 	if (ast_is_error(value)) {
 		return value;
 	}
-	value->interpolated_string.args = parts;
-	value->interpolated_string.nargs = nparts;
+	value->interpolated_string = parts;
 	return value;
 }
 
@@ -132,33 +121,27 @@ static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
 		return value;
 	}
 	value->import.path = path;
-	value->import.source = COM_SOURCE_INVALID;
-	if (!compiler_record_import(par->compiler, par->source_id, value)) {
-		return ERROR_OOM_AST;
-	}
 	return value;
 }
 
-static Ast create_table_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
+static Ast create_table_ast(Parser *par, SourceSite site, AstArray args)
 {
 	Ast tree = create_ast(par, site, AST_TABLE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->table.args = args;
-	tree->table.nargs = nargs;
+	tree->table = args;
 	return tree;
 }
 
-static Ast create_array_ast(Parser *par, SourceSite site, Ast *items, u32 count)
+static Ast create_array_ast(Parser *par, SourceSite site, AstArray items)
 {
 	Ast tree = create_ast(par, site, AST_ARRAY);
 	if (ast_is_error(tree))
 	{
 		return tree;
 	}
-	tree->array.args = items;
-	tree->array.nargs = count;
+	tree->array = items;
 	return tree;
 }
 
@@ -179,15 +162,14 @@ static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast val
 	return tree;
 }
 
-static Ast create_tuple_ast(Parser *par, SourceSite site, Ast *args, u32 nargs)
+static Ast create_tuple_ast(Parser *par, SourceSite site, AstArray args)
 {
-	ASSERT(nargs >= 1);
+	ASSERT(args.count >= 1);
 	Ast tree = create_ast(par, site, AST_TUPLE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->tuple.args = args;
-	tree->tuple.nargs = nargs;
+	tree->tuple = args;
 	return tree;
 }
 
@@ -275,7 +257,7 @@ static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 	return tree;
 }
 
-static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u32 nargs)
+static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, AstArray args, Ast carg)
 {
 	if (ast_is_error(expr)) {
 		return expr;
@@ -286,8 +268,7 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast *args, u3
 	}
 	tree->call.expr = expr;
 	tree->call.args = args;
-	tree->call.nargs = nargs;
-	tree->call.carg = 0;
+	tree->call.carg = carg;
 	return tree;
 }
 
@@ -300,15 +281,15 @@ static Ast create_carg_call_ast(Parser *par, SourceSite site, Ast left, Ast carg
 		return carg;
 	}
 
-	if (left->kind != AST_CALL || left->call.carg)
-	{
-		left = create_call_ast(par, site, left, 0, 0);
-		if (ast_is_error(left)) {
-			return left;
-		}
+	Ast result = 0;
+	if (left->kind == AST_CALL && !left->call.carg) {
+		result = create_call_ast(par, left->site, left->call.expr, left->call.args, carg);
 	}
-	left->call.carg = carg;
-	return left;
+	else
+	{
+		result = create_call_ast(par, site, left, (AstArray) {}, carg);
+	}
+	return result;
 }
 
 static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
@@ -341,14 +322,13 @@ static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 	return tree;
 }
 
-static Ast create_block_ast(Parser *par, SourceSite site, Ast *stats, u32 nstats)
+static Ast create_block_ast(Parser *par, SourceSite site, AstArray stats)
 {
 	Ast tree = create_ast(par, site, AST_BLOCK_STAT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->block.stats = stats;
-	tree->block.nstats = nstats;
+	tree->block = stats;
 	return tree;
 }
 
@@ -455,7 +435,7 @@ static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast
 	return tree;
 }
 
-static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast expr)
+static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast expr, b32 exported)
 {
 	if (ast_is_error(name)) {
 		return name;
@@ -467,6 +447,7 @@ static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast ex
 	if (ast_is_error(tree)) {
 		return tree;
 	}
+	tree->static_decl.exported = exported;
 	tree->static_decl.name = name;
 	tree->static_decl.expr = expr;
 	return tree;
@@ -498,7 +479,7 @@ static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 	return tree;
 }
 
-static Ast create_function_ast(Parser *par, SourceSite site, Ast *params, u32 nparams, b32 variadic, Ast body)
+static Ast create_function_ast(Parser *par, SourceSite site, AstArray params, b32 variadic, Ast body)
 {
 	if (ast_is_error(body)) {
 		return body;
@@ -508,7 +489,6 @@ static Ast create_function_ast(Parser *par, SourceSite site, Ast *params, u32 np
 		return tree;
 	}
 	tree->function.params = params;
-	tree->function.nparams = nparams;
 	tree->function.variadic = variadic;
 	tree->function.body = body;
 	return tree;
@@ -644,7 +624,7 @@ static void print_ast(Printer *pr, Ast tree)
 		case AST_INTERPOLATED_STRING:
 		{
 			PRINT(pr, "f[");
-			print_ast_list(pr, tree->interpolated_string.args, tree->interpolated_string.nargs);
+			print_ast_list(pr, tree->interpolated_string.items, tree->interpolated_string.count);
 			PRINT(pr, "]");
 		}
 		break;
@@ -701,8 +681,8 @@ static void print_ast(Printer *pr, Ast tree)
 		case AST_FUNCTION:
 		{
 
-			Ast *params    = tree->function.params;
-			u32  nparams   = tree->function.nparams;
+			Ast *params    = tree->function.params.items;
+			u32  nparams   = tree->function.params.count;
 			b32  variadic  = tree->function.variadic;
 			Ast  body      = tree->function.body;
 
@@ -808,8 +788,8 @@ static void print_ast(Printer *pr, Ast tree)
 		case AST_BLOCK_STAT:
 		{
 
-			Ast *stats = tree->block.stats;
-			u32 nstats = tree->block.nstats;
+			Ast *stats = tree->block.items;
+			u32 nstats = tree->block.count;
 
 
 			PRINT(pr, "{");
@@ -857,8 +837,8 @@ static void print_ast(Printer *pr, Ast tree)
 		case AST_CALL:
 		{
 			Ast expr = tree->call.expr;
-			Ast *args = tree->call.args;
-			u32 nargs = tree->call.nargs;
+			Ast *args = tree->call.args.items;
+			u32 nargs = tree->call.args.count;
 			print_ast(pr, expr);
 			PRINT(pr, "(");
 			print_ast_list(pr, args, nargs);
@@ -867,13 +847,13 @@ static void print_ast(Printer *pr, Ast tree)
 			if (carg)
 			{
 				PRINT(pr, " -> ");
-				if (carg->function.nparams || carg->function.variadic)
+				if (carg->function.params.count || carg->function.variadic)
 				{
 					PRINT(pr, "(");
-					print_ast_list(pr, carg->function.params, carg->function.nparams);
+					print_ast_list(pr, carg->function.params.items, carg->function.params.count);
 					if (carg->function.variadic)
 					{
-						if (carg->function.nparams) {
+						if (carg->function.params.count) {
 							PRINT(pr, ", ");
 						}
 						PRINT(pr, "...");
@@ -956,8 +936,8 @@ static void print_ast(Printer *pr, Ast tree)
 		case AST_TUPLE:
 		{
 
-			Ast *args = tree->tuple.args;
-			u32 nargs = tree->tuple.nargs;
+			Ast *args = tree->tuple.items;
+			u32 nargs = tree->tuple.count;
 
 
 			PRINT(pr, "(");
@@ -968,14 +948,14 @@ static void print_ast(Printer *pr, Ast tree)
 		case AST_TABLE:
 		{
 			PRINT(pr, "{");
-			print_ast_list(pr, tree->table.args, tree->table.nargs);
+			print_ast_list(pr, tree->table.items, tree->table.count);
 			PRINT(pr, "}");
 		}
 		break;
 		case AST_ARRAY:
 		{
 			PRINT(pr, "[");
-			print_ast_list(pr, tree->array.args, tree->array.nargs);
+			print_ast_list(pr, tree->array.items, tree->array.count);
 			PRINT(pr, "]");
 		}
 		break;

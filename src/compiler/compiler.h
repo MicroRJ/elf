@@ -184,6 +184,14 @@ typedef struct
 }
 Com_StaticScope;
 
+typedef struct
+{
+	struct Atom *path;
+	SourceSite site;
+	Com_SourceId resolved_source;
+}
+Com_Import;
+
 // One source file taking part in a compilation. The compiler owns its copied
 // text, parsed AST, imports, and compile-time declarations.
 typedef struct
@@ -192,7 +200,7 @@ typedef struct
 	struct Atom *canonical_path;
 	SourceBuffer source;
 	struct Ast_T *ast;
-	struct Ast_T **imports;
+	Com_Import *imports;
 	u32 import_count;
 	u32 import_capacity;
 	Com_StaticScope statics;
@@ -253,7 +261,6 @@ Compiler *compiler_create(elf_Arena *arena);
 Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source);
 Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path);
 void compiler_set_log_messages(Compiler *compiler, b32 enabled);
-b32 compiler_record_import(Compiler *compiler, Com_SourceId source, struct Ast_T *import);
 b32 compiler_parse_sources(Compiler *compiler);
 b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type);
 Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, struct Atom *name);

@@ -102,20 +102,12 @@ static const char *ast_type_name(AstType type);
 
 typedef struct
 {
-	u32 nargs;
-	Ast *args;
+	Ast *items;
+	u32 count;
 }
 AstArray;
 
-typedef struct
-{
-	elf_Arena *arena;
-	u32        stack_size;
-	u32        stack_index;
-	Ast       *stack;
-}
-AstContext;
-
+// IMMUTABLE once constructed.
 struct Ast_T
 {
 	AstType    kind;
@@ -132,7 +124,6 @@ struct Ast_T
 		struct
 		{
 			Atom *path;
-			Com_SourceId source;
 		}
 		import;
 
@@ -144,10 +135,9 @@ struct Ast_T
 
 		struct
 		{
-			Ast *params;
-			u32 nparams;
-			b32  variadic;
-			Ast  body;
+			AstArray params;
+			b32      variadic;
+			Ast      body;
 		}
 		function;
 
@@ -185,19 +175,13 @@ struct Ast_T
 		}
 		binary;
 
-		struct
-		{
-			Ast *args;
-			u32    nargs;
-		}
-		tuple;
+		AstArray tuple;
 
 		struct
 		{
-			Ast  expr;
-			Ast *args;
-			u32    nargs;
-			Ast  carg;
+			Ast      expr;
+			AstArray args;
+			Ast      carg;
 		}
 		call;
 
@@ -208,12 +192,7 @@ struct Ast_T
 		}
 		named_argument;
 
-		struct
-		{
-			Ast *args;
-			u32    nargs;
-		}
-		table;
+		AstArray table;
 
 		AstArray array;
 
@@ -239,12 +218,7 @@ struct Ast_T
 		}
 		return_stat;
 
-		struct
-		{
-			Ast *stats;
-			u32    nstats;
-		}
-		block;
+		AstArray block;
 
 		struct
 		{

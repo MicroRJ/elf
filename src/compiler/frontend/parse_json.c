@@ -38,7 +38,7 @@ static Ast parse_json_ast_object(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_RIGHT_BRACE))
 	{
-		Ast table = create_table_ast(parser, start.site, 0, 0);
+		Ast table = create_table_ast(parser, start.site, (AstArray) {});
 		if (ast_is_error(table)) {
 			return table;
 		}
@@ -87,11 +87,11 @@ static Ast parse_json_ast_object(Parser *parser)
 		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected '}'");
 	}
 
-	Ast *args = pop_ast_array(parser, nargs);
-	if (nargs && !args) {
+	AstArray args = pop_ast_array(parser, nargs);
+	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
-	Ast table = create_table_ast(parser, start.site, args, nargs);
+	Ast table = create_table_ast(parser, start.site, args);
 	if (ast_is_error(table)) {
 		return table;
 	}
@@ -108,7 +108,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_SQUARE_RIGHT))
 	{
-		return create_array_ast(parser, start.site, 0, 0);
+		return create_array_ast(parser, start.site, (AstArray) {});
 	}
 
 	b32 done = false;
@@ -135,11 +135,11 @@ static Ast parse_json_ast_array(Parser *parser)
 		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected ']'");
 	}
 
-	Ast *args = pop_ast_array(parser, nargs);
-	if (nargs && !args) {
+	AstArray args = pop_ast_array(parser, nargs);
+	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
-	return create_array_ast(parser, start.site, args, nargs);
+	return create_array_ast(parser, start.site, args);
 }
 
 static Ast parse_json_ast_number(Parser *parser)
@@ -282,10 +282,10 @@ static Ast parse_jsonl_ast(Parser *parser)
 		count += 1;
 	}
 
-	Ast *values = pop_ast_array(parser, count);
-	if (count && !values)
+	AstArray values = pop_ast_array(parser, count);
+	if (values.count && !values.items)
 	{
 		return ERROR_OOM_AST;
 	}
-	return create_array_ast(parser, site, values, count);
+	return create_array_ast(parser, site, values);
 }

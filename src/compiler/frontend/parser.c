@@ -207,8 +207,9 @@ static Parser *parser_create(Compiler *compiler, Com_SourceId source_id)
 	parser->source_id = source_id;
 	parser->atoms = compiler->atoms;
 	parser->arena = arena;
-	parser->ast = create_ast_context(arena);
-	if (!parser->ast.stack) {
+	parser->ast_stack_size = 4096;
+	parser->ast_stack = elf_arena_push_zero(arena, sizeof(*parser->ast_stack) * parser->ast_stack_size);
+	if (!parser->ast_stack) {
 		return 0;
 	}
 
@@ -265,29 +266,30 @@ static inline b32 peek_next_token(Parser *parser, Token_Type type)
 
 static b32 push_ast(Parser *par, Ast tree)
 {
-	if (par->ast.stack_index == par->ast.stack_size)
+	if (par->ast_stack_index == par->ast_stack_size)
 	{
-		u32 stack_size = par->ast.stack_size ? par->ast.stack_size * 2 : 256;
-		Ast *stack = elf_arena_push(par->ast.arena, sizeof(*stack) * stack_size);
+		u32 stack_size = par->ast_stack_size ? par->ast_stack_size * 2 : 256;
+		Ast *stack = elf_arena_push(par->arena, sizeof(*stack) * stack_size);
 		if (!stack) {
 			return false;
 		}
-		if (par->ast.stack_index) {
-			copy_memory(stack, par->ast.stack, sizeof(*stack) * par->ast.stack_index);
+		if (par->ast_stack_index) {
+			copy_memory(stack, par->ast_stack, sizeof(*stack) * par->ast_stack_index);
 		}
-		par->ast.stack = stack;
-		par->ast.stack_size = stack_size;
+		par->ast_stack = stack;
+		par->ast_stack_size = stack_size;
 	}
-	par->ast.stack[par->ast.stack_index++] = tree;
+	par->ast_stack[par->ast_stack_index++] = tree;
 	return true;
 }
 
-static Ast *pop_ast_array(Parser *par, u32 nargs)
+static AstArray pop_ast_array(Parser *par, u32 count)
 {
-	ASSERT(par->ast.stack_index >= nargs);
-	par->ast.stack_index -= nargs;
-	Ast *copy = elf_arena_push_copy(par->ast.arena, sizeof(*copy) * nargs, par->ast.stack + par->ast.stack_index);
-	return copy;
+	ASSERT(par->ast_stack_index >= count);
+	par->ast_stack_index -= count;
+	AstArray result = {.count = count};
+	result.items = elf_arena_push_copy(par->arena, sizeof(*result.items) * count, par->ast_stack + par->ast_stack_index);
+	return result;
 }
 
 static Ast elf_parse_file(Parser *parser)
@@ -322,11 +324,11 @@ static Ast elf_parse_file(Parser *parser)
 		++ nstats;
 	}
 
-	Ast *stats = pop_ast_array(parser, nstats);
-	if (nstats && !stats) {
+	AstArray stats = pop_ast_array(parser, nstats);
+	if (stats.count && !stats.items) {
 		return ERROR_OOM_AST;
 	}
-	Ast body = create_block_ast(parser, tok.site, stats, nstats);
+	Ast body = create_block_ast(parser, tok.site, stats);
 
 	Ast file_ast = create_file_ast(parser, tok.site, body);
 	return file_ast;
@@ -339,7 +341,7 @@ static Ast parse_function(Parser *par, Token marker)
 {
 	ASSERT(marker.type == TOK_FUN || marker.type == TOK_ARROW);
 
-	u32 stack_start = par->ast.stack_index;
+	u32 stack_start = par->ast_stack_index;
 	u32 param_count = 0;
 	AstArray params = {};
 	b32 variadic = false;
@@ -389,16 +391,15 @@ static Ast parse_function(Parser *par, Token marker)
 		}
 		if (!error && param_count)
 		{
-			params.args = pop_ast_array(par, param_count);
-			params.nargs = param_count;
-			if (!params.args) {
+			params = pop_ast_array(par, param_count);
+			if (!params.items) {
 				error = ERROR_OOM_AST;
 			}
 		}
 	}
 	if (error)
 	{
-		par->ast.stack_index = stack_start;
+		par->ast_stack_index = stack_start;
 		return error;
 	}
 
@@ -411,7 +412,7 @@ static Ast parse_function(Parser *par, Token marker)
 		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, par->tok.site, "expected function body");
 	}
 
-	Ast function = create_function_ast(par, marker.site, params.args, params.nargs, variadic, body);
+	Ast function = create_function_ast(par, marker.site, params, variadic, body);
 	return function;
 }
 
@@ -459,11 +460,11 @@ static Ast parse_tuple_expr(Parser *par)
 	Ast tuple = 0;
 	if (nargs)
 	{
-		Ast *args = pop_ast_array(par, nargs);
-		if (!args) {
+		AstArray args = pop_ast_array(par, nargs);
+		if (!args.items) {
 			return ERROR_OOM_AST;
 		}
-		tuple = create_tuple_ast(par, tok.site, args, nargs);
+		tuple = create_tuple_ast(par, tok.site, args);
 	}
 	return tuple;
 }
@@ -479,35 +480,35 @@ static Ast parse_optional_tuple_expr(Parser *par)
 static Ast parse_for_identifier_tuple(Parser *parser)
 {
 	Token start = parser->tok;
-	u32 stack_start = parser->ast.stack_index;
+	u32 stack_start = parser->ast_stack_index;
 	u32 nargs = 0;
 
 	do
 	{
 		Token token = take_token(parser, TOK_IDENTIFIER);
 		if (token_is_error(token)) {
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return ast_from_token_error(token);
 		}
 
 		Ast name = create_ident_ast(parser, token.site, token.atom);
 		if (ast_is_error(name)) {
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return name;
 		}
 		if (!push_ast(parser, name)) {
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return ERROR_OOM_AST;
 		}
 		++ nargs;
 	}
 	while (pick_token(parser, TOK_COMMA));
 
-	Ast *names = pop_ast_array(parser, nargs);
-	if (!names) {
+	AstArray names = pop_ast_array(parser, nargs);
+	if (!names.items) {
 		return ERROR_OOM_AST;
 	}
-	return create_tuple_ast(parser, start.site, names, nargs);
+	return create_tuple_ast(parser, start.site, names);
 }
 
 static Ast parse_get_mem_expr(Parser *parser)
@@ -580,7 +581,7 @@ static Ast parse_interpolated_string(Parser *parser)
 	if (token_is_error(start)) {
 		return ast_from_token_error(start);
 	}
-	u32 stack_start = parser->ast.stack_index;
+	u32 stack_start = parser->ast_stack_index;
 	u32 nparts = 0;
 
 	Ast first_part = create_atom_ast(parser, start.site, start.atom);
@@ -597,16 +598,16 @@ static Ast parse_interpolated_string(Parser *parser)
 		Ast expr = parse_expr(parser);
 		if (ast_is_error(expr))
 		{
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return expr;
 		}
 		if (!expr)
 		{
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected expression inside interpolated string");
 		}
 		if (!push_ast(parser, expr)) {
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return ERROR_OOM_AST;
 		}
 		nparts += 1;
@@ -614,7 +615,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		Token part = parser->tok;
 		if (part.type != TOK_STRING_PART && part.type != TOK_STRING_END)
 		{
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			if (token_is_error(part)) {
 				return ast_from_token_error(part);
 			}
@@ -624,11 +625,11 @@ static Ast parse_interpolated_string(Parser *parser)
 		consume_token(parser);
 		Ast text = create_atom_ast(parser, part.site, part.atom);
 		if (ast_is_error(text)) {
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return text;
 		}
 		if (!push_ast(parser, text)) {
-			parser->ast.stack_index = stack_start;
+			parser->ast_stack_index = stack_start;
 			return ERROR_OOM_AST;
 		}
 		nparts += 1;
@@ -638,11 +639,11 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 	}
 
-	Ast *parts = pop_ast_array(parser, nparts);
-	if (!parts) {
+	AstArray parts = pop_ast_array(parser, nparts);
+	if (!parts.items) {
 		return ERROR_OOM_AST;
 	}
-	return create_interpolated_string_ast(parser, start.site, parts, nparts);
+	return create_interpolated_string_ast(parser, start.site, parts);
 }
 
 static Ast parse_unary_expr(Parser *parser)
@@ -935,11 +936,11 @@ static Ast parse_table_expr(Parser *parser)
 		return ast_from_token_error(closing);
 	}
 
-	Ast *args = pop_ast_array(parser, nargs);
-	if (nargs && !args) {
+	AstArray args = pop_ast_array(parser, nargs);
+	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
-	Ast table = create_table_ast(parser, table_token.site, args, nargs);
+	Ast table = create_table_ast(parser, table_token.site, args);
 	return table;
 }
 
@@ -977,17 +978,17 @@ static Ast parse_array_expr(Parser *parser)
 		return ast_from_token_error(closing);
 	}
 
-	Ast *items = pop_ast_array(parser, count);
-	if (count && !items)
+	AstArray items = pop_ast_array(parser, count);
+	if (items.count && !items.items)
 	{
 		return ERROR_OOM_AST;
 	}
-	return create_array_ast(parser, array_token.site, items, count);
+	return create_array_ast(parser, array_token.site, items);
 }
 
 static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 {
-	u32 stack_start = par->ast.stack_index;
+	u32 stack_start = par->ast_stack_index;
 	u32 nargs = 0;
 
 	if (peek_token(par, TOK_LEFT_BRACE))
@@ -1019,27 +1020,27 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 			{
 				if (peek_token(par, TOK_PAREN_RIGHT))
 				{
-					par->ast.stack_index = stack_start;
+					par->ast_stack_index = stack_start;
 					return parser_error(par, ERROR_EXCESS_COMMA, par->tok_prev.site, "excess comma");
 				}
 				if (peek_token(par, TOK_COMMA))
 				{
-					par->ast.stack_index = stack_start;
+					par->ast_stack_index = stack_start;
 					return parser_error(par, ERROR_EXCESS_COMMA, par->tok.site, "excess comma");
 				}
 
 				Ast x = parse_call_argument(par);
 				if (ast_is_error(x)) {
-					par->ast.stack_index = stack_start;
+					par->ast_stack_index = stack_start;
 					return x;
 				}
 				if (!x) {
-					par->ast.stack_index = stack_start;
+					par->ast_stack_index = stack_start;
 					return parser_error(par, ERROR_INVALID_EXPRESSION, par->tok.site, "expected call argument");
 				}
 
 				if (!push_ast(par, x)) {
-					par->ast.stack_index = stack_start;
+					par->ast_stack_index = stack_start;
 					return ERROR_OOM_AST;
 				}
 				++ nargs;
@@ -1049,16 +1050,16 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 
 		Token closing = take_token(par, TOK_PAREN_RIGHT);
 		if (token_is_error(closing)) {
-			par->ast.stack_index = stack_start;
+			par->ast_stack_index = stack_start;
 			return ast_from_token_error(closing);
 		}
 	}
 
-	Ast *args = pop_ast_array(par, nargs);
-	if (nargs && !args) {
+	AstArray args = pop_ast_array(par, nargs);
+	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
-	return create_call_ast(par, site, callee, args, nargs);
+	return create_call_ast(par, site, callee, args, 0);
 }
 
 static Ast parse_call_argument(Parser *parser)
@@ -1116,11 +1117,11 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 		}
 		while (pick_token(par, TOK_COMMA));
 
-		Ast *args = pop_ast_array(par, nargs);
-		if (!args) {
+		AstArray args = pop_ast_array(par, nargs);
+		if (!args.items) {
 			return ERROR_OOM_AST;
 		}
-		left = create_tuple_ast(par, tok.site, args, nargs);
+		left = create_tuple_ast(par, tok.site, args);
 		if (ast_is_error(left)) {
 			return left;
 		}
@@ -1328,7 +1329,7 @@ static Ast parse_expr(Parser *parser)
 	return parse_subexpr(parser, 0);
 }
 
-static Ast parse_expr_stat(Parser *parser)
+static Ast parse_expr_stat(Parser *parser, b32 exported)
 {
 	Ast x = parse_tuple_expr(parser);
 	if (ast_is_error(x)) {
@@ -1360,7 +1361,7 @@ static Ast parse_expr_stat(Parser *parser)
 		{
 			consume_token(parser);
 
-			if (x->tuple.nargs != 1 || x->tuple.args[0]->kind != AST_IDENT)
+			if (x->tuple.count != 1 || x->tuple.items[0]->kind != AST_IDENT)
 			{
 				return parser_error(parser, ERROR_INVALID_STATEMENT, x->site, "static declaration name must be an identifier");
 			}
@@ -1372,7 +1373,7 @@ static Ast parse_expr_stat(Parser *parser)
 			if (!y) {
 				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected static declaration expression");
 			}
-			x = create_static_decl_ast(parser, tok.site, x->tuple.args[0], y);
+			x = create_static_decl_ast(parser, tok.site, x->tuple.items[0], y, exported);
 		}
 		break;
 		case TOK_BIND:
@@ -1466,14 +1467,13 @@ static Ast parse_stat(Parser *parser)
 		case TOK_EXPORT:
 		{
 			consume_token(parser);
-			tree = parse_expr_stat(parser);
+			tree = parse_expr_stat(parser, true);
 			if (ast_is_error(tree)) {
 				return tree;
 			}
 			if (!tree || tree->kind != AST_STATIC_DECL) {
 				return parser_error(parser, ERROR_INVALID_STATEMENT, tok.site, "'export' must be followed by a static declaration");
 			}
-			tree->static_decl.exported = true;
 		}
 		break;
 
@@ -1553,11 +1553,11 @@ static Ast parse_stat(Parser *parser)
 				return ast_from_token_error(closing);
 			}
 
-			Ast *stats = pop_ast_array(parser, nstats);
-			if (nstats && !stats) {
+			AstArray stats = pop_ast_array(parser, nstats);
+			if (stats.count && !stats.items) {
 				return ERROR_OOM_AST;
 			}
-			tree = create_block_ast(parser, tok.site, stats, nstats);
+			tree = create_block_ast(parser, tok.site, stats);
 		}
 		break;
 
@@ -1625,12 +1625,12 @@ static Ast parse_stat(Parser *parser)
 
 			if (pick_token(parser, TOK_QMARK))
 			{
-				if (init_expr->tuple.nargs != 1)
+				if (init_expr->tuple.count != 1)
 				{
 					return parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site, "range for loops require exactly one expression on the right-hand side");
 				}
 
-				Ast range = init_expr->tuple.args[0];
+				Ast range = init_expr->tuple.items[0];
 				if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 				{
 					return parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site, "range for loops require a range or ranged index expression");
@@ -1665,7 +1665,7 @@ static Ast parse_stat(Parser *parser)
 					return ast_from_token_error(second_separator);
 				}
 
-				Ast step = parse_expr_stat(parser);
+				Ast step = parse_expr_stat(parser, false);
 				if (ast_is_error(step)) {
 					return step;
 				}
@@ -1699,7 +1699,7 @@ static Ast parse_stat(Parser *parser)
 
 		default:
 		{
-			tree = parse_expr_stat(parser);
+			tree = parse_expr_stat(parser, false);
 		}
 		break;
 	}

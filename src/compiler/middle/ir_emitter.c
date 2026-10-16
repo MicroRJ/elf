@@ -494,7 +494,7 @@ static u32 function_index_from_ptr(IrFunctionEmitter *ctx, IrFunction *function)
 
 static Ir create_ast_function_value_ir(IrFunctionEmitter *ctx, Ast expr)
 {
-	u32 param_count = IMPLICIT_PARAM_COUNT + expr->function.nparams;
+	u32 param_count = IMPLICIT_PARAM_COUNT + expr->function.params.count;
 	IrFunction *function = add_function_ir(ctx, expr->site, expr->function.variadic != 0, param_count, 0);
 	u32 function_index = function_index_from_ptr(ctx, function);
 	return create_function_ir(ctx, expr->site, function_index);
@@ -516,8 +516,8 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 	ASSERT(ir && ir->kind == IR_FUNCTION);
 	ASSERT(ir->ir_function.index < ctx->module->module.function_count);
 	IrFunction *function = ctx->module->module.functions + ir->ir_function.index;
-	Ast *params = expr->function.params;
-	u32 nparams = expr->function.nparams;
+	Ast *params = expr->function.params.items;
+	u32 nparams = expr->function.params.count;
 
 	EntityScope function_scope = get_entity_scope(ctx);
 	LwScopeFunction function_ctx = {};
@@ -685,7 +685,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 	IrFunction *ir_function = ctx->module->module.functions + callee->ir_function.index;
 	ASSERT(function->param_count >= IMPLICIT_PARAM_COUNT);
 	u32 declared_param_count = function->param_count - IMPLICIT_PARAM_COUNT;
-	u32 argument_count = call->call.nargs;
+	u32 argument_count = call->call.args.count;
 	b32 has_carg = call->call.carg != 0;
 	if (has_carg && ir_function->variadic)
 	{
@@ -712,9 +712,9 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 
 	u32 argument_index = 0;
 	u32 parameter_index = 0;
-	while (argument_index < argument_count && call->call.args[argument_index]->kind != AST_NAMED_ARGUMENT)
+	while (argument_index < argument_count && call->call.args.items[argument_index]->kind != AST_NAMED_ARGUMENT)
 	{
-		Ast argument = call->call.args[argument_index];
+		Ast argument = call->call.args.items[argument_index];
 		if (parameter_index >= bind_param_count && !ir_function->variadic)
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "too many arguments for static function");
@@ -735,7 +735,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 	while (parameter_index < bind_param_count)
 	{
 		Com_FunctionParameter *parameter = function->params + parameter_index;
-		Ast argument = argument_index < argument_count ? call->call.args[argument_index] : 0;
+		Ast argument = argument_index < argument_count ? call->call.args.items[argument_index] : 0;
 		if (argument && argument->kind != AST_NAMED_ARGUMENT)
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "positional arguments cannot follow named arguments");
@@ -771,7 +771,7 @@ static IrArray lower_direct_call_arguments(IrFunctionEmitter *ctx, Ast call, Ir 
 
 	if (argument_index < argument_count)
 	{
-		Ast argument = call->call.args[argument_index];
+		Ast argument = call->call.args.items[argument_index];
 		if (reserve_final_parameter && argument->kind == AST_NAMED_ARGUMENT && argument->named_argument.name->atom == function->params[declared_param_count - 1].name) {
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "final parameter '%s' is already supplied by the trailing closure", atom_data(argument->named_argument.name->atom));
 		}
@@ -825,8 +825,8 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 
 		case AST_INTERPOLATED_STRING:
 		{
-			Ast *parts = expr->interpolated_string.args;
-			u32 nparts = expr->interpolated_string.nargs;
+			Ast *parts = expr->interpolated_string.items;
+			u32 nparts = expr->interpolated_string.count;
 			if (nparts < 3 || (nparts & 1) == 0)
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, expr->site,
@@ -950,7 +950,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 
 		case AST_CALL:
 		{
-			u32 nargs = expr->call.nargs;
+			u32 nargs = expr->call.args.count;
 
 			Ir ir_func = lower_ast_expr_to_ir(ctx, expr->call.expr);
 			IrCallType call_type = call_type_from_callee(ctx, ir_func);
@@ -972,7 +972,7 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 				}
 				for (u32 i = 0; i < nargs; ++i)
 				{
-					Ast argument = expr->call.args[i];
+					Ast argument = expr->call.args.items[i];
 					if (argument->kind == AST_NAMED_ARGUMENT)
 					{
 						report_lowering_error(ctx, LOWERING_ERROR_GENERIC, argument->site, "named arguments require a statically known function");
@@ -1015,8 +1015,8 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 
 		case AST_TABLE:
 		{
-			Ast *args = expr->table.args;
-			u32 nargs = expr->table.nargs;
+			Ast *args = expr->table.items;
+			u32 nargs = expr->table.count;
 
 			IrFrame table_items = begin_ir_frame(ctx);
 			Ir table_local = create_local_ir(ctx, expr->site, create_table_ir(ctx, expr->site));
@@ -1059,11 +1059,11 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 			Ir array_local = create_local_ir(ctx, expr->site, create_array_ir(ctx, expr->site));
 			push_ir(&array_items, array_local);
 
-			for (u32 i = 0; i < expr->array.nargs; ++i)
+			for (u32 i = 0; i < expr->array.count; ++i)
 			{
 				Ir array = create_load_local_ir(ctx, expr->site, array_local);
-				Ir value = lower_ast_expr_to_ir(ctx, expr->array.args[i]);
-				push_ir(&array_items, create_array_add_ir(ctx, expr->array.args[i]->site, array, value));
+				Ir value = lower_ast_expr_to_ir(ctx, expr->array.items[i]);
+				push_ir(&array_items, create_array_add_ir(ctx, expr->array.items[i]->site, array, value));
 			}
 
 			Ir value = create_load_local_ir(ctx, expr->site, array_local);
@@ -1143,9 +1143,9 @@ static Ir lower_ast_block(IrFunctionEmitter *ctx, Ast stat, b32 is_file_body)
 	{
 		EntityScope scope = get_entity_scope(ctx);
 		DeferScope defer_scope = get_defer_scope(ctx);
-		for (u32 i = 0; i < stat->block.nstats; ++ i)
+		for (u32 i = 0; i < stat->block.count; ++ i)
 		{
-			Ast item = stat->block.stats[i];
+			Ast item = stat->block.items[i];
 			if (!is_file_body || item->kind != AST_STATIC_DECL) {
 				lower_ast_stat_to_ir(&block_items, item);
 			}
@@ -1235,11 +1235,11 @@ static Ir lower_ast_lvalue_to_ir_once(IrFunctionEmitter *ctx, IrFrame *items, As
 
 static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
-	u32 nvars = name_tuple->tuple.nargs;
+	u32 nvars = name_tuple->tuple.count;
 
-	for (u32 i = 0; i < expr_tuple->tuple.nargs; ++ i)
+	for (u32 i = 0; i < expr_tuple->tuple.count; ++ i)
 	{
-		Ast expr = expr_tuple->tuple.args[i];
+		Ast expr = expr_tuple->tuple.items[i];
 		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
 		{
 			const char *message = "range expressions cannot be used as declaration values; use a range for loop";
@@ -1253,13 +1253,13 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 		}
 	}
 
-	if (nvars > 1 && expr_tuple->tuple.nargs == 1 && ast_is_call(expr_tuple->tuple.args[0]))
+	if (nvars > 1 && expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 	{
-		Ir expr = lower_ast_expr_to_ir(ctx, expr_tuple->tuple.args[0]);
+		Ir expr = lower_ast_expr_to_ir(ctx, expr_tuple->tuple.items[0]);
 		Ir *locals = elf_arena_push(ctx->module->arena, sizeof(*locals) * nvars);
 		for (u32 i = 0; i < nvars; ++i)
 		{
-			Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
+			Ast name = check_ast_type(name_tuple->tuple.items[i], AST_IDENT);
 			if (ast_is_error(name))
 			{
 				report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
@@ -1277,7 +1277,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
+		Ast name = check_ast_type(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
@@ -1286,9 +1286,9 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 		}
 
 		Ir value = 0;
-		if (i < expr_tuple->tuple.nargs)
+		if (i < expr_tuple->tuple.count)
 		{
-			Ast expr = expr_tuple->tuple.args[i];
+			Ast expr = expr_tuple->tuple.items[i];
 			value = lower_ast_expr_to_ir(ctx, expr);
 		}
 		else
@@ -1325,8 +1325,8 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 
 	EntityScope scope = get_entity_scope(ctx);
 
-	u32 nvars = name_tuple->tuple.nargs;
-	Ast first_name = check_ast_type(name_tuple->tuple.args[0], AST_IDENT);
+	u32 nvars = name_tuple->tuple.count;
+	Ast first_name = check_ast_type(name_tuple->tuple.items[0], AST_IDENT);
 	if (ast_is_error(first_name))
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
@@ -1371,7 +1371,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 	Ir *var_locals = elf_arena_push(ctx->module->arena, sizeof(*var_locals) * nvars);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		Ast name = check_ast_type(name_tuple->tuple.args[i], AST_IDENT);
+		Ast name = check_ast_type(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
 			report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
@@ -1408,7 +1408,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 	push_ir(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		Ast name = name_tuple->tuple.args[i];
+		Ast name = name_tuple->tuple.items[i];
 		Ir iterator_load = create_load_local_ir(ctx, name->site, iterator_local);
 		Ir value = iterator_load;
 		if (i != 0)
@@ -1477,13 +1477,13 @@ static Ir lower_ast_for_range_to_ir(IrFunctionEmitter *ctx, Ast stat)
 		return ERROR_IR;
 	}
 
-	if (name_tuple->tuple.nargs == 0 || expr_tuple->tuple.nargs != 1)
+	if (name_tuple->tuple.count == 0 || expr_tuple->tuple.count != 1)
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
 		return ERROR_IR;
 	}
 
-	Ast range = expr_tuple->tuple.args[0];
+	Ast range = expr_tuple->tuple.items[0];
 	if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
@@ -1550,7 +1550,7 @@ static Ir lower_compound_assign_to_ir(IrFunctionEmitter *ctx, IrFrame *items, As
 		return ERROR_IR;
 	}
 
-	if (dest_tuple->tuple.nargs != 1 || expr_tuple->tuple.nargs != 1)
+	if (dest_tuple->tuple.count != 1 || expr_tuple->tuple.count != 1)
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, stat->site, "compound assignment requires one destination and one value");
 		return ERROR_IR;
@@ -1559,8 +1559,8 @@ static Ir lower_compound_assign_to_ir(IrFunctionEmitter *ctx, IrFrame *items, As
 	IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
 	ASSERT(op != IR_NONE);
 
-	Ast dest_ast = dest_tuple->tuple.args[0];
-	Ast expr_ast = expr_tuple->tuple.args[0];
+	Ast dest_ast = dest_tuple->tuple.items[0];
+	Ast expr_ast = expr_tuple->tuple.items[0];
 	if (!mark_entity_assigned(ctx, dest_ast)) return ERROR_IR;
 
 	Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
@@ -1685,15 +1685,15 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 				break;
 			}
 
-			u32 nargs = dest_tuple->tuple.nargs;
+			u32 nargs = dest_tuple->tuple.count;
 			if (nargs == 1)
 			{
-				Ast dest_ast = dest_tuple->tuple.args[0];
+				Ast dest_ast = dest_tuple->tuple.items[0];
 				if (!mark_entity_assigned(ctx, dest_ast)) {
 					push_ir(items, ERROR_IR);
 					break;
 				}
-				Ast expr_ast = expr_tuple->tuple.nargs ? expr_tuple->tuple.args[0] : 0;
+				Ast expr_ast = expr_tuple->tuple.count ? expr_tuple->tuple.items[0] : 0;
 
 				Ir dest_ir = lower_ast_expr_to_ir(ctx, dest_ast);
 				Ir expr_ir = expr_ast ? lower_ast_expr_to_ir(ctx, expr_ast) : create_nil_ir(ctx, dest_ast->site);
@@ -1704,9 +1704,9 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 
 			// TODO(RJ): we don't need multi-local! could be done with the same mechanism!
 			Ir *values = elf_arena_push(ctx->module->arena, sizeof(*values) * nargs);
-			if (expr_tuple->tuple.nargs == 1 && ast_is_call(expr_tuple->tuple.args[0]))
+			if (expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 			{
-				Ast expr_ast = expr_tuple->tuple.args[0];
+				Ast expr_ast = expr_tuple->tuple.items[0];
 				Ir expr_ir = lower_ast_expr_to_ir(ctx, expr_ast);
 				for (u32 i = 0; i < nargs; ++i) {
 					values[i] = create_local_ir(ctx, expr_ast->site, 0);
@@ -1719,8 +1719,8 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 				{
 					SourceSite site = stat->site;
 					Ir expr_ir;
-					if (i < expr_tuple->tuple.nargs) {
-						Ast expr_ast = expr_tuple->tuple.args[i];
+					if (i < expr_tuple->tuple.count) {
+						Ast expr_ast = expr_tuple->tuple.items[i];
 						site = expr_ast->site;
 						expr_ir = lower_ast_expr_to_ir(ctx, expr_ast);
 					}
@@ -1735,7 +1735,7 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
-				Ast dest_ast = dest_tuple->tuple.args[i];
+				Ast dest_ast = dest_tuple->tuple.items[i];
 				if (!mark_entity_assigned(ctx, dest_ast)) {
 					push_ir(items, ERROR_IR);
 					continue;
@@ -1773,14 +1773,14 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 				break;
 			}
 
-			for (u32 i = 0; i < dest_tuple->tuple.nargs; ++ i)
+			for (u32 i = 0; i < dest_tuple->tuple.count; ++ i)
 			{
-				if (i >= expr_tuple->tuple.nargs) {
+				if (i >= expr_tuple->tuple.count) {
 					ASSERT(!"Error");
 				}
 
-				Ast dest_ast = dest_tuple->tuple.args[i];
-				Ast expr_ast = expr_tuple->tuple.args[i];
+				Ast dest_ast = dest_tuple->tuple.items[i];
+				Ast expr_ast = expr_tuple->tuple.items[i];
 				if (!mark_entity_assigned(ctx, dest_ast)) {
 					push_ir(items, ERROR_IR);
 					continue;
@@ -1808,8 +1808,8 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 			Ir expr_ir = 0;
 			if (expr)
 			{
-				if (expr->kind == AST_TUPLE && expr->tuple.nargs == 1) {
-					expr = expr->tuple.args[0];
+				if (expr->kind == AST_TUPLE && expr->tuple.count == 1) {
+					expr = expr->tuple.items[0];
 				}
 				expr_ir = lower_ast_expr_to_ir(ctx, expr);
 			}
@@ -1851,8 +1851,8 @@ static void lower_ast_stat_to_ir(IrFrame *items, Ast stat)
 
 		case AST_TUPLE:
 		{
-			Ast *args = stat->tuple.args;
-			u32 nargs = stat->tuple.nargs;
+			Ast *args = stat->tuple.items;
+			u32 nargs = stat->tuple.count;
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{

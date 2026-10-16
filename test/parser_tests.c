@@ -28,11 +28,11 @@ static Ast parser_test_stat(Ast file, u32 index, AstType kind, const char *label
 	if (!body) {
 		return 0;
 	}
-	if (index >= body->block.nstats) {
+	if (index >= body->block.count) {
 		test_fail(label);
 		return 0;
 	}
-	Ast stat = body->block.stats[index];
+	Ast stat = body->block.items[index];
 	if (!stat || stat->kind != kind) {
 		test_fail(label);
 		return 0;
@@ -42,11 +42,11 @@ static Ast parser_test_stat(Ast file, u32 index, AstType kind, const char *label
 
 static Ast parser_test_tuple_item(Ast tuple, u32 index, AstType kind, const char *label)
 {
-	if (!tuple || tuple->kind != AST_TUPLE || index >= tuple->tuple.nargs) {
+	if (!tuple || tuple->kind != AST_TUPLE || index >= tuple->tuple.count) {
 		test_fail(label);
 		return 0;
 	}
-	Ast item = tuple->tuple.args[index];
+	Ast item = tuple->tuple.items[index];
 	if (!item || item->kind != kind) {
 		test_fail(label);
 		return 0;
@@ -153,9 +153,6 @@ static void test_parser_import_expression(elf_State *state)
 	if (!import || !import->import.path || strcmp(atom_data(import->import.path), "math.elf") != 0) {
 		test_fail("import expression stores path atom");
 	}
-	if (import && import->import.source != COM_SOURCE_INVALID) {
-		test_fail("unresolved import starts with invalid source id");
-	}
 }
 
 static void test_parser_module_discovery(elf_State *state)
@@ -189,17 +186,17 @@ static void test_parser_module_discovery(elf_State *state)
 	Com_Source *root = compiler->sources + 0;
 	Com_Source *a = compiler->sources + 1;
 	Com_Source *b = compiler->sources + 2;
-	if (root->import_count != 2 || root->imports[0]->import.source != 1 || root->imports[1]->import.source != 1) {
+	if (root->import_count != 2 || root->imports[0].resolved_source != 1 || root->imports[1].resolved_source != 1) {
 		test_fail("root imports resolve to deduplicated source id");
 	}
-	if (a->import_count != 1 || a->imports[0]->import.source != 2) {
+	if (a->import_count != 1 || a->imports[0].resolved_source != 2) {
 		test_fail("imported module resolves transitive import");
 	}
-	if (b->import_count != 1 || b->imports[0]->import.source != 0) {
+	if (b->import_count != 1 || b->imports[0].resolved_source != 0) {
 		test_fail("module discovery resolves import cycle to existing root");
 	}
-	if (a->imports[0]->site.source != 1 || b->imports[0]->site.source != 2) {
-		test_fail("imported AST source sites retain source ids");
+	if (a->imports[0].site.source != 1 || b->imports[0].site.source != 2) {
+		test_fail("import records retain source ids");
 	}
 	elf_arena_destroy(&arena);
 }
@@ -242,36 +239,36 @@ static void test_parser_interpolated_strings(elf_State *state)
 	}
 
 	AstArray parts = string->interpolated_string;
-	if (parts.nargs != 5) {
+	if (parts.count != 5) {
 		test_fail("interpolated string keeps alternating text and expression parts");
 		return;
 	}
-	expect_ast_kind(parts.args[0], AST_STRING_LITERAL, "interpolated string starts with text");
-	expect_ast_atom(parts.args[0], "hello ", "interpolated string leading text");
-	expect_ast_kind(parts.args[1], AST_IDENT, "interpolated string keeps first expression");
-	expect_ast_atom(parts.args[1], "name", "interpolated string first expression identifier");
-	expect_ast_kind(parts.args[2], AST_STRING_LITERAL, "interpolated string keeps middle text");
-	expect_ast_atom(parts.args[2], ", count ", "interpolated string middle text payload");
-	expect_ast_kind(parts.args[3], AST_ADD, "interpolated string parses full binary expression");
-	expect_ast_kind(parts.args[3]->binary.x, AST_IDENT, "interpolated binary expression lhs");
-	expect_ast_i64(parts.args[3]->binary.y, 1, "interpolated binary expression rhs");
-	expect_ast_kind(parts.args[4], AST_STRING_LITERAL, "interpolated string ends with text");
-	expect_ast_atom(parts.args[4], "", "interpolated string keeps empty trailing text");
+	expect_ast_kind(parts.items[0], AST_STRING_LITERAL, "interpolated string starts with text");
+	expect_ast_atom(parts.items[0], "hello ", "interpolated string leading text");
+	expect_ast_kind(parts.items[1], AST_IDENT, "interpolated string keeps first expression");
+	expect_ast_atom(parts.items[1], "name", "interpolated string first expression identifier");
+	expect_ast_kind(parts.items[2], AST_STRING_LITERAL, "interpolated string keeps middle text");
+	expect_ast_atom(parts.items[2], ", count ", "interpolated string middle text payload");
+	expect_ast_kind(parts.items[3], AST_ADD, "interpolated string parses full binary expression");
+	expect_ast_kind(parts.items[3]->binary.x, AST_IDENT, "interpolated binary expression lhs");
+	expect_ast_i64(parts.items[3]->binary.y, 1, "interpolated binary expression rhs");
+	expect_ast_kind(parts.items[4], AST_STRING_LITERAL, "interpolated string ends with text");
+	expect_ast_atom(parts.items[4], "", "interpolated string keeps empty trailing text");
 
 	file = parser_test_parse_file(state, "ret f\"outer ${f\"inner ${value}\"}\"");
 	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse nested interpolated string return");
 	Ast outer = parser_test_tuple_item(ret->return_stat.expr, 0, AST_INTERPOLATED_STRING,
 		"parse outer interpolated string");
-	if (!outer || outer->interpolated_string.nargs != 3) {
+	if (!outer || outer->interpolated_string.count != 3) {
 		test_fail("outer interpolated string keeps nested expression");
 		return;
 	}
-	Ast inner = outer->interpolated_string.args[1];
+	Ast inner = outer->interpolated_string.items[1];
 	expect_ast_kind(inner, AST_INTERPOLATED_STRING, "interpolated expression can contain interpolated string");
-	if (inner && inner->interpolated_string.nargs == 3) {
-		expect_ast_atom(inner->interpolated_string.args[0], "inner ", "nested interpolated leading text");
-		expect_ast_atom(inner->interpolated_string.args[1], "value", "nested interpolated expression");
-		expect_ast_atom(inner->interpolated_string.args[2], "", "nested interpolated trailing text");
+	if (inner && inner->interpolated_string.count == 3) {
+		expect_ast_atom(inner->interpolated_string.items[0], "inner ", "nested interpolated leading text");
+		expect_ast_atom(inner->interpolated_string.items[1], "value", "nested interpolated expression");
+		expect_ast_atom(inner->interpolated_string.items[2], "", "nested interpolated trailing text");
 	}
 	else {
 		test_fail("nested interpolated string keeps three parts");
@@ -294,7 +291,7 @@ static void test_parser_if_else_blocks(elf_State *state)
 	expect_ast_kind(stat->if_stat.true_clause, AST_BLOCK_STAT, "parse if true block");
 	expect_ast_kind(stat->if_stat.else_clause, AST_BLOCK_STAT, "parse if else block");
 
-	Ast ret = stat->if_stat.true_clause->block.stats[0];
+	Ast ret = stat->if_stat.true_clause->block.items[0];
 	expect_ast_kind(ret, AST_RETURN, "parse return in true block");
 	Ast value = parser_test_tuple_item(ret->return_stat.expr, 0, AST_INTEGER_LITERAL, "parse return value");
 	expect_ast_i64(value, 1, "parse return integer");
@@ -320,7 +317,7 @@ static void test_parser_for_loops(elf_State *state)
 		"for declaration parses second identifier");
 	expect_ast_atom(key, "key", "for declaration keeps first identifier");
 	expect_ast_atom(value, "value", "for declaration keeps second identifier");
-	if (decl->decl.name->tuple.nargs != 2) {
+	if (decl->decl.name->tuple.count != 2) {
 		test_fail("for declaration contains only its identifier list");
 	}
 	Ast range = parser_test_tuple_item(decl->decl.expr, 0, AST_RANGE,
@@ -355,15 +352,15 @@ static void test_parser_call_with_table_argument(elf_State *state)
 
 	expect_ast_kind(call->call.expr, AST_IDENT, "parse call callee");
 	expect_ast_atom(call->call.expr, "make", "parse call callee string");
-	if (call->call.nargs != 1) {
+	if (call->call.args.count != 1) {
 		test_fail("table call shorthand counts argument");
 		elf_arena_destroy(&arena);
 		return;
 	}
 
-	Ast table = call->call.args[0];
+	Ast table = call->call.args.items[0];
 	expect_ast_kind(table, AST_TABLE, "parse table argument");
-	if (table->table.nargs != 2) {
+	if (table->table.count != 2) {
 		test_fail("table parser counts entries");
 	}
 	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->phase != COMPILER_PHASE_PARSER) {
@@ -381,12 +378,12 @@ static void test_parser_trailing_closures(elf_State *state)
 		return;
 	}
 	expect_ast_atom(first->call.expr, "run", "trailing call keeps callee expression");
-	if (first->call.nargs != 0) {
+	if (first->call.args.count != 0) {
 		test_fail("carg is not counted as an ordinary argument");
 	}
 	Ast first_function = first->call.carg;
 	expect_ast_kind(first_function, AST_FUNCTION, "trailing call stores carg function");
-	if (!first_function || first_function->function.nparams != 0) {
+	if (!first_function || first_function->function.params.count != 0) {
 		test_fail("omitted trailing closure parameters mean zero parameters");
 	}
 	expect_ast_kind(first_function ? first_function->function.body : 0, AST_BLOCK_STAT, "trailing closure stores block body");
@@ -397,22 +394,22 @@ static void test_parser_trailing_closures(elf_State *state)
 		return;
 	}
 	expect_ast_atom(second->call.expr, "map", "trailing call preserves existing callee");
-	if (second->call.nargs != 1) {
+	if (second->call.args.count != 1) {
 		test_fail("trailing call preserves existing arguments");
 	}
 	else {
-		expect_ast_i64(second->call.args[0], 2, "trailing call keeps existing argument");
+		expect_ast_i64(second->call.args.items[0], 2, "trailing call keeps existing argument");
 	}
 	Ast function = second->call.carg;
-	if (!function || function->kind != AST_FUNCTION || function->function.nparams != 2) {
+	if (!function || function->kind != AST_FUNCTION || function->function.params.count != 2) {
 		test_fail("trailing closure preserves parameter list");
 	}
 	else
 	{
-		Ast item = function->function.params[0];
+		Ast item = function->function.params.items[0];
 		expect_ast_atom(item->param.name, "item", "trailing closure keeps first parameter");
 		expect_ast_atom(item->param.type, "int", "trailing closure keeps parameter type");
-		expect_ast_atom(function->function.params[1]->param.name, "index", "trailing closure keeps second parameter");
+		expect_ast_atom(function->function.params.items[1]->param.name, "index", "trailing closure keeps second parameter");
 	}
 
 	Ast third_stat = parser_test_stat(file, 2, AST_TUPLE, "parse single-statement trailing closure tuple");
@@ -425,13 +422,13 @@ static void test_parser_named_call_arguments(elf_State *state)
 	Ast file = parser_test_parse_file(state, "build(1, width = 20 + 2, title = make(\"ok\"))");
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse named call argument statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call with named arguments");
-	if (!call || call->call.nargs != 3) {
+	if (!call || call->call.args.count != 3) {
 		test_fail("named and positional call arguments share the call argument list");
 		return;
 	}
 
-	expect_ast_i64(call->call.args[0], 1, "positional argument remains an expression");
-	Ast width = call->call.args[1];
+	expect_ast_i64(call->call.args.items[0], 1, "positional argument remains an expression");
+	Ast width = call->call.args.items[1];
 	expect_ast_kind(width, AST_NAMED_ARGUMENT, "parse first named argument");
 	if (width && width->kind == AST_NAMED_ARGUMENT)
 	{
@@ -440,7 +437,7 @@ static void test_parser_named_call_arguments(elf_State *state)
 		expect_ast_kind(width->named_argument.expr, AST_ADD, "named argument stores full value expression");
 	}
 
-	Ast title = call->call.args[2];
+	Ast title = call->call.args.items[2];
 	expect_ast_kind(title, AST_NAMED_ARGUMENT, "parse second named argument");
 	if (title && title->kind == AST_NAMED_ARGUMENT)
 	{
@@ -455,21 +452,21 @@ static void test_parser_array_literals(elf_State *state)
 
 	Ast empty_ret = parser_test_stat(file, 0, AST_RETURN, "parse empty array return");
 	Ast empty = parser_test_tuple_item(empty_ret->return_stat.expr, 0, AST_ARRAY, "empty brackets parse as an array literal");
-	if (empty && empty->array.nargs != 0)
+	if (empty && empty->array.count != 0)
 	{
 		test_fail("empty array literal has no items");
 	}
 
 	Ast values_ret = parser_test_stat(file, 1, AST_RETURN, "parse populated array return");
 	Ast values = parser_test_tuple_item(values_ret->return_stat.expr, 0, AST_ARRAY, "populated brackets parse as an array literal");
-	if (!values || values->array.nargs != 3)
+	if (!values || values->array.count != 3)
 	{
 		test_fail("array literal keeps all items");
 		return;
 	}
-	expect_ast_i64(values->array.args[0], 1, "array literal keeps first item");
-	expect_ast_kind(values->array.args[1], AST_ADD, "array literal keeps expression item");
-	expect_ast_kind(values->array.args[2], AST_ARRAY, "array literal keeps nested array");
+	expect_ast_i64(values->array.items[0], 1, "array literal keeps first item");
+	expect_ast_kind(values->array.items[1], AST_ADD, "array literal keeps expression item");
+	expect_ast_kind(values->array.items[2], AST_ARRAY, "array literal keeps nested array");
 
 	Ast index_ret = parser_test_stat(file, 2, AST_RETURN, "parse array literal index return");
 	Ast index = parser_test_tuple_item(index_ret->return_stat.expr, 0, AST_INDEX, "array literal accepts index postfix");
@@ -574,13 +571,13 @@ static void test_parser_function_expression(elf_State *state)
 	if (!function) {
 		return;
 	}
-	if (function->function.nparams != 2) {
+	if (function->function.params.count != 2) {
 		test_fail("function expression keeps parameters");
 		return;
 	}
 
-	Ast first_param = function->function.params[0];
-	Ast second_param = function->function.params[1];
+	Ast first_param = function->function.params.items[0];
+	Ast second_param = function->function.params.items[1];
 	expect_ast_kind(first_param, AST_FUNCTION_PARAM, "parse first function param");
 	expect_ast_kind(second_param, AST_FUNCTION_PARAM, "parse second function param");
 	expect_ast_atom(first_param ? first_param->param.name : 0, "a", "first function param name");
@@ -592,15 +589,15 @@ static void test_parser_function_expression(elf_State *state)
 	file = parser_test_parse_file(state, "configure := fun(required, count = 1 + 2, label: str = \"elf\") { ret required }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration with defaults");
 	function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression with defaults");
-	if (!function || function->function.nparams != 3)
+	if (!function || function->function.params.count != 3)
 	{
 		test_fail("function expression keeps defaulted parameters");
 		return;
 	}
 
-	Ast required_param = function->function.params[0];
-	Ast count_param = function->function.params[1];
-	Ast label_param = function->function.params[2];
+	Ast required_param = function->function.params.items[0];
+	Ast count_param = function->function.params.items[1];
+	Ast label_param = function->function.params.items[2];
 	if (required_param->param.expr) {
 		test_fail("required function parameter has no default expression");
 	}
@@ -618,12 +615,12 @@ static void test_parser_function_expression(elf_State *state)
 		return;
 	}
 
-	if (function->function.nparams != 1) {
+	if (function->function.params.count != 1) {
 		test_fail("variadic marker is not counted as a named parameter");
 		return;
 	}
 
-	expect_ast_atom(function->function.params[0] ? function->function.params[0]->param.name : 0, "a", "variadic function named parameter");
+	expect_ast_atom(function->function.params.items[0] ? function->function.params.items[0]->param.name : 0, "a", "variadic function named parameter");
 	if (!function->function.variadic) {
 		test_fail("function tracks variadic marker separately");
 	}
@@ -631,7 +628,7 @@ static void test_parser_function_expression(elf_State *state)
 	file = parser_test_parse_file(state, "callback := fun { ret 42 }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration without parameter list");
 	function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression without parameter list");
-	if (function && function->function.nparams != 0) {
+	if (function && function->function.params.count != 0) {
 		test_fail("function without parameter list has no parameters");
 	}
 

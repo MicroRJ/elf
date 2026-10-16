@@ -18,12 +18,12 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 	{
 		case AST_TUPLE:
 		{
-			if (ast->tuple.nargs != 1)
+			if (ast->tuple.count != 1)
 			{
 				compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "constant expression must produce one value");
 				return false;
 			}
-			return lib_eval_constant_ast(state, compiler, ast->tuple.args[0], out);
+			return lib_eval_constant_ast(state, compiler, ast->tuple.items[0], out);
 		}
 
 		case AST_NIL_LITERAL:
@@ -53,9 +53,9 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 		case AST_TABLE:
 		{
 			elf_Table *table = elf_table_new(state);
-			for (u32 i = 0; i < ast->table.nargs; ++i)
+			for (u32 i = 0; i < ast->table.count; ++i)
 			{
-				Ast entry_ast = ast->table.args[i];
+				Ast entry_ast = ast->table.items[i];
 				if (!entry_ast || entry_ast->kind != AST_TABLE_ENTRY)
 				{
 					compiler_report(compiler, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, ast->site, "invalid table constant");
@@ -85,10 +85,10 @@ static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, 
 		case AST_ARRAY:
 		{
 			elf_Array *array = elf_array_new(state);
-			for (u32 i = 0; i < ast->array.nargs; ++i)
+			for (u32 i = 0; i < ast->array.count; ++i)
 			{
 				elf_Value value = {};
-				if (!lib_eval_constant_ast(state, compiler, ast->array.args[i], &value)) {
+				if (!lib_eval_constant_ast(state, compiler, ast->array.items[i], &value)) {
 					return false;
 				}
 				elf_array_add(state, array, value);

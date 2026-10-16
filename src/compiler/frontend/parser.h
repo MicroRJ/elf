@@ -41,5 +41,7 @@ struct Parser
 	Lexer               lexer;
 	// TODO(RJ): probably redundant now!
 	Token               tok,tok_prev,tok_prox;
-	AstContext          ast;
+	Ast                *ast_stack;
+	u32                 ast_stack_size;
+	u32                 ast_stack_index;
 };
