@@ -51,14 +51,6 @@ void elf_push_error(elf_State *state, const char *message)
 	elf_table_set(state, info, key, pop_value(state));
 }
 
-elf_ErrorCode elf_push_buffer(elf_State *state, elf_Size capacity)
-{
-	if (!state) return ELF_ERROR_INVALID_ARGUMENT;
-	if (capacity > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
-	push_value(state, value_from_buffer(elf_buffer_new_object(state, (u32)capacity)));
-	return ELF_ERROR_NONE;
-}
-
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data)
 {
@@ -245,12 +237,6 @@ elf_Bool elf_is_error(elf_State *state, elf_Index index)
 	return value && value_is_error(*value);
 }
 
-elf_Bool elf_is_buffer(elf_State *state, elf_Index index)
-{
-	elf_Value *value = value_at(state, index);
-	return value && value_is_buffer(*value);
-}
-
 elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type)
 {
 	elf_Value *value = value_at(state, index);
@@ -288,17 +274,6 @@ elf_Bool elf_to_cstr(elf_State *state, elf_Index index, const char **result)
 	elf_StrSlice string;
 	if (!result || !elf_to_str(state, index, &string)) return false;
 	*result = string.data;
-	return true;
-}
-
-elf_Bool elf_to_buffer(elf_State *state, elf_Index index, elf_BufferView *result)
-{
-	elf_Value *value = value_at(state, index);
-	if (!value || !value_is_buffer(*value) || !result) return false;
-	elf_ByteBuffer *buffer = value_as_buffer(*value);
-	result->data = buffer->data;
-	result->size = buffer->size;
-	result->capacity = buffer->capacity;
 	return true;
 }
 
@@ -473,66 +448,6 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 	}
 	elf_array_add(state, array, pop_value(state));
 	return ELF_ERROR_NONE;
-}
-
-static elf_ErrorCode mutable_buffer_at(elf_State *state, elf_Index index,
-	elf_ByteBuffer **result)
-{
-	elf_Value *value = value_at(state, index);
-	if (!value) return ELF_ERROR_INVALID_INDEX;
-	if (!value_is_buffer(*value)) return ELF_ERROR_TYPE_MISMATCH;
-	elf_ByteBuffer *buffer = value_as_buffer(*value);
-	if (buffer->obj.status & ELF_OBJECT_READONLY) return ELF_ERROR_READONLY;
-	*result = buffer;
-	return ELF_ERROR_NONE;
-}
-
-elf_ErrorCode elf_buffer_reserve(elf_State *state, elf_Index index, elf_Size capacity)
-{
-	elf_ByteBuffer *buffer;
-	if (capacity > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
-	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
-	if (error != ELF_ERROR_NONE) return error;
-	return elf_buffer_reserve_object(state, buffer, (u32)capacity) ?
-		ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
-}
-
-elf_ErrorCode elf_buffer_resize(elf_State *state, elf_Index index, elf_Size size)
-{
-	elf_ByteBuffer *buffer;
-	if (size > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
-	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
-	if (error != ELF_ERROR_NONE) return error;
-	return elf_buffer_resize_object(state, buffer, (u32)size) ?
-		ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
-}
-
-elf_ErrorCode elf_buffer_append(elf_State *state, elf_Index index,
-	const void *data, elf_Size size)
-{
-	elf_ByteBuffer *buffer;
-	if (!data && size) return ELF_ERROR_INVALID_ARGUMENT;
-	if (size > UINT32_MAX) return ELF_ERROR_OUT_OF_RANGE;
-	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
-	if (error != ELF_ERROR_NONE) return error;
-	if (size > UINT32_MAX - buffer->size) return ELF_ERROR_OUT_OF_RANGE;
-	return elf_buffer_append_object(state, buffer, data, (u32)size) ?
-		ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
-}
-
-elf_ErrorCode elf_buffer_patch(elf_State *state, elf_Index index, elf_Size position,
-	elf_Size delete_size, const void *data, elf_Size insert_size)
-{
-	elf_ByteBuffer *buffer;
-	if (!data && insert_size) return ELF_ERROR_INVALID_ARGUMENT;
-	if (position > UINT32_MAX || delete_size > UINT32_MAX || insert_size > UINT32_MAX)
-		return ELF_ERROR_OUT_OF_RANGE;
-	elf_ErrorCode error = mutable_buffer_at(state, index, &buffer);
-	if (error != ELF_ERROR_NONE) return error;
-	if (position > buffer->size || delete_size > buffer->size - position ||
-		insert_size > UINT32_MAX - (buffer->size - delete_size))
-		return ELF_ERROR_OUT_OF_RANGE;
-	return elf_buffer_splice_object(state, buffer, (u32)position, (u32)delete_size, data, (u32)insert_size) ? ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
 }
 
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)

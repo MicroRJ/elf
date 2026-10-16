@@ -275,7 +275,7 @@ static void test_gc_keeps_referenced_buffer(void)
 	elf_pop(state, 1);
 
 	force_gc_allocations(state, 256);
-	if (!elf_push_ref(state, reference) || !elf_is_buffer(state, -1)) {
+	if (!elf_push_ref(state, reference) || elf_type(state, -1) != ELF_VALUE_TYPE_BUFFER) {
 		test_fail("buffer reference preserves its allocation through GC");
 	}
 	else

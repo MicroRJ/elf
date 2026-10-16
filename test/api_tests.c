@@ -278,35 +278,6 @@ static void test_api_errors(elf_State *state)
 static void test_api_buffers(elf_State *state)
 {
 	elf_Index checkpoint = elf_get_top(state);
-	if (elf_push_buffer(state, 3) != ELF_ERROR_NONE || !elf_is_buffer(state, -1)) {
-		test_fail("API pushes a buffer value");
-	}
-	else
-	{
-		elf_Index host_buffer = elf_abs_index(state, -1);
-		if (elf_buffer_append(state, host_buffer, "abc", 3) != ELF_ERROR_NONE ||
-			elf_buffer_reserve(state, host_buffer, 16) != ELF_ERROR_NONE) {
-			test_fail("API grows and appends to a buffer");
-		}
-		elf_BufferView view = {};
-		if (!elf_to_buffer(state, host_buffer, &view) || view.size != 3 ||
-			view.capacity < 16 || memcmp(view.data, "abc", 3) != 0) {
-			test_fail("API exposes buffer storage");
-		}
-		if (elf_buffer_resize(state, host_buffer, 5) != ELF_ERROR_NONE ||
-			!elf_to_buffer(state, host_buffer, &view) || view.size != 5 ||
-			view.data[3] != 0 || view.data[4] != 0) {
-			test_fail("API resizes and zero-fills a buffer");
-		}
-		if (elf_buffer_resize(state, host_buffer, 3) != ELF_ERROR_NONE ||
-			elf_buffer_patch(state, host_buffer, 1, 1, "XYZ", 3) != ELF_ERROR_NONE ||
-			!elf_to_buffer(state, host_buffer, &view) || view.size != 5 ||
-			memcmp(view.data, "aXYZc", 5) != 0) {
-			test_fail("API patches a buffer range");
-		}
-	}
-	elf_set_top(state, checkpoint);
-
 	char source_data[] = "ret elf.buffer(4):append(\"ok\")";
 	elf_StrSlice source = {source_data, sizeof(source_data) - 1};
 	if (elf_push_code_source(state, "api-buffer", source) != ELF_ERROR_NONE)
@@ -318,7 +289,7 @@ static void test_api_buffers(elf_State *state)
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Index buffer = elf_abs_index(state, -1);
-	if (elf_type(state, buffer) != ELF_VALUE_TYPE_BUFFER || !elf_is_buffer(state, buffer)) {
+	if (elf_type(state, buffer) != ELF_VALUE_TYPE_BUFFER) {
 		test_fail("API identifies a buffer value");
 	}
 	elf_u32 length = 0;
@@ -329,14 +300,20 @@ static void test_api_buffers(elf_State *state)
 	if (!elf_get_index(state, buffer, 1) || !elf_to_int(state, -1, &byte) || byte != 'k') {
 		test_fail("API reads a buffer byte");
 	}
-	else elf_pop(state, 1);
+	else
+	{
+		elf_pop(state, 1);
+	}
 
 	elf_push_int(state, 'n');
 	if (elf_set_index(state, buffer, 1) != ELF_ERROR_NONE ||
 		!elf_get_index(state, buffer, 1) || !elf_to_int(state, -1, &byte) || byte != 'n') {
 		test_fail("API writes a buffer byte");
 	}
-	else elf_pop(state, 1);
+	else
+	{
+		elf_pop(state, 1);
+	}
 
 	if (!elf_push_value_text(state, buffer)) {
 		test_fail("API formats a buffer value");

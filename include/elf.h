@@ -47,14 +47,6 @@ typedef struct
 }
 elf_StrSlice;
 
-typedef struct
-{
-	elf_u8  *data;
-	elf_Size size;
-	elf_Size capacity;
-}
-elf_BufferView;
-
 typedef enum
 {
 	ELF_ERROR_NONE = 0,
@@ -106,7 +98,6 @@ void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, elf_Size size);
 void elf_push_error(elf_State *state, const char *message);
-elf_ErrorCode elf_push_buffer(elf_State *state, elf_Size capacity);
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data);
 
@@ -126,13 +117,11 @@ elf_Bool elf_is_nil(elf_State *state, elf_Index index);
 elf_Bool elf_is_numeric(elf_State *state, elf_Index index);
 elf_Bool elf_is_callable(elf_State *state, elf_Index index);
 elf_Bool elf_is_error(elf_State *state, elf_Index index);
-elf_Bool elf_is_buffer(elf_State *state, elf_Index index);
 elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type);
 elf_Bool elf_to_int(elf_State *state, elf_Index index, elf_Int *value);
 elf_Bool elf_to_num(elf_State *state, elf_Index index, elf_Num *value);
 elf_Bool elf_to_str(elf_State *state, elf_Index index, elf_StrSlice *value);
 elf_Bool elf_to_cstr(elf_State *state, elf_Index index, const char **value);
-elf_Bool elf_to_buffer(elf_State *state, elf_Index index, elf_BufferView *value);
 void *elf_to_user_object(elf_State *state, elf_Index index, const elf_UserType *type);
 elf_Bool elf_push_value_text(elf_State *state, elf_Index index);
 // Pushes constant-expression source for a supported acyclic data value.
@@ -146,11 +135,6 @@ elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field
 elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_append(elf_State *state, elf_Index index);
-elf_ErrorCode elf_buffer_reserve(elf_State *state, elf_Index index, elf_Size capacity);
-elf_ErrorCode elf_buffer_resize(elf_State *state, elf_Index index, elf_Size size);
-elf_ErrorCode elf_buffer_append(elf_State *state, elf_Index index, const void *data, elf_Size size);
-elf_ErrorCode elf_buffer_patch(elf_State *state, elf_Index index, elf_Size position,
-	elf_Size delete_size, const void *data, elf_Size insert_size);
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor);
 elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right);
 

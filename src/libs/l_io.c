@@ -97,10 +97,12 @@ ELF_FUNCTION(l_stream_read)
 {
 	lib_check_arg_count(S, "stream.read", nargs, 2, 3);
 	Lib_Stream *stream = lib_stream_receiver(S);
-	elf_BufferView buffer = {0};
-	if (!elf_to_buffer(S, 1, &buffer))
+	elf_Value buffer_value = load_value(S, 1);
+	check_value_type(S, buffer_value, ELF_VALUE_TYPE_BUFFER);
+	elf_ByteBuffer *buffer = value_as_buffer(buffer_value);
+	if (buffer->obj.status & ELF_OBJECT_READONLY)
 	{
-		elf_error(S, "stream.read expected a buffer");
+		elf_error(S, "stream.read cannot modify a read-only buffer");
 	}
 	elf_Size request = lib_stream_load_size(S, 2, "stream read");
 	u32 flags = nargs > 3 ? (u32)lib_load_integer(S, 3) : 0;
@@ -108,28 +110,24 @@ ELF_FUNCTION(l_stream_read)
 	{
 		elf_error(S, "invalid stream read flags");
 	}
-	if (request > UINT32_MAX - buffer.size)
+	if (request > UINT32_MAX - buffer->size)
 	{
 		elf_error(S, "stream read exceeds buffer size range");
 	}
 
-	elf_Size original_size = buffer.size;
+	u32 original_size = buffer->size;
 	dy_u64 bytes_read = 0;
 	dy_Result result = { .error = DY_ERROR_INVALID_ARGUMENT };
 	if (stream->stream)
 	{
-		if (elf_buffer_resize(S, 1, original_size + request) != ELF_ERROR_NONE)
+		if (!elf_buffer_resize_object(S, buffer, original_size + (u32)request))
 		{
 			elf_error(S, "could not grow stream read buffer");
 		}
-		if (!elf_to_buffer(S, 1, &buffer))
-		{
-			elf_error(S, "stream read lost its buffer");
-		}
-		void *destination = request ? buffer.data + original_size : 0;
+		void *destination = request ? buffer->data + original_size : 0;
 		result = dy_stream_read(stream->stream, destination, request, flags, &bytes_read);
-		elf_Size committed = result.error == DY_ERROR_NONE ? original_size + (elf_Size)bytes_read : original_size;
-		if (elf_buffer_resize(S, 1, committed) != ELF_ERROR_NONE)
+		u64 committed = result.error == DY_ERROR_NONE ? (u64)original_size + bytes_read : original_size;
+		if (committed > UINT32_MAX || !elf_buffer_resize_object(S, buffer, (u32)committed))
 		{
 			elf_error(S, "could not commit stream read buffer");
 		}
@@ -146,12 +144,13 @@ ELF_FUNCTION(l_stream_write)
 	Lib_Stream *stream = lib_stream_receiver(S);
 	const void *data = 0;
 	elf_Size size = 0;
-	elf_BufferView buffer = {0};
+	elf_Value source = load_value(S, 1);
 	elf_StrSlice string = {0};
-	if (elf_to_buffer(S, 1, &buffer))
+	if (value_is_buffer(source))
 	{
-		data = buffer.data;
-		size = buffer.size;
+		elf_ByteBuffer *buffer = value_as_buffer(source);
+		data = buffer->data;
+		size = buffer->size;
 	}
 	else if (elf_to_str(S, 1, &string))
 	{
