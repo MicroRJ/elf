@@ -18,11 +18,7 @@
 
 // Compiler sources included by the unity tests.
 #include "logging.c"
-#include "atom.c"
 #include "lexer.c"
-#include "ast.c"
-#include "parser.c"
-#include "parse_json.c"
 #include "bc_emitter.h"
 
 static int test_failures;

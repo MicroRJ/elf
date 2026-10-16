@@ -277,17 +277,8 @@ struct Ast_T
 	};
 };
 
-static Ast_T ast_error_sentinel =
-{
-	.kind = AST_ERROR,
-	.error = COM_ERROR_SOURCE,
-};
-
-static Ast_T ast_error_oom_sentinel =
-{
-	.kind = AST_ERROR,
-	.error = COM_ERROR_OOM,
-};
+extern Ast_T ast_error_sentinel;
+extern Ast_T ast_error_oom_sentinel;
 
 #define NULL_AST ((Ast)0)
 #define ERROR_AST (&ast_error_sentinel)

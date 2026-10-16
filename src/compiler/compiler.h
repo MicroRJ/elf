@@ -252,11 +252,13 @@ struct Compiler
 	Com_Source        *sources;
 	u32                source_count;
 	u32                source_capacity;
+	Com_Report         report;
+	b32                log_messages;
+
+	// TODO(RJ): remove this shit!
 	Com_Function      *functions;
 	u32                function_count;
 	u32                function_capacity;
-	Com_Report         report;
-	b32                log_messages;
 };
 
 Compiler *compiler_create(elf_Arena *arena);

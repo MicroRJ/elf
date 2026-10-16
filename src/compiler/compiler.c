@@ -24,11 +24,8 @@
 #include "ir_emitter.h"
 
 #include "logging.c"
+#include "source_diagnostics.c"
 #include "atom.c"
-#include "lexer.c"
-#include "ast.c"
-#include "parser.c"
-#include "parse_json.c"
 
 static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
 {
@@ -367,7 +364,7 @@ b32 compiler_parse_sources(Compiler *compiler)
 		}
 		else
 		{
-			Ast ast = elf_parse_file(parser);
+			Ast ast = parser_parse_file(parser);
 			compiler->sources[source_id].ast = ast;
 			if (ast_is_error(ast))
 			{
@@ -878,7 +875,7 @@ Ast compiler_parse_constant_expr(Compiler *compiler)
 		if (parser)
 		{
 			if (parser_set_source(parser, 0)) {
-				ast = parse_constexpr(parser);
+				ast = parser_parse_constant_expr(parser);
 			}
 			parser_destroy(parser);
 		}
@@ -897,7 +894,7 @@ Ast compiler_parse_json(Compiler *compiler)
 		if (parser)
 		{
 			if (parser_set_source(parser, 0)) {
-				ast = parse_json_ast(parser);
+				ast = parser_parse_json(parser);
 			}
 			parser_destroy(parser);
 		}
@@ -916,7 +913,7 @@ Ast compiler_parse_jsonl(Compiler *compiler)
 		if (parser)
 		{
 			if (parser_set_source(parser, 0)) {
-				ast = parse_jsonl_ast(parser);
+				ast = parser_parse_jsonl(parser);
 			}
 			parser_destroy(parser);
 		}

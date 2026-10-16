@@ -124,8 +124,6 @@ STATIC_ASSERT(sizeof(Bytecode) == 12);
 #define BC_ARGZ(B)      (B).b_z
 #define BC_ARGW(B)      (B).b_w
 
-// One executable bytecode function. Its bytecode and constant indices are
-// relative to the module that owns it.
 typedef struct BcFunction
 {
 	b32                  variadic;

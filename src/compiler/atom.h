@@ -18,7 +18,7 @@ struct Atom_Table
 };
 
 static void atom_table_init(Atom_Table *table, elf_Arena *arena);
-static Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id);
+Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id);
 
 static inline Atom *atom_from_data_size(Atom_Table *table, const char *data, u32 size)
 {

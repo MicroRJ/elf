@@ -2,6 +2,23 @@
 //	See Copyright Notice In elf.h
 //
 
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <dy.h>
+
+#include "elf.h"
+#include "base.h"
+#include "atom.h"
+#include "compiler.h"
+#include "token.h"
+#include "ast.h"
+#include "parser.h"
+
+#include "logging.c"
+#include "lexer.c"
+#include "ast.c"
 
 #define I64_MAX_MAGNITUDE 0x7fffffffffffffffull
 #define I64_MIN_MAGNITUDE 0x8000000000000000ull
@@ -190,7 +207,7 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-static Parser *parser_create(Compiler *compiler)
+Parser *parser_create(Compiler *compiler)
 {
 	ASSERT(compiler != 0);
 	Parser *parser = elf_arena_push_zero(compiler->arena, sizeof(*parser));
@@ -207,14 +224,14 @@ static Parser *parser_create(Compiler *compiler)
 	return parser;
 }
 
-static void parser_destroy(Parser *parser)
+void parser_destroy(Parser *parser)
 {
 	if (parser) {
 		elf_arena_destroy(&parser->scratch_arena);
 	}
 }
 
-static b32 parser_set_source(Parser *parser, Com_SourceId source_id)
+b32 parser_set_source(Parser *parser, Com_SourceId source_id)
 {
 	ASSERT(parser);
 	ASSERT(source_id < parser->compiler->source_count);
@@ -310,7 +327,7 @@ static AstArray pop_ast_array(Parser *par, u32 count)
 	return result;
 }
 
-static Ast elf_parse_file(Parser *parser)
+static Ast parse_file(Parser *parser)
 {
 	if (token_is_error(parser->tok)) {
 		return ast_from_token_error(parser->tok);
@@ -1773,5 +1790,27 @@ static Ast parse_constexpr(Parser *parser)
 		return parser_unexpected_token(parser, parser->tok);
 	}
 	return ast;
+}
+
+#include "parse_json.c"
+
+Ast parser_parse_file(Parser *parser)
+{
+	return parse_file(parser);
+}
+
+Ast parser_parse_constant_expr(Parser *parser)
+{
+	return parse_constexpr(parser);
+}
+
+Ast parser_parse_json(Parser *parser)
+{
+	return parse_json_ast(parser);
+}
+
+Ast parser_parse_jsonl(Parser *parser)
+{
+	return parse_jsonl_ast(parser);
 }
 

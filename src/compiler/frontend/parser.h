@@ -47,3 +47,11 @@ struct Parser
 	u32                 ast_stack_size;
 	u32                 ast_stack_index;
 };
+
+Parser *parser_create(Compiler *compiler);
+void parser_destroy(Parser *parser);
+b32 parser_set_source(Parser *parser, Com_SourceId source_id);
+Ast parser_parse_file(Parser *parser);
+Ast parser_parse_constant_expr(Parser *parser);
+Ast parser_parse_json(Parser *parser);
+Ast parser_parse_jsonl(Parser *parser);

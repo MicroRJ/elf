@@ -4,6 +4,18 @@
 
 // AST constructors are side-effect free beyond allocating and initializing the returned tree.
 
+Ast_T ast_error_sentinel =
+{
+	.kind = AST_ERROR,
+	.error = COM_ERROR_SOURCE,
+};
+
+Ast_T ast_error_oom_sentinel =
+{
+	.kind = AST_ERROR,
+	.error = COM_ERROR_OOM,
+};
+
 static Ast create_ast(Parser *par, SourceSite site, AstType kind)
 {
 	Ast_T *tree = elf_arena_push_zero(par->result_arena, sizeof(*tree));

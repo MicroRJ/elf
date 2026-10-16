@@ -82,7 +82,7 @@ static void atom_table_init(Atom_Table *table, elf_Arena *arena)
 	table->buckets = elf_arena_push_zero(arena, sizeof(*table->buckets) * table->bucket_count);
 }
 
-static Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id)
+Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id)
 {
 	ASSERT(table);
 	ASSERT(data);
