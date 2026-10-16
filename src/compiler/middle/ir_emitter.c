@@ -84,7 +84,7 @@ struct LwCapture
 struct LwScopeFunction
 {
 	LwScopeFunction *parent;
-	IrFunDef      *function;
+	IrFunDef        *function;
 	LwCapture       *first_capture;
 	LwCapture       *last_capture;
 	u32              capture_count;

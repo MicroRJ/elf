@@ -28,12 +28,50 @@
 #include "atom.c"
 
 
+static void compiler_init_atoms(Compiler *compiler)
+{
+#define INTERN_KEYWORD_ATOM(NAME, TEXT) atom_from_data_id(compiler->atoms, TEXT, XFUSE(TOK_, NAME));
+	KEYWORD_DEFINITIONS(INTERN_KEYWORD_ATOM)
+#undef INTERN_KEYWORD_ATOM
+
+#define INTERN_MACRO_ATOM(NAME, TEXT) atom_from_data_id(compiler->atoms, "#" TEXT, XFUSE(TOK_, NAME));
+	MACRO_DEFINITIONS(INTERN_MACRO_ATOM)
+#undef INTERN_MACRO_ATOM
+
+#define INTERN_TYPE_NAME_ATOM(NAME, TEXT, RULE) atom_from_data_id(compiler->atoms, TEXT, XFUSE(ATOM_TYPE_NAME_, NAME));
+	TYPE_NAME_DEFINITIONS(INTERN_TYPE_NAME_ATOM)
+#undef INTERN_TYPE_NAME_ATOM
+}
+
 
 Compiler *compiler_create(elf_Arena *arena)
 {
-	Compiler *compiler = elf_arena_push_zero(arena, sizeof(*compiler));
-	if (compiler) {
+	Compiler *compiler = 0;
+	if (arena)
+	{
+		compiler = dy_arena_push_zero(arena, sizeof(*compiler), _Alignof(Compiler));
+	}
+	if (compiler)
+	{
 		compiler->arena = arena;
+		compiler->atoms = dy_arena_push_zero(arena, sizeof(*compiler->atoms), _Alignof(Atom_Table));
+		if (compiler->atoms)
+		{
+			atom_table_init(compiler->atoms, arena);
+			if (compiler->atoms->buckets)
+			{
+				compiler_init_atoms(compiler);
+				compiler->log_messages = true;
+			}
+			else
+			{
+				compiler = 0;
+			}
+		}
+		else
+		{
+			compiler = 0;
+		}
 	}
 	return compiler;
 }
@@ -130,10 +168,63 @@ b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, 
 
 BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
-	(void)arena;
-	(void)name;
-	(void)source;
-	return 0;
+	BcModule *module = 0;
+	if (arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
+	{
+		Compiler *compiler = compiler_create(arena);
+		if (compiler)
+		{
+			Atom *source_name = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
+			char *source_data = dy_arena_push_zero(arena, source.size + 1, 1);
+			Com_Source *compiler_source = dy_arena_push_zero(arena, sizeof(*compiler_source), _Alignof(Com_Source));
+			if (source_name && source_data && compiler_source)
+			{
+				copy_memory(source_data, source.data, source.size);
+				compiler_source->name = source_name;
+				compiler_source->canonical_path = source_name;
+				compiler_source->source = (BcSourceBuffer) {.data = source_data, .size = (u32)source.size};
+				compiler->sources = compiler_source;
+				compiler->source_count = 1;
+				compiler->source_capacity = 1;
+
+				Parser *parser = parser_create(compiler);
+				if (parser)
+				{
+					Ast ast = ERROR_AST;
+					if (parser_set_source(parser, 0)) {
+						ast = parser_parse_file(parser);
+					}
+					parser_destroy(parser);
+
+					if (!ast_is_error(ast) && !compiler->report.error_count)
+					{
+						IrModule *ir_module = ir_emit_module(compiler, ast);
+						if (ir_module && !compiler->report.error_count)
+						{
+							module = bc_emit_module(ir_module);
+							if (module)
+							{
+								module->sources = dy_arena_push_zero(arena, sizeof(*module->sources), _Alignof(BcSource));
+								if (module->sources)
+								{
+									module->source_count = 1;
+									module->root_source = 0;
+									module->sources[0].name = (BcString) {.data = atom_data(source_name), .size = atom_size(source_name)};
+									module->sources[0].path = module->sources[0].name;
+									module->sources[0].source = compiler_source->source;
+								}
+								else
+								{
+									module = 0;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return module;
 }
 
 Ast compiler_parse_constant_expr(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)

@@ -261,8 +261,6 @@ struct IrFunDef
 	IrArray    capture_sources;
 };
 
-// One lowered compilation unit. Global indices are still module-local here and
-// are resolved to runtime slots only when the compiled module is linked.
 typedef struct
 {
 	elf_Arena *arena;
