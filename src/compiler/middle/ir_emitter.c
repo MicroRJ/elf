@@ -253,9 +253,6 @@ static IrEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, IrEntit
 	const char *name_data = atom_data(name);
 	if (en)
 	{
-		if (en->type == ENTITY_DIRECTORY) {
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': a directory with this name already exists", name_data);
-		}
 		if (en->scope_start == ctx->scope_start) {
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
 		}

@@ -11,13 +11,9 @@ enum
 	MAX_ENTITIES = 4096
 };
 
-#define NO_ENTITY 0xDEADBEEF
-
 typedef enum
 {
 	ENTITY_INVALID = 0,
-	// TODO(RJ): to be removed!
-	ENTITY_DIRECTORY,
 	ENTITY_LOCAL_DECLARATION,
 }
 IrEntityType;
