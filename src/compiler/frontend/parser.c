@@ -57,7 +57,7 @@ static Token take_field_name(Parser *parser)
 }
 
 
-static AstType binary_ast_expr_type_from_token_type(Token_Type type)
+static Ast_Kind binary_ast_expr_type_from_token_type(Token_Type type)
 {
 	switch (type)
 	{
@@ -87,7 +87,7 @@ static AstType binary_ast_expr_type_from_token_type(Token_Type type)
 	}
 }
 
-static AstType compound_assign_ast_type_from_token_type(Token_Type type)
+static Ast_Kind compound_assign_ast_type_from_token_type(Token_Type type)
 {
 	switch (type)
 	{
@@ -103,7 +103,7 @@ static AstType compound_assign_ast_type_from_token_type(Token_Type type)
 	}
 }
 
-static AstType precedence_from_binary_ast_expr_type(AstType type)
+static Ast_Kind precedence_from_binary_ast_expr_type(Ast_Kind type)
 {
 	switch (type)
 	{
@@ -289,11 +289,11 @@ static b32 push_ast(Parser *par, Ast tree)
 	return true;
 }
 
-static AstArray pop_ast_array(Parser *par, u32 count)
+static Ast_Array pop_ast_array(Parser *par, u32 count)
 {
 	ASSERT(par->ast_stack_index >= count);
 	par->ast_stack_index -= count;
-	AstArray result = {.count = count};
+	Ast_Array result = {.count = count};
 	result.items = elf_arena_push_copy(par->result_arena, sizeof(*result.items) * count, par->ast_stack + par->ast_stack_index);
 	return result;
 }
@@ -330,7 +330,7 @@ static Ast parse_file(Parser *parser)
 		++ nstats;
 	}
 
-	AstArray stats = pop_ast_array(parser, nstats);
+	Ast_Array stats = pop_ast_array(parser, nstats);
 	if (stats.count && !stats.items) {
 		return ERROR_OOM_AST;
 	}
@@ -349,7 +349,7 @@ static Ast parse_function(Parser *par, Token marker)
 
 	u32 stack_start = par->ast_stack_index;
 	u32 param_count = 0;
-	AstArray params = {};
+	Ast_Array params = {};
 	b32 variadic = false;
 	Ast error = 0;
 	if (pick_token(par, TOK_LEFT_PAREN))
@@ -466,7 +466,7 @@ static Ast parse_tuple_expr(Parser *par)
 	Ast tuple = 0;
 	if (nargs)
 	{
-		AstArray args = pop_ast_array(par, nargs);
+		Ast_Array args = pop_ast_array(par, nargs);
 		if (!args.items) {
 			return ERROR_OOM_AST;
 		}
@@ -510,7 +510,7 @@ static Ast parse_for_identifier_tuple(Parser *parser)
 	}
 	while (pick_token(parser, TOK_COMMA));
 
-	AstArray names = pop_ast_array(parser, nargs);
+	Ast_Array names = pop_ast_array(parser, nargs);
 	if (!names.items) {
 		return ERROR_OOM_AST;
 	}
@@ -645,7 +645,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 	}
 
-	AstArray parts = pop_ast_array(parser, nparts);
+	Ast_Array parts = pop_ast_array(parser, nparts);
 	if (!parts.items) {
 		return ERROR_OOM_AST;
 	}
@@ -942,7 +942,7 @@ static Ast parse_table_expr(Parser *parser)
 		return ast_from_token_error(closing);
 	}
 
-	AstArray args = pop_ast_array(parser, nargs);
+	Ast_Array args = pop_ast_array(parser, nargs);
 	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
@@ -984,7 +984,7 @@ static Ast parse_array_expr(Parser *parser)
 		return ast_from_token_error(closing);
 	}
 
-	AstArray items = pop_ast_array(parser, count);
+	Ast_Array items = pop_ast_array(parser, count);
 	if (items.count && !items.items)
 	{
 		return ERROR_OOM_AST;
@@ -1061,7 +1061,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 		}
 	}
 
-	AstArray args = pop_ast_array(par, nargs);
+	Ast_Array args = pop_ast_array(par, nargs);
 	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
@@ -1123,7 +1123,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 		}
 		while (pick_token(par, TOK_COMMA));
 
-		AstArray args = pop_ast_array(par, nargs);
+		Ast_Array args = pop_ast_array(par, nargs);
 		if (!args.items) {
 			return ERROR_OOM_AST;
 		}
@@ -1296,7 +1296,7 @@ static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 		tok = parser->tok;
 		if (tok.line_break_before) break;
 
-		AstType ast_type = binary_ast_expr_type_from_token_type(tok.type);
+		Ast_Kind ast_type = binary_ast_expr_type_from_token_type(tok.type);
 		if (ast_type == AST_NONE) break;
 
 		u32 inner_precedence = precedence_from_binary_ast_expr_type(ast_type);
@@ -1346,7 +1346,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 	}
 
 	Token tok = parser->tok;
-	AstType compound_assign_type = compound_assign_ast_type_from_token_type(tok.type);
+	Ast_Kind compound_assign_type = compound_assign_ast_type_from_token_type(tok.type);
 	if (compound_assign_type != AST_NONE)
 	{
 		consume_token(parser);
@@ -1559,7 +1559,7 @@ static Ast parse_stat(Parser *parser)
 				return ast_from_token_error(closing);
 			}
 
-			AstArray stats = pop_ast_array(parser, nstats);
+			Ast_Array stats = pop_ast_array(parser, nstats);
 			if (stats.count && !stats.items) {
 				return ERROR_OOM_AST;
 			}

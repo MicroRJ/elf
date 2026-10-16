@@ -220,13 +220,10 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	for (u32 i = 0; i < iterations; ++i)
 	{
 		elf_Scratch scratch = elf_begin_scratch();
-		Compiler *compiler = compiler_create(scratch.arena);
-		compiler_set_log_messages(compiler, false);
-		compiler_add_root_source(compiler, "benchmark.module", text);
-		Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_MODULE);
+		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
+		BcModule *compiled_module = compiler_compile(scratch.arena, name, text);
 		elf_Module *module = elf_link_module(state, compiled_module);
 		bench_require(module != 0, "could not compile benchmark module");
-		bench_require(!compiled_module->has_entry, "static module unexpectedly has an entry function");
 		elf_end_scratch(scratch);
 	}
 	double seconds = bench_elapsed_s(start);

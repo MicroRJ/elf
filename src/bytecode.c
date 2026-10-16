@@ -5,7 +5,7 @@
 #include "elf.h"
 #include "bytecode.h"
 
-const char *bytecode_type_name(BytecodeType type)
+const char *bytecode_type_name(BcType type)
 {
 	static const char *names[] =
 	{

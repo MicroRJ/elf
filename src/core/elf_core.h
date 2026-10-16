@@ -11,8 +11,6 @@
 
 #include "bytecode.h"
 
-#include "source.h"
-
 typedef struct elf_State      elf_State;
 typedef struct elf_Object     elf_Object;
 typedef struct elf_Value      elf_Value;
@@ -23,14 +21,13 @@ typedef struct elf_Closure    elf_Closure;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Module     elf_Module;
-typedef struct Com_Module     Com_Module;
 typedef struct BcFunctionRef  BcFunctionRef;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
 
 // Copies a compiled module into one runtime, interns its strings, and resolves
 // its module-local globals without modifying the compiler output.
-elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module);
+elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module);
 
 typedef enum
 {
@@ -165,7 +162,7 @@ struct elf_Module
 	u32           bytecode_function_count;
 	Bytecode     *bytecode;
 	u32           bytecode_count;
-	SourceMapEntry *source_map;
+	BcSourceMapEntry *source_map;
 	u32             source_map_count;
 };
 

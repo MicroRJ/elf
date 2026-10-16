@@ -27,9 +27,145 @@
 #include "source_diagnostics.c"
 #include "atom.c"
 
+
+
+Compiler *compiler_create(elf_Arena *arena)
+{
+	Compiler *compiler = elf_arena_push_zero(arena, sizeof(*compiler));
+	if (compiler) {
+		compiler->arena = arena;
+	}
+	return compiler;
+}
+
+void compiler_set_log_messages(Compiler *compiler, b32 enabled)
+{
+	if (compiler) {
+		compiler->log_messages = enabled;
+	}
+}
+
+static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format, va_list args)
+{
+	va_list count_args;
+	va_copy(count_args, args);
+	int message_size = vsnprintf(0, 0, format, count_args);
+	va_end(count_args);
+	if (message_size < 0) {
+		return (elf_StrSlice) {0};
+	}
+	char *message = elf_arena_push(arena, (u64)message_size + 1);
+	if (!message) {
+		return (elf_StrSlice) {0};
+	}
+	vsnprintf(message, (u64)message_size + 1, format, args);
+	return (elf_StrSlice) {message, (u64)message_size};
+}
+
+b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
+{
+	ASSERT(compiler);
+	ASSERT(error != COM_ERROR_NONE);
+	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
+	if (!message.data) {
+		return false;
+	}
+
+	Com_Message *compiler_message = dy_arena_push_zero(compiler->arena, sizeof(*compiler_message), _Alignof(Com_Message));
+	if (!compiler_message) {
+		return false;
+	}
+	compiler_message->error = error;
+	compiler_message->severity = severity;
+	compiler_message->phase = phase;
+	compiler_message->site = site;
+	compiler_message->text = message;
+	if (compiler->report.last)
+	{
+		compiler->report.last->next = compiler_message;
+	}
+	else
+	{
+		compiler->report.first = compiler_message;
+	}
+	compiler->report.last = compiler_message;
+	compiler->report.message_count += 1;
+
+	if (severity == COMPILER_ERROR)
+	{
+		compiler->report.error_count += 1;
+	}
+	else if (severity == COMPILER_WARNING)
+	{
+		compiler->report.warning_count += 1;
+	}
+
+	if (compiler->log_messages)
+	{
+		LogLevel level = severity == COMPILER_ERROR ? LOG_LEVEL_ERROR : severity == COMPILER_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
+		const char *severity_name = severity == COMPILER_ERROR ? "error" : severity == COMPILER_WARNING ? "warning" : "note";
+		Com_Source *source = site.source < compiler->source_count ? compiler->sources + site.source : 0;
+		const char *source_name = source ? atom_data(source->name) : "<unknown>";
+		if (site.line_index) {
+			log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message.data);
+		}
+		else {
+			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message.data);
+		}
+		if (source && source_slice_is_valid(site)) {
+			print_source_slice_marker(site, source->source);
+		}
+	}
+	return true;
+}
+
+b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	b32 result = compiler_reportv(compiler, error, severity, phase, site, format, args);
+	va_end(args);
+	return result;
+}
+
+BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
+{
+	(void)arena;
+	(void)name;
+	(void)source;
+	return 0;
+}
+
+Ast compiler_parse_constant_expr(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
+{
+	(void)arena;
+	(void)name;
+	(void)source;
+	return ERROR_AST;
+}
+
+Ast compiler_parse_json(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
+{
+	(void)arena;
+	(void)name;
+	(void)source;
+	return ERROR_AST;
+}
+
+Ast compiler_parse_jsonl(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
+{
+	(void)arena;
+	(void)name;
+	(void)source;
+	return ERROR_AST;
+}
+
+
+
+
 #if 0
 
-static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, SourceBuffer source)
+static Com_SourceId compiler_append_source(Compiler *compiler, Atom *name, Atom *canonical_path, BcSourceBuffer source)
 {
 	if (compiler->source_count == compiler->source_capacity)
 	{
@@ -121,7 +257,7 @@ static Com_SourceId compiler_find_source(Compiler *compiler, Atom *canonical_pat
 	return result;
 }
 
-static SourceBuffer compiler_copy_source(Compiler *compiler, elf_StrSlice source)
+static BcSourceBuffer compiler_copy_source(Compiler *compiler, elf_StrSlice source)
 {
 	ASSERT(source.size <= 0xffffffffu);
 	char *data = elf_arena_push(compiler->arena, source.size + 1);
@@ -129,7 +265,7 @@ static SourceBuffer compiler_copy_source(Compiler *compiler, elf_StrSlice source
 		copy_memory(data, source.data, source.size);
 	}
 	data[source.size] = 0;
-	return (SourceBuffer) {.data = data, .size = (u32)source.size};
+	return (BcSourceBuffer) {.data = data, .size = (u32)source.size};
 }
 
 static Com_SourceId compiler_register_source(Compiler *compiler, Atom *name, Atom *canonical_path, elf_StrSlice source_text, SourceSite site)
@@ -148,7 +284,7 @@ static Com_SourceId compiler_register_source(Compiler *compiler, Atom *name, Ato
 	{
 		if (compiler->source_count == 0)
 		{
-			source_id = compiler_append_source(compiler, name, canonical_path, (SourceBuffer) {.data = source_text.data});
+			source_id = compiler_append_source(compiler, name, canonical_path, (BcSourceBuffer) {.data = source_text.data});
 			site.source = source_id;
 		}
 		if (source_is_oversized) {
@@ -163,17 +299,8 @@ static Com_SourceId compiler_register_source(Compiler *compiler, Atom *name, Ato
 		return COM_SOURCE_INVALID;
 	}
 
-	SourceBuffer source = compiler_copy_source(compiler, source_text);
+	BcSourceBuffer source = compiler_copy_source(compiler, source_text);
 	return compiler_append_source(compiler, name, canonical_path, source);
-}
-
-Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source)
-{
-	ASSERT(compiler->source_count == 0);
-	Atom *source_name = atom_from_data(compiler->atoms, name ? name : "<unknown>");
-	Com_SourceId source_id = compiler_register_source(compiler, source_name, source_name, source, (SourceSite) {});
-	ASSERT(source_id == COM_SOURCE_INVALID || source_id == 0);
-	return source_id;
 }
 
 // TODO(RJ): dy-core :path addition!
@@ -235,7 +362,7 @@ static Com_SourceId compiler_load_source_file(Compiler *compiler, Atom *importer
 	if (!canonical_path)
 	{
 		if (compiler->source_count == 0) {
-			site.source = compiler_append_source(compiler, requested_path, requested_path, (SourceBuffer) {});
+			site.source = compiler_append_source(compiler, requested_path, requested_path, (BcSourceBuffer) {});
 		}
 		compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "failed to resolve source path '%s'", atom_data(requested_path));
 	}
@@ -285,7 +412,7 @@ static Com_SourceId compiler_load_source_file(Compiler *compiler, Atom *importer
 			if (error)
 			{
 				if (compiler->source_count == 0) {
-					site.source = compiler_append_source(compiler, canonical_path, canonical_path, (SourceBuffer) {});
+					site.source = compiler_append_source(compiler, canonical_path, canonical_path, (BcSourceBuffer) {});
 				}
 				compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "%s '%s'", error, atom_data(canonical_path));
 			}
@@ -938,7 +1065,7 @@ static IrModule *ir_new_module(Compiler *compiler)
 	{
 		Com_Function *input = compiler->functions + i;
 		Ast ast = input->ast;
-		IrFunction *function = module->functions + i;
+		IrFunDef *function = module->functions + i;
 		function->site = ast->site;
 		function->variadic = input->variadic;
 		function->is_static = ast->kind == AST_FUNCTION;
@@ -946,34 +1073,29 @@ static IrModule *ir_new_module(Compiler *compiler)
 		ASSERT(input->index == i);
 	}
 	module->function_count = compiler->function_count;
-	if (compiler->function_count && compiler->functions[0].ast->kind == AST_FILE)
-	{
-		module->has_entry = true;
-		module->entry_index = compiler->functions[0].index;
-	}
 	return module;
 }
 
-static Com_String compiler_copy_compiled_string(elf_Arena *arena, const char *data, u32 size)
+static BcString compiler_copy_compiled_string(elf_Arena *arena, const char *data, u32 size)
 {
 	char *copy = elf_arena_push(arena, size + 1);
 	if (size) {
 		copy_memory(copy, data, size);
 	}
 	copy[size] = 0;
-	return (Com_String) {.data = copy, .size = size};
+	return (BcString) {.data = copy, .size = size};
 }
 
-static Com_String compiler_copy_compiled_atom(elf_Arena *arena, Atom *atom)
+static BcString compiler_copy_compiled_atom(elf_Arena *arena, Atom *atom)
 {
 	return compiler_copy_compiled_string(arena, atom_data(atom), atom_size(atom));
 }
 
-static Com_Module *compiler_package_module(Compiler *compiler, elf_Arena *output_arena, IrModule *ir_module, BcModule *input)
+static BcModule *compiler_package_module(Compiler *compiler, elf_Arena *output_arena, IrModule *ir_module, BcModule *input)
 {
 	ASSERT(input);
 	elf_arena_align(output_arena, 8);
-	Com_Module *module = elf_arena_push_zero(output_arena, sizeof(*module));
+	BcModule *module = elf_arena_push_zero(output_arena, sizeof(*module));
 
 	module->source_count = compiler->source_count;
 	module->root_source = 0;
@@ -984,11 +1106,11 @@ static Com_Module *compiler_package_module(Compiler *compiler, elf_Arena *output
 		for (u32 i = 0; i < module->source_count; ++i)
 		{
 			Com_Source *source = compiler->sources + i;
-			Com_ModuleSource *output_source = module->sources + i;
+			BcSource *output_source = module->sources + i;
 			output_source->name = compiler_copy_compiled_atom(output_arena, source->name);
 			output_source->canonical_path = compiler_copy_compiled_atom(output_arena, source->canonical_path);
-			Com_String source_text = compiler_copy_compiled_string(output_arena, source->source.data, source->source.size);
-			output_source->source = (SourceBuffer) {.data = source_text.data, .size = source_text.size};
+			BcString source_text = compiler_copy_compiled_string(output_arena, source->source.data, source->source.size);
+			output_source->source = (BcSourceBuffer) {.data = source_text.data, .size = source_text.size};
 		}
 	}
 
@@ -1032,9 +1154,9 @@ static Com_Module *compiler_package_module(Compiler *compiler, elf_Arena *output
 	if (module->global_count)
 	{
 		elf_arena_align(output_arena, 8);
-		module->globals = elf_arena_push_zero(output_arena, sizeof(*module->globals) * module->global_count);
+		module->global_names = elf_arena_push_zero(output_arena, sizeof(*module->global_names) * module->global_count);
 		for (u32 i = 0; i < module->global_count; ++i) {
-			module->globals[i].name = input->global_names[i];
+			module->global_names[i] = input->global_names[i];
 		}
 	}
 
@@ -1057,18 +1179,16 @@ static Com_Module *compiler_package_module(Compiler *compiler, elf_Arena *output
 		module->functions = elf_arena_push_copy(output_arena, sizeof(*module->functions) * module->function_count, input->functions);
 	}
 
-	module->has_entry = ir_module->has_entry;
-	module->entry_index = ir_module->entry_index;
 	return module;
 }
 
-Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type)
+BcModule *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type)
 {
 	ASSERT(compiler);
 	ASSERT(output_arena);
 	ASSERT(compiler->source_count);
 	ASSERT(unit_type == COM_UNIT_FUNCTION || unit_type == COM_UNIT_MODULE);
-	Com_Module *module = 0;
+	BcModule *module = 0;
 	if (compiler->report.error_count) {
 		return module;
 	}
@@ -1093,7 +1213,7 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 	}
 
 	IrModule *ir_module = ir_new_module(compiler);
-	IrFunctionEmitter *ir_function_emitter = ir_new_function_emitter(ir_module);
+	IrEmitter *ir_function_emitter = ir_new_function_emitter(ir_module);
 	PROF_BLOCK("compiler.lower")
 	{
 		for (u32 i = 0; i < compiler->function_count; ++i) {
@@ -1107,126 +1227,8 @@ Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_Un
 		return module;
 	}
 	ASSERT(ir_module->functions || ir_module->function_count == 0);
-	ASSERT(!ir_module->has_entry || ir_module->entry_index < ir_module->function_count);
-
 	BcModule *bc_module = bc_emit_module(ir_module);
 	module = compiler_package_module(compiler, output_arena, ir_module, bc_module);
 	return module;
 }
 #endif
-
-Compiler *compiler_create(elf_Arena *arena)
-{
-	Compiler *compiler = elf_arena_push_zero(arena, sizeof(*compiler));
-	if (compiler) {
-		compiler->arena = arena;
-	}
-	return compiler;
-}
-
-Com_SourceId compiler_add_root_source(Compiler *compiler, const char *name, elf_StrSlice source)
-{
-	(void)compiler;
-	(void)name;
-	(void)source;
-	return COM_SOURCE_INVALID;
-}
-
-Com_SourceId compiler_add_root_file(Compiler *compiler, const char *path)
-{
-	(void)compiler;
-	(void)path;
-	return COM_SOURCE_INVALID;
-}
-
-void compiler_set_log_messages(Compiler *compiler, b32 enabled)
-{
-	if (compiler) {
-		compiler->log_messages = enabled;
-	}
-}
-
-b32 compiler_parse_sources(Compiler *compiler)
-{
-	(void)compiler;
-	return false;
-}
-
-b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
-{
-	(void)compiler;
-	(void)unit_type;
-	return false;
-}
-
-Com_StaticSymbol *compiler_static_symbol_from_source(Compiler *compiler, Com_SourceId source, Atom *name)
-{
-	(void)compiler;
-	(void)source;
-	(void)name;
-	return 0;
-}
-
-Com_StaticLookup compiler_lookup_static_expr(Compiler *compiler, Com_SourceId source, Ast expr, Com_StaticValue *out)
-{
-	(void)compiler;
-	(void)source;
-	(void)expr;
-	(void)out;
-	return COM_STATIC_LOOKUP_NONE;
-}
-
-void compiler_report_unreferenced_statics(Compiler *compiler, Com_SourceId source)
-{
-	(void)compiler;
-	(void)source;
-}
-
-b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
-{
-	(void)compiler;
-	(void)error;
-	(void)severity;
-	(void)phase;
-	(void)site;
-	(void)format;
-	(void)args;
-	return false;
-}
-
-b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
-{
-	(void)compiler;
-	(void)error;
-	(void)severity;
-	(void)phase;
-	(void)site;
-	(void)format;
-	return false;
-}
-
-Com_Module *compiler_compile(Compiler *compiler, elf_Arena *output_arena, Com_UnitType unit_type)
-{
-	(void)compiler;
-	(void)output_arena;
-	(void)unit_type;
-	return 0;
-}
-
-Ast compiler_parse_constant_expr(Compiler *compiler)
-{
-	(void)compiler;
-	return ERROR_AST;
-}
-
-Ast compiler_parse_json(Compiler *compiler)
-{
-	(void)compiler;
-	return ERROR_AST;
-}
-
-Ast compiler_parse_jsonl(Compiler *compiler)
-{
-	(void)compiler;
-	return ERROR_AST;
-}

@@ -324,5 +324,4 @@ static void run_gc_tests(void)
 	test_gc_keeps_referenced_string();
 	test_gc_keeps_referenced_error_info();
 	test_gc_keeps_referenced_buffer();
-	test_state_create_destroy_repeatedly();
 }

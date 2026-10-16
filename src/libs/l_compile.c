@@ -6,6 +6,8 @@
 #include "ast.h"
 #include "l_compile.h"
 
+#if 0
+
 static b32 lib_eval_constant_ast(elf_State *state, Compiler *compiler, Ast ast, elf_Value *out)
 {
 	if (!ast)
@@ -144,18 +146,19 @@ static b32 lib_push_parsed_source(elf_State *state, const char *name, elf_StrSli
 	elf_Scratch scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, name, source);
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	Ast ast = ERROR_AST;
 	if (type == LIB_PARSE_JSON)
 	{
-		ast = compiler_parse_json(compiler);
+		ast = compiler_parse_json(scratch.arena, source_name, source);
 	}
 	else if (type == LIB_PARSE_JSONL)
 	{
-		ast = compiler_parse_jsonl(compiler);
+		ast = compiler_parse_jsonl(scratch.arena, source_name, source);
 	}
 	else
 	{
-		ast = compiler_parse_constant_expr(compiler);
+		ast = compiler_parse_constant_expr(scratch.arena, source_name, source);
 	}
 	b32 result = lib_push_compiler_ast(state, compiler, ast);
 	elf_end_scratch(scratch);
@@ -176,3 +179,4 @@ elf_Bool lib_push_jsonl(elf_State *state, const char *name, elf_StrSlice source)
 {
 	return lib_push_parsed_source(state, name, source, LIB_PARSE_JSONL);
 }
+#endif

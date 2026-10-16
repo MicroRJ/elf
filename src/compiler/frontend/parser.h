@@ -21,7 +21,7 @@ typedef struct
 	Com_SourceId      source_id;
 	Atom_Table       *atoms;
 	elf_Arena        *scratch_arena;
-	SourceBuffer      source;
+	BcSourceBuffer      source;
 
 	const char       *cursor;
 	const char       *end;
@@ -46,6 +46,7 @@ struct Parser
 	Ast                *ast_stack;
 	u32                 ast_stack_size;
 	u32                 ast_stack_index;
+	u32                 ast_count;
 };
 
 Parser *parser_create(Compiler *compiler);

@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-#define AST_XDEF(X)                                          \
+#define AST_DEFINITIONS(X)                                   \
 	X(AST_NONE                , "none")                       \
 	X(AST_ERROR               , "error")                      \
 	X(AST_FILE                , "file")                       \
@@ -79,17 +79,21 @@
 
 typedef struct Ast_T Ast_T;
 typedef Ast_T *Ast;
+typedef u32 Ast_Id;
+
+enum
+{
+	AST_ID_INVALID = 0,
+};
 
 typedef enum
 {
 #define AST_XPAND(ENUM, NAME) ENUM,
-
-	AST_XDEF(AST_XPAND)
-
+	AST_DEFINITIONS(AST_XPAND)
 #undef AST_XPAND
 	AST_COUNT_,
 }
-AstType;
+Ast_Kind;
 
 typedef enum
 {
@@ -98,12 +102,12 @@ typedef enum
 }
 AstDeclTags;
 
-static inline const char *ast_type_name(AstType type)
+static inline const char *ast_type_name(Ast_Kind type)
 {
 	static const char *names[] =
 	{
 #define AST_XPAND(ENUM, NAME) #ENUM,
-		AST_XDEF(AST_XPAND)
+		AST_DEFINITIONS(AST_XPAND)
 #undef AST_XPAND
 	};
 
@@ -116,14 +120,15 @@ static inline const char *ast_type_name(AstType type)
 typedef struct
 {
 	Ast *items;
-	u32 count;
+	u32  count;
 }
-AstArray;
+Ast_Array;
 
 // IMMUTABLE once constructed.
 struct Ast_T
 {
-	AstType    kind;
+	Ast_Id     id;
+	Ast_Kind   kind;
 	SourceSite site;
 
 	union
@@ -132,7 +137,7 @@ struct Ast_T
 		Atom       *atom;
 		i64         integer_value;
 		f64         number_value;
-		AstArray    interpolated_string;
+		Ast_Array    interpolated_string;
 
 		struct
 		{
@@ -148,7 +153,7 @@ struct Ast_T
 
 		struct
 		{
-			AstArray params;
+			Ast_Array params;
 			b32      variadic;
 			Ast      body;
 		}
@@ -188,12 +193,12 @@ struct Ast_T
 		}
 		binary;
 
-		AstArray tuple;
+		Ast_Array tuple;
 
 		struct
 		{
 			Ast      expr;
-			AstArray args;
+			Ast_Array args;
 			Ast      carg;
 		}
 		call;
@@ -205,9 +210,9 @@ struct Ast_T
 		}
 		named_argument;
 
-		AstArray table;
+		Ast_Array table;
 
-		AstArray array;
+		Ast_Array array;
 
 		struct
 		{
@@ -231,7 +236,7 @@ struct Ast_T
 		}
 		return_stat;
 
-		AstArray block;
+		Ast_Array block;
 
 		struct
 		{

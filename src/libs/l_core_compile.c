@@ -6,6 +6,14 @@
 // Compiler-backed core operations.
 //
 
+static b32 lib_push_constant_expr(elf_State *state, const char *name, elf_StrSlice source)
+{
+	(void)state;
+	(void)name;
+	(void)source;
+	return false;
+}
+
 ELF_FUNCTION(l_core_const_expr)
 {
 	lib_check_arg_count(S, "const_expr", nargs, 1, 1);

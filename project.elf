@@ -32,6 +32,7 @@ library := {
 		"src/compiler/compiler.c",
 		"src/compiler/frontend/parser.c",
 		"src/compiler/middle/ir_emitter.c",
+		"src/compiler/middle/static_analysis.c",
 		"src/compiler/backend/bc_emitter.c",
 	],
 	private_include_directories = internal_include_directories,

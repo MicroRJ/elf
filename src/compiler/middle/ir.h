@@ -2,7 +2,9 @@
 // See Copyright Notice In elf.h
 //
 
-typedef struct Compiler Compiler;
+#include "bytecode.h"
+
+typedef struct Atom Atom;
 
 typedef struct
 {
@@ -157,8 +159,7 @@ struct IrNode
 
 		struct
 		{
-			u32     index;
-			IrArray captures;
+			u32 index;
 		}
 		ir_closure;
 
@@ -248,34 +249,29 @@ static inline b32 ir_is_error(Ir ir)
 	return ir == ERROR_IR;
 }
 
-typedef struct IrFunction IrFunction;
+typedef struct IrFunDef IrFunDef;
 
-struct IrFunction
+struct IrFunDef
 {
 	SourceSite site;
 	b32        variadic;
-	b32        is_static;
 	Ir         body;
 	Ir        *params;
 	u32        param_count;
-	u32        capture_count;
+	IrArray    capture_sources;
 };
 
 // One lowered compilation unit. Global indices are still module-local here and
 // are resolved to runtime slots only when the compiled module is linked.
 typedef struct
 {
-	Compiler   *compiler;
-	elf_Arena  *arena;
-	IrFunction *functions;
-	u32         function_count;
-	u32         function_capacity;
-	Atom      **globals;
-	u32         global_count;
-	u32         global_capacity;
-	b32         has_entry;
-	// TODO(RJ): just make index zero be the entry function!
-	u32         entry_index;
+	elf_Arena *arena;
+	IrFunDef  *functions;
+	u32        function_count;
+	u32        function_capacity;
+	Atom     **globals;
+	u32        global_count;
+	u32        global_capacity;
 }
 IrModule;
 

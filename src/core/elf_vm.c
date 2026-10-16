@@ -106,7 +106,7 @@ static inline void pop_stack_frame(elf_State *state)
 	state->frame--;
 }
 
-static void vm_error_invalid_operands(elf_State *state, BytecodeType op, elf_Value left, elf_Value right)
+static void vm_error_invalid_operands(elf_State *state, BcType op, elf_Value left, elf_Value right)
 {
 	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "%s: invalid operands '%s' and '%s'",
 		bytecode_type_name(op), value_type_name(left.type), value_type_name(right.type));

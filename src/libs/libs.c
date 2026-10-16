@@ -14,8 +14,6 @@
 #include "compiler.h"
 #include "libs.h"
 
-#include "l_compile.c"
-
 #include "l_core_io.c"
 #include "l_io.c"
 #include "l_load_file.c"
@@ -35,16 +33,33 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 	}
 
 	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	Com_SourceId root = compiler_add_root_file(compiler, name);
-	b32 root_loaded = root != COM_SOURCE_INVALID;
-	Com_Module *compiled_module = root != COM_SOURCE_INVALID ? compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION) : 0;
+	elf_StrSlice source = {};
+	dy_File_Info info;
+	dy_File file = {};
+	b32 root_loaded = !dy_get_file_info(dy_string_from_cstring(name), &info).error && !info.is_directory;
+	if (root_loaded) {
+		root_loaded = !dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error;
+	}
+	if (root_loaded)
+	{
+		char *data = elf_arena_push(scratch.arena, info.size + 16);
+		zero_memory(data + info.size, 16);
+		dy_u64 read = 0;
+		dy_Result read_result = dy_read_file(file, data, info.size, &read);
+		dy_close_file(file);
+		root_loaded = !read_result.error && read == info.size;
+		if (root_loaded) {
+			source = (elf_StrSlice) {data, info.size};
+		}
+	}
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	BcModule *compiled_module = root_loaded ? compiler_compile(scratch.arena, source_name, source) : 0;
 	elf_Module *module = elf_link_module(state, compiled_module);
 	BcFunctionRef entry = {};
-	if (module && compiled_module->has_entry)
+	if (module)
 	{
 		entry.module = module;
-		entry.index = compiled_module->entry_index;
+		entry.index = 0;
 	}
 	elf_end_scratch(scratch);
 

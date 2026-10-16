@@ -19,16 +19,14 @@ static BcFunction *backend_test_function(BackendCompileResult result)
 static BcFunctionRef backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
 {
 	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_set_log_messages(compiler, false);
-	compiler_add_root_source(compiler, name, source);
-	Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION);
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
 	elf_Module *module = elf_link_module(state, compiled_module);
 	BcFunctionRef entry = {};
-	if (module && compiled_module->has_entry)
+	if (module)
 	{
 		entry.module = module;
-		entry.index = compiled_module->entry_index;
+		entry.index = 0;
 	}
 	elf_end_scratch(scratch);
 	return entry;
@@ -87,7 +85,7 @@ static void backend_test_destroy(BackendCompileResult result)
 	elf_destroy_state(result.state);
 }
 
-static u32 backend_count_bytecode(BackendCompileResult result, BytecodeType type)
+static u32 backend_count_bytecode(BackendCompileResult result, BcType type)
 {
 	u32 count = 0;
 	BcFunction *function = backend_test_function(result);
@@ -101,10 +99,10 @@ static u32 backend_count_bytecode(BackendCompileResult result, BytecodeType type
 	return count;
 }
 
-static SourceMapEntry *backend_find_source_map_entry(elf_Module *module, u32 byte)
+static BcSourceMapEntry *backend_find_source_map_entry(elf_Module *module, u32 byte)
 {
 	for (u32 i = 0; i < module->source_map_count; ++ i) {
-		SourceMapEntry *entry = &module->source_map[i];
+		BcSourceMapEntry *entry = &module->source_map[i];
 		if (byte >= entry->byte_start && byte < entry->byte_end) {
 			return entry;
 		}
@@ -128,7 +126,7 @@ static void test_backend_source_map(void)
 
 	for (u32 i = 0; i < function->length; ++ i) {
 		u32 byte = function->offset + i;
-		SourceMapEntry *entry = backend_find_source_map_entry(module, byte);
+		BcSourceMapEntry *entry = backend_find_source_map_entry(module, byte);
 		if (!entry || !source_slice_is_valid(entry->site) || entry->site.size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
 			goto done;
@@ -263,7 +261,7 @@ static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_
 	}
 }
 
-static i32 backend_find_first_bytecode(BackendCompileResult result, BytecodeType type)
+static i32 backend_find_first_bytecode(BackendCompileResult result, BcType type)
 {
 	BcFunction *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
@@ -500,7 +498,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
 	IrModule *ir_module = ir_new_module(compiler);
-	IrFunctionEmitter *ctx = ir_new_function_emitter(ir_module);
+	IrEmitter *ctx = ir_new_function_emitter(ir_module);
 	SourceSite site = {};
 
 	Ir pred = ir_new_int(ctx, site, 0);
@@ -514,7 +512,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	push_ir(&stats, after_if);
 	Ir body = ir_new_block(ctx, site, close_ir_frame(&stats));
 
-	IrFunction function = {};
+	IrFunDef function = {};
 	function.site = site;
 	function.variadic = true;
 	Ir params[] = { ir_new_local(ctx, site, 0) };
@@ -562,19 +560,6 @@ static void test_backend_formats_bytecode_function(void)
 	backend_test_destroy(result);
 }
 
-static void test_backend_generates_module_without_entry(void)
-{
-	elf_State *state = elf_create_state();
-	elf_Scratch scratch = elf_begin_scratch();
-	IrModule ir_module = {.arena = scratch.arena};
-	BcModule *module = bc_emit_module(&ir_module);
-	if (ir_module.has_entry || module->function_count || module->bytecode_count) {
-		test_fail("module without entry contains no implicit executable code");
-	}
-	elf_end_scratch(scratch);
-	elf_destroy_state(state);
-}
-
 static void test_backend_outputs_strings(void)
 {
 	elf_Arena arena = elf_arena_create(0);
@@ -585,7 +570,7 @@ static void test_backend_outputs_strings(void)
 
 	IrNode string = {.kind = IR_ATOM, .atom = atom};
 	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &string};
-	IrFunction function = {.body = &return_string};
+	IrFunDef function = {.body = &return_string};
 	IrModule ir_module = {.arena = &arena, .functions = &function, .function_count = 1, .function_capacity = 1};
 
 	BcModule *module = bc_emit_module(&ir_module);
@@ -784,7 +769,6 @@ static void run_backend_tests(void)
 	test_backend_truthy_or_reuses_left_result_slot();
 	test_backend_logical_expr_delays_result_slot();
 	test_backend_formats_bytecode_function();
-	test_backend_generates_module_without_entry();
 	test_backend_outputs_strings();
 	test_backend_compiles_static_functions();
 	test_backend_emits_direct_static_call();

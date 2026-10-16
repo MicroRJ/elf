@@ -13,6 +13,22 @@ typedef struct
 }
 JsonWriter;
 
+static b32 lib_push_json(elf_State *state, const char *name, elf_StrSlice source)
+{
+	(void)state;
+	(void)name;
+	(void)source;
+	return false;
+}
+
+static b32 lib_push_jsonl(elf_State *state, const char *name, elf_StrSlice source)
+{
+	(void)state;
+	(void)name;
+	(void)source;
+	return false;
+}
+
 static void json_push_error_value(elf_State *state, const char *message, const Com_Message *compiler_message)
 {
 	elf_Table *info = elf_table_new(state);
@@ -241,20 +257,8 @@ static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
 ELF_FUNCTION(l_json_parse)
 {
 	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
-	elf_String *text = lib_load_string(S, 1);
-	elf_StrSlice source = {(char *)elf_string_data(text), elf_string_size(text)};
-	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_set_log_messages(compiler, false);
-	compiler_add_root_source(compiler, "<json>", source);
-	Ast ast = compiler_parse_json(compiler);
-	if (!lib_push_compiler_ast(S, compiler, ast))
-	{
-		const Com_Message *compiler_message = compiler->report.first;
-		const char *message = compiler_message ? compiler_message->text.data : "invalid JSON";
-		json_push_error_value(S, message, compiler_message);
-	}
-	elf_end_scratch(scratch);
+	(void)lib_load_string(S, 1);
+	json_push_error_value(S, "JSON parsing is temporarily unavailable", 0);
 	return 1;
 }
 

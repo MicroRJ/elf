@@ -31,32 +31,33 @@ BcJumpPatch;
 typedef struct BcEmitter BcEmitter;
 struct BcEmitter
 {
-	elf_Arena      *arena;
-	Bytecode       *bytecode;
-	u32             bytecode_capacity;
-	u32             bytecode_count;
-	BcFunction     *functions;
-	u32             function_count;
-	u32             generated_function_count;
-	Atom          **atoms;
-	u32             atom_capacity;
-	u32             atom_count;
-	i64            *integer_constants;
-	u32             integer_constant_capacity;
-	u32             integer_constant_count;
-	f64            *number_constants;
-	u32             number_constant_capacity;
-	u32             number_constant_count;
-	SourceMapEntry *source_map;
-	u32             source_map_capacity;
-	u32             source_map_count;
+	IrModule         *input;
+	elf_Arena        *arena;
+	Bytecode         *bytecode;
+	u32               bytecode_capacity;
+	u32               bytecode_count;
+	BcFunction       *functions;
+	u32               function_count;
+	u32               generated_function_count;
+	Atom            **atoms;
+	u32               atom_capacity;
+	u32               atom_count;
+	i64              *integer_constants;
+	u32               integer_constant_capacity;
+	u32               integer_constant_count;
+	f64              *number_constants;
+	u32               number_constant_capacity;
+	u32               number_constant_count;
+	BcSourceMapEntry *source_map;
+	u32               source_map_capacity;
+	u32               source_map_count;
 	// -- per function state --
-	u32             stack_size;
-	u32             stack_top;
-	BcLabel         labels[4096];
-	u32             label_count;
-	BcJumpPatch     jump_patches[4096];
-	u32             jump_patch_count;
+	u32               stack_size;
+	u32               stack_top;
+	BcLabel           labels[4096];
+	u32               label_count;
+	BcJumpPatch       jump_patches[4096];
+	u32               jump_patch_count;
 };
 
 static inline b32 bc_slot_is_valid(BcSlot memory)
@@ -91,7 +92,7 @@ static b32 source_slice_equal(SourceSite left, SourceSite right)
 static void emit_source_map_entry(BcEmitter *emitter, SourceSite site, u32 byte_position)
 {
 	if (emitter->source_map_count > 0) {
-		SourceMapEntry *entry = emitter->source_map + emitter->source_map_count - 1;
+		BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count - 1;
 		if (entry->byte_end == byte_position && source_slice_equal(entry->site, site)) {
 			entry->byte_end = byte_position + 1;
 			return;
@@ -99,7 +100,7 @@ static void emit_source_map_entry(BcEmitter *emitter, SourceSite site, u32 byte_
 	}
 
 	emitter->source_map = grow_module_array(emitter->arena, emitter->source_map, emitter->source_map_count, &emitter->source_map_capacity, emitter->source_map_count + 1, sizeof(*emitter->source_map));
-	SourceMapEntry *entry = emitter->source_map + emitter->source_map_count++;
+	BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count++;
 	entry->byte_start = byte_position;
 	entry->byte_end = byte_position + 1;
 	entry->site = site;
@@ -255,25 +256,25 @@ static u32 emit_bc(BcEmitter *emitter, SourceSite site, Bytecode byte)
 	return position;
 }
 
-static u32 emit_x_bc(BcEmitter *emitter, SourceSite site, BytecodeType k, i32 x)
+static u32 emit_x_bc(BcEmitter *emitter, SourceSite site, BcType k, i32 x)
 {
 	Bytecode byte = BC_XXX(k, x);
 	return emit_bc(emitter, site, byte);
 }
 
-static u32 emit_xy_bc(BcEmitter *emitter, SourceSite site, BytecodeType k, i32 x, i32 y)
+static u32 emit_xy_bc(BcEmitter *emitter, SourceSite site, BcType k, i32 x, i32 y)
 {
 	Bytecode byte = BC_XYY(k,x,y);
 	return emit_bc(emitter,site,byte);
 }
 
-static u32 emit_xyz_bc(BcEmitter *emitter, SourceSite site, BytecodeType k, i32 x, i32 y, i32 z)
+static u32 emit_xyz_bc(BcEmitter *emitter, SourceSite site, BcType k, i32 x, i32 y, i32 z)
 {
 	Bytecode byte = BC_XYZ(k, x, y, z);
 	return emit_bc(emitter, site, byte);
 }
 
-static u32 emit_xyzw_bc(BcEmitter *emitter, SourceSite site, BytecodeType k, i32 x, i32 y, i32 z, i32 w)
+static u32 emit_xyzw_bc(BcEmitter *emitter, SourceSite site, BcType k, i32 x, i32 y, i32 z, i32 w)
 {
 	Bytecode byte = BC_XYZW(k, x, y, z, w);
 	return emit_bc(emitter, site, byte);
@@ -284,7 +285,7 @@ static u32 emit_jump_bc(BcEmitter *emitter, SourceSite site)
 	return emit_x_bc(emitter, site, BC_JUMP, 0);
 }
 
-static u32 emit_jump_if_bc(BcEmitter *emitter, SourceSite site, BytecodeType type, BcSlot pred)
+static u32 emit_jump_if_bc(BcEmitter *emitter, SourceSite site, BcType type, BcSlot pred)
 {
 	ASSERT(type == BC_JZ || type == BC_JNZ);
 	return emit_xy_bc(emitter, site, type, 0, unwrap_slot(pred));
@@ -420,7 +421,7 @@ static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
 
 	for (u32 i = 0; i < module->bytecode_count; ++i)
 	{
-		BytecodeType type = BC_TYPE(module->bytecode[i]);
+		BcType type = BC_TYPE(module->bytecode[i]);
 		if (type == BC_GETGLOBAL || type == BC_SETGLOBAL) {
 			module->global_relocation_count += 1;
 		}
@@ -432,7 +433,7 @@ static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
 		for (u32 i = 0; i < module->bytecode_count; ++i)
 		{
 			Bytecode bytecode = module->bytecode[i];
-			BytecodeType type = BC_TYPE(bytecode);
+			BcType type = BC_TYPE(bytecode);
 			if (type == BC_GETGLOBAL || type == BC_SETGLOBAL)
 			{
 				u32 global_index = type == BC_GETGLOBAL ? (u32)BC_ARGY(bytecode) : (u32)BC_ARGX(bytecode);
@@ -445,7 +446,7 @@ static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
 	return module;
 }
 
-static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
+static void bc_emit_function(BcEmitter *emitter, IrFunDef *function)
 {
 	ASSERT(emitter);
 	ASSERT(function);
@@ -487,13 +488,14 @@ static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 	bc_function->arity = function->param_count;
 	bc_function->offset = bytecode_start;
 	bc_function->length = module->bytecode_count - bytecode_start;
-	bc_function->captures = function->capture_count;
+	bc_function->captures = function->capture_sources.count;
 	bc_function->stack_size = emitter->stack_size;
 }
 
 BcModule *bc_emit_module(IrModule *input)
 {
 	ASSERT(input);
+	ASSERT(input->function_count);
 
 	elf_Arena *arena = input->arena;
 
@@ -502,6 +504,7 @@ BcModule *bc_emit_module(IrModule *input)
 
 	// TODO(RJ): allocate the emitter itself on a scratch arena!
 	BcEmitter *emitter = dy_arena_push_zero(arena, sizeof(*emitter), 8);
+	emitter->input = input;
 	emitter->arena = arena;
 	emitter->function_count = input->function_count;
 	emitter->functions = dy_arena_push_zero(arena, sizeof(*emitter->functions) * emitter->function_count, 8);
@@ -669,7 +672,7 @@ static BcSlot emit_direct_call(BcEmitter *emitter, Ir ir, BcSlot out, u32 nout)
 	return finish_call(emitter, ir, stack_top, out, nout);
 }
 
-static BytecodeType bc_op(IrKind type)
+static BcType bc_op(IrKind type)
 {
 	switch (type)
 	{
@@ -716,7 +719,7 @@ static BcSlot emit_binary_expr(BcEmitter *emitter, Ir expr, BcSlot out, u32 nout
 	return out;
 }
 
-static BcSlot emit_unary_expr(BcEmitter *emitter, Ir expr, BytecodeType bytecode_type, BcSlot out, u32 nout)
+static BcSlot emit_unary_expr(BcEmitter *emitter, Ir expr, BcType bytecode_type, BcSlot out, u32 nout)
 {
 	if (nout < 1) {
 		return out;
@@ -907,7 +910,7 @@ static BcSlot emit_expr(BcEmitter *emitter, Ir expr, BcSlot out, u32 nout)
 			u32 bytecode_function_id = expr->ir_closure.index;
 			ASSERT(bytecode_function_id < emitter->function_count);
 
-			IrArray captures = expr->ir_closure.captures;
+			IrArray captures = emitter->input->functions[bytecode_function_id].capture_sources;
 			if (captures.count == 0)
 			{
 				emit_xy_bc(emitter, site, BC_CLOSURE, unwrap_slot(out), bytecode_function_id);

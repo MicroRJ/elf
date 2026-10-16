@@ -6,7 +6,7 @@ typedef struct
 	const char *data;
 	u32         size;
 }
-SourceBuffer;
+BcSourceBuffer;
 
 // Points at a byte range in one source participating in the compilation.
 // source is the stable index used by tokens, AST nodes, and runtime source maps.
@@ -26,6 +26,6 @@ typedef struct
 	u32        byte_end;
 	SourceSite site;
 }
-SourceMapEntry;
+BcSourceMapEntry;
 
 #endif

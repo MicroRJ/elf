@@ -26,7 +26,7 @@ RuntimeSourceLocation;
 static SourceSite find_source_for_instr(elf_Module *module, int instr)
 {
 	for (u32 i = 0; i < module->source_map_count; ++ i) {
-		SourceMapEntry entry = module->source_map[i];
+		BcSourceMapEntry entry = module->source_map[i];
 		if (instr >= entry.byte_start && instr < entry.byte_end) {
 			return entry.site;
 		}
@@ -104,7 +104,7 @@ static void print_runtime_source_location(RuntimeSourceLocation location)
 	, bytecode_type_name(BC_TYPE(location.byte)));
 
 	log_line(LOG_LEVEL_INFO, "|");
-	SourceBuffer source = {};
+	BcSourceBuffer source = {};
 	if (module && module->source_data) {
 		source.data = module->source_data;
 		source.size = module->source_size;

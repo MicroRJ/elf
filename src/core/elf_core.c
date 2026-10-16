@@ -39,28 +39,25 @@
 
 #include "compiler.h"
 
-elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
+elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 {
 	ASSERT(state);
-	if (!compiled_module || !compiled_module->source_count || compiled_module->root_source >= compiled_module->source_count) {
-		return 0;
-	}
-	if (compiled_module->has_entry && compiled_module->entry_index >= compiled_module->function_count) {
+	if (!compiled_module || !compiled_module->source_count || compiled_module->root_source >= compiled_module->source_count || !compiled_module->function_count) {
 		return 0;
 	}
 	for (u32 i = 0; i < compiled_module->global_count; ++i)
 	{
-		if (compiled_module->globals[i].name >= compiled_module->string_count) {
+		if (compiled_module->global_names[i] >= compiled_module->string_count) {
 			return 0;
 		}
 	}
 	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
 	{
-		Com_GlobalRelocation relocation = compiled_module->global_relocations[i];
+		BcGlobalRelocation relocation = compiled_module->global_relocations[i];
 		if (relocation.bytecode_index >= compiled_module->bytecode_count || relocation.global_index >= compiled_module->global_count) {
 			return 0;
 		}
-		BytecodeType type = BC_TYPE(compiled_module->bytecode[relocation.bytecode_index]);
+		BcType type = BC_TYPE(compiled_module->bytecode[relocation.bytecode_index]);
 		if (type != BC_GETGLOBAL && type != BC_SETGLOBAL) {
 			return 0;
 		}
@@ -71,7 +68,7 @@ elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
 	u32 next_new_slot = state->globals.count;
 	for (u32 i = 0; i < compiled_module->global_count; ++i)
 	{
-		Com_String name = compiled_module->strings[compiled_module->globals[i].name];
+		BcString name = compiled_module->strings[compiled_module->global_names[i]];
 		elf_StrSlice slice = {(char *)name.data, name.size};
 		u32 slot = 0;
 		if (!elf_globals_find(&state->globals, slice, &slot)) {
@@ -89,13 +86,13 @@ elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
 	state->gc_mode = ELF_GC_PAUSED;
 	for (u32 i = 0; i < compiled_module->global_count; ++i)
 	{
-		Com_String name = compiled_module->strings[compiled_module->globals[i].name];
+		BcString name = compiled_module->strings[compiled_module->global_names[i]];
 		global_slots[i] = elf_globals_ensure(&state->globals, (elf_StrSlice) {(char *)name.data, name.size});
 	}
 
 	elf_arena_align(&state->arena, 8);
 	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
-	Com_ModuleSource root_source = compiled_module->sources[compiled_module->root_source];
+	BcSource root_source = compiled_module->sources[compiled_module->root_source];
 	module->source_name = elf_string_from_data_size(state, root_source.name.data, root_source.name.size);
 	u64 source_storage_size = ((u64)root_source.source.size + 1 + 7) & ~(u64)7;
 	module->source_data = elf_arena_push_zero(&state->arena, source_storage_size);
@@ -109,7 +106,7 @@ elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
 		module->strings = elf_arena_push_zero(&state->arena, sizeof(*module->strings) * module->string_count);
 		for (u32 i = 0; i < module->string_count; ++i)
 		{
-			Com_String string = compiled_module->strings[i];
+			BcString string = compiled_module->strings[i];
 			module->strings[i] = elf_string_from_data_size(state, string.data, string.size);
 		}
 	}
@@ -145,7 +142,7 @@ elf_Module *elf_link_module(elf_State *state, const Com_Module *compiled_module)
 	}
 	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
 	{
-		Com_GlobalRelocation relocation = compiled_module->global_relocations[i];
+		BcGlobalRelocation relocation = compiled_module->global_relocations[i];
 		Bytecode *bytecode = module->bytecode + relocation.bytecode_index;
 		i16 slot = (i16)global_slots[relocation.global_index];
 		if (BC_TYPE(*bytecode) == BC_GETGLOBAL) {

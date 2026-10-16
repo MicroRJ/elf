@@ -2,38 +2,44 @@
 // See Copyright Notice In elf.h
 //
 
-// AST constructors are side-effect free beyond allocating and initializing the returned tree.
+// AST constructors only allocate, reserve an AST ID, and initialize the returned tree.
 
 Ast_T ast_error_sentinel =
 {
+	.id = AST_ID_INVALID,
 	.kind = AST_ERROR,
 	.status = COM_STATUS_REPORTED,
 };
 
 Ast_T ast_error_oom_sentinel =
 {
+	.id = AST_ID_INVALID,
 	.kind = AST_ERROR,
 	.status = COM_STATUS_OOM,
 };
 
-static Ast create_ast(Parser *par, SourceSite site, AstType kind)
+static Ast create_ast(Parser *par, SourceSite site, Ast_Kind kind)
 {
+	if (par->ast_count == UINT32_MAX) {
+		return ERROR_OOM_AST;
+	}
 	Ast_T *tree = elf_arena_push_zero(par->result_arena, sizeof(*tree));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}
+	tree->id = ++par->ast_count;
 	tree->site = site;
 	tree->kind = kind;
 	return tree;
 }
 
-static Ast create_nullary_ast(Parser *par, SourceSite site, AstType kind)
+static Ast create_nullary_ast(Parser *par, SourceSite site, Ast_Kind kind)
 {
 	Ast tree = create_ast(par,site,kind);
 	return tree;
 }
 
-static Ast create_unary_ast(Parser *par, SourceSite site, AstType kind, Ast x)
+static Ast create_unary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x)
 {
 	if (ast_is_error(x)) {
 		return x;
@@ -46,7 +52,7 @@ static Ast create_unary_ast(Parser *par, SourceSite site, AstType kind, Ast x)
 	return tree;
 }
 
-static Ast create_binary_ast(Parser *par, SourceSite site, AstType kind, Ast x, Ast y)
+static Ast create_binary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x, Ast y)
 {
 	if (ast_is_error(x)) {
 		return x;
@@ -99,7 +105,7 @@ static Ast create_atom_ast(Parser *par, SourceSite site, Atom *atom)
 	return value;
 }
 
-static Ast create_interpolated_string_ast(Parser *par, SourceSite site, AstArray parts)
+static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast_Array parts)
 {
 	ASSERT(parts.count >= 3);
 	ASSERT((parts.count & 1) != 0);
@@ -121,7 +127,7 @@ static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
 	return value;
 }
 
-static Ast create_table_ast(Parser *par, SourceSite site, AstArray args)
+static Ast create_table_ast(Parser *par, SourceSite site, Ast_Array args)
 {
 	Ast tree = create_ast(par, site, AST_TABLE);
 	if (ast_is_error(tree)) {
@@ -131,7 +137,7 @@ static Ast create_table_ast(Parser *par, SourceSite site, AstArray args)
 	return tree;
 }
 
-static Ast create_array_ast(Parser *par, SourceSite site, AstArray items)
+static Ast create_array_ast(Parser *par, SourceSite site, Ast_Array items)
 {
 	Ast tree = create_ast(par, site, AST_ARRAY);
 	if (ast_is_error(tree))
@@ -159,7 +165,7 @@ static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast val
 	return tree;
 }
 
-static Ast create_tuple_ast(Parser *par, SourceSite site, AstArray args)
+static Ast create_tuple_ast(Parser *par, SourceSite site, Ast_Array args)
 {
 	ASSERT(args.count >= 1);
 	Ast tree = create_ast(par, site, AST_TUPLE);
@@ -254,7 +260,7 @@ static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 	return tree;
 }
 
-static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, AstArray args, Ast carg)
+static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array args, Ast carg)
 {
 	if (ast_is_error(expr)) {
 		return expr;
@@ -284,7 +290,7 @@ static Ast create_carg_call_ast(Parser *par, SourceSite site, Ast left, Ast carg
 	}
 	else
 	{
-		result = create_call_ast(par, site, left, (AstArray) {}, carg);
+		result = create_call_ast(par, site, left, (Ast_Array) {}, carg);
 	}
 	return result;
 }
@@ -319,7 +325,7 @@ static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 	return tree;
 }
 
-static Ast create_block_ast(Parser *par, SourceSite site, AstArray stats)
+static Ast create_block_ast(Parser *par, SourceSite site, Ast_Array stats)
 {
 	Ast tree = create_ast(par, site, AST_BLOCK_STAT);
 	if (ast_is_error(tree)) {
@@ -476,7 +482,7 @@ static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 	return tree;
 }
 
-static Ast create_function_ast(Parser *par, SourceSite site, AstArray params, b32 variadic, Ast body)
+static Ast create_function_ast(Parser *par, SourceSite site, Ast_Array params, b32 variadic, Ast body)
 {
 	if (ast_is_error(body)) {
 		return body;
@@ -543,7 +549,7 @@ static void print_ast_list(Printer *pr, Ast *items, u32 count)
 	}
 }
 
-static const char *ast_binary_operator(AstType kind)
+static const char *ast_binary_operator(Ast_Kind kind)
 {
 	switch (kind)
 	{

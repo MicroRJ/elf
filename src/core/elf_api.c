@@ -70,15 +70,14 @@ elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	elf_Scratch scratch = elf_begin_scratch();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_add_root_source(compiler, name, source);
-	Com_Module *compiled_module = compiler_compile(compiler, scratch.arena, COM_UNIT_FUNCTION);
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
 	elf_Module *module = elf_link_module(state, compiled_module);
 	BcFunctionRef entry = {};
-	if (module && compiled_module->has_entry)
+	if (module)
 	{
 		entry.module = module;
-		entry.index = compiled_module->entry_index;
+		entry.index = 0;
 	}
 	elf_end_scratch(scratch);
 	return entry;

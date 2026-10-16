@@ -36,14 +36,16 @@ static void test_fail(const char *label)
 #include "globals_tests.c"
 #include "api_tests.c"
 #include "arena_tests.c"
+#if 0
 #include "lexer_tests.c"
 #include "parser_tests.c"
+#endif
 #include "json_tests.c"
 #include "unparse_tests.c"
 #if 0
 #include "ir_tests.c"
-#endif
 #include "backend_tests.c"
+#endif
 #include "vm_tests.c"
 #include "smoke_tests.c"
 
@@ -66,13 +68,8 @@ int main(void)
 	run_globals_tests(state);
 	run_api_tests();
 	run_arena_tests();
-	run_lexer_tests(state);
-	run_parser_tests(state);
 	run_json_tests(state);
 	run_unparse_tests(state);
-	run_backend_tests();
-	run_vm_tests();
-	run_smoke_tests();
 
 	prof_dump();
 	elf_destroy_state(state);

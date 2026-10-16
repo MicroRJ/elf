@@ -152,7 +152,7 @@ here instead of scattering `TODO` comments through the source.
   - Do this as one ownership change rather than moving the two fields separately.
 
 - [ ] Simplify frontend collection and interpolation state.
-  - Return and use `AstArray` consistently instead of passing separate pointer/count
+  - Return and use `Ast_Array` consistently instead of passing separate pointer/count
     pairs where practical.
   - Revisit whether formatted-string modes belong in the lexer, and replace the
     fixed nesting stack or give it a checked limit.

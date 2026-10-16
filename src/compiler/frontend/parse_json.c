@@ -38,7 +38,7 @@ static Ast parse_json_ast_object(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_RIGHT_BRACE))
 	{
-		Ast table = create_table_ast(parser, start.site, (AstArray) {});
+		Ast table = create_table_ast(parser, start.site, (Ast_Array) {});
 		if (ast_is_error(table)) {
 			return table;
 		}
@@ -87,7 +87,7 @@ static Ast parse_json_ast_object(Parser *parser)
 		return parser_error(parser, COM_ERROR_EXPECTED_TOKEN, parser->tok.site, "expected '}'");
 	}
 
-	AstArray args = pop_ast_array(parser, nargs);
+	Ast_Array args = pop_ast_array(parser, nargs);
 	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
@@ -108,7 +108,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	u32 nargs = 0;
 	if (pick_token(parser, TOK_SQUARE_RIGHT))
 	{
-		return create_array_ast(parser, start.site, (AstArray) {});
+		return create_array_ast(parser, start.site, (Ast_Array) {});
 	}
 
 	b32 done = false;
@@ -135,7 +135,7 @@ static Ast parse_json_ast_array(Parser *parser)
 		return parser_error(parser, COM_ERROR_EXPECTED_TOKEN, parser->tok.site, "expected ']'");
 	}
 
-	AstArray args = pop_ast_array(parser, nargs);
+	Ast_Array args = pop_ast_array(parser, nargs);
 	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
@@ -282,7 +282,7 @@ static Ast parse_jsonl_ast(Parser *parser)
 		count += 1;
 	}
 
-	AstArray values = pop_ast_array(parser, count);
+	Ast_Array values = pop_ast_array(parser, count);
 	if (values.count && !values.items)
 	{
 		return ERROR_OOM_AST;

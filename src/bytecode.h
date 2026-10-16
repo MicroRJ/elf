@@ -11,7 +11,7 @@
 
 #include "elf.h"
 #include "base.h"
-#include "source.h"
+
 
 // Type masks embedded in BC_ENFORCE instructions.
 typedef enum
@@ -97,21 +97,108 @@ typedef enum
 #undef XPAND
 	BC_COUNT_,
 }
-BytecodeType;
+BcType;
 
-const char *bytecode_type_name(BytecodeType type);
+const char *bytecode_type_name(BcType type);
 
 // One fixed-width VM instruction. The fourth operand uses padding that already
 // existed after z, so adding it does not make an instruction any larger.
 typedef struct
 {
-	BytecodeType b_type;
+	BcType b_type;
 	i16 b_x, b_y, b_z;
 	u8 b_w;
 }
 Bytecode;
 
 STATIC_ASSERT(sizeof(Bytecode) == 12);
+
+typedef struct BcFunction
+{
+	b32       variadic;
+	u8           arity;
+	u8        captures;
+	u16     stack_size;
+	u16         length;
+	u32         offset;
+}
+BcFunction;
+
+typedef struct
+{
+	u32 source;
+	u32 offset;
+	u32 size;
+	u32 line_offset;
+	u32 line_index;
+}
+SourceSite;
+
+typedef struct
+{
+	u32        byte_start;
+	u32        byte_end;
+	SourceSite site;
+}
+BcSourceMapEntry;
+
+typedef struct
+{
+	const char *data;
+	u32         size;
+}
+BcString;
+
+typedef BcString BcSourceBuffer;
+
+typedef struct
+{
+	BcString name;
+	// NOTE(RJ): after canonicalization!
+	BcString path;
+	BcString source;
+}
+BcSource;
+
+typedef struct
+{
+	u32 bytecode_index;
+	u32 global_index;
+}
+BcGlobalRelocation;
+
+typedef struct BcModule BcModule;
+struct BcModule
+{
+	BcSource           *sources;
+	u32                 source_count;
+	u32                 root_source;
+
+	BcString           *strings;
+	u32                 string_count;
+
+	u32                *global_names;
+	u32                 global_count;
+	BcGlobalRelocation *global_relocations;
+	u32                 global_relocation_count;
+
+	i64                *integer_constants;
+	u32                 integer_constant_count;
+	f64                *number_constants;
+	u32                 number_constant_count;
+
+	BcFunction         *functions;
+	u32                 function_count;
+	Bytecode           *bytecode;
+	u32                 bytecode_count;
+	BcSourceMapEntry   *source_map;
+	u32                 source_map_count;
+};
+
+
+
+
+
 
 #define BC_XYZW(K,X,Y,Z,W) (Bytecode){.b_type = (K), .b_w = (u8)(W), .b_x = (X), .b_y = (Y), .b_z = (Z)}
 #define BC_XYZ(K,X,Y,Z)     BC_XYZW(K,X,Y,Z,0)
@@ -124,15 +211,6 @@ STATIC_ASSERT(sizeof(Bytecode) == 12);
 #define BC_ARGZ(B)      (B).b_z
 #define BC_ARGW(B)      (B).b_w
 
-typedef struct BcFunction
-{
-	b32                  variadic;
-	u8                      arity;
-	u8                   captures;
-	u16                stack_size;
-	u16                    length;
-	u32                    offset;
-}
-BcFunction;
+
 
 #endif
