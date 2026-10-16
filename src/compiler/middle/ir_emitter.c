@@ -278,7 +278,7 @@ static void install_source_static_entities(IrFunctionEmitter *ctx, Com_SourceId 
 	ctx->current_source = source;
 }
 
-static IrEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, IrEntityType type, u32 tags, Atom *name)
+static IrEntity *declare_local_entity(IrFunctionEmitter *ctx, SourceSite site, u32 tags, Atom *name)
 {
 	IrEntity *en = entity_from_name(ctx, name);
 	const char *name_data = atom_data(name);
@@ -294,7 +294,7 @@ static IrEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, IrEntit
 
 	en = & ctx->entities[ctx->scope_end ++];
 	zero_memory(en, sizeof(* en));
-	en->type = type;
+	en->type = ENTITY_LOCAL_DECLARATION;
 	en->tags = tags;
 	en->name = name;
 	en->site = site;
@@ -575,7 +575,7 @@ static void lower_ast_function_body(IrFunctionEmitter *ctx, Ast expr, Ir ir)
 			}
 		}
 
-		IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, ENTITY_TAG_PARAMETER, name->atom);
+		IrEntity *entity = declare_local_entity(ctx, name->site, ENTITY_TAG_PARAMETER, name->atom);
 		entity->memory_ir = param_memory;
 	}
 
@@ -1268,7 +1268,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 			}
 			Ir local = create_local_ir(ctx, name->site, 0);
 			locals[i] = local;
-			IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+			IrEntity *entity = declare_local_entity(ctx, name->site, entity_tags, name->atom);
 			entity->memory_ir = local;
 		}
 		push_ir(items, create_multi_local_ir(ctx, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
@@ -1299,7 +1299,7 @@ static u32 lower_local_decl_tuples_to_ir(IrFunctionEmitter *ctx, IrFrame *items,
 		Ir local = create_local_ir(ctx, name->site, value);
 		push_ir(items, local);
 
-		IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION, entity_tags, name->atom);
+		IrEntity *entity = declare_local_entity(ctx, name->site, entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
@@ -1382,8 +1382,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrFunctionEmitter *ctx, Ast stat, Ast n
 		Ir local = create_local_ir(ctx, name->site, 0);
 		var_locals[i] = local;
 
-		IrEntity *entity = declare_entity(ctx, name->site, ENTITY_LOCAL_DECLARATION,
-			ENTITY_TAG_FORLOOP | entity_tags, name->atom);
+		IrEntity *entity = declare_local_entity(ctx, name->site, ENTITY_TAG_FORLOOP | entity_tags, name->atom);
 		entity->memory_ir = local;
 	}
 
