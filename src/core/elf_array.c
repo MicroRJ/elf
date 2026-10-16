@@ -83,6 +83,50 @@ void elf_array_remove(elf_State *state, elf_Array *array, u32 index, u32 count)
 	}
 }
 
+void elf_array_splice(elf_State *state, elf_Array *array, u32 index, u32 delete_count, elf_Array *replacement)
+{
+	array_check_write(state, array);
+	if (index > array->count || delete_count > array->count - index)
+	{
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "array splice range is out of bounds");
+	}
+	u32 insert_count = replacement->count;
+	u32 count_after_delete = array->count - delete_count;
+	if (insert_count > UINT32_MAX - count_after_delete)
+	{
+		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "array size exceeds the supported range");
+	}
+
+	elf_Value *insert_items = replacement->items;
+	elf_Value *insert_copy = 0;
+	if (replacement == array && insert_count)
+	{
+		u64 insert_size = (u64)insert_count * sizeof(*insert_copy);
+		insert_copy = elf_alloc(state, insert_size);
+		if (!insert_copy) {
+			elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "could not allocate %u values for array splice", insert_count);
+		}
+		copy_memory(insert_copy, insert_items, insert_size);
+		insert_items = insert_copy;
+	}
+
+	u32 old_count = array->count;
+	u32 new_count = count_after_delete + insert_count;
+	array_reserve(state, array, new_count);
+	u32 tail_count = old_count - index - delete_count;
+	if (tail_count) {
+		memmove(array->items + index + insert_count, array->items + index + delete_count, (u64)tail_count * sizeof(*array->items));
+	}
+	if (insert_count) {
+		copy_memory(array->items + index, insert_items, (u64)insert_count * sizeof(*array->items));
+	}
+	if (new_count < old_count) {
+		value_zero_many(array->items + new_count, old_count - new_count);
+	}
+	array->count = new_count;
+	elf_free(state, insert_copy, insert_copy ? (u64)insert_count * sizeof(*insert_copy) : 0);
+}
+
 u32 elf_array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value value)
 {
 	array_check_write(state, array);

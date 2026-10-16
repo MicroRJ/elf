@@ -165,6 +165,42 @@ ELF_FUNCTION(l_string_slice)
 	return 1;
 }
 
+ELF_FUNCTION(l_string_splice)
+{
+	lib_check_arg_count(S, "string.splice", nargs, 3, 3);
+	elf_String *string = string_receiver(S);
+	elf_String *replacement = lib_load_string(S, 3);
+	u32 size = elf_string_size(string);
+	u32 position = 0;
+	if (!string_normalize_index(S, lib_load_integer(S, 1), size, true, &position)) {
+		return 0;
+	}
+	i64 requested = lib_load_integer(S, 2);
+	if (requested < 0 || (u64)requested > size - position)
+	{
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "string splice delete count %lld is out of bounds", requested);
+		return 0;
+	}
+	u32 delete_size = (u32)requested;
+	u32 replacement_size = elf_string_size(replacement);
+	u32 size_after_delete = size - delete_size;
+	if (replacement_size > ELF_STRING_MAX_SIZE - size_after_delete)
+	{
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "string size exceeds the supported range");
+		return 0;
+	}
+
+	elf_Scratch scratch = elf_begin_scratch();
+	elf_arena_push_data(scratch.arena, elf_string_data(string), position);
+	elf_arena_push_data(scratch.arena, elf_string_data(replacement), replacement_size);
+	u32 suffix = position + delete_size;
+	elf_arena_push_data(scratch.arena, elf_string_data(string) + suffix, size - suffix);
+	u32 result_size = size_after_delete + replacement_size;
+	string_push(S, (char *)scratch.arena->data + scratch.restore_used, result_size);
+	elf_end_scratch(scratch);
+	return 1;
+}
+
 ELF_FUNCTION(l_string_compare)
 {
 	elf_String *left = string_receiver(S);
@@ -499,6 +535,7 @@ static const elf_Binding l_string[] = {
 	{"size",        l_string_length},
 	{"byte",        l_string_byte},
 	{"slice",       l_string_slice},
+	{"splice",      l_string_splice},
 	{"compare",     l_string_compare},
 	{"starts_with", l_string_starts_with},
 	{"ends_with",   l_string_ends_with},

@@ -109,8 +109,7 @@ b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const voi
 	return true;
 }
 
-b32 elf_buffer_patch_object(elf_State *state, elf_ByteBuffer *buffer, u32 position,
-	u32 delete_size, const void *data, u32 insert_size)
+b32 elf_buffer_splice_object(elf_State *state, elf_ByteBuffer *buffer, u32 position, u32 delete_size, const void *data, u32 insert_size)
 {
 	ASSERT(buffer);
 	ASSERT(data || !insert_size);
@@ -118,7 +117,7 @@ b32 elf_buffer_patch_object(elf_State *state, elf_ByteBuffer *buffer, u32 positi
 	if (position > buffer->size || delete_size > buffer->size - position)
 	{
 		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
-			"buffer patch range is out of bounds");
+			"buffer splice range is out of bounds");
 		return false;
 	}
 	u32 size_after_delete = buffer->size - delete_size;
@@ -142,14 +141,14 @@ b32 elf_buffer_patch_object(elf_State *state, elf_ByteBuffer *buffer, u32 positi
 			if (source_offset > buffer->size || insert_size > buffer->size - source_offset)
 			{
 				elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
-					"buffer patch source is out of bounds");
+					"buffer splice source is out of bounds");
 				return false;
 			}
 			insert_copy = elf_alloc(state, insert_size);
 			if (!insert_copy)
 			{
 				elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
-					"could not allocate %u bytes for buffer patch", insert_size);
+					"could not allocate %u bytes for buffer splice", insert_size);
 				return false;
 			}
 			copy_memory(insert_copy, data, insert_size);

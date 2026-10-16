@@ -532,8 +532,7 @@ elf_ErrorCode elf_buffer_patch(elf_State *state, elf_Index index, elf_Size posit
 	if (position > buffer->size || delete_size > buffer->size - position ||
 		insert_size > UINT32_MAX - (buffer->size - delete_size))
 		return ELF_ERROR_OUT_OF_RANGE;
-	return elf_buffer_patch_object(state, buffer, (u32)position, (u32)delete_size,
-		data, (u32)insert_size) ? ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
+	return elf_buffer_splice_object(state, buffer, (u32)position, (u32)delete_size, data, (u32)insert_size) ? ELF_ERROR_NONE : ELF_ERROR_OUT_OF_RANGE;
 }
 
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor)

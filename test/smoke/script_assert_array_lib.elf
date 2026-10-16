@@ -9,6 +9,27 @@ test_assert(array:remove(2) == 20)
 test_assert(array:get(-1) == 40)
 test_assert(array:set(-1, 41)[3] == 41)
 
+spliced := [1, 2, 3, 4]
+test_assert(spliced:splice(1, 2, [7, 8, 9]) == spliced)
+test_assert(spliced:length() == 5)
+test_assert(spliced[0] == 1)
+test_assert(spliced[1] == 7)
+test_assert(spliced[3] == 9)
+test_assert(spliced[4] == 4)
+spliced:splice(-1, 1, [])
+test_assert(spliced:length() == 4)
+spliced:splice(spliced:length(), 0, [10])
+test_assert(spliced[4] == 10)
+
+self_spliced := [1, 2, 3]
+self_spliced:splice(1, 1, self_spliced)
+test_assert(self_spliced:length() == 5)
+test_assert(self_spliced[0] == 1)
+test_assert(self_spliced[1] == 1)
+test_assert(self_spliced[2] == 2)
+test_assert(self_spliced[3] == 3)
+test_assert(self_spliced[4] == 3)
+
 shared := { value = 1 }
 source := [10, shared]
 clone := source:clone()

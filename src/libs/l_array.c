@@ -145,6 +145,27 @@ ELF_FUNCTION(l_array_remove)
 	return 1;
 }
 
+ELF_FUNCTION(l_array_splice)
+{
+	lib_check_arg_count(S, "array.splice", nargs, 3, 3);
+	elf_Array *array = array_receiver(S);
+	u32 index = 0;
+	if (!array_normalize_index(S, lib_load_integer(S, 1), array->count, true, &index)) {
+		return 0;
+	}
+	i64 requested = lib_load_integer(S, 2);
+	if (requested < 0 || (u64)requested > array->count - index)
+	{
+		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "array splice delete count %lld is out of bounds", requested);
+		return 0;
+	}
+	elf_Value replacement_value = load_value(S, 3);
+	check_value_type(S, replacement_value, ELF_VALUE_TYPE_ARRAY);
+	elf_array_splice(S, array, index, (u32)requested, value_as_array(replacement_value));
+	push_array(S, array);
+	return 1;
+}
+
 ELF_FUNCTION(l_array_slice)
 {
 	lib_check_arg_count(S, "array.slice", nargs, 0, 2);
@@ -336,6 +357,7 @@ static const elf_Binding l_array[] = {
 	{"insert",  l_array_insert},
 	{"pop",     l_array_pop},
 	{"remove",  l_array_remove},
+	{"splice",  l_array_splice},
 	{"slice",   l_array_slice},
 	{"clone",   l_array_clone},
 	{"extend",  l_array_extend},

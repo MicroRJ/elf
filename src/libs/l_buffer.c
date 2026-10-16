@@ -124,13 +124,13 @@ ELF_FUNCTION(l_buffer_append)
 	return 1;
 }
 
-ELF_FUNCTION(l_buffer_patch)
+ELF_FUNCTION(l_buffer_splice)
 {
-	lib_check_arg_count(S, "buffer.patch", nargs, 3, 3);
+	lib_check_arg_count(S, "buffer.splice", nargs, 3, 3);
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 position = 0;
 	if (!buffer_normalize_index(S, lib_load_integer(S, 1), buffer->size, true, &position)) return 0;
-	u32 delete_size = buffer_load_size(S, 2, "buffer patch delete");
+	u32 delete_size = buffer_load_size(S, 2, "buffer splice delete");
 	elf_Value replacement = load_value(S, 3);
 	const void *data = 0;
 	u32 insert_size = 0;
@@ -149,11 +149,11 @@ ELF_FUNCTION(l_buffer_patch)
 	else
 	{
 		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
-			"buffer patch expected string or buffer, got '%s'",
+			"buffer splice expected string or buffer, got '%s'",
 			value_type_name(replacement.type));
 		return 0;
 	}
-	if (!elf_buffer_patch_object(S, buffer, position, delete_size, data, insert_size)) return 0;
+	if (!elf_buffer_splice_object(S, buffer, position, delete_size, data, insert_size)) return 0;
 	push_value(S, value_from_buffer(buffer));
 	return 1;
 }
@@ -224,7 +224,7 @@ static const elf_Binding l_buffer[] = {
 	{"reserve",   l_buffer_reserve},
 	{"resize",    l_buffer_resize},
 	{"append",    l_buffer_append},
-	{"patch",     l_buffer_patch},
+	{"splice",    l_buffer_splice},
 	{"byte",      l_buffer_byte},
 	{"set",       l_buffer_set},
 	{"slice",     l_buffer_slice},

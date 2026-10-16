@@ -291,7 +291,7 @@ elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity);
 b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capacity);
 b32 elf_buffer_resize_object(elf_State *state, elf_ByteBuffer *buffer, u32 size);
 b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const void *data, u32 size);
-b32 elf_buffer_patch_object(elf_State *state, elf_ByteBuffer *buffer, u32 position, u32 delete_size, const void *data, u32 insert_size);
+b32 elf_buffer_splice_object(elf_State *state, elf_ByteBuffer *buffer, u32 position, u32 delete_size, const void *data, u32 insert_size);
 
 elf_UserObject *elf_user_object_new(elf_State *state, const elf_UserType *type, elf_Table *metatable, u32 size);
 
@@ -301,6 +301,7 @@ u32 elf_array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value va
 elf_Value elf_array_get(elf_State *state, elf_Array *array, u32 index);
 void elf_array_set(elf_State *state, elf_Array *array, u32 index, elf_Value value);
 void elf_array_remove(elf_State *state, elf_Array *array, u32 index, u32 count);
+void elf_array_splice(elf_State *state, elf_Array *array, u32 index, u32 delete_count, elf_Array *replacement);
 void elf_array_swap(elf_State *state, elf_Array *array, u32 left, u32 right);
 u32 elf_array_length(elf_Array *array);
 
