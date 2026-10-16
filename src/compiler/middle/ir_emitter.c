@@ -132,31 +132,6 @@ static void ir_lower_stat(IrFrame *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *ctx, Ast expr);
 static Ir ir_lower_stat_as_block(IrEmitter *ctx, Ast stat);
 
-static u32 add_global_symbol(IrEmitter *ctx, Atom *name)
-{
-	for (u32 i = 0; i < ctx->module->global_count; ++i)
-	{
-		if (ctx->module->globals[i] == name) {
-			return i;
-		}
-	}
-
-	if (ctx->module->global_count == ctx->module->global_capacity)
-	{
-		u32 capacity = ctx->module->global_capacity ? ctx->module->global_capacity * 2 : 16;
-		Atom **globals = elf_arena_push(ctx->module->arena, sizeof(*globals) * capacity);
-		if (ctx->module->globals) {
-			memcpy(globals, ctx->module->globals, sizeof(*globals) * ctx->module->global_count);
-		}
-		ctx->module->globals = globals;
-		ctx->module->global_capacity = capacity;
-	}
-
-	u32 index = ctx->module->global_count++;
-	ctx->module->globals[index] = name;
-	return index;
-}
-
 static void report_lowering_error(IrEmitter *ctx, Com_Error error, SourceSite site, const char *format, ...)
 {
 	va_list args;
@@ -699,8 +674,7 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 			}
 			else
 			{
-				u32 global_index = add_global_symbol(ctx, expr->atom);
-				ir = ir_new_load_global(ctx, expr->site, global_index);
+				ir = ir_new_global(ctx, expr->site, expr->atom);
 			}
 		}
 		break;

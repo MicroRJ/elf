@@ -59,10 +59,11 @@ static Ir ir_new_atom(IrEmitter *ctx, SourceSite site, Atom *atom)
 	return ir;
 }
 
-static Ir ir_new_load_global(IrEmitter *ctx, SourceSite site, u32 slot)
+static Ir ir_new_global(IrEmitter *ctx, SourceSite site, Atom *name)
 {
-	Ir ir = ir_alloc(ctx, site, IR_LOAD_GLOBAL);
-	ir->ir_global = slot;
+	ASSERT(name);
+	Ir ir = ir_alloc(ctx, site, IR_GLOBAL);
+	ir->ir_global = name;
 	return ir;
 }
 

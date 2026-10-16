@@ -163,7 +163,7 @@ BcSource;
 typedef struct
 {
 	u32 bytecode_index;
-	u32 global_index;
+	u32 name_index;
 }
 BcGlobalRelocation;
 
@@ -177,8 +177,6 @@ struct BcModule
 	BcString           *strings;
 	u32                 string_count;
 
-	u32                *global_names;
-	u32                 global_count;
 	BcGlobalRelocation *global_relocations;
 	u32                 global_relocation_count;
 

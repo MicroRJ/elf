@@ -64,7 +64,7 @@ BcSlot;
 	X(IR_LOCAL               , "local")                      \
 	X(IR_MULTI_LOCAL         , "multi_local")                \
 	X(IR_LOAD_LOCAL          , "load_local")                 \
-	X(IR_LOAD_GLOBAL         , "load_global")                \
+	X(IR_GLOBAL              , "global")                     \
 	X(IR_CAPTURE             , "capture")                    \
 /* end */
 
@@ -120,7 +120,7 @@ struct IrNode
 
 	union
 	{
-		u32      ir_global;
+		Atom    *ir_global;
 		u32      ir_capture;
 
 		struct
@@ -267,9 +267,6 @@ typedef struct
 	IrFunDef  *functions;
 	u32        function_count;
 	u32        function_capacity;
-	Atom     **globals;
-	u32        global_count;
-	u32        global_capacity;
 }
 IrModule;
 

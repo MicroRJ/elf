@@ -48,6 +48,9 @@ struct BcEmitter
 	f64              *number_constants;
 	u32               number_constant_capacity;
 	u32               number_constant_count;
+	BcGlobalRelocation *global_relocations;
+	u32                global_relocation_capacity;
+	u32                global_relocation_count;
 	BcSourceMapEntry *source_map;
 	u32               source_map_capacity;
 	u32               source_map_count;
@@ -163,9 +166,11 @@ static u32 add_atom(BcEmitter *module, Atom *atom)
 	return index;
 }
 
-static void bc_add_global(BcEmitter *module, Atom *name)
+static void add_global_relocation(BcEmitter *emitter, u32 bytecode_index, Atom *name)
 {
-	add_atom(module, name);
+	u32 name_index = add_atom(emitter, name);
+	emitter->global_relocations = grow_module_array(emitter->arena, emitter->global_relocations, emitter->global_relocation_count, &emitter->global_relocation_capacity, emitter->global_relocation_count + 1, sizeof(*emitter->global_relocations));
+	emitter->global_relocations[emitter->global_relocation_count++] = (BcGlobalRelocation) {.bytecode_index = bytecode_index, .name_index = name_index};
 }
 
 #define BC_LABEL_INVALID     ((u32)-1)
@@ -314,9 +319,18 @@ static u32 emit_load_nil_bc(BcEmitter *emitter, SourceSite site, BcSlot dest)
 	return emit_xy_bc(emitter, site, BC_LOADNIL, unwrap_slot(dest), 0);
 }
 
-static u32 emit_load_glb_bc(BcEmitter *emitter, SourceSite site, BcSlot dest, u32 global_index)
+static u32 emit_load_glb_bc(BcEmitter *emitter, SourceSite site, BcSlot dest, Atom *name)
 {
-	return emit_xy_bc(emitter, site, BC_GETGLOBAL, unwrap_slot(dest), global_index);
+	u32 bytecode_index = emit_xy_bc(emitter, site, BC_GETGLOBAL, unwrap_slot(dest), 0);
+	add_global_relocation(emitter, bytecode_index, name);
+	return bytecode_index;
+}
+
+static u32 emit_store_glb_bc(BcEmitter *emitter, SourceSite site, Atom *name, BcSlot source)
+{
+	u32 bytecode_index = emit_xy_bc(emitter, site, BC_SETGLOBAL, 0, unwrap_slot(source));
+	add_global_relocation(emitter, bytecode_index, name);
+	return bytecode_index;
 }
 
 static u32 emit_reload_bc(BcEmitter *emitter, SourceSite site, BcSlot dst, BcSlot src)
@@ -366,18 +380,6 @@ static BcSlot ensure_slot(BcEmitter *emitter, BcSlot slot)
 	return slot;
 }
 
-static u32 find_emitter_atom(BcEmitter *emitter, Atom *atom)
-{
-	for (u32 i = 0; i < emitter->atom_count; ++i)
-	{
-		if (emitter->atoms[i] == atom) {
-			return i;
-		}
-	}
-	ASSERT(!"module global atom is missing from the string table");
-	return 0;
-}
-
 static BcString copy_emitter_string(elf_Arena *arena, Atom *atom)
 {
 	u32 size = atom_size(atom);
@@ -386,7 +388,7 @@ static BcString copy_emitter_string(elf_Arena *arena, Atom *atom)
 	return (BcString) {.data = data, .size = size};
 }
 
-static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
+static BcModule *bc_finish_module(BcEmitter *emitter)
 {
 	ASSERT(emitter->generated_function_count == emitter->function_count);
 	elf_Arena *arena = emitter->arena;
@@ -409,40 +411,8 @@ static BcModule *bc_finish_module(IrModule *input, BcEmitter *emitter)
 	module->integer_constant_count = emitter->integer_constant_count;
 	module->number_constants = emitter->number_constants;
 	module->number_constant_count = emitter->number_constant_count;
-	module->global_count = input->global_count;
-
-	if (module->global_count)
-	{
-		module->global_names = dy_arena_push_zero(arena, sizeof(*module->global_names) * module->global_count, 8);
-		for (u32 i = 0; i < module->global_count; ++i) {
-			module->global_names[i] = find_emitter_atom(emitter, input->globals[i]);
-		}
-	}
-
-	for (u32 i = 0; i < module->bytecode_count; ++i)
-	{
-		BcType type = BC_TYPE(module->bytecode[i]);
-		if (type == BC_GETGLOBAL || type == BC_SETGLOBAL) {
-			module->global_relocation_count += 1;
-		}
-	}
-	if (module->global_relocation_count)
-	{
-		module->global_relocations = dy_arena_push_zero(arena, sizeof(*module->global_relocations) * module->global_relocation_count, 8);
-		u32 relocation_index = 0;
-		for (u32 i = 0; i < module->bytecode_count; ++i)
-		{
-			Bytecode bytecode = module->bytecode[i];
-			BcType type = BC_TYPE(bytecode);
-			if (type == BC_GETGLOBAL || type == BC_SETGLOBAL)
-			{
-				u32 global_index = type == BC_GETGLOBAL ? (u32)BC_ARGY(bytecode) : (u32)BC_ARGX(bytecode);
-				ASSERT(global_index < module->global_count);
-				module->global_relocations[relocation_index++] = (BcGlobalRelocation) {.bytecode_index = i, .global_index = global_index};
-			}
-		}
-		ASSERT(relocation_index == module->global_relocation_count);
-	}
+	module->global_relocations = emitter->global_relocations;
+	module->global_relocation_count = emitter->global_relocation_count;
 	return module;
 }
 
@@ -515,10 +485,7 @@ BcModule *bc_emit_module(IrModule *input)
 	for (u32 i = 0; i < input->function_count; ++i) {
 		bc_emit_function(emitter, input->functions + i);
 	}
-	for (u32 i = 0; i < input->global_count; ++i) {
-		bc_add_global(emitter, input->globals[i]);
-	}
-	return bc_finish_module(input, emitter);
+	return bc_finish_module(emitter);
 }
 
 static BcSlot ensure_expr_memory(BcEmitter *emitter, Ir expr)
@@ -958,7 +925,7 @@ static BcSlot emit_expr(BcEmitter *emitter, Ir expr, BcSlot out, u32 nout)
 		}
 		break;
 
-		case IR_LOAD_GLOBAL:
+		case IR_GLOBAL:
 		{
 			if (nout < 1) {
 				return out;
@@ -1149,12 +1116,10 @@ static void emit_store(BcEmitter *emitter, SourceSite site, Ir dest, Ir expr)
 			}
 			break;
 
-			case IR_LOAD_GLOBAL:
+			case IR_GLOBAL:
 			{
-				u32 dest_slot = dest->ir_global;
-
 				BcSlot expr_slot = ensure_expr_memory(emitter, expr);
-				emit_xy_bc(emitter, dest->site, BC_SETGLOBAL, dest_slot, unwrap_slot(expr_slot));
+				emit_store_glb_bc(emitter, dest->site, dest->ir_global, expr_slot);
 			}
 			break;
 

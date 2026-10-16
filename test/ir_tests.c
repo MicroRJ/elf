@@ -154,7 +154,7 @@ static void test_ir_lowers_strings_and_globals(elf_State *state)
 	expect_ir_atom(ret_string->ir_return.expr, "hello", "string literal lowers to atom ir");
 
 	Ir ret_global = ir_test_body_stat(body, 1, IR_RETURN, "lower global return");
-	expect_ir_kind(ret_global->ir_return.expr, IR_LOAD_GLOBAL, "identifier without local lowers to global load");
+	expect_ir_kind(ret_global->ir_return.expr, IR_GLOBAL, "identifier without local lowers to global load");
 	elf_arena_destroy(&arena);
 }
 
@@ -199,14 +199,14 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower field return");
 	Ir field = ret->ir_return.expr;
 	expect_ir_kind(field, IR_FIELD, "field access lowers to field ir");
-	expect_ir_kind(field->ir_binary.x, IR_LOAD_GLOBAL, "field object lowers to global load");
+	expect_ir_kind(field->ir_binary.x, IR_GLOBAL, "field object lowers to global load");
 	expect_ir_atom(field->ir_binary.y, "name", "field key lowers to atom ir");
 
 	Ir call = ir_test_body_stat(body, 1, IR_CALL, "lower call expression statement");
 	if (call && call->ir_call.type != IR_CALL_DYNAMIC) {
 		test_fail("runtime callee lowers to a dynamic call");
 	}
-	expect_ir_kind(call->ir_call.expr, IR_LOAD_GLOBAL, "call callee lowers to global load");
+	expect_ir_kind(call->ir_call.expr, IR_GLOBAL, "call callee lowers to global load");
 	if (call && call->ir_call.args.count != 1) {
 		test_fail("call keeps one table argument");
 	}
@@ -251,7 +251,7 @@ static void test_ir_lowers_if_else(elf_State *state)
 	Ir body = ir_test_main_body(ctx);
 	Ir ir_if = ir_test_body_stat(body, 0, IR_IF, "lower if statement");
 
-	expect_ir_kind(ir_if->ir_if.pred, IR_LOAD_GLOBAL, "if predicate lowers to global load");
+	expect_ir_kind(ir_if->ir_if.pred, IR_GLOBAL, "if predicate lowers to global load");
 	expect_ir_kind(ir_if->ir_if.true_clause, IR_BLOCK, "if true clause lowers to block");
 	expect_ir_kind(ir_if->ir_if.else_clause, IR_BLOCK, "if else clause lowers to block");
 	elf_arena_destroy(&arena);
@@ -266,13 +266,13 @@ static void test_ir_lowers_while(elf_State *state)
 
 	expect_ir_kind(ir_test_body_stat(loop, 0, IR_LABEL, "while starts with label"), IR_LABEL, "while start label");
 	Ir branch = ir_test_body_stat(loop, 1, IR_JUMP_IF_FALSE, "while branches to exit");
-	expect_ir_kind(branch ? branch->ir_jump_if_false.pred : 0, IR_LOAD_GLOBAL, "while predicate lowers to global load");
+	expect_ir_kind(branch ? branch->ir_jump_if_false.pred : 0, IR_GLOBAL, "while predicate lowers to global load");
 	Ir loop_body = ir_test_body_stat(loop, 2, IR_BLOCK, "while body lowers to block");
 	expect_ir_kind(ir_test_body_stat(loop, 3, IR_JUMP, "while jumps back to start"), IR_JUMP, "while back jump");
 	expect_ir_kind(ir_test_body_stat(loop, 4, IR_LABEL, "while ends with exit label"), IR_LABEL, "while exit label");
 
 	Ir store = ir_test_body_stat(loop_body, 0, IR_STORE, "while body lowers statements");
-	expect_ir_kind(store->ir_binary.x, IR_LOAD_GLOBAL, "while body assignment destination");
+	expect_ir_kind(store->ir_binary.x, IR_GLOBAL, "while body assignment destination");
 	expect_ir_i64(store->ir_binary.y, 1, "while body assignment value");
 	elf_arena_destroy(&arena);
 }
