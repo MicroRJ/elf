@@ -54,7 +54,7 @@ static IrFunctionEmitter *ir_create_function_emitter(IrModuleEmitter *module)
 	elf_Arena *arena = module->arena;
 	IrFunctionEmitter *ctx = elf_arena_push_zero(arena, sizeof(*ctx));
 	ctx->module = module;
-	ctx->current_source = 0;
+	ctx->current_source = COM_SOURCE_INVALID;
 
 	u32 ir_stack_size = 4096;
 	ctx->ir_stack = elf_arena_push_zero(arena, sizeof(*ctx->ir_stack) * ir_stack_size);
@@ -242,9 +242,40 @@ static IrEntity *entity_from_name(IrFunctionEmitter *ctx, Atom *name)
 	return 0;
 }
 
-static Com_StaticSymbol *static_symbol_from_name(IrFunctionEmitter *ctx, Atom *name)
+static IrEntity *entity_from_expr_root(IrFunctionEmitter *ctx, Ast expr)
 {
-	return compiler_static_symbol_from_source(ctx->module->compiler, ctx->current_source, name);
+	while (expr && expr->kind == AST_FIELD) {
+		expr = expr->binary.x;
+	}
+	return expr && expr->kind == AST_IDENT ? entity_from_name(ctx, expr->atom) : 0;
+}
+
+static void install_source_static_entities(IrFunctionEmitter *ctx, Com_SourceId source)
+{
+	if (ctx->current_source == source) {
+		return;
+	}
+
+	ASSERT(source < ctx->module->compiler->source_count);
+	ASSERT(ctx->scope_end == ctx->static_entity_count);
+	ASSERT(ctx->scope_start == 0);
+	ASSERT(ctx->scope_depth == 0);
+
+	ctx->scope_end = 0;
+	Com_StaticScope *statics = &ctx->module->compiler->sources[source].statics;
+	ASSERT(statics->symbol_count <= MAX_ENTITIES);
+	for (u32 i = 0; i < statics->symbol_count; ++i)
+	{
+		Com_StaticSymbol *symbol = statics->symbols + i;
+		IrEntity *entity = ctx->entities + ctx->scope_end++;
+		zero_memory(entity, sizeof(*entity));
+		entity->type = ENTITY_STATIC_SYMBOL;
+		entity->name = symbol->name;
+		entity->site = symbol->site;
+		entity->static_symbol = symbol;
+	}
+	ctx->static_entity_count = ctx->scope_end;
+	ctx->current_source = source;
 }
 
 static IrEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, IrEntityType type, u32 tags, Atom *name)
@@ -253,12 +284,10 @@ static IrEntity *declare_entity(IrFunctionEmitter *ctx, SourceSite site, IrEntit
 	const char *name_data = atom_data(name);
 	if (en)
 	{
-		if (en->scope_start == ctx->scope_start) {
+		b32 conflicts_with_file_static = en->type == ENTITY_STATIC_SYMBOL && ctx->scope_depth == 1 && ctx->function && !ctx->function->parent;
+		if (en->scope_start == ctx->scope_start || conflicts_with_file_static) {
 			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
 		}
-	}
-	else if (ctx->scope_depth == 1 && ctx->function && !ctx->function->parent && static_symbol_from_name(ctx, name)) {
-		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, site, "'%s': is already declared", name_data);
 	}
 
 	ASSERT(ctx->scope_end < MAX_ENTITIES);
@@ -336,6 +365,15 @@ static u32 capture_entity_in_function(IrFunctionEmitter *ctx, LwScopeFunction *f
 
 static Ir load_entity_ir(IrFunctionEmitter *ctx, SourceSite site, IrEntity *entity)
 {
+	if (entity->type == ENTITY_STATIC_SYMBOL)
+	{
+		Com_StaticSymbol *symbol = entity->static_symbol;
+		ASSERT(symbol);
+		symbol->referenced = true;
+		return static_value_to_ir(ctx, site, symbol->value);
+	}
+
+	ASSERT(entity->type == ENTITY_LOCAL_DECLARATION);
 	entity->tags |= ENTITY_TAG_REFERENCED;
 	if (ctx->function && entity->scope_start < ctx->function->scope_start)
 	{
@@ -350,15 +388,13 @@ static b32 mark_entity_assigned(IrFunctionEmitter *ctx, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) return true;
 	IrEntity *entity = entity_from_name(ctx, destination->atom);
-	if (!entity)
+	if (entity && entity->type == ENTITY_STATIC_SYMBOL)
 	{
-		if (static_symbol_from_name(ctx, destination->atom))
-		{
-			report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
-			return false;
-		}
-		return true;
+		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
+		return false;
 	}
+	if (!entity) return true;
+	ASSERT(entity->type == ENTITY_LOCAL_DECLARATION);
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
 		report_lowering_error(ctx, LOWERING_ERROR_GENERIC, destination->site,
@@ -396,8 +432,8 @@ static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 {
 	ASSERT(input->index < ctx->module->module.function_count);
 	IrFunction *function = ctx->module->module.functions + input->index;
+	install_source_static_entities(ctx, input->source);
 	initialize_function_ir(ctx, function);
-	ctx->current_source = input->source;
 	if (input->ast->kind == AST_FILE)
 	{
 		Ast file = input->ast;
@@ -419,6 +455,9 @@ static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 		Ir function = create_function_ir(ctx, input->ast->site, input->index);
 		lower_ast_function_body(ctx, input->ast, function);
 	}
+	ASSERT(ctx->scope_end == ctx->static_entity_count);
+	ASSERT(ctx->scope_start == 0);
+	ASSERT(ctx->scope_depth == 0);
 }
 
 static void initialize_function_ir(IrFunctionEmitter *ctx, IrFunction *function)
@@ -828,31 +867,14 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 		case AST_IDENT:
 		{
 			Atom *ident = expr->atom;
-
 			IrEntity *en = entity_from_name(ctx, ident);
-
-			if (en && en->type == ENTITY_LOCAL_DECLARATION)
-			{
+			if (en) {
 				ir = load_entity_ir(ctx, expr->site, en);
-			}
-			else if (en)
-			{
-				report_lowering_error(ctx, LOWERING_ERROR_UNDECLARED_IDENTIFIER, expr->site, "'%s' is an undeclared identifier", atom_data(ident));
-				ir = ERROR_IR;
 			}
 			else
 			{
-				Com_StaticSymbol *symbol = static_symbol_from_name(ctx, ident);
-				if (symbol)
-				{
-					symbol->referenced = true;
-					ir = static_value_to_ir(ctx, expr->site, symbol->value);
-				}
-				else
-				{
-					u32 global_index = add_global_symbol(ctx, expr->atom);
-					ir = create_load_global_ir(ctx, expr->site, global_index);
-				}
+				u32 global_index = add_global_symbol(ctx, expr->atom);
+				ir = create_load_global_ir(ctx, expr->site, global_index);
 			}
 		}
 		break;
@@ -907,7 +929,8 @@ static Ir lower_ast_expr_to_ir(IrFunctionEmitter *ctx, Ast expr)
 		case AST_FIELD:
 		{
 			Com_StaticValue value = {};
-			Com_StaticLookup lookup = compiler_lookup_static_expr(ctx->module->compiler, ctx->current_source, expr, &value);
+			IrEntity *root = entity_from_expr_root(ctx, expr);
+			Com_StaticLookup lookup = root && root->type == ENTITY_STATIC_SYMBOL ? compiler_lookup_static_expr(ctx->module->compiler, ctx->current_source, expr, &value) : COM_STATIC_LOOKUP_NONE;
 			if (lookup == COM_STATIC_LOOKUP_VALUE) {
 				ir = static_value_to_ir(ctx, expr->site, value);
 			}

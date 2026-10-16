@@ -14,6 +14,7 @@ enum
 typedef enum
 {
 	ENTITY_INVALID = 0,
+	ENTITY_STATIC_SYMBOL,
 	ENTITY_LOCAL_DECLARATION,
 }
 IrEntityType;
@@ -37,7 +38,11 @@ typedef struct IrEntity
 	u32           scope_start;
 	Atom         *name;
 	SourceSite    site;
-	Ir            memory_ir;
+	union
+	{
+		Ir                memory_ir;
+		Com_StaticSymbol *static_symbol;
+	};
 }
 IrEntity;
 
@@ -137,6 +142,7 @@ struct IrFunctionEmitter
 
 	IrEntityId       scope_start;
 	IrEntityId       scope_end;
+	u32              static_entity_count;
 	u32              scope_depth;
 
 	Com_SourceId     current_source;

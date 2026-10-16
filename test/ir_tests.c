@@ -399,9 +399,28 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 	if (!ctx || ctx->module->compiler->source_count != 1 || ctx->current_source != 0 || ctx->module->compiler->sources[0].statics.symbol_count != 2) {
 		test_fail("lowering stores root static symbols in source scope zero");
 	}
+	else if (ctx->static_entity_count != 2 || ctx->scope_end != 2 || ctx->entities[0].type != ENTITY_STATIC_SYMBOL || ctx->entities[1].type != ENTITY_STATIC_SYMBOL) {
+		test_fail("lowering keeps source statics as the entity stack prefix");
+	}
 	Ir body = ir_test_main_body(ctx);
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static declarations emit no runtime statements");
 	expect_ir_i64(ret ? ret->ir_return.expr : 0, 42, "static forward reference resolves to literal ir");
+	elf_arena_destroy(&arena);
+}
+
+static void test_ir_rejects_assignment_to_file_static(elf_State *state)
+{
+	elf_Arena arena = elf_arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	IrFunctionEmitter *ctx = ir_test_lower_source(state, &arena, "answer :: 42\nanswer = 0");
+	log_set_hook(0, 0);
+	if (!ctx || ctx->module->compiler->report.error_count != 1) {
+		test_fail("assignment to a file static reports one lowering error");
+	}
+	Ir body = ir_test_main_body(ctx);
+	if (!body || body->kind != IR_BLOCK || body->ir_block.stats.count != 1 || body->ir_block.stats.items[0] != ERROR_IR) {
+		test_fail("assignment to a file static lowers to an error");
+	}
 	elf_arena_destroy(&arena);
 }
 
@@ -682,6 +701,7 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_function_expression(state);
 	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);
+	test_ir_rejects_assignment_to_file_static(state);
 	test_ir_resolves_static_function_defaults(state);
 	test_ir_lowers_static_call_arguments(state);
 	test_ir_lowers_variadic_static_call_arguments(state);
