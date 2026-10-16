@@ -36,12 +36,12 @@ static IrModuleEmitter *ir_create_module_emitter(Compiler *compiler)
 		IrFunction *function = emitter->module.functions + i;
 		function->site = ast->site;
 		function->variadic = input->variadic;
-		function->is_static = input->is_static;
+		function->is_static = ast->kind == AST_FUNCTION;
 		function->param_count = input->param_count;
 		ASSERT(input->index == i);
 	}
 	emitter->module.function_count = compiler->function_count;
-	if (compiler->function_count && compiler->functions[0].is_entry)
+	if (compiler->function_count && compiler->functions[0].ast->kind == AST_FILE)
 	{
 		emitter->module.has_entry = true;
 		emitter->module.entry_index = compiler->functions[0].index;
@@ -401,7 +401,7 @@ static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 	IrFunction *function = ctx->module->module.functions + input->index;
 	initialize_function_ir(ctx, function);
 	ctx->current_source = input->source;
-	if (input->is_entry)
+	if (input->ast->kind == AST_FILE)
 	{
 		Ast file = input->ast;
 		ASSERT(file && file->kind == AST_FILE);
@@ -418,7 +418,7 @@ static void ir_emit_function(IrFunctionEmitter *ctx, Com_Function *input)
 	}
 	else
 	{
-		ASSERT(input->is_static && input->ast && input->ast->kind == AST_FUNCTION);
+		ASSERT(input->ast->kind == AST_FUNCTION);
 		Ir function = create_function_ir(ctx, input->ast->site, input->index);
 		lower_ast_function_body(ctx, input->ast, function);
 	}

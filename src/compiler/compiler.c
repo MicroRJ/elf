@@ -384,9 +384,10 @@ static Com_StaticSymbol *compiler_exported_symbol_from_source(Compiler *compiler
 	return symbol && symbol->exported ? symbol : 0;
 }
 
-static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast ast, b32 is_entry, b32 is_static)
+static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast ast)
 {
 	ASSERT(ast);
+	b32 is_entry = ast->kind == AST_FILE;
 	b32 variadic = true;
 	u32 param_count = IMPLICIT_PARAM_COUNT;
 	if (!is_entry)
@@ -408,8 +409,6 @@ static u32 compiler_add_function(Compiler *compiler, Com_SourceId source, Ast as
 		.index = index,
 		.param_count = param_count,
 		.variadic = variadic,
-		.is_entry = is_entry,
-		.is_static = is_static,
 	};
 	return index;
 }
@@ -573,7 +572,6 @@ static b32 compiler_evaluate_static_symbol(Compiler *compiler, Com_StaticSymbol 
 
 static b32 compiler_resolve_function_parameters(Compiler *compiler, Com_Function *function)
 {
-	ASSERT(function->is_static);
 	ASSERT(function->ast && function->ast->kind == AST_FUNCTION);
 
 	Ast ast = function->ast;
@@ -678,7 +676,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 	compiler->function_capacity = planned_function_count;
 	if (unit_type == COM_UNIT_FUNCTION)
 	{
-		compiler_add_function(compiler, 0, compiler->sources[0].ast, true, false);
+		compiler_add_function(compiler, 0, compiler->sources[0].ast);
 	}
 
 	for (Com_SourceId source = 0; source < compiler->source_count; ++source)
@@ -690,7 +688,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 			if (symbol->expr->kind == AST_FUNCTION)
 			{
 				symbol->value.kind = COM_STATIC_FUNCTION;
-				symbol->value.function = compiler_add_function(compiler, source, symbol->expr, false, true);
+				symbol->value.function = compiler_add_function(compiler, source, symbol->expr);
 				symbol->state = COM_STATIC_RESOLVED;
 			}
 		}
@@ -706,7 +704,7 @@ b32 compiler_resolve_statics(Compiler *compiler, Com_UnitType unit_type)
 	for (u32 i = 0; i < compiler->function_count; ++i)
 	{
 		Com_Function *function = compiler->functions + i;
-		if (function->is_static) {
+		if (function->ast->kind == AST_FUNCTION) {
 			compiler_resolve_function_parameters(compiler, function);
 		}
 	}

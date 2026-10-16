@@ -221,9 +221,6 @@ typedef struct
 	u32 index;
 	u32 param_count;
 	b32 variadic;
-	// TODO(RJ): these two fields can be removed!
-	b32 is_entry;
-	b32 is_static;
 }
 Com_Function;
 
