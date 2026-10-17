@@ -5,6 +5,7 @@
 #define NO_LINE (0)
 
 typedef struct Parser Parser;
+typedef struct Ast_Node Ast_Node;
 
 typedef struct
 {
@@ -43,9 +44,14 @@ struct Parser
 	Lexer               lexer;
 	// TODO(RJ): probably redundant now!
 	Token               tok,tok_prev,tok_prox;
+
 	Ast                *ast_stack;
 	u32                 ast_stack_size;
 	u32                 ast_stack_index;
+
+	Ast_Node           *first_import;
+	Ast_Node            *last_import;
+	u32                 import_count;
 };
 
 Parser *parser_create(Compiler *compiler);

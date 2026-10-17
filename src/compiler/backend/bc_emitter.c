@@ -637,8 +637,7 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 			callee_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
 			this_slot = emit_expr(emitter, expr->ir_binary.x, NO_SLOT, 1);
 
-			emit_xyz_bc(emitter, expr->site, BC_GETMETAFIELD
-			,	callee_slot, this_slot, callee_slot);
+			emit_xyz_bc(emitter, expr->site, BC_GETMETAFIELD, callee_slot, this_slot, callee_slot);
 		}
 		else if (expr->kind == IR_FIELD)
 		{
@@ -647,8 +646,7 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 			callee_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
 			this_slot = emit_expr(emitter, expr->ir_binary.x, NO_SLOT, 1);
 
-			emit_xyz_bc(emitter, expr->site, BC_GETFIELD
-			,	callee_slot, this_slot, callee_slot);
+			emit_xyz_bc(emitter, expr->site, BC_GETFIELD, callee_slot, this_slot, callee_slot);
 		}
 		else if (call_can_reference_local_directly(expr, args, &callee_slot))
 		{

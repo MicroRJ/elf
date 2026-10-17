@@ -1,13 +1,3 @@
-
-i := 10
-THING :: fun() {
-	elf.printl("Here's a capture: ", i)
-}
-
-THING()
-
-
-#eof
 paths := elf.fs.get_paths("test/smoke")
 test_assert = fun(cond) {
 	if cond != true ? {

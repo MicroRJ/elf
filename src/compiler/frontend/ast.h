@@ -82,27 +82,12 @@ typedef Ast_T *Ast;
 
 typedef enum
 {
-#define AST_XPAND(ENUM, NAME) ENUM,
-	AST_DEFINITIONS(AST_XPAND)
-#undef AST_XPAND
+#define EXPAND(ENUM, NAME) ENUM,
+	AST_DEFINITIONS(EXPAND)
+#undef EXPAND
 	AST_COUNT_,
 }
 Ast_Kind;
-
-static inline const char *ast_type_name(Ast_Kind type)
-{
-	static const char *names[] =
-	{
-#define AST_XPAND(ENUM, NAME) #ENUM,
-		AST_DEFINITIONS(AST_XPAND)
-#undef AST_XPAND
-	};
-
-	if ((u32)type >= AST_COUNT_) {
-		return "AST_UNKNOWN";
-	}
-	return names[type];
-}
 
 typedef struct
 {
@@ -110,6 +95,13 @@ typedef struct
 	u32  count;
 }
 Ast_Array;
+
+typedef struct Ast_Node Ast_Node;
+struct Ast_Node
+{
+	Ast_Node *next;
+	Ast       tree;
+};
 
 // IMMUTABLE once constructed.
 struct Ast_T
@@ -125,9 +117,9 @@ struct Ast_T
 
 	union
 	{
-		Com_Status  status;
-		Atom         *atom;
-		Atom        *identifier;
+		Com_Status               status;
+		Atom                      *atom;
+		Atom                *identifier;
 		// TODO(RJ): have these store a value instead, that way we can go from:
 		// token -> ast -> ir -> checking -> bytecode more easily ...
 		Atom              *string_value;
@@ -143,15 +135,16 @@ struct Ast_T
 
 		struct
 		{
-			Ast body;
+			Ast          body;
+			Ast_Array imports;
 		}
 		file;
 
 		struct
 		{
 			Ast_Array params;
-			b32      variadic;
-			Ast      body;
+			b32       variadic;
+			Ast       body;
 		}
 		function;
 
@@ -193,9 +186,9 @@ struct Ast_T
 
 		struct
 		{
-			Ast      expr;
+			Ast       expr;
 			Ast_Array args;
-			Ast      carg;
+			Ast       carg;
 		}
 		call;
 
@@ -312,4 +305,19 @@ static Ast ast_ensure_kind(Ast ast, Ast_Kind type)
 	}
 
 	return ast;
+}
+
+static inline const char *ast_type_name(Ast_Kind type)
+{
+	static const char *names[] =
+	{
+#define EXPAND(ENUM, NAME) #ENUM,
+		AST_DEFINITIONS(EXPAND)
+#undef EXPAND
+	};
+
+	if ((u32)type >= AST_COUNT_) {
+		return "AST_UNKNOWN";
+	}
+	return names[type];
 }

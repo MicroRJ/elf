@@ -52,7 +52,7 @@ static Ast parse_json_ast_object(Parser *parser)
 		if (token_is_error(key_token)) {
 			return ast_from_token_error(key_token);
 		}
-		Ast key = create_atom_ast(parser, key_token.site, key_token.atom);
+		Ast key = ast_new_string_literal(parser, key_token.site, key_token.atom);
 		if (ast_is_error(key)) {
 			return key;
 		}
@@ -173,7 +173,7 @@ static Ast parse_json_ast_number(Parser *parser)
 		{
 			consume_token(parser);
 			f64 value = token.number;
-			return create_num_ast(parser, is_negative ? sign.site : token.site, is_negative ? -value : value);
+			return ast_new_number_literal(parser, is_negative ? sign.site : token.site, is_negative ? -value : value);
 		}
 
 		default:
@@ -207,7 +207,7 @@ static Ast parse_json_ast_value(Parser *parser)
 		case TOK_STRING:
 		{
 			consume_token(parser);
-			return create_atom_ast(parser, token.site, token.atom);
+			return ast_new_string_literal(parser, token.site, token.atom);
 		}
 
 		case TOK_INTEGER:
@@ -220,13 +220,13 @@ static Ast parse_json_ast_value(Parser *parser)
 		case TOK_TRUE:
 		{
 			consume_token(parser);
-			return create_int_ast(parser, token.site, 1);
+			return ast_new_integer_literal(parser, token.site, 1);
 		}
 
 		case TOK_FALSE:
 		{
 			consume_token(parser);
-			return create_int_ast(parser, token.site, 0);
+			return ast_new_integer_literal(parser, token.site, 0);
 		}
 
 		default:
@@ -234,7 +234,7 @@ static Ast parse_json_ast_value(Parser *parser)
 			if (json_token_is_null(token))
 			{
 				consume_token(parser);
-				return create_nil_ast(parser, token.site);
+				return ast_new_nil_literal(parser, token.site);
 			}
 
 			return parser_error(parser, COM_ERROR_INVALID_EXPRESSION, token.site, "expected JSON value");

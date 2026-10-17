@@ -144,7 +144,7 @@ static void test_parser_exported_static_declaration(elf_State *state)
 
 static void test_parser_import_expression(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "math :: import \"math.elf\"");
+	Ast file = parser_test_parse_file(state, "math :: import \"math.elf\"\nloader := fun() { ret import \"nested.elf\" }");
 	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse imported module declaration");
 	if (!decl) {
 		return;
@@ -154,6 +154,16 @@ static void test_parser_import_expression(elf_State *state)
 	expect_ast_kind(import, AST_IMPORT, "static declaration stores import expression");
 	if (!import || !import->import.path || strcmp(atom_data(import->import.path), "math.elf") != 0) {
 		test_fail("import expression stores path atom");
+	}
+	if (file->file.imports.count != 2 || file->file.imports.items[0] != import) {
+		test_fail("file records imports in source order");
+	}
+	else
+	{
+		Ast nested = file->file.imports.items[1];
+		if (nested->kind != AST_IMPORT || strcmp(atom_data(nested->import.path), "nested.elf") != 0) {
+			test_fail("file records imports nested inside functions");
+		}
 	}
 }
 

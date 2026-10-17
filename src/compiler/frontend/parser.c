@@ -218,6 +218,9 @@ b32 parser_set_source(Parser *parser, Com_SourceId source_id)
 	parser->ast_stack_size = 4096;
 	parser->ast_stack_index = 0;
 	parser->ast_stack = elf_arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size);
+	parser->first_import = 0;
+	parser->last_import = 0;
+	parser->import_count = 0;
 	if (!parser->ast_stack) {
 		return false;
 	}
@@ -298,6 +301,47 @@ static Ast_Array pop_ast_array(Parser *par, u32 count)
 	return result;
 }
 
+static b32 parser_record_import(Parser *parser, Ast tree)
+{
+	ASSERT(tree && tree->kind == AST_IMPORT);
+	Ast_Node *node = elf_arena_push_zero(&parser->scratch_arena, sizeof(*node));
+	if (!node) {
+		return false;
+	}
+
+	node->tree = tree;
+	if (parser->last_import) {
+		parser->last_import->next = node;
+	}
+	else {
+		parser->first_import = node;
+	}
+	parser->last_import = node;
+	parser->import_count += 1;
+	return true;
+}
+
+static Ast_Array parser_flatten_imports(Parser *parser)
+{
+	Ast_Array imports = {.count = parser->import_count};
+	if (!imports.count) {
+		return imports;
+	}
+
+	imports.items = dy_arena_push(parser->result_arena, sizeof(*imports.items) * imports.count, _Alignof(Ast));
+	if (!imports.items) {
+		return (Ast_Array) {};
+	}
+
+	u32 index = 0;
+	for (Ast_Node *node = parser->first_import; node; node = node->next) {
+		ASSERT(index < imports.count);
+		imports.items[index++] = node->tree;
+	}
+	ASSERT(index == imports.count);
+	return imports;
+}
+
 static Ast parse_file(Parser *parser)
 {
 	if (token_is_error(parser->tok)) {
@@ -335,8 +379,15 @@ static Ast parse_file(Parser *parser)
 		return ERROR_OOM_AST;
 	}
 	Ast body = create_block_ast(parser, tok.site, stats);
+	if (ast_is_error(body)) {
+		return body;
+	}
 
-	Ast file_ast = create_file_ast(parser, tok.site, body);
+	Ast_Array imports = parser_flatten_imports(parser);
+	if (parser->import_count && !imports.items) {
+		return ERROR_OOM_AST;
+	}
+	Ast file_ast = create_file_ast(parser, tok.site, body, imports);
 	return file_ast;
 }
 
@@ -558,7 +609,7 @@ static Ast parse_positive_integer_literal(Parser *parser, Token token)
 		,	token.integer_magnitude);
 	}
 
-	return create_int_ast(parser, token.site, (i64)token.integer_magnitude);
+	return ast_new_integer_literal(parser, token.site, (i64)token.integer_magnitude);
 }
 
 static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token token)
@@ -578,7 +629,7 @@ static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token toke
 		value = -(i64)token.integer_magnitude;
 	}
 
-	return create_int_ast(parser, sign.site, value);
+	return ast_new_integer_literal(parser, sign.site, value);
 }
 
 static Ast parse_interpolated_string(Parser *parser)
@@ -590,7 +641,7 @@ static Ast parse_interpolated_string(Parser *parser)
 	u32 stack_start = parser->ast_stack_index;
 	u32 nparts = 0;
 
-	Ast first_part = create_atom_ast(parser, start.site, start.atom);
+	Ast first_part = ast_new_string_literal(parser, start.site, start.atom);
 	if (ast_is_error(first_part)) {
 		return first_part;
 	}
@@ -629,7 +680,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 
 		consume_token(parser);
-		Ast text = create_atom_ast(parser, part.site, part.atom);
+		Ast text = ast_new_string_literal(parser, part.site, part.atom);
 		if (ast_is_error(text)) {
 			parser->ast_stack_index = stack_start;
 			return text;
@@ -678,19 +729,19 @@ static Ast parse_unary_expr(Parser *parser)
 		case TOK_NIL:
 		{
 			consume_token(parser);
-			value = create_nil_ast(parser, tok.site);
+			value = ast_new_nil_literal(parser, tok.site);
 		}
 		break;
 		case TOK_TRUE:
 		{
 			consume_token(parser);
-			value = create_int_ast(parser, tok.site, 1);
+			value = ast_new_integer_literal(parser, tok.site, 1);
 		}
 		break;
 		case TOK_FALSE:
 		{
 			consume_token(parser);
-			value = create_int_ast(parser, tok.site, 0);
+			value = ast_new_integer_literal(parser, tok.site, 0);
 		}
 		break;
 		case TOK_LETTER:
@@ -703,13 +754,13 @@ static Ast parse_unary_expr(Parser *parser)
 		case TOK_NUMBER:
 		{
 			consume_token(parser);
-			value = create_num_ast(parser, tok.site, tok.number);
+			value = ast_new_number_literal(parser, tok.site, tok.number);
 		}
 		break;
 		case TOK_STRING:
 		{
 			consume_token(parser);
-			value = create_atom_ast(parser, tok.site, tok.atom);
+			value = ast_new_string_literal(parser, tok.site, tok.atom);
 		}
 		break;
 		case TOK_STRING_START:
@@ -728,7 +779,10 @@ static Ast parse_unary_expr(Parser *parser)
 			else if (path.type == TOK_STRING)
 			{
 				consume_token(parser);
-				value = create_import_ast(parser, tok.site, path.atom);
+				value = ast_new_import(parser, tok.site, path.atom);
+				if (!ast_is_error(value) && !parser_record_import(parser, value)) {
+					value = ERROR_OOM_AST;
+				}
 			}
 			else
 			{
@@ -741,7 +795,7 @@ static Ast parse_unary_expr(Parser *parser)
 			consume_token(parser);
 			value = parse_subexpr(parser, 10000);
 			if (!ast_is_error(value)) {
-				value = create_unary_ast(parser, tok.site, AST_BITWISE_NOT, value);
+				value = ast_new_unary_expr(parser, tok.site, AST_BITWISE_NOT, value);
 			}
 		}
 		break;
@@ -751,7 +805,7 @@ static Ast parse_unary_expr(Parser *parser)
 			value = parse_subexpr(parser, 10000);
 			if (!ast_is_error(value))
 			{
-				value = create_measure_ast(parser, tok.site, value);
+				value = ast_new_measure_intrin(parser, tok.site, value);
 			}
 		}
 		break;
@@ -766,13 +820,13 @@ static Ast parse_unary_expr(Parser *parser)
 			else if (peek_token(parser, TOK_NUMBER))
 			{
 				Token number = consume_token(parser);
-				value = create_num_ast(parser, tok.site, -number.number);
+				value = ast_new_number_literal(parser, tok.site, -number.number);
 			}
 			else
 			{
 				value = parse_subexpr(parser, 10000);
 				if (!ast_is_error(value)) {
-					value = create_binary_ast(parser, tok.site, AST_SUB, create_int_ast(parser, tok.site, 0), value);
+					value = ast_new_binary_expr(parser, tok.site, AST_SUB, ast_new_integer_literal(parser, tok.site, 0), value);
 				}
 			}
 		}
@@ -828,7 +882,7 @@ static Ast parse_unary_expr(Parser *parser)
 		case TOK_RECURSE:
 		{
 			consume_token(parser);
-			value = create_nullary_ast(parser, tok.site, AST_RECURSE);
+			value = ast_new_nullary_expr(parser, tok.site, AST_RECURSE);
 		}
 		break;
 		case TOK_M_GET_MEM:
@@ -862,7 +916,7 @@ static Ast parse_table_entry(Parser *parser)
 			return ast_from_token_error(assign);
 		}
 
-		key = create_atom_ast(parser, name.site, name.atom);
+		key = ast_new_string_literal(parser, name.site, name.atom);
 		if (ast_is_error(key)) {
 			return key;
 		}
@@ -1111,7 +1165,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 			if (token_is_error(name)) {
 				return ast_from_token_error(name);
 			}
-			Ast right = create_atom_ast(par, name.site, name.atom);
+			Ast right = ast_new_string_literal(par, name.site, name.atom);
 			Ast value = create_field_ast(par, tok.site, left, right);
 			if (ast_is_error(value)) {
 				return value;
@@ -1146,7 +1200,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 		if (token_is_error(name)) {
 			return ast_from_token_error(name);
 		}
-		Ast right = create_atom_ast(par, name.site, name.atom);
+		Ast right = ast_new_string_literal(par, name.site, name.atom);
 		left = create_field_ast(par, tok.site, left, right);
 	}
 	return left;
@@ -1184,7 +1238,7 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 					return parser_error(par, COM_ERROR_INVALID_EXPRESSION, par->tok.site, "expected range expression");
 				}
 			}
-			index = create_binary_ast(par, index->site, AST_RANGE, 0, right);
+			index = ast_new_binary_expr(par, index->site, AST_RANGE, 0, right);
 			if (ast_is_error(index)) {
 				return index;
 			}
@@ -1252,7 +1306,7 @@ static Ast parse_postfix_expr(Parser *parser)
 				}
 				else
 				{
-					Ast y = create_atom_ast(parser, name.site, name.atom);
+					Ast y = ast_new_string_literal(parser, name.site, name.atom);
 					value = create_meta_field_ast(parser, tok.site, value, y);
 				}
 			}
@@ -1320,7 +1374,7 @@ static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 			break;
 		}
 
-		x = create_binary_ast(parser, tok.site, ast_type, x, y);
+		x = ast_new_binary_expr(parser, tok.site, ast_type, x, y);
 		if (ast_is_error(x)) {
 			break;
 		}
@@ -1358,7 +1412,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 		if (!y) {
 			return parser_error(parser, COM_ERROR_INVALID_EXPRESSION, parser->tok.site, "expected expression after assignment operator");
 		}
-		return create_binary_ast(parser, tok.site, compound_assign_type, x, y);
+		return ast_new_binary_expr(parser, tok.site, compound_assign_type, x, y);
 	}
 
 	switch (parser->tok.type)
@@ -1423,7 +1477,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 			if (!y) {
 				return parser_error(parser, COM_ERROR_INVALID_EXPRESSION, parser->tok.site, "expected nil assignment expression");
 			}
-			x = create_binary_ast(parser, tok.site, AST_NIL_ASSIGN, x, y);
+			x = ast_new_binary_expr(parser, tok.site, AST_NIL_ASSIGN, x, y);
 		}
 		break;
 		default:

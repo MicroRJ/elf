@@ -3,6 +3,8 @@
 //
 
 // AST constructors only allocate and initialize the returned tree.
+// README: use ast_new_ *** _expr naming convention
+// README: use ast_new_ *** _stat naming convention
 
 Ast_T ast_error_sentinel =
 {
@@ -16,9 +18,9 @@ Ast_T ast_error_oom_sentinel =
 	.status = COM_STATUS_OOM,
 };
 
-static Ast create_ast(Parser *par, SourceSite site, Ast_Kind kind)
+static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
 {
-	Ast_T *tree = elf_arena_push_zero(par->result_arena, sizeof(*tree));
+	Ast_T *tree = dy_arena_push_zero(par->result_arena, sizeof(*tree), _Alignof(Ast_T));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}
@@ -27,18 +29,18 @@ static Ast create_ast(Parser *par, SourceSite site, Ast_Kind kind)
 	return tree;
 }
 
-static Ast create_nullary_ast(Parser *par, SourceSite site, Ast_Kind kind)
+static Ast ast_new_nullary_expr(Parser *par, SourceSite site, Ast_Kind kind)
 {
-	Ast tree = create_ast(par,site,kind);
+	Ast tree = ast_new(par,site,kind);
 	return tree;
 }
 
-static Ast create_unary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x)
+static Ast ast_new_unary_expr(Parser *par, SourceSite site, Ast_Kind kind, Ast x)
 {
 	if (ast_is_error(x)) {
 		return x;
 	}
-	Ast tree = create_ast(par, site, kind);
+	Ast tree = ast_new(par, site, kind);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -46,7 +48,7 @@ static Ast create_unary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x)
 	return tree;
 }
 
-static Ast create_binary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x, Ast y)
+static Ast ast_new_binary_expr(Parser *par, SourceSite site, Ast_Kind kind, Ast x, Ast y)
 {
 	if (ast_is_error(x)) {
 		return x;
@@ -54,7 +56,7 @@ static Ast create_binary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x,
 	if (ast_is_error(y)) {
 		return y;
 	}
-	Ast tree = create_ast(par, site, kind);
+	Ast tree = ast_new(par, site, kind);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -63,15 +65,15 @@ static Ast create_binary_ast(Parser *par, SourceSite site, Ast_Kind kind, Ast x,
 	return tree;
 }
 
-static Ast create_nil_ast(Parser *par, SourceSite site)
+static Ast ast_new_nil_literal(Parser *par, SourceSite site)
 {
-	return create_nullary_ast(par, site, AST_NIL_LITERAL);
+	return ast_new_nullary_expr(par, site, AST_NIL_LITERAL);
 }
 
-static Ast create_int_ast(Parser *par, SourceSite site, i64 i)
+static Ast ast_new_integer_literal(Parser *par, SourceSite site, i64 i)
 {
 	Ast value;
-	value = create_nullary_ast(par, site, AST_INTEGER_LITERAL);
+	value = ast_new_nullary_expr(par, site, AST_INTEGER_LITERAL);
 	if (ast_is_error(value)) {
 		return value;
 	}
@@ -79,9 +81,9 @@ static Ast create_int_ast(Parser *par, SourceSite site, i64 i)
 	return value;
 }
 
-static Ast create_num_ast(Parser *par, SourceSite site, f64 n)
+static Ast ast_new_number_literal(Parser *par, SourceSite site, f64 n)
 {
-	Ast value = create_nullary_ast(par, site, AST_NUMBER_LITERAL);
+	Ast value = ast_new_nullary_expr(par, site, AST_NUMBER_LITERAL);
 	if (ast_is_error(value)) {
 		return value;
 	}
@@ -89,9 +91,9 @@ static Ast create_num_ast(Parser *par, SourceSite site, f64 n)
 	return value;
 }
 
-static Ast create_atom_ast(Parser *par, SourceSite site, Atom *atom)
+static Ast ast_new_string_literal(Parser *par, SourceSite site, Atom *atom)
 {
-	Ast value = create_nullary_ast(par, site, AST_STRING_LITERAL);
+	Ast value = ast_new_nullary_expr(par, site, AST_STRING_LITERAL);
 	if (ast_is_error(value)) {
 		return value;
 	}
@@ -103,7 +105,7 @@ static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast_Arra
 {
 	ASSERT(parts.count >= 3);
 	ASSERT((parts.count & 1) != 0);
-	Ast value = create_ast(par, site, AST_INTERPOLATED_STRING);
+	Ast value = ast_new(par, site, AST_INTERPOLATED_STRING);
 	if (ast_is_error(value)) {
 		return value;
 	}
@@ -111,9 +113,9 @@ static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast_Arra
 	return value;
 }
 
-static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
+static Ast ast_new_import(Parser *par, SourceSite site, Atom *path)
 {
-	Ast value = create_nullary_ast(par, site, AST_IMPORT);
+	Ast value = ast_new_nullary_expr(par, site, AST_IMPORT);
 	if (ast_is_error(value)) {
 		return value;
 	}
@@ -123,7 +125,7 @@ static Ast create_import_ast(Parser *par, SourceSite site, Atom *path)
 
 static Ast create_table_ast(Parser *par, SourceSite site, Ast_Array args)
 {
-	Ast tree = create_ast(par, site, AST_TABLE);
+	Ast tree = ast_new(par, site, AST_TABLE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -133,7 +135,7 @@ static Ast create_table_ast(Parser *par, SourceSite site, Ast_Array args)
 
 static Ast create_array_ast(Parser *par, SourceSite site, Ast_Array items)
 {
-	Ast tree = create_ast(par, site, AST_ARRAY);
+	Ast tree = ast_new(par, site, AST_ARRAY);
 	if (ast_is_error(tree))
 	{
 		return tree;
@@ -150,7 +152,7 @@ static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast val
 	if (ast_is_error(value)) {
 		return value;
 	}
-	Ast tree = create_ast(par, site, AST_TABLE_ENTRY);
+	Ast tree = ast_new(par, site, AST_TABLE_ENTRY);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -162,7 +164,7 @@ static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast val
 static Ast create_tuple_ast(Parser *par, SourceSite site, Ast_Array args)
 {
 	ASSERT(args.count >= 1);
-	Ast tree = create_ast(par, site, AST_TUPLE);
+	Ast tree = ast_new(par, site, AST_TUPLE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -172,38 +174,38 @@ static Ast create_tuple_ast(Parser *par, SourceSite site, Ast_Array args)
 
 static Ast create_ellipsis_ast(Parser *par, SourceSite site)
 {
-	Ast tree = create_ast(par, site, AST_ELLIPSIS);
+	Ast tree = ast_new(par, site, AST_ELLIPSIS);
 	return tree;
 }
 
-static Ast create_measure_ast(Parser *par, SourceSite site, Ast x)
+static Ast ast_new_measure_intrin(Parser *par, SourceSite site, Ast x)
 {
-	return create_unary_ast(par, site, AST_MEASURE, x);
+	return ast_new_unary_expr(par, site, AST_MEASURE, x);
 }
 
 static Ast create_get_mem_ast(Parser *par, SourceSite site, Ast x)
 {
-	return create_unary_ast(par, site, AST_GET_MEM, x);
+	return ast_new_unary_expr(par, site, AST_GET_MEM, x);
 }
 
 static Ast create_index_ast(Parser *par, SourceSite site, Ast x, Ast y)
 {
-	return create_binary_ast(par, site, AST_INDEX, x, y);
+	return ast_new_binary_expr(par, site, AST_INDEX, x, y);
 }
 
 static Ast create_field_ast(Parser *par, SourceSite site, Ast x, Ast y)
 {
-	return create_binary_ast(par, site, AST_FIELD, x, y);
+	return ast_new_binary_expr(par, site, AST_FIELD, x, y);
 }
 
 static Ast create_range_index_ast(Parser *par, SourceSite site, Ast x, Ast y)
 {
-	return create_binary_ast(par, site, AST_RANGE_INDEX, x, y);
+	return ast_new_binary_expr(par, site, AST_RANGE_INDEX, x, y);
 }
 
 static Ast create_meta_field_ast(Parser *par, SourceSite site, Ast x, Ast y)
 {
-	return create_binary_ast(par,site,AST_META_FIELD,x,y);
+	return ast_new_binary_expr(par,site,AST_META_FIELD,x,y);
 }
 
 static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause, Ast else_clause)
@@ -217,7 +219,7 @@ static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause
 	if (ast_is_error(else_clause)) {
 		return else_clause;
 	}
-	Ast value = create_ast(par, site, AST_IF);
+	Ast value = ast_new(par, site, AST_IF);
 	if (ast_is_error(value)) {
 		return value;
 	}
@@ -229,7 +231,7 @@ static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause
 
 static Ast create_ident_ast(Parser *par, SourceSite site, Atom *atom)
 {
-	Ast tree = create_ast(par, site, AST_IDENT);
+	Ast tree = ast_new(par, site, AST_IDENT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -245,7 +247,7 @@ static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 	if (ast_is_error(y)) {
 		return y;
 	}
-	Ast tree = create_ast(par, site, AST_ASSIGN);
+	Ast tree = ast_new(par, site, AST_ASSIGN);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -259,7 +261,7 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array arg
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_CALL);
+	Ast tree = ast_new(par, site, AST_CALL);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -297,7 +299,7 @@ static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_NAMED_ARGUMENT);
+	Ast tree = ast_new(par, site, AST_NAMED_ARGUMENT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -311,7 +313,7 @@ static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_RETURN);
+	Ast tree = ast_new(par, site, AST_RETURN);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -321,7 +323,7 @@ static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
 
 static Ast create_block_ast(Parser *par, SourceSite site, Ast_Array stats)
 {
-	Ast tree = create_ast(par, site, AST_BLOCK_STAT);
+	Ast tree = ast_new(par, site, AST_BLOCK_STAT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -329,16 +331,17 @@ static Ast create_block_ast(Parser *par, SourceSite site, Ast_Array stats)
 	return tree;
 }
 
-static Ast create_file_ast(Parser *par, SourceSite site, Ast body)
+static Ast create_file_ast(Parser *par, SourceSite site, Ast body, Ast_Array imports)
 {
 	if (ast_is_error(body)) {
 		return body;
 	}
-	Ast tree = create_ast(par, site, AST_FILE);
+	Ast tree = ast_new(par, site, AST_FILE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
 	tree->file.body = body;
+	tree->file.imports = imports;
 	return tree;
 }
 
@@ -350,7 +353,7 @@ static Ast create_while_ast(Parser *par, SourceSite site, Ast pred, Ast body)
 	if (ast_is_error(body)) {
 		return body;
 	}
-	Ast tree = create_ast(par, site, AST_WHILE);
+	Ast tree = ast_new(par, site, AST_WHILE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -373,7 +376,7 @@ static Ast create_for_ast(Parser *par, SourceSite site, Ast init, Ast pred, Ast 
 	if (ast_is_error(body)) {
 		return body;
 	}
-	Ast tree = create_ast(par, site, AST_FOR);
+	Ast tree = ast_new(par, site, AST_FOR);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -392,7 +395,7 @@ static Ast create_for_range_ast(Parser *par, SourceSite site, Ast decl, Ast body
 	if (ast_is_error(body)) {
 		return body;
 	}
-	Ast tree = create_ast(par, site, AST_FOR_RANGE);
+	Ast tree = ast_new(par, site, AST_FOR_RANGE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -406,7 +409,7 @@ static Ast create_defer_ast(Parser *par, SourceSite site, Ast body)
 	if (ast_is_error(body)) {
 		return body;
 	}
-	Ast tree = create_ast(par, site, AST_DEFER_STAT);
+	Ast tree = ast_new(par, site, AST_DEFER_STAT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -422,7 +425,7 @@ static Ast create_decl_ast(Parser *par, SourceSite site, b32 constant, Ast name,
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_DECL_STAT);
+	Ast tree = ast_new(par, site, AST_DECL_STAT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -440,7 +443,7 @@ static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast ex
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_STATIC_DECL);
+	Ast tree = ast_new(par, site, AST_STATIC_DECL);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -455,7 +458,7 @@ static Ast create_break_ast(Parser *par, SourceSite site, Ast expr)
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_BREAK);
+	Ast tree = ast_new(par, site, AST_BREAK);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -468,7 +471,7 @@ static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_CONTINUE);
+	Ast tree = ast_new(par, site, AST_CONTINUE);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -481,7 +484,7 @@ static Ast create_function_ast(Parser *par, SourceSite site, Ast_Array params, b
 	if (ast_is_error(body)) {
 		return body;
 	}
-	Ast tree = create_ast(par, site, AST_FUNCTION);
+	Ast tree = ast_new(par, site, AST_FUNCTION);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
@@ -502,7 +505,7 @@ static Ast create_param_ast(Parser *par, SourceSite site, Ast name, Ast type, As
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = create_ast(par, site, AST_FUNCTION_PARAM);
+	Ast tree = ast_new(par, site, AST_FUNCTION_PARAM);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
