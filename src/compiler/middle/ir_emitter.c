@@ -39,7 +39,7 @@ struct IrCapture
 {
 	IrCapture *next;
 	Entity    *entity;
-	Ir         source;
+	Ir         target;
 };
 
 // represents a lexical function as we descend
@@ -173,22 +173,22 @@ static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functi
 	ASSERT(function_ctx->capture_count < 255);
 	ASSERT(capture_index == function_ctx->capture_count);
 
-	Ir source = 0;
+	Ir target = 0;
 	IrEmitterFrame *parent = function_ctx->parent;
 
 	if (parent && entity->parent != parent->tree)
 	{
 		u32 parent_capture = capture_entity_in_function(emitter, parent, entity, site);
-		source = ir_new_capture(emitter, site, parent_capture);
+		target = ir_new_capture(emitter, site, parent_capture);
 	}
 	else
 	{
-		source = ir_new_load_local(emitter, site, entity->ir);
+		target = ir_new_load_local(emitter, site, entity->ir);
 	}
 
 	IrCapture *capture = dy_arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
 	capture->entity = entity;
-	capture->source = source;
+	capture->target = target;
 	if (function_ctx->last_capture) {
 		function_ctx->last_capture->next = capture;
 	}
@@ -1499,7 +1499,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 	for (IrCapture *capture = function_ctx.first_capture; capture; capture = capture->next)
 	{
 		ASSERT(capture_index < captures.count);
-		captures.items[capture_index++] = capture->source;
+		captures.items[capture_index++] = capture->target;
 	}
 	ASSERT(capture_index == captures.count);
 
