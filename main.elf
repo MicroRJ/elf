@@ -1,3 +1,9 @@
+{
+	if true ? defer elf.printl("LOOKS FIRST")
+	elf.printl("HERE!")
+}
+
+#eof
 paths := elf.fs.get_paths("test/smoke")
 test_assert = fun(cond) {
 	if cond != true ? {

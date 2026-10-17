@@ -507,10 +507,10 @@ static void test_backend_if_else_restores_stack_top(void)
 	Ir if_ir = ir_new_if(emitter, site, pred, true_clause, else_clause);
 	Ir after_if = ir_new_local(emitter, site, ir_new_int(emitter, site, 33));
 
-	IrCollector stats = begin_ir_frame(emitter);
+	IrQueue stats = ir_begin_queue(emitter);
 	ir_push(&stats, if_ir);
 	ir_push(&stats, after_if);
-	Ir body = ir_new_block(emitter, site, close_ir_frame(&stats));
+	Ir body = ir_new_block(emitter, site, ir_end_queue(&stats));
 
 	IrFunction function = {};
 	function.site = site;

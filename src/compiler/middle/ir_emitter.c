@@ -22,12 +22,6 @@ struct IrDefer
 	Ast      stat;
 };
 
-typedef struct
-{
-	IrDefer *previous_defer_start;
-}
-DeferScope;
-
 typedef struct IrLoopFrame IrLoopFrame;
 struct IrLoopFrame
 {
@@ -81,9 +75,9 @@ typedef struct
 	u32        start;
 	u32        count;
 }
-IrCollector;
+IrQueue;
 
-static void ir_emit_stat(IrCollector *block, Ast stat);
+static void ir_emit_stat(IrQueue *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
 static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
 
@@ -95,16 +89,16 @@ static void ir_report_error(IrEmitter *emitter, Com_Error error, SourceSite site
 	va_end(args);
 }
 
-static IrCollector begin_ir_frame(IrEmitter *emitter)
+static IrQueue ir_begin_queue(IrEmitter *emitter)
 {
-	IrCollector block = {};
+	IrQueue block = {};
 	block.emitter = emitter;
 	block.start = emitter->ir_stack_index;
 	block.count = 0;
 	return block;
 }
 
-static void ir_push(IrCollector *stack, Ir ir)
+static void ir_push(IrQueue *stack, Ir ir)
 {
 	IrEmitter *emitter = stack->emitter;
 	ASSERT(emitter);
@@ -114,7 +108,7 @@ static void ir_push(IrCollector *stack, Ir ir)
 	stack->count += 1;
 }
 
-static IrArray close_ir_frame(IrCollector *frame)
+static IrArray ir_end_queue(IrQueue *frame)
 {
 	IrEmitter *emitter = frame->emitter;
 	ASSERT(emitter);
@@ -131,20 +125,19 @@ static IrArray close_ir_frame(IrCollector *frame)
 	return items;
 }
 
-static DeferScope get_defer_scope(IrEmitter *emitter)
+static IrDefer *ir_begin_defer_scope(IrEmitter *emitter)
 {
 	ASSERT(emitter->function);
-	DeferScope scope = {};
-	scope.previous_defer_start = emitter->function->defer_scope_start;
+	IrDefer *previous_defer_start = emitter->function->defer_scope_start;
 	emitter->function->defer_scope_start = emitter->function->defer;
-	return scope;
+	return previous_defer_start;
 }
 
-static void set_defer_scope(IrEmitter *emitter, DeferScope scope)
+static void ir_close_defer_scope(IrEmitter *emitter, IrDefer *previous_defer_start)
 {
 	ASSERT(emitter->function);
 	emitter->function->defer = emitter->function->defer_scope_start;
-	emitter->function->defer_scope_start = scope.previous_defer_start;
+	emitter->function->defer_scope_start = previous_defer_start;
 }
 
 static void push_defer_stat(IrEmitter *emitter, Ast stat)
@@ -156,7 +149,7 @@ static void push_defer_stat(IrEmitter *emitter, Ast stat)
 	emitter->function->defer = defer;
 }
 
-static void emit_defer_range(IrEmitter *emitter, IrCollector *items, IrDefer *start)
+static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 {
 	ASSERT(emitter->function);
 	for (IrDefer *defer = emitter->function->defer; defer != start; defer = defer->previous)
@@ -582,7 +575,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			Ast *args = expr->table.items;
 			u32 nargs = expr->table.count;
 
-			IrCollector table_items = begin_ir_frame(emitter);
+			IrQueue table_items = ir_begin_queue(emitter);
 			Ir table_local = ir_new_local(emitter, expr->site, ir_new_table(emitter, expr->site));
 			ir_push(&table_items, table_local);
 
@@ -612,14 +605,14 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			}
 
 			Ir value = ir_new_load_local(emitter, expr->site, table_local);
-			IrArray stats = close_ir_frame(&table_items);
+			IrArray stats = ir_end_queue(&table_items);
 			ir = ir_new_expr_block(emitter, expr->site, stats, value);
 		}
 		break;
 
 		case AST_ARRAY:
 		{
-			IrCollector array_items = begin_ir_frame(emitter);
+			IrQueue array_items = ir_begin_queue(emitter);
 			Ir array_local = ir_new_local(emitter, expr->site, ir_new_array(emitter, expr->site));
 			ir_push(&array_items, array_local);
 
@@ -631,7 +624,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			}
 
 			Ir value = ir_new_load_local(emitter, expr->site, array_local);
-			IrArray stats = close_ir_frame(&array_items);
+			IrArray stats = ir_end_queue(&array_items);
 			ir = ir_new_expr_block(emitter, expr->site, stats, value);
 		}
 		break;
@@ -702,31 +695,34 @@ static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat)
 		return ERROR_IR;
 	}
 
-	IrCollector block_items = begin_ir_frame(emitter);
-	if (stat->kind == AST_BLOCK_STAT)
+	IrQueue queue = ir_begin_queue(emitter);
+
+	IrDefer *defer_scope = ir_begin_defer_scope(emitter);
 	{
-		DeferScope defer_scope = get_defer_scope(emitter);
-		for (u32 i = 0; i < stat->block.count; ++ i)
+		if (stat->kind == AST_BLOCK_STAT)
 		{
-			if (stat->block.items[i]->kind != AST_STATIC_DECL) {
-				ir_emit_stat(&block_items, stat->block.items[i]);
+			for (u32 i = 0; i < stat->block.count; ++ i)
+			{
+				if (stat->block.items[i]->kind != AST_STATIC_DECL) {
+					ir_emit_stat(&queue, stat->block.items[i]);
+				}
 			}
 		}
-		emit_defer_range(emitter, &block_items, emitter->function->defer_scope_start);
-		set_defer_scope(emitter, defer_scope);
+		else
+		{
+			ir_emit_stat(&queue, stat);
+		}
 	}
-	else
-	{
-		ir_emit_stat(&block_items, stat);
-	}
+	emit_defer_range(emitter, &queue, emitter->function->defer_scope_start);
+	ir_close_defer_scope(emitter, defer_scope);
 
-	ASSERT(emitter->ir_stack_index == block_items.start + block_items.count);
-	IrArray instr = close_ir_frame(&block_items);
+	ASSERT(emitter->ir_stack_index == queue.start + queue.count);
+	IrArray instr = ir_end_queue(&queue);
 	Ir ir = ir_new_block(emitter, stat->site, instr);
 	return ir;
 }
 
-static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrCollector *items, Ast expr)
+static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrQueue *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -783,7 +779,7 @@ static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrCollector *items, Ast expr)
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrCollector *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.count;
 
@@ -951,7 +947,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	Ir iterator_less_than_range_end = ir_new_binary(emitter, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = ir_new_jump_if_false(emitter, range->site, iterator_less_than_range_end, break_label);
 
-	IrCollector loop_items = begin_ir_frame(emitter);
+	IrQueue loop_items = ir_begin_queue(emitter);
 	ir_push(&loop_items, start_label);
 	ir_push(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
@@ -986,10 +982,10 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	ir_push(&loop_items, increment);
 	ir_push(&loop_items, ir_new_jump(emitter, first_name->site, start_label));
 	ir_push(&loop_items, break_label);
-	IrArray loop_stats = close_ir_frame(&loop_items);
+	IrArray loop_stats = ir_end_queue(&loop_items);
 	Ir loop = ir_new_block(emitter, stat->site, loop_stats);
 
-	IrCollector block_items = begin_ir_frame(emitter);
+	IrQueue block_items = ir_begin_queue(emitter);
 	if (collection_local) {
 		ir_push(&block_items, collection_local);
 	}
@@ -1001,7 +997,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	}
 	ir_push(&block_items, loop);
 
-	IrArray stats = close_ir_frame(&block_items);
+	IrArray stats = ir_end_queue(&block_items);
 	Ir ir = ir_new_block(emitter, stat->site, stats);
 
 	return ir;
@@ -1050,7 +1046,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 		return ERROR_IR;
 	}
 
-	IrCollector block_items = begin_ir_frame(emitter);
+	IrQueue block_items = ir_begin_queue(emitter);
 	ir_emit_stat(&block_items, init);
 
 	Ir condition_label = ir_new_label(emitter, stat->site);
@@ -1069,7 +1065,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	Ir exit_jump = ir_new_jump_if_false(emitter, stat->for_stat.pred->site, pred, break_label);
 	Ir step = ir_emit_stat_as_block(emitter, stat->for_stat.step);
 
-	IrCollector loop_items = begin_ir_frame(emitter);
+	IrQueue loop_items = ir_begin_queue(emitter);
 	ir_push(&loop_items, condition_label);
 	ir_push(&loop_items, exit_jump);
 	ir_push(&loop_items, body);
@@ -1077,15 +1073,15 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	ir_push(&loop_items, step);
 	ir_push(&loop_items, ir_new_jump(emitter, stat->site, condition_label));
 	ir_push(&loop_items, break_label);
-	IrArray loop_stats = close_ir_frame(&loop_items);
+	IrArray loop_stats = ir_end_queue(&loop_items);
 	ir_push(&block_items, ir_new_block(emitter, stat->site, loop_stats));
 
-	IrArray stats = close_ir_frame(&block_items);
+	IrArray stats = ir_end_queue(&block_items);
 	Ir ir = ir_new_block(emitter, stat->site, stats);
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrCollector *items, Ast stat)
+static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrQueue *items, Ast stat)
 {
 	Ast dest_tuple = ast_ensure_kind(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
@@ -1114,7 +1110,7 @@ static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrCollector *items, As
 	return ir_new_store(emitter, stat->site, dest_ir, value_ir);
 }
 
-static void ir_emit_stat(IrCollector *items, Ast stat)
+static void ir_emit_stat(IrQueue *items, Ast stat)
 {
 	IrEmitter *emitter = items->emitter;
 
@@ -1163,14 +1159,14 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 			Ir pred_ir = ir_emit_expr(emitter, pred);
 			Ir jump_if_false = ir_new_jump_if_false(emitter, pred->site, pred_ir, break_label);
 
-			IrCollector loop_items = begin_ir_frame(emitter);
+			IrQueue loop_items = ir_begin_queue(emitter);
 			ir_push(&loop_items, start_label);
 			ir_push(&loop_items, jump_if_false);
 			ir_push(&loop_items, body_ir);
 			ir_push(&loop_items, ir_new_jump(emitter, stat->site, start_label));
 			ir_push(&loop_items, break_label);
 
-			IrArray loop_stats = close_ir_frame(&loop_items);
+			IrArray loop_stats = ir_end_queue(&loop_items);
 			Ir ir = ir_new_block(emitter, stat->site, loop_stats);
 			ir_push(items, ir);
 		}
@@ -1348,9 +1344,9 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 				Ir value_ir = ir_emit_expr(emitter, expr_ast);
 				Ir store_ir = ir_new_store(emitter, stat->site, dest_ir, value_ir);
 
-				IrCollector true_items = begin_ir_frame(emitter);
+				IrQueue true_items = ir_begin_queue(emitter);
 				ir_push(&true_items, store_ir);
-				IrArray true_stats = close_ir_frame(&true_items);
+				IrArray true_stats = ir_end_queue(&true_items);
 				Ir true_clause = ir_new_block(emitter, stat->site, true_stats);
 				Ir ir = ir_new_if(emitter, stat->site, pred_ir, true_clause, 0);
 				ir_push(items, ir);
