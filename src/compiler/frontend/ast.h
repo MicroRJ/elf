@@ -106,8 +106,9 @@ struct Ast_Node
 // IMMUTABLE once constructed.
 struct Ast_T
 {
-	Ast_Kind           kind;
-	SourceSite         site;
+	Ast_Kind             kind;
+	SourceSite           site;
+	// TODO(RJ): probably remove this entirely
 	struct Com_Source *source;
 
 	// NOTE(RJ): this is populated by the checker, it is the only mutable field, this is to avoid keeping

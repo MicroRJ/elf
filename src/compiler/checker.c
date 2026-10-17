@@ -50,9 +50,7 @@ static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, A
 		ASSERT(tree);
 		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
 		return existing;
-
 	}
-	printf("DECLARE ENTITY: %s\n", atom_data(name));
 
 	Entity *entity = scope_declare(scope, kind, name);
 	ASSERT(entity || !"Codex: proper erroring!");

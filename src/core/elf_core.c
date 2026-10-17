@@ -11,11 +11,6 @@
 #include <string.h>
 #include <assert.h>
 
-#if defined(__EMSCRIPTEN__)
-   #include <emscripten.h>
-   #include <unistd.h>
-#endif
-
 #include "elf.h"
 #include "base.h"
 #include "libs.h"
