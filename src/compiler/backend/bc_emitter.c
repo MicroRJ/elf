@@ -565,10 +565,10 @@ static i32 finish_call(BcEmitter *emitter, Ir ir, i32 call_slot, i32 out, u32 no
 
 	if (!bc_slot_is_valid(out))
 	{
-		while ((i32)emitter->stack_top < call_slot + (i32)nout) {
+		out = alloc_slot(emitter);
+		for (u32 i = 1; i < nout; ++i) {
 			alloc_slot(emitter);
 		}
-		out = call_slot;
 	}
 
 	if (out != call_slot)
