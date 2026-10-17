@@ -67,7 +67,7 @@ static Ir ir_new_global(IrEmitter *emitter, SourceSite site, Atom *name)
 	return ir;
 }
 
-static Ir ir_new_function(IrEmitter *emitter, SourceSite site, IrFunDef *function)
+static Ir ir_new_function(IrEmitter *emitter, SourceSite site, IrFunction *function)
 {
 	ASSERT(function);
 	Ir ir = ir_alloc(emitter, site, IR_FUNCTION);
@@ -75,7 +75,7 @@ static Ir ir_new_function(IrEmitter *emitter, SourceSite site, IrFunDef *functio
 	return ir;
 }
 
-static Ir ir_new_closure(IrEmitter *emitter, SourceSite site, IrFunDef *function)
+static Ir ir_new_closure(IrEmitter *emitter, SourceSite site, IrFunction *function)
 {
 	ASSERT(function);
 	Ir ir = ir_alloc(emitter, site, IR_CLOSURE);

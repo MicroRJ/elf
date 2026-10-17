@@ -24,7 +24,7 @@ static IrEmitter *ir_test_lower_source(elf_State *state, elf_Arena *arena, const
 	return emitter;
 }
 
-static IrFunDef *ir_test_main_function(IrEmitter *emitter)
+static IrFunction *ir_test_main_function(IrEmitter *emitter)
 {
 	if (!emitter || emitter->module->function_count != 1) {
 		test_fail("lowering produced one main function");
@@ -35,7 +35,7 @@ static IrFunDef *ir_test_main_function(IrEmitter *emitter)
 
 static Ir ir_test_main_body(IrEmitter *emitter)
 {
-	IrFunDef *function = ir_test_main_function(emitter);
+	IrFunction *function = ir_test_main_function(emitter);
 	if (!function) {
 		return 0;
 	}
@@ -351,7 +351,7 @@ static void test_ir_lowers_function_expression(elf_State *state)
 		test_fail("function ir points at nested function");
 	}
 
-	IrFunDef *function = &emitter->module->functions[1];
+	IrFunction *function = &emitter->module->functions[1];
 	if (function->param_count != IMPLICIT_PARAM_COUNT + 2) {
 		test_fail("function parameter count includes implicit this and source params");
 	}

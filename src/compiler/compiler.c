@@ -1180,7 +1180,7 @@ static IrModule *ir_new_module(Compiler *compiler)
 	{
 		Com_Function *input = compiler->functions + i;
 		Ast ast = input->ast;
-		IrFunDef *function = module->functions + i;
+		IrFunction *function = module->functions + i;
 		function->site = ast->site;
 		function->variadic = input->variadic;
 		function->is_static = ast->kind == AST_FUNCTION;

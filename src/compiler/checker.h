@@ -6,7 +6,7 @@
 //
 typedef struct Entity      Entity;
 typedef struct EntityTable EntityTable;
-typedef struct IrFunDef    IrFunDef;
+typedef struct IrFunction    IrFunction;
 
 // TODO(RJ): maybe allocate the entities here directly?
 // TODO(RJ): def use a hash-table for globals!
@@ -37,7 +37,7 @@ typedef struct {
 		EntityTable *exports;
 		struct {
 			Ast       function;
-			IrFunDef *definition;
+			IrFunction *definition;
 		};
 	};
 }

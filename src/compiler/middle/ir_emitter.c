@@ -282,9 +282,9 @@ static TypeRule type_rule_from_atom(Atom *atom)
 	}
 }
 
-static IrFunDef *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count);
-static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast tree, Ast_Array ast_params, Ast body);
-static IrFunDef *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body);
+static IrFunction *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count);
+static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, Ast tree, Ast_Array ast_params, Ast body);
+static IrFunction *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body);
 
 static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
 {
@@ -400,7 +400,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		switch (value.type) {
 			case STATIC_VALUE_FUNCTION:
 			{
-				IrFunDef *definition = entity->value.definition;
+				IrFunction *definition = entity->value.definition;
 				if (!definition)
 				{
 					Ast function = entity->value.function;
@@ -565,7 +565,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		case AST_FUNCTION:
 		{
 			// TODO(RJ): only create a closure if we actually have any captures ...
-			IrFunDef *definition = ir_lower_function(emitter, expr, expr->site, expr->function.variadic, expr->function.params, expr->function.body);
+			IrFunction *definition = ir_lower_function(emitter, expr, expr->site, expr->function.variadic, expr->function.params, expr->function.body);
 			ir = ir_new_closure(emitter, expr->site, definition);
 		}
 		break;
@@ -1427,9 +1427,9 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 	}
 }
 
-static IrFunDef *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count)
+static IrFunction *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count)
 {
-	IrFunDef *definition = dy_arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunDef));
+	IrFunction *definition = dy_arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunction));
 	definition->index = IR_FUNCTION_INDEX_INVALID;
 	definition->site = site;
 	definition->variadic = variadic;
@@ -1447,7 +1447,7 @@ static IrFunDef *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 va
 	return definition;
 }
 
-static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast tree, Ast_Array ast_params, Ast body)
+static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, Ast tree, Ast_Array ast_params, Ast body)
 {
 	ASSERT(definition);
 	ASSERT(definition->param_count == IMPLICIT_PARAM_COUNT + ast_params.count);
@@ -1523,12 +1523,12 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast
 
 	emitter->function = outer_function;
 
-	definition->capture_sources = captures;
+	definition->captures = captures;
 }
 
-static IrFunDef *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body)
+static IrFunction *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body)
 {
-	IrFunDef *definition = ir_reserve_function(emitter, site, variadic, ast_params.count);
+	IrFunction *definition = ir_reserve_function(emitter, site, variadic, ast_params.count);
 	ir_lower_function_body(emitter, definition, tree, ast_params, body);
 	return definition;
 }
@@ -1549,8 +1549,8 @@ IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
 	emitter->module = module;
 	emitter->ir_stack_size = 4096;
 	emitter->ir_stack = elf_arena_push_zero(module->arena, sizeof(*emitter->ir_stack) * emitter->ir_stack_size);
-	IrFunDef *entry = ir_lower_function(emitter, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
+	IrFunction *entry = ir_lower_function(emitter, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
 	ASSERT(entry == module->first_function);
-	ASSERT(!entry->capture_sources.items && !entry->capture_sources.count);
+	ASSERT(!entry->captures.items && !entry->captures.count);
 	return module;
 }

@@ -389,7 +389,7 @@ static BcString copy_emitter_string(elf_Arena *arena, Atom *atom)
 	return (BcString) {.data = data, .size = size};
 }
 
-static u32 bc_function_index(BcEmitter *emitter, IrFunDef *function)
+static u32 bc_function_index(BcEmitter *emitter, IrFunction *function)
 {
 	ASSERT(function);
 	if (function->index == IR_FUNCTION_INDEX_INVALID)
@@ -430,7 +430,7 @@ static BcModule *bc_finish_module(BcEmitter *emitter)
 	return module;
 }
 
-static void bc_emit_function(BcEmitter *emitter, IrFunDef *function)
+static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 {
 	ASSERT(emitter);
 	ASSERT(function);
@@ -474,7 +474,7 @@ static void bc_emit_function(BcEmitter *emitter, IrFunDef *function)
 	bc_function->arity = function->param_count;
 	bc_function->offset = bytecode_start;
 	bc_function->length = module->bytecode_count - bytecode_start;
-	bc_function->captures = function->capture_sources.count;
+	bc_function->captures = function->captures.count;
 	bc_function->stack_size = emitter->stack_size;
 }
 
@@ -483,7 +483,7 @@ BcModule *bc_emit_module(IrModule *input)
 	ASSERT(input);
 	ASSERT(input->function_count);
 	u32 function_count = 0;
-	for (IrFunDef *function = input->first_function; function; function = function->next)
+	for (IrFunction *function = input->first_function; function; function = function->next)
 	{
 		function->index = IR_FUNCTION_INDEX_INVALID;
 		function_count += 1;
@@ -507,7 +507,7 @@ BcModule *bc_emit_module(IrModule *input)
 	emitter->bytecode_capacity = 1 << 13;
 	emitter->bytecode = dy_arena_push_zero(arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, 8);
 
-	for (IrFunDef *function = input->first_function; function; function = function->next) {
+	for (IrFunction *function = input->first_function; function; function = function->next) {
 		bc_emit_function(emitter, function);
 	}
 	return bc_finish_module(emitter);
@@ -898,9 +898,9 @@ static BcSlot emit_expr(BcEmitter *emitter, Ir expr, BcSlot out, u32 nout)
 
 			out = ensure_slot(emitter, out);
 
-			IrFunDef *function = expr->ir_closure;
+			IrFunction *function = expr->ir_closure;
 			u32 bytecode_function_id = bc_function_index(emitter, function);
-			IrArray captures = function->capture_sources;
+			IrArray captures = function->captures;
 			if (captures.count == 0)
 			{
 				emit_xy_bc(emitter, site, BC_CLOSURE, unwrap_slot(out), bytecode_function_id);

@@ -96,7 +96,7 @@ static inline const char *ir_kind_name(IrKind kind)
 
 typedef struct IrNode IrNode;
 typedef IrNode *Ir;
-typedef struct IrFunDef IrFunDef;
+typedef struct IrFunction IrFunction;
 
 typedef struct
 {
@@ -152,8 +152,8 @@ struct IrNode
 		}
 		ir_call;
 
-		IrFunDef *ir_function;
-		IrFunDef *ir_closure;
+		IrFunction *ir_function;
+		IrFunction *ir_closure;
 
 		struct
 		{
@@ -243,24 +243,24 @@ static inline b32 ir_is_error(Ir ir)
 
 #define IR_FUNCTION_INDEX_INVALID ((u32)-1)
 
-struct IrFunDef
+struct IrFunction
 {
-	IrFunDef  *next;
-	u32        index;
-	SourceSite site;
-	b32        variadic;
-	Ir         body;
-	Ir        *params;
-	u32        param_count;
-	IrArray    capture_sources;
+	IrFunction *next;
+	SourceSite  site;
+	b32         variadic;
+	Ir          body;
+	Ir         *params;
+	u32         param_count;
+	IrArray     captures;
+	u32         index;
 };
 
 typedef struct
 {
-	elf_Arena *arena;
-	IrFunDef  *first_function;
-	IrFunDef  *last_function;
-	u32        function_count;
+	elf_Arena  *arena;
+	IrFunction *first_function;
+	IrFunction  *last_function;
+	u32         function_count;
 }
 IrModule;
 

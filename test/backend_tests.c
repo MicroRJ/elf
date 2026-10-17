@@ -512,7 +512,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	ir_push(&stats, after_if);
 	Ir body = ir_new_block(emitter, site, close_ir_frame(&stats));
 
-	IrFunDef function = {};
+	IrFunction function = {};
 	function.site = site;
 	function.variadic = true;
 	Ir params[] = { ir_new_local(emitter, site, 0) };
@@ -570,7 +570,7 @@ static void test_backend_outputs_strings(void)
 
 	IrNode string = {.kind = IR_ATOM, .atom = atom};
 	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &string};
-	IrFunDef function = {.body = &return_string};
+	IrFunction function = {.body = &return_string};
 	IrModule ir_module = {.arena = &arena, .functions = &function, .function_count = 1, .function_capacity = 1};
 
 	BcModule *module = bc_emit_module(&ir_module);
