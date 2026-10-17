@@ -22,7 +22,6 @@ typedef struct
 	Com_Source       *compiler_source;
 	Atom_Table       *atoms;
 	elf_Arena        *scratch_arena;
-	BcSourceBuffer    source;
 
 	const char       *cursor;
 	const char       *end;

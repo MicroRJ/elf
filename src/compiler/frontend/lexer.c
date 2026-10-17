@@ -44,14 +44,14 @@ static Token_Type check_keyword(Atom *atom)
 
 static u32 lexer_scratch_capacity(Lexer *lexer)
 {
-	return lexer->source.size;
+	return lexer->compiler_source->source.size;
 }
 
 enum { LEXER_EOF = -1 };
 
 static inline int lexer_peek(Lexer *lexer, const char *cursor, u32 offset)
 {
-	ASSERT(cursor >= lexer->source.data && cursor <= lexer->end);
+	ASSERT(cursor >= lexer->compiler_source->source.data && cursor <= lexer->end);
 	u64 remaining = (u64)(lexer->end - cursor);
 	return offset < remaining ? (u8)cursor[offset] : LEXER_EOF;
 }
@@ -79,7 +79,6 @@ static void lexer_init(Lexer *lexer, Compiler *compiler, Com_Source *source, elf
 	lexer->compiler_source = source;
 	lexer->atoms = compiler->atoms;
 	lexer->scratch_arena = scratch_arena;
-	lexer->source = source->source;
 	lexer->cursor = source->source.data;
 	lexer->end = source->source.data + source->source.size;
 	lexer->line_index = 1;
@@ -98,8 +97,8 @@ static SourceSite source_site_from_ptr(Lexer *lexer, const char *data)
 	ASSERT(data);
 	ASSERT(data >= lexer->line_start);
 	ASSERT(data <= lexer->end);
-	u64 offset = (u64)(data - lexer->source.data);
-	u64 line_offset = (u64)(lexer->line_start - lexer->source.data);
+	u64 offset = (u64)(data - lexer->compiler_source->source.data);
+	u64 line_offset = (u64)(lexer->line_start - lexer->compiler_source->source.data);
 	ASSERT(offset <= UINT32_MAX);
 	ASSERT(line_offset <= UINT32_MAX);
 	return (SourceSite) {
@@ -691,7 +690,7 @@ static Com_Status lexer_format_string(Lexer *lexer, const char **cursor, Token o
 			.line_break_before = line_break_before,
 			.atom = atom,
 		};
-		part.site.size = (u32)(cur - (worker.source.data + part.site.offset));
+		part.site.size = (u32)(cur - (worker.compiler_source->source.data + part.site.offset));
 		if (part.site.size == 0) {
 			part.site.size = 1;
 		}
@@ -894,7 +893,7 @@ static Com_Status lex(Lexer *lexer)
 			else
 			{
 				lex_identifier(lexer, &cur);
-				const char *token_data = lexer->source.data + token.site.offset;
+				const char *token_data = lexer->compiler_source->source.data + token.site.offset;
 				u32 size = (u32)(cur - token_data);
 				Atom *atom = atom_from_data_size(lexer->atoms, token_data, size);
 				if (!atom)
@@ -1160,7 +1159,7 @@ static Com_Status lex(Lexer *lexer)
 		} break;
 	}
 
-	token.site.size = (u32)(cur - (lexer->source.data + token.site.offset));
+	token.site.size = (u32)(cur - (lexer->compiler_source->source.data + token.site.offset));
 	if (token.site.size == 0) {
 		token.site.size = 1;
 	}
