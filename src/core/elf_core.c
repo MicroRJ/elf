@@ -37,8 +37,6 @@
 #include "elf_gc.c"
 #include "elf_value_text.c"
 
-#include "compiler.h"
-
 #include "../libs/l_math.c"
 #include "../libs/l_number.c"
 #include "../libs/l_core.c"

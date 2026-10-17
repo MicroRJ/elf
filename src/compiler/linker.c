@@ -3,10 +3,12 @@
 //
 
 #include <dy.h>
+#include <string.h>
 
 #include "elf.h"
 #include "base.h"
 #include "bytecode.h"
+#include "compiler.h"
 #include "elf_core.h"
 
 // TODO(RJ): better error reporting here!
@@ -133,4 +135,37 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 	state->gc_mode = saved_gc_mode;
 	elf_end_scratch(scratch);
 	return module;
+}
+
+static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
+{
+	elf_Scratch scratch = elf_begin_scratch();
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
+	elf_Module *module = elf_link_module(state, compiled_module);
+	BcFunctionRef entry = {};
+	if (module)
+	{
+		entry.module = module;
+		entry.index = 0;
+	}
+	elf_end_scratch(scratch);
+	return entry;
+}
+
+elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source)
+{
+	if (!name || !source.data) {
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
+	BcFunctionRef function = compile_source(state, name, source);
+	if (!bc_function_ref_is_valid(function)) {
+		return ELF_ERROR_COMPILATION_FAILED;
+	}
+	ASSERT(bc_function_from_ref(function)->captures == 0);
+
+	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
+	closure->function = function;
+	push_value(state, value_from_closure(closure));
+	return ELF_ERROR_NONE;
 }
