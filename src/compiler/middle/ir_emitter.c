@@ -75,91 +75,91 @@ struct IrEmitter
 
 typedef struct
 {
-	IrEmitter *ctx;
+	IrEmitter *emitter;
 	u32        start;
 	u32        count;
 }
 IrCollector;
 
-static void ir_lower_stat(IrCollector *block, Ast stat);
-static Ir ir_emit_expr(IrEmitter *ctx, Ast expr);
-static Ir ir_lower_stat_as_block(IrEmitter *ctx, Ast stat);
+static void ir_emit_stat(IrCollector *block, Ast stat);
+static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
+static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
 
-static void ir_report_error(IrEmitter *ctx, Com_Error error, SourceSite site, const char *format, ...)
+static void ir_report_error(IrEmitter *emitter, Com_Error error, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(ctx->compiler, error, COMPILER_ERROR, COMPILER_PHASE_LOWERING, site, format, args);
+	compiler_reportv(emitter->compiler, error, COMPILER_ERROR, COMPILER_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 
-static IrCollector begin_ir_frame(IrEmitter *ctx)
+static IrCollector begin_ir_frame(IrEmitter *emitter)
 {
 	IrCollector block = {};
-	block.ctx = ctx;
-	block.start = ctx->ir_stack_index;
+	block.emitter = emitter;
+	block.start = emitter->ir_stack_index;
 	block.count = 0;
 	return block;
 }
 
-static void push_ir(IrCollector *stack, Ir ir)
+static void ir_push(IrCollector *stack, Ir ir)
 {
-	IrEmitter *ctx = stack->ctx;
-	ASSERT(ctx);
-	ASSERT(ctx->ir_stack_index == stack->start + stack->count);
-	ASSERT(ctx->ir_stack_index < ctx->ir_stack_size);
-	ctx->ir_stack[ctx->ir_stack_index++] = ir;
+	IrEmitter *emitter = stack->emitter;
+	ASSERT(emitter);
+	ASSERT(emitter->ir_stack_index == stack->start + stack->count);
+	ASSERT(emitter->ir_stack_index < emitter->ir_stack_size);
+	emitter->ir_stack[emitter->ir_stack_index++] = ir;
 	stack->count += 1;
 }
 
 static IrArray close_ir_frame(IrCollector *frame)
 {
-	IrEmitter *ctx = frame->ctx;
-	ASSERT(ctx);
-	ASSERT(ctx->ir_stack_index == frame->start + frame->count);
+	IrEmitter *emitter = frame->emitter;
+	ASSERT(emitter);
+	ASSERT(emitter->ir_stack_index == frame->start + frame->count);
 
-	ctx->ir_stack_index -= frame->count;
+	emitter->ir_stack_index -= frame->count;
 
 	IrArray items = {};
 	items.count = frame->count;
-	items.items = elf_arena_push_copy(ctx->module->arena, sizeof(*items.items) * items.count, ctx->ir_stack + ctx->ir_stack_index);
+	items.items = elf_arena_push_copy(emitter->module->arena, sizeof(*items.items) * items.count, emitter->ir_stack + emitter->ir_stack_index);
 
-	ASSERT(ctx->ir_stack_index == frame->start);
+	ASSERT(emitter->ir_stack_index == frame->start);
 	frame->count = 0;
 	return items;
 }
 
-static DeferScope get_defer_scope(IrEmitter *ctx)
+static DeferScope get_defer_scope(IrEmitter *emitter)
 {
 	DeferScope scope = {};
-	scope.previous_defer_start = ctx->defer_scope_start;
-	ctx->defer_scope_start = ctx->defer_count;
+	scope.previous_defer_start = emitter->defer_scope_start;
+	emitter->defer_scope_start = emitter->defer_count;
 	return scope;
 }
 
-static void set_defer_scope(IrEmitter *ctx, DeferScope scope)
+static void set_defer_scope(IrEmitter *emitter, DeferScope scope)
 {
-	ctx->defer_count = ctx->defer_scope_start;
-	ctx->defer_scope_start = scope.previous_defer_start;
+	emitter->defer_count = emitter->defer_scope_start;
+	emitter->defer_scope_start = scope.previous_defer_start;
 }
 
-static void push_defer_stat(IrEmitter *ctx, Ast stat)
+static void push_defer_stat(IrEmitter *emitter, Ast stat)
 {
-	ASSERT(ctx->defer_count < ctx->defer_stack_size);
-	ctx->defer_stack[ctx->defer_count++] = stat;
+	ASSERT(emitter->defer_count < emitter->defer_stack_size);
+	emitter->defer_stack[emitter->defer_count++] = stat;
 }
 
-static void emit_defer_range(IrEmitter *ctx, IrCollector *items, u32 start)
+static void emit_defer_range(IrEmitter *emitter, IrCollector *items, u32 start)
 {
-	ASSERT(start <= ctx->defer_count);
-	for (u32 i = ctx->defer_count; i > start; --i)
+	ASSERT(start <= emitter->defer_count);
+	for (u32 i = emitter->defer_count; i > start; --i)
 	{
-		Ast deferred = ctx->defer_stack[i - 1];
-		ir_lower_stat(items, deferred);
+		Ast deferred = emitter->defer_stack[i - 1];
+		ir_emit_stat(items, deferred);
 	}
 }
 
-static u32 capture_entity_in_function(IrEmitter *ctx, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
+static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
 {
 	u32 capture_index = 0;
 	for (IrCapture *capture = function_ctx->first_capture; capture; capture = capture->next)
@@ -178,15 +178,15 @@ static u32 capture_entity_in_function(IrEmitter *ctx, IrEmitterFrame *function_c
 
 	if (parent && entity->parent != parent->tree)
 	{
-		u32 parent_capture = capture_entity_in_function(ctx, parent, entity, site);
-		source = ir_new_capture(ctx, site, parent_capture);
+		u32 parent_capture = capture_entity_in_function(emitter, parent, entity, site);
+		source = ir_new_capture(emitter, site, parent_capture);
 	}
 	else
 	{
-		source = ir_new_load_local(ctx, site, entity->ir);
+		source = ir_new_load_local(emitter, site, entity->ir);
 	}
 
-	IrCapture *capture = dy_arena_push_zero(ctx->module->arena, sizeof(*capture), _Alignof(IrCapture));
+	IrCapture *capture = dy_arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
 	capture->entity = entity;
 	capture->source = source;
 	if (function_ctx->last_capture) {
@@ -198,6 +198,7 @@ static u32 capture_entity_in_function(IrEmitter *ctx, IrEmitterFrame *function_c
 	function_ctx->last_capture = capture;
 	function_ctx->capture_count += 1;
 	entity->tags |= ENTITY_TAG_REFERENCED;
+	entity->users ++;
 	return capture_index;
 }
 
@@ -206,6 +207,7 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 	ASSERT(entity);
 	ASSERT(emitter->function);
 	entity->tags |= ENTITY_TAG_REFERENCED;
+	entity->users ++;
 	if (entity->kind == ENTITY_GLOBAL) {
 		return ir_new_global(emitter, site, entity->name);
 	}
@@ -219,7 +221,7 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 	return ir_new_load_local(emitter, site, entity->ir);
 }
 
-static b32 mark_entity_assigned(IrEmitter *ctx, Ast destination)
+static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 {
 	if (!destination || destination->kind != AST_IDENT) {
 		return true;
@@ -228,7 +230,7 @@ static b32 mark_entity_assigned(IrEmitter *ctx, Ast destination)
 	ASSERT(entity);
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
-		ir_report_error(ctx, COM_ERROR_LOWERING, destination->site
+		ir_report_error(emitter, COM_ERROR_LOWERING, destination->site
 		, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
 		return false;
 	}
@@ -236,27 +238,27 @@ static b32 mark_entity_assigned(IrEmitter *ctx, Ast destination)
 	return true;
 }
 
-static void push_loop(IrEmitter *ctx, IrLoopFrame *loop)
+static void push_loop(IrEmitter *emitter, IrLoopFrame *loop)
 {
-	loop->parent = ctx->loop;
-	ctx->loop = loop;
+	loop->parent = emitter->loop;
+	emitter->loop = loop;
 }
 
-static void pop_loop(IrEmitter *ctx, IrLoopFrame *loop)
+static void pop_loop(IrEmitter *emitter, IrLoopFrame *loop)
 {
-	ASSERT(ctx->loop == loop);
-	ctx->loop = loop->parent;
+	ASSERT(emitter->loop == loop);
+	emitter->loop = loop->parent;
 }
 
-static IrLoopFrame current_loop(IrEmitter *ctx, SourceSite site)
+static IrLoopFrame current_loop(IrEmitter *emitter, SourceSite site)
 {
-	if (!ctx->loop)
+	if (!emitter->loop)
 	{
-		ir_report_error(ctx, COM_ERROR_LOWERING, site, "break and continue must be inside a loop");
+		ir_report_error(emitter, COM_ERROR_LOWERING, site, "break and continue must be inside a loop");
 		IrLoopFrame loop = {};
 		return loop;
 	}
-	return *ctx->loop;
+	return *emitter->loop;
 }
 
 static TypeRule type_rule_from_atom(Atom *atom)
@@ -270,7 +272,9 @@ static TypeRule type_rule_from_atom(Atom *atom)
 	}
 }
 
-static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body);
+static IrFunDef *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count);
+static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast tree, Ast_Array ast_params, Ast body);
+static IrFunDef *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body);
 
 static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
 {
@@ -331,7 +335,7 @@ static b32 ast_is_call(Ast expr)
 	return expr && expr->kind == AST_CALL;
 }
 
-static IrArray lower_call_arguments(IrEmitter *ctx, Ast call, b32 *failed)
+static IrArray lower_call_arguments(IrEmitter *emitter, Ast call, b32 *failed)
 {
 	ASSERT(call && call->kind == AST_CALL);
 	u32 argument_count = call->call.args.count;
@@ -339,19 +343,19 @@ static IrArray lower_call_arguments(IrEmitter *ctx, Ast call, b32 *failed)
 	u32 capacity = argument_count + has_carg;
 	IrArray result = {};
 	if (capacity) {
-		result.items = elf_arena_push(ctx->module->arena, sizeof(*result.items) * capacity);
+		result.items = elf_arena_push(emitter->module->arena, sizeof(*result.items) * capacity);
 	}
 	for (u32 i = 0; i < argument_count; ++i)
 	{
 		Ast argument = call->call.args.items[i];
 		if (argument->kind == AST_NAMED_ARGUMENT)
 		{
-			ir_report_error(ctx, COM_ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
+			ir_report_error(emitter, COM_ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
 			*failed = true;
 		}
 		else
 		{
-			Ir argument_ir = ir_emit_expr(ctx, argument);
+			Ir argument_ir = ir_emit_expr(emitter, argument);
 			result.items[result.count++] = argument_ir;
 			if (!argument_ir || argument_ir == ERROR_IR) {
 				*failed = true;
@@ -360,7 +364,7 @@ static IrArray lower_call_arguments(IrEmitter *ctx, Ast call, b32 *failed)
 	}
 	if (has_carg)
 	{
-		Ir argument_ir = ir_emit_expr(ctx, call->call.carg);
+		Ir argument_ir = ir_emit_expr(emitter, call->call.carg);
 		result.items[result.count++] = argument_ir;
 		if (!argument_ir || argument_ir == ERROR_IR) {
 			*failed = true;
@@ -370,7 +374,7 @@ static IrArray lower_call_arguments(IrEmitter *ctx, Ast call, b32 *failed)
 	return result;
 }
 
-static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
+static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 {
 	if (!expr || ast_is_error(expr)) {
 		return ERROR_IR;
@@ -378,15 +382,31 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 
 	Ir ir = 0;
 
-	const Entity *entity = ast_entity(expr);
+	Entity *entity = expr->entity;
 	if (entity)
 	{
 		StaticValue value = entity->value;
 
 		switch (value.type) {
+			case STATIC_VALUE_FUNCTION:
+			{
+				IrFunDef *definition = entity->value.definition;
+				if (!definition)
+				{
+					Ast function = entity->value.function;
+					ASSERT(function && function->kind == AST_FUNCTION);
+					definition = ir_reserve_function(emitter, function->site, function->function.variadic, function->function.params.count);
+					entity->value.definition = definition;
+					ir_lower_function_body(emitter, definition, function, function->function.params, function->function.body);
+				}
+				ir = ir_new_function(emitter, expr->site, definition);
+				return ir;
+			}
+			break;
 
-			case STATIC_VALUE_INTEGER: {
-				ir = ir_new_int(ctx, expr->site, value.integer);
+			case STATIC_VALUE_INTEGER:
+			{
+				ir = ir_new_int(emitter, expr->site, value.integer);
 				return ir;
 			}
 			break;
@@ -399,19 +419,19 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 	{
 		case AST_INTEGER_LITERAL:
 		{
-			ir = ir_new_int(ctx, expr->site, expr->integer_value);
+			ir = ir_new_int(emitter, expr->site, expr->integer_value);
 		}
 		break;
 
 		case AST_NUMBER_LITERAL:
 		{
-			ir = ir_new_num(ctx, expr->site, expr->number_value);
+			ir = ir_new_num(emitter, expr->site, expr->number_value);
 		}
 		break;
 
 		case AST_STRING_LITERAL:
 		{
-			ir = ir_new_atom(ctx, expr->site, expr->atom);
+			ir = ir_new_atom(emitter, expr->site, expr->atom);
 		}
 		break;
 
@@ -421,7 +441,7 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 			u32 nparts = expr->interpolated_string.count;
 			if (nparts < 3 || (nparts & 1) == 0)
 			{
-				ir_report_error(ctx, COM_ERROR_INTERNAL, expr->site,
+				ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site,
 					"interpolated string must contain alternating text and expression parts");
 				ir = ERROR_IR;
 				break;
@@ -433,26 +453,26 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 				Ast part = parts[i];
 				if (!part || ((i & 1) == 0 && part->kind != AST_STRING_LITERAL))
 				{
-					ir_report_error(ctx, COM_ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
+					ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
 					ir = ERROR_IR;
 					break;
 				}
 
-				Ir part_ir = ir_emit_expr(ctx, part);
+				Ir part_ir = ir_emit_expr(emitter, part);
 				if (!part_ir || part_ir == ERROR_IR)
 				{
 					ir = ERROR_IR;
 					break;
 				}
 
-				ir = ir ? ir_new_binary(ctx, part->site, IR_ADD, ir, part_ir) : part_ir;
+				ir = ir ? ir_new_binary(emitter, part->site, IR_ADD, ir, part_ir) : part_ir;
 			}
 		}
 		break;
 
 		case AST_NIL_LITERAL:
 		{
-			ir = ir_new_nil(ctx, expr->site);
+			ir = ir_new_nil(emitter, expr->site);
 		}
 		break;
 
@@ -460,7 +480,7 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 		{
 			Entity *entity = expr->entity;
 			ASSERT(entity);
-			ir = load_entity_ir(ctx, expr->site, entity);
+			ir = load_entity_ir(emitter, expr->site, entity);
 		}
 		break;
 
@@ -469,10 +489,10 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 			Ast x = expr->binary.x;
 			Ast y = expr->binary.y;
 
-			Ir x_ir = ir_emit_expr(ctx, x);
-			Ir y_ir = ir_emit_expr(ctx, y);
+			Ir x_ir = ir_emit_expr(emitter, x);
+			Ir y_ir = ir_emit_expr(emitter, y);
 
-			ir = ir_new_binary(ctx, expr->site, IR_META_FIELD, x_ir, y_ir);
+			ir = ir_new_binary(emitter, expr->site, IR_META_FIELD, x_ir, y_ir);
 		}
 		break;
 
@@ -481,32 +501,32 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 			Ast x = expr->binary.x;
 			Ast y = expr->binary.y;
 
-			Ir x_ir = ir_emit_expr(ctx, x);
-			Ir y_ir = ir_emit_expr(ctx, y);
+			Ir x_ir = ir_emit_expr(emitter, x);
+			Ir y_ir = ir_emit_expr(emitter, y);
 
-			ir = ir_new_index(ctx, expr->site, x_ir, y_ir);
+			ir = ir_new_index(emitter, expr->site, x_ir, y_ir);
 		}
 		break;
 
 		case AST_MEASURE:
 		{
-			Ir expr_ir = ir_emit_expr(ctx, expr->unary);
-			ir = ir_new_measure(ctx, expr->site, expr_ir);
+			Ir expr_ir = ir_emit_expr(emitter, expr->unary);
+			ir = ir_new_measure(emitter, expr->site, expr_ir);
 		}
 		break;
 
 		case AST_GET_MEM:
 		{
-			Ir expr_ir = ir_emit_expr(ctx, expr->unary);
+			Ir expr_ir = ir_emit_expr(emitter, expr->unary);
 			if (!expr_ir || expr_ir->kind != IR_LOAD_LOCAL)
 			{
-				ir_report_error(ctx, COM_ERROR_LOWERING, expr->site
+				ir_report_error(emitter, COM_ERROR_LOWERING, expr->site
 				, "#get_mem expects a local or parameter expression");
 				ir = ERROR_IR;
 			}
 			else
 			{
-				ir = ir_new_get_mem(ctx, expr->site, expr_ir);
+				ir = ir_new_get_mem(emitter, expr->site, expr_ir);
 			}
 		}
 		break;
@@ -515,36 +535,35 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 		{
 			Ast x = expr->binary.x;
 			Ast y = expr->binary.y;
-			Ir x_ir = ir_emit_expr(ctx, x);
-			Ir y_ir = ir_emit_expr(ctx, y);
-			ir = ir_new_binary(ctx, expr->site, IR_FIELD, x_ir, y_ir);
+			Ir x_ir = ir_emit_expr(emitter, x);
+			Ir y_ir = ir_emit_expr(emitter, y);
+			ir = ir_new_binary(emitter, expr->site, IR_FIELD, x_ir, y_ir);
 		}
 		break;
 
 		case AST_CALL:
 		{
-			Ir ir_func = ir_emit_expr(ctx, expr->call.expr);
+			Ir ir_func = ir_emit_expr(emitter, expr->call.expr);
 			IrCallType call_type = call_type_from_callee(ir_func);
 			b32 failed = !ir_func || ir_func == ERROR_IR;
-			IrArray ir_args = lower_call_arguments(ctx, expr, &failed);
+			IrArray ir_args = lower_call_arguments(emitter, expr, &failed);
 
-			ir = failed ? ERROR_IR : ir_new_call(ctx, expr->site, call_type, ir_func, ir_args);
+			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, call_type, ir_func, ir_args);
 		}
 		break;
 
 		case AST_FUNCTION:
 		{
-			ASSERT(ctx->module->function_count < ctx->module->function_capacity);
-
-			u32 index = ir_lower_function(ctx, expr, expr->site, expr->function.variadic, expr->function.params, expr->function.body);
-			ir = ir_new_closure(ctx, expr->site, index);
+			// TODO(RJ): only create a closure if we actually have any captures ...
+			IrFunDef *definition = ir_lower_function(emitter, expr, expr->site, expr->function.variadic, expr->function.params, expr->function.body);
+			ir = ir_new_closure(emitter, expr->site, definition);
 		}
 		break;
 
 		case AST_RECURSE:
 		{
-			ASSERT(ctx->function);
-			ir = ir_new_recurse(ctx, expr->site);
+			ASSERT(emitter->function);
+			ir = ir_new_recurse(emitter, expr->site);
 		}
 		break;
 
@@ -553,80 +572,80 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 			Ast *args = expr->table.items;
 			u32 nargs = expr->table.count;
 
-			IrCollector table_items = begin_ir_frame(ctx);
-			Ir table_local = ir_new_local(ctx, expr->site, ir_new_table(ctx, expr->site));
-			push_ir(&table_items, table_local);
+			IrCollector table_items = begin_ir_frame(emitter);
+			Ir table_local = ir_new_local(emitter, expr->site, ir_new_table(emitter, expr->site));
+			ir_push(&table_items, table_local);
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				Ast entry = ast_ensure_kind(args[i], AST_TABLE_ENTRY);
 				if (ast_is_error(entry))
 				{
-					ir_report_error(ctx, COM_ERROR_INTERNAL, args[i]->site, "expected table entry");
-					push_ir(&table_items, ERROR_IR);
+					ir_report_error(emitter, COM_ERROR_INTERNAL, args[i]->site, "expected table entry");
+					ir_push(&table_items, ERROR_IR);
 					continue;
 				}
 
 				Ast key = entry->table_entry.key;
 				Ast value = entry->table_entry.value;
-				Ir table = ir_new_load_local(ctx, entry->site, table_local);
-				Ir ir_value = ir_emit_expr(ctx, value);
+				Ir table = ir_new_load_local(emitter, entry->site, table_local);
+				Ir ir_value = ir_emit_expr(emitter, value);
 				if (!key)
 				{
-					ir_report_error(ctx, COM_ERROR_INTERNAL, entry->site, "expected keyed table entry");
-					push_ir(&table_items, ERROR_IR);
+					ir_report_error(emitter, COM_ERROR_INTERNAL, entry->site, "expected keyed table entry");
+					ir_push(&table_items, ERROR_IR);
 					continue;
 				}
-				Ir ir_key = ir_emit_expr(ctx, key);
-				Ir field = ir_new_binary(ctx, entry->site, IR_FIELD, table, ir_key);
-				push_ir(&table_items, ir_new_store(ctx, entry->site, field, ir_value));
+				Ir ir_key = ir_emit_expr(emitter, key);
+				Ir field = ir_new_binary(emitter, entry->site, IR_FIELD, table, ir_key);
+				ir_push(&table_items, ir_new_store(emitter, entry->site, field, ir_value));
 			}
 
-			Ir value = ir_new_load_local(ctx, expr->site, table_local);
+			Ir value = ir_new_load_local(emitter, expr->site, table_local);
 			IrArray stats = close_ir_frame(&table_items);
-			ir = ir_new_expr_block(ctx, expr->site, stats, value);
+			ir = ir_new_expr_block(emitter, expr->site, stats, value);
 		}
 		break;
 
 		case AST_ARRAY:
 		{
-			IrCollector array_items = begin_ir_frame(ctx);
-			Ir array_local = ir_new_local(ctx, expr->site, ir_new_array(ctx, expr->site));
-			push_ir(&array_items, array_local);
+			IrCollector array_items = begin_ir_frame(emitter);
+			Ir array_local = ir_new_local(emitter, expr->site, ir_new_array(emitter, expr->site));
+			ir_push(&array_items, array_local);
 
 			for (u32 i = 0; i < expr->array.count; ++i)
 			{
-				Ir array = ir_new_load_local(ctx, expr->site, array_local);
-				Ir value = ir_emit_expr(ctx, expr->array.items[i]);
-				push_ir(&array_items, ir_new_array_add(ctx, expr->array.items[i]->site, array, value));
+				Ir array = ir_new_load_local(emitter, expr->site, array_local);
+				Ir value = ir_emit_expr(emitter, expr->array.items[i]);
+				ir_push(&array_items, ir_new_array_add(emitter, expr->array.items[i]->site, array, value));
 			}
 
-			Ir value = ir_new_load_local(ctx, expr->site, array_local);
+			Ir value = ir_new_load_local(emitter, expr->site, array_local);
 			IrArray stats = close_ir_frame(&array_items);
-			ir = ir_new_expr_block(ctx, expr->site, stats, value);
+			ir = ir_new_expr_block(emitter, expr->site, stats, value);
 		}
 		break;
 
 		case AST_TABLE_ENTRY:
 		{
-			ir_report_error(ctx, COM_ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
+			ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
 			ir = ERROR_IR;
 		}
 		break;
 
 		case AST_GREATER_THAN_EQ:
 		{
-			Ir x = ir_emit_expr(ctx, expr->binary.x);
-			Ir y = ir_emit_expr(ctx, expr->binary.y);
-			ir = ir_new_binary(ctx, expr->site, IR_LESS_THAN_EQ, y, x);
+			Ir x = ir_emit_expr(emitter, expr->binary.x);
+			Ir y = ir_emit_expr(emitter, expr->binary.y);
+			ir = ir_new_binary(emitter, expr->site, IR_LESS_THAN_EQ, y, x);
 		}
 		break;
 
 		case AST_GREATER_THAN:
 		{
-			Ir x = ir_emit_expr(ctx, expr->binary.x);
-			Ir y = ir_emit_expr(ctx, expr->binary.y);
-			ir = ir_new_binary(ctx, expr->site, IR_LESS_THAN, y, x);
+			Ir x = ir_emit_expr(emitter, expr->binary.x);
+			Ir y = ir_emit_expr(emitter, expr->binary.y);
+			ir = ir_new_binary(emitter, expr->site, IR_LESS_THAN, y, x);
 		}
 		break;
 
@@ -650,15 +669,15 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 		case AST_BITWISE_XOR:
 		case AST_BITWISE_NOT:
 		{
-			Ir x = ir_emit_expr(ctx, expr->binary.x);
-			Ir y = ir_emit_expr(ctx, expr->binary.y);
+			Ir x = ir_emit_expr(emitter, expr->binary.x);
+			Ir y = ir_emit_expr(emitter, expr->binary.y);
 			IrKind ir_kind = ir_kind_from_ast_kind(expr->kind);
-			ir = ir_new_binary(ctx, expr->site, ir_kind, x, y);
+			ir = ir_new_binary(emitter, expr->site, ir_kind, x, y);
 		}
 		break;
 		default:
 		{
-			ir_report_error(ctx, COM_ERROR_INTERNAL, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
+			ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
 			ir = ERROR_IR;
 		}
 		break;
@@ -667,37 +686,37 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 	return ir;
 }
 
-static Ir ir_lower_stat_as_block(IrEmitter *ctx, Ast stat)
+static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat)
 {
 	if (!stat || ast_is_error(stat)) {
 		return ERROR_IR;
 	}
 
-	IrCollector block_items = begin_ir_frame(ctx);
+	IrCollector block_items = begin_ir_frame(emitter);
 	if (stat->kind == AST_BLOCK_STAT)
 	{
-		DeferScope defer_scope = get_defer_scope(ctx);
+		DeferScope defer_scope = get_defer_scope(emitter);
 		for (u32 i = 0; i < stat->block.count; ++ i)
 		{
 			if (stat->block.items[i]->kind != AST_STATIC_DECL) {
-				ir_lower_stat(&block_items, stat->block.items[i]);
+				ir_emit_stat(&block_items, stat->block.items[i]);
 			}
 		}
-		emit_defer_range(ctx, &block_items, ctx->defer_scope_start);
-		set_defer_scope(ctx, defer_scope);
+		emit_defer_range(emitter, &block_items, emitter->defer_scope_start);
+		set_defer_scope(emitter, defer_scope);
 	}
 	else
 	{
-		ir_lower_stat(&block_items, stat);
+		ir_emit_stat(&block_items, stat);
 	}
 
-	ASSERT(ctx->ir_stack_index == block_items.start + block_items.count);
+	ASSERT(emitter->ir_stack_index == block_items.start + block_items.count);
 	IrArray instr = close_ir_frame(&block_items);
-	Ir ir = ir_new_block(ctx, stat->site, instr);
+	Ir ir = ir_new_block(emitter, stat->site, instr);
 	return ir;
 }
 
-static Ir ir_emit_lvalue_once(IrEmitter *ctx, IrCollector *items, Ast expr)
+static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrCollector *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -708,20 +727,20 @@ static Ir ir_emit_lvalue_once(IrEmitter *ctx, IrCollector *items, Ast expr)
 			Ast x = expr->binary.x;
 			Ast y = expr->binary.y;
 
-			Ir receiver = ir_emit_expr(ctx, x);
-			Ir receiver_memory = ir_new_local(ctx, x->site, receiver);
-			push_ir(items, receiver_memory);
-			Ir receiver_load = ir_new_load_local(ctx, x->site, receiver_memory);
+			Ir receiver = ir_emit_expr(emitter, x);
+			Ir receiver_memory = ir_new_local(emitter, x->site, receiver);
+			ir_push(items, receiver_memory);
+			Ir receiver_load = ir_new_load_local(emitter, x->site, receiver_memory);
 
-			Ir key_load = ir_emit_expr(ctx, y);
+			Ir key_load = ir_emit_expr(emitter, y);
 			if (y->kind != AST_STRING_LITERAL)
 			{
-				Ir key_memory = ir_new_local(ctx, y->site, key_load);
-				push_ir(items, key_memory);
-				key_load = ir_new_load_local(ctx, y->site, key_memory);
+				Ir key_memory = ir_new_local(emitter, y->site, key_load);
+				ir_push(items, key_memory);
+				key_load = ir_new_load_local(emitter, y->site, key_memory);
 			}
 
-			ir = ir_new_binary(ctx, expr->site, IR_FIELD, receiver_load, key_load);
+			ir = ir_new_binary(emitter, expr->site, IR_FIELD, receiver_load, key_load);
 		}
 		break;
 
@@ -730,23 +749,23 @@ static Ir ir_emit_lvalue_once(IrEmitter *ctx, IrCollector *items, Ast expr)
 			Ast x = expr->binary.x;
 			Ast y = expr->binary.y;
 
-			Ir receiver = ir_emit_expr(ctx, x);
-			Ir receiver_memory = ir_new_local(ctx, x->site, receiver);
-			push_ir(items, receiver_memory);
-			Ir receiver_load = ir_new_load_local(ctx, x->site, receiver_memory);
+			Ir receiver = ir_emit_expr(emitter, x);
+			Ir receiver_memory = ir_new_local(emitter, x->site, receiver);
+			ir_push(items, receiver_memory);
+			Ir receiver_load = ir_new_load_local(emitter, x->site, receiver_memory);
 
-			Ir key = ir_emit_expr(ctx, y);
-			Ir key_memory = ir_new_local(ctx, y->site, key);
-			push_ir(items, key_memory);
-			Ir key_load = ir_new_load_local(ctx, y->site, key_memory);
+			Ir key = ir_emit_expr(emitter, y);
+			Ir key_memory = ir_new_local(emitter, y->site, key);
+			ir_push(items, key_memory);
+			Ir key_load = ir_new_load_local(emitter, y->site, key_memory);
 
-			ir = ir_new_index(ctx, expr->site, receiver_load, key_load);
+			ir = ir_new_index(emitter, expr->site, receiver_load, key_load);
 		}
 		break;
 
 		default:
 		{
-			ir = ir_emit_expr(ctx, expr);
+			ir = ir_emit_expr(emitter, expr);
 		}
 		break;
 	}
@@ -754,7 +773,7 @@ static Ir ir_emit_lvalue_once(IrEmitter *ctx, IrCollector *items, Ast expr)
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrCollector *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrCollector *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.count;
 
@@ -768,33 +787,33 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrCollector *items, Ast
 				message = "range for loops require one range expression";
 			}
 
-			ir_report_error(ctx, COM_ERROR_LOWERING, expr->site, message);
-			push_ir(items, ERROR_IR);
+			ir_report_error(emitter, COM_ERROR_LOWERING, expr->site, message);
+			ir_push(items, ERROR_IR);
 			return 1;
 		}
 	}
 
 	if (nvars > 1 && expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 	{
-		Ir expr = ir_emit_expr(ctx, expr_tuple->tuple.items[0]);
-		Ir *locals = dy_arena_push(ctx->module->arena, sizeof(*locals) * nvars, _Alignof(Ir *));
+		Ir expr = ir_emit_expr(emitter, expr_tuple->tuple.items[0]);
+		Ir *locals = dy_arena_push(emitter->module->arena, sizeof(*locals) * nvars, _Alignof(Ir *));
 		for (u32 i = 0; i < nvars; ++i)
 		{
 			Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
 			if (ast_is_error(name))
 			{
-				ir_report_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
-				push_ir(items, ERROR_IR);
+				ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
+				ir_push(items, ERROR_IR);
 				return 1;
 			}
 
-			locals[i] = ir_new_local(ctx, name->site, 0);
+			locals[i] = ir_new_local(emitter, name->site, 0);
 
 			ASSERT(name->entity);
 			ASSERT(!name->entity->ir);
 			name->entity->ir = locals[i];
 		}
-		push_ir(items, ir_new_multi_local(ctx, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
+		ir_push(items, ir_new_multi_local(emitter, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
 		return nvars;
 	}
 
@@ -803,8 +822,8 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrCollector *items, Ast
 		Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
-			ir_report_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
-			push_ir(items, ERROR_IR);
+			ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
+			ir_push(items, ERROR_IR);
 			return 1;
 		}
 
@@ -812,15 +831,15 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrCollector *items, Ast
 		if (i < expr_tuple->tuple.count)
 		{
 			Ast expr = expr_tuple->tuple.items[i];
-			value = ir_emit_expr(ctx, expr);
+			value = ir_emit_expr(emitter, expr);
 		}
 		else
 		{
-			value = ir_new_nil(ctx, name->site);
+			value = ir_new_nil(emitter, name->site);
 		}
 
-		Ir local = ir_new_local(ctx, name->site, value);
-		push_ir(items, local);
+		Ir local = ir_new_local(emitter, name->site, value);
+		ir_push(items, local);
 		ASSERT(name->entity);
 		ASSERT(!name->entity->ir);
 		name->entity->ir = local;
@@ -829,7 +848,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrCollector *items, Ast
 	return nvars;
 }
 
-static Ir lower_ast_for_range_expr_to_ir(IrEmitter *ctx, Ast stat, Ast name_tuple,
+static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_tuple,
 	Ast range_expr, u32 entity_tags)
 {
 	Ast collection_expr = 0;
@@ -842,7 +861,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *ctx, Ast stat, Ast name_tupl
 
 	if (!range || range->kind != AST_RANGE)
 	{
-		ir_report_error(ctx, COM_ERROR_LOWERING, stat->site, "range for loops require a range expression");
+		ir_report_error(emitter, COM_ERROR_LOWERING, stat->site, "range for loops require a range expression");
 		return ERROR_IR;
 	}
 
@@ -850,15 +869,15 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *ctx, Ast stat, Ast name_tupl
 	Ast first_name = ast_ensure_kind(name_tuple->tuple.items[0], AST_IDENT);
 	if (ast_is_error(first_name))
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
 		return ERROR_IR;
 	}
 
 	Ir collection_local = 0;
 	if (collection_expr)
 	{
-		Ir collection = ir_emit_expr(ctx, collection_expr);
-		collection_local = ir_new_local(ctx, collection_expr->site, collection);
+		Ir collection = ir_emit_expr(emitter, collection_expr);
+		collection_local = ir_new_local(emitter, collection_expr->site, collection);
 	}
 
 	Ast range_start_expr = range->binary.x;
@@ -867,123 +886,123 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *ctx, Ast stat, Ast name_tupl
 	SourceSite range_end_site = range_end_expr ? range_end_expr->site : range->site;
 
 	Ir range_start = range_start_expr
-		? ir_emit_expr(ctx, range_start_expr)
-		: ir_new_int(ctx, range_start_site, 0);
+		? ir_emit_expr(emitter, range_start_expr)
+		: ir_new_int(emitter, range_start_site, 0);
 	Ir range_end = 0;
 	if (range_end_expr) {
-		range_end = ir_emit_expr(ctx, range_end_expr);
+		range_end = ir_emit_expr(emitter, range_end_expr);
 	}
 	else if (collection_local)
 	{
-		Ir collection = ir_new_load_local(ctx, range_end_site, collection_local);
-		range_end = ir_new_measure(ctx, range_end_site, collection);
+		Ir collection = ir_new_load_local(emitter, range_end_site, collection_local);
+		range_end = ir_new_measure(emitter, range_end_site, collection);
 	}
 	else
 	{
-		ir_report_error(ctx, COM_ERROR_LOWERING, range->site,
+		ir_report_error(emitter, COM_ERROR_LOWERING, range->site,
 			"an omitted range end requires an indexed collection");
 		return ERROR_IR;
 	}
 
-	Ir iterator_local = ir_new_local(ctx, range_start_site, range_start);
-	Ir range_end_local = ir_new_local(ctx, range_end_site, range_end);
+	Ir iterator_local = ir_new_local(emitter, range_start_site, range_start);
+	Ir range_end_local = ir_new_local(emitter, range_end_site, range_end);
 
-	Ir *var_locals = elf_arena_push(ctx->module->arena, sizeof(*var_locals) * nvars);
+	Ir *var_locals = elf_arena_push(emitter->module->arena, sizeof(*var_locals) * nvars);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
-			ir_report_error(ctx, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
+			ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
 			return ERROR_IR;
 		}
 
-		Ir local = ir_new_local(ctx, name->site, 0);
+		Ir local = ir_new_local(emitter, name->site, 0);
 		var_locals[i] = local;
 		ASSERT(name->entity);
 		ASSERT(!name->entity->ir);
 		name->entity->ir = local;
 	}
 
-	Ir start_label = ir_new_label(ctx, stat->site);
-	Ir continue_label = ir_new_label(ctx, first_name->site);
-	Ir break_label = ir_new_label(ctx, stat->site);
+	Ir start_label = ir_new_label(emitter, stat->site);
+	Ir continue_label = ir_new_label(emitter, first_name->site);
+	Ir break_label = ir_new_label(emitter, stat->site);
 
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = ctx->defer_count;
-	push_loop(ctx, &loop_frame);
-	Ir body = ir_lower_stat_as_block(ctx, stat->for_range_stat.body);
-	pop_loop(ctx, &loop_frame);
+	loop_frame.defer_start = emitter->defer_count;
+	push_loop(emitter, &loop_frame);
+	Ir body = ir_emit_stat_as_block(emitter, stat->for_range_stat.body);
+	pop_loop(emitter, &loop_frame);
 
-	Ir load_iterator_local = ir_new_load_local(ctx, first_name->site, iterator_local);
-	Ir load_range_end_local = ir_new_load_local(ctx, range_end_site, range_end_local);
-	Ir iterator_less_than_range_end = ir_new_binary(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
-	Ir exit_jump = ir_new_jump_if_false(ctx, range->site, iterator_less_than_range_end, break_label);
+	Ir load_iterator_local = ir_new_load_local(emitter, first_name->site, iterator_local);
+	Ir load_range_end_local = ir_new_load_local(emitter, range_end_site, range_end_local);
+	Ir iterator_less_than_range_end = ir_new_binary(emitter, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
+	Ir exit_jump = ir_new_jump_if_false(emitter, range->site, iterator_less_than_range_end, break_label);
 
-	IrCollector loop_items = begin_ir_frame(ctx);
-	push_ir(&loop_items, start_label);
-	push_ir(&loop_items, exit_jump);
+	IrCollector loop_items = begin_ir_frame(emitter);
+	ir_push(&loop_items, start_label);
+	ir_push(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = name_tuple->tuple.items[i];
-		Ir iterator_load = ir_new_load_local(ctx, name->site, iterator_local);
+		Ir iterator_load = ir_new_load_local(emitter, name->site, iterator_local);
 		Ir value = iterator_load;
 		if (i != 0)
 		{
-			Ir offset = ir_new_int(ctx, name->site, i);
-			value = ir_new_binary(ctx, name->site, IR_ADD, iterator_load, offset);
+			Ir offset = ir_new_int(emitter, name->site, i);
+			value = ir_new_binary(emitter, name->site, IR_ADD, iterator_load, offset);
 		}
 
 		if (collection_local)
 		{
-			Ir collection = ir_new_load_local(ctx, name->site, collection_local);
-			value = ir_new_index(ctx, name->site, collection, value);
+			Ir collection = ir_new_load_local(emitter, name->site, collection_local);
+			value = ir_new_index(emitter, name->site, collection, value);
 		}
 
-		Ir var_dest = ir_new_load_local(ctx, name->site, var_locals[i]);
-		push_ir(&loop_items, ir_new_store(ctx, name->site, var_dest, value));
+		Ir var_dest = ir_new_load_local(emitter, name->site, var_locals[i]);
+		ir_push(&loop_items, ir_new_store(emitter, name->site, var_dest, value));
 	}
 
-	Ir iterator_load_for_add = ir_new_load_local(ctx, first_name->site, iterator_local);
-	Ir stride = ir_new_int(ctx, first_name->site, nvars);
-	Ir next_value = ir_new_binary(ctx, first_name->site, IR_ADD, iterator_load_for_add, stride);
-	Ir iterator_dest = ir_new_load_local(ctx, first_name->site, iterator_local);
-	Ir increment = ir_new_store(ctx, first_name->site, iterator_dest, next_value);
+	Ir iterator_load_for_add = ir_new_load_local(emitter, first_name->site, iterator_local);
+	Ir stride = ir_new_int(emitter, first_name->site, nvars);
+	Ir next_value = ir_new_binary(emitter, first_name->site, IR_ADD, iterator_load_for_add, stride);
+	Ir iterator_dest = ir_new_load_local(emitter, first_name->site, iterator_local);
+	Ir increment = ir_new_store(emitter, first_name->site, iterator_dest, next_value);
 
-	push_ir(&loop_items, body);
-	push_ir(&loop_items, continue_label);
-	push_ir(&loop_items, increment);
-	push_ir(&loop_items, ir_new_jump(ctx, first_name->site, start_label));
-	push_ir(&loop_items, break_label);
+	ir_push(&loop_items, body);
+	ir_push(&loop_items, continue_label);
+	ir_push(&loop_items, increment);
+	ir_push(&loop_items, ir_new_jump(emitter, first_name->site, start_label));
+	ir_push(&loop_items, break_label);
 	IrArray loop_stats = close_ir_frame(&loop_items);
-	Ir loop = ir_new_block(ctx, stat->site, loop_stats);
+	Ir loop = ir_new_block(emitter, stat->site, loop_stats);
 
-	IrCollector block_items = begin_ir_frame(ctx);
+	IrCollector block_items = begin_ir_frame(emitter);
 	if (collection_local) {
-		push_ir(&block_items, collection_local);
+		ir_push(&block_items, collection_local);
 	}
-	push_ir(&block_items, iterator_local);
-	push_ir(&block_items, range_end_local);
+	ir_push(&block_items, iterator_local);
+	ir_push(&block_items, range_end_local);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		push_ir(&block_items, var_locals[i]);
+		ir_push(&block_items, var_locals[i]);
 	}
-	push_ir(&block_items, loop);
+	ir_push(&block_items, loop);
 
 	IrArray stats = close_ir_frame(&block_items);
-	Ir ir = ir_new_block(ctx, stat->site, stats);
+	Ir ir = ir_new_block(emitter, stat->site, stats);
 
 	return ir;
 }
 
-static Ir lower_ast_for_range_to_ir(IrEmitter *ctx, Ast stat)
+static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
 {
 	Ast decl = ast_ensure_kind(stat->for_range_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
@@ -991,84 +1010,84 @@ static Ir lower_ast_for_range_to_ir(IrEmitter *ctx, Ast stat)
 	Ast expr_tuple = ast_ensure_kind(decl->decl.expr, AST_TUPLE);
 	if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
 	if (name_tuple->tuple.count == 0 || expr_tuple->tuple.count != 1)
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
 		return ERROR_IR;
 	}
 
 	Ast range = expr_tuple->tuple.items[0];
 	if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
 		return ERROR_IR;
 	}
 
 	u32 entity_tags = decl->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
-	return lower_ast_for_range_expr_to_ir(ctx, stat, name_tuple, range, entity_tags);
+	return lower_ast_for_range_expr_to_ir(emitter, stat, name_tuple, range, entity_tags);
 }
 
-static Ir lower_ast_for_to_ir(IrEmitter *ctx, Ast stat)
+static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 {
 	Ast init = ast_ensure_kind(stat->for_stat.init, AST_DECL_STAT);
 	if (ast_is_error(init))
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
 		return ERROR_IR;
 	}
 
-	IrCollector block_items = begin_ir_frame(ctx);
-	ir_lower_stat(&block_items, init);
+	IrCollector block_items = begin_ir_frame(emitter);
+	ir_emit_stat(&block_items, init);
 
-	Ir condition_label = ir_new_label(ctx, stat->site);
-	Ir continue_label = ir_new_label(ctx, stat->for_stat.step->site);
-	Ir break_label = ir_new_label(ctx, stat->site);
+	Ir condition_label = ir_new_label(emitter, stat->site);
+	Ir continue_label = ir_new_label(emitter, stat->for_stat.step->site);
+	Ir break_label = ir_new_label(emitter, stat->site);
 
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = ctx->defer_count;
-	push_loop(ctx, &loop_frame);
-	Ir body = ir_lower_stat_as_block(ctx, stat->for_stat.body);
-	pop_loop(ctx, &loop_frame);
+	loop_frame.defer_start = emitter->defer_count;
+	push_loop(emitter, &loop_frame);
+	Ir body = ir_emit_stat_as_block(emitter, stat->for_stat.body);
+	pop_loop(emitter, &loop_frame);
 
-	Ir pred = ir_emit_expr(ctx, stat->for_stat.pred);
-	Ir exit_jump = ir_new_jump_if_false(ctx, stat->for_stat.pred->site, pred, break_label);
-	Ir step = ir_lower_stat_as_block(ctx, stat->for_stat.step);
+	Ir pred = ir_emit_expr(emitter, stat->for_stat.pred);
+	Ir exit_jump = ir_new_jump_if_false(emitter, stat->for_stat.pred->site, pred, break_label);
+	Ir step = ir_emit_stat_as_block(emitter, stat->for_stat.step);
 
-	IrCollector loop_items = begin_ir_frame(ctx);
-	push_ir(&loop_items, condition_label);
-	push_ir(&loop_items, exit_jump);
-	push_ir(&loop_items, body);
-	push_ir(&loop_items, continue_label);
-	push_ir(&loop_items, step);
-	push_ir(&loop_items, ir_new_jump(ctx, stat->site, condition_label));
-	push_ir(&loop_items, break_label);
+	IrCollector loop_items = begin_ir_frame(emitter);
+	ir_push(&loop_items, condition_label);
+	ir_push(&loop_items, exit_jump);
+	ir_push(&loop_items, body);
+	ir_push(&loop_items, continue_label);
+	ir_push(&loop_items, step);
+	ir_push(&loop_items, ir_new_jump(emitter, stat->site, condition_label));
+	ir_push(&loop_items, break_label);
 	IrArray loop_stats = close_ir_frame(&loop_items);
-	push_ir(&block_items, ir_new_block(ctx, stat->site, loop_stats));
+	ir_push(&block_items, ir_new_block(emitter, stat->site, loop_stats));
 
 	IrArray stats = close_ir_frame(&block_items);
-	Ir ir = ir_new_block(ctx, stat->site, stats);
+	Ir ir = ir_new_block(emitter, stat->site, stats);
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(IrEmitter *ctx, IrCollector *items, Ast stat)
+static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrCollector *items, Ast stat)
 {
 	Ast dest_tuple = ast_ensure_kind(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
 	if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 	{
-		ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid compound assignment");
+		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid compound assignment");
 		return ERROR_IR;
 	}
 
 	if (dest_tuple->tuple.count != 1 || expr_tuple->tuple.count != 1)
 	{
-		ir_report_error(ctx, COM_ERROR_LOWERING, stat->site, "compound assignment requires one destination and one value");
+		ir_report_error(emitter, COM_ERROR_LOWERING, stat->site, "compound assignment requires one destination and one value");
 		return ERROR_IR;
 	}
 
@@ -1077,21 +1096,21 @@ static Ir lower_compound_assign_to_ir(IrEmitter *ctx, IrCollector *items, Ast st
 
 	Ast dest_ast = dest_tuple->tuple.items[0];
 	Ast expr_ast = expr_tuple->tuple.items[0];
-	if (!mark_entity_assigned(ctx, dest_ast)) return ERROR_IR;
+	if (!mark_entity_assigned(emitter, dest_ast)) return ERROR_IR;
 
-	Ir dest_ir = ir_emit_lvalue_once(ctx, items, dest_ast);
-	Ir right_ir = ir_emit_expr(ctx, expr_ast);
-	Ir value_ir = ir_new_binary(ctx, stat->site, op, dest_ir, right_ir);
-	return ir_new_store(ctx, stat->site, dest_ir, value_ir);
+	Ir dest_ir = ir_emit_lvalue_once(emitter, items, dest_ast);
+	Ir right_ir = ir_emit_expr(emitter, expr_ast);
+	Ir value_ir = ir_new_binary(emitter, stat->site, op, dest_ir, right_ir);
+	return ir_new_store(emitter, stat->site, dest_ir, value_ir);
 }
 
-static void ir_lower_stat(IrCollector *items, Ast stat)
+static void ir_emit_stat(IrCollector *items, Ast stat)
 {
-	IrEmitter *ctx = items->ctx;
+	IrEmitter *emitter = items->emitter;
 
 	if (!stat || ast_is_error(stat))
 	{
-		push_ir(items, ERROR_IR);
+		ir_push(items, ERROR_IR);
 		return;
 	}
 
@@ -1103,15 +1122,15 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 			Ast true_clause = stat->if_stat.true_clause;
 			Ast else_clause = stat->if_stat.else_clause;
 
-			Ir pred_ir = ir_emit_expr(ctx, pred);
-			Ir true_ir = ir_lower_stat_as_block(ctx, true_clause);
+			Ir pred_ir = ir_emit_expr(emitter, pred);
+			Ir true_ir = ir_emit_stat_as_block(emitter, true_clause);
 			Ir else_ir = 0;
 			if (else_clause) {
-				else_ir = ir_lower_stat_as_block(ctx, else_clause);
+				else_ir = ir_emit_stat_as_block(emitter, else_clause);
 			}
 
-			Ir ir = ir_new_if(ctx, stat->site, pred_ir, true_ir, else_ir);
-			push_ir(items, ir);
+			Ir ir = ir_new_if(emitter, stat->site, pred_ir, true_ir, else_ir);
+			ir_push(items, ir);
 		}
 		break;
 
@@ -1120,56 +1139,68 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 			Ast pred = stat->while_stat.pred;
 			Ast body = stat->while_stat.body;
 
-			Ir start_label = ir_new_label(ctx, stat->site);
-			Ir break_label = ir_new_label(ctx, stat->site);
+			Ir start_label = ir_new_label(emitter, stat->site);
+			Ir break_label = ir_new_label(emitter, stat->site);
 
 			IrLoopFrame loop_frame = {};
 			loop_frame.continue_label = start_label;
 			loop_frame.break_label = break_label;
-			loop_frame.defer_start = ctx->defer_count;
-			push_loop(ctx, &loop_frame);
-			Ir body_ir = ir_lower_stat_as_block(ctx, body);
-			pop_loop(ctx, &loop_frame);
+			loop_frame.defer_start = emitter->defer_count;
+			push_loop(emitter, &loop_frame);
+			Ir body_ir = ir_emit_stat_as_block(emitter, body);
+			pop_loop(emitter, &loop_frame);
 
-			Ir pred_ir = ir_emit_expr(ctx, pred);
-			Ir jump_if_false = ir_new_jump_if_false(ctx, pred->site, pred_ir, break_label);
+			Ir pred_ir = ir_emit_expr(emitter, pred);
+			Ir jump_if_false = ir_new_jump_if_false(emitter, pred->site, pred_ir, break_label);
 
-			IrCollector loop_items = begin_ir_frame(ctx);
-			push_ir(&loop_items, start_label);
-			push_ir(&loop_items, jump_if_false);
-			push_ir(&loop_items, body_ir);
-			push_ir(&loop_items, ir_new_jump(ctx, stat->site, start_label));
-			push_ir(&loop_items, break_label);
+			IrCollector loop_items = begin_ir_frame(emitter);
+			ir_push(&loop_items, start_label);
+			ir_push(&loop_items, jump_if_false);
+			ir_push(&loop_items, body_ir);
+			ir_push(&loop_items, ir_new_jump(emitter, stat->site, start_label));
+			ir_push(&loop_items, break_label);
 
 			IrArray loop_stats = close_ir_frame(&loop_items);
-			Ir ir = ir_new_block(ctx, stat->site, loop_stats);
-			push_ir(items, ir);
+			Ir ir = ir_new_block(emitter, stat->site, loop_stats);
+			ir_push(items, ir);
 		}
 		break;
 
 		case AST_FOR:
 		{
-			Ir ir = lower_ast_for_to_ir(ctx, stat);
-			push_ir(items, ir);
+			Ir ir = lower_ast_for_to_ir(emitter, stat);
+			ir_push(items, ir);
 		}
 		break;
 
 		case AST_FOR_RANGE:
 		{
-			Ir ir = lower_ast_for_range_to_ir(ctx, stat);
-			push_ir(items, ir);
+			Ir ir = lower_ast_for_range_to_ir(emitter, stat);
+			ir_push(items, ir);
 		}
 		break;
 
 		case AST_BLOCK_STAT:
 		{
-			push_ir(items, ir_lower_stat_as_block(ctx, stat));
+			ir_push(items, ir_emit_stat_as_block(emitter, stat));
 		}
 		break;
 
 		case AST_STATIC_DECL:
 		{
-			// Static declarations are consumed before IR lowering.
+			ASSERT(stat->static_decl.name);
+			ASSERT(stat->static_decl.expr);
+
+			// if (stat->static_decl.expr->kind == AST_FUNCTION) {
+			// 	Entity *entity = ast_entity(ast_ensure_kind(stat->static_decl.name, AST_IDENT));
+			// 	ASSERT(entity);
+
+			// 	Ast func = stat->static_decl.expr;
+			// 	u32 index = ir_lower_function(emitter, func, func->site, func->function.variadic, func->function.params, func->function.body);
+
+			// 	Ir ir = ir_new_function(emitter, func->site, index);
+			// 	ir_push(items, ir);
+			// }
 		}
 		break;
 
@@ -1179,13 +1210,13 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 			Ast expr_tuple = ast_ensure_kind(stat->decl.expr, AST_TUPLE);
 			if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 			{
-				ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid declaration");
-				push_ir(items, ERROR_IR);
+				ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid declaration");
+				ir_push(items, ERROR_IR);
 				break;
 			}
 
 			u32 entity_tags = stat->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
-			lower_local_decl_tuples_to_ir(ctx, items, name_tuple, expr_tuple, entity_tags);
+			lower_local_decl_tuples_to_ir(emitter, items, name_tuple, expr_tuple, entity_tags);
 		}
 		break;
 
@@ -1195,8 +1226,8 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 			Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
-				ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid assignment");
-				push_ir(items, ERROR_IR);
+				ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid assignment");
+				ir_push(items, ERROR_IR);
 				break;
 			}
 
@@ -1204,29 +1235,29 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 			if (nargs == 1)
 			{
 				Ast dest_ast = dest_tuple->tuple.items[0];
-				if (!mark_entity_assigned(ctx, dest_ast)) {
-					push_ir(items, ERROR_IR);
+				if (!mark_entity_assigned(emitter, dest_ast)) {
+					ir_push(items, ERROR_IR);
 					break;
 				}
 				Ast expr_ast = expr_tuple->tuple.count ? expr_tuple->tuple.items[0] : 0;
 
-				Ir dest_ir = ir_emit_expr(ctx, dest_ast);
-				Ir expr_ir = expr_ast ? ir_emit_expr(ctx, expr_ast) : ir_new_nil(ctx, dest_ast->site);
-				Ir ir = ir_new_store(ctx, stat->site, dest_ir, expr_ir);
-				push_ir(items, ir);
+				Ir dest_ir = ir_emit_expr(emitter, dest_ast);
+				Ir expr_ir = expr_ast ? ir_emit_expr(emitter, expr_ast) : ir_new_nil(emitter, dest_ast->site);
+				Ir ir = ir_new_store(emitter, stat->site, dest_ir, expr_ir);
+				ir_push(items, ir);
 				break;
 			}
 
 			// TODO(RJ): we don't need multi-local! could be done with the same mechanism!
-			Ir *values = elf_arena_push(ctx->module->arena, sizeof(*values) * nargs);
+			Ir *values = elf_arena_push(emitter->module->arena, sizeof(*values) * nargs);
 			if (expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 			{
 				Ast expr_ast = expr_tuple->tuple.items[0];
-				Ir expr_ir = ir_emit_expr(ctx, expr_ast);
+				Ir expr_ir = ir_emit_expr(emitter, expr_ast);
 				for (u32 i = 0; i < nargs; ++i) {
-					values[i] = ir_new_local(ctx, expr_ast->site, 0);
+					values[i] = ir_new_local(emitter, expr_ast->site, 0);
 				}
-				push_ir(items, ir_new_multi_local(ctx, expr_ast->site, expr_ir, (IrArray){ .items = values, .count = nargs }));
+				ir_push(items, ir_new_multi_local(emitter, expr_ast->site, expr_ir, (IrArray){ .items = values, .count = nargs }));
 			}
 			else
 			{
@@ -1237,28 +1268,28 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 					if (i < expr_tuple->tuple.count) {
 						Ast expr_ast = expr_tuple->tuple.items[i];
 						site = expr_ast->site;
-						expr_ir = ir_emit_expr(ctx, expr_ast);
+						expr_ir = ir_emit_expr(emitter, expr_ast);
 					}
 					else {
-						expr_ir = ir_new_nil(ctx, site);
+						expr_ir = ir_new_nil(emitter, site);
 					}
 
-					values[i] = ir_new_local(ctx, site, expr_ir);
-					push_ir(items, values[i]);
+					values[i] = ir_new_local(emitter, site, expr_ir);
+					ir_push(items, values[i]);
 				}
 			}
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				Ast dest_ast = dest_tuple->tuple.items[i];
-				if (!mark_entity_assigned(ctx, dest_ast)) {
-					push_ir(items, ERROR_IR);
+				if (!mark_entity_assigned(emitter, dest_ast)) {
+					ir_push(items, ERROR_IR);
 					continue;
 				}
-				Ir dest_ir = ir_emit_expr(ctx, dest_ast);
-				Ir value_ir = ir_new_load_local(ctx, values[i]->site, values[i]);
-				Ir ir = ir_new_store(ctx, stat->site, dest_ir, value_ir);
-				push_ir(items, ir);
+				Ir dest_ir = ir_emit_expr(emitter, dest_ast);
+				Ir value_ir = ir_new_load_local(emitter, values[i]->site, values[i]);
+				Ir ir = ir_new_store(emitter, stat->site, dest_ir, value_ir);
+				ir_push(items, ir);
 			}
 		}
 		break;
@@ -1272,8 +1303,8 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 		case AST_SHL_ASSIGN:
 		case AST_SHR_ASSIGN:
 		{
-			Ir ir = lower_compound_assign_to_ir(ctx, items, stat);
-			push_ir(items, ir);
+			Ir ir = lower_compound_assign_to_ir(emitter, items, stat);
+			ir_push(items, ir);
 		}
 		break;
 
@@ -1283,8 +1314,8 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 			Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
-				ir_report_error(ctx, COM_ERROR_INTERNAL, stat->site, "invalid nil assignment");
-				push_ir(items, ERROR_IR);
+				ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid nil assignment");
+				ir_push(items, ERROR_IR);
 				break;
 			}
 
@@ -1296,23 +1327,23 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 
 				Ast dest_ast = dest_tuple->tuple.items[i];
 				Ast expr_ast = expr_tuple->tuple.items[i];
-				if (!mark_entity_assigned(ctx, dest_ast)) {
-					push_ir(items, ERROR_IR);
+				if (!mark_entity_assigned(emitter, dest_ast)) {
+					ir_push(items, ERROR_IR);
 					continue;
 				}
 
-				Ir dest_ir = ir_emit_lvalue_once(ctx, items, dest_ast);
-				Ir nil_ir = ir_new_nil(ctx, dest_ast->site);
-				Ir pred_ir = ir_new_binary(ctx, stat->site, IR_EQ, dest_ir, nil_ir);
-				Ir value_ir = ir_emit_expr(ctx, expr_ast);
-				Ir store_ir = ir_new_store(ctx, stat->site, dest_ir, value_ir);
+				Ir dest_ir = ir_emit_lvalue_once(emitter, items, dest_ast);
+				Ir nil_ir = ir_new_nil(emitter, dest_ast->site);
+				Ir pred_ir = ir_new_binary(emitter, stat->site, IR_EQ, dest_ir, nil_ir);
+				Ir value_ir = ir_emit_expr(emitter, expr_ast);
+				Ir store_ir = ir_new_store(emitter, stat->site, dest_ir, value_ir);
 
-				IrCollector true_items = begin_ir_frame(ctx);
-				push_ir(&true_items, store_ir);
+				IrCollector true_items = begin_ir_frame(emitter);
+				ir_push(&true_items, store_ir);
 				IrArray true_stats = close_ir_frame(&true_items);
-				Ir true_clause = ir_new_block(ctx, stat->site, true_stats);
-				Ir ir = ir_new_if(ctx, stat->site, pred_ir, true_clause, 0);
-				push_ir(items, ir);
+				Ir true_clause = ir_new_block(emitter, stat->site, true_stats);
+				Ir ir = ir_new_if(emitter, stat->site, pred_ir, true_clause, 0);
+				ir_push(items, ir);
 			}
 		}
 		break;
@@ -1326,41 +1357,41 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 				if (expr->kind == AST_TUPLE && expr->tuple.count == 1) {
 					expr = expr->tuple.items[0];
 				}
-				expr_ir = ir_emit_expr(ctx, expr);
+				expr_ir = ir_emit_expr(emitter, expr);
 			}
-			if (expr_ir && ctx->defer_count > 0)
+			if (expr_ir && emitter->defer_count > 0)
 			{
-				Ir return_value = ir_new_local(ctx, stat->site, expr_ir);
-				push_ir(items, return_value);
-				expr_ir = ir_new_load_local(ctx, stat->site, return_value);
+				Ir return_value = ir_new_local(emitter, stat->site, expr_ir);
+				ir_push(items, return_value);
+				expr_ir = ir_new_load_local(emitter, stat->site, return_value);
 			}
-			emit_defer_range(ctx, items, ctx->function_defer_start);
-			Ir ir = ir_new_return(ctx, stat->site, expr_ir);
-			push_ir(items, ir);
+			emit_defer_range(emitter, items, emitter->function_defer_start);
+			Ir ir = ir_new_return(emitter, stat->site, expr_ir);
+			ir_push(items, ir);
 		}
 		break;
 
 		case AST_BREAK:
 		{
-			IrLoopFrame loop = current_loop(ctx, stat->site);
-			emit_defer_range(ctx, items, loop.defer_start);
-			Ir ir = ir_new_jump(ctx, stat->site, loop.break_label);
-			push_ir(items, ir);
+			IrLoopFrame loop = current_loop(emitter, stat->site);
+			emit_defer_range(emitter, items, loop.defer_start);
+			Ir ir = ir_new_jump(emitter, stat->site, loop.break_label);
+			ir_push(items, ir);
 		}
 		break;
 
 		case AST_CONTINUE:
 		{
-			IrLoopFrame loop = current_loop(ctx, stat->site);
-			emit_defer_range(ctx, items, loop.defer_start);
-			Ir ir = ir_new_jump(ctx, stat->site, loop.continue_label);
-			push_ir(items, ir);
+			IrLoopFrame loop = current_loop(emitter, stat->site);
+			emit_defer_range(emitter, items, loop.defer_start);
+			Ir ir = ir_new_jump(emitter, stat->site, loop.continue_label);
+			ir_push(items, ir);
 		}
 		break;
 
 		case AST_DEFER_STAT:
 		{
-			push_defer_stat(ctx, stat->defer_stat.body);
+			push_defer_stat(emitter, stat->defer_stat.body);
 		}
 		break;
 
@@ -1371,31 +1402,45 @@ static void ir_lower_stat(IrCollector *items, Ast stat)
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
-				Ir ir = ir_emit_expr(ctx, args[i]);
-				push_ir(items, ir);
+				Ir ir = ir_emit_expr(emitter, args[i]);
+				ir_push(items, ir);
 			}
 		}
 		break;
 
 		default:
 		{
-			Ir ir = ir_emit_expr(ctx, stat);
-			push_ir(items, ir);
+			Ir ir = ir_emit_expr(emitter, stat);
+			ir_push(items, ir);
 		}
 		break;
 	}
 }
 
-static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body)
+static IrFunDef *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count)
 {
-	ASSERT(emitter->module->function_count < emitter->module->function_capacity);
-
-	u32 index = emitter->module->function_count ++;
-
-	IrFunDef *definition = &emitter->module->functions[index];
+	IrFunDef *definition = dy_arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunDef));
+	definition->index = IR_FUNCTION_INDEX_INVALID;
 	definition->site = site;
 	definition->variadic = variadic;
-	definition->param_count = IMPLICIT_PARAM_COUNT + ast_params.count;
+	definition->param_count = IMPLICIT_PARAM_COUNT + param_count;
+	if (emitter->module->last_function)
+	{
+		emitter->module->last_function->next = definition;
+	}
+	else
+	{
+		emitter->module->first_function = definition;
+	}
+	emitter->module->last_function = definition;
+	emitter->module->function_count += 1;
+	return definition;
+}
+
+static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast tree, Ast_Array ast_params, Ast body)
+{
+	ASSERT(definition);
+	ASSERT(definition->param_count == IMPLICIT_PARAM_COUNT + ast_params.count);
 
 	IrEmitterFrame function_ctx = {};
 	function_ctx.parent = emitter->function;
@@ -1412,7 +1457,7 @@ static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 
 	emitter->loop = 0;
 
 	Ir *ir_params = elf_arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count));
-	ir_params[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, site, 0);
+	ir_params[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, definition->site, 0);
 	definition->params = ir_params;
 
 	for (u32 i = 0; i < ast_params.count; ++ i)
@@ -1457,7 +1502,7 @@ static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 
 		}
 	}
 
-	definition->body = ir_lower_stat_as_block(emitter, body);
+	definition->body = ir_emit_stat_as_block(emitter, body);
 
 	IrArray captures = {};
 	captures.count = function_ctx.capture_count;
@@ -1480,8 +1525,13 @@ static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 
 	emitter->function_defer_start = outer_function_defer_start;
 
 	definition->capture_sources = captures;
+}
 
-	return index;
+static IrFunDef *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body)
+{
+	IrFunDef *definition = ir_reserve_function(emitter, site, variadic, ast_params.count);
+	ir_lower_function_body(emitter, definition, tree, ast_params, body);
+	return definition;
 }
 
 IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
@@ -1493,9 +1543,6 @@ IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
 
 	IrModule *module = dy_arena_push_zero(compiler->arena, sizeof(*module), 8);
 	module->arena = compiler->arena;
-	module->function_capacity = 4096;
-	module->functions = elf_arena_push_zero(module->arena, sizeof(*module->functions) * module->function_capacity);
-	module->function_count = 0;
 
 	IrEmitter *emitter = elf_arena_push_zero(module->arena, sizeof(*emitter));
 	emitter->checker = checker;
@@ -1506,8 +1553,8 @@ IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
 	emitter->defer_stack_size = 4096;
 	emitter->defer_stack = elf_arena_push_zero(module->arena, sizeof(*emitter->defer_stack) * emitter->defer_stack_size);
 
-	u32 index = ir_lower_function(emitter, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
-	ASSERT(index == 0);
-	ASSERT(!module->functions[index].capture_sources.items && !module->functions[index].capture_sources.count);
+	IrFunDef *entry = ir_lower_function(emitter, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
+	ASSERT(entry == module->first_function);
+	ASSERT(!entry->capture_sources.items && !entry->capture_sources.count);
 	return module;
 }

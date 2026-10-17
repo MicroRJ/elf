@@ -37,6 +37,62 @@ static void pop_scope(Checker *checker, StaticScope scope)
 	checker->scope_start = scope.outer_scope_start;
 }
 
+// TOOD(RJ): imagine writing an interpreter for an interpreter ...
+static StaticValue evaluate_static_expr(Checker *checker, Ast expr)
+{
+	StaticValue value = {STATIC_VALUE_NONE};
+	switch (expr->kind)
+	{
+		case AST_NIL_LITERAL:
+		{
+			value.type = STATIC_VALUE_NIL;
+		}
+		break;
+
+		case AST_INTEGER_LITERAL:
+		{
+			value.type = STATIC_VALUE_INTEGER;
+			value.integer = expr->integer_value;
+		}
+		break;
+
+		case AST_NUMBER_LITERAL:
+		{
+			value.type = STATIC_VALUE_NUMBER;
+			value.number = expr->number_value;
+		}
+		break;
+
+		case AST_STRING_LITERAL:
+		{
+			value.type = STATIC_VALUE_STRING;
+			value.string = expr->string_value;
+		}
+		break;
+
+		case AST_FUNCTION:
+		{
+			value.type = STATIC_VALUE_FUNCTION;
+			value.function = expr;
+		}
+		break;
+
+		case AST_IDENT:
+		case AST_IMPORT:
+		case AST_FIELD:
+		{
+			ASSERT(!"Error");
+		}
+		break;
+
+		default:
+		{
+			compiler_report(checker->compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
+		}
+		break;
+	}
+	return value;
+}
 
 static Entity *lookup_entity(Checker *checker, Atom *name)
 {
@@ -100,6 +156,7 @@ static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, Entit
 	return entity;
 }
 
+// Codex: just inline this
 static void declare_names(Checker *checker, EntityTags tags, Ast_Array names) {
 	for (u32 i = 0; i < names.count; ++ i)
 	{
@@ -115,35 +172,7 @@ static void declare_names(Checker *checker, EntityTags tags, Ast_Array names) {
 
 static StaticValue process_static_declaration_value(Checker *checker, Ast expr)
 {
-	StaticValue value = {STATIC_VALUE_NONE};
-	switch (expr->kind) {
-		case AST_IDENT: {
-			ASSERT(expr->atom);
-			value.type = STATIC_VALUE_UNIDENT;
-			value.unident = expr->atom;
-		}
-		break;
-		case AST_IMPORT: {
-			ASSERT(!"Error: not supported yet!");
-		}
-		break;
-		case AST_FUNCTION: {
-		}
-		break;
-		case AST_INTEGER_LITERAL: {
-			value.type = STATIC_VALUE_INTEGER;
-			value.integer = expr->integer_value;
-		}
-		break;
-		case AST_NUMBER_LITERAL:
-		case AST_STRING_LITERAL: {
-		}
-		break;
-		default: {
-			ASSERT(!"Codex: proper error reporting here");
-		}
-		break;
-	}
+	StaticValue value = evaluate_static_expr(checker, expr);
 	return value;
 }
 
@@ -164,8 +193,10 @@ static void predeclare_static_declarations(Checker *checker, Ast_Array stats)
 		Entity *entity = declare_entity(checker, ENTITY_STATIC, item, ENTITY_TAG_CONSTANT, item->static_decl.name->atom);
 		ASSERT(!item->static_decl.name->entity);
 		item->static_decl.name->entity = entity;
+
 		entity->value = value;
 	}
+	// TODO(RJ): handle out of order stuff!
 }
 
 static StaticValue check_tree(Checker *checker, Ast ast);

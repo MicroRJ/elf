@@ -9,9 +9,9 @@
 struct GlobalEntry
 {
 	char *name;
-	u64 size;
-	u32 hash;
-	u32 slot;
+	u64   size;
+	u32   hash;
+	u32   slot;
 };
 
 static u32 global_name_hash(elf_StrSlice name)

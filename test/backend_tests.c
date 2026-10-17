@@ -498,24 +498,24 @@ static void test_backend_if_else_restores_stack_top(void)
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
 	IrModule *ir_module = ir_new_module(compiler);
-	IrEmitter *ctx = ir_new_function_emitter(ir_module);
+	IrEmitter *emitter = ir_new_function_emitter(ir_module);
 	SourceSite site = {};
 
-	Ir pred = ir_new_int(ctx, site, 0);
-	Ir true_clause = ir_new_local(ctx, site, ir_new_int(ctx, site, 11));
-	Ir else_clause = ir_new_local(ctx, site, ir_new_int(ctx, site, 22));
-	Ir if_ir = ir_new_if(ctx, site, pred, true_clause, else_clause);
-	Ir after_if = ir_new_local(ctx, site, ir_new_int(ctx, site, 33));
+	Ir pred = ir_new_int(emitter, site, 0);
+	Ir true_clause = ir_new_local(emitter, site, ir_new_int(emitter, site, 11));
+	Ir else_clause = ir_new_local(emitter, site, ir_new_int(emitter, site, 22));
+	Ir if_ir = ir_new_if(emitter, site, pred, true_clause, else_clause);
+	Ir after_if = ir_new_local(emitter, site, ir_new_int(emitter, site, 33));
 
-	IrCollector stats = begin_ir_frame(ctx);
-	push_ir(&stats, if_ir);
-	push_ir(&stats, after_if);
-	Ir body = ir_new_block(ctx, site, close_ir_frame(&stats));
+	IrCollector stats = begin_ir_frame(emitter);
+	ir_push(&stats, if_ir);
+	ir_push(&stats, after_if);
+	Ir body = ir_new_block(emitter, site, close_ir_frame(&stats));
 
 	IrFunDef function = {};
 	function.site = site;
 	function.variadic = true;
-	Ir params[] = { ir_new_local(ctx, site, 0) };
+	Ir params[] = { ir_new_local(emitter, site, 0) };
 	function.params = params;
 	function.param_count = ARRAY_COUNT(params);
 	function.body = body;

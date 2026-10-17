@@ -120,6 +120,10 @@ typedef struct BcFunction
 {
 	b32       variadic;
 	u8           arity;
+	// TODO(RJ): we could literally instead just have i16 *captures, u8 ncaptures, here and the vm would
+	// just load the values directly into the closure ...
+	// we can put a limit on the number of captures, and if negative load from the parent's captures otherwise
+	// from the stack
 	u8        captures;
 	u16     stack_size;
 	u16         length;

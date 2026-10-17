@@ -6,6 +6,7 @@
 //
 typedef struct Entity      Entity;
 typedef struct EntityTable EntityTable;
+typedef struct IrFunDef    IrFunDef;
 
 // TODO(RJ): maybe allocate the entities here directly?
 // TODO(RJ): def use a hash-table for globals!
@@ -17,12 +18,14 @@ struct EntityTable {
 
 typedef enum {
 	STATIC_VALUE_NONE = 0,
-	STATIC_VALUE_UNIDENT,
+	STATIC_VALUE_NIL,
 	STATIC_VALUE_NUMBER,
 	STATIC_VALUE_INTEGER,
 	STATIC_VALUE_STRING,
+	STATIC_VALUE_FUNCTION,
 }
 StaticValueType;
+
 
 typedef struct {
 	StaticValueType type;
@@ -32,6 +35,10 @@ typedef struct {
 		Atom        *string;
 		Atom        *unident;
 		EntityTable *exports;
+		struct {
+			Ast       function;
+			IrFunDef *definition;
+		};
 	};
 }
 StaticValue;

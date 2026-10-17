@@ -38,6 +38,7 @@ struct BcEmitter
 	u32               bytecode_count;
 	BcFunction       *functions;
 	u32               function_count;
+	u32               indexed_function_count;
 	u32               generated_function_count;
 	Atom            **atoms;
 	u32               atom_capacity;
@@ -388,8 +389,21 @@ static BcString copy_emitter_string(elf_Arena *arena, Atom *atom)
 	return (BcString) {.data = data, .size = size};
 }
 
+static u32 bc_function_index(BcEmitter *emitter, IrFunDef *function)
+{
+	ASSERT(function);
+	if (function->index == IR_FUNCTION_INDEX_INVALID)
+	{
+		ASSERT(emitter->indexed_function_count < emitter->function_count);
+		function->index = emitter->indexed_function_count++;
+	}
+	ASSERT(function->index < emitter->function_count);
+	return function->index;
+}
+
 static BcModule *bc_finish_module(BcEmitter *emitter)
 {
+	ASSERT(emitter->indexed_function_count == emitter->function_count);
 	ASSERT(emitter->generated_function_count == emitter->function_count);
 	elf_Arena *arena = emitter->arena;
 	BcModule *module = dy_arena_push_zero(arena, sizeof(*module), 8);
@@ -421,6 +435,7 @@ static void bc_emit_function(BcEmitter *emitter, IrFunDef *function)
 	ASSERT(emitter);
 	ASSERT(function);
 	BcEmitter *module = emitter;
+	u32 function_index = bc_function_index(emitter, function);
 
 	u32 bytecode_start = module->bytecode_count;
 	emitter->stack_size = function->param_count;
@@ -453,7 +468,8 @@ static void bc_emit_function(BcEmitter *emitter, IrFunDef *function)
 	patch_bytecode_labels(emitter);
 
 	ASSERT(module->generated_function_count < module->function_count);
-	BcFunction *bc_function = module->functions + module->generated_function_count ++;
+	BcFunction *bc_function = module->functions + function_index;
+	module->generated_function_count += 1;
 	bc_function->variadic = function->variadic;
 	bc_function->arity = function->param_count;
 	bc_function->offset = bytecode_start;
@@ -466,6 +482,15 @@ BcModule *bc_emit_module(IrModule *input)
 {
 	ASSERT(input);
 	ASSERT(input->function_count);
+	u32 function_count = 0;
+	for (IrFunDef *function = input->first_function; function; function = function->next)
+	{
+		function->index = IR_FUNCTION_INDEX_INVALID;
+		function_count += 1;
+	}
+	ASSERT(function_count == input->function_count);
+	ASSERT(input->last_function);
+	ASSERT(!input->last_function->next);
 
 	elf_Arena *arena = input->arena;
 
@@ -482,8 +507,8 @@ BcModule *bc_emit_module(IrModule *input)
 	emitter->bytecode_capacity = 1 << 13;
 	emitter->bytecode = dy_arena_push_zero(arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, 8);
 
-	for (u32 i = 0; i < input->function_count; ++i) {
-		bc_emit_function(emitter, input->functions + i);
+	for (IrFunDef *function = input->first_function; function; function = function->next) {
+		bc_emit_function(emitter, function);
 	}
 	return bc_finish_module(emitter);
 }
@@ -615,8 +640,8 @@ static BcSlot emit_direct_call(BcEmitter *emitter, Ir ir, BcSlot out, u32 nout)
 	u32 nargs = args.count;
 	ASSERT(ir->ir_call.type == IR_CALL_DIRECT);
 	ASSERT(function->kind == IR_FUNCTION);
-	ASSERT(function->ir_function.index < emitter->function_count);
 	ASSERT(nout <= 0xff);
+	u32 function_index = bc_function_index(emitter, function->ir_function);
 
 	BcSlot stack_top = mark_slots(emitter);
 	{
@@ -635,7 +660,7 @@ static BcSlot emit_direct_call(BcEmitter *emitter, Ir ir, BcSlot out, u32 nout)
 	}
 	restore_slots(emitter, stack_top);
 
-	emit_xyzw_bc(emitter, ir->site, BC_CALL, unwrap_slot(stack_top), function->ir_function.index, nargs + 1, nout);
+	emit_xyzw_bc(emitter, ir->site, BC_CALL, unwrap_slot(stack_top), function_index, nargs + 1, nout);
 	return finish_call(emitter, ir, stack_top, out, nout);
 }
 
@@ -860,8 +885,7 @@ static BcSlot emit_expr(BcEmitter *emitter, Ir expr, BcSlot out, u32 nout)
 			}
 
 			out = ensure_slot(emitter, out);
-			u32 bytecode_function_id = expr->ir_function.index;
-			ASSERT(bytecode_function_id < emitter->function_count);
+			u32 bytecode_function_id = bc_function_index(emitter, expr->ir_function);
 			emit_xy_bc(emitter, site, BC_CLOSURE, unwrap_slot(out), bytecode_function_id);
 		}
 		break;
@@ -874,10 +898,9 @@ static BcSlot emit_expr(BcEmitter *emitter, Ir expr, BcSlot out, u32 nout)
 
 			out = ensure_slot(emitter, out);
 
-			u32 bytecode_function_id = expr->ir_closure.index;
-			ASSERT(bytecode_function_id < emitter->function_count);
-
-			IrArray captures = emitter->input->functions[bytecode_function_id].capture_sources;
+			IrFunDef *function = expr->ir_closure;
+			u32 bytecode_function_id = bc_function_index(emitter, function);
+			IrArray captures = function->capture_sources;
 			if (captures.count == 0)
 			{
 				emit_xy_bc(emitter, site, BC_CLOSURE, unwrap_slot(out), bytecode_function_id);
