@@ -2,6 +2,9 @@
 // See Copyright Notice In elf.h
 //
 
+#ifndef ELF_COMPILER_H
+#define ELF_COMPILER_H
+
 #include "bytecode.h"
 
 typedef struct Compiler Compiler;
@@ -134,3 +137,5 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 struct Ast_T *compiler_parse_constant_expr(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_json(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_jsonl(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
+
+#endif

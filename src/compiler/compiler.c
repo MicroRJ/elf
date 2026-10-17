@@ -239,20 +239,59 @@ Ast compiler_parse_constant_expr(elf_Arena *arena, elf_StrSlice name, elf_StrSli
 	return ERROR_AST;
 }
 
+typedef enum
+{
+	COMPILER_PARSE_JSON,
+	COMPILER_PARSE_JSONL,
+}
+CompilerParseType;
+
+static Ast compiler_parse_json_source(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source, CompilerParseType type)
+{
+	Ast ast = ERROR_AST;
+	if (arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
+	{
+		Compiler *compiler = compiler_create(arena);
+		if (compiler)
+		{
+			Atom *source_name = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
+			char *source_data = dy_arena_push_zero(arena, source.size + 1, 1);
+			Com_Source *compiler_source = dy_arena_push_zero(arena, sizeof(*compiler_source), _Alignof(Com_Source));
+			if (source_name && source_data && compiler_source)
+			{
+				copy_memory(source_data, source.data, source.size);
+				compiler_source->name = source_name;
+				compiler_source->canonical_path = source_name;
+				compiler_source->source = (BcSourceBuffer) {.data = source_data, .size = (u32)source.size};
+				compiler->sources = compiler_source;
+				compiler->source_count = 1;
+				compiler->source_capacity = 1;
+
+				Parser *parser = parser_create(compiler);
+				if (parser)
+				{
+					if (parser_set_source(parser, 0)) {
+						ast = type == COMPILER_PARSE_JSON ? parser_parse_json(parser) : parser_parse_jsonl(parser);
+					}
+					parser_destroy(parser);
+				}
+			}
+			if (compiler->report.error_count) {
+				ast = ERROR_AST;
+			}
+		}
+	}
+	return ast;
+}
+
 Ast compiler_parse_json(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
-	(void)arena;
-	(void)name;
-	(void)source;
-	return ERROR_AST;
+	return compiler_parse_json_source(arena, name, source, COMPILER_PARSE_JSON);
 }
 
 Ast compiler_parse_jsonl(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
-	(void)arena;
-	(void)name;
-	(void)source;
-	return ERROR_AST;
+	return compiler_parse_json_source(arena, name, source, COMPILER_PARSE_JSONL);
 }
 
 

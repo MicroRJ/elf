@@ -2,6 +2,10 @@
 // JSON parsing and serialization.
 //
 
+#include "atom_view.h"
+#include "ast.h"
+#include "compiler.h"
+
 typedef struct
 {
 	elf_State  *state;
@@ -13,20 +17,113 @@ typedef struct
 }
 JsonWriter;
 
+static b32 json_ast_to_value(elf_State *state, Ast ast, elf_Value *out)
+{
+	b32 result = true;
+	switch (ast->kind)
+	{
+		case AST_NIL_LITERAL:
+		{
+			*out = value_nil();
+		}
+		break;
+
+		case AST_INTEGER_LITERAL:
+		{
+			*out = value_from_integer(ast->integer_value);
+		}
+		break;
+
+		case AST_NUMBER_LITERAL:
+		{
+			*out = value_from_number(ast->number_value);
+		}
+		break;
+
+		case AST_STRING_LITERAL:
+		{
+			*out = value_from_string(elf_string_from_data_size(state, atom_data(ast->atom), atom_size(ast->atom)));
+		}
+		break;
+
+		case AST_TABLE:
+		{
+			elf_Table *table = elf_table_new(state);
+			for (u32 i = 0; result && i < ast->table.count; ++i)
+			{
+				Ast entry = ast->table.items[i];
+				if (!entry || entry->kind != AST_TABLE_ENTRY || !entry->table_entry.key)
+				{
+					result = false;
+				}
+				else
+				{
+					elf_Value key = {};
+					elf_Value value = {};
+					result = json_ast_to_value(state, entry->table_entry.key, &key) && json_ast_to_value(state, entry->table_entry.value, &value);
+					if (result) {
+						elf_table_set(state, table, key, value);
+					}
+				}
+			}
+			if (result) {
+				*out = value_from_table(table);
+			}
+		}
+		break;
+
+		case AST_ARRAY:
+		{
+			elf_Array *array = elf_array_new(state);
+			for (u32 i = 0; result && i < ast->array.count; ++i)
+			{
+				elf_Value value = {};
+				result = json_ast_to_value(state, ast->array.items[i], &value);
+				if (result) {
+					elf_array_add(state, array, value);
+				}
+			}
+			if (result) {
+				*out = value_from_array(array);
+			}
+		}
+		break;
+
+		default:
+		{
+			result = false;
+		}
+		break;
+	}
+	return result;
+}
+
+static b32 lib_push_json_source(elf_State *state, const char *name, elf_StrSlice source, b32 jsonl)
+{
+	elf_Scratch scratch = elf_begin_scratch();
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	Ast ast = jsonl ? compiler_parse_jsonl(scratch.arena, source_name, source) : compiler_parse_json(scratch.arena, source_name, source);
+
+	u32 saved_gc_mode = state->gc_mode;
+	state->gc_mode = ELF_GC_PAUSED;
+	elf_Value value = {};
+	b32 result = !ast_is_error(ast) && json_ast_to_value(state, ast, &value);
+	if (result) {
+		push_value(state, value);
+	}
+	state->gc_mode = saved_gc_mode;
+	elf_end_scratch(scratch);
+	return result;
+}
+
 static b32 lib_push_json(elf_State *state, const char *name, elf_StrSlice source)
 {
-	(void)state;
-	(void)name;
-	(void)source;
-	return false;
+	return lib_push_json_source(state, name, source, false);
 }
 
 static b32 lib_push_jsonl(elf_State *state, const char *name, elf_StrSlice source)
 {
-	(void)state;
-	(void)name;
-	(void)source;
-	return false;
+	return lib_push_json_source(state, name, source, true);
 }
 
 static void json_push_error_value(elf_State *state, const char *message, const Com_Message *compiler_message)
@@ -257,8 +354,10 @@ static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
 ELF_FUNCTION(l_json_parse)
 {
 	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
-	(void)lib_load_string(S, 1);
-	json_push_error_value(S, "JSON parsing is temporarily unavailable", 0);
+	elf_StrSlice source = lib_load_string_slice(S, 1);
+	if (!lib_push_json(S, "json.parse", source)) {
+		json_push_error_value(S, "invalid JSON", 0);
+	}
 	return 1;
 }
 
