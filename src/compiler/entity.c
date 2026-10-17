@@ -10,9 +10,10 @@
 #include "entity.h"
 #include "ast.h"
 
-Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_SourceId source)
+Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
 {
-	ASSERT(!owner || owner->site.source == source);
+	ASSERT(!owner || owner->source == source);
+	ASSERT(!parent || kind == SCOPE_SOURCE || parent->source == source);
 	Scope *scope = dy_arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
 	if (scope)
 	{
@@ -74,7 +75,6 @@ Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
 		entity->kind = kind;
 		entity->name = name;
 		entity->scope = scope;
-		entity->source = scope->source;
 		scope->entities[scope->count++] = entity;
 		result = entity;
 	}

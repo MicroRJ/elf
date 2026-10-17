@@ -76,7 +76,6 @@ struct Entity
 	EntityState     state;
 	u32             users;
 	EntityTags      tags;
-	Com_SourceId    source;
 	struct Ast_T   *parent;
 	struct Ast_T   *expr;
 	struct Ast_T   *tree;
@@ -99,14 +98,14 @@ struct Scope
 	Arena          *arena;
 	Scope          *parent;
 	struct Ast_T   *owner;
-	Com_SourceId    source;
+	Com_Source     *source;
 	ScopeKind       kind;
 	Entity        **entities;
 	u32             count;
 	u32             capacity;
 };
 
-Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_SourceId source);
+Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source);
 Entity *scope_find_current(Scope *scope, struct Atom *name);
 Entity *scope_find(Scope *scope, struct Atom *name);
 Entity *scope_declare(Scope *scope, EntityKind kind, struct Atom *name);

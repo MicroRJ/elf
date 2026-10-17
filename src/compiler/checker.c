@@ -27,7 +27,8 @@ static Scope *push_scope(Checker *checker, ScopeKind kind, Ast owner)
 	ASSERT(checker->active_scope);
 	ASSERT(owner);
 	ASSERT(checker->source_scope);
-	ASSERT(owner->site.source == checker->source_scope->source);
+	ASSERT(owner->source == checker->source_scope->source);
+	ASSERT(checker->active_scope->source == checker->source_scope->source);
 	Scope *scope = scope_create(checker->compiler->arena, kind, checker->active_scope, owner, checker->source_scope->source);
 	ASSERT(scope || !"Codex: proper error propagation");
 	checker->active_scope = scope;
@@ -121,7 +122,7 @@ Checker *checker_run(Compiler *compiler, Ast ast_file)
 	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
 	checker->compiler = compiler;
 	checker->current_function = ast_file;
-	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, COM_INVALID_SOURCE_ID);
+	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
 	check_statement(checker, ast_file);
 	return checker;
 }
@@ -197,7 +198,7 @@ static Scope *resolve_source_scope_lazily(Checker *checker, Com_SourceId source_
 	if (source->scope) {
 		return source->scope;
 	}
-	source->scope = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source_id);
+	source->scope = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source);
 	ASSERT(source->scope || !"Codex: proper error propagation");
 
 	Ast_Array stats = source->ast->file.body->block;
@@ -475,8 +476,8 @@ static void check_statement(Checker *checker, Ast stat)
 
 	ASSERT(stat->kind == AST_FILE || checker->active_scope);
 	ASSERT(stat->kind == AST_FILE || checker->source_scope);
-	ASSERT(stat->kind == AST_FILE || stat->site.source == checker->source_scope->source);
-	ASSERT(stat->kind == AST_FILE || stat->site.source == checker->active_scope->source);
+	ASSERT(stat->kind == AST_FILE || stat->source == checker->source_scope->source);
+	ASSERT(stat->kind == AST_FILE || stat->source == checker->active_scope->source);
 
 	switch (stat->kind)
 	{
@@ -491,7 +492,7 @@ static void check_statement(Checker *checker, Ast stat)
 			Scope *previous_source_scope = checker->source_scope;
 			Scope *previous_active_scope = checker->active_scope;
 
-			checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, stat, stat->site.source);
+			checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, stat, stat->source);
 			checker->active_scope = checker->source_scope;
 
 			declare_statics(checker, stat->file.body->block);
@@ -499,7 +500,7 @@ static void check_statement(Checker *checker, Ast stat)
 				check_statement(checker, stat->file.body->block.items[i]);
 			}
 
-			Com_Source *source = compiler_source_from_id(checker->compiler, stat->site.source);
+			Com_Source *source = stat->source;
 			ASSERT(source);
 			ASSERT(!source->scope);
 			source->scope = checker->source_scope;
