@@ -87,7 +87,7 @@ static Entity *global_entity(Checker *checker, Atom *name) {
 static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, EntityTags tags, Atom *name) {
 	Entity *entity = lookup_entity_in_current_scope(checker, name);
 	if (entity) {
-		ASSERT(!"Codex: generate proper error handling here!");
+		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
 	}
 	ASSERT(checker->entity_index < MAX_ENTITIES);
 	entity = alloc_entity(checker, name);
@@ -413,17 +413,21 @@ static StaticValue check_tree(Checker *checker, Ast ast)
 
 		case AST_FOR:
 		{
+			StaticScope scope = push_scope(checker);
 			check_tree(checker, ast->for_stat.init);
 			check_tree(checker, ast->for_stat.pred);
 			check_tree(checker, ast->for_stat.step);
 			check_tree(checker, ast->for_stat.body);
+			pop_scope(checker, scope);
 		}
 		break;
 
 		case AST_FOR_RANGE:
 		{
+			StaticScope scope = push_scope(checker);
 			check_tree(checker, ast->for_range_stat.decl);
 			check_tree(checker, ast->for_range_stat.body);
+			pop_scope(checker, scope);
 		}
 		break;
 

@@ -1,17 +1,20 @@
+
+paths := elf.fs.get_paths("test/smoke")
+test_assert = fun(cond) {
+	if cond != true ? {
+		elf.printl("test failed")
+	}
+}
+for p := paths[...] ? {
+	if p == "test/smoke/core_lib_loaded.elf" || p:ends_with(".elf") != true ? {
+		continue
+	}
+	elf.printl("calling: ", p)
+	elf.load_file(p)
+}
+
 SOMETHING_STATIC :: 20
 elf.printl(SOMETHING_STATIC)
-
-
-// paths := elf.fs.get_paths("test/smoke")
-// test_assert = fun(cond) {
-// 	if cond != true ? {
-// 		elf.printl("test failed")
-// 	}
-// }
-// for p := paths[...] ? {
-// 	elf.printl("calling: ", p)
-// 	elf.load_file(p)
-// }
 
 elf.println("=== current compiler pipeline demo ===")
 
