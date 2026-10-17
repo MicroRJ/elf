@@ -86,12 +86,12 @@ static u32 lib_process_validate_arguments(elf_State *state, elf_i32 index)
 	return count;
 }
 
-static dy_String_Array lib_process_load_arguments(elf_State *state, elf_i32 index, u32 count, dy_Arena *arena)
+static dy_String_Array lib_process_load_arguments(elf_State *state, elf_i32 index, u32 count, Arena *arena)
 {
 	dy_String_Array arguments = {0};
 	if (count != 0)
 	{
-		arguments.items = dy_arena_push(arena, sizeof(*arguments.items) * count, _Alignof(dy_String));
+		arguments.items = arena_push(arena, sizeof(*arguments.items) * count, _Alignof(dy_String));
 	}
 	if (arguments.items)
 	{
@@ -194,7 +194,7 @@ ELF_FUNCTION(l_process_start)
 	u32 argument_count = nargs > 2 ? lib_process_validate_arguments(S, arguments_index) : 0;
 	elf_i32 options_index = nargs > 3 ? elf_abs_index(S, 3) : 0;
 	elf_i32 metatable = lib_process_metatable(S);
-	dy_Scratch scratch = dy_begin_scratch();
+	Scratch scratch = scratch_begin();
 	dy_String_Array arguments = lib_process_load_arguments(S, arguments_index, argument_count, scratch.arena);
 	dy_Process_Start_Options options = {
 		.executable = executable,
@@ -210,7 +210,7 @@ ELF_FUNCTION(l_process_start)
 	{
 		result = dy_process_start(options, &process);
 	}
-	dy_end_scratch(scratch);
+	scratch_end(scratch);
 	elf_push_int(S, lib_io_status(result.error));
 	int return_count = 1;
 	if (result.error == DY_ERROR_NONE)

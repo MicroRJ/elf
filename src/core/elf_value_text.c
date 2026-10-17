@@ -4,9 +4,9 @@
 
 #include "elf_value_text.h"
 
-static void table_to_text(elf_Arena *arena, elf_Table *table)
+static void table_to_text(Arena *arena, elf_Table *table)
 {
-	elf_arena_push_text(arena, "{");
+	arena_push_text(arena, "{");
 	u32 emitted = 0;
 	for (u32 i = 0; i < table->capacity; ++i)
 	{
@@ -15,28 +15,28 @@ static void table_to_text(elf_Arena *arena, elf_Table *table)
 		{
 			if (emitted++)
 			{
-				elf_arena_push_text(arena, ", ");
+				arena_push_text(arena, ", ");
 			}
 			elf_print_value(arena, entry.key);
-			elf_arena_push_text(arena, " = ");
+			arena_push_text(arena, " = ");
 			elf_print_value(arena, entry.value);
 		}
 	}
-	elf_arena_push_text(arena, "}");
+	arena_push_text(arena, "}");
 }
 
-static void array_to_text(elf_Arena *arena, elf_Array *array)
+static void array_to_text(Arena *arena, elf_Array *array)
 {
-	elf_arena_push_text(arena, "[");
+	arena_push_text(arena, "[");
 	for (u32 i = 0; i < array->count; ++i)
 	{
 		if (i != 0)
 		{
-			elf_arena_push_text(arena, ", ");
+			arena_push_text(arena, ", ");
 		}
 		elf_print_value(arena, array->items[i]);
 	}
-	elf_arena_push_text(arena, "]");
+	arena_push_text(arena, "]");
 }
 
 static elf_Value table_get_named_field(elf_Table *table, const char *name)
@@ -62,39 +62,39 @@ static elf_Value table_get_named_field(elf_Table *table, const char *name)
 	return value_nil();
 }
 
-static void error_to_text(elf_Arena *arena, elf_Table *info)
+static void error_to_text(Arena *arena, elf_Table *info)
 {
 	elf_Value message = table_get_named_field(info, "message");
 	if (value_is_string(message)) {
-		elf_arena_push_data(arena, elf_string_data(value_as_string(message)), elf_string_size(value_as_string(message)));
+		arena_push_data(arena, elf_string_data(value_as_string(message)), elf_string_size(value_as_string(message)));
 	}
 	else {
-		elf_arena_push_text(arena, "error");
+		arena_push_text(arena, "error");
 	}
 }
 
-void elf_print_value(elf_Arena *arena, elf_Value value)
+void elf_print_value(Arena *arena, elf_Value value)
 {
 	switch (value.type)
 	{
-		case ELF_VALUE_TYPE_NIL:       elf_arena_push_text(arena, "nil"); break;
-		case ELF_VALUE_TYPE_INTEGER:   elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
-		case ELF_VALUE_TYPE_NUMBER:    elf_arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_STRING:    elf_arena_push_data(arena, value.x_string->data, elf_string_size(value.x_string)); break;
-		case ELF_VALUE_TYPE_CLOSURE:   elf_arena_push_text(arena, "C()"); break;
-		case ELF_VALUE_TYPE_CFUNCTION: elf_arena_push_text(arena, "F()"); break;
+		case ELF_VALUE_TYPE_NIL:       arena_push_text(arena, "nil"); break;
+		case ELF_VALUE_TYPE_INTEGER:   arena_pushf(arena, "%lli", value_as_integer(value)); break;
+		case ELF_VALUE_TYPE_NUMBER:    arena_pushf(arena, "%f", value.x_num); break;
+		case ELF_VALUE_TYPE_STRING:    arena_push_data(arena, value.x_string->data, elf_string_size(value.x_string)); break;
+		case ELF_VALUE_TYPE_CLOSURE:   arena_push_text(arena, "C()"); break;
+		case ELF_VALUE_TYPE_CFUNCTION: arena_push_text(arena, "F()"); break;
 		case ELF_VALUE_TYPE_TABLE:     table_to_text(arena, value_as_table(value)); break;
 		case ELF_VALUE_TYPE_ARRAY:     array_to_text(arena, value_as_array(value)); break;
 		case ELF_VALUE_TYPE_ERROR:     error_to_text(arena, value_as_error(value)); break;
-		case ELF_VALUE_TYPE_BUFFER:    elf_arena_pushf(arena, "buffer(%u)", value_as_buffer(value)->size); break;
-		case ELF_VALUE_TYPE_USER_OBJECT: elf_arena_pushf(arena, "%s()", value_name(value)); break;
-		default:                       elf_arena_push_text(arena, "(?)"); break;
+		case ELF_VALUE_TYPE_BUFFER:    arena_pushf(arena, "buffer(%u)", value_as_buffer(value)->size); break;
+		case ELF_VALUE_TYPE_USER_OBJECT: arena_pushf(arena, "%s()", value_name(value)); break;
+		default:                       arena_push_text(arena, "(?)"); break;
 	}
 }
 
-static void source_indent(elf_Arena *arena, u32 indent)
+static void source_indent(Arena *arena, u32 indent)
 {
-	elf_arena_push_nchar(arena, '\t', indent);
+	arena_push_nchar(arena, '\t', indent);
 }
 
 typedef struct SourceValuePath SourceValuePath;
@@ -104,7 +104,7 @@ struct SourceValuePath
 	elf_Object      *object;
 };
 
-static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent, SourceValuePath *path);
+static b32 unparse_value(elf_State *state, Arena *arena, elf_Value value, u32 indent, SourceValuePath *path);
 
 static b32 source_path_contains(SourceValuePath *path, elf_Object *object)
 {
@@ -118,7 +118,7 @@ static b32 source_path_contains(SourceValuePath *path, elf_Object *object)
 	return false;
 }
 
-static b32 number_to_source(elf_Arena *arena, f64 number)
+static b32 number_to_source(Arena *arena, f64 number)
 {
 	if (!isfinite(number)) return false;
 
@@ -130,44 +130,44 @@ static b32 number_to_source(elf_Arena *arena, f64 number)
 	for (i32 i = 0; i < size; ++ i) {
 		if (text[i] == '.' || text[i] == 'e' || text[i] == 'E') has_fraction = true;
 	}
-	elf_arena_push_data(arena, text, size);
-	if (!has_fraction) elf_arena_push_text(arena, ".0");
+	arena_push_data(arena, text, size);
+	if (!has_fraction) arena_push_text(arena, ".0");
 	return true;
 }
 
-static void string_to_source(elf_Arena *arena, elf_String *string)
+static void string_to_source(Arena *arena, elf_String *string)
 {
-	elf_arena_push_char(arena, '"');
+	arena_push_char(arena, '"');
 
 	const char *data = string->data;
 	for (u32 i = 0; i < elf_string_size(string); ++ i)
 	{
 		switch (data[i])
 		{
-			case '\0': elf_arena_push_text(arena, "\\0");  break;
-			case '\a': elf_arena_push_text(arena, "\\a");  break;
-			case '\b': elf_arena_push_text(arena, "\\b");  break;
-			case '\f': elf_arena_push_text(arena, "\\f");  break;
-			case '\\': elf_arena_push_text(arena, "\\\\"); break;
-			case '"':  elf_arena_push_text(arena, "\\\""); break;
-			case '\n': elf_arena_push_text(arena, "\\n");  break;
-			case '\r': elf_arena_push_text(arena, "\\r");  break;
-			case '\t': elf_arena_push_text(arena, "\\t");  break;
-			case '\v': elf_arena_push_text(arena, "\\v");  break;
+			case '\0': arena_push_text(arena, "\\0");  break;
+			case '\a': arena_push_text(arena, "\\a");  break;
+			case '\b': arena_push_text(arena, "\\b");  break;
+			case '\f': arena_push_text(arena, "\\f");  break;
+			case '\\': arena_push_text(arena, "\\\\"); break;
+			case '"':  arena_push_text(arena, "\\\""); break;
+			case '\n': arena_push_text(arena, "\\n");  break;
+			case '\r': arena_push_text(arena, "\\r");  break;
+			case '\t': arena_push_text(arena, "\\t");  break;
+			case '\v': arena_push_text(arena, "\\v");  break;
 			default:
 			{
 				u8 byte = (u8)data[i];
-				if (byte < 0x20 || byte == 0x7f) elf_arena_pushf(arena, "\\x%02x", byte);
-				else elf_arena_push_char(arena, data[i]);
+				if (byte < 0x20 || byte == 0x7f) arena_pushf(arena, "\\x%02x", byte);
+				else arena_push_char(arena, data[i]);
 			}
 			break;
 		}
 	}
 
-	elf_arena_push_char(arena, '"');
+	arena_push_char(arena, '"');
 }
 
-static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table, u32 indent, SourceValuePath *path)
+static b32 table_to_source(elf_State *state, Arena *arena, elf_Table *table, u32 indent, SourceValuePath *path)
 {
 	if (source_path_contains(path, (elf_Object *)table))
 	{
@@ -175,7 +175,7 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 	}
 	SourceValuePath table_path = {path, (elf_Object *)table};
 
-	elf_arena_push_text(arena, "{");
+	arena_push_text(arena, "{");
 
 	b32 needs_separator = false;
 	for (u32 i = 0; i < table->capacity; ++i)
@@ -183,13 +183,13 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 		Entry entry = table->entries[i];
 		if (elf_table_entry_is_key(entry))
 		{
-			elf_arena_push_text(arena, needs_separator ? ",\n" : "\n");
+			arena_push_text(arena, needs_separator ? ",\n" : "\n");
 			source_indent(arena, indent + 1);
 			if (!unparse_value(state, arena, entry.key, indent + 1, &table_path))
 			{
 				return false;
 			}
-			elf_arena_push_text(arena, " = ");
+			arena_push_text(arena, " = ");
 			if (!unparse_value(state, arena, entry.value, indent + 1, &table_path))
 			{
 				return false;
@@ -200,15 +200,15 @@ static b32 table_to_source(elf_State *state, elf_Arena *arena, elf_Table *table,
 
 	if (needs_separator)
 	{
-		elf_arena_push_text(arena, "\n");
+		arena_push_text(arena, "\n");
 		source_indent(arena, indent);
 	}
 
-	elf_arena_push_text(arena, "}");
+	arena_push_text(arena, "}");
 	return true;
 }
 
-static b32 array_to_source(elf_State *state, elf_Arena *arena, elf_Array *array, u32 indent, SourceValuePath *path)
+static b32 array_to_source(elf_State *state, Arena *arena, elf_Array *array, u32 indent, SourceValuePath *path)
 {
 	if (source_path_contains(path, (elf_Object *)array))
 	{
@@ -216,35 +216,35 @@ static b32 array_to_source(elf_State *state, elf_Arena *arena, elf_Array *array,
 	}
 	SourceValuePath array_path = {path, (elf_Object *)array};
 
-	elf_arena_push_text(arena, "[");
+	arena_push_text(arena, "[");
 	for (u32 i = 0; i < array->count; ++i)
 	{
 		if (i != 0)
 		{
-			elf_arena_push_text(arena, ", ");
+			arena_push_text(arena, ", ");
 		}
 		if (!unparse_value(state, arena, array->items[i], indent, &array_path))
 		{
 			return false;
 		}
 	}
-	elf_arena_push_text(arena, "]");
+	arena_push_text(arena, "]");
 	return true;
 }
 
-static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent, SourceValuePath *path)
+static b32 unparse_value(elf_State *state, Arena *arena, elf_Value value, u32 indent, SourceValuePath *path)
 {
 	switch (value.type)
 	{
 		case ELF_VALUE_TYPE_NIL:
 		{
-			elf_arena_push_text(arena, "nil");
+			arena_push_text(arena, "nil");
 		}
 		break;
 
 		case ELF_VALUE_TYPE_INTEGER:
 		{
-			elf_arena_pushf(arena, "%lli", value_as_integer(value));
+			arena_pushf(arena, "%lli", value_as_integer(value));
 		}
 		break;
 
@@ -278,7 +278,7 @@ static b32 unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u3
 	return true;
 }
 
-b32 elf_unparse_value(elf_State *state, elf_Arena *arena, elf_Value value, u32 indent)
+b32 elf_unparse_value(elf_State *state, Arena *arena, elf_Value value, u32 indent)
 {
 	return unparse_value(state, arena, value, indent, 0);
 }

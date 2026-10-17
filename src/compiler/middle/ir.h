@@ -249,7 +249,7 @@ struct IrFunction
 
 typedef struct
 {
-	elf_Arena  *arena;
+	Arena  *arena;
 	IrFunction *first_function;
 	IrFunction  *last_function;
 	u32         function_count;

@@ -140,7 +140,7 @@ struct Compiler
 	Com_Report         report;
 };
 
-Compiler *compiler_create(elf_Arena *arena);
+Compiler *compiler_create(Arena *arena);
 Com_Source *compiler_source_from_id(Compiler *compiler, Com_SourceId source_id);
 
 void compiler_log_report(Compiler *compiler);
@@ -148,9 +148,9 @@ void compiler_log_report(Compiler *compiler);
 b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
 
-BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
-struct Ast_T *compiler_parse_constant_expr(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
-struct Ast_T *compiler_parse_json(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
-struct Ast_T *compiler_parse_jsonl(elf_Arena *arena, elf_StrSlice name, elf_StrSlice source);
+BcModule *compiler_compile(Arena *arena, elf_StrSlice name, elf_StrSlice source);
+struct Ast_T *compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source);
+struct Ast_T *compiler_parse_json(Arena *arena, elf_StrSlice name, elf_StrSlice source);
+struct Ast_T *compiler_parse_jsonl(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 
 #endif

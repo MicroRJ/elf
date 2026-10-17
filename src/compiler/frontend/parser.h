@@ -21,7 +21,7 @@ typedef struct
 	Compiler         *compiler;
 	Com_Source       *compiler_source;
 	Atom_Table       *atoms;
-	elf_Arena        *scratch_arena;
+	Arena        *scratch_arena;
 
 	const char       *cursor;
 	const char       *end;
@@ -35,8 +35,8 @@ Lexer;
 
 struct Parser
 {
-	elf_Arena          *result_arena;
-	elf_Arena           scratch_arena;
+	Arena          *result_arena;
+	Arena           scratch_arena;
 	Compiler           *compiler;
 	Com_Source         *source;
 	Atom_Table         *atoms;

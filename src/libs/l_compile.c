@@ -143,7 +143,7 @@ LibParseType;
 
 static b32 lib_push_parsed_source(elf_State *state, const char *name, elf_StrSlice source, LibParseType type)
 {
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, name, source);
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
@@ -161,7 +161,7 @@ static b32 lib_push_parsed_source(elf_State *state, const char *name, elf_StrSli
 		ast = compiler_parse_constant_expr(scratch.arena, source_name, source);
 	}
 	b32 result = lib_push_compiler_ast(state, compiler, ast);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return result;
 }
 

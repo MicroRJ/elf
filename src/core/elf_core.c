@@ -45,11 +45,11 @@
 static void init_runtime_storage(elf_State *state)
 {
 	state->frame_stack_size = 4096;
-	state->frame_stack = elf_arena_push_zero(&state->arena, sizeof(*state->frame_stack) * state->frame_stack_size);
+	state->frame_stack = arena_push_zero(&state->arena, sizeof(*state->frame_stack) * state->frame_stack_size, _Alignof(StackFrame));
 	state->frame = state->frame_stack;
 
 	state->stack_size = 4096;
-	state->stack = elf_arena_push_zero(&state->arena, sizeof(*state->stack) * state->stack_size);
+	state->stack = arena_push_zero(&state->arena, sizeof(*state->stack) * state->stack_size, _Alignof(elf_Value));
 	state->stack_ptr = state->stack;
 }
 
@@ -135,9 +135,9 @@ static void bootstrap_state(elf_State *state)
 
 elf_State *elf_create_state()
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 
-	elf_State *state = elf_arena_push_zero(&arena, sizeof(*state));
+	elf_State *state = arena_push_zero(&arena, sizeof(*state), _Alignof(elf_State));
 	state->arena = arena;
 
 	init_state_storage(state);
@@ -155,8 +155,8 @@ void elf_destroy_state(elf_State *state)
 		gc_destroy_all(state);
 		elf_free(state, state->string_buckets,
 			(u64)state->string_bucket_count * sizeof(*state->string_buckets));
-		elf_Arena arena = state->arena;
-		elf_arena_destroy(&arena);
+		Arena arena = state->arena;
+		arena_destroy(&arena);
 	}
 }
 

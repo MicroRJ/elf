@@ -190,14 +190,14 @@ ELF_FUNCTION(l_string_splice)
 		return 0;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
-	elf_arena_push_data(scratch.arena, elf_string_data(string), position);
-	elf_arena_push_data(scratch.arena, elf_string_data(replacement), replacement_size);
+	Scratch scratch = scratch_begin();
+	arena_push_data(scratch.arena, elf_string_data(string), position);
+	arena_push_data(scratch.arena, elf_string_data(replacement), replacement_size);
 	u32 suffix = position + delete_size;
-	elf_arena_push_data(scratch.arena, elf_string_data(string) + suffix, size - suffix);
+	arena_push_data(scratch.arena, elf_string_data(string) + suffix, size - suffix);
 	u32 result_size = size_after_delete + replacement_size;
 	string_push(S, (char *)scratch.arena->data + scratch.restore_used, result_size);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 
@@ -352,8 +352,8 @@ ELF_FUNCTION(l_string_dedent)
 		if (text[index] == '\n' || text[index] == '\r') ++line_count;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
-	StringLine *lines = elf_arena_push_zero(scratch.arena, sizeof(StringLine) * line_count);
+	Scratch scratch = scratch_begin();
+	StringLine *lines = arena_push_zero(scratch.arena, sizeof(StringLine) * line_count, _Alignof(StringLine));
 	u32 at = 0;
 	for (u32 index = 0; index < line_count; ++index)
 	{
@@ -398,11 +398,11 @@ ELF_FUNCTION(l_string_dedent)
 	if (!prefix)
 	{
 		string_push(S, "", 0);
-		elf_end_scratch(scratch);
+		scratch_end(scratch);
 		return 1;
 	}
 
-	char *result = elf_arena_push(scratch.arena, size);
+	char *result = arena_push(scratch.arena, size, 1);
 	u32 result_size = 0;
 	for (u32 index = first; index < end; ++index)
 	{
@@ -422,7 +422,7 @@ ELF_FUNCTION(l_string_dedent)
 	}
 
 	string_push(S, result, result_size);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 
@@ -430,11 +430,11 @@ ELF_FUNCTION(l_string_lower)
 {
 	elf_String *string = string_receiver(S);
 	u32 size = elf_string_size(string);
-	elf_Scratch scratch = elf_begin_scratch();
-	u8 *result = elf_arena_push(scratch.arena, size);
+	Scratch scratch = scratch_begin();
+	u8 *result = arena_push(scratch.arena, size, 1);
 	for (u32 i = 0; i < size; ++i) result[i] = string_to_lower((u8)elf_string_data(string)[i]);
 	string_push(S, (char *)result, size);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 
@@ -442,11 +442,11 @@ ELF_FUNCTION(l_string_upper)
 {
 	elf_String *string = string_receiver(S);
 	u32 size = elf_string_size(string);
-	elf_Scratch scratch = elf_begin_scratch();
-	u8 *result = elf_arena_push(scratch.arena, size);
+	Scratch scratch = scratch_begin();
+	u8 *result = arena_push(scratch.arena, size, 1);
 	for (u32 i = 0; i < size; ++i) result[i] = string_to_upper((u8)elf_string_data(string)[i]);
 	string_push(S, (char *)result, size);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 
@@ -466,21 +466,21 @@ ELF_FUNCTION(l_string_replace)
 		return 0;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	u32 start = 0;
 	for (;;)
 	{
 		const char *found = string_find_data(text, size, old_data, old_size, start);
 		if (!found) break;
 		u32 at = (u32)(found - text);
-		elf_arena_push_data(scratch.arena, text + start, at - start);
-		elf_arena_push_data(scratch.arena, elf_string_data(replacement), elf_string_size(replacement));
+		arena_push_data(scratch.arena, text + start, at - start);
+		arena_push_data(scratch.arena, elf_string_data(replacement), elf_string_size(replacement));
 		start = at + old_size;
 	}
-	elf_arena_push_data(scratch.arena, text + start, size - start);
+	arena_push_data(scratch.arena, text + start, size - start);
 	string_push(S, (char *)scratch.arena->data + scratch.restore_used,
 		(u32)(scratch.arena->used - scratch.restore_used));
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 
@@ -496,12 +496,12 @@ ELF_FUNCTION(l_string_repeat)
 		return 0;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	for (i64 i = 0; i < count; ++i) {
-		elf_arena_push_data(scratch.arena, elf_string_data(string), size);
+		arena_push_data(scratch.arena, elf_string_data(string), size);
 	}
 	string_push(S, (char *)scratch.arena->data + scratch.restore_used, (u32)(count * size));
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 
@@ -512,21 +512,21 @@ ELF_FUNCTION(l_string_join)
 	check_value_type(S, parts_value, ELF_VALUE_TYPE_ARRAY);
 	elf_Array *parts = value_as_array(parts_value);
 	u32 count = elf_array_length(parts);
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 
 	for (u32 i = 0; i < count; ++i)
 	{
 		elf_Value part_value = elf_array_get(S, parts, i);
 		check_value_type(S, part_value, ELF_VALUE_TYPE_STRING);
 		elf_String *part = value_as_string(part_value);
-		if (i > 0) elf_arena_push_data(scratch.arena,
+		if (i > 0) arena_push_data(scratch.arena,
 			elf_string_data(separator), elf_string_size(separator));
-		elf_arena_push_data(scratch.arena, elf_string_data(part), elf_string_size(part));
+		arena_push_data(scratch.arena, elf_string_data(part), elf_string_size(part));
 	}
 
 	string_push(S, (char *)scratch.arena->data + scratch.restore_used,
 		(u32)(scratch.arena->used - scratch.restore_used));
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 

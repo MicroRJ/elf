@@ -32,7 +32,7 @@ typedef struct BcEmitter BcEmitter;
 struct BcEmitter
 {
 	IrModule         *input;
-	elf_Arena        *arena;
+	Arena        *arena;
 	Bytecode         *bytecode;
 	u32               bytecode_capacity;
 	u32               bytecode_count;
@@ -76,7 +76,7 @@ static void jump_to_label(BcEmitter *emitter, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, u32 label);
 static void jump_if_expr_true(BcEmitter *emitter, Ir expr, u32 true_label);
 static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label);
-static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size);
+static void *grow_module_array(Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size);
 
 static b32 source_slice_equal(SourceSite left, SourceSite right)
 {
@@ -107,7 +107,7 @@ static void emit_source_map_entry(BcEmitter *emitter, SourceSite site, u32 byte_
 #define BC_MODULE_OPERAND_COUNT_MAX (1u << 15)
 
 // TODO(RJ): use some sort of a chunked system instead!
-static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size)
+static void *grow_module_array(Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size)
 {
 	if (required_count <= *capacity) return items;
 
@@ -118,7 +118,7 @@ static void *grow_module_array(elf_Arena *arena, void *items, u32 count, u32 *ca
 		new_capacity *= 2;
 	}
 
-	void *new_items = dy_arena_push(arena, item_size * new_capacity, 8);
+	void *new_items = arena_push(arena, item_size * new_capacity, 8);
 	if (count) copy_memory(new_items, items, item_size * count);
 	*capacity = new_capacity;
 	return new_items;
@@ -386,10 +386,10 @@ static i32 ensure_slot(BcEmitter *emitter, i32 slot)
 	return slot;
 }
 
-static BcString copy_emitter_string(elf_Arena *arena, Atom *atom)
+static BcString copy_emitter_string(Arena *arena, Atom *atom)
 {
 	u32 size = atom_size(atom);
-	char *data = dy_arena_push_zero(arena, size + 1, 1);
+	char *data = arena_push_zero(arena, size + 1, 1);
 	copy_memory(data, atom_data(atom), size);
 	return (BcString) {.data = data, .size = size};
 }
@@ -410,8 +410,8 @@ static BcModule *bc_finish_module(BcEmitter *emitter)
 {
 	ASSERT(emitter->indexed_function_count == emitter->function_count);
 	ASSERT(emitter->generated_function_count == emitter->function_count);
-	elf_Arena *arena = emitter->arena;
-	BcModule *module = dy_arena_push_zero(arena, sizeof(*module), 8);
+	Arena *arena = emitter->arena;
+	BcModule *module = arena_push_zero(arena, sizeof(*module), 8);
 	module->bytecode = emitter->bytecode;
 	module->bytecode_count = emitter->bytecode_count;
 	module->source_map = emitter->source_map;
@@ -421,7 +421,7 @@ static BcModule *bc_finish_module(BcEmitter *emitter)
 	module->string_count = emitter->atom_count;
 	if (module->string_count)
 	{
-		module->strings = dy_arena_push_zero(arena, sizeof(*module->strings) * module->string_count, 8);
+		module->strings = arena_push_zero(arena, sizeof(*module->strings) * module->string_count, 8);
 		for (u32 i = 0; i < module->string_count; ++i) {
 			module->strings[i] = copy_emitter_string(arena, emitter->atoms[i]);
 		}
@@ -497,20 +497,20 @@ BcModule *bc_emit_module(IrModule *input)
 	ASSERT(input->last_function);
 	ASSERT(!input->last_function->next);
 
-	elf_Arena *arena = input->arena;
+	Arena *arena = input->arena;
 
 	// TODO(RJ): proper error handling
 	if (input->function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
 
 	// TODO(RJ): allocate the emitter itself on a scratch arena!
-	BcEmitter *emitter = dy_arena_push_zero(arena, sizeof(*emitter), 8);
+	BcEmitter *emitter = arena_push_zero(arena, sizeof(*emitter), 8);
 	emitter->input = input;
 	emitter->arena = arena;
 	emitter->function_count = input->function_count;
-	emitter->functions = dy_arena_push_zero(arena, sizeof(*emitter->functions) * emitter->function_count, 8);
+	emitter->functions = arena_push_zero(arena, sizeof(*emitter->functions) * emitter->function_count, 8);
 
 	emitter->bytecode_capacity = 1 << 13;
-	emitter->bytecode = dy_arena_push_zero(arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, 8);
+	emitter->bytecode = arena_push_zero(arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, 8);
 
 	for (IrFunction *function = input->first_function; function; function = function->next) {
 		bc_emit_function(emitter, function);

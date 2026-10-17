@@ -23,52 +23,52 @@ const char *bytecode_type_name(BcType type)
 	return names[type];
 }
 
-static void format_value_shallow(elf_Arena *arena, elf_Value value)
+static void format_value_shallow(Arena *arena, elf_Value value)
 {
 	switch (value.type)
 	{
-		case ELF_VALUE_TYPE_NIL:         elf_arena_push_text(arena, "nil"); break;
-		case ELF_VALUE_TYPE_INTEGER:     elf_arena_pushf(arena, "%lli", value_as_integer(value)); break;
-		case ELF_VALUE_TYPE_NUMBER:      elf_arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_STRING:      elf_arena_pushf(arena, "%s", elf_string_data(value_as_string(value))); break;
-		case ELF_VALUE_TYPE_CLOSURE:     elf_arena_push_text(arena, "closure"); break;
-		case ELF_VALUE_TYPE_CFUNCTION:   elf_arena_push_text(arena, "function"); break;
-		case ELF_VALUE_TYPE_TABLE:       elf_arena_push_text(arena, "table"); break;
-		case ELF_VALUE_TYPE_ERROR:       elf_arena_push_text(arena, "error"); break;
-		case ELF_VALUE_TYPE_BUFFER:      elf_arena_push_text(arena, "buffer"); break;
-		case ELF_VALUE_TYPE_ARRAY:       elf_arena_push_text(arena, "array"); break;
-		case ELF_VALUE_TYPE_USER_OBJECT: elf_arena_push_text(arena, "user object"); break;
-		default:                         elf_arena_push_text(arena, "?"); break;
+		case ELF_VALUE_TYPE_NIL:         arena_push_text(arena, "nil"); break;
+		case ELF_VALUE_TYPE_INTEGER:     arena_pushf(arena, "%lli", value_as_integer(value)); break;
+		case ELF_VALUE_TYPE_NUMBER:      arena_pushf(arena, "%f", value.x_num); break;
+		case ELF_VALUE_TYPE_STRING:      arena_pushf(arena, "%s", elf_string_data(value_as_string(value))); break;
+		case ELF_VALUE_TYPE_CLOSURE:     arena_push_text(arena, "closure"); break;
+		case ELF_VALUE_TYPE_CFUNCTION:   arena_push_text(arena, "function"); break;
+		case ELF_VALUE_TYPE_TABLE:       arena_push_text(arena, "table"); break;
+		case ELF_VALUE_TYPE_ERROR:       arena_push_text(arena, "error"); break;
+		case ELF_VALUE_TYPE_BUFFER:      arena_push_text(arena, "buffer"); break;
+		case ELF_VALUE_TYPE_ARRAY:       arena_push_text(arena, "array"); break;
+		case ELF_VALUE_TYPE_USER_OBJECT: arena_push_text(arena, "user object"); break;
+		default:                         arena_push_text(arena, "?"); break;
 	}
 }
 
-static void format_global_value(elf_State *state, elf_Arena *arena, u32 index)
+static void format_global_value(elf_State *state, Arena *arena, u32 index)
 {
 	if (index >= state->globals.count)
 	{
-		elf_arena_push_text(arena, "<bad-global>");
+		arena_push_text(arena, "<bad-global>");
 		return;
 	}
 
 	format_value_shallow(arena, elf_globals_get_by_slot(&state->globals, index));
 }
 
-static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Arena *arena, u32 index, Bytecode byte)
+static void format_bytecode_instr(elf_State *state, elf_Module *module, Arena *arena, u32 index, Bytecode byte)
 {
-	elf_arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
+	arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
 
 	switch (byte.b_type)
 	{
 		case BC_HALT:
 		case BC_NOP:
 		{
-			elf_arena_push_text(arena, bytecode_type_name(byte.b_type));
+			arena_push_text(arena, bytecode_type_name(byte.b_type));
 		}
 		break;
 
 		case BC_JUMP:
 		{
-			elf_arena_pushf(arena, "jump %d -> %d", byte.b_x, (i32)index + byte.b_x);
+			arena_pushf(arena, "jump %d -> %d", byte.b_x, (i32)index + byte.b_x);
 		}
 		break;
 
@@ -77,150 +77,150 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		case BC_JE:
 		case BC_JNE:
 		{
-			elf_arena_pushf(arena, "%s r%d r%d -> %d", bytecode_type_name(byte.b_type), byte.b_y, byte.b_z, (i32)index + byte.b_x);
+			arena_pushf(arena, "%s r%d r%d -> %d", bytecode_type_name(byte.b_type), byte.b_y, byte.b_z, (i32)index + byte.b_x);
 		}
 		break;
 
 		case BC_RETURN:
 		{
-			elf_arena_pushf(arena, "return r%d count=%d", byte.b_x, byte.b_y);
+			arena_pushf(arena, "return r%d count=%d", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_LOADCVAL:
 		{
-			elf_arena_pushf(arena, "r%d = capture[%d]", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = capture[%d]", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_GETGLOBAL:
 		{
-			elf_arena_pushf(arena, "r%d = global[%d] // ", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = global[%d] // ", byte.b_x, byte.b_y);
 			format_global_value(state, arena, byte.b_y);
 		}
 		break;
 
 		case BC_SETGLOBAL:
 		{
-			elf_arena_pushf(arena, "global[%d] = r%d", byte.b_x, byte.b_y);
+			arena_pushf(arena, "global[%d] = r%d", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_LOADKNUM:
 		{
-			elf_arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
 			if (byte.b_y >= 0 && (u32)byte.b_y < module->number_constant_count) {
-				elf_arena_pushf(arena, " // %f", module->number_constants[byte.b_y]);
+				arena_pushf(arena, " // %f", module->number_constants[byte.b_y]);
 			}
 		}
 		break;
 
 		case BC_LOADKSTRING:
 		{
-			elf_arena_pushf(arena, "r%d = string[%d]", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = string[%d]", byte.b_x, byte.b_y);
 			if (byte.b_y >= 0 && (u32)byte.b_y < module->string_count) {
-				elf_arena_pushf(arena, " // %s", elf_string_data(module->strings[byte.b_y]));
+				arena_pushf(arena, " // %s", elf_string_data(module->strings[byte.b_y]));
 			}
 		}
 		break;
 
 		case BC_LOADKINT:
 		{
-			elf_arena_pushf(arena, "r%d = integer[%d]", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = integer[%d]", byte.b_x, byte.b_y);
 			if (byte.b_y >= 0 && (u32)byte.b_y < module->integer_constant_count) {
-				elf_arena_pushf(arena, " // %lli", module->integer_constants[byte.b_y]);
+				arena_pushf(arena, " // %lli", module->integer_constants[byte.b_y]);
 			}
 		}
 		break;
 
 		case BC_LOADNIL:
 		{
-			elf_arena_pushf(arena, "r%d = nil", byte.b_x);
+			arena_pushf(arena, "r%d = nil", byte.b_x);
 		}
 		break;
 
 		case BC_RELOAD:
 		{
-			elf_arena_pushf(arena, "r%d = r%d", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = r%d", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_CURRENT_CLOSURE:
 		{
-			elf_arena_pushf(arena, "r%d = current_closure", byte.b_x);
+			arena_pushf(arena, "r%d = current_closure", byte.b_x);
 		}
 		break;
 
 		case BC_GETINDEX:
 		{
-			elf_arena_pushf(arena, "r%d = r%d[r%d]", byte.b_x, byte.b_y, byte.b_z);
+			arena_pushf(arena, "r%d = r%d[r%d]", byte.b_x, byte.b_y, byte.b_z);
 		}
 		break;
 
 		case BC_SETINDEX:
 		{
-			elf_arena_pushf(arena, "r%d[r%d] = r%d", byte.b_x, byte.b_y, byte.b_z);
+			arena_pushf(arena, "r%d[r%d] = r%d", byte.b_x, byte.b_y, byte.b_z);
 		}
 		break;
 
 		case BC_GETMETAFIELD:
 		case BC_GETFIELD:
 		{
-			elf_arena_pushf(arena, "r%d = r%d.%d", byte.b_x, byte.b_y, byte.b_z);
+			arena_pushf(arena, "r%d = r%d.%d", byte.b_x, byte.b_y, byte.b_z);
 		}
 		break;
 
 		case BC_SETFIELD:
 		{
-			elf_arena_pushf(arena, "r%d[r%d] = r%d", byte.b_x, byte.b_y, byte.b_z);
+			arena_pushf(arena, "r%d[r%d] = r%d", byte.b_x, byte.b_y, byte.b_z);
 		}
 		break;
 
 		case BC_MEASURE:
 		{
-			elf_arena_pushf(arena, "r%d = measure(r%d)", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = measure(r%d)", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_ARRAYADD:
 		{
-			elf_arena_pushf(arena, "arrayadd r%d, r%d", byte.b_x, byte.b_y);
+			arena_pushf(arena, "arrayadd r%d, r%d", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_DYNAMIC_CALL:
 		{
-			elf_arena_pushf(arena, "dynamic_call callee=r%d result=r%d nargs=%d nrets=%d", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
+			arena_pushf(arena, "dynamic_call callee=r%d result=r%d nargs=%d nrets=%d", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
 		}
 		break;
 
 		case BC_CALL:
 		{
-			elf_arena_pushf(arena, "call function[%d] result=r%d nargs=%d nrets=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
+			arena_pushf(arena, "call function[%d] result=r%d nargs=%d nrets=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
 		}
 		break;
 
 		case BC_TABLE:
 		{
-			elf_arena_pushf(arena, "r%d = table", byte.b_x);
+			arena_pushf(arena, "r%d = table", byte.b_x);
 		}
 		break;
 
 		case BC_ARRAY:
 		{
-			elf_arena_pushf(arena, "r%d = array", byte.b_x);
+			arena_pushf(arena, "r%d = array", byte.b_x);
 		}
 		break;
 
 		case BC_CLOSURE:
 		{
-			elf_arena_pushf(arena, "r%d = closure function[%d]", byte.b_x, byte.b_y);
+			arena_pushf(arena, "r%d = closure function[%d]", byte.b_x, byte.b_y);
 		}
 		break;
 
 		case BC_ENFORCE:
 		{
-			elf_arena_pushf(arena, "enforce r%d rule=%d", byte.b_x, byte.b_y);
+			arena_pushf(arena, "enforce r%d rule=%d", byte.b_x, byte.b_y);
 		}
 		break;
 
@@ -240,7 +240,7 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		case BC_BIT_OR:
 		case BC_BIT_AND:
 		{
-			elf_arena_pushf(arena, "r%d = r%d %s r%d", byte.b_x, byte.b_y, bytecode_type_name(byte.b_type), byte.b_z);
+			arena_pushf(arena, "r%d = r%d %s r%d", byte.b_x, byte.b_y, bytecode_type_name(byte.b_type), byte.b_z);
 		}
 		break;
 
@@ -248,36 +248,36 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, elf_Aren
 		case BC_I2N:
 		case BC_N2I:
 		{
-			elf_arena_pushf(arena, "r%d = %s r%d", byte.b_x, bytecode_type_name(byte.b_type), byte.b_y);
+			arena_pushf(arena, "r%d = %s r%d", byte.b_x, bytecode_type_name(byte.b_type), byte.b_y);
 		}
 		break;
 
 		default:
 		{
-			elf_arena_push_text(arena, bytecode_type_name(byte.b_type));
+			arena_push_text(arena, bytecode_type_name(byte.b_type));
 		}
 		break;
 	}
 
-	elf_arena_push_char(arena, '\n');
+	arena_push_char(arena, '\n');
 }
 
-char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunctionRef function_ref)
+char *format_bytecode_function(elf_State *state, Arena *arena, BcFunctionRef function_ref)
 {
 	BcFunction *function = bc_function_from_ref(function_ref);
 	elf_Module *module = function_ref.module;
-	char *start = elf_arena_push(arena, 0);
+	char *start = arena_push(arena, 0, 1);
 	const char *source_name = module->source_name ? elf_string_data(module->source_name) : "<unknown>";
 
-	elf_arena_push_text(arena, "bytecode function\n");
-	elf_arena_pushf(arena, "  source      = %s\n", source_name);
-	elf_arena_pushf(arena, "  arity       = %u\n", function->arity);
-	elf_arena_pushf(arena, "  variadic    = %s\n", function->variadic ? "true" : "false");
-	elf_arena_pushf(arena, "  offset      = %u\n", function->offset);
-	elf_arena_pushf(arena, "  length      = %u\n", function->length);
-	elf_arena_pushf(arena, "  captures    = %u\n", function->captures);
-	elf_arena_pushf(arena, "  stack_size  = %u\n", function->stack_size);
-	elf_arena_push_text(arena, "body\n");
+	arena_push_text(arena, "bytecode function\n");
+	arena_pushf(arena, "  source      = %s\n", source_name);
+	arena_pushf(arena, "  arity       = %u\n", function->arity);
+	arena_pushf(arena, "  variadic    = %s\n", function->variadic ? "true" : "false");
+	arena_pushf(arena, "  offset      = %u\n", function->offset);
+	arena_pushf(arena, "  length      = %u\n", function->length);
+	arena_pushf(arena, "  captures    = %u\n", function->captures);
+	arena_pushf(arena, "  stack_size  = %u\n", function->stack_size);
+	arena_push_text(arena, "body\n");
 
 	Bytecode *bytecode = module->bytecode + function->offset;
 	for (u32 i = 0; i < function->length; ++i)
@@ -285,15 +285,15 @@ char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunctionRef
 		format_bytecode_instr(state, module, arena, i, bytecode[i]);
 	}
 
-	elf_arena_push_text(arena, "end\n");
-	elf_arena_push_zero(arena, 1);
+	arena_push_text(arena, "end\n");
+	arena_push_zero(arena, 1, 1);
 	return start;
 }
 
 void print_bytecode_function(elf_State *state, BcFunctionRef function)
 {
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	char *text = format_bytecode_function(state, scratch.arena, function);
 	printf("%s", text);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 }

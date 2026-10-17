@@ -6,7 +6,7 @@
 
 static Ir ir_alloc(IrEmitter *emitter, SourceSite site, IrKind kind)
 {
-	IrNode *ir = elf_arena_push_zero(emitter->module->arena, sizeof(*ir));
+	IrNode *ir = arena_push_zero(emitter->module->arena, sizeof(*ir), _Alignof(IrNode));
 	ir->kind = kind;
 	ir->site = site;
 	return ir;

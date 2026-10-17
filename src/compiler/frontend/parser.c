@@ -181,14 +181,14 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 Parser *parser_create(Compiler *compiler)
 {
 	ASSERT(compiler != 0);
-	Parser *parser = elf_arena_push_zero(compiler->arena, sizeof(*parser));
+	Parser *parser = arena_push_zero(compiler->arena, sizeof(*parser), _Alignof(Parser));
 	if (!parser) {
 		return 0;
 	}
 	parser->compiler = compiler;
 	parser->atoms = compiler->atoms;
 	parser->result_arena = compiler->arena;
-	parser->scratch_arena = elf_arena_create(0);
+	parser->scratch_arena = arena_create(0);
 	if (!parser->scratch_arena.data) {
 		return 0;
 	}
@@ -198,7 +198,7 @@ Parser *parser_create(Compiler *compiler)
 void parser_destroy(Parser *parser)
 {
 	if (parser) {
-		elf_arena_destroy(&parser->scratch_arena);
+		arena_destroy(&parser->scratch_arena);
 	}
 }
 
@@ -210,13 +210,13 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 	ASSERT(source->source.data != 0);
 	parser->source = source;
 
-	elf_arena_reset(&parser->scratch_arena);
+	arena_reset(&parser->scratch_arena);
 	parser->tok = (Token) {};
 	parser->tok_prev = (Token) {};
 	parser->tok_prox = (Token) {};
 	parser->ast_stack_size = 4096;
 	parser->ast_stack_index = 0;
-	parser->ast_stack = elf_arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size);
+	parser->ast_stack = arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size, _Alignof(Ast));
 	parser->first_import = 0;
 	parser->last_import = 0;
 	parser->import_count = 0;
@@ -277,7 +277,7 @@ static b32 push_ast(Parser *par, Ast tree)
 	if (par->ast_stack_index == par->ast_stack_size)
 	{
 		u32 stack_size = par->ast_stack_size ? par->ast_stack_size * 2 : 256;
-		Ast *stack = elf_arena_push(&par->scratch_arena, sizeof(*stack) * stack_size);
+		Ast *stack = arena_push(&par->scratch_arena, sizeof(*stack) * stack_size, _Alignof(Ast));
 		if (!stack) {
 			return false;
 		}
@@ -296,14 +296,14 @@ static Ast_Array pop_ast_array(Parser *par, u32 count)
 	ASSERT(par->ast_stack_index >= count);
 	par->ast_stack_index -= count;
 	Ast_Array result = {.count = count};
-	result.items = elf_arena_push_copy(par->result_arena, sizeof(*result.items) * count, par->ast_stack + par->ast_stack_index);
+	result.items = arena_push_copy(par->result_arena, sizeof(*result.items) * count, _Alignof(Ast), par->ast_stack + par->ast_stack_index);
 	return result;
 }
 
 static b32 parser_record_import(Parser *parser, Ast tree)
 {
 	ASSERT(tree && tree->kind == AST_IMPORT);
-	Ast_Node *node = elf_arena_push_zero(&parser->scratch_arena, sizeof(*node));
+	Ast_Node *node = arena_push_zero(&parser->scratch_arena, sizeof(*node), _Alignof(Ast_Node));
 	if (!node) {
 		return false;
 	}
@@ -327,7 +327,7 @@ static Ast_Array parser_flatten_imports(Parser *parser)
 		return imports;
 	}
 
-	imports.items = dy_arena_push(parser->result_arena, sizeof(*imports.items) * imports.count, _Alignof(Ast));
+	imports.items = arena_push(parser->result_arena, sizeof(*imports.items) * imports.count, _Alignof(Ast));
 	if (!imports.items) {
 		return (Ast_Array) {};
 	}

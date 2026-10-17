@@ -446,10 +446,10 @@ static void test_api_mutation_errors(elf_State *state)
 }
 
 #if 0
-static Compiler *api_test_create_compiler(elf_State *state, elf_Scratch *scratch, const char *name, elf_StrSlice source)
+static Compiler *api_test_create_compiler(elf_State *state, Scratch *scratch, const char *name, elf_StrSlice source)
 {
 	(void)state;
-	*scratch = elf_begin_scratch();
+	*scratch = scratch_begin();
 	Compiler *compiler = compiler_create(scratch->arena);
 	compiler_add_root_source(compiler, name, source);
 	return compiler;
@@ -471,7 +471,7 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("public compilation reports failure without compiler messages");
 	}
 
-	elf_Scratch compiler_scratch;
+	Scratch compiler_scratch;
 	Compiler *compiler;
 	Com_Report *report;
 	char bounded_constant_text[] = {'4', '2'};
@@ -484,7 +484,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (!elf_to_int(state, -1, &bounded_value) || bounded_value != 42) {
 		test_fail("bounded source slice compiles completely");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 	elf_pop(state, 1);
 
 	char constant_array_text[] = "[1, 2, [3]]";
@@ -513,7 +513,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (elf_get_top(state) != sentinel_top || report->error_count != 1 || report->first->phase != COMPILER_PHASE_LEXER || !api_slice_contains(report->first->text, "NUL byte")) {
 		test_fail("embedded NUL failure returns a lexer message");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 
 #if SIZE_MAX > UINT32_MAX
 	elf_StrSlice oversized_source = {bounded_constant_text, (elf_Size)UINT32_MAX + 1};
@@ -525,7 +525,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (elf_get_top(state) != sentinel_top || report->error_count != 1 || !api_slice_contains(report->first->text, "32-bit size limit")) {
 		test_fail("oversized source failure returns a compiler message");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 #endif
 
 	char invalid_constant_text[] = "{\n  answer = runtime_value,\n}";
@@ -546,7 +546,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (report->error_count == 0 || report->message_count == 0 || report->first->severity != COMPILER_ERROR || report->first->phase != COMPILER_PHASE_EVALUATION || report->first->site.source != 0 || report->first->site.line_index != 2 || source_slice_column(report->first->site) != 12 || !api_slice_contains(report->first->text, "not a constant expression")) {
 		test_fail("compiler reports constant-expression messages");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 
 	char invalid_string_text[] = "\"\\q\"";
 	elf_StrSlice invalid_string = {invalid_string_text, sizeof(invalid_string_text) - 1};
@@ -561,7 +561,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (report->error_count == 0 || report->message_count == 0 || report->first->phase != COMPILER_PHASE_LEXER || report->first->site.source != 0) {
 		test_fail("compiler retains lexer messages");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 
 	char valid_constant_text[] = "42";
 	elf_StrSlice valid_constant = {valid_constant_text, sizeof(valid_constant_text) - 1};
@@ -576,7 +576,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (compiler->report.error_count != 0) {
 		test_fail("successful source parsing has no errors");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 	elf_pop(state, 1);
 
 	elf_Module *module_checkpoint = state->modules;
@@ -608,7 +608,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (linked_message_count != report->message_count || last_message != report->last) {
 		test_fail("compiler report links every message in order");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 
 	char valid_code_text[] = "unused := 1\nret 42";
 	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
@@ -637,13 +637,13 @@ static void test_api_source_compilation(elf_State *state)
 	if (report->error_count != 0 || report->warning_count != 1 || report->message_count != 1 || report->first->severity != COMPILER_WARNING || report->first->phase != COMPILER_PHASE_LOWERING || !api_slice_contains(report->first->text, "unreferenced entity")) {
 		test_fail("successful compilation retains lowering warnings");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 	elf_set_top(state, checkpoint);
 }
 
 static void test_api_module_compilation(elf_State *state)
 {
-	elf_Scratch compiler_scratch = {};
+	Scratch compiler_scratch = {};
 	char valid_text[] = "export foo :: fun() { ret bar() }\nexport bar :: fun() { ret foo() }";
 	elf_StrSlice valid_source = {valid_text, sizeof(valid_text) - 1};
 	Compiler *compiler = api_test_create_compiler(state, &compiler_scratch, "valid-module.elf", valid_source);
@@ -657,7 +657,7 @@ static void test_api_module_compilation(elf_State *state)
 	if (compiler->report.error_count || compiler->report.warning_count) {
 		test_fail("static module exports are not reported as unreferenced");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 
 	elf_Module *module_checkpoint = state->modules;
 	elf_u64 arena_checkpoint = state->arena.used;
@@ -674,7 +674,7 @@ static void test_api_module_compilation(elf_State *state)
 	if (state->modules != module_checkpoint || state->arena.used != arena_checkpoint) {
 		test_fail("failed static module compilation publishes no partial module");
 	}
-	elf_end_scratch(compiler_scratch);
+	scratch_end(compiler_scratch);
 }
 
 static void api_test_set_integer_global(elf_State *state, const char *name, i64 value)
@@ -712,16 +712,16 @@ static void api_test_linked_module_result(elf_State *state, elf_Module *module, 
 
 static void test_api_links_compiled_module_into_multiple_states(void)
 {
-	elf_Arena output_arena = elf_arena_create(0);
+	Arena output_arena = arena_create(0);
 	char source_text[] = "ret [linked_value, \"linked-string\"]";
 	BcModule *compiled_module = compiler_compile(&output_arena, (elf_StrSlice) {(char *)"linked-module.elf", sizeof("linked-module.elf") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
 	if (!compiled_module || !compiled_module->function_count)
 	{
 		test_fail("compiler produces a state-independent module with an entry function");
-		elf_arena_destroy(&output_arena);
+		arena_destroy(&output_arena);
 		return;
 	}
-	Bytecode *bytecode_snapshot = elf_arena_push_copy(&output_arena, sizeof(*bytecode_snapshot) * compiled_module->bytecode_count, compiled_module->bytecode);
+	Bytecode *bytecode_snapshot = arena_push_copy(&output_arena, sizeof(*bytecode_snapshot) * compiled_module->bytecode_count, _Alignof(Bytecode), compiled_module->bytecode);
 
 	elf_State *first = elf_create_state();
 	elf_State *second = elf_create_state();
@@ -754,7 +754,7 @@ static void test_api_links_compiled_module_into_multiple_states(void)
 
 	elf_destroy_state(first);
 	elf_destroy_state(second);
-	elf_arena_destroy(&output_arena);
+	arena_destroy(&output_arena);
 }
 
 static void test_api_value_source(elf_State *state)

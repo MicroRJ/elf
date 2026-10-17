@@ -17,7 +17,7 @@ static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *so
 	if (dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
 		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return 0;
 	u64 size = info.size;
-	char *data = elf_arena_push(&state->arena, size + 16);
+	char *data = arena_push(&state->arena, size + 16, 1);
 	zero_memory(data + size, 16);
 	dy_u64 read = 0;
 	dy_Result read_result = dy_read_file(file, data, size, &read);
@@ -31,7 +31,7 @@ static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *so
 
 static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
 {
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
 	elf_Module *module = elf_link_module(state, compiled_module);
@@ -41,7 +41,7 @@ static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrS
 		entry.module = module;
 		entry.index = 0;
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return entry;
 }
 

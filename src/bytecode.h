@@ -102,7 +102,7 @@ typedef enum
 BcType;
 
 const char *bytecode_type_name(BcType type);
-char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunctionRef function);
+char *format_bytecode_function(elf_State *state, Arena *arena, BcFunctionRef function);
 void print_bytecode_function(elf_State *state, BcFunctionRef function);
 
 // One fixed-width VM instruction. The fourth operand uses padding that already

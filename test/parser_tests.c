@@ -1,6 +1,6 @@
 static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_tests", source);
@@ -170,22 +170,22 @@ static void test_parser_import_expression(elf_State *state)
 static void test_parser_module_discovery(elf_State *state)
 {
 	(void)state;
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
 	if (compiler_add_root_file(compiler, "test/imports/discovery/root.elf") == COM_INVALID_SOURCE_ID) {
 		test_fail("compiler loads root source file directly");
-		elf_arena_destroy(&arena);
+		arena_destroy(&arena);
 		return;
 	}
 	if (!compiler_parse_sources(compiler)) {
 		test_fail("compiler parses imported module graph");
-		elf_arena_destroy(&arena);
+		arena_destroy(&arena);
 		return;
 	}
 
 	if (compiler->source_count != 3) {
 		test_fail("module discovery deduplicates canonical paths");
-		elf_arena_destroy(&arena);
+		arena_destroy(&arena);
 		return;
 	}
 	for (Com_SourceId source_id = 0; source_id < compiler->source_count; ++source_id)
@@ -210,13 +210,13 @@ static void test_parser_module_discovery(elf_State *state)
 	if (a->imports[0].site.source != 1 || b->imports[0].site.source != 2) {
 		test_fail("import records retain source ids");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void test_parser_missing_import(elf_State *state)
 {
 	(void)state;
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
 	const char *source_text = "missing :: import \"missing.elf\"";
 	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
@@ -227,7 +227,7 @@ static void test_parser_missing_import(elf_State *state)
 	if (compiler->report.error_count != 1) {
 		test_fail("missing imported source reports one compiler error");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 #endif
 
@@ -352,7 +352,7 @@ static void test_parser_for_loops(elf_State *state)
 static void test_parser_call_with_table_argument(elf_State *state)
 {
 	(void)state;
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	char source_text[] = "make {x = 1, [2] = 3}";
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "deprecated_table_call", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
@@ -366,7 +366,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	expect_ast_atom(call->call.expr, "make", "parse call callee string");
 	if (call->call.args.count != 1) {
 		test_fail("table call shorthand counts argument");
-		elf_arena_destroy(&arena);
+		arena_destroy(&arena);
 		return;
 	}
 
@@ -378,7 +378,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->error != COM_ERROR_SYNTAX_DEPRECATION || compiler->report.first->phase != COMPILER_PHASE_PARSER) {
 		test_fail("table call shorthand reports one parser deprecation warning");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void test_parser_trailing_closures(elf_State *state)
@@ -520,7 +520,7 @@ static void test_parser_table_access_modes(elf_State *state)
 
 static void parser_expect_source_error(elf_State *state, const char *source_text, const char *label)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_source_error", source);
@@ -531,7 +531,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	{
 		test_fail(label);
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void test_parser_rejects_legacy_table_syntax(elf_State *state)
@@ -741,7 +741,7 @@ static void test_parser_line_boundaries(elf_State *state)
 
 static void test_parser_lexer_error_boundary(elf_State *state)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"@ ignored", 9};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_lexer_error", source);
@@ -751,13 +751,13 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
 		test_fail("parser propagates a lexer error token");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 #if 0
 static void test_parser_take_token_error(elf_State *state)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"value", 5};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_take_token_error", source);
@@ -768,12 +768,12 @@ static void test_parser_take_token_error(elf_State *state)
 	if (!token_is_error(token) || token.status != COM_STATUS_REPORTED || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
 		test_fail("take token returns its source error");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void test_parser_take_token_oom(elf_State *state)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"value", 5};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_take_token_oom", source);
@@ -787,13 +787,13 @@ static void test_parser_take_token_oom(elf_State *state)
 	if (!token_is_error(token) || token.status != COM_STATUS_OOM || ast_from_token_error(token) != ERROR_OOM_AST || compiler->report.error_count != 0) {
 		test_fail("take token returns diagnostic allocation failure");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 #endif
 
 static void test_parser_ast_oom(elf_State *state)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"42", 2};
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_ast_oom", source);
@@ -806,7 +806,7 @@ static void test_parser_ast_oom(elf_State *state)
 	if (ast != ERROR_OOM_AST || ast->status != COM_STATUS_OOM) {
 		test_fail("parser returns AST allocation failure");
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void run_parser_tests(elf_State *state)

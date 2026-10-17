@@ -22,7 +22,7 @@ static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
 {
 	ASSERT(par->source);
 	ASSERT(site.source == par->source->id);
-	Ast_T *tree = dy_arena_push_zero(par->result_arena, sizeof(*tree), _Alignof(Ast_T));
+	Ast_T *tree = arena_push_zero(par->result_arena, sizeof(*tree), _Alignof(Ast_T));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}

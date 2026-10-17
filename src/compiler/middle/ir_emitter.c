@@ -118,7 +118,7 @@ static IrArray ir_end_queue(IrQueue *frame)
 
 	IrArray items = {};
 	items.count = frame->count;
-	items.items = elf_arena_push_copy(emitter->module->arena, sizeof(*items.items) * items.count, emitter->ir_stack + emitter->ir_stack_index);
+	items.items = arena_push_copy(emitter->module->arena, sizeof(*items.items) * items.count, _Alignof(Ir), emitter->ir_stack + emitter->ir_stack_index);
 
 	ASSERT(emitter->ir_stack_index == frame->start);
 	frame->count = 0;
@@ -143,7 +143,7 @@ static void ir_close_defer_scope(IrEmitter *emitter, IrDefer *previous_defer_sta
 static void push_defer_stat(IrEmitter *emitter, Ast stat)
 {
 	ASSERT(emitter->function);
-	IrDefer *defer = dy_arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
+	IrDefer *defer = arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
 	defer->previous = emitter->function->defer;
 	defer->stat = stat;
 	emitter->function->defer = defer;
@@ -186,7 +186,7 @@ static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functi
 		target = ir_new_load_local(emitter, site, entity->ir);
 	}
 
-	IrCapture *capture = dy_arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
+	IrCapture *capture = arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
 	capture->entity = entity;
 	capture->target = target;
 	if (function_ctx->last_capture) {
@@ -346,7 +346,7 @@ static IrArray lower_call_arguments(IrEmitter *emitter, Ast call, b32 *failed)
 	u32 capacity = argument_count + has_carg;
 	IrArray result = {};
 	if (capacity) {
-		result.items = elf_arena_push(emitter->module->arena, sizeof(*result.items) * capacity);
+		result.items = arena_push(emitter->module->arena, sizeof(*result.items) * capacity, _Alignof(Ir));
 	}
 	for (u32 i = 0; i < argument_count; ++i)
 	{
@@ -801,7 +801,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 	if (nvars > 1 && expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 	{
 		Ir expr = ir_emit_expr(emitter, expr_tuple->tuple.items[0]);
-		Ir *locals = dy_arena_push(emitter->module->arena, sizeof(*locals) * nvars, _Alignof(Ir *));
+		Ir *locals = arena_push(emitter->module->arena, sizeof(*locals) * nvars, _Alignof(Ir *));
 		for (u32 i = 0; i < nvars; ++i)
 		{
 			Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
@@ -912,7 +912,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	Ir iterator_local = ir_new_local(emitter, range_start_site, range_start);
 	Ir range_end_local = ir_new_local(emitter, range_end_site, range_end);
 
-	Ir *var_locals = elf_arena_push(emitter->module->arena, sizeof(*var_locals) * nvars);
+	Ir *var_locals = arena_push(emitter->module->arena, sizeof(*var_locals) * nvars, _Alignof(Ir));
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
@@ -1242,7 +1242,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			}
 
 			// TODO(RJ): we don't need multi-local! could be done with the same mechanism!
-			Ir *values = elf_arena_push(emitter->module->arena, sizeof(*values) * nargs);
+			Ir *values = arena_push(emitter->module->arena, sizeof(*values) * nargs, _Alignof(Ir));
 			if (expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 			{
 				Ast expr_ast = expr_tuple->tuple.items[0];
@@ -1412,7 +1412,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 
 static IrFunction *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 variadic, u32 param_count)
 {
-	IrFunction *definition = dy_arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunction));
+	IrFunction *definition = arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunction));
 	definition->index = IR_FUNCTION_INDEX_INVALID;
 	definition->site = site;
 	definition->variadic = variadic;
@@ -1442,7 +1442,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 	IrEmitterFrame *outer_function = emitter->function;
 	emitter->function = &function_ctx;
 
-	Ir *ir_params = elf_arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count));
+	Ir *ir_params = arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count), _Alignof(Ir));
 	ir_params[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, definition->site, 0);
 	definition->params = ir_params;
 
@@ -1493,7 +1493,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 	IrArray captures = {};
 	captures.count = function_ctx.capture_count;
 	if (captures.count) {
-		captures.items = elf_arena_push(emitter->module->arena, sizeof(*captures.items) * captures.count);
+		captures.items = arena_push(emitter->module->arena, sizeof(*captures.items) * captures.count, _Alignof(Ir));
 	}
 	u32 capture_index = 0;
 	for (IrCapture *capture = function_ctx.first_capture; capture; capture = capture->next)
@@ -1523,14 +1523,14 @@ IrModule *ir_emit_module(Compiler *compiler, Ast ast)
 	ASSERT(ast);
 	ASSERT(ast->kind == AST_FILE);
 
-	IrModule *module = dy_arena_push_zero(compiler->arena, sizeof(*module), 8);
+	IrModule *module = arena_push_zero(compiler->arena, sizeof(*module), 8);
 	module->arena = compiler->arena;
 
-	IrEmitter *emitter = elf_arena_push_zero(module->arena, sizeof(*emitter));
+	IrEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(IrEmitter));
 	emitter->compiler = compiler;
 	emitter->module = module;
 	emitter->ir_stack_size = 4096;
-	emitter->ir_stack = elf_arena_push_zero(module->arena, sizeof(*emitter->ir_stack) * emitter->ir_stack_size);
+	emitter->ir_stack = arena_push_zero(module->arena, sizeof(*emitter->ir_stack) * emitter->ir_stack_size, _Alignof(Ir));
 	IrFunction *entry = ir_lower_function(emitter, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
 	ASSERT(entry == module->first_function);
 	ASSERT(!entry->captures.items && !entry->captures.count);

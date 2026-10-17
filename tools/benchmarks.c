@@ -246,12 +246,12 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	i64 start = bench_now();
 	for (u32 i = 0; i < iterations; ++i)
 	{
-		elf_Scratch scratch = elf_begin_scratch();
+		Scratch scratch = scratch_begin();
 		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
 		BcModule *compiled_module = compiler_compile(scratch.arena, name, text);
 		elf_Module *module = elf_link_module(state, compiled_module);
 		bench_require(module != 0, "could not compile benchmark module");
-		elf_end_scratch(scratch);
+		scratch_end(scratch);
 	}
 	double seconds = bench_elapsed_s(start);
 

@@ -100,12 +100,12 @@ static b32 json_push_ast_value(elf_State *state, Ast ast)
 
 static b32 lib_push_json_source(elf_State *state, const char *name, elf_StrSlice source, b32 jsonl)
 {
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	Ast ast = jsonl ? compiler_parse_jsonl(scratch.arena, source_name, source) : compiler_parse_json(scratch.arena, source_name, source);
 
 	b32 result = !ast_is_error(ast) && json_push_ast_value(state, ast);
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return result;
 }
 

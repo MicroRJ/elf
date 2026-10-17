@@ -1,23 +1,23 @@
-static char *test_serialize_to_text(elf_State *state, elf_Arena *arena, elf_Value value)
+static char *test_serialize_to_text(elf_State *state, Arena *arena, elf_Value value)
 {
-	char *start = elf_arena_push(arena, 0);
+	char *start = arena_push(arena, 0, 1);
 	if (!elf_unparse_value(state, arena, value, 0)) {
 		test_fail("serialize accepts value");
 	}
-	elf_arena_push_zero(arena, 1);
+	arena_push_zero(arena, 1, 1);
 	return start;
 }
 
 static void expect_serialize_text(elf_State *state, elf_Value value, const char *expected, const char *label)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	char *text = test_serialize_to_text(state, &arena, value);
 	if (strcmp(text, expected) != 0)
 	{
 		fprintf(stderr, "FAIL: %s expected:\n%s\nactual:\n%s\n", label, expected, text);
 		test_failures += 1;
 	}
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void test_serialize_scalars(elf_State *state)

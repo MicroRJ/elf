@@ -18,7 +18,7 @@ static BcFunction *backend_test_function(BackendCompileResult result)
 
 static BcFunctionRef backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
 {
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
 	elf_Module *module = elf_link_module(state, compiled_module);
@@ -28,7 +28,7 @@ static BcFunctionRef backend_test_compile(elf_State *state, const char *name, el
 		entry.module = module;
 		entry.index = 0;
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return entry;
 }
 
@@ -46,7 +46,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	if (dy_file_is_valid(file))
 	{
 		u64 size = info.size;
-		char *data = elf_arena_push(&result.state->arena, size + 16);
+		char *data = arena_push(&result.state->arena, size + 16, 1);
 		zero_memory(data + size, 16);
 		dy_u64 read = 0;
 		dy_Result read_result = dy_read_file(file, data, size, &read);
@@ -494,7 +494,7 @@ static void test_backend_logical_expr_delays_result_slot(void)
 static void test_backend_if_else_restores_stack_top(void)
 {
 	elf_State *state = elf_create_state();
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	Compiler *compiler = compiler_create(scratch.arena);
 	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
 	IrModule *ir_module = ir_new_module(compiler);
@@ -531,7 +531,7 @@ static void test_backend_if_else_restores_stack_top(void)
 		test_fail("if/else restores stack top before following statement");
 	}
 
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	elf_destroy_state(state);
 }
 #endif
@@ -542,7 +542,7 @@ static void test_backend_formats_bytecode_function(void)
 		"x := 41\n"
 		"ret x + 1\n");
 
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	char *text = format_bytecode_function(result.state, scratch.arena, result.function);
 	if (!strstr(text, "bytecode function")) {
 		test_fail("bytecode formatter prints function header");
@@ -556,15 +556,15 @@ static void test_backend_formats_bytecode_function(void)
 	if (!strstr(text, "return")) {
 		test_fail("bytecode formatter prints return bytecode");
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	backend_test_destroy(result);
 }
 
 static void test_backend_outputs_strings(void)
 {
-	elf_Arena arena = elf_arena_create(0);
+	Arena arena = arena_create(0);
 	const char text[] = "backend string";
-	Atom *atom = elf_arena_push_zero(&arena, sizeof(*atom) + sizeof(text));
+	Atom *atom = arena_push_zero(&arena, sizeof(*atom) + sizeof(text), _Alignof(Atom));
 	atom->size = sizeof(text) - 1;
 	copy_memory(atom->data, text, sizeof(text));
 
@@ -581,7 +581,7 @@ static void test_backend_outputs_strings(void)
 		test_fail("backend bytecode strings do not borrow compiler atoms");
 	}
 
-	elf_arena_destroy(&arena);
+	arena_destroy(&arena);
 }
 
 static void test_backend_compiles_static_functions(void)

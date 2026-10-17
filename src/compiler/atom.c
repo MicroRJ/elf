@@ -49,7 +49,7 @@ static b32 atom_table_resize(Atom_Table *table)
 	u32 old_bucket_count = table->bucket_count;
 	Atom **old_buckets = table->buckets;
 	u32 new_bucket_count = old_bucket_count << 1;
-	Atom **new_buckets = elf_arena_push_zero(table->arena, sizeof(*new_buckets) * new_bucket_count);
+	Atom **new_buckets = arena_push_zero(table->arena, sizeof(*new_buckets) * new_bucket_count, _Alignof(Atom *));
 	if (!new_buckets) {
 		return false;
 	}
@@ -72,14 +72,14 @@ static b32 atom_table_resize(Atom_Table *table)
 	return true;
 }
 
-static void atom_table_init(Atom_Table *table, elf_Arena *arena)
+static void atom_table_init(Atom_Table *table, Arena *arena)
 {
 	ASSERT(table);
 	ASSERT(arena);
 	zero_memory(table, sizeof(*table));
 	table->arena = arena;
 	table->bucket_count = ATOM_INITIAL_BUCKET_COUNT;
-	table->buckets = elf_arena_push_zero(arena, sizeof(*table->buckets) * table->bucket_count);
+	table->buckets = arena_push_zero(arena, sizeof(*table->buckets) * table->bucket_count, _Alignof(Atom *));
 }
 
 Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id)
@@ -101,8 +101,7 @@ Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 
 	}
 	u32 bucket_index = atom_bucket_index(table, hash);
 
-	elf_arena_align(table->arena, 8);
-	Atom *atom = elf_arena_push_zero(table->arena, sizeof(*atom) + size + 1);
+	Atom *atom = arena_push_zero(table->arena, sizeof(*atom) + size + 1, 8);
 	if (!atom) {
 		return 0;
 	}

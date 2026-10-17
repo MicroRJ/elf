@@ -59,14 +59,14 @@ static b32 push_fixed_number_text(elf_State *state, f64 number, i32 precision)
 		return false;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
-	char *data = elf_arena_push(scratch.arena, (u64)size + 1);
+	Scratch scratch = scratch_begin();
+	char *data = arena_push(scratch.arena, (u64)size + 1, 1);
 	b32 formatted = data != 0 && stbsp_snprintf(data, size + 1, "%.*f", precision, number) == size;
 	if (formatted)
 	{
 		push_value(state, value_from_string(elf_string_from_data_size(state, data, (u32)size)));
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return formatted;
 }
 

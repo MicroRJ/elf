@@ -71,7 +71,7 @@ static b32 is_hexadecimal(u32 c)
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-static void lexer_init(Lexer *lexer, Compiler *compiler, Com_Source *source, elf_Arena *scratch_arena)
+static void lexer_init(Lexer *lexer, Compiler *compiler, Com_Source *source, Arena *scratch_arena)
 {
 	ASSERT(source);
 	ASSERT(scratch_arena);
@@ -469,10 +469,10 @@ static Com_Status lex_string_segment(Lexer *lexer, const char **cursor, SourceSi
 	*out_atom = 0;
 
 	const char *cur = *cursor;
-	u64 scratch_mark = elf_arena_mark(lexer->scratch_arena);
-	char *text = elf_arena_push(lexer->scratch_arena, lexer_scratch_capacity(lexer));
+	u64 scratch_mark = arena_mark(lexer->scratch_arena);
+	char *text = arena_push(lexer->scratch_arena, lexer_scratch_capacity(lexer), 1);
 	if (!text && lexer_scratch_capacity(lexer)) {
-		elf_arena_restore(lexer->scratch_arena, scratch_mark);
+		arena_restore(lexer->scratch_arena, scratch_mark);
 		return COM_STATUS_OOM;
 	}
 	char *out = text;
@@ -550,7 +550,7 @@ static Com_Status lex_string_segment(Lexer *lexer, const char **cursor, SourceSi
 			error = COM_STATUS_OOM;
 		}
 	}
-	elf_arena_restore(lexer->scratch_arena, scratch_mark);
+	arena_restore(lexer->scratch_arena, scratch_mark);
 	*cursor = cur;
 	return error;
 }
@@ -639,12 +639,12 @@ static Com_Status lexer_skip_trivia(Lexer *lexer, const char **cursor, b32 *line
 }
 
 // TODO(RJ): proper allocation!
-static Com_Status lexer_tokens_push(Lexer_TokenFIFO *tokens, elf_Arena *arena, Token token)
+static Com_Status lexer_tokens_push(Lexer_TokenFIFO *tokens, Arena *arena, Token token)
 {
 	if (tokens->count >= tokens->capacity)
 	{
 		u32 capacity = tokens->capacity ? tokens->capacity * 2 : 16;
-		Token *items = elf_arena_push(arena, sizeof(*items) * capacity);
+		Token *items = arena_push(arena, sizeof(*items) * capacity, _Alignof(Token));
 		if (!items) {
 			return COM_STATUS_OOM;
 		}

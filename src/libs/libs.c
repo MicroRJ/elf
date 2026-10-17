@@ -33,7 +33,7 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		return false;
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	elf_StrSlice source = {};
 	dy_File_Info info;
 	dy_File file = {};
@@ -43,7 +43,7 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 	}
 	if (root_loaded)
 	{
-		char *data = elf_arena_push(scratch.arena, info.size + 16);
+		char *data = arena_push(scratch.arena, info.size + 16, 1);
 		zero_memory(data + info.size, 16);
 		dy_u64 read = 0;
 		dy_Result read_result = dy_read_file(file, data, info.size, &read);
@@ -62,7 +62,7 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		entry.module = module;
 		entry.index = 0;
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 
 	if (!bc_function_ref_is_valid(entry))
 	{

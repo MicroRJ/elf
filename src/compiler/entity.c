@@ -14,7 +14,7 @@ Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *o
 {
 	ASSERT(!owner || owner->source == source);
 	ASSERT(!parent || kind == SCOPE_SOURCE || parent->source == source);
-	Scope *scope = dy_arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
+	Scope *scope = arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
 	if (scope)
 	{
 		scope->arena = arena;
@@ -58,17 +58,17 @@ Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
 		if (scope->count == scope->capacity)
 		{
 			u32 capacity = scope->capacity ? scope->capacity * 2 : 16;
-			Entity **entities = dy_arena_push(scope->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
+			Entity **entities = arena_push(scope->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
 			if (!entities) {
 				return 0;
 			}
 			if (scope->count) {
-				dy_memory_copy(entities, scope->entities, sizeof(*entities) * scope->count);
+				copy_memory(entities, scope->entities, sizeof(*entities) * scope->count);
 			}
 			scope->entities = entities;
 			scope->capacity = capacity;
 		}
-		Entity *entity = dy_arena_push_zero(scope->arena, sizeof(*entity), _Alignof(Entity));
+		Entity *entity = arena_push_zero(scope->arena, sizeof(*entity), _Alignof(Entity));
 		if (!entity) {
 			return 0;
 		}

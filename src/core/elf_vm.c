@@ -133,13 +133,13 @@ static inline u32 vm_check_index(elf_State *state, int instr, elf_Value value, u
 
 static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left, elf_Value right)
 {
-	elf_Scratch scratch = elf_begin_scratch();
-	char *join_start = elf_arena_push(scratch.arena, 0);
+	Scratch scratch = scratch_begin();
+	char *join_start = arena_push(scratch.arena, 0, 1);
 	elf_print_value(scratch.arena, left);
 	elf_print_value(scratch.arena, right);
-	char *join_end = elf_arena_push_zero(scratch.arena, 1);
+	char *join_end = arena_push_zero(scratch.arena, 1, 1);
 	elf_String *string = elf_string_from_data_size(state, join_start, (u32)(join_end - join_start));
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return string;
 }
 

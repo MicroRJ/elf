@@ -258,12 +258,12 @@ elf_Bool elf_push_value_text(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return false;
-	elf_Scratch scratch = elf_begin_scratch();
-	char *begin = elf_arena_push(scratch.arena, 0);
+	Scratch scratch = scratch_begin();
+	char *begin = arena_push(scratch.arena, 0, 1);
 	elf_print_value(scratch.arena, *value);
-	char *end = elf_arena_push(scratch.arena, 0);
+	char *end = arena_push(scratch.arena, 0, 1);
 	elf_push_str(state, begin, (int)(end - begin));
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return true;
 }
 
@@ -272,16 +272,16 @@ elf_Bool elf_push_value_source(elf_State *state, elf_Index index)
 	elf_Value *value = value_at(state, index);
 	if (!value) return false;
 
-	elf_Scratch scratch = elf_begin_scratch();
-	char *begin = elf_arena_push(scratch.arena, 0);
+	Scratch scratch = scratch_begin();
+	char *begin = arena_push(scratch.arena, 0, 1);
 	b32 result = elf_unparse_value(state, scratch.arena, *value, 0);
 	if (result)
 	{
-		char *end = elf_arena_push(scratch.arena, 0);
+		char *end = arena_push(scratch.arena, 0, 1);
 		ASSERT(end - begin <= 0x7fffffff);
 		elf_push_str(state, begin, (int)(end - begin));
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return result;
 }
 

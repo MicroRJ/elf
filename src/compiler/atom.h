@@ -11,13 +11,13 @@ typedef struct Atom_Table Atom_Table;
 
 struct Atom_Table
 {
-	elf_Arena  *arena;
+	Arena  *arena;
 	Atom      **buckets;
 	u32         bucket_count;
 	u32         count;
 };
 
-static void atom_table_init(Atom_Table *table, elf_Arena *arena);
+static void atom_table_init(Atom_Table *table, Arena *arena);
 Atom *atom_from_data_size_id(Atom_Table *table, const char *data, u32 size, u16 id);
 
 static inline Atom *atom_from_data_size(Atom_Table *table, const char *data, u32 size)

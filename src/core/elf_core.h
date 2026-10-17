@@ -194,7 +194,7 @@ struct StackFrame
 
 struct elf_State
 {
-	elf_Arena      arena;
+	Arena      arena;
 	void          *user_data;
 
 	elf_Module    *modules;

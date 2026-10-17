@@ -31,8 +31,8 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 		}
 	}
 
-	elf_Scratch scratch = elf_begin_scratch();
-	u32 *global_slots = elf_arena_push(scratch.arena, sizeof(*global_slots) * compiled_module->string_count);
+	Scratch scratch = scratch_begin();
+	u32 *global_slots = arena_push(scratch.arena, sizeof(*global_slots) * compiled_module->string_count, _Alignof(u32));
 	for (u32 i = 0; i < compiled_module->string_count; ++i) {
 		global_slots[i] = UINT32_MAX;
 	}
@@ -50,7 +50,7 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 			}
 			if (slot > 32767u)
 			{
-				elf_end_scratch(scratch);
+				scratch_end(scratch);
 				return 0;
 			}
 			global_slots[name_index] = slot;
@@ -68,20 +68,18 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 		}
 	}
 
-	elf_arena_align(&state->arena, 8);
-	elf_Module *module = elf_arena_push_zero(&state->arena, sizeof(*module));
+	elf_Module *module = arena_push_zero(&state->arena, sizeof(*module), 8);
 	BcSource root_source = compiled_module->sources[compiled_module->root_source];
 	module->source_name = elf_string_from_data_size(state, root_source.name.data, root_source.name.size);
 	u64 source_storage_size = ((u64)root_source.source.size + 1 + 7) & ~(u64)7;
-	module->source_data = elf_arena_push_zero(&state->arena, source_storage_size);
+	module->source_data = arena_push_zero(&state->arena, source_storage_size, 1);
 	copy_memory(module->source_data, root_source.source.data, root_source.source.size);
 	module->source_size = root_source.source.size;
 
 	module->string_count = compiled_module->string_count;
 	if (module->string_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->strings = elf_arena_push_zero(&state->arena, sizeof(*module->strings) * module->string_count);
+		module->strings = arena_push_zero(&state->arena, sizeof(*module->strings) * module->string_count, 8);
 		for (u32 i = 0; i < module->string_count; ++i)
 		{
 			BcString string = compiled_module->strings[i];
@@ -92,31 +90,27 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 	module->integer_constant_count = compiled_module->integer_constant_count;
 	if (module->integer_constant_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->integer_constants = elf_arena_push_copy(&state->arena, sizeof(*module->integer_constants) * module->integer_constant_count, compiled_module->integer_constants);
+		module->integer_constants = arena_push_copy(&state->arena, sizeof(*module->integer_constants) * module->integer_constant_count, 8, compiled_module->integer_constants);
 	}
 	module->number_constant_count = compiled_module->number_constant_count;
 	if (module->number_constant_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->number_constants = elf_arena_push_copy(&state->arena, sizeof(*module->number_constants) * module->number_constant_count, compiled_module->number_constants);
+		module->number_constants = arena_push_copy(&state->arena, sizeof(*module->number_constants) * module->number_constant_count, 8, compiled_module->number_constants);
 	}
 	module->bytecode_count = compiled_module->bytecode_count;
 	if (module->bytecode_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->bytecode = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode) * module->bytecode_count, compiled_module->bytecode);
+		module->bytecode = arena_push_copy(&state->arena, sizeof(*module->bytecode) * module->bytecode_count, 8, compiled_module->bytecode);
 	}
 	module->source_map_count = compiled_module->source_map_count;
 	if (module->source_map_count)
 	{
-		module->source_map = dy_arena_push_copy(&state->arena, sizeof(*module->source_map) * module->source_map_count, 8, compiled_module->source_map);
+		module->source_map = arena_push_copy(&state->arena, sizeof(*module->source_map) * module->source_map_count, 8, compiled_module->source_map);
 	}
 	module->bytecode_function_count = compiled_module->function_count;
 	if (module->bytecode_function_count)
 	{
-		elf_arena_align(&state->arena, 8);
-		module->bytecode_functions = elf_arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, compiled_module->functions);
+		module->bytecode_functions = arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, 8, compiled_module->functions);
 	}
 	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
 	{
@@ -134,13 +128,13 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 	module->next = state->modules;
 	state->modules = module;
 	state->gc_mode = saved_gc_mode;
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return module;
 }
 
 static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
 {
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
 	elf_Module *module = elf_link_module(state, compiled_module);
@@ -150,7 +144,7 @@ static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrS
 		entry.module = module;
 		entry.index = 0;
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 	return entry;
 }
 

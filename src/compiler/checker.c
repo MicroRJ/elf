@@ -120,7 +120,7 @@ Checker *check_source(Compiler *compiler, Com_Source *source)
 	ASSERT(ast_file->file.body);
 	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
 
-	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
+	Checker *checker = arena_push_zero(compiler->arena, sizeof(*checker), _Alignof(Checker));
 	checker->compiler = compiler;
 	checker->current_function = ast_file;
 	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);

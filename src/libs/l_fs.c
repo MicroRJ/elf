@@ -175,15 +175,15 @@ ELF_FUNCTION(lib_fs_remove_tree)
 ELF_FUNCTION(lib_fs_get_working_directory)
 {
 	lib_check_arg_count(S, "fs.get_working_directory", nargs, 0, 0);
-	dy_Scratch scratch = dy_begin_scratch();
+	Scratch scratch = scratch_begin();
 	dy_String directory;
 	if (dy_get_current_directory(scratch.arena, &directory).error || directory.size > INT_MAX) {
-		dy_end_scratch(scratch);
+		scratch_end(scratch);
 		elf_push_nil(S);
 		return 1;
 	}
 	elf_push_str(S, directory.data, (int)directory.size);
-	dy_end_scratch(scratch);
+	scratch_end(scratch);
 	return 1;
 }
 

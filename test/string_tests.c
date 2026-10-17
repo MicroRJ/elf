@@ -40,12 +40,12 @@ static void test_string_public_text_helpers(elf_State *state)
 {
 	elf_String *string = elf_string_from_data(state, "copy.me");
 
-	elf_Scratch scratch = elf_begin_scratch();
+	Scratch scratch = scratch_begin();
 	elf_StrSlice copy = elf_string_copy_text(scratch.arena, string);
 	if (copy.size != 7 || strcmp(copy.data, "copy.me") != 0) {
 		test_fail("string copy returns arena-owned c string");
 	}
-	elf_end_scratch(scratch);
+	scratch_end(scratch);
 }
 #endif
 
