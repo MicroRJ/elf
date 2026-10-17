@@ -186,6 +186,7 @@ struct StackFrame
 	elf_Value    *framebase;
 	elf_Value    *reference;
 	elf_Value     *captures;
+	elf_Closure    *closure;
 	u32           framesize;
 	u32         instruction;
 	u8                nargs;
@@ -193,6 +194,9 @@ struct StackFrame
 	u8                arity;
 	u8             variadic;
 	u8            ncaptures;
+	// Internal calls return over argument zero at framebase[0]. Public API calls
+	// preserve their pushed-callee layout and return over it at framebase[-1].
+	i8         return_offset;
 };
 
 struct elf_State

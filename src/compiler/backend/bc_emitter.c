@@ -565,10 +565,10 @@ static i32 finish_call(BcEmitter *emitter, Ir ir, i32 call_slot, i32 out, u32 no
 
 	if (!bc_slot_is_valid(out))
 	{
-		out = alloc_slot(emitter);
-		for (u32 i = 1; i < nout; ++i) {
+		while ((i32)emitter->stack_top < call_slot + (i32)nout) {
 			alloc_slot(emitter);
 		}
+		out = call_slot;
 	}
 
 	if (out != call_slot)
@@ -584,6 +584,40 @@ static i32 finish_call(BcEmitter *emitter, Ir ir, i32 call_slot, i32 out, u32 no
 	return out;
 }
 
+static b32 call_can_reference_local_directly(Ir expr, IrArray args, i32 *callee_slot)
+{
+	if (expr->kind != IR_LOAD_LOCAL) {
+		return false;
+	}
+
+	for (u32 i = 0; i < args.count; ++i)
+	{
+		switch (args.items[i]->kind)
+		{
+			case IR_NUMBER:
+			case IR_INTEGER:
+			case IR_ATOM:
+			case IR_NIL:
+			case IR_LOAD_LOCAL:
+			case IR_GLOBAL:
+			case IR_CAPTURE:
+			{
+			}
+			break;
+
+			default:
+			{
+				return false;
+			}
+		}
+	}
+
+	Ir local = check_ir_type(expr->ir_load_local.local, IR_LOCAL);
+	ASSERT(bc_slot_is_valid(local->ir_local.slot));
+	*callee_slot = local->ir_local.slot;
+	return true;
+}
+
 static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 {
 	ASSERT(ir->ir_call.type == IR_CALL_DYNAMIC);
@@ -592,50 +626,61 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	u32 nargs = args.count;
 
 	i32 stack_top = mark_slots(emitter);
+	i32 callee_slot = NO_SLOT;
+	i32 call_slot = NO_SLOT;
 	{
 		i32 this_slot;
-		i32 expr_slot;
 		if (expr->kind == IR_META_FIELD)
 		{
 			check_ir_type(expr->ir_binary.y, IR_ATOM);
 
-			expr_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
+			callee_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
 			this_slot = emit_expr(emitter, expr->ir_binary.x, NO_SLOT, 1);
 
 			emit_xyz_bc(emitter, expr->site, BC_GETMETAFIELD
-			,	expr_slot, this_slot, expr_slot);
+			,	callee_slot, this_slot, callee_slot);
 		}
 		else if (expr->kind == IR_FIELD)
 		{
 			check_ir_type(expr->ir_binary.y, IR_ATOM);
 
-			expr_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
+			callee_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
 			this_slot = emit_expr(emitter, expr->ir_binary.x, NO_SLOT, 1);
 
 			emit_xyz_bc(emitter, expr->site, BC_GETFIELD
-			,	expr_slot, this_slot, expr_slot);
+			,	callee_slot, this_slot, callee_slot);
+		}
+		else if (call_can_reference_local_directly(expr, args, &callee_slot))
+		{
+			this_slot = alloc_slot(emitter);
+			emit_xy_bc(emitter, ir->site, BC_RELOAD, this_slot, 0);
 		}
 		else
 		{
-			expr_slot = emit_expr(emitter, expr, NO_SLOT, 1);
+			callee_slot = emit_expr(emitter, expr, NO_SLOT, 1);
 			this_slot = alloc_slot(emitter);
 
 			emit_xy_bc(emitter, ir->site, BC_RELOAD, this_slot, 0);
 		}
 
-		ASSERT(expr_slot == stack_top + 0);
-		ASSERT(this_slot == stack_top + 1);
+		call_slot = this_slot;
+		ASSERT(callee_slot < call_slot);
 
 		for (u32 i = 0; i < nargs; ++ i)
 		{
 			i32 arg_slot = emit_expr(emitter, args.items[i], NO_SLOT, 1);
-			ASSERT(arg_slot == stack_top + 2 + (i32)i);
+			ASSERT(arg_slot == call_slot + 1 + (i32)i);
+		}
+
+		u32 call_width = MAX(nargs + 1, nout);
+		while ((i32)emitter->stack_top < call_slot + (i32)call_width) {
+			alloc_slot(emitter);
 		}
 	}
 	restore_slots(emitter, stack_top);
 
-	emit_xyz_bc(emitter, expr->site, BC_DYNAMIC_CALL, stack_top, nargs + 1, nout);
-	return finish_call(emitter, ir, stack_top, out, nout);
+	emit_xyzw_bc(emitter, expr->site, BC_DYNAMIC_CALL, call_slot, callee_slot, nargs + 1, nout);
+	return finish_call(emitter, ir, call_slot, out, nout);
 }
 
 static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
@@ -650,24 +695,27 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	u32 function_index = bc_function_index(emitter, function->ir_function);
 
 	i32 stack_top = mark_slots(emitter);
+	i32 call_slot = stack_top;
 	{
-		i32 call_slot = alloc_slot(emitter);
-		ASSERT(call_slot == stack_top);
-
 		i32 this_slot = alloc_slot(emitter);
-		ASSERT(this_slot == stack_top + 1);
+		ASSERT(this_slot == call_slot);
 		emit_xy_bc(emitter, ir->site, BC_RELOAD, this_slot, 0);
 
 		for (u32 i = 0; i < nargs; ++i)
 		{
 			i32 arg_slot = emit_expr(emitter, args.items[i], NO_SLOT, 1);
-			ASSERT(arg_slot == stack_top + 2 + (i32)i);
+			ASSERT(arg_slot == call_slot + 1 + (i32)i);
+		}
+
+		u32 call_width = MAX(nargs + 1, nout);
+		while ((i32)emitter->stack_top < call_slot + (i32)call_width) {
+			alloc_slot(emitter);
 		}
 	}
 	restore_slots(emitter, stack_top);
 
-	emit_xyzw_bc(emitter, ir->site, BC_CALL, stack_top, function_index, nargs + 1, nout);
-	return finish_call(emitter, ir, stack_top, out, nout);
+	emit_xyzw_bc(emitter, ir->site, BC_CALL, call_slot, function_index, nargs + 1, nout);
+	return finish_call(emitter, ir, call_slot, out, nout);
 }
 
 static BcType bc_op(IrKind type)
