@@ -172,6 +172,65 @@ static Entity *resolve_identifier(Checker *checker, Atom *name)
 	return entity;
 }
 
+static EntityTable *resolve_source_exports_lazily(Checker *checker, Com_SourceId source_id)
+{
+	Compiler *compiler = checker->compiler;
+	ASSERT(source_id != COM_INVALID_SOURCE_ID);
+	ASSERT(source_id < compiler->source_count);
+	Com_Source *source = compiler->sources + source_id;
+	ASSERT(source->name);
+	ASSERT(source->path);
+	ASSERT(source->ast);
+	ASSERT(source->ast->kind == AST_FILE);
+	ASSERT(source->ast->file.body->kind == AST_BLOCK_STAT);
+	if (source->exports) {
+		printf("EXPORTS ALREADY RESOLVED\n");
+		return source->exports;
+	}
+	printf("RESOLVING EXPORTS FOR SOURCE: %s\n", atom_data(source->name));
+
+	source->exports = entity_table_create(compiler->arena);
+	ASSERT(source->exports || !"Codex: proper error propagation");
+
+	Ast_Array stats = source->ast->file.body->block;
+	for (u32 i = 0; i < stats.count; ++ i)
+	{
+		Ast stat = stats.items[i];
+		if (stat->kind != AST_STATIC_DECL || !stat->static_decl.exported) {
+			continue;
+		}
+
+		Ast name = stat->static_decl.name;
+		ASSERT(name);
+		ASSERT(name->kind == AST_IDENT);
+		ASSERT(name->atom);
+		ASSERT(!name->entity);
+		ASSERT(!stat->entity);
+
+		printf("  FOUND EXPORT: %s\n", atom_data(name->atom));
+
+		Entity *entity = entity_alloc(compiler->arena, ENTITY_STATIC, name->identifier);
+		ASSERT(entity || !"Codex: you know the deal");
+		entity->state = ENTITY_UNRESOLVED;
+		entity->tags = ENTITY_TAG_CONSTANT;
+		entity->source = source_id;
+		entity->parent = source->ast;
+		entity->expr = stat->static_decl.expr;
+		entity->tree = stat;
+		Entity *inserted = entity_table_insert(source->exports, entity);
+		ASSERT(inserted || !"Codex: you know the deal");
+
+		if (inserted != entity) {
+			compiler_report(compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s' is already exported by this source", atom_data(name->identifier));
+			ASSERT(0 || !"Codex: you know the deal");
+		}
+		name->entity = entity;
+		stat->entity = entity;
+	}
+
+	return source->exports;
+}
+
 // TOOD(RJ): imagine writing an interpreter for an interpreter ...
 static StaticValue resolve_expression(Checker *checker, Ast expr)
 {
@@ -246,12 +305,9 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 
 		case AST_IMPORT:
 		{
-			ASSERT(expr->import.source != COM_INVALID_SOURCE_ID);
-			ASSERT(expr->import.source < checker->compiler->source_count);
-			Com_Source *source = checker->compiler->sources + expr->import.source;
-			ASSERT(source->exports);
+			printf("RESOLVING IMPORT EXPRESSION!\n");
 			value.type = STATIC_VALUE_EXPORTS;
-			value.exports = source->exports;
+			value.exports = resolve_source_exports_lazily(checker, expr->import.source);
 		}
 		break;
 
@@ -276,6 +332,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				if (!entity) {
 					ASSERT(!"Codex: proper error handling");
 				}
+				resolve_entity(checker, entity);
 				ASSERT(entity->value.type != STATIC_VALUE_NONE);
 				ASSERT(entity->kind == ENTITY_STATIC);
 				entity->users ++;
@@ -283,7 +340,6 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				value = entity->value;
 				ASSERT(!expr->entity);
 				expr->entity = entity;
-				entity->tree = expr;
 			}
 		}
 		break;
