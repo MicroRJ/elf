@@ -77,7 +77,6 @@ static void lexer_init(Lexer *lexer, Compiler *compiler, Com_Source *source, elf
 	ASSERT(scratch_arena);
 	lexer->compiler = compiler;
 	lexer->compiler_source = source;
-	lexer->source_id = source->id;
 	lexer->atoms = compiler->atoms;
 	lexer->scratch_arena = scratch_arena;
 	lexer->source = source->source;
@@ -104,7 +103,7 @@ static SourceSite source_site_from_ptr(Lexer *lexer, const char *data)
 	ASSERT(offset <= UINT32_MAX);
 	ASSERT(line_offset <= UINT32_MAX);
 	return (SourceSite) {
-		.source      = lexer->source_id,
+		.source      = lexer->compiler_source->id,
 		.offset      = (u32) offset,
 		.size        = 1,
 		.line_offset = (u32) line_offset,

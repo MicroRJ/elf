@@ -20,7 +20,6 @@ typedef struct
 {
 	Compiler         *compiler;
 	Com_Source       *compiler_source;
-	Com_SourceId      source_id;
 	Atom_Table       *atoms;
 	elf_Arena        *scratch_arena;
 	BcSourceBuffer    source;
