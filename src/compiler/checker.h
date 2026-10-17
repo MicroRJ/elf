@@ -13,6 +13,6 @@ struct Checker {
 	struct Ast_T *current_function;
 };
 
-Checker *check_file(Compiler *compiler, struct Ast_T *tree);
+Checker *check_source(Compiler *compiler, Com_Source *source);
 
 #endif

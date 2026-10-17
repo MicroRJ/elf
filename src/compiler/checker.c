@@ -112,9 +112,12 @@ static void declare_statics(Checker *checker, Ast_Array stats)
 	}
 }
 
-Checker *check_file(Compiler *compiler, Ast ast_file)
+Checker *check_source(Compiler *compiler, Com_Source *source)
 {
 	ASSERT(compiler);
+	ASSERT(source);
+	Ast ast_file = source->ast;
+	ASSERT(ast_file);
 	ASSERT(ast_file->kind == AST_FILE);
 	ASSERT(ast_file->file.body);
 	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
@@ -127,11 +130,9 @@ Checker *check_file(Compiler *compiler, Ast ast_file)
 	Scope *previous_source_scope = checker->source_scope;
 	Scope *previous_active_scope = checker->active_scope;
 
-	checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, ast_file, ast_file->source);
+	checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, ast_file, source);
 	checker->active_scope = checker->source_scope;
 
-	Com_Source *source = ast_file->source;
-	ASSERT(source);
 	ASSERT(!source->scope);
 	source->scope = checker->source_scope;
 
