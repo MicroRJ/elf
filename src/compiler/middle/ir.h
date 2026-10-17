@@ -6,13 +6,7 @@
 
 typedef struct Atom Atom;
 
-typedef struct
-{
-	i32 slot;
-}
-BcSlot;
-
-#define NO_MEMORY ((BcSlot) { -1 })
+#define NO_SLOT (-1)
 
 #define IR_DEFINITIONS(X)                                   \
 	X(IR_NONE                , "none")                       \
@@ -210,7 +204,7 @@ struct IrNode
 		struct
 		{
 			Ir     expr;
-			BcSlot slot;
+			i32 slot;
 		}
 		ir_local;
 

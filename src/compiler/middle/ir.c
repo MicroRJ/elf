@@ -150,7 +150,7 @@ static Ir ir_new_local(IrEmitter *emitter, SourceSite site, Ir expr)
 {
 	Ir ir = ir_alloc(emitter, site, IR_LOCAL);
 	ir->ir_local.expr = expr;
-	ir->ir_local.slot = NO_MEMORY;
+	ir->ir_local.slot = NO_SLOT;
 	return ir;
 }
 

@@ -527,7 +527,7 @@ static void test_backend_if_else_restores_stack_top(void)
 		test_fail("function generation appends one bytecode function to its module");
 	}
 
-	if (after_if->ir_local.slot.slot != IMPLICIT_PARAM_COUNT) {
+	if (after_if->ir_local.slot != IMPLICIT_PARAM_COUNT) {
 		test_fail("if/else restores stack top before following statement");
 	}
 
