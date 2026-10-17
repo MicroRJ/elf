@@ -53,7 +53,6 @@ typedef struct Atom Atom;
 	X(IR_MEASURE             , "measure")                    \
 	X(IR_GET_MEM             , "get_mem")                    \
 	X(IR_FUNCTION            , "function")                   \
-	X(IR_CLOSURE             , "closure")                    \
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_LOCAL               , "local")                      \
 	X(IR_MULTI_LOCAL         , "multi_local")                \
@@ -147,7 +146,6 @@ struct IrNode
 		ir_call;
 
 		IrFunction *ir_function;
-		IrFunction *ir_closure;
 
 		struct
 		{

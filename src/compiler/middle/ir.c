@@ -75,14 +75,6 @@ static Ir ir_new_function(IrEmitter *emitter, SourceSite site, IrFunction *funct
 	return ir;
 }
 
-static Ir ir_new_closure(IrEmitter *emitter, SourceSite site, IrFunction *function)
-{
-	ASSERT(function);
-	Ir ir = ir_alloc(emitter, site, IR_CLOSURE);
-	ir->ir_closure = function;
-	return ir;
-}
-
 static Ir ir_new_recurse(IrEmitter *emitter, SourceSite site)
 {
 	return ir_new_nullary(emitter, site, IR_RECURSE);
@@ -381,12 +373,6 @@ static void print_ir(IrPrinter *pr, Ir ir)
 		case IR_FUNCTION:
 		{
 			IR_PRINT(pr, "function[%p]", (void *)ir->ir_function);
-		}
-		break;
-
-		case IR_CLOSURE:
-		{
-			IR_PRINT(pr, "closure[%p]", (void *)ir->ir_closure);
 		}
 		break;
 

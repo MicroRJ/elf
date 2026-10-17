@@ -1,7 +1,11 @@
-{
-	if true ? defer elf.printl("LOOKS FIRST")
-	elf.printl("HERE!")
+
+i := 10
+THING :: fun() {
+	elf.printl("Here's a capture: ", i)
 }
+
+THING()
+
 
 #eof
 paths := elf.fs.get_paths("test/smoke")

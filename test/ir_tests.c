@@ -346,8 +346,8 @@ static void test_ir_lowers_function_expression(elf_State *state)
 
 	Ir main_body = emitter->module->functions[0].body;
 	Ir memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
-	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_CLOSURE, "function expression lowers to closure ir");
-	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_closure.index != 1) {
+	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION, "function expression lowers to function ir");
+	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_function != emitter->module->first_function->next) {
 		test_fail("function ir points at nested function");
 	}
 

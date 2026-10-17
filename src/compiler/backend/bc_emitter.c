@@ -645,6 +645,7 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	u32 nargs = args.count;
 	ASSERT(ir->ir_call.type == IR_CALL_DIRECT);
 	ASSERT(function->kind == IR_FUNCTION);
+	ASSERT(function->ir_function->captures.count == 0);
 	ASSERT(nout <= 0xff);
 	u32 function_index = bc_function_index(emitter, function->ir_function);
 
@@ -890,20 +891,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			}
 
 			out = ensure_slot(emitter, out);
-			u32 bytecode_function_id = bc_function_index(emitter, expr->ir_function);
-			emit_xy_bc(emitter, site, BC_CLOSURE, out, bytecode_function_id);
-		}
-		break;
-
-		case IR_CLOSURE:
-		{
-			if (nout < 1) {
-				return out;
-			}
-
-			out = ensure_slot(emitter, out);
-
-			IrFunction *function = expr->ir_closure;
+			IrFunction *function = expr->ir_function;
 			u32 bytecode_function_id = bc_function_index(emitter, function);
 			IrArray captures = function->captures;
 			if (captures.count == 0)

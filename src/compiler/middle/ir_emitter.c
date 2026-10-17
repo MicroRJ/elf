@@ -326,7 +326,7 @@ static IrKind ir_kind_from_compound_assign_ast_kind(Ast_Kind kind)
 static IrCallType call_type_from_callee(Ir callee)
 {
 	IrCallType type = IR_CALL_DYNAMIC;
-	if (callee && callee->kind == IR_FUNCTION)
+	if (callee && callee->kind == IR_FUNCTION && callee->ir_function->captures.count == 0)
 	{
 		type = IR_CALL_DIRECT;
 	}
@@ -557,9 +557,8 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 
 		case AST_FUNCTION:
 		{
-			// TODO(RJ): only create a closure if we actually have any captures ...
 			IrFunction *definition = ir_lower_function(emitter, expr, expr->site, expr->function.variadic, expr->function.params, expr->function.body);
-			ir = ir_new_closure(emitter, expr->site, definition);
+			ir = ir_new_function(emitter, expr->site, definition);
 		}
 		break;
 
@@ -1194,19 +1193,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 
 		case AST_STATIC_DECL:
 		{
-			ASSERT(stat->static_decl.name);
-			ASSERT(stat->static_decl.expr);
-
-			// if (stat->static_decl.expr->kind == AST_FUNCTION) {
-			// 	Entity *entity = ast_entity(ast_ensure_kind(stat->static_decl.name, AST_IDENT));
-			// 	ASSERT(entity);
-
-			// 	Ast func = stat->static_decl.expr;
-			// 	u32 index = ir_lower_function(emitter, func, func->site, func->function.variadic, func->function.params, func->function.body);
-
-			// 	Ir ir = ir_new_function(emitter, func->site, index);
-			// 	ir_push(items, ir);
-			// }
+			// NOTE(RJ): functions are lazily lowered
 		}
 		break;
 
