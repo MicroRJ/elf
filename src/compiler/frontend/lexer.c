@@ -66,7 +66,7 @@ static b32 is_identifier_continue(u32 c)
 	return is_identifier_start(c) || ('0' <= c && c <= '9');
 }
 
-static b32 lexer_is_hex_digit(u32 c)
+static b32 is_hexadecimal(u32 c)
 {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
@@ -138,7 +138,7 @@ static Com_Status lexer_parse_hex_codepoint(Lexer *lexer, const char **cursor, u
 	for (u32 i = 0; i < digits; ++i)
 	{
 		int digit = lexer_peek(lexer, cur, i);
-		if (digit == LEXER_EOF || !lexer_is_hex_digit((char)digit))
+		if (digit == LEXER_EOF || !is_hexadecimal((char)digit))
 		{
 			return lexer_errorf(lexer, COM_ERROR_INVALID_UNICODE_ESCAPE, site, "invalid unicode escape");
 		}

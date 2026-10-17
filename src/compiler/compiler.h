@@ -116,13 +116,12 @@ Com_SourceState;
 typedef struct Com_Source Com_Source;
 struct Com_Source
 {
-	Com_Source        *next;
-	Com_SourceId       id;
+	Com_Source         *next;
+	Com_SourceId        id;
 	struct Atom        *name;
 	struct Atom        *path;
 	BcSourceBuffer      source;
 	struct Ast_T       *ast;
-	// struct Scope       *exports;
 	struct Scope       *scope;
 	Com_SourceState     state;
 };
