@@ -52,6 +52,9 @@ struct IrEmitterFrame
 {
 	IrEmitterFrame  *parent;
 	Ast              tree;
+	IrDefer         *defer;
+	IrDefer         *defer_scope_start;
+	IrLoopFrame     *loop;
 	IrCapture       *first_capture;
 	IrCapture       *last_capture;
 	u32              capture_count;
@@ -66,13 +69,7 @@ struct IrEmitter
 	u32              ir_stack_size;
 	u32              ir_stack_index;
 	Ir              *ir_stack;
-
-	IrDefer         *defer;
-	IrDefer         *defer_scope_start;
-	IrDefer         *function_defer_start;
-
 	IrEmitterFrame *function;
-	IrLoopFrame    *loop;
 };
 
 
@@ -136,29 +133,33 @@ static IrArray close_ir_frame(IrCollector *frame)
 
 static DeferScope get_defer_scope(IrEmitter *emitter)
 {
+	ASSERT(emitter->function);
 	DeferScope scope = {};
-	scope.previous_defer_start = emitter->defer_scope_start;
-	emitter->defer_scope_start = emitter->defer;
+	scope.previous_defer_start = emitter->function->defer_scope_start;
+	emitter->function->defer_scope_start = emitter->function->defer;
 	return scope;
 }
 
 static void set_defer_scope(IrEmitter *emitter, DeferScope scope)
 {
-	emitter->defer = emitter->defer_scope_start;
-	emitter->defer_scope_start = scope.previous_defer_start;
+	ASSERT(emitter->function);
+	emitter->function->defer = emitter->function->defer_scope_start;
+	emitter->function->defer_scope_start = scope.previous_defer_start;
 }
 
 static void push_defer_stat(IrEmitter *emitter, Ast stat)
 {
+	ASSERT(emitter->function);
 	IrDefer *defer = dy_arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
-	defer->previous = emitter->defer;
+	defer->previous = emitter->function->defer;
 	defer->stat = stat;
-	emitter->defer = defer;
+	emitter->function->defer = defer;
 }
 
 static void emit_defer_range(IrEmitter *emitter, IrCollector *items, IrDefer *start)
 {
-	for (IrDefer *defer = emitter->defer; defer != start; defer = defer->previous)
+	ASSERT(emitter->function);
+	for (IrDefer *defer = emitter->function->defer; defer != start; defer = defer->previous)
 	{
 		ASSERT(defer);
 		ir_emit_stat(items, defer->stat);
@@ -246,25 +247,28 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 
 static void push_loop(IrEmitter *emitter, IrLoopFrame *loop)
 {
-	loop->parent = emitter->loop;
-	emitter->loop = loop;
+	ASSERT(emitter->function);
+	loop->parent = emitter->function->loop;
+	emitter->function->loop = loop;
 }
 
 static void pop_loop(IrEmitter *emitter, IrLoopFrame *loop)
 {
-	ASSERT(emitter->loop == loop);
-	emitter->loop = loop->parent;
+	ASSERT(emitter->function);
+	ASSERT(emitter->function->loop == loop);
+	emitter->function->loop = loop->parent;
 }
 
 static IrLoopFrame current_loop(IrEmitter *emitter, SourceSite site)
 {
-	if (!emitter->loop)
+	ASSERT(emitter->function);
+	if (!emitter->function->loop)
 	{
 		ir_report_error(emitter, COM_ERROR_LOWERING, site, "break and continue must be inside a loop");
 		IrLoopFrame loop = {};
 		return loop;
 	}
-	return *emitter->loop;
+	return *emitter->function->loop;
 }
 
 static TypeRule type_rule_from_atom(Atom *atom)
@@ -708,7 +712,7 @@ static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat)
 				ir_emit_stat(&block_items, stat->block.items[i]);
 			}
 		}
-		emit_defer_range(emitter, &block_items, emitter->defer_scope_start);
+		emit_defer_range(emitter, &block_items, emitter->function->defer_scope_start);
 		set_defer_scope(emitter, defer_scope);
 	}
 	else
@@ -937,7 +941,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = emitter->defer;
+	loop_frame.defer_start = emitter->function->defer;
 	push_loop(emitter, &loop_frame);
 	Ir body = ir_emit_stat_as_block(emitter, stat->for_range_stat.body);
 	pop_loop(emitter, &loop_frame);
@@ -1056,7 +1060,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = emitter->defer;
+	loop_frame.defer_start = emitter->function->defer;
 	push_loop(emitter, &loop_frame);
 	Ir body = ir_emit_stat_as_block(emitter, stat->for_stat.body);
 	pop_loop(emitter, &loop_frame);
@@ -1151,7 +1155,7 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 			IrLoopFrame loop_frame = {};
 			loop_frame.continue_label = start_label;
 			loop_frame.break_label = break_label;
-			loop_frame.defer_start = emitter->defer;
+			loop_frame.defer_start = emitter->function->defer;
 			push_loop(emitter, &loop_frame);
 			Ir body_ir = ir_emit_stat_as_block(emitter, body);
 			pop_loop(emitter, &loop_frame);
@@ -1365,13 +1369,13 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 				}
 				expr_ir = ir_emit_expr(emitter, expr);
 			}
-			if (expr_ir && emitter->defer)
+			if (expr_ir && emitter->function->defer)
 			{
 				Ir return_value = ir_new_local(emitter, stat->site, expr_ir);
 				ir_push(items, return_value);
 				expr_ir = ir_new_load_local(emitter, stat->site, return_value);
 			}
-			emit_defer_range(emitter, items, emitter->function_defer_start);
+			emit_defer_range(emitter, items, 0);
 			Ir ir = ir_new_return(emitter, stat->site, expr_ir);
 			ir_push(items, ir);
 		}
@@ -1453,14 +1457,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast
 	function_ctx.tree = tree;
 
 	IrEmitterFrame *outer_function = emitter->function;
-	IrDefer *outer_defer = emitter->defer;
-	IrDefer *outer_defer_scope_start = emitter->defer_scope_start;
-	IrDefer *outer_function_defer_start = emitter->function_defer_start;
-	IrLoopFrame *outer_loop = emitter->loop;
 	emitter->function = &function_ctx;
-	emitter->defer_scope_start = outer_defer;
-	emitter->function_defer_start = outer_defer;
-	emitter->loop = 0;
 
 	Ir *ir_params = elf_arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count));
 	ir_params[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, definition->site, 0);
@@ -1525,10 +1522,6 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast
 
 
 	emitter->function = outer_function;
-	emitter->loop = outer_loop;
-	emitter->defer = outer_defer;
-	emitter->defer_scope_start = outer_defer_scope_start;
-	emitter->function_defer_start = outer_function_defer_start;
 
 	definition->capture_sources = captures;
 }
