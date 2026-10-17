@@ -120,7 +120,8 @@ struct Com_Source
 	struct Atom        *path;
 	BcSourceBuffer      source;
 	struct Ast_T       *ast;
-	struct Scope       *exports;
+	// struct Scope       *exports;
+	struct Scope       *scope;
 	Com_SourceState     state;
 };
 

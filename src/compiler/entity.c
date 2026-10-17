@@ -8,9 +8,11 @@
 #include "base.h"
 #include "atom_view.h"
 #include "entity.h"
+#include "ast.h"
 
 Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_SourceId source)
 {
+	ASSERT(!owner || owner->site.source == source);
 	Scope *scope = dy_arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
 	if (scope)
 	{
@@ -47,9 +49,9 @@ Entity *scope_find(Scope *scope, Atom *name)
 	return 0;
 }
 
-Entity *scope_insert(Scope *scope, Entity *entity)
+Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
 {
-	Entity *result = scope_find_current(scope, entity->name);
+	Entity *result = scope_find_current(scope, name);
 	if (!result)
 	{
 		if (scope->count == scope->capacity)
@@ -65,21 +67,16 @@ Entity *scope_insert(Scope *scope, Entity *entity)
 			scope->entities = entities;
 			scope->capacity = capacity;
 		}
-		ASSERT(!entity->scope || entity->scope == scope);
+		Entity *entity = dy_arena_push_zero(scope->arena, sizeof(*entity), _Alignof(Entity));
+		if (!entity) {
+			return 0;
+		}
+		entity->kind = kind;
+		entity->name = name;
 		entity->scope = scope;
+		entity->source = scope->source;
 		scope->entities[scope->count++] = entity;
 		result = entity;
 	}
 	return result;
-}
-
-Entity *entity_alloc(Arena *arena, EntityKind kind, Atom *name)
-{
-	Entity *entity = dy_arena_push_zero(arena, sizeof(*entity), _Alignof(Entity));
-	if (entity)
-	{
-		entity->kind = kind;
-		entity->name = name;
-	}
-	return entity;
 }

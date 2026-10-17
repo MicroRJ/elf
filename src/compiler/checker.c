@@ -23,45 +23,54 @@ static StaticValue resolve_expression(Checker *checker, Ast expr);
 
 static Scope *push_scope(Checker *checker, ScopeKind kind, Ast owner)
 {
-	ASSERT(checker->current_scope);
-	ASSERT(!owner || owner->site.source == checker->current_scope->source);
-	Com_SourceId source = owner ? owner->site.source : checker->current_scope->source;
-	Scope *scope = scope_create(checker->compiler->arena, kind, checker->current_scope, owner, source);
+	ASSERT(checker);
+	ASSERT(checker->active_scope);
+	ASSERT(owner);
+	ASSERT(checker->source_scope);
+	ASSERT(owner->site.source == checker->source_scope->source);
+	Scope *scope = scope_create(checker->compiler->arena, kind, checker->active_scope, owner, checker->source_scope->source);
 	ASSERT(scope || !"Codex: proper error propagation");
-	checker->current_scope = scope;
+	checker->active_scope = scope;
 	return scope;
 }
 
 static void pop_scope(Checker *checker, Scope *scope)
 {
 	ASSERT(scope);
-	ASSERT(checker->current_scope == scope);
-	checker->current_scope = scope->parent;
+	ASSERT(checker->active_scope == scope);
+	checker->active_scope = scope->parent;
 }
 
-static Entity *alloc_entity(Checker *checker, Atom *name)
+static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Ast tree, Ast expr, EntityTags tags, Atom *name)
 {
-	return entity_alloc(checker->compiler->arena, ENTITY_NONE, name);
-}
-
-static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, EntityTags tags, Atom *name) {
-	Entity *existing = scope_find_current(checker->current_scope, name);
-	if (existing) {
+	Entity *existing = scope_find_current(scope, name);
+	if (existing)
+	{
+		ASSERT(tree);
 		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
+		return existing;
+
 	}
 	printf("DECLARE ENTITY: %s\n", atom_data(name));
-	Entity *entity = alloc_entity(checker, name);
-	entity->kind = kind;
-	entity->name = name;
-	entity->state = ENTITY_UNRESOLVED;
+
+	Entity *entity = scope_declare(scope, kind, name);
+	ASSERT(entity || !"Codex: proper erroring!");
+
+	entity->state = kind == ENTITY_STATIC ? ENTITY_UNRESOLVED : ENTITY_RESOLVED;
 	entity->tree = tree;
-	entity->parent = checker->current_function;
-	entity->tags = tags;
-	if (!existing)
-	{
-		Entity *inserted = scope_insert(checker->current_scope, entity);
-		ASSERT(inserted == entity);
+	entity->expr = expr;
+
+	if (kind == ENTITY_GLOBAL) {
+		entity->parent = 0;
 	}
+	else if (scope->kind == SCOPE_SOURCE) {
+		entity->parent = scope->owner;
+	}
+	else {
+		entity->parent = checker->current_function;
+	}
+
+	entity->tags = tags;
 	return entity;
 }
 
@@ -75,8 +84,7 @@ static void declare_locals(Checker *checker, EntityTags tags, Ast_Array names) {
 			ASSERT(!"Codex: proper error reporting!");
 		}
 		ASSERT(!name->entity);
-		name->entity = declare_entity(checker, ENTITY_LOCAL, name, tags, name->identifier);
-		name->entity->state = ENTITY_RESOLVED;
+		name->entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name, 0, tags, name->identifier);
 	}
 }
 
@@ -96,28 +104,40 @@ static void declare_statics(Checker *checker, Ast_Array stats)
 		ASSERT(!ast_name->entity);
 		ASSERT(!ast_decl->entity);
 
-		Entity *entity = declare_entity(checker, ENTITY_STATIC, ast_decl, ENTITY_TAG_CONSTANT, ast_name->atom);
+		Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_STATIC, ast_decl, ast_expr, ENTITY_TAG_CONSTANT, ast_name->atom);
 		ASSERT(entity);
 		ast_name->entity = entity;
 		ast_decl->entity = entity;
-		entity->expr = ast_expr;
 	}
 }
 
-Checker *checker_run(Compiler *compiler, Ast ast)
+Checker *checker_run(Compiler *compiler, Ast ast_file)
 {
 	ASSERT(compiler);
-	ASSERT(ast->kind == AST_FILE);
-	ASSERT(ast->file.body);
-	ASSERT(ast->file.body->kind == AST_BLOCK_STAT);
+	ASSERT(ast_file->kind == AST_FILE);
+	ASSERT(ast_file->file.body);
+	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
 
 	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
 	checker->compiler = compiler;
-	checker->current_function = ast;
+	checker->current_function = ast_file;
 	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, COM_INVALID_SOURCE_ID);
-	checker->current_scope = checker->globals;
-	check_statement(checker, ast->file.body);
+	check_statement(checker, ast_file);
 	return checker;
+}
+
+// scopes are always:
+//       			        global
+//	      	source | source | source | source
+//	   ... ... ... ... ... ... ... ... ... ... ... ...
+static Scope *find_source_scope(Scope *scope) {
+	ASSERT(scope->kind != SCOPE_GLOBAL);
+	ASSERT(scope->parent);
+	while (scope->kind != SCOPE_SOURCE) {
+		scope = scope->parent;
+		ASSERT(scope);
+	}
+	return scope;
 }
 
 static void resolve_entity(Checker *checker, Entity *entity) {
@@ -127,7 +147,20 @@ static void resolve_entity(Checker *checker, Entity *entity) {
 	}
 	ASSERT(entity->expr || !"Internal Error");
 	entity->state = ENTITY_RESOLVING;
+
+	// NOTE(RJ): we can lazily resolve entities from different sources
+	Scope *previous_source_scope = checker->source_scope;
+	Scope *previous_active_scope = checker->active_scope;
+
+	checker->source_scope = find_source_scope(entity->scope);
+	checker->active_scope = entity->scope;
+
 	StaticValue value = resolve_expression(checker, entity->expr);
+
+	checker->source_scope = previous_source_scope;
+	checker->active_scope = previous_active_scope;
+
+
 	ASSERT(value.type != STATIC_VALUE_NONE || !"Codex: error reporting!");
 	entity->state = ENTITY_RESOLVED;
 	entity->value = value;
@@ -135,7 +168,7 @@ static void resolve_entity(Checker *checker, Entity *entity) {
 
 static Entity *resolve_identifier(Checker *checker, Atom *name)
 {
-	Entity *entity = scope_find(checker->current_scope, name);
+	Entity *entity = scope_find(checker->active_scope, name);
 	if (entity)
 	{
 		// NOTE(RJ): if we're not a static entity then we must be resolved, because only static entities
@@ -146,14 +179,11 @@ static Entity *resolve_identifier(Checker *checker, Atom *name)
 		}
 		return entity;
 	}
-	entity = alloc_entity(checker, name);
-	entity->kind = ENTITY_GLOBAL;
-	entity->state = ENTITY_RESOLVED;
-	entity = scope_insert(checker->globals, entity);
+	entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, 0, 0, ENTITY_TAG_NONE, name);
 	return entity;
 }
 
-static Scope *resolve_source_exports_lazily(Checker *checker, Com_SourceId source_id)
+static Scope *resolve_source_scope_lazily(Checker *checker, Com_SourceId source_id)
 {
 	Compiler *compiler = checker->compiler;
 	ASSERT(source_id != COM_INVALID_SOURCE_ID);
@@ -164,20 +194,17 @@ static Scope *resolve_source_exports_lazily(Checker *checker, Com_SourceId sourc
 	ASSERT(source->ast);
 	ASSERT(source->ast->kind == AST_FILE);
 	ASSERT(source->ast->file.body->kind == AST_BLOCK_STAT);
-	if (source->exports) {
-		printf("EXPORTS ALREADY RESOLVED\n");
-		return source->exports;
+	if (source->scope) {
+		return source->scope;
 	}
-	printf("RESOLVING EXPORTS FOR SOURCE: %s\n", atom_data(source->name));
-
-	source->exports = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source_id);
-	ASSERT(source->exports || !"Codex: proper error propagation");
+	source->scope = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source_id);
+	ASSERT(source->scope || !"Codex: proper error propagation");
 
 	Ast_Array stats = source->ast->file.body->block;
 	for (u32 i = 0; i < stats.count; ++ i)
 	{
 		Ast stat = stats.items[i];
-		if (stat->kind != AST_STATIC_DECL || !stat->static_decl.exported) {
+		if (stat->kind != AST_STATIC_DECL) {
 			continue;
 		}
 
@@ -188,28 +215,20 @@ static Scope *resolve_source_exports_lazily(Checker *checker, Com_SourceId sourc
 		ASSERT(!name->entity);
 		ASSERT(!stat->entity);
 
-		printf("  FOUND EXPORT: %s\n", atom_data(name->atom));
 
-		Entity *entity = entity_alloc(compiler->arena, ENTITY_STATIC, name->identifier);
-		ASSERT(entity || !"Codex: you know the deal");
-		entity->state = ENTITY_UNRESOLVED;
-		entity->tags = ENTITY_TAG_CONSTANT;
-		entity->source = source_id;
-		entity->parent = source->ast;
-		entity->expr = stat->static_decl.expr;
-		entity->tree = stat;
-		Entity *inserted = scope_insert(source->exports, entity);
-		ASSERT(inserted || !"Codex: you know the deal");
-
-		if (inserted != entity) {
-			compiler_report(compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s' is already exported by this source", atom_data(name->identifier));
-			ASSERT(0 || !"Codex: you know the deal");
+		EntityTags tags = ENTITY_TAG_CONSTANT;
+		if (stat->static_decl.exported) {
+			tags |= ENTITY_TAG_EXPORTED;
+			printf("  FOUND EXPORT: %s\n", atom_data(name->atom));
 		}
+
+		Entity *entity = declare_entity(checker, source->scope, ENTITY_STATIC, stat, stat->static_decl.expr, tags, name->identifier);
 		name->entity = entity;
 		stat->entity = entity;
+
 	}
 
-	return source->exports;
+	return source->scope;
 }
 
 // TOOD(RJ): imagine writing an interpreter for an interpreter ...
@@ -273,8 +292,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 					ASSERT(!"Codex: error");
 				}
 				ASSERT(!name->entity);
-				name->entity = declare_entity(checker, ENTITY_PARAMETER, param, ENTITY_TAG_PARAMETER, name->identifier);
-				name->entity->state = ENTITY_RESOLVED;
+				name->entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_PARAMETER, name->identifier);
 			}
 			check_statement(checker, expr->function.body);
 			checker->current_function = outer_function;
@@ -288,7 +306,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 		{
 			printf("RESOLVING IMPORT EXPRESSION!\n");
 			value.type = STATIC_VALUE_EXPORTS;
-			value.exports = resolve_source_exports_lazily(checker, expr->import.source);
+			value.exports = resolve_source_scope_lazily(checker, expr->import.source);
 		}
 		break;
 
@@ -311,6 +329,10 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				ASSERT(expr->binary.y->atom);
 				Entity *entity = scope_find_current(left_value.exports, expr->binary.y->atom);
 				if (!entity) {
+					ASSERT(!"Codex: proper error handling");
+				}
+				if (~entity->tags & ENTITY_TAG_EXPORTED) {
+					ASSERT(!"You can't see this entity ... use 'export'");
 					ASSERT(!"Codex: proper error handling");
 				}
 				resolve_entity(checker, entity);
@@ -451,6 +473,11 @@ static void check_statement(Checker *checker, Ast stat)
 		return;
 	}
 
+	ASSERT(stat->kind == AST_FILE || checker->active_scope);
+	ASSERT(stat->kind == AST_FILE || checker->source_scope);
+	ASSERT(stat->kind == AST_FILE || stat->site.source == checker->source_scope->source);
+	ASSERT(stat->kind == AST_FILE || stat->site.source == checker->active_scope->source);
+
 	switch (stat->kind)
 	{
 		case AST_NONE:
@@ -461,7 +488,23 @@ static void check_statement(Checker *checker, Ast stat)
 
 		case AST_FILE:
 		{
-			check_statement(checker, stat->file.body);
+			Scope *previous_source_scope = checker->source_scope;
+			Scope *previous_active_scope = checker->active_scope;
+
+			checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, stat, stat->site.source);
+			checker->active_scope = checker->source_scope;
+
+			declare_statics(checker, stat->file.body->block);
+			for (u32 i = 0; i < stat->file.body->block.count; ++i) {
+				check_statement(checker, stat->file.body->block.items[i]);
+			}
+
+			ASSERT(!checker->compiler->sources[stat->site.source].scope);
+			checker->compiler->sources[stat->site.source].scope = checker->source_scope;
+
+			checker->source_scope = previous_source_scope;
+			checker->active_scope = previous_active_scope;
+
 		}
 		break;
 

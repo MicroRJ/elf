@@ -8,7 +8,8 @@ typedef struct Checker Checker;
 struct Checker {
 	Compiler     *compiler;
 	Scope        *globals;
-	Scope        *current_scope;
+	Scope        *source_scope;
+	Scope        *active_scope;
 	struct Ast_T *current_function;
 };
 
