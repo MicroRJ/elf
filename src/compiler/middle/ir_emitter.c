@@ -57,7 +57,6 @@ struct IrEmitterFrame
 struct IrEmitter
 {
 	Compiler        *compiler;
-	Checker         *checker;
 	IrModule        *module;
 
 	u32              ir_stack_size;
@@ -1516,7 +1515,7 @@ static IrFunction *ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite si
 	return definition;
 }
 
-IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
+IrModule *ir_emit_module(Compiler *compiler, Ast ast)
 {
 	ASSERT(compiler);
 	ASSERT(compiler->arena);
@@ -1527,7 +1526,6 @@ IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
 	module->arena = compiler->arena;
 
 	IrEmitter *emitter = elf_arena_push_zero(module->arena, sizeof(*emitter));
-	emitter->checker = checker;
 	emitter->compiler = compiler;
 	emitter->module = module;
 	emitter->ir_stack_size = 4096;

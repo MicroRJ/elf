@@ -9,6 +9,6 @@ typedef struct Compiler Compiler;
 
 #include "checker.h"
 
-IrModule *ir_emit_module(Compiler *compiler, Checker *analysis, Ast ast);
+IrModule *ir_emit_module(Compiler *compiler, Ast ast);
 
 #endif

@@ -102,15 +102,27 @@ typedef struct
 }
 Com_Report;
 
-#define COM_SOURCE_INVALID ((Com_SourceId)-1)
+#define COM_INVALID_SOURCE_ID ((Com_SourceId)-1)
 
-typedef struct
+typedef enum
 {
-	struct Atom *name;
-	struct Atom *canonical_path;
-	BcSourceBuffer source;
+	COM_SOURCE_UNPARSED = 0,
+	COM_SOURCE_PARSED,
+	COM_SOURCE_CHECKING,
+	COM_SOURCE_CHECKED,
 }
-Com_Source;
+Com_SourceState;
+
+typedef struct Com_Source Com_Source;
+struct Com_Source
+{
+	struct Atom        *name;
+	struct Atom        *path;
+	BcSourceBuffer      source;
+	struct Ast_T       *ast;
+	struct EntityTable *namespace;
+	Com_SourceState     state;
+};
 
 // NOTE(RJ):
 // This will remain only the shared stuff across compilation stages;
@@ -118,7 +130,7 @@ Com_Source;
 // and sources ...
 struct Compiler
 {
-	elf_Arena         *arena;
+	Arena             *arena;
 	struct Atom_Table *atoms;
 	Com_Source        *sources;
 	u32                source_count;

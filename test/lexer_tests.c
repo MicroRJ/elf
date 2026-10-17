@@ -715,7 +715,7 @@ static void test_lexer_compiler_source(elf_State *state)
 	if (source->name != atom_from_data(compiler->atoms, "lexer_tests")) {
 		test_fail("compiler source name uses shared atom table");
 	}
-	if (source->canonical_path != source->name) {
+	if (source->path != source->name) {
 		test_fail("root source initially uses its name as canonical path");
 	}
 	if (source->source.data != parser.lexer.source.data || source->source.size != parser.lexer.source.size) {

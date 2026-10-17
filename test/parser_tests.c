@@ -172,7 +172,7 @@ static void test_parser_module_discovery(elf_State *state)
 	(void)state;
 	elf_Arena arena = elf_arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
-	if (compiler_add_root_file(compiler, "test/imports/discovery/root.elf") == COM_SOURCE_INVALID) {
+	if (compiler_add_root_file(compiler, "test/imports/discovery/root.elf") == COM_INVALID_SOURCE_ID) {
 		test_fail("compiler loads root source file directly");
 		elf_arena_destroy(&arena);
 		return;

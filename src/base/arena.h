@@ -9,6 +9,8 @@
 typedef dy_Arena elf_Arena;
 typedef dy_Scratch elf_Scratch;
 
+typedef dy_Arena Arena;
+
 #define elf_arena_create dy_arena_create
 #define elf_arena_destroy dy_arena_destroy
 #define elf_arena_reset dy_arena_reset
