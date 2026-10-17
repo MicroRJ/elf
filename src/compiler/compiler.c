@@ -192,10 +192,7 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 				Parser *parser = parser_create(compiler);
 				if (parser)
 				{
-					Ast ast = ERROR_AST;
-					if (parser_set_source(parser, 0)) {
-						ast = parser_parse_file(parser);
-					}
+					Ast ast = parser_parse_file(parser, 0);
 					parser_destroy(parser);
 
 					if (!ast_is_error(ast) && !compiler->report.error_count)
@@ -272,9 +269,7 @@ static Ast compiler_parse_json_source(elf_Arena *arena, elf_StrSlice name, elf_S
 				Parser *parser = parser_create(compiler);
 				if (parser)
 				{
-					if (parser_set_source(parser, 0)) {
-						ast = type == COMPILER_PARSE_JSON ? parser_parse_json(parser) : parser_parse_jsonl(parser);
-					}
+					ast = type == COMPILER_PARSE_JSON ? parser_parse_json(parser, 0) : parser_parse_jsonl(parser, 0);
 					parser_destroy(parser);
 				}
 			}
@@ -617,25 +612,18 @@ b32 compiler_parse_sources(Compiler *compiler)
 	b32 result = true;
 	for (Com_SourceId source_id = 0; result && source_id < compiler->source_count; ++source_id)
 	{
-		if (!parser_set_source(parser, source_id))
+		Ast ast = parser_parse_file(parser, source_id);
+		compiler->sources[source_id].ast = ast;
+		if (ast_is_error(ast))
 		{
+			if (compiler->report.error_count == 0) {
+				compiler_report(compiler, COM_ERROR_PARSE_FAILED, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.source = source_id}, "failed to parse source");
+			}
 			result = false;
 		}
 		else
 		{
-			Ast ast = parser_parse_file(parser);
-			compiler->sources[source_id].ast = ast;
-			if (ast_is_error(ast))
-			{
-				if (compiler->report.error_count == 0) {
-					compiler_report(compiler, COM_ERROR_PARSE_FAILED, COMPILER_ERROR, COMPILER_PHASE_PARSER, (SourceSite) {.source = source_id}, "failed to parse source");
-				}
-				result = false;
-			}
-			else
-			{
-				result = compiler_discover_source_imports(compiler, source_id, ast);
-			}
+			result = compiler_discover_source_imports(compiler, source_id, ast);
 		}
 	}
 	parser_destroy(parser);
@@ -1120,9 +1108,7 @@ Ast compiler_parse_constant_expr(Compiler *compiler)
 		Parser *parser = parser_create(compiler);
 		if (parser)
 		{
-			if (parser_set_source(parser, 0)) {
-				ast = parser_parse_constant_expr(parser);
-			}
+			ast = parser_parse_constant_expr(parser, 0);
 			parser_destroy(parser);
 		}
 	}
@@ -1139,9 +1125,7 @@ Ast compiler_parse_json(Compiler *compiler)
 		Parser *parser = parser_create(compiler);
 		if (parser)
 		{
-			if (parser_set_source(parser, 0)) {
-				ast = parser_parse_json(parser);
-			}
+			ast = parser_parse_json(parser, 0);
 			parser_destroy(parser);
 		}
 	}
@@ -1158,9 +1142,7 @@ Ast compiler_parse_jsonl(Compiler *compiler)
 		Parser *parser = parser_create(compiler);
 		if (parser)
 		{
-			if (parser_set_source(parser, 0)) {
-				ast = parser_parse_jsonl(parser);
-			}
+			ast = parser_parse_jsonl(parser, 0);
 			parser_destroy(parser);
 		}
 	}

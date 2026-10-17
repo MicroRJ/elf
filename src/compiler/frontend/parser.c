@@ -202,7 +202,7 @@ void parser_destroy(Parser *parser)
 	}
 }
 
-b32 parser_set_source(Parser *parser, Com_SourceId source_id)
+static b32 parser_begin_source(Parser *parser, Com_SourceId source_id)
 {
 	ASSERT(parser);
 	ASSERT(source_id < parser->compiler->source_count);
@@ -211,7 +211,6 @@ b32 parser_set_source(Parser *parser, Com_SourceId source_id)
 	ASSERT(source->source.data != 0);
 
 	elf_arena_reset(&parser->scratch_arena);
-	parser->source_id = source_id;
 	parser->tok = (Token) {};
 	parser->tok_prev = (Token) {};
 	parser->tok_prox = (Token) {};
@@ -1819,23 +1818,39 @@ static Ast parse_constexpr(Parser *parser)
 
 #include "parse_json.c"
 
-Ast parser_parse_file(Parser *parser)
+Ast parser_parse_file(Parser *parser, Com_SourceId source_id)
 {
-	return parse_file(parser);
+	Ast ast = ERROR_AST;
+	if (parser_begin_source(parser, source_id)) {
+		ast = parse_file(parser);
+	}
+	return ast;
 }
 
-Ast parser_parse_constant_expr(Parser *parser)
+Ast parser_parse_constant_expr(Parser *parser, Com_SourceId source_id)
 {
-	return parse_constexpr(parser);
+	Ast ast = ERROR_AST;
+	if (parser_begin_source(parser, source_id)) {
+		ast = parse_constexpr(parser);
+	}
+	return ast;
 }
 
-Ast parser_parse_json(Parser *parser)
+Ast parser_parse_json(Parser *parser, Com_SourceId source_id)
 {
-	return parse_json_ast(parser);
+	Ast ast = ERROR_AST;
+	if (parser_begin_source(parser, source_id)) {
+		ast = parse_json_ast(parser);
+	}
+	return ast;
 }
 
-Ast parser_parse_jsonl(Parser *parser)
+Ast parser_parse_jsonl(Parser *parser, Com_SourceId source_id)
 {
-	return parse_jsonl_ast(parser);
+	Ast ast = ERROR_AST;
+	if (parser_begin_source(parser, source_id)) {
+		ast = parse_jsonl_ast(parser);
+	}
+	return ast;
 }
 
