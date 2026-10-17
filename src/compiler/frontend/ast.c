@@ -25,6 +25,8 @@ static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
 		return ERROR_OOM_AST;
 	}
 	tree->site = site;
+	tree->source = compiler_source_from_id(par->compiler, site.source);
+	ASSERT(tree->source);
 	tree->kind = kind;
 	return tree;
 }

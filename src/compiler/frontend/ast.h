@@ -106,8 +106,9 @@ struct Ast_Node
 // IMMUTABLE once constructed.
 struct Ast_T
 {
-	Ast_Kind   kind;
-	SourceSite site;
+	Ast_Kind           kind;
+	SourceSite         site;
+	struct Com_Source *source;
 
 	// NOTE(RJ): this is populated by the checker, it is the only mutable field, this is to avoid keeping
 	// a side table, it's way more convenient ... but the parser itself SHOULD not know nor rely on the
