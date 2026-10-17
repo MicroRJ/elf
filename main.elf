@@ -1,3 +1,16 @@
+
+
+THIS_IS_STATICALLY_KNOWN         :: THIS_IS_STATICALLY_KNOWN_TOO
+THIS_IS_STATICALLY_KNOWN_TOO     :: THIS_IS_STATICALLY_KNOWN_TOO_TOO
+THIS_IS_STATICALLY_KNOWN_TOO_TOO :: 40
+
+elf.printl(THIS_IS_STATICALLY_KNOWN)
+
+#eof
+dummy_exports :: import "dummy_exports.elf"
+dummy_exports.dummy()
+#eof
+
 paths := elf.fs.get_paths("test/smoke")
 test_assert = fun(cond) {
 	if cond != true ? {

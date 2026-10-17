@@ -14,68 +14,18 @@
 
 #include "checker.h"
 
+
+static void check_statement(Checker *checker, Ast ast);
+static Entity *resolve_identifier(Checker *checker, Atom *name);
+static void resolve_entity(Checker *checker, Entity *entity);
+static StaticValue resolve_expression(Checker *checker, Ast expr);
+
 typedef struct {
 	u32 outer_scope_start;
 	u32 entity_start;
 	u32 local;
 }
 StaticScope;
-
-EntityTable *entity_table_create(Arena *arena)
-{
-	EntityTable *table = dy_arena_push_zero(arena, sizeof(*table), _Alignof(EntityTable));
-	if (table) {
-		table->arena = arena;
-	}
-	return table;
-}
-
-Entity *entity_table_find(EntityTable *table, Atom *name)
-{
-	for (u32 i = 0; i < table->count; ++i)
-	{
-		Entity *entity = table->entities[i];
-		if (entity->name == name) {
-			return entity;
-		}
-	}
-	return 0;
-}
-
-Entity *entity_table_insert(EntityTable *table, Entity *entity)
-{
-	Entity *result = entity_table_find(table, entity->name);
-	if (!result)
-	{
-		if (table->count == table->capacity)
-		{
-			u32 capacity = table->capacity ? table->capacity * 2 : 16;
-			Entity **entities = dy_arena_push(table->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
-			if (!entities) {
-				return 0;
-			}
-			if (table->count) {
-				dy_memory_copy(entities, table->entities, sizeof(*entities) * table->count);
-			}
-			table->entities = entities;
-			table->capacity = capacity;
-		}
-		table->entities[table->count++] = entity;
-		result = entity;
-	}
-	return result;
-}
-
-Entity *entity_alloc(Arena *arena, EntityKind kind, Atom *name)
-{
-	Entity *entity = dy_arena_push_zero(arena, sizeof(*entity), _Alignof(Entity));
-	if (entity)
-	{
-		entity->kind = kind;
-		entity->name = name;
-	}
-	return entity;
-}
 
 static StaticScope push_scope(Checker *checker)
 {
@@ -93,12 +43,153 @@ static void pop_scope(Checker *checker, StaticScope scope)
 	checker->scope_start = scope.outer_scope_start;
 }
 
+static Entity *lookup_entity_in_current_scope(Checker *checker, Atom *name)
+{
+	for (u32 i = checker->entity_index; i > checker->scope_start; -- i)
+	{
+		Entity *entity = checker->entity_stack[i - 1];
+		if (entity->name == name) {
+			return entity;
+		}
+	}
+	return 0;
+}
+
+static Entity *alloc_entity(Checker *checker, Atom *name)
+{
+	return entity_alloc(checker->compiler->arena, ENTITY_NONE, name);
+}
+
+static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, EntityTags tags, Atom *name) {
+	Entity *entity = lookup_entity_in_current_scope(checker, name);
+	if (entity) {
+		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
+	}
+	printf("DECLARE ENTITY: %s\n", atom_data(name));
+	ASSERT(checker->entity_index < MAX_ENTITIES);
+	entity = alloc_entity(checker, name);
+	checker->entity_stack[checker->entity_index ++] = entity;
+	entity->kind = kind;
+	entity->name = name;
+	entity->state = ENTITY_UNRESOLVED;
+	entity->tree = tree;
+	entity->parent = checker->current_function;
+	entity->tags = tags;
+	return entity;
+}
+
+// Codex: just inline this
+static void declare_locals(Checker *checker, EntityTags tags, Ast_Array names) {
+	for (u32 i = 0; i < names.count; ++ i)
+	{
+		Ast name = ast_ensure_kind(names.items[i], AST_IDENT);
+		if (ast_is_error(name))
+		{
+			ASSERT(!"Codex: proper error reporting!");
+		}
+		ASSERT(!name->entity);
+		name->entity = declare_entity(checker, ENTITY_LOCAL, name, tags, name->identifier);
+		name->entity->state = ENTITY_RESOLVED;
+	}
+}
+
+static void declare_statics(Checker *checker, Ast_Array stats)
+{
+	for (u32 i = 0; i < stats.count; ++ i) {
+		Ast ast_decl = stats.items[i];
+		if (ast_decl->kind != AST_STATIC_DECL) {
+			continue;
+		}
+		Ast ast_name = ast_decl->static_decl.name;
+		Ast ast_expr = ast_decl->static_decl.expr;
+		ASSERT(ast_name);
+		ASSERT(ast_name->kind == AST_IDENT);
+		ASSERT(ast_name->atom);
+		ASSERT(ast_expr);
+		ASSERT(!ast_name->entity);
+		ASSERT(!ast_decl->entity);
+
+		Entity *entity = declare_entity(checker, ENTITY_STATIC, ast_decl, ENTITY_TAG_CONSTANT, ast_name->atom);
+		ASSERT(entity);
+		ast_name->entity = entity;
+		ast_decl->entity = entity;
+		entity->expr = ast_expr;
+	}
+}
+
+Checker *checker_run(Compiler *compiler, Ast ast)
+{
+	ASSERT(compiler);
+	ASSERT(ast->kind == AST_FILE);
+	ASSERT(ast->file.body);
+	ASSERT(ast->file.body->kind == AST_BLOCK_STAT);
+
+	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
+	checker->compiler = compiler;
+	checker->current_function = ast;
+	checker->globals = entity_table_create(compiler->arena);
+	check_statement(checker, ast->file.body);
+	return checker;
+}
+
+static void resolve_entity(Checker *checker, Entity *entity) {
+	ASSERT(entity->state != ENTITY_RESOLVING || !"Codex: error reporting!");
+	if (entity->state == ENTITY_RESOLVED) {
+		return;
+	}
+	ASSERT(entity->expr || !"Internal Error");
+	entity->state = ENTITY_RESOLVING;
+	StaticValue value = resolve_expression(checker, entity->expr);
+	ASSERT(value.type != STATIC_VALUE_NONE || !"Codex: error reporting!");
+	entity->state = ENTITY_RESOLVED;
+	entity->value = value;
+}
+
+static Entity *resolve_identifier(Checker *checker, Atom *name)
+{
+	for (u32 i = checker->entity_index; i > 0; -- i)
+	{
+		Entity *entity = checker->entity_stack[i - 1];
+		if (entity->name == name)
+		{
+			// NOTE(RJ): if we're not a static entity then we must be resolved, because only static entities
+			// are allowed to be unresolved
+			ASSERT(entity->kind == ENTITY_STATIC || entity->state == ENTITY_RESOLVED);
+			if (entity->kind == ENTITY_STATIC && entity->state != ENTITY_RESOLVED) {
+				resolve_entity(checker, entity);
+			}
+			return entity;
+		}
+	}
+	Entity *entity = entity_table_find(checker->globals, name);
+	if (!entity)
+	{
+		entity = alloc_entity(checker, name);
+		entity->kind = ENTITY_GLOBAL;
+		entity->state = ENTITY_RESOLVED;
+		entity = entity_table_insert(checker->globals, entity);
+	}
+	return entity;
+}
+
 // TOOD(RJ): imagine writing an interpreter for an interpreter ...
-static StaticValue evaluate_static_expr(Checker *checker, Ast expr)
+static StaticValue resolve_expression(Checker *checker, Ast expr)
 {
 	StaticValue value = {STATIC_VALUE_NONE};
+	if (!expr) {
+		return value;
+	}
+
 	switch (expr->kind)
 	{
+		case AST_NONE:
+		case AST_ERROR:
+		case AST_RECURSE:
+		case AST_ELLIPSIS:
+		{
+		}
+		break;
+
 		case AST_NIL_LITERAL:
 		{
 			value.type = STATIC_VALUE_NIL;
@@ -128,250 +219,72 @@ static StaticValue evaluate_static_expr(Checker *checker, Ast expr)
 
 		case AST_FUNCTION:
 		{
+			StaticScope scope = push_scope(checker);
+			Ast outer_function = checker->current_function;
+			checker->current_function = expr;
+			for (u32 i = 0; i < expr->function.params.count; ++i)
+			{
+				Ast param = expr->function.params.items[i];
+				ASSERT(param->kind == AST_FUNCTION_PARAM);
+				resolve_expression(checker, param->param.type);
+				resolve_expression(checker, param->param.expr);
+				Ast name = ast_ensure_kind(param->param.name, AST_IDENT);
+				if (ast_is_error(name)) {
+					ASSERT(!"Codex: error");
+				}
+				ASSERT(!name->entity);
+				name->entity = declare_entity(checker, ENTITY_PARAMETER, param, ENTITY_TAG_PARAMETER, name->identifier);
+				name->entity->state = ENTITY_RESOLVED;
+			}
+			check_statement(checker, expr->function.body);
+			checker->current_function = outer_function;
+			pop_scope(checker, scope);
 			value.type = STATIC_VALUE_FUNCTION;
 			value.function = expr;
 		}
 		break;
 
-		case AST_IDENT:
 		case AST_IMPORT:
+		{
+			ASSERT(expr->import.source != COM_INVALID_SOURCE_ID);
+			ASSERT(expr->import.source < checker->compiler->source_count);
+			Com_Source *source = checker->compiler->sources + expr->import.source;
+			ASSERT(source->exports);
+			value.type = STATIC_VALUE_EXPORTS;
+			value.exports = source->exports;
+		}
+		break;
+
+		case AST_IDENT:
+		{
+			Entity *entity = resolve_identifier(checker, expr->identifier);
+			ASSERT(entity || !"Codex: proper error!");
+			expr->entity = entity;
+			value = entity->value;
+		}
+		break;
+
 		case AST_FIELD:
 		{
-			ASSERT(!"Error");
-		}
-		break;
-
-		default:
-		{
-			compiler_report(checker->compiler, COM_ERROR_INVALID_STATIC_EXPRESSION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, expr->site, "'%s' is not supported in a static expression", ast_type_name(expr->kind));
-		}
-		break;
-	}
-	return value;
-}
-
-static Entity *lookup_entity(Checker *checker, Atom *name)
-{
-	for (u32 i = checker->entity_index; i > 0; -- i)
-	{
-		Entity *entity = checker->entity_stack[i - 1];
-		if (entity->name == name) {
-			return entity;
-		}
-	}
-	return 0;
-}
-
-static Entity *lookup_entity_in_current_scope(Checker *checker, Atom *name)
-{
-	for (u32 i = checker->entity_index; i > checker->scope_start; -- i)
-	{
-		Entity *entity = checker->entity_stack[i - 1];
-		if (entity->name == name) {
-			return entity;
-		}
-	}
-	return 0;
-}
-
-static Entity *alloc_entity(Checker *checker, Atom *name)
-{
-	return entity_alloc(checker->compiler->arena, ENTITY_NONE, name);
-}
-
-// TODO(RJ): hash table
-static Entity *global_entity(Checker *checker, Atom *name)
-{
-	Entity *entity = entity_table_find(checker->globals, name);
-	if (!entity)
-	{
-		entity = alloc_entity(checker, name);
-		entity->kind = ENTITY_GLOBAL;
-		entity = entity_table_insert(checker->globals, entity);
-	}
-	return entity;
-}
-
-static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, EntityTags tags, Atom *name) {
-	Entity *entity = lookup_entity_in_current_scope(checker, name);
-	if (entity) {
-		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
-	}
-	ASSERT(checker->entity_index < MAX_ENTITIES);
-	entity = alloc_entity(checker, name);
-	checker->entity_stack[checker->entity_index ++] = entity;
-	entity->kind = kind;
-	entity->tree = tree;
-	entity->parent = checker->current_function;
-	entity->tags = tags;
-	entity->name = name;
-	return entity;
-}
-
-// Codex: just inline this
-static void declare_names(Checker *checker, EntityTags tags, Ast_Array names) {
-	for (u32 i = 0; i < names.count; ++ i)
-	{
-		Ast name = ast_ensure_kind(names.items[i], AST_IDENT);
-		if (ast_is_error(name))
-		{
-			ASSERT(!"Codex: error");
-		}
-		ASSERT(!name->entity);
-		name->entity = declare_entity(checker, ENTITY_LOCAL, name, tags, name->identifier);
-	}
-}
-
-static StaticValue process_static_declaration_value(Checker *checker, Ast expr)
-{
-	StaticValue value = evaluate_static_expr(checker, expr);
-	return value;
-}
-
-// NOTE(RJ): iterate over each statement, collect static declarations only, and add them to the scope and resolve
-static void predeclare_static_declarations(Checker *checker, Ast_Array stats)
-{
-	for (u32 i = 0; i < stats.count; ++ i) {
-		Ast item = stats.items[i];
-		if (item->kind != AST_STATIC_DECL) {
-			continue;
-		}
-		ASSERT(item->static_decl.name);
-		ASSERT(item->static_decl.name->kind == AST_IDENT);
-		ASSERT(item->static_decl.name->atom);
-		ASSERT(item->static_decl.expr);
-
-		StaticValue value = process_static_declaration_value(checker, item->static_decl.expr);
-		Entity *entity = item->static_decl.name->entity;
-		if (entity)
-		{
-			if (lookup_entity_in_current_scope(checker, entity->name)) {
-				compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, item->site, "'%s' is already declared in this scope", atom_data(entity->name));
+			StaticValue left_value = resolve_expression(checker, expr->binary.x);
+			if (left_value.type == STATIC_VALUE_EXPORTS)
+			{
+				ASSERT(expr->binary.y);
+				ASSERT(expr->binary.y->kind == AST_IDENT || expr->binary.y->kind == AST_STRING_LITERAL);
+				ASSERT(expr->binary.y->atom);
+				Entity *entity = entity_table_find(left_value.exports, expr->binary.y->atom);
+				if (!entity) {
+					ASSERT(!"Codex: proper error handling");
+				}
+				ASSERT(entity->value.type != STATIC_VALUE_NONE);
+				ASSERT(entity->kind == ENTITY_STATIC);
+				entity->users ++;
+				entity->tags |= ENTITY_TAG_REFERENCED;
+				value = entity->value;
+				ASSERT(!expr->entity);
+				expr->entity = entity;
+				entity->tree = expr;
 			}
-			ASSERT(entity->kind == ENTITY_STATIC);
-			ASSERT(entity->tree == item);
-			ASSERT(checker->entity_index < MAX_ENTITIES);
-			checker->entity_stack[checker->entity_index++] = entity;
-			entity->parent = checker->current_function;
-			entity->tags |= ENTITY_TAG_CONSTANT;
-		}
-		else
-		{
-			entity = declare_entity(checker, ENTITY_STATIC, item, ENTITY_TAG_CONSTANT, item->static_decl.name->atom);
-			item->static_decl.name->entity = entity;
-		}
-
-		entity->value = value;
-	}
-	// TODO(RJ): handle out of order stuff!
-}
-
-static StaticValue check_tree(Checker *checker, Ast ast);
-
-
-Checker *checker_run(Compiler *compiler, Ast ast)
-{
-	ASSERT(compiler);
-	ASSERT(ast->kind == AST_FILE);
-	ASSERT(ast->file.body);
-	ASSERT(ast->file.body->kind == AST_BLOCK_STAT);
-
-	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
-	checker->compiler = compiler;
-	checker->current_function = ast;
-	checker->globals = entity_table_create(compiler->arena);
-	check_tree(checker, ast->file.body);
-	return checker;
-}
-
-static StaticValue check_tree(Checker *checker, Ast ast)
-{
-
-	StaticValue value = { STATIC_VALUE_NONE };
-	if (!ast) {
-		return value;
-	}
-
-	switch (ast->kind)
-	{
-		case AST_NONE:
-		case AST_ERROR:
-		case AST_NUMBER_LITERAL:
-		case AST_INTEGER_LITERAL:
-		case AST_STRING_LITERAL:
-		case AST_IMPORT:
-		case AST_RECURSE:
-		case AST_NIL_LITERAL:
-		case AST_ELLIPSIS:
-		{
-		}
-		break;
-
-		case AST_IDENT:
-		{
-			Entity *entity = lookup_entity(checker, ast->identifier);
-			if (!entity) entity = global_entity(checker, ast->identifier);
-			ast->entity = entity;
-		}
-		break;
-
-		case AST_FILE:
-		{
-			check_tree(checker, ast->file.body);
-		}
-		break;
-
-		case AST_BLOCK_STAT:
-		{
-			StaticScope scope = push_scope(checker);
-			predeclare_static_declarations(checker, ast->block);
-			for (u32 i = 0; i < ast->block.count; ++i) {
-				check_tree(checker, ast->block.items[i]);
-			}
-			pop_scope(checker, scope);
-		}
-		break;
-
-		case AST_FUNCTION:
-		{
-			StaticScope scope = push_scope(checker);
-			Ast outer_function = checker->current_function;
-			checker->current_function = ast;
-			for (u32 i = 0; i < ast->function.params.count; ++i) {
-				check_tree(checker, ast->function.params.items[i]);
-			}
-			check_tree(checker, ast->function.body);
-			checker->current_function = outer_function;
-			pop_scope(checker, scope);
-		}
-		break;
-
-		case AST_FUNCTION_PARAM:
-		{
-			check_tree(checker, ast->param.type);
-			check_tree(checker, ast->param.expr);
-			Ast name = ast_ensure_kind(ast->param.name, AST_IDENT);
-			if (ast_is_error(name)) {
-				ASSERT(!"Codex: error");
-			}
-			ASSERT(!name->entity);
-			name->entity = declare_entity(checker, ENTITY_PARAMETER, ast, ENTITY_TAG_PARAMETER, name->identifier);
-		}
-		break;
-
-		case AST_DECL_STAT:
-		{
-			Ast names = ast_ensure_kind(ast->decl.name, AST_TUPLE);
-			EntityTags tags = ast->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
-			check_tree(checker, ast->decl.type);
-			check_tree(checker, ast->decl.expr);
-			declare_names(checker, tags, names->tuple);
-		}
-		break;
-
-		case AST_STATIC_DECL:
-		{
-			check_tree(checker, ast->static_decl.expr);
 		}
 		break;
 
@@ -379,7 +292,7 @@ static StaticValue check_tree(Checker *checker, Ast ast)
 		case AST_MEASURE:
 		case AST_GET_MEM:
 		{
-			check_tree(checker, ast->unary);
+			resolve_expression(checker, expr->unary);
 		}
 		break;
 
@@ -419,22 +332,21 @@ static StaticValue check_tree(Checker *checker, Ast ast)
 		case AST_RANGE:
 		case AST_RANGE_INDEX:
 		{
-			check_tree(checker, ast->binary.x);
-			check_tree(checker, ast->binary.y);
+			resolve_expression(checker, expr->binary.x);
+			resolve_expression(checker, expr->binary.y);
 		}
 		break;
 
-		case AST_FIELD:
 		case AST_META_FIELD:
 		{
-			check_tree(checker, ast->binary.x);
+			resolve_expression(checker, expr->binary.x);
 		}
 		break;
 
 		case AST_INTERPOLATED_STRING:
 		{
-			for (u32 i = 0; i < ast->interpolated_string.count; ++i) {
-				check_tree(checker, ast->interpolated_string.items[i]);
+			for (u32 i = 0; i < expr->interpolated_string.count; ++i) {
+				resolve_expression(checker, expr->interpolated_string.items[i]);
 			}
 		}
 		break;
@@ -442,80 +354,137 @@ static StaticValue check_tree(Checker *checker, Ast ast)
 		case AST_CALL:
 		case AST_META_CALL:
 		{
-			check_tree(checker, ast->call.expr);
-			for (u32 i = 0; i < ast->call.args.count; ++i) {
-				check_tree(checker, ast->call.args.items[i]);
+			resolve_expression(checker, expr->call.expr);
+			for (u32 i = 0; i < expr->call.args.count; ++i) {
+				resolve_expression(checker, expr->call.args.items[i]);
 			}
-			check_tree(checker, ast->call.carg);
+			resolve_expression(checker, expr->call.carg);
 		}
 		break;
 
 		case AST_NAMED_ARGUMENT:
 		{
-			check_tree(checker, ast->named_argument.expr);
+			resolve_expression(checker, expr->named_argument.expr);
 		}
 		break;
 
 		case AST_TUPLE:
 		{
-			for (u32 i = 0; i < ast->tuple.count; ++i) {
-				check_tree(checker, ast->tuple.items[i]);
+			for (u32 i = 0; i < expr->tuple.count; ++i) {
+				resolve_expression(checker, expr->tuple.items[i]);
 			}
 		}
 		break;
 
 		case AST_TABLE:
 		{
-			for (u32 i = 0; i < ast->table.count; ++i) {
-				check_tree(checker, ast->table.items[i]);
+			for (u32 i = 0; i < expr->table.count; ++i) {
+				resolve_expression(checker, expr->table.items[i]);
 			}
 		}
 		break;
 
 		case AST_ARRAY:
 		{
-			for (u32 i = 0; i < ast->array.count; ++i) {
-				check_tree(checker, ast->array.items[i]);
+			for (u32 i = 0; i < expr->array.count; ++i) {
+				resolve_expression(checker, expr->array.items[i]);
 			}
 		}
 		break;
 
 		case AST_TABLE_ENTRY:
 		{
-			check_tree(checker, ast->table_entry.key);
-			check_tree(checker, ast->table_entry.value);
+			resolve_expression(checker, expr->table_entry.key);
+			resolve_expression(checker, expr->table_entry.value);
+		}
+		break;
+
+		default:
+		{
+			ASSERT(!"statement passed to resolve_expression");
+		}
+		break;
+	}
+	return value;
+}
+
+static void check_statement(Checker *checker, Ast stat)
+{
+	if (!stat) {
+		return;
+	}
+
+	switch (stat->kind)
+	{
+		case AST_NONE:
+		case AST_ERROR:
+		{
+		}
+		break;
+
+		case AST_FILE:
+		{
+			check_statement(checker, stat->file.body);
+		}
+		break;
+
+		case AST_BLOCK_STAT:
+		{
+			StaticScope scope = push_scope(checker);
+			declare_statics(checker, stat->block);
+			for (u32 i = 0; i < stat->block.count; ++i) {
+				check_statement(checker, stat->block.items[i]);
+			}
+			pop_scope(checker, scope);
+		}
+		break;
+
+		case AST_DECL_STAT:
+		{
+			Ast names = ast_ensure_kind(stat->decl.name, AST_TUPLE);
+			EntityTags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+			resolve_expression(checker, stat->decl.type);
+			resolve_expression(checker, stat->decl.expr);
+			declare_locals(checker, tags, names->tuple);
+		}
+		break;
+
+		case AST_STATIC_DECL:
+		{
+			ASSERT(stat->entity);
+			// NOTE(RJ): lazily resolved !
 		}
 		break;
 
 		case AST_IF:
 		{
-			check_tree(checker, ast->if_stat.pred);
-			check_tree(checker, ast->if_stat.true_clause);
-			check_tree(checker, ast->if_stat.else_clause);
-			check_tree(checker, ast->if_stat.then_clause);
+			resolve_expression(checker, stat->if_stat.pred);
+			check_statement(checker, stat->if_stat.true_clause);
+			check_statement(checker, stat->if_stat.else_clause);
+			check_statement(checker, stat->if_stat.then_clause);
 		}
 		break;
 
 		case AST_DEFER_STAT:
 		{
-			check_tree(checker, ast->defer_stat.body);
+			check_statement(checker, stat->defer_stat.body);
 		}
 		break;
 
 		case AST_WHILE:
 		{
-			check_tree(checker, ast->while_stat.pred);
-			check_tree(checker, ast->while_stat.body);
+			resolve_expression(checker, stat->while_stat.pred);
+			check_statement(checker, stat->while_stat.body);
 		}
 		break;
 
 		case AST_FOR:
 		{
 			StaticScope scope = push_scope(checker);
-			check_tree(checker, ast->for_stat.init);
-			check_tree(checker, ast->for_stat.pred);
-			check_tree(checker, ast->for_stat.step);
-			check_tree(checker, ast->for_stat.body);
+			check_statement(checker, stat->for_stat.init);
+			resolve_expression(checker, stat->for_stat.pred);
+			check_statement(checker, stat->for_stat.step);
+			check_statement(checker, stat->for_stat.body);
 			pop_scope(checker, scope);
 		}
 		break;
@@ -523,36 +492,34 @@ static StaticValue check_tree(Checker *checker, Ast ast)
 		case AST_FOR_RANGE:
 		{
 			StaticScope scope = push_scope(checker);
-			check_tree(checker, ast->for_range_stat.decl);
-			check_tree(checker, ast->for_range_stat.body);
+			check_statement(checker, stat->for_range_stat.decl);
+			check_statement(checker, stat->for_range_stat.body);
 			pop_scope(checker, scope);
 		}
 		break;
 
 		case AST_RETURN:
 		{
-			check_tree(checker, ast->return_stat.expr);
+			resolve_expression(checker, stat->return_stat.expr);
 		}
 		break;
 
 		case AST_BREAK:
 		{
-			check_tree(checker, ast->break_stat.expr);
+			resolve_expression(checker, stat->break_stat.expr);
 		}
 		break;
 
 		case AST_CONTINUE:
 		{
-			check_tree(checker, ast->continue_stat.expr);
+			resolve_expression(checker, stat->continue_stat.expr);
 		}
 		break;
 
 		default:
 		{
-			ASSERT(!"unhandled AST kind");
+			resolve_expression(checker, stat);
 		}
 		break;
 	}
-
-	return value;
 }

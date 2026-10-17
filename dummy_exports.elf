@@ -1,0 +1,4 @@
+
+export dummy :: fun() {
+	elf.printl("You're calling an exported function!")
+}
