@@ -14,9 +14,6 @@
 
 #include "checker.h"
 
-#define DEBUG_LOG(contents) printf(contents "\n")
-
-
 typedef struct {
 	u32 outer_scope_start;
 	u32 entity_start;

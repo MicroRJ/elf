@@ -507,7 +507,7 @@ static void test_backend_if_else_restores_stack_top(void)
 	Ir if_ir = ir_new_if(ctx, site, pred, true_clause, else_clause);
 	Ir after_if = ir_new_local(ctx, site, ir_new_int(ctx, site, 33));
 
-	IrFrame stats = begin_ir_frame(ctx);
+	IrCollector stats = begin_ir_frame(ctx);
 	push_ir(&stats, if_ir);
 	push_ir(&stats, after_if);
 	Ir body = ir_new_block(ctx, site, close_ir_frame(&stats));

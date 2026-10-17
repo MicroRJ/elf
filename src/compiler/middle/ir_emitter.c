@@ -21,15 +21,16 @@ typedef struct
 }
 DeferScope;
 
-typedef struct
+typedef struct IrLoopFrame IrLoopFrame;
+struct IrLoopFrame
 {
+	IrLoopFrame *parent;
 	Ir continue_label;
 	Ir break_label;
 	u32 defer_start;
-}
-LoopLabels;
+};
 
-typedef struct LwScopeFunction LwScopeFunction;
+typedef struct IrEmitterFrame IrEmitterFrame;
 typedef struct IrCapture IrCapture;
 
 struct IrCapture
@@ -39,10 +40,10 @@ struct IrCapture
 	Ir         source;
 };
 
-struct LwScopeFunction
+// represents a lexical function as we descend
+struct IrEmitterFrame
 {
-	LwScopeFunction *parent;
-	IrFunDef        *function;
+	IrEmitterFrame  *parent;
 	Ast              tree;
 	IrCapture       *first_capture;
 	IrCapture       *last_capture;
@@ -65,11 +66,8 @@ struct IrEmitter
 	u32              defer_scope_start;
 	u32              function_defer_start;
 
-	LwScopeFunction *function;
-
-	u32              loop_count;
-
-	LoopLabels       loop_stack[64];
+	IrEmitterFrame *function;
+	IrLoopFrame    *loop;
 };
 
 
@@ -78,12 +76,12 @@ struct IrEmitter
 typedef struct
 {
 	IrEmitter *ctx;
-	u32           start;
-	u32           count;
+	u32        start;
+	u32        count;
 }
-IrFrame;
+IrCollector;
 
-static void ir_lower_stat(IrFrame *block, Ast stat);
+static void ir_lower_stat(IrCollector *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *ctx, Ast expr);
 static Ir ir_lower_stat_as_block(IrEmitter *ctx, Ast stat);
 
@@ -95,16 +93,16 @@ static void ir_report_error(IrEmitter *ctx, Com_Error error, SourceSite site, co
 	va_end(args);
 }
 
-static IrFrame begin_ir_frame(IrEmitter *ctx)
+static IrCollector begin_ir_frame(IrEmitter *ctx)
 {
-	IrFrame block = {};
+	IrCollector block = {};
 	block.ctx = ctx;
 	block.start = ctx->ir_stack_index;
 	block.count = 0;
 	return block;
 }
 
-static void push_ir(IrFrame *stack, Ir ir)
+static void push_ir(IrCollector *stack, Ir ir)
 {
 	IrEmitter *ctx = stack->ctx;
 	ASSERT(ctx);
@@ -114,7 +112,7 @@ static void push_ir(IrFrame *stack, Ir ir)
 	stack->count += 1;
 }
 
-static IrArray close_ir_frame(IrFrame *frame)
+static IrArray close_ir_frame(IrCollector *frame)
 {
 	IrEmitter *ctx = frame->ctx;
 	ASSERT(ctx);
@@ -151,7 +149,7 @@ static void push_defer_stat(IrEmitter *ctx, Ast stat)
 	ctx->defer_stack[ctx->defer_count++] = stat;
 }
 
-static void emit_defer_range(IrEmitter *ctx, IrFrame *items, u32 start)
+static void emit_defer_range(IrEmitter *ctx, IrCollector *items, u32 start)
 {
 	ASSERT(start <= ctx->defer_count);
 	for (u32 i = ctx->defer_count; i > start; --i)
@@ -161,7 +159,7 @@ static void emit_defer_range(IrEmitter *ctx, IrFrame *items, u32 start)
 	}
 }
 
-static u32 capture_entity_in_function(IrEmitter *ctx, LwScopeFunction *function_ctx, Entity *entity, SourceSite site)
+static u32 capture_entity_in_function(IrEmitter *ctx, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
 {
 	u32 capture_index = 0;
 	for (IrCapture *capture = function_ctx->first_capture; capture; capture = capture->next)
@@ -176,7 +174,7 @@ static u32 capture_entity_in_function(IrEmitter *ctx, LwScopeFunction *function_
 	ASSERT(capture_index == function_ctx->capture_count);
 
 	Ir source = 0;
-	LwScopeFunction *parent = function_ctx->parent;
+	IrEmitterFrame *parent = function_ctx->parent;
 
 	if (parent && entity->parent != parent->tree)
 	{
@@ -238,27 +236,27 @@ static b32 mark_entity_assigned(IrEmitter *ctx, Ast destination)
 	return true;
 }
 
-static void push_loop_labels(IrEmitter *ctx, LoopLabels labels)
+static void push_loop(IrEmitter *ctx, IrLoopFrame *loop)
 {
-	ASSERT(ctx->loop_count < ARRAY_COUNT(ctx->loop_stack));
-	ctx->loop_stack[ctx->loop_count ++] = labels;
+	loop->parent = ctx->loop;
+	ctx->loop = loop;
 }
 
-static void pop_loop_labels(IrEmitter *ctx)
+static void pop_loop(IrEmitter *ctx, IrLoopFrame *loop)
 {
-	ASSERT(ctx->loop_count > 0);
-	ctx->loop_count -= 1;
+	ASSERT(ctx->loop == loop);
+	ctx->loop = loop->parent;
 }
 
-static LoopLabels current_loop_labels(IrEmitter *ctx, SourceSite site)
+static IrLoopFrame current_loop(IrEmitter *ctx, SourceSite site)
 {
-	if (ctx->loop_count == 0)
+	if (!ctx->loop)
 	{
 		ir_report_error(ctx, COM_ERROR_LOWERING, site, "break and continue must be inside a loop");
-		LoopLabels labels = {};
-		return labels;
+		IrLoopFrame loop = {};
+		return loop;
 	}
-	return ctx->loop_stack[ctx->loop_count - 1];
+	return *ctx->loop;
 }
 
 static TypeRule type_rule_from_atom(Atom *atom)
@@ -545,7 +543,7 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 
 		case AST_RECURSE:
 		{
-			ASSERT(ctx->function && ctx->function->function);
+			ASSERT(ctx->function);
 			ir = ir_new_recurse(ctx, expr->site);
 		}
 		break;
@@ -555,7 +553,7 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 			Ast *args = expr->table.items;
 			u32 nargs = expr->table.count;
 
-			IrFrame table_items = begin_ir_frame(ctx);
+			IrCollector table_items = begin_ir_frame(ctx);
 			Ir table_local = ir_new_local(ctx, expr->site, ir_new_table(ctx, expr->site));
 			push_ir(&table_items, table_local);
 
@@ -592,7 +590,7 @@ static Ir ir_emit_expr(IrEmitter *ctx, Ast expr)
 
 		case AST_ARRAY:
 		{
-			IrFrame array_items = begin_ir_frame(ctx);
+			IrCollector array_items = begin_ir_frame(ctx);
 			Ir array_local = ir_new_local(ctx, expr->site, ir_new_array(ctx, expr->site));
 			push_ir(&array_items, array_local);
 
@@ -675,7 +673,7 @@ static Ir ir_lower_stat_as_block(IrEmitter *ctx, Ast stat)
 		return ERROR_IR;
 	}
 
-	IrFrame block_items = begin_ir_frame(ctx);
+	IrCollector block_items = begin_ir_frame(ctx);
 	if (stat->kind == AST_BLOCK_STAT)
 	{
 		DeferScope defer_scope = get_defer_scope(ctx);
@@ -699,7 +697,7 @@ static Ir ir_lower_stat_as_block(IrEmitter *ctx, Ast stat)
 	return ir;
 }
 
-static Ir lower_ast_lvalue_to_ir_once(IrEmitter *ctx, IrFrame *items, Ast expr)
+static Ir ir_emit_lvalue_once(IrEmitter *ctx, IrCollector *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -756,7 +754,7 @@ static Ir lower_ast_lvalue_to_ir_once(IrEmitter *ctx, IrFrame *items, Ast expr)
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrFrame *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(IrEmitter *ctx, IrCollector *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
 {
 	u32 nvars = name_tuple->tuple.count;
 
@@ -911,20 +909,20 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *ctx, Ast stat, Ast name_tupl
 	Ir continue_label = ir_new_label(ctx, first_name->site);
 	Ir break_label = ir_new_label(ctx, stat->site);
 
-	LoopLabels loop_labels = {};
-	loop_labels.continue_label = continue_label;
-	loop_labels.break_label = break_label;
-	loop_labels.defer_start = ctx->defer_count;
-	push_loop_labels(ctx, loop_labels);
+	IrLoopFrame loop_frame = {};
+	loop_frame.continue_label = continue_label;
+	loop_frame.break_label = break_label;
+	loop_frame.defer_start = ctx->defer_count;
+	push_loop(ctx, &loop_frame);
 	Ir body = ir_lower_stat_as_block(ctx, stat->for_range_stat.body);
-	pop_loop_labels(ctx);
+	pop_loop(ctx, &loop_frame);
 
 	Ir load_iterator_local = ir_new_load_local(ctx, first_name->site, iterator_local);
 	Ir load_range_end_local = ir_new_load_local(ctx, range_end_site, range_end_local);
 	Ir iterator_less_than_range_end = ir_new_binary(ctx, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = ir_new_jump_if_false(ctx, range->site, iterator_less_than_range_end, break_label);
 
-	IrFrame loop_items = begin_ir_frame(ctx);
+	IrCollector loop_items = begin_ir_frame(ctx);
 	push_ir(&loop_items, start_label);
 	push_ir(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
@@ -962,7 +960,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *ctx, Ast stat, Ast name_tupl
 	IrArray loop_stats = close_ir_frame(&loop_items);
 	Ir loop = ir_new_block(ctx, stat->site, loop_stats);
 
-	IrFrame block_items = begin_ir_frame(ctx);
+	IrCollector block_items = begin_ir_frame(ctx);
 	if (collection_local) {
 		push_ir(&block_items, collection_local);
 	}
@@ -1023,26 +1021,26 @@ static Ir lower_ast_for_to_ir(IrEmitter *ctx, Ast stat)
 		return ERROR_IR;
 	}
 
-	IrFrame block_items = begin_ir_frame(ctx);
+	IrCollector block_items = begin_ir_frame(ctx);
 	ir_lower_stat(&block_items, init);
 
 	Ir condition_label = ir_new_label(ctx, stat->site);
 	Ir continue_label = ir_new_label(ctx, stat->for_stat.step->site);
 	Ir break_label = ir_new_label(ctx, stat->site);
 
-	LoopLabels loop_labels = {};
-	loop_labels.continue_label = continue_label;
-	loop_labels.break_label = break_label;
-	loop_labels.defer_start = ctx->defer_count;
-	push_loop_labels(ctx, loop_labels);
+	IrLoopFrame loop_frame = {};
+	loop_frame.continue_label = continue_label;
+	loop_frame.break_label = break_label;
+	loop_frame.defer_start = ctx->defer_count;
+	push_loop(ctx, &loop_frame);
 	Ir body = ir_lower_stat_as_block(ctx, stat->for_stat.body);
-	pop_loop_labels(ctx);
+	pop_loop(ctx, &loop_frame);
 
 	Ir pred = ir_emit_expr(ctx, stat->for_stat.pred);
 	Ir exit_jump = ir_new_jump_if_false(ctx, stat->for_stat.pred->site, pred, break_label);
 	Ir step = ir_lower_stat_as_block(ctx, stat->for_stat.step);
 
-	IrFrame loop_items = begin_ir_frame(ctx);
+	IrCollector loop_items = begin_ir_frame(ctx);
 	push_ir(&loop_items, condition_label);
 	push_ir(&loop_items, exit_jump);
 	push_ir(&loop_items, body);
@@ -1058,7 +1056,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *ctx, Ast stat)
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(IrEmitter *ctx, IrFrame *items, Ast stat)
+static Ir lower_compound_assign_to_ir(IrEmitter *ctx, IrCollector *items, Ast stat)
 {
 	Ast dest_tuple = ast_ensure_kind(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
@@ -1081,13 +1079,13 @@ static Ir lower_compound_assign_to_ir(IrEmitter *ctx, IrFrame *items, Ast stat)
 	Ast expr_ast = expr_tuple->tuple.items[0];
 	if (!mark_entity_assigned(ctx, dest_ast)) return ERROR_IR;
 
-	Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
+	Ir dest_ir = ir_emit_lvalue_once(ctx, items, dest_ast);
 	Ir right_ir = ir_emit_expr(ctx, expr_ast);
 	Ir value_ir = ir_new_binary(ctx, stat->site, op, dest_ir, right_ir);
 	return ir_new_store(ctx, stat->site, dest_ir, value_ir);
 }
 
-static void ir_lower_stat(IrFrame *items, Ast stat)
+static void ir_lower_stat(IrCollector *items, Ast stat)
 {
 	IrEmitter *ctx = items->ctx;
 
@@ -1125,18 +1123,18 @@ static void ir_lower_stat(IrFrame *items, Ast stat)
 			Ir start_label = ir_new_label(ctx, stat->site);
 			Ir break_label = ir_new_label(ctx, stat->site);
 
-			LoopLabels loop_labels = {};
-			loop_labels.continue_label = start_label;
-			loop_labels.break_label = break_label;
-			loop_labels.defer_start = ctx->defer_count;
-			push_loop_labels(ctx, loop_labels);
+			IrLoopFrame loop_frame = {};
+			loop_frame.continue_label = start_label;
+			loop_frame.break_label = break_label;
+			loop_frame.defer_start = ctx->defer_count;
+			push_loop(ctx, &loop_frame);
 			Ir body_ir = ir_lower_stat_as_block(ctx, body);
-			pop_loop_labels(ctx);
+			pop_loop(ctx, &loop_frame);
 
 			Ir pred_ir = ir_emit_expr(ctx, pred);
 			Ir jump_if_false = ir_new_jump_if_false(ctx, pred->site, pred_ir, break_label);
 
-			IrFrame loop_items = begin_ir_frame(ctx);
+			IrCollector loop_items = begin_ir_frame(ctx);
 			push_ir(&loop_items, start_label);
 			push_ir(&loop_items, jump_if_false);
 			push_ir(&loop_items, body_ir);
@@ -1303,13 +1301,13 @@ static void ir_lower_stat(IrFrame *items, Ast stat)
 					continue;
 				}
 
-				Ir dest_ir = lower_ast_lvalue_to_ir_once(ctx, items, dest_ast);
+				Ir dest_ir = ir_emit_lvalue_once(ctx, items, dest_ast);
 				Ir nil_ir = ir_new_nil(ctx, dest_ast->site);
 				Ir pred_ir = ir_new_binary(ctx, stat->site, IR_EQ, dest_ir, nil_ir);
 				Ir value_ir = ir_emit_expr(ctx, expr_ast);
 				Ir store_ir = ir_new_store(ctx, stat->site, dest_ir, value_ir);
 
-				IrFrame true_items = begin_ir_frame(ctx);
+				IrCollector true_items = begin_ir_frame(ctx);
 				push_ir(&true_items, store_ir);
 				IrArray true_stats = close_ir_frame(&true_items);
 				Ir true_clause = ir_new_block(ctx, stat->site, true_stats);
@@ -1344,18 +1342,18 @@ static void ir_lower_stat(IrFrame *items, Ast stat)
 
 		case AST_BREAK:
 		{
-			LoopLabels loop_labels = current_loop_labels(ctx, stat->site);
-			emit_defer_range(ctx, items, loop_labels.defer_start);
-			Ir ir = ir_new_jump(ctx, stat->site, loop_labels.break_label);
+			IrLoopFrame loop = current_loop(ctx, stat->site);
+			emit_defer_range(ctx, items, loop.defer_start);
+			Ir ir = ir_new_jump(ctx, stat->site, loop.break_label);
 			push_ir(items, ir);
 		}
 		break;
 
 		case AST_CONTINUE:
 		{
-			LoopLabels loop_labels = current_loop_labels(ctx, stat->site);
-			emit_defer_range(ctx, items, loop_labels.defer_start);
-			Ir ir = ir_new_jump(ctx, stat->site, loop_labels.continue_label);
+			IrLoopFrame loop = current_loop(ctx, stat->site);
+			emit_defer_range(ctx, items, loop.defer_start);
+			Ir ir = ir_new_jump(ctx, stat->site, loop.continue_label);
 			push_ir(items, ir);
 		}
 		break;
@@ -1399,20 +1397,19 @@ static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 
 	definition->variadic = variadic;
 	definition->param_count = IMPLICIT_PARAM_COUNT + ast_params.count;
 
-	LwScopeFunction function_ctx = {};
+	IrEmitterFrame function_ctx = {};
 	function_ctx.parent = emitter->function;
-	function_ctx.function = definition;
 	function_ctx.tree = tree;
 
-	LwScopeFunction *outer_function = emitter->function;
+	IrEmitterFrame *outer_function = emitter->function;
 	u32 outer_defer_count = emitter->defer_count;
 	u32 outer_defer_scope_start = emitter->defer_scope_start;
 	u32 outer_function_defer_start = emitter->function_defer_start;
-	u32 outer_loop_count = emitter->loop_count;
+	IrLoopFrame *outer_loop = emitter->loop;
 	emitter->function = &function_ctx;
 	emitter->defer_scope_start = outer_defer_count;
 	emitter->function_defer_start = outer_defer_count;
-	emitter->loop_count = 0;
+	emitter->loop = 0;
 
 	Ir *ir_params = elf_arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count));
 	ir_params[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, site, 0);
@@ -1477,7 +1474,7 @@ static u32 ir_lower_function(IrEmitter *emitter, Ast tree, SourceSite site, b32 
 
 
 	emitter->function = outer_function;
-	emitter->loop_count = outer_loop_count;
+	emitter->loop = outer_loop;
 	emitter->defer_count = outer_defer_count;
 	emitter->defer_scope_start = outer_defer_scope_start;
 	emitter->function_defer_start = outer_function_defer_start;
