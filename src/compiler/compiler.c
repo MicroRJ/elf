@@ -334,7 +334,7 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 
 						if (!ast_is_error(ast) && !compiler->report.error_count)
 						{
-							checker_run(compiler, ast);
+							check_file(compiler, ast);
 							IrModule *ir_module = ir_emit_module(compiler, ast);
 							if (ir_module && !compiler->report.error_count)
 							{

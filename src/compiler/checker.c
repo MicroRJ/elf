@@ -112,7 +112,7 @@ static void declare_statics(Checker *checker, Ast_Array stats)
 	}
 }
 
-Checker *checker_run(Compiler *compiler, Ast ast_file)
+Checker *check_file(Compiler *compiler, Ast ast_file)
 {
 	ASSERT(compiler);
 	ASSERT(ast_file->kind == AST_FILE);
@@ -123,7 +123,25 @@ Checker *checker_run(Compiler *compiler, Ast ast_file)
 	checker->compiler = compiler;
 	checker->current_function = ast_file;
 	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
-	check_statement(checker, ast_file);
+
+	Scope *previous_source_scope = checker->source_scope;
+	Scope *previous_active_scope = checker->active_scope;
+
+	checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, ast_file, ast_file->source);
+	checker->active_scope = checker->source_scope;
+
+	Com_Source *source = ast_file->source;
+	ASSERT(source);
+	ASSERT(!source->scope);
+	source->scope = checker->source_scope;
+
+	declare_statics(checker, ast_file->file.body->block);
+	for (u32 i = 0; i < ast_file->file.body->block.count; ++i) {
+		check_statement(checker, ast_file->file.body->block.items[i]);
+	}
+
+	checker->source_scope = previous_source_scope;
+	checker->active_scope = previous_active_scope;
 	return checker;
 }
 
@@ -474,40 +492,17 @@ static void check_statement(Checker *checker, Ast stat)
 		return;
 	}
 
-	ASSERT(stat->kind == AST_FILE || checker->active_scope);
-	ASSERT(stat->kind == AST_FILE || checker->source_scope);
-	ASSERT(stat->kind == AST_FILE || stat->source == checker->source_scope->source);
-	ASSERT(stat->kind == AST_FILE || stat->source == checker->active_scope->source);
+	ASSERT(stat->kind != AST_FILE);
+	ASSERT(checker->active_scope);
+	ASSERT(checker->source_scope);
+	ASSERT(stat->source == checker->source_scope->source);
+	ASSERT(stat->source == checker->active_scope->source);
 
 	switch (stat->kind)
 	{
 		case AST_NONE:
 		case AST_ERROR:
 		{
-		}
-		break;
-
-		case AST_FILE:
-		{
-			Scope *previous_source_scope = checker->source_scope;
-			Scope *previous_active_scope = checker->active_scope;
-
-			checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, stat, stat->source);
-			checker->active_scope = checker->source_scope;
-
-			declare_statics(checker, stat->file.body->block);
-			for (u32 i = 0; i < stat->file.body->block.count; ++i) {
-				check_statement(checker, stat->file.body->block.items[i]);
-			}
-
-			Com_Source *source = stat->source;
-			ASSERT(source);
-			ASSERT(!source->scope);
-			source->scope = checker->source_scope;
-
-			checker->source_scope = previous_source_scope;
-			checker->active_scope = previous_active_scope;
-
 		}
 		break;
 
