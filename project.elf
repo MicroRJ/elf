@@ -29,7 +29,7 @@ library := {
 		"src/core/elf_core.c",
 		"src/libs/libs.c",
 		"src/compiler/compiler.c",
-		"src/compiler/linker.c",
+		"src/linker.c",
 		"src/compiler/entity.c",
 		"src/compiler/frontend/parser.c",
 		"src/compiler/middle/ir_emitter.c",
