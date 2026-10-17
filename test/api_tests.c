@@ -451,7 +451,6 @@ static Compiler *api_test_create_compiler(elf_State *state, elf_Scratch *scratch
 	(void)state;
 	*scratch = elf_begin_scratch();
 	Compiler *compiler = compiler_create(scratch->arena);
-	compiler_set_log_messages(compiler, false);
 	compiler_add_root_source(compiler, name, source);
 	return compiler;
 }

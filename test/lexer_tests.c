@@ -757,7 +757,6 @@ static void test_lexer_out_of_memory(elf_State *state)
 {
 	elf_Arena arena = elf_arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
-	compiler_set_log_messages(compiler, false);
 	elf_StrSlice source = {(char *)"oom_identifier", 14};
 	compiler_add_root_source(compiler, "lexer_oom", source);
 	Lexer lexer = {};
@@ -776,7 +775,6 @@ static void test_lexer_out_of_memory(elf_State *state)
 
 	arena = elf_arena_create(0);
 	compiler = compiler_create(&arena);
-	compiler_set_log_messages(compiler, false);
 	source = (elf_StrSlice) {(char *)"@", 1};
 	compiler_add_root_source(compiler, "lexer_report_oom", source);
 	lexer = (Lexer) {};

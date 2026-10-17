@@ -62,7 +62,6 @@ Compiler *compiler_create(elf_Arena *arena)
 			if (compiler->atoms->buckets)
 			{
 				compiler_init_atoms(compiler);
-				compiler->log_messages = true;
 			}
 			else
 			{
@@ -75,13 +74,6 @@ Compiler *compiler_create(elf_Arena *arena)
 		}
 	}
 	return compiler;
-}
-
-void compiler_set_log_messages(Compiler *compiler, b32 enabled)
-{
-	if (compiler) {
-		compiler->log_messages = enabled;
-	}
 }
 
 static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format, va_list args)
@@ -139,23 +131,32 @@ b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity,
 		compiler->report.warning_count += 1;
 	}
 
-	if (compiler->log_messages)
+	return true;
+}
+
+void compiler_log_report(Compiler *compiler)
+{
+	ASSERT(compiler);
+	for (Com_Message *message = compiler->report.first; message; message = message->next)
 	{
-		LogLevel level = severity == COMPILER_ERROR ? LOG_LEVEL_ERROR : severity == COMPILER_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
-		const char *severity_name = severity == COMPILER_ERROR ? "error" : severity == COMPILER_WARNING ? "warning" : "note";
+		LogLevel level = message->severity == COMPILER_ERROR ? LOG_LEVEL_ERROR : message->severity == COMPILER_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
+		const char *severity_name = message->severity == COMPILER_ERROR ? "error" : message->severity == COMPILER_WARNING ? "warning" : "note";
+		SourceSite site = message->site;
 		Com_Source *source = site.source < compiler->source_count ? compiler->sources + site.source : 0;
 		const char *source_name = source ? atom_data(source->name) : "<unknown>";
-		if (site.line_index) {
-			log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message.data);
+		if (site.line_index)
+		{
+			log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message->text.data);
 		}
-		else {
-			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message.data);
+		else
+		{
+			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message->text.data);
 		}
-		if (source && source_slice_is_valid(site)) {
+		if (source && source_slice_is_valid(site))
+		{
 			print_source_slice_marker(site, source->source);
 		}
 	}
-	return true;
 }
 
 b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
@@ -226,6 +227,7 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 					}
 				}
 			}
+			compiler_log_report(compiler);
 		}
 	}
 	return module;
@@ -342,13 +344,7 @@ Compiler *compiler_create(elf_Arena *arena)
 	compiler->atoms = elf_arena_push_zero(arena, sizeof(*compiler->atoms));
 	atom_table_init(compiler->atoms, arena);
 	init_atoms(compiler);
-	compiler->log_messages = true;
 	return compiler;
-}
-
-void compiler_set_log_messages(Compiler *compiler, b32 enabled)
-{
-	compiler->log_messages = enabled;
 }
 
 static Com_Import *compiler_append_import(Compiler *compiler, Com_SourceId source_id, Atom *path, SourceSite site)
@@ -1072,9 +1068,6 @@ b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity,
 		return false;
 	}
 
-	Com_SourceId source_id = site.source < compiler->source_count ? site.source : 0;
-	Com_Source *source = compiler->sources + source_id;
-	const char *source_name = atom_data(source->name);
 	elf_arena_align(compiler->arena, _Alignof(Com_Message));
 	Com_Message *compiler_message = elf_arena_push_zero(compiler->arena, sizeof(*compiler_message));
 	if (!compiler_message) {
@@ -1105,18 +1098,6 @@ b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity,
 		compiler->report.warning_count += 1;
 	}
 
-	if (compiler->log_messages)
-	{
-		LogLevel level = severity == COMPILER_ERROR ? LOG_LEVEL_ERROR : severity == COMPILER_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
-		const char *severity_name = severity == COMPILER_ERROR ? "error" : severity == COMPILER_WARNING ? "warning" : "note";
-		if (site.line_index) {
-			log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message.data);
-		}
-		else {
-			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message.data);
-		}
-		if (source_slice_is_valid(site)) print_source_slice_marker(site, source->source);
-	}
 	return true;
 }
 

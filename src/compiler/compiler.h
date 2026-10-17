@@ -124,12 +124,11 @@ struct Compiler
 	u32                source_count;
 	u32                source_capacity;
 	Com_Report         report;
-	b32                log_messages;
 };
 
 Compiler *compiler_create(elf_Arena *arena);
 
-void compiler_set_log_messages(Compiler *compiler, b32 enabled);
+void compiler_log_report(Compiler *compiler);
 
 b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
