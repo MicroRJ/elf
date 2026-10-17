@@ -97,7 +97,7 @@ static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, Entit
 	checker->entity_stack[checker->entity_index ++] = entity;
 	entity->kind = kind;
 	entity->tree = tree;
-	entity->owner_function = checker->current_function;
+	entity->parent = checker->current_function;
 	entity->tags = tags;
 	entity->name = name;
 	return entity;

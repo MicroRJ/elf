@@ -64,7 +64,7 @@ struct Entity {
 	EntityKind  kind;
 	Atom       *name;
 	Ast         tree;
-	Ast         owner_function;
+	Ast         parent;
 	Ir          ir;
 	EntityTags  tags;
 	u32         users;
