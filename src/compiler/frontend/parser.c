@@ -202,11 +202,10 @@ void parser_destroy(Parser *parser)
 	}
 }
 
-static b32 parser_begin_source(Parser *parser, Com_SourceId source_id)
+static b32 parser_begin_source(Parser *parser, Com_Source *source)
 {
 	ASSERT(parser);
-	ASSERT(source_id < parser->compiler->source_count);
-	Com_Source *source = parser->compiler->sources + source_id;
+	ASSERT(source);
 	ASSERT(source->name != 0);
 	ASSERT(source->source.data != 0);
 
@@ -224,7 +223,7 @@ static b32 parser_begin_source(Parser *parser, Com_SourceId source_id)
 		return false;
 	}
 
-	lexer_init(&parser->lexer, parser->compiler, source_id, &parser->scratch_arena);
+	lexer_init(&parser->lexer, parser->compiler, source, &parser->scratch_arena);
 	consume_token(parser);
 	consume_token(parser);
 	return true;
@@ -1818,37 +1817,37 @@ static Ast parse_constexpr(Parser *parser)
 
 #include "parse_json.c"
 
-Ast parser_parse_file(Parser *parser, Com_SourceId source_id)
+Ast parser_parse_file(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
-	if (parser_begin_source(parser, source_id)) {
+	if (parser_begin_source(parser, source)) {
 		ast = parse_file(parser);
 	}
 	return ast;
 }
 
-Ast parser_parse_constant_expr(Parser *parser, Com_SourceId source_id)
+Ast parser_parse_constant_expr(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
-	if (parser_begin_source(parser, source_id)) {
+	if (parser_begin_source(parser, source)) {
 		ast = parse_constexpr(parser);
 	}
 	return ast;
 }
 
-Ast parser_parse_json(Parser *parser, Com_SourceId source_id)
+Ast parser_parse_json(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
-	if (parser_begin_source(parser, source_id)) {
+	if (parser_begin_source(parser, source)) {
 		ast = parse_json_ast(parser);
 	}
 	return ast;
 }
 
-Ast parser_parse_jsonl(Parser *parser, Com_SourceId source_id)
+Ast parser_parse_jsonl(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
-	if (parser_begin_source(parser, source_id)) {
+	if (parser_begin_source(parser, source)) {
 		ast = parse_jsonl_ast(parser);
 	}
 	return ast;

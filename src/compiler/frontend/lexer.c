@@ -71,13 +71,12 @@ static b32 lexer_is_hex_digit(u32 c)
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-static void lexer_init(Lexer *lexer, Compiler *compiler, Com_SourceId source_id, elf_Arena *scratch_arena)
+static void lexer_init(Lexer *lexer, Compiler *compiler, Com_Source *source, elf_Arena *scratch_arena)
 {
-	ASSERT(source_id < compiler->source_count);
+	ASSERT(source);
 	ASSERT(scratch_arena);
-	Com_Source *source = compiler->sources + source_id;
 	lexer->compiler = compiler;
-	lexer->source_id = source_id;
+	lexer->source_id = source->id;
 	lexer->atoms = compiler->atoms;
 	lexer->scratch_arena = scratch_arena;
 	lexer->source = source->source;

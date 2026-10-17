@@ -55,7 +55,7 @@ struct Parser
 
 Parser *parser_create(Compiler *compiler);
 void parser_destroy(Parser *parser);
-Ast parser_parse_file(Parser *parser, Com_SourceId source_id);
-Ast parser_parse_constant_expr(Parser *parser, Com_SourceId source_id);
-Ast parser_parse_json(Parser *parser, Com_SourceId source_id);
-Ast parser_parse_jsonl(Parser *parser, Com_SourceId source_id);
+Ast parser_parse_file(Parser *parser, Com_Source *source);
+Ast parser_parse_constant_expr(Parser *parser, Com_Source *source);
+Ast parser_parse_json(Parser *parser, Com_Source *source);
+Ast parser_parse_jsonl(Parser *parser, Com_Source *source);

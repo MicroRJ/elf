@@ -5,7 +5,7 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_tests", source);
 	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, 0);
+	Ast file = parser_parse_file(parser, compiler->sources);
 	parser_destroy(parser);
 	return file;
 }
@@ -357,7 +357,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "deprecated_table_call", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
 	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, 0);
+	Ast file = parser_parse_file(parser, compiler->sources);
 	parser_destroy(parser);
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
@@ -525,7 +525,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_source_error", source);
 	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, 0);
+	Ast file = parser_parse_file(parser, compiler->sources);
 	parser_destroy(parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_PARSER)
 	{
@@ -746,7 +746,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	compiler_add_root_source(compiler, "parser_lexer_error", source);
 	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, 0);
+	Ast file = parser_parse_file(parser, compiler->sources);
 	parser_destroy(parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
 		test_fail("parser propagates a lexer error token");
@@ -800,7 +800,7 @@ static void test_parser_ast_oom(elf_State *state)
 	Parser *parser = parser_create(compiler);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
-	Ast ast = parser_parse_constant_expr(parser, 0);
+	Ast ast = parser_parse_constant_expr(parser, compiler->sources);
 	arena.capacity = capacity;
 	parser_destroy(parser);
 	if (ast != ERROR_OOM_AST || ast->status != COM_STATUS_OOM) {
