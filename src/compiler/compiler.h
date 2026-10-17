@@ -116,6 +116,7 @@ Com_SourceState;
 typedef struct Com_Source Com_Source;
 struct Com_Source
 {
+	Com_Source        *next;
 	Com_SourceId       id;
 	struct Atom        *name;
 	struct Atom        *path;
@@ -134,13 +135,14 @@ struct Compiler
 {
 	Arena             *arena;
 	struct Atom_Table *atoms;
-	Com_Source        *sources;
+	Com_Source        *first_source;
+	Com_Source        *last_source;
 	u32                source_count;
-	u32                source_capacity;
 	Com_Report         report;
 };
 
 Compiler *compiler_create(elf_Arena *arena);
+Com_Source *compiler_source_from_id(Compiler *compiler, Com_SourceId source_id);
 
 void compiler_log_report(Compiler *compiler);
 

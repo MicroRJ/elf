@@ -76,6 +76,18 @@ Compiler *compiler_create(elf_Arena *arena)
 	return compiler;
 }
 
+Com_Source *compiler_source_from_id(Compiler *compiler, Com_SourceId source_id)
+{
+	ASSERT(compiler);
+	for (Com_Source *source = compiler->first_source; source; source = source->next)
+	{
+		if (source->id == source_id) {
+			return source;
+		}
+	}
+	return 0;
+}
+
 static elf_StrSlice compiler_format_message(elf_Arena *arena, const char *format, va_list args)
 {
 	va_list count_args;
@@ -142,7 +154,7 @@ void compiler_log_report(Compiler *compiler)
 		LogLevel level = message->severity == COMPILER_ERROR ? LOG_LEVEL_ERROR : message->severity == COMPILER_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
 		const char *severity_name = message->severity == COMPILER_ERROR ? "error" : message->severity == COMPILER_WARNING ? "warning" : "note";
 		SourceSite site = message->site;
-		Com_Source *source = site.source < compiler->source_count ? compiler->sources + site.source : 0;
+		Com_Source *source = compiler_source_from_id(compiler, site.source);
 		const char *source_name = source ? atom_data(source->name) : "<unknown>";
 		if (site.line_index)
 		{
@@ -168,38 +180,32 @@ b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, 
 	return result;
 }
 
-static Com_SourceId compiler_alloc_source(Compiler *compiler, Atom *name, Atom *path, BcSourceBuffer data)
+static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *path, BcSourceBuffer data)
 {
-	if (compiler->source_count == compiler->source_capacity)
-	{
-		u32 capacity = compiler->source_capacity ? compiler->source_capacity * 2 : 8;
-		Com_Source *sources = dy_arena_push_zero(compiler->arena, capacity * sizeof(*sources), _Alignof(Com_Source));
-		if (!sources) {
-			return COM_INVALID_SOURCE_ID;
-		}
-		if (compiler->source_count) {
-			dy_memory_copy(sources, compiler->sources, compiler->source_count * sizeof(*sources));
-		}
-		compiler->sources = sources;
-		compiler->source_capacity = capacity;
+	Com_Source *source = dy_arena_push_zero(compiler->arena, sizeof(*source), _Alignof(Com_Source));
+	if (!source) {
+		return 0;
 	}
-	Com_SourceId source_id = compiler->source_count++;
-	Com_Source *source = compiler->sources + source_id;
-	source->id = source_id;
+	source->id = compiler->source_count++;
 	source->name = name;
 	source->path = path;
 	source->source = data;
-	return source_id;
+	if (compiler->last_source) {
+		compiler->last_source->next = source;
+	} else {
+		compiler->first_source = source;
+	}
+	compiler->last_source = source;
+	return source;
 }
 
 // NOTE(RJ): assumes the path is canonical
-static Com_SourceId compiler_load_source(Compiler *compiler, SourceSite site, Atom *path_atom)
+static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Atom *path_atom)
 {
-	for (u32 i = 0; i < compiler->source_count; ++i)
+	for (Com_Source *source = compiler->first_source; source; source = source->next)
 	{
-		Com_Source *source = compiler->sources + i;
 		if (source->path == path_atom) {
-			return i;
+			return source;
 		}
 	}
 
@@ -250,25 +256,24 @@ static Com_SourceId compiler_load_source(Compiler *compiler, SourceSite site, At
 		error = "could not find source file";
 	}
 
-	Com_SourceId source_id = COM_INVALID_SOURCE_ID;
+	Com_Source *source = 0;
 	if (error)
 	{
 		compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "%s '%s'", error, atom_data(path_atom));
 	}
 	else
 	{
-		source_id = compiler_alloc_source(compiler, path_atom, path_atom, (BcSourceBuffer) {.data = contents.data, .size = (u32)contents.size});
-		if (source_id == COM_INVALID_SOURCE_ID) {
+		source = compiler_alloc_source(compiler, path_atom, path_atom, (BcSourceBuffer) {.data = contents.data, .size = (u32)contents.size});
+		if (!source) {
 			compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
 		}
 	}
-	return source_id;
+	return source;
 }
 
-static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_SourceId source_id)
+static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Source *source)
 {
-	ASSERT(source_id < compiler->source_count);
-	Com_Source *source = compiler->sources + source_id;
+	ASSERT(source);
 	if (source->state != COM_SOURCE_UNPARSED) {
 		return source->ast;
 	}
@@ -290,12 +295,12 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 		ASSERT(import_ast->import.path);
 
 		Atom *import_path_requested = import_ast->import.path;
-		Com_SourceId imported_source_id = compiler_load_source(compiler, import_ast->site, import_path_requested);
-		if (imported_source_id == COM_INVALID_SOURCE_ID) {
+		Com_Source *imported_source = compiler_load_source(compiler, import_ast->site, import_path_requested);
+		if (!imported_source) {
 			return ERROR_AST;
 		}
-		import_ast->import.source = imported_source_id;
-		Ast imported_ast = parse_source_recursively(compiler, parser, imported_source_id);
+		import_ast->import.source = imported_source->id;
+		Ast imported_ast = parse_source_recursively(compiler, parser, imported_source);
 		if (ast_is_error(imported_ast)) {
 			return imported_ast;
 		}
@@ -317,13 +322,13 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 			if (source_name && source_data)
 			{
 				copy_memory(source_data, source.data, source.size);
-				Com_SourceId source_id = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
-				if (source_id != COM_INVALID_SOURCE_ID)
+				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
+				if (compiler_source)
 				{
 					Parser *parser = parser_create(compiler);
 					if (parser)
 					{
-						Ast ast = parse_source_recursively(compiler, parser, source_id);
+						Ast ast = parse_source_recursively(compiler, parser, compiler_source);
 
 						parser_destroy(parser);
 
@@ -340,10 +345,10 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 									if (module->sources)
 									{
 										module->source_count = 1;
-										module->root_source = source_id;
+										module->root_source = compiler_source->id;
 										module->sources[0].name = (BcString) {.data = atom_data(source_name), .size = atom_size(source_name)};
 										module->sources[0].path = module->sources[0].name;
-										module->sources[0].source = compiler->sources[source_id].source;
+										module->sources[0].source = compiler_source->source;
 									}
 									else
 									{
@@ -389,13 +394,12 @@ static Ast compiler_parse_json_source(elf_Arena *arena, elf_StrSlice name, elf_S
 			if (source_name && source_data)
 			{
 				copy_memory(source_data, source.data, source.size);
-				Com_SourceId source_id = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
-				if (source_id != COM_INVALID_SOURCE_ID)
+				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
+				if (compiler_source)
 				{
 					Parser *parser = parser_create(compiler);
 					if (parser)
 					{
-						Com_Source *compiler_source = compiler->sources + source_id;
 						ast = type == COMPILER_PARSE_JSON ? parser_parse_json(parser, compiler_source) : parser_parse_jsonl(parser, compiler_source);
 						parser_destroy(parser);
 					}

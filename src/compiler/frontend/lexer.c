@@ -76,6 +76,7 @@ static void lexer_init(Lexer *lexer, Compiler *compiler, Com_Source *source, elf
 	ASSERT(source);
 	ASSERT(scratch_arena);
 	lexer->compiler = compiler;
+	lexer->compiler_source = source;
 	lexer->source_id = source->id;
 	lexer->atoms = compiler->atoms;
 	lexer->scratch_arena = scratch_arena;
@@ -909,7 +910,7 @@ static Com_Status lex(Lexer *lexer)
 					}
 					else if (token.type == TOK_M_FILE_NAME) {
 						token.type = TOK_STRING;
-						token.atom = lexer->compiler->sources[lexer->source_id].name;
+						token.atom = lexer->compiler_source->name;
 					}
 					else if (token.type == TOK_M_LINE_NUMBER) {
 						token.type = TOK_INTEGER;

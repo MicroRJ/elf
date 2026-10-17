@@ -187,8 +187,8 @@ static Scope *resolve_source_scope_lazily(Checker *checker, Com_SourceId source_
 {
 	Compiler *compiler = checker->compiler;
 	ASSERT(source_id != COM_INVALID_SOURCE_ID);
-	ASSERT(source_id < compiler->source_count);
-	Com_Source *source = compiler->sources + source_id;
+	Com_Source *source = compiler_source_from_id(compiler, source_id);
+	ASSERT(source);
 	ASSERT(source->name);
 	ASSERT(source->path);
 	ASSERT(source->ast);
@@ -499,8 +499,10 @@ static void check_statement(Checker *checker, Ast stat)
 				check_statement(checker, stat->file.body->block.items[i]);
 			}
 
-			ASSERT(!checker->compiler->sources[stat->site.source].scope);
-			checker->compiler->sources[stat->site.source].scope = checker->source_scope;
+			Com_Source *source = compiler_source_from_id(checker->compiler, stat->site.source);
+			ASSERT(source);
+			ASSERT(!source->scope);
+			source->scope = checker->source_scope;
 
 			checker->source_scope = previous_source_scope;
 			checker->active_scope = previous_active_scope;
