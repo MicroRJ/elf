@@ -37,15 +37,15 @@
 #include "elf_gc.c"
 #include "elf_value_text.c"
 
-#include "../libs/l_math.c"
-#include "../libs/l_number.c"
-#include "../libs/l_core.c"
-#include "../libs/l_gc.c"
-#include "../libs/l_vm.c"
-#include "../libs/l_table.c"
-#include "../libs/l_array.c"
-#include "../libs/l_string.c"
-#include "../libs/l_buffer.c"
+#include "libs/l_math.c"
+#include "libs/l_number.c"
+#include "libs/l_core.c"
+#include "libs/l_gc.c"
+#include "libs/l_vm.c"
+#include "libs/l_table.c"
+#include "libs/l_array.c"
+#include "libs/l_string.c"
+#include "libs/l_buffer.c"
 
 static void init_runtime_storage(elf_State *state)
 {
