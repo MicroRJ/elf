@@ -21,39 +21,22 @@ static Entity *resolve_identifier(Checker *checker, Atom *name);
 static void resolve_entity(Checker *checker, Entity *entity);
 static StaticValue resolve_expression(Checker *checker, Ast expr);
 
-typedef struct {
-	u32 outer_scope_start;
-	u32 entity_start;
-	u32 local;
-}
-StaticScope;
-
-static StaticScope push_scope(Checker *checker)
+static Scope *push_scope(Checker *checker, ScopeKind kind, Ast owner)
 {
-	StaticScope scope;
-	scope.outer_scope_start = checker->scope_start;
-	scope.entity_start = checker->entity_index;
-	checker->scope_start = checker->entity_index;
+	ASSERT(checker->current_scope);
+	ASSERT(!owner || owner->site.source == checker->current_scope->source);
+	Com_SourceId source = owner ? owner->site.source : checker->current_scope->source;
+	Scope *scope = scope_create(checker->compiler->arena, kind, checker->current_scope, owner, source);
+	ASSERT(scope || !"Codex: proper error propagation");
+	checker->current_scope = scope;
 	return scope;
 }
 
-static void pop_scope(Checker *checker, StaticScope scope)
+static void pop_scope(Checker *checker, Scope *scope)
 {
-	ASSERT(checker->entity_index >= scope.entity_start);
-	checker->entity_index = scope.entity_start;
-	checker->scope_start = scope.outer_scope_start;
-}
-
-static Entity *lookup_entity_in_current_scope(Checker *checker, Atom *name)
-{
-	for (u32 i = checker->entity_index; i > checker->scope_start; -- i)
-	{
-		Entity *entity = checker->entity_stack[i - 1];
-		if (entity->name == name) {
-			return entity;
-		}
-	}
-	return 0;
+	ASSERT(scope);
+	ASSERT(checker->current_scope == scope);
+	checker->current_scope = scope->parent;
 }
 
 static Entity *alloc_entity(Checker *checker, Atom *name)
@@ -62,20 +45,23 @@ static Entity *alloc_entity(Checker *checker, Atom *name)
 }
 
 static Entity *declare_entity(Checker *checker, EntityKind kind, Ast tree, EntityTags tags, Atom *name) {
-	Entity *entity = lookup_entity_in_current_scope(checker, name);
-	if (entity) {
+	Entity *existing = scope_find_current(checker->current_scope, name);
+	if (existing) {
 		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
 	}
 	printf("DECLARE ENTITY: %s\n", atom_data(name));
-	ASSERT(checker->entity_index < MAX_ENTITIES);
-	entity = alloc_entity(checker, name);
-	checker->entity_stack[checker->entity_index ++] = entity;
+	Entity *entity = alloc_entity(checker, name);
 	entity->kind = kind;
 	entity->name = name;
 	entity->state = ENTITY_UNRESOLVED;
 	entity->tree = tree;
 	entity->parent = checker->current_function;
 	entity->tags = tags;
+	if (!existing)
+	{
+		Entity *inserted = scope_insert(checker->current_scope, entity);
+		ASSERT(inserted == entity);
+	}
 	return entity;
 }
 
@@ -129,6 +115,7 @@ Checker *checker_run(Compiler *compiler, Ast ast)
 	checker->compiler = compiler;
 	checker->current_function = ast;
 	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, COM_INVALID_SOURCE_ID);
+	checker->current_scope = checker->globals;
 	check_statement(checker, ast->file.body);
 	return checker;
 }
@@ -148,28 +135,21 @@ static void resolve_entity(Checker *checker, Entity *entity) {
 
 static Entity *resolve_identifier(Checker *checker, Atom *name)
 {
-	for (u32 i = checker->entity_index; i > 0; -- i)
+	Entity *entity = scope_find(checker->current_scope, name);
+	if (entity)
 	{
-		Entity *entity = checker->entity_stack[i - 1];
-		if (entity->name == name)
-		{
-			// NOTE(RJ): if we're not a static entity then we must be resolved, because only static entities
-			// are allowed to be unresolved
-			ASSERT(entity->kind == ENTITY_STATIC || entity->state == ENTITY_RESOLVED);
-			if (entity->kind == ENTITY_STATIC && entity->state != ENTITY_RESOLVED) {
-				resolve_entity(checker, entity);
-			}
-			return entity;
+		// NOTE(RJ): if we're not a static entity then we must be resolved, because only static entities
+		// are allowed to be unresolved
+		ASSERT(entity->kind == ENTITY_STATIC || entity->state == ENTITY_RESOLVED);
+		if (entity->kind == ENTITY_STATIC && entity->state != ENTITY_RESOLVED) {
+			resolve_entity(checker, entity);
 		}
+		return entity;
 	}
-	Entity *entity = scope_find_current(checker->globals, name);
-	if (!entity)
-	{
-		entity = alloc_entity(checker, name);
-		entity->kind = ENTITY_GLOBAL;
-		entity->state = ENTITY_RESOLVED;
-		entity = scope_insert(checker->globals, entity);
-	}
+	entity = alloc_entity(checker, name);
+	entity->kind = ENTITY_GLOBAL;
+	entity->state = ENTITY_RESOLVED;
+	entity = scope_insert(checker->globals, entity);
 	return entity;
 }
 
@@ -279,7 +259,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 
 		case AST_FUNCTION:
 		{
-			StaticScope scope = push_scope(checker);
+			Scope *scope = push_scope(checker, SCOPE_FUNCTION, expr);
 			Ast outer_function = checker->current_function;
 			checker->current_function = expr;
 			for (u32 i = 0; i < expr->function.params.count; ++i)
@@ -487,7 +467,7 @@ static void check_statement(Checker *checker, Ast stat)
 
 		case AST_BLOCK_STAT:
 		{
-			StaticScope scope = push_scope(checker);
+			Scope *scope = push_scope(checker, SCOPE_BLOCK, stat);
 			declare_statics(checker, stat->block);
 			for (u32 i = 0; i < stat->block.count; ++i) {
 				check_statement(checker, stat->block.items[i]);
@@ -537,7 +517,7 @@ static void check_statement(Checker *checker, Ast stat)
 
 		case AST_FOR:
 		{
-			StaticScope scope = push_scope(checker);
+			Scope *scope = push_scope(checker, SCOPE_BLOCK, stat);
 			check_statement(checker, stat->for_stat.init);
 			resolve_expression(checker, stat->for_stat.pred);
 			check_statement(checker, stat->for_stat.step);
@@ -548,7 +528,7 @@ static void check_statement(Checker *checker, Ast stat)
 
 		case AST_FOR_RANGE:
 		{
-			StaticScope scope = push_scope(checker);
+			Scope *scope = push_scope(checker, SCOPE_BLOCK, stat);
 			check_statement(checker, stat->for_range_stat.decl);
 			check_statement(checker, stat->for_range_stat.body);
 			pop_scope(checker, scope);

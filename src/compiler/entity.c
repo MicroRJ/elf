@@ -35,6 +35,18 @@ Entity *scope_find_current(Scope *scope, Atom *name)
 	return 0;
 }
 
+Entity *scope_find(Scope *scope, Atom *name)
+{
+	for (Scope *current = scope; current; current = current->parent)
+	{
+		Entity *entity = scope_find_current(current, name);
+		if (entity) {
+			return entity;
+		}
+	}
+	return 0;
+}
+
 Entity *scope_insert(Scope *scope, Entity *entity)
 {
 	Entity *result = scope_find_current(scope, entity->name);

@@ -107,6 +107,7 @@ struct Scope
 
 Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_SourceId source);
 Entity *scope_find_current(Scope *scope, struct Atom *name);
+Entity *scope_find(Scope *scope, struct Atom *name);
 Entity *scope_insert(Scope *scope, Entity *entity);
 Entity *entity_alloc(Arena *arena, EntityKind kind, struct Atom *name);
 
