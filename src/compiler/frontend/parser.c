@@ -208,6 +208,7 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 	ASSERT(source);
 	ASSERT(source->name != 0);
 	ASSERT(source->source.data != 0);
+	parser->source = source;
 
 	elf_arena_reset(&parser->scratch_arena);
 	parser->tok = (Token) {};

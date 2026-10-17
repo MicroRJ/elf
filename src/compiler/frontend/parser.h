@@ -38,6 +38,7 @@ struct Parser
 	elf_Arena          *result_arena;
 	elf_Arena           scratch_arena;
 	Compiler           *compiler;
+	Com_Source         *source;
 	Atom_Table         *atoms;
 	Lexer               lexer;
 	// TODO(RJ): probably redundant now!

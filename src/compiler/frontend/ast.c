@@ -20,13 +20,14 @@ Ast_T ast_error_oom_sentinel =
 
 static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
 {
+	ASSERT(par->source);
+	ASSERT(site.source == par->source->id);
 	Ast_T *tree = dy_arena_push_zero(par->result_arena, sizeof(*tree), _Alignof(Ast_T));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}
 	tree->site = site;
-	tree->source = compiler_source_from_id(par->compiler, site.source);
-	ASSERT(tree->source);
+	tree->source = par->source;
 	tree->kind = kind;
 	return tree;
 }
