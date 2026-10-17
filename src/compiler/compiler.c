@@ -185,6 +185,7 @@ static Com_SourceId compiler_alloc_source(Compiler *compiler, Atom *name, Atom *
 	}
 	Com_SourceId source_id = compiler->source_count++;
 	Com_Source *source = compiler->sources + source_id;
+	source->id = source_id;
 	source->name = name;
 	source->path = path;
 	source->source = data;

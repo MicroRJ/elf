@@ -116,6 +116,7 @@ Com_SourceState;
 typedef struct Com_Source Com_Source;
 struct Com_Source
 {
+	Com_SourceId       id;
 	struct Atom        *name;
 	struct Atom        *path;
 	BcSourceBuffer      source;
