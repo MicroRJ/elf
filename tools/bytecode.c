@@ -6,7 +6,7 @@
 #include "base.h"
 #include "elf_core.h"
 #include "compiler.h"
-#include "bytecode_debug.h"
+#include "bytecode.h"
 
 static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *source)
 {

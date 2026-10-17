@@ -26,7 +26,6 @@ library := {
 	sources = [
 		"src/base/base.c",
 		"src/bytecode.c",
-		"src/bytecode_debug.c",
 		"src/core/elf_core.c",
 		"src/libs/libs.c",
 		"src/compiler/compiler.c",

@@ -13,7 +13,7 @@
 #include "parser.h"
 #include "ir.h"
 #include "ir_emitter.h"
-#include "bytecode_debug.h"
+#include "bytecode.h"
 #include "elf_value_text.h"
 
 // Compiler sources included by the unity tests.

@@ -12,6 +12,7 @@
 #include "elf.h"
 #include "base.h"
 
+typedef struct BcFunctionRef BcFunctionRef;
 
 // Type masks embedded in BC_ENFORCE instructions.
 typedef enum
@@ -100,6 +101,8 @@ typedef enum
 BcType;
 
 const char *bytecode_type_name(BcType type);
+char *format_bytecode_function(elf_State *state, elf_Arena *arena, BcFunctionRef function);
+void print_bytecode_function(elf_State *state, BcFunctionRef function);
 
 // One fixed-width VM instruction. The fourth operand uses padding that already
 // existed after z, so adding it does not make an instruction any larger.
