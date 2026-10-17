@@ -3,7 +3,6 @@ dy.root = "dy-core"
 
 internal_include_directories := [
 	"src",
-	"src/base",
 	"src/core",
 	"src/libs",
 	"src/compiler",
