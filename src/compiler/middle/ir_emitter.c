@@ -8,6 +8,7 @@
 #include "base.h"
 #include "atom_view.h"
 #include "compiler.h"
+#include "entity.h"
 #include "ir.h"
 #include "ast.h"
 #include "ir_emitter.h"

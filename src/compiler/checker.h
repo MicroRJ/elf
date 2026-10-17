@@ -2,6 +2,7 @@
 #define CHECKER_H
 
 #include "compiler.h"
+#include "entity.h"
 
 enum {MAX_ENTITIES=4096};
 
