@@ -194,9 +194,6 @@ struct StackFrame
 	u8                arity;
 	u8             variadic;
 	u8            ncaptures;
-	// Internal calls return over argument zero at framebase[0]. Public API calls
-	// preserve their pushed-callee layout and return over it at framebase[-1].
-	i8         return_offset;
 };
 
 struct elf_State

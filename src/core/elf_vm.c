@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, BcFunctionRef function_ref, elf_Value *captures, elf_Closure *closure, elf_Value *return_base, int nargs, int nrets)
+static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, BcFunctionRef function_ref, elf_Value *captures, elf_Closure *closure, int nargs, int nrets)
 {
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
@@ -42,8 +42,6 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 	frame->captures = captures;
 	frame->closure = closure;
 	frame->ncaptures = function->captures;
-	ASSERT(return_base == frame_base || return_base == frame_base - 1);
-	frame->return_offset = (i8)(return_base - frame_base);
 	frame->instruction = 0;
 
 	elf_Value *stack_pointer = frame_base + frame_size;
@@ -52,17 +50,16 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 	vm_record_stack_usage(state);
 }
 
-static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, elf_Value *return_base, int nargs, int nrets)
+static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs, int nrets)
 {
-	prepare_bytecode_stack_frame(state, frame, closure->function, closure->captures, closure, return_base, nargs, nrets);
+	prepare_bytecode_stack_frame(state, frame, closure->function, closure->captures, closure, nargs, nrets);
 }
 
-static u32 call_native_function(elf_State *state, elf_Function function, elf_Value *return_base, u32 nargs, u32 nrets)
+static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs, u32 nrets)
 {
 	state->vm_native_calls += 1;
 	elf_Value *frame_base = state->stack_ptr - nargs;
 	u32 frame_size = nargs;
-	ASSERT(return_base == frame_base || return_base == frame_base - 1);
 
 	*state->frame = (StackFrame) {
 		.framebase = frame_base,
@@ -70,7 +67,6 @@ static u32 call_native_function(elf_State *state, elf_Function function, elf_Val
 		.framesize = frame_size,
 		.nargs = nargs,
 		.nrets = nrets,
-		.return_offset = (i8)(return_base - frame_base),
 	};
 
 	// Native calls run directly above their arguments, so framebase + framesize
@@ -89,11 +85,11 @@ static u32 call_native_function(elf_State *state, elf_Function function, elf_Val
 
 	if (returned_count < nrets)
 	{
-		value_zero_many(return_base + returned_count, nrets - returned_count);
+		value_zero_many(frame_base - 1 + returned_count, nrets - returned_count);
 	}
 
-	value_copy_many(return_base, state->stack_ptr - returned_count, copied_return_count);
-	state->stack_ptr = return_base + nrets;
+	value_copy_many(frame_base - 1, state->stack_ptr - returned_count, copied_return_count);
+	state->stack_ptr = frame_base - 1 + nrets;
 	return copied_return_count;
 }
 
@@ -230,18 +226,17 @@ activate_frame:
 				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
 				ASSERT(byte.b_y >= 0 && (u32)byte.b_y < function->stack_size);
 				elf_Value callee = reference[byte.b_y];
-				elf_Value *return_base = reference + byte.b_x;
-				state->stack_ptr = return_base + byte.b_z;
+				state->stack_ptr = reference + byte.b_x + byte.b_z + 1;
 
 				if (value_is_closure(callee)) {
 					push_stack_frame(state);
-					prepare_closure_stack_frame(state, state->frame, value_as_closure(callee), return_base, byte.b_z, byte.b_w);
+					prepare_closure_stack_frame(state, state->frame, value_as_closure(callee), byte.b_z, byte.b_w);
 					ASSERT(state->stack_ptr == state->frame->framebase + state->frame->framesize);
 					goto activate_frame;
 				}
 				else if (value_is_function(callee)) {
 					push_stack_frame(state);
-					call_native_function(state, value_as_function(callee), return_base, byte.b_z, byte.b_w);
+					call_native_function(state, value_as_function(callee), byte.b_z, byte.b_w);
 					pop_stack_frame(state);
 					state->frame->instruction++;
 					elf_Value *stack_pointer = state->frame->framebase + state->frame->framesize;
@@ -266,19 +261,17 @@ activate_frame:
 				};
 				ASSERT(bc_function_ref_is_valid(function_ref));
 				ASSERT(bc_function_from_ref(function_ref)->captures == 0);
-				elf_Value *return_base = reference + byte.b_x;
-				state->stack_ptr = return_base + byte.b_z;
+				state->stack_ptr = reference + byte.b_x + byte.b_z + 1;
 				push_stack_frame(state);
-				prepare_bytecode_stack_frame(state, state->frame, function_ref, 0, 0, return_base, byte.b_z, byte.b_w);
+				prepare_bytecode_stack_frame(state, state->frame, function_ref, 0, 0, byte.b_z, byte.b_w);
 				ASSERT(state->stack_ptr == state->frame->framebase + state->frame->framesize);
 				goto activate_frame;
 			} break;
 
 			case BC_RETURN: {
 				nrets = MIN(byte.b_y, frame_nrets);
-				elf_Value *return_base = framebase + frame->return_offset;
 				if (nrets) {
-					value_copy_many(return_base, vm_slot(reference, byte.b_x), nrets);
+					value_copy_many(framebase - 1, vm_slot(reference, byte.b_x), nrets);
 				}
 
 				ASSERT(state->frame >= root_frame);
@@ -294,7 +287,7 @@ activate_frame:
 				}
 				else {
 					ASSERT(framebase == root_frame->framebase);
-					state->stack_ptr = return_base + nrets;
+					state->stack_ptr = framebase - 1 + nrets;
 					goto exit;
 				}
 			} break;
@@ -778,8 +771,7 @@ exit:
 
 static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int nrets)
 {
-	elf_Value *return_base = state->stack_ptr - nargs - 1;
-	prepare_closure_stack_frame(state, state->frame, closure, return_base, nargs, nrets);
+	prepare_closure_stack_frame(state, state->frame, closure, nargs, nrets);
 	int result = 0;
 	PROF_BLOCK("vm.run_bytecode_frame")
 	{
@@ -801,8 +793,7 @@ u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)
 	}
 	else if (value_is_function(value))
 	{
-		elf_Value *return_base = state->stack_ptr - nargs - 1;
-		nrets = call_native_function(state, value_as_function(value), return_base, nargs, nrets);
+		nrets = call_native_function(state, value_as_function(value), nargs, nrets);
 	}
 	else
 	{

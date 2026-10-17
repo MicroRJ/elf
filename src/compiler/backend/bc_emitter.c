@@ -627,7 +627,7 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 
 	i32 stack_top = mark_slots(emitter);
 	i32 callee_slot = NO_SLOT;
-	i32 call_slot = NO_SLOT;
+	i32 call_slot = stack_top;
 	{
 		i32 this_slot;
 		if (expr->kind == IR_META_FIELD)
@@ -652,6 +652,8 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 		}
 		else if (call_can_reference_local_directly(expr, args, &callee_slot))
 		{
+			i32 result_slot = alloc_slot(emitter);
+			ASSERT(result_slot == call_slot);
 			this_slot = alloc_slot(emitter);
 			emit_xy_bc(emitter, ir->site, BC_RELOAD, this_slot, 0);
 		}
@@ -663,16 +665,16 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 			emit_xy_bc(emitter, ir->site, BC_RELOAD, this_slot, 0);
 		}
 
-		call_slot = this_slot;
-		ASSERT(callee_slot < call_slot);
+		ASSERT(callee_slot <= call_slot);
+		ASSERT(this_slot == call_slot + 1);
 
 		for (u32 i = 0; i < nargs; ++ i)
 		{
 			i32 arg_slot = emit_expr(emitter, args.items[i], NO_SLOT, 1);
-			ASSERT(arg_slot == call_slot + 1 + (i32)i);
+			ASSERT(arg_slot == call_slot + 2 + (i32)i);
 		}
 
-		u32 call_width = MAX(nargs + 1, nout);
+		u32 call_width = MAX(nargs + 2, nout);
 		while ((i32)emitter->stack_top < call_slot + (i32)call_width) {
 			alloc_slot(emitter);
 		}
@@ -697,17 +699,20 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	i32 stack_top = mark_slots(emitter);
 	i32 call_slot = stack_top;
 	{
+		i32 result_slot = alloc_slot(emitter);
+		ASSERT(result_slot == call_slot);
+
 		i32 this_slot = alloc_slot(emitter);
-		ASSERT(this_slot == call_slot);
+		ASSERT(this_slot == call_slot + 1);
 		emit_xy_bc(emitter, ir->site, BC_RELOAD, this_slot, 0);
 
 		for (u32 i = 0; i < nargs; ++i)
 		{
 			i32 arg_slot = emit_expr(emitter, args.items[i], NO_SLOT, 1);
-			ASSERT(arg_slot == call_slot + 1 + (i32)i);
+			ASSERT(arg_slot == call_slot + 2 + (i32)i);
 		}
 
-		u32 call_width = MAX(nargs + 1, nout);
+		u32 call_width = MAX(nargs + 2, nout);
 		while ((i32)emitter->stack_top < call_slot + (i32)call_width) {
 			alloc_slot(emitter);
 		}
