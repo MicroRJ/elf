@@ -8,6 +8,7 @@
 #include "base.h"
 #include "elf_core.h"
 #include "compiler.h"
+#include "linker.h"
 
 static volatile elf_Int bench_integer_sink;
 static volatile elf_Num bench_number_sink;
