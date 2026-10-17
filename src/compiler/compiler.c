@@ -280,6 +280,43 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 	source->ast = ast_file;
 	source->state = COM_SOURCE_PARSED;
 
+	Ast_Array stats = ast_file->file.body->block;
+	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
+
+	for (u32 i = 0; i < stats.count; ++ i)
+	{
+		Ast stat = stats.items[i];
+		if (stat->kind == AST_STATIC_DECL && stat->static_decl.exported)
+		{
+			if (!source->exports)
+			{
+				source->exports = entity_table_create(compiler->arena);
+			}
+			if (!source->exports) {
+				return ERROR_OOM_AST;
+			}
+
+			Ast name = stat->static_decl.name;
+			ASSERT(name && name->kind == AST_IDENT);
+			ASSERT(!name->entity);
+			Entity *entity = entity_alloc(compiler->arena, ENTITY_STATIC, name->identifier);
+			if (!entity) {
+				return ERROR_OOM_AST;
+			}
+			entity->tree = stat;
+			Entity *inserted = entity_table_insert(source->exports, entity);
+			if (!inserted) {
+				return ERROR_OOM_AST;
+			}
+			if (inserted != entity)
+			{
+				compiler_report(compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, name->site, "'%s' is already exported by this source", atom_data(name->identifier));
+				return ERROR_AST;
+			}
+			name->entity = entity;
+		}
+	}
+
 	Ast_Array imports = ast_file->file.imports;
 	for (u32 i = 0; i < imports.count; ++i)
 	{

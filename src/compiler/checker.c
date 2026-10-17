@@ -21,6 +21,62 @@ typedef struct {
 }
 StaticScope;
 
+EntityTable *entity_table_create(Arena *arena)
+{
+	EntityTable *table = dy_arena_push_zero(arena, sizeof(*table), _Alignof(EntityTable));
+	if (table) {
+		table->arena = arena;
+	}
+	return table;
+}
+
+Entity *entity_table_find(EntityTable *table, Atom *name)
+{
+	for (u32 i = 0; i < table->count; ++i)
+	{
+		Entity *entity = table->entities[i];
+		if (entity->name == name) {
+			return entity;
+		}
+	}
+	return 0;
+}
+
+Entity *entity_table_insert(EntityTable *table, Entity *entity)
+{
+	Entity *result = entity_table_find(table, entity->name);
+	if (!result)
+	{
+		if (table->count == table->capacity)
+		{
+			u32 capacity = table->capacity ? table->capacity * 2 : 16;
+			Entity **entities = dy_arena_push(table->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
+			if (!entities) {
+				return 0;
+			}
+			if (table->count) {
+				dy_memory_copy(entities, table->entities, sizeof(*entities) * table->count);
+			}
+			table->entities = entities;
+			table->capacity = capacity;
+		}
+		table->entities[table->count++] = entity;
+		result = entity;
+	}
+	return result;
+}
+
+Entity *entity_alloc(Arena *arena, EntityKind kind, Atom *name)
+{
+	Entity *entity = dy_arena_push_zero(arena, sizeof(*entity), _Alignof(Entity));
+	if (entity)
+	{
+		entity->kind = kind;
+		entity->name = name;
+	}
+	return entity;
+}
+
 static StaticScope push_scope(Checker *checker)
 {
 	StaticScope scope;
@@ -118,25 +174,21 @@ static Entity *lookup_entity_in_current_scope(Checker *checker, Atom *name)
 	return 0;
 }
 
-static Entity *alloc_entity(Checker *checker, Atom *name) {
-	Entity *entity = dy_arena_push_zero(checker->compiler->arena, sizeof(*entity), _Alignof(Entity));
-	entity->name = name;
-	return entity;
+static Entity *alloc_entity(Checker *checker, Atom *name)
+{
+	return entity_alloc(checker->compiler->arena, ENTITY_NONE, name);
 }
 
 // TODO(RJ): hash table
-static Entity *global_entity(Checker *checker, Atom *name) {
-	EntityTable *table = & checker->globals;
-
-	for (u32 index = 0; index < table->counter; ++ index) {
-		if (table->references[index]->name == name) {
-			return table->references[index];
-		}
+static Entity *global_entity(Checker *checker, Atom *name)
+{
+	Entity *entity = entity_table_find(checker->globals, name);
+	if (!entity)
+	{
+		entity = alloc_entity(checker, name);
+		entity->kind = ENTITY_GLOBAL;
+		entity = entity_table_insert(checker->globals, entity);
 	}
-	ASSERT(table->counter < table->capacity);
-	Entity *entity = alloc_entity(checker, name);
-	entity->kind = ENTITY_GLOBAL;
-	table->references[table->counter ++] = entity;
 	return entity;
 }
 
@@ -190,9 +242,24 @@ static void predeclare_static_declarations(Checker *checker, Ast_Array stats)
 		ASSERT(item->static_decl.expr);
 
 		StaticValue value = process_static_declaration_value(checker, item->static_decl.expr);
-		Entity *entity = declare_entity(checker, ENTITY_STATIC, item, ENTITY_TAG_CONSTANT, item->static_decl.name->atom);
-		ASSERT(!item->static_decl.name->entity);
-		item->static_decl.name->entity = entity;
+		Entity *entity = item->static_decl.name->entity;
+		if (entity)
+		{
+			if (lookup_entity_in_current_scope(checker, entity->name)) {
+				compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, item->site, "'%s' is already declared in this scope", atom_data(entity->name));
+			}
+			ASSERT(entity->kind == ENTITY_STATIC);
+			ASSERT(entity->tree == item);
+			ASSERT(checker->entity_index < MAX_ENTITIES);
+			checker->entity_stack[checker->entity_index++] = entity;
+			entity->parent = checker->current_function;
+			entity->tags |= ENTITY_TAG_CONSTANT;
+		}
+		else
+		{
+			entity = declare_entity(checker, ENTITY_STATIC, item, ENTITY_TAG_CONSTANT, item->static_decl.name->atom);
+			item->static_decl.name->entity = entity;
+		}
 
 		entity->value = value;
 	}
@@ -200,6 +267,7 @@ static void predeclare_static_declarations(Checker *checker, Ast_Array stats)
 }
 
 static StaticValue check_tree(Checker *checker, Ast ast);
+
 
 Checker *checker_run(Compiler *compiler, Ast ast)
 {
@@ -211,8 +279,7 @@ Checker *checker_run(Compiler *compiler, Ast ast)
 	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
 	checker->compiler = compiler;
 	checker->current_function = ast;
-	checker->globals.capacity = 4096;
-	checker->globals.references = dy_arena_push_zero(compiler->arena, sizeof(*checker->globals.references) * checker->globals.capacity, _Alignof(Entity *));
+	checker->globals = entity_table_create(compiler->arena);
 	check_tree(checker, ast->file.body);
 	return checker;
 }

@@ -8,13 +8,18 @@ typedef struct Entity      Entity;
 typedef struct EntityTable EntityTable;
 typedef struct IrFunction    IrFunction;
 
-// TODO(RJ): maybe allocate the entities here directly?
 // TODO(RJ): def use a hash-table for globals!
 struct EntityTable {
-	Entity **references;
-	u32      counter;
+	Arena   *arena;
+	Entity **entities;
+	u32      count;
 	u32      capacity;
 };
+
+
+EntityTable *entity_table_create(Arena *arena);
+Entity *entity_table_find(EntityTable *table, Atom *name);
+Entity *entity_table_insert(EntityTable *table, Entity *entity);
 
 typedef enum {
 	STATIC_VALUE_NONE = 0,
@@ -23,6 +28,7 @@ typedef enum {
 	STATIC_VALUE_INTEGER,
 	STATIC_VALUE_STRING,
 	STATIC_VALUE_FUNCTION,
+	STATIC_VALUE_EXPORTS,
 }
 StaticValueType;
 
@@ -82,14 +88,15 @@ enum {MAX_ENTITIES=4096};
 
 typedef struct Checker Checker;
 struct Checker {
-	Compiler    *compiler;
-	EntityTable  globals;
-	Ast          current_function;
-	u32          scope_start;
-	u32          entity_index;
-	Entity      *entity_stack[MAX_ENTITIES];
+	Compiler     *compiler;
+	EntityTable  *globals;
+	Ast           current_function;
+	u32           scope_start;
+	u32           entity_index;
+	Entity       *entity_stack[MAX_ENTITIES];
 };
 
 Checker *checker_run(Compiler *compiler, Ast tree);
+Entity *entity_alloc(Arena *arena, EntityKind kind, Atom *name);
 
 #endif
