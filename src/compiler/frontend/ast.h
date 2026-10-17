@@ -89,13 +89,6 @@ typedef enum
 }
 Ast_Kind;
 
-typedef enum
-{
-	AST_DECL_TAG_NONE     = 0,
-	AST_DECL_TAG_CONSTANT = 1 << 0,
-}
-AstDeclTags;
-
 static inline const char *ast_type_name(Ast_Kind type)
 {
 	static const char *names[] =
@@ -172,7 +165,7 @@ struct Ast_T
 
 		struct
 		{
-			u32 tags;
+			b32 constant;
 			Ast name;
 			Ast type;
 			Ast expr;

@@ -21,7 +21,7 @@ typedef struct
 	Com_SourceId      source_id;
 	Atom_Table       *atoms;
 	elf_Arena        *scratch_arena;
-	BcSourceBuffer      source;
+	BcSourceBuffer    source;
 
 	const char       *cursor;
 	const char       *end;

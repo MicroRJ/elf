@@ -295,7 +295,7 @@ static StaticValue check_tree(Checker *checker, Ast ast)
 		case AST_DECL_STAT:
 		{
 			Ast names = ast_ensure_kind(ast->decl.name, AST_TUPLE);
-			EntityTags tags = ast->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+			EntityTags tags = ast->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
 			check_tree(checker, ast->decl.type);
 			check_tree(checker, ast->decl.expr);
 			declare_names(checker, tags, names->tuple);

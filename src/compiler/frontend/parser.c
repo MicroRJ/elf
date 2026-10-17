@@ -1394,8 +1394,8 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 			if (!y) {
 				return parser_error(parser, COM_ERROR_INVALID_EXPRESSION, parser->tok.site, "expected declaration expression");
 			}
-			u32 tags = tok.type == TOK_HARD_BIND ? AST_DECL_TAG_CONSTANT : AST_DECL_TAG_NONE;
-			x = create_decl_ast(parser, tok.site, tags, x, y);
+			b32 constant = tok.type == TOK_HARD_BIND;
+			x = create_decl_ast(parser, tok.site, constant, x, y);
 		}
 		break;
 		case TOK_ASSIGN:
@@ -1607,14 +1607,14 @@ static Ast parse_stat(Parser *parser)
 			if (!name) {
 				return parser_error(parser, COM_ERROR_INVALID_DECLARATION, parser->tok.site, "expected for-loop declaration");
 			}
-			u32 decl_tags = AST_DECL_TAG_NONE;
+			b32 constant = false;
 			if (!pick_token(parser, TOK_BIND))
 			{
 				Token hard_bind = take_token(parser, TOK_HARD_BIND);
 				if (token_is_error(hard_bind)) {
 					return ast_from_token_error(hard_bind);
 				}
-				decl_tags |= AST_DECL_TAG_CONSTANT;
+				constant = true;
 			}
 
 			Ast init_expr = parse_tuple_expr(parser);
@@ -1624,7 +1624,7 @@ static Ast parse_stat(Parser *parser)
 			if (!init_expr) {
 				return parser_error(parser, COM_ERROR_INVALID_EXPRESSION, parser->tok.site, "expected for-loop initializer");
 			}
-			Ast init = create_decl_ast(parser, tok.site, decl_tags, name, init_expr);
+			Ast init = create_decl_ast(parser, tok.site, constant, name, init_expr);
 			if (ast_is_error(init)) {
 				return init;
 			}

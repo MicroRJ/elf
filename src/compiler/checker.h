@@ -36,7 +36,7 @@ typedef struct {
 		Atom        *unident;
 		EntityTable *exports;
 		struct {
-			Ast       function;
+			Ast         function;
 			IrFunction *definition;
 		};
 	};

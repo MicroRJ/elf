@@ -414,7 +414,7 @@ static Ast create_defer_ast(Parser *par, SourceSite site, Ast body)
 	return tree;
 }
 
-static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast expr)
+static Ast create_decl_ast(Parser *par, SourceSite site, b32 constant, Ast name, Ast expr)
 {
 	if (ast_is_error(name)) {
 		return name;
@@ -426,7 +426,7 @@ static Ast create_decl_ast(Parser *par, SourceSite site, u32 tags, Ast name, Ast
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->decl.tags = tags;
+	tree->decl.constant = constant;
 	tree->decl.name = name;
 	tree->decl.expr = expr;
 	return tree;
@@ -877,7 +877,7 @@ static void print_ast(Printer *pr, Ast tree)
 
 
 			print_ast(pr, name);
-			PRINT(pr, tree->decl.tags & AST_DECL_TAG_CONSTANT ? " ::= " : " := ");
+			PRINT(pr, tree->decl.constant ? " ::= " : " := ");
 			print_ast(pr, expr);
 		}
 		break;

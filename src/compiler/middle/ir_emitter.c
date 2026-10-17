@@ -1032,7 +1032,7 @@ static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
 		return ERROR_IR;
 	}
 
-	u32 entity_tags = decl->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
+	u32 entity_tags = decl->decl.constant ? ENTITY_TAG_CONSTANT : 0;
 	return lower_ast_for_range_expr_to_ir(emitter, stat, name_tuple, range, entity_tags);
 }
 
@@ -1208,7 +1208,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				break;
 			}
 
-			u32 entity_tags = stat->decl.tags & AST_DECL_TAG_CONSTANT ? ENTITY_TAG_CONSTANT : 0;
+			u32 entity_tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : 0;
 			lower_local_decl_tuples_to_ir(emitter, items, name_tuple, expr_tuple, entity_tags);
 		}
 		break;

@@ -108,7 +108,7 @@ static void test_parser_constant_declaration(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "answer ::= 42");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse constant declaration");
-	if (decl && !(decl->decl.tags & AST_DECL_TAG_CONSTANT)) {
+	if (decl && !decl->decl.constant) {
 		test_fail("hard bind marks declaration constant");
 	}
 }
