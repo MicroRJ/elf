@@ -14,10 +14,17 @@
 #include "token.h"
 
 typedef struct IrEmitter IrEmitter;
+typedef struct IrDefer IrDefer;
+
+struct IrDefer
+{
+	IrDefer *previous;
+	Ast      stat;
+};
 
 typedef struct
 {
-	u32 previous_defer_start;
+	IrDefer *previous_defer_start;
 }
 DeferScope;
 
@@ -27,7 +34,7 @@ struct IrLoopFrame
 	IrLoopFrame *parent;
 	Ir continue_label;
 	Ir break_label;
-	u32 defer_start;
+	IrDefer *defer_start;
 };
 
 typedef struct IrEmitterFrame IrEmitterFrame;
@@ -60,11 +67,9 @@ struct IrEmitter
 	u32              ir_stack_index;
 	Ir              *ir_stack;
 
-	Ast             *defer_stack;
-	u32              defer_stack_size;
-	u32              defer_count;
-	u32              defer_scope_start;
-	u32              function_defer_start;
+	IrDefer         *defer;
+	IrDefer         *defer_scope_start;
+	IrDefer         *function_defer_start;
 
 	IrEmitterFrame *function;
 	IrLoopFrame    *loop;
@@ -133,29 +138,30 @@ static DeferScope get_defer_scope(IrEmitter *emitter)
 {
 	DeferScope scope = {};
 	scope.previous_defer_start = emitter->defer_scope_start;
-	emitter->defer_scope_start = emitter->defer_count;
+	emitter->defer_scope_start = emitter->defer;
 	return scope;
 }
 
 static void set_defer_scope(IrEmitter *emitter, DeferScope scope)
 {
-	emitter->defer_count = emitter->defer_scope_start;
+	emitter->defer = emitter->defer_scope_start;
 	emitter->defer_scope_start = scope.previous_defer_start;
 }
 
 static void push_defer_stat(IrEmitter *emitter, Ast stat)
 {
-	ASSERT(emitter->defer_count < emitter->defer_stack_size);
-	emitter->defer_stack[emitter->defer_count++] = stat;
+	IrDefer *defer = dy_arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
+	defer->previous = emitter->defer;
+	defer->stat = stat;
+	emitter->defer = defer;
 }
 
-static void emit_defer_range(IrEmitter *emitter, IrCollector *items, u32 start)
+static void emit_defer_range(IrEmitter *emitter, IrCollector *items, IrDefer *start)
 {
-	ASSERT(start <= emitter->defer_count);
-	for (u32 i = emitter->defer_count; i > start; --i)
+	for (IrDefer *defer = emitter->defer; defer != start; defer = defer->previous)
 	{
-		Ast deferred = emitter->defer_stack[i - 1];
-		ir_emit_stat(items, deferred);
+		ASSERT(defer);
+		ir_emit_stat(items, defer->stat);
 	}
 }
 
@@ -931,7 +937,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = emitter->defer_count;
+	loop_frame.defer_start = emitter->defer;
 	push_loop(emitter, &loop_frame);
 	Ir body = ir_emit_stat_as_block(emitter, stat->for_range_stat.body);
 	pop_loop(emitter, &loop_frame);
@@ -1050,7 +1056,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = emitter->defer_count;
+	loop_frame.defer_start = emitter->defer;
 	push_loop(emitter, &loop_frame);
 	Ir body = ir_emit_stat_as_block(emitter, stat->for_stat.body);
 	pop_loop(emitter, &loop_frame);
@@ -1145,7 +1151,7 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 			IrLoopFrame loop_frame = {};
 			loop_frame.continue_label = start_label;
 			loop_frame.break_label = break_label;
-			loop_frame.defer_start = emitter->defer_count;
+			loop_frame.defer_start = emitter->defer;
 			push_loop(emitter, &loop_frame);
 			Ir body_ir = ir_emit_stat_as_block(emitter, body);
 			pop_loop(emitter, &loop_frame);
@@ -1359,7 +1365,7 @@ static void ir_emit_stat(IrCollector *items, Ast stat)
 				}
 				expr_ir = ir_emit_expr(emitter, expr);
 			}
-			if (expr_ir && emitter->defer_count > 0)
+			if (expr_ir && emitter->defer)
 			{
 				Ir return_value = ir_new_local(emitter, stat->site, expr_ir);
 				ir_push(items, return_value);
@@ -1447,13 +1453,13 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast
 	function_ctx.tree = tree;
 
 	IrEmitterFrame *outer_function = emitter->function;
-	u32 outer_defer_count = emitter->defer_count;
-	u32 outer_defer_scope_start = emitter->defer_scope_start;
-	u32 outer_function_defer_start = emitter->function_defer_start;
+	IrDefer *outer_defer = emitter->defer;
+	IrDefer *outer_defer_scope_start = emitter->defer_scope_start;
+	IrDefer *outer_function_defer_start = emitter->function_defer_start;
 	IrLoopFrame *outer_loop = emitter->loop;
 	emitter->function = &function_ctx;
-	emitter->defer_scope_start = outer_defer_count;
-	emitter->function_defer_start = outer_defer_count;
+	emitter->defer_scope_start = outer_defer;
+	emitter->function_defer_start = outer_defer;
 	emitter->loop = 0;
 
 	Ir *ir_params = elf_arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count));
@@ -1520,7 +1526,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunDef *definition, Ast
 
 	emitter->function = outer_function;
 	emitter->loop = outer_loop;
-	emitter->defer_count = outer_defer_count;
+	emitter->defer = outer_defer;
 	emitter->defer_scope_start = outer_defer_scope_start;
 	emitter->function_defer_start = outer_function_defer_start;
 
@@ -1550,9 +1556,6 @@ IrModule *ir_emit_module(Compiler *compiler, Checker *checker, Ast ast)
 	emitter->module = module;
 	emitter->ir_stack_size = 4096;
 	emitter->ir_stack = elf_arena_push_zero(module->arena, sizeof(*emitter->ir_stack) * emitter->ir_stack_size);
-	emitter->defer_stack_size = 4096;
-	emitter->defer_stack = elf_arena_push_zero(module->arena, sizeof(*emitter->defer_stack) * emitter->defer_stack_size);
-
 	IrFunDef *entry = ir_lower_function(emitter, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
 	ASSERT(entry == module->first_function);
 	ASSERT(!entry->capture_sources.items && !entry->capture_sources.count);
