@@ -185,6 +185,7 @@ static inline elf_Value *vm_slot(elf_Value *reference, i16 index)
 	return reference + index;
 }
 
+// TODO(RJ): proper error handling!
 static int run_bytecode_frame(elf_State *state)
 {
 	elf_Globals *globals = &state->globals;
@@ -206,10 +207,12 @@ activate_frame:
 	int byte_count = function->length;
 	const Bytecode *code = module->bytecode + byte_offset;
 
-	while (instruction < byte_count) {
+	while (instruction < byte_count)
+	{
 		int instr = instruction;
 		int next_instruction = instr + 1;
 		int byte_index = byte_offset + instr;
+		// TODO(RJ): consider caching this
 		frame->instruction = instruction;
 
 		Bytecode byte = code[instr];
