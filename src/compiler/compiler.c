@@ -200,9 +200,9 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 					if (!ast_is_error(ast) && !compiler->report.error_count)
 					{
 
-						Checker *analyzer = checker_run(compiler, ast);
+						Checker *checker = checker_run(compiler, ast);
 
-						IrModule *ir_module = ir_emit_module(compiler, analyzer, ast);
+						IrModule *ir_module = ir_emit_module(compiler, checker, ast);
 						if (ir_module && !compiler->report.error_count)
 						{
 							module = bc_emit_module(ir_module);

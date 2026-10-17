@@ -348,13 +348,33 @@ elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field)
 
 elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field)
 {
+	if (!field) {
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
+	elf_StrSlice slice = {(char *)field, strlen(field)};
+	return elf_set_field_slice(state, index, slice);
+}
+
+elf_ErrorCode elf_set_field_slice(elf_State *state, elf_Index index, elf_StrSlice field)
+{
 	elf_Table *table;
-	if (!field) return ELF_ERROR_INVALID_ARGUMENT;
+	if (!field.data) {
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
+	if (field.size > ELF_STRING_MAX_SIZE) {
+		return ELF_ERROR_OUT_OF_RANGE;
+	}
 	elf_ErrorCode error = field_table_at_for_write(state, index, &table);
-	if (error != ELF_ERROR_NONE) return error;
-	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
-	if (table_is_readonly(table)) return ELF_ERROR_READONLY;
-	elf_Value key = value_from_string(elf_string_from_data(state, field));
+	if (error != ELF_ERROR_NONE) {
+		return error;
+	}
+	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) {
+		return ELF_ERROR_STACK_UNDERFLOW;
+	}
+	if (table_is_readonly(table)) {
+		return ELF_ERROR_READONLY;
+	}
+	elf_Value key = value_from_string(elf_string_from_data_size(state, field.data, (u32)field.size));
 	elf_Value value = pop_value(state);
 	elf_table_set(state, table, key, value);
 	return ELF_ERROR_NONE;

@@ -17,74 +17,70 @@ typedef struct
 }
 JsonWriter;
 
-static b32 json_ast_to_value(elf_State *state, Ast ast, elf_Value *out)
+static b32 json_push_ast_value(elf_State *state, Ast ast)
 {
+	elf_Index stack_checkpoint = elf_get_top(state);
 	b32 result = true;
 	switch (ast->kind)
 	{
 		case AST_NIL_LITERAL:
 		{
-			*out = value_nil();
+			elf_push_nil(state);
 		}
 		break;
 
 		case AST_INTEGER_LITERAL:
 		{
-			*out = value_from_integer(ast->integer_value);
+			elf_push_int(state, ast->integer_value);
 		}
 		break;
 
 		case AST_NUMBER_LITERAL:
 		{
-			*out = value_from_number(ast->number_value);
+			elf_push_num(state, ast->number_value);
 		}
 		break;
 
 		case AST_STRING_LITERAL:
 		{
-			*out = value_from_string(elf_string_from_data_size(state, atom_data(ast->atom), atom_size(ast->atom)));
+			elf_push_str(state, atom_data(ast->atom), atom_size(ast->atom));
 		}
 		break;
 
 		case AST_TABLE:
 		{
-			elf_Table *table = elf_table_new(state);
+			elf_new_table(state);
+			elf_Index table = elf_abs_index(state, -1);
 			for (u32 i = 0; result && i < ast->table.count; ++i)
 			{
 				Ast entry = ast->table.items[i];
-				if (!entry || entry->kind != AST_TABLE_ENTRY || !entry->table_entry.key)
+				Ast key = entry && entry->kind == AST_TABLE_ENTRY ? entry->table_entry.key : 0;
+				if (!key || key->kind != AST_STRING_LITERAL)
 				{
 					result = false;
 				}
 				else
 				{
-					elf_Value key = {};
-					elf_Value value = {};
-					result = json_ast_to_value(state, entry->table_entry.key, &key) && json_ast_to_value(state, entry->table_entry.value, &value);
+					result = json_push_ast_value(state, entry->table_entry.value);
 					if (result) {
-						elf_table_set(state, table, key, value);
+						elf_StrSlice field = {(char *)atom_data(key->atom), atom_size(key->atom)};
+						result = elf_set_field_slice(state, table, field) == ELF_ERROR_NONE;
 					}
 				}
-			}
-			if (result) {
-				*out = value_from_table(table);
 			}
 		}
 		break;
 
 		case AST_ARRAY:
 		{
-			elf_Array *array = elf_array_new(state);
+			elf_new_array(state);
+			elf_Index array = elf_abs_index(state, -1);
 			for (u32 i = 0; result && i < ast->array.count; ++i)
 			{
-				elf_Value value = {};
-				result = json_ast_to_value(state, ast->array.items[i], &value);
+				result = json_push_ast_value(state, ast->array.items[i]);
 				if (result) {
-					elf_array_add(state, array, value);
+					result = elf_append(state, array) == ELF_ERROR_NONE;
 				}
-			}
-			if (result) {
-				*out = value_from_array(array);
 			}
 		}
 		break;
@@ -95,6 +91,10 @@ static b32 json_ast_to_value(elf_State *state, Ast ast, elf_Value *out)
 		}
 		break;
 	}
+	if (!result) {
+		elf_set_top(state, stack_checkpoint);
+	}
+	ASSERT(!result || elf_get_top(state) == stack_checkpoint + 1);
 	return result;
 }
 
@@ -104,14 +104,7 @@ static b32 lib_push_json_source(elf_State *state, const char *name, elf_StrSlice
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	Ast ast = jsonl ? compiler_parse_jsonl(scratch.arena, source_name, source) : compiler_parse_json(scratch.arena, source_name, source);
 
-	u32 saved_gc_mode = state->gc_mode;
-	state->gc_mode = ELF_GC_PAUSED;
-	elf_Value value = {};
-	b32 result = !ast_is_error(ast) && json_ast_to_value(state, ast, &value);
-	if (result) {
-		push_value(state, value);
-	}
-	state->gc_mode = saved_gc_mode;
+	b32 result = !ast_is_error(ast) && json_push_ast_value(state, ast);
 	elf_end_scratch(scratch);
 	return result;
 }

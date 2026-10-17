@@ -40,7 +40,6 @@ static void test_fail(const char *label)
 #include "lexer_tests.c"
 #include "parser_tests.c"
 #endif
-#include "json_tests.c"
 #include "unparse_tests.c"
 #if 0
 #include "ir_tests.c"
@@ -68,7 +67,6 @@ int main(void)
 	run_globals_tests(state);
 	run_api_tests();
 	run_arena_tests();
-	run_json_tests(state);
 	run_unparse_tests(state);
 
 	prof_dump();

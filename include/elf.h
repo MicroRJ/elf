@@ -132,6 +132,7 @@ void elf_new_array(elf_State *state);
 elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length);
 elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field);
 elf_ErrorCode elf_set_field(elf_State *state, elf_Index index, const char *field);
+elf_ErrorCode elf_set_field_slice(elf_State *state, elf_Index index, elf_StrSlice field);
 elf_Bool elf_get_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_append(elf_State *state, elf_Index index);
