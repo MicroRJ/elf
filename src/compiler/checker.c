@@ -146,20 +146,6 @@ Checker *check_source(Compiler *compiler, Com_Source *source)
 	return checker;
 }
 
-// scopes are always:
-//       			        global
-//	      	source | source | source | source
-//	   ... ... ... ... ... ... ... ... ... ... ... ...
-static Scope *find_source_scope(Scope *scope) {
-	ASSERT(scope->kind != SCOPE_GLOBAL);
-	ASSERT(scope->parent);
-	while (scope->kind != SCOPE_SOURCE) {
-		scope = scope->parent;
-		ASSERT(scope);
-	}
-	return scope;
-}
-
 static void resolve_entity(Checker *checker, Entity *entity) {
 	ASSERT(entity->state != ENTITY_RESOLVING || !"Codex: error reporting!");
 	if (entity->state == ENTITY_RESOLVED) {
@@ -172,7 +158,10 @@ static void resolve_entity(Checker *checker, Entity *entity) {
 	Scope *previous_source_scope = checker->source_scope;
 	Scope *previous_active_scope = checker->active_scope;
 
-	checker->source_scope = find_source_scope(entity->scope);
+	Com_Source *source = entity->scope->source;
+	ASSERT(source);
+	ASSERT(source->scope);
+	checker->source_scope = source->scope;
 	checker->active_scope = entity->scope;
 
 	StaticValue value = resolve_expression(checker, entity->expr);
