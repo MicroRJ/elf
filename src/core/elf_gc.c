@@ -192,7 +192,6 @@ static u32 gc_mark_metatables(elf_State *state)
 
 static u32 gc_collect(elf_State *state)
 {
-	// Time time = prof_get_time();
 	u32 marked_count = gc_mark_stack(state);
 	if (state->ref_table) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->ref_table);
@@ -201,8 +200,6 @@ static u32 gc_collect(elf_State *state)
 	marked_count += gc_mark_metatables(state);
 	marked_count += gc_mark_modules(state);
 	u32 freed_count = gc_sweep(state);
-	// elf_f64 took = prof_time_diff_ms(time);
-	// elf_ldebug("marked: %i, freed: %i, took: %.4fMS", marked_count, freed_count, took);
 	return freed_count;
 }
 

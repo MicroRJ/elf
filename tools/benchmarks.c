@@ -413,8 +413,6 @@ int main(void)
 		"}\n"
 		"calculate :: fun(value) { ret value + 1.25 + 7 }\n";
 
-	prof_begin_capture();
-
 	elf_State *state = elf_create_state();
 
 	elf_Value *string_hit_keys = calloc(KEY_COUNT, sizeof(*string_hit_keys));
@@ -430,32 +428,16 @@ int main(void)
 
 	printf("table lookup benchmarks (%u keys, %u iterations each)\n", KEY_COUNT, ITERATIONS);
 
-	double string_hit_seconds = 0;
-	PROF_BLOCK("bench.table.string_hit")
-	{
-		string_hit_seconds = bench_table_get(state, string_table, string_hit_keys, KEY_COUNT, ITERATIONS);
-	}
+	double string_hit_seconds = bench_table_get(state, string_table, string_hit_keys, KEY_COUNT, ITERATIONS);
 	bench_report("string hit", "lookups", ITERATIONS, string_hit_seconds);
 
-	double string_miss_seconds = 0;
-	PROF_BLOCK("bench.table.string_miss")
-	{
-		string_miss_seconds = bench_table_get(state, string_table, string_miss_keys, KEY_COUNT, ITERATIONS);
-	}
+	double string_miss_seconds = bench_table_get(state, string_table, string_miss_keys, KEY_COUNT, ITERATIONS);
 	bench_report("string miss", "lookups", ITERATIONS, string_miss_seconds);
 
-	double integer_hit_seconds = 0;
-	PROF_BLOCK("bench.table.integer_hit")
-	{
-		integer_hit_seconds = bench_table_get(state, int_table, int_hit_keys, KEY_COUNT, ITERATIONS);
-	}
+	double integer_hit_seconds = bench_table_get(state, int_table, int_hit_keys, KEY_COUNT, ITERATIONS);
 	bench_report("integer hit", "lookups", ITERATIONS, integer_hit_seconds);
 
-	double integer_miss_seconds = 0;
-	PROF_BLOCK("bench.table.integer_miss")
-	{
-		integer_miss_seconds = bench_table_get(state, int_table, int_miss_keys, KEY_COUNT, ITERATIONS);
-	}
+	double integer_miss_seconds = bench_table_get(state, int_table, int_miss_keys, KEY_COUNT, ITERATIONS);
 	bench_report("integer miss", "lookups", ITERATIONS, integer_miss_seconds);
 
 	printf("\nVM benchmarks (median of 7 measured runs after one warmup)\n");
@@ -477,7 +459,6 @@ int main(void)
 	bench_compile_and_load_modules(module_compile_source, COMPILE_ITERATIONS);
 
 	printf("sinks: %lld %.3f\n", bench_integer_sink, bench_number_sink);
-	prof_dump();
 	elf_destroy_state(state);
 	return 0;
 }

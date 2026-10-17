@@ -772,12 +772,7 @@ exit:
 static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int nrets)
 {
 	prepare_closure_stack_frame(state, state->frame, closure, nargs, nrets);
-	int result = 0;
-	PROF_BLOCK("vm.run_bytecode_frame")
-	{
-		result = run_bytecode_frame(state);
-	}
-	return result;
+	return run_bytecode_frame(state);
 }
 
 u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)

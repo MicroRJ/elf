@@ -63,6 +63,5 @@ static inline void *copy_memory(void *dst, const void *src, u64 size)
 }
 
 #include "arena.h"
-#include "profiler.h"
 
 #endif

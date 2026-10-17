@@ -77,21 +77,17 @@ static inline u32 table_hash_key(u64 key, u32 type)
 
 static inline Entry *table_find_entry(Entry *entries, u32 capacity, elf_Value key)
 {
-	PROF_ADD(PROF_COUNTER_TABLE_LOOKUP, 1);
 	u64 key_bits = (u64)key.x_i64;
 	u32 slot = table_hash_key(key_bits, key.type) & (capacity - 1);
 	for (;;)
 	{
-		PROF_ADD(PROF_COUNTER_TABLE_PROBE, 1);
 		Entry *entry = entries + slot;
 		if (entry_is_nil(*entry))
 		{
-			PROF_ADD(PROF_COUNTER_TABLE_MISS, 1);
 			return 0;
 		}
 		if (entry->key.type == key.type && (u64)entry->key.x_i64 == key_bits)
 		{
-			PROF_ADD(PROF_COUNTER_TABLE_HIT, 1);
 			return entry;
 		}
 		slot = (slot + 1) & (capacity - 1);
@@ -100,17 +96,14 @@ static inline Entry *table_find_entry(Entry *entries, u32 capacity, elf_Value ke
 
 static inline Entry *table_find_entry_for_write(Entry *entries, u32 capacity, elf_Value key)
 {
-	PROF_ADD(PROF_COUNTER_TABLE_LOOKUP, 1);
 	u64 key_bits = (u64)key.x_i64;
 	u32 slot = table_hash_key(key_bits, key.type) & (capacity - 1);
 	Entry *tomb = 0;
 	for (;;)
 	{
-		PROF_ADD(PROF_COUNTER_TABLE_PROBE, 1);
 		Entry *entry = entries + slot;
 		if (entry_is_nil(*entry))
 		{
-			PROF_ADD(PROF_COUNTER_TABLE_MISS, 1);
 			return tomb ? tomb : entry;
 		}
 		if (entry_is_tomb(*entry))
@@ -122,7 +115,6 @@ static inline Entry *table_find_entry_for_write(Entry *entries, u32 capacity, el
 		}
 		else if (entry->key.type == key.type && (u64)entry->key.x_i64 == key_bits)
 		{
-			PROF_ADD(PROF_COUNTER_TABLE_HIT, 1);
 			return entry;
 		}
 		slot = (slot + 1) & (capacity - 1);

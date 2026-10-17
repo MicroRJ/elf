@@ -54,8 +54,6 @@ int main(void)
 	setvbuf(stdout, 0, _IONBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
 
-	prof_begin_capture();
-
 	elf_State *state = elf_create_state();
 	if (strcmp(elf_version(), ELF_VERSION) != 0) {
 		test_fail("public elf version matches the linked runtime");
@@ -70,7 +68,6 @@ int main(void)
 	run_arena_tests();
 	run_unparse_tests(state);
 
-	prof_dump();
 	elf_destroy_state(state);
 
 	if (test_failures) {
