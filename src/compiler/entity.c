@@ -9,20 +9,25 @@
 #include "atom_view.h"
 #include "entity.h"
 
-EntityTable *entity_table_create(Arena *arena)
+Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_SourceId source)
 {
-	EntityTable *table = dy_arena_push_zero(arena, sizeof(*table), _Alignof(EntityTable));
-	if (table) {
-		table->arena = arena;
+	Scope *scope = dy_arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
+	if (scope)
+	{
+		scope->arena = arena;
+		scope->parent = parent;
+		scope->owner = owner;
+		scope->source = source;
+		scope->kind = kind;
 	}
-	return table;
+	return scope;
 }
 
-Entity *entity_table_find(EntityTable *table, Atom *name)
+Entity *scope_find_current(Scope *scope, Atom *name)
 {
-	for (u32 i = 0; i < table->count; ++i)
+	for (u32 i = 0; i < scope->count; ++i)
 	{
-		Entity *entity = table->entities[i];
+		Entity *entity = scope->entities[i];
 		if (entity->name == name) {
 			return entity;
 		}
@@ -30,25 +35,27 @@ Entity *entity_table_find(EntityTable *table, Atom *name)
 	return 0;
 }
 
-Entity *entity_table_insert(EntityTable *table, Entity *entity)
+Entity *scope_insert(Scope *scope, Entity *entity)
 {
-	Entity *result = entity_table_find(table, entity->name);
+	Entity *result = scope_find_current(scope, entity->name);
 	if (!result)
 	{
-		if (table->count == table->capacity)
+		if (scope->count == scope->capacity)
 		{
-			u32 capacity = table->capacity ? table->capacity * 2 : 16;
-			Entity **entities = dy_arena_push(table->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
+			u32 capacity = scope->capacity ? scope->capacity * 2 : 16;
+			Entity **entities = dy_arena_push(scope->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
 			if (!entities) {
 				return 0;
 			}
-			if (table->count) {
-				dy_memory_copy(entities, table->entities, sizeof(*entities) * table->count);
+			if (scope->count) {
+				dy_memory_copy(entities, scope->entities, sizeof(*entities) * scope->count);
 			}
-			table->entities = entities;
-			table->capacity = capacity;
+			scope->entities = entities;
+			scope->capacity = capacity;
 		}
-		table->entities[table->count++] = entity;
+		ASSERT(!entity->scope || entity->scope == scope);
+		entity->scope = scope;
+		scope->entities[scope->count++] = entity;
 		result = entity;
 	}
 	return result;

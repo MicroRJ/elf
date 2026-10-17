@@ -128,7 +128,7 @@ Checker *checker_run(Compiler *compiler, Ast ast)
 	Checker *checker = elf_arena_push_zero(compiler->arena, sizeof(* checker));
 	checker->compiler = compiler;
 	checker->current_function = ast;
-	checker->globals = entity_table_create(compiler->arena);
+	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, COM_INVALID_SOURCE_ID);
 	check_statement(checker, ast->file.body);
 	return checker;
 }
@@ -162,18 +162,18 @@ static Entity *resolve_identifier(Checker *checker, Atom *name)
 			return entity;
 		}
 	}
-	Entity *entity = entity_table_find(checker->globals, name);
+	Entity *entity = scope_find_current(checker->globals, name);
 	if (!entity)
 	{
 		entity = alloc_entity(checker, name);
 		entity->kind = ENTITY_GLOBAL;
 		entity->state = ENTITY_RESOLVED;
-		entity = entity_table_insert(checker->globals, entity);
+		entity = scope_insert(checker->globals, entity);
 	}
 	return entity;
 }
 
-static EntityTable *resolve_source_exports_lazily(Checker *checker, Com_SourceId source_id)
+static Scope *resolve_source_exports_lazily(Checker *checker, Com_SourceId source_id)
 {
 	Compiler *compiler = checker->compiler;
 	ASSERT(source_id != COM_INVALID_SOURCE_ID);
@@ -190,7 +190,7 @@ static EntityTable *resolve_source_exports_lazily(Checker *checker, Com_SourceId
 	}
 	printf("RESOLVING EXPORTS FOR SOURCE: %s\n", atom_data(source->name));
 
-	source->exports = entity_table_create(compiler->arena);
+	source->exports = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source_id);
 	ASSERT(source->exports || !"Codex: proper error propagation");
 
 	Ast_Array stats = source->ast->file.body->block;
@@ -218,7 +218,7 @@ static EntityTable *resolve_source_exports_lazily(Checker *checker, Com_SourceId
 		entity->parent = source->ast;
 		entity->expr = stat->static_decl.expr;
 		entity->tree = stat;
-		Entity *inserted = entity_table_insert(source->exports, entity);
+		Entity *inserted = scope_insert(source->exports, entity);
 		ASSERT(inserted || !"Codex: you know the deal");
 
 		if (inserted != entity) {
@@ -329,7 +329,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				ASSERT(expr->binary.y);
 				ASSERT(expr->binary.y->kind == AST_IDENT || expr->binary.y->kind == AST_STRING_LITERAL);
 				ASSERT(expr->binary.y->atom);
-				Entity *entity = entity_table_find(left_value.exports, expr->binary.y->atom);
+				Entity *entity = scope_find_current(left_value.exports, expr->binary.y->atom);
 				if (!entity) {
 					ASSERT(!"Codex: proper error handling");
 				}

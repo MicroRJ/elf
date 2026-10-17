@@ -4,7 +4,7 @@
 #include "compiler.h"
 
 typedef struct Entity Entity;
-typedef struct EntityTable EntityTable;
+typedef struct Scope Scope;
 typedef struct IrFunction IrFunction;
 
 typedef enum
@@ -28,7 +28,7 @@ typedef struct
 		i64          integer;
 		struct Atom *string;
 		struct Atom *unident;
-		EntityTable *exports;
+		Scope       *exports;
 		struct
 		{
 			struct Ast_T *function;
@@ -71,6 +71,7 @@ struct Entity
 {
 	EntityKind      kind;
 	struct Atom    *name;
+	Scope          *scope;
 	EntityState     state;
 	u32             users;
 	EntityTags      tags;
@@ -82,17 +83,31 @@ struct Entity
 	StaticValue     value;
 };
 
-struct EntityTable
+typedef enum
 {
-	Arena   *arena;
-	Entity **entities;
-	u32      count;
-	u32      capacity;
+	SCOPE_NONE = 0,
+	SCOPE_GLOBAL,
+	SCOPE_SOURCE,
+	SCOPE_FUNCTION,
+	SCOPE_BLOCK,
+}
+ScopeKind;
+
+struct Scope
+{
+	Arena          *arena;
+	Scope          *parent;
+	struct Ast_T   *owner;
+	Com_SourceId    source;
+	ScopeKind       kind;
+	Entity        **entities;
+	u32             count;
+	u32             capacity;
 };
 
-EntityTable *entity_table_create(Arena *arena);
-Entity *entity_table_find(EntityTable *table, struct Atom *name);
-Entity *entity_table_insert(EntityTable *table, Entity *entity);
+Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_SourceId source);
+Entity *scope_find_current(Scope *scope, struct Atom *name);
+Entity *scope_insert(Scope *scope, Entity *entity);
 Entity *entity_alloc(Arena *arena, EntityKind kind, struct Atom *name);
 
 #endif

@@ -9,7 +9,7 @@ enum {MAX_ENTITIES=4096};
 typedef struct Checker Checker;
 struct Checker {
 	Compiler     *compiler;
-	EntityTable  *globals;
+	Scope        *globals;
 	struct Ast_T *current_function;
 	u32           scope_start;
 	u32           entity_index;
