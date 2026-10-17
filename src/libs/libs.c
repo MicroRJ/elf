@@ -12,6 +12,7 @@
 #include "elf.h"
 #include "elf_core.h"
 #include "compiler.h"
+#include "linker.h"
 #include "libs.h"
 
 #include "l_core_io.c"

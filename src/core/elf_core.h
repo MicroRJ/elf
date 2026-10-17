@@ -25,10 +25,6 @@ typedef struct BcFunctionRef  BcFunctionRef;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
 
-// Copies a compiled module into one runtime, interns its strings, and resolves
-// its module-local globals without modifying the compiler output.
-elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module);
-
 typedef enum
 {
 	ELF_GC_ACTIVE = 0,

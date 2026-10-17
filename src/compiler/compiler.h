@@ -5,7 +5,7 @@
 #ifndef ELF_COMPILER_H
 #define ELF_COMPILER_H
 
-#include "bytecode.h"
+#include "bc_module.h"
 
 typedef struct Compiler Compiler;
 typedef u32 Com_SourceId;

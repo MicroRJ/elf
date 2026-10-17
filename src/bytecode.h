@@ -11,6 +11,7 @@
 
 #include "elf.h"
 #include "base.h"
+#include "source.h"
 
 typedef struct BcFunctionRef BcFunctionRef;
 
@@ -130,80 +131,6 @@ typedef struct BcFunction
 	u32         offset;
 }
 BcFunction;
-
-typedef struct
-{
-	u32 source;
-	u32 offset;
-	u32 size;
-	u32 line_offset;
-	u32 line_index;
-}
-SourceSite;
-
-typedef struct
-{
-	u32        byte_start;
-	u32        byte_end;
-	SourceSite site;
-}
-BcSourceMapEntry;
-
-typedef struct
-{
-	const char *data;
-	u32         size;
-}
-BcString;
-
-typedef BcString BcSourceBuffer;
-
-typedef struct
-{
-	BcString name;
-	// NOTE(RJ): after canonicalization!
-	BcString path;
-	BcString source;
-}
-BcSource;
-
-typedef struct
-{
-	u32 bytecode_index;
-	u32 name_index;
-}
-BcGlobalRelocation;
-
-typedef struct BcModule BcModule;
-struct BcModule
-{
-	BcSource           *sources;
-	u32                 source_count;
-	u32                 root_source;
-
-	BcString           *strings;
-	u32                 string_count;
-
-	BcGlobalRelocation *global_relocations;
-	u32                 global_relocation_count;
-
-	i64                *integer_constants;
-	u32                 integer_constant_count;
-	f64                *number_constants;
-	u32                 number_constant_count;
-
-	BcFunction         *functions;
-	u32                 function_count;
-	Bytecode           *bytecode;
-	u32                 bytecode_count;
-	BcSourceMapEntry   *source_map;
-	u32                 source_map_count;
-};
-
-
-
-
-
 
 #define BC_XYZW(K,X,Y,Z,W) (Bytecode){.b_type = (K), .b_w = (u8)(W), .b_x = (X), .b_y = (Y), .b_z = (Z)}
 #define BC_XYZ(K,X,Y,Z)     BC_XYZW(K,X,Y,Z,0)

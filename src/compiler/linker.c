@@ -10,6 +10,7 @@
 #include "bytecode.h"
 #include "compiler.h"
 #include "elf_core.h"
+#include "linker.h"
 
 // TODO(RJ): better error reporting here!
 elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
