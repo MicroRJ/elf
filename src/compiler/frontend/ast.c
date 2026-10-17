@@ -2,32 +2,26 @@
 // See Copyright Notice In elf.h
 //
 
-// AST constructors only allocate, reserve an AST ID, and initialize the returned tree.
+// AST constructors only allocate and initialize the returned tree.
 
 Ast_T ast_error_sentinel =
 {
-	.id = AST_ID_INVALID,
 	.kind = AST_ERROR,
 	.status = COM_STATUS_REPORTED,
 };
 
 Ast_T ast_error_oom_sentinel =
 {
-	.id = AST_ID_INVALID,
 	.kind = AST_ERROR,
 	.status = COM_STATUS_OOM,
 };
 
 static Ast create_ast(Parser *par, SourceSite site, Ast_Kind kind)
 {
-	if (par->ast_count == UINT32_MAX) {
-		return ERROR_OOM_AST;
-	}
 	Ast_T *tree = elf_arena_push_zero(par->result_arena, sizeof(*tree));
 	if (!tree) {
 		return ERROR_OOM_AST;
 	}
-	tree->id = ++par->ast_count;
 	tree->site = site;
 	tree->kind = kind;
 	return tree;

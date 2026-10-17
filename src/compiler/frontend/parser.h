@@ -46,7 +46,6 @@ struct Parser
 	Ast                *ast_stack;
 	u32                 ast_stack_size;
 	u32                 ast_stack_index;
-	u32                 ast_count;
 };
 
 Parser *parser_create(Compiler *compiler);

@@ -2,6 +2,7 @@ project := elf.load_file("project.elf")
 tasks := manny.load("c").project_to_tasks(project, {
 	output_directory = "build",
 	compile_options = [ "/Od", "/Zi", "/D_DEBUG", "-fcolor-diagnostics", "-fansi-escape-codes" ],
+	link_options = [ "/DEBUG" ],
 })
 
 site_targets := elf.load_file("site/site.elf")

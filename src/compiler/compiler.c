@@ -26,6 +26,7 @@
 #include "logging.c"
 #include "source_diagnostics.c"
 #include "atom.c"
+#include "checker.h"
 
 
 static void compiler_init_atoms(Compiler *compiler)
@@ -198,7 +199,10 @@ BcModule *compiler_compile(elf_Arena *arena, elf_StrSlice name, elf_StrSlice sou
 
 					if (!ast_is_error(ast) && !compiler->report.error_count)
 					{
-						IrModule *ir_module = ir_emit_module(compiler, ast);
+
+						Checker *analyzer = checker_run(compiler, ast);
+
+						IrModule *ir_module = ir_emit_module(compiler, analyzer, ast);
 						if (ir_module && !compiler->report.error_count)
 						{
 							module = bc_emit_module(ir_module);

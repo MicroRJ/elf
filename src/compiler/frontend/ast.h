@@ -79,12 +79,6 @@
 
 typedef struct Ast_T Ast_T;
 typedef Ast_T *Ast;
-typedef u32 Ast_Id;
-
-enum
-{
-	AST_ID_INVALID = 0,
-};
 
 typedef enum
 {
@@ -127,17 +121,26 @@ Ast_Array;
 // IMMUTABLE once constructed.
 struct Ast_T
 {
-	Ast_Id     id;
 	Ast_Kind   kind;
 	SourceSite site;
+
+	// NOTE(RJ): this is populated by the checker, it is the only mutable field, this is to avoid keeping
+	// a side table, it's way more convenient ... but the parser itself SHOULD not know nor rely on the
+	// entity or checker!
+	// Any tree that has a name or is associated or references a name gets the unique entity for that name.
+	struct Entity *entity;
 
 	union
 	{
 		Com_Status  status;
-		Atom       *atom;
-		i64         integer_value;
-		f64         number_value;
-		Ast_Array    interpolated_string;
+		Atom         *atom;
+		Atom        *identifier;
+		// TODO(RJ): have these store a value instead, that way we can go from:
+		// token -> ast -> ir -> checking -> bytecode more easily ...
+		Atom              *string_value;
+		i64               integer_value;
+		f64                number_value;
+		Ast_Array   interpolated_string;
 
 		struct
 		{
@@ -285,13 +288,13 @@ struct Ast_T
 extern Ast_T ast_error_sentinel;
 extern Ast_T ast_error_oom_sentinel;
 
-#define NULL_AST ((Ast)0)
-#define ERROR_AST (&ast_error_sentinel)
+#define NULL_AST      ((Ast)0)
+#define ERROR_AST     (&ast_error_sentinel)
 #define ERROR_OOM_AST (&ast_error_oom_sentinel)
 
-static inline b32 ast_is_error(Ast ast)
+static const struct Entity *ast_entity(Ast ast)
 {
-	return ast && ast->kind == AST_ERROR;
+	return ast->entity;
 }
 
 static Ast ast_from_status(Com_Status status)
@@ -299,7 +302,21 @@ static Ast ast_from_status(Com_Status status)
 	switch (status)
 	{
 		case COM_STATUS_REPORTED: return ERROR_AST;
-		case COM_STATUS_OOM: return ERROR_OOM_AST;
-		default: ASSERT(0); return ERROR_AST;
+		case COM_STATUS_OOM:      return ERROR_OOM_AST;
+		default: ASSERT(0);       return ERROR_AST;
 	}
+}
+
+static inline b32 ast_is_error(Ast ast)
+{
+	return ast && ast->kind == AST_ERROR;
+}
+
+static Ast ast_ensure_kind(Ast ast, Ast_Kind type)
+{
+	if (!ast || ast_is_error(ast) || ast->kind != type) {
+		return ERROR_AST;
+	}
+
+	return ast;
 }
