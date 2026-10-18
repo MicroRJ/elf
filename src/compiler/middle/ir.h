@@ -56,7 +56,7 @@ typedef struct Atom Atom;
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_LOCAL               , "local")                      \
 	X(IR_MULTI_LOCAL         , "multi_local")                \
-	X(IR_LOAD_LOCAL          , "load_local")                 \
+	X(IR_LOAD                , "load")                       \
 	X(IR_GLOBAL              , "global")                     \
 	X(IR_CAPTURE             , "capture")                    \
 /* end */
@@ -217,7 +217,7 @@ struct IrNode
 		{
 			Ir local;
 		}
-		ir_load_local;
+		ir_load;
 	};
 };
 

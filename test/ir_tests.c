@@ -97,7 +97,7 @@ static void expect_ir_atom(Ir ir, const char *text, const char *label)
 
 static void expect_load_local(Ir ir, Ir local, const char *label)
 {
-	if (!ir || ir->kind != IR_LOAD_LOCAL || ir->ir_load_local.local != local) {
+	if (!ir || ir->kind != IR_LOAD || ir->ir_load.local != local) {
 		test_fail(label);
 	}
 }
@@ -126,7 +126,9 @@ static void test_ir_lowers_assignment_to_local(elf_State *state)
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "lower local declaration");
 	Ir store = ir_test_body_stat(body, 1, IR_STORE, "lower assignment to store");
 
-	expect_load_local(store ? store->ir_binary.x : 0, memory, "assignment destination loads local");
+	if (!store || store->ir_binary.x != memory) {
+		test_fail("assignment destination is local");
+	}
 	expect_ir_i64(store->ir_binary.y, 2, "assignment expression lowered");
 	arena_destroy(&arena);
 }
@@ -309,7 +311,9 @@ static void test_ir_lowers_nil_assign(elf_State *state)
 	Ir true_clause = ir_if->ir_if.true_clause;
 	expect_ir_kind(true_clause, IR_BLOCK, "nil assignment true clause is block");
 	Ir store = ir_test_body_stat(true_clause, 0, IR_STORE, "nil assignment true clause stores value");
-	expect_load_local(store ? store->ir_binary.x : 0, memory, "nil assignment store writes destination local");
+	if (!store || store->ir_binary.x != memory) {
+		test_fail("nil assignment store writes destination local");
+	}
 	expect_ir_i64(store ? store->ir_binary.y : 0, 1, "nil assignment store value");
 	if (ir_if && ir_if->ir_if.else_clause) {
 		test_fail("nil assignment has no else clause");
@@ -386,10 +390,10 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "function body lowers return");
 	Ir add = ret ? ret->ir_return.expr : 0;
 	expect_ir_kind(add, IR_ADD, "function return lowers expression");
-	expect_ir_kind(add ? add->ir_binary.x : 0, IR_LOAD_LOCAL, "first param lowers to local load");
-	expect_ir_kind(add ? add->ir_binary.y : 0, IR_LOAD_LOCAL, "second param lowers to local load");
-	Ir first_param = add && add->ir_binary.x ? add->ir_binary.x->ir_load_local.local : 0;
-	Ir second_param = add && add->ir_binary.y ? add->ir_binary.y->ir_load_local.local : 0;
+	expect_ir_kind(add ? add->ir_binary.x : 0, IR_LOAD, "first param lowers to local load");
+	expect_ir_kind(add ? add->ir_binary.y : 0, IR_LOAD, "second param lowers to local load");
+	Ir first_param = add && add->ir_binary.x ? add->ir_binary.x->ir_load.local : 0;
+	Ir second_param = add && add->ir_binary.y ? add->ir_binary.y->ir_load.local : 0;
 	Ir implicit_param = function->params[IMPLICIT_PARAM_INDEX];
 	expect_ir_kind(implicit_param, IR_LOCAL, "function creates implicit this parameter local");
 	if (function->param_count != IMPLICIT_PARAM_COUNT + 2 || function->params[IMPLICIT_PARAM_COUNT] != first_param || function->params[IMPLICIT_PARAM_COUNT + 1] != second_param) {

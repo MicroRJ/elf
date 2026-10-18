@@ -409,8 +409,8 @@ static i32 ensure_slot(BcEmitter *emitter, i32 slot)
 static i32 emit_expr_to_slot(BcEmitter *emitter, Ir expr)
 {
 	i32 slot = NO_SLOT;
-	if (expr->kind == IR_LOAD_LOCAL) {
-		Ir local = expr->ir_load_local.local;
+	if (expr->kind == IR_LOAD) {
+		Ir local = expr->ir_load.local;
 		require_ir_kind(local, IR_LOCAL);
 		slot = local->ir_local.slot;
 	}
@@ -474,7 +474,7 @@ static i32 finish_call_result(BcEmitter *emitter, Ir ir, i32 call_slot, i32 out,
 
 static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 {
-	if (expr->kind != IR_LOAD_LOCAL) {
+	if (expr->kind != IR_LOAD) {
 		return false;
 	}
 
@@ -486,7 +486,7 @@ static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 			case IR_INTEGER:
 			case IR_ATOM:
 			case IR_NIL:
-			case IR_LOAD_LOCAL:
+			case IR_LOAD:
 			case IR_GLOBAL:
 			case IR_CAPTURE:
 			{
@@ -500,7 +500,7 @@ static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 		}
 	}
 
-	Ir local = require_ir_kind(expr->ir_load_local.local, IR_LOCAL);
+	Ir local = require_ir_kind(expr->ir_load.local, IR_LOCAL);
 	ASSERT(slot_is_valid(local->ir_local.slot));
 	*callee_slot = local->ir_local.slot;
 	return true;
@@ -894,14 +894,14 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		}
 		break;
 
-		case IR_LOAD_LOCAL:
+		case IR_LOAD:
 		{
 			if (nout < 1) {
 				return out;
 			}
 
 			out = ensure_slot(emitter, out);
-			Ir local = expr->ir_load_local.local;
+			Ir local = expr->ir_load.local;
 			require_ir_kind(local, IR_LOCAL);
 			ASSERT(slot_is_valid(local->ir_local.slot));
 
@@ -917,9 +917,9 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 			out = ensure_slot(emitter, out);
 			Ir target = expr->ir_unary;
-			require_ir_kind(target, IR_LOAD_LOCAL);
+			require_ir_kind(target, IR_LOAD);
 
-			Ir local = target->ir_load_local.local;
+			Ir local = target->ir_load.local;
 			require_ir_kind(local, IR_LOCAL);
 			ASSERT(slot_is_valid(local->ir_local.slot));
 
@@ -1063,12 +1063,9 @@ static void emit_store(BcEmitter *emitter, SourceSite site, Ir destination, Ir e
 	{
 		switch (destination->kind)
 		{
-			case IR_LOAD_LOCAL:
+			case IR_LOCAL:
 			{
-				Ir local = destination->ir_load_local.local;
-				require_ir_kind(local, IR_LOCAL);
-
-				i32 dest_slot = local->ir_local.slot;
+				i32 dest_slot = destination->ir_local.slot;
 				ASSERT(slot_is_valid(dest_slot));
 
 				i32 final_slot = emit_expr(emitter, expr, dest_slot, 1);

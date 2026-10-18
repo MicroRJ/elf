@@ -154,13 +154,13 @@ static Ir ir_new_multi_local(IrEmitter *emitter, SourceSite site, Ir expr, IrArr
 	return ir;
 }
 
-static Ir ir_new_load_local(IrEmitter *emitter, SourceSite site, Ir local)
+static Ir ir_new_load(IrEmitter *emitter, SourceSite site, Ir local)
 {
 	ASSERT(local);
 	ASSERT(local->kind == IR_LOCAL);
 
-	Ir ir = ir_alloc(emitter, site, IR_LOAD_LOCAL);
-	ir->ir_load_local.local = local;
+	Ir ir = ir_alloc(emitter, site, IR_LOAD);
+	ir->ir_load.local = local;
 	return ir;
 }
 
