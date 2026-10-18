@@ -258,11 +258,7 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 	StaticValue value = {STATIC_VALUE_NONE};
 	Com_Status status = COM_STATUS_OK;
 	ASSERT(result);
-	if (!expr)
-	{
-		*result = value;
-		return COM_STATUS_OK;
-	}
+	ASSERT(expr);
 
 	switch (expr->kind)
 	{
@@ -314,18 +310,18 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 			for (u32 i = 0; status == COM_STATUS_OK && i < expr->function.params.count; ++i)
 			{
 				Ast param = expr->function.params.items[i];
-				if (!param || param->kind != AST_FUNCTION_PARAM)
-				{
-					status = checker_report(checker, ERROR_INVALID_FUNCTION_PARAMETER, ERROR_ERROR, expr->site, "invalid function parameter");
-					value = static_value_error();
-					break;
-				}
+				ASSERT(param);
+				ASSERT(param->kind == AST_FUNCTION_PARAM);
 				StaticValue param_value = {0};
-				status = resolve_expression(checker, param->param.type, &param_value);
-				if (status == COM_STATUS_OK && param_value.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
+				if (param->param.type)
+				{
+					status = resolve_expression(checker, param->param.type, &param_value);
+					if (status == COM_STATUS_OK && param_value.type == STATIC_VALUE_ERROR) {
+						value = static_value_error();
+					}
 				}
-				if (status == COM_STATUS_OK) {
+				if (status == COM_STATUS_OK && param->param.expr)
+				{
 					status = resolve_expression(checker, param->param.expr, &param_value);
 					if (param_value.type == STATIC_VALUE_ERROR) {
 						value = static_value_error();
@@ -335,13 +331,10 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 					value = static_value_error();
 					break;
 				}
-				Ast name = ast_ensure_kind(param->param.name, AST_IDENT);
-				if (ast_is_error(name))
-				{
-					status = checker_report(checker, ERROR_INVALID_FUNCTION_PARAMETER, ERROR_ERROR, param->site, "function parameter name must be an identifier");
-					value = static_value_error();
-					break;
-				}
+				Ast name = param->param.name;
+				ASSERT(name);
+				ASSERT(name->kind == AST_IDENT);
+				ASSERT(name->atom);
 				ASSERT(!name->entity);
 				Entity *entity = 0;
 				status = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_PARAMETER, name->identifier, name->site, &entity);
@@ -410,6 +403,8 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 
 		case AST_FIELD:
 		{
+			ASSERT(expr->binary.x);
+			ASSERT(expr->binary.y);
 			StaticValue left_value = {0};
 			status = resolve_expression(checker, expr->binary.x, &left_value);
 			if (status != COM_STATUS_OK || left_value.type == STATIC_VALUE_ERROR)
@@ -449,6 +444,7 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		case AST_MEASURE:
 		case AST_GET_MEM:
 		{
+			ASSERT(expr->unary);
 			StaticValue operand = {0};
 			status = resolve_expression(checker, expr->unary, &operand);
 			if (status != COM_STATUS_OK || operand.type == STATIC_VALUE_ERROR) {
@@ -490,9 +486,10 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		case AST_ASSIGN:
 		case AST_INDEX:
 		case AST_COMMA_EXPR:
-		case AST_RANGE:
 		case AST_RANGE_INDEX:
 		{
+			ASSERT(expr->binary.x);
+			ASSERT(expr->binary.y);
 			StaticValue operand = {0};
 			status = resolve_expression(checker, expr->binary.x, &operand);
 			if (status == COM_STATUS_OK && operand.type == STATIC_VALUE_ERROR) {
@@ -510,8 +507,33 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		}
 		break;
 
+		case AST_RANGE:
+		{
+			StaticValue operand = {0};
+			if (expr->binary.x)
+			{
+				status = resolve_expression(checker, expr->binary.x, &operand);
+				if (status == COM_STATUS_OK && operand.type == STATIC_VALUE_ERROR) {
+					value = static_value_error();
+				}
+			}
+			if (status == COM_STATUS_OK && expr->binary.y)
+			{
+				status = resolve_expression(checker, expr->binary.y, &operand);
+				if (operand.type == STATIC_VALUE_ERROR) {
+					value = static_value_error();
+				}
+			}
+			if (status != COM_STATUS_OK) {
+				value = static_value_error();
+			}
+		}
+		break;
+
 		case AST_META_FIELD:
 		{
+			ASSERT(expr->binary.x);
+			ASSERT(expr->binary.y);
 			StaticValue operand = {0};
 			status = resolve_expression(checker, expr->binary.x, &operand);
 			if (status != COM_STATUS_OK || operand.type == STATIC_VALUE_ERROR) {
@@ -602,6 +624,8 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 
 		case AST_TABLE_ENTRY:
 		{
+			ASSERT(expr->table_entry.key);
+			ASSERT(expr->table_entry.value);
 			StaticValue item = {0};
 			status = resolve_expression(checker, expr->table_entry.key, &item);
 			if (status == COM_STATUS_OK && item.type == STATIC_VALUE_ERROR) {
@@ -632,10 +656,7 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 
 static Com_Status check_statement(Checker *checker, Ast stat)
 {
-	if (!stat) {
-		return COM_STATUS_OK;
-	}
-
+	ASSERT(stat);
 	ASSERT(stat->kind != AST_FILE);
 	ASSERT(checker->active_scope);
 	ASSERT(checker->source_scope);
@@ -671,7 +692,10 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		{
 			Ast names = ast_ensure_kind(stat->decl.name, AST_TUPLE);
 			EntityTags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
-			status = resolve_expression(checker, stat->decl.type, &value);
+			if (stat->decl.type) {
+				status = resolve_expression(checker, stat->decl.type, &value);
+			}
+			ASSERT(stat->decl.expr);
 			if (status == COM_STATUS_OK) {
 				status = resolve_expression(checker, stat->decl.expr, &value);
 			}
@@ -702,13 +726,13 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		case AST_IF:
 		{
 			status = resolve_expression(checker, stat->if_stat.pred, &value);
-			if (status == COM_STATUS_OK) {
+			if (status == COM_STATUS_OK && stat->if_stat.true_clause) {
 				status = check_statement(checker, stat->if_stat.true_clause);
 			}
-			if (status == COM_STATUS_OK) {
+			if (status == COM_STATUS_OK && stat->if_stat.else_clause) {
 				status = check_statement(checker, stat->if_stat.else_clause);
 			}
-			if (status == COM_STATUS_OK) {
+			if (status == COM_STATUS_OK && stat->if_stat.then_clause) {
 				status = check_statement(checker, stat->if_stat.then_clause);
 			}
 		}
@@ -767,19 +791,25 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 
 		case AST_RETURN:
 		{
-			status = resolve_expression(checker, stat->return_stat.expr, &value);
+			if (stat->return_stat.expr) {
+				status = resolve_expression(checker, stat->return_stat.expr, &value);
+			}
 		}
 		break;
 
 		case AST_BREAK:
 		{
-			status = resolve_expression(checker, stat->break_stat.expr, &value);
+			if (stat->break_stat.expr) {
+				status = resolve_expression(checker, stat->break_stat.expr, &value);
+			}
 		}
 		break;
 
 		case AST_CONTINUE:
 		{
-			status = resolve_expression(checker, stat->continue_stat.expr, &value);
+			if (stat->continue_stat.expr) {
+				status = resolve_expression(checker, stat->continue_stat.expr, &value);
+			}
 		}
 		break;
 
