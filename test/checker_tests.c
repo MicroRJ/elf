@@ -3,6 +3,7 @@ typedef struct
 	Arena       arena;
 	Compiler   *compiler;
 	Com_Source *source;
+	Com_Status  status;
 }
 CheckerTest;
 
@@ -28,7 +29,7 @@ static void checker_test_init(CheckerTest *test, const char *name, const char *s
 	}
 	test->source->ast = file;
 	test->source->state = COM_SOURCE_PARSED;
-	check_source(test->compiler, test->source);
+	test->status = check_source(test->compiler, test->source);
 	test->source->state = COM_SOURCE_CHECKED;
 }
 
@@ -227,6 +228,17 @@ static void test_checker_reports_duplicate_local(void)
 	checker_test_destroy(&test);
 }
 
+static void test_checker_reports_duplicate_static(void)
+{
+	CheckerTest test;
+	checker_test_init(&test, "checker_duplicate_static", "value :: 1\nvalue :: 2");
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_DUPLICATE_STATIC_DECLARATION || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("checker reports duplicate static declaration");
+	}
+	checker_test_destroy(&test);
+}
+
 static void test_checker_resolves_imported_export(void)
 {
 	Arena arena = arena_create(0);
@@ -265,6 +277,147 @@ static void test_checker_resolves_imported_export(void)
 	arena_destroy(&arena);
 }
 
+typedef struct
+{
+	Arena       arena;
+	Compiler   *compiler;
+	Com_Source *root;
+	Com_Source *module;
+}
+CheckerImportTest;
+
+static void checker_import_test_init(CheckerImportTest *test, const char *root_text, const char *module_text)
+{
+	zero_memory(test, sizeof(*test));
+	test->arena = arena_create(0);
+	test->compiler = compiler_create(&test->arena);
+	test->root = parser_test_add_source(test->compiler, (elf_StrSlice) {(char *)"checker_import_root", sizeof("checker_import_root") - 1}, (elf_StrSlice) {(char *)root_text, strlen(root_text)});
+	test->module = parser_test_add_source(test->compiler, (elf_StrSlice) {(char *)"checker_import_module", sizeof("checker_import_module") - 1}, (elf_StrSlice) {(char *)module_text, strlen(module_text)});
+
+	Parser parser = {0};
+	if (!parser_init(&parser, test->compiler)) {
+		test_fail("checker error import test initializes parser");
+		return;
+	}
+	test->root->ast = parser_parse_file(&parser, test->root);
+	test->module->ast = parser_parse_file(&parser, test->module);
+	parser_destroy(&parser);
+	if (!test->root->ast || ast_is_error(test->root->ast) || !test->module->ast || ast_is_error(test->module->ast)) {
+		test_fail("checker error import test parses sources");
+		return;
+	}
+	test->root->state = COM_SOURCE_PARSED;
+	test->module->state = COM_SOURCE_PARSED;
+	Ast import = test->root->ast->file.imports.count ? test->root->ast->file.imports.items[0] : 0;
+	if (!import || import->kind != AST_IMPORT) {
+		test_fail("checker error import test finds import");
+		return;
+	}
+	import->import.target = test->module;
+	check_source(test->compiler, test->root);
+}
+
+static void checker_import_test_destroy(CheckerImportTest *test)
+{
+	arena_destroy(&test->arena);
+}
+
+static void test_checker_reports_static_cycle(void)
+{
+	CheckerTest test;
+	checker_test_init(&test, "checker_cycle", "first :: second\nsecond :: first\nret first");
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	Ast first_decl = checker_test_stat(&test, 0, AST_STATIC_DECL, "checker parses cyclic static");
+	Ast second_decl = checker_test_stat(&test, 1, AST_STATIC_DECL, "checker parses cyclic static dependency");
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_CYCLIC_STATIC_DEFINITION || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("checker reports cyclic static definition");
+	}
+	if (!first_decl || !second_decl || first_decl->entity->value.type != STATIC_VALUE_ERROR || second_decl->entity->value.type != STATIC_VALUE_ERROR) {
+		test_fail("checker propagates cyclic static error through entities");
+	}
+	checker_test_destroy(&test);
+}
+
+static void test_checker_reports_invalid_static_expression(void)
+{
+	CheckerTest test;
+	checker_test_init(&test, "checker_invalid_static", "answer :: runtime_value\nret answer");
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	Ast declaration = checker_test_stat(&test, 0, AST_STATIC_DECL, "checker parses invalid static");
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("checker reports expression without static value");
+	}
+	if (!declaration || !declaration->entity || declaration->entity->value.type != STATIC_VALUE_ERROR) {
+		test_fail("checker stores invalid static result on entity");
+	}
+	checker_test_destroy(&test);
+}
+
+static void test_checker_reports_unresolved_import(void)
+{
+	CheckerTest test;
+	checker_test_init(&test, "checker_unresolved_import", "module :: import \"missing\"\nret module.answer");
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_IMPORT || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("checker reports import without resolved source");
+	}
+	checker_test_destroy(&test);
+}
+
+static void test_checker_reports_missing_imported_static(void)
+{
+	CheckerImportTest test;
+	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.missing", "export answer :: 42");
+	Com_Message *message = test.root ? test.root->report.first : 0;
+	if (!message || test.root->report.error_count != 1 || message->code != ERROR_STATIC_LOOKUP || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("checker reports missing imported static");
+	}
+	checker_import_test_destroy(&test);
+}
+
+static void test_checker_reports_private_imported_static(void)
+{
+	CheckerImportTest test;
+	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.answer", "answer :: 42");
+	Com_Message *message = test.root ? test.root->report.first : 0;
+	if (!message || test.root->report.error_count != 1 || message->code != ERROR_STATIC_LOOKUP || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("checker reports private imported static");
+	}
+	checker_import_test_destroy(&test);
+}
+
+static void test_checker_routes_imported_static_error_to_source(void)
+{
+	CheckerImportTest test;
+	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.answer", "export answer :: runtime_value");
+	Com_Message *message = test.module ? test.module->report.first : 0;
+	if (!message || test.module->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || test.root->report.error_count != 0) {
+		test_fail("checker routes imported static error to defining source");
+	}
+	checker_import_test_destroy(&test);
+}
+
+static void test_checker_propagates_diagnostic_oom(void)
+{
+	Arena arena = arena_create(0);
+	Compiler *compiler = compiler_create(&arena);
+	char source_text[] = "value := 42";
+	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_oom", sizeof("checker_oom") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
+	Parser parser = {0};
+	ASSERT(parser_init(&parser, compiler));
+	source->ast = parser_parse_file(&parser, source);
+	parser_destroy(&parser);
+	source->state = COM_SOURCE_PARSED;
+	u64 capacity = arena.capacity;
+	arena.capacity = arena.used;
+	Com_Status status = check_source(compiler, source);
+	arena.capacity = capacity;
+	if (status != COM_STATUS_OOM || compiler->error_count != 0 || source->report.error_count != 0) {
+		test_fail("checker propagates failure to allocate an out-of-memory diagnostic");
+	}
+	arena_destroy(&arena);
+}
+
 static void run_checker_tests(void)
 {
 	test_checker_resolves_static_forward_reference();
@@ -274,5 +427,13 @@ static void run_checker_tests(void)
 	test_checker_does_not_leak_block_locals();
 	test_checker_attaches_function_entities();
 	test_checker_reports_duplicate_local();
+	test_checker_reports_duplicate_static();
 	test_checker_resolves_imported_export();
+	test_checker_reports_static_cycle();
+	test_checker_reports_invalid_static_expression();
+	test_checker_reports_unresolved_import();
+	test_checker_reports_missing_imported_static();
+	test_checker_reports_private_imported_static();
+	test_checker_routes_imported_static_error_to_source();
+	test_checker_propagates_diagnostic_oom();
 }

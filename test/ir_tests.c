@@ -348,6 +348,17 @@ static void test_ir_lowers_nil_assign_field_once(elf_State *state)
 	arena_destroy(&arena);
 }
 
+static void test_ir_reports_nil_assignment_arity(elf_State *state)
+{
+	Arena arena = arena_create(0);
+	IrTestResult result = ir_test_lower_source(state, &arena, "x, y := nil, nil\nx, y ?= 1");
+	Com_Message *message = result.source ? result.source->report.first : 0;
+	if (!message || result.source->report.error_count != 1 || message->code != ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_LOWERING) {
+		test_fail("nil assignment arity reports a lowering error");
+	}
+	arena_destroy(&arena);
+}
+
 static void test_ir_lowers_function_expression(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -533,6 +544,7 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_while(state);
 	test_ir_lowers_nil_assign(state);
 	test_ir_lowers_nil_assign_field_once(state);
+	test_ir_reports_nil_assignment_arity(state);
 	test_ir_lowers_function_expression(state);
 	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);

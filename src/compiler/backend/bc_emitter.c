@@ -635,7 +635,7 @@ static BcType bytecode_type_from_ir(IrKind type)
 		default: NO_CODE;
 	}
 
-	ASSERT(!"Error");
+	ASSERT(!"unsupported binary IR kind");
 	return BC_HALT;
 }
 

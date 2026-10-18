@@ -356,11 +356,13 @@ elf_u32 compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf
 
 						if (!ast_is_error(ast) && !compiler->error_count)
 						{
-							check_source(compiler, compiler_source);
-							IrModule *ir_module = ir_emit_module(compiler, ast);
-							if (ir_module && !compiler->error_count)
+							Com_Status check_status = check_source(compiler, compiler_source);
+							if (check_status == COM_STATUS_OK)
 							{
-								entry = bc_emit_module(compiler->target, ir_module);
+								IrModule *ir_module = ir_emit_module(compiler, ast);
+								if (ir_module && !compiler->error_count) {
+									entry = bc_emit_module(compiler->target, ir_module);
+								}
 							}
 						}
 					}

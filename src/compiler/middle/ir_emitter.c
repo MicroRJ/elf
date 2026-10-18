@@ -1081,7 +1081,7 @@ static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrQueue *items, Ast st
 
 	if (dest_tuple->tuple.count != 1 || expr_tuple->tuple.count != 1)
 	{
-		ir_report_error(emitter, ERROR_LOWERING, stat->site, "compound assignment requires one destination and one value");
+		ir_report_error(emitter, ERROR_INVALID_ASSIGNMENT, stat->site, "compound assignment requires one destination and one value");
 		return ERROR_IR;
 	}
 
@@ -1300,13 +1300,15 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				ir_push(items, ERROR_IR);
 				break;
 			}
+			if (dest_tuple->tuple.count != expr_tuple->tuple.count)
+			{
+				ir_report_error(emitter, ERROR_INVALID_ASSIGNMENT, stat->site, "nil assignment requires one value for each destination");
+				ir_push(items, ERROR_IR);
+				break;
+			}
 
 			for (u32 i = 0; i < dest_tuple->tuple.count; ++ i)
 			{
-				if (i >= expr_tuple->tuple.count) {
-					ASSERT(!"Error");
-				}
-
 				Ast dest_ast = dest_tuple->tuple.items[i];
 				Ast expr_ast = expr_tuple->tuple.items[i];
 				if (!mark_entity_assigned(emitter, dest_ast)) {

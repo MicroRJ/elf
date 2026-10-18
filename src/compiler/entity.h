@@ -10,6 +10,7 @@ typedef struct IrFunction IrFunction;
 typedef enum
 {
 	STATIC_VALUE_NONE = 0,
+	STATIC_VALUE_ERROR,
 	STATIC_VALUE_NIL,
 	STATIC_VALUE_NUMBER,
 	STATIC_VALUE_INTEGER,
