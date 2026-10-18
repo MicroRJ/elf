@@ -58,10 +58,8 @@
 	X(INTEGER             , "int")         \
 	X(NUMBER              , "num")         \
 	X(STRING              , "str")         \
-	X(FORMAT_STRING       , "fmt")         \
-	X(STRING_START        , "str_start")   \
-	X(STRING_PART         , "str_part")    \
-	X(STRING_END          , "str_end")     \
+	X(INTERPOLATION_START , "fmt_start")   \
+	X(INTERPOLATION_END   , "fmt_end")     \
 	X(LETTER              , "chr")         \
 	X(IDENTIFIER          , "idn")         \
 	X(TILDE               , "~"  )         \

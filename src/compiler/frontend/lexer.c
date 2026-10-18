@@ -640,6 +640,12 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 	SourceSite part_site = opening.site;
 	b32 line_break_before = opening.line_break_before;
 	Com_Status error = COM_STATUS_OK;
+	Token start = {
+		.type = TOK_INTERPOLATION_START,
+		.site = opening.site,
+		.line_break_before = opening.line_break_before,
+	};
+	error = token_array_push(lexer->tokens, lexer->scratch_arena, start);
 
 	while (error == COM_STATUS_OK)
 	{
@@ -651,9 +657,7 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 		}
 
 		Token part = {
-			.type = ended
-				? (interpolation_count ? TOK_STRING_END : TOK_STRING)
-				: (interpolation_count ? TOK_STRING_PART : TOK_STRING_START),
+			.type = TOK_STRING,
 			.site = part_site,
 			.line_break_before = line_break_before,
 			.atom = atom,
@@ -667,7 +671,21 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 			break;
 		}
 
-		if (ended || lexer->cursor >= lexer->end) {
+		if (ended || lexer->cursor >= lexer->end)
+		{
+			if (interpolation_count == 0)
+			{
+				lexer->tokens->count = token_start;
+				error = token_array_push(lexer->tokens, lexer->scratch_arena, part);
+			}
+			else
+			{
+				Token end = {
+					.type = TOK_INTERPOLATION_END,
+					.site = source_site_from_ptr(lexer, lexer->cursor - (is_block ? 3 : 1)),
+				};
+				error = token_array_push(lexer->tokens, lexer->scratch_arena, end);
+			}
 			break;
 		}
 		interpolation_count += 1;

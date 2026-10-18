@@ -647,14 +647,18 @@ static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token toke
 
 static Ast parse_interpolated_string(Parser *parser)
 {
-	Token start = take_token(parser, TOK_STRING_START);
+	Token start = take_token(parser, TOK_INTERPOLATION_START);
 	if (token_is_error(start)) {
 		return ast_from_token_error(start);
 	}
 	u32 stack_start = parser->ast_stack_index;
 	u32 nparts = 0;
 
-	Ast first_part = ast_new_string_literal(parser, start.site, start.atom);
+	Token first = take_token(parser, TOK_STRING);
+	if (token_is_error(first)) {
+		return ast_from_token_error(first);
+	}
+	Ast first_part = ast_new_string_literal(parser, first.site, first.atom);
 	if (ast_is_error(first_part)) {
 		return first_part;
 	}
@@ -682,17 +686,13 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 		nparts += 1;
 
-		Token part = parser_current_token(parser);
-		if (part.type != TOK_STRING_PART && part.type != TOK_STRING_END)
+		Token part = take_token(parser, TOK_STRING);
+		if (token_is_error(part))
 		{
 			parser->ast_stack_index = stack_start;
-			if (token_is_error(part)) {
-				return ast_from_token_error(part);
-			}
-			return parser_error(parser, ERROR_EXPECTED_TOKEN, part.site, "expected the end of an interpolated expression");
+			return ast_from_token_error(part);
 		}
 
-		consume_token(parser);
 		Ast text = ast_new_string_literal(parser, part.site, part.atom);
 		if (ast_is_error(text)) {
 			parser->ast_stack_index = stack_start;
@@ -704,7 +704,8 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 		nparts += 1;
 
-		if (part.type == TOK_STRING_END) {
+		if (peek_token(parser, TOK_INTERPOLATION_END)) {
+			consume_token(parser);
 			break;
 		}
 	}
@@ -776,7 +777,7 @@ static Ast parse_unary_expr(Parser *parser)
 			value = ast_new_string_literal(parser, tok.site, tok.atom);
 		}
 		break;
-		case TOK_STRING_START:
+		case TOK_INTERPOLATION_START:
 		{
 			value = parse_interpolated_string(parser);
 		}
