@@ -15,13 +15,11 @@
 #include "libs.h"
 
 #include "l_core_io.c"
-#include "l_io.c"
 #include "l_load_file.c"
 #include "l_json.c"
 #include "l_env.c"
 #include "l_fs.c"
 #include "l_path.c"
-#include "l_process.c"
 #include "l_random.c"
 #include "l_time.c"
 
@@ -84,10 +82,8 @@ void elf_open_libraries(elf_State *state)
 	elf_lib_env(state);           elf_set_field(state, root, "env");
 	elf_lib_fs(state);            elf_set_field(state, root, "fs");
 	elf_lib_path(state);          elf_set_field(state, root, "path");
-	elf_lib_process(state);       elf_set_field(state, root, "process");
 	elf_lib_random(state);        elf_set_field(state, root, "random");
 	elf_lib_time(state);          elf_set_field(state, root, "time");
-	elf_lib_io(state);            elf_set_field(state, root, "io");
 	elf_push_fun(state, l_core_load_file); elf_set_field(state, root, "load_file");
 	elf_push_fun(state, l_core_print);     elf_set_field(state, root, "print");
 	elf_push_fun(state, l_core_println);   elf_set_field(state, root, "println");

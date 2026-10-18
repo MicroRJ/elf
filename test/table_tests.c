@@ -216,15 +216,8 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_string(state, "set")), "elf.env.set is a field function");
 	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_string(state, "unset")), "elf.env.unset is a field function");
 
-	elf_Value process_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "process"));
-	expect_table_value(process_value, "elf.process is a table");
-	elf_Table *process_table = value_as_table(process_value);
-	expect_function_value(elf_table_get_or_nil(state, process_table, test_key_string(state, "start")), "elf.process.start is a field function");
-	expect_table_value(elf_table_get_or_nil(state, process_table, test_key_string(state, "Process")), "elf.process.Process is a method table");
-
-	elf_Value io_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "io"));
-	expect_table_value(io_value, "elf.io is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(io_value), test_key_string(state, "pipe")), "elf.io.pipe is a field function");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "process")), "elf.process library is absent");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "io")), "elf.io library is absent");
 
 	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "os")), "empty elf.os library is absent");
 

@@ -17,3 +17,4 @@ This file tracks language features and other changes visible to elf users. Inter
 ### Standard library
 
 - Added `elf.json.load_jsonl(path)`, which loads a JSON Lines file into an array containing one decoded value per line.
+- Removed the `elf.io` stream and pipe library and the `elf.process` child-process library.

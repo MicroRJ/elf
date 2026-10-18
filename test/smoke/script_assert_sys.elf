@@ -73,28 +73,6 @@ test_assert(path_lib.stem("some/path/name.ext") == "name")
 test_assert(path_lib.extension("some/path/name.ext") == "ext")
 test_assert(path_lib.parent("some/path/name.ext") == "some/path")
 
-powershell_path := path_lib.join(elf.env.get("SystemRoot"), "System32/WindowsPowerShell/v1.0/powershell.exe")
-process_status, process := elf.process.start(powershell_path, ["-NoProfile", "-NonInteractive", "-Command", "exit 0"], { hide_window = 1 })
-test_assert(process_status == elf.io.SUCCESS)
-test_assert(elf.type_of(process) == "process")
-test_assert(elf.metatable(process) == elf.process.Process)
-process_state, exit_code := process:wait()
-test_assert(process_state == elf.process.EXITED)
-test_assert(exit_code == 0)
-test_assert(process:close() == elf.io.SUCCESS)
-test_assert(process:is_closed())
-
-process_status, process = elf.process.start(powershell_path, ["-NoProfile", "-NonInteractive", "-Command", "exit 7"])
-test_assert(process_status == elf.io.SUCCESS)
-process_state, exit_code = process:wait()
-test_assert(process_state == elf.process.EXITED)
-test_assert(exit_code == 7)
-test_assert(process:close() == elf.io.SUCCESS)
-
-process_status, process = elf.process.start("elf_missing_process_7f31.exe")
-test_assert(process_status == elf.io.FAILURE)
-test_assert(process == nil)
-
 test_assert(fs.remove_file(path) == 1)
 test_assert(fs.read_text_file(path) == nil)
 
