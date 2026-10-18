@@ -265,7 +265,8 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		if (reference->type == ELF_OBJECT_CLOSURE)
 		{
 			elf_Closure * closure = (elf_Closure *) reference;
-			elf_Prototype *function = prototype_from_index(state, closure->prototype_index);
+			elf_Prototype *function = closure->prototype;
+			ASSERT(function);
 
 			for (u32 i = 0; i < function->captures; ++ i)
 			{

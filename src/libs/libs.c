@@ -64,9 +64,10 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		return false;
 	}
 
-	ASSERT(prototype_from_index(state, entry)->captures == 0);
+	elf_Prototype *prototype = prototype_from_index(state, entry);
+	ASSERT(prototype->captures == 0);
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-	closure->prototype_index = entry;
+	closure->prototype = prototype;
 	push_value(state, value_from_closure(closure));
 	return true;
 }

@@ -209,8 +209,8 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	{
 		u32 first_prototype = state->prototype_count;
 		bench_require(elf_push_code_source(state, "benchmark.compile", text) == ELF_ERROR_NONE, "could not compile benchmark source");
-		u32 entry = value_as_closure(state->stack_ptr[-1])->prototype_index;
-		bench_require(entry == first_prototype, "compile entry is not the first new prototype");
+		elf_Prototype *entry = value_as_closure(state->stack_ptr[-1])->prototype;
+		bench_require(entry == state->prototypes[first_prototype], "compile entry is not the first new prototype");
 		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
 		{
 			elf_Prototype *prototype = prototype_from_index(state, prototype_index);

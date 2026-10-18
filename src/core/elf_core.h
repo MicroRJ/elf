@@ -147,25 +147,25 @@ struct elf_Prototype
 
 struct elf_Closure
 {
-	elf_Object obj;
-	u32        prototype_index;
-	elf_Value  captures[];
+	elf_Object     obj;
+	elf_Prototype *prototype;
+	elf_Value      captures[];
 };
 
 struct StackFrame
 {
-	u32           prototype_index;
-	elf_Value    *framebase;
-	elf_Value    *reference;
-	elf_Value     *captures;
-	elf_Closure    *closure;
-	u32           framesize;
-	u32         instruction;
-	u8                nargs;
-	u8                nrets;
-	u8                arity;
-	u8             variadic;
-	u8            ncaptures;
+	elf_Prototype *prototype;
+	elf_Closure     *closure;
+	elf_Value     *framebase;
+	elf_Value     *reference;
+	elf_Value      *captures;
+	u32          instruction;
+	u32            framesize;
+	u8                 nargs;
+	u8                 nrets;
+	u8                 arity;
+	u8              variadic;
+	u8             ncaptures;
 };
 
 struct elf_State

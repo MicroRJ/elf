@@ -28,13 +28,12 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	StackFrame *native_frame_pointer = S->frame;
 	StackFrame native_frame = *S->frame;
 	StackFrame *caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
-	u32 caller_prototype = caller ? caller->prototype_index : ELF_PROTOTYPE_INVALID;
+	elf_Prototype *caller_prototype = caller ? caller->prototype : 0;
 	u32 caller_instruction = caller ? caller->instruction : 0;
-	b32 preserved = context && native_frame.prototype_index == ELF_PROTOTYPE_INVALID && prototype_index_is_valid(S, caller_prototype);
+	b32 preserved = context && !native_frame.prototype && caller_prototype;
 	if (preserved)
 	{
-		elf_Prototype *caller_function = prototype_from_index(S, caller_prototype);
-		preserved = BC_TYPE(caller_function->bytecode[caller_instruction]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
+		preserved = BC_TYPE(caller_prototype->bytecode[caller_instruction]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
 	}
 	if (preserved)
 	{
@@ -44,8 +43,8 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 		preserved = S->frame == native_frame_pointer &&
 			S->frame->framebase == native_frame.framebase && S->frame->reference == native_frame.reference &&
 			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs && S->frame->nrets == native_frame.nrets &&
-			S->frame->prototype_index == ELF_PROTOTYPE_INVALID && restored_caller &&
-			restored_caller->prototype_index == caller_prototype &&
+			!S->frame->prototype && restored_caller &&
+			restored_caller->prototype == caller_prototype &&
 			restored_caller->instruction == caller_instruction;
 	}
 	elf_push_int(S, preserved);
@@ -366,14 +365,14 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		return;
 	}
 	elf_Closure *first_entry = value_as_closure(state->stack_ptr[-1]);
-	u32 first_entry_index = first_entry->prototype_index;
-	if (first_entry_index != 0) {
+	elf_Prototype *first_entry_prototype = first_entry->prototype;
+	if (first_entry_prototype != state->prototypes[0]) {
 		test_fail("first compiled entry uses the first prototype index");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Closure *first_factory = value_as_closure(state->stack_ptr[-1]);
-	u32 first_factory_index = first_factory->prototype_index;
+	elf_Prototype *first_factory_prototype = first_factory->prototype;
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
@@ -383,15 +382,15 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		return;
 	}
 	elf_Closure *second_entry = value_as_closure(state->stack_ptr[-1]);
-	u32 second_entry_index = second_entry->prototype_index;
-	if (second_entry_index == first_entry_index) {
+	elf_Prototype *second_entry_prototype = second_entry->prototype;
+	if (second_entry_prototype == first_entry_prototype) {
 		test_fail("each compilation publishes a distinct entry prototype");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Closure *second_factory = value_as_closure(state->stack_ptr[-1]);
-	u32 second_factory_index = second_factory->prototype_index;
-	if (second_factory_index == first_factory_index) {
+	elf_Prototype *second_factory_prototype = second_factory->prototype;
+	if (second_factory_prototype == first_factory_prototype) {
 		test_fail("nested functions receive distinct state prototype indices");
 	}
 	elf_Ref second_factory_ref = elf_create_ref(state, -1);
@@ -408,7 +407,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_push_int(state, 100);
 	elf_call(state, 2, 1);
 	elf_Closure *first_closure = value_as_closure(state->stack_ptr[-1]);
-	u32 first_closure_index = first_closure->prototype_index;
+	elf_Prototype *first_closure_prototype = first_closure->prototype;
 	elf_Ref first = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
@@ -421,11 +420,11 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_push_int(state, 200);
 	elf_call(state, 2, 1);
 	elf_Closure *second_closure = value_as_closure(state->stack_ptr[-1]);
-	u32 second_closure_index = second_closure->prototype_index;
+	elf_Prototype *second_closure_prototype = second_closure->prototype;
 	elf_Ref second = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
-	if (first == ELF_NO_REF || second == ELF_NO_REF || first_closure_index == second_closure_index)
+	if (first == ELF_NO_REF || second == ELF_NO_REF || first_closure_prototype == second_closure_prototype)
 	{
 		test_fail("capturing closures preserve distinct prototype identities");
 		elf_destroy_state(state);
@@ -530,7 +529,7 @@ static void test_vm_module_emitter_grows_constant_arrays(void)
 		return;
 	}
 
-	elf_Prototype *prototype = prototype_from_index(state, value_as_closure(state->stack_ptr[-1])->prototype_index);
+	elf_Prototype *prototype = value_as_closure(state->stack_ptr[-1])->prototype;
 	if (prototype->integer_constant_count <= 64 || prototype->number_constant_count <= 64) {
 		test_fail("function emitter grows both constant arrays beyond their initial capacity");
 	}
@@ -555,7 +554,7 @@ static void test_vm_module_converts_atom_constants(void)
 		return;
 	}
 
-	elf_Prototype *prototype = prototype_from_index(state, value_as_closure(state->stack_ptr[-1])->prototype_index);
+	elf_Prototype *prototype = value_as_closure(state->stack_ptr[-1])->prototype;
 	if (prototype->string_count != 2 || strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0)
 	{
 		test_fail("function converts deduplicated atom constants to strings");

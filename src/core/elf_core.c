@@ -78,7 +78,7 @@ static void bootstrap_base_frame(elf_State *state)
 
 	state->frame->framebase = state->stack;
 	state->frame->framesize = 16;
-	state->frame->prototype_index = ELF_PROTOTYPE_INVALID;
+	state->frame->prototype = 0;
 }
 
 static void reserve_bootstrap_frame_stack_space(elf_State *state)
