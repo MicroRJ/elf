@@ -194,7 +194,6 @@ struct Ast_T
 		{
 			Ast       expr;
 			Ast_Array args;
-			Ast       carg;
 		}
 		call;
 

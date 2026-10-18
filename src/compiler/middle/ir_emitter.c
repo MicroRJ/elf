@@ -342,11 +342,9 @@ static IrArray lower_call_arguments(IrEmitter *emitter, Ast call, b32 *failed)
 {
 	ASSERT(call && call->kind == AST_CALL);
 	u32 argument_count = call->call.args.count;
-	b32 has_carg = call->call.carg != 0;
-	u32 capacity = argument_count + has_carg;
 	IrArray result = {};
-	if (capacity) {
-		result.items = arena_push(emitter->module->arena, sizeof(*result.items) * capacity, _Alignof(Ir));
+	if (argument_count) {
+		result.items = arena_push(emitter->module->arena, sizeof(*result.items) * argument_count, _Alignof(Ir));
 	}
 	for (u32 i = 0; i < argument_count; ++i)
 	{
@@ -365,15 +363,6 @@ static IrArray lower_call_arguments(IrEmitter *emitter, Ast call, b32 *failed)
 			}
 		}
 	}
-	if (has_carg)
-	{
-		Ir argument_ir = ir_emit_expr(emitter, call->call.carg);
-		result.items[result.count++] = argument_ir;
-		if (!argument_ir || argument_ir == ERROR_IR) {
-			*failed = true;
-		}
-	}
-
 	return result;
 }
 

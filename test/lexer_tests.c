@@ -679,7 +679,8 @@ static void test_lexer_operators(elf_State *state)
 	expect_token_type(lexer_next(&parser), TOK_BIND, "lex :=");
 	expect_token_type(lexer_next(&parser), TOK_HARD_BIND, "lex ::=");
 	expect_token_type(lexer_next(&parser), TOK_STATIC_BIND, "lex ::");
-	expect_token_type(lexer_next(&parser), TOK_ARROW, "lex ->");
+	expect_token_type(lexer_next(&parser), TOK_SUB, "lex - in ->");
+	expect_token_type(lexer_next(&parser), TOK_GT, "lex > in ->");
 	expect_token_type(lexer_next(&parser), TOK_NIL_OR, "lex ??");
 	expect_token_type(lexer_next(&parser), TOK_NIL_AND, "lex !!");
 	expect_token_type(lexer_next(&parser), TOK_ELLIPSIS, "lex ...");

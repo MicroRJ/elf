@@ -260,7 +260,7 @@ static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
 	return tree;
 }
 
-static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array args, Ast carg)
+static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array args)
 {
 	if (ast_is_error(expr)) {
 		return expr;
@@ -271,28 +271,7 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array arg
 	}
 	tree->call.expr = expr;
 	tree->call.args = args;
-	tree->call.carg = carg;
 	return tree;
-}
-
-static Ast create_carg_call_ast(Parser *par, SourceSite site, Ast left, Ast carg)
-{
-	if (ast_is_error(left)) {
-		return left;
-	}
-	if (ast_is_error(carg)) {
-		return carg;
-	}
-
-	Ast result = 0;
-	if (left->kind == AST_CALL && !left->call.carg) {
-		result = create_call_ast(par, left->site, left->call.expr, left->call.args, carg);
-	}
-	else
-	{
-		result = create_call_ast(par, site, left, (Ast_Array) {}, carg);
-	}
-	return result;
 }
 
 static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
@@ -847,25 +826,6 @@ static void print_ast(Printer *pr, Ast tree)
 			PRINT(pr, "(");
 			print_ast_list(pr, args, nargs);
 			PRINT(pr, ")");
-			Ast carg = tree->call.carg;
-			if (carg)
-			{
-				PRINT(pr, " -> ");
-				if (carg->function.params.count || carg->function.variadic)
-				{
-					PRINT(pr, "(");
-					print_ast_list(pr, carg->function.params.items, carg->function.params.count);
-					if (carg->function.variadic)
-					{
-						if (carg->function.params.count) {
-							PRINT(pr, ", ");
-						}
-						PRINT(pr, "...");
-					}
-					PRINT(pr, ") ");
-				}
-				print_ast(pr, carg->function.body);
-			}
 		}
 		break;
 		case AST_NAMED_ARGUMENT:

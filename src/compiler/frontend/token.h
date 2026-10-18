@@ -67,7 +67,6 @@
 	X(PLUS_PLUS           , "++" )         \
 	X(QMARK               , "?"  )         \
 	X(EXCLAMATION_MARK    , "!"  )         \
-	X(ARROW               , "->" )         \
 	X(BIND                , ":=" )         \
 	X(HARD_BIND           , "::=")         \
 	X(STATIC_BIND         , "::" )         \

@@ -407,54 +407,6 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	arena_destroy(&arena);
 }
 
-static void test_parser_trailing_closures(elf_State *state)
-{
-	Ast file = parser_test_parse_file(state, "run -> {}\nmap(2) -> (item: int, index) { ret item }\nrun -> elf.println(\"welcome\")");
-	Ast first_stat = parser_test_stat(file, 0, AST_TUPLE, "parse zero-parameter trailing closure tuple");
-	Ast first = parser_test_tuple_item(first_stat, 0, AST_CALL, "trailing closure is part of call ast");
-	if (!first) {
-		return;
-	}
-	expect_ast_atom(first->call.expr, "run", "trailing call keeps callee expression");
-	if (first->call.args.count != 0) {
-		test_fail("carg is not counted as an ordinary argument");
-	}
-	Ast first_function = first->call.carg;
-	expect_ast_kind(first_function, AST_FUNCTION, "trailing call stores carg function");
-	if (!first_function || first_function->function.params.count != 0) {
-		test_fail("omitted trailing closure parameters mean zero parameters");
-	}
-	expect_ast_kind(first_function ? first_function->function.body : 0, AST_BLOCK_STAT, "trailing closure stores block body");
-
-	Ast second_stat = parser_test_stat(file, 1, AST_TUPLE, "parse parameterized trailing closure tuple");
-	Ast second = parser_test_tuple_item(second_stat, 0, AST_CALL, "parameterized trailing closure is part of call ast");
-	if (!second) {
-		return;
-	}
-	expect_ast_atom(second->call.expr, "map", "trailing call preserves existing callee");
-	if (second->call.args.count != 1) {
-		test_fail("trailing call preserves existing arguments");
-	}
-	else {
-		expect_ast_i64(second->call.args.items[0], 2, "trailing call keeps existing argument");
-	}
-	Ast function = second->call.carg;
-	if (!function || function->kind != AST_FUNCTION || function->function.params.count != 2) {
-		test_fail("trailing closure preserves parameter list");
-	}
-	else
-	{
-		Ast item = function->function.params.items[0];
-		expect_ast_atom(item->param.name, "item", "trailing closure keeps first parameter");
-		expect_ast_atom(item->param.type, "int", "trailing closure keeps parameter type");
-		expect_ast_atom(function->function.params.items[1]->param.name, "index", "trailing closure keeps second parameter");
-	}
-
-	Ast third_stat = parser_test_stat(file, 2, AST_TUPLE, "parse single-statement trailing closure tuple");
-	Ast third = parser_test_tuple_item(third_stat, 0, AST_CALL, "single-statement trailing closure is part of call ast");
-	expect_ast_kind(third && third->call.carg ? third->call.carg->function.body : 0, AST_TUPLE, "trailing closure stores single-statement body");
-}
-
 static void test_parser_named_call_arguments(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "build(1, width = 20 + 2, title = make(\"ok\"))");
@@ -565,6 +517,11 @@ static void test_parser_rejects_legacy_table_syntax(elf_State *state)
 {
 	parser_expect_source_error(state, "ret {1}", "parser rejects unkeyed table entries");
 	parser_expect_source_error(state, "ret table.[key]", "parser rejects dot bracket field access");
+}
+
+static void test_parser_rejects_trailing_closures(elf_State *state)
+{
+	parser_expect_source_error(state, "ret run -> { ret 1 }", "parser rejects removed trailing closure syntax");
 }
 
 static void test_parser_open_range_indexes(elf_State *state)
@@ -851,12 +808,12 @@ static void run_parser_tests(elf_State *state)
 	test_parser_if_else_blocks(state);
 	test_parser_for_loops(state);
 	test_parser_call_with_table_argument(state);
-	test_parser_trailing_closures(state);
 	test_parser_named_call_arguments(state);
 	test_parser_array_literals(state);
 	test_parser_nil_assign(state);
 	test_parser_table_access_modes(state);
 	test_parser_rejects_legacy_table_syntax(state);
+	test_parser_rejects_trailing_closures(state);
 	test_parser_open_range_indexes(state);
 	test_parser_function_expression(state);
 	test_parser_get_mem_macro(state);

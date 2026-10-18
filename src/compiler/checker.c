@@ -424,7 +424,6 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 			for (u32 i = 0; i < expr->call.args.count; ++i) {
 				resolve_expression(checker, expr->call.args.items[i]);
 			}
-			resolve_expression(checker, expr->call.carg);
 		}
 		break;
 

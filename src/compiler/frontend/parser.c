@@ -404,12 +404,12 @@ static Ast parse_file(Parser *parser)
 	return file_ast;
 }
 
-// <function> ::= ("fun" | "->") ["(" [<parameter-list>] ")"] <statement>
+// <function> ::= "fun" ["(" [<parameter-list>] ")"] <statement>
 // <parameter-list> ::= <parameter> {"," <parameter>} ["," "..."] | "..."
 // <parameter> ::= <identifier> [":" <identifier>] ["=" <expression>]
 static Ast parse_function(Parser *par, Token marker)
 {
-	ASSERT(marker.type == TOK_FUN || marker.type == TOK_ARROW);
+	ASSERT(marker.type == TOK_FUN);
 
 	u32 stack_start = par->ast_stack_index;
 	u32 param_count = 0;
@@ -1133,7 +1133,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
-	return create_call_ast(par, site, callee, args, 0);
+	return create_call_ast(par, site, callee, args);
 }
 
 static Ast parse_call_argument(Parser *parser)
@@ -1330,14 +1330,6 @@ static Ast parse_postfix_expr(Parser *parser)
 			case TOK_LEFT_PAREN:
 			{
 				value = parse_call_expr(parser, value, tok.site);
-			}
-			break;
-
-			case TOK_ARROW:
-			{
-				consume_token(parser);
-				Ast function = parse_function(parser, tok);
-				value = create_carg_call_ast(parser, tok.site, value, function);
 			}
 			break;
 

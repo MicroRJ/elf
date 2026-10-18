@@ -1011,10 +1011,6 @@ static Com_Status lexer_emit_token(Lexer *lexer)
 				lexer->cursor += 1;
 				token.type = TOK_MINUS_MINUS;
 			}
-			else if (lexer_peek(lexer, 0) == '>') {
-				lexer->cursor += 1;
-				token.type = TOK_ARROW;
-			}
 		} break;
 
 		case '>':
