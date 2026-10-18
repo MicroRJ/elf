@@ -41,6 +41,7 @@ static void test_fail(const char *label)
 #include "lexer_tests.c"
 #include "parser_tests.c"
 #include "unparse_tests.c"
+#include "checker_tests.c"
 #include "ir_tests.c"
 #include "backend_tests.c"
 #include "vm_tests.c"
@@ -66,6 +67,7 @@ int main(void)
 	run_lexer_tests(state);
 	run_parser_tests(state);
 	run_unparse_tests(state);
+	run_checker_tests();
 	run_ir_tests(state);
 	run_backend_tests();
 

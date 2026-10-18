@@ -112,7 +112,11 @@ static void declare_statics(Checker *checker, Ast_Array stats)
 		ASSERT(!ast_name->entity);
 		ASSERT(!ast_decl->entity);
 
-		Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_STATIC, ast_decl, ast_expr, ENTITY_TAG_CONSTANT, ast_name->atom);
+		EntityTags tags = ENTITY_TAG_CONSTANT;
+		if (ast_decl->static_decl.exported) {
+			tags |= ENTITY_TAG_EXPORTED;
+		}
+		Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_STATIC, ast_decl, ast_expr, tags, ast_name->atom);
 		ASSERT(entity);
 		ast_name->entity = entity;
 		ast_decl->entity = entity;
@@ -232,7 +236,6 @@ static Scope *resolve_source_scope_lazily(Checker *checker, Com_Source *source)
 		EntityTags tags = ENTITY_TAG_CONSTANT;
 		if (stat->static_decl.exported) {
 			tags |= ENTITY_TAG_EXPORTED;
-			printf("  FOUND EXPORT: %s\n", atom_data(name->atom));
 		}
 
 		Entity *entity = declare_entity(checker, source->scope, ENTITY_STATIC, stat, stat->static_decl.expr, tags, name->identifier);
@@ -317,7 +320,6 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 
 		case AST_IMPORT:
 		{
-			printf("RESOLVING IMPORT EXPRESSION!\n");
 			value.type = STATIC_VALUE_EXPORTS;
 			value.exports = resolve_source_scope_lazily(checker, expr->import.target);
 		}
