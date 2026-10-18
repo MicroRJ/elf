@@ -168,6 +168,10 @@ here instead of scattering `TODO` comments through the source.
   - Compare eager and lazy string hashing with realistic string sizes.
   - Measure the cost and benefit of caching live table-entry counts.
   - Profile `StackFrame` and `Bytecode` size before compacting either structure.
+  - Experiment with replacing the separate frame stack with two internal
+    `elf_Value` slots before each frame's arguments. Derive frame state from the
+    prototype where possible, preserve the closure as a GC root, and account for
+    overlapping register windows and hidden slots in the public stack API.
 
 - [ ] Centralize temporary and host allocation policy.
   - Use scratch storage for short-lived filesystem buffers where its lifetime is
@@ -177,6 +181,8 @@ here instead of scattering `TODO` comments through the source.
 
 ## Future capabilities
 
+- [ ] Experiment with expression-block syntax that exposes the existing
+  statement-plus-result `IR_EXPR_BLOCK` model at the language level.
 - [ ] Support independent module unloading.
 - [ ] Add versioned bytecode serialization.
 - [ ] Add comparative performance benchmarks.
