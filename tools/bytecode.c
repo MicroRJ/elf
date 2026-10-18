@@ -33,7 +33,7 @@ static elf_PrototypeRef compile_source(elf_State *state, const char *name, elf_S
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
+	BcModule *compiled_module = compiler_compile(state, scratch.arena, source_name, source);
 	elf_Program *module = elf_link_module(state, compiled_module);
 	elf_PrototypeRef entry = {};
 	if (module)

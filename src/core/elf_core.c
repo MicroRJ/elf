@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include "elf.h"
+#include "elf_target.h"
 #include "base.h"
 #include "libs.h"
 

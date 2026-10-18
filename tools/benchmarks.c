@@ -248,7 +248,7 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	{
 		Scratch scratch = scratch_begin();
 		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
-		BcModule *compiled_module = compiler_compile(scratch.arena, name, text);
+		BcModule *compiled_module = compiler_compile(state, scratch.arena, name, text);
 		elf_Program *module = elf_link_module(state, compiled_module);
 		bench_require(module != 0, "could not compile benchmark module");
 		scratch_end(scratch);

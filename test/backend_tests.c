@@ -20,7 +20,7 @@ static elf_PrototypeRef backend_test_compile(elf_State *state, const char *name,
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
+	BcModule *compiled_module = compiler_compile(state, scratch.arena, source_name, source);
 	elf_Program *module = elf_link_module(state, compiled_module);
 	elf_PrototypeRef entry = {};
 	if (module)
@@ -563,6 +563,7 @@ static void test_backend_formats_bytecode_function(void)
 static void test_backend_outputs_strings(void)
 {
 	Arena arena = arena_create(0);
+	elf_State *state = elf_create_state();
 	const char text[] = "backend string";
 	Atom *atom = arena_push_zero(&arena, sizeof(*atom) + sizeof(text), _Alignof(Atom));
 	atom->size = sizeof(text) - 1;
@@ -573,7 +574,7 @@ static void test_backend_outputs_strings(void)
 	IrFunction function = {.body = &return_string};
 	IrModule ir_module = {.arena = &arena, .functions = &function, .function_count = 1, .function_capacity = 1};
 
-	BcModule *module = bc_emit_module(&ir_module);
+	BcModule *module = bc_emit_module(state, &ir_module);
 	if (module->string_count != 1 || module->strings[0].size != sizeof(text) - 1 || memcmp(module->strings[0].data, text, sizeof(text))) {
 		test_fail("backend outputs owned bytecode strings");
 	}
@@ -581,6 +582,7 @@ static void test_backend_outputs_strings(void)
 		test_fail("backend bytecode strings do not borrow compiler atoms");
 	}
 
+	elf_destroy_state(state);
 	arena_destroy(&arena);
 }
 

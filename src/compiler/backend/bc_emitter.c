@@ -7,6 +7,7 @@
 #include <dy.h>
 
 #include "elf.h"
+#include "elf_target.h"
 #include "base.h"
 #include "bytecode.h"
 #include "atom_view.h"
@@ -31,37 +32,45 @@ BcJumpPatch;
 typedef struct BcEmitter BcEmitter;
 struct BcEmitter
 {
-	IrModule         *input;
-	Arena        *arena;
-	Bytecode         *bytecode;
-	u32               bytecode_capacity;
-	u32               bytecode_count;
-	elf_Prototype       *functions;
-	u32               function_count;
-	u32               indexed_function_count;
-	u32               generated_function_count;
-	Atom            **atoms;
-	u32               atom_capacity;
-	u32               atom_count;
-	i64              *integer_constants;
-	u32               integer_constant_capacity;
-	u32               integer_constant_count;
-	f64              *number_constants;
-	u32               number_constant_capacity;
-	u32               number_constant_count;
-	BcGlobalRelocation *global_relocations;
-	u32                global_relocation_capacity;
-	u32                global_relocation_count;
-	BcSourceMapEntry *source_map;
-	u32               source_map_capacity;
-	u32               source_map_count;
-	// -- per function state --
-	u32               stack_size;
-	u32               stack_top;
-	BcLabel           labels[4096];
-	u32               label_count;
-	BcJumpPatch       jump_patches[4096];
-	u32               jump_patch_count;
+	elf_State          *target;
+	IrModule           *input;
+
+	Arena              *arena;
+
+	// DY: these are all scratch buffers for each function that we generate, once we're done with a function,
+	// we copy the exact counts and produce a BcFunction
+	Bytecode           *bytecode;
+	u32                 bytecode_capacity;
+	u32                 bytecode_count;
+
+	elf_Prototype      *functions;
+	u32                 function_count;
+	u32                 indexed_function_count;
+	u32                 generated_function_count;
+
+	i64                *integer_constants;
+	u32                 integer_constant_capacity;
+	u32                 integer_constant_count;
+
+	f64                *number_constants;
+	u32                 number_constant_capacity;
+	u32                 number_constant_count;
+
+	BcSourceMapEntry   *source_map;
+	u32                 source_map_capacity;
+	u32                 source_map_count;
+
+	// Codex: do not use this for globals anymore
+	Atom              **atoms;
+	u32                 atom_capacity;
+	u32                 atom_count;
+
+	u32                 stack_size;
+	u32                 stack_top;
+	BcLabel             labels[4096];
+	u32                 label_count;
+	BcJumpPatch         jump_patches[4096];
+	u32                 jump_patch_count;
 };
 
 static inline b32 bc_slot_is_valid(i32 slot)
@@ -159,13 +168,6 @@ static u32 add_atom(BcEmitter *module, Atom *atom)
 	u32 index = module->atom_count++;
 	module->atoms[index] = atom;
 	return index;
-}
-
-static void add_global_relocation(BcEmitter *emitter, u32 bytecode_index, Atom *name)
-{
-	u32 name_index = add_atom(emitter, name);
-	emitter->global_relocations = grow_module_array(emitter->arena, emitter->global_relocations, emitter->global_relocation_count, &emitter->global_relocation_capacity, emitter->global_relocation_count + 1, sizeof(*emitter->global_relocations));
-	emitter->global_relocations[emitter->global_relocation_count++] = (BcGlobalRelocation) {.bytecode_index = bytecode_index, .name_index = name_index};
 }
 
 #define BC_LABEL_INVALID     ((u32)-1)
@@ -322,17 +324,23 @@ static u32 emit_load_nil_bc(BcEmitter *emitter, SourceSite site, i32 dest)
 static u32 emit_load_glb_bc(BcEmitter *emitter, SourceSite site, i32 dest, Atom *name)
 {
 	ASSERT(bc_slot_is_valid(dest));
-	u32 bytecode_index = emit_xy_bc(emitter, site, BC_GETGLOBAL, dest, 0);
-	add_global_relocation(emitter, bytecode_index, name);
-	return bytecode_index;
+	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
+	u32 global = elf_ensure_global_symbol(emitter->target, symbol);
+	if (global >= BC_MODULE_OPERAND_COUNT_MAX) {
+		abort();
+	}
+	return emit_xy_bc(emitter, site, BC_GETGLOBAL, dest, global);
 }
 
 static u32 emit_store_glb_bc(BcEmitter *emitter, SourceSite site, Atom *name, i32 source)
 {
 	ASSERT(bc_slot_is_valid(source));
-	u32 bytecode_index = emit_xy_bc(emitter, site, BC_SETGLOBAL, 0, source);
-	add_global_relocation(emitter, bytecode_index, name);
-	return bytecode_index;
+	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
+	u32 global = elf_ensure_global_symbol(emitter->target, symbol);
+	if (global >= BC_MODULE_OPERAND_COUNT_MAX) {
+		abort();
+	}
+	return emit_xy_bc(emitter, site, BC_SETGLOBAL, global, source);
 }
 
 static u32 emit_reload_bc(BcEmitter *emitter, SourceSite site, i32 dst, i32 src)
@@ -430,8 +438,6 @@ static BcModule *bc_finish_module(BcEmitter *emitter)
 	module->integer_constant_count = emitter->integer_constant_count;
 	module->number_constants = emitter->number_constants;
 	module->number_constant_count = emitter->number_constant_count;
-	module->global_relocations = emitter->global_relocations;
-	module->global_relocation_count = emitter->global_relocation_count;
 	return module;
 }
 
@@ -484,8 +490,9 @@ static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 	bc_function->stack_size = emitter->stack_size;
 }
 
-BcModule *bc_emit_module(IrModule *input)
+BcModule *bc_emit_module(elf_State *target, IrModule *input)
 {
+	ASSERT(target);
 	ASSERT(input);
 	ASSERT(input->function_count);
 	u32 function_count = 0;
@@ -505,6 +512,7 @@ BcModule *bc_emit_module(IrModule *input)
 
 	// TODO(RJ): allocate the emitter itself on a scratch arena!
 	BcEmitter *emitter = arena_push_zero(arena, sizeof(*emitter), 8);
+	emitter->target = target;
 	emitter->input = input;
 	emitter->arena = arena;
 	emitter->function_count = input->function_count;

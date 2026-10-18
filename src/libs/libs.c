@@ -54,7 +54,7 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		}
 	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	BcModule *compiled_module = root_loaded ? compiler_compile(scratch.arena, source_name, source) : 0;
+	BcModule *compiled_module = root_loaded ? compiler_compile(state, scratch.arena, source_name, source) : 0;
 	elf_Program *module = elf_link_module(state, compiled_module);
 	elf_PrototypeRef entry = {};
 	if (module)

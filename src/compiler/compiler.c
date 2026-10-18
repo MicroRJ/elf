@@ -324,14 +324,15 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 	return ast_file;
 }
 
-BcModule *compiler_compile(Arena *arena, elf_StrSlice name, elf_StrSlice source)
+BcModule *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
 	BcModule *module = 0;
-	if (arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
+	if (target && arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
 	{
 		Compiler *compiler = compiler_create(arena);
 		if (compiler)
 		{
+			compiler->target = target;
 			Atom *source_name = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
 			char *source_data = arena_push_zero(arena, source.size + 1, 1);
 			if (source_name && source_data)
@@ -353,23 +354,7 @@ BcModule *compiler_compile(Arena *arena, elf_StrSlice name, elf_StrSlice source)
 							IrModule *ir_module = ir_emit_module(compiler, ast);
 							if (ir_module && !compiler->report.error_count)
 							{
-								module = bc_emit_module(ir_module);
-								if (module)
-								{
-									module->sources = arena_push_zero(arena, sizeof(*module->sources), _Alignof(BcSource));
-									if (module->sources)
-									{
-										module->source_count = 1;
-										module->root_source = compiler_source->id;
-										module->sources[0].name = (BcString) {.data = atom_data(source_name), .size = atom_size(source_name)};
-										module->sources[0].path = module->sources[0].name;
-										module->sources[0].source = compiler_source->source;
-									}
-									else
-									{
-										module = 0;
-									}
-								}
+								module = bc_emit_module(compiler->target, ir_module);
 							}
 						}
 					}

@@ -5,6 +5,7 @@
 #ifndef ELF_COMPILER_H
 #define ELF_COMPILER_H
 
+#include "elf_target.h"
 #include "bc_module.h"
 #include "error.h"
 
@@ -70,6 +71,7 @@ struct Com_Source
 // and sources ...
 struct Compiler
 {
+	elf_State         *target;
 	Arena             *arena;
 	struct Atom_Table *atoms;
 	Com_Source        *first_source;
@@ -86,7 +88,7 @@ void compiler_log_report(Compiler *compiler);
 b32 compiler_report(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
 
-BcModule *compiler_compile(Arena *arena, elf_StrSlice name, elf_StrSlice source);
+BcModule *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_json(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_jsonl(Arena *arena, elf_StrSlice name, elf_StrSlice source);
