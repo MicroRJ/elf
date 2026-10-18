@@ -556,7 +556,6 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		break;
 
 		case AST_CALL:
-		case AST_META_CALL:
 		{
 			StaticValue item = {0};
 			status = resolve_expression(checker, expr->call.expr, &item);

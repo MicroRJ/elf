@@ -40,7 +40,6 @@ typedef struct Atom Atom;
 	X(IR_ATOM                , "atom")                       \
 	X(IR_NIL                 , "nil")                        \
 	X(IR_CALL                , "call")                       \
-	X(IR_META_CALL           , "meta_call")                  \
 	X(IR_TABLE               , "table")                      \
 	X(IR_ARRAY               , "array")                      \
 	X(IR_INDEX               , "index")                      \

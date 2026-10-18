@@ -53,7 +53,6 @@
 	X(AST_IMPORT              , "import")                     \
 	X(AST_CALL                , "call")                       \
 	X(AST_NAMED_ARGUMENT      , "named_argument")             \
-	X(AST_META_CALL           , "meta_call")                  \
 	X(AST_TUPLE               , "tuple")                      \
 	X(AST_FUNCTION            , "function")                   \
 	X(AST_FUNCTION_PARAM      , "function_param")             \
