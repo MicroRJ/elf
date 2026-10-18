@@ -1022,68 +1022,51 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 	u32 stack_start = par->ast_stack_index;
 	u32 nargs = 0;
 
-	if (peek_token(par, TOK_LEFT_BRACE))
-	{
-		Com_Status warning = parser_report(par, ERROR_WARNING, ERROR_SYNTAX_DEPRECATION, parser_current_token(par).site, "implicit table call syntax is deprecated; write 'expr({...})'");
-		if (warning == COM_STATUS_OOM) {
-			return ERROR_OOM_AST;
-		}
-		Ast expr = parse_table_expr(par);
-		if (ast_is_error(expr)) {
-			return expr;
-		}
-		if (!expr) {
-			return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected call argument");
-		}
-
-		if (!push_ast(par, expr)) {
-			return ERROR_OOM_AST;
-		}
-		++ nargs;
+	Token opening = take_token(par, TOK_LEFT_PAREN);
+	if (token_is_error(opening)) {
+		return ast_from_token_error(opening);
 	}
-	else if (pick_token(par, TOK_LEFT_PAREN))
+
+	pick_token(par, TOK_COMMA);
+
+	if (!peek_token(par, TOK_PAREN_RIGHT))
 	{
-		pick_token(par, TOK_COMMA);
-
-		if (!peek_token(par, TOK_PAREN_RIGHT))
+		do
 		{
-			do
+			if (peek_token(par, TOK_PAREN_RIGHT))
 			{
-				if (peek_token(par, TOK_PAREN_RIGHT))
-				{
-					par->ast_stack_index = stack_start;
-					return parser_error(par, ERROR_EXCESS_COMMA, parser_previous_token(par).site, "excess comma");
-				}
-				if (peek_token(par, TOK_COMMA))
-				{
-					par->ast_stack_index = stack_start;
-					return parser_error(par, ERROR_EXCESS_COMMA, parser_current_token(par).site, "excess comma");
-				}
-
-				Ast x = parse_call_argument(par);
-				if (ast_is_error(x)) {
-					par->ast_stack_index = stack_start;
-					return x;
-				}
-				if (!x) {
-					par->ast_stack_index = stack_start;
-					return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected call argument");
-				}
-
-				if (!push_ast(par, x)) {
-					par->ast_stack_index = stack_start;
-					return ERROR_OOM_AST;
-				}
-				++ nargs;
+				par->ast_stack_index = stack_start;
+				return parser_error(par, ERROR_EXCESS_COMMA, parser_previous_token(par).site, "excess comma");
 			}
-			while (pick_token(par, TOK_COMMA));
-		}
+			if (peek_token(par, TOK_COMMA))
+			{
+				par->ast_stack_index = stack_start;
+				return parser_error(par, ERROR_EXCESS_COMMA, parser_current_token(par).site, "excess comma");
+			}
 
-		Token closing = take_token(par, TOK_PAREN_RIGHT);
-		if (token_is_error(closing)) {
-			par->ast_stack_index = stack_start;
-			return ast_from_token_error(closing);
+			Ast x = parse_call_argument(par);
+			if (ast_is_error(x)) {
+				par->ast_stack_index = stack_start;
+				return x;
+			}
+			if (!x) {
+				par->ast_stack_index = stack_start;
+				return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected call argument");
+			}
+
+			if (!push_ast(par, x)) {
+				par->ast_stack_index = stack_start;
+				return ERROR_OOM_AST;
+			}
+			++ nargs;
 		}
+		while (pick_token(par, TOK_COMMA));
+	}
+
+	Token closing = take_token(par, TOK_PAREN_RIGHT);
+	if (token_is_error(closing)) {
+		par->ast_stack_index = stack_start;
+		return ast_from_token_error(closing);
 	}
 
 	Ast_Array args = pop_ast_array(par, nargs);
@@ -1283,7 +1266,6 @@ static Ast parse_postfix_expr(Parser *parser)
 			}
 			break;
 
-			case TOK_LEFT_BRACE:
 			case TOK_LEFT_PAREN:
 			{
 				value = parse_call_expr(parser, value, tok.site);

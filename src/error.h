@@ -31,7 +31,6 @@
 	X(ERROR_INVALID_DECLARATION,          "invalid-declaration") \
 	X(ERROR_INVALID_ASSIGNMENT,           "invalid-assignment") \
 	X(ERROR_DUPLICATE_DECLARATION,        "duplicate-declaration") \
-	X(ERROR_SYNTAX_DEPRECATION,           "syntax-deprecation") \
 	X(ERROR_INVALID_FIELD_INITIALIZER,    "invalid-field-initializer") \
 	X(ERROR_EXCESS_COMMA,                 "excess-comma") \
 	X(ERROR_MISSING_FUNCTION_BODY,        "missing-function-body") \

@@ -376,23 +376,14 @@ static void test_parser_for_loops(elf_State *state)
 
 static void test_parser_call_with_table_argument(elf_State *state)
 {
-	(void)state;
-	Arena arena = arena_create(0);
-	char source_text[] = "make {x = 1, [2] = 3}";
-	Compiler *compiler = compiler_create(&arena);
-	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"deprecated_table_call", sizeof("deprecated_table_call") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
-	Parser parser = {};
-	ASSERT(parser_init(&parser, compiler));
-	Ast file = parser_parse_file(&parser, source);
-	parser_destroy(&parser);
+	Ast file = parser_test_parse_file(state, "make({x = 1, [2] = 3})");
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
 	expect_ast_kind(call->call.expr, AST_IDENT, "parse call callee");
 	expect_ast_atom(call->call.expr, "make", "parse call callee string");
 	if (call->call.args.count != 1) {
-		test_fail("table call shorthand counts argument");
-		arena_destroy(&arena);
+		test_fail("table call counts argument");
 		return;
 	}
 
@@ -401,10 +392,12 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	if (table->table.count != 2) {
 		test_fail("table parser counts entries");
 	}
-	if (source->report.error_count != 0 || source->report.warning_count != 1 || !source->report.first || source->report.first->code != ERROR_SYNTAX_DEPRECATION || source->report.first->phase != ERROR_PHASE_PARSER) {
-		test_fail("table call shorthand reports one parser deprecation warning");
-	}
-	arena_destroy(&arena);
+
+	file = parser_test_parse_file(state, "make {}");
+	stat = parser_test_stat(file, 0, AST_TUPLE, "implicit table call parses callee as its own statement");
+	Ast callee = parser_test_tuple_item(stat, 0, AST_IDENT, "implicit table call no longer creates a call");
+	expect_ast_atom(callee, "make", "implicit table call retains callee expression");
+	parser_test_stat(file, 1, AST_BLOCK_STAT, "implicit table call braces parse as a separate block");
 }
 
 static void test_parser_named_call_arguments(elf_State *state)

@@ -12,10 +12,7 @@ This file tracks language features and other changes visible to elf users. Inter
 - Added default parameter values for static functions.
 - Added named arguments when calling a statically known function. Positional arguments must come first, and named arguments must follow parameter order.
 - Removed backtick strings and triple-quoted string blocks. Strings now use `"..."` exclusively, with `\n` for embedded newlines and `f"..."` for interpolation.
-
-### Deprecated
-
-- Deprecated implicit table calls such as `render {width = 20}`. Use `render({width = 20})` instead.
+- Removed implicit table calls such as `render {width = 20}`. Use `render({width = 20})` instead.
 
 ### Standard library
 
