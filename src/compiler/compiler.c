@@ -314,7 +314,7 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 		if (!imported_source) {
 			return ERROR_AST;
 		}
-		import_ast->import.source = imported_source->id;
+		import_ast->import.target = imported_source;
 		Ast imported_ast = parse_source_recursively(compiler, parser, imported_source);
 		if (ast_is_error(imported_ast)) {
 			return imported_ast;

@@ -190,11 +190,9 @@ static Entity *resolve_identifier(Checker *checker, Atom *name)
 	return entity;
 }
 
-static Scope *resolve_source_scope_lazily(Checker *checker, Com_SourceId source_id)
+static Scope *resolve_source_scope_lazily(Checker *checker, Com_Source *source)
 {
 	Compiler *compiler = checker->compiler;
-	ASSERT(source_id != COM_INVALID_SOURCE_ID);
-	Com_Source *source = compiler_source_from_id(compiler, source_id);
 	ASSERT(source);
 	ASSERT(source->name);
 	ASSERT(source->path);
@@ -313,7 +311,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 		{
 			printf("RESOLVING IMPORT EXPRESSION!\n");
 			value.type = STATIC_VALUE_EXPORTS;
-			value.exports = resolve_source_scope_lazily(checker, expr->import.source);
+			value.exports = resolve_source_scope_lazily(checker, expr->import.target);
 		}
 		break;
 

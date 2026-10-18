@@ -123,7 +123,6 @@ static Ast ast_new_import(Parser *par, SourceSite site, Atom *path)
 		return value;
 	}
 	value->import.path = path;
-	value->import.source = COM_INVALID_SOURCE_ID;
 	return value;
 }
 

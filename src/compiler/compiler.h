@@ -43,8 +43,6 @@ typedef struct
 }
 Com_Report;
 
-#define COM_INVALID_SOURCE_ID ((Com_SourceId)-1)
-
 typedef enum
 {
 	COM_SOURCE_UNPARSED = 0,

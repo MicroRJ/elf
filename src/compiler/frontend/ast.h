@@ -114,6 +114,7 @@ struct Ast_T
 
 	// Todo, remove this entirely
 	struct Com_Source *source;
+
 	struct Entity     *entity;
 
 	union
@@ -130,8 +131,10 @@ struct Ast_T
 
 		struct
 		{
+			// Todo, path should be a tree as well ...
 			Atom         *path;
-			Com_SourceId  source;
+
+			Com_Source *target;
 		}
 		import;
 
