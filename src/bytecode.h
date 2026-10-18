@@ -120,6 +120,7 @@ STATIC_ASSERT(sizeof(Bytecode) == 12);
 typedef struct BcFunction
 {
 	b32       variadic;
+	u32       source_index;
 	u8           arity;
 	// TODO(RJ): we could literally instead just have i16 *captures, u8 ncaptures, here and the vm would
 	// just load the values directly into the closure ...

@@ -476,6 +476,7 @@ static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 	BcFunction *bc_function = module->functions + function_index;
 	module->generated_function_count += 1;
 	bc_function->variadic = function->variadic;
+	bc_function->source_index = function->site.source;
 	bc_function->arity = function->param_count;
 	bc_function->offset = bytecode_start;
 	bc_function->length = module->bytecode_count - bytecode_start;
