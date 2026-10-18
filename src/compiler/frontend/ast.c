@@ -18,6 +18,48 @@ Ast_T ast_error_oom_sentinel =
 	.status = COM_STATUS_OOM,
 };
 
+static b32 ast_list_push(Ast_List *list, Arena *arena, Ast tree)
+{
+	ASSERT(list);
+	ASSERT(arena);
+	Ast_Node *node = arena_push_zero(arena, sizeof(*node), _Alignof(Ast_Node));
+	if (!node) {
+		return false;
+	}
+	node->tree = tree;
+	if (list->last) {
+		list->last->next = node;
+	}
+	else {
+		list->first = node;
+	}
+	list->last = node;
+	list->count += 1;
+	return true;
+}
+
+static Ast_Array ast_list_compact(Ast_List *list, Arena *arena)
+{
+	ASSERT(list);
+	ASSERT(arena);
+	Ast_Array result = {.count = list->count};
+	if (!result.count) {
+		return result;
+	}
+	result.items = arena_push(arena, sizeof(*result.items) * result.count, _Alignof(Ast));
+	if (!result.items) {
+		return (Ast_Array) {};
+	}
+	u32 index = 0;
+	for (Ast_Node *node = list->first; node; node = node->next)
+	{
+		ASSERT(index < result.count);
+		result.items[index++] = node->tree;
+	}
+	ASSERT(index == result.count);
+	return result;
+}
+
 static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
 {
 	ASSERT(par->source);

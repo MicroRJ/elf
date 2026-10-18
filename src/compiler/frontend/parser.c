@@ -231,12 +231,10 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 	arena_reset(&parser->scratch_arena);
 	parser->tokens = (Token_Array) {};
 	parser->token_index = 0;
+	parser->imports = (Ast_List) {};
 	parser->ast_stack_size = 4096;
 	parser->ast_stack_index = 0;
 	parser->ast_stack = arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size, _Alignof(Ast));
-	parser->first_import = 0;
-	parser->last_import = 0;
-	parser->import_count = 0;
 	if (!parser->ast_stack) {
 		return false;
 	}
@@ -314,47 +312,6 @@ static Ast_Array pop_ast_array(Parser *par, u32 count)
 	return result;
 }
 
-static b32 parser_record_import(Parser *parser, Ast tree)
-{
-	ASSERT(tree && tree->kind == AST_IMPORT);
-	Ast_Node *node = arena_push_zero(&parser->scratch_arena, sizeof(*node), _Alignof(Ast_Node));
-	if (!node) {
-		return false;
-	}
-
-	node->tree = tree;
-	if (parser->last_import) {
-		parser->last_import->next = node;
-	}
-	else {
-		parser->first_import = node;
-	}
-	parser->last_import = node;
-	parser->import_count += 1;
-	return true;
-}
-
-static Ast_Array parser_flatten_imports(Parser *parser)
-{
-	Ast_Array imports = {.count = parser->import_count};
-	if (!imports.count) {
-		return imports;
-	}
-
-	imports.items = arena_push(parser->result_arena, sizeof(*imports.items) * imports.count, _Alignof(Ast));
-	if (!imports.items) {
-		return (Ast_Array) {};
-	}
-
-	u32 index = 0;
-	for (Ast_Node *node = parser->first_import; node; node = node->next) {
-		ASSERT(index < imports.count);
-		imports.items[index++] = node->tree;
-	}
-	ASSERT(index == imports.count);
-	return imports;
-}
-
 static Ast parse_file(Parser *parser)
 {
 	if (token_is_error(parser_current_token(parser))) {
@@ -396,8 +353,8 @@ static Ast parse_file(Parser *parser)
 		return body;
 	}
 
-	Ast_Array imports = parser_flatten_imports(parser);
-	if (parser->import_count && !imports.items) {
+	Ast_Array imports = ast_list_compact(&parser->imports, parser->result_arena);
+	if (parser->imports.count && !imports.items) {
 		return ERROR_OOM_AST;
 	}
 	Ast file_ast = create_file_ast(parser, tok.site, body, imports);
@@ -794,7 +751,7 @@ static Ast parse_unary_expr(Parser *parser)
 			{
 				consume_token(parser);
 				value = ast_new_import(parser, tok.site, path.atom);
-				if (!ast_is_error(value) && !parser_record_import(parser, value)) {
+				if (!ast_is_error(value) && !ast_list_push(&parser->imports, &parser->scratch_arena, value)) {
 					value = ERROR_OOM_AST;
 				}
 			}

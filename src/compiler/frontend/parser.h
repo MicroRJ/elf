@@ -29,9 +29,7 @@ struct Parser
 	u32                 ast_stack_size;
 	u32                 ast_stack_index;
 
-	Ast_Node           *first_import;
-	Ast_Node            *last_import;
-	u32                 import_count;
+	Ast_List             imports;
 };
 
 b32 parser_init(Parser *parser, Compiler *compiler);

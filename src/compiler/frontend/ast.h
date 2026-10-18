@@ -106,6 +106,14 @@ struct Ast_Node
 	Ast       tree;
 };
 
+typedef struct
+{
+	Ast_Node *first;
+	Ast_Node *last;
+	u32       count;
+}
+Ast_List;
+
 // IMMUTABLE once constructed.
 struct Ast_T
 {
