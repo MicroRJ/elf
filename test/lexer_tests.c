@@ -1,14 +1,40 @@
+static Com_Source *lexer_test_add_source(Compiler *compiler, elf_StrSlice name, elf_StrSlice source_text)
+{
+	ASSERT(compiler);
+	ASSERT(name.size <= UINT32_MAX);
+	ASSERT(source_text.size <= UINT32_MAX);
+
+	Atom *name_atom = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
+	Com_Source *source = arena_push_zero(compiler->arena, sizeof(*source), _Alignof(Com_Source));
+	ASSERT(name_atom);
+	ASSERT(source);
+
+	source->id = compiler->source_count++;
+	source->name = name_atom;
+	source->path = name_atom;
+	source->source = (BcSourceBuffer) {source_text.data, (u32)source_text.size};
+	if (compiler->last_source)
+	{
+		compiler->last_source->next = source;
+	}
+	else
+	{
+		compiler->first_source = source;
+	}
+	compiler->last_source = source;
+	return source;
+}
+
 static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 size)
 {
 	Parser parser = {};
 	elf_StrSlice source_buffer = {(char *)source, size};
 	parser.compiler = compiler_create(&state->arena);
-	compiler_add_root_source(parser.compiler, "lexer_tests", source_buffer);
+	parser.source = lexer_test_add_source(parser.compiler, (elf_StrSlice) {(char *)"lexer_tests", sizeof("lexer_tests") - 1}, source_buffer);
 	parser.result_arena = &state->arena;
 	parser.scratch_arena = arena_create(1024 * 1024);
-	parser.source_id = 0;
 	parser.atoms = parser.compiler->atoms;
-	lexer_init(&parser.lexer, parser.compiler, parser.source_id, &parser.scratch_arena);
+	lexer_init(&parser.lexer, parser.compiler, parser.source, &parser.scratch_arena);
 	return parser;
 }
 
@@ -74,8 +100,8 @@ static void expect_token_atom_bytes(Token token, const char *data, u32 size, con
 static void expect_token_line(Parser *parser, Token token, u32 index, const char *text, const char *label)
 {
 	u32 expected_size = (u32)strlen(text);
-	const char *line_start = parser->lexer.source.data + token.site.line_offset;
-	const char *source_end = parser->lexer.source.data + parser->lexer.source.size;
+	const char *line_start = parser->lexer.compiler_source->source.data + token.site.line_offset;
+	const char *source_end = parser->lexer.compiler_source->source.data + parser->lexer.compiler_source->source.size;
 
 	u32 line_size = 0;
 	while (line_start + line_size < source_end &&
@@ -711,14 +737,14 @@ static void test_lexer_compiler_source(elf_State *state)
 		test_fail("compiler creates one root source");
 	}
 
-	Com_Source *source = compiler->sources;
+	Com_Source *source = compiler->first_source;
 	if (source->name != atom_from_data(compiler->atoms, "lexer_tests")) {
 		test_fail("compiler source name uses shared atom table");
 	}
 	if (source->path != source->name) {
 		test_fail("root source initially uses its name as canonical path");
 	}
-	if (source->source.data != parser.lexer.source.data || source->source.size != parser.lexer.source.size) {
+	if (source->source.data != parser.lexer.compiler_source->source.data || source->source.size != parser.lexer.compiler_source->source.size) {
 		test_fail("lexer reads its compiler source");
 	}
 
@@ -758,10 +784,10 @@ static void test_lexer_out_of_memory(elf_State *state)
 	Arena arena = arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
 	elf_StrSlice source = {(char *)"oom_identifier", 14};
-	compiler_add_root_source(compiler, "lexer_oom", source);
+	Com_Source *compiler_source = lexer_test_add_source(compiler, (elf_StrSlice) {(char *)"lexer_oom", sizeof("lexer_oom") - 1}, source);
 	Lexer lexer = {};
 	Arena scratch_arena = arena_create(0);
-	lexer_init(&lexer, compiler, 0, &scratch_arena);
+	lexer_init(&lexer, compiler, compiler_source, &scratch_arena);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
 	Token token = lex_token(&lexer);
@@ -776,10 +802,10 @@ static void test_lexer_out_of_memory(elf_State *state)
 	arena = arena_create(0);
 	compiler = compiler_create(&arena);
 	source = (elf_StrSlice) {(char *)"@", 1};
-	compiler_add_root_source(compiler, "lexer_report_oom", source);
+	compiler_source = lexer_test_add_source(compiler, (elf_StrSlice) {(char *)"lexer_report_oom", sizeof("lexer_report_oom") - 1}, source);
 	lexer = (Lexer) {};
 	scratch_arena = arena_create(0);
-	lexer_init(&lexer, compiler, 0, &scratch_arena);
+	lexer_init(&lexer, compiler, compiler_source, &scratch_arena);
 	capacity = arena.capacity;
 	arena.capacity = arena.used;
 	token = lex_token(&lexer);
