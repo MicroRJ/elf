@@ -77,7 +77,7 @@ void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size)
 		gc_check(state);
 	}
 
-	elf_Object * reference = elf_alloc_zero(state, size);
+	elf_Object *reference = elf_alloc_zero(state, size);
 	ASSERT(reference != 0);
 	reference->status = 0;
 	reference->type   = type;
@@ -150,9 +150,9 @@ static u32 gc_mark_prototypes(elf_State *state)
 static u32 gc_mark_globals(elf_State *state)
 {
 	u32 marked_count = 0;
-	for (u32 i = 0; i < state->globals.count; ++i)
+	for (u32 i = 0; i < state->global_count; ++i)
 	{
-		elf_Value value = state->globals.values[i];
+		elf_Value value = state->global_values[i];
 		if (value_is_object(value))
 		{
 			marked_count += gc_mark_reachable(state, value_as_object(value));

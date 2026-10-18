@@ -70,7 +70,6 @@ static void init_state_storage(elf_State *state)
 {
 	init_runtime_storage(state);
 	init_gc_storage(state);
-	elf_globals_init(&state->globals, state);
 }
 
 static void bootstrap_base_frame(elf_State *state)
@@ -111,7 +110,7 @@ static void bootstrap_standard_libraries(elf_State *state)
 	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "vm")), value_from_table(elf_lib_vm(state)));
 
 	elf_StrSlice elf_name = {(char *)"elf", 3};
-	elf_globals_set_by_name(&state->globals, elf_name, value_from_table(elf_table));
+	elf_globals_set_by_name(state, elf_name, value_from_table(elf_table));
 
 	// The library constructors push each table while building the graph. The
 	// global store and metatables have dedicated roots in the collector.
@@ -154,7 +153,7 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
-		elf_globals_destroy(&state->globals);
+		elf_globals_destroy(state);
 		gc_destroy_all(state);
 		elf_free(state, state->prototypes, (u64)state->prototype_capacity * sizeof(*state->prototypes));
 		elf_free(state, state->string_buckets,

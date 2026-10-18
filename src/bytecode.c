@@ -44,13 +44,13 @@ static void format_value_shallow(Arena *arena, elf_Value value)
 
 static void format_global_value(elf_State *state, Arena *arena, u32 index)
 {
-	if (index >= state->globals.count)
+	if (index >= state->global_count)
 	{
 		arena_push_text(arena, "<bad-global>");
 		return;
 	}
 
-	format_value_shallow(arena, elf_globals_get_by_slot(&state->globals, index));
+	format_value_shallow(arena, elf_globals_get_by_slot(state, index));
 }
 
 static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Arena *arena, u32 index, Bytecode byte)

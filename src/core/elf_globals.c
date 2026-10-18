@@ -49,15 +49,15 @@ static GlobalEntry *global_find_entry(GlobalEntry *entries, u32 capacity, elf_St
 	}
 }
 
-static void globals_resize_entries(elf_Globals *globals, u32 capacity)
+static void globals_resize_entries(elf_State *state, u32 capacity)
 {
-	u64 entry_bytes = (u64)capacity * sizeof(*globals->entries);
-	GlobalEntry *entries = elf_alloc_zero(globals->state, entry_bytes);
+	u64 entry_bytes = (u64)capacity * sizeof(*state->global_entries);
+	GlobalEntry *entries = elf_alloc_zero(state, entry_bytes);
 	ASSERT(entries != 0);
 
-	for (u32 i = 0; i < globals->entry_capacity; ++i)
+	for (u32 i = 0; i < state->global_entry_capacity; ++i)
 	{
-		GlobalEntry entry = globals->entries[i];
+		GlobalEntry entry = state->global_entries[i];
 		if (entry.name)
 		{
 			elf_StrSlice name = {entry.name, entry.size};
@@ -66,62 +66,60 @@ static void globals_resize_entries(elf_Globals *globals, u32 capacity)
 		}
 	}
 
-	elf_free(globals->state, globals->entries, (u64)globals->entry_capacity * sizeof(*globals->entries));
-	globals->entries = entries;
-	globals->entry_capacity = capacity;
+	elf_free(state, state->global_entries, (u64)state->global_entry_capacity * sizeof(*state->global_entries));
+	state->global_entries = entries;
+	state->global_entry_capacity = capacity;
 }
 
-static void globals_ensure_entry_capacity(elf_Globals *globals)
+static void globals_ensure_entry_capacity(elf_State *state)
 {
-	if (globals->entry_capacity && (u64)(globals->count + 1) * GLOBAL_MAX_LOAD_DENOMINATOR <= (u64)globals->entry_capacity * GLOBAL_MAX_LOAD_NUMERATOR)
+	if (state->global_entry_capacity && (u64)(state->global_count + 1) * GLOBAL_MAX_LOAD_DENOMINATOR <= (u64)state->global_entry_capacity * GLOBAL_MAX_LOAD_NUMERATOR)
 	{
 		return;
 	}
-	u32 capacity = globals->entry_capacity ? globals->entry_capacity << 1 : GLOBAL_INITIAL_CAPACITY;
-	globals_resize_entries(globals, capacity);
+	u32 capacity = state->global_entry_capacity ? state->global_entry_capacity << 1 : GLOBAL_INITIAL_CAPACITY;
+	globals_resize_entries(state, capacity);
 }
 
-static void globals_ensure_value_capacity(elf_Globals *globals)
+static void globals_ensure_value_capacity(elf_State *state)
 {
-	if (globals->count < globals->value_capacity)
+	if (state->global_count < state->global_value_capacity)
 	{
 		return;
 	}
-	u32 capacity = globals->value_capacity ? globals->value_capacity << 1 : GLOBAL_INITIAL_CAPACITY;
-	u64 old_bytes = (u64)globals->value_capacity * sizeof(*globals->values);
-	u64 new_bytes = (u64)capacity * sizeof(*globals->values);
-	elf_Value *values = elf_realloc(globals->state, globals->values, old_bytes, new_bytes);
+	u32 capacity = state->global_value_capacity ? state->global_value_capacity << 1 : GLOBAL_INITIAL_CAPACITY;
+	u64 old_bytes = (u64)state->global_value_capacity * sizeof(*state->global_values);
+	u64 new_bytes = (u64)capacity * sizeof(*state->global_values);
+	elf_Value *values = elf_realloc(state, state->global_values, old_bytes, new_bytes);
 	ASSERT(values != 0);
-	value_zero_many(values + globals->value_capacity, capacity - globals->value_capacity);
-	globals->values = values;
-	globals->value_capacity = capacity;
+	value_zero_many(values + state->global_value_capacity, capacity - state->global_value_capacity);
+	state->global_values = values;
+	state->global_value_capacity = capacity;
 }
 
-void elf_globals_init(elf_Globals *globals, elf_State *state)
+void elf_globals_destroy(elf_State *state)
 {
-	zero_memory(globals, sizeof(*globals));
-	globals->state = state;
-}
-
-void elf_globals_destroy(elf_Globals *globals)
-{
-	for (u32 i = 0; i < globals->entry_capacity; ++i)
+	for (u32 i = 0; i < state->global_entry_capacity; ++i)
 	{
-		GlobalEntry *entry = globals->entries + i;
+		GlobalEntry *entry = state->global_entries + i;
 		if (entry->name)
 		{
-			elf_free(globals->state, entry->name, entry->size + 1);
+			elf_free(state, entry->name, entry->size + 1);
 		}
 	}
-	elf_free(globals->state, globals->entries, (u64)globals->entry_capacity * sizeof(*globals->entries));
-	elf_free(globals->state, globals->values, (u64)globals->value_capacity * sizeof(*globals->values));
-	zero_memory(globals, sizeof(*globals));
+	elf_free(state, state->global_entries, (u64)state->global_entry_capacity * sizeof(*state->global_entries));
+	elf_free(state, state->global_values, (u64)state->global_value_capacity * sizeof(*state->global_values));
+	state->global_entries = 0;
+	state->global_entry_capacity = 0;
+	state->global_values = 0;
+	state->global_value_capacity = 0;
+	state->global_count = 0;
 }
 
-b32 elf_globals_find(elf_Globals *globals, elf_StrSlice name, u32 *slot)
+b32 elf_globals_find(elf_State *state, elf_StrSlice name, u32 *slot)
 {
 	u32 hash = global_name_hash(name);
-	GlobalEntry *entry = global_find_entry(globals->entries, globals->entry_capacity, name, hash);
+	GlobalEntry *entry = global_find_entry(state->global_entries, state->global_entry_capacity, name, hash);
 	if (!entry || !entry->name)
 	{
 		return false;
@@ -133,21 +131,21 @@ b32 elf_globals_find(elf_Globals *globals, elf_StrSlice name, u32 *slot)
 	return true;
 }
 
-u32 elf_globals_ensure(elf_Globals *globals, elf_StrSlice name)
+u32 elf_globals_ensure(elf_State *state, elf_StrSlice name)
 {
 	u32 hash = global_name_hash(name);
-	GlobalEntry *entry = global_find_entry(globals->entries, globals->entry_capacity, name, hash);
+	GlobalEntry *entry = global_find_entry(state->global_entries, state->global_entry_capacity, name, hash);
 	if (entry && entry->name)
 	{
 		return entry->slot;
 	}
 
-	globals_ensure_entry_capacity(globals);
-	globals_ensure_value_capacity(globals);
-	entry = global_find_entry(globals->entries, globals->entry_capacity, name, hash);
+	globals_ensure_entry_capacity(state);
+	globals_ensure_value_capacity(state);
+	entry = global_find_entry(state->global_entries, state->global_entry_capacity, name, hash);
 	ASSERT(entry && !entry->name);
 
-	char *name_copy = elf_alloc(globals->state, name.size + 1);
+	char *name_copy = elf_alloc(state, name.size + 1);
 	ASSERT(name_copy != 0);
 	if (name.size)
 	{
@@ -155,41 +153,41 @@ u32 elf_globals_ensure(elf_Globals *globals, elf_StrSlice name)
 	}
 	name_copy[name.size] = 0;
 
-	u32 slot = globals->count++;
+	u32 slot = state->global_count++;
 	entry->name = name_copy;
 	entry->size = name.size;
 	entry->hash = hash;
 	entry->slot = slot;
-	globals->values[slot] = value_nil();
+	state->global_values[slot] = value_nil();
 	return slot;
 }
 
 elf_u32 elf_ensure_global_symbol(elf_State *state, elf_StrSlice name)
 {
 	ASSERT(state);
-	return elf_globals_ensure(&state->globals, name);
+	return elf_globals_ensure(state, name);
 }
 
-elf_Value elf_globals_get_by_name(elf_Globals *globals, elf_StrSlice name)
+elf_Value elf_globals_get_by_name(elf_State *state, elf_StrSlice name)
 {
 	u32 slot = 0;
-	return elf_globals_find(globals, name, &slot) ? globals->values[slot] : value_nil();
+	return elf_globals_find(state, name, &slot) ? state->global_values[slot] : value_nil();
 }
 
-void elf_globals_set_by_name(elf_Globals *globals, elf_StrSlice name, elf_Value value)
+void elf_globals_set_by_name(elf_State *state, elf_StrSlice name, elf_Value value)
 {
-	u32 slot = elf_globals_ensure(globals, name);
-	globals->values[slot] = value;
+	u32 slot = elf_globals_ensure(state, name);
+	state->global_values[slot] = value;
 }
 
-elf_Value elf_globals_get_by_slot(elf_Globals *globals, u32 slot)
+elf_Value elf_globals_get_by_slot(elf_State *state, u32 slot)
 {
-	ASSERT(slot < globals->count);
-	return globals->values[slot];
+	ASSERT(slot < state->global_count);
+	return state->global_values[slot];
 }
 
-void elf_globals_set_by_slot(elf_Globals *globals, u32 slot, elf_Value value)
+void elf_globals_set_by_slot(elf_State *state, u32 slot, elf_Value value)
 {
-	ASSERT(slot < globals->count);
-	globals->values[slot] = value;
+	ASSERT(slot < state->global_count);
+	state->global_values[slot] = value;
 }

@@ -126,17 +126,6 @@ struct elf_Table
 	u32        occupied;
 };
 
-typedef struct
-{
-	elf_State   *state;
-	GlobalEntry *entries;
-	u32          entry_capacity;
-	elf_Value   *values;
-	u32          value_capacity;
-	u32          count;
-}
-elf_Globals;
-
 struct elf_Prototype
 {
 	elf_String      **strings;
@@ -180,7 +169,7 @@ struct StackFrame
 
 struct elf_State
 {
-	Arena      arena;
+	Arena          arena;
 	void          *user_data;
 
 	elf_Prototype *prototypes;
@@ -209,7 +198,11 @@ struct elf_State
 	};
 	struct
 	{
-		elf_Globals  globals;
+		GlobalEntry *global_entries;
+		u32          global_entry_capacity;
+		elf_Value   *global_values;
+		u32          global_value_capacity;
+		u32          global_count;
 		elf_Table   *ref_table;
 		u32          next_ref;
 		u64          vm_closure_calls;
@@ -285,14 +278,13 @@ b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key);
 b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Value *removed);
 void elf_table_clear(elf_State *state, elf_Table *table);
 
-void elf_globals_init(elf_Globals *globals, elf_State *state);
-void elf_globals_destroy(elf_Globals *globals);
-b32 elf_globals_find(elf_Globals *globals, elf_StrSlice name, u32 *slot);
-u32 elf_globals_ensure(elf_Globals *globals, elf_StrSlice name);
-elf_Value elf_globals_get_by_name(elf_Globals *globals, elf_StrSlice name);
-void elf_globals_set_by_name(elf_Globals *globals, elf_StrSlice name, elf_Value value);
-elf_Value elf_globals_get_by_slot(elf_Globals *globals, u32 slot);
-void elf_globals_set_by_slot(elf_Globals *globals, u32 slot, elf_Value value);
+void elf_globals_destroy(elf_State *state);
+b32 elf_globals_find(elf_State *state, elf_StrSlice name, u32 *slot);
+u32 elf_globals_ensure(elf_State *state, elf_StrSlice name);
+elf_Value elf_globals_get_by_name(elf_State *state, elf_StrSlice name);
+void elf_globals_set_by_name(elf_State *state, elf_StrSlice name, elf_Value value);
+elf_Value elf_globals_get_by_slot(elf_State *state, u32 slot);
+void elf_globals_set_by_slot(elf_State *state, u32 slot, elf_Value value);
 
 void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);
 void print_current_runtime_source_location(elf_State *state);

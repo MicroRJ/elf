@@ -184,7 +184,6 @@ static inline elf_Value *vm_slot(elf_Value *reference, i16 index)
 // TODO(RJ): proper error handling!
 static int run_bytecode_frame(elf_State *state)
 {
-	elf_Globals *globals = &state->globals;
 	StackFrame *root_frame = state->frame;
 	int nrets = state->frame->nrets;
 
@@ -345,11 +344,11 @@ activate_frame:
 			} break;
 
 			case BC_GETGLOBAL: {
-				value_copy(vm_slot(reference, byte.b_x), elf_globals_get_by_slot(globals, byte.b_y));
+				value_copy(vm_slot(reference, byte.b_x), elf_globals_get_by_slot(state, byte.b_y));
 			} break;
 
 			case BC_SETGLOBAL: {
-				elf_globals_set_by_slot(globals, byte.b_x, *vm_slot(reference, byte.b_y));
+				elf_globals_set_by_slot(state, byte.b_x, *vm_slot(reference, byte.b_y));
 			} break;
 
 			case BC_TABLE: {

@@ -5,50 +5,42 @@ static elf_StrSlice globals_test_name(char *name)
 
 static void test_globals_own_names_and_preserve_slots(elf_State *state)
 {
-	u64 starting_live_bytes = state->gc_live_bytes;
-	elf_Globals globals;
-	elf_globals_init(&globals, state);
+	u32 starting_count = state->global_count;
 
 	char name[32];
 	for (u32 i = 0; i < 256; ++i)
 	{
 		snprintf(name, sizeof(name), "global_%u", i);
-		u32 slot = elf_globals_ensure(&globals, globals_test_name(name));
-		if (slot != i)
+		u32 slot = elf_globals_ensure(state, globals_test_name(name));
+		if (slot != starting_count + i)
 		{
 			test_fail("globals assign stable sequential slots");
 		}
-		elf_globals_set_by_slot(&globals, slot, value_from_integer((i64)i * 3));
+		elf_globals_set_by_slot(state, slot, value_from_integer((i64)i * 3));
 	}
 
 	for (u32 i = 0; i < 256; ++i)
 	{
 		snprintf(name, sizeof(name), "global_%u", i);
 		u32 slot = UINT32_MAX;
-		if (!elf_globals_find(&globals, globals_test_name(name), &slot) || slot != i || value_as_integer(elf_globals_get_by_slot(&globals, slot)) != (i64)i * 3)
+		if (!elf_globals_find(state, globals_test_name(name), &slot) || slot != starting_count + i || value_as_integer(elf_globals_get_by_slot(state, slot)) != (i64)i * 3)
 		{
 			test_fail("globals preserve names, slots, and values while growing");
 		}
 	}
 
 	char owned_name[] = "owned_name";
-	u32 owned_slot = elf_globals_ensure(&globals, globals_test_name(owned_name));
+	u32 owned_slot = elf_globals_ensure(state, globals_test_name(owned_name));
 	owned_name[0] = 'x';
 	elf_StrSlice original_name = {(char *)"owned_name", 10};
 	u32 found_slot = UINT32_MAX;
-	if (!elf_globals_find(&globals, original_name, &found_slot) || found_slot != owned_slot)
+	if (!elf_globals_find(state, original_name, &found_slot) || found_slot != owned_slot)
 	{
 		test_fail("globals own copies of their names");
 	}
-	if (elf_globals_ensure(&globals, original_name) != owned_slot || globals.count != 257)
+	if (elf_globals_ensure(state, original_name) != owned_slot || state->global_count != starting_count + 257)
 	{
 		test_fail("globals reuse an existing name slot");
-	}
-
-	elf_globals_destroy(&globals);
-	if (state->gc_live_bytes != starting_live_bytes)
-	{
-		test_fail("globals release all owned storage");
 	}
 }
 

@@ -546,7 +546,7 @@ static void test_vm_module_emitter_grows_constant_arrays(void)
 static void test_vm_module_converts_atom_constants(void)
 {
 	elf_State *state = elf_create_state();
-	u32 global_count = state->globals.count;
+	u32 global_count = state->global_count;
 	char source_text[] = "ret [\"same\", \"same\", \"other\"]";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
 	if (elf_push_code_source(state, "module-strings", source) != ELF_ERROR_NONE) {
@@ -560,7 +560,7 @@ static void test_vm_module_converts_atom_constants(void)
 	{
 		test_fail("function converts deduplicated atom constants to strings");
 	}
-	if (state->globals.count != global_count) {
+	if (state->global_count != global_count) {
 		test_fail("string constants do not consume global slots");
 	}
 
