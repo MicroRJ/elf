@@ -112,6 +112,7 @@ static void print_runtime_context(elf_State *state)
 	}
 }
 
+// TODO(RJ): this is deprecated!
 static void abort_after_runtime_error(void)
 {
 #if defined(_DEBUG) && defined(ELF_DEBUG_BREAK_ON_RUNTIME_ERROR)
