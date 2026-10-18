@@ -28,15 +28,13 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	StackFrame *native_frame_pointer = S->frame;
 	StackFrame native_frame = *S->frame;
 	StackFrame *caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
-	elf_Program *caller_module = caller ? caller->program : 0;
-	u32 caller_prototype = caller ? caller->prototype_index : 0;
+	u32 caller_prototype = caller ? caller->prototype_index : ELF_PROTOTYPE_INVALID;
 	u32 caller_instruction = caller ? caller->instruction : 0;
-	b32 preserved = context && !native_frame.program && caller_module;
+	b32 preserved = context && native_frame.prototype_index == ELF_PROTOTYPE_INVALID && prototype_index_is_valid(S, caller_prototype);
 	if (preserved)
 	{
-		elf_Prototype *caller_function = prototype_from_ref((elf_PrototypeRef) {.program = caller_module, .index = caller_prototype});
-		u32 byte_index = caller_function->offset + caller_instruction;
-		preserved = BC_TYPE(caller_module->bytecode[byte_index]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
+		elf_Prototype *caller_function = prototype_from_index(S, caller_prototype);
+		preserved = BC_TYPE(caller_function->bytecode[caller_instruction]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
 	}
 	if (preserved)
 	{
@@ -46,8 +44,8 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 		preserved = S->frame == native_frame_pointer &&
 			S->frame->framebase == native_frame.framebase && S->frame->reference == native_frame.reference &&
 			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs && S->frame->nrets == native_frame.nrets &&
-			!S->frame->program && restored_caller &&
-			restored_caller->program == caller_module && restored_caller->prototype_index == caller_prototype &&
+			S->frame->prototype_index == ELF_PROTOTYPE_INVALID && restored_caller &&
+			restored_caller->prototype_index == caller_prototype &&
 			restored_caller->instruction == caller_instruction;
 	}
 	elf_push_int(S, preserved);
@@ -368,16 +366,14 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		return;
 	}
 	elf_Closure *first_entry = value_as_closure(state->stack_ptr[-1]);
-	elf_Program *first_module = first_entry->function.program;
-	if (first_entry->function.index != 0) {
-		test_fail("compiled module entry uses a local function index");
+	u32 first_entry_index = first_entry->prototype_index;
+	if (first_entry_index != 0) {
+		test_fail("first compiled entry uses the first prototype index");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Closure *first_factory = value_as_closure(state->stack_ptr[-1]);
-	if (first_factory->function.program != first_module) {
-		test_fail("nested closure retains its defining module");
-	}
+	u32 first_factory_index = first_factory->prototype_index;
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
@@ -387,17 +383,16 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		return;
 	}
 	elf_Closure *second_entry = value_as_closure(state->stack_ptr[-1]);
-	elf_Program *second_module = second_entry->function.program;
-	if (second_module == first_module || second_entry->function.index != 0) {
-		test_fail("each compilation publishes an independent module with a local entry");
+	u32 second_entry_index = second_entry->prototype_index;
+	if (second_entry_index == first_entry_index) {
+		test_fail("each compilation publishes a distinct entry prototype");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Closure *second_factory = value_as_closure(state->stack_ptr[-1]);
-	if (second_factory->function.program != second_module ||
-		second_factory->function.index != first_factory->function.index)
-	{
-		test_fail("second nested closure retains its defining module");
+	u32 second_factory_index = second_factory->prototype_index;
+	if (second_factory_index == first_factory_index) {
+		test_fail("nested functions receive distinct state prototype indices");
 	}
 	elf_Ref second_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
@@ -413,6 +408,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_push_int(state, 100);
 	elf_call(state, 2, 1);
 	elf_Closure *first_closure = value_as_closure(state->stack_ptr[-1]);
+	u32 first_closure_index = first_closure->prototype_index;
 	elf_Ref first = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
@@ -425,25 +421,18 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_push_int(state, 200);
 	elf_call(state, 2, 1);
 	elf_Closure *second_closure = value_as_closure(state->stack_ptr[-1]);
+	u32 second_closure_index = second_closure->prototype_index;
 	elf_Ref second = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
-	if (first == ELF_NO_REF || second == ELF_NO_REF ||
-		first_closure->function.program != first_module ||
-		second_closure->function.program != second_module ||
-		first_closure->function.index != second_closure->function.index)
+	if (first == ELF_NO_REF || second == ELF_NO_REF || first_closure_index == second_closure_index)
 	{
-		test_fail("capturing closures preserve overlapping module-local identities");
+		test_fail("capturing closures preserve distinct prototype identities");
 		elf_destroy_state(state);
 		return;
 	}
 
 	force_gc_allocations(state, 256);
-	if (!first_module->source_name || strcmp(elf_string_data(first_module->source_name), "first") != 0 ||
-		!second_module->source_name || strcmp(elf_string_data(second_module->source_name), "second") != 0)
-	{
-		test_fail("compiled module source names survive GC");
-	}
 
 	if (!elf_push_ref(state, first)) {
 		test_fail("first captured closure survives GC");
@@ -541,9 +530,9 @@ static void test_vm_module_emitter_grows_constant_arrays(void)
 		return;
 	}
 
-	elf_Program *module = value_as_closure(state->stack_ptr[-1])->function.program;
-	if (module->integer_constant_count <= 64 || module->number_constant_count <= 64) {
-		test_fail("module emitter grows both constant arrays beyond their initial capacity");
+	elf_Prototype *prototype = prototype_from_index(state, value_as_closure(state->stack_ptr[-1])->prototype_index);
+	if (prototype->integer_constant_count <= 64 || prototype->number_constant_count <= 64) {
+		test_fail("function emitter grows both constant arrays beyond their initial capacity");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
@@ -566,27 +555,26 @@ static void test_vm_module_converts_atom_constants(void)
 		return;
 	}
 
-	elf_Program *module = value_as_closure(state->stack_ptr[-1])->function.program;
-	if (module->string_count != 2 || strcmp(elf_string_data(module->strings[0]), "same") != 0 ||
-		strcmp(elf_string_data(module->strings[1]), "other") != 0)
+	elf_Prototype *prototype = prototype_from_index(state, value_as_closure(state->stack_ptr[-1])->prototype_index);
+	if (prototype->string_count != 2 || strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0)
 	{
-		test_fail("module converts deduplicated atom constants to strings");
+		test_fail("function converts deduplicated atom constants to strings");
 	}
 	if (state->globals.count != global_count) {
 		test_fail("string constants do not consume global slots");
 	}
 
 	force_gc_allocations(state, 256);
-	if (strcmp(elf_string_data(module->strings[0]), "same") != 0 || strcmp(elf_string_data(module->strings[1]), "other") != 0) {
-		test_fail("module string constants survive GC");
+	if (strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0) {
+		test_fail("function string constants survive GC");
 	}
 
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Array *result = value_as_array(state->stack_ptr[-1]);
-	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), module->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), module->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), module->strings[1]))
+	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), prototype->strings[1]))
 	{
-		test_fail("VM loads string constants from their module");
+		test_fail("VM loads string constants from their function");
 	}
 
 	elf_destroy_state(state);

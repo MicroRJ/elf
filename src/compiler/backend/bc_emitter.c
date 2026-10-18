@@ -43,7 +43,6 @@ struct BcEmitter
 	u32                 bytecode_capacity;
 	u32                 bytecode_count;
 
-	elf_Prototype      *functions;
 	u32                 function_count;
 	u32                 indexed_function_count;
 	u32                 generated_function_count;
@@ -85,7 +84,7 @@ static void jump_to_label(BcEmitter *emitter, SourceSite site, u32 label);
 static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, u32 label);
 static void jump_if_expr_true(BcEmitter *emitter, Ir expr, u32 true_label);
 static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label);
-static void *grow_module_array(Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size);
+static void *grow_emitter_array(Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size);
 
 static b32 source_slice_equal(SourceSite left, SourceSite right)
 {
@@ -106,17 +105,17 @@ static void emit_source_map_entry(BcEmitter *emitter, SourceSite site, u32 byte_
 		}
 	}
 
-	emitter->source_map = grow_module_array(emitter->arena, emitter->source_map, emitter->source_map_count, &emitter->source_map_capacity, emitter->source_map_count + 1, sizeof(*emitter->source_map));
+	emitter->source_map = grow_emitter_array(emitter->arena, emitter->source_map, emitter->source_map_count, &emitter->source_map_capacity, emitter->source_map_count + 1, sizeof(*emitter->source_map));
 	BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count++;
 	entry->byte_start = byte_position;
 	entry->byte_end = byte_position + 1;
 	entry->site = site;
 }
 
-#define BC_MODULE_OPERAND_COUNT_MAX (1u << 15)
+#define BC_OPERAND_COUNT_MAX (1u << 15)
 
 // TODO(RJ): use some sort of a chunked system instead!
-static void *grow_module_array(Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size)
+static void *grow_emitter_array(Arena *arena, void *items, u32 count, u32 *capacity, u32 required_count, u64 item_size)
 {
 	if (required_count <= *capacity) return items;
 
@@ -133,40 +132,48 @@ static void *grow_module_array(Arena *arena, void *items, u32 count, u32 *capaci
 	return new_items;
 }
 
-static u32 add_const_int(BcEmitter *module, i64 i)
+static u32 add_const_int(BcEmitter *emitter, i64 i)
 {
-	if (module->integer_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->integer_constants = grow_module_array(module->arena, module->integer_constants
-	, module->integer_constant_count, &module->integer_constant_capacity
-	, module->integer_constant_count + 1, sizeof(*module->integer_constants));
-	u32 index = module->integer_constant_count++;
-	module->integer_constants[index] = i;
+	if (emitter->integer_constant_count >= BC_OPERAND_COUNT_MAX) {
+		abort();
+	}
+	emitter->integer_constants = grow_emitter_array(emitter->arena, emitter->integer_constants
+	, emitter->integer_constant_count, &emitter->integer_constant_capacity
+	, emitter->integer_constant_count + 1, sizeof(*emitter->integer_constants));
+	u32 index = emitter->integer_constant_count++;
+	emitter->integer_constants[index] = i;
 	return index;
 }
 
-static u32 add_const_num(BcEmitter *module, f64 i)
+static u32 add_const_num(BcEmitter *emitter, f64 i)
 {
-	if (module->number_constant_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->number_constants = grow_module_array(module->arena, module->number_constants
-	, module->number_constant_count, &module->number_constant_capacity
-	, module->number_constant_count + 1, sizeof(*module->number_constants));
-	u32 index = module->number_constant_count++;
-	module->number_constants[index] = i;
+	if (emitter->number_constant_count >= BC_OPERAND_COUNT_MAX) {
+		abort();
+	}
+	emitter->number_constants = grow_emitter_array(emitter->arena, emitter->number_constants
+	, emitter->number_constant_count, &emitter->number_constant_capacity
+	, emitter->number_constant_count + 1, sizeof(*emitter->number_constants));
+	u32 index = emitter->number_constant_count++;
+	emitter->number_constants[index] = i;
 	return index;
 }
 
-static u32 add_atom(BcEmitter *module, Atom *atom)
+static u32 add_atom(BcEmitter *emitter, Atom *atom)
 {
-	for (u32 i = 0; i < module->atom_count; ++ i) {
-		if (module->atoms[i] == atom) return i;
+	for (u32 i = 0; i < emitter->atom_count; ++i) {
+		if (emitter->atoms[i] == atom) {
+			return i;
+		}
 	}
 
-	if (module->atom_count >= BC_MODULE_OPERAND_COUNT_MAX) abort();
-	module->atoms = grow_module_array(module->arena, module->atoms
-	, module->atom_count, &module->atom_capacity
-	, module->atom_count + 1, sizeof(*module->atoms));
-	u32 index = module->atom_count++;
-	module->atoms[index] = atom;
+	if (emitter->atom_count >= BC_OPERAND_COUNT_MAX) {
+		abort();
+	}
+	emitter->atoms = grow_emitter_array(emitter->arena, emitter->atoms
+	, emitter->atom_count, &emitter->atom_capacity
+	, emitter->atom_count + 1, sizeof(*emitter->atoms));
+	u32 index = emitter->atom_count++;
+	emitter->atoms[index] = atom;
 	return index;
 }
 
@@ -175,9 +182,8 @@ static u32 add_atom(BcEmitter *module, Atom *atom)
 /* emitters */
 static void patch_jump_to_position(BcEmitter *emitter, u32 source_position, u32 target_position)
 {
-	BcEmitter *module = emitter;
-	ASSERT(source_position < module->bytecode_count);
-	Bytecode source_bytecode = module->bytecode[source_position];
+	ASSERT(source_position < emitter->bytecode_count);
+	Bytecode source_bytecode = emitter->bytecode[source_position];
 
 	i32 relative_distance = (i32)target_position - (i32)source_position;
 	ASSERT(relative_distance >= -32768 && relative_distance <= 32767);
@@ -186,13 +192,13 @@ static void patch_jump_to_position(BcEmitter *emitter, u32 source_position, u32 
 	{
 		case BC_JUMP:
 		{
-			module->bytecode[source_position] = BC_XXX(BC_TYPE(source_bytecode), relative_distance);
+			emitter->bytecode[source_position] = BC_XXX(BC_TYPE(source_bytecode), relative_distance);
 		}
 		break;
 		case BC_JZ:
 		case BC_JNZ:
 		{
-			module->bytecode[source_position] = BC_XYZ(BC_TYPE(source_bytecode), relative_distance, BC_ARGY(source_bytecode), BC_ARGZ(source_bytecode));
+			emitter->bytecode[source_position] = BC_XYZ(BC_TYPE(source_bytecode), relative_distance, BC_ARGY(source_bytecode), BC_ARGZ(source_bytecode));
 		}
 		break;
 		default: NO_CODE;
@@ -249,11 +255,10 @@ static void patch_bytecode_labels(BcEmitter *emitter)
 
 static u32 emit_bc(BcEmitter *emitter, SourceSite site, Bytecode byte)
 {
-	BcEmitter *module = emitter;
-	ASSERT(module->bytecode_count < 0xffffffffu);
-	module->bytecode = grow_module_array(module->arena, module->bytecode, module->bytecode_count, &module->bytecode_capacity, module->bytecode_count + 1, sizeof(*module->bytecode));
-	u32 position = module->bytecode_count++;
-	module->bytecode[position] = byte;
+	ASSERT(emitter->bytecode_count < 0xffffffffu);
+	emitter->bytecode = grow_emitter_array(emitter->arena, emitter->bytecode, emitter->bytecode_count, &emitter->bytecode_capacity, emitter->bytecode_count + 1, sizeof(*emitter->bytecode));
+	u32 position = emitter->bytecode_count++;
+	emitter->bytecode[position] = byte;
 	emit_source_map_entry(emitter, site, position);
 	return position;
 }
@@ -326,7 +331,7 @@ static u32 emit_load_glb_bc(BcEmitter *emitter, SourceSite site, i32 dest, Atom 
 	ASSERT(bc_slot_is_valid(dest));
 	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
 	u32 global = elf_ensure_global_symbol(emitter->target, symbol);
-	if (global >= BC_MODULE_OPERAND_COUNT_MAX) {
+	if (global >= BC_OPERAND_COUNT_MAX) {
 		abort();
 	}
 	return emit_xy_bc(emitter, site, BC_GETGLOBAL, dest, global);
@@ -337,7 +342,7 @@ static u32 emit_store_glb_bc(BcEmitter *emitter, SourceSite site, Atom *name, i3
 	ASSERT(bc_slot_is_valid(source));
 	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
 	u32 global = elf_ensure_global_symbol(emitter->target, symbol);
-	if (global >= BC_MODULE_OPERAND_COUNT_MAX) {
+	if (global >= BC_OPERAND_COUNT_MAX) {
 		abort();
 	}
 	return emit_xy_bc(emitter, site, BC_SETGLOBAL, global, source);
@@ -394,12 +399,9 @@ static i32 ensure_slot(BcEmitter *emitter, i32 slot)
 	return slot;
 }
 
-static BcString copy_emitter_string(Arena *arena, Atom *atom)
+static BcString emitter_string(Atom *atom)
 {
-	u32 size = atom_size(atom);
-	char *data = arena_push_zero(arena, size + 1, 1);
-	copy_memory(data, atom_data(atom), size);
-	return (BcString) {.data = data, .size = size};
+	return (BcString) {.data = atom_data(atom), .size = atom_size(atom)};
 }
 
 static u32 bc_function_index(BcEmitter *emitter, IrFunction *function)
@@ -408,47 +410,26 @@ static u32 bc_function_index(BcEmitter *emitter, IrFunction *function)
 	if (function->index == IR_FUNCTION_INDEX_INVALID)
 	{
 		ASSERT(emitter->indexed_function_count < emitter->function_count);
-		function->index = emitter->indexed_function_count++;
-	}
-	ASSERT(function->index < emitter->function_count);
-	return function->index;
-}
-
-static BcModule *bc_finish_module(BcEmitter *emitter)
-{
-	ASSERT(emitter->indexed_function_count == emitter->function_count);
-	ASSERT(emitter->generated_function_count == emitter->function_count);
-	Arena *arena = emitter->arena;
-	BcModule *module = arena_push_zero(arena, sizeof(*module), 8);
-	module->bytecode = emitter->bytecode;
-	module->bytecode_count = emitter->bytecode_count;
-	module->source_map = emitter->source_map;
-	module->source_map_count = emitter->source_map_count;
-	module->functions = emitter->functions;
-	module->function_count = emitter->function_count;
-	module->string_count = emitter->atom_count;
-	if (module->string_count)
-	{
-		module->strings = arena_push_zero(arena, sizeof(*module->strings) * module->string_count, 8);
-		for (u32 i = 0; i < module->string_count; ++i) {
-			module->strings[i] = copy_emitter_string(arena, emitter->atoms[i]);
+		function->index = elf_reserve_prototype(emitter->target);
+		if (function->index == ELF_PROTOTYPE_INVALID || function->index >= BC_OPERAND_COUNT_MAX) {
+			abort();
 		}
+		emitter->indexed_function_count += 1;
 	}
-	module->integer_constants = emitter->integer_constants;
-	module->integer_constant_count = emitter->integer_constant_count;
-	module->number_constants = emitter->number_constants;
-	module->number_constant_count = emitter->number_constant_count;
-	return module;
+	return function->index;
 }
 
 static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 {
 	ASSERT(emitter);
 	ASSERT(function);
-	BcEmitter *module = emitter;
 	u32 function_index = bc_function_index(emitter, function);
 
-	u32 bytecode_start = module->bytecode_count;
+	emitter->bytecode_count = 0;
+	emitter->integer_constant_count = 0;
+	emitter->number_constant_count = 0;
+	emitter->source_map_count = 0;
+	emitter->atom_count = 0;
 	emitter->stack_size = function->param_count;
 	emitter->stack_top = function->param_count;
 	emitter->label_count = 0;
@@ -471,26 +452,45 @@ static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 	emit_stat(emitter, body);
 	restore_slots(emitter, memory_checkpoint);
 
-	if (module->bytecode_count == bytecode_start || BC_TYPE(module->bytecode[module->bytecode_count - 1]) != BC_RETURN)
+	if (emitter->bytecode_count == 0 || BC_TYPE(emitter->bytecode[emitter->bytecode_count - 1]) != BC_RETURN)
 	{
 		emit_return_bc(emitter, body->site, NO_SLOT, 0);
 	}
 
 	patch_bytecode_labels(emitter);
 
-	ASSERT(module->generated_function_count < module->function_count);
-	elf_Prototype *bc_function = module->functions + function_index;
-	module->generated_function_count += 1;
-	bc_function->variadic = function->variadic;
-	bc_function->source_index = function->site.source;
-	bc_function->arity = function->param_count;
-	bc_function->offset = bytecode_start;
-	bc_function->length = module->bytecode_count - bytecode_start;
-	bc_function->captures = function->captures.count;
-	bc_function->stack_size = emitter->stack_size;
+	ASSERT(emitter->generated_function_count < emitter->function_count);
+	BcString *strings = 0;
+	if (emitter->atom_count)
+	{
+		strings = arena_push(emitter->arena, sizeof(*strings) * emitter->atom_count, _Alignof(BcString));
+		for (u32 i = 0; i < emitter->atom_count; ++i) {
+			strings[i] = emitter_string(emitter->atoms[i]);
+		}
+	}
+	BcFunction bc_function = {
+		.variadic = function->variadic,
+		.arity = function->param_count,
+		.captures = function->captures.count,
+		.stack_size = emitter->stack_size,
+		.strings = strings,
+		.string_count = emitter->atom_count,
+		.integer_constants = emitter->integer_constants,
+		.integer_constant_count = emitter->integer_constant_count,
+		.number_constants = emitter->number_constants,
+		.number_constant_count = emitter->number_constant_count,
+		.bytecode = emitter->bytecode,
+		.bytecode_count = emitter->bytecode_count,
+		.source_map = emitter->source_map,
+		.source_map_count = emitter->source_map_count,
+	};
+	if (!elf_init_prototype(emitter->target, function_index, &bc_function)) {
+		abort();
+	}
+	emitter->generated_function_count += 1;
 }
 
-BcModule *bc_emit_module(elf_State *target, IrModule *input)
+u32 bc_emit_module(elf_State *target, IrModule *input)
 {
 	ASSERT(target);
 	ASSERT(input);
@@ -508,7 +508,9 @@ BcModule *bc_emit_module(elf_State *target, IrModule *input)
 	Arena *arena = input->arena;
 
 	// TODO(RJ): proper error handling
-	if (input->function_count > BC_MODULE_OPERAND_COUNT_MAX) abort();
+	if (input->function_count > BC_OPERAND_COUNT_MAX) {
+		abort();
+	}
 
 	// TODO(RJ): allocate the emitter itself on a scratch arena!
 	BcEmitter *emitter = arena_push_zero(arena, sizeof(*emitter), 8);
@@ -516,15 +518,15 @@ BcModule *bc_emit_module(elf_State *target, IrModule *input)
 	emitter->input = input;
 	emitter->arena = arena;
 	emitter->function_count = input->function_count;
-	emitter->functions = arena_push_zero(arena, sizeof(*emitter->functions) * emitter->function_count, 8);
-
 	emitter->bytecode_capacity = 1 << 13;
 	emitter->bytecode = arena_push_zero(arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, 8);
 
 	for (IrFunction *function = input->first_function; function; function = function->next) {
 		bc_emit_function(emitter, function);
 	}
-	return bc_finish_module(emitter);
+	ASSERT(emitter->indexed_function_count == emitter->function_count);
+	ASSERT(emitter->generated_function_count == emitter->function_count);
+	return input->first_function->index;
 }
 
 static i32 ensure_expr_memory(BcEmitter *emitter, Ir expr)

@@ -8,7 +8,6 @@
 #include "base.h"
 #include "elf_core.h"
 #include "compiler.h"
-#include "linker.h"
 
 static volatile elf_Int bench_integer_sink;
 static volatile elf_Num bench_number_sink;
@@ -195,7 +194,7 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
-	bench_require(state->programs == 0, "new state preallocates compiled modules");
+	bench_require(state->prototype_count == 0, "new state preallocates compiled prototypes");
 	u64 arena_before = state->arena.used;
 	u64 bytecode_count = 0;
 	u64 function_count = 0;
@@ -207,23 +206,25 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	i64 start = bench_now();
 	for (u32 i = 0; i < iterations; ++i)
 	{
-		elf_Program *previous_module = state->programs;
+		u32 first_prototype = state->prototype_count;
 		bench_require(elf_push_code_source(state, "benchmark.compile", text) == ELF_ERROR_NONE, "could not compile benchmark source");
-		elf_Program *module = state->programs;
-		bench_require(module && module != previous_module, "compile did not publish a distinct module");
-		bench_require(value_as_closure(state->stack_ptr[-1])->function.index == 0, "module entry is not local");
-		bytecode_count += module->bytecode_count;
-		function_count += module->prototype_count;
-		string_count += module->string_count;
-		integer_constant_count += module->integer_constant_count;
-		number_constant_count += module->number_constant_count;
+		u32 entry = value_as_closure(state->stack_ptr[-1])->prototype_index;
+		bench_require(entry == first_prototype, "compile entry is not the first new prototype");
+		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
+		{
+			elf_Prototype *prototype = state->prototypes + prototype_index;
+			bytecode_count += prototype->bytecode_count;
+			function_count += 1;
+			string_count += prototype->string_count;
+			integer_constant_count += prototype->integer_constant_count;
+			number_constant_count += prototype->number_constant_count;
+		}
 		elf_pop(state, 1);
 	}
 	double seconds = bench_elapsed_s(start);
 	u64 retained_arena_storage = state->arena.used - arena_before;
 	u64 array_storage =
 		bytecode_count * sizeof(Bytecode) +
-		function_count * sizeof(elf_Prototype) +
 		string_count * sizeof(elf_String *) +
 		integer_constant_count * sizeof(i64) +
 		number_constant_count * sizeof(f64);
@@ -234,7 +235,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 		bytecode_count, function_count, string_count, integer_constant_count, number_constant_count);
 	printf("  retained state-arena storage: %llu bytes (%llu bytes outside finalized arrays)\n",
 		retained_arena_storage, non_array_arena_storage);
-	printf("  preallocated compiled-program arrays per state: 0 bytes\n");
+	printf("  prototype table storage: %llu bytes\n", (u64)state->prototype_capacity * sizeof(*state->prototypes));
 	elf_destroy_state(state);
 }
 
@@ -248,9 +249,8 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	{
 		Scratch scratch = scratch_begin();
 		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
-		BcModule *compiled_module = compiler_compile(state, scratch.arena, name, text);
-		elf_Program *module = elf_link_module(state, compiled_module);
-		bench_require(module != 0, "could not compile benchmark module");
+		u32 entry = compiler_compile(state, scratch.arena, name, text);
+		bench_require(prototype_index_is_valid(state, entry), "could not compile benchmark module");
 		scratch_end(scratch);
 	}
 	double seconds = bench_elapsed_s(start);

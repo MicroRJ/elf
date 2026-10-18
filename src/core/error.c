@@ -11,12 +11,12 @@ static const char *error_code_names[] =
 #undef ERROR_CODE_NAME
 };
 
-static SourceSite find_source_for_instr(elf_Program *module, int instr)
+static SourceSite find_source_for_instr(elf_Prototype *function, int instr)
 {
 	SourceSite site = {};
-	for (u32 i = 0; i < module->source_map_count; ++i)
+	for (u32 i = 0; i < function->source_map_count; ++i)
 	{
-		BcSourceMapEntry entry = module->source_map[i];
+		BcSourceMapEntry entry = function->source_map[i];
 		if (instr >= entry.byte_start && instr < entry.byte_end)
 		{
 			site = entry.site;
@@ -40,7 +40,7 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 	StackFrame *result = 0;
 	for (StackFrame *frame = state->frame;; --frame)
 	{
-		if (frame->program)
+		if (prototype_index_is_valid(state, frame->prototype_index))
 		{
 			result = frame;
 			break;
@@ -53,30 +53,23 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 	return result;
 }
 
-static void print_runtime_source_location(StackFrame *frame)
+static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 {
 	ASSERT(frame);
-	ASSERT(frame->program);
-	elf_Program *module = frame->program;
-	elf_PrototypeRef function_ref = {.program = module, .index = frame->prototype_index};
-	elf_Prototype *function = prototype_from_ref(function_ref);
-	u32 instr = function->offset + frame->instruction;
-	ASSERT(instr < module->bytecode_count);
-	SourceSite site = find_source_for_instr(module, instr);
-	const char *name = module->source_name ? elf_string_data(module->source_name) : "<unknown>";
-	const char *bytecode_name = bytecode_type_name(BC_TYPE(module->bytecode[instr]));
+	ASSERT(prototype_index_is_valid(state, frame->prototype_index));
+	elf_Prototype *function = prototype_from_index(state, frame->prototype_index);
+	u32 instr = frame->instruction;
+	ASSERT(instr < function->bytecode_count);
+	SourceSite site = find_source_for_instr(function, instr);
+	const char *bytecode_name = bytecode_type_name(BC_TYPE(function->bytecode[instr]));
 
 	if (source_slice_is_valid(site))
 	{
-		log_linef(LOG_LEVEL_ERROR, "%s [%u:%llu] [%u](%s):", name, site.line_index, source_slice_column(site), instr, bytecode_name);
-		log_line(LOG_LEVEL_INFO, "|");
-		BcSourceBuffer source = {.data = module->source_data, .size = module->source_size};
-		print_source_slice_marker(site, source);
-		log_line(LOG_LEVEL_INFO, "|");
+		log_linef(LOG_LEVEL_ERROR, "<unknown> [%u:%llu] [%u](%s)", site.line_index, source_slice_column(site), instr, bytecode_name);
 	}
 	else
 	{
-		log_linef(LOG_LEVEL_ERROR, "%s [?] [%u](%s): source information could not be found", name, instr, bytecode_name);
+		log_linef(LOG_LEVEL_ERROR, "<unknown> [?] [%u](%s): source information could not be found", instr, bytecode_name);
 	}
 }
 
@@ -86,14 +79,14 @@ static void print_runtime_call_stack(elf_State *state, StackFrame *current)
 	for (StackFrame *frame = current; frame && frame > state->frame_stack;)
 	{
 		--frame;
-		if (frame->program)
+		if (prototype_index_is_valid(state, frame->prototype_index))
 		{
 			if (!printed)
 			{
 				log_line(LOG_LEVEL_INFO, "call stack:");
 				printed = true;
 			}
-			print_runtime_source_location(frame);
+			print_runtime_source_location(state, frame);
 		}
 	}
 }
@@ -103,7 +96,7 @@ static void print_runtime_context(elf_State *state)
 	StackFrame *current = runtime_current_bytecode_frame(state);
 	if (current)
 	{
-		print_runtime_source_location(current);
+		print_runtime_source_location(state, current);
 		print_runtime_call_stack(state, current);
 	}
 	else

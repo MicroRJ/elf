@@ -2,6 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include "bc_module.h"
+#include "elf_target.h"
 
-BcModule *bc_emit_module(elf_State *target, IrModule *input);
+u32 bc_emit_module(elf_State *target, IrModule *input);

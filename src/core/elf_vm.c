@@ -2,13 +2,13 @@
 // See Copyright Notice In elf.h
 //
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_PrototypeRef function_ref, elf_Value *captures, elf_Closure *closure, int nargs, int nrets)
+static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, u32 prototype_index, elf_Value *captures, elf_Closure *closure, int nargs, int nrets)
 {
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
 	state->vm_closure_calls += 1;
 
-	elf_Prototype *function = prototype_from_ref(function_ref);
+	elf_Prototype *function = prototype_from_index(state, prototype_index);
 	ASSERT(captures || function->captures == 0);
 	u32 argument_count = (u32)nargs;
 	elf_Value *frame_base = state->stack_ptr - argument_count;
@@ -30,8 +30,7 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 	ASSERT(register_offset + function->stack_size <= frame_size);
 	value_zero_many(frame_base + clear_start, frame_size - clear_start);
 
-	frame->program = function_ref.program;
-	frame->prototype_index = function_ref.index;
+	frame->prototype_index = prototype_index;
 	frame->framesize = frame_size;
 	frame->framebase = frame_base;
 	frame->reference = reference;
@@ -52,7 +51,7 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 
 static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs, int nrets)
 {
-	prepare_bytecode_stack_frame(state, frame, closure->function, closure->captures, closure, nargs, nrets);
+	prepare_bytecode_stack_frame(state, frame, closure->prototype_index, closure->captures, closure, nargs, nrets);
 }
 
 static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs, u32 nrets)
@@ -62,6 +61,7 @@ static u32 call_native_function(elf_State *state, elf_Function function, u32 nar
 	u32 frame_size = nargs;
 
 	*state->frame = (StackFrame) {
+		.prototype_index = ELF_PROTOTYPE_INVALID,
 		.framebase = frame_base,
 		.reference = frame_base,
 		.framesize = frame_size,
@@ -164,12 +164,12 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static elf_Closure *vm_new_closure(elf_State *state, elf_PrototypeRef function_ref, elf_Value *captures)
+static elf_Closure *vm_new_closure(elf_State *state, u32 prototype_index, elf_Value *captures)
 {
-	elf_Prototype *function = prototype_from_ref(function_ref);
+	elf_Prototype *function = prototype_from_index(state, prototype_index);
 	u32 size = sizeof(elf_Closure) + sizeof(elf_Value) * function->captures;
 	elf_Closure *closure = (elf_Closure *)elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
-	closure->function = function_ref;
+	closure->prototype_index = prototype_index;
 
 	value_copy_many(closure->captures, captures, function->captures);
 	return closure;
@@ -190,19 +190,16 @@ static int run_bytecode_frame(elf_State *state)
 
 activate_frame:
 	StackFrame *frame = state->frame;
-	ASSERT(frame->program);
-	elf_Program *module = frame->program;
-	elf_PrototypeRef function_ref = {.program = module, .index = frame->prototype_index};
-	elf_Prototype *function = prototype_from_ref(function_ref);
+	ASSERT(prototype_index_is_valid(state, frame->prototype_index));
+	elf_Prototype *function = prototype_from_index(state, frame->prototype_index);
 	elf_Value *framebase = frame->framebase;
 	elf_Value *reference = frame->reference;
 	elf_Value *captures = frame->captures;
 	u32 instruction = frame->instruction;
 	u8 frame_nrets = frame->nrets;
 	u8 ncaptures = frame->ncaptures;
-	int byte_offset = function->offset;
-	int byte_count = function->length;
-	const Bytecode *code = module->bytecode + byte_offset;
+	int byte_count = function->bytecode_count;
+	const Bytecode *code = function->bytecode;
 
 	while (instruction < byte_count)
 	{
@@ -255,15 +252,12 @@ activate_frame:
 			case BC_CALL: {
 				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
 				ASSERT(byte.b_y >= 0);
-				elf_PrototypeRef function_ref = {
-					.program = module,
-					.index = (u32)byte.b_y,
-				};
-				ASSERT(prototype_ref_is_valid(function_ref));
-				ASSERT(prototype_from_ref(function_ref)->captures == 0);
+				u32 prototype_index = (u32)byte.b_y;
+				ASSERT(prototype_index_is_valid(state, prototype_index));
+				ASSERT(prototype_from_index(state, prototype_index)->captures == 0);
 				state->stack_ptr = reference + byte.b_x + byte.b_z + 1;
 				push_stack_frame(state);
-				prepare_bytecode_stack_frame(state, state->frame, function_ref, 0, 0, byte.b_z, byte.b_w);
+				prepare_bytecode_stack_frame(state, state->frame, prototype_index, 0, 0, byte.b_z, byte.b_w);
 				ASSERT(state->stack_ptr == state->frame->framebase + state->frame->framesize);
 				goto activate_frame;
 			} break;
@@ -325,15 +319,15 @@ activate_frame:
 			} break;
 
 			case BC_LOADKINT: {
-				*vm_slot(reference, byte.b_x) = value_from_integer(module->integer_constants[byte.b_y]);
+				*vm_slot(reference, byte.b_x) = value_from_integer(function->integer_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADKNUM: {
-				*vm_slot(reference, byte.b_x) = value_from_number(module->number_constants[byte.b_y]);
+				*vm_slot(reference, byte.b_x) = value_from_number(function->number_constants[byte.b_y]);
 			} break;
 
 			case BC_LOADKSTRING: {
-				*vm_slot(reference, byte.b_x) = value_from_string(module->strings[byte.b_y]);
+				*vm_slot(reference, byte.b_x) = value_from_string(function->strings[byte.b_y]);
 			} break;
 
 			case BC_LOADCVAL: {
@@ -369,14 +363,11 @@ activate_frame:
 
 			case BC_CLOSURE: {
 				ASSERT(byte.b_y >= 0);
-				elf_PrototypeRef function = {
-					.program = module,
-					.index  = (u32)byte.b_y,
-				};
-				ASSERT(prototype_ref_is_valid(function));
+				u32 prototype_index = (u32)byte.b_y;
+				ASSERT(prototype_index_is_valid(state, prototype_index));
 
 				elf_Value *result = vm_slot(reference, byte.b_x);
-				elf_Closure *new_closure = vm_new_closure(state, function, result);
+				elf_Closure *new_closure = vm_new_closure(state, prototype_index, result);
 				*result = value_from_closure(new_closure);
 			} break;
 

@@ -53,7 +53,7 @@ static void format_global_value(elf_State *state, Arena *arena, u32 index)
 	format_value_shallow(arena, elf_globals_get_by_slot(&state->globals, index));
 }
 
-static void format_bytecode_instr(elf_State *state, elf_Program *module, Arena *arena, u32 index, Bytecode byte)
+static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Arena *arena, u32 index, Bytecode byte)
 {
 	arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
 
@@ -109,8 +109,8 @@ static void format_bytecode_instr(elf_State *state, elf_Program *module, Arena *
 		case BC_LOADKNUM:
 		{
 			arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && (u32)byte.b_y < module->number_constant_count) {
-				arena_pushf(arena, " // %f", module->number_constants[byte.b_y]);
+			if (byte.b_y >= 0 && (u32)byte.b_y < function->number_constant_count) {
+				arena_pushf(arena, " // %f", function->number_constants[byte.b_y]);
 			}
 		}
 		break;
@@ -118,8 +118,8 @@ static void format_bytecode_instr(elf_State *state, elf_Program *module, Arena *
 		case BC_LOADKSTRING:
 		{
 			arena_pushf(arena, "r%d = string[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && (u32)byte.b_y < module->string_count) {
-				arena_pushf(arena, " // %s", elf_string_data(module->strings[byte.b_y]));
+			if (byte.b_y >= 0 && (u32)byte.b_y < function->string_count) {
+				arena_pushf(arena, " // %s", elf_string_data(function->strings[byte.b_y]));
 			}
 		}
 		break;
@@ -127,8 +127,8 @@ static void format_bytecode_instr(elf_State *state, elf_Program *module, Arena *
 		case BC_LOADKINT:
 		{
 			arena_pushf(arena, "r%d = integer[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && (u32)byte.b_y < module->integer_constant_count) {
-				arena_pushf(arena, " // %lli", module->integer_constants[byte.b_y]);
+			if (byte.b_y >= 0 && (u32)byte.b_y < function->integer_constant_count) {
+				arena_pushf(arena, " // %lli", function->integer_constants[byte.b_y]);
 			}
 		}
 		break;
@@ -262,27 +262,22 @@ static void format_bytecode_instr(elf_State *state, elf_Program *module, Arena *
 	arena_push_char(arena, '\n');
 }
 
-char *format_bytecode_function(elf_State *state, Arena *arena, elf_PrototypeRef function_ref)
+char *format_bytecode_function(elf_State *state, Arena *arena, u32 prototype_index)
 {
-	elf_Prototype *function = prototype_from_ref(function_ref);
-	elf_Program *module = function_ref.program;
+	elf_Prototype *function = prototype_from_index(state, prototype_index);
 	char *start = arena_push(arena, 0, 1);
-	const char *source_name = module->source_name ? elf_string_data(module->source_name) : "<unknown>";
 
 	arena_push_text(arena, "bytecode function\n");
-	arena_pushf(arena, "  source      = %s\n", source_name);
 	arena_pushf(arena, "  arity       = %u\n", function->arity);
 	arena_pushf(arena, "  variadic    = %s\n", function->variadic ? "true" : "false");
-	arena_pushf(arena, "  offset      = %u\n", function->offset);
-	arena_pushf(arena, "  length      = %u\n", function->length);
+	arena_pushf(arena, "  length      = %u\n", function->bytecode_count);
 	arena_pushf(arena, "  captures    = %u\n", function->captures);
 	arena_pushf(arena, "  stack_size  = %u\n", function->stack_size);
 	arena_push_text(arena, "body\n");
 
-	Bytecode *bytecode = module->bytecode + function->offset;
-	for (u32 i = 0; i < function->length; ++i)
+	for (u32 i = 0; i < function->bytecode_count; ++i)
 	{
-		format_bytecode_instr(state, module, arena, i, bytecode[i]);
+		format_bytecode_instr(state, function, arena, i, function->bytecode[i]);
 	}
 
 	arena_push_text(arena, "end\n");
@@ -290,10 +285,10 @@ char *format_bytecode_function(elf_State *state, Arena *arena, elf_PrototypeRef 
 	return start;
 }
 
-void print_bytecode_function(elf_State *state, elf_PrototypeRef function)
+void print_bytecode_function(elf_State *state, u32 prototype_index)
 {
 	Scratch scratch = scratch_begin();
-	char *text = format_bytecode_function(state, scratch.arena, function);
+	char *text = format_bytecode_function(state, scratch.arena, prototype_index);
 	printf("%s", text);
 	scratch_end(scratch);
 }

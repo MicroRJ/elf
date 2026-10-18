@@ -324,9 +324,9 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 	return ast_file;
 }
 
-BcModule *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)
+elf_u32 compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
-	BcModule *module = 0;
+	elf_u32 entry = ELF_PROTOTYPE_INVALID;
 	if (target && arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
 	{
 		Compiler *compiler = compiler_create(arena);
@@ -354,7 +354,7 @@ BcModule *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, e
 							IrModule *ir_module = ir_emit_module(compiler, ast);
 							if (ir_module && !compiler->report.error_count)
 							{
-								module = bc_emit_module(compiler->target, ir_module);
+								entry = bc_emit_module(compiler->target, ir_module);
 							}
 						}
 					}
@@ -363,7 +363,7 @@ BcModule *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, e
 			compiler_log_report(compiler);
 		}
 	}
-	return module;
+	return entry;
 }
 
 Ast compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source)

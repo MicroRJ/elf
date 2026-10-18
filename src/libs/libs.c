@@ -12,7 +12,6 @@
 #include "elf.h"
 #include "elf_core.h"
 #include "compiler.h"
-#include "linker.h"
 #include "libs.h"
 
 #include "l_core_io.c"
@@ -54,17 +53,10 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		}
 	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	BcModule *compiled_module = root_loaded ? compiler_compile(state, scratch.arena, source_name, source) : 0;
-	elf_Program *module = elf_link_module(state, compiled_module);
-	elf_PrototypeRef entry = {};
-	if (module)
-	{
-		entry.program = module;
-		entry.index = 0;
-	}
+	u32 entry = root_loaded ? compiler_compile(state, scratch.arena, source_name, source) : ELF_PROTOTYPE_INVALID;
 	scratch_end(scratch);
 
-	if (!prototype_ref_is_valid(entry))
+	if (!prototype_index_is_valid(state, entry))
 	{
 		if (!root_loaded) {
 			elf_push_nil(state);
@@ -72,9 +64,9 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		return false;
 	}
 
-	ASSERT(prototype_from_ref(entry)->captures == 0);
+	ASSERT(prototype_from_index(state, entry)->captures == 0);
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-	closure->function = entry;
+	closure->prototype_index = entry;
 	push_value(state, value_from_closure(closure));
 	return true;
 }

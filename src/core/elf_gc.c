@@ -134,19 +134,16 @@ static u32 gc_mark_stack(elf_State *state)
 	return marked_count;
 }
 
-static u32 gc_mark_modules(elf_State *state)
+static u32 gc_mark_prototypes(elf_State *state)
 {
 	u32 marked_count = 0;
-
-	for (elf_Program *module = state->programs; module; module = module->next) {
-		if (module->source_name) {
-			marked_count += gc_mark_reachable(state, (elf_Object *)module->source_name);
-		}
-		for (u32 i = 0; i < module->string_count; ++ i) {
-			marked_count += gc_mark_reachable(state, (elf_Object *)module->strings[i]);
+	for (u32 prototype_index = 0; prototype_index < state->prototype_count; ++prototype_index)
+	{
+		elf_Prototype *prototype = state->prototypes + prototype_index;
+		for (u32 i = 0; i < prototype->string_count; ++i) {
+			marked_count += gc_mark_reachable(state, (elf_Object *)prototype->strings[i]);
 		}
 	}
-
 	return marked_count;
 }
 
@@ -198,7 +195,7 @@ static u32 gc_collect(elf_State *state)
 	}
 	marked_count += gc_mark_globals(state);
 	marked_count += gc_mark_metatables(state);
-	marked_count += gc_mark_modules(state);
+	marked_count += gc_mark_prototypes(state);
 	u32 freed_count = gc_sweep(state);
 	return freed_count;
 }
@@ -264,7 +261,7 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		if (reference->type == ELF_OBJECT_CLOSURE)
 		{
 			elf_Closure * closure = (elf_Closure *) reference;
-			elf_Prototype *function = prototype_from_ref(closure->function);
+			elf_Prototype *function = prototype_from_index(state, closure->prototype_index);
 
 			for (u32 i = 0; i < function->captures; ++ i)
 			{

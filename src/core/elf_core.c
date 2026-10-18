@@ -25,6 +25,7 @@
 #include "elf_memory.c"
 #include "elf_globals.c"
 #include "elf_string.c"
+#include "elf_target.c"
 #include "elf_buffer.c"
 #include "elf_user_object.c"
 #include "elf_array.c"
@@ -78,6 +79,7 @@ static void bootstrap_base_frame(elf_State *state)
 
 	state->frame->framebase = state->stack;
 	state->frame->framesize = 16;
+	state->frame->prototype_index = ELF_PROTOTYPE_INVALID;
 }
 
 static void reserve_bootstrap_frame_stack_space(elf_State *state)
@@ -154,6 +156,7 @@ void elf_destroy_state(elf_State *state)
 	{
 		elf_globals_destroy(&state->globals);
 		gc_destroy_all(state);
+		elf_free(state, state->prototypes, (u64)state->prototype_capacity * sizeof(*state->prototypes));
 		elf_free(state, state->string_buckets,
 			(u64)state->string_bucket_count * sizeof(*state->string_buckets));
 		Arena arena = state->arena;

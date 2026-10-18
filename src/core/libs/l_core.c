@@ -212,7 +212,7 @@ static StackFrame *core_caller_frame(elf_State *state)
 			"caller introspection requires a bytecode caller");
 	}
 	StackFrame *caller = state->frame - 1;
-	if (!caller->program || caller->prototype_index >= caller->program->prototype_count)
+	if (!prototype_index_is_valid(state, caller->prototype_index))
 	{
 		report_runtime_error(state, ERROR_RUNTIME,
 			"caller introspection requires a bytecode caller");

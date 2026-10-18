@@ -19,8 +19,7 @@ typedef struct elf_Array      elf_Array;
 typedef struct elf_Closure    elf_Closure;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
-typedef struct elf_Program     elf_Program;
-typedef struct elf_PrototypeRef  elf_PrototypeRef;
+typedef struct elf_Prototype   elf_Prototype;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
 
@@ -138,44 +137,34 @@ typedef struct
 }
 elf_Globals;
 
-// TODO(RJ): consider untracking gc strings since a program is the longest-lived object.
-struct elf_Program
+struct elf_Prototype
 {
-	elf_Program       *next;
-	elf_String       *source_name;
-	char             *source_data;
-	u32               source_size;
 	elf_String      **strings;
 	u32               string_count;
 	f64              *number_constants;
 	u32               number_constant_count;
 	i64              *integer_constants;
 	u32               integer_constant_count;
-	elf_Prototype       *prototypes;
-	u32               prototype_count;
 	Bytecode         *bytecode;
 	u32               bytecode_count;
 	BcSourceMapEntry *source_map;
 	u32               source_map_count;
-};
-
-struct elf_PrototypeRef
-{
-	elf_Program *program;
-	u32          index;
+	b32               variadic;
+	u8                 arity;
+	u8                 captures;
+	u16                stack_size;
 };
 
 struct elf_Closure
 {
-	elf_Object         obj;
-	elf_PrototypeRef function;
-	elf_Value     captures[];
+	elf_Object obj;
+	u32        prototype_index;
+	elf_Value  captures[];
 };
 
 struct StackFrame
 {
-	elf_Program      *program;
-	u32                prototype_index;
+	u32           prototype_index;
 	elf_Value    *framebase;
 	elf_Value    *reference;
 	elf_Value     *captures;
@@ -194,7 +183,9 @@ struct elf_State
 	Arena      arena;
 	void          *user_data;
 
-	elf_Program    *programs;
+	elf_Prototype *prototypes;
+	u32            prototype_count;
+	u32            prototype_capacity;
 
 	struct
 	{
