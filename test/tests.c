@@ -42,9 +42,7 @@ static void test_fail(const char *label)
 #include "parser_tests.c"
 #include "unparse_tests.c"
 #include "ir_tests.c"
-#if 0
 #include "backend_tests.c"
-#endif
 #include "vm_tests.c"
 #include "smoke_tests.c"
 
@@ -69,6 +67,7 @@ int main(void)
 	run_parser_tests(state);
 	run_unparse_tests(state);
 	run_ir_tests(state);
+	run_backend_tests();
 
 	elf_destroy_state(state);
 

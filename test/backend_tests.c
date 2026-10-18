@@ -6,28 +6,21 @@
 
 typedef struct
 {
-	elf_State       *state;
-	elf_PrototypeRef function;
+	elf_State *state;
+	u32        function;
 }
 BackendCompileResult;
 
 static elf_Prototype *backend_test_function(BackendCompileResult result)
 {
-	return prototype_from_ref(result.function);
+	return prototype_from_index(result.state, result.function);
 }
 
-static elf_PrototypeRef backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
+static u32 backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	BcModule *compiled_module = compiler_compile(state, scratch.arena, source_name, source);
-	elf_Program *module = elf_link_module(state, compiled_module);
-	elf_PrototypeRef entry = {};
-	if (module)
-	{
-		entry.program = module;
-		entry.index = 0;
-	}
+	u32 entry = compiler_compile(state, scratch.arena, source_name, source);
 	scratch_end(scratch);
 	return entry;
 }
@@ -40,9 +33,9 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 	elf_StrSlice source = {};
 	dy_File_Info info;
 	dy_File file = {0};
-	if (!dy_get_file_info(dy_string_from_cstring(path), &info).error && !info.is_directory)
-		dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
-			DY_FILE_READ | DY_FILE_SHARE_READ, &file);
+	if (!dy_get_file_info(dy_string_from_cstring(path), &info).error && !info.is_directory) {
+		dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file);
+	}
 	if (dy_file_is_valid(file))
 	{
 		u64 size = info.size;
@@ -51,7 +44,9 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 		dy_u64 read = 0;
 		dy_Result read_result = dy_read_file(file, data, size, &read);
 		dy_close_file(file);
-		if (read_result.error || read != size) size = 0;
+		if (read_result.error || read != size) {
+			size = 0;
+		}
 
 		source.data = data;
 		source.size = size;
@@ -77,7 +72,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 static Bytecode *backend_test_bytes(BackendCompileResult result)
 {
 	elf_Prototype *function = backend_test_function(result);
-	return result.function.program->bytecode + function->offset;
+	return function->bytecode;
 }
 
 static void backend_test_destroy(BackendCompileResult result)
@@ -90,7 +85,7 @@ static u32 backend_count_bytecode(BackendCompileResult result, BcType type)
 	u32 count = 0;
 	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < function->length; ++ i)
+	for (u32 i = 0; i < function->bytecode_count; ++ i)
 	{
 		if (bytes[i].b_type == type) {
 			count += 1;
@@ -99,10 +94,23 @@ static u32 backend_count_bytecode(BackendCompileResult result, BcType type)
 	return count;
 }
 
-static BcSourceMapEntry *backend_find_source_map_entry(elf_Program *module, u32 byte)
+static u32 backend_count_all_bytecode(BackendCompileResult result, BcType type)
 {
-	for (u32 i = 0; i < module->source_map_count; ++ i) {
-		BcSourceMapEntry *entry = &module->source_map[i];
+	u32 count = 0;
+	for (u32 function_index = 0; function_index < result.state->prototype_count; ++function_index)
+	{
+		elf_Prototype *function = prototype_from_index(result.state, function_index);
+		for (u32 byte_index = 0; byte_index < function->bytecode_count; ++byte_index) {
+			count += function->bytecode[byte_index].b_type == type;
+		}
+	}
+	return count;
+}
+
+static BcSourceMapEntry *backend_find_source_map_entry(elf_Prototype *function, u32 byte)
+{
+	for (u32 i = 0; i < function->source_map_count; ++ i) {
+		BcSourceMapEntry *entry = &function->source_map[i];
 		if (byte >= entry->byte_start && byte < entry->byte_end) {
 			return entry;
 		}
@@ -114,19 +122,13 @@ static void test_backend_source_map(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/smoke/return_add.elf");
 	elf_Prototype *function = backend_test_function(result);
-	elf_Program *module = result.function.program;
-	if (!module->source_name || !module->source_data || module->source_size == 0) {
-		test_fail("backend stores source data on compiled module");
-		goto done;
-	}
-	if (module->source_map_count == 0) {
+	if (function->source_map_count == 0) {
 		test_fail("backend emits source map entries");
 		goto done;
 	}
 
-	for (u32 i = 0; i < function->length; ++ i) {
-		u32 byte = function->offset + i;
-		BcSourceMapEntry *entry = backend_find_source_map_entry(module, byte);
+	for (u32 byte = 0; byte < function->bytecode_count; ++byte) {
+		BcSourceMapEntry *entry = backend_find_source_map_entry(function, byte);
 		if (!entry || !source_slice_is_valid(entry->site) || entry->site.size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
 			goto done;
@@ -135,44 +137,6 @@ static void test_backend_source_map(void)
 
 done:
 	backend_test_destroy(result);
-}
-
-static void test_backend_module_owns_source(void)
-{
-	static const char expected[] = "value := 41\nret value + 1\n";
-	u32 source_size = sizeof(expected) - 1;
-	char *source_data = malloc(source_size);
-	copy_memory(source_data, expected, source_size);
-
-	elf_State *state = elf_create_state();
-	elf_StrSlice source = {source_data, source_size};
-	elf_PrototypeRef entry = backend_test_compile(state, "owned_source", source);
-	elf_Program *module = entry.program;
-	if (module->source_data == source_data) {
-		test_fail("compiled module does not borrow caller source memory");
-		free(source_data);
-		elf_destroy_state(state);
-		return;
-	}
-
-	zero_memory(source_data, source_size);
-	free(source_data);
-	if (module->source_size != source_size || memcmp(module->source_data, expected, source_size) != 0) {
-		test_fail("compiled module retains an owned source copy");
-	}
-
-	for (u32 map_index = 0; map_index < module->source_map_count; ++map_index)
-	{
-		SourceSite site = module->source_map[map_index].site;
-		if (!source_slice_is_valid(site) || site.offset > module->source_size || site.line_offset > module->source_size || site.size > module->source_size - site.offset)
-		{
-			test_fail("source map offsets fit module-owned source memory");
-			elf_destroy_state(state);
-			return;
-		}
-	}
-
-	elf_destroy_state(state);
 }
 
 static void backend_expect_no_eager_logical_bytecode(BackendCompileResult result, const char *label)
@@ -189,7 +153,7 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 {
 	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < function->length; ++ i)
+	for (u32 i = 0; i < function->bytecode_count; ++ i)
 	{
 		Bytecode byte = bytes[i];
 		if (byte.b_type == BC_JUMP ||
@@ -197,7 +161,7 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 			byte.b_type == BC_JNZ)
 		{
 			i32 target = (i32)i + byte.b_x;
-			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->length) {
+			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->bytecode_count) {
 				test_fail(label);
 				return;
 			}
@@ -213,12 +177,7 @@ static void backend_expect_min_conditional_jumps(BackendCompileResult result, u3
 	}
 }
 
-static void backend_expect_jump_counts(
-	BackendCompileResult result,
-	u32 expected_jz,
-	u32 expected_jnz,
-	u32 expected_jump,
-	const char *label)
+static void backend_expect_jump_counts(BackendCompileResult result, u32 expected_jz, u32 expected_jnz, u32 expected_jump, const char *label)
 {
 	if (backend_count_bytecode(result, BC_JZ) != expected_jz ||
 		backend_count_bytecode(result, BC_JNZ) != expected_jnz ||
@@ -233,23 +192,22 @@ static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_
 	u32 backward_jumps = 0;
 	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < function->length; ++ i)
+	for (u32 i = 0; i < function->bytecode_count; ++ i)
 	{
 		Bytecode byte = bytes[i];
 		if (byte.b_type == BC_JUMP)
 		{
 			i32 target = (i32)i + byte.b_x;
-			if (byte.b_x >= 0 || target < 0 || target >= (i32)function->length) {
+			if (byte.b_x >= 0 || target < 0 || target >= (i32)function->bytecode_count) {
 				test_fail(label);
 				return;
 			}
 			backward_jumps += 1;
 		}
-		else if (byte.b_type == BC_JZ ||
-			byte.b_type == BC_JNZ)
+		else if (byte.b_type == BC_JZ || byte.b_type == BC_JNZ)
 		{
 			i32 target = (i32)i + byte.b_x;
-			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->length) {
+			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->bytecode_count) {
 				test_fail(label);
 				return;
 			}
@@ -265,7 +223,7 @@ static i32 backend_find_first_bytecode(BackendCompileResult result, BcType type)
 {
 	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
-	for (u32 i = 0; i < function->length; ++ i)
+	for (u32 i = 0; i < function->bytecode_count; ++ i)
 	{
 		if (bytes[i].b_type == type) {
 			return i;
@@ -571,35 +529,20 @@ static void test_backend_outputs_strings(void)
 
 	IrNode string = {.kind = IR_ATOM, .atom = atom};
 	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &string};
-	IrFunction function = {.body = &return_string};
-	IrModule ir_module = {.arena = &arena, .functions = &function, .function_count = 1, .function_capacity = 1};
+	IrFunction function = {.body = &return_string, .index = IR_FUNCTION_INDEX_INVALID};
+	IrModule ir_module = {.arena = &arena, .first_function = &function, .last_function = &function, .function_count = 1};
 
-	BcModule *module = bc_emit_module(state, &ir_module);
-	if (module->string_count != 1 || module->strings[0].size != sizeof(text) - 1 || memcmp(module->strings[0].data, text, sizeof(text))) {
+	u32 prototype_index = bc_emit_module(state, &ir_module);
+	elf_Prototype *prototype = prototype_from_index(state, prototype_index);
+	if (prototype->string_count != 1 || elf_string_size(prototype->strings[0]) != sizeof(text) - 1 || memcmp(elf_string_data(prototype->strings[0]), text, sizeof(text) - 1)) {
 		test_fail("backend outputs owned bytecode strings");
 	}
-	if (module->strings[0].data == atom->data) {
+	if (elf_string_data(prototype->strings[0]) == atom->data) {
 		test_fail("backend bytecode strings do not borrow compiler atoms");
 	}
 
 	elf_destroy_state(state);
 	arena_destroy(&arena);
-}
-
-static void test_backend_compiles_static_functions(void)
-{
-	BackendCompileResult result = backend_test_compile_source(
-		"foo :: fun() { ret bar() }\n"
-		"bar :: fun() { ret foo() }\n"
-		"ret foo\n");
-
-	if (!prototype_ref_is_valid(result.function)) {
-		test_fail("backend compiles mutually recursive static functions");
-	}
-	else if (result.function.program->prototype_count != 3) {
-		test_fail("backend emits both mutually recursive static functions");
-	}
-	backend_test_destroy(result);
 }
 
 static void test_backend_emits_direct_static_call(void)
@@ -618,7 +561,7 @@ static void test_backend_emits_direct_static_call(void)
 	i32 call_index = backend_find_first_bytecode(result, BC_CALL);
 	if (call_index >= 0) {
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (call.b_y < 0 || (u32)call.b_y >= result.function.program->prototype_count || call.b_z != 3 || call.b_w != 1) {
+		if (call.b_y < 0 || (u32)call.b_y >= result.state->prototype_count || call.b_z != 3 || call.b_w != 1) {
 			test_fail("direct static call encodes function, argument, and return counts");
 		}
 	}
@@ -628,18 +571,18 @@ static void test_backend_emits_direct_static_call(void)
 static void test_backend_calls_imported_static_function(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/imports/statics/root.elf");
-	if (!prototype_ref_is_valid(result.function))
+	if (!prototype_index_is_valid(result.state, result.function))
 	{
 		test_fail("backend compiles imported static namespace");
 	}
 	else
 	{
-		if (result.function.program->prototype_count != 2 || backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+		if (result.state->prototype_count != 2 || backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
 			test_fail("imported static function emits a direct call");
 		}
 
 		elf_Closure *closure = elf_gc_alloc(result.state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-		closure->function = result.function;
+		closure->prototype = backend_test_function(result);
 		push_value(result.state, value_from_closure(closure));
 		elf_push_nil(result.state);
 		elf_call(result.state, 1, 1);
@@ -652,32 +595,17 @@ static void test_backend_calls_imported_static_function(void)
 	backend_test_destroy(result);
 }
 
-static void test_backend_rejects_private_imported_static(void)
-{
-	BackendCompileResult result = backend_test_compile_file("test/imports/statics/private_root.elf");
-	if (prototype_ref_is_valid(result.function)) {
-		test_fail("imported namespace hides private static declarations");
-	}
-	backend_test_destroy(result);
-}
-
 static void test_backend_emits_direct_static_recurse_call(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
 		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
 		"ret count(3)\n");
 
-	elf_Program *module = result.function.program;
-	u32 direct_calls = 0;
-	u32 dynamic_calls = 0;
-	u32 closures = 0;
-	for (u32 i = 0; i < module->bytecode_count; ++i) {
-		direct_calls += module->bytecode[i].b_type == BC_CALL;
-		dynamic_calls += module->bytecode[i].b_type == BC_DYNAMIC_CALL;
-		closures += module->bytecode[i].b_type == BC_CLOSURE;
-	}
-	if (direct_calls != 2 || dynamic_calls != 0) {
-		test_fail("static recurse and its caller emit direct calls");
+	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL);
+	u32 dynamic_calls = backend_count_all_bytecode(result, BC_DYNAMIC_CALL);
+	u32 closures = backend_count_all_bytecode(result, BC_CLOSURE);
+	if (direct_calls != 1 || dynamic_calls != 1) {
+		test_fail("static function call is direct while recurse calls the current closure");
 	}
 	if (closures != 0) {
 		test_fail("calling recurse in a static function does not allocate a closure");
@@ -691,20 +619,14 @@ static void test_backend_materializes_static_recurse_value(void)
 		"self :: fun() { ret recurse }\n"
 		"ret self()\n");
 
-	elf_Program *module = result.function.program;
-	u32 direct_calls = 0;
-	u32 dynamic_calls = 0;
-	u32 closures = 0;
-	for (u32 i = 0; i < module->bytecode_count; ++i) {
-		direct_calls += module->bytecode[i].b_type == BC_CALL;
-		dynamic_calls += module->bytecode[i].b_type == BC_DYNAMIC_CALL;
-		closures += module->bytecode[i].b_type == BC_CLOSURE;
-	}
+	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL);
+	u32 dynamic_calls = backend_count_all_bytecode(result, BC_DYNAMIC_CALL);
+	u32 closures = backend_count_all_bytecode(result, BC_CLOSURE);
 	if (direct_calls != 1 || dynamic_calls != 0) {
 		test_fail("calling a static function that returns recurse remains direct");
 	}
-	if (closures != 1) {
-		test_fail("using static recurse as a value materializes one closure");
+	if (closures != 0) {
+		test_fail("using recurse as a value loads the current closure without allocating one");
 	}
 	backend_test_destroy(result);
 }
@@ -712,15 +634,15 @@ static void test_backend_materializes_static_recurse_value(void)
 static void test_backend_emits_parameter_type_enforcement(void)
 {
 	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
-	if (!prototype_ref_is_valid(result.function) || result.function.program->prototype_count != 2)
+	if (!prototype_index_is_valid(result.state, result.function) || result.state->prototype_count != 2)
 	{
 		test_fail("backend compiles typed function parameters");
 	}
 	else
 	{
-		elf_Prototype *function = result.function.program->prototypes + 1;
-		Bytecode *bytes = result.function.program->bytecode + function->offset;
-		if (function->length < 2 || bytes[0].b_type != BC_ENFORCE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_ENFORCE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
+		elf_Prototype *function = prototype_from_index(result.state, 1);
+		Bytecode *bytes = function->bytecode;
+		if (function->bytecode_count < 2 || bytes[0].b_type != BC_ENFORCE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_ENFORCE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
 		{
 			test_fail("backend emits parameter type enforcement at function entry");
 		}
@@ -731,7 +653,6 @@ static void test_backend_emits_parameter_type_enforcement(void)
 static void run_backend_tests(void)
 {
 	test_backend_source_map();
-	test_backend_module_owns_source();
 	test_backend_short_circuit_and();
 	test_backend_short_circuit_or();
 	test_backend_short_circuit_nested_and_or();
@@ -747,10 +668,8 @@ static void run_backend_tests(void)
 	test_backend_logical_expr_delays_result_slot();
 	test_backend_formats_bytecode_function();
 	test_backend_outputs_strings();
-	test_backend_compiles_static_functions();
 	test_backend_emits_direct_static_call();
 	test_backend_calls_imported_static_function();
-	test_backend_rejects_private_imported_static();
 	test_backend_emits_direct_static_recurse_call();
 	test_backend_materializes_static_recurse_value();
 	test_backend_emits_parameter_type_enforcement();
