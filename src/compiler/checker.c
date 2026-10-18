@@ -15,6 +15,15 @@
 
 #include "checker.h"
 
+typedef struct
+{
+	Compiler *compiler;
+	Scope    *globals;
+	Scope    *source_scope;
+	Scope    *active_scope;
+	Ast       current_function;
+}
+Checker;
 
 static void check_statement(Checker *checker, Ast ast);
 static Entity *resolve_identifier(Checker *checker, Atom *name);
@@ -110,7 +119,7 @@ static void declare_statics(Checker *checker, Ast_Array stats)
 	}
 }
 
-Checker *check_source(Compiler *compiler, Com_Source *source)
+void check_source(Compiler *compiler, Com_Source *source)
 {
 	ASSERT(compiler);
 	ASSERT(source);
@@ -120,28 +129,27 @@ Checker *check_source(Compiler *compiler, Com_Source *source)
 	ASSERT(ast_file->file.body);
 	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
 
-	Checker *checker = arena_push_zero(compiler->arena, sizeof(*checker), _Alignof(Checker));
-	checker->compiler = compiler;
-	checker->current_function = ast_file;
-	checker->globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
+	Checker checker = {0};
+	checker.compiler = compiler;
+	checker.current_function = ast_file;
+	checker.globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
 
-	Scope *previous_source_scope = checker->source_scope;
-	Scope *previous_active_scope = checker->active_scope;
+	Scope *previous_source_scope = checker.source_scope;
+	Scope *previous_active_scope = checker.active_scope;
 
-	checker->source_scope = scope_create(checker->compiler->arena, SCOPE_SOURCE, checker->globals, ast_file, source);
-	checker->active_scope = checker->source_scope;
+	checker.source_scope = scope_create(checker.compiler->arena, SCOPE_SOURCE, checker.globals, ast_file, source);
+	checker.active_scope = checker.source_scope;
 
 	ASSERT(!source->scope);
-	source->scope = checker->source_scope;
+	source->scope = checker.source_scope;
 
-	declare_statics(checker, ast_file->file.body->block);
+	declare_statics(&checker, ast_file->file.body->block);
 	for (u32 i = 0; i < ast_file->file.body->block.count; ++i) {
-		check_statement(checker, ast_file->file.body->block.items[i]);
+		check_statement(&checker, ast_file->file.body->block.items[i]);
 	}
 
-	checker->source_scope = previous_source_scope;
-	checker->active_scope = previous_active_scope;
-	return checker;
+	checker.source_scope = previous_source_scope;
+	checker.active_scope = previous_active_scope;
 }
 
 static void resolve_entity(Checker *checker, Entity *entity) {
