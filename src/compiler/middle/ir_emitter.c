@@ -647,12 +647,18 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		case AST_BITWISE_AND:
 		case AST_BITWISE_OR:
 		case AST_BITWISE_XOR:
-		case AST_BITWISE_NOT:
 		{
 			Ir x = ir_emit_expr(emitter, expr->binary.x);
 			Ir y = ir_emit_expr(emitter, expr->binary.y);
 			IrKind ir_kind = ir_kind_from_ast_kind(expr->kind);
 			ir = ir_new_binary(emitter, expr->site, ir_kind, x, y);
+		}
+		break;
+
+		case AST_BITWISE_NOT:
+		{
+			Ir value = ir_emit_expr(emitter, expr->unary);
+			ir = ir_new_unary(emitter, expr->site, IR_BITWISE_NOT, value);
 		}
 		break;
 		default:

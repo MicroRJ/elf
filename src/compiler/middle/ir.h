@@ -8,9 +8,79 @@ typedef struct Atom Atom;
 
 #define NO_SLOT (-1)
 
+/*
+IR kinds are grouped by behavior:
+
+Sentinels
+  IR_NONE is an invalid or uninitialized kind and is never emitted.
+  IR_ERROR preserves an already reported lowering failure.
+
+Literal values
+  IR_NIL, IR_INTEGER, and IR_NUMBER produce their corresponding literal values.
+  IR_ATOM produces a runtime string from an interned compiler atom.
+
+Named, local, and callable values
+  IR_GLOBAL reads a symbolic global and may also be an IR_STORE destination.
+  IR_CAPTURE reads a capture by index from the current closure.
+  IR_RECURSE produces the current closure for a recursive call.
+  IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
+  IR_LOAD reads a previously allocated IR_LOCAL.
+  IR_GET_MEM produces the stack-slot index addressed by an IR_LOAD.
+
+Aggregate values and access
+  IR_TABLE and IR_ARRAY allocate empty collections.
+  IR_INDEX reads an indexed value and may also be an IR_STORE destination.
+  IR_FIELD reads a field and preserves its receiver as the implicit argument when called.
+  IR_META_FIELD does the same for a meta field.
+  IR_MEASURE produces the measured length of its operand.
+
+Short-circuit expressions
+  IR_AND and IR_OR evaluate lazily and produce normalized boolean zero or one.
+  IR_NIL_OR produces its left operand unless it is nil, then evaluates its right operand.
+
+Arithmetic, comparison, and bitwise expressions
+  IR_ADD, IR_SUB, IR_MUL, IR_DIV, IR_POW, and IR_MOD perform their named arithmetic operations.
+  IR_EQ, IR_NOT_EQ, IR_LESS_THAN, and IR_LESS_THAN_EQ compare two operands.
+  IR_SHIFT_LEFT, IR_SHIFT_RIGHT, IR_BITWISE_AND, IR_BITWISE_OR, and IR_BITWISE_XOR operate on two integers.
+  IR_BITWISE_NOT computes the complement of one integer.
+
+Calls and structured expressions
+  IR_CALL calls an expression with arguments; the backend selects direct or dynamic dispatch.
+  IR_EXPR_BLOCK executes a statement sequence and then produces its final value.
+
+Statements and storage
+  IR_LOCAL allocates one local slot and optionally initializes it.
+  IR_MULTI_LOCAL evaluates one expression for N results and binds N consecutive locals.
+  IR_STORE writes to an allocated local, global, field, or index.
+  IR_ARRAY_ADD appends one value to an array.
+  IR_BLOCK executes statements with a scoped local-slot lifetime.
+  IR_IF executes one of two statement branches according to a predicate.
+  IR_RETURN returns zero or one value from the current function.
+
+Low-level control flow
+  IR_LABEL defines a symbolic bytecode position.
+  IR_JUMP transfers control unconditionally to an IR_LABEL.
+  IR_JUMP_IF_FALSE transfers control to an IR_LABEL when its predicate is false.
+*/
 #define IR_DEFINITIONS(X)                                   \
 	X(IR_NONE                , "none")                       \
 	X(IR_ERROR               , "error")                      \
+	X(IR_NIL                 , "nil")                        \
+	X(IR_INTEGER             , "integer")                    \
+	X(IR_NUMBER              , "number")                     \
+	X(IR_ATOM                , "atom")                       \
+	X(IR_GLOBAL              , "global")                     \
+	X(IR_CAPTURE             , "capture")                    \
+	X(IR_RECURSE             , "recurse")                    \
+	X(IR_FUNCTION            , "function")                   \
+	X(IR_LOAD                , "load")                       \
+	X(IR_GET_MEM             , "get_mem")                    \
+	X(IR_TABLE               , "table")                      \
+	X(IR_ARRAY               , "array")                      \
+	X(IR_INDEX               , "index")                      \
+	X(IR_FIELD               , "field")                      \
+	X(IR_META_FIELD          , "meta_field")                 \
+	X(IR_MEASURE             , "measure")                    \
 	X(IR_AND                 , "and")                        \
 	X(IR_OR                  , "or")                         \
 	X(IR_NIL_OR              , "nil_or")                     \
@@ -30,34 +100,18 @@ typedef struct Atom Atom;
 	X(IR_BITWISE_OR          , "bitwise_or")                 \
 	X(IR_BITWISE_XOR         , "bitwise_xor")                \
 	X(IR_BITWISE_NOT         , "bitwise_not")                \
+	X(IR_CALL                , "call")                       \
+	X(IR_EXPR_BLOCK          , "expr_block")                 \
+	X(IR_LOCAL               , "local")                      \
+	X(IR_MULTI_LOCAL         , "multi_local")                \
 	X(IR_STORE               , "store")                      \
 	X(IR_ARRAY_ADD           , "array_add")                  \
-	X(IR_IF                  , "if")                         \
 	X(IR_BLOCK               , "block_stat")                 \
-	X(IR_EXPR_BLOCK          , "expr_block")                 \
-	X(IR_NUMBER              , "number")                     \
-	X(IR_INTEGER             , "integer")                    \
-	X(IR_ATOM                , "atom")                       \
-	X(IR_NIL                 , "nil")                        \
-	X(IR_CALL                , "call")                       \
-	X(IR_TABLE               , "table")                      \
-	X(IR_ARRAY               , "array")                      \
-	X(IR_INDEX               , "index")                      \
-	X(IR_FIELD               , "field")                      \
-	X(IR_META_FIELD          , "meta_field")                 \
+	X(IR_IF                  , "if")                         \
+	X(IR_RETURN              , "return")                     \
 	X(IR_LABEL               , "label")                      \
 	X(IR_JUMP                , "jump")                       \
 	X(IR_JUMP_IF_FALSE       , "jump_if_false")              \
-	X(IR_RETURN              , "return")                     \
-	X(IR_MEASURE             , "measure")                    \
-	X(IR_GET_MEM             , "get_mem")                    \
-	X(IR_FUNCTION            , "function")                   \
-	X(IR_RECURSE             , "recurse")                    \
-	X(IR_LOCAL               , "local")                      \
-	X(IR_MULTI_LOCAL         , "multi_local")                \
-	X(IR_LOAD                , "load")                       \
-	X(IR_GLOBAL              , "global")                     \
-	X(IR_CAPTURE             , "capture")                    \
 /* end */
 
 typedef enum

@@ -395,6 +395,15 @@ static void test_backend_array_bytecode(void)
 	backend_test_destroy(result);
 }
 
+static void test_backend_bitwise_not(void)
+{
+	BackendCompileResult result = backend_test_compile_source("ret ~1");
+	if (backend_count_bytecode(result, BC_BIT_NOT) != 1) {
+		test_fail("bitwise not emits unary bytecode");
+	}
+	backend_test_destroy(result);
+}
+
 static void test_backend_local_initializer_reuses_result_slot(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -663,6 +672,7 @@ static void run_backend_tests(void)
 	test_backend_range_for_loop_shape();
 	test_backend_range_for_collection_call_is_hoisted();
 	test_backend_array_bytecode();
+	test_backend_bitwise_not();
 	test_backend_local_initializer_reuses_result_slot();
 	test_backend_truthy_or_reuses_left_result_slot();
 	test_backend_logical_expr_delays_result_slot();

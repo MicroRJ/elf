@@ -118,6 +118,19 @@ static void test_ir_lowers_declaration_expression(elf_State *state)
 	arena_destroy(&arena);
 }
 
+static void test_ir_lowers_bitwise_not(elf_State *state)
+{
+	Arena arena = arena_create(0);
+	IrTestResult result = ir_test_lower_source(state, &arena, "ret ~1");
+	Ir body = ir_test_main_body(result.module);
+	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower bitwise not return");
+	Ir expr = ret ? ret->ir_return.expr : 0;
+
+	expect_ir_kind(expr, IR_BITWISE_NOT, "lower bitwise not expression");
+	expect_ir_i64(expr ? expr->ir_unary : 0, 1, "lower bitwise not operand");
+	arena_destroy(&arena);
+}
+
 static void test_ir_lowers_assignment_to_local(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -533,6 +546,7 @@ static void test_ir_lowers_get_mem_macro(elf_State *state)
 static void run_ir_tests(elf_State *state)
 {
 	test_ir_lowers_declaration_expression(state);
+	test_ir_lowers_bitwise_not(state);
 	test_ir_lowers_assignment_to_local(state);
 	test_ir_rejects_assignment_to_constant(state);
 	test_ir_lowers_strings_and_globals(state);

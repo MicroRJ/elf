@@ -621,7 +621,6 @@ static BcType bytecode_type_from_ir(IrKind type)
 		case IR_EQ:                return BC_EQ;
 		case IR_LESS_THAN:         return BC_LT;
 		case IR_LESS_THAN_EQ:      return BC_LTEQ;
-		case IR_BITWISE_NOT:       return BC_BIT_NOT;
 		case IR_BITWISE_OR:        return BC_BIT_OR;
 		case IR_BITWISE_AND:       return BC_BIT_AND;
 		case IR_SHIFT_LEFT:        return BC_BIT_SHL;
@@ -1002,6 +1001,12 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		case IR_MEASURE:
 		{
 			out = emit_unary_expr(emitter, expr, BC_MEASURE, out, nout);
+		}
+		break;
+
+		case IR_BITWISE_NOT:
+		{
+			out = emit_unary_expr(emitter, expr, BC_BIT_NOT, out, nout);
 		}
 		break;
 
