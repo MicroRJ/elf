@@ -70,6 +70,7 @@ int main(void)
 	run_checker_tests();
 	run_ir_tests(state);
 	run_backend_tests();
+	run_vm_tests();
 
 	elf_destroy_state(state);
 
