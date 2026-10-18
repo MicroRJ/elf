@@ -328,34 +328,6 @@ static b32 ast_is_call(Ast expr)
 	return expr && expr->kind == AST_CALL;
 }
 
-static IrArray lower_call_arguments(IrEmitter *emitter, Ast call, b32 *failed)
-{
-	ASSERT(call && call->kind == AST_CALL);
-	u32 argument_count = call->call.args.count;
-	IrArray result = {};
-	if (argument_count) {
-		result.items = arena_push(emitter->module->arena, sizeof(*result.items) * argument_count, _Alignof(Ir));
-	}
-	for (u32 i = 0; i < argument_count; ++i)
-	{
-		Ast argument = call->call.args.items[i];
-		if (argument->kind == AST_NAMED_ARGUMENT)
-		{
-			ir_report_error(emitter, ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
-			*failed = true;
-		}
-		else
-		{
-			Ir argument_ir = ir_emit_expr(emitter, argument);
-			result.items[result.count++] = argument_ir;
-			if (!argument_ir || argument_ir == ERROR_IR) {
-				*failed = true;
-			}
-		}
-	}
-	return result;
-}
-
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 {
 	if (!expr || ast_is_error(expr)) {
@@ -527,7 +499,25 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		{
 			Ir ir_func = ir_emit_expr(emitter, expr->call.expr);
 			b32 failed = !ir_func || ir_func == ERROR_IR;
-			IrArray ir_args = lower_call_arguments(emitter, expr, &failed);
+			IrQueue args = ir_begin_queue(emitter);
+			for (u32 i = 0; i < expr->call.args.count; ++i)
+			{
+				Ast argument = expr->call.args.items[i];
+				if (argument->kind == AST_NAMED_ARGUMENT)
+				{
+					ir_report_error(emitter, ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
+					failed = true;
+				}
+				else
+				{
+					Ir argument_ir = ir_emit_expr(emitter, argument);
+					ir_push(&args, argument_ir);
+					if (!argument_ir || argument_ir == ERROR_IR) {
+						failed = true;
+					}
+				}
+			}
+			IrArray ir_args = ir_end_queue(&args);
 
 			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, ir_func, ir_args);
 		}
