@@ -175,7 +175,7 @@ struct elf_Closure
 struct StackFrame
 {
 	elf_Program      *program;
-	elf_Prototype    *function;
+	u32                prototype_index;
 	elf_Value    *framebase;
 	elf_Value    *reference;
 	elf_Value     *captures;

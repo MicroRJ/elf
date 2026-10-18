@@ -40,7 +40,7 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 	StackFrame *result = 0;
 	for (StackFrame *frame = state->frame;; --frame)
 	{
-		if (frame->program && frame->function)
+		if (frame->program)
 		{
 			result = frame;
 			break;
@@ -57,9 +57,9 @@ static void print_runtime_source_location(StackFrame *frame)
 {
 	ASSERT(frame);
 	ASSERT(frame->program);
-	ASSERT(frame->function);
 	elf_Program *module = frame->program;
-	elf_Prototype *function = frame->function;
+	elf_PrototypeRef function_ref = {.program = module, .index = frame->prototype_index};
+	elf_Prototype *function = prototype_from_ref(function_ref);
 	u32 instr = function->offset + frame->instruction;
 	ASSERT(instr < module->bytecode_count);
 	SourceSite site = find_source_for_instr(module, instr);
@@ -86,7 +86,7 @@ static void print_runtime_call_stack(elf_State *state, StackFrame *current)
 	for (StackFrame *frame = current; frame && frame > state->frame_stack;)
 	{
 		--frame;
-		if (frame->program && frame->function)
+		if (frame->program)
 		{
 			if (!printed)
 			{

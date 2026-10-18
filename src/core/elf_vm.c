@@ -31,7 +31,7 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 	value_zero_many(frame_base + clear_start, frame_size - clear_start);
 
 	frame->program = function_ref.program;
-	frame->function = function;
+	frame->prototype_index = function_ref.index;
 	frame->framesize = frame_size;
 	frame->framebase = frame_base;
 	frame->reference = reference;
@@ -190,9 +190,10 @@ static int run_bytecode_frame(elf_State *state)
 
 activate_frame:
 	StackFrame *frame = state->frame;
-	ASSERT(frame->program && frame->function);
+	ASSERT(frame->program);
 	elf_Program *module = frame->program;
-	elf_Prototype *function = frame->function;
+	elf_PrototypeRef function_ref = {.program = module, .index = frame->prototype_index};
+	elf_Prototype *function = prototype_from_ref(function_ref);
 	elf_Value *framebase = frame->framebase;
 	elf_Value *reference = frame->reference;
 	elf_Value *captures = frame->captures;

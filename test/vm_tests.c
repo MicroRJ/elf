@@ -29,11 +29,12 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	StackFrame native_frame = *S->frame;
 	StackFrame *caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
 	elf_Program *caller_module = caller ? caller->program : 0;
-	elf_Prototype *caller_function = caller ? caller->function : 0;
+	u32 caller_prototype = caller ? caller->prototype_index : 0;
 	u32 caller_instruction = caller ? caller->instruction : 0;
-	b32 preserved = context && !native_frame.program && !native_frame.function && caller_module && caller_function;
+	b32 preserved = context && !native_frame.program && caller_module;
 	if (preserved)
 	{
+		elf_Prototype *caller_function = prototype_from_ref((elf_PrototypeRef) {.program = caller_module, .index = caller_prototype});
 		u32 byte_index = caller_function->offset + caller_instruction;
 		preserved = BC_TYPE(caller_module->bytecode[byte_index]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
 	}
@@ -45,8 +46,8 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 		preserved = S->frame == native_frame_pointer &&
 			S->frame->framebase == native_frame.framebase && S->frame->reference == native_frame.reference &&
 			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs && S->frame->nrets == native_frame.nrets &&
-			!S->frame->program && !S->frame->function && restored_caller &&
-			restored_caller->program == caller_module && restored_caller->function == caller_function &&
+			!S->frame->program && restored_caller &&
+			restored_caller->program == caller_module && restored_caller->prototype_index == caller_prototype &&
 			restored_caller->instruction == caller_instruction;
 	}
 	elf_push_int(S, preserved);
