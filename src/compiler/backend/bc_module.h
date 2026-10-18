@@ -48,7 +48,7 @@ struct BcModule
 	f64                *number_constants;
 	u32                 number_constant_count;
 
-	BcFunction         *functions;
+	elf_Prototype         *functions;
 	u32                 function_count;
 	Bytecode           *bytecode;
 	u32                 bytecode_count;

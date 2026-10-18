@@ -13,7 +13,7 @@
 #include "linker.h"
 
 // TODO(RJ): better error reporting here!
-elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
+elf_Program *elf_link_module(elf_State *state, const BcModule *compiled_module)
 {
 	ASSERT(state);
 	if (!compiled_module || !compiled_module->source_count || compiled_module->root_source >= compiled_module->source_count || !compiled_module->function_count) {
@@ -68,7 +68,7 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 		}
 	}
 
-	elf_Module *module = arena_push_zero(&state->arena, sizeof(*module), 8);
+	elf_Program *module = arena_push_zero(&state->arena, sizeof(*module), 8);
 	BcSource root_source = compiled_module->sources[compiled_module->root_source];
 	module->source_name = elf_string_from_data_size(state, root_source.name.data, root_source.name.size);
 	u64 source_storage_size = ((u64)root_source.source.size + 1 + 7) & ~(u64)7;
@@ -107,10 +107,10 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 	{
 		module->source_map = arena_push_copy(&state->arena, sizeof(*module->source_map) * module->source_map_count, 8, compiled_module->source_map);
 	}
-	module->bytecode_function_count = compiled_module->function_count;
-	if (module->bytecode_function_count)
+	module->prototype_count = compiled_module->function_count;
+	if (module->prototype_count)
 	{
-		module->bytecode_functions = arena_push_copy(&state->arena, sizeof(*module->bytecode_functions) * module->bytecode_function_count, 8, compiled_module->functions);
+		module->prototypes = arena_push_copy(&state->arena, sizeof(*module->prototypes) * module->prototype_count, 8, compiled_module->functions);
 	}
 	for (u32 i = 0; i < compiled_module->global_relocation_count; ++i)
 	{
@@ -125,23 +125,23 @@ elf_Module *elf_link_module(elf_State *state, const BcModule *compiled_module)
 		}
 	}
 
-	module->next = state->modules;
-	state->modules = module;
+	module->next = state->programs;
+	state->programs = module;
 	state->gc_mode = saved_gc_mode;
 	scratch_end(scratch);
 	return module;
 }
 
-static BcFunctionRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
+static elf_PrototypeRef compile_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
-	elf_Module *module = elf_link_module(state, compiled_module);
-	BcFunctionRef entry = {};
+	elf_Program *module = elf_link_module(state, compiled_module);
+	elf_PrototypeRef entry = {};
 	if (module)
 	{
-		entry.module = module;
+		entry.program = module;
 		entry.index = 0;
 	}
 	scratch_end(scratch);
@@ -153,11 +153,11 @@ elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSl
 	if (!name || !source.data) {
 		return ELF_ERROR_INVALID_ARGUMENT;
 	}
-	BcFunctionRef function = compile_source(state, name, source);
-	if (!bc_function_ref_is_valid(function)) {
+	elf_PrototypeRef function = compile_source(state, name, source);
+	if (!prototype_ref_is_valid(function)) {
 		return ELF_ERROR_COMPILATION_FAILED;
 	}
-	ASSERT(bc_function_from_ref(function)->captures == 0);
+	ASSERT(prototype_from_ref(function)->captures == 0);
 
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = function;

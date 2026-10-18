@@ -36,7 +36,7 @@ struct BcEmitter
 	Bytecode         *bytecode;
 	u32               bytecode_capacity;
 	u32               bytecode_count;
-	BcFunction       *functions;
+	elf_Prototype       *functions;
 	u32               function_count;
 	u32               indexed_function_count;
 	u32               generated_function_count;
@@ -473,7 +473,7 @@ static void bc_emit_function(BcEmitter *emitter, IrFunction *function)
 	patch_bytecode_labels(emitter);
 
 	ASSERT(module->generated_function_count < module->function_count);
-	BcFunction *bc_function = module->functions + function_index;
+	elf_Prototype *bc_function = module->functions + function_index;
 	module->generated_function_count += 1;
 	bc_function->variadic = function->variadic;
 	bc_function->source_index = function->site.source;

@@ -11,7 +11,7 @@ static const char *error_code_names[] =
 #undef ERROR_CODE_NAME
 };
 
-static SourceSite find_source_for_instr(elf_Module *module, int instr)
+static SourceSite find_source_for_instr(elf_Program *module, int instr)
 {
 	SourceSite site = {};
 	for (u32 i = 0; i < module->source_map_count; ++i)
@@ -40,7 +40,7 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 	StackFrame *result = 0;
 	for (StackFrame *frame = state->frame;; --frame)
 	{
-		if (frame->module && frame->function)
+		if (frame->program && frame->function)
 		{
 			result = frame;
 			break;
@@ -56,10 +56,10 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 static void print_runtime_source_location(StackFrame *frame)
 {
 	ASSERT(frame);
-	ASSERT(frame->module);
+	ASSERT(frame->program);
 	ASSERT(frame->function);
-	elf_Module *module = frame->module;
-	BcFunction *function = frame->function;
+	elf_Program *module = frame->program;
+	elf_Prototype *function = frame->function;
 	u32 instr = function->offset + frame->instruction;
 	ASSERT(instr < module->bytecode_count);
 	SourceSite site = find_source_for_instr(module, instr);
@@ -86,7 +86,7 @@ static void print_runtime_call_stack(elf_State *state, StackFrame *current)
 	for (StackFrame *frame = current; frame && frame > state->frame_stack;)
 	{
 		--frame;
-		if (frame->module && frame->function)
+		if (frame->program && frame->function)
 		{
 			if (!printed)
 			{

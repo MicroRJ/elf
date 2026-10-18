@@ -55,16 +55,16 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	BcModule *compiled_module = root_loaded ? compiler_compile(scratch.arena, source_name, source) : 0;
-	elf_Module *module = elf_link_module(state, compiled_module);
-	BcFunctionRef entry = {};
+	elf_Program *module = elf_link_module(state, compiled_module);
+	elf_PrototypeRef entry = {};
 	if (module)
 	{
-		entry.module = module;
+		entry.program = module;
 		entry.index = 0;
 	}
 	scratch_end(scratch);
 
-	if (!bc_function_ref_is_valid(entry))
+	if (!prototype_ref_is_valid(entry))
 	{
 		if (!root_loaded) {
 			elf_push_nil(state);
@@ -72,7 +72,7 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		return false;
 	}
 
-	ASSERT(bc_function_from_ref(entry)->captures == 0);
+	ASSERT(prototype_from_ref(entry)->captures == 0);
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->function = entry;
 	push_value(state, value_from_closure(closure));

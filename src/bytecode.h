@@ -13,7 +13,7 @@
 #include "base.h"
 #include "source.h"
 
-typedef struct BcFunctionRef BcFunctionRef;
+typedef struct elf_PrototypeRef elf_PrototypeRef;
 
 // Type masks embedded in BC_ENFORCE instructions.
 typedef enum
@@ -102,8 +102,8 @@ typedef enum
 BcType;
 
 const char *bytecode_type_name(BcType type);
-char *format_bytecode_function(elf_State *state, Arena *arena, BcFunctionRef function);
-void print_bytecode_function(elf_State *state, BcFunctionRef function);
+char *format_bytecode_function(elf_State *state, Arena *arena, elf_PrototypeRef function);
+void print_bytecode_function(elf_State *state, elf_PrototypeRef function);
 
 // One fixed-width VM instruction. The fourth operand uses padding that already
 // existed after z, so adding it does not make an instruction any larger.
@@ -117,7 +117,7 @@ Bytecode;
 
 STATIC_ASSERT(sizeof(Bytecode) == 12);
 
-typedef struct BcFunction
+typedef struct elf_Prototype
 {
 	u32   source_index;
 	b32       variadic;
@@ -131,7 +131,7 @@ typedef struct BcFunction
 	u16         length;
 	u32         offset;
 }
-BcFunction;
+elf_Prototype;
 
 #define BC_XYZW(K,X,Y,Z,W) (Bytecode){.b_type = (K), .b_w = (u8)(W), .b_x = (X), .b_y = (Y), .b_z = (Z)}
 #define BC_XYZ(K,X,Y,Z)     BC_XYZW(K,X,Y,Z,0)

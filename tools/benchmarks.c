@@ -195,7 +195,7 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
-	bench_require(state->modules == 0, "new state preallocates compiled modules");
+	bench_require(state->programs == 0, "new state preallocates compiled modules");
 	u64 arena_before = state->arena.used;
 	u64 bytecode_count = 0;
 	u64 function_count = 0;
@@ -207,13 +207,13 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	i64 start = bench_now();
 	for (u32 i = 0; i < iterations; ++i)
 	{
-		elf_Module *previous_module = state->modules;
+		elf_Program *previous_module = state->programs;
 		bench_require(elf_push_code_source(state, "benchmark.compile", text) == ELF_ERROR_NONE, "could not compile benchmark source");
-		elf_Module *module = state->modules;
+		elf_Program *module = state->programs;
 		bench_require(module && module != previous_module, "compile did not publish a distinct module");
 		bench_require(value_as_closure(state->stack_ptr[-1])->function.index == 0, "module entry is not local");
 		bytecode_count += module->bytecode_count;
-		function_count += module->bytecode_function_count;
+		function_count += module->prototype_count;
 		string_count += module->string_count;
 		integer_constant_count += module->integer_constant_count;
 		number_constant_count += module->number_constant_count;
@@ -223,7 +223,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	u64 retained_arena_storage = state->arena.used - arena_before;
 	u64 array_storage =
 		bytecode_count * sizeof(Bytecode) +
-		function_count * sizeof(BcFunction) +
+		function_count * sizeof(elf_Prototype) +
 		string_count * sizeof(elf_String *) +
 		integer_constant_count * sizeof(i64) +
 		number_constant_count * sizeof(f64);
@@ -249,7 +249,7 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 		Scratch scratch = scratch_begin();
 		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
 		BcModule *compiled_module = compiler_compile(scratch.arena, name, text);
-		elf_Module *module = elf_link_module(state, compiled_module);
+		elf_Program *module = elf_link_module(state, compiled_module);
 		bench_require(module != 0, "could not compile benchmark module");
 		scratch_end(scratch);
 	}

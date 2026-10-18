@@ -19,8 +19,8 @@ typedef struct elf_Array      elf_Array;
 typedef struct elf_Closure    elf_Closure;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
-typedef struct elf_Module     elf_Module;
-typedef struct BcFunctionRef  BcFunctionRef;
+typedef struct elf_Program     elf_Program;
+typedef struct elf_PrototypeRef  elf_PrototypeRef;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
 
@@ -138,12 +138,10 @@ typedef struct
 }
 elf_Globals;
 
-// A module keeps one compiler output together. Dynamically loaded code has its
-// own bytecode, functions, and constant pools, so for now their indices stay
-// module-relative. Relocating them into elf_State may be worth exploring later.
-struct elf_Module
+// TODO(RJ): consider untracking gc strings since a program is the longest-lived object.
+struct elf_Program
 {
-	elf_Module       *next;
+	elf_Program       *next;
 	elf_String       *source_name;
 	char             *source_data;
 	u32               source_size;
@@ -153,31 +151,31 @@ struct elf_Module
 	u32               number_constant_count;
 	i64              *integer_constants;
 	u32               integer_constant_count;
-	BcFunction       *bytecode_functions;
-	u32               bytecode_function_count;
+	elf_Prototype       *prototypes;
+	u32               prototype_count;
 	Bytecode         *bytecode;
 	u32               bytecode_count;
 	BcSourceMapEntry *source_map;
 	u32               source_map_count;
 };
 
-struct BcFunctionRef
+struct elf_PrototypeRef
 {
-	elf_Module *module;
+	elf_Program *program;
 	u32          index;
 };
 
 struct elf_Closure
 {
 	elf_Object         obj;
-	BcFunctionRef function;
+	elf_PrototypeRef function;
 	elf_Value     captures[];
 };
 
 struct StackFrame
 {
-	elf_Module      *module;
-	BcFunction    *function;
+	elf_Program      *program;
+	elf_Prototype    *function;
 	elf_Value    *framebase;
 	elf_Value    *reference;
 	elf_Value     *captures;
@@ -196,7 +194,7 @@ struct elf_State
 	Arena      arena;
 	void          *user_data;
 
-	elf_Module    *modules;
+	elf_Program    *programs;
 
 	struct
 	{

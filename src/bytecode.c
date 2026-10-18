@@ -53,7 +53,7 @@ static void format_global_value(elf_State *state, Arena *arena, u32 index)
 	format_value_shallow(arena, elf_globals_get_by_slot(&state->globals, index));
 }
 
-static void format_bytecode_instr(elf_State *state, elf_Module *module, Arena *arena, u32 index, Bytecode byte)
+static void format_bytecode_instr(elf_State *state, elf_Program *module, Arena *arena, u32 index, Bytecode byte)
 {
 	arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
 
@@ -262,10 +262,10 @@ static void format_bytecode_instr(elf_State *state, elf_Module *module, Arena *a
 	arena_push_char(arena, '\n');
 }
 
-char *format_bytecode_function(elf_State *state, Arena *arena, BcFunctionRef function_ref)
+char *format_bytecode_function(elf_State *state, Arena *arena, elf_PrototypeRef function_ref)
 {
-	BcFunction *function = bc_function_from_ref(function_ref);
-	elf_Module *module = function_ref.module;
+	elf_Prototype *function = prototype_from_ref(function_ref);
+	elf_Program *module = function_ref.program;
 	char *start = arena_push(arena, 0, 1);
 	const char *source_name = module->source_name ? elf_string_data(module->source_name) : "<unknown>";
 
@@ -290,7 +290,7 @@ char *format_bytecode_function(elf_State *state, Arena *arena, BcFunctionRef fun
 	return start;
 }
 
-void print_bytecode_function(elf_State *state, BcFunctionRef function)
+void print_bytecode_function(elf_State *state, elf_PrototypeRef function)
 {
 	Scratch scratch = scratch_begin();
 	char *text = format_bytecode_function(state, scratch.arena, function);

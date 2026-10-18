@@ -7,25 +7,25 @@
 typedef struct
 {
 	elf_State       *state;
-	BcFunctionRef function;
+	elf_PrototypeRef function;
 }
 BackendCompileResult;
 
-static BcFunction *backend_test_function(BackendCompileResult result)
+static elf_Prototype *backend_test_function(BackendCompileResult result)
 {
-	return bc_function_from_ref(result.function);
+	return prototype_from_ref(result.function);
 }
 
-static BcFunctionRef backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
+static elf_PrototypeRef backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	BcModule *compiled_module = compiler_compile(scratch.arena, source_name, source);
-	elf_Module *module = elf_link_module(state, compiled_module);
-	BcFunctionRef entry = {};
+	elf_Program *module = elf_link_module(state, compiled_module);
+	elf_PrototypeRef entry = {};
 	if (module)
 	{
-		entry.module = module;
+		entry.program = module;
 		entry.index = 0;
 	}
 	scratch_end(scratch);
@@ -76,8 +76,8 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 
 static Bytecode *backend_test_bytes(BackendCompileResult result)
 {
-	BcFunction *function = backend_test_function(result);
-	return result.function.module->bytecode + function->offset;
+	elf_Prototype *function = backend_test_function(result);
+	return result.function.program->bytecode + function->offset;
 }
 
 static void backend_test_destroy(BackendCompileResult result)
@@ -88,7 +88,7 @@ static void backend_test_destroy(BackendCompileResult result)
 static u32 backend_count_bytecode(BackendCompileResult result, BcType type)
 {
 	u32 count = 0;
-	BcFunction *function = backend_test_function(result);
+	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
 	for (u32 i = 0; i < function->length; ++ i)
 	{
@@ -99,7 +99,7 @@ static u32 backend_count_bytecode(BackendCompileResult result, BcType type)
 	return count;
 }
 
-static BcSourceMapEntry *backend_find_source_map_entry(elf_Module *module, u32 byte)
+static BcSourceMapEntry *backend_find_source_map_entry(elf_Program *module, u32 byte)
 {
 	for (u32 i = 0; i < module->source_map_count; ++ i) {
 		BcSourceMapEntry *entry = &module->source_map[i];
@@ -113,8 +113,8 @@ static BcSourceMapEntry *backend_find_source_map_entry(elf_Module *module, u32 b
 static void test_backend_source_map(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/smoke/return_add.elf");
-	BcFunction *function = backend_test_function(result);
-	elf_Module *module = result.function.module;
+	elf_Prototype *function = backend_test_function(result);
+	elf_Program *module = result.function.program;
 	if (!module->source_name || !module->source_data || module->source_size == 0) {
 		test_fail("backend stores source data on compiled module");
 		goto done;
@@ -146,8 +146,8 @@ static void test_backend_module_owns_source(void)
 
 	elf_State *state = elf_create_state();
 	elf_StrSlice source = {source_data, source_size};
-	BcFunctionRef entry = backend_test_compile(state, "owned_source", source);
-	elf_Module *module = entry.module;
+	elf_PrototypeRef entry = backend_test_compile(state, "owned_source", source);
+	elf_Program *module = entry.program;
 	if (module->source_data == source_data) {
 		test_fail("compiled module does not borrow caller source memory");
 		free(source_data);
@@ -187,7 +187,7 @@ static void backend_expect_no_eager_logical_bytecode(BackendCompileResult result
 
 static void backend_expect_patched_forward_jumps(BackendCompileResult result, const char *label)
 {
-	BcFunction *function = backend_test_function(result);
+	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
 	for (u32 i = 0; i < function->length; ++ i)
 	{
@@ -231,7 +231,7 @@ static void backend_expect_jump_counts(
 static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_backward_jumps, const char *label)
 {
 	u32 backward_jumps = 0;
-	BcFunction *function = backend_test_function(result);
+	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
 	for (u32 i = 0; i < function->length; ++ i)
 	{
@@ -263,7 +263,7 @@ static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_
 
 static i32 backend_find_first_bytecode(BackendCompileResult result, BcType type)
 {
-	BcFunction *function = backend_test_function(result);
+	elf_Prototype *function = backend_test_function(result);
 	Bytecode *bytes = backend_test_bytes(result);
 	for (u32 i = 0; i < function->length; ++ i)
 	{
@@ -591,10 +591,10 @@ static void test_backend_compiles_static_functions(void)
 		"bar :: fun() { ret foo() }\n"
 		"ret foo\n");
 
-	if (!bc_function_ref_is_valid(result.function)) {
+	if (!prototype_ref_is_valid(result.function)) {
 		test_fail("backend compiles mutually recursive static functions");
 	}
-	else if (result.function.module->bytecode_function_count != 3) {
+	else if (result.function.program->prototype_count != 3) {
 		test_fail("backend emits both mutually recursive static functions");
 	}
 	backend_test_destroy(result);
@@ -616,7 +616,7 @@ static void test_backend_emits_direct_static_call(void)
 	i32 call_index = backend_find_first_bytecode(result, BC_CALL);
 	if (call_index >= 0) {
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (call.b_y < 0 || (u32)call.b_y >= result.function.module->bytecode_function_count || call.b_z != 3 || call.b_w != 1) {
+		if (call.b_y < 0 || (u32)call.b_y >= result.function.program->prototype_count || call.b_z != 3 || call.b_w != 1) {
 			test_fail("direct static call encodes function, argument, and return counts");
 		}
 	}
@@ -629,7 +629,7 @@ static void test_backend_lowers_trailing_closure(void)
 		"apply :: fun(value, increment = 1, callback) { ret callback(value + increment) }\n"
 		"offset := 1\n"
 		"ret apply(value = 40) -> (value) { ret value + offset }\n");
-	if (!bc_function_ref_is_valid(result.function))
+	if (!prototype_ref_is_valid(result.function))
 	{
 		test_fail("trailing closure compiles");
 	}
@@ -651,13 +651,13 @@ static void test_backend_lowers_trailing_closure(void)
 static void test_backend_calls_imported_static_function(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/imports/statics/root.elf");
-	if (!bc_function_ref_is_valid(result.function))
+	if (!prototype_ref_is_valid(result.function))
 	{
 		test_fail("backend compiles imported static namespace");
 	}
 	else
 	{
-		if (result.function.module->bytecode_function_count != 2 || backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+		if (result.function.program->prototype_count != 2 || backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
 			test_fail("imported static function emits a direct call");
 		}
 
@@ -678,7 +678,7 @@ static void test_backend_calls_imported_static_function(void)
 static void test_backend_rejects_private_imported_static(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/imports/statics/private_root.elf");
-	if (bc_function_ref_is_valid(result.function)) {
+	if (prototype_ref_is_valid(result.function)) {
 		test_fail("imported namespace hides private static declarations");
 	}
 	backend_test_destroy(result);
@@ -690,7 +690,7 @@ static void test_backend_emits_direct_static_recurse_call(void)
 		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
 		"ret count(3)\n");
 
-	elf_Module *module = result.function.module;
+	elf_Program *module = result.function.program;
 	u32 direct_calls = 0;
 	u32 dynamic_calls = 0;
 	u32 closures = 0;
@@ -714,7 +714,7 @@ static void test_backend_materializes_static_recurse_value(void)
 		"self :: fun() { ret recurse }\n"
 		"ret self()\n");
 
-	elf_Module *module = result.function.module;
+	elf_Program *module = result.function.program;
 	u32 direct_calls = 0;
 	u32 dynamic_calls = 0;
 	u32 closures = 0;
@@ -735,14 +735,14 @@ static void test_backend_materializes_static_recurse_value(void)
 static void test_backend_emits_parameter_type_enforcement(void)
 {
 	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
-	if (!bc_function_ref_is_valid(result.function) || result.function.module->bytecode_function_count != 2)
+	if (!prototype_ref_is_valid(result.function) || result.function.program->prototype_count != 2)
 	{
 		test_fail("backend compiles typed function parameters");
 	}
 	else
 	{
-		BcFunction *function = result.function.module->bytecode_functions + 1;
-		Bytecode *bytes = result.function.module->bytecode + function->offset;
+		elf_Prototype *function = result.function.program->prototypes + 1;
+		Bytecode *bytes = result.function.program->bytecode + function->offset;
 		if (function->length < 2 || bytes[0].b_type != BC_ENFORCE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_ENFORCE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
 		{
 			test_fail("backend emits parameter type enforcement at function entry");

@@ -138,7 +138,7 @@ static u32 gc_mark_modules(elf_State *state)
 {
 	u32 marked_count = 0;
 
-	for (elf_Module *module = state->modules; module; module = module->next) {
+	for (elf_Program *module = state->programs; module; module = module->next) {
 		if (module->source_name) {
 			marked_count += gc_mark_reachable(state, (elf_Object *)module->source_name);
 		}
@@ -264,7 +264,7 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		if (reference->type == ELF_OBJECT_CLOSURE)
 		{
 			elf_Closure * closure = (elf_Closure *) reference;
-			BcFunction *function = bc_function_from_ref(closure->function);
+			elf_Prototype *function = prototype_from_ref(closure->function);
 
 			for (u32 i = 0; i < function->captures; ++ i)
 			{

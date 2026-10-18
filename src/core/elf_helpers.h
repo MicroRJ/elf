@@ -254,15 +254,15 @@ static inline b32 elf_table_entry_is_key(Entry entry)
 	return entry.key.type != ELF_VALUE_TYPE_NIL && entry.key.type != ENTRY_TOMB_TYPE;
 }
 
-static inline b32 bc_function_ref_is_valid(BcFunctionRef function)
+static inline b32 prototype_ref_is_valid(elf_PrototypeRef function)
 {
-	return function.module && function.index < function.module->bytecode_function_count;
+	return function.program && function.index < function.program->prototype_count;
 }
 
-static inline BcFunction *bc_function_from_ref(BcFunctionRef function)
+static inline elf_Prototype *prototype_from_ref(elf_PrototypeRef function)
 {
-	ASSERT(bc_function_ref_is_valid(function));
-	return function.module->bytecode_functions + function.index;
+	ASSERT(prototype_ref_is_valid(function));
+	return function.program->prototypes + function.index;
 }
 
 //

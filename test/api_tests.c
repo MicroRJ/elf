@@ -579,7 +579,7 @@ static void test_api_source_compilation(elf_State *state)
 	scratch_end(compiler_scratch);
 	elf_pop(state, 1);
 
-	elf_Module *module_checkpoint = state->modules;
+	elf_Program *module_checkpoint = state->programs;
 	elf_u64 arena_checkpoint = state->arena.used;
 	char invalid_code_text[] = "answer := 1 +";
 	elf_StrSlice invalid_code = {invalid_code_text, sizeof(invalid_code_text) - 1};
@@ -591,7 +591,7 @@ static void test_api_source_compilation(elf_State *state)
 	if (elf_get_top(state) != sentinel_top) {
 		test_fail("failed code compilation leaves the stack unchanged");
 	}
-	if (state->modules != module_checkpoint || state->arena.used != arena_checkpoint) {
+	if (state->programs != module_checkpoint || state->arena.used != arena_checkpoint) {
 		test_fail("failed code compilation publishes no partial module");
 	}
 	report = &compiler->report;
@@ -614,14 +614,14 @@ static void test_api_source_compilation(elf_State *state)
 	elf_StrSlice valid_code = {valid_code_text, sizeof(valid_code_text) - 1};
 	compiler = api_test_create_compiler(state, &compiler_scratch, "valid-code.elf", valid_code);
 	BcModule *compiled_module = compiler_compile(compiler_scratch.arena, (elf_StrSlice) {(char *)"valid-code.elf", sizeof("valid-code.elf") - 1}, valid_code);
-	elf_Module *module = elf_link_module(state, compiled_module);
-	BcFunctionRef function = {.module = module, .index = 0};
-	if (!bc_function_ref_is_valid(function)) {
+	elf_Program *module = elf_link_module(state, compiled_module);
+	elf_PrototypeRef function = {.program = module, .index = 0};
+	if (!prototype_ref_is_valid(function)) {
 		test_fail("API compiles valid code after a failed parse");
 	}
 	else
 	{
-		ASSERT(bc_function_from_ref(function)->captures == 0);
+		ASSERT(prototype_from_ref(function)->captures == 0);
 		elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 		closure->function = function;
 		push_value(state, value_from_closure(closure));
@@ -659,7 +659,7 @@ static void test_api_module_compilation(elf_State *state)
 	}
 	scratch_end(compiler_scratch);
 
-	elf_Module *module_checkpoint = state->modules;
+	elf_Program *module_checkpoint = state->programs;
 	elf_u64 arena_checkpoint = state->arena.used;
 	char invalid_text[] = "answer :: 42\nret answer";
 	elf_StrSlice invalid_source = {invalid_text, sizeof(invalid_text) - 1};
@@ -671,7 +671,7 @@ static void test_api_module_compilation(elf_State *state)
 	if (compiler->report.error_count != 1 || !api_slice_contains(compiler->report.first->text, "executable top-level statements")) {
 		test_fail("static module compilation reports its top-level restriction");
 	}
-	if (state->modules != module_checkpoint || state->arena.used != arena_checkpoint) {
+	if (state->programs != module_checkpoint || state->arena.used != arena_checkpoint) {
 		test_fail("failed static module compilation publishes no partial module");
 	}
 	scratch_end(compiler_scratch);
@@ -682,11 +682,11 @@ static void api_test_set_integer_global(elf_State *state, const char *name, i64 
 	elf_globals_set_by_name(&state->globals, (elf_StrSlice) {(char *)name, strlen(name)}, value_from_integer(value));
 }
 
-static void api_test_linked_module_result(elf_State *state, elf_Module *module, i64 expected)
+static void api_test_linked_module_result(elf_State *state, elf_Program *module, i64 expected)
 {
 	force_gc_allocations(state, 32);
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-	closure->function = (BcFunctionRef) {.module = module, .index = 0};
+	closure->function = (elf_PrototypeRef) {.program = module, .index = 0};
 	push_value(state, value_from_closure(closure));
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
@@ -738,8 +738,8 @@ static void test_api_links_compiled_module_into_multiple_states(void)
 		test_fail("link test arranges different global slots in each runtime state");
 	}
 
-	elf_Module *first_module = elf_link_module(first, compiled_module);
-	elf_Module *second_module = elf_link_module(second, compiled_module);
+	elf_Program *first_module = elf_link_module(first, compiled_module);
+	elf_Program *second_module = elf_link_module(second, compiled_module);
 	if (!first_module || !second_module) {
 		test_fail("one compiled module links into multiple runtime states");
 	}

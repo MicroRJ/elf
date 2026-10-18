@@ -2,13 +2,13 @@
 // See Copyright Notice In elf.h
 //
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, BcFunctionRef function_ref, elf_Value *captures, elf_Closure *closure, int nargs, int nrets)
+static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_PrototypeRef function_ref, elf_Value *captures, elf_Closure *closure, int nargs, int nrets)
 {
 	ASSERT(nargs >= 0);
 	ASSERT(nrets >= 0);
 	state->vm_closure_calls += 1;
 
-	BcFunction *function = bc_function_from_ref(function_ref);
+	elf_Prototype *function = prototype_from_ref(function_ref);
 	ASSERT(captures || function->captures == 0);
 	u32 argument_count = (u32)nargs;
 	elf_Value *frame_base = state->stack_ptr - argument_count;
@@ -30,7 +30,7 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 	ASSERT(register_offset + function->stack_size <= frame_size);
 	value_zero_many(frame_base + clear_start, frame_size - clear_start);
 
-	frame->module = function_ref.module;
+	frame->program = function_ref.program;
 	frame->function = function;
 	frame->framesize = frame_size;
 	frame->framebase = frame_base;
@@ -164,9 +164,9 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static elf_Closure *vm_new_closure(elf_State *state, BcFunctionRef function_ref, elf_Value *captures)
+static elf_Closure *vm_new_closure(elf_State *state, elf_PrototypeRef function_ref, elf_Value *captures)
 {
-	BcFunction *function = bc_function_from_ref(function_ref);
+	elf_Prototype *function = prototype_from_ref(function_ref);
 	u32 size = sizeof(elf_Closure) + sizeof(elf_Value) * function->captures;
 	elf_Closure *closure = (elf_Closure *)elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
 	closure->function = function_ref;
@@ -190,9 +190,9 @@ static int run_bytecode_frame(elf_State *state)
 
 activate_frame:
 	StackFrame *frame = state->frame;
-	ASSERT(frame->module && frame->function);
-	elf_Module *module = frame->module;
-	BcFunction *function = frame->function;
+	ASSERT(frame->program && frame->function);
+	elf_Program *module = frame->program;
+	elf_Prototype *function = frame->function;
 	elf_Value *framebase = frame->framebase;
 	elf_Value *reference = frame->reference;
 	elf_Value *captures = frame->captures;
@@ -254,12 +254,12 @@ activate_frame:
 			case BC_CALL: {
 				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
 				ASSERT(byte.b_y >= 0);
-				BcFunctionRef function_ref = {
-					.module = module,
+				elf_PrototypeRef function_ref = {
+					.program = module,
 					.index = (u32)byte.b_y,
 				};
-				ASSERT(bc_function_ref_is_valid(function_ref));
-				ASSERT(bc_function_from_ref(function_ref)->captures == 0);
+				ASSERT(prototype_ref_is_valid(function_ref));
+				ASSERT(prototype_from_ref(function_ref)->captures == 0);
 				state->stack_ptr = reference + byte.b_x + byte.b_z + 1;
 				push_stack_frame(state);
 				prepare_bytecode_stack_frame(state, state->frame, function_ref, 0, 0, byte.b_z, byte.b_w);
@@ -368,11 +368,11 @@ activate_frame:
 
 			case BC_CLOSURE: {
 				ASSERT(byte.b_y >= 0);
-				BcFunctionRef function = {
-					.module = module,
+				elf_PrototypeRef function = {
+					.program = module,
 					.index  = (u32)byte.b_y,
 				};
-				ASSERT(bc_function_ref_is_valid(function));
+				ASSERT(prototype_ref_is_valid(function));
 
 				elf_Value *result = vm_slot(reference, byte.b_x);
 				elf_Closure *new_closure = vm_new_closure(state, function, result);
