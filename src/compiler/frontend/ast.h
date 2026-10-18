@@ -111,14 +111,10 @@ struct Ast_T
 {
 	Ast_Kind             kind;
 	SourceSite           site;
-	// TODO(RJ): probably remove this entirely
-	struct Com_Source *source;
 
-	// NOTE(RJ): this is populated by the checker, it is the only mutable field, this is to avoid keeping
-	// a side table, it's way more convenient ... but the parser itself SHOULD not know nor rely on the
-	// entity or checker!
-	// Any tree that has a name or is associated or references a name gets the unique entity for that name.
-	struct Entity *entity;
+	// Todo, remove this entirely
+	struct Com_Source *source;
+	struct Entity     *entity;
 
 	union
 	{

@@ -11,6 +11,8 @@
 #include "token.h"
 #include "ast.h"
 #include "parser.h"
+#include "checker.h"
+#include "entity.h"
 #include "ir.h"
 #include "ir_emitter.h"
 #include "bytecode.h"
@@ -39,8 +41,8 @@ static void test_fail(const char *label)
 #include "lexer_tests.c"
 #include "parser_tests.c"
 #include "unparse_tests.c"
-#if 0
 #include "ir_tests.c"
+#if 0
 #include "backend_tests.c"
 #endif
 #include "vm_tests.c"
@@ -66,6 +68,7 @@ int main(void)
 	run_lexer_tests(state);
 	run_parser_tests(state);
 	run_unparse_tests(state);
+	run_ir_tests(state);
 
 	elf_destroy_state(state);
 

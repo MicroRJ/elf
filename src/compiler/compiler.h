@@ -11,6 +11,7 @@
 typedef struct Compiler Compiler;
 typedef u32 Com_SourceId;
 
+// Status for control flow based exception handling, it'll probably take a while to fully cover everything ...
 typedef enum
 {
 	COM_STATUS_OK = 0,
@@ -19,17 +20,19 @@ typedef enum
 }
 Com_Status;
 
+// Compiler wide diagnostic messages
 typedef struct Com_Message Com_Message;
 struct Com_Message
 {
-	Com_Message *next;
-	ErrorCode code;
+	Com_Message   *next;
+	ErrorCode     code;
 	ErrorSeverity severity;
-	ErrorPhase phase;
-	SourceSite site;
-	elf_StrSlice text;
+	ErrorPhase    phase;
+	SourceSite    site;
+	elf_StrSlice  text;
 };
 
+// Diagnostic message container
 typedef struct
 {
 	Com_Message *first;
