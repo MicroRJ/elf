@@ -439,7 +439,7 @@ static Atom *lex_identifier(Lexer *lexer)
 	return atom_from_data_size(lexer->atoms, start, size);
 }
 
-static Com_Status lex_string_segment(Lexer *lexer, SourceSite site, char quote, b32 is_block, b32 is_format, b32 *ended, Atom **out_atom)
+static Com_Status lex_string_segment(Lexer *lexer, SourceSite site, b32 is_format, b32 *ended, Atom **out_atom)
 {
 	if (ended) {
 		*ended = false;
@@ -460,21 +460,13 @@ static Com_Status lex_string_segment(Lexer *lexer, SourceSite site, char quote, 
 		int current = lexer_peek(lexer, 0);
 		if (current == LEXER_EOF)
 		{
-			error = lexer_errorf(lexer, ERROR_UNTERMINATED_STRING, site, is_block ? "unterminated string block" : "unterminated string");
+			error = lexer_errorf(lexer, ERROR_UNTERMINATED_STRING, site, "unterminated string");
 		}
 		else if (current == 0)
 		{
 			error = lexer_errorf(lexer, ERROR_NUL_BYTE_IN_SOURCE, lexer_source_site(lexer), "NUL byte in source");
 		}
-		else if (is_block && current == quote && lexer_peek(lexer, 1) == quote && lexer_peek(lexer, 2) == quote)
-		{
-			lexer->cursor += 3;
-			if (ended) {
-				*ended = true;
-			}
-			break;
-		}
-		else if (!is_block && current == quote)
+		else if (current == '"')
 		{
 			lexer->cursor += 1;
 			if (ended) {
@@ -487,23 +479,9 @@ static Com_Status lex_string_segment(Lexer *lexer, SourceSite site, char quote, 
 			lexer->cursor += 2;
 			break;
 		}
-		else if (!is_block && (current == '\n' || current == '\r'))
+		else if (current == '\n' || current == '\r')
 		{
-			error = lexer_errorf(lexer, ERROR_NEWLINE_IN_STRING, lexer_source_site(lexer), "newline in string; use \\n or a string block");
-		}
-		else if (current == '\r')
-		{
-			lexer->cursor += 1;
-			if (lexer_peek(lexer, 0) == '\n') {
-				lexer->cursor += 1;
-			}
-			lexer_advance_line(lexer);
-			*out++ = '\n';
-		}
-		else if (current == '\n') {
-			lexer->cursor += 1;
-			lexer_advance_line(lexer);
-			*out++ = '\n';
+			error = lexer_errorf(lexer, ERROR_NEWLINE_IN_STRING, lexer_source_site(lexer), "newline in string; use \\n");
 		}
 		else if (current == '\\')
 		{
@@ -633,7 +611,7 @@ static Com_Status token_array_push(Token_Array *tokens, Arena *arena, Token toke
 
 static Com_Status lexer_emit_token(Lexer *lexer);
 
-static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b32 is_block)
+static Com_Status lexer_format_string(Lexer *lexer, Token opening)
 {
 	u32 token_start = lexer->tokens->count;
 	u32 interpolation_count = 0;
@@ -651,7 +629,7 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 	{
 		b32 ended = false;
 		Atom *atom = 0;
-		error = lex_string_segment(lexer, opening.site, quote, is_block, true, &ended, &atom);
+		error = lex_string_segment(lexer, opening.site, true, &ended, &atom);
 		if (error != COM_STATUS_OK) {
 			break;
 		}
@@ -682,7 +660,7 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 			{
 				Token end = {
 					.type = TOK_INTERPOLATION_END,
-					.site = source_site_from_ptr(lexer, lexer->cursor - (is_block ? 3 : 1)),
+					.site = source_site_from_ptr(lexer, lexer->cursor - 1),
 				};
 				error = token_array_push(lexer->tokens, lexer->scratch_arena, end);
 			}
@@ -764,12 +742,10 @@ static Com_Status lexer_emit_token(Lexer *lexer)
 		case 'v': case 'w': case 'x': case 'y': case 'z':
 		case '_':
 		{
-			u32 quote = lexer_peek(lexer, 1);
-			if (lexer_peek(lexer, 0) == 'f' && (quote == '"' || quote == '`'))
+			if (lexer_peek(lexer, 0) == 'f' && lexer_peek(lexer, 1) == '"')
 			{
-				b32 is_block = lexer_peek(lexer, 2) == quote && lexer_peek(lexer, 3) == quote;
-				lexer->cursor += 2 + is_block * 2;
-				error = lexer_format_string(lexer, token, (char)quote, is_block);
+				lexer->cursor += 2;
+				error = lexer_format_string(lexer, token);
 				return error;
 			}
 			else
@@ -840,13 +816,10 @@ static Com_Status lexer_emit_token(Lexer *lexer)
 			}
 		} break;
 
-		case '`':
 		case '"':
 		{
-			char quote = (char)lexer_peek(lexer, 0);
-			b32 is_block = lexer_peek(lexer, 1) == quote && lexer_peek(lexer, 2) == quote;
-			lexer->cursor += is_block ? 3 : 1;
-			error = lex_string_segment(lexer, token.site, quote, is_block, false, 0, &token.atom);
+			lexer->cursor += 1;
+			error = lex_string_segment(lexer, token.site, false, 0, &token.atom);
 			if (error == COM_STATUS_OK) {
 				token.type = TOK_STRING;
 			}

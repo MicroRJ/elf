@@ -94,8 +94,6 @@ test_assert("  alpha\r\n  beta":dedent() == "alpha\r\nbeta")
 test_assert("plain":dedent() == "plain")
 
 dedent_name := "elf"
-test_assert(f"""
-    hello ${dedent_name}
-""":dedent() == "hello elf")
+test_assert(f"\n    hello ${dedent_name}\n":dedent() == "hello elf")
 
 ret 94

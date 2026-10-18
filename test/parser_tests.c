@@ -705,12 +705,12 @@ static void test_parser_line_boundaries(elf_State *state)
 		"operator after newline unary expression");
 	expect_ast_i64(unary_value, 4, "operator after newline unary value");
 
-	file = parser_test_parse_file(state, "ret \"\"\"one\ntwo\"\"\":trim()\nret target\n(value)");
+	file = parser_test_parse_file(state, "ret \"one\\ntwo\":trim()\nret target\n(value)");
 
-	first_return = parser_test_stat(file, 0, AST_RETURN, "postfix follows multiline token");
+	first_return = parser_test_stat(file, 0, AST_RETURN, "postfix follows string token");
 	Ast call = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_CALL,
-		"postfix call follows multiline token");
-	expect_ast_kind(call ? call->call.expr : 0, AST_META_FIELD, "multiline token keeps metafield postfix");
+		"postfix call follows string token");
+	expect_ast_kind(call ? call->call.expr : 0, AST_META_FIELD, "string token keeps metafield postfix");
 
 	second_return = parser_test_stat(file, 1, AST_RETURN, "newline ends postfix chain");
 	Ast target = parser_test_tuple_item(second_return->return_stat.expr, 0, AST_IDENT,

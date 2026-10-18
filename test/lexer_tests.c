@@ -338,11 +338,17 @@ static void test_lexer_strings(elf_State *state)
 	expect_token_type(second_string, TOK_STRING, "lex second non-joined string");
 	expect_token_atom(second_string, "b", "second non-joined string payload");
 
-	Parser block = lexer_test_parser(state, "\"\"\"a\nb\"\"\"");
+	Parser multiline = lexer_test_parser(state, "\"a\nb\"");
+	expect_token_type(lexer_next(&multiline), TOK_ERROR, "reject newline in string");
+	if (!multiline.source->report.first || multiline.source->report.first->code != ERROR_NEWLINE_IN_STRING) {
+		test_fail("newline in string reports its compiler error code");
+	}
 
-	Token block_string = lexer_next(&block);
-	expect_token_type(block_string, TOK_STRING, "lex string block");
-	expect_token_atom(block_string, "a\nb", "string block string payload");
+	Parser backtick = lexer_test_parser(state, "`text`");
+	expect_token_type(lexer_next(&backtick), TOK_ERROR, "reject backtick string");
+	if (!backtick.source->report.first || backtick.source->report.first->code != ERROR_UNEXPECTED_CHARACTER) {
+		test_fail("backtick string reports an unexpected character");
+	}
 
 	Parser format = lexer_test_parser(state, "f\"hello ${name}\" f\"plain\"");
 
@@ -403,27 +409,6 @@ static void test_lexer_format_string_parts(elf_State *state)
 	if (many_part_count != 23) {
 		test_fail("formatted string grows the lexer token buffer");
 	}
-
-	Parser block = lexer_test_parser(state, "f\"\"\"top ${value}\r\nbottom\"\"\"");
-
-	Token block_start = lexer_next_interpolation_start(&block, "lex format string block start");
-	expect_token_atom(block_start, "top ", "format string block leading text");
-	expect_token_atom(lexer_next(&block), "value", "format string block interpolation identifier");
-
-	Token block_end = lexer_next_interpolation_end(&block, "lex format string block end");
-	expect_token_atom(block_end, "\nbottom", "format string block normalizes newline");
-
-	Parser backtick_block = lexer_test_parser(state, "f```<a href=\"${url}\">${label}</a>```");
-
-	Token backtick_start = lexer_next_interpolation_start(&backtick_block, "lex backtick format block start");
-	expect_token_atom(backtick_start, "<a href=\"", "backtick block keeps double quotes");
-	expect_token_atom(lexer_next(&backtick_block), "url", "backtick block first interpolation");
-	Token backtick_part = lexer_next(&backtick_block);
-	expect_token_type(backtick_part, TOK_STRING, "lex backtick format block part");
-	expect_token_atom(backtick_part, "\">", "backtick block middle text");
-	expect_token_atom(lexer_next(&backtick_block), "label", "backtick block second interpolation");
-	Token backtick_end = lexer_next_interpolation_end(&backtick_block, "lex backtick format block end");
-	expect_token_atom(backtick_end, "</a>", "backtick block trailing text");
 
 	Parser string_expr = lexer_test_parser(state, "f\"value ${\"text\"} done\"");
 
@@ -488,30 +473,18 @@ static void test_lexer_format_string_parts(elf_State *state)
 	expect_token_atom(restored_next, "next", "token after restored normal mode payload");
 	expect_token_type(lexer_next(&restored), TOK_NONE, "restored mode source consumed completely");
 
-	Parser nested_format = lexer_test_parser(state, "f\"\"\"outer ${f\"inner ${value}\"} tail\"\"\"");
+	Parser nested_format = lexer_test_parser(state, "f\"outer ${f\"inner ${value}\"} tail\"");
 
-	Token outer_start = lexer_next_interpolation_start(&nested_format, "lex outer format block start");
-	expect_token_atom(outer_start, "outer ", "outer format block leading text");
+	Token outer_start = lexer_next_interpolation_start(&nested_format, "lex outer format string start");
+	expect_token_atom(outer_start, "outer ", "outer format string leading text");
 	Token inner_start = lexer_next_interpolation_start(&nested_format, "lex nested format string start");
 	expect_token_atom(inner_start, "inner ", "nested format string leading text");
 	expect_token_type(lexer_next(&nested_format), TOK_IDENTIFIER, "lex nested format interpolation value");
 	Token inner_end = lexer_next_interpolation_end(&nested_format, "lex nested format string end");
 	expect_token_atom(inner_end, "", "nested format string trailing text");
-	Token outer_end = lexer_next_interpolation_end(&nested_format, "restore outer block format mode");
-	expect_token_atom(outer_end, " tail", "outer format block trailing text");
+	Token outer_end = lexer_next_interpolation_end(&nested_format, "restore outer format string mode");
+	expect_token_atom(outer_end, " tail", "outer format string trailing text");
 	expect_token_type(lexer_next(&nested_format), TOK_NONE, "nested format source consumes outer delimiter");
-
-	Parser tracked_block = lexer_test_parser(state, "f\"\"\"first\n${value}\nlast\"\"\"\nnext");
-
-	Token tracked_start = lexer_next_interpolation_start(&tracked_block, "lex tracked format block start");
-	expect_token_line(&tracked_block, tracked_start, 1, "f\"\"\"first", "format block start line");
-	Token tracked_value = lexer_next(&tracked_block);
-	expect_token_line(&tracked_block, tracked_value, 2, "${value}", "format block interpolation line");
-	Token tracked_end = lexer_next_interpolation_end(&tracked_block, "lex tracked format block end");
-	expect_token_line(&tracked_block, tracked_end, 2, "${value}", "format block end token begins at interpolation close");
-	Token tracked_next = lexer_next(&tracked_block);
-	expect_token_type(tracked_next, TOK_IDENTIFIER, "lex token after multiline format block");
-	expect_token_line(&tracked_block, tracked_next, 4, "next", "line after multiline format block");
 }
 
 static void test_lexer_line_slices(elf_State *state)
@@ -539,7 +512,7 @@ static void test_lexer_line_slices(elf_State *state)
 
 static void test_lexer_line_tracking_through_skipped_text(elf_State *state)
 {
-	const char *source = "alpha\n/* block\n comment */\n\"\"\"one\ntwo\"\"\"\nnext";
+	const char *source = "alpha\n/* block\n comment */\n\"one\\ntwo\"\nnext";
 	Parser parser = lexer_test_parser(state, source);
 
 	Token alpha = lexer_next(&parser);
@@ -547,17 +520,17 @@ static void test_lexer_line_tracking_through_skipped_text(elf_State *state)
 	expect_token_site(&parser, alpha, 0, "tracked first token site");
 	expect_token_line(&parser, alpha, 1, "alpha", "tracked first token line");
 
-	Token block = lexer_next(&parser);
-	expect_token_type(block, TOK_STRING, "lex tracked string block token");
-	expect_token_site(&parser, block, 27, "tracked string block site");
-	expect_token_site_size(block, 13, "tracked string block site size");
-	expect_token_line(&parser, block, 4, "\"\"\"one", "tracked string block starting line");
-	expect_token_atom(block, "one\ntwo", "tracked string block payload");
+	Token string = lexer_next(&parser);
+	expect_token_type(string, TOK_STRING, "lex tracked string token");
+	expect_token_site(&parser, string, 27, "tracked string site");
+	expect_token_site_size(string, 10, "tracked string site size");
+	expect_token_line(&parser, string, 4, "\"one\\ntwo\"", "tracked string line");
+	expect_token_atom(string, "one\ntwo", "tracked string payload");
 
 	Token next = lexer_next(&parser);
-	expect_token_type(next, TOK_IDENTIFIER, "lex tracked token after string block");
-	expect_token_site(&parser, next, 41, "tracked token after string block site");
-	expect_token_line(&parser, next, 6, "next", "tracked token after string block line");
+	expect_token_type(next, TOK_IDENTIFIER, "lex tracked token after string");
+	expect_token_site(&parser, next, 38, "tracked token after string site");
+	expect_token_line(&parser, next, 5, "next", "tracked token after string line");
 }
 
 static void test_lexer_line_breaks(elf_State *state)
@@ -583,21 +556,21 @@ static void test_lexer_line_breaks(elf_State *state)
 	Token zeta = lexer_next(&parser);
 	expect_token_line_break(zeta, true, "line comment newline marks the next token");
 
-	Parser block = lexer_test_parser(state, "\"\"\"one\ntwo\"\"\":trim\nnext");
+	Parser string_parser = lexer_test_parser(state, "\"one\\ntwo\":trim\nnext");
 
-	Token string = lexer_next(&block);
-	expect_token_type(string, TOK_STRING, "lex multiline token for line break test");
-	expect_token_line_break(string, false, "multiline token has no leading line break");
+	Token string = lexer_next(&string_parser);
+	expect_token_type(string, TOK_STRING, "lex escaped newline string for line break test");
+	expect_token_line_break(string, false, "string has no leading line break");
 
-	Token colon = lexer_next(&block);
+	Token colon = lexer_next(&string_parser);
 	expect_token_type(colon, TOK_COLON, "lex postfix after multiline token");
-	expect_token_line_break(colon, false, "newline inside token does not break following postfix");
+	expect_token_line_break(colon, false, "escaped newline does not break following postfix");
 
-	Token trim = lexer_next(&block);
+	Token trim = lexer_next(&string_parser);
 	expect_token_type(trim, TOK_IDENTIFIER, "lex field after multiline token");
 	expect_token_line_break(trim, false, "same-line field has no leading line break");
 
-	Token next = lexer_next(&block);
+	Token next = lexer_next(&string_parser);
 	expect_token_type(next, TOK_IDENTIFIER, "lex token on line after multiline token");
 	expect_token_line_break(next, true, "newline after multiline token marks next token");
 }
