@@ -78,7 +78,7 @@ static u32 call_native_function(elf_State *state, elf_Function function, u32 nar
 
 	if (returned_count < 0 || pushed_count < returned_count)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "invalid number of returns from function: %i, however the function pushed: %i", returned_count, pushed_count);
+		elf_report_runtime_error(state, ERROR_INVALID_RETURN_COUNT, "invalid number of returns from function: %i, however the function pushed: %i", returned_count, pushed_count);
 	}
 
 	i32 copied_return_count = MIN(returned_count, (i32)nrets);
@@ -109,26 +109,26 @@ static inline void pop_stack_frame(elf_State *state)
 
 static void vm_error_invalid_operands(elf_State *state, BcType op, elf_Value left, elf_Value right)
 {
-	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "%s: invalid operands '%s' and '%s'",
+	elf_report_runtime_error(state, ERROR_TYPE_MISMATCH, "%s: invalid operands '%s' and '%s'",
 		bytecode_type_name(op), value_type_name(left.type), value_type_name(right.type));
 }
 
 static void vm_error_cannot_call(elf_State *state, elf_Value value)
 {
-	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "cannot call '%s'", value_type_name(value.type));
+	elf_report_runtime_error(state, ERROR_EXPECTED_CALLABLE, "cannot call '%s'", value_type_name(value.type));
 }
 
 static void vm_error_invalid_field_arguments(elf_State *state, elf_Value object, elf_Value field)
 {
-	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "cannot get field '%s' from '%s'",
+	elf_report_runtime_error(state, ERROR_TYPE_MISMATCH, "cannot get field '%s' from '%s'",
 		value_type_name(field.type),
 		value_type_name(object.type));
 }
 
-static inline u32 vm_check_index(elf_State *state, int instr, elf_Value value, u32 count)
+static inline u32 vm_check_index(elf_State *state, elf_Value value, u32 count)
 {
 	check_value_type(state, value, ELF_VALUE_TYPE_INTEGER);
-	return check_array_index(state, instr, value_as_integer(value), count);
+	return check_array_index(state, value_as_integer(value), count);
 }
 
 static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left, elf_Value right)
@@ -207,7 +207,6 @@ activate_frame:
 	{
 		int instr = instruction;
 		int next_instruction = instr + 1;
-		int byte_index = byte_offset + instr;
 		// TODO(RJ): consider caching this
 		frame->instruction = instruction;
 
@@ -386,7 +385,7 @@ activate_frame:
 				elf_Value field = *vm_slot(reference, byte.b_z);
 
 				if (value_is_nil(field)) {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid field");
+					elf_report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "nil is not a valid field");
 				}
 
 				switch (object.type) {
@@ -411,22 +410,22 @@ activate_frame:
 
 				if (value_is_table(table)) {
 					if (value_is_nil(key)) {
-						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "key is nil...");
+						elf_report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "key is nil...");
 					}
 
 					elf_table_set(state, value_as_table(table), key, value);
 				}
 				else if (value_is_user(table)) {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "overload not implemented");
+					elf_report_runtime_error(state, ERROR_NOT_IMPLEMENTED, "overload not implemented");
 				}
 				else if (value_is_string(table)) {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "strings are readonly, you may not change them");
+					elf_report_runtime_error(state, ERROR_READONLY, "strings are readonly, you may not change them");
 				}
 				else if (value_is_error(table)) {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "errors are readonly, you may not change them");
+					elf_report_runtime_error(state, ERROR_READONLY, "errors are readonly, you may not change them");
 				}
 				else {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "attempted to set field of '%s' value", value_type_name(table.type));
+					elf_report_runtime_error(state, ERROR_TYPE_MISMATCH, "attempted to set field of '%s' value", value_type_name(table.type));
 				}
 			} break;
 
@@ -437,28 +436,28 @@ activate_frame:
 
 				if (value_is_array(object)) {
 					elf_Array *array = value_as_array(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_array_length(array));
+					u32 index = vm_check_index(state, index_value, elf_array_length(array));
 					value_copy(result, elf_array_get(state, array, index));
 				}
 				else if (value_is_table(object)) {
 					if (value_is_nil(index_value))
 					{
-						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid table key");
+						elf_report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "nil is not a valid table key");
 					}
 					value_copy(result, elf_table_get_or_nil(state, value_as_table(object), index_value));
 				}
 				else if (value_is_string(object)) {
 					elf_String *string = value_as_string(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_string_size(string));
+					u32 index = vm_check_index(state, index_value, elf_string_size(string));
 					*result = value_from_integer((u8)elf_string_data(string)[index]);
 				}
 				else if (value_is_buffer(object)) {
 					elf_ByteBuffer *buffer = value_as_buffer(object);
-					u32 index = vm_check_index(state, byte_index, index_value, buffer->size);
+					u32 index = vm_check_index(state, index_value, buffer->size);
 					*result = value_from_integer(buffer->data[index]);
 				}
 				else {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+					elf_report_runtime_error(state, ERROR_TYPE_MISMATCH,
 						"cannot index '%s' value", value_type_name(object.type));
 				}
 			} break;
@@ -470,26 +469,26 @@ activate_frame:
 				if (value_is_array(object))
 				{
 					elf_Array *array = value_as_array(object);
-					u32 index = vm_check_index(state, byte_index, index_value, elf_array_length(array));
+					u32 index = vm_check_index(state, index_value, elf_array_length(array));
 					elf_array_set(state, array, index, assigned);
 				}
 				else if (value_is_table(object))
 				{
 					if (value_is_nil(index_value))
 					{
-						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "nil is not a valid table key");
+						elf_report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "nil is not a valid table key");
 					}
 					elf_table_set(state, value_as_table(object), index_value, assigned);
 				}
 				else if (value_is_buffer(object))
 				{
 					elf_ByteBuffer *buffer = value_as_buffer(object);
-					u32 index = vm_check_index(state, byte_index, index_value, buffer->size);
+					u32 index = vm_check_index(state, index_value, buffer->size);
 					check_value_type(state, assigned, ELF_VALUE_TYPE_INTEGER);
 					i64 value = value_as_integer(assigned);
 					if (value < 0 || value > UINT8_MAX)
 					{
-						elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+						elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 							"buffer byte is out of range: %lld", value);
 					}
 					buffer_require_writable(state, buffer);
@@ -497,7 +496,7 @@ activate_frame:
 				}
 				else
 				{
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index,
+					elf_report_runtime_error(state, ERROR_TYPE_MISMATCH,
 						"cannot assign through index of '%s' value", value_type_name(object.type));
 				}
 			} break;
@@ -517,7 +516,7 @@ activate_frame:
 				}
 				else
 				{
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "cannot measure '%s' value", value_type_name(value.type));
+					elf_report_runtime_error(state, ERROR_TYPE_MISMATCH, "cannot measure '%s' value", value_type_name(value.type));
 				}
 			} break;
 
@@ -526,7 +525,7 @@ activate_frame:
 				elf_Table *metatable = elf_get_type_metatable(state, value);
 
 				if (!metatable) {
-					elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "'%s': required metatable for metafield lookup", value_type_name(value.type));
+					elf_report_runtime_error(state, ERROR_MISSING_METATABLE, "'%s': required metatable for metafield lookup", value_type_name(value.type));
 				}
 
 				value_copy(vm_slot(reference, byte.b_x), elf_table_get_or_nil(state, metatable, *vm_slot(reference, byte.b_z)));
@@ -649,10 +648,10 @@ activate_frame:
 						i64 dividend = value_as_integer(left);
 						i64 divisor = value_as_integer(right);
 						if (divisor == 0) {
-							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "integer division by zero");
+							elf_report_runtime_error(state, ERROR_DIVISION_BY_ZERO, "integer division by zero");
 						}
 						if (dividend == INT64_MIN && divisor == -1) {
-							elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, byte_index, "integer division overflow: minimum integer divided by -1");
+							elf_report_runtime_error(state, ERROR_OUT_OF_RANGE, "integer division overflow: minimum integer divided by -1");
 						}
 						*vm_slot(reference, byte.b_x) = value_from_integer(dividend / divisor);
 					}
@@ -758,7 +757,7 @@ activate_frame:
 			} break;
 
 			default: {
-				elf_report_runtime_error(state, RUNTIME_ERROR_UNKNOWN_BYTECODE, NO_BYTE, "'%s' unknown bytecode", bytecode_type_name(byte.b_type));
+				elf_report_runtime_error(state, ERROR_UNKNOWN_BYTECODE, "'%s' unknown bytecode", bytecode_type_name(byte.b_type));
 			} break;
 		}
 		instruction = next_instruction;
@@ -792,7 +791,7 @@ u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)
 	}
 	else
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, NO_BYTE, "'%s' cannot be called", value_type_name(value.type));
+		elf_report_runtime_error(state, ERROR_EXPECTED_CALLABLE, "'%s' cannot be called", value_type_name(value.type));
 	}
 
 	ASSERT(state->frame == frame);
@@ -803,13 +802,13 @@ u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
 {
 	if (nargs < 1)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_INVALID_ARGUMENT_COUNT, NO_BYTE, "invalid number of arguments, expected at least one");
+		elf_report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "invalid number of arguments, expected at least one");
 	}
 	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
 	elf_Value callee = *(state->stack_ptr - nargs - 1);
 	if (!value_is_callable(callee))
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_EXPECTS_CALLABLE, NO_BYTE, "'%s' cannot be called", value_type_name(callee.type));
+		elf_report_runtime_error(state, ERROR_EXPECTED_CALLABLE, "'%s' cannot be called", value_type_name(callee.type));
 	}
 
 	push_stack_frame(state);

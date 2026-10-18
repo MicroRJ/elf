@@ -229,7 +229,7 @@ static void test_lexer_macros(elf_State *state)
 	if (invalid.compiler->report.error_count != 1) {
 		test_fail("invalid macro reports one error");
 	}
-	if (!invalid.compiler->report.first || invalid.compiler->report.first->error != COM_ERROR_EXPECTED_MACRO_NAME) {
+	if (!invalid.compiler->report.first || invalid.compiler->report.first->code != ERROR_EXPECTED_MACRO_NAME) {
 		test_fail("invalid macro records its compiler error code");
 	}
 }

@@ -48,7 +48,7 @@ static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, A
 	if (existing)
 	{
 		ASSERT(tree);
-		compiler_report(checker->compiler, COM_ERROR_DUPLICATE_DECLARATION, COMPILER_ERROR, COMPILER_PHASE_EVALUATION, tree->site, "'%s' is already declared in this scope", atom_data(name));
+		compiler_report(checker->compiler, ERROR_DUPLICATE_DECLARATION, ERROR_ERROR, ERROR_PHASE_CHECKER, tree->site, "'%s' is already declared in this scope", atom_data(name));
 		return existing;
 	}
 

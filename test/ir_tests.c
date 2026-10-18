@@ -575,7 +575,7 @@ static void test_ir_rejects_runtime_static_function_default(elf_State *state)
 	log_set_hook(ignore_expected_lowering_error, 0);
 	IrEmitter *emitter = ir_test_lower_source(state, &arena, "bad :: fun(value = runtime_default()) { ret value }\nret bad");
 	log_set_hook(0, 0);
-	if (!emitter || emitter->module->compiler->report.error_count != 1 || emitter->module->compiler->report.first->phase != COMPILER_PHASE_EVALUATION) {
+	if (!emitter || emitter->module->compiler->report.error_count != 1 || emitter->module->compiler->report.first->phase != ERROR_PHASE_CHECKER) {
 		test_fail("runtime static function default reports one evaluation error");
 	}
 	arena_destroy(&arena);

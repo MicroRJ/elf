@@ -6,8 +6,7 @@
 #define ELF_CORE_H
 
 #include "base.h"
-
-#define NO_BYTE (-1)
+#include "error.h"
 
 #include "bytecode.h"
 
@@ -258,17 +257,6 @@ struct elf_State
 	metatables;
 };
 
-// TODO(RJ): remove this!
-typedef enum
-{
-	RUNTIME_ERROR_NONE = 0,
-	RUNTIME_ERROR_GENERIC,
-	RUNTIME_ERROR_EXPECTS_CALLABLE,
-	RUNTIME_ERROR_INVALID_ARGUMENT_COUNT,
-	RUNTIME_ERROR_UNKNOWN_BYTECODE
-}
-RuntimeErrorType;
-
 #define ELF_OBJECT_REACHABLE 1
 #define ELF_OBJECT_READONLY  2
 #define ELF_GC_NEXT_MIN ((u32)MEGABYTES(1))
@@ -317,7 +305,7 @@ void elf_globals_set_by_name(elf_Globals *globals, elf_StrSlice name, elf_Value 
 elf_Value elf_globals_get_by_slot(elf_Globals *globals, u32 slot);
 void elf_globals_set_by_slot(elf_Globals *globals, u32 slot, elf_Value value);
 
-void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...);
+void elf_report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);
 void elf_print_current_runtime_source_location(elf_State *state);
 
 #include "elf_helpers.h"

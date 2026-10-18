@@ -21,7 +21,7 @@ static b32 buffer_normalize_index(elf_State *state, i64 index, u32 size,
 	i64 upper = allow_end ? size : (i64)size - 1;
 	if (index < 0 || index > upper)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 			"buffer index %lld is out of bounds for length %u", index, size);
 		return false;
 	}
@@ -34,7 +34,7 @@ static u32 buffer_load_size(elf_State *state, u32 argument, const char *operatio
 	i64 size = lib_load_integer(state, argument);
 	if (size < 0 || (u64)size > UINT32_MAX)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 			"%s size is out of range: %lld", operation, size);
 		return 0;
 	}
@@ -114,7 +114,7 @@ ELF_FUNCTION(l_buffer_append)
 	}
 	else
 	{
-		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, ERROR_TYPE_MISMATCH,
 			"buffer append expected string or buffer, got '%s'",
 			value_type_name(source.type));
 		return 0;
@@ -148,7 +148,7 @@ ELF_FUNCTION(l_buffer_splice)
 	}
 	else
 	{
-		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, ERROR_TYPE_MISMATCH,
 			"buffer splice expected string or buffer, got '%s'",
 			value_type_name(replacement.type));
 		return 0;
@@ -177,7 +177,7 @@ ELF_FUNCTION(l_buffer_set)
 	i64 byte = lib_load_integer(S, 2);
 	if (byte < 0 || byte > UINT8_MAX)
 	{
-		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE,
 			"buffer byte is out of range: %lld", byte);
 		return 0;
 	}
@@ -197,7 +197,7 @@ ELF_FUNCTION(l_buffer_slice)
 	if (nargs > 2 && !buffer_normalize_index(S, lib_load_integer(S, 2), buffer->size, true, &end)) return 0;
 	if (end < first)
 	{
-		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE,
 			"buffer slice end %u precedes start %u", end, first);
 		return 0;
 	}

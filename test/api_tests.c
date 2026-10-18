@@ -510,7 +510,7 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("API rejects embedded NUL source bytes");
 	}
 	report = &compiler->report;
-	if (elf_get_top(state) != sentinel_top || report->error_count != 1 || report->first->phase != COMPILER_PHASE_LEXER || !api_slice_contains(report->first->text, "NUL byte")) {
+	if (elf_get_top(state) != sentinel_top || report->error_count != 1 || report->first->phase != ERROR_PHASE_LEXER || !api_slice_contains(report->first->text, "NUL byte")) {
 		test_fail("embedded NUL failure returns a lexer message");
 	}
 	scratch_end(compiler_scratch);
@@ -543,7 +543,7 @@ static void test_api_source_compilation(elf_State *state)
 	}
 
 	report = &compiler->report;
-	if (report->error_count == 0 || report->message_count == 0 || report->first->severity != COMPILER_ERROR || report->first->phase != COMPILER_PHASE_EVALUATION || report->first->site.source != 0 || report->first->site.line_index != 2 || source_slice_column(report->first->site) != 12 || !api_slice_contains(report->first->text, "not a constant expression")) {
+	if (report->error_count == 0 || report->message_count == 0 || report->first->severity != ERROR_ERROR || report->first->phase != ERROR_PHASE_CHECKER || report->first->site.source != 0 || report->first->site.line_index != 2 || source_slice_column(report->first->site) != 12 || !api_slice_contains(report->first->text, "not a constant expression")) {
 		test_fail("compiler reports constant-expression messages");
 	}
 	scratch_end(compiler_scratch);
@@ -558,7 +558,7 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("lexer failure leaves the stack unchanged");
 	}
 	report = &compiler->report;
-	if (report->error_count == 0 || report->message_count == 0 || report->first->phase != COMPILER_PHASE_LEXER || report->first->site.source != 0) {
+	if (report->error_count == 0 || report->message_count == 0 || report->first->phase != ERROR_PHASE_LEXER || report->first->site.source != 0) {
 		test_fail("compiler retains lexer messages");
 	}
 	scratch_end(compiler_scratch);
@@ -595,7 +595,7 @@ static void test_api_source_compilation(elf_State *state)
 		test_fail("failed code compilation publishes no partial module");
 	}
 	report = &compiler->report;
-	if (report->error_count != 1 || report->message_count != 1 || report->first->phase != COMPILER_PHASE_PARSER || report->first->site.source != 0) {
+	if (report->error_count != 1 || report->message_count != 1 || report->first->phase != ERROR_PHASE_PARSER || report->first->site.source != 0) {
 		test_fail("compiler retains the terminal code parser message");
 	}
 	u32 linked_message_count = 0;
@@ -634,7 +634,7 @@ static void test_api_source_compilation(elf_State *state)
 		elf_pop(state, 1);
 	}
 	report = &compiler->report;
-	if (report->error_count != 0 || report->warning_count != 1 || report->message_count != 1 || report->first->severity != COMPILER_WARNING || report->first->phase != COMPILER_PHASE_LOWERING || !api_slice_contains(report->first->text, "unreferenced entity")) {
+	if (report->error_count != 0 || report->warning_count != 1 || report->message_count != 1 || report->first->severity != ERROR_WARNING || report->first->phase != ERROR_PHASE_LOWERING || !api_slice_contains(report->first->text, "unreferenced entity")) {
 		test_fail("successful compilation retains lowering warnings");
 	}
 	scratch_end(compiler_scratch);

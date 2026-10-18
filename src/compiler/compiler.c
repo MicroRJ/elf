@@ -105,10 +105,10 @@ static elf_StrSlice compiler_format_message(Arena *arena, const char *format, va
 	return (elf_StrSlice) {message, (u64)message_size};
 }
 
-b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args)
+b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args)
 {
 	ASSERT(compiler);
-	ASSERT(error != COM_ERROR_NONE);
+	ASSERT(code != ERROR_NONE);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
 	if (!message.data) {
 		return false;
@@ -118,7 +118,7 @@ b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity,
 	if (!compiler_message) {
 		return false;
 	}
-	compiler_message->error = error;
+	compiler_message->code = code;
 	compiler_message->severity = severity;
 	compiler_message->phase = phase;
 	compiler_message->site = site;
@@ -134,11 +134,11 @@ b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity,
 	compiler->report.last = compiler_message;
 	compiler->report.message_count += 1;
 
-	if (severity == COMPILER_ERROR)
+	if (severity == ERROR_ERROR || severity == ERROR_FATAL)
 	{
 		compiler->report.error_count += 1;
 	}
-	else if (severity == COMPILER_WARNING)
+	else if (severity == ERROR_WARNING)
 	{
 		compiler->report.warning_count += 1;
 	}
@@ -151,8 +151,23 @@ void compiler_log_report(Compiler *compiler)
 	ASSERT(compiler);
 	for (Com_Message *message = compiler->report.first; message; message = message->next)
 	{
-		LogLevel level = message->severity == COMPILER_ERROR ? LOG_LEVEL_ERROR : message->severity == COMPILER_WARNING ? LOG_LEVEL_WARNING : LOG_LEVEL_INFO;
-		const char *severity_name = message->severity == COMPILER_ERROR ? "error" : message->severity == COMPILER_WARNING ? "warning" : "note";
+		LogLevel level = LOG_LEVEL_INFO;
+		const char *severity_name = "note";
+		if (message->severity == ERROR_FATAL)
+		{
+			level = LOG_LEVEL_FATAL;
+			severity_name = "fatal";
+		}
+		else if (message->severity == ERROR_ERROR)
+		{
+			level = LOG_LEVEL_ERROR;
+			severity_name = "error";
+		}
+		else if (message->severity == ERROR_WARNING)
+		{
+			level = LOG_LEVEL_WARNING;
+			severity_name = "warning";
+		}
 		SourceSite site = message->site;
 		Com_Source *source = compiler_source_from_id(compiler, site.source);
 		const char *source_name = source ? atom_data(source->name) : "<unknown>";
@@ -171,11 +186,11 @@ void compiler_log_report(Compiler *compiler)
 	}
 }
 
-b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...)
+b32 compiler_report(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	b32 result = compiler_reportv(compiler, error, severity, phase, site, format, args);
+	b32 result = compiler_reportv(compiler, code, severity, phase, site, format, args);
 	va_end(args);
 	return result;
 }
@@ -259,13 +274,13 @@ static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Ato
 	Com_Source *source = 0;
 	if (error)
 	{
-		compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "%s '%s'", error, atom_data(path_atom));
+		compiler_report(compiler, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%s '%s'", error, atom_data(path_atom));
 	}
 	else
 	{
 		source = compiler_alloc_source(compiler, path_atom, path_atom, (BcSourceBuffer) {.data = contents.data, .size = (u32)contents.size});
 		if (!source) {
-			compiler_report(compiler, COM_ERROR_SOURCE_PATH, COMPILER_ERROR, COMPILER_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
+			compiler_report(compiler, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
 		}
 	}
 	return source;

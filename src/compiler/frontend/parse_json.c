@@ -23,7 +23,7 @@ static Ast json_expect_separator_or_end(Parser *parser, Token_Type end, const ch
 		if (token_is_error(parser->tok)) {
 			return ast_from_token_error(parser->tok);
 		}
-		return parser_error(parser, COM_ERROR_EXPECTED_TOKEN, parser->tok.site, message);
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, message);
 	}
 	return NULL_AST;
 }
@@ -84,7 +84,7 @@ static Ast parse_json_ast_object(Parser *parser)
 	}
 	if (!done)
 	{
-		return parser_error(parser, COM_ERROR_EXPECTED_TOKEN, parser->tok.site, "expected '}'");
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected '}'");
 	}
 
 	Ast_Array args = pop_ast_array(parser, nargs);
@@ -132,7 +132,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	}
 	if (!done)
 	{
-		return parser_error(parser, COM_ERROR_EXPECTED_TOKEN, parser->tok.site, "expected ']'");
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected ']'");
 	}
 
 	Ast_Array args = pop_ast_array(parser, nargs);
@@ -178,7 +178,7 @@ static Ast parse_json_ast_number(Parser *parser)
 
 		default:
 		{
-			return parser_error(parser, COM_ERROR_EXPECTED_TOKEN, token.site, "expected number");
+			return parser_error(parser, ERROR_EXPECTED_TOKEN, token.site, "expected number");
 		}
 	}
 }
@@ -237,7 +237,7 @@ static Ast parse_json_ast_value(Parser *parser)
 				return ast_new_nil_literal(parser, token.site);
 			}
 
-			return parser_error(parser, COM_ERROR_INVALID_EXPRESSION, token.site, "expected JSON value");
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, token.site, "expected JSON value");
 		}
 	}
 }
@@ -269,11 +269,11 @@ static Ast parse_jsonl_ast(Parser *parser)
 		}
 		if (parser->tok_prev.site.line_index != line_index)
 		{
-			return parser_error(parser, COM_ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
 		}
 		if (!peek_token(parser, TOK_NONE) && parser->tok.site.line_index == line_index)
 		{
-			return parser_error(parser, COM_ERROR_UNEXPECTED_TOKEN, parser->tok.site, "expected a line break after JSON value");
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, parser->tok.site, "expected a line break after JSON value");
 		}
 		if (!push_ast(parser, value))
 		{

@@ -375,7 +375,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	if (table->table.count != 2) {
 		test_fail("table parser counts entries");
 	}
-	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->error != COM_ERROR_SYNTAX_DEPRECATION || compiler->report.first->phase != COMPILER_PHASE_PARSER) {
+	if (compiler->report.error_count != 0 || compiler->report.warning_count != 1 || !compiler->report.first || compiler->report.first->code != ERROR_SYNTAX_DEPRECATION || compiler->report.first->phase != ERROR_PHASE_PARSER) {
 		test_fail("table call shorthand reports one parser deprecation warning");
 	}
 	arena_destroy(&arena);
@@ -527,7 +527,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	Parser *parser = parser_create(compiler);
 	Ast file = parser_parse_file(parser, compiler->sources);
 	parser_destroy(parser);
-	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_PARSER)
+	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != ERROR_PHASE_PARSER)
 	{
 		test_fail(label);
 	}
@@ -748,7 +748,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	Parser *parser = parser_create(compiler);
 	Ast file = parser_parse_file(parser, compiler->sources);
 	parser_destroy(parser);
-	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != COMPILER_PHASE_LEXER) {
+	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != ERROR_PHASE_LEXER) {
 		test_fail("parser propagates a lexer error token");
 	}
 	arena_destroy(&arena);

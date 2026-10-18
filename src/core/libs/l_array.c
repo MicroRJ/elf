@@ -19,7 +19,7 @@ static b32 array_normalize_index(elf_State *state, i64 index, u32 length, b32 al
 	i64 upper = allow_end ? length : (i64)length - 1;
 	if (index < 0 || index > upper)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "array index %lld is out of bounds for length %u", index, length);
+		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE, "array index %lld is out of bounds for length %u", index, length);
 		return false;
 	}
 
@@ -133,7 +133,7 @@ ELF_FUNCTION(l_array_remove)
 		i64 requested = lib_load_integer(S, 2);
 		if (requested < 0 || (u64)requested > array->count - index)
 		{
-			elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "array remove count %lld is out of bounds", requested);
+			elf_report_runtime_error(S, ERROR_OUT_OF_RANGE, "array remove count %lld is out of bounds", requested);
 			return 0;
 		}
 		count = (u32)requested;
@@ -156,7 +156,7 @@ ELF_FUNCTION(l_array_splice)
 	i64 requested = lib_load_integer(S, 2);
 	if (requested < 0 || (u64)requested > array->count - index)
 	{
-		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "array splice delete count %lld is out of bounds", requested);
+		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE, "array splice delete count %lld is out of bounds", requested);
 		return 0;
 	}
 	elf_Value replacement_value = load_value(S, 3);
@@ -182,7 +182,7 @@ ELF_FUNCTION(l_array_slice)
 	}
 	if (end < first)
 	{
-		elf_report_runtime_error(S, RUNTIME_ERROR_GENERIC, NO_BYTE, "array slice end %u precedes start %u", end, first);
+		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE, "array slice end %u precedes start %u", end, first);
 		return 0;
 	}
 

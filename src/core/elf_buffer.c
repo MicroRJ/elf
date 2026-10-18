@@ -6,7 +6,7 @@ static b32 buffer_require_writable(elf_State *state, elf_ByteBuffer *buffer)
 {
 	if (buffer->obj.status & ELF_OBJECT_READONLY)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_READONLY,
 			"attempted to write to readonly buffer");
 		return false;
 	}
@@ -21,7 +21,7 @@ elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity)
 		buffer->data = elf_alloc(state, capacity);
 		if (!buffer->data)
 		{
-			elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+			elf_report_runtime_error(state, ERROR_OUT_OF_MEMORY,
 				"could not allocate %u bytes for buffer", capacity);
 		}
 		buffer->capacity = capacity;
@@ -49,7 +49,7 @@ b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capa
 	u8 *data = elf_realloc(state, buffer->data, buffer->capacity, grown);
 	if (!data)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_OUT_OF_MEMORY,
 			"could not grow buffer to %u bytes", grown);
 		return false;
 	}
@@ -76,7 +76,7 @@ b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const voi
 	if (!buffer_require_writable(state, buffer)) return false;
 	if (size > UINT32_MAX - buffer->size)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 			"buffer size exceeds the supported range");
 		return false;
 	}
@@ -94,7 +94,7 @@ b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const voi
 			source_is_buffer = true;
 			if (source_offset > buffer->size || size > buffer->size - source_offset)
 			{
-				elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+				elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 					"buffer append source is out of bounds");
 				return false;
 			}
@@ -116,14 +116,14 @@ b32 elf_buffer_splice_object(elf_State *state, elf_ByteBuffer *buffer, u32 posit
 	if (!buffer_require_writable(state, buffer)) return false;
 	if (position > buffer->size || delete_size > buffer->size - position)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 			"buffer splice range is out of bounds");
 		return false;
 	}
 	u32 size_after_delete = buffer->size - delete_size;
 	if (insert_size > UINT32_MAX - size_after_delete)
 	{
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 			"buffer size exceeds the supported range");
 		return false;
 	}
@@ -140,14 +140,14 @@ b32 elf_buffer_splice_object(elf_State *state, elf_ByteBuffer *buffer, u32 posit
 			u32 source_offset = (u32)(source_address - buffer_address);
 			if (source_offset > buffer->size || insert_size > buffer->size - source_offset)
 			{
-				elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+				elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
 					"buffer splice source is out of bounds");
 				return false;
 			}
 			insert_copy = elf_alloc(state, insert_size);
 			if (!insert_copy)
 			{
-				elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE,
+				elf_report_runtime_error(state, ERROR_OUT_OF_MEMORY,
 					"could not allocate %u bytes for buffer splice", insert_size);
 				return false;
 			}

@@ -23,7 +23,7 @@ void *elf_get_user_data(elf_State *state)
 
 void elf_error(elf_State *state, const char *message)
 {
-	elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, -1, "%s",
+	elf_report_runtime_error(state, ERROR_RUNTIME, "%s",
 		message ? message : "host error");
 }
 

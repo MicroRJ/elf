@@ -81,11 +81,11 @@ static void ir_emit_stat(IrQueue *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
 static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
 
-static void ir_report_error(IrEmitter *emitter, Com_Error error, SourceSite site, const char *format, ...)
+static void ir_report_error(IrEmitter *emitter, ErrorCode error, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(emitter->compiler, error, COMPILER_ERROR, COMPILER_PHASE_LOWERING, site, format, args);
+	compiler_reportv(emitter->compiler, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 
@@ -230,7 +230,7 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 	ASSERT(entity);
 	if (entity->tags & ENTITY_TAG_CONSTANT)
 	{
-		ir_report_error(emitter, COM_ERROR_LOWERING, destination->site
+		ir_report_error(emitter, ERROR_LOWERING, destination->site
 		, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
 		return false;
 	}
@@ -257,7 +257,7 @@ static IrLoopFrame current_loop(IrEmitter *emitter, SourceSite site)
 	ASSERT(emitter->function);
 	if (!emitter->function->loop)
 	{
-		ir_report_error(emitter, COM_ERROR_LOWERING, site, "break and continue must be inside a loop");
+		ir_report_error(emitter, ERROR_LOWERING, site, "break and continue must be inside a loop");
 		IrLoopFrame loop = {};
 		return loop;
 	}
@@ -353,7 +353,7 @@ static IrArray lower_call_arguments(IrEmitter *emitter, Ast call, b32 *failed)
 		Ast argument = call->call.args.items[i];
 		if (argument->kind == AST_NAMED_ARGUMENT)
 		{
-			ir_report_error(emitter, COM_ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
+			ir_report_error(emitter, ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
 			*failed = true;
 		}
 		else
@@ -444,7 +444,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			u32 nparts = expr->interpolated_string.count;
 			if (nparts < 3 || (nparts & 1) == 0)
 			{
-				ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site,
+				ir_report_error(emitter, ERROR_INTERNAL, expr->site,
 					"interpolated string must contain alternating text and expression parts");
 				ir = ERROR_IR;
 				break;
@@ -456,7 +456,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				Ast part = parts[i];
 				if (!part || ((i & 1) == 0 && part->kind != AST_STRING_LITERAL))
 				{
-					ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
+					ir_report_error(emitter, ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
 					ir = ERROR_IR;
 					break;
 				}
@@ -523,7 +523,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			Ir expr_ir = ir_emit_expr(emitter, expr->unary);
 			if (!expr_ir || expr_ir->kind != IR_LOAD_LOCAL)
 			{
-				ir_report_error(emitter, COM_ERROR_LOWERING, expr->site
+				ir_report_error(emitter, ERROR_LOWERING, expr->site
 				, "#get_mem expects a local or parameter expression");
 				ir = ERROR_IR;
 			}
@@ -583,7 +583,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				Ast entry = ast_ensure_kind(args[i], AST_TABLE_ENTRY);
 				if (ast_is_error(entry))
 				{
-					ir_report_error(emitter, COM_ERROR_INTERNAL, args[i]->site, "expected table entry");
+					ir_report_error(emitter, ERROR_INTERNAL, args[i]->site, "expected table entry");
 					ir_push(&table_items, ERROR_IR);
 					continue;
 				}
@@ -594,7 +594,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				Ir ir_value = ir_emit_expr(emitter, value);
 				if (!key)
 				{
-					ir_report_error(emitter, COM_ERROR_INTERNAL, entry->site, "expected keyed table entry");
+					ir_report_error(emitter, ERROR_INTERNAL, entry->site, "expected keyed table entry");
 					ir_push(&table_items, ERROR_IR);
 					continue;
 				}
@@ -630,7 +630,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 
 		case AST_TABLE_ENTRY:
 		{
-			ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
+			ir_report_error(emitter, ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
 			ir = ERROR_IR;
 		}
 		break;
@@ -679,7 +679,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		break;
 		default:
 		{
-			ir_report_error(emitter, COM_ERROR_INTERNAL, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
+			ir_report_error(emitter, ERROR_INTERNAL, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
 			ir = ERROR_IR;
 		}
 		break;
@@ -792,7 +792,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 				message = "range for loops require one range expression";
 			}
 
-			ir_report_error(emitter, COM_ERROR_LOWERING, expr->site, message);
+			ir_report_error(emitter, ERROR_LOWERING, expr->site, message);
 			ir_push(items, ERROR_IR);
 			return 1;
 		}
@@ -807,7 +807,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 			Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
 			if (ast_is_error(name))
 			{
-				ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
+				ir_report_error(emitter, ERROR_INTERNAL, name_tuple->site, "expected declaration name");
 				ir_push(items, ERROR_IR);
 				return 1;
 			}
@@ -827,7 +827,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 		Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
-			ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
+			ir_report_error(emitter, ERROR_INTERNAL, name_tuple->site, "expected declaration name");
 			ir_push(items, ERROR_IR);
 			return 1;
 		}
@@ -866,7 +866,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 
 	if (!range || range->kind != AST_RANGE)
 	{
-		ir_report_error(emitter, COM_ERROR_LOWERING, stat->site, "range for loops require a range expression");
+		ir_report_error(emitter, ERROR_LOWERING, stat->site, "range for loops require a range expression");
 		return ERROR_IR;
 	}
 
@@ -874,7 +874,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	Ast first_name = ast_ensure_kind(name_tuple->tuple.items[0], AST_IDENT);
 	if (ast_is_error(first_name))
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
+		ir_report_error(emitter, ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
 		return ERROR_IR;
 	}
 
@@ -904,7 +904,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	}
 	else
 	{
-		ir_report_error(emitter, COM_ERROR_LOWERING, range->site,
+		ir_report_error(emitter, ERROR_LOWERING, range->site,
 			"an omitted range end requires an indexed collection");
 		return ERROR_IR;
 	}
@@ -918,7 +918,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 		Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
 		if (ast_is_error(name))
 		{
-			ir_report_error(emitter, COM_ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
+			ir_report_error(emitter, ERROR_INTERNAL, name_tuple->site, "expected for-loop variable name");
 			return ERROR_IR;
 		}
 
@@ -1007,7 +1007,7 @@ static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
 	Ast decl = ast_ensure_kind(stat->for_range_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
+		ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
@@ -1015,20 +1015,20 @@ static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
 	Ast expr_tuple = ast_ensure_kind(decl->decl.expr, AST_TUPLE);
 	if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
+		ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid range for-loop declaration");
 		return ERROR_IR;
 	}
 
 	if (name_tuple->tuple.count == 0 || expr_tuple->tuple.count != 1)
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
+		ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid range for-loop arity");
 		return ERROR_IR;
 	}
 
 	Ast range = expr_tuple->tuple.items[0];
 	if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
+		ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid range for-loop expression");
 		return ERROR_IR;
 	}
 
@@ -1041,7 +1041,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	Ast init = ast_ensure_kind(stat->for_stat.init, AST_DECL_STAT);
 	if (ast_is_error(init))
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
+		ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid C-style for-loop initializer");
 		return ERROR_IR;
 	}
 
@@ -1086,13 +1086,13 @@ static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrQueue *items, Ast st
 	Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
 	if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 	{
-		ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid compound assignment");
+		ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid compound assignment");
 		return ERROR_IR;
 	}
 
 	if (dest_tuple->tuple.count != 1 || expr_tuple->tuple.count != 1)
 	{
-		ir_report_error(emitter, COM_ERROR_LOWERING, stat->site, "compound assignment requires one destination and one value");
+		ir_report_error(emitter, ERROR_LOWERING, stat->site, "compound assignment requires one destination and one value");
 		return ERROR_IR;
 	}
 
@@ -1203,7 +1203,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			Ast expr_tuple = ast_ensure_kind(stat->decl.expr, AST_TUPLE);
 			if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 			{
-				ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid declaration");
+				ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid declaration");
 				ir_push(items, ERROR_IR);
 				break;
 			}
@@ -1219,7 +1219,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
-				ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid assignment");
+				ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid assignment");
 				ir_push(items, ERROR_IR);
 				break;
 			}
@@ -1307,7 +1307,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
-				ir_report_error(emitter, COM_ERROR_INTERNAL, stat->site, "invalid nil assignment");
+				ir_report_error(emitter, ERROR_INTERNAL, stat->site, "invalid nil assignment");
 				ir_push(items, ERROR_IR);
 				break;
 			}
@@ -1450,13 +1450,13 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 	{
 		Ast param = ast_ensure_kind(ast_params.items[i], AST_FUNCTION_PARAM);
 		if (ast_is_error(param)) {
-			ir_report_error(emitter, COM_ERROR_INTERNAL, param->site, "expected function parameter");
+			ir_report_error(emitter, ERROR_INTERNAL, param->site, "expected function parameter");
 			continue;
 		}
 
 		Ast name = ast_ensure_kind(param->param.name, AST_IDENT);
 		if (ast_is_error(name)) {
-			ir_report_error(emitter, COM_ERROR_INTERNAL, param->site, "expected function parameter name");
+			ir_report_error(emitter, ERROR_INTERNAL, param->site, "expected function parameter name");
 			continue;
 		}
 
@@ -1471,14 +1471,14 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 			type = ast_ensure_kind(type, AST_IDENT);
 			if (ast_is_error(type))
 			{
-				ir_report_error(emitter, COM_ERROR_INTERNAL, param->site, "expected function parameter type name");
+				ir_report_error(emitter, ERROR_INTERNAL, param->site, "expected function parameter type name");
 			}
 			else
 			{
 				TypeRule rule = type_rule_from_atom(type->atom);
 				if (rule == TRULE_NONE)
 				{
-					ir_report_error(emitter, COM_ERROR_LOWERING, type->site, "'%s' is not a known type name", atom_data(type->atom));
+					ir_report_error(emitter, ERROR_LOWERING, type->site, "'%s' is not a known type name", atom_data(type->atom));
 				}
 				else
 				{

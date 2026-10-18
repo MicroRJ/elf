@@ -6,6 +6,7 @@
 #define ELF_COMPILER_H
 
 #include "bc_module.h"
+#include "error.h"
 
 typedef struct Compiler Compiler;
 typedef u32 Com_SourceId;
@@ -18,76 +19,13 @@ typedef enum
 }
 Com_Status;
 
-typedef enum
-{
-	COM_ERROR_NONE = 0,
-	COM_ERROR_INVALID_SOURCE,
-	COM_ERROR_SOURCE_PATH,
-	COM_ERROR_IMPORT,
-	COM_ERROR_PARSE_FAILED,
-	COM_ERROR_INVALID_UNICODE_ESCAPE,
-	COM_ERROR_UNTERMINATED_ESCAPE_SEQUENCE,
-	COM_ERROR_INVALID_ESCAPE_SEQUENCE,
-	COM_ERROR_INVALID_NUMBER_LITERAL,
-	COM_ERROR_INTEGER_LITERAL_OVERFLOW,
-	COM_ERROR_UNTERMINATED_STRING,
-	COM_ERROR_NEWLINE_IN_STRING,
-	COM_ERROR_UNTERMINATED_COMMENT,
-	COM_ERROR_UNTERMINATED_INTERPOLATION,
-	COM_ERROR_INVALID_CHARACTER_CONSTANT,
-	COM_ERROR_EXPECTED_MACRO_NAME,
-	COM_ERROR_UNRECOGNIZED_MACRO,
-	COM_ERROR_NUL_BYTE_IN_SOURCE,
-	COM_ERROR_UNEXPECTED_CHARACTER,
-	COM_ERROR_UNEXPECTED_TOKEN,
-	COM_ERROR_INVALID_EXPRESSION,
-	COM_ERROR_EXPECTED_TOKEN,
-	COM_ERROR_INVALID_DECLARATION,
-	COM_ERROR_DUPLICATE_DECLARATION,
-	COM_ERROR_SYNTAX_DEPRECATION,
-	COM_ERROR_INVALID_FIELD_INITIALIZER,
-	COM_ERROR_EXCESS_COMMA,
-	COM_ERROR_MISSING_FUNCTION_BODY,
-	COM_ERROR_INVALID_STATEMENT,
-	COM_ERROR_STATIC_LOOKUP,
-	COM_ERROR_INVALID_STATIC_EXPRESSION,
-	COM_ERROR_CYCLIC_STATIC_DEFINITION,
-	COM_ERROR_INVALID_FUNCTION_PARAMETER,
-	COM_ERROR_INVALID_STATIC_DECLARATION,
-	COM_ERROR_DUPLICATE_STATIC_DECLARATION,
-	COM_ERROR_EXECUTABLE_MODULE_STATEMENT,
-	COM_ERROR_LOWERING,
-	COM_ERROR_INTERNAL,
-	COM_ERROR_UNREFERENCED_ENTITY,
-	COM_ERROR_UNDECLARED_IDENTIFIER,
-}
-Com_Error;
-
-typedef enum
-{
-	COMPILER_NOTE = 0,
-	COMPILER_WARNING,
-	COMPILER_ERROR,
-}
-Com_Severity;
-
-typedef enum
-{
-	COMPILER_PHASE_LEXER = 0,
-	COMPILER_PHASE_PARSER,
-	COMPILER_PHASE_EVALUATION,
-	COMPILER_PHASE_LOWERING,
-	COMPILER_PHASE_BYTECODE,
-}
-Com_Phase;
-
 typedef struct Com_Message Com_Message;
 struct Com_Message
 {
 	Com_Message *next;
-	Com_Error error;
-	Com_Severity severity;
-	Com_Phase phase;
+	ErrorCode code;
+	ErrorSeverity severity;
+	ErrorPhase phase;
 	SourceSite site;
 	elf_StrSlice text;
 };
@@ -145,8 +83,8 @@ Com_Source *compiler_source_from_id(Compiler *compiler, Com_SourceId source_id);
 
 void compiler_log_report(Compiler *compiler);
 
-b32 compiler_report(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, ...);
-b32 compiler_reportv(Compiler *compiler, Com_Error error, Com_Severity severity, Com_Phase phase, SourceSite site, const char *format, va_list args);
+b32 compiler_report(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
+b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
 
 BcModule *compiler_compile(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source);

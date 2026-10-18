@@ -240,7 +240,7 @@ void gc_check(elf_State *state)
 	gc_update_next_cycle(state);
 
 	if (state->gc_live_bytes > state->gc_next_cycle_bytes) {
-		elf_report_runtime_error(state, RUNTIME_ERROR_GENERIC, NO_BYTE, "out of memory, %lluMB allocated, %lluMB threshold"
+		elf_report_runtime_error(state, ERROR_OUT_OF_MEMORY, "out of memory, %lluMB allocated, %lluMB threshold"
 		, state->gc_live_bytes / MEGABYTES(1)
 		, state->gc_next_cycle_bytes / MEGABYTES(1));
 	}

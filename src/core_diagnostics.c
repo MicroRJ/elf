@@ -4,13 +4,11 @@
 
 #include <dy.h>
 
-static const char *runtime_error_type_names[] =
+static const char *error_code_names[] =
 {
-	[RUNTIME_ERROR_NONE]                   = "none",
-	[RUNTIME_ERROR_GENERIC]                = "runtime",
-	[RUNTIME_ERROR_EXPECTS_CALLABLE]       = "call",
-	[RUNTIME_ERROR_INVALID_ARGUMENT_COUNT] = "arguments",
-	[RUNTIME_ERROR_UNKNOWN_BYTECODE]       = "bytecode",
+#define ERROR_CODE_NAME(code, name) [code] = name,
+	ERROR_CODE_X_LIST(ERROR_CODE_NAME)
+#undef ERROR_CODE_NAME
 };
 
 typedef struct
@@ -34,10 +32,10 @@ static SourceSite find_source_for_instr(elf_Module *module, int instr)
 	return (SourceSite){};
 }
 
-static const char *runtime_error_type_name(RuntimeErrorType error)
+static const char *error_code_name(ErrorCode code)
 {
-	if ((u32)error < ARRAY_COUNT(runtime_error_type_names) && runtime_error_type_names[error]) {
-		return runtime_error_type_names[error];
+	if ((u32)code < ERROR_CODE_COUNT && error_code_names[code]) {
+		return error_code_names[code];
 	}
 	return "runtime";
 }
@@ -71,11 +69,11 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 	return 0;
 }
 
-static RuntimeSourceLocation runtime_source_location(elf_State *state, int instr)
+static RuntimeSourceLocation runtime_source_location(elf_State *state)
 {
 	StackFrame *frame = runtime_current_bytecode_frame(state);
 	if (!frame) return (RuntimeSourceLocation) {};
-	if (instr == NO_BYTE) instr = frame->function->offset + frame->instruction;
+	int instr = frame->function->offset + frame->instruction;
 	return runtime_source_location_for_function(frame->module, frame->function, instr);
 }
 
@@ -150,11 +148,11 @@ static void abort_after_runtime_error(void)
 	dy_exit_process(1);
 }
 
-static void report_runtime_error_message(elf_State *state, RuntimeErrorType error, int instr, const char *message)
+static void report_runtime_error_message(elf_State *state, ErrorCode code, const char *message)
 {
-	RuntimeSourceLocation location = runtime_source_location(state, instr);
+	RuntimeSourceLocation location = runtime_source_location(state);
 
-	log_linef(LOG_LEVEL_ERROR, "runtime error[%s]: %s", runtime_error_type_name(error), message);
+	log_linef(LOG_LEVEL_ERROR, "runtime error[%s]: %s", error_code_name(code), message);
 	print_runtime_error_location(location);
 	print_runtime_call_stack(state);
 	abort_after_runtime_error();
@@ -162,12 +160,12 @@ static void report_runtime_error_message(elf_State *state, RuntimeErrorType erro
 
 void elf_print_current_runtime_source_location(elf_State *state)
 {
-	RuntimeSourceLocation location = runtime_source_location(state, NO_BYTE);
+	RuntimeSourceLocation location = runtime_source_location(state);
 	print_runtime_error_location(location);
 	print_runtime_call_stack(state);
 }
 
-void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int instr, const char *format, ...)
+void elf_report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -176,7 +174,7 @@ void elf_report_runtime_error(elf_State *state, RuntimeErrorType error, int inst
 	va_end(args);
 	arena_push_zero(scratch.arena, 1, 1);
 
-	report_runtime_error_message(state, error, instr, message);
+	report_runtime_error_message(state, code, message);
 
 	scratch_end(scratch);
 }
