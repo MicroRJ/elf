@@ -24,8 +24,8 @@ Named, local, and callable values
   IR_CAPTURE reads a capture by index from the current closure.
   IR_RECURSE produces the current closure for a recursive call.
   IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
-  IR_LOAD reads a previously allocated IR_LOCAL.
-  IR_GET_MEM produces the stack-slot index addressed by an IR_LOAD.
+  IR_LOAD reads an IR_LOCAL whose statement has already assigned its slot; it never allocates the slot itself.
+  IR_GET_MEM produces that assigned stack-slot index and has the same allocation precondition as IR_LOAD.
 
 Aggregate values and access
   IR_TABLE and IR_ARRAY allocate empty collections.
@@ -49,9 +49,10 @@ Calls and structured expressions
   IR_EXPR_BLOCK executes a statement sequence and then produces its final value.
 
 Statements and storage
-  IR_LOCAL allocates one local slot and optionally initializes it.
-  IR_MULTI_LOCAL evaluates one expression for N results and binds N consecutive locals.
-  IR_STORE writes to an allocated local, global, field, or index.
+  IR_LOCAL represents stable local storage. Parameters receive incoming slots during function setup; a standalone IR_LOCAL
+  statement adopts its initializer's result slot or allocates a fresh slot when emitted.
+  IR_MULTI_LOCAL is a statement that evaluates one expression for N results and assigns those consecutive slots to N locals.
+  IR_STORE writes to an allocated local, global, field, or index; a local destination must already have an assigned slot.
   IR_ARRAY_ADD appends one value to an array.
   IR_BLOCK executes statements with a scoped local-slot lifetime.
   IR_IF executes one of two statement branches according to a predicate.
