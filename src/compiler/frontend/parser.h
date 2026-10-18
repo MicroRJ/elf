@@ -2,36 +2,19 @@
 // See Copyright Notice In elf.h
 //
 
+#ifndef ELF_COMPILER_PARSER_H
+#define ELF_COMPILER_PARSER_H
+
+#include "base.h"
+#include "atom.h"
+#include "compiler.h"
+#include "token.h"
+#include "ast.h"
+
 #define NO_LINE (0)
 
 typedef struct Parser Parser;
 typedef struct Ast_Node Ast_Node;
-
-typedef struct
-{
-	Token *items;
-	u32    index;
-	u32    count;
-	u32    capacity;
-}
-Lexer_TokenFIFO;
-
-typedef struct
-{
-	Compiler         *compiler;
-	Com_Source       *compiler_source;
-	Atom_Table       *atoms;
-	Arena        *scratch_arena;
-
-	const char       *cursor;
-	const char       *end;
-
-	u32               line_index;
-	const char       *line_start;
-
-	Lexer_TokenFIFO   tokens;
-}
-Lexer;
 
 struct Parser
 {
@@ -39,10 +22,8 @@ struct Parser
 	Arena           scratch_arena;
 	Compiler           *compiler;
 	Com_Source         *source;
-	Atom_Table         *atoms;
-	Lexer               lexer;
-	// TODO(RJ): probably redundant now!
-	Token               tok,tok_prev,tok_prox;
+	Token_Array         tokens;
+	u32                 token_index;
 
 	Ast                *ast_stack;
 	u32                 ast_stack_size;
@@ -53,9 +34,11 @@ struct Parser
 	u32                 import_count;
 };
 
-Parser *parser_create(Compiler *compiler);
+b32 parser_init(Parser *parser, Compiler *compiler);
 void parser_destroy(Parser *parser);
 Ast parser_parse_file(Parser *parser, Com_Source *source);
 Ast parser_parse_constant_expr(Parser *parser, Com_Source *source);
 Ast parser_parse_json(Parser *parser, Com_Source *source);
 Ast parser_parse_jsonl(Parser *parser, Com_Source *source);
+
+#endif

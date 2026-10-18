@@ -39,6 +39,30 @@ static Ast parse_call_expr(Parser *parser, Ast callee, SourceSite site);
 static Token consume_token(Parser *parser);
 static Token take_token(Parser *parser, Token_Type type);
 
+static Token parser_token_at(Parser *parser, u32 index)
+{
+	ASSERT(parser->tokens.count);
+	if (index >= parser->tokens.count) {
+		index = parser->tokens.count - 1;
+	}
+	return parser->tokens.items[index];
+}
+
+static Token parser_current_token(Parser *parser)
+{
+	return parser_token_at(parser, parser->token_index);
+}
+
+static Token parser_previous_token(Parser *parser)
+{
+	return parser->token_index ? parser_token_at(parser, parser->token_index - 1) : (Token) {};
+}
+
+static Token parser_next_token(Parser *parser)
+{
+	return parser_token_at(parser, parser->token_index + 1);
+}
+
 static Ast ast_from_token_error(Token token)
 {
 	ASSERT(token_is_error(token));
@@ -47,7 +71,7 @@ static Ast ast_from_token_error(Token token)
 
 static Token take_field_name(Parser *parser)
 {
-	Token token = parser->tok;
+	Token token = parser_current_token(parser);
 	if (token.type == TOK_IDENTIFIER || (token.type >= TOK_JSON && token.type <= TOK_GLOBAL))
 	{
 		consume_token(parser);
@@ -136,7 +160,7 @@ static Ast_Kind precedence_from_binary_ast_expr_type(Ast_Kind type)
 static Com_Status parser_report(Parser *parser, ErrorSeverity severity, ErrorCode error, SourceSite site, const char *message)
 {
 	if (!source_slice_is_valid(site)) {
-		site = parser->tok.site;
+		site = parser_current_token(parser).site;
 	}
 
 	b32 reported = compiler_report(parser->compiler, error, severity, ERROR_PHASE_PARSER, site, "%s", message);
@@ -151,7 +175,7 @@ static Ast parser_error(Parser *parser, ErrorCode error, SourceSite site, const 
 static Ast parser_errorf(Parser *parser, ErrorCode error, SourceSite site, const char *format, ...)
 {
 	if (!source_slice_is_valid(site)) {
-		site = parser->tok.site;
+		site = parser_current_token(parser).site;
 	}
 	va_list args;
 	va_start(args, format);
@@ -178,21 +202,15 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-Parser *parser_create(Compiler *compiler)
+b32 parser_init(Parser *parser, Compiler *compiler)
 {
-	ASSERT(compiler != 0);
-	Parser *parser = arena_push_zero(compiler->arena, sizeof(*parser), _Alignof(Parser));
-	if (!parser) {
-		return 0;
-	}
+	ASSERT(parser);
+	ASSERT(compiler);
+	*parser = (Parser) {};
 	parser->compiler = compiler;
-	parser->atoms = compiler->atoms;
 	parser->result_arena = compiler->arena;
 	parser->scratch_arena = arena_create(0);
-	if (!parser->scratch_arena.data) {
-		return 0;
-	}
-	return parser;
+	return parser->scratch_arena.data != 0;
 }
 
 void parser_destroy(Parser *parser)
@@ -211,9 +229,8 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 	parser->source = source;
 
 	arena_reset(&parser->scratch_arena);
-	parser->tok = (Token) {};
-	parser->tok_prev = (Token) {};
-	parser->tok_prox = (Token) {};
+	parser->tokens = (Token_Array) {};
+	parser->token_index = 0;
 	parser->ast_stack_size = 4096;
 	parser->ast_stack_index = 0;
 	parser->ast_stack = arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size, _Alignof(Ast));
@@ -224,24 +241,21 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 		return false;
 	}
 
-	lexer_init(&parser->lexer, parser->compiler, source, &parser->scratch_arena);
-	consume_token(parser);
-	consume_token(parser);
-	return true;
+	return lexer_tokenize(parser->compiler, source, &parser->scratch_arena, &parser->tokens) == COM_STATUS_OK;
 }
 
 static Token consume_token(Parser *par)
 {
-	Token token = token_is_error(par->tok_prox) ? par->tok_prox : lex_token(&par->lexer);
-	par->tok_prev = par->tok;
-	par->tok = par->tok_prox;
-	par->tok_prox = token;
-	return par->tok_prev;
+	Token token = parser_current_token(par);
+	if (!token_is_error(token) && par->token_index + 1 < par->tokens.count) {
+		par->token_index += 1;
+	}
+	return token;
 }
 
 static inline b32 peek_token(Parser *parser, Token_Type type)
 {
-	return parser->tok.type == type;
+	return parser_current_token(parser).type == type;
 }
 
 static inline b32 pick_token(Parser *parser, Token_Type type)
@@ -255,7 +269,7 @@ static inline b32 pick_token(Parser *parser, Token_Type type)
 
 static Token take_token(Parser *parser, Token_Type type)
 {
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 
 	if (token_is_error(tok)) {
 		return tok;
@@ -269,7 +283,7 @@ static Token take_token(Parser *parser, Token_Type type)
 
 static inline b32 peek_next_token(Parser *parser, Token_Type type)
 {
-	return parser->tok_prox.type == type;
+	return parser_next_token(parser).type == type;
 }
 
 static b32 push_ast(Parser *par, Ast tree)
@@ -343,17 +357,17 @@ static Ast_Array parser_flatten_imports(Parser *parser)
 
 static Ast parse_file(Parser *parser)
 {
-	if (token_is_error(parser->tok)) {
-		return ast_from_token_error(parser->tok);
+	if (token_is_error(parser_current_token(parser))) {
+		return ast_from_token_error(parser_current_token(parser));
 	}
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 	u32 nstats = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
-		if (token_is_error(parser->tok)) {
-			return ast_from_token_error(parser->tok);
+		if (token_is_error(parser_current_token(parser))) {
+			return ast_from_token_error(parser_current_token(parser));
 		}
-		Token before = parser->tok;
+		Token before = parser_current_token(parser);
 		Ast_T *stat = parse_stat(parser);
 		if (ast_is_error(stat)) {
 			return stat;
@@ -362,7 +376,7 @@ static Ast parse_file(Parser *parser)
 		{
 			return parser_unexpected_token(parser, before);
 		}
-		if (before.site.offset == parser->tok.site.offset && before.type == parser->tok.type)
+		if (before.site.offset == parser_current_token(parser).site.offset && before.type == parser_current_token(parser).type)
 		{
 			return parser_error(parser, ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading statement");
 		}
@@ -406,7 +420,7 @@ static Ast parse_function(Parser *par, Token marker)
 	{
 		if (!peek_token(par, TOK_PAREN_RIGHT)) do
 		{
-			Token tok = par->tok;
+			Token tok = parser_current_token(par);
 			if (pick_token(par, TOK_ELLIPSIS))
 			{
 				variadic = true;
@@ -465,7 +479,7 @@ static Ast parse_function(Parser *par, Token marker)
 	}
 
 	if (!body) {
-		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, par->tok.site, "expected function body");
+		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, parser_current_token(par).site, "expected function body");
 	}
 
 	Ast function = create_function_ast(par, marker.site, params, variadic, body);
@@ -498,7 +512,7 @@ static b32 token_ends_expression(Token_Type type)
 
 static Ast parse_tuple_expr(Parser *par)
 {
-	Token tok = par->tok;
+	Token tok = parser_current_token(par);
 	u32 nargs = 0;
 	do
 	{
@@ -527,7 +541,7 @@ static Ast parse_tuple_expr(Parser *par)
 
 static Ast parse_optional_tuple_expr(Parser *par)
 {
-	if (token_ends_expression(par->tok.type)) {
+	if (token_ends_expression(parser_current_token(par).type)) {
 		return NULL_AST;
 	}
 	return parse_tuple_expr(par);
@@ -535,7 +549,7 @@ static Ast parse_optional_tuple_expr(Parser *par)
 
 static Ast parse_for_identifier_tuple(Parser *parser)
 {
-	Token start = parser->tok;
+	Token start = parser_current_token(parser);
 	u32 stack_start = parser->ast_stack_index;
 	u32 nargs = 0;
 
@@ -660,7 +674,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		if (!expr)
 		{
 			parser->ast_stack_index = stack_start;
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected expression inside interpolated string");
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected expression inside interpolated string");
 		}
 		if (!push_ast(parser, expr)) {
 			parser->ast_stack_index = stack_start;
@@ -668,7 +682,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		}
 		nparts += 1;
 
-		Token part = parser->tok;
+		Token part = parser_current_token(parser);
 		if (part.type != TOK_STRING_PART && part.type != TOK_STRING_END)
 		{
 			parser->ast_stack_index = stack_start;
@@ -704,7 +718,7 @@ static Ast parse_interpolated_string(Parser *parser)
 
 static Ast parse_unary_expr(Parser *parser)
 {
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 
 	Ast value = 0;
 	switch (tok.type)
@@ -770,7 +784,7 @@ static Ast parse_unary_expr(Parser *parser)
 		case TOK_IMPORT:
 		{
 			consume_token(parser);
-			Token path = parser->tok;
+			Token path = parser_current_token(parser);
 			if (token_is_error(path))
 			{
 				value = ast_from_token_error(path);
@@ -903,7 +917,7 @@ static Ast parse_unary_expr(Parser *parser)
 
 static Ast parse_table_entry(Parser *parser)
 {
-	Token start = parser->tok;
+	Token start = parser_current_token(parser);
 	Ast key = NULL_AST;
 	Ast value = NULL_AST;
 
@@ -1021,7 +1035,7 @@ static Ast parse_array_expr(Parser *parser)
 		}
 		if (!item)
 		{
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected array item");
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected array item");
 		}
 		if (!push_ast(parser, item))
 		{
@@ -1052,7 +1066,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 
 	if (peek_token(par, TOK_LEFT_BRACE))
 	{
-		Com_Status warning = parser_report(par, ERROR_WARNING, ERROR_SYNTAX_DEPRECATION, par->tok.site, "implicit table call syntax is deprecated; write 'expr({...})'");
+		Com_Status warning = parser_report(par, ERROR_WARNING, ERROR_SYNTAX_DEPRECATION, parser_current_token(par).site, "implicit table call syntax is deprecated; write 'expr({...})'");
 		if (warning == COM_STATUS_OOM) {
 			return ERROR_OOM_AST;
 		}
@@ -1061,7 +1075,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 			return expr;
 		}
 		if (!expr) {
-			return parser_error(par, ERROR_INVALID_EXPRESSION, par->tok.site, "expected call argument");
+			return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected call argument");
 		}
 
 		if (!push_ast(par, expr)) {
@@ -1080,12 +1094,12 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 				if (peek_token(par, TOK_PAREN_RIGHT))
 				{
 					par->ast_stack_index = stack_start;
-					return parser_error(par, ERROR_EXCESS_COMMA, par->tok_prev.site, "excess comma");
+					return parser_error(par, ERROR_EXCESS_COMMA, parser_previous_token(par).site, "excess comma");
 				}
 				if (peek_token(par, TOK_COMMA))
 				{
 					par->ast_stack_index = stack_start;
-					return parser_error(par, ERROR_EXCESS_COMMA, par->tok.site, "excess comma");
+					return parser_error(par, ERROR_EXCESS_COMMA, parser_current_token(par).site, "excess comma");
 				}
 
 				Ast x = parse_call_argument(par);
@@ -1095,7 +1109,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 				}
 				if (!x) {
 					par->ast_stack_index = stack_start;
-					return parser_error(par, ERROR_INVALID_EXPRESSION, par->tok.site, "expected call argument");
+					return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected call argument");
 				}
 
 				if (!push_ast(par, x)) {
@@ -1222,7 +1236,7 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 			return index;
 		}
 		if (!index) {
-			return parser_error(par, ERROR_INVALID_EXPRESSION, par->tok.site, "expected index expression");
+			return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected index expression");
 		}
 		if (index->kind == AST_ELLIPSIS)
 		{
@@ -1234,7 +1248,7 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 					return right;
 				}
 				if (!right) {
-					return parser_error(par, ERROR_INVALID_EXPRESSION, par->tok.site, "expected range expression");
+					return parser_error(par, ERROR_INVALID_EXPRESSION, parser_current_token(par).site, "expected range expression");
 				}
 			}
 			index = ast_new_binary_expr(par, index->site, AST_RANGE, 0, right);
@@ -1273,14 +1287,14 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 
 static Ast parse_postfix_expr(Parser *parser)
 {
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 
 	Ast value = parse_unary_expr(parser);
 	if (ast_is_error(value)) goto esc;
 
-	while (parser->tok.type != TOK_NONE && !parser->tok.line_break_before)
+	while (parser_current_token(parser).type != TOK_NONE && !parser_current_token(parser).line_break_before)
 	{
-		tok = parser->tok;
+		tok = parser_current_token(parser);
 
 		switch (tok.type)
 		{
@@ -1339,14 +1353,14 @@ static Ast parse_postfix_expr(Parser *parser)
 
 static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 {
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 
 	Ast x = parse_postfix_expr(parser);
 	if (ast_is_error(x)) goto esc;
 
 	for (;;)
 	{
-		tok = parser->tok;
+		tok = parser_current_token(parser);
 		if (tok.line_break_before) break;
 
 		Ast_Kind ast_type = binary_ast_expr_type_from_token_type(tok.type);
@@ -1395,10 +1409,10 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 		return x;
 	}
 	if (!x) {
-		return parser_unexpected_token(parser, parser->tok);
+		return parser_unexpected_token(parser, parser_current_token(parser));
 	}
 
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 	Ast_Kind compound_assign_type = compound_assign_ast_type_from_token_type(tok.type);
 	if (compound_assign_type != AST_NONE)
 	{
@@ -1409,12 +1423,12 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 			return y;
 		}
 		if (!y) {
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected expression after assignment operator");
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected expression after assignment operator");
 		}
 		return ast_new_binary_expr(parser, tok.site, compound_assign_type, x, y);
 	}
 
-	switch (parser->tok.type)
+	switch (parser_current_token(parser).type)
 	{
 		case TOK_STATIC_BIND:
 		{
@@ -1430,7 +1444,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected static declaration expression");
+				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected static declaration expression");
 			}
 			x = create_static_decl_ast(parser, tok.site, x->tuple.items[0], y, exported);
 		}
@@ -1445,7 +1459,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected declaration expression");
+				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected declaration expression");
 			}
 			b32 constant = tok.type == TOK_HARD_BIND;
 			x = create_decl_ast(parser, tok.site, constant, x, y);
@@ -1460,7 +1474,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected assignment expression");
+				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected assignment expression");
 			}
 			x = create_assign_ast(parser, tok.site, x, y);
 		}
@@ -1474,7 +1488,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected nil assignment expression");
+				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected nil assignment expression");
 			}
 			x = ast_new_binary_expr(parser, tok.site, AST_NIL_ASSIGN, x, y);
 		}
@@ -1489,7 +1503,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 
 static Ast parse_stat(Parser *parser)
 {
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 	Ast tree = 0;
 
 	switch (tok.type)
@@ -1517,7 +1531,7 @@ static Ast parse_stat(Parser *parser)
 				return tree;
 			}
 			if (!tree) {
-				return parser_error(parser, ERROR_INVALID_STATEMENT, parser->tok.site, "expected deferred statement");
+				return parser_error(parser, ERROR_INVALID_STATEMENT, parser_current_token(parser).site, "expected deferred statement");
 			}
 			tree = create_defer_ast(parser, tok.site, tree);
 		}
@@ -1541,7 +1555,7 @@ static Ast parse_stat(Parser *parser)
 			consume_token(parser);
 
 			Ast expr = 0;
-			if (!parser->tok.line_break_before)
+			if (!parser_current_token(parser).line_break_before)
 			{
 				expr = parse_optional_tuple_expr(parser);
 				if (ast_is_error(expr)) {
@@ -1556,7 +1570,7 @@ static Ast parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 			Ast expr = 0;
-			if (!parser->tok.line_break_before)
+			if (!parser_current_token(parser).line_break_before)
 			{
 				expr = parse_optional_tuple_expr(parser);
 				if (ast_is_error(expr)) {
@@ -1571,7 +1585,7 @@ static Ast parse_stat(Parser *parser)
 		{
 			consume_token(parser);
 			Ast expr = 0;
-			if (!parser->tok.line_break_before)
+			if (!parser_current_token(parser).line_break_before)
 			{
 				expr = parse_optional_tuple_expr(parser);
 				if (ast_is_error(expr)) {
@@ -1588,7 +1602,7 @@ static Ast parse_stat(Parser *parser)
 			consume_token(parser);
 			while (!peek_token(parser, TOK_NONE) && !peek_token(parser, TOK_RIGHT_BRACE))
 			{
-				Token before = parser->tok;
+				Token before = parser_current_token(parser);
 				Ast_T *stat = parse_stat(parser);
 				if (ast_is_error(stat)) {
 					return stat;
@@ -1597,7 +1611,7 @@ static Ast parse_stat(Parser *parser)
 				{
 					return parser_unexpected_token(parser, before);
 				}
-				if (before.site.offset == parser->tok.site.offset && before.type == parser->tok.type)
+				if (before.site.offset == parser_current_token(parser).site.offset && before.type == parser_current_token(parser).type)
 				{
 					return parser_error(parser, ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading block statement");
 				}
@@ -1629,7 +1643,7 @@ static Ast parse_stat(Parser *parser)
 				return pred;
 			}
 			if (!pred) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected while predicate");
+				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected while predicate");
 			}
 
 			Token question = take_token(parser, TOK_QMARK);
@@ -1642,7 +1656,7 @@ static Ast parse_stat(Parser *parser)
 				return body;
 			}
 			if (!body) {
-				return parser_error(parser, ERROR_INVALID_STATEMENT, parser->tok.site, "expected while body");
+				return parser_error(parser, ERROR_INVALID_STATEMENT, parser_current_token(parser).site, "expected while body");
 			}
 
 			tree = create_while_ast(parser, tok.site, pred, body);
@@ -1658,7 +1672,7 @@ static Ast parse_stat(Parser *parser)
 				return name;
 			}
 			if (!name) {
-				return parser_error(parser, ERROR_INVALID_DECLARATION, parser->tok.site, "expected for-loop declaration");
+				return parser_error(parser, ERROR_INVALID_DECLARATION, parser_current_token(parser).site, "expected for-loop declaration");
 			}
 			b32 constant = false;
 			if (!pick_token(parser, TOK_BIND))
@@ -1675,7 +1689,7 @@ static Ast parse_stat(Parser *parser)
 				return init_expr;
 			}
 			if (!init_expr) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected for-loop initializer");
+				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected for-loop initializer");
 			}
 			Ast init = create_decl_ast(parser, tok.site, constant, name, init_expr);
 			if (ast_is_error(init)) {
@@ -1700,7 +1714,7 @@ static Ast parse_stat(Parser *parser)
 					return body;
 				}
 				if (!body) {
-					return parser_error(parser, ERROR_INVALID_STATEMENT, parser->tok.site, "expected for-loop body");
+					return parser_error(parser, ERROR_INVALID_STATEMENT, parser_current_token(parser).site, "expected for-loop body");
 				}
 
 				tree = create_for_range_ast(parser, tok.site, init, body);
@@ -1717,7 +1731,7 @@ static Ast parse_stat(Parser *parser)
 					return pred;
 				}
 				if (!pred) {
-					return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected for-loop predicate");
+					return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected for-loop predicate");
 				}
 				Token second_separator = take_token(parser, TOK_SEMICOLON);
 				if (token_is_error(second_separator)) {
@@ -1729,7 +1743,7 @@ static Ast parse_stat(Parser *parser)
 					return step;
 				}
 				if (!step) {
-					return parser_error(parser, ERROR_INVALID_STATEMENT, parser->tok.site, "expected for-loop step");
+					return parser_error(parser, ERROR_INVALID_STATEMENT, parser_current_token(parser).site, "expected for-loop step");
 				}
 				Token question = take_token(parser, TOK_QMARK);
 				if (token_is_error(question)) {
@@ -1741,7 +1755,7 @@ static Ast parse_stat(Parser *parser)
 					return body;
 				}
 				if (!body) {
-					return parser_error(parser, ERROR_INVALID_STATEMENT, parser->tok.site, "expected for-loop body");
+					return parser_error(parser, ERROR_INVALID_STATEMENT, parser_current_token(parser).site, "expected for-loop body");
 				}
 
 				tree = create_for_ast(parser, tok.site, init, pred, step, body);
@@ -1768,13 +1782,13 @@ static Ast parse_stat(Parser *parser)
 
 static Ast parse_if_stat(Parser *parser)
 {
-	Token tok = parser->tok;
+	Token tok = parser_current_token(parser);
 	Ast pred = parse_expr(parser);
 	if (ast_is_error(pred)) {
 		return pred;
 	}
 	if (!pred) {
-		return parser_error(parser, ERROR_INVALID_EXPRESSION, parser->tok.site, "expected if predicate");
+		return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected if predicate");
 	}
 	if (!pick_token(parser, TOK_QMARK)) {
 		return parser_error(parser, ERROR_EXPECTED_TOKEN, pred->site, "expected '?' for 'if' statement");
@@ -1785,7 +1799,7 @@ static Ast parse_if_stat(Parser *parser)
 		return true_clause;
 	}
 	if (!true_clause) {
-		return parser_error(parser, ERROR_INVALID_STATEMENT, parser->tok.site, "expected if body");
+		return parser_error(parser, ERROR_INVALID_STATEMENT, parser_current_token(parser).site, "expected if body");
 	}
 
 	Ast else_clause = 0;
@@ -1811,7 +1825,7 @@ static Ast parse_constexpr(Parser *parser)
 	}
 	if (!peek_token(parser, TOK_NONE))
 	{
-		return parser_unexpected_token(parser, parser->tok);
+		return parser_unexpected_token(parser, parser_current_token(parser));
 	}
 	return ast;
 }

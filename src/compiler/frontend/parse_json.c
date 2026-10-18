@@ -20,10 +20,10 @@ static Ast json_expect_separator_or_end(Parser *parser, Token_Type end, const ch
 	if (!pick_token(parser, TOK_COMMA))
 	{
 		*done = true;
-		if (token_is_error(parser->tok)) {
-			return ast_from_token_error(parser->tok);
+		if (token_is_error(parser_current_token(parser))) {
+			return ast_from_token_error(parser_current_token(parser));
 		}
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, message);
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, message);
 	}
 	return NULL_AST;
 }
@@ -84,7 +84,7 @@ static Ast parse_json_ast_object(Parser *parser)
 	}
 	if (!done)
 	{
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected '}'");
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, "expected '}'");
 	}
 
 	Ast_Array args = pop_ast_array(parser, nargs);
@@ -132,7 +132,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	}
 	if (!done)
 	{
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser->tok.site, "expected ']'");
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, "expected ']'");
 	}
 
 	Ast_Array args = pop_ast_array(parser, nargs);
@@ -152,7 +152,7 @@ static Ast parse_json_ast_number(Parser *parser)
 		is_negative = true;
 	}
 
-	Token token = parser->tok;
+	Token token = parser_current_token(parser);
 	switch (token.type)
 	{
 		case TOK_ERROR:
@@ -185,7 +185,7 @@ static Ast parse_json_ast_number(Parser *parser)
 
 static Ast parse_json_ast_value(Parser *parser)
 {
-	Token token = parser->tok;
+	Token token = parser_current_token(parser);
 
 	switch (token.type)
 	{
@@ -250,7 +250,7 @@ static Ast parse_json_ast(Parser *parser)
 	}
 	if (!peek_token(parser, TOK_NONE))
 	{
-		return parser_unexpected_token(parser, parser->tok);
+		return parser_unexpected_token(parser, parser_current_token(parser));
 	}
 	return ast;
 }
@@ -258,22 +258,22 @@ static Ast parse_json_ast(Parser *parser)
 static Ast parse_jsonl_ast(Parser *parser)
 {
 	u32 count = 0;
-	SourceSite site = parser->tok.site;
+	SourceSite site = parser_current_token(parser).site;
 	while (!peek_token(parser, TOK_NONE))
 	{
-		u32 line_index = parser->tok.site.line_index;
+		u32 line_index = parser_current_token(parser).site.line_index;
 		Ast value = parse_json_ast_value(parser);
 		if (ast_is_error(value))
 		{
 			return value;
 		}
-		if (parser->tok_prev.site.line_index != line_index)
+		if (parser_previous_token(parser).site.line_index != line_index)
 		{
 			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
 		}
-		if (!peek_token(parser, TOK_NONE) && parser->tok.site.line_index == line_index)
+		if (!peek_token(parser, TOK_NONE) && parser_current_token(parser).site.line_index == line_index)
 		{
-			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, parser->tok.site, "expected a line break after JSON value");
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, parser_current_token(parser).site, "expected a line break after JSON value");
 		}
 		if (!push_ast(parser, value))
 		{

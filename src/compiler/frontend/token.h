@@ -2,6 +2,9 @@
 // See Copyright Notice In elf.h
 //
 
+#ifndef ELF_COMPILER_TOKEN_H
+#define ELF_COMPILER_TOKEN_H
+
 #define FORMAT_CHAR '$'
 
 #define KEYWORD_DEFINITIONS(X) \
@@ -165,6 +168,14 @@ typedef struct
 }
 Token;
 
+typedef struct
+{
+	Token *items;
+	u32    count;
+	u32    capacity;
+}
+Token_Array;
+
 static inline b32 token_is_error(Token token)
 {
 	return token.type == TOK_ERROR;
@@ -179,3 +190,5 @@ static Token token_from_status(Com_Status status, SourceSite site)
 	}
 	return token;
 }
+
+#endif

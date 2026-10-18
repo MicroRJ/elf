@@ -341,12 +341,12 @@ elf_u32 compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf
 				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
 				if (compiler_source)
 				{
-					Parser *parser = parser_create(compiler);
-					if (parser)
+					Parser parser = {};
+					if (parser_init(&parser, compiler))
 					{
-						Ast ast = parse_source_recursively(compiler, parser, compiler_source);
+						Ast ast = parse_source_recursively(compiler, &parser, compiler_source);
 
-						parser_destroy(parser);
+						parser_destroy(&parser);
 
 						if (!ast_is_error(ast) && !compiler->report.error_count)
 						{
@@ -397,11 +397,11 @@ static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSl
 				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
 				if (compiler_source)
 				{
-					Parser *parser = parser_create(compiler);
-					if (parser)
+					Parser parser = {};
+					if (parser_init(&parser, compiler))
 					{
-						ast = type == COMPILER_PARSE_JSON ? parser_parse_json(parser, compiler_source) : parser_parse_jsonl(parser, compiler_source);
-						parser_destroy(parser);
+						ast = type == COMPILER_PARSE_JSON ? parser_parse_json(&parser, compiler_source) : parser_parse_jsonl(&parser, compiler_source);
+						parser_destroy(&parser);
 					}
 				}
 			}
