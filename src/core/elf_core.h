@@ -143,22 +143,22 @@ elf_Globals;
 // module-relative. Relocating them into elf_State may be worth exploring later.
 struct elf_Module
 {
-	elf_Module   *next;
-	elf_String   *source_name;
-	char         *source_data;
-	u32           source_size;
-	elf_String  **strings;
-	u32           string_count;
-	f64          *number_constants;
-	u32           number_constant_count;
-	i64          *integer_constants;
-	u32           integer_constant_count;
-	BcFunction   *bytecode_functions;
-	u32           bytecode_function_count;
-	Bytecode     *bytecode;
-	u32           bytecode_count;
+	elf_Module       *next;
+	elf_String       *source_name;
+	char             *source_data;
+	u32               source_size;
+	elf_String      **strings;
+	u32               string_count;
+	f64              *number_constants;
+	u32               number_constant_count;
+	i64              *integer_constants;
+	u32               integer_constant_count;
+	BcFunction       *bytecode_functions;
+	u32               bytecode_function_count;
+	Bytecode         *bytecode;
+	u32               bytecode_count;
 	BcSourceMapEntry *source_map;
-	u32             source_map_count;
+	u32               source_map_count;
 };
 
 struct BcFunctionRef
