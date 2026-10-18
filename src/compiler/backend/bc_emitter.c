@@ -508,7 +508,6 @@ static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 
 static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 {
-	ASSERT(ir->ir_call.type == IR_CALL_DYNAMIC);
 	Ir expr = ir->ir_call.expr;
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
@@ -576,7 +575,6 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	Ir function = ir->ir_call.expr;
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
-	ASSERT(ir->ir_call.type == IR_CALL_DIRECT);
 	ASSERT(function->kind == IR_FUNCTION);
 	ASSERT(function->ir_function->captures.count == 0);
 	ASSERT(nout <= 0xff);
@@ -973,14 +971,12 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 		case IR_CALL:
 		{
-			if (expr->ir_call.type == IR_CALL_DIRECT) {
+			Ir callee = expr->ir_call.expr;
+			if (callee->kind == IR_FUNCTION && callee->ir_function->captures.count == 0) {
 				out = emit_direct_call(emitter, expr, out, nout);
 			}
-			else if (expr->ir_call.type == IR_CALL_DYNAMIC) {
-				out = emit_dynamic_call(emitter, expr, out, nout);
-			}
 			else {
-				NO_CODE;
+				out = emit_dynamic_call(emitter, expr, out, nout);
 			}
 		}
 		break;

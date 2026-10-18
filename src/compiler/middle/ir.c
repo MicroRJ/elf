@@ -177,12 +177,9 @@ static Ir ir_new_array_add(IrEmitter *emitter, SourceSite site, Ir array, Ir val
 	return ir_new_binary(emitter, site, IR_ARRAY_ADD, array, value);
 }
 
-static Ir ir_new_call(IrEmitter *emitter, SourceSite site, IrCallType type, Ir expr, IrArray args)
+static Ir ir_new_call(IrEmitter *emitter, SourceSite site, Ir expr, IrArray args)
 {
-	ASSERT(type == IR_CALL_DYNAMIC || type == IR_CALL_DIRECT);
-	ASSERT(type != IR_CALL_DIRECT || (expr && expr->kind == IR_FUNCTION));
 	Ir ir = ir_alloc(emitter, site, IR_CALL);
-	ir->ir_call.type = type;
 	ir->ir_call.expr = expr;
 	ir->ir_call.args = args;
 	return ir;

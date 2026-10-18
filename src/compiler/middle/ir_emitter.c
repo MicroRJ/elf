@@ -323,16 +323,6 @@ static IrKind ir_kind_from_compound_assign_ast_kind(Ast_Kind kind)
 	}
 }
 
-static IrCallType call_type_from_callee(Ir callee)
-{
-	IrCallType type = IR_CALL_DYNAMIC;
-	if (callee && callee->kind == IR_FUNCTION && callee->ir_function->captures.count == 0)
-	{
-		type = IR_CALL_DIRECT;
-	}
-	return type;
-}
-
 static b32 ast_is_call(Ast expr)
 {
 	return expr && expr->kind == AST_CALL;
@@ -536,11 +526,10 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		case AST_CALL:
 		{
 			Ir ir_func = ir_emit_expr(emitter, expr->call.expr);
-			IrCallType call_type = call_type_from_callee(ir_func);
 			b32 failed = !ir_func || ir_func == ERROR_IR;
 			IrArray ir_args = lower_call_arguments(emitter, expr, &failed);
 
-			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, call_type, ir_func, ir_args);
+			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, ir_func, ir_args);
 		}
 		break;
 

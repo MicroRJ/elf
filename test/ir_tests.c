@@ -220,9 +220,6 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 	expect_ir_atom(field->ir_binary.y, "name", "field key lowers to atom ir");
 
 	Ir call = ir_test_body_stat(body, 1, IR_CALL, "lower call expression statement");
-	if (call && call->ir_call.type != IR_CALL_DYNAMIC) {
-		test_fail("runtime callee lowers to a dynamic call");
-	}
 	expect_ir_kind(call->ir_call.expr, IR_GLOBAL, "call callee lowers to global load");
 	if (call && call->ir_call.args.count != 1) {
 		test_fail("call keeps one table argument");
@@ -469,9 +466,7 @@ static void test_ir_lowers_static_call_arguments(elf_State *state)
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static call lowers return");
 	Ir call = ret ? ret->ir_return.expr : 0;
 	expect_ir_kind(call, IR_CALL, "static call lowers call expression");
-	if (call && call->ir_call.type != IR_CALL_DIRECT) {
-		test_fail("static call arguments remain on a direct call");
-	}
+	expect_ir_kind(call ? call->ir_call.expr : 0, IR_FUNCTION, "static call retains function callee");
 	if (!call || call->ir_call.args.count != 3)
 	{
 		test_fail("static call fills every declared parameter");
@@ -498,7 +493,7 @@ static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
 
 	Ir ret = ir_test_body_stat(result.module->first_function->body, 0, IR_RETURN, "variadic static call lowers return");
 	Ir call = ret ? ret->ir_return.expr : 0;
-	if (!call || call->kind != IR_CALL || call->ir_call.type != IR_CALL_DIRECT || call->ir_call.args.count != 3) {
+	if (!call || call->kind != IR_CALL || call->ir_call.args.count != 3) {
 		test_fail("variadic static call retains all positional arguments");
 	}
 	arena_destroy(&arena);
