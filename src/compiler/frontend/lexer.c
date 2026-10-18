@@ -631,7 +631,7 @@ static Com_Status token_array_push(Token_Array *tokens, Arena *arena, Token toke
 	return COM_STATUS_OK;
 }
 
-static Com_Status lexer_emit_token(Lexer *lexer, Token *emitted);
+static Com_Status lexer_emit_token(Lexer *lexer);
 
 static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b32 is_block)
 {
@@ -694,12 +694,13 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 		Token closing = {0};
 		for (;;)
 		{
-			u32 emitted_start = lexer->tokens->count;
-			Token token = {};
-			error = lexer_emit_token(lexer, &token);
+			u32 token_start = lexer->tokens->count;
+			error = lexer_emit_token(lexer);
 			if (error != COM_STATUS_OK) {
 				break;
 			}
+			ASSERT(lexer->tokens->count > token_start);
+			Token token = lexer->tokens->items[token_start];
 			if (token.type == TOK_NONE)
 			{
 				error = lexer_errorf(lexer, ERROR_UNTERMINATED_INTERPOLATION, opening.site, "unterminated interpolated expression");
@@ -708,8 +709,8 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 
 			if (token.type == TOK_RIGHT_BRACE && brace_depth == 0)
 			{
-				ASSERT(lexer->tokens->count == emitted_start + 1);
-				lexer->tokens->count = emitted_start;
+				ASSERT(lexer->tokens->count == token_start + 1);
+				lexer->tokens->count = token_start;
 				closing = token;
 				break;
 			}
@@ -739,9 +740,8 @@ static Com_Status lexer_format_string(Lexer *lexer, Token opening, char quote, b
 	return error;
 }
 
-static Com_Status lexer_emit_token(Lexer *lexer, Token *emitted)
+static Com_Status lexer_emit_token(Lexer *lexer)
 {
-	ASSERT(emitted);
 	b32 line_break_before = false;
 	Com_Status error = lexer_skip_trivia(lexer, &line_break_before);
 	Token token = {0};
@@ -769,11 +769,7 @@ static Com_Status lexer_emit_token(Lexer *lexer, Token *emitted)
 			{
 				b32 is_block = lexer_peek(lexer, 2) == quote && lexer_peek(lexer, 3) == quote;
 				lexer->cursor += 2 + is_block * 2;
-				u32 token_start = lexer->tokens->count;
 				error = lexer_format_string(lexer, token, (char)quote, is_block);
-				if (error == COM_STATUS_OK) {
-					*emitted = lexer->tokens->items[token_start];
-				}
 				return error;
 			}
 			else
@@ -1141,9 +1137,6 @@ static Com_Status lexer_emit_token(Lexer *lexer, Token *emitted)
 	if (error == COM_STATUS_OK)
 	{
 		error = token_array_push(lexer->tokens, lexer->scratch_arena, token);
-		if (error == COM_STATUS_OK) {
-			*emitted = token;
-		}
 	}
 	return error;
 }
@@ -1169,13 +1162,15 @@ static Com_Status lexer_tokenize(Compiler *compiler, Com_Source *source, Arena *
 	for (;;)
 	{
 		SourceSite site = lexer_source_site(&lexer);
-		Token token = {};
-		Com_Status error = lexer_emit_token(&lexer, &token);
+		u32 token_start = tokens->count;
+		Com_Status error = lexer_emit_token(&lexer);
 		if (error != COM_STATUS_OK)
 		{
 			Token error_token = token_from_status(error, site);
 			return token_array_push(tokens, scratch_arena, error_token) == COM_STATUS_OK ? COM_STATUS_OK : COM_STATUS_OOM;
 		}
+		ASSERT(tokens->count > token_start);
+		Token token = tokens->items[token_start];
 		if (token.type == TOK_NONE) {
 			return COM_STATUS_OK;
 		}
