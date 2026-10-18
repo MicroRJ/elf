@@ -63,6 +63,7 @@ struct Com_Source
 	struct Ast_T       *ast;
 	struct Scope       *scope;
 	Com_SourceState     state;
+	Com_Report          report;
 };
 
 // NOTE(RJ):
@@ -77,7 +78,8 @@ struct Compiler
 	Com_Source        *first_source;
 	Com_Source        *last_source;
 	u32                source_count;
-	Com_Report         report;
+	u32                error_count;
+	u32                warning_count;
 };
 
 Compiler *compiler_create(Arena *arena);

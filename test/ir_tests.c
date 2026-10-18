@@ -400,7 +400,7 @@ static void test_ir_rejects_unknown_parameter_type(elf_State *state)
 	log_set_hook(ignore_expected_lowering_error, 0);
 	IrTestResult result = ir_test_lower_source(state, &arena, "probe := fun(value: mystery) { ret value }\nret probe");
 	log_set_hook(0, 0);
-	if (!result.module || result.compiler->report.error_count != 1) {
+	if (!result.module || result.source->report.error_count != 1) {
 		test_fail("unknown function parameter type reports one lowering error");
 	}
 	arena_destroy(&arena);
@@ -429,7 +429,7 @@ static void test_ir_rejects_assignment_to_file_static(elf_State *state)
 	log_set_hook(ignore_expected_lowering_error, 0);
 	IrTestResult result = ir_test_lower_source(state, &arena, "answer :: 42\nanswer = 0");
 	log_set_hook(0, 0);
-	if (!result.module || result.compiler->report.error_count != 1) {
+	if (!result.module || result.source->report.error_count != 1) {
 		test_fail("assignment to a file static reports one lowering error");
 	}
 	Ir body = ir_test_main_body(result.module);
@@ -474,7 +474,7 @@ static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
 {
 	Arena arena = arena_create(0);
 	IrTestResult result = ir_test_lower_source(state, &arena, "collect :: fun(first, ...) { ret first }\nret collect(1, 2, 3)");
-	if (!result.module || result.compiler->report.error_count != 0 || result.module->function_count != 2)
+	if (!result.module || result.source->report.error_count != 0 || result.module->function_count != 2)
 	{
 		test_fail("variadic static call accepts extra positional arguments");
 		arena_destroy(&arena);

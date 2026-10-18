@@ -109,6 +109,8 @@ b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity,
 {
 	ASSERT(compiler);
 	ASSERT(code != ERROR_NONE);
+	Com_Source *source = compiler_source_from_id(compiler, site.source);
+	ASSERT(source);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
 	if (!message.data) {
 		return false;
@@ -123,24 +125,26 @@ b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity,
 	compiler_message->phase = phase;
 	compiler_message->site = site;
 	compiler_message->text = message;
-	if (compiler->report.last)
+	if (source->report.last)
 	{
-		compiler->report.last->next = compiler_message;
+		source->report.last->next = compiler_message;
 	}
 	else
 	{
-		compiler->report.first = compiler_message;
+		source->report.first = compiler_message;
 	}
-	compiler->report.last = compiler_message;
-	compiler->report.message_count += 1;
+	source->report.last = compiler_message;
+	source->report.message_count += 1;
 
 	if (severity == ERROR_ERROR || severity == ERROR_FATAL)
 	{
-		compiler->report.error_count += 1;
+		source->report.error_count += 1;
+		compiler->error_count += 1;
 	}
 	else if (severity == ERROR_WARNING)
 	{
-		compiler->report.warning_count += 1;
+		source->report.warning_count += 1;
+		compiler->warning_count += 1;
 	}
 
 	return true;
@@ -149,39 +153,41 @@ b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity,
 void compiler_log_report(Compiler *compiler)
 {
 	ASSERT(compiler);
-	for (Com_Message *message = compiler->report.first; message; message = message->next)
+	for (Com_Source *source = compiler->first_source; source; source = source->next)
 	{
-		LogLevel level = LOG_LEVEL_INFO;
-		const char *severity_name = "note";
-		if (message->severity == ERROR_FATAL)
+		for (Com_Message *message = source->report.first; message; message = message->next)
 		{
-			level = LOG_LEVEL_FATAL;
-			severity_name = "fatal";
-		}
-		else if (message->severity == ERROR_ERROR)
-		{
-			level = LOG_LEVEL_ERROR;
-			severity_name = "error";
-		}
-		else if (message->severity == ERROR_WARNING)
-		{
-			level = LOG_LEVEL_WARNING;
-			severity_name = "warning";
-		}
-		SourceSite site = message->site;
-		Com_Source *source = compiler_source_from_id(compiler, site.source);
-		const char *source_name = source ? atom_data(source->name) : "<unknown>";
-		if (site.line_index)
-		{
-			log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message->text.data);
-		}
-		else
-		{
-			log_linef(level, "%s [?] %s: %s", source_name, severity_name, message->text.data);
-		}
-		if (source && source_slice_is_valid(site))
-		{
-			print_source_slice_marker(site, source->source);
+			LogLevel level = LOG_LEVEL_INFO;
+			const char *severity_name = "note";
+			if (message->severity == ERROR_FATAL)
+			{
+				level = LOG_LEVEL_FATAL;
+				severity_name = "fatal";
+			}
+			else if (message->severity == ERROR_ERROR)
+			{
+				level = LOG_LEVEL_ERROR;
+				severity_name = "error";
+			}
+			else if (message->severity == ERROR_WARNING)
+			{
+				level = LOG_LEVEL_WARNING;
+				severity_name = "warning";
+			}
+			SourceSite site = message->site;
+			const char *source_name = atom_data(source->name);
+			if (site.line_index)
+			{
+				log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message->text.data);
+			}
+			else
+			{
+				log_linef(level, "%s [?] %s: %s", source_name, severity_name, message->text.data);
+			}
+			if (source_slice_is_valid(site))
+			{
+				print_source_slice_marker(site, source->source);
+			}
 		}
 	}
 }
@@ -348,11 +354,11 @@ elf_u32 compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf
 
 						parser_destroy(&parser);
 
-						if (!ast_is_error(ast) && !compiler->report.error_count)
+						if (!ast_is_error(ast) && !compiler->error_count)
 						{
 							check_source(compiler, compiler_source);
 							IrModule *ir_module = ir_emit_module(compiler, ast);
-							if (ir_module && !compiler->report.error_count)
+							if (ir_module && !compiler->error_count)
 							{
 								entry = bc_emit_module(compiler->target, ir_module);
 							}
@@ -405,7 +411,7 @@ static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSl
 					}
 				}
 			}
-			if (compiler->report.error_count) {
+			if (compiler->error_count) {
 				ast = ERROR_AST;
 			}
 		}

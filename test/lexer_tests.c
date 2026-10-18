@@ -263,10 +263,10 @@ static void test_lexer_macros(elf_State *state)
 		test_fail("invalid macro retains its source error");
 	}
 	expect_token_site_size(bare_hash, 1, "bare # consumes only hash");
-	if (invalid.compiler->report.error_count != 1) {
+	if (invalid.source->report.error_count != 1) {
 		test_fail("invalid macro reports one error");
 	}
-	if (!invalid.compiler->report.first || invalid.compiler->report.first->code != ERROR_EXPECTED_MACRO_NAME) {
+	if (!invalid.source->report.first || invalid.source->report.first->code != ERROR_EXPECTED_MACRO_NAME) {
 		test_fail("invalid macro records its compiler error code");
 	}
 }
@@ -666,7 +666,7 @@ static void test_lexer_numbers(elf_State *state)
 	{
 		Parser malformed = lexer_test_parser(state, malformed_sources[i]);
 		expect_token_type(lexer_next(&malformed), TOK_ERROR, "malformed exponent returns an error token");
-		if (malformed.compiler->report.error_count != 1) {
+		if (malformed.source->report.error_count != 1) {
 			test_fail("malformed exponent reports missing digits");
 		}
 	}
@@ -736,7 +736,7 @@ static void test_lexer_bounded_source(elf_State *state)
 	char comment_source[] = {'/', '*'};
 	Parser comment_parser = lexer_test_parser_slice(state, comment_source, sizeof(comment_source));
 	expect_token_type(lexer_next(&comment_parser), TOK_ERROR, "bounded unterminated comment returns an error token");
-	if (comment_parser.compiler->report.error_count != 1) {
+	if (comment_parser.source->report.error_count != 1) {
 		test_fail("bounded unterminated comment reports an error");
 	}
 }
