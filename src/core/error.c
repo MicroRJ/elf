@@ -158,14 +158,14 @@ static void report_runtime_error_message(elf_State *state, ErrorCode code, const
 	abort_after_runtime_error();
 }
 
-void elf_print_current_runtime_source_location(elf_State *state)
+void print_current_runtime_source_location(elf_State *state)
 {
 	RuntimeSourceLocation location = runtime_source_location(state);
 	print_runtime_error_location(location);
 	print_runtime_call_stack(state);
 }
 
-void elf_report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...)
+void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);

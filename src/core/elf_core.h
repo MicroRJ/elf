@@ -305,8 +305,8 @@ void elf_globals_set_by_name(elf_Globals *globals, elf_StrSlice name, elf_Value 
 elf_Value elf_globals_get_by_slot(elf_Globals *globals, u32 slot);
 void elf_globals_set_by_slot(elf_Globals *globals, u32 slot, elf_Value value);
 
-void elf_report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);
-void elf_print_current_runtime_source_location(elf_State *state);
+void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);
+void print_current_runtime_source_location(elf_State *state);
 
 #include "elf_helpers.h"
 

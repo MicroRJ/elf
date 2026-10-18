@@ -80,7 +80,7 @@ ELF_FUNCTION(l_core_assert)
 	if (nargs > 2) message = lib_load_cstr(S, 2);
 	if (!value_to_integer(condition))
 	{
-		elf_report_runtime_error(S, ERROR_RUNTIME, "%s", message);
+		report_runtime_error(S, ERROR_RUNTIME, "%s", message);
 	}
 	return 0;
 }
@@ -208,13 +208,13 @@ static StackFrame *core_caller_frame(elf_State *state)
 {
 	if (state->frame == state->frame_stack)
 	{
-		elf_report_runtime_error(state, ERROR_RUNTIME,
+		report_runtime_error(state, ERROR_RUNTIME,
 			"caller introspection requires a bytecode caller");
 	}
 	StackFrame *caller = state->frame - 1;
 	if (!caller->module || !caller->function)
 	{
-		elf_report_runtime_error(state, ERROR_RUNTIME,
+		report_runtime_error(state, ERROR_RUNTIME,
 			"caller introspection requires a bytecode caller");
 	}
 	return caller;

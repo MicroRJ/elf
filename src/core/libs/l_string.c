@@ -84,7 +84,7 @@ static b32 string_normalize_index(elf_State *state, i64 index, u32 size,
 	i64 upper = allow_end ? size : (i64)size - 1;
 	if (index < 0 || index > upper)
 	{
-		elf_report_runtime_error(state, ERROR_OUT_OF_RANGE,
+		report_runtime_error(state, ERROR_OUT_OF_RANGE,
 			"string index %lld is out of bounds for length %u", index, size);
 		return false;
 	}
@@ -157,7 +157,7 @@ ELF_FUNCTION(l_string_slice)
 	if (nargs > 2 && !string_normalize_index(S, lib_load_integer(S, 2), size, true, &end)) return 0;
 	if (end < first)
 	{
-		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE,
+		report_runtime_error(S, ERROR_OUT_OF_RANGE,
 			"string slice end %u precedes start %u", end, first);
 		return 0;
 	}
@@ -178,7 +178,7 @@ ELF_FUNCTION(l_string_splice)
 	i64 requested = lib_load_integer(S, 2);
 	if (requested < 0 || (u64)requested > size - position)
 	{
-		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE, "string splice delete count %lld is out of bounds", requested);
+		report_runtime_error(S, ERROR_OUT_OF_RANGE, "string splice delete count %lld is out of bounds", requested);
 		return 0;
 	}
 	u32 delete_size = (u32)requested;
@@ -186,7 +186,7 @@ ELF_FUNCTION(l_string_splice)
 	u32 size_after_delete = size - delete_size;
 	if (replacement_size > ELF_STRING_MAX_SIZE - size_after_delete)
 	{
-		elf_report_runtime_error(S, ERROR_OUT_OF_RANGE, "string size exceeds the supported range");
+		report_runtime_error(S, ERROR_OUT_OF_RANGE, "string size exceeds the supported range");
 		return 0;
 	}
 
@@ -285,7 +285,7 @@ ELF_FUNCTION(l_string_split)
 	u32 separator_size = elf_string_size(separator);
 	if (separator_size == 0)
 	{
-		elf_report_runtime_error(S, ERROR_INVALID_ARGUMENT,
+		report_runtime_error(S, ERROR_INVALID_ARGUMENT,
 			"string split separator cannot be empty");
 		return 0;
 	}
@@ -461,7 +461,7 @@ ELF_FUNCTION(l_string_replace)
 	u32 old_size = elf_string_size(old);
 	if (old_size == 0)
 	{
-		elf_report_runtime_error(S, ERROR_INVALID_ARGUMENT,
+		report_runtime_error(S, ERROR_INVALID_ARGUMENT,
 			"string replacement target cannot be empty");
 		return 0;
 	}
@@ -491,7 +491,7 @@ ELF_FUNCTION(l_string_repeat)
 	u32 size = elf_string_size(string);
 	if (count < 0 || (u64)count * size > UINT_MAX)
 	{
-		elf_report_runtime_error(S, ERROR_INVALID_ARGUMENT,
+		report_runtime_error(S, ERROR_INVALID_ARGUMENT,
 			"invalid string repeat count %lld", count);
 		return 0;
 	}

@@ -35,7 +35,7 @@ static void table_check_write(elf_State *state, elf_Table *table)
 {
 	if (table->obj.status & ELF_OBJECT_READONLY)
 	{
-		elf_report_runtime_error(state, ERROR_READONLY, "attempted to write to readonly object");
+		report_runtime_error(state, ERROR_READONLY, "attempted to write to readonly object");
 	}
 }
 
@@ -172,7 +172,7 @@ void elf_table_set(elf_State *state, elf_Table *table, elf_Value key, elf_Value 
 	table_check_write(state, table);
 	if (value_is_nil(key))
 	{
-		elf_report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "table key cannot be nil");
+		report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "table key cannot be nil");
 		return;
 	}
 	table_ensure_capacity(state, table);

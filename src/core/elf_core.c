@@ -19,7 +19,7 @@
 
 #include "elf_core.h"
 #include "source_diagnostics.c"
-#include "core_diagnostics.c"
+#include "error.c"
 
 #include "elf_memory.c"
 #include "elf_globals.c"
