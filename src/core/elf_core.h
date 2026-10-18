@@ -128,6 +128,11 @@ struct elf_Table
 
 struct elf_Prototype
 {
+	u64               allocation_size;
+	b32               variadic;
+	u8                arity;
+	u8                captures;
+	u16               stack_size;
 	elf_String      **strings;
 	u32               string_count;
 	f64              *number_constants;
@@ -138,10 +143,6 @@ struct elf_Prototype
 	u32               bytecode_count;
 	BcSourceMapEntry *source_map;
 	u32               source_map_count;
-	b32               variadic;
-	u8                 arity;
-	u8                 captures;
-	u16                stack_size;
 };
 
 struct elf_Closure
@@ -172,9 +173,9 @@ struct elf_State
 	Arena          arena;
 	void          *user_data;
 
-	elf_Prototype *prototypes;
-	u32            prototype_count;
-	u32            prototype_capacity;
+	elf_Prototype **prototypes;
+	u32             prototype_count;
+	u32             prototype_capacity;
 
 	struct
 	{

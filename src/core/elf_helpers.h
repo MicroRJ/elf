@@ -256,13 +256,13 @@ static inline b32 elf_table_entry_is_key(Entry entry)
 
 static inline b32 prototype_index_is_valid(elf_State *state, u32 prototype_index)
 {
-	return prototype_index < state->prototype_count;
+	return prototype_index < state->prototype_count && state->prototypes[prototype_index];
 }
 
 static inline elf_Prototype *prototype_from_index(elf_State *state, u32 prototype_index)
 {
 	ASSERT(prototype_index_is_valid(state, prototype_index));
-	return state->prototypes + prototype_index;
+	return state->prototypes[prototype_index];
 }
 
 //

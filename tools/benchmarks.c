@@ -201,6 +201,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	u64 string_count = 0;
 	u64 integer_constant_count = 0;
 	u64 number_constant_count = 0;
+	u64 prototype_storage = 0;
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 
 	i64 start = bench_now();
@@ -212,29 +213,24 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 		bench_require(entry == first_prototype, "compile entry is not the first new prototype");
 		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
 		{
-			elf_Prototype *prototype = state->prototypes + prototype_index;
+			elf_Prototype *prototype = prototype_from_index(state, prototype_index);
 			bytecode_count += prototype->bytecode_count;
 			function_count += 1;
 			string_count += prototype->string_count;
 			integer_constant_count += prototype->integer_constant_count;
 			number_constant_count += prototype->number_constant_count;
+			prototype_storage += prototype->allocation_size;
 		}
 		elf_pop(state, 1);
 	}
 	double seconds = bench_elapsed_s(start);
 	u64 retained_arena_storage = state->arena.used - arena_before;
-	u64 array_storage =
-		bytecode_count * sizeof(Bytecode) +
-		string_count * sizeof(elf_String *) +
-		integer_constant_count * sizeof(i64) +
-		number_constant_count * sizeof(f64);
-	u64 non_array_arena_storage = retained_arena_storage - array_storage;
 
 	bench_report("compile + load script", "loads", iterations, seconds);
 	printf("  growth: %llu bytecodes, %llu functions, %llu strings, %llu integer constants, %llu number constants\n",
 		bytecode_count, function_count, string_count, integer_constant_count, number_constant_count);
-	printf("  retained state-arena storage: %llu bytes (%llu bytes outside finalized arrays)\n",
-		retained_arena_storage, non_array_arena_storage);
+	printf("  retained state-arena storage: %llu bytes\n", retained_arena_storage);
+	printf("  prototype allocation storage: %llu bytes\n", prototype_storage);
 	printf("  prototype table storage: %llu bytes\n", (u64)state->prototype_capacity * sizeof(*state->prototypes));
 	elf_destroy_state(state);
 }

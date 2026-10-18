@@ -139,9 +139,13 @@ static u32 gc_mark_prototypes(elf_State *state)
 	u32 marked_count = 0;
 	for (u32 prototype_index = 0; prototype_index < state->prototype_count; ++prototype_index)
 	{
-		elf_Prototype *prototype = state->prototypes + prototype_index;
-		for (u32 i = 0; i < prototype->string_count; ++i) {
-			marked_count += gc_mark_reachable(state, (elf_Object *)prototype->strings[i]);
+		elf_Prototype *prototype = state->prototypes[prototype_index];
+		if (prototype)
+		{
+			for (u32 i = 0; i < prototype->string_count; ++i)
+			{
+				marked_count += gc_mark_reachable(state, (elf_Object *)prototype->strings[i]);
+			}
 		}
 	}
 	return marked_count;
