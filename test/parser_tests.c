@@ -1,12 +1,37 @@
+static Com_Source *parser_test_add_source(Compiler *compiler, elf_StrSlice name, elf_StrSlice source_text)
+{
+	ASSERT(compiler);
+	ASSERT(name.size <= UINT32_MAX);
+	ASSERT(source_text.size <= UINT32_MAX);
+	Atom *name_atom = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
+	Com_Source *source = arena_push_zero(compiler->arena, sizeof(*source), _Alignof(Com_Source));
+	ASSERT(name_atom);
+	ASSERT(source);
+	source->id = compiler->source_count++;
+	source->name = name_atom;
+	source->path = name_atom;
+	source->source = (BcSourceBuffer) {source_text.data, (u32)source_text.size};
+	if (compiler->last_source)
+	{
+		compiler->last_source->next = source;
+	}
+	else
+	{
+		compiler->first_source = source;
+	}
+	compiler->last_source = source;
+	return source;
+}
+
 static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 {
-	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "parser_tests", source);
-	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, compiler->sources);
-	parser_destroy(parser);
+	Compiler *compiler = compiler_create(&state->arena);
+	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_tests", sizeof("parser_tests") - 1}, source);
+	Parser parser = {};
+	ASSERT(parser_init(&parser, compiler));
+	Ast file = parser_parse_file(&parser, compiler_source);
+	parser_destroy(&parser);
 	return file;
 }
 
@@ -355,10 +380,11 @@ static void test_parser_call_with_table_argument(elf_State *state)
 	Arena arena = arena_create(0);
 	char source_text[] = "make {x = 1, [2] = 3}";
 	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "deprecated_table_call", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
-	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, compiler->sources);
-	parser_destroy(parser);
+	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"deprecated_table_call", sizeof("deprecated_table_call") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
+	Parser parser = {};
+	ASSERT(parser_init(&parser, compiler));
+	Ast file = parser_parse_file(&parser, source);
+	parser_destroy(&parser);
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
@@ -523,10 +549,11 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "parser_source_error", source);
-	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, compiler->sources);
-	parser_destroy(parser);
+	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_source_error", sizeof("parser_source_error") - 1}, source);
+	Parser parser = {};
+	ASSERT(parser_init(&parser, compiler));
+	Ast file = parser_parse_file(&parser, compiler_source);
+	parser_destroy(&parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != ERROR_PHASE_PARSER)
 	{
 		test_fail(label);
@@ -744,10 +771,11 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"@ ignored", 9};
 	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "parser_lexer_error", source);
-	Parser *parser = parser_create(compiler);
-	Ast file = parser_parse_file(parser, compiler->sources);
-	parser_destroy(parser);
+	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_lexer_error", sizeof("parser_lexer_error") - 1}, source);
+	Parser parser = {};
+	ASSERT(parser_init(&parser, compiler));
+	Ast file = parser_parse_file(&parser, compiler_source);
+	parser_destroy(&parser);
 	if (file != ERROR_AST || compiler->report.error_count != 1 || compiler->report.first->phase != ERROR_PHASE_LEXER) {
 		test_fail("parser propagates a lexer error token");
 	}
@@ -796,13 +824,14 @@ static void test_parser_ast_oom(elf_State *state)
 	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"42", 2};
 	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "parser_ast_oom", source);
-	Parser *parser = parser_create(compiler);
+	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_ast_oom", sizeof("parser_ast_oom") - 1}, source);
+	Parser parser = {};
+	ASSERT(parser_init(&parser, compiler));
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
-	Ast ast = parser_parse_constant_expr(parser, compiler->sources);
+	Ast ast = parser_parse_constant_expr(&parser, compiler_source);
 	arena.capacity = capacity;
-	parser_destroy(parser);
+	parser_destroy(&parser);
 	if (ast != ERROR_OOM_AST || ast->status != COM_STATUS_OOM) {
 		test_fail("parser returns AST allocation failure");
 	}

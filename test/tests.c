@@ -37,9 +37,7 @@ static void test_fail(const char *label)
 #include "api_tests.c"
 #include "arena_tests.c"
 #include "lexer_tests.c"
-#if 0
 #include "parser_tests.c"
-#endif
 #include "unparse_tests.c"
 #if 0
 #include "ir_tests.c"
@@ -66,6 +64,7 @@ int main(void)
 	run_api_tests();
 	run_arena_tests();
 	run_lexer_tests(state);
+	run_parser_tests(state);
 	run_unparse_tests(state);
 
 	elf_destroy_state(state);
