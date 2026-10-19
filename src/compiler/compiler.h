@@ -12,6 +12,7 @@
 
 typedef struct Compiler Compiler;
 typedef struct elf_Prototype elf_Prototype;
+typedef struct elf_Source elf_Source;
 typedef u32 Com_SourceId;
 
 // Status for control flow based exception handling, it'll probably take a while to fully cover everything ...
@@ -62,6 +63,7 @@ struct Com_Source
 	Com_SourceId        id;
 	struct Atom        *name;
 	struct Atom        *path;
+	elf_Source         *runtime_source;
 	BcSourceBuffer      source;
 	struct Ast_T       *ast;
 	struct Scope       *scope;

@@ -13,6 +13,7 @@
 #include <dy.h>
 
 #include "elf.h"
+#include "elf_core.h"
 #include "base.h"
 #include "atom.h"
 #include "compiler.h"
@@ -201,7 +202,7 @@ b32 compiler_report(Compiler *compiler, ErrorCode code, ErrorSeverity severity, 
 	return result;
 }
 
-static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *path, BcSourceBuffer data)
+static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *path, elf_Source *runtime_source, BcSourceBuffer data)
 {
 	Com_Source *source = arena_push_zero(compiler->arena, sizeof(*source), _Alignof(Com_Source));
 	if (!source) {
@@ -210,6 +211,14 @@ static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *p
 	source->id = compiler->source_count++;
 	source->name = name;
 	source->path = path;
+	source->runtime_source = runtime_source;
+	if (runtime_source)
+	{
+		ASSERT(!data.data && !data.size);
+		ASSERT(runtime_source->text.size <= UINT32_MAX);
+		data.data = runtime_source->text.data;
+		data.size = (u32)runtime_source->text.size;
+	}
 	source->source = data;
 	if (compiler->last_source) {
 		compiler->last_source->next = source;
@@ -223,6 +232,7 @@ static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *p
 // NOTE(RJ): assumes the path is canonical
 static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Atom *path_atom)
 {
+	ASSERT(compiler->target);
 	for (Com_Source *source = compiler->first_source; source; source = source->next)
 	{
 		if (source->path == path_atom) {
@@ -236,7 +246,8 @@ static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Ato
 	path.data = (char *) atom_data(path_atom);
 	path.size = atom_size(path_atom);
 
-	elf_StrSlice contents = {0};
+	u64 arena_checkpoint = arena_mark(compiler->arena);
+	dy_String contents = {0};
 
 	dy_File_Info info = {0};
 	if (!dy_get_file_info(path, &info).error && !info.is_directory)
@@ -277,6 +288,13 @@ static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Ato
 		error = "could not find source file";
 	}
 
+	elf_Source *runtime_source = 0;
+	if (!error)
+	{
+		runtime_source = elf_source_create(compiler->target, path, contents);
+	}
+	arena_restore(compiler->arena, arena_checkpoint);
+
 	Com_Source *source = 0;
 	if (error)
 	{
@@ -284,7 +302,7 @@ static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Ato
 	}
 	else
 	{
-		source = compiler_alloc_source(compiler, path_atom, path_atom, (BcSourceBuffer) {.data = contents.data, .size = (u32)contents.size});
+		source = compiler_alloc_source(compiler, path_atom, path_atom, runtime_source, (BcSourceBuffer) {});
 		if (!source) {
 			compiler_report(compiler, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
 		}
@@ -340,11 +358,12 @@ elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice na
 		{
 			compiler->target = target;
 			Atom *source_name = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
-			char *source_data = arena_push_zero(arena, source.size + 1, 1);
-			if (source_name && source_data)
+			dy_String runtime_name = {(char *)name.data, name.size};
+			dy_String runtime_text = {(char *)source.data, source.size};
+			elf_Source *runtime_source = elf_source_create(target, runtime_name, runtime_text);
+			if (source_name && runtime_source)
 			{
-				copy_memory(source_data, source.data, source.size);
-				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
+				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, runtime_source, (BcSourceBuffer) {});
 				if (compiler_source)
 				{
 					Parser parser = {};
@@ -402,7 +421,7 @@ static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSl
 			if (source_name && source_data)
 			{
 				copy_memory(source_data, source.data, source.size);
-				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
+				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, 0, (BcSourceBuffer) {.data = source_data, .size = (u32)source.size});
 				if (compiler_source)
 				{
 					Parser parser = {};
