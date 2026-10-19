@@ -28,8 +28,7 @@ static u32 source_slice_line_end(SourceSite site, dy_String source)
 
 static void print_source_slice_marker(SourceSite site, dy_String source)
 {
-	if (!source_slice_is_valid(site) || !source.data ||
-		(elf_Size)site.offset > source.size || (elf_Size)site.line_offset > source.size)
+	if (!source_slice_is_valid(site) || !source.data || (elf_Size)site.offset > source.size || (elf_Size)site.line_offset > source.size)
 	{
 		log_line(LOG_LEVEL_ERROR, "| source information could not be found");
 		return;
@@ -38,8 +37,7 @@ static void print_source_slice_marker(SourceSite site, dy_String source)
 	u32 line_start_offset = site.line_offset;
 	u32 line_end_offset = source_slice_line_end(site, source);
 
-	while (line_start_offset < site.offset && line_start_offset < line_end_offset &&
-		(source.data[line_start_offset] == '\t' || source.data[line_start_offset] == ' '))
+	while (line_start_offset < site.offset && line_start_offset < line_end_offset && (source.data[line_start_offset] == '\t' || source.data[line_start_offset] == ' '))
 	{
 		++line_start_offset;
 	}
@@ -51,43 +49,25 @@ static void print_source_slice_marker(SourceSite site, dy_String source)
 	const char *line_start = source.data + line_start_offset;
 	u64 column = (u64)(site.offset - line_start_offset);
 	u64 line_size = (u64)(line_end_offset - line_start_offset);
-	u32 highlight_size = site.size ? site.size : 1;
+	u64 highlight_size = site.size ? site.size : 1;
+	u64 visible_highlight_size = MIN(highlight_size, line_size - MIN(line_size, column));
+	visible_highlight_size = MAX(visible_highlight_size, 1);
+	u64 marker_size = column + visible_highlight_size;
+	Scratch scratch = scratch_begin();
+	char *marker = arena_push(scratch.arena, marker_size, 1);
 
-	enum { MARKER_CAPACITY = 256 };
-	char marker[MARKER_CAPACITY];
-
-	if (column >= MARKER_CAPACITY)
+	for (u64 i = 0; i < column; ++i)
 	{
-		u64 shift = column - (MARKER_CAPACITY - 1);
-		line_start += shift;
-		line_size -= MIN(line_size, shift);
-		column = MARKER_CAPACITY - 1;
-	}
-
-	if (line_size > column + highlight_size + 32) {
-		line_size = column + highlight_size + 32;
-	}
-
-	u64 visible_highlight_size = highlight_size;
-	if (visible_highlight_size > MARKER_CAPACITY - column) {
-		visible_highlight_size = MARKER_CAPACITY - column;
-	}
-	if (visible_highlight_size > line_size - MIN(line_size, column)) {
-		visible_highlight_size = line_size > column ? line_size - column : 1;
-	}
-	if (visible_highlight_size == 0) {
-		visible_highlight_size = 1;
-	}
-
-	for (u64 i = 0; i < column; ++i) {
 		marker[i] = line_start[i] == '\t' ? '\t' : ' ';
 	}
 
 	marker[column] = '^';
-	for (u64 i = 1; i < visible_highlight_size; ++i) {
+	for (u64 i = 1; i < visible_highlight_size; ++i)
+	{
 		marker[column + i] = '~';
 	}
 
 	log_linef(LOG_LEVEL_INFO, "| %.*s", (i32)line_size, line_start);
-	log_linef(LOG_LEVEL_ERROR, "| %.*s", (i32)(column + visible_highlight_size), marker);
+	log_linef(LOG_LEVEL_ERROR, "| %.*s", (i32)marker_size, marker);
+	scratch_end(scratch);
 }

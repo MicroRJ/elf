@@ -41,10 +41,14 @@ static void test_fail(const char *label)
 #include "script_tests.c"
 #include "smoke_tests.c"
 
-int main(void)
+int main(int argc, char **argv)
 {
 	setvbuf(stdout, 0, _IONBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
+	if (argc == 2 && strcmp(argv[1], "--runtime-error-diagnostic-child") == 0)
+	{
+		return vm_run_runtime_error_diagnostic_child();
+	}
 
 	elf_State *state = elf_create_state();
 	run_lexer_tests(state);
