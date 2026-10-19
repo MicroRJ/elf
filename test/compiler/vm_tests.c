@@ -500,10 +500,10 @@ static int vm_run_runtime_error_diagnostic_child(void)
 	char source_text[] =
 		"outer := fun(options) {\n"
 		"\tmiddle := fun() {\n"
-		"\t\tinner := fun() {\n"
-		"\t\t\tret 1 + \"bad\"\n"
+		"\t\tinner := fun(callback: callable) {\n"
+		"\t\t\tret callback\n"
 		"\t\t}\n"
-		"\t\tinner()\n"
+		"\t\tinner(42)\n"
 		"\t}\n"
 		"\tmiddle()\n"
 		"}\n"
@@ -576,17 +576,18 @@ static void test_vm_runtime_error_diagnostics(void)
 	if (valid)
 	{
 		const char *headline = strstr(output, "runtime error[type-mismatch]");
-		const char *current = headline ? strstr(headline, "diagnostic-stack [4:10]") : 0;
-		const char *current_source = current ? strstr(current, "| ret 1 + \"bad\"") : 0;
-		const char *current_marker = current_source ? strstr(current_source, "|       ^") : 0;
+		const char *type_error = headline ? strstr(headline, "type error, expected 'callable', got 'integer'") : 0;
+		const char *current = type_error ? strstr(type_error, "diagnostic-stack [3:16]") : 0;
+		const char *current_source = current ? strstr(current, "| inner := fun(callback: callable) {") : 0;
+		const char *current_marker = current_source ? strstr(current_source, "|              ^~~~~~~~") : 0;
 		const char *call_stack = current_marker ? strstr(current_marker, "call stack:") : 0;
 		const char *inner_caller = call_stack ? strstr(call_stack, "diagnostic-stack [6:3]") : 0;
-		const char *inner_source = inner_caller ? strstr(inner_caller, "| inner()") : 0;
+		const char *inner_source = inner_caller ? strstr(inner_caller, "| inner(42)") : 0;
 		const char *middle_caller = inner_source ? strstr(inner_source, "diagnostic-stack [8:2]") : 0;
 		const char *middle_source = middle_caller ? strstr(middle_caller, "| middle()") : 0;
 		const char *outer_caller = middle_source ? strstr(middle_source, "diagnostic-stack [10:1]") : 0;
 		const char *outer_source = outer_caller ? strstr(outer_caller, "| outer({ first = 1, second = 2, third = 3, expected_tail = 4 })") : 0;
-		valid = headline && current && current_source && current_marker && call_stack && inner_caller && inner_source && middle_caller && middle_source && outer_caller && outer_source;
+		valid = headline && type_error && current && current_source && current_marker && call_stack && inner_caller && inner_source && middle_caller && middle_source && outer_caller && outer_source;
 	}
 
 	dy_pipe_close(&error_pipe);

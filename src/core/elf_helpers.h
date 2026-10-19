@@ -222,6 +222,30 @@ static const char *value_type_name(elf_ValueType type)
 	return names[type];
 }
 
+static const char *type_rule_name(TypeRule rule)
+{
+	switch (rule)
+	{
+		case TRULE_NONE:     return "no value";
+		case TRULE_ALL:      return "any value";
+		case TRULE_NUMERIC:  return "numeric";
+		case TRULE_NONNIL:   return "non-nil";
+		case TRULE_OBJECT:   return "object";
+		case TRULE_CALLABLE: return "callable";
+		default:
+		{
+			for (u32 type = 0; type < ELF_VALUE_TYPE_COUNT_; ++type)
+			{
+				if (rule == (TypeRule)(1 << type)) {
+					return value_type_name(type);
+				}
+			}
+		}
+		break;
+	}
+	return "unknown";
+}
+
 //
 // Core object helpers.
 //
@@ -342,7 +366,7 @@ static inline void check_value_type(elf_State *S, elf_Value value, int type)
 static inline void check_value_type_rule(elf_State *S, elf_Value value, TypeRule rule)
 {
 	if (~rule & 1 << value.type) {
-		report_runtime_error(S, ERROR_TYPE_MISMATCH, "type rule violation, got '%s'", value_type_name(value.type));
+		report_runtime_error(S, ERROR_TYPE_MISMATCH, "type error, expected '%s', got '%s'", type_rule_name(rule), value_type_name(value.type));
 	}
 }
 
