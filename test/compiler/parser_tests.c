@@ -23,29 +23,37 @@ static Com_Source *parser_test_add_source(Compiler *compiler, elf_StrSlice name,
 	return source;
 }
 
-static Ast parser_test_parse_file(elf_State *state, const char *source_text)
+static Ast parser_test_parse(elf_State *state, const char *source_text, Com_Source **result_source)
 {
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	Compiler *compiler = compiler_create(&state->arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_tests", sizeof("parser_tests") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));
-	Ast file = parser_parse_file(&parser, compiler_source);
+	Ast file = parser_parse_source(&parser, compiler_source);
 	parser_destroy(&parser);
+	if (result_source) {
+		*result_source = compiler_source;
+	}
 	return file;
 }
 
-static Ast parser_test_body(Ast file)
+static Ast parser_test_parse_source(elf_State *state, const char *source_text)
 {
-	if (!file || file->kind != AST_FILE) {
-		test_fail("parser produced file ast");
+	return parser_test_parse(state, source_text, 0);
+}
+
+static Ast parser_test_body(Ast root)
+{
+	if (!root || root->kind != AST_FUNCTION || root->function.parent || !root->function.variadic || root->function.params.count) {
+		test_fail("parser produced variadic root function");
 		return 0;
 	}
-	if (!file->file.body || file->file.body->kind != AST_BLOCK_STAT) {
+	if (!root->function.body || root->function.body->kind != AST_BLOCK_STAT) {
 		test_fail("parser produced file block");
 		return 0;
 	}
-	return file->file.body;
+	return root->function.body;
 }
 
 static Ast parser_test_stat(Ast file, u32 index, Ast_Kind kind, const char *label)
@@ -103,7 +111,7 @@ static void expect_ast_i64(Ast ast, i64 value, const char *label)
 
 static void test_parser_decl_precedence_and_strings(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "x := 1 + 2 * 3");
+	Ast file = parser_test_parse_source(state, "x := 1 + 2 * 3");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse declaration statement");
 
 	Ast name = parser_test_tuple_item(decl->decl.name, 0, AST_IDENT, "parse declaration name");
@@ -119,7 +127,7 @@ static void test_parser_decl_precedence_and_strings(elf_State *state)
 
 static void test_parser_measure_operator(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret *items * 2");
+	Ast file = parser_test_parse_source(state, "ret *items * 2");
 	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse measure return");
 	Ast multiply = parser_test_tuple_item(ret->return_stat.expr, 0, AST_MUL, "measure binds before multiplication");
 	Ast measure = multiply ? multiply->binary.x : 0;
@@ -130,7 +138,7 @@ static void test_parser_measure_operator(elf_State *state)
 
 static void test_parser_constant_declaration(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "answer ::= 42");
+	Ast file = parser_test_parse_source(state, "answer ::= 42");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse constant declaration");
 	if (decl && !decl->decl.constant) {
 		test_fail("hard bind marks declaration constant");
@@ -139,7 +147,7 @@ static void test_parser_constant_declaration(elf_State *state)
 
 static void test_parser_static_declaration(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "answer :: 40 + 2");
+	Ast file = parser_test_parse_source(state, "answer :: 40 + 2");
 	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse static declaration");
 	if (!decl) {
 		return;
@@ -154,7 +162,7 @@ static void test_parser_static_declaration(elf_State *state)
 
 static void test_parser_exported_static_declaration(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "export answer :: 42");
+	Ast file = parser_test_parse_source(state, "export answer :: 42");
 	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse exported static declaration");
 	if (!decl) {
 		return;
@@ -168,7 +176,8 @@ static void test_parser_exported_static_declaration(elf_State *state)
 
 static void test_parser_import_expression(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "math :: import \"math.elf\"\nloader := fun() { ret import \"nested.elf\" }");
+	Com_Source *source = 0;
+	Ast file = parser_test_parse(state, "math :: import \"math.elf\"\nloader := fun() { ret import \"nested.elf\" }", &source);
 	Ast decl = parser_test_stat(file, 0, AST_STATIC_DECL, "parse imported module declaration");
 	if (!decl) {
 		return;
@@ -179,14 +188,14 @@ static void test_parser_import_expression(elf_State *state)
 	if (!import || !import->import.path || strcmp(atom_data(import->import.path), "math.elf") != 0) {
 		test_fail("import expression stores path atom");
 	}
-	if (file->file.imports.count != 2 || file->file.imports.items[0] != import) {
-		test_fail("file records imports in source order");
+	if (!source || source->import_count != 2 || source->imports[0] != import) {
+		test_fail("source records imports in source order");
 	}
 	else
 	{
-		Ast nested = file->file.imports.items[1];
+		Ast nested = source->imports[1];
 		if (nested->kind != AST_IMPORT || strcmp(atom_data(nested->import.path), "nested.elf") != 0) {
-			test_fail("file records imports nested inside functions");
+			test_fail("source records imports nested inside functions");
 		}
 	}
 }
@@ -215,7 +224,7 @@ static void test_parser_module_discovery(elf_State *state)
 	}
 	for (Com_SourceId source_id = 0; source_id < compiler->source_count; ++source_id)
 	{
-		if (!compiler->sources[source_id].ast || compiler->sources[source_id].ast->kind != AST_FILE) {
+		if (!compiler->sources[source_id].ast || compiler->sources[source_id].ast->kind != AST_FUNCTION) {
 			test_fail("module discovery stores every parsed source AST");
 		}
 	}
@@ -258,7 +267,7 @@ static void test_parser_missing_import(elf_State *state)
 
 static void test_parser_string_strings(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "name := \"hello\"");
+	Ast file = parser_test_parse_source(state, "name := \"hello\"");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse string declaration");
 	Ast string = parser_test_tuple_item(decl->decl.expr, 0, AST_STRING_LITERAL, "parse string literal");
 	expect_ast_atom(string, "hello", "string ast stores string");
@@ -266,7 +275,7 @@ static void test_parser_string_strings(elf_State *state)
 
 static void test_parser_interpolated_strings(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state,
+	Ast file = parser_test_parse_source(state,
 		"message := f\"hello ${name}, count ${count + 1}\"");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse interpolated string declaration");
 	Ast string = parser_test_tuple_item(decl->decl.expr, 0, AST_INTERPOLATED_STRING,
@@ -292,7 +301,7 @@ static void test_parser_interpolated_strings(elf_State *state)
 	expect_ast_kind(parts.items[4], AST_STRING_LITERAL, "interpolated string ends with text");
 	expect_ast_atom(parts.items[4], "", "interpolated string keeps empty trailing text");
 
-	file = parser_test_parse_file(state, "ret f\"outer ${f\"inner ${value}\"}\"");
+	file = parser_test_parse_source(state, "ret f\"outer ${f\"inner ${value}\"}\"");
 	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse nested interpolated string return");
 	Ast outer = parser_test_tuple_item(ret->return_stat.expr, 0, AST_INTERPOLATED_STRING,
 		"parse outer interpolated string");
@@ -311,7 +320,7 @@ static void test_parser_interpolated_strings(elf_State *state)
 		test_fail("nested interpolated string keeps three parts");
 	}
 
-	file = parser_test_parse_file(state, "ret f\"plain\"");
+	file = parser_test_parse_source(state, "ret f\"plain\"");
 	ret = parser_test_stat(file, 0, AST_RETURN, "parse plain format-prefixed string return");
 	Ast plain = parser_test_tuple_item(ret->return_stat.expr, 0, AST_STRING_LITERAL,
 		"format prefix without interpolation remains string literal");
@@ -320,7 +329,7 @@ static void test_parser_interpolated_strings(elf_State *state)
 
 static void test_parser_if_else_blocks(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "if flag ? { ret 1 } else { ret nil }");
+	Ast file = parser_test_parse_source(state, "if flag ? { ret 1 } else { ret nil }");
 	Ast stat = parser_test_stat(file, 0, AST_IF, "parse if statement");
 
 	expect_ast_kind(stat->if_stat.pred, AST_IDENT, "parse if predicate");
@@ -336,7 +345,7 @@ static void test_parser_if_else_blocks(elf_State *state)
 
 static void test_parser_statement_semicolons(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "first := 1; second := 2; if first ? ret; else ret; { third := 3; fourth := 4; };");
+	Ast file = parser_test_parse_source(state, "first := 1; second := 2; if first ? ret; else ret; { third := 3; fourth := 4; };");
 	Ast body = parser_test_body(file);
 	if (!body || body->block.count != 4) {
 		test_fail("semicolons separate top-level statements");
@@ -360,7 +369,7 @@ static void test_parser_statement_semicolons(elf_State *state)
 
 static void test_parser_for_loops(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "for key, value := 0 ... 4 ? {}");
+	Ast file = parser_test_parse_source(state, "for key, value := 0 ... 4 ? {}");
 	Ast loop = parser_test_stat(file, 0, AST_FOR_RANGE, "parse range for statement");
 	if (!loop) {
 		return;
@@ -386,7 +395,7 @@ static void test_parser_for_loops(elf_State *state)
 	expect_ast_i64(range ? range->binary.x : 0, 0, "range for stores range start");
 	expect_ast_i64(range ? range->binary.y : 0, 4, "range for stores range end");
 
-	file = parser_test_parse_file(state, "for i := 0; i < 10; i += 1 ? {}");
+	file = parser_test_parse_source(state, "for i := 0; i < 10; i += 1 ? {}");
 	loop = parser_test_stat(file, 0, AST_FOR, "parse C-style for statement");
 	if (!loop) {
 		return;
@@ -400,7 +409,7 @@ static void test_parser_for_loops(elf_State *state)
 
 static void test_parser_call_with_table_argument(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "make({x = 1, [2] = 3})");
+	Ast file = parser_test_parse_source(state, "make({x = 1, [2] = 3})");
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse call expression statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call statement");
 
@@ -417,7 +426,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 		test_fail("table parser counts entries");
 	}
 
-	file = parser_test_parse_file(state, "make {}");
+	file = parser_test_parse_source(state, "make {}");
 	stat = parser_test_stat(file, 0, AST_TUPLE, "implicit table call parses callee as its own statement");
 	Ast callee = parser_test_tuple_item(stat, 0, AST_IDENT, "implicit table call no longer creates a call");
 	expect_ast_atom(callee, "make", "implicit table call retains callee expression");
@@ -426,7 +435,7 @@ static void test_parser_call_with_table_argument(elf_State *state)
 
 static void test_parser_named_call_arguments(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "build(1, width = 20 + 2, title = make(\"ok\"))");
+	Ast file = parser_test_parse_source(state, "build(1, width = 20 + 2, title = make(\"ok\"))");
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse named call argument statement tuple");
 	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call with named arguments");
 	if (!call || call->call.args.count != 3) {
@@ -455,7 +464,7 @@ static void test_parser_named_call_arguments(elf_State *state)
 
 static void test_parser_array_literals(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret []\nret [1, 2 + 3, [4]]\nret [5][0]");
+	Ast file = parser_test_parse_source(state, "ret []\nret [1, 2 + 3, [4]]\nret [5][0]");
 
 	Ast empty_ret = parser_test_stat(file, 0, AST_RETURN, "parse empty array return");
 	Ast empty = parser_test_tuple_item(empty_ret->return_stat.expr, 0, AST_ARRAY, "empty brackets parse as an array literal");
@@ -483,7 +492,7 @@ static void test_parser_array_literals(elf_State *state)
 
 static void test_parser_nil_assign(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "x ?= 1");
+	Ast file = parser_test_parse_source(state, "x ?= 1");
 	Ast stat = parser_test_stat(file, 0, AST_NIL_ASSIGN, "parse nil assignment statement");
 
 	Ast name = parser_test_tuple_item(stat->binary.x, 0, AST_IDENT, "parse nil assignment destination");
@@ -495,7 +504,7 @@ static void test_parser_nil_assign(elf_State *state)
 
 static void test_parser_table_access_modes(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret t[0]\nret t[key]\nret t.name");
+	Ast file = parser_test_parse_source(state, "ret t[0]\nret t[key]\nret t.name");
 
 	Ast integer_ret = parser_test_stat(file, 0, AST_RETURN, "parse integer index return");
 	Ast integer_index = parser_test_tuple_item(integer_ret->return_stat.expr, 0, AST_INDEX, "plain brackets parse as an index");
@@ -521,7 +530,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_source_error", sizeof("parser_source_error") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));
-	Ast file = parser_parse_file(&parser, compiler_source);
+	Ast file = parser_parse_source(&parser, compiler_source);
 	parser_destroy(&parser);
 	if (file != ERROR_AST || compiler_source->report.error_count != 1 || compiler_source->report.first->phase != ERROR_PHASE_PARSER)
 	{
@@ -544,7 +553,7 @@ static void test_parser_rejects_trailing_closures(elf_State *state)
 
 static void test_parser_open_range_indexes(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret t[...]\nret t[2 ...]\nret t[... 4]");
+	Ast file = parser_test_parse_source(state, "ret t[...]\nret t[2 ...]\nret t[... 4]");
 
 	Ast full_ret = parser_test_stat(file, 0, AST_RETURN, "parse fully open range index return");
 	Ast full_index = parser_test_tuple_item(full_ret->return_stat.expr, 0, AST_RANGE_INDEX,
@@ -578,7 +587,7 @@ static void test_parser_open_range_indexes(elf_State *state)
 
 static void test_parser_function_expression(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "add := fun(a: int, b: str) { nested := fun() {}\nret a + b }");
+	Ast file = parser_test_parse_source(state, "add := fun(a: int, b: str) { nested := fun() {}\nret a + b }");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration");
 	Ast function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression");
 
@@ -600,7 +609,7 @@ static void test_parser_function_expression(elf_State *state)
 	expect_ast_atom(second_param ? second_param->decl.type : 0, "str", "second function param type");
 	expect_ast_kind(function->function.body, AST_BLOCK_STAT, "function body parses as block");
 	if (function->function.parent != file) {
-		test_fail("top-level function links file parent");
+		test_fail("top-level function links root function parent");
 	}
 	Ast nested_decl = function->function.body->block.count ? function->function.body->block.items[0] : 0;
 	Ast nested_function = nested_decl && nested_decl->kind == AST_DECL_STAT ? parser_test_tuple_item(nested_decl->decl.expr, 0, AST_FUNCTION, "parse nested function expression") : 0;
@@ -608,7 +617,7 @@ static void test_parser_function_expression(elf_State *state)
 		test_fail("nested function links enclosing function parent");
 	}
 
-	file = parser_test_parse_file(state, "configure := fun(required, count = 1 + 2, label: str = \"elf\") { ret required }");
+	file = parser_test_parse_source(state, "configure := fun(required, count = 1 + 2, label: str = \"elf\") { ret required }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration with defaults");
 	function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression with defaults");
 	if (!function || function->function.params.count != 3)
@@ -630,7 +639,7 @@ static void test_parser_function_expression(elf_State *state)
 	expect_ast_kind(label_param->decl.expr, AST_STRING_LITERAL, "typed function parameter keeps default");
 	expect_ast_atom(label_param->decl.expr, "elf", "typed function parameter keeps default text");
 
-	file = parser_test_parse_file(state, "collect := fun(a, ...) { ret elf.varg(0) }");
+	file = parser_test_parse_source(state, "collect := fun(a, ...) { ret elf.varg(0) }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse variadic function declaration");
 	function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse variadic function expression");
 	if (!function) {
@@ -647,7 +656,7 @@ static void test_parser_function_expression(elf_State *state)
 		test_fail("function tracks variadic marker separately");
 	}
 
-	file = parser_test_parse_file(state, "callback := fun { ret 42 }");
+	file = parser_test_parse_source(state, "callback := fun { ret 42 }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration without parameter list");
 	function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression without parameter list");
 	if (function && function->function.params.count != 0) {
@@ -659,7 +668,7 @@ static void test_parser_function_expression(elf_State *state)
 
 static void test_parser_get_mem_macro(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret #get_mem(x)");
+	Ast file = parser_test_parse_source(state, "ret #get_mem(x)");
 	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse get_mem return");
 	Ast expr = parser_test_tuple_item(ret->return_stat.expr, 0, AST_GET_MEM, "parse get_mem macro expression");
 
@@ -669,7 +678,7 @@ static void test_parser_get_mem_macro(elf_State *state)
 
 static void test_parser_integer_literal_boundaries(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret 9223372036854775807\nret -9223372036854775808");
+	Ast file = parser_test_parse_source(state, "ret 9223372036854775807\nret -9223372036854775808");
 
 	Ast max_return = parser_test_stat(file, 0, AST_RETURN, "parse i64 max return");
 	Ast max_value = parser_test_tuple_item(max_return->return_stat.expr, 0, AST_INTEGER_LITERAL, "parse i64 max literal");
@@ -682,7 +691,7 @@ static void test_parser_integer_literal_boundaries(elf_State *state)
 
 static void test_parser_source_slices(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "alpha := 1\n  beta := 2");
+	Ast file = parser_test_parse_source(state, "alpha := 1\n  beta := 2");
 	Ast first = parser_test_stat(file, 0, AST_DECL_STAT, "parse first declaration");
 	Ast second = parser_test_stat(file, 1, AST_DECL_STAT, "parse second declaration");
 
@@ -696,7 +705,7 @@ static void test_parser_source_slices(elf_State *state)
 
 static void test_parser_line_boundaries(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "ret /* same */ 1\nret /* split\n*/ 2");
+	Ast file = parser_test_parse_source(state, "ret /* same */ 1\nret /* split\n*/ 2");
 
 	Ast first_return = parser_test_stat(file, 0, AST_RETURN, "same-line comment keeps return value");
 	Ast first_value = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_INTEGER_LITERAL,
@@ -713,7 +722,7 @@ static void test_parser_line_boundaries(elf_State *state)
 		"expression after multiline comment return value");
 	expect_ast_i64(after_return_value, 2, "expression after multiline comment integer");
 
-	file = parser_test_parse_file(state, "ret 1 +\n2\nret 3\n+4");
+	file = parser_test_parse_source(state, "ret 1 +\n2\nret 3\n+4");
 
 	first_return = parser_test_stat(file, 0, AST_RETURN, "operator before newline continues return");
 	Ast add = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_ADD,
@@ -731,7 +740,7 @@ static void test_parser_line_boundaries(elf_State *state)
 		"operator after newline unary expression");
 	expect_ast_i64(unary_value, 4, "operator after newline unary value");
 
-	file = parser_test_parse_file(state, "ret \"one\\ntwo\":trim()\nret target\n(value)");
+	file = parser_test_parse_source(state, "ret \"one\\ntwo\":trim()\nret target\n(value)");
 
 	first_return = parser_test_stat(file, 0, AST_RETURN, "postfix follows string token");
 	Ast call = parser_test_tuple_item(first_return->return_stat.expr, 0, AST_CALL,
@@ -757,7 +766,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_lexer_error", sizeof("parser_lexer_error") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));
-	Ast file = parser_parse_file(&parser, compiler_source);
+	Ast file = parser_parse_source(&parser, compiler_source);
 	parser_destroy(&parser);
 	if (file != ERROR_AST || compiler_source->report.error_count != 1 || compiler_source->report.first->phase != ERROR_PHASE_LEXER) {
 		test_fail("parser propagates a lexer error token");

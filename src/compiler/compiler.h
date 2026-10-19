@@ -76,6 +76,8 @@ struct Com_Source
 	struct Atom        *path;
 	dy_String           source;
 	struct Ast_T       *ast;
+	struct Ast_T      **imports;
+	u32                  import_count;
 	struct Scope       *scope;
 	Com_SourceState     state;
 	Com_Report          report;

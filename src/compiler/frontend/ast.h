@@ -8,7 +8,6 @@
 #define AST_DEFINITIONS(X)                                   \
 	X(AST_NONE                , "none")                       \
 	X(AST_ERROR               , "error")                      \
-	X(AST_FILE                , "file")                       \
 	X(AST_IDENT               , "identifier")                 \
 	X(AST_AND                 , "and")                        \
 	X(AST_OR                  , "or")                         \
@@ -80,6 +79,7 @@
 
 typedef struct Ast_T Ast_T;
 typedef Ast_T *Ast;
+struct IrFunction;
 
 typedef enum
 {
@@ -147,17 +147,11 @@ struct Ast_T
 
 		struct
 		{
-			Ast          body;
-			Ast_Array imports;
-		}
-		file;
-
-		struct
-		{
-			Ast       parent;
-			Ast_Array params;
-			b32       variadic;
-			Ast       body;
+			Ast                parent;
+			Ast_Array          params;
+			b32                variadic;
+			Ast                body;
+			struct IrFunction *ir;
 		}
 		function;
 

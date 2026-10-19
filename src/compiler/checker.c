@@ -137,31 +137,32 @@ Com_Status check_source(Com_Source *source)
 	ASSERT(source);
 	Compiler *compiler = source->compiler;
 	ASSERT(compiler);
-	Ast ast_file = source->ast;
-	ASSERT(ast_file);
-	ASSERT(ast_file->kind == AST_FILE);
-	ASSERT(ast_file->file.body);
-	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
+	Ast root = source->ast;
+	ASSERT(root);
+	ASSERT(root->kind == AST_FUNCTION);
+	ASSERT(!root->function.parent);
+	ASSERT(root->function.body);
+	ASSERT(root->function.body->kind == AST_BLOCK_STAT);
 
 	Checker checker = {0};
-	checker.current_function = ast_file;
+	checker.current_function = root;
 	checker.globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
 	if (!checker.globals) {
-		return checker_out_of_memory(source, ast_file->site);
+		return checker_out_of_memory(source, root->site);
 	}
 
-	checker.source_scope = scope_create(compiler->arena, SCOPE_SOURCE, checker.globals, ast_file, source);
+	checker.source_scope = scope_create(compiler->arena, SCOPE_SOURCE, checker.globals, root, source);
 	checker.active_scope = checker.source_scope;
 	if (!checker.source_scope) {
-		return checker_out_of_memory(source, ast_file->site);
+		return checker_out_of_memory(source, root->site);
 	}
 
 	ASSERT(!source->scope);
 	source->scope = checker.source_scope;
 
-	Com_Status status = declare_statics(&checker, checker.source_scope, ast_file->file.body->block);
-	for (u32 i = 0; status == COM_STATUS_OK && i < ast_file->file.body->block.count; ++i) {
-		status = check_statement(&checker, ast_file->file.body->block.items[i]);
+	Com_Status status = declare_statics(&checker, checker.source_scope, root->function.body->block);
+	for (u32 i = 0; status == COM_STATUS_OK && i < root->function.body->block.count; ++i) {
+		status = check_statement(&checker, root->function.body->block.items[i]);
 	}
 	return status;
 }
@@ -216,8 +217,9 @@ static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *sour
 	ASSERT(source->name);
 	ASSERT(source->path);
 	ASSERT(source->ast);
-	ASSERT(source->ast->kind == AST_FILE);
-	ASSERT(source->ast->file.body->kind == AST_BLOCK_STAT);
+	ASSERT(source->ast->kind == AST_FUNCTION);
+	ASSERT(!source->ast->function.parent);
+	ASSERT(source->ast->function.body->kind == AST_BLOCK_STAT);
 	if (source->scope)
 	{
 		*result = source->scope;
@@ -228,7 +230,7 @@ static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *sour
 	{
 		return checker_out_of_memory(source, source->ast->site);
 	}
-	Com_Status status = declare_statics(checker, source->scope, source->ast->file.body->block);
+	Com_Status status = declare_statics(checker, source->scope, source->ast->function.body->block);
 	if (status == COM_STATUS_OK) {
 		*result = source->scope;
 	}
@@ -681,7 +683,6 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 static Com_Status check_statement(Checker *checker, Ast stat)
 {
 	ASSERT(stat);
-	ASSERT(stat->kind != AST_FILE);
 	ASSERT(checker->active_scope);
 	ASSERT(checker->source_scope);
 	Com_Status status = COM_STATUS_OK;

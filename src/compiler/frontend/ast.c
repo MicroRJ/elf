@@ -353,12 +353,6 @@ static Ast create_block_ast(Parser *par, SourceSite site, Ast_Array stats)
 	return tree;
 }
 
-static Ast create_file_ast(Parser *par, SourceSite site)
-{
-	Ast tree = ast_new(par, site, AST_FILE);
-	return tree;
-}
-
 static Ast create_while_ast(Parser *par, SourceSite site, Ast pred, Ast body)
 {
 	if (ast_is_error(pred)) {
@@ -495,8 +489,7 @@ static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 
 static Ast create_function_ast(Parser *par, SourceSite site, Ast parent)
 {
-	ASSERT(parent);
-	ASSERT(parent->kind == AST_FILE || parent->kind == AST_FUNCTION);
+	ASSERT(!parent || parent->kind == AST_FUNCTION);
 	Ast tree = ast_new(par, site, AST_FUNCTION);
 	if (ast_is_error(tree)) {
 		return tree;
@@ -679,16 +672,6 @@ static void print_ast(Printer *pr, Ast tree)
 			PRINT(pr, ")");
 		}
 		break;
-		case AST_FILE:
-		{
-
-			Ast body = tree->file.body;
-
-
-			print_ast(pr, body);
-		}
-		break;
-
 		case AST_FUNCTION:
 		{
 
@@ -698,36 +681,43 @@ static void print_ast(Printer *pr, Ast tree)
 			Ast  body      = tree->function.body;
 
 
-			PRINT(pr, "fun(");
-			for (u32 i = 0; i < nparams; ++i)
+			if (!tree->function.parent)
 			{
-				Ast param = params[i];
-				ASSERT(param);
-				ASSERT(param->kind == AST_DECL_STAT);
-				if (i) {
-					PRINT(pr, ", ");
-				}
-				print_ast(pr, param->decl.name);
-				if (param->decl.type)
-				{
-					PRINT(pr, ": ");
-					print_ast(pr, param->decl.type);
-				}
-				if (param->decl.expr)
-				{
-					PRINT(pr, " = ");
-					print_ast(pr, param->decl.expr);
-				}
+				print_ast(pr, body);
 			}
-			if (variadic)
+			else
 			{
-				if (nparams) {
-					PRINT(pr, ", ");
+				PRINT(pr, "fun(");
+				for (u32 i = 0; i < nparams; ++i)
+				{
+					Ast param = params[i];
+					ASSERT(param);
+					ASSERT(param->kind == AST_DECL_STAT);
+					if (i) {
+						PRINT(pr, ", ");
+					}
+					print_ast(pr, param->decl.name);
+					if (param->decl.type)
+					{
+						PRINT(pr, ": ");
+						print_ast(pr, param->decl.type);
+					}
+					if (param->decl.expr)
+					{
+						PRINT(pr, " = ");
+						print_ast(pr, param->decl.expr);
+					}
 				}
-				PRINT(pr, "...");
+				if (variadic)
+				{
+					if (nparams) {
+						PRINT(pr, ", ");
+					}
+					PRINT(pr, "...");
+				}
+				PRINT(pr, ")");
+				print_ast(pr, body);
 			}
-			PRINT(pr, ")");
-			print_ast(pr, body);
 		}
 		break;
 

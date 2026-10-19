@@ -309,18 +309,18 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 		return source->ast;
 	}
 
-	Ast ast_file = parser_parse_file(parser, source);
-	if (ast_is_error(ast_file)) {
-		return ast_file;
+	Ast ast = parser_parse_source(parser, source);
+	if (ast_is_error(ast)) {
+		return ast;
 	}
-	ASSERT(ast_file->kind == AST_FILE);
-	source->ast = ast_file;
+	ASSERT(ast->kind == AST_FUNCTION);
+	ASSERT(!ast->function.parent);
+	source->ast = ast;
 	source->state = COM_SOURCE_PARSED;
 
-	Ast_Array imports = ast_file->file.imports;
-	for (u32 i = 0; i < imports.count; ++i)
+	for (u32 i = 0; i < source->import_count; ++i)
 	{
-		Ast import_ast = imports.items[i];
+		Ast import_ast = source->imports[i];
 		ASSERT(import_ast);
 		ASSERT(import_ast->kind == AST_IMPORT);
 		ASSERT(import_ast->import.path);
@@ -337,7 +337,7 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 		}
 	}
 
-	return ast_file;
+	return ast;
 }
 
 elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)

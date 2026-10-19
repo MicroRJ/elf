@@ -313,18 +313,18 @@ static Ast_Array pop_ast_array(Parser *par, u32 count)
 	return result;
 }
 
-static Ast parse_file(Parser *parser)
+static Ast parse_source(Parser *parser)
 {
 	if (token_is_error(parser_current_token(parser))) {
 		return ast_from_token_error(parser_current_token(parser));
 	}
 	Token tok = parser_current_token(parser);
-	Ast file_ast = create_file_ast(parser, tok.site);
-	if (ast_is_error(file_ast)) {
-		return file_ast;
+	Ast root = create_function_ast(parser, tok.site, 0);
+	if (ast_is_error(root)) {
+		return root;
 	}
 	ASSERT(!parser->current_function);
-	parser->current_function = file_ast;
+	parser->current_function = root;
 	u32 nstats = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
@@ -364,10 +364,12 @@ static Ast parse_file(Parser *parser)
 	if (parser->imports.count && !imports.items) {
 		return ERROR_OOM_AST;
 	}
-	file_ast->file.body = body;
-	file_ast->file.imports = imports;
+	root->function.variadic = true;
+	root->function.body = body;
+	parser->source->imports = imports.items;
+	parser->source->import_count = imports.count;
 	parser->current_function = 0;
-	return file_ast;
+	return root;
 }
 
 // <function> ::= "fun" ["(" [<parameter-list>] ")"] <statement>
@@ -1794,11 +1796,11 @@ static Ast parse_constexpr(Parser *parser)
 
 #include "parse_json.c"
 
-Ast parser_parse_file(Parser *parser, Com_Source *source)
+Ast parser_parse_source(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
 	if (parser_begin_source(parser, source)) {
-		ast = parse_file(parser);
+		ast = parse_source(parser);
 	}
 	return ast;
 }

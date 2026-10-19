@@ -16,7 +16,7 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 
 	Parser parser = {0};
 	ASSERT(parser_init(&parser));
-	Ast file = parser_parse_file(&parser, result.source);
+	Ast file = parser_parse_source(&parser, result.source);
 	parser_destroy(&parser);
 	result.source->ast = file;
 	result.source->state = COM_SOURCE_PARSED;
@@ -166,7 +166,7 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 	{
 		test_fail("assignment to constant lowers to an error");
 	}
-	Ast declaration = result.source->ast->file.body->block.items[0];
+	Ast declaration = result.source->ast->function.body->block.items[0];
 	Ast names = ast_ensure_kind(declaration->decl.name, AST_TUPLE);
 	if (!names->tuple.items[0]->entity || !entity_is_constant(names->tuple.items[0]->entity)) {
 		test_fail("constant declaration marks its entity constant");
@@ -392,6 +392,12 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	}
 
 	IrFunction *function = ir_test_function_at(result.module, 1);
+	if (result.source->ast->function.ir != result.module->first_function) {
+		test_fail("root ast points at entry ir function");
+	}
+	if (!function->ast || function->ast->kind != AST_FUNCTION || function->ast->function.ir != function) {
+		test_fail("function ast points at nested ir function");
+	}
 	if (function->param_count != IMPLICIT_PARAM_COUNT + 2) {
 		test_fail("function parameter count includes implicit this and source params");
 	}

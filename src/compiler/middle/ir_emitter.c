@@ -279,9 +279,9 @@ static TypeRule type_rule_from_atom(Atom *atom)
 	}
 }
 
-static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, SourceSite site, b32 variadic, u32 param_count);
-static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, Ast tree, Ast_Array ast_params, Ast body);
-static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body);
+static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree);
+static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition);
+static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree);
 
 static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
 {
@@ -354,8 +354,8 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 					ASSERT(function && function->kind == AST_FUNCTION);
 					ASSERT(entity->scope);
 					ASSERT(entity->scope->source);
-					entity->en_static.value.definition = ir_reserve_function(emitter, entity->scope->source, function->site, function->function.variadic, function->function.params.count);
-					ir_lower_function_body(emitter, entity->en_static.value.definition, function, function->function.params, function->function.body);
+					entity->en_static.value.definition = ir_reserve_function(emitter, entity->scope->source, function);
+					ir_lower_function_body(emitter, entity->en_static.value.definition);
 				}
 				ir = ir_new_function(emitter, expr->site, entity->en_static.value.definition);
 				return ir;
@@ -574,7 +574,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		{
 			ASSERT(emitter->function);
 			ASSERT(emitter->function->definition);
-			IrFunction *definition = ir_lower_function(emitter, emitter->function->definition->source, expr, expr->site, expr->function.variadic, expr->function.params, expr->function.body);
+			IrFunction *definition = ir_lower_function(emitter, emitter->function->definition->source, expr);
 			ir = ir_new_function(emitter, expr->site, definition);
 		}
 		break;
@@ -1439,15 +1439,20 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 	}
 }
 
-static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, SourceSite site, b32 variadic, u32 param_count)
+static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree)
 {
 	ASSERT(source);
+	ASSERT(tree);
+	ASSERT(tree->kind == AST_FUNCTION);
 	IrFunction *definition = arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunction));
+	definition->ast = tree;
 	definition->source = source;
 	definition->index = IR_FUNCTION_INDEX_INVALID;
-	definition->site = site;
-	definition->variadic = variadic;
-	definition->param_count = IMPLICIT_PARAM_COUNT + param_count;
+	definition->site = tree->site;
+	definition->variadic = tree->function.variadic;
+	definition->param_count = IMPLICIT_PARAM_COUNT + tree->function.params.count;
+	ASSERT(!tree->function.ir);
+	tree->function.ir = definition;
 	if (emitter->module->last_function)
 	{
 		emitter->module->last_function->next = definition;
@@ -1461,14 +1466,15 @@ static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, S
 	return definition;
 }
 
-static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, Ast tree, Ast_Array ast_params, Ast body)
+static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 {
 	ASSERT(definition);
+	Ast tree = definition->ast;
 	ASSERT(tree);
-	ASSERT(!definition->ast || definition->ast == tree);
+	ASSERT(tree->kind == AST_FUNCTION);
+	Ast_Array ast_params = tree->function.params;
 	ASSERT(definition->param_count == IMPLICIT_PARAM_COUNT + ast_params.count);
 	ASSERT(definition->source);
-	definition->ast = tree;
 
 	IrEmitterFrame function_ctx = {};
 	function_ctx.parent = emitter->function;
@@ -1523,7 +1529,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 		}
 	}
 
-	definition->body = ir_emit_stat_as_block(emitter, body);
+	definition->body = ir_emit_stat_as_block(emitter, tree->function.body);
 
 	IrArray captures = {};
 	captures.count = function_ctx.capture_count;
@@ -1544,10 +1550,10 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 	definition->captures = captures;
 }
 
-static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree, SourceSite site, b32 variadic, Ast_Array ast_params, Ast body)
+static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree)
 {
-	IrFunction *definition = ir_reserve_function(emitter, source, site, variadic, ast_params.count);
-	ir_lower_function_body(emitter, definition, tree, ast_params, body);
+	IrFunction *definition = ir_reserve_function(emitter, source, tree);
+	ir_lower_function_body(emitter, definition);
 	return definition;
 }
 
@@ -1559,7 +1565,8 @@ IrModule *ir_emit_module(Com_Source *source)
 	ASSERT(compiler);
 	ASSERT(compiler->arena);
 	ASSERT(ast);
-	ASSERT(ast->kind == AST_FILE);
+	ASSERT(ast->kind == AST_FUNCTION);
+	ASSERT(!ast->function.parent);
 
 	IrModule *module = arena_push_zero(compiler->arena, sizeof(*module), 8);
 	module->arena = compiler->arena;
@@ -1569,7 +1576,7 @@ IrModule *ir_emit_module(Com_Source *source)
 	emitter->ir_stack_size = 4096;
 	emitter->ir_stack = arena_push_zero(module->arena, sizeof(*emitter->ir_stack) * emitter->ir_stack_size, _Alignof(Ir));
 
-	IrFunction *entry = ir_lower_function(emitter, source, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
+	IrFunction *entry = ir_lower_function(emitter, source, ast);
 	ASSERT(entry == module->first_function);
 	ASSERT(!entry->captures.items && !entry->captures.count
 	|| !"Internal error: for some reason the entry function has captures, how is this even possible?");

@@ -21,7 +21,7 @@ static void checker_test_init(CheckerTest *test, const char *name, const char *s
 		test_fail("checker test initializes parser");
 		return;
 	}
-	Ast file = parser_parse_file(&parser, test->source);
+	Ast file = parser_parse_source(&parser, test->source);
 	parser_destroy(&parser);
 	if (!file || ast_is_error(file)) {
 		test_fail("checker test parses source");
@@ -40,8 +40,8 @@ static void checker_test_destroy(CheckerTest *test)
 
 static Ast checker_test_stat(CheckerTest *test, u32 index, Ast_Kind kind, const char *label)
 {
-	Ast file = test->source ? test->source->ast : 0;
-	Ast body = file && file->kind == AST_FILE ? file->file.body : 0;
+	Ast root = test->source ? test->source->ast : 0;
+	Ast body = root && root->kind == AST_FUNCTION && !root->function.parent ? root->function.body : 0;
 	if (!body || body->kind != AST_BLOCK_STAT || index >= body->block.count) {
 		test_fail(label);
 		return 0;
@@ -288,12 +288,12 @@ static void test_checker_resolves_imported_export(void)
 		arena_destroy(&arena);
 		return;
 	}
-	root->ast = parser_parse_file(&parser, root);
-	module->ast = parser_parse_file(&parser, module);
+	root->ast = parser_parse_source(&parser, root);
+	module->ast = parser_parse_source(&parser, module);
 	parser_destroy(&parser);
 	root->state = COM_SOURCE_PARSED;
 	module->state = COM_SOURCE_PARSED;
-	Ast import = root->ast && root->ast->kind == AST_FILE && root->ast->file.imports.count ? root->ast->file.imports.items[0] : 0;
+	Ast import = root->import_count ? root->imports[0] : 0;
 	if (import && import->kind == AST_IMPORT) {
 		import->import.target = module;
 		check_source(root);
@@ -301,7 +301,7 @@ static void test_checker_resolves_imported_export(void)
 	else {
 		test_fail("checker import test parses import");
 	}
-	Ast root_return = root->ast && root->ast->kind == AST_FILE && root->ast->file.body->block.count > 1 ? root->ast->file.body->block.items[1] : 0;
+	Ast root_return = root->ast && root->ast->kind == AST_FUNCTION && root->ast->function.body->block.count > 1 ? root->ast->function.body->block.items[1] : 0;
 	Ast field = root_return && root_return->kind == AST_RETURN ? checker_test_single_expression(root_return->return_stat.expr, AST_FIELD, "checker finds imported field expression") : 0;
 	Atom *answer_name = atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1);
 	Entity *answer = module->scope ? scope_find_current(module->scope, answer_name) : 0;
@@ -336,8 +336,8 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 		test_fail("checker error import test initializes parser");
 		return;
 	}
-	test->root->ast = parser_parse_file(&parser, test->root);
-	test->module->ast = parser_parse_file(&parser, test->module);
+	test->root->ast = parser_parse_source(&parser, test->root);
+	test->module->ast = parser_parse_source(&parser, test->module);
 	parser_destroy(&parser);
 	if (!test->root->ast || ast_is_error(test->root->ast) || !test->module->ast || ast_is_error(test->module->ast)) {
 		test_fail("checker error import test parses sources");
@@ -345,7 +345,7 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 	}
 	test->root->state = COM_SOURCE_PARSED;
 	test->module->state = COM_SOURCE_PARSED;
-	Ast import = test->root->ast->file.imports.count ? test->root->ast->file.imports.items[0] : 0;
+	Ast import = test->root->import_count ? test->root->imports[0] : 0;
 	if (!import || import->kind != AST_IMPORT) {
 		test_fail("checker error import test finds import");
 		return;
@@ -442,7 +442,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_oom", sizeof("checker_oom") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
 	Parser parser = {0};
 	ASSERT(parser_init(&parser));
-	source->ast = parser_parse_file(&parser, source);
+	source->ast = parser_parse_source(&parser, source);
 	parser_destroy(&parser);
 	source->state = COM_SOURCE_PARSED;
 	u64 capacity = arena.capacity;
