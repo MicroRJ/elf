@@ -127,6 +127,9 @@ struct elf_Table
 	u32        occupied;
 };
 
+// TODO(RJ): we could compress this WAY down, encode the line index & column as a u16,
+// store base line index in the prototype as a u32, byte start and byte end could be
+// replaced with a single u16 end marker ...
 typedef struct
 {
 	u32 byte_start;
@@ -140,22 +143,22 @@ elf_SourceMapEntry;
 
 struct elf_Prototype
 {
-	u64               allocation_size;
-	elf_Source       *source;
-	b32               variadic;
-	u8                arity;
-	u8                captures;
-	u16               stack_size;
-	elf_String      **strings;
-	u32               string_count;
-	f64              *number_constants;
-	u32               number_constant_count;
-	i64              *integer_constants;
-	u32               integer_constant_count;
-	Bytecode         *bytecode;
-	u32               bytecode_count;
+	u64                 allocation_size;
+	elf_Source         *source;
+	b32                 variadic;
+	u8                  arity;
+	u8                  captures;
+	u16                 stack_size;
+	elf_String        **strings;
+	u32                 string_count;
+	f64                *number_constants;
+	u32                 number_constant_count;
+	i64                *integer_constants;
+	u32                 integer_constant_count;
+	Bytecode           *bytecode;
+	u32                 bytecode_count;
 	elf_SourceMapEntry *source_map;
-	u32               source_map_count;
+	u32                 source_map_count;
 };
 
 struct elf_Source
