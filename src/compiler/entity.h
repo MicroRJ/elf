@@ -9,22 +9,22 @@ typedef struct IrFunction IrFunction;
 
 typedef enum
 {
-	STATIC_VALUE_NONE = 0,
-	STATIC_VALUE_AST,
-	STATIC_VALUE_RESOLVING,
-	STATIC_VALUE_ERROR,
-	STATIC_VALUE_NIL,
-	STATIC_VALUE_NUMBER,
-	STATIC_VALUE_INTEGER,
-	STATIC_VALUE_STRING,
-	STATIC_VALUE_FUNCTION,
-	STATIC_VALUE_EXPORTS,
+	COM_VALUE_NONE = 0,
+	COM_VALUE_AST,
+	COM_VALUE_RESOLVING,
+	COM_VALUE_ERROR,
+	COM_VALUE_NIL,
+	COM_VALUE_NUMBER,
+	COM_VALUE_INTEGER,
+	COM_VALUE_STRING,
+	COM_VALUE_FUNCTION,
+	COM_VALUE_EXPORTS,
 }
-StaticValueType;
+Com_ValueType;
 
 typedef struct
 {
-	StaticValueType type;
+	Com_ValueType type;
 	union
 	{
 		Com_Status   status;
@@ -40,7 +40,7 @@ typedef struct
 		};
 	};
 }
-StaticValue;
+Com_Value;
 
 typedef enum
 {
@@ -55,10 +55,12 @@ EntityKind;
 typedef enum
 {
 	ENTITY_TAG_NONE       = 0,
+
 	ENTITY_TAG_REFERENCED = 1 << 0,
-	ENTITY_TAG_CONSTANT   = 1 << 1,
-	ENTITY_TAG_ASSIGNED   = 1 << 2,
-	ENTITY_TAG_EXPORTED   = 1 << 5,
+	ENTITY_TAG_EXPORTED   = 1 << 1,
+
+	ENTITY_TAG_CONSTANT   = 1 << 2,
+	ENTITY_TAG_ASSIGNED   = 1 << 3,
 }
 EntityTags;
 
@@ -74,7 +76,7 @@ struct Entity
 		struct
 		{
 			struct Ast_T *declaration;
-			StaticValue   value;
+			Com_Value     value;
 		}
 		en_static;
 		struct

@@ -341,10 +341,10 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 	Entity *entity = expr->entity;
 	if (entity && entity->kind == ENTITY_STATIC)
 	{
-		StaticValue value = entity->en_static.value;
+		Com_Value value = entity->en_static.value;
 
 		switch (value.type) {
-			case STATIC_VALUE_FUNCTION:
+			case COM_VALUE_FUNCTION:
 			{
 				if (!entity->en_static.value.definition)
 				{
@@ -360,7 +360,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			}
 			break;
 
-			case STATIC_VALUE_INTEGER:
+			case COM_VALUE_INTEGER:
 			{
 				ir = ir_new_int(emitter, expr->site, value.integer);
 				return ir;
