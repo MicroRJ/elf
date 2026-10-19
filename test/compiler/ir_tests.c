@@ -131,6 +131,30 @@ static void test_ir_lowers_bitwise_not(elf_State *state)
 	arena_destroy(&arena);
 }
 
+static void test_ir_lowers_tuple_expression(elf_State *state)
+{
+	Arena arena = arena_create(0);
+	IrTestResult result = ir_test_lower_source(state, &arena, "ret 1, 2 + 3, \"four\"");
+	Ir body = ir_test_main_body(result.module);
+	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower tuple return");
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+
+	expect_ir_kind(tuple, IR_TUPLE, "AST tuple lowers to IR tuple");
+	if (!tuple || tuple->kind != IR_TUPLE || tuple->ir_tuple.count != 3)
+	{
+		test_fail("IR tuple retains every AST tuple item");
+	}
+	else
+	{
+		expect_ir_i64(tuple->ir_tuple.items[0], 1, "IR tuple lowers first item");
+		expect_ir_kind(tuple->ir_tuple.items[1], IR_ADD, "IR tuple lowers second item");
+		expect_ir_i64(tuple->ir_tuple.items[1]->ir_binary.x, 2, "IR tuple lowers second item lhs");
+		expect_ir_i64(tuple->ir_tuple.items[1]->ir_binary.y, 3, "IR tuple lowers second item rhs");
+		expect_ir_atom(tuple->ir_tuple.items[2], "four", "IR tuple lowers third item");
+	}
+	arena_destroy(&arena);
+}
+
 static void test_ir_lowers_assignment_to_local(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -623,6 +647,7 @@ static void run_ir_tests(elf_State *state)
 {
 	test_ir_lowers_declaration_expression(state);
 	test_ir_lowers_bitwise_not(state);
+	test_ir_lowers_tuple_expression(state);
 	test_ir_lowers_assignment_to_local(state);
 	test_ir_rejects_assignment_to_constant(state);
 	test_ir_lowers_strings_and_globals(state);

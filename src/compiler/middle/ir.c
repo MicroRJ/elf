@@ -12,6 +12,14 @@ static Ir ir_alloc(IrEmitter *emitter, SourceSite site, IrKind kind)
 	return ir;
 }
 
+static IrArray ir_array_alloc(IrEmitter *emitter, u32 count)
+{
+	IrArray array = {};
+	array.items = arena_push_zero(emitter->module->arena, sizeof(*array.items) * count, _Alignof(Ir));
+	array.count = count;
+	return array;
+}
+
 static Ir ir_new_nullary(IrEmitter *emitter, SourceSite site, IrKind kind)
 {
 	Ir ir = ir_alloc(emitter, site, kind);
@@ -78,6 +86,13 @@ static Ir ir_new_function(IrEmitter *emitter, SourceSite site, IrFunction *funct
 static Ir ir_new_recurse(IrEmitter *emitter, SourceSite site)
 {
 	return ir_new_nullary(emitter, site, IR_RECURSE);
+}
+
+static Ir ir_new_tuple(IrEmitter *emitter, SourceSite site, IrArray items)
+{
+	Ir ir = ir_alloc(emitter, site, IR_TUPLE);
+	ir->ir_tuple = items;
+	return ir;
 }
 
 static Ir ir_new_load_capture(IrEmitter *emitter, SourceSite site, IrCapture *capture)
@@ -363,6 +378,20 @@ static void print_ir(IrPrinter *pr, Ir ir)
 			{
 				if (i != 0) IR_PRINT(pr, ", ");
 				print_ir(pr, args.items[i]);
+			}
+			IR_PRINT(pr, ")");
+		}
+		break;
+
+		case IR_TUPLE:
+		{
+			IR_PRINT(pr, "(");
+			for (u32 i = 0; i < ir->ir_tuple.count; ++i)
+			{
+				if (i != 0) {
+					IR_PRINT(pr, ", ");
+				}
+				print_ir(pr, ir->ir_tuple.items[i]);
 			}
 			IR_PRINT(pr, ")");
 		}

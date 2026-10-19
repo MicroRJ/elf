@@ -104,6 +104,7 @@ Low-level control flow
 	X(IR_BITWISE_OR          , "bitwise_or")                 \
 	X(IR_BITWISE_XOR         , "bitwise_xor")                \
 	X(IR_BITWISE_NOT         , "bitwise_not")                \
+	X(IR_TUPLE               , "tuple")                      \
 	X(IR_CALL                , "call")                       \
 	X(IR_EXPR_BLOCK          , "expr_block")                 \
 	X(IR_LOCAL               , "local")                      \
@@ -214,6 +215,7 @@ struct IrNode
 		f64   ir_num;
 
 		Ir ir_unary;
+		IrArray ir_tuple;
 
 		struct
 		{

@@ -105,9 +105,10 @@ static IrArray ir_end_queue(IrQueue *frame)
 
 	emitter->ir_stack_index -= frame->count;
 
-	IrArray items = {};
-	items.count = frame->count;
-	items.items = arena_push_copy(emitter->module->arena, sizeof(*items.items) * items.count, _Alignof(Ir), emitter->ir_stack + emitter->ir_stack_index);
+	IrArray items = ir_array_alloc(emitter, frame->count);
+	if (items.count) {
+		copy_memory(items.items, emitter->ir_stack + emitter->ir_stack_index, sizeof(*items.items) * items.count);
+	}
 
 	ASSERT(emitter->ir_stack_index == frame->start);
 	frame->count = 0;
@@ -511,7 +512,8 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				alloc_arguments = MAX(ir_func->ast->function.params.count, alloc_arguments);
 			}
 
-			Ir *arguments = arena_push_zero(emitter->module->arena, sizeof(* arguments) * alloc_arguments, _Alignof(Ir));
+			IrArray ir_args = ir_array_alloc(emitter, alloc_arguments);
+			Ir *arguments = ir_args.items;
 
 			for (u32 i = 0; i < expr->call.args.count; ++i)
 			{
@@ -559,8 +561,6 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 					arguments[i] = ir_new_nil(emitter, expr->site);
 				}
 			}
-			IrArray ir_args = {arguments, alloc_arguments};
-
 			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, ir_expr, ir_args);
 		}
 		break;
@@ -588,6 +588,16 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			ASSERT(emitter->function->definition->params);
 			Ir implicit_param = emitter->function->definition->params[IMPLICIT_PARAM_INDEX];
 			ir = ir_new_load(emitter, expr->site, implicit_param);
+		}
+		break;
+
+		case AST_TUPLE:
+		{
+			IrArray items = ir_array_alloc(emitter, expr->tuple.count);
+			for (u32 i = 0; i < expr->tuple.count; ++i) {
+				items.items[i] = ir_emit_expr(emitter, expr->tuple.items[i]);
+			}
+			ir = ir_new_tuple(emitter, expr->site, items);
 		}
 		break;
 
@@ -824,7 +834,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 	if (nvars > 1 && expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 	{
 		Ir expr = ir_emit_expr(emitter, expr_tuple->tuple.items[0]);
-		Ir *locals = arena_push(emitter->module->arena, sizeof(*locals) * nvars, _Alignof(Ir *));
+		IrArray locals = ir_array_alloc(emitter, nvars);
 		for (u32 i = 0; i < nvars; ++i)
 		{
 			Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
@@ -835,13 +845,13 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 				return 1;
 			}
 
-			locals[i] = ir_new_local(emitter, name->site, 0);
+			locals.items[i] = ir_new_local(emitter, name->site, 0);
 
 			ASSERT(name->entity);
 			ASSERT(!name->entity->en_local.storage);
-			name->entity->en_local.storage = locals[i];
+			name->entity->en_local.storage = locals.items[i];
 		}
-		ir_push(items, ir_new_multi_local(emitter, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
+		ir_push(items, ir_new_multi_local(emitter, expr_tuple->site, expr, locals));
 		return nvars;
 	}
 
@@ -934,7 +944,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	Ir iterator_local = ir_new_local(emitter, range_start_site, range_start);
 	Ir range_end_local = ir_new_local(emitter, range_end_site, range_end);
 
-	Ir *var_locals = arena_push(emitter->module->arena, sizeof(*var_locals) * nvars, _Alignof(Ir));
+	IrArray var_locals = ir_array_alloc(emitter, nvars);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = ast_ensure_kind(name_tuple->tuple.items[i], AST_IDENT);
@@ -945,7 +955,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 		}
 
 		Ir local = ir_new_local(emitter, name->site, 0);
-		var_locals[i] = local;
+		var_locals.items[i] = local;
 		ASSERT(name->entity);
 		ASSERT(!name->entity->en_local.storage);
 		name->entity->en_local.storage = local;
@@ -988,7 +998,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 			value = ir_new_index(emitter, name->site, collection, value);
 		}
 
-		ir_push(&loop_items, ir_new_store(emitter, name->site, var_locals[i], value));
+		ir_push(&loop_items, ir_new_store(emitter, name->site, var_locals.items[i], value));
 	}
 
 	Ir iterator_load_for_add = ir_new_load(emitter, first_name->site, iterator_local);
@@ -1012,7 +1022,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	ir_push(&block_items, range_end_local);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		ir_push(&block_items, var_locals[i]);
+		ir_push(&block_items, var_locals.items[i]);
 	}
 	ir_push(&block_items, loop);
 
@@ -1267,15 +1277,15 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			}
 
 			// TODO(RJ): we don't need multi-local! could be done with the same mechanism!
-			Ir *values = arena_push(emitter->module->arena, sizeof(*values) * nargs, _Alignof(Ir));
+			IrArray values = ir_array_alloc(emitter, nargs);
 			if (expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
 			{
 				Ast expr_ast = expr_tuple->tuple.items[0];
 				Ir expr_ir = ir_emit_expr(emitter, expr_ast);
 				for (u32 i = 0; i < nargs; ++i) {
-					values[i] = ir_new_local(emitter, expr_ast->site, 0);
+					values.items[i] = ir_new_local(emitter, expr_ast->site, 0);
 				}
-				ir_push(items, ir_new_multi_local(emitter, expr_ast->site, expr_ir, (IrArray){ .items = values, .count = nargs }));
+				ir_push(items, ir_new_multi_local(emitter, expr_ast->site, expr_ir, values));
 			}
 			else
 			{
@@ -1292,8 +1302,8 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 						expr_ir = ir_new_nil(emitter, site);
 					}
 
-					values[i] = ir_new_local(emitter, site, expr_ir);
-					ir_push(items, values[i]);
+					values.items[i] = ir_new_local(emitter, site, expr_ir);
+					ir_push(items, values.items[i]);
 				}
 			}
 
@@ -1305,7 +1315,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 					continue;
 				}
 				Ir dest_ir = ir_emit_expr(emitter, dest_ast);
-				Ir value_ir = ir_new_load(emitter, values[i]->site, values[i]);
+				Ir value_ir = ir_new_load(emitter, values.items[i]->site, values.items[i]);
 				if (dest_ir->kind == IR_LOAD) {
 					dest_ir = dest_ir->ir_load.local;
 				}
@@ -1488,9 +1498,9 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 	IrEmitterFrame *outer_function = emitter->function;
 	emitter->function = &function_ctx;
 
-	Ir *ir_params = arena_push_zero(emitter->module->arena, sizeof(*ir_params) * (IMPLICIT_PARAM_COUNT + ast_params.count), _Alignof(Ir));
-	ir_params[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, definition->site, 0);
-	definition->params = ir_params;
+	IrArray ir_params = ir_array_alloc(emitter, IMPLICIT_PARAM_COUNT + ast_params.count);
+	ir_params.items[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, definition->site, 0);
+	definition->params = ir_params.items;
 
 	for (u32 i = 0; i < ast_params.count; ++ i)
 	{
@@ -1507,7 +1517,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 		}
 
 		Ir param_memory = ir_new_local(emitter, name->site, 0);
-		ir_params[IMPLICIT_PARAM_COUNT + i] = param_memory;
+		ir_params.items[IMPLICIT_PARAM_COUNT + i] = param_memory;
 		ASSERT(name->entity);
 		name->entity->en_local.storage = param_memory;
 
