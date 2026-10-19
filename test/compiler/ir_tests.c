@@ -425,6 +425,49 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	arena_destroy(&arena);
 }
 
+static void test_ir_loads_capture_per_reference(elf_State *state)
+{
+	Arena arena = arena_create(0);
+	IrTestResult result = ir_test_lower_source(state, &arena, "outer := fun(value) { ret fun() { ret value + value } }");
+	IrFunction *function = ir_test_function_at(result.module, 2);
+	if (!function || function->capture_count != 1 || !function->first_capture || function->first_capture != function->last_capture) {
+		test_fail("nested function records one capture descriptor");
+		arena_destroy(&arena);
+		return;
+	}
+
+	Ir ret = ir_test_body_stat(function->body, 0, IR_RETURN, "capturing function lowers return");
+	Ir add = ret ? ret->ir_return.expr : 0;
+	Ir left = add && add->kind == IR_ADD ? add->ir_binary.x : 0;
+	Ir right = add && add->kind == IR_ADD ? add->ir_binary.y : 0;
+	expect_ir_kind(left, IR_LOAD_CAPTURE, "first capture reference lowers to capture load");
+	expect_ir_kind(right, IR_LOAD_CAPTURE, "second capture reference lowers to capture load");
+	if (!left || !right || left == right || left->ir_load_capture != function->first_capture || right->ir_load_capture != function->first_capture) {
+		test_fail("capture references use distinct loads of one descriptor");
+	}
+	if (!left || !right || left->site.offset == right->site.offset) {
+		test_fail("capture loads retain their source sites");
+	}
+
+	arena_destroy(&arena);
+}
+
+static void test_ir_reports_cross_function_capture(elf_State *state)
+{
+	Arena arena = arena_create(0);
+	log_set_hook(ignore_expected_lowering_error, 0);
+	IrTestResult result = ir_test_lower_source(state, &arena, "main :: fun(a, b = a) {}\nmain(1)");
+	log_set_hook(0, 0);
+	Com_Message *message = result.source ? result.source->report.first : 0;
+	if (!message || result.source->report.error_count != 1 || message->code != ERROR_LOWERING || message->phase != ERROR_PHASE_LOWERING) {
+		test_fail("cross-function capture reports a lowering error");
+	}
+	if (!result.module || !result.module->first_function || result.module->first_function->capture_count != 0) {
+		test_fail("invalid capture does not alter the entry function captures");
+	}
+	arena_destroy(&arena);
+}
+
 static void test_ir_rejects_unknown_parameter_type(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -565,6 +608,8 @@ static void run_ir_tests(elf_State *state)
 	test_ir_lowers_nil_assign_field_once(state);
 	test_ir_reports_nil_assignment_arity(state);
 	test_ir_lowers_function_expression(state);
+	test_ir_loads_capture_per_reference(state);
+	test_ir_reports_cross_function_capture(state);
 	test_ir_rejects_unknown_parameter_type(state);
 	test_ir_lowers_static_forward_reference(state);
 	test_ir_rejects_assignment_to_file_static(state);

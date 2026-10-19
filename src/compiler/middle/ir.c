@@ -80,10 +80,11 @@ static Ir ir_new_recurse(IrEmitter *emitter, SourceSite site)
 	return ir_new_nullary(emitter, site, IR_RECURSE);
 }
 
-static Ir ir_new_capture(IrEmitter *emitter, SourceSite site, u32 capture_index)
+static Ir ir_new_load_capture(IrEmitter *emitter, SourceSite site, IrCapture *capture)
 {
-	Ir ir = ir_alloc(emitter, site, IR_CAPTURE);
-	ir->ir_capture = capture_index;
+	ASSERT(capture);
+	Ir ir = ir_alloc(emitter, site, IR_LOAD_CAPTURE);
+	ir->ir_load_capture = capture;
 	return ir;
 }
 

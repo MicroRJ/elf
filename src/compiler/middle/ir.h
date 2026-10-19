@@ -24,7 +24,7 @@ Literal values
 
 Named, local, and callable values
   IR_GLOBAL reads a symbolic global and may also be an IR_STORE destination.
-  IR_CAPTURE reads a capture by index from the current closure.
+  IR_LOAD_CAPTURE reads an IrCapture from the current closure.
   IR_RECURSE produces the current closure for a recursive call.
   IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
   IR_LOAD reads an IR_LOCAL whose statement has already assigned its slot; it never allocates the slot itself.
@@ -74,7 +74,7 @@ Low-level control flow
 	X(IR_NUMBER              , "number")                     \
 	X(IR_ATOM                , "atom")                       \
 	X(IR_GLOBAL              , "global")                     \
-	X(IR_CAPTURE             , "capture")                    \
+	X(IR_LOAD_CAPTURE        , "load_capture")               \
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_FUNCTION            , "function")                   \
 	X(IR_LOAD                , "load")                       \
@@ -154,6 +154,15 @@ typedef struct
 }
 IrArray;
 
+typedef struct IrCapture IrCapture;
+struct IrCapture
+{
+	IrCapture     *next;
+	struct Entity *entity;
+	Ir             target;
+	u32            slot;
+};
+
 // Note, IrFunctions are allocated separately from regular IR nodes, an actual IR_FUNCTION refers
 // to this structure directly ...
 typedef struct IrFunction IrFunction;
@@ -167,7 +176,9 @@ struct IrFunction
 	Ir          body;
 	Ir         *params;
 	u32         param_count;
-	IrArray     captures;
+	IrCapture  *first_capture;
+	IrCapture  *last_capture;
+	u32         capture_count;
 	u32         index;
 };
 
@@ -189,7 +200,7 @@ struct IrNode
 	union
 	{
 		Atom    *ir_global;
-		u32      ir_capture;
+		IrCapture *ir_load_capture;
 
 		struct
 		{

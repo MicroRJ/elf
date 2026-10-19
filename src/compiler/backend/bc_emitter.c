@@ -44,7 +44,7 @@ struct BcEmitter
 	u32                 number_constant_capacity;
 	u32                 number_constant_count;
 
-	elf_SourceMapEntry   *source_map;
+	elf_SourceMapEntry *source_map;
 	u32                 source_map_capacity;
 	u32                 source_map_count;
 
@@ -453,7 +453,7 @@ static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 			case IR_NIL:
 			case IR_LOAD:
 			case IR_GLOBAL:
-			case IR_CAPTURE:
+			case IR_LOAD_CAPTURE:
 			{
 			}
 			break;
@@ -541,7 +541,7 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	IrArray args = ir->ir_call.args;
 	u32 nargs = args.count;
 	ASSERT(function->kind == IR_FUNCTION);
-	ASSERT(function->ir_function->captures.count == 0);
+	ASSERT(function->ir_function->capture_count == 0);
 	ASSERT(nout <= 0xff);
 	ASSERT(function->ir_function->index != IR_FUNCTION_INDEX_INVALID);
 	u32 prototype_index = function->ir_function->index;
@@ -799,8 +799,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			IrFunction *function = expr->ir_function;
 			ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
 			u32 prototype_index = function->index;
-			IrArray captures = function->captures;
-			if (captures.count == 0)
+			if (function->capture_count == 0)
 			{
 				emit_bytecode_xy(emitter, site, BC_CLOSURE, out, prototype_index);
 			}
@@ -808,12 +807,13 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			{
 				i32 slot_checkpoint = save_slots(emitter);
 				i32 first_capture_slot = slot_checkpoint;
-
-				for (u32 i = 0; i < captures.count; ++i)
+				i32 prev_capture_slot = 0;
+				for (IrCapture *capture = function->first_capture; capture; capture = capture->next)
 				{
-					i32 next_capture_slot = emit_expr(emitter, captures.items[i], NO_SLOT, 1);
+					i32 next_capture_slot = emit_expr(emitter, capture->target, NO_SLOT, 1);
 					ASSERT(slot_is_valid(next_capture_slot));
-					ASSERT(first_capture_slot + (i32)i == next_capture_slot);
+					ASSERT(first_capture_slot + prev_capture_slot == next_capture_slot);
+					prev_capture_slot ++;
 				}
 
 				emit_bytecode_xy(emitter, site, BC_CLOSURE, first_capture_slot, prototype_index);
@@ -825,14 +825,14 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		}
 		break;
 
-		case IR_CAPTURE:
+		case IR_LOAD_CAPTURE:
 		{
 			if (nout < 1) {
 				return out;
 			}
 
 			out = ensure_slot(emitter, out);
-			emit_bytecode_xy(emitter, site, BC_LOADCVAL, out, expr->ir_capture);
+			emit_bytecode_xy(emitter, site, BC_LOADCVAL, out, expr->ir_load_capture->slot);
 		}
 		break;
 
@@ -938,7 +938,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		case IR_CALL:
 		{
 			Ir callee = expr->ir_call.expr;
-			if (callee->kind == IR_FUNCTION && callee->ir_function->captures.count == 0) {
+			if (callee->kind == IR_FUNCTION && callee->ir_function->capture_count == 0) {
 				out = emit_direct_call(emitter, expr, out, nout);
 			}
 			else {
@@ -1299,7 +1299,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	prototype->source = function->source->runtime_source;
 	prototype->variadic = function->variadic;
 	prototype->arity = function->param_count;
-	prototype->captures = function->captures.count;
+	prototype->captures = function->capture_count;
 	prototype->stack_size = emitter->stack_size;
 	prototype->integer_constant_count = emitter->integer_constant_count;
 	prototype->number_constant_count = emitter->number_constant_count;

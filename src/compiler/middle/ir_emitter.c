@@ -32,17 +32,8 @@ struct IrLoopFrame
 	IrDefer *defer_start;
 };
 
-typedef struct IrEmitterFrame IrEmitterFrame;
-typedef struct IrCapture IrCapture;
-
-struct IrCapture
-{
-	IrCapture *next;
-	Entity    *entity;
-	Ir         target;
-};
-
 // represents a lexical function as we descend
+typedef struct IrEmitterFrame IrEmitterFrame;
 struct IrEmitterFrame
 {
 	IrEmitterFrame  *parent;
@@ -50,18 +41,14 @@ struct IrEmitterFrame
 	IrDefer         *defer;
 	IrDefer         *defer_scope_start;
 	IrLoopFrame     *loop;
-	IrCapture       *first_capture;
-	IrCapture       *last_capture;
-	u32              capture_count;
 };
 
 struct IrEmitter
 {
-	IrModule        *module;
-
-	u32              ir_stack_size;
-	u32              ir_stack_index;
-	Ir              *ir_stack;
+	IrModule       *module;
+	u32             ir_stack_size;
+	u32             ir_stack_index;
+	Ir             *ir_stack;
 	IrEmitterFrame *function;
 };
 
@@ -161,47 +148,52 @@ static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 	}
 }
 
-static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
+static Ir capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
 {
 	ASSERT(entity->kind == ENTITY_LOCAL);
-	u32 capture_index = 0;
-	for (IrCapture *capture = function_ctx->first_capture; capture; capture = capture->next)
-	{
+	ASSERT(entity->en_local.storage);
+	ASSERT(entity->en_local.storage->kind == IR_LOCAL);
+	ASSERT(function_ctx->definition);
+	ASSERT(function_ctx->definition->ast);
+
+	// is the entity already within this function? if so just load it
+	if (entity->en_local.function == function_ctx->definition->ast) {
+		return ir_new_load(emitter, site, entity->en_local.storage);
+	}
+
+	for (IrCapture *capture = function_ctx->definition->first_capture; capture; capture = capture->next) {
 		if (capture->entity == entity) {
-			return capture_index;
+			return ir_new_load_capture(emitter, site, capture);
 		}
-		capture_index += 1;
 	}
 
-	ASSERT(function_ctx->capture_count < 255);
-	ASSERT(capture_index == function_ctx->capture_count);
+	ASSERT(function_ctx->definition->capture_count < 255);
 
-	Ir target = 0;
 	IrEmitterFrame *parent = function_ctx->parent;
-
-	if (parent && entity->en_local.function != parent->definition->ast)
+	if (!parent)
 	{
-		u32 parent_capture = capture_entity_in_function(emitter, parent, entity, site);
-		target = ir_new_capture(emitter, site, parent_capture);
+		ir_report_error(emitter, ERROR_LOWERING, site, "local '%s' cannot be captured from an unrelated function", atom_data(entity->name));
+		return ERROR_IR;
 	}
-	else
-	{
-		target = ir_new_load(emitter, site, entity->en_local.storage);
+
+	Ir parent_capture = capture_entity_in_function(emitter, parent, entity, site);
+	if (ir_is_error(parent_capture)) {
+		return ERROR_IR;
 	}
 
 	IrCapture *capture = arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
 	capture->entity = entity;
-	capture->target = target;
-	if (function_ctx->last_capture) {
-		function_ctx->last_capture->next = capture;
+	capture->target = parent_capture;
+	capture->slot = function_ctx->definition->capture_count ++;
+	if (function_ctx->definition->last_capture) {
+		function_ctx->definition->last_capture->next = capture;
 	}
 	else {
-		function_ctx->first_capture = capture;
+		function_ctx->definition->first_capture = capture;
 	}
-	function_ctx->last_capture = capture;
-	function_ctx->capture_count += 1;
+	function_ctx->definition->last_capture = capture;
 	entity->referenced = true;
-	return capture_index;
+	return ir_new_load_capture(emitter, site, capture);
 }
 
 static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
@@ -214,13 +206,8 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 	}
 	ASSERT(entity->kind == ENTITY_LOCAL);
 	ASSERT(entity->en_local.storage);
-	if (entity->en_local.function != emitter->function->definition->ast)
-	{
-		u32 capture_index = capture_entity_in_function(emitter, emitter->function, entity, site);
-		return ir_new_capture(emitter, site, capture_index);
-	}
 
-	return ir_new_load(emitter, site, entity->en_local.storage);
+	return capture_entity_in_function(emitter, emitter->function, entity, site);
 }
 
 static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
@@ -348,16 +335,16 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		switch (value.type) {
 			case COM_VALUE_FUNCTION:
 			{
-				if (!entity->en_static.value.definition)
+				Ast function = value.function;
+				ASSERT(function && function->kind == AST_FUNCTION);
+				if (!function->function.ir)
 				{
-					Ast function = entity->en_static.value.function;
-					ASSERT(function && function->kind == AST_FUNCTION);
 					ASSERT(entity->scope);
 					ASSERT(entity->scope->source);
-					entity->en_static.value.definition = ir_reserve_function(emitter, entity->scope->source, function);
-					ir_lower_function_body(emitter, entity->en_static.value.definition);
+					IrFunction *definition = ir_reserve_function(emitter, entity->scope->source, function);
+					ir_lower_function_body(emitter, definition);
 				}
-				ir = ir_new_function(emitter, expr->site, entity->en_static.value.definition);
+				ir = ir_new_function(emitter, expr->site, function->function.ir);
 				return ir;
 			}
 			break;
@@ -1531,23 +1518,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 
 	definition->body = ir_emit_stat_as_block(emitter, tree->function.body);
 
-	IrArray captures = {};
-	captures.count = function_ctx.capture_count;
-	if (captures.count) {
-		captures.items = arena_push(emitter->module->arena, sizeof(*captures.items) * captures.count, _Alignof(Ir));
-	}
-	u32 capture_index = 0;
-	for (IrCapture *capture = function_ctx.first_capture; capture; capture = capture->next)
-	{
-		ASSERT(capture_index < captures.count);
-		captures.items[capture_index++] = capture->target;
-	}
-	ASSERT(capture_index == captures.count);
-
-
 	emitter->function = outer_function;
-
-	definition->captures = captures;
 }
 
 static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree)
@@ -1578,7 +1549,6 @@ IrModule *ir_emit_module(Com_Source *source)
 
 	IrFunction *entry = ir_lower_function(emitter, source, ast);
 	ASSERT(entry == module->first_function);
-	ASSERT(!entry->captures.items && !entry->captures.count
-	|| !"Internal error: for some reason the entry function has captures, how is this even possible?");
+	ASSERT(!entry->capture_count || !"Internal error: for some reason the entry function has captures, how is this even possible?");
 	return module;
 }

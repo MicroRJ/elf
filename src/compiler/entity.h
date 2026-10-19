@@ -5,7 +5,6 @@
 
 typedef struct Entity Entity;
 typedef struct Scope Scope;
-typedef struct IrFunction IrFunction;
 
 typedef enum
 {
@@ -27,17 +26,13 @@ typedef struct
 	Com_ValueType type;
 	union
 	{
-		Com_Status   status;
+		Com_Status    status;
 		struct Ast_T *ast;
-		f64          number;
-		i64          integer;
-		struct Atom *string;
-		Scope       *exports;
-		struct
-		{
-			struct Ast_T *function;
-			IrFunction   *definition;
-		};
+		f64           number;
+		i64           integer;
+		struct Atom  *string;
+		Scope        *exports;
+		struct Ast_T *function;
 	};
 }
 Com_Value;
