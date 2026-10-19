@@ -9,7 +9,7 @@ API, and module model are still evolving. It should be treated as experimental r
 than production-ready.
 
 ```elf
-numbers := {10, 20, 30}
+numbers := [10, 20, 30]
 
 make_adder := fun(base) {
 	ret fun(value) {
@@ -35,9 +35,9 @@ The project currently provides:
 - a lexer and parser with source-located diagnostics;
 - AST-to-IR lowering and a bytecode backend;
 - a slot-based virtual machine with first-class functions and closures;
-- one table representation for array, map, and record-like data;
+- separate array, table, string, and buffer data structures;
 - a stack-based C API for embedding and native functions; and
-- optional filesystem, path, process, environment, serialization, random, and time
+- optional filesystem, path, environment, serialization, random, and time
   libraries.
 
 Manny uses elf as its build-description language, and Orbiter uses elf programs for its
@@ -45,10 +45,8 @@ build and game-library configuration.
 
 ## Documentation
 
-- [Project overview and design](docs/about.md)
-- [Language guide](docs/grammar.md)
-- [C embedding API](docs/public-api.md)
-- [Standard libraries](docs/libraries/README.md)
+- [Feature map](docs/feature-map.md) — language basics, grammar, runtime values,
+  compiler structure, libraries, embedding, and runnable examples
 
 ## Building
 
@@ -94,7 +92,7 @@ default entry.
 - `include/` — public C headers
 - `src/compiler/` — lexer, parser, AST, IR, and bytecode generation
 - `src/core/` — runtime values, tables, strings, VM, GC, and core libraries
-- `src/batteries/` — optional host-facing libraries
+- `src/libs/` — optional host-facing libraries
 - `test/` — C unit tests and end-to-end elf programs
 - `tools/` — runner, bytecode inspector, and benchmarks
 
