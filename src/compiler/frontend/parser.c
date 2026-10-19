@@ -880,6 +880,12 @@ static Ast parse_unary_expr(Parser *parser)
 			value = ast_new_nullary_expr(parser, tok.site, AST_RECURSE);
 		}
 		break;
+		case TOK_THIS:
+		{
+			consume_token(parser);
+			value = ast_new_nullary_expr(parser, tok.site, AST_THIS);
+		}
+		break;
 		case TOK_M_GET_MEM:
 		{
 			value = parse_get_mem_expr(parser);

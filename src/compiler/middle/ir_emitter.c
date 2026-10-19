@@ -212,7 +212,15 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 
 static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 {
-	if (!destination || destination->kind != AST_IDENT) {
+	if (!destination) {
+		return true;
+	}
+	if (destination->kind == AST_THIS)
+	{
+		ir_report_error(emitter, ERROR_INVALID_ASSIGNMENT, destination->site, "'this' cannot be assigned");
+		return false;
+	}
+	if (destination->kind != AST_IDENT) {
 		return true;
 	}
 	Entity *entity = destination->entity;
@@ -570,6 +578,16 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		{
 			ASSERT(emitter->function);
 			ir = ir_new_recurse(emitter, expr->site);
+		}
+		break;
+
+		case AST_THIS:
+		{
+			ASSERT(emitter->function);
+			ASSERT(emitter->function->definition);
+			ASSERT(emitter->function->definition->params);
+			Ir implicit_param = emitter->function->definition->params[IMPLICIT_PARAM_INDEX];
+			ir = ir_new_load(emitter, expr->site, implicit_param);
 		}
 		break;
 

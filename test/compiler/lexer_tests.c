@@ -197,7 +197,7 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 
 static void test_lexer_keywords_and_identifiers(elf_State *state)
 {
-	Parser parser = lexer_test_parser(state, "true false if fun export import recurse true_value load int str arr");
+	Parser parser = lexer_test_parser(state, "true false if fun export import recurse this this_value load int str arr");
 
 	expect_token_type(lexer_next(&parser), TOK_TRUE, "lex true keyword");
 	expect_token_type(lexer_next(&parser), TOK_FALSE, "lex false keyword");
@@ -206,10 +206,11 @@ static void test_lexer_keywords_and_identifiers(elf_State *state)
 	expect_token_type(lexer_next(&parser), TOK_EXPORT, "lex export keyword");
 	expect_token_type(lexer_next(&parser), TOK_IMPORT, "lex import keyword");
 	expect_token_type(lexer_next(&parser), TOK_RECURSE, "lex recurse keyword");
+	expect_token_type(lexer_next(&parser), TOK_THIS, "lex this keyword");
 
 	Token identifier = lexer_next(&parser);
 	expect_token_type(identifier, TOK_IDENTIFIER, "lex identifier near keyword");
-	expect_token_atom(identifier, "true_value", "identifier atom payload");
+	expect_token_atom(identifier, "this_value", "identifier atom payload");
 
 	Token load = lexer_next(&parser);
 	expect_token_type(load, TOK_IDENTIFIER, "load is an ordinary identifier");

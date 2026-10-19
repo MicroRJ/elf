@@ -676,6 +676,15 @@ static void test_parser_get_mem_macro(elf_State *state)
 	expect_ast_atom(expr ? expr->unary : 0, "x", "get_mem target string");
 }
 
+static void test_parser_this_expression(elf_State *state)
+{
+	Ast file = parser_test_parse_source(state, "ret this.value");
+	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse this return");
+	Ast field = parser_test_tuple_item(ret->return_stat.expr, 0, AST_FIELD, "this expression supports field access");
+	expect_ast_kind(field ? field->binary.x : 0, AST_THIS, "this expression has its own ast kind");
+	expect_ast_atom(field ? field->binary.y : 0, "value", "this field keeps its name");
+}
+
 static void test_parser_integer_literal_boundaries(elf_State *state)
 {
 	Ast file = parser_test_parse_source(state, "ret 9223372036854775807\nret -9223372036854775808");
@@ -853,6 +862,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_open_range_indexes(state);
 	test_parser_function_expression(state);
 	test_parser_get_mem_macro(state);
+	test_parser_this_expression(state);
 	test_parser_integer_literal_boundaries(state);
 	test_parser_source_slices(state);
 	test_parser_line_boundaries(state);

@@ -55,6 +55,7 @@
 	X(AST_TUPLE               , "tuple")                      \
 	X(AST_FUNCTION            , "function")                   \
 	X(AST_RECURSE             , "recurse")                    \
+	X(AST_THIS                , "this")                       \
 	X(AST_TABLE               , "table")                      \
 	X(AST_ARRAY               , "array")                      \
 	X(AST_TABLE_ENTRY         , "table_entry")                \
