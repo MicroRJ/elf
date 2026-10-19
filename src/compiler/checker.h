@@ -3,6 +3,6 @@
 
 #include "compiler.h"
 
-Com_Status check_source(Compiler *compiler, Com_Source *source);
+Com_Status check_source(Com_Source *source);
 
 #endif

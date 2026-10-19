@@ -22,7 +22,7 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	result.source->state = COM_SOURCE_PARSED;
 
 	if (!ast_is_error(file)) {
-		check_source(result.compiler, result.source);
+		check_source(result.source);
 		result.source->state = COM_SOURCE_CHECKED;
 		result.module = ir_emit_module(result.source);
 	}

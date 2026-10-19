@@ -19,7 +19,6 @@
 
 typedef struct
 {
-	Compiler *compiler;
 	Scope    *globals;
 	Scope    *source_scope;
 	Scope    *active_scope;
@@ -65,7 +64,7 @@ static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope 
 	ASSERT(result);
 	ASSERT(checker->source_scope);
 	ASSERT(checker->active_scope->source == checker->source_scope->source);
-	Scope *scope = scope_create(checker->compiler->arena, kind, checker->active_scope, owner, checker->source_scope->source);
+	Scope *scope = scope_create(checker->active_scope->arena, kind, checker->active_scope, owner, checker->source_scope->source);
 	if (scope) {
 		checker->active_scope = scope;
 		*result = scope;
@@ -146,10 +145,11 @@ static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stat
 	return COM_STATUS_OK;
 }
 
-Com_Status check_source(Compiler *compiler, Com_Source *source)
+Com_Status check_source(Com_Source *source)
 {
-	ASSERT(compiler);
 	ASSERT(source);
+	Compiler *compiler = source->compiler;
+	ASSERT(compiler);
 	Ast ast_file = source->ast;
 	ASSERT(ast_file);
 	ASSERT(ast_file->kind == AST_FILE);
@@ -157,14 +157,13 @@ Com_Status check_source(Compiler *compiler, Com_Source *source)
 	ASSERT(ast_file->file.body->kind == AST_BLOCK_STAT);
 
 	Checker checker = {0};
-	checker.compiler = compiler;
 	checker.current_function = ast_file;
 	checker.globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
 	if (!checker.globals) {
 		return checker_out_of_memory(source, ast_file->site);
 	}
 
-	checker.source_scope = scope_create(checker.compiler->arena, SCOPE_SOURCE, checker.globals, ast_file, source);
+	checker.source_scope = scope_create(compiler->arena, SCOPE_SOURCE, checker.globals, ast_file, source);
 	checker.active_scope = checker.source_scope;
 	if (!checker.source_scope) {
 		return checker_out_of_memory(source, ast_file->site);
@@ -223,7 +222,7 @@ static StaticValue resolve_entity(Checker *checker, Entity *entity)
 
 static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *source, Scope **result)
 {
-	Compiler *compiler = checker->compiler;
+	Compiler *compiler = source->compiler;
 	ASSERT(result);
 	*result = 0;
 	ASSERT(source);

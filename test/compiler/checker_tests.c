@@ -29,7 +29,7 @@ static void checker_test_init(CheckerTest *test, const char *name, const char *s
 	}
 	test->source->ast = file;
 	test->source->state = COM_SOURCE_PARSED;
-	test->status = check_source(test->compiler, test->source);
+	test->status = check_source(test->source);
 	test->source->state = COM_SOURCE_CHECKED;
 }
 
@@ -296,7 +296,7 @@ static void test_checker_resolves_imported_export(void)
 	Ast import = root->ast && root->ast->kind == AST_FILE && root->ast->file.imports.count ? root->ast->file.imports.items[0] : 0;
 	if (import && import->kind == AST_IMPORT) {
 		import->import.target = module;
-		check_source(compiler, root);
+		check_source(root);
 	}
 	else {
 		test_fail("checker import test parses import");
@@ -351,7 +351,7 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 		return;
 	}
 	import->import.target = test->module;
-	check_source(test->compiler, test->root);
+	check_source(test->root);
 }
 
 static void checker_import_test_destroy(CheckerImportTest *test)
@@ -447,7 +447,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 	source->state = COM_SOURCE_PARSED;
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
-	Com_Status status = check_source(compiler, source);
+	Com_Status status = check_source(source);
 	arena.capacity = capacity;
 	if (status != COM_STATUS_OOM || compiler->error_count != 0 || source->report.error_count != 0) {
 		test_fail("checker propagates failure to allocate an out-of-memory diagnostic");

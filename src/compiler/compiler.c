@@ -368,7 +368,7 @@ elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice na
 
 						if (!ast_is_error(ast) && !compiler->error_count)
 						{
-							Com_Status check_status = check_source(compiler, compiler_source);
+							Com_Status check_status = check_source(compiler_source);
 							if (check_status == COM_STATUS_OK)
 							{
 								IrModule *ir_module = ir_emit_module(compiler_source);
