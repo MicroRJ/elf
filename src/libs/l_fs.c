@@ -4,6 +4,608 @@
 
 #define ELF_FS_MAX_RECURSION 32
 
+#define ELF_FS_FILE_METATABLE "_file_metatable"
+
+typedef struct
+{
+	dy_File file;
+	b32 readable;
+	b32 writable;
+	b32 append;
+}
+FsFile;
+
+static void fs_file_destroy(elf_State *state, void *data)
+{
+	(void)state;
+	FsFile *file = data;
+	if (dy_file_is_valid(file->file))
+	{
+		dy_close_file(file->file);
+		file->file = (dy_File) {0};
+	}
+}
+
+static const elf_UserType fs_file_type = {
+	.name = "file",
+	.destroy = fs_file_destroy,
+};
+
+static void fs_push_errorf(elf_State *state, const char *format, ...)
+{
+	va_list arguments;
+	va_start(arguments, format);
+	Scratch scratch = scratch_begin();
+	char *message = arena_pushfv(scratch.arena, format, arguments);
+	va_end(arguments);
+	arena_push_zero(scratch.arena, 1, 1);
+	elf_push_error(state, message ? message : "file operation failed");
+	scratch_end(scratch);
+}
+
+static void fs_push_io_error(elf_State *state, const char *operation, dy_Result result)
+{
+	Scratch scratch = scratch_begin();
+	dy_String system_message = {0};
+	char *message = 0;
+	if (result.os_error && !dy_error_message(scratch.arena, result.os_error, &system_message).error)
+	{
+		message = arena_pushf(scratch.arena, "%s failed: %.*s", operation, (int)system_message.size, system_message.data);
+	}
+	else
+	{
+		message = arena_pushf(scratch.arena, "%s failed (error %u)", operation, (u32)result.error);
+	}
+	elf_push_error(state, message ? message : "file operation failed");
+	scratch_end(scratch);
+
+	elf_Index error = elf_abs_index(state, -1);
+	elf_push_int(state, result.error);
+	elf_set_field(state, error, "code");
+	elf_push_int(state, result.os_error);
+	elf_set_field(state, error, "os_code");
+}
+
+static b32 fs_check_arg_count(elf_State *state, int nargs, int minimum, int maximum, const char *operation)
+{
+	int count = nargs - 1;
+	b32 valid = count >= minimum && count <= maximum;
+	if (!valid)
+	{
+		if (minimum == maximum)
+		{
+			fs_push_errorf(state, "%s expected %i argument(s), got %i", operation, minimum, count);
+		}
+		else
+		{
+			fs_push_errorf(state, "%s expected %i to %i arguments, got %i", operation, minimum, maximum, count);
+		}
+	}
+	return valid;
+}
+
+static b32 fs_load_file_receiver(elf_State *state, FsFile **result)
+{
+	elf_Value value = state->frame->framebase[0];
+	b32 valid = value_is_user(value) && value_as_user(value)->type == &fs_file_type;
+	if (!valid)
+	{
+		fs_push_errorf(state, "file method expected a file receiver, got '%s'", value_type_name(value.type));
+	}
+	else
+	{
+		*result = (FsFile *)value_as_user(value)->data;
+	}
+	return valid;
+}
+
+static b32 fs_load_buffer(elf_State *state, u32 index, elf_ByteBuffer **result)
+{
+	elf_Value value = state->frame->framebase[index];
+	b32 valid = value_is_buffer(value);
+	if (!valid)
+	{
+		fs_push_errorf(state, "expected a buffer, got '%s'", value_type_name(value.type));
+	}
+	else
+	{
+		*result = value_as_buffer(value);
+	}
+	return valid;
+}
+
+static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i64 *result)
+{
+	elf_Value value = state->frame->framebase[index];
+	b32 valid = value_is_numeric(value);
+	if (!valid)
+	{
+		fs_push_errorf(state, "%s expected an integer, got '%s'", operation, value_type_name(value.type));
+	}
+	else
+	{
+		*result = value_to_integer(value);
+	}
+	return valid;
+}
+
+static b32 fs_load_string(elf_State *state, u32 index, const char *operation, elf_StrSlice *result)
+{
+	elf_Value value = state->frame->framebase[index];
+	b32 valid = value_is_string(value);
+	if (!valid)
+	{
+		fs_push_errorf(state, "%s expected a string, got '%s'", operation, value_type_name(value.type));
+	}
+	else
+	{
+		elf_String *string = value_as_string(value);
+		*result = (elf_StrSlice) {(char *)elf_string_data(string), elf_string_size(string)};
+	}
+	return valid;
+}
+
+static b32 fs_require_open(elf_State *state, FsFile *file)
+{
+	b32 open = dy_file_is_valid(file->file);
+	if (!open)
+	{
+		elf_push_error(state, "file is closed");
+	}
+	return open;
+}
+
+static b32 fs_load_size(elf_State *state, u32 index, const char *operation, u32 *result)
+{
+	i64 value = 0;
+	if (!fs_load_integer(state, index, operation, &value))
+	{
+		return false;
+	}
+	if (value < 0 || (u64)value > UINT32_MAX)
+	{
+		fs_push_errorf(state, "%s size is out of range: %lld", operation, value);
+		return false;
+	}
+	*result = (u32)value;
+	return true;
+}
+
+//
+// file:read(buffer, count) -> integer | error
+// Appends at most count bytes to buffer. Returns the number of bytes appended;
+// zero means the file is at EOF.
+//
+// Example:
+// data := elf.buffer()
+// bytes_read := file:read(data, 4096)
+// if elf.is_error(bytes_read) ? { ret bytes_read }
+//
+ELF_FUNCTION(lib_fs_file_read)
+{
+	if (!fs_check_arg_count(S, nargs, 2, 2, "file.read"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	elf_ByteBuffer *buffer = 0;
+	u32 count = 0;
+	if (!fs_load_file_receiver(S, &file) || !fs_load_buffer(S, 1, &buffer) || !fs_load_size(S, 2, "file read", &count))
+	{
+		return 1;
+	}
+	if (!fs_require_open(S, file))
+	{
+		return 1;
+	}
+	if (!file->readable)
+	{
+		elf_push_error(S, "file is not open for reading");
+		return 1;
+	}
+	if (count > UINT32_MAX - buffer->size)
+	{
+		elf_push_error(S, "file read exceeds the maximum buffer size");
+		return 1;
+	}
+
+	u32 offset = buffer->size;
+	if (!elf_buffer_reserve_object(S, buffer, offset + count))
+	{
+		elf_push_error(S, "could not reserve the destination buffer for file read");
+		return 1;
+	}
+	dy_u64 bytes_read = 0;
+	dy_Result result = dy_read_file(file->file, buffer->data ? buffer->data + offset : 0, count, &bytes_read);
+	ASSERT(bytes_read <= count);
+	buffer->size += (u32)bytes_read;
+	if (result.error)
+	{
+		fs_push_io_error(S, "file read", result);
+	}
+	else
+	{
+		elf_push_int(S, bytes_read);
+	}
+	return 1;
+}
+
+//
+// file:write(buffer, offset = 0, count = buffer:length() - offset) -> integer | error
+// Writes a range of bytes from buffer. Returns the number of bytes written.
+// Append-mode files always write the range at the current end of the file.
+//
+// Example:
+// data := elf.buffer():append("hello")
+// bytes_written := file:write(data, 1, 3)
+// if elf.is_error(bytes_written) ? { ret bytes_written }
+//
+ELF_FUNCTION(lib_fs_file_write)
+{
+	if (!fs_check_arg_count(S, nargs, 1, 3, "file.write"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	elf_ByteBuffer *buffer = 0;
+	if (!fs_load_file_receiver(S, &file) || !fs_load_buffer(S, 1, &buffer))
+	{
+		return 1;
+	}
+	u32 offset = 0;
+	u32 count = buffer->size;
+	if (nargs > 2)
+	{
+		if (!fs_load_size(S, 2, "file write offset", &offset))
+		{
+			return 1;
+		}
+		if (offset > buffer->size)
+		{
+			fs_push_errorf(S, "file write offset %u exceeds buffer length %u", offset, buffer->size);
+			return 1;
+		}
+		count = buffer->size - offset;
+	}
+	if (nargs > 3)
+	{
+		if (!fs_load_size(S, 3, "file write", &count))
+		{
+			return 1;
+		}
+		if (count > buffer->size - offset)
+		{
+			fs_push_errorf(S, "file write range exceeds buffer length %u", buffer->size);
+			return 1;
+		}
+	}
+
+	if (!fs_require_open(S, file))
+	{
+		return 1;
+	}
+	if (!file->writable)
+	{
+		elf_push_error(S, "file is not open for writing");
+		return 1;
+	}
+	if (file->append)
+	{
+		dy_u64 position = 0;
+		dy_Result seek = dy_set_file_cursor(file->file, DY_SEEK_END, 0, &position);
+		if (seek.error)
+		{
+			fs_push_io_error(S, "file append seek", seek);
+			return 1;
+		}
+	}
+
+	dy_u64 bytes_written = 0;
+	const u8 *data = buffer->data ? buffer->data + offset : 0;
+	dy_Result result = dy_write_file(file->file, data, count, &bytes_written);
+	if (result.error)
+	{
+		fs_push_io_error(S, "file write", result);
+	}
+	else
+	{
+		elf_push_int(S, bytes_written);
+	}
+	return 1;
+}
+
+//
+// file:seek(offset, origin) -> integer | error
+// Moves the cursor relative to "begin", "current", or "end" and returns its
+// resulting absolute byte position.
+//
+// Example:
+// position := file:seek(-4, "end")
+// if elf.is_error(position) ? { ret position }
+//
+ELF_FUNCTION(lib_fs_file_seek)
+{
+	if (!fs_check_arg_count(S, nargs, 2, 2, "file.seek"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	i64 distance = 0;
+	elf_StrSlice origin_name = {0};
+	if (!fs_load_file_receiver(S, &file) || !fs_load_integer(S, 1, "file seek offset", &distance) || !fs_load_string(S, 2, "file seek origin", &origin_name))
+	{
+		return 1;
+	}
+	dy_String origin_string = dy_string_from_data(origin_name.data, origin_name.size);
+	dy_Seek_Origin origin;
+	if (dy_string_is(origin_string, "begin"))
+	{
+		origin = DY_SEEK_BEGIN;
+	}
+	else if (dy_string_is(origin_string, "current"))
+	{
+		origin = DY_SEEK_CURRENT;
+	}
+	else if (dy_string_is(origin_string, "end"))
+	{
+		origin = DY_SEEK_END;
+	}
+	else
+	{
+		elf_push_error(S, "invalid file seek origin; expected 'begin', 'current', or 'end'");
+		return 1;
+	}
+
+	if (!fs_require_open(S, file))
+	{
+		return 1;
+	}
+	dy_u64 position = 0;
+	dy_Result result = dy_set_file_cursor(file->file, origin, distance, &position);
+	if (result.error || position > INT64_MAX)
+	{
+		if (!result.error)
+		{
+			result.error = DY_ERROR_NOT_SUPPORTED;
+		}
+		fs_push_io_error(S, "file seek", result);
+	}
+	else
+	{
+		elf_push_int(S, (i64)position);
+	}
+	return 1;
+}
+
+//
+// file:tell() -> integer | error
+// Returns the cursor's current absolute byte position.
+//
+// Example:
+// position := file:tell()
+// if elf.is_error(position) ? { ret position }
+//
+ELF_FUNCTION(lib_fs_file_tell)
+{
+	if (!fs_check_arg_count(S, nargs, 0, 0, "file.tell"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	if (!fs_load_file_receiver(S, &file))
+	{
+		return 1;
+	}
+	if (!fs_require_open(S, file))
+	{
+		return 1;
+	}
+	dy_u64 position = 0;
+	dy_Result result = dy_set_file_cursor(file->file, DY_SEEK_CURRENT, 0, &position);
+	if (result.error || position > INT64_MAX)
+	{
+		if (!result.error)
+		{
+			result.error = DY_ERROR_NOT_SUPPORTED;
+		}
+		fs_push_io_error(S, "file tell", result);
+	}
+	else
+	{
+		elf_push_int(S, (i64)position);
+	}
+	return 1;
+}
+
+//
+// file:size() -> integer | error
+// Returns the file's current size in bytes without changing its cursor.
+//
+// Example:
+// size := file:size()
+// if elf.is_error(size) ? { ret size }
+//
+ELF_FUNCTION(lib_fs_file_size)
+{
+	if (!fs_check_arg_count(S, nargs, 0, 0, "file.size"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	if (!fs_load_file_receiver(S, &file))
+	{
+		return 1;
+	}
+	if (!fs_require_open(S, file))
+	{
+		return 1;
+	}
+	dy_u64 size = 0;
+	dy_Result result = dy_get_file_size(file->file, &size);
+	if (result.error || size > INT64_MAX)
+	{
+		if (!result.error)
+		{
+			result.error = DY_ERROR_NOT_SUPPORTED;
+		}
+		fs_push_io_error(S, "file size", result);
+	}
+	else
+	{
+		elf_push_int(S, (i64)size);
+	}
+	return 1;
+}
+
+//
+// file:close() -> true | error
+// Closes the handle. Closing an already closed file succeeds, and an unclosed
+// handle is closed automatically when collected.
+//
+// Example:
+// closed := file:close()
+// if elf.is_error(closed) ? { ret closed }
+//
+ELF_FUNCTION(lib_fs_file_close)
+{
+	if (!fs_check_arg_count(S, nargs, 0, 0, "file.close"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	if (!fs_load_file_receiver(S, &file))
+	{
+		return 1;
+	}
+	if (!dy_file_is_valid(file->file))
+	{
+		elf_push_int(S, true);
+		return 1;
+	}
+	dy_Result result = dy_close_file(file->file);
+	if (result.error)
+	{
+		fs_push_io_error(S, "file close", result);
+	}
+	else
+	{
+		file->file = (dy_File) {0};
+		elf_push_int(S, true);
+	}
+	return 1;
+}
+
+static const elf_Binding l_fs_file[] = {
+	{"read",  lib_fs_file_read},
+	{"write", lib_fs_file_write},
+	{"seek",  lib_fs_file_seek},
+	{"tell",  lib_fs_file_tell},
+	{"size",  lib_fs_file_size},
+	{"close", lib_fs_file_close},
+};
+
+//
+// elf.fs.open(path, mode) -> file | error
+// Opens path with one of the modes "r", "w", "a", "r+", "w+", or "a+".
+// Append modes place every write at the current end of the file.
+//
+// Example:
+// file := elf.fs.open("data.bin", "r+")
+// if elf.is_error(file) ? { ret file }
+//
+ELF_FUNCTION(lib_fs_open)
+{
+	if (!fs_check_arg_count(S, nargs, 2, 2, "fs.open"))
+	{
+		return 1;
+	}
+	elf_Value receiver = S->frame->framebase[0];
+	if (!value_is_table(receiver))
+	{
+		fs_push_errorf(S, "fs.open expected the elf.fs receiver, got '%s'", value_type_name(receiver.type));
+		return 1;
+	}
+	elf_StrSlice path = {0};
+	elf_StrSlice mode_name = {0};
+	if (!fs_load_string(S, 1, "file path", &path) || !fs_load_string(S, 2, "file mode", &mode_name))
+	{
+		return 1;
+	}
+	dy_String mode = dy_string_from_data(mode_name.data, mode_name.size);
+	dy_File_Intent intent;
+	dy_File_Access access;
+	b32 readable = false;
+	b32 writable = false;
+	b32 append = false;
+
+	if (dy_string_is(mode, "r"))
+	{
+		intent = DY_FILE_OPEN_EXISTING;
+		access = DY_FILE_READ | DY_FILE_SHARE_READ;
+		readable = true;
+	}
+	else if (dy_string_is(mode, "w"))
+	{
+		intent = DY_FILE_CREATE_ALWAYS;
+		access = DY_FILE_WRITE;
+		writable = true;
+	}
+	else if (dy_string_is(mode, "a"))
+	{
+		intent = DY_FILE_OPEN_ALWAYS;
+		access = DY_FILE_WRITE;
+		writable = true;
+		append = true;
+	}
+	else if (dy_string_is(mode, "r+"))
+	{
+		intent = DY_FILE_OPEN_EXISTING;
+		access = DY_FILE_READ | DY_FILE_WRITE;
+		readable = true;
+		writable = true;
+	}
+	else if (dy_string_is(mode, "w+"))
+	{
+		intent = DY_FILE_CREATE_ALWAYS;
+		access = DY_FILE_READ | DY_FILE_WRITE;
+		readable = true;
+		writable = true;
+	}
+	else if (dy_string_is(mode, "a+"))
+	{
+		intent = DY_FILE_OPEN_ALWAYS;
+		access = DY_FILE_READ | DY_FILE_WRITE;
+		readable = true;
+		writable = true;
+		append = true;
+	}
+	else
+	{
+		elf_push_error(S, "invalid file mode; expected 'r', 'w', 'a', 'r+', 'w+', or 'a+'");
+		return 1;
+	}
+
+	elf_Value metatable_value = elf_table_get_or_nil(S, value_as_table(receiver), value_from_string(elf_string_from_data(S, ELF_FS_FILE_METATABLE)));
+	if (!value_is_table(metatable_value))
+	{
+		elf_push_error(S, "file metatable is unavailable");
+		return 1;
+	}
+	elf_UserObject *user = elf_user_object_new(S, &fs_file_type, value_as_table(metatable_value), sizeof(FsFile));
+	FsFile *file = (FsFile *)user->data;
+	file->readable = readable;
+	file->writable = writable;
+	file->append = append;
+	push_value(S, value_from_user(user));
+
+	dy_Result result = dy_access_file(dy_string_from_data(path.data, path.size), intent, access, &file->file);
+	if (result.error)
+	{
+		fs_push_io_error(S, "file open", result);
+	}
+	return 1;
+}
+
 static b32 fs_get_file_info(const char *path, dy_File_Info *info)
 {
 	return !dy_get_file_info(dy_string_from_cstring(path), info).error &&
@@ -314,6 +916,7 @@ ELF_FUNCTION(lib_fs_for_each_path)
 }
 
 static const elf_Binding l_fs[] = {
+	{"open",                  lib_fs_open},
 	{"exists",                lib_fs_exists},
 	{"is_file",               lib_fs_is_file},
 	{"is_directory",          lib_fs_is_directory},
@@ -336,5 +939,9 @@ static const elf_Binding l_fs[] = {
 
 static void elf_lib_fs(elf_State *state)
 {
-	new_binding_table(state, l_fs, ARRAY_COUNT(l_fs));
+	elf_Table *fs = new_binding_table(state, l_fs, ARRAY_COUNT(l_fs));
+	elf_Table *file_metatable = new_binding_table(state, l_fs_file, ARRAY_COUNT(l_fs_file));
+	elf_Value key = value_from_string(elf_string_from_data(state, ELF_FS_FILE_METATABLE));
+	elf_table_set(state, fs, key, value_from_table(file_metatable));
+	elf_pop(state, 1);
 }
