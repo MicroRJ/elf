@@ -541,7 +541,8 @@ static void test_backend_outputs_strings(void)
 
 	IrNode string = {.kind = IR_ATOM, .atom = atom};
 	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &string};
-	IrFunction function = {.body = &return_string, .index = IR_FUNCTION_INDEX_INVALID};
+	elf_Source *source = elf_source_create(state, (dy_String) {(char *)"backend", sizeof("backend") - 1}, (dy_String) {});
+	IrFunction function = {.source = source, .body = &return_string, .index = IR_FUNCTION_INDEX_INVALID};
 	IrModule ir_module = {.arena = &arena, .first_function = &function, .last_function = &function, .function_count = 1};
 
 	elf_Prototype *prototype = bc_emit_module(state, &ir_module);

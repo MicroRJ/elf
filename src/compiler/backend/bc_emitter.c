@@ -1281,6 +1281,7 @@ static void reserve_module_prototypes(elf_State *target, IrModule *module)
 
 static void install_function(BcEmitter *emitter, IrFunction *function, u32 prototype_index)
 {
+	ASSERT(function->source);
 	ASSERT(prototype_index < emitter->target->prototype_count);
 	ASSERT(!emitter->target->prototypes[prototype_index]);
 
@@ -1294,6 +1295,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	ASSERT(prototype);
 
 	prototype->allocation_size = allocation_size;
+	prototype->source = function->source;
 	prototype->variadic = function->variadic;
 	prototype->arity = function->param_count;
 	prototype->captures = function->captures.count;

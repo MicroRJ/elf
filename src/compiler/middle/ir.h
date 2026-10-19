@@ -6,6 +6,7 @@
 
 typedef struct Atom Atom;
 typedef struct Ast_T Ast_T;
+typedef struct elf_Source elf_Source;
 typedef Ast_T *Ast;
 
 #define NO_SLOT (-1)
@@ -160,6 +161,7 @@ struct IrFunction
 {
 	Ast         ast;
 	IrFunction *next;
+	elf_Source *source;
 	SourceSite  site;
 	b32         variadic;
 	Ir          body;

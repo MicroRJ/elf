@@ -130,6 +130,7 @@ struct elf_Table
 struct elf_Prototype
 {
 	u64               allocation_size;
+	elf_Source       *source;
 	b32               variadic;
 	u8                arity;
 	u8                captures;

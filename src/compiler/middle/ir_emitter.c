@@ -1465,7 +1465,9 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 	ASSERT(tree);
 	ASSERT(!definition->ast || definition->ast == tree);
 	ASSERT(definition->param_count == IMPLICIT_PARAM_COUNT + ast_params.count);
+	ASSERT(tree->source);
 	definition->ast = tree;
+	definition->source = tree->source->runtime_source;
 
 	IrEmitterFrame function_ctx = {};
 	function_ctx.parent = emitter->function;
