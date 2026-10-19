@@ -52,25 +52,13 @@ typedef enum
 }
 EntityKind;
 
-typedef enum
-{
-	ENTITY_TAG_NONE       = 0,
-
-	ENTITY_TAG_REFERENCED = 1 << 0,
-	ENTITY_TAG_EXPORTED   = 1 << 1,
-
-	ENTITY_TAG_CONSTANT   = 1 << 2,
-	ENTITY_TAG_ASSIGNED   = 1 << 3,
-}
-EntityTags;
-
 struct Entity
 {
 	EntityKind      kind;
 	Com_Status      status;
 	struct Atom    *name;
 	Scope          *scope;
-	EntityTags      tags;
+	b32             referenced;
 	union
 	{
 		struct
@@ -81,8 +69,10 @@ struct Entity
 		en_static;
 		struct
 		{
+			struct Ast_T  *declaration;
 			struct Ast_T  *function;
 			struct IrNode *storage;
+			b32            assigned;
 		}
 		en_local;
 	};
@@ -108,6 +98,9 @@ static inline b32 entity_is_error(const Entity *entity)
 {
 	return entity && entity->kind == ENTITY_ERROR;
 }
+
+b32 entity_is_constant(const Entity *entity);
+b32 entity_is_exported(const Entity *entity);
 
 typedef enum
 {

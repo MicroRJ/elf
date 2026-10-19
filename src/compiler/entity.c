@@ -22,6 +22,34 @@ Entity entity_oom_sentinel =
 	.status = COM_STATUS_OOM,
 };
 
+b32 entity_is_constant(const Entity *entity)
+{
+	ASSERT(entity);
+	b32 result = entity->kind == ENTITY_STATIC;
+	if (entity->kind == ENTITY_LOCAL)
+	{
+		Ast declaration = entity->en_local.declaration;
+		ASSERT(declaration);
+		ASSERT(declaration->kind == AST_DECL_STAT || declaration->kind == AST_FUNCTION_PARAM);
+		result = declaration->kind == AST_DECL_STAT && declaration->decl.constant;
+	}
+	return result;
+}
+
+b32 entity_is_exported(const Entity *entity)
+{
+	ASSERT(entity);
+	b32 result = false;
+	if (entity->kind == ENTITY_STATIC)
+	{
+		Ast declaration = entity->en_static.declaration;
+		ASSERT(declaration);
+		ASSERT(declaration->kind == AST_STATIC_DECL);
+		result = declaration->static_decl.exported;
+	}
+	return result;
+}
+
 Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
 {
 	ASSERT(!parent || kind == SCOPE_SOURCE || parent->source == source);

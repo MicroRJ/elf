@@ -107,8 +107,8 @@ static void test_checker_tags_exported_static(void)
 	checker_test_init(&test, "checker_export", "export answer :: 42\nret answer");
 	Ast declaration = checker_test_stat(&test, 0, AST_STATIC_DECL, "checker parses exported static");
 	Entity *entity = declaration ? declaration->entity : 0;
-	if (!entity || !(entity->tags & ENTITY_TAG_EXPORTED)) {
-		test_fail("checker tags exported source static");
+	if (!entity || !entity_is_exported(entity)) {
+		test_fail("checker records exported source static");
 	}
 	checker_test_destroy(&test);
 }
@@ -201,13 +201,13 @@ static void test_checker_attaches_function_entities(void)
 	Ast inner_return = inner_body && inner_body->kind == AST_BLOCK_STAT && inner_body->block.count ? inner_body->block.items[0] : 0;
 	Entity *parameter_entity = parameter_name ? parameter_name->entity : 0;
 	Entity *local_entity = local_name ? local_name->entity : 0;
-	if (!parameter_entity || parameter_entity->kind != ENTITY_LOCAL || parameter_entity->en_local.function != outer_function) {
+	if (!parameter_entity || parameter_entity->kind != ENTITY_LOCAL || parameter_entity->en_local.declaration != parameter || parameter_entity->en_local.function != outer_function) {
 		test_fail("checker attaches parameter entity to owning function");
 	}
 	if (!parameter_use || parameter_use->entity != parameter_entity) {
 		test_fail("checker resolves function parameter use");
 	}
-	if (!local_entity || local_entity->kind != ENTITY_LOCAL || local_entity->en_local.function != outer_function) {
+	if (!local_entity || local_entity->kind != ENTITY_LOCAL || local_entity->en_local.declaration != local_decl || local_entity->en_local.function != outer_function) {
 		test_fail("checker records local owner function");
 	}
 	Ast inner_return_expr = inner_return && inner_return->kind == AST_RETURN ? checker_test_single_expression(inner_return->return_stat.expr, AST_IDENT, "checker finds captured local use") : 0;
@@ -305,7 +305,7 @@ static void test_checker_resolves_imported_export(void)
 	Ast field = root_return && root_return->kind == AST_RETURN ? checker_test_single_expression(root_return->return_stat.expr, AST_FIELD, "checker finds imported field expression") : 0;
 	Atom *answer_name = atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1);
 	Entity *answer = module->scope ? scope_find_current(module->scope, answer_name) : 0;
-	if (!answer || answer->kind != ENTITY_STATIC || !(answer->tags & ENTITY_TAG_EXPORTED) || answer->en_static.value.type != COM_VALUE_INTEGER || answer->en_static.value.integer != 42) {
+	if (!answer || answer->kind != ENTITY_STATIC || !entity_is_exported(answer) || answer->en_static.value.type != COM_VALUE_INTEGER || answer->en_static.value.integer != 42) {
 		test_fail("checker lazily resolves imported export");
 	}
 	if (!field || field->kind != AST_FIELD || field->entity != answer) {

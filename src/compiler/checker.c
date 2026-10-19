@@ -81,7 +81,7 @@ static void pop_scope(Checker *checker, Scope *scope)
 	checker->active_scope = scope->parent;
 }
 
-static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, EntityTags tags, Atom *name, SourceSite site)
+static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Atom *name, SourceSite site)
 {
 	b32 created = false;
 	Entity *entity = scope_declare(scope, kind, name, &created);
@@ -101,7 +101,6 @@ static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, E
 		entity->en_local.function = checker->current_function;
 	}
 
-	entity->tags = tags;
 	return entity;
 }
 
@@ -121,11 +120,7 @@ static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stat
 		ASSERT(!ast_name->entity);
 		ASSERT(!ast_decl->entity);
 
-		EntityTags tags = ENTITY_TAG_CONSTANT;
-		if (ast_decl->static_decl.exported) {
-			tags |= ENTITY_TAG_EXPORTED;
-		}
-		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, tags, ast_name->atom, ast_decl->site);
+		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_name->atom, ast_decl->site);
 		if (entity_is_error(entity)) {
 			return entity->status;
 		}
@@ -337,10 +332,11 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);
 				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, ENTITY_TAG_NONE, name->identifier, name->site);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name->identifier, name->site);
 				if (entity_is_error(entity)) {
 					value = com_value_error(entity->status);
 				} else {
+					entity->en_local.declaration = param;
 					name->entity = entity;
 				}
 			}
@@ -384,7 +380,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			Entity *entity = scope_find(checker->active_scope, name);
 			if (!entity)
 			{
-				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, ENTITY_TAG_NONE, name, expr->site);
+				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, name, expr->site);
 				if (entity_is_error(entity)) {
 					value = com_value_error(entity->status);
 				}
@@ -419,7 +415,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 					Com_Status status = checker_report(checker->source_scope->source, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left_value.exports->source->name), atom_data(expr->binary.y->atom));
 					value = com_value_error(status);
 				}
-				else if (!(entity->tags & ENTITY_TAG_EXPORTED))
+				else if (!entity_is_exported(entity))
 				{
 					Com_Status status = checker_report(checker->source_scope->source, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left_value.exports->source->name));
 					value = com_value_error(status);
@@ -428,7 +424,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				{
 					value = resolve_entity(checker, entity);
 					if (value.type != COM_VALUE_ERROR) {
-						entity->tags |= ENTITY_TAG_REFERENCED;
+						entity->referenced = true;
 						expr->entity = entity;
 					}
 				}
@@ -717,7 +713,6 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		case AST_DECL_STAT:
 		{
 			Ast names = ast_ensure_kind(stat->decl.name, AST_TUPLE);
-			EntityTags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
 			if (stat->decl.type)
 			{
 				value = resolve_expression(checker, stat->decl.type);
@@ -738,9 +733,10 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 					break;
 				}
 				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, tags, name->identifier, name->site);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name->identifier, name->site);
 				status = entity_is_error(entity) ? entity->status : COM_STATUS_OK;
 				if (status == COM_STATUS_OK) {
+					entity->en_local.declaration = stat;
 					name->entity = entity;
 				}
 			}

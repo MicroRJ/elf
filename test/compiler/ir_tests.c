@@ -168,8 +168,8 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 	}
 	Ast declaration = result.source->ast->file.body->block.items[0];
 	Ast names = ast_ensure_kind(declaration->decl.name, AST_TUPLE);
-	if (!names->tuple.items[0]->entity || !(names->tuple.items[0]->entity->tags & ENTITY_TAG_CONSTANT)) {
-		test_fail("constant declaration tags its entity");
+	if (!names->tuple.items[0]->entity || !entity_is_constant(names->tuple.items[0]->entity)) {
+		test_fail("constant declaration marks its entity constant");
 	}
 	arena_destroy(&arena);
 }

@@ -200,7 +200,7 @@ static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functi
 	}
 	function_ctx->last_capture = capture;
 	function_ctx->capture_count += 1;
-	entity->tags |= ENTITY_TAG_REFERENCED;
+	entity->referenced = true;
 	return capture_index;
 }
 
@@ -208,7 +208,7 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 {
 	ASSERT(entity);
 	ASSERT(emitter->function);
-	entity->tags |= ENTITY_TAG_REFERENCED;
+	entity->referenced = true;
 	if (entity->kind == ENTITY_GLOBAL) {
 		return ir_new_global(emitter, site, entity->name);
 	}
@@ -230,13 +230,15 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 	}
 	Entity *entity = destination->entity;
 	ASSERT(entity);
-	if (entity->tags & ENTITY_TAG_CONSTANT)
+	if (entity_is_constant(entity))
 	{
 		ir_report_error(emitter, ERROR_LOWERING, destination->site
 		, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
 		return false;
 	}
-	entity->tags |= ENTITY_TAG_ASSIGNED;
+	if (entity->kind == ENTITY_LOCAL) {
+		entity->en_local.assigned = true;
+	}
 	return true;
 }
 
