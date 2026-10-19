@@ -91,20 +91,16 @@ static void *grow_emitter_array(Arena *arena, void *items, u32 count, u32 *capac
 	return new_items;
 }
 
-static b32 source_site_equal(SourceSite left, SourceSite right)
+static b32 source_map_entry_matches_site(BcSourceMapEntry *entry, SourceSite site)
 {
-	return left.source == right.source &&
-	left.offset == right.offset &&
-	left.size == right.size &&
-	left.line_offset == right.line_offset &&
-	left.line_index == right.line_index;
+	return entry->source_offset == site.offset && entry->source_size == site.size && entry->line_offset == site.line_offset && entry->line_index == site.line_index;
 }
 
 static void record_source_map(BcEmitter *emitter, SourceSite site, u32 byte_position)
 {
 	if (emitter->source_map_count > 0) {
 		BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count - 1;
-		if (entry->byte_end == byte_position && source_site_equal(entry->site, site)) {
+		if (entry->byte_end == byte_position && source_map_entry_matches_site(entry, site)) {
 			entry->byte_end = byte_position + 1;
 			return;
 		}
@@ -114,7 +110,10 @@ static void record_source_map(BcEmitter *emitter, SourceSite site, u32 byte_posi
 	BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count++;
 	entry->byte_start = byte_position;
 	entry->byte_end = byte_position + 1;
-	entry->site = site;
+	entry->source_offset = site.offset;
+	entry->source_size = site.size;
+	entry->line_offset = site.line_offset;
+	entry->line_index = site.line_index;
 }
 
 static u32 add_integer_constant(BcEmitter *emitter, i64 value)

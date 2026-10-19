@@ -132,7 +132,7 @@ static void test_backend_source_map(void)
 
 	for (u32 byte = 0; byte < function->bytecode_count; ++byte) {
 		BcSourceMapEntry *entry = backend_find_source_map_entry(function, byte);
-		if (!entry || !source_slice_is_valid(entry->site) || entry->site.size == 0) {
+		if (!entry || entry->line_index == 0 || entry->line_offset > entry->source_offset || entry->source_size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
 			goto done;
 		}

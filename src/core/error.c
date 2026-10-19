@@ -11,19 +11,19 @@ static const char *error_code_names[] =
 #undef ERROR_CODE_NAME
 };
 
-static SourceSite find_source_for_instr(elf_Prototype *function, int instr)
+static BcSourceMapEntry *find_source_for_instr(elf_Prototype *function, u32 instr)
 {
-	SourceSite site = {};
+	BcSourceMapEntry *result = 0;
 	for (u32 i = 0; i < function->source_map_count; ++i)
 	{
-		BcSourceMapEntry entry = function->source_map[i];
-		if (instr >= entry.byte_start && instr < entry.byte_end)
+		BcSourceMapEntry *entry = function->source_map + i;
+		if (instr >= entry->byte_start && instr < entry->byte_end)
 		{
-			site = entry.site;
+			result = entry;
 			break;
 		}
 	}
-	return site;
+	return result;
 }
 
 static const char *error_code_name(ErrorCode code)
@@ -60,12 +60,25 @@ static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 	elf_Prototype *function = frame->prototype;
 	u32 instr = frame->instruction;
 	ASSERT(instr < function->bytecode_count);
-	SourceSite site = find_source_for_instr(function, instr);
+	BcSourceMapEntry *entry = find_source_for_instr(function, instr);
 	const char *bytecode_name = bytecode_type_name(BC_TYPE(function->bytecode[instr]));
-
-	if (source_slice_is_valid(site))
+	SourceSite site = {};
+	if (entry)
 	{
-		log_linef(LOG_LEVEL_ERROR, "<unknown> [%u:%llu] [%u](%s)", site.line_index, source_slice_column(site), instr, bytecode_name);
+		site.offset = entry->source_offset;
+		site.size = entry->source_size;
+		site.line_offset = entry->line_offset;
+		site.line_index = entry->line_index;
+	}
+
+	if (function->source && source_slice_is_valid(site))
+	{
+		BcSourceBuffer source = {};
+		source.data = function->source->text.data;
+		source.size = (u32)function->source->text.size;
+
+		log_linef(LOG_LEVEL_ERROR, "%.*s [%u:%llu] [%u](%s)", (i32)function->source->name.size, function->source->name.data, site.line_index, source_slice_column(site), instr, bytecode_name);
+		print_source_slice_marker(site, source);
 	}
 	else
 	{
