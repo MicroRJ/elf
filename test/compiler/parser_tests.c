@@ -334,6 +334,30 @@ static void test_parser_if_else_blocks(elf_State *state)
 	expect_ast_i64(value, 1, "parse return integer");
 }
 
+static void test_parser_statement_semicolons(elf_State *state)
+{
+	Ast file = parser_test_parse_file(state, "first := 1; second := 2; if first ? ret; else ret; { third := 3; fourth := 4; };");
+	Ast body = parser_test_body(file);
+	if (!body || body->block.count != 4) {
+		test_fail("semicolons separate top-level statements");
+		return;
+	}
+
+	parser_test_stat(file, 0, AST_DECL_STAT, "parse first semicolon-terminated declaration");
+	parser_test_stat(file, 1, AST_DECL_STAT, "parse second semicolon-terminated declaration");
+	Ast conditional = parser_test_stat(file, 2, AST_IF, "parse semicolon-terminated if statement");
+	if (conditional)
+	{
+		expect_ast_kind(conditional->if_stat.true_clause, AST_RETURN, "semicolon terminates single-statement if body");
+		expect_ast_kind(conditional->if_stat.else_clause, AST_RETURN, "semicolon terminates single-statement else body");
+	}
+
+	Ast block = parser_test_stat(file, 3, AST_BLOCK_STAT, "parse semicolon-terminated block");
+	if (!block || block->block.count != 2) {
+		test_fail("semicolons separate block statements");
+	}
+}
+
 static void test_parser_for_loops(elf_State *state)
 {
 	Ast file = parser_test_parse_file(state, "for key, value := 0 ... 4 ? {}");
@@ -800,6 +824,7 @@ static void run_parser_tests(elf_State *state)
 	test_parser_string_strings(state);
 	test_parser_interpolated_strings(state);
 	test_parser_if_else_blocks(state);
+	test_parser_statement_semicolons(state);
 	test_parser_for_loops(state);
 	test_parser_call_with_table_argument(state);
 	test_parser_named_call_arguments(state);

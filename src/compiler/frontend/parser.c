@@ -1715,6 +1715,8 @@ static Ast parse_stat(Parser *parser)
 		break;
 	}
 
+	pick_token(parser, TOK_SEMICOLON);
+
 	return tree;
 }
 

@@ -247,13 +247,14 @@ Unary `+`, `-`, and `~` are implemented. `&&` and `||` short-circuit and return
 ### Compact grammar
 
 This sketch covers the stable center of the current parser. Newlines normally
-separate statements; semicolons separate the clauses of a C-style `for`.
+separate statements, and a statement may optionally end with a semicolon.
+Semicolons remain required between the clauses of a C-style `for`.
 
 ```text
 source       := statement*
-statement    := block | declaration | assignment | expression
-              | if | while | for | defer statement
-              | "ret" expressions? | "break" | "continue"
+statement    := (block | declaration | assignment | expression
+               | if | while | for | defer statement
+               | "ret" expressions? | "break" | "continue") ";"?
 block        := "{" statement* "}"
 
 declaration  := names (":=" | "::=") expressions
