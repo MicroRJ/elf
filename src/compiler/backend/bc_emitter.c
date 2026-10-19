@@ -67,8 +67,8 @@ struct BcEmitter
 	u32                 label_count;
 	u32                 jump_patch_count;
 
-	BcLabel             labels[BC_LABEL_COUNT_MAX];
-	BcJumpPatch         jump_patches[BC_LABEL_COUNT_MAX];
+	BcLabel            *labels;
+	BcJumpPatch        *jump_patches;
 };
 
 static inline b32 slot_is_valid(i32 slot)
@@ -199,13 +199,13 @@ static void patch_jump(BcEmitter *emitter, u32 source_position, u32 target_posit
 
 static BcLabel *get_label(BcEmitter *emitter, u32 label)
 {
-	ASSERT(label < ARRAY_COUNT(emitter->labels));
+	ASSERT(label < BC_LABEL_COUNT_MAX);
 	return &emitter->labels[label];
 }
 
 static u32 new_label(BcEmitter *emitter)
 {
-	ASSERT(emitter->label_count < ARRAY_COUNT(emitter->labels));
+	ASSERT(emitter->label_count < BC_LABEL_COUNT_MAX);
 	return emitter->label_count ++;
 }
 
@@ -226,7 +226,7 @@ static u32 label_for_ir(BcEmitter *emitter, Ir ir_label)
 static void record_jump_patch(BcEmitter *emitter, u32 bytecode_position, u32 label)
 {
 	ASSERT(label != BC_LABEL_INVALID);
-	ASSERT(emitter->jump_patch_count < ARRAY_COUNT(emitter->jump_patches));
+	ASSERT(emitter->jump_patch_count < BC_LABEL_COUNT_MAX);
 
 	BcJumpPatch *patch = emitter->jump_patches + emitter->jump_patch_count++;
 	patch->bytecode_position = bytecode_position;
@@ -1316,20 +1316,6 @@ static void reserve_module_prototypes(BcEmitter *emitter, IrModule *module)
 	ASSERT(prototype_index == target->prototype_count);
 }
 
-static void begin_function(BcEmitter *emitter, IrFunction *function)
-{
-	emitter->bytecode_count = 0;
-	emitter->integer_constant_count = 0;
-	emitter->number_constant_count = 0;
-	emitter->source_map_count = 0;
-	emitter->string_atom_count = 0;
-	emitter->stack_size = function->param_count;
-	emitter->stack_top = function->param_count;
-	emitter->label_count = 0;
-	emitter->jump_patch_count = 0;
-	zero_memory(emitter->labels, sizeof(emitter->labels));
-}
-
 static void install_function(BcEmitter *emitter, IrFunction *function, u32 prototype_index)
 {
 	ASSERT(emitter->emitted_function_count < emitter->function_count);
@@ -1399,7 +1385,16 @@ static void emit_function(BcEmitter *emitter, IrFunction *function)
 	ASSERT(function);
 	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
 	u32 prototype_index = function->index;
-	begin_function(emitter, function);
+	emitter->bytecode_count = 0;
+	emitter->integer_constant_count = 0;
+	emitter->number_constant_count = 0;
+	emitter->source_map_count = 0;
+	emitter->string_atom_count = 0;
+	emitter->stack_size = function->param_count;
+	emitter->stack_top = function->param_count;
+	emitter->label_count = 0;
+	emitter->jump_patch_count = 0;
+	zero_memory(emitter->labels, sizeof(*emitter->labels) * BC_LABEL_COUNT_MAX);
 
 	for (u32 i = 0; i < function->param_count; ++i)
 	{
@@ -1434,19 +1429,21 @@ elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 		abort();
 	}
 
-	BcEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(BcEmitter));
-	emitter->target = target;
-	emitter->arena = module->arena;
-	emitter->function_count = module->function_count;
-	emitter->bytecode_capacity = 1 << 13;
-	emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
-	reserve_module_prototypes(emitter, module);
+	BcEmitter emitter = {};
+	emitter.target = target;
+	emitter.arena = module->arena;
+	emitter.function_count = module->function_count;
+	emitter.bytecode_capacity = 1 << 13;
+	emitter.bytecode = arena_push_zero(emitter.arena, sizeof(*emitter.bytecode) * emitter.bytecode_capacity, _Alignof(Bytecode));
+	emitter.labels = arena_push_zero(emitter.arena, sizeof(*emitter.labels) * BC_LABEL_COUNT_MAX, _Alignof(BcLabel));
+	emitter.jump_patches = arena_push_zero(emitter.arena, sizeof(*emitter.jump_patches) * BC_LABEL_COUNT_MAX, _Alignof(BcJumpPatch));
+	reserve_module_prototypes(&emitter, module);
 
 	for (IrFunction *function = module->first_function; function; function = function->next)
 	{
-		emit_function(emitter, function);
+		emit_function(&emitter, function);
 	}
-	ASSERT(emitter->emitted_function_count == emitter->function_count);
+	ASSERT(emitter.emitted_function_count == emitter.function_count);
 	ASSERT(module->first_function->index < target->prototype_count);
 	return target->prototypes[module->first_function->index];
 }
