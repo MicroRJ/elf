@@ -20,6 +20,7 @@ typedef struct elf_Closure    elf_Closure;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Prototype   elf_Prototype;
+typedef struct elf_Source      elf_Source;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
 
@@ -145,6 +146,14 @@ struct elf_Prototype
 	u32               source_map_count;
 };
 
+struct elf_Source
+{
+	elf_Source *next;
+	u64         allocation_size;
+	dy_String   name;
+	dy_String   text;
+};
+
 struct elf_Closure
 {
 	elf_Object     obj;
@@ -176,6 +185,7 @@ struct elf_State
 	elf_Prototype **prototypes;
 	u32             prototype_count;
 	u32             prototype_capacity;
+	elf_Source     *sources;
 
 	struct
 	{
@@ -249,6 +259,9 @@ void *elf_alloc(elf_State *state, elf_u64 size);
 void *elf_alloc_zero(elf_State *state, elf_u64 size);
 void *elf_realloc(elf_State *state, void *memory, elf_u64 old_size, elf_u64 new_size);
 void elf_free(elf_State *state, void *memory, elf_u64 size);
+
+elf_Source *elf_source_create(elf_State *state, dy_String name, dy_String text);
+void elf_sources_destroy(elf_State *state);
 
 void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 

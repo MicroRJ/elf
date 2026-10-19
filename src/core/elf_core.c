@@ -22,6 +22,7 @@
 #include "error.c"
 
 #include "elf_memory.c"
+#include "elf_source.c"
 #include "elf_globals.c"
 #include "elf_string.c"
 #include "elf_buffer.c"
@@ -153,6 +154,7 @@ void elf_destroy_state(elf_State *state)
 	{
 		elf_globals_destroy(state);
 		gc_destroy_all(state);
+		elf_sources_destroy(state);
 		for (u32 i = 0; i < state->prototype_count; ++i)
 		{
 			elf_Prototype *prototype = state->prototypes[i];
