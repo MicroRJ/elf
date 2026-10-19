@@ -360,7 +360,7 @@ elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice na
 				if (compiler_source)
 				{
 					Parser parser = {};
-					if (parser_init(&parser, compiler))
+					if (parser_init(&parser))
 					{
 						Ast ast = parse_source_recursively(compiler, &parser, compiler_source);
 
@@ -418,7 +418,7 @@ static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSl
 				if (compiler_source)
 				{
 					Parser parser = {};
-					if (parser_init(&parser, compiler))
+					if (parser_init(&parser))
 					{
 						ast = type == COMPILER_PARSE_JSON ? parser_parse_json(&parser, compiler_source) : parser_parse_jsonl(&parser, compiler_source);
 						parser_destroy(&parser);

@@ -29,7 +29,7 @@ static Ast parser_test_parse_file(elf_State *state, const char *source_text)
 	Compiler *compiler = compiler_create(&state->arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_tests", sizeof("parser_tests") - 1}, source);
 	Parser parser = {};
-	ASSERT(parser_init(&parser, compiler));
+	ASSERT(parser_init(&parser));
 	Ast file = parser_parse_file(&parser, compiler_source);
 	parser_destroy(&parser);
 	return file;
@@ -520,7 +520,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 	Compiler *compiler = compiler_create(&arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_source_error", sizeof("parser_source_error") - 1}, source);
 	Parser parser = {};
-	ASSERT(parser_init(&parser, compiler));
+	ASSERT(parser_init(&parser));
 	Ast file = parser_parse_file(&parser, compiler_source);
 	parser_destroy(&parser);
 	if (file != ERROR_AST || compiler_source->report.error_count != 1 || compiler_source->report.first->phase != ERROR_PHASE_PARSER)
@@ -748,7 +748,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_lexer_error", sizeof("parser_lexer_error") - 1}, source);
 	Parser parser = {};
-	ASSERT(parser_init(&parser, compiler));
+	ASSERT(parser_init(&parser));
 	Ast file = parser_parse_file(&parser, compiler_source);
 	parser_destroy(&parser);
 	if (file != ERROR_AST || compiler_source->report.error_count != 1 || compiler_source->report.first->phase != ERROR_PHASE_LEXER) {
@@ -801,7 +801,7 @@ static void test_parser_ast_oom(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_ast_oom", sizeof("parser_ast_oom") - 1}, source);
 	Parser parser = {};
-	ASSERT(parser_init(&parser, compiler));
+	ASSERT(parser_init(&parser));
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
 	Ast ast = parser_parse_constant_expr(&parser, compiler_source);

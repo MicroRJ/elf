@@ -29,11 +29,11 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 {
 	Parser parser = {};
 	elf_StrSlice source_buffer = {(char *)source, size};
-	parser.compiler = compiler_create(&state->arena);
-	parser.source = lexer_test_add_source(parser.compiler, (elf_StrSlice) {(char *)"lexer_tests", sizeof("lexer_tests") - 1}, source_buffer);
+	Compiler *compiler = compiler_create(&state->arena);
+	parser.source = lexer_test_add_source(compiler, (elf_StrSlice) {(char *)"lexer_tests", sizeof("lexer_tests") - 1}, source_buffer);
 	parser.result_arena = &state->arena;
 	parser.scratch_arena = arena_create(1024 * 1024);
-	ASSERT(lexer_tokenize(parser.compiler, parser.source, &parser.scratch_arena, &parser.tokens) == COM_STATUS_OK);
+	ASSERT(lexer_tokenize(parser.source, &parser.scratch_arena, &parser.tokens) == COM_STATUS_OK);
 	return parser;
 }
 
@@ -233,7 +233,7 @@ static void test_lexer_keywords_and_identifiers(elf_State *state)
 		test_fail("arr type name atom keeps its type id");
 	}
 
-	Atom *keyword = atom_from_data(parser.compiler->atoms, "true");
+	Atom *keyword = atom_from_data(parser.source->compiler->atoms, "true");
 	if (keyword->id != TOK_TRUE) {
 		test_fail("keyword atom keeps token id");
 	}
@@ -250,7 +250,7 @@ static void test_lexer_macros(elf_State *state)
 	expect_token_type(file_name, TOK_STRING, "lex #file_name macro");
 	expect_token_atom(file_name, "lexer_tests", "#file_name string payload");
 
-	Atom *macro = atom_from_data(parser.compiler->atoms, "#int");
+	Atom *macro = atom_from_data(parser.source->compiler->atoms, "#int");
 	if (macro->id != TOK_M_INT) {
 		test_fail("macro atom keeps token id");
 	}
@@ -670,7 +670,7 @@ static void test_lexer_operators(elf_State *state)
 static void test_lexer_compiler_source(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "value");
-	Compiler *compiler = parser.compiler;
+	Compiler *compiler = parser.source->compiler;
 	Com_Source *source = compiler->first_source;
 	if (source->name != atom_from_data(compiler->atoms, "lexer_tests")) {
 		test_fail("compiler source name uses shared atom table");
@@ -715,7 +715,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	Arena scratch_arena = arena_create(0);
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
-	ASSERT(lexer_tokenize(compiler, compiler_source, &scratch_arena, &tokens) == COM_STATUS_OK);
+	ASSERT(lexer_tokenize(compiler_source, &scratch_arena, &tokens) == COM_STATUS_OK);
 	Token token = tokens.items[0];
 	expect_token_type(token, TOK_ERROR, "atom allocation failure returns an error token");
 	if (token.status != COM_STATUS_OOM) {
@@ -733,7 +733,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	scratch_arena = arena_create(0);
 	capacity = arena.capacity;
 	arena.capacity = arena.used;
-	ASSERT(lexer_tokenize(compiler, compiler_source, &scratch_arena, &tokens) == COM_STATUS_OK);
+	ASSERT(lexer_tokenize(compiler_source, &scratch_arena, &tokens) == COM_STATUS_OK);
 	token = tokens.items[0];
 	expect_token_type(token, TOK_ERROR, "diagnostic allocation failure returns an error token");
 	if (token.status != COM_STATUS_OOM) {

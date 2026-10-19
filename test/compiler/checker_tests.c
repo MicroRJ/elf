@@ -17,7 +17,7 @@ static void checker_test_init(CheckerTest *test, const char *name, const char *s
 	test->source = parser_test_add_source(test->compiler, source_name, source);
 
 	Parser parser = {0};
-	if (!parser_init(&parser, test->compiler)) {
+	if (!parser_init(&parser)) {
 		test_fail("checker test initializes parser");
 		return;
 	}
@@ -283,7 +283,7 @@ static void test_checker_resolves_imported_export(void)
 	Com_Source *root = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_root", sizeof("checker_root") - 1}, (elf_StrSlice) {(char *)"module :: import \"checker_module\"\nret module.answer", sizeof("module :: import \"checker_module\"\nret module.answer") - 1});
 	Com_Source *module = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_module", sizeof("checker_module") - 1}, (elf_StrSlice) {(char *)"export answer :: 42", sizeof("export answer :: 42") - 1});
 	Parser parser = {0};
-	if (!parser_init(&parser, compiler)) {
+	if (!parser_init(&parser)) {
 		test_fail("checker import test initializes parser");
 		arena_destroy(&arena);
 		return;
@@ -332,7 +332,7 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 	test->module = parser_test_add_source(test->compiler, (elf_StrSlice) {(char *)"checker_import_module", sizeof("checker_import_module") - 1}, (elf_StrSlice) {(char *)module_text, strlen(module_text)});
 
 	Parser parser = {0};
-	if (!parser_init(&parser, test->compiler)) {
+	if (!parser_init(&parser)) {
 		test_fail("checker error import test initializes parser");
 		return;
 	}
@@ -441,7 +441,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 	char source_text[] = "value := 42";
 	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_oom", sizeof("checker_oom") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
 	Parser parser = {0};
-	ASSERT(parser_init(&parser, compiler));
+	ASSERT(parser_init(&parser));
 	source->ast = parser_parse_file(&parser, source);
 	parser_destroy(&parser);
 	source->state = COM_SOURCE_PARSED;

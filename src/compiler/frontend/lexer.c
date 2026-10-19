@@ -8,7 +8,6 @@
 
 typedef struct
 {
-	Compiler    *compiler;
 	Com_Source  *compiler_source;
 	Atom_Table  *atoms;
 	Arena       *scratch_arena;
@@ -1109,14 +1108,14 @@ static Com_Status lexer_emit_token(Lexer *lexer)
 	return error;
 }
 
-static Com_Status lexer_tokenize(Compiler *compiler, Com_Source *source, Arena *scratch_arena, Token_Array *tokens)
+static Com_Status lexer_tokenize(Com_Source *source, Arena *scratch_arena, Token_Array *tokens)
 {
-	ASSERT(compiler);
 	ASSERT(source);
+	Compiler *compiler = source->compiler;
+	ASSERT(compiler);
 	ASSERT(scratch_arena);
 	ASSERT(tokens);
 	Lexer lexer = {
-		.compiler = compiler,
 		.compiler_source = source,
 		.atoms = compiler->atoms,
 		.scratch_arena = scratch_arena,

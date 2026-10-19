@@ -15,7 +15,7 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	result.source = parser_test_add_source(result.compiler, (elf_StrSlice) {(char *)"ir_tests", sizeof("ir_tests") - 1}, source);
 
 	Parser parser = {0};
-	ASSERT(parser_init(&parser, result.compiler));
+	ASSERT(parser_init(&parser));
 	Ast file = parser_parse_file(&parser, result.source);
 	parser_destroy(&parser);
 	result.source->ast = file;

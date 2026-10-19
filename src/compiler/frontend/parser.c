@@ -202,13 +202,10 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-b32 parser_init(Parser *parser, Compiler *compiler)
+b32 parser_init(Parser *parser)
 {
 	ASSERT(parser);
-	ASSERT(compiler);
 	*parser = (Parser) {};
-	parser->compiler = compiler;
-	parser->result_arena = compiler->arena;
 	parser->scratch_arena = arena_create(0);
 	return parser->scratch_arena.data != 0;
 }
@@ -224,8 +221,11 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 {
 	ASSERT(parser);
 	ASSERT(source);
+	ASSERT(source->compiler);
 	ASSERT(source->name != 0);
 	ASSERT(source->source.data != 0);
+	ASSERT(!parser->result_arena || parser->result_arena == source->compiler->arena);
+	parser->result_arena = source->compiler->arena;
 	parser->source = source;
 
 	arena_reset(&parser->scratch_arena);
@@ -239,7 +239,7 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 		return false;
 	}
 
-	return lexer_tokenize(parser->compiler, source, &parser->scratch_arena, &parser->tokens) == COM_STATUS_OK;
+	return lexer_tokenize(source, &parser->scratch_arena, &parser->tokens) == COM_STATUS_OK;
 }
 
 static Token consume_token(Parser *par)

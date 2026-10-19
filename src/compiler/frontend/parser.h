@@ -20,7 +20,6 @@ struct Parser
 {
 	Arena          *result_arena;
 	Arena           scratch_arena;
-	Compiler           *compiler;
 	Com_Source         *source;
 	Token_Array         tokens;
 	u32                 token_index;
@@ -32,7 +31,7 @@ struct Parser
 	Ast_List             imports;
 };
 
-b32 parser_init(Parser *parser, Compiler *compiler);
+b32 parser_init(Parser *parser);
 void parser_destroy(Parser *parser);
 Ast parser_parse_file(Parser *parser, Com_Source *source);
 Ast parser_parse_constant_expr(Parser *parser, Com_Source *source);
