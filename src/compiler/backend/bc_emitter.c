@@ -789,6 +789,10 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			return out;
 		}
 
+		// case IR_TUPLE: {
+		// }
+		// break;
+
 		case IR_FUNCTION:
 		{
 			if (nout < 1) {

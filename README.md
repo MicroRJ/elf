@@ -1,103 +1,217 @@
 # elf
 
-elf is a small, bytecode-interpreted scripting language designed to complement C.
-It combines familiar control flow and zero-based indexing with table-centered data,
-closures, and a compact native embedding API.
+elf is a small scripting language for programs that want C to remain in charge.
+It is useful for configuration, build descriptions, automation, and data-heavy
+logic that benefits from quick iteration.
 
-elf is currently `0.2.0-dev`. The language is useful in my own projects, but its syntax,
-API, and module model are still evolving. It should be treated as experimental rather
-than production-ready.
+elf is currently `0.2.0-dev`. Its language, embedding API, and module behavior
+are still evolving.
 
 ```elf
-numbers := [10, 20, 30]
-
-make_adder := fun(base) {
-	ret fun(value) {
-		ret base + value
+make_person := fun(name: str) {
+	ret {
+		name = name,
+		greet = fun(greeting = "hello") {
+			elf.println(f"${greeting}, ${this.name}")
+		},
 	}
 }
 
-add_ten := make_adder(10)
+people := [make_person("Ada"), make_person("Grace")]
 
-for number := numbers[...] ? {
-	print(add_ten(number))
+for person := people[...] ? {
+	person.greet("hello")
 }
 ```
 
-## Why elf?
+elf has integers, numbers, strings, arrays, tables, buffers, closures, native
+functions, errors, and host-owned user objects. Arrays are zero-indexed and
+tables provide named and computed fields.
 
-C remains the host language. elf handles the parts of a native program that benefit
-from dynamic values and short iteration cycles: configuration, build descriptions,
-automation, strings, and nested data.
+## Language tour
 
-The project currently provides:
+### Values, declarations, and assignment
 
-- a lexer and parser with source-located diagnostics;
-- AST-to-IR lowering and a bytecode backend;
-- a slot-based virtual machine with first-class functions and closures;
-- separate array, table, string, and buffer data structures;
-- a stack-based C API for embedding and native functions; and
-- optional filesystem, path, environment, serialization, random, and time
-  libraries.
+```elf
+count := 0                 // mutable local
+limit ::= 60               // constant local
+answer :: 40 + 2           // statically resolved declaration
 
-Manny uses elf as its build-description language, and Orbiter uses elf programs for its
-build and game-library configuration.
+count += 1
+count ?= load_cached()      // assign only when count is nil
 
-## Documentation
+left, right := 10, 20
+left, right = right, left
 
-- [Feature map](docs/feature-map.md) — language basics, grammar, runtime values,
-  compiler structure, libraries, embedding, and runnable examples
+items := [10, 20, 30]
+user := {
+	name = "Ada",
+	["favorite"] = "compiler",
+	[7] = "lucky",
+}
+```
+
+Table entries are assignments and require commas between entries. A key may be
+a field name, a bracketed expression, or an expression followed by `=`.
+
+### Functions, calls, and `this`
+
+```elf
+scale :: fun(value: numeric, factor = 2) {
+	ret value * factor
+}
+
+doubled := scale(10)
+tripled := scale(10, factor = 3)
+
+collector := fun(first, ...) {
+	ret first, elf.nvargs(), elf.varg(0)
+}
+```
+
+Parameters may have defaults and runtime-checked annotations. The current type
+names are `int`, `num`, `numeric`, `str`, `arr`, `tab`, `buf`, `err`,
+`non_nil`, and `callable`. Default and named arguments require a statically
+known elf function.
+
+Every call has an implicit receiver available as `this`. Calling a table field
+or type method passes the value on the left as that receiver:
+
+```elf
+counter := {
+	value = 0,
+	increment = fun() {
+		this.value += 1
+		ret this.value
+	},
+}
+
+counter.increment()
+items:add(40)
+```
+
+### Control flow and iteration
+
+```elf
+if score > 100 ? {
+	label = "high"
+}
+elif score > 50 ? {
+	label = "medium"
+}
+else {
+	label = "low"
+}
+
+while pending ? {
+	poll()
+}
+
+for i := 0 ... 10 ? {
+	if i == 3 ? continue
+	if i == 8 ? break
+}
+
+for value := items[...] ? {
+	use(value)
+}
+```
+
+Ranges are half-open. Arrays and strings can be iterated with `[...]`,
+`[start ... end]`, `[start ...]`, or `[... end]`.
+
+`defer` runs a statement when its lexical scope exits, including through
+`ret`, `break`, and `continue`:
+
+```elf
+file := elf.fs.open("output.bin", "w")
+if elf.is_error(file) ? ret file
+defer file:close()
+```
+
+### Strings, returns, and statement endings
+
+```elf
+name := "elf"
+message := f"hello ${name}"
+
+pair := fun() {
+	ret 10, 20
+}
+
+left, right := pair()
+```
+
+Strings use `"..."`; interpolated strings use `f"..."` and `${expression}`.
+Functions may return zero, one, or several values. Newlines normally separate
+statements, and semicolons may be used as optional terminators. Comments use
+`//` or `/* ... */`.
+
+## Builtin surface
+
+Every state exposes an `elf` table together with methods on the builtin value
+types.
+
+| Surface | What it provides |
+| --- | --- |
+| `elf` | printing, assertions, conversions, error inspection, and argument access |
+| string methods | slicing, searching, splitting, trimming, replacement, and joining |
+| array methods | mutation, slicing, cloning, mapping, filtering, and sorting |
+| table methods | size, membership, deletion, cloning, and keys |
+| `elf.buffer` | mutable byte storage and string conversion |
+| `elf.math` | numeric utilities and common math functions |
+| `elf.fs`, `elf.path`, `elf.env` | files, directories, paths, and environment variables |
+| `elf.json` | JSON parsing, serialization, files, and JSON Lines |
+| `elf.random`, `elf.time` | pseudorandom values and clocks |
+| `elf.gc`, `elf.vm` | runtime diagnostic counters |
+
+Errors returned as values can be checked with `elf.is_error(value)`.
+
+## Examples
+
+The scripts used by the test suite are the best source of current examples:
+
+- [`test/compiler/scripts/`](test/compiler/scripts/) contains larger scripts,
+  including [named arguments](test/compiler/scripts/named_arguments.elf) and
+  [file I/O](test/compiler/scripts/file_io.elf).
+- [`test/compiler/smoke/`](test/compiler/smoke/) contains focused language and
+  library examples.
+- Start with [`method_this.elf`](test/compiler/smoke/method_this.elf),
+  [`for_range.elf`](test/compiler/smoke/for_range.elf),
+  [`defer.elf`](test/compiler/smoke/defer.elf), and
+  [`interpolated_strings.elf`](test/compiler/smoke/interpolated_strings.elf).
 
 ## Building
 
-The supported build environment is Windows x64. You need:
-
-- Git;
-- `clang-cl`; and
-- Microsoft's `lib.exe` librarian.
-
-Clone the repository with its platform-layer submodule:
+The supported build environment is Windows x64 with Git, `clang-cl`, and
+Microsoft's `lib.exe`. Clone the repository with its `dy-core` submodule:
 
 ```bat
 git clone --recursive https://github.com/MicroRJ/elf.git
 cd elf
 ```
 
-If the repository is already cloned, initialize the submodule with:
-
-```bat
-git submodule update --init --recursive
-```
-
-The repository includes a Windows x64 Manny bootstrap executable, so Manny does not need to
-be installed separately.
+The repository includes a Manny bootstrap executable, so Manny does not need
+to be installed separately.
 
 ```bat
 build.bat build
 build.bat test
-```
-
-Additional entries build the static libraries or run optimized benchmarks:
-
-```bat
 build.bat lib
+build.bat optimized
 build.bat benchmark
 ```
 
-Build products are written beneath `build/`. Passing no entry to `build.bat` uses Manny's
-default entry.
+Build products are written beneath `build/`.
 
-## Repository layout
+## Embedding
 
-- `include/` — public C headers
-- `src/compiler/` — lexer, parser, AST, IR, and bytecode generation
-- `src/core/` — runtime values, tables, strings, VM, GC, and core libraries
-- `src/libs/` — optional host-facing libraries
-- `test/` — C unit tests and end-to-end elf programs
-- `tools/` — runner, bytecode inspector, and benchmarks
+The public C interface is declared in [`include/elf.h`](include/elf.h). An
+embedder creates an `elf_State`, pushes source or a source file, calls the
+resulting function, exchanges values through the stack API, and destroys the
+state when finished. Native C functions use the same stack and receive the
+implicit receiver at argument index zero.
 
 ## License
 
 elf is available under the [MIT License](LICENSE).
-
-

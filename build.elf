@@ -5,9 +5,6 @@ tasks := manny.load("c").project_to_tasks(project, {
 	link_options = [ "/DEBUG" ],
 })
 
-site_targets := elf.load_file("site/site.elf")
-elf.assert(elf.type_of(site_targets) == "array", "site/site.elf must return its targets")
-
 options := {
 	workers = 4,
 	verbosity = 0,
@@ -50,10 +47,6 @@ entries.optimized = fun() {
 
 entries.benchmark = fun() {
 	ret manny.build({ targets = [ tasks.targets.run_optimized_benchmarks ], options = options })
-}
-
-entries.site = fun() {
-	ret manny.build({ targets = site_targets, options = options })
 }
 
 ret entries

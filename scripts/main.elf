@@ -1,5 +1,39 @@
 
-new_person := fun(name: int) {
+// what about multiple returns?
+
+foo :: fun() {
+	ret 1, 2, 3, 4
+}
+
+a, b, c, d := foo()
+
+#eof
+
+totally_unrelated_function :: fun() {
+	elf.println(f"yep, I can also see '${this.name}'")
+}
+
+new_person := fun(name: str) {
+	person := {
+
+		say_hi = fun() {
+			name ::= this.name
+			elf.printl(f"you said hi to '${name}'")
+
+			// we now about this, but will this also carry onto other functions?
+			totally_unrelated_function()
+		}
+	}
+	person.name = name
+	ret person
+}
+
+person := new_person("dy")
+person.say_hi()
+
+#eof
+
+new_person := fun(name: str) {
 	person := {
 		say_hi = fun() {
 			elf.printl(f"you said hi to ${this.name}")
@@ -11,7 +45,6 @@ new_person := fun(name: int) {
 
 person := new_person("dy")
 person.say_hi()
-
 
 #eof
 pipeline :: import "scripts/trace_pipeline.elf"
