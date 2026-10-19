@@ -13,6 +13,7 @@
 typedef struct Compiler Compiler;
 typedef struct elf_Prototype elf_Prototype;
 typedef struct elf_Source elf_Source;
+typedef struct Com_Source Com_Source;
 
 // Status for control flow based exception handling, it'll probably take a while to fully cover everything ...
 typedef enum
@@ -55,7 +56,17 @@ typedef enum
 }
 Com_SourceState;
 
-typedef struct Com_Source Com_Source;
+struct Compiler
+{
+	elf_State         *target;
+	Arena             *arena;
+	struct Atom_Table *atoms;
+	Com_Source        *first_source;
+	Com_Source        *last_source;
+	u32                error_count;
+	u32                warning_count;
+};
+
 struct Com_Source
 {
 	Compiler           *compiler;
@@ -68,21 +79,6 @@ struct Com_Source
 	struct Scope       *scope;
 	Com_SourceState     state;
 	Com_Report          report;
-};
-
-// NOTE(RJ):
-// This will remain only the shared stuff across compilation stages;
-// Error reporting sink, logging configurations apparently, compile wide allocations
-// and sources ...
-struct Compiler
-{
-	elf_State         *target;
-	Arena             *arena;
-	struct Atom_Table *atoms;
-	Com_Source        *first_source;
-	Com_Source        *last_source;
-	u32                error_count;
-	u32                warning_count;
 };
 
 Compiler *compiler_create(Arena *arena);
