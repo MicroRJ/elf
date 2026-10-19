@@ -73,9 +73,7 @@ static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 
 	if (function->source && source_slice_is_valid(site))
 	{
-		BcSourceBuffer source = {};
-		source.data = function->source->text.data;
-		source.size = (u32)function->source->text.size;
+		dy_String source = function->source->text;
 
 		log_linef(LOG_LEVEL_INFO, "%.*s [%u:%llu] [%u](%s)", (i32)function->source->name.size, function->source->name.data, site.line_index, source_slice_column(site), instr, bytecode_name);
 		print_source_slice_marker(site, source);

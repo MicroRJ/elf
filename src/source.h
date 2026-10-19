@@ -3,14 +3,6 @@
 
 #include "base.h"
 
-// Todo, delete this
-typedef struct
-{
-	const char *data;
-	u32         size;
-}
-BcSourceBuffer;
-
 // Points at a byte range in one source participating in the compilation.
 // Todo, compress this, especially with the line map!
 typedef struct

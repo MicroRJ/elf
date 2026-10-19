@@ -70,11 +70,11 @@ struct Compiler
 struct Com_Source
 {
 	Compiler           *compiler;
+	elf_Source         *runtime_source;
 	Com_Source         *next;
 	struct Atom        *name;
 	struct Atom        *path;
-	elf_Source         *runtime_source;
-	BcSourceBuffer      source;
+	dy_String           source;
 	struct Ast_T       *ast;
 	struct Scope       *scope;
 	Com_SourceState     state;

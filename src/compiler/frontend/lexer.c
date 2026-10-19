@@ -57,7 +57,8 @@ static Token_Type check_keyword(Atom *atom)
 
 static u32 lexer_scratch_capacity(Lexer *lexer)
 {
-	return lexer->compiler_source->source.size;
+	ASSERT(lexer->compiler_source->source.size <= UINT32_MAX);
+	return (u32)lexer->compiler_source->source.size;
 }
 
 enum { LEXER_EOF = -1 };

@@ -10,7 +10,7 @@ static Com_Source *parser_test_add_source(Compiler *compiler, elf_StrSlice name,
 	source->compiler = compiler;
 	source->name = name_atom;
 	source->path = name_atom;
-	source->source = (BcSourceBuffer) {source_text.data, (u32)source_text.size};
+	source->source = (dy_String) {source_text.data, source_text.size};
 	if (compiler->last_source)
 	{
 		compiler->last_source->next = source;
