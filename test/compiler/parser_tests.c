@@ -8,7 +8,6 @@ static Com_Source *parser_test_add_source(Compiler *compiler, elf_StrSlice name,
 	ASSERT(name_atom);
 	ASSERT(source);
 	source->compiler = compiler;
-	source->id = compiler->source_count++;
 	source->name = name_atom;
 	source->path = name_atom;
 	source->source = (BcSourceBuffer) {source_text.data, (u32)source_text.size};

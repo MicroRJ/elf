@@ -100,7 +100,6 @@ b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity,
 	Compiler *compiler = source->compiler;
 	ASSERT(compiler);
 	ASSERT(code != ERROR_NONE);
-	ASSERT(source->id == site.source);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
 	if (!message.data) {
 		return false;
@@ -202,7 +201,6 @@ static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *p
 		return 0;
 	}
 	source->compiler = compiler;
-	source->id = compiler->source_count++;
 	source->name = name;
 	source->path = path;
 	source->runtime_source = runtime_source;

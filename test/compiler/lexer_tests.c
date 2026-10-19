@@ -10,7 +10,6 @@ static Com_Source *lexer_test_add_source(Compiler *compiler, elf_StrSlice name, 
 	ASSERT(source);
 
 	source->compiler = compiler;
-	source->id = compiler->source_count++;
 	source->name = name_atom;
 	source->path = name_atom;
 	source->source = (BcSourceBuffer) {source_text.data, (u32)source_text.size};
@@ -672,10 +671,6 @@ static void test_lexer_compiler_source(elf_State *state)
 {
 	Parser parser = lexer_test_parser(state, "value");
 	Compiler *compiler = parser.compiler;
-	if (compiler->source_count != 1) {
-		test_fail("compiler creates one root source");
-	}
-
 	Com_Source *source = compiler->first_source;
 	if (source->name != atom_from_data(compiler->atoms, "lexer_tests")) {
 		test_fail("compiler source name uses shared atom table");
@@ -685,11 +680,6 @@ static void test_lexer_compiler_source(elf_State *state)
 	}
 	if (source != parser.source) {
 		test_fail("lexer reads its compiler source");
-	}
-
-	Token token = lexer_next(&parser);
-	if (token.site.source != 0) {
-		test_fail("lexer source sites retain compiler source index");
 	}
 }
 

@@ -13,7 +13,6 @@
 typedef struct Compiler Compiler;
 typedef struct elf_Prototype elf_Prototype;
 typedef struct elf_Source elf_Source;
-typedef u32 Com_SourceId;
 
 // Status for control flow based exception handling, it'll probably take a while to fully cover everything ...
 typedef enum
@@ -61,7 +60,6 @@ struct Com_Source
 {
 	Compiler           *compiler;
 	Com_Source         *next;
-	Com_SourceId        id;
 	struct Atom        *name;
 	struct Atom        *path;
 	elf_Source         *runtime_source;
@@ -83,7 +81,6 @@ struct Compiler
 	struct Atom_Table *atoms;
 	Com_Source        *first_source;
 	Com_Source        *last_source;
-	u32                source_count;
 	u32                error_count;
 	u32                warning_count;
 };

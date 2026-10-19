@@ -101,7 +101,6 @@ static SourceSite source_site_from_ptr(Lexer *lexer, const char *data)
 	ASSERT(offset <= UINT32_MAX);
 	ASSERT(line_offset <= UINT32_MAX);
 	return (SourceSite) {
-		.source      = lexer->compiler_source->id,
 		.offset      = (u32) offset,
 		.size        = 1,
 		.line_offset = (u32) line_offset,
