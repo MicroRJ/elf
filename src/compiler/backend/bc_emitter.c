@@ -15,22 +15,14 @@
 #include "bc_emitter.h"
 
 #define BC_OPERAND_COUNT_MAX (1u << 15)
-#define BC_LABEL_COUNT_MAX   4096
-#define BC_LABEL_INVALID     ((u32)-1)
 
-typedef struct
+typedef struct BcJumpPatch BcJumpPatch;
+struct BcJumpPatch
 {
-	b32 defined;
-	i32 position;
-}
-BcLabel;
-
-typedef struct
-{
+	BcJumpPatch *next;
 	u32 bytecode_position;
-	u32 label;
-}
-BcJumpPatch;
+	Ir  label;
+};
 
 typedef struct BcEmitter BcEmitter;
 struct BcEmitter
@@ -38,13 +30,10 @@ struct BcEmitter
 	elf_State          *target;
 	Arena              *arena;
 
-	// Reused scratch buffers. Each emitted function is copied into its runtime prototype.
+	// Temporary buffers copied into the runtime prototype after emission.
 	Bytecode           *bytecode;
 	u32                 bytecode_capacity;
 	u32                 bytecode_count;
-
-	u32                 function_count;
-	u32                 emitted_function_count;
 
 	i64                *integer_constants;
 	u32                 integer_constant_capacity;
@@ -64,10 +53,6 @@ struct BcEmitter
 
 	u32                 stack_size;
 	u32                 stack_top;
-	u32                 label_count;
-	u32                 jump_patch_count;
-
-	BcLabel            *labels;
 	BcJumpPatch        *jump_patches;
 };
 
@@ -78,9 +63,9 @@ static inline b32 slot_is_valid(i32 slot)
 
 static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout);
 static void emit_stat(BcEmitter *emitter, Ir stat);
-static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, u32 label);
-static void jump_if_expr_true(BcEmitter *emitter, Ir expr, u32 true_label);
-static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label);
+static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, Ir label);
+static void jump_if_expr_true(BcEmitter *emitter, Ir expr, Ir true_label);
+static void jump_if_expr_false(BcEmitter *emitter, Ir expr, Ir false_label);
 
 // Scratch buffers and constant pools
 
@@ -197,52 +182,32 @@ static void patch_jump(BcEmitter *emitter, u32 source_position, u32 target_posit
 	}
 }
 
-static BcLabel *get_label(BcEmitter *emitter, u32 label)
+static Ir new_label(BcEmitter *emitter)
 {
-	ASSERT(label < BC_LABEL_COUNT_MAX);
-	return &emitter->labels[label];
+	Ir label = arena_push_zero(emitter->arena, sizeof(*label), _Alignof(IrNode));
+	label->kind = IR_LABEL;
+	return label;
 }
 
-static u32 new_label(BcEmitter *emitter)
+static void record_jump_patch(BcEmitter *emitter, u32 bytecode_position, Ir label)
 {
-	ASSERT(emitter->label_count < BC_LABEL_COUNT_MAX);
-	return emitter->label_count ++;
-}
-
-static u32 label_for_ir(BcEmitter *emitter, Ir ir_label)
-{
-	ASSERT(ir_label);
-	ASSERT(ir_label->kind == IR_LABEL);
-
-	if (!ir_label->ir_label.has_bytecode_label)
-	{
-		ir_label->ir_label.bytecode_label = new_label(emitter);
-		ir_label->ir_label.has_bytecode_label = true;
-	}
-
-	return ir_label->ir_label.bytecode_label;
-}
-
-static void record_jump_patch(BcEmitter *emitter, u32 bytecode_position, u32 label)
-{
-	ASSERT(label != BC_LABEL_INVALID);
-	ASSERT(emitter->jump_patch_count < BC_LABEL_COUNT_MAX);
-
-	BcJumpPatch *patch = emitter->jump_patches + emitter->jump_patch_count++;
+	ASSERT(label);
+	ASSERT(label->kind == IR_LABEL);
+	BcJumpPatch *patch = arena_push_zero(emitter->arena, sizeof(*patch), _Alignof(BcJumpPatch));
+	patch->next = emitter->jump_patches;
 	patch->bytecode_position = bytecode_position;
 	patch->label = label;
+	emitter->jump_patches = patch;
 }
 
 static void patch_jumps(BcEmitter *emitter)
 {
-	for (u32 i = 0; i < emitter->jump_patch_count; ++i)
+	for (BcJumpPatch *patch = emitter->jump_patches; patch; patch = patch->next)
 	{
-		BcJumpPatch patch = emitter->jump_patches[i];
-		BcLabel *label = get_label(emitter, patch.label);
-		ASSERT(label->defined);
-		patch_jump(emitter, patch.bytecode_position, (u32)label->position);
+		Ir label = patch->label;
+		ASSERT(label->ir_label.defined);
+		patch_jump(emitter, patch->bytecode_position, label->ir_label.position);
 	}
-	emitter->jump_patch_count = 0;
 }
 
 static u32 emit_bytecode(BcEmitter *emitter, SourceSite site, Bytecode byte)
@@ -289,15 +254,16 @@ static u32 emit_conditional_jump(BcEmitter *emitter, SourceSite site, BcType typ
 	return emit_bytecode_xy(emitter, site, type, 0, predicate);
 }
 
-static void define_label(BcEmitter *emitter, u32 label)
+static void define_label(BcEmitter *emitter, Ir label)
 {
-	BcLabel *target = get_label(emitter, label);
-	ASSERT(!target->defined);
-	target->defined = true;
-	target->position = emitter->bytecode_count;
+	ASSERT(label);
+	ASSERT(label->kind == IR_LABEL);
+	ASSERT(!label->ir_label.defined);
+	label->ir_label.defined = true;
+	label->ir_label.position = emitter->bytecode_count;
 }
 
-static void jump_to_label(BcEmitter *emitter, SourceSite site, u32 label)
+static void jump_to_label(BcEmitter *emitter, SourceSite site, Ir label)
 {
 	u32 jump = emit_jump(emitter, site);
 	record_jump_patch(emitter, jump, label);
@@ -671,7 +637,7 @@ static i32 emit_nil_or_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 {
 	i32 slot_checkpoint;
 	i32 temp_slot;
-	u32 done_label;
+	Ir done_label;
 
 	if (nout < 1) {
 		return out;
@@ -692,8 +658,8 @@ static i32 emit_nil_or_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 static i32 emit_logical_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 {
-	u32 false_label;
-	u32 done_label;
+	Ir false_label;
+	Ir done_label;
 
 	if (nout < 1) {
 		return out;
@@ -713,19 +679,19 @@ static i32 emit_logical_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 	return out;
 }
 
-static void jump_if_true_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, u32 label)
+static void jump_if_true_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, Ir label)
 {
 	u32 jump = emit_conditional_jump(emitter, site, BC_JNZ, pred);
 	record_jump_patch(emitter, jump, label);
 }
 
-static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, u32 label)
+static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, Ir label)
 {
 	u32 jump = emit_conditional_jump(emitter, site, BC_JZ, pred);
 	record_jump_patch(emitter, jump, label);
 }
 
-static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label)
+static void jump_if_expr_false(BcEmitter *emitter, Ir expr, Ir false_label)
 {
 	switch (expr->kind)
 	{
@@ -739,7 +705,7 @@ static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label)
 		// 'a' || 'b'
 		case IR_OR:
 		{
-			u32 fallthrough_label = new_label(emitter);
+			Ir fallthrough_label = new_label(emitter);
 			jump_if_expr_true(emitter, expr->ir_binary.x, fallthrough_label);
 			jump_if_expr_false(emitter, expr->ir_binary.y, false_label);
 			define_label(emitter, fallthrough_label);
@@ -756,14 +722,14 @@ static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label)
 	}
 }
 
-static void jump_if_expr_true(BcEmitter *emitter, Ir expr, u32 true_label)
+static void jump_if_expr_true(BcEmitter *emitter, Ir expr, Ir true_label)
 {
 	switch (expr->kind)
 	{
 		// 'a' && 'b'
 		case IR_AND:
 		{
-			u32 fallthrough_label = new_label(emitter);
+			Ir fallthrough_label = new_label(emitter);
 			jump_if_expr_false(emitter, expr->ir_binary.x, fallthrough_label);
 			jump_if_expr_true(emitter, expr->ir_binary.y, true_label);
 			define_label(emitter, fallthrough_label);
@@ -1172,21 +1138,19 @@ static void emit_stat(BcEmitter *emitter, Ir stat)
 
 		case IR_LABEL:
 		{
-			define_label(emitter, label_for_ir(emitter, stat));
+			define_label(emitter, stat);
 		}
 		break;
 
 		case IR_JUMP:
 		{
-			u32 label = label_for_ir(emitter, stat->ir_jump.label);
-			jump_to_label(emitter, stat->site, label);
+			jump_to_label(emitter, stat->site, stat->ir_jump.label);
 		}
 		break;
 
 		case IR_JUMP_IF_FALSE:
 		{
-			u32 label = label_for_ir(emitter, stat->ir_jump_if_false.label);
-			jump_if_expr_false(emitter, stat->ir_jump_if_false.pred, label);
+			jump_if_expr_false(emitter, stat->ir_jump_if_false.pred, stat->ir_jump_if_false.label);
 		}
 		break;
 
@@ -1211,7 +1175,7 @@ static void emit_stat(BcEmitter *emitter, Ir stat)
 			Ir true_clause = stat->ir_if.true_clause;
 			Ir else_clause = stat->ir_if.else_clause;
 
-			u32 else_label = new_label(emitter);
+			Ir else_label = new_label(emitter);
 			jump_if_expr_false(emitter, pred, else_label);
 
 			{
@@ -1222,7 +1186,7 @@ static void emit_stat(BcEmitter *emitter, Ir stat)
 
 			if (else_clause)
 			{
-				u32 end_label = new_label(emitter);
+				Ir end_label = new_label(emitter);
 				jump_to_label(emitter, stat->site, end_label);
 
 				i32 else_slots = save_slots(emitter);
@@ -1279,9 +1243,8 @@ static u64 prototype_append_region(u64 *allocation_size, u64 size, u64 alignment
 	return offset;
 }
 
-static void reserve_module_prototypes(BcEmitter *emitter, IrModule *module)
+static void reserve_module_prototypes(elf_State *target, IrModule *module)
 {
-	elf_State *target = emitter->target;
 	if (target->prototype_count > BC_OPERAND_COUNT_MAX || module->function_count > BC_OPERAND_COUNT_MAX - target->prototype_count)
 	{
 		abort();
@@ -1318,7 +1281,6 @@ static void reserve_module_prototypes(BcEmitter *emitter, IrModule *module)
 
 static void install_function(BcEmitter *emitter, IrFunction *function, u32 prototype_index)
 {
-	ASSERT(emitter->emitted_function_count < emitter->function_count);
 	ASSERT(prototype_index < emitter->target->prototype_count);
 	ASSERT(!emitter->target->prototypes[prototype_index]);
 
@@ -1376,7 +1338,6 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 		prototype->string_count += 1;
 	}
 	ASSERT(prototype->string_count == emitter->string_atom_count);
-	emitter->emitted_function_count += 1;
 }
 
 static void emit_function(BcEmitter *emitter, IrFunction *function)
@@ -1385,16 +1346,8 @@ static void emit_function(BcEmitter *emitter, IrFunction *function)
 	ASSERT(function);
 	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
 	u32 prototype_index = function->index;
-	emitter->bytecode_count = 0;
-	emitter->integer_constant_count = 0;
-	emitter->number_constant_count = 0;
-	emitter->source_map_count = 0;
-	emitter->string_atom_count = 0;
 	emitter->stack_size = function->param_count;
 	emitter->stack_top = function->param_count;
-	emitter->label_count = 0;
-	emitter->jump_patch_count = 0;
-	zero_memory(emitter->labels, sizeof(*emitter->labels) * BC_LABEL_COUNT_MAX);
 
 	for (u32 i = 0; i < function->param_count; ++i)
 	{
@@ -1429,21 +1382,22 @@ elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 		abort();
 	}
 
-	BcEmitter emitter = {};
-	emitter.target = target;
-	emitter.arena = module->arena;
-	emitter.function_count = module->function_count;
-	emitter.bytecode_capacity = 1 << 13;
-	emitter.bytecode = arena_push_zero(emitter.arena, sizeof(*emitter.bytecode) * emitter.bytecode_capacity, _Alignof(Bytecode));
-	emitter.labels = arena_push_zero(emitter.arena, sizeof(*emitter.labels) * BC_LABEL_COUNT_MAX, _Alignof(BcLabel));
-	emitter.jump_patches = arena_push_zero(emitter.arena, sizeof(*emitter.jump_patches) * BC_LABEL_COUNT_MAX, _Alignof(BcJumpPatch));
-	reserve_module_prototypes(&emitter, module);
+	reserve_module_prototypes(target, module);
 
+	u32 emitted_function_count = 0;
 	for (IrFunction *function = module->first_function; function; function = function->next)
 	{
-		emit_function(&emitter, function);
+		u64 arena_checkpoint = arena_mark(module->arena);
+		BcEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(BcEmitter));
+		emitter->target = target;
+		emitter->arena = module->arena;
+		emitter->bytecode_capacity = 1 << 13;
+		emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
+		emit_function(emitter, function);
+		arena_restore(module->arena, arena_checkpoint);
+		emitted_function_count += 1;
 	}
-	ASSERT(emitter.emitted_function_count == emitter.function_count);
+	ASSERT(emitted_function_count == module->function_count);
 	ASSERT(module->first_function->index < target->prototype_count);
 	return target->prototypes[module->first_function->index];
 }

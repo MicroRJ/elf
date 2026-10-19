@@ -191,8 +191,8 @@ struct IrNode
 
 		struct
 		{
-			u32 bytecode_label;
-			b32 has_bytecode_label;
+			b32 defined;
+			u32 position;
 		}
 		ir_label;
 
