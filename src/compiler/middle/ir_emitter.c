@@ -1571,6 +1571,7 @@ IrModule *ir_emit_module(Com_Source *source)
 
 	IrFunction *entry = ir_lower_function(emitter, source, ast, ast->site, 1, (Ast_Array){0}, ast->file.body);
 	ASSERT(entry == module->first_function);
-	ASSERT(!entry->captures.items && !entry->captures.count);
+	ASSERT(!entry->captures.items && !entry->captures.count
+	|| !"Internal error: for some reason the entry function has captures, how is this even possible?");
 	return module;
 }

@@ -110,10 +110,10 @@ static u32 backend_count_all_bytecode(BackendCompileResult result, BcType type)
 	return count;
 }
 
-static BcSourceMapEntry *backend_find_source_map_entry(elf_Prototype *function, u32 byte)
+static elf_SourceMapEntry *backend_find_source_map_entry(elf_Prototype *function, u32 byte)
 {
 	for (u32 i = 0; i < function->source_map_count; ++ i) {
-		BcSourceMapEntry *entry = &function->source_map[i];
+		elf_SourceMapEntry *entry = &function->source_map[i];
 		if (byte >= entry->byte_start && byte < entry->byte_end) {
 			return entry;
 		}
@@ -131,7 +131,7 @@ static void test_backend_source_map(void)
 	}
 
 	for (u32 byte = 0; byte < function->bytecode_count; ++byte) {
-		BcSourceMapEntry *entry = backend_find_source_map_entry(function, byte);
+		elf_SourceMapEntry *entry = backend_find_source_map_entry(function, byte);
 		if (!entry || entry->line_index == 0 || entry->line_offset > entry->source_offset || entry->source_size == 0) {
 			test_fail("backend maps each bytecode instruction to source");
 			goto done;

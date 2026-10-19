@@ -44,7 +44,7 @@ struct BcEmitter
 	u32                 number_constant_capacity;
 	u32                 number_constant_count;
 
-	BcSourceMapEntry   *source_map;
+	elf_SourceMapEntry   *source_map;
 	u32                 source_map_capacity;
 	u32                 source_map_count;
 
@@ -92,7 +92,7 @@ static void *grow_emitter_array(Arena *arena, void *items, u32 count, u32 *capac
 	return new_items;
 }
 
-static b32 source_map_entry_matches_site(BcSourceMapEntry *entry, SourceSite site)
+static b32 source_map_entry_matches_site(elf_SourceMapEntry *entry, SourceSite site)
 {
 	return entry->source_offset == site.offset && entry->source_size == site.size && entry->line_offset == site.line_offset && entry->line_index == site.line_index;
 }
@@ -100,7 +100,7 @@ static b32 source_map_entry_matches_site(BcSourceMapEntry *entry, SourceSite sit
 static void record_source_map(BcEmitter *emitter, SourceSite site, u32 byte_position)
 {
 	if (emitter->source_map_count > 0) {
-		BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count - 1;
+		elf_SourceMapEntry *entry = emitter->source_map + emitter->source_map_count - 1;
 		if (entry->byte_end == byte_position && source_map_entry_matches_site(entry, site)) {
 			entry->byte_end = byte_position + 1;
 			return;
@@ -108,7 +108,7 @@ static void record_source_map(BcEmitter *emitter, SourceSite site, u32 byte_posi
 	}
 
 	emitter->source_map = grow_emitter_array(emitter->arena, emitter->source_map, emitter->source_map_count, &emitter->source_map_capacity, emitter->source_map_count + 1, sizeof(*emitter->source_map));
-	BcSourceMapEntry *entry = emitter->source_map + emitter->source_map_count++;
+	elf_SourceMapEntry *entry = emitter->source_map + emitter->source_map_count++;
 	entry->byte_start = byte_position;
 	entry->byte_end = byte_position + 1;
 	entry->source_offset = site.offset;
@@ -1291,7 +1291,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	u64 integer_constants_offset = prototype_append_region(&allocation_size, sizeof(i64) * emitter->integer_constant_count, _Alignof(i64));
 	u64 number_constants_offset = prototype_append_region(&allocation_size, sizeof(f64) * emitter->number_constant_count, _Alignof(f64));
 	u64 bytecode_offset = prototype_append_region(&allocation_size, sizeof(Bytecode) * emitter->bytecode_count, _Alignof(Bytecode));
-	u64 source_map_offset = prototype_append_region(&allocation_size, sizeof(BcSourceMapEntry) * emitter->source_map_count, _Alignof(BcSourceMapEntry));
+	u64 source_map_offset = prototype_append_region(&allocation_size, sizeof(elf_SourceMapEntry) * emitter->source_map_count, _Alignof(elf_SourceMapEntry));
 	elf_Prototype *prototype = elf_alloc_zero(emitter->target, allocation_size);
 	ASSERT(prototype);
 
@@ -1326,7 +1326,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	}
 	if (prototype->source_map_count)
 	{
-		prototype->source_map = (BcSourceMapEntry *)((u8 *)prototype + source_map_offset);
+		prototype->source_map = (elf_SourceMapEntry *)((u8 *)prototype + source_map_offset);
 		copy_memory(prototype->source_map, emitter->source_map, sizeof(*prototype->source_map) * prototype->source_map_count);
 	}
 

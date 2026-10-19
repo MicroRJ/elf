@@ -127,6 +127,17 @@ struct elf_Table
 	u32        occupied;
 };
 
+typedef struct
+{
+	u32 byte_start;
+	u32 byte_end;
+	u32 source_offset;
+	u32 source_size;
+	u32 line_offset;
+	u32 line_index;
+}
+elf_SourceMapEntry;
+
 struct elf_Prototype
 {
 	u64               allocation_size;
@@ -143,7 +154,7 @@ struct elf_Prototype
 	u32               integer_constant_count;
 	Bytecode         *bytecode;
 	u32               bytecode_count;
-	BcSourceMapEntry *source_map;
+	elf_SourceMapEntry *source_map;
 	u32               source_map_count;
 };
 

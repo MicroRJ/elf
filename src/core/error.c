@@ -11,12 +11,12 @@ static const char *error_code_names[] =
 #undef ERROR_CODE_NAME
 };
 
-static BcSourceMapEntry *find_source_for_instr(elf_Prototype *function, u32 instr)
+static elf_SourceMapEntry *find_source_for_instr(elf_Prototype *function, u32 instr)
 {
-	BcSourceMapEntry *result = 0;
+	elf_SourceMapEntry *result = 0;
 	for (u32 i = 0; i < function->source_map_count; ++i)
 	{
-		BcSourceMapEntry *entry = function->source_map + i;
+		elf_SourceMapEntry *entry = function->source_map + i;
 		if (instr >= entry->byte_start && instr < entry->byte_end)
 		{
 			result = entry;
@@ -60,7 +60,7 @@ static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 	elf_Prototype *function = frame->prototype;
 	u32 instr = frame->instruction;
 	ASSERT(instr < function->bytecode_count);
-	BcSourceMapEntry *entry = find_source_for_instr(function, instr);
+	elf_SourceMapEntry *entry = find_source_for_instr(function, instr);
 	const char *bytecode_name = bytecode_type_name(BC_TYPE(function->bytecode[instr]));
 	SourceSite site = {};
 	if (entry)

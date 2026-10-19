@@ -14,15 +14,4 @@ typedef struct
 }
 SourceSite;
 
-typedef struct
-{
-	u32 byte_start;
-	u32 byte_end;
-	u32 source_offset;
-	u32 source_size;
-	u32 line_offset;
-	u32 line_index;
-}
-BcSourceMapEntry;
-
 #endif
