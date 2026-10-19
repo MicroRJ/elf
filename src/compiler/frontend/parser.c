@@ -163,7 +163,7 @@ static Com_Status parser_report(Parser *parser, ErrorSeverity severity, ErrorCod
 		site = parser_current_token(parser).site;
 	}
 
-	b32 reported = compiler_report(parser->compiler, error, severity, ERROR_PHASE_PARSER, site, "%s", message);
+	b32 reported = compiler_report(parser->source, error, severity, ERROR_PHASE_PARSER, site, "%s", message);
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
@@ -179,7 +179,7 @@ static Ast parser_errorf(Parser *parser, ErrorCode error, SourceSite site, const
 	}
 	va_list args;
 	va_start(args, format);
-	b32 reported = compiler_reportv(parser->compiler, error, ERROR_ERROR, ERROR_PHASE_PARSER, site, format, args);
+	b32 reported = compiler_reportv(parser->source, error, ERROR_ERROR, ERROR_PHASE_PARSER, site, format, args);
 	va_end(args);
 	return ast_from_status(reported ? COM_STATUS_REPORTED : COM_STATUS_OOM);
 }

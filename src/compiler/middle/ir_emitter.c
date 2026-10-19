@@ -83,9 +83,11 @@ static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
 
 static void ir_report_error(IrEmitter *emitter, ErrorCode error, SourceSite site, const char *format, ...)
 {
+	ASSERT(emitter->function);
+	ASSERT(emitter->function->tree);
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(emitter->compiler, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
+	compiler_reportv(emitter->function->tree->source, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 

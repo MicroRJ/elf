@@ -118,7 +118,7 @@ static Com_Status lexer_errorf(Lexer *lexer, ErrorCode error, SourceSite site, c
 {
 	va_list args;
 	va_start(args, format);
-	b32 reported = compiler_reportv(lexer->compiler, error, ERROR_ERROR, ERROR_PHASE_LEXER, site, format, args);
+	b32 reported = compiler_reportv(lexer->compiler_source, error, ERROR_ERROR, ERROR_PHASE_LEXER, site, format, args);
 	va_end(args);
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }

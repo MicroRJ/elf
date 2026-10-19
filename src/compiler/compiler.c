@@ -77,18 +77,6 @@ Compiler *compiler_create(Arena *arena)
 	return compiler;
 }
 
-Com_Source *compiler_source_from_id(Compiler *compiler, Com_SourceId source_id)
-{
-	ASSERT(compiler);
-	for (Com_Source *source = compiler->first_source; source; source = source->next)
-	{
-		if (source->id == source_id) {
-			return source;
-		}
-	}
-	return 0;
-}
-
 static elf_StrSlice compiler_format_message(Arena *arena, const char *format, va_list args)
 {
 	va_list count_args;
@@ -106,12 +94,13 @@ static elf_StrSlice compiler_format_message(Arena *arena, const char *format, va
 	return (elf_StrSlice) {message, (u64)message_size};
 }
 
-b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args)
+b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args)
 {
+	ASSERT(source);
+	Compiler *compiler = source->compiler;
 	ASSERT(compiler);
 	ASSERT(code != ERROR_NONE);
-	Com_Source *source = compiler_source_from_id(compiler, site.source);
-	ASSERT(source);
+	ASSERT(source->id == site.source);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
 	if (!message.data) {
 		return false;
@@ -197,11 +186,11 @@ void compiler_log_report(Compiler *compiler)
 	}
 }
 
-b32 compiler_report(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...)
+b32 compiler_report(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	b32 result = compiler_reportv(compiler, code, severity, phase, site, format, args);
+	b32 result = compiler_reportv(source, code, severity, phase, site, format, args);
 	va_end(args);
 	return result;
 }
@@ -212,6 +201,7 @@ static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *p
 	if (!source) {
 		return 0;
 	}
+	source->compiler = compiler;
 	source->id = compiler->source_count++;
 	source->name = name;
 	source->path = path;
@@ -234,9 +224,10 @@ static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *p
 }
 
 // NOTE(RJ): assumes the path is canonical
-static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Atom *path_atom)
+static Com_Source *compiler_load_source(Compiler *compiler, Com_Source *requesting_source, SourceSite site, Atom *path_atom)
 {
 	ASSERT(compiler->target);
+	ASSERT(requesting_source);
 	for (Com_Source *source = compiler->first_source; source; source = source->next)
 	{
 		if (source->path == path_atom) {
@@ -302,13 +293,13 @@ static Com_Source *compiler_load_source(Compiler *compiler, SourceSite site, Ato
 	Com_Source *source = 0;
 	if (error)
 	{
-		compiler_report(compiler, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%s '%s'", error, atom_data(path_atom));
+		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%s '%s'", error, atom_data(path_atom));
 	}
 	else
 	{
 		source = compiler_alloc_source(compiler, path_atom, path_atom, runtime_source, (BcSourceBuffer) {});
 		if (!source) {
-			compiler_report(compiler, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
+			compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
 		}
 	}
 	return source;
@@ -338,7 +329,7 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 		ASSERT(import_ast->import.path);
 
 		Atom *import_path_requested = import_ast->import.path;
-		Com_Source *imported_source = compiler_load_source(compiler, import_ast->site, import_path_requested);
+		Com_Source *imported_source = compiler_load_source(compiler, source, import_ast->site, import_path_requested);
 		if (!imported_source) {
 			return ERROR_AST;
 		}

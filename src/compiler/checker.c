@@ -43,18 +43,18 @@ static Com_Status static_value_status(StaticValue value)
 	return value.type == STATIC_VALUE_ERROR ? value.status : COM_STATUS_OK;
 }
 
-static Com_Status checker_report(Checker *checker, ErrorCode error, ErrorSeverity severity, SourceSite site, const char *format, ...)
+static Com_Status checker_report(Com_Source *source, ErrorCode error, ErrorSeverity severity, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	b32 reported = compiler_reportv(checker->compiler, error, severity, ERROR_PHASE_CHECKER, site, format, args);
+	b32 reported = compiler_reportv(source, error, severity, ERROR_PHASE_CHECKER, site, format, args);
 	va_end(args);
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
-static Com_Status checker_out_of_memory(Checker *checker, SourceSite site)
+static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 {
-	return compiler_report(checker->compiler, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
+	return compiler_report(source, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
 static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope **result)
@@ -73,7 +73,7 @@ static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope 
 		return COM_STATUS_OK;
 	}
 	*result = 0;
-	return checker_out_of_memory(checker, owner->site);
+	return checker_out_of_memory(checker->source_scope->source, owner->site);
 }
 
 static void pop_scope(Checker *checker, Scope *scope)
@@ -89,14 +89,14 @@ static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, A
 	if (existing)
 	{
 		ErrorCode error = kind == ENTITY_STATIC ? ERROR_DUPLICATE_STATIC_DECLARATION : ERROR_DUPLICATE_DECLARATION;
-		Com_Status status = checker_report(checker, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
+		Com_Status status = checker_report(scope->source, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
 		return entity_from_status(status);
 	}
 
 	Entity *entity = scope_declare(scope, kind, name);
 	if (!entity)
 	{
-		return entity_from_status(checker_out_of_memory(checker, site));
+		return entity_from_status(checker_out_of_memory(scope->source, site));
 	}
 
 	entity->state = kind == ENTITY_STATIC ? ENTITY_UNRESOLVED : ENTITY_RESOLVED;
@@ -162,13 +162,13 @@ Com_Status check_source(Compiler *compiler, Com_Source *source)
 	checker.current_function = ast_file;
 	checker.globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
 	if (!checker.globals) {
-		return checker_out_of_memory(&checker, ast_file->site);
+		return checker_out_of_memory(source, ast_file->site);
 	}
 
 	checker.source_scope = scope_create(checker.compiler->arena, SCOPE_SOURCE, checker.globals, ast_file, source);
 	checker.active_scope = checker.source_scope;
 	if (!checker.source_scope) {
-		return checker_out_of_memory(&checker, ast_file->site);
+		return checker_out_of_memory(source, ast_file->site);
 	}
 
 	ASSERT(!source->scope);
@@ -187,7 +187,7 @@ static StaticValue resolve_entity(Checker *checker, Entity *entity)
 	ASSERT(entity->kind == ENTITY_STATIC);
 	if (entity->state == ENTITY_RESOLVING)
 	{
-		Com_Status status = checker_report(checker, ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->tree->site, "cyclic static definition involving '%s'", atom_data(entity->name));
+		Com_Status status = checker_report(entity->scope->source, ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->tree->site, "cyclic static definition involving '%s'", atom_data(entity->name));
 		return static_value_error(status);
 	}
 	if (entity->state == ENTITY_RESOLVED)
@@ -214,7 +214,7 @@ static StaticValue resolve_entity(Checker *checker, Entity *entity)
 
 	if (value.type == STATIC_VALUE_NONE)
 	{
-		Com_Status status = checker_report(checker, ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, entity->expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
+		Com_Status status = checker_report(source, ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, entity->expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
 		value = static_value_error(status);
 	}
 	entity->state = ENTITY_RESOLVED;
@@ -241,7 +241,7 @@ static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *sour
 	source->scope = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source);
 	if (!source->scope)
 	{
-		return checker_out_of_memory(checker, source->ast->site);
+		return checker_out_of_memory(source, source->ast->site);
 	}
 	Com_Status status = declare_statics(checker, source->scope, source->ast->file.body->block);
 	if (status == COM_STATUS_OK) {
@@ -374,7 +374,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 		{
 			if (!expr->import.target)
 			{
-				Com_Status status = checker_report(checker, ERROR_IMPORT, ERROR_ERROR, expr->site, "import '%s' was not resolved to a source", atom_data(expr->import.path));
+				Com_Status status = checker_report(checker->source_scope->source, ERROR_IMPORT, ERROR_ERROR, expr->site, "import '%s' was not resolved to a source", atom_data(expr->import.path));
 				value = static_value_error(status);
 			}
 			else
@@ -429,12 +429,12 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				Entity *entity = scope_find_current(left_value.exports, expr->binary.y->atom);
 				if (!entity)
 				{
-					Com_Status status = checker_report(checker, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left_value.exports->source->name), atom_data(expr->binary.y->atom));
+					Com_Status status = checker_report(checker->source_scope->source, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left_value.exports->source->name), atom_data(expr->binary.y->atom));
 					value = static_value_error(status);
 				}
 				else if (!(entity->tags & ENTITY_TAG_EXPORTED))
 				{
-					Com_Status status = checker_report(checker, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left_value.exports->source->name));
+					Com_Status status = checker_report(checker->source_scope->source, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left_value.exports->source->name));
 					value = static_value_error(status);
 				}
 				else
@@ -581,7 +581,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 
 					if (target.type != STATIC_VALUE_FUNCTION)
 					{
-						Com_Status status = checker_report(checker, ERROR_NAMED_ARGUMENT_TARGET, ERROR_ERROR, argument->site, "named arguments require a statically known function");
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_NAMED_ARGUMENT_TARGET, ERROR_ERROR, argument->site, "named arguments require a statically known function");
 						value = static_value_error(status);
 						break;
 					}
@@ -590,7 +590,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 					i32 named_slot = find_parameter_by_name(target.function->function.params, argument_name->identifier);
 					if (named_slot < 0)
 					{
-						Com_Status status = checker_report(checker, ERROR_UNKNOWN_NAMED_ARGUMENT, ERROR_ERROR, argument_name->site, "function has no parameter named '%s'", atom_data(argument_name->identifier));
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_UNKNOWN_NAMED_ARGUMENT, ERROR_ERROR, argument_name->site, "function has no parameter named '%s'", atom_data(argument_name->identifier));
 						value = static_value_error(status);
 						break;
 					}
@@ -602,13 +602,13 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 					}
 					if (duplicate)
 					{
-						Com_Status status = checker_report(checker, ERROR_DUPLICATE_ARGUMENT, ERROR_ERROR, argument->site, "parameter '%s' was specified more than once", atom_data(argument_name->identifier));
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_DUPLICATE_ARGUMENT, ERROR_ERROR, argument->site, "parameter '%s' was specified more than once", atom_data(argument_name->identifier));
 						value = static_value_error(status);
 						break;
 					}
 					if (argument_slot < bind_slot)
 					{
-						Com_Status status = checker_report(checker, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "named argument '%s' does not follow parameter order", atom_data(argument_name->identifier));
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "named argument '%s' does not follow parameter order", atom_data(argument_name->identifier));
 						value = static_value_error(status);
 						break;
 					}
@@ -618,7 +618,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				{
 					if (require_named_arguments)
 					{
-						Com_Status status = checker_report(checker, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "positional arguments must come before named arguments");
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "positional arguments must come before named arguments");
 						value = static_value_error(status);
 						break;
 					}
@@ -688,7 +688,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 
 		default:
 		{
-			Com_Status status = checker_report(checker, ERROR_INTERNAL, ERROR_ERROR, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
+			Com_Status status = checker_report(checker->source_scope->source, ERROR_INTERNAL, ERROR_ERROR, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
 			value = static_value_error(status);
 		}
 		break;
@@ -750,7 +750,7 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 				Ast name = ast_ensure_kind(names->tuple.items[i], AST_IDENT);
 				if (ast_is_error(name))
 				{
-					status = checker_report(checker, ERROR_INVALID_DECLARATION, ERROR_ERROR, names->tuple.items[i]->site, "declaration name must be an identifier");
+					status = checker_report(checker->source_scope->source, ERROR_INVALID_DECLARATION, ERROR_ERROR, names->tuple.items[i]->site, "declaration name must be an identifier");
 					break;
 				}
 				ASSERT(!name->entity);

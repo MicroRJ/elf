@@ -7,6 +7,7 @@ static Com_Source *parser_test_add_source(Compiler *compiler, elf_StrSlice name,
 	Com_Source *source = arena_push_zero(compiler->arena, sizeof(*source), _Alignof(Com_Source));
 	ASSERT(name_atom);
 	ASSERT(source);
+	source->compiler = compiler;
 	source->id = compiler->source_count++;
 	source->name = name_atom;
 	source->path = name_atom;

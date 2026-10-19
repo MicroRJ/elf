@@ -59,6 +59,7 @@ Com_SourceState;
 typedef struct Com_Source Com_Source;
 struct Com_Source
 {
+	Compiler           *compiler;
 	Com_Source         *next;
 	Com_SourceId        id;
 	struct Atom        *name;
@@ -88,12 +89,11 @@ struct Compiler
 };
 
 Compiler *compiler_create(Arena *arena);
-Com_Source *compiler_source_from_id(Compiler *compiler, Com_SourceId source_id);
 
 void compiler_log_report(Compiler *compiler);
 
-b32 compiler_report(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
-b32 compiler_reportv(Compiler *compiler, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
+b32 compiler_report(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
+b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
 
 elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source);
