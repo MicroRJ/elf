@@ -85,10 +85,10 @@ static void test_checker_resolves_static_forward_reference(void)
 	if (!first || !second || first->kind != ENTITY_STATIC || second->kind != ENTITY_STATIC) {
 		test_fail("checker predeclares source statics");
 	}
-	if (!first || first->state != ENTITY_RESOLVED || first->value.type != STATIC_VALUE_INTEGER || first->value.integer != 42) {
+	if (!first || first->value.type != STATIC_VALUE_INTEGER || first->value.integer != 42) {
 		test_fail("checker lazily resolves static forward reference");
 	}
-	if (!second || second->state != ENTITY_RESOLVED || second->value.type != STATIC_VALUE_INTEGER || second->value.integer != 42) {
+	if (!second || second->value.type != STATIC_VALUE_INTEGER || second->value.integer != 42) {
 		test_fail("checker resolves referenced static value");
 	}
 	if (!first_decl || first_decl->static_decl.name->entity != first || !second_decl || second_decl->static_decl.name->entity != second) {

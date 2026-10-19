@@ -10,6 +10,8 @@ typedef struct IrFunction IrFunction;
 typedef enum
 {
 	STATIC_VALUE_NONE = 0,
+	STATIC_VALUE_AST,
+	STATIC_VALUE_RESOLVING,
 	STATIC_VALUE_ERROR,
 	STATIC_VALUE_NIL,
 	STATIC_VALUE_NUMBER,
@@ -26,6 +28,7 @@ typedef struct
 	union
 	{
 		Com_Status   status;
+		struct Ast_T *ast;
 		f64          number;
 		i64          integer;
 		struct Atom *string;
@@ -60,24 +63,14 @@ typedef enum
 }
 EntityTags;
 
-typedef enum
-{
-	ENTITY_UNRESOLVED = 0,
-	ENTITY_RESOLVING,
-	ENTITY_RESOLVED,
-}
-EntityState;
-
 struct Entity
 {
 	EntityKind      kind;
 	Com_Status      status;
 	struct Atom    *name;
 	Scope          *scope;
-	EntityState     state;
 	EntityTags      tags;
 	struct Ast_T   *parent;
-	struct Ast_T   *expr;
 	struct Ast_T   *tree;
 	struct IrNode  *ir;
 	StaticValue     value;

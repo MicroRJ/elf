@@ -81,7 +81,7 @@ static void pop_scope(Checker *checker, Scope *scope)
 	checker->active_scope = scope->parent;
 }
 
-static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Ast tree, Ast expr, EntityTags tags, Atom *name, SourceSite site)
+static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Ast tree, EntityTags tags, Atom *name, SourceSite site)
 {
 	Entity *existing = scope_find_current(scope, name);
 	if (existing)
@@ -97,9 +97,7 @@ static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, A
 		return entity_from_status(checker_out_of_memory(scope->source, site));
 	}
 
-	entity->state = kind == ENTITY_STATIC ? ENTITY_UNRESOLVED : ENTITY_RESOLVED;
 	entity->tree = tree;
-	entity->expr = expr;
 
 	if (kind == ENTITY_GLOBAL) {
 		entity->parent = 0;
@@ -135,10 +133,11 @@ static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stat
 		if (ast_decl->static_decl.exported) {
 			tags |= ENTITY_TAG_EXPORTED;
 		}
-		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_decl, ast_expr, tags, ast_name->atom, ast_decl->site);
+		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_decl, tags, ast_name->atom, ast_decl->site);
 		if (entity_is_error(entity)) {
 			return entity->status;
 		}
+		entity->value = (StaticValue) {.type = STATIC_VALUE_AST, .ast = ast_expr};
 		ast_name->entity = entity;
 		ast_decl->entity = entity;
 	}
@@ -183,40 +182,40 @@ static StaticValue resolve_entity(Checker *checker, Entity *entity)
 {
 	ASSERT(entity);
 	ASSERT(entity->kind == ENTITY_STATIC);
-	if (entity->state == ENTITY_RESOLVING)
+	StaticValue value = entity->value;
+	if (value.type == STATIC_VALUE_RESOLVING)
 	{
 		Com_Status status = checker_report(entity->scope->source, ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->tree->site, "cyclic static definition involving '%s'", atom_data(entity->name));
-		return static_value_error(status);
-	}
-	if (entity->state == ENTITY_RESOLVED)
-	{
-		return entity->value;
-	}
-	ASSERT(entity->expr || !"Error: internal error, unresolved entity missing expression to resolve");
-	entity->state = ENTITY_RESOLVING;
-
-	// Note, we can lazily resolve entities from different sources
-	Scope *previous_source_scope = checker->source_scope;
-	Scope *previous_active_scope = checker->active_scope;
-
-	Com_Source *source = entity->scope->source;
-	ASSERT(source);
-	ASSERT(source->scope);
-	checker->source_scope = source->scope;
-	checker->active_scope = entity->scope;
-
-	StaticValue value = resolve_expression(checker, entity->expr);
-
-	checker->source_scope = previous_source_scope;
-	checker->active_scope = previous_active_scope;
-
-	if (value.type == STATIC_VALUE_NONE)
-	{
-		Com_Status status = checker_report(source, ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, entity->expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
 		value = static_value_error(status);
 	}
-	entity->state = ENTITY_RESOLVED;
-	entity->value = value;
+	else if (value.type == STATIC_VALUE_AST)
+	{
+		Ast expr = value.ast;
+		ASSERT(expr || !"Error: internal error, unresolved entity missing expression to resolve");
+		entity->value.type = STATIC_VALUE_RESOLVING;
+
+		// Note, we can lazily resolve entities from different sources
+		Scope *previous_source_scope = checker->source_scope;
+		Scope *previous_active_scope = checker->active_scope;
+
+		Com_Source *source = entity->scope->source;
+		ASSERT(source);
+		ASSERT(source->scope);
+		checker->source_scope = source->scope;
+		checker->active_scope = entity->scope;
+
+		value = resolve_expression(checker, expr);
+
+		checker->source_scope = previous_source_scope;
+		checker->active_scope = previous_active_scope;
+
+		if (value.type == STATIC_VALUE_NONE)
+		{
+			Com_Status status = checker_report(source, ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
+			value = static_value_error(status);
+		}
+		entity->value = value;
+	}
 	return value;
 }
 
@@ -345,7 +344,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);
 				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_NONE, name->identifier, name->site);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, ENTITY_TAG_NONE, name->identifier, name->site);
 				if (entity_is_error(entity)) {
 					value = static_value_error(entity->status);
 				} else {
@@ -390,10 +389,9 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 		{
 			Atom *name = expr->identifier;
 			Entity *entity = scope_find(checker->active_scope, name);
-			if (entity) {
-				ASSERT(entity->kind == ENTITY_STATIC || entity->state == ENTITY_RESOLVED);
-			} else {
-				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, 0, 0, ENTITY_TAG_NONE, name, expr->site);
+			if (!entity)
+			{
+				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, 0, ENTITY_TAG_NONE, name, expr->site);
 				if (entity_is_error(entity)) {
 					value = static_value_error(entity->status);
 				}
@@ -749,7 +747,7 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 					break;
 				}
 				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name, 0, tags, name->identifier, name->site);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name, tags, name->identifier, name->site);
 				status = entity_is_error(entity) ? entity->status : COM_STATUS_OK;
 				if (status == COM_STATUS_OK) {
 					name->entity = entity;
