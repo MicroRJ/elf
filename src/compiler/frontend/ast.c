@@ -527,13 +527,13 @@ static Ast create_param_ast(Parser *par, SourceSite site, Ast name, Ast type, As
 	if (ast_is_error(expr)) {
 		return expr;
 	}
-	Ast tree = ast_new(par, site, AST_FUNCTION_PARAM);
+	Ast tree = ast_new(par, site, AST_DECL_STAT);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->param.name = name;
-	tree->param.type = type;
-	tree->param.expr = expr;
+	tree->decl.name = name;
+	tree->decl.type = type;
+	tree->decl.expr = expr;
 	return tree;
 }
 
@@ -710,7 +710,26 @@ static void print_ast(Printer *pr, Ast tree)
 
 
 			PRINT(pr, "fun(");
-			print_ast_list(pr, params, nparams);
+			for (u32 i = 0; i < nparams; ++i)
+			{
+				Ast param = params[i];
+				ASSERT(param);
+				ASSERT(param->kind == AST_DECL_STAT);
+				if (i) {
+					PRINT(pr, ", ");
+				}
+				print_ast(pr, param->decl.name);
+				if (param->decl.type)
+				{
+					PRINT(pr, ": ");
+					print_ast(pr, param->decl.type);
+				}
+				if (param->decl.expr)
+				{
+					PRINT(pr, " = ");
+					print_ast(pr, param->decl.expr);
+				}
+			}
 			if (variadic)
 			{
 				if (nparams) {
@@ -766,26 +785,6 @@ static void print_ast(Printer *pr, Ast tree)
 			print_ast(pr, tree->for_range_stat.decl);
 			PRINT(pr, " ? ");
 			print_ast(pr, tree->for_range_stat.body);
-		}
-		break;
-
-		case AST_FUNCTION_PARAM:
-		{
-
-			Ast name = tree->param.name;
-			Ast type = tree->param.type;
-			Ast expr = tree->param.expr;
-
-
-			print_ast(pr, name);
-			if (type) {
-				PRINT(pr, ": ");
-				print_ast(pr, type);
-			}
-			if (expr) {
-				PRINT(pr, " = ");
-				print_ast(pr, expr);
-			}
 		}
 		break;
 

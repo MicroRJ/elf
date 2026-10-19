@@ -241,11 +241,11 @@ static i32 find_parameter_by_name(Ast_Array params, Atom *name)
 	{
 		Ast param = params.items[i];
 		ASSERT(param);
-		ASSERT(param->kind == AST_FUNCTION_PARAM);
-		ASSERT(param->param.name);
-		ASSERT(param->param.name->kind == AST_IDENT);
-		ASSERT(param->param.name->identifier);
-		if (param->param.name->identifier == name) {
+		ASSERT(param->kind == AST_DECL_STAT);
+		ASSERT(param->decl.name);
+		ASSERT(param->decl.name->kind == AST_IDENT);
+		ASSERT(param->decl.name->identifier);
+		if (param->decl.name->identifier == name) {
 			return i;
 		}
 	}
@@ -309,17 +309,17 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			{
 				Ast param = expr->function.params.items[i];
 				ASSERT(param);
-				ASSERT(param->kind == AST_FUNCTION_PARAM);
-				if (param->param.type)
+				ASSERT(param->kind == AST_DECL_STAT);
+				if (param->decl.type)
 				{
-					Com_Value param_value = resolve_expression(checker, param->param.type);
+					Com_Value param_value = resolve_expression(checker, param->decl.type);
 					if (param_value.type == COM_VALUE_ERROR) {
 						value = param_value;
 					}
 				}
-				if (value.type != COM_VALUE_ERROR && param->param.expr)
+				if (value.type != COM_VALUE_ERROR && param->decl.expr)
 				{
-					Com_Value param_value = resolve_expression(checker, param->param.expr);
+					Com_Value param_value = resolve_expression(checker, param->decl.expr);
 					if (param_value.type == COM_VALUE_ERROR) {
 						value = param_value;
 					}
@@ -327,7 +327,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				if (value.type == COM_VALUE_ERROR) {
 					break;
 				}
-				Ast name = param->param.name;
+				Ast name = param->decl.name;
 				ASSERT(name);
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);

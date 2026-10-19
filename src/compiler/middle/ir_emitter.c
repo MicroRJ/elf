@@ -547,11 +547,11 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				{
 					Ast tree_parameter = tree_function->function.params.items[i];
 					ASSERT(tree_parameter);
-					ASSERT(tree_parameter->kind == AST_FUNCTION_PARAM);
-					ASSERT(tree_parameter->param.name);
-					if (!arguments[i] && tree_parameter->param.expr)
+					ASSERT(tree_parameter->kind == AST_DECL_STAT);
+					ASSERT(tree_parameter->decl.name);
+					if (!arguments[i] && tree_parameter->decl.expr)
 					{
-						arguments[i] = ir_emit_expr(emitter, tree_parameter->param.expr);
+						arguments[i] = ir_emit_expr(emitter, tree_parameter->decl.expr);
 						failed |= !arguments[i] || arguments[i] == ERROR_IR;
 					}
 				}
@@ -1483,13 +1483,13 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 
 	for (u32 i = 0; i < ast_params.count; ++ i)
 	{
-		Ast param = ast_ensure_kind(ast_params.items[i], AST_FUNCTION_PARAM);
+		Ast param = ast_ensure_kind(ast_params.items[i], AST_DECL_STAT);
 		if (ast_is_error(param)) {
 			ir_report_error(emitter, ERROR_INTERNAL, param->site, "expected function parameter");
 			continue;
 		}
 
-		Ast name = ast_ensure_kind(param->param.name, AST_IDENT);
+		Ast name = ast_ensure_kind(param->decl.name, AST_IDENT);
 		if (ast_is_error(name)) {
 			ir_report_error(emitter, ERROR_INTERNAL, param->site, "expected function parameter name");
 			continue;
@@ -1500,7 +1500,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 		ASSERT(name->entity);
 		name->entity->en_local.storage = param_memory;
 
-		Ast type = param->param.type;
+		Ast type = param->decl.type;
 		if (type)
 		{
 			type = ast_ensure_kind(type, AST_IDENT);

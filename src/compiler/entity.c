@@ -30,8 +30,8 @@ b32 entity_is_constant(const Entity *entity)
 	{
 		Ast declaration = entity->en_local.declaration;
 		ASSERT(declaration);
-		ASSERT(declaration->kind == AST_DECL_STAT || declaration->kind == AST_FUNCTION_PARAM);
-		result = declaration->kind == AST_DECL_STAT && declaration->decl.constant;
+		ASSERT(declaration->kind == AST_DECL_STAT);
+		result = declaration->decl.constant;
 	}
 	return result;
 }

@@ -190,7 +190,7 @@ static void test_checker_attaches_function_entities(void)
 	Ast outer_decl = checker_test_stat(&test, 0, AST_DECL_STAT, "checker parses outer function declaration");
 	Ast outer_function = outer_decl ? checker_test_tuple_item(outer_decl->decl.expr, 0, AST_FUNCTION, "checker finds outer function") : 0;
 	Ast parameter = outer_function && outer_function->function.params.count ? outer_function->function.params.items[0] : 0;
-	Ast parameter_name = parameter && parameter->kind == AST_FUNCTION_PARAM ? parameter->param.name : 0;
+	Ast parameter_name = parameter && parameter->kind == AST_DECL_STAT ? parameter->decl.name : 0;
 	Ast body = outer_function ? outer_function->function.body : 0;
 	Ast local_decl = body && body->kind == AST_BLOCK_STAT && body->block.count > 0 ? body->block.items[0] : 0;
 	Ast inner_decl = body && body->kind == AST_BLOCK_STAT && body->block.count > 1 ? body->block.items[1] : 0;

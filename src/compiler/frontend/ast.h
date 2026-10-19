@@ -55,7 +55,6 @@
 	X(AST_NAMED_ARGUMENT      , "named_argument")             \
 	X(AST_TUPLE               , "tuple")                      \
 	X(AST_FUNCTION            , "function")                   \
-	X(AST_FUNCTION_PARAM      , "function_param")             \
 	X(AST_RECURSE             , "recurse")                    \
 	X(AST_TABLE               , "table")                      \
 	X(AST_ARRAY               , "array")                      \
@@ -160,14 +159,6 @@ struct Ast_T
 			Ast       body;
 		}
 		function;
-
-		struct
-		{
-			Ast name;
-			Ast type;
-			Ast expr;
-		}
-		param;
 
 		struct
 		{

@@ -592,12 +592,12 @@ static void test_parser_function_expression(elf_State *state)
 
 	Ast first_param = function->function.params.items[0];
 	Ast second_param = function->function.params.items[1];
-	expect_ast_kind(first_param, AST_FUNCTION_PARAM, "parse first function param");
-	expect_ast_kind(second_param, AST_FUNCTION_PARAM, "parse second function param");
-	expect_ast_atom(first_param ? first_param->param.name : 0, "a", "first function param name");
-	expect_ast_atom(second_param ? second_param->param.name : 0, "b", "second function param name");
-	expect_ast_atom(first_param ? first_param->param.type : 0, "int", "first function param type");
-	expect_ast_atom(second_param ? second_param->param.type : 0, "str", "second function param type");
+	expect_ast_kind(first_param, AST_DECL_STAT, "parse first function param");
+	expect_ast_kind(second_param, AST_DECL_STAT, "parse second function param");
+	expect_ast_atom(first_param ? first_param->decl.name : 0, "a", "first function param name");
+	expect_ast_atom(second_param ? second_param->decl.name : 0, "b", "second function param name");
+	expect_ast_atom(first_param ? first_param->decl.type : 0, "int", "first function param type");
+	expect_ast_atom(second_param ? second_param->decl.type : 0, "str", "second function param type");
 	expect_ast_kind(function->function.body, AST_BLOCK_STAT, "function body parses as block");
 
 	file = parser_test_parse_file(state, "configure := fun(required, count = 1 + 2, label: str = \"elf\") { ret required }");
@@ -612,15 +612,15 @@ static void test_parser_function_expression(elf_State *state)
 	Ast required_param = function->function.params.items[0];
 	Ast count_param = function->function.params.items[1];
 	Ast label_param = function->function.params.items[2];
-	if (required_param->param.expr) {
+	if (required_param->decl.expr) {
 		test_fail("required function parameter has no default expression");
 	}
-	expect_ast_kind(count_param->param.expr, AST_ADD, "function parameter keeps expression default");
-	expect_ast_i64(count_param->param.expr ? count_param->param.expr->binary.x : 0, 1, "default expression keeps left operand");
-	expect_ast_i64(count_param->param.expr ? count_param->param.expr->binary.y : 0, 2, "default expression keeps right operand");
-	expect_ast_atom(label_param->param.type, "str", "defaulted function parameter keeps type");
-	expect_ast_kind(label_param->param.expr, AST_STRING_LITERAL, "typed function parameter keeps default");
-	expect_ast_atom(label_param->param.expr, "elf", "typed function parameter keeps default text");
+	expect_ast_kind(count_param->decl.expr, AST_ADD, "function parameter keeps expression default");
+	expect_ast_i64(count_param->decl.expr ? count_param->decl.expr->binary.x : 0, 1, "default expression keeps left operand");
+	expect_ast_i64(count_param->decl.expr ? count_param->decl.expr->binary.y : 0, 2, "default expression keeps right operand");
+	expect_ast_atom(label_param->decl.type, "str", "defaulted function parameter keeps type");
+	expect_ast_kind(label_param->decl.expr, AST_STRING_LITERAL, "typed function parameter keeps default");
+	expect_ast_atom(label_param->decl.expr, "elf", "typed function parameter keeps default text");
 
 	file = parser_test_parse_file(state, "collect := fun(a, ...) { ret elf.varg(0) }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse variadic function declaration");
@@ -634,7 +634,7 @@ static void test_parser_function_expression(elf_State *state)
 		return;
 	}
 
-	expect_ast_atom(function->function.params.items[0] ? function->function.params.items[0]->param.name : 0, "a", "variadic function named parameter");
+	expect_ast_atom(function->function.params.items[0] ? function->function.params.items[0]->decl.name : 0, "a", "variadic function named parameter");
 	if (!function->function.variadic) {
 		test_fail("function tracks variadic marker separately");
 	}
