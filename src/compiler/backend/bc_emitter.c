@@ -1293,17 +1293,15 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	elf_Prototype *prototype = elf_alloc_zero(emitter->target, allocation_size);
 	ASSERT(prototype);
 
-	*prototype = (elf_Prototype) {
-		.allocation_size = allocation_size,
-		.variadic = function->variadic,
-		.arity = function->param_count,
-		.captures = function->captures.count,
-		.stack_size = emitter->stack_size,
-		.integer_constant_count = emitter->integer_constant_count,
-		.number_constant_count = emitter->number_constant_count,
-		.bytecode_count = emitter->bytecode_count,
-		.source_map_count = emitter->source_map_count,
-	};
+	prototype->allocation_size = allocation_size;
+	prototype->variadic = function->variadic;
+	prototype->arity = function->param_count;
+	prototype->captures = function->captures.count;
+	prototype->stack_size = emitter->stack_size;
+	prototype->integer_constant_count = emitter->integer_constant_count;
+	prototype->number_constant_count = emitter->number_constant_count;
+	prototype->bytecode_count = emitter->bytecode_count;
+	prototype->source_map_count = emitter->source_map_count;
 	if (emitter->string_atom_count)
 	{
 		prototype->strings = (elf_String **)((u8 *)prototype + strings_offset);
