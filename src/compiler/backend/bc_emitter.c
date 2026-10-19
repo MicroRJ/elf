@@ -44,7 +44,6 @@ struct BcEmitter
 	u32                 bytecode_count;
 
 	u32                 function_count;
-	u32                 reserved_function_count;
 	u32                 emitted_function_count;
 
 	i64                *integer_constants;
@@ -65,10 +64,11 @@ struct BcEmitter
 
 	u32                 stack_size;
 	u32                 stack_top;
-	BcLabel             labels[BC_LABEL_COUNT_MAX];
 	u32                 label_count;
-	BcJumpPatch         jump_patches[BC_LABEL_COUNT_MAX];
 	u32                 jump_patch_count;
+
+	BcLabel             labels[BC_LABEL_COUNT_MAX];
+	BcJumpPatch         jump_patches[BC_LABEL_COUNT_MAX];
 };
 
 static inline b32 slot_is_valid(i32 slot)
@@ -81,7 +81,6 @@ static void emit_stat(BcEmitter *emitter, Ir stat);
 static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, u32 label);
 static void jump_if_expr_true(BcEmitter *emitter, Ir expr, u32 true_label);
 static void jump_if_expr_false(BcEmitter *emitter, Ir expr, u32 false_label);
-static u32 reserve_prototype_index(BcEmitter *emitter, IrFunction *function);
 
 // Scratch buffers and constant pools
 
@@ -578,7 +577,8 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	ASSERT(function->kind == IR_FUNCTION);
 	ASSERT(function->ir_function->captures.count == 0);
 	ASSERT(nout <= 0xff);
-	u32 prototype_index = reserve_prototype_index(emitter, function->ir_function);
+	ASSERT(function->ir_function->index != IR_FUNCTION_INDEX_INVALID);
+	u32 prototype_index = function->ir_function->index;
 
 	i32 slot_checkpoint = save_slots(emitter);
 	i32 call_slot = slot_checkpoint;
@@ -831,7 +831,8 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 			out = ensure_slot(emitter, out);
 			IrFunction *function = expr->ir_function;
-			u32 prototype_index = reserve_prototype_index(emitter, function);
+			ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
+			u32 prototype_index = function->index;
 			IrArray captures = function->captures;
 			if (captures.count == 0)
 			{
@@ -1278,39 +1279,41 @@ static u64 prototype_append_region(u64 *allocation_size, u64 size, u64 alignment
 	return offset;
 }
 
-static u32 reserve_runtime_prototype(BcEmitter *emitter)
+static void reserve_module_prototypes(BcEmitter *emitter, IrModule *module)
 {
 	elf_State *target = emitter->target;
-	if (target->prototype_count == target->prototype_capacity)
+	if (target->prototype_count > BC_OPERAND_COUNT_MAX || module->function_count > BC_OPERAND_COUNT_MAX - target->prototype_count)
+	{
+		abort();
+	}
+
+	u32 required_capacity = target->prototype_count + module->function_count;
+	if (required_capacity > target->prototype_capacity)
 	{
 		u32 old_capacity = target->prototype_capacity;
-		u32 new_capacity = old_capacity ? old_capacity * 2 : 16;
-		new_capacity = MIN(new_capacity, BC_OPERAND_COUNT_MAX);
+		u32 new_capacity = old_capacity ? old_capacity : 16;
+		while (new_capacity < required_capacity)
+		{
+			new_capacity = MIN(new_capacity * 2, BC_OPERAND_COUNT_MAX);
+		}
 		target->prototypes = elf_realloc(target, target->prototypes, sizeof(*target->prototypes) * old_capacity, sizeof(*target->prototypes) * new_capacity);
 		ASSERT(target->prototypes);
 		zero_memory(target->prototypes + old_capacity, sizeof(*target->prototypes) * (new_capacity - old_capacity));
 		target->prototype_capacity = new_capacity;
 	}
-	u32 index = target->prototype_count++;
-	ASSERT(index < BC_OPERAND_COUNT_MAX);
-	ASSERT(!target->prototypes[index]);
-	return index;
-}
 
-static u32 reserve_prototype_index(BcEmitter *emitter, IrFunction *function)
-{
-	ASSERT(function);
-	if (function->index == IR_FUNCTION_INDEX_INVALID)
+	u32 prototype_index = target->prototype_count;
+	u32 function_count = 0;
+	target->prototype_count = required_capacity;
+	for (IrFunction *function = module->first_function; function; function = function->next)
 	{
-		ASSERT(emitter->reserved_function_count < emitter->function_count);
-		if (emitter->target->prototype_count >= BC_OPERAND_COUNT_MAX)
-		{
-			abort();
-		}
-		function->index = reserve_runtime_prototype(emitter);
-		emitter->reserved_function_count += 1;
+		ASSERT(prototype_index < target->prototype_count);
+		ASSERT(!target->prototypes[prototype_index]);
+		function->index = prototype_index++;
+		function_count += 1;
 	}
-	return function->index;
+	ASSERT(function_count == module->function_count);
+	ASSERT(prototype_index == target->prototype_count);
 }
 
 static void begin_function(BcEmitter *emitter, IrFunction *function)
@@ -1394,7 +1397,8 @@ static void emit_function(BcEmitter *emitter, IrFunction *function)
 {
 	ASSERT(emitter);
 	ASSERT(function);
-	u32 prototype_index = reserve_prototype_index(emitter, function);
+	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
+	u32 prototype_index = function->index;
 	begin_function(emitter, function);
 
 	for (u32 i = 0; i < function->param_count; ++i)
@@ -1425,17 +1429,10 @@ elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 	ASSERT(module->function_count);
 	ASSERT(module->last_function);
 	ASSERT(!module->last_function->next);
-	if (module->function_count > BC_OPERAND_COUNT_MAX) {
+	if (module->function_count > BC_OPERAND_COUNT_MAX)
+	{
 		abort();
 	}
-
-	u32 function_count = 0;
-	for (IrFunction *function = module->first_function; function; function = function->next)
-	{
-		function->index = IR_FUNCTION_INDEX_INVALID;
-		function_count += 1;
-	}
-	ASSERT(function_count == module->function_count);
 
 	BcEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(BcEmitter));
 	emitter->target = target;
@@ -1443,12 +1440,12 @@ elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 	emitter->function_count = module->function_count;
 	emitter->bytecode_capacity = 1 << 13;
 	emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
+	reserve_module_prototypes(emitter, module);
 
 	for (IrFunction *function = module->first_function; function; function = function->next)
 	{
 		emit_function(emitter, function);
 	}
-	ASSERT(emitter->reserved_function_count == emitter->function_count);
 	ASSERT(emitter->emitted_function_count == emitter->function_count);
 	ASSERT(module->first_function->index < target->prototype_count);
 	return target->prototypes[module->first_function->index];
