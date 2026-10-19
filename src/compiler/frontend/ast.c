@@ -68,7 +68,6 @@ static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
 		return ERROR_OOM_AST;
 	}
 	tree->site = site;
-	tree->source = par->source;
 	tree->kind = kind;
 	return tree;
 }

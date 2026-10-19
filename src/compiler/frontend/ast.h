@@ -119,8 +119,6 @@ struct Ast_T
 	Ast_Kind             kind;
 	SourceSite           site;
 
-	// Todo, try to remove source entirely ...
-	struct Com_Source *source;
 	// metadata
 	struct Entity     *entity;
 

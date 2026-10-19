@@ -371,7 +371,7 @@ elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice na
 							Com_Status check_status = check_source(compiler, compiler_source);
 							if (check_status == COM_STATUS_OK)
 							{
-								IrModule *ir_module = ir_emit_module(compiler, ast);
+								IrModule *ir_module = ir_emit_module(compiler_source);
 								if (ir_module && !compiler->error_count) {
 									entry = bc_emit_module(compiler->target, ir_module);
 								}

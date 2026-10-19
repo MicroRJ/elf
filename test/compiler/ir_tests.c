@@ -24,7 +24,7 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	if (!ast_is_error(file)) {
 		check_source(result.compiler, result.source);
 		result.source->state = COM_SOURCE_CHECKED;
-		result.module = ir_emit_module(result.compiler, file);
+		result.module = ir_emit_module(result.source);
 	}
 	return result;
 }

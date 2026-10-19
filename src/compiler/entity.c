@@ -24,7 +24,6 @@ Entity entity_oom_sentinel =
 
 Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
 {
-	ASSERT(!owner || owner->source == source);
 	ASSERT(!parent || kind == SCOPE_SOURCE || parent->source == source);
 	Scope *scope = arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
 	if (scope)

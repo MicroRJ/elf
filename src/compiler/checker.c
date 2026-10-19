@@ -64,7 +64,6 @@ static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope 
 	ASSERT(owner);
 	ASSERT(result);
 	ASSERT(checker->source_scope);
-	ASSERT(owner->source == checker->source_scope->source);
 	ASSERT(checker->active_scope->source == checker->source_scope->source);
 	Scope *scope = scope_create(checker->compiler->arena, kind, checker->active_scope, owner, checker->source_scope->source);
 	if (scope) {
@@ -702,8 +701,6 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 	ASSERT(stat->kind != AST_FILE);
 	ASSERT(checker->active_scope);
 	ASSERT(checker->source_scope);
-	ASSERT(stat->source == checker->source_scope->source);
-	ASSERT(stat->source == checker->active_scope->source);
 	Com_Status status = COM_STATUS_OK;
 	StaticValue value = {0};
 
