@@ -509,6 +509,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 static void test_parser_rejects_legacy_table_syntax(elf_State *state)
 {
 	parser_expect_source_error(state, "ret {1}", "parser rejects unkeyed table entries");
+	parser_expect_source_error(state, "ret {first = 1 second = 2}", "parser rejects table entries without a comma");
 	parser_expect_source_error(state, "ret table.[key]", "parser rejects dot bracket field access");
 }
 

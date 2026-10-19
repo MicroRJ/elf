@@ -275,7 +275,7 @@ call         := expression "(" arguments? ")"
 argument     := expression | identifier "=" expression
 
 array        := "[" (expression ","?)* "]"
-table        := "{" (table_entry ","?)* "}"
+table        := "{" [table_entry ("," table_entry)* [","]] "}"
 table_entry  := identifier "=" expression
               | "[" expression "]" "=" expression
               | expression ("=" expression)?

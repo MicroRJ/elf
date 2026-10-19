@@ -959,7 +959,13 @@ static Ast parse_table_expr(Parser *parser)
 		}
 		++ nargs;
 
-		pick_token(parser, TOK_COMMA);
+		if (!pick_token(parser, TOK_COMMA))
+		{
+			if (!peek_token(parser, TOK_RIGHT_BRACE)) {
+				return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, "expected ',' or '}'");
+			}
+			break;
+		}
 	}
 
 	Token closing = take_token(parser, TOK_RIGHT_BRACE);

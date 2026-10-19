@@ -14,6 +14,31 @@ content, examples maintained primarily as documentation, and changelogs. Do
 not update documentation merely because a code change makes it stale; leave
 that work to the repository's documentation agent.
 
+## Architecture Direction
+
+Runtime and core must never depend on the compiler. The compiler backend may
+target runtime objects directly, but the frontend and middle stages remain
+runtime-independent: lexer, parser, checker, and IR lowering operate on
+compiler-owned representations. Runtime knowledge begins at the bytecode
+emitter.
+
+The bytecode emitter directly creates and initializes self-contained
+`elf_Prototype` objects. Do not reintroduce `BcModule`, a target abstraction,
+or an intermediate packaged module merely to create a conceptually clean
+boundary. `elf_State` owns the growable prototype table and runtime sources.
+Each prototype owns its bytecode, constants, runtime string references, source
+map, and source reference.
+
+Compiler sources may reference runtime-owned `elf_Source` objects, while
+parsing, checking, and lowering continue using compiler representations such
+as atoms, AST nodes, entities, and IR nodes. Preserve the one-way dependency:
+compiler backend to core/runtime, never core/runtime to compiler.
+
+Avoid copying source, bytecode, constants, or other compiled data through
+additional temporary module representations without a concrete need.
+Architectural boundaries should reduce work and clarify ownership, not create
+APIs solely for conceptual purity.
+
 ## Commit Boundaries
 
 An agent may develop, test, and fix one coherent change without interrupting
