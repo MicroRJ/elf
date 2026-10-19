@@ -129,7 +129,7 @@ static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i
 	return valid;
 }
 
-static b32 fs_load_string(elf_State *state, u32 index, const char *operation, elf_StrSlice *result)
+static b32 fs_load_string(elf_State *state, u32 index, const char *operation, dy_String *result)
 {
 	elf_Value value = state->frame->framebase[index];
 	b32 valid = value_is_string(value);
@@ -140,7 +140,7 @@ static b32 fs_load_string(elf_State *state, u32 index, const char *operation, el
 	else
 	{
 		elf_String *string = value_as_string(value);
-		*result = (elf_StrSlice) {(char *)elf_string_data(string), elf_string_size(string)};
+		*result = dy_string_from_data(elf_string_data(string), elf_string_size(string));
 	}
 	return valid;
 }
@@ -331,24 +331,23 @@ ELF_FUNCTION(lib_fs_file_seek)
 	}
 	FsFile *file = 0;
 	i64 distance = 0;
-	elf_StrSlice origin_name = {0};
-	if (!fs_load_file_receiver(S, &file) || !fs_load_integer(S, 1, "file seek offset", &distance) || !fs_load_string(S, 2, "file seek origin", &origin_name))
+	dy_String origin = {0};
+	if (!fs_load_file_receiver(S, &file) || !fs_load_integer(S, 1, "file seek offset", &distance) || !fs_load_string(S, 2, "file seek origin", &origin))
 	{
 		return 1;
 	}
-	dy_String origin_string = dy_string_from_data(origin_name.data, origin_name.size);
-	dy_Seek_Origin origin;
-	if (dy_string_is(origin_string, "begin"))
+	dy_Seek_Origin seek_origin;
+	if (dy_string_is(origin, "begin"))
 	{
-		origin = DY_SEEK_BEGIN;
+		seek_origin = DY_SEEK_BEGIN;
 	}
-	else if (dy_string_is(origin_string, "current"))
+	else if (dy_string_is(origin, "current"))
 	{
-		origin = DY_SEEK_CURRENT;
+		seek_origin = DY_SEEK_CURRENT;
 	}
-	else if (dy_string_is(origin_string, "end"))
+	else if (dy_string_is(origin, "end"))
 	{
-		origin = DY_SEEK_END;
+		seek_origin = DY_SEEK_END;
 	}
 	else
 	{
@@ -361,7 +360,7 @@ ELF_FUNCTION(lib_fs_file_seek)
 		return 1;
 	}
 	dy_u64 position = 0;
-	dy_Result result = dy_set_file_cursor(file->file, origin, distance, &position);
+	dy_Result result = dy_set_file_cursor(file->file, seek_origin, distance, &position);
 	if (result.error || position > INT64_MAX)
 	{
 		if (!result.error)
@@ -525,13 +524,12 @@ ELF_FUNCTION(lib_fs_open)
 		fs_push_errorf(S, "fs.open expected the elf.fs receiver, got '%s'", value_type_name(receiver.type));
 		return 1;
 	}
-	elf_StrSlice path = {0};
-	elf_StrSlice mode_name = {0};
-	if (!fs_load_string(S, 1, "file path", &path) || !fs_load_string(S, 2, "file mode", &mode_name))
+	dy_String path = {0};
+	dy_String mode = {0};
+	if (!fs_load_string(S, 1, "file path", &path) || !fs_load_string(S, 2, "file mode", &mode))
 	{
 		return 1;
 	}
-	dy_String mode = dy_string_from_data(mode_name.data, mode_name.size);
 	dy_File_Intent intent;
 	dy_File_Access access;
 	b32 readable = false;
@@ -598,7 +596,7 @@ ELF_FUNCTION(lib_fs_open)
 	file->append = append;
 	push_value(S, value_from_user(user));
 
-	dy_Result result = dy_access_file(dy_string_from_data(path.data, path.size), intent, access, &file->file);
+	dy_Result result = dy_access_file(path, intent, access, &file->file);
 	if (result.error)
 	{
 		fs_push_io_error(S, "file open", result);
@@ -606,9 +604,9 @@ ELF_FUNCTION(lib_fs_open)
 	return 1;
 }
 
-static b32 fs_get_file_info(const char *path, dy_File_Info *info)
+static b32 fs_get_file_info(dy_String path, dy_File_Info *info)
 {
-	return !dy_get_file_info(dy_string_from_cstring(path), info).error &&
+	return !dy_get_file_info(path, info).error &&
 		!info->is_directory && !info->is_symbolic_link;
 }
 
@@ -616,7 +614,7 @@ static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directo
 {
 	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
 	dy_File_Info info = {0};
-	b32 found = !dy_get_file_info(dy_string_from_cstring(lib_load_cstr(state, 1)), &info).error;
+	b32 found = !dy_get_file_info(lib_load_string_view(state, 1), &info).error;
 	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
 	return 1;
 }
@@ -640,21 +638,21 @@ ELF_FUNCTION(lib_fs_file_exists)
 {
 	lib_check_arg_count(S, "fs.file_exists", nargs, 1, 1);
 	dy_File_Info info = {0};
-	elf_push_int(S, fs_get_file_info(lib_load_cstr(S, 1), &info));
+	elf_push_int(S, fs_get_file_info(lib_load_string_view(S, 1), &info));
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_read_text_file)
 {
 	lib_check_arg_count(S, "fs.read_text_file", nargs, 1, 1);
-	const char *path = lib_load_cstr(S, 1);
+	dy_String path = lib_load_string_view(S, 1);
 	dy_File_Info info = {0};
 	if (!fs_get_file_info(path, &info) || info.size > INT_MAX) {
 		elf_push_nil(S);
 		return 1;
 	}
 	dy_File file;
-	if (dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
+	if (dy_access_file(path, DY_FILE_OPEN_EXISTING,
 		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) {
 		elf_push_nil(S);
 		return 1;
@@ -682,10 +680,10 @@ ELF_FUNCTION(lib_fs_read_text_file)
 ELF_FUNCTION(lib_fs_write_text_file)
 {
 	lib_check_arg_count(S, "fs.write_text_file", nargs, 2, 2);
-	const char *path = lib_load_cstr(S, 1);
-	elf_StrSlice data = lib_load_string_slice(S, 2);
+	dy_String path = lib_load_string_view(S, 1);
+	dy_String data = lib_load_string_view(S, 2);
 	dy_File file;
-	if (dy_access_file(dy_string_from_cstring(path), DY_FILE_CREATE_ALWAYS,
+	if (dy_access_file(path, DY_FILE_CREATE_ALWAYS,
 		DY_FILE_WRITE, &file).error) {
 		elf_push_int(S, false);
 		return 1;
@@ -702,7 +700,7 @@ ELF_FUNCTION(lib_fs_get_file_info)
 {
 	lib_check_arg_count(S, "fs.get_file_info", nargs, 1, 1);
 	dy_File_Info info = {0};
-	if (!fs_get_file_info(lib_load_cstr(S, 1), &info) || info.size > INT64_MAX) {
+	if (!fs_get_file_info(lib_load_string_view(S, 1), &info) || info.size > INT64_MAX) {
 		elf_push_nil(S);
 		return 1;
 	}
@@ -718,26 +716,24 @@ ELF_FUNCTION(lib_fs_get_file_info)
 ELF_FUNCTION(lib_fs_create_directory)
 {
 	lib_check_arg_count(S, "fs.create_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_create_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_create_directory(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_create_directories)
 {
 	lib_check_arg_count(S, "fs.create_directories", nargs, 1, 1);
-	elf_push_int(S, !dy_create_directories(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_create_directories(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 
 static int fs_transfer_file(elf_State *state, int nargs, b32 move)
 {
 	lib_check_arg_count(state, move ? "fs.move_file" : "fs.copy_file", nargs, 2, 3);
-	const char *source = lib_load_cstr(state, 1);
-	const char *destination = lib_load_cstr(state, 2);
+	dy_String source = lib_load_string_view(state, 1);
+	dy_String destination = lib_load_string_view(state, 2);
 	b32 overwrite = nargs == 4 ? (b32)lib_load_integer(state, 3) : true;
-	dy_Result transfer = move ? dy_move_file(dy_string_from_cstring(source),
-		dy_string_from_cstring(destination), overwrite) : dy_copy_file(dy_string_from_cstring(source),
-		dy_string_from_cstring(destination), overwrite);
+	dy_Result transfer = move ? dy_move_file(source, destination, overwrite) : dy_copy_file(source, destination, overwrite);
 	b32 success = !transfer.error;
 	elf_push_int(state, success);
 	return 1;
@@ -756,21 +752,21 @@ ELF_FUNCTION(lib_fs_move_file)
 ELF_FUNCTION(lib_fs_remove_file)
 {
 	lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1);
-	elf_push_int(S, !dy_remove_file(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_remove_file(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_directory)
 {
 	lib_check_arg_count(S, "fs.remove_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_remove_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_remove_directory(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_tree)
 {
 	lib_check_arg_count(S, "fs.remove_tree", nargs, 1, 1);
-	elf_push_int(S, !dy_remove_tree(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_remove_tree(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 
@@ -792,7 +788,7 @@ ELF_FUNCTION(lib_fs_get_working_directory)
 ELF_FUNCTION(lib_fs_set_working_directory)
 {
 	lib_check_arg_count(S, "fs.set_working_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_set_current_directory(dy_string_from_cstring(lib_load_cstr(S, 1))).error);
+	elf_push_int(S, !dy_set_current_directory(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 
@@ -845,8 +841,19 @@ ELF_FUNCTION(lib_fs_get_paths)
 		elf_push_nil(S);
 		return 1;
 	}
-	elf_StrSlice root = {".", 1};
-	if ((nargs >= 2 && !elf_to_str(S, 1, &root)) || root.size == 0 || root.size >= DY_PATH_CAPACITY) {
+	dy_String root = DY_LIT(".");
+	if (nargs >= 2)
+	{
+		elf_Value root_value = load_value(S, 1);
+		if (!value_is_string(root_value))
+		{
+			elf_push_nil(S);
+			return 1;
+		}
+		elf_String *root_string = value_as_string(root_value);
+		root = dy_string_from_data(elf_string_data(root_string), elf_string_size(root_string));
+	}
+	if (root.size == 0 || root.size >= DY_PATH_CAPACITY) {
 		elf_push_nil(S);
 		return 1;
 	}
@@ -859,7 +866,7 @@ ELF_FUNCTION(lib_fs_get_paths)
 	elf_i32 result = elf_abs_index(S, -1);
 	char storage[DY_PATH_CAPACITY];
 	dy_Path_Builder path;
-	if (!dy_path_builder_init(&path, storage, sizeof(storage), dy_string_from_data(root.data, root.size))) {
+	if (!dy_path_builder_init(&path, storage, sizeof(storage), root)) {
 		elf_pop(S, 1);
 		elf_push_nil(S);
 		return 1;
@@ -880,14 +887,17 @@ ELF_FUNCTION(lib_fs_for_each_path)
 		elf_push_nil(S);
 		return 1;
 	}
-	elf_StrSlice root = {".", 1};
+	dy_String root = DY_LIT(".");
 	elf_Int recursion_level = 0;
 	elf_i32 callback = 1;
 	if (nargs >= 3) {
-		if (!elf_to_str(S, 1, &root)) {
+		elf_Value root_value = load_value(S, 1);
+		if (!value_is_string(root_value)) {
 			elf_push_nil(S);
 			return 1;
 		}
+		elf_String *root_string = value_as_string(root_value);
+		root = dy_string_from_data(elf_string_data(root_string), elf_string_size(root_string));
 		callback = 2;
 	}
 	if (nargs == 4) {
@@ -904,7 +914,7 @@ ELF_FUNCTION(lib_fs_for_each_path)
 	callback = elf_abs_index(S, callback);
 	char storage[DY_PATH_CAPACITY];
 	dy_Path_Builder path;
-	if (!dy_path_builder_init(&path, storage, sizeof(storage), dy_string_from_data(root.data, root.size))) {
+	if (!dy_path_builder_init(&path, storage, sizeof(storage), root)) {
 		elf_push_nil(S);
 		return 1;
 	}

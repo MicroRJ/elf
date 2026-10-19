@@ -98,23 +98,24 @@ static b32 json_push_ast_value(elf_State *state, Ast ast)
 	return result;
 }
 
-static b32 lib_push_json_source(elf_State *state, const char *name, elf_StrSlice source, b32 jsonl)
+static b32 lib_push_json_source(elf_State *state, dy_String name, dy_String source, b32 jsonl)
 {
 	Scratch scratch = scratch_begin();
-	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	Ast ast = jsonl ? compiler_parse_jsonl(scratch.arena, source_name, source) : compiler_parse_json(scratch.arena, source_name, source);
+	elf_StrSlice source_name = {name.data, name.size};
+	elf_StrSlice source_text = {source.data, source.size};
+	Ast ast = jsonl ? compiler_parse_jsonl(scratch.arena, source_name, source_text) : compiler_parse_json(scratch.arena, source_name, source_text);
 
 	b32 result = !ast_is_error(ast) && json_push_ast_value(state, ast);
 	scratch_end(scratch);
 	return result;
 }
 
-static b32 lib_push_json(elf_State *state, const char *name, elf_StrSlice source)
+static b32 lib_push_json(elf_State *state, dy_String name, dy_String source)
 {
 	return lib_push_json_source(state, name, source, false);
 }
 
-static b32 lib_push_jsonl(elf_State *state, const char *name, elf_StrSlice source)
+static b32 lib_push_jsonl(elf_State *state, dy_String name, dy_String source)
 {
 	return lib_push_json_source(state, name, source, true);
 }
@@ -347,8 +348,8 @@ static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
 ELF_FUNCTION(l_json_parse)
 {
 	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
-	elf_StrSlice source = lib_load_string_slice(S, 1);
-	if (!lib_push_json(S, "json.parse", source)) {
+	dy_String source = lib_load_string_view(S, 1);
+	if (!lib_push_json(S, DY_LIT("json.parse"), source)) {
 		json_push_error_value(S, "invalid JSON", 0);
 	}
 	return 1;
@@ -371,16 +372,16 @@ ELF_FUNCTION(l_json_stringify)
 	return 1;
 }
 
-static b32 json_read_file(elf_State *state, const char *name, elf_StrSlice *source, u64 *allocation_size)
+static b32 json_read_file(elf_State *state, dy_String name, dy_String *source, u64 *allocation_size)
 {
 	dy_File_Info info;
-	if (dy_get_file_info(dy_string_from_cstring(name), &info).error || info.is_directory || info.size > INT_MAX)
+	if (dy_get_file_info(name, &info).error || info.is_directory || info.size > INT_MAX)
 	{
 		return false;
 	}
 
 	dy_File file;
-	if (dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
+	if (dy_access_file(name, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
 	{
 		return false;
 	}
@@ -403,13 +404,13 @@ static b32 json_read_file(elf_State *state, const char *name, elf_StrSlice *sour
 	}
 
 	data[size] = 0;
-	*source = (elf_StrSlice) {data, size};
+	*source = dy_string_from_data(data, size);
 	return true;
 }
 
-static void json_push_loaded_file(elf_State *state, const char *name, b32 jsonl)
+static void json_push_loaded_file(elf_State *state, dy_String name, b32 jsonl)
 {
-	elf_StrSlice source = {};
+	dy_String source = {};
 	u64 allocation_size = 0;
 	if (!json_read_file(state, name, &source, &allocation_size))
 	{
@@ -428,14 +429,14 @@ static void json_push_loaded_file(elf_State *state, const char *name, b32 jsonl)
 ELF_FUNCTION(l_json_load_file)
 {
 	lib_check_arg_count(S, "json.load_file", nargs, 1, 1);
-	json_push_loaded_file(S, lib_load_cstr(S, 1), false);
+	json_push_loaded_file(S, lib_load_string_view(S, 1), false);
 	return 1;
 }
 
 ELF_FUNCTION(l_json_load_jsonl)
 {
 	lib_check_arg_count(S, "json.load_jsonl", nargs, 1, 1);
-	json_push_loaded_file(S, lib_load_cstr(S, 1), true);
+	json_push_loaded_file(S, lib_load_string_view(S, 1), true);
 	return 1;
 }
 

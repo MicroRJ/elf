@@ -287,7 +287,10 @@ void elf_globals_set_by_name(elf_State *state, elf_StrSlice name, elf_Value valu
 elf_Value elf_globals_get_by_slot(elf_State *state, u32 slot);
 void elf_globals_set_by_slot(elf_State *state, u32 slot, elf_Value value);
 
+// README: STOP RELYING ON THIS TO ABORT THE PROGRAM
 void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);
+
+// README: THIS IS ONLY FOR TESTING
 void print_current_runtime_source_location(elf_State *state);
 
 #include "elf_helpers.h"
