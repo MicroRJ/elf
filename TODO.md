@@ -181,6 +181,15 @@ here instead of scattering `TODO` comments through the source.
 
 ## Future capabilities
 
+- [ ] Explore statement-bodied table construction with an implicit receiver after
+  the current release.
+  - Bind the table under construction as implicit `this` within its braces, so
+    `.name = value` means `this.name = value` and `.[key] = value` means
+    `this[key] = value`.
+  - Allow ordinary control flow in that scope, such as a loop that fills computed
+    fields, rather than treating adjacent expressions as implicit table entries.
+  - Require the leading `.` for mutations targeting the constructed table; do not
+    infer table entries merely from whitespace-separated expressions.
 - [ ] Experiment with expression-block syntax that exposes the existing
   statement-plus-result `IR_EXPR_BLOCK` model at the language level.
 - [ ] Support independent module unloading.
