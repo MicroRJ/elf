@@ -39,18 +39,12 @@
 	X(M_LINE_NUMBER   , "line_number" ) \
 	X(M_LINE_CHAR     , "line_char"   ) \
 	X(M_FILE_NAME     , "file_name"   ) \
-	X(M_ASSERT        , "assert"      ) \
 	X(M_INT           , "int"         ) \
-	X(M_NUM           , "num"         ) \
-	X(M_LEVEL         , "level"       ) \
 	X(M_GET_MEM       , "get_mem"     ) \
-	X(M_GETEXPR       , "getexpr"     ) \
 	X(M_INDEX         , "index"       ) \
 	X(M_VALUE         , "value"       ) \
 	X(M_ARRAY         , "array"       ) \
-	X(M_FIELD         , "field"       ) \
 	X(M_ENDOFFILE     , "eof"         ) \
-	X(M_THIS          , "this"        ) \
 // END
 
 #define TOKEN_DEFINITIONS(X)              \
