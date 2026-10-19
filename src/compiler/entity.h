@@ -29,7 +29,6 @@ typedef struct
 		f64          number;
 		i64          integer;
 		struct Atom *string;
-		struct Atom *unident;
 		Scope       *exports;
 		struct
 		{
@@ -57,8 +56,6 @@ typedef enum
 	ENTITY_TAG_REFERENCED = 1 << 0,
 	ENTITY_TAG_CONSTANT   = 1 << 1,
 	ENTITY_TAG_ASSIGNED   = 1 << 2,
-	ENTITY_TAG_PARAMETER  = 1 << 3,
-	ENTITY_TAG_FORLOOP    = 1 << 4,
 	ENTITY_TAG_EXPORTED   = 1 << 5,
 }
 EntityTags;
@@ -78,7 +75,6 @@ struct Entity
 	struct Atom    *name;
 	Scope          *scope;
 	EntityState     state;
-	u32             users;
 	EntityTags      tags;
 	struct Ast_T   *parent;
 	struct Ast_T   *expr;

@@ -345,7 +345,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);
 				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_PARAMETER, name->identifier, name->site);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_NONE, name->identifier, name->site);
 				if (entity_is_error(entity)) {
 					value = static_value_error(entity->status);
 				} else {
@@ -439,7 +439,6 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				{
 					value = resolve_entity(checker, entity);
 					if (value.type != STATIC_VALUE_ERROR) {
-						entity->users += 1;
 						entity->tags |= ENTITY_TAG_REFERENCED;
 						expr->entity = entity;
 					}

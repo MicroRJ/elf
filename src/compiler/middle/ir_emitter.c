@@ -200,7 +200,6 @@ static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functi
 	function_ctx->last_capture = capture;
 	function_ctx->capture_count += 1;
 	entity->tags |= ENTITY_TAG_REFERENCED;
-	entity->users ++;
 	return capture_index;
 }
 
@@ -209,7 +208,6 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 	ASSERT(entity);
 	ASSERT(emitter->function);
 	entity->tags |= ENTITY_TAG_REFERENCED;
-	entity->users ++;
 	if (entity->kind == ENTITY_GLOBAL) {
 		return ir_new_global(emitter, site, entity->name);
 	}
@@ -799,7 +797,7 @@ static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrQueue *items, Ast expr)
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast name_tuple, Ast expr_tuple, u32 entity_tags)
+static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast name_tuple, Ast expr_tuple)
 {
 	u32 nvars = name_tuple->tuple.count;
 
@@ -808,12 +806,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 		Ast expr = expr_tuple->tuple.items[i];
 		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
 		{
-			const char *message = "range expressions cannot be used as declaration values; use a range for loop";
-			if (entity_tags & ENTITY_TAG_FORLOOP) {
-				message = "range for loops require one range expression";
-			}
-
-			ir_report_error(emitter, ERROR_LOWERING, expr->site, message);
+			ir_report_error(emitter, ERROR_LOWERING, expr->site, "range expressions cannot be used as declaration values; use a range for loop");
 			ir_push(items, ERROR_IR);
 			return 1;
 		}
@@ -874,8 +867,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 	return nvars;
 }
 
-static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_tuple,
-	Ast range_expr, u32 entity_tags)
+static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_tuple, Ast range_expr)
 {
 	Ast collection_expr = 0;
 	Ast range = range_expr;
@@ -1051,8 +1043,7 @@ static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
 		return ERROR_IR;
 	}
 
-	u32 entity_tags = decl->decl.constant ? ENTITY_TAG_CONSTANT : 0;
-	return lower_ast_for_range_expr_to_ir(emitter, stat, name_tuple, range, entity_tags);
+	return lower_ast_for_range_expr_to_ir(emitter, stat, name_tuple, range);
 }
 
 static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
@@ -1231,8 +1222,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				break;
 			}
 
-			u32 entity_tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : 0;
-			lower_local_decl_tuples_to_ir(emitter, items, name_tuple, expr_tuple, entity_tags);
+			lower_local_decl_tuples_to_ir(emitter, items, name_tuple, expr_tuple);
 		}
 		break;
 
