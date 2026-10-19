@@ -70,10 +70,21 @@ struct Entity
 	struct Atom    *name;
 	Scope          *scope;
 	EntityTags      tags;
-	struct Ast_T   *parent;
-	struct Ast_T   *tree;
-	struct IrNode  *ir;
-	StaticValue     value;
+	union
+	{
+		struct
+		{
+			struct Ast_T *declaration;
+			StaticValue   value;
+		}
+		en_static;
+		struct
+		{
+			struct Ast_T  *function;
+			struct IrNode *storage;
+		}
+		en_local;
+	};
 };
 
 extern Entity entity_error_sentinel;

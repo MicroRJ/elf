@@ -85,10 +85,10 @@ static void test_checker_resolves_static_forward_reference(void)
 	if (!first || !second || first->kind != ENTITY_STATIC || second->kind != ENTITY_STATIC) {
 		test_fail("checker predeclares source statics");
 	}
-	if (!first || first->value.type != STATIC_VALUE_INTEGER || first->value.integer != 42) {
+	if (!first || first->en_static.value.type != STATIC_VALUE_INTEGER || first->en_static.value.integer != 42) {
 		test_fail("checker lazily resolves static forward reference");
 	}
-	if (!second || second->value.type != STATIC_VALUE_INTEGER || second->value.integer != 42) {
+	if (!second || second->en_static.value.type != STATIC_VALUE_INTEGER || second->en_static.value.integer != 42) {
 		test_fail("checker resolves referenced static value");
 	}
 	if (!first_decl || first_decl->static_decl.name->entity != first || !second_decl || second_decl->static_decl.name->entity != second) {
@@ -201,13 +201,13 @@ static void test_checker_attaches_function_entities(void)
 	Ast inner_return = inner_body && inner_body->kind == AST_BLOCK_STAT && inner_body->block.count ? inner_body->block.items[0] : 0;
 	Entity *parameter_entity = parameter_name ? parameter_name->entity : 0;
 	Entity *local_entity = local_name ? local_name->entity : 0;
-	if (!parameter_entity || parameter_entity->kind != ENTITY_PARAMETER || parameter_entity->parent != outer_function) {
+	if (!parameter_entity || parameter_entity->kind != ENTITY_PARAMETER || parameter_entity->en_local.function != outer_function) {
 		test_fail("checker attaches parameter entity to owning function");
 	}
 	if (!parameter_use || parameter_use->entity != parameter_entity) {
 		test_fail("checker resolves function parameter use");
 	}
-	if (!local_entity || local_entity->kind != ENTITY_LOCAL || local_entity->parent != outer_function) {
+	if (!local_entity || local_entity->kind != ENTITY_LOCAL || local_entity->en_local.function != outer_function) {
 		test_fail("checker records local owner function");
 	}
 	Ast inner_return_expr = inner_return && inner_return->kind == AST_RETURN ? checker_test_single_expression(inner_return->return_stat.expr, AST_IDENT, "checker finds captured local use") : 0;
@@ -305,7 +305,7 @@ static void test_checker_resolves_imported_export(void)
 	Ast field = root_return && root_return->kind == AST_RETURN ? checker_test_single_expression(root_return->return_stat.expr, AST_FIELD, "checker finds imported field expression") : 0;
 	Atom *answer_name = atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1);
 	Entity *answer = module->scope ? scope_find_current(module->scope, answer_name) : 0;
-	if (!answer || answer->kind != ENTITY_STATIC || !(answer->tags & ENTITY_TAG_EXPORTED) || answer->value.type != STATIC_VALUE_INTEGER || answer->value.integer != 42) {
+	if (!answer || answer->kind != ENTITY_STATIC || !(answer->tags & ENTITY_TAG_EXPORTED) || answer->en_static.value.type != STATIC_VALUE_INTEGER || answer->en_static.value.integer != 42) {
 		test_fail("checker lazily resolves imported export");
 	}
 	if (!field || field->kind != AST_FIELD || field->entity != answer) {
@@ -369,7 +369,7 @@ static void test_checker_reports_static_cycle(void)
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_CYCLIC_STATIC_DEFINITION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports cyclic static definition");
 	}
-	if (!first_decl || !second_decl || first_decl->entity->value.type != STATIC_VALUE_ERROR || first_decl->entity->value.status != COM_STATUS_REPORTED || second_decl->entity->value.type != STATIC_VALUE_ERROR || second_decl->entity->value.status != COM_STATUS_REPORTED) {
+	if (!first_decl || !second_decl || first_decl->entity->en_static.value.type != STATIC_VALUE_ERROR || first_decl->entity->en_static.value.status != COM_STATUS_REPORTED || second_decl->entity->en_static.value.type != STATIC_VALUE_ERROR || second_decl->entity->en_static.value.status != COM_STATUS_REPORTED) {
 		test_fail("checker propagates cyclic static error through entities");
 	}
 	checker_test_destroy(&test);
@@ -384,7 +384,7 @@ static void test_checker_reports_invalid_static_expression(void)
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports expression without static value");
 	}
-	if (!declaration || !declaration->entity || declaration->entity->value.type != STATIC_VALUE_ERROR || declaration->entity->value.status != COM_STATUS_REPORTED) {
+	if (!declaration || !declaration->entity || declaration->entity->en_static.value.type != STATIC_VALUE_ERROR || declaration->entity->en_static.value.status != COM_STATUS_REPORTED) {
 		test_fail("checker stores invalid static result on entity");
 	}
 	checker_test_destroy(&test);

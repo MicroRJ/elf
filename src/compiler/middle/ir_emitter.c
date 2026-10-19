@@ -163,6 +163,7 @@ static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 
 static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
 {
+	ASSERT(entity->kind == ENTITY_LOCAL || entity->kind == ENTITY_PARAMETER);
 	u32 capture_index = 0;
 	for (IrCapture *capture = function_ctx->first_capture; capture; capture = capture->next)
 	{
@@ -178,14 +179,14 @@ static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functi
 	Ir target = 0;
 	IrEmitterFrame *parent = function_ctx->parent;
 
-	if (parent && entity->parent != parent->definition->ast)
+	if (parent && entity->en_local.function != parent->definition->ast)
 	{
 		u32 parent_capture = capture_entity_in_function(emitter, parent, entity, site);
 		target = ir_new_capture(emitter, site, parent_capture);
 	}
 	else
 	{
-		target = ir_new_load(emitter, site, entity->ir);
+		target = ir_new_load(emitter, site, entity->en_local.storage);
 	}
 
 	IrCapture *capture = arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
@@ -211,14 +212,15 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 	if (entity->kind == ENTITY_GLOBAL) {
 		return ir_new_global(emitter, site, entity->name);
 	}
-	ASSERT(entity->ir);
-	if (entity->parent != emitter->function->definition->ast)
+	ASSERT(entity->kind == ENTITY_LOCAL || entity->kind == ENTITY_PARAMETER);
+	ASSERT(entity->en_local.storage);
+	if (entity->en_local.function != emitter->function->definition->ast)
 	{
 		u32 capture_index = capture_entity_in_function(emitter, emitter->function, entity, site);
 		return ir_new_capture(emitter, site, capture_index);
 	}
 
-	return ir_new_load(emitter, site, entity->ir);
+	return ir_new_load(emitter, site, entity->en_local.storage);
 }
 
 static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
@@ -337,23 +339,23 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 	Ir ir = 0;
 
 	Entity *entity = expr->entity;
-	if (entity)
+	if (entity && entity->kind == ENTITY_STATIC)
 	{
-		StaticValue value = entity->value;
+		StaticValue value = entity->en_static.value;
 
 		switch (value.type) {
 			case STATIC_VALUE_FUNCTION:
 			{
-				if (!entity->value.definition)
+				if (!entity->en_static.value.definition)
 				{
-					Ast function = entity->value.function;
+					Ast function = entity->en_static.value.function;
 					ASSERT(function && function->kind == AST_FUNCTION);
 					ASSERT(entity->scope);
 					ASSERT(entity->scope->source);
-					entity->value.definition = ir_reserve_function(emitter, entity->scope->source, function->site, function->function.variadic, function->function.params.count);
-					ir_lower_function_body(emitter, entity->value.definition, function, function->function.params, function->function.body);
+					entity->en_static.value.definition = ir_reserve_function(emitter, entity->scope->source, function->site, function->function.variadic, function->function.params.count);
+					ir_lower_function_body(emitter, entity->en_static.value.definition, function, function->function.params, function->function.body);
 				}
-				ir = ir_new_function(emitter, expr->site, entity->value.definition);
+				ir = ir_new_function(emitter, expr->site, entity->en_static.value.definition);
 				return ir;
 			}
 			break;
@@ -829,8 +831,8 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 			locals[i] = ir_new_local(emitter, name->site, 0);
 
 			ASSERT(name->entity);
-			ASSERT(!name->entity->ir);
-			name->entity->ir = locals[i];
+			ASSERT(!name->entity->en_local.storage);
+			name->entity->en_local.storage = locals[i];
 		}
 		ir_push(items, ir_new_multi_local(emitter, expr_tuple->site, expr, (IrArray){ .items = locals, .count = nvars }));
 		return nvars;
@@ -860,8 +862,8 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 		Ir local = ir_new_local(emitter, name->site, value);
 		ir_push(items, local);
 		ASSERT(name->entity);
-		ASSERT(!name->entity->ir);
-		name->entity->ir = local;
+		ASSERT(!name->entity->en_local.storage);
+		name->entity->en_local.storage = local;
 	}
 
 	return nvars;
@@ -938,8 +940,8 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 		Ir local = ir_new_local(emitter, name->site, 0);
 		var_locals[i] = local;
 		ASSERT(name->entity);
-		ASSERT(!name->entity->ir);
-		name->entity->ir = local;
+		ASSERT(!name->entity->en_local.storage);
+		name->entity->en_local.storage = local;
 	}
 
 	Ir start_label = ir_new_label(emitter, stat->site);
@@ -1494,7 +1496,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, A
 		Ir param_memory = ir_new_local(emitter, name->site, 0);
 		ir_params[IMPLICIT_PARAM_COUNT + i] = param_memory;
 		ASSERT(name->entity);
-		name->entity->ir = param_memory;
+		name->entity->en_local.storage = param_memory;
 
 		Ast type = param->param.type;
 		if (type)
