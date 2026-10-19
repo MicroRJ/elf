@@ -27,6 +27,7 @@ struct Parser
 	Ast                *ast_stack;
 	u32                 ast_stack_size;
 	u32                 ast_stack_index;
+	Ast                 current_function;
 
 	Ast_List             imports;
 };

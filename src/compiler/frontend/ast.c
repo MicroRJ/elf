@@ -353,17 +353,9 @@ static Ast create_block_ast(Parser *par, SourceSite site, Ast_Array stats)
 	return tree;
 }
 
-static Ast create_file_ast(Parser *par, SourceSite site, Ast body, Ast_Array imports)
+static Ast create_file_ast(Parser *par, SourceSite site)
 {
-	if (ast_is_error(body)) {
-		return body;
-	}
 	Ast tree = ast_new(par, site, AST_FILE);
-	if (ast_is_error(tree)) {
-		return tree;
-	}
-	tree->file.body = body;
-	tree->file.imports = imports;
 	return tree;
 }
 
@@ -501,18 +493,15 @@ static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
 	return tree;
 }
 
-static Ast create_function_ast(Parser *par, SourceSite site, Ast_Array params, b32 variadic, Ast body)
+static Ast create_function_ast(Parser *par, SourceSite site, Ast parent)
 {
-	if (ast_is_error(body)) {
-		return body;
-	}
+	ASSERT(parent);
+	ASSERT(parent->kind == AST_FILE || parent->kind == AST_FUNCTION);
 	Ast tree = ast_new(par, site, AST_FUNCTION);
 	if (ast_is_error(tree)) {
 		return tree;
 	}
-	tree->function.params = params;
-	tree->function.variadic = variadic;
-	tree->function.body = body;
+	tree->function.parent = parent;
 	return tree;
 }
 

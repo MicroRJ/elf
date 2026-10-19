@@ -154,6 +154,7 @@ struct Ast_T
 
 		struct
 		{
+			Ast       parent;
 			Ast_Array params;
 			b32       variadic;
 			Ast       body;

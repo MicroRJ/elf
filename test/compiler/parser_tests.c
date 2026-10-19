@@ -578,7 +578,7 @@ static void test_parser_open_range_indexes(elf_State *state)
 
 static void test_parser_function_expression(elf_State *state)
 {
-	Ast file = parser_test_parse_file(state, "add := fun(a: int, b: str) { ret a + b }");
+	Ast file = parser_test_parse_file(state, "add := fun(a: int, b: str) { nested := fun() {}\nret a + b }");
 	Ast decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration");
 	Ast function = parser_test_tuple_item(decl->decl.expr, 0, AST_FUNCTION, "parse function expression");
 
@@ -599,6 +599,14 @@ static void test_parser_function_expression(elf_State *state)
 	expect_ast_atom(first_param ? first_param->decl.type : 0, "int", "first function param type");
 	expect_ast_atom(second_param ? second_param->decl.type : 0, "str", "second function param type");
 	expect_ast_kind(function->function.body, AST_BLOCK_STAT, "function body parses as block");
+	if (function->function.parent != file) {
+		test_fail("top-level function links file parent");
+	}
+	Ast nested_decl = function->function.body->block.count ? function->function.body->block.items[0] : 0;
+	Ast nested_function = nested_decl && nested_decl->kind == AST_DECL_STAT ? parser_test_tuple_item(nested_decl->decl.expr, 0, AST_FUNCTION, "parse nested function expression") : 0;
+	if (nested_function && nested_function->function.parent != function) {
+		test_fail("nested function links enclosing function parent");
+	}
 
 	file = parser_test_parse_file(state, "configure := fun(required, count = 1 + 2, label: str = \"elf\") { ret required }");
 	decl = parser_test_stat(file, 0, AST_DECL_STAT, "parse function declaration with defaults");

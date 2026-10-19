@@ -234,6 +234,7 @@ static b32 parser_begin_source(Parser *parser, Com_Source *source)
 	parser->imports = (Ast_List) {};
 	parser->ast_stack_size = 4096;
 	parser->ast_stack_index = 0;
+	parser->current_function = 0;
 	parser->ast_stack = arena_push_zero(&parser->scratch_arena, sizeof(*parser->ast_stack) * parser->ast_stack_size, _Alignof(Ast));
 	if (!parser->ast_stack) {
 		return false;
@@ -318,6 +319,12 @@ static Ast parse_file(Parser *parser)
 		return ast_from_token_error(parser_current_token(parser));
 	}
 	Token tok = parser_current_token(parser);
+	Ast file_ast = create_file_ast(parser, tok.site);
+	if (ast_is_error(file_ast)) {
+		return file_ast;
+	}
+	ASSERT(!parser->current_function);
+	parser->current_function = file_ast;
 	u32 nstats = 0;
 	while (!peek_token(parser, TOK_NONE))
 	{
@@ -357,7 +364,9 @@ static Ast parse_file(Parser *parser)
 	if (parser->imports.count && !imports.items) {
 		return ERROR_OOM_AST;
 	}
-	Ast file_ast = create_file_ast(parser, tok.site, body, imports);
+	file_ast->file.body = body;
+	file_ast->file.imports = imports;
+	parser->current_function = 0;
 	return file_ast;
 }
 
@@ -367,6 +376,13 @@ static Ast parse_file(Parser *parser)
 static Ast parse_function(Parser *par, Token marker)
 {
 	ASSERT(marker.type == TOK_FUN);
+	ASSERT(par->current_function);
+	Ast parent_function = par->current_function;
+	Ast function = create_function_ast(par, marker.site, parent_function);
+	if (ast_is_error(function)) {
+		return function;
+	}
+	par->current_function = function;
 
 	u32 stack_start = par->ast_stack_index;
 	u32 param_count = 0;
@@ -427,19 +443,25 @@ static Ast parse_function(Parser *par, Token marker)
 	if (error)
 	{
 		par->ast_stack_index = stack_start;
+		par->current_function = parent_function;
 		return error;
 	}
 
 	Ast body = parse_stat(par);
 	if (ast_is_error(body)) {
+		par->current_function = parent_function;
 		return body;
 	}
 
 	if (!body) {
+		par->current_function = parent_function;
 		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, parser_current_token(par).site, "expected function body");
 	}
 
-	Ast function = create_function_ast(par, marker.site, params, variadic, body);
+	function->function.params = params;
+	function->function.variadic = variadic;
+	function->function.body = body;
+	par->current_function = parent_function;
 	return function;
 }
 
