@@ -344,16 +344,14 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		switch (value.type) {
 			case STATIC_VALUE_FUNCTION:
 			{
-				IrFunction *definition = entity->value.definition;
-				if (!definition)
+				if (!entity->value.definition)
 				{
 					Ast function = entity->value.function;
 					ASSERT(function && function->kind == AST_FUNCTION);
-					definition = ir_reserve_function(emitter, function->site, function->function.variadic, function->function.params.count);
-					entity->value.definition = definition;
-					ir_lower_function_body(emitter, definition, function, function->function.params, function->function.body);
+					entity->value.definition = ir_reserve_function(emitter, function->site, function->function.variadic, function->function.params.count);
+					ir_lower_function_body(emitter, entity->value.definition, function, function->function.params, function->function.body);
 				}
-				ir = ir_new_function(emitter, expr->site, definition);
+				ir = ir_new_function(emitter, expr->site, entity->value.definition);
 				return ir;
 			}
 			break;
@@ -497,29 +495,72 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 
 		case AST_CALL:
 		{
-			Ir ir_func = ir_emit_expr(emitter, expr->call.expr);
-			b32 failed = !ir_func || ir_func == ERROR_IR;
-			IrQueue args = ir_begin_queue(emitter);
+			Ir ir_expr = ir_emit_expr(emitter, expr->call.expr);
+			b32 failed = !ir_expr || ir_expr == ERROR_IR;
+			u32 alloc_arguments = expr->call.args.count;
+
+			if (!failed && ir_expr->kind == IR_FUNCTION)
+			{
+				IrFunction *ir_func = ir_expr->ir_function;
+				ASSERT(ir_func);
+				ASSERT(ir_func->ast);
+				ASSERT(ir_func->ast->kind == AST_FUNCTION);
+				ASSERT(ir_func->param_count >= IMPLICIT_PARAM_COUNT);
+				ASSERT(ir_func->ast->function.params.count == ir_func->param_count - IMPLICIT_PARAM_COUNT);
+				alloc_arguments = MAX(ir_func->ast->function.params.count, alloc_arguments);
+			}
+
+			Ir *arguments = arena_push_zero(emitter->compiler->arena, sizeof(* arguments) * alloc_arguments, _Alignof(Ir));
+
 			for (u32 i = 0; i < expr->call.args.count; ++i)
 			{
 				Ast argument = expr->call.args.items[i];
+				ASSERT(argument);
+				u32 argument_slot = i;
+				Ast argument_expr = argument;
+				if (ir_expr && ir_expr != ERROR_IR && ir_expr->kind == IR_FUNCTION)
+				{
+					argument_slot = argument->param_slot;
+				}
 				if (argument->kind == AST_NAMED_ARGUMENT)
 				{
-					ir_report_error(emitter, ERROR_LOWERING, argument->site, "named arguments must be resolved before IR lowering");
-					failed = true;
+					ASSERT(ir_expr && ir_expr != ERROR_IR && ir_expr->kind == IR_FUNCTION);
+					ASSERT(argument->named_argument.expr);
+					argument_expr = argument->named_argument.expr;
 				}
-				else
+				ASSERT(argument_slot < alloc_arguments);
+				ASSERT(!arguments[argument_slot]);
+				arguments[argument_slot] = ir_emit_expr(emitter, argument_expr);
+				failed |= !arguments[argument_slot] || arguments[argument_slot] == ERROR_IR;
+			}
+
+			if (!failed && ir_expr->kind == IR_FUNCTION)
+			{
+				Ast tree_function = ir_expr->ir_function->ast;
+				for (u32 i = 0; i < tree_function->function.params.count; ++ i)
 				{
-					Ir argument_ir = ir_emit_expr(emitter, argument);
-					ir_push(&args, argument_ir);
-					if (!argument_ir || argument_ir == ERROR_IR) {
-						failed = true;
+					Ast tree_parameter = tree_function->function.params.items[i];
+					ASSERT(tree_parameter);
+					ASSERT(tree_parameter->kind == AST_FUNCTION_PARAM);
+					ASSERT(tree_parameter->param.name);
+					if (!arguments[i] && tree_parameter->param.expr)
+					{
+						arguments[i] = ir_emit_expr(emitter, tree_parameter->param.expr);
+						failed |= !arguments[i] || arguments[i] == ERROR_IR;
 					}
 				}
 			}
-			IrArray ir_args = ir_end_queue(&args);
 
-			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, ir_func, ir_args);
+			for (u32 i = 0; i < alloc_arguments; ++i)
+			{
+				if (!arguments[i])
+				{
+					arguments[i] = ir_new_nil(emitter, expr->site);
+				}
+			}
+			IrArray ir_args = {arguments, alloc_arguments};
+
+			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, ir_expr, ir_args);
 		}
 		break;
 
@@ -1421,7 +1462,10 @@ static IrFunction *ir_reserve_function(IrEmitter *emitter, SourceSite site, b32 
 static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition, Ast tree, Ast_Array ast_params, Ast body)
 {
 	ASSERT(definition);
+	ASSERT(tree);
+	ASSERT(!definition->ast || definition->ast == tree);
 	ASSERT(definition->param_count == IMPLICIT_PARAM_COUNT + ast_params.count);
+	definition->ast = tree;
 
 	IrEmitterFrame function_ctx = {};
 	function_ctx.parent = emitter->function;

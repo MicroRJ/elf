@@ -5,6 +5,8 @@
 #include "bytecode.h"
 
 typedef struct Atom Atom;
+typedef struct Ast_T Ast_T;
+typedef Ast_T *Ast;
 
 #define NO_SLOT (-1)
 
@@ -156,6 +158,7 @@ IrArray;
 typedef struct IrFunction IrFunction;
 struct IrFunction
 {
+	Ast         ast;
 	IrFunction *next;
 	SourceSite  site;
 	b32         variadic;

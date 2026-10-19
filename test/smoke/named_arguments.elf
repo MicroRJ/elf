@@ -1,0 +1,20 @@
+combine :: fun(a, b = 10 + 10, c = 3) {
+	ret a * 100 + b * 10 + c
+}
+
+all_positional := combine(1, 2, 3)
+default_tail := combine(4)
+named_skip := combine(5, c = 7)
+named_overrides := combine(6, b = 8, c = 9)
+named_expressions := combine(1 + 1, c = 2 + 3)
+
+test_assert(all_positional == 123)
+test_assert(default_tail == 603)
+test_assert(named_skip == 707)
+test_assert(named_overrides == 689)
+test_assert(named_expressions == 405)
+
+must_override :: fun(value = 1 / 0) { ret value }
+test_assert(must_override(value = 42) == 42)
+
+ret 2122
