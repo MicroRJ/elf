@@ -51,10 +51,10 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		}
 	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	u32 entry = root_loaded ? compiler_compile(state, scratch.arena, source_name, source) : ELF_PROTOTYPE_INVALID;
+	elf_Prototype *prototype = root_loaded ? compiler_compile(state, scratch.arena, source_name, source) : 0;
 	scratch_end(scratch);
 
-	if (!prototype_index_is_valid(state, entry))
+	if (!prototype)
 	{
 		if (!root_loaded) {
 			elf_push_nil(state);
@@ -62,7 +62,6 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		return false;
 	}
 
-	elf_Prototype *prototype = prototype_from_index(state, entry);
 	ASSERT(prototype->captures == 0);
 	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 	closure->prototype = prototype;

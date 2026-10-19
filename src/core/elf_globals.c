@@ -162,12 +162,6 @@ u32 elf_globals_ensure(elf_State *state, elf_StrSlice name)
 	return slot;
 }
 
-elf_u32 elf_ensure_global_symbol(elf_State *state, elf_StrSlice name)
-{
-	ASSERT(state);
-	return elf_globals_ensure(state, name);
-}
-
 elf_Value elf_globals_get_by_name(elf_State *state, elf_StrSlice name)
 {
 	u32 slot = 0;

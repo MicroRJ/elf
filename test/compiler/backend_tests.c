@@ -6,21 +6,22 @@
 
 typedef struct
 {
-	elf_State *state;
-	u32        function;
+	elf_State     *state;
+	elf_Prototype *function;
+	u32            function_index;
 }
 BackendCompileResult;
 
 static elf_Prototype *backend_test_function(BackendCompileResult result)
 {
-	return prototype_from_index(result.state, result.function);
+	return result.function;
 }
 
-static u32 backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
+static elf_Prototype *backend_test_compile(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	u32 entry = compiler_compile(state, scratch.arena, source_name, source);
+	elf_Prototype *entry = compiler_compile(state, scratch.arena, source_name, source);
 	scratch_end(scratch);
 	return entry;
 }
@@ -52,6 +53,7 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 		source.size = size;
 	}
 
+	result.function_index = result.state->prototype_count;
 	result.function = backend_test_compile(result.state, path, source);
 	return result;
 }
@@ -65,6 +67,7 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 	source.data = (char *)source_text;
 	source.size = (u64)strlen(source_text);
 
+	result.function_index = result.state->prototype_count;
 	result.function = backend_test_compile(result.state, "backend_tests", source);
 	return result;
 }
@@ -510,7 +513,7 @@ static void test_backend_formats_bytecode_function(void)
 		"ret x + 1\n");
 
 	Scratch scratch = scratch_begin();
-	char *text = format_bytecode_function(result.state, scratch.arena, result.function);
+	char *text = format_bytecode_function(result.state, scratch.arena, result.function_index);
 	if (!strstr(text, "bytecode function")) {
 		test_fail("bytecode formatter prints function header");
 	}
@@ -541,8 +544,7 @@ static void test_backend_outputs_strings(void)
 	IrFunction function = {.body = &return_string, .index = IR_FUNCTION_INDEX_INVALID};
 	IrModule ir_module = {.arena = &arena, .first_function = &function, .last_function = &function, .function_count = 1};
 
-	u32 prototype_index = bc_emit_module(state, &ir_module);
-	elf_Prototype *prototype = prototype_from_index(state, prototype_index);
+	elf_Prototype *prototype = bc_emit_module(state, &ir_module);
 	if (prototype->string_count != 1 || elf_string_size(prototype->strings[0]) != sizeof(text) - 1 || memcmp(elf_string_data(prototype->strings[0]), text, sizeof(text) - 1)) {
 		test_fail("backend outputs owned bytecode strings");
 	}
@@ -580,7 +582,7 @@ static void test_backend_emits_direct_static_call(void)
 static void test_backend_calls_imported_static_function(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/imports/statics/root.elf");
-	if (!prototype_index_is_valid(result.state, result.function))
+	if (!result.function)
 	{
 		test_fail("backend compiles imported static namespace");
 	}
@@ -643,7 +645,7 @@ static void test_backend_materializes_static_recurse_value(void)
 static void test_backend_emits_parameter_type_enforcement(void)
 {
 	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
-	if (!prototype_index_is_valid(result.state, result.function) || result.state->prototype_count != 2)
+	if (!result.function || result.state->prototype_count != 2)
 	{
 		test_fail("backend compiles typed function parameters");
 	}

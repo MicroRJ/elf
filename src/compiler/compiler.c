@@ -330,9 +330,9 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 	return ast_file;
 }
 
-elf_u32 compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)
+elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
-	elf_u32 entry = ELF_PROTOTYPE_INVALID;
+	elf_Prototype *entry = 0;
 	if (target && arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
 	{
 		Compiler *compiler = compiler_create(arena);

@@ -12,7 +12,6 @@
 #include <assert.h>
 
 #include "elf.h"
-#include "elf_target.h"
 #include "base.h"
 #include "libs.h"
 
@@ -25,7 +24,6 @@
 #include "elf_memory.c"
 #include "elf_globals.c"
 #include "elf_string.c"
-#include "elf_target.c"
 #include "elf_buffer.c"
 #include "elf_user_object.c"
 #include "elf_array.c"

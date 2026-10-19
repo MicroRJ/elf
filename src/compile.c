@@ -16,10 +16,9 @@ elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSl
 	{
 		Scratch scratch = scratch_begin();
 		elf_StrSlice source_name = {(char *)name, strlen(name)};
-		u32 prototype_index = compiler_compile(state, scratch.arena, source_name, source);
-		if (prototype_index_is_valid(state, prototype_index))
+		elf_Prototype *prototype = compiler_compile(state, scratch.arena, source_name, source);
+		if (prototype)
 		{
-			elf_Prototype *prototype = prototype_from_index(state, prototype_index);
 			ASSERT(prototype->captures == 0);
 			elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
 			closure->prototype = prototype;

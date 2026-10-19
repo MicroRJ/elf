@@ -28,11 +28,11 @@ static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *so
 	return 1;
 }
 
-static u32 compile_source(elf_State *state, const char *name, elf_StrSlice source)
+static elf_Prototype *compile_source(elf_State *state, const char *name, elf_StrSlice source)
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	u32 entry = compiler_compile(state, scratch.arena, source_name, source);
+	elf_Prototype *entry = compiler_compile(state, scratch.arena, source_name, source);
 	scratch_end(scratch);
 	return entry;
 }
@@ -60,8 +60,8 @@ int main(int argc, char **argv)
 	}
 
 	u32 first_prototype = state->prototype_count;
-	u32 entry = compile_source(state, path, source);
-	if (!prototype_index_is_valid(state, entry))
+	elf_Prototype *entry = compile_source(state, path, source);
+	if (!entry)
 	{
 		elf_destroy_state(state);
 		return 1;

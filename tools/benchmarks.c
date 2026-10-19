@@ -245,8 +245,8 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	{
 		Scratch scratch = scratch_begin();
 		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
-		u32 entry = compiler_compile(state, scratch.arena, name, text);
-		bench_require(prototype_index_is_valid(state, entry), "could not compile benchmark module");
+		elf_Prototype *entry = compiler_compile(state, scratch.arena, name, text);
+		bench_require(entry != 0, "could not compile benchmark module");
 		scratch_end(scratch);
 	}
 	double seconds = bench_elapsed_s(start);
