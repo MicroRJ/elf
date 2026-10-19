@@ -1,0 +1,4 @@
+export read :: fun(stream, cursor) {
+	channel := stream.channels[cursor.channel]
+	ret channel[cursor.sample]
+}

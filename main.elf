@@ -1,7 +1,0 @@
-
-
-main :: fun(a, b, c = a) {
-	elf.printl(a, ", ", b, ", ", c)
-}
-
-main(1, 2)

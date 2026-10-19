@@ -1,0 +1,17 @@
+samples :: import "scripts/trace_samples.elf"
+
+advance_cursor :: fun(cursor, stride) {
+	ret {
+		channel = cursor.channel,
+		sample = cursor.sample + stride,
+	}
+}
+
+export decode :: fun(stream, packet) {
+	cursor := {
+		channel = packet.channel,
+		sample = packet.start,
+	}
+	cursor = advance_cursor(cursor, packet.stride)
+	ret samples.read(stream, cursor)
+}
