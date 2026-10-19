@@ -28,13 +28,19 @@ typedef struct
 Checker;
 
 static Com_Status check_statement(Checker *checker, Ast ast);
-static Com_Status resolve_entity(Checker *checker, Entity *entity, StaticValue *value);
-static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *value);
+static StaticValue resolve_entity(Checker *checker, Entity *entity);
+static StaticValue resolve_expression(Checker *checker, Ast expr);
 
-static StaticValue static_value_error(void)
+static StaticValue static_value_error(Com_Status status)
 {
-	StaticValue value = {STATIC_VALUE_ERROR};
+	ASSERT(status != COM_STATUS_OK);
+	StaticValue value = {.type = STATIC_VALUE_ERROR, .status = status};
 	return value;
+}
+
+static Com_Status static_value_status(StaticValue value)
+{
+	return value.type == STATIC_VALUE_ERROR ? value.status : COM_STATUS_OK;
 }
 
 static Com_Status checker_report(Checker *checker, ErrorCode error, ErrorSeverity severity, SourceSite site, const char *format, ...)
@@ -77,22 +83,20 @@ static void pop_scope(Checker *checker, Scope *scope)
 	checker->active_scope = scope->parent;
 }
 
-static Com_Status declare_entity(Checker *checker, Scope *scope, EntityKind kind, Ast tree, Ast expr, EntityTags tags, Atom *name, SourceSite site, Entity **result)
+static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Ast tree, Ast expr, EntityTags tags, Atom *name, SourceSite site)
 {
-	ASSERT(result);
-	*result = 0;
 	Entity *existing = scope_find_current(scope, name);
 	if (existing)
 	{
 		ErrorCode error = kind == ENTITY_STATIC ? ERROR_DUPLICATE_STATIC_DECLARATION : ERROR_DUPLICATE_DECLARATION;
-		*result = existing;
-		return checker_report(checker, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
+		Com_Status status = checker_report(checker, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
+		return entity_from_status(status);
 	}
 
 	Entity *entity = scope_declare(scope, kind, name);
 	if (!entity)
 	{
-		return checker_out_of_memory(checker, site);
+		return entity_from_status(checker_out_of_memory(checker, site));
 	}
 
 	entity->state = kind == ENTITY_STATIC ? ENTITY_UNRESOLVED : ENTITY_RESOLVED;
@@ -110,8 +114,7 @@ static Com_Status declare_entity(Checker *checker, Scope *scope, EntityKind kind
 	}
 
 	entity->tags = tags;
-	*result = entity;
-	return COM_STATUS_OK;
+	return entity;
 }
 
 static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stats)
@@ -134,10 +137,9 @@ static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stat
 		if (ast_decl->static_decl.exported) {
 			tags |= ENTITY_TAG_EXPORTED;
 		}
-		Entity *entity = 0;
-		Com_Status status = declare_entity(checker, scope, ENTITY_STATIC, ast_decl, ast_expr, tags, ast_name->atom, ast_decl->site, &entity);
-		if (status != COM_STATUS_OK) {
-			return status;
+		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_decl, ast_expr, tags, ast_name->atom, ast_decl->site);
+		if (entity_is_error(entity)) {
+			return entity->status;
 		}
 		ast_name->entity = entity;
 		ast_decl->entity = entity;
@@ -179,20 +181,18 @@ Com_Status check_source(Compiler *compiler, Com_Source *source)
 	return status;
 }
 
-static Com_Status resolve_entity(Checker *checker, Entity *entity, StaticValue *result)
+static StaticValue resolve_entity(Checker *checker, Entity *entity)
 {
 	ASSERT(entity);
-	ASSERT(result);
 	ASSERT(entity->kind == ENTITY_STATIC);
-	*result = static_value_error();
 	if (entity->state == ENTITY_RESOLVING)
 	{
-		return checker_report(checker, ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->tree->site, "cyclic static definition involving '%s'", atom_data(entity->name));
+		Com_Status status = checker_report(checker, ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->tree->site, "cyclic static definition involving '%s'", atom_data(entity->name));
+		return static_value_error(status);
 	}
 	if (entity->state == ENTITY_RESOLVED)
 	{
-		*result = entity->value;
-		return COM_STATUS_OK;
+		return entity->value;
 	}
 	ASSERT(entity->expr || !"Error: internal error, unresolved entity missing expression to resolve");
 	entity->state = ENTITY_RESOLVING;
@@ -207,21 +207,19 @@ static Com_Status resolve_entity(Checker *checker, Entity *entity, StaticValue *
 	checker->source_scope = source->scope;
 	checker->active_scope = entity->scope;
 
-	StaticValue value = {0};
-	Com_Status status = resolve_expression(checker, entity->expr, &value);
+	StaticValue value = resolve_expression(checker, entity->expr);
 
 	checker->source_scope = previous_source_scope;
 	checker->active_scope = previous_active_scope;
 
-	if (status == COM_STATUS_OK && value.type == STATIC_VALUE_NONE)
+	if (value.type == STATIC_VALUE_NONE)
 	{
-		status = checker_report(checker, ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, entity->expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
-		value = static_value_error();
+		Com_Status status = checker_report(checker, ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, entity->expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
+		value = static_value_error(status);
 	}
 	entity->state = ENTITY_RESOLVED;
 	entity->value = value;
-	*result = value;
-	return status;
+	return value;
 }
 
 static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *source, Scope **result)
@@ -252,12 +250,27 @@ static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *sour
 	return status;
 }
 
+static i32 find_parameter_by_name(Ast_Array params, Atom *name)
+{
+	for (u32 i = 0; i < params.count; ++i)
+	{
+		Ast param = params.items[i];
+		ASSERT(param);
+		ASSERT(param->kind == AST_FUNCTION_PARAM);
+		ASSERT(param->param.name);
+		ASSERT(param->param.name->kind == AST_IDENT);
+		ASSERT(param->param.name->identifier);
+		if (param->param.name->identifier == name) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 // TOOD(RJ): imagine writing an interpreter for an interpreter ...
-static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *result)
+static StaticValue resolve_expression(Checker *checker, Ast expr)
 {
 	StaticValue value = {STATIC_VALUE_NONE};
-	Com_Status status = COM_STATUS_OK;
-	ASSERT(result);
 	ASSERT(expr);
 
 	switch (expr->kind)
@@ -300,35 +313,33 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		case AST_FUNCTION:
 		{
 			Scope *scope = 0;
-			status = push_scope(checker, SCOPE_FUNCTION, expr, &scope);
+			Com_Status status = push_scope(checker, SCOPE_FUNCTION, expr, &scope);
 			if (status != COM_STATUS_OK) {
-				value = static_value_error();
+				value = static_value_error(status);
 				break;
 			}
 			Ast outer_function = checker->current_function;
 			checker->current_function = expr;
-			for (u32 i = 0; status == COM_STATUS_OK && i < expr->function.params.count; ++i)
+			for (u32 i = 0; value.type != STATIC_VALUE_ERROR && i < expr->function.params.count; ++i)
 			{
 				Ast param = expr->function.params.items[i];
 				ASSERT(param);
 				ASSERT(param->kind == AST_FUNCTION_PARAM);
-				StaticValue param_value = {0};
 				if (param->param.type)
 				{
-					status = resolve_expression(checker, param->param.type, &param_value);
-					if (status == COM_STATUS_OK && param_value.type == STATIC_VALUE_ERROR) {
-						value = static_value_error();
-					}
-				}
-				if (status == COM_STATUS_OK && param->param.expr)
-				{
-					status = resolve_expression(checker, param->param.expr, &param_value);
+					StaticValue param_value = resolve_expression(checker, param->param.type);
 					if (param_value.type == STATIC_VALUE_ERROR) {
-						value = static_value_error();
+						value = param_value;
 					}
 				}
-				if (status != COM_STATUS_OK) {
-					value = static_value_error();
+				if (value.type != STATIC_VALUE_ERROR && param->param.expr)
+				{
+					StaticValue param_value = resolve_expression(checker, param->param.expr);
+					if (param_value.type == STATIC_VALUE_ERROR) {
+						value = param_value;
+					}
+				}
+				if (value.type == STATIC_VALUE_ERROR) {
 					break;
 				}
 				Ast name = param->param.name;
@@ -336,25 +347,25 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);
 				ASSERT(!name->entity);
-				Entity *entity = 0;
-				status = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_PARAMETER, name->identifier, name->site, &entity);
-				if (status == COM_STATUS_OK) {
-					name->entity = entity;
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, param, 0, ENTITY_TAG_PARAMETER, name->identifier, name->site);
+				if (entity_is_error(entity)) {
+					value = static_value_error(entity->status);
 				} else {
-					value = static_value_error();
+					name->entity = entity;
 				}
 			}
-			if (status == COM_STATUS_OK) {
+			if (value.type != STATIC_VALUE_ERROR) {
 				status = check_statement(checker, expr->function.body);
+				if (status != COM_STATUS_OK) {
+					value = static_value_error(status);
+				}
 			}
 			checker->current_function = outer_function;
 			pop_scope(checker, scope);
-			if (status == COM_STATUS_OK && value.type != STATIC_VALUE_ERROR)
-			{
+
+			if (value.type != STATIC_VALUE_ERROR) {
 				value.type = STATIC_VALUE_FUNCTION;
 				value.function = expr;
-			} else {
-				value = static_value_error();
 			}
 		}
 		break;
@@ -363,15 +374,15 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		{
 			if (!expr->import.target)
 			{
-				status = checker_report(checker, ERROR_IMPORT, ERROR_ERROR, expr->site, "import '%s' was not resolved to a source", atom_data(expr->import.path));
-				value = static_value_error();
+				Com_Status status = checker_report(checker, ERROR_IMPORT, ERROR_ERROR, expr->site, "import '%s' was not resolved to a source", atom_data(expr->import.path));
+				value = static_value_error(status);
 			}
 			else
 			{
 				value.type = STATIC_VALUE_EXPORTS;
-				status = resolve_source_scope_lazily(checker, expr->import.target, &value.exports);
+				Com_Status status = resolve_source_scope_lazily(checker, expr->import.target, &value.exports);
 				if (status != COM_STATUS_OK) {
-					value = static_value_error();
+					value = static_value_error(status);
 				}
 			}
 		}
@@ -384,19 +395,19 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 			if (entity) {
 				ASSERT(entity->kind == ENTITY_STATIC || entity->state == ENTITY_RESOLVED);
 			} else {
-				status = declare_entity(checker, checker->globals, ENTITY_GLOBAL, 0, 0, ENTITY_TAG_NONE, name, expr->site, &entity);
+				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, 0, 0, ENTITY_TAG_NONE, name, expr->site);
+				if (entity_is_error(entity)) {
+					value = static_value_error(entity->status);
+				}
 			}
-			if (status == COM_STATUS_OK)
+			if (value.type != STATIC_VALUE_ERROR)
 			{
 				expr->entity = entity;
 				if (entity->kind == ENTITY_STATIC) {
-					status = resolve_entity(checker, entity, &value);
+					value = resolve_entity(checker, entity);
 				} else {
 					value = entity->value;
 				}
-			}
-			else {
-				value = static_value_error();
 			}
 		}
 		break;
@@ -405,11 +416,10 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			StaticValue left_value = {0};
-			status = resolve_expression(checker, expr->binary.x, &left_value);
-			if (status != COM_STATUS_OK || left_value.type == STATIC_VALUE_ERROR)
+			StaticValue left_value = resolve_expression(checker, expr->binary.x);
+			if (left_value.type == STATIC_VALUE_ERROR)
 			{
-				value = static_value_error();
+				value = left_value;
 			}
 			else if (left_value.type == STATIC_VALUE_EXPORTS)
 			{
@@ -419,18 +429,18 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 				Entity *entity = scope_find_current(left_value.exports, expr->binary.y->atom);
 				if (!entity)
 				{
-					status = checker_report(checker, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left_value.exports->source->name), atom_data(expr->binary.y->atom));
-					value = static_value_error();
+					Com_Status status = checker_report(checker, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left_value.exports->source->name), atom_data(expr->binary.y->atom));
+					value = static_value_error(status);
 				}
 				else if (!(entity->tags & ENTITY_TAG_EXPORTED))
 				{
-					status = checker_report(checker, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left_value.exports->source->name));
-					value = static_value_error();
+					Com_Status status = checker_report(checker, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left_value.exports->source->name));
+					value = static_value_error(status);
 				}
 				else
 				{
-					status = resolve_entity(checker, entity, &value);
-					if (status == COM_STATUS_OK) {
+					value = resolve_entity(checker, entity);
+					if (value.type != STATIC_VALUE_ERROR) {
 						entity->users += 1;
 						entity->tags |= ENTITY_TAG_REFERENCED;
 						expr->entity = entity;
@@ -445,10 +455,9 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		case AST_GET_MEM:
 		{
 			ASSERT(expr->unary);
-			StaticValue operand = {0};
-			status = resolve_expression(checker, expr->unary, &operand);
-			if (status != COM_STATUS_OK || operand.type == STATIC_VALUE_ERROR) {
-				value = static_value_error();
+			StaticValue operand = resolve_expression(checker, expr->unary);
+			if (operand.type == STATIC_VALUE_ERROR) {
+				value = operand;
 			}
 		}
 		break;
@@ -490,42 +499,29 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			StaticValue operand = {0};
-			status = resolve_expression(checker, expr->binary.x, &operand);
-			if (status == COM_STATUS_OK && operand.type == STATIC_VALUE_ERROR) {
-				value = static_value_error();
+			StaticValue operand = resolve_expression(checker, expr->binary.x);
+			if (operand.type != STATIC_VALUE_ERROR) {
+				operand = resolve_expression(checker, expr->binary.y);
 			}
-			if (status == COM_STATUS_OK) {
-				status = resolve_expression(checker, expr->binary.y, &operand);
-				if (operand.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
-				}
-			}
-			if (status != COM_STATUS_OK) {
-				value = static_value_error();
+			if (operand.type == STATIC_VALUE_ERROR) {
+				value = operand;
 			}
 		}
 		break;
 
 		case AST_RANGE:
 		{
-			StaticValue operand = {0};
+			StaticValue operand = {STATIC_VALUE_NONE};
 			if (expr->binary.x)
 			{
-				status = resolve_expression(checker, expr->binary.x, &operand);
-				if (status == COM_STATUS_OK && operand.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
-				}
+				operand = resolve_expression(checker, expr->binary.x);
 			}
-			if (status == COM_STATUS_OK && expr->binary.y)
+			if (operand.type != STATIC_VALUE_ERROR && expr->binary.y)
 			{
-				status = resolve_expression(checker, expr->binary.y, &operand);
-				if (operand.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
-				}
+				operand = resolve_expression(checker, expr->binary.y);
 			}
-			if (status != COM_STATUS_OK) {
-				value = static_value_error();
+			if (operand.type == STATIC_VALUE_ERROR) {
+				value = operand;
 			}
 		}
 		break;
@@ -534,22 +530,20 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			StaticValue operand = {0};
-			status = resolve_expression(checker, expr->binary.x, &operand);
-			if (status != COM_STATUS_OK || operand.type == STATIC_VALUE_ERROR) {
-				value = static_value_error();
+			StaticValue operand = resolve_expression(checker, expr->binary.x);
+			if (operand.type == STATIC_VALUE_ERROR) {
+				value = operand;
 			}
 		}
 		break;
 
 		case AST_INTERPOLATED_STRING:
 		{
-			for (u32 i = 0; status == COM_STATUS_OK && i < expr->interpolated_string.count; ++i)
+			for (u32 i = 0; value.type != STATIC_VALUE_ERROR && i < expr->interpolated_string.count; ++i)
 			{
-				StaticValue item = {0};
-				status = resolve_expression(checker, expr->interpolated_string.items[i], &item);
+				StaticValue item = resolve_expression(checker, expr->interpolated_string.items[i]);
 				if (item.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
+					value = item;
 				}
 			}
 		}
@@ -557,39 +551,98 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 
 		case AST_CALL:
 		{
-			StaticValue item = {0};
-			status = resolve_expression(checker, expr->call.expr, &item);
-			if (item.type == STATIC_VALUE_ERROR) {
-				value = static_value_error();
+			StaticValue target = resolve_expression(checker, expr->call.expr);
+			if (target.type == STATIC_VALUE_ERROR) {
+				value = target;
+				break;
 			}
-			for (u32 i = 0; status == COM_STATUS_OK && i < expr->call.args.count; ++i)
-			{
-				status = resolve_expression(checker, expr->call.args.items[i], &item);
-				if (item.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
-				}
-			}
-		}
-		break;
 
-		case AST_NAMED_ARGUMENT:
-		{
-			StaticValue item = {0};
-			status = resolve_expression(checker, expr->named_argument.expr, &item);
-			if (status != COM_STATUS_OK || item.type == STATIC_VALUE_ERROR) {
-				value = static_value_error();
+			Ast_Array args = expr->call.args;
+
+			u32 bind_slot = 0;
+			b32 require_named_arguments = 0;
+
+			for (u32 i = 0; value.type != STATIC_VALUE_ERROR && i < args.count; ++i)
+			{
+				ASSERT(args.items[i]);
+				Ast argument = args.items[i];
+				Ast argument_expr = argument;
+				u32 argument_slot = bind_slot;
+
+				if (argument->kind == AST_NAMED_ARGUMENT)
+				{
+					require_named_arguments = true;
+
+					Ast argument_name = argument->named_argument.name;
+					ASSERT(argument_name);
+					ASSERT(argument_name->kind == AST_IDENT);
+					ASSERT(argument_name->identifier != 0);
+					ASSERT(argument->named_argument.expr);
+
+					if (target.type != STATIC_VALUE_FUNCTION)
+					{
+						Com_Status status = checker_report(checker, ERROR_NAMED_ARGUMENT_TARGET, ERROR_ERROR, argument->site, "named arguments require a statically known function");
+						value = static_value_error(status);
+						break;
+					}
+					ASSERT(target.function);
+
+					i32 named_slot = find_parameter_by_name(target.function->function.params, argument_name->identifier);
+					if (named_slot < 0)
+					{
+						Com_Status status = checker_report(checker, ERROR_UNKNOWN_NAMED_ARGUMENT, ERROR_ERROR, argument_name->site, "function has no parameter named '%s'", atom_data(argument_name->identifier));
+						value = static_value_error(status);
+						break;
+					}
+					argument_slot = (u32)named_slot;
+
+					b32 duplicate = false;
+					for (u32 prior_index = 0; !duplicate && prior_index < i; ++ prior_index) {
+						duplicate = args.items[prior_index]->param_slot == argument_slot;
+					}
+					if (duplicate)
+					{
+						Com_Status status = checker_report(checker, ERROR_DUPLICATE_ARGUMENT, ERROR_ERROR, argument->site, "parameter '%s' was specified more than once", atom_data(argument_name->identifier));
+						value = static_value_error(status);
+						break;
+					}
+					if (argument_slot < bind_slot)
+					{
+						Com_Status status = checker_report(checker, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "named argument '%s' does not follow parameter order", atom_data(argument_name->identifier));
+						value = static_value_error(status);
+						break;
+					}
+					argument_expr = argument->named_argument.expr;
+				}
+				else
+				{
+					if (require_named_arguments)
+					{
+						Com_Status status = checker_report(checker, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "positional arguments must come before named arguments");
+						value = static_value_error(status);
+						break;
+					}
+				}
+
+				StaticValue item = resolve_expression(checker, argument_expr);
+				if (item.type == STATIC_VALUE_ERROR) {
+					value = item;
+					break;
+				}
+
+				argument->param_slot = argument_slot;
+				bind_slot = argument_slot + 1;
 			}
 		}
 		break;
 
 		case AST_TUPLE:
 		{
-			for (u32 i = 0; status == COM_STATUS_OK && i < expr->tuple.count; ++i)
+			for (u32 i = 0; value.type != STATIC_VALUE_ERROR && i < expr->tuple.count; ++i)
 			{
-				StaticValue item = {0};
-				status = resolve_expression(checker, expr->tuple.items[i], &item);
+				StaticValue item = resolve_expression(checker, expr->tuple.items[i]);
 				if (item.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
+					value = item;
 				}
 			}
 		}
@@ -597,12 +650,11 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 
 		case AST_TABLE:
 		{
-			for (u32 i = 0; status == COM_STATUS_OK && i < expr->table.count; ++i)
+			for (u32 i = 0; value.type != STATIC_VALUE_ERROR && i < expr->table.count; ++i)
 			{
-				StaticValue item = {0};
-				status = resolve_expression(checker, expr->table.items[i], &item);
+				StaticValue item = resolve_expression(checker, expr->table.items[i]);
 				if (item.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
+					value = item;
 				}
 			}
 		}
@@ -610,12 +662,11 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 
 		case AST_ARRAY:
 		{
-			for (u32 i = 0; status == COM_STATUS_OK && i < expr->array.count; ++i)
+			for (u32 i = 0; value.type != STATIC_VALUE_ERROR && i < expr->array.count; ++i)
 			{
-				StaticValue item = {0};
-				status = resolve_expression(checker, expr->array.items[i], &item);
+				StaticValue item = resolve_expression(checker, expr->array.items[i]);
 				if (item.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
+					value = item;
 				}
 			}
 		}
@@ -625,32 +676,24 @@ static Com_Status resolve_expression(Checker *checker, Ast expr, StaticValue *re
 		{
 			ASSERT(expr->table_entry.key);
 			ASSERT(expr->table_entry.value);
-			StaticValue item = {0};
-			status = resolve_expression(checker, expr->table_entry.key, &item);
-			if (status == COM_STATUS_OK && item.type == STATIC_VALUE_ERROR) {
-				value = static_value_error();
+			StaticValue item = resolve_expression(checker, expr->table_entry.key);
+			if (item.type != STATIC_VALUE_ERROR) {
+				item = resolve_expression(checker, expr->table_entry.value);
 			}
-			if (status == COM_STATUS_OK) {
-				status = resolve_expression(checker, expr->table_entry.value, &item);
-				if (item.type == STATIC_VALUE_ERROR) {
-					value = static_value_error();
-				}
-			}
-			if (status != COM_STATUS_OK) {
-				value = static_value_error();
+			if (item.type == STATIC_VALUE_ERROR) {
+				value = item;
 			}
 		}
 		break;
 
 		default:
 		{
-			status = checker_report(checker, ERROR_INTERNAL, ERROR_ERROR, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
-			value = static_value_error();
+			Com_Status status = checker_report(checker, ERROR_INTERNAL, ERROR_ERROR, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
+			value = static_value_error(status);
 		}
 		break;
 	}
-	*result = value;
-	return status;
+	return value;
 }
 
 static Com_Status check_statement(Checker *checker, Ast stat)
@@ -691,12 +734,16 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		{
 			Ast names = ast_ensure_kind(stat->decl.name, AST_TUPLE);
 			EntityTags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
-			if (stat->decl.type) {
-				status = resolve_expression(checker, stat->decl.type, &value);
+			if (stat->decl.type)
+			{
+				value = resolve_expression(checker, stat->decl.type);
+				status = static_value_status(value);
 			}
 			ASSERT(stat->decl.expr);
-			if (status == COM_STATUS_OK) {
-				status = resolve_expression(checker, stat->decl.expr, &value);
+			if (status == COM_STATUS_OK)
+			{
+				value = resolve_expression(checker, stat->decl.expr);
+				status = static_value_status(value);
 			}
 			for (u32 i = 0; status == COM_STATUS_OK && i < names->tuple.count; ++ i)
 			{
@@ -707,8 +754,8 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 					break;
 				}
 				ASSERT(!name->entity);
-				Entity *entity = 0;
-				status = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name, 0, tags, name->identifier, name->site, &entity);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name, 0, tags, name->identifier, name->site);
+				status = entity_is_error(entity) ? entity->status : COM_STATUS_OK;
 				if (status == COM_STATUS_OK) {
 					name->entity = entity;
 				}
@@ -724,7 +771,8 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 
 		case AST_IF:
 		{
-			status = resolve_expression(checker, stat->if_stat.pred, &value);
+			value = resolve_expression(checker, stat->if_stat.pred);
+			status = static_value_status(value);
 			if (status == COM_STATUS_OK && stat->if_stat.true_clause) {
 				status = check_statement(checker, stat->if_stat.true_clause);
 			}
@@ -745,7 +793,8 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 
 		case AST_WHILE:
 		{
-			status = resolve_expression(checker, stat->while_stat.pred, &value);
+			value = resolve_expression(checker, stat->while_stat.pred);
+			status = static_value_status(value);
 			if (status == COM_STATUS_OK) {
 				status = check_statement(checker, stat->while_stat.body);
 			}
@@ -759,8 +808,10 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 			if (status == COM_STATUS_OK)
 			{
 				status = check_statement(checker, stat->for_stat.init);
-				if (status == COM_STATUS_OK) {
-					status = resolve_expression(checker, stat->for_stat.pred, &value);
+				if (status == COM_STATUS_OK)
+				{
+					value = resolve_expression(checker, stat->for_stat.pred);
+					status = static_value_status(value);
 				}
 				if (status == COM_STATUS_OK) {
 					status = check_statement(checker, stat->for_stat.step);
@@ -790,31 +841,38 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 
 		case AST_RETURN:
 		{
-			if (stat->return_stat.expr) {
-				status = resolve_expression(checker, stat->return_stat.expr, &value);
+			if (stat->return_stat.expr)
+			{
+				value = resolve_expression(checker, stat->return_stat.expr);
+				status = static_value_status(value);
 			}
 		}
 		break;
 
 		case AST_BREAK:
 		{
-			if (stat->break_stat.expr) {
-				status = resolve_expression(checker, stat->break_stat.expr, &value);
+			if (stat->break_stat.expr)
+			{
+				value = resolve_expression(checker, stat->break_stat.expr);
+				status = static_value_status(value);
 			}
 		}
 		break;
 
 		case AST_CONTINUE:
 		{
-			if (stat->continue_stat.expr) {
-				status = resolve_expression(checker, stat->continue_stat.expr, &value);
+			if (stat->continue_stat.expr)
+			{
+				value = resolve_expression(checker, stat->continue_stat.expr);
+				status = static_value_status(value);
 			}
 		}
 		break;
 
 		default:
 		{
-			status = resolve_expression(checker, stat, &value);
+			value = resolve_expression(checker, stat);
+			status = static_value_status(value);
 		}
 		break;
 	}

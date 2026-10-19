@@ -10,6 +10,18 @@
 #include "entity.h"
 #include "ast.h"
 
+Entity entity_error_sentinel =
+{
+	.kind = ENTITY_ERROR,
+	.status = COM_STATUS_REPORTED,
+};
+
+Entity entity_oom_sentinel =
+{
+	.kind = ENTITY_ERROR,
+	.status = COM_STATUS_OOM,
+};
+
 Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
 {
 	ASSERT(!owner || owner->source == source);
@@ -52,6 +64,7 @@ Entity *scope_find(Scope *scope, Atom *name)
 
 Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
 {
+	ASSERT(kind != ENTITY_ERROR);
 	Entity *result = scope_find_current(scope, name);
 	if (!result)
 	{

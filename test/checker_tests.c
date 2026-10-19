@@ -217,6 +217,43 @@ static void test_checker_attaches_function_entities(void)
 	checker_test_destroy(&test);
 }
 
+static void test_checker_binds_call_arguments_to_parameter_slots(void)
+{
+	CheckerTest test;
+	checker_test_init(&test, "checker_named_arguments", "target :: fun(first, second, third, fourth) {}\ntarget(1, third = 3, fourth = 4)");
+	Ast statement = checker_test_stat(&test, 1, AST_TUPLE, "checker parses named argument call");
+	Ast call = statement ? checker_test_tuple_item(statement, 0, AST_CALL, "checker finds named argument call") : 0;
+	if (test.status != COM_STATUS_OK || !call || call->call.args.count != 3)
+	{
+		test_fail("checker preserves call arguments while binding parameter slots");
+	}
+	else if (call->call.args.items[0]->param_slot != 0 || call->call.args.items[1]->param_slot != 2 || call->call.args.items[2]->param_slot != 3)
+	{
+		test_fail("checker binds positional and named arguments to parameter slots");
+	}
+	checker_test_destroy(&test);
+}
+
+static void checker_expect_call_error(const char *name, const char *source, ErrorCode code, const char *label)
+{
+	CheckerTest test;
+	checker_test_init(&test, name, source);
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != code || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail(label);
+	}
+	checker_test_destroy(&test);
+}
+
+static void test_checker_reports_invalid_named_arguments(void)
+{
+	checker_expect_call_error("checker_dynamic_named_argument", "target := fun(first) {}\ntarget(first = 1)", ERROR_NAMED_ARGUMENT_TARGET, "checker rejects named arguments for dynamic calls");
+	checker_expect_call_error("checker_unknown_named_argument", "target :: fun(first) {}\ntarget(missing = 1)", ERROR_UNKNOWN_NAMED_ARGUMENT, "checker reports unknown named arguments");
+	checker_expect_call_error("checker_duplicate_argument", "target :: fun(first, second) {}\ntarget(1, first = 2)", ERROR_DUPLICATE_ARGUMENT, "checker reports duplicate argument bindings");
+	checker_expect_call_error("checker_named_argument_order", "target :: fun(first, second, third) {}\ntarget(third = 3, second = 2)", ERROR_ARGUMENT_ORDER, "checker enforces named argument parameter order");
+	checker_expect_call_error("checker_positional_argument_order", "target :: fun(first, second) {}\ntarget(first = 1, 2)", ERROR_ARGUMENT_ORDER, "checker rejects positional arguments after named arguments");
+}
+
 static void test_checker_reports_duplicate_local(void)
 {
 	CheckerTest test;
@@ -332,7 +369,7 @@ static void test_checker_reports_static_cycle(void)
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_CYCLIC_STATIC_DEFINITION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports cyclic static definition");
 	}
-	if (!first_decl || !second_decl || first_decl->entity->value.type != STATIC_VALUE_ERROR || second_decl->entity->value.type != STATIC_VALUE_ERROR) {
+	if (!first_decl || !second_decl || first_decl->entity->value.type != STATIC_VALUE_ERROR || first_decl->entity->value.status != COM_STATUS_REPORTED || second_decl->entity->value.type != STATIC_VALUE_ERROR || second_decl->entity->value.status != COM_STATUS_REPORTED) {
 		test_fail("checker propagates cyclic static error through entities");
 	}
 	checker_test_destroy(&test);
@@ -347,7 +384,7 @@ static void test_checker_reports_invalid_static_expression(void)
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports expression without static value");
 	}
-	if (!declaration || !declaration->entity || declaration->entity->value.type != STATIC_VALUE_ERROR) {
+	if (!declaration || !declaration->entity || declaration->entity->value.type != STATIC_VALUE_ERROR || declaration->entity->value.status != COM_STATUS_REPORTED) {
 		test_fail("checker stores invalid static result on entity");
 	}
 	checker_test_destroy(&test);
@@ -426,6 +463,8 @@ static void run_checker_tests(void)
 	test_checker_preserves_block_shadowing();
 	test_checker_does_not_leak_block_locals();
 	test_checker_attaches_function_entities();
+	test_checker_binds_call_arguments_to_parameter_slots();
+	test_checker_reports_invalid_named_arguments();
 	test_checker_reports_duplicate_local();
 	test_checker_reports_duplicate_static();
 	test_checker_resolves_imported_export();

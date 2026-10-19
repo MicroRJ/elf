@@ -119,22 +119,25 @@ struct Ast_T
 	Ast_Kind             kind;
 	SourceSite           site;
 
-	// Todo, remove this entirely
+	// Todo, try to remove source entirely ...
 	struct Com_Source *source;
-
+	// metadata
 	struct Entity     *entity;
+
+	u32         param_slot;
 
 	union
 	{
 		Com_Status               status;
 		Atom                      *atom;
 		Atom                *identifier;
+		Ast_Array   interpolated_string;
+
 		// TODO(RJ): have these store a value instead, that way we can go from:
 		// token -> ast -> ir -> checking -> bytecode more easily ...
 		Atom              *string_value;
 		i64               integer_value;
 		f64                number_value;
-		Ast_Array   interpolated_string;
 
 		struct
 		{

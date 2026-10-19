@@ -39,6 +39,10 @@
 	X(ERROR_INVALID_STATIC_EXPRESSION,    "invalid-static-expression") \
 	X(ERROR_CYCLIC_STATIC_DEFINITION,     "cyclic-static-definition") \
 	X(ERROR_INVALID_FUNCTION_PARAMETER,   "invalid-function-parameter") \
+	X(ERROR_NAMED_ARGUMENT_TARGET,        "named-argument-target") \
+	X(ERROR_UNKNOWN_NAMED_ARGUMENT,       "unknown-named-argument") \
+	X(ERROR_DUPLICATE_ARGUMENT,           "duplicate-argument") \
+	X(ERROR_ARGUMENT_ORDER,               "argument-order") \
 	X(ERROR_INVALID_STATIC_DECLARATION,   "invalid-static-declaration") \
 	X(ERROR_DUPLICATE_STATIC_DECLARATION, "duplicate-static-declaration") \
 	X(ERROR_EXECUTABLE_MODULE_STATEMENT,  "executable-module-statement") \

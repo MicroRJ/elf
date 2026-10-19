@@ -143,7 +143,6 @@ static inline const char *ir_kind_name(IrKind kind)
 
 typedef struct IrNode IrNode;
 typedef IrNode *Ir;
-typedef struct IrFunction IrFunction;
 
 typedef struct
 {
@@ -151,6 +150,30 @@ typedef struct
 	u32 count;
 }
 IrArray;
+
+// Note, IrFunctions are allocated separately from regular IR nodes, an actual IR_FUNCTION refers
+// to this structure directly ...
+typedef struct IrFunction IrFunction;
+struct IrFunction
+{
+	IrFunction *next;
+	SourceSite  site;
+	b32         variadic;
+	Ir          body;
+	Ir         *params;
+	u32         param_count;
+	IrArray     captures;
+	u32         index;
+};
+
+typedef struct IrModule IrModule;
+struct IrModule
+{
+	Arena       *arena;
+	IrFunction *first_function;
+	IrFunction  *last_function;
+	u32         function_count;
+};
 
 struct IrNode
 {
@@ -266,6 +289,7 @@ struct IrNode
 	};
 };
 
+
 static IrNode ir_error_sentinel =
 {
 	.kind = IR_ERROR,
@@ -280,24 +304,4 @@ static inline b32 ir_is_error(Ir ir)
 
 #define IR_FUNCTION_INDEX_INVALID ((u32)-1)
 
-struct IrFunction
-{
-	IrFunction *next;
-	SourceSite  site;
-	b32         variadic;
-	Ir          body;
-	Ir         *params;
-	u32         param_count;
-	IrArray     captures;
-	u32         index;
-};
-
-typedef struct
-{
-	Arena  *arena;
-	IrFunction *first_function;
-	IrFunction  *last_function;
-	u32         function_count;
-}
-IrModule;
 

@@ -25,6 +25,7 @@ typedef struct
 	StaticValueType type;
 	union
 	{
+		Com_Status   status;
 		f64          number;
 		i64          integer;
 		struct Atom *string;
@@ -42,6 +43,7 @@ StaticValue;
 typedef enum
 {
 	ENTITY_NONE = 0,
+	ENTITY_ERROR,
 	ENTITY_STATIC,
 	ENTITY_PARAMETER,
 	ENTITY_LOCAL,
@@ -72,6 +74,7 @@ EntityState;
 struct Entity
 {
 	EntityKind      kind;
+	Com_Status      status;
 	struct Atom    *name;
 	Scope          *scope;
 	EntityState     state;
@@ -83,6 +86,27 @@ struct Entity
 	struct IrNode  *ir;
 	StaticValue     value;
 };
+
+extern Entity entity_error_sentinel;
+extern Entity entity_oom_sentinel;
+
+#define ERROR_ENTITY     (&entity_error_sentinel)
+#define ERROR_OOM_ENTITY (&entity_oom_sentinel)
+
+static inline Entity *entity_from_status(Com_Status status)
+{
+	switch (status)
+	{
+		case COM_STATUS_REPORTED: return ERROR_ENTITY;
+		case COM_STATUS_OOM:      return ERROR_OOM_ENTITY;
+		default: ASSERT(0);       return ERROR_ENTITY;
+	}
+}
+
+static inline b32 entity_is_error(const Entity *entity)
+{
+	return entity && entity->kind == ENTITY_ERROR;
+}
 
 typedef enum
 {
