@@ -179,11 +179,15 @@ void compiler_log_report(Compiler *compiler)
 			const char *source_name = atom_data(source->name);
 			if (site.line_index)
 			{
-				log_linef(level, "%s [%u:%llu] %s: %s", source_name, site.line_index, source_slice_column(site), severity_name, message->text.data);
+				log_format(LOG_LEVEL_INFO, "%s [%u:%llu] ", source_name, site.line_index, source_slice_column(site));
+				log_format(level, "%s", severity_name);
+				log_linef(LOG_LEVEL_INFO, ": %s", message->text.data);
 			}
 			else
 			{
-				log_linef(level, "%s [?] %s: %s", source_name, severity_name, message->text.data);
+				log_format(LOG_LEVEL_INFO, "%s [?] ", source_name);
+				log_format(level, "%s", severity_name);
+				log_linef(LOG_LEVEL_INFO, ": %s", message->text.data);
 			}
 			if (source_slice_is_valid(site))
 			{

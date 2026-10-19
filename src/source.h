@@ -3,6 +3,7 @@
 
 #include "base.h"
 
+// Todo, delete this
 typedef struct
 {
 	const char *data;
@@ -12,6 +13,7 @@ BcSourceBuffer;
 
 // Points at a byte range in one source participating in the compilation.
 // source is the stable index used by tokens, AST nodes, and runtime source maps.
+// Todo, compress this, especially with the line map!
 typedef struct
 {
 	// TODO(RJ): probably remove this entirely!

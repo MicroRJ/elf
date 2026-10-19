@@ -77,12 +77,12 @@ static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 		source.data = function->source->text.data;
 		source.size = (u32)function->source->text.size;
 
-		log_linef(LOG_LEVEL_ERROR, "%.*s [%u:%llu] [%u](%s)", (i32)function->source->name.size, function->source->name.data, site.line_index, source_slice_column(site), instr, bytecode_name);
+		log_linef(LOG_LEVEL_INFO, "%.*s [%u:%llu] [%u](%s)", (i32)function->source->name.size, function->source->name.data, site.line_index, source_slice_column(site), instr, bytecode_name);
 		print_source_slice_marker(site, source);
 	}
 	else
 	{
-		log_linef(LOG_LEVEL_ERROR, "<unknown> [?] [%u](%s): source information could not be found", instr, bytecode_name);
+		log_linef(LOG_LEVEL_INFO, "<unknown> [?] [%u](%s): source information could not be found", instr, bytecode_name);
 	}
 }
 
@@ -114,7 +114,7 @@ static void print_runtime_context(elf_State *state)
 	}
 	else
 	{
-		log_line(LOG_LEVEL_ERROR, "source information could not be found");
+		log_line(LOG_LEVEL_INFO, "source information could not be found");
 	}
 }
 
@@ -130,7 +130,8 @@ static void abort_after_runtime_error(void)
 
 static void report_runtime_error_message(elf_State *state, ErrorCode code, const char *message)
 {
-	log_linef(LOG_LEVEL_ERROR, "runtime error[%s]: %s", error_code_name(code), message);
+	log_format(LOG_LEVEL_ERROR, "runtime error[%s]", error_code_name(code));
+	log_linef(LOG_LEVEL_INFO, ": %s", message);
 	print_runtime_context(state);
 	abort_after_runtime_error();
 }
