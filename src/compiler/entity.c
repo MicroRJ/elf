@@ -61,10 +61,12 @@ Entity *scope_find(Scope *scope, Atom *name)
 	return 0;
 }
 
-Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
+Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name, b32 *created)
 {
 	ASSERT(kind != ENTITY_ERROR);
+	ASSERT(created);
 	Entity *result = scope_find_current(scope, name);
+	*created = false;
 	if (!result)
 	{
 		if (scope->count == scope->capacity)
@@ -89,6 +91,7 @@ Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
 		entity->scope = scope;
 		scope->entities[scope->count++] = entity;
 		result = entity;
+		*created = true;
 	}
 	return result;
 }

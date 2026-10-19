@@ -163,7 +163,7 @@ static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 
 static u32 capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
 {
-	ASSERT(entity->kind == ENTITY_LOCAL || entity->kind == ENTITY_PARAMETER);
+	ASSERT(entity->kind == ENTITY_LOCAL);
 	u32 capture_index = 0;
 	for (IrCapture *capture = function_ctx->first_capture; capture; capture = capture->next)
 	{
@@ -212,7 +212,7 @@ static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
 	if (entity->kind == ENTITY_GLOBAL) {
 		return ir_new_global(emitter, site, entity->name);
 	}
-	ASSERT(entity->kind == ENTITY_LOCAL || entity->kind == ENTITY_PARAMETER);
+	ASSERT(entity->kind == ENTITY_LOCAL);
 	ASSERT(entity->en_local.storage);
 	if (entity->en_local.function != emitter->function->definition->ast)
 	{

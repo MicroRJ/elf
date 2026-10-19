@@ -201,7 +201,7 @@ static void test_checker_attaches_function_entities(void)
 	Ast inner_return = inner_body && inner_body->kind == AST_BLOCK_STAT && inner_body->block.count ? inner_body->block.items[0] : 0;
 	Entity *parameter_entity = parameter_name ? parameter_name->entity : 0;
 	Entity *local_entity = local_name ? local_name->entity : 0;
-	if (!parameter_entity || parameter_entity->kind != ENTITY_PARAMETER || parameter_entity->en_local.function != outer_function) {
+	if (!parameter_entity || parameter_entity->kind != ENTITY_LOCAL || parameter_entity->en_local.function != outer_function) {
 		test_fail("checker attaches parameter entity to owning function");
 	}
 	if (!parameter_use || parameter_use->entity != parameter_entity) {

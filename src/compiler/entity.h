@@ -47,7 +47,6 @@ typedef enum
 	ENTITY_NONE = 0,
 	ENTITY_ERROR,
 	ENTITY_STATIC,
-	ENTITY_PARAMETER,
 	ENTITY_LOCAL,
 	ENTITY_GLOBAL,
 }
@@ -133,6 +132,6 @@ struct Scope
 Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source);
 Entity *scope_find_current(Scope *scope, struct Atom *name);
 Entity *scope_find(Scope *scope, struct Atom *name);
-Entity *scope_declare(Scope *scope, EntityKind kind, struct Atom *name);
+Entity *scope_declare(Scope *scope, EntityKind kind, struct Atom *name, b32 *created);
 
 #endif

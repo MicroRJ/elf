@@ -83,23 +83,22 @@ static void pop_scope(Checker *checker, Scope *scope)
 
 static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, EntityTags tags, Atom *name, SourceSite site)
 {
-	Entity *existing = scope_find_current(scope, name);
-	if (existing)
+	b32 created = false;
+	Entity *entity = scope_declare(scope, kind, name, &created);
+	if (!entity)
+	{
+		return entity_from_status(checker_out_of_memory(scope->source, site));
+	}
+	if (!created)
 	{
 		ErrorCode error = kind == ENTITY_STATIC ? ERROR_DUPLICATE_STATIC_DECLARATION : ERROR_DUPLICATE_DECLARATION;
 		Com_Status status = checker_report(scope->source, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
 		return entity_from_status(status);
 	}
 
-	Entity *entity = scope_declare(scope, kind, name);
-	if (!entity)
+	if (kind == ENTITY_LOCAL)
 	{
-		return entity_from_status(checker_out_of_memory(scope->source, site));
-	}
-
-	if (kind == ENTITY_LOCAL || kind == ENTITY_PARAMETER)
-	{
-		entity->en_local.function = scope->kind == SCOPE_SOURCE ? scope->owner : checker->current_function;
+		entity->en_local.function = checker->current_function;
 	}
 
 	entity->tags = tags;
@@ -338,7 +337,7 @@ static StaticValue resolve_expression(Checker *checker, Ast expr)
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);
 				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_PARAMETER, ENTITY_TAG_NONE, name->identifier, name->site);
+				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, ENTITY_TAG_NONE, name->identifier, name->site);
 				if (entity_is_error(entity)) {
 					value = static_value_error(entity->status);
 				} else {
