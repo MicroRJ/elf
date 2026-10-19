@@ -63,8 +63,10 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 	}
 
 	ASSERT(prototype->captures == 0);
-	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-	closure->prototype = prototype;
+	elf_Closure *closure = elf_closure_new(state, prototype, 0, 0);
+	if (!closure) {
+		return false;
+	}
 	push_value(state, value_from_closure(closure));
 	return true;
 }

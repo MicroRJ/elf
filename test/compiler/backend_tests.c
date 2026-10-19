@@ -594,8 +594,8 @@ static void test_backend_calls_imported_static_function(void)
 			test_fail("imported static function emits a direct call");
 		}
 
-		elf_Closure *closure = elf_gc_alloc(result.state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-		closure->prototype = backend_test_function(result);
+		elf_Closure *closure = elf_closure_new(result.state, backend_test_function(result), 0, 0);
+		ASSERT(closure);
 		push_value(result.state, value_from_closure(closure));
 		elf_push_nil(result.state);
 		elf_call(result.state, 1, 1);

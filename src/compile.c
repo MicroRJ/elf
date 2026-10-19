@@ -20,10 +20,15 @@ elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSl
 		if (prototype)
 		{
 			ASSERT(prototype->captures == 0);
-			elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, sizeof(*closure));
-			closure->prototype = prototype;
-			push_value(state, value_from_closure(closure));
-			error = ELF_ERROR_NONE;
+			elf_Closure *closure = elf_closure_new(state, prototype, 0, 0);
+			if (closure)
+			{
+				push_value(state, value_from_closure(closure));
+				error = ELF_ERROR_NONE;
+			}
+			else {
+				error = ELF_ERROR_COMPILATION_FAILED;
+			}
 		}
 		else
 		{

@@ -164,17 +164,6 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static elf_Closure *vm_new_closure(elf_State *state, elf_Prototype *function, elf_Value *captures)
-{
-	ASSERT(function);
-	u32 size = sizeof(elf_Closure) + sizeof(elf_Value) * function->captures;
-	elf_Closure *closure = (elf_Closure *)elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
-	closure->prototype = function;
-
-	value_copy_many(closure->captures, captures, function->captures);
-	return closure;
-}
-
 static inline elf_Value *vm_slot(elf_Value *reference, i16 index)
 {
 	ASSERT(index >= 0);
@@ -368,7 +357,8 @@ activate_frame:
 				elf_Prototype *prototype = prototype_from_index(state, prototype_index);
 
 				elf_Value *result = vm_slot(reference, byte.b_x);
-				elf_Closure *new_closure = vm_new_closure(state, prototype, result);
+				elf_Closure *new_closure = elf_closure_new(state, prototype, result, prototype->captures);
+				ASSERT(new_closure);
 				*result = value_from_closure(new_closure);
 			} break;
 

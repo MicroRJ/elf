@@ -280,6 +280,8 @@ void elf_sources_destroy(elf_State *state);
 
 void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 
+elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Value *captures, u32 capture_count);
+
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 
 elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity);

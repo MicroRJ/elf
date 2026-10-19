@@ -43,6 +43,24 @@
 #include "libs/l_string.c"
 #include "libs/l_buffer.c"
 
+elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Value *captures, u32 capture_count)
+{
+	ASSERT(state);
+	ASSERT(prototype);
+	ASSERT(captures || !capture_count);
+	ASSERT(capture_count == prototype->captures);
+	if (!state || !prototype || (!captures && capture_count) || capture_count != prototype->captures) {
+		return 0;
+	}
+	u32 size = sizeof(elf_Closure) + sizeof(elf_Value) * capture_count;
+	elf_Closure *closure = elf_gc_alloc(state, ELF_OBJECT_CLOSURE, size);
+	closure->prototype = prototype;
+	if (capture_count) {
+		value_copy_many(closure->captures, captures, capture_count);
+	}
+	return closure;
+}
+
 static void init_runtime_storage(elf_State *state)
 {
 	state->frame_stack_size = 4096;
