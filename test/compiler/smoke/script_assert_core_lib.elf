@@ -77,13 +77,13 @@ probe := fun(a, ...) {
 probe(10, 20, 30)
 
 test_assert(elf.const_expr("42") == 42)
-test_assert(elf.load_file("test/smoke/core_lib_loaded.elf", 41) == 42)
+test_assert(elf.load_file("test/compiler/smoke/core_lib_loaded.elf", 41) == 42)
 
-document := elf.json.load_file("test/smoke/core_lib_data.json")
+document := elf.json.load_file("test/compiler/smoke/core_lib_data.json")
 test_assert(document.answer == 42)
 test_assert(document.items[0] == 3)
 test_assert(document.items[2] == 8)
-test_assert(elf.json.load_file("test/smoke/does_not_exist.json") == nil)
+test_assert(elf.json.load_file("test/compiler/smoke/does_not_exist.json") == nil)
 
 gc_counters := elf.gc.counters()
 test_assert(elf.type_of(gc_counters.allocated_objects) == "integer")
@@ -149,7 +149,7 @@ test_assert(vm_counters.closure_calls == vm_closure_calls + 1)
 test_assert(vm_counters.native_calls == vm_native_calls + 1)
 
 test_assert(elf.fs.get_paths() != nil)
-paths := elf.fs.get_paths("test/smoke")
+paths := elf.fs.get_paths("test/compiler/smoke")
 test_assert(paths != nil)
 test_assert(elf.type_of(paths) == "array")
 found_basic := 0
@@ -157,7 +157,7 @@ for path := paths[...] ? {
 	if elf.path.filename(path) == "basic.elf" ? { found_basic = 1 }
 }
 test_assert(found_basic)
-test_assert(elf.fs.get_paths("test/smoke/does-not-exist") == nil)
+test_assert(elf.fs.get_paths("test/compiler/smoke/does-not-exist") == nil)
 
 flat_paths := elf.fs.get_paths("src", 0)
 recursive_paths := elf.fs.get_paths("src", 1)
@@ -171,8 +171,8 @@ for path := recursive_paths[...] ? {
 }
 test_assert(found_flat_l_string == 0)
 test_assert(found_recursive_l_string)
-test_assert(elf.fs.get_paths("test/smoke", -1) == nil)
-test_assert(elf.fs.get_paths("test/smoke", 33) == nil)
+test_assert(elf.fs.get_paths("test/compiler/smoke", -1) == nil)
+test_assert(elf.fs.get_paths("test/compiler/smoke", 33) == nil)
 
 iteration := { count = 0, found_l_string = 0 }
 iteration_count := elf.fs.for_each_path("src", 1, fun(path) {
@@ -182,7 +182,7 @@ iteration_count := elf.fs.for_each_path("src", 1, fun(path) {
 test_assert(iteration_count == iteration.count)
 test_assert(iteration_count == recursive_paths:length())
 test_assert(iteration.found_l_string)
-test_assert(elf.fs.for_each_path("test/smoke/does-not-exist", fun(path) {}) == nil)
+test_assert(elf.fs.for_each_path("test/compiler/smoke/does-not-exist", fun(path) {}) == nil)
 
 test_assert(elf.load_expr == nil)
 test_assert(elf.unparse == nil)

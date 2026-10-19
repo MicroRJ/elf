@@ -1,2 +1,0 @@
-math :: import "test/imports/statics/math.elf"
-ret math.add(40)

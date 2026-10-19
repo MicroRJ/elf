@@ -51,7 +51,7 @@ cyclic_array[0] = cyclic_array
 test_assert(elf.is_error(elf.json.stringify(cyclic_array)))
 test_assert(elf.is_error(elf.json.stringify(fun() {})))
 
-lines := elf.json.load_jsonl("test/smoke/core_lib_data.jsonl")
+lines := elf.json.load_jsonl("test/compiler/smoke/core_lib_data.jsonl")
 test_assert(elf.type_of(lines) == "array")
 test_assert(lines:length() == 3)
 test_assert(lines[0].name == "first")

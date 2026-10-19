@@ -24,7 +24,7 @@ entries.build = fun() {
 		targets = [
 			tasks.targets.public_header_test,
 			tasks.targets.core_tests,
-			tasks.targets.tests,
+			tasks.targets.compiler_tests,
 			tasks.targets.benchmarks,
 			tasks.targets.bytecode_tool,
 			tasks.targets.elf_runner,
@@ -38,7 +38,7 @@ entries.test = fun() {
 		targets = [
 			tasks.targets.public_header_test,
 			tasks.targets.run_core_tests,
-			tasks.targets.run_tests,
+			tasks.targets.run_compiler_tests,
 		],
 		options = options,
 	})

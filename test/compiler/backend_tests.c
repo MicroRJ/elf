@@ -120,7 +120,7 @@ static BcSourceMapEntry *backend_find_source_map_entry(elf_Prototype *function, 
 
 static void test_backend_source_map(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/return_add.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/return_add.elf");
 	elf_Prototype *function = backend_test_function(result);
 	if (function->source_map_count == 0) {
 		test_fail("backend emits source map entries");
@@ -234,7 +234,7 @@ static i32 backend_find_first_bytecode(BackendCompileResult result, BcType type)
 
 static void test_backend_short_circuit_and(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_and.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_and.elf");
 
 	backend_expect_min_conditional_jumps(result, 2, "&& emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 0, 0, "&& emits optimal short-circuit jump shape");
@@ -245,7 +245,7 @@ static void test_backend_short_circuit_and(void)
 
 static void test_backend_short_circuit_or(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_or.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_or.elf");
 
 	backend_expect_min_conditional_jumps(result, 2, "|| emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 1, 1, 0, "|| emits optimal short-circuit jump shape");
@@ -256,7 +256,7 @@ static void test_backend_short_circuit_or(void)
 
 static void test_backend_short_circuit_nested_and_or(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_nested_and_or.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_nested_and_or.elf");
 
 	backend_expect_min_conditional_jumps(result, 3, "nested a && (b || c) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a && (b || c) emits optimal short-circuit jump shape");
@@ -267,7 +267,7 @@ static void test_backend_short_circuit_nested_and_or(void)
 
 static void test_backend_short_circuit_nested_or_and(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_nested_or_and.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_nested_or_and.elf");
 
 	backend_expect_min_conditional_jumps(result, 3, "nested a || (b && c) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a || (b && c) emits optimal short-circuit jump shape");
@@ -278,7 +278,7 @@ static void test_backend_short_circuit_nested_or_and(void)
 
 static void test_backend_short_circuit_mixed_groups(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/short_circuit_mixed_groups.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_mixed_groups.elf");
 
 	backend_expect_min_conditional_jumps(result, 4, "mixed (a || b) && (c || d) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 2, 0, "mixed (a || b) && (c || d) emits optimal short-circuit jump shape");
@@ -289,7 +289,7 @@ static void test_backend_short_circuit_mixed_groups(void)
 
 static void test_backend_while_loop(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/while_loop.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/while_loop.elf");
 
 	if (backend_count_bytecode(result, BC_JZ) != 1) {
 		test_fail("while emits one loop-exit conditional jump");
@@ -303,7 +303,7 @@ static void test_backend_while_loop(void)
 
 static void test_backend_while_short_circuit_loop(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/smoke/while_short_circuit.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/while_short_circuit.elf");
 
 	if (backend_count_bytecode(result, BC_JZ) != 2) {
 		test_fail("while short-circuit predicate emits two false jumps");
@@ -579,7 +579,7 @@ static void test_backend_emits_direct_static_call(void)
 
 static void test_backend_calls_imported_static_function(void)
 {
-	BackendCompileResult result = backend_test_compile_file("test/imports/statics/root.elf");
+	BackendCompileResult result = backend_test_compile_file("test/compiler/imports/statics/root.elf");
 	if (!prototype_index_is_valid(result.state, result.function))
 	{
 		test_fail("backend compiles imported static namespace");

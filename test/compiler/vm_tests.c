@@ -22,6 +22,15 @@ typedef struct
 }
 VmRunResult;
 
+static void vm_force_gc_allocations(elf_State *state, u32 count)
+{
+	for (u32 i = 0; i < count; ++i)
+	{
+		state->gc_next_cycle_bytes = 1;
+		elf_table_new(state);
+	}
+}
+
 ELF_FUNCTION(vm_test_nested_call_preserves_context)
 {
 	VmNestedCallContext *context = elf_get_user_data(S);
@@ -82,27 +91,27 @@ static void vm_expect_int(const char *path, i64 expected, const char *label)
 
 static void test_vm_return_int(void)
 {
-	vm_expect_int("test/smoke/return_int.elf", 1, "vm returns integer value");
+	vm_expect_int("test/compiler/smoke/return_int.elf", 1, "vm returns integer value");
 }
 
 static void test_vm_integer_add(void)
 {
-	vm_expect_int("test/smoke/return_add.elf", 3, "vm executes integer addition");
+	vm_expect_int("test/compiler/smoke/return_add.elf", 3, "vm executes integer addition");
 }
 
 static void test_vm_string_index(void)
 {
-	vm_expect_int("test/smoke/string_index.elf", 324, "vm indexes string bytes");
+	vm_expect_int("test/compiler/smoke/string_index.elf", 324, "vm indexes string bytes");
 }
 
 static void test_vm_measure(void)
 {
-	vm_expect_int("test/smoke/measure.elf", 13, "vm measures nil and collection values");
+	vm_expect_int("test/compiler/smoke/measure.elf", 13, "vm measures nil and collection values");
 }
 
 static void test_vm_return_nil(void)
 {
-	VmRunResult result = vm_test_run_file("test/smoke/return_nil.elf");
+	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_nil.elf");
 	if (!value_is_nil(result.value)) {
 		test_fail("vm returns nil value");
 	}
@@ -111,7 +120,7 @@ static void test_vm_return_nil(void)
 
 static void test_vm_return_table(void)
 {
-	VmRunResult result = vm_test_run_file("test/smoke/return_table.elf");
+	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_table.elf");
 	if (!value_is_table(result.value)) {
 		test_fail("vm returns table value");
 	}
@@ -123,7 +132,7 @@ static void test_vm_return_table(void)
 
 static void test_vm_return_array(void)
 {
-	VmRunResult result = vm_test_run_file("test/smoke/return_array.elf");
+	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_array.elf");
 	if (!value_is_array(result.value))
 	{
 		test_fail("vm returns array value");
@@ -150,122 +159,122 @@ static void test_vm_return_array(void)
 
 static void test_vm_nil_assign(void)
 {
-	vm_expect_int("test/smoke/nil_assign.elf", 42, "vm nil assignment stores fallback value");
+	vm_expect_int("test/compiler/smoke/nil_assign.elf", 42, "vm nil assignment stores fallback value");
 }
 
 static void test_vm_function_call(void)
 {
-	vm_expect_int("test/smoke/function_call.elf", 5, "vm calls user function with arguments");
+	vm_expect_int("test/compiler/smoke/function_call.elf", 5, "vm calls user function with arguments");
 }
 
 static void test_vm_function_arguments(void)
 {
-	vm_expect_int("test/smoke/function_arguments.elf", 345, "vm exposes implicit this and explicit arguments");
+	vm_expect_int("test/compiler/smoke/function_arguments.elf", 345, "vm exposes implicit this and explicit arguments");
 }
 
 static void test_vm_variadic_arguments(void)
 {
-	vm_expect_int("test/smoke/variadic_arguments.elf", 436, "vm exposes variadic arguments");
+	vm_expect_int("test/compiler/smoke/variadic_arguments.elf", 436, "vm exposes variadic arguments");
 }
 
 static void test_vm_closure_capture(void)
 {
-	vm_expect_int("test/smoke/closure_capture.elf", 17350, "vm runs closures with captured values");
+	vm_expect_int("test/compiler/smoke/closure_capture.elf", 17350, "vm runs closures with captured values");
 }
 
 static void test_vm_get_mem_macro(void)
 {
-	vm_expect_int("test/smoke/get_mem.elf", 123, "vm reports local memory slots");
+	vm_expect_int("test/compiler/smoke/get_mem.elf", 123, "vm reports local memory slots");
 }
 
 static void test_vm_method_this(void)
 {
-	vm_expect_int("test/smoke/method_this.elf", 242, "vm passes field receiver as implicit this");
+	vm_expect_int("test/compiler/smoke/method_this.elf", 242, "vm passes field receiver as implicit this");
 }
 
 static void test_vm_script_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_assignments.elf", 99, "vm runs script-side assignment assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_assignments.elf", 99, "vm runs script-side assignment assertions");
 }
 
 static void test_vm_script_logical_decl(void)
 {
-	vm_expect_int("test/smoke/script_assert_logical_decl.elf", 42, "vm runs logical expression declarations");
+	vm_expect_int("test/compiler/smoke/script_assert_logical_decl.elf", 42, "vm runs logical expression declarations");
 }
 
 static void test_vm_script_table_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_tables.elf", 123, "vm runs script-side table assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_tables.elf", 123, "vm runs script-side table assertions");
 }
 
 static void test_vm_script_compound_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_compound.elf", 46, "vm runs script-side compound assignment assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_compound.elf", 46, "vm runs script-side compound assignment assertions");
 }
 
 static void test_vm_script_json_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_json.elf", 321, "vm runs script-side json table assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_json.elf", 321, "vm runs script-side json table assertions");
 }
 
 static void test_vm_script_sys_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_sys.elf", 77, "vm runs script-side path and filesystem assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_sys.elf", 77, "vm runs script-side path and filesystem assertions");
 }
 
 static void test_vm_script_string_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_strings.elf", 94, "vm runs counted string library assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_strings.elf", 94, "vm runs counted string library assertions");
 }
 
 static void test_vm_script_table_lib_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_table_lib.elf", 144, "vm runs table library assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_table_lib.elf", 144, "vm runs table library assertions");
 }
 
 static void test_vm_script_array_lib_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_array_lib.elf", 145, "vm runs array library assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_array_lib.elf", 145, "vm runs array library assertions");
 }
 
 static void test_vm_core_library_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_core_lib.elf", 4242, "vm runs core library assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_core_lib.elf", 4242, "vm runs core library assertions");
 }
 
 static void test_vm_buffer_assertions(void)
 {
-	vm_expect_int("test/smoke/script_assert_buffer.elf", 5150, "vm runs byte buffer assertions");
+	vm_expect_int("test/compiler/smoke/script_assert_buffer.elf", 5150, "vm runs byte buffer assertions");
 }
 
 static void test_vm_for_range(void)
 {
-	vm_expect_int("test/smoke/for_range.elf", 276, "vm runs half-open range for loop");
+	vm_expect_int("test/compiler/smoke/for_range.elf", 276, "vm runs half-open range for loop");
 }
 
 static void test_vm_c_for(void)
 {
-	vm_expect_int("test/smoke/c_for.elf", 103, "vm runs C-style for loops");
+	vm_expect_int("test/compiler/smoke/c_for.elf", 103, "vm runs C-style for loops");
 }
 
 static void test_vm_break_continue(void)
 {
-	vm_expect_int("test/smoke/break_continue.elf", 1813, "vm runs break and continue");
+	vm_expect_int("test/compiler/smoke/break_continue.elf", 1813, "vm runs break and continue");
 }
 
 static void test_vm_loop_slots(void)
 {
-	vm_expect_int("test/smoke/loop_slots.elf", 24781, "vm restores loop slots");
+	vm_expect_int("test/compiler/smoke/loop_slots.elf", 24781, "vm restores loop slots");
 }
 
 static void test_vm_defer(void)
 {
-	vm_expect_int("test/smoke/defer.elf", 2114344, "vm runs deferred statements");
+	vm_expect_int("test/compiler/smoke/defer.elf", 2114344, "vm runs deferred statements");
 }
 
 static void test_vm_string_join(void)
 {
-	VmRunResult result = vm_test_run_file("test/smoke/script_assert_string_join.elf");
+	VmRunResult result = vm_test_run_file("test/compiler/smoke/script_assert_string_join.elf");
 	if (!value_is_string(result.value) || strcmp(value_as_string(result.value)->data, "score9") != 0) {
 		test_fail("vm joins string lhs with formatted rhs");
 	}
@@ -274,7 +283,7 @@ static void test_vm_string_join(void)
 
 static void test_vm_interpolated_strings(void)
 {
-	VmRunResult result = vm_test_run_file("test/smoke/interpolated_strings.elf");
+	VmRunResult result = vm_test_run_file("test/compiler/smoke/interpolated_strings.elf");
 	if (!value_is_string(result.value) || strcmp(value_as_string(result.value)->data, "score9") != 0) {
 		test_fail("vm evaluates interpolated strings");
 	}
@@ -283,7 +292,7 @@ static void test_vm_interpolated_strings(void)
 
 static void test_vm_fib(void)
 {
-	vm_expect_int("test/smoke/fib.elf", 55, "vm runs recursive fibonacci");
+	vm_expect_int("test/compiler/smoke/fib.elf", 55, "vm runs recursive fibonacci");
 }
 
 static void test_vm_static_function(void)
@@ -304,11 +313,6 @@ static void test_vm_static_function(void)
 		test_fail("static function executes through the VM");
 	}
 	elf_destroy_state(state);
-}
-
-static void test_vm_named_arguments(void)
-{
-	vm_expect_int("test/smoke/named_arguments.elf", 2122, "vm resolves named and default arguments");
 }
 
 static void test_vm_static_recurse_function(void)
@@ -411,7 +415,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		return;
 	}
 
-	force_gc_allocations(state, 256);
+	vm_force_gc_allocations(state, 256);
 
 	if (!elf_push_ref(state, first)) {
 		test_fail("first captured closure survives GC");
@@ -543,7 +547,7 @@ static void test_vm_module_converts_atom_constants(void)
 		test_fail("string constants do not consume global slots");
 	}
 
-	force_gc_allocations(state, 256);
+	vm_force_gc_allocations(state, 256);
 	if (strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0) {
 		test_fail("function string constants survive GC");
 	}
@@ -601,7 +605,6 @@ static void run_vm_tests(void)
 	test_vm_interpolated_strings();
 	test_vm_fib();
 	test_vm_static_function();
-	test_vm_named_arguments();
 #if 0
 	// Static recurse currently requires a missing closure.
 	test_vm_static_recurse_function();

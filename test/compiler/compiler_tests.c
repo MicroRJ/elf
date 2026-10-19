@@ -31,13 +31,6 @@ static void test_fail(const char *label)
 	test_failures += 1;
 }
 
-#include "string_tests.c"
-#include "table_tests.c"
-#include "array_tests.c"
-#include "gc_tests.c"
-#include "globals_tests.c"
-#include "api_tests.c"
-#include "arena_tests.c"
 #include "lexer_tests.c"
 #include "parser_tests.c"
 #include "unparse_tests.c"
@@ -45,6 +38,7 @@ static void test_fail(const char *label)
 #include "ir_tests.c"
 #include "backend_tests.c"
 #include "vm_tests.c"
+#include "script_tests.c"
 #include "smoke_tests.c"
 
 int main(void)
@@ -53,17 +47,6 @@ int main(void)
 	setvbuf(stderr, 0, _IONBF, 0);
 
 	elf_State *state = elf_create_state();
-	if (strcmp(elf_version(), ELF_VERSION) != 0) {
-		test_fail("public elf version matches the linked runtime");
-	}
-
-	run_string_tests(state);
-	run_table_tests(state);
-	run_array_tests();
-	run_gc_tests();
-	run_globals_tests(state);
-	run_api_tests();
-	run_arena_tests();
 	run_lexer_tests(state);
 	run_parser_tests(state);
 	run_unparse_tests(state);
@@ -71,6 +54,7 @@ int main(void)
 	run_ir_tests(state);
 	run_backend_tests();
 	run_vm_tests();
+	run_script_tests();
 
 	elf_destroy_state(state);
 

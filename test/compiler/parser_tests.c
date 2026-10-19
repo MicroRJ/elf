@@ -197,7 +197,7 @@ static void test_parser_module_discovery(elf_State *state)
 	(void)state;
 	Arena arena = arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
-	if (compiler_add_root_file(compiler, "test/imports/discovery/root.elf") == COM_INVALID_SOURCE_ID) {
+	if (compiler_add_root_file(compiler, "test/compiler/imports/discovery/root.elf") == COM_INVALID_SOURCE_ID) {
 		test_fail("compiler loads root source file directly");
 		arena_destroy(&arena);
 		return;
@@ -245,7 +245,7 @@ static void test_parser_missing_import(elf_State *state)
 	Compiler *compiler = compiler_create(&arena);
 	const char *source_text = "missing :: import \"missing.elf\"";
 	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
-	compiler_add_root_source(compiler, "test/imports/discovery/missing-root.elf", source);
+	compiler_add_root_source(compiler, "test/compiler/imports/discovery/missing-root.elf", source);
 	if (compiler_parse_sources(compiler)) {
 		test_fail("missing imported source fails module discovery");
 	}
