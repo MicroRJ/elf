@@ -194,8 +194,9 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "is_file")), "elf.fs.is_file is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "is_directory")), "elf.fs.is_directory is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "file_exists")), "elf.fs.file_exists is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "read_text_file")), "elf.fs.read_text_file is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "write_text_file")), "elf.fs.write_text_file is a field function");
+	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "open")), "elf.fs.open is a field function");
+	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_string(state, "read_text_file")), "elf.fs.read_text_file is absent");
+	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_string(state, "write_text_file")), "elf.fs.write_text_file is absent");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "get_file_info")), "elf.fs.get_file_info is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "create_directory")), "elf.fs.create_directory is a field function");
 	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "create_directories")), "elf.fs.create_directories is a field function");

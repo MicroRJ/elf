@@ -642,60 +642,6 @@ ELF_FUNCTION(lib_fs_file_exists)
 	return 1;
 }
 
-ELF_FUNCTION(lib_fs_read_text_file)
-{
-	lib_check_arg_count(S, "fs.read_text_file", nargs, 1, 1);
-	dy_String path = lib_load_string_view(S, 1);
-	dy_File_Info info = {0};
-	if (!fs_get_file_info(path, &info) || info.size > INT_MAX) {
-		elf_push_nil(S);
-		return 1;
-	}
-	dy_File file;
-	if (dy_access_file(path, DY_FILE_OPEN_EXISTING,
-		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) {
-		elf_push_nil(S);
-		return 1;
-	}
-	u64 allocation_size = info.size + 1;
-	char *data = elf_alloc(S, allocation_size);
-	if (!data) {
-		dy_close_file(file);
-		elf_push_nil(S);
-		return 1;
-	}
-	dy_u64 size = 0;
-	dy_Result read = dy_read_file(file, data, info.size, &size);
-	dy_close_file(file);
-	if (read.error || size != info.size) {
-		elf_free(S, data, allocation_size);
-		elf_push_nil(S);
-		return 1;
-	}
-	elf_push_str(S, data, (int)size);
-	elf_free(S, data, allocation_size);
-	return 1;
-}
-
-ELF_FUNCTION(lib_fs_write_text_file)
-{
-	lib_check_arg_count(S, "fs.write_text_file", nargs, 2, 2);
-	dy_String path = lib_load_string_view(S, 1);
-	dy_String data = lib_load_string_view(S, 2);
-	dy_File file;
-	if (dy_access_file(path, DY_FILE_CREATE_ALWAYS,
-		DY_FILE_WRITE, &file).error) {
-		elf_push_int(S, false);
-		return 1;
-	}
-	dy_u64 written = 0;
-	dy_Result write = dy_write_file(file, data.data, data.size, &written);
-	b32 success = !write.error && written == data.size;
-	dy_close_file(file);
-	elf_push_int(S, success);
-	return 1;
-}
-
 ELF_FUNCTION(lib_fs_get_file_info)
 {
 	lib_check_arg_count(S, "fs.get_file_info", nargs, 1, 1);
@@ -933,8 +879,6 @@ static const elf_Binding l_fs[] = {
 	{"file_exists",           lib_fs_file_exists},
 	{"get_paths",             lib_fs_get_paths},
 	{"for_each_path",         lib_fs_for_each_path},
-	{"read_text_file",        lib_fs_read_text_file},
-	{"write_text_file",       lib_fs_write_text_file},
 	{"get_file_info",         lib_fs_get_file_info},
 	{"create_directory",      lib_fs_create_directory},
 	{"create_directories",    lib_fs_create_directories},
