@@ -1,3 +1,9 @@
+# Repository Guide
+
+## Shared Coding Rules
+
+`W:\MicroRJ\AGENTS_CODING_RULES.md` is the authoritative guide for general code writing, syntax, control flow, data flow, and abstraction throughout this repository. The rules below are project-specific additions.
+
 ## Verification
 
 Use `.\build.bat test` for the public-header, core, compiler, VM, API, and smoke
@@ -52,11 +58,6 @@ Compiler sources may reference runtime-owned `elf_Source` objects, while
 parsing, checking, and lowering continue using compiler representations such
 as atoms, AST nodes, entities, and IR nodes. Preserve the one-way dependency:
 compiler backend to core/runtime, never core/runtime to compiler.
-
-Avoid copying source, bytecode, constants, or other compiled data through
-additional temporary module representations without a concrete need.
-Architectural boundaries should reduce work and clarify ownership, not create
-APIs solely for conceptual purity.
 
 ## Error Propagation
 
@@ -144,7 +145,7 @@ agreed API cannot be implemented as written without broader changes, return to
 the user before proceeding. Do not silently reinterpret the request as
 permission to complete prerequisite language or architectural work.
 
-## Code Style
+## String Representations
 
 Use the project's string types for string data. Use `dy_String` for ordinary
 borrowed text and names inside the implementation, `elf_StrSlice` at public ELF
@@ -154,29 +155,3 @@ introduce `const char *` parameters or fields for ordinary string data, especial
 when the implementation immediately calls `strlen`. Reserve raw C strings for
 string literals, format strings, and direct CRT, platform, or external C API
 boundaries that specifically require null termination; convert at that boundary.
-
-Always use braces for `if` statements and `for` loops, including single-line
-bodies.
-
-Keep parenthesized conditions on one physical line. Never format an `if` like
-this:
-
-```c
-if (expr_tuple->tuple.nargs == 1 &&
-	expr_tuple->tuple.args[0]->kind == AST_CALL)
-```
-
-Prefer a long condition on one line. If that becomes unreasonable, simplify
-the control flow by splitting the `if` or extract parts of the condition into
-clearly named local variables instead of wrapping the parenthesized expression
-across lines.
-
-Keep function declarations and definitions, including their parameter lists,
-on one physical line. Prefer a long line over splitting a signature across
-multiple lines. Apply the same rule to function calls and their argument lists;
-for example, keep `BcSlot first = emit_expr(gen, stat->ir_multi_local.expr, NO_MEMORY, locals.count);` on one physical line. As a general rule, keep
-syntactically connected code on the same line rather than introducing line breaks inside it.
-
-Prefer explicit, structured control flow over scattered early exits. Use clear
-`if`/`else` structure and an obvious exit path instead of spreading `return` or
-`break` statements throughout a function or loop.
