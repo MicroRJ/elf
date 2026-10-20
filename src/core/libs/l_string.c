@@ -97,29 +97,6 @@ static b32 string_is_space(u8 c)
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\v' || c == '\f';
 }
 
-typedef struct StringLine {
-	u32 start;
-	u32 end;
-	u32 next;
-} StringLine;
-
-static b32 string_is_indent(u8 c)
-{
-	return c == ' ' || c == '\t';
-}
-
-static u32 string_line_indent(const char *text, StringLine line)
-{
-	u32 index = line.start;
-	while (index < line.end && string_is_indent((u8)text[index])) ++index;
-	return index - line.start;
-}
-
-static b32 string_line_is_blank(const char *text, StringLine line)
-{
-	return string_line_indent(text, line) == line.end - line.start;
-}
-
 static u8 string_to_lower(u8 c)
 {
 	return c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c;
@@ -339,93 +316,6 @@ ELF_FUNCTION(l_string_trim)
 	return 1;
 }
 
-ELF_FUNCTION(l_string_dedent)
-{
-	elf_String *string = string_receiver(S);
-	const char *text = elf_string_data(string);
-	u32 size = elf_string_size(string);
-	u32 line_count = 1;
-
-	for (u32 index = 0; index < size; ++index)
-	{
-		if (text[index] == '\r' && index + 1 < size && text[index + 1] == '\n') ++index;
-		if (text[index] == '\n' || text[index] == '\r') ++line_count;
-	}
-
-	Scratch scratch = scratch_begin();
-	StringLine *lines = arena_push_zero(scratch.arena, sizeof(StringLine) * line_count, _Alignof(StringLine));
-	u32 at = 0;
-	for (u32 index = 0; index < line_count; ++index)
-	{
-		StringLine *line = &lines[index];
-		line->start = at;
-		while (at < size && text[at] != '\n' && text[at] != '\r') ++at;
-		line->end = at;
-		if (at < size)
-		{
-			if (text[at] == '\r' && at + 1 < size && text[at + 1] == '\n') at += 2;
-			else ++at;
-		}
-		line->next = at;
-	}
-
-	u32 first = 0;
-	u32 end = line_count;
-	if (first < end && string_line_is_blank(text, lines[first])) ++first;
-	if (first < end && string_line_is_blank(text, lines[end - 1])) --end;
-
-	const char *prefix = 0;
-	u32 prefix_size = 0;
-	for (u32 index = first; index < end; ++index)
-	{
-		StringLine line = lines[index];
-		u32 indent = string_line_indent(text, line);
-		if (indent == line.end - line.start) continue;
-
-		if (!prefix)
-		{
-			prefix = text + line.start;
-			prefix_size = indent;
-			continue;
-		}
-
-		u32 shared = 0;
-		while (shared < prefix_size && shared < indent &&
-			prefix[shared] == text[line.start + shared]) ++shared;
-		prefix_size = shared;
-	}
-
-	if (!prefix)
-	{
-		string_push(S, "", 0);
-		scratch_end(scratch);
-		return 1;
-	}
-
-	char *result = arena_push(scratch.arena, size, 1);
-	u32 result_size = 0;
-	for (u32 index = first; index < end; ++index)
-	{
-		StringLine line = lines[index];
-		u32 indent = string_line_indent(text, line);
-		u32 skip = indent == line.end - line.start ? indent : prefix_size;
-		u32 content_size = line.end - line.start - skip;
-		memcpy(result + result_size, text + line.start + skip, content_size);
-		result_size += content_size;
-
-		if (index + 1 < end)
-		{
-			u32 newline_size = line.next - line.end;
-			memcpy(result + result_size, text + line.end, newline_size);
-			result_size += newline_size;
-		}
-	}
-
-	string_push(S, result, result_size);
-	scratch_end(scratch);
-	return 1;
-}
-
 ELF_FUNCTION(l_string_lower)
 {
 	elf_String *string = string_receiver(S);
@@ -545,7 +435,6 @@ static const elf_Binding l_string[] = {
 	{"split",       l_string_split},
 	{"lines",       l_string_lines},
 	{"trim",        l_string_trim},
-	{"dedent",      l_string_dedent},
 	{"lower",       l_string_lower},
 	{"upper",       l_string_upper},
 	{"replace",     l_string_replace},
