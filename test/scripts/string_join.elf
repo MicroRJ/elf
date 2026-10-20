@@ -1,0 +1,8 @@
+test_assert("hp42" == "hp" + 42)
+test_assert("hp1.500000" == "hp" + 1.5)
+test_assert("hpnil" == "hp" + nil)
+
+value := "score" + 9
+test_assert(value == "score9")
+
+ret value

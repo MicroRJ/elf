@@ -1,0 +1,10 @@
+values := [10, 20, 30]
+test_assert(values[0] == 10)
+test_assert(values[-1] == 30)
+values[1] = 22
+test_assert(values[1] == 22)
+
+nested := [values, [40, 50]]
+test_assert(nested[0][1] == 22)
+test_assert(nested[1][0] == 40)
+ret nested
