@@ -171,9 +171,9 @@ Errors returned as values can be checked with `elf.is_error(value)`.
 
 The scripts used by the test suite are the best source of current examples:
 
-- [`test/compiler/scripts/`](test/compiler/scripts/) contains larger scripts,
-  including [named arguments](test/compiler/scripts/named_arguments.elf) and
-  [file I/O](test/compiler/scripts/file_io.elf).
+- [`test/scripts/`](test/scripts/) contains automatically discovered assertion
+  scripts, including [named arguments](test/scripts/named_arguments.elf) and
+  [file I/O](test/scripts/file_io.elf).
 - [`test/compiler/smoke/`](test/compiler/smoke/) contains focused language and
   library examples.
 - Start with [`method_this.elf`](test/compiler/smoke/method_this.elf),

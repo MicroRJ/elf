@@ -4,6 +4,18 @@ Use `.\build.bat test` for the public-header, core, compiler, VM, API, and smoke
 tests. Also run `.\build.bat optimized` for runtime/compiler changes. Use
 `.\build.bat benchmark` when making performance claims or changing hot paths.
 
+For language and runtime behavior that can be asserted from Elf, add a `.elf`
+file directly under `test/scripts`. The runner in `test/script_tests.c`
+automatically discovers every `.elf` file in that directory, installs
+`test_assert`, compiles the script, and executes it. Use `test_assert` for the
+expected behavior; no C registration function or sentinel return value is
+needed.
+
+Keep scripts under `test/compiler/smoke` when a C test must inspect the returned
+value or runtime state directly, and register those explicitly in
+`test/compiler/vm_tests.c`. Add lower-level parser, checker, IR, backend, core,
+or API coverage to the corresponding C test suite.
+
 ## Documentation
 
 Do not create, edit, delete, regenerate, or otherwise maintain documentation

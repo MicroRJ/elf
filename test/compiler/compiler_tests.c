@@ -38,7 +38,7 @@ static void test_fail(const char *label)
 #include "ir_tests.c"
 #include "backend_tests.c"
 #include "vm_tests.c"
-#include "script_tests.c"
+#include "../script_tests.c"
 #include "smoke_tests.c"
 
 int main(int argc, char **argv)

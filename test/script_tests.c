@@ -51,7 +51,7 @@ static void run_script_tests(void)
 	dy_Directory directory = {};
 	dy_Directory_Entry entry = {};
 	dy_Directory_Status status = DY_DIRECTORY_END;
-	b32 success = dy_path_builder_init(&path, path_storage, sizeof(path_storage), DY_LIT("test/compiler/scripts"));
+	b32 success = dy_path_builder_init(&path, path_storage, sizeof(path_storage), DY_LIT("test/scripts"));
 	if (success)
 	{
 		success = !dy_find_first_file(&path, &directory, &entry, &status).error;
