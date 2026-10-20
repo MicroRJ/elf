@@ -139,6 +139,37 @@ static void test_vm_pads_missing_returns(void)
 	elf_destroy_state(state);
 }
 
+static void test_vm_discards_excess_returns(void)
+{
+	elf_State *state = elf_create_state();
+	char source_text[] = "ret 11, 22";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (elf_push_code_source(state, "excess-returns", source) != ELF_ERROR_NONE)
+	{
+		test_fail("excess-return test source compiles");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_Value *results = state->stack_ptr - 1;
+	elf_push_nil(state);
+	u32 returned_count = elf_call(state, 1, 1);
+	if (returned_count != 1)
+	{
+		test_fail("bytecode call reports only the exposed return count");
+	}
+	if (state->stack_ptr != results + 1)
+	{
+		test_fail("bytecode call reserves only the requested return slots");
+	}
+	if (!value_is_integer(results[0]) || value_as_integer(results[0]) != 11)
+	{
+		test_fail("bytecode call preserves the first requested return value");
+	}
+
+	elf_destroy_state(state);
+}
+
 static void test_vm_return_table(void)
 {
 	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_table.elf");
@@ -609,6 +640,7 @@ static void run_vm_tests(void)
 	TEST_RUN("vm.integer_add", test_vm_integer_add);
 	TEST_RUN("vm.return_nil", test_vm_return_nil);
 	TEST_RUN("vm.pads_missing_returns", test_vm_pads_missing_returns);
+	TEST_RUN("vm.discards_excess_returns", test_vm_discards_excess_returns);
 	TEST_RUN("vm.return_table", test_vm_return_table);
 	TEST_RUN("vm.return_array", test_vm_return_array);
 	TEST_RUN("vm.nil_assign", test_vm_nil_assign);

@@ -184,9 +184,8 @@ activate_frame:
 	elf_Value *reference = frame->reference;
 	elf_Value *captures = frame->captures;
 	u32 instruction = frame->instruction;
-	u8 frame_nrets = frame->nrets;
-	u8 ncaptures = frame->ncaptures;
-	int byte_count = function->bytecode_count;
+	u32 ncaptures = frame->ncaptures;
+	u32 byte_count = function->bytecode_count;
 	const Bytecode *code = function->bytecode;
 
 	while (instruction < byte_count)
@@ -252,9 +251,13 @@ activate_frame:
 			} break;
 
 			case BC_RETURN: {
-				nrets = MIN(byte.b_y, frame_nrets);
-				if (nrets) {
-					value_copy_many(framebase - 1, vm_slot(reference, byte.b_x), nrets);
+				u32 requested_return_count = frame->nrets;
+				u32 copied_return_count = MIN(byte.b_y, requested_return_count);
+				if (copied_return_count) {
+					value_copy_many(framebase - 1, vm_slot(reference, byte.b_x), copied_return_count);
+				}
+				if (copied_return_count < requested_return_count) {
+					value_zero_many(framebase - 1 + copied_return_count, requested_return_count - copied_return_count);
 				}
 
 				ASSERT(state->frame >= root_frame);
@@ -269,8 +272,9 @@ activate_frame:
 					goto activate_frame;
 				}
 				else {
+					nrets = copied_return_count;
 					ASSERT(framebase == root_frame->framebase);
-					state->stack_ptr = framebase - 1 + nrets;
+					state->stack_ptr = framebase - 1 + requested_return_count;
 					goto exit;
 				}
 			} break;
