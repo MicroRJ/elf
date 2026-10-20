@@ -122,11 +122,13 @@ static int test_finish(const char *suite)
 {
 	if (test_context.failures)
 	{
-		fprintf(stderr, "%s: %u failure(s) in %u of %u test(s), %u check(s)\n", suite, test_context.failures, test_context.failed_tests, test_context.tests, test_context.checks);
+		fprintf(stderr, "%s: %u of %u test(s) failed (%u failed check(s))\n", suite, test_context.failed_tests, test_context.tests, test_context.failures);
+		fprintf(stderr, "\n\x1b[31m================ TESTS FAILED ================\x1b[0m\n");
 		return 1;
 	}
 
-	fprintf(stderr, "%s: %u test(s), %u check(s) passed\n", suite, test_context.tests, test_context.checks);
+	fprintf(stderr, "%s: %u test(s) passed\n", suite, test_context.tests);
+	fprintf(stderr, "\n\x1b[32m================== TESTS OK ==================\x1b[0m\n");
 	return 0;
 }
 

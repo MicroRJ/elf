@@ -2,8 +2,7 @@ static void array_expect_int(elf_Value value, i64 expected, const char *label)
 {
 	if (!value_is_integer(value) || value_as_integer(value) != expected)
 	{
-		fprintf(stderr, "FAIL: %s expected int %lld, got tag %d value %lld\n", label, expected, value.type, value.x_i64);
-		test_failures += 1;
+		TEST_FAIL("%s expected int %lld, got tag %d value %lld", label, (long long)expected, value.type, (long long)value.x_i64);
 	}
 }
 
@@ -80,6 +79,6 @@ static void test_array_operations(void)
 
 static void run_array_tests(void)
 {
-	test_array_value();
-	test_array_operations();
+	TEST_RUN("array.value", test_array_value);
+	TEST_RUN("array.operations", test_array_operations);
 }

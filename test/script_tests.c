@@ -13,14 +13,13 @@ ELF_FUNCTION(script_test_assert)
 	const char *message = nargs > 2 ? lib_load_cstr(S, 2) : 0;
 	if (!value_to_integer(value))
 	{
-		print_current_runtime_source_location(S);
 		if (message) {
-			fprintf(stderr, "FAIL: %s in %s\n", message, context->path);
+			TEST_FAIL("%s", message);
 		}
 		else {
-			fprintf(stderr, "FAIL: assertion in %s\n", context->path);
+			TEST_FAIL("assertion failed");
 		}
-		test_failures += 1;
+		print_current_runtime_source_location(S);
 	}
 	return 0;
 }
@@ -34,13 +33,11 @@ static void run_script_test(const char *path)
 	elf_push_fun(state, script_test_assert);
 	if (elf_set_global(state, "test_assert") != ELF_ERROR_NONE)
 	{
-		fprintf(stderr, "FAIL: could not install test_assert for %s\n", path);
-		test_failures += 1;
+		TEST_FAIL("could not install test_assert");
 	}
 	else if (!elf_push_code_file(state, path))
 	{
-		fprintf(stderr, "FAIL: could not compile %s\n", path);
-		test_failures += 1;
+		TEST_FAIL("could not compile script");
 	}
 	else
 	{
@@ -49,6 +46,18 @@ static void run_script_test(const char *path)
 	}
 
 	elf_destroy_state(state);
+}
+
+static void test_script_discovery(b32 success, u32 script_count)
+{
+	if (!success)
+	{
+		TEST_FAIL("could not enumerate compiler assertion scripts");
+	}
+	if (!script_count)
+	{
+		TEST_FAIL("compiler assertion script directory is empty");
+	}
 }
 
 static void run_script_tests(void)
@@ -76,7 +85,7 @@ static void run_script_tests(void)
 			}
 			else
 			{
-				run_script_test(path.data);
+				TEST_RUN(path.data, run_script_test, path.data);
 				script_count += 1;
 			}
 			dy_path_pop(&path, mark);
@@ -91,12 +100,5 @@ static void run_script_tests(void)
 	{
 		success &= !dy_close_directory(&directory).error;
 	}
-	if (!success)
-	{
-		test_fail("could not enumerate compiler assertion scripts");
-	}
-	if (!script_count)
-	{
-		test_fail("compiler assertion script directory is empty");
-	}
+	TEST_RUN("scripts.discovery", test_script_discovery, success, script_count);
 }

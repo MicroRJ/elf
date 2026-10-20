@@ -457,22 +457,22 @@ static void test_checker_propagates_diagnostic_oom(void)
 
 static void run_checker_tests(void)
 {
-	test_checker_resolves_static_forward_reference();
-	test_checker_tags_exported_static();
-	test_checker_declares_local_after_initializer();
-	test_checker_preserves_block_shadowing();
-	test_checker_does_not_leak_block_locals();
-	test_checker_attaches_function_entities();
-	test_checker_binds_call_arguments_to_parameter_slots();
-	test_checker_reports_invalid_named_arguments();
-	test_checker_reports_duplicate_local();
-	test_checker_reports_duplicate_static();
-	test_checker_resolves_imported_export();
-	test_checker_reports_static_cycle();
-	test_checker_reports_invalid_static_expression();
-	test_checker_reports_unresolved_import();
-	test_checker_reports_missing_imported_static();
-	test_checker_reports_private_imported_static();
-	test_checker_routes_imported_static_error_to_source();
-	test_checker_propagates_diagnostic_oom();
+	TEST_RUN("checker.resolves_static_forward_reference", test_checker_resolves_static_forward_reference);
+	TEST_RUN("checker.tags_exported_static", test_checker_tags_exported_static);
+	TEST_RUN("checker.declares_local_after_initializer", test_checker_declares_local_after_initializer);
+	TEST_RUN("checker.preserves_block_shadowing", test_checker_preserves_block_shadowing);
+	TEST_RUN("checker.does_not_leak_block_locals", test_checker_does_not_leak_block_locals);
+	TEST_RUN("checker.attaches_function_entities", test_checker_attaches_function_entities);
+	TEST_RUN("checker.binds_call_arguments_to_parameter_slots", test_checker_binds_call_arguments_to_parameter_slots);
+	TEST_RUN("checker.reports_invalid_named_arguments", test_checker_reports_invalid_named_arguments);
+	TEST_RUN("checker.reports_duplicate_local", test_checker_reports_duplicate_local);
+	TEST_RUN("checker.reports_duplicate_static", test_checker_reports_duplicate_static);
+	TEST_RUN("checker.resolves_imported_export", test_checker_resolves_imported_export);
+	TEST_RUN("checker.reports_static_cycle", test_checker_reports_static_cycle);
+	TEST_RUN("checker.reports_invalid_static_expression", test_checker_reports_invalid_static_expression);
+	TEST_RUN("checker.reports_unresolved_import", test_checker_reports_unresolved_import);
+	TEST_RUN("checker.reports_missing_imported_static", test_checker_reports_missing_imported_static);
+	TEST_RUN("checker.reports_private_imported_static", test_checker_reports_private_imported_static);
+	TEST_RUN("checker.routes_imported_static_error_to_source", test_checker_routes_imported_static_error_to_source);
+	TEST_RUN("checker.propagates_diagnostic_oom", test_checker_propagates_diagnostic_oom);
 }

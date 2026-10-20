@@ -200,71 +200,6 @@ static void test_parser_import_expression(elf_State *state)
 	}
 }
 
-#if 0
-static void test_parser_module_discovery(elf_State *state)
-{
-	(void)state;
-	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
-	if (compiler_add_root_file(compiler, "test/compiler/imports/discovery/root.elf") == COM_INVALID_SOURCE_ID) {
-		test_fail("compiler loads root source file directly");
-		arena_destroy(&arena);
-		return;
-	}
-	if (!compiler_parse_sources(compiler)) {
-		test_fail("compiler parses imported module graph");
-		arena_destroy(&arena);
-		return;
-	}
-
-	if (compiler->source_count != 3) {
-		test_fail("module discovery deduplicates canonical paths");
-		arena_destroy(&arena);
-		return;
-	}
-	for (Com_SourceId source_id = 0; source_id < compiler->source_count; ++source_id)
-	{
-		if (!compiler->sources[source_id].ast || compiler->sources[source_id].ast->kind != AST_FUNCTION) {
-			test_fail("module discovery stores every parsed source AST");
-		}
-	}
-
-	Com_Source *root = compiler->sources + 0;
-	Com_Source *a = compiler->sources + 1;
-	Com_Source *b = compiler->sources + 2;
-	if (root->import_count != 2 || root->imports[0].resolved_source != 1 || root->imports[1].resolved_source != 1) {
-		test_fail("root imports resolve to deduplicated source id");
-	}
-	if (a->import_count != 1 || a->imports[0].resolved_source != 2) {
-		test_fail("imported module resolves transitive import");
-	}
-	if (b->import_count != 1 || b->imports[0].resolved_source != 0) {
-		test_fail("module discovery resolves import cycle to existing root");
-	}
-	if (a->imports[0].site.source != 1 || b->imports[0].site.source != 2) {
-		test_fail("import records retain source ids");
-	}
-	arena_destroy(&arena);
-}
-
-static void test_parser_missing_import(elf_State *state)
-{
-	(void)state;
-	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
-	const char *source_text = "missing :: import \"missing.elf\"";
-	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
-	compiler_add_root_source(compiler, "test/compiler/imports/discovery/missing-root.elf", source);
-	if (compiler_parse_sources(compiler)) {
-		test_fail("missing imported source fails module discovery");
-	}
-	if (compiler->report.error_count != 1) {
-		test_fail("missing imported source reports one compiler error");
-	}
-	arena_destroy(&arena);
-}
-#endif
-
 static void test_parser_string_strings(elf_State *state)
 {
 	Ast file = parser_test_parse_source(state, "name := \"hello\"");
@@ -783,43 +718,6 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 	arena_destroy(&arena);
 }
 
-#if 0
-static void test_parser_take_token_error(elf_State *state)
-{
-	Arena arena = arena_create(0);
-	elf_StrSlice source = {(char *)"value", 5};
-	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "parser_take_token_error", source);
-	Parser *parser = parser_create(compiler);
-	parser_begin_source(parser, 0);
-	Token token = take_token(parser, TOK_LEFT_PAREN);
-	parser_destroy(parser);
-	if (!token_is_error(token) || token.status != COM_STATUS_REPORTED || ast_from_token_error(token) != ERROR_AST || compiler->report.error_count != 1) {
-		test_fail("take token returns its source error");
-	}
-	arena_destroy(&arena);
-}
-
-static void test_parser_take_token_oom(elf_State *state)
-{
-	Arena arena = arena_create(0);
-	elf_StrSlice source = {(char *)"value", 5};
-	Compiler *compiler = compiler_create(&arena);
-	compiler_add_root_source(compiler, "parser_take_token_oom", source);
-	Parser *parser = parser_create(compiler);
-	parser_begin_source(parser, 0);
-	u64 capacity = arena.capacity;
-	arena.capacity = arena.used;
-	Token token = take_token(parser, TOK_LEFT_PAREN);
-	arena.capacity = capacity;
-	parser_destroy(parser);
-	if (!token_is_error(token) || token.status != COM_STATUS_OOM || ast_from_token_error(token) != ERROR_OOM_AST || compiler->report.error_count != 0) {
-		test_fail("take token returns diagnostic allocation failure");
-	}
-	arena_destroy(&arena);
-}
-#endif
-
 static void test_parser_ast_oom(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -841,31 +739,31 @@ static void test_parser_ast_oom(elf_State *state)
 
 static void run_parser_tests(elf_State *state)
 {
-	test_parser_decl_precedence_and_strings(state);
-	test_parser_measure_operator(state);
-	test_parser_constant_declaration(state);
-	test_parser_static_declaration(state);
-	test_parser_exported_static_declaration(state);
-	test_parser_import_expression(state);
-	test_parser_string_strings(state);
-	test_parser_interpolated_strings(state);
-	test_parser_if_else_blocks(state);
-	test_parser_statement_semicolons(state);
-	test_parser_for_loops(state);
-	test_parser_call_with_table_argument(state);
-	test_parser_named_call_arguments(state);
-	test_parser_array_literals(state);
-	test_parser_nil_assign(state);
-	test_parser_table_access_modes(state);
-	test_parser_rejects_legacy_table_syntax(state);
-	test_parser_rejects_trailing_closures(state);
-	test_parser_open_range_indexes(state);
-	test_parser_function_expression(state);
-	test_parser_get_mem_macro(state);
-	test_parser_this_expression(state);
-	test_parser_integer_literal_boundaries(state);
-	test_parser_source_slices(state);
-	test_parser_line_boundaries(state);
-	test_parser_lexer_error_boundary(state);
-	test_parser_ast_oom(state);
+	TEST_RUN("parser.decl_precedence_and_strings", test_parser_decl_precedence_and_strings, state);
+	TEST_RUN("parser.measure_operator", test_parser_measure_operator, state);
+	TEST_RUN("parser.constant_declaration", test_parser_constant_declaration, state);
+	TEST_RUN("parser.static_declaration", test_parser_static_declaration, state);
+	TEST_RUN("parser.exported_static_declaration", test_parser_exported_static_declaration, state);
+	TEST_RUN("parser.import_expression", test_parser_import_expression, state);
+	TEST_RUN("parser.string_strings", test_parser_string_strings, state);
+	TEST_RUN("parser.interpolated_strings", test_parser_interpolated_strings, state);
+	TEST_RUN("parser.if_else_blocks", test_parser_if_else_blocks, state);
+	TEST_RUN("parser.statement_semicolons", test_parser_statement_semicolons, state);
+	TEST_RUN("parser.for_loops", test_parser_for_loops, state);
+	TEST_RUN("parser.call_with_table_argument", test_parser_call_with_table_argument, state);
+	TEST_RUN("parser.named_call_arguments", test_parser_named_call_arguments, state);
+	TEST_RUN("parser.array_literals", test_parser_array_literals, state);
+	TEST_RUN("parser.nil_assign", test_parser_nil_assign, state);
+	TEST_RUN("parser.table_access_modes", test_parser_table_access_modes, state);
+	TEST_RUN("parser.rejects_legacy_table_syntax", test_parser_rejects_legacy_table_syntax, state);
+	TEST_RUN("parser.rejects_trailing_closures", test_parser_rejects_trailing_closures, state);
+	TEST_RUN("parser.open_range_indexes", test_parser_open_range_indexes, state);
+	TEST_RUN("parser.function_expression", test_parser_function_expression, state);
+	TEST_RUN("parser.get_mem_macro", test_parser_get_mem_macro, state);
+	TEST_RUN("parser.this_expression", test_parser_this_expression, state);
+	TEST_RUN("parser.integer_literal_boundaries", test_parser_integer_literal_boundaries, state);
+	TEST_RUN("parser.source_slices", test_parser_source_slices, state);
+	TEST_RUN("parser.line_boundaries", test_parser_line_boundaries, state);
+	TEST_RUN("parser.lexer_error_boundary", test_parser_lexer_error_boundary, state);
+	TEST_RUN("parser.ast_oom", test_parser_ast_oom, state);
 }

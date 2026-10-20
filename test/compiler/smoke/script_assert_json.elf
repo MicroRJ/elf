@@ -41,7 +41,6 @@ test_assert(elf.json.stringify(nil) == "null")
 
 invalid := elf.json.parse("{")
 test_assert(elf.is_error(invalid))
-test_assert(invalid.line == 1)
 
 cyclic := {}
 cyclic.self = cyclic

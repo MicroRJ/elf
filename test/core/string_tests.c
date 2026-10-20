@@ -35,20 +35,6 @@ static void test_string_size_limited_interning(elf_State *state)
 	}
 }
 
-#if 0
-static void test_string_public_text_helpers(elf_State *state)
-{
-	elf_String *string = elf_string_from_data(state, "copy.me");
-
-	Scratch scratch = scratch_begin();
-	elf_StrSlice copy = elf_string_copy_text(scratch.arena, string);
-	if (copy.size != 7 || strcmp(copy.data, "copy.me") != 0) {
-		test_fail("string copy returns arena-owned c string");
-	}
-	scratch_end(scratch);
-}
-#endif
-
 static void force_string_gc(elf_State *state)
 {
 	state->gc_next_cycle_bytes = 1;
@@ -98,10 +84,7 @@ static void test_string_unrooted_values_are_swept(void)
 	force_string_gc(state);
 
 	if (state->string_count > baseline + 8) {
-		fprintf(stderr, "FAIL: unrooted strings are swept expected interner count near %u, got %u\n"
-		,	baseline
-		,	state->string_count);
-		test_failures += 1;
+		TEST_FAIL("unrooted strings are swept expected interner count near %u, got %u", baseline, state->string_count);
 	}
 	elf_destroy_state(state);
 }
@@ -146,10 +129,9 @@ static void test_string_bucket_unlinks_dead_collisions(void)
 
 static void run_string_tests(elf_State *state)
 {
-	test_string_interned_identity(state);
-	test_string_size_limited_interning(state);
-	// test_string_public_text_helpers(state);
-	test_string_stack_roots_survive_gc();
-	test_string_unrooted_values_are_swept();
-	test_string_bucket_unlinks_dead_collisions();
+	TEST_RUN("string.interned_identity", test_string_interned_identity, state);
+	TEST_RUN("string.size_limited_interning", test_string_size_limited_interning, state);
+	TEST_RUN("string.stack_roots_survive_gc", test_string_stack_roots_survive_gc);
+	TEST_RUN("string.unrooted_values_are_swept", test_string_unrooted_values_are_swept);
+	TEST_RUN("string.bucket_unlinks_dead_collisions", test_string_bucket_unlinks_dead_collisions);
 }

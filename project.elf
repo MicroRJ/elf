@@ -49,32 +49,18 @@ public_header_test := {
 	private_include_directories = [ "include" ],
 }
 
-core_tests := {
+tests := {
 	kind = "executable",
-	name = "core_tests",
-	sources = [ "test/core/core_tests.c" ],
+	name = "tests",
+	sources = [ "test/test.c" ],
 	private_include_directories = internal_include_directories,
 	dependencies = [ library ],
 }
 
-run_core_tests := {
+run_tests := {
 	kind = "run",
-	name = "run core tests",
-	target = core_tests,
-}
-
-compiler_tests := {
-	kind = "executable",
-	name = "compiler_tests",
-	sources = [ "test/compiler/compiler_tests.c" ],
-	private_include_directories = internal_include_directories,
-	dependencies = [ library ],
-}
-
-run_compiler_tests := {
-	kind = "run",
-	name = "run compiler tests",
-	target = compiler_tests,
+	name = "run tests",
+	target = tests,
 }
 
 benchmarks := {
@@ -130,10 +116,8 @@ ret {
 	targets = {
 		library = library,
 		public_header_test = public_header_test,
-		core_tests = core_tests,
-		run_core_tests = run_core_tests,
-		compiler_tests = compiler_tests,
-		run_compiler_tests = run_compiler_tests,
+		tests = tests,
+		run_tests = run_tests,
 		benchmarks = benchmarks,
 		optimized_library = optimized_library,
 		optimized_benchmarks = optimized_benchmarks,

@@ -55,9 +55,7 @@ static Token lexer_next(Parser *parser)
 static void expect_token_type(Token token, Token_Type type, const char *label)
 {
 	if (token.type != type) {
-		fprintf(stderr, "FAIL: %s expected token %s, got %s\n",
-			label, token_type_name(type), token_type_name(token.type));
-		test_failures += 1;
+		TEST_FAIL("%s expected token %s, got %s", label, token_type_name(type), token_type_name(token.type));
 	}
 }
 
@@ -80,8 +78,7 @@ static Token lexer_next_interpolation_end(Parser *parser, const char *label)
 static void expect_token_atom(Token token, const char *text, const char *label)
 {
 	if (!token.atom) {
-		fprintf(stderr, "FAIL: %s expected string '%s', got no string\n", label, text);
-		test_failures += 1;
+		TEST_FAIL("%s expected string '%s', got no string", label, text);
 		return;
 	}
 
@@ -90,24 +87,21 @@ static void expect_token_atom(Token token, const char *text, const char *label)
 	u32 expected_size = (u32)strlen(text);
 
 	if (size != expected_size || memcmp(data, text, expected_size) != 0) {
-		fprintf(stderr, "FAIL: %s expected string '%s', got '%.*s'\n", label, text, size, data);
-		test_failures += 1;
+		TEST_FAIL("%s expected string '%s', got '%.*s'", label, text, size, data);
 	}
 }
 
 static void expect_token_atom_bytes(Token token, const char *data, u32 size, const char *label)
 {
 	if (!token.atom) {
-		fprintf(stderr, "FAIL: %s expected string bytes, got no string\n", label);
-		test_failures += 1;
+		TEST_FAIL("%s expected string bytes, got no string", label);
 		return;
 	}
 
 	const char *actual = atom_data(token.atom);
 	u32 actual_size = atom_size(token.atom);
 	if (actual_size != size || memcmp(actual, data, size) != 0) {
-		fprintf(stderr, "FAIL: %s expected %u string bytes, got %u\n", label, size, actual_size);
-		test_failures += 1;
+		TEST_FAIL("%s expected %u string bytes, got %u", label, size, actual_size);
 	}
 }
 
@@ -128,14 +122,7 @@ static void expect_token_line(Parser *parser, Token token, u32 index, const char
 		line_size != expected_size ||
 		memcmp(line_start, text, expected_size) != 0)
 	{
-		fprintf(stderr, "FAIL: %s expected line %u '%s', got line %u '%.*s'\n",
-			label,
-			index,
-			text,
-			token.site.line_index,
-			(i32)line_size,
-			line_start);
-		test_failures += 1;
+		TEST_FAIL("%s expected line %u '%s', got line %u '%.*s'", label, index, text, token.site.line_index, (i32)line_size, line_start);
 	}
 }
 
@@ -144,41 +131,28 @@ static void expect_token_site(Parser *parser, Token token, u64 offset, const cha
 	u64 actual = token.site.offset;
 
 	if (actual != offset) {
-		fprintf(stderr, "FAIL: %s expected site offset %llu, got %llu\n",
-			label,
-			offset,
-			actual);
-		test_failures += 1;
+		TEST_FAIL("%s expected site offset %llu, got %llu", label, (unsigned long long)offset, (unsigned long long)actual);
 	}
 }
 
 static void expect_token_site_size(Token token, u32 size, const char *label)
 {
 	if (token.site.size != size) {
-		fprintf(stderr, "FAIL: %s expected site size %u, got %u\n",
-			label,
-			size,
-			token.site.size);
-		test_failures += 1;
+		TEST_FAIL("%s expected site size %u, got %u", label, size, token.site.size);
 	}
 }
 
 static void expect_token_line_break(Token token, b32 expected, const char *label)
 {
 	if (!!token.line_break_before != !!expected) {
-		fprintf(stderr, "FAIL: %s expected line_break_before %u, got %u\n",
-			label,
-			!!expected,
-			!!token.line_break_before);
-		test_failures += 1;
+		TEST_FAIL("%s expected line_break_before %u, got %u", label, !!expected, !!token.line_break_before);
 	}
 }
 
 static void expect_token_int(Token token, u64 expected, const char *label)
 {
 	if (token.integer_magnitude != expected) {
-		fprintf(stderr, "FAIL: %s expected integer %llu, got %llu\n", label, expected, token.integer_magnitude);
-		test_failures += 1;
+		TEST_FAIL("%s expected integer %llu, got %llu", label, (unsigned long long)expected, (unsigned long long)token.integer_magnitude);
 	}
 }
 
@@ -190,8 +164,7 @@ static void expect_token_number(Token token, f64 expected, const char *label)
 	}
 
 	if (delta > 0.000001) {
-		fprintf(stderr, "FAIL: %s expected number %f, got %f\n", label, expected, token.number);
-		test_failures += 1;
+		TEST_FAIL("%s expected number %f, got %f", label, expected, token.number);
 	}
 }
 
@@ -747,16 +720,16 @@ static void test_lexer_out_of_memory(elf_State *state)
 
 static void run_lexer_tests(elf_State *state)
 {
-	test_lexer_keywords_and_identifiers(state);
-	test_lexer_macros(state);
-	test_lexer_strings(state);
-	test_lexer_format_string_parts(state);
-	test_lexer_line_slices(state);
-	test_lexer_line_tracking_through_skipped_text(state);
-	test_lexer_line_breaks(state);
-	test_lexer_numbers(state);
-	test_lexer_operators(state);
-	test_lexer_compiler_source(state);
-	test_lexer_bounded_source(state);
-	test_lexer_out_of_memory(state);
+	TEST_RUN("lexer.keywords_and_identifiers", test_lexer_keywords_and_identifiers, state);
+	TEST_RUN("lexer.macros", test_lexer_macros, state);
+	TEST_RUN("lexer.strings", test_lexer_strings, state);
+	TEST_RUN("lexer.format_string_parts", test_lexer_format_string_parts, state);
+	TEST_RUN("lexer.line_slices", test_lexer_line_slices, state);
+	TEST_RUN("lexer.line_tracking_through_skipped_text", test_lexer_line_tracking_through_skipped_text, state);
+	TEST_RUN("lexer.line_breaks", test_lexer_line_breaks, state);
+	TEST_RUN("lexer.numbers", test_lexer_numbers, state);
+	TEST_RUN("lexer.operators", test_lexer_operators, state);
+	TEST_RUN("lexer.compiler_source", test_lexer_compiler_source, state);
+	TEST_RUN("lexer.bounded_source", test_lexer_bounded_source, state);
+	TEST_RUN("lexer.out_of_memory", test_lexer_out_of_memory, state);
 }

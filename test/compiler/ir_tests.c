@@ -659,30 +659,30 @@ static void test_ir_lowers_get_mem_macro(elf_State *state)
 
 static void run_ir_tests(elf_State *state)
 {
-	test_ir_lowers_declaration_expression(state);
-	test_ir_lowers_bitwise_not(state);
-	test_ir_lowers_tuple_expression(state);
-	test_ir_lowers_assignment_to_local(state);
-	test_ir_rejects_assignment_to_constant(state);
-	test_ir_lowers_strings_and_globals(state);
-	test_ir_lowers_interpolated_string(state);
-	test_ir_lowers_field_and_call(state);
-	test_ir_lowers_array_literal(state);
-	test_ir_lowers_if_else(state);
-	test_ir_lowers_while(state);
-	test_ir_lowers_nil_assign(state);
-	test_ir_lowers_nil_assign_field_once(state);
-	test_ir_reports_nil_assignment_arity(state);
-	test_ir_lowers_function_expression(state);
-	test_ir_loads_implicit_this(state);
-	test_ir_rejects_this_assignment(state);
-	test_ir_loads_capture_per_reference(state);
-	test_ir_reports_cross_function_capture(state);
-	test_ir_rejects_unknown_parameter_type(state);
-	test_ir_lowers_static_forward_reference(state);
-	test_ir_rejects_assignment_to_file_static(state);
-	test_ir_lowers_static_call_arguments(state);
-	test_ir_lowers_variadic_static_call_arguments(state);
-	test_ir_lowers_local_shadow_of_file_static(state);
-	test_ir_lowers_get_mem_macro(state);
+	TEST_RUN("ir.lowers_declaration_expression", test_ir_lowers_declaration_expression, state);
+	TEST_RUN("ir.lowers_bitwise_not", test_ir_lowers_bitwise_not, state);
+	TEST_RUN("ir.lowers_tuple_expression", test_ir_lowers_tuple_expression, state);
+	TEST_RUN("ir.lowers_assignment_to_local", test_ir_lowers_assignment_to_local, state);
+	TEST_RUN("ir.rejects_assignment_to_constant", test_ir_rejects_assignment_to_constant, state);
+	TEST_RUN("ir.lowers_strings_and_globals", test_ir_lowers_strings_and_globals, state);
+	TEST_RUN("ir.lowers_interpolated_string", test_ir_lowers_interpolated_string, state);
+	TEST_RUN("ir.lowers_field_and_call", test_ir_lowers_field_and_call, state);
+	TEST_RUN("ir.lowers_array_literal", test_ir_lowers_array_literal, state);
+	TEST_RUN("ir.lowers_if_else", test_ir_lowers_if_else, state);
+	TEST_RUN("ir.lowers_while", test_ir_lowers_while, state);
+	TEST_RUN("ir.lowers_nil_assign", test_ir_lowers_nil_assign, state);
+	TEST_RUN("ir.lowers_nil_assign_field_once", test_ir_lowers_nil_assign_field_once, state);
+	TEST_RUN("ir.reports_nil_assignment_arity", test_ir_reports_nil_assignment_arity, state);
+	TEST_RUN("ir.lowers_function_expression", test_ir_lowers_function_expression, state);
+	TEST_RUN("ir.loads_implicit_this", test_ir_loads_implicit_this, state);
+	TEST_RUN("ir.rejects_this_assignment", test_ir_rejects_this_assignment, state);
+	TEST_RUN("ir.loads_capture_per_reference", test_ir_loads_capture_per_reference, state);
+	TEST_RUN("ir.reports_cross_function_capture", test_ir_reports_cross_function_capture, state);
+	TEST_RUN("ir.rejects_unknown_parameter_type", test_ir_rejects_unknown_parameter_type, state);
+	TEST_RUN("ir.lowers_static_forward_reference", test_ir_lowers_static_forward_reference, state);
+	TEST_RUN("ir.rejects_assignment_to_file_static", test_ir_rejects_assignment_to_file_static, state);
+	TEST_RUN("ir.lowers_static_call_arguments", test_ir_lowers_static_call_arguments, state);
+	TEST_RUN("ir.lowers_variadic_static_call_arguments", test_ir_lowers_variadic_static_call_arguments, state);
+	TEST_RUN("ir.lowers_local_shadow_of_file_static", test_ir_lowers_local_shadow_of_file_static, state);
+	TEST_RUN("ir.lowers_get_mem_macro", test_ir_lowers_get_mem_macro, state);
 }

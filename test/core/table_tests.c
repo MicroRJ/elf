@@ -27,18 +27,14 @@ static void expect_nil(elf_Value value, const char *label)
 static void expect_int(elf_Value value, elf_Int expected, const char *label)
 {
 	if (value.type != ELF_VALUE_TYPE_INTEGER || value.x_int != expected) {
-		fprintf(stderr, "FAIL: %s expected int %lld, got tag %d elf_Value %lld\n",
-			label, expected, value.type, value.x_int);
-		test_failures += 1;
+		TEST_FAIL("%s expected int %lld, got tag %d elf_Value %lld", label, (long long)expected, value.type, (long long)value.x_int);
 	}
 }
 
 static void expect_index(u32 value, u32 expected, const char *label)
 {
 	if (value != expected) {
-		fprintf(stderr, "FAIL: %s expected u32 %u, got %u\n",
-			label, expected, value);
-		test_failures += 1;
+		TEST_FAIL("%s expected u32 %u, got %u", label, expected, value);
 	}
 }
 
@@ -249,9 +245,9 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 
 static void run_table_tests(elf_State *state)
 {
-	test_table_field_set_get(state);
-	test_table_integer_keys(state);
-	test_table_resize_stress(state);
-	test_table_delete_and_reuse_tombstones(state);
-	test_runtime_elf_global_is_table(state);
+	TEST_RUN("table.field_set_get", test_table_field_set_get, state);
+	TEST_RUN("table.integer_keys", test_table_integer_keys, state);
+	TEST_RUN("table.resize_stress", test_table_resize_stress, state);
+	TEST_RUN("table.delete_and_reuse_tombstones", test_table_delete_and_reuse_tombstones, state);
+	TEST_RUN("table.runtime_elf_global", test_runtime_elf_global_is_table, state);
 }

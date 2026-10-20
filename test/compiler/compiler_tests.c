@@ -6,7 +6,6 @@
 #include <dy_io.h>
 #include <dy_process.h>
 
-#include "../test.h"
 #include "base.h"
 #include "elf_core.h"
 #include "libs.h"
@@ -27,38 +26,19 @@
 #include "lexer.c"
 #include "bc_emitter.h"
 
-static int test_failures;
-
-static void test_fail(const char *label)
-{
-	log_linef(LOG_LEVEL_ERROR, "FAIL: %s", label);
-	test_failures += 1;
-}
-
+#define test_fail(label) TEST_FAIL("%s", (label))
 #include "lexer_tests.c"
 #include "parser_tests.c"
 #include "unparse_tests.c"
 #include "checker_tests.c"
 #include "ir_tests.c"
 #include "backend_tests.c"
-#define test_fail(label) TEST_FAIL("%s", (label))
 #include "vm_tests.c"
-#undef test_fail
 #include "../script_tests.c"
-#include "smoke_tests.c"
+#undef test_fail
 
-int main(int argc, char **argv)
+static void run_compiler_tests(void)
 {
-	setvbuf(stdout, 0, _IONBF, 0);
-	setvbuf(stderr, 0, _IONBF, 0);
-	if (argc == 2 && strcmp(argv[1], "--runtime-error-diagnostic-child") == 0)
-	{
-		return vm_run_runtime_error_diagnostic_child();
-	}
-
-	// start tests on a new line because manny will also print shit
-	fprintf(stderr, "\n");
-
 	elf_State *state = elf_create_state();
 	run_lexer_tests(state);
 	run_parser_tests(state);
@@ -70,13 +50,4 @@ int main(int argc, char **argv)
 	run_script_tests();
 
 	elf_destroy_state(state);
-
-	u32 failures = (u32)test_failures + test_context.failed_tests;
-	if (failures) {
-		fprintf(stderr, "tests failed: %u\n", failures);
-		return 1;
-	}
-
-	log_line(LOG_LEVEL_SUCCESS, "tests ok");
-	return 0;
 }

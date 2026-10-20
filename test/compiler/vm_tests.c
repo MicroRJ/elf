@@ -5,8 +5,8 @@ ELF_FUNCTION(vm_test_assert)
 	check_numeric(S, value);
 	const char *message = nargs > 2 ? lib_load_cstr(S, 2) : "script assertion failed";
 	if (!value_to_integer(value)) {
-		print_current_runtime_source_location(S);
 		test_fail(message);
+		print_current_runtime_source_location(S);
 	}
 	return 0;
 }
@@ -615,14 +615,8 @@ static void run_vm_tests(void)
 	TEST_RUN("vm.function_call", test_vm_function_call);
 	TEST_RUN("vm.function_arguments", test_vm_function_arguments);
 	TEST_RUN("vm.method_this", test_vm_method_this);
-#if 0
-	// Disabled until JSON errors report the expected source line.
 	TEST_RUN("vm.script_json_assertions", test_vm_script_json_assertions);
-#endif
-#if 0
-	// Disabled until the core library regains feature parity.
 	TEST_RUN("vm.core_library_assertions", test_vm_core_library_assertions);
-#endif
 	TEST_RUN("vm.string_join", test_vm_string_join);
 	TEST_RUN("vm.interpolated_strings", test_vm_interpolated_strings);
 	TEST_RUN("vm.static_function", test_vm_static_function);

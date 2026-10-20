@@ -14,8 +14,7 @@ static void expect_serialize_text(elf_State *state, elf_Value value, const char 
 	char *text = test_serialize_to_text(state, &arena, value);
 	if (strcmp(text, expected) != 0)
 	{
-		fprintf(stderr, "FAIL: %s expected:\n%s\nactual:\n%s\n", label, expected, text);
-		test_failures += 1;
+		TEST_FAIL("%s expected:\n%s\nactual:\n%s", label, expected, text);
 	}
 	arena_destroy(&arena);
 }
@@ -53,7 +52,7 @@ static void test_serialize_array(elf_State *state)
 
 static void run_unparse_tests(elf_State *state)
 {
-	test_serialize_scalars(state);
-	test_serialize_table(state);
-	test_serialize_array(state);
+	TEST_RUN("unparse.scalars", test_serialize_scalars, state);
+	TEST_RUN("unparse.table", test_serialize_table, state);
+	TEST_RUN("unparse.array", test_serialize_array, state);
 }

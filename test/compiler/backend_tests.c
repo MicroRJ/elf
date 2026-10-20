@@ -460,52 +460,6 @@ static void test_backend_logical_expr_delays_result_slot(void)
 	backend_test_destroy(or_result);
 }
 
-#if 0
-static void test_backend_if_else_restores_stack_top(void)
-{
-	elf_State *state = elf_create_state();
-	Scratch scratch = scratch_begin();
-	Compiler *compiler = compiler_create(scratch.arena);
-	compiler_add_root_source(compiler, "backend_tests", (elf_StrSlice) {});
-	IrModule *ir_module = ir_new_module(compiler);
-	IrEmitter *emitter = ir_new_function_emitter(ir_module);
-	SourceSite site = {};
-
-	Ir pred = ir_new_int(emitter, site, 0);
-	Ir true_clause = ir_new_local(emitter, site, ir_new_int(emitter, site, 11));
-	Ir else_clause = ir_new_local(emitter, site, ir_new_int(emitter, site, 22));
-	Ir if_ir = ir_new_if(emitter, site, pred, true_clause, else_clause);
-	Ir after_if = ir_new_local(emitter, site, ir_new_int(emitter, site, 33));
-
-	IrQueue stats = ir_begin_queue(emitter);
-	ir_push(&stats, if_ir);
-	ir_push(&stats, after_if);
-	Ir body = ir_new_block(emitter, site, ir_end_queue(&stats));
-
-	IrFunction function = {};
-	function.site = site;
-	function.variadic = true;
-	Ir params[] = { ir_new_local(emitter, site, 0) };
-	function.params = params;
-	function.param_count = ARRAY_COUNT(params);
-	function.body = body;
-
-	BcEmitter *module = bc_create_module_emitter(compiler, 1);
-	BcFunctionEmitter *emitter = bc_create_function_emitter(module);
-	bc_emit_function(emitter, &function);
-	if (module->generated_function_count != 1) {
-		test_fail("function generation appends one bytecode function to its module");
-	}
-
-	if (after_if->ir_local.slot != IMPLICIT_PARAM_COUNT) {
-		test_fail("if/else restores stack top before following statement");
-	}
-
-	scratch_end(scratch);
-	elf_destroy_state(state);
-}
-#endif
-
 static void test_backend_formats_bytecode_function(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
@@ -667,26 +621,26 @@ static void test_backend_emits_parameter_type_enforcement(void)
 
 static void run_backend_tests(void)
 {
-	test_backend_source_map();
-	test_backend_short_circuit_and();
-	test_backend_short_circuit_or();
-	test_backend_short_circuit_nested_and_or();
-	test_backend_short_circuit_nested_or_and();
-	test_backend_short_circuit_mixed_groups();
-	test_backend_while_loop();
-	test_backend_while_short_circuit_loop();
-	test_backend_range_for_loop_shape();
-	test_backend_range_for_collection_call_is_hoisted();
-	test_backend_array_bytecode();
-	test_backend_bitwise_not();
-	test_backend_local_initializer_reuses_result_slot();
-	test_backend_truthy_or_reuses_left_result_slot();
-	test_backend_logical_expr_delays_result_slot();
-	test_backend_formats_bytecode_function();
-	test_backend_outputs_strings();
-	test_backend_emits_direct_static_call();
-	test_backend_calls_imported_static_function();
-	test_backend_emits_direct_static_recurse_call();
-	test_backend_materializes_static_recurse_value();
-	test_backend_emits_parameter_type_enforcement();
+	TEST_RUN("backend.source_map", test_backend_source_map);
+	TEST_RUN("backend.short_circuit_and", test_backend_short_circuit_and);
+	TEST_RUN("backend.short_circuit_or", test_backend_short_circuit_or);
+	TEST_RUN("backend.short_circuit_nested_and_or", test_backend_short_circuit_nested_and_or);
+	TEST_RUN("backend.short_circuit_nested_or_and", test_backend_short_circuit_nested_or_and);
+	TEST_RUN("backend.short_circuit_mixed_groups", test_backend_short_circuit_mixed_groups);
+	TEST_RUN("backend.while_loop", test_backend_while_loop);
+	TEST_RUN("backend.while_short_circuit_loop", test_backend_while_short_circuit_loop);
+	TEST_RUN("backend.range_for_loop_shape", test_backend_range_for_loop_shape);
+	TEST_RUN("backend.range_for_collection_call_is_hoisted", test_backend_range_for_collection_call_is_hoisted);
+	TEST_RUN("backend.array_bytecode", test_backend_array_bytecode);
+	TEST_RUN("backend.bitwise_not", test_backend_bitwise_not);
+	TEST_RUN("backend.local_initializer_reuses_result_slot", test_backend_local_initializer_reuses_result_slot);
+	TEST_RUN("backend.truthy_or_reuses_left_result_slot", test_backend_truthy_or_reuses_left_result_slot);
+	TEST_RUN("backend.logical_expr_delays_result_slot", test_backend_logical_expr_delays_result_slot);
+	TEST_RUN("backend.formats_bytecode_function", test_backend_formats_bytecode_function);
+	TEST_RUN("backend.outputs_strings", test_backend_outputs_strings);
+	TEST_RUN("backend.emits_direct_static_call", test_backend_emits_direct_static_call);
+	TEST_RUN("backend.calls_imported_static_function", test_backend_calls_imported_static_function);
+	TEST_RUN("backend.emits_direct_static_recurse_call", test_backend_emits_direct_static_recurse_call);
+	TEST_RUN("backend.materializes_static_recurse_value", test_backend_materializes_static_recurse_value);
+	TEST_RUN("backend.emits_parameter_type_enforcement", test_backend_emits_parameter_type_enforcement);
 }

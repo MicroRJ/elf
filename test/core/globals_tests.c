@@ -70,6 +70,6 @@ static void test_globals_are_gc_roots(elf_State *state)
 
 static void run_globals_tests(elf_State *state)
 {
-	test_globals_own_names_and_preserve_slots(state);
-	test_globals_are_gc_roots(state);
+	TEST_RUN("globals.own_names_and_preserve_slots", test_globals_own_names_and_preserve_slots, state);
+	TEST_RUN("globals.are_gc_roots", test_globals_are_gc_roots, state);
 }

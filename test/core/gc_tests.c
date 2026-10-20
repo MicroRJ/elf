@@ -9,9 +9,7 @@ static void force_gc_allocations(elf_State *state, u32 count)
 static void expect_gc_reference_count_below(elf_State *state, u32 max_count, const char *label)
 {
 	if (state->gc_reference_count > max_count) {
-		fprintf(stderr, "FAIL: %s expected GC reference count <= %u, got %u\n",
-			label, max_count, state->gc_reference_count);
-		test_failures += 1;
+		TEST_FAIL("%s expected GC reference count <= %u, got %u", label, max_count, state->gc_reference_count);
 	}
 }
 
@@ -315,13 +313,14 @@ static void test_state_create_destroy_repeatedly(void)
 
 static void run_gc_tests(void)
 {
-	test_gc_tracks_owned_storage();
-	test_gc_tracks_array_storage();
-	test_gc_keeps_stack_rooted_array_graph();
-	test_gc_sweeps_unreachable_tables();
-	test_gc_keeps_stack_rooted_table_graph();
-	test_gc_keeps_referenced_table_graph();
-	test_gc_keeps_referenced_string();
-	test_gc_keeps_referenced_error_info();
-	test_gc_keeps_referenced_buffer();
+	TEST_RUN("gc.tracks_owned_storage", test_gc_tracks_owned_storage);
+	TEST_RUN("gc.tracks_array_storage", test_gc_tracks_array_storage);
+	TEST_RUN("gc.keeps_stack_rooted_array_graph", test_gc_keeps_stack_rooted_array_graph);
+	TEST_RUN("gc.sweeps_unreachable_tables", test_gc_sweeps_unreachable_tables);
+	TEST_RUN("gc.keeps_stack_rooted_table_graph", test_gc_keeps_stack_rooted_table_graph);
+	TEST_RUN("gc.keeps_referenced_table_graph", test_gc_keeps_referenced_table_graph);
+	TEST_RUN("gc.keeps_referenced_string", test_gc_keeps_referenced_string);
+	TEST_RUN("gc.keeps_referenced_error_info", test_gc_keeps_referenced_error_info);
+	TEST_RUN("gc.keeps_referenced_buffer", test_gc_keeps_referenced_buffer);
+	TEST_RUN("gc.state_create_destroy_repeatedly", test_state_create_destroy_repeatedly);
 }

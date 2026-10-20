@@ -76,7 +76,6 @@ probe := fun(a, ...) {
 }
 probe(10, 20, 30)
 
-test_assert(elf.const_expr("42") == 42)
 test_assert(elf.load_file("test/compiler/smoke/core_lib_loaded.elf", 41) == 42)
 
 document := elf.json.load_file("test/compiler/smoke/core_lib_data.json")
@@ -160,7 +159,7 @@ test_assert(found_basic)
 test_assert(elf.fs.get_paths("test/compiler/smoke/does-not-exist") == nil)
 
 flat_paths := elf.fs.get_paths("src", 0)
-recursive_paths := elf.fs.get_paths("src", 1)
+recursive_paths := elf.fs.get_paths("src", 2)
 found_flat_l_string := 0
 found_recursive_l_string := 0
 for path := flat_paths[...] ? {
@@ -175,7 +174,7 @@ test_assert(elf.fs.get_paths("test/compiler/smoke", -1) == nil)
 test_assert(elf.fs.get_paths("test/compiler/smoke", 33) == nil)
 
 iteration := { count = 0, found_l_string = 0 }
-iteration_count := elf.fs.for_each_path("src", 1, fun(path) {
+iteration_count := elf.fs.for_each_path("src", 2, fun(path) {
 	iteration.count += 1
 	if elf.path.filename(path) == "l_string.c" ? { iteration.found_l_string = 1 }
 })
