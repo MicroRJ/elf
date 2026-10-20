@@ -110,6 +110,37 @@ static void test_vm_return_nil(void)
 	elf_destroy_state(result.state);
 }
 
+static void test_vm_pads_missing_returns(void)
+{
+	elf_State *state = elf_create_state();
+	char source_text[] = "ret 11, 22";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (elf_push_code_source(state, "missing-returns", source) != ELF_ERROR_NONE)
+	{
+		test_fail("missing-return test source compiles");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_Value *results = state->stack_ptr - 1;
+	elf_push_nil(state);
+	u32 returned_count = elf_call(state, 1, 3);
+	if (returned_count != 2)
+	{
+		test_fail("bytecode call reports its actual return count");
+	}
+	if (state->stack_ptr != results + 3)
+	{
+		test_fail("bytecode call reserves every requested return slot");
+	}
+	if (!value_is_integer(results[0]) || value_as_integer(results[0]) != 11 || !value_is_integer(results[1]) || value_as_integer(results[1]) != 22 || !value_is_nil(results[2]))
+	{
+		test_fail("bytecode call pads missing return values with nil");
+	}
+
+	elf_destroy_state(state);
+}
+
 static void test_vm_return_table(void)
 {
 	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_table.elf");
@@ -579,6 +610,7 @@ static void run_vm_tests(void)
 	test_vm_return_int();
 	test_vm_integer_add();
 	test_vm_return_nil();
+	test_vm_pads_missing_returns();
 	test_vm_return_table();
 	test_vm_return_array();
 	test_vm_nil_assign();
