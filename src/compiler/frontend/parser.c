@@ -635,61 +635,27 @@ static Ast parse_interpolated_string(Parser *parser)
 	u32 stack_start = parser->ast_stack_index;
 	u32 nparts = 0;
 
-	Token first = take_token(parser, TOK_STRING);
-	if (token_is_error(first)) {
-		return ast_from_token_error(first);
-	}
-	Ast first_part = ast_new_string_literal(parser, first.site, first.atom);
-	if (ast_is_error(first_part)) {
-		return first_part;
-	}
-	if (!push_ast(parser, first_part)) {
-		return ERROR_OOM_AST;
-	}
-	nparts += 1;
-
-	for (;;)
+	while (!peek_token(parser, TOK_INTERPOLATION_END))
 	{
-		Ast expr = parse_expr(parser);
-		if (ast_is_error(expr))
+		Ast part = parse_expr(parser);
+		if (ast_is_error(part))
 		{
 			parser->ast_stack_index = stack_start;
-			return expr;
+			return part;
 		}
-		if (!expr)
+		if (!part)
 		{
 			parser->ast_stack_index = stack_start;
 			return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected expression inside interpolated string");
 		}
-		if (!push_ast(parser, expr)) {
-			parser->ast_stack_index = stack_start;
-			return ERROR_OOM_AST;
-		}
-		nparts += 1;
-
-		Token part = take_token(parser, TOK_STRING);
-		if (token_is_error(part))
+		if (!push_ast(parser, part))
 		{
 			parser->ast_stack_index = stack_start;
-			return ast_from_token_error(part);
-		}
-
-		Ast text = ast_new_string_literal(parser, part.site, part.atom);
-		if (ast_is_error(text)) {
-			parser->ast_stack_index = stack_start;
-			return text;
-		}
-		if (!push_ast(parser, text)) {
-			parser->ast_stack_index = stack_start;
 			return ERROR_OOM_AST;
 		}
 		nparts += 1;
-
-		if (peek_token(parser, TOK_INTERPOLATION_END)) {
-			consume_token(parser);
-			break;
-		}
 	}
+	consume_token(parser);
 
 	Ast_Array parts = pop_ast_array(parser, nparts);
 	if (!parts.items) {
