@@ -11,6 +11,13 @@ automatically discovers every `.elf` file in that directory, installs
 expected behavior; no C registration function or sentinel return value is
 needed.
 
+Do not hesitate to add assertion scripts. New language or runtime features,
+bug fixes, suspected regressions, and behavior that is uncertain during an
+investigation should normally gain focused coverage under `test/scripts` when
+the behavior can be expressed from Elf. Keep useful diagnostic scripts as
+regression tests instead of discarding them after the immediate issue is
+understood.
+
 Keep scripts under `test/compiler/smoke` when a C test must inspect the returned
 value or runtime state directly, and register those explicitly in
 `test/compiler/vm_tests.c`. Add lower-level parser, checker, IR, backend, core,
@@ -50,6 +57,52 @@ Avoid copying source, bytecode, constants, or other compiled data through
 additional temporary module representations without a concrete need.
 Architectural boundaries should reduce work and clarify ownership, not create
 APIs solely for conceptual purity.
+
+## Error Propagation
+
+New code, especially runtime and core code, must report failure through an
+explicit return path and let callers return or recover gracefully. Never call
+`report_runtime_error` and rely on its current process exit to prevent the
+function from continuing. Treat `report_runtime_error` and
+`abort_after_runtime_error` as deprecated legacy control flow, not as patterns
+to extend. When this pattern is encountered in existing code, point it out to
+the user and account for it in the proposed work instead of silently copying
+it.
+
+Keep failure reporting separate from failure detection. Low-level containers
+and helpers return a status without logging or terminating; an owning boundary
+turns that status into a compiler diagnostic, runtime error value, VM error, or
+public API error exactly once. Callers must check and propagate failure before
+using outputs or continuing mutation. Use `ASSERT` only for impossible internal
+invariants, never for invalid input, allocation failure, or another recoverable
+runtime condition.
+
+Use the result convention belonging to the layer:
+
+- Compiler status-only operations return `Com_Status`. Compiler functions whose
+  primary result is a token, AST, entity, value, or IR node use that type's
+  existing error representation and preserve the underlying status where the
+  representation supports it.
+- Internal runtime and core operations return `ErrorCode`, with `ERROR_NONE` on
+  success. Return payloads through out parameters when a function needs both a
+  value and a status. Mutating operations that can fail must not return `void`.
+- Public ELF API operations return `elf_ErrorCode`, with `ELF_ERROR_NONE` on
+  success. Translate an internal `ErrorCode` at the public boundary rather than
+  exposing compiler or internal error types.
+- Use `b32` or `elf_Bool` only for predicates, lookups, and probes where `false`
+  is an ordinary, unambiguous outcome and callers do not need an error reason.
+  Do not use a boolean as a lossy substitute for a meaningful failure code.
+- An `ELF_FUNCTION` return value is the number of values returned to Elf, not a
+  status code. Recoverable script-facing failures should push an `elf_Error`
+  value and return it, following the filesystem library pattern. VM execution
+  failures must use a graceful VM error-propagation path; if that path does not
+  yet exist for the requested work, stop and agree on it rather than adding a
+  new crash-dependent call to `report_runtime_error`.
+
+Initialize out parameters to a safe value before work begins when practical,
+document whether they are valid on failure, and keep status checks close to the
+call that produced them. Do not introduce a generic result wrapper when one of
+the layer-specific conventions above already represents the operation clearly.
 
 ## Commit Boundaries
 
