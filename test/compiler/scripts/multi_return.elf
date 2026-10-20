@@ -19,5 +19,3 @@ deferred_pair :: fun() {
 f, g := deferred_pair()
 test_assert(f == 31)
 test_assert(g == 32)
-
-ret 909
