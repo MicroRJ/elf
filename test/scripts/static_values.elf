@@ -1,0 +1,11 @@
+STATIC_NIL      :: nil
+STATIC_NUMBER   :: 1.5
+STATIC_INTEGER  :: 42
+STATIC_STRING   :: "elf"
+STATIC_FUNCTION :: fun() { ret STATIC_STRING }
+
+test_assert(STATIC_NIL == nil, "static nil lowers to a runtime value")
+test_assert(STATIC_NUMBER == 1.5, "static number lowers to a runtime value")
+test_assert(STATIC_INTEGER == 42, "static integer lowers to a runtime value")
+test_assert(STATIC_STRING == "elf", "static string lowers to a runtime value")
+test_assert(STATIC_FUNCTION() == "elf", "static function lowers to a runtime value")

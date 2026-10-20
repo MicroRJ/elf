@@ -66,6 +66,9 @@ IrQueue;
 static void ir_emit_stat(IrQueue *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
 static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
+static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree);
+static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition);
+static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree);
 
 static void ir_report_error(IrEmitter *emitter, ErrorCode error, SourceSite site, const char *format, ...)
 {
@@ -197,18 +200,107 @@ static Ir capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functio
 	return ir_new_load_capture(emitter, site, capture);
 }
 
-static Ir load_entity_ir(IrEmitter *emitter, SourceSite site, Entity *entity)
+static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 {
-	ASSERT(entity);
-	ASSERT(emitter->function);
+	if (!entity)
+	{
+		ir_report_error(emitter, ERROR_INTERNAL, site, "expression has no resolved entity");
+		return ERROR_IR;
+	}
 	entity->referenced = true;
-	if (entity->kind == ENTITY_GLOBAL) {
+
+	if (entity->kind == ENTITY_GLOBAL)
+	{
 		return ir_new_global(emitter, site, entity->name);
 	}
-	ASSERT(entity->kind == ENTITY_LOCAL);
-	ASSERT(entity->en_local.storage);
+	else if (entity->kind == ENTITY_STATIC)
+	{
+		Com_Value value = entity->en_static.value;
 
-	return capture_entity_in_function(emitter, emitter->function, entity, site);
+		switch (value.type)
+		{
+			case COM_VALUE_NIL:
+			{
+				return ir_new_nil(emitter, site);
+			}
+
+			case COM_VALUE_NUMBER:
+			{
+				return ir_new_num(emitter, site, value.number);
+			}
+
+			case COM_VALUE_INTEGER:
+			{
+				return ir_new_int(emitter, site, value.integer);
+			}
+
+			case COM_VALUE_STRING:
+			{
+				return ir_new_atom(emitter, site, value.string);
+			}
+
+			case COM_VALUE_FUNCTION:
+			{
+				Ast function = value.function;
+				if (!function || function->kind != AST_FUNCTION)
+				{
+					ir_report_error(emitter, ERROR_INTERNAL, site, "static function '%s' has an invalid value", atom_data(entity->name));
+					return ERROR_IR;
+				}
+
+				if (!function->function.ir)
+				{
+					if (!entity->scope || !entity->scope->source)
+					{
+						ir_report_error(emitter, ERROR_INTERNAL, site, "static function '%s' has no source", atom_data(entity->name));
+						return ERROR_IR;
+					}
+					IrFunction *definition = ir_reserve_function(emitter, entity->scope->source, function);
+					ir_lower_function_body(emitter, definition);
+				}
+
+				return ir_new_function(emitter, site, function->function.ir);
+			}
+
+			case COM_VALUE_EXPORTS:
+			{
+				ir_report_error(emitter, ERROR_LOWERING, site, "source namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
+				return ERROR_IR;
+			}
+
+			case COM_VALUE_ERROR:
+			{
+				return ERROR_IR;
+			}
+
+			case COM_VALUE_NONE:
+			case COM_VALUE_AST:
+			case COM_VALUE_RESOLVING:
+			default:
+			{
+				ir_report_error(emitter, ERROR_INTERNAL, site, "static entity '%s' has invalid value type %u", atom_data(entity->name), (u32)value.type);
+				return ERROR_IR;
+			}
+		}
+	}
+	else if (entity->kind == ENTITY_LOCAL)
+	{
+		if (!entity->en_local.storage)
+		{
+			ir_report_error(emitter, ERROR_INTERNAL, site, "local entity '%s' has no storage", atom_data(entity->name));
+			return ERROR_IR;
+		}
+		return capture_entity_in_function(emitter, emitter->function, entity, site);
+	}
+	else if (entity->kind == ENTITY_ERROR)
+	{
+		return ERROR_IR;
+	}
+	else
+	{
+		ir_report_error(emitter, ERROR_INTERNAL, site, "entity has invalid kind %u", (u32)entity->kind);
+		return ERROR_IR;
+	}
 }
 
 static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
@@ -275,10 +367,6 @@ static TypeRule type_rule_from_atom(Atom *atom)
 	}
 }
 
-static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree);
-static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition);
-static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree);
-
 static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
 {
 	switch (kind)
@@ -334,43 +422,22 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		return ERROR_IR;
 	}
 
-	Ir ir = 0;
-
 	Entity *entity = expr->entity;
-	if (entity && entity->kind == ENTITY_STATIC)
+	if (entity)
 	{
-		Com_Value value = entity->en_static.value;
-
-		switch (value.type) {
-			case COM_VALUE_FUNCTION:
-			{
-				Ast function = value.function;
-				ASSERT(function && function->kind == AST_FUNCTION);
-				if (!function->function.ir)
-				{
-					ASSERT(entity->scope);
-					ASSERT(entity->scope->source);
-					IrFunction *definition = ir_reserve_function(emitter, entity->scope->source, function);
-					ir_lower_function_body(emitter, definition);
-				}
-				ir = ir_new_function(emitter, expr->site, function->function.ir);
-				return ir;
-			}
-			break;
-
-			case COM_VALUE_INTEGER:
-			{
-				ir = ir_new_int(emitter, expr->site, value.integer);
-				return ir;
-			}
-			break;
-
-			default:;
-		}
+		return ir_emit_entity(emitter, expr->site, entity);
 	}
 
+	Ir ir = 0;
 	switch (expr->kind)
 	{
+		case AST_IDENT:
+		{
+			ir_report_error(emitter, ERROR_INTERNAL, expr->site, "identifier '%s' has no resolved entity", atom_data(expr->atom));
+			ir = ERROR_IR;
+		}
+		break;
+
 		case AST_INTEGER_LITERAL:
 		{
 			ir = ir_new_int(emitter, expr->site, expr->integer_value);
@@ -427,14 +494,6 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		case AST_NIL_LITERAL:
 		{
 			ir = ir_new_nil(emitter, expr->site);
-		}
-		break;
-
-		case AST_IDENT:
-		{
-			Entity *entity = expr->entity;
-			ASSERT(entity);
-			ir = load_entity_ir(emitter, expr->site, entity);
 		}
 		break;
 
