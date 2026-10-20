@@ -6,6 +6,7 @@
 #include <dy_io.h>
 #include <dy_process.h>
 
+#include "../test.h"
 #include "base.h"
 #include "elf_core.h"
 #include "libs.h"
@@ -40,7 +41,9 @@ static void test_fail(const char *label)
 #include "checker_tests.c"
 #include "ir_tests.c"
 #include "backend_tests.c"
+#define test_fail(label) TEST_FAIL("%s", (label))
 #include "vm_tests.c"
+#undef test_fail
 #include "../script_tests.c"
 #include "smoke_tests.c"
 
@@ -52,6 +55,9 @@ int main(int argc, char **argv)
 	{
 		return vm_run_runtime_error_diagnostic_child();
 	}
+
+	// start tests on a new line because manny will also print shit
+	fprintf(stderr, "\n");
 
 	elf_State *state = elf_create_state();
 	run_lexer_tests(state);
@@ -65,8 +71,9 @@ int main(int argc, char **argv)
 
 	elf_destroy_state(state);
 
-	if (test_failures) {
-		fprintf(stderr, "tests failed: %d\n", test_failures);
+	u32 failures = (u32)test_failures + test_context.failed_tests;
+	if (failures) {
+		fprintf(stderr, "tests failed: %u\n", failures);
 		return 1;
 	}
 

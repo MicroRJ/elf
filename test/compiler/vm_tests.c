@@ -84,9 +84,7 @@ static void vm_expect_int(const char *path, i64 expected, const char *label)
 {
 	VmRunResult result = vm_test_run_file(path);
 	if (!value_is_integer(result.value) || value_as_integer(result.value) != expected) {
-		fprintf(stderr, "FAIL: %s expected int %lld, got tag %d value %lld\n",
-			label, expected, value_type(result.value), value_as_integer(result.value));
-		test_failures += 1;
+		TEST_FAIL("%s expected int %lld, got tag %d value %lld", label, (long long)expected, value_type(result.value), (long long)value_as_integer(result.value));
 	}
 	elf_destroy_state(result.state);
 }
@@ -607,34 +605,34 @@ static void test_vm_module_converts_atom_constants(void)
 
 static void run_vm_tests(void)
 {
-	test_vm_return_int();
-	test_vm_integer_add();
-	test_vm_return_nil();
-	test_vm_pads_missing_returns();
-	test_vm_return_table();
-	test_vm_return_array();
-	test_vm_nil_assign();
-	test_vm_function_call();
-	test_vm_function_arguments();
-	test_vm_method_this();
+	TEST_RUN("vm.return_int", test_vm_return_int);
+	TEST_RUN("vm.integer_add", test_vm_integer_add);
+	TEST_RUN("vm.return_nil", test_vm_return_nil);
+	TEST_RUN("vm.pads_missing_returns", test_vm_pads_missing_returns);
+	TEST_RUN("vm.return_table", test_vm_return_table);
+	TEST_RUN("vm.return_array", test_vm_return_array);
+	TEST_RUN("vm.nil_assign", test_vm_nil_assign);
+	TEST_RUN("vm.function_call", test_vm_function_call);
+	TEST_RUN("vm.function_arguments", test_vm_function_arguments);
+	TEST_RUN("vm.method_this", test_vm_method_this);
 #if 0
 	// Disabled until JSON errors report the expected source line.
-	test_vm_script_json_assertions();
+	TEST_RUN("vm.script_json_assertions", test_vm_script_json_assertions);
 #endif
 #if 0
 	// Disabled until the core library regains feature parity.
-	test_vm_core_library_assertions();
+	TEST_RUN("vm.core_library_assertions", test_vm_core_library_assertions);
 #endif
-	test_vm_string_join();
-	test_vm_interpolated_strings();
-	test_vm_static_function();
+	TEST_RUN("vm.string_join", test_vm_string_join);
+	TEST_RUN("vm.interpolated_strings", test_vm_interpolated_strings);
+	TEST_RUN("vm.static_function", test_vm_static_function);
 #if 0
 	// Static recurse currently requires a missing closure.
-	test_vm_static_recurse_function();
+	TEST_RUN("vm.static_recurse_function", test_vm_static_recurse_function);
 #endif
-	test_vm_compiled_closure_keeps_function_identity();
-	test_vm_nested_host_call_preserves_diagnostics_context();
-	test_vm_runtime_error_diagnostics();
-	test_vm_module_emitter_grows_constant_arrays();
-	test_vm_module_converts_atom_constants();
+	TEST_RUN("vm.compiled_closure_keeps_function_identity", test_vm_compiled_closure_keeps_function_identity);
+	TEST_RUN("vm.nested_host_call_preserves_diagnostics_context", test_vm_nested_host_call_preserves_diagnostics_context);
+	TEST_RUN("vm.runtime_error_diagnostics", test_vm_runtime_error_diagnostics);
+	TEST_RUN("vm.module_emitter_grows_constant_arrays", test_vm_module_emitter_grows_constant_arrays);
+	TEST_RUN("vm.module_converts_atom_constants", test_vm_module_converts_atom_constants);
 }
