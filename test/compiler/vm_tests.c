@@ -52,7 +52,7 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 		elf_call(S, 1, 0);
 		StackFrame *restored_caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
 		preserved = S->frame == native_frame_pointer &&
-			S->frame->framebase == native_frame.framebase && S->frame->reference == native_frame.reference &&
+			S->frame->framebase == native_frame.framebase && S->frame->registers == native_frame.registers &&
 			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs && S->frame->nrets == native_frame.nrets &&
 			!S->frame->prototype && restored_caller &&
 			restored_caller->prototype == caller_prototype &&

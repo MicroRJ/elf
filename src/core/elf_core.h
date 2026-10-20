@@ -176,12 +176,28 @@ struct elf_Closure
 	elf_Value      captures[];
 };
 
+// Bytecode stack frame layouts:
+//
+//   ordinary call or variadic call without extra arguments
+//
+//     [callee][arguments / bytecode registers...]
+//              ^ framebase
+//              ^ registers
+//
+//   variadic call with extra arguments
+//
+//     [callee][original arguments...][bytecode registers...]
+//              ^ framebase             ^ registers
+//
+// framebase preserves the original call arguments for elf.arg() and
+// elf.varg(). Bytecode operands index the register window through registers.
+// Named parameters are copied into that window when the two bases differ.
 struct StackFrame
 {
 	elf_Prototype *prototype;
 	elf_Closure     *closure;
 	elf_Value     *framebase;
-	elf_Value     *reference;
+	elf_Value     *registers;
 	elf_Value      *captures;
 	u32          instruction;
 	u32            framesize;

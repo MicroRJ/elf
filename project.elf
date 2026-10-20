@@ -115,13 +115,19 @@ ret {
 	default_target = library,
 	targets = {
 		library = library,
+
 		public_header_test = public_header_test,
+
 		tests = tests,
 		run_tests = run_tests,
+
 		benchmarks = benchmarks,
+
 		optimized_library = optimized_library,
 		optimized_benchmarks = optimized_benchmarks,
+
 		run_optimized_benchmarks = run_optimized_benchmarks,
+
 		bytecode_tool = bytecode_tool,
 		elf_runner = elf_runner,
 	},
