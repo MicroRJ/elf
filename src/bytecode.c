@@ -259,7 +259,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		break;
 	}
 
-	arena_push_char(arena, '\n');
+	arena_push_text(arena, "\n");
 }
 
 char *format_bytecode_function(elf_State *state, Arena *arena, u32 prototype_index)

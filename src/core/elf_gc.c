@@ -2,6 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
+#include <dy_time.h>
+
 static void gc_check(elf_State *state);
 static u32 gc_mark_reachable(elf_State *state, elf_Object * reference);
 

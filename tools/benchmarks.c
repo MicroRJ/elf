@@ -4,6 +4,7 @@
 
 #include "elf.h"
 #include <dy.h>
+#include <dy_time.h>
 
 #include "base.h"
 #include "elf_core.h"

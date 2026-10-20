@@ -12,6 +12,7 @@
 
 #include "elf.h"
 #include <dy.h>
+#include <dy_fs.h>
 
 #if !defined(false) && !defined(true)
 enum
@@ -68,8 +69,6 @@ typedef dy_Scratch Scratch;
 #define arena_push_copy dy_arena_push_copy
 #define arena_push_data dy_arena_push_data
 #define arena_push_text dy_arena_push_text
-#define arena_push_char dy_arena_push_char
-#define arena_push_nchar dy_arena_push_nchar
 #define arena_pushfv dy_arena_pushfv
 #define arena_pushf dy_arena_pushf
 

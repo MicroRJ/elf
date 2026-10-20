@@ -94,7 +94,11 @@ void elf_print_value(Arena *arena, elf_Value value)
 
 static void source_indent(Arena *arena, u32 indent)
 {
-	arena_push_nchar(arena, '\t', indent);
+	char *data = arena_push(arena, indent, 1);
+	if (data)
+	{
+		dy_memory_fill(data, '\t', indent);
+	}
 }
 
 typedef struct SourceValuePath SourceValuePath;
@@ -137,7 +141,7 @@ static b32 number_to_source(Arena *arena, f64 number)
 
 static void string_to_source(Arena *arena, elf_String *string)
 {
-	arena_push_char(arena, '"');
+	arena_push_text(arena, "\"");
 
 	const char *data = string->data;
 	for (u32 i = 0; i < elf_string_size(string); ++ i)
@@ -158,13 +162,13 @@ static void string_to_source(Arena *arena, elf_String *string)
 			{
 				u8 byte = (u8)data[i];
 				if (byte < 0x20 || byte == 0x7f) arena_pushf(arena, "\\x%02x", byte);
-				else arena_push_char(arena, data[i]);
+				else arena_push_data(arena, data + i, 1);
 			}
 			break;
 		}
 	}
 
-	arena_push_char(arena, '"');
+	arena_push_text(arena, "\"");
 }
 
 static b32 table_to_source(elf_State *state, Arena *arena, elf_Table *table, u32 indent, SourceValuePath *path)

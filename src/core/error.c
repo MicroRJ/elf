@@ -3,6 +3,7 @@
 //
 
 #include <dy.h>
+#include <dy_process.h>
 
 static const char *error_code_names[] =
 {
@@ -144,11 +145,11 @@ void report_runtime_error(elf_State *state, ErrorCode code, const char *format, 
 	va_list args;
 	va_start(args, format);
 	Scratch scratch = scratch_begin();
-	char *message = arena_pushfv(scratch.arena, format, args);
+	dy_String message = arena_pushfv(scratch.arena, format, args);
 	va_end(args);
 	arena_push_zero(scratch.arena, 1, 1);
 
-	report_runtime_error_message(state, code, message);
+	report_runtime_error_message(state, code, message.data ? message.data : "runtime error");
 
 	scratch_end(scratch);
 }

@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include <dy.h>
+#include <dy_fs.h>
+#include <dy_process.h>
+#include <dy_time.h>
 
 #include "elf.h"
 #include "elf_core.h"
@@ -34,17 +37,17 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 	elf_StrSlice source = {};
 	dy_File_Info info;
 	dy_File file = {};
-	b32 root_loaded = !dy_get_file_info(dy_string_from_cstring(name), &info).error && !info.is_directory;
+	b32 root_loaded = !dy_file_info(dy_string_from_cstring(name), &info).error && !info.is_directory;
 	if (root_loaded) {
-		root_loaded = !dy_access_file(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error;
+		root_loaded = !dy_file_open(dy_string_from_cstring(name), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error;
 	}
 	if (root_loaded)
 	{
 		char *data = arena_push(scratch.arena, info.size + 16, 1);
 		zero_memory(data + info.size, 16);
 		dy_u64 read = 0;
-		dy_Result read_result = dy_read_file(file, data, info.size, &read);
-		dy_close_file(file);
+		dy_Result read_result = dy_file_read(file, data, info.size, &read);
+		dy_file_close(file);
 		root_loaded = !read_result.error && read == info.size;
 		if (root_loaded) {
 			source = (elf_StrSlice) {data, info.size};

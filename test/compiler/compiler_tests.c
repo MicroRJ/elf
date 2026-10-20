@@ -3,6 +3,9 @@
 
 #include "elf.h"
 
+#include <dy_io.h>
+#include <dy_process.h>
+
 #include "base.h"
 #include "elf_core.h"
 #include "libs.h"

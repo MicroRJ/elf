@@ -21,7 +21,7 @@ static void fs_file_destroy(elf_State *state, void *data)
 	FsFile *file = data;
 	if (dy_file_is_valid(file->file))
 	{
-		dy_close_file(file->file);
+		dy_file_close(file->file);
 		file->file = (dy_File) {0};
 	}
 }
@@ -36,10 +36,10 @@ static void fs_push_errorf(elf_State *state, const char *format, ...)
 	va_list arguments;
 	va_start(arguments, format);
 	Scratch scratch = scratch_begin();
-	char *message = arena_pushfv(scratch.arena, format, arguments);
+	dy_String message = arena_pushfv(scratch.arena, format, arguments);
 	va_end(arguments);
 	arena_push_zero(scratch.arena, 1, 1);
-	elf_push_error(state, message ? message : "file operation failed");
+	elf_push_error(state, message.data ? message.data : "file operation failed");
 	scratch_end(scratch);
 }
 
@@ -47,7 +47,7 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 {
 	Scratch scratch = scratch_begin();
 	dy_String system_message = {0};
-	char *message = 0;
+	dy_String message = {0};
 	if (result.os_error && !dy_error_message(scratch.arena, result.os_error, &system_message).error)
 	{
 		message = arena_pushf(scratch.arena, "%s failed: %.*s", operation, (int)system_message.size, system_message.data);
@@ -56,7 +56,7 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 	{
 		message = arena_pushf(scratch.arena, "%s failed (error %u)", operation, (u32)result.error);
 	}
-	elf_push_error(state, message ? message : "file operation failed");
+	elf_push_error(state, message.data ? message.data : "file operation failed");
 	scratch_end(scratch);
 
 	elf_Index error = elf_abs_index(state, -1);
@@ -216,7 +216,7 @@ ELF_FUNCTION(lib_fs_file_read)
 		return 1;
 	}
 	dy_u64 bytes_read = 0;
-	dy_Result result = dy_read_file(file->file, buffer->data ? buffer->data + offset : 0, count, &bytes_read);
+	dy_Result result = dy_file_read(file->file, buffer->data ? buffer->data + offset : 0, count, &bytes_read);
 	ASSERT(bytes_read <= count);
 	buffer->size += (u32)bytes_read;
 	if (result.error)
@@ -292,7 +292,7 @@ ELF_FUNCTION(lib_fs_file_write)
 	if (file->append)
 	{
 		dy_u64 position = 0;
-		dy_Result seek = dy_set_file_cursor(file->file, DY_SEEK_END, 0, &position);
+		dy_Result seek = dy_file_set_cursor(file->file, DY_SEEK_END, 0, &position);
 		if (seek.error)
 		{
 			fs_push_io_error(S, "file append seek", seek);
@@ -302,7 +302,7 @@ ELF_FUNCTION(lib_fs_file_write)
 
 	dy_u64 bytes_written = 0;
 	const u8 *data = buffer->data ? buffer->data + offset : 0;
-	dy_Result result = dy_write_file(file->file, data, count, &bytes_written);
+	dy_Result result = dy_file_write(file->file, data, count, &bytes_written);
 	if (result.error)
 	{
 		fs_push_io_error(S, "file write", result);
@@ -360,7 +360,7 @@ ELF_FUNCTION(lib_fs_file_seek)
 		return 1;
 	}
 	dy_u64 position = 0;
-	dy_Result result = dy_set_file_cursor(file->file, seek_origin, distance, &position);
+	dy_Result result = dy_file_set_cursor(file->file, seek_origin, distance, &position);
 	if (result.error || position > INT64_MAX)
 	{
 		if (!result.error)
@@ -400,7 +400,7 @@ ELF_FUNCTION(lib_fs_file_tell)
 		return 1;
 	}
 	dy_u64 position = 0;
-	dy_Result result = dy_set_file_cursor(file->file, DY_SEEK_CURRENT, 0, &position);
+	dy_Result result = dy_file_set_cursor(file->file, DY_SEEK_CURRENT, 0, &position);
 	if (result.error || position > INT64_MAX)
 	{
 		if (!result.error)
@@ -440,7 +440,7 @@ ELF_FUNCTION(lib_fs_file_size)
 		return 1;
 	}
 	dy_u64 size = 0;
-	dy_Result result = dy_get_file_size(file->file, &size);
+	dy_Result result = dy_file_size(file->file, &size);
 	if (result.error || size > INT64_MAX)
 	{
 		if (!result.error)
@@ -481,7 +481,7 @@ ELF_FUNCTION(lib_fs_file_close)
 		elf_push_int(S, true);
 		return 1;
 	}
-	dy_Result result = dy_close_file(file->file);
+	dy_Result result = dy_file_close(file->file);
 	if (result.error)
 	{
 		fs_push_io_error(S, "file close", result);
@@ -494,12 +494,50 @@ ELF_FUNCTION(lib_fs_file_close)
 	return 1;
 }
 
+//
+// file:flush() -> true | error
+// Flushes pending writes to the underlying storage.
+//
+ELF_FUNCTION(lib_fs_file_flush)
+{
+	if (!fs_check_arg_count(S, nargs, 0, 0, "file.flush"))
+	{
+		return 1;
+	}
+	FsFile *file = 0;
+	if (!fs_load_file_receiver(S, &file))
+	{
+		return 1;
+	}
+	if (!fs_require_open(S, file))
+	{
+		return 1;
+	}
+	if (!file->writable)
+	{
+		elf_push_error(S, "file is not open for writing");
+		return 1;
+	}
+
+	dy_Result result = dy_file_flush(file->file);
+	if (result.error)
+	{
+		fs_push_io_error(S, "file flush", result);
+	}
+	else
+	{
+		elf_push_int(S, true);
+	}
+	return 1;
+}
+
 static const elf_Binding l_fs_file[] = {
 	{"read",  lib_fs_file_read},
 	{"write", lib_fs_file_write},
 	{"seek",  lib_fs_file_seek},
 	{"tell",  lib_fs_file_tell},
 	{"size",  lib_fs_file_size},
+	{"flush", lib_fs_file_flush},
 	{"close", lib_fs_file_close},
 };
 
@@ -596,7 +634,7 @@ ELF_FUNCTION(lib_fs_open)
 	file->append = append;
 	push_value(S, value_from_user(user));
 
-	dy_Result result = dy_access_file(path, intent, access, &file->file);
+	dy_Result result = dy_file_open(path, intent, access, &file->file);
 	if (result.error)
 	{
 		fs_push_io_error(S, "file open", result);
@@ -606,7 +644,7 @@ ELF_FUNCTION(lib_fs_open)
 
 static b32 fs_get_file_info(dy_String path, dy_File_Info *info)
 {
-	return !dy_get_file_info(path, info).error &&
+	return !dy_file_info(path, info).error &&
 		!info->is_directory && !info->is_symbolic_link;
 }
 
@@ -614,7 +652,7 @@ static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directo
 {
 	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
 	dy_File_Info info = {0};
-	b32 found = !dy_get_file_info(lib_load_string_view(state, 1), &info).error;
+	b32 found = !dy_file_info(lib_load_string_view(state, 1), &info).error;
 	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
 	return 1;
 }
@@ -679,7 +717,7 @@ static int fs_transfer_file(elf_State *state, int nargs, b32 move)
 	dy_String source = lib_load_string_view(state, 1);
 	dy_String destination = lib_load_string_view(state, 2);
 	b32 overwrite = nargs == 4 ? (b32)lib_load_integer(state, 3) : true;
-	dy_Result transfer = move ? dy_move_file(source, destination, overwrite) : dy_copy_file(source, destination, overwrite);
+	dy_Result transfer = move ? dy_file_move(source, destination, overwrite) : dy_file_copy(source, destination, overwrite);
 	b32 success = !transfer.error;
 	elf_push_int(state, success);
 	return 1;
@@ -698,7 +736,7 @@ ELF_FUNCTION(lib_fs_move_file)
 ELF_FUNCTION(lib_fs_remove_file)
 {
 	lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1);
-	elf_push_int(S, !dy_remove_file(lib_load_string_view(S, 1)).error);
+	elf_push_int(S, !dy_file_remove(lib_load_string_view(S, 1)).error);
 	return 1;
 }
 

@@ -375,13 +375,13 @@ ELF_FUNCTION(l_json_stringify)
 static b32 json_read_file(elf_State *state, dy_String name, dy_String *source, u64 *allocation_size)
 {
 	dy_File_Info info;
-	if (dy_get_file_info(name, &info).error || info.is_directory || info.size > INT_MAX)
+	if (dy_file_info(name, &info).error || info.is_directory || info.size > INT_MAX)
 	{
 		return false;
 	}
 
 	dy_File file;
-	if (dy_access_file(name, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
+	if (dy_file_open(name, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
 	{
 		return false;
 	}
@@ -390,13 +390,13 @@ static b32 json_read_file(elf_State *state, dy_String name, dy_String *source, u
 	char *data = elf_alloc(state, *allocation_size);
 	if (!data)
 	{
-		dy_close_file(file);
+		dy_file_close(file);
 		return false;
 	}
 
 	dy_u64 size = 0;
-	dy_Result read = dy_read_file(file, data, info.size, &size);
-	dy_close_file(file);
+	dy_Result read = dy_file_read(file, data, info.size, &size);
+	dy_file_close(file);
 	if (read.error || size != info.size)
 	{
 		elf_free(state, data, *allocation_size);

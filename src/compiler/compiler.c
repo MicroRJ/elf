@@ -242,18 +242,18 @@ static Com_Source *compiler_load_source(Compiler *compiler, Com_Source *requesti
 	dy_String contents = {0};
 
 	dy_File_Info info = {0};
-	if (!dy_get_file_info(path, &info).error && !info.is_directory)
+	if (!dy_file_info(path, &info).error && !info.is_directory)
 	{
 		if (info.size <= UINT32_MAX)
 		{
 			dy_File file = {0};
-			if (!dy_access_file(path, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
+			if (!dy_file_open(path, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
 			{
 				contents.data = arena_push(compiler->arena, info.size + 1, 16);
 				if (contents.data)
 				{
 					dy_u64 read = 0;
-					if (!dy_read_file(file, contents.data, info.size, &read).error && read == info.size)
+					if (!dy_file_read(file, contents.data, info.size, &read).error && read == info.size)
 					{
 						contents.data[info.size] = 0;
 						contents.size = info.size;
@@ -266,7 +266,7 @@ static Com_Source *compiler_load_source(Compiler *compiler, Com_Source *requesti
 					error = "out of memory while loading source file";
 				}
 
-				dy_close_file(file);
+				dy_file_close(file);
 			}
 			else {
 				error = "could not open source file";

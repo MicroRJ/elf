@@ -11,17 +11,25 @@
 static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *source)
 {
 	dy_File_Info info;
-	if (dy_get_file_info(dy_string_from_cstring(path), &info).error || info.is_directory) return 0;
+	if (dy_file_info(dy_string_from_cstring(path), &info).error || info.is_directory)
+	{
+		return 0;
+	}
 	dy_File file;
-	if (dy_access_file(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING,
-		DY_FILE_READ | DY_FILE_SHARE_READ, &file).error) return 0;
+	if (dy_file_open(dy_string_from_cstring(path), DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
+	{
+		return 0;
+	}
 	u64 size = info.size;
 	char *data = arena_push(&state->arena, size + 16, 1);
 	zero_memory(data + size, 16);
 	dy_u64 read = 0;
-	dy_Result read_result = dy_read_file(file, data, size, &read);
-	dy_close_file(file);
-	if (read_result.error || read != size) return 0;
+	dy_Result read_result = dy_file_read(file, data, size, &read);
+	dy_file_close(file);
+	if (read_result.error || read != size)
+	{
+		return 0;
+	}
 
 	source->data = data;
 	source->size = size;

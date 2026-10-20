@@ -15,7 +15,6 @@ static void test_fail(const char *label)
 	test_failures += 1;
 }
 
-#include "arena_tests.c"
 #include "string_tests.c"
 #include "table_tests.c"
 #include "array_tests.c"
@@ -29,7 +28,6 @@ int main(void)
 	setvbuf(stderr, 0, _IONBF, 0);
 
 	elf_State *state = elf_create_state();
-	run_arena_tests();
 	run_string_tests(state);
 	run_table_tests(state);
 	run_array_tests();
