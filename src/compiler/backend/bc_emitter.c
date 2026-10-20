@@ -375,8 +375,7 @@ static i32 emit_expr_to_slot(BcEmitter *emitter, Ir expr)
 {
 	i32 slot = NO_SLOT;
 	if (expr->kind == IR_LOAD) {
-		Ir local = expr->ir_load.local;
-		require_ir_kind(local, IR_LOCAL);
+		Ir local = require_ir_kind(expr->ir_load.local, IR_LOCAL);
 		slot = local->ir_local.slot;
 	}
 	else {
@@ -779,8 +778,11 @@ static i32 emit_expr_block(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 	return out;
 }
 
+// Todo, remove nout
 static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 {
+	ASSERT(nout <= 1 || (expr->kind == IR_MULTI_LOCAL || expr->kind == IR_CALL) || !"Dayan - internal error, only call expressions and multi-locals are allowed to have more than one output");
+
 	SourceSite site = expr->site;
 	switch (expr->kind)
 	{
@@ -789,9 +791,20 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			return out;
 		}
 
-		// case IR_TUPLE: {
-		// }
-		// break;
+		case IR_TUPLE:
+		{
+			ASSERT(out == NO_SLOT || !"Dayan - internal error, when lowering a tuple, you must not specify the resulting slot, otherwise we'd have to emit code for relocation, which is not the intended usage");
+			ASSERT(expr->ir_tuple.items || !expr->ir_tuple.count);
+			ASSERT(nout == 0 || nout == 1);
+
+			i32 first_slot = save_slots(emitter);
+			for (u32 i = 0; i < expr->ir_tuple.count; ++ i) {
+				i32 expr_slot = emit_expr(emitter, expr->ir_tuple.items[i], NO_SLOT, 1);
+				ASSERT(first_slot + i == expr_slot);
+			}
+			out = first_slot;
+		}
+		break;
 
 		case IR_FUNCTION:
 		{
@@ -1094,6 +1107,7 @@ static void emit_stat(BcEmitter *emitter, Ir stat)
 		{
 			i32 slot = stat->ir_local.slot;
 			ASSERT(!slot_is_valid(slot));
+			ASSERT(!stat->ir_local.expr || stat->ir_local.expr->kind != IR_TUPLE || stat->ir_local.expr->ir_tuple.count == 1);
 			if (stat->ir_local.expr)
 			{
 				slot = emit_expr(emitter, stat->ir_local.expr, NO_SLOT, 1);
@@ -1210,10 +1224,12 @@ static void emit_stat(BcEmitter *emitter, Ir stat)
 		case IR_RETURN:
 		{
 			Ir expr = stat->ir_return.expr;
+			ASSERT(!expr || expr->kind == IR_TUPLE);
 			if (expr)
 			{
 				i32 slot = emit_expr_to_slot(emitter, expr);
-				emit_return(emitter, stat->site, slot, 1);
+				u32 size = expr->ir_tuple.count;
+				emit_return(emitter, stat->site, slot, size);
 			}
 			else
 			{

@@ -540,7 +540,9 @@ static void test_backend_outputs_strings(void)
 	copy_memory(atom->data, text, sizeof(text));
 
 	IrNode string = {.kind = IR_ATOM, .atom = atom};
-	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &string};
+	Ir string_items[] = {&string};
+	IrNode tuple = {.kind = IR_TUPLE, .ir_tuple = {.items = string_items, .count = ARRAY_COUNT(string_items)}};
+	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &tuple};
 	elf_Source *runtime_source = elf_source_create(state, (dy_String) {(char *)"backend", sizeof("backend") - 1}, (dy_String) {});
 	Com_Source source = {.runtime_source = runtime_source};
 	IrFunction function = {.source = &source, .body = &return_string, .index = IR_FUNCTION_INDEX_INVALID};

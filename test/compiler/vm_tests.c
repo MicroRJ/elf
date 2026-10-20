@@ -272,6 +272,11 @@ static void test_vm_defer(void)
 	vm_expect_int("test/compiler/smoke/defer.elf", 2114344, "vm runs deferred statements");
 }
 
+static void test_vm_multi_return(void)
+{
+	vm_expect_int("test/compiler/smoke/multi_return.elf", 909, "vm returns multiple values");
+}
+
 static void test_vm_string_join(void)
 {
 	VmRunResult result = vm_test_run_file("test/compiler/smoke/script_assert_string_join.elf");
@@ -710,6 +715,7 @@ static void run_vm_tests(void)
 	test_vm_break_continue();
 	test_vm_loop_slots();
 	test_vm_defer();
+	test_vm_multi_return();
 	test_vm_string_join();
 	test_vm_interpolated_strings();
 	test_vm_fib();

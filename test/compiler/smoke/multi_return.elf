@@ -1,0 +1,23 @@
+pair :: fun() {
+	ret 11, 22
+}
+
+a, b := pair()
+test_assert(a == 11)
+test_assert(b == 22)
+
+c, d, e := pair()
+test_assert(c == 11)
+test_assert(d == 22)
+test_assert(e == nil)
+
+deferred_pair :: fun() {
+	defer test_assert(1)
+	ret 31, 32
+}
+
+f, g := deferred_pair()
+test_assert(f == 31)
+test_assert(g == 32)
+
+ret 909

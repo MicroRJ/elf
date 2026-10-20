@@ -156,6 +156,7 @@ static Ir ir_new_expr_block(IrEmitter *emitter, SourceSite site, IrArray stats, 
 
 static Ir ir_new_local(IrEmitter *emitter, SourceSite site, Ir expr)
 {
+	ASSERT(!expr || expr->kind != IR_TUPLE || expr->ir_tuple.count == 1 || !"A local can only hold a single value slot");
 	Ir ir = ir_alloc(emitter, site, IR_LOCAL);
 	ir->ir_local.expr = expr;
 	ir->ir_local.slot = NO_SLOT;

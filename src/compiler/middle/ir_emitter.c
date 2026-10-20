@@ -1388,19 +1388,24 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 		case AST_RETURN:
 		{
 			Ast expr = stat->return_stat.expr;
+			ASSERT(!expr || expr->kind == AST_TUPLE);
+
 			Ir expr_ir = 0;
-			if (expr)
-			{
-				if (expr->kind == AST_TUPLE && expr->tuple.count == 1) {
-					expr = expr->tuple.items[0];
-				}
+			if (expr) {
 				expr_ir = ir_emit_expr(emitter, expr);
 			}
+
 			if (expr_ir && emitter->function->defer)
 			{
-				Ir return_value = ir_new_local(emitter, stat->site, expr_ir);
-				ir_push(items, return_value);
-				expr_ir = ir_new_load(emitter, stat->site, return_value);
+				ASSERT(expr_ir->kind == IR_TUPLE);
+
+				IrArray return_tuple = ir_array_alloc(emitter, expr_ir->ir_tuple.count);
+				for (u32 i = 0; i < expr_ir->ir_tuple.count; ++ i) {
+					Ir return_value = ir_new_local(emitter, stat->site, expr_ir->ir_tuple.items[i]);
+					ir_push(items, return_value);
+					return_tuple.items[i] = ir_new_load(emitter, stat->site, return_value);
+				}
+				expr_ir = ir_new_tuple(emitter, stat->site, return_tuple);
 			}
 			emit_defer_range(emitter, items, 0);
 			Ir ir = ir_new_return(emitter, stat->site, expr_ir);

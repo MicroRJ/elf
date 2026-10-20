@@ -2,11 +2,12 @@
 // what about multiple returns?
 
 foo :: fun() {
-	ret 1, 2, 3, 4
+	defer elf.printl("foo")
+	ret 7, 4, 5, 4, 1, 2, 3, 4
 }
 
 a, b, c, d := foo()
-
+elf.println(a, ", ", b, ", ", c, ", ", d)
 #eof
 
 totally_unrelated_function :: fun() {

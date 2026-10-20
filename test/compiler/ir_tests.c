@@ -124,7 +124,8 @@ static void test_ir_lowers_bitwise_not(elf_State *state)
 	IrTestResult result = ir_test_lower_source(state, &arena, "ret ~1");
 	Ir body = ir_test_main_body(result.module);
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower bitwise not return");
-	Ir expr = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir expr = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 
 	expect_ir_kind(expr, IR_BITWISE_NOT, "lower bitwise not expression");
 	expect_ir_i64(expr ? expr->ir_unary : 0, 1, "lower bitwise not operand");
@@ -205,10 +206,12 @@ static void test_ir_lowers_strings_and_globals(elf_State *state)
 	Ir body = ir_test_main_body(result.module);
 
 	Ir ret_string = ir_test_body_stat(body, 0, IR_RETURN, "lower string return");
-	expect_ir_atom(ret_string->ir_return.expr, "hello", "string literal lowers to atom ir");
+	Ir string_tuple = ret_string ? ret_string->ir_return.expr : 0;
+	expect_ir_atom(string_tuple && string_tuple->kind == IR_TUPLE && string_tuple->ir_tuple.count == 1 ? string_tuple->ir_tuple.items[0] : 0, "hello", "string literal lowers to atom ir");
 
 	Ir ret_global = ir_test_body_stat(body, 1, IR_RETURN, "lower global return");
-	expect_ir_kind(ret_global->ir_return.expr, IR_GLOBAL, "identifier without local lowers to global load");
+	Ir global_tuple = ret_global ? ret_global->ir_return.expr : 0;
+	expect_ir_kind(global_tuple && global_tuple->kind == IR_TUPLE && global_tuple->ir_tuple.count == 1 ? global_tuple->ir_tuple.items[0] : 0, IR_GLOBAL, "identifier without local lowers to global load");
 	arena_destroy(&arena);
 }
 
@@ -220,7 +223,8 @@ static void test_ir_lowers_interpolated_string(elf_State *state)
 	Ir body = ir_test_main_body(result.module);
 	Ir name_local = ir_test_body_stat(body, 0, IR_LOCAL, "lower interpolated string local");
 	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "lower interpolated string return");
-	Ir trailing = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir trailing = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 
 	expect_ir_kind(trailing, IR_ADD, "interpolated string lowers final text join");
 	expect_ir_atom(trailing ? trailing->ir_binary.y : 0, "", "interpolated string lowers empty trailing text");
@@ -251,7 +255,8 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 	Ir body = ir_test_main_body(result.module);
 
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower field return");
-	Ir field = ret->ir_return.expr;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir field = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(field, IR_FIELD, "field access lowers to field ir");
 	expect_ir_kind(field->ir_binary.x, IR_GLOBAL, "field object lowers to global load");
 	expect_ir_atom(field->ir_binary.y, "name", "field key lowers to atom ir");
@@ -277,7 +282,8 @@ static void test_ir_lowers_array_literal(elf_State *state)
 	IrTestResult result = ir_test_lower_source(state, &arena, "ret [1, 2]");
 	Ir body = ir_test_main_body(result.module);
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower array return");
-	Ir block = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir block = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(block, IR_EXPR_BLOCK, "array literal lowers to expression block");
 	if (!block || block->kind != IR_EXPR_BLOCK || block->ir_expr_block.stats.count != 3)
 	{
@@ -428,7 +434,8 @@ static void test_ir_lowers_function_expression(elf_State *state)
 
 	Ir body = function->body;
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "function body lowers return");
-	Ir add = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir add = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(add, IR_ADD, "function return lowers expression");
 	expect_ir_kind(add ? add->ir_binary.x : 0, IR_LOAD, "first param lowers to local load");
 	expect_ir_kind(add ? add->ir_binary.y : 0, IR_LOAD, "second param lowers to local load");
@@ -461,7 +468,8 @@ static void test_ir_loads_capture_per_reference(elf_State *state)
 	}
 
 	Ir ret = ir_test_body_stat(function->body, 0, IR_RETURN, "capturing function lowers return");
-	Ir add = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir add = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	Ir left = add && add->kind == IR_ADD ? add->ir_binary.x : 0;
 	Ir right = add && add->kind == IR_ADD ? add->ir_binary.y : 0;
 	expect_ir_kind(left, IR_LOAD_CAPTURE, "first capture reference lowers to capture load");
@@ -482,7 +490,8 @@ static void test_ir_loads_implicit_this(elf_State *state)
 	IrTestResult result = ir_test_lower_source(state, &arena, "get_this := fun() { ret this }");
 	IrFunction *function = ir_test_function_at(result.module, 1);
 	Ir ret = function ? ir_test_body_stat(function->body, 0, IR_RETURN, "this function lowers return") : 0;
-	Ir load = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir load = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(load, IR_LOAD, "this lowers to a local load");
 	if (!function || !load || load->ir_load.local != function->params[IMPLICIT_PARAM_INDEX]) {
 		test_fail("this loads the function's implicit receiver parameter");
@@ -544,7 +553,8 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 	}
 	Ir body = ir_test_main_body(result.module);
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static declarations emit no runtime statements");
-	expect_ir_i64(ret ? ret->ir_return.expr : 0, 42, "static forward reference resolves to literal ir");
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	expect_ir_i64(tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0, 42, "static forward reference resolves to literal ir");
 	arena_destroy(&arena);
 }
 
@@ -577,7 +587,8 @@ static void test_ir_lowers_static_call_arguments(elf_State *state)
 
 	Ir body = result.module->first_function->body;
 	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "static call lowers return");
-	Ir call = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir call = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(call, IR_CALL, "static call lowers call expression");
 	expect_ir_kind(call ? call->ir_call.expr : 0, IR_FUNCTION, "static call retains function callee");
 	if (!call || call->ir_call.args.count != 3)
@@ -605,7 +616,8 @@ static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
 	}
 
 	Ir ret = ir_test_body_stat(result.module->first_function->body, 0, IR_RETURN, "variadic static call lowers return");
-	Ir call = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir call = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	if (!call || call->kind != IR_CALL || call->ir_call.args.count != 3) {
 		test_fail("variadic static call retains all positional arguments");
 	}
@@ -624,7 +636,8 @@ static void test_ir_lowers_local_shadow_of_file_static(elf_State *state)
 	expect_load_local(mul ? mul->ir_binary.x : 0, ir_test_body_stat(nested, 0, IR_LOCAL, "nested local shadows file static"), "nested local shadows file static");
 	expect_ir_i64(mul ? mul->ir_binary.y : 0, 2, "nested runtime expression keeps rhs");
 	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "outer static remains visible after nested scope");
-	expect_ir_i64(ret ? ret->ir_return.expr : 0, 7, "nested local does not replace file static");
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	expect_ir_i64(tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0, 7, "nested local does not replace file static");
 	arena_destroy(&arena);
 }
 
@@ -636,7 +649,8 @@ static void test_ir_lowers_get_mem_macro(elf_State *state)
 
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "get_mem keeps local declaration");
 	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "get_mem lowers return");
-	Ir get_mem = ret ? ret->ir_return.expr : 0;
+	Ir tuple = ret ? ret->ir_return.expr : 0;
+	Ir get_mem = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(get_mem, IR_GET_MEM, "get_mem lowers to get_mem ir");
 	expect_load_local(get_mem ? get_mem->ir_unary : 0, memory, "get_mem targets local load");
 
