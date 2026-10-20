@@ -2,8 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-static void vm_set_counter(elf_State *state, elf_Table *table,
-	const char *name, u64 value)
+static void vm_set_counter(elf_State *state, elf_Table *table, const char *name, u64 value)
 {
 	elf_Value key = value_from_string(elf_string_from_data(state, name));
 	elf_table_set(state, table, key, value_from_integer((i64)value));
