@@ -191,8 +191,8 @@ git clone --recursive https://github.com/MicroRJ/elf.git
 cd elf
 ```
 
-The repository includes a Manny bootstrap executable, so Manny does not need
-to be installed separately.
+Build [Manny](https://github.com/MicroRJ/Manny#build-from-source) and make sure
+`manny` is available on `PATH`.
 
 ```bat
 build.bat build
