@@ -1,10 +1,12 @@
 ELF_FUNCTION(vm_test_assert)
 {
+	lib_check_arg_count(S, "test_assert", nargs, 1, 2);
 	elf_Value value = load_value(S, 1);
 	check_numeric(S, value);
+	const char *message = nargs > 2 ? lib_load_cstr(S, 2) : "script assertion failed";
 	if (!value_to_integer(value)) {
 		print_current_runtime_source_location(S);
-		test_fail("script assertion failed");
+		test_fail(message);
 	}
 	return 0;
 }

@@ -7,12 +7,19 @@ ScriptTestContext;
 ELF_FUNCTION(script_test_assert)
 {
 	ScriptTestContext *context = elf_get_user_data(S);
+	lib_check_arg_count(S, "test_assert", nargs, 1, 2);
 	elf_Value value = load_value(S, 1);
 	check_numeric(S, value);
+	const char *message = nargs > 2 ? lib_load_cstr(S, 2) : 0;
 	if (!value_to_integer(value))
 	{
 		print_current_runtime_source_location(S);
-		fprintf(stderr, "FAIL: assertion in %s\n", context->path);
+		if (message) {
+			fprintf(stderr, "FAIL: %s in %s\n", message, context->path);
+		}
+		else {
+			fprintf(stderr, "FAIL: assertion in %s\n", context->path);
+		}
 		test_failures += 1;
 	}
 	return 0;
