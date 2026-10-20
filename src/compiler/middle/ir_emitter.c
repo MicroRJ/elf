@@ -460,10 +460,9 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		{
 			Ast *parts = expr->interpolated_string.items;
 			u32 nparts = expr->interpolated_string.count;
-			if (nparts < 3 || (nparts & 1) == 0)
+			if (!nparts)
 			{
-				ir_report_error(emitter, ERROR_INTERNAL, expr->site,
-					"interpolated string must contain alternating text and expression parts");
+				ir_report_error(emitter, ERROR_INTERNAL, expr->site, "interpolated string has no parts");
 				ir = ERROR_IR;
 				break;
 			}
@@ -472,9 +471,9 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			for (u32 i = 0; i < nparts; ++ i)
 			{
 				Ast part = parts[i];
-				if (!part || ((i & 1) == 0 && part->kind != AST_STRING_LITERAL))
+				if (!part)
 				{
-					ir_report_error(emitter, ERROR_INTERNAL, expr->site, "invalid interpolated string part at index %u", i);
+					ir_report_error(emitter, ERROR_INTERNAL, expr->site, "interpolated string part %u is missing", i);
 					ir = ERROR_IR;
 					break;
 				}
