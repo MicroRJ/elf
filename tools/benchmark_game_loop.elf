@@ -1,0 +1,152 @@
+// Representative application workload for measuring global core-library access.
+
+ACTOR_COUNT :: 192
+TICK_COUNT :: 600
+SAMPLE_COUNT :: 7
+
+make_world :: fun(count) {
+	world := []
+	for index := 0; index < count; index += 1 ? {
+		world:add({
+			x = (index * 17) % 1001 - 500,
+			y = (index * 31) % 1001 - 500,
+			vx = index % 7 - 3,
+			vy = (index * 3) % 7 - 3,
+			hp = 50 + index % 51,
+			energy = 25 + index % 76,
+			cooldown = index % 9,
+			team = index % 4,
+			score = 0,
+		})
+	}
+	ret world
+}
+
+simulate_global_core :: fun(world, ticks) {
+	checksum := 0
+	for tick := 0; tick < ticks; tick += 1 ? {
+		for index := 0; index < world:length(); index += 1 ? {
+			actor := world[index]
+			actor.x += actor.vx
+			actor.y += actor.vy
+
+			if elf.math.abs(actor.x) > 500 ? {
+				actor.vx = -actor.vx
+				actor.x = elf.math.trim(actor.x, -500, 500)
+			}
+			if elf.math.abs(actor.y) > 500 ? {
+				actor.vy = -actor.vy
+				actor.y = elf.math.trim(actor.y, -500, 500)
+			}
+
+			distance := elf.math.abs(actor.x) + elf.math.abs(actor.y)
+			actor.energy = elf.math.trim(actor.energy + (tick + index) % 5 - 2, 0, 100)
+			if actor.cooldown > 0 ? {
+				actor.cooldown -= 1
+			} else {
+				damage := 1 + (distance + tick + index) % 7
+				actor.hp = elf.math.trim(actor.hp - damage, 0, 100)
+				actor.cooldown = 3 + (actor.team + index) % 5
+			}
+
+			if actor.hp == 0 ? {
+				actor.hp = 100
+				actor.score -= 25
+			} else {
+				actor.score += actor.energy % 3
+			}
+
+			checksum = (checksum * 33 + actor.x * 3 + actor.y * 5 + actor.hp * 7 + actor.score) % 2147483647
+		}
+	}
+	ret checksum
+}
+
+simulate_cached_core :: fun(world, ticks) {
+	math := elf.math
+	checksum := 0
+	for tick := 0; tick < ticks; tick += 1 ? {
+		for index := 0; index < world:length(); index += 1 ? {
+			actor := world[index]
+			actor.x += actor.vx
+			actor.y += actor.vy
+
+			if math.abs(actor.x) > 500 ? {
+				actor.vx = -actor.vx
+				actor.x = math.trim(actor.x, -500, 500)
+			}
+			if math.abs(actor.y) > 500 ? {
+				actor.vy = -actor.vy
+				actor.y = math.trim(actor.y, -500, 500)
+			}
+
+			distance := math.abs(actor.x) + math.abs(actor.y)
+			actor.energy = math.trim(actor.energy + (tick + index) % 5 - 2, 0, 100)
+			if actor.cooldown > 0 ? {
+				actor.cooldown -= 1
+			} else {
+				damage := 1 + (distance + tick + index) % 7
+				actor.hp = math.trim(actor.hp - damage, 0, 100)
+				actor.cooldown = 3 + (actor.team + index) % 5
+			}
+
+			if actor.hp == 0 ? {
+				actor.hp = 100
+				actor.score -= 25
+			} else {
+				actor.score += actor.energy % 3
+			}
+
+			checksum = (checksum * 33 + actor.x * 3 + actor.y * 5 + actor.hp * 7 + actor.score) % 2147483647
+		}
+	}
+	ret checksum
+}
+
+run_sample :: fun(simulate) {
+	world := make_world(ACTOR_COUNT)
+	before := elf.vm.counters()
+	start := elf.time.counter()
+	checksum := simulate(world, TICK_COUNT)
+	elapsed := elf.time.elapsed(start)
+	after := elf.vm.counters()
+	ret elapsed, checksum, after.instructions - before.instructions
+}
+
+benchmark :: fun(label, simulate) {
+	// Warm the instruction paths and native calls before collecting samples.
+	run_sample(simulate)
+
+	samples := []
+	expected_checksum := nil
+	expected_instructions := nil
+	for sample := 0; sample < SAMPLE_COUNT; sample += 1 ? {
+		elapsed, checksum, instructions := run_sample(simulate)
+		if expected_checksum == nil ? {
+			expected_checksum = checksum
+			expected_instructions = instructions
+		} else {
+			elf.assert(checksum == expected_checksum, "benchmark checksum changed between samples")
+			elf.assert(instructions == expected_instructions, "benchmark instruction count changed between samples")
+		}
+		samples:add(elapsed)
+	}
+
+	// Sort after measurement so reporting work is excluded from the samples.
+	for index := 1; index < samples:length(); index += 1 ? {
+		cursor := index
+		while cursor > 0 && samples[cursor] < samples[cursor - 1] ? {
+			samples:swap(cursor, cursor - 1)
+			cursor -= 1
+		}
+	}
+
+	median_ms := samples[SAMPLE_COUNT / 2] * 1000
+	elf.println(label + ": " + median_ms:fmt(".03") + " ms, " + expected_instructions + " instructions, checksum " + expected_checksum)
+	ret expected_checksum
+}
+
+elf.println("representative game loop (median of 7 runs after one warmup)")
+global_checksum := benchmark("global core lookup", simulate_global_core)
+cached_checksum := benchmark("cached core lookup", simulate_cached_core)
+elf.assert(global_checksum == cached_checksum, "global and cached workloads diverged")

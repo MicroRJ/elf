@@ -256,6 +256,35 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	elf_destroy_state(state);
 }
 
+static void bench_representative_elf_workload(void)
+{
+	enum { SAMPLE_COUNT = 7 };
+	double samples[SAMPLE_COUNT];
+	elf_State *state = elf_create_state();
+
+	bench_require(elf_push_code_file(state, "tools/benchmark_game_loop.elf"),
+		"could not compile representative Elf workload");
+	elf_pop(state, 1);
+
+	for (u32 i = 0; i < SAMPLE_COUNT; ++i)
+	{
+		i64 start = bench_now();
+		bench_require(elf_push_code_file(state, "tools/benchmark_game_loop.elf"),
+			"could not compile representative Elf workload");
+		samples[i] = bench_elapsed_s(start);
+		if (i + 1 < SAMPLE_COUNT) {
+			elf_pop(state, 1);
+		}
+	}
+	bench_report("compile + load game", "loads", 1, bench_median(samples, SAMPLE_COUNT));
+	fflush(stdout);
+
+	elf_push_nil(state);
+	bench_require(elf_call(state, 1, 0) == 0,
+		"representative Elf workload returned values");
+	elf_destroy_state(state);
+}
+
 static void fill_string_table(elf_State *state, elf_Table *table, elf_Value *hit_keys, elf_Value *miss_keys, u32 count)
 {
 	for (u32 i = 0; i < count; ++i) {
@@ -450,6 +479,9 @@ int main(void)
 	bench_vm_integer_program("closure create/call", closure_source, CLOSURE_ITERATIONS, CLOSURE_ITERATIONS);
 	bench_vm_integer_program("captured closure calls", captured_closure_call_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("dynamic closure selection", dynamic_closure_selection_source, VM_ITERATIONS, 0);
+
+	printf("\nRepresentative Elf application benchmark\n");
+	bench_representative_elf_workload();
 
 	printf("\nCompiler, loading, and storage benchmarks\n");
 	bench_compile_and_load_scripts(script_compile_source, COMPILE_ITERATIONS);
