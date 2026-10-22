@@ -300,7 +300,12 @@ static u32 emit_get_global(BcEmitter *emitter, SourceSite site, i32 destination,
 {
 	ASSERT(slot_is_valid(destination));
 	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
-	u32 global = elf_globals_ensure(emitter->target, symbol);
+	u32 global = 0;
+	if (!elf_globals_find(emitter->target, symbol, &global))
+	{
+		ASSERT(!"global must be registered before bytecode emission");
+		abort();
+	}
 	if (global >= BC_OPERAND_COUNT_MAX) {
 		abort();
 	}
