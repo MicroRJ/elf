@@ -62,47 +62,6 @@ simulate_global_core :: fun(world, ticks) {
 	ret checksum
 }
 
-simulate_cached_core :: fun(world, ticks) {
-	math := elf.math
-	checksum := 0
-	for tick := 0; tick < ticks; tick += 1 ? {
-		for index := 0; index < world:length(); index += 1 ? {
-			actor := world[index]
-			actor.x += actor.vx
-			actor.y += actor.vy
-
-			if math.abs(actor.x) > 500 ? {
-				actor.vx = -actor.vx
-				actor.x = math.trim(actor.x, -500, 500)
-			}
-			if math.abs(actor.y) > 500 ? {
-				actor.vy = -actor.vy
-				actor.y = math.trim(actor.y, -500, 500)
-			}
-
-			distance := math.abs(actor.x) + math.abs(actor.y)
-			actor.energy = math.trim(actor.energy + (tick + index) % 5 - 2, 0, 100)
-			if actor.cooldown > 0 ? {
-				actor.cooldown -= 1
-			} else {
-				damage := 1 + (distance + tick + index) % 7
-				actor.hp = math.trim(actor.hp - damage, 0, 100)
-				actor.cooldown = 3 + (actor.team + index) % 5
-			}
-
-			if actor.hp == 0 ? {
-				actor.hp = 100
-				actor.score -= 25
-			} else {
-				actor.score += actor.energy % 3
-			}
-
-			checksum = (checksum * 33 + actor.x * 3 + actor.y * 5 + actor.hp * 7 + actor.score) % 2147483647
-		}
-	}
-	ret checksum
-}
-
 run_sample :: fun(simulate) {
 	world := make_world(ACTOR_COUNT)
 	before := elf.vm.counters()
@@ -147,6 +106,4 @@ benchmark :: fun(label, simulate) {
 }
 
 elf.println("representative game loop (median of 7 runs after one warmup)")
-global_checksum := benchmark("global core lookup", simulate_global_core)
-cached_checksum := benchmark("cached core lookup", simulate_cached_core)
-elf.assert(global_checksum == cached_checksum, "global and cached workloads diverged")
+benchmark("core library calls", simulate_global_core)

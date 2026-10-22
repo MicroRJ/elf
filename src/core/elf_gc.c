@@ -189,6 +189,9 @@ static u32 gc_mark_metatables(elf_State *state)
 	if (state->metatables.buffer) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.buffer);
 	}
+	if (state->metatables.fs_file) {
+		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.fs_file);
+	}
 
 	return marked_count;
 }

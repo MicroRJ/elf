@@ -10,6 +10,7 @@
 #include "base.h"
 #include "atom_view.h"
 #include "compiler.h"
+#include "token.h"
 #include "entity.h"
 #include "ast.h"
 #include "ir.h"
@@ -197,7 +198,7 @@ Com_Status check_source(Com_Source *source)
 
 	Checker checker = {0};
 	checker.current_function = root;
-	checker.globals = scope_create(compiler->arena, SCOPE_GLOBAL, 0, 0, 0);
+	checker.globals = compiler->globals;
 	if (!checker.globals) {
 		return checker_out_of_memory(source, root->site);
 	}
@@ -359,12 +360,12 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			}
 			Ast outer_function = checker->current_function;
 			checker->current_function = expr;
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->function.params.count; ++i)
+			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->function.params.count; ++ i)
 			{
 				Ast param = expr->function.params.items[i];
 				ASSERT(param);
 				ASSERT(param->kind == AST_DECL_STAT);
-				if (param->decl.type)
+				if (param->decl.type && (param->decl.type->kind != AST_IDENT || param->decl.type->atom->id <= ATOM_TYPE_NAME_NONE || param->decl.type->atom->id >= ATOM_TYPE_NAME_COUNT))
 				{
 					Com_Value param_value = resolve_expression(checker, param->decl.type);
 					if (param_value.type == COM_VALUE_ERROR) {
@@ -453,16 +454,17 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 
 			if (!entity)
 			{
-				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, name, expr->site);
-				if (entity_is_error(entity)) {
-					value = com_value_error(entity->status);
-				}
+				Com_Status status = checker_report(checker->source_scope->source, ERROR_UNDECLARED_IDENTIFIER, ERROR_ERROR, expr->site, "undeclared identifier '%s'", atom_data(name));
+				value = com_value_error(status);
 			}
 			if (value.type != COM_VALUE_ERROR)
 			{
 				expr->entity = entity;
 				if (entity->kind == ENTITY_STATIC) {
 					value = resolve_static_entity(checker, entity);
+				}
+				else if (entity->kind == ENTITY_GLOBAL) {
+					value = entity->en_global.value;
 				}
 			}
 		}
@@ -476,6 +478,24 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			if (left_value.type == COM_VALUE_ERROR)
 			{
 				value = left_value;
+			}
+			else if (left_value.type == COM_VALUE_SCOPE)
+			{
+				ASSERT(expr->binary.y->kind == AST_IDENT || expr->binary.y->kind == AST_STRING_LITERAL);
+				ASSERT(expr->binary.y->atom);
+				Entity *entity = scope_find_current(left_value.scope, expr->binary.y->atom);
+				if (!entity)
+				{
+					Com_Status status = checker_report(checker->source_scope->source, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "host namespace has no member named '%s'", atom_data(expr->binary.y->atom));
+					value = com_value_error(status);
+				}
+				else
+				{
+					ASSERT(entity->kind == ENTITY_GLOBAL);
+					value = entity->en_global.value;
+					entity->referenced = true;
+					expr->entity = entity;
+				}
 			}
 			else if (left_value.type == COM_VALUE_EXPORTS)
 			{

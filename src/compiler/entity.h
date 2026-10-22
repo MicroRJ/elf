@@ -18,6 +18,8 @@ typedef enum
 	COM_VALUE_STRING,
 	COM_VALUE_FUNCTION,
 	COM_VALUE_EXPORTS,
+	COM_VALUE_SCOPE,
+	COM_VALUE_NATIVE_FUNCTION,
 }
 Com_ValueType;
 
@@ -32,7 +34,9 @@ typedef struct
 		i64           integer;
 		struct Atom  *string;
 		Scope        *exports;
+		Scope        *scope;
 		struct Ast_T *function;
+		u32           native_function_index;
 	};
 }
 Com_Value;
@@ -62,6 +66,11 @@ struct Entity
 			Com_Value     value;
 		}
 		en_static;
+		struct
+		{
+			Com_Value value;
+		}
+		en_global;
 		struct
 		{
 			struct Ast_T  *declaration;
@@ -101,6 +110,7 @@ typedef enum
 {
 	SCOPE_NONE = 0,
 	SCOPE_GLOBAL,
+	SCOPE_NAMESPACE,
 	SCOPE_SOURCE,
 	SCOPE_FUNCTION,
 	SCOPE_BLOCK,

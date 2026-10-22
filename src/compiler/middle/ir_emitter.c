@@ -215,13 +215,9 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 	}
 	entity->referenced = true;
 
-	if (entity->kind == ENTITY_GLOBAL)
+	if (entity->kind == ENTITY_GLOBAL || entity->kind == ENTITY_STATIC)
 	{
-		return ir_new_global(emitter, site, entity->name);
-	}
-	else if (entity->kind == ENTITY_STATIC)
-	{
-		Com_Value value = entity->en_static.value;
+		Com_Value value = entity->kind == ENTITY_GLOBAL ? entity->en_global.value : entity->en_static.value;
 
 		switch (value.type)
 		{
@@ -268,9 +264,20 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 				return ir_new_function(emitter, site, function->function.ir);
 			}
 
+			case COM_VALUE_NATIVE_FUNCTION:
+			{
+				return ir_new_native_function(emitter, site, value.native_function_index);
+			}
+
 			case COM_VALUE_EXPORTS:
 			{
 				ir_report_error(emitter, ERROR_LOWERING, site, "source namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
+				return ERROR_IR;
+			}
+
+			case COM_VALUE_SCOPE:
+			{
+				ir_report_error(emitter, ERROR_LOWERING, site, "host namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
 				return ERROR_IR;
 			}
 

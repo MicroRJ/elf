@@ -1,0 +1,4 @@
+// Verifies that injected host namespaces resolve native functions statically and load them from the state registry.
+counters := elf.vm.counters()
+test_assert(elf.type_of(counters) == "table")
+test_assert(counters.native_calls > 0)

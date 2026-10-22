@@ -341,6 +341,15 @@ activate_frame:
 				value_copy(vm_register(registers, byte.b_x), elf_globals_get_by_slot(state, byte.b_y));
 			} break;
 
+			case BC_LOAD_NATIVE_FUNCTION: {
+				if (byte.b_y < 0 || (u32)byte.b_y >= state->native_function_count)
+				{
+					ASSERT(!"native function index is out of bounds");
+					break;
+				}
+				*vm_register(registers, byte.b_x) = value_from_function(state->native_functions[(u32)byte.b_y]);
+			} break;
+
 			case BC_TABLE: {
 				elf_Table *table = elf_table_new(state);
 				*vm_register(registers, byte.b_x) = value_from_table(table);

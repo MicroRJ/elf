@@ -127,6 +127,14 @@ struct elf_Table
 	u32        occupied;
 };
 
+struct GlobalEntry
+{
+	char *name;
+	u64   size;
+	u32   hash;
+	u32   slot;
+};
+
 // TODO(RJ): we could compress this WAY down, encode the line index & column as a u16,
 // store base line index in the prototype as a u32, byte start and byte end could be
 // replaced with a single u16 end marker ...
@@ -216,6 +224,9 @@ struct elf_State
 	elf_Prototype **prototypes;
 	u32             prototype_count;
 	u32             prototype_capacity;
+	elf_Function   *native_functions;
+	u32             native_function_count;
+	u32             native_function_capacity;
 	elf_Source     *sources;
 
 	struct
@@ -277,6 +288,7 @@ struct elf_State
 		elf_Table *table;
 		elf_Table *array;
 		elf_Table *buffer;
+		elf_Table *fs_file;
 	}
 	metatables;
 };
@@ -290,6 +302,9 @@ void *elf_alloc(elf_State *state, elf_u64 size);
 void *elf_alloc_zero(elf_State *state, elf_u64 size);
 void *elf_realloc(elf_State *state, void *memory, elf_u64 old_size, elf_u64 new_size);
 void elf_free(elf_State *state, void *memory, elf_u64 size);
+
+ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index);
+void elf_native_functions_destroy(elf_State *state);
 
 elf_Source *elf_source_create(elf_State *state, dy_String name, dy_String text);
 void elf_sources_destroy(elf_State *state);

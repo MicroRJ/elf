@@ -63,11 +63,10 @@ test_assert(pair_count == 3)
 test_assert(last_a == 17)
 test_assert(last_b == 19)
 
-elf.source_calls = 0
-elf.cached_values = values
+source := {calls = 0, values = values}
 get_values := fun() {
-	elf.source_calls += 1
-	ret elf.cached_values
+	source.calls += 1
+	ret source.values
 }
 
 cached_sum := 0
@@ -76,28 +75,28 @@ for item := get_values()[0 ... 3] ? {
 }
 
 test_assert(cached_sum == 23)
-test_assert(elf.source_calls == 1)
+test_assert(source.calls == 1)
 
 full_sum := 0
 for item := get_values()[...] ? {
 	full_sum += item
 }
 test_assert(full_sum == 72)
-test_assert(elf.source_calls == 2)
+test_assert(source.calls == 2)
 
 tail_sum := 0
 for item := get_values()[2 ...] ? {
 	tail_sum += item
 }
 test_assert(tail_sum == 60)
-test_assert(elf.source_calls == 3)
+test_assert(source.calls == 3)
 
 prefix_sum := 0
 for item := get_values()[... 3] ? {
 	prefix_sum += item
 }
 test_assert(prefix_sum == 23)
-test_assert(elf.source_calls == 4)
+test_assert(source.calls == 4)
 
 string_sum := 0
 string_count := 0

@@ -19,6 +19,7 @@
 #include "compiler.h"
 #include "token.h"
 #include "ast.h"
+#include "entity.h"
 #include "parser.h"
 #include "ir.h"
 #include "bc_emitter.h"
@@ -63,6 +64,10 @@ Compiler *compiler_create(Arena *arena)
 			if (compiler->atoms->buckets)
 			{
 				compiler_init_atoms(compiler);
+				compiler->globals = scope_create(arena, SCOPE_GLOBAL, 0, 0, 0);
+				if (!compiler->globals) {
+					compiler = 0;
+				}
 			}
 			else
 			{
@@ -75,6 +80,120 @@ Compiler *compiler_create(Arena *arena)
 		}
 	}
 	return compiler;
+}
+
+static Com_Status compiler_inject_value(Compiler *compiler, Scope *scope, Atom *name, elf_Value value);
+
+static Com_Status compiler_inject_table(Compiler *compiler, Scope *scope, elf_Table *table)
+{
+	for (u32 i = 0; i < table->capacity; ++i)
+	{
+		Entry entry = table->entries[i];
+		if (!elf_table_entry_is_key(entry)) {
+			continue;
+		}
+		ASSERT(value_is_string(entry.key));
+		if (!value_is_string(entry.key)) {
+			continue;
+		}
+		elf_String *key = value_as_string(entry.key);
+		Atom *name = atom_from_data_size(compiler->atoms, elf_string_data(key), elf_string_size(key));
+		if (!name) {
+			return COM_STATUS_OOM;
+		}
+		Com_Status status = compiler_inject_value(compiler, scope, name, entry.value);
+		if (status != COM_STATUS_OK) {
+			return status;
+		}
+	}
+	return COM_STATUS_OK;
+}
+
+static Com_Status compiler_inject_value(Compiler *compiler, Scope *scope, Atom *name, elf_Value value)
+{
+	b32 created = false;
+	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
+	if (!entity) {
+		return COM_STATUS_OOM;
+	}
+	ASSERT(created);
+
+	Com_Value *compiler_value = &entity->en_global.value;
+	if (value_is_nil(value))
+	{
+		compiler_value->type = COM_VALUE_NIL;
+	}
+	else if (value_is_number(value))
+	{
+		compiler_value->type = COM_VALUE_NUMBER;
+		compiler_value->number = value_as_number(value);
+	}
+	else if (value_is_integer(value))
+	{
+		compiler_value->type = COM_VALUE_INTEGER;
+		compiler_value->integer = value_as_integer(value);
+	}
+	else if (value_is_string(value))
+	{
+		elf_String *string = value_as_string(value);
+		compiler_value->type = COM_VALUE_STRING;
+		compiler_value->string = atom_from_data_size(compiler->atoms, elf_string_data(string), elf_string_size(string));
+		if (!compiler_value->string) {
+			return COM_STATUS_OOM;
+		}
+	}
+	else if (value_is_function(value))
+	{
+		u32 native_function_index = UINT32_MAX;
+		ErrorCode error = elf_native_function_ensure(compiler->target, value_as_function(value), &native_function_index);
+		if (error != ERROR_NONE) {
+			return COM_STATUS_OOM;
+		}
+		compiler_value->type = COM_VALUE_NATIVE_FUNCTION;
+		compiler_value->native_function_index = native_function_index;
+	}
+	else if (value_is_table(value))
+	{
+		Scope *members = scope_create(compiler->arena, SCOPE_NAMESPACE, scope, 0, 0);
+		if (!members) {
+			return COM_STATUS_OOM;
+		}
+		compiler_value->type = COM_VALUE_SCOPE;
+		compiler_value->scope = members;
+		return compiler_inject_table(compiler, members, value_as_table(value));
+	}
+	else
+	{
+		ASSERT(!"unsupported host global value type");
+	}
+	return COM_STATUS_OK;
+}
+
+Com_Status compiler_inject_globals(Compiler *compiler, Scope *globals)
+{
+	ASSERT(compiler);
+	ASSERT(compiler->target);
+	ASSERT(globals);
+	ASSERT(globals->kind == SCOPE_GLOBAL);
+	elf_State *state = compiler->target;
+	for (u32 i = 0; i < state->global_entry_capacity; ++i)
+	{
+		GlobalEntry *entry = state->global_entries + i;
+		if (!entry->name) {
+			continue;
+		}
+		ASSERT(entry->size <= UINT32_MAX);
+		ASSERT(entry->slot < state->global_count);
+		Atom *name = atom_from_data_size(compiler->atoms, entry->name, (u32)entry->size);
+		if (!name) {
+			return COM_STATUS_OOM;
+		}
+		Com_Status status = compiler_inject_value(compiler, globals, name, state->global_values[entry->slot]);
+		if (status != COM_STATUS_OK) {
+			return status;
+		}
+	}
+	return COM_STATUS_OK;
 }
 
 static elf_StrSlice compiler_format_message(Arena *arena, const char *format, va_list args)
@@ -358,21 +477,29 @@ elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice na
 				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, runtime_source, (dy_String) {});
 				if (compiler_source)
 				{
-					Parser parser = {};
-					if (parser_init(&parser))
+					Com_Status inject_status = compiler_inject_globals(compiler, compiler->globals);
+					if (inject_status != COM_STATUS_OK)
 					{
-						Ast ast = parse_source_recursively(compiler, &parser, compiler_source);
-
-						parser_destroy(&parser);
-
-						if (!ast_is_error(ast) && !compiler->error_count)
+						compiler_report(compiler_source, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {}, "could not inject host globals");
+					}
+					else
+					{
+						Parser parser = {};
+						if (parser_init(&parser))
 						{
-							Com_Status check_status = check_source(compiler_source);
-							if (check_status == COM_STATUS_OK)
+							Ast ast = parse_source_recursively(compiler, &parser, compiler_source);
+
+							parser_destroy(&parser);
+
+							if (!ast_is_error(ast) && !compiler->error_count)
 							{
-								IrModule *ir_module = ir_emit_module(compiler_source);
-								if (ir_module && !compiler->error_count) {
-									entry = bc_emit_module(compiler->target, ir_module);
+								Com_Status check_status = check_source(compiler_source);
+								if (check_status == COM_STATUS_OK)
+								{
+									IrModule *ir_module = ir_emit_module(compiler_source);
+									if (ir_module && !compiler->error_count) {
+										entry = bc_emit_module(compiler->target, ir_module);
+									}
 								}
 							}
 						}

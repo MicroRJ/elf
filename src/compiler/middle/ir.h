@@ -23,7 +23,8 @@ Literal values
   IR_ATOM produces a runtime string from an interned compiler atom.
 
 Named, local, and callable values
-  IR_GLOBAL reads a symbolic global.
+  IR_GLOBAL reads a symbolic runtime global.
+  IR_NATIVE_FUNCTION refers to a native function in the target state's registry.
   IR_LOAD_CAPTURE reads an IrCapture from the current closure.
   IR_RECURSE produces the current closure for a recursive call.
   IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
@@ -74,6 +75,7 @@ Low-level control flow
 	X(IR_NUMBER              , "number")                     \
 	X(IR_ATOM                , "atom")                       \
 	X(IR_GLOBAL              , "global")                     \
+	X(IR_NATIVE_FUNCTION     , "native_function")            \
 	X(IR_LOAD_CAPTURE        , "load_capture")               \
 	X(IR_RECURSE             , "recurse")                    \
 	X(IR_FUNCTION            , "function")                   \
@@ -201,6 +203,7 @@ struct IrNode
 	union
 	{
 		Atom    *ir_global;
+		u32      native_function_index;
 		IrCapture *ir_load_capture;
 
 		struct

@@ -61,6 +61,7 @@ struct Compiler
 	elf_State         *target;
 	Arena             *arena;
 	struct Atom_Table *atoms;
+	struct Scope      *globals;
 	Com_Source        *first_source;
 	Com_Source        *last_source;
 	u32                error_count;
@@ -84,6 +85,7 @@ struct Com_Source
 };
 
 Compiler *compiler_create(Arena *arena);
+Com_Status compiler_inject_globals(Compiler *compiler, struct Scope *globals);
 
 void compiler_log_report(Compiler *compiler);
 

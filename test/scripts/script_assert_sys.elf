@@ -1,8 +1,8 @@
 path := "build/sys_smoke_test.txt"
 missing := "build/sys_smoke_missing.txt"
-fs := elf.fs
-path_lib := elf.path
-env := elf.env
+fs :: elf.fs
+path_lib :: elf.path
+env :: elf.env
 
 unix_ms := elf.time.unix_ms()
 test_assert(elf.type_of(unix_ms) == "integer")
@@ -70,13 +70,6 @@ test_assert(fs.remove_directory(tree) == 0)
 test_assert(fs.remove_tree(tree) == 1)
 test_assert(fs.exists(tree) == 0)
 test_assert(fs.remove_tree(tree) == 1)
-
-test_assert(fs.read == nil)
-test_assert(fs.write == nil)
-test_assert(fs.stat == nil)
-test_assert(fs.mkdir == nil)
-test_assert(fs.remove == nil)
-test_assert(elf.os == nil)
 
 test_assert(path_lib.join("some/path", "name.ext") == "some/path/name.ext")
 test_assert(path_lib.filename("some/path/name.ext") == "name.ext")

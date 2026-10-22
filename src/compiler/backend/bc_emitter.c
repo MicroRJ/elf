@@ -446,6 +446,7 @@ static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 			case IR_NIL:
 			case IR_LOAD:
 			case IR_GLOBAL:
+			case IR_NATIVE_FUNCTION:
 			case IR_LOAD_CAPTURE:
 			{
 			}
@@ -866,6 +867,18 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 			out = ensure_slot(emitter, out);
 			emit_get_global(emitter, expr->site, out, expr->ir_global);
+		}
+		break;
+
+		case IR_NATIVE_FUNCTION:
+		{
+			if (nout < 1) {
+				return out;
+			}
+
+			out = ensure_slot(emitter, out);
+			ASSERT(expr->native_function_index < BC_OPERAND_COUNT_MAX);
+			emit_bytecode_xy(emitter, site, BC_LOAD_NATIVE_FUNCTION, out, expr->native_function_index);
 		}
 		break;
 

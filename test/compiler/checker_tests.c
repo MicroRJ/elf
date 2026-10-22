@@ -7,11 +7,19 @@ typedef struct
 }
 CheckerTest;
 
-static void checker_test_init(CheckerTest *test, const char *name, const char *source_text)
+static void checker_test_init_with_target(CheckerTest *test, elf_State *target, const char *name, const char *source_text)
 {
 	zero_memory(test, sizeof(*test));
 	test->arena = arena_create(0);
 	test->compiler = compiler_create(&test->arena);
+	if (target)
+	{
+		test->compiler->target = target;
+		if (compiler_inject_globals(test->compiler, test->compiler->globals) != COM_STATUS_OK) {
+			test_fail("checker test injects host globals");
+			return;
+		}
+	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
 	test->source = parser_test_add_source(test->compiler, source_name, source);
@@ -31,6 +39,11 @@ static void checker_test_init(CheckerTest *test, const char *name, const char *s
 	test->source->state = COM_SOURCE_PARSED;
 	test->status = check_source(test->source);
 	test->source->state = COM_SOURCE_CHECKED;
+}
+
+static void checker_test_init(CheckerTest *test, const char *name, const char *source_text)
+{
+	checker_test_init_with_target(test, 0, name, source_text);
 }
 
 static void checker_test_destroy(CheckerTest *test)
@@ -101,6 +114,35 @@ static void test_checker_resolves_static_forward_reference(void)
 	checker_test_destroy(&test);
 }
 
+static void test_compiler_injects_global_scopes(void)
+{
+	elf_State *state = elf_create_state();
+	Arena arena = arena_create(0);
+	Compiler *compiler = compiler_create(&arena);
+	compiler->target = state;
+	Scope *globals = compiler->globals;
+	Com_Status status = compiler_inject_globals(compiler, globals);
+
+	Atom *elf_name = atom_from_data_size(compiler->atoms, "elf", 3);
+	Entity *elf_entity = scope_find_current(globals, elf_name);
+	Scope *elf_scope = elf_entity && elf_entity->en_global.value.type == COM_VALUE_SCOPE ? elf_entity->en_global.value.scope : 0;
+	Atom *vm_name = atom_from_data_size(compiler->atoms, "vm", 2);
+	Entity *vm_entity = elf_scope ? scope_find_current(elf_scope, vm_name) : 0;
+	Scope *vm_scope = vm_entity && vm_entity->en_global.value.type == COM_VALUE_SCOPE ? vm_entity->en_global.value.scope : 0;
+	Atom *counters_name = atom_from_data_size(compiler->atoms, "counters", 8);
+	Entity *counters_entity = vm_scope ? scope_find_current(vm_scope, counters_name) : 0;
+
+	if (status != COM_STATUS_OK || !elf_entity || elf_entity->kind != ENTITY_GLOBAL || !elf_scope || !vm_entity || !vm_scope ||
+		!counters_entity || counters_entity->kind != ENTITY_GLOBAL || counters_entity->en_global.value.type != COM_VALUE_NATIVE_FUNCTION ||
+		counters_entity->en_global.value.native_function_index >= state->native_function_count)
+	{
+		test_fail("compiler injects recursive global scopes");
+	}
+
+	arena_destroy(&arena);
+	elf_destroy_state(state);
+}
+
 static void test_checker_tags_exported_static(void)
 {
 	CheckerTest test;
@@ -116,14 +158,15 @@ static void test_checker_tags_exported_static(void)
 static void test_checker_declares_local_after_initializer(void)
 {
 	CheckerTest test;
-	checker_test_init(&test, "checker_initializer", "value := value\nret value");
-	Ast declaration = checker_test_stat(&test, 0, AST_DECL_STAT, "checker parses local declaration");
-	Ast return_stat = checker_test_stat(&test, 1, AST_RETURN, "checker parses local return");
+	checker_test_init(&test, "checker_initializer", "value :: 7\n{ value := value\nret value }");
+	Ast block = checker_test_stat(&test, 1, AST_BLOCK_STAT, "checker parses initializer block");
+	Ast declaration = block && block->block.count > 0 ? block->block.items[0] : 0;
+	Ast return_stat = block && block->block.count > 1 ? block->block.items[1] : 0;
 	Ast name = declaration ? checker_test_tuple_item(declaration->decl.name, 0, AST_IDENT, "checker finds local declaration name") : 0;
 	Ast initializer = declaration ? checker_test_tuple_item(declaration->decl.expr, 0, AST_IDENT, "checker finds local initializer") : 0;
 	Entity *local = name ? name->entity : 0;
 	Entity *prior = initializer ? initializer->entity : 0;
-	if (!local || local->kind != ENTITY_LOCAL || !prior || prior->kind != ENTITY_GLOBAL || local == prior) {
+	if (!local || local->kind != ENTITY_LOCAL || !prior || prior->kind != ENTITY_STATIC || local == prior) {
 		test_fail("checker resolves initializer before declaring local names");
 	}
 	Ast return_expr = return_stat ? checker_test_single_expression(return_stat->return_stat.expr, AST_IDENT, "checker finds local return expression") : 0;
@@ -177,8 +220,9 @@ static void test_checker_does_not_leak_block_locals(void)
 	Entity *local = name ? name->entity : 0;
 	Ast return_expr = return_stat ? checker_test_single_expression(return_stat->return_stat.expr, AST_IDENT, "checker finds use after block") : 0;
 	Entity *outside = return_expr ? return_expr->entity : 0;
-	if (!local || local->kind != ENTITY_LOCAL || !outside || outside->kind != ENTITY_GLOBAL || outside == local) {
-		test_fail("checker does not leak block locals into parent scope");
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	if (!local || local->kind != ENTITY_LOCAL || outside || test.status != COM_STATUS_REPORTED || !message || message->code != ERROR_UNDECLARED_IDENTIFIER) {
+		test_fail("checker reports block locals used outside their scope");
 	}
 	checker_test_destroy(&test);
 }
@@ -278,21 +322,23 @@ static void test_checker_reports_duplicate_static(void)
 
 static void checker_expect_global_assignment_error(const char *name, const char *source, const char *label)
 {
+	elf_State *state = elf_create_state();
 	CheckerTest test;
-	checker_test_init(&test, name, source);
+	checker_test_init_with_target(&test, state, name, source);
 	Com_Message *message = test.source ? test.source->report.first : 0;
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail(label);
 	}
 	checker_test_destroy(&test);
+	elf_destroy_state(state);
 }
 
 static void test_checker_rejects_global_assignment(void)
 {
-	checker_expect_global_assignment_error("checker_global_assign", "value = 1", "checker rejects assignment to a global");
-	checker_expect_global_assignment_error("checker_global_compound_assign", "value += 1", "checker rejects compound assignment to a global");
-	checker_expect_global_assignment_error("checker_global_nil_assign", "value ?= 1", "checker rejects nil assignment to a global");
-	checker_expect_global_assignment_error("checker_global_multi_assign", "first, second = 1, 2", "checker rejects multi-assignment to globals");
+	checker_expect_global_assignment_error("checker_global_assign", "elf = 1", "checker rejects assignment to a global");
+	checker_expect_global_assignment_error("checker_global_compound_assign", "elf += 1", "checker rejects compound assignment to a global");
+	checker_expect_global_assignment_error("checker_global_nil_assign", "elf ?= 1", "checker rejects nil assignment to a global");
+	checker_expect_global_assignment_error("checker_global_multi_assign", "elf, elf = 1, 2", "checker rejects multi-assignment to globals");
 }
 
 static void test_checker_resolves_imported_export(void)
@@ -397,9 +443,9 @@ static void test_checker_reports_static_cycle(void)
 static void test_checker_reports_invalid_static_expression(void)
 {
 	CheckerTest test;
-	checker_test_init(&test, "checker_invalid_static", "answer :: runtime_value\nret answer");
+	checker_test_init(&test, "checker_invalid_static", "runtime_value := 1\nanswer :: runtime_value\nret answer");
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	Ast declaration = checker_test_stat(&test, 0, AST_STATIC_DECL, "checker parses invalid static");
+	Ast declaration = checker_test_stat(&test, 1, AST_STATIC_DECL, "checker parses invalid static");
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports expression without static value");
 	}
@@ -447,7 +493,7 @@ static void test_checker_routes_imported_static_error_to_source(void)
 	CheckerImportTest test;
 	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.answer", "export answer :: runtime_value");
 	Com_Message *message = test.module ? test.module->report.first : 0;
-	if (!message || test.module->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || test.root->report.error_count != 0) {
+	if (!message || test.module->report.error_count != 1 || message->code != ERROR_UNDECLARED_IDENTIFIER || test.root->report.error_count != 0) {
 		test_fail("checker routes imported static error to defining source");
 	}
 	checker_import_test_destroy(&test);
@@ -476,6 +522,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 
 static void run_checker_tests(void)
 {
+	TEST_RUN("compiler.injects_global_scopes", test_compiler_injects_global_scopes);
 	TEST_RUN("checker.resolves_static_forward_reference", test_checker_resolves_static_forward_reference);
 	TEST_RUN("checker.tags_exported_static", test_checker_tags_exported_static);
 	TEST_RUN("checker.declares_local_after_initializer", test_checker_declares_local_after_initializer);

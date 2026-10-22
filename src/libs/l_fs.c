@@ -4,8 +4,6 @@
 
 #define ELF_FS_MAX_RECURSION 32
 
-#define ELF_FS_FILE_METATABLE "_file_metatable"
-
 typedef struct
 {
 	dy_File file;
@@ -556,12 +554,6 @@ ELF_FUNCTION(lib_fs_open)
 	{
 		return 1;
 	}
-	elf_Value receiver = S->frame->framebase[0];
-	if (!value_is_table(receiver))
-	{
-		fs_push_errorf(S, "fs.open expected the elf.fs receiver, got '%s'", value_type_name(receiver.type));
-		return 1;
-	}
 	dy_String path = {0};
 	dy_String mode = {0};
 	if (!fs_load_string(S, 1, "file path", &path) || !fs_load_string(S, 2, "file mode", &mode))
@@ -621,13 +613,13 @@ ELF_FUNCTION(lib_fs_open)
 		return 1;
 	}
 
-	elf_Value metatable_value = elf_table_get_or_nil(S, value_as_table(receiver), value_from_string(elf_string_from_data(S, ELF_FS_FILE_METATABLE)));
-	if (!value_is_table(metatable_value))
+	elf_Table *file_metatable = S->metatables.fs_file;
+	if (!file_metatable)
 	{
 		elf_push_error(S, "file metatable is unavailable");
 		return 1;
 	}
-	elf_UserObject *user = elf_user_object_new(S, &fs_file_type, value_as_table(metatable_value), sizeof(FsFile));
+	elf_UserObject *user = elf_user_object_new(S, &fs_file_type, file_metatable, sizeof(FsFile));
 	FsFile *file = (FsFile *)user->data;
 	file->readable = readable;
 	file->writable = writable;
@@ -931,9 +923,7 @@ static const elf_Binding l_fs[] = {
 
 static void elf_lib_fs(elf_State *state)
 {
-	elf_Table *fs = new_binding_table(state, l_fs, ARRAY_COUNT(l_fs));
-	elf_Table *file_metatable = new_binding_table(state, l_fs_file, ARRAY_COUNT(l_fs_file));
-	elf_Value key = value_from_string(elf_string_from_data(state, ELF_FS_FILE_METATABLE));
-	elf_table_set(state, fs, key, value_from_table(file_metatable));
+	new_binding_table(state, l_fs, ARRAY_COUNT(l_fs));
+	state->metatables.fs_file = new_binding_table(state, l_fs_file, ARRAY_COUNT(l_fs_file));
 	elf_pop(state, 1);
 }

@@ -100,6 +100,15 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		}
 		break;
 
+		case BC_LOAD_NATIVE_FUNCTION:
+		{
+			arena_pushf(arena, "r%d = native_function[%d]", byte.b_x, byte.b_y);
+			if (byte.b_y < 0 || (u32)byte.b_y >= state->native_function_count) {
+				arena_push_text(arena, " // <bad-native-function>");
+			}
+		}
+		break;
+
 		case BC_LOADKNUM:
 		{
 			arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);

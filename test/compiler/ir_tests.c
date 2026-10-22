@@ -12,6 +12,10 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	result.compiler = compiler_create(arena);
 	result.compiler->target = state;
+	if (compiler_inject_globals(result.compiler, result.compiler->globals) != COM_STATUS_OK) {
+		test_fail("IR test injects host globals");
+		return result;
+	}
 	result.source = parser_test_add_source(result.compiler, (elf_StrSlice) {(char *)"ir_tests", sizeof("ir_tests") - 1}, source);
 
 	Parser parser = {0};
@@ -22,9 +26,11 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	result.source->state = COM_SOURCE_PARSED;
 
 	if (!ast_is_error(file)) {
-		check_source(result.source);
+		Com_Status status = check_source(result.source);
 		result.source->state = COM_SOURCE_CHECKED;
-		result.module = ir_emit_module(result.source);
+		if (status == COM_STATUS_OK) {
+			result.module = ir_emit_module(result.source);
+		}
 	}
 	return result;
 }
@@ -199,19 +205,23 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 	arena_destroy(&arena);
 }
 
-static void test_ir_lowers_strings_and_globals(elf_State *state)
+static void test_ir_lowers_strings_and_native_functions(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "ret \"hello\"\nret foo");
+	IrTestResult result = ir_test_lower_source(state, &arena, "ret \"hello\"\nret elf.vm.counters");
 	Ir body = ir_test_main_body(result.module);
 
 	Ir ret_string = ir_test_body_stat(body, 0, IR_RETURN, "lower string return");
 	Ir string_tuple = ret_string ? ret_string->ir_return.expr : 0;
 	expect_ir_atom(string_tuple && string_tuple->kind == IR_TUPLE && string_tuple->ir_tuple.count == 1 ? string_tuple->ir_tuple.items[0] : 0, "hello", "string literal lowers to atom ir");
 
-	Ir ret_global = ir_test_body_stat(body, 1, IR_RETURN, "lower global return");
-	Ir global_tuple = ret_global ? ret_global->ir_return.expr : 0;
-	expect_ir_kind(global_tuple && global_tuple->kind == IR_TUPLE && global_tuple->ir_tuple.count == 1 ? global_tuple->ir_tuple.items[0] : 0, IR_GLOBAL, "identifier without local lowers to global load");
+	Ir ret_function = ir_test_body_stat(body, 1, IR_RETURN, "lower native function return");
+	Ir function_tuple = ret_function ? ret_function->ir_return.expr : 0;
+	Ir native_function = function_tuple && function_tuple->kind == IR_TUPLE && function_tuple->ir_tuple.count == 1 ? function_tuple->ir_tuple.items[0] : 0;
+	expect_ir_kind(native_function, IR_NATIVE_FUNCTION, "host function lowers to native function IR");
+	if (!native_function || native_function->native_function_index >= state->native_function_count) {
+		test_fail("native function IR keeps its state registry index");
+	}
 	arena_destroy(&arena);
 }
 
@@ -251,18 +261,18 @@ static void test_ir_lowers_interpolated_string(elf_State *state)
 static void test_ir_lowers_field_and_call(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "ret obj.name\nmake({x = 1})");
+	IrTestResult result = ir_test_lower_source(state, &arena, "obj := {name = 1}\nret obj.name\nelf.type_of({x = 1})");
 	Ir body = ir_test_main_body(result.module);
 
-	Ir ret = ir_test_body_stat(body, 0, IR_RETURN, "lower field return");
+	Ir ret = ir_test_body_stat(body, 1, IR_RETURN, "lower field return");
 	Ir tuple = ret ? ret->ir_return.expr : 0;
 	Ir field = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(field, IR_FIELD, "field access lowers to field ir");
-	expect_ir_kind(field->ir_binary.x, IR_GLOBAL, "field object lowers to global load");
+	expect_ir_kind(field->ir_binary.x, IR_LOAD, "field object lowers to local load");
 	expect_ir_atom(field->ir_binary.y, "name", "field key lowers to atom ir");
 
-	Ir call = ir_test_body_stat(body, 1, IR_CALL, "lower call expression statement");
-	expect_ir_kind(call->ir_call.expr, IR_GLOBAL, "call callee lowers to global load");
+	Ir call = ir_test_body_stat(body, 2, IR_CALL, "lower call expression statement");
+	expect_ir_kind(call->ir_call.expr, IR_NATIVE_FUNCTION, "host call callee lowers to native function");
 	if (call && call->ir_call.args.count != 1) {
 		test_fail("call keeps one table argument");
 	}
@@ -304,11 +314,11 @@ static void test_ir_lowers_array_literal(elf_State *state)
 static void test_ir_lowers_if_else(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "if flag ? { ret 1 } else { ret 2 }");
+	IrTestResult result = ir_test_lower_source(state, &arena, "flag :: 1\nif flag ? { ret 1 } else { ret 2 }");
 	Ir body = ir_test_main_body(result.module);
 	Ir ir_if = ir_test_body_stat(body, 0, IR_IF, "lower if statement");
 
-	expect_ir_kind(ir_if->ir_if.pred, IR_GLOBAL, "if predicate lowers to global load");
+	expect_ir_i64(ir_if->ir_if.pred, 1, "if predicate lowers its static value");
 	expect_ir_kind(ir_if->ir_if.true_clause, IR_BLOCK, "if true clause lowers to block");
 	expect_ir_kind(ir_if->ir_if.else_clause, IR_BLOCK, "if else clause lowers to block");
 	arena_destroy(&arena);
@@ -317,14 +327,14 @@ static void test_ir_lowers_if_else(elf_State *state)
 static void test_ir_lowers_while(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "x := 0\nwhile flag ? { x = 1 }");
+	IrTestResult result = ir_test_lower_source(state, &arena, "flag :: 1\nx := 0\nwhile flag ? { x = 1 }");
 	Ir body = ir_test_main_body(result.module);
 	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "while assignment declares local storage");
 	Ir loop = ir_test_body_stat(body, 1, IR_BLOCK, "while lowers to label block");
 
 	expect_ir_kind(ir_test_body_stat(loop, 0, IR_LABEL, "while starts with label"), IR_LABEL, "while start label");
 	Ir branch = ir_test_body_stat(loop, 1, IR_JUMP_IF_FALSE, "while branches to exit");
-	expect_ir_kind(branch ? branch->ir_jump_if_false.pred : 0, IR_GLOBAL, "while predicate lowers to global load");
+	expect_ir_i64(branch ? branch->ir_jump_if_false.pred : 0, 1, "while predicate lowers its static value");
 	Ir loop_body = ir_test_body_stat(loop, 2, IR_BLOCK, "while body lowers to block");
 	expect_ir_kind(ir_test_body_stat(loop, 3, IR_JUMP, "while jumps back to start"), IR_JUMP, "while back jump");
 	expect_ir_kind(ir_test_body_stat(loop, 4, IR_LABEL, "while ends with exit label"), IR_LABEL, "while exit label");
@@ -537,8 +547,9 @@ static void test_ir_rejects_unknown_parameter_type(elf_State *state)
 	log_set_hook(ignore_expected_lowering_error, 0);
 	IrTestResult result = ir_test_lower_source(state, &arena, "probe := fun(value: mystery) { ret value }\nret probe");
 	log_set_hook(0, 0);
-	if (!result.module || result.source->report.error_count != 1) {
-		test_fail("unknown function parameter type reports one lowering error");
+	Com_Message *message = result.source ? result.source->report.first : 0;
+	if (result.module || !message || result.source->report.error_count != 1 || message->code != ERROR_UNDECLARED_IDENTIFIER || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail("unknown function parameter type reports one checker error");
 	}
 	arena_destroy(&arena);
 }
@@ -667,7 +678,7 @@ static void run_ir_tests(elf_State *state)
 	TEST_RUN("ir.lowers_tuple_expression", test_ir_lowers_tuple_expression, state);
 	TEST_RUN("ir.lowers_assignment_to_local", test_ir_lowers_assignment_to_local, state);
 	TEST_RUN("ir.rejects_assignment_to_constant", test_ir_rejects_assignment_to_constant, state);
-	TEST_RUN("ir.lowers_strings_and_globals", test_ir_lowers_strings_and_globals, state);
+	TEST_RUN("ir.lowers_strings_and_native_functions", test_ir_lowers_strings_and_native_functions, state);
 	TEST_RUN("ir.lowers_interpolated_string", test_ir_lowers_interpolated_string, state);
 	TEST_RUN("ir.lowers_field_and_call", test_ir_lowers_field_and_call, state);
 	TEST_RUN("ir.lowers_array_literal", test_ir_lowers_array_literal, state);

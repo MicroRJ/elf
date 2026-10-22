@@ -22,6 +22,7 @@
 #include "error.c"
 
 #include "elf_memory.c"
+#include "elf_native_function.c"
 #include "elf_source.c"
 #include "elf_globals.c"
 #include "elf_string.c"
@@ -170,6 +171,7 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
+		elf_native_functions_destroy(state);
 		elf_globals_destroy(state);
 		gc_destroy_all(state);
 		elf_sources_destroy(state);
