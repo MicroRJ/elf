@@ -67,14 +67,6 @@ static Ir ir_new_atom(IrEmitter *emitter, SourceSite site, Atom *atom)
 	return ir;
 }
 
-static Ir ir_new_global(IrEmitter *emitter, SourceSite site, Atom *name)
-{
-	ASSERT(name);
-	Ir ir = ir_alloc(emitter, site, IR_GLOBAL);
-	ir->ir_global = name;
-	return ir;
-}
-
 static Ir ir_new_native_function(IrEmitter *emitter, SourceSite site, u32 native_function_index)
 {
 	Ir ir = ir_alloc(emitter, site, IR_NATIVE_FUNCTION);

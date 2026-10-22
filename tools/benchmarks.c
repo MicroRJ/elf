@@ -406,7 +406,7 @@ int main(void)
 		"\t}\n"
 		"\tret value\n"
 		"}\n";
-	static const char global_read_source[] =
+	static const char host_constant_read_source[] =
 		"ret fun(n) {\n"
 		"\tresult := 0\n"
 		"\tfor i := 0; i < n; i += 1 ? {\n"
@@ -464,7 +464,7 @@ int main(void)
 	bench_vm_integer_program("VM dispatch", dispatch_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("function calls", call_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("static function calls", static_call_source, VM_ITERATIONS, VM_ITERATIONS);
-	bench_vm_integer_program("global reads", global_read_source, VM_ITERATIONS, VM_ITERATIONS);
+	bench_vm_integer_program("host constant reads", host_constant_read_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("string constants", string_constant_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("integer constants", integer_constant_source, VM_ITERATIONS,
 		4ll * VM_ITERATIONS * (VM_ITERATIONS - 1ll) + 98ll * VM_ITERATIONS);

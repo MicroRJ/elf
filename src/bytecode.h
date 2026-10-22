@@ -48,7 +48,6 @@ STATIC_ASSERT(TRULE_ALL <= 0x7fff);
 	X(JNE,             "jne")              \
 	X(RETURN,          "return")           \
 	X(LOADCVAL,        "getupval")         \
-	X(GETGLOBAL,       "getglobal")        \
 	X(LOAD_NATIVE_FUNCTION, "load_native_function") \
 	X(LOADKSTRING,     "getstring")        \
 	X(LOADKNUM,        "getnum")           \

@@ -337,10 +337,6 @@ activate_frame:
 				value_copy(vm_register(registers, byte.b_x), value_from_closure(frame->closure));
 			} break;
 
-			case BC_GETGLOBAL: {
-				value_copy(vm_register(registers, byte.b_x), elf_globals_get_by_slot(state, byte.b_y));
-			} break;
-
 			case BC_LOAD_NATIVE_FUNCTION: {
 				if (byte.b_y < 0 || (u32)byte.b_y >= state->native_function_count)
 				{

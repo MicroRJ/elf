@@ -296,22 +296,6 @@ static u32 emit_nil(BcEmitter *emitter, SourceSite site, i32 destination)
 	return emit_bytecode_xy(emitter, site, BC_LOADNIL, destination, 0);
 }
 
-static u32 emit_get_global(BcEmitter *emitter, SourceSite site, i32 destination, Atom *name)
-{
-	ASSERT(slot_is_valid(destination));
-	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
-	u32 global = 0;
-	if (!elf_globals_find(emitter->target, symbol, &global))
-	{
-		ASSERT(!"global must be registered before bytecode emission");
-		abort();
-	}
-	if (global >= BC_OPERAND_COUNT_MAX) {
-		abort();
-	}
-	return emit_bytecode_xy(emitter, site, BC_GETGLOBAL, destination, global);
-}
-
 static u32 emit_move(BcEmitter *emitter, SourceSite site, i32 destination, i32 source)
 {
 	ASSERT(slot_is_valid(destination));
@@ -445,7 +429,6 @@ static b32 can_reuse_local_callee(Ir expr, IrArray args, i32 *callee_slot)
 			case IR_ATOM:
 			case IR_NIL:
 			case IR_LOAD:
-			case IR_GLOBAL:
 			case IR_NATIVE_FUNCTION:
 			case IR_LOAD_CAPTURE:
 			{
@@ -856,17 +839,6 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 			out = ensure_slot(emitter, out);
 			emit_bytecode_xy(emitter, site, BC_CURRENT_CLOSURE, out, 0);
-		}
-		break;
-
-		case IR_GLOBAL:
-		{
-			if (nout < 1) {
-				return out;
-			}
-
-			out = ensure_slot(emitter, out);
-			emit_get_global(emitter, expr->site, out, expr->ir_global);
 		}
 		break;
 

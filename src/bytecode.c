@@ -23,36 +23,6 @@ const char *bytecode_type_name(BcType type)
 	return names[type];
 }
 
-static void format_value_shallow(Arena *arena, elf_Value value)
-{
-	switch (value.type)
-	{
-		case ELF_VALUE_TYPE_NIL:         arena_push_text(arena, "nil"); break;
-		case ELF_VALUE_TYPE_INTEGER:     arena_pushf(arena, "%lli", value_as_integer(value)); break;
-		case ELF_VALUE_TYPE_NUMBER:      arena_pushf(arena, "%f", value.x_num); break;
-		case ELF_VALUE_TYPE_STRING:      arena_pushf(arena, "%s", elf_string_data(value_as_string(value))); break;
-		case ELF_VALUE_TYPE_CLOSURE:     arena_push_text(arena, "closure"); break;
-		case ELF_VALUE_TYPE_CFUNCTION:   arena_push_text(arena, "function"); break;
-		case ELF_VALUE_TYPE_TABLE:       arena_push_text(arena, "table"); break;
-		case ELF_VALUE_TYPE_ERROR:       arena_push_text(arena, "error"); break;
-		case ELF_VALUE_TYPE_BUFFER:      arena_push_text(arena, "buffer"); break;
-		case ELF_VALUE_TYPE_ARRAY:       arena_push_text(arena, "array"); break;
-		case ELF_VALUE_TYPE_USER_OBJECT: arena_push_text(arena, "user object"); break;
-		default:                         arena_push_text(arena, "?"); break;
-	}
-}
-
-static void format_global_value(elf_State *state, Arena *arena, u32 index)
-{
-	if (index >= state->global_count)
-	{
-		arena_push_text(arena, "<bad-global>");
-		return;
-	}
-
-	format_value_shallow(arena, elf_globals_get_by_slot(state, index));
-}
-
 static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Arena *arena, u32 index, Bytecode byte)
 {
 	arena_pushf(arena, "  %04u  %-16s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
@@ -90,13 +60,6 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		case BC_LOADCVAL:
 		{
 			arena_pushf(arena, "r%d = capture[%d]", byte.b_x, byte.b_y);
-		}
-		break;
-
-		case BC_GETGLOBAL:
-		{
-			arena_pushf(arena, "r%d = global[%d] // ", byte.b_x, byte.b_y);
-			format_global_value(state, arena, byte.b_y);
 		}
 		break;
 
