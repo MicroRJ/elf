@@ -145,6 +145,9 @@ static void bench_vm_integer_program(const char *name, const char *source, u32 i
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];
 	elf_State *state = elf_create_state();
+	elf_push_int(state, 1);
+	bench_require(elf_set_global(state, "benchmark_global") == ELF_ERROR_NONE,
+		"could not install benchmark global");
 	elf_Ref program = bench_compile_program(state, name, source);
 	bench_run_integer_program(state, program, iterations, expected, 0);
 
@@ -404,21 +407,12 @@ int main(void)
 		"\tret value\n"
 		"}\n";
 	static const char global_read_source[] =
-		"benchmark_global = 1\n"
 		"ret fun(n) {\n"
 		"\tresult := 0\n"
 		"\tfor i := 0; i < n; i += 1 ? {\n"
 		"\t\tresult += benchmark_global\n"
 		"\t}\n"
 		"\tret result\n"
-		"}\n";
-	static const char global_write_source[] =
-		"ret fun(n) {\n"
-		"\tbenchmark_global = 0\n"
-		"\tfor i := 0; i < n; i += 1 ? {\n"
-		"\t\tbenchmark_global = i + 1\n"
-		"\t}\n"
-		"\tret benchmark_global\n"
 		"}\n";
 	static const char string_constant_source[] =
 		"ret fun(n) {\n"
@@ -429,12 +423,12 @@ int main(void)
 		"\tret result\n"
 		"}\n";
 	static const char script_compile_source[] =
-		"benchmark_load_global = \"loaded\"\n"
+		"benchmark_load_value := \"loaded\"\n"
 		"helper := fun(value) { ret value + 1.25 }\n"
 		"ret helper(7)\n";
 	static const char module_compile_source[] =
-		"set_value :: fun(value) {\n"
-		"\tbenchmark_module_global = value\n"
+		"set_value :: fun(target, value) {\n"
+		"\ttarget.value = value\n"
 		"\tret \"linked\"\n"
 		"}\n"
 		"calculate :: fun(value) { ret value + 1.25 + 7 }\n";
@@ -471,7 +465,6 @@ int main(void)
 	bench_vm_integer_program("function calls", call_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("static function calls", static_call_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("global reads", global_read_source, VM_ITERATIONS, VM_ITERATIONS);
-	bench_vm_integer_program("global writes", global_write_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("string constants", string_constant_source, VM_ITERATIONS, VM_ITERATIONS);
 	bench_vm_integer_program("integer constants", integer_constant_source, VM_ITERATIONS,
 		4ll * VM_ITERATIONS * (VM_ITERATIONS - 1ll) + 98ll * VM_ITERATIONS);

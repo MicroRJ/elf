@@ -23,7 +23,7 @@ Literal values
   IR_ATOM produces a runtime string from an interned compiler atom.
 
 Named, local, and callable values
-  IR_GLOBAL reads a symbolic global and may also be an IR_STORE destination.
+  IR_GLOBAL reads a symbolic global.
   IR_LOAD_CAPTURE reads an IrCapture from the current closure.
   IR_RECURSE produces the current closure for a recursive call.
   IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
@@ -55,7 +55,7 @@ Statements and storage
   IR_LOCAL represents stable local storage. Parameters receive incoming slots during function setup; a standalone IR_LOCAL
   statement adopts its initializer's result slot or allocates a fresh slot when emitted.
   IR_MULTI_LOCAL is a statement that evaluates one expression for N results and assigns those consecutive slots to N locals.
-  IR_STORE writes to an allocated local, global, field, or index; a local destination must already have an assigned slot.
+  IR_STORE writes to an allocated local, field, or index; a local destination must already have an assigned slot.
   IR_ARRAY_ADD appends one value to an array.
   IR_BLOCK executes statements with a scoped local-slot lifetime.
   IR_IF executes one of two statement branches according to a predicate.

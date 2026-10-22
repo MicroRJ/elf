@@ -10,7 +10,7 @@ MAX_RETRY_COUNT       :: 3
 RATE_LIMIT_RETRY_MS   :: 60000
 UNAVAILABLE_RETRY_MS  :: 5000
 
-chats = [{
+chats := [{
 	active_state = AGENT_STATE_IDLE,
 	time_start   = elf.time.unix_ms(),
 	agent_state  = {

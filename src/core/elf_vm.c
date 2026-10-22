@@ -341,10 +341,6 @@ activate_frame:
 				value_copy(vm_register(registers, byte.b_x), elf_globals_get_by_slot(state, byte.b_y));
 			} break;
 
-			case BC_SETGLOBAL: {
-				elf_globals_set_by_slot(state, byte.b_x, *vm_register(registers, byte.b_y));
-			} break;
-
 			case BC_TABLE: {
 				elf_Table *table = elf_table_new(state);
 				*vm_register(registers, byte.b_x) = value_from_table(table);

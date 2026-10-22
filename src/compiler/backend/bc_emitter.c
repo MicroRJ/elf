@@ -307,17 +307,6 @@ static u32 emit_get_global(BcEmitter *emitter, SourceSite site, i32 destination,
 	return emit_bytecode_xy(emitter, site, BC_GETGLOBAL, destination, global);
 }
 
-static u32 emit_set_global(BcEmitter *emitter, SourceSite site, Atom *name, i32 source)
-{
-	ASSERT(slot_is_valid(source));
-	elf_StrSlice symbol = {(char *)atom_data(name), atom_size(name)};
-	u32 global = elf_globals_ensure(emitter->target, symbol);
-	if (global >= BC_OPERAND_COUNT_MAX) {
-		abort();
-	}
-	return emit_bytecode_xy(emitter, site, BC_SETGLOBAL, global, source);
-}
-
 static u32 emit_move(BcEmitter *emitter, SourceSite site, i32 destination, i32 source)
 {
 	ASSERT(slot_is_valid(destination));
@@ -1055,13 +1044,6 @@ static void emit_store(BcEmitter *emitter, SourceSite site, Ir destination, Ir e
 
 				i32 final_slot = emit_expr(emitter, expr, dest_slot, 1);
 				ASSERT(final_slot == dest_slot);
-			}
-			break;
-
-			case IR_GLOBAL:
-			{
-				i32 expr_slot = emit_expr_to_slot(emitter, expr);
-				emit_set_global(emitter, destination->site, destination->ir_global, expr_slot);
 			}
 			break;
 

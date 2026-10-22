@@ -324,6 +324,7 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 	}
 	Entity *entity = destination->entity;
 	ASSERT(entity);
+	ASSERT(entity->kind != ENTITY_GLOBAL);
 	if (entity_is_constant(entity))
 	{
 		ir_report_error(emitter, ERROR_LOWERING, destination->site

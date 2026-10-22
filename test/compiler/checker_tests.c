@@ -276,6 +276,25 @@ static void test_checker_reports_duplicate_static(void)
 	checker_test_destroy(&test);
 }
 
+static void checker_expect_global_assignment_error(const char *name, const char *source, const char *label)
+{
+	CheckerTest test;
+	checker_test_init(&test, name, source);
+	Com_Message *message = test.source ? test.source->report.first : 0;
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_CHECKER) {
+		test_fail(label);
+	}
+	checker_test_destroy(&test);
+}
+
+static void test_checker_rejects_global_assignment(void)
+{
+	checker_expect_global_assignment_error("checker_global_assign", "value = 1", "checker rejects assignment to a global");
+	checker_expect_global_assignment_error("checker_global_compound_assign", "value += 1", "checker rejects compound assignment to a global");
+	checker_expect_global_assignment_error("checker_global_nil_assign", "value ?= 1", "checker rejects nil assignment to a global");
+	checker_expect_global_assignment_error("checker_global_multi_assign", "first, second = 1, 2", "checker rejects multi-assignment to globals");
+}
+
 static void test_checker_resolves_imported_export(void)
 {
 	Arena arena = arena_create(0);
@@ -467,6 +486,7 @@ static void run_checker_tests(void)
 	TEST_RUN("checker.reports_invalid_named_arguments", test_checker_reports_invalid_named_arguments);
 	TEST_RUN("checker.reports_duplicate_local", test_checker_reports_duplicate_local);
 	TEST_RUN("checker.reports_duplicate_static", test_checker_reports_duplicate_static);
+	TEST_RUN("checker.rejects_global_assignment", test_checker_rejects_global_assignment);
 	TEST_RUN("checker.resolves_imported_export", test_checker_resolves_imported_export);
 	TEST_RUN("checker.reports_static_cycle", test_checker_reports_static_cycle);
 	TEST_RUN("checker.reports_invalid_static_expression", test_checker_reports_invalid_static_expression);

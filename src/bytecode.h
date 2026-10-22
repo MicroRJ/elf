@@ -59,7 +59,6 @@ STATIC_ASSERT(TRULE_ALL <= 0x7fff);
 	X(GETMETAFIELD,    "getmetafield")     \
 	X(MEASURE,         "measure")          \
 	X(GETFIELD,        "getfield")         \
-	X(SETGLOBAL,       "setglobal")        \
 	X(SETFIELD,        "setfield")         \
 	X(SETINDEX,        "setindex")         \
 	X(ARRAYADD,        "arrayadd")         \

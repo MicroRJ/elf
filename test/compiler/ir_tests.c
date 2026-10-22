@@ -317,9 +317,10 @@ static void test_ir_lowers_if_else(elf_State *state)
 static void test_ir_lowers_while(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "while flag ? { x = 1 }");
+	IrTestResult result = ir_test_lower_source(state, &arena, "x := 0\nwhile flag ? { x = 1 }");
 	Ir body = ir_test_main_body(result.module);
-	Ir loop = ir_test_body_stat(body, 0, IR_BLOCK, "while lowers to label block");
+	Ir memory = ir_test_body_stat(body, 0, IR_LOCAL, "while assignment declares local storage");
+	Ir loop = ir_test_body_stat(body, 1, IR_BLOCK, "while lowers to label block");
 
 	expect_ir_kind(ir_test_body_stat(loop, 0, IR_LABEL, "while starts with label"), IR_LABEL, "while start label");
 	Ir branch = ir_test_body_stat(loop, 1, IR_JUMP_IF_FALSE, "while branches to exit");
@@ -329,7 +330,9 @@ static void test_ir_lowers_while(elf_State *state)
 	expect_ir_kind(ir_test_body_stat(loop, 4, IR_LABEL, "while ends with exit label"), IR_LABEL, "while exit label");
 
 	Ir store = ir_test_body_stat(loop_body, 0, IR_STORE, "while body lowers statements");
-	expect_ir_kind(store->ir_binary.x, IR_GLOBAL, "while body assignment destination");
+	if (!store || store->ir_binary.x != memory) {
+		test_fail("while body assignment targets local storage");
+	}
 	expect_ir_i64(store->ir_binary.y, 1, "while body assignment value");
 	arena_destroy(&arena);
 }

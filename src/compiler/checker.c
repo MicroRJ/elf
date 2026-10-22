@@ -30,6 +30,31 @@ static Com_Status check_statement(Checker *checker, Ast ast);
 static Com_Value resolve_static_entity(Checker *checker, Entity *entity);
 static Com_Value resolve_expression(Checker *checker, Ast expr);
 
+static b32 is_assignment_kind(Ast_Kind kind)
+{
+	switch (kind)
+	{
+		case AST_ASSIGN:
+		case AST_ADD_ASSIGN:
+		case AST_SUB_ASSIGN:
+		case AST_MUL_ASSIGN:
+		case AST_DIV_ASSIGN:
+		case AST_MOD_ASSIGN:
+		case AST_XOR_ASSIGN:
+		case AST_SHL_ASSIGN:
+		case AST_SHR_ASSIGN:
+		case AST_NIL_ASSIGN:
+		{
+			return true;
+		}
+
+		default:
+		{
+			return false;
+		}
+	}
+}
+
 static Com_Value com_value_error(Com_Status status)
 {
 	ASSERT(status != COM_STATUS_OK);
@@ -54,6 +79,32 @@ static Com_Status checker_report(Com_Source *source, ErrorCode error, ErrorSever
 static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 {
 	return compiler_report(source, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
+}
+
+static Com_Status check_assignment_destination(Checker *checker, Ast destination)
+{
+	ASSERT(checker);
+	ASSERT(destination);
+	if (destination->kind == AST_TUPLE)
+	{
+		for (u32 i = 0; i < destination->tuple.count; ++i)
+		{
+			Com_Status status = check_assignment_destination(checker, destination->tuple.items[i]);
+			if (status != COM_STATUS_OK) {
+				return status;
+			}
+		}
+		return COM_STATUS_OK;
+	}
+	if (destination->kind == AST_IDENT)
+	{
+		ASSERT(destination->entity);
+		if (destination->entity->kind == ENTITY_GLOBAL) {
+			return checker_report(checker->source_scope->source, ERROR_INVALID_ASSIGNMENT, ERROR_ERROR,
+				destination->site, "global '%s' is read-only", atom_data(destination->identifier));
+		}
+	}
+	return COM_STATUS_OK;
 }
 
 static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope **result)
@@ -504,6 +555,13 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
 			Com_Value operand = resolve_expression(checker, expr->binary.x);
+			if (operand.type != COM_VALUE_ERROR && is_assignment_kind(expr->kind))
+			{
+				Com_Status status = check_assignment_destination(checker, expr->binary.x);
+				if (status != COM_STATUS_OK) {
+					operand = com_value_error(status);
+				}
+			}
 			if (operand.type != COM_VALUE_ERROR) {
 				operand = resolve_expression(checker, expr->binary.y);
 			}

@@ -100,12 +100,6 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		}
 		break;
 
-		case BC_SETGLOBAL:
-		{
-			arena_pushf(arena, "global[%d] = r%d", byte.b_x, byte.b_y);
-		}
-		break;
-
 		case BC_LOADKNUM:
 		{
 			arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
