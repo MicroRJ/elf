@@ -121,8 +121,11 @@ struct Ast_T
 
 	// metadata
 	struct Entity     *entity;
+	u32            param_slot;
 
-	u32         param_slot;
+	// if this is an expression, whether it appears on the right hand side
+	// of a static declaration
+	b32             is_static;
 
 	union
 	{

@@ -27,7 +27,7 @@ typedef struct
 Checker;
 
 static Com_Status check_statement(Checker *checker, Ast ast);
-static Com_Value resolve_entity(Checker *checker, Entity *entity);
+static Com_Value resolve_static_entity(Checker *checker, Entity *entity);
 static Com_Value resolve_expression(Checker *checker, Ast expr);
 
 static Com_Value com_value_error(Com_Status status)
@@ -167,7 +167,7 @@ Com_Status check_source(Com_Source *source)
 	return status;
 }
 
-static Com_Value resolve_entity(Checker *checker, Entity *entity)
+static Com_Value resolve_static_entity(Checker *checker, Entity *entity)
 {
 	ASSERT(entity);
 	ASSERT(entity->kind == ENTITY_STATIC);
@@ -380,7 +380,26 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		case AST_IDENT:
 		{
 			Atom *name = expr->identifier;
+
 			Entity *entity = scope_find(checker->active_scope, name);
+			if (entity && entity->kind == ENTITY_LOCAL)
+			{
+				Ast entity_function = entity->en_local.function;
+				for (Ast function = checker->current_function; function && function != entity_function; function = function->function.parent)
+				{
+					if (function->is_static)
+					{
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->site, "static function definitions cannot capture locals");
+						value = com_value_error(status);
+						break;
+					}
+				}
+				if (value.type == COM_VALUE_ERROR)
+				{
+					break;
+				}
+			}
+
 			if (!entity)
 			{
 				entity = declare_entity(checker, checker->globals, ENTITY_GLOBAL, name, expr->site);
@@ -392,7 +411,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			{
 				expr->entity = entity;
 				if (entity->kind == ENTITY_STATIC) {
-					value = resolve_entity(checker, entity);
+					value = resolve_static_entity(checker, entity);
 				}
 			}
 		}
@@ -425,7 +444,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				}
 				else
 				{
-					value = resolve_entity(checker, entity);
+					value = resolve_static_entity(checker, entity);
 					if (value.type != COM_VALUE_ERROR) {
 						entity->referenced = true;
 						expr->entity = entity;

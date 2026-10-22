@@ -1380,7 +1380,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 			if (!y) {
 				return parser_error(parser, ERROR_INVALID_EXPRESSION, parser_current_token(parser).site, "expected static declaration expression");
 			}
-			x = create_static_decl_ast(parser, tok.site, x->tuple.items[0], y, exported);
+			x = ast_new_static_decl(parser, tok.site, x->tuple.items[0], y, exported);
 		}
 		break;
 		case TOK_BIND:

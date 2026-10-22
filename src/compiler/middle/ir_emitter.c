@@ -159,10 +159,16 @@ static Ir capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functio
 	ASSERT(entity->en_local.storage->kind == IR_LOCAL);
 	ASSERT(function_ctx->definition);
 	ASSERT(function_ctx->definition->ast);
+	ASSERT(!function_ctx->definition->ast->is_static || !function_ctx->definition->first_capture);
 
 	// is the entity already within this function? if so just load it
 	if (entity->en_local.function == function_ctx->definition->ast) {
 		return ir_new_load(emitter, site, entity->en_local.storage);
+	}
+
+	if (function_ctx->definition->ast->is_static) {
+		ir_report_error(emitter, ERROR_LOWERING, site, "local '%s' cannot be captured from a static function", atom_data(entity->name));
+		return ERROR_IR;
 	}
 
 	for (IrCapture *capture = function_ctx->definition->first_capture; capture; capture = capture->next) {

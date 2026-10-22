@@ -443,7 +443,7 @@ static Ast create_decl_ast(Parser *par, SourceSite site, b32 constant, Ast name,
 	return tree;
 }
 
-static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast expr, b32 exported)
+static Ast ast_new_static_decl(Parser *par, SourceSite site, Ast name, Ast expr, b32 exported)
 {
 	if (ast_is_error(name)) {
 		return name;
@@ -455,6 +455,10 @@ static Ast create_static_decl_ast(Parser *par, SourceSite site, Ast name, Ast ex
 	if (ast_is_error(tree)) {
 		return tree;
 	}
+	ASSERT(expr);
+	ASSERT(!expr->is_static);
+	expr->is_static = true;
+
 	tree->static_decl.exported = exported;
 	tree->static_decl.name = name;
 	tree->static_decl.expr = expr;
