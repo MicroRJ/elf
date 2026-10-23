@@ -82,265 +82,134 @@ Compiler *compiler_create(Arena *arena)
 	return compiler;
 }
 
-static Com_Status compiler_inject_value(Compiler *compiler, Scope *scope, Atom *name, elf_Value value);
-
-static Com_Status compiler_inject_table(Compiler *compiler, Scope *scope, elf_Table *table)
+static Com_Status compiler_report_symbol(Com_Source *source, elf_SymField *field, ErrorCode error, const char *message)
 {
-	for (u32 i = 0; i < table->capacity; ++i)
-	{
-		Entry entry = table->entries[i];
-		if (!elf_table_entry_is_key(entry)) {
-			continue;
-		}
-		ASSERT(value_is_string(entry.key));
-		if (!value_is_string(entry.key)) {
-			continue;
-		}
-		elf_String *key = value_as_string(entry.key);
-		Atom *name = atom_from_data_size(compiler->atoms, elf_string_data(key), elf_string_size(key));
-		if (!name) {
-			return COM_STATUS_OOM;
-		}
-		Com_Status status = compiler_inject_value(compiler, scope, name, entry.value);
-		if (status != COM_STATUS_OK) {
-			return status;
-		}
-	}
-	return COM_STATUS_OK;
-}
-
-static Com_Status compiler_inject_value(Compiler *compiler, Scope *scope, Atom *name, elf_Value value)
-{
-	b32 created = false;
-	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
-	if (!entity) {
-		return COM_STATUS_OOM;
-	}
-	ASSERT(created);
-
-	Com_Value *compiler_value = &entity->en_global.value;
-	if (value_is_nil(value))
-	{
-		compiler_value->type = COM_VALUE_NIL;
-	}
-	else if (value_is_number(value))
-	{
-		compiler_value->type = COM_VALUE_NUMBER;
-		compiler_value->number = value_as_number(value);
-	}
-	else if (value_is_integer(value))
-	{
-		compiler_value->type = COM_VALUE_INTEGER;
-		compiler_value->integer = value_as_integer(value);
-	}
-	else if (value_is_string(value))
-	{
-		elf_String *string = value_as_string(value);
-		compiler_value->type = COM_VALUE_STRING;
-		compiler_value->string = atom_from_data_size(compiler->atoms, elf_string_data(string), elf_string_size(string));
-		if (!compiler_value->string) {
-			return COM_STATUS_OOM;
-		}
-	}
-	else if (value_is_function(value))
-	{
-		u32 native_function_index = UINT32_MAX;
-		ErrorCode error = elf_native_function_ensure(compiler->target, value_as_function(value), &native_function_index);
-		if (error != ERROR_NONE) {
-			return COM_STATUS_OOM;
-		}
-		compiler_value->type = COM_VALUE_NATIVE_FUNCTION;
-		compiler_value->native_function_index = native_function_index;
-	}
-	else if (value_is_table(value))
-	{
-		Scope *members = scope_create(compiler->arena, SCOPE_NAMESPACE, scope, 0, 0);
-		if (!members) {
-			return COM_STATUS_OOM;
-		}
-		compiler_value->type = COM_VALUE_SCOPE;
-		compiler_value->scope = members;
-		return compiler_inject_table(compiler, members, value_as_table(value));
-	}
-	else
-	{
-		ASSERT(!"unsupported host global value type");
-	}
-	return COM_STATUS_OK;
-}
-
-Com_Status compiler_inject_globals(Compiler *compiler, Scope *globals)
-{
-	ASSERT(compiler);
-	ASSERT(compiler->target);
-	ASSERT(globals);
-	ASSERT(globals->kind == SCOPE_GLOBAL);
-	elf_State *state = compiler->target;
-	for (u32 i = 0; i < state->global_entry_capacity; ++i)
-	{
-		GlobalEntry *entry = state->global_entries + i;
-		if (!entry->name) {
-			continue;
-		}
-		ASSERT(entry->size <= UINT32_MAX);
-		ASSERT(entry->slot < state->global_count);
-		Atom *name = atom_from_data_size(compiler->atoms, entry->name, (u32)entry->size);
-		if (!name) {
-			return COM_STATUS_OOM;
-		}
-		Com_Status status = compiler_inject_value(compiler, globals, name, state->global_values[entry->slot]);
-		if (status != COM_STATUS_OK) {
-			return status;
-		}
-	}
-	return COM_STATUS_OK;
-}
-
-static Com_Status compiler_report_public_binding(Com_Source *source, elf_PublicBinding *binding, ErrorCode error, const char *message)
-{
-	const char *name = binding->name.data ? binding->name.data : "<invalid>";
-	b32 reported = compiler_report(source, error, ERROR_ERROR, ERROR_PHASE_CHECKER, (SourceSite) {}, "published binding '%s' %s", name, message);
+	const char *name = field->name.data ? field->name.data : "<invalid>";
+	b32 reported = compiler_report(source, error, ERROR_ERROR, ERROR_PHASE_CHECKER, (SourceSite) {}, "environment symbol '%s' %s", name, message);
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
-static Com_Status compiler_inject_public_binding(Compiler *compiler, Scope *globals, Com_Source *source, elf_PublicBinding *binding)
+Com_Status compiler_inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table)
 {
-	if (!binding->name.data || !binding->name.size || binding->name.size > UINT32_MAX)
+	ASSERT(compiler);
+	ASSERT(compiler->target);
+	ASSERT(scope);
+	ASSERT(source);
+	if (!table)
 	{
-		return compiler_report_public_binding(source, binding, ERROR_INVALID_DECLARATION, "has an invalid qualified name");
+		return COM_STATUS_OK;
 	}
 
-	Com_Value value = {0};
-	switch (binding->type)
+	for (elf_SymField *field = table->first_field; field; field = field->next)
 	{
-		case ELF_PUBLIC_INTEGER:
+		if (!field->name.data || !field->name.size || field->name.size > UINT32_MAX)
 		{
-			value.type = COM_VALUE_INTEGER;
-			value.integer = binding->integer;
+			return compiler_report_symbol(source, field, ERROR_INVALID_DECLARATION, "has an invalid name");
 		}
-		break;
-		case ELF_PUBLIC_NUMBER:
-		{
-			value.type = COM_VALUE_NUMBER;
-			value.number = binding->number;
-		}
-		break;
-		case ELF_PUBLIC_STRING:
-		{
-			if (!binding->string.data || binding->string.size > UINT32_MAX)
-			{
-				return compiler_report_public_binding(source, binding, ERROR_OUT_OF_RANGE, "has an invalid string value");
-			}
-			value.type = COM_VALUE_STRING;
-			value.string = atom_from_data_size(compiler->atoms, binding->string.data, (u32)binding->string.size);
-			if (!value.string)
-			{
-				return COM_STATUS_OOM;
-			}
-		}
-		break;
-		case ELF_PUBLIC_FUNCTION:
-		{
-			if (binding->native_function_index >= compiler->target->native_function_count)
-			{
-				return compiler_report_public_binding(source, binding, ERROR_INTERNAL, "has an invalid native function index");
-			}
-			value.type = COM_VALUE_NATIVE_FUNCTION;
-			value.native_function_index = binding->native_function_index;
-		}
-		break;
-		default:
-		{
-			return compiler_report_public_binding(source, binding, ERROR_INTERNAL, "has an invalid value type");
-		}
-	}
-
-	Scope *scope = globals;
-	u32 segment_start = 0;
-	u32 name_size = (u32)binding->name.size;
-	for (u32 cursor = 0; cursor <= name_size; ++cursor)
-	{
-		if (cursor < name_size && binding->name.data[cursor] != '.')
-		{
-			continue;
-		}
-
-		u32 segment_size = cursor - segment_start;
-		if (!segment_size)
-		{
-			return compiler_report_public_binding(source, binding, ERROR_INVALID_DECLARATION, "has an empty namespace segment");
-		}
-		Atom *name = atom_from_data_size(compiler->atoms, binding->name.data + segment_start, segment_size);
+		Atom *name = atom_from_data_size(compiler->atoms, field->name.data, (u32)field->name.size);
 		if (!name)
 		{
 			return COM_STATUS_OOM;
 		}
 
-		b32 is_leaf = cursor == name_size;
 		Entity *existing = scope_find_current(scope, name);
-		if (is_leaf)
+		if (field->type == ELF_SYMBOL_TABLE)
 		{
+			Scope *members = 0;
 			if (existing)
 			{
-				return compiler_report_public_binding(source, binding, ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host binding");
+				if (existing->kind != ENTITY_GLOBAL || existing->en_global.value.type != COM_VALUE_SCOPE)
+				{
+					return compiler_report_symbol(source, field, ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
+				}
+				members = existing->en_global.value.scope;
 			}
-			b32 created = false;
-			Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
-			if (!entity)
+			else
 			{
-				return COM_STATUS_OOM;
+				b32 created = false;
+				Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
+				if (!entity)
+				{
+					return COM_STATUS_OOM;
+				}
+				ASSERT(created);
+				members = scope_create(compiler->arena, SCOPE_NAMESPACE, scope, 0, 0);
+				if (!members)
+				{
+					return COM_STATUS_OOM;
+				}
+				entity->en_global.value.type = COM_VALUE_SCOPE;
+				entity->en_global.value.scope = members;
 			}
-			ASSERT(created);
-			entity->en_global.value = value;
-			return COM_STATUS_OK;
+			Com_Status status = compiler_inject_symbols(compiler, members, source, field->table);
+			if (status != COM_STATUS_OK)
+			{
+				return status;
+			}
+			continue;
 		}
 
 		if (existing)
 		{
-			if (existing->kind != ENTITY_GLOBAL || existing->en_global.value.type != COM_VALUE_SCOPE)
-			{
-				return compiler_report_public_binding(source, binding, ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
-			}
-			scope = existing->en_global.value.scope;
+			return compiler_report_symbol(source, field, ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host symbol");
 		}
-		else
+		b32 created = false;
+		Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
+		if (!entity)
 		{
-			b32 created = false;
-			Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
-			if (!entity)
-			{
-				return COM_STATUS_OOM;
-			}
-			ASSERT(created);
-			Scope *members = scope_create(compiler->arena, SCOPE_NAMESPACE, scope, 0, 0);
-			if (!members)
-			{
-				return COM_STATUS_OOM;
-			}
-			entity->en_global.value.type = COM_VALUE_SCOPE;
-			entity->en_global.value.scope = members;
-			scope = members;
+			return COM_STATUS_OOM;
 		}
-		segment_start = cursor + 1;
-	}
-	NO_CODE;
-	return COM_STATUS_REPORTED;
-}
+		ASSERT(created);
 
-Com_Status compiler_inject_public_bindings(Compiler *compiler, Scope *globals, Com_Source *source)
-{
-	ASSERT(compiler);
-	ASSERT(compiler->target);
-	ASSERT(globals);
-	ASSERT(globals->kind == SCOPE_GLOBAL);
-	ASSERT(source);
-	elf_State *state = compiler->target;
-	for (u32 i = 0; i < state->public_binding_count; ++i)
-	{
-		Com_Status status = compiler_inject_public_binding(compiler, globals, source, state->public_bindings + i);
-		if (status != COM_STATUS_OK)
+		Com_Value *value = &entity->en_global.value;
+		switch (field->type)
 		{
-			return status;
+			case ELF_SYMBOL_INTEGER:
+			{
+				value->type = COM_VALUE_INTEGER;
+				value->integer = field->integer;
+			}
+			break;
+			case ELF_SYMBOL_NUMBER:
+			{
+				value->type = COM_VALUE_NUMBER;
+				value->number = field->number;
+			}
+			break;
+			case ELF_SYMBOL_STRING:
+			{
+				if (!field->string.data || field->string.size > UINT32_MAX)
+				{
+					return compiler_report_symbol(source, field, ERROR_OUT_OF_RANGE, "has an invalid string value");
+				}
+				value->type = COM_VALUE_STRING;
+				value->string = atom_from_data_size(compiler->atoms, field->string.data, (u32)field->string.size);
+				if (!value->string)
+				{
+					return COM_STATUS_OOM;
+				}
+			}
+			break;
+			case ELF_SYMBOL_FUNCTION:
+			{
+				u32 native_function_index = UINT32_MAX;
+				ErrorCode error = elf_native_function_ensure(compiler->target, field->function, &native_function_index);
+				if (error == ERROR_OUT_OF_MEMORY)
+				{
+					return COM_STATUS_OOM;
+				}
+				if (error != ERROR_NONE)
+				{
+					return compiler_report_symbol(source, field, error, "could not be installed in the target state");
+				}
+				value->type = COM_VALUE_NATIVE_FUNCTION;
+				value->native_function_index = native_function_index;
+			}
+			break;
+			default:
+			{
+				return compiler_report_symbol(source, field, ERROR_INTERNAL, "has an invalid value type");
+			}
 		}
 	}
 	return COM_STATUS_OK;
@@ -609,7 +478,7 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 	return ast;
 }
 
-elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source)
+elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
 	elf_Prototype *entry = 0;
 	if (target && arena && name.data && name.size <= UINT32_MAX && source.data && source.size <= UINT32_MAX)
@@ -627,14 +496,14 @@ elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice na
 				Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, runtime_source, (dy_String) {});
 				if (compiler_source)
 				{
-					Com_Status inject_status = compiler_inject_globals(compiler, compiler->globals);
-					if (inject_status == COM_STATUS_OK)
+					Com_Status inject_status = compiler_inject_symbols(compiler, compiler->globals, compiler_source, target->symbols);
+					if (inject_status == COM_STATUS_OK && symbols != target->symbols)
 					{
-						inject_status = compiler_inject_public_bindings(compiler, compiler->globals, compiler_source);
+						inject_status = compiler_inject_symbols(compiler, compiler->globals, compiler_source, symbols);
 					}
 					if (inject_status == COM_STATUS_OOM)
 					{
-						compiler_report(compiler_source, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {}, "could not inject host bindings");
+						compiler_report(compiler_source, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {}, "could not inject environment symbols");
 					}
 					else if (inject_status == COM_STATUS_OK)
 					{

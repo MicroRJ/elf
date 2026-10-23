@@ -1,4 +1,4 @@
-static ELF_FUNCTION(publication_test_function)
+static ELF_FUNCTION(symbol_test_function)
 {
 	(void)S;
 	(void)nargs;
@@ -6,57 +6,71 @@ static ELF_FUNCTION(publication_test_function)
 	return 0;
 }
 
-static void test_public_bindings_store_owned_values(elf_State *state)
+static elf_SymField *symbol_field_at(elf_SymTable *table, u32 index)
 {
-	u32 initial_count = state->public_binding_count;
-	char integer_name[] = "app.answer";
-	char number_name[] = "app.ratio";
-	char string_name[] = "app.message";
-	char function_name[] = "app.run";
-	char string_value[] = "hello";
+	elf_SymField *field = table ? table->first_field : 0;
+	for (u32 i = 0; field && i < index; ++i)
+	{
+		field = field->next;
+	}
+	return field;
+}
 
-	elf_ErrorCode integer_error = elf_pub_int(state, (elf_StrSlice) {integer_name, sizeof(integer_name) - 1}, 42);
-	elf_ErrorCode number_error = elf_pub_num(state, (elf_StrSlice) {number_name, sizeof(number_name) - 1}, 1.5);
-	elf_ErrorCode string_error = elf_pub_str(state, (elf_StrSlice) {string_name, sizeof(string_name) - 1}, (elf_StrSlice) {string_value, sizeof(string_value) - 1});
-	elf_ErrorCode function_error = elf_pub_fun(state, (elf_StrSlice) {function_name, sizeof(function_name) - 1}, publication_test_function);
+static void test_symbol_tables_store_owned_values(void)
+{
+	elf_SymTable *root = 0;
+	elf_SymTable *app = 0;
+	char integer_name[] = "answer";
+	char string_value[] = "hello";
+	elf_ErrorCode create_root_error = elf_sym_create(&root);
+	elf_ErrorCode create_app_error = elf_sym_create(&app);
+	elf_ErrorCode integer_error = elf_sym_int(app, (elf_StrSlice) {integer_name, sizeof(integer_name) - 1}, 42);
+	elf_ErrorCode number_error = elf_sym_num(app, ELF_LIT("ratio"), 1.5);
+	elf_ErrorCode string_error = elf_sym_str(app, ELF_LIT("message"), (elf_StrSlice) {string_value, sizeof(string_value) - 1});
+	elf_ErrorCode function_error = elf_sym_fun(app, ELF_LIT("run"), symbol_test_function);
+	elf_ErrorCode table_error = elf_sym_tab(root, ELF_LIT("app"), app);
 
 	integer_name[0] = 'x';
 	string_value[0] = 'x';
 
-	elf_PublicBinding *integer = state->public_bindings + initial_count;
-	elf_PublicBinding *number = state->public_bindings + initial_count + 1;
-	elf_PublicBinding *string = state->public_bindings + initial_count + 2;
-	elf_PublicBinding *function = state->public_bindings + initial_count + 3;
-	b32 valid_function_index = function->native_function_index < state->native_function_count;
-	b32 calls_succeeded = integer_error == ELF_ERROR_NONE && number_error == ELF_ERROR_NONE && string_error == ELF_ERROR_NONE && function_error == ELF_ERROR_NONE;
-	b32 integer_is_valid = integer->type == ELF_PUBLIC_INTEGER && integer->integer == 42 && integer->name.size == sizeof(integer_name) - 1 && !memcmp(integer->name.data, "app.answer", sizeof(integer_name) - 1);
-	b32 number_is_valid = number->type == ELF_PUBLIC_NUMBER && number->number == 1.5;
-	b32 string_is_valid = string->type == ELF_PUBLIC_STRING && string->string.size == sizeof(string_value) - 1 && !memcmp(string->string.data, "hello", sizeof(string_value) - 1);
-	b32 function_is_valid = function->type == ELF_PUBLIC_FUNCTION && valid_function_index && state->native_functions[function->native_function_index] == publication_test_function;
-	if (!calls_succeeded || state->public_binding_count != initial_count + 4 || !integer_is_valid || !number_is_valid || !string_is_valid || !function_is_valid)
+	elf_SymField *table = symbol_field_at(root, 0);
+	elf_SymField *integer = symbol_field_at(app, 0);
+	elf_SymField *number = symbol_field_at(app, 1);
+	elf_SymField *string = symbol_field_at(app, 2);
+	elf_SymField *function = symbol_field_at(app, 3);
+	b32 calls_succeeded = create_root_error == ELF_ERROR_NONE && create_app_error == ELF_ERROR_NONE && integer_error == ELF_ERROR_NONE && number_error == ELF_ERROR_NONE && string_error == ELF_ERROR_NONE && function_error == ELF_ERROR_NONE && table_error == ELF_ERROR_NONE;
+	b32 table_is_valid = table && table->type == ELF_SYMBOL_TABLE && table->table == app && app->parent == root;
+	b32 integer_is_valid = integer && integer->type == ELF_SYMBOL_INTEGER && integer->integer == 42 && integer->name.size == sizeof(integer_name) - 1 && !memcmp(integer->name.data, "answer", sizeof(integer_name) - 1);
+	b32 number_is_valid = number && number->type == ELF_SYMBOL_NUMBER && number->number == 1.5;
+	b32 string_is_valid = string && string->type == ELF_SYMBOL_STRING && string->string.size == sizeof(string_value) - 1 && !memcmp(string->string.data, "hello", sizeof(string_value) - 1);
+	b32 function_is_valid = function && function->type == ELF_SYMBOL_FUNCTION && function->function == symbol_test_function;
+	if (!calls_succeeded || root->field_count != 1 || app->field_count != 4 || !table_is_valid || !integer_is_valid || !number_is_valid || !string_is_valid || !function_is_valid)
 	{
-		test_fail("public bindings store owned values");
+		test_fail("symbol tables store owned values");
 	}
+	elf_sym_destroy(root);
 }
 
-static void test_public_bindings_reject_invalid_and_duplicate_names(elf_State *state)
+static void test_symbol_tables_reject_invalid_and_duplicate_names(void)
 {
-	u32 count = state->public_binding_count;
-	elf_StrSlice duplicate_name = {(char *)"app.answer", sizeof("app.answer") - 1};
-	elf_StrSlice empty_name = {(char *)"", 0};
-	elf_StrSlice invalid_string = {0, 1};
-	elf_ErrorCode duplicate_error = elf_pub_int(state, duplicate_name, 0);
-	elf_ErrorCode empty_name_error = elf_pub_int(state, empty_name, 0);
-	elf_ErrorCode invalid_string_error = elf_pub_str(state, (elf_StrSlice) {(char *)"app.invalid", sizeof("app.invalid") - 1}, invalid_string);
-	elf_ErrorCode invalid_function_error = elf_pub_fun(state, (elf_StrSlice) {(char *)"app.invalid", sizeof("app.invalid") - 1}, 0);
-	if (duplicate_error != ELF_ERROR_INVALID_ARGUMENT || empty_name_error != ELF_ERROR_INVALID_ARGUMENT || invalid_string_error != ELF_ERROR_INVALID_ARGUMENT || invalid_function_error != ELF_ERROR_INVALID_ARGUMENT || state->public_binding_count != count)
+	elf_SymTable *table = 0;
+	elf_sym_create(&table);
+	elf_ErrorCode first_error = elf_sym_int(table, ELF_LIT("answer"), 42);
+	elf_ErrorCode duplicate_error = elf_sym_int(table, ELF_LIT("answer"), 0);
+	elf_ErrorCode empty_name_error = elf_sym_int(table, ELF_LIT(""), 0);
+	elf_ErrorCode invalid_string_error = elf_sym_str(table, ELF_LIT("invalid"), (elf_StrSlice) {0, 1});
+	elf_ErrorCode invalid_function_error = elf_sym_fun(table, ELF_LIT("invalid"), 0);
+	elf_ErrorCode cyclic_table_error = elf_sym_tab(table, ELF_LIT("self"), table);
+	if (first_error != ELF_ERROR_NONE || duplicate_error != ELF_ERROR_INVALID_ARGUMENT || empty_name_error != ELF_ERROR_INVALID_ARGUMENT || invalid_string_error != ELF_ERROR_INVALID_ARGUMENT || invalid_function_error != ELF_ERROR_INVALID_ARGUMENT || cyclic_table_error != ELF_ERROR_INVALID_ARGUMENT || table->field_count != 1)
 	{
-		test_fail("public bindings reject invalid and duplicate names");
+		test_fail("symbol tables reject invalid and duplicate names");
 	}
+	elf_sym_destroy(table);
 }
 
 static void run_publication_tests(elf_State *state)
 {
-	TEST_RUN("public_bindings.store_owned_values", test_public_bindings_store_owned_values, state);
-	TEST_RUN("public_bindings.reject_invalid_and_duplicate_names", test_public_bindings_reject_invalid_and_duplicate_names, state);
+	(void)state;
+	TEST_RUN("symbols.store_owned_values", test_symbol_tables_store_owned_values);
+	TEST_RUN("symbols.reject_invalid_and_duplicate_names", test_symbol_tables_reject_invalid_and_duplicate_names);
 }

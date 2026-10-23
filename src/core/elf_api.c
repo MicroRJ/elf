@@ -465,25 +465,6 @@ elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right)
 	return left_value && right_value && values_equal(*left_value, *right_value);
 }
 
-void elf_get_global(elf_State *state, const char *name)
-{
-	if (!name) {
-		push_value(state, value_nil());
-		return;
-	}
-	elf_StrSlice name_slice = {(char *)name, (u64)strlen(name)};
-	push_value(state, elf_globals_get_by_name(state, name_slice));
-}
-
-elf_ErrorCode elf_set_global(elf_State *state, const char *name)
-{
-	if (!name) return ELF_ERROR_INVALID_ARGUMENT;
-	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
-	elf_StrSlice name_slice = {(char *)name, (u64)strlen(name)};
-	elf_globals_set_by_name(state, name_slice, pop_value(state));
-	return ELF_ERROR_NONE;
-}
-
 elf_Ref elf_create_ref(elf_State *state, elf_Index index)
 {
 	elf_Value *value = value_at(state, index);

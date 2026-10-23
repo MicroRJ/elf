@@ -42,7 +42,7 @@ static const elf_Binding l_time[] = {
 	{"sleep",     lib_time_sleep},
 };
 
-static void elf_lib_time(elf_State *state)
+static elf_SymTable *elf_lib_time(void)
 {
-	new_binding_table(state, l_time, ARRAY_COUNT(l_time));
+	return new_symbol_table(l_time, ARRAY_COUNT(l_time));
 }

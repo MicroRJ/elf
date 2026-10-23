@@ -30,6 +30,7 @@ typedef elf_u32 elf_Ref;
 #define ELF_NO_REF ((elf_Ref)(0))
 
 typedef struct elf_State elf_State;
+typedef struct elf_SymTable elf_SymTable;
 
 typedef void elf_UserObjectDestructor(elf_State *state, void *data);
 
@@ -104,8 +105,8 @@ void elf_push_error(elf_State *state, const char *message);
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data);
 
-elf_ErrorCode elf_push_code_source(elf_State *state, const char *name, elf_StrSlice source);
-elf_Bool elf_push_code_file(elf_State *state, const char *name);
+elf_ErrorCode elf_push_code_source(elf_State *state, elf_SymTable *symbols, const char *name, elf_StrSlice source);
+elf_Bool elf_push_code_file(elf_State *state, elf_SymTable *symbols, const char *name);
 
 elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);
@@ -116,10 +117,14 @@ elf_ErrorCode elf_pop(elf_State *state, elf_u32 count);
 elf_ErrorCode elf_push_value(elf_State *state, elf_Index index);
 
 elf_ValueType elf_type(elf_State *state, elf_Index index);
+
+
 elf_Bool elf_is_nil(elf_State *state, elf_Index index);
 elf_Bool elf_is_numeric(elf_State *state, elf_Index index);
 elf_Bool elf_is_callable(elf_State *state, elf_Index index);
 elf_Bool elf_is_error(elf_State *state, elf_Index index);
+
+
 elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type);
 elf_Bool elf_to_int(elf_State *state, elf_Index index, elf_Int *value);
 elf_Bool elf_to_num(elf_State *state, elf_Index index, elf_Num *value);
@@ -142,13 +147,13 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index);
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor);
 elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right);
 
-elf_ErrorCode elf_pub_int(elf_State *state, elf_StrSlice name, elf_Int value);
-elf_ErrorCode elf_pub_num(elf_State *state, elf_StrSlice name, elf_Num value);
-elf_ErrorCode elf_pub_str(elf_State *state, elf_StrSlice name, elf_StrSlice value);
-elf_ErrorCode elf_pub_fun(elf_State *state, elf_StrSlice name, elf_Function function);
-
-void elf_get_global(elf_State *state, const char *name);
-elf_ErrorCode elf_set_global(elf_State *state, const char *name);
+elf_ErrorCode elf_sym_create(elf_SymTable **tab);
+void elf_sym_destroy(elf_SymTable *tab);
+elf_ErrorCode elf_sym_tab(elf_SymTable *tab, elf_StrSlice name, elf_SymTable *value);
+elf_ErrorCode elf_sym_int(elf_SymTable *tab, elf_StrSlice name, elf_Int value);
+elf_ErrorCode elf_sym_num(elf_SymTable *tab, elf_StrSlice name, elf_Num value);
+elf_ErrorCode elf_sym_str(elf_SymTable *tab, elf_StrSlice name, elf_StrSlice value);
+elf_ErrorCode elf_sym_fun(elf_SymTable *tab, elf_StrSlice name, elf_Function value);
 
 elf_Ref elf_create_ref(elf_State *state, elf_Index index);
 elf_Bool elf_push_ref(elf_State *state, elf_Ref reference);

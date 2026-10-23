@@ -26,7 +26,7 @@
 #include "l_random.c"
 #include "l_time.c"
 
-elf_Bool elf_push_code_file(elf_State *state, const char *name)
+elf_Bool elf_push_code_file(elf_State *state, elf_SymTable *symbols, const char *name)
 {
 	if (!name) {
 		elf_push_nil(state);
@@ -54,7 +54,7 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 		}
 	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	elf_Prototype *prototype = root_loaded ? compiler_compile(state, scratch.arena, source_name, source) : 0;
+	elf_Prototype *prototype = root_loaded ? compiler_compile(state, symbols, scratch.arena, source_name, source) : 0;
 	scratch_end(scratch);
 
 	if (!prototype)
@@ -74,25 +74,16 @@ elf_Bool elf_push_code_file(elf_State *state, const char *name)
 	return true;
 }
 
-void elf_open_libraries(elf_State *state)
+void elf_open_libraries(elf_State *state, elf_SymTable *elf_symbols)
 {
-	if (!state) return;
-	elf_i32 checkpoint = elf_get_top(state);
-	elf_get_global(state, "elf");
-	elf_i32 root = elf_abs_index(state, -1);
-	if (elf_type(state, root) != ELF_VALUE_TYPE_TABLE) goto cleanup;
-
-	elf_lib_json(state);          elf_set_field(state, root, "json");
-	elf_lib_env(state);           elf_set_field(state, root, "env");
-	elf_lib_fs(state);            elf_set_field(state, root, "fs");
-	elf_lib_path(state);          elf_set_field(state, root, "path");
-	elf_lib_random(state);        elf_set_field(state, root, "random");
-	elf_lib_time(state);          elf_set_field(state, root, "time");
-	elf_push_fun(state, l_core_load_file); elf_set_field(state, root, "load_file");
-	elf_push_fun(state, l_core_print);     elf_set_field(state, root, "print");
-	elf_push_fun(state, l_core_println);   elf_set_field(state, root, "println");
-	elf_push_fun(state, l_core_println);   elf_set_field(state, root, "printl");
-
-cleanup:
-	elf_set_top(state, checkpoint);
+	elf_sym_tab(elf_symbols, ELF_LIT("json"), elf_lib_json());
+	elf_sym_tab(elf_symbols, ELF_LIT("env"), elf_lib_env());
+	elf_sym_tab(elf_symbols, ELF_LIT("fs"), elf_lib_fs(state));
+	elf_sym_tab(elf_symbols, ELF_LIT("path"), elf_lib_path());
+	elf_sym_tab(elf_symbols, ELF_LIT("random"), elf_lib_random());
+	elf_sym_tab(elf_symbols, ELF_LIT("time"), elf_lib_time());
+	elf_sym_fun(elf_symbols, ELF_LIT("load_file"), l_core_load_file);
+	elf_sym_fun(elf_symbols, ELF_LIT("print"), l_core_print);
+	elf_sym_fun(elf_symbols, ELF_LIT("println"), l_core_println);
+	elf_sym_fun(elf_symbols, ELF_LIT("printl"), l_core_println);
 }

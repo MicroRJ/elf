@@ -22,8 +22,7 @@ typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Prototype   elf_Prototype;
 typedef struct elf_Source      elf_Source;
 typedef struct StackFrame     StackFrame;
-typedef struct GlobalEntry    GlobalEntry;
-typedef struct elf_PublicBinding elf_PublicBinding;
+typedef struct elf_SymField   elf_SymField;
 
 typedef enum
 {
@@ -128,34 +127,37 @@ struct elf_Table
 	u32        occupied;
 };
 
-struct GlobalEntry
-{
-	char *name;
-	u64   size;
-	u32   hash;
-	u32   slot;
-};
-
 typedef enum
 {
-	ELF_PUBLIC_INTEGER = 0,
-	ELF_PUBLIC_NUMBER,
-	ELF_PUBLIC_STRING,
-	ELF_PUBLIC_FUNCTION,
+	ELF_SYMBOL_INTEGER = 0,
+	ELF_SYMBOL_NUMBER,
+	ELF_SYMBOL_STRING,
+	ELF_SYMBOL_TABLE,
+	ELF_SYMBOL_FUNCTION,
 }
-elf_PublicType;
+elf_SymbolType;
 
-struct elf_PublicBinding
+struct elf_SymField
 {
-	dy_String name;
-	u8        type;
+	elf_SymField *next;
+	dy_String     name;
+	u8            type;
 	union
 	{
-		i64       integer;
-		f64       number;
-		dy_String string;
-		u32       native_function_index;
+		i64           integer;
+		f64           number;
+		dy_String     string;
+		elf_SymTable *table;
+		elf_Function  function;
 	};
+};
+
+struct elf_SymTable
+{
+	elf_SymTable *parent;
+	elf_SymField *first_field;
+	elf_SymField *last_field;
+	u32           field_count;
 };
 
 // TODO(RJ): we could compress this WAY down, encode the line index & column as a u16,
@@ -250,9 +252,7 @@ struct elf_State
 	elf_Function   *native_functions;
 	u32             native_function_count;
 	u32             native_function_capacity;
-	elf_PublicBinding *public_bindings;
-	u32                public_binding_count;
-	u32                public_binding_capacity;
+	elf_SymTable   *symbols;
 	elf_Source     *sources;
 
 	struct
@@ -277,11 +277,6 @@ struct elf_State
 	};
 	struct
 	{
-		GlobalEntry *global_entries;
-		u32          global_entry_capacity;
-		elf_Value   *global_values;
-		u32          global_value_capacity;
-		u32          global_count;
 		elf_Table   *ref_table;
 		u32          next_ref;
 		u64          vm_closure_calls;
@@ -332,8 +327,6 @@ void elf_free(elf_State *state, void *memory, elf_u64 size);
 ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index);
 void elf_native_functions_destroy(elf_State *state);
 
-void elf_public_bindings_destroy(elf_State *state);
-
 elf_Source *elf_source_create(elf_State *state, dy_String name, dy_String text);
 void elf_sources_destroy(elf_State *state);
 
@@ -367,14 +360,6 @@ elf_Value elf_table_get_or_nil(elf_State *state, elf_Table *table, elf_Value key
 b32 elf_table_contains(elf_State *state, elf_Table *table, elf_Value key);
 b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Value *removed);
 void elf_table_clear(elf_State *state, elf_Table *table);
-
-void elf_globals_destroy(elf_State *state);
-b32 elf_globals_find(elf_State *state, elf_StrSlice name, u32 *slot);
-u32 elf_globals_ensure(elf_State *state, elf_StrSlice name);
-elf_Value elf_globals_get_by_name(elf_State *state, elf_StrSlice name);
-void elf_globals_set_by_name(elf_State *state, elf_StrSlice name, elf_Value value);
-elf_Value elf_globals_get_by_slot(elf_State *state, u32 slot);
-void elf_globals_set_by_slot(elf_State *state, u32 slot, elf_Value value);
 
 // README: STOP RELYING ON THIS TO ABORT THE PROGRAM
 void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);

@@ -447,7 +447,7 @@ static const elf_Binding l_json[] = {
 	{"load_jsonl", l_json_load_jsonl},
 };
 
-static elf_Table *elf_lib_json(elf_State *state)
+static elf_SymTable *elf_lib_json(void)
 {
-	return new_binding_table(state, l_json, ARRAY_COUNT(l_json));
+	return new_symbol_table(l_json, ARRAY_COUNT(l_json));
 }

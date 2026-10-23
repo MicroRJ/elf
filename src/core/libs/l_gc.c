@@ -58,12 +58,3 @@ ELF_FUNCTION(l_gc_counters)
 	gc_set_counter(S, result, "max_collection_time_ns", max_collection_time_ns);
 	return 1;
 }
-
-static const elf_Binding l_gc[] = {
-	{"counters", l_gc_counters},
-};
-
-static elf_Table *elf_lib_gc(elf_State *state)
-{
-	return new_binding_table(state, l_gc, ARRAY_COUNT(l_gc));
-}

@@ -15,14 +15,14 @@ static void checker_test_init_with_target(CheckerTest *test, elf_State *target, 
 	if (target)
 	{
 		test->compiler->target = target;
-		if (compiler_inject_globals(test->compiler, test->compiler->globals) != COM_STATUS_OK) {
-			test_fail("checker test injects host globals");
-			return;
-		}
 	}
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
 	test->source = parser_test_add_source(test->compiler, source_name, source);
+	if (target && compiler_inject_symbols(test->compiler, test->compiler->globals, test->source, target->symbols) != COM_STATUS_OK) {
+		test_fail("checker test injects environment symbols");
+		return;
+	}
 
 	Parser parser = {0};
 	if (!parser_init(&parser)) {
@@ -114,36 +114,7 @@ static void test_checker_resolves_static_forward_reference(void)
 	checker_test_destroy(&test);
 }
 
-static void test_compiler_injects_global_scopes(void)
-{
-	elf_State *state = elf_create_state();
-	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
-	compiler->target = state;
-	Scope *globals = compiler->globals;
-	Com_Status status = compiler_inject_globals(compiler, globals);
-
-	Atom *elf_name = atom_from_data_size(compiler->atoms, "elf", 3);
-	Entity *elf_entity = scope_find_current(globals, elf_name);
-	Scope *elf_scope = elf_entity && elf_entity->en_global.value.type == COM_VALUE_SCOPE ? elf_entity->en_global.value.scope : 0;
-	Atom *gc_name = atom_from_data_size(compiler->atoms, "gc", 2);
-	Entity *gc_entity = elf_scope ? scope_find_current(elf_scope, gc_name) : 0;
-	Scope *gc_scope = gc_entity && gc_entity->en_global.value.type == COM_VALUE_SCOPE ? gc_entity->en_global.value.scope : 0;
-	Atom *counters_name = atom_from_data_size(compiler->atoms, "counters", 8);
-	Entity *counters_entity = gc_scope ? scope_find_current(gc_scope, counters_name) : 0;
-
-	if (status != COM_STATUS_OK || !elf_entity || elf_entity->kind != ENTITY_GLOBAL || !elf_scope || !gc_entity || !gc_scope ||
-		!counters_entity || counters_entity->kind != ENTITY_GLOBAL || counters_entity->en_global.value.type != COM_VALUE_NATIVE_FUNCTION ||
-		counters_entity->en_global.value.native_function_index >= state->native_function_count)
-	{
-		test_fail("compiler injects recursive global scopes");
-	}
-
-	arena_destroy(&arena);
-	elf_destroy_state(state);
-}
-
-static ELF_FUNCTION(compiler_public_binding_test_function)
+static ELF_FUNCTION(compiler_symbol_test_function)
 {
 	(void)S;
 	(void)nargs;
@@ -151,22 +122,30 @@ static ELF_FUNCTION(compiler_public_binding_test_function)
 	return 0;
 }
 
-static void test_compiler_injects_public_bindings(void)
+static void test_compiler_injects_symbols(void)
 {
 	elf_State *state = elf_create_state();
-	elf_ErrorCode answer_error = elf_pub_int(state, (elf_StrSlice) {(char *)"elf.published.answer", sizeof("elf.published.answer") - 1}, 42);
-	elf_ErrorCode ratio_error = elf_pub_num(state, (elf_StrSlice) {(char *)"elf.published.ratio", sizeof("elf.published.ratio") - 1}, 1.5);
-	elf_ErrorCode message_error = elf_pub_str(state, (elf_StrSlice) {(char *)"elf.published.message", sizeof("elf.published.message") - 1}, (elf_StrSlice) {(char *)"hello", sizeof("hello") - 1});
-	elf_ErrorCode run_error = elf_pub_fun(state, (elf_StrSlice) {(char *)"elf.published.run", sizeof("elf.published.run") - 1}, compiler_public_binding_test_function);
+	elf_SymTable *symbols = 0;
+	elf_SymTable *elf = 0;
+	elf_SymTable *published_symbols = 0;
+	elf_ErrorCode create_symbols_error = elf_sym_create(&symbols);
+	elf_ErrorCode create_elf_error = elf_sym_create(&elf);
+	elf_ErrorCode create_published_error = elf_sym_create(&published_symbols);
+	elf_ErrorCode answer_error = elf_sym_int(published_symbols, ELF_LIT("answer"), 42);
+	elf_ErrorCode ratio_error = elf_sym_num(published_symbols, ELF_LIT("ratio"), 1.5);
+	elf_ErrorCode message_error = elf_sym_str(published_symbols, ELF_LIT("message"), ELF_LIT("hello"));
+	elf_ErrorCode run_error = elf_sym_fun(published_symbols, ELF_LIT("run"), compiler_symbol_test_function);
+	elf_ErrorCode published_error = elf_sym_tab(elf, ELF_LIT("published"), published_symbols);
+	elf_ErrorCode elf_error = elf_sym_tab(symbols, ELF_LIT("elf"), elf);
 
 	Arena arena = arena_create(0);
 	Compiler *compiler = compiler_create(&arena);
 	compiler->target = state;
-	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"public_bindings", sizeof("public_bindings") - 1}, (elf_StrSlice) {(char *)"ret 0", sizeof("ret 0") - 1});
-	Com_Status global_status = compiler_inject_globals(compiler, compiler->globals);
+	Com_Source *source = parser_test_add_source(compiler, ELF_LIT("symbols"), ELF_LIT("ret 0"));
+	Com_Status builtin_status = compiler_inject_symbols(compiler, compiler->globals, source, state->symbols);
 	Atom *elf_name = atom_from_data_size(compiler->atoms, "elf", sizeof("elf") - 1);
 	Entity *elf_before = scope_find_current(compiler->globals, elf_name);
-	Com_Status public_status = compiler_inject_public_bindings(compiler, compiler->globals, source);
+	Com_Status symbol_status = compiler_inject_symbols(compiler, compiler->globals, source, symbols);
 	Entity *elf_after = scope_find_current(compiler->globals, elf_name);
 	Scope *elf_scope = elf_after && elf_after->en_global.value.type == COM_VALUE_SCOPE ? elf_after->en_global.value.scope : 0;
 	Atom *published_name = atom_from_data_size(compiler->atoms, "published", sizeof("published") - 1);
@@ -180,14 +159,15 @@ static void test_compiler_injects_public_bindings(void)
 	b32 answer_is_valid = answer && answer->en_global.value.type == COM_VALUE_INTEGER && answer->en_global.value.integer == 42;
 	b32 ratio_is_valid = ratio && ratio->en_global.value.type == COM_VALUE_NUMBER && ratio->en_global.value.number == 1.5;
 	b32 message_is_valid = message && message->en_global.value.type == COM_VALUE_STRING && atom_size(message->en_global.value.string) == sizeof("hello") - 1 && !memcmp(atom_data(message->en_global.value.string), "hello", sizeof("hello") - 1);
-	b32 run_is_valid = run && run->en_global.value.type == COM_VALUE_NATIVE_FUNCTION && run->en_global.value.native_function_index < state->native_function_count && state->native_functions[run->en_global.value.native_function_index] == compiler_public_binding_test_function;
-	b32 publication_succeeded = answer_error == ELF_ERROR_NONE && ratio_error == ELF_ERROR_NONE && message_error == ELF_ERROR_NONE && run_error == ELF_ERROR_NONE;
-	if (!publication_succeeded || global_status != COM_STATUS_OK || public_status != COM_STATUS_OK || elf_before != elf_after || !published_scope || !answer_is_valid || !ratio_is_valid || !message_is_valid || !run_is_valid)
+	b32 run_is_valid = run && run->en_global.value.type == COM_VALUE_NATIVE_FUNCTION && run->en_global.value.native_function_index < state->native_function_count && state->native_functions[run->en_global.value.native_function_index] == compiler_symbol_test_function;
+	b32 symbols_succeeded = create_symbols_error == ELF_ERROR_NONE && create_elf_error == ELF_ERROR_NONE && create_published_error == ELF_ERROR_NONE && answer_error == ELF_ERROR_NONE && ratio_error == ELF_ERROR_NONE && message_error == ELF_ERROR_NONE && run_error == ELF_ERROR_NONE && published_error == ELF_ERROR_NONE && elf_error == ELF_ERROR_NONE;
+	if (!symbols_succeeded || builtin_status != COM_STATUS_OK || symbol_status != COM_STATUS_OK || elf_before != elf_after || !published_scope || !answer_is_valid || !ratio_is_valid || !message_is_valid || !run_is_valid)
 	{
-		test_fail("compiler injects public bindings into host namespaces");
+		test_fail("compiler injects environment symbols into host namespaces");
 	}
 
 	arena_destroy(&arena);
+	elf_sym_destroy(symbols);
 	elf_destroy_state(state);
 }
 
@@ -570,8 +550,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 
 static void run_checker_tests(void)
 {
-	TEST_RUN("compiler.injects_global_scopes", test_compiler_injects_global_scopes);
-	TEST_RUN("compiler.injects_public_bindings", test_compiler_injects_public_bindings);
+	TEST_RUN("compiler.injects_symbols", test_compiler_injects_symbols);
 	TEST_RUN("checker.resolves_static_forward_reference", test_checker_resolves_static_forward_reference);
 	TEST_RUN("checker.tags_exported_static", test_checker_tags_exported_static);
 	TEST_RUN("checker.declares_local_after_initializer", test_checker_declares_local_after_initializer);

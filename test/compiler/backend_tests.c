@@ -21,7 +21,7 @@ static elf_Prototype *backend_test_compile(elf_State *state, const char *name, e
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	elf_Prototype *entry = compiler_compile(state, scratch.arena, source_name, source);
+	elf_Prototype *entry = compiler_compile(state, 0, scratch.arena, source_name, source);
 	scratch_end(scratch);
 	return entry;
 }

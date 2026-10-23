@@ -3,6 +3,6 @@
 
 #include "elf.h"
 
-void elf_open_libraries(elf_State *state);
+void elf_open_libraries(elf_State *state, elf_SymTable *elf_symbols);
 
 #endif

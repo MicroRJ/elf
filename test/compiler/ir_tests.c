@@ -13,12 +13,8 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	result.compiler = compiler_create(arena);
 	result.compiler->target = state;
 	result.source = parser_test_add_source(result.compiler, (elf_StrSlice) {(char *)"ir_tests", sizeof("ir_tests") - 1}, source);
-	if (compiler_inject_globals(result.compiler, result.compiler->globals) != COM_STATUS_OK) {
-		test_fail("IR test injects host globals");
-		return result;
-	}
-	if (compiler_inject_public_bindings(result.compiler, result.compiler->globals, result.source) != COM_STATUS_OK) {
-		test_fail("IR test injects public bindings");
+	if (compiler_inject_symbols(result.compiler, result.compiler->globals, result.source, state->symbols) != COM_STATUS_OK) {
+		test_fail("IR test injects environment symbols");
 		return result;
 	}
 

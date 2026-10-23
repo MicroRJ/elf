@@ -85,15 +85,14 @@ struct Com_Source
 };
 
 Compiler *compiler_create(Arena *arena);
-Com_Status compiler_inject_globals(Compiler *compiler, struct Scope *globals);
-Com_Status compiler_inject_public_bindings(Compiler *compiler, struct Scope *globals, Com_Source *source);
+Com_Status compiler_inject_symbols(Compiler *compiler, struct Scope *scope, Com_Source *source, elf_SymTable *table);
 
 void compiler_log_report(Compiler *compiler);
 
 b32 compiler_report(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
 b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
 
-elf_Prototype *compiler_compile(elf_State *target, Arena *arena, elf_StrSlice name, elf_StrSlice source);
+elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_json(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 struct Ast_T *compiler_parse_jsonl(Arena *arena, elf_StrSlice name, elf_StrSlice source);

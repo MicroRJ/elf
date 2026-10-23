@@ -66,7 +66,7 @@ static const elf_Binding l_env[] = {
 	{"unset", lib_env_unset},
 };
 
-static void elf_lib_env(elf_State *state)
+static elf_SymTable *elf_lib_env(void)
 {
-	new_binding_table(state, l_env, ARRAY_COUNT(l_env));
+	return new_symbol_table(l_env, ARRAY_COUNT(l_env));
 }

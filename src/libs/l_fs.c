@@ -921,9 +921,9 @@ static const elf_Binding l_fs[] = {
 	{"set_working_directory", lib_fs_set_working_directory},
 };
 
-static void elf_lib_fs(elf_State *state)
+static elf_SymTable *elf_lib_fs(elf_State *state)
 {
-	new_binding_table(state, l_fs, ARRAY_COUNT(l_fs));
 	state->metatables.fs_file = new_binding_table(state, l_fs_file, ARRAY_COUNT(l_fs_file));
 	elf_pop(state, 1);
+	return new_symbol_table(l_fs, ARRAY_COUNT(l_fs));
 }

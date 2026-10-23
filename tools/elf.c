@@ -22,7 +22,7 @@ int main(int argc, char **argv)
 	}
 
 	elf_State *state = elf_create_state();
-	if (!elf_push_code_file(state, path))
+	if (!elf_push_code_file(state, 0, path))
 	{
 		fprintf(stderr, "elf: could not load '%s'\n", path);
 		elf_destroy_state(state);

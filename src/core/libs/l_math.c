@@ -206,7 +206,7 @@ static const elf_Binding lib_math[] = {
 	{"atan2", l_math_atan2},
 };
 
-static elf_Table *elf_lib_math(elf_State *state)
+static elf_SymTable *elf_lib_math(void)
 {
-	return new_binding_table(state, lib_math, ARRAY_COUNT(lib_math));
+	return new_symbol_table(lib_math, ARRAY_COUNT(lib_math));
 }

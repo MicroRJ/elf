@@ -101,21 +101,9 @@ static void test_api_tables_and_refs(elf_State *state)
 		test_fail("API iterates keyed table entries");
 	}
 
-	if (elf_push_value(state, -1) != ELF_ERROR_NONE
-	|| elf_set_global(state, "api_test") != ELF_ERROR_NONE) {
-		test_fail("API writes a global from the stack");
-	}
-	elf_get_global(state, "api_test");
-	if (!elf_equal(state, -1, -2)) {
-		test_fail("API global preserves table identity");
-	}
-	elf_pop(state, 1);
-
 	if (elf_release_ref(state, reference) != ELF_ERROR_NONE || elf_push_ref(state, reference)) {
 		test_fail("API releases state-owned references");
 	}
-	elf_push_nil(state);
-	elf_set_global(state, "api_test");
 	elf_set_top(state, checkpoint);
 }
 
@@ -280,7 +268,7 @@ static void test_api_buffers(elf_State *state)
 	elf_Index checkpoint = elf_get_top(state);
 	char source_data[] = "ret elf.buffer(4):append(\"ok\")";
 	elf_StrSlice source = {source_data, sizeof(source_data) - 1};
-	if (elf_push_code_source(state, "api-buffer", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, "api-buffer", source) != ELF_ERROR_NONE)
 	{
 		test_fail("API buffer source compiles");
 		elf_set_top(state, checkpoint);

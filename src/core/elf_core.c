@@ -23,9 +23,8 @@
 
 #include "elf_memory.c"
 #include "elf_native_function.c"
-#include "elf_pub.c"
+#include "elf_symbols.c"
 #include "elf_source.c"
-#include "elf_globals.c"
 #include "elf_string.c"
 #include "elf_buffer.c"
 #include "elf_user_object.c"
@@ -122,16 +121,8 @@ static void bootstrap_standard_libraries(elf_State *state)
 	state->metatables.array = elf_lib_array(state);
 	state->metatables.buffer = elf_lib_buffer(state);
 
-	elf_Table *elf_table = elf_lib_core(state);
-	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "buffer")), value_from_function(l_buffer_new));
-	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "math")), value_from_table(elf_lib_math(state)));
-	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "gc")), value_from_table(elf_lib_gc(state)));
-
-	elf_StrSlice elf_name = {(char *)"elf", 3};
-	elf_globals_set_by_name(state, elf_name, value_from_table(elf_table));
-
 	// The library constructors push each table while building the graph. The
-	// global store and metatables have dedicated roots in the collector.
+	// metatables have dedicated roots in the collector.
 	state->stack_ptr = stack_checkpoint;
 }
 
@@ -153,6 +144,30 @@ static void bootstrap_state(elf_State *state)
 	reserve_bootstrap_frame_stack_space(state);
 }
 
+static elf_SymTable *bootstrap_symbols(elf_State *state)
+{
+	elf_SymTable *root = 0;
+	elf_sym_create(&root);
+
+	elf_SymTable *elf = elf_lib_core();
+
+	elf_SymTable *vm = 0;
+	elf_sym_create(&vm);
+
+	elf_SymTable *gc = 0;
+	elf_sym_create(&gc);
+
+	elf_sym_fun(vm, ELF_LIT("counters"), l_vm_counters);
+	elf_sym_fun(gc, ELF_LIT("counters"), l_gc_counters);
+	elf_sym_fun(elf, ELF_LIT("buffer"), l_buffer_new);
+	elf_sym_tab(elf, ELF_LIT("math"), elf_lib_math());
+	elf_sym_tab(elf, ELF_LIT("vm"), vm);
+	elf_sym_tab(elf, ELF_LIT("gc"), gc);
+	elf_sym_tab(root, ELF_LIT("elf"), elf);
+	state->symbols = root;
+	return elf;
+}
+
 elf_State *elf_create_state()
 {
 	Arena arena = arena_create(0);
@@ -162,13 +177,8 @@ elf_State *elf_create_state()
 
 	init_state_storage(state);
 	bootstrap_state(state);
-	elf_ErrorCode public_error = elf_pub_fun(state, ELF_LIT("elf.vm.counters"), l_vm_counters);
-	if (public_error != ELF_ERROR_NONE)
-	{
-		elf_destroy_state(state);
-		return 0;
-	}
-	elf_open_libraries(state);
+	elf_SymTable *elf_symbols = bootstrap_symbols(state);
+	elf_open_libraries(state, elf_symbols);
 
 	return state;
 }
@@ -177,9 +187,8 @@ void elf_destroy_state(elf_State *state)
 {
 	if (state)
 	{
-		elf_public_bindings_destroy(state);
+		elf_sym_destroy(state->symbols);
 		elf_native_functions_destroy(state);
-		elf_globals_destroy(state);
 		gc_destroy_all(state);
 		elf_sources_destroy(state);
 		for (u32 i = 0; i < state->prototype_count; ++i)

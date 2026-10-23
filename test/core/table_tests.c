@@ -38,6 +38,13 @@ static void expect_index(u32 value, u32 expected, const char *label)
 	}
 }
 
+static void expect_table_value(elf_Value value, const char *label)
+{
+	if (value.type != ELF_VALUE_TYPE_TABLE) {
+		test_fail(label);
+	}
+}
+
 static void test_table_field_set_get(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
@@ -123,13 +130,6 @@ static void test_table_delete_and_reuse_tombstones(elf_State *state)
 	}
 }
 
-static void expect_table_value(elf_Value value, const char *label)
-{
-	if (value.type != ELF_VALUE_TYPE_TABLE) {
-		test_fail(label);
-	}
-}
-
 static void expect_function_value(elf_Value value, const char *label)
 {
 	if (value.type != ELF_VALUE_TYPE_CFUNCTION) {
@@ -137,94 +137,8 @@ static void expect_function_value(elf_Value value, const char *label)
 	}
 }
 
-static void test_runtime_elf_global_is_table(elf_State *state)
+static void test_table_metatable(elf_State *state)
 {
-	elf_StrSlice elf_name = {(char *)"elf", 3};
-	elf_Value elf_value = elf_globals_get_by_name(state, elf_name);
-	expect_table_value(elf_value, "global elf is a table");
-
-	elf_Table *elf_table = value_as_table(elf_value);
-	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "print")), "elf.print is a field function");
-	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "println")), "elf.println is a field function");
-	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "to_string")), "elf.to_string is a field function");
-	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "error")), "elf.error is a field function");
-	expect_function_value(elf_table_get_or_nil(state, elf_table, test_key_string(state, "is_error")), "elf.is_error is a field function");
-	elf_StrSlice flat_print_name = {(char *)"elf.print", 9};
-	expect_nil(elf_globals_get_by_name(state, flat_print_name), "flattened elf.print global is absent");
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "load_expr")), "broken elf.load_expr binding is absent");
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "unparse")), "broken elf.unparse binding is absent");
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "format")), "obsolete elf.format binding is absent");
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "get_obj_pointer")), "raw object pointer binding is absent");
-
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "debug")), "redundant elf.debug table is absent");
-
-	elf_Value gc_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "gc"));
-	expect_table_value(gc_value, "elf.gc is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(gc_value), test_key_string(state, "counters")), "elf.gc.counters is a field function");
-
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "vm")), "elf.vm runtime table is absent");
-
-	elf_Value json_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "json"));
-	expect_table_value(json_value, "elf.json is a table");
-	elf_Table *json_table = value_as_table(json_value);
-	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "parse")), "elf.json.parse is a field function");
-	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "stringify")), "elf.json.stringify is a field function");
-	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "load_file")), "elf.json.load_file is a field function");
-	expect_function_value(elf_table_get_or_nil(state, json_table, test_key_string(state, "load_jsonl")), "elf.json.load_jsonl is a field function");
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "serialization")), "elf.serialization is not installed");
-
-	elf_Value math_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "math"));
-	expect_table_value(math_value, "elf.math is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(math_value), test_key_string(state, "sqrt")), "elf.math.sqrt is a field function");
-
-	elf_Value path_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "path"));
-	expect_table_value(path_value, "elf.path is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(path_value), test_key_string(state, "join")), "elf.path.join is a field function");
-
-	elf_Value fs_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "fs"));
-	expect_table_value(fs_value, "elf.fs is a table");
-	elf_Table *fs_table = value_as_table(fs_value);
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "exists")), "elf.fs.exists is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "is_file")), "elf.fs.is_file is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "is_directory")), "elf.fs.is_directory is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "file_exists")), "elf.fs.file_exists is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "open")), "elf.fs.open is a field function");
-	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_string(state, "read_text_file")), "elf.fs.read_text_file is absent");
-	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_string(state, "write_text_file")), "elf.fs.write_text_file is absent");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "get_file_info")), "elf.fs.get_file_info is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "create_directory")), "elf.fs.create_directory is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "create_directories")), "elf.fs.create_directories is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "copy_file")), "elf.fs.copy_file is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "move_file")), "elf.fs.move_file is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "remove_file")), "elf.fs.remove_file is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "remove_directory")), "elf.fs.remove_directory is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "remove_tree")), "elf.fs.remove_tree is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "get_working_directory")), "elf.fs.get_working_directory is a field function");
-	expect_function_value(elf_table_get_or_nil(state, fs_table, test_key_string(state, "set_working_directory")), "elf.fs.set_working_directory is a field function");
-	expect_nil(elf_table_get_or_nil(state, fs_table, test_key_string(state, "read")), "old elf.fs.read binding is absent");
-
-	elf_Value env_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "env"));
-	expect_table_value(env_value, "elf.env is a table");
-	elf_Table *env_table = value_as_table(env_value);
-	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_string(state, "get")), "elf.env.get is a field function");
-	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_string(state, "has")), "elf.env.has is a field function");
-	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_string(state, "set")), "elf.env.set is a field function");
-	expect_function_value(elf_table_get_or_nil(state, env_table, test_key_string(state, "unset")), "elf.env.unset is a field function");
-
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "process")), "elf.process library is absent");
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "io")), "elf.io library is absent");
-
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "os")), "empty elf.os library is absent");
-
-	elf_Value time_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "time"));
-	expect_table_value(time_value, "elf.time is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(time_value), test_key_string(state, "elapsed")), "elf.time.elapsed is a field function");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(time_value), test_key_string(state, "unix_ms")), "elf.time.unix_ms is a field function");
-
-	elf_Value random_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "random"));
-	expect_table_value(random_value, "elf.random is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(random_value), test_key_string(state, "random")), "elf.random.random is a field function");
-
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "length")), "table.length is a method");
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "size")), "table.size is a method");
 	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "has")), "table.has is a method");
@@ -237,8 +151,6 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "values")), "table.values is absent");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "pairs")), "table.pairs is absent");
 	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "merge")), "table.merge is absent");
-
-	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "sockets")), "deleted elf.sockets library is absent");
 }
 
 static void run_table_tests(elf_State *state)
@@ -247,5 +159,5 @@ static void run_table_tests(elf_State *state)
 	TEST_RUN("table.integer_keys", test_table_integer_keys, state);
 	TEST_RUN("table.resize_stress", test_table_resize_stress, state);
 	TEST_RUN("table.delete_and_reuse_tombstones", test_table_delete_and_reuse_tombstones, state);
-	TEST_RUN("table.runtime_elf_global", test_runtime_elf_global_is_table, state);
+	TEST_RUN("table.metatable", test_table_metatable, state);
 }

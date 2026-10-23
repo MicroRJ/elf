@@ -32,7 +32,7 @@ static const elf_Binding l_random[] = {
 	{"random",      lib_random_random},
 };
 
-static void elf_lib_random(elf_State *state)
+static elf_SymTable *elf_lib_random(void)
 {
-	new_binding_table(state, l_random, ARRAY_COUNT(l_random));
+	return new_symbol_table(l_random, ARRAY_COUNT(l_random));
 }

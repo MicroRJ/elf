@@ -524,4 +524,16 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 	return table;
 }
 
+static elf_SymTable *new_symbol_table(const elf_Binding *bindings, u32 count)
+{
+	elf_SymTable *table = 0;
+	elf_sym_create(&table);
+	for (u32 i = 0; i < count; ++i)
+	{
+		elf_StrSlice name = {bindings[i].name, strlen(bindings[i].name)};
+		elf_sym_fun(table, name, bindings[i].function);
+	}
+	return table;
+}
+
 #endif

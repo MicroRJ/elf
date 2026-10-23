@@ -40,7 +40,7 @@ static elf_Prototype *compile_source(elf_State *state, const char *name, elf_Str
 {
 	Scratch scratch = scratch_begin();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	elf_Prototype *entry = compiler_compile(state, scratch.arena, source_name, source);
+	elf_Prototype *entry = compiler_compile(state, 0, scratch.arena, source_name, source);
 	scratch_end(scratch);
 	return entry;
 }

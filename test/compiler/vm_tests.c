@@ -62,19 +62,21 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	return 1;
 }
 
-static void vm_test_install_bindings(elf_State *state)
+static elf_SymTable *vm_test_symbols(void)
 {
-	elf_push_fun(state, vm_test_assert);
-	if (elf_set_global(state, "test_assert") != ELF_ERROR_NONE) {
+	elf_SymTable *symbols = 0;
+	if (elf_sym_create(&symbols) != ELF_ERROR_NONE || elf_sym_fun(symbols, ELF_LIT("test_assert"), vm_test_assert) != ELF_ERROR_NONE) {
 		test_fail("VM test binding registration");
 	}
+	return symbols;
 }
 
 static VmRunResult vm_test_run_file(const char *path)
 {
 	elf_State *state = elf_create_state();
-	vm_test_install_bindings(state);
-	elf_push_code_file(state, path);
+	elf_SymTable *symbols = vm_test_symbols();
+	elf_push_code_file(state, symbols, path);
+	elf_sym_destroy(symbols);
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	return (VmRunResult){state, state->stack_ptr[-1]};
@@ -113,7 +115,7 @@ static void test_vm_pads_missing_returns(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "ret 11, 22";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, "missing-returns", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, "missing-returns", source) != ELF_ERROR_NONE)
 	{
 		test_fail("missing-return test source compiles");
 		elf_destroy_state(state);
@@ -144,7 +146,7 @@ static void test_vm_discards_excess_returns(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "ret 11, 22";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, "excess-returns", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, "excess-returns", source) != ELF_ERROR_NONE)
 	{
 		test_fail("excess-return test source compiles");
 		elf_destroy_state(state);
@@ -229,7 +231,7 @@ static void test_vm_method_this(void)
 	vm_expect_int("test/compiler/smoke/method_this.elf", 242, "vm passes field receiver as implicit this");
 }
 
-static ELF_FUNCTION(vm_test_public_function)
+static ELF_FUNCTION(vm_test_symbol_function)
 {
 	(void)nargs;
 	(void)nrets;
@@ -237,26 +239,33 @@ static ELF_FUNCTION(vm_test_public_function)
 	return 1;
 }
 
-static void test_vm_public_bindings(void)
+static void test_vm_symbols(void)
 {
 	elf_State *state = elf_create_state();
-	elf_ErrorCode answer_error = elf_pub_int(state, (elf_StrSlice) {(char *)"host.answer", sizeof("host.answer") - 1}, 34);
-	elf_ErrorCode function_error = elf_pub_fun(state, (elf_StrSlice) {(char *)"host.get", sizeof("host.get") - 1}, vm_test_public_function);
+	elf_SymTable *symbols = 0;
+	elf_SymTable *host = 0;
+	elf_ErrorCode create_symbols_error = elf_sym_create(&symbols);
+	elf_ErrorCode create_host_error = elf_sym_create(&host);
+	elf_ErrorCode answer_error = elf_sym_int(host, ELF_LIT("answer"), 34);
+	elf_ErrorCode function_error = elf_sym_fun(host, ELF_LIT("get"), vm_test_symbol_function);
+	elf_ErrorCode host_error = elf_sym_tab(symbols, ELF_LIT("host"), host);
 	char source_text[] = "ret host.answer + host.get()";
-	elf_ErrorCode compile_error = elf_push_code_source(state, "public-bindings", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
-	if (answer_error != ELF_ERROR_NONE || function_error != ELF_ERROR_NONE || compile_error != ELF_ERROR_NONE)
+	elf_ErrorCode compile_error = elf_push_code_source(state, symbols, "symbols", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
+	if (create_symbols_error != ELF_ERROR_NONE || create_host_error != ELF_ERROR_NONE || answer_error != ELF_ERROR_NONE || function_error != ELF_ERROR_NONE || host_error != ELF_ERROR_NONE || compile_error != ELF_ERROR_NONE)
 	{
-		test_fail("VM compiles public bindings");
+		test_fail("VM compiles environment symbols");
+		elf_sym_destroy(symbols);
 		elf_destroy_state(state);
 		return;
 	}
+	elf_sym_destroy(symbols);
 
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 	elf_Value result = state->stack_ptr[-1];
 	if (!value_is_integer(result) || value_as_integer(result) != 42)
 	{
-		test_fail("VM executes public bindings");
+		test_fail("VM executes environment symbols");
 	}
 	elf_destroy_state(state);
 }
@@ -294,7 +303,7 @@ static void test_vm_static_function(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "answer :: fun() { ret 42 }\nret answer()";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, "static-function", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, "static-function", source) != ELF_ERROR_NONE)
 	{
 		test_fail("static function source compiles");
 		elf_destroy_state(state);
@@ -314,7 +323,7 @@ static void test_vm_static_recurse_function(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\nret count(3)";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, "static-recurse-function", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, "static-recurse-function", source) != ELF_ERROR_NONE)
 	{
 		test_fail("static recurse function source compiles");
 		elf_destroy_state(state);
@@ -337,7 +346,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_StrSlice first_source = {first_source_text, sizeof(first_source_text) - 1};
 	elf_StrSlice second_source = {second_source_text, sizeof(second_source_text) - 1};
 
-	if (elf_push_code_source(state, "first", first_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, "first", first_source) != ELF_ERROR_NONE) {
 		test_fail("first closure module compiles");
 		elf_destroy_state(state);
 		return;
@@ -354,7 +363,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
-	if (elf_push_code_source(state, "second", second_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, "second", second_source) != ELF_ERROR_NONE) {
 		test_fail("second closure module compiles");
 		elf_destroy_state(state);
 		return;
@@ -448,7 +457,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	elf_State *state = elf_create_state();
 	char callback_source_text[] = "ret 41";
 	elf_StrSlice callback_source = {callback_source_text, sizeof(callback_source_text) - 1};
-	if (elf_push_code_source(state, "nested-callback", callback_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, "nested-callback", callback_source) != ELF_ERROR_NONE) {
 		test_fail("nested callback compiles");
 		elf_destroy_state(state);
 		return;
@@ -463,19 +472,21 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	}
 
 	elf_set_user_data(state, &context);
-	elf_push_fun(state, vm_test_nested_call_preserves_context);
-	if (elf_set_global(state, "context_probe") != ELF_ERROR_NONE) {
+	elf_SymTable *symbols = 0;
+	if (elf_sym_create(&symbols) != ELF_ERROR_NONE || elf_sym_fun(symbols, ELF_LIT("context_probe"), vm_test_nested_call_preserves_context) != ELF_ERROR_NONE) {
 		test_fail("nested context probe binding registration");
 	}
 
 	char caller_source_text[] = "ret context_probe()";
 	elf_StrSlice caller_source = {caller_source_text, sizeof(caller_source_text) - 1};
-	if (elf_push_code_source(state, "nested-caller", caller_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, symbols, "nested-caller", caller_source) != ELF_ERROR_NONE) {
 		test_fail("nested caller compiles");
+		elf_sym_destroy(symbols);
 		elf_release_ref(state, context.callback);
 		elf_destroy_state(state);
 		return;
 	}
+	elf_sym_destroy(symbols);
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
 
@@ -503,7 +514,7 @@ static int vm_run_runtime_error_diagnostic_child(void)
 		"}\n"
 		"outer({ first = 1, second = 2, third = 3, expected_tail = 4 })";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, "diagnostic-stack", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, "diagnostic-stack", source) != ELF_ERROR_NONE)
 	{
 		elf_destroy_state(state);
 		return 2;
@@ -610,7 +621,7 @@ static void test_vm_module_emitter_grows_constant_arrays(void)
 
 	elf_State *state = elf_create_state();
 	elf_StrSlice source_slice = {source, used};
-	if (elf_push_code_source(state, "constant-growth", source_slice) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, "constant-growth", source_slice) != ELF_ERROR_NONE) {
 		test_fail("module growth source compiles");
 		elf_destroy_state(state);
 		return;
@@ -632,10 +643,9 @@ static void test_vm_module_emitter_grows_constant_arrays(void)
 static void test_vm_module_converts_atom_constants(void)
 {
 	elf_State *state = elf_create_state();
-	u32 global_count = state->global_count;
 	char source_text[] = "ret [\"same\", \"same\", \"other\"]";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, "module-strings", source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, "module-strings", source) != ELF_ERROR_NONE) {
 		test_fail("module string source compiles");
 		elf_destroy_state(state);
 		return;
@@ -646,10 +656,6 @@ static void test_vm_module_converts_atom_constants(void)
 	{
 		test_fail("function converts deduplicated atom constants to strings");
 	}
-	if (state->global_count != global_count) {
-		test_fail("string constants do not consume global slots");
-	}
-
 	vm_force_gc_allocations(state, 256);
 	if (strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0) {
 		test_fail("function string constants survive GC");
@@ -679,7 +685,7 @@ static void run_vm_tests(void)
 	TEST_RUN("vm.function_call", test_vm_function_call);
 	TEST_RUN("vm.function_arguments", test_vm_function_arguments);
 	TEST_RUN("vm.method_this", test_vm_method_this);
-	TEST_RUN("vm.public_bindings", test_vm_public_bindings);
+	TEST_RUN("vm.symbols", test_vm_symbols);
 	TEST_RUN("vm.script_json_assertions", test_vm_script_json_assertions);
 	TEST_RUN("vm.core_library_assertions", test_vm_core_library_assertions);
 	TEST_RUN("vm.string_join", test_vm_string_join);

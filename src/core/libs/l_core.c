@@ -312,7 +312,7 @@ static const elf_Binding l_core[] = {
 	{"const_expr",   l_core_const_expr},
 };
 
-static elf_Table *elf_lib_core(elf_State *state)
+static elf_SymTable *elf_lib_core(void)
 {
-	return new_binding_table(state, l_core, ARRAY_COUNT(l_core));
+	return new_symbol_table(l_core, ARRAY_COUNT(l_core));
 }

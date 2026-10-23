@@ -134,7 +134,7 @@ static const elf_Binding l_path[] = {
 	{"extension", lib_path_extension},
 };
 
-static void elf_lib_path(elf_State *state)
+static elf_SymTable *elf_lib_path(void)
 {
-	new_binding_table(state, l_path, ARRAY_COUNT(l_path));
+	return new_symbol_table(l_path, ARRAY_COUNT(l_path));
 }

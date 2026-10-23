@@ -30,12 +30,13 @@ static void run_script_test(const char *path)
 	ScriptTestContext context = {path};
 	elf_set_user_data(state, &context);
 
-	elf_push_fun(state, script_test_assert);
-	if (elf_set_global(state, "test_assert") != ELF_ERROR_NONE)
+	elf_SymTable *symbols = 0;
+	elf_sym_create(&symbols);
+	if (elf_sym_fun(symbols, ELF_LIT("test_assert"), script_test_assert) != ELF_ERROR_NONE)
 	{
 		TEST_FAIL("could not install test_assert");
 	}
-	else if (!elf_push_code_file(state, path))
+	else if (!elf_push_code_file(state, symbols, path))
 	{
 		TEST_FAIL("could not compile script");
 	}
@@ -45,6 +46,7 @@ static void run_script_test(const char *path)
 		elf_call(state, 1, 0);
 	}
 
+	elf_sym_destroy(symbols);
 	elf_destroy_state(state);
 }
 
