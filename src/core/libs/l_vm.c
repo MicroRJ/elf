@@ -37,12 +37,3 @@ ELF_FUNCTION(l_vm_counters)
 	vm_set_counter(S, result, "max_call_depth", max_call_depth);
 	return 1;
 }
-
-static const elf_Binding l_vm[] = {
-	{"counters", l_vm_counters},
-};
-
-static elf_Table *elf_lib_vm(elf_State *state)
-{
-	return new_binding_table(state, l_vm, ARRAY_COUNT(l_vm));
-}

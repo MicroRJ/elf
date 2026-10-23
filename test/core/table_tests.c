@@ -162,9 +162,7 @@ static void test_runtime_elf_global_is_table(elf_State *state)
 	expect_table_value(gc_value, "elf.gc is a table");
 	expect_function_value(elf_table_get_or_nil(state, value_as_table(gc_value), test_key_string(state, "counters")), "elf.gc.counters is a field function");
 
-	elf_Value vm_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "vm"));
-	expect_table_value(vm_value, "elf.vm is a table");
-	expect_function_value(elf_table_get_or_nil(state, value_as_table(vm_value), test_key_string(state, "counters")), "elf.vm.counters is a field function");
+	expect_nil(elf_table_get_or_nil(state, elf_table, test_key_string(state, "vm")), "elf.vm runtime table is absent");
 
 	elf_Value json_value = elf_table_get_or_nil(state, elf_table, test_key_string(state, "json"));
 	expect_table_value(json_value, "elf.json is a table");

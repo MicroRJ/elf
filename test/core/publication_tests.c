@@ -8,6 +8,7 @@ static ELF_FUNCTION(publication_test_function)
 
 static void test_public_bindings_store_owned_values(elf_State *state)
 {
+	u32 initial_count = state->public_binding_count;
 	char integer_name[] = "app.answer";
 	char number_name[] = "app.ratio";
 	char string_name[] = "app.message";
@@ -22,17 +23,17 @@ static void test_public_bindings_store_owned_values(elf_State *state)
 	integer_name[0] = 'x';
 	string_value[0] = 'x';
 
-	elf_PublicBinding *integer = state->public_bindings + 0;
-	elf_PublicBinding *number = state->public_bindings + 1;
-	elf_PublicBinding *string = state->public_bindings + 2;
-	elf_PublicBinding *function = state->public_bindings + 3;
+	elf_PublicBinding *integer = state->public_bindings + initial_count;
+	elf_PublicBinding *number = state->public_bindings + initial_count + 1;
+	elf_PublicBinding *string = state->public_bindings + initial_count + 2;
+	elf_PublicBinding *function = state->public_bindings + initial_count + 3;
 	b32 valid_function_index = function->native_function_index < state->native_function_count;
 	b32 calls_succeeded = integer_error == ELF_ERROR_NONE && number_error == ELF_ERROR_NONE && string_error == ELF_ERROR_NONE && function_error == ELF_ERROR_NONE;
 	b32 integer_is_valid = integer->type == ELF_PUBLIC_INTEGER && integer->integer == 42 && integer->name.size == sizeof(integer_name) - 1 && !memcmp(integer->name.data, "app.answer", sizeof(integer_name) - 1);
 	b32 number_is_valid = number->type == ELF_PUBLIC_NUMBER && number->number == 1.5;
 	b32 string_is_valid = string->type == ELF_PUBLIC_STRING && string->string.size == sizeof(string_value) - 1 && !memcmp(string->string.data, "hello", sizeof(string_value) - 1);
 	b32 function_is_valid = function->type == ELF_PUBLIC_FUNCTION && valid_function_index && state->native_functions[function->native_function_index] == publication_test_function;
-	if (!calls_succeeded || state->public_binding_count != 4 || !integer_is_valid || !number_is_valid || !string_is_valid || !function_is_valid)
+	if (!calls_succeeded || state->public_binding_count != initial_count + 4 || !integer_is_valid || !number_is_valid || !string_is_valid || !function_is_valid)
 	{
 		test_fail("public bindings store owned values");
 	}

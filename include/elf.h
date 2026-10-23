@@ -47,6 +47,8 @@ typedef struct
 }
 elf_StrSlice;
 
+#define ELF_LIT(TEXT) ((elf_StrSlice) {(char *)(TEXT), sizeof(TEXT) - 1})
+
 typedef enum
 {
 	ELF_ERROR_NONE = 0,

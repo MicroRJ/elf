@@ -12,11 +12,15 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
 	result.compiler = compiler_create(arena);
 	result.compiler->target = state;
+	result.source = parser_test_add_source(result.compiler, (elf_StrSlice) {(char *)"ir_tests", sizeof("ir_tests") - 1}, source);
 	if (compiler_inject_globals(result.compiler, result.compiler->globals) != COM_STATUS_OK) {
 		test_fail("IR test injects host globals");
 		return result;
 	}
-	result.source = parser_test_add_source(result.compiler, (elf_StrSlice) {(char *)"ir_tests", sizeof("ir_tests") - 1}, source);
+	if (compiler_inject_public_bindings(result.compiler, result.compiler->globals, result.source) != COM_STATUS_OK) {
+		test_fail("IR test injects public bindings");
+		return result;
+	}
 
 	Parser parser = {0};
 	ASSERT(parser_init(&parser));

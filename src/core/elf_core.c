@@ -126,7 +126,6 @@ static void bootstrap_standard_libraries(elf_State *state)
 	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "buffer")), value_from_function(l_buffer_new));
 	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "math")), value_from_table(elf_lib_math(state)));
 	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "gc")), value_from_table(elf_lib_gc(state)));
-	elf_table_set(state, elf_table, value_from_string(elf_string_from_data(state, "vm")), value_from_table(elf_lib_vm(state)));
 
 	elf_StrSlice elf_name = {(char *)"elf", 3};
 	elf_globals_set_by_name(state, elf_name, value_from_table(elf_table));
@@ -163,6 +162,12 @@ elf_State *elf_create_state()
 
 	init_state_storage(state);
 	bootstrap_state(state);
+	elf_ErrorCode public_error = elf_pub_fun(state, ELF_LIT("elf.vm.counters"), l_vm_counters);
+	if (public_error != ELF_ERROR_NONE)
+	{
+		elf_destroy_state(state);
+		return 0;
+	}
 	elf_open_libraries(state);
 
 	return state;

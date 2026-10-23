@@ -16,6 +16,7 @@ static ELF_FUNCTION(native_function_test_b)
 
 static void test_native_functions_assign_stable_indices(elf_State *state)
 {
+	u32 initial_count = state->native_function_count;
 	u32 first = UINT32_MAX;
 	u32 second = UINT32_MAX;
 	u32 repeated = UINT32_MAX;
@@ -24,7 +25,7 @@ static void test_native_functions_assign_stable_indices(elf_State *state)
 	ErrorCode repeated_error = elf_native_function_ensure(state, native_function_test_a, &repeated);
 
 	if (first_error != ERROR_NONE || second_error != ERROR_NONE || repeated_error != ERROR_NONE ||
-		first == second || repeated != first || state->native_function_count != 2 ||
+		first == second || repeated != first || state->native_function_count != initial_count + 2 ||
 		state->native_functions[first] != native_function_test_a || state->native_functions[second] != native_function_test_b)
 	{
 		test_fail("native functions assign stable indices");

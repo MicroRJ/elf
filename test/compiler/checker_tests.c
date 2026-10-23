@@ -126,13 +126,13 @@ static void test_compiler_injects_global_scopes(void)
 	Atom *elf_name = atom_from_data_size(compiler->atoms, "elf", 3);
 	Entity *elf_entity = scope_find_current(globals, elf_name);
 	Scope *elf_scope = elf_entity && elf_entity->en_global.value.type == COM_VALUE_SCOPE ? elf_entity->en_global.value.scope : 0;
-	Atom *vm_name = atom_from_data_size(compiler->atoms, "vm", 2);
-	Entity *vm_entity = elf_scope ? scope_find_current(elf_scope, vm_name) : 0;
-	Scope *vm_scope = vm_entity && vm_entity->en_global.value.type == COM_VALUE_SCOPE ? vm_entity->en_global.value.scope : 0;
+	Atom *gc_name = atom_from_data_size(compiler->atoms, "gc", 2);
+	Entity *gc_entity = elf_scope ? scope_find_current(elf_scope, gc_name) : 0;
+	Scope *gc_scope = gc_entity && gc_entity->en_global.value.type == COM_VALUE_SCOPE ? gc_entity->en_global.value.scope : 0;
 	Atom *counters_name = atom_from_data_size(compiler->atoms, "counters", 8);
-	Entity *counters_entity = vm_scope ? scope_find_current(vm_scope, counters_name) : 0;
+	Entity *counters_entity = gc_scope ? scope_find_current(gc_scope, counters_name) : 0;
 
-	if (status != COM_STATUS_OK || !elf_entity || elf_entity->kind != ENTITY_GLOBAL || !elf_scope || !vm_entity || !vm_scope ||
+	if (status != COM_STATUS_OK || !elf_entity || elf_entity->kind != ENTITY_GLOBAL || !elf_scope || !gc_entity || !gc_scope ||
 		!counters_entity || counters_entity->kind != ENTITY_GLOBAL || counters_entity->en_global.value.type != COM_VALUE_NATIVE_FUNCTION ||
 		counters_entity->en_global.value.native_function_index >= state->native_function_count)
 	{
