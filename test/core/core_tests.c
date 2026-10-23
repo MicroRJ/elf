@@ -15,6 +15,7 @@
 #include "gc_tests.c"
 #include "globals_tests.c"
 #include "native_function_tests.c"
+#include "publication_tests.c"
 #include "api_tests.c"
 #undef test_fail
 
@@ -27,6 +28,7 @@ static void run_core_tests(void)
 	run_gc_tests();
 	run_globals_tests(state);
 	run_native_function_tests(state);
+	run_publication_tests(state);
 	run_api_tests();
 	elf_destroy_state(state);
 }

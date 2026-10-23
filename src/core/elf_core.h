@@ -23,6 +23,7 @@ typedef struct elf_Prototype   elf_Prototype;
 typedef struct elf_Source      elf_Source;
 typedef struct StackFrame     StackFrame;
 typedef struct GlobalEntry    GlobalEntry;
+typedef struct elf_PublicBinding elf_PublicBinding;
 
 typedef enum
 {
@@ -135,6 +136,28 @@ struct GlobalEntry
 	u32   slot;
 };
 
+typedef enum
+{
+	ELF_PUBLIC_INTEGER = 0,
+	ELF_PUBLIC_NUMBER,
+	ELF_PUBLIC_STRING,
+	ELF_PUBLIC_FUNCTION,
+}
+elf_PublicType;
+
+struct elf_PublicBinding
+{
+	dy_String name;
+	u8        type;
+	union
+	{
+		i64       integer;
+		f64       number;
+		dy_String string;
+		u32       native_function_index;
+	};
+};
+
 // TODO(RJ): we could compress this WAY down, encode the line index & column as a u16,
 // store base line index in the prototype as a u32, byte start and byte end could be
 // replaced with a single u16 end marker ...
@@ -227,6 +250,9 @@ struct elf_State
 	elf_Function   *native_functions;
 	u32             native_function_count;
 	u32             native_function_capacity;
+	elf_PublicBinding *public_bindings;
+	u32                public_binding_count;
+	u32                public_binding_capacity;
 	elf_Source     *sources;
 
 	struct
@@ -305,6 +331,8 @@ void elf_free(elf_State *state, void *memory, elf_u64 size);
 
 ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index);
 void elf_native_functions_destroy(elf_State *state);
+
+void elf_public_bindings_destroy(elf_State *state);
 
 elf_Source *elf_source_create(elf_State *state, dy_String name, dy_String text);
 void elf_sources_destroy(elf_State *state);

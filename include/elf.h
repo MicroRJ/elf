@@ -58,6 +58,7 @@ typedef enum
 	ELF_ERROR_OUT_OF_RANGE,
 	ELF_ERROR_READONLY,
 	ELF_ERROR_COMPILATION_FAILED,
+	ELF_ERROR_OUT_OF_MEMORY,
 }
 elf_ErrorCode;
 
@@ -138,6 +139,11 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element);
 elf_ErrorCode elf_append(elf_State *state, elf_Index index);
 elf_Bool elf_next(elf_State *state, elf_Index index, elf_u32 *cursor);
 elf_Bool elf_equal(elf_State *state, elf_Index left, elf_Index right);
+
+elf_ErrorCode elf_pub_int(elf_State *state, elf_StrSlice name, elf_Int value);
+elf_ErrorCode elf_pub_num(elf_State *state, elf_StrSlice name, elf_Num value);
+elf_ErrorCode elf_pub_str(elf_State *state, elf_StrSlice name, elf_StrSlice value);
+elf_ErrorCode elf_pub_fun(elf_State *state, elf_StrSlice name, elf_Function function);
 
 void elf_get_global(elf_State *state, const char *name);
 elf_ErrorCode elf_set_global(elf_State *state, const char *name);
