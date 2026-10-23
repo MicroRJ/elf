@@ -86,6 +86,7 @@ struct Com_Source
 
 Compiler *compiler_create(Arena *arena);
 Com_Status compiler_inject_globals(Compiler *compiler, struct Scope *globals);
+Com_Status compiler_inject_public_bindings(Compiler *compiler, struct Scope *globals, Com_Source *source);
 
 void compiler_log_report(Compiler *compiler);
 

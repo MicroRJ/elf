@@ -143,6 +143,54 @@ static void test_compiler_injects_global_scopes(void)
 	elf_destroy_state(state);
 }
 
+static ELF_FUNCTION(compiler_public_binding_test_function)
+{
+	(void)S;
+	(void)nargs;
+	(void)nrets;
+	return 0;
+}
+
+static void test_compiler_injects_public_bindings(void)
+{
+	elf_State *state = elf_create_state();
+	elf_ErrorCode answer_error = elf_pub_int(state, (elf_StrSlice) {(char *)"elf.published.answer", sizeof("elf.published.answer") - 1}, 42);
+	elf_ErrorCode ratio_error = elf_pub_num(state, (elf_StrSlice) {(char *)"elf.published.ratio", sizeof("elf.published.ratio") - 1}, 1.5);
+	elf_ErrorCode message_error = elf_pub_str(state, (elf_StrSlice) {(char *)"elf.published.message", sizeof("elf.published.message") - 1}, (elf_StrSlice) {(char *)"hello", sizeof("hello") - 1});
+	elf_ErrorCode run_error = elf_pub_fun(state, (elf_StrSlice) {(char *)"elf.published.run", sizeof("elf.published.run") - 1}, compiler_public_binding_test_function);
+
+	Arena arena = arena_create(0);
+	Compiler *compiler = compiler_create(&arena);
+	compiler->target = state;
+	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"public_bindings", sizeof("public_bindings") - 1}, (elf_StrSlice) {(char *)"ret 0", sizeof("ret 0") - 1});
+	Com_Status global_status = compiler_inject_globals(compiler, compiler->globals);
+	Atom *elf_name = atom_from_data_size(compiler->atoms, "elf", sizeof("elf") - 1);
+	Entity *elf_before = scope_find_current(compiler->globals, elf_name);
+	Com_Status public_status = compiler_inject_public_bindings(compiler, compiler->globals, source);
+	Entity *elf_after = scope_find_current(compiler->globals, elf_name);
+	Scope *elf_scope = elf_after && elf_after->en_global.value.type == COM_VALUE_SCOPE ? elf_after->en_global.value.scope : 0;
+	Atom *published_name = atom_from_data_size(compiler->atoms, "published", sizeof("published") - 1);
+	Entity *published = elf_scope ? scope_find_current(elf_scope, published_name) : 0;
+	Scope *published_scope = published && published->en_global.value.type == COM_VALUE_SCOPE ? published->en_global.value.scope : 0;
+	Entity *answer = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1)) : 0;
+	Entity *ratio = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "ratio", sizeof("ratio") - 1)) : 0;
+	Entity *message = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "message", sizeof("message") - 1)) : 0;
+	Entity *run = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "run", sizeof("run") - 1)) : 0;
+
+	b32 answer_is_valid = answer && answer->en_global.value.type == COM_VALUE_INTEGER && answer->en_global.value.integer == 42;
+	b32 ratio_is_valid = ratio && ratio->en_global.value.type == COM_VALUE_NUMBER && ratio->en_global.value.number == 1.5;
+	b32 message_is_valid = message && message->en_global.value.type == COM_VALUE_STRING && atom_size(message->en_global.value.string) == sizeof("hello") - 1 && !memcmp(atom_data(message->en_global.value.string), "hello", sizeof("hello") - 1);
+	b32 run_is_valid = run && run->en_global.value.type == COM_VALUE_NATIVE_FUNCTION && run->en_global.value.native_function_index < state->native_function_count && state->native_functions[run->en_global.value.native_function_index] == compiler_public_binding_test_function;
+	b32 publication_succeeded = answer_error == ELF_ERROR_NONE && ratio_error == ELF_ERROR_NONE && message_error == ELF_ERROR_NONE && run_error == ELF_ERROR_NONE;
+	if (!publication_succeeded || global_status != COM_STATUS_OK || public_status != COM_STATUS_OK || elf_before != elf_after || !published_scope || !answer_is_valid || !ratio_is_valid || !message_is_valid || !run_is_valid)
+	{
+		test_fail("compiler injects public bindings into host namespaces");
+	}
+
+	arena_destroy(&arena);
+	elf_destroy_state(state);
+}
+
 static void test_checker_tags_exported_static(void)
 {
 	CheckerTest test;
@@ -523,6 +571,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 static void run_checker_tests(void)
 {
 	TEST_RUN("compiler.injects_global_scopes", test_compiler_injects_global_scopes);
+	TEST_RUN("compiler.injects_public_bindings", test_compiler_injects_public_bindings);
 	TEST_RUN("checker.resolves_static_forward_reference", test_checker_resolves_static_forward_reference);
 	TEST_RUN("checker.tags_exported_static", test_checker_tags_exported_static);
 	TEST_RUN("checker.declares_local_after_initializer", test_checker_declares_local_after_initializer);

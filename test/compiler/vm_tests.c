@@ -229,6 +229,38 @@ static void test_vm_method_this(void)
 	vm_expect_int("test/compiler/smoke/method_this.elf", 242, "vm passes field receiver as implicit this");
 }
 
+static ELF_FUNCTION(vm_test_public_function)
+{
+	(void)nargs;
+	(void)nrets;
+	elf_push_int(S, 8);
+	return 1;
+}
+
+static void test_vm_public_bindings(void)
+{
+	elf_State *state = elf_create_state();
+	elf_ErrorCode answer_error = elf_pub_int(state, (elf_StrSlice) {(char *)"host.answer", sizeof("host.answer") - 1}, 34);
+	elf_ErrorCode function_error = elf_pub_fun(state, (elf_StrSlice) {(char *)"host.get", sizeof("host.get") - 1}, vm_test_public_function);
+	char source_text[] = "ret host.answer + host.get()";
+	elf_ErrorCode compile_error = elf_push_code_source(state, "public-bindings", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
+	if (answer_error != ELF_ERROR_NONE || function_error != ELF_ERROR_NONE || compile_error != ELF_ERROR_NONE)
+	{
+		test_fail("VM compiles public bindings");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_Value result = state->stack_ptr[-1];
+	if (!value_is_integer(result) || value_as_integer(result) != 42)
+	{
+		test_fail("VM executes public bindings");
+	}
+	elf_destroy_state(state);
+}
+
 static void test_vm_script_json_assertions(void)
 {
 	vm_expect_int("test/compiler/smoke/script_assert_json.elf", 321, "vm runs script-side json table assertions");
@@ -647,6 +679,7 @@ static void run_vm_tests(void)
 	TEST_RUN("vm.function_call", test_vm_function_call);
 	TEST_RUN("vm.function_arguments", test_vm_function_arguments);
 	TEST_RUN("vm.method_this", test_vm_method_this);
+	TEST_RUN("vm.public_bindings", test_vm_public_bindings);
 	TEST_RUN("vm.script_json_assertions", test_vm_script_json_assertions);
 	TEST_RUN("vm.core_library_assertions", test_vm_core_library_assertions);
 	TEST_RUN("vm.string_join", test_vm_string_join);
