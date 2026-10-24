@@ -2,9 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#ifndef ELF_COMPILER_AST_H
-#define ELF_COMPILER_AST_H
-
 #define AST_DEFINITIONS(X)                                   \
 	X(AST_NONE                , "none")                       \
 	X(AST_ERROR               , "error")                      \
@@ -323,5 +320,3 @@ static inline const char *ast_type_name(Ast_Kind type)
 	}
 	return names[type];
 }
-
-#endif

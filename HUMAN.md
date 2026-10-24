@@ -1,3 +1,6 @@
+## Compilers and Atoms:
+
+
 Dear globals:
 
 I've used elf for many years - long enough to know one thing: globals aren't really needed anymore...
@@ -14,3 +17,4 @@ Here's the itinerary:
 * It will also perhaps come with a gratuitous performance boost.
 
 But most notably of all: no more implicit globals.
+

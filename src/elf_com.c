@@ -36,14 +36,14 @@ static elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols,
 
 #include "logging.c"
 #include "source_diagnostics.c"
-#include "frontend/lexer.c"
-#include "frontend/ast.c"
-#include "frontend/parser.c"
-#include "frontend/parse_json.c"
+#include "lexer.c"
+#include "ast.c"
+#include "parser.c"
+#include "parse_json.c"
 #include "entity.c"
 #include "checker.c"
-#include "middle/ir_emitter.c"
-#include "backend/bc_emitter.c"
+#include "ir_emitter.c"
+#include "bc_emitter.c"
 
 
 static Compiler *compiler_create(Arena *arena)
