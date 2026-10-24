@@ -56,24 +56,6 @@ static void test_array_operations(void)
 	elf_array_set(state, array, 5, value_from_integer(50));
 	array_expect_int(elf_array_get(state, array, 5), 50, "array set replaces an item");
 
-	if (elf_array_insert(state, array, 5, value_from_integer(40)) != 5)
-	{
-		test_fail("array insert returns the inserted index");
-	}
-	array_expect_int(elf_array_get(state, array, 5), 40, "array insert stores the new item");
-	array_expect_int(elf_array_get(state, array, 6), 50, "array insert shifts following items");
-
-	elf_array_remove(state, array, 4, 3);
-	if (elf_array_length(array) != 18)
-	{
-		test_fail("array remove reduces the length");
-	}
-	array_expect_int(elf_array_get(state, array, 4), 6, "array remove closes the removed range");
-
-	elf_array_swap(state, array, 0, 17);
-	array_expect_int(elf_array_get(state, array, 0), 19, "array swap replaces the left item");
-	array_expect_int(elf_array_get(state, array, 17), 0, "array swap replaces the right item");
-
 	elf_destroy_state(state);
 }
 

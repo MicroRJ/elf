@@ -5,6 +5,544 @@
 #define I64_MAX_MAGNITUDE 0x7fffffffffffffffull
 #define I64_MIN_MAGNITUDE 0x8000000000000000ull
 
+typedef struct Parser Parser;
+struct Parser
+{
+	Arena          *result_arena;
+	Arena           scratch_arena;
+	Com_Source         *source;
+	Token_Array         tokens;
+	u32                 token_index;
+
+	Ast                *ast_stack;
+	u32                 ast_stack_size;
+	u32                 ast_stack_index;
+	Ast                 current_function;
+
+	Ast_List             imports;
+};
+
+// AST constructors only allocate and initialize the returned tree.
+// README: use ast_new_ *** _expr naming convention
+// README: use ast_new_ *** _stat naming convention
+
+static Ast_T ast_error_sentinel =
+{
+	.kind = AST_ERROR,
+	.status = COM_STATUS_REPORTED,
+};
+
+static Ast_T ast_error_oom_sentinel =
+{
+	.kind = AST_ERROR,
+	.status = COM_STATUS_OOM,
+};
+
+static b32 ast_list_push(Ast_List *list, Arena *arena, Ast tree)
+{
+	ASSERT(list);
+	ASSERT(arena);
+	Ast_Node *node = arena_push_zero(arena, sizeof(*node), _Alignof(Ast_Node));
+	if (!node) {
+		return false;
+	}
+	node->tree = tree;
+	if (list->last) {
+		list->last->next = node;
+	}
+	else {
+		list->first = node;
+	}
+	list->last = node;
+	list->count += 1;
+	return true;
+}
+
+static Ast_Array ast_list_compact(Ast_List *list, Arena *arena)
+{
+	ASSERT(list);
+	ASSERT(arena);
+	Ast_Array result = {.count = list->count};
+	if (!result.count) {
+		return result;
+	}
+	result.items = arena_push(arena, sizeof(*result.items) * result.count, _Alignof(Ast));
+	if (!result.items) {
+		return (Ast_Array) {};
+	}
+	u32 index = 0;
+	for (Ast_Node *node = list->first; node; node = node->next)
+	{
+		ASSERT(index < result.count);
+		result.items[index++] = node->tree;
+	}
+	ASSERT(index == result.count);
+	return result;
+}
+
+static Ast ast_new(Parser *par, SourceSite site, Ast_Kind kind)
+{
+	ASSERT(par->source);
+	Ast_T *tree = arena_push_zero(par->result_arena, sizeof(*tree), _Alignof(Ast_T));
+	if (!tree) {
+		return ERROR_OOM_AST;
+	}
+	tree->site = site;
+	tree->kind = kind;
+	return tree;
+}
+
+static Ast ast_new_nullary_expr(Parser *par, SourceSite site, Ast_Kind kind)
+{
+	Ast tree = ast_new(par,site,kind);
+	return tree;
+}
+
+static Ast ast_new_unary_expr(Parser *par, SourceSite site, Ast_Kind kind, Ast x)
+{
+	if (ast_is_error(x)) {
+		return x;
+	}
+	Ast tree = ast_new(par, site, kind);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->unary = x;
+	return tree;
+}
+
+static Ast ast_new_binary_expr(Parser *par, SourceSite site, Ast_Kind kind, Ast x, Ast y)
+{
+	if (ast_is_error(x)) {
+		return x;
+	}
+	if (ast_is_error(y)) {
+		return y;
+	}
+	Ast tree = ast_new(par, site, kind);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->binary.x = x;
+	tree->binary.y = y;
+	return tree;
+}
+
+static Ast ast_new_nil_literal(Parser *par, SourceSite site)
+{
+	return ast_new_nullary_expr(par, site, AST_NIL_LITERAL);
+}
+
+static Ast ast_new_integer_literal(Parser *par, SourceSite site, i64 i)
+{
+	Ast value;
+	value = ast_new_nullary_expr(par, site, AST_INTEGER_LITERAL);
+	if (ast_is_error(value)) {
+		return value;
+	}
+	value->integer_value = i;
+	return value;
+}
+
+static Ast ast_new_number_literal(Parser *par, SourceSite site, f64 n)
+{
+	Ast value = ast_new_nullary_expr(par, site, AST_NUMBER_LITERAL);
+	if (ast_is_error(value)) {
+		return value;
+	}
+	value->number_value=n;
+	return value;
+}
+
+static Ast ast_new_string_literal(Parser *par, SourceSite site, Atom *atom)
+{
+	Ast value = ast_new_nullary_expr(par, site, AST_STRING_LITERAL);
+	if (ast_is_error(value)) {
+		return value;
+	}
+	value->atom = atom;
+	return value;
+}
+
+static Ast create_interpolated_string_ast(Parser *par, SourceSite site, Ast_Array parts)
+{
+	ASSERT(parts.count >= 3);
+	ASSERT((parts.count & 1) != 0);
+	Ast value = ast_new(par, site, AST_INTERPOLATED_STRING);
+	if (ast_is_error(value)) {
+		return value;
+	}
+	value->interpolated_string = parts;
+	return value;
+}
+
+static Ast ast_new_import(Parser *par, SourceSite site, Atom *path)
+{
+	Ast value = ast_new_nullary_expr(par, site, AST_IMPORT);
+	if (ast_is_error(value)) {
+		return value;
+	}
+	value->import.path = path;
+	return value;
+}
+
+static Ast create_table_ast(Parser *par, SourceSite site, Ast_Array args)
+{
+	Ast tree = ast_new(par, site, AST_TABLE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->table = args;
+	return tree;
+}
+
+static Ast create_array_ast(Parser *par, SourceSite site, Ast_Array items)
+{
+	Ast tree = ast_new(par, site, AST_ARRAY);
+	if (ast_is_error(tree))
+	{
+		return tree;
+	}
+	tree->array = items;
+	return tree;
+}
+
+static Ast create_table_entry_ast(Parser *par, SourceSite site, Ast key, Ast value)
+{
+	if (ast_is_error(key)) {
+		return key;
+	}
+	if (ast_is_error(value)) {
+		return value;
+	}
+	Ast tree = ast_new(par, site, AST_TABLE_ENTRY);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->table_entry.key = key;
+	tree->table_entry.value = value;
+	return tree;
+}
+
+static Ast create_tuple_ast(Parser *par, SourceSite site, Ast_Array args)
+{
+	ASSERT(args.count >= 1);
+	Ast tree = ast_new(par, site, AST_TUPLE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->tuple = args;
+	return tree;
+}
+
+static Ast create_ellipsis_ast(Parser *par, SourceSite site)
+{
+	Ast tree = ast_new(par, site, AST_ELLIPSIS);
+	return tree;
+}
+
+static Ast ast_new_measure_intrin(Parser *par, SourceSite site, Ast x)
+{
+	return ast_new_unary_expr(par, site, AST_MEASURE, x);
+}
+
+static Ast create_get_mem_ast(Parser *par, SourceSite site, Ast x)
+{
+	return ast_new_unary_expr(par, site, AST_GET_MEM, x);
+}
+
+static Ast create_index_ast(Parser *par, SourceSite site, Ast x, Ast y)
+{
+	return ast_new_binary_expr(par, site, AST_INDEX, x, y);
+}
+
+static Ast create_field_ast(Parser *par, SourceSite site, Ast x, Ast y)
+{
+	return ast_new_binary_expr(par, site, AST_FIELD, x, y);
+}
+
+static Ast create_range_index_ast(Parser *par, SourceSite site, Ast x, Ast y)
+{
+	return ast_new_binary_expr(par, site, AST_RANGE_INDEX, x, y);
+}
+
+static Ast create_meta_field_ast(Parser *par, SourceSite site, Ast x, Ast y)
+{
+	return ast_new_binary_expr(par,site,AST_META_FIELD,x,y);
+}
+
+static Ast create_if_ast(Parser *par, SourceSite site, Ast pred, Ast true_clause, Ast else_clause)
+{
+	if (ast_is_error(pred)) {
+		return pred;
+	}
+	if (ast_is_error(true_clause)) {
+		return true_clause;
+	}
+	if (ast_is_error(else_clause)) {
+		return else_clause;
+	}
+	Ast value = ast_new(par, site, AST_IF);
+	if (ast_is_error(value)) {
+		return value;
+	}
+	value->if_stat.pred = pred;
+	value->if_stat.true_clause = true_clause;
+	value->if_stat.else_clause = else_clause;
+	return value;
+}
+
+static Ast create_ident_ast(Parser *par, SourceSite site, Atom *atom)
+{
+	Ast tree = ast_new(par, site, AST_IDENT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->atom = atom;
+	return tree;
+}
+
+static Ast create_assign_ast(Parser *par, SourceSite site, Ast x, Ast y)
+{
+	if (ast_is_error(x)) {
+		return x;
+	}
+	if (ast_is_error(y)) {
+		return y;
+	}
+	Ast tree = ast_new(par, site, AST_ASSIGN);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->binary.x = x;
+	tree->binary.y = y;
+	return tree;
+}
+
+static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array args)
+{
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_CALL);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->call.expr = expr;
+	tree->call.args = args;
+	return tree;
+}
+
+static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
+{
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_NAMED_ARGUMENT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->named_argument.name = name;
+	tree->named_argument.expr = expr;
+	return tree;
+}
+
+static Ast create_return_ast(Parser *par, SourceSite site, Ast expr)
+{
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_RETURN);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->return_stat.expr = expr;
+	return tree;
+}
+
+static Ast create_block_ast(Parser *par, SourceSite site, Ast_Array stats)
+{
+	Ast tree = ast_new(par, site, AST_BLOCK_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->block = stats;
+	return tree;
+}
+
+static Ast create_while_ast(Parser *par, SourceSite site, Ast pred, Ast body)
+{
+	if (ast_is_error(pred)) {
+		return pred;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
+	Ast tree = ast_new(par, site, AST_WHILE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->while_stat.pred = pred;
+	tree->while_stat.body = body;
+	return tree;
+}
+
+static Ast create_for_ast(Parser *par, SourceSite site, Ast init, Ast pred, Ast step, Ast body)
+{
+	if (ast_is_error(init)) {
+		return init;
+	}
+	if (ast_is_error(pred)) {
+		return pred;
+	}
+	if (ast_is_error(step)) {
+		return step;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
+	Ast tree = ast_new(par, site, AST_FOR);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->for_stat.init = init;
+	tree->for_stat.pred = pred;
+	tree->for_stat.step = step;
+	tree->for_stat.body = body;
+	return tree;
+}
+
+static Ast create_for_range_ast(Parser *par, SourceSite site, Ast decl, Ast body)
+{
+	if (ast_is_error(decl)) {
+		return decl;
+	}
+	if (ast_is_error(body)) {
+		return body;
+	}
+	Ast tree = ast_new(par, site, AST_FOR_RANGE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->for_range_stat.decl = decl;
+	tree->for_range_stat.body = body;
+	return tree;
+}
+
+static Ast create_defer_ast(Parser *par, SourceSite site, Ast body)
+{
+	if (ast_is_error(body)) {
+		return body;
+	}
+	Ast tree = ast_new(par, site, AST_DEFER_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->defer_stat.body = body;
+	return tree;
+}
+
+static Ast create_decl_ast(Parser *par, SourceSite site, b32 constant, Ast name, Ast expr)
+{
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_DECL_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->decl.constant = constant;
+	tree->decl.name = name;
+	tree->decl.expr = expr;
+	return tree;
+}
+
+static Ast ast_new_static_decl(Parser *par, SourceSite site, Ast name, Ast expr, b32 exported)
+{
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_STATIC_DECL);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	ASSERT(expr);
+	ASSERT(!expr->is_static);
+	expr->is_static = true;
+
+	tree->static_decl.exported = exported;
+	tree->static_decl.name = name;
+	tree->static_decl.expr = expr;
+	return tree;
+}
+
+static Ast create_break_ast(Parser *par, SourceSite site, Ast expr)
+{
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_BREAK);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->break_stat.expr = expr;
+	return tree;
+}
+
+static Ast create_continue_ast(Parser *par, SourceSite site, Ast expr)
+{
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_CONTINUE);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->continue_stat.expr = expr;
+	return tree;
+}
+
+static Ast create_function_ast(Parser *par, SourceSite site, Ast parent)
+{
+	ASSERT(!parent || parent->kind == AST_FUNCTION);
+	Ast tree = ast_new(par, site, AST_FUNCTION);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->function.parent = parent;
+	return tree;
+}
+
+static Ast create_param_ast(Parser *par, SourceSite site, Ast name, Ast type, Ast expr)
+{
+	if (ast_is_error(name)) {
+		return name;
+	}
+	if (ast_is_error(type)) {
+		return type;
+	}
+	if (ast_is_error(expr)) {
+		return expr;
+	}
+	Ast tree = ast_new(par, site, AST_DECL_STAT);
+	if (ast_is_error(tree)) {
+		return tree;
+	}
+	tree->decl.name = name;
+	tree->decl.type = type;
+	tree->decl.expr = expr;
+	return tree;
+}
+
 static Ast parse_unary_expr(Parser *parser);
 static Ast parse_expr(Parser *parser);
 static Ast parse_subexpr(Parser *parser, u32 rank);
@@ -15,8 +553,6 @@ static Ast parse_ident_expr(Parser *parser);
 static Ast parse_call_argument(Parser *parser);
 static Ast parse_stat(Parser *parser);
 static Ast parse_if_stat(Parser *parser);
-static Ast parse_json_ast(Parser *parser);
-static Ast parse_jsonl_ast(Parser *parser);
 static Ast parse_json_ast_value(Parser *parser);
 static Ast parse_call_expr(Parser *parser, Ast callee, SourceSite site);
 static Token consume_token(Parser *parser);
@@ -607,6 +1143,292 @@ static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token toke
 	}
 
 	return ast_new_integer_literal(parser, sign.site, value);
+}
+
+static b32 json_token_is_null(Token token)
+{
+	return token.type == TOK_IDENTIFIER && strcmp(atom_data(token.atom), "null") == 0;
+}
+
+static Ast json_expect_separator_or_end(Parser *parser, Token_Type end, const char *message, b32 *done)
+{
+	if (pick_token(parser, end))
+	{
+		*done = true;
+		return NULL_AST;
+	}
+
+	if (!pick_token(parser, TOK_COMMA))
+	{
+		*done = true;
+		if (token_is_error(parser_current_token(parser))) {
+			return ast_from_token_error(parser_current_token(parser));
+		}
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, message);
+	}
+	return NULL_AST;
+}
+
+static Ast parse_json_ast_object(Parser *parser)
+{
+	Token start = take_token(parser, TOK_LEFT_BRACE);
+	if (token_is_error(start)) {
+		return ast_from_token_error(start);
+	}
+
+	u32 nargs = 0;
+	if (pick_token(parser, TOK_RIGHT_BRACE))
+	{
+		Ast table = create_table_ast(parser, start.site, (Ast_Array) {});
+		if (ast_is_error(table)) {
+			return table;
+		}
+		return table;
+	}
+
+	b32 done = false;
+	while (!done && !peek_token(parser, TOK_NONE))
+	{
+		Token key_token = take_token(parser, TOK_STRING);
+		if (token_is_error(key_token)) {
+			return ast_from_token_error(key_token);
+		}
+		Ast key = ast_new_string_literal(parser, key_token.site, key_token.atom);
+		if (ast_is_error(key)) {
+			return key;
+		}
+
+		Token colon = take_token(parser, TOK_COLON);
+		if (token_is_error(colon)) {
+			return ast_from_token_error(colon);
+		}
+
+		Ast value = parse_json_ast_value(parser);
+		if (ast_is_error(value))
+		{
+			return value;
+		}
+
+		Ast entry = create_table_entry_ast(parser, key_token.site, key, value);
+		if (ast_is_error(entry)) {
+			return entry;
+		}
+		if (!push_ast(parser, entry)) {
+			return ERROR_OOM_AST;
+		}
+		nargs += 1;
+
+		Ast separator_error = json_expect_separator_or_end(parser, TOK_RIGHT_BRACE, "expected ',' or '}'", &done);
+		if (separator_error) {
+			return separator_error;
+		}
+	}
+	if (!done)
+	{
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, "expected '}'");
+	}
+
+	Ast_Array args = pop_ast_array(parser, nargs);
+	if (args.count && !args.items) {
+		return ERROR_OOM_AST;
+	}
+	Ast table = create_table_ast(parser, start.site, args);
+	if (ast_is_error(table)) {
+		return table;
+	}
+	return table;
+}
+
+static Ast parse_json_ast_array(Parser *parser)
+{
+	Token start = take_token(parser, TOK_SQUARE_LEFT);
+	if (token_is_error(start)) {
+		return ast_from_token_error(start);
+	}
+
+	u32 nargs = 0;
+	if (pick_token(parser, TOK_SQUARE_RIGHT))
+	{
+		return create_array_ast(parser, start.site, (Ast_Array) {});
+	}
+
+	b32 done = false;
+	while (!done && !peek_token(parser, TOK_NONE))
+	{
+		Ast value = parse_json_ast_value(parser);
+		if (ast_is_error(value))
+		{
+			return value;
+		}
+
+		if (!push_ast(parser, value)) {
+			return ERROR_OOM_AST;
+		}
+		nargs += 1;
+
+		Ast separator_error = json_expect_separator_or_end(parser, TOK_SQUARE_RIGHT, "expected ',' or ']'", &done);
+		if (separator_error) {
+			return separator_error;
+		}
+	}
+	if (!done)
+	{
+		return parser_error(parser, ERROR_EXPECTED_TOKEN, parser_current_token(parser).site, "expected ']'");
+	}
+
+	Ast_Array args = pop_ast_array(parser, nargs);
+	if (args.count && !args.items) {
+		return ERROR_OOM_AST;
+	}
+	return create_array_ast(parser, start.site, args);
+}
+
+static Ast parse_json_ast_number(Parser *parser)
+{
+	Token sign = {};
+	b32 is_negative = false;
+	if (peek_token(parser, TOK_SUB))
+	{
+		sign = consume_token(parser);
+		is_negative = true;
+	}
+
+	Token token = parser_current_token(parser);
+	switch (token.type)
+	{
+		case TOK_ERROR:
+		{
+			return ast_from_token_error(token);
+		}
+
+		case TOK_INTEGER:
+		{
+			consume_token(parser);
+			if (is_negative) {
+				return parse_negative_integer_literal(parser, sign, token);
+			}
+			return parse_positive_integer_literal(parser, token);
+		}
+
+		case TOK_NUMBER:
+		{
+			consume_token(parser);
+			f64 value = token.number;
+			return ast_new_number_literal(parser, is_negative ? sign.site : token.site, is_negative ? -value : value);
+		}
+
+		default:
+		{
+			return parser_error(parser, ERROR_EXPECTED_TOKEN, token.site, "expected number");
+		}
+	}
+}
+
+static Ast parse_json_ast_value(Parser *parser)
+{
+	Token token = parser_current_token(parser);
+
+	switch (token.type)
+	{
+		case TOK_ERROR:
+		{
+			return ast_from_token_error(token);
+		}
+
+		case TOK_LEFT_BRACE:
+		{
+			return parse_json_ast_object(parser);
+		}
+
+		case TOK_SQUARE_LEFT:
+		{
+			return parse_json_ast_array(parser);
+		}
+
+		case TOK_STRING:
+		{
+			consume_token(parser);
+			return ast_new_string_literal(parser, token.site, token.atom);
+		}
+
+		case TOK_INTEGER:
+		case TOK_NUMBER:
+		case TOK_SUB:
+		{
+			return parse_json_ast_number(parser);
+		}
+
+		case TOK_TRUE:
+		{
+			consume_token(parser);
+			return ast_new_integer_literal(parser, token.site, 1);
+		}
+
+		case TOK_FALSE:
+		{
+			consume_token(parser);
+			return ast_new_integer_literal(parser, token.site, 0);
+		}
+
+		default:
+		{
+			if (json_token_is_null(token))
+			{
+				consume_token(parser);
+				return ast_new_nil_literal(parser, token.site);
+			}
+
+			return parser_error(parser, ERROR_INVALID_EXPRESSION, token.site, "expected JSON value");
+		}
+	}
+}
+
+static Ast parse_json_ast(Parser *parser)
+{
+	Ast ast = parse_json_ast_value(parser);
+	if (ast_is_error(ast)) {
+		return ast;
+	}
+	if (!peek_token(parser, TOK_NONE))
+	{
+		return parser_unexpected_token(parser, parser_current_token(parser));
+	}
+	return ast;
+}
+
+static Ast parse_jsonl_ast(Parser *parser)
+{
+	u32 count = 0;
+	SourceSite site = parser_current_token(parser).site;
+	while (!peek_token(parser, TOK_NONE))
+	{
+		u32 line_index = parser_current_token(parser).site.line_index;
+		Ast value = parse_json_ast_value(parser);
+		if (ast_is_error(value))
+		{
+			return value;
+		}
+		if (parser_previous_token(parser).site.line_index != line_index)
+		{
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
+		}
+		if (!peek_token(parser, TOK_NONE) && parser_current_token(parser).site.line_index == line_index)
+		{
+			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, parser_current_token(parser).site, "expected a line break after JSON value");
+		}
+		if (!push_ast(parser, value))
+		{
+			return ERROR_OOM_AST;
+		}
+		count += 1;
+	}
+
+	Ast_Array values = pop_ast_array(parser, count);
+	if (values.count && !values.items)
+	{
+		return ERROR_OOM_AST;
+	}
+	return create_array_ast(parser, site, values);
 }
 
 static Ast parse_interpolated_string(Parser *parser)

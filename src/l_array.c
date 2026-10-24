@@ -27,6 +27,92 @@ static b32 array_normalize_index(elf_State *state, i64 index, u32 length, b32 al
 	return true;
 }
 
+static void array_remove(elf_State *state, elf_Array *array, u32 index, u32 count)
+{
+	array_check_write(state, array);
+	if (index > array->count || count > array->count - index)
+	{
+		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array range out of bounds: index %u, count %u, length %u", index, count, array->count);
+	}
+
+	if (count != 0)
+	{
+		u32 tail_count = array->count - index - count;
+		memmove(array->items + index, array->items + index + count, (u64)tail_count * sizeof(*array->items));
+		array->count -= count;
+		value_zero_many(array->items + array->count, count);
+	}
+}
+
+static void array_splice(elf_State *state, elf_Array *array, u32 index, u32 delete_count, elf_Array *replacement)
+{
+	array_check_write(state, array);
+	if (index > array->count || delete_count > array->count - index)
+	{
+		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array splice range is out of bounds");
+	}
+	u32 insert_count = replacement->count;
+	u32 count_after_delete = array->count - delete_count;
+	if (insert_count > UINT32_MAX - count_after_delete)
+	{
+		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array size exceeds the supported range");
+	}
+
+	elf_Value *insert_items = replacement->items;
+	elf_Value *insert_copy = 0;
+	if (replacement == array && insert_count)
+	{
+		u64 insert_size = (u64)insert_count * sizeof(*insert_copy);
+		insert_copy = elf_alloc(state, insert_size);
+		if (!insert_copy) {
+			report_runtime_error(state, ERROR_OUT_OF_MEMORY, "could not allocate %u values for array splice", insert_count);
+		}
+		copy_memory(insert_copy, insert_items, insert_size);
+		insert_items = insert_copy;
+	}
+
+	u32 old_count = array->count;
+	u32 new_count = count_after_delete + insert_count;
+	array_reserve(state, array, new_count);
+	u32 tail_count = old_count - index - delete_count;
+	if (tail_count) {
+		memmove(array->items + index + insert_count, array->items + index + delete_count, (u64)tail_count * sizeof(*array->items));
+	}
+	if (insert_count) {
+		copy_memory(array->items + index, insert_items, (u64)insert_count * sizeof(*array->items));
+	}
+	if (new_count < old_count) {
+		value_zero_many(array->items + new_count, old_count - new_count);
+	}
+	array->count = new_count;
+	elf_free(state, insert_copy, insert_copy ? (u64)insert_count * sizeof(*insert_copy) : 0);
+}
+
+static u32 array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value value)
+{
+	array_check_write(state, array);
+	if (index > array->count)
+	{
+		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array insert index %u is out of bounds for length %u", index, array->count);
+	}
+
+	array_reserve(state, array, array->count + 1);
+	memmove(array->items + index + 1, array->items + index, (u64)(array->count - index) * sizeof(*array->items));
+	array->items[index] = value;
+	array->count += 1;
+	return index;
+}
+
+static void array_swap(elf_State *state, elf_Array *array, u32 left, u32 right)
+{
+	array_check_write(state, array);
+	elf_Value *left_slot = array_slot(state, array, left);
+	elf_Value *right_slot = array_slot(state, array, right);
+	elf_Value temporary = *left_slot;
+	*left_slot = *right_slot;
+	*right_slot = temporary;
+}
+
 static elf_Value array_call(elf_State *state, elf_Value function, elf_Array *receiver, elf_Value a, elf_Value b, b32 pass_b)
 {
 	push_value(state, function);
@@ -95,7 +181,7 @@ ELF_FUNCTION(l_array_insert)
 	{
 		return 0;
 	}
-	elf_array_insert(S, array, index, load_value(S, 2));
+	array_insert(S, array, index, load_value(S, 2));
 	push_array(S, array);
 	return 1;
 }
@@ -111,7 +197,7 @@ ELF_FUNCTION(l_array_pop)
 	else
 	{
 		elf_Value value = array->items[array->count - 1];
-		elf_array_remove(S, array, array->count - 1, 1);
+		array_remove(S, array, array->count - 1, 1);
 		push_value(S, value);
 	}
 	return 1;
@@ -140,7 +226,7 @@ ELF_FUNCTION(l_array_remove)
 	}
 
 	elf_Value first = array->items[index];
-	elf_array_remove(S, array, index, count);
+	array_remove(S, array, index, count);
 	push_value(S, first);
 	return 1;
 }
@@ -161,7 +247,7 @@ ELF_FUNCTION(l_array_splice)
 	}
 	elf_Value replacement_value = load_value(S, 3);
 	check_value_type(S, replacement_value, ELF_VALUE_TYPE_ARRAY);
-	elf_array_splice(S, array, index, (u32)requested, value_as_array(replacement_value));
+	array_splice(S, array, index, (u32)requested, value_as_array(replacement_value));
 	push_array(S, array);
 	return 1;
 }
@@ -238,7 +324,7 @@ ELF_FUNCTION(l_array_swap)
 	{
 		return 0;
 	}
-	elf_array_swap(S, array, left, right);
+	array_swap(S, array, left, right);
 	push_array(S, array);
 	return 1;
 }
@@ -249,7 +335,7 @@ ELF_FUNCTION(l_array_reverse)
 	elf_Array *array = array_receiver(S);
 	for (u32 i = 0; i < array->count / 2; ++i)
 	{
-		elf_array_swap(S, array, i, array->count - i - 1);
+		array_swap(S, array, i, array->count - i - 1);
 	}
 	push_array(S, array);
 	return 1;
@@ -309,11 +395,11 @@ static void array_quicksort(elf_State *state, elf_Value function, elf_Array *arr
 			i64 order = array_compare(state, function, array, array->items[i], pivot);
 			if (order < 0)
 			{
-				elf_array_swap(state, array, i++, lower++);
+				array_swap(state, array, i++, lower++);
 			}
 			else if (order > 0)
 			{
-				elf_array_swap(state, array, i, upper--);
+				array_swap(state, array, i, upper--);
 			}
 			else
 			{

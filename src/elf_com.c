@@ -23,7 +23,6 @@
 #include "token.h"
 #include "atom.c"
 #include "ast.h"
-#include "parser.h"
 #include "entity.h"
 #include "ir.h"
 
@@ -37,9 +36,7 @@ static elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols,
 #include "logging.c"
 #include "source_diagnostics.c"
 #include "lexer.c"
-#include "ast.c"
 #include "parser.c"
-#include "parse_json.c"
 #include "entity.c"
 #include "checker.c"
 #include "ir_emitter.c"
