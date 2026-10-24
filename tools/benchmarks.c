@@ -8,7 +8,6 @@
 
 #include "base.h"
 #include "elf_core.h"
-#include "compiler.h"
 
 static volatile elf_Int bench_integer_sink;
 static volatile elf_Num bench_number_sink;
@@ -84,7 +83,7 @@ static double bench_median(double *samples, u32 count)
 	return samples[count / 2];
 }
 
-static elf_Ref bench_compile_program(elf_State *state, elf_SymTable *symbols, const char *name, const char *source)
+static elf_Ref bench_compile_program(elf_State *state, elf_SymTable *symbols, elf_StrSlice name, const char *source)
 {
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 	bench_require(elf_push_code_source(state, symbols, name, text) == ELF_ERROR_NONE, "could not compile benchmark source");
@@ -148,7 +147,8 @@ static void bench_vm_integer_program(const char *name, const char *source, u32 i
 	elf_SymTable *symbols = 0;
 	bench_require(elf_sym_create(&symbols) == ELF_ERROR_NONE, "could not create benchmark symbols");
 	bench_require(elf_sym_int(symbols, ELF_LIT("benchmark_global"), 1) == ELF_ERROR_NONE, "could not install benchmark symbol");
-	elf_Ref program = bench_compile_program(state, symbols, name, source);
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	elf_Ref program = bench_compile_program(state, symbols, source_name, source);
 	elf_sym_destroy(symbols);
 	bench_run_integer_program(state, program, iterations, expected, 0);
 
@@ -175,7 +175,8 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];
 	elf_State *state = elf_create_state();
-	elf_Ref program = bench_compile_program(state, 0, name, source);
+	elf_StrSlice source_name = {(char *)name, strlen(name)};
+	elf_Ref program = bench_compile_program(state, 0, source_name, source);
 	bench_run_number_program(state, program, iterations, expected, 0);
 
 	u64 instruction_count = 0;
@@ -213,7 +214,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	for (u32 i = 0; i < iterations; ++i)
 	{
 		u32 first_prototype = state->prototype_count;
-		bench_require(elf_push_code_source(state, 0, "benchmark.compile", text) == ELF_ERROR_NONE, "could not compile benchmark source");
+		bench_require(elf_push_code_source(state, 0, ELF_LIT("benchmark.compile"), text) == ELF_ERROR_NONE, "could not compile benchmark source");
 		elf_Prototype *entry = value_as_closure(state->stack_ptr[-1])->prototype;
 		bench_require(entry == state->prototypes[first_prototype], "compile entry is not the first new prototype");
 		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
@@ -248,11 +249,8 @@ static void bench_compile_and_load_modules(const char *source, u32 iterations)
 	i64 start = bench_now();
 	for (u32 i = 0; i < iterations; ++i)
 	{
-		Scratch scratch = scratch_begin();
-		elf_StrSlice name = {(char *)"benchmark.module", sizeof("benchmark.module") - 1};
-		elf_Prototype *entry = compiler_compile(state, 0, scratch.arena, name, text);
-		bench_require(entry != 0, "could not compile benchmark module");
-		scratch_end(scratch);
+		bench_require(elf_push_code_source(state, 0, ELF_LIT("benchmark.module"), text) == ELF_ERROR_NONE, "could not compile benchmark module");
+		elf_pop(state, 1);
 	}
 	double seconds = bench_elapsed_s(start);
 
@@ -266,14 +264,14 @@ static void bench_representative_elf_workload(void)
 	double samples[SAMPLE_COUNT];
 	elf_State *state = elf_create_state();
 
-	bench_require(elf_push_code_file(state, 0, "tools/benchmark_game_loop.elf"),
+	bench_require(elf_push_code_file(state, 0, ELF_LIT("tools/benchmark_game_loop.elf")),
 		"could not compile representative Elf workload");
 	elf_pop(state, 1);
 
 	for (u32 i = 0; i < SAMPLE_COUNT; ++i)
 	{
 		i64 start = bench_now();
-		bench_require(elf_push_code_file(state, 0, "tools/benchmark_game_loop.elf"),
+		bench_require(elf_push_code_file(state, 0, ELF_LIT("tools/benchmark_game_loop.elf")),
 			"could not compile representative Elf workload");
 		samples[i] = bench_elapsed_s(start);
 		if (i + 1 < SAMPLE_COUNT) {

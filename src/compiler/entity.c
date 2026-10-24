@@ -2,27 +2,19 @@
 // See Copyright Notice In elf.h
 //
 
-#include <dy.h>
-
-#include "elf.h"
-#include "base.h"
-#include "atom_view.h"
-#include "entity.h"
-#include "ast.h"
-
-Entity entity_error_sentinel =
+static Entity entity_error_sentinel =
 {
 	.kind = ENTITY_ERROR,
 	.status = COM_STATUS_REPORTED,
 };
 
-Entity entity_oom_sentinel =
+static Entity entity_oom_sentinel =
 {
 	.kind = ENTITY_ERROR,
 	.status = COM_STATUS_OOM,
 };
 
-b32 entity_is_constant(const Entity *entity)
+static b32 entity_is_constant(const Entity *entity)
 {
 	ASSERT(entity);
 	b32 result = entity->kind == ENTITY_STATIC;
@@ -36,7 +28,7 @@ b32 entity_is_constant(const Entity *entity)
 	return result;
 }
 
-b32 entity_is_exported(const Entity *entity)
+static b32 entity_is_exported(const Entity *entity)
 {
 	ASSERT(entity);
 	b32 result = false;
@@ -50,7 +42,7 @@ b32 entity_is_exported(const Entity *entity)
 	return result;
 }
 
-Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
+static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
 {
 	ASSERT(!parent || kind == SCOPE_SOURCE || parent->source == source);
 	Scope *scope = arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
@@ -65,7 +57,7 @@ Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *o
 	return scope;
 }
 
-Entity *scope_find_current(Scope *scope, Atom *name)
+static Entity *scope_find_current(Scope *scope, Atom *name)
 {
 	for (u32 i = 0; i < scope->count; ++i)
 	{
@@ -77,7 +69,7 @@ Entity *scope_find_current(Scope *scope, Atom *name)
 	return 0;
 }
 
-Entity *scope_find(Scope *scope, Atom *name)
+static Entity *scope_find(Scope *scope, Atom *name)
 {
 	for (Scope *current = scope; current; current = current->parent)
 	{
@@ -89,7 +81,7 @@ Entity *scope_find(Scope *scope, Atom *name)
 	return 0;
 }
 
-Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name, b32 *created)
+static Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name, b32 *created)
 {
 	ASSERT(kind != ENTITY_ERROR);
 	ASSERT(created);

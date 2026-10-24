@@ -6,13 +6,13 @@
 // README: use ast_new_ *** _expr naming convention
 // README: use ast_new_ *** _stat naming convention
 
-Ast_T ast_error_sentinel =
+static Ast_T ast_error_sentinel =
 {
 	.kind = AST_ERROR,
 	.status = COM_STATUS_REPORTED,
 };
 
-Ast_T ast_error_oom_sentinel =
+static Ast_T ast_error_oom_sentinel =
 {
 	.kind = AST_ERROR,
 	.status = COM_STATUS_OOM,

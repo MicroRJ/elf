@@ -75,7 +75,8 @@ static VmRunResult vm_test_run_file(const char *path)
 {
 	elf_State *state = elf_create_state();
 	elf_SymTable *symbols = vm_test_symbols();
-	elf_push_code_file(state, symbols, path);
+	elf_StrSlice source_path = {(char *)path, strlen(path)};
+	elf_push_code_file(state, symbols, source_path);
 	elf_sym_destroy(symbols);
 	elf_push_nil(state);
 	elf_call(state, 1, 1);
@@ -115,7 +116,7 @@ static void test_vm_pads_missing_returns(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "ret 11, 22";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, "missing-returns", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, ELF_LIT("missing-returns"), source) != ELF_ERROR_NONE)
 	{
 		test_fail("missing-return test source compiles");
 		elf_destroy_state(state);
@@ -146,7 +147,7 @@ static void test_vm_discards_excess_returns(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "ret 11, 22";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, "excess-returns", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, ELF_LIT("excess-returns"), source) != ELF_ERROR_NONE)
 	{
 		test_fail("excess-return test source compiles");
 		elf_destroy_state(state);
@@ -250,7 +251,7 @@ static void test_vm_symbols(void)
 	elf_ErrorCode function_error = elf_sym_fun(host, ELF_LIT("get"), vm_test_symbol_function);
 	elf_ErrorCode host_error = elf_sym_tab(symbols, ELF_LIT("host"), host);
 	char source_text[] = "ret host.answer + host.get()";
-	elf_ErrorCode compile_error = elf_push_code_source(state, symbols, "symbols", (elf_StrSlice) {source_text, sizeof(source_text) - 1});
+	elf_ErrorCode compile_error = elf_push_code_source(state, symbols, ELF_LIT("symbols"), (elf_StrSlice) {source_text, sizeof(source_text) - 1});
 	if (create_symbols_error != ELF_ERROR_NONE || create_host_error != ELF_ERROR_NONE || answer_error != ELF_ERROR_NONE || function_error != ELF_ERROR_NONE || host_error != ELF_ERROR_NONE || compile_error != ELF_ERROR_NONE)
 	{
 		test_fail("VM compiles environment symbols");
@@ -303,7 +304,7 @@ static void test_vm_static_function(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "answer :: fun() { ret 42 }\nret answer()";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, "static-function", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, ELF_LIT("static-function"), source) != ELF_ERROR_NONE)
 	{
 		test_fail("static function source compiles");
 		elf_destroy_state(state);
@@ -323,7 +324,7 @@ static void test_vm_static_recurse_function(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\nret count(3)";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, "static-recurse-function", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, ELF_LIT("static-recurse-function"), source) != ELF_ERROR_NONE)
 	{
 		test_fail("static recurse function source compiles");
 		elf_destroy_state(state);
@@ -346,7 +347,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_StrSlice first_source = {first_source_text, sizeof(first_source_text) - 1};
 	elf_StrSlice second_source = {second_source_text, sizeof(second_source_text) - 1};
 
-	if (elf_push_code_source(state, 0, "first", first_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, ELF_LIT("first"), first_source) != ELF_ERROR_NONE) {
 		test_fail("first closure module compiles");
 		elf_destroy_state(state);
 		return;
@@ -363,7 +364,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
-	if (elf_push_code_source(state, 0, "second", second_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, ELF_LIT("second"), second_source) != ELF_ERROR_NONE) {
 		test_fail("second closure module compiles");
 		elf_destroy_state(state);
 		return;
@@ -457,7 +458,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	elf_State *state = elf_create_state();
 	char callback_source_text[] = "ret 41";
 	elf_StrSlice callback_source = {callback_source_text, sizeof(callback_source_text) - 1};
-	if (elf_push_code_source(state, 0, "nested-callback", callback_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, ELF_LIT("nested-callback"), callback_source) != ELF_ERROR_NONE) {
 		test_fail("nested callback compiles");
 		elf_destroy_state(state);
 		return;
@@ -479,7 +480,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 
 	char caller_source_text[] = "ret context_probe()";
 	elf_StrSlice caller_source = {caller_source_text, sizeof(caller_source_text) - 1};
-	if (elf_push_code_source(state, symbols, "nested-caller", caller_source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, symbols, ELF_LIT("nested-caller"), caller_source) != ELF_ERROR_NONE) {
 		test_fail("nested caller compiles");
 		elf_sym_destroy(symbols);
 		elf_release_ref(state, context.callback);
@@ -514,7 +515,7 @@ static int vm_run_runtime_error_diagnostic_child(void)
 		"}\n"
 		"outer({ first = 1, second = 2, third = 3, expected_tail = 4 })";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, "diagnostic-stack", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, ELF_LIT("diagnostic-stack"), source) != ELF_ERROR_NONE)
 	{
 		elf_destroy_state(state);
 		return 2;
@@ -621,7 +622,7 @@ static void test_vm_module_emitter_grows_constant_arrays(void)
 
 	elf_State *state = elf_create_state();
 	elf_StrSlice source_slice = {source, used};
-	if (elf_push_code_source(state, 0, "constant-growth", source_slice) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, ELF_LIT("constant-growth"), source_slice) != ELF_ERROR_NONE) {
 		test_fail("module growth source compiles");
 		elf_destroy_state(state);
 		return;
@@ -645,7 +646,7 @@ static void test_vm_module_converts_atom_constants(void)
 	elf_State *state = elf_create_state();
 	char source_text[] = "ret [\"same\", \"same\", \"other\"]";
 	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, "module-strings", source) != ELF_ERROR_NONE) {
+	if (elf_push_code_source(state, 0, ELF_LIT("module-strings"), source) != ELF_ERROR_NONE) {
 		test_fail("module string source compiles");
 		elf_destroy_state(state);
 		return;

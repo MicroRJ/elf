@@ -5,12 +5,6 @@
 #ifndef ELF_COMPILER_PARSER_H
 #define ELF_COMPILER_PARSER_H
 
-#include "base.h"
-#include "atom.h"
-#include "compiler.h"
-#include "token.h"
-#include "ast.h"
-
 #define NO_LINE (0)
 
 typedef struct Parser Parser;
@@ -32,11 +26,11 @@ struct Parser
 	Ast_List             imports;
 };
 
-b32 parser_init(Parser *parser);
-void parser_destroy(Parser *parser);
-Ast parser_parse_source(Parser *parser, Com_Source *source);
-Ast parser_parse_constant_expr(Parser *parser, Com_Source *source);
-Ast parser_parse_json(Parser *parser, Com_Source *source);
-Ast parser_parse_jsonl(Parser *parser, Com_Source *source);
+static b32 parser_init(Parser *parser);
+static void parser_destroy(Parser *parser);
+static Ast parser_parse_source(Parser *parser, Com_Source *source);
+static Ast parser_parse_constant_expr(Parser *parser, Com_Source *source);
+static Ast parser_parse_json(Parser *parser, Com_Source *source);
+static Ast parser_parse_jsonl(Parser *parser, Com_Source *source);
 
 #endif

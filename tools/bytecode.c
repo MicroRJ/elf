@@ -5,7 +5,6 @@
 #include <dy.h>
 #include "base.h"
 #include "elf_core.h"
-#include "compiler.h"
 #include "bytecode.h"
 
 static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *source)
@@ -36,13 +35,13 @@ static b32 read_source_file(elf_State *state, const char *path, elf_StrSlice *so
 	return 1;
 }
 
-static elf_Prototype *compile_source(elf_State *state, const char *name, elf_StrSlice source)
+static elf_Prototype *compile_source(elf_State *state, elf_StrSlice name, elf_StrSlice source)
 {
-	Scratch scratch = scratch_begin();
-	elf_StrSlice source_name = {(char *)name, strlen(name)};
-	elf_Prototype *entry = compiler_compile(state, 0, scratch.arena, source_name, source);
-	scratch_end(scratch);
-	return entry;
+	if (elf_push_code_source(state, 0, name, source) != ELF_ERROR_NONE)
+	{
+		return 0;
+	}
+	return value_as_closure(state->stack_ptr[-1])->prototype;
 }
 
 int main(int argc, char **argv)
@@ -68,7 +67,8 @@ int main(int argc, char **argv)
 	}
 
 	u32 first_prototype = state->prototype_count;
-	elf_Prototype *entry = compile_source(state, path, source);
+	elf_StrSlice source_path = {(char *)path, strlen(path)};
+	elf_Prototype *entry = compile_source(state, source_path, source);
 	if (!entry)
 	{
 		elf_destroy_state(state);

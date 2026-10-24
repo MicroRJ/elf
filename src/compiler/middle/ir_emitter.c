@@ -2,18 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include <dy.h>
-
-#include "elf.h"
-#include "base.h"
-#include "atom_view.h"
-#include "compiler.h"
-#include "entity.h"
-#include "ir.h"
-#include "ast.h"
-#include "ir_emitter.h"
-#include "token.h"
-
 typedef struct IrEmitter IrEmitter;
 typedef struct IrDefer IrDefer;
 
@@ -1633,7 +1621,7 @@ static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast
 	return definition;
 }
 
-IrModule *ir_emit_module(Com_Source *source)
+static IrModule *ir_emit_module(Com_Source *source)
 {
 	ASSERT(source);
 	Compiler *compiler = source->compiler;

@@ -14,6 +14,7 @@
 #include "elf.h"
 #include "base.h"
 #include "libs.h"
+#include "lib_com.h"
 
 #include "logging.c"
 
@@ -179,6 +180,7 @@ elf_State *elf_create_state()
 	bootstrap_state(state);
 	elf_SymTable *elf_symbols = bootstrap_symbols(state);
 	elf_open_libraries(state, elf_symbols);
+	elf_com_open_libs(state, elf_symbols);
 
 	return state;
 }

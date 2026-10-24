@@ -2,22 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include <stdarg.h>
-
-#include <dy.h>
-
-#include "elf.h"
-#include "base.h"
-#include "atom_view.h"
-#include "compiler.h"
-#include "token.h"
-#include "entity.h"
-#include "ast.h"
-#include "ir.h"
-#include "ir_emitter.h"
-
-#include "checker.h"
-
 typedef struct
 {
 	Scope    *globals;
@@ -184,7 +168,7 @@ static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stat
 	return COM_STATUS_OK;
 }
 
-Com_Status check_source(Com_Source *source)
+static Com_Status check_source(Com_Source *source)
 {
 	ASSERT(source);
 	Compiler *compiler = source->compiler;

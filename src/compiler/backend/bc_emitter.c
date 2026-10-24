@@ -2,19 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include <stdlib.h>
-
-#include <dy.h>
-
-#include "elf.h"
-#include "elf_core.h"
-#include "base.h"
-#include "bytecode.h"
-#include "atom_view.h"
-#include "compiler.h"
-#include "ir.h"
-#include "bc_emitter.h"
-
 #define BC_OPERAND_COUNT_MAX (1u << 15)
 
 typedef struct BcJumpPatch BcJumpPatch;
@@ -1363,7 +1350,7 @@ static void emit_function(BcEmitter *emitter, IrFunction *function)
 	install_function(emitter, function, prototype_index);
 }
 
-elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
+static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 {
 	ASSERT(target);
 	ASSERT(module);

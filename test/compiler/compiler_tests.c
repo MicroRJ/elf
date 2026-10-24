@@ -9,22 +9,12 @@
 #include "base.h"
 #include "elf_core.h"
 #include "libs.h"
-#include "atom.h"
-#include "compiler.h"
-#include "token.h"
-#include "ast.h"
-#include "parser.h"
-#include "checker.h"
-#include "entity.h"
-#include "ir.h"
-#include "ir_emitter.h"
 #include "bytecode.h"
 #include "elf_value_text.h"
 
-// Compiler sources included by the unity tests.
-#include "logging.c"
-#include "lexer.c"
-#include "bc_emitter.h"
+#define ELF_COM_TEST_COPY
+#include "elf_com.c"
+#undef ELF_COM_TEST_COPY
 
 #define test_fail(label) TEST_FAIL("%s", (label))
 #include "lexer_tests.c"

@@ -273,8 +273,8 @@ struct Ast_T
 	};
 };
 
-extern Ast_T ast_error_sentinel;
-extern Ast_T ast_error_oom_sentinel;
+static Ast_T ast_error_sentinel;
+static Ast_T ast_error_oom_sentinel;
 
 #define NULL_AST      ((Ast)0)
 #define ERROR_AST     (&ast_error_sentinel)

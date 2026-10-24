@@ -22,7 +22,8 @@ int main(int argc, char **argv)
 	}
 
 	elf_State *state = elf_create_state();
-	if (!elf_push_code_file(state, 0, path))
+	elf_StrSlice source_path = {(char *)path, strlen(path)};
+	if (!elf_push_code_file(state, 0, source_path))
 	{
 		fprintf(stderr, "elf: could not load '%s'\n", path);
 		elf_destroy_state(state);

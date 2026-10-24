@@ -1,23 +1,52 @@
 //
-// JSON parsing and serialization.
+// See Copyright Notice In elf.h
 //
 
-#include "atom_view.h"
-#include "ast.h"
-#include "compiler.h"
-
-typedef struct
+typedef enum
 {
-	elf_State  *state;
-	char       *data;
-	u64         count;
-	u64      capacity;
-	const char *error;
-	elf_Object *ancestors[256];
+	COMPILER_PARSE_JSON,
+	COMPILER_PARSE_JSONL,
 }
-JsonWriter;
+CompilerParseType;
 
-static b32 json_push_ast_value(elf_State *state, Ast ast)
+static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSlice source, CompilerParseType type)
+{
+	if (!arena || !name.data || name.size > UINT32_MAX || !source.data || source.size > UINT32_MAX)
+	{
+		return ERROR_AST;
+	}
+
+	Compiler *compiler = compiler_create(arena);
+	if (!compiler)
+	{
+		return ERROR_AST;
+	}
+
+	Atom *source_name = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
+	char *source_data = arena_push_zero(arena, source.size + 1, 1);
+	if (!source_name || !source_data)
+	{
+		return ERROR_AST;
+	}
+	copy_memory(source_data, source.data, source.size);
+
+	Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, 0, (dy_String) {.data = source_data, .size = source.size});
+	if (!compiler_source)
+	{
+		return ERROR_AST;
+	}
+
+	Parser parser = {0};
+	if (!parser_init(&parser))
+	{
+		return ERROR_AST;
+	}
+	Ast ast = type == COMPILER_PARSE_JSON ? parser_parse_json(&parser, compiler_source) : parser_parse_jsonl(&parser, compiler_source);
+	parser_destroy(&parser);
+	return compiler->error_count ? ERROR_AST : ast;
+}
+
+static b32 compiler_push_json_ast(elf_State *state, Ast ast)
 {
 	elf_Index stack_checkpoint = elf_get_top(state);
 	b32 result = true;
@@ -61,8 +90,9 @@ static b32 json_push_ast_value(elf_State *state, Ast ast)
 				}
 				else
 				{
-					result = json_push_ast_value(state, entry->table_entry.value);
-					if (result) {
+					result = compiler_push_json_ast(state, entry->table_entry.value);
+					if (result)
+					{
 						elf_StrSlice field = {(char *)atom_data(key->atom), atom_size(key->atom)};
 						result = elf_set_field_slice(state, table, field) == ELF_ERROR_NONE;
 					}
@@ -77,8 +107,9 @@ static b32 json_push_ast_value(elf_State *state, Ast ast)
 			elf_Index array = elf_abs_index(state, -1);
 			for (u32 i = 0; result && i < ast->array.count; ++i)
 			{
-				result = json_push_ast_value(state, ast->array.items[i]);
-				if (result) {
+				result = compiler_push_json_ast(state, ast->array.items[i]);
+				if (result)
+				{
 					result = elf_append(state, array) == ELF_ERROR_NONE;
 				}
 			}
@@ -91,23 +122,62 @@ static b32 json_push_ast_value(elf_State *state, Ast ast)
 		}
 		break;
 	}
-	if (!result) {
+	if (!result)
+	{
 		elf_set_top(state, stack_checkpoint);
 	}
 	ASSERT(!result || elf_get_top(state) == stack_checkpoint + 1);
 	return result;
 }
 
-static b32 lib_push_json_source(elf_State *state, dy_String name, dy_String source, b32 jsonl)
+static b32 compiler_push_json(elf_State *state, elf_StrSlice name, elf_StrSlice source, b32 jsonl)
 {
-	Scratch scratch = scratch_begin();
-	elf_StrSlice source_name = {name.data, name.size};
-	elf_StrSlice source_text = {source.data, source.size};
-	Ast ast = jsonl ? compiler_parse_jsonl(scratch.arena, source_name, source_text) : compiler_parse_json(scratch.arena, source_name, source_text);
+	if (!state)
+	{
+		return false;
+	}
 
-	b32 result = !ast_is_error(ast) && json_push_ast_value(state, ast);
+	Scratch scratch = scratch_begin();
+	CompilerParseType type = jsonl ? COMPILER_PARSE_JSONL : COMPILER_PARSE_JSON;
+	Ast ast = compiler_parse_json_source(scratch.arena, name, source, type);
+	b32 result = !ast_is_error(ast) && compiler_push_json_ast(state, ast);
 	scratch_end(scratch);
 	return result;
+}
+
+
+ELF_FUNCTION(l_core_load_file)
+{
+	lib_check_arg_count(S, "load_file", nargs, 1, INT_MAX);
+	dy_String name = lib_load_string_view(S, 1);
+	if (!elf_push_code_file(S, 0, (elf_StrSlice) {name.data, name.size})) return 0;
+
+	elf_push_value(S, 0);
+	for (i64 index = 2; index < nargs; ++index)
+	{
+		elf_push_value(S, (elf_i32)index);
+	}
+	return elf_tail_call(S, nargs - 1, nrets);
+}
+
+// JSON parsing and serialization.
+
+typedef struct
+{
+	elf_State  *state;
+	char       *data;
+	u64         count;
+	u64      capacity;
+	const char *error;
+	elf_Object *ancestors[256];
+}
+JsonWriter;
+
+static b32 lib_push_json_source(elf_State *state, dy_String name, dy_String source, b32 jsonl)
+{
+	elf_StrSlice source_name = {name.data, name.size};
+	elf_StrSlice source_text = {source.data, source.size};
+	return compiler_push_json(state, source_name, source_text, jsonl);
 }
 
 static b32 lib_push_json(elf_State *state, dy_String name, dy_String source)
@@ -120,7 +190,7 @@ static b32 lib_push_jsonl(elf_State *state, dy_String name, dy_String source)
 	return lib_push_json_source(state, name, source, true);
 }
 
-static void json_push_error_value(elf_State *state, const char *message, const Com_Message *compiler_message)
+static void json_push_error_value(elf_State *state, const char *message)
 {
 	elf_Table *info = elf_table_new(state);
 	push_value(state, value_from_error(info));
@@ -129,15 +199,6 @@ static void json_push_error_value(elf_State *state, const char *message, const C
 	elf_Value message_value = value_from_string(elf_string_from_data(state, message ? message : "JSON error"));
 	elf_table_set(state, info, message_key, message_value);
 
-	if (compiler_message)
-	{
-		SourceSite site = compiler_message->site;
-		i64 column = site.line_index && site.line_offset <= site.offset ? 1 + (i64)(site.offset - site.line_offset) : 0;
-		elf_Value line_key = value_from_string(elf_string_from_data(state, "line"));
-		elf_Value column_key = value_from_string(elf_string_from_data(state, "column"));
-		elf_table_set(state, info, line_key, value_from_integer(site.line_index));
-		elf_table_set(state, info, column_key, value_from_integer(column));
-	}
 }
 
 static b32 json_writer_reserve(JsonWriter *writer, u64 additional)
@@ -350,7 +411,7 @@ ELF_FUNCTION(l_json_parse)
 	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
 	dy_String source = lib_load_string_view(S, 1);
 	if (!lib_push_json(S, DY_LIT("json.parse"), source)) {
-		json_push_error_value(S, "invalid JSON", 0);
+		json_push_error_value(S, "invalid JSON");
 	}
 	return 1;
 }
@@ -362,7 +423,7 @@ ELF_FUNCTION(l_json_stringify)
 	json_write_value(&writer, load_value(S, 1), 0);
 	if (writer.error)
 	{
-		json_push_error_value(S, writer.error, 0);
+		json_push_error_value(S, writer.error);
 	}
 	else
 	{
@@ -450,4 +511,12 @@ static const elf_Binding l_json[] = {
 static elf_SymTable *elf_lib_json(void)
 {
 	return new_symbol_table(l_json, ARRAY_COUNT(l_json));
+}
+
+void elf_com_open_libs(elf_State *state, elf_SymTable *elf_symbols)
+{
+	ASSERT(state);
+	ASSERT(elf_symbols);
+	elf_sym_tab(elf_symbols, ELF_LIT("json"), elf_lib_json());
+	elf_sym_fun(elf_symbols, ELF_LIT("load_file"), l_core_load_file);
 }

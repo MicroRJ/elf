@@ -1,8 +1,6 @@
 #ifndef ELF_ENTITY_H
 #define ELF_ENTITY_H
 
-#include "compiler.h"
-
 typedef struct Entity Entity;
 typedef struct Scope Scope;
 
@@ -82,8 +80,8 @@ struct Entity
 	};
 };
 
-extern Entity entity_error_sentinel;
-extern Entity entity_oom_sentinel;
+static Entity entity_error_sentinel;
+static Entity entity_oom_sentinel;
 
 #define ERROR_ENTITY     (&entity_error_sentinel)
 #define ERROR_OOM_ENTITY (&entity_oom_sentinel)
@@ -103,8 +101,8 @@ static inline b32 entity_is_error(const Entity *entity)
 	return entity && entity->kind == ENTITY_ERROR;
 }
 
-b32 entity_is_constant(const Entity *entity);
-b32 entity_is_exported(const Entity *entity);
+static b32 entity_is_constant(const Entity *entity);
+static b32 entity_is_exported(const Entity *entity);
 
 typedef enum
 {
@@ -129,9 +127,9 @@ struct Scope
 	u32             capacity;
 };
 
-Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source);
-Entity *scope_find_current(Scope *scope, struct Atom *name);
-Entity *scope_find(Scope *scope, struct Atom *name);
-Entity *scope_declare(Scope *scope, EntityKind kind, struct Atom *name, b32 *created);
+static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source);
+static Entity *scope_find_current(Scope *scope, struct Atom *name);
+static Entity *scope_find(Scope *scope, struct Atom *name);
+static Entity *scope_declare(Scope *scope, EntityKind kind, struct Atom *name, b32 *created);
 
 #endif

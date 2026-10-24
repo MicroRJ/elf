@@ -2,8 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include "bytecode.h"
-
 typedef struct Atom Atom;
 typedef struct Ast_T Ast_T;
 typedef struct Com_Source Com_Source;

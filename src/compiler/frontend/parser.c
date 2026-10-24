@@ -2,24 +2,6 @@
 //	See Copyright Notice In elf.h
 //
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <dy.h>
-
-#include "elf.h"
-#include "base.h"
-#include "atom.h"
-#include "compiler.h"
-#include "token.h"
-#include "ast.h"
-#include "parser.h"
-
-#include "logging.c"
-#include "lexer.c"
-#include "ast.c"
-
 #define I64_MAX_MAGNITUDE 0x7fffffffffffffffull
 #define I64_MIN_MAGNITUDE 0x8000000000000000ull
 
@@ -34,6 +16,7 @@ static Ast parse_call_argument(Parser *parser);
 static Ast parse_stat(Parser *parser);
 static Ast parse_if_stat(Parser *parser);
 static Ast parse_json_ast(Parser *parser);
+static Ast parse_jsonl_ast(Parser *parser);
 static Ast parse_json_ast_value(Parser *parser);
 static Ast parse_call_expr(Parser *parser, Ast callee, SourceSite site);
 static Token consume_token(Parser *parser);
@@ -202,7 +185,7 @@ static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
-b32 parser_init(Parser *parser)
+static b32 parser_init(Parser *parser)
 {
 	ASSERT(parser);
 	*parser = (Parser) {};
@@ -210,7 +193,7 @@ b32 parser_init(Parser *parser)
 	return parser->scratch_arena.data != 0;
 }
 
-void parser_destroy(Parser *parser)
+static void parser_destroy(Parser *parser)
 {
 	if (parser) {
 		arena_destroy(&parser->scratch_arena);
@@ -1766,9 +1749,7 @@ static Ast parse_constexpr(Parser *parser)
 	return ast;
 }
 
-#include "parse_json.c"
-
-Ast parser_parse_source(Parser *parser, Com_Source *source)
+static Ast parser_parse_source(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
 	if (parser_begin_source(parser, source)) {
@@ -1777,7 +1758,7 @@ Ast parser_parse_source(Parser *parser, Com_Source *source)
 	return ast;
 }
 
-Ast parser_parse_constant_expr(Parser *parser, Com_Source *source)
+static Ast parser_parse_constant_expr(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
 	if (parser_begin_source(parser, source)) {
@@ -1786,7 +1767,7 @@ Ast parser_parse_constant_expr(Parser *parser, Com_Source *source)
 	return ast;
 }
 
-Ast parser_parse_json(Parser *parser, Com_Source *source)
+static Ast parser_parse_json(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
 	if (parser_begin_source(parser, source)) {
@@ -1795,7 +1776,7 @@ Ast parser_parse_json(Parser *parser, Com_Source *source)
 	return ast;
 }
 
-Ast parser_parse_jsonl(Parser *parser, Com_Source *source)
+static Ast parser_parse_jsonl(Parser *parser, Com_Source *source)
 {
 	Ast ast = ERROR_AST;
 	if (parser_begin_source(parser, source)) {

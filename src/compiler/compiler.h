@@ -78,23 +78,10 @@ struct Com_Source
 	dy_String           source;
 	struct Ast_T       *ast;
 	struct Ast_T      **imports;
-	u32                  import_count;
+	u32                 import_count;
 	struct Scope       *scope;
 	Com_SourceState     state;
 	Com_Report          report;
 };
-
-Compiler *compiler_create(Arena *arena);
-Com_Status compiler_inject_symbols(Compiler *compiler, struct Scope *scope, Com_Source *source, elf_SymTable *table);
-
-void compiler_log_report(Compiler *compiler);
-
-b32 compiler_report(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
-b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
-
-elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source);
-struct Ast_T *compiler_parse_constant_expr(Arena *arena, elf_StrSlice name, elf_StrSlice source);
-struct Ast_T *compiler_parse_json(Arena *arena, elf_StrSlice name, elf_StrSlice source);
-struct Ast_T *compiler_parse_jsonl(Arena *arena, elf_StrSlice name, elf_StrSlice source);
 
 #endif

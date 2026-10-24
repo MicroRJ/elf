@@ -32,11 +32,12 @@ static void run_script_test(const char *path)
 
 	elf_SymTable *symbols = 0;
 	elf_sym_create(&symbols);
+	elf_StrSlice source_path = {(char *)path, strlen(path)};
 	if (elf_sym_fun(symbols, ELF_LIT("test_assert"), script_test_assert) != ELF_ERROR_NONE)
 	{
 		TEST_FAIL("could not install test_assert");
 	}
-	else if (!elf_push_code_file(state, symbols, path))
+	else if (!elf_push_code_file(state, symbols, source_path))
 	{
 		TEST_FAIL("could not compile script");
 	}

@@ -155,7 +155,7 @@ typedef struct
 	{
 		u64   integer_magnitude;
 		f64   number;
-		Atom *atom;
+		struct Atom *atom;
 		Com_Status status;
 	};
 }

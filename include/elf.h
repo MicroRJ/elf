@@ -105,8 +105,8 @@ void elf_push_error(elf_State *state, const char *message);
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data);
 
-elf_ErrorCode elf_push_code_source(elf_State *state, elf_SymTable *symbols, const char *name, elf_StrSlice source);
-elf_Bool elf_push_code_file(elf_State *state, elf_SymTable *symbols, const char *name);
+elf_ErrorCode elf_push_code_source(elf_State *state, elf_SymTable *symbols, elf_StrSlice name, elf_StrSlice source);
+elf_Bool elf_push_code_file(elf_State *state, elf_SymTable *symbols, elf_StrSlice name);
 
 elf_u32 elf_arg_count(elf_State *state);
 elf_Index elf_get_top(elf_State *state);

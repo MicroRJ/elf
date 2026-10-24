@@ -268,7 +268,7 @@ static void test_api_buffers(elf_State *state)
 	elf_Index checkpoint = elf_get_top(state);
 	char source_data[] = "ret elf.buffer(4):append(\"ok\")";
 	elf_StrSlice source = {source_data, sizeof(source_data) - 1};
-	if (elf_push_code_source(state, 0, "api-buffer", source) != ELF_ERROR_NONE)
+	if (elf_push_code_source(state, 0, ELF_LIT("api-buffer"), source) != ELF_ERROR_NONE)
 	{
 		test_fail("API buffer source compiles");
 		elf_set_top(state, checkpoint);

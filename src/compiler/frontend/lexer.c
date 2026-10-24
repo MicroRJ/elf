@@ -2,10 +2,6 @@
 // See Copyright Notice In elf.h
 //
 
-#include <math.h>
-
-#include "source_diagnostics.c"
-
 typedef struct
 {
 	Com_Source  *compiler_source;
