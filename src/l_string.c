@@ -115,30 +115,89 @@ ELF_FUNCTION(l_string_length)
 
 ELF_FUNCTION(l_string_byte)
 {
-	elf_String *string = string_receiver(S);
-	u32 index = 0;
-	if (!string_normalize_index(S, lib_load_integer(S, 1), elf_string_size(string), false, &index)) {
-		return 0;
+	if (nargs < 2)
+	{
+		elf_push_error(S, "string.byte requires an index");
+		return 1;
 	}
-	push_value(S, value_from_integer((u8)elf_string_data(string)[index]));
+
+	elf_StrSlice source = {0};
+	if (!elf_to_str(S, 0, &source))
+	{
+		elf_push_error(S, "string.byte requires a string receiver");
+		return 1;
+	}
+
+	elf_Int index = 0;
+	if (!elf_to_int(S, 1, &index))
+	{
+		elf_push_error(S, "string.byte index must be an integer");
+		return 1;
+	}
+
+	if (index < 0)
+	{
+		index += (elf_Int)source.size;
+	}
+
+	if (index < 0 || (elf_Size)index >= source.size)
+	{
+		elf_push_error(S, "string.byte index is out of bounds");
+		return 1;
+	}
+
+	elf_push_int(S, (u8)source.data[index]);
 	return 1;
 }
 
 ELF_FUNCTION(l_string_slice)
 {
-	elf_String *string = string_receiver(S);
-	u32 size = elf_string_size(string);
-	u32 first = 0;
-	u32 end = size;
-	if (!string_normalize_index(S, lib_load_integer(S, 1), size, true, &first)) return 0;
-	if (nargs > 2 && !string_normalize_index(S, lib_load_integer(S, 2), size, true, &end)) return 0;
+	if (nargs < 2)
+	{
+		elf_push_error(S, "string.slice requires a start index");
+		return 1;
+	}
+
+	elf_StrSlice source = {0};
+	if (!elf_to_str(S, 0, &source))
+	{
+		elf_push_error(S, "string.slice requires a string receiver");
+		return 1;
+	}
+
+	elf_Int bounds[2] = {0, (elf_Int)source.size};
+	for (int argument = 1; argument < nargs && argument < 3; ++argument)
+	{
+		elf_Int index = 0;
+		if (!elf_to_int(S, argument, &index))
+		{
+			elf_push_error(S, "string.slice index must be an integer");
+			return 1;
+		}
+
+		if (index < 0)
+		{
+			index += (elf_Int)source.size;
+		}
+
+		if (index < 0 || (elf_Size)index > source.size)
+		{
+			elf_push_error(S, "string.slice index is out of bounds");
+			return 1;
+		}
+
+		bounds[argument - 1] = index;
+	}
+
+	elf_Int first = bounds[0];
+	elf_Int end = bounds[1];
 	if (end < first)
 	{
-		report_runtime_error(S, ERROR_OUT_OF_RANGE,
-			"string slice end %u precedes start %u", end, first);
-		return 0;
+		elf_push_error(S, "string.slice end precedes start");
+		return 1;
 	}
-	string_push(S, elf_string_data(string) + first, end - first);
+
+	elf_push_str(S, source.data + first, (elf_Size)(end - first));
 	return 1;
 }
 
@@ -218,17 +277,53 @@ ELF_FUNCTION(l_string_ends_with)
 
 ELF_FUNCTION(l_string_find)
 {
-	elf_String *string = string_receiver(S);
-	elf_String *needle = lib_load_string(S, 1);
-	u32 size = elf_string_size(string);
-	u32 start = 0;
-	if (nargs > 2 && !string_normalize_index(S, lib_load_integer(S, 2), size, true, &start)) {
-		return 0;
+	if (nargs < 2)
+	{
+		elf_push_error(S, "string.find requires a search string");
+		return 1;
 	}
-	const char *found = string_find_data(elf_string_data(string), size,
-		elf_string_data(needle), elf_string_size(needle), start);
-	if (found) push_value(S, value_from_integer(found - elf_string_data(string)));
-	else push_value(S, value_nil());
+
+	elf_StrSlice source = {0};
+	if (!elf_to_str(S, 0, &source))
+	{
+		elf_push_error(S, "string.find requires a string receiver");
+		return 1;
+	}
+
+	elf_StrSlice needle = {0};
+	if (!elf_to_str(S, 1, &needle))
+	{
+		elf_push_error(S, "string.find search argument must be a string");
+		return 1;
+	}
+
+	elf_Int start = 0;
+	if (nargs > 2 && !elf_to_int(S, 2, &start))
+	{
+		elf_push_error(S, "string.find start index must be an integer");
+		return 1;
+	}
+
+	if (start < 0)
+	{
+		start += (elf_Int)source.size;
+	}
+
+	if (start < 0 || (elf_Size)start > source.size)
+	{
+		elf_push_error(S, "string.find start index is out of bounds");
+		return 1;
+	}
+
+	const char *found = string_find_data(source.data, (u32)source.size, needle.data, (u32)needle.size, (u32)start);
+	if (found)
+	{
+		elf_push_int(S, found - source.data);
+	}
+	else
+	{
+		elf_push_nil(S);
+	}
 	return 1;
 }
 
@@ -254,30 +349,46 @@ ELF_FUNCTION(l_string_glob_match)
 
 ELF_FUNCTION(l_string_split)
 {
-	elf_String *string = string_receiver(S);
-	elf_String *separator = lib_load_string(S, 1);
-	const char *text = elf_string_data(string);
-	const char *separator_data = elf_string_data(separator);
-	u32 size = elf_string_size(string);
-	u32 separator_size = elf_string_size(separator);
-	if (separator_size == 0)
+	if (nargs < 2)
 	{
-		report_runtime_error(S, ERROR_INVALID_ARGUMENT,
-			"string split separator cannot be empty");
-		return 0;
+		elf_push_error(S, "string.split requires a separator");
+		return 1;
+	}
+
+	elf_StrSlice source = {0};
+	if (!elf_to_str(S, 0, &source))
+	{
+		elf_push_error(S, "string.split requires a string receiver");
+		return 1;
+	}
+
+	elf_StrSlice separator = {0};
+	if (!elf_to_str(S, 1, &separator))
+	{
+		elf_push_error(S, "string.split separator must be a string");
+		return 1;
+	}
+
+	if (separator.size == 0)
+	{
+		elf_push_error(S, "string.split separator cannot be empty");
+		return 1;
 	}
 
 	elf_Array *parts = push_new_array(S);
 	u32 start = 0;
 	for (;;)
 	{
-		const char *found = string_find_data(text, size, separator_data, separator_size, start);
-		if (!found) break;
-		u32 at = (u32)(found - text);
-		string_array_add(S, parts, text + start, at - start);
-		start = at + separator_size;
+		const char *found = string_find_data(source.data, (u32)source.size, separator.data, (u32)separator.size, start);
+		if (!found)
+		{
+			break;
+		}
+		u32 at = (u32)(found - source.data);
+		string_array_add(S, parts, source.data + start, at - start);
+		start = at + (u32)separator.size;
 	}
-	string_array_add(S, parts, text + start, size - start);
+	string_array_add(S, parts, source.data + start, (u32)source.size - start);
 	return 1;
 }
 
