@@ -41,6 +41,10 @@ that work to the repository's documentation agent.
 
 ## Architecture Direction
 
+Read [`ORGANIZATION.md`](ORGANIZATION.md) before moving, renaming, splitting,
+or merging files under `src`. It records the current unit-build layout,
+terminology, dependency direction, and ordered cleanup work.
+
 Runtime and core must never depend on the compiler. The compiler backend may
 target runtime objects directly, but the frontend and middle stages remain
 runtime-independent: lexer, parser, checker, and IR lowering operate on
