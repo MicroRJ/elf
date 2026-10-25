@@ -1,41 +1,22 @@
 
-AGENT_STATE_IDLE     :: "IDLE"
-AGENT_STATE_THINKING :: "THINKING"
-AGENT_STATE_APPROVAL :: "APPROVAL"
-AGENT_STATE_WORKING  :: "WORKING"
-AGENT_STATE_BROKEN   :: "BROKEN"
-AGENT_STATE_RETRYING :: "RETRYING"
+cyclic_def :: fun() {
+	cyclic_def()
+}
 
-MAX_RETRY_COUNT       :: 3
-RATE_LIMIT_RETRY_MS   :: 60000
-UNAVAILABLE_RETRY_MS  :: 5000
+cyclic_def()
 
-chats := [{
-	active_state = AGENT_STATE_IDLE,
-	time_start   = elf.time.unix_ms(),
-	agent_state  = {
-		tool_results  = [],
-		tool_requests = [],
-		retry_count   = 0,
-	},
 
-	messages = [
-		{
-			type = MESSAGE_TYPE_USER,
-			text = "This is a dummy message!"
-		},
-		{
-			type = MESSAGE_TYPE_AGENT,
-			items = [
-				{
-					type = "markdown",
-					text = "This is a dummy message!",
-					blocks = Markdown.parse("this is a ```dummy``` markdown file, and this is italic *** like so *** "),
-				}
-			]
-		}
-	]
-}]
+#eof
+
+
+do_sum_strange :: fun() {
+	c := elf.buffer() + 10
+	ret c
+}
+c := do_sum_strange()
+
+elf.printl(c)
+
 
 #eof
 

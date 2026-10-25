@@ -1,5 +1,75 @@
-## Compilers and Atoms:
+## Notes on the error handling model:
 
+Currently we abort on whatever error we get, the problem with that is that it kills the host,
+and has a bunch of nasty implications ...
+
+So this was an early language design pattern that we used because it was simple ...
+
+Instead, we need proper error handling, what should happen when the VM fails?
+
+For instance, suppose the VM encounters '1 / 0', that's clearly an error the VM should signal,
+the question is, how?
+
+Do we stop execution entirely and return to the nearest native call?
+Do we use long jumps to return to the nearest setup error handling point?
+
+Based off of my experience with error handling models, and what people actually tend to prefer
+and or complain about, I think there needs to be a better, uniform way to handle errors than
+what something like Lua does.
+
+The question isn't what constitutes an error of any kind, or how that error should be stored,
+but what the propagation model is.
+
+Suppose there existed a programming language that was entirely explicit, such that each
+operation or expression or function, would either output a regular result or an error,
+an error being a special signaling value.
+
+For instance:
+
+a + b = c ; when no error occurs
+
+a + b = <error> ; when an error occurs
+
+Same for functions as well, when the function succeeds, return your regular result, when the
+function fails, return an <error>
+
+So now, you're tasked with doing stuff like this:
+
+
+	```
+	c := a + b
+	if c is error ? {
+		ret c
+	}
+	```
+
+Now, this is annoying, but it has one really nice property, and that is that you're always
+in control of the execution flow, which isn't true for a lot of other languages, and one
+of the biggest complaints I see.
+
+So to make this easier, instead of making it so that you have to manually check, we flip
+it, so that:
+
+	```
+	c := a + b
+	```
+
+Automatically returns on error, and if you want to catch the error, you do:
+
+	```
+	c := try a + b
+	if c is error ? {
+		...
+	}
+	```
+
+
+
+
+
+
+
+## Compilers and Atoms:
 
 Dear globals:
 

@@ -44,7 +44,7 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	b32 preserved = context && !native_frame.prototype && caller_prototype;
 	if (preserved)
 	{
-		preserved = BC_TYPE(caller_prototype->bytecode[caller_instruction]) == BC_DYNAMIC_CALL && elf_push_ref(S, context->callback);
+		preserved = BC_TYPE(caller_prototype->bytecode[caller_instruction]) == BC_CALL_DYNAMIC && elf_push_ref(S, context->callback);
 	}
 	if (preserved)
 	{

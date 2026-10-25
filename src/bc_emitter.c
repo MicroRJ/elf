@@ -156,11 +156,11 @@ static void patch_jump(BcEmitter *emitter, u32 source_position, u32 target_posit
 	{
 		case BC_JUMP:
 		{
-			emitter->bytecode[source_position] = BC_XXX(BC_TYPE(source_bytecode), relative_distance);
+			emitter->bytecode[source_position] = BC_X(BC_TYPE(source_bytecode), relative_distance);
 		}
 		break;
-		case BC_JZ:
-		case BC_JNZ:
+		case BC_JUMP_IF_ZERO:
+		case BC_JUMP_IF_NONZERO:
 		{
 			emitter->bytecode[source_position] = BC_XYZ(BC_TYPE(source_bytecode), relative_distance, BC_ARGY(source_bytecode), BC_ARGZ(source_bytecode));
 		}
@@ -211,12 +211,12 @@ static u32 emit_bytecode(BcEmitter *emitter, SourceSite site, Bytecode byte)
 
 static u32 emit_bytecode_x(BcEmitter *emitter, SourceSite site, BcType type, i32 x)
 {
-	return emit_bytecode(emitter, site, BC_XXX(type, x));
+	return emit_bytecode(emitter, site, BC_X(type, x));
 }
 
 static u32 emit_bytecode_xy(BcEmitter *emitter, SourceSite site, BcType type, i32 x, i32 y)
 {
-	return emit_bytecode(emitter, site, BC_XYY(type, x, y));
+	return emit_bytecode(emitter, site, BC_XY(type, x, y));
 }
 
 static u32 emit_bytecode_xyz(BcEmitter *emitter, SourceSite site, BcType type, i32 x, i32 y, i32 z)
@@ -236,7 +236,7 @@ static u32 emit_jump(BcEmitter *emitter, SourceSite site)
 
 static u32 emit_conditional_jump(BcEmitter *emitter, SourceSite site, BcType type, i32 predicate)
 {
-	ASSERT(type == BC_JZ || type == BC_JNZ);
+	ASSERT(type == BC_JUMP_IF_ZERO || type == BC_JUMP_IF_NONZERO);
 	ASSERT(slot_is_valid(predicate));
 	return emit_bytecode_xy(emitter, site, type, 0, predicate);
 }
@@ -260,34 +260,34 @@ static u32 emit_integer(BcEmitter *emitter, SourceSite site, i32 destination, i6
 {
 	ASSERT(slot_is_valid(destination));
 	u32 index = add_integer_constant(emitter, integer);
-	return emit_bytecode_xy(emitter, site, BC_LOADKINT, destination, index);
+	return emit_bytecode_xy(emitter, site, BC_LOAD_CONSTANT_INTEGER, destination, index);
 }
 
 static u32 emit_number(BcEmitter *emitter, SourceSite site, i32 destination, f64 number)
 {
 	ASSERT(slot_is_valid(destination));
 	u32 index = add_number_constant(emitter, number);
-	return emit_bytecode_xy(emitter, site, BC_LOADKNUM, destination, index);
+	return emit_bytecode_xy(emitter, site, BC_LOAD_CONSTANT_NUMBER, destination, index);
 }
 
 static u32 emit_string(BcEmitter *emitter, SourceSite site, i32 destination, Atom *atom)
 {
 	ASSERT(slot_is_valid(destination));
 	u32 index = add_string_atom(emitter, atom);
-	return emit_bytecode_xy(emitter, site, BC_LOADKSTRING, destination, index);
+	return emit_bytecode_xy(emitter, site, BC_LOAD_CONSTANT_STRING, destination, index);
 }
 
 static u32 emit_nil(BcEmitter *emitter, SourceSite site, i32 destination)
 {
 	ASSERT(slot_is_valid(destination));
-	return emit_bytecode_xy(emitter, site, BC_LOADNIL, destination, 0);
+	return emit_bytecode_xy(emitter, site, BC_LOAD_NIL, destination, 0);
 }
 
 static u32 emit_move(BcEmitter *emitter, SourceSite site, i32 destination, i32 source)
 {
 	ASSERT(slot_is_valid(destination));
 	ASSERT(slot_is_valid(source));
-	return emit_bytecode_xy(emitter, site, BC_RELOAD, destination, source);
+	return emit_bytecode_xy(emitter, site, BC_MOVE, destination, source);
 }
 
 static u32 emit_return(BcEmitter *emitter, SourceSite site, i32 output, u32 output_count)
@@ -358,7 +358,7 @@ static i32 emit_table_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 	}
 
 	out = ensure_slot(emitter, out);
-	emit_bytecode_x(emitter, expr->site, BC_TABLE, out);
+	emit_bytecode_x(emitter, expr->site, BC_NEW_TABLE, out);
 	return out;
 }
 
@@ -370,7 +370,7 @@ static i32 emit_array_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 	}
 
 	out = ensure_slot(emitter, out);
-	emit_bytecode_x(emitter, expr->site, BC_ARRAY, out);
+	emit_bytecode_x(emitter, expr->site, BC_NEW_ARRAY, out);
 	return out;
 }
 
@@ -453,7 +453,7 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 			callee_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
 			this_slot = emit_expr(emitter, expr->ir_binary.x, NO_SLOT, 1);
 
-			emit_bytecode_xyz(emitter, expr->site, BC_GETMETAFIELD, callee_slot, this_slot, callee_slot);
+			emit_bytecode_xyz(emitter, expr->site, BC_GET_META_FIELD, callee_slot, this_slot, callee_slot);
 		}
 		else if (expr->kind == IR_FIELD)
 		{
@@ -462,7 +462,7 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 			callee_slot = emit_expr(emitter, expr->ir_binary.y, NO_SLOT, 1);
 			this_slot = emit_expr(emitter, expr->ir_binary.x, NO_SLOT, 1);
 
-			emit_bytecode_xyz(emitter, expr->site, BC_GETFIELD, callee_slot, this_slot, callee_slot);
+			emit_bytecode_xyz(emitter, expr->site, BC_GET_FIELD, callee_slot, this_slot, callee_slot);
 		}
 		else if (can_reuse_local_callee(expr, args, &callee_slot))
 		{
@@ -495,7 +495,7 @@ static i32 emit_dynamic_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	}
 	restore_slots(emitter, slot_checkpoint);
 
-	emit_bytecode_xyzw(emitter, expr->site, BC_DYNAMIC_CALL, call_slot, callee_slot, nargs + 1, nout);
+	emit_bytecode_xyzw(emitter, expr->site, BC_CALL_DYNAMIC, call_slot, callee_slot, nargs + 1, nout);
 	return finish_call_result(emitter, ir, call_slot, out, nout);
 }
 
@@ -533,40 +533,11 @@ static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
 	}
 	restore_slots(emitter, slot_checkpoint);
 
-	emit_bytecode_xyzw(emitter, ir->site, BC_CALL, call_slot, prototype_index, nargs + 1, nout);
+	emit_bytecode_xyzw(emitter, ir->site, BC_CALL_DIRECT, call_slot, prototype_index, nargs + 1, nout);
 	return finish_call_result(emitter, ir, call_slot, out, nout);
 }
 
-static BcType bytecode_type_from_ir(IrKind type)
-{
-	switch (type)
-	{
-		case IR_ADD:               return BC_ADD;
-		case IR_SUB:               return BC_SUB;
-		case IR_DIV:               return BC_DIV;
-		case IR_MUL:               return BC_MUL;
-		case IR_POW:               return BC_POW;
-		case IR_MOD:               return BC_MOD;
-		case IR_NOT_EQ:            return BC_NEQ;
-		case IR_EQ:                return BC_EQ;
-		case IR_LESS_THAN:         return BC_LT;
-		case IR_LESS_THAN_EQ:      return BC_LTEQ;
-		case IR_BITWISE_OR:        return BC_BIT_OR;
-		case IR_BITWISE_AND:       return BC_BIT_AND;
-		case IR_SHIFT_LEFT:        return BC_BIT_SHL;
-		case IR_SHIFT_RIGHT:       return BC_BIT_SHR;
-		case IR_BITWISE_XOR:       return BC_BIT_XOR;
-		case IR_INDEX:             return BC_GETINDEX;
-		case IR_FIELD:             return BC_GETFIELD;
-		case IR_META_FIELD:        return BC_GETMETAFIELD;
-		default: NO_CODE;
-	}
-
-	ASSERT(!"unsupported binary IR kind");
-	return BC_HALT;
-}
-
-static i32 emit_binary_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
+static i32 emit_binary_expr(BcEmitter *emitter, Ir expr, BcType bytecode_type, i32 out, u32 nout)
 {
 	if (nout < 1) {
 		return out;
@@ -578,7 +549,7 @@ static i32 emit_binary_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 	restore_slots(emitter, slot_checkpoint);
 
 	out = ensure_slot(emitter, out);
-	emit_bytecode_xyz(emitter, expr->site, bytecode_type_from_ir(expr->kind), out, left_slot, right_slot);
+	emit_bytecode_xyz(emitter, expr->site, bytecode_type, out, left_slot, right_slot);
 	return out;
 }
 
@@ -645,13 +616,13 @@ static i32 emit_logical_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 static void jump_if_true_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, Ir label)
 {
-	u32 jump = emit_conditional_jump(emitter, site, BC_JNZ, pred);
+	u32 jump = emit_conditional_jump(emitter, site, BC_JUMP_IF_NONZERO, pred);
 	record_jump_patch(emitter, jump, label);
 }
 
 static void jump_if_false_slot_to_label(BcEmitter *emitter, SourceSite site, i32 pred, Ir label)
 {
-	u32 jump = emit_conditional_jump(emitter, site, BC_JZ, pred);
+	u32 jump = emit_conditional_jump(emitter, site, BC_JUMP_IF_ZERO, pred);
 	record_jump_patch(emitter, jump, label);
 }
 
@@ -783,7 +754,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			u32 prototype_index = function->index;
 			if (function->capture_count == 0)
 			{
-				emit_bytecode_xy(emitter, site, BC_CLOSURE, out, prototype_index);
+				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, out, prototype_index);
 			}
 			else
 			{
@@ -798,7 +769,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 					prev_capture_slot ++;
 				}
 
-				emit_bytecode_xy(emitter, site, BC_CLOSURE, first_capture_slot, prototype_index);
+				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, first_capture_slot, prototype_index);
 				if (first_capture_slot != out) {
 					emit_move(emitter, site, out, first_capture_slot);
 				}
@@ -814,7 +785,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			}
 
 			out = ensure_slot(emitter, out);
-			emit_bytecode_xy(emitter, site, BC_LOADCVAL, out, expr->ir_load_capture->slot);
+			emit_bytecode_xy(emitter, site, BC_LOAD_CAPTURE, out, expr->ir_load_capture->slot);
 		}
 		break;
 
@@ -825,7 +796,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			}
 
 			out = ensure_slot(emitter, out);
-			emit_bytecode_xy(emitter, site, BC_CURRENT_CLOSURE, out, 0);
+			emit_bytecode_xy(emitter, site, BC_LOAD_CURRENT_CLOSURE, out, 0);
 		}
 		break;
 
@@ -956,7 +927,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 		case IR_BITWISE_NOT:
 		{
-			out = emit_unary_expr(emitter, expr, BC_BIT_NOT, out, nout);
+			out = emit_unary_expr(emitter, expr, BC_BITWISE_NOT, out, nout);
 		}
 		break;
 
@@ -973,28 +944,24 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		}
 		break;
 
-		case IR_EQ:
-		case IR_NOT_EQ:
-		case IR_LESS_THAN_EQ:
-		case IR_LESS_THAN:
-		case IR_DIV:
-		case IR_MUL:
-		case IR_MOD:
-		case IR_SUB:
-		case IR_ADD:
-		case IR_POW:
-		case IR_SHIFT_LEFT:
-		case IR_SHIFT_RIGHT:
-		case IR_INDEX:
-		case IR_FIELD:
-		case IR_META_FIELD:
-		case IR_BITWISE_XOR:
-		case IR_BITWISE_AND:
-		case IR_BITWISE_OR:
-		{
-			out = emit_binary_expr(emitter, expr, out, nout);
-		}
-		break;
+		case IR_EQ:           return emit_binary_expr(emitter, expr, BC_EQ, out, nout);
+		case IR_NOT_EQ:       return emit_binary_expr(emitter, expr, BC_NOT_EQ, out, nout);
+		case IR_LESS_THAN_EQ: return emit_binary_expr(emitter, expr, BC_LESS_THAN_EQ, out, nout);
+		case IR_LESS_THAN:    return emit_binary_expr(emitter, expr, BC_LESS_THAN, out, nout);
+		case IR_DIV:          return emit_binary_expr(emitter, expr, BC_DIV, out, nout);
+		case IR_MUL:          return emit_binary_expr(emitter, expr, BC_MUL, out, nout);
+		case IR_MOD:          return emit_binary_expr(emitter, expr, BC_MOD, out, nout);
+		case IR_SUB:          return emit_binary_expr(emitter, expr, BC_SUB, out, nout);
+		case IR_ADD:          return emit_binary_expr(emitter, expr, BC_ADD, out, nout);
+		case IR_POW:          return emit_binary_expr(emitter, expr, BC_POW, out, nout);
+		case IR_SHIFT_LEFT:   return emit_binary_expr(emitter, expr, BC_SHIFT_LEFT, out, nout);
+		case IR_SHIFT_RIGHT:  return emit_binary_expr(emitter, expr, BC_SHIFT_RIGHT, out, nout);
+		case IR_INDEX:        return emit_binary_expr(emitter, expr, BC_GET_INDEX, out, nout);
+		case IR_FIELD:        return emit_binary_expr(emitter, expr, BC_GET_FIELD, out, nout);
+		case IR_META_FIELD:   return emit_binary_expr(emitter, expr, BC_GET_META_FIELD, out, nout);
+		case IR_BITWISE_XOR:  return emit_binary_expr(emitter, expr, BC_BITWISE_XOR, out, nout);
+		case IR_BITWISE_AND:  return emit_binary_expr(emitter, expr, BC_BITWISE_AND, out, nout);
+		case IR_BITWISE_OR:   return emit_binary_expr(emitter, expr, BC_BITWISE_OR, out, nout);
 
 		default:
 		{
@@ -1030,7 +997,7 @@ static void emit_store(BcEmitter *emitter, SourceSite site, Ir destination, Ir e
 				i32 object_slot = emit_expr_to_slot(emitter, destination->ir_binary.x);
 				i32 field_slot = emit_expr_to_slot(emitter, destination->ir_binary.y);
 
-				emit_bytecode_xyz(emitter, site, BC_SETFIELD, object_slot, field_slot, value_slot);
+				emit_bytecode_xyz(emitter, site, BC_SET_FIELD, object_slot, field_slot, value_slot);
 			}
 			break;
 
@@ -1039,7 +1006,7 @@ static void emit_store(BcEmitter *emitter, SourceSite site, Ir destination, Ir e
 				i32 value_slot = emit_expr_to_slot(emitter, expr);
 				i32 array_slot = emit_expr_to_slot(emitter, destination->ir_binary.x);
 				i32 index_slot = emit_expr_to_slot(emitter, destination->ir_binary.y);
-				emit_bytecode_xyz(emitter, site, BC_SETINDEX, array_slot, index_slot, value_slot);
+				emit_bytecode_xyz(emitter, site, BC_SET_INDEX, array_slot, index_slot, value_slot);
 			}
 			break;
 
@@ -1108,7 +1075,7 @@ static void emit_stat(BcEmitter *emitter, Ir stat)
 			i32 slot_checkpoint = save_slots(emitter);
 			i32 array_slot = emit_expr_to_slot(emitter, stat->ir_binary.x);
 			i32 value_slot = emit_expr_to_slot(emitter, stat->ir_binary.y);
-			emit_bytecode_xy(emitter, stat->site, BC_ARRAYADD, array_slot, value_slot);
+			emit_bytecode_xy(emitter, stat->site, BC_ARRAY_APPEND, array_slot, value_slot);
 			restore_slots(emitter, slot_checkpoint);
 		}
 		break;
@@ -1336,7 +1303,7 @@ static void emit_function(BcEmitter *emitter, IrFunction *function)
 		ASSERT(!slot_is_valid(param->ir_local.slot));
 		param->ir_local.slot = (i32)i;
 		if (param->type_rule != TRULE_NONE) {
-			emit_bytecode_xy(emitter, param->site, BC_ENFORCE, param->ir_local.slot, param->type_rule);
+			emit_bytecode_xy(emitter, param->site, BC_CHECK_TYPE, param->ir_local.slot, param->type_rule);
 		}
 	}
 

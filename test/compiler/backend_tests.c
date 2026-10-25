@@ -144,10 +144,10 @@ done:
 
 static void backend_expect_no_eager_logical_bytecode(BackendCompileResult result, const char *label)
 {
-	if (backend_count_bytecode(result, BC_BIT_AND) != 0) {
+	if (backend_count_bytecode(result, BC_BITWISE_AND) != 0) {
 		test_fail(label);
 	}
-	if (backend_count_bytecode(result, BC_BIT_OR) != 0) {
+	if (backend_count_bytecode(result, BC_BITWISE_OR) != 0) {
 		test_fail(label);
 	}
 }
@@ -159,9 +159,7 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 	for (u32 i = 0; i < function->bytecode_count; ++ i)
 	{
 		Bytecode byte = bytes[i];
-		if (byte.b_type == BC_JUMP ||
-			byte.b_type == BC_JZ ||
-			byte.b_type == BC_JNZ)
+		if (byte.b_type == BC_JUMP || byte.b_type == BC_JUMP_IF_ZERO || byte.b_type == BC_JUMP_IF_NONZERO)
 		{
 			i32 target = (i32)i + byte.b_x;
 			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->bytecode_count) {
@@ -174,7 +172,7 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 
 static void backend_expect_min_conditional_jumps(BackendCompileResult result, u32 min_count, const char *label)
 {
-	u32 count = backend_count_bytecode(result, BC_JZ) + backend_count_bytecode(result, BC_JNZ);
+	u32 count = backend_count_bytecode(result, BC_JUMP_IF_ZERO) + backend_count_bytecode(result, BC_JUMP_IF_NONZERO);
 	if (count < min_count) {
 		test_fail(label);
 	}
@@ -182,9 +180,7 @@ static void backend_expect_min_conditional_jumps(BackendCompileResult result, u3
 
 static void backend_expect_jump_counts(BackendCompileResult result, u32 expected_jz, u32 expected_jnz, u32 expected_jump, const char *label)
 {
-	if (backend_count_bytecode(result, BC_JZ) != expected_jz ||
-		backend_count_bytecode(result, BC_JNZ) != expected_jnz ||
-		backend_count_bytecode(result, BC_JUMP) != expected_jump)
+	if (backend_count_bytecode(result, BC_JUMP_IF_ZERO) != expected_jz || backend_count_bytecode(result, BC_JUMP_IF_NONZERO) != expected_jnz || backend_count_bytecode(result, BC_JUMP) != expected_jump)
 	{
 		test_fail(label);
 	}
@@ -207,7 +203,7 @@ static void backend_expect_loop_jumps(BackendCompileResult result, u32 expected_
 			}
 			backward_jumps += 1;
 		}
-		else if (byte.b_type == BC_JZ || byte.b_type == BC_JNZ)
+		else if (byte.b_type == BC_JUMP_IF_ZERO || byte.b_type == BC_JUMP_IF_NONZERO)
 		{
 			i32 target = (i32)i + byte.b_x;
 			if (byte.b_x <= 0 || target <= (i32)i || target > (i32)function->bytecode_count) {
@@ -294,7 +290,7 @@ static void test_backend_while_loop(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/while_loop.elf");
 
-	if (backend_count_bytecode(result, BC_JZ) != 1) {
+	if (backend_count_bytecode(result, BC_JUMP_IF_ZERO) != 1) {
 		test_fail("while emits one loop-exit conditional jump");
 	}
 	if (backend_count_bytecode(result, BC_JUMP) != 1) {
@@ -308,7 +304,7 @@ static void test_backend_while_short_circuit_loop(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/while_short_circuit.elf");
 
-	if (backend_count_bytecode(result, BC_JZ) != 2) {
+	if (backend_count_bytecode(result, BC_JUMP_IF_ZERO) != 2) {
 		test_fail("while short-circuit predicate emits two false jumps");
 	}
 	if (backend_count_bytecode(result, BC_JUMP) != 1) {
@@ -328,19 +324,19 @@ static void test_backend_range_for_loop_shape(void)
 		"}\n"
 		"ret sum\n");
 
-	if (backend_count_bytecode(result, BC_JZ) != 1) {
+	if (backend_count_bytecode(result, BC_JUMP_IF_ZERO) != 1) {
 		test_fail("range for emits one loop-exit conditional jump");
 	}
 	if (backend_count_bytecode(result, BC_JUMP) != 1) {
 		test_fail("range for emits one loop-back jump");
 	}
-	if (backend_count_bytecode(result, BC_CALL) != 0 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+	if (backend_count_bytecode(result, BC_CALL_DIRECT) != 0 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
 		test_fail("plain range for does not emit calls");
 	}
-	if (backend_count_bytecode(result, BC_GETINDEX) != 0) {
+	if (backend_count_bytecode(result, BC_GET_INDEX) != 0) {
 		test_fail("plain range for does not index a collection");
 	}
-	if (backend_count_bytecode(result, BC_LOADNIL) != 0) {
+	if (backend_count_bytecode(result, BC_LOAD_NIL) != 0) {
 		test_fail("range for does not nil-initialize loop variables");
 	}
 	backend_expect_loop_jumps(result, 1, "range for patches exit and loop-back jumps");
@@ -357,15 +353,15 @@ static void test_backend_range_for_collection_call_is_hoisted(void)
 		"}\n"
 		"ret sum\n");
 
-	if (backend_count_bytecode(result, BC_DYNAMIC_CALL) != 1) {
+	if (backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
 		test_fail("range collection expression is evaluated once before the loop");
 	}
-	if (backend_count_bytecode(result, BC_GETINDEX) != 1) {
+	if (backend_count_bytecode(result, BC_GET_INDEX) != 1) {
 		test_fail("single-variable collection range for emits one indexed load in loop body");
 	}
 
-	i32 call = backend_find_first_bytecode(result, BC_DYNAMIC_CALL);
-	i32 loop_exit = backend_find_first_bytecode(result, BC_JZ);
+	i32 call = backend_find_first_bytecode(result, BC_CALL_DYNAMIC);
+	i32 loop_exit = backend_find_first_bytecode(result, BC_JUMP_IF_ZERO);
 	if (call < 0 || loop_exit < 0 || call >= loop_exit) {
 		test_fail("range collection call happens before loop condition");
 	}
@@ -376,22 +372,22 @@ static void test_backend_range_for_collection_call_is_hoisted(void)
 static void test_backend_array_bytecode(void)
 {
 	BackendCompileResult result = backend_test_compile_source("values := [1, 2, 3]\nvalues[1] = 9\nret values[1]");
-	if (backend_count_bytecode(result, BC_ARRAY) != 1 || backend_count_bytecode(result, BC_ARRAYADD) != 3)
+	if (backend_count_bytecode(result, BC_NEW_ARRAY) != 1 || backend_count_bytecode(result, BC_ARRAY_APPEND) != 3)
 	{
 		test_fail("array literal emits array allocation and append bytecodes");
 	}
-	if (backend_count_bytecode(result, BC_SETINDEX) != 1 || backend_count_bytecode(result, BC_GETINDEX) != 1)
+	if (backend_count_bytecode(result, BC_SET_INDEX) != 1 || backend_count_bytecode(result, BC_GET_INDEX) != 1)
 	{
 		test_fail("array indexed access emits generic index bytecodes");
 	}
-	if (backend_count_bytecode(result, BC_TABLE) != 0)
+	if (backend_count_bytecode(result, BC_NEW_TABLE) != 0)
 	{
 		test_fail("array literal does not emit table compatibility bytecodes");
 	}
 	backend_test_destroy(result);
 
 	result = backend_test_compile_source("ret {answer = 1}");
-	if (backend_count_bytecode(result, BC_TABLE) != 1 || backend_count_bytecode(result, BC_SETFIELD) != 1 || backend_count_bytecode(result, BC_ARRAYADD) != 0)
+	if (backend_count_bytecode(result, BC_NEW_TABLE) != 1 || backend_count_bytecode(result, BC_SET_FIELD) != 1 || backend_count_bytecode(result, BC_ARRAY_APPEND) != 0)
 	{
 		test_fail("keyed table literal emits only table field bytecodes");
 	}
@@ -401,7 +397,7 @@ static void test_backend_array_bytecode(void)
 static void test_backend_bitwise_not(void)
 {
 	BackendCompileResult result = backend_test_compile_source("ret ~1");
-	if (backend_count_bytecode(result, BC_BIT_NOT) != 1) {
+	if (backend_count_bytecode(result, BC_BITWISE_NOT) != 1) {
 		test_fail("bitwise not emits unary bytecode");
 	}
 	backend_test_destroy(result);
@@ -520,14 +516,14 @@ static void test_backend_emits_direct_static_call(void)
 		"add :: fun(a, b) { ret a + b }\n"
 		"ret add(2, 3)\n");
 
-	if (backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+	if (backend_count_bytecode(result, BC_CALL_DIRECT) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
 		test_fail("static function call emits one direct call");
 	}
-	if (backend_count_bytecode(result, BC_CLOSURE) != 0) {
+	if (backend_count_bytecode(result, BC_NEW_CLOSURE) != 0) {
 		test_fail("direct static function call does not allocate a closure");
 	}
 
-	i32 call_index = backend_find_first_bytecode(result, BC_CALL);
+	i32 call_index = backend_find_first_bytecode(result, BC_CALL_DIRECT);
 	if (call_index >= 0) {
 		Bytecode call = backend_test_bytes(result)[call_index];
 		if (call.b_y < 0 || (u32)call.b_y >= result.state->prototype_count || call.b_z != 3 || call.b_w != 1) {
@@ -546,7 +542,7 @@ static void test_backend_calls_imported_static_function(void)
 	}
 	else
 	{
-		if (result.state->prototype_count != 2 || backend_count_bytecode(result, BC_CALL) != 1 || backend_count_bytecode(result, BC_DYNAMIC_CALL) != 0) {
+		if (result.state->prototype_count != 2 || backend_count_bytecode(result, BC_CALL_DIRECT) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
 			test_fail("imported static function emits a direct call");
 		}
 
@@ -570,9 +566,9 @@ static void test_backend_emits_direct_static_recurse_call(void)
 		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
 		"ret count(3)\n");
 
-	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL);
-	u32 dynamic_calls = backend_count_all_bytecode(result, BC_DYNAMIC_CALL);
-	u32 closures = backend_count_all_bytecode(result, BC_CLOSURE);
+	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL_DIRECT);
+	u32 dynamic_calls = backend_count_all_bytecode(result, BC_CALL_DYNAMIC);
+	u32 closures = backend_count_all_bytecode(result, BC_NEW_CLOSURE);
 	if (direct_calls != 1 || dynamic_calls != 1) {
 		test_fail("static function call is direct while recurse calls the current closure");
 	}
@@ -588,9 +584,9 @@ static void test_backend_materializes_static_recurse_value(void)
 		"self :: fun() { ret recurse }\n"
 		"ret self()\n");
 
-	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL);
-	u32 dynamic_calls = backend_count_all_bytecode(result, BC_DYNAMIC_CALL);
-	u32 closures = backend_count_all_bytecode(result, BC_CLOSURE);
+	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL_DIRECT);
+	u32 dynamic_calls = backend_count_all_bytecode(result, BC_CALL_DYNAMIC);
+	u32 closures = backend_count_all_bytecode(result, BC_NEW_CLOSURE);
 	if (direct_calls != 1 || dynamic_calls != 0) {
 		test_fail("calling a static function that returns recurse remains direct");
 	}
@@ -611,7 +607,7 @@ static void test_backend_emits_parameter_type_enforcement(void)
 	{
 		elf_Prototype *function = prototype_from_index(result.state, 1);
 		Bytecode *bytes = function->bytecode;
-		if (function->bytecode_count < 2 || bytes[0].b_type != BC_ENFORCE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_ENFORCE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
+		if (function->bytecode_count < 2 || bytes[0].b_type != BC_CHECK_TYPE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_CHECK_TYPE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
 		{
 			test_fail("backend emits parameter type enforcement at function entry");
 		}

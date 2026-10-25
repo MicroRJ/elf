@@ -217,7 +217,14 @@ static Com_Value resolve_static_entity(Checker *checker, Entity *entity)
 	{
 		Ast expr = value.ast;
 		ASSERT(expr || !"Error: internal error, unresolved entity missing expression to resolve");
-		entity->en_static.value.type = COM_VALUE_RESOLVING;
+		if (expr->kind == AST_FUNCTION)
+		{
+			entity->en_static.value = (Com_Value) {.type = COM_VALUE_FUNCTION, .function = expr};
+		}
+		else
+		{
+			entity->en_static.value.type = COM_VALUE_RESOLVING;
+		}
 
 		// Note, we can lazily resolve entities from different sources
 		Scope *previous_source_scope = checker->source_scope;
