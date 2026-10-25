@@ -18,7 +18,7 @@ library := {
 	sources = [
 		"src/elf.c",
 		"src/bytecode.c",
-		"src/elf_core.c",
+		"src/elf_runtime.c",
 		"src/libs.c",
 		"src/elf_com.c",
 	],
@@ -34,7 +34,7 @@ library := {
 public_header_test := {
 	kind = "static_library",
 	name = "public_header_test",
-	sources = [ "test/core/public_header_compile_test.c" ],
+	sources = [ "test/runtime/public_header_compile_test.c" ],
 	private_include_directories = [ "include" ],
 }
 

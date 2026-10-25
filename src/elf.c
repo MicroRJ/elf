@@ -3,7 +3,7 @@
 //
 
 #include "elf.h"
-#include "elf_core.h"
+#include "elf_runtime.h"
 
 elf_SymTable *elf_open_core_libraries(elf_State *state);
 void elf_open_host_libraries(elf_State *state, elf_SymTable *elf_symbols);

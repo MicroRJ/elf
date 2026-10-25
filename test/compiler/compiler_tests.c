@@ -7,7 +7,7 @@
 #include <dy_process.h>
 
 #include "base.h"
-#include "elf_core.h"
+#include "elf_runtime.h"
 #include "bytecode.h"
 #include "elf_value_text.h"
 

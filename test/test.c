@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "test.h"
-#include "core/core_tests.c"
+#include "runtime/runtime_tests.c"
 #include "compiler/compiler_tests.c"
 
 int main(int argc, char **argv)
@@ -17,7 +17,7 @@ int main(int argc, char **argv)
 	// Start tests on a new line because Manny also prints status.
 	fprintf(stderr, "\n");
 
-	run_core_tests();
+	run_runtime_tests();
 	run_compiler_tests();
 	return test_finish("tests");
 }

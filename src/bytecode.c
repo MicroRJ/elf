@@ -6,7 +6,7 @@
 
 #include "elf.h"
 #include "bytecode.h"
-#include "elf_core.h"
+#include "elf_runtime.h"
 
 const char *bytecode_type_name(BcType type)
 {

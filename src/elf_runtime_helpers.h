@@ -2,8 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
-#ifndef ELF_CORE_HELPERS_H
-#define ELF_CORE_HELPERS_H
+#ifndef ELF_RUNTIME_HELPERS_H
+#define ELF_RUNTIME_HELPERS_H
 
 //
 // Value type predicates.

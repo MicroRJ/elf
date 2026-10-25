@@ -2,8 +2,8 @@
 // See Copyright Notice In elf.h
 //
 
-#ifndef ELF_CORE_H
-#define ELF_CORE_H
+#ifndef ELF_RUNTIME_H
+#define ELF_RUNTIME_H
 
 #include "base.h"
 #include "error.h"
@@ -369,6 +369,6 @@ void report_runtime_error(elf_State *state, ErrorCode code, const char *format, 
 // README: THIS IS ONLY FOR TESTING
 void print_current_runtime_source_location(elf_State *state);
 
-#include "elf_helpers.h"
+#include "elf_runtime_helpers.h"
 
 #endif

@@ -5,7 +5,7 @@
 
 #include "../test.h"
 #include "base.h"
-#include "elf_core.h"
+#include "elf_runtime.h"
 #include "elf_value_text.h"
 
 #define test_fail(label) TEST_FAIL("%s", (label))
@@ -18,7 +18,7 @@
 #include "api_tests.c"
 #undef test_fail
 
-static void run_core_tests(void)
+static void run_runtime_tests(void)
 {
 	elf_State *state = elf_create_state();
 	run_string_tests(state);

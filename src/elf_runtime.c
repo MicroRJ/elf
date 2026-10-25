@@ -16,7 +16,7 @@
 
 #include "logging.c"
 
-#include "elf_core.h"
+#include "elf_runtime.h"
 #include "source_diagnostics.c"
 #include "error.c"
 

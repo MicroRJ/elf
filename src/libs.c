@@ -9,7 +9,7 @@
 #include <dy_time.h>
 
 #include "elf.h"
-#include "elf_core.h"
+#include "elf_runtime.h"
 
 #include "l_math.c"
 #include "l_number.c"

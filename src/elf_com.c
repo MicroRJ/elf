@@ -15,7 +15,7 @@
 #include <dy_fs.h>
 
 #include "elf.h"
-#include "elf_core.h"
+#include "elf_runtime.h"
 #include "base.h"
 #include "bytecode.h"
 #include "compiler.h"
