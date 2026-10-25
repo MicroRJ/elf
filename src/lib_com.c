@@ -192,13 +192,7 @@ static b32 lib_push_jsonl(elf_State *state, dy_String name, dy_String source)
 
 static void json_push_error_value(elf_State *state, const char *message)
 {
-	elf_Table *info = elf_table_new(state);
-	push_value(state, value_from_error(info));
-
-	elf_Value message_key = value_from_string(elf_string_from_data(state, "message"));
-	elf_Value message_value = value_from_string(elf_string_from_data(state, message ? message : "JSON error"));
-	elf_table_set(state, info, message_key, message_value);
-
+	elf_push_error(state, message ? message : "JSON error");
 }
 
 static b32 json_writer_reserve(JsonWriter *writer, u64 additional)

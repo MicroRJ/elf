@@ -63,7 +63,7 @@ static inline elf_Object *value_as_object(elf_Value value)   { return value.x_ob
 static inline elf_String *value_as_string(elf_Value value)   { return value.x_string; }
 static inline elf_Table *value_as_table(elf_Value value)     { return value.x_tab; }
 static inline elf_Array *value_as_array(elf_Value value)     { return value.x_array; }
-static inline elf_Table *value_as_error(elf_Value value)     { return value.x_tab; }
+static inline elf_GCError *value_as_error(elf_Value value)   { return value.x_error; }
 static inline elf_ByteBuffer *value_as_buffer(elf_Value value){ return value.x_buffer; }
 static inline elf_UserObject *value_as_user(elf_Value value)  { return value.x_user; }
 static inline elf_Closure *value_as_closure(elf_Value value) { return value.x_closure; }
@@ -150,12 +150,12 @@ static inline elf_Value value_from_array(elf_Array *array)
 	return value;
 }
 
-static inline elf_Value value_from_error(elf_Table *info)
+static inline elf_Value value_from_error(elf_GCError *error)
 {
-	ASSERT(info != 0);
+	ASSERT(error != 0);
 	elf_Value value = {};
 	value.type = ELF_VALUE_TYPE_ERROR;
-	value.x_tab = info;
+	value.x_error = error;
 	return value;
 }
 
@@ -303,6 +303,7 @@ static inline elf_Table *elf_get_type_metatable(elf_State *state, elf_Value valu
 		case ELF_VALUE_TYPE_NUMBER:  return state->metatables.number;
 		case ELF_VALUE_TYPE_INTEGER: return state->metatables.integer;
 		case ELF_VALUE_TYPE_BUFFER:  return state->metatables.buffer;
+		case ELF_VALUE_TYPE_ERROR:   return state->metatables.error;
 		case ELF_VALUE_TYPE_USER_OBJECT: return value_as_user(value)->metatable;
 		default:                     return 0;
 	}

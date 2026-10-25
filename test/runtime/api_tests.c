@@ -210,31 +210,25 @@ static void test_api_errors(elf_State *state)
 	if (elf_type(state, error) != ELF_VALUE_TYPE_ERROR || !elf_is_error(state, error)) {
 		test_fail("API creates a tagged error value");
 	}
-	if (!elf_get_field(state, error, "message")) {
-		test_fail("API gets an error field");
-	}
-	else
+	elf_GCError *error_object = value_as_error(state->stack_ptr[-1]);
+	if (elf_string_size(error_object->message) != 12 || memcmp(elf_string_data(error_object->message), "host failure", 12) != 0)
 	{
-		elf_StrSlice message = {};
-		if (!elf_to_str(state, -1, &message) || !api_slice_matches(message, "host failure")) {
-			test_fail("API error retains its message");
-		}
-		elf_pop(state, 1);
+		test_fail("API error retains its message");
 	}
-
+	if (error_object->data)
+	{
+		test_fail("API error has no data by default");
+	}
+	if (elf_get_field(state, error, "message"))
+	{
+		test_fail("API does not treat errors as field tables");
+	}
 	elf_push_cstr(state, "host");
-	if (elf_set_field(state, error, "kind") != ELF_ERROR_NONE
-	|| !elf_get_field(state, error, "kind")) {
-		test_fail("API populates structured error fields");
-	}
-	else
+	if (elf_set_field(state, error, "kind") != ELF_ERROR_TYPE_MISMATCH)
 	{
-		elf_StrSlice kind = {};
-		if (!elf_to_str(state, -1, &kind) || !api_slice_matches(kind, "host")) {
-			test_fail("API structured error field retains its value");
-		}
-		elf_pop(state, 1);
+		test_fail("API does not treat errors as mutable field tables");
 	}
+	elf_pop(state, 1);
 
 	if (!elf_push_value_text(state, error)) {
 		test_fail("API formats an error value");

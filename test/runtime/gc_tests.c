@@ -238,26 +238,43 @@ static void test_gc_keeps_referenced_error_info(void)
 	elf_State *state = elf_create_state();
 	elf_Index checkpoint = elf_get_top(state);
 	u32 baseline_count = state->gc_reference_count;
-	elf_push_error(state, "retained error");
+	elf_Table *data = push_new_table(state);
+	elf_Value kind_key = value_from_string(elf_string_from_data(state, "kind"));
+	elf_Value kind_value = value_from_string(elf_string_from_data(state, "retained"));
+	elf_table_set(state, data, kind_key, kind_value);
+	elf_String *message = elf_string_from_data(state, "retained error");
+	push_value(state, value_from_string(message));
+	elf_GCError *created_error = elf_error_new(state, message, data);
+	pop_value(state);
+	pop_value(state);
+	push_value(state, value_from_error(created_error));
 	elf_Ref reference = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
 	force_gc_allocations(state, 256);
-	elf_StrSlice message = {};
-	if (!elf_push_ref(state, reference)
-	|| !elf_is_error(state, -1)
-	|| !elf_get_field(state, -1, "message")
-	|| !elf_to_str(state, -1, &message)
-	|| message.size != 14
-	|| memcmp(message.data, "retained error", 14) != 0) {
-		test_fail("error reference preserves its backing table through GC");
+	if (!elf_push_ref(state, reference) || !elf_is_error(state, -1))
+	{
+		test_fail("error reference survives GC");
+	}
+	else
+	{
+		elf_GCError *error = value_as_error(state->stack_ptr[-1]);
+		if (elf_string_size(error->message) != 14 || memcmp(elf_string_data(error->message), "retained error", 14) != 0)
+		{
+			test_fail("error reference preserves its message through GC");
+		}
+		elf_Value kind = elf_table_get_or_nil(state, error->data, kind_key);
+		if (!value_is_string(kind) || elf_string_size(value_as_string(kind)) != 8 || memcmp(elf_string_data(value_as_string(kind)), "retained", 8) != 0)
+		{
+			test_fail("error reference preserves its attached data through GC");
+		}
 	}
 
 	elf_set_top(state, checkpoint);
 	elf_release_ref(state, reference);
 	force_gc_allocations(state, 256);
 	expect_gc_reference_count_below(state, baseline_count + 8,
-		"released error backing table becomes collectible");
+		"released error becomes collectible");
 	elf_destroy_state(state);
 }
 

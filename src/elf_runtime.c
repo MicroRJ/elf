@@ -31,6 +31,7 @@
 #include "elf_user_object.c"
 #include "elf_array.c"
 #include "elf_table.c"
+#include "elf_error.c"
 
 #include "elf_gc.c"
 #include "elf_value_text.c"

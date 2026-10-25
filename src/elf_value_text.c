@@ -39,38 +39,9 @@ static void array_to_text(Arena *arena, elf_Array *array)
 	arena_push_text(arena, "]");
 }
 
-static elf_Value table_get_named_field(elf_Table *table, const char *name)
+static void error_to_text(Arena *arena, elf_GCError *error)
 {
-	u32 name_size = (u32)strlen(name);
-	for (u32 i = 0; i < table->capacity; ++i)
-	{
-		Entry entry = table->entries[i];
-		if (!elf_table_entry_is_key(entry))
-		{
-			continue;
-		}
-		elf_Value key = entry.key;
-		if (!value_is_string(key))
-		{
-			continue;
-		}
-		elf_String *string = value_as_string(key);
-		if (elf_string_size(string) == name_size && memcmp(elf_string_data(string), name, name_size) == 0) {
-			return entry.value;
-		}
-	}
-	return value_nil();
-}
-
-static void error_to_text(Arena *arena, elf_Table *info)
-{
-	elf_Value message = table_get_named_field(info, "message");
-	if (value_is_string(message)) {
-		arena_push_data(arena, elf_string_data(value_as_string(message)), elf_string_size(value_as_string(message)));
-	}
-	else {
-		arena_push_text(arena, "error");
-	}
+	arena_push_data(arena, elf_string_data(error->message), elf_string_size(error->message));
 }
 
 void elf_print_value(Arena *arena, elf_Value value)

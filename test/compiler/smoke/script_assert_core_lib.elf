@@ -19,18 +19,21 @@ failure := elf.error("file not found", error_details)
 test_assert(elf.type_of(failure) == "error")
 test_assert(elf.is_error(failure))
 test_assert(elf.is_error(error_details) == 0)
-test_assert(failure.message == "file not found")
-test_assert(failure.kind == "filesystem")
-test_assert(failure.code == 2)
-test_assert(failure.missing == nil)
+test_assert(failure:message() == "file not found")
+test_assert(failure:data() == error_details)
+test_assert(failure:data().kind == "filesystem")
+test_assert(failure:data().code == 2)
 test_assert(elf.to_string(failure) == "file not found")
 test_assert(elf.is_readonly(failure))
 error_details.kind = "changed"
-test_assert(failure.kind == "filesystem")
+test_assert(failure:data().kind == "changed")
 return_error := fun() ret failure
 test_assert(return_error() == failure)
 error_holder := [failure]
-test_assert(error_holder[0].message == "file not found")
+test_assert(error_holder[0]:message() == "file not found")
+
+empty_failure := elf.error("empty", nil)
+test_assert(empty_failure:data() == nil)
 
 test_assert(elf.is_string("elf"))
 test_assert(elf.is_string(7) == 0)

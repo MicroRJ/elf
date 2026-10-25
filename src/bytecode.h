@@ -68,7 +68,7 @@ Allocation
   Let n be the target prototype's capture count. Copy n captures beginning at r[x], then replace r[x] with the new closure.
 
 Access and mutation
-  BC_GET_FIELD: x = destination register, y = object register, z = key register. Read a table or error field into r[x].
+  BC_GET_FIELD: x = destination register, y = object register, z = key register. Read a table field into r[x].
   BC_GET_META_FIELD: x = destination register, y = receiver register, z = key register. Read the receiver's metatable entry into r[x].
   BC_GET_INDEX: x = destination register, y = object register, z = index/key register. Read an array, table, string, or buffer element.
   String and buffer indexing produces an integer byte. Array, string, and buffer indices are integers; negative indices count from the end.

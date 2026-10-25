@@ -673,6 +673,52 @@ static void test_vm_module_converts_atom_constants(void)
 	elf_destroy_state(state);
 }
 
+static void test_vm_error_snapshots_call_frames(void)
+{
+	elf_State *state = elf_create_state();
+	char source_text[] =
+		"make_error :: fun() ret elf.error(\"failure\", { kind = \"trace\" })\n"
+		"outer :: fun() ret make_error()\n"
+		"ret outer()";
+	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
+	if (elf_push_code_source(state, 0, ELF_LIT("error-trace"), source) != ELF_ERROR_NONE)
+	{
+		test_fail("error trace source compiles");
+		elf_destroy_state(state);
+		return;
+	}
+
+	elf_push_nil(state);
+	elf_call(state, 1, 1);
+	elf_Value result = state->stack_ptr[-1];
+	if (!value_is_error(result))
+	{
+		test_fail("error trace source returns an error");
+	}
+	else
+	{
+		elf_GCError *error = value_as_error(result);
+		if (error->frame_count != 3)
+		{
+			TEST_FAIL("error snapshots 3 bytecode frames, got %u", error->frame_count);
+		}
+		for (u32 index = 0; index < error->frame_count; ++index)
+		{
+			elf_ErrorFrame frame = error->frames[index];
+			if (!frame.prototype || frame.instruction >= frame.prototype->bytecode_count)
+			{
+				test_fail("error snapshot contains valid bytecode locations");
+			}
+		}
+		if (!error->data)
+		{
+			test_fail("error snapshot retains attached data");
+		}
+	}
+
+	elf_destroy_state(state);
+}
+
 static void run_vm_tests(void)
 {
 	TEST_RUN("vm.return_int", test_vm_return_int);
@@ -701,4 +747,5 @@ static void run_vm_tests(void)
 	TEST_RUN("vm.runtime_error_diagnostics", test_vm_runtime_error_diagnostics);
 	TEST_RUN("vm.module_emitter_grows_constant_arrays", test_vm_module_emitter_grows_constant_arrays);
 	TEST_RUN("vm.module_converts_atom_constants", test_vm_module_converts_atom_constants);
+	TEST_RUN("vm.error_snapshots_call_frames", test_vm_error_snapshots_call_frames);
 }

@@ -17,6 +17,7 @@ typedef struct elf_String     elf_String;
 typedef struct elf_Table      elf_Table;
 typedef struct elf_Array      elf_Array;
 typedef struct elf_Closure    elf_Closure;
+typedef struct elf_GCError    elf_GCError;
 typedef struct elf_ByteBuffer elf_ByteBuffer;
 typedef struct elf_UserObject elf_UserObject;
 typedef struct elf_Prototype   elf_Prototype;
@@ -37,6 +38,7 @@ typedef enum
 	ELF_OBJECT_CLOSURE,
 	ELF_OBJECT_TABLE,
 	ELF_OBJECT_STRING,
+	ELF_OBJECT_ERROR,
 	ELF_OBJECT_BUFFER,
 	ELF_OBJECT_ARRAY,
 	ELF_OBJECT_COUNT,
@@ -64,6 +66,7 @@ struct elf_Value
 		elf_Table      *x_tab;
 		elf_Array      *x_array;
 		elf_String     *x_string;
+		elf_GCError    *x_error;
 		elf_ByteBuffer *x_buffer;
 		elf_UserObject *x_user;
 		elf_Function    x_proc;
@@ -194,6 +197,22 @@ struct elf_Prototype
 	u32                 source_map_count;
 };
 
+typedef struct
+{
+	elf_Prototype *prototype;
+	u32            instruction;
+}
+elf_ErrorFrame;
+
+struct elf_GCError
+{
+	elf_Object     obj;
+	elf_String    *message;
+	elf_Table     *data;
+	u32            frame_count;
+	elf_ErrorFrame frames[];
+};
+
 struct elf_Source
 {
 	elf_Source *next;
@@ -309,6 +328,7 @@ struct elf_State
 		elf_Table *table;
 		elf_Table *array;
 		elf_Table *buffer;
+		elf_Table *error;
 		elf_Table *fs_file;
 	}
 	metatables;
@@ -335,6 +355,7 @@ void elf_sources_destroy(elf_State *state);
 void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 
 elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Value *captures, u32 capture_count);
+elf_GCError *elf_error_new(elf_State *state, elf_String *message, elf_Table *data);
 
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 

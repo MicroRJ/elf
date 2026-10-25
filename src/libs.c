@@ -20,6 +20,7 @@
 #include "l_array.c"
 #include "l_string.c"
 #include "l_buffer.c"
+#include "l_error.c"
 
 //
 // Standard host libraries.
@@ -43,6 +44,7 @@ elf_SymTable *elf_open_core_libraries(elf_State *state)
 	state->metatables.table = elf_lib_table(state);
 	state->metatables.array = elf_lib_array(state);
 	state->metatables.buffer = elf_lib_buffer(state);
+	state->metatables.error = elf_lib_error(state);
 
 	// The library constructors push each table while building the graph. The
 	// metatables have dedicated roots in the collector.

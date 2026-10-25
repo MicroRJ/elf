@@ -175,6 +175,9 @@ static u32 gc_mark_metatables(elf_State *state)
 	if (state->metatables.buffer) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.buffer);
 	}
+	if (state->metatables.error) {
+		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.error);
+	}
 	if (state->metatables.fs_file) {
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->metatables.fs_file);
 	}
@@ -279,6 +282,15 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		}
 		else if (reference->type == ELF_OBJECT_BUFFER)
 		{
+		}
+		else if (reference->type == ELF_OBJECT_ERROR)
+		{
+			elf_GCError *error = (elf_GCError *)reference;
+			marked_count += gc_mark_reachable(state, (elf_Object *)error->message);
+			if (error->data)
+			{
+				marked_count += gc_mark_reachable(state, (elf_Object *)error->data);
+			}
 		}
 		else if (reference->type == ELF_OBJECT_USER)
 		{

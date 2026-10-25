@@ -44,11 +44,10 @@ void elf_push_str(elf_State *state, const char *data, elf_Size size)
 
 void elf_push_error(elf_State *state, const char *message)
 {
-	elf_Table *info = elf_table_new(state);
-	push_value(state, value_from_error(info));
-	elf_push_cstr(state, message ? message : "error");
-	elf_Value key = value_from_string(elf_string_from_data(state, "message"));
-	elf_table_set(state, info, key, pop_value(state));
+	elf_String *error_message = elf_string_from_data(state, message ? message : "error");
+	push_value(state, value_from_string(error_message));
+	elf_GCError *error = elf_error_new(state, error_message, 0);
+	state->stack_ptr[-1] = value_from_error(error);
 }
 
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
@@ -83,22 +82,11 @@ static elf_Bool table_at(elf_State *state, elf_Index index, elf_Table **table)
 	return true;
 }
 
-static elf_Bool field_table_at(elf_State *state, elf_Index index, elf_Table **table)
-{
-	elf_Value *value = value_at(state, index);
-	if (!value) return false;
-	if (value_is_table(*value)) *table = value_as_table(*value);
-	else if (value_is_error(*value)) *table = value_as_error(*value);
-	else return false;
-	return true;
-}
-
 static elf_ErrorCode field_table_at_for_write(elf_State *state, elf_Index index, elf_Table **table)
 {
 	elf_Value *value = value_at(state, index);
 	if (!value) return ELF_ERROR_INVALID_INDEX;
 	if (value_is_table(*value)) *table = value_as_table(*value);
-	else if (value_is_error(*value)) *table = value_as_error(*value);
 	else return ELF_ERROR_TYPE_MISMATCH;
 	return ELF_ERROR_NONE;
 }
@@ -309,7 +297,7 @@ elf_Bool elf_length(elf_State *state, elf_Index index, elf_u32 *length)
 elf_Bool elf_get_field(elf_State *state, elf_Index index, const char *field)
 {
 	elf_Table *table;
-	if (!field || !field_table_at(state, index, &table)) return false;
+	if (!field || !table_at(state, index, &table)) return false;
 	elf_Value key = value_from_string(elf_string_from_data(state, field));
 	push_value(state, elf_table_get_or_nil(state, table, key));
 	return true;

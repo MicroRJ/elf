@@ -54,14 +54,20 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 	{
 		message = arena_pushf(scratch.arena, "%s failed (error %u)", operation, (u32)result.error);
 	}
-	elf_push_error(state, message.data ? message.data : "file operation failed");
+	elf_String *error_message = elf_string_from_data(state, message.data ? message.data : "file operation failed");
+	push_value(state, value_from_string(error_message));
 	scratch_end(scratch);
 
-	elf_Index error = elf_abs_index(state, -1);
-	elf_push_int(state, result.error);
-	elf_set_field(state, error, "code");
-	elf_push_int(state, result.os_error);
-	elf_set_field(state, error, "os_code");
+	elf_Table *data = push_new_table(state);
+	elf_Value code_key = value_from_string(elf_string_from_data(state, "code"));
+	elf_table_set(state, data, code_key, value_from_integer(result.error));
+	elf_Value os_code_key = value_from_string(elf_string_from_data(state, "os_code"));
+	elf_table_set(state, data, os_code_key, value_from_integer(result.os_error));
+
+	elf_GCError *error = elf_error_new(state, error_message, data);
+	pop_value(state);
+	pop_value(state);
+	push_value(state, value_from_error(error));
 }
 
 static b32 fs_check_arg_count(elf_State *state, int nargs, int minimum, int maximum, const char *operation)

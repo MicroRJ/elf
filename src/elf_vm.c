@@ -419,18 +419,13 @@ activate_frame:
 					report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "nil is not a valid field");
 				}
 
-				switch (object.type) {
-					case ELF_VALUE_TYPE_TABLE: {
-						*result = elf_table_get_or_nil(state, value_as_table(object), field);
-					} break;
-
-					case ELF_VALUE_TYPE_ERROR: {
-						*result = elf_table_get_or_nil(state, value_as_error(object), field);
-					} break;
-
-					default: {
-						vm_error_invalid_field_arguments(state, object, field);
-					} break;
+				if (value_is_table(object))
+				{
+					*result = elf_table_get_or_nil(state, value_as_table(object), field);
+				}
+				else
+				{
+					vm_error_invalid_field_arguments(state, object, field);
 				}
 			} break;
 
@@ -451,9 +446,6 @@ activate_frame:
 				}
 				else if (value_is_string(table)) {
 					report_runtime_error(state, ERROR_READONLY, "strings are readonly, you may not change them");
-				}
-				else if (value_is_error(table)) {
-					report_runtime_error(state, ERROR_READONLY, "errors are readonly, you may not change them");
 				}
 				else {
 					report_runtime_error(state, ERROR_TYPE_MISMATCH, "attempted to set field of '%s' value", value_type_name(table.type));

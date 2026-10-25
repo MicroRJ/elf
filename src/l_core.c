@@ -109,7 +109,7 @@ ELF_FUNCTION(l_core_is_readonly)
 	lib_check_arg_count(S, "is_readonly", nargs, 1, 1);
 	elf_Value value = load_value(S, 1);
 	check_value_type_rule(S, value, TRULE_OBJECT);
-	push_value(S, value_from_integer(value_is_error(value) || (value_as_object(value)->status & ELF_OBJECT_READONLY) != 0));
+	push_value(S, value_from_integer((value_as_object(value)->status & ELF_OBJECT_READONLY) != 0));
 	return 1;
 }
 
@@ -132,32 +132,18 @@ ELF_FUNCTION(l_core_error)
 {
 	lib_check_arg_count(S, "error", nargs, 1, 2);
 	elf_String *message = lib_load_string(S, 1);
-	elf_Table *details = 0;
+	elf_Table *data = 0;
 	if (nargs > 2)
 	{
-		elf_Value details_value = load_value(S, 2);
-		check_value_type(S, details_value, ELF_VALUE_TYPE_TABLE);
-		details = value_as_table(details_value);
-	}
-
-	elf_Table *info = elf_table_new(S);
-	push_value(S, value_from_error(info));
-
-	if (details)
-	{
-		for (u32 i = 0; i < details->capacity; ++i)
+		elf_Value data_value = load_value(S, 2);
+		if (!value_is_nil(data_value))
 		{
-			Entry entry = details->entries[i];
-			if (!elf_table_entry_is_key(entry))
-			{
-				continue;
-			}
-			elf_table_set(S, info, entry.key, entry.value);
+			check_value_type(S, data_value, ELF_VALUE_TYPE_TABLE);
+			data = value_as_table(data_value);
 		}
 	}
 
-	elf_Value message_key = value_from_string(elf_string_from_data(S, "message"));
-	elf_table_set(S, info, message_key, value_from_string(message));
+	push_value(S, value_from_error(elf_error_new(S, message, data)));
 	return 1;
 }
 
