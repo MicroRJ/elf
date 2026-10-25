@@ -1,4 +1,8 @@
 
+elf.error("Welcome!")
+elf.printl("calling a function that returns an error should automatically raise it")
+
+#eof
 cyclic_def :: fun() {
 	cyclic_def()
 }

@@ -170,7 +170,7 @@ static void test_api_arrays(elf_State *state)
 	}
 	elf_pop(state, 1);
 
-	elf_Array *array = value_as_array(state->frame->framebase[array_index]);
+	elf_Array *array = value_as_array(state->frame->arguments[array_index]);
 	array->obj.status |= ELF_OBJECT_READONLY;
 	elf_push_int(state, 30);
 	top = elf_get_top(state);
@@ -418,7 +418,7 @@ static void test_api_mutation_errors(elf_State *state)
 		test_fail("API rejects appending to tables and preserves the value being written");
 	}
 
-	elf_Table *table = value_as_table(state->frame->framebase[table_index]);
+	elf_Table *table = value_as_table(state->frame->arguments[table_index]);
 	table->obj.status |= ELF_OBJECT_READONLY;
 	if (elf_set_field(state, table_index, "field") != ELF_ERROR_READONLY
 	|| elf_get_top(state) != value_top) {

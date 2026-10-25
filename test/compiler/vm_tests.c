@@ -52,7 +52,7 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 		elf_call(S, 1, 0);
 		StackFrame *restored_caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
 		preserved = S->frame == native_frame_pointer &&
-			S->frame->framebase == native_frame.framebase && S->frame->registers == native_frame.registers &&
+			S->frame->arguments == native_frame.arguments && S->frame->registers == native_frame.registers &&
 			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs && S->frame->nrets == native_frame.nrets &&
 			!S->frame->prototype && restored_caller &&
 			restored_caller->prototype == caller_prototype &&
@@ -87,7 +87,7 @@ static void vm_expect_int(const char *path, i64 expected, const char *label)
 {
 	VmRunResult result = vm_test_run_file(path);
 	if (!value_is_integer(result.value) || value_as_integer(result.value) != expected) {
-		TEST_FAIL("%s expected int %lld, got tag %d value %lld", label, (long long)expected, value_type(result.value), (long long)value_as_integer(result.value));
+		TEST_FAIL("%s expected int %lld, got tag %d (%s) value %lld", label, (long long)expected, value_type(result.value), value_type_name(result.value.type), (long long)value_as_integer(result.value));
 	}
 	elf_destroy_state(result.state);
 }

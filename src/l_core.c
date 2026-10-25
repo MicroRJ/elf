@@ -223,7 +223,7 @@ ELF_FUNCTION(l_core_varg)
 	i64 count = caller->variadic ? caller->nargs - caller->arity : 0;
 
 	if (index < 0 || index >= count) push_value(S, value_nil());
-	else push_value(S, caller->framebase[caller->arity + index]);
+	else push_value(S, caller->arguments[caller->arity + index]);
 	return 1;
 }
 
@@ -247,7 +247,7 @@ ELF_FUNCTION(l_core_arg)
 	StackFrame *caller = core_caller_frame(S);
 	i64 index = lib_load_integer(S, 1);
 	if (index < 0 || index >= caller->nargs) push_value(S, value_nil());
-	else push_value(S, caller->framebase[index]);
+	else push_value(S, caller->arguments[index]);
 	return 1;
 }
 

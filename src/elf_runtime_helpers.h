@@ -452,7 +452,7 @@ static inline elf_Value load_value(elf_State *S, int x)
 	if (x < 0 || x >= S->frame->nargs) {
 		report_runtime_error(S, ERROR_INVALID_ARGUMENT, "invalid argument index: %i, got: %i", x, S->frame->nargs);
 	}
-	return S->frame->framebase[x];
+	return S->frame->arguments[x];
 }
 
 //

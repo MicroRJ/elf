@@ -71,7 +71,7 @@ static elf_Value *value_at(elf_State *state, elf_Index index)
 	elf_Index top = elf_get_top(state);
 	elf_Index absolute = index < 0 ? top + index : index;
 	if (absolute < 0 || absolute >= top) return 0;
-	return state->frame->framebase + absolute;
+	return state->frame->arguments + absolute;
 }
 
 static elf_Bool table_at(elf_State *state, elf_Index index, elf_Table **table)
@@ -113,7 +113,7 @@ static elf_Bool values_equal(elf_Value left, elf_Value right)
 
 elf_Index elf_get_top(elf_State *state)
 {
-	return (elf_Index)(state->stack_ptr - state->frame->framebase);
+	return (elf_Index)(state->stack_ptr - state->frame->arguments);
 }
 
 elf_u32 elf_arg_count(elf_State *state)
@@ -135,15 +135,15 @@ elf_Bool elf_is_valid(elf_State *state, elf_Index index)
 elf_ErrorCode elf_set_top(elf_State *state, elf_Index top)
 {
 	elf_Index current = elf_get_top(state);
-	elf_Index capacity = (elf_Index)(state->stack + state->stack_size - state->frame->framebase);
+	elf_Index capacity = (elf_Index)(state->stack + state->stack_size - state->frame->arguments);
 	if (top < (elf_i32)state->frame->framesize || top > capacity) return ELF_ERROR_OUT_OF_RANGE;
 	while (current < top) {
 		push_value(state, value_nil());
 		current += 1;
 	}
 	if (current > top) {
-		value_zero_many(state->frame->framebase + top, current - top);
-		state->stack_ptr = state->frame->framebase + top;
+		value_zero_many(state->frame->arguments + top, current - top);
+		state->stack_ptr = state->frame->arguments + top;
 	}
 	return ELF_ERROR_NONE;
 }
@@ -325,7 +325,7 @@ elf_ErrorCode elf_set_field_slice(elf_State *state, elf_Index index, elf_StrSlic
 	if (error != ELF_ERROR_NONE) {
 		return error;
 	}
-	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) {
+	if (state->stack_ptr <= state->frame->arguments + (elf_i32)state->frame->framesize) {
 		return ELF_ERROR_STACK_UNDERFLOW;
 	}
 	if (table_is_readonly(table)) {
@@ -364,7 +364,7 @@ elf_ErrorCode elf_set_index(elf_State *state, elf_Index index, elf_u32 element)
 {
 	elf_Value *target = value_at(state, index);
 	if (!target) return ELF_ERROR_INVALID_INDEX;
-	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
+	if (state->stack_ptr <= state->frame->arguments + (elf_i32)state->frame->framesize) return ELF_ERROR_STACK_UNDERFLOW;
 	if (value_is_array(*target))
 	{
 		elf_Array *array = value_as_array(*target);
@@ -409,7 +409,7 @@ elf_ErrorCode elf_append(elf_State *state, elf_Index index)
 	{
 		return ELF_ERROR_INVALID_INDEX;
 	}
-	if (state->stack_ptr <= state->frame->framebase + (elf_i32)state->frame->framesize)
+	if (state->stack_ptr <= state->frame->arguments + (elf_i32)state->frame->framesize)
 	{
 		return ELF_ERROR_STACK_UNDERFLOW;
 	}

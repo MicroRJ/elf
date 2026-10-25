@@ -86,7 +86,7 @@ static void bootstrap_base_frame(elf_State *state)
 {
 	push_value(state, value_nil());
 
-	state->frame->framebase = state->stack;
+	state->frame->arguments = state->stack;
 	state->frame->framesize = 16;
 	state->frame->prototype = 0;
 }
@@ -95,7 +95,7 @@ static void reserve_bootstrap_frame_stack_space(elf_State *state)
 {
 	ASSERT((state->stack_ptr - state->stack) < state->frame->framesize);
 
-	elf_Value *stack_pointer = state->frame->framebase + state->frame->framesize;
+	elf_Value *stack_pointer = state->frame->arguments + state->frame->framesize;
 	ASSERT(stack_pointer >= state->stack_ptr);
 	value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
 	state->stack_ptr = stack_pointer;

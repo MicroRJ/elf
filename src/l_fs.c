@@ -90,7 +90,7 @@ static b32 fs_check_arg_count(elf_State *state, int nargs, int minimum, int maxi
 
 static b32 fs_load_file_receiver(elf_State *state, FsFile **result)
 {
-	elf_Value value = state->frame->framebase[0];
+	elf_Value value = state->frame->arguments[0];
 	b32 valid = value_is_user(value) && value_as_user(value)->type == &fs_file_type;
 	if (!valid)
 	{
@@ -105,7 +105,7 @@ static b32 fs_load_file_receiver(elf_State *state, FsFile **result)
 
 static b32 fs_load_buffer(elf_State *state, u32 index, elf_ByteBuffer **result)
 {
-	elf_Value value = state->frame->framebase[index];
+	elf_Value value = state->frame->arguments[index];
 	b32 valid = value_is_buffer(value);
 	if (!valid)
 	{
@@ -120,7 +120,7 @@ static b32 fs_load_buffer(elf_State *state, u32 index, elf_ByteBuffer **result)
 
 static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i64 *result)
 {
-	elf_Value value = state->frame->framebase[index];
+	elf_Value value = state->frame->arguments[index];
 	b32 valid = value_is_numeric(value);
 	if (!valid)
 	{
@@ -135,7 +135,7 @@ static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i
 
 static b32 fs_load_string(elf_State *state, u32 index, const char *operation, dy_String *result)
 {
-	elf_Value value = state->frame->framebase[index];
+	elf_Value value = state->frame->arguments[index];
 	b32 valid = value_is_string(value);
 	if (!valid)
 	{
