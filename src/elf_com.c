@@ -19,7 +19,6 @@
 #include "base.h"
 #include "bytecode.h"
 #include "compiler.h"
-#include "lib_com.h"
 #include "token.h"
 #include "atom.c"
 #include "ast.h"

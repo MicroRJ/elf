@@ -10,7 +10,6 @@
 
 #include "elf.h"
 #include "elf_core.h"
-#include "libs.h"
 
 #include "l_math.c"
 #include "l_number.c"

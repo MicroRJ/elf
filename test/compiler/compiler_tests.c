@@ -8,7 +8,6 @@
 
 #include "base.h"
 #include "elf_core.h"
-#include "libs.h"
 #include "bytecode.h"
 #include "elf_value_text.h"
 

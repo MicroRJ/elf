@@ -4,8 +4,10 @@
 
 #include "elf.h"
 #include "elf_core.h"
-#include "libs.h"
-#include "lib_com.h"
+
+elf_SymTable *elf_open_core_libraries(elf_State *state);
+void elf_open_host_libraries(elf_State *state, elf_SymTable *elf_symbols);
+void elf_open_compiler_libraries(elf_State *state, elf_SymTable *elf_symbols);
 
 elf_State *elf_create_state(void)
 {
