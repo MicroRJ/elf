@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-static b32 buffer_require_writable(elf_State *state, elf_ByteBuffer *buffer)
+b32 elf_buffer_require_writable(elf_State *state, elf_ByteBuffer *buffer)
 {
 	if (buffer->obj.status & ELF_OBJECT_READONLY)
 	{
@@ -32,7 +32,7 @@ elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity)
 b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capacity)
 {
 	ASSERT(buffer);
-	if (!buffer_require_writable(state, buffer)) return false;
+	if (!elf_buffer_require_writable(state, buffer)) return false;
 	if (capacity <= buffer->capacity) return true;
 
 	u32 grown = buffer->capacity ? buffer->capacity : 16;
@@ -61,7 +61,7 @@ b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capa
 b32 elf_buffer_resize_object(elf_State *state, elf_ByteBuffer *buffer, u32 size)
 {
 	ASSERT(buffer);
-	if (!buffer_require_writable(state, buffer)) return false;
+	if (!elf_buffer_require_writable(state, buffer)) return false;
 	u32 previous_size = buffer->size;
 	if (!elf_buffer_reserve_object(state, buffer, size)) return false;
 	if (size > previous_size) zero_memory(buffer->data + previous_size, size - previous_size);
@@ -73,7 +73,7 @@ b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const voi
 {
 	ASSERT(buffer);
 	ASSERT(data || !size);
-	if (!buffer_require_writable(state, buffer)) return false;
+	if (!elf_buffer_require_writable(state, buffer)) return false;
 	if (size > UINT32_MAX - buffer->size)
 	{
 		report_runtime_error(state, ERROR_OUT_OF_RANGE,
@@ -113,7 +113,7 @@ b32 elf_buffer_splice_object(elf_State *state, elf_ByteBuffer *buffer, u32 posit
 {
 	ASSERT(buffer);
 	ASSERT(data || !insert_size);
-	if (!buffer_require_writable(state, buffer)) return false;
+	if (!elf_buffer_require_writable(state, buffer)) return false;
 	if (position > buffer->size || delete_size > buffer->size - position)
 	{
 		report_runtime_error(state, ERROR_OUT_OF_RANGE,

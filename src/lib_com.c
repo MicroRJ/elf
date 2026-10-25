@@ -513,7 +513,7 @@ static elf_SymTable *elf_lib_json(void)
 	return new_symbol_table(l_json, ARRAY_COUNT(l_json));
 }
 
-void elf_com_open_libs(elf_State *state, elf_SymTable *elf_symbols)
+void elf_open_compiler_libraries(elf_State *state, elf_SymTable *elf_symbols)
 {
 	ASSERT(state);
 	ASSERT(elf_symbols);

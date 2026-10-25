@@ -319,6 +319,8 @@ struct elf_State
 #define ELF_GC_NEXT_MIN ((u32)MEGABYTES(1))
 #define ELF_GC_NEXT_MAX ((u32)GIGABYTES(1))
 
+elf_State *elf_runtime_create_state(void);
+
 void *elf_alloc(elf_State *state, elf_u64 size);
 void *elf_alloc_zero(elf_State *state, elf_u64 size);
 void *elf_realloc(elf_State *state, void *memory, elf_u64 old_size, elf_u64 new_size);
@@ -337,6 +339,7 @@ elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Val
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 
 elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity);
+b32 elf_buffer_require_writable(elf_State *state, elf_ByteBuffer *buffer);
 b32 elf_buffer_reserve_object(elf_State *state, elf_ByteBuffer *buffer, u32 capacity);
 b32 elf_buffer_resize_object(elf_State *state, elf_ByteBuffer *buffer, u32 size);
 b32 elf_buffer_append_object(elf_State *state, elf_ByteBuffer *buffer, const void *data, u32 size);
@@ -345,6 +348,9 @@ b32 elf_buffer_splice_object(elf_State *state, elf_ByteBuffer *buffer, u32 posit
 elf_UserObject *elf_user_object_new(elf_State *state, const elf_UserType *type, elf_Table *metatable, u32 size);
 
 elf_Array *elf_array_new(elf_State *state);
+void elf_array_check_write(elf_State *state, elf_Array *array);
+void elf_array_reserve(elf_State *state, elf_Array *array, u32 min_capacity);
+elf_Value *elf_array_slot(elf_State *state, elf_Array *array, u32 index);
 u32 elf_array_add(elf_State *state, elf_Array *array, elf_Value value);
 elf_Value elf_array_get(elf_State *state, elf_Array *array, u32 index);
 void elf_array_set(elf_State *state, elf_Array *array, u32 index, elf_Value value);

@@ -4,7 +4,7 @@
 
 #define ARRAY_INITIAL_CAPACITY 8
 
-static void array_check_write(elf_State *state, elf_Array *array)
+void elf_array_check_write(elf_State *state, elf_Array *array)
 {
 	if (array->obj.status & ELF_OBJECT_READONLY)
 	{
@@ -12,7 +12,7 @@ static void array_check_write(elf_State *state, elf_Array *array)
 	}
 }
 
-static void array_reserve(elf_State *state, elf_Array *array, u32 min_capacity)
+void elf_array_reserve(elf_State *state, elf_Array *array, u32 min_capacity)
 {
 	if (array->capacity < min_capacity)
 	{
@@ -30,7 +30,7 @@ static void array_reserve(elf_State *state, elf_Array *array, u32 min_capacity)
 	}
 }
 
-static elf_Value *array_slot(elf_State *state, elf_Array *array, u32 index)
+elf_Value *elf_array_slot(elf_State *state, elf_Array *array, u32 index)
 {
 	check_array_index(state, index, array->count);
 	return array->items + index;
@@ -48,8 +48,8 @@ u32 elf_array_length(elf_Array *array)
 
 u32 elf_array_add(elf_State *state, elf_Array *array, elf_Value value)
 {
-	array_check_write(state, array);
-	array_reserve(state, array, array->count + 1);
+	elf_array_check_write(state, array);
+	elf_array_reserve(state, array, array->count + 1);
 	u32 index = array->count++;
 	array->items[index] = value;
 	return index;
@@ -57,11 +57,11 @@ u32 elf_array_add(elf_State *state, elf_Array *array, elf_Value value)
 
 elf_Value elf_array_get(elf_State *state, elf_Array *array, u32 index)
 {
-	return *array_slot(state, array, index);
+	return *elf_array_slot(state, array, index);
 }
 
 void elf_array_set(elf_State *state, elf_Array *array, u32 index, elf_Value value)
 {
-	array_check_write(state, array);
-	*array_slot(state, array, index) = value;
+	elf_array_check_write(state, array);
+	*elf_array_slot(state, array, index) = value;
 }

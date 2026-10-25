@@ -29,7 +29,7 @@ static b32 array_normalize_index(elf_State *state, i64 index, u32 length, b32 al
 
 static void array_remove(elf_State *state, elf_Array *array, u32 index, u32 count)
 {
-	array_check_write(state, array);
+	elf_array_check_write(state, array);
 	if (index > array->count || count > array->count - index)
 	{
 		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array range out of bounds: index %u, count %u, length %u", index, count, array->count);
@@ -46,7 +46,7 @@ static void array_remove(elf_State *state, elf_Array *array, u32 index, u32 coun
 
 static void array_splice(elf_State *state, elf_Array *array, u32 index, u32 delete_count, elf_Array *replacement)
 {
-	array_check_write(state, array);
+	elf_array_check_write(state, array);
 	if (index > array->count || delete_count > array->count - index)
 	{
 		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array splice range is out of bounds");
@@ -73,7 +73,7 @@ static void array_splice(elf_State *state, elf_Array *array, u32 index, u32 dele
 
 	u32 old_count = array->count;
 	u32 new_count = count_after_delete + insert_count;
-	array_reserve(state, array, new_count);
+	elf_array_reserve(state, array, new_count);
 	u32 tail_count = old_count - index - delete_count;
 	if (tail_count) {
 		memmove(array->items + index + insert_count, array->items + index + delete_count, (u64)tail_count * sizeof(*array->items));
@@ -90,13 +90,13 @@ static void array_splice(elf_State *state, elf_Array *array, u32 index, u32 dele
 
 static u32 array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value value)
 {
-	array_check_write(state, array);
+	elf_array_check_write(state, array);
 	if (index > array->count)
 	{
 		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array insert index %u is out of bounds for length %u", index, array->count);
 	}
 
-	array_reserve(state, array, array->count + 1);
+	elf_array_reserve(state, array, array->count + 1);
 	memmove(array->items + index + 1, array->items + index, (u64)(array->count - index) * sizeof(*array->items));
 	array->items[index] = value;
 	array->count += 1;
@@ -105,9 +105,9 @@ static u32 array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value
 
 static void array_swap(elf_State *state, elf_Array *array, u32 left, u32 right)
 {
-	array_check_write(state, array);
-	elf_Value *left_slot = array_slot(state, array, left);
-	elf_Value *right_slot = array_slot(state, array, right);
+	elf_array_check_write(state, array);
+	elf_Value *left_slot = elf_array_slot(state, array, left);
+	elf_Value *right_slot = elf_array_slot(state, array, right);
 	elf_Value temporary = *left_slot;
 	*left_slot = *right_slot;
 	*right_slot = temporary;

@@ -67,7 +67,7 @@ ELF_FUNCTION(l_buffer_clear)
 {
 	lib_check_arg_count(S, "buffer.clear", nargs, 0, 0);
 	elf_ByteBuffer *buffer = buffer_receiver(S);
-	if (!buffer_require_writable(S, buffer)) return 0;
+	if (!elf_buffer_require_writable(S, buffer)) return 0;
 	buffer->size = 0;
 	push_value(S, value_from_buffer(buffer));
 	return 1;
@@ -181,7 +181,7 @@ ELF_FUNCTION(l_buffer_set)
 			"buffer byte is out of range: %lld", byte);
 		return 0;
 	}
-	if (!buffer_require_writable(S, buffer)) return 0;
+	if (!elf_buffer_require_writable(S, buffer)) return 0;
 	buffer->data[index] = (u8)byte;
 	push_value(S, value_from_buffer(buffer));
 	return 1;

@@ -522,7 +522,7 @@ activate_frame:
 						report_runtime_error(state, ERROR_OUT_OF_RANGE,
 							"buffer byte is out of range: %lld", value);
 					}
-					buffer_require_writable(state, buffer);
+					elf_buffer_require_writable(state, buffer);
 					buffer->data[index] = (u8)value;
 				}
 				else

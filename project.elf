@@ -16,6 +16,7 @@ library := {
 	kind = "static_library",
 	name = "elf",
 	sources = [
+		"src/elf.c",
 		"src/bytecode.c",
 		"src/elf_core.c",
 		"src/libs.c",
