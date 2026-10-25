@@ -16,45 +16,21 @@ static inline void pop_stack_frame(elf_State *state)
 	state->frame--;
 }
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_Prototype *function, elf_Value *captures, elf_Closure *closure, int nargs, int nrets);
-static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs, int nrets)
+static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_Prototype *function, elf_Value *captures, elf_Closure *closure, int nargs);
+static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs)
 {
-	prepare_bytecode_stack_frame(state, frame, closure->prototype, closure->captures, closure, nargs, nrets);
+	prepare_bytecode_stack_frame(state, frame, closure->prototype, closure->captures, closure, nargs);
 }
 
 static int run_bytecode_frame(elf_State *state);
-static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs, int nrets)
+static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs)
 {
-	prepare_closure_stack_frame(state, state->frame, closure, nargs, nrets);
+	prepare_closure_stack_frame(state, state->frame, closure, nargs);
 	return run_bytecode_frame(state);
 }
 
-static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs, u32 nrets);
-u32 elf_tail_call(elf_State *state, u32 nargs, u32 nrets)
-{
-	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
-
-	StackFrame *frame = state->frame;
-	elf_Value value = *(state->stack_ptr - nargs - 1);
-
-	if (value_is_closure(value))
-	{
-		nrets = call_bytecode_closure(state, value_as_closure(value), nargs, nrets);
-	}
-	else if (value_is_function(value))
-	{
-		nrets = call_native_function(state, value_as_function(value), nargs, nrets);
-	}
-	else
-	{
-		report_runtime_error(state, ERROR_EXPECTED_CALLABLE, "'%s' cannot be called", value_type_name(value.type));
-	}
-
-	ASSERT(state->frame == frame);
-	return nrets;
-}
-
-u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
+static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs);
+u32 elf_call(elf_State *state, u32 nargs)
 {
 	if (nargs < 1)
 	{
@@ -68,45 +44,57 @@ u32 elf_call(elf_State *state, u32 nargs, u32 nrets)
 	}
 
 	push_stack_frame(state);
-	nrets = elf_tail_call(state, nargs, nrets);
+	u32 returned_count = 0;
+	if (value_is_closure(callee))
+	{
+		returned_count = call_bytecode_closure(state, value_as_closure(callee), nargs);
+	}
+	else
+	{
+		ASSERT(value_is_function(callee));
+		returned_count = call_native_function(state, value_as_function(callee), nargs);
+		elf_Value *results = state->frame->arguments - 1;
+		if (returned_count) {
+			memmove(results, state->stack_ptr - returned_count, returned_count * sizeof(*results));
+		}
+		state->stack_ptr = results + returned_count;
+	}
 	pop_stack_frame(state);
-	return nrets;
+	return returned_count;
 }
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_Prototype *function, elf_Value *captures, elf_Closure *closure, int nargs, int nrets)
+static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_Prototype *function, elf_Value *captures, elf_Closure *closure, int nargs)
 {
 	ASSERT(nargs >= 0);
-	ASSERT(nrets >= 0);
 	ASSERT(function);
 	state->vm_closure_calls += 1;
 
 	ASSERT(captures || function->captures == 0);
 	u32 argument_count = (u32)nargs;
-	elf_Value *frame_base = state->stack_ptr - argument_count;
+	elf_Value *arguments = state->stack_ptr - argument_count;
 	u32 register_offset = 0;
 	u32 frame_size = MAX(argument_count, function->stack_size);
-	elf_Value *registers = frame_base;
+	elf_Value *registers = arguments;
 
 	if (function->variadic && argument_count > function->arity)
 	{
 		register_offset = argument_count;
 		frame_size = argument_count + function->stack_size;
 		registers += register_offset;
-		value_copy_many(registers, frame_base, function->arity);
+		value_copy_many(registers, arguments, function->arity);
 	}
 
 	u32 copied_arg_count = MIN(function->arity, argument_count);
-	u32 clear_start = (u32)(registers - frame_base) + copied_arg_count;
+	u32 clear_start = (u32)(registers - arguments) + copied_arg_count;
 	ASSERT(clear_start <= frame_size);
 	ASSERT(register_offset + function->stack_size <= frame_size);
-	value_zero_many(frame_base + clear_start, frame_size - clear_start);
+	value_zero_many(arguments + clear_start, frame_size - clear_start);
 
 	frame->prototype = function;
 	frame->framesize = frame_size;
-	frame->arguments = frame_base;
+	frame->arguments = arguments;
 	frame->registers = registers;
 	frame->nargs = nargs;
-	frame->nrets = nrets;
 	frame->arity = function->arity;
 	frame->variadic = function->variadic;
 	frame->captures = captures;
@@ -114,49 +102,39 @@ static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *fr
 	frame->ncaptures = function->captures;
 	frame->instruction = 0;
 
-	elf_Value *stack_pointer = frame_base + frame_size;
+	elf_Value *stack_pointer = arguments + frame_size;
 	ASSERT(stack_pointer >= state->stack_ptr);
 	state->stack_ptr = stack_pointer;
 	vm_record_stack_usage(state);
 }
 
-static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs, u32 nrets)
+static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs)
 {
 	state->vm_native_calls += 1;
-	elf_Value *frame_base = state->stack_ptr - nargs;
+	elf_Value *arguments = state->stack_ptr - nargs;
 	u32 frame_size = nargs;
 
 	*state->frame = (StackFrame) {
 		.prototype = 0,
-		.arguments = frame_base,
-		.registers = frame_base,
+		.arguments = arguments,
+		.registers = arguments,
 		.framesize = frame_size,
 		.nargs = nargs,
-		.nrets = nrets,
 	};
 
 	// Native calls run directly above their arguments, so arguments + framesize
 	// is exactly the current stack pointer. There is no frame slack to zero here.
-	ASSERT(frame_base + frame_size == state->stack_ptr);
+	ASSERT(arguments + frame_size == state->stack_ptr);
 
-	i32 returned_count = function(state, nargs, nrets);
-	i32 pushed_count = (i32)(state->stack_ptr - frame_base - frame_size);
+	i32 returned_count = function(state, nargs);
+	i32 pushed_count = (i32)(state->stack_ptr - arguments - frame_size);
 
 	if (returned_count < 0 || pushed_count < returned_count)
 	{
 		report_runtime_error(state, ERROR_INVALID_RETURN_COUNT, "invalid number of returns from function: %i, however the function pushed: %i", returned_count, pushed_count);
 	}
 
-	i32 copied_return_count = MIN(returned_count, (i32)nrets);
-
-	if (returned_count < nrets)
-	{
-		value_zero_many(frame_base - 1 + returned_count, nrets - returned_count);
-	}
-
-	value_copy_many(frame_base - 1, state->stack_ptr - returned_count, copied_return_count);
-	state->stack_ptr = frame_base - 1 + nrets;
-	return copied_return_count;
+	return (u32)returned_count;
 }
 
 static void vm_error_invalid_operands(elf_State *state, BcType op, elf_Value left, elf_Value right)
@@ -225,7 +203,8 @@ static inline elf_Value *vm_register(elf_Value *registers, i16 index)
 static int run_bytecode_frame(elf_State *state)
 {
 	StackFrame *first_frame = state->frame;
-	u32 active_returns = state->frame->nrets;
+	u32 returned_count = 0;
+	elf_Value *returned_values = 0;
 
 	activate_frame:
 	StackFrame *frame = state->frame;
@@ -261,14 +240,15 @@ static int run_bytecode_frame(elf_State *state)
 				if (value_is_closure(callee))
 				{
 					push_stack_frame(state);
-					prepare_closure_stack_frame(state, state->frame, value_as_closure(callee), byte.b_z, byte.b_w);
+					prepare_closure_stack_frame(state, state->frame, value_as_closure(callee), byte.b_z);
 					ASSERT(state->stack_ptr == state->frame->arguments + state->frame->framesize);
 					goto activate_frame;
 				}
 				else if (value_is_function(callee))
 				{
 					push_stack_frame(state);
-					active_returns = call_native_function(state, value_as_function(callee), byte.b_z, byte.b_w);
+					returned_count = call_native_function(state, value_as_function(callee), byte.b_z);
+					returned_values = state->stack_ptr - returned_count;
 					goto resume_caller;
 				}
 				else
@@ -288,7 +268,7 @@ static int run_bytecode_frame(elf_State *state)
 				ASSERT(prototype->captures == 0);
 				state->stack_ptr = registers + byte.b_x + byte.b_z + 1;
 				push_stack_frame(state);
-				prepare_bytecode_stack_frame(state, state->frame, prototype, 0, 0, byte.b_z, byte.b_w);
+				prepare_bytecode_stack_frame(state, state->frame, prototype, 0, 0, byte.b_z);
 				ASSERT(state->stack_ptr == state->frame->arguments + state->frame->framesize);
 				goto activate_frame;
 			}
@@ -296,41 +276,40 @@ static int run_bytecode_frame(elf_State *state)
 
 			case BC_RETURN:
 			{
-				// the amount of returns to actually copy is the min of how many returns the
-				// instruction specifies, vs how many returns the frame expects.
-				active_returns = MIN(byte.b_y, frame->nrets);
+				returned_count = byte.b_y;
+				returned_values = vm_register(registers, byte.b_x);
 
-				if (active_returns) {
-					value_copy_many(state->frame->arguments - 1, vm_register(registers, byte.b_x), active_returns);
-				}
-				if (active_returns < frame->nrets) {
-					value_zero_many(state->frame->arguments - 1 + active_returns, frame->nrets - active_returns);
-				}
-
-				return_frame:
+				return_from_frame:
 				ASSERT(state->frame >= first_frame);
 				if (state->frame == first_frame)
 				{
-					// for native calls, the stack pointer is always left under the expected
-					// returns ...
-					state->stack_ptr = state->frame->arguments - 1 + frame->nrets;
+					elf_Value *results = state->frame->arguments - 1;
+					if (returned_count) {
+						memmove(results, returned_values, returned_count * sizeof(*results));
+					}
+					state->stack_ptr = results + returned_count;
 					goto exit;
 				}
 
 				resume_caller:
+				ASSERT(state->frame > first_frame);
+				StackFrame *caller = state->frame - 1;
+				Bytecode call = caller->prototype->bytecode[caller->instruction];
+				ASSERT(call.b_type == BC_CALL_DYNAMIC || call.b_type == BC_CALL_DIRECT);
+				u32 requested_count = call.b_w;
+				u32 copied_count = MIN(returned_count, requested_count);
+				elf_Value *results = state->frame->arguments - 1;
+				if (copied_count) {
+					memmove(results, returned_values, copied_count * sizeof(*results));
+				}
+				if (copied_count < requested_count) {
+					value_zero_many(results + copied_count, requested_count - copied_count);
+				}
+				state->stack_ptr = results + requested_count;
 
 				// restore parent frame
 				pop_stack_frame(state);
 				state->frame->instruction ++;
-
-				// // check return value, is it an error?
-				// if (active_returns == 1 && state->stack_ptr[-1].type == ELF_VALUE_TYPE_ERROR) {
-				// 	// copy the error to our result space ...
-				// 	state->frame->nrets = 1;
-				// 	state->frame->arguments[-1] = state->stack_ptr[-1];
-				// 	// return ...
-				// 	goto return_frame;
-				// }
 
 				elf_Value *stack_pointer = state->frame->arguments + state->frame->framesize;
 				if (stack_pointer > state->stack_ptr)
@@ -626,17 +605,12 @@ static int run_bytecode_frame(elf_State *state)
 				}
 				else
 				{
-					// TODO(RJ): remove this redundant push
 					elf_push_error(state, "__add invalid operands");
 					elf_Value error = pop_value(state);
-					value_zero_many(state->frame->arguments - 1, MAX(frame->nrets, 1));
 					state->frame->arguments[-1] = error;
-					active_returns = 1;
-					// Errors return exactly one value regardless of the requested count. The shared
-					// root-frame exit uses nrets to position the stack pointer, so override it only
-					// after clearing the originally requested result slots above.
-					frame->nrets = 1;
-					goto return_frame;
+					returned_count = 1;
+					returned_values = state->frame->arguments - 1;
+					goto return_from_frame;
 				}
 			}
 			break;
@@ -804,6 +778,6 @@ static int run_bytecode_frame(elf_State *state)
 	frame->instruction = instruction;
 
 	exit:
-	return active_returns;
+	return returned_count;
 }
 

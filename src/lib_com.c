@@ -157,7 +157,7 @@ ELF_FUNCTION(l_core_load_file)
 	{
 		elf_push_value(S, (elf_i32)index);
 	}
-	return elf_tail_call(S, nargs - 1, nrets);
+	return elf_call(S, nargs - 1);
 }
 
 // JSON parsing and serialization.

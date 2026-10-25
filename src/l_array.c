@@ -122,8 +122,10 @@ static elf_Value array_call(elf_State *state, elf_Value function, elf_Array *rec
 	{
 		push_value(state, b);
 	}
-	elf_call(state, pass_b ? 3 : 2, 1);
-	return pop_value(state);
+	u32 returned_count = elf_call(state, pass_b ? 3 : 2);
+	elf_Value result = returned_count ? *(state->stack_ptr - returned_count) : value_nil();
+	ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
+	return result;
 }
 
 ELF_FUNCTION(l_array_length)

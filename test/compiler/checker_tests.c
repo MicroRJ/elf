@@ -118,7 +118,6 @@ static ELF_FUNCTION(compiler_symbol_test_function)
 {
 	(void)S;
 	(void)nargs;
-	(void)nrets;
 	return 0;
 }
 

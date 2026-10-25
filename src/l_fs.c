@@ -796,7 +796,8 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 			elf_push_value(state, output);
 			elf_push_nil(state);
 			elf_push_str(state, path->data, (int)path->size);
-			elf_call(state, 2, 0);
+			u32 returned_count = elf_call(state, 2);
+			ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
 			++*count;
 		}
 		else {
@@ -818,7 +819,6 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 
 ELF_FUNCTION(lib_fs_get_paths)
 {
-	(void)nrets;
 	if (nargs < 1 || nargs > 3) {
 		elf_push_nil(S);
 		return 1;
@@ -864,7 +864,6 @@ ELF_FUNCTION(lib_fs_get_paths)
 
 ELF_FUNCTION(lib_fs_for_each_path)
 {
-	(void)nrets;
 	if (nargs < 2 || nargs > 4) {
 		elf_push_nil(S);
 		return 1;

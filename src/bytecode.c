@@ -152,13 +152,13 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 
 		case BC_CALL_DYNAMIC:
 		{
-			arena_pushf(arena, "call_dynamic callee=r%d result=r%d nargs=%d nrets=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
+			arena_pushf(arena, "call_dynamic callee=r%d result=r%d nargs=%d nout=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
 		}
 		break;
 
 		case BC_CALL_DIRECT:
 		{
-			arena_pushf(arena, "call_direct prototype[%d] result=r%d nargs=%d nrets=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
+			arena_pushf(arena, "call_direct prototype[%d] result=r%d nargs=%d nout=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
 		}
 		break;
 

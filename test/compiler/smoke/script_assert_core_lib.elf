@@ -68,7 +68,6 @@ test_assert(elf.is_readonly(child))
 probe := fun(a, ...) {
 	test_assert(elf.nargs() == 4)
 	test_assert(elf.nvargs() == 2)
-	test_assert(elf.nrets() == 0)
 	test_assert(elf.arg(-1) == nil)
 	test_assert(elf.arg(4) == nil)
 	test_assert(elf.varg(-1) == nil)

@@ -550,7 +550,7 @@ static void test_backend_calls_imported_static_function(void)
 		ASSERT(closure);
 		push_value(result.state, value_from_closure(closure));
 		elf_push_nil(result.state);
-		elf_call(result.state, 1, 1);
+		elf_call(result.state, 1);
 		elf_Int value = 0;
 		if (!elf_to_int(result.state, -1, &value) || value != 42) {
 			test_fail("imported static function executes from its source namespace");

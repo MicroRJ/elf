@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	elf_push_nil(state);
-	elf_call(state, 1, 0);
+	elf_call(state, 1);
 	elf_destroy_state(state);
 
 	return 0;

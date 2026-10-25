@@ -15,7 +15,8 @@ static ELF_FUNCTION(test_api_callback)
 	}
 
 	elf_push_int(S, argument + 1);
-	return 1;
+	elf_push_int(S, argument + 2);
+	return 2;
 }
 
 static elf_b32 api_slice_matches(elf_StrSlice slice, const char *text)
@@ -40,11 +41,12 @@ static void test_api_call_addressing(elf_State *state)
 	elf_push_fun(state, test_api_callback);
 	elf_push_cstr(state, "this");
 	elf_push_int(state, 41);
-	elf_call(state, 2, 1);
+	elf_u32 returned_count = elf_call(state, 2);
 
-	elf_Int result = 0;
-	if (!elf_to_int(state, -1, &result) || result != 42) {
-		test_fail("API native callback result");
+	elf_Int first = 0;
+	elf_Int second = 0;
+	if (returned_count != 2 || !elf_to_int(state, -2, &first) || first != 42 || !elf_to_int(state, -1, &second) || second != 43) {
+		test_fail("API native callback results");
 	}
 	if (elf_set_top(state, checkpoint) != ELF_ERROR_NONE) {
 		test_fail("API restores host checkpoint");
@@ -269,7 +271,7 @@ static void test_api_buffers(elf_State *state)
 		return;
 	}
 	elf_push_nil(state);
-	elf_call(state, 1, 1);
+	elf_call(state, 1);
 	elf_Index buffer = elf_abs_index(state, -1);
 	if (elf_type(state, buffer) != ELF_VALUE_TYPE_BUFFER) {
 		test_fail("API identifies a buffer value");

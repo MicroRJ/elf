@@ -227,13 +227,6 @@ ELF_FUNCTION(l_core_varg)
 	return 1;
 }
 
-ELF_FUNCTION(l_core_nrets)
-{
-	lib_check_arg_count(S, "nrets", nargs, 0, 0);
-	push_value(S, value_from_integer(core_caller_frame(S)->nrets));
-	return 1;
-}
-
 ELF_FUNCTION(l_core_nargs)
 {
 	lib_check_arg_count(S, "nargs", nargs, 0, 0);
@@ -291,7 +284,6 @@ static const elf_Binding l_core[] = {
 
 	{"nvargs",       l_core_nvargs},
 	{"varg",         l_core_varg},
-	{"nrets",        l_core_nrets},
 	{"nargs",        l_core_nargs},
 	{"arg",          l_core_arg},
 

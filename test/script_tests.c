@@ -44,7 +44,7 @@ static void run_script_test(const char *path)
 	else
 	{
 		elf_push_nil(state);
-		elf_call(state, 1, 0);
+		elf_call(state, 1);
 	}
 
 	elf_sym_destroy(symbols);

@@ -65,7 +65,7 @@ typedef enum
 }
 elf_ErrorCode;
 
-#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs, int nrets)
+#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs)
 typedef ELF_FUNCTION(*elf_Function);
 
 typedef enum
@@ -92,8 +92,7 @@ void elf_set_user_data(elf_State *state, void *user_data);
 void *elf_get_user_data(elf_State *state);
 void elf_error(elf_State *state, const char *message);
 
-elf_u32 elf_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
-elf_u32 elf_tail_call(elf_State *state, elf_u32 nargs, elf_u32 nrets);
+elf_u32 elf_call(elf_State *state, elf_u32 nargs);
 
 void elf_push_nil(elf_State *state);
 void elf_push_int(elf_State *state, elf_Int value);

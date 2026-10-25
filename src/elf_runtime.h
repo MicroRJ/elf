@@ -254,7 +254,6 @@ struct StackFrame
 	u32          instruction;
 	u32            framesize;
 	u8                 nargs;
-	u8                 nrets;
 	u8                 arity;
 	u8              variadic;
 	u8             ncaptures;

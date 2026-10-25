@@ -2,7 +2,6 @@ static ELF_FUNCTION(native_function_test_a)
 {
 	(void)S;
 	(void)nargs;
-	(void)nrets;
 	return 0;
 }
 
@@ -10,7 +9,6 @@ static ELF_FUNCTION(native_function_test_b)
 {
 	(void)S;
 	(void)nargs;
-	(void)nrets;
 	return 0;
 }
 

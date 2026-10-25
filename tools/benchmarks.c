@@ -88,7 +88,7 @@ static elf_Ref bench_compile_program(elf_State *state, elf_SymTable *symbols, el
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 	bench_require(elf_push_code_source(state, symbols, name, text) == ELF_ERROR_NONE, "could not compile benchmark source");
 	elf_push_nil(state);
-	bench_require(elf_call(state, 1, 1) == 1, "benchmark file did not return one value");
+	bench_require(elf_call(state, 1) == 1, "benchmark file did not return one value");
 	bench_require(elf_is_callable(state, -1), "benchmark file did not return a function");
 	elf_Ref program = elf_create_ref(state, -1);
 	bench_require(program != ELF_NO_REF, "could not retain benchmark function");
@@ -103,7 +103,7 @@ static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 i
 	elf_push_int(state, iterations);
 	u64 instructions_before = state->vm_instructions;
 	i64 start = bench_now();
-	u32 result_count = elf_call(state, 2, 1);
+	u32 result_count = elf_call(state, 2);
 	double seconds = bench_elapsed_s(start);
 	if (instruction_count) {
 		*instruction_count = state->vm_instructions - instructions_before;
@@ -124,7 +124,7 @@ static double bench_run_number_program(elf_State *state, elf_Ref program, u32 it
 	elf_push_int(state, iterations);
 	u64 instructions_before = state->vm_instructions;
 	i64 start = bench_now();
-	u32 result_count = elf_call(state, 2, 1);
+	u32 result_count = elf_call(state, 2);
 	double seconds = bench_elapsed_s(start);
 	if (instruction_count) {
 		*instruction_count = state->vm_instructions - instructions_before;
@@ -282,7 +282,7 @@ static void bench_representative_elf_workload(void)
 	fflush(stdout);
 
 	elf_push_nil(state);
-	bench_require(elf_call(state, 1, 0) == 0,
+	bench_require(elf_call(state, 1) == 0,
 		"representative Elf workload returned values");
 	elf_destroy_state(state);
 }

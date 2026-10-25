@@ -11,6 +11,9 @@ test_assert(c == 11)
 test_assert(d == 22)
 test_assert(e == nil, "missing returned values are nil")
 
+first := pair()
+test_assert(first == 11, "extra returned values are discarded")
+
 deferred_pair :: fun() {
 	defer test_assert(1)
 	ret 31, 32
