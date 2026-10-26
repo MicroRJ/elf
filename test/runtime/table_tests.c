@@ -1,14 +1,14 @@
 static elf_Value test_key_string(elf_State *state, const char *text)
 {
 	elf_Value value = {};
-	value = value_from_string(elf_string_from_data(state, text));
+	value = str_value(elf_string_from_data(state, text));
 	return value;
 }
 
 static elf_Value test_key_int(elf_Int integer)
 {
 	elf_Value value = {};
-	value = value_from_integer(integer);
+	value = int_value(integer);
 	return value;
 }
 

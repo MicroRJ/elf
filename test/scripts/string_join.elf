@@ -1,3 +1,4 @@
+// Verifies that string addition formats and appends values of other types.
 test_assert("hp42" == "hp" + 42)
 test_assert("hp1.500000" == "hp" + 1.5)
 test_assert("hpnil" == "hp" + nil)

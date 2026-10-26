@@ -296,11 +296,11 @@ static void test_checker_binds_call_arguments_to_parameter_slots(void)
 	Ast call = statement ? checker_test_tuple_item(statement, 0, AST_CALL, "checker finds named argument call") : 0;
 	if (test.status != COM_STATUS_OK || !call || call->call.args.count != 3)
 	{
-		test_fail("checker preserves call arguments while binding parameter slots");
+		test_fail("checker preserves call args while binding parameter slots");
 	}
 	else if (call->call.args.items[0]->param_slot != 0 || call->call.args.items[1]->param_slot != 2 || call->call.args.items[2]->param_slot != 3)
 	{
-		test_fail("checker binds positional and named arguments to parameter slots");
+		test_fail("checker binds positional and named args to parameter slots");
 	}
 	checker_test_destroy(&test);
 }
@@ -318,11 +318,11 @@ static void checker_expect_call_error(const char *name, const char *source, Erro
 
 static void test_checker_reports_invalid_named_arguments(void)
 {
-	checker_expect_call_error("checker_dynamic_named_argument", "target := fun(first) {}\ntarget(first = 1)", ERROR_NAMED_ARGUMENT_TARGET, "checker rejects named arguments for dynamic calls");
-	checker_expect_call_error("checker_unknown_named_argument", "target :: fun(first) {}\ntarget(missing = 1)", ERROR_UNKNOWN_NAMED_ARGUMENT, "checker reports unknown named arguments");
+	checker_expect_call_error("checker_dynamic_named_argument", "target := fun(first) {}\ntarget(first = 1)", ERROR_NAMED_ARGUMENT_TARGET, "checker rejects named args for dynamic calls");
+	checker_expect_call_error("checker_unknown_named_argument", "target :: fun(first) {}\ntarget(missing = 1)", ERROR_UNKNOWN_NAMED_ARGUMENT, "checker reports unknown named args");
 	checker_expect_call_error("checker_duplicate_argument", "target :: fun(first, second) {}\ntarget(1, first = 2)", ERROR_DUPLICATE_ARGUMENT, "checker reports duplicate argument bindings");
 	checker_expect_call_error("checker_named_argument_order", "target :: fun(first, second, third) {}\ntarget(third = 3, second = 2)", ERROR_ARGUMENT_ORDER, "checker enforces named argument parameter order");
-	checker_expect_call_error("checker_positional_argument_order", "target :: fun(first, second) {}\ntarget(first = 1, 2)", ERROR_ARGUMENT_ORDER, "checker rejects positional arguments after named arguments");
+	checker_expect_call_error("checker_positional_argument_order", "target :: fun(first, second) {}\ntarget(first = 1, 2)", ERROR_ARGUMENT_ORDER, "checker rejects positional args after named args");
 }
 
 static void test_checker_reports_duplicate_local(void)

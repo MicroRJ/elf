@@ -52,14 +52,14 @@ ELF_FUNCTION(l_buffer_new)
 ELF_FUNCTION(l_buffer_length)
 {
 	lib_check_arg_count(S, "buffer.length", nargs, 0, 0);
-	push_value(S, value_from_integer(buffer_receiver(S)->size));
+	push_value(S, int_value(buffer_receiver(S)->size));
 	return 1;
 }
 
 ELF_FUNCTION(l_buffer_capacity)
 {
 	lib_check_arg_count(S, "buffer.capacity", nargs, 0, 0);
-	push_value(S, value_from_integer(buffer_receiver(S)->capacity));
+	push_value(S, int_value(buffer_receiver(S)->capacity));
 	return 1;
 }
 
@@ -164,7 +164,7 @@ ELF_FUNCTION(l_buffer_byte)
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 index = 0;
 	if (!buffer_normalize_index(S, lib_load_integer(S, 1), buffer->size, false, &index)) return 0;
-	push_value(S, value_from_integer(buffer->data[index]));
+	push_value(S, int_value(buffer->data[index]));
 	return 1;
 }
 
@@ -212,7 +212,7 @@ ELF_FUNCTION(l_buffer_to_string)
 {
 	lib_check_arg_count(S, "buffer.to_string", nargs, 0, 0);
 	elf_ByteBuffer *buffer = buffer_receiver(S);
-	push_value(S, value_from_string(elf_string_from_data_size(S,
+	push_value(S, str_value(elf_string_from_data_size(S,
 		(const char *)(buffer->data ? buffer->data : (u8 *)""), buffer->size)));
 	return 1;
 }

@@ -31,11 +31,11 @@ static const elf_UserType fs_file_type = {
 
 static void fs_push_errorf(elf_State *state, const char *format, ...)
 {
-	va_list arguments;
-	va_start(arguments, format);
+	va_list args;
+	va_start(args, format);
 	Scratch scratch = scratch_begin();
-	dy_String message = arena_pushfv(scratch.arena, format, arguments);
-	va_end(arguments);
+	dy_String message = arena_pushfv(scratch.arena, format, args);
+	va_end(args);
 	arena_push_zero(scratch.arena, 1, 1);
 	elf_push_error(state, message.data ? message.data : "file operation failed");
 	scratch_end(scratch);
@@ -55,14 +55,14 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 		message = arena_pushf(scratch.arena, "%s failed (error %u)", operation, (u32)result.error);
 	}
 	elf_String *error_message = elf_string_from_data(state, message.data ? message.data : "file operation failed");
-	push_value(state, value_from_string(error_message));
+	push_value(state, str_value(error_message));
 	scratch_end(scratch);
 
 	elf_Table *data = push_new_table(state);
-	elf_Value code_key = value_from_string(elf_string_from_data(state, "code"));
-	elf_table_set(state, data, code_key, value_from_integer(result.error));
-	elf_Value os_code_key = value_from_string(elf_string_from_data(state, "os_code"));
-	elf_table_set(state, data, os_code_key, value_from_integer(result.os_error));
+	elf_Value code_key = str_value(elf_string_from_data(state, "code"));
+	elf_table_set(state, data, code_key, int_value(result.error));
+	elf_Value os_code_key = str_value(elf_string_from_data(state, "os_code"));
+	elf_table_set(state, data, os_code_key, int_value(result.os_error));
 
 	elf_GCError *error = elf_error_new(state, error_message, data);
 	pop_value(state);
@@ -70,19 +70,19 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 	push_value(state, value_from_error(error));
 }
 
-static b32 fs_check_arg_count(elf_State *state, int nargs, int minimum, int maximum, const char *operation)
+static b32 fs_check_arg_count(elf_State *state, u32 nargs, u32 minimum, u32 maximum, const char *operation)
 {
-	int count = nargs - 1;
+	u32 count = nargs - 1;
 	b32 valid = count >= minimum && count <= maximum;
 	if (!valid)
 	{
 		if (minimum == maximum)
 		{
-			fs_push_errorf(state, "%s expected %i argument(s), got %i", operation, minimum, count);
+			fs_push_errorf(state, "%s expected %u argument(s), got %u", operation, minimum, count);
 		}
 		else
 		{
-			fs_push_errorf(state, "%s expected %i to %i arguments, got %i", operation, minimum, maximum, count);
+			fs_push_errorf(state, "%s expected %u to %u args, got %u", operation, minimum, maximum, count);
 		}
 	}
 	return valid;
@@ -90,7 +90,7 @@ static b32 fs_check_arg_count(elf_State *state, int nargs, int minimum, int maxi
 
 static b32 fs_load_file_receiver(elf_State *state, FsFile **result)
 {
-	elf_Value value = state->frame->arguments[0];
+	elf_Value value = load_value(state, 0);
 	b32 valid = value_is_user(value) && value_as_user(value)->type == &fs_file_type;
 	if (!valid)
 	{
@@ -105,7 +105,7 @@ static b32 fs_load_file_receiver(elf_State *state, FsFile **result)
 
 static b32 fs_load_buffer(elf_State *state, u32 index, elf_ByteBuffer **result)
 {
-	elf_Value value = state->frame->arguments[index];
+	elf_Value value = load_value(state, index);
 	b32 valid = value_is_buffer(value);
 	if (!valid)
 	{
@@ -120,7 +120,7 @@ static b32 fs_load_buffer(elf_State *state, u32 index, elf_ByteBuffer **result)
 
 static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i64 *result)
 {
-	elf_Value value = state->frame->arguments[index];
+	elf_Value value = load_value(state, index);
 	b32 valid = value_is_numeric(value);
 	if (!valid)
 	{
@@ -135,7 +135,7 @@ static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i
 
 static b32 fs_load_string(elf_State *state, u32 index, const char *operation, dy_String *result)
 {
-	elf_Value value = state->frame->arguments[index];
+	elf_Value value = load_value(state, index);
 	b32 valid = value_is_string(value);
 	if (!valid)
 	{
@@ -646,7 +646,7 @@ static b32 fs_get_file_info(dy_String path, dy_File_Info *info)
 		!info->is_directory && !info->is_symbolic_link;
 }
 
-static int fs_push_path_kind(elf_State *state, int nargs, b32 files, b32 directories)
+static u32 fs_push_path_kind(elf_State *state, u32 nargs, b32 files, b32 directories)
 {
 	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
 	dy_File_Info info = {0};
@@ -709,7 +709,7 @@ ELF_FUNCTION(lib_fs_create_directories)
 	return 1;
 }
 
-static int fs_transfer_file(elf_State *state, int nargs, b32 move)
+static u32 fs_transfer_file(elf_State *state, u32 nargs, b32 move)
 {
 	lib_check_arg_count(state, move ? "fs.move_file" : "fs.copy_file", nargs, 2, 3);
 	dy_String source = lib_load_string_view(state, 1);

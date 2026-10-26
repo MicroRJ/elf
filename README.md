@@ -71,7 +71,7 @@ collector := fun(first, ...) {
 
 Parameters may have defaults and runtime-checked annotations. The current type
 names are `int`, `num`, `numeric`, `str`, `arr`, `tab`, `buf`, `err`,
-`non_nil`, and `callable`. Default and named arguments require a statically
+`non_nil`, and `callable`. Default and named args require a statically
 known elf function.
 
 Every call has an implicit receiver available as `this`. Calling a table field
@@ -172,7 +172,7 @@ Errors returned as values can be checked with `elf.is_error(value)`.
 The scripts used by the test suite are the best source of current examples:
 
 - [`test/scripts/`](test/scripts/) contains automatically discovered assertion
-  scripts, including [named arguments](test/scripts/named_arguments.elf) and
+  scripts, including [named args](test/scripts/named_arguments.elf) and
   [file I/O](test/scripts/file_io.elf).
 - [`test/compiler/smoke/`](test/compiler/smoke/) contains focused language and
   library examples.

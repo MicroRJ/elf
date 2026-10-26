@@ -46,7 +46,7 @@ Arithmetic, comparison, and bitwise expressions
   IR_BITWISE_NOT computes the complement of one integer.
 
 Calls and structured expressions
-  IR_CALL calls an expression with arguments; the backend selects direct or dynamic dispatch.
+  IR_CALL calls an expression with args; the backend selects direct or dynamic dispatch.
   IR_EXPR_BLOCK executes a statement sequence and then produces its final value.
 
 Statements and storage

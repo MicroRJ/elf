@@ -123,7 +123,7 @@ static elf_Value array_call(elf_State *state, elf_Value function, elf_Array *rec
 		push_value(state, b);
 	}
 	u32 returned_count = elf_call(state, pass_b ? 3 : 2);
-	elf_Value result = returned_count ? *(state->stack_ptr - returned_count) : value_nil();
+	elf_Value result = returned_count ? *(state->stack_top - returned_count) : value_nil();
 	ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
 	return result;
 }
@@ -131,7 +131,7 @@ static elf_Value array_call(elf_State *state, elf_Value function, elf_Array *rec
 ELF_FUNCTION(l_array_length)
 {
 	lib_check_arg_count(S, "array.length", nargs, 0, 0);
-	push_value(S, value_from_integer(elf_array_length(array_receiver(S))));
+	push_value(S, int_value(elf_array_length(array_receiver(S))));
 	return 1;
 }
 
@@ -170,7 +170,7 @@ ELF_FUNCTION(l_array_add)
 	{
 		elf_array_add(S, array, load_value(S, arg));
 	}
-	push_value(S, value_from_integer(first));
+	push_value(S, int_value(first));
 	return 1;
 }
 
@@ -352,7 +352,7 @@ ELF_FUNCTION(l_array_map)
 	elf_Array *result = push_new_array(S);
 	for (u32 i = 0; i < array->count; ++i)
 	{
-		elf_Value mapped = array_call(S, function, array, array->items[i], value_from_integer(i), true);
+		elf_Value mapped = array_call(S, function, array, array->items[i], int_value(i), true);
 		elf_array_add(S, result, mapped);
 	}
 	return 1;
@@ -367,7 +367,7 @@ ELF_FUNCTION(l_array_filter)
 	elf_Array *result = push_new_array(S);
 	for (u32 i = 0; i < array->count; ++i)
 	{
-		elf_Value keep = array_call(S, function, array, array->items[i], value_from_integer(i), true);
+		elf_Value keep = array_call(S, function, array, array->items[i], int_value(i), true);
 		check_value_type(S, keep, ELF_VALUE_TYPE_INTEGER);
 		if (value_as_integer(keep))
 		{

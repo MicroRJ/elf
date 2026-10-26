@@ -13,13 +13,13 @@ static elf_String *string_receiver(elf_State *state)
 
 static void string_push(elf_State *state, const char *data, u32 size)
 {
-	push_value(state, value_from_string(elf_string_from_data_size(state, data, size)));
+	push_value(state, str_value(elf_string_from_data_size(state, data, size)));
 }
 
 static void string_array_add(elf_State *state, elf_Array *array, const char *data, u32 size)
 {
 	elf_String *string = elf_string_from_data_size(state, data, size);
-	elf_array_add(state, array, value_from_string(string));
+	elf_array_add(state, array, str_value(string));
 }
 
 static const char *string_find_data(const char *text, u32 text_size,
@@ -109,7 +109,7 @@ static u8 string_to_upper(u8 c)
 
 ELF_FUNCTION(l_string_length)
 {
-	push_value(S, value_from_integer(elf_string_size(string_receiver(S))));
+	push_value(S, int_value(elf_string_size(string_receiver(S))));
 	return 1;
 }
 
@@ -246,7 +246,7 @@ ELF_FUNCTION(l_string_compare)
 	u32 size = MIN(left_size, right_size);
 	int order = memcmp(elf_string_data(left), elf_string_data(right), size);
 	if (order == 0) order = (left_size > right_size) - (left_size < right_size);
-	push_value(S, value_from_integer((order > 0) - (order < 0)));
+	push_value(S, int_value((order > 0) - (order < 0)));
 	return 1;
 }
 
@@ -258,7 +258,7 @@ ELF_FUNCTION(l_string_starts_with)
 	u32 prefix_size = elf_string_size(prefix);
 	b32 matches = prefix_size <= size &&
 		memcmp(elf_string_data(string), elf_string_data(prefix), prefix_size) == 0;
-	push_value(S, value_from_integer(matches));
+	push_value(S, int_value(matches));
 	return 1;
 }
 
@@ -271,7 +271,7 @@ ELF_FUNCTION(l_string_ends_with)
 	b32 matches = suffix_size <= size && memcmp(
 		elf_string_data(string) + size - suffix_size,
 		elf_string_data(suffix), suffix_size) == 0;
-	push_value(S, value_from_integer(matches));
+	push_value(S, int_value(matches));
 	return 1;
 }
 
@@ -333,7 +333,7 @@ ELF_FUNCTION(l_string_contains)
 	elf_String *needle = lib_load_string(S, 1);
 	const char *found = string_find_data(elf_string_data(string), elf_string_size(string),
 		elf_string_data(needle), elf_string_size(needle), 0);
-	push_value(S, value_from_integer(found != 0));
+	push_value(S, int_value(found != 0));
 	return 1;
 }
 
@@ -343,7 +343,7 @@ ELF_FUNCTION(l_string_glob_match)
 	elf_String *pattern = lib_load_string(S, 1);
 	b32 matches = string_glob_match_data(elf_string_data(string), elf_string_size(string),
 		elf_string_data(pattern), elf_string_size(pattern));
-	push_value(S, value_from_integer(matches));
+	push_value(S, int_value(matches));
 	return 1;
 }
 

@@ -372,9 +372,9 @@ static void test_parser_named_call_arguments(elf_State *state)
 {
 	Ast file = parser_test_parse_source(state, "build(1, width = 20 + 2, title = make(\"ok\"))");
 	Ast stat = parser_test_stat(file, 0, AST_TUPLE, "parse named call argument statement tuple");
-	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call with named arguments");
+	Ast call = parser_test_tuple_item(stat, 0, AST_CALL, "parse call with named args");
 	if (!call || call->call.args.count != 3) {
-		test_fail("named and positional call arguments share the call argument list");
+		test_fail("named and positional call args share the call argument list");
 		return;
 	}
 

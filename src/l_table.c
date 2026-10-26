@@ -12,14 +12,14 @@ static elf_Table *table_receiver(elf_State *state)
 ELF_FUNCTION(l_table_length)
 {
 	lib_check_arg_count(S, "table.length", nargs, 0, 0);
-	push_value(S, value_from_integer(table_receiver(S)->count));
+	push_value(S, int_value(table_receiver(S)->count));
 	return 1;
 }
 
 ELF_FUNCTION(l_table_has)
 {
 	lib_check_arg_count(S, "table.has", nargs, 1, 1);
-	push_value(S, value_from_integer(elf_table_contains(S, table_receiver(S), load_value(S, 1))));
+	push_value(S, int_value(elf_table_contains(S, table_receiver(S), load_value(S, 1))));
 	return 1;
 }
 

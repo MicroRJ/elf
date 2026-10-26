@@ -1,3 +1,4 @@
+// Verifies interpolation of names, expressions, nested strings, and escaped newlines.
 name := "elf"
 count := 2
 nested := f"inner ${count + 1}"

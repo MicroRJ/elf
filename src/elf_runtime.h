@@ -70,6 +70,7 @@ struct elf_Value
 		elf_ByteBuffer *x_buffer;
 		elf_UserObject *x_user;
 		elf_Function    x_proc;
+		elf_Function    x_function;
 		elf_Closure    *x_closure;
 		void           *x_ptr;
 	};
@@ -184,12 +185,14 @@ struct elf_Prototype
 	b32                 variadic;
 	u8                  arity;
 	u8                  captures;
+	// TODO(RJ): rename this to nregs
 	u16                 stack_size;
+
 	elf_String        **strings;
 	u32                 string_count;
-	f64                *number_constants;
+	f64                *num_data;
 	u32                 number_constant_count;
-	i64                *integer_constants;
+	i64                *int_data;
 	u32                 integer_constant_count;
 	Bytecode           *bytecode;
 	u32                 bytecode_count;
@@ -230,33 +233,41 @@ struct elf_Closure
 
 // Bytecode stack frame layouts:
 //
-//   ordinary call or variadic call without extra arguments
+//   ordinary call or variadic call without extra args
 //
-//     [callee][arguments / bytecode registers...]
-//              ^ arguments
-//              ^ registers
+//     [callee][args / bytecode regs...]
+//              ^ args
+//              ^ regs
 //
-//   variadic call with extra arguments
+//   variadic call with extra args
 //
-//     [callee][original arguments...][bytecode registers...]
-//              ^ arguments             ^ registers
+//     [callee][original args...][bytecode regs...]
+//              ^ args             ^ regs
 //
-// arguments preserves the original call arguments for elf.arg() and
-// elf.varg(). Bytecode operands index the register window through registers.
+// args preserves the original call args for elf.arg() and
+// elf.varg(). Bytecode operands index the register window through regs.
 // Named parameters are copied into that window when the two bases differ.
 struct StackFrame
 {
-	elf_Prototype *prototype;
-	elf_Closure     *closure;
-	elf_Value     *arguments;
-	elf_Value     *registers;
-	elf_Value      *captures;
-	u32          instruction;
-	u32            framesize;
+	// TODO(RJ): consider removing these, all we need is the base pointer!
+	// We could initially ensure that the size of the frame accounts for the
+	// prototype's number of registers + 1, but if the prototype itself came
+	// with the backed in notion that base[0] is the caller, that'd be freaking
+	// great ... And all instructions could be relative to that or something.
+	// So if you wanted to get the current closure/prototype just emit a load to 0,
+	// variadic functions would also just copy that, so that it works ...
+
+	elf_Prototype     *proto;
+	elf_Closure       *close;
+	elf_Value          *args;
+
+	//
+	elf_Value          *regs;
+	Bytecode          *instr;
+	u16                 padd;
+	u16                 size;
 	u8                 nargs;
-	u8                 arity;
-	u8              variadic;
-	u8             ncaptures;
+	u8                 ndest;
 };
 
 struct elf_State
@@ -297,14 +308,9 @@ struct elf_State
 	{
 		elf_Table   *ref_table;
 		u32          next_ref;
-		u64          vm_closure_calls;
-		u64          vm_native_calls;
-		u64          vm_instructions;
-		u64          vm_max_stack_slots;
-		u64          vm_max_call_depth;
 
 		u32          stack_size;
-		elf_Value   *stack_ptr;
+		elf_Value   *stack_top;
 		elf_Value   *stack;
 
 		u64          frame_stack_size;

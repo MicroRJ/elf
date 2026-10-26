@@ -558,7 +558,7 @@ static elf_Bool push_compiled_prototype(elf_State *state, elf_Prototype *prototy
 	{
 		return false;
 	}
-	push_value(state, value_from_closure(closure));
+	push_value(state, cls_value(closure));
 	return true;
 }
 

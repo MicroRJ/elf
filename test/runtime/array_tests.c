@@ -42,7 +42,7 @@ static void test_array_operations(void)
 
 	for (u32 i = 0; i < 20; ++i)
 	{
-		u32 index = elf_array_add(state, array, value_from_integer(i));
+		u32 index = elf_array_add(state, array, int_value(i));
 		if (index != i)
 		{
 			test_fail("array append returns the appended index");
@@ -53,7 +53,7 @@ static void test_array_operations(void)
 		test_fail("array append grows dense storage");
 	}
 
-	elf_array_set(state, array, 5, value_from_integer(50));
+	elf_array_set(state, array, 5, int_value(50));
 	array_expect_int(elf_array_get(state, array, 5), 50, "array set replaces an item");
 
 	elf_destroy_state(state);

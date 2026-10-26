@@ -84,8 +84,8 @@ Calls and returns
   Call a prototype without captures directly, without materializing a closure.
   BC_CALL_DYNAMIC: x = result base register, y = callee register, z = argument count, w = requested result count.
   Call the closure or native function in r[y]. The callee register need not equal the result base.
-  Both calls read z arguments beginning at r[x + 1], including the implicit receiver in r[x + 1].
-  Explicit arguments begin at r[x + 2]. Results begin at r[x]; r[x] also reserves the callee/result slot in the call layout.
+  Both calls read z args beginning at r[x + 1], including the implicit receiver in r[x + 1].
+  Explicit args begin at r[x + 2]. Results begin at r[x]; r[x] also reserves the callee/result slot in the call layout.
   BC_RETURN: x = first result register, y = produced result count. Finish the current frame.
   Copy the lesser of y and the requested result count to the caller's result base; fill missing requested results with nil.
   Excess produced results are discarded. x is ignored when no results are copied.
@@ -105,7 +105,7 @@ Arithmetic
   BC_POW raises the left input to the right input's power using pow; integer inputs cast the result to an integer.
 
 Comparisons
-  All comparisons use x = destination register, y/z = input registers, and produce integer zero or one.
+  All comparisons use x = destination register, y/z = input regs, and produce integer zero or one.
   BC_LESS_THAN performs numeric less-than comparison.
   BC_LESS_THAN_EQ performs numeric less-than-or-equal comparison.
   BC_EQ compares numeric inputs numerically, strings by contents, and other matching types by their stored payload.

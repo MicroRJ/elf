@@ -41,7 +41,7 @@ static elf_Prototype *compile_source(elf_State *state, elf_StrSlice name, elf_St
 	{
 		return 0;
 	}
-	return value_as_closure(state->stack_ptr[-1])->prototype;
+	return value_as_closure(state->stack_top[-1])->prototype;
 }
 
 int main(int argc, char **argv)

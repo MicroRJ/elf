@@ -35,14 +35,14 @@ static double bench_elapsed_s(i64 start)
 static elf_Value bench_string_key(elf_State *state, const char *text)
 {
 	elf_Value value = {};
-	value = value_from_string(elf_string_from_data(state, text));
+	value = str_value(elf_string_from_data(state, text));
 	return value;
 }
 
 static elf_Value bench_int_key(elf_Int integer)
 {
 	elf_Value value = {};
-	value = value_from_integer(integer);
+	value = int_value(integer);
 	return value;
 }
 
@@ -96,18 +96,14 @@ static elf_Ref bench_compile_program(elf_State *state, elf_SymTable *symbols, el
 	return program;
 }
 
-static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 iterations, elf_Int expected, u64 *instruction_count)
+static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 iterations, elf_Int expected)
 {
 	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
 	elf_push_nil(state);
 	elf_push_int(state, iterations);
-	u64 instructions_before = state->vm_instructions;
 	i64 start = bench_now();
 	u32 result_count = elf_call(state, 2);
 	double seconds = bench_elapsed_s(start);
-	if (instruction_count) {
-		*instruction_count = state->vm_instructions - instructions_before;
-	}
 	bench_require(result_count == 1, "benchmark function did not return one value");
 	elf_Int result = 0;
 	bench_require(elf_to_int(state, -1, &result), "benchmark result was not an integer");
@@ -117,18 +113,14 @@ static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 i
 	return seconds;
 }
 
-static double bench_run_number_program(elf_State *state, elf_Ref program, u32 iterations, elf_Num expected, u64 *instruction_count)
+static double bench_run_number_program(elf_State *state, elf_Ref program, u32 iterations, elf_Num expected)
 {
 	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
 	elf_push_nil(state);
 	elf_push_int(state, iterations);
-	u64 instructions_before = state->vm_instructions;
 	i64 start = bench_now();
 	u32 result_count = elf_call(state, 2);
 	double seconds = bench_elapsed_s(start);
-	if (instruction_count) {
-		*instruction_count = state->vm_instructions - instructions_before;
-	}
 	bench_require(result_count == 1, "benchmark function did not return one value");
 	elf_Num result = 0;
 	bench_require(elf_type(state, -1) == ELF_VALUE_TYPE_NUMBER, "benchmark result did not use the number path");
@@ -150,22 +142,13 @@ static void bench_vm_integer_program(const char *name, const char *source, u32 i
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	elf_Ref program = bench_compile_program(state, symbols, source_name, source);
 	elf_sym_destroy(symbols);
-	bench_run_integer_program(state, program, iterations, expected, 0);
+	bench_run_integer_program(state, program, iterations, expected);
 
-	u64 instruction_count = 0;
 	for (u32 i = 0; i < SAMPLE_COUNT; ++i) {
-		u64 sample_instruction_count = 0;
-		samples[i] = bench_run_integer_program(state, program, iterations, expected, &sample_instruction_count);
-		if (i == 0) {
-			instruction_count = sample_instruction_count;
-		}
-		else {
-			bench_require(sample_instruction_count == instruction_count, "benchmark instruction count changed between samples");
-		}
+		samples[i] = bench_run_integer_program(state, program, iterations, expected);
 	}
 
 	bench_report(name, "iterations", iterations, bench_median(samples, SAMPLE_COUNT));
-	printf("  instructions: %llu total, %.2f/iteration\n", instruction_count, instruction_count / (double)iterations);
 	elf_release_ref(state, program);
 	elf_destroy_state(state);
 }
@@ -177,22 +160,13 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 	elf_State *state = elf_create_state();
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	elf_Ref program = bench_compile_program(state, 0, source_name, source);
-	bench_run_number_program(state, program, iterations, expected, 0);
+	bench_run_number_program(state, program, iterations, expected);
 
-	u64 instruction_count = 0;
 	for (u32 i = 0; i < SAMPLE_COUNT; ++i) {
-		u64 sample_instruction_count = 0;
-		samples[i] = bench_run_number_program(state, program, iterations, expected, &sample_instruction_count);
-		if (i == 0) {
-			instruction_count = sample_instruction_count;
-		}
-		else {
-			bench_require(sample_instruction_count == instruction_count, "benchmark instruction count changed between samples");
-		}
+		samples[i] = bench_run_number_program(state, program, iterations, expected);
 	}
 
 	bench_report(name, "iterations", iterations, bench_median(samples, SAMPLE_COUNT));
-	printf("  instructions: %llu total, %.2f/iteration\n", instruction_count, instruction_count / (double)iterations);
 	elf_release_ref(state, program);
 	elf_destroy_state(state);
 }
@@ -215,7 +189,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	{
 		u32 first_prototype = state->prototype_count;
 		bench_require(elf_push_code_source(state, 0, ELF_LIT("benchmark.compile"), text) == ELF_ERROR_NONE, "could not compile benchmark source");
-		elf_Prototype *entry = value_as_closure(state->stack_ptr[-1])->prototype;
+		elf_Prototype *entry = value_as_closure(state->stack_top[-1])->prototype;
 		bench_require(entry == state->prototypes[first_prototype], "compile entry is not the first new prototype");
 		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
 		{

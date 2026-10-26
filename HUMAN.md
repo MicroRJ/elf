@@ -66,7 +66,7 @@ care?
 
 I think elf can still be embeddable, if someone what's to use the shitty Lua like API to link their stuff,
 that's fine too ... but we gotta find a better solution that doesn't force anyone to go through this and
-allows elf to statically check arguments at compile time.
+allows elf to statically check args at compile time.
 
 
 ### Trailing Closures

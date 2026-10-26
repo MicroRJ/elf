@@ -38,7 +38,7 @@ static void test_native_functions_reject_invalid_arguments(elf_State *state)
 		elf_native_function_ensure(state, native_function_test_a, 0) != ERROR_INVALID_ARGUMENT ||
 		state->native_function_count != count)
 	{
-		test_fail("native functions reject invalid arguments");
+		test_fail("native functions reject invalid args");
 	}
 }
 

@@ -2,166 +2,123 @@
 // See Copyright Notice In elf.h
 //
 
-static inline void push_stack_frame(elf_State *state)
-{
-	ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
-	state->frame++;
-	u64 depth = (u64)(state->frame - state->frame_stack);
-	state->vm_max_call_depth = MAX(state->vm_max_call_depth, depth);
+#define RUNTIME_CHECK ASSERT
+
+// reduce visual noise
+typedef elf_Prototype Proto;
+typedef elf_Value     Value;
+typedef elf_State     State;
+typedef StackFrame    Frame;
+
+static void value_zero_range(Value *first, Value *past_last) {
+	ASSERT(first <= past_last);
+	value_zero_many(first, past_last - first);
 }
 
-static inline void pop_stack_frame(elf_State *state)
+static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *args, u32 nargs)
 {
-	ASSERT(state->frame > state->frame_stack);
-	state->frame--;
-}
+	Frame *frame = state->frame;
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_Prototype *function, elf_Value *captures, elf_Closure *closure, int nargs);
-static inline void prepare_closure_stack_frame(elf_State *state, StackFrame *frame, elf_Closure *closure, int nargs)
-{
-	prepare_bytecode_stack_frame(state, frame, closure->prototype, closure->captures, closure, nargs);
-}
+	ASSERT(proto);
+	ASSERT(proto->arity <= proto->stack_size);
+	ASSERT(ndest < 256);
+	ASSERT(nargs < 256);
 
-static int run_bytecode_frame(elf_State *state);
-static int call_bytecode_closure(elf_State *state, elf_Closure *closure, int nargs)
-{
-	prepare_closure_stack_frame(state, state->frame, closure, nargs);
-	return run_bytecode_frame(state);
-}
+	// Todo, remove this wide zero
+	zero_memory(frame, sizeof(* frame));
 
-static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs);
-u32 elf_call(elf_State *state, u32 nargs)
-{
-	if (nargs < 1)
+	frame->proto = proto;
+	frame->close = 0;
+	frame->size = proto->stack_size;
+	frame->args = args;
+	frame->regs = args;
+	frame->nargs = nargs;
+	frame->ndest = ndest;
+	frame->instr = proto->bytecode;
+
+	if (proto->variadic && nargs > proto->arity)
 	{
-		report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "invalid number of arguments, expected at least one");
-	}
-	ASSERT(state->stack_ptr - nargs - 1 >= state->stack);
-	elf_Value callee = *(state->stack_ptr - nargs - 1);
-	if (!value_is_callable(callee))
-	{
-		report_runtime_error(state, ERROR_EXPECTED_CALLABLE, "'%s' cannot be called", value_type_name(callee.type));
-	}
-
-	push_stack_frame(state);
-	u32 returned_count = 0;
-	if (value_is_closure(callee))
-	{
-		returned_count = call_bytecode_closure(state, value_as_closure(callee), nargs);
+		frame->size += nargs;
+		frame->regs += nargs;
+		value_copy_many(frame->regs, frame->args, proto->arity);
+		value_zero_range(frame->regs + proto->arity, frame->args + frame->size);
 	}
 	else
 	{
-		ASSERT(value_is_function(callee));
-		returned_count = call_native_function(state, value_as_function(callee), nargs);
-		elf_Value *results = state->frame->arguments - 1;
-		if (returned_count) {
-			memmove(results, state->stack_ptr - returned_count, returned_count * sizeof(*results));
-		}
-		state->stack_ptr = results + returned_count;
+		frame->nargs = MIN(frame->nargs, proto->arity);
+		value_zero_range(frame->regs + frame->nargs, frame->args + frame->size);
 	}
-	pop_stack_frame(state);
-	return returned_count;
+
+	state->stack_top = frame->args + frame->size;
 }
 
-static inline void prepare_bytecode_stack_frame(elf_State *state, StackFrame *frame, elf_Prototype *function, elf_Value *captures, elf_Closure *closure, int nargs)
+static u32 vm_resume(State *state);
+
+static u32 call_native_function(State *state, elf_Function function, u32 nargs);
+
+u32 elf_call(State *state, u32 nargs)
 {
-	ASSERT(nargs >= 0);
-	ASSERT(function);
-	state->vm_closure_calls += 1;
+	u32 nrets = 0;
+	RUNTIME_CHECK(nargs >= 1);
+	Value *base = state->stack_top - nargs - 1;
 
-	ASSERT(captures || function->captures == 0);
-	u32 argument_count = (u32)nargs;
-	elf_Value *arguments = state->stack_ptr - argument_count;
-	u32 register_offset = 0;
-	u32 frame_size = MAX(argument_count, function->stack_size);
-	elf_Value *registers = arguments;
-
-	if (function->variadic && argument_count > function->arity)
+	state->frame ++;
+	Frame *frame = state->frame;
+	if (base->type == ELF_VALUE_TYPE_CLOSURE)
 	{
-		register_offset = argument_count;
-		frame_size = argument_count + function->stack_size;
-		registers += register_offset;
-		value_copy_many(registers, arguments, function->arity);
+		begin_proto(state, base->x_closure->prototype, 1, base + 1, nargs);
+		frame->close = base->x_closure;
+		state->stack_top = frame->args + frame->size;
+		nrets = vm_resume(state);
 	}
-
-	u32 copied_arg_count = MIN(function->arity, argument_count);
-	u32 clear_start = (u32)(registers - arguments) + copied_arg_count;
-	ASSERT(clear_start <= frame_size);
-	ASSERT(register_offset + function->stack_size <= frame_size);
-	value_zero_many(arguments + clear_start, frame_size - clear_start);
-
-	frame->prototype = function;
-	frame->framesize = frame_size;
-	frame->arguments = arguments;
-	frame->registers = registers;
-	frame->nargs = nargs;
-	frame->arity = function->arity;
-	frame->variadic = function->variadic;
-	frame->captures = captures;
-	frame->closure = closure;
-	frame->ncaptures = function->captures;
-	frame->instruction = 0;
-
-	elf_Value *stack_pointer = arguments + frame_size;
-	ASSERT(stack_pointer >= state->stack_ptr);
-	state->stack_ptr = stack_pointer;
-	vm_record_stack_usage(state);
+	else if (base->type == ELF_VALUE_TYPE_CFUNCTION)
+	{
+		zero_memory(frame, sizeof(*frame));
+		frame->args = base + 1;
+		frame->regs = base + 1;
+		frame->nargs = nargs;
+		frame->size = nargs;
+		frame->ndest = 1;
+		nrets = base->x_function(state, nargs);
+		ASSERT(nrets <= state->stack_top - frame->args - frame->size);
+		state->stack_top -= nrets;
+		value_move_many(base, state->stack_top, nrets);
+	}
+	else
+	{
+		RUNTIME_CHECK(!"Error, not callable!");
+	}
+	ASSERT(frame == state->frame);
+	state->frame --;
+	state->stack_top = base + nrets;
+	return nrets;
 }
 
-static u32 call_native_function(elf_State *state, elf_Function function, u32 nargs)
-{
-	state->vm_native_calls += 1;
-	elf_Value *arguments = state->stack_ptr - nargs;
-	u32 frame_size = nargs;
-
-	*state->frame = (StackFrame) {
-		.prototype = 0,
-		.arguments = arguments,
-		.registers = arguments,
-		.framesize = frame_size,
-		.nargs = nargs,
-	};
-
-	// Native calls run directly above their arguments, so arguments + framesize
-	// is exactly the current stack pointer. There is no frame slack to zero here.
-	ASSERT(arguments + frame_size == state->stack_ptr);
-
-	i32 returned_count = function(state, nargs);
-	i32 pushed_count = (i32)(state->stack_ptr - arguments - frame_size);
-
-	if (returned_count < 0 || pushed_count < returned_count)
-	{
-		report_runtime_error(state, ERROR_INVALID_RETURN_COUNT, "invalid number of returns from function: %i, however the function pushed: %i", returned_count, pushed_count);
-	}
-
-	return (u32)returned_count;
-}
-
-static void vm_error_invalid_operands(elf_State *state, BcType op, elf_Value left, elf_Value right)
+static void vm_error_invalid_operands(State *state, BcType op, Value left, Value right)
 {
 	report_runtime_error(state, ERROR_TYPE_MISMATCH, "%s: invalid operands '%s' and '%s'",
 	bytecode_type_name(op), value_type_name(left.type), value_type_name(right.type));
 }
 
-static void vm_error_cannot_call(elf_State *state, elf_Value value)
+static void vm_error_cannot_call(State *state, Value value)
 {
 	report_runtime_error(state, ERROR_EXPECTED_CALLABLE, "cannot call '%s'", value_type_name(value.type));
 }
 
-static void vm_error_invalid_field_arguments(elf_State *state, elf_Value object, elf_Value field)
+static void vm_error_invalid_field_arguments(State *state, Value object, Value field)
 {
 	report_runtime_error(state, ERROR_TYPE_MISMATCH, "cannot get field '%s' from '%s'",
 	value_type_name(field.type),
 	value_type_name(object.type));
 }
 
-static inline u32 vm_check_index(elf_State *state, elf_Value value, u32 count)
+static inline u32 vm_check_index(State *state, Value value, u32 count)
 {
 	check_value_type(state, value, ELF_VALUE_TYPE_INTEGER);
 	return check_array_index(state, value_as_integer(value), count);
 }
 
-static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left, elf_Value right)
+static inline elf_String *vm_add_values_to_str(State *state, Value left, Value right)
 {
 	Scratch scratch = scratch_begin();
 	char *join_start = arena_push(scratch.arena, 0, 1);
@@ -173,7 +130,7 @@ static inline elf_String *vm_add_values_to_str(elf_State *state, elf_Value left,
 	return string;
 }
 
-static inline b32 vm_values_equal(elf_Value left, elf_Value right)
+static inline b32 vm_values_equal(Value left, Value right)
 {
 	if (value_is_numeric(left) && value_is_numeric(right)) {
 		if (value_is_number(left) || value_is_number(right)) {
@@ -194,178 +151,177 @@ static inline b32 vm_values_equal(elf_Value left, elf_Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static inline elf_Value *vm_register(elf_Value *registers, i16 index)
-{
-	ASSERT(index >= 0);
-	return registers + index;
+static void vm_zero_top(State *state, Value *top) {
+	if (top > state->stack_top) {
+		value_zero_many(state->stack_top, top - state->stack_top);
+	}
+	state->stack_top = top;
 }
 
-static int run_bytecode_frame(elf_State *state)
+static u32 vm_resume(State *state)
 {
-	StackFrame *first_frame = state->frame;
-	u32 returned_count = 0;
-	elf_Value *returned_values = 0;
+	Frame *root = state->frame;
+	u32 nroot = 0;
 
-	activate_frame:
-	StackFrame *frame = state->frame;
-	elf_Prototype *function = frame->prototype;
-	ASSERT(function);
-	elf_Value *registers = frame->registers;
-	elf_Value *captures = frame->captures;
-	u32 instruction = frame->instruction;
-	u32 ncaptures = frame->ncaptures;
-	u32 byte_count = function->bytecode_count;
-	const Bytecode *code = function->bytecode;
-
-	while (instruction < byte_count)
+	Frame *frame = state->frame;
+	for (;;)
 	{
-		int instr = instruction;
-		int next_instruction = instr + 1;
-		// TODO(RJ): consider caching this
-		frame->instruction = instruction;
-
-		Bytecode byte = code[instr];
-		// NOTE(RJ): this is a debug counter!
-		state->vm_instructions += 1;
+		Bytecode *const instr = frame->instr;
+		Bytecode byte = * frame->instr ++;
 
 		switch (byte.b_type) {
 
 			case BC_CALL_DYNAMIC:
 			{
-				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
-				ASSERT(byte.b_y >= 0 && (u32)byte.b_y < function->stack_size);
-				elf_Value callee = registers[byte.b_y];
-				state->stack_ptr = registers + byte.b_x + byte.b_z + 1;
+				ASSERT((u32)byte.b_x < frame->proto->stack_size);
+				ASSERT((u32)byte.b_y < frame->proto->stack_size);
 
-				if (value_is_closure(callee))
+				Value *dest = frame->regs + byte.b_x;
+				dest[0] = frame->regs[byte.b_y];
+				u32 nargs = byte.b_z;
+				u32 ndest = byte.b_w;
+
+				if (dest->type == ELF_VALUE_TYPE_CLOSURE)
 				{
-					push_stack_frame(state);
-					prepare_closure_stack_frame(state, state->frame, value_as_closure(callee), byte.b_z);
-					ASSERT(state->stack_ptr == state->frame->arguments + state->frame->framesize);
-					goto activate_frame;
+					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
+					Proto *proto = dest->x_closure->prototype;
+					frame = ++ state->frame;
+					begin_proto(state, proto, ndest, dest + 1, nargs);
+					frame->close = dest->x_closure;
 				}
-				else if (value_is_function(callee))
+				else if (dest->type == ELF_VALUE_TYPE_CFUNCTION)
 				{
-					push_stack_frame(state);
-					returned_count = call_native_function(state, value_as_function(callee), byte.b_z);
-					returned_values = state->stack_ptr - returned_count;
-					goto resume_caller;
+					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
+					ASSERT(frame == state->frame);
+					Frame *inner = ++ state->frame;
+					zero_memory(inner, sizeof(*inner));
+					inner->args = dest + 1;
+					inner->regs = dest + 1;
+					inner->nargs = nargs;
+					inner->size = nargs;
+					inner->ndest = ndest;
+					state->stack_top = inner->args + inner->size;
+					u32 nrets = dest->x_function(state, byte.b_z);
+					ASSERT(state->stack_top >= inner->args + inner->size);
+					RUNTIME_CHECK(nrets + nargs <= state->stack_top - inner->args);
+					state->frame --;
+					ASSERT(frame == state->frame);
+					Value *rets = state->stack_top - nrets;
+					value_move_many(dest, rets, MIN(ndest, nrets));
+					state->stack_top = dest + MIN(ndest, nrets);
+					vm_zero_top(state, frame->args + frame->size);
 				}
 				else
 				{
-					vm_error_cannot_call(state, callee);
+					RUNTIME_CHECK(!"Error: proper error reporting");
+					// vm_error_cannot_call(state, callee);
 				}
 			}
 			break;
 
 			case BC_CALL_DIRECT:
 			{
-				ASSERT(byte.b_x >= 0 && (u32)byte.b_x < function->stack_size);
-				ASSERT(byte.b_y >= 0);
-				u32 prototype_index = (u32)byte.b_y;
-				ASSERT(prototype_index_is_valid(state, prototype_index));
-				elf_Prototype *prototype = prototype_from_index(state, prototype_index);
-				ASSERT(prototype->captures == 0);
-				state->stack_ptr = registers + byte.b_x + byte.b_z + 1;
-				push_stack_frame(state);
-				prepare_bytecode_stack_frame(state, state->frame, prototype, 0, 0, byte.b_z);
-				ASSERT(state->stack_ptr == state->frame->arguments + state->frame->framesize);
-				goto activate_frame;
+				Value *start = frame->regs + byte.b_x;
+				u32 index = byte.b_y;
+				u32 nargs = byte.b_z;
+				u32 ndest = byte.b_w;
+				Proto *proto = prototype_from_index(state, index);
+				start[0] = value_nil();
+				frame = ++ state->frame;
+				begin_proto(state, proto, ndest, start + 1, nargs);
 			}
 			break;
 
 			case BC_RETURN:
 			{
-				returned_count = byte.b_y;
-				returned_values = vm_register(registers, byte.b_x);
+				u32 nrets = byte.b_y;
+				Value *rets = frame->regs + byte.b_x;
+				Value *dest = frame->args - 1;
 
-				return_from_frame:
-				ASSERT(state->frame >= first_frame);
-				if (state->frame == first_frame)
-				{
-					elf_Value *results = state->frame->arguments - 1;
-					if (returned_count) {
-						memmove(results, returned_values, returned_count * sizeof(*results));
-					}
-					state->stack_ptr = results + returned_count;
+
+				if (frame == root) {
+					value_move_many(dest, rets, nrets);
+					nroot = nrets;
 					goto exit;
 				}
 
-				resume_caller:
-				ASSERT(state->frame > first_frame);
-				StackFrame *caller = state->frame - 1;
-				Bytecode call = caller->prototype->bytecode[caller->instruction];
-				ASSERT(call.b_type == BC_CALL_DYNAMIC || call.b_type == BC_CALL_DIRECT);
-				u32 requested_count = call.b_w;
-				u32 copied_count = MIN(returned_count, requested_count);
-				elf_Value *results = state->frame->arguments - 1;
-				if (copied_count) {
-					memmove(results, returned_values, copied_count * sizeof(*results));
-				}
-				if (copied_count < requested_count) {
-					value_zero_many(results + copied_count, requested_count - copied_count);
-				}
-				state->stack_ptr = results + requested_count;
+				nrets = MIN(nrets, frame->ndest);
+				value_move_many(dest, rets, nrets);
 
-				// restore parent frame
-				pop_stack_frame(state);
-				state->frame->instruction ++;
+				state->frame --;
+				frame = state->frame;
 
-				elf_Value *stack_pointer = state->frame->arguments + state->frame->framesize;
-				if (stack_pointer > state->stack_ptr)
-				{
-					value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
-				}
-				state->stack_ptr = stack_pointer;
-				goto activate_frame;
+				state->stack_top = dest + nrets;
+				vm_zero_top(state, frame->args + frame->size);
 			}
 			break;
 
-			case BC_JUMP: {
-				next_instruction = instr + byte.b_x;
-			} break;
+			case BC_JUMP:
+			{
+				frame->instr = instr + byte.b_x;
+			}
+			break;
 
-			case BC_JUMP_IF_ZERO: {
-				if (value_as_integer(*vm_register(registers, byte.b_y)) == 0) {
-					next_instruction = instr + byte.b_x;
+			case BC_JUMP_IF_ZERO:
+			{
+				if (value_as_integer(frame->regs[byte.b_y]) == 0) {
+					frame->instr = instr + byte.b_x;
 				}
-			} break;
+			}
+			break;
 
-			case BC_JUMP_IF_NONZERO: {
-				if (value_as_integer(*vm_register(registers, byte.b_y)) != 0) {
-					next_instruction = instr + byte.b_x;
+			case BC_JUMP_IF_NONZERO:
+			{
+				if (value_as_integer(frame->regs[byte.b_y]) != 0) {
+					frame->instr = instr + byte.b_x;
 				}
-			} break;
+			}
+			break;
 
-			case BC_LOAD_NIL: {
-				*vm_register(registers, byte.b_x) = value_nil();
-			} break;
+			case BC_LOAD_NIL:
+			{
+				frame->regs[byte.b_x] = value_nil();
+			}
+			break;
 
-			case BC_LOAD_CONSTANT_INTEGER: {
-				*vm_register(registers, byte.b_x) = value_from_integer(function->integer_constants[byte.b_y]);
-			} break;
+			case BC_MOVE:
+			{
+				value_copy(&frame->regs[byte.b_x], frame->regs[byte.b_y]);
+			}
+			break;
 
-			case BC_LOAD_CONSTANT_NUMBER: {
-				*vm_register(registers, byte.b_x) = value_from_number(function->number_constants[byte.b_y]);
-			} break;
+			case BC_LOAD_CONSTANT_INTEGER:
+			{
+				frame->regs[byte.b_x] = int_value(frame->proto->int_data[byte.b_y]);
+			}
+			break;
 
-			case BC_LOAD_CONSTANT_STRING: {
-				*vm_register(registers, byte.b_x) = value_from_string(function->strings[byte.b_y]);
-			} break;
+			case BC_LOAD_CONSTANT_NUMBER:
+			{
+				frame->regs[byte.b_x] = num_value(frame->proto->num_data[byte.b_y]);
+			}
+			break;
 
-			case BC_LOAD_CAPTURE: {
-				ASSERT(byte.b_y >= 0 && byte.b_y < ncaptures);
-				value_copy(vm_register(registers, byte.b_x), captures[byte.b_y]);
-			} break;
+			case BC_LOAD_CONSTANT_STRING:
+			{
+				frame->regs[byte.b_x] = str_value(frame->proto->strings[byte.b_y]);
+			}
+			break;
 
-			case BC_MOVE: {
-				value_copy(vm_register(registers, byte.b_x), *vm_register(registers, byte.b_y));
-			} break;
+			case BC_LOAD_CAPTURE:
+			{
+				ASSERT(byte.b_y >= 0 && byte.b_y < frame->proto->captures);
+				value_copy(&frame->regs[byte.b_x], frame->close->captures[byte.b_y]);
+			}
+			break;
 
-			case BC_LOAD_CURRENT_CLOSURE: {
-				ASSERT(frame->closure);
-				value_copy(vm_register(registers, byte.b_x), value_from_closure(frame->closure));
-			} break;
+			// TODO(RJ): deprecate this function, the compiler knows the current closure already!
+			case BC_LOAD_CURRENT_CLOSURE:
+			{
+				ASSERT(frame->close);
+				value_copy(&frame->regs[byte.b_x], cls_value(frame->close));
+			}
+			break;
 
 			case BC_LOAD_NATIVE_FUNCTION: {
 				if (byte.b_y < 0 || (u32)byte.b_y >= state->native_function_count)
@@ -373,34 +329,34 @@ static int run_bytecode_frame(elf_State *state)
 					ASSERT(!"native function index is out of bounds");
 					break;
 				}
-				*vm_register(registers, byte.b_x) = value_from_function(state->native_functions[(u32)byte.b_y]);
+				frame->regs[byte.b_x] = value_from_function(state->native_functions[(u32)byte.b_y]);
 			} break;
 
 			case BC_NEW_TABLE: {
 				elf_Table *table = elf_table_new(state);
-				*vm_register(registers, byte.b_x) = value_from_table(table);
+				frame->regs[byte.b_x] = value_from_table(table);
 			} break;
 
 			case BC_NEW_ARRAY: {
-				*vm_register(registers, byte.b_x) = value_from_array(elf_array_new(state));
+				frame->regs[byte.b_x] = value_from_array(elf_array_new(state));
 			} break;
 
 			case BC_NEW_CLOSURE: {
 				ASSERT(byte.b_y >= 0);
 				u32 prototype_index = (u32)byte.b_y;
 				ASSERT(prototype_index_is_valid(state, prototype_index));
-				elf_Prototype *prototype = prototype_from_index(state, prototype_index);
+				Proto *prototype = prototype_from_index(state, prototype_index);
 
-				elf_Value *result = vm_register(registers, byte.b_x);
+				Value *result = &frame->regs[byte.b_x];
 				elf_Closure *new_closure = elf_closure_new(state, prototype, result, prototype->captures);
 				ASSERT(new_closure);
-				*result = value_from_closure(new_closure);
+				*result = cls_value(new_closure);
 			} break;
 
 			case BC_GET_FIELD: {
-				elf_Value *result = vm_register(registers, byte.b_x);
-				elf_Value object = *vm_register(registers, byte.b_y);
-				elf_Value field = *vm_register(registers, byte.b_z);
+				Value *result = &frame->regs[byte.b_x];
+				Value object = frame->regs[byte.b_y];
+				Value field = frame->regs[byte.b_z];
 
 				if (value_is_nil(field)) {
 					report_runtime_error(state, ERROR_INVALID_TABLE_KEY, "nil is not a valid field");
@@ -417,9 +373,9 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_SET_FIELD: {
-				elf_Value table = *vm_register(registers, byte.b_x);
-				elf_Value key = *vm_register(registers, byte.b_y);
-				elf_Value value = *vm_register(registers, byte.b_z);
+				Value table = frame->regs[byte.b_x];
+				Value key = frame->regs[byte.b_y];
+				Value value = frame->regs[byte.b_z];
 
 				if (value_is_table(table)) {
 					if (value_is_nil(key)) {
@@ -440,9 +396,9 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_GET_INDEX: {
-				elf_Value object = *vm_register(registers, byte.b_y);
-				elf_Value index_value = *vm_register(registers, byte.b_z);
-				elf_Value *result = vm_register(registers, byte.b_x);
+				Value object = frame->regs[byte.b_y];
+				Value index_value = frame->regs[byte.b_z];
+				Value *result = &frame->regs[byte.b_x];
 
 				if (value_is_array(object)) {
 					elf_Array *array = value_as_array(object);
@@ -459,12 +415,12 @@ static int run_bytecode_frame(elf_State *state)
 				else if (value_is_string(object)) {
 					elf_String *string = value_as_string(object);
 					u32 index = vm_check_index(state, index_value, elf_string_size(string));
-					*result = value_from_integer((u8)elf_string_data(string)[index]);
+					*result = int_value((u8)elf_string_data(string)[index]);
 				}
 				else if (value_is_buffer(object)) {
 					elf_ByteBuffer *buffer = value_as_buffer(object);
 					u32 index = vm_check_index(state, index_value, buffer->size);
-					*result = value_from_integer(buffer->data[index]);
+					*result = int_value(buffer->data[index]);
 				}
 				else {
 					report_runtime_error(state, ERROR_TYPE_MISMATCH,
@@ -473,9 +429,9 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_SET_INDEX: {
-				elf_Value object = *vm_register(registers, byte.b_x);
-				elf_Value index_value = *vm_register(registers, byte.b_y);
-				elf_Value assigned = *vm_register(registers, byte.b_z);
+				Value object = frame->regs[byte.b_x];
+				Value index_value = frame->regs[byte.b_y];
+				Value assigned = frame->regs[byte.b_z];
 				if (value_is_array(object))
 				{
 					elf_Array *array = value_as_array(object);
@@ -512,17 +468,17 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_ARRAY_APPEND: {
-				elf_Value array = *vm_register(registers, byte.b_x);
+				Value array = frame->regs[byte.b_x];
 				check_value_type(state, array, ELF_VALUE_TYPE_ARRAY);
-				elf_array_add(state, value_as_array(array), *vm_register(registers, byte.b_y));
+				elf_array_add(state, value_as_array(array), frame->regs[byte.b_y]);
 			} break;
 
 			case BC_MEASURE: {
-				elf_Value value = *vm_register(registers, byte.b_y);
+				Value value = frame->regs[byte.b_y];
 				u32 measure = 0;
 				if (value_measure(value, &measure))
 				{
-					*vm_register(registers, byte.b_x) = value_from_integer(measure);
+					frame->regs[byte.b_x] = int_value(measure);
 				}
 				else
 				{
@@ -531,37 +487,37 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_GET_META_FIELD: {
-				elf_Value value = *vm_register(registers, byte.b_y);
+				Value value = frame->regs[byte.b_y];
 				elf_Table *metatable = elf_get_type_metatable(state, value);
 
 				if (!metatable) {
 					report_runtime_error(state, ERROR_MISSING_METATABLE, "'%s': required metatable for metafield lookup", value_type_name(value.type));
 				}
 
-				value_copy(vm_register(registers, byte.b_x), elf_table_get_or_nil(state, metatable, *vm_register(registers, byte.b_z)));
+				value_copy(&frame->regs[byte.b_x], elf_table_get_or_nil(state, metatable, frame->regs[byte.b_z]));
 			} break;
 
 			case BC_CHECK_TYPE: {
-				check_value_type_rule(state, *vm_register(registers, byte.b_x), byte.b_y);
+				check_value_type_rule(state, frame->regs[byte.b_x], byte.b_y);
 			} break;
 
 			case BC_EQ: {
-				*vm_register(registers, byte.b_x) = value_from_integer(vm_values_equal(*vm_register(registers, byte.b_y), *vm_register(registers, byte.b_z)));
+				frame->regs[byte.b_x] = int_value(vm_values_equal(frame->regs[byte.b_y], frame->regs[byte.b_z]));
 			} break;
 
 			case BC_NOT_EQ: {
-				*vm_register(registers, byte.b_x) = value_from_integer(!vm_values_equal(*vm_register(registers, byte.b_y), *vm_register(registers, byte.b_z)));
+				frame->regs[byte.b_x] = int_value(!vm_values_equal(frame->regs[byte.b_y], frame->regs[byte.b_z]));
 			} break;
 
 			case BC_LESS_THAN: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_to_number(left) < value_to_number(right));
+						frame->regs[byte.b_x] = int_value(value_to_number(left) < value_to_number(right));
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) < value_as_integer(right));
+						frame->regs[byte.b_x] = int_value(value_as_integer(left) < value_as_integer(right));
 					}
 				}
 				else {
@@ -570,14 +526,14 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_LESS_THAN_EQ: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_to_number(left) <= value_to_number(right));
+						frame->regs[byte.b_x] = int_value(value_to_number(left) <= value_to_number(right));
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) <= value_as_integer(right));
+						frame->regs[byte.b_x] = int_value(value_as_integer(left) <= value_as_integer(right));
 					}
 				}
 				else {
@@ -587,43 +543,38 @@ static int run_bytecode_frame(elf_State *state)
 
 			case BC_ADD:
 			{
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 
 				if (value_is_string(left))
 				{
-					*vm_register(registers, byte.b_x) = value_from_string(vm_add_values_to_str(state, left, right));
+					frame->regs[byte.b_x] = str_value(vm_add_values_to_str(state, left, right));
 				}
 				else if (value_is_numeric(left) && value_is_numeric(right))
 				{
 					if (value_is_number(left) || value_is_number(right)) {
-						*vm_register(registers, byte.b_x) = value_from_number(value_to_number(left) + value_to_number(right));
+						frame->regs[byte.b_x] = num_value(value_to_number(left) + value_to_number(right));
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) + value_as_integer(right));
+						frame->regs[byte.b_x] = int_value(value_as_integer(left) + value_as_integer(right));
 					}
 				}
 				else
 				{
-					elf_push_error(state, "__add invalid operands");
-					elf_Value error = pop_value(state);
-					state->frame->arguments[-1] = error;
-					returned_count = 1;
-					returned_values = state->frame->arguments - 1;
-					goto return_from_frame;
+					vm_error_invalid_operands(state, BC_ADD, left, right);
 				}
 			}
 			break;
 
 			case BC_SUB: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*vm_register(registers, byte.b_x) = value_from_number(value_to_number(left) - value_to_number(right));
+						frame->regs[byte.b_x] = num_value(value_to_number(left) - value_to_number(right));
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) - value_as_integer(right));
+						frame->regs[byte.b_x] = int_value(value_as_integer(left) - value_as_integer(right));
 					}
 				}
 				else {
@@ -632,14 +583,14 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_MUL: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*vm_register(registers, byte.b_x) = value_from_number(value_to_number(left) * value_to_number(right));
+						frame->regs[byte.b_x] = num_value(value_to_number(left) * value_to_number(right));
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) * value_as_integer(right));
+						frame->regs[byte.b_x] = int_value(value_as_integer(left) * value_as_integer(right));
 					}
 				}
 				else {
@@ -649,12 +600,12 @@ static int run_bytecode_frame(elf_State *state)
 
 			case BC_DIV:
 			{
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right))
 					{
-						*vm_register(registers, byte.b_x) = value_from_number(value_to_number(left) / value_to_number(right));
+						frame->regs[byte.b_x] = num_value(value_to_number(left) / value_to_number(right));
 					}
 					else
 					{
@@ -666,7 +617,7 @@ static int run_bytecode_frame(elf_State *state)
 						if (dividend == INT64_MIN && divisor == -1) {
 							report_runtime_error(state, ERROR_OUT_OF_RANGE, "integer division overflow: minimum integer divided by -1");
 						}
-						*vm_register(registers, byte.b_x) = value_from_integer(dividend / divisor);
+						frame->regs[byte.b_x] = int_value(dividend / divisor);
 					}
 				}
 				else {
@@ -675,16 +626,16 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_MOD: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
 						f64 left_number = value_to_number(left);
 						f64 right_number = value_to_number(right);
-						*vm_register(registers, byte.b_x) = value_from_number(left_number - ((i64)(left_number / right_number)) * right_number);
+						frame->regs[byte.b_x] = num_value(left_number - ((i64)(left_number / right_number)) * right_number);
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) % value_as_integer(right));
+						frame->regs[byte.b_x] = int_value(value_as_integer(left) % value_as_integer(right));
 					}
 				}
 				else {
@@ -693,14 +644,14 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_POW: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_numeric(left) && value_is_numeric(right)) {
 					if (value_is_number(left) || value_is_number(right)) {
-						*vm_register(registers, byte.b_x) = value_from_number(pow(value_to_number(left), value_to_number(right)));
+						frame->regs[byte.b_x] = num_value(pow(value_to_number(left), value_to_number(right)));
 					}
 					else {
-						*vm_register(registers, byte.b_x) = value_from_integer((i64)pow(value_as_integer(left), value_as_integer(right)));
+						frame->regs[byte.b_x] = int_value((i64)pow(value_as_integer(left), value_as_integer(right)));
 					}
 				}
 				else {
@@ -709,16 +660,16 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_BITWISE_NOT: {
-				elf_Value value = *vm_register(registers, byte.b_y);
+				Value value = frame->regs[byte.b_y];
 				check_value_type(state, value, ELF_VALUE_TYPE_INTEGER);
-				*vm_register(registers, byte.b_x) = value_from_integer(~value_as_integer(value));
+				frame->regs[byte.b_x] = int_value(~value_as_integer(value));
 			} break;
 
 			case BC_BITWISE_AND: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) & value_as_integer(right));
+					frame->regs[byte.b_x] = int_value(value_as_integer(left) & value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BITWISE_AND, left, right);
@@ -726,10 +677,10 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_BITWISE_OR: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) | value_as_integer(right));
+					frame->regs[byte.b_x] = int_value(value_as_integer(left) | value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BITWISE_OR, left, right);
@@ -737,10 +688,10 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_BITWISE_XOR: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) ^ value_as_integer(right));
+					frame->regs[byte.b_x] = int_value(value_as_integer(left) ^ value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_BITWISE_XOR, left, right);
@@ -748,10 +699,10 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_SHIFT_LEFT: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) << value_as_integer(right));
+					frame->regs[byte.b_x] = int_value(value_as_integer(left) << value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_SHIFT_LEFT, left, right);
@@ -759,10 +710,10 @@ static int run_bytecode_frame(elf_State *state)
 			} break;
 
 			case BC_SHIFT_RIGHT: {
-				elf_Value left = *vm_register(registers, byte.b_y);
-				elf_Value right = *vm_register(registers, byte.b_z);
+				Value left = frame->regs[byte.b_y];
+				Value right = frame->regs[byte.b_z];
 				if (value_is_integer(left) && value_is_integer(right)) {
-					*vm_register(registers, byte.b_x) = value_from_integer(value_as_integer(left) >> value_as_integer(right));
+					frame->regs[byte.b_x] = int_value(value_as_integer(left) >> value_as_integer(right));
 				}
 				else {
 					vm_error_invalid_operands(state, BC_SHIFT_RIGHT, left, right);
@@ -773,11 +724,9 @@ static int run_bytecode_frame(elf_State *state)
 				report_runtime_error(state, ERROR_UNKNOWN_BYTECODE, "'%s' unknown bytecode", bytecode_type_name(byte.b_type));
 			} break;
 		}
-		instruction = next_instruction;
 	}
-	frame->instruction = instruction;
 
 	exit:
-	return returned_count;
+	return nroot;
 }
 

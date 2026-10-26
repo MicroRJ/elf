@@ -65,7 +65,7 @@ typedef enum
 }
 elf_ErrorCode;
 
-#define ELF_FUNCTION(NAME) int (NAME)(elf_State *S, int nargs)
+#define ELF_FUNCTION(NAME) elf_u32 (NAME)(elf_State *S, elf_u32 nargs)
 typedef ELF_FUNCTION(*elf_Function);
 
 typedef enum
@@ -107,7 +107,7 @@ elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 elf_ErrorCode elf_push_code_source(elf_State *state, elf_SymTable *symbols, elf_StrSlice name, elf_StrSlice source);
 elf_Bool elf_push_code_file(elf_State *state, elf_SymTable *symbols, elf_StrSlice name);
 
-elf_u32 elf_arg_count(elf_State *state);
+elf_u32 elf_nargs(elf_State *state);
 elf_Index elf_get_top(elf_State *state);
 elf_Index elf_abs_index(elf_State *state, elf_Index index);
 elf_Bool elf_is_valid(elf_State *state, elf_Index index);

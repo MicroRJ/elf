@@ -2,6 +2,9 @@
 #include <string.h>
 
 #include "elf.h"
+#include "elf_runtime.h"
+#include "elf_runtime_helpers.h"
+#include "elf_value_text.h"
 
 int main(int argc, char **argv)
 {
@@ -30,7 +33,22 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	elf_push_nil(state);
-	elf_call(state, 1);
+	u32 nrets = elf_call(state, 1);
+	if (nrets != 0) {
+		printf("elf returned %u result(s):\n", nrets);
+
+		elf_Value *results = state->stack_top - nrets;
+		for (u32 i = 0; i < nrets; ++ i) {
+
+			Scratch scratch = scratch_begin();
+			char *begin = arena_push(scratch.arena, 0, 1);
+			elf_print_value(scratch.arena, results[i]);
+			arena_push_zero(scratch.arena, 1, 1);
+			scratch_end(scratch);
+
+			printf("  [%u] = %s: %s\n", i, value_type_name(results[i].type), begin);
+		}
+	}
 	elf_destroy_state(state);
 
 	return 0;

@@ -88,14 +88,19 @@ static inline void value_copy(elf_Value *dst, elf_Value src)
 	copy_memory(dst, &src, sizeof(src));
 }
 
-static inline void value_copy_many(elf_Value *dst, elf_Value *src, int count)
+static inline void value_copy_many(elf_Value *dst, elf_Value *src, u32 count)
 {
 	copy_memory(dst, src, count * sizeof(*src));
 }
 
-static inline void value_zero_many(elf_Value *dst, int count)
+static inline void value_zero_many(elf_Value *dst, u32 count)
 {
 	zero_memory(dst, count * sizeof(*dst));
+}
+
+static inline void value_move_many(elf_Value *dst, elf_Value *src, u32 count)
+{
+	memmove(dst, src, count * sizeof(*dst));
 }
 
 //
@@ -107,7 +112,7 @@ static inline elf_Value value_nil(void)
 	return (elf_Value){ELF_VALUE_TYPE_NIL};
 }
 
-static inline elf_Value value_from_integer(i64 integer)
+static inline elf_Value int_value(i64 integer)
 {
 	elf_Value value = {};
 	value.type = ELF_VALUE_TYPE_INTEGER;
@@ -115,7 +120,7 @@ static inline elf_Value value_from_integer(i64 integer)
 	return value;
 }
 
-static inline elf_Value value_from_number(f64 number)
+static inline elf_Value num_value(f64 number)
 {
 	elf_Value value = {};
 	value.type = ELF_VALUE_TYPE_NUMBER;
@@ -123,7 +128,7 @@ static inline elf_Value value_from_number(f64 number)
 	return value;
 }
 
-static inline elf_Value value_from_string(elf_String *string)
+static inline elf_Value str_value(elf_String *string)
 {
 	ASSERT(string != 0);
 	elf_Value value = {};
@@ -186,7 +191,7 @@ static inline elf_Value value_from_function(elf_Function function)
 	return value;
 }
 
-static inline elf_Value value_from_closure(elf_Closure *closure)
+static inline elf_Value cls_value(elf_Closure *closure)
 {
 	ASSERT(closure != 0);
 	elf_Value value = {};
@@ -404,17 +409,10 @@ static inline u32 check_array_index(elf_State *state, i64 index, u32 count)
 // Stack and frame helpers.
 //
 
-static inline void vm_record_stack_usage(elf_State *state)
-{
-	u64 slots = (u64)(state->stack_ptr - state->stack);
-	state->vm_max_stack_slots = MAX(state->vm_max_stack_slots, slots);
-}
-
 static inline void push_value(elf_State *S, elf_Value value)
 {
-	ASSERT(S->stack_ptr < S->stack + S->stack_size);
-	*S->stack_ptr++ = value;
-	vm_record_stack_usage(S);
+	ASSERT(S->stack_top < S->stack + S->stack_size);
+	*S->stack_top++ = value;
 }
 
 static inline void push_table(elf_State *S, elf_Table *table)
@@ -443,16 +441,75 @@ static inline elf_Array *push_new_array(elf_State *state)
 
 static inline elf_Value pop_value(elf_State *S)
 {
-	ASSERT(S->stack_ptr > S->stack);
-	return *--S->stack_ptr;
+	ASSERT(S->stack_top > S->stack);
+	return *--S->stack_top;
+}
+
+static inline StackFrame *frame_current(elf_State *state)
+{
+	return state->frame;
+}
+
+static inline StackFrame *frame_previous(elf_State *state, StackFrame *frame)
+{
+	ASSERT(frame >= state->frame_stack);
+	ASSERT(frame <= state->frame);
+	return frame == state->frame_stack ? 0 : frame - 1;
+}
+
+static inline elf_Value *frame_args(StackFrame *frame)
+{
+	return frame->args;
+}
+
+static inline u32 frame_nargs(StackFrame *frame)
+{
+	return frame->nargs;
+}
+
+static inline u32 frame_size(StackFrame *frame)
+{
+	return frame->size;
+}
+
+static inline elf_Value *frame_top(StackFrame *frame)
+{
+	return frame_args(frame) + frame_size(frame);
+}
+
+static inline elf_Value frame_arg(StackFrame *frame, u32 index)
+{
+	ASSERT(index < frame_nargs(frame));
+	return frame_args(frame)[index];
+}
+
+static inline elf_Prototype *frame_proto(StackFrame *frame)
+{
+	return frame->proto;
+}
+
+static inline Bytecode *frame_next_instr(StackFrame *frame)
+{
+	return frame->instr;
+}
+
+static inline Bytecode *frame_active_instr(StackFrame *frame)
+{
+	elf_Prototype *proto = frame_proto(frame);
+	Bytecode *next = frame_next_instr(frame);
+	ASSERT(proto);
+	ASSERT(next > proto->bytecode);
+	ASSERT(next <= proto->bytecode + proto->bytecode_count);
+	return next - 1;
 }
 
 static inline elf_Value load_value(elf_State *S, int x)
 {
-	if (x < 0 || x >= S->frame->nargs) {
-		report_runtime_error(S, ERROR_INVALID_ARGUMENT, "invalid argument index: %i, got: %i", x, S->frame->nargs);
+	StackFrame *frame = frame_current(S);
+	if (x < 0 || (u32)x >= frame_nargs(frame)) {
+		report_runtime_error(S, ERROR_INVALID_ARGUMENT, "invalid argument index: %i, got: %u", x, frame_nargs(frame));
 	}
-	return S->frame->arguments[x];
+	return frame_arg(frame, (u32)x);
 }
 
 //
@@ -466,18 +523,18 @@ typedef struct
 }
 elf_Binding;
 
-static void lib_check_arg_count(elf_State *state, const char *name, int nargs, int minimum, int maximum)
+static void lib_check_arg_count(elf_State *state, const char *name, u32 nargs, u32 minimum, u32 maximum)
 {
-	int count = nargs - 1;
+	u32 count = nargs - 1;
 	if (count < minimum || count > maximum)
 	{
 		if (minimum == maximum)
 		{
-			report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "%s expected %i argument(s), got %i", name, minimum, count);
+			report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "%s expected %u argument(s), got %u", name, minimum, count);
 		}
 		else
 		{
-			report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "%s expected %i to %i arguments, got %i", name, minimum, maximum, count);
+			report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "%s expected %u to %u args, got %u", name, minimum, maximum, count);
 		}
 	}
 }
@@ -518,7 +575,7 @@ static elf_Table *new_binding_table(elf_State *state, const elf_Binding *binding
 	elf_Table *table = push_new_table(state);
 	for (u32 i = 0; i < count; ++i)
 	{
-		elf_Value key = value_from_string(elf_string_from_data(state, bindings[i].name));
+		elf_Value key = str_value(elf_string_from_data(state, bindings[i].name));
 		elf_Value value = value_from_function(bindings[i].function);
 		elf_table_set(state, table, key, value);
 	}

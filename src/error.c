@@ -39,15 +39,11 @@ static const char *error_code_name(ErrorCode code)
 static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 {
 	StackFrame *result = 0;
-	for (StackFrame *frame = state->frame;; --frame)
+	for (StackFrame *frame = frame_current(state); frame; frame = frame_previous(state, frame))
 	{
-		if (frame->prototype)
+		if (frame_proto(frame))
 		{
 			result = frame;
-			break;
-		}
-		if (frame == state->frame_stack)
-		{
 			break;
 		}
 	}
@@ -57,12 +53,12 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 {
 	ASSERT(frame);
-	ASSERT(frame->prototype);
-	elf_Prototype *function = frame->prototype;
-	u32 instr = frame->instruction;
-	ASSERT(instr < function->bytecode_count);
-	elf_SourceMapEntry *entry = find_source_for_instr(function, instr);
-	const char *bytecode_name = bytecode_type_name(BC_TYPE(function->bytecode[instr]));
+	elf_Prototype *proto = frame_proto(frame);
+	ASSERT(proto);
+	Bytecode *instruction = frame_active_instr(frame);
+	u32 instr = instruction - proto->bytecode;
+	elf_SourceMapEntry *entry = find_source_for_instr(proto, instr);
+	const char *bytecode_name = bytecode_type_name(BC_TYPE(proto->bytecode[instr]));
 	SourceSite site = {};
 	if (entry)
 	{
@@ -72,11 +68,11 @@ static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 		site.line_index = entry->line_index;
 	}
 
-	if (function->source && source_slice_is_valid(site))
+	if (proto->source && source_slice_is_valid(site))
 	{
-		dy_String source = function->source->text;
+		dy_String source = proto->source->text;
 
-		log_linef(LOG_LEVEL_INFO, "%.*s [%u:%llu] [%u](%s)", (i32)function->source->name.size, function->source->name.data, site.line_index, source_slice_column(site), instr, bytecode_name);
+		log_linef(LOG_LEVEL_INFO, "%.*s [%u:%llu] [%u](%s)", (i32)proto->source->name.size, proto->source->name.data, site.line_index, source_slice_column(site), instr, bytecode_name);
 		print_source_slice_marker(site, source);
 	}
 	else
@@ -88,10 +84,9 @@ static void print_runtime_source_location(elf_State *state, StackFrame *frame)
 static void print_runtime_call_stack(elf_State *state, StackFrame *current)
 {
 	b32 printed = false;
-	for (StackFrame *frame = current; frame && frame > state->frame_stack;)
+	for (StackFrame *frame = frame_previous(state, current); frame; frame = frame_previous(state, frame))
 	{
-		--frame;
-		if (frame->prototype)
+		if (frame_proto(frame))
 		{
 			if (!printed)
 			{

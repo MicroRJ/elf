@@ -654,7 +654,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 
 					if (target.type != COM_VALUE_FUNCTION)
 					{
-						Com_Status status = checker_report(checker->source_scope->source, ERROR_NAMED_ARGUMENT_TARGET, ERROR_ERROR, argument->site, "named arguments require a statically known function");
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_NAMED_ARGUMENT_TARGET, ERROR_ERROR, argument->site, "named args require a statically known function");
 						value = com_value_error(status);
 						break;
 					}
@@ -691,7 +691,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				{
 					if (require_named_arguments)
 					{
-						Com_Status status = checker_report(checker->source_scope->source, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "positional arguments must come before named arguments");
+						Com_Status status = checker_report(checker->source_scope->source, ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "positional args must come before named args");
 						value = com_value_error(status);
 						break;
 					}

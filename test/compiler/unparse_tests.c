@@ -22,14 +22,14 @@ static void expect_serialize_text(elf_State *state, elf_Value value, const char 
 static void test_serialize_scalars(elf_State *state)
 {
 	expect_serialize_text(state, value_nil(), "nil", "serialize nil");
-	expect_serialize_text(state, value_from_integer(42), "42", "serialize integer");
-	expect_serialize_text(state, value_from_string(elf_string_from_data(state, "a\"b\\c\n")), "\"a\\\"b\\\\c\\n\"", "serialize escaped string");
+	expect_serialize_text(state, int_value(42), "42", "serialize integer");
+	expect_serialize_text(state, str_value(elf_string_from_data(state, "a\"b\\c\n")), "\"a\\\"b\\\\c\\n\"", "serialize escaped string");
 }
 
 static void test_serialize_table(elf_State *state)
 {
 	elf_Table *table = push_new_table(state);
-	elf_table_set(state, table, value_from_string(elf_string_from_data(state, "answer")), value_from_integer(42));
+	elf_table_set(state, table, str_value(elf_string_from_data(state, "answer")), int_value(42));
 
 	const char *expected =
 		"{\n"
@@ -42,8 +42,8 @@ static void test_serialize_table(elf_State *state)
 static void test_serialize_array(elf_State *state)
 {
 	elf_Array *array = push_new_array(state);
-	elf_array_add(state, array, value_from_integer(10));
-	elf_array_add(state, array, value_from_string(elf_string_from_data(state, "row")));
+	elf_array_add(state, array, int_value(10));
+	elf_array_add(state, array, str_value(elf_string_from_data(state, "row")));
 
 	const char *expected = "[10, \"row\"]";
 	expect_serialize_text(state, value_from_array(array), expected, "serialize array");

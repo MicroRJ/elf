@@ -573,7 +573,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			}
 
 			IrArray ir_args = ir_array_alloc(emitter, alloc_arguments);
-			Ir *arguments = ir_args.items;
+			Ir *args = ir_args.items;
 
 			for (u32 i = 0; i < expr->call.args.count; ++i)
 			{
@@ -592,9 +592,9 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 					argument_expr = argument->named_argument.expr;
 				}
 				ASSERT(argument_slot < alloc_arguments);
-				ASSERT(!arguments[argument_slot]);
-				arguments[argument_slot] = ir_emit_expr(emitter, argument_expr);
-				failed |= !arguments[argument_slot] || arguments[argument_slot] == ERROR_IR;
+				ASSERT(!args[argument_slot]);
+				args[argument_slot] = ir_emit_expr(emitter, argument_expr);
+				failed |= !args[argument_slot] || args[argument_slot] == ERROR_IR;
 			}
 
 			if (!failed && ir_expr->kind == IR_FUNCTION)
@@ -606,19 +606,19 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 					ASSERT(tree_parameter);
 					ASSERT(tree_parameter->kind == AST_DECL_STAT);
 					ASSERT(tree_parameter->decl.name);
-					if (!arguments[i] && tree_parameter->decl.expr)
+					if (!args[i] && tree_parameter->decl.expr)
 					{
-						arguments[i] = ir_emit_expr(emitter, tree_parameter->decl.expr);
-						failed |= !arguments[i] || arguments[i] == ERROR_IR;
+						args[i] = ir_emit_expr(emitter, tree_parameter->decl.expr);
+						failed |= !args[i] || args[i] == ERROR_IR;
 					}
 				}
 			}
 
 			for (u32 i = 0; i < alloc_arguments; ++i)
 			{
-				if (!arguments[i])
+				if (!args[i])
 				{
-					arguments[i] = ir_new_nil(emitter, expr->site);
+					args[i] = ir_new_nil(emitter, expr->site);
 				}
 			}
 			ir = failed ? ERROR_IR : ir_new_call(emitter, expr->site, ir_expr, ir_args);

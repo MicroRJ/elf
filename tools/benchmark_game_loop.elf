@@ -64,12 +64,10 @@ simulate_global_core :: fun(world, ticks) {
 
 run_sample :: fun(simulate) {
 	world := make_world(ACTOR_COUNT)
-	before := elf.vm.counters()
 	start := elf.time.counter()
 	checksum := simulate(world, TICK_COUNT)
 	elapsed := elf.time.elapsed(start)
-	after := elf.vm.counters()
-	ret elapsed, checksum, after.instructions - before.instructions
+	ret elapsed, checksum
 }
 
 benchmark :: fun(label, simulate) {
@@ -78,15 +76,12 @@ benchmark :: fun(label, simulate) {
 
 	samples := []
 	expected_checksum := nil
-	expected_instructions := nil
 	for sample := 0; sample < SAMPLE_COUNT; sample += 1 ? {
-		elapsed, checksum, instructions := run_sample(simulate)
+		elapsed, checksum := run_sample(simulate)
 		if expected_checksum == nil ? {
 			expected_checksum = checksum
-			expected_instructions = instructions
 		} else {
 			elf.assert(checksum == expected_checksum, "benchmark checksum changed between samples")
-			elf.assert(instructions == expected_instructions, "benchmark instruction count changed between samples")
 		}
 		samples:add(elapsed)
 	}
@@ -101,7 +96,7 @@ benchmark :: fun(label, simulate) {
 	}
 
 	median_ms := samples[SAMPLE_COUNT / 2] * 1000
-	elf.println(label + ": " + median_ms:fmt(".03") + " ms, " + expected_instructions + " instructions, checksum " + expected_checksum)
+	elf.println(label + ": " + median_ms:fmt(".03") + " ms, checksum " + expected_checksum)
 	ret expected_checksum
 }
 

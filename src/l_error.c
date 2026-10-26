@@ -12,7 +12,7 @@ static elf_GCError *error_receiver(elf_State *state)
 ELF_FUNCTION(l_error_message)
 {
 	lib_check_arg_count(S, "error.message", nargs, 0, 0);
-	push_value(S, value_from_string(error_receiver(S)->message));
+	push_value(S, str_value(error_receiver(S)->message));
 	return 1;
 }
 

@@ -1,3 +1,4 @@
+// Verifies array literals, indexing, assignment, negative indices, and nested arrays.
 values := [10, 20, 30]
 test_assert(values[0] == 10)
 test_assert(values[-1] == 30)

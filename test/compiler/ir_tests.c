@@ -208,7 +208,7 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 static void test_ir_lowers_strings_and_native_functions(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "ret \"hello\"\nret elf.vm.counters");
+	IrTestResult result = ir_test_lower_source(state, &arena, "ret \"hello\"\nret elf.gc.counters");
 	Ir body = ir_test_main_body(result.module);
 
 	Ir ret_string = ir_test_body_stat(body, 0, IR_RETURN, "lower string return");
@@ -624,7 +624,7 @@ static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
 	IrTestResult result = ir_test_lower_source(state, &arena, "collect :: fun(first, ...) { ret first }\nret collect(1, 2, 3)");
 	if (!result.module || result.source->report.error_count != 0 || result.module->function_count != 2)
 	{
-		test_fail("variadic static call accepts extra positional arguments");
+		test_fail("variadic static call accepts extra positional args");
 		arena_destroy(&arena);
 		return;
 	}
@@ -633,7 +633,7 @@ static void test_ir_lowers_variadic_static_call_arguments(elf_State *state)
 	Ir tuple = ret ? ret->ir_return.expr : 0;
 	Ir call = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	if (!call || call->kind != IR_CALL || call->ir_call.args.count != 3) {
-		test_fail("variadic static call retains all positional arguments");
+		test_fail("variadic static call retains all positional args");
 	}
 	arena_destroy(&arena);
 }

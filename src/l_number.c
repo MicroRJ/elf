@@ -64,7 +64,7 @@ static b32 push_fixed_number_text(elf_State *state, f64 number, i32 precision)
 	b32 formatted = data != 0 && stbsp_snprintf(data, size + 1, "%.*f", precision, number) == size;
 	if (formatted)
 	{
-		push_value(state, value_from_string(elf_string_from_data_size(state, data, (u32)size)));
+		push_value(state, str_value(elf_string_from_data_size(state, data, (u32)size)));
 	}
 	scratch_end(scratch);
 	return formatted;

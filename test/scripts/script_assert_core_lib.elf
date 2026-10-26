@@ -23,7 +23,8 @@ test_assert(failure:message() == "file not found")
 test_assert(failure:data() == error_details)
 test_assert(failure:data().kind == "filesystem")
 test_assert(failure:data().code == 2)
-test_assert(elf.to_string(failure) == "file not found")
+failure_text := elf.to_string(failure)
+test_assert(failure_text == "error(\"file not found\")", "error formatting changed: expected error(\"file not found\"), got " + failure_text)
 test_assert(elf.is_readonly(failure))
 error_details.kind = "changed"
 test_assert(failure:data().kind == "changed")
@@ -119,36 +120,6 @@ test_assert(gc_counters.allocated_objects == reused_objects)
 test_assert(gc_counters.allocated_tables == reused_tables)
 test_assert(allocation_probe:length() == 0)
 
-vm_counters := elf.vm.counters()
-test_assert(elf.type_of(vm_counters.calls) == "integer")
-test_assert(elf.type_of(vm_counters.closure_calls) == "integer")
-test_assert(elf.type_of(vm_counters.native_calls) == "integer")
-test_assert(elf.type_of(vm_counters.instructions) == "integer")
-test_assert(elf.type_of(vm_counters.max_stack_slots) == "integer")
-test_assert(elf.type_of(vm_counters.max_call_depth) == "integer")
-test_assert(vm_counters.instructions > 0)
-test_assert(vm_counters.max_stack_slots > 0)
-test_assert(vm_counters.max_call_depth > 0)
-vm_counters = elf.vm.counters(vm_counters)
-vm_calls := vm_counters.calls
-vm_closure_calls := vm_counters.closure_calls
-vm_native_calls := vm_counters.native_calls
-vm_counters = elf.vm.counters(vm_counters)
-test_assert(vm_counters.calls == vm_calls + 1)
-test_assert(vm_counters.closure_calls == vm_closure_calls)
-test_assert(vm_counters.native_calls == vm_native_calls + 1)
-
-vm_counters = elf.vm.counters(vm_counters)
-vm_calls = vm_counters.calls
-vm_closure_calls = vm_counters.closure_calls
-vm_native_calls = vm_counters.native_calls
-vm_call_probe := fun() {}
-vm_call_probe()
-vm_counters = elf.vm.counters(vm_counters)
-test_assert(vm_counters.calls == vm_calls + 2)
-test_assert(vm_counters.closure_calls == vm_closure_calls + 1)
-test_assert(vm_counters.native_calls == vm_native_calls + 1)
-
 test_assert(elf.fs.get_paths() != nil)
 paths := elf.fs.get_paths("test/compiler/smoke")
 test_assert(paths != nil)
@@ -188,5 +159,3 @@ test_assert(elf.fs.for_each_path("test/compiler/smoke/does-not-exist", fun(path)
 test_assert(elf.print("") == 0)
 test_assert(elf.println("") == 1)
 test_assert(elf.printl("") == 1)
-
-ret 4242

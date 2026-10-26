@@ -56,17 +56,17 @@ static u32 test_string_hash_data(const char *data, u32 size)
 static void test_string_stack_roots_survive_gc(void)
 {
 	elf_State *state = elf_create_state();
-	elf_Value *stack_checkpoint = state->stack_ptr;
+	elf_Value *stack_checkpoint = state->stack_top;
 
 	elf_String *interned = elf_string_from_data(state, "rooted.string");
-	push_value(state, value_from_string(interned));
+	push_value(state, str_value(interned));
 
 	force_string_gc(state);
 
 	elf_String *again = elf_string_from_data(state, "rooted.string");
 	expect_same_string(interned, again, "stack rooted string survives GC");
 
-	state->stack_ptr = stack_checkpoint;
+	state->stack_top = stack_checkpoint;
 	elf_destroy_state(state);
 }
 
@@ -92,10 +92,10 @@ static void test_string_unrooted_values_are_swept(void)
 static void test_string_bucket_unlinks_dead_collisions(void)
 {
 	elf_State *state = elf_create_state();
-	elf_Value *stack_checkpoint = state->stack_ptr;
+	elf_Value *stack_checkpoint = state->stack_top;
 
 	elf_String *root = elf_string_from_data(state, "rooted.bucket.string");
-	push_value(state, value_from_string(root));
+	push_value(state, str_value(root));
 
 	u32 bucket_index = root->hash & (state->string_bucket_count - 1);
 	u32 collisions = 0;
@@ -113,7 +113,7 @@ static void test_string_bucket_unlinks_dead_collisions(void)
 
 	if (collisions < 8) {
 		test_fail("string collision test generated enough colliding strings");
-		state->stack_ptr = stack_checkpoint;
+		state->stack_top = stack_checkpoint;
 		elf_destroy_state(state);
 		return;
 	}
@@ -123,7 +123,7 @@ static void test_string_bucket_unlinks_dead_collisions(void)
 	elf_String *again = elf_string_from_data(state, "rooted.bucket.string");
 	expect_same_string(root, again, "bucket GC keeps rooted string behind dead collisions");
 
-	state->stack_ptr = stack_checkpoint;
+	state->stack_top = stack_checkpoint;
 	elf_destroy_state(state);
 }
 

@@ -41,7 +41,9 @@ static void array_to_text(Arena *arena, elf_Array *array)
 
 static void error_to_text(Arena *arena, elf_GCError *error)
 {
+	arena_push_text(arena, "error(\"");
 	arena_push_data(arena, elf_string_data(error->message), elf_string_size(error->message));
+	arena_push_text(arena, "\")");
 }
 
 void elf_print_value(Arena *arena, elf_Value value)

@@ -85,6 +85,16 @@ ELF_FUNCTION(l_core_assert)
 	return 0;
 }
 
+ELF_FUNCTION(l_core_echo)
+{
+	u32 count = nargs ? nargs - 1 : 0;
+	for (u32 index = 0; index < count; ++index)
+	{
+		push_value(S, load_value(S, index + 1));
+	}
+	return count;
+}
+
 ELF_FUNCTION(l_core_metatable)
 {
 	lib_check_arg_count(S, "metatable", nargs, 1, 1);
@@ -109,7 +119,7 @@ ELF_FUNCTION(l_core_is_readonly)
 	lib_check_arg_count(S, "is_readonly", nargs, 1, 1);
 	elf_Value value = load_value(S, 1);
 	check_value_type_rule(S, value, TRULE_OBJECT);
-	push_value(S, value_from_integer((value_as_object(value)->status & ELF_OBJECT_READONLY) != 0));
+	push_value(S, int_value((value_as_object(value)->status & ELF_OBJECT_READONLY) != 0));
 	return 1;
 }
 
@@ -117,7 +127,7 @@ ELF_FUNCTION(l_core_type_of)
 {
 	lib_check_arg_count(S, "type_of", nargs, 1, 1);
 	const char *name = value_name(load_value(S, 1));
-	push_value(S, value_from_string(elf_string_from_data(S, name)));
+	push_value(S, str_value(elf_string_from_data(S, name)));
 	return 1;
 }
 
@@ -150,21 +160,21 @@ ELF_FUNCTION(l_core_error)
 ELF_FUNCTION(l_core_is_error)
 {
 	lib_check_arg_count(S, "is_error", nargs, 1, 1);
-	push_value(S, value_from_integer(value_is_error(load_value(S, 1))));
+	push_value(S, int_value(value_is_error(load_value(S, 1))));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_is_string)
 {
 	lib_check_arg_count(S, "is_string", nargs, 1, 1);
-	push_value(S, value_from_integer(value_is_string(load_value(S, 1))));
+	push_value(S, int_value(value_is_string(load_value(S, 1))));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_is_numeric)
 {
 	lib_check_arg_count(S, "is_numeric", nargs, 1, 1);
-	push_value(S, value_from_integer(value_is_numeric(load_value(S, 1))));
+	push_value(S, int_value(value_is_numeric(load_value(S, 1))));
 	return 1;
 }
 
@@ -173,7 +183,7 @@ ELF_FUNCTION(l_core_to_number)
 	lib_check_arg_count(S, "to_number", nargs, 1, 1);
 	elf_Value value = load_value(S, 1);
 	check_numeric(S, value);
-	push_value(S, value_from_number(value_to_number(value)));
+	push_value(S, num_value(value_to_number(value)));
 	return 1;
 }
 
@@ -182,7 +192,7 @@ ELF_FUNCTION(l_core_to_integer)
 	lib_check_arg_count(S, "to_integer", nargs, 1, 1);
 	elf_Value value = load_value(S, 1);
 	check_numeric(S, value);
-	push_value(S, value_from_integer(value_to_integer(value)));
+	push_value(S, int_value(value_to_integer(value)));
 	return 1;
 }
 
@@ -192,13 +202,8 @@ ELF_FUNCTION(l_core_to_integer)
 
 static StackFrame *core_caller_frame(elf_State *state)
 {
-	if (state->frame == state->frame_stack)
-	{
-		report_runtime_error(state, ERROR_RUNTIME,
-			"caller introspection requires a bytecode caller");
-	}
-	StackFrame *caller = state->frame - 1;
-	if (!caller->prototype)
+	StackFrame *caller = frame_previous(state, frame_current(state));
+	if (!caller || !frame_proto(caller))
 	{
 		report_runtime_error(state, ERROR_RUNTIME,
 			"caller introspection requires a bytecode caller");
@@ -210,8 +215,9 @@ ELF_FUNCTION(l_core_nvargs)
 {
 	lib_check_arg_count(S, "nvargs", nargs, 0, 0);
 	StackFrame *caller = core_caller_frame(S);
-	i64 count = caller->variadic ? caller->nargs - caller->arity : 0;
-	push_value(S, value_from_integer(MAX(count, 0)));
+	elf_Prototype *proto = frame_proto(caller);
+	i64 count = proto->variadic ? (i64)frame_nargs(caller) - proto->arity : 0;
+	push_value(S, int_value(MAX(count, 0)));
 	return 1;
 }
 
@@ -219,18 +225,19 @@ ELF_FUNCTION(l_core_varg)
 {
 	lib_check_arg_count(S, "varg", nargs, 1, 1);
 	StackFrame *caller = core_caller_frame(S);
+	elf_Prototype *proto = frame_proto(caller);
 	i64 index = lib_load_integer(S, 1);
-	i64 count = caller->variadic ? caller->nargs - caller->arity : 0;
+	i64 count = proto->variadic ? (i64)frame_nargs(caller) - proto->arity : 0;
 
 	if (index < 0 || index >= count) push_value(S, value_nil());
-	else push_value(S, caller->arguments[caller->arity + index]);
+	else push_value(S, frame_arg(caller, proto->arity + (u32)index));
 	return 1;
 }
 
 ELF_FUNCTION(l_core_nargs)
 {
 	lib_check_arg_count(S, "nargs", nargs, 0, 0);
-	push_value(S, value_from_integer(core_caller_frame(S)->nargs));
+	push_value(S, int_value(frame_nargs(core_caller_frame(S))));
 	return 1;
 }
 
@@ -239,8 +246,8 @@ ELF_FUNCTION(l_core_arg)
 	lib_check_arg_count(S, "arg", nargs, 1, 1);
 	StackFrame *caller = core_caller_frame(S);
 	i64 index = lib_load_integer(S, 1);
-	if (index < 0 || index >= caller->nargs) push_value(S, value_nil());
-	else push_value(S, caller->arguments[index]);
+	if (index < 0 || index >= frame_nargs(caller)) push_value(S, value_nil());
+	else push_value(S, frame_arg(caller, (u32)index));
 	return 1;
 }
 
@@ -269,6 +276,7 @@ ELF_FUNCTION(l_core_const_expr)
 
 static const elf_Binding l_core[] = {
 	{"assert",       l_core_assert},
+	{"echo",         l_core_echo},
 	{"metatable",    l_core_metatable},
 	{"freeze",       l_core_freeze},
 	{"is_readonly",  l_core_is_readonly},

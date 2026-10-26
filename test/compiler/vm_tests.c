@@ -1,28 +1,8 @@
-ELF_FUNCTION(vm_test_assert)
-{
-	lib_check_arg_count(S, "test_assert", nargs, 1, 2);
-	elf_Value value = load_value(S, 1);
-	check_numeric(S, value);
-	const char *message = nargs > 2 ? lib_load_cstr(S, 2) : "script assertion failed";
-	if (!value_to_integer(value)) {
-		test_fail(message);
-		print_current_runtime_source_location(S);
-	}
-	return 0;
-}
-
 typedef struct
 {
 	elf_Ref callback;
 }
 VmNestedCallContext;
-
-typedef struct
-{
-	elf_State *state;
-	elf_Value  value;
-}
-VmRunResult;
 
 static void vm_force_gc_allocations(elf_State *state, u32 count)
 {
@@ -39,76 +19,100 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	StackFrame *native_frame_pointer = S->frame;
 	StackFrame native_frame = *S->frame;
 	StackFrame *caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
-	elf_Prototype *caller_prototype = caller ? caller->prototype : 0;
-	u32 caller_instruction = caller ? caller->instruction : 0;
-	b32 preserved = context && !native_frame.prototype && caller_prototype;
-	if (preserved)
+	elf_Prototype *caller_prototype = caller ? caller->proto : 0;
+	Bytecode *caller_next_instruction = caller ? frame_next_instr(caller) : 0;
+	b32 preserved = true;
+
+	if (!context)
 	{
-		preserved = BC_TYPE(caller_prototype->bytecode[caller_instruction]) == BC_CALL_DYNAMIC && elf_push_ref(S, context->callback);
+		test_fail("nested host call expected user context, got null");
+		preserved = false;
+	}
+	if (native_frame.proto)
+	{
+		TEST_FAIL("nested host call expected a native frame prototype of null, got %p", (void *)native_frame.proto);
+		preserved = false;
+	}
+	if (!caller)
+	{
+		test_fail("nested host call expected a bytecode caller frame, got none");
+		preserved = false;
+	}
+	else if (!caller_prototype)
+	{
+		test_fail("nested host call expected its caller frame to have a prototype, got null");
+		preserved = false;
+	}
+	else
+	{
+		BcType caller_type = BC_TYPE(*frame_active_instr(caller));
+		if (caller_type != BC_CALL_DYNAMIC)
+		{
+			TEST_FAIL("nested host call expected active caller instruction 'call_dynamic', got '%s'", bytecode_type_name(caller_type));
+			preserved = false;
+		}
+	}
+	if (preserved && !elf_push_ref(S, context->callback))
+	{
+		test_fail("nested host call expected its callback reference to remain valid, got an invalid reference");
+		preserved = false;
 	}
 	if (preserved)
 	{
 		elf_push_nil(S);
 		elf_call(S, 1);
 		StackFrame *restored_caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
-		preserved = S->frame == native_frame_pointer &&
-			S->frame->arguments == native_frame.arguments && S->frame->registers == native_frame.registers &&
-			S->frame->framesize == native_frame.framesize && S->frame->nargs == native_frame.nargs &&
-			!S->frame->prototype && restored_caller &&
-			restored_caller->prototype == caller_prototype &&
-			restored_caller->instruction == caller_instruction;
+		if (S->frame != native_frame_pointer)
+		{
+			TEST_FAIL("nested host call expected current frame %p, got %p", (void *)native_frame_pointer, (void *)S->frame);
+			preserved = false;
+		}
+		if (S->frame->args != native_frame.args)
+		{
+			TEST_FAIL("nested host call expected native arguments %p, got %p", (void *)native_frame.args, (void *)S->frame->args);
+			preserved = false;
+		}
+		if (S->frame->regs != native_frame.regs)
+		{
+			TEST_FAIL("nested host call expected native registers %p, got %p", (void *)native_frame.regs, (void *)S->frame->regs);
+			preserved = false;
+		}
+		if (S->frame->size != native_frame.size)
+		{
+			TEST_FAIL("nested host call expected native frame size %u, got %u", native_frame.size, S->frame->size);
+			preserved = false;
+		}
+		if (S->frame->nargs != native_frame.nargs)
+		{
+			TEST_FAIL("nested host call expected native argument count %u, got %u", native_frame.nargs, S->frame->nargs);
+			preserved = false;
+		}
+		if (S->frame->proto)
+		{
+			TEST_FAIL("nested host call expected restored native prototype null, got %p", (void *)S->frame->proto);
+			preserved = false;
+		}
+		if (!restored_caller)
+		{
+			test_fail("nested host call expected its bytecode caller to remain on the frame stack, got none");
+			preserved = false;
+		}
+		else
+		{
+			if (restored_caller->proto != caller_prototype)
+			{
+				TEST_FAIL("nested host call expected caller prototype %p, got %p", (void *)caller_prototype, (void *)restored_caller->proto);
+				preserved = false;
+			}
+			if (frame_next_instr(restored_caller) != caller_next_instruction)
+			{
+				TEST_FAIL("nested host call expected caller continuation %p, got %p", (void *)caller_next_instruction, (void *)frame_next_instr(restored_caller));
+				preserved = false;
+			}
+		}
 	}
 	elf_push_int(S, preserved);
 	return 1;
-}
-
-static elf_SymTable *vm_test_symbols(void)
-{
-	elf_SymTable *symbols = 0;
-	if (elf_sym_create(&symbols) != ELF_ERROR_NONE || elf_sym_fun(symbols, ELF_LIT("test_assert"), vm_test_assert) != ELF_ERROR_NONE) {
-		test_fail("VM test binding registration");
-	}
-	return symbols;
-}
-
-static VmRunResult vm_test_run_file(const char *path)
-{
-	elf_State *state = elf_create_state();
-	elf_SymTable *symbols = vm_test_symbols();
-	elf_StrSlice source_path = {(char *)path, strlen(path)};
-	elf_push_code_file(state, symbols, source_path);
-	elf_sym_destroy(symbols);
-	elf_push_nil(state);
-	elf_call(state, 1);
-	return (VmRunResult){state, state->stack_ptr[-1]};
-}
-
-static void vm_expect_int(const char *path, i64 expected, const char *label)
-{
-	VmRunResult result = vm_test_run_file(path);
-	if (!value_is_integer(result.value) || value_as_integer(result.value) != expected) {
-		TEST_FAIL("%s expected int %lld, got tag %d (%s) value %lld", label, (long long)expected, value_type(result.value), value_type_name(result.value.type), (long long)value_as_integer(result.value));
-	}
-	elf_destroy_state(result.state);
-}
-
-static void test_vm_return_int(void)
-{
-	vm_expect_int("test/compiler/smoke/return_int.elf", 1, "vm returns integer value");
-}
-
-static void test_vm_integer_add(void)
-{
-	vm_expect_int("test/compiler/smoke/return_add.elf", 3, "vm executes integer addition");
-}
-
-static void test_vm_return_nil(void)
-{
-	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_nil.elf");
-	if (!value_is_nil(result.value)) {
-		test_fail("vm returns nil value");
-	}
-	elf_destroy_state(result.state);
 }
 
 static void test_vm_preserves_actual_returns(void)
@@ -123,14 +127,14 @@ static void test_vm_preserves_actual_returns(void)
 		return;
 	}
 
-	elf_Value *results = state->stack_ptr - 1;
+	elf_Value *results = state->stack_top - 1;
 	elf_push_nil(state);
 	u32 returned_count = elf_call(state, 1);
 	if (returned_count != 2)
 	{
 		test_fail("bytecode call reports its actual return count");
 	}
-	if (state->stack_ptr != results + 2)
+	if (state->stack_top != results + 2)
 	{
 		test_fail("bytecode call exposes its actual return values");
 	}
@@ -140,65 +144,6 @@ static void test_vm_preserves_actual_returns(void)
 	}
 
 	elf_destroy_state(state);
-}
-
-static void test_vm_return_table(void)
-{
-	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_table.elf");
-	if (!value_is_table(result.value)) {
-		test_fail("vm returns table value");
-	}
-	else if (value_as_table(result.value)->count != 2) {
-		test_fail("vm table literal stores keyed values");
-	}
-	elf_destroy_state(result.state);
-}
-
-static void test_vm_return_array(void)
-{
-	VmRunResult result = vm_test_run_file("test/compiler/smoke/return_array.elf");
-	if (!value_is_array(result.value))
-	{
-		test_fail("vm returns array value");
-	}
-	else
-	{
-		elf_Array *array = value_as_array(result.value);
-		if (elf_array_length(array) != 2 || !value_is_array(elf_array_get(result.state, array, 0)) || !value_is_array(elf_array_get(result.state, array, 1)))
-		{
-			test_fail("vm array literal preserves nested arrays");
-		}
-		else
-		{
-			elf_Array *values = value_as_array(elf_array_get(result.state, array, 0));
-			elf_Array *nested = value_as_array(elf_array_get(result.state, array, 1));
-			if (elf_array_length(values) != 3 || value_as_integer(elf_array_get(result.state, values, 1)) != 22 || value_as_integer(elf_array_get(result.state, nested, 0)) != 40)
-			{
-				test_fail("vm executes array indexing and assignment");
-			}
-		}
-	}
-	elf_destroy_state(result.state);
-}
-
-static void test_vm_nil_assign(void)
-{
-	vm_expect_int("test/compiler/smoke/nil_assign.elf", 42, "vm nil assignment stores fallback value");
-}
-
-static void test_vm_function_call(void)
-{
-	vm_expect_int("test/compiler/smoke/function_call.elf", 5, "vm calls user function with arguments");
-}
-
-static void test_vm_function_arguments(void)
-{
-	vm_expect_int("test/compiler/smoke/function_arguments.elf", 345, "vm exposes implicit this and explicit arguments");
-}
-
-static void test_vm_method_this(void)
-{
-	vm_expect_int("test/compiler/smoke/method_this.elf", 242, "vm passes field receiver as implicit this");
 }
 
 static ELF_FUNCTION(vm_test_symbol_function)
@@ -231,78 +176,10 @@ static void test_vm_symbols(void)
 
 	elf_push_nil(state);
 	elf_call(state, 1);
-	elf_Value result = state->stack_ptr[-1];
+	elf_Value result = state->stack_top[-1];
 	if (!value_is_integer(result) || value_as_integer(result) != 42)
 	{
 		test_fail("VM executes environment symbols");
-	}
-	elf_destroy_state(state);
-}
-
-static void test_vm_script_json_assertions(void)
-{
-	vm_expect_int("test/compiler/smoke/script_assert_json.elf", 321, "vm runs script-side json table assertions");
-}
-
-static void test_vm_core_library_assertions(void)
-{
-	vm_expect_int("test/compiler/smoke/script_assert_core_lib.elf", 4242, "vm runs core library assertions");
-}
-
-static void test_vm_string_join(void)
-{
-	VmRunResult result = vm_test_run_file("test/compiler/smoke/script_assert_string_join.elf");
-	if (!value_is_string(result.value) || strcmp(value_as_string(result.value)->data, "score9") != 0) {
-		test_fail("vm joins string lhs with formatted rhs");
-	}
-	elf_destroy_state(result.state);
-}
-
-static void test_vm_interpolated_strings(void)
-{
-	VmRunResult result = vm_test_run_file("test/compiler/smoke/interpolated_strings.elf");
-	if (!value_is_string(result.value) || strcmp(value_as_string(result.value)->data, "score9") != 0) {
-		test_fail("vm evaluates interpolated strings");
-	}
-	elf_destroy_state(result.state);
-}
-
-static void test_vm_static_function(void)
-{
-	elf_State *state = elf_create_state();
-	char source_text[] = "answer :: fun() { ret 42 }\nret answer()";
-	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, ELF_LIT("static-function"), source) != ELF_ERROR_NONE)
-	{
-		test_fail("static function source compiles");
-		elf_destroy_state(state);
-		return;
-	}
-
-	elf_push_nil(state);
-	elf_call(state, 1);
-	if (!value_is_integer(state->stack_ptr[-1]) || value_as_integer(state->stack_ptr[-1]) != 42) {
-		test_fail("static function executes through the VM");
-	}
-	elf_destroy_state(state);
-}
-
-static void test_vm_static_recurse_function(void)
-{
-	elf_State *state = elf_create_state();
-	char source_text[] = "count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\nret count(3)";
-	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, ELF_LIT("static-recurse-function"), source) != ELF_ERROR_NONE)
-	{
-		test_fail("static recurse function source compiles");
-		elf_destroy_state(state);
-		return;
-	}
-
-	elf_push_nil(state);
-	elf_call(state, 1);
-	if (!value_is_integer(state->stack_ptr[-1]) || value_as_integer(state->stack_ptr[-1]) != 0) {
-		test_fail("static function using recurse executes through its closure");
 	}
 	elf_destroy_state(state);
 }
@@ -320,14 +197,14 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		elf_destroy_state(state);
 		return;
 	}
-	elf_Closure *first_entry = value_as_closure(state->stack_ptr[-1]);
+	elf_Closure *first_entry = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *first_entry_prototype = first_entry->prototype;
 	if (first_entry_prototype != state->prototypes[0]) {
 		test_fail("first compiled entry uses the first prototype index");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1);
-	elf_Closure *first_factory = value_as_closure(state->stack_ptr[-1]);
+	elf_Closure *first_factory = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *first_factory_prototype = first_factory->prototype;
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
@@ -337,14 +214,14 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		elf_destroy_state(state);
 		return;
 	}
-	elf_Closure *second_entry = value_as_closure(state->stack_ptr[-1]);
+	elf_Closure *second_entry = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *second_entry_prototype = second_entry->prototype;
 	if (second_entry_prototype == first_entry_prototype) {
 		test_fail("each compilation publishes a distinct entry prototype");
 	}
 	elf_push_nil(state);
 	elf_call(state, 1);
-	elf_Closure *second_factory = value_as_closure(state->stack_ptr[-1]);
+	elf_Closure *second_factory = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *second_factory_prototype = second_factory->prototype;
 	if (second_factory_prototype == first_factory_prototype) {
 		test_fail("nested functions receive distinct state prototype indices");
@@ -362,7 +239,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_push_nil(state);
 	elf_push_int(state, 100);
 	elf_call(state, 2);
-	elf_Closure *first_closure = value_as_closure(state->stack_ptr[-1]);
+	elf_Closure *first_closure = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *first_closure_prototype = first_closure->prototype;
 	elf_Ref first = elf_create_ref(state, -1);
 	elf_pop(state, 1);
@@ -375,7 +252,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_push_nil(state);
 	elf_push_int(state, 200);
 	elf_call(state, 2);
-	elf_Closure *second_closure = value_as_closure(state->stack_ptr[-1]);
+	elf_Closure *second_closure = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *second_closure_prototype = second_closure->prototype;
 	elf_Ref second = elf_create_ref(state, -1);
 	elf_pop(state, 1);
@@ -460,8 +337,13 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	elf_call(state, 1);
 
 	elf_Int preserved = 0;
-	if (!elf_to_int(state, -1, &preserved) || preserved != 1) {
-		test_fail("nested host call preserves the caller diagnostic context");
+	if (!elf_to_int(state, -1, &preserved))
+	{
+		TEST_FAIL("nested host context probe expected type 'integer', got '%s'", value_type_name(elf_type(state, -1)));
+	}
+	else if (preserved != 1)
+	{
+		TEST_FAIL("nested host context probe expected success 1, got %lld after the preceding context failure", (long long)preserved);
 	}
 
 	elf_release_ref(state, context.callback);
@@ -512,10 +394,10 @@ static void test_vm_runtime_error_diagnostics(void)
 	}
 	if (valid)
 	{
-		dy_String arguments[] = {DY_LIT("--runtime-error-diagnostic-child")};
+		dy_String args[] = {DY_LIT("--runtime-error-diagnostic-child")};
 		dy_Process_Start_Options options = {
 			.executable = executable,
-			.arguments = {arguments, ARRAY_COUNT(arguments)},
+			.args = {args, ARRAY_COUNT(args)},
 			.standard_error = error_pipe.writer,
 			.hide_window = true,
 		};
@@ -577,38 +459,6 @@ static void test_vm_runtime_error_diagnostics(void)
 	scratch_end(scratch);
 }
 
-static void test_vm_module_emitter_grows_constant_arrays(void)
-{
-	char source[4096];
-	u32 used = (u32)snprintf(source, sizeof(source), "ret [");
-	for (u32 i = 0; i < 80; ++i) used += (u32)snprintf(source + used, sizeof(source) - used, "%u,", i);
-	for (u32 i = 0; i < 80; ++i) used += (u32)snprintf(source + used, sizeof(source) - used, "%u.5%s", i, i == 79 ? "]" : ",");
-	if (used >= sizeof(source)) {
-		test_fail("module growth test source fits its buffer");
-		return;
-	}
-
-	elf_State *state = elf_create_state();
-	elf_StrSlice source_slice = {source, used};
-	if (elf_push_code_source(state, 0, ELF_LIT("constant-growth"), source_slice) != ELF_ERROR_NONE) {
-		test_fail("module growth source compiles");
-		elf_destroy_state(state);
-		return;
-	}
-
-	elf_Prototype *prototype = value_as_closure(state->stack_ptr[-1])->prototype;
-	if (prototype->integer_constant_count <= 64 || prototype->number_constant_count <= 64) {
-		test_fail("function emitter grows both constant arrays beyond their initial capacity");
-	}
-	elf_push_nil(state);
-	elf_call(state, 1);
-	if (!value_is_array(state->stack_ptr[-1]) || elf_array_length(value_as_array(state->stack_ptr[-1])) != 160) {
-		test_fail("grown module constant arrays execute correctly");
-	}
-
-	elf_destroy_state(state);
-}
-
 static void test_vm_module_converts_atom_constants(void)
 {
 	elf_State *state = elf_create_state();
@@ -620,7 +470,7 @@ static void test_vm_module_converts_atom_constants(void)
 		return;
 	}
 
-	elf_Prototype *prototype = value_as_closure(state->stack_ptr[-1])->prototype;
+	elf_Prototype *prototype = value_as_closure(state->stack_top[-1])->prototype;
 	if (prototype->string_count != 2 || strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0)
 	{
 		test_fail("function converts deduplicated atom constants to strings");
@@ -632,7 +482,7 @@ static void test_vm_module_converts_atom_constants(void)
 
 	elf_push_nil(state);
 	elf_call(state, 1);
-	elf_Array *result = value_as_array(state->stack_ptr[-1]);
+	elf_Array *result = value_as_array(state->stack_top[-1]);
 	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), prototype->strings[1]))
 	{
 		test_fail("VM loads string constants from their function");
@@ -658,7 +508,7 @@ static void test_vm_error_snapshots_call_frames(void)
 
 	elf_push_nil(state);
 	elf_call(state, 1);
-	elf_Value result = state->stack_ptr[-1];
+	elf_Value result = state->stack_top[-1];
 	if (!value_is_error(result))
 	{
 		test_fail("error trace source returns an error");
@@ -689,30 +539,11 @@ static void test_vm_error_snapshots_call_frames(void)
 
 static void run_vm_tests(void)
 {
-	TEST_RUN("vm.return_int", test_vm_return_int);
-	TEST_RUN("vm.integer_add", test_vm_integer_add);
-	TEST_RUN("vm.return_nil", test_vm_return_nil);
 	TEST_RUN("vm.preserves_actual_returns", test_vm_preserves_actual_returns);
-	TEST_RUN("vm.return_table", test_vm_return_table);
-	TEST_RUN("vm.return_array", test_vm_return_array);
-	TEST_RUN("vm.nil_assign", test_vm_nil_assign);
-	TEST_RUN("vm.function_call", test_vm_function_call);
-	TEST_RUN("vm.function_arguments", test_vm_function_arguments);
-	TEST_RUN("vm.method_this", test_vm_method_this);
 	TEST_RUN("vm.symbols", test_vm_symbols);
-	TEST_RUN("vm.script_json_assertions", test_vm_script_json_assertions);
-	TEST_RUN("vm.core_library_assertions", test_vm_core_library_assertions);
-	TEST_RUN("vm.string_join", test_vm_string_join);
-	TEST_RUN("vm.interpolated_strings", test_vm_interpolated_strings);
-	TEST_RUN("vm.static_function", test_vm_static_function);
-#if 0
-	// Static recurse currently requires a missing closure.
-	TEST_RUN("vm.static_recurse_function", test_vm_static_recurse_function);
-#endif
 	TEST_RUN("vm.compiled_closure_keeps_function_identity", test_vm_compiled_closure_keeps_function_identity);
 	TEST_RUN("vm.nested_host_call_preserves_diagnostics_context", test_vm_nested_host_call_preserves_diagnostics_context);
 	TEST_RUN("vm.runtime_error_diagnostics", test_vm_runtime_error_diagnostics);
-	TEST_RUN("vm.module_emitter_grows_constant_arrays", test_vm_module_emitter_grows_constant_arrays);
 	TEST_RUN("vm.module_converts_atom_constants", test_vm_module_converts_atom_constants);
 	TEST_RUN("vm.error_snapshots_call_frames", test_vm_error_snapshots_call_frames);
 }

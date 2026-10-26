@@ -170,14 +170,6 @@ static void backend_expect_patched_forward_jumps(BackendCompileResult result, co
 	}
 }
 
-static void backend_expect_min_conditional_jumps(BackendCompileResult result, u32 min_count, const char *label)
-{
-	u32 count = backend_count_bytecode(result, BC_JUMP_IF_ZERO) + backend_count_bytecode(result, BC_JUMP_IF_NONZERO);
-	if (count < min_count) {
-		test_fail(label);
-	}
-}
-
 static void backend_expect_jump_counts(BackendCompileResult result, u32 expected_jz, u32 expected_jnz, u32 expected_jump, const char *label)
 {
 	if (backend_count_bytecode(result, BC_JUMP_IF_ZERO) != expected_jz || backend_count_bytecode(result, BC_JUMP_IF_NONZERO) != expected_jnz || backend_count_bytecode(result, BC_JUMP) != expected_jump)
@@ -235,7 +227,6 @@ static void test_backend_short_circuit_and(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_and.elf");
 
-	backend_expect_min_conditional_jumps(result, 2, "&& emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 0, 0, "&& emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "&& does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "&& patches condition jumps forward");
@@ -246,7 +237,6 @@ static void test_backend_short_circuit_or(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_or.elf");
 
-	backend_expect_min_conditional_jumps(result, 2, "|| emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 1, 1, 0, "|| emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "|| does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "|| patches condition jumps forward");
@@ -257,7 +247,6 @@ static void test_backend_short_circuit_nested_and_or(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_nested_and_or.elf");
 
-	backend_expect_min_conditional_jumps(result, 3, "nested a && (b || c) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a && (b || c) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "nested a && (b || c) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "nested a && (b || c) patches jumps forward");
@@ -268,7 +257,6 @@ static void test_backend_short_circuit_nested_or_and(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_nested_or_and.elf");
 
-	backend_expect_min_conditional_jumps(result, 3, "nested a || (b && c) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 1, 0, "nested a || (b && c) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "nested a || (b && c) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "nested a || (b && c) patches jumps forward");
@@ -279,7 +267,6 @@ static void test_backend_short_circuit_mixed_groups(void)
 {
 	BackendCompileResult result = backend_test_compile_file("test/compiler/smoke/short_circuit_mixed_groups.elf");
 
-	backend_expect_min_conditional_jumps(result, 4, "mixed (a || b) && (c || d) emits conditional jumps for short-circuiting");
 	backend_expect_jump_counts(result, 2, 2, 0, "mixed (a || b) && (c || d) emits optimal short-circuit jump shape");
 	backend_expect_no_eager_logical_bytecode(result, "mixed (a || b) && (c || d) does not lower to eager logical bytecode");
 	backend_expect_patched_forward_jumps(result, "mixed (a || b) && (c || d) patches jumps forward");
@@ -548,7 +535,7 @@ static void test_backend_calls_imported_static_function(void)
 
 		elf_Closure *closure = elf_closure_new(result.state, backend_test_function(result), 0, 0);
 		ASSERT(closure);
-		push_value(result.state, value_from_closure(closure));
+		push_value(result.state, cls_value(closure));
 		elf_push_nil(result.state);
 		elf_call(result.state, 1);
 		elf_Int value = 0;

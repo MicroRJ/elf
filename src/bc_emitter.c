@@ -23,11 +23,11 @@ struct BcEmitter
 	u32                 bytecode_capacity;
 	u32                 bytecode_count;
 
-	i64                *integer_constants;
+	i64                *int_data;
 	u32                 integer_constant_capacity;
 	u32                 integer_constant_count;
 
-	f64                *number_constants;
+	f64                *num_data;
 	u32                 number_constant_capacity;
 	u32                 number_constant_count;
 
@@ -109,9 +109,9 @@ static u32 add_integer_constant(BcEmitter *emitter, i64 value)
 	if (emitter->integer_constant_count >= BC_OPERAND_COUNT_MAX) {
 		abort();
 	}
-	emitter->integer_constants = grow_emitter_array(emitter->arena, emitter->integer_constants, emitter->integer_constant_count, &emitter->integer_constant_capacity, emitter->integer_constant_count + 1, sizeof(*emitter->integer_constants));
+	emitter->int_data = grow_emitter_array(emitter->arena, emitter->int_data, emitter->integer_constant_count, &emitter->integer_constant_capacity, emitter->integer_constant_count + 1, sizeof(*emitter->int_data));
 	u32 index = emitter->integer_constant_count++;
-	emitter->integer_constants[index] = value;
+	emitter->int_data[index] = value;
 	return index;
 }
 
@@ -120,9 +120,9 @@ static u32 add_number_constant(BcEmitter *emitter, f64 value)
 	if (emitter->number_constant_count >= BC_OPERAND_COUNT_MAX) {
 		abort();
 	}
-	emitter->number_constants = grow_emitter_array(emitter->arena, emitter->number_constants, emitter->number_constant_count, &emitter->number_constant_capacity, emitter->number_constant_count + 1, sizeof(*emitter->number_constants));
+	emitter->num_data = grow_emitter_array(emitter->arena, emitter->num_data, emitter->number_constant_count, &emitter->number_constant_capacity, emitter->number_constant_count + 1, sizeof(*emitter->num_data));
 	u32 index = emitter->number_constant_count++;
-	emitter->number_constants[index] = value;
+	emitter->num_data[index] = value;
 	return index;
 }
 
@@ -1257,13 +1257,13 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	}
 	if (prototype->integer_constant_count)
 	{
-		prototype->integer_constants = (i64 *)((u8 *)prototype + integer_constants_offset);
-		copy_memory(prototype->integer_constants, emitter->integer_constants, sizeof(*prototype->integer_constants) * prototype->integer_constant_count);
+		prototype->int_data = (i64 *)((u8 *)prototype + integer_constants_offset);
+		copy_memory(prototype->int_data, emitter->int_data, sizeof(*prototype->int_data) * prototype->integer_constant_count);
 	}
 	if (prototype->number_constant_count)
 	{
-		prototype->number_constants = (f64 *)((u8 *)prototype + number_constants_offset);
-		copy_memory(prototype->number_constants, emitter->number_constants, sizeof(*prototype->number_constants) * prototype->number_constant_count);
+		prototype->num_data = (f64 *)((u8 *)prototype + number_constants_offset);
+		copy_memory(prototype->num_data, emitter->num_data, sizeof(*prototype->num_data) * prototype->number_constant_count);
 	}
 	if (prototype->bytecode_count)
 	{

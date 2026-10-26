@@ -8,15 +8,11 @@ elf_GCError *elf_error_new(elf_State *state, elf_String *message, elf_Table *dat
 	ASSERT(message);
 
 	u32 frame_count = 0;
-	for (StackFrame *frame = state->frame;; --frame)
+	for (StackFrame *frame = frame_current(state); frame; frame = frame_previous(state, frame))
 	{
-		if (frame->prototype)
+		if (frame_proto(frame))
 		{
 			frame_count += 1;
-		}
-		if (frame == state->frame_stack)
-		{
-			break;
 		}
 	}
 
@@ -26,17 +22,14 @@ elf_GCError *elf_error_new(elf_State *state, elf_String *message, elf_Table *dat
 	error->message = message;
 	error->data = data;
 
-	for (StackFrame *frame = state->frame;; --frame)
+	for (StackFrame *frame = frame_current(state); frame; frame = frame_previous(state, frame))
 	{
-		if (frame->prototype)
+		elf_Prototype *proto = frame_proto(frame);
+		if (proto)
 		{
-			error->frames[error->frame_count].prototype = frame->prototype;
-			error->frames[error->frame_count].instruction = frame->instruction;
+			error->frames[error->frame_count].prototype = proto;
+			error->frames[error->frame_count].instruction = frame_active_instr(frame) - proto->bytecode;
 			error->frame_count += 1;
-		}
-		if (frame == state->frame_stack)
-		{
-			break;
 		}
 	}
 

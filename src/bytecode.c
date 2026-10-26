@@ -67,7 +67,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		{
 			arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
 			if (byte.b_y >= 0 && (u32)byte.b_y < function->number_constant_count) {
-				arena_pushf(arena, " // %f", function->number_constants[byte.b_y]);
+				arena_pushf(arena, " // %f", function->num_data[byte.b_y]);
 			}
 		}
 		break;
@@ -85,7 +85,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		{
 			arena_pushf(arena, "r%d = integer[%d]", byte.b_x, byte.b_y);
 			if (byte.b_y >= 0 && (u32)byte.b_y < function->integer_constant_count) {
-				arena_pushf(arena, " // %lli", function->integer_constants[byte.b_y]);
+				arena_pushf(arena, " // %lli", function->int_data[byte.b_y]);
 			}
 		}
 		break;

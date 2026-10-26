@@ -126,7 +126,7 @@ static u32 gc_sweep(elf_State *state)
 static u32 gc_mark_stack(elf_State *state)
 {
 	u32 marked_count = 0;
-	for (elf_Value *ptr = state->stack; ptr < state->stack_ptr; ++ ptr)
+	for (elf_Value *ptr = state->stack; ptr < state->stack_top; ++ ptr)
 	{
 		if (type_is_object(ptr->type))
 		{

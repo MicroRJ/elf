@@ -62,7 +62,7 @@ static void init_runtime_storage(elf_State *state)
 
 	state->stack_size = 4096;
 	state->stack = arena_push_zero(&state->arena, sizeof(*state->stack) * state->stack_size, _Alignof(elf_Value));
-	state->stack_ptr = state->stack;
+	state->stack_top = state->stack;
 }
 
 static void init_gc_storage(elf_State *state)
@@ -85,21 +85,20 @@ static void init_state_storage(elf_State *state)
 static void bootstrap_base_frame(elf_State *state)
 {
 	push_value(state, value_nil());
-
-	state->frame->arguments = state->stack;
-	state->frame->framesize = 16;
-	state->frame->prototype = 0;
+	// TODO(RJ): what even is this!
+	state->frame->args = state->stack;
+	state->frame->size = 16;
+	state->frame->proto = 0;
 }
 
 static void reserve_bootstrap_frame_stack_space(elf_State *state)
 {
-	ASSERT((state->stack_ptr - state->stack) < state->frame->framesize);
+	ASSERT((state->stack_top - state->stack) < state->frame->size);
 
-	elf_Value *stack_pointer = state->frame->arguments + state->frame->framesize;
-	ASSERT(stack_pointer >= state->stack_ptr);
-	value_zero_many(state->stack_ptr, stack_pointer - state->stack_ptr);
-	state->stack_ptr = stack_pointer;
-	vm_record_stack_usage(state);
+	elf_Value *stack_top = state->frame->args + state->frame->size;
+	ASSERT(stack_top >= state->stack_top);
+	value_zero_many(state->stack_top, stack_top - state->stack_top);
+	state->stack_top = stack_top;
 }
 
 void init_strings(elf_State *state)

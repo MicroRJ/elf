@@ -52,10 +52,10 @@ static void test_fail_at(const char *file, int line, const char *function, const
 
 	fprintf(stderr, "  %s:%d: ", file, line);
 
-	va_list arguments;
-	va_start(arguments, format);
-	vfprintf(stderr, format, arguments);
-	va_end(arguments);
+	va_list args;
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
 	fputc('\n', stderr);
 	test_context.failures += 1;
 }

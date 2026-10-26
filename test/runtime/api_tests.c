@@ -3,15 +3,27 @@ static ELF_FUNCTION(test_api_callback)
 	elf_StrSlice receiver = {};
 	elf_Int argument = 0;
 
-	if (elf_arg_count(S) != 2) {
-		test_fail("API callback argument count includes this");
+	elf_u32 argument_count = elf_nargs(S);
+	if (argument_count != 2)
+	{
+		TEST_FAIL("API callback expected 2 arguments including this, got %u", argument_count);
+		return 0;
 	}
-	if (!elf_to_str(S, 0, &receiver)
-	|| receiver.size != 4 || memcmp(receiver.data, "this", 4) != 0) {
-		test_fail("API argument zero is this");
+	if (!elf_to_str(S, 0, &receiver))
+	{
+		TEST_FAIL("API callback argument 0 expected type 'string', got '%s'", value_type_name(elf_type(S, 0)));
 	}
-	if (!elf_to_int(S, 1, &argument) || argument != 41) {
-		test_fail("API argument one is first explicit argument");
+	else if (receiver.size != 4 || memcmp(receiver.data, "this", 4) != 0)
+	{
+		TEST_FAIL("API callback argument 0 expected receiver 'this', got '%.*s'", (int)receiver.size, receiver.data);
+	}
+	if (!elf_to_int(S, 1, &argument))
+	{
+		TEST_FAIL("API callback argument 1 expected type 'integer', got '%s'", value_type_name(elf_type(S, 1)));
+	}
+	else if (argument != 41)
+	{
+		TEST_FAIL("API callback argument 1 expected 41, got %lld", (long long)argument);
 	}
 
 	elf_push_int(S, argument + 1);
@@ -43,13 +55,35 @@ static void test_api_call_addressing(elf_State *state)
 	elf_push_int(state, 41);
 	elf_u32 returned_count = elf_call(state, 2);
 
-	elf_Int first = 0;
-	elf_Int second = 0;
-	if (returned_count != 2 || !elf_to_int(state, -2, &first) || first != 42 || !elf_to_int(state, -1, &second) || second != 43) {
-		test_fail("API native callback results");
+	if (returned_count != 2)
+	{
+		TEST_FAIL("API native call expected 2 results, got %u", returned_count);
 	}
-	if (elf_set_top(state, checkpoint) != ELF_ERROR_NONE) {
-		test_fail("API restores host checkpoint");
+	else
+	{
+		elf_Int first = 0;
+		if (!elf_to_int(state, -2, &first))
+		{
+			TEST_FAIL("API native call result 0 expected type 'integer', got '%s'", value_type_name(elf_type(state, -2)));
+		}
+		else if (first != 42)
+		{
+			TEST_FAIL("API native call result 0 expected 42, got %lld", (long long)first);
+		}
+
+		elf_Int second = 0;
+		if (!elf_to_int(state, -1, &second))
+		{
+			TEST_FAIL("API native call result 1 expected type 'integer', got '%s'", value_type_name(elf_type(state, -1)));
+		}
+		else if (second != 43)
+		{
+			TEST_FAIL("API native call result 1 expected 43, got %lld", (long long)second);
+		}
+	}
+	elf_ErrorCode restore_error = elf_set_top(state, checkpoint);
+	if (restore_error != ELF_ERROR_NONE) {
+		TEST_FAIL("API host checkpoint restore expected error %u, got %u", (u32)ELF_ERROR_NONE, (u32)restore_error);
 	}
 }
 
@@ -172,7 +206,7 @@ static void test_api_arrays(elf_State *state)
 	}
 	elf_pop(state, 1);
 
-	elf_Array *array = value_as_array(state->frame->arguments[array_index]);
+	elf_Array *array = value_as_array(state->frame->args[array_index]);
 	array->obj.status |= ELF_OBJECT_READONLY;
 	elf_push_int(state, 30);
 	top = elf_get_top(state);
@@ -212,7 +246,7 @@ static void test_api_errors(elf_State *state)
 	if (elf_type(state, error) != ELF_VALUE_TYPE_ERROR || !elf_is_error(state, error)) {
 		test_fail("API creates a tagged error value");
 	}
-	elf_GCError *error_object = value_as_error(state->stack_ptr[-1]);
+	elf_GCError *error_object = value_as_error(state->stack_top[-1]);
 	if (elf_string_size(error_object->message) != 12 || memcmp(elf_string_data(error_object->message), "host failure", 12) != 0)
 	{
 		test_fail("API error retains its message");
@@ -238,8 +272,13 @@ static void test_api_errors(elf_State *state)
 	else
 	{
 		elf_StrSlice text = {};
-		if (!elf_to_str(state, -1, &text) || !api_slice_matches(text, "host failure")) {
-			test_fail("API formats an error using its message");
+		if (!elf_to_str(state, -1, &text))
+		{
+			test_fail("API error formatting expected a string result");
+		}
+		else if (!api_slice_matches(text, "error(\"host failure\")"))
+		{
+			TEST_FAIL("API error formatting changed: expected 'error(\"host failure\")', got '%.*s'", (int)text.size, text.data);
 		}
 		elf_pop(state, 1);
 	}
@@ -370,7 +409,7 @@ static void test_api_user_objects(elf_State *state)
 	}
 	else
 	{
-		elf_UserObject *user = value_as_user(state->stack_ptr[-1]);
+		elf_UserObject *user = value_as_user(state->stack_top[-1]);
 		elf_Value answer = elf_table_get_or_nil(state, user->metatable,
 			test_key_string(state, "answer"));
 		if (!value_is_integer(answer) || value_as_integer(answer) != 42)
@@ -420,7 +459,7 @@ static void test_api_mutation_errors(elf_State *state)
 		test_fail("API rejects appending to tables and preserves the value being written");
 	}
 
-	elf_Table *table = value_as_table(state->frame->arguments[table_index]);
+	elf_Table *table = value_as_table(state->frame->args[table_index]);
 	table->obj.status |= ELF_OBJECT_READONLY;
 	if (elf_set_field(state, table_index, "field") != ELF_ERROR_READONLY
 	|| elf_get_top(state) != value_top) {

@@ -94,12 +94,12 @@ static void test_gc_keeps_stack_rooted_array_graph(void)
 {
 	elf_State *state = elf_create_state();
 	u32 baseline_count = state->gc_reference_count;
-	elf_Value *stack_checkpoint = state->stack_ptr;
+	elf_Value *stack_checkpoint = state->stack_top;
 	elf_Array *root = elf_array_new(state);
 	push_value(state, value_from_array(root));
 	elf_Array *child = elf_array_new(state);
 	elf_array_add(state, root, value_from_array(child));
-	elf_array_add(state, child, value_from_string(elf_string_from_data(state, "array child")));
+	elf_array_add(state, child, str_value(elf_string_from_data(state, "array child")));
 
 	force_gc_allocations(state, 256);
 	elf_Value child_value = elf_array_get(state, root, 0);
@@ -116,7 +116,7 @@ static void test_gc_keeps_stack_rooted_array_graph(void)
 		}
 	}
 
-	state->stack_ptr = stack_checkpoint;
+	state->stack_top = stack_checkpoint;
 	force_gc_allocations(state, 256);
 	expect_gc_reference_count_below(state, baseline_count + 8, "released array graph becomes collectible");
 	elf_destroy_state(state);
@@ -136,7 +136,7 @@ static void test_gc_sweeps_unreachable_tables(void)
 static void test_gc_keeps_stack_rooted_table_graph(void)
 {
 	elf_State *state = elf_create_state();
-	elf_Value *stack_checkpoint = state->stack_ptr;
+	elf_Value *stack_checkpoint = state->stack_top;
 
 	elf_Table *root = push_new_table(state);
 	elf_Value child_key = test_key_string(state, "child");
@@ -168,7 +168,7 @@ static void test_gc_keeps_stack_rooted_table_graph(void)
 	elf_table_set(state, root, child_key, first_child);
 	expect_table_value(elf_table_get_or_nil(state, root, child_key), "GC preserves rooted table field references");
 
-	state->stack_ptr = stack_checkpoint;
+	state->stack_top = stack_checkpoint;
 	force_gc_allocations(state, 256);
 	elf_destroy_state(state);
 }
@@ -194,7 +194,7 @@ static void test_gc_keeps_referenced_table_graph(void)
 		elf_destroy_state(state);
 		return;
 	}
-	root = value_as_table(state->stack_ptr[-1]);
+	root = value_as_table(state->stack_top[-1]);
 	elf_Value child_value = elf_table_get_or_nil(state, root, child_key);
 	expect_table_value(child_value, "table reference preserves child table");
 	expect_int(elf_table_get_or_nil(state, value_as_table(child_value), value_key), 42,
@@ -239,11 +239,11 @@ static void test_gc_keeps_referenced_error_info(void)
 	elf_Index checkpoint = elf_get_top(state);
 	u32 baseline_count = state->gc_reference_count;
 	elf_Table *data = push_new_table(state);
-	elf_Value kind_key = value_from_string(elf_string_from_data(state, "kind"));
-	elf_Value kind_value = value_from_string(elf_string_from_data(state, "retained"));
+	elf_Value kind_key = str_value(elf_string_from_data(state, "kind"));
+	elf_Value kind_value = str_value(elf_string_from_data(state, "retained"));
 	elf_table_set(state, data, kind_key, kind_value);
 	elf_String *message = elf_string_from_data(state, "retained error");
-	push_value(state, value_from_string(message));
+	push_value(state, str_value(message));
 	elf_GCError *created_error = elf_error_new(state, message, data);
 	pop_value(state);
 	pop_value(state);
@@ -258,7 +258,7 @@ static void test_gc_keeps_referenced_error_info(void)
 	}
 	else
 	{
-		elf_GCError *error = value_as_error(state->stack_ptr[-1]);
+		elf_GCError *error = value_as_error(state->stack_top[-1]);
 		if (elf_string_size(error->message) != 14 || memcmp(elf_string_data(error->message), "retained error", 14) != 0)
 		{
 			test_fail("error reference preserves its message through GC");
@@ -295,7 +295,7 @@ static void test_gc_keeps_referenced_buffer(void)
 	}
 	else
 	{
-		elf_ByteBuffer *retained = value_as_buffer(state->stack_ptr[-1]);
+		elf_ByteBuffer *retained = value_as_buffer(state->stack_top[-1]);
 		if (retained->size != 5 || memcmp(retained->data, "bytes", 5) != 0) {
 			test_fail("buffer retains its bytes through GC");
 		}
