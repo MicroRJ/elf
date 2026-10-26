@@ -193,7 +193,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 		bench_require(entry == state->prototypes[first_prototype], "compile entry is not the first new prototype");
 		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
 		{
-			elf_Prototype *prototype = prototype_from_index(state, prototype_index);
+			elf_Prototype *prototype = proto_from_index(state, prototype_index);
 			bytecode_count += prototype->bytecode_count;
 			function_count += 1;
 			string_count += prototype->string_count;

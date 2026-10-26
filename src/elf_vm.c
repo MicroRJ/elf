@@ -15,8 +15,10 @@ static void value_zero_range(Value *first, Value *past_last) {
 	value_zero_many(first, past_last - first);
 }
 
-static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *args, u32 nargs)
+static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *base, u32 nargs)
 {
+	ASSERT(base->type == ELF_VALUE_TYPE_CLOSURE || base->type == ELF_VALUE_TYPE_PROTOTYPE);
+
 	Frame *frame = state->frame;
 
 	ASSERT(proto);
@@ -30,8 +32,9 @@ static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *arg
 	frame->proto = proto;
 	frame->close = 0;
 	frame->size = proto->stack_size;
-	frame->args = args;
-	frame->regs = args;
+	frame->base = base;
+	frame->args = base + 1;
+	frame->regs = base + 1;
 	frame->nargs = nargs;
 	frame->ndest = ndest;
 	frame->instr = proto->bytecode;
@@ -66,7 +69,7 @@ u32 elf_call(State *state, u32 nargs)
 	Frame *frame = state->frame;
 	if (base->type == ELF_VALUE_TYPE_CLOSURE)
 	{
-		begin_proto(state, base->x_closure->prototype, 1, base + 1, nargs);
+		begin_proto(state, base->x_closure->prototype, 1, base, nargs);
 		frame->close = base->x_closure;
 		state->stack_top = frame->args + frame->size;
 		nrets = vm_resume(state);
@@ -186,7 +189,7 @@ static u32 vm_resume(State *state)
 					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
 					Proto *proto = dest->x_closure->prototype;
 					frame = ++ state->frame;
-					begin_proto(state, proto, ndest, dest + 1, nargs);
+					begin_proto(state, proto, ndest, dest, nargs);
 					frame->close = dest->x_closure;
 				}
 				else if (dest->type == ELF_VALUE_TYPE_CFUNCTION)
@@ -221,14 +224,14 @@ static u32 vm_resume(State *state)
 
 			case BC_CALL_DIRECT:
 			{
-				Value *start = frame->regs + byte.b_x;
+				Value *base = frame->regs + byte.b_x;
 				u32 index = byte.b_y;
 				u32 nargs = byte.b_z;
 				u32 ndest = byte.b_w;
-				Proto *proto = prototype_from_index(state, index);
-				start[0] = value_nil();
+				Proto *proto = proto_from_index(state, index);
+				base[0] = proto_value(proto);
 				frame = ++ state->frame;
-				begin_proto(state, proto, ndest, start + 1, nargs);
+				begin_proto(state, proto, ndest, base, nargs);
 			}
 			break;
 
@@ -345,7 +348,7 @@ static u32 vm_resume(State *state)
 				ASSERT(byte.b_y >= 0);
 				u32 prototype_index = (u32)byte.b_y;
 				ASSERT(prototype_index_is_valid(state, prototype_index));
-				Proto *prototype = prototype_from_index(state, prototype_index);
+				Proto *prototype = proto_from_index(state, prototype_index);
 
 				Value *result = &frame->regs[byte.b_x];
 				elf_Closure *new_closure = elf_closure_new(state, prototype, result, prototype->captures);

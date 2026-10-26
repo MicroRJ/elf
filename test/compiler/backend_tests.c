@@ -102,7 +102,7 @@ static u32 backend_count_all_bytecode(BackendCompileResult result, BcType type)
 	u32 count = 0;
 	for (u32 function_index = 0; function_index < result.state->prototype_count; ++function_index)
 	{
-		elf_Prototype *function = prototype_from_index(result.state, function_index);
+		elf_Prototype *function = proto_from_index(result.state, function_index);
 		for (u32 byte_index = 0; byte_index < function->bytecode_count; ++byte_index) {
 			count += function->bytecode[byte_index].b_type == type;
 		}
@@ -592,7 +592,7 @@ static void test_backend_emits_parameter_type_enforcement(void)
 	}
 	else
 	{
-		elf_Prototype *function = prototype_from_index(result.state, 1);
+		elf_Prototype *function = proto_from_index(result.state, 1);
 		Bytecode *bytes = function->bytecode;
 		if (function->bytecode_count < 2 || bytes[0].b_type != BC_CHECK_TYPE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_CHECK_TYPE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
 		{

@@ -179,7 +179,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 			arena_pushf(arena, "r%d = closure prototype[%d]", byte.b_x, byte.b_y);
 			if (byte.b_y >= 0 && prototype_index_is_valid(state, (u32)byte.b_y))
 			{
-				elf_Prototype *prototype = prototype_from_index(state, (u32)byte.b_y);
+				elf_Prototype *prototype = proto_from_index(state, (u32)byte.b_y);
 				arena_pushf(arena, " captures=r%d count=%u", byte.b_x, prototype->captures);
 			}
 		}
@@ -229,7 +229,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 
 char *format_bytecode_function(elf_State *state, Arena *arena, u32 prototype_index)
 {
-	elf_Prototype *function = prototype_from_index(state, prototype_index);
+	elf_Prototype *function = proto_from_index(state, prototype_index);
 	char *start = arena_push(arena, 0, 1);
 
 	arena_push_text(arena, "bytecode function\n");

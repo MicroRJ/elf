@@ -1,6 +1,168 @@
+// missing return values on native function
+x, y, z, w := elf.echo(777)
+elf.printl(x, y, z, w)
 
-elf.error("Welcome!")
-elf.printl("calling a function that returns an error should automatically raise it")
+#eof
+
+
+x, y, z, w := elf.echo(1, 2, 3, 4)
+elf.printl(x, y, z, w)
+
+#eof
+
+elf.printl(elf.is_error(elf.error("THIS IS AN ERROR!")))
+#eof
+
+// calling a native function
+x := elf.echo(1)
+ret x
+
+#eof
+
+
+
+// missing return values
+foo :: fun() {
+	ret 7
+}
+
+x, y, z := foo()
+
+ret x, y, z
+#eof
+
+
+
+// varg counting
+foo :: fun(...) {
+	ret elf.nvargs()
+}
+
+ret foo(1, 2, 3, 4, 5, 6, 7)
+#eof
+
+
+
+// arguments don't conflict with returns
+foo :: fun(...) {
+	ret 1, 2, 3, 5, 6, 7, 8
+}
+
+x, y, z, w, i, j, k := foo("error 1", "error 2", "error 3")
+ret x, y, z, w, i, j, k
+#eof
+
+
+// arguments don't conflict with returns
+foo :: fun(x, y, z, w, ...) {
+	ret 1, 2, 3, 5
+}
+
+x, y, z, w := foo("error")
+ret x, y, z, w
+#eof
+
+
+// arguments don't conflict with returns
+foo :: fun() {
+	ret 1, 2, 3, 5
+}
+
+x, y, z, w := foo(1, 2, 3)
+ret x, y, z, w
+#eof
+
+foo :: fun() {
+	ret elf.nvargs()
+}
+
+ret foo(1, 2, 3, 4)
+
+#eof
+
+wrapper :: fun() {
+
+	wrapper :: fun() {
+		x, y, z, w := elf.nargs() * 1, elf.nargs() * 2, elf.nargs() * 3, elf.nargs() * 4
+		ret x, y, z, w
+	}
+
+	x, y, z, w := wrapper()
+	ret x, y, z, w
+}
+
+x, y, z, w := wrapper()
+ret x, y, z, w
+#eof
+
+x, y, z, w := elf.nargs(), elf.nargs(), elf.nargs(), elf.nargs()
+ret x, y, z, w
+#eof
+
+ret elf.nargs(), elf.nargs(), elf.nargs(), elf.nargs()
+#eof
+
+// call a native function
+ret elf.nargs()
+#eof
+
+
+// multiple calls multiple returns
+regular0 :: fun() => 0, 1, 2
+regular1 :: fun() => 3, 4, 5
+x, y, z := regular0()
+w, i, j := regular1()
+ret x, y, z, w, i, j
+#eof
+
+
+// returning several integers from a bytecode frame
+regular :: fun() => 0, 1, 2
+x, y, z := regular()
+ret x, y, z
+
+#eof
+
+
+// returning directly from a function
+regular :: fun() => 777
+x := regular()
+ret x
+
+#eof
+
+// returning several locals
+x, y, z := 0, 1, 2
+ret x, y, z
+
+#eof
+
+// returning several integers
+ret 0, 1, 2, 3, 4, 5, 6, 7
+#eof
+
+regular :: fun() {
+	ret 777, 888, 999
+}
+
+x, y, z := regular()
+elf.printl(x, ", ", y, ", ", z)
+
+ret x, y, z
+
+#eof
+
+ret 777, 888, 999
+
+#eof
+
+wrapper :: fun() {
+	elf.error("Welcome!")
+	elf.printl("error 1")
+}
+
+result := wrapper()
+elf.printl("error 2")
 
 #eof
 cyclic_def :: fun() {
@@ -8,7 +170,6 @@ cyclic_def :: fun() {
 }
 
 cyclic_def()
-
 
 #eof
 

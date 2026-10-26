@@ -37,6 +37,7 @@ static inline b32 value_is_array(elf_Value value)    { return value.type == ELF_
 static inline b32 value_is_user(elf_Value value)     { return value.type == ELF_VALUE_TYPE_USER_OBJECT; }
 static inline b32 value_is_function(elf_Value value) { return value.type == ELF_VALUE_TYPE_CFUNCTION; }
 static inline b32 value_is_closure(elf_Value value)  { return value.type == ELF_VALUE_TYPE_CLOSURE; }
+static inline b32 value_is_prototype(elf_Value value){ return value.type == ELF_VALUE_TYPE_PROTOTYPE; }
 
 static inline b32 value_is_numeric(elf_Value value)
 {
@@ -67,6 +68,7 @@ static inline elf_GCError *value_as_error(elf_Value value)   { return value.x_er
 static inline elf_ByteBuffer *value_as_buffer(elf_Value value){ return value.x_buffer; }
 static inline elf_UserObject *value_as_user(elf_Value value)  { return value.x_user; }
 static inline elf_Closure *value_as_closure(elf_Value value) { return value.x_closure; }
+static inline elf_Prototype *value_as_prototype(elf_Value value) { return value.x_proto; }
 static inline elf_Function value_as_function(elf_Value value){ return value.x_proc; }
 
 static inline f64 value_to_number(elf_Value value)
@@ -200,6 +202,15 @@ static inline elf_Value cls_value(elf_Closure *closure)
 	return value;
 }
 
+static inline elf_Value proto_value(elf_Prototype *prototype)
+{
+	ASSERT(prototype != 0);
+	elf_Value value = {};
+	value.type = ELF_VALUE_TYPE_PROTOTYPE;
+	value.x_proto = prototype;
+	return value;
+}
+
 //
 // Value names.
 //
@@ -214,6 +225,7 @@ static const char *value_type_name(elf_ValueType type)
 		[ELF_VALUE_TYPE_USER_OBJECT] = "user object",
 		[ELF_VALUE_TYPE_CFUNCTION]   = "function",
 		[ELF_VALUE_TYPE_CLOSURE]     = "closure",
+		[ELF_VALUE_TYPE_PROTOTYPE]   = "prototype",
 		[ELF_VALUE_TYPE_STRING]      = "string",
 		[ELF_VALUE_TYPE_TABLE]       = "table",
 		[ELF_VALUE_TYPE_ERROR]       = "error",
@@ -288,7 +300,7 @@ static inline b32 prototype_index_is_valid(elf_State *state, u32 prototype_index
 	return prototype_index < state->prototype_count && state->prototypes[prototype_index];
 }
 
-static inline elf_Prototype *prototype_from_index(elf_State *state, u32 prototype_index)
+static inline elf_Prototype *proto_from_index(elf_State *state, u32 prototype_index)
 {
 	ASSERT(prototype_index_is_valid(state, prototype_index));
 	return state->prototypes[prototype_index];

@@ -72,6 +72,7 @@ struct elf_Value
 		elf_Function    x_proc;
 		elf_Function    x_function;
 		elf_Closure    *x_closure;
+		elf_Prototype  *x_proto;
 		void           *x_ptr;
 	};
 };
@@ -249,13 +250,7 @@ struct elf_Closure
 // Named parameters are copied into that window when the two bases differ.
 struct StackFrame
 {
-	// TODO(RJ): consider removing these, all we need is the base pointer!
-	// We could initially ensure that the size of the frame accounts for the
-	// prototype's number of registers + 1, but if the prototype itself came
-	// with the backed in notion that base[0] is the caller, that'd be freaking
-	// great ... And all instructions could be relative to that or something.
-	// So if you wanted to get the current closure/prototype just emit a load to 0,
-	// variadic functions would also just copy that, so that it works ...
+	elf_Value          *base;
 
 	elf_Prototype     *proto;
 	elf_Closure       *close;
