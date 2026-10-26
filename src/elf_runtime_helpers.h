@@ -471,7 +471,8 @@ static inline StackFrame *frame_previous(elf_State *state, StackFrame *frame)
 
 static inline elf_Value *frame_args(StackFrame *frame)
 {
-	return frame->args;
+	ASSERT(frame->base);
+	return frame->base + 1;
 }
 
 static inline u32 frame_nargs(StackFrame *frame)

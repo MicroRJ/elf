@@ -84,9 +84,8 @@ static void init_state_storage(elf_State *state)
 
 static void bootstrap_base_frame(elf_State *state)
 {
-	push_value(state, value_nil());
-	// TODO(RJ): what even is this!
-	state->frame->args = state->stack;
+	state->frame->base = state->stack;
+	state->frame->args = state->stack + 1;
 	state->frame->size = 16;
 	state->frame->proto = 0;
 }
