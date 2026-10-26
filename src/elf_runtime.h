@@ -253,7 +253,6 @@ struct StackFrame
 	elf_Value          *base;
 
 	elf_Prototype     *proto;
-	elf_Closure       *close;
 	elf_Value          *args;
 
 	//

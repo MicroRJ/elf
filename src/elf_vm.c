@@ -30,7 +30,6 @@ static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *bas
 	zero_memory(frame, sizeof(* frame));
 
 	frame->proto = proto;
-	frame->close = 0;
 	frame->size = proto->stack_size;
 	frame->base = base;
 	frame->args = base + 1;
@@ -68,7 +67,6 @@ u32 elf_call(State *state, u32 nargs)
 	if (base->type == ELF_VALUE_TYPE_CLOSURE)
 	{
 		begin_proto(state, base->x_closure->prototype, 1, base, nargs);
-		frame->close = base->x_closure;
 		state->stack_top = frame->args + frame->size;
 		nrets = vm_resume(state);
 	}
@@ -189,7 +187,6 @@ static u32 vm_resume(State *state)
 					Proto *proto = base->x_closure->prototype;
 					frame = ++ state->frame;
 					begin_proto(state, proto, ndest, base, nargs);
-					frame->close = base->x_closure;
 				}
 				else if (base->type == ELF_VALUE_TYPE_CFUNCTION)
 				{
@@ -314,15 +311,16 @@ static u32 vm_resume(State *state)
 			case BC_LOAD_CAPTURE:
 			{
 				ASSERT(byte.b_y >= 0 && byte.b_y < frame->proto->captures);
-				value_copy(&frame->regs[byte.b_x], frame->close->captures[byte.b_y]);
+				ASSERT(frame->base->type == ELF_VALUE_TYPE_CLOSURE);
+				value_copy(&frame->regs[byte.b_x], frame->base->x_closure->captures[byte.b_y]);
 			}
 			break;
 
 			// TODO(RJ): deprecate this function, the compiler knows the current closure already!
 			case BC_LOAD_CURRENT_CLOSURE:
 			{
-				ASSERT(frame->close);
-				value_copy(&frame->regs[byte.b_x], cls_value(frame->close));
+				ASSERT(frame->base->type == ELF_VALUE_TYPE_CLOSURE);
+				frame->regs[byte.b_x] = * frame->base;
 			}
 			break;
 
