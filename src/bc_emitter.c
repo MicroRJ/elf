@@ -305,20 +305,20 @@ static Ir require_ir_kind(Ir ir, IrKind kind)
 }
 
 // Stack slots
-static i32 save_slots(BcEmitter *emitter)
+static u32 save_slots(BcEmitter *emitter)
 {
-	return (i32)emitter->stack_top;
+	return emitter->stack_top;
 }
 
-static void restore_slots(BcEmitter *emitter, i32 stack_top)
+static void restore_slots(BcEmitter *emitter, u32 stack_top)
 {
 	ASSERT(slot_is_valid(stack_top));
 	emitter->stack_top = (u32)stack_top;
 }
 
-static i32 push_slot(BcEmitter *emitter)
+static u32 push_slot(BcEmitter *emitter)
 {
-	i32 stack_top = (i32)emitter->stack_top;
+	u32 stack_top = emitter->stack_top;
 	emitter->stack_top += 1;
 	if (emitter->stack_size < emitter->stack_top) {
 		emitter->stack_size = emitter->stack_top;
@@ -326,7 +326,7 @@ static i32 push_slot(BcEmitter *emitter)
 	return stack_top;
 }
 
-static i32 ensure_slot(BcEmitter *emitter, i32 slot)
+static u32 ensure_slot(BcEmitter *emitter, u32 slot)
 {
 	if (!slot_is_valid(slot)) {
 		slot = push_slot(emitter);
@@ -1244,7 +1244,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	prototype->allocation_size = allocation_size;
 	prototype->source = function->source->runtime_source;
 	prototype->variadic = function->variadic;
-	prototype->arity = function->param_count;
+	prototype->arity = function->param_count + 1;
 	prototype->captures = function->capture_count;
 	prototype->stack_size = emitter->stack_size;
 	prototype->integer_constant_count = emitter->integer_constant_count;
@@ -1287,21 +1287,25 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	ASSERT(prototype->string_count == emitter->string_atom_count);
 }
 
-static void emit_function(BcEmitter *emitter, IrFunction *function)
+static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
 {
 	ASSERT(emitter);
 	ASSERT(function);
 	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
-	u32 prototype_index = function->index;
-	emitter->stack_size = function->param_count;
-	emitter->stack_top = function->param_count;
+	ASSERT(!function->ast || function->ast->function.params.count == function->param_count);
 
+	emitter->stack_size = 1;
+	emitter->stack_top = 1;
 	for (u32 i = 0; i < function->param_count; ++i)
 	{
 		Ir param = function->params[i];
 		ASSERT(param && param->kind == IR_LOCAL);
 		ASSERT(!slot_is_valid(param->ir_local.slot));
-		param->ir_local.slot = (i32)i;
+
+		param->ir_local.slot = push_slot(emitter);
+		ASSERT(param->ir_local.slot == 1 + i);
+
+		// TODO(RJ): these could be intrinsic to the prototype itself, could prob save us some instructions or something
 		if (param->type_rule != TRULE_NONE) {
 			emit_bytecode_xy(emitter, param->site, BC_CHECK_TYPE, param->ir_local.slot, param->type_rule);
 		}
@@ -1314,7 +1318,7 @@ static void emit_function(BcEmitter *emitter, IrFunction *function)
 		emit_return(emitter, function->body->site, NO_SLOT, 0);
 	}
 	patch_jumps(emitter);
-	install_function(emitter, function, prototype_index);
+	install_function(emitter, function, function->index);
 }
 
 static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
@@ -1324,10 +1328,7 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 	ASSERT(module->function_count);
 	ASSERT(module->last_function);
 	ASSERT(!module->last_function->next);
-	if (module->function_count > BC_OPERAND_COUNT_MAX)
-	{
-		abort();
-	}
+	ASSERT(module->function_count < BC_OPERAND_COUNT_MAX);
 
 	reserve_module_prototypes(target, module);
 
@@ -1340,7 +1341,7 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 		emitter->arena = module->arena;
 		emitter->bytecode_capacity = 1 << 13;
 		emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
-		emit_function(emitter, function);
+		bc_emit_func(emitter, function);
 		arena_restore(module->arena, arena_checkpoint);
 		emitted_function_count += 1;
 	}

@@ -172,9 +172,9 @@ struct IrFunction
 	Com_Source *source;
 	SourceSite  site;
 	b32         variadic;
+	u32         param_count;
 	Ir          body;
 	Ir         *params;
-	u32         param_count;
 	IrCapture  *first_capture;
 	IrCapture  *last_capture;
 	u32         capture_count;

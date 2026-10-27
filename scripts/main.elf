@@ -1,23 +1,47 @@
-// missing return values on native function
-x, y, z, w := elf.echo(777)
-elf.printl(x, y, z, w)
+
+export add :: fun(value) {
+	ret value
+}
+
+elf.printl(add(1))
 
 #eof
 
+offset :: 2
+export add :: fun(value) {
+	ret value + offset
+}
 
-x, y, z, w := elf.echo(1, 2, 3, 4)
-elf.printl(x, y, z, w)
+add(1, 2, 3)
 
 #eof
 
-elf.printl(elf.is_error(elf.error("THIS IS AN ERROR!")))
+// parameter slot index
+foo :: fun(x) {
+	elf.printl(#get_mem(x))
+}
+foo(1)
+
 #eof
 
 // calling a native function
 x := elf.echo(1)
 ret x
-
 #eof
+
+elf.printl(elf.is_error(elf.error("THIS IS AN ERROR!")))
+#eof
+
+x, y, z, w := elf.echo(1, 2, 3, 4)
+elf.printl(x, y, z, w)
+#eof
+
+// missing return values on native function
+x, y, z, w := elf.echo(777)
+elf.printl(x, y, z, w)
+#eof
+
+
 
 
 

@@ -55,7 +55,7 @@ static void ir_emit_stat(IrQueue *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
 static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
 static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree);
-static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition);
+static void ir_emit_body(IrEmitter *emitter, IrFunction *definition);
 static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree);
 
 static void ir_report_error(IrEmitter *emitter, ErrorCode error, SourceSite site, const char *format, ...)
@@ -246,7 +246,7 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 						return ERROR_IR;
 					}
 					IrFunction *definition = ir_reserve_function(emitter, entity->scope->source, function);
-					ir_lower_function_body(emitter, definition);
+					ir_emit_body(emitter, definition);
 				}
 
 				return ir_new_function(emitter, site, function->function.ir);
@@ -562,8 +562,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				ASSERT(ir_func);
 				ASSERT(ir_func->ast);
 				ASSERT(ir_func->ast->kind == AST_FUNCTION);
-				ASSERT(ir_func->param_count >= IMPLICIT_PARAM_COUNT);
-				ASSERT(ir_func->ast->function.params.count == ir_func->param_count - IMPLICIT_PARAM_COUNT);
+				ASSERT(ir_func->ast->function.params.count == ir_func->param_count);
 				alloc_arguments = MAX(ir_func->ast->function.params.count, alloc_arguments);
 			}
 
@@ -1504,20 +1503,20 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 	}
 }
 
-static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree)
+static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast ast)
 {
 	ASSERT(source);
-	ASSERT(tree);
-	ASSERT(tree->kind == AST_FUNCTION);
+	ASSERT(ast);
+	ASSERT(ast->kind == AST_FUNCTION);
 	IrFunction *definition = arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunction));
-	definition->ast = tree;
+	definition->ast = ast;
 	definition->source = source;
 	definition->index = IR_FUNCTION_INDEX_INVALID;
-	definition->site = tree->site;
-	definition->variadic = tree->function.variadic;
-	definition->param_count = IMPLICIT_PARAM_COUNT + tree->function.params.count;
-	ASSERT(!tree->function.ir);
-	tree->function.ir = definition;
+	definition->site = ast->site;
+	definition->variadic = ast->function.variadic;
+	definition->param_count = ast->function.params.count;
+	ASSERT(!ast->function.ir);
+	ast->function.ir = definition;
 	if (emitter->module->last_function)
 	{
 		emitter->module->last_function->next = definition;
@@ -1531,14 +1530,14 @@ static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, A
 	return definition;
 }
 
-static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
+static void ir_emit_body(IrEmitter *emitter, IrFunction *definition)
 {
 	ASSERT(definition);
 	Ast tree = definition->ast;
 	ASSERT(tree);
 	ASSERT(tree->kind == AST_FUNCTION);
 	Ast_Array ast_params = tree->function.params;
-	ASSERT(definition->param_count == IMPLICIT_PARAM_COUNT + ast_params.count);
+	ASSERT(definition->param_count == ast_params.count);
 	ASSERT(definition->source);
 
 	IrEmitterFrame function_ctx = {};
@@ -1548,8 +1547,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 	IrEmitterFrame *outer_function = emitter->function;
 	emitter->function = &function_ctx;
 
-	IrArray ir_params = ir_array_alloc(emitter, IMPLICIT_PARAM_COUNT + ast_params.count);
-	ir_params.items[IMPLICIT_PARAM_INDEX] = ir_new_local(emitter, definition->site, 0);
+	IrArray ir_params = ir_array_alloc(emitter, ast_params.count);
 	definition->params = ir_params.items;
 
 	for (u32 i = 0; i < ast_params.count; ++ i)
@@ -1567,7 +1565,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 		}
 
 		Ir param_memory = ir_new_local(emitter, name->site, 0);
-		ir_params.items[IMPLICIT_PARAM_COUNT + i] = param_memory;
+		ir_params.items[i] = param_memory;
 		ASSERT(name->entity);
 		name->entity->en_local.storage = param_memory;
 
@@ -1602,7 +1600,7 @@ static void ir_lower_function_body(IrEmitter *emitter, IrFunction *definition)
 static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree)
 {
 	IrFunction *definition = ir_reserve_function(emitter, source, tree);
-	ir_lower_function_body(emitter, definition);
+	ir_emit_body(emitter, definition);
 	return definition;
 }
 
