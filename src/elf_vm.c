@@ -150,11 +150,10 @@ static inline b32 vm_values_equal(Value left, Value right)
 	return value_as_integer(left) == value_as_integer(right);
 }
 
-static void vm_zero_top(State *state, Value *top) {
-	if (top > state->stack_top) {
-		value_zero_many(state->stack_top, top - state->stack_top);
+static void vm_zero_range_safe(Value *first, Value *past_last) {
+	if (first < past_last) {
+		value_zero_range(first, past_last);
 	}
-	state->stack_top = top;
 }
 
 static u32 vm_resume(State *state)
@@ -174,45 +173,47 @@ static u32 vm_resume(State *state)
 			{
 				ASSERT((u32)byte.b_x < frame_proto(frame)->stack_size);
 
-				Value *base = frame->regs + byte.b_x;
+				Value *dest = frame->regs + byte.b_x;
 				u32 nargs = byte.b_y;
 				u32 ndest = byte.b_z;
 
-				if (base->type == ELF_VALUE_TYPE_PROTOTYPE)
+				if (dest->type == ELF_VALUE_TYPE_PROTOTYPE)
 				{
 					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
-					Proto *proto = base->x_proto;
+					Proto *proto = dest->x_proto;
 					frame = ++ state->frame;
-					begin_proto(state, proto, ndest, base, nargs);
+					begin_proto(state, proto, ndest, dest, nargs);
 				}
-				else if (base->type == ELF_VALUE_TYPE_CLOSURE)
+				else if (dest->type == ELF_VALUE_TYPE_CLOSURE)
 				{
 					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
-					Proto *proto = base->x_closure->prototype;
+					Proto *proto = dest->x_closure->prototype;
 					frame = ++ state->frame;
-					begin_proto(state, proto, ndest, base, nargs);
+					begin_proto(state, proto, ndest, dest, nargs);
 				}
-				else if (base->type == ELF_VALUE_TYPE_CFUNCTION)
+				else if (dest->type == ELF_VALUE_TYPE_CFUNCTION)
 				{
 					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
 					ASSERT(frame == state->frame);
 					Frame *inner = ++ state->frame;
 					zero_memory(inner, sizeof(*inner));
-					inner->base = base;
-					inner->regs = base;
+					inner->base = dest;
+					inner->regs = dest;
 					inner->nargs = nargs;
 					inner->size = nargs + 1;
 					inner->ndest = ndest;
 					state->stack_top = inner->base + inner->size;
-					u32 nrets = base->x_function(state, nargs);
+					u32 nrets = dest->x_function(state, nargs);
 					ASSERT(state->stack_top >= inner->base + inner->size);
 					RUNTIME_CHECK(nrets <= state->stack_top - inner->base - inner->size);
 					state->frame --;
 					ASSERT(frame == state->frame);
 					Value *rets = state->stack_top - nrets;
-					value_move_many(base, rets, MIN(ndest, nrets));
-					state->stack_top = base + MIN(ndest, nrets);
-					vm_zero_top(state, frame->base + frame->size);
+
+					Value *next_top = frame->base + frame->size;
+					value_move_many(dest, rets, MIN(ndest, nrets));
+					vm_zero_range_safe(dest + MIN(ndest, nrets), next_top);
+					state->stack_top = next_top;
 				}
 				else
 				{
@@ -225,23 +226,20 @@ static u32 vm_resume(State *state)
 			case BC_RETURN:
 			{
 				u32 nrets = byte.b_y;
-				Value *rets = frame->regs + byte.b_x;
-				Value *dest = frame->base;
+				u32 rets = byte.b_x;
 
 				if (frame == root) {
-					value_move_many(dest, rets, nrets);
+					value_move_many(frame->base, frame->regs + rets, nrets);
 					nroot = nrets;
 					goto exit;
 				}
 
 				nrets = MIN(nrets, frame->ndest);
-				value_move_many(dest, rets, nrets);
-
-				state->frame --;
-				frame = state->frame;
-
-				state->stack_top = dest + nrets;
-				vm_zero_top(state, frame->base + frame->size);
+				value_move_many(frame->base, frame->regs + rets, nrets);
+				Value *next_top = state->frame[-1].base + state->frame[-1].size;
+				vm_zero_range_safe(frame->base + nrets, next_top);
+				state->stack_top = next_top;
+				frame = -- state->frame;
 			}
 			break;
 
