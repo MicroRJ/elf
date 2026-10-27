@@ -46,7 +46,7 @@ static inline b32 value_is_numeric(elf_Value value)
 
 static inline b32 value_is_callable(elf_Value value)
 {
-	return value_is_closure(value) || value_is_function(value);
+	return value_is_prototype(value) || value_is_closure(value) || value_is_function(value);
 }
 
 static inline b32 value_is_object(elf_Value value)

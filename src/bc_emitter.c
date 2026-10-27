@@ -446,40 +446,6 @@ static u32 emit_dynamic_call(BcEmitter *emitter, Ir ir, u32 dest, u32 ndest)
 	return finish_call_result(emitter, ir, rets, dest, ndest);
 }
 
-static i32 emit_direct_call(BcEmitter *emitter, Ir ir, i32 out, u32 nout)
-{
-	Ir function = ir->ir_call.expr;
-	IrArray args = ir->ir_call.args;
-	u32 nargs = args.count;
-	ASSERT(function->kind == IR_FUNCTION);
-	ASSERT(function->ir_function->capture_count == 0);
-	ASSERT(nout <= 0xff);
-	ASSERT(function->ir_function->index != IR_FUNCTION_INDEX_INVALID);
-	u32 prototype_index = function->ir_function->index;
-
-	i32 slot_checkpoint = ir_stack_top(emitter);
-	i32 call_slot = slot_checkpoint;
-	{
-		i32 result_slot = ir_stack_alloc(emitter);
-		ASSERT(result_slot == call_slot);
-
-		for (u32 i = 0; i < nargs; ++i)
-		{
-			i32 arg_slot = emit_expr(emitter, args.items[i], NO_SLOT, 1);
-			ASSERT(arg_slot == call_slot + 1 + (i32)i);
-		}
-
-		u32 call_width = MAX(nargs + 1, nout);
-		while ((i32)emitter->stack_top < call_slot + (i32)call_width) {
-			ir_stack_alloc(emitter);
-		}
-	}
-	ir_set_stack_top(emitter, slot_checkpoint);
-
-	emit_bytecode_xyzw(emitter, ir->site, BC_CALL_DIRECT, call_slot, prototype_index, nargs, nout);
-	return finish_call_result(emitter, ir, call_slot, out, nout);
-}
-
 static i32 emit_binary_expr(BcEmitter *emitter, Ir expr, BcType bytecode_type, i32 out, u32 nout)
 {
 	if (nout < 1) {
@@ -697,7 +663,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			u32 prototype_index = function->index;
 			if (function->capture_count == 0)
 			{
-				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, out, prototype_index);
+				emit_bytecode_xy(emitter, site, BC_LOAD_PROTOTYPE, out, prototype_index);
 			}
 			else
 			{
@@ -834,13 +800,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 		case IR_CALL:
 		{
-			Ir callee = expr->ir_call.expr;
-			if (callee->kind == IR_FUNCTION && callee->ir_function->capture_count == 0) {
-				out = emit_direct_call(emitter, expr, out, nout);
-			}
-			else {
-				out = emit_dynamic_call(emitter, expr, out, nout);
-			}
+			out = emit_dynamic_call(emitter, expr, out, nout);
 		}
 		break;
 

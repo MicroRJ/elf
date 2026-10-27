@@ -63,6 +63,15 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		}
 		break;
 
+		case BC_LOAD_PROTOTYPE:
+		{
+			arena_pushf(arena, "r%d = prototype[%d]", byte.b_x, byte.b_y);
+			if (byte.b_y < 0 || !prototype_index_is_valid(state, (u32)byte.b_y)) {
+				arena_push_text(arena, " // <bad-prototype>");
+			}
+		}
+		break;
+
 		case BC_LOAD_CONSTANT_NUMBER:
 		{
 			arena_pushf(arena, "r%d = number[%d]", byte.b_x, byte.b_y);
@@ -153,12 +162,6 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		case BC_CALL_DYNAMIC:
 		{
 			arena_pushf(arena, "call_dynamic callee=r%d result=r%d nargs=%d nout=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
-		}
-		break;
-
-		case BC_CALL_DIRECT:
-		{
-			arena_pushf(arena, "call_direct prototype[%d] result=r%d nargs=%d nout=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
 		}
 		break;
 

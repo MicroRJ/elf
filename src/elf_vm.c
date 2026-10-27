@@ -60,7 +60,13 @@ u32 elf_call(State *state, u32 nargs)
 
 	state->frame ++;
 	Frame *frame = state->frame;
-	if (base->type == ELF_VALUE_TYPE_CLOSURE)
+	if (base->type == ELF_VALUE_TYPE_PROTOTYPE)
+	{
+		begin_proto(state, base->x_proto, 1, base, nargs);
+		state->stack_top = frame->base + frame->size;
+		nrets = vm_resume(state);
+	}
+	else if (base->type == ELF_VALUE_TYPE_CLOSURE)
 	{
 		begin_proto(state, base->x_closure->prototype, 1, base, nargs);
 		state->stack_top = frame->base + frame->size;
@@ -176,7 +182,14 @@ static u32 vm_resume(State *state)
 				u32 nargs = byte.b_z;
 				u32 ndest = byte.b_w;
 
-				if (base->type == ELF_VALUE_TYPE_CLOSURE)
+				if (base->type == ELF_VALUE_TYPE_PROTOTYPE)
+				{
+					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
+					Proto *proto = base->x_proto;
+					frame = ++ state->frame;
+					begin_proto(state, proto, ndest, base, nargs);
+				}
+				else if (base->type == ELF_VALUE_TYPE_CLOSURE)
 				{
 					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
 					Proto *proto = base->x_closure->prototype;
@@ -210,19 +223,6 @@ static u32 vm_resume(State *state)
 					RUNTIME_CHECK(!"Error: proper error reporting");
 					// vm_error_cannot_call(state, callee);
 				}
-			}
-			break;
-
-			case BC_CALL_DIRECT:
-			{
-				Value *base = frame->regs + byte.b_x;
-				u32 index = byte.b_y;
-				u32 nargs = byte.b_z;
-				u32 ndest = byte.b_w;
-				Proto *proto = proto_from_index(state, index);
-				base[0] = proto_value(proto);
-				frame = ++ state->frame;
-				begin_proto(state, proto, ndest, base, nargs);
 			}
 			break;
 
@@ -312,7 +312,7 @@ static u32 vm_resume(State *state)
 			// TODO(RJ): deprecate this function, the compiler knows the current closure already!
 			case BC_LOAD_CURRENT_CLOSURE:
 			{
-				ASSERT(frame->base->type == ELF_VALUE_TYPE_CLOSURE);
+				ASSERT(frame->base->type == ELF_VALUE_TYPE_PROTOTYPE || frame->base->type == ELF_VALUE_TYPE_CLOSURE);
 				frame->regs[byte.b_x] = * frame->base;
 			}
 			break;
@@ -324,6 +324,13 @@ static u32 vm_resume(State *state)
 					break;
 				}
 				frame->regs[byte.b_x] = value_from_function(state->native_functions[(u32)byte.b_y]);
+			} break;
+
+			case BC_LOAD_PROTOTYPE: {
+				ASSERT(byte.b_y >= 0);
+				u32 prototype_index = (u32)byte.b_y;
+				ASSERT(prototype_index_is_valid(state, prototype_index));
+				frame->regs[byte.b_x] = proto_value(proto_from_index(state, prototype_index));
 			} break;
 
 			case BC_NEW_TABLE: {

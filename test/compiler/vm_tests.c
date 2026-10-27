@@ -190,8 +190,13 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		test_fail("first compiled entry uses the first prototype index");
 	}
 	elf_call(state, 0);
-	elf_Closure *first_factory = value_as_closure(state->stack_top[-1]);
-	elf_Prototype *first_factory_prototype = first_factory->prototype;
+	elf_Value first_factory = state->stack_top[-1];
+	if (!value_is_prototype(first_factory)) {
+		test_fail("zero-capture factory compiles to a prototype value");
+		elf_destroy_state(state);
+		return;
+	}
+	elf_Prototype *first_factory_prototype = value_as_prototype(first_factory);
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);
 
@@ -206,8 +211,13 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		test_fail("each compilation publishes a distinct entry prototype");
 	}
 	elf_call(state, 0);
-	elf_Closure *second_factory = value_as_closure(state->stack_top[-1]);
-	elf_Prototype *second_factory_prototype = second_factory->prototype;
+	elf_Value second_factory = state->stack_top[-1];
+	if (!value_is_prototype(second_factory)) {
+		test_fail("second zero-capture factory compiles to a prototype value");
+		elf_destroy_state(state);
+		return;
+	}
+	elf_Prototype *second_factory_prototype = value_as_prototype(second_factory);
 	if (second_factory_prototype == first_factory_prototype) {
 		test_fail("nested functions receive distinct state prototype indices");
 	}

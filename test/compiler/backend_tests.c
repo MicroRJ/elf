@@ -317,7 +317,7 @@ static void test_backend_range_for_loop_shape(void)
 	if (backend_count_bytecode(result, BC_JUMP) != 1) {
 		test_fail("range for emits one loop-back jump");
 	}
-	if (backend_count_bytecode(result, BC_CALL_DIRECT) != 0 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
+	if (backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
 		test_fail("plain range for does not emit calls");
 	}
 	if (backend_count_bytecode(result, BC_GET_INDEX) != 0) {
@@ -497,24 +497,26 @@ static void test_backend_outputs_strings(void)
 	arena_destroy(&arena);
 }
 
-static void test_backend_emits_direct_static_call(void)
+static void test_backend_loads_prototype_for_static_call(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
 		"add :: fun(a, b) { ret a + b }\n"
 		"ret add(2, 3)\n");
 
-	if (backend_count_bytecode(result, BC_CALL_DIRECT) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
-		test_fail("static function call emits one direct call");
+	if (backend_count_bytecode(result, BC_LOAD_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
+		test_fail("static function call loads its prototype and emits one dynamic call");
 	}
 	if (backend_count_bytecode(result, BC_NEW_CLOSURE) != 0) {
-		test_fail("direct static function call does not allocate a closure");
+		test_fail("static function call does not allocate a closure");
 	}
 
-	i32 call_index = backend_find_first_bytecode(result, BC_CALL_DIRECT);
-	if (call_index >= 0) {
+	i32 load_index = backend_find_first_bytecode(result, BC_LOAD_PROTOTYPE);
+	i32 call_index = backend_find_first_bytecode(result, BC_CALL_DYNAMIC);
+	if (load_index >= 0 && call_index >= 0) {
+		Bytecode load = backend_test_bytes(result)[load_index];
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (call.b_y < 0 || (u32)call.b_y >= result.state->prototype_count || call.b_z != 2 || call.b_w != 1) {
-			test_fail("direct static call encodes function, argument, and return counts");
+		if (load.b_y < 0 || (u32)load.b_y >= result.state->prototype_count || call.b_y != load.b_x || call.b_z != 2 || call.b_w != 1) {
+			test_fail("static call loads its callee and encodes argument and return counts");
 		}
 	}
 	backend_test_destroy(result);
@@ -529,8 +531,8 @@ static void test_backend_calls_imported_static_function(void)
 	}
 	else
 	{
-		if (result.state->prototype_count != 2 || backend_count_bytecode(result, BC_CALL_DIRECT) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 0) {
-			test_fail("imported static function emits a direct call");
+		if (result.state->prototype_count != 2 || backend_count_bytecode(result, BC_LOAD_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
+			test_fail("imported static function loads its prototype and emits a dynamic call");
 		}
 
 		elf_Closure *closure = elf_closure_new(result.state, backend_test_function(result), 0, 0);
@@ -546,17 +548,17 @@ static void test_backend_calls_imported_static_function(void)
 	backend_test_destroy(result);
 }
 
-static void test_backend_emits_direct_static_recurse_call(void)
+static void test_backend_calls_static_recurse_through_values(void)
 {
 	BackendCompileResult result = backend_test_compile_source(
 		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
 		"ret count(3)\n");
 
-	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL_DIRECT);
+	u32 prototype_loads = backend_count_all_bytecode(result, BC_LOAD_PROTOTYPE);
 	u32 dynamic_calls = backend_count_all_bytecode(result, BC_CALL_DYNAMIC);
 	u32 closures = backend_count_all_bytecode(result, BC_NEW_CLOSURE);
-	if (direct_calls != 1 || dynamic_calls != 1) {
-		test_fail("static function call is direct while recurse calls the current closure");
+	if (prototype_loads != 1 || dynamic_calls != 2) {
+		test_fail("static and recursive calls both use callable values");
 	}
 	if (closures != 0) {
 		test_fail("calling recurse in a static function does not allocate a closure");
@@ -570,11 +572,11 @@ static void test_backend_materializes_static_recurse_value(void)
 		"self :: fun() { ret recurse }\n"
 		"ret self()\n");
 
-	u32 direct_calls = backend_count_all_bytecode(result, BC_CALL_DIRECT);
+	u32 prototype_loads = backend_count_all_bytecode(result, BC_LOAD_PROTOTYPE);
 	u32 dynamic_calls = backend_count_all_bytecode(result, BC_CALL_DYNAMIC);
 	u32 closures = backend_count_all_bytecode(result, BC_NEW_CLOSURE);
-	if (direct_calls != 1 || dynamic_calls != 0) {
-		test_fail("calling a static function that returns recurse remains direct");
+	if (prototype_loads != 1 || dynamic_calls != 1) {
+		test_fail("calling a static function that returns recurse uses its prototype value");
 	}
 	if (closures != 0) {
 		test_fail("using recurse as a value loads the current closure without allocating one");
@@ -620,9 +622,9 @@ static void run_backend_tests(void)
 	TEST_RUN("backend.logical_expr_delays_result_slot", test_backend_logical_expr_delays_result_slot);
 	TEST_RUN("backend.formats_bytecode_function", test_backend_formats_bytecode_function);
 	TEST_RUN("backend.outputs_strings", test_backend_outputs_strings);
-	TEST_RUN("backend.emits_direct_static_call", test_backend_emits_direct_static_call);
+	TEST_RUN("backend.loads_prototype_for_static_call", test_backend_loads_prototype_for_static_call);
 	TEST_RUN("backend.calls_imported_static_function", test_backend_calls_imported_static_function);
-	TEST_RUN("backend.emits_direct_static_recurse_call", test_backend_emits_direct_static_recurse_call);
+	TEST_RUN("backend.calls_static_recurse_through_values", test_backend_calls_static_recurse_through_values);
 	TEST_RUN("backend.materializes_static_recurse_value", test_backend_materializes_static_recurse_value);
 	TEST_RUN("backend.emits_parameter_type_enforcement", test_backend_emits_parameter_type_enforcement);
 }

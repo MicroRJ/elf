@@ -28,7 +28,7 @@ typedef enum
 	TRULE_NUMERIC  = TRULE_NUMBER | TRULE_INTEGER,
 	TRULE_NONNIL   = TRULE_ALL & ~TRULE_NIL,
 	TRULE_OBJECT   = (1 << ELF_VALUE_TYPE_USER_OBJECT) | (1 << ELF_VALUE_TYPE_CLOSURE) | (1 << ELF_VALUE_TYPE_TABLE) | (1 << ELF_VALUE_TYPE_ERROR) | (1 << ELF_VALUE_TYPE_BUFFER) | (1 << ELF_VALUE_TYPE_ARRAY),
-	TRULE_CALLABLE = (1 << ELF_VALUE_TYPE_CFUNCTION) | (1 << ELF_VALUE_TYPE_CLOSURE),
+	TRULE_CALLABLE = (1 << ELF_VALUE_TYPE_CFUNCTION) | (1 << ELF_VALUE_TYPE_CLOSURE) | (1 << ELF_VALUE_TYPE_PROTOTYPE),
 }
 TypeRule;
 
@@ -50,6 +50,7 @@ Control flow
 Loads and register movement
   BC_LOAD_CAPTURE: x = destination register, y = capture index in the current closure. Copy capture[y] to r[x].
   BC_LOAD_NATIVE_FUNCTION: x = destination register, y = index in the state's native-function registry.
+  BC_LOAD_PROTOTYPE: x = destination register, y = prototype index in the state.
   BC_LOAD_CONSTANT_STRING: x = destination register, y = index in the prototype's runtime-string references.
   BC_LOAD_CONSTANT_NUMBER: x = destination register, y = index in the prototype's number constants.
   BC_LOAD_CONSTANT_INTEGER: x = destination register, y = index in the prototype's integer constants.
@@ -76,12 +77,9 @@ Access and mutation
   The count is the table entry count, array length, string byte length, buffer byte size, or zero for nil.
 
 Calls and returns
-  BC_CALL_DIRECT: x = result base register, y = prototype index, z = argument count, w = requested result count.
-  Call a prototype without captures directly, without materializing a closure.
   BC_CALL_DYNAMIC: x = result base register, y = callee register, z = argument count, w = requested result count.
-  Call the closure or native function in r[y]. The callee register need not equal the result base.
-  Both calls read z args beginning at r[x + 1], including the implicit receiver in r[x + 1].
-  Explicit args begin at r[x + 2]. Results begin at r[x]; r[x] also reserves the callee/result slot in the call layout.
+  Call the prototype, closure, or native function in r[y]. The callee register need not equal the result base.
+  Calls read z args beginning at r[x + 1]. Results begin at r[x]; r[x] also reserves the callee/result slot in the call layout.
   BC_RETURN: x = first result register, y = produced result count. Finish the current frame.
   Copy the lesser of y and the requested result count to the caller's result base; fill missing requested results with nil.
   Excess produced results are discarded. x is ignored when no results are copied.
@@ -125,6 +123,7 @@ Bitwise operations
 	X(RETURN,                   "return")                          \
 	X(LOAD_CAPTURE,             "load_capture")                    \
 	X(LOAD_NATIVE_FUNCTION,     "load_native_function")            \
+	X(LOAD_PROTOTYPE,           "load_prototype")                  \
 	X(LOAD_CONSTANT_STRING,     "load_constant_string")            \
 	X(LOAD_CONSTANT_NUMBER,     "load_constant_number")            \
 	X(LOAD_CONSTANT_INTEGER,    "load_constant_integer")           \
@@ -139,7 +138,6 @@ Bitwise operations
 	X(SET_INDEX,                "set_index")                       \
 	X(ARRAY_APPEND,             "array_append")                    \
 	X(CALL_DYNAMIC,             "call_dynamic")                    \
-	X(CALL_DIRECT,              "call_direct")                     \
 	X(NEW_TABLE,                "new_table")                       \
 	X(NEW_ARRAY,                "new_array")                       \
 	X(NEW_CLOSURE,              "new_closure")                     \
