@@ -113,16 +113,15 @@ static void array_swap(elf_State *state, elf_Array *array, u32 left, u32 right)
 	*right_slot = temporary;
 }
 
-static elf_Value array_call(elf_State *state, elf_Value function, elf_Array *receiver, elf_Value a, elf_Value b, b32 pass_b)
+static elf_Value array_call(elf_State *state, elf_Value function, elf_Value a, elf_Value b, b32 pass_b)
 {
 	push_value(state, function);
-	push_array(state, receiver);
 	push_value(state, a);
 	if (pass_b)
 	{
 		push_value(state, b);
 	}
-	u32 returned_count = elf_call(state, pass_b ? 3 : 2);
+	u32 returned_count = elf_call(state, pass_b ? 2 : 1);
 	elf_Value result = returned_count ? *(state->stack_top - returned_count) : value_nil();
 	ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
 	return result;
@@ -130,14 +129,18 @@ static elf_Value array_call(elf_State *state, elf_Value function, elf_Array *rec
 
 ELF_FUNCTION(l_array_length)
 {
-	lib_check_arg_count(S, "array.length", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "array.length", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	push_value(S, int_value(elf_array_length(array_receiver(S))));
 	return 1;
 }
 
 ELF_FUNCTION(l_array_get)
 {
-	lib_check_arg_count(S, "array.get", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "array.get", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 index = 0;
 	if (!array_normalize_index(S, lib_load_integer(S, 1), array->count, false, &index))
@@ -150,7 +153,9 @@ ELF_FUNCTION(l_array_get)
 
 ELF_FUNCTION(l_array_set)
 {
-	lib_check_arg_count(S, "array.set", nargs, 2, 2);
+	if (!lib_check_arg_count(S, "array.set", nargs - 1, 2, 2)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 index = 0;
 	if (!array_normalize_index(S, lib_load_integer(S, 1), array->count, false, &index))
@@ -176,7 +181,9 @@ ELF_FUNCTION(l_array_add)
 
 ELF_FUNCTION(l_array_insert)
 {
-	lib_check_arg_count(S, "array.insert", nargs, 2, 2);
+	if (!lib_check_arg_count(S, "array.insert", nargs - 1, 2, 2)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 index = 0;
 	if (!array_normalize_index(S, lib_load_integer(S, 1), array->count, true, &index))
@@ -190,7 +197,9 @@ ELF_FUNCTION(l_array_insert)
 
 ELF_FUNCTION(l_array_pop)
 {
-	lib_check_arg_count(S, "array.pop", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "array.pop", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	if (array->count == 0)
 	{
@@ -207,7 +216,9 @@ ELF_FUNCTION(l_array_pop)
 
 ELF_FUNCTION(l_array_remove)
 {
-	lib_check_arg_count(S, "array.remove", nargs, 1, 2);
+	if (!lib_check_arg_count(S, "array.remove", nargs - 1, 1, 2)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 index = 0;
 	if (!array_normalize_index(S, lib_load_integer(S, 1), array->count, false, &index))
@@ -235,7 +246,9 @@ ELF_FUNCTION(l_array_remove)
 
 ELF_FUNCTION(l_array_splice)
 {
-	lib_check_arg_count(S, "array.splice", nargs, 3, 3);
+	if (!lib_check_arg_count(S, "array.splice", nargs - 1, 3, 3)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 index = 0;
 	if (!array_normalize_index(S, lib_load_integer(S, 1), array->count, true, &index)) {
@@ -256,7 +269,9 @@ ELF_FUNCTION(l_array_splice)
 
 ELF_FUNCTION(l_array_slice)
 {
-	lib_check_arg_count(S, "array.slice", nargs, 0, 2);
+	if (!lib_check_arg_count(S, "array.slice", nargs - 1, 0, 2)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 first = 0;
 	u32 end = array->count;
@@ -284,7 +299,9 @@ ELF_FUNCTION(l_array_slice)
 
 ELF_FUNCTION(l_array_clone)
 {
-	lib_check_arg_count(S, "array.clone", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "array.clone", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	elf_Array *result = push_new_array(S);
 	for (u32 i = 0; i < array->count; ++i)
@@ -314,7 +331,9 @@ ELF_FUNCTION(l_array_extend)
 
 ELF_FUNCTION(l_array_swap)
 {
-	lib_check_arg_count(S, "array.swap", nargs, 2, 2);
+	if (!lib_check_arg_count(S, "array.swap", nargs - 1, 2, 2)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	u32 left = 0;
 	u32 right = 0;
@@ -333,7 +352,9 @@ ELF_FUNCTION(l_array_swap)
 
 ELF_FUNCTION(l_array_reverse)
 {
-	lib_check_arg_count(S, "array.reverse", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "array.reverse", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	for (u32 i = 0; i < array->count / 2; ++i)
 	{
@@ -345,14 +366,16 @@ ELF_FUNCTION(l_array_reverse)
 
 ELF_FUNCTION(l_array_map)
 {
-	lib_check_arg_count(S, "array.map", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "array.map", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	elf_Value function = load_value(S, 1);
 	check_value_type_rule(S, function, TRULE_CALLABLE);
 	elf_Array *result = push_new_array(S);
 	for (u32 i = 0; i < array->count; ++i)
 	{
-		elf_Value mapped = array_call(S, function, array, array->items[i], int_value(i), true);
+		elf_Value mapped = array_call(S, function, array->items[i], int_value(i), true);
 		elf_array_add(S, result, mapped);
 	}
 	return 1;
@@ -360,14 +383,16 @@ ELF_FUNCTION(l_array_map)
 
 ELF_FUNCTION(l_array_filter)
 {
-	lib_check_arg_count(S, "array.filter", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "array.filter", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	elf_Value function = load_value(S, 1);
 	check_value_type_rule(S, function, TRULE_CALLABLE);
 	elf_Array *result = push_new_array(S);
 	for (u32 i = 0; i < array->count; ++i)
 	{
-		elf_Value keep = array_call(S, function, array, array->items[i], int_value(i), true);
+		elf_Value keep = array_call(S, function, array->items[i], int_value(i), true);
 		check_value_type(S, keep, ELF_VALUE_TYPE_INTEGER);
 		if (value_as_integer(keep))
 		{
@@ -379,7 +404,7 @@ ELF_FUNCTION(l_array_filter)
 
 static i64 array_compare(elf_State *state, elf_Value function, elf_Array *array, elf_Value left, elf_Value right)
 {
-	elf_Value result = array_call(state, function, array, left, right, true);
+	elf_Value result = array_call(state, function, left, right, true);
 	check_value_type(state, result, ELF_VALUE_TYPE_INTEGER);
 	return value_as_integer(result);
 }
@@ -424,7 +449,9 @@ static void array_quicksort(elf_State *state, elf_Value function, elf_Array *arr
 
 ELF_FUNCTION(l_array_sort)
 {
-	lib_check_arg_count(S, "array.sort", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "array.sort", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_Array *array = array_receiver(S);
 	elf_Value function = load_value(S, 1);
 	check_value_type_rule(S, function, TRULE_CALLABLE);

@@ -203,7 +203,9 @@ ELF_FUNCTION(l_string_slice)
 
 ELF_FUNCTION(l_string_splice)
 {
-	lib_check_arg_count(S, "string.splice", nargs, 3, 3);
+	if (!lib_check_arg_count(S, "string.splice", nargs - 1, 3, 3)) {
+		return 1;
+	}
 	elf_String *string = string_receiver(S);
 	elf_String *replacement = lib_load_string(S, 3);
 	u32 size = elf_string_size(string);

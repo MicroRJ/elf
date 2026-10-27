@@ -14,14 +14,18 @@ static u32 random_xorshift32(u32 value)
 
 ELF_FUNCTION(lib_random_seed)
 {
-	lib_check_arg_count(S, "random.random_seed", nargs, 1, 1);
-	random_state = (u32)lib_load_integer(S, 1);
+	if (!lib_check_arg_count(S, "random.random_seed", nargs, 1, 1)) {
+		return 1;
+	}
+	random_state = (u32)lib_load_integer(S, 0);
 	return 0;
 }
 
 ELF_FUNCTION(lib_random_random)
 {
-	lib_check_arg_count(S, "random.random", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "random.random", nargs, 0, 0)) {
+		return 1;
+	}
 	random_state = random_xorshift32(random_state);
 	elf_push_num(S, random_state / (double)UINT_MAX);
 	return 1;

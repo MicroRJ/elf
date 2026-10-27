@@ -105,6 +105,11 @@ static inline void value_move_many(elf_Value *dst, elf_Value *src, u32 count)
 	memmove(dst, src, count * sizeof(*dst));
 }
 
+static void value_zero_range(elf_Value *first, elf_Value *past_last) {
+	ASSERT(first <= past_last);
+	value_zero_many(first, past_last - first);
+}
+
 //
 // Value constructors.
 //
@@ -487,7 +492,7 @@ static inline u32 frame_size(StackFrame *frame)
 
 static inline elf_Value *frame_top(StackFrame *frame)
 {
-	return frame_args(frame) + frame_size(frame);
+	return frame->base + frame->size;
 }
 
 static inline elf_Value frame_arg(StackFrame *frame, u32 index)
@@ -498,7 +503,13 @@ static inline elf_Value frame_arg(StackFrame *frame, u32 index)
 
 static inline elf_Prototype *frame_proto(StackFrame *frame)
 {
-	return frame->proto;
+	if (frame->base->type == ELF_VALUE_TYPE_PROTOTYPE) {
+		return frame->base->x_proto;
+	}
+	if (frame->base->type == ELF_VALUE_TYPE_CLOSURE) {
+		return frame->base->x_closure->prototype;
+	}
+	return 0;
 }
 
 static inline Bytecode *frame_next_instr(StackFrame *frame)
@@ -536,20 +547,26 @@ typedef struct
 }
 elf_Binding;
 
-static void lib_check_arg_count(elf_State *state, const char *name, u32 nargs, u32 minimum, u32 maximum)
+static b32 lib_check_arg_count(elf_State *state, const char *name, u32 count, u32 minimum, u32 maximum)
 {
-	u32 count = nargs - 1;
-	if (count < minimum || count > maximum)
-	{
-		if (minimum == maximum)
-		{
-			report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "%s expected %u argument(s), got %u", name, minimum, count);
-		}
-		else
-		{
-			report_runtime_error(state, ERROR_INVALID_ARGUMENT_COUNT, "%s expected %u to %u args, got %u", name, minimum, maximum, count);
-		}
+	if (count >= minimum && count <= maximum) {
+		return true;
 	}
+
+	Scratch scratch = scratch_begin();
+	dy_String message;
+	if (minimum == maximum)
+	{
+		message = arena_pushf(scratch.arena, "%s expected %u argument(s), got %u", name, minimum, count);
+	}
+	else
+	{
+		message = arena_pushf(scratch.arena, "%s expected %u to %u args, got %u", name, minimum, maximum, count);
+	}
+	arena_push_zero(scratch.arena, 1, 1);
+	elf_push_error(state, message.data ? message.data : "invalid argument count");
+	scratch_end(scratch);
+	return false;
 }
 
 static elf_String *lib_load_string(elf_State *state, u32 index)

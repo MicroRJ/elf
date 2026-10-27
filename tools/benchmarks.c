@@ -87,8 +87,7 @@ static elf_Ref bench_compile_program(elf_State *state, elf_SymTable *symbols, el
 {
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 	bench_require(elf_push_code_source(state, symbols, name, text) == ELF_ERROR_NONE, "could not compile benchmark source");
-	elf_push_nil(state);
-	bench_require(elf_call(state, 1) == 1, "benchmark file did not return one value");
+	bench_require(elf_call(state, 0) == 1, "benchmark file did not return one value");
 	bench_require(elf_is_callable(state, -1), "benchmark file did not return a function");
 	elf_Ref program = elf_create_ref(state, -1);
 	bench_require(program != ELF_NO_REF, "could not retain benchmark function");
@@ -99,10 +98,9 @@ static elf_Ref bench_compile_program(elf_State *state, elf_SymTable *symbols, el
 static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 iterations, elf_Int expected)
 {
 	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
-	elf_push_nil(state);
 	elf_push_int(state, iterations);
 	i64 start = bench_now();
-	u32 result_count = elf_call(state, 2);
+	u32 result_count = elf_call(state, 1);
 	double seconds = bench_elapsed_s(start);
 	bench_require(result_count == 1, "benchmark function did not return one value");
 	elf_Int result = 0;
@@ -116,10 +114,9 @@ static double bench_run_integer_program(elf_State *state, elf_Ref program, u32 i
 static double bench_run_number_program(elf_State *state, elf_Ref program, u32 iterations, elf_Num expected)
 {
 	bench_require(elf_push_ref(state, program), "benchmark function reference expired");
-	elf_push_nil(state);
 	elf_push_int(state, iterations);
 	i64 start = bench_now();
-	u32 result_count = elf_call(state, 2);
+	u32 result_count = elf_call(state, 1);
 	double seconds = bench_elapsed_s(start);
 	bench_require(result_count == 1, "benchmark function did not return one value");
 	elf_Num result = 0;
@@ -255,8 +252,7 @@ static void bench_representative_elf_workload(void)
 	bench_report("compile + load game", "loads", 1, bench_median(samples, SAMPLE_COUNT));
 	fflush(stdout);
 
-	elf_push_nil(state);
-	bench_require(elf_call(state, 1) == 0,
+	bench_require(elf_call(state, 0) == 0,
 		"representative Elf workload returned values");
 	elf_destroy_state(state);
 }

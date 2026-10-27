@@ -5,7 +5,7 @@
 static u32 core_print_values(elf_State *state, u32 nargs, b32 newline)
 {
 	i64 size = 0;
-	for (u32 index = 1; index < nargs; ++index)
+	for (u32 index = 0; index < nargs; ++index)
 	{
 		if (!elf_push_value_text(state, index)) continue;
 		elf_StrSlice text = {0};

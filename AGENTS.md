@@ -65,6 +65,28 @@ parsing, checking, and lowering continue using compiler representations such
 as atoms, AST nodes, entities, and IR nodes. Preserve the one-way dependency:
 compiler backend to core/runtime, never core/runtime to compiler.
 
+## Calling Convention
+
+elf functions do not have a universal implicit `this` parameter. Bytecode
+register zero is the current callable, and the function's declared parameters
+begin at register one. A frame's `base[0]` contains that callable and
+`base[1...]` contains its arguments. Prototype arity and argument counts exclude
+the callable, while the bytecode register/frame size includes its register.
+
+Runtime field calls still inject a receiver intentionally. Lower
+`foo.get_name()` as the equivalent of `get_name(foo)`, and lower
+`foo.method(value)` as the equivalent of `method(foo, value)`. Removing the
+universal implicit `this` parameter must not remove this field-call
+desugaring. When emitting such a call, iterate the explicit argument array by
+its own count even though the final call argument count also includes the
+injected receiver.
+
+Compiler symbol tables are compile-time namespaces, not runtime elf tables.
+In particular, `elf` is an injected `elf_SymTable`; an expression such as
+`elf.echo(value)` resolves directly to the native function and does not pass an
+`elf` receiver. Do not conflate compiler namespace resolution with runtime
+field-call receiver injection.
+
 ## Error Propagation
 
 New code, especially runtime and core code, must report failure through an

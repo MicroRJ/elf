@@ -70,9 +70,8 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 	push_value(state, value_from_error(error));
 }
 
-static b32 fs_check_arg_count(elf_State *state, u32 nargs, u32 minimum, u32 maximum, const char *operation)
+static b32 fs_check_arg_count(elf_State *state, u32 count, u32 minimum, u32 maximum, const char *operation)
 {
-	u32 count = nargs - 1;
 	b32 valid = count >= minimum && count <= maximum;
 	if (!valid)
 	{
@@ -187,7 +186,7 @@ static b32 fs_load_size(elf_State *state, u32 index, const char *operation, u32 
 //
 ELF_FUNCTION(lib_fs_file_read)
 {
-	if (!fs_check_arg_count(S, nargs, 2, 2, "file.read"))
+	if (!fs_check_arg_count(S, nargs - 1, 2, 2, "file.read"))
 	{
 		return 1;
 	}
@@ -246,7 +245,7 @@ ELF_FUNCTION(lib_fs_file_read)
 //
 ELF_FUNCTION(lib_fs_file_write)
 {
-	if (!fs_check_arg_count(S, nargs, 1, 3, "file.write"))
+	if (!fs_check_arg_count(S, nargs - 1, 1, 3, "file.write"))
 	{
 		return 1;
 	}
@@ -329,7 +328,7 @@ ELF_FUNCTION(lib_fs_file_write)
 //
 ELF_FUNCTION(lib_fs_file_seek)
 {
-	if (!fs_check_arg_count(S, nargs, 2, 2, "file.seek"))
+	if (!fs_check_arg_count(S, nargs - 1, 2, 2, "file.seek"))
 	{
 		return 1;
 	}
@@ -390,7 +389,7 @@ ELF_FUNCTION(lib_fs_file_seek)
 //
 ELF_FUNCTION(lib_fs_file_tell)
 {
-	if (!fs_check_arg_count(S, nargs, 0, 0, "file.tell"))
+	if (!fs_check_arg_count(S, nargs - 1, 0, 0, "file.tell"))
 	{
 		return 1;
 	}
@@ -430,7 +429,7 @@ ELF_FUNCTION(lib_fs_file_tell)
 //
 ELF_FUNCTION(lib_fs_file_size)
 {
-	if (!fs_check_arg_count(S, nargs, 0, 0, "file.size"))
+	if (!fs_check_arg_count(S, nargs - 1, 0, 0, "file.size"))
 	{
 		return 1;
 	}
@@ -471,7 +470,7 @@ ELF_FUNCTION(lib_fs_file_size)
 //
 ELF_FUNCTION(lib_fs_file_close)
 {
-	if (!fs_check_arg_count(S, nargs, 0, 0, "file.close"))
+	if (!fs_check_arg_count(S, nargs - 1, 0, 0, "file.close"))
 	{
 		return 1;
 	}
@@ -504,7 +503,7 @@ ELF_FUNCTION(lib_fs_file_close)
 //
 ELF_FUNCTION(lib_fs_file_flush)
 {
-	if (!fs_check_arg_count(S, nargs, 0, 0, "file.flush"))
+	if (!fs_check_arg_count(S, nargs - 1, 0, 0, "file.flush"))
 	{
 		return 1;
 	}
@@ -562,7 +561,7 @@ ELF_FUNCTION(lib_fs_open)
 	}
 	dy_String path = {0};
 	dy_String mode = {0};
-	if (!fs_load_string(S, 1, "file path", &path) || !fs_load_string(S, 2, "file mode", &mode))
+	if (!fs_load_string(S, 0, "file path", &path) || !fs_load_string(S, 1, "file mode", &mode))
 	{
 		return 1;
 	}
@@ -648,9 +647,11 @@ static b32 fs_get_file_info(dy_String path, dy_File_Info *info)
 
 static u32 fs_push_path_kind(elf_State *state, u32 nargs, b32 files, b32 directories)
 {
-	lib_check_arg_count(state, "fs path query", nargs, 1, 1);
+	if (!lib_check_arg_count(state, "fs path query", nargs, 1, 1)) {
+		return 1;
+	}
 	dy_File_Info info = {0};
-	b32 found = !dy_file_info(lib_load_string_view(state, 1), &info).error;
+	b32 found = !dy_file_info(lib_load_string_view(state, 0), &info).error;
 	elf_push_int(state, found && ((files && !info.is_directory) || (directories && info.is_directory)));
 	return 1;
 }
@@ -672,17 +673,21 @@ ELF_FUNCTION(lib_fs_is_directory)
 
 ELF_FUNCTION(lib_fs_file_exists)
 {
-	lib_check_arg_count(S, "fs.file_exists", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "fs.file_exists", nargs, 1, 1)) {
+		return 1;
+	}
 	dy_File_Info info = {0};
-	elf_push_int(S, fs_get_file_info(lib_load_string_view(S, 1), &info));
+	elf_push_int(S, fs_get_file_info(lib_load_string_view(S, 0), &info));
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_get_file_info)
 {
-	lib_check_arg_count(S, "fs.get_file_info", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "fs.get_file_info", nargs, 1, 1)) {
+		return 1;
+	}
 	dy_File_Info info = {0};
-	if (!fs_get_file_info(lib_load_string_view(S, 1), &info) || info.size > INT64_MAX) {
+	if (!fs_get_file_info(lib_load_string_view(S, 0), &info) || info.size > INT64_MAX) {
 		elf_push_nil(S);
 		return 1;
 	}
@@ -697,24 +702,30 @@ ELF_FUNCTION(lib_fs_get_file_info)
 
 ELF_FUNCTION(lib_fs_create_directory)
 {
-	lib_check_arg_count(S, "fs.create_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_create_directory(lib_load_string_view(S, 1)).error);
+	if (!lib_check_arg_count(S, "fs.create_directory", nargs, 1, 1)) {
+		return 1;
+	}
+	elf_push_int(S, !dy_create_directory(lib_load_string_view(S, 0)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_create_directories)
 {
-	lib_check_arg_count(S, "fs.create_directories", nargs, 1, 1);
-	elf_push_int(S, !dy_create_directories(lib_load_string_view(S, 1)).error);
+	if (!lib_check_arg_count(S, "fs.create_directories", nargs, 1, 1)) {
+		return 1;
+	}
+	elf_push_int(S, !dy_create_directories(lib_load_string_view(S, 0)).error);
 	return 1;
 }
 
 static u32 fs_transfer_file(elf_State *state, u32 nargs, b32 move)
 {
-	lib_check_arg_count(state, move ? "fs.move_file" : "fs.copy_file", nargs, 2, 3);
-	dy_String source = lib_load_string_view(state, 1);
-	dy_String destination = lib_load_string_view(state, 2);
-	b32 overwrite = nargs == 4 ? (b32)lib_load_integer(state, 3) : true;
+	if (!lib_check_arg_count(state, move ? "fs.move_file" : "fs.copy_file", nargs, 2, 3)) {
+		return 1;
+	}
+	dy_String source = lib_load_string_view(state, 0);
+	dy_String destination = lib_load_string_view(state, 1);
+	b32 overwrite = nargs == 3 ? (b32)lib_load_integer(state, 2) : true;
 	dy_Result transfer = move ? dy_file_move(source, destination, overwrite) : dy_file_copy(source, destination, overwrite);
 	b32 success = !transfer.error;
 	elf_push_int(state, success);
@@ -733,28 +744,36 @@ ELF_FUNCTION(lib_fs_move_file)
 
 ELF_FUNCTION(lib_fs_remove_file)
 {
-	lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1);
-	elf_push_int(S, !dy_file_remove(lib_load_string_view(S, 1)).error);
+	if (!lib_check_arg_count(S, "fs.remove_file", nargs, 1, 1)) {
+		return 1;
+	}
+	elf_push_int(S, !dy_file_remove(lib_load_string_view(S, 0)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_directory)
 {
-	lib_check_arg_count(S, "fs.remove_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_remove_directory(lib_load_string_view(S, 1)).error);
+	if (!lib_check_arg_count(S, "fs.remove_directory", nargs, 1, 1)) {
+		return 1;
+	}
+	elf_push_int(S, !dy_remove_directory(lib_load_string_view(S, 0)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_remove_tree)
 {
-	lib_check_arg_count(S, "fs.remove_tree", nargs, 1, 1);
-	elf_push_int(S, !dy_remove_tree(lib_load_string_view(S, 1)).error);
+	if (!lib_check_arg_count(S, "fs.remove_tree", nargs, 1, 1)) {
+		return 1;
+	}
+	elf_push_int(S, !dy_remove_tree(lib_load_string_view(S, 0)).error);
 	return 1;
 }
 
 ELF_FUNCTION(lib_fs_get_working_directory)
 {
-	lib_check_arg_count(S, "fs.get_working_directory", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "fs.get_working_directory", nargs, 0, 0)) {
+		return 1;
+	}
 	Scratch scratch = scratch_begin();
 	dy_String directory;
 	if (dy_get_current_directory(scratch.arena, &directory).error || directory.size > INT_MAX) {
@@ -769,8 +788,10 @@ ELF_FUNCTION(lib_fs_get_working_directory)
 
 ELF_FUNCTION(lib_fs_set_working_directory)
 {
-	lib_check_arg_count(S, "fs.set_working_directory", nargs, 1, 1);
-	elf_push_int(S, !dy_set_current_directory(lib_load_string_view(S, 1)).error);
+	if (!lib_check_arg_count(S, "fs.set_working_directory", nargs, 1, 1)) {
+		return 1;
+	}
+	elf_push_int(S, !dy_set_current_directory(lib_load_string_view(S, 0)).error);
 	return 1;
 }
 
@@ -794,9 +815,8 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 		}
 		if (call_each) {
 			elf_push_value(state, output);
-			elf_push_nil(state);
 			elf_push_str(state, path->data, (int)path->size);
-			u32 returned_count = elf_call(state, 2);
+			u32 returned_count = elf_call(state, 1);
 			ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
 			++*count;
 		}
@@ -819,14 +839,14 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 
 ELF_FUNCTION(lib_fs_get_paths)
 {
-	if (nargs < 1 || nargs > 3) {
+	if (nargs > 2) {
 		elf_push_nil(S);
 		return 1;
 	}
 	dy_String root = DY_LIT(".");
-	if (nargs >= 2)
+	if (nargs >= 1)
 	{
-		elf_Value root_value = load_value(S, 1);
+		elf_Value root_value = load_value(S, 0);
 		if (!value_is_string(root_value))
 		{
 			elf_push_nil(S);
@@ -840,7 +860,7 @@ ELF_FUNCTION(lib_fs_get_paths)
 		return 1;
 	}
 	elf_Int recursion_level = 0;
-	if ((nargs == 3 && !elf_to_int(S, 2, &recursion_level)) || recursion_level < 0 || recursion_level > ELF_FS_MAX_RECURSION) {
+	if ((nargs == 2 && !elf_to_int(S, 1, &recursion_level)) || recursion_level < 0 || recursion_level > ELF_FS_MAX_RECURSION) {
 		elf_push_nil(S);
 		return 1;
 	}
@@ -864,29 +884,29 @@ ELF_FUNCTION(lib_fs_get_paths)
 
 ELF_FUNCTION(lib_fs_for_each_path)
 {
-	if (nargs < 2 || nargs > 4) {
+	if (nargs < 1 || nargs > 3) {
 		elf_push_nil(S);
 		return 1;
 	}
 	dy_String root = DY_LIT(".");
 	elf_Int recursion_level = 0;
-	elf_i32 callback = 1;
-	if (nargs >= 3) {
-		elf_Value root_value = load_value(S, 1);
+	elf_i32 callback = 0;
+	if (nargs >= 2) {
+		elf_Value root_value = load_value(S, 0);
 		if (!value_is_string(root_value)) {
 			elf_push_nil(S);
 			return 1;
 		}
 		elf_String *root_string = value_as_string(root_value);
 		root = dy_string_from_data(elf_string_data(root_string), elf_string_size(root_string));
-		callback = 2;
+		callback = 1;
 	}
-	if (nargs == 4) {
-		if (!elf_to_int(S, 2, &recursion_level)) {
+	if (nargs == 3) {
+		if (!elf_to_int(S, 1, &recursion_level)) {
 			elf_push_nil(S);
 			return 1;
 		}
-		callback = 3;
+		callback = 2;
 	}
 	if (root.size == 0 || root.size >= DY_PATH_CAPACITY || recursion_level < 0 || recursion_level > ELF_FS_MAX_RECURSION || !elf_is_callable(S, callback)) {
 		elf_push_nil(S);

@@ -19,18 +19,13 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	StackFrame *native_frame_pointer = S->frame;
 	StackFrame native_frame = *S->frame;
 	StackFrame *caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
-	elf_Prototype *caller_prototype = caller ? caller->proto : 0;
+	elf_Prototype *caller_prototype = caller ? frame_proto(caller) : 0;
 	Bytecode *caller_next_instruction = caller ? frame_next_instr(caller) : 0;
 	b32 preserved = true;
 
 	if (!context)
 	{
 		test_fail("nested host call expected user context, got null");
-		preserved = false;
-	}
-	if (native_frame.proto)
-	{
-		TEST_FAIL("nested host call expected a native frame prototype of null, got %p", (void *)native_frame.proto);
 		preserved = false;
 	}
 	if (!caller)
@@ -59,17 +54,16 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 	}
 	if (preserved)
 	{
-		elf_push_nil(S);
-		elf_call(S, 1);
+		elf_call(S, 0);
 		StackFrame *restored_caller = S->frame > S->frame_stack ? S->frame - 1 : 0;
 		if (S->frame != native_frame_pointer)
 		{
 			TEST_FAIL("nested host call expected current frame %p, got %p", (void *)native_frame_pointer, (void *)S->frame);
 			preserved = false;
 		}
-		if (S->frame->args != native_frame.args)
+		if (S->frame->base != native_frame.base)
 		{
-			TEST_FAIL("nested host call expected native arguments %p, got %p", (void *)native_frame.args, (void *)S->frame->args);
+			TEST_FAIL("nested host call expected native frame base %p, got %p", (void *)native_frame.base, (void *)S->frame->base);
 			preserved = false;
 		}
 		if (S->frame->regs != native_frame.regs)
@@ -87,11 +81,6 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 			TEST_FAIL("nested host call expected native argument count %u, got %u", native_frame.nargs, S->frame->nargs);
 			preserved = false;
 		}
-		if (S->frame->proto)
-		{
-			TEST_FAIL("nested host call expected restored native prototype null, got %p", (void *)S->frame->proto);
-			preserved = false;
-		}
 		if (!restored_caller)
 		{
 			test_fail("nested host call expected its bytecode caller to remain on the frame stack, got none");
@@ -99,9 +88,9 @@ ELF_FUNCTION(vm_test_nested_call_preserves_context)
 		}
 		else
 		{
-			if (restored_caller->proto != caller_prototype)
+			if (frame_proto(restored_caller) != caller_prototype)
 			{
-				TEST_FAIL("nested host call expected caller prototype %p, got %p", (void *)caller_prototype, (void *)restored_caller->proto);
+				TEST_FAIL("nested host call expected caller prototype %p, got %p", (void *)caller_prototype, (void *)frame_proto(restored_caller));
 				preserved = false;
 			}
 			if (frame_next_instr(restored_caller) != caller_next_instruction)
@@ -128,8 +117,7 @@ static void test_vm_preserves_actual_returns(void)
 	}
 
 	elf_Value *results = state->stack_top - 1;
-	elf_push_nil(state);
-	u32 returned_count = elf_call(state, 1);
+	u32 returned_count = elf_call(state, 0);
 	if (returned_count != 2)
 	{
 		test_fail("bytecode call reports its actual return count");
@@ -174,8 +162,7 @@ static void test_vm_symbols(void)
 	}
 	elf_sym_destroy(symbols);
 
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Value result = state->stack_top[-1];
 	if (!value_is_integer(result) || value_as_integer(result) != 42)
 	{
@@ -202,8 +189,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	if (first_entry_prototype != state->prototypes[0]) {
 		test_fail("first compiled entry uses the first prototype index");
 	}
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Closure *first_factory = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *first_factory_prototype = first_factory->prototype;
 	elf_Ref first_factory_ref = elf_create_ref(state, -1);
@@ -219,8 +205,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	if (second_entry_prototype == first_entry_prototype) {
 		test_fail("each compilation publishes a distinct entry prototype");
 	}
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Closure *second_factory = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *second_factory_prototype = second_factory->prototype;
 	if (second_factory_prototype == first_factory_prototype) {
@@ -236,9 +221,8 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		elf_destroy_state(state);
 		return;
 	}
-	elf_push_nil(state);
 	elf_push_int(state, 100);
-	elf_call(state, 2);
+	elf_call(state, 1);
 	elf_Closure *first_closure = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *first_closure_prototype = first_closure->prototype;
 	elf_Ref first = elf_create_ref(state, -1);
@@ -249,9 +233,8 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		elf_destroy_state(state);
 		return;
 	}
-	elf_push_nil(state);
 	elf_push_int(state, 200);
-	elf_call(state, 2);
+	elf_call(state, 1);
 	elf_Closure *second_closure = value_as_closure(state->stack_top[-1]);
 	elf_Prototype *second_closure_prototype = second_closure->prototype;
 	elf_Ref second = elf_create_ref(state, -1);
@@ -271,8 +254,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		elf_destroy_state(state);
 		return;
 	}
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Int result = 0;
 	if (!elf_to_int(state, -1, &result) || result != 111) {
 		test_fail("compiled closure retains its module/function identity");
@@ -284,8 +266,7 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 		elf_destroy_state(state);
 		return;
 	}
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	if (!elf_to_int(state, -1, &result) || result != 222) {
 		test_fail("independent compiled modules execute overlapping local indices");
 	}
@@ -333,8 +314,7 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 		return;
 	}
 	elf_sym_destroy(symbols);
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 
 	elf_Int preserved = 0;
 	if (!elf_to_int(state, -1, &preserved))
@@ -370,8 +350,7 @@ static int vm_run_runtime_error_diagnostic_child(void)
 		elf_destroy_state(state);
 		return 2;
 	}
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_destroy_state(state);
 	return 3;
 }
@@ -480,8 +459,7 @@ static void test_vm_module_converts_atom_constants(void)
 		test_fail("function string constants survive GC");
 	}
 
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Array *result = value_as_array(state->stack_top[-1]);
 	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), prototype->strings[1]))
 	{
@@ -506,8 +484,7 @@ static void test_vm_error_snapshots_call_frames(void)
 		return;
 	}
 
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Value result = state->stack_top[-1];
 	if (!value_is_error(result))
 	{

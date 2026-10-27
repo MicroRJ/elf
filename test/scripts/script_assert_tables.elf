@@ -57,8 +57,8 @@ test_assert(nested_array["child"][1] == 2)
 target := { base = 34 }
 table_meta := elf.metatable(target)
 table_meta.answer = 42
-table_meta.add = fun(x) {
-	ret elf.arg(0).base + x
+table_meta.add = fun(self, x) {
+	ret self.base + x
 }
 
 test_assert(target:answer == 42)

@@ -11,7 +11,9 @@ static void gc_set_counter(elf_State *state, elf_Table *table,
 
 ELF_FUNCTION(l_gc_counters)
 {
-	lib_check_arg_count(S, "gc.counters", nargs, 0, 1);
+	if (!lib_check_arg_count(S, "gc.counters", nargs, 0, 1)) {
+		return 1;
+	}
 
 	u64 allocated_objects = S->gc_allocated_objects;
 	u64 allocated_bytes = S->gc_allocated_bytes;
@@ -31,9 +33,9 @@ ELF_FUNCTION(l_gc_counters)
 	u64 max_collection_time_ns = S->gc_max_collection_time_ns;
 
 	elf_Table *result = 0;
-	if (nargs == 2)
+	if (nargs == 1)
 	{
-		elf_Value value = load_value(S, 1);
+		elf_Value value = load_value(S, 0);
 		check_value_type(S, value, ELF_VALUE_TYPE_TABLE);
 		result = value_as_table(value);
 		push_table(S, result);

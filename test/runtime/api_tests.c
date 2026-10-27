@@ -1,29 +1,20 @@
 static ELF_FUNCTION(test_api_callback)
 {
-	elf_StrSlice receiver = {};
 	elf_Int argument = 0;
 
 	elf_u32 argument_count = elf_nargs(S);
-	if (argument_count != 2)
+	if (argument_count != 1)
 	{
-		TEST_FAIL("API callback expected 2 arguments including this, got %u", argument_count);
+		TEST_FAIL("API callback expected 1 argument, got %u", argument_count);
 		return 0;
 	}
-	if (!elf_to_str(S, 0, &receiver))
+	if (!elf_to_int(S, 0, &argument))
 	{
-		TEST_FAIL("API callback argument 0 expected type 'string', got '%s'", value_type_name(elf_type(S, 0)));
-	}
-	else if (receiver.size != 4 || memcmp(receiver.data, "this", 4) != 0)
-	{
-		TEST_FAIL("API callback argument 0 expected receiver 'this', got '%.*s'", (int)receiver.size, receiver.data);
-	}
-	if (!elf_to_int(S, 1, &argument))
-	{
-		TEST_FAIL("API callback argument 1 expected type 'integer', got '%s'", value_type_name(elf_type(S, 1)));
+		TEST_FAIL("API callback argument 0 expected type 'integer', got '%s'", value_type_name(elf_type(S, 0)));
 	}
 	else if (argument != 41)
 	{
-		TEST_FAIL("API callback argument 1 expected 41, got %lld", (long long)argument);
+		TEST_FAIL("API callback argument 0 expected 41, got %lld", (long long)argument);
 	}
 
 	elf_push_int(S, argument + 1);
@@ -51,9 +42,8 @@ static void test_api_call_addressing(elf_State *state)
 {
 	elf_i32 checkpoint = elf_get_top(state);
 	elf_push_fun(state, test_api_callback);
-	elf_push_cstr(state, "this");
 	elf_push_int(state, 41);
-	elf_u32 returned_count = elf_call(state, 2);
+	elf_u32 returned_count = elf_call(state, 1);
 
 	if (returned_count != 2)
 	{
@@ -206,7 +196,7 @@ static void test_api_arrays(elf_State *state)
 	}
 	elf_pop(state, 1);
 
-	elf_Array *array = value_as_array(state->frame->args[array_index]);
+	elf_Array *array = value_as_array(frame_args(state->frame)[array_index]);
 	array->obj.status |= ELF_OBJECT_READONLY;
 	elf_push_int(state, 30);
 	top = elf_get_top(state);
@@ -309,8 +299,7 @@ static void test_api_buffers(elf_State *state)
 		elf_set_top(state, checkpoint);
 		return;
 	}
-	elf_push_nil(state);
-	elf_call(state, 1);
+	elf_call(state, 0);
 	elf_Index buffer = elf_abs_index(state, -1);
 	if (elf_type(state, buffer) != ELF_VALUE_TYPE_BUFFER) {
 		test_fail("API identifies a buffer value");
@@ -459,7 +448,7 @@ static void test_api_mutation_errors(elf_State *state)
 		test_fail("API rejects appending to tables and preserves the value being written");
 	}
 
-	elf_Table *table = value_as_table(state->frame->args[table_index]);
+	elf_Table *table = value_as_table(frame_args(state->frame)[table_index]);
 	table->obj.status |= ELF_OBJECT_READONLY;
 	if (elf_set_field(state, table_index, "field") != ELF_ERROR_READONLY
 	|| elf_get_top(state) != value_top) {

@@ -84,17 +84,15 @@ static void init_state_storage(elf_State *state)
 
 static void bootstrap_base_frame(elf_State *state)
 {
-	state->frame->base = state->stack;
-	state->frame->args = state->stack + 1;
-	state->frame->size = 16;
-	state->frame->proto = 0;
+	state->frame->base  = state->stack;
+	state->frame->size  = 16;
 }
 
 static void reserve_bootstrap_frame_stack_space(elf_State *state)
 {
 	ASSERT((state->stack_top - state->stack) < state->frame->size);
 
-	elf_Value *stack_top = state->frame->args + state->frame->size;
+	elf_Value *stack_top = state->frame->base + state->frame->size;
 	ASSERT(stack_top >= state->stack_top);
 	value_zero_many(state->stack_top, stack_top - state->stack_top);
 	state->stack_top = stack_top;

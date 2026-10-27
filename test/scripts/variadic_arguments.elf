@@ -1,8 +1,8 @@
 sum := fun(a, ...) {
-	test_assert(elf.nargs() == 5)
+	test_assert(elf.nargs() == 4)
 	test_assert(elf.nvargs() == 3)
-	test_assert(elf.arg(1) == 4)
-	test_assert(elf.arg(4) == 7)
+	test_assert(elf.arg(0) == 4)
+	test_assert(elf.arg(3) == 7)
 	test_assert(elf.varg(0) == 5)
 	test_assert(elf.varg(2) == 7)
 	test_assert(elf.varg(3) == nil)

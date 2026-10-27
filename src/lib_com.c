@@ -148,12 +148,13 @@ static b32 compiler_push_json(elf_State *state, elf_StrSlice name, elf_StrSlice 
 
 ELF_FUNCTION(l_core_load_file)
 {
-	lib_check_arg_count(S, "load_file", nargs, 1, INT_MAX);
-	dy_String name = lib_load_string_view(S, 1);
+	if (!lib_check_arg_count(S, "load_file", nargs, 1, INT_MAX)) {
+		return 1;
+	}
+	dy_String name = lib_load_string_view(S, 0);
 	if (!elf_push_code_file(S, 0, (elf_StrSlice) {name.data, name.size})) return 0;
 
-	elf_push_value(S, 0);
-	for (i64 index = 2; index < nargs; ++index)
+	for (i64 index = 1; index < nargs; ++index)
 	{
 		elf_push_value(S, (elf_i32)index);
 	}
@@ -402,8 +403,10 @@ static void json_write_value(JsonWriter *writer, elf_Value value, u32 depth)
 
 ELF_FUNCTION(l_json_parse)
 {
-	lib_check_arg_count(S, "json.parse", nargs, 1, 1);
-	dy_String source = lib_load_string_view(S, 1);
+	if (!lib_check_arg_count(S, "json.parse", nargs, 1, 1)) {
+		return 1;
+	}
+	dy_String source = lib_load_string_view(S, 0);
 	if (!lib_push_json(S, DY_LIT("json.parse"), source)) {
 		json_push_error_value(S, "invalid JSON");
 	}
@@ -412,9 +415,11 @@ ELF_FUNCTION(l_json_parse)
 
 ELF_FUNCTION(l_json_stringify)
 {
-	lib_check_arg_count(S, "json.stringify", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "json.stringify", nargs, 1, 1)) {
+		return 1;
+	}
 	JsonWriter writer = {.state = S};
-	json_write_value(&writer, load_value(S, 1), 0);
+	json_write_value(&writer, load_value(S, 0), 0);
 	if (writer.error)
 	{
 		json_push_error_value(S, writer.error);
@@ -483,15 +488,19 @@ static void json_push_loaded_file(elf_State *state, dy_String name, b32 jsonl)
 
 ELF_FUNCTION(l_json_load_file)
 {
-	lib_check_arg_count(S, "json.load_file", nargs, 1, 1);
-	json_push_loaded_file(S, lib_load_string_view(S, 1), false);
+	if (!lib_check_arg_count(S, "json.load_file", nargs, 1, 1)) {
+		return 1;
+	}
+	json_push_loaded_file(S, lib_load_string_view(S, 0), false);
 	return 1;
 }
 
 ELF_FUNCTION(l_json_load_jsonl)
 {
-	lib_check_arg_count(S, "json.load_jsonl", nargs, 1, 1);
-	json_push_loaded_file(S, lib_load_string_view(S, 1), true);
+	if (!lib_check_arg_count(S, "json.load_jsonl", nargs, 1, 1)) {
+		return 1;
+	}
+	json_push_loaded_file(S, lib_load_string_view(S, 0), true);
 	return 1;
 }
 

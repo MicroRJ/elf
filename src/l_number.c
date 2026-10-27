@@ -72,7 +72,9 @@ static b32 push_fixed_number_text(elf_State *state, f64 number, i32 precision)
 
 ELF_FUNCTION(l_number_fmt)
 {
-	lib_check_arg_count(S, "number.fmt", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "number.fmt", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	f64 number = number_receiver(S);
 	elf_String *format = lib_load_string(S, 1);
 	i32 precision = 0;

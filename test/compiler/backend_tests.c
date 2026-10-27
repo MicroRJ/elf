@@ -513,7 +513,7 @@ static void test_backend_emits_direct_static_call(void)
 	i32 call_index = backend_find_first_bytecode(result, BC_CALL_DIRECT);
 	if (call_index >= 0) {
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (call.b_y < 0 || (u32)call.b_y >= result.state->prototype_count || call.b_z != 3 || call.b_w != 1) {
+		if (call.b_y < 0 || (u32)call.b_y >= result.state->prototype_count || call.b_z != 2 || call.b_w != 1) {
 			test_fail("direct static call encodes function, argument, and return counts");
 		}
 	}
@@ -536,8 +536,7 @@ static void test_backend_calls_imported_static_function(void)
 		elf_Closure *closure = elf_closure_new(result.state, backend_test_function(result), 0, 0);
 		ASSERT(closure);
 		push_value(result.state, cls_value(closure));
-		elf_push_nil(result.state);
-		elf_call(result.state, 1);
+		elf_call(result.state, 0);
 		elf_Int value = 0;
 		if (!elf_to_int(result.state, -1, &value) || value != 42) {
 			test_fail("imported static function executes from its source namespace");

@@ -7,10 +7,12 @@ ScriptTestContext;
 ELF_FUNCTION(script_test_assert)
 {
 	ScriptTestContext *context = elf_get_user_data(S);
-	lib_check_arg_count(S, "test_assert", nargs, 1, 2);
-	elf_Value value = load_value(S, 1);
+	if (!lib_check_arg_count(S, "test_assert", nargs, 1, 2)) {
+		return 1;
+	}
+	elf_Value value = load_value(S, 0);
 	check_numeric(S, value);
-	const char *message = nargs > 2 ? lib_load_cstr(S, 2) : 0;
+	const char *message = nargs > 1 ? lib_load_cstr(S, 1) : 0;
 	if (!value_to_integer(value))
 	{
 		if (message) {
@@ -43,8 +45,7 @@ static void run_script_test(const char *path)
 	}
 	else
 	{
-		elf_push_nil(state);
-		elf_call(state, 1);
+		elf_call(state, 0);
 	}
 
 	elf_sym_destroy(symbols);

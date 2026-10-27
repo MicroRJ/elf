@@ -113,7 +113,7 @@ static elf_Bool values_equal(elf_Value left, elf_Value right)
 
 elf_Index elf_get_top(elf_State *state)
 {
-	return (elf_Index)(state->stack_top - frame_args(frame_current(state)));
+	return state->stack_top - (state->frame->base + 1);
 }
 
 elf_u32 elf_nargs(elf_State *state)
@@ -132,29 +132,35 @@ elf_Bool elf_is_valid(elf_State *state, elf_Index index)
 	return value_at(state, index) != 0;
 }
 
-elf_ErrorCode elf_set_top(elf_State *state, elf_Index top)
+elf_ErrorCode elf_set_top(elf_State *state, elf_Index index)
 {
-	StackFrame *frame = frame_current(state);
-	elf_Value *args = frame_args(frame);
-	elf_Index current = elf_get_top(state);
-	elf_Index capacity = (elf_Index)(state->stack + state->stack_size - args);
-	if (top < (elf_i32)frame_size(frame) || top > capacity) return ELF_ERROR_OUT_OF_RANGE;
-	while (current < top) {
-		push_value(state, value_nil());
-		current += 1;
+	if (index < 0) {
+		return ELF_ERROR_OUT_OF_RANGE;
 	}
-	if (current > top) {
-		value_zero_many(args + top, current - top);
-		state->stack_top = args + top;
+	StackFrame *frame = state->frame;
+	elf_Value *next = frame->base + 1 + index;
+	if (next < frame->base + frame->size) {
+		return ELF_ERROR_OUT_OF_RANGE;
 	}
+	if (next > state->stack + state->stack_size) {
+		return ELF_ERROR_OUT_OF_RANGE;
+	}
+	if (next > state->stack_top) {
+		value_zero_range(state->stack_top, next);
+	}
+	state->stack_top = next;
 	return ELF_ERROR_NONE;
 }
 
 elf_ErrorCode elf_pop(elf_State *state, elf_u32 count)
 {
-	elf_Index top = elf_get_top(state);
-	if (count > (elf_u32)(top - (elf_i32)frame_size(frame_current(state)))) return ELF_ERROR_STACK_UNDERFLOW;
-	return elf_set_top(state, top - (elf_Index) count);
+	StackFrame *frame = state->frame;
+	elf_Value *next = state->stack_top - count;
+	if (next < frame->base + frame->size) {
+		return ELF_ERROR_STACK_UNDERFLOW;
+	}
+	state->stack_top = next;
+	return ELF_ERROR_NONE;
 }
 
 elf_ErrorCode elf_push_value(elf_State *state, elf_Index index)

@@ -43,29 +43,37 @@ static u32 buffer_load_size(elf_State *state, u32 argument, const char *operatio
 
 ELF_FUNCTION(l_buffer_new)
 {
-	lib_check_arg_count(S, "buffer", nargs, 0, 1);
-	u32 capacity = nargs > 1 ? buffer_load_size(S, 1, "buffer capacity") : 0;
+	if (!lib_check_arg_count(S, "buffer", nargs, 0, 1)) {
+		return 1;
+	}
+	u32 capacity = nargs ? buffer_load_size(S, 0, "buffer capacity") : 0;
 	push_value(S, value_from_buffer(elf_buffer_new_object(S, capacity)));
 	return 1;
 }
 
 ELF_FUNCTION(l_buffer_length)
 {
-	lib_check_arg_count(S, "buffer.length", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "buffer.length", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	push_value(S, int_value(buffer_receiver(S)->size));
 	return 1;
 }
 
 ELF_FUNCTION(l_buffer_capacity)
 {
-	lib_check_arg_count(S, "buffer.capacity", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "buffer.capacity", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	push_value(S, int_value(buffer_receiver(S)->capacity));
 	return 1;
 }
 
 ELF_FUNCTION(l_buffer_clear)
 {
-	lib_check_arg_count(S, "buffer.clear", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "buffer.clear", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	if (!elf_buffer_require_writable(S, buffer)) return 0;
 	buffer->size = 0;
@@ -75,7 +83,9 @@ ELF_FUNCTION(l_buffer_clear)
 
 ELF_FUNCTION(l_buffer_reserve)
 {
-	lib_check_arg_count(S, "buffer.reserve", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "buffer.reserve", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 capacity = buffer_load_size(S, 1, "buffer reserve");
 	if (!elf_buffer_reserve_object(S, buffer, capacity)) return 0;
@@ -85,7 +95,9 @@ ELF_FUNCTION(l_buffer_reserve)
 
 ELF_FUNCTION(l_buffer_resize)
 {
-	lib_check_arg_count(S, "buffer.resize", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "buffer.resize", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 size = buffer_load_size(S, 1, "buffer resize");
 	if (!elf_buffer_resize_object(S, buffer, size)) return 0;
@@ -95,7 +107,9 @@ ELF_FUNCTION(l_buffer_resize)
 
 ELF_FUNCTION(l_buffer_append)
 {
-	lib_check_arg_count(S, "buffer.append", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "buffer.append", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	elf_Value source = load_value(S, 1);
 	const void *data = 0;
@@ -126,7 +140,9 @@ ELF_FUNCTION(l_buffer_append)
 
 ELF_FUNCTION(l_buffer_splice)
 {
-	lib_check_arg_count(S, "buffer.splice", nargs, 3, 3);
+	if (!lib_check_arg_count(S, "buffer.splice", nargs - 1, 3, 3)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 position = 0;
 	if (!buffer_normalize_index(S, lib_load_integer(S, 1), buffer->size, true, &position)) return 0;
@@ -160,7 +176,9 @@ ELF_FUNCTION(l_buffer_splice)
 
 ELF_FUNCTION(l_buffer_byte)
 {
-	lib_check_arg_count(S, "buffer.byte", nargs, 1, 1);
+	if (!lib_check_arg_count(S, "buffer.byte", nargs - 1, 1, 1)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 index = 0;
 	if (!buffer_normalize_index(S, lib_load_integer(S, 1), buffer->size, false, &index)) return 0;
@@ -170,7 +188,9 @@ ELF_FUNCTION(l_buffer_byte)
 
 ELF_FUNCTION(l_buffer_set)
 {
-	lib_check_arg_count(S, "buffer.set", nargs, 2, 2);
+	if (!lib_check_arg_count(S, "buffer.set", nargs - 1, 2, 2)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 index = 0;
 	if (!buffer_normalize_index(S, lib_load_integer(S, 1), buffer->size, false, &index)) return 0;
@@ -189,7 +209,9 @@ ELF_FUNCTION(l_buffer_set)
 
 ELF_FUNCTION(l_buffer_slice)
 {
-	lib_check_arg_count(S, "buffer.slice", nargs, 1, 2);
+	if (!lib_check_arg_count(S, "buffer.slice", nargs - 1, 1, 2)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	u32 first = 0;
 	u32 end = buffer->size;
@@ -210,7 +232,9 @@ ELF_FUNCTION(l_buffer_slice)
 
 ELF_FUNCTION(l_buffer_to_string)
 {
-	lib_check_arg_count(S, "buffer.to_string", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "buffer.to_string", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	elf_ByteBuffer *buffer = buffer_receiver(S);
 	push_value(S, str_value(elf_string_from_data_size(S,
 		(const char *)(buffer->data ? buffer->data : (u8 *)""), buffer->size)));

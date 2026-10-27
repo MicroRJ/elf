@@ -32,8 +32,7 @@ int main(int argc, char **argv)
 		elf_destroy_state(state);
 		return 1;
 	}
-	elf_push_nil(state);
-	u32 nrets = elf_call(state, 1);
+	u32 nrets = elf_call(state, 0);
 	if (nrets != 0) {
 		printf("elf returned %u result(s):\n", nrets);
 

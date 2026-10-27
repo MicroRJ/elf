@@ -251,11 +251,6 @@ struct elf_Closure
 struct StackFrame
 {
 	elf_Value          *base;
-
-	elf_Prototype     *proto;
-	elf_Value          *args;
-
-	//
 	elf_Value          *regs;
 	Bytecode          *instr;
 	u16                 padd;

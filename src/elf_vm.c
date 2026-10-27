@@ -10,10 +10,6 @@ typedef elf_Value     Value;
 typedef elf_State     State;
 typedef StackFrame    Frame;
 
-static void value_zero_range(Value *first, Value *past_last) {
-	ASSERT(first <= past_last);
-	value_zero_many(first, past_last - first);
-}
 
 static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *base, u32 nargs)
 {
@@ -22,6 +18,8 @@ static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *bas
 	Frame *frame = state->frame;
 
 	ASSERT(proto);
+	// Note, must account for callee
+	ASSERT(proto->stack_size >= 1);
 	ASSERT(proto->arity <= proto->stack_size);
 	ASSERT(ndest < 256);
 	ASSERT(nargs < 256);
@@ -29,29 +27,28 @@ static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *bas
 	// Todo, remove this wide zero
 	zero_memory(frame, sizeof(* frame));
 
-	frame->proto = proto;
 	frame->size = proto->stack_size;
 	frame->base = base;
-	frame->args = base + 1;
-	frame->regs = base + 1;
+	frame->regs = base;
 	frame->nargs = nargs;
 	frame->ndest = ndest;
 	frame->instr = proto->bytecode;
 
 	if (proto->variadic && nargs > proto->arity)
 	{
-		frame->size += nargs;
-		frame->regs += nargs;
-		value_copy_many(frame->regs, frame->args, proto->arity);
-		value_zero_range(frame->regs + proto->arity, frame->args + frame->size);
+		/* the callee is also copied */
+		frame->size += nargs + 1;
+		frame->regs += nargs + 1;
+		value_copy_many(frame->regs, frame->base, proto->arity + 1);
+		value_zero_range(frame->regs + proto->arity + 1, frame->base + frame->size);
 	}
 	else
 	{
 		frame->nargs = MIN(frame->nargs, proto->arity);
-		value_zero_range(frame->regs + frame->nargs, frame->args + frame->size);
+		value_zero_range(frame->regs + frame->nargs + 1, frame->base + frame->size);
 	}
 
-	state->stack_top = frame->args + frame->size;
+	state->stack_top = frame->base + frame->size;
 }
 
 static u32 vm_resume(State *state);
@@ -59,7 +56,6 @@ static u32 vm_resume(State *state);
 u32 elf_call(State *state, u32 nargs)
 {
 	u32 nrets = 0;
-	RUNTIME_CHECK(nargs >= 1);
 	Value *base = state->stack_top - nargs - 1;
 
 	state->frame ++;
@@ -67,20 +63,19 @@ u32 elf_call(State *state, u32 nargs)
 	if (base->type == ELF_VALUE_TYPE_CLOSURE)
 	{
 		begin_proto(state, base->x_closure->prototype, 1, base, nargs);
-		state->stack_top = frame->args + frame->size;
+		state->stack_top = frame->base + frame->size;
 		nrets = vm_resume(state);
 	}
 	else if (base->type == ELF_VALUE_TYPE_CFUNCTION)
 	{
 		zero_memory(frame, sizeof(*frame));
 		frame->base = base;
-		frame->args = base + 1;
-		frame->regs = base + 1;
+		frame->regs = base;
 		frame->nargs = nargs;
-		frame->size = nargs;
+		frame->size = nargs + 1;
 		frame->ndest = 1;
 		nrets = base->x_function(state, nargs);
-		ASSERT(nrets <= state->stack_top - frame->args - frame->size);
+		ASSERT(nrets <= state->stack_top - frame->base - frame->size);
 		state->stack_top -= nrets;
 		value_move_many(base, state->stack_top, nrets);
 	}
@@ -173,8 +168,8 @@ static u32 vm_resume(State *state)
 
 			case BC_CALL_DYNAMIC:
 			{
-				ASSERT((u32)byte.b_x < frame->proto->stack_size);
-				ASSERT((u32)byte.b_y < frame->proto->stack_size);
+				ASSERT((u32)byte.b_x < frame_proto(frame)->stack_size);
+				ASSERT((u32)byte.b_y < frame_proto(frame)->stack_size);
 
 				Value *base = frame->regs + byte.b_x;
 				base[0] = frame->regs[byte.b_y];
@@ -195,21 +190,20 @@ static u32 vm_resume(State *state)
 					Frame *inner = ++ state->frame;
 					zero_memory(inner, sizeof(*inner));
 					inner->base = base;
-					inner->args = base + 1;
-					inner->regs = base + 1;
+					inner->regs = base;
 					inner->nargs = nargs;
-					inner->size = nargs;
+					inner->size = nargs + 1;
 					inner->ndest = ndest;
-					state->stack_top = inner->args + inner->size;
+					state->stack_top = inner->base + inner->size;
 					u32 nrets = base->x_function(state, byte.b_z);
-					ASSERT(state->stack_top >= inner->args + inner->size);
-					RUNTIME_CHECK(nrets + nargs <= state->stack_top - inner->args);
+					ASSERT(state->stack_top >= inner->base + inner->size);
+					RUNTIME_CHECK(nrets <= state->stack_top - inner->base - inner->size);
 					state->frame --;
 					ASSERT(frame == state->frame);
 					Value *rets = state->stack_top - nrets;
 					value_move_many(base, rets, MIN(ndest, nrets));
 					state->stack_top = base + MIN(ndest, nrets);
-					vm_zero_top(state, frame->args + frame->size);
+					vm_zero_top(state, frame->base + frame->size);
 				}
 				else
 				{
@@ -236,8 +230,7 @@ static u32 vm_resume(State *state)
 			{
 				u32 nrets = byte.b_y;
 				Value *rets = frame->regs + byte.b_x;
-				Value *dest = frame->args - 1;
-
+				Value *dest = frame->base;
 
 				if (frame == root) {
 					value_move_many(dest, rets, nrets);
@@ -252,7 +245,7 @@ static u32 vm_resume(State *state)
 				frame = state->frame;
 
 				state->stack_top = dest + nrets;
-				vm_zero_top(state, frame->args + frame->size);
+				vm_zero_top(state, frame->base + frame->size);
 			}
 			break;
 
@@ -292,25 +285,25 @@ static u32 vm_resume(State *state)
 
 			case BC_LOAD_CONSTANT_INTEGER:
 			{
-				frame->regs[byte.b_x] = int_value(frame->proto->int_data[byte.b_y]);
+				frame->regs[byte.b_x] = int_value(frame_proto(frame)->int_data[byte.b_y]);
 			}
 			break;
 
 			case BC_LOAD_CONSTANT_NUMBER:
 			{
-				frame->regs[byte.b_x] = num_value(frame->proto->num_data[byte.b_y]);
+				frame->regs[byte.b_x] = num_value(frame_proto(frame)->num_data[byte.b_y]);
 			}
 			break;
 
 			case BC_LOAD_CONSTANT_STRING:
 			{
-				frame->regs[byte.b_x] = str_value(frame->proto->strings[byte.b_y]);
+				frame->regs[byte.b_x] = str_value(frame_proto(frame)->strings[byte.b_y]);
 			}
 			break;
 
 			case BC_LOAD_CAPTURE:
 			{
-				ASSERT(byte.b_y >= 0 && byte.b_y < frame->proto->captures);
+				ASSERT(byte.b_y >= 0 && byte.b_y < frame_proto(frame)->captures);
 				ASSERT(frame->base->type == ELF_VALUE_TYPE_CLOSURE);
 				value_copy(&frame->regs[byte.b_x], frame->base->x_closure->captures[byte.b_y]);
 			}

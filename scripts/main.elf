@@ -1,11 +1,71 @@
 
+my_table := { foo = fun(me, x) => me, x }
+foo := my_table.foo
+
+x, y := my_table.foo(777)
+w, z := foo(my_table, 777)
+
+elf.printl(x, ", ", y)
+elf.printl(w, ", ", z)
+
+#eof
+
+fib := fun(n) {
+	if n < 2 ? {
+		ret n
+	}
+
+	ret recurse(n - 1) + recurse(n - 2)
+}
+
+elf.printl(fib(0), ": ", 0)
+elf.printl(fib(1), ": ", 1)
+elf.printl(fib(6), ": ", 8)
+
+ret fib(10)
+
+
+x, y, z := elf.echo(11, 13, 17)
+ret x, y, z
+#eof
+export foo :: fun() {
+	ret 777
+}
+
+ret foo(1, 2, 3)
+#eof
+
+export foo :: fun(x) {
+	ret x
+}
+
+ret foo(777)
+#eof
+
+
+
+export foo :: fun() {
+	ret 777
+}
+
+ret foo()
+#eof
+
+elf.printl(1, 2, 3, 4)
+#eof
+
+
+ret 1, 2, 3, 5, 7, 11, 13, 17, 19
+#eof
+
 export add :: fun(value) {
+	elf.printl(#get_mem(value))
 	ret value
 }
 
 elf.printl(add(1))
-
 #eof
+
 
 offset :: 2
 export add :: fun(value) {

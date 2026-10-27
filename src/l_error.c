@@ -11,14 +11,18 @@ static elf_GCError *error_receiver(elf_State *state)
 
 ELF_FUNCTION(l_error_message)
 {
-	lib_check_arg_count(S, "error.message", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "error.message", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	push_value(S, str_value(error_receiver(S)->message));
 	return 1;
 }
 
 ELF_FUNCTION(l_error_data)
 {
-	lib_check_arg_count(S, "error.data", nargs, 0, 0);
+	if (!lib_check_arg_count(S, "error.data", nargs - 1, 0, 0)) {
+		return 1;
+	}
 	elf_Table *data = error_receiver(S)->data;
 	push_value(S, data ? value_from_table(data) : value_nil());
 	return 1;

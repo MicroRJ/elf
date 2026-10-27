@@ -67,13 +67,13 @@ test_assert(elf.is_readonly(root))
 test_assert(elf.is_readonly(child))
 
 probe := fun(a, ...) {
-	test_assert(elf.nargs() == 4)
+	test_assert(elf.nargs() == 3)
 	test_assert(elf.nvargs() == 2)
 	test_assert(elf.arg(-1) == nil)
-	test_assert(elf.arg(4) == nil)
+	test_assert(elf.arg(3) == nil)
 	test_assert(elf.varg(-1) == nil)
 	test_assert(elf.varg(2) == nil)
-	test_assert(elf.arg(1) == 10)
+	test_assert(elf.arg(0) == 10)
 	test_assert(elf.varg(0) == 20)
 	test_assert(elf.varg(1) == 30)
 }
