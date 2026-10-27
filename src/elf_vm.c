@@ -175,12 +175,10 @@ static u32 vm_resume(State *state)
 			case BC_CALL_DYNAMIC:
 			{
 				ASSERT((u32)byte.b_x < frame_proto(frame)->stack_size);
-				ASSERT((u32)byte.b_y < frame_proto(frame)->stack_size);
 
 				Value *base = frame->regs + byte.b_x;
-				base[0] = frame->regs[byte.b_y];
-				u32 nargs = byte.b_z;
-				u32 ndest = byte.b_w;
+				u32 nargs = byte.b_y;
+				u32 ndest = byte.b_z;
 
 				if (base->type == ELF_VALUE_TYPE_PROTOTYPE)
 				{
@@ -208,7 +206,7 @@ static u32 vm_resume(State *state)
 					inner->size = nargs + 1;
 					inner->ndest = ndest;
 					state->stack_top = inner->base + inner->size;
-					u32 nrets = base->x_function(state, byte.b_z);
+					u32 nrets = base->x_function(state, nargs);
 					ASSERT(state->stack_top >= inner->base + inner->size);
 					RUNTIME_CHECK(nrets <= state->stack_top - inner->base - inner->size);
 					state->frame --;

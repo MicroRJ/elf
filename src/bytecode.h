@@ -77,9 +77,8 @@ Access and mutation
   The count is the table entry count, array length, string byte length, buffer byte size, or zero for nil.
 
 Calls and returns
-  BC_CALL_DYNAMIC: x = result base register, y = callee register, z = argument count, w = requested result count.
-  Call the prototype, closure, or native function in r[y]. The callee register need not equal the result base.
-  Calls read z args beginning at r[x + 1]. Results begin at r[x]; r[x] also reserves the callee/result slot in the call layout.
+  BC_CALL_DYNAMIC: x = callable/result base register, y = argument count, z = requested result count.
+  Call the prototype, closure, or native function in r[x]. Calls read y args beginning at r[x + 1]. Results begin at r[x].
   BC_RETURN: x = first result register, y = produced result count. Finish the current frame.
   Copy the lesser of y and the requested result count to the caller's result base; fill missing requested results with nil.
   Excess produced results are discarded. x is ignored when no results are copied.
@@ -174,20 +173,17 @@ const char *bytecode_type_name(BcType type);
 char *format_bytecode_function(elf_State *state, Arena *arena, u32 prototype_index);
 void print_bytecode_function(elf_State *state, u32 prototype_index);
 
-// One fixed-width VM instruction. The fourth operand uses padding that already
-// existed after z, so adding it does not make an instruction any larger.
+// One fixed-width VM instruction.
 typedef struct
 {
 	BcType b_type;
 	i16 b_x, b_y, b_z;
-	u8 b_w;
 }
 Bytecode;
 
 STATIC_ASSERT(sizeof(Bytecode) == 12);
 
-#define BC_XYZW(K,X,Y,Z,W) (Bytecode){.b_type = (K), .b_w = (u8)(W), .b_x = (X), .b_y = (Y), .b_z = (Z)}
-#define BC_XYZ(K,X,Y,Z)     BC_XYZW(K,X,Y,Z,0)
+#define BC_XYZ(K,X,Y,Z)     (Bytecode){.b_type = (K), .b_x = (X), .b_y = (Y), .b_z = (Z)}
 #define BC_XY(K,X,Y)        BC_XYZ(K,X,Y,0)
 #define BC_X(K,X)           BC_XYZ(K,X,0,0)
 
@@ -195,7 +191,6 @@ STATIC_ASSERT(sizeof(Bytecode) == 12);
 #define BC_ARGX(B)      (B).b_x
 #define BC_ARGY(B)      (B).b_y
 #define BC_ARGZ(B)      (B).b_z
-#define BC_ARGW(B)      (B).b_w
 
 
 

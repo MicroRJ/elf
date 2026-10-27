@@ -25,7 +25,7 @@ const char *bytecode_type_name(BcType type)
 
 static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Arena *arena, u32 index, Bytecode byte)
 {
-	arena_pushf(arena, "  %04u  %-24s x=%d y=%d z=%d w=%u  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z, byte.b_w);
+	arena_pushf(arena, "  %04u  %-24s x=%d y=%d z=%d  ", index, bytecode_type_name(byte.b_type), byte.b_x, byte.b_y, byte.b_z);
 
 	switch (byte.b_type)
 	{
@@ -161,7 +161,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 
 		case BC_CALL_DYNAMIC:
 		{
-			arena_pushf(arena, "call_dynamic callee=r%d result=r%d nargs=%d nout=%u", byte.b_y, byte.b_x, byte.b_z, byte.b_w);
+			arena_pushf(arena, "call_dynamic base=r%d nargs=%d nout=%d", byte.b_x, byte.b_y, byte.b_z);
 		}
 		break;
 

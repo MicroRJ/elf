@@ -224,11 +224,6 @@ static u32 emit_bytecode_xyz(BcEmitter *emitter, SourceSite site, BcType type, i
 	return emit_bytecode(emitter, site, BC_XYZ(type, x, y, z));
 }
 
-static u32 emit_bytecode_xyzw(BcEmitter *emitter, SourceSite site, BcType type, i32 x, i32 y, i32 z, i32 w)
-{
-	return emit_bytecode(emitter, site, BC_XYZW(type, x, y, z, w));
-}
-
 static u32 emit_jump(BcEmitter *emitter, SourceSite site)
 {
 	return emit_bytecode_x(emitter, site, BC_JUMP, 0);
@@ -442,7 +437,8 @@ static u32 emit_dynamic_call(BcEmitter *emitter, Ir ir, u32 dest, u32 ndest)
 	}
 	ir_set_stack_top(emitter, rets);
 
-	emit_bytecode_xyzw(emitter, expr->site, BC_CALL_DYNAMIC, rets, call, nargs, ndest);
+	ASSERT(call == rets);
+	emit_bytecode_xyz(emitter, expr->site, BC_CALL_DYNAMIC, rets, nargs, ndest);
 	return finish_call_result(emitter, ir, rets, dest, ndest);
 }
 

@@ -515,7 +515,7 @@ static void test_backend_loads_prototype_for_static_call(void)
 	if (load_index >= 0 && call_index >= 0) {
 		Bytecode load = backend_test_bytes(result)[load_index];
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (load.b_y < 0 || (u32)load.b_y >= result.state->prototype_count || call.b_y != load.b_x || call.b_z != 2 || call.b_w != 1) {
+		if (load.b_y < 0 || (u32)load.b_y >= result.state->prototype_count || call.b_x != load.b_x || call.b_y != 2 || call.b_z != 1) {
 			test_fail("static call loads its callee and encodes argument and return counts");
 		}
 	}
