@@ -443,30 +443,6 @@ static void test_backend_logical_expr_delays_result_slot(void)
 	backend_test_destroy(or_result);
 }
 
-static void test_backend_formats_bytecode_function(void)
-{
-	BackendCompileResult result = backend_test_compile_source(
-		"x := 41\n"
-		"ret x + 1\n");
-
-	Scratch scratch = scratch_begin();
-	char *text = format_bytecode_function(result.state, scratch.arena, result.function_index);
-	if (!strstr(text, "bytecode function")) {
-		test_fail("bytecode formatter prints function header");
-	}
-	if (!strstr(text, "stack_size")) {
-		test_fail("bytecode formatter prints function metadata");
-	}
-	if (!strstr(text, "integer[")) {
-		test_fail("bytecode formatter prints integer constants");
-	}
-	if (!strstr(text, "return")) {
-		test_fail("bytecode formatter prints return bytecode");
-	}
-	scratch_end(scratch);
-	backend_test_destroy(result);
-}
-
 static void test_backend_outputs_strings(void)
 {
 	Arena arena = arena_create(0);
@@ -620,7 +596,6 @@ static void run_backend_tests(void)
 	TEST_RUN("backend.local_initializer_reuses_result_slot", test_backend_local_initializer_reuses_result_slot);
 	TEST_RUN("backend.truthy_or_reuses_left_result_slot", test_backend_truthy_or_reuses_left_result_slot);
 	TEST_RUN("backend.logical_expr_delays_result_slot", test_backend_logical_expr_delays_result_slot);
-	TEST_RUN("backend.formats_bytecode_function", test_backend_formats_bytecode_function);
 	TEST_RUN("backend.outputs_strings", test_backend_outputs_strings);
 	TEST_RUN("backend.loads_prototype_for_static_call", test_backend_loads_prototype_for_static_call);
 	TEST_RUN("backend.calls_imported_static_function", test_backend_calls_imported_static_function);

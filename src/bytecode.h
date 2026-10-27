@@ -169,9 +169,16 @@ typedef enum
 }
 BcType;
 
-const char *bytecode_type_name(BcType type);
-char *format_bytecode_function(elf_State *state, Arena *arena, u32 prototype_index);
-void print_bytecode_function(elf_State *state, u32 prototype_index);
+static inline const char *bytecode_type_name(BcType type)
+{
+	switch (type)
+	{
+#define XPAND(ENUM, NAME) case BC_##ENUM: return NAME;
+		BC_XDEF(XPAND)
+#undef XPAND
+		default: return "unknown";
+	}
+}
 
 // One fixed-width VM instruction.
 typedef struct
