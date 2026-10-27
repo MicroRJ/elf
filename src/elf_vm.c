@@ -11,6 +11,24 @@ typedef elf_State     State;
 typedef StackFrame    Frame;
 
 
+// TODO(RJ): make this a helper
+static void vm_push_errorf(elf_State *state, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	Scratch scratch = scratch_begin();
+	dy_String message = arena_pushfv(scratch.arena, format, args);
+	va_end(args);
+	arena_push_zero(scratch.arena, 1, 1);
+	elf_push_error(state, message.data);
+	scratch_end(scratch);
+}
+
+
+
+
+
+
 static inline void begin_proto(State *state, Proto *proto, u32 ndest, Value *base, u32 nargs)
 {
 	ASSERT(base->type == ELF_VALUE_TYPE_CLOSURE || base->type == ELF_VALUE_TYPE_PROTOTYPE);
@@ -80,13 +98,13 @@ u32 elf_call(State *state, u32 nargs)
 		frame->ndest = 1;
 		nrets = base->x_function(state, nargs);
 		ASSERT(nrets <= state->stack_top - frame->base - frame->size);
-		state->stack_top -= nrets;
-		value_move_many(base, state->stack_top, nrets);
 	}
 	else
 	{
 		RUNTIME_CHECK(!"Error, not callable!");
 	}
+	state->stack_top -= nrets;
+	value_move_many(base, state->stack_top, nrets);
 	ASSERT(frame == state->frame);
 	state->frame --;
 	state->stack_top = base + nrets;
@@ -95,8 +113,7 @@ u32 elf_call(State *state, u32 nargs)
 
 static void vm_error_invalid_operands(State *state, BcType op, Value left, Value right)
 {
-	report_runtime_error(state, ERROR_TYPE_MISMATCH, "%s: invalid operands '%s' and '%s'",
-	bytecode_type_name(op), value_type_name(left.type), value_type_name(right.type));
+	report_runtime_error(state, ERROR_TYPE_MISMATCH, "%s: invalid operands '%s' and '%s'", bytecode_type_name(op), value_type_name(left.type), value_type_name(right.type));
 }
 
 static void vm_error_cannot_call(State *state, Value value)
@@ -231,7 +248,7 @@ static u32 vm_resume(State *state)
 				u32 rets = byte.b_x;
 
 				if (frame == root) {
-					value_move_many(frame->base, frame->regs + rets, nrets);
+					state->stack_top = frame->regs + rets + nrets;
 					nroot = nrets;
 					goto exit;
 				}
