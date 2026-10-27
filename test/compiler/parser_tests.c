@@ -611,12 +611,13 @@ static void test_parser_get_mem_macro(elf_State *state)
 	expect_ast_atom(expr ? expr->unary : 0, "x", "get_mem target string");
 }
 
-static void test_parser_this_expression(elf_State *state)
+static void test_parser_this_identifier(elf_State *state)
 {
 	Ast file = parser_test_parse_source(state, "ret this.value");
 	Ast ret = parser_test_stat(file, 0, AST_RETURN, "parse this return");
-	Ast field = parser_test_tuple_item(ret->return_stat.expr, 0, AST_FIELD, "this expression supports field access");
-	expect_ast_kind(field ? field->binary.x : 0, AST_THIS, "this expression has its own ast kind");
+	Ast field = parser_test_tuple_item(ret->return_stat.expr, 0, AST_FIELD, "this identifier supports field access");
+	expect_ast_kind(field ? field->binary.x : 0, AST_IDENT, "this parses as an identifier");
+	expect_ast_atom(field ? field->binary.x : 0, "this", "this identifier keeps its name");
 	expect_ast_atom(field ? field->binary.y : 0, "value", "this field keeps its name");
 }
 
@@ -760,7 +761,7 @@ static void run_parser_tests(elf_State *state)
 	TEST_RUN("parser.open_range_indexes", test_parser_open_range_indexes, state);
 	TEST_RUN("parser.function_expression", test_parser_function_expression, state);
 	TEST_RUN("parser.get_mem_macro", test_parser_get_mem_macro, state);
-	TEST_RUN("parser.this_expression", test_parser_this_expression, state);
+	TEST_RUN("parser.this_identifier", test_parser_this_identifier, state);
 	TEST_RUN("parser.integer_literal_boundaries", test_parser_integer_literal_boundaries, state);
 	TEST_RUN("parser.source_slices", test_parser_source_slices, state);
 	TEST_RUN("parser.line_boundaries", test_parser_line_boundaries, state);

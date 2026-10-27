@@ -497,34 +497,6 @@ static void test_ir_loads_capture_per_reference(elf_State *state)
 	arena_destroy(&arena);
 }
 
-static void test_ir_loads_implicit_this(elf_State *state)
-{
-	Arena arena = arena_create(0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "get_this := fun() { ret this }");
-	IrFunction *function = ir_test_function_at(result.module, 1);
-	Ir ret = function ? ir_test_body_stat(function->body, 0, IR_RETURN, "this function lowers return") : 0;
-	Ir tuple = ret ? ret->ir_return.expr : 0;
-	Ir load = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
-	expect_ir_kind(load, IR_LOAD, "this lowers to a local load");
-	if (!function || !load || load->ir_load.local != function->params[IMPLICIT_PARAM_INDEX]) {
-		test_fail("this loads the function's implicit receiver parameter");
-	}
-	arena_destroy(&arena);
-}
-
-static void test_ir_rejects_this_assignment(elf_State *state)
-{
-	Arena arena = arena_create(0);
-	log_set_hook(ignore_expected_lowering_error, 0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "set_this := fun() { this = nil }");
-	log_set_hook(0, 0);
-	Com_Message *message = result.source ? result.source->report.first : 0;
-	if (!message || result.source->report.error_count != 1 || message->code != ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_LOWERING) {
-		test_fail("assigning this reports an invalid assignment");
-	}
-	arena_destroy(&arena);
-}
-
 static void test_ir_reports_cross_function_capture(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -688,8 +660,6 @@ static void run_ir_tests(elf_State *state)
 	TEST_RUN("ir.lowers_nil_assign_field_once", test_ir_lowers_nil_assign_field_once, state);
 	TEST_RUN("ir.reports_nil_assignment_arity", test_ir_reports_nil_assignment_arity, state);
 	TEST_RUN("ir.lowers_function_expression", test_ir_lowers_function_expression, state);
-	TEST_RUN("ir.loads_implicit_this", test_ir_loads_implicit_this, state);
-	TEST_RUN("ir.rejects_this_assignment", test_ir_rejects_this_assignment, state);
 	TEST_RUN("ir.loads_capture_per_reference", test_ir_loads_capture_per_reference, state);
 	TEST_RUN("ir.reports_cross_function_capture", test_ir_reports_cross_function_capture, state);
 	TEST_RUN("ir.rejects_unknown_parameter_type", test_ir_rejects_unknown_parameter_type, state);

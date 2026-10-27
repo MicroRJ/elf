@@ -1,6 +1,0 @@
-// Verifies that field calls pass their receiver as implicit this.
-receiver := {
-	id = 37,
-	check = fun(value) ret elf.nargs() * 100 + this.id + elf.arg(1)
-}
-test_assert(receiver.check(5) == 242)

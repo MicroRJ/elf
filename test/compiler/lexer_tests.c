@@ -179,7 +179,10 @@ static void test_lexer_keywords_and_identifiers(elf_State *state)
 	expect_token_type(lexer_next(&parser), TOK_EXPORT, "lex export keyword");
 	expect_token_type(lexer_next(&parser), TOK_IMPORT, "lex import keyword");
 	expect_token_type(lexer_next(&parser), TOK_RECURSE, "lex recurse keyword");
-	expect_token_type(lexer_next(&parser), TOK_THIS, "lex this keyword");
+
+	Token this_identifier = lexer_next(&parser);
+	expect_token_type(this_identifier, TOK_IDENTIFIER, "this is an ordinary identifier");
+	expect_token_atom(this_identifier, "this", "this identifier atom payload");
 
 	Token identifier = lexer_next(&parser);
 	expect_token_type(identifier, TOK_IDENTIFIER, "lex identifier near keyword");

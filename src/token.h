@@ -28,7 +28,6 @@
 	X(DEFER    ,"defer"       ) \
 	X(RET      ,"ret"         ) \
 	X(RECURSE  ,"recurse"     ) \
-	X(THIS     ,"this"        ) \
 	X(IF       ,"if"          ) \
 	X(ELSE     ,"else"        ) \
 	X(ELIF     ,"elif"        ) \

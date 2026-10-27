@@ -308,7 +308,6 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		case AST_NONE:
 		case AST_ERROR:
 		case AST_RECURSE:
-		case AST_THIS:
 		case AST_ELLIPSIS:
 		{
 		}
