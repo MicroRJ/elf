@@ -84,7 +84,7 @@ static b32 string_normalize_index(elf_State *state, i64 index, u32 size,
 	i64 upper = allow_end ? size : (i64)size - 1;
 	if (index < 0 || index > upper)
 	{
-		report_runtime_error(state, ERROR_OUT_OF_RANGE,
+		report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE,
 			"string index %lld is out of bounds for length %u", index, size);
 		return false;
 	}
@@ -117,21 +117,21 @@ ELF_FUNCTION(l_string_byte)
 {
 	if (nargs < 2)
 	{
-		elf_push_error(S, "string.byte requires an index");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT_COUNT, "string.byte requires an index");
 		return 1;
 	}
 
 	elf_StrSlice source = {0};
 	if (!elf_to_str(S, 0, &source))
 	{
-		elf_push_error(S, "string.byte requires a string receiver");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.byte requires a string receiver");
 		return 1;
 	}
 
 	elf_Int index = 0;
 	if (!elf_to_int(S, 1, &index))
 	{
-		elf_push_error(S, "string.byte index must be an integer");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.byte index must be an integer");
 		return 1;
 	}
 
@@ -142,7 +142,7 @@ ELF_FUNCTION(l_string_byte)
 
 	if (index < 0 || (elf_Size)index >= source.size)
 	{
-		elf_push_error(S, "string.byte index is out of bounds");
+		elf_push_error(S, ELF_ERROR_OUT_OF_RANGE, "string.byte index is out of bounds");
 		return 1;
 	}
 
@@ -154,14 +154,14 @@ ELF_FUNCTION(l_string_slice)
 {
 	if (nargs < 2)
 	{
-		elf_push_error(S, "string.slice requires a start index");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT_COUNT, "string.slice requires a start index");
 		return 1;
 	}
 
 	elf_StrSlice source = {0};
 	if (!elf_to_str(S, 0, &source))
 	{
-		elf_push_error(S, "string.slice requires a string receiver");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.slice requires a string receiver");
 		return 1;
 	}
 
@@ -171,7 +171,7 @@ ELF_FUNCTION(l_string_slice)
 		elf_Int index = 0;
 		if (!elf_to_int(S, argument, &index))
 		{
-			elf_push_error(S, "string.slice index must be an integer");
+			elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.slice index must be an integer");
 			return 1;
 		}
 
@@ -182,7 +182,7 @@ ELF_FUNCTION(l_string_slice)
 
 		if (index < 0 || (elf_Size)index > source.size)
 		{
-			elf_push_error(S, "string.slice index is out of bounds");
+			elf_push_error(S, ELF_ERROR_OUT_OF_RANGE, "string.slice index is out of bounds");
 			return 1;
 		}
 
@@ -193,7 +193,7 @@ ELF_FUNCTION(l_string_slice)
 	elf_Int end = bounds[1];
 	if (end < first)
 	{
-		elf_push_error(S, "string.slice end precedes start");
+		elf_push_error(S, ELF_ERROR_OUT_OF_RANGE, "string.slice end precedes start");
 		return 1;
 	}
 
@@ -216,7 +216,7 @@ ELF_FUNCTION(l_string_splice)
 	i64 requested = lib_load_integer(S, 2);
 	if (requested < 0 || (u64)requested > size - position)
 	{
-		report_runtime_error(S, ERROR_OUT_OF_RANGE, "string splice delete count %lld is out of bounds", requested);
+		report_runtime_error(S, ELF_ERROR_OUT_OF_RANGE, "string splice delete count %lld is out of bounds", requested);
 		return 0;
 	}
 	u32 delete_size = (u32)requested;
@@ -224,7 +224,7 @@ ELF_FUNCTION(l_string_splice)
 	u32 size_after_delete = size - delete_size;
 	if (replacement_size > ELF_STRING_MAX_SIZE - size_after_delete)
 	{
-		report_runtime_error(S, ERROR_OUT_OF_RANGE, "string size exceeds the supported range");
+		report_runtime_error(S, ELF_ERROR_OUT_OF_RANGE, "string size exceeds the supported range");
 		return 0;
 	}
 
@@ -281,28 +281,28 @@ ELF_FUNCTION(l_string_find)
 {
 	if (nargs < 2)
 	{
-		elf_push_error(S, "string.find requires a search string");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT_COUNT, "string.find requires a search string");
 		return 1;
 	}
 
 	elf_StrSlice source = {0};
 	if (!elf_to_str(S, 0, &source))
 	{
-		elf_push_error(S, "string.find requires a string receiver");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.find requires a string receiver");
 		return 1;
 	}
 
 	elf_StrSlice needle = {0};
 	if (!elf_to_str(S, 1, &needle))
 	{
-		elf_push_error(S, "string.find search argument must be a string");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.find search argument must be a string");
 		return 1;
 	}
 
 	elf_Int start = 0;
 	if (nargs > 2 && !elf_to_int(S, 2, &start))
 	{
-		elf_push_error(S, "string.find start index must be an integer");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.find start index must be an integer");
 		return 1;
 	}
 
@@ -313,7 +313,7 @@ ELF_FUNCTION(l_string_find)
 
 	if (start < 0 || (elf_Size)start > source.size)
 	{
-		elf_push_error(S, "string.find start index is out of bounds");
+		elf_push_error(S, ELF_ERROR_OUT_OF_RANGE, "string.find start index is out of bounds");
 		return 1;
 	}
 
@@ -353,27 +353,27 @@ ELF_FUNCTION(l_string_split)
 {
 	if (nargs < 2)
 	{
-		elf_push_error(S, "string.split requires a separator");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT_COUNT, "string.split requires a separator");
 		return 1;
 	}
 
 	elf_StrSlice source = {0};
 	if (!elf_to_str(S, 0, &source))
 	{
-		elf_push_error(S, "string.split requires a string receiver");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.split requires a string receiver");
 		return 1;
 	}
 
 	elf_StrSlice separator = {0};
 	if (!elf_to_str(S, 1, &separator))
 	{
-		elf_push_error(S, "string.split separator must be a string");
+		elf_push_error(S, ELF_ERROR_TYPE_MISMATCH, "string.split separator must be a string");
 		return 1;
 	}
 
 	if (separator.size == 0)
 	{
-		elf_push_error(S, "string.split separator cannot be empty");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT, "string.split separator cannot be empty");
 		return 1;
 	}
 
@@ -464,7 +464,7 @@ ELF_FUNCTION(l_string_replace)
 	u32 old_size = elf_string_size(old);
 	if (old_size == 0)
 	{
-		report_runtime_error(S, ERROR_INVALID_ARGUMENT,
+		report_runtime_error(S, ELF_ERROR_INVALID_ARGUMENT,
 			"string replacement target cannot be empty");
 		return 0;
 	}
@@ -494,7 +494,7 @@ ELF_FUNCTION(l_string_repeat)
 	u32 size = elf_string_size(string);
 	if (count < 0 || (u64)count * size > UINT_MAX)
 	{
-		report_runtime_error(S, ERROR_INVALID_ARGUMENT,
+		report_runtime_error(S, ELF_ERROR_INVALID_ARGUMENT,
 			"invalid string repeat count %lld", count);
 		return 0;
 	}

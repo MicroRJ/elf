@@ -23,7 +23,7 @@ void *elf_get_user_data(elf_State *state)
 
 void elf_error(elf_State *state, const char *message)
 {
-	report_runtime_error(state, ERROR_RUNTIME, "%s",
+	report_runtime_error(state, ELF_ERROR_RUNTIME, "%s",
 		message ? message : "host error");
 }
 
@@ -42,11 +42,11 @@ void elf_push_str(elf_State *state, const char *data, elf_Size size)
 	push_value(state, str_value(elf_string_from_data_size(state, data, size)));
 }
 
-void elf_push_error(elf_State *state, const char *message)
+void elf_push_error(elf_State *state, elf_ErrorCode code, const char *message)
 {
 	elf_String *error_message = elf_string_from_data(state, message ? message : "error");
 	push_value(state, str_value(error_message));
-	elf_GCError *error = elf_error_new(state, error_message, 0);
+	elf_GCError *error = elf_error_new(state, code, error_message, 0);
 	state->stack_top[-1] = value_from_error(error);
 }
 

@@ -244,7 +244,7 @@ static void test_gc_keeps_referenced_error_info(void)
 	elf_table_set(state, data, kind_key, kind_value);
 	elf_String *message = elf_string_from_data(state, "retained error");
 	push_value(state, str_value(message));
-	elf_GCError *created_error = elf_error_new(state, message, data);
+	elf_GCError *created_error = elf_error_new(state, ELF_ERROR_RUNTIME, message, data);
 	pop_value(state);
 	pop_value(state);
 	push_value(state, value_from_error(created_error));

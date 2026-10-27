@@ -18,6 +18,15 @@ ELF_FUNCTION(l_error_message)
 	return 1;
 }
 
+ELF_FUNCTION(l_error_code)
+{
+	if (!lib_check_arg_count(S, "error.code", nargs - 1, 0, 0)) {
+		return 1;
+	}
+	elf_push_cstr(S, elf_error_code_name(error_receiver(S)->code));
+	return 1;
+}
+
 ELF_FUNCTION(l_error_data)
 {
 	if (!lib_check_arg_count(S, "error.data", nargs - 1, 0, 0)) {
@@ -29,6 +38,7 @@ ELF_FUNCTION(l_error_data)
 }
 
 static const elf_Binding l_error[] = {
+	{"code",    l_error_code},
 	{"message", l_error_message},
 	{"data",    l_error_data},
 };

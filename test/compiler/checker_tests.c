@@ -248,7 +248,7 @@ static void test_checker_does_not_leak_block_locals(void)
 	Ast return_expr = return_stat ? checker_test_single_expression(return_stat->return_stat.expr, AST_IDENT, "checker finds use after block") : 0;
 	Entity *outside = return_expr ? return_expr->entity : 0;
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	if (!local || local->kind != ENTITY_LOCAL || outside || test.status != COM_STATUS_REPORTED || !message || message->code != ERROR_UNDECLARED_IDENTIFIER) {
+	if (!local || local->kind != ENTITY_LOCAL || outside || test.status != COM_STATUS_REPORTED || !message || message->code != ELF_ERROR_UNDECLARED_IDENTIFIER) {
 		test_fail("checker reports block locals used outside their scope");
 	}
 	checker_test_destroy(&test);
@@ -305,7 +305,7 @@ static void test_checker_binds_call_arguments_to_parameter_slots(void)
 	checker_test_destroy(&test);
 }
 
-static void checker_expect_call_error(const char *name, const char *source, ErrorCode code, const char *label)
+static void checker_expect_call_error(const char *name, const char *source, elf_ErrorCode code, const char *label)
 {
 	CheckerTest test;
 	checker_test_init(&test, name, source);
@@ -318,11 +318,11 @@ static void checker_expect_call_error(const char *name, const char *source, Erro
 
 static void test_checker_reports_invalid_named_arguments(void)
 {
-	checker_expect_call_error("checker_dynamic_named_argument", "target := fun(first) {}\ntarget(first = 1)", ERROR_NAMED_ARGUMENT_TARGET, "checker rejects named args for dynamic calls");
-	checker_expect_call_error("checker_unknown_named_argument", "target :: fun(first) {}\ntarget(missing = 1)", ERROR_UNKNOWN_NAMED_ARGUMENT, "checker reports unknown named args");
-	checker_expect_call_error("checker_duplicate_argument", "target :: fun(first, second) {}\ntarget(1, first = 2)", ERROR_DUPLICATE_ARGUMENT, "checker reports duplicate argument bindings");
-	checker_expect_call_error("checker_named_argument_order", "target :: fun(first, second, third) {}\ntarget(third = 3, second = 2)", ERROR_ARGUMENT_ORDER, "checker enforces named argument parameter order");
-	checker_expect_call_error("checker_positional_argument_order", "target :: fun(first, second) {}\ntarget(first = 1, 2)", ERROR_ARGUMENT_ORDER, "checker rejects positional args after named args");
+	checker_expect_call_error("checker_dynamic_named_argument", "target := fun(first) {}\ntarget(first = 1)", ELF_ERROR_NAMED_ARGUMENT_TARGET, "checker rejects named args for dynamic calls");
+	checker_expect_call_error("checker_unknown_named_argument", "target :: fun(first) {}\ntarget(missing = 1)", ELF_ERROR_UNKNOWN_NAMED_ARGUMENT, "checker reports unknown named args");
+	checker_expect_call_error("checker_duplicate_argument", "target :: fun(first, second) {}\ntarget(1, first = 2)", ELF_ERROR_DUPLICATE_ARGUMENT, "checker reports duplicate argument bindings");
+	checker_expect_call_error("checker_named_argument_order", "target :: fun(first, second, third) {}\ntarget(third = 3, second = 2)", ELF_ERROR_ARGUMENT_ORDER, "checker enforces named argument parameter order");
+	checker_expect_call_error("checker_positional_argument_order", "target :: fun(first, second) {}\ntarget(first = 1, 2)", ELF_ERROR_ARGUMENT_ORDER, "checker rejects positional args after named args");
 }
 
 static void test_checker_reports_duplicate_local(void)
@@ -330,7 +330,7 @@ static void test_checker_reports_duplicate_local(void)
 	CheckerTest test;
 	checker_test_init(&test, "checker_duplicate", "value := 1\nvalue := 2");
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	if (!test.source || test.source->report.error_count != 1 || !message || message->code != ERROR_DUPLICATE_DECLARATION || message->phase != ERROR_PHASE_CHECKER) {
+	if (!test.source || test.source->report.error_count != 1 || !message || message->code != ELF_ERROR_DUPLICATE_DECLARATION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports duplicate local declaration");
 	}
 	checker_test_destroy(&test);
@@ -341,7 +341,7 @@ static void test_checker_reports_duplicate_static(void)
 	CheckerTest test;
 	checker_test_init(&test, "checker_duplicate_static", "value :: 1\nvalue :: 2");
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_DUPLICATE_STATIC_DECLARATION || message->phase != ERROR_PHASE_CHECKER) {
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_DUPLICATE_STATIC_DECLARATION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports duplicate static declaration");
 	}
 	checker_test_destroy(&test);
@@ -353,7 +353,7 @@ static void checker_expect_global_assignment_error(const char *name, const char 
 	CheckerTest test;
 	checker_test_init_with_target(&test, state, name, source);
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_CHECKER) {
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail(label);
 	}
 	checker_test_destroy(&test);
@@ -458,7 +458,7 @@ static void test_checker_reports_static_cycle(void)
 	Com_Message *message = test.source ? test.source->report.first : 0;
 	Ast first_decl = checker_test_stat(&test, 0, AST_STATIC_DECL, "checker parses cyclic static");
 	Ast second_decl = checker_test_stat(&test, 1, AST_STATIC_DECL, "checker parses cyclic static dependency");
-	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_CYCLIC_STATIC_DEFINITION || message->phase != ERROR_PHASE_CHECKER) {
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_CYCLIC_STATIC_DEFINITION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports cyclic static definition");
 	}
 	if (!first_decl || !second_decl || first_decl->entity->en_static.value.type != COM_VALUE_ERROR || first_decl->entity->en_static.value.status != COM_STATUS_REPORTED || second_decl->entity->en_static.value.type != COM_VALUE_ERROR || second_decl->entity->en_static.value.status != COM_STATUS_REPORTED) {
@@ -473,7 +473,7 @@ static void test_checker_reports_invalid_static_expression(void)
 	checker_test_init(&test, "checker_invalid_static", "runtime_value := 1\nanswer :: runtime_value\nret answer");
 	Com_Message *message = test.source ? test.source->report.first : 0;
 	Ast declaration = checker_test_stat(&test, 1, AST_STATIC_DECL, "checker parses invalid static");
-	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports expression without static value");
 	}
 	if (!declaration || !declaration->entity || declaration->entity->en_static.value.type != COM_VALUE_ERROR || declaration->entity->en_static.value.status != COM_STATUS_REPORTED) {
@@ -487,7 +487,7 @@ static void test_checker_reports_unresolved_import(void)
 	CheckerTest test;
 	checker_test_init(&test, "checker_unresolved_import", "module :: import \"missing\"\nret module.answer");
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ERROR_IMPORT || message->phase != ERROR_PHASE_CHECKER) {
+	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_IMPORT || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports import without resolved source");
 	}
 	checker_test_destroy(&test);
@@ -498,7 +498,7 @@ static void test_checker_reports_missing_imported_static(void)
 	CheckerImportTest test;
 	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.missing", "export answer :: 42");
 	Com_Message *message = test.root ? test.root->report.first : 0;
-	if (!message || test.root->report.error_count != 1 || message->code != ERROR_STATIC_LOOKUP || message->phase != ERROR_PHASE_CHECKER) {
+	if (!message || test.root->report.error_count != 1 || message->code != ELF_ERROR_STATIC_LOOKUP || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports missing imported static");
 	}
 	checker_import_test_destroy(&test);
@@ -509,7 +509,7 @@ static void test_checker_reports_private_imported_static(void)
 	CheckerImportTest test;
 	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.answer", "answer :: 42");
 	Com_Message *message = test.root ? test.root->report.first : 0;
-	if (!message || test.root->report.error_count != 1 || message->code != ERROR_STATIC_LOOKUP || message->phase != ERROR_PHASE_CHECKER) {
+	if (!message || test.root->report.error_count != 1 || message->code != ELF_ERROR_STATIC_LOOKUP || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports private imported static");
 	}
 	checker_import_test_destroy(&test);
@@ -520,7 +520,7 @@ static void test_checker_routes_imported_static_error_to_source(void)
 	CheckerImportTest test;
 	checker_import_test_init(&test, "module :: import \"checker_import_module\"\nret module.answer", "export answer :: runtime_value");
 	Com_Message *message = test.module ? test.module->report.first : 0;
-	if (!message || test.module->report.error_count != 1 || message->code != ERROR_UNDECLARED_IDENTIFIER || test.root->report.error_count != 0) {
+	if (!message || test.module->report.error_count != 1 || message->code != ELF_ERROR_UNDECLARED_IDENTIFIER || test.root->report.error_count != 0) {
 		test_fail("checker routes imported static error to defining source");
 	}
 	checker_import_test_destroy(&test);

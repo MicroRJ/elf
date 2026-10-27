@@ -100,6 +100,8 @@ static void string_remove_dead(elf_State *state)
 	state->string_count = counter;
 }
 
+
+// Todo, rename this to elf_string_new(state, elf_StrSlice)
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size)
 {
 	ASSERT(state);
@@ -112,6 +114,7 @@ elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 si
 
 	u32 allocation_size = ELF_STRING_HEADER_SIZE + size + 1;
 	elf_String *string = elf_gc_alloc(state, ELF_OBJECT_STRING, allocation_size);
+	string->obj.status = ELF_OBJECT_READONLY;
 	string->hash = hash;
 	copy_memory(string->data, data, size);
 	string->data[size] = 0;

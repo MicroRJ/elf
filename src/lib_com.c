@@ -191,9 +191,9 @@ static b32 lib_push_jsonl(elf_State *state, dy_String name, dy_String source)
 	return lib_push_json_source(state, name, source, true);
 }
 
-static void json_push_error_value(elf_State *state, const char *message)
+static void json_push_error_value(elf_State *state, elf_ErrorCode code, const char *message)
 {
-	elf_push_error(state, message ? message : "JSON error");
+	elf_push_error(state, code, message ? message : "JSON error");
 }
 
 static b32 json_writer_reserve(JsonWriter *writer, u64 additional)
@@ -408,7 +408,7 @@ ELF_FUNCTION(l_json_parse)
 	}
 	dy_String source = lib_load_string_view(S, 0);
 	if (!lib_push_json(S, DY_LIT("json.parse"), source)) {
-		json_push_error_value(S, "invalid JSON");
+		json_push_error_value(S, ELF_ERROR_PARSE_FAILED, "invalid JSON");
 	}
 	return 1;
 }
@@ -422,7 +422,7 @@ ELF_FUNCTION(l_json_stringify)
 	json_write_value(&writer, load_value(S, 0), 0);
 	if (writer.error)
 	{
-		json_push_error_value(S, writer.error);
+		json_push_error_value(S, ELF_ERROR_RUNTIME, writer.error);
 	}
 	else
 	{

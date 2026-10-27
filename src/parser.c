@@ -676,7 +676,7 @@ static Ast_Kind precedence_from_binary_ast_expr_type(Ast_Kind type)
 	}
 }
 
-static Com_Status parser_report(Parser *parser, ErrorSeverity severity, ErrorCode error, SourceSite site, const char *message)
+static Com_Status parser_report(Parser *parser, ErrorSeverity severity, elf_ErrorCode error, SourceSite site, const char *message)
 {
 	if (!source_slice_is_valid(site)) {
 		site = this_token(parser).site;
@@ -686,12 +686,12 @@ static Com_Status parser_report(Parser *parser, ErrorSeverity severity, ErrorCod
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
-static Ast parser_error(Parser *parser, ErrorCode error, SourceSite site, const char *message)
+static Ast parser_error(Parser *parser, elf_ErrorCode error, SourceSite site, const char *message)
 {
 	return ast_from_status(parser_report(parser, ERROR_ERROR, error, site, message));
 }
 
-static Ast parser_errorf(Parser *parser, ErrorCode error, SourceSite site, const char *format, ...)
+static Ast parser_errorf(Parser *parser, elf_ErrorCode error, SourceSite site, const char *format, ...)
 {
 	if (!source_slice_is_valid(site)) {
 		site = this_token(parser).site;
@@ -705,20 +705,20 @@ static Ast parser_errorf(Parser *parser, ErrorCode error, SourceSite site, const
 
 static Ast parser_unexpected_token(Parser *parser, Token token)
 {
-	return parser_errorf(parser, ERROR_UNEXPECTED_TOKEN, token.site
+	return parser_errorf(parser, ELF_ERROR_UNEXPECTED_TOKEN, token.site
 	,	"unexpected token '%s'", token_type_name(token.type));
 }
 
 static Token parser_expected_token(Parser *parser, Token token, Token_Type expected)
 {
-	Ast error = parser_errorf(parser, ERROR_EXPECTED_TOKEN, token.site
+	Ast error = parser_errorf(parser, ELF_ERROR_EXPECTED_TOKEN, token.site
 	,	"expected '%s', got '%s'", token_type_name(expected), token_type_name(token.type));
 	return token_from_status(error->status, token.site);
 }
 
 static Ast parser_invalid_table_entry(Parser *parser, SourceSite site)
 {
-	return parser_error(parser, ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
+	return parser_error(parser, ELF_ERROR_INVALID_FIELD_INITIALIZER, site, "invalid table entry");
 }
 
 static b32 parser_init(Parser *parser)
@@ -861,7 +861,7 @@ static Ast parse_source(Parser *parser)
 		}
 		if (before.site.offset == this_token(parser).site.offset && before.type == this_token(parser).type)
 		{
-			return parser_error(parser, ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading statement");
+			return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading statement");
 		}
 
 		if (!push_ast(parser, stat)) {
@@ -919,7 +919,7 @@ static Ast parse_function(Parser *par, Token marker)
 			{
 				variadic = true;
 				if (pick_token(par, TOK_COMMA)) {
-					error = parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "variadic marker must be the final parameter");
+					error = parser_error(par, ELF_ERROR_INVALID_EXPRESSION, tok.site, "variadic marker must be the final parameter");
 				}
 			}
 			else
@@ -976,7 +976,7 @@ static Ast parse_function(Parser *par, Token marker)
 
 	if (!body) {
 		par->current_function = parent_function;
-		return parser_error(par, ERROR_MISSING_FUNCTION_BODY, this_token(par).site, "expected function body");
+		return parser_error(par, ELF_ERROR_MISSING_FUNCTION_BODY, this_token(par).site, "expected function body");
 	}
 
 	function->function.params = params;
@@ -1117,7 +1117,7 @@ static Ast parse_positive_integer_literal(Parser *parser, Token token)
 {
 	if (token.integer_magnitude > I64_MAX_MAGNITUDE)
 	{
-		return parser_errorf(parser, ERROR_INVALID_EXPRESSION, token.site
+		return parser_errorf(parser, ELF_ERROR_INVALID_EXPRESSION, token.site
 		,	"integer literal out of range for i64: %llu"
 		,	token.integer_magnitude);
 	}
@@ -1129,7 +1129,7 @@ static Ast parse_negative_integer_literal(Parser *parser, Token sign, Token toke
 {
 	if (token.integer_magnitude > I64_MIN_MAGNITUDE)
 	{
-		return parser_errorf(parser, ERROR_INVALID_EXPRESSION, token.site
+		return parser_errorf(parser, ELF_ERROR_INVALID_EXPRESSION, token.site
 		,	"integer literal out of range for i64: -%llu"
 		,	token.integer_magnitude);
 	}
@@ -1164,7 +1164,7 @@ static Ast json_expect_separator_or_end(Parser *parser, Token_Type end, const ch
 		if (token_is_error(this_token(parser))) {
 			return ast_from_token_error(this_token(parser));
 		}
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, this_token(parser).site, message);
+		return parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, this_token(parser).site, message);
 	}
 	return NULL_AST;
 }
@@ -1225,7 +1225,7 @@ static Ast parse_json_ast_object(Parser *parser)
 	}
 	if (!done)
 	{
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, this_token(parser).site, "expected '}'");
+		return parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, this_token(parser).site, "expected '}'");
 	}
 
 	Ast_Array args = pop_ast_array(parser, nargs);
@@ -1273,7 +1273,7 @@ static Ast parse_json_ast_array(Parser *parser)
 	}
 	if (!done)
 	{
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, this_token(parser).site, "expected ']'");
+		return parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, this_token(parser).site, "expected ']'");
 	}
 
 	Ast_Array args = pop_ast_array(parser, nargs);
@@ -1319,7 +1319,7 @@ static Ast parse_json_ast_number(Parser *parser)
 
 		default:
 		{
-			return parser_error(parser, ERROR_EXPECTED_TOKEN, token.site, "expected number");
+			return parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, token.site, "expected number");
 		}
 	}
 }
@@ -1378,7 +1378,7 @@ static Ast parse_json_ast_value(Parser *parser)
 				return ast_new_nil_literal(parser, token.site);
 			}
 
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, token.site, "expected JSON value");
+			return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, token.site, "expected JSON value");
 		}
 	}
 }
@@ -1410,11 +1410,11 @@ static Ast parse_jsonl_ast(Parser *parser)
 		}
 		if (parser_previous_token(parser).site.line_index != line_index)
 		{
-			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
+			return parser_error(parser, ELF_ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
 		}
 		if (!peek_token(parser, TOK_NONE) && this_token(parser).site.line_index == line_index)
 		{
-			return parser_error(parser, ERROR_UNEXPECTED_TOKEN, this_token(parser).site, "expected a line break after JSON value");
+			return parser_error(parser, ELF_ERROR_UNEXPECTED_TOKEN, this_token(parser).site, "expected a line break after JSON value");
 		}
 		if (!push_ast(parser, value))
 		{
@@ -1451,7 +1451,7 @@ static Ast parse_interpolated_string(Parser *parser)
 		if (!part)
 		{
 			parser->ast_stack_index = stack_start;
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected expression inside interpolated string");
+			return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected expression inside interpolated string");
 		}
 		if (!push_ast(parser, part))
 		{
@@ -1552,7 +1552,7 @@ static Ast parse_unary_expr(Parser *parser)
 			}
 			else
 			{
-				value = parser_error(parser, ERROR_EXPECTED_TOKEN, path.site, "expected a plain string after 'import'");
+				value = parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, path.site, "expected a plain string after 'import'");
 			}
 		}
 		break;
@@ -1625,7 +1625,7 @@ static Ast parse_unary_expr(Parser *parser)
 			consume_token(parser);
 			if (peek_token(parser, TOK_PAREN_RIGHT))
 			{
-				value = parser_error(parser, ERROR_INVALID_EXPRESSION, tok.site, "expected expression inside parentheses");
+				value = parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, tok.site, "expected expression inside parentheses");
 			}
 			else
 			{
@@ -1757,7 +1757,7 @@ static Ast parse_table_expr(Parser *parser)
 		if (!pick_token(parser, TOK_COMMA))
 		{
 			if (!peek_token(parser, TOK_RIGHT_BRACE)) {
-				return parser_error(parser, ERROR_EXPECTED_TOKEN, this_token(parser).site, "expected ',' or '}'");
+				return parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, this_token(parser).site, "expected ',' or '}'");
 			}
 			break;
 		}
@@ -1794,7 +1794,7 @@ static Ast parse_array_expr(Parser *parser)
 		}
 		if (!item)
 		{
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected array item");
+			return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected array item");
 		}
 		if (!push_ast(parser, item))
 		{
@@ -1837,12 +1837,12 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 			if (peek_token(par, TOK_PAREN_RIGHT))
 			{
 				par->ast_stack_index = stack_start;
-				return parser_error(par, ERROR_EXCESS_COMMA, parser_previous_token(par).site, "excess comma");
+				return parser_error(par, ELF_ERROR_EXCESS_COMMA, parser_previous_token(par).site, "excess comma");
 			}
 			if (peek_token(par, TOK_COMMA))
 			{
 				par->ast_stack_index = stack_start;
-				return parser_error(par, ERROR_EXCESS_COMMA, this_token(par).site, "excess comma");
+				return parser_error(par, ELF_ERROR_EXCESS_COMMA, this_token(par).site, "excess comma");
 			}
 
 			Ast x = parse_call_argument(par);
@@ -1852,7 +1852,7 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 			}
 			if (!x) {
 				par->ast_stack_index = stack_start;
-				return parser_error(par, ERROR_INVALID_EXPRESSION, this_token(par).site, "expected call argument");
+				return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, this_token(par).site, "expected call argument");
 			}
 
 			if (!push_ast(par, x)) {
@@ -1896,7 +1896,7 @@ static Ast parse_call_argument(Parser *parser)
 			return expr;
 		}
 		if (!expr) {
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, assign.site, "expected named argument expression");
+			return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, assign.site, "expected named argument expression");
 		}
 		return create_named_argument_ast(parser, name_token.site, name, expr);
 	}
@@ -1947,7 +1947,7 @@ static Ast parse_field_postfix(Parser *par, Ast left)
 	}
 	else if (pick_token(par, TOK_LEFT_BRACE))
 	{
-		return parser_error(par, ERROR_INVALID_EXPRESSION, tok.site, "field table projection is not implemented");
+		return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, tok.site, "field table projection is not implemented");
 	}
 	else
 	{
@@ -1978,7 +1978,7 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 			return index;
 		}
 		if (!index) {
-			return parser_error(par, ERROR_INVALID_EXPRESSION, this_token(par).site, "expected index expression");
+			return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, this_token(par).site, "expected index expression");
 		}
 		if (index->kind == AST_ELLIPSIS)
 		{
@@ -1990,7 +1990,7 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 					return right;
 				}
 				if (!right) {
-					return parser_error(par, ERROR_INVALID_EXPRESSION, this_token(par).site, "expected range expression");
+					return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, this_token(par).site, "expected range expression");
 				}
 			}
 			index = ast_new_binary_expr(par, index->site, AST_RANGE, 0, right);
@@ -2001,7 +2001,7 @@ static Ast parse_index_postfix(Parser *par, Ast value)
 
 		if (index->kind == AST_TUPLE)
 		{
-			return parser_error(par, ERROR_INVALID_EXPRESSION, index->site, "tuple indexes are not implemented");
+			return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, index->site, "tuple indexes are not implemented");
 		}
 		else if (index->kind == AST_RANGE)
 		{
@@ -2116,7 +2116,7 @@ static Ast parse_subexpr(Parser *parser, u32 upper_precedence)
 		}
 		if (!y && ast_type != AST_RANGE)
 		{
-			x = parser_error(parser, ERROR_INVALID_EXPRESSION, tok.site, "expected expression after binary operator");
+			x = parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, tok.site, "expected expression after binary operator");
 			break;
 		}
 
@@ -2156,7 +2156,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 			return y;
 		}
 		if (!y) {
-			return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected expression after assignment operator");
+			return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected expression after assignment operator");
 		}
 		return ast_new_binary_expr(parser, tok.site, compound_assign_type, x, y);
 	}
@@ -2169,7 +2169,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 
 			if (x->tuple.count != 1 || x->tuple.items[0]->kind != AST_IDENT)
 			{
-				return parser_error(parser, ERROR_INVALID_STATEMENT, x->site, "static declaration name must be an identifier");
+				return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, x->site, "static declaration name must be an identifier");
 			}
 
 			Ast y = parse_expr(parser);
@@ -2177,7 +2177,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected static declaration expression");
+				return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected static declaration expression");
 			}
 			x = ast_new_static_decl(parser, tok.site, x->tuple.items[0], y, exported);
 		}
@@ -2192,7 +2192,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected declaration expression");
+				return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected declaration expression");
 			}
 			b32 constant = tok.type == TOK_HARD_BIND;
 			x = create_decl_ast(parser, tok.site, constant, x, y);
@@ -2207,7 +2207,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected assignment expression");
+				return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected assignment expression");
 			}
 			x = create_assign_ast(parser, tok.site, x, y);
 		}
@@ -2221,7 +2221,7 @@ static Ast parse_expr_stat(Parser *parser, b32 exported)
 				return y;
 			}
 			if (!y) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected nil assignment expression");
+				return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected nil assignment expression");
 			}
 			x = ast_new_binary_expr(parser, tok.site, AST_NIL_ASSIGN, x, y);
 		}
@@ -2264,7 +2264,7 @@ static Ast parse_stat(Parser *parser)
 				return tree;
 			}
 			if (!tree) {
-				return parser_error(parser, ERROR_INVALID_STATEMENT, this_token(parser).site, "expected deferred statement");
+				return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, this_token(parser).site, "expected deferred statement");
 			}
 			tree = create_defer_ast(parser, tok.site, tree);
 		}
@@ -2278,7 +2278,7 @@ static Ast parse_stat(Parser *parser)
 				return tree;
 			}
 			if (!tree || tree->kind != AST_STATIC_DECL) {
-				return parser_error(parser, ERROR_INVALID_STATEMENT, tok.site, "'export' must be followed by a static declaration");
+				return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, tok.site, "'export' must be followed by a static declaration");
 			}
 		}
 		break;
@@ -2346,7 +2346,7 @@ static Ast parse_stat(Parser *parser)
 				}
 				if (before.site.offset == this_token(parser).site.offset && before.type == this_token(parser).type)
 				{
-					return parser_error(parser, ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading block statement");
+					return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, before.site, "parser made no progress while reading block statement");
 				}
 
 				if (!push_ast(parser, stat)) {
@@ -2376,7 +2376,7 @@ static Ast parse_stat(Parser *parser)
 				return pred;
 			}
 			if (!pred) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected while predicate");
+				return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected while predicate");
 			}
 
 			Token question = take_token(parser, TOK_QMARK);
@@ -2389,7 +2389,7 @@ static Ast parse_stat(Parser *parser)
 				return body;
 			}
 			if (!body) {
-				return parser_error(parser, ERROR_INVALID_STATEMENT, this_token(parser).site, "expected while body");
+				return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, this_token(parser).site, "expected while body");
 			}
 
 			tree = create_while_ast(parser, tok.site, pred, body);
@@ -2405,7 +2405,7 @@ static Ast parse_stat(Parser *parser)
 				return name;
 			}
 			if (!name) {
-				return parser_error(parser, ERROR_INVALID_DECLARATION, this_token(parser).site, "expected for-loop declaration");
+				return parser_error(parser, ELF_ERROR_INVALID_DECLARATION, this_token(parser).site, "expected for-loop declaration");
 			}
 			b32 constant = false;
 			if (!pick_token(parser, TOK_BIND))
@@ -2422,7 +2422,7 @@ static Ast parse_stat(Parser *parser)
 				return init_expr;
 			}
 			if (!init_expr) {
-				return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected for-loop initializer");
+				return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected for-loop initializer");
 			}
 			Ast init = create_decl_ast(parser, tok.site, constant, name, init_expr);
 			if (ast_is_error(init)) {
@@ -2433,13 +2433,13 @@ static Ast parse_stat(Parser *parser)
 			{
 				if (init_expr->tuple.count != 1)
 				{
-					return parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site, "range for loops require exactly one expression on the right-hand side");
+					return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, init_expr->site, "range for loops require exactly one expression on the right-hand side");
 				}
 
 				Ast range = init_expr->tuple.items[0];
 				if (!range || (range->kind != AST_RANGE && range->kind != AST_RANGE_INDEX))
 				{
-					return parser_error(parser, ERROR_INVALID_EXPRESSION, init_expr->site, "range for loops require a range or ranged index expression");
+					return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, init_expr->site, "range for loops require a range or ranged index expression");
 				}
 
 				Ast body = parse_stat(parser);
@@ -2447,7 +2447,7 @@ static Ast parse_stat(Parser *parser)
 					return body;
 				}
 				if (!body) {
-					return parser_error(parser, ERROR_INVALID_STATEMENT, this_token(parser).site, "expected for-loop body");
+					return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, this_token(parser).site, "expected for-loop body");
 				}
 
 				tree = create_for_range_ast(parser, tok.site, init, body);
@@ -2464,7 +2464,7 @@ static Ast parse_stat(Parser *parser)
 					return pred;
 				}
 				if (!pred) {
-					return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected for-loop predicate");
+					return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected for-loop predicate");
 				}
 				Token second_separator = take_token(parser, TOK_SEMICOLON);
 				if (token_is_error(second_separator)) {
@@ -2476,7 +2476,7 @@ static Ast parse_stat(Parser *parser)
 					return step;
 				}
 				if (!step) {
-					return parser_error(parser, ERROR_INVALID_STATEMENT, this_token(parser).site, "expected for-loop step");
+					return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, this_token(parser).site, "expected for-loop step");
 				}
 				Token question = take_token(parser, TOK_QMARK);
 				if (token_is_error(question)) {
@@ -2488,7 +2488,7 @@ static Ast parse_stat(Parser *parser)
 					return body;
 				}
 				if (!body) {
-					return parser_error(parser, ERROR_INVALID_STATEMENT, this_token(parser).site, "expected for-loop body");
+					return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, this_token(parser).site, "expected for-loop body");
 				}
 
 				tree = create_for_ast(parser, tok.site, init, pred, step, body);
@@ -2523,10 +2523,10 @@ static Ast parse_if_stat(Parser *parser)
 		return pred;
 	}
 	if (!pred) {
-		return parser_error(parser, ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected if predicate");
+		return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, this_token(parser).site, "expected if predicate");
 	}
 	if (!pick_token(parser, TOK_QMARK)) {
-		return parser_error(parser, ERROR_EXPECTED_TOKEN, pred->site, "expected '?' for 'if' statement");
+		return parser_error(parser, ELF_ERROR_EXPECTED_TOKEN, pred->site, "expected '?' for 'if' statement");
 	}
 
 	Ast true_clause = parse_stat(parser);
@@ -2534,7 +2534,7 @@ static Ast parse_if_stat(Parser *parser)
 		return true_clause;
 	}
 	if (!true_clause) {
-		return parser_error(parser, ERROR_INVALID_STATEMENT, this_token(parser).site, "expected if body");
+		return parser_error(parser, ELF_ERROR_INVALID_STATEMENT, this_token(parser).site, "expected if body");
 	}
 
 	Ast else_clause = 0;

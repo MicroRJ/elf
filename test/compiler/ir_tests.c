@@ -410,7 +410,7 @@ static void test_ir_reports_nil_assignment_arity(elf_State *state)
 	Arena arena = arena_create(0);
 	IrTestResult result = ir_test_lower_source(state, &arena, "x, y := nil, nil\nx, y ?= 1");
 	Com_Message *message = result.source ? result.source->report.first : 0;
-	if (!message || result.source->report.error_count != 1 || message->code != ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_LOWERING) {
+	if (!message || result.source->report.error_count != 1 || message->code != ELF_ERROR_INVALID_ASSIGNMENT || message->phase != ERROR_PHASE_LOWERING) {
 		test_fail("nil assignment arity reports a lowering error");
 	}
 	arena_destroy(&arena);
@@ -505,7 +505,7 @@ static void test_ir_reports_cross_function_capture(elf_State *state)
 	IrTestResult result = ir_test_lower_source(state, &arena, "main :: fun(a, b = a) {}\nmain(1)");
 	log_set_hook(0, 0);
 	Com_Message *message = result.source ? result.source->report.first : 0;
-	if (!message || result.source->report.error_count != 1 || message->code != ERROR_LOWERING || message->phase != ERROR_PHASE_LOWERING) {
+	if (!message || result.source->report.error_count != 1 || message->code != ELF_ERROR_LOWERING || message->phase != ERROR_PHASE_LOWERING) {
 		test_fail("cross-function capture reports a lowering error");
 	}
 	if (!result.module || !result.module->first_function || result.module->first_function->capture_count != 0) {
@@ -521,7 +521,7 @@ static void test_ir_rejects_unknown_parameter_type(elf_State *state)
 	IrTestResult result = ir_test_lower_source(state, &arena, "probe := fun(value: mystery) { ret value }\nret probe");
 	log_set_hook(0, 0);
 	Com_Message *message = result.source ? result.source->report.first : 0;
-	if (result.module || !message || result.source->report.error_count != 1 || message->code != ERROR_UNDECLARED_IDENTIFIER || message->phase != ERROR_PHASE_CHECKER) {
+	if (result.module || !message || result.source->report.error_count != 1 || message->code != ELF_ERROR_UNDECLARED_IDENTIFIER || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("unknown function parameter type reports one checker error");
 	}
 	arena_destroy(&arena);

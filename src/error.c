@@ -7,9 +7,9 @@
 
 static const char *error_code_names[] =
 {
-#define ERROR_CODE_NAME(code, name) [code] = name,
-	ERROR_CODE_X_LIST(ERROR_CODE_NAME)
-#undef ERROR_CODE_NAME
+#define ELF_ERROR_CODE(name, text) [ELF_ERROR_##name] = text,
+#include "elf_error.def"
+#undef ELF_ERROR_CODE
 };
 
 static elf_SourceMapEntry *find_source_for_instr(elf_Prototype *function, u32 instr)
@@ -27,13 +27,13 @@ static elf_SourceMapEntry *find_source_for_instr(elf_Prototype *function, u32 in
 	return result;
 }
 
-static const char *error_code_name(ErrorCode code)
+const char *elf_error_code_name(elf_ErrorCode code)
 {
-	if ((u32)code < ERROR_CODE_COUNT && error_code_names[code])
+	if ((u32)code < ELF_ERROR_COUNT && error_code_names[code])
 	{
 		return error_code_names[code];
 	}
-	return "runtime";
+	return "unknown";
 }
 
 static StackFrame *runtime_current_bytecode_frame(elf_State *state)
@@ -122,9 +122,9 @@ static void abort_after_runtime_error(void)
 	dy_exit_process(1);
 }
 
-static void report_runtime_error_message(elf_State *state, ErrorCode code, const char *message)
+static void report_runtime_error_message(elf_State *state, elf_ErrorCode code, const char *message)
 {
-	log_format(LOG_LEVEL_ERROR, "runtime error[%s]", error_code_name(code));
+	log_format(LOG_LEVEL_ERROR, "runtime error[%s]", elf_error_code_name(code));
 	log_linef(LOG_LEVEL_INFO, ": %s", message);
 	print_runtime_context(state);
 	abort_after_runtime_error();
@@ -135,7 +135,7 @@ void print_current_runtime_source_location(elf_State *state)
 	print_runtime_context(state);
 }
 
-void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...)
+void report_runtime_error(elf_State *state, elf_ErrorCode code, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);

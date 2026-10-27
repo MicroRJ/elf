@@ -52,18 +52,14 @@ elf_StrSlice;
 
 typedef enum
 {
-	ELF_ERROR_NONE = 0,
-	ELF_ERROR_INVALID_ARGUMENT,
-	ELF_ERROR_INVALID_INDEX,
-	ELF_ERROR_INVALID_REFERENCE,
-	ELF_ERROR_TYPE_MISMATCH,
-	ELF_ERROR_STACK_UNDERFLOW,
-	ELF_ERROR_OUT_OF_RANGE,
-	ELF_ERROR_READONLY,
-	ELF_ERROR_COMPILATION_FAILED,
-	ELF_ERROR_OUT_OF_MEMORY,
+#define ELF_ERROR_CODE(name, text) ELF_ERROR_##name,
+#include "elf_error.def"
+#undef ELF_ERROR_CODE
+	ELF_ERROR_COUNT,
 }
 elf_ErrorCode;
+
+const char *elf_error_code_name(elf_ErrorCode code);
 
 #define ELF_FUNCTION(NAME) elf_u32 (NAME)(elf_State *S, elf_u32 nargs)
 typedef ELF_FUNCTION(*elf_Function);
@@ -101,7 +97,7 @@ void elf_push_num(elf_State *state, elf_Num value);
 void elf_push_fun(elf_State *state, elf_Function function);
 void elf_push_cstr(elf_State *state, const char *data);
 void elf_push_str(elf_State *state, const char *data, elf_Size size);
-void elf_push_error(elf_State *state, const char *message);
+void elf_push_error(elf_State *state, elf_ErrorCode code, const char *message);
 elf_ErrorCode elf_push_user_object(elf_State *state, const elf_UserType *type,
 	elf_Index metatable, elf_Size size, void **data);
 

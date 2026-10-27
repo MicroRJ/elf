@@ -81,11 +81,11 @@ ELF_FUNCTION(l_number_fmt)
 
 	if (!parse_number_precision(format, &precision))
 	{
-		elf_push_error(S, "number format must be '.' followed by a precision from 0 to 99");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT, "number format must be '.' followed by a precision from 0 to 99");
 	}
 	else if (!push_fixed_number_text(S, number, precision))
 	{
-		elf_push_error(S, "could not format number");
+		elf_push_error(S, ELF_ERROR_OUT_OF_MEMORY, "could not format number");
 	}
 	return 1;
 }

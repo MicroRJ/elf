@@ -243,7 +243,7 @@ static void test_lexer_macros(elf_State *state)
 	if (invalid.source->report.error_count != 1) {
 		test_fail("invalid macro reports one error");
 	}
-	if (!invalid.source->report.first || invalid.source->report.first->code != ERROR_EXPECTED_MACRO_NAME) {
+	if (!invalid.source->report.first || invalid.source->report.first->code != ELF_ERROR_EXPECTED_MACRO_NAME) {
 		test_fail("invalid macro records its compiler error code");
 	}
 }
@@ -317,13 +317,13 @@ static void test_lexer_strings(elf_State *state)
 
 	Parser multiline = lexer_test_parser(state, "\"a\nb\"");
 	expect_token_type(lexer_next(&multiline), TOK_ERROR, "reject newline in string");
-	if (!multiline.source->report.first || multiline.source->report.first->code != ERROR_NEWLINE_IN_STRING) {
+	if (!multiline.source->report.first || multiline.source->report.first->code != ELF_ERROR_NEWLINE_IN_STRING) {
 		test_fail("newline in string reports its compiler error code");
 	}
 
 	Parser backtick = lexer_test_parser(state, "`text`");
 	expect_token_type(lexer_next(&backtick), TOK_ERROR, "reject backtick string");
-	if (!backtick.source->report.first || backtick.source->report.first->code != ERROR_UNEXPECTED_CHARACTER) {
+	if (!backtick.source->report.first || backtick.source->report.first->code != ELF_ERROR_UNEXPECTED_CHARACTER) {
 		test_fail("backtick string reports an unexpected character");
 	}
 

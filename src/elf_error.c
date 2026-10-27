@@ -2,7 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
-elf_GCError *elf_error_new(elf_State *state, elf_String *message, elf_Table *data)
+elf_GCError *elf_error_new(elf_State *state, elf_ErrorCode code, elf_String *message, elf_Table *data)
 {
 	ASSERT(state);
 	ASSERT(message);
@@ -19,6 +19,7 @@ elf_GCError *elf_error_new(elf_State *state, elf_String *message, elf_Table *dat
 	u32 size = sizeof(elf_GCError) + frame_count * sizeof(elf_ErrorFrame);
 	elf_GCError *error = elf_gc_alloc(state, ELF_OBJECT_ERROR, size);
 	error->obj.status |= ELF_OBJECT_READONLY;
+	error->code = code;
 	error->message = message;
 	error->data = data;
 

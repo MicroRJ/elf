@@ -29,7 +29,7 @@ static const elf_UserType fs_file_type = {
 	.destroy = fs_file_destroy,
 };
 
-static void fs_push_errorf(elf_State *state, const char *format, ...)
+static void fs_push_errorf(elf_State *state, elf_ErrorCode code, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -37,7 +37,7 @@ static void fs_push_errorf(elf_State *state, const char *format, ...)
 	dy_String message = arena_pushfv(scratch.arena, format, args);
 	va_end(args);
 	arena_push_zero(scratch.arena, 1, 1);
-	elf_push_error(state, message.data ? message.data : "file operation failed");
+	elf_push_error(state, code, message.data ? message.data : "file operation failed");
 	scratch_end(scratch);
 }
 
@@ -64,7 +64,7 @@ static void fs_push_io_error(elf_State *state, const char *operation, dy_Result 
 	elf_Value os_code_key = str_value(elf_string_from_data(state, "os_code"));
 	elf_table_set(state, data, os_code_key, int_value(result.os_error));
 
-	elf_GCError *error = elf_error_new(state, error_message, data);
+	elf_GCError *error = elf_error_new(state, ELF_ERROR_RUNTIME, error_message, data);
 	pop_value(state);
 	pop_value(state);
 	push_value(state, value_from_error(error));
@@ -77,11 +77,11 @@ static b32 fs_check_arg_count(elf_State *state, u32 count, u32 minimum, u32 maxi
 	{
 		if (minimum == maximum)
 		{
-			fs_push_errorf(state, "%s expected %u argument(s), got %u", operation, minimum, count);
+			fs_push_errorf(state, ELF_ERROR_INVALID_ARGUMENT_COUNT, "%s expected %u argument(s), got %u", operation, minimum, count);
 		}
 		else
 		{
-			fs_push_errorf(state, "%s expected %u to %u args, got %u", operation, minimum, maximum, count);
+			fs_push_errorf(state, ELF_ERROR_INVALID_ARGUMENT_COUNT, "%s expected %u to %u args, got %u", operation, minimum, maximum, count);
 		}
 	}
 	return valid;
@@ -93,7 +93,7 @@ static b32 fs_load_file_receiver(elf_State *state, FsFile **result)
 	b32 valid = value_is_user(value) && value_as_user(value)->type == &fs_file_type;
 	if (!valid)
 	{
-		fs_push_errorf(state, "file method expected a file receiver, got '%s'", value_type_name(value.type));
+		fs_push_errorf(state, ELF_ERROR_TYPE_MISMATCH, "file method expected a file receiver, got '%s'", value_type_name(value.type));
 	}
 	else
 	{
@@ -108,7 +108,7 @@ static b32 fs_load_buffer(elf_State *state, u32 index, elf_ByteBuffer **result)
 	b32 valid = value_is_buffer(value);
 	if (!valid)
 	{
-		fs_push_errorf(state, "expected a buffer, got '%s'", value_type_name(value.type));
+		fs_push_errorf(state, ELF_ERROR_TYPE_MISMATCH, "expected a buffer, got '%s'", value_type_name(value.type));
 	}
 	else
 	{
@@ -123,7 +123,7 @@ static b32 fs_load_integer(elf_State *state, u32 index, const char *operation, i
 	b32 valid = value_is_numeric(value);
 	if (!valid)
 	{
-		fs_push_errorf(state, "%s expected an integer, got '%s'", operation, value_type_name(value.type));
+		fs_push_errorf(state, ELF_ERROR_TYPE_MISMATCH, "%s expected an integer, got '%s'", operation, value_type_name(value.type));
 	}
 	else
 	{
@@ -138,7 +138,7 @@ static b32 fs_load_string(elf_State *state, u32 index, const char *operation, dy
 	b32 valid = value_is_string(value);
 	if (!valid)
 	{
-		fs_push_errorf(state, "%s expected a string, got '%s'", operation, value_type_name(value.type));
+		fs_push_errorf(state, ELF_ERROR_TYPE_MISMATCH, "%s expected a string, got '%s'", operation, value_type_name(value.type));
 	}
 	else
 	{
@@ -153,7 +153,7 @@ static b32 fs_require_open(elf_State *state, FsFile *file)
 	b32 open = dy_file_is_valid(file->file);
 	if (!open)
 	{
-		elf_push_error(state, "file is closed");
+		elf_push_error(state, ELF_ERROR_INVALID_REFERENCE, "file is closed");
 	}
 	return open;
 }
@@ -167,7 +167,7 @@ static b32 fs_load_size(elf_State *state, u32 index, const char *operation, u32 
 	}
 	if (value < 0 || (u64)value > UINT32_MAX)
 	{
-		fs_push_errorf(state, "%s size is out of range: %lld", operation, value);
+		fs_push_errorf(state, ELF_ERROR_OUT_OF_RANGE, "%s size is out of range: %lld", operation, value);
 		return false;
 	}
 	*result = (u32)value;
@@ -203,19 +203,19 @@ ELF_FUNCTION(lib_fs_file_read)
 	}
 	if (!file->readable)
 	{
-		elf_push_error(S, "file is not open for reading");
+		elf_push_error(S, ELF_ERROR_RUNTIME, "file is not open for reading");
 		return 1;
 	}
 	if (count > UINT32_MAX - buffer->size)
 	{
-		elf_push_error(S, "file read exceeds the maximum buffer size");
+		elf_push_error(S, ELF_ERROR_OUT_OF_RANGE, "file read exceeds the maximum buffer size");
 		return 1;
 	}
 
 	u32 offset = buffer->size;
 	if (!elf_buffer_reserve_object(S, buffer, offset + count))
 	{
-		elf_push_error(S, "could not reserve the destination buffer for file read");
+		elf_push_error(S, ELF_ERROR_OUT_OF_MEMORY, "could not reserve the destination buffer for file read");
 		return 1;
 	}
 	dy_u64 bytes_read = 0;
@@ -265,7 +265,7 @@ ELF_FUNCTION(lib_fs_file_write)
 		}
 		if (offset > buffer->size)
 		{
-			fs_push_errorf(S, "file write offset %u exceeds buffer length %u", offset, buffer->size);
+			fs_push_errorf(S, ELF_ERROR_OUT_OF_RANGE, "file write offset %u exceeds buffer length %u", offset, buffer->size);
 			return 1;
 		}
 		count = buffer->size - offset;
@@ -278,7 +278,7 @@ ELF_FUNCTION(lib_fs_file_write)
 		}
 		if (count > buffer->size - offset)
 		{
-			fs_push_errorf(S, "file write range exceeds buffer length %u", buffer->size);
+			fs_push_errorf(S, ELF_ERROR_OUT_OF_RANGE, "file write range exceeds buffer length %u", buffer->size);
 			return 1;
 		}
 	}
@@ -289,7 +289,7 @@ ELF_FUNCTION(lib_fs_file_write)
 	}
 	if (!file->writable)
 	{
-		elf_push_error(S, "file is not open for writing");
+		elf_push_error(S, ELF_ERROR_READONLY, "file is not open for writing");
 		return 1;
 	}
 	if (file->append)
@@ -354,7 +354,7 @@ ELF_FUNCTION(lib_fs_file_seek)
 	}
 	else
 	{
-		elf_push_error(S, "invalid file seek origin; expected 'begin', 'current', or 'end'");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT, "invalid file seek origin; expected 'begin', 'current', or 'end'");
 		return 1;
 	}
 
@@ -518,7 +518,7 @@ ELF_FUNCTION(lib_fs_file_flush)
 	}
 	if (!file->writable)
 	{
-		elf_push_error(S, "file is not open for writing");
+		elf_push_error(S, ELF_ERROR_READONLY, "file is not open for writing");
 		return 1;
 	}
 
@@ -614,14 +614,14 @@ ELF_FUNCTION(lib_fs_open)
 	}
 	else
 	{
-		elf_push_error(S, "invalid file mode; expected 'r', 'w', 'a', 'r+', 'w+', or 'a+'");
+		elf_push_error(S, ELF_ERROR_INVALID_ARGUMENT, "invalid file mode; expected 'r', 'w', 'a', 'r+', 'w+', or 'a+'");
 		return 1;
 	}
 
 	elf_Table *file_metatable = S->metatables.fs_file;
 	if (!file_metatable)
 	{
-		elf_push_error(S, "file metatable is unavailable");
+		elf_push_error(S, ELF_ERROR_MISSING_METATABLE, "file metatable is unavailable");
 		return 1;
 	}
 	elf_UserObject *user = elf_user_object_new(S, &fs_file_type, file_metatable, sizeof(FsFile));

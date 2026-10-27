@@ -28,8 +28,8 @@
 static Compiler *compiler_create(Arena *arena);
 static Com_Status compiler_inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table);
 static void compiler_log_report(Compiler *compiler);
-static b32 compiler_report(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
-static b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
+static b32 compiler_report(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
+static b32 compiler_reportv(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
 static elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source);
 
 #include "logging.c"
@@ -69,7 +69,7 @@ static Compiler *compiler_create(Arena *arena)
 	return compiler;
 }
 
-static Com_Status compiler_report_symbol(Com_Source *source, elf_SymField *field, ErrorCode error, const char *message)
+static Com_Status compiler_report_symbol(Com_Source *source, elf_SymField *field, elf_ErrorCode error, const char *message)
 {
 	const char *name = field->name.data ? field->name.data : "<invalid>";
 	b32 reported = compiler_report(source, error, ERROR_ERROR, ERROR_PHASE_CHECKER, (SourceSite) {}, "environment symbol '%s' %s", name, message);
@@ -83,7 +83,7 @@ static Com_Status compiler_inject_symbol_table(Compiler *compiler, Scope *scope,
 	{
 		if (existing->kind != ENTITY_GLOBAL || existing->en_global.value.type != COM_VALUE_SCOPE)
 		{
-			return compiler_report_symbol(source, field, ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
+			return compiler_report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
 		}
 		return compiler_inject_symbols(compiler, existing->en_global.value.scope, source, field->table);
 	}
@@ -110,7 +110,7 @@ static Com_Status compiler_inject_symbol_value(Compiler *compiler, Scope *scope,
 {
 	if (scope_find_current(scope, name))
 	{
-		return compiler_report_symbol(source, field, ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host symbol");
+		return compiler_report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host symbol");
 	}
 
 	b32 created = false;
@@ -140,7 +140,7 @@ static Com_Status compiler_inject_symbol_value(Compiler *compiler, Scope *scope,
 		{
 			if (!field->string.data || field->string.size > UINT32_MAX)
 			{
-				return compiler_report_symbol(source, field, ERROR_OUT_OF_RANGE, "has an invalid string value");
+				return compiler_report_symbol(source, field, ELF_ERROR_OUT_OF_RANGE, "has an invalid string value");
 			}
 			value->type = COM_VALUE_STRING;
 			value->string = atom_from_data_size(compiler->atoms, field->string.data, (u32)field->string.size);
@@ -153,12 +153,12 @@ static Com_Status compiler_inject_symbol_value(Compiler *compiler, Scope *scope,
 		case ELF_SYMBOL_FUNCTION:
 		{
 			u32 native_function_index = UINT32_MAX;
-			ErrorCode error = elf_native_function_ensure(compiler->target, field->function, &native_function_index);
-			if (error == ERROR_OUT_OF_MEMORY)
+			elf_ErrorCode error = elf_native_function_ensure(compiler->target, field->function, &native_function_index);
+			if (error == ELF_ERROR_OUT_OF_MEMORY)
 			{
 				return COM_STATUS_OOM;
 			}
-			if (error != ERROR_NONE)
+			if (error != ELF_ERROR_NONE)
 			{
 				return compiler_report_symbol(source, field, error, "could not be installed in the target state");
 			}
@@ -168,7 +168,7 @@ static Com_Status compiler_inject_symbol_value(Compiler *compiler, Scope *scope,
 		break;
 		default:
 		{
-			return compiler_report_symbol(source, field, ERROR_INTERNAL, "has an invalid value type");
+			return compiler_report_symbol(source, field, ELF_ERROR_INTERNAL, "has an invalid value type");
 		}
 	}
 	return COM_STATUS_OK;
@@ -189,7 +189,7 @@ static Com_Status compiler_inject_symbols(Compiler *compiler, Scope *scope, Com_
 	{
 		if (!field->name.data || !field->name.size || field->name.size > UINT32_MAX)
 		{
-			return compiler_report_symbol(source, field, ERROR_INVALID_DECLARATION, "has an invalid name");
+			return compiler_report_symbol(source, field, ELF_ERROR_INVALID_DECLARATION, "has an invalid name");
 		}
 		Atom *name = atom_from_data_size(compiler->atoms, field->name.data, (u32)field->name.size);
 		if (!name)
@@ -223,12 +223,12 @@ static elf_StrSlice compiler_format_message(Arena *arena, const char *format, va
 	return (elf_StrSlice) {message, (u64)message_size};
 }
 
-static b32 compiler_reportv(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args)
+static b32 compiler_reportv(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args)
 {
 	ASSERT(source);
 	Compiler *compiler = source->compiler;
 	ASSERT(compiler);
-	ASSERT(code != ERROR_NONE);
+	ASSERT(code != ELF_ERROR_NONE);
 	elf_StrSlice message = compiler_format_message(compiler->arena, format, args);
 	if (!message.data) {
 		return false;
@@ -314,7 +314,7 @@ static void compiler_log_report(Compiler *compiler)
 	}
 }
 
-static b32 compiler_report(Com_Source *source, ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...)
+static b32 compiler_report(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -368,20 +368,20 @@ static Com_Source *compiler_load_source(Compiler *compiler, Com_Source *requesti
 	dy_File_Info info = {0};
 	if (dy_file_info(path, &info).error || info.is_directory)
 	{
-		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "could not find source file '%s'", atom_data(path_atom));
+		compiler_report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "could not find source file '%s'", atom_data(path_atom));
 		return 0;
 	}
 
 	if (info.size > UINT32_MAX)
 	{
-		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "source file exceeds the 32-bit size limit '%s'", atom_data(path_atom));
+		compiler_report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "source file exceeds the 32-bit size limit '%s'", atom_data(path_atom));
 		return 0;
 	}
 
 	dy_File file = {0};
 	if (dy_file_open(path, DY_FILE_OPEN_EXISTING, DY_FILE_READ | DY_FILE_SHARE_READ, &file).error)
 	{
-		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "could not open source file '%s'", atom_data(path_atom));
+		compiler_report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "could not open source file '%s'", atom_data(path_atom));
 		return 0;
 	}
 
@@ -411,7 +411,7 @@ static Com_Source *compiler_load_source(Compiler *compiler, Com_Source *requesti
 	if (load_error)
 	{
 		arena_restore(compiler->arena, arena_checkpoint);
-		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%s '%s'", load_error, atom_data(path_atom));
+		compiler_report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%s '%s'", load_error, atom_data(path_atom));
 		return 0;
 	}
 
@@ -419,14 +419,14 @@ static Com_Source *compiler_load_source(Compiler *compiler, Com_Source *requesti
 	arena_restore(compiler->arena, arena_checkpoint);
 	if (!runtime_source)
 	{
-		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while creating source file '%s'", atom_data(path_atom));
+		compiler_report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while creating source file '%s'", atom_data(path_atom));
 		return 0;
 	}
 
 	Com_Source *source = compiler_alloc_source(compiler, path_atom, path_atom, runtime_source, (dy_String) {0});
 	if (!source)
 	{
-		compiler_report(requesting_source, ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
+		compiler_report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
 	}
 	return source;
 }
@@ -478,7 +478,7 @@ static elf_Prototype *compiler_compile_source(Compiler *compiler, Com_Source *so
 	}
 	if (inject_status == COM_STATUS_OOM)
 	{
-		compiler_report(source, ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {0}, "could not inject environment symbols");
+		compiler_report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {0}, "could not inject environment symbols");
 	}
 	if (inject_status != COM_STATUS_OK)
 	{

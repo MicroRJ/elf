@@ -1,4 +1,92 @@
 
+error_catcher := elf.call(fun() {
+
+	ret "foo" < "faa"
+
+})
+
+elf.printl(error_catcher)
+
+#eof
+
+foo :: fun(something: str) {
+
+}
+
+foo(10)
+#eof
+
+x := elf.freeze({welcome=true})
+x.welcome = 1
+ret x
+#eof
+
+
+x := "welcome"
+x[0] = 1
+ret x
+#eof
+
+
+x := elf.freeze(elf.buffer())
+x[0] = 1
+ret x
+#eof
+
+
+
+x := elf.freeze([11,22,33,44,55])
+x[0] = 1
+ret x
+#eof
+
+x := [11,22,33,44,55]
+x[0] = 1
+x[1] = 2
+x[- 1] = 5
+x[- 10] = 2
+x[10] = 2
+ret x
+#eof
+
+
+ret [11,22,33,44,55][{"welcome" = true}]
+#eof
+
+ret [11,22,33,44,55]["10"]
+#eof
+
+ret [11,22,33,44,55][10]
+#eof
+
+
+ret [11,22,33,44,55][-10]
+#eof
+
+wrapper :: fun() {
+	ret nil.name
+}
+wrapper()
+
+#eof
+
+
+nil.name = 10
+#eof
+
+x := {}[nil]
+#eof
+
+x := nil.foo
+#eof
+
+ret nil.name
+#eof
+
+foo := nil
+x := foo.name
+#eof
+
 wrapper :: fun() {
 	fun() { elf.error("this is an error") }()
 }

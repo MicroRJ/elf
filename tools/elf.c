@@ -32,8 +32,11 @@ int main(int argc, char **argv)
 		elf_destroy_state(state);
 		return 1;
 	}
+
 	u32 nrets = elf_call(state, 0);
-	if (nrets != 0) {
+
+	// TODO(RJ): make this based off of a command arg
+	if (true) {
 		printf("elf returned %u result(s):\n", nrets);
 
 		elf_Value *results = state->stack_top - nrets;

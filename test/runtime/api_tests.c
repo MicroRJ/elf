@@ -230,7 +230,7 @@ static void test_api_string_length(elf_State *state)
 static void test_api_errors(elf_State *state)
 {
 	elf_Index checkpoint = elf_get_top(state);
-	elf_push_error(state, "host failure");
+	elf_push_error(state, ELF_ERROR_RUNTIME, "host failure");
 	elf_Index error = elf_abs_index(state, -1);
 
 	if (elf_type(state, error) != ELF_VALUE_TYPE_ERROR || !elf_is_error(state, error)) {

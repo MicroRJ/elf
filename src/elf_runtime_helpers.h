@@ -382,24 +382,25 @@ static inline b32 value_measure(elf_Value value, u32 *measure)
 static inline void check_value_type(elf_State *S, elf_Value value, int type)
 {
 	if (value.type != type) {
-		report_runtime_error(S, ERROR_TYPE_MISMATCH, "type error, expected '%s', got '%s'", value_type_name(type), value_type_name(value.type));
+		report_runtime_error(S, ELF_ERROR_TYPE_MISMATCH, "type error, expected '%s', got '%s'", value_type_name(type), value_type_name(value.type));
 	}
 }
 
 static inline void check_value_type_rule(elf_State *S, elf_Value value, TypeRule rule)
 {
 	if (~rule & 1 << value.type) {
-		report_runtime_error(S, ERROR_TYPE_MISMATCH, "type error, expected '%s', got '%s'", type_rule_name(rule), value_type_name(value.type));
+		report_runtime_error(S, ELF_ERROR_TYPE_MISMATCH, "type error, expected '%s', got '%s'", type_rule_name(rule), value_type_name(value.type));
 	}
 }
 
 static inline void check_numeric(elf_State *state, elf_Value value)
 {
 	if (!value_is_numeric(value)) {
-		report_runtime_error(state, ERROR_TYPE_MISMATCH, "type error, expected numeric, got '%s'", value_type_name(value.type));
+		report_runtime_error(state, ELF_ERROR_TYPE_MISMATCH, "type error, expected numeric, got '%s'", value_type_name(value.type));
 	}
 }
 
+// Todo, deprecated!
 static inline u32 check_array_index(elf_State *state, i64 index, u32 count)
 {
 	i64 resolved = index;
@@ -411,11 +412,11 @@ static inline u32 check_array_index(elf_State *state, i64 index, u32 count)
 	{
 		if (resolved != index)
 		{
-			report_runtime_error(state, ERROR_OUT_OF_RANGE, "array index out of bounds: index %lli resolved to %lli, length %u", index, resolved, count);
+			report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array index out of bounds: index %lli resolved to %lli, length %u", index, resolved, count);
 		}
 		else
 		{
-			report_runtime_error(state, ERROR_OUT_OF_RANGE, "array index out of bounds: index %lli, length %u", index, count);
+			report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array index out of bounds: index %lli, length %u", index, count);
 		}
 	}
 
@@ -531,7 +532,7 @@ static inline elf_Value load_value(elf_State *S, int x)
 {
 	StackFrame *frame = frame_current(S);
 	if (x < 0 || (u32)x >= frame_nargs(frame)) {
-		report_runtime_error(S, ERROR_INVALID_ARGUMENT, "invalid argument index: %i, got: %u", x, frame_nargs(frame));
+		report_runtime_error(S, ELF_ERROR_INVALID_ARGUMENT, "invalid argument index: %i, got: %u", x, frame_nargs(frame));
 	}
 	return frame_arg(frame, (u32)x);
 }
@@ -564,7 +565,7 @@ static b32 lib_check_arg_count(elf_State *state, const char *name, u32 count, u3
 		message = arena_pushf(scratch.arena, "%s expected %u to %u args, got %u", name, minimum, maximum, count);
 	}
 	arena_push_zero(scratch.arena, 1, 1);
-	elf_push_error(state, message.data ? message.data : "invalid argument count");
+	elf_push_error(state, ELF_ERROR_INVALID_ARGUMENT_COUNT, message.data ? message.data : "invalid argument count");
 	scratch_end(scratch);
 	return false;
 }

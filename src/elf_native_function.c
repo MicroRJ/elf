@@ -4,13 +4,13 @@
 
 #define NATIVE_FUNCTION_INITIAL_CAPACITY 16u
 
-ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index)
+elf_ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index)
 {
 	if (index) {
 		*index = UINT32_MAX;
 	}
 	if (!state || !function || !index) {
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 
 	for (u32 i = 0; i < state->native_function_count; ++i)
@@ -18,12 +18,12 @@ ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u3
 		if (state->native_functions[i] == function)
 		{
 			*index = i;
-			return ERROR_NONE;
+			return ELF_ERROR_NONE;
 		}
 	}
 
 	if (state->native_function_count == UINT32_MAX) {
-		return ERROR_OUT_OF_RANGE;
+		return ELF_ERROR_OUT_OF_RANGE;
 	}
 	if (state->native_function_count == state->native_function_capacity)
 	{
@@ -35,11 +35,11 @@ ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u3
 		u64 old_size = (u64)old_capacity * sizeof(*state->native_functions);
 		u64 new_size = (u64)new_capacity * sizeof(*state->native_functions);
 		if (new_size > SIZE_MAX) {
-			return ERROR_OUT_OF_MEMORY;
+			return ELF_ERROR_OUT_OF_MEMORY;
 		}
 		elf_Function *functions = elf_realloc(state, state->native_functions, old_size, new_size);
 		if (!functions) {
-			return ERROR_OUT_OF_MEMORY;
+			return ELF_ERROR_OUT_OF_MEMORY;
 		}
 		state->native_functions = functions;
 		state->native_function_capacity = new_capacity;
@@ -48,7 +48,7 @@ ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u3
 	u32 function_index = state->native_function_count++;
 	state->native_functions[function_index] = function;
 	*index = function_index;
-	return ERROR_NONE;
+	return ELF_ERROR_NONE;
 }
 
 void elf_native_functions_destroy(elf_State *state)

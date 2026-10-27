@@ -8,7 +8,7 @@ void elf_array_check_write(elf_State *state, elf_Array *array)
 {
 	if (array->obj.status & ELF_OBJECT_READONLY)
 	{
-		report_runtime_error(state, ERROR_READONLY, "attempted to write to readonly object");
+		report_runtime_error(state, ELF_ERROR_READONLY, "attempted to write to readonly object");
 	}
 }
 

@@ -82,7 +82,7 @@ ELF_FUNCTION(l_core_assert)
 	if (nargs > 1) message = lib_load_cstr(S, 1);
 	if (!value_to_integer(condition))
 	{
-		report_runtime_error(S, ERROR_RUNTIME, "%s", message);
+		report_runtime_error(S, ELF_ERROR_RUNTIME, "%s", message);
 	}
 	return 0;
 }
@@ -94,6 +94,20 @@ ELF_FUNCTION(l_core_echo)
 		push_value(S, load_value(S, index));
 	}
 	return nargs;
+}
+
+ELF_FUNCTION(l_core_call)
+{
+	if (!lib_check_arg_count(S, "call", nargs, 1, INT_MAX))
+	{
+		return 1;
+	}
+
+	for (u32 index = 0; index < nargs; ++ index)
+	{
+		push_value(S, load_value(S, index));
+	}
+	return elf_call(S, nargs - 1);
 }
 
 ELF_FUNCTION(l_core_metatable)
@@ -166,7 +180,7 @@ ELF_FUNCTION(l_core_error)
 		}
 	}
 
-	push_value(S, value_from_error(elf_error_new(S, message, data)));
+	push_value(S, value_from_error(elf_error_new(S, ELF_ERROR_RUNTIME, message, data)));
 	return 1;
 }
 
@@ -228,7 +242,7 @@ static StackFrame *core_caller_frame(elf_State *state)
 	StackFrame *caller = frame_previous(state, frame_current(state));
 	if (!caller || !frame_proto(caller))
 	{
-		report_runtime_error(state, ERROR_RUNTIME,
+		report_runtime_error(state, ELF_ERROR_RUNTIME,
 			"caller introspection requires a bytecode caller");
 	}
 	return caller;
@@ -310,6 +324,7 @@ ELF_FUNCTION(l_core_const_expr)
 static const elf_Binding l_core[] = {
 	{"assert",       l_core_assert},
 	{"echo",         l_core_echo},
+	{"call",         l_core_call},
 	{"metatable",    l_core_metatable},
 	{"freeze",       l_core_freeze},
 	{"is_readonly",  l_core_is_readonly},

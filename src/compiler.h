@@ -29,7 +29,7 @@ typedef struct Com_Message Com_Message;
 struct Com_Message
 {
 	Com_Message   *next;
-	ErrorCode     code;
+	elf_ErrorCode code;
 	ErrorSeverity severity;
 	ErrorPhase    phase;
 	SourceSite    site;

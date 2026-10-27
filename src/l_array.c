@@ -19,7 +19,7 @@ static b32 array_normalize_index(elf_State *state, i64 index, u32 length, b32 al
 	i64 upper = allow_end ? length : (i64)length - 1;
 	if (index < 0 || index > upper)
 	{
-		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array index %lld is out of bounds for length %u", index, length);
+		report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array index %lld is out of bounds for length %u", index, length);
 		return false;
 	}
 
@@ -32,7 +32,7 @@ static void array_remove(elf_State *state, elf_Array *array, u32 index, u32 coun
 	elf_array_check_write(state, array);
 	if (index > array->count || count > array->count - index)
 	{
-		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array range out of bounds: index %u, count %u, length %u", index, count, array->count);
+		report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array range out of bounds: index %u, count %u, length %u", index, count, array->count);
 	}
 
 	if (count != 0)
@@ -49,13 +49,13 @@ static void array_splice(elf_State *state, elf_Array *array, u32 index, u32 dele
 	elf_array_check_write(state, array);
 	if (index > array->count || delete_count > array->count - index)
 	{
-		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array splice range is out of bounds");
+		report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array splice range is out of bounds");
 	}
 	u32 insert_count = replacement->count;
 	u32 count_after_delete = array->count - delete_count;
 	if (insert_count > UINT32_MAX - count_after_delete)
 	{
-		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array size exceeds the supported range");
+		report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array size exceeds the supported range");
 	}
 
 	elf_Value *insert_items = replacement->items;
@@ -65,7 +65,7 @@ static void array_splice(elf_State *state, elf_Array *array, u32 index, u32 dele
 		u64 insert_size = (u64)insert_count * sizeof(*insert_copy);
 		insert_copy = elf_alloc(state, insert_size);
 		if (!insert_copy) {
-			report_runtime_error(state, ERROR_OUT_OF_MEMORY, "could not allocate %u values for array splice", insert_count);
+			report_runtime_error(state, ELF_ERROR_OUT_OF_MEMORY, "could not allocate %u values for array splice", insert_count);
 		}
 		copy_memory(insert_copy, insert_items, insert_size);
 		insert_items = insert_copy;
@@ -93,7 +93,7 @@ static u32 array_insert(elf_State *state, elf_Array *array, u32 index, elf_Value
 	elf_array_check_write(state, array);
 	if (index > array->count)
 	{
-		report_runtime_error(state, ERROR_OUT_OF_RANGE, "array insert index %u is out of bounds for length %u", index, array->count);
+		report_runtime_error(state, ELF_ERROR_OUT_OF_RANGE, "array insert index %u is out of bounds for length %u", index, array->count);
 	}
 
 	elf_array_reserve(state, array, array->count + 1);
@@ -232,7 +232,7 @@ ELF_FUNCTION(l_array_remove)
 		i64 requested = lib_load_integer(S, 2);
 		if (requested < 0 || (u64)requested > array->count - index)
 		{
-			report_runtime_error(S, ERROR_OUT_OF_RANGE, "array remove count %lld is out of bounds", requested);
+			report_runtime_error(S, ELF_ERROR_OUT_OF_RANGE, "array remove count %lld is out of bounds", requested);
 			return 0;
 		}
 		count = (u32)requested;
@@ -257,7 +257,7 @@ ELF_FUNCTION(l_array_splice)
 	i64 requested = lib_load_integer(S, 2);
 	if (requested < 0 || (u64)requested > array->count - index)
 	{
-		report_runtime_error(S, ERROR_OUT_OF_RANGE, "array splice delete count %lld is out of bounds", requested);
+		report_runtime_error(S, ELF_ERROR_OUT_OF_RANGE, "array splice delete count %lld is out of bounds", requested);
 		return 0;
 	}
 	elf_Value replacement_value = load_value(S, 3);
@@ -285,7 +285,7 @@ ELF_FUNCTION(l_array_slice)
 	}
 	if (end < first)
 	{
-		report_runtime_error(S, ERROR_OUT_OF_RANGE, "array slice end %u precedes start %u", end, first);
+		report_runtime_error(S, ELF_ERROR_OUT_OF_RANGE, "array slice end %u precedes start %u", end, first);
 		return 0;
 	}
 

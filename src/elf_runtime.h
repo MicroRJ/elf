@@ -211,6 +211,7 @@ elf_ErrorFrame;
 struct elf_GCError
 {
 	elf_Object     obj;
+	elf_ErrorCode  code;
 	elf_String    *message;
 	elf_Table     *data;
 	u32            frame_count;
@@ -340,7 +341,7 @@ void *elf_alloc_zero(elf_State *state, elf_u64 size);
 void *elf_realloc(elf_State *state, void *memory, elf_u64 old_size, elf_u64 new_size);
 void elf_free(elf_State *state, void *memory, elf_u64 size);
 
-ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index);
+elf_ErrorCode elf_native_function_ensure(elf_State *state, elf_Function function, u32 *index);
 void elf_native_functions_destroy(elf_State *state);
 
 elf_Source *elf_source_create(elf_State *state, dy_String name, dy_String text);
@@ -349,7 +350,7 @@ void elf_sources_destroy(elf_State *state);
 void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 
 elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Value *captures, u32 capture_count);
-elf_GCError *elf_error_new(elf_State *state, elf_String *message, elf_Table *data);
+elf_GCError *elf_error_new(elf_State *state, elf_ErrorCode code, elf_String *message, elf_Table *data);
 
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 
@@ -379,7 +380,7 @@ b32 elf_table_delete(elf_State *state, elf_Table *table, elf_Value key, elf_Valu
 void elf_table_clear(elf_State *state, elf_Table *table);
 
 // README: STOP RELYING ON THIS TO ABORT THE PROGRAM
-void report_runtime_error(elf_State *state, ErrorCode code, const char *format, ...);
+void report_runtime_error(elf_State *state, elf_ErrorCode code, const char *format, ...);
 
 // README: THIS IS ONLY FOR TESTING
 void print_current_runtime_source_location(elf_State *state);

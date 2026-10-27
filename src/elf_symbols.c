@@ -29,23 +29,23 @@ static b32 symbol_exists(elf_SymTable *table, dy_String name)
 	return false;
 }
 
-static ErrorCode symbol_copy_string(dy_String source, dy_String *destination)
+static elf_ErrorCode symbol_copy_string(dy_String source, dy_String *destination)
 {
 	ASSERT(destination);
 	*destination = (dy_String) {0};
 	if (!source.data && source.size)
 	{
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 	if (source.size == UINT64_MAX || source.size + 1 > SIZE_MAX)
 	{
-		return ERROR_OUT_OF_RANGE;
+		return ELF_ERROR_OUT_OF_RANGE;
 	}
 
 	char *data = malloc((size_t)source.size + 1);
 	if (!data)
 	{
-		return ERROR_OUT_OF_MEMORY;
+		return ELF_ERROR_OUT_OF_MEMORY;
 	}
 	if (source.size)
 	{
@@ -54,65 +54,65 @@ static ErrorCode symbol_copy_string(dy_String source, dy_String *destination)
 	data[source.size] = 0;
 	destination->data = data;
 	destination->size = source.size;
-	return ERROR_NONE;
+	return ELF_ERROR_NONE;
 }
 
-static ErrorCode symbol_validate_table(elf_SymTable *parent, elf_SymTable *child)
+static elf_ErrorCode symbol_validate_table(elf_SymTable *parent, elf_SymTable *child)
 {
 	if (!child || child->parent)
 	{
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 	for (elf_SymTable *ancestor = parent; ancestor; ancestor = ancestor->parent)
 	{
 		if (ancestor == child)
 		{
-			return ERROR_INVALID_ARGUMENT;
+			return ELF_ERROR_INVALID_ARGUMENT;
 		}
 	}
-	return ERROR_NONE;
+	return ELF_ERROR_NONE;
 }
 
-static ErrorCode symbol_add(elf_SymTable *table, dy_String name, elf_SymbolType type, SymbolInput input)
+static elf_ErrorCode symbol_add(elf_SymTable *table, dy_String name, elf_SymbolType type, SymbolInput input)
 {
 	if (!table || !name.data || !name.size)
 	{
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 	if (table->field_count == UINT32_MAX)
 	{
-		return ERROR_OUT_OF_RANGE;
+		return ELF_ERROR_OUT_OF_RANGE;
 	}
 	if (type == ELF_SYMBOL_STRING && !input.string.data && input.string.size)
 	{
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 	if (type == ELF_SYMBOL_TABLE)
 	{
-		ErrorCode error = symbol_validate_table(table, input.table);
-		if (error != ERROR_NONE)
+		elf_ErrorCode error = symbol_validate_table(table, input.table);
+		if (error != ELF_ERROR_NONE)
 		{
 			return error;
 		}
 	}
 	if (type == ELF_SYMBOL_FUNCTION && !input.function)
 	{
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 	if (type > ELF_SYMBOL_FUNCTION || symbol_exists(table, name))
 	{
-		return ERROR_INVALID_ARGUMENT;
+		return ELF_ERROR_INVALID_ARGUMENT;
 	}
 
 	elf_SymField *field = malloc(sizeof(*field));
 	if (!field)
 	{
-		return ERROR_OUT_OF_MEMORY;
+		return ELF_ERROR_OUT_OF_MEMORY;
 	}
 	zero_memory(field, sizeof(*field));
 
-	ErrorCode error = symbol_copy_string(name, &field->name);
-	if (error != ERROR_NONE)
+	elf_ErrorCode error = symbol_copy_string(name, &field->name);
+	if (error != ELF_ERROR_NONE)
 	{
 		free(field);
 		return error;
@@ -122,7 +122,7 @@ static ErrorCode symbol_add(elf_SymTable *table, dy_String name, elf_SymbolType 
 	if (type == ELF_SYMBOL_STRING)
 	{
 		error = symbol_copy_string(input.string, &string);
-		if (error != ERROR_NONE)
+		if (error != ELF_ERROR_NONE)
 		{
 			free(field->name.data);
 			free(field);
@@ -154,23 +154,7 @@ static ErrorCode symbol_add(elf_SymTable *table, dy_String name, elf_SymbolType 
 	{
 		input.table->parent = table;
 	}
-	return ERROR_NONE;
-}
-
-static elf_ErrorCode symbol_error(ErrorCode error)
-{
-	switch (error)
-	{
-		case ERROR_NONE:             return ELF_ERROR_NONE;
-		case ERROR_INVALID_ARGUMENT: return ELF_ERROR_INVALID_ARGUMENT;
-		case ERROR_OUT_OF_RANGE:     return ELF_ERROR_OUT_OF_RANGE;
-		case ERROR_OUT_OF_MEMORY:    return ELF_ERROR_OUT_OF_MEMORY;
-		default:
-		{
-			ASSERT(!"unhandled symbol error");
-			return ELF_ERROR_INVALID_ARGUMENT;
-		}
-	}
+	return ELF_ERROR_NONE;
 }
 
 elf_ErrorCode elf_sym_create(elf_SymTable **table)
@@ -223,29 +207,29 @@ void elf_sym_destroy(elf_SymTable *table)
 elf_ErrorCode elf_sym_tab(elf_SymTable *table, elf_StrSlice name, elf_SymTable *value)
 {
 	SymbolInput input = {.table = value};
-	return symbol_error(symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_TABLE, input));
+	return symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_TABLE, input);
 }
 
 elf_ErrorCode elf_sym_int(elf_SymTable *table, elf_StrSlice name, elf_Int value)
 {
 	SymbolInput input = {.integer = value};
-	return symbol_error(symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_INTEGER, input));
+	return symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_INTEGER, input);
 }
 
 elf_ErrorCode elf_sym_num(elf_SymTable *table, elf_StrSlice name, elf_Num value)
 {
 	SymbolInput input = {.number = value};
-	return symbol_error(symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_NUMBER, input));
+	return symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_NUMBER, input);
 }
 
 elf_ErrorCode elf_sym_str(elf_SymTable *table, elf_StrSlice name, elf_StrSlice value)
 {
 	SymbolInput input = {.string = (dy_String) {value.data, value.size}};
-	return symbol_error(symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_STRING, input));
+	return symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_STRING, input);
 }
 
 elf_ErrorCode elf_sym_fun(elf_SymTable *table, elf_StrSlice name, elf_Function value)
 {
 	SymbolInput input = {.function = value};
-	return symbol_error(symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_FUNCTION, input));
+	return symbol_add(table, (dy_String) {name.data, name.size}, ELF_SYMBOL_FUNCTION, input);
 }
