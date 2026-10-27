@@ -46,7 +46,6 @@ If records reduce table usage significantly, and as a consequence, '.' syntax on
 prevalent, we'll drop the ':method()' syntax entirely, and then all type functions can just use '.'
 directly ...
 
-
 ### Embed-ability
 
 There is a lot of back and forth between elf and C, and that requires maintaining tons of glue code,

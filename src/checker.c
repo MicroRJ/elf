@@ -342,6 +342,14 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 
 		case AST_FUNCTION:
 		{
+
+			/* Check for missing function bodies */
+			if (!expr->function.body) {
+				Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_MISSING_FUNCTION_BODY, ERROR_ERROR, expr->site, "missing function body");
+				value = com_value_error(status);
+				break;
+			}
+
 			Scope *scope = 0;
 			Com_Status status = push_scope(checker, SCOPE_FUNCTION, expr, &scope);
 			if (status != COM_STATUS_OK) {

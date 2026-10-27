@@ -1,3 +1,54 @@
+// detached functions are NOT supported everywhere
+fun(fun(), fun())
+
+#eof
+
+// detached functions are NOT supported everywhere
+fun() + fun()
+
+#eof
+
+// named arguments are supported for detached functions
+foo :: fun(x) => x()
+
+foo(x = fun()) { elf.printl("attached") }
+
+#eof
+
+
+// detached functions require a block statement
+foo :: fun(x) => x()
+
+foo(fun()) elf.printl("not attached")
+
+#eof
+
+// detached functions are NOT supported everywhere
+fun()
+
+#eof
+
+
+// detached functions only work as the last argument
+foo :: fun(x) => x()
+
+
+foo(fun(), 1, 2) {
+	elf.printl("THIS IS NOT A DETACHED FUNCTION!")
+}
+
+#eof
+
+// detached functions
+foo :: fun(x) => x()
+
+foo(fun()) {
+
+	elf.printl("THIS IS A DETACHED FUNCTION!")
+}
+
+
+#eof
 
 error_catcher := elf.call(fun() {
 

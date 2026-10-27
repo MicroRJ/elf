@@ -333,7 +333,7 @@ static Ast create_call_ast(Parser *par, SourceSite site, Ast expr, Ast_Array arg
 	return tree;
 }
 
-static Ast create_named_argument_ast(Parser *par, SourceSite site, Ast name, Ast expr)
+static Ast ast_new_named_argument(Parser *par, SourceSite site, Ast name, Ast expr)
 {
 	if (ast_is_error(name)) {
 		return name;
@@ -558,7 +558,7 @@ static Ast parse_call_expr(Parser *parser, Ast callee, SourceSite site);
 static Token consume_token(Parser *parser);
 static Token take_token(Parser *parser, Token_Type type);
 
-static Token parser_token_at(Parser *parser, u32 index)
+static Token token_at(Parser *parser, u32 index)
 {
 	ASSERT(parser->tokens.count);
 	if (index >= parser->tokens.count) {
@@ -569,17 +569,17 @@ static Token parser_token_at(Parser *parser, u32 index)
 
 static Token this_token(Parser *parser)
 {
-	return parser_token_at(parser, parser->token_index);
+	return token_at(parser, parser->token_index);
 }
 
-static Token parser_previous_token(Parser *parser)
+static Token prev_token(Parser *parser)
 {
-	return parser->token_index ? parser_token_at(parser, parser->token_index - 1) : (Token) {};
+	return parser->token_index ? token_at(parser, parser->token_index - 1) : (Token) {};
 }
 
-static Token parser_next_token(Parser *parser)
+static Token next_token(Parser *parser)
 {
-	return parser_token_at(parser, parser->token_index + 1);
+	return token_at(parser, parser->token_index + 1);
 }
 
 static Ast ast_from_token_error(Token token)
@@ -801,7 +801,7 @@ static Token take_token(Parser *parser, Token_Type type)
 
 static inline b32 peek_next_token(Parser *parser, Token_Type type)
 {
-	return parser_next_token(parser).type == type;
+	return next_token(parser).type == type;
 }
 
 static b32 push_ast(Parser *par, Ast tree)
@@ -891,6 +891,30 @@ static Ast parse_source(Parser *parser)
 	return root;
 }
 
+static Ast parse_function_body(Parser *par, Ast function)
+{
+	ASSERT(function);
+	ASSERT(function->kind == AST_FUNCTION);
+
+	Ast parent_function = par->current_function;
+
+	par->current_function = function;
+	Ast body = parse_stat(par);
+	par->current_function = parent_function;
+
+	if (ast_is_error(body)) {
+		return body;
+	}
+	if (!body) {
+		return parser_error(par, ELF_ERROR_MISSING_FUNCTION_BODY, this_token(par).site, "expected function body");
+	}
+	if (body->kind != AST_BLOCK_STAT) {
+		return parser_error(par, ELF_ERROR_MISSING_FUNCTION_BODY, body->site, "expected block statement for function body");
+	}
+
+	return body;
+}
+
 // <function> ::= "fun" ["(" [<parameter-list>] ")"] <statement>
 // <parameter-list> ::= <parameter> {"," <parameter>} ["," "..."] | "..."
 // <parameter> ::= <identifier> [":" <identifier>] ["=" <expression>]
@@ -903,6 +927,8 @@ static Ast parse_function(Parser *par, Token marker)
 	if (ast_is_error(function)) {
 		return function;
 	}
+
+	/* set this before parameters because of default arguments */
 	par->current_function = function;
 
 	u32 stack_start = par->ast_stack_index;
@@ -974,10 +1000,14 @@ static Ast parse_function(Parser *par, Token marker)
 		return body;
 	}
 
+	/* Note that we allow bodyless functions here, but users must ensure the body is attached */
+
+#if 0
 	if (!body) {
 		par->current_function = parent_function;
 		return parser_error(par, ELF_ERROR_MISSING_FUNCTION_BODY, this_token(par).site, "expected function body");
 	}
+#endif
 
 	function->function.params = params;
 	function->function.variadic = variadic;
@@ -1408,7 +1438,7 @@ static Ast parse_jsonl_ast(Parser *parser)
 		{
 			return value;
 		}
-		if (parser_previous_token(parser).site.line_index != line_index)
+		if (prev_token(parser).site.line_index != line_index)
 		{
 			return parser_error(parser, ELF_ERROR_UNEXPECTED_TOKEN, value->site, "JSONL values must fit on one line");
 		}
@@ -1823,57 +1853,85 @@ static Ast parse_call_expr(Parser *par, Ast callee, SourceSite site)
 	u32 stack_start = par->ast_stack_index;
 	u32 nargs = 0;
 
-	Token opening = take_token(par, TOK_LEFT_PAREN);
-	if (token_is_error(opening)) {
-		return ast_from_token_error(opening);
+	Token open = take_token(par, TOK_LEFT_PAREN);
+	if (token_is_error(open)) {
+		return ast_from_token_error(open);
 	}
 
 	pick_token(par, TOK_COMMA);
 
-	if (!peek_token(par, TOK_PAREN_RIGHT))
+	if (!peek_token(par, TOK_PAREN_RIGHT)) do
 	{
-		do
+		if (peek_token(par, TOK_PAREN_RIGHT))
 		{
-			if (peek_token(par, TOK_PAREN_RIGHT))
-			{
-				par->ast_stack_index = stack_start;
-				return parser_error(par, ELF_ERROR_EXCESS_COMMA, parser_previous_token(par).site, "excess comma");
-			}
-			if (peek_token(par, TOK_COMMA))
-			{
-				par->ast_stack_index = stack_start;
-				return parser_error(par, ELF_ERROR_EXCESS_COMMA, this_token(par).site, "excess comma");
-			}
-
-			Ast x = parse_call_argument(par);
-			if (ast_is_error(x)) {
-				par->ast_stack_index = stack_start;
-				return x;
-			}
-			if (!x) {
-				par->ast_stack_index = stack_start;
-				return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, this_token(par).site, "expected call argument");
-			}
-
-			if (!push_ast(par, x)) {
-				par->ast_stack_index = stack_start;
-				return ERROR_OOM_AST;
-			}
-			++ nargs;
+			par->ast_stack_index = stack_start;
+			return parser_error(par, ELF_ERROR_EXCESS_COMMA, prev_token(par).site, "excess comma");
 		}
-		while (pick_token(par, TOK_COMMA));
-	}
+		if (peek_token(par, TOK_COMMA))
+		{
+			par->ast_stack_index = stack_start;
+			return parser_error(par, ELF_ERROR_EXCESS_COMMA, this_token(par).site, "excess comma");
+		}
 
-	Token closing = take_token(par, TOK_PAREN_RIGHT);
-	if (token_is_error(closing)) {
+		Ast argument = parse_call_argument(par);
+		if (ast_is_error(argument)) {
+			par->ast_stack_index = stack_start;
+			return argument;
+		}
+
+		if (argument == NULL_AST)
+		{
+			par->ast_stack_index = stack_start;
+			return parser_error(par, ELF_ERROR_INVALID_EXPRESSION, this_token(par).site, "expected call argument");
+		}
+
+		if (!push_ast(par, argument)) {
+			par->ast_stack_index = stack_start;
+			return ERROR_OOM_AST;
+		}
+
+		++ nargs;
+
+		/* the last argument is allowed to be a detached function,
+		so if we see a detached function, this must be the last argument,
+		Todo, we could probably add better hints here */
+		if (argument->kind == AST_NAMED_ARGUMENT) {
+			argument = argument->named_argument.expr;
+		}
+		if (argument->kind == AST_FUNCTION && argument->function.body == 0) {
+			break;
+		}
+	}
+	while (pick_token(par, TOK_COMMA));
+
+	Token close = take_token(par, TOK_PAREN_RIGHT);
+	if (token_is_error(close)) {
 		par->ast_stack_index = stack_start;
-		return ast_from_token_error(closing);
+		return ast_from_token_error(close);
 	}
 
 	Ast_Array args = pop_ast_array(par, nargs);
 	if (args.count && !args.items) {
 		return ERROR_OOM_AST;
 	}
+
+	if (args.count >= 1) {
+
+		Ast last = args.items[args.count - 1];
+		if (last->kind == AST_NAMED_ARGUMENT) {
+			last = last->named_argument.expr;
+		}
+		if (last->kind == AST_FUNCTION && !last->function.body)
+		{
+			last->function.body = parse_function_body(par, last);
+
+			if (ast_is_error(last->function.body))
+			{
+				return last->function.body;
+			}
+		}
+	}
+
 	return create_call_ast(par, site, callee, args);
 }
 
@@ -1898,7 +1956,7 @@ static Ast parse_call_argument(Parser *parser)
 		if (!expr) {
 			return parser_error(parser, ELF_ERROR_INVALID_EXPRESSION, assign.site, "expected named argument expression");
 		}
-		return create_named_argument_ast(parser, name_token.site, name, expr);
+		return ast_new_named_argument(parser, name_token.site, name, expr);
 	}
 
 	return parse_expr(parser);
