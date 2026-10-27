@@ -56,7 +56,6 @@ Loads and register movement
   BC_LOAD_CONSTANT_INTEGER: x = destination register, y = index in the prototype's integer constants.
   BC_LOAD_NIL: x = destination register. Write nil to r[x].
   BC_MOVE: x = destination register, y = source register. Copy r[y] to r[x].
-  BC_LOAD_CURRENT_CLOSURE: x = destination register. Load the executing closure; requires a closure-backed frame.
 
 Allocation
   BC_NEW_TABLE: x = destination register. Allocate an empty table in r[x].
@@ -128,7 +127,6 @@ Bitwise operations
 	X(LOAD_CONSTANT_INTEGER,    "load_constant_integer")           \
 	X(LOAD_NIL,                 "load_nil")                        \
 	X(MOVE,                     "move")                            \
-	X(LOAD_CURRENT_CLOSURE,     "load_current_closure")            \
 	X(GET_INDEX,                "get_index")                       \
 	X(GET_META_FIELD,           "get_meta_field")                  \
 	X(MEASURE,                  "measure")                         \

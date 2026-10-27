@@ -555,7 +555,7 @@ static void test_backend_materializes_static_recurse_value(void)
 		test_fail("calling a static function that returns recurse uses its prototype value");
 	}
 	if (closures != 0) {
-		test_fail("using recurse as a value loads the current closure without allocating one");
+		test_fail("using recurse as a value copies the current callable without allocating a closure");
 	}
 	backend_test_destroy(result);
 }

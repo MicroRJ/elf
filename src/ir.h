@@ -23,7 +23,7 @@ Literal values
 Named, local, and callable values
   IR_NATIVE_FUNCTION refers to a native function in the target state's registry.
   IR_LOAD_CAPTURE reads an IrCapture from the current closure.
-  IR_RECURSE produces the current closure for a recursive call.
+  IR_RECURSE produces the current callable for a recursive call.
   IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
   IR_LOAD reads an IR_LOCAL whose statement has already assigned its slot; it never allocates the slot itself.
   IR_GET_MEM produces that assigned stack-slot index and has the same allocation precondition as IR_LOAD.

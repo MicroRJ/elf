@@ -95,12 +95,6 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		}
 		break;
 
-		case BC_LOAD_CURRENT_CLOSURE:
-		{
-			arena_pushf(arena, "r%d = current_closure", byte.b_x);
-		}
-		break;
-
 		case BC_GET_INDEX:
 		{
 			arena_pushf(arena, "r%d = r%d[r%d]", byte.b_x, byte.b_y, byte.b_z);

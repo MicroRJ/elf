@@ -306,14 +306,6 @@ static u32 vm_resume(State *state)
 			}
 			break;
 
-			// TODO(RJ): deprecate this function, the compiler knows the current closure already!
-			case BC_LOAD_CURRENT_CLOSURE:
-			{
-				ASSERT(frame->base->type == ELF_VALUE_TYPE_PROTOTYPE || frame->base->type == ELF_VALUE_TYPE_CLOSURE);
-				frame->regs[byte.b_x] = * frame->base;
-			}
-			break;
-
 			case BC_LOAD_NATIVE_FUNCTION: {
 				if (byte.b_y < 0 || (u32)byte.b_y >= state->native_function_count)
 				{

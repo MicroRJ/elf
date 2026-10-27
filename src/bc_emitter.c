@@ -701,7 +701,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			}
 
 			out = ensure_slot(emitter, out);
-			emit_bytecode_xy(emitter, site, BC_LOAD_CURRENT_CLOSURE, out, 0);
+			emit_move(emitter, site, out, 0);
 		}
 		break;
 
