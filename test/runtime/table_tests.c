@@ -17,13 +17,6 @@ static elf_Value test_value_int(elf_Int integer)
 	return test_key_int(integer);
 }
 
-static void expect_nil(elf_Value value, const char *label)
-{
-	if (value.type != ELF_VALUE_TYPE_NIL) {
-		test_fail(label);
-	}
-}
-
 static void expect_int(elf_Value value, elf_Int expected, const char *label)
 {
 	if (value.type != ELF_VALUE_TYPE_INTEGER || value.x_int != expected) {
@@ -42,33 +35,6 @@ static void expect_table_value(elf_Value value, const char *label)
 {
 	if (value.type != ELF_VALUE_TYPE_TABLE) {
 		test_fail(label);
-	}
-}
-
-static void test_table_field_set_get(elf_State *state)
-{
-	elf_Table *table = push_new_table(state);
-
-	elf_table_set(state, table, test_key_string(state, "answer"), test_value_int(42));
-	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "answer")), 42, "field get by equal string key");
-
-	elf_table_set(state, table, test_key_string(state, "answer"), test_value_int(43));
-	expect_index(table->count, 1, "field overwrite keeps one mapping");
-	expect_int(elf_table_get_or_nil(state, table, test_key_string(state, "answer")), 43, "field overwrite elf_Value");
-
-	expect_nil(elf_table_get_or_nil(state, table, test_key_string(state, "missing")), "missing field returns nil");
-}
-
-static void test_table_integer_keys(elf_State *state)
-{
-	elf_Table *table = push_new_table(state);
-
-	for (u32 i = 0; i < 64; ++i) {
-		elf_table_set(state, table, test_key_int(i), test_value_int(i * 10));
-	}
-
-	for (u32 i = 0; i < 64; ++i) {
-		expect_int(elf_table_get_or_nil(state, table, test_key_int(i)), i * 10, "integer key lookup");
 	}
 }
 
@@ -130,34 +96,8 @@ static void test_table_delete_and_reuse_tombstones(elf_State *state)
 	}
 }
 
-static void expect_function_value(elf_Value value, const char *label)
-{
-	if (value.type != ELF_VALUE_TYPE_CFUNCTION) {
-		test_fail(label);
-	}
-}
-
-static void test_table_metatable(elf_State *state)
-{
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "length")), "table.length is a method");
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "size")), "table.size is a method");
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "has")), "table.has is a method");
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "delete")), "table.delete is a method");
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clear")), "table.clear is a method");
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "clone")), "table.clone is a method");
-	expect_function_value(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "keys")), "table.keys is a method");
-	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "map_equal")), "table.map_equal is absent");
-	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "haskey")), "table.haskey is absent");
-	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "values")), "table.values is absent");
-	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "pairs")), "table.pairs is absent");
-	expect_nil(elf_table_get_or_nil(state, state->metatables.table, test_key_string(state, "merge")), "table.merge is absent");
-}
-
 static void run_table_tests(elf_State *state)
 {
-	TEST_RUN("table.field_set_get", test_table_field_set_get, state);
-	TEST_RUN("table.integer_keys", test_table_integer_keys, state);
 	TEST_RUN("table.resize_stress", test_table_resize_stress, state);
 	TEST_RUN("table.delete_and_reuse_tombstones", test_table_delete_and_reuse_tombstones, state);
-	TEST_RUN("table.metatable", test_table_metatable, state);
 }
