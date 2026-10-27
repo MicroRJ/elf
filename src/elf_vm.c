@@ -195,25 +195,27 @@ static u32 vm_resume(State *state)
 				{
 					ASSERT(state->frame + 1 < state->frame_stack + state->frame_stack_size);
 					ASSERT(frame == state->frame);
-					Frame *inner = ++ state->frame;
-					zero_memory(inner, sizeof(*inner));
-					inner->base = dest;
-					inner->regs = dest;
-					inner->nargs = nargs;
-					inner->size = nargs + 1;
-					inner->ndest = ndest;
-					state->stack_top = inner->base + inner->size;
+
+					frame = ++ state->frame;
+					zero_memory(frame, sizeof(*frame));
+					frame->base = dest;
+					frame->regs = dest;
+					frame->nargs = nargs;
+					frame->size = nargs + 1;
+					frame->ndest = ndest;
+					state->stack_top = frame->base + frame->size;
 					u32 nrets = dest->x_function(state, nargs);
-					ASSERT(state->stack_top >= inner->base + inner->size);
-					RUNTIME_CHECK(nrets <= state->stack_top - inner->base - inner->size);
-					state->frame --;
-					ASSERT(frame == state->frame);
+					RUNTIME_CHECK(state->stack_top >= frame->base + frame->size + nrets);
+
 					Value *rets = state->stack_top - nrets;
 
-					Value *next_top = frame->base + frame->size;
-					value_move_many(dest, rets, MIN(ndest, nrets));
-					vm_zero_range_safe(dest + MIN(ndest, nrets), next_top);
-					state->stack_top = next_top;
+					nrets = MIN(nrets, frame->ndest);
+					value_move_many(frame->base, rets, nrets);
+					state->stack_top = frame->base + nrets;
+
+					frame = -- state->frame;
+					vm_zero_range_safe(state->stack_top, frame->base + frame->size);
+					state->stack_top = frame->base + frame->size;
 				}
 				else
 				{
@@ -236,10 +238,11 @@ static u32 vm_resume(State *state)
 
 				nrets = MIN(nrets, frame->ndest);
 				value_move_many(frame->base, frame->regs + rets, nrets);
-				Value *next_top = state->frame[-1].base + state->frame[-1].size;
-				vm_zero_range_safe(frame->base + nrets, next_top);
-				state->stack_top = next_top;
+				state->stack_top = frame->base + nrets;
+
 				frame = -- state->frame;
+				vm_zero_range_safe(state->stack_top, frame->base + frame->size);
+				state->stack_top = frame->base + frame->size;
 			}
 			break;
 

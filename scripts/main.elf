@@ -1,4 +1,12 @@
 
+wrapper :: fun() {
+	fun() { elf.error("this is an error") }()
+}
+
+wrapper()
+elf.printl("this should not print!")
+
+#eof
 my_table := { foo = fun(me, x) => me, x }
 foo := my_table.foo
 
