@@ -386,7 +386,7 @@ static void test_vm_runtime_error_diagnostics(void)
 		dy_String args[] = {DY_LIT("--runtime-error-diagnostic-child")};
 		dy_Process_Start_Options options = {
 			.executable = executable,
-			.args = {args, ARRAY_COUNT(args)},
+			.arguments = {args, ARRAY_COUNT(args)},
 			.standard_error = error_pipe.writer,
 			.hide_window = true,
 		};
