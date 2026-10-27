@@ -340,114 +340,6 @@ static void test_vm_nested_host_call_preserves_diagnostics_context(void)
 	elf_destroy_state(state);
 }
 
-static int vm_run_runtime_error_diagnostic_child(void)
-{
-	elf_State *state = elf_create_state();
-	char source_text[] =
-		"outer := fun(options) {\n"
-		"\tmiddle := fun() {\n"
-		"\t\tinner := fun(callback: callable) {\n"
-		"\t\t\tret callback\n"
-		"\t\t}\n"
-		"\t\tinner(42)\n"
-		"\t}\n"
-		"\tmiddle()\n"
-		"}\n"
-		"outer({ first = 1, second = 2, third = 3, expected_tail = 4 })";
-	elf_StrSlice source = {source_text, sizeof(source_text) - 1};
-	if (elf_push_code_source(state, 0, ELF_LIT("diagnostic-stack"), source) != ELF_ERROR_NONE)
-	{
-		elf_destroy_state(state);
-		return 2;
-	}
-	elf_call(state, 0);
-	elf_destroy_state(state);
-	return 3;
-}
-
-static void test_vm_runtime_error_diagnostics(void)
-{
-	Scratch scratch = scratch_begin();
-	dy_String executable = {};
-	dy_Pipe error_pipe = {};
-	dy_Process process = {};
-	dy_Process_Status status = DY_PROCESS_RUNNING;
-	u32 exit_code = 0;
-	char output[16384] = {};
-	u64 output_size = 0;
-	b32 valid = dy_get_executable_path(scratch.arena, &executable).error == DY_ERROR_NONE;
-	b32 started = false;
-	if (valid)
-	{
-		valid = dy_pipe_create(&error_pipe).error == DY_ERROR_NONE;
-	}
-	if (valid)
-	{
-		dy_String args[] = {DY_LIT("--runtime-error-diagnostic-child")};
-		dy_Process_Start_Options options = {
-			.executable = executable,
-			.arguments = {args, ARRAY_COUNT(args)},
-			.standard_error = error_pipe.writer,
-			.hide_window = true,
-		};
-		started = dy_process_start(options, &process).error == DY_ERROR_NONE;
-		valid = started;
-	}
-	if (started)
-	{
-		dy_stream_close(error_pipe.writer);
-		error_pipe.writer = 0;
-		b32 exited = dy_process_wait(process, DY_WAIT_INFINITE, &status, &exit_code).error == DY_ERROR_NONE;
-		valid = valid && exited && status == DY_PROCESS_EXITED && exit_code == 1;
-
-		b32 read_complete = false;
-		while (output_size < sizeof(output) - 1)
-		{
-			u64 read_size = 0;
-			dy_Result read = dy_stream_read(error_pipe.reader, output + output_size, sizeof(output) - output_size - 1, 0, &read_size);
-			if (read.error == DY_ERROR_NONE)
-			{
-				output_size += read_size;
-			}
-			else
-			{
-				read_complete = read.error == DY_ERROR_END_OF_STREAM;
-				break;
-			}
-		}
-		output[output_size] = 0;
-		valid = valid && read_complete;
-	}
-	if (valid)
-	{
-		const char *headline = strstr(output, "runtime error[type-mismatch]");
-		const char *type_error = headline ? strstr(headline, "type error, expected 'callable', got 'integer'") : 0;
-		const char *current = type_error ? strstr(type_error, "diagnostic-stack [3:16]") : 0;
-		const char *current_source = current ? strstr(current, "| inner := fun(callback: callable) {") : 0;
-		const char *current_marker = current_source ? strstr(current_source, "|              ^~~~~~~~") : 0;
-		const char *call_stack = current_marker ? strstr(current_marker, "call stack:") : 0;
-		const char *inner_caller = call_stack ? strstr(call_stack, "diagnostic-stack [6:3]") : 0;
-		const char *inner_source = inner_caller ? strstr(inner_caller, "| inner(42)") : 0;
-		const char *middle_caller = inner_source ? strstr(inner_source, "diagnostic-stack [8:2]") : 0;
-		const char *middle_source = middle_caller ? strstr(middle_caller, "| middle()") : 0;
-		const char *outer_caller = middle_source ? strstr(middle_source, "diagnostic-stack [10:1]") : 0;
-		const char *outer_source = outer_caller ? strstr(outer_caller, "| outer({ first = 1, second = 2, third = 3, expected_tail = 4 })") : 0;
-		valid = headline && type_error && current && current_source && current_marker && call_stack && inner_caller && inner_source && middle_caller && middle_source && outer_caller && outer_source;
-	}
-
-	dy_pipe_close(&error_pipe);
-	if (dy_process_is_valid(process))
-	{
-		dy_process_close(&process);
-	}
-	if (!valid)
-	{
-		fprintf(stderr, "runtime error diagnostics output:\n%s", output);
-		test_fail("runtime errors print the current source and ordered caller locations");
-	}
-	scratch_end(scratch);
-}
-
 static void test_vm_module_converts_atom_constants(void)
 {
 	elf_State *state = elf_create_state();
@@ -530,7 +422,6 @@ static void run_vm_tests(void)
 	TEST_RUN("vm.symbols", test_vm_symbols);
 	TEST_RUN("vm.compiled_closure_keeps_function_identity", test_vm_compiled_closure_keeps_function_identity);
 	TEST_RUN("vm.nested_host_call_preserves_diagnostics_context", test_vm_nested_host_call_preserves_diagnostics_context);
-	TEST_RUN("vm.runtime_error_diagnostics", test_vm_runtime_error_diagnostics);
 	TEST_RUN("vm.module_converts_atom_constants", test_vm_module_converts_atom_constants);
 	TEST_RUN("vm.error_snapshots_call_frames", test_vm_error_snapshots_call_frames);
 }

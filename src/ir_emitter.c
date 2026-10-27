@@ -1268,6 +1268,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 		}
 		break;
 
+		case AST_IMPORT:
 		case AST_STATIC_DECL:
 		{
 			// NOTE(RJ): functions are lazily lowered
@@ -1488,6 +1489,11 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
+				/* static expressions are omitted, but its a bit weird that it seems
+				as if a tuple would allow static expressions to mix */
+				if (args[i]->kind == AST_IMPORT) {
+					continue;
+				}
 				Ir ir = ir_emit_expr(emitter, args[i]);
 				ir_push(items, ir);
 			}

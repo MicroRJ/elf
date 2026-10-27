@@ -1,3 +1,4 @@
+
 // detached functions are NOT supported everywhere
 fun(fun(), fun())
 
