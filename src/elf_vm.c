@@ -63,13 +63,11 @@ u32 elf_call(State *state, u32 nargs)
 	if (base->type == ELF_VALUE_TYPE_PROTOTYPE)
 	{
 		begin_proto(state, base->x_proto, 1, base, nargs);
-		state->stack_top = frame->base + frame->size;
 		nrets = vm_resume(state);
 	}
 	else if (base->type == ELF_VALUE_TYPE_CLOSURE)
 	{
 		begin_proto(state, base->x_closure->prototype, 1, base, nargs);
-		state->stack_top = frame->base + frame->size;
 		nrets = vm_resume(state);
 	}
 	else if (base->type == ELF_VALUE_TYPE_CFUNCTION)
