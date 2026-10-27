@@ -224,15 +224,8 @@ static u32 vm_resume(State *state)
 					u32 nrets = dest->x_function(state, nargs);
 					RUNTIME_CHECK(state->stack_top >= frame->base + frame->size + nrets);
 
-					Value *rets = state->stack_top - nrets;
-
-					nrets = MIN(nrets, frame->ndest);
-					value_move_many(frame->base, rets, nrets);
-					state->stack_top = frame->base + nrets;
-
-					frame = -- state->frame;
-					vm_zero_range_safe(state->stack_top, frame->base + frame->size);
-					state->stack_top = frame->base + frame->size;
+					nroot = nrets;
+					goto finish_frame;
 				}
 				else
 				{
@@ -244,17 +237,21 @@ static u32 vm_resume(State *state)
 
 			case BC_RETURN:
 			{
-				u32 nrets = byte.b_y;
-				u32 rets = byte.b_x;
+				u32 irets = byte.b_x;
+				nroot = byte.b_y;
+				state->stack_top = frame->regs + irets + nroot;
 
 				if (frame == root) {
-					state->stack_top = frame->regs + rets + nrets;
-					nroot = nrets;
 					goto exit;
 				}
 
-				nrets = MIN(nrets, frame->ndest);
-				value_move_many(frame->base, frame->regs + rets, nrets);
+				// (stack_top, nroot):
+				//	first_return = stack_top - nroot
+				finish_frame:
+
+				Value *vrets = state->stack_top - nroot;
+				u32 nrets = MIN(nroot, frame->ndest);
+				value_move_many(frame->base, vrets, nrets);
 				state->stack_top = frame->base + nrets;
 
 				frame = -- state->frame;
