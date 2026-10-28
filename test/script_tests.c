@@ -45,7 +45,12 @@ static void run_script_test(const char *path)
 	}
 	else
 	{
-		elf_call(state, 0);
+		u32 nrets = elf_call(state, 0);
+		if (nrets == 1 && elf_is_error(state, -1))
+		{
+			TEST_FAIL("script returned an unhandled error");
+			elf_print_error(state, -1);
+		}
 	}
 
 	elf_sym_destroy(symbols);
