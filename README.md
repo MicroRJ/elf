@@ -1,217 +1,103 @@
 # elf
 
-elf is a small scripting language for programs that want C to remain in charge.
-It is useful for configuration, build descriptions, automation, and data-heavy
-logic that benefits from quick iteration.
 
-elf is currently `0.2.0-dev`. Its language, embedding API, and module behavior
-are still evolving.
+### ROADMAP
 
-```elf
-make_person := fun(name: str) {
-	ret {
-		name = name,
-		greet = fun(greeting = "hello") {
-			elf.println(f"${greeting}, ${this.name}")
-		},
-	}
-}
+- Unified error diagnostics.
 
-people := [make_person("Ada"), make_person("Grace")]
+	Currently elf sort of just reports and prints errors internally, this is simply
+	wrong, especially for an embeddable language.
 
-for person := people[...] ? {
-	person.greet("hello")
-}
+	We're already moving towards an unified error object.
+
+	Whenever some error happens, the VM creates an error object, captures whatever
+	information is necessary, stores it in that error and return it to the host.
+
+	The problem is that not every path does this, for instance, the compiler - which
+	is really just a subsystem of the runtime collects its diagnostic messages,
+	attaches each to each corresponding source, and then prints each.
+
+	Instead, it should return some sort of error as well, and attach the diagnostics
+	to it.
+
+	Then, we'll ship a unified error diagnostics API function, that takes that error
+	and actually prints it.
+
+	Or, you can take the error and print it yourself.
+
+	Because errors are catchable within the script itself, and reference-able by
+	GC objects, they must also realistically be GC objects themselves ...
+
+- Better C Integration
+
+	Writing bindings for elf, is terrible, we copied the same Lua like design and it's
+	just painful.
+
+	The direction that I want to head in is:
+
+	Have out the box (elf -> C) interfacing through JIT.
+
+	This removes, parameter validation from C and parameter extraction.
+
+	Just signature validation and parameter extraction alone consumes most of the code in some
+	of the bindings and it is a pain in the ass to maintain and produce good errors for, especially
+	at compile time.
+
+	For objects, instead of going through the C stack API, we're gonna expose the same direct table
+	"API" that we use internally, same for other objects.
+
+	I don't think the stack model makes anything easier or safer when you factor in its own complications,
+	people complain about how awkward Lua's API is regardless.
+
+	The idea is, you borrow an object, that object is never GC'd when borrowed, you manipulate it and do
+	whatever you want to it, then you return it.
+
+	Whether this reduces GC optimization opportunities in the future, or makes it harder ...
+	Not sure ...
+
+	But if that ever becomes the case, we figure out the solution.
+
+	So the current C embedding API should be considered provisional.
+
+
+
+- Static type resolution.
+
+	Currently elf is completely dynamic, the compiler has no idea what the type
+	of something is at all.
+
+	I want to move away from this, I've had my fun with it but it doesn't scale
+	well.
+
+	We don't need a full on type system.
+
+	All we need is basic type information for a given value.
+
+	Adding this, will immediately replace "meta-tables" which is I brought over
+	from Lua.
+
+	We'll retain the same syntax, but instead it'll be sugar coating for this:
+
+```c
+	foo:length() == length(foo)
 ```
 
-elf has integers, numbers, strings, arrays, tables, buffers, closures, native
-functions, errors, and host-owned user objects. Arrays are zero-indexed and
-tables provide named and computed fields.
+	We'll rely on static function signatures to find the matching length overload.
 
-## Language tour
+	That is, the user can write and define their own array functions as you normally
+	would and reuse the same convenient syntax if you wish.
 
-### Values, declarations, and assignment
+	And this will happen entire at compile time instead of resulting in a table
+	extraction, string lookup and dynamic call.
 
-```elf
-count := 0                 // mutable local
-limit ::= 60               // constant local
-answer :: 40 + 2           // statically resolved declaration
+	For length specifically, we'll have a length intrinsic instruction, since array
+	is a builtin VM object.
 
-count += 1
-count ?= load_cached()      // assign only when count is nil
+```c
 
-left, right := 10, 20
-left, right = right, left
+	length :: inline fun(array: arr) => __arr_size(array)
 
-items := [10, 20, 30]
-user := {
-	name = "Ada",
-	["favorite"] = "compiler",
-	[7] = "lucky",
-}
 ```
 
-Table entries are assignments and require commas between entries. A key may be
-a field name, a bracketed expression, or an expression followed by `=`.
+	So meta-tables are super deprecated!
 
-### Functions, calls, and `this`
-
-```elf
-scale :: fun(value: numeric, factor = 2) {
-	ret value * factor
-}
-
-doubled := scale(10)
-tripled := scale(10, factor = 3)
-
-collector := fun(first, ...) {
-	ret first, elf.nvargs(), elf.varg(0)
-}
-```
-
-Parameters may have defaults and runtime-checked annotations. The current type
-names are `int`, `num`, `numeric`, `str`, `arr`, `tab`, `buf`, `err`,
-`non_nil`, and `callable`. Default and named args require a statically
-known elf function.
-
-Every call has an implicit receiver available as `this`. Calling a table field
-or type method passes the value on the left as that receiver:
-
-```elf
-counter := {
-	value = 0,
-	increment = fun() {
-		this.value += 1
-		ret this.value
-	},
-}
-
-counter.increment()
-items:add(40)
-```
-
-### Control flow and iteration
-
-```elf
-if score > 100 ? {
-	label = "high"
-}
-elif score > 50 ? {
-	label = "medium"
-}
-else {
-	label = "low"
-}
-
-while pending ? {
-	poll()
-}
-
-for i := 0 ... 10 ? {
-	if i == 3 ? continue
-	if i == 8 ? break
-}
-
-for value := items[...] ? {
-	use(value)
-}
-```
-
-Ranges are half-open. Arrays and strings can be iterated with `[...]`,
-`[start ... end]`, `[start ...]`, or `[... end]`.
-
-`defer` runs a statement when its lexical scope exits, including through
-`ret`, `break`, and `continue`:
-
-```elf
-file := elf.fs.open("output.bin", "w")
-if elf.is_error(file) ? ret file
-defer file:close()
-```
-
-### Strings, returns, and statement endings
-
-```elf
-name := "elf"
-message := f"hello ${name}"
-
-pair := fun() {
-	ret 10, 20
-}
-
-left, right := pair()
-```
-
-Strings use `"..."`; interpolated strings use `f"..."` and `${expression}`.
-Functions may return zero, one, or several values. Newlines normally separate
-statements, and semicolons may be used as optional terminators. Comments use
-`//` or `/* ... */`.
-
-## Builtin surface
-
-Every state exposes an `elf` table together with methods on the builtin value
-types.
-
-| Surface | What it provides |
-| --- | --- |
-| `elf` | printing, assertions, conversions, error inspection, and argument access |
-| string methods | slicing, searching, splitting, trimming, replacement, and joining |
-| array methods | mutation, slicing, cloning, mapping, filtering, and sorting |
-| table methods | size, membership, deletion, cloning, and keys |
-| `elf.buffer` | mutable byte storage and string conversion |
-| `elf.math` | numeric utilities and common math functions |
-| `elf.fs`, `elf.path`, `elf.env` | files, directories, paths, and environment variables |
-| `elf.json` | JSON parsing, serialization, files, and JSON Lines |
-| `elf.random`, `elf.time` | pseudorandom values and clocks |
-| `elf.gc`, `elf.vm` | runtime diagnostic counters |
-
-Errors returned as values can be checked with `elf.is_error(value)`.
-
-## Examples
-
-The scripts used by the test suite are the best source of current examples:
-
-- [`test/scripts/`](test/scripts/) contains automatically discovered assertion
-  scripts, including [named args](test/scripts/named_arguments.elf) and
-  [file I/O](test/scripts/file_io.elf).
-- [`test/compiler/smoke/`](test/compiler/smoke/) contains focused language and
-  library examples.
-- Start with [`method_this.elf`](test/compiler/smoke/method_this.elf),
-  [`for_range.elf`](test/compiler/smoke/for_range.elf),
-  [`defer.elf`](test/compiler/smoke/defer.elf), and
-  [`interpolated_strings.elf`](test/compiler/smoke/interpolated_strings.elf).
-
-## Building
-
-The supported build environment is Windows x64 with Git, `clang-cl`, and
-Microsoft's `lib.exe`. Clone the repository with its `dy-core` submodule:
-
-```bat
-git clone --recursive https://github.com/MicroRJ/elf.git
-cd elf
-```
-
-Build [Manny](https://github.com/MicroRJ/Manny#build-from-source) and make sure
-`manny` is available on `PATH`.
-
-```bat
-build.bat build
-build.bat test
-build.bat lib
-build.bat optimized
-build.bat benchmark
-```
-
-Build products are written beneath `build/`.
-
-## Embedding
-
-The public C interface is declared in [`include/elf.h`](include/elf.h). An
-embedder creates an `elf_State`, pushes source or a source file, calls the
-resulting function, exchanges values through the stack API, and destroys the
-state when finished. Native C functions use the same stack and receive the
-implicit receiver at argument index zero.
-
-## License
-
-elf is available under the [MIT License](LICENSE).

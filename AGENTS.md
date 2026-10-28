@@ -2,34 +2,7 @@
 
 ## Shared Coding Rules
 
-`W:\MicroRJ\AGENTS_CODING_RULES.md` is the authoritative guide for general code writing, syntax, control flow, data flow, and abstraction throughout this repository. The rules below are project-specific additions.
-
-## Verification
-
-Use `.\build.bat test` for the public-header, core, compiler, VM, API, and smoke
-tests. Also run `.\build.bat optimized` for runtime/compiler changes. Use
-`.\build.bat benchmark` when making performance claims or changing hot paths.
-
-Do not create a new test or add a new test case unless the user explicitly
-authorizes it in the current task. If new coverage would help verify a feature,
-bug fix, suspected regression, or uncertain behavior, describe the proposed
-test and ask the user for permission before editing any test file. Permission
-to implement a change or run the existing test suite does not imply permission
-to create or add tests.
-
-When the user authorizes a language or runtime test that can be expressed from
-elf, add a `.elf` file directly under `test/scripts`. The runner in
-`test/script_tests.c` automatically discovers every `.elf` file in that
-directory, installs `test_assert`, compiles the script, and executes it. Use
-`test_assert` for the expected behavior; no C registration function or
-sentinel return value is needed. Keep useful authorized diagnostic scripts as
-regression tests instead of discarding them after the immediate issue is
-understood.
-
-When authorized, keep scripts under `test/compiler/smoke` when a C test must
-inspect the returned value or runtime state directly, and register those
-explicitly in `test/compiler/vm_tests.c`. Add authorized lower-level parser,
-checker, IR, backend, core, or API coverage to the corresponding C test suite.
+`..\AGENTS_CODING_RULES.md` is the authoritative guide for general code writing, syntax, control flow, data flow, and abstraction throughout this repository. The rules below are project-specific additions.
 
 ## Documentation
 
@@ -40,30 +13,6 @@ This includes documentation directories, README files, API guides, website
 content, examples maintained primarily as documentation, and changelogs. Do
 not update documentation merely because a code change makes it stale; leave
 that work to the repository's documentation agent.
-
-## Architecture Direction
-
-Read [`ORGANIZATION.md`](ORGANIZATION.md) before moving, renaming, splitting,
-or merging files under `src`. It records the current unit-build layout,
-terminology, dependency direction, and ordered cleanup work.
-
-Runtime and core must never depend on the compiler. The compiler backend may
-target runtime objects directly, but the frontend and middle stages remain
-runtime-independent: lexer, parser, checker, and IR lowering operate on
-compiler-owned representations. Runtime knowledge begins at the bytecode
-emitter.
-
-The bytecode emitter directly creates and initializes self-contained
-`elf_Prototype` objects. Do not reintroduce `BcModule`, a target abstraction,
-or an intermediate packaged module merely to create a conceptually clean
-boundary. `elf_State` owns the growable prototype table and runtime sources.
-Each prototype owns its bytecode, constants, runtime string references, source
-map, and source reference.
-
-Compiler sources may reference runtime-owned `elf_Source` objects, while
-parsing, checking, and lowering continue using compiler representations such
-as atoms, AST nodes, entities, and IR nodes. Preserve the one-way dependency:
-compiler backend to core/runtime, never core/runtime to compiler.
 
 ## Calling Convention
 

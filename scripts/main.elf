@@ -1,4 +1,29 @@
 
+// error diagnostics are printed
+
+nested :: fun() {
+	nested :: fun() {
+		nested :: fun() {
+			nested :: fun() {
+				nested :: fun() {
+					ret 1 / 0
+				}
+				nested()
+			}
+			nested()
+		}
+		nested()
+	}
+	nested()
+}
+
+nested()
+
+
+#eof
+
+
+
 // detached functions are NOT supported everywhere
 fun(fun(), fun())
 
@@ -471,8 +496,8 @@ pipeline :: import "scripts/trace_pipeline.elf"
 handle_message :: fun(message) {
 	stream := {
 		channels = [
-			[10, 20, 30],
-			[40, 50, 60],
+		[10, 20, 30],
+		[40, 50, 60],
 		],
 	}
 	packet := {

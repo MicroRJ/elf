@@ -50,13 +50,10 @@ static StackFrame *runtime_current_bytecode_frame(elf_State *state)
 	return result;
 }
 
-static void print_runtime_source_location(elf_State *state, StackFrame *frame)
+static void print_runtime_source_location(elf_Prototype *proto, u32 instr)
 {
-	ASSERT(frame);
-	elf_Prototype *proto = frame_proto(frame);
 	ASSERT(proto);
-	Bytecode *instruction = frame_active_instr(frame);
-	u32 instr = instruction - proto->bytecode;
+	ASSERT(instr < proto->bytecode_count);
 	elf_SourceMapEntry *entry = find_source_for_instr(proto, instr);
 	const char *bytecode_name = bytecode_type_name(BC_TYPE(proto->bytecode[instr]));
 	SourceSite site = {};
@@ -93,7 +90,9 @@ static void print_runtime_call_stack(elf_State *state, StackFrame *current)
 				log_line(LOG_LEVEL_INFO, "call stack:");
 				printed = true;
 			}
-			print_runtime_source_location(state, frame);
+			elf_Prototype *proto = frame_proto(frame);
+			u32 instr = frame_active_instr(frame) - proto->bytecode;
+			print_runtime_source_location(proto, instr);
 		}
 	}
 }
@@ -103,12 +102,42 @@ static void print_runtime_context(elf_State *state)
 	StackFrame *current = runtime_current_bytecode_frame(state);
 	if (current)
 	{
-		print_runtime_source_location(state, current);
+		elf_Prototype *proto = frame_proto(current);
+		u32 instr = frame_active_instr(current) - proto->bytecode;
+		print_runtime_source_location(proto, instr);
 		print_runtime_call_stack(state, current);
 	}
 	else
 	{
 		log_line(LOG_LEVEL_INFO, "source information could not be found");
+	}
+}
+
+static void print_error_diagnostic(elf_GCError *error)
+{
+	ASSERT(error);
+	ASSERT(error->message);
+
+	log_format(LOG_LEVEL_ERROR, "runtime error[%s]", elf_error_code_name(error->code));
+	log_linef(LOG_LEVEL_INFO, ": %.*s", (i32)elf_string_size(error->message), error->message->data);
+
+	if (!error->frame_count)
+	{
+		log_line(LOG_LEVEL_INFO, "source information could not be found");
+		return;
+	}
+
+	elf_ErrorFrame *frame = error->frames;
+	print_runtime_source_location(frame->prototype, frame->instruction);
+
+	if (error->frame_count > 1)
+	{
+		log_line(LOG_LEVEL_INFO, "call stack:");
+		for (u32 index = 1; index < error->frame_count; ++index)
+		{
+			frame = error->frames + index;
+			print_runtime_source_location(frame->prototype, frame->instruction);
+		}
 	}
 }
 

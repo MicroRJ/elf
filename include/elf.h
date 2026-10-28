@@ -119,6 +119,7 @@ elf_Bool elf_is_nil(elf_State *state, elf_Index index);
 elf_Bool elf_is_numeric(elf_State *state, elf_Index index);
 elf_Bool elf_is_callable(elf_State *state, elf_Index index);
 elf_Bool elf_is_error(elf_State *state, elf_Index index);
+elf_ErrorCode elf_print_error(elf_State *state, elf_Index index);
 
 
 elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type);

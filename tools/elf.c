@@ -34,6 +34,12 @@ int main(int argc, char **argv)
 	}
 
 	u32 nrets = elf_call(state, 0);
+	if (nrets == 1 && elf_is_error(state, -1))
+	{
+		elf_print_error(state, -1);
+		elf_destroy_state(state);
+		return 1;
+	}
 
 	// TODO(RJ): make this based off of a command arg
 	if (true) {

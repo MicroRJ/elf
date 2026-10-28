@@ -201,6 +201,27 @@ elf_Bool elf_is_error(elf_State *state, elf_Index index)
 	return value && value_is_error(*value);
 }
 
+elf_ErrorCode elf_print_error(elf_State *state, elf_Index index)
+{
+	if (!state)
+	{
+		return ELF_ERROR_INVALID_ARGUMENT;
+	}
+
+	elf_Value *value = value_at(state, index);
+	if (!value)
+	{
+		return ELF_ERROR_INVALID_INDEX;
+	}
+	if (!value_is_error(*value))
+	{
+		return ELF_ERROR_TYPE_MISMATCH;
+	}
+
+	print_error_diagnostic(value_as_error(*value));
+	return ELF_ERROR_NONE;
+}
+
 elf_Bool elf_is_user_object(elf_State *state, elf_Index index, const elf_UserType *type)
 {
 	elf_Value *value = value_at(state, index);
