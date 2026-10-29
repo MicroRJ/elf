@@ -89,13 +89,14 @@ static Com_Status compiler_inject_symbol_table(Compiler *compiler, Scope *scope,
 		return compiler_inject_symbols(compiler, existing->en_global.value.scope, source, field->table);
 	}
 
-	b32 created = false;
-	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
+	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name);
 	if (!entity)
 	{
 		return COM_STATUS_OOM;
 	}
-	ASSERT(created);
+
+	// TODO(RJ):
+	ASSERT(entity->count == 1);
 
 	Scope *members = scope_create(compiler->arena, SCOPE_NAMESPACE, scope, 0, 0);
 	if (!members)
@@ -114,13 +115,12 @@ static Com_Status compiler_inject_symbol_value(Compiler *compiler, Scope *scope,
 		return compiler_report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host symbol");
 	}
 
-	b32 created = false;
-	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name, &created);
+	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name);
 	if (!entity)
 	{
 		return COM_STATUS_OOM;
 	}
-	ASSERT(created);
+	ASSERT(entity->count == 1);
 
 	Com_Value *value = &entity->en_global.value;
 	switch (field->type)

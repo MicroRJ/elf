@@ -51,6 +51,7 @@ typedef dy_b32 b32;
 #define STATIC_ASSERT(x) _Static_assert(x, "no message")
 #define NO_CODE ASSERT(!"NO_CODE")
 
+#define ASSERT assert
 
 typedef dy_Arena Arena;
 typedef dy_Scratch Scratch;

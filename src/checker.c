@@ -119,13 +119,13 @@ static void pop_scope(Checker *checker, Scope *scope)
 
 static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Atom *name, SourceSite site)
 {
-	b32 created = false;
-	Entity *entity = scope_declare(scope, kind, name, &created);
+	Entity *entity = scope_declare(scope, kind, name);
 	if (!entity)
 	{
 		return entity_from_status(checker_out_of_memory(scope->source, site));
 	}
-	if (!created)
+
+	if (entity->count != 1)
 	{
 		elf_ErrorCode error = kind == ENTITY_STATIC ? ELF_ERROR_DUPLICATE_STATIC_DECLARATION : ELF_ERROR_DUPLICATE_DECLARATION;
 		Com_Status status = checker_report(scope->source, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));

@@ -53,7 +53,13 @@ struct Entity
 {
 	EntityKind      kind;
 	Com_Status      status;
-	Entity         *next_with_name;
+
+	u32            count;
+	Entity        *first;
+	Entity         *last;
+
+	Entity         *next;
+
 	struct Atom    *name;
 	Scope          *scope;
 	b32             referenced;
@@ -131,6 +137,4 @@ struct Scope
 static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source);
 static Entity *scope_find_current(Scope *scope, struct Atom *name);
 static Entity *scope_find(Scope *scope, struct Atom *name);
-static Entity *scope_declare(Scope *scope, EntityKind kind, struct Atom *name, b32 *created);
-
 #endif

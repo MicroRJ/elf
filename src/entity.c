@@ -57,12 +57,16 @@ static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct A
 	return scope;
 }
 
+// Todo, not sure if we should really consider buckets for entities with the same name ...
 static Entity *scope_find_current(Scope *scope, Atom *name)
 {
 	for (u32 i = 0; i < scope->count; ++i)
 	{
 		Entity *entity = scope->entities[i];
+
 		if (entity->name == name) {
+			ASSERT(entity->count >= 1);
+			ASSERT(entity->count != 1 || (entity->first == entity && entity->last == entity));
 			return entity;
 		}
 	}
@@ -81,37 +85,45 @@ static Entity *scope_find(Scope *scope, Atom *name)
 	return 0;
 }
 
-static Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name, b32 *created)
+static Entity *scope_declare(Scope *scope, EntityKind kind, Atom *name)
 {
 	ASSERT(kind != ENTITY_ERROR);
-	ASSERT(created);
-	Entity *result = scope_find_current(scope, name);
-	*created = false;
-	if (!result)
+	Entity *anchor = scope_find_current(scope, name);
+	ASSERT(!anchor || (anchor->count >= 1 && anchor->first == anchor));
+
+	if (scope->count == scope->capacity)
 	{
-		if (scope->count == scope->capacity)
-		{
-			u32 capacity = scope->capacity ? scope->capacity * 2 : 16;
-			Entity **entities = arena_push(scope->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
-			if (!entities) {
-				return 0;
-			}
-			if (scope->count) {
-				copy_memory(entities, scope->entities, sizeof(*entities) * scope->count);
-			}
-			scope->entities = entities;
-			scope->capacity = capacity;
-		}
-		Entity *entity = arena_push_zero(scope->arena, sizeof(*entity), _Alignof(Entity));
-		if (!entity) {
+		u32 capacity = scope->capacity ? scope->capacity * 2 : 16;
+		Entity **entities = arena_push(scope->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
+		if (!entities) {
 			return 0;
 		}
-		entity->kind = kind;
-		entity->name = name;
-		entity->scope = scope;
-		scope->entities[scope->count++] = entity;
-		result = entity;
-		*created = true;
+		if (scope->count) {
+			copy_memory(entities, scope->entities, sizeof(*entities) * scope->count);
+		}
+		scope->entities = entities;
+		scope->capacity = capacity;
 	}
-	return result;
+
+	Entity *entity = arena_push_zero(scope->arena, sizeof(*entity), _Alignof(Entity));
+
+	if (!entity) {
+		return 0;
+	}
+
+	if (!anchor) {
+		anchor = entity;
+	}
+	anchor->count ++;
+	entity->next = anchor->last;
+	anchor->last = entity;
+
+	entity->kind = kind;
+	entity->name = name;
+	entity->scope = scope;
+	entity->first = entity;
+	entity->last  = entity;
+
+	scope->entities[scope->count ++] = entity;
+	return entity;
 }
