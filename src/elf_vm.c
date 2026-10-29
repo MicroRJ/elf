@@ -330,7 +330,7 @@ static u32 vm_resume(State *state)
 			{
 				// TODO: wrong behavior | this should only accept
 				// integer or nil ... nil means zero under boolean evaluation ...
-				if (value_as_integer(frame->regs[byte.b_y]) == 0) {
+				if (frame->regs[byte.b_y].x_int == 0) {
 					frame->instr = instr + byte.b_x;
 				}
 			}
@@ -339,7 +339,7 @@ static u32 vm_resume(State *state)
 			case BC_JUMP_IF_NONZERO:
 			{
 				// TODO: wrong behavior | this performs an integer union read without accepting or validating the value type.
-				if (value_as_integer(frame->regs[byte.b_y]) != 0) {
+				if (frame->regs[byte.b_y].x_int != 0) {
 					frame->instr = instr + byte.b_x;
 				}
 			}
