@@ -171,7 +171,7 @@ static void test_vm_symbols(void)
 	elf_destroy_state(state);
 }
 
-static void test_vm_compiled_closure_keeps_function_identity(void)
+static void test_vm_compiled_functions_keep_identity(void)
 {
 	elf_State *state = elf_create_state();
 	char first_source_text[] = "ret fun(base) { ret fun() { ret base + 11 } }";
@@ -180,12 +180,17 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_StrSlice second_source = {second_source_text, sizeof(second_source_text) - 1};
 
 	if (elf_push_code_source(state, 0, ELF_LIT("first"), first_source) != ELF_ERROR_NONE) {
-		test_fail("first closure module compiles");
+		test_fail("first module compiles");
 		elf_destroy_state(state);
 		return;
 	}
-	elf_Closure *first_entry = value_as_closure(state->stack_top[-1]);
-	elf_Prototype *first_entry_prototype = first_entry->prototype;
+	elf_Value first_entry = state->stack_top[-1];
+	if (!value_is_prototype(first_entry)) {
+		test_fail("compiled source pushes its entry prototype");
+		elf_destroy_state(state);
+		return;
+	}
+	elf_Prototype *first_entry_prototype = value_as_prototype(first_entry);
 	if (first_entry_prototype != state->prototypes[0]) {
 		test_fail("first compiled entry uses the first prototype index");
 	}
@@ -201,12 +206,17 @@ static void test_vm_compiled_closure_keeps_function_identity(void)
 	elf_pop(state, 1);
 
 	if (elf_push_code_source(state, 0, ELF_LIT("second"), second_source) != ELF_ERROR_NONE) {
-		test_fail("second closure module compiles");
+		test_fail("second module compiles");
 		elf_destroy_state(state);
 		return;
 	}
-	elf_Closure *second_entry = value_as_closure(state->stack_top[-1]);
-	elf_Prototype *second_entry_prototype = second_entry->prototype;
+	elf_Value second_entry = state->stack_top[-1];
+	if (!value_is_prototype(second_entry)) {
+		test_fail("second compiled source pushes its entry prototype");
+		elf_destroy_state(state);
+		return;
+	}
+	elf_Prototype *second_entry_prototype = value_as_prototype(second_entry);
 	if (second_entry_prototype == first_entry_prototype) {
 		test_fail("each compilation publishes a distinct entry prototype");
 	}
@@ -351,7 +361,13 @@ static void test_vm_module_converts_atom_constants(void)
 		return;
 	}
 
-	elf_Prototype *prototype = value_as_closure(state->stack_top[-1])->prototype;
+	elf_Value entry = state->stack_top[-1];
+	if (!value_is_prototype(entry)) {
+		test_fail("compiled source pushes its entry prototype");
+		elf_destroy_state(state);
+		return;
+	}
+	elf_Prototype *prototype = value_as_prototype(entry);
 	if (prototype->string_count != 2 || strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0)
 	{
 		test_fail("function converts deduplicated atom constants to strings");
@@ -420,7 +436,7 @@ static void run_vm_tests(void)
 {
 	TEST_RUN("vm.preserves_actual_returns", test_vm_preserves_actual_returns);
 	TEST_RUN("vm.symbols", test_vm_symbols);
-	TEST_RUN("vm.compiled_closure_keeps_function_identity", test_vm_compiled_closure_keeps_function_identity);
+	TEST_RUN("vm.compiled_functions_keep_identity", test_vm_compiled_functions_keep_identity);
 	TEST_RUN("vm.nested_host_call_preserves_diagnostics_context", test_vm_nested_host_call_preserves_diagnostics_context);
 	TEST_RUN("vm.module_converts_atom_constants", test_vm_module_converts_atom_constants);
 	TEST_RUN("vm.error_snapshots_call_frames", test_vm_error_snapshots_call_frames);

@@ -25,12 +25,8 @@
 #include "entity.h"
 #include "ir.h"
 
-static Compiler *compiler_create(Arena *arena);
-static Com_Status compiler_inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table);
-static void compiler_log_report(Compiler *compiler);
 static b32 compiler_report(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
 static b32 compiler_reportv(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
-static elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source);
 
 #include "logging.c"
 #include "source_diagnostics.c"
@@ -40,6 +36,11 @@ static elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols,
 #include "checker.c"
 #include "ir_emitter.c"
 #include "bc_emitter.c"
+
+
+static void compiler_log_report(Compiler *compiler);
+static Compiler *compiler_create(Arena *arena);
+static Com_Status compiler_inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table);
 
 
 static Compiler *compiler_create(Arena *arena)
@@ -546,19 +547,12 @@ static elf_Prototype *compiler_compile(elf_State *target, elf_SymTable *symbols,
 
 #if !defined(ELF_COM_TEST_COPY)
 
-static elf_Bool push_compiled_prototype(elf_State *state, elf_Prototype *prototype)
+static b32 push_compiled_prototype(elf_State *state, elf_Prototype *proto)
 {
-	if (!prototype)
+	if (!proto)
 	{
 		return false;
 	}
-	ASSERT(prototype->captures == 0);
-	elf_Closure *closure = elf_closure_new(state, prototype, 0, 0);
-	if (!closure)
-	{
-		return false;
-	}
-	push_value(state, cls_value(closure));
 	return true;
 }
 
@@ -570,9 +564,14 @@ elf_ErrorCode elf_push_code_source(elf_State *state, elf_SymTable *symbols, elf_
 	}
 
 	Scratch scratch = scratch_begin();
-	elf_Prototype *prototype = compiler_compile(state, symbols, scratch.arena, name, source);
+	elf_Prototype *proto = compiler_compile(state, symbols, scratch.arena, name, source);
 	scratch_end(scratch);
-	return push_compiled_prototype(state, prototype) ? ELF_ERROR_NONE : ELF_ERROR_COMPILATION_FAILED;
+
+	if (proto) {
+		push_value(state, proto_value(proto));
+		return ELF_ERROR_NONE;
+	}
+	return ELF_ERROR_COMPILATION_FAILED;
 }
 
 static b32 compiler_load_source_file(Arena *arena, elf_StrSlice name, elf_StrSlice *source)

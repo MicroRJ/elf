@@ -99,7 +99,19 @@ static inline b32 vm_values_equal(Value left, Value right)
 		return elf_string_equal(value_as_string(left), value_as_string(right));
 	}
 
-	return value_as_integer(left) == value_as_integer(right);
+	if (value_is_nil(left)) {
+		return true;
+	}
+
+	if (value_is_function(left)) {
+		return value_as_function(left) == value_as_function(right);
+	}
+
+	if (value_is_prototype(left)) {
+		return value_as_prototype(left) == value_as_prototype(right);
+	}
+
+	return value_as_object(left) == value_as_object(right);
 }
 
 static void vm_zero_range_safe(Value *first, Value *past_last) {

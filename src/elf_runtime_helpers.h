@@ -58,18 +58,18 @@ static inline b32 value_is_object(elf_Value value)
 // Value accessors and conversions.
 //
 
-static inline i64 value_as_integer(elf_Value value)          { return value.x_int; }
-static inline f64 value_as_number(elf_Value value)           { return value.x_num; }
-static inline elf_Object *value_as_object(elf_Value value)   { return value.x_obj; }
-static inline elf_String *value_as_string(elf_Value value)   { return value.x_string; }
-static inline elf_Table *value_as_table(elf_Value value)     { return value.x_tab; }
-static inline elf_Array *value_as_array(elf_Value value)     { return value.x_array; }
-static inline elf_GCError *value_as_error(elf_Value value)   { return value.x_error; }
-static inline elf_ByteBuffer *value_as_buffer(elf_Value value){ return value.x_buffer; }
-static inline elf_UserObject *value_as_user(elf_Value value)  { return value.x_user; }
-static inline elf_Closure *value_as_closure(elf_Value value) { return value.x_closure; }
-static inline elf_Prototype *value_as_prototype(elf_Value value) { return value.x_proto; }
-static inline elf_Function value_as_function(elf_Value value){ return value.x_proc; }
+static inline i64 value_as_integer(elf_Value value)          { ASSERT(value_is_integer(value));   return value.x_int; }
+static inline f64 value_as_number(elf_Value value)           { ASSERT(value_is_number(value));    return value.x_num; }
+static inline elf_Object *value_as_object(elf_Value value)   { ASSERT(value_is_object(value));    return value.x_obj; }
+static inline elf_String *value_as_string(elf_Value value)   { ASSERT(value_is_string(value));    return value.x_string; }
+static inline elf_Table *value_as_table(elf_Value value)     { ASSERT(value_is_table(value));     return value.x_tab; }
+static inline elf_Array *value_as_array(elf_Value value)     { ASSERT(value_is_array(value));     return value.x_array; }
+static inline elf_GCError *value_as_error(elf_Value value)   { ASSERT(value_is_error(value));     return value.x_error; }
+static inline elf_ByteBuffer *value_as_buffer(elf_Value value){ ASSERT(value_is_buffer(value));    return value.x_buffer; }
+static inline elf_UserObject *value_as_user(elf_Value value) { ASSERT(value_is_user(value));      return value.x_user; }
+static inline elf_Closure *value_as_closure(elf_Value value) { ASSERT(value_is_closure(value));   return value.x_closure; }
+static inline elf_Prototype *value_as_prototype(elf_Value value) { ASSERT(value_is_prototype(value)); return value.x_proto; }
+static inline elf_Function value_as_function(elf_Value value){ ASSERT(value_is_function(value));  return value.x_proc; }
 
 static inline f64 value_to_number(elf_Value value)
 {
