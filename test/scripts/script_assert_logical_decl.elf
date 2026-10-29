@@ -18,4 +18,63 @@ if nil ? {
 }
 test_assert(nil_branch == 0, "nil does not enter a true branch")
 
+truthy :: fun(value) {
+	if value ? {
+		ret 1
+	}
+	ret 0
+}
+
+prototype_a :: fun() ret 1
+prototype_b :: fun() ret 2
+make_closure :: fun(value) ret fun() ret value
+
+closure_a := make_closure(1)
+closure_b := make_closure(2)
+table_a := {}
+table_b := {}
+array_a := []
+array_b := []
+buffer_a := elf.buffer()
+buffer_b := elf.buffer()
+error_a := elf.error("a")
+error_b := elf.error("b")
+file_a := elf.fs.open("test/scripts/script_assert_logical_decl.elf", "r")
+file_b := elf.fs.open("test/scripts/script_assert_logical_decl.elf", "r")
+
+test_assert(nil == nil, "nil equals nil")
+test_assert(0 != nil, "zero is not equal to nil")
+test_assert(1 == 1.0, "integer and number equality is numeric")
+test_assert("elf" == "e" + "lf", "strings compare by value")
+test_assert("elf" != "ELF", "different strings are not equal")
+test_assert(elf.echo == elf.echo, "the same native function compares equal")
+test_assert(elf.echo != elf.call, "different native functions do not compare equal")
+test_assert(prototype_a == prototype_a, "the same prototype compares equal")
+test_assert(prototype_a != prototype_b, "different prototypes do not compare equal")
+test_assert(closure_a == closure_a, "the same closure compares equal")
+test_assert(closure_a != closure_b, "different closures do not compare equal")
+test_assert(table_a == table_a && table_a != table_b, "tables compare by identity")
+test_assert(array_a == array_a && array_a != array_b, "arrays compare by identity")
+test_assert(buffer_a == buffer_a && buffer_a != buffer_b, "buffers compare by identity")
+test_assert(error_a == error_a && error_a != error_b, "errors compare by identity")
+test_assert(file_a == file_a && file_a != file_b, "user objects compare by identity")
+
+test_assert(truthy(nil) == 0, "nil is false")
+test_assert(truthy(0) == 0, "zero is false")
+test_assert(truthy(1) == 1, "nonzero integers are true")
+test_assert(elf.is_error(elf.call(truthy, 0.0)), "zero number conditions are rejected")
+test_assert(elf.is_error(elf.call(truthy, 1.0)), "nonzero number conditions are rejected")
+test_assert(truthy("") == 1, "strings are true")
+test_assert(truthy(elf.echo) == 1, "native functions are true")
+test_assert(truthy(prototype_a) == 1, "prototypes are true")
+test_assert(truthy(closure_a) == 1, "closures are true")
+test_assert(truthy(table_a) == 1, "tables are true")
+test_assert(truthy(array_a) == 1, "arrays are true")
+test_assert(truthy(buffer_a) == 1, "buffers are true")
+test_assert(truthy(error_a) == 1, "errors are true")
+test_assert(truthy(file_a) == 1, "user objects are true")
+
+test_assert(file_a:close())
+test_assert(file_b:close())
+
 ret 42
