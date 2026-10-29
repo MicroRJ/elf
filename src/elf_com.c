@@ -341,9 +341,16 @@ static Com_Source *compiler_alloc_source(Compiler *compiler, Atom *name, Atom *p
 		data = runtime_source->text;
 	}
 	source->source = data;
-	if (compiler->last_source) {
+	if (compiler->last_source)
+	{
 		compiler->last_source->next = source;
-	} else {
+		if (compiler->last_source->runtime_source && runtime_source)
+		{
+			compiler->last_source->runtime_source->next_compilation_source = runtime_source;
+		}
+	}
+	else
+	{
 		compiler->first_source = source;
 	}
 	compiler->last_source = source;

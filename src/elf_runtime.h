@@ -222,6 +222,7 @@ struct elf_GCError
 struct elf_Source
 {
 	elf_Source *next;
+	elf_Source *next_compilation_source;
 	u64         allocation_size;
 	dy_String   name;
 	dy_String   text;
