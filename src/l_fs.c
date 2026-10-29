@@ -814,7 +814,8 @@ static b32 fs_collect_paths(elf_State *state, dy_Path_Builder *path, u32 recursi
 			elf_push_value(state, output);
 			elf_push_str(state, path->data, (int)path->size);
 			u32 returned_count = elf_call(state, 1);
-			ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
+			elf_ErrorCode pop_error = elf_pop(state, returned_count);
+			ASSERT(pop_error == ELF_ERROR_NONE);
 			++*count;
 		}
 		else {

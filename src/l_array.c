@@ -123,7 +123,8 @@ static elf_Value array_call(elf_State *state, elf_Value function, elf_Value a, e
 	}
 	u32 returned_count = elf_call(state, pass_b ? 2 : 1);
 	elf_Value result = returned_count ? *(state->stack_top - returned_count) : value_nil();
-	ASSERT(elf_pop(state, returned_count) == ELF_ERROR_NONE);
+	elf_ErrorCode pop_error = elf_pop(state, returned_count);
+	ASSERT(pop_error == ELF_ERROR_NONE);
 	return result;
 }
 
