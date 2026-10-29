@@ -167,8 +167,8 @@ struct IrCapture
 typedef struct IrFunction IrFunction;
 struct IrFunction
 {
-	Ast         ast;
 	IrFunction *next;
+	Ast         ast;
 	Com_Source *source;
 	SourceSite  site;
 	b32         variadic;

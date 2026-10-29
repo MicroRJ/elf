@@ -1,4 +1,12 @@
 
+
+length :: fun(a: tab) {
+}
+
+#eof
+
+
+
 foo :: 1
 {
 	foo :: 2

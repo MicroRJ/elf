@@ -4,12 +4,22 @@
 typedef struct Entity Entity;
 typedef struct Scope Scope;
 
+
+typedef struct
+{
+	Ast         ast;
+	Com_Source *source;
+	SourceSite  site;
+}
+Com_Type;
+
 typedef enum
 {
 	COM_VALUE_NONE = 0,
+	COM_VALUE_ERROR,
+	COM_VALUE_TYPE,
 	COM_VALUE_AST,
 	COM_VALUE_RESOLVING,
-	COM_VALUE_ERROR,
 	COM_VALUE_NIL,
 	COM_VALUE_NUMBER,
 	COM_VALUE_INTEGER,

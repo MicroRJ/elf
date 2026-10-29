@@ -21,12 +21,9 @@ static void vm_push_errorf(elf_State *state, elf_ErrorCode code, const char *for
 {
 	va_list args;
 	va_start(args, format);
-	Scratch scratch = scratch_begin();
-	dy_String message = arena_pushfv(scratch.arena, format, args);
+	elf_GCError *error = elf_error_newfv(state, code, 0, format, args);
 	va_end(args);
-	arena_push_zero(scratch.arena, 1, 1);
-	elf_push_error(state, code, message.data);
-	scratch_end(scratch);
+	push_value(state, value_from_error(error));
 }
 
 static void vm_error_invalid_operands(State *state, BcType op, Value left, Value right)

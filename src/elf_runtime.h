@@ -214,6 +214,7 @@ struct elf_GCError
 	elf_ErrorCode  code;
 	elf_String    *message;
 	elf_Table     *data;
+	elf_Source    *source;
 	u32            frame_count;
 	elf_ErrorFrame frames[];
 };
@@ -351,6 +352,8 @@ void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
 
 elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Value *captures, u32 capture_count);
 elf_GCError *elf_error_new(elf_State *state, elf_ErrorCode code, elf_String *message, elf_Table *data);
+elf_GCError *elf_error_newf(elf_State *state, elf_ErrorCode code, elf_Table *data, const char *format, ...);
+elf_GCError *elf_error_newfv(elf_State *state, elf_ErrorCode code, elf_Table *data, const char *format, va_list args);
 
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 
