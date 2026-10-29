@@ -142,17 +142,11 @@ static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *enti
 	ASSERT(local->kind == IR_LOCAL);
 	ASSERT(local->ir_local.owner);
 	ASSERT(function);
-	ASSERT(function->ast);
-	ASSERT(!function->ast->is_static || !function->first_capture);
+	ASSERT(function->parent || !function->first_capture);
 
 	// is the entity already within this function? if so just load it
 	if (local->ir_local.owner == function) {
 		return ir_new_load(emitter, site, local);
-	}
-
-	if (function->ast->is_static) {
-		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "local '%s' cannot be captured from a static function", atom_data(entity->name));
-		return ERROR_IR;
 	}
 
 	for (IrCapture *capture = function->first_capture; capture; capture = capture->next) {
