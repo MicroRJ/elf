@@ -1575,6 +1575,7 @@ static void ir_emit_body(IrEmitter *emitter, IrFunction *definition)
 		name->entity->en_local.storage = param_memory;
 
 		Ast type = param->decl.type;
+		ASSERT(!type || (type->entity && type->entity->kind == ENTITY_STATIC && type->entity->en_static.value.type == COM_VALUE_TYPE));
 		if (type)
 		{
 			type = ast_ensure_kind(type, AST_IDENT);
@@ -1584,15 +1585,9 @@ static void ir_emit_body(IrEmitter *emitter, IrFunction *definition)
 			}
 			else
 			{
-				TypeRule rule = type_rule_from_atom(type->atom);
-				if (rule == TRULE_NONE)
-				{
-					ir_report_error(emitter, ELF_ERROR_LOWERING, type->site, "'%s' is not a known type name", atom_data(type->atom));
-				}
-				else
-				{
-					param_memory->type_rule = rule;
-				}
+				TypeRule rule = type->entity->en_static.value.com_type->rule;
+				ASSERT(rule != TRULE_NONE);
+				param_memory->type_rule = rule;
 			}
 		}
 	}

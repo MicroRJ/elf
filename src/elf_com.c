@@ -68,38 +68,52 @@ static Compiler *new_compiler(Arena *arena)
 		return 0;
 	}
 
-
-	static Com_Type type_nil = {};
-	static Com_Type type_int = {};
-	static Com_Type type_num = {};
-	static Com_Type type_tab = {};
-	static Com_Type type_arr = {};
-	static Com_Type type_fun = {};
-	static Com_Type type_cls = {};
-	static Com_Type type_cfn = {};
-	static Com_Type type_buf = {};
+	static Com_Type type_nil = {TRULE_NIL};
+	static Com_Type type_num = {TRULE_NUMBER};
+	static Com_Type type_int = {TRULE_INTEGER};
+	static Com_Type type_fun = {TRULE_FUNCTION};
+	static Com_Type type_user = {TRULE_USER};
+	static Com_Type type_closure = {TRULE_CLOSURE};
+	static Com_Type type_tab = {TRULE_TABLE};
+	static Com_Type type_str = {TRULE_STRING};
+	static Com_Type type_err = {TRULE_ERROR};
+	static Com_Type type_buf = {TRULE_BUFFER};
+	static Com_Type type_arr = {TRULE_ARRAY};
+	static Com_Type type_all = {TRULE_ALL};
+	static Com_Type type_numeric = {TRULE_NUMERIC};
+	static Com_Type type_nonnil = {TRULE_NONNIL};
+	static Com_Type type_obj = {TRULE_OBJECT};
+	static Com_Type type_callable = {TRULE_CALLABLE};
 
 	struct {
 		const char *name;
-		Com_Type    type;
+		Com_Type   *type;
 	}
 	static type_decls[] = {
-		{"int", {0}},
-		{"num", {0}},
-		{"tab", {0}},
-		{"str", {0}},
-		{"arr", {0}},
-		{"fun", {0}},
-		{"cls", {0}},
-		{"cfn", {0}},
-		{"buf", {0}},
+		{ "nil",      &type_nil      },
+		{ "num",      &type_num      },
+		{ "int",      &type_int      },
+		{ "fun",      &type_fun      },
+		{ "user",     &type_user     },
+		{ "closure",  &type_closure  },
+		{ "tab",      &type_tab      },
+		{ "str",      &type_str      },
+		{ "err",      &type_err      },
+		{ "buf",      &type_buf      },
+		{ "arr",      &type_arr      },
+		{ "all",      &type_all      },
+		{ "numeric",  &type_numeric  },
+		{ "nonnil",   &type_nonnil   },
+		{ "obj",      &type_obj      },
+		{ "callable", &type_callable },
 	};
 
 	for (u32 i = 0; i < ARRAY_COUNT(type_decls); ++ i) {
 		Entity *en = scope_declare(com->globals, ENTITY_STATIC, atom_from_data(com->atoms, type_decls[i].name));
 		en->en_static.value.type = COM_VALUE_TYPE;
-		en->en_static.value.com_type = &type_decls[i].type;
+		en->en_static.value.com_type = type_decls[i].type;
 	}
+
 
 	return com;
 }

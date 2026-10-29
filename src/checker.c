@@ -364,32 +364,42 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				Ast param = expr->function.params.items[i];
 				ASSERT(param);
 				ASSERT(param->kind == AST_DECL_STAT);
-				if (param->decl.type && (param->decl.type->kind != AST_IDENT || param->decl.type->atom->id <= ATOM_TYPE_NAME_NONE || param->decl.type->atom->id >= ATOM_TYPE_NAME_COUNT))
+				ASSERT(!param->decl.type || param->decl.type->kind == AST_IDENT);
+
+				if (param->decl.type)
 				{
 					Com_Value param_value = resolve_expression(checker, param->decl.type);
 					if (param_value.type == COM_VALUE_ERROR) {
 						value = param_value;
+						break;
+					}
+					else if (param_value.type != COM_VALUE_TYPE) {
+						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_NOT_A_TYPE, ERROR_ERROR, param->decl.type->site, "expression does not evaluate to a type");
+						value = com_value_error(status);
+						break;
 					}
 				}
-				if (value.type != COM_VALUE_ERROR && param->decl.expr)
+
+				if (param->decl.expr)
 				{
 					Com_Value param_value = resolve_expression(checker, param->decl.expr);
 					if (param_value.type == COM_VALUE_ERROR) {
 						value = param_value;
 					}
 				}
-				if (value.type == COM_VALUE_ERROR) {
-					break;
-				}
+
 				Ast name = param->decl.name;
 				ASSERT(name);
 				ASSERT(name->kind == AST_IDENT);
 				ASSERT(name->atom);
 				ASSERT(!name->entity);
 				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name->identifier, name->site);
-				if (entity_is_error(entity)) {
+				if (entity_is_error(entity))
+				{
 					value = com_value_error(entity->status);
-				} else {
+				}
+				else
+				{
 					entity->en_local.declaration = param;
 					name->entity = entity;
 				}

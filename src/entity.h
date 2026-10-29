@@ -7,9 +7,8 @@ typedef struct Scope Scope;
 
 typedef struct
 {
-	Ast         ast;
-	Com_Source *source;
-	SourceSite  site;
+	// TODO(RJ): this is because the VM uses type rules for runtime checking ...
+	TypeRule    rule;
 }
 Com_Type;
 
@@ -17,6 +16,7 @@ Com_Type;
 	X(NONE,            "none")            \
 	X(ERROR,           "error")           \
 	X(TYPE,            "type")            \
+	X(TYPE_RULE,       "type_rule")       \
 	X(AST,             "ast")             \
 	X(RESOLVING,       "resolving")       \
 	X(NIL,             "nil")             \
@@ -26,7 +26,7 @@ Com_Type;
 	X(FUNCTION,        "function")        \
 	X(EXPORTS,         "exports")         \
 	X(SCOPE,           "scope")           \
-	X(NATIVE_FUNCTION, "native function") \
+	X(NATIVE_FUNCTION, "native_function") \
 /* end */
 
 typedef enum
@@ -49,13 +49,16 @@ static inline const char *com_value_type_name(Com_ValueType type)
 	}
 }
 
+// Todo, prefix fields with cv_ for easier grepping!
 typedef struct
 {
+	// Todo, rename to kind
 	Com_ValueType type;
 	union
 	{
 		Com_Status    status;
 		struct Ast_T *ast;
+		// Todo, rename to type
 		Com_Type     *com_type;
 		f64           number;
 		i64           integer;

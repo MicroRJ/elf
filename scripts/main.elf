@@ -1,5 +1,37 @@
 
-ret cls + tab
+
+
+length :: fun(b: callable) {
+}
+
+length(10)
+#eof
+
+length :: fun(b: int) {
+}
+
+length(fun(){})
+#eof
+
+length :: fun(b: mystery) {
+}
+
+length(fun(){})
+#eof
+
+
+length :: fun(b: callable) {
+}
+
+length(fun(){})
+#eof
+length :: fun(b: foo) {
+}
+
+length(10)
+#eof
+
+ret closure + tab
 ret str + tab
 ret int + tab
 
