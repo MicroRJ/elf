@@ -356,6 +356,7 @@ elf_GCError *elf_error_new(elf_State *state, elf_ErrorCode code, elf_String *mes
 elf_GCError *elf_error_newf(elf_State *state, elf_ErrorCode code, elf_Table *data, const char *format, ...);
 elf_GCError *elf_error_newfv(elf_State *state, elf_ErrorCode code, elf_Table *data, const char *format, va_list args);
 
+// Todo, this should take a str slice!
 elf_String *elf_string_from_data_size(elf_State *state, const char *data, u32 size);
 
 elf_ByteBuffer *elf_buffer_new_object(elf_State *state, u32 capacity);

@@ -13,23 +13,41 @@ typedef struct
 }
 Com_Type;
 
+#define COM_VALUE_TYPES(X)               \
+	X(NONE,            "none")            \
+	X(ERROR,           "error")           \
+	X(TYPE,            "type")            \
+	X(AST,             "ast")             \
+	X(RESOLVING,       "resolving")       \
+	X(NIL,             "nil")             \
+	X(NUMBER,          "number")          \
+	X(INTEGER,         "integer")         \
+	X(STRING,          "string")          \
+	X(FUNCTION,        "function")        \
+	X(EXPORTS,         "exports")         \
+	X(SCOPE,           "scope")           \
+	X(NATIVE_FUNCTION, "native function") \
+/* end */
+
 typedef enum
 {
-	COM_VALUE_NONE = 0,
-	COM_VALUE_ERROR,
-	COM_VALUE_TYPE,
-	COM_VALUE_AST,
-	COM_VALUE_RESOLVING,
-	COM_VALUE_NIL,
-	COM_VALUE_NUMBER,
-	COM_VALUE_INTEGER,
-	COM_VALUE_STRING,
-	COM_VALUE_FUNCTION,
-	COM_VALUE_EXPORTS,
-	COM_VALUE_SCOPE,
-	COM_VALUE_NATIVE_FUNCTION,
+#define COM_VALUE_ENUM(name, text) COM_VALUE_##name,
+	COM_VALUE_TYPES(COM_VALUE_ENUM)
+#undef COM_VALUE_ENUM
+	COM_VALUE_COUNT,
 }
 Com_ValueType;
+
+static inline const char *com_value_type_name(Com_ValueType type)
+{
+	switch (type)
+	{
+#define COM_VALUE_NAME(name, text) case COM_VALUE_##name: return text;
+		COM_VALUE_TYPES(COM_VALUE_NAME)
+#undef COM_VALUE_NAME
+		default: return "unknown";
+	}
+}
 
 typedef struct
 {
@@ -38,6 +56,7 @@ typedef struct
 	{
 		Com_Status    status;
 		struct Ast_T *ast;
+		Com_Type     *com_type;
 		f64           number;
 		i64           integer;
 		struct Atom  *string;

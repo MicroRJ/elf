@@ -49,25 +49,59 @@ static Compiler *new_compiler(Arena *arena)
 		return 0;
 	}
 
-	Compiler *compiler = arena_push_zero(arena, sizeof(*compiler), _Alignof(Compiler));
-	if (!compiler) {
+	Compiler *com = arena_push_zero(arena, sizeof(*com), _Alignof(Compiler));
+	if (!com) {
 		return 0;
 	}
-	compiler->arena = arena;
+	com->arena = arena;
 
-	compiler->atoms = arena_push_zero(arena, sizeof(*compiler->atoms), _Alignof(Atom_Table));
-	if (!compiler->atoms) {
+	com->atoms = arena_push_zero(arena, sizeof(*com->atoms), _Alignof(Atom_Table));
+	if (!com->atoms) {
 		return 0;
 	}
-	if (!atom_table_init(compiler->atoms, arena)) {
+	if (!atom_table_init(com->atoms, arena)) {
 		return 0;
 	}
 
-	compiler->globals = scope_create(arena, SCOPE_GLOBAL, 0, 0, 0);
-	if (!compiler->globals) {
+	com->globals = scope_create(arena, SCOPE_GLOBAL, 0, 0, 0);
+	if (!com->globals) {
 		return 0;
 	}
-	return compiler;
+
+
+	static Com_Type type_nil = {};
+	static Com_Type type_int = {};
+	static Com_Type type_num = {};
+	static Com_Type type_tab = {};
+	static Com_Type type_arr = {};
+	static Com_Type type_fun = {};
+	static Com_Type type_cls = {};
+	static Com_Type type_cfn = {};
+	static Com_Type type_buf = {};
+
+	struct {
+		const char *name;
+		Com_Type    type;
+	}
+	static type_decls[] = {
+		{"int", {0}},
+		{"num", {0}},
+		{"tab", {0}},
+		{"str", {0}},
+		{"arr", {0}},
+		{"fun", {0}},
+		{"cls", {0}},
+		{"cfn", {0}},
+		{"buf", {0}},
+	};
+
+	for (u32 i = 0; i < ARRAY_COUNT(type_decls); ++ i) {
+		Entity *en = scope_declare(com->globals, ENTITY_STATIC, atom_from_data(com->atoms, type_decls[i].name));
+		en->en_static.value.type = COM_VALUE_TYPE;
+		en->en_static.value.com_type = &type_decls[i].type;
+	}
+
+	return com;
 }
 
 static Com_Status report_symbol(Com_Source *source, elf_SymField *field, elf_ErrorCode error, const char *message)

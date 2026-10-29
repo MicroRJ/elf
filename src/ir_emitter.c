@@ -279,7 +279,7 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 			case COM_VALUE_RESOLVING:
 			default:
 			{
-				ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "static entity '%s' has invalid value type %u", atom_data(entity->name), (u32)value.type);
+				ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "static entity '%s' has invalid value type '%s'", atom_data(entity->name), com_value_type_name(value.type));
 				return ERROR_IR;
 			}
 		}

@@ -1,4 +1,11 @@
 
+ret cls + tab
+ret str + tab
+ret int + tab
+
+ret tab + tab
+
+#eof
 
 length :: fun(a: tab) {
 }
