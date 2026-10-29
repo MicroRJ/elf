@@ -45,10 +45,10 @@ IrQueue;
 
 static void ir_emit_stat(IrQueue *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
-static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
+static Ir ir_emit_block(IrEmitter *emitter, Ast stat);
 static IrFunction *ir_reserve_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast tree);
-static void ir_emit_body(IrEmitter *emitter);
-static IrFunction *ir_lower_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast tree);
+static void ir_emit_function_body(IrEmitter *emitter);
+static IrFunction *ir_emit_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast tree);
 
 static void ir_report_error(IrEmitter *emitter, elf_ErrorCode error, SourceSite site, const char *format, ...)
 {
@@ -60,7 +60,7 @@ static void ir_report_error(IrEmitter *emitter, elf_ErrorCode error, SourceSite 
 	va_end(args);
 }
 
-static IrQueue ir_begin_queue(IrEmitter *emitter)
+static IrQueue ir_queue_begin(IrEmitter *emitter)
 {
 	IrQueue block = {};
 	block.emitter = emitter;
@@ -69,7 +69,7 @@ static IrQueue ir_begin_queue(IrEmitter *emitter)
 	return block;
 }
 
-static void ir_push(IrQueue *stack, Ir ir)
+static void ir_queue_push(IrQueue *stack, Ir ir)
 {
 	IrEmitter *emitter = stack->emitter;
 	ASSERT(emitter);
@@ -79,7 +79,7 @@ static void ir_push(IrQueue *stack, Ir ir)
 	stack->count += 1;
 }
 
-static IrArray ir_end_queue(IrQueue *frame)
+static IrArray ir_queue_end(IrQueue *frame)
 {
 	IrEmitter *emitter = frame->emitter;
 	ASSERT(emitter);
@@ -97,7 +97,7 @@ static IrArray ir_end_queue(IrQueue *frame)
 	return items;
 }
 
-static IrDefer *ir_begin_defer_scope(IrEmitter *emitter)
+static IrDefer *ir_defer_begin(IrEmitter *emitter)
 {
 	ASSERT(emitter->function);
 	IrDefer *previous_defer_start = emitter->defer_scope_start;
@@ -105,14 +105,14 @@ static IrDefer *ir_begin_defer_scope(IrEmitter *emitter)
 	return previous_defer_start;
 }
 
-static void ir_close_defer_scope(IrEmitter *emitter, IrDefer *previous_defer_start)
+static void ir_defer_end(IrEmitter *emitter, IrDefer *previous_defer_start)
 {
 	ASSERT(emitter->function);
 	emitter->defer = emitter->defer_scope_start;
 	emitter->defer_scope_start = previous_defer_start;
 }
 
-static void push_defer_stat(IrEmitter *emitter, Ast stat)
+static void ir_defer_push(IrEmitter *emitter, Ast stat)
 {
 	ASSERT(emitter->function);
 	IrDefer *defer = arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
@@ -121,7 +121,7 @@ static void push_defer_stat(IrEmitter *emitter, Ast stat)
 	emitter->defer = defer;
 }
 
-static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
+static void ir_defer_emit(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 {
 	ASSERT(emitter->function);
 	for (IrDefer *defer = emitter->defer; defer != start; defer = defer->previous)
@@ -131,7 +131,7 @@ static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 	}
 }
 
-static Ir capture_entity_in_function(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
+static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
 {
 	ASSERT(entity->kind == ENTITY_LOCAL);
 	ASSERT(entity->en_local.storage);
@@ -165,7 +165,7 @@ static Ir capture_entity_in_function(IrEmitter *emitter, IrFunction *function, E
 		return ERROR_IR;
 	}
 
-	Ir parent_capture = capture_entity_in_function(emitter, parent, entity, site);
+	Ir parent_capture = ir_emit_capture(emitter, parent, entity, site);
 	if (ir_is_error(parent_capture)) {
 		return ERROR_IR;
 	}
@@ -236,7 +236,7 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 						ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "static function '%s' has no source", atom_data(entity->name));
 						return ERROR_IR;
 					}
-					ir_lower_function(entity->scope->source, emitter->module, 0, function);
+					ir_emit_function(entity->scope->source, emitter->module, 0, function);
 				}
 
 				return ir_new_function(emitter, site, function->function.ir);
@@ -281,7 +281,7 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 			ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "local entity '%s' has no storage", atom_data(entity->name));
 			return ERROR_IR;
 		}
-		return capture_entity_in_function(emitter, emitter->function, entity, site);
+		return ir_emit_capture(emitter, emitter->function, entity, site);
 	}
 	else if (entity->kind == ENTITY_ERROR)
 	{
@@ -294,7 +294,7 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 	}
 }
 
-static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
+static b32 ir_mark_entity_assigned(IrEmitter *emitter, Ast destination)
 {
 	if (!destination) {
 		return true;
@@ -316,21 +316,21 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 	return true;
 }
 
-static void push_loop(IrEmitter *emitter, IrLoopFrame *loop)
+static void ir_loop_push(IrEmitter *emitter, IrLoopFrame *loop)
 {
 	ASSERT(emitter->function);
 	loop->parent = emitter->loop;
 	emitter->loop = loop;
 }
 
-static void pop_loop(IrEmitter *emitter, IrLoopFrame *loop)
+static void ir_loop_pop(IrEmitter *emitter, IrLoopFrame *loop)
 {
 	ASSERT(emitter->function);
 	ASSERT(emitter->loop == loop);
 	emitter->loop = loop->parent;
 }
 
-static IrLoopFrame current_loop(IrEmitter *emitter, SourceSite site)
+static IrLoopFrame ir_loop_current(IrEmitter *emitter, SourceSite site)
 {
 	ASSERT(emitter->function);
 	if (!emitter->loop)
@@ -600,7 +600,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		case AST_FUNCTION:
 		{
 			ASSERT(emitter->function);
-			IrFunction *definition = ir_lower_function(emitter->function->source, emitter->module, emitter->function, expr);
+			IrFunction *definition = ir_emit_function(emitter->function->source, emitter->module, emitter->function, expr);
 			ir = ir_new_function(emitter, expr->site, definition);
 		}
 		break;
@@ -627,9 +627,9 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 			Ast *args = expr->table.items;
 			u32 nargs = expr->table.count;
 
-			IrQueue table_items = ir_begin_queue(emitter);
+			IrQueue table_items = ir_queue_begin(emitter);
 			Ir table_local = ir_new_local(emitter, expr->site, ir_new_table(emitter, expr->site));
-			ir_push(&table_items, table_local);
+			ir_queue_push(&table_items, table_local);
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
@@ -637,7 +637,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				if (ast_is_error(entry))
 				{
 					ir_report_error(emitter, ELF_ERROR_INTERNAL, args[i]->site, "expected table entry");
-					ir_push(&table_items, ERROR_IR);
+					ir_queue_push(&table_items, ERROR_IR);
 					continue;
 				}
 
@@ -648,35 +648,35 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 				if (!key)
 				{
 					ir_report_error(emitter, ELF_ERROR_INTERNAL, entry->site, "expected keyed table entry");
-					ir_push(&table_items, ERROR_IR);
+					ir_queue_push(&table_items, ERROR_IR);
 					continue;
 				}
 				Ir ir_key = ir_emit_expr(emitter, key);
 				Ir field = ir_new_binary(emitter, entry->site, IR_FIELD, table, ir_key);
-				ir_push(&table_items, ir_new_store(emitter, entry->site, field, ir_value));
+				ir_queue_push(&table_items, ir_new_store(emitter, entry->site, field, ir_value));
 			}
 
 			Ir value = ir_new_load(emitter, expr->site, table_local);
-			IrArray stats = ir_end_queue(&table_items);
+			IrArray stats = ir_queue_end(&table_items);
 			ir = ir_new_expr_block(emitter, expr->site, stats, value);
 		}
 		break;
 
 		case AST_ARRAY:
 		{
-			IrQueue array_items = ir_begin_queue(emitter);
+			IrQueue array_items = ir_queue_begin(emitter);
 			Ir array_local = ir_new_local(emitter, expr->site, ir_new_array(emitter, expr->site));
-			ir_push(&array_items, array_local);
+			ir_queue_push(&array_items, array_local);
 
 			for (u32 i = 0; i < expr->array.count; ++i)
 			{
 				Ir array = ir_new_load(emitter, expr->site, array_local);
 				Ir value = ir_emit_expr(emitter, expr->array.items[i]);
-				ir_push(&array_items, ir_new_array_add(emitter, expr->array.items[i]->site, array, value));
+				ir_queue_push(&array_items, ir_new_array_add(emitter, expr->array.items[i]->site, array, value));
 			}
 
 			Ir value = ir_new_load(emitter, expr->site, array_local);
-			IrArray stats = ir_end_queue(&array_items);
+			IrArray stats = ir_queue_end(&array_items);
 			ir = ir_new_expr_block(emitter, expr->site, stats, value);
 		}
 		break;
@@ -747,15 +747,15 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 	return ir;
 }
 
-static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat)
+static Ir ir_emit_block(IrEmitter *emitter, Ast stat)
 {
 	if (!stat || ast_is_error(stat)) {
 		return ERROR_IR;
 	}
 
-	IrQueue queue = ir_begin_queue(emitter);
+	IrQueue queue = ir_queue_begin(emitter);
 
-	IrDefer *defer_scope = ir_begin_defer_scope(emitter);
+	IrDefer *defer_scope = ir_defer_begin(emitter);
 	{
 		if (stat->kind == AST_BLOCK_STAT)
 		{
@@ -771,16 +771,16 @@ static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat)
 			ir_emit_stat(&queue, stat);
 		}
 	}
-	emit_defer_range(emitter, &queue, emitter->defer_scope_start);
-	ir_close_defer_scope(emitter, defer_scope);
+	ir_defer_emit(emitter, &queue, emitter->defer_scope_start);
+	ir_defer_end(emitter, defer_scope);
 
 	ASSERT(emitter->ir_stack_index == queue.start + queue.count);
-	IrArray instr = ir_end_queue(&queue);
+	IrArray instr = ir_queue_end(&queue);
 	Ir ir = ir_new_block(emitter, stat->site, instr);
 	return ir;
 }
 
-static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrQueue *items, Ast expr)
+static Ir ir_emit_lvalue(IrEmitter *emitter, IrQueue *items, Ast expr)
 {
 	Ir ir = 0;
 
@@ -793,14 +793,14 @@ static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrQueue *items, Ast expr)
 
 			Ir receiver = ir_emit_expr(emitter, x);
 			Ir receiver_memory = ir_new_local(emitter, x->site, receiver);
-			ir_push(items, receiver_memory);
+			ir_queue_push(items, receiver_memory);
 			Ir receiver_load = ir_new_load(emitter, x->site, receiver_memory);
 
 			Ir key_load = ir_emit_expr(emitter, y);
 			if (y->kind != AST_STRING_LITERAL)
 			{
 				Ir key_memory = ir_new_local(emitter, y->site, key_load);
-				ir_push(items, key_memory);
+				ir_queue_push(items, key_memory);
 				key_load = ir_new_load(emitter, y->site, key_memory);
 			}
 
@@ -815,12 +815,12 @@ static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrQueue *items, Ast expr)
 
 			Ir receiver = ir_emit_expr(emitter, x);
 			Ir receiver_memory = ir_new_local(emitter, x->site, receiver);
-			ir_push(items, receiver_memory);
+			ir_queue_push(items, receiver_memory);
 			Ir receiver_load = ir_new_load(emitter, x->site, receiver_memory);
 
 			Ir key = ir_emit_expr(emitter, y);
 			Ir key_memory = ir_new_local(emitter, y->site, key);
-			ir_push(items, key_memory);
+			ir_queue_push(items, key_memory);
 			Ir key_load = ir_new_load(emitter, y->site, key_memory);
 
 			ir = ir_new_index(emitter, expr->site, receiver_load, key_load);
@@ -837,7 +837,7 @@ static Ir ir_emit_lvalue_once(IrEmitter *emitter, IrQueue *items, Ast expr)
 	return ir;
 }
 
-static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast name_tuple, Ast expr_tuple)
+static u32 ir_emit_local_decl(IrEmitter *emitter, IrQueue *items, Ast name_tuple, Ast expr_tuple)
 {
 	u32 nvars = name_tuple->tuple.count;
 
@@ -847,7 +847,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
 		{
 			ir_report_error(emitter, ELF_ERROR_LOWERING, expr->site, "range expressions cannot be used as declaration values; use a range for loop");
-			ir_push(items, ERROR_IR);
+			ir_queue_push(items, ERROR_IR);
 			return 1;
 		}
 	}
@@ -862,7 +862,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 			if (ast_is_error(name))
 			{
 				ir_report_error(emitter, ELF_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
-				ir_push(items, ERROR_IR);
+				ir_queue_push(items, ERROR_IR);
 				return 1;
 			}
 
@@ -872,7 +872,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 			ASSERT(!name->entity->en_local.storage);
 			name->entity->en_local.storage = locals.items[i];
 		}
-		ir_push(items, ir_new_multi_local(emitter, expr_tuple->site, expr, locals));
+		ir_queue_push(items, ir_new_multi_local(emitter, expr_tuple->site, expr, locals));
 		return nvars;
 	}
 
@@ -882,7 +882,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 		if (ast_is_error(name))
 		{
 			ir_report_error(emitter, ELF_ERROR_INTERNAL, name_tuple->site, "expected declaration name");
-			ir_push(items, ERROR_IR);
+			ir_queue_push(items, ERROR_IR);
 			return 1;
 		}
 
@@ -898,7 +898,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 		}
 
 		Ir local = ir_new_local(emitter, name->site, value);
-		ir_push(items, local);
+		ir_queue_push(items, local);
 		ASSERT(name->entity);
 		ASSERT(!name->entity->en_local.storage);
 		name->entity->en_local.storage = local;
@@ -907,7 +907,7 @@ static u32 lower_local_decl_tuples_to_ir(IrEmitter *emitter, IrQueue *items, Ast
 	return nvars;
 }
 
-static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_tuple, Ast range_expr)
+static Ir ir_emit_range_for_expr(IrEmitter *emitter, Ast stat, Ast name_tuple, Ast range_expr)
 {
 	Ast collection_expr = 0;
 	Ast range = range_expr;
@@ -990,18 +990,18 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
 	loop_frame.defer_start = emitter->defer;
-	push_loop(emitter, &loop_frame);
-	Ir body = ir_emit_stat_as_block(emitter, stat->for_range_stat.body);
-	pop_loop(emitter, &loop_frame);
+	ir_loop_push(emitter, &loop_frame);
+	Ir body = ir_emit_block(emitter, stat->for_range_stat.body);
+	ir_loop_pop(emitter, &loop_frame);
 
 	Ir load_iterator_local = ir_new_load(emitter, first_name->site, iterator_local);
 	Ir load_range_end_local = ir_new_load(emitter, range_end_site, range_end_local);
 	Ir iterator_less_than_range_end = ir_new_binary(emitter, range->site, IR_LESS_THAN, load_iterator_local, load_range_end_local);
 	Ir exit_jump = ir_new_jump_if_false(emitter, range->site, iterator_less_than_range_end, break_label);
 
-	IrQueue loop_items = ir_begin_queue(emitter);
-	ir_push(&loop_items, start_label);
-	ir_push(&loop_items, exit_jump);
+	IrQueue loop_items = ir_queue_begin(emitter);
+	ir_queue_push(&loop_items, start_label);
+	ir_queue_push(&loop_items, exit_jump);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = name_tuple->tuple.items[i];
@@ -1019,7 +1019,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 			value = ir_new_index(emitter, name->site, collection, value);
 		}
 
-		ir_push(&loop_items, ir_new_store(emitter, name->site, var_locals.items[i], value));
+		ir_queue_push(&loop_items, ir_new_store(emitter, name->site, var_locals.items[i], value));
 	}
 
 	Ir iterator_load_for_add = ir_new_load(emitter, first_name->site, iterator_local);
@@ -1027,33 +1027,33 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	Ir next_value = ir_new_binary(emitter, first_name->site, IR_ADD, iterator_load_for_add, stride);
 	Ir increment = ir_new_store(emitter, first_name->site, iterator_local, next_value);
 
-	ir_push(&loop_items, body);
-	ir_push(&loop_items, continue_label);
-	ir_push(&loop_items, increment);
-	ir_push(&loop_items, ir_new_jump(emitter, first_name->site, start_label));
-	ir_push(&loop_items, break_label);
-	IrArray loop_stats = ir_end_queue(&loop_items);
+	ir_queue_push(&loop_items, body);
+	ir_queue_push(&loop_items, continue_label);
+	ir_queue_push(&loop_items, increment);
+	ir_queue_push(&loop_items, ir_new_jump(emitter, first_name->site, start_label));
+	ir_queue_push(&loop_items, break_label);
+	IrArray loop_stats = ir_queue_end(&loop_items);
 	Ir loop = ir_new_block(emitter, stat->site, loop_stats);
 
-	IrQueue block_items = ir_begin_queue(emitter);
+	IrQueue block_items = ir_queue_begin(emitter);
 	if (collection_local) {
-		ir_push(&block_items, collection_local);
+		ir_queue_push(&block_items, collection_local);
 	}
-	ir_push(&block_items, iterator_local);
-	ir_push(&block_items, range_end_local);
+	ir_queue_push(&block_items, iterator_local);
+	ir_queue_push(&block_items, range_end_local);
 	for (u32 i = 0; i < nvars; ++ i)
 	{
-		ir_push(&block_items, var_locals.items[i]);
+		ir_queue_push(&block_items, var_locals.items[i]);
 	}
-	ir_push(&block_items, loop);
+	ir_queue_push(&block_items, loop);
 
-	IrArray stats = ir_end_queue(&block_items);
+	IrArray stats = ir_queue_end(&block_items);
 	Ir ir = ir_new_block(emitter, stat->site, stats);
 
 	return ir;
 }
 
-static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
+static Ir ir_emit_range_for(IrEmitter *emitter, Ast stat)
 {
 	Ast decl = ast_ensure_kind(stat->for_range_stat.decl, AST_DECL_STAT);
 	if (ast_is_error(decl))
@@ -1083,10 +1083,10 @@ static Ir lower_ast_for_range_to_ir(IrEmitter *emitter, Ast stat)
 		return ERROR_IR;
 	}
 
-	return lower_ast_for_range_expr_to_ir(emitter, stat, name_tuple, range);
+	return ir_emit_range_for_expr(emitter, stat, name_tuple, range);
 }
 
-static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
+static Ir ir_emit_for(IrEmitter *emitter, Ast stat)
 {
 	Ast init = ast_ensure_kind(stat->for_stat.init, AST_DECL_STAT);
 	if (ast_is_error(init))
@@ -1095,7 +1095,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 		return ERROR_IR;
 	}
 
-	IrQueue block_items = ir_begin_queue(emitter);
+	IrQueue block_items = ir_queue_begin(emitter);
 	ir_emit_stat(&block_items, init);
 
 	Ir condition_label = ir_new_label(emitter, stat->site);
@@ -1106,31 +1106,31 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
 	loop_frame.defer_start = emitter->defer;
-	push_loop(emitter, &loop_frame);
-	Ir body = ir_emit_stat_as_block(emitter, stat->for_stat.body);
-	pop_loop(emitter, &loop_frame);
+	ir_loop_push(emitter, &loop_frame);
+	Ir body = ir_emit_block(emitter, stat->for_stat.body);
+	ir_loop_pop(emitter, &loop_frame);
 
 	Ir pred = ir_emit_expr(emitter, stat->for_stat.pred);
 	Ir exit_jump = ir_new_jump_if_false(emitter, stat->for_stat.pred->site, pred, break_label);
-	Ir step = ir_emit_stat_as_block(emitter, stat->for_stat.step);
+	Ir step = ir_emit_block(emitter, stat->for_stat.step);
 
-	IrQueue loop_items = ir_begin_queue(emitter);
-	ir_push(&loop_items, condition_label);
-	ir_push(&loop_items, exit_jump);
-	ir_push(&loop_items, body);
-	ir_push(&loop_items, continue_label);
-	ir_push(&loop_items, step);
-	ir_push(&loop_items, ir_new_jump(emitter, stat->site, condition_label));
-	ir_push(&loop_items, break_label);
-	IrArray loop_stats = ir_end_queue(&loop_items);
-	ir_push(&block_items, ir_new_block(emitter, stat->site, loop_stats));
+	IrQueue loop_items = ir_queue_begin(emitter);
+	ir_queue_push(&loop_items, condition_label);
+	ir_queue_push(&loop_items, exit_jump);
+	ir_queue_push(&loop_items, body);
+	ir_queue_push(&loop_items, continue_label);
+	ir_queue_push(&loop_items, step);
+	ir_queue_push(&loop_items, ir_new_jump(emitter, stat->site, condition_label));
+	ir_queue_push(&loop_items, break_label);
+	IrArray loop_stats = ir_queue_end(&loop_items);
+	ir_queue_push(&block_items, ir_new_block(emitter, stat->site, loop_stats));
 
-	IrArray stats = ir_end_queue(&block_items);
+	IrArray stats = ir_queue_end(&block_items);
 	Ir ir = ir_new_block(emitter, stat->site, stats);
 	return ir;
 }
 
-static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrQueue *items, Ast stat)
+static Ir ir_emit_compound_assign(IrEmitter *emitter, IrQueue *items, Ast stat)
 {
 	Ast dest_tuple = ast_ensure_kind(stat->binary.x, AST_TUPLE);
 	Ast expr_tuple = ast_ensure_kind(stat->binary.y, AST_TUPLE);
@@ -1151,9 +1151,9 @@ static Ir lower_compound_assign_to_ir(IrEmitter *emitter, IrQueue *items, Ast st
 
 	Ast dest_ast = dest_tuple->tuple.items[0];
 	Ast expr_ast = expr_tuple->tuple.items[0];
-	if (!mark_entity_assigned(emitter, dest_ast)) return ERROR_IR;
+	if (!ir_mark_entity_assigned(emitter, dest_ast)) return ERROR_IR;
 
-	Ir dest_ir = ir_emit_lvalue_once(emitter, items, dest_ast);
+	Ir dest_ir = ir_emit_lvalue(emitter, items, dest_ast);
 	Ir right_ir = ir_emit_expr(emitter, expr_ast);
 	Ir value_ir = ir_new_binary(emitter, stat->site, op, dest_ir, right_ir);
 	Ir destination_ir = dest_ir;
@@ -1169,7 +1169,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 
 	if (!stat || ast_is_error(stat))
 	{
-		ir_push(items, ERROR_IR);
+		ir_queue_push(items, ERROR_IR);
 		return;
 	}
 
@@ -1182,14 +1182,14 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			Ast else_clause = stat->if_stat.else_clause;
 
 			Ir pred_ir = ir_emit_expr(emitter, pred);
-			Ir true_ir = ir_emit_stat_as_block(emitter, true_clause);
+			Ir true_ir = ir_emit_block(emitter, true_clause);
 			Ir else_ir = 0;
 			if (else_clause) {
-				else_ir = ir_emit_stat_as_block(emitter, else_clause);
+				else_ir = ir_emit_block(emitter, else_clause);
 			}
 
 			Ir ir = ir_new_if(emitter, stat->site, pred_ir, true_ir, else_ir);
-			ir_push(items, ir);
+			ir_queue_push(items, ir);
 		}
 		break;
 
@@ -1205,43 +1205,43 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			loop_frame.continue_label = start_label;
 			loop_frame.break_label = break_label;
 			loop_frame.defer_start = emitter->defer;
-			push_loop(emitter, &loop_frame);
-			Ir body_ir = ir_emit_stat_as_block(emitter, body);
-			pop_loop(emitter, &loop_frame);
+			ir_loop_push(emitter, &loop_frame);
+			Ir body_ir = ir_emit_block(emitter, body);
+			ir_loop_pop(emitter, &loop_frame);
 
 			Ir pred_ir = ir_emit_expr(emitter, pred);
 			Ir jump_if_false = ir_new_jump_if_false(emitter, pred->site, pred_ir, break_label);
 
-			IrQueue loop_items = ir_begin_queue(emitter);
-			ir_push(&loop_items, start_label);
-			ir_push(&loop_items, jump_if_false);
-			ir_push(&loop_items, body_ir);
-			ir_push(&loop_items, ir_new_jump(emitter, stat->site, start_label));
-			ir_push(&loop_items, break_label);
+			IrQueue loop_items = ir_queue_begin(emitter);
+			ir_queue_push(&loop_items, start_label);
+			ir_queue_push(&loop_items, jump_if_false);
+			ir_queue_push(&loop_items, body_ir);
+			ir_queue_push(&loop_items, ir_new_jump(emitter, stat->site, start_label));
+			ir_queue_push(&loop_items, break_label);
 
-			IrArray loop_stats = ir_end_queue(&loop_items);
+			IrArray loop_stats = ir_queue_end(&loop_items);
 			Ir ir = ir_new_block(emitter, stat->site, loop_stats);
-			ir_push(items, ir);
+			ir_queue_push(items, ir);
 		}
 		break;
 
 		case AST_FOR:
 		{
-			Ir ir = lower_ast_for_to_ir(emitter, stat);
-			ir_push(items, ir);
+			Ir ir = ir_emit_for(emitter, stat);
+			ir_queue_push(items, ir);
 		}
 		break;
 
 		case AST_FOR_RANGE:
 		{
-			Ir ir = lower_ast_for_range_to_ir(emitter, stat);
-			ir_push(items, ir);
+			Ir ir = ir_emit_range_for(emitter, stat);
+			ir_queue_push(items, ir);
 		}
 		break;
 
 		case AST_BLOCK_STAT:
 		{
-			ir_push(items, ir_emit_stat_as_block(emitter, stat));
+			ir_queue_push(items, ir_emit_block(emitter, stat));
 		}
 		break;
 
@@ -1259,11 +1259,11 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			if (ast_is_error(name_tuple) || ast_is_error(expr_tuple))
 			{
 				ir_report_error(emitter, ELF_ERROR_INTERNAL, stat->site, "invalid declaration");
-				ir_push(items, ERROR_IR);
+				ir_queue_push(items, ERROR_IR);
 				break;
 			}
 
-			lower_local_decl_tuples_to_ir(emitter, items, name_tuple, expr_tuple);
+			ir_emit_local_decl(emitter, items, name_tuple, expr_tuple);
 		}
 		break;
 
@@ -1274,7 +1274,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
 				ir_report_error(emitter, ELF_ERROR_INTERNAL, stat->site, "invalid assignment");
-				ir_push(items, ERROR_IR);
+				ir_queue_push(items, ERROR_IR);
 				break;
 			}
 
@@ -1282,8 +1282,8 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			if (nargs == 1)
 			{
 				Ast dest_ast = dest_tuple->tuple.items[0];
-				if (!mark_entity_assigned(emitter, dest_ast)) {
-					ir_push(items, ERROR_IR);
+				if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+					ir_queue_push(items, ERROR_IR);
 					break;
 				}
 				Ast expr_ast = expr_tuple->tuple.count ? expr_tuple->tuple.items[0] : 0;
@@ -1294,7 +1294,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 					dest_ir = dest_ir->ir_load.local;
 				}
 				Ir ir = ir_new_store(emitter, stat->site, dest_ir, expr_ir);
-				ir_push(items, ir);
+				ir_queue_push(items, ir);
 				break;
 			}
 
@@ -1307,7 +1307,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				for (u32 i = 0; i < nargs; ++i) {
 					values.items[i] = ir_new_local(emitter, expr_ast->site, 0);
 				}
-				ir_push(items, ir_new_multi_local(emitter, expr_ast->site, expr_ir, values));
+				ir_queue_push(items, ir_new_multi_local(emitter, expr_ast->site, expr_ir, values));
 			}
 			else
 			{
@@ -1325,15 +1325,15 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 					}
 
 					values.items[i] = ir_new_local(emitter, site, expr_ir);
-					ir_push(items, values.items[i]);
+					ir_queue_push(items, values.items[i]);
 				}
 			}
 
 			for (u32 i = 0; i < nargs; ++ i)
 			{
 				Ast dest_ast = dest_tuple->tuple.items[i];
-				if (!mark_entity_assigned(emitter, dest_ast)) {
-					ir_push(items, ERROR_IR);
+				if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+					ir_queue_push(items, ERROR_IR);
 					continue;
 				}
 				Ir dest_ir = ir_emit_expr(emitter, dest_ast);
@@ -1342,7 +1342,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 					dest_ir = dest_ir->ir_load.local;
 				}
 				Ir ir = ir_new_store(emitter, stat->site, dest_ir, value_ir);
-				ir_push(items, ir);
+				ir_queue_push(items, ir);
 			}
 		}
 		break;
@@ -1356,8 +1356,8 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 		case AST_SHL_ASSIGN:
 		case AST_SHR_ASSIGN:
 		{
-			Ir ir = lower_compound_assign_to_ir(emitter, items, stat);
-			ir_push(items, ir);
+			Ir ir = ir_emit_compound_assign(emitter, items, stat);
+			ir_queue_push(items, ir);
 		}
 		break;
 
@@ -1368,13 +1368,13 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			if (ast_is_error(dest_tuple) || ast_is_error(expr_tuple))
 			{
 				ir_report_error(emitter, ELF_ERROR_INTERNAL, stat->site, "invalid nil assignment");
-				ir_push(items, ERROR_IR);
+				ir_queue_push(items, ERROR_IR);
 				break;
 			}
 			if (dest_tuple->tuple.count != expr_tuple->tuple.count)
 			{
 				ir_report_error(emitter, ELF_ERROR_INVALID_ASSIGNMENT, stat->site, "nil assignment requires one value for each destination");
-				ir_push(items, ERROR_IR);
+				ir_queue_push(items, ERROR_IR);
 				break;
 			}
 
@@ -1382,12 +1382,12 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			{
 				Ast dest_ast = dest_tuple->tuple.items[i];
 				Ast expr_ast = expr_tuple->tuple.items[i];
-				if (!mark_entity_assigned(emitter, dest_ast)) {
-					ir_push(items, ERROR_IR);
+				if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+					ir_queue_push(items, ERROR_IR);
 					continue;
 				}
 
-				Ir dest_ir = ir_emit_lvalue_once(emitter, items, dest_ast);
+				Ir dest_ir = ir_emit_lvalue(emitter, items, dest_ast);
 				Ir nil_ir = ir_new_nil(emitter, dest_ast->site);
 				Ir pred_ir = ir_new_binary(emitter, stat->site, IR_EQ, dest_ir, nil_ir);
 				Ir value_ir = ir_emit_expr(emitter, expr_ast);
@@ -1397,12 +1397,12 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				}
 				Ir store_ir = ir_new_store(emitter, stat->site, destination_ir, value_ir);
 
-				IrQueue true_items = ir_begin_queue(emitter);
-				ir_push(&true_items, store_ir);
-				IrArray true_stats = ir_end_queue(&true_items);
+				IrQueue true_items = ir_queue_begin(emitter);
+				ir_queue_push(&true_items, store_ir);
+				IrArray true_stats = ir_queue_end(&true_items);
 				Ir true_clause = ir_new_block(emitter, stat->site, true_stats);
 				Ir ir = ir_new_if(emitter, stat->site, pred_ir, true_clause, 0);
-				ir_push(items, ir);
+				ir_queue_push(items, ir);
 			}
 		}
 		break;
@@ -1424,38 +1424,38 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				IrArray return_tuple = ir_array_alloc(emitter, expr_ir->ir_tuple.count);
 				for (u32 i = 0; i < expr_ir->ir_tuple.count; ++ i) {
 					Ir return_value = ir_new_local(emitter, stat->site, expr_ir->ir_tuple.items[i]);
-					ir_push(items, return_value);
+					ir_queue_push(items, return_value);
 					return_tuple.items[i] = ir_new_load(emitter, stat->site, return_value);
 				}
 				expr_ir = ir_new_tuple(emitter, stat->site, return_tuple);
 			}
-			emit_defer_range(emitter, items, 0);
+			ir_defer_emit(emitter, items, 0);
 			Ir ir = ir_new_return(emitter, stat->site, expr_ir);
-			ir_push(items, ir);
+			ir_queue_push(items, ir);
 		}
 		break;
 
 		case AST_BREAK:
 		{
-			IrLoopFrame loop = current_loop(emitter, stat->site);
-			emit_defer_range(emitter, items, loop.defer_start);
+			IrLoopFrame loop = ir_loop_current(emitter, stat->site);
+			ir_defer_emit(emitter, items, loop.defer_start);
 			Ir ir = ir_new_jump(emitter, stat->site, loop.break_label);
-			ir_push(items, ir);
+			ir_queue_push(items, ir);
 		}
 		break;
 
 		case AST_CONTINUE:
 		{
-			IrLoopFrame loop = current_loop(emitter, stat->site);
-			emit_defer_range(emitter, items, loop.defer_start);
+			IrLoopFrame loop = ir_loop_current(emitter, stat->site);
+			ir_defer_emit(emitter, items, loop.defer_start);
 			Ir ir = ir_new_jump(emitter, stat->site, loop.continue_label);
-			ir_push(items, ir);
+			ir_queue_push(items, ir);
 		}
 		break;
 
 		case AST_DEFER_STAT:
 		{
-			push_defer_stat(emitter, stat->defer_stat.body);
+			ir_defer_push(emitter, stat->defer_stat.body);
 		}
 		break;
 
@@ -1472,7 +1472,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 					continue;
 				}
 				Ir ir = ir_emit_expr(emitter, args[i]);
-				ir_push(items, ir);
+				ir_queue_push(items, ir);
 			}
 		}
 		break;
@@ -1480,7 +1480,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 		default:
 		{
 			Ir ir = ir_emit_expr(emitter, stat);
-			ir_push(items, ir);
+			ir_queue_push(items, ir);
 		}
 		break;
 	}
@@ -1515,7 +1515,7 @@ static IrFunction *ir_reserve_function(Com_Source *source, IrModule *module, IrF
 	return definition;
 }
 
-static void ir_emit_body(IrEmitter *emitter)
+static void ir_emit_function_body(IrEmitter *emitter)
 {
 	ASSERT(emitter);
 
@@ -1562,10 +1562,10 @@ static void ir_emit_body(IrEmitter *emitter)
 		}
 	}
 
-	definition->body = ir_emit_stat_as_block(emitter, ast->function.body);
+	definition->body = ir_emit_block(emitter, ast->function.body);
 }
 
-static IrFunction *ir_lower_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast ast)
+static IrFunction *ir_emit_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast ast)
 {
 	IrFunction *definition = ir_reserve_function(source, module, parent, ast);
 
@@ -1574,7 +1574,7 @@ static IrFunction *ir_lower_function(Com_Source *source, IrModule *module, IrFun
 	emitter.function = definition;
 	emitter.ir_stack_size = 4096;
 	emitter.ir_stack = arena_push_zero(module->arena, sizeof(*emitter.ir_stack) * emitter.ir_stack_size, _Alignof(Ir));
-	ir_emit_body(&emitter);
+	ir_emit_function_body(&emitter);
 	return definition;
 }
 
@@ -1592,7 +1592,7 @@ static IrModule *ir_emit_module(Com_Source *source)
 	IrModule *module = arena_push_zero(compiler->arena, sizeof(*module), 8);
 	module->arena = compiler->arena;
 
-	IrFunction *entry = ir_lower_function(source, module, 0, ast);
+	IrFunction *entry = ir_emit_function(source, module, 0, ast);
 	ASSERT(entry == module->first_function);
 	ASSERT(!entry->capture_count || !"Internal error: for some reason the entry function has captures, how is this even possible?");
 	return module;
