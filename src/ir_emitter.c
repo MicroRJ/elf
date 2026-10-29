@@ -203,9 +203,9 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 	}
 	entity->referenced = true;
 
-	if (entity->kind == ENTITY_GLOBAL || entity->kind == ENTITY_STATIC)
+	if (entity->kind == ENTITY_STATIC)
 	{
-		Com_Value value = entity->kind == ENTITY_GLOBAL ? entity->en_global.value : entity->en_static.value;
+		Com_Value value = entity->en_static.value;
 
 		switch (value.type)
 		{
@@ -314,7 +314,6 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 	}
 	Entity *entity = destination->entity;
 	ASSERT(entity);
-	ASSERT(entity->kind != ENTITY_GLOBAL);
 	if (entity_is_constant(entity))
 	{
 		ir_report_error(emitter, ELF_ERROR_LOWERING, destination->site

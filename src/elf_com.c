@@ -116,14 +116,14 @@ static Com_Status inject_symbol_table(Compiler *compiler, Scope *scope, Com_Sour
 	Entity *existing = scope_find_current(scope, name);
 	if (existing)
 	{
-		if (existing->kind != ENTITY_GLOBAL || existing->en_global.value.type != COM_VALUE_SCOPE)
+		if (existing->kind != ENTITY_STATIC || existing->en_static.declaration || existing->en_static.value.type != COM_VALUE_SCOPE)
 		{
 			return report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
 		}
-		return inject_symbols(compiler, existing->en_global.value.scope, source, field->table);
+		return inject_symbols(compiler, existing->en_static.value.scope, source, field->table);
 	}
 
-	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name);
+	Entity *entity = scope_declare(scope, ENTITY_STATIC, name);
 	if (!entity)
 	{
 		return COM_STATUS_OOM;
@@ -137,8 +137,8 @@ static Com_Status inject_symbol_table(Compiler *compiler, Scope *scope, Com_Sour
 	{
 		return COM_STATUS_OOM;
 	}
-	entity->en_global.value.type = COM_VALUE_SCOPE;
-	entity->en_global.value.scope = members;
+	entity->en_static.value.type = COM_VALUE_SCOPE;
+	entity->en_static.value.scope = members;
 	return inject_symbols(compiler, members, source, field->table);
 }
 
@@ -149,14 +149,14 @@ static Com_Status inject_symbol_value(Compiler *compiler, Scope *scope, Com_Sour
 		return report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host symbol");
 	}
 
-	Entity *entity = scope_declare(scope, ENTITY_GLOBAL, name);
+	Entity *entity = scope_declare(scope, ENTITY_STATIC, name);
 	if (!entity)
 	{
 		return COM_STATUS_OOM;
 	}
 	ASSERT(entity->count == 1);
 
-	Com_Value *value = &entity->en_global.value;
+	Com_Value *value = &entity->en_static.value;
 	switch (field->type)
 	{
 		case ELF_SYMBOL_INTEGER:

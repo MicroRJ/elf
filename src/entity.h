@@ -74,7 +74,6 @@ typedef enum
 	ENTITY_ERROR,
 	ENTITY_STATIC,
 	ENTITY_LOCAL,
-	ENTITY_GLOBAL,
 }
 EntityKind;
 
@@ -100,11 +99,6 @@ struct Entity
 			Com_Value     value;
 		}
 		en_static;
-		struct
-		{
-			Com_Value value;
-		}
-		en_global;
 		struct
 		{
 			struct Ast_T  *declaration;

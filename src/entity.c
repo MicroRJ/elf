@@ -35,9 +35,11 @@ static b32 entity_is_exported(const Entity *entity)
 	if (entity->kind == ENTITY_STATIC)
 	{
 		Ast declaration = entity->en_static.declaration;
-		ASSERT(declaration);
-		ASSERT(declaration->kind == AST_STATIC_DECL);
-		result = declaration->static_decl.exported;
+		if (declaration)
+		{
+			ASSERT(declaration->kind == AST_STATIC_DECL);
+			result = declaration->static_decl.exported;
+		}
 	}
 	return result;
 }

@@ -84,7 +84,7 @@ static Com_Status check_assignment_destination(Checker *checker, Ast destination
 	if (destination->kind == AST_IDENT)
 	{
 		ASSERT(destination->entity);
-		if (destination->entity->kind == ENTITY_GLOBAL) {
+		if (destination->entity->kind == ENTITY_STATIC && !destination->entity->en_static.declaration) {
 			return checker_report(checker->source_scope->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR,
 				destination->site, "global '%s' is read-only", atom_data(destination->identifier));
 		}
@@ -208,6 +208,7 @@ static Com_Value resolve_static_entity(Checker *checker, Entity *entity)
 	ASSERT(entity);
 	ASSERT(entity->kind == ENTITY_STATIC);
 	Com_Value value = entity->en_static.value;
+	ASSERT(entity->en_static.declaration || (value.type != COM_VALUE_NONE && value.type != COM_VALUE_AST && value.type != COM_VALUE_RESOLVING));
 	if (value.type == COM_VALUE_RESOLVING)
 	{
 		Com_Status status = checker_report(entity->scope->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->en_static.declaration->site, "cyclic static definition involving '%s'", atom_data(entity->name));
@@ -461,9 +462,6 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				if (entity->kind == ENTITY_STATIC) {
 					value = resolve_static_entity(checker, entity);
 				}
-				else if (entity->kind == ENTITY_GLOBAL) {
-					value = entity->en_global.value;
-				}
 			}
 		}
 		break;
@@ -489,8 +487,9 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				}
 				else
 				{
-					ASSERT(entity->kind == ENTITY_GLOBAL);
-					value = entity->en_global.value;
+					ASSERT(entity->kind == ENTITY_STATIC);
+					ASSERT(!entity->en_static.declaration);
+					value = entity->en_static.value;
 					entity->referenced = true;
 					expr->entity = entity;
 				}

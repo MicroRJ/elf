@@ -146,19 +146,19 @@ static void test_compiler_injects_symbols(void)
 	Entity *elf_before = scope_find_current(compiler->globals, elf_name);
 	Com_Status symbol_status = inject_symbols(compiler, compiler->globals, source, symbols);
 	Entity *elf_after = scope_find_current(compiler->globals, elf_name);
-	Scope *elf_scope = elf_after && elf_after->en_global.value.type == COM_VALUE_SCOPE ? elf_after->en_global.value.scope : 0;
+	Scope *elf_scope = elf_after && elf_after->en_static.value.type == COM_VALUE_SCOPE ? elf_after->en_static.value.scope : 0;
 	Atom *published_name = atom_from_data_size(compiler->atoms, "published", sizeof("published") - 1);
 	Entity *published = elf_scope ? scope_find_current(elf_scope, published_name) : 0;
-	Scope *published_scope = published && published->en_global.value.type == COM_VALUE_SCOPE ? published->en_global.value.scope : 0;
+	Scope *published_scope = published && published->en_static.value.type == COM_VALUE_SCOPE ? published->en_static.value.scope : 0;
 	Entity *answer = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1)) : 0;
 	Entity *ratio = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "ratio", sizeof("ratio") - 1)) : 0;
 	Entity *message = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "message", sizeof("message") - 1)) : 0;
 	Entity *run = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "run", sizeof("run") - 1)) : 0;
 
-	b32 answer_is_valid = answer && answer->en_global.value.type == COM_VALUE_INTEGER && answer->en_global.value.integer == 42;
-	b32 ratio_is_valid = ratio && ratio->en_global.value.type == COM_VALUE_NUMBER && ratio->en_global.value.number == 1.5;
-	b32 message_is_valid = message && message->en_global.value.type == COM_VALUE_STRING && atom_size(message->en_global.value.string) == sizeof("hello") - 1 && !memcmp(atom_data(message->en_global.value.string), "hello", sizeof("hello") - 1);
-	b32 run_is_valid = run && run->en_global.value.type == COM_VALUE_NATIVE_FUNCTION && run->en_global.value.native_function_index < state->native_function_count && state->native_functions[run->en_global.value.native_function_index] == compiler_symbol_test_function;
+	b32 answer_is_valid = answer && answer->en_static.value.type == COM_VALUE_INTEGER && answer->en_static.value.integer == 42;
+	b32 ratio_is_valid = ratio && ratio->en_static.value.type == COM_VALUE_NUMBER && ratio->en_static.value.number == 1.5;
+	b32 message_is_valid = message && message->en_static.value.type == COM_VALUE_STRING && atom_size(message->en_static.value.string) == sizeof("hello") - 1 && !memcmp(atom_data(message->en_static.value.string), "hello", sizeof("hello") - 1);
+	b32 run_is_valid = run && run->en_static.value.type == COM_VALUE_NATIVE_FUNCTION && run->en_static.value.native_function_index < state->native_function_count && state->native_functions[run->en_static.value.native_function_index] == compiler_symbol_test_function;
 	b32 symbols_succeeded = create_symbols_error == ELF_ERROR_NONE && create_elf_error == ELF_ERROR_NONE && create_published_error == ELF_ERROR_NONE && answer_error == ELF_ERROR_NONE && ratio_error == ELF_ERROR_NONE && message_error == ELF_ERROR_NONE && run_error == ELF_ERROR_NONE && published_error == ELF_ERROR_NONE && elf_error == ELF_ERROR_NONE;
 	if (!symbols_succeeded || builtin_status != COM_STATUS_OK || symbol_status != COM_STATUS_OK || elf_before != elf_after || !published_scope || !answer_is_valid || !ratio_is_valid || !message_is_valid || !run_is_valid)
 	{
