@@ -14,6 +14,10 @@ content, examples maintained primarily as documentation, and changelogs. Do
 not update documentation merely because a code change makes it stale; leave
 that work to the repository's documentation agent.
 
+When the user explicitly indicates that a workday or development session is
+ending, append a concise dated summary to `LEDGER.md`. Do not update the ledger
+after every individual change.
+
 ## Calling Convention
 
 elf functions do not have a universal implicit `this` parameter. Bytecode
