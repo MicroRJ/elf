@@ -2,6 +2,7 @@
 // See Copyright Notice In elf.h
 //
 
+
 typedef struct IrEmitter IrEmitter;
 typedef struct IrDefer IrDefer;
 
@@ -27,6 +28,8 @@ struct IrEmitter
 	IrDefer     *defer;
 	IrDefer     *defer_scope_start;
 	IrLoopFrame *loop;
+	// Todo, when revisiting this again, reuse the ir stack for the entire process
+	// not just per function ...
 	u32          ir_stack_size;
 	u32          ir_stack_index;
 	Ir          *ir_stack;
@@ -134,15 +137,17 @@ static void ir_defer_emit(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
 {
 	ASSERT(entity->kind == ENTITY_LOCAL);
-	ASSERT(entity->en_local.storage);
-	ASSERT(entity->en_local.storage->kind == IR_LOCAL);
+	Ir local = entity->en_local.storage;
+	ASSERT(local);
+	ASSERT(local->kind == IR_LOCAL);
+	ASSERT(local->ir_local.owner);
 	ASSERT(function);
 	ASSERT(function->ast);
 	ASSERT(!function->ast->is_static || !function->first_capture);
 
 	// is the entity already within this function? if so just load it
-	if (entity->en_local.function == function->ast) {
-		return ir_new_load(emitter, site, entity->en_local.storage);
+	if (local->ir_local.owner == function) {
+		return ir_new_load(emitter, site, local);
 	}
 
 	if (function->ast->is_static) {

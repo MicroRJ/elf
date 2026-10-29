@@ -286,8 +286,9 @@ struct IrNode
 
 		struct
 		{
-			Ir     expr;
-			i32 slot;
+			IrFunction *owner;
+			Ir          expr;
+			i32         slot;
 		}
 		ir_local;
 

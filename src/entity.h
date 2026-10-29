@@ -12,6 +12,9 @@ typedef struct
 }
 Com_Type;
 
+// Todo, we don't need another constant value type here, we just need to ensure that the AST
+// can be evaluated statically and serve the value as an AST value, let the ir stage handle
+// the rest ...
 #define COM_VALUE_TYPES(X)               \
 	X(NONE,            "none")            \
 	X(ERROR,           "error")           \
