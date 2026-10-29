@@ -184,9 +184,5 @@ static b32 atom_table_init(Atom_Table *table, Arena *arena)
 	MACRO_DEFINITIONS(INTERN_MACRO_ATOM)
 #undef INTERN_MACRO_ATOM
 
-#define INTERN_TYPE_NAME_ATOM(NAME, TEXT, RULE) result = result && atom_from_data_id(table, TEXT, XFUSE(ATOM_TYPE_NAME_, NAME));
-	TYPE_NAME_DEFINITIONS(INTERN_TYPE_NAME_ATOM)
-#undef INTERN_TYPE_NAME_ATOM
-
 	return result;
 }

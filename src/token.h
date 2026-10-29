@@ -120,29 +120,6 @@ typedef enum
 }
 Token_Type;
 
-#define TYPE_NAME_DEFINITIONS(X)     \
-	X(INT      , "int"      , TRULE_INTEGER ) \
-	X(NUM      , "num"      , TRULE_NUMBER  ) \
-	X(NUMERIC  , "numeric"  , TRULE_NUMERIC ) \
-	X(STR      , "str"      , TRULE_STRING  ) \
-	X(ARR      , "arr"      , TRULE_ARRAY   ) \
-	X(TAB      , "tab"      , TRULE_TABLE   ) \
-	X(BUF      , "buf"      , TRULE_BUFFER  ) \
-	X(ERR      , "err"      , TRULE_ERROR   ) \
-	X(NONNIL   , "non_nil"  , TRULE_NONNIL  ) \
-	X(CALLABLE , "callable" , TRULE_CALLABLE) \
-// END
-
-typedef enum
-{
-	ATOM_TYPE_NAME_NONE = TOK_COUNT_,
-#define TYPE_NAME_ID(NAME, TEXT, RULE) ATOM_TYPE_NAME_##NAME,
-	TYPE_NAME_DEFINITIONS(TYPE_NAME_ID)
-#undef TYPE_NAME_ID
-	ATOM_TYPE_NAME_COUNT,
-}
-TypeNameAtomId;
-
 static const char *token_type_name(Token_Type type);
 
 typedef struct

@@ -352,17 +352,6 @@ static IrLoopFrame current_loop(IrEmitter *emitter, SourceSite site)
 	return *emitter->function->loop;
 }
 
-static TypeRule type_rule_from_atom(Atom *atom)
-{
-	switch (atom->id)
-	{
-#define TYPE_NAME_RULE(NAME, TEXT, RULE) case ATOM_TYPE_NAME_##NAME: return RULE;
-		TYPE_NAME_DEFINITIONS(TYPE_NAME_RULE)
-#undef TYPE_NAME_RULE
-		default: return TRULE_NONE;
-	}
-}
-
 static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
 {
 	switch (kind)
