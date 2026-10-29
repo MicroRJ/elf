@@ -10,4 +10,12 @@ apple_y = 21
 eating = new_x == apple_x && new_y == apple_y
 test_assert(eating == 0)
 
+test_assert(nil != 0, "nil is not equal to zero")
+
+nil_branch := 0
+if nil ? {
+	nil_branch = 1
+}
+test_assert(nil_branch == 0, "nil does not enter a true branch")
+
 ret 42
