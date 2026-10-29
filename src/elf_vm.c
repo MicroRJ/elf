@@ -326,10 +326,17 @@ static u32 vm_resume(State *state)
 			}
 			break;
 
+			//	Note, no object value is allowed to have zero payload, it must instead
+			//	become 'nil'.
+			//	Zero payload should only be possible for nil, and the literal zero integer,
+			// which is what we want ...
 			case BC_JUMP_IF_ZERO:
 			{
-				// TODO: wrong behavior | this should only accept
-				// integer or nil ... nil means zero under boolean evaluation ...
+				if (value_is_number(frame->regs[byte.b_y])) {
+					vm_push_errorf(state, ELF_ERROR_TYPE_MISMATCH, "cannot branch on 'number'");
+					goto exit_error;
+				}
+
 				if (frame->regs[byte.b_y].x_int == 0) {
 					frame->instr = instr + byte.b_x;
 				}
@@ -338,7 +345,11 @@ static u32 vm_resume(State *state)
 
 			case BC_JUMP_IF_NONZERO:
 			{
-				// TODO: wrong behavior | this performs an integer union read without accepting or validating the value type.
+				if (value_is_number(frame->regs[byte.b_y])) {
+					vm_push_errorf(state, ELF_ERROR_TYPE_MISMATCH, "cannot branch on 'number'");
+					goto exit_error;
+				}
+
 				if (frame->regs[byte.b_y].x_int != 0) {
 					frame->instr = instr + byte.b_x;
 				}

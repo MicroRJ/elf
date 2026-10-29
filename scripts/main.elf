@@ -1,3 +1,12 @@
+ret 0 + nil
+
+#eof
+
+if 0.0 ? {
+}
+
+#eof
+
 
 if nil ? ret 1 else ret 0
 #eof
