@@ -156,7 +156,7 @@ static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stat
 		ASSERT(!ast_name->entity);
 		ASSERT(!ast_decl->entity);
 
-		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_name->atom, ast_decl->site);
+		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_name->atom, ast_name->site);
 		if (entity_is_error(entity)) {
 			return entity->status;
 		}

@@ -53,6 +53,7 @@ struct Entity
 {
 	EntityKind      kind;
 	Com_Status      status;
+	Entity         *next_with_name;
 	struct Atom    *name;
 	Scope          *scope;
 	b32             referenced;
