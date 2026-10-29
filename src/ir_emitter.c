@@ -20,24 +20,16 @@ struct IrLoopFrame
 	IrDefer *defer_start;
 };
 
-// represents a lexical function as we descend
-typedef struct IrEmitterFrame IrEmitterFrame;
-struct IrEmitterFrame
-{
-	IrEmitterFrame  *parent;
-	IrFunction      *definition;
-	IrDefer         *defer;
-	IrDefer         *defer_scope_start;
-	IrLoopFrame     *loop;
-};
-
 struct IrEmitter
 {
-	IrModule       *module;
-	u32             ir_stack_size;
-	u32             ir_stack_index;
-	Ir             *ir_stack;
-	IrEmitterFrame *function;
+	IrModule    *module;
+	IrFunction  *function;
+	IrDefer     *defer;
+	IrDefer     *defer_scope_start;
+	IrLoopFrame *loop;
+	u32          ir_stack_size;
+	u32          ir_stack_index;
+	Ir          *ir_stack;
 };
 
 
@@ -54,18 +46,17 @@ IrQueue;
 static void ir_emit_stat(IrQueue *block, Ast stat);
 static Ir ir_emit_expr(IrEmitter *emitter, Ast expr);
 static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat);
-static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast tree);
-static void ir_emit_body(IrEmitter *emitter, IrFunction *definition);
-static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree);
+static IrFunction *ir_reserve_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast tree);
+static void ir_emit_body(IrEmitter *emitter);
+static IrFunction *ir_lower_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast tree);
 
 static void ir_report_error(IrEmitter *emitter, elf_ErrorCode error, SourceSite site, const char *format, ...)
 {
 	ASSERT(emitter->function);
-	ASSERT(emitter->function->definition);
-	ASSERT(emitter->function->definition->source);
+	ASSERT(emitter->function->source);
 	va_list args;
 	va_start(args, format);
-	reportv(emitter->function->definition->source, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
+	reportv(emitter->function->source, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 
@@ -109,65 +100,65 @@ static IrArray ir_end_queue(IrQueue *frame)
 static IrDefer *ir_begin_defer_scope(IrEmitter *emitter)
 {
 	ASSERT(emitter->function);
-	IrDefer *previous_defer_start = emitter->function->defer_scope_start;
-	emitter->function->defer_scope_start = emitter->function->defer;
+	IrDefer *previous_defer_start = emitter->defer_scope_start;
+	emitter->defer_scope_start = emitter->defer;
 	return previous_defer_start;
 }
 
 static void ir_close_defer_scope(IrEmitter *emitter, IrDefer *previous_defer_start)
 {
 	ASSERT(emitter->function);
-	emitter->function->defer = emitter->function->defer_scope_start;
-	emitter->function->defer_scope_start = previous_defer_start;
+	emitter->defer = emitter->defer_scope_start;
+	emitter->defer_scope_start = previous_defer_start;
 }
 
 static void push_defer_stat(IrEmitter *emitter, Ast stat)
 {
 	ASSERT(emitter->function);
 	IrDefer *defer = arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
-	defer->previous = emitter->function->defer;
+	defer->previous = emitter->defer;
 	defer->stat = stat;
-	emitter->function->defer = defer;
+	emitter->defer = defer;
 }
 
 static void emit_defer_range(IrEmitter *emitter, IrQueue *items, IrDefer *start)
 {
 	ASSERT(emitter->function);
-	for (IrDefer *defer = emitter->function->defer; defer != start; defer = defer->previous)
+	for (IrDefer *defer = emitter->defer; defer != start; defer = defer->previous)
 	{
 		ASSERT(defer);
 		ir_emit_stat(items, defer->stat);
 	}
 }
 
-static Ir capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *function_ctx, Entity *entity, SourceSite site)
+static Ir capture_entity_in_function(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
 {
 	ASSERT(entity->kind == ENTITY_LOCAL);
 	ASSERT(entity->en_local.storage);
 	ASSERT(entity->en_local.storage->kind == IR_LOCAL);
-	ASSERT(function_ctx->definition);
-	ASSERT(function_ctx->definition->ast);
-	ASSERT(!function_ctx->definition->ast->is_static || !function_ctx->definition->first_capture);
+	ASSERT(function);
+	ASSERT(function->ast);
+	ASSERT(!function->ast->is_static || !function->first_capture);
 
 	// is the entity already within this function? if so just load it
-	if (entity->en_local.function == function_ctx->definition->ast) {
+	if (entity->en_local.function == function->ast) {
 		return ir_new_load(emitter, site, entity->en_local.storage);
 	}
 
-	if (function_ctx->definition->ast->is_static) {
+	if (function->ast->is_static) {
 		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "local '%s' cannot be captured from a static function", atom_data(entity->name));
 		return ERROR_IR;
 	}
 
-	for (IrCapture *capture = function_ctx->definition->first_capture; capture; capture = capture->next) {
+	for (IrCapture *capture = function->first_capture; capture; capture = capture->next) {
 		if (capture->entity == entity) {
 			return ir_new_load_capture(emitter, site, capture);
 		}
 	}
 
-	ASSERT(function_ctx->definition->capture_count < 255);
+	ASSERT(function->capture_count < 255);
 
-	IrEmitterFrame *parent = function_ctx->parent;
+	IrFunction *parent = function->parent;
 	if (!parent)
 	{
 		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "local '%s' cannot be captured from an unrelated function", atom_data(entity->name));
@@ -182,14 +173,14 @@ static Ir capture_entity_in_function(IrEmitter *emitter, IrEmitterFrame *functio
 	IrCapture *capture = arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
 	capture->entity = entity;
 	capture->target = parent_capture;
-	capture->slot = function_ctx->definition->capture_count ++;
-	if (function_ctx->definition->last_capture) {
-		function_ctx->definition->last_capture->next = capture;
+	capture->slot = function->capture_count ++;
+	if (function->last_capture) {
+		function->last_capture->next = capture;
 	}
 	else {
-		function_ctx->definition->first_capture = capture;
+		function->first_capture = capture;
 	}
-	function_ctx->definition->last_capture = capture;
+	function->last_capture = capture;
 	entity->referenced = true;
 	return ir_new_load_capture(emitter, site, capture);
 }
@@ -245,8 +236,7 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 						ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "static function '%s' has no source", atom_data(entity->name));
 						return ERROR_IR;
 					}
-					IrFunction *definition = ir_reserve_function(emitter, entity->scope->source, function);
-					ir_emit_body(emitter, definition);
+					ir_lower_function(entity->scope->source, emitter->module, 0, function);
 				}
 
 				return ir_new_function(emitter, site, function->function.ir);
@@ -329,27 +319,27 @@ static b32 mark_entity_assigned(IrEmitter *emitter, Ast destination)
 static void push_loop(IrEmitter *emitter, IrLoopFrame *loop)
 {
 	ASSERT(emitter->function);
-	loop->parent = emitter->function->loop;
-	emitter->function->loop = loop;
+	loop->parent = emitter->loop;
+	emitter->loop = loop;
 }
 
 static void pop_loop(IrEmitter *emitter, IrLoopFrame *loop)
 {
 	ASSERT(emitter->function);
-	ASSERT(emitter->function->loop == loop);
-	emitter->function->loop = loop->parent;
+	ASSERT(emitter->loop == loop);
+	emitter->loop = loop->parent;
 }
 
 static IrLoopFrame current_loop(IrEmitter *emitter, SourceSite site)
 {
 	ASSERT(emitter->function);
-	if (!emitter->function->loop)
+	if (!emitter->loop)
 	{
 		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "break and continue must be inside a loop");
 		IrLoopFrame loop = {};
 		return loop;
 	}
-	return *emitter->function->loop;
+	return *emitter->loop;
 }
 
 static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
@@ -610,8 +600,7 @@ static Ir ir_emit_expr(IrEmitter *emitter, Ast expr)
 		case AST_FUNCTION:
 		{
 			ASSERT(emitter->function);
-			ASSERT(emitter->function->definition);
-			IrFunction *definition = ir_lower_function(emitter, emitter->function->definition->source, expr);
+			IrFunction *definition = ir_lower_function(emitter->function->source, emitter->module, emitter->function, expr);
 			ir = ir_new_function(emitter, expr->site, definition);
 		}
 		break;
@@ -782,7 +771,7 @@ static Ir ir_emit_stat_as_block(IrEmitter *emitter, Ast stat)
 			ir_emit_stat(&queue, stat);
 		}
 	}
-	emit_defer_range(emitter, &queue, emitter->function->defer_scope_start);
+	emit_defer_range(emitter, &queue, emitter->defer_scope_start);
 	ir_close_defer_scope(emitter, defer_scope);
 
 	ASSERT(emitter->ir_stack_index == queue.start + queue.count);
@@ -1000,7 +989,7 @@ static Ir lower_ast_for_range_expr_to_ir(IrEmitter *emitter, Ast stat, Ast name_
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = emitter->function->defer;
+	loop_frame.defer_start = emitter->defer;
 	push_loop(emitter, &loop_frame);
 	Ir body = ir_emit_stat_as_block(emitter, stat->for_range_stat.body);
 	pop_loop(emitter, &loop_frame);
@@ -1116,7 +1105,7 @@ static Ir lower_ast_for_to_ir(IrEmitter *emitter, Ast stat)
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
 	loop_frame.break_label = break_label;
-	loop_frame.defer_start = emitter->function->defer;
+	loop_frame.defer_start = emitter->defer;
 	push_loop(emitter, &loop_frame);
 	Ir body = ir_emit_stat_as_block(emitter, stat->for_stat.body);
 	pop_loop(emitter, &loop_frame);
@@ -1215,7 +1204,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 			IrLoopFrame loop_frame = {};
 			loop_frame.continue_label = start_label;
 			loop_frame.break_label = break_label;
-			loop_frame.defer_start = emitter->function->defer;
+			loop_frame.defer_start = emitter->defer;
 			push_loop(emitter, &loop_frame);
 			Ir body_ir = ir_emit_stat_as_block(emitter, body);
 			pop_loop(emitter, &loop_frame);
@@ -1428,7 +1417,7 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 				expr_ir = ir_emit_expr(emitter, expr);
 			}
 
-			if (expr_ir && emitter->function->defer)
+			if (expr_ir && emitter->defer)
 			{
 				ASSERT(expr_ir->kind == IR_TUPLE);
 
@@ -1497,12 +1486,14 @@ static void ir_emit_stat(IrQueue *items, Ast stat)
 	}
 }
 
-static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, Ast ast)
+static IrFunction *ir_reserve_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast ast)
 {
+	ASSERT(module);
 	ASSERT(source);
 	ASSERT(ast);
 	ASSERT(ast->kind == AST_FUNCTION);
-	IrFunction *definition = arena_push_zero(emitter->module->arena, sizeof(*definition), _Alignof(IrFunction));
+	IrFunction *definition = arena_push_zero(module->arena, sizeof(*definition), _Alignof(IrFunction));
+	definition->parent = parent;
 	definition->ast = ast;
 	definition->source = source;
 	definition->index = IR_FUNCTION_INDEX_INVALID;
@@ -1511,35 +1502,33 @@ static IrFunction *ir_reserve_function(IrEmitter *emitter, Com_Source *source, A
 	definition->param_count = ast->function.params.count;
 	ASSERT(!ast->function.ir);
 	ast->function.ir = definition;
-	if (emitter->module->last_function)
+	if (module->last_function)
 	{
-		emitter->module->last_function->next = definition;
+		module->last_function->next = definition;
 	}
 	else
 	{
-		emitter->module->first_function = definition;
+		module->first_function = definition;
 	}
-	emitter->module->last_function = definition;
-	emitter->module->function_count += 1;
+	module->last_function = definition;
+	module->function_count += 1;
 	return definition;
 }
 
-static void ir_emit_body(IrEmitter *emitter, IrFunction *definition)
+static void ir_emit_body(IrEmitter *emitter)
 {
+	ASSERT(emitter);
+
+	IrFunction *definition = emitter->function;
 	ASSERT(definition);
-	Ast tree = definition->ast;
-	ASSERT(tree);
-	ASSERT(tree->kind == AST_FUNCTION);
-	Ast_Array ast_params = tree->function.params;
+
+	Ast ast = definition->ast;
+	ASSERT(ast);
+	ASSERT(ast->kind == AST_FUNCTION);
+
+	Ast_Array ast_params = ast->function.params;
 	ASSERT(definition->param_count == ast_params.count);
 	ASSERT(definition->source);
-
-	IrEmitterFrame function_ctx = {};
-	function_ctx.parent = emitter->function;
-	function_ctx.definition = definition;
-
-	IrEmitterFrame *outer_function = emitter->function;
-	emitter->function = &function_ctx;
 
 	IrArray ir_params = ir_array_alloc(emitter, ast_params.count);
 	definition->params = ir_params.items;
@@ -1567,29 +1556,25 @@ static void ir_emit_body(IrEmitter *emitter, IrFunction *definition)
 		ASSERT(!type || (type->entity && type->entity->kind == ENTITY_STATIC && type->entity->en_static.value.type == COM_VALUE_TYPE));
 		if (type)
 		{
-			type = ast_ensure_kind(type, AST_IDENT);
-			if (ast_is_error(type))
-			{
-				ir_report_error(emitter, ELF_ERROR_INTERNAL, param->site, "expected function parameter type name");
-			}
-			else
-			{
-				TypeRule rule = type->entity->en_static.value.com_type->rule;
-				ASSERT(rule != TRULE_NONE);
-				param_memory->type_rule = rule;
-			}
+			TypeRule rule = type->entity->en_static.value.com_type->rule;
+			ASSERT(rule != TRULE_NONE);
+			param_memory->type_rule = rule;
 		}
 	}
 
-	definition->body = ir_emit_stat_as_block(emitter, tree->function.body);
-
-	emitter->function = outer_function;
+	definition->body = ir_emit_stat_as_block(emitter, ast->function.body);
 }
 
-static IrFunction *ir_lower_function(IrEmitter *emitter, Com_Source *source, Ast tree)
+static IrFunction *ir_lower_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast ast)
 {
-	IrFunction *definition = ir_reserve_function(emitter, source, tree);
-	ir_emit_body(emitter, definition);
+	IrFunction *definition = ir_reserve_function(source, module, parent, ast);
+
+	IrEmitter emitter = {};
+	emitter.module = module;
+	emitter.function = definition;
+	emitter.ir_stack_size = 4096;
+	emitter.ir_stack = arena_push_zero(module->arena, sizeof(*emitter.ir_stack) * emitter.ir_stack_size, _Alignof(Ir));
+	ir_emit_body(&emitter);
 	return definition;
 }
 
@@ -1607,12 +1592,7 @@ static IrModule *ir_emit_module(Com_Source *source)
 	IrModule *module = arena_push_zero(compiler->arena, sizeof(*module), 8);
 	module->arena = compiler->arena;
 
-	IrEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(IrEmitter));
-	emitter->module = module;
-	emitter->ir_stack_size = 4096;
-	emitter->ir_stack = arena_push_zero(module->arena, sizeof(*emitter->ir_stack) * emitter->ir_stack_size, _Alignof(Ir));
-
-	IrFunction *entry = ir_lower_function(emitter, source, ast);
+	IrFunction *entry = ir_lower_function(source, module, 0, ast);
 	ASSERT(entry == module->first_function);
 	ASSERT(!entry->capture_count || !"Internal error: for some reason the entry function has captures, how is this even possible?");
 	return module;

@@ -168,6 +168,7 @@ typedef struct IrFunction IrFunction;
 struct IrFunction
 {
 	IrFunction *next;
+	IrFunction *parent;
 	Ast         ast;
 	Com_Source *source;
 	SourceSite  site;
