@@ -65,7 +65,7 @@ static void ir_report_error(IrEmitter *emitter, elf_ErrorCode error, SourceSite 
 	ASSERT(emitter->function->definition->source);
 	va_list args;
 	va_start(args, format);
-	compiler_reportv(emitter->function->definition->source, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
+	reportv(emitter->function->definition->source, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
 	va_end(args);
 }
 

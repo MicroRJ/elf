@@ -16,7 +16,7 @@ static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSl
 		return ERROR_AST;
 	}
 
-	Compiler *compiler = compiler_create(arena);
+	Compiler *compiler = new_compiler(arena);
 	if (!compiler)
 	{
 		return ERROR_AST;
@@ -30,7 +30,7 @@ static Ast compiler_parse_json_source(Arena *arena, elf_StrSlice name, elf_StrSl
 	}
 	copy_memory(source_data, source.data, source.size);
 
-	Com_Source *compiler_source = compiler_alloc_source(compiler, source_name, source_name, 0, (dy_String) {.data = source_data, .size = source.size});
+	Com_Source *compiler_source = alloc_source(compiler, source_name, source_name, 0, (dy_String) {.data = source_data, .size = source.size});
 	if (!compiler_source)
 	{
 		return ERROR_AST;

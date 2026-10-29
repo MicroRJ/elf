@@ -56,14 +56,14 @@ static Com_Status checker_report(Com_Source *source, elf_ErrorCode error, ErrorS
 {
 	va_list args;
 	va_start(args, format);
-	b32 reported = compiler_reportv(source, error, severity, ERROR_PHASE_CHECKER, site, format, args);
+	b32 reported = reportv(source, error, severity, ERROR_PHASE_CHECKER, site, format, args);
 	va_end(args);
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
 static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 {
-	return compiler_report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
+	return report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
 static Com_Status check_assignment_destination(Checker *checker, Ast destination)

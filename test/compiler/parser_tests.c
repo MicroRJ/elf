@@ -26,7 +26,7 @@ static Com_Source *parser_test_add_source(Compiler *compiler, elf_StrSlice name,
 static Ast parser_test_parse(elf_State *state, const char *source_text, Com_Source **result_source)
 {
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(&state->arena);
+	Compiler *compiler = new_compiler(&state->arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_tests", sizeof("parser_tests") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));
@@ -461,7 +461,7 @@ static void parser_expect_source_error(elf_State *state, const char *source_text
 {
 	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_source_error", sizeof("parser_source_error") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));
@@ -707,7 +707,7 @@ static void test_parser_lexer_error_boundary(elf_State *state)
 {
 	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"@ ignored", 9};
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_lexer_error", sizeof("parser_lexer_error") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));
@@ -723,7 +723,7 @@ static void test_parser_ast_oom(elf_State *state)
 {
 	Arena arena = arena_create(0);
 	elf_StrSlice source = {(char *)"42", 2};
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	Com_Source *compiler_source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"parser_ast_oom", sizeof("parser_ast_oom") - 1}, source);
 	Parser parser = {};
 	ASSERT(parser_init(&parser));

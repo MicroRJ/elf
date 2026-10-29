@@ -29,7 +29,7 @@ static Parser lexer_test_parser_slice(elf_State *state, const char *source, u32 
 {
 	Parser parser = {};
 	elf_StrSlice source_buffer = {(char *)source, size};
-	Compiler *compiler = compiler_create(&state->arena);
+	Compiler *compiler = new_compiler(&state->arena);
 	parser.source = lexer_test_add_source(compiler, (elf_StrSlice) {(char *)"lexer_tests", sizeof("lexer_tests") - 1}, source_buffer);
 	parser.result_arena = &state->arena;
 	parser.scratch_arena = arena_create(1024 * 1024);
@@ -685,7 +685,7 @@ static void test_lexer_bounded_source(elf_State *state)
 static void test_lexer_out_of_memory(elf_State *state)
 {
 	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	elf_StrSlice source = {(char *)"oom_identifier", 14};
 	Com_Source *compiler_source = lexer_test_add_source(compiler, (elf_StrSlice) {(char *)"lexer_oom", sizeof("lexer_oom") - 1}, source);
 	Token_Array tokens = {};
@@ -703,7 +703,7 @@ static void test_lexer_out_of_memory(elf_State *state)
 	arena_destroy(&arena);
 
 	arena = arena_create(0);
-	compiler = compiler_create(&arena);
+	compiler = new_compiler(&arena);
 	source = (elf_StrSlice) {(char *)"@", 1};
 	compiler_source = lexer_test_add_source(compiler, (elf_StrSlice) {(char *)"lexer_report_oom", sizeof("lexer_report_oom") - 1}, source);
 	tokens = (Token_Array) {};

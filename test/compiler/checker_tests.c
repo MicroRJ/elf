@@ -11,7 +11,7 @@ static void checker_test_init_with_target(CheckerTest *test, elf_State *target, 
 {
 	zero_memory(test, sizeof(*test));
 	test->arena = arena_create(0);
-	test->compiler = compiler_create(&test->arena);
+	test->compiler = new_compiler(&test->arena);
 	if (target)
 	{
 		test->compiler->target = target;
@@ -19,7 +19,7 @@ static void checker_test_init_with_target(CheckerTest *test, elf_State *target, 
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	elf_StrSlice source = {(char *)source_text, strlen(source_text)};
 	test->source = parser_test_add_source(test->compiler, source_name, source);
-	if (target && compiler_inject_symbols(test->compiler, test->compiler->globals, test->source, target->symbols) != COM_STATUS_OK) {
+	if (target && inject_symbols(test->compiler, test->compiler->globals, test->source, target->symbols) != COM_STATUS_OK) {
 		test_fail("checker test injects environment symbols");
 		return;
 	}
@@ -138,13 +138,13 @@ static void test_compiler_injects_symbols(void)
 	elf_ErrorCode elf_error = elf_sym_tab(symbols, ELF_LIT("elf"), elf);
 
 	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	compiler->target = state;
 	Com_Source *source = parser_test_add_source(compiler, ELF_LIT("symbols"), ELF_LIT("ret 0"));
-	Com_Status builtin_status = compiler_inject_symbols(compiler, compiler->globals, source, state->symbols);
+	Com_Status builtin_status = inject_symbols(compiler, compiler->globals, source, state->symbols);
 	Atom *elf_name = atom_from_data_size(compiler->atoms, "elf", sizeof("elf") - 1);
 	Entity *elf_before = scope_find_current(compiler->globals, elf_name);
-	Com_Status symbol_status = compiler_inject_symbols(compiler, compiler->globals, source, symbols);
+	Com_Status symbol_status = inject_symbols(compiler, compiler->globals, source, symbols);
 	Entity *elf_after = scope_find_current(compiler->globals, elf_name);
 	Scope *elf_scope = elf_after && elf_after->en_global.value.type == COM_VALUE_SCOPE ? elf_after->en_global.value.scope : 0;
 	Atom *published_name = atom_from_data_size(compiler->atoms, "published", sizeof("published") - 1);
@@ -371,7 +371,7 @@ static void test_checker_rejects_global_assignment(void)
 static void test_checker_resolves_imported_export(void)
 {
 	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	Com_Source *root = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_root", sizeof("checker_root") - 1}, (elf_StrSlice) {(char *)"module :: import \"checker_module\"\nret module.answer", sizeof("module :: import \"checker_module\"\nret module.answer") - 1});
 	Com_Source *module = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_module", sizeof("checker_module") - 1}, (elf_StrSlice) {(char *)"export answer :: 42", sizeof("export answer :: 42") - 1});
 	Parser parser = {0};
@@ -419,7 +419,7 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 {
 	zero_memory(test, sizeof(*test));
 	test->arena = arena_create(0);
-	test->compiler = compiler_create(&test->arena);
+	test->compiler = new_compiler(&test->arena);
 	test->root = parser_test_add_source(test->compiler, (elf_StrSlice) {(char *)"checker_import_root", sizeof("checker_import_root") - 1}, (elf_StrSlice) {(char *)root_text, strlen(root_text)});
 	test->module = parser_test_add_source(test->compiler, (elf_StrSlice) {(char *)"checker_import_module", sizeof("checker_import_module") - 1}, (elf_StrSlice) {(char *)module_text, strlen(module_text)});
 
@@ -529,7 +529,7 @@ static void test_checker_routes_imported_static_error_to_source(void)
 static void test_checker_propagates_diagnostic_oom(void)
 {
 	Arena arena = arena_create(0);
-	Compiler *compiler = compiler_create(&arena);
+	Compiler *compiler = new_compiler(&arena);
 	char source_text[] = "value := 42";
 	Com_Source *source = parser_test_add_source(compiler, (elf_StrSlice) {(char *)"checker_oom", sizeof("checker_oom") - 1}, (elf_StrSlice) {source_text, sizeof(source_text) - 1});
 	Parser parser = {0};

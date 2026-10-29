@@ -10,10 +10,10 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 {
 	IrTestResult result = {0};
 	elf_StrSlice source = {(char *)source_text, (u64)strlen(source_text)};
-	result.compiler = compiler_create(arena);
+	result.compiler = new_compiler(arena);
 	result.compiler->target = state;
 	result.source = parser_test_add_source(result.compiler, (elf_StrSlice) {(char *)"ir_tests", sizeof("ir_tests") - 1}, source);
-	if (compiler_inject_symbols(result.compiler, result.compiler->globals, result.source, state->symbols) != COM_STATUS_OK) {
+	if (inject_symbols(result.compiler, result.compiler->globals, result.source, state->symbols) != COM_STATUS_OK) {
 		test_fail("IR test injects environment symbols");
 		return result;
 	}
