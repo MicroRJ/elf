@@ -11,34 +11,9 @@ typedef struct
 }
 Checker;
 
-static Com_Status check_statement(Checker *checker, Ast ast);
+static Com_Status check_stat(Checker *checker, Ast ast);
 static Com_Value resolve_static_entity(Checker *checker, Entity *entity);
-static Com_Value resolve_expression(Checker *checker, Ast expr);
-
-static b32 is_assignment_kind(Ast_Kind kind)
-{
-	switch (kind)
-	{
-		case AST_ASSIGN:
-		case AST_ADD_ASSIGN:
-		case AST_SUB_ASSIGN:
-		case AST_MUL_ASSIGN:
-		case AST_DIV_ASSIGN:
-		case AST_MOD_ASSIGN:
-		case AST_XOR_ASSIGN:
-		case AST_SHL_ASSIGN:
-		case AST_SHR_ASSIGN:
-		case AST_NIL_ASSIGN:
-		{
-			return true;
-		}
-
-		default:
-		{
-			return false;
-		}
-	}
-}
+static Com_Value check_expr(Checker *checker, Ast expr);
 
 static Com_Value com_value_error(Com_Status status)
 {
@@ -66,27 +41,26 @@ static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 	return report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
-static Com_Status check_assignment_destination(Checker *checker, Ast destination)
+static Com_Status check_assign_dest(Checker *checker, Ast dest)
 {
 	ASSERT(checker);
-	ASSERT(destination);
-	if (destination->kind == AST_TUPLE)
+	ASSERT(dest);
+	if (dest->kind == AST_TUPLE)
 	{
-		for (u32 i = 0; i < destination->tuple.count; ++i)
+		for (u32 i = 0; i < dest->tuple.count; ++i)
 		{
-			Com_Status status = check_assignment_destination(checker, destination->tuple.items[i]);
+			Com_Status status = check_assign_dest(checker, dest->tuple.items[i]);
 			if (status != COM_STATUS_OK) {
 				return status;
 			}
 		}
 		return COM_STATUS_OK;
 	}
-	if (destination->kind == AST_IDENT)
+	if (dest->kind == AST_IDENT)
 	{
-		ASSERT(destination->entity);
-		if (destination->entity->kind == ENTITY_STATIC && !destination->entity->en_static.declaration) {
-			return checker_report(checker->source_scope->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR,
-				destination->site, "global '%s' is read-only", atom_data(destination->identifier));
+		ASSERT(dest->entity);
+		if (dest->entity->kind == ENTITY_STATIC) {
+			return checker_report(checker->source_scope->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "static '%s' is read-only", atom_data(dest->identifier));
 		}
 	}
 	return COM_STATUS_OK;
@@ -197,8 +171,11 @@ static Com_Status check_source(Com_Source *source)
 	source->scope = checker.source_scope;
 
 	Com_Status status = declare_statics(&checker, checker.source_scope, root->function.body->block);
-	for (u32 i = 0; status == COM_STATUS_OK && i < root->function.body->block.count; ++i) {
-		status = check_statement(&checker, root->function.body->block.items[i]);
+	for (u32 i = 0; i < root->function.body->block.count; ++i) {
+		status = check_stat(&checker, root->function.body->block.items[i]);
+		if (status == COM_STATUS_OK) {
+			break;
+		}
 	}
 	return status;
 }
@@ -237,7 +214,7 @@ static Com_Value resolve_static_entity(Checker *checker, Entity *entity)
 		checker->source_scope = source->scope;
 		checker->active_scope = entity->scope;
 
-		value = resolve_expression(checker, expr);
+		value = check_expr(checker, expr);
 
 		checker->source_scope = previous_source_scope;
 		checker->active_scope = previous_active_scope;
@@ -299,7 +276,7 @@ static i32 find_parameter_by_name(Ast_Array params, Atom *name)
 }
 
 // TOOD(RJ): imagine writing an interpreter for an interpreter ...
-static Com_Value resolve_expression(Checker *checker, Ast expr)
+static Com_Value check_expr(Checker *checker, Ast expr)
 {
 	Com_Value value = {COM_VALUE_NONE};
 	ASSERT(expr);
@@ -368,7 +345,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 
 				if (param->decl.type)
 				{
-					Com_Value param_value = resolve_expression(checker, param->decl.type);
+					Com_Value param_value = check_expr(checker, param->decl.type);
 					if (param_value.type == COM_VALUE_ERROR) {
 						value = param_value;
 						break;
@@ -382,7 +359,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 
 				if (param->decl.expr)
 				{
-					Com_Value param_value = resolve_expression(checker, param->decl.expr);
+					Com_Value param_value = check_expr(checker, param->decl.expr);
 					if (param_value.type == COM_VALUE_ERROR) {
 						value = param_value;
 					}
@@ -405,7 +382,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 				}
 			}
 			if (value.type != COM_VALUE_ERROR) {
-				status = check_statement(checker, expr->function.body);
+				status = check_stat(checker, expr->function.body);
 				if (status != COM_STATUS_OK) {
 					value = com_value_error(status);
 				}
@@ -480,7 +457,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			Com_Value left_value = resolve_expression(checker, expr->binary.x);
+			Com_Value left_value = check_expr(checker, expr->binary.x);
 			if (left_value.type == COM_VALUE_ERROR)
 			{
 				value = left_value;
@@ -537,7 +514,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		case AST_GET_MEM:
 		{
 			ASSERT(expr->unary);
-			Com_Value operand = resolve_expression(checker, expr->unary);
+			Com_Value operand = check_expr(checker, expr->unary);
 			if (operand.type == COM_VALUE_ERROR) {
 				value = operand;
 			}
@@ -565,32 +542,15 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		case AST_BITWISE_AND:
 		case AST_BITWISE_OR:
 		case AST_BITWISE_XOR:
-		case AST_ADD_ASSIGN:
-		case AST_SUB_ASSIGN:
-		case AST_MUL_ASSIGN:
-		case AST_DIV_ASSIGN:
-		case AST_MOD_ASSIGN:
-		case AST_XOR_ASSIGN:
-		case AST_SHL_ASSIGN:
-		case AST_SHR_ASSIGN:
-		case AST_NIL_ASSIGN:
-		case AST_ASSIGN:
 		case AST_INDEX:
 		case AST_COMMA_EXPR:
 		case AST_RANGE_INDEX:
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			Com_Value operand = resolve_expression(checker, expr->binary.x);
-			if (operand.type != COM_VALUE_ERROR && is_assignment_kind(expr->kind))
-			{
-				Com_Status status = check_assignment_destination(checker, expr->binary.x);
-				if (status != COM_STATUS_OK) {
-					operand = com_value_error(status);
-				}
-			}
+			Com_Value operand = check_expr(checker, expr->binary.x);
 			if (operand.type != COM_VALUE_ERROR) {
-				operand = resolve_expression(checker, expr->binary.y);
+				operand = check_expr(checker, expr->binary.y);
 			}
 			if (operand.type == COM_VALUE_ERROR) {
 				value = operand;
@@ -603,11 +563,11 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 			Com_Value operand = {COM_VALUE_NONE};
 			if (expr->binary.x)
 			{
-				operand = resolve_expression(checker, expr->binary.x);
+				operand = check_expr(checker, expr->binary.x);
 			}
 			if (operand.type != COM_VALUE_ERROR && expr->binary.y)
 			{
-				operand = resolve_expression(checker, expr->binary.y);
+				operand = check_expr(checker, expr->binary.y);
 			}
 			if (operand.type == COM_VALUE_ERROR) {
 				value = operand;
@@ -619,7 +579,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			Com_Value operand = resolve_expression(checker, expr->binary.x);
+			Com_Value operand = check_expr(checker, expr->binary.x);
 			if (operand.type == COM_VALUE_ERROR) {
 				value = operand;
 			}
@@ -630,7 +590,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->interpolated_string.count; ++i)
 			{
-				Com_Value item = resolve_expression(checker, expr->interpolated_string.items[i]);
+				Com_Value item = check_expr(checker, expr->interpolated_string.items[i]);
 				if (item.type == COM_VALUE_ERROR) {
 					value = item;
 				}
@@ -640,7 +600,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 
 		case AST_CALL:
 		{
-			Com_Value target = resolve_expression(checker, expr->call.expr);
+			Com_Value target = check_expr(checker, expr->call.expr);
 			if (target.type == COM_VALUE_ERROR) {
 				value = target;
 				break;
@@ -713,7 +673,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 					}
 				}
 
-				Com_Value item = resolve_expression(checker, argument_expr);
+				Com_Value item = check_expr(checker, argument_expr);
 				if (item.type == COM_VALUE_ERROR) {
 					value = item;
 					break;
@@ -729,7 +689,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->tuple.count; ++i)
 			{
-				Com_Value item = resolve_expression(checker, expr->tuple.items[i]);
+				Com_Value item = check_expr(checker, expr->tuple.items[i]);
 				if (item.type == COM_VALUE_ERROR) {
 					value = item;
 				}
@@ -741,7 +701,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->table.count; ++i)
 			{
-				Com_Value item = resolve_expression(checker, expr->table.items[i]);
+				Com_Value item = check_expr(checker, expr->table.items[i]);
 				if (item.type == COM_VALUE_ERROR) {
 					value = item;
 				}
@@ -753,7 +713,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->array.count; ++i)
 			{
-				Com_Value item = resolve_expression(checker, expr->array.items[i]);
+				Com_Value item = check_expr(checker, expr->array.items[i]);
 				if (item.type == COM_VALUE_ERROR) {
 					value = item;
 				}
@@ -765,9 +725,9 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 		{
 			ASSERT(expr->table_entry.key);
 			ASSERT(expr->table_entry.value);
-			Com_Value item = resolve_expression(checker, expr->table_entry.key);
+			Com_Value item = check_expr(checker, expr->table_entry.key);
 			if (item.type != COM_VALUE_ERROR) {
-				item = resolve_expression(checker, expr->table_entry.value);
+				item = check_expr(checker, expr->table_entry.value);
 			}
 			if (item.type == COM_VALUE_ERROR) {
 				value = item;
@@ -785,7 +745,7 @@ static Com_Value resolve_expression(Checker *checker, Ast expr)
 	return value;
 }
 
-static Com_Status check_statement(Checker *checker, Ast stat)
+static Com_Status check_stat(Checker *checker, Ast stat)
 {
 	ASSERT(stat);
 	ASSERT(checker->active_scope);
@@ -809,7 +769,7 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 			{
 				status = declare_statics(checker, scope, stat->block);
 				for (u32 i = 0; status == COM_STATUS_OK && i < stat->block.count; ++i) {
-					status = check_statement(checker, stat->block.items[i]);
+					status = check_stat(checker, stat->block.items[i]);
 				}
 				pop_scope(checker, scope);
 			}
@@ -821,13 +781,13 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 			Ast names = ast_ensure_kind(stat->decl.name, AST_TUPLE);
 			if (stat->decl.type)
 			{
-				value = resolve_expression(checker, stat->decl.type);
+				value = check_expr(checker, stat->decl.type);
 				status = com_value_status(value);
 			}
 			ASSERT(stat->decl.expr);
 			if (status == COM_STATUS_OK)
 			{
-				value = resolve_expression(checker, stat->decl.expr);
+				value = check_expr(checker, stat->decl.expr);
 				status = com_value_status(value);
 			}
 			for (u32 i = 0; status == COM_STATUS_OK && i < names->tuple.count; ++ i)
@@ -857,32 +817,32 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 
 		case AST_IF:
 		{
-			value = resolve_expression(checker, stat->if_stat.pred);
+			value = check_expr(checker, stat->if_stat.pred);
 			status = com_value_status(value);
 			if (status == COM_STATUS_OK && stat->if_stat.true_clause) {
-				status = check_statement(checker, stat->if_stat.true_clause);
+				status = check_stat(checker, stat->if_stat.true_clause);
 			}
 			if (status == COM_STATUS_OK && stat->if_stat.else_clause) {
-				status = check_statement(checker, stat->if_stat.else_clause);
+				status = check_stat(checker, stat->if_stat.else_clause);
 			}
 			if (status == COM_STATUS_OK && stat->if_stat.then_clause) {
-				status = check_statement(checker, stat->if_stat.then_clause);
+				status = check_stat(checker, stat->if_stat.then_clause);
 			}
 		}
 		break;
 
 		case AST_DEFER_STAT:
 		{
-			status = check_statement(checker, stat->defer_stat.body);
+			status = check_stat(checker, stat->defer_stat.body);
 		}
 		break;
 
 		case AST_WHILE:
 		{
-			value = resolve_expression(checker, stat->while_stat.pred);
+			value = check_expr(checker, stat->while_stat.pred);
 			status = com_value_status(value);
 			if (status == COM_STATUS_OK) {
-				status = check_statement(checker, stat->while_stat.body);
+				status = check_stat(checker, stat->while_stat.body);
 			}
 		}
 		break;
@@ -893,17 +853,17 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 			status = push_scope(checker, SCOPE_BLOCK, stat, &scope);
 			if (status == COM_STATUS_OK)
 			{
-				status = check_statement(checker, stat->for_stat.init);
+				status = check_stat(checker, stat->for_stat.init);
 				if (status == COM_STATUS_OK)
 				{
-					value = resolve_expression(checker, stat->for_stat.pred);
+					value = check_expr(checker, stat->for_stat.pred);
 					status = com_value_status(value);
 				}
 				if (status == COM_STATUS_OK) {
-					status = check_statement(checker, stat->for_stat.step);
+					status = check_stat(checker, stat->for_stat.step);
 				}
 				if (status == COM_STATUS_OK) {
-					status = check_statement(checker, stat->for_stat.body);
+					status = check_stat(checker, stat->for_stat.body);
 				}
 				pop_scope(checker, scope);
 			}
@@ -916,9 +876,9 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 			status = push_scope(checker, SCOPE_BLOCK, stat, &scope);
 			if (status == COM_STATUS_OK)
 			{
-				status = check_statement(checker, stat->for_range_stat.decl);
+				status = check_stat(checker, stat->for_range_stat.decl);
 				if (status == COM_STATUS_OK) {
-					status = check_statement(checker, stat->for_range_stat.body);
+					status = check_stat(checker, stat->for_range_stat.body);
 				}
 				pop_scope(checker, scope);
 			}
@@ -929,7 +889,7 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		{
 			if (stat->return_stat.expr)
 			{
-				value = resolve_expression(checker, stat->return_stat.expr);
+				value = check_expr(checker, stat->return_stat.expr);
 				status = com_value_status(value);
 			}
 		}
@@ -939,7 +899,7 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		{
 			if (stat->break_stat.expr)
 			{
-				value = resolve_expression(checker, stat->break_stat.expr);
+				value = check_expr(checker, stat->break_stat.expr);
 				status = com_value_status(value);
 			}
 		}
@@ -949,7 +909,32 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 		{
 			if (stat->continue_stat.expr)
 			{
-				value = resolve_expression(checker, stat->continue_stat.expr);
+				value = check_expr(checker, stat->continue_stat.expr);
+				status = com_value_status(value);
+			}
+		}
+		break;
+
+		case AST_ADD_ASSIGN:
+		case AST_SUB_ASSIGN:
+		case AST_MUL_ASSIGN:
+		case AST_DIV_ASSIGN:
+		case AST_MOD_ASSIGN:
+		case AST_XOR_ASSIGN:
+		case AST_SHL_ASSIGN:
+		case AST_SHR_ASSIGN:
+		case AST_NIL_ASSIGN:
+		case AST_ASSIGN:
+		{
+			ASSERT(stat->binary.x);
+			ASSERT(stat->binary.y);
+			value = check_expr(checker, stat->binary.x);
+			status = com_value_status(value);
+			if (status == COM_STATUS_OK) {
+				status = check_assign_dest(checker, stat->binary.x);
+			}
+			if (status == COM_STATUS_OK) {
+				value = check_expr(checker, stat->binary.y);
 				status = com_value_status(value);
 			}
 		}
@@ -957,7 +942,7 @@ static Com_Status check_statement(Checker *checker, Ast stat)
 
 		default:
 		{
-			value = resolve_expression(checker, stat);
+			value = check_expr(checker, stat);
 			status = com_value_status(value);
 		}
 		break;

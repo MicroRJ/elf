@@ -347,7 +347,7 @@ static void test_checker_reports_duplicate_static(void)
 	checker_test_destroy(&test);
 }
 
-static void checker_expect_global_assignment_error(const char *name, const char *source, const char *label)
+static void checker_expect_static_assignment_error(const char *name, const char *source, const char *label)
 {
 	elf_State *state = elf_create_state();
 	CheckerTest test;
@@ -360,12 +360,13 @@ static void checker_expect_global_assignment_error(const char *name, const char 
 	elf_destroy_state(state);
 }
 
-static void test_checker_rejects_global_assignment(void)
+static void test_checker_rejects_static_assignment(void)
 {
-	checker_expect_global_assignment_error("checker_global_assign", "elf = 1", "checker rejects assignment to a global");
-	checker_expect_global_assignment_error("checker_global_compound_assign", "elf += 1", "checker rejects compound assignment to a global");
-	checker_expect_global_assignment_error("checker_global_nil_assign", "elf ?= 1", "checker rejects nil assignment to a global");
-	checker_expect_global_assignment_error("checker_global_multi_assign", "elf, elf = 1, 2", "checker rejects multi-assignment to globals");
+	checker_expect_static_assignment_error("checker_source_static_assign", "answer :: 42\nanswer = 0", "checker rejects assignment to a source static");
+	checker_expect_static_assignment_error("checker_global_assign", "elf = 1", "checker rejects assignment to an injected static");
+	checker_expect_static_assignment_error("checker_global_compound_assign", "elf += 1", "checker rejects compound assignment to an injected static");
+	checker_expect_static_assignment_error("checker_global_nil_assign", "elf ?= 1", "checker rejects nil assignment to an injected static");
+	checker_expect_static_assignment_error("checker_global_multi_assign", "elf, elf = 1, 2", "checker rejects multi-assignment to injected statics");
 }
 
 static void test_checker_resolves_imported_export(void)
@@ -560,7 +561,7 @@ static void run_checker_tests(void)
 	TEST_RUN("checker.reports_invalid_named_arguments", test_checker_reports_invalid_named_arguments);
 	TEST_RUN("checker.reports_duplicate_local", test_checker_reports_duplicate_local);
 	TEST_RUN("checker.reports_duplicate_static", test_checker_reports_duplicate_static);
-	TEST_RUN("checker.rejects_global_assignment", test_checker_rejects_global_assignment);
+	TEST_RUN("checker.rejects_static_assignment", test_checker_rejects_static_assignment);
 	TEST_RUN("checker.resolves_imported_export", test_checker_resolves_imported_export);
 	TEST_RUN("checker.reports_static_cycle", test_checker_reports_static_cycle);
 	TEST_RUN("checker.reports_invalid_static_expression", test_checker_reports_invalid_static_expression);

@@ -545,22 +545,6 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 	arena_destroy(&arena);
 }
 
-static void test_ir_rejects_assignment_to_file_static(elf_State *state)
-{
-	Arena arena = arena_create(0);
-	log_set_hook(ignore_expected_lowering_error, 0);
-	IrTestResult result = ir_test_lower_source(state, &arena, "answer :: 42\nanswer = 0");
-	log_set_hook(0, 0);
-	if (!result.module || result.source->report.error_count != 1) {
-		test_fail("assignment to a file static reports one lowering error");
-	}
-	Ir body = ir_test_main_body(result.module);
-	if (!body || body->kind != IR_BLOCK || body->ir_block.stats.count != 1 || !body->ir_block.stats.items[0] || body->ir_block.stats.items[0]->kind != IR_ERROR) {
-		test_fail("assignment to a file static lowers to an error");
-	}
-	arena_destroy(&arena);
-}
-
 static void test_ir_lowers_static_call_arguments(elf_State *state)
 {
 	Arena arena = arena_create(0);
@@ -665,7 +649,6 @@ static void run_ir_tests(elf_State *state)
 	TEST_RUN("ir.reports_cross_function_capture", test_ir_reports_cross_function_capture, state);
 	TEST_RUN("ir.rejects_unknown_parameter_type", test_ir_rejects_unknown_parameter_type, state);
 	TEST_RUN("ir.lowers_static_forward_reference", test_ir_lowers_static_forward_reference, state);
-	TEST_RUN("ir.rejects_assignment_to_file_static", test_ir_rejects_assignment_to_file_static, state);
 	TEST_RUN("ir.lowers_static_call_arguments", test_ir_lowers_static_call_arguments, state);
 	TEST_RUN("ir.lowers_variadic_static_call_arguments", test_ir_lowers_variadic_static_call_arguments, state);
 	TEST_RUN("ir.lowers_local_shadow_of_file_static", test_ir_lowers_local_shadow_of_file_static, state);
