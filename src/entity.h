@@ -140,30 +140,18 @@ static inline b32 entity_is_error(const Entity *entity)
 static b32 entity_is_constant(const Entity *entity);
 static b32 entity_is_exported(const Entity *entity);
 
-typedef enum
-{
-	SCOPE_NONE = 0,
-	SCOPE_GLOBAL,
-	SCOPE_NAMESPACE,
-	SCOPE_SOURCE,
-	SCOPE_FUNCTION,
-	SCOPE_BLOCK,
-}
-ScopeKind;
-
 struct Scope
 {
 	Arena          *arena;
 	Scope          *parent;
 	struct Ast_T   *owner;
 	Com_Source     *source;
-	ScopeKind       kind;
 	Entity        **entities;
 	u32             count;
 	u32             capacity;
 };
 
-static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source);
+static Scope *scope_create(Arena *arena, Scope *parent, struct Ast_T *owner, Com_Source *source);
 static Entity *scope_find_current(Scope *scope, struct Atom *name);
-static Entity *scope_find(Scope *scope, struct Atom *name);
+static Entity *scope_find(Scope *scope, Scope *static_boundary, struct Atom *name);
 #endif

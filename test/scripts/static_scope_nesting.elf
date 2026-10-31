@@ -1,0 +1,11 @@
+// Nested static lookup skips runtime locals in enclosing lexical blocks.
+value :: 10
+
+{
+	value := 20
+
+	{
+		nested_static :: value
+		test_assert(nested_static == 10, "nested static lookup skips enclosing runtime locals")
+	}
+}

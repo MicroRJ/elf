@@ -1,5 +1,58 @@
 
 
+// static values get their own scope in the main block
+this_local_should_be_invisible_to_the_static_value := 1
+{
+	this_is_a_static_value :: fun() {
+		elf.printl(this_local_should_be_invisible_to_the_static_value)
+	}
+	this_is_a_static_value()
+}
+
+#eof
+
+// static values get their own scope in the main block
+this_local_should_be_invisible_to_the_static_value := 1
+this_is_a_static_value :: fun() {
+	elf.printl(this_local_should_be_invisible_to_the_static_value)
+}
+
+this_is_a_static_value()
+
+
+#eof
+
+// static values get their own scope inside lexical blocks
+{
+	this_local_should_be_invisible_to_the_static_value := 1
+	this_is_a_static_value :: fun() {
+		elf.printl(this_local_should_be_invisible_to_the_static_value)
+	}
+
+	this_is_a_static_value()
+}
+
+
+
+
+#eof
+a_capture := 0
+static_function :: fun() {
+	a_capture = 10
+}
+
+static_function()
+
+#eof
+
+
+a_capture := 0
+fun() {
+	a_capture = 10
+}
+
+#eof
+
 
 length :: fun(b: callable) {
 }

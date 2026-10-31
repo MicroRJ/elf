@@ -63,7 +63,7 @@ static Compiler *new_compiler(Arena *arena)
 		return 0;
 	}
 
-	com->globals = scope_create(arena, SCOPE_GLOBAL, 0, 0, 0);
+	com->globals = scope_create(arena, 0, 0, 0);
 	if (!com->globals) {
 		return 0;
 	}
@@ -146,7 +146,7 @@ static Com_Status inject_symbol_table(Compiler *compiler, Scope *scope, Com_Sour
 	// TODO(RJ):
 	ASSERT(entity->count == 1);
 
-	Scope *members = scope_create(compiler->arena, SCOPE_NAMESPACE, scope, 0, 0);
+	Scope *members = scope_create(compiler->arena, scope, 0, 0);
 	if (!members)
 	{
 		return COM_STATUS_OOM;
@@ -355,13 +355,13 @@ static b32 report(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity
 	return result;
 }
 
-static Com_Source *alloc_source(Compiler *compiler, Atom *name, Atom *path, elf_Source *runtime_source, dy_String data)
+static Com_Source *alloc_source(Compiler *com, Atom *name, Atom *path, elf_Source *runtime_source, dy_String data)
 {
-	Com_Source *source = arena_push_zero(compiler->arena, sizeof(*source), _Alignof(Com_Source));
+	Com_Source *source = arena_push_zero(com->arena, sizeof(*source), _Alignof(Com_Source));
 	if (!source) {
 		return 0;
 	}
-	source->compiler = compiler;
+	source->compiler = com;
 	source->name = name;
 	source->path = path;
 	source->runtime_source = runtime_source;
@@ -372,19 +372,19 @@ static Com_Source *alloc_source(Compiler *compiler, Atom *name, Atom *path, elf_
 		data = runtime_source->text;
 	}
 	source->source = data;
-	if (compiler->last_source)
+	if (com->last_source)
 	{
-		compiler->last_source->next = source;
-		if (compiler->last_source->runtime_source && runtime_source)
+		com->last_source->next = source;
+		if (com->last_source->runtime_source && runtime_source)
 		{
-			compiler->last_source->runtime_source->next_compilation_source = runtime_source;
+			com->last_source->runtime_source->next_compilation_source = runtime_source;
 		}
 	}
 	else
 	{
-		compiler->first_source = source;
+		com->first_source = source;
 	}
-	compiler->last_source = source;
+	com->last_source = source;
 	return source;
 }
 
@@ -432,12 +432,12 @@ static dy_String read_source_file(Arena *arena, dy_String path, dy_String *conte
 }
 
 // NOTE(RJ): assumes the path is canonical
-static Com_Source *load_source(Compiler *compiler, Com_Source *requesting_source, SourceSite site, Atom *path_atom)
+static Com_Source *load_source(Compiler *com, Com_Source *req, SourceSite site, Atom *path_atom)
 {
-	ASSERT(compiler->target);
-	ASSERT(requesting_source);
+	ASSERT(com->target);
+	ASSERT(req);
 
-	for (Com_Source *source = compiler->first_source; source; source = source->next)
+	for (Com_Source *source = com->first_source; source; source = source->next)
 	{
 		if (source->path == path_atom)
 		{
@@ -446,28 +446,28 @@ static Com_Source *load_source(Compiler *compiler, Com_Source *requesting_source
 	}
 
 	dy_String path = dy_string_from_data(atom_data(path_atom), atom_size(path_atom));
-	u64 arena_checkpoint = arena_mark(compiler->arena);
+	u64 arena_checkpoint = arena_mark(com->arena);
 	dy_String contents = {0};
-	dy_String load_error = read_source_file(compiler->arena, path, &contents);
+	dy_String load_error = read_source_file(com->arena, path, &contents);
 	if (load_error.data)
 	{
-		arena_restore(compiler->arena, arena_checkpoint);
-		report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%.*s '%s'", (i32)load_error.size, load_error.data, atom_data(path_atom));
+		arena_restore(com->arena, arena_checkpoint);
+		report(req, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "%.*s '%s'", (i32)load_error.size, load_error.data, atom_data(path_atom));
 		return 0;
 	}
 
-	elf_Source *runtime_source = elf_source_create(compiler->target, path, contents);
-	arena_restore(compiler->arena, arena_checkpoint);
+	elf_Source *runtime_source = elf_source_create(com->target, path, contents);
+	arena_restore(com->arena, arena_checkpoint);
 	if (!runtime_source)
 	{
-		report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while creating source file '%s'", atom_data(path_atom));
+		report(req, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while creating source file '%s'", atom_data(path_atom));
 		return 0;
 	}
 
-	Com_Source *source = alloc_source(compiler, path_atom, path_atom, runtime_source, (dy_String) {0});
+	Com_Source *source = alloc_source(com, path_atom, path_atom, runtime_source, (dy_String) {0});
 	if (!source)
 	{
-		report(requesting_source, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
+		report(req, ELF_ERROR_SOURCE_PATH, ERROR_ERROR, ERROR_PHASE_PARSER, site, "out of memory while registering source file '%s'", atom_data(path_atom));
 	}
 	return source;
 }
@@ -510,47 +510,6 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 	return ast;
 }
 
-static elf_Prototype *compile_source(Compiler *compiler, Com_Source *source, elf_SymTable *symbols)
-{
-	Com_Status inject_status = inject_symbols(compiler, compiler->globals, source, compiler->target->symbols);
-	if (inject_status == COM_STATUS_OK && symbols != compiler->target->symbols)
-	{
-		inject_status = inject_symbols(compiler, compiler->globals, source, symbols);
-	}
-	if (inject_status == COM_STATUS_OOM)
-	{
-		report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {0}, "could not inject environment symbols");
-	}
-	if (inject_status != COM_STATUS_OK)
-	{
-		return 0;
-	}
-
-	Parser parser = {0};
-	if (!parser_init(&parser))
-	{
-		return 0;
-	}
-	Ast ast = parse_source_recursively(compiler, &parser, source);
-	parser_destroy(&parser);
-	if (ast_is_error(ast) || compiler->error_count)
-	{
-		return 0;
-	}
-
-	if (check_source(source) != COM_STATUS_OK)
-	{
-		return 0;
-	}
-
-	IrModule *ir_module = ir_emit_module(source);
-	if (!ir_module || compiler->error_count)
-	{
-		return 0;
-	}
-	return bc_emit_module(compiler->target, ir_module);
-}
-
 static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source)
 {
 	if (!target || !arena || !name.data || name.size > UINT32_MAX || !source.data || source.size > UINT32_MAX)
@@ -558,14 +517,14 @@ static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *a
 		return 0;
 	}
 
-	Compiler *compiler = new_compiler(arena);
-	if (!compiler)
+	Compiler *com = new_compiler(arena);
+	if (!com)
 	{
 		return 0;
 	}
-	compiler->target = target;
+	com->target = target;
 
-	Atom *source_name = atom_from_data_size(compiler->atoms, name.data, (u32)name.size);
+	Atom *source_name = atom_from_data_size(com->atoms, name.data, (u32)name.size);
 	dy_String runtime_name = {(char *)name.data, name.size};
 	dy_String runtime_text = {(char *)source.data, source.size};
 	elf_Source *runtime_source = elf_source_create(target, runtime_name, runtime_text);
@@ -574,14 +533,39 @@ static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *a
 		return 0;
 	}
 
-	Com_Source *compiler_source = alloc_source(compiler, source_name, source_name, runtime_source, (dy_String) {0});
-	if (!compiler_source)
+	Com_Source *com_source = alloc_source(com, source_name, source_name, runtime_source, (dy_String) {0});
+	if (!com_source)
 	{
 		return 0;
 	}
 
-	elf_Prototype *entry = compile_source(compiler, compiler_source, symbols);
-	log_report(compiler);
+	elf_Prototype *entry = 0;
+	Com_Status inject_status = inject_symbols(com, com->globals, com_source, com->target->symbols);
+	if (inject_status == COM_STATUS_OK && symbols != com->target->symbols)
+	{
+		inject_status = inject_symbols(com, com->globals, com_source, symbols);
+	}
+	if (inject_status == COM_STATUS_OOM)
+	{
+		report(com_source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {0}, "could not inject environment symbols");
+	}
+	if (inject_status == COM_STATUS_OK)
+	{
+		Parser parser = {0};
+		if (parser_init(&parser))
+		{
+			Ast ast = parse_source_recursively(com, &parser, com_source);
+			parser_destroy(&parser);
+			if (!ast_is_error(ast) && !com->error_count && check_source(com_source) == COM_STATUS_OK)
+			{
+				IrModule *ir_module = ir_emit_module(com_source);
+				if (ir_module && !com->error_count) {
+					entry = bc_emit_module(com->target, ir_module);
+				}
+			}
+		}
+	}
+	log_report(com);
 	return entry;
 }
 

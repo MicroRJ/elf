@@ -44,9 +44,9 @@ static b32 entity_is_exported(const Entity *entity)
 	return result;
 }
 
-static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct Ast_T *owner, Com_Source *source)
+static Scope *scope_create(Arena *arena, Scope *parent, struct Ast_T *owner, Com_Source *source)
 {
-	ASSERT(!parent || kind == SCOPE_SOURCE || parent->source == source);
+	ASSERT(!parent || !parent->source || parent->source == source);
 	Scope *scope = arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
 	if (scope)
 	{
@@ -54,7 +54,6 @@ static Scope *scope_create(Arena *arena, ScopeKind kind, Scope *parent, struct A
 		scope->parent = parent;
 		scope->owner = owner;
 		scope->source = source;
-		scope->kind = kind;
 	}
 	return scope;
 }
@@ -75,12 +74,16 @@ static Entity *scope_find_current(Scope *scope, Atom *name)
 	return 0;
 }
 
-static Entity *scope_find(Scope *scope, Atom *name)
+static Entity *scope_find(Scope *scope, Scope *static_boundary, Atom *name)
 {
+	b32 static_only = false;
 	for (Scope *current = scope; current; current = current->parent)
 	{
+		if (current == static_boundary) {
+			static_only = true;
+		}
 		Entity *entity = scope_find_current(current, name);
-		if (entity) {
+		if (entity && (!static_only || entity->kind == ENTITY_STATIC)) {
 			return entity;
 		}
 	}

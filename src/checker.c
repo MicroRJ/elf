@@ -7,6 +7,7 @@ typedef struct
 	Scope    *globals;
 	Scope    *source_scope;
 	Scope    *active_scope;
+	Scope    *static_boundary;
 	Ast       current_function;
 }
 Checker;
@@ -14,6 +15,7 @@ Checker;
 static Com_Status check_stat(Checker *checker, Ast ast);
 static Com_Value resolve_static_entity(Checker *checker, Entity *entity);
 static Com_Value check_expr(Checker *checker, Ast expr);
+static Com_Status check_block_stat(Checker *checker, Ast stat);
 
 static Com_Value com_value_error(Com_Status status)
 {
@@ -66,7 +68,8 @@ static Com_Status check_assign_dest(Checker *checker, Ast dest)
 	return COM_STATUS_OK;
 }
 
-static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope **result)
+// TODO(RJ): the only way this fails is by running out of memory, just return 0 in that case
+static Com_Status push_scope(Checker *checker, Ast owner, Scope **result)
 {
 	ASSERT(checker);
 	ASSERT(checker->active_scope);
@@ -74,7 +77,7 @@ static Com_Status push_scope(Checker *checker, ScopeKind kind, Ast owner, Scope 
 	ASSERT(result);
 	ASSERT(checker->source_scope);
 	ASSERT(checker->active_scope->source == checker->source_scope->source);
-	Scope *scope = scope_create(checker->active_scope->arena, kind, checker->active_scope, owner, checker->source_scope->source);
+	Scope *scope = scope_create(checker->active_scope->arena, checker->active_scope, owner, checker->source_scope->source);
 	if (scope) {
 		checker->active_scope = scope;
 		*result = scope;
@@ -91,6 +94,7 @@ static void pop_scope(Checker *checker, Scope *scope)
 	checker->active_scope = scope->parent;
 }
 
+// TODO(RJ): remove local stuff from here!
 static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Atom *name, SourceSite site)
 {
 	Entity *entity = scope_declare(scope, kind, name);
@@ -147,6 +151,7 @@ static Com_Status check_source(Com_Source *source)
 	ASSERT(source);
 	Compiler *compiler = source->compiler;
 	ASSERT(compiler);
+	ASSERT(compiler->globals);
 	Ast root = source->ast;
 	ASSERT(root);
 	ASSERT(root->kind == AST_FUNCTION);
@@ -157,26 +162,14 @@ static Com_Status check_source(Com_Source *source)
 	Checker checker = {0};
 	checker.current_function = root;
 	checker.globals = compiler->globals;
-	if (!checker.globals) {
-		return checker_out_of_memory(source, root->site);
-	}
-
-	checker.source_scope = scope_create(compiler->arena, SCOPE_SOURCE, checker.globals, root, source);
-	checker.active_scope = checker.source_scope;
+	checker.source_scope = scope_create(compiler->arena, checker.globals, root, source);
 	if (!checker.source_scope) {
 		return checker_out_of_memory(source, root->site);
 	}
-
-	ASSERT(!source->scope);
+	checker.active_scope = checker.source_scope;
 	source->scope = checker.source_scope;
 
-	Com_Status status = declare_statics(&checker, checker.source_scope, root->function.body->block);
-	for (u32 i = 0; i < root->function.body->block.count; ++i) {
-		status = check_stat(&checker, root->function.body->block.items[i]);
-		if (status == COM_STATUS_OK) {
-			break;
-		}
-	}
+	Com_Status status = check_block_stat(&checker, root->function.body);
 	return status;
 }
 
@@ -207,17 +200,20 @@ static Com_Value resolve_static_entity(Checker *checker, Entity *entity)
 		// Note, we can lazily resolve entities from different sources
 		Scope *previous_source_scope = checker->source_scope;
 		Scope *previous_active_scope = checker->active_scope;
+		Scope *previous_static_boundary = checker->static_boundary;
 
 		Com_Source *source = entity->scope->source;
 		ASSERT(source);
 		ASSERT(source->scope);
 		checker->source_scope = source->scope;
 		checker->active_scope = entity->scope;
+		checker->static_boundary = entity->scope;
 
 		value = check_expr(checker, expr);
 
 		checker->source_scope = previous_source_scope;
 		checker->active_scope = previous_active_scope;
+		checker->static_boundary = previous_static_boundary;
 
 		if (value.type == COM_VALUE_NONE)
 		{
@@ -246,7 +242,7 @@ static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *sour
 		*result = source->scope;
 		return COM_STATUS_OK;
 	}
-	source->scope = scope_create(compiler->arena, SCOPE_SOURCE, checker->globals, source->ast, source);
+	source->scope = scope_create(compiler->arena, checker->globals, source->ast, source);
 	if (!source->scope)
 	{
 		return checker_out_of_memory(source, source->ast->site);
@@ -329,7 +325,7 @@ static Com_Value check_expr(Checker *checker, Ast expr)
 			}
 
 			Scope *scope = 0;
-			Com_Status status = push_scope(checker, SCOPE_FUNCTION, expr, &scope);
+			Com_Status status = push_scope(checker, expr, &scope);
 			if (status != COM_STATUS_OK) {
 				value = com_value_error(status);
 				break;
@@ -419,7 +415,7 @@ static Com_Value check_expr(Checker *checker, Ast expr)
 		{
 			Atom *name = expr->identifier;
 
-			Entity *entity = scope_find(checker->active_scope, name);
+			Entity *entity = scope_find(checker->active_scope, checker->static_boundary, name);
 			if (entity && entity->kind == ENTITY_LOCAL)
 			{
 				Ast entity_function = entity->en_local.function;
@@ -745,6 +741,32 @@ static Com_Value check_expr(Checker *checker, Ast expr)
 	return value;
 }
 
+static Com_Status check_block_stat(Checker *checker, Ast stat)
+{
+	Scope *static_scope = 0;
+	Com_Status status = push_scope(checker, stat, &static_scope);
+	if (status == COM_STATUS_OK)
+	{
+		status = declare_statics(checker, static_scope, stat->block);
+		if (status == COM_STATUS_OK)
+		{
+			Scope *local_scope = 0;
+			status = push_scope(checker, stat, &local_scope);
+			if (status == COM_STATUS_OK)
+			{
+				for (u32 i = 0; i < stat->block.count; ++i)
+				{
+					status = check_stat(checker, stat->block.items[i]);
+					if (status != COM_STATUS_OK) break;
+				}
+			}
+			pop_scope(checker, local_scope);
+		}
+		pop_scope(checker, static_scope);
+	}
+	return status;
+}
+
 static Com_Status check_stat(Checker *checker, Ast stat)
 {
 	ASSERT(stat);
@@ -763,16 +785,7 @@ static Com_Status check_stat(Checker *checker, Ast stat)
 
 		case AST_BLOCK_STAT:
 		{
-			Scope *scope = 0;
-			status = push_scope(checker, SCOPE_BLOCK, stat, &scope);
-			if (status == COM_STATUS_OK)
-			{
-				status = declare_statics(checker, scope, stat->block);
-				for (u32 i = 0; status == COM_STATUS_OK && i < stat->block.count; ++i) {
-					status = check_stat(checker, stat->block.items[i]);
-				}
-				pop_scope(checker, scope);
-			}
+			status = check_block_stat(checker, stat);
 		}
 		break;
 
@@ -850,7 +863,7 @@ static Com_Status check_stat(Checker *checker, Ast stat)
 		case AST_FOR:
 		{
 			Scope *scope = 0;
-			status = push_scope(checker, SCOPE_BLOCK, stat, &scope);
+			status = push_scope(checker, stat, &scope);
 			if (status == COM_STATUS_OK)
 			{
 				status = check_stat(checker, stat->for_stat.init);
@@ -873,7 +886,7 @@ static Com_Status check_stat(Checker *checker, Ast stat)
 		case AST_FOR_RANGE:
 		{
 			Scope *scope = 0;
-			status = push_scope(checker, SCOPE_BLOCK, stat, &scope);
+			status = push_scope(checker, stat, &scope);
 			if (status == COM_STATUS_OK)
 			{
 				status = check_stat(checker, stat->for_range_stat.decl);

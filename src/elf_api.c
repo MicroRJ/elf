@@ -21,6 +21,7 @@ void *elf_get_user_data(elf_State *state)
 	return state->user_data;
 }
 
+// TODO(RJ): this is deprecated!
 void elf_error(elf_State *state, const char *message)
 {
 	report_runtime_error(state, ELF_ERROR_RUNTIME, "%s",

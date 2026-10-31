@@ -186,11 +186,7 @@ static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *enti
 
 static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 {
-	if (!entity)
-	{
-		ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "expression has no resolved entity");
-		return ERROR_IR;
-	}
+	ASSERT(entity);
 	entity->referenced = true;
 
 	if (entity->kind == ENTITY_STATIC)

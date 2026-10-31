@@ -179,6 +179,7 @@ typedef struct
 }
 elf_SourceMapEntry;
 
+// TODO(RJ): store prototypes
 struct elf_Prototype
 {
 	u64                 allocation_size;
