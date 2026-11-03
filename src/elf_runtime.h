@@ -271,9 +271,6 @@ struct elf_State
 	Arena          arena;
 	void          *user_data;
 
-	elf_Prototype **prototypes;
-	u32             prototype_count;
-	u32             prototype_capacity;
 	elf_Function   *native_functions;
 	u32             native_function_count;
 	u32             native_function_capacity;

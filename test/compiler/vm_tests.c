@@ -191,9 +191,6 @@ static void test_vm_compiled_functions_keep_identity(void)
 		return;
 	}
 	elf_Prototype *first_entry_prototype = value_as_prototype(first_entry);
-	if (first_entry_prototype != state->prototypes[0]) {
-		test_fail("first compiled entry uses the first prototype index");
-	}
 	elf_call(state, 0);
 	elf_Value first_factory = state->stack_top[-1];
 	if (!value_is_prototype(first_factory)) {

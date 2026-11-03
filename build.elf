@@ -22,7 +22,6 @@ entries.build = fun() {
 			tasks.targets.public_header_test,
 			tasks.targets.tests,
 			tasks.targets.benchmarks,
-			tasks.targets.bytecode_tool,
 			tasks.targets.elf_runner,
 		],
 		options = options,

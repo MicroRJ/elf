@@ -173,7 +173,6 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 {
 	elf_State *state = elf_create_state();
-	bench_require(state->prototype_count == 0, "new state preallocates compiled prototypes");
 	u64 arena_before = state->arena.used;
 	u64 bytecode_count = 0;
 	u64 function_count = 0;
@@ -186,13 +185,16 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	i64 start = bench_now();
 	for (u32 i = 0; i < iterations; ++i)
 	{
-		u32 first_prototype = state->prototype_count;
+		u32 first_reference = state->gc_reference_count;
 		bench_require(elf_push_code_source(state, 0, ELF_LIT("benchmark.compile"), text) == ELF_ERROR_NONE, "could not compile benchmark source");
-		elf_Prototype *entry = value_as_prototype(state->stack_top[-1]);
-		bench_require(entry == state->prototypes[first_prototype], "compile entry is not the first new prototype");
-		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
+		for (u32 object_index = first_reference; object_index < state->gc_reference_count; ++object_index)
 		{
-			elf_Prototype *prototype = state->prototypes[prototype_index];
+			elf_Object *object = state->gc_references[object_index];
+			if (object->type != ELF_OBJECT_PROTOTYPE) {
+				continue;
+			}
+
+			elf_Prototype *prototype = (elf_Prototype *)object;
 			bytecode_count += prototype->bytecode_count;
 			function_count += 1;
 			string_count += prototype->string_count;
@@ -210,7 +212,6 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 		bytecode_count, function_count, string_count, integer_constant_count, number_constant_count);
 	printf("  retained state-arena storage: %llu bytes\n", retained_arena_storage);
 	printf("  prototype allocation storage: %llu bytes\n", prototype_storage);
-	printf("  prototype table storage: %llu bytes\n", (u64)state->prototype_capacity * sizeof(*state->prototypes));
 	elf_destroy_state(state);
 }
 

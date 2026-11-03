@@ -97,9 +97,14 @@ static u32 backend_count_bytecode(BackendCompileResult result, BcType type)
 static u32 backend_count_all_bytecode(BackendCompileResult result, BcType type)
 {
 	u32 count = 0;
-	for (u32 function_index = 0; function_index < result.state->prototype_count; ++function_index)
+	for (u32 object_index = 0; object_index < result.state->gc_reference_count; ++object_index)
 	{
-		elf_Prototype *function = result.state->prototypes[function_index];
+		elf_Object *object = result.state->gc_references[object_index];
+		if (object->type != ELF_OBJECT_PROTOTYPE) {
+			continue;
+		}
+
+		elf_Prototype *function = (elf_Prototype *)object;
 		for (u32 byte_index = 0; byte_index < function->bytecode_count; ++byte_index) {
 			count += function->bytecode[byte_index].b_type == type;
 		}
@@ -504,7 +509,7 @@ static void test_backend_calls_imported_static_function(void)
 	}
 	else
 	{
-		if (result.state->prototype_count != 2 || backend_count_bytecode(result, BC_LOAD_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
+		if (backend_count_bytecode(result, BC_LOAD_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
 			test_fail("imported static function loads its prototype and emits a dynamic call");
 		}
 

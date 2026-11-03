@@ -78,14 +78,6 @@ run_optimized_benchmarks := {
 	target = optimized_benchmarks,
 }
 
-bytecode_tool := {
-	kind = "executable",
-	name = "bytecode",
-	sources = [ "tools/bytecode.c" ],
-	private_include_directories = internal_include_directories,
-	dependencies = [ library ],
-}
-
 elf_runner := {
 	kind = "executable",
 	name = "elf",
@@ -116,7 +108,6 @@ ret {
 
 		run_optimized_benchmarks = run_optimized_benchmarks,
 
-		bytecode_tool = bytecode_tool,
 		elf_runner = elf_runner,
 	},
 }

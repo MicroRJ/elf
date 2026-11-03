@@ -136,7 +136,6 @@ void elf_destroy_state(elf_State *state)
 		elf_native_functions_destroy(state);
 		gc_destroy_all(state);
 		elf_sources_destroy(state);
-		elf_free(state, state->prototypes, (u64)state->prototype_capacity * sizeof(*state->prototypes));
 		elf_free(state, state->string_buckets,
 			(u64)state->string_bucket_count * sizeof(*state->string_buckets));
 		Arena arena = state->arena;

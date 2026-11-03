@@ -130,19 +130,6 @@ static u32 gc_mark_stack(elf_State *state)
 	return marked_count;
 }
 
-static u32 gc_mark_prototypes(elf_State *state)
-{
-	u32 marked_count = 0;
-	for (u32 prototype_index = 0; prototype_index < state->prototype_count; ++prototype_index)
-	{
-		elf_Prototype *prototype = state->prototypes[prototype_index];
-		if (prototype) {
-			marked_count += gc_mark_reachable(state, (elf_Object *)prototype);
-		}
-	}
-	return marked_count;
-}
-
 static u32 gc_mark_metatables(elf_State *state)
 {
 	u32 marked_count = 0;
@@ -182,7 +169,6 @@ static u32 gc_collect(elf_State *state)
 		marked_count += gc_mark_reachable(state, (elf_Object *)state->ref_table);
 	}
 	marked_count += gc_mark_metatables(state);
-	marked_count += gc_mark_prototypes(state);
 	u32 freed_count = gc_sweep(state);
 	return freed_count;
 }
