@@ -103,6 +103,7 @@ struct Entity
 	Entity         *last;
 
 	Entity         *next;
+	Entity         *next_in_compiler;
 
 	Entity_Tags     tags;
 

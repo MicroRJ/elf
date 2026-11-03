@@ -169,6 +169,8 @@ struct IrEmitter
 {
 	IrModule    *module;
 	IrFunction  *function;
+	Com_Source  *source;
+	struct Scope *active_scope;
 
 	IrDefer     *defer;
 	IrDefer     *defer_scope_start;

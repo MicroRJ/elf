@@ -39,7 +39,7 @@ static void checker_test_init_with_target(CheckerTest *test, elf_State *target, 
 	test->source->ast = file;
 	test->source->state = COM_SOURCE_PARSED;
 	ir_module_init(&test->module, &test->arena);
-	test->status = check_source(&test->module, test->source);
+	test->status = check(&test->module, test->compiler);
 }
 
 static void checker_test_init(CheckerTest *test, const char *name, const char *source_text)
@@ -392,7 +392,7 @@ static void test_checker_resolves_imported_export(void)
 		import->import.target = module;
 		IrModule ir_module;
 		ir_module_init(&ir_module, &arena);
-		check_source(&ir_module, root);
+		check(&ir_module, compiler);
 	}
 	else {
 		test_fail("checker import test parses import");
@@ -449,7 +449,7 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 	}
 	import->import.target = test->module;
 	ir_module_init(&test->ir_module, &test->arena);
-	check_source(&test->ir_module, test->root);
+	check(&test->ir_module, test->compiler);
 }
 
 static void checker_import_test_destroy(CheckerImportTest *test)
@@ -547,7 +547,7 @@ static void test_checker_propagates_diagnostic_oom(void)
 	arena.capacity = arena.used;
 	IrModule ir_module;
 	ir_module_init(&ir_module, &arena);
-	Com_Status status = check_source(&ir_module, source);
+	Com_Status status = check(&ir_module, compiler);
 	arena.capacity = capacity;
 	if (status != COM_STATUS_OOM || compiler->error_count != 0 || source->report.error_count != 0) {
 		test_fail("checker propagates failure to allocate an out-of-memory diagnostic");

@@ -14,6 +14,7 @@ typedef struct Compiler Compiler;
 typedef struct elf_Prototype elf_Prototype;
 typedef struct elf_Source elf_Source;
 typedef struct Com_Source Com_Source;
+typedef struct Entity Entity;
 
 // Status for control flow based exception handling, it'll probably take a while to fully cover everything ...
 typedef enum
@@ -51,7 +52,7 @@ typedef enum
 {
 	COM_SOURCE_UNPARSED = 0,
 	COM_SOURCE_PARSED,
-	COM_SOURCE_CHECKING,
+	COM_SOURCE_PREPARED,
 	COM_SOURCE_CHECKED,
 }
 Com_SourceState;
@@ -64,6 +65,7 @@ struct Compiler
 	struct Scope      *globals;
 	Com_Source        *first_source;
 	Com_Source        *last_source;
+	Entity            *entities;
 	u32                error_count;
 	u32                warning_count;
 };

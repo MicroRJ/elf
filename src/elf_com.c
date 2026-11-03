@@ -566,7 +566,7 @@ static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *a
 		return 0;
 	}
 
-	if (check_source(&ir_module, com_source) != COM_STATUS_OK) {
+	if (check(&ir_module, com) != COM_STATUS_OK) {
 		log_report(com);
 		return 0;
 	}
