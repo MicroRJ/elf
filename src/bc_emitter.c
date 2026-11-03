@@ -12,12 +12,26 @@ struct BcJumpPatch
 	Ir  label;
 };
 
+typedef struct
+{
+	IrFunction *func;
+	u32         slot;
+}
+BcRef;
+
+typedef struct
+{
+	elf_Prototype *proto;
+	IrFunction    *func;
+	u32            slot;
+}
+BcPatch;
+
 typedef struct BcEmitter BcEmitter;
 struct BcEmitter
 {
 	elf_State          *target;
 	Arena              *arena;
-	IrFunction         *function;
 
 	// Temporary buffers copied into the runtime prototype after emission.
 	Bytecode           *bytecode;
@@ -27,6 +41,9 @@ struct BcEmitter
 	elf_Value          *consts;
 	u32                 xconsts;
 	u32                 nconsts;
+	BcRef              *refs;
+	u32                 xrefs;
+	u32                 nrefs;
 
 	elf_SourceMapEntry *source_map;
 	u32                 source_map_capacity;
@@ -104,8 +121,13 @@ static b32 consts_equal(elf_Value x, elf_Value y)
 
 static u32 add_const(BcEmitter *emitter, elf_Value value)
 {
-	for (u32 i = 0; i < emitter->nconsts; ++i) {
-		if (consts_equal(emitter->consts[i], value)) {
+	for (u32 i = 0; i < emitter->nconsts; ++i)
+	{
+		b32 is_ref = false;
+		for (u32 j = 0; j < emitter->nrefs; ++j) {
+			is_ref |= emitter->refs[j].slot == i;
+		}
+		if (!is_ref && consts_equal(emitter->consts[i], value)) {
 			return i;
 		}
 	}
@@ -117,6 +139,26 @@ static u32 add_const(BcEmitter *emitter, elf_Value value)
 	u32 index = emitter->nconsts++;
 	emitter->consts[index] = value;
 	return index;
+}
+
+static u32 add_func(BcEmitter *emitter, IrFunction *func)
+{
+	for (u32 i = 0; i < emitter->nrefs; ++i) {
+		if (emitter->refs[i].func == func) {
+			return emitter->refs[i].slot;
+		}
+	}
+
+	if (emitter->nconsts >= BC_OPERAND_COUNT_MAX) {
+		abort();
+	}
+	emitter->consts = grow_emitter_array(emitter->arena, emitter->consts, emitter->nconsts, &emitter->xconsts, emitter->nconsts + 1, sizeof(*emitter->consts));
+	u32 slot = emitter->nconsts++;
+	emitter->consts[slot] = value_nil();
+
+	emitter->refs = grow_emitter_array(emitter->arena, emitter->refs, emitter->nrefs, &emitter->xrefs, emitter->nrefs + 1, sizeof(*emitter->refs));
+	emitter->refs[emitter->nrefs++] = (BcRef) { .func = func, .slot = slot };
+	return slot;
 }
 
 // Labels and jump patching
@@ -633,12 +675,11 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			}
 
 			out = ensure_slot(emitter, out);
-			ASSERT(expr->func < emitter->function->nfuncs);
-			IrFunction *function = emitter->function->funcs[expr->func];
-			ASSERT(expr->func < BC_OPERAND_COUNT_MAX);
+			IrFunction *function = expr->func;
+			u32 slot = add_func(emitter, function);
 			if (function->ncaps == 0)
 			{
-				emit_bytecode_xy(emitter, site, BC_LOAD_CONST, out, expr->func);
+				emit_bytecode_xy(emitter, site, BC_LOAD_CONST, out, slot);
 			}
 			else
 			{
@@ -653,7 +694,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 					prev_capture_slot ++;
 				}
 
-				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, first_capture_slot, expr->func);
+				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, first_capture_slot, slot);
 				if (first_capture_slot != out) {
 					emit_move(emitter, site, out, first_capture_slot);
 				}
@@ -1139,16 +1180,6 @@ static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
 	ASSERT(emitter);
 	ASSERT(function);
 	ASSERT(!function->ast || function->ast->function.params.count == function->params.count);
-	emitter->function = function;
-	if (function->nfuncs > BC_OPERAND_COUNT_MAX) {
-		abort();
-	}
-	if (function->nfuncs)
-	{
-		emitter->consts = grow_emitter_array(emitter->arena, emitter->consts, emitter->nconsts, &emitter->xconsts, function->nfuncs, sizeof(*emitter->consts));
-		zero_memory(emitter->consts, sizeof(*emitter->consts) * function->nfuncs);
-	}
-	emitter->nconsts = function->nfuncs;
 
 	emitter->stack_size = 1;
 	emitter->stack_top = 1;
@@ -1185,6 +1216,11 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 	ASSERT(module->last_function);
 	ASSERT(!module->last_function->next);
 
+	Scratch scratch = scratch_begin_excluding(module->arena);
+	BcPatch *patches = 0;
+	u32 npatches = 0;
+	u32 xpatches = 0;
+
 	u32 emitted_function_count = 0;
 	for (IrFunction *function = module->first_function; function; function = function->next)
 	{
@@ -1195,20 +1231,24 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 		emitter->bytecode_capacity = 1 << 13;
 		emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
 		bc_emit_func(emitter, function);
+
+		patches = grow_emitter_array(scratch.arena, patches, npatches, &xpatches, npatches + emitter->nrefs, sizeof(*patches));
+		for (u32 i = 0; i < emitter->nrefs; ++i) {
+			patches[npatches++] = (BcPatch) { .proto = function->proto, .func = emitter->refs[i].func, .slot = emitter->refs[i].slot };
+		}
+
 		arena_restore(module->arena, arena_checkpoint);
 		emitted_function_count += 1;
 	}
 	ASSERT(emitted_function_count == module->function_count);
 
-	for (IrFunction *function = module->first_function; function; function = function->next)
+	for (u32 i = 0; i < npatches; ++i)
 	{
-		ASSERT(function->proto);
-		ASSERT(function->proto->nconsts >= function->nfuncs);
-		for (u32 i = 0; i < function->nfuncs; ++i)
-		{
-			ASSERT(function->funcs[i]->proto);
-			function->proto->consts[i] = proto_value(function->funcs[i]->proto);
-		}
+		BcPatch patch = patches[i];
+		ASSERT(patch.func->proto);
+		ASSERT(patch.slot < patch.proto->nconsts);
+		patch.proto->consts[patch.slot] = proto_value(patch.func->proto);
 	}
+	scratch_end(scratch);
 	return module->first_function->proto;
 }

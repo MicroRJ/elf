@@ -230,31 +230,9 @@ static Ir ir_new_native_function(IrEmitter *emitter, SourceSite site, u32 native
 
 static Ir ir_new_function_ref(IrEmitter *emitter, SourceSite site, IrFunction *function)
 {
-	ASSERT(emitter->function);
 	ASSERT(function);
-
-	IrFunction *owner = emitter->function;
-	u32 index = 0;
-	while (index < owner->nfuncs && owner->funcs[index] != function) {
-		index += 1;
-	}
-	if (index == owner->nfuncs)
-	{
-		if (owner->nfuncs == owner->xfuncs)
-		{
-			u32 cap = owner->xfuncs ? owner->xfuncs * 2 : 8;
-			IrFunction **funcs = arena_push(emitter->module->arena, sizeof(*funcs) * cap, _Alignof(IrFunction *));
-			if (owner->nfuncs) {
-				copy_memory(funcs, owner->funcs, sizeof(*funcs) * owner->nfuncs);
-			}
-			owner->funcs = funcs;
-			owner->xfuncs = cap;
-		}
-		owner->funcs[owner->nfuncs++] = function;
-	}
-
 	Ir ir = ir_alloc(emitter, site, IR_FUNCTION_REF);
-	ir->func = index;
+	ir->func = function;
 	return ir;
 }
 
@@ -595,7 +573,7 @@ static void print_ir(IrPrinter *pr, Ir ir)
 
 		case IR_FUNCTION_REF:
 		{
-			IR_PRINT(pr, "function[%u]", ir->func);
+			IR_PRINT(pr, "function[%p]", (void *)ir->func);
 		}
 		break;
 

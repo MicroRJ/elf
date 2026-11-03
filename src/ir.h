@@ -218,9 +218,6 @@ struct IrFunction
 	IrCapture  *caps;
 	u32         ncaps;
 	u32         xcaps;
-	IrFunction **funcs;
-	u32          nfuncs;
-	u32          xfuncs;
 	elf_Prototype *proto;
 };
 
@@ -274,7 +271,7 @@ struct IrNode
 		}
 		ir_call;
 
-		u32 func;
+		IrFunction *func;
 
 		struct
 		{

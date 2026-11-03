@@ -433,7 +433,7 @@ static void test_ir_lowers_function_expression(elf_State *state)
 	Ir main_body = result.module->first_function->body;
 	Ir memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
 	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION_REF, "function expression lowers to function ir");
-	if (memory && memory->ir_local.expr && result.module->first_function->funcs[memory->ir_local.expr->func] != result.module->first_function->next) {
+	if (memory && memory->ir_local.expr && memory->ir_local.expr->func != result.module->first_function->next) {
 		test_fail("function ir points at nested function");
 	}
 
