@@ -301,17 +301,6 @@ static inline b32 elf_table_entry_is_key(Entry entry)
 	return entry.key.type != ELF_VALUE_TYPE_NIL && entry.key.type != ENTRY_TOMB_TYPE;
 }
 
-static inline b32 prototype_index_is_valid(elf_State *state, u32 prototype_index)
-{
-	return prototype_index < state->prototype_count && state->prototypes[prototype_index];
-}
-
-static inline elf_Prototype *proto_from_index(elf_State *state, u32 prototype_index)
-{
-	ASSERT(prototype_index_is_valid(state, prototype_index));
-	return state->prototypes[prototype_index];
-}
-
 //
 // Cross-type runtime helpers.
 //

@@ -8,7 +8,6 @@ typedef struct
 {
 	elf_State     *state;
 	elf_Prototype *function;
-	u32            function_index;
 }
 BackendCompileResult;
 
@@ -53,7 +52,6 @@ static BackendCompileResult backend_test_compile_file(const char *path)
 		source.size = size;
 	}
 
-	result.function_index = result.state->prototype_count;
 	result.function = backend_test_compile(result.state, path, source);
 	return result;
 }
@@ -67,7 +65,6 @@ static BackendCompileResult backend_test_compile_source(const char *source_text)
 	source.data = (char *)source_text;
 	source.size = (u64)strlen(source_text);
 
-	result.function_index = result.state->prototype_count;
 	result.function = backend_test_compile(result.state, "backend_tests", source);
 	return result;
 }
@@ -102,7 +99,7 @@ static u32 backend_count_all_bytecode(BackendCompileResult result, BcType type)
 	u32 count = 0;
 	for (u32 function_index = 0; function_index < result.state->prototype_count; ++function_index)
 	{
-		elf_Prototype *function = proto_from_index(result.state, function_index);
+		elf_Prototype *function = result.state->prototypes[function_index];
 		for (u32 byte_index = 0; byte_index < function->bytecode_count; ++byte_index) {
 			count += function->bytecode[byte_index].b_type == type;
 		}
@@ -458,7 +455,7 @@ static void test_backend_outputs_strings(void)
 	IrNode return_string = {.kind = IR_RETURN, .ir_return.expr = &tuple};
 	elf_Source *runtime_source = elf_source_create(state, (dy_String) {(char *)"backend", sizeof("backend") - 1}, (dy_String) {});
 	Com_Source source = {.runtime_source = runtime_source};
-	IrFunction function = {.source = &source, .body = &return_string, .index = IR_FUNCTION_INDEX_INVALID};
+	IrFunction function = {.source = &source, .body = &return_string};
 	IrModule ir_module = {.arena = &arena, .first_function = &function, .last_function = &function, .function_count = 1};
 
 	elf_Prototype *prototype = bc_emit_module(state, &ir_module);
@@ -491,7 +488,7 @@ static void test_backend_loads_prototype_for_static_call(void)
 	if (load_index >= 0 && call_index >= 0) {
 		Bytecode load = backend_test_bytes(result)[load_index];
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (load.b_y < 0 || (u32)load.b_y >= result.state->prototype_count || call.b_x != load.b_x || call.b_y != 2 || call.b_z != 1) {
+		if (load.b_y < 0 || (u32)load.b_y >= result.function->nprotos || call.b_x != load.b_x || call.b_y != 2 || call.b_z != 1) {
 			test_fail("static call loads its callee and encodes argument and return counts");
 		}
 	}
@@ -563,13 +560,13 @@ static void test_backend_materializes_static_recurse_value(void)
 static void test_backend_emits_parameter_type_enforcement(void)
 {
 	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
-	if (!result.function || result.state->prototype_count != 2)
+	if (!result.function || result.function->nprotos != 1)
 	{
 		test_fail("backend compiles typed function parameters");
 	}
 	else
 	{
-		elf_Prototype *function = proto_from_index(result.state, 1);
+		elf_Prototype *function = result.function->protos[0];
 		Bytecode *bytes = function->bytecode;
 		if (function->bytecode_count < 2 || bytes[0].b_type != BC_CHECK_TYPE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_CHECK_TYPE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
 		{

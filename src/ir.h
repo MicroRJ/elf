@@ -201,8 +201,6 @@ struct IrCapture
 	Ir target;
 };
 
-#define IR_FUNCTION_INDEX_INVALID ((u32)-1)
-
 struct IrFunction
 {
 	IrFunction *next;
@@ -219,7 +217,7 @@ struct IrFunction
 	IrFunction **funcs;
 	u32          nfuncs;
 	u32          xfuncs;
-	u32          index;
+	elf_Prototype *proto;
 };
 
 struct IrModule

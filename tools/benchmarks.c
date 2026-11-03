@@ -133,6 +133,7 @@ static void bench_vm_integer_program(const char *name, const char *source, u32 i
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];
 	elf_State *state = elf_create_state();
+	state->gc_mode = ELF_GC_PAUSED;
 	elf_SymTable *symbols = 0;
 	bench_require(elf_sym_create(&symbols) == ELF_ERROR_NONE, "could not create benchmark symbols");
 	bench_require(elf_sym_int(symbols, ELF_LIT("benchmark_global"), 1) == ELF_ERROR_NONE, "could not install benchmark symbol");
@@ -155,6 +156,7 @@ static void bench_vm_number_program(const char *name, const char *source, u32 it
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];
 	elf_State *state = elf_create_state();
+	state->gc_mode = ELF_GC_PAUSED;
 	elf_StrSlice source_name = {(char *)name, strlen(name)};
 	elf_Ref program = bench_compile_program(state, 0, source_name, source);
 	bench_run_number_program(state, program, iterations, expected);
@@ -186,17 +188,17 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	{
 		u32 first_prototype = state->prototype_count;
 		bench_require(elf_push_code_source(state, 0, ELF_LIT("benchmark.compile"), text) == ELF_ERROR_NONE, "could not compile benchmark source");
-		elf_Prototype *entry = value_as_closure(state->stack_top[-1])->prototype;
+		elf_Prototype *entry = value_as_prototype(state->stack_top[-1]);
 		bench_require(entry == state->prototypes[first_prototype], "compile entry is not the first new prototype");
 		for (u32 prototype_index = first_prototype; prototype_index < state->prototype_count; ++prototype_index)
 		{
-			elf_Prototype *prototype = proto_from_index(state, prototype_index);
+			elf_Prototype *prototype = state->prototypes[prototype_index];
 			bytecode_count += prototype->bytecode_count;
 			function_count += 1;
 			string_count += prototype->string_count;
 			integer_constant_count += prototype->integer_constant_count;
 			number_constant_count += prototype->number_constant_count;
-			prototype_storage += prototype->allocation_size;
+			prototype_storage += prototype->obj.size;
 		}
 		elf_pop(state, 1);
 	}
@@ -234,6 +236,7 @@ static void bench_representative_elf_workload(void)
 	enum { SAMPLE_COUNT = 7 };
 	double samples[SAMPLE_COUNT];
 	elf_State *state = elf_create_state();
+	state->gc_mode = ELF_GC_PAUSED;
 
 	bench_require(elf_push_code_file(state, 0, ELF_LIT("tools/benchmark_game_loop.elf")),
 		"could not compile representative Elf workload");

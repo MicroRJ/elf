@@ -269,6 +269,9 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		else if (reference->type == ELF_OBJECT_PROTOTYPE)
 		{
 			elf_Prototype *prototype = (elf_Prototype *)reference;
+			for (u32 i = 0; i < prototype->nprotos; ++i) {
+				marked_count += gc_mark_reachable(state, (elf_Object *)prototype->protos[i]);
+			}
 			for (u32 i = 0; i < prototype->string_count; ++i) {
 				marked_count += gc_mark_reachable(state, (elf_Object *)prototype->strings[i]);
 			}

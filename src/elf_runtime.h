@@ -185,6 +185,8 @@ struct elf_Prototype
 {
 	elf_Object          obj;
 	elf_Source         *source;
+	elf_Prototype     **protos;
+	u32                 nprotos;
 	b32                 variadic;
 	u8                  arity;
 	u8                  captures;

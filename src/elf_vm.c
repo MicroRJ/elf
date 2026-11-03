@@ -397,7 +397,9 @@ static u32 vm_resume(State *state)
 
 			case BC_LOAD_PROTOTYPE:
 			{
-				frame->regs[byte.b_x] = proto_value(proto_from_index(state, byte.b_y));
+				Proto *owner = frame_proto(frame);
+				ASSERT(byte.b_y >= 0 && (u32)byte.b_y < owner->nprotos);
+				frame->regs[byte.b_x] = proto_value(owner->protos[byte.b_y]);
 			}
 			break;
 
@@ -417,7 +419,9 @@ static u32 vm_resume(State *state)
 
 			case BC_NEW_CLOSURE:
 			{
-				Proto *proto = proto_from_index(state, byte.b_y);
+				Proto *owner = frame_proto(frame);
+				ASSERT(byte.b_y >= 0 && (u32)byte.b_y < owner->nprotos);
+				Proto *proto = owner->protos[byte.b_y];
 				// TODO: crashes | closure allocation failure still asserts.
 				frame->regs[byte.b_x] = cls_value(elf_closure_new(state, proto, frame->regs + byte.b_x, proto->captures));
 			}

@@ -229,7 +229,7 @@ static void test_vm_compiled_functions_keep_identity(void)
 	}
 	elf_Prototype *second_factory_prototype = value_as_prototype(second_factory);
 	if (second_factory_prototype == first_factory_prototype) {
-		test_fail("nested functions receive distinct state prototype indices");
+		test_fail("nested functions receive distinct prototypes");
 	}
 	elf_Ref second_factory_ref = elf_create_ref(state, -1);
 	elf_pop(state, 1);

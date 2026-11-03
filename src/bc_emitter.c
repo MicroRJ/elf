@@ -659,11 +659,10 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 			out = ensure_slot(emitter, out);
 			ASSERT(expr->func < emitter->function->nfuncs);
 			IrFunction *function = emitter->function->funcs[expr->func];
-			ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
-			u32 prototype_index = function->index;
+			ASSERT(expr->func < BC_OPERAND_COUNT_MAX);
 			if (function->ncaps == 0)
 			{
-				emit_bytecode_xy(emitter, site, BC_LOAD_PROTOTYPE, out, prototype_index);
+				emit_bytecode_xy(emitter, site, BC_LOAD_PROTOTYPE, out, expr->func);
 			}
 			else
 			{
@@ -678,7 +677,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 					prev_capture_slot ++;
 				}
 
-				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, first_capture_slot, prototype_index);
+				emit_bytecode_xy(emitter, site, BC_NEW_CLOSURE, first_capture_slot, expr->func);
 				if (first_capture_slot != out) {
 					emit_move(emitter, site, out, first_capture_slot);
 				}
@@ -1092,9 +1091,9 @@ static u64 prototype_append_region(u64 *allocation_size, u64 size, u64 alignment
 	return offset;
 }
 
-static void reserve_module_prototypes(elf_State *target, IrModule *module)
+static u32 reserve_module_prototypes(elf_State *target, IrModule *module)
 {
-	if (target->prototype_count > BC_OPERAND_COUNT_MAX || module->function_count > BC_OPERAND_COUNT_MAX - target->prototype_count)
+	if (module->function_count > UINT32_MAX - target->prototype_count)
 	{
 		abort();
 	}
@@ -1106,7 +1105,8 @@ static void reserve_module_prototypes(elf_State *target, IrModule *module)
 		u32 new_capacity = old_capacity ? old_capacity : 16;
 		while (new_capacity < required_capacity)
 		{
-			new_capacity = MIN(new_capacity * 2, BC_OPERAND_COUNT_MAX);
+			ASSERT(new_capacity <= UINT32_MAX / 2);
+			new_capacity *= 2;
 		}
 		target->prototypes = elf_realloc(target, target->prototypes, sizeof(*target->prototypes) * old_capacity, sizeof(*target->prototypes) * new_capacity);
 		ASSERT(target->prototypes);
@@ -1114,28 +1114,21 @@ static void reserve_module_prototypes(elf_State *target, IrModule *module)
 		target->prototype_capacity = new_capacity;
 	}
 
-	u32 prototype_index = target->prototype_count;
-	u32 function_count = 0;
+	u32 first = target->prototype_count;
 	target->prototype_count = required_capacity;
-	for (IrFunction *function = module->first_function; function; function = function->next)
-	{
-		ASSERT(prototype_index < target->prototype_count);
-		ASSERT(!target->prototypes[prototype_index]);
-		function->index = prototype_index++;
-		function_count += 1;
-	}
-	ASSERT(function_count == module->function_count);
-	ASSERT(prototype_index == target->prototype_count);
+	return first;
 }
 
-static void install_function(BcEmitter *emitter, IrFunction *function, u32 prototype_index)
+static void install_function(BcEmitter *emitter, IrFunction *function, u32 root)
 {
 	ASSERT(function->source);
 	ASSERT(function->source->runtime_source);
-	ASSERT(prototype_index < emitter->target->prototype_count);
-	ASSERT(!emitter->target->prototypes[prototype_index]);
+	ASSERT(!function->proto);
+	ASSERT(root < emitter->target->prototype_count);
+	ASSERT(!emitter->target->prototypes[root]);
 
 	u64 allocation_size = sizeof(elf_Prototype);
+	u64 prototypes_offset = prototype_append_region(&allocation_size, sizeof(elf_Prototype *) * function->nfuncs, _Alignof(elf_Prototype *));
 	u64 strings_offset = prototype_append_region(&allocation_size, sizeof(elf_String *) * emitter->string_atom_count, _Alignof(elf_String *));
 	u64 integer_constants_offset = prototype_append_region(&allocation_size, sizeof(i64) * emitter->integer_constant_count, _Alignof(i64));
 	u64 number_constants_offset = prototype_append_region(&allocation_size, sizeof(f64) * emitter->number_constant_count, _Alignof(f64));
@@ -1154,6 +1147,9 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	prototype->number_constant_count = emitter->number_constant_count;
 	prototype->bytecode_count = emitter->bytecode_count;
 	prototype->source_map_count = emitter->source_map_count;
+	if (function->nfuncs) {
+		prototype->protos = (elf_Prototype **)((u8 *)prototype + prototypes_offset);
+	}
 	if (emitter->string_atom_count)
 	{
 		prototype->strings = (elf_String **)((u8 *)prototype + strings_offset);
@@ -1179,7 +1175,8 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 		copy_memory(prototype->source_map, emitter->source_map, sizeof(*prototype->source_map) * prototype->source_map_count);
 	}
 
-	emitter->target->prototypes[prototype_index] = prototype;
+	function->proto = prototype;
+	emitter->target->prototypes[root] = prototype;
 	for (u32 i = 0; i < emitter->string_atom_count; ++i)
 	{
 		Atom *atom = emitter->string_atoms[i];
@@ -1190,11 +1187,10 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	ASSERT(prototype->string_count == emitter->string_atom_count);
 }
 
-static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
+static void bc_emit_func(BcEmitter *emitter, IrFunction *function, u32 root)
 {
 	ASSERT(emitter);
 	ASSERT(function);
-	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
 	ASSERT(!function->ast || function->ast->function.params.count == function->params.count);
 	emitter->function = function;
 
@@ -1222,7 +1218,7 @@ static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
 		emit_return(emitter, function->body->site, NO_SLOT, 0);
 	}
 	patch_jumps(emitter);
-	install_function(emitter, function, function->index);
+	install_function(emitter, function, root);
 }
 
 static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
@@ -1232,9 +1228,8 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 	ASSERT(module->function_count);
 	ASSERT(module->last_function);
 	ASSERT(!module->last_function->next);
-	ASSERT(module->function_count < BC_OPERAND_COUNT_MAX);
 
-	reserve_module_prototypes(target, module);
+	u32 root = reserve_module_prototypes(target, module);
 
 	u32 emitted_function_count = 0;
 	for (IrFunction *function = module->first_function; function; function = function->next)
@@ -1245,11 +1240,22 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 		emitter->arena = module->arena;
 		emitter->bytecode_capacity = 1 << 13;
 		emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
-		bc_emit_func(emitter, function);
+		bc_emit_func(emitter, function, root++);
 		arena_restore(module->arena, arena_checkpoint);
 		emitted_function_count += 1;
 	}
 	ASSERT(emitted_function_count == module->function_count);
-	ASSERT(module->first_function->index < target->prototype_count);
-	return target->prototypes[module->first_function->index];
+
+	for (IrFunction *function = module->first_function; function; function = function->next)
+	{
+		ASSERT(function->proto);
+		ASSERT(function->proto->nprotos == 0);
+		for (u32 i = 0; i < function->nfuncs; ++i)
+		{
+			ASSERT(function->funcs[i]->proto);
+			function->proto->protos[i] = function->funcs[i]->proto;
+		}
+		function->proto->nprotos = function->nfuncs;
+	}
+	return module->first_function->proto;
 }

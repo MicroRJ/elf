@@ -32,7 +32,6 @@ static IrFunction *ir_reserve_function(Com_Source *source, IrModule *module, IrF
 	func->parent = parent;
 	func->ast = ast;
 	func->source = source;
-	func->index = IR_FUNCTION_INDEX_INVALID;
 	func->site = ast->site;
 	func->variadic = ast->function.variadic;
 	ASSERT(!ast->function.ir);

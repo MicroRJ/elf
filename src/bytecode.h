@@ -50,7 +50,7 @@ Control flow
 Loads and register movement
   BC_LOAD_CAPTURE: x = destination register, y = capture index in the current closure. Copy capture[y] to r[x].
   BC_LOAD_NATIVE_FUNCTION: x = destination register, y = index in the state's native-function registry.
-  BC_LOAD_PROTOTYPE: x = destination register, y = prototype index in the state.
+  BC_LOAD_PROTOTYPE: x = destination register, y = index in the current prototype's prototype references.
   BC_LOAD_CONSTANT_STRING: x = destination register, y = index in the prototype's runtime-string references.
   BC_LOAD_CONSTANT_NUMBER: x = destination register, y = index in the prototype's number constants.
   BC_LOAD_CONSTANT_INTEGER: x = destination register, y = index in the prototype's integer constants.
@@ -60,7 +60,7 @@ Loads and register movement
 Allocation
   BC_NEW_TABLE: x = destination register. Allocate an empty table in r[x].
   BC_NEW_ARRAY: x = destination register. Allocate an empty array in r[x].
-  BC_NEW_CLOSURE: x = destination and first capture-input register, y = prototype index in the state.
+  BC_NEW_CLOSURE: x = destination and first capture-input register, y = index in the current prototype's prototype references.
   Let n be the target prototype's capture count. Copy n captures beginning at r[x], then replace r[x] with the new closure.
 
 Access and mutation
