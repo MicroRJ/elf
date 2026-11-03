@@ -142,12 +142,8 @@ static u32 gc_mark_prototypes(elf_State *state)
 	for (u32 prototype_index = 0; prototype_index < state->prototype_count; ++prototype_index)
 	{
 		elf_Prototype *prototype = state->prototypes[prototype_index];
-		if (prototype)
-		{
-			for (u32 i = 0; i < prototype->string_count; ++i)
-			{
-				marked_count += gc_mark_reachable(state, (elf_Object *)prototype->strings[i]);
-			}
+		if (prototype) {
+			marked_count += gc_mark_reachable(state, (elf_Object *)prototype);
 		}
 	}
 	return marked_count;
@@ -260,6 +256,7 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 			elf_Closure * closure = (elf_Closure *) reference;
 			elf_Prototype *function = closure->prototype;
 			ASSERT(function);
+			marked_count += gc_mark_reachable(state, (elf_Object *)function);
 
 			for (u32 i = 0; i < function->captures; ++ i)
 			{
@@ -267,6 +264,13 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 				{
 					marked_count += gc_mark_reachable(state, value_as_object(closure->captures[i]));
 				}
+			}
+		}
+		else if (reference->type == ELF_OBJECT_PROTOTYPE)
+		{
+			elf_Prototype *prototype = (elf_Prototype *)reference;
+			for (u32 i = 0; i < prototype->string_count; ++i) {
+				marked_count += gc_mark_reachable(state, (elf_Object *)prototype->strings[i]);
 			}
 		}
 		else if (reference->type == ELF_OBJECT_TABLE)
@@ -287,6 +291,9 @@ static u32 gc_mark_reachable(elf_State *state, elf_Object * reference)
 		{
 			elf_GCError *error = (elf_GCError *)reference;
 			marked_count += gc_mark_reachable(state, (elf_Object *)error->message);
+			for (u32 i = 0; i < error->frame_count; ++i) {
+				marked_count += gc_mark_reachable(state, (elf_Object *)error->frames[i].prototype);
+			}
 			if (error->data)
 			{
 				marked_count += gc_mark_reachable(state, (elf_Object *)error->data);

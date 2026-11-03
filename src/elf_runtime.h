@@ -36,6 +36,7 @@ typedef enum
 {
 	ELF_OBJECT_USER = 0,
 	ELF_OBJECT_CLOSURE,
+	ELF_OBJECT_PROTOTYPE,
 	ELF_OBJECT_TABLE,
 	ELF_OBJECT_STRING,
 	ELF_OBJECT_ERROR,
@@ -182,7 +183,7 @@ elf_SourceMapEntry;
 // TODO(RJ): store prototypes
 struct elf_Prototype
 {
-	u64                 allocation_size;
+	elf_Object          obj;
 	elf_Source         *source;
 	b32                 variadic;
 	u8                  arity;

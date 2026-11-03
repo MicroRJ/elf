@@ -13,6 +13,7 @@ static inline b32 type_is_object(elf_ValueType type)
 {
 	return type == ELF_VALUE_TYPE_USER_OBJECT
 	||     type == ELF_VALUE_TYPE_CLOSURE
+	||     type == ELF_VALUE_TYPE_PROTOTYPE
 	||     type == ELF_VALUE_TYPE_TABLE
 	||     type == ELF_VALUE_TYPE_STRING
 	||     type == ELF_VALUE_TYPE_ERROR

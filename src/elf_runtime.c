@@ -136,14 +136,6 @@ void elf_destroy_state(elf_State *state)
 		elf_native_functions_destroy(state);
 		gc_destroy_all(state);
 		elf_sources_destroy(state);
-		for (u32 i = 0; i < state->prototype_count; ++i)
-		{
-			elf_Prototype *prototype = state->prototypes[i];
-			if (prototype)
-			{
-				elf_free(state, prototype, prototype->allocation_size);
-			}
-		}
 		elf_free(state, state->prototypes, (u64)state->prototype_capacity * sizeof(*state->prototypes));
 		elf_free(state, state->string_buckets,
 			(u64)state->string_bucket_count * sizeof(*state->string_buckets));

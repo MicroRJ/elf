@@ -1141,10 +1141,10 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	u64 number_constants_offset = prototype_append_region(&allocation_size, sizeof(f64) * emitter->number_constant_count, _Alignof(f64));
 	u64 bytecode_offset = prototype_append_region(&allocation_size, sizeof(Bytecode) * emitter->bytecode_count, _Alignof(Bytecode));
 	u64 source_map_offset = prototype_append_region(&allocation_size, sizeof(elf_SourceMapEntry) * emitter->source_map_count, _Alignof(elf_SourceMapEntry));
-	elf_Prototype *prototype = elf_alloc_zero(emitter->target, allocation_size);
+	ASSERT(allocation_size <= UINT32_MAX);
+	elf_Prototype *prototype = elf_gc_alloc(emitter->target, ELF_OBJECT_PROTOTYPE, (u32)allocation_size);
 	ASSERT(prototype);
 
-	prototype->allocation_size = allocation_size;
 	prototype->source = function->source->runtime_source;
 	prototype->variadic = function->variadic;
 	prototype->arity = function->params.count;
