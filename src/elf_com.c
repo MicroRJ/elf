@@ -33,8 +33,8 @@ static b32 reportv(Com_Source *source, elf_ErrorCode code, ErrorSeverity severit
 #include "lexer.c"
 #include "parser.c"
 #include "ir.c"
-#include "checker.c"
 #include "bc_emitter.c"
+#include "checker.c"
 
 static Com_Status inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table);
 
@@ -566,12 +566,15 @@ static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *a
 		return 0;
 	}
 
+	elf_Value *root_checkpoint = target->stack_top;
 	if (check(&ir_module, com) != COM_STATUS_OK) {
+		target->stack_top = root_checkpoint;
 		log_report(com);
 		return 0;
 	}
 
 	elf_Prototype *entry = bc_emit_module(com->target, &ir_module);
+	target->stack_top = root_checkpoint;
 	log_report(com);
 	return entry;
 }

@@ -1210,6 +1210,7 @@ static elf_Prototype *bc_emit_func(elf_State *target, IrModule *module, IrFuncti
 	}
 	patch_jumps(emitter);
 	install_function(emitter, function);
+	push_value(target, proto_value(function->proto));
 
 	for (u32 i = 0; i < emitter->nrefs; ++i)
 	{

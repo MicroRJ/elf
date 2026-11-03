@@ -109,9 +109,8 @@ static Entity *scope_declare(Scope *scope, Atom *name, Entity_Tags tags)
 	return entity;
 }
 
-static Com_Value ensure_entity_value(IrEmitter *emitter, Entity *entity);
+static Ir eval_static(elf_State *state, IrModule *module, Com_Source *source, Ir ir);
 static Com_Status check(IrModule *module, Compiler *compiler);
-static Com_Status prepare_source(IrModule *module, Com_Source *source);
 static Com_Status eval_statics(IrModule *module, Compiler *compiler);
 static Com_Status check_stat(IrEmitter *emitter, IrQueue *items, Ast ast);
 static Com_Value check_expr(IrEmitter *emitter, Ast expr);
@@ -144,6 +143,38 @@ static Com_Value com_value_ir(Ir ir)
 		return com_value_error(ir_status(ir));
 	}
 	return (Com_Value) { .type = COM_VALUE_IR, .ir = ir };
+}
+
+static Ir ir_from_value(IrEmitter *emitter, SourceSite site, elf_Value value)
+{
+	switch (value.type)
+	{
+		case ELF_VALUE_TYPE_NIL: {
+			return ir_new_nil(emitter, site);
+		}
+		case ELF_VALUE_TYPE_INTEGER: {
+			return ir_new_int(emitter, site, value_as_integer(value));
+		}
+		case ELF_VALUE_TYPE_NUMBER: {
+			return ir_new_num(emitter, site, value_as_number(value));
+		}
+		case ELF_VALUE_TYPE_STRING:
+		{
+			elf_String *string = value_as_string(value);
+			Atom *atom = atom_from_data_size(emitter->source->compiler->atoms, elf_string_data(string), elf_string_size(string));
+			return atom ? ir_new_atom(emitter, site, atom) : ERROR_OOM_IR;
+		}
+		case ELF_VALUE_TYPE_TABLE: {
+			return ir_new_tab_ref(emitter, site, value_as_table(value));
+		}
+		case ELF_VALUE_TYPE_ARRAY: {
+			return ir_new_arr_ref(emitter, site, value_as_array(value));
+		}
+		default: {
+			ASSERT(!"unsupported static result type");
+			return ERROR_IR;
+		}
+	}
 }
 
 static Com_Status checker_report(Com_Source *source, elf_ErrorCode error, ErrorSeverity severity, SourceSite site, const char *format, ...)
@@ -244,38 +275,6 @@ static Entity *declare_entity(Scope *scope, SourceSite site, Atom *name, Entity_
 	return entity;
 }
 
-static Com_Value ensure_entity_value(IrEmitter *emitter, Entity *entity)
-{
-	ASSERT(entity);
-	ASSERT(entity->value.type != COM_VALUE_NONE);
-	ASSERT(entity->value.type != COM_VALUE_ERROR);
-	ASSERT(entity->scope);
-
-	Com_Value value = entity->value;
-
-	if (value.type == COM_VALUE_RESOLVING)
-	{
-		Com_Status status = checker_report(emitter->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->declaration->site, "cyclic static definition involving '%s'", atom_data(entity->name));
-		value = com_value_error(status);
-	}
-	else if (value.type == COM_VALUE_AST)
-	{
-		Ast expr = value.ast;
-		ASSERT(expr);
-
-		entity->value.type = COM_VALUE_RESOLVING;
-
-		value = check_expr(emitter, expr);
-
-		if (value.type == COM_VALUE_NONE) {
-			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
-			value = com_value_error(status);
-		}
-		entity->value = value;
-	}
-	return value;
-}
-
 static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
 {
 	ASSERT(entity->value.type == COM_VALUE_LOCAL);
@@ -323,62 +322,6 @@ static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *enti
 	}
 
 	return ir_new_capture_ref(emitter, site, capture);
-}
-
-static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
-{
-	ASSERT(entity);
-	entity->referenced = true;
-
-	Com_Value value = entity->value;
-	switch (value.type)
-	{
-		case COM_VALUE_IR: {
-			return value.ir;
-		}
-		case COM_VALUE_LOCAL:
-		{
-			if (!value.local.storage)
-			{
-				ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "local entity '%s' has no storage", atom_data(entity->name));
-				return ERROR_IR;
-			}
-			return ir_emit_capture(emitter, emitter->function, entity, site);
-		}
-		case COM_VALUE_NUMBER: {
-			return ir_new_num(emitter, site, value.number);
-		}
-		case COM_VALUE_INTEGER: {
-			return ir_new_int(emitter, site, value.integer);
-		}
-		case COM_VALUE_STRING: {
-			return ir_new_atom(emitter, site, value.string);
-		}
-		case COM_VALUE_NATIVE_FUNCTION: {
-			return ir_new_native_function(emitter, site, value.native_function_index);
-		}
-		case COM_VALUE_EXPORTS:
-		{
-			ir_report_error(emitter, ELF_ERROR_LOWERING, site, "source namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
-			return ERROR_IR;
-		}
-		case COM_VALUE_SCOPE:
-		{
-			ir_report_error(emitter, ELF_ERROR_LOWERING, site, "host namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
-			return ERROR_IR;
-		}
-		case COM_VALUE_ERROR: {
-			return ERROR_IR;
-		}
-		case COM_VALUE_NONE:
-		case COM_VALUE_AST:
-		case COM_VALUE_RESOLVING:
-		default:
-		{
-			ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "static entity '%s' has invalid value type '%s'", atom_data(entity->name), com_value_type_name(value.type));
-			return ERROR_IR;
-		}
-	}
 }
 
 static b32 ir_mark_entity_assigned(IrEmitter *emitter, Ast destination)
@@ -442,17 +385,48 @@ static IrKind ir_kind_from_compound_assign_ast_kind(Ast_Kind kind)
 	}
 }
 
-static b32 ast_is_call(Ast expr)
-{
-	return expr && expr->kind == AST_CALL;
-}
-
 static Com_Value check_entity(IrEmitter *checker, SourceSite site, Entity *entity)
 {
 	ASSERT(checker);
 	ASSERT(entity);
+	ASSERT(entity->scope);
 
-	Com_Value value = ensure_entity_value(checker, entity);
+	Com_Value value = entity->value;
+	if ((entity->tags & ENTITY_TAG_STATIC) && value.type == COM_VALUE_RESOLVING)
+	{
+		ASSERT(entity->declaration);
+		ASSERT(entity->scope->source);
+		Com_Status status = checker_report(entity->scope->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->declaration->site, "cyclic static definition involving '%s'", atom_data(entity->name));
+		value = com_value_error(status);
+		entity->value = value;
+	}
+	else if ((entity->tags & ENTITY_TAG_STATIC) && value.type == COM_VALUE_AST)
+	{
+		ASSERT(entity->declaration);
+		ASSERT(entity->scope->source);
+		Ast expr = value.ast;
+		ASSERT(expr);
+
+		entity->value.type = COM_VALUE_RESOLVING;
+		value = check_expr(checker, expr);
+		if (value.type == COM_VALUE_NONE)
+		{
+			Com_Status status = checker_report(entity->scope->source, ELF_ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
+			value = com_value_error(status);
+		}
+		else if (value.type == COM_VALUE_IR)
+		{
+			Com_Source *source = entity->scope->source;
+			Ir ir = eval_static(source->compiler->target, checker->module, source, value.ir);
+			if (ir == ERROR_OOM_IR) {
+				value = com_value_error(checker_out_of_memory(source, expr->site));
+			}
+			else {
+				value = com_value_ir(ir);
+			}
+		}
+		entity->value = value;
+	}
 	if (value.type == COM_VALUE_ERROR) {
 		return value;
 	}
@@ -460,7 +434,64 @@ static Com_Value check_entity(IrEmitter *checker, SourceSite site, Entity *entit
 		return value;
 	}
 
-	Ir ir = ir_emit_entity(checker, site, entity);
+	entity->referenced = true;
+
+	Ir ir = 0;
+	switch (value.type)
+	{
+		case COM_VALUE_IR: {
+			ir = value.ir;
+		}
+		break;
+
+		case COM_VALUE_LOCAL:
+		{
+			if (!value.local.storage)
+			{
+				ir_report_error(checker, ELF_ERROR_INTERNAL, site, "local entity '%s' has no storage", atom_data(entity->name));
+				ir = ERROR_IR;
+				break;
+			}
+			ir = ir_emit_capture(checker, checker->function, entity, site);
+		}
+		break;
+
+		case COM_VALUE_NUMBER: {
+			ir = ir_new_num(checker, site, value.number);
+		}
+		break;
+
+		case COM_VALUE_INTEGER: {
+			ir = ir_new_int(checker, site, value.integer);
+		}
+		break;
+
+		case COM_VALUE_STRING: {
+			ir = ir_new_atom(checker, site, value.string);
+		}
+		break;
+
+		case COM_VALUE_NATIVE_FUNCTION: {
+			ir = ir_new_native_function(checker, site, value.native_function_index);
+		}
+		break;
+
+		case COM_VALUE_ERROR: {
+			ir = ERROR_IR;
+		}
+		break;
+
+		case COM_VALUE_NONE:
+		case COM_VALUE_AST:
+		case COM_VALUE_RESOLVING:
+		default:
+		{
+			ir_report_error(checker, ELF_ERROR_INTERNAL, site, "static entity '%s' has invalid value type '%s'", atom_data(entity->name), com_value_type_name(value.type));
+			ir = ERROR_IR;
+		}
+		break;
+	}
+
 	if (ir_is_error(ir)) {
 		return com_value_error(ir_status(ir));
 	}
@@ -1300,7 +1331,7 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 			}
 
 			u32 count = names->tuple.count;
-			if (count > 1 && exprs->tuple.count == 1 && ast_is_call(exprs->tuple.items[0]))
+			if (count > 1 && exprs->tuple.count == 1 && exprs->tuple.items[0] && exprs->tuple.items[0]->kind == AST_CALL)
 			{
 				IrArray locals = ir_array_alloc(emitter, count);
 				for (u32 i = 0; i < count; ++ i)
@@ -1559,7 +1590,7 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 			}
 
 			IrArray locals = ir_array_alloc(emitter, count);
-			if (expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
+			if (expr_tuple->tuple.count == 1 && expr_tuple->tuple.items[0] && expr_tuple->tuple.items[0]->kind == AST_CALL)
 			{
 				Ast expr = expr_tuple->tuple.items[0];
 				for (u32 i = 0; i < count; ++ i) {
@@ -1761,7 +1792,8 @@ static Com_Status prepare_scope(IrEmitter *checker, Scope *scope, Ast_Array stat
 		name->entity = entity;
 		if (expr->kind == AST_FUNCTION)
 		{
-			ir_reserve_function(checker->source, checker->module, 0, expr);
+			IrFunction *function = ir_reserve_function(checker->source, checker->module, 0, expr);
+			entity->value = com_value_ir(ir_new_function_ref(checker, expr->site, function));
 		}
 
 		Compiler *compiler = checker->source->compiler;
@@ -2107,6 +2139,47 @@ static Com_Status prepare_source(IrModule *module, Com_Source *source)
 	return status;
 }
 
+static Ir eval_static(elf_State *state, IrModule *module, Com_Source *source, Ir ir)
+{
+	ASSERT(module);
+	ASSERT(source);
+	ASSERT(ir);
+	switch (ir->kind)
+	{
+		case IR_NIL:
+		case IR_INTEGER:
+		case IR_NUMBER:
+		case IR_ATOM:
+		case IR_NATIVE_FUNCTION:
+		case IR_FUNCTION_REF:
+		case IR_TAB_REF:
+		case IR_ARR_REF:
+		{
+			return ir;
+		}
+
+		default: break;
+	}
+
+	ASSERT(state);
+	IrEmitter emitter = {};
+	emitter.module = module;
+	emitter.source = source;
+
+	IrFunction eval = {};
+	eval.source = source;
+	eval.site = ir->site;
+	eval.body = ir_new_return(&emitter, ir->site, ir);
+
+	elf_Prototype *proto = bc_emit_func(state, module, &eval);
+	push_value(state, proto_value(proto));
+	u32 nrets = elf_call(state, 0);
+	ASSERT(nrets == 1);
+
+	elf_Value result = state->stack_top[-1];
+	return ir_from_value(&emitter, ir->site, result);
+}
+
 static Com_Status eval_statics(IrModule *module, Compiler *compiler)
 {
 	for (Entity *entity = compiler->entities; entity; entity = entity->next_in_compiler)
@@ -2114,19 +2187,34 @@ static Com_Status eval_statics(IrModule *module, Compiler *compiler)
 		ASSERT(entity->tags & ENTITY_TAG_STATIC);
 		ASSERT(entity->declaration);
 		ASSERT(entity->declaration->kind == AST_STATIC_DECL);
+		Ast expr = entity->declaration->static_decl.expr;
+		ASSERT(expr);
+
+		if (expr->kind == AST_FUNCTION)
+		{
+			ASSERT(entity->value.type == COM_VALUE_IR);
+			ASSERT(entity->value.ir->kind == IR_FUNCTION_REF);
+
+			IrEmitter checker = {};
+			checker.module = module;
+			checker.source = entity->scope->source;
+			checker.active_scope = entity->scope;
+
+			Com_Status status = check_function(&checker, entity->value.ir->func);
+			if (status != COM_STATUS_OK) {
+				return status;
+			}
+			continue;
+		}
 
 		IrEmitter checker = {};
 		checker.module = module;
 		checker.source = entity->scope->source;
 		checker.active_scope = entity->scope;
 
-		if (entity->value.type != COM_VALUE_AST) {
-			continue;
-		}
-
-		entity->value = check_expr(&checker, entity->value.ast);
-		if (entity->value.type == COM_VALUE_ERROR) {
-			return entity->value.status;
+		Com_Value value = check_entity(&checker, expr->site, entity);
+		if (value.type == COM_VALUE_ERROR) {
+			return value.status;
 		}
 	}
 	return COM_STATUS_OK;
