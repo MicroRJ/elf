@@ -119,7 +119,9 @@ static Ir check_ir(IrEmitter *emitter, Ast expr);
 static Ir check_block(IrEmitter *emitter, Ast stat);
 static Ir check_for(IrEmitter *emitter, Ast stat);
 static Ir check_range_for(IrEmitter *emitter, Ast stat);
+static Com_Status prepare_func(IrEmitter *emitter, IrFunction *func);
 static Com_Status prepare_ast(IrEmitter *emitter, Ast ast);
+static Com_Status prepare_ast_array(IrEmitter *emitter, Ast_Array array);
 static Com_Status prepare_scope(IrEmitter *emitter, Scope *scope, Ast_Array stats);
 static Com_Status check_function(IrEmitter *emitter, IrFunction *function);
 
@@ -533,14 +535,11 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 		case AST_FUNCTION:
 		{
 			IrFunction *function = expr->function.ir;
-			if (!function)
-			{
-				function = ir_reserve_function(checker->source, checker->module, checker->function, expr);
-				Com_Status status = check_function(checker, function);
-				if (status != COM_STATUS_OK) {
-					value = com_value_error(status);
-					break;
-				}
+			ASSERT(function);
+			Com_Status status = check_function(checker, function);
+			if (status != COM_STATUS_OK) {
+				value = com_value_error(status);
+				break;
 			}
 			value = com_value_ir(ir_new_function_ref(emitter, expr->site, function));
 		}
@@ -1785,6 +1784,33 @@ static Com_Status prepare_ast_array(IrEmitter *checker, Ast_Array array)
 	return COM_STATUS_OK;
 }
 
+static Com_Status prepare_func(IrEmitter *checker, IrFunction *func)
+{
+	ASSERT(func);
+	ASSERT(func->ast);
+	ASSERT(func->ast->kind == AST_FUNCTION);
+	ASSERT(func->ast->function.ir == func);
+
+	IrFunction *outer = checker->function;
+	checker->function = func;
+
+	Ast ast = func->ast;
+	Scope *scope = push_scope(checker, ast);
+	if (!scope)
+	{
+		checker->function = outer;
+		return COM_STATUS_REPORTED;
+	}
+
+	Com_Status status = prepare_ast_array(checker, ast->function.params);
+	if (status == COM_STATUS_OK) {
+		status = prepare_ast(checker, ast->function.body);
+	}
+	pop_scope(checker, scope);
+	checker->function = outer;
+	return status;
+}
+
 static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 {
 	if (!ast) {
@@ -1901,17 +1927,9 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 
 		case AST_FUNCTION:
 		{
-			Scope *scope = push_scope(checker, ast);
-			if (!scope) {
-				return COM_STATUS_REPORTED;
-			}
-
-			Com_Status status = prepare_ast_array(checker, ast->function.params);
-			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->function.body);
-			}
-			pop_scope(checker, scope);
-			return status;
+			ASSERT(!ast->function.ir);
+			IrFunction *func = ir_reserve_function(checker->source, checker->module, checker->function, ast);
+			return prepare_func(checker, func);
 		}
 
 		case AST_DECL_STAT:
@@ -1925,7 +1943,14 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 
 		case AST_STATIC_DECL:
 		{
-			return prepare_ast(checker, ast->static_decl.expr);
+			Ast expr = ast->static_decl.expr;
+			ASSERT(expr);
+			if (expr->kind == AST_FUNCTION)
+			{
+				ASSERT(expr->function.ir);
+				return prepare_func(checker, expr->function.ir);
+			}
+			return prepare_ast(checker, expr);
 		}
 
 		case AST_BLOCK_STAT:
@@ -2049,7 +2074,7 @@ static Com_Status prepare_source(IrModule *module, Com_Source *source)
 	checker.source = source;
 	checker.active_scope = compiler->globals;
 
-	ir_reserve_function(source, module, 0, root);
+	checker.function = ir_reserve_function(source, module, 0, root);
 	Scope *function_scope = push_scope(&checker, root);
 	if (!function_scope) {
 		return COM_STATUS_REPORTED;
