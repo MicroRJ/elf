@@ -231,9 +231,31 @@ static Ir ir_new_native_function(IrEmitter *emitter, SourceSite site, u32 native
 
 static Ir ir_new_function_ref(IrEmitter *emitter, SourceSite site, IrFunction *function)
 {
+	ASSERT(emitter->function);
 	ASSERT(function);
-	Ir ir = ir_alloc(emitter, site, IR_FUNCTION);
-	ir->ir_function = function;
+
+	IrFunction *owner = emitter->function;
+	u32 index = 0;
+	while (index < owner->nfuncs && owner->funcs[index] != function) {
+		index += 1;
+	}
+	if (index == owner->nfuncs)
+	{
+		if (owner->nfuncs == owner->xfuncs)
+		{
+			u32 cap = owner->xfuncs ? owner->xfuncs * 2 : 8;
+			IrFunction **funcs = arena_push(emitter->module->arena, sizeof(*funcs) * cap, _Alignof(IrFunction *));
+			if (owner->nfuncs) {
+				copy_memory(funcs, owner->funcs, sizeof(*funcs) * owner->nfuncs);
+			}
+			owner->funcs = funcs;
+			owner->xfuncs = cap;
+		}
+		owner->funcs[owner->nfuncs++] = function;
+	}
+
+	Ir ir = ir_alloc(emitter, site, IR_FUNCTION_REF);
+	ir->func = index;
 	return ir;
 }
 
@@ -249,14 +271,6 @@ static Ir ir_new_tuple(IrEmitter *emitter, SourceSite site, IrArray items)
 	}
 	Ir ir = ir_alloc(emitter, site, IR_TUPLE);
 	ir->ir_tuple = items;
-	return ir;
-}
-
-static Ir ir_new_load_capture(IrEmitter *emitter, SourceSite site, IrCapture *capture)
-{
-	ASSERT(capture);
-	Ir ir = ir_alloc(emitter, site, IR_LOAD_CAPTURE);
-	ir->ir_load_capture = capture;
 	return ir;
 }
 
@@ -337,6 +351,13 @@ static Ir ir_new_load(IrEmitter *emitter, SourceSite site, Ir local)
 
 	Ir ir = ir_alloc(emitter, site, IR_LOAD);
 	ir->ir_load.local = local;
+	return ir;
+}
+
+static Ir ir_new_capture_ref(IrEmitter *emitter, SourceSite site, u32 capture)
+{
+	Ir ir = ir_alloc(emitter, site, IR_CAPTURE_REF);
+	ir->capture = capture;
 	return ir;
 }
 
@@ -557,9 +578,9 @@ static void print_ir(IrPrinter *pr, Ir ir)
 		}
 		break;
 
-		case IR_FUNCTION:
+		case IR_FUNCTION_REF:
 		{
-			IR_PRINT(pr, "function[%p]", (void *)ir->ir_function);
+			IR_PRINT(pr, "function[%u]", ir->func);
 		}
 		break;
 

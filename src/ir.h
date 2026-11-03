@@ -28,9 +28,9 @@ Literal values
 
 Named, local, and callable values
   IR_NATIVE_FUNCTION refers to a native function in the target state's registry.
-  IR_LOAD_CAPTURE reads an IrCapture from the current closure.
+  IR_CAPTURE_REF refers to an IrCapture in the current function's capture table.
   IR_RECURSE produces the current callable for a recursive call.
-  IR_FUNCTION refers to an IrFunction and materializes a closure when used as a value.
+  IR_FUNCTION_REF refers to an IrFunction and materializes a closure when used as a value.
   IR_LOAD reads an IR_LOCAL whose statement has already assigned its slot; it never allocates the slot itself.
   IR_GET_MEM produces that assigned stack-slot index and has the same allocation precondition as IR_LOAD.
 
@@ -78,9 +78,9 @@ Low-level control flow
 	X(IR_NUMBER              , "number")                     \
 	X(IR_ATOM                , "atom")                       \
 	X(IR_NATIVE_FUNCTION     , "native_function")            \
-	X(IR_LOAD_CAPTURE        , "load_capture")               \
+	X(IR_CAPTURE_REF         , "capture_ref")                \
 	X(IR_RECURSE             , "recurse")                    \
-	X(IR_FUNCTION            , "function")                   \
+	X(IR_FUNCTION_REF        , "function_ref")               \
 	X(IR_LOAD                , "load")                       \
 	X(IR_GET_MEM             , "get_mem")                    \
 	X(IR_TABLE               , "table")                      \
@@ -197,10 +197,8 @@ IrQueue;
 
 struct IrCapture
 {
-	IrCapture     *next;
-	struct Entity *entity;
-	Ir             target;
-	u32            slot;
+	Ir local;
+	Ir target;
 };
 
 #define IR_FUNCTION_INDEX_INVALID ((u32)-1)
@@ -215,10 +213,13 @@ struct IrFunction
 	b32         variadic;
 	Ir          body;
 	IrArray     params;
-	IrCapture  *first_capture;
-	IrCapture  *last_capture;
-	u32         capture_count;
-	u32         index;
+	IrCapture  *caps;
+	u32         ncaps;
+	u32         xcaps;
+	IrFunction **funcs;
+	u32          nfuncs;
+	u32          xfuncs;
+	u32          index;
 };
 
 struct IrModule
@@ -239,7 +240,7 @@ struct IrNode
 	{
 		Com_Status status;
 		u32        native_function_index;
-		IrCapture *ir_load_capture;
+		u32        capture;
 
 		struct
 		{
@@ -269,7 +270,7 @@ struct IrNode
 		}
 		ir_call;
 
-		IrFunction *ir_function;
+		u32 func;
 
 		struct
 		{

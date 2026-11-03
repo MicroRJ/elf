@@ -291,45 +291,45 @@ static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *enti
 	ASSERT(local->kind == IR_LOCAL);
 	ASSERT(local->ir_local.owner);
 	ASSERT(function);
-	ASSERT(function->parent || !function->first_capture);
+	ASSERT(function->parent || !function->ncaps);
 
 	if (local->ir_local.owner == function) {
 		return ir_new_load(emitter, site, local);
 	}
 
-	for (IrCapture *capture = function->first_capture; capture; capture = capture->next) {
-		if (capture->entity == entity) {
-			return ir_new_load_capture(emitter, site, capture);
-		}
+	u32 capture = 0;
+	while (capture < function->ncaps && function->caps[capture].local != local) {
+		capture += 1;
 	}
-
-	ASSERT(function->capture_count < 255);
-
-	IrFunction *parent = function->parent;
-	if (!parent)
+	if (capture == function->ncaps)
 	{
-		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "local '%s' cannot be captured from an unrelated function", atom_data(entity->name));
-		return ERROR_IR;
+		ASSERT(function->ncaps < 255);
+		IrFunction *parent = function->parent;
+		if (!parent)
+		{
+			ir_report_error(emitter, ELF_ERROR_LOWERING, site, "local '%s' cannot be captured from an unrelated function", atom_data(entity->name));
+			return ERROR_IR;
+		}
+
+		Ir target = ir_emit_capture(emitter, parent, entity, site);
+		if (ir_is_error(target)) {
+			return ERROR_IR;
+		}
+
+		if (function->ncaps == function->xcaps)
+		{
+			u32 cap = function->xcaps ? function->xcaps * 2 : 8;
+			IrCapture *caps = arena_push(emitter->module->arena, sizeof(*caps) * cap, _Alignof(IrCapture));
+			if (function->ncaps) {
+				copy_memory(caps, function->caps, sizeof(*caps) * function->ncaps);
+			}
+			function->caps = caps;
+			function->xcaps = cap;
+		}
+		function->caps[function->ncaps++] = (IrCapture) { .local = local, .target = target };
 	}
 
-	Ir parent_capture = ir_emit_capture(emitter, parent, entity, site);
-	if (ir_is_error(parent_capture)) {
-		return ERROR_IR;
-	}
-
-	IrCapture *capture = arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
-	capture->entity = entity;
-	capture->target = parent_capture;
-	capture->slot = function->capture_count ++;
-	if (function->last_capture) {
-		function->last_capture->next = capture;
-	}
-	else {
-		function->first_capture = capture;
-	}
-	function->last_capture = capture;
-	entity->referenced = true;
-	return ir_new_load_capture(emitter, site, capture);
+	return ir_new_capture_ref(emitter, site, capture);
 }
 
 static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)

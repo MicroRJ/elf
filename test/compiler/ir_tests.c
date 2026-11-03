@@ -432,8 +432,8 @@ static void test_ir_lowers_function_expression(elf_State *state)
 
 	Ir main_body = result.module->first_function->body;
 	Ir memory = ir_test_body_stat(main_body, 0, IR_LOCAL, "function declaration lowers to local");
-	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION, "function expression lowers to function ir");
-	if (memory && memory->ir_local.expr && memory->ir_local.expr->ir_function != result.module->first_function->next) {
+	expect_ir_kind(memory ? memory->ir_local.expr : 0, IR_FUNCTION_REF, "function expression lowers to function ir");
+	if (memory && memory->ir_local.expr && result.module->first_function->funcs[memory->ir_local.expr->func] != result.module->first_function->next) {
 		test_fail("function ir points at nested function");
 	}
 
@@ -478,7 +478,7 @@ static void test_ir_loads_capture_per_reference(elf_State *state)
 	Arena arena = arena_create(0);
 	IrTestResult result = ir_test_lower_source(state, &arena, "outer := fun(value) { ret fun() { ret value + value } }");
 	IrFunction *function = ir_test_function_at(result.module, 2);
-	if (!function || function->capture_count != 1 || !function->first_capture || function->first_capture != function->last_capture) {
+	if (!function || function->ncaps != 1 || !function->caps) {
 		test_fail("nested function records one capture descriptor");
 		arena_destroy(&arena);
 		return;
@@ -489,9 +489,9 @@ static void test_ir_loads_capture_per_reference(elf_State *state)
 	Ir add = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	Ir left = add && add->kind == IR_ADD ? add->ir_binary.x : 0;
 	Ir right = add && add->kind == IR_ADD ? add->ir_binary.y : 0;
-	expect_ir_kind(left, IR_LOAD_CAPTURE, "first capture reference lowers to capture load");
-	expect_ir_kind(right, IR_LOAD_CAPTURE, "second capture reference lowers to capture load");
-	if (!left || !right || left == right || left->ir_load_capture != function->first_capture || right->ir_load_capture != function->first_capture) {
+	expect_ir_kind(left, IR_CAPTURE_REF, "first capture reference lowers to capture load");
+	expect_ir_kind(right, IR_CAPTURE_REF, "second capture reference lowers to capture load");
+	if (!left || !right || left == right || left->capture != 0 || right->capture != 0) {
 		test_fail("capture references use distinct loads of one descriptor");
 	}
 	if (!left || !right || left->site.offset == right->site.offset) {
@@ -511,7 +511,7 @@ static void test_ir_reports_cross_function_capture(elf_State *state)
 	if (!message || result.source->report.error_count != 1 || message->code != ELF_ERROR_LOWERING || message->phase != ERROR_PHASE_LOWERING) {
 		test_fail("cross-function capture reports a lowering error");
 	}
-	if (!result.module || !result.module->first_function || result.module->first_function->capture_count != 0) {
+	if (!result.module || !result.module->first_function || result.module->first_function->ncaps != 0) {
 		test_fail("invalid capture does not alter the entry function captures");
 	}
 	arena_destroy(&arena);
@@ -564,7 +564,7 @@ static void test_ir_lowers_static_call_arguments(elf_State *state)
 	Ir tuple = ret ? ret->ir_return.expr : 0;
 	Ir call = tuple && tuple->kind == IR_TUPLE && tuple->ir_tuple.count == 1 ? tuple->ir_tuple.items[0] : 0;
 	expect_ir_kind(call, IR_CALL, "static call lowers call expression");
-	expect_ir_kind(call ? call->ir_call.expr : 0, IR_FUNCTION, "static call retains function callee");
+	expect_ir_kind(call ? call->ir_call.expr : 0, IR_FUNCTION_REF, "static call retains function callee");
 	if (!call || call->ir_call.args.count != 3)
 	{
 		test_fail("static call fills every declared parameter");

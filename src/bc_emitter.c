@@ -17,6 +17,7 @@ struct BcEmitter
 {
 	elf_State          *target;
 	Arena              *arena;
+	IrFunction         *function;
 
 	// Temporary buffers copied into the runtime prototype after emission.
 	Bytecode           *bytecode;
@@ -649,17 +650,18 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		}
 		break;
 
-		case IR_FUNCTION:
+		case IR_FUNCTION_REF:
 		{
 			if (nout < 1) {
 				return out;
 			}
 
 			out = ensure_slot(emitter, out);
-			IrFunction *function = expr->ir_function;
+			ASSERT(expr->func < emitter->function->nfuncs);
+			IrFunction *function = emitter->function->funcs[expr->func];
 			ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
 			u32 prototype_index = function->index;
-			if (function->capture_count == 0)
+			if (function->ncaps == 0)
 			{
 				emit_bytecode_xy(emitter, site, BC_LOAD_PROTOTYPE, out, prototype_index);
 			}
@@ -668,9 +670,9 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 				i32 slot_checkpoint = ir_stack_top(emitter);
 				i32 first_capture_slot = slot_checkpoint;
 				i32 prev_capture_slot = 0;
-				for (IrCapture *capture = function->first_capture; capture; capture = capture->next)
+				for (u32 i = 0; i < function->ncaps; ++i)
 				{
-					i32 next_capture_slot = emit_expr(emitter, capture->target, NO_SLOT, 1);
+					i32 next_capture_slot = emit_expr(emitter, function->caps[i].target, NO_SLOT, 1);
 					ASSERT(slot_is_valid(next_capture_slot));
 					ASSERT(first_capture_slot + prev_capture_slot == next_capture_slot);
 					prev_capture_slot ++;
@@ -685,14 +687,14 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		}
 		break;
 
-		case IR_LOAD_CAPTURE:
+		case IR_CAPTURE_REF:
 		{
 			if (nout < 1) {
 				return out;
 			}
 
 			out = ensure_slot(emitter, out);
-			emit_bytecode_xy(emitter, site, BC_LOAD_CAPTURE, out, expr->ir_load_capture->slot);
+			emit_bytecode_xy(emitter, site, BC_LOAD_CAPTURE, out, expr->capture);
 		}
 		break;
 
@@ -1146,7 +1148,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	prototype->source = function->source->runtime_source;
 	prototype->variadic = function->variadic;
 	prototype->arity = function->params.count;
-	prototype->captures = function->capture_count;
+	prototype->captures = function->ncaps;
 	prototype->stack_size = emitter->stack_size;
 	prototype->integer_constant_count = emitter->integer_constant_count;
 	prototype->number_constant_count = emitter->number_constant_count;
@@ -1194,6 +1196,7 @@ static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
 	ASSERT(function);
 	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
 	ASSERT(!function->ast || function->ast->function.params.count == function->params.count);
+	emitter->function = function;
 
 	emitter->stack_size = 1;
 	emitter->stack_top = 1;
