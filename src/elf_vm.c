@@ -188,6 +188,7 @@ u32 elf_call(State *state, u32 nargs)
 		frame->nargs = nargs;
 		frame->size = nargs + 1;
 		frame->ndest = 1;
+		gc_check(state);
 		nrets = base->x_function(state, nargs);
 		// TODO: crashes | a native function can report a result count that is inconsistent with the stack.
 		ASSERT(nrets <= state->stack_top - frame->base - frame->size);
@@ -269,6 +270,7 @@ static u32 vm_resume(State *state)
 					frame->size = nargs + 1;
 					frame->ndest = ndest;
 					state->stack_top = frame->base + frame->size;
+					gc_check(state);
 					u32 nrets = dest->x_function(state, nargs);
 					// TODO: crashes | validate native result counts without relying on pointer arithmetic or an assertion.
 					RUNTIME_CHECK(state->stack_top >= frame->base + frame->size + nrets);
@@ -406,6 +408,7 @@ static u32 vm_resume(State *state)
 			case BC_NEW_TABLE:
 			{
 				// TODO: crashes | object and table-storage allocation failures still assert.
+				gc_check(state);
 				frame->regs[byte.b_x] = value_from_table(elf_table_new(state));
 			}
 			break;
@@ -413,6 +416,7 @@ static u32 vm_resume(State *state)
 			case BC_NEW_ARRAY:
 			{
 				// TODO: crashes | object allocation failure still asserts.
+				gc_check(state);
 				frame->regs[byte.b_x] = value_from_array(elf_array_new(state));
 			}
 			break;
@@ -420,9 +424,9 @@ static u32 vm_resume(State *state)
 			case BC_NEW_CLOSURE:
 			{
 				Proto *owner = frame_proto(frame);
-				ASSERT(byte.b_y >= 0 && (u32)byte.b_y < owner->nprotos);
 				Proto *proto = owner->protos[byte.b_y];
 				// TODO: crashes | closure allocation failure still asserts.
+				gc_check(state);
 				frame->regs[byte.b_x] = cls_value(elf_closure_new(state, proto, frame->regs + byte.b_x, proto->captures));
 			}
 			break;
@@ -723,6 +727,7 @@ static u32 vm_resume(State *state)
 
 				if (value_is_string(x))
 				{
+					gc_check(state);
 					frame->regs[byte.b_x] = str_value(vm_add_values_to_str(state, x, y));
 				}
 				else if (value_is_numeric(x) && value_is_numeric(y))

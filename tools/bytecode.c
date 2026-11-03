@@ -50,7 +50,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		case BC_LOAD_PROTOTYPE:
 		{
 			arena_pushf(arena, "r%d = prototype[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y < 0 || !prototype_index_is_valid(state, (u32)byte.b_y)) {
+			if (byte.b_y < 0 || (u32)byte.b_y >= function->nprotos) {
 				arena_push_text(arena, " // <bad-prototype>");
 			}
 		}
@@ -158,9 +158,9 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 		case BC_NEW_CLOSURE:
 		{
 			arena_pushf(arena, "r%d = closure prototype[%d]", byte.b_x, byte.b_y);
-			if (byte.b_y >= 0 && prototype_index_is_valid(state, (u32)byte.b_y))
+			if (byte.b_y >= 0 && (u32)byte.b_y < function->nprotos)
 			{
-				elf_Prototype *prototype = proto_from_index(state, (u32)byte.b_y);
+				elf_Prototype *prototype = function->protos[byte.b_y];
 				arena_pushf(arena, " captures=r%d count=%u", byte.b_x, prototype->captures);
 			}
 		}
@@ -210,7 +210,7 @@ static void format_bytecode_instr(elf_State *state, elf_Prototype *function, Are
 
 static char *format_bytecode_function(elf_State *state, Arena *arena, u32 prototype_index)
 {
-	elf_Prototype *function = proto_from_index(state, prototype_index);
+	elf_Prototype *function = state->prototypes[prototype_index];
 	char *start = arena_push(arena, 0, 1);
 
 	arena_push_text(arena, "bytecode function\n");
@@ -273,7 +273,7 @@ static elf_Prototype *compile_source(elf_State *state, elf_StrSlice name, elf_St
 	{
 		return 0;
 	}
-	return value_as_closure(state->stack_top[-1])->prototype;
+	return value_as_prototype(state->stack_top[-1]);
 }
 
 int main(int argc, char **argv)

@@ -4,7 +4,6 @@
 
 #include <dy_time.h>
 
-static void gc_check(elf_State *state);
 static u32 gc_mark_reachable(elf_State *state, elf_Object * reference);
 
 static void gc_free_object(elf_State *state, elf_Object *reference)
@@ -73,11 +72,6 @@ void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size)
 	ASSERT((u32)type < ELF_OBJECT_COUNT);
 	state->gc_allocated_objects += 1;
 	state->gc_allocated_by_type[type] += 1;
-
-	if (state->gc_mode == ELF_GC_ACTIVE)
-	{
-		gc_check(state);
-	}
 
 	elf_Object *reference = elf_alloc_zero(state, size);
 	ASSERT(reference != 0);
@@ -209,7 +203,7 @@ static void gc_update_next_cycle(elf_State *state)
 
 void gc_check(elf_State *state)
 {
-	if (state->gc_live_bytes < state->gc_next_cycle_bytes) {
+	if (state->gc_mode != ELF_GC_ACTIVE || state->gc_live_bytes < state->gc_next_cycle_bytes) {
 		return;
 	}
 

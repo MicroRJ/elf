@@ -354,6 +354,7 @@ elf_Source *elf_source_create(elf_State *state, dy_String name, dy_String text);
 void elf_sources_destroy(elf_State *state);
 
 void *elf_gc_alloc(elf_State *state, elf_ObjectType type, u32 size);
+void gc_check(elf_State *state);
 
 elf_Closure *elf_closure_new(elf_State *state, elf_Prototype *prototype, elf_Value *captures, u32 capture_count);
 elf_GCError *elf_error_new(elf_State *state, elf_ErrorCode code, elf_String *message, elf_Table *data);
