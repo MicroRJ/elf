@@ -381,14 +381,30 @@ static Ir ir_new_call(IrEmitter *emitter, SourceSite site, Ir expr, IrArray args
 	return ir;
 }
 
-static Ir ir_new_table(IrEmitter *emitter, SourceSite site)
+static Ir ir_new_tab(IrEmitter *emitter, SourceSite site)
 {
-	return ir_new_nullary(emitter, site, IR_TABLE);
+	return ir_new_nullary(emitter, site, IR_NEW_TAB);
 }
 
-static Ir ir_new_array(IrEmitter *emitter, SourceSite site)
+static Ir ir_new_arr(IrEmitter *emitter, SourceSite site)
 {
-	return ir_new_nullary(emitter, site, IR_ARRAY);
+	return ir_new_nullary(emitter, site, IR_NEW_ARR);
+}
+
+static Ir ir_new_tab_ref(IrEmitter *emitter, SourceSite site, elf_Table *tab)
+{
+	ASSERT(tab);
+	Ir ir = ir_alloc(emitter, site, IR_TAB_REF);
+	ir->ir_tab = tab;
+	return ir;
+}
+
+static Ir ir_new_arr_ref(IrEmitter *emitter, SourceSite site, elf_Array *arr)
+{
+	ASSERT(arr);
+	Ir ir = ir_alloc(emitter, site, IR_ARR_REF);
+	ir->ir_arr = arr;
+	return ir;
 }
 
 static Ir ir_new_index(IrEmitter *emitter, SourceSite site, Ir x, Ir y)
@@ -583,15 +599,27 @@ static void print_ir(IrPrinter *pr, Ir ir)
 		}
 		break;
 
-		case IR_TABLE:
+		case IR_NEW_TAB:
 		{
-			IR_PRINT(pr, "table");
+			IR_PRINT(pr, "new_tab");
 		}
 		break;
 
-		case IR_ARRAY:
+		case IR_NEW_ARR:
 		{
-			IR_PRINT(pr, "array");
+			IR_PRINT(pr, "new_arr");
+		}
+		break;
+
+		case IR_TAB_REF:
+		{
+			IR_PRINT(pr, "tab_ref");
+		}
+		break;
+
+		case IR_ARR_REF:
+		{
+			IR_PRINT(pr, "arr_ref");
 		}
 		break;
 

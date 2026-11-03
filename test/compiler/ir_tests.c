@@ -285,7 +285,7 @@ static void test_ir_lowers_field_and_call(elf_State *state)
 		? table_block->ir_expr_block.stats.items[0]
 		: 0;
 	expect_ir_kind(table_local, IR_LOCAL, "table expression block creates table local");
-	expect_ir_kind(table_local ? table_local->ir_local.expr : 0, IR_TABLE, "table expression block creates table ir");
+	expect_ir_kind(table_local ? table_local->ir_local.expr : 0, IR_NEW_TAB, "table expression block creates table ir");
 	arena_destroy(&arena);
 }
 
@@ -307,7 +307,7 @@ static void test_ir_lowers_array_literal(elf_State *state)
 
 	Ir local = block->ir_expr_block.stats.items[0];
 	expect_ir_kind(local, IR_LOCAL, "array literal stores allocation in a local");
-	expect_ir_kind(local ? local->ir_local.expr : 0, IR_ARRAY, "array literal allocates an array");
+	expect_ir_kind(local ? local->ir_local.expr : 0, IR_NEW_ARR, "array literal allocates an array");
 	expect_ir_kind(block->ir_expr_block.stats.items[1], IR_ARRAY_ADD, "array literal appends first item");
 	expect_ir_kind(block->ir_expr_block.stats.items[2], IR_ARRAY_ADD, "array literal appends second item");
 	expect_load_local(block->ir_expr_block.value, local, "array literal returns allocated array");

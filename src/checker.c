@@ -851,7 +851,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 		case AST_TABLE:
 		{
 			IrQueue items = ir_queue_begin(emitter);
-			Ir local = ir_new_local(emitter, expr->site, ir_new_table(emitter, expr->site));
+			Ir local = ir_new_local(emitter, expr->site, ir_new_tab(emitter, expr->site));
 			ir_queue_push(&items, local);
 
 			for (u32 i = 0; i < expr->table.count; ++ i)
@@ -889,7 +889,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 		case AST_ARRAY:
 		{
 			IrQueue items = ir_queue_begin(emitter);
-			Ir local = ir_new_local(emitter, expr->site, ir_new_array(emitter, expr->site));
+			Ir local = ir_new_local(emitter, expr->site, ir_new_arr(emitter, expr->site));
 			ir_queue_push(&items, local);
 			for (u32 i = 0; i < expr->array.count; ++ i)
 			{

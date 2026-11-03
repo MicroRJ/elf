@@ -35,7 +35,7 @@ Named, local, and callable values
   IR_GET_MEM produces that assigned stack-slot index and has the same allocation precondition as IR_LOAD.
 
 Aggregate values and access
-  IR_TABLE and IR_ARRAY allocate empty collections.
+  IR_NEW_TAB and IR_NEW_ARR allocate empty collections.
   IR_INDEX reads an indexed value and may also be an IR_STORE destination.
   IR_FIELD reads a field and preserves its receiver as the implicit argument when called.
   IR_META_FIELD does the same for a meta field.
@@ -83,8 +83,10 @@ Low-level control flow
 	X(IR_FUNCTION_REF        , "function_ref")               \
 	X(IR_LOAD                , "load")                       \
 	X(IR_GET_MEM             , "get_mem")                    \
-	X(IR_TABLE               , "table")                      \
-	X(IR_ARRAY               , "array")                      \
+	X(IR_NEW_TAB             , "new_tab")                    \
+	X(IR_NEW_ARR             , "new_arr")                    \
+	X(IR_TAB_REF             , "tab_ref")                    \
+	X(IR_ARR_REF             , "arr_ref")                    \
 	X(IR_INDEX               , "index")                      \
 	X(IR_FIELD               , "field")                      \
 	X(IR_META_FIELD          , "meta_field")                 \
@@ -252,6 +254,8 @@ struct IrNode
 		Atom *atom;
 		i64   ir_int;
 		f64   ir_num;
+		elf_Table *ir_tab;
+		elf_Array *ir_arr;
 
 		Ir ir_unary;
 		IrArray ir_tuple;

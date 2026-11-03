@@ -781,15 +781,39 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 		}
 		break;
 
-		case IR_TABLE:
+		case IR_NEW_TAB:
 		{
 			out = emit_table_expr(emitter, expr, out, nout);
 		}
 		break;
 
-		case IR_ARRAY:
+		case IR_NEW_ARR:
 		{
 			out = emit_array_expr(emitter, expr, out, nout);
+		}
+		break;
+
+		case IR_TAB_REF:
+		{
+			if (nout < 1) {
+				return out;
+			}
+
+			out = ensure_slot(emitter, out);
+			u32 index = add_const(emitter, value_from_table(expr->ir_tab));
+			emit_bytecode_xy(emitter, site, BC_LOAD_CONST, out, index);
+		}
+		break;
+
+		case IR_ARR_REF:
+		{
+			if (nout < 1) {
+				return out;
+			}
+
+			out = ensure_slot(emitter, out);
+			u32 index = add_const(emitter, value_from_array(expr->ir_arr));
+			emit_bytecode_xy(emitter, site, BC_LOAD_CONST, out, index);
 		}
 		break;
 
