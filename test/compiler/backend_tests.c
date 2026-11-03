@@ -112,6 +112,28 @@ static u32 backend_count_all_bytecode(BackendCompileResult result, BcType type)
 	return count;
 }
 
+static u32 backend_count_constant_loads(BackendCompileResult result, elf_ValueType type)
+{
+	u32 count = 0;
+	for (u32 object_index = 0; object_index < result.state->gc_reference_count; ++object_index)
+	{
+		elf_Object *object = result.state->gc_references[object_index];
+		if (object->type != ELF_OBJECT_PROTOTYPE) {
+			continue;
+		}
+
+		elf_Prototype *function = (elf_Prototype *)object;
+		for (u32 byte_index = 0; byte_index < function->bytecode_count; ++byte_index)
+		{
+			Bytecode byte = function->bytecode[byte_index];
+			if (byte.b_type == BC_LOAD_CONST && byte.b_y >= 0 && (u32)byte.b_y < function->nconsts && function->consts[byte.b_y].type == type) {
+				count += 1;
+			}
+		}
+	}
+	return count;
+}
+
 static elf_SourceMapEntry *backend_find_source_map_entry(elf_Prototype *function, u32 byte)
 {
 	for (u32 i = 0; i < function->source_map_count; ++ i) {
@@ -219,6 +241,19 @@ static i32 backend_find_first_bytecode(BackendCompileResult result, BcType type)
 	for (u32 i = 0; i < function->bytecode_count; ++ i)
 	{
 		if (bytes[i].b_type == type) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static i32 backend_find_first_constant_load(BackendCompileResult result, elf_ValueType type)
+{
+	elf_Prototype *function = backend_test_function(result);
+	for (u32 i = 0; i < function->bytecode_count; ++i)
+	{
+		Bytecode byte = function->bytecode[i];
+		if (byte.b_type == BC_LOAD_CONST && byte.b_y >= 0 && (u32)byte.b_y < function->nconsts && function->consts[byte.b_y].type == type) {
 			return i;
 		}
 	}
@@ -464,11 +499,18 @@ static void test_backend_outputs_strings(void)
 	IrModule ir_module = {.arena = &arena, .first_function = &function, .last_function = &function, .function_count = 1};
 
 	elf_Prototype *prototype = bc_emit_module(state, &ir_module);
-	if (prototype->string_count != 1 || elf_string_size(prototype->strings[0]) != sizeof(text) - 1 || memcmp(elf_string_data(prototype->strings[0]), text, sizeof(text) - 1)) {
+	if (prototype->nconsts != 1 || !value_is_string(prototype->consts[0])) {
 		test_fail("backend outputs owned bytecode strings");
 	}
-	if (elf_string_data(prototype->strings[0]) == atom->data) {
-		test_fail("backend bytecode strings do not borrow compiler atoms");
+	else
+	{
+		elf_String *constant = value_as_string(prototype->consts[0]);
+		if (elf_string_size(constant) != sizeof(text) - 1 || memcmp(elf_string_data(constant), text, sizeof(text) - 1)) {
+			test_fail("backend outputs owned bytecode strings");
+		}
+		if (elf_string_data(constant) == atom->data) {
+			test_fail("backend bytecode strings do not borrow compiler atoms");
+		}
 	}
 
 	elf_destroy_state(state);
@@ -481,19 +523,19 @@ static void test_backend_loads_prototype_for_static_call(void)
 		"add :: fun(a, b) { ret a + b }\n"
 		"ret add(2, 3)\n");
 
-	if (backend_count_bytecode(result, BC_LOAD_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
+	if (backend_count_constant_loads(result, ELF_VALUE_TYPE_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
 		test_fail("static function call loads its prototype and emits one dynamic call");
 	}
 	if (backend_count_bytecode(result, BC_NEW_CLOSURE) != 0) {
 		test_fail("static function call does not allocate a closure");
 	}
 
-	i32 load_index = backend_find_first_bytecode(result, BC_LOAD_PROTOTYPE);
+	i32 load_index = backend_find_first_constant_load(result, ELF_VALUE_TYPE_PROTOTYPE);
 	i32 call_index = backend_find_first_bytecode(result, BC_CALL_DYNAMIC);
 	if (load_index >= 0 && call_index >= 0) {
 		Bytecode load = backend_test_bytes(result)[load_index];
 		Bytecode call = backend_test_bytes(result)[call_index];
-		if (load.b_y < 0 || (u32)load.b_y >= result.function->nprotos || call.b_x != load.b_x || call.b_y != 2 || call.b_z != 1) {
+		if (load.b_y < 0 || (u32)load.b_y >= result.function->nconsts || call.b_x != load.b_x || call.b_y != 2 || call.b_z != 1) {
 			test_fail("static call loads its callee and encodes argument and return counts");
 		}
 	}
@@ -509,7 +551,7 @@ static void test_backend_calls_imported_static_function(void)
 	}
 	else
 	{
-		if (backend_count_bytecode(result, BC_LOAD_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
+		if (backend_count_constant_loads(result, ELF_VALUE_TYPE_PROTOTYPE) != 1 || backend_count_bytecode(result, BC_CALL_DYNAMIC) != 1) {
 			test_fail("imported static function loads its prototype and emits a dynamic call");
 		}
 
@@ -532,7 +574,7 @@ static void test_backend_calls_static_recurse_through_values(void)
 		"count :: fun(n) { if n ? { ret recurse(n - 1) } ret 0 }\n"
 		"ret count(3)\n");
 
-	u32 prototype_loads = backend_count_all_bytecode(result, BC_LOAD_PROTOTYPE);
+	u32 prototype_loads = backend_count_constant_loads(result, ELF_VALUE_TYPE_PROTOTYPE);
 	u32 dynamic_calls = backend_count_all_bytecode(result, BC_CALL_DYNAMIC);
 	u32 closures = backend_count_all_bytecode(result, BC_NEW_CLOSURE);
 	if (prototype_loads != 1 || dynamic_calls != 2) {
@@ -550,7 +592,7 @@ static void test_backend_materializes_static_recurse_value(void)
 		"self :: fun() { ret recurse }\n"
 		"ret self()\n");
 
-	u32 prototype_loads = backend_count_all_bytecode(result, BC_LOAD_PROTOTYPE);
+	u32 prototype_loads = backend_count_constant_loads(result, ELF_VALUE_TYPE_PROTOTYPE);
 	u32 dynamic_calls = backend_count_all_bytecode(result, BC_CALL_DYNAMIC);
 	u32 closures = backend_count_all_bytecode(result, BC_NEW_CLOSURE);
 	if (prototype_loads != 1 || dynamic_calls != 1) {
@@ -565,13 +607,13 @@ static void test_backend_materializes_static_recurse_value(void)
 static void test_backend_emits_parameter_type_enforcement(void)
 {
 	BackendCompileResult result = backend_test_compile_source("probe := fun(a: int, b: str) { ret [a, b] }\nret probe");
-	if (!result.function || result.function->nprotos != 1)
+	if (!result.function || result.function->nconsts < 1 || !value_is_prototype(result.function->consts[0]))
 	{
 		test_fail("backend compiles typed function parameters");
 	}
 	else
 	{
-		elf_Prototype *function = result.function->protos[0];
+		elf_Prototype *function = value_as_prototype(result.function->consts[0]);
 		Bytecode *bytes = function->bytecode;
 		if (function->bytecode_count < 2 || bytes[0].b_type != BC_CHECK_TYPE || bytes[0].b_x != 1 || bytes[0].b_y != TRULE_INTEGER || bytes[1].b_type != BC_CHECK_TYPE || bytes[1].b_x != 2 || bytes[1].b_y != TRULE_STRING)
 		{

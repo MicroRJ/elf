@@ -185,20 +185,14 @@ struct elf_Prototype
 {
 	elf_Object          obj;
 	elf_Source         *source;
-	elf_Prototype     **protos;
-	u32                 nprotos;
+	elf_Value          *consts;
+	u32                 nconsts;
 	b32                 variadic;
 	u8                  arity;
 	u8                  captures;
 	// TODO(RJ): rename this to nregs
 	u16                 stack_size;
 
-	elf_String        **strings;
-	u32                 string_count;
-	f64                *num_data;
-	u32                 number_constant_count;
-	i64                *int_data;
-	u32                 integer_constant_count;
 	Bytecode           *bytecode;
 	u32                 bytecode_count;
 	elf_SourceMapEntry *source_map;

@@ -365,18 +365,25 @@ static void test_vm_module_converts_atom_constants(void)
 		return;
 	}
 	elf_Prototype *prototype = value_as_prototype(entry);
-	if (prototype->string_count != 2 || strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0)
+	if (prototype->nconsts != 2 || !value_is_string(prototype->consts[0]) || !value_is_string(prototype->consts[1]))
 	{
+		test_fail("function converts deduplicated atom constants to strings");
+		elf_destroy_state(state);
+		return;
+	}
+	elf_String *same = value_as_string(prototype->consts[0]);
+	elf_String *other = value_as_string(prototype->consts[1]);
+	if (strcmp(elf_string_data(same), "same") != 0 || strcmp(elf_string_data(other), "other") != 0) {
 		test_fail("function converts deduplicated atom constants to strings");
 	}
 	vm_force_gc_allocations(state, 256);
-	if (strcmp(elf_string_data(prototype->strings[0]), "same") != 0 || strcmp(elf_string_data(prototype->strings[1]), "other") != 0) {
+	if (strcmp(elf_string_data(same), "same") != 0 || strcmp(elf_string_data(other), "other") != 0) {
 		test_fail("function string constants survive GC");
 	}
 
 	elf_call(state, 0);
 	elf_Array *result = value_as_array(state->stack_top[-1]);
-	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), prototype->strings[0]) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), prototype->strings[1]))
+	if (elf_array_length(result) != 3 || !elf_string_equal(value_as_string(elf_array_get(state, result, 0)), same) || !elf_string_equal(value_as_string(elf_array_get(state, result, 1)), same) || !elf_string_equal(value_as_string(elf_array_get(state, result, 2)), other))
 	{
 		test_fail("VM loads string constants from their function");
 	}

@@ -176,9 +176,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	u64 arena_before = state->arena.used;
 	u64 bytecode_count = 0;
 	u64 function_count = 0;
-	u64 string_count = 0;
-	u64 integer_constant_count = 0;
-	u64 number_constant_count = 0;
+	u64 constant_count = 0;
 	u64 prototype_storage = 0;
 	elf_StrSlice text = {(char *)source, (elf_u64)strlen(source)};
 
@@ -197,9 +195,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 			elf_Prototype *prototype = (elf_Prototype *)object;
 			bytecode_count += prototype->bytecode_count;
 			function_count += 1;
-			string_count += prototype->string_count;
-			integer_constant_count += prototype->integer_constant_count;
-			number_constant_count += prototype->number_constant_count;
+			constant_count += prototype->nconsts;
 			prototype_storage += prototype->obj.size;
 		}
 		elf_pop(state, 1);
@@ -208,8 +204,7 @@ static void bench_compile_and_load_scripts(const char *source, u32 iterations)
 	u64 retained_arena_storage = state->arena.used - arena_before;
 
 	bench_report("compile + load script", "loads", iterations, seconds);
-	printf("  growth: %llu bytecodes, %llu functions, %llu strings, %llu integer constants, %llu number constants\n",
-		bytecode_count, function_count, string_count, integer_constant_count, number_constant_count);
+	printf("  growth: %llu bytecodes, %llu functions, %llu constants\n", bytecode_count, function_count, constant_count);
 	printf("  retained state-arena storage: %llu bytes\n", retained_arena_storage);
 	printf("  prototype allocation storage: %llu bytes\n", prototype_storage);
 	elf_destroy_state(state);

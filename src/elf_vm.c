@@ -367,41 +367,16 @@ static u32 vm_resume(State *state)
 			}
 			break;
 
-			case BC_LOAD_CONSTANT_INTEGER:
+			case BC_LOAD_CONST:
 			{
-				frame->regs[byte.b_x] = int_value(frame_proto(frame)->int_data[byte.b_y]);
-			}
-			break;
-
-			case BC_LOAD_CONSTANT_NUMBER:
-			{
-				frame->regs[byte.b_x] = num_value(frame_proto(frame)->num_data[byte.b_y]);
-			}
-			break;
-
-			case BC_LOAD_CONSTANT_STRING:
-			{
-				frame->regs[byte.b_x] = str_value(frame_proto(frame)->strings[byte.b_y]);
+				Proto *proto = frame_proto(frame);
+				frame->regs[byte.b_x] = proto->consts[byte.b_y];
 			}
 			break;
 
 			case BC_LOAD_CAPTURE:
 			{
 				frame->regs[byte.b_x] = frame->base->x_closure->captures[byte.b_y];
-			}
-			break;
-
-			case BC_LOAD_NATIVE_FUNCTION:
-			{
-				frame->regs[byte.b_x] = value_from_function(state->native_functions[byte.b_y]);
-			}
-			break;
-
-			case BC_LOAD_PROTOTYPE:
-			{
-				Proto *owner = frame_proto(frame);
-				ASSERT(byte.b_y >= 0 && (u32)byte.b_y < owner->nprotos);
-				frame->regs[byte.b_x] = proto_value(owner->protos[byte.b_y]);
 			}
 			break;
 
@@ -424,7 +399,7 @@ static u32 vm_resume(State *state)
 			case BC_NEW_CLOSURE:
 			{
 				Proto *owner = frame_proto(frame);
-				Proto *proto = owner->protos[byte.b_y];
+				Proto *proto = owner->consts[byte.b_y].x_proto;
 				// TODO: crashes | closure allocation failure still asserts.
 				gc_check(state);
 				frame->regs[byte.b_x] = cls_value(elf_closure_new(state, proto, frame->regs + byte.b_x, proto->captures));

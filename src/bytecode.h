@@ -120,11 +120,7 @@ Bitwise operations
 	X(JUMP_IF_NONZERO,          "jump_if_nonzero")                 \
 	X(RETURN,                   "return")                          \
 	X(LOAD_CAPTURE,             "load_capture")                    \
-	X(LOAD_NATIVE_FUNCTION,     "load_native_function")            \
-	X(LOAD_PROTOTYPE,           "load_prototype")                  \
-	X(LOAD_CONSTANT_STRING,     "load_constant_string")            \
-	X(LOAD_CONSTANT_NUMBER,     "load_constant_number")            \
-	X(LOAD_CONSTANT_INTEGER,    "load_constant_integer")           \
+	X(LOAD_CONST,               "load_const")                      \
 	X(LOAD_NIL,                 "load_nil")                        \
 	X(MOVE,                     "move")                            \
 	X(GET_INDEX,                "get_index")                       \
