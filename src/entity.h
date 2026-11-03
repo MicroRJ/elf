@@ -27,7 +27,6 @@ Com_Type;
 	X(NUMBER,          "number")          \
 	X(INTEGER,         "integer")         \
 	X(STRING,          "string")          \
-	X(FUNCTION,        "function")        \
 	X(EXPORTS,         "exports")         \
 	X(SCOPE,           "scope")           \
 	X(NATIVE_FUNCTION, "native_function") \
@@ -70,8 +69,6 @@ typedef struct
 		struct Atom  *string;
 		Scope        *exports;
 		Scope        *scope;
-		IrFunction   *ir_function;
-		struct Ast_T *function;
 		u32           native_function_index;
 		struct
 		{

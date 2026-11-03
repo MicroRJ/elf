@@ -352,9 +352,6 @@ static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
 		case COM_VALUE_STRING: {
 			return ir_new_atom(emitter, site, value.string);
 		}
-		case COM_VALUE_FUNCTION: {
-			return ir_new_function_ref(emitter, site, value.ir_function);
-		}
 		case COM_VALUE_NATIVE_FUNCTION: {
 			return ir_new_native_function(emitter, site, value.native_function_index);
 		}
@@ -1765,8 +1762,8 @@ static Com_Status prepare_scope(IrEmitter *checker, Scope *scope, Ast_Array stat
 		name->entity = entity;
 		if (expr->kind == AST_FUNCTION)
 		{
-			IrFunction *function = ir_reserve_function(checker->source, checker->module, 0, expr);
-			entity->value = (Com_Value) { .type = COM_VALUE_FUNCTION, .ir_function = function };
+			IrFunction *func = ir_reserve_function(checker->source, checker->module, 0, expr);
+			entity->value = com_value_ir(ir_new_function_ref(checker, expr->site, func));
 		}
 
 		Compiler *compiler = checker->source->compiler;
@@ -2093,7 +2090,7 @@ static Com_Status eval_statics(IrModule *module, Compiler *compiler)
 		ASSERT(entity->tags & ENTITY_TAG_STATIC);
 		ASSERT(entity->declaration);
 		ASSERT(entity->declaration->kind == AST_STATIC_DECL);
-		if (entity->value.type != COM_VALUE_FUNCTION) {
+		if (entity->value.type != COM_VALUE_IR || entity->value.ir->kind != IR_FUNCTION_REF) {
 			continue;
 		}
 
@@ -2102,7 +2099,7 @@ static Com_Status eval_statics(IrModule *module, Compiler *compiler)
 		checker.source = entity->scope->source;
 		checker.active_scope = entity->scope;
 
-		Com_Status status = check_function(&checker, entity->value.ir_function);
+		Com_Status status = check_function(&checker, entity->value.ir->func);
 		if (status != COM_STATUS_OK) {
 			return status;
 		}
