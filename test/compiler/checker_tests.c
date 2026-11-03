@@ -3,6 +3,7 @@ typedef struct
 	Arena       arena;
 	Compiler   *compiler;
 	Com_Source *source;
+	IrModule    module;
 	Com_Status  status;
 }
 CheckerTest;
@@ -37,8 +38,8 @@ static void checker_test_init_with_target(CheckerTest *test, elf_State *target, 
 	}
 	test->source->ast = file;
 	test->source->state = COM_SOURCE_PARSED;
-	test->status = check_source(test->source);
-	test->source->state = COM_SOURCE_CHECKED;
+	ir_module_init(&test->module, &test->arena);
+	test->status = check_source(&test->module, test->source);
 }
 
 static void checker_test_init(CheckerTest *test, const char *name, const char *source_text)
@@ -95,13 +96,13 @@ static void test_checker_resolves_static_forward_reference(void)
 	Ast return_stat = checker_test_stat(&test, 2, AST_RETURN, "checker parses static return");
 	Entity *first = first_decl ? first_decl->entity : 0;
 	Entity *second = second_decl ? second_decl->entity : 0;
-	if (!first || !second || first->kind != ENTITY_STATIC || second->kind != ENTITY_STATIC) {
+	if (!first || !second) {
 		test_fail("checker predeclares source statics");
 	}
-	if (!first || first->en_static.value.type != COM_VALUE_INTEGER || first->en_static.value.integer != 42) {
+	if (!first || first->value.type != COM_VALUE_INTEGER || first->value.integer != 42) {
 		test_fail("checker lazily resolves static forward reference");
 	}
-	if (!second || second->en_static.value.type != COM_VALUE_INTEGER || second->en_static.value.integer != 42) {
+	if (!second || second->value.type != COM_VALUE_INTEGER || second->value.integer != 42) {
 		test_fail("checker resolves referenced static value");
 	}
 	if (!first_decl || first_decl->static_decl.name->entity != first || !second_decl || second_decl->static_decl.name->entity != second) {
@@ -146,19 +147,19 @@ static void test_compiler_injects_symbols(void)
 	Entity *elf_before = scope_find_current(compiler->globals, elf_name);
 	Com_Status symbol_status = inject_symbols(compiler, compiler->globals, source, symbols);
 	Entity *elf_after = scope_find_current(compiler->globals, elf_name);
-	Scope *elf_scope = elf_after && elf_after->en_static.value.type == COM_VALUE_SCOPE ? elf_after->en_static.value.scope : 0;
+	Scope *elf_scope = elf_after && elf_after->value.type == COM_VALUE_SCOPE ? elf_after->value.scope : 0;
 	Atom *published_name = atom_from_data_size(compiler->atoms, "published", sizeof("published") - 1);
 	Entity *published = elf_scope ? scope_find_current(elf_scope, published_name) : 0;
-	Scope *published_scope = published && published->en_static.value.type == COM_VALUE_SCOPE ? published->en_static.value.scope : 0;
+	Scope *published_scope = published && published->value.type == COM_VALUE_SCOPE ? published->value.scope : 0;
 	Entity *answer = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1)) : 0;
 	Entity *ratio = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "ratio", sizeof("ratio") - 1)) : 0;
 	Entity *message = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "message", sizeof("message") - 1)) : 0;
 	Entity *run = published_scope ? scope_find_current(published_scope, atom_from_data_size(compiler->atoms, "run", sizeof("run") - 1)) : 0;
 
-	b32 answer_is_valid = answer && answer->en_static.value.type == COM_VALUE_INTEGER && answer->en_static.value.integer == 42;
-	b32 ratio_is_valid = ratio && ratio->en_static.value.type == COM_VALUE_NUMBER && ratio->en_static.value.number == 1.5;
-	b32 message_is_valid = message && message->en_static.value.type == COM_VALUE_STRING && atom_size(message->en_static.value.string) == sizeof("hello") - 1 && !memcmp(atom_data(message->en_static.value.string), "hello", sizeof("hello") - 1);
-	b32 run_is_valid = run && run->en_static.value.type == COM_VALUE_NATIVE_FUNCTION && run->en_static.value.native_function_index < state->native_function_count && state->native_functions[run->en_static.value.native_function_index] == compiler_symbol_test_function;
+	b32 answer_is_valid = answer && answer->value.type == COM_VALUE_INTEGER && answer->value.integer == 42;
+	b32 ratio_is_valid = ratio && ratio->value.type == COM_VALUE_NUMBER && ratio->value.number == 1.5;
+	b32 message_is_valid = message && message->value.type == COM_VALUE_STRING && atom_size(message->value.string) == sizeof("hello") - 1 && !memcmp(atom_data(message->value.string), "hello", sizeof("hello") - 1);
+	b32 run_is_valid = run && run->value.type == COM_VALUE_NATIVE_FUNCTION && run->value.native_function_index < state->native_function_count && state->native_functions[run->value.native_function_index] == compiler_symbol_test_function;
 	b32 symbols_succeeded = create_symbols_error == ELF_ERROR_NONE && create_elf_error == ELF_ERROR_NONE && create_published_error == ELF_ERROR_NONE && answer_error == ELF_ERROR_NONE && ratio_error == ELF_ERROR_NONE && message_error == ELF_ERROR_NONE && run_error == ELF_ERROR_NONE && published_error == ELF_ERROR_NONE && elf_error == ELF_ERROR_NONE;
 	if (!symbols_succeeded || builtin_status != COM_STATUS_OK || symbol_status != COM_STATUS_OK || elf_before != elf_after || !published_scope || !answer_is_valid || !ratio_is_valid || !message_is_valid || !run_is_valid)
 	{
@@ -193,7 +194,7 @@ static void test_checker_declares_local_after_initializer(void)
 	Ast initializer = declaration ? checker_test_tuple_item(declaration->decl.expr, 0, AST_IDENT, "checker finds local initializer") : 0;
 	Entity *local = name ? name->entity : 0;
 	Entity *prior = initializer ? initializer->entity : 0;
-	if (!local || local->kind != ENTITY_LOCAL || !prior || prior->kind != ENTITY_STATIC || local == prior) {
+	if (!local || local->value.type != COM_VALUE_LOCAL || !prior || !prior->declaration || prior->declaration->kind != AST_STATIC_DECL || local == prior) {
 		test_fail("checker resolves initializer before declaring local names");
 	}
 	Ast return_expr = return_stat ? checker_test_single_expression(return_stat->return_stat.expr, AST_IDENT, "checker finds local return expression") : 0;
@@ -248,7 +249,7 @@ static void test_checker_does_not_leak_block_locals(void)
 	Ast return_expr = return_stat ? checker_test_single_expression(return_stat->return_stat.expr, AST_IDENT, "checker finds use after block") : 0;
 	Entity *outside = return_expr ? return_expr->entity : 0;
 	Com_Message *message = test.source ? test.source->report.first : 0;
-	if (!local || local->kind != ENTITY_LOCAL || outside || test.status != COM_STATUS_REPORTED || !message || message->code != ELF_ERROR_UNDECLARED_IDENTIFIER) {
+	if (!local || local->value.type != COM_VALUE_LOCAL || outside || test.status != COM_STATUS_REPORTED || !message || message->code != ELF_ERROR_UNDECLARED_IDENTIFIER) {
 		test_fail("checker reports block locals used outside their scope");
 	}
 	checker_test_destroy(&test);
@@ -272,13 +273,13 @@ static void test_checker_attaches_function_entities(void)
 	Ast inner_return = inner_body && inner_body->kind == AST_BLOCK_STAT && inner_body->block.count ? inner_body->block.items[0] : 0;
 	Entity *parameter_entity = parameter_name ? parameter_name->entity : 0;
 	Entity *local_entity = local_name ? local_name->entity : 0;
-	if (!parameter_entity || parameter_entity->kind != ENTITY_LOCAL || parameter_entity->en_local.declaration != parameter || parameter_entity->en_local.function != outer_function) {
+	if (!parameter_entity || parameter_entity->value.type != COM_VALUE_LOCAL || parameter_entity->declaration != parameter || parameter_entity->value.local.function != outer_function) {
 		test_fail("checker attaches parameter entity to owning function");
 	}
 	if (!parameter_use || parameter_use->entity != parameter_entity) {
 		test_fail("checker resolves function parameter use");
 	}
-	if (!local_entity || local_entity->kind != ENTITY_LOCAL || local_entity->en_local.declaration != local_decl || local_entity->en_local.function != outer_function) {
+	if (!local_entity || local_entity->value.type != COM_VALUE_LOCAL || local_entity->declaration != local_decl || local_entity->value.local.function != outer_function) {
 		test_fail("checker records local owner function");
 	}
 	Ast inner_return_expr = inner_return && inner_return->kind == AST_RETURN ? checker_test_single_expression(inner_return->return_stat.expr, AST_IDENT, "checker finds captured local use") : 0;
@@ -389,7 +390,9 @@ static void test_checker_resolves_imported_export(void)
 	Ast import = root->import_count ? root->imports[0] : 0;
 	if (import && import->kind == AST_IMPORT) {
 		import->import.target = module;
-		check_source(root);
+		IrModule ir_module;
+		ir_module_init(&ir_module, &arena);
+		check_source(&ir_module, root);
 	}
 	else {
 		test_fail("checker import test parses import");
@@ -398,7 +401,7 @@ static void test_checker_resolves_imported_export(void)
 	Ast field = root_return && root_return->kind == AST_RETURN ? checker_test_single_expression(root_return->return_stat.expr, AST_FIELD, "checker finds imported field expression") : 0;
 	Atom *answer_name = atom_from_data_size(compiler->atoms, "answer", sizeof("answer") - 1);
 	Entity *answer = module->scope ? scope_find_current(module->scope, answer_name) : 0;
-	if (!answer || answer->kind != ENTITY_STATIC || !entity_is_exported(answer) || answer->en_static.value.type != COM_VALUE_INTEGER || answer->en_static.value.integer != 42) {
+	if (!answer || !entity_is_exported(answer) || answer->value.type != COM_VALUE_INTEGER || answer->value.integer != 42) {
 		test_fail("checker lazily resolves imported export");
 	}
 	if (!field || field->kind != AST_FIELD || field->entity != answer) {
@@ -413,6 +416,7 @@ typedef struct
 	Compiler   *compiler;
 	Com_Source *root;
 	Com_Source *module;
+	IrModule    ir_module;
 }
 CheckerImportTest;
 
@@ -444,7 +448,8 @@ static void checker_import_test_init(CheckerImportTest *test, const char *root_t
 		return;
 	}
 	import->import.target = test->module;
-	check_source(test->root);
+	ir_module_init(&test->ir_module, &test->arena);
+	check_source(&test->ir_module, test->root);
 }
 
 static void checker_import_test_destroy(CheckerImportTest *test)
@@ -462,7 +467,7 @@ static void test_checker_reports_static_cycle(void)
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_CYCLIC_STATIC_DEFINITION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports cyclic static definition");
 	}
-	if (!first_decl || !second_decl || first_decl->entity->en_static.value.type != COM_VALUE_ERROR || first_decl->entity->en_static.value.status != COM_STATUS_REPORTED || second_decl->entity->en_static.value.type != COM_VALUE_ERROR || second_decl->entity->en_static.value.status != COM_STATUS_REPORTED) {
+	if (!first_decl || !second_decl || first_decl->entity->value.type != COM_VALUE_ERROR || first_decl->entity->value.status != COM_STATUS_REPORTED || second_decl->entity->value.type != COM_VALUE_ERROR || second_decl->entity->value.status != COM_STATUS_REPORTED) {
 		test_fail("checker propagates cyclic static error through entities");
 	}
 	checker_test_destroy(&test);
@@ -477,7 +482,7 @@ static void test_checker_reports_invalid_static_expression(void)
 	if (test.status != COM_STATUS_REPORTED || !message || test.source->report.error_count != 1 || message->code != ELF_ERROR_INVALID_STATIC_EXPRESSION || message->phase != ERROR_PHASE_CHECKER) {
 		test_fail("checker reports expression without static value");
 	}
-	if (!declaration || !declaration->entity || declaration->entity->en_static.value.type != COM_VALUE_ERROR || declaration->entity->en_static.value.status != COM_STATUS_REPORTED) {
+	if (!declaration || !declaration->entity || declaration->entity->value.type != COM_VALUE_ERROR || declaration->entity->value.status != COM_STATUS_REPORTED) {
 		test_fail("checker stores invalid static result on entity");
 	}
 	checker_test_destroy(&test);
@@ -540,7 +545,9 @@ static void test_checker_propagates_diagnostic_oom(void)
 	source->state = COM_SOURCE_PARSED;
 	u64 capacity = arena.capacity;
 	arena.capacity = arena.used;
-	Com_Status status = check_source(source);
+	IrModule ir_module;
+	ir_module_init(&ir_module, &arena);
+	Com_Status status = check_source(&ir_module, source);
 	arena.capacity = capacity;
 	if (status != COM_STATUS_OOM || compiler->error_count != 0 || source->report.error_count != 0) {
 		test_fail("checker propagates failure to allocate an out-of-memory diagnostic");

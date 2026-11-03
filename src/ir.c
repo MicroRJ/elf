@@ -2,14 +2,62 @@
 // See Copyright Notice In elf.h
 //
 
-// README: IR node constructors are named ir_new_<kind>.
-
-static Ir ir_alloc(IrEmitter *emitter, SourceSite site, IrKind kind)
+static IrNode ir_error_sentinel =
 {
-	IrNode *ir = arena_push_zero(emitter->module->arena, sizeof(*ir), _Alignof(IrNode));
-	ir->kind = kind;
-	ir->site = site;
-	return ir;
+	.kind = IR_ERROR,
+	.status = COM_STATUS_REPORTED,
+};
+
+static IrNode ir_oom_sentinel =
+{
+	.kind = IR_ERROR,
+	.status = COM_STATUS_OOM,
+};
+
+static Com_Status ir_module_init(IrModule *module, Arena *arena) {
+	zero_memory(module, sizeof(*module));
+	module->arena = arena;
+	return COM_STATUS_OK;
+}
+
+// TODO(RJ): module should come first!
+// TODO(RJ): why store the ast still?
+static IrFunction *ir_reserve_function(Com_Source *source, IrModule *module, IrFunction *parent, Ast ast)
+{
+	ASSERT(module);
+	ASSERT(source);
+	ASSERT(ast);
+	ASSERT(ast->kind == AST_FUNCTION);
+	IrFunction *func = arena_push_zero(module->arena, sizeof(*func), _Alignof(IrFunction));
+	func->parent = parent;
+	func->ast = ast;
+	func->source = source;
+	func->index = IR_FUNCTION_INDEX_INVALID;
+	func->site = ast->site;
+	func->variadic = ast->function.variadic;
+	ASSERT(!ast->function.ir);
+	ast->function.ir = func;
+	if (module->last_function)
+	{
+		module->last_function->next = func;
+	}
+	else
+	{
+		module->first_function = func;
+	}
+	module->last_function = func;
+	module->function_count += 1;
+	return func;
+}
+
+static void ir_report_error(IrEmitter *emitter, elf_ErrorCode error, SourceSite site, const char *format, ...)
+{
+	ASSERT(emitter->function);
+	ASSERT(emitter->function->source);
+	va_list args;
+	va_start(args, format);
+	reportv(emitter->function->source, error, ERROR_ERROR, ERROR_PHASE_LOWERING, site, format, args);
+	va_end(args);
 }
 
 static IrArray ir_array_alloc(IrEmitter *emitter, u32 count)
@@ -18,6 +66,113 @@ static IrArray ir_array_alloc(IrEmitter *emitter, u32 count)
 	array.items = arena_push_zero(emitter->module->arena, sizeof(*array.items) * count, _Alignof(Ir));
 	array.count = count;
 	return array;
+}
+
+static IrQueue ir_queue_begin(IrEmitter *emitter)
+{
+	IrQueue block = {};
+	block.emitter = emitter;
+	block.start = emitter->ir_stack_index;
+	block.count = 0;
+	return block;
+}
+
+static void ir_queue_push(IrQueue *stack, Ir ir)
+{
+	IrEmitter *emitter = stack->emitter;
+	ASSERT(emitter);
+	ASSERT(emitter->ir_stack_index == stack->start + stack->count);
+	ASSERT(emitter->ir_stack_index < emitter->ir_stack_size);
+	emitter->ir_stack[emitter->ir_stack_index++] = ir;
+	stack->count += 1;
+}
+
+static IrArray ir_queue_end(IrQueue *frame)
+{
+	IrEmitter *emitter = frame->emitter;
+	ASSERT(emitter);
+	ASSERT(emitter->ir_stack_index == frame->start + frame->count);
+
+	emitter->ir_stack_index -= frame->count;
+
+	IrArray items = ir_array_alloc(emitter, frame->count);
+	if (items.count) {
+		copy_memory(items.items, emitter->ir_stack + emitter->ir_stack_index, sizeof(*items.items) * items.count);
+	}
+
+	ASSERT(emitter->ir_stack_index == frame->start);
+	frame->count = 0;
+	return items;
+}
+
+static IrDefer *ir_defer_begin(IrEmitter *emitter)
+{
+	ASSERT(emitter->function);
+	IrDefer *previous_defer_start = emitter->defer_scope_start;
+	emitter->defer_scope_start = emitter->defer;
+	return previous_defer_start;
+}
+
+static void ir_defer_end(IrEmitter *emitter, IrDefer *previous_defer_start)
+{
+	ASSERT(emitter->function);
+	emitter->defer = emitter->defer_scope_start;
+	emitter->defer_scope_start = previous_defer_start;
+}
+
+static void ir_defer_push_ir(IrEmitter *emitter, Ir ir)
+{
+	ASSERT(emitter->function);
+	ASSERT(ir);
+	IrDefer *defer = arena_push_zero(emitter->module->arena, sizeof(*defer), _Alignof(IrDefer));
+	defer->previous = emitter->defer;
+	defer->ir = ir;
+	emitter->defer = defer;
+}
+
+static void ir_defer_emit(IrEmitter *emitter, IrQueue *items, IrDefer *start)
+{
+	ASSERT(emitter->function);
+	for (IrDefer *defer = emitter->defer; defer != start; defer = defer->previous)
+	{
+		ASSERT(defer);
+		ASSERT(defer->ir);
+		ir_queue_push(items, defer->ir);
+	}
+}
+
+static void ir_loop_push(IrEmitter *emitter, IrLoopFrame *loop)
+{
+	ASSERT(emitter->function);
+	loop->parent = emitter->loop;
+	emitter->loop = loop;
+}
+
+static void ir_loop_pop(IrEmitter *emitter, IrLoopFrame *loop)
+{
+	ASSERT(emitter->function);
+	ASSERT(emitter->loop == loop);
+	emitter->loop = loop->parent;
+}
+
+static IrLoopFrame ir_loop_current(IrEmitter *emitter, SourceSite site)
+{
+	ASSERT(emitter->function);
+	if (!emitter->loop)
+	{
+		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "break and continue must be inside a loop");
+		IrLoopFrame loop = {};
+		return loop;
+	}
+	return *emitter->loop;
+}
+
+static Ir ir_alloc(IrEmitter *emitter, SourceSite site, IrKind kind)
+{
+	IrNode *ir = arena_push_zero(emitter->module->arena, sizeof(*ir), _Alignof(IrNode));
+	ir->kind = kind;
+	ir->site = site;
+	return ir;
 }
 
 static Ir ir_new_nullary(IrEmitter *emitter, SourceSite site, IrKind kind)
@@ -74,7 +229,7 @@ static Ir ir_new_native_function(IrEmitter *emitter, SourceSite site, u32 native
 	return ir;
 }
 
-static Ir ir_new_function(IrEmitter *emitter, SourceSite site, IrFunction *function)
+static Ir ir_new_function_ref(IrEmitter *emitter, SourceSite site, IrFunction *function)
 {
 	ASSERT(function);
 	Ir ir = ir_alloc(emitter, site, IR_FUNCTION);
@@ -89,6 +244,9 @@ static Ir ir_new_recurse(IrEmitter *emitter, SourceSite site)
 
 static Ir ir_new_tuple(IrEmitter *emitter, SourceSite site, IrArray items)
 {
+	for (u32 i = 0; i < items.count; ++ i) {
+		ASSERT(items.items[i] != 0);
+	}
 	Ir ir = ir_alloc(emitter, site, IR_TUPLE);
 	ir->ir_tuple = items;
 	return ir;

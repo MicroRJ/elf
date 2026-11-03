@@ -109,6 +109,8 @@ typedef struct
 }
 Ast_List;
 
+// TODO(RJ): only identifiers should be able to point to entities directly...
+// Other things can be a direct value
 // IMMUTABLE once constructed.
 struct Ast_T
 {
@@ -116,8 +118,9 @@ struct Ast_T
 	SourceSite           site;
 
 	// metadata
-	struct Entity     *entity;
-	u32            param_slot;
+	struct Entity        *entity;
+	struct Scope         *scope;
+	u32                   param_slot;
 
 	// if this is an expression, whether it appears on the right hand side
 	// of a static declaration
@@ -158,6 +161,7 @@ struct Ast_T
 		struct
 		{
 			b32 constant;
+			// TODO(RJ): rename to dest
 			Ast name;
 			Ast type;
 			Ast expr;
@@ -296,13 +300,11 @@ static inline b32 ast_is_error(Ast ast)
 	return ast && ast->kind == AST_ERROR;
 }
 
-static Ast ast_ensure_kind(Ast ast, Ast_Kind type)
+static inline Com_Status ast_status(Ast ast)
 {
-	if (!ast || ast_is_error(ast) || ast->kind != type) {
-		return ERROR_AST;
-	}
-
-	return ast;
+	ASSERT(ast_is_error(ast));
+	ASSERT(ast->status != COM_STATUS_OK);
+	return ast->status;
 }
 
 static inline const char *ast_type_name(Ast_Kind type)

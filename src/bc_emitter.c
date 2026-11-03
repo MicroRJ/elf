@@ -622,6 +622,7 @@ static i32 emit_expr_block(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 // Todo, remove nout
 static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 {
+	ASSERT(expr);
 	ASSERT(nout <= 1 || (expr->kind == IR_MULTI_LOCAL || expr->kind == IR_CALL) || !"Dayan - internal error, only call expressions and multi-locals are allowed to have more than one output");
 
 	SourceSite site = expr->site;
@@ -640,6 +641,7 @@ static i32 emit_expr(BcEmitter *emitter, Ir expr, i32 out, u32 nout)
 
 			i32 first_slot = ir_stack_top(emitter);
 			for (u32 i = 0; i < expr->ir_tuple.count; ++ i) {
+				ASSERT(expr->ir_tuple.items[i] != 0);
 				i32 expr_slot = emit_expr(emitter, expr->ir_tuple.items[i], NO_SLOT, 1);
 				ASSERT(first_slot + i == expr_slot);
 			}
@@ -1143,7 +1145,7 @@ static void install_function(BcEmitter *emitter, IrFunction *function, u32 proto
 	prototype->allocation_size = allocation_size;
 	prototype->source = function->source->runtime_source;
 	prototype->variadic = function->variadic;
-	prototype->arity = function->param_count;
+	prototype->arity = function->params.count;
 	prototype->captures = function->capture_count;
 	prototype->stack_size = emitter->stack_size;
 	prototype->integer_constant_count = emitter->integer_constant_count;
@@ -1191,13 +1193,13 @@ static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
 	ASSERT(emitter);
 	ASSERT(function);
 	ASSERT(function->index != IR_FUNCTION_INDEX_INVALID);
-	ASSERT(!function->ast || function->ast->function.params.count == function->param_count);
+	ASSERT(!function->ast || function->ast->function.params.count == function->params.count);
 
 	emitter->stack_size = 1;
 	emitter->stack_top = 1;
-	for (u32 i = 0; i < function->param_count; ++i)
+	for (u32 i = 0; i < function->params.count; ++i)
 	{
-		Ir param = function->params[i];
+		Ir param = function->params.items[i];
 		ASSERT(param && param->kind == IR_LOCAL);
 		ASSERT(!slot_is_valid(param->ir_local.slot));
 

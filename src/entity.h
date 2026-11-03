@@ -20,9 +20,10 @@ Com_Type;
 	X(ERROR,           "error")           \
 	X(TYPE,            "type")            \
 	X(TYPE_RULE,       "type_rule")       \
+	X(LOCAL,           "local")           \
+	X(IR,              "ir")              \
 	X(AST,             "ast")             \
 	X(RESOLVING,       "resolving")       \
-	X(NIL,             "nil")             \
 	X(NUMBER,          "number")          \
 	X(INTEGER,         "integer")         \
 	X(STRING,          "string")          \
@@ -60,6 +61,7 @@ typedef struct
 	union
 	{
 		Com_Status    status;
+		Ir            ir;
 		struct Ast_T *ast;
 		// Todo, rename to type
 		Com_Type     *com_type;
@@ -68,25 +70,33 @@ typedef struct
 		struct Atom  *string;
 		Scope        *exports;
 		Scope        *scope;
+		IrFunction   *ir_function;
 		struct Ast_T *function;
 		u32           native_function_index;
+		struct
+		{
+			struct Ast_T  *function;
+			IrFunction    *ir_function;
+			struct IrNode *storage;
+			b32            assigned;
+		}
+		local;
 	};
 }
 Com_Value;
 
 typedef enum
 {
-	ENTITY_NONE = 0,
-	ENTITY_ERROR,
-	ENTITY_STATIC,
-	ENTITY_LOCAL,
+	ENTITY_TAG_NONE = 0,
+	ENTITY_TAG_CONSTANT = 1 << 0,
+	ENTITY_TAG_STATIC   = 1 << 1,
+	ENTITY_TAG_EXPORTED = 1 << 2,
 }
-EntityKind;
+Entity_Tags;
 
 struct Entity
 {
-	EntityKind      kind;
-	Com_Status      status;
+	Com_Status    status;
 
 	u32            count;
 	Entity        *first;
@@ -94,26 +104,13 @@ struct Entity
 
 	Entity         *next;
 
+	Entity_Tags     tags;
+
 	struct Atom    *name;
 	Scope          *scope;
+	struct Ast_T   *declaration;
+	Com_Value       value;
 	b32             referenced;
-	union
-	{
-		struct
-		{
-			struct Ast_T *declaration;
-			Com_Value     value;
-		}
-		en_static;
-		struct
-		{
-			struct Ast_T  *declaration;
-			struct Ast_T  *function;
-			struct IrNode *storage;
-			b32            assigned;
-		}
-		en_local;
-	};
 };
 
 static Entity entity_error_sentinel;
@@ -134,7 +131,13 @@ static inline Entity *entity_from_status(Com_Status status)
 
 static inline b32 entity_is_error(const Entity *entity)
 {
-	return entity && entity->kind == ENTITY_ERROR;
+	return entity && entity->status != COM_STATUS_OK;
+}
+
+static inline Com_Status entity_status(const Entity *entity)
+{
+	ASSERT(entity_is_error(entity));
+	return entity->status;
 }
 
 static b32 entity_is_constant(const Entity *entity);
@@ -153,5 +156,5 @@ struct Scope
 
 static Scope *scope_create(Arena *arena, Scope *parent, struct Ast_T *owner, Com_Source *source);
 static Entity *scope_find_current(Scope *scope, struct Atom *name);
-static Entity *scope_find(Scope *scope, Scope *static_boundary, struct Atom *name);
+static Entity *scope_find(Scope *scope, struct Atom *name);
 #endif

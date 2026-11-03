@@ -25,11 +25,12 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	result.source->ast = file;
 	result.source->state = COM_SOURCE_PARSED;
 
-	if (!ast_is_error(file)) {
-		Com_Status status = check_source(result.source);
-		result.source->state = COM_SOURCE_CHECKED;
-		if (status == COM_STATUS_OK) {
-			result.module = ir_emit_module(result.source);
+	if (!ast_is_error(file))
+	{
+		result.module = arena_push_zero(arena, sizeof(*result.module), _Alignof(IrModule));
+		ir_module_init(result.module, arena);
+		if (check_source(result.module, result.source) != COM_STATUS_OK) {
+			result.module = 0;
 		}
 	}
 	return result;
@@ -198,7 +199,9 @@ static void test_ir_rejects_assignment_to_constant(elf_State *state)
 		test_fail("assignment to constant lowers to an error");
 	}
 	Ast declaration = result.source->ast->function.body->block.items[0];
-	Ast names = ast_ensure_kind(declaration->decl.name, AST_TUPLE);
+	Ast names = declaration->decl.name;
+	ASSERT(names);
+	ASSERT(names->kind == AST_TUPLE);
 	if (!names->tuple.items[0]->entity || !entity_is_constant(names->tuple.items[0]->entity)) {
 		test_fail("constant declaration marks its entity constant");
 	}
@@ -535,7 +538,7 @@ static void test_ir_lowers_static_forward_reference(elf_State *state)
 	Atom *second_name = atom_from_data_size(result.compiler->atoms, "second", sizeof("second") - 1);
 	Entity *first = result.source->scope ? scope_find_current(result.source->scope, first_name) : 0;
 	Entity *second = result.source->scope ? scope_find_current(result.source->scope, second_name) : 0;
-	if (!first || !second || first->kind != ENTITY_STATIC || second->kind != ENTITY_STATIC) {
+	if (!first || !second) {
 		test_fail("checker retains source statics in the source scope");
 	}
 	Ir body = ir_test_main_body(result.module);

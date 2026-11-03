@@ -22,8 +22,8 @@
 #include "token.h"
 #include "atom.c"
 #include "ast.h"
-#include "entity.h"
 #include "ir.h"
+#include "entity.h"
 
 static b32 report(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, ...);
 static b32 reportv(Com_Source *source, elf_ErrorCode code, ErrorSeverity severity, ErrorPhase phase, SourceSite site, const char *format, va_list args);
@@ -32,16 +32,11 @@ static b32 reportv(Com_Source *source, elf_ErrorCode code, ErrorSeverity severit
 #include "source_diagnostics.c"
 #include "lexer.c"
 #include "parser.c"
-#include "entity.c"
+#include "ir.c"
 #include "checker.c"
-#include "ir_emitter.c"
 #include "bc_emitter.c"
 
-
-static void log_report(Compiler *compiler);
-static Compiler *new_compiler(Arena *arena);
 static Com_Status inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table);
-
 
 static Compiler *new_compiler(Arena *arena)
 {
@@ -109,9 +104,9 @@ static Compiler *new_compiler(Arena *arena)
 	};
 
 	for (u32 i = 0; i < ARRAY_COUNT(type_decls); ++ i) {
-		Entity *en = scope_declare(com->globals, ENTITY_STATIC, atom_from_data(com->atoms, type_decls[i].name));
-		en->en_static.value.type = COM_VALUE_TYPE;
-		en->en_static.value.com_type = type_decls[i].type;
+		Entity *en = scope_declare(com->globals, atom_from_data(com->atoms, type_decls[i].name), ENTITY_TAG_STATIC | ENTITY_TAG_CONSTANT);
+		en->value.type = COM_VALUE_TYPE;
+		en->value.com_type = type_decls[i].type;
 	}
 
 
@@ -130,20 +125,19 @@ static Com_Status inject_symbol_table(Compiler *compiler, Scope *scope, Com_Sour
 	Entity *existing = scope_find_current(scope, name);
 	if (existing)
 	{
-		if (existing->kind != ENTITY_STATIC || existing->en_static.declaration || existing->en_static.value.type != COM_VALUE_SCOPE)
+		if (existing->declaration || existing->value.type != COM_VALUE_SCOPE)
 		{
 			return report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
 		}
-		return inject_symbols(compiler, existing->en_static.value.scope, source, field->table);
+		return inject_symbols(compiler, existing->value.scope, source, field->table);
 	}
 
-	Entity *entity = scope_declare(scope, ENTITY_STATIC, name);
+	Entity *entity = scope_declare(scope, name, ENTITY_TAG_STATIC | ENTITY_TAG_CONSTANT);
 	if (!entity)
 	{
 		return COM_STATUS_OOM;
 	}
 
-	// TODO(RJ):
 	ASSERT(entity->count == 1);
 
 	Scope *members = scope_create(compiler->arena, scope, 0, 0);
@@ -151,8 +145,8 @@ static Com_Status inject_symbol_table(Compiler *compiler, Scope *scope, Com_Sour
 	{
 		return COM_STATUS_OOM;
 	}
-	entity->en_static.value.type = COM_VALUE_SCOPE;
-	entity->en_static.value.scope = members;
+	entity->value.type = COM_VALUE_SCOPE;
+	entity->value.scope = members;
 	return inject_symbols(compiler, members, source, field->table);
 }
 
@@ -163,14 +157,14 @@ static Com_Status inject_symbol_value(Compiler *compiler, Scope *scope, Com_Sour
 		return report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "conflicts with an existing host symbol");
 	}
 
-	Entity *entity = scope_declare(scope, ENTITY_STATIC, name);
+	Entity *entity = scope_declare(scope, name, ENTITY_TAG_STATIC | ENTITY_TAG_CONSTANT);
 	if (!entity)
 	{
 		return COM_STATUS_OOM;
 	}
 	ASSERT(entity->count == 1);
 
-	Com_Value *value = &entity->en_static.value;
+	Com_Value *value = &entity->value;
 	switch (field->type)
 	{
 		case ELF_SYMBOL_INTEGER:
@@ -223,6 +217,8 @@ static Com_Status inject_symbol_value(Compiler *compiler, Scope *scope, Com_Sour
 	return COM_STATUS_OK;
 }
 
+// TODO(RJ): the only reason this takes a source is for error reporting, the we should have a compiler wide
+// dummy source for 'sourceless' diagnostics.
 static Com_Status inject_symbols(Compiler *compiler, Scope *scope, Com_Source *source, elf_SymTable *table)
 {
 	ASSERT(compiler);
@@ -472,17 +468,18 @@ static Com_Source *load_source(Compiler *com, Com_Source *req, SourceSite site, 
 	return source;
 }
 
-static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Source *source)
+static Com_Status parse_source_recursively(Compiler *compiler, Parser *parser, Com_Source *source)
 {
 	ASSERT(source);
 	if (source->state != COM_SOURCE_UNPARSED) {
-		return source->ast;
+		return COM_STATUS_OK;
 	}
 
 	Ast ast = parser_parse_source(parser, source);
 	if (ast_is_error(ast)) {
-		return ast;
+		return COM_STATUS_REPORTED;
 	}
+
 	ASSERT(ast->kind == AST_FUNCTION);
 	ASSERT(!ast->function.parent);
 	source->ast = ast;
@@ -498,16 +495,16 @@ static Ast parse_source_recursively(Compiler *compiler, Parser *parser, Com_Sour
 		Atom *import_path_requested = import_ast->import.path;
 		Com_Source *imported_source = load_source(compiler, source, import_ast->site, import_path_requested);
 		if (!imported_source) {
-			return ERROR_AST;
+			return COM_STATUS_REPORTED;
 		}
 		import_ast->import.target = imported_source;
-		Ast imported_ast = parse_source_recursively(compiler, parser, imported_source);
-		if (ast_is_error(imported_ast)) {
-			return imported_ast;
+		Com_Status status = parse_source_recursively(compiler, parser, imported_source);
+		if (status != COM_STATUS_OK) {
+			return status;
 		}
 	}
 
-	return ast;
+	return COM_STATUS_OK;
 }
 
 static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *arena, elf_StrSlice name, elf_StrSlice source)
@@ -534,37 +531,47 @@ static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *a
 	}
 
 	Com_Source *com_source = alloc_source(com, source_name, source_name, runtime_source, (dy_String) {0});
-	if (!com_source)
-	{
+	if (!com_source) {
 		return 0;
 	}
 
-	elf_Prototype *entry = 0;
 	Com_Status inject_status = inject_symbols(com, com->globals, com_source, com->target->symbols);
-	if (inject_status == COM_STATUS_OK && symbols != com->target->symbols)
-	{
+	if (inject_status == COM_STATUS_OK && symbols != com->target->symbols) {
 		inject_status = inject_symbols(com, com->globals, com_source, symbols);
 	}
-	if (inject_status == COM_STATUS_OOM)
-	{
+
+	if (inject_status != COM_STATUS_OK) {
 		report(com_source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, (SourceSite) {0}, "could not inject environment symbols");
+		return 0;
 	}
-	if (inject_status == COM_STATUS_OK)
-	{
-		Parser parser = {0};
-		if (parser_init(&parser))
-		{
-			Ast ast = parse_source_recursively(com, &parser, com_source);
-			parser_destroy(&parser);
-			if (!ast_is_error(ast) && !com->error_count && check_source(com_source) == COM_STATUS_OK)
-			{
-				IrModule *ir_module = ir_emit_module(com_source);
-				if (ir_module && !com->error_count) {
-					entry = bc_emit_module(com->target, ir_module);
-				}
-			}
-		}
+
+	// TODO(RJ): why the fuck do we need to preinitialize the parser, just make this one
+	// atomic parse operation ...
+	Parser parser = {0};
+	if (!parser_init(&parser)) {
+		return 0;
 	}
+
+	if (parse_source_recursively(com, &parser, com_source) != COM_STATUS_OK) {
+		log_report(com);
+		return 0;
+	}
+
+	// NOTE(RJ): only destroys the scratch arena ...
+	parser_destroy(&parser);
+
+	IrModule ir_module;
+	if (ir_module_init(&ir_module, com->arena) != COM_STATUS_OK) {
+		log_report(com);
+		return 0;
+	}
+
+	if (check_source(&ir_module, com_source) != COM_STATUS_OK) {
+		log_report(com);
+		return 0;
+	}
+
+	elf_Prototype *entry = bc_emit_module(com->target, &ir_module);
 	log_report(com);
 	return entry;
 }

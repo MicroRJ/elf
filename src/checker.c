@@ -2,20 +2,135 @@
 // See Copyright Notice In elf.h
 //
 
+static Entity entity_error_sentinel =
+{
+	.status = COM_STATUS_REPORTED,
+};
+
+static Entity entity_oom_sentinel =
+{
+	.status = COM_STATUS_OOM,
+};
+
+static b32 entity_is_constant(const Entity *entity)
+{
+	ASSERT(entity);
+	ASSERT(!entity_is_error(entity));
+	return (entity->tags & ENTITY_TAG_CONSTANT) != 0;
+}
+
+static b32 entity_is_exported(const Entity *entity)
+{
+	ASSERT(entity);
+	return (entity->tags & ENTITY_TAG_EXPORTED) != 0;
+}
+
+static Scope *scope_create(Arena *arena, Scope *parent, struct Ast_T *owner, Com_Source *source)
+{
+	ASSERT(!parent || !parent->source || parent->source == source);
+	Scope *scope = arena_push_zero(arena, sizeof(*scope), _Alignof(Scope));
+	if (scope)
+	{
+		scope->arena = arena;
+		scope->parent = parent;
+		scope->owner = owner;
+		scope->source = source;
+	}
+	return scope;
+}
+
+// Todo, not sure if we should really consider buckets for entities with the same name ...
+static Entity *scope_find_current(Scope *scope, Atom *name)
+{
+	for (u32 i = 0; i < scope->count; ++i)
+	{
+		Entity *entity = scope->entities[i];
+
+		if (entity->name == name) {
+			ASSERT(entity->count >= 1);
+			ASSERT(entity->count != 1 || (entity->first == entity && entity->last == entity));
+			return entity;
+		}
+	}
+	return 0;
+}
+
+static Entity *scope_find(Scope *scope, Atom *name)
+{
+	for (Scope *current = scope; current; current = current->parent)
+	{
+		Entity *entity = scope_find_current(current, name);
+		if (entity) {
+			return entity;
+		}
+	}
+	return 0;
+}
+
+static Entity *scope_declare(Scope *scope, Atom *name, Entity_Tags tags)
+{
+	Entity *anchor = scope_find_current(scope, name);
+	ASSERT(!anchor || (anchor->count >= 1 && anchor->first == anchor));
+
+	if (scope->count == scope->capacity)
+	{
+		u32 capacity = scope->capacity ? scope->capacity * 2 : 16;
+		Entity **entities = arena_push(scope->arena, sizeof(*entities) * capacity, _Alignof(Entity *));
+		if (!entities) {
+			return 0;
+		}
+		if (scope->count) {
+			copy_memory(entities, scope->entities, sizeof(*entities) * scope->count);
+		}
+		scope->entities = entities;
+		scope->capacity = capacity;
+	}
+
+	Entity *entity = arena_push_zero(scope->arena, sizeof(*entity), _Alignof(Entity));
+
+	if (!entity) {
+		return 0;
+	}
+
+	if (!anchor) {
+		anchor = entity;
+	}
+	anchor->count ++;
+	entity->next = anchor->last;
+	anchor->last = entity;
+
+	entity->name = name;
+	entity->scope = scope;
+	entity->tags = tags;
+	entity->first = entity;
+	entity->last  = entity;
+
+	scope->entities[scope->count ++] = entity;
+	return entity;
+}
+
 typedef struct
 {
-	Scope    *globals;
-	Scope    *source_scope;
-	Scope    *active_scope;
-	Scope    *static_boundary;
-	Ast       current_function;
+	IrModule    *module;
+	IrEmitter   *emitter;
+	Com_Source  *source;
+	IrFunction  *function;
+	Scope       *active_scope;
 }
 Checker;
 
-static Com_Status check_stat(Checker *checker, Ast ast);
-static Com_Value resolve_static_entity(Checker *checker, Entity *entity);
+static Com_Value ensure_entity_value(Checker *checker, Entity *entity);
+static Com_Status check_source(IrModule *module, Com_Source *source);
+static Com_Status check_stat(Checker *checker, IrQueue *items, Ast ast);
 static Com_Value check_expr(Checker *checker, Ast expr);
-static Com_Status check_block_stat(Checker *checker, Ast stat);
+static Ir check_ir(Checker *checker, Ast expr);
+static Ir check_block(Checker *checker, Ast stat);
+static Ir check_for(Checker *checker, Ast stat);
+static Ir check_range_for(Checker *checker, Ast stat);
+static Com_Status prepare_ast(Checker *checker, Ast ast);
+static Com_Status prepare_scope(Checker *checker, Scope *scope, Ast_Array stats);
+static Com_Status check_static_functions(Checker *checker, Ast_Array stats);
+static Com_Status check_function(Checker *checker, IrFunction *function);
 
 static Com_Value com_value_error(Com_Status status)
 {
@@ -29,6 +144,15 @@ static Com_Status com_value_status(Com_Value value)
 	return value.type == COM_VALUE_ERROR ? value.status : COM_STATUS_OK;
 }
 
+static Com_Value com_value_ir(Ir ir)
+{
+	ASSERT(ir);
+	if (ir_is_error(ir)) {
+		return com_value_error(ir_status(ir));
+	}
+	return (Com_Value) { .type = COM_VALUE_IR, .ir = ir };
+}
+
 static Com_Status checker_report(Com_Source *source, elf_ErrorCode error, ErrorSeverity severity, SourceSite site, const char *format, ...)
 {
 	va_list args;
@@ -38,6 +162,7 @@ static Com_Status checker_report(Com_Source *source, elf_ErrorCode error, ErrorS
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
+// TODO(RJ): why the fuck are we routing out of memory errors to the fucking diagnostics system!
 static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 {
 	return report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
@@ -61,30 +186,40 @@ static Com_Status check_assign_dest(Checker *checker, Ast dest)
 	if (dest->kind == AST_IDENT)
 	{
 		ASSERT(dest->entity);
-		if (dest->entity->kind == ENTITY_STATIC) {
-			return checker_report(checker->source_scope->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "static '%s' is read-only", atom_data(dest->identifier));
+		if (dest->entity->tags & ENTITY_TAG_STATIC) {
+			return checker_report(checker->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "static '%s' is read-only", atom_data(dest->identifier));
 		}
 	}
 	return COM_STATUS_OK;
 }
 
-// TODO(RJ): the only way this fails is by running out of memory, just return 0 in that case
-static Com_Status push_scope(Checker *checker, Ast owner, Scope **result)
+static Scope *push_scope(Checker *checker, Ast owner)
 {
 	ASSERT(checker);
 	ASSERT(checker->active_scope);
 	ASSERT(owner);
-	ASSERT(result);
-	ASSERT(checker->source_scope);
-	ASSERT(checker->active_scope->source == checker->source_scope->source);
-	Scope *scope = scope_create(checker->active_scope->arena, checker->active_scope, owner, checker->source_scope->source);
-	if (scope) {
-		checker->active_scope = scope;
-		*result = scope;
-		return COM_STATUS_OK;
+	ASSERT(!checker->active_scope->source || checker->active_scope->source == checker->source);
+	Scope *scope = scope_create(checker->active_scope->arena, checker->active_scope, owner, checker->source);
+	if (!scope)
+	{
+		checker_out_of_memory(checker->source, owner->site);
+		return 0;
 	}
-	*result = 0;
-	return checker_out_of_memory(checker->source_scope->source, owner->site);
+	ASSERT(!owner->scope);
+	owner->scope = scope;
+	checker->active_scope = scope;
+	return scope;
+}
+
+static Scope *enter_scope(Checker *checker, Ast owner)
+{
+	ASSERT(checker);
+	ASSERT(checker->active_scope);
+	ASSERT(owner);
+	ASSERT(owner->scope);
+	ASSERT(owner->scope->parent == checker->active_scope);
+	checker->active_scope = owner->scope;
+	return owner->scope;
 }
 
 static void pop_scope(Checker *checker, Scope *scope)
@@ -94,319 +229,347 @@ static void pop_scope(Checker *checker, Scope *scope)
 	checker->active_scope = scope->parent;
 }
 
-// TODO(RJ): remove local stuff from here!
-static Entity *declare_entity(Checker *checker, Scope *scope, EntityKind kind, Atom *name, SourceSite site)
+static Entity *declare_entity(Scope *scope, SourceSite site, Atom *name, Entity_Tags tags, Com_Value value)
 {
-	Entity *entity = scope_declare(scope, kind, name);
-	if (!entity)
-	{
+	ASSERT(name);
+	ASSERT(scope);
+	ASSERT(value.type != COM_VALUE_NONE);
+
+	Entity *entity = scope_declare(scope, name, tags);
+	if (!entity) {
+		// TODO(RJ): why the fuck are we routing OOM errors to the diagnostics reporting path?
 		return entity_from_status(checker_out_of_memory(scope->source, site));
 	}
 
 	if (entity->count != 1)
 	{
-		elf_ErrorCode error = kind == ENTITY_STATIC ? ELF_ERROR_DUPLICATE_STATIC_DECLARATION : ELF_ERROR_DUPLICATE_DECLARATION;
-		Com_Status status = checker_report(scope->source, error, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
+		Com_Status status = checker_report(scope->source, ELF_ERROR_DUPLICATE_DECLARATION, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
 		return entity_from_status(status);
 	}
 
-	if (kind == ENTITY_LOCAL)
-	{
-		entity->en_local.function = checker->current_function;
-	}
-
+	entity->value = value;
 	return entity;
 }
 
-static Com_Status declare_statics(Checker *checker, Scope *scope, Ast_Array stats)
-{
-	for (u32 i = 0; i < stats.count; ++ i) {
-		Ast ast_decl = stats.items[i];
-		if (ast_decl->kind != AST_STATIC_DECL) {
-			continue;
-		}
-		Ast ast_name = ast_decl->static_decl.name;
-		Ast ast_expr = ast_decl->static_decl.expr;
-		ASSERT(ast_name);
-		ASSERT(ast_name->kind == AST_IDENT);
-		ASSERT(ast_name->atom);
-		ASSERT(ast_expr);
-		ASSERT(!ast_name->entity);
-		ASSERT(!ast_decl->entity);
-
-		Entity *entity = declare_entity(checker, scope, ENTITY_STATIC, ast_name->atom, ast_name->site);
-		if (entity_is_error(entity)) {
-			return entity->status;
-		}
-		entity->en_static.declaration = ast_decl;
-		entity->en_static.value = (Com_Value) {.type = COM_VALUE_AST, .ast = ast_expr};
-		ast_name->entity = entity;
-		ast_decl->entity = entity;
-	}
-	return COM_STATUS_OK;
-}
-
-static Com_Status check_source(Com_Source *source)
-{
-	ASSERT(source);
-	Compiler *compiler = source->compiler;
-	ASSERT(compiler);
-	ASSERT(compiler->globals);
-	Ast root = source->ast;
-	ASSERT(root);
-	ASSERT(root->kind == AST_FUNCTION);
-	ASSERT(!root->function.parent);
-	ASSERT(root->function.body);
-	ASSERT(root->function.body->kind == AST_BLOCK_STAT);
-
-	Checker checker = {0};
-	checker.current_function = root;
-	checker.globals = compiler->globals;
-	checker.source_scope = scope_create(compiler->arena, checker.globals, root, source);
-	if (!checker.source_scope) {
-		return checker_out_of_memory(source, root->site);
-	}
-	checker.active_scope = checker.source_scope;
-	source->scope = checker.source_scope;
-
-	Com_Status status = check_block_stat(&checker, root->function.body);
-	return status;
-}
-
-static Com_Value resolve_static_entity(Checker *checker, Entity *entity)
+static Com_Value ensure_entity_value(Checker *checker, Entity *entity)
 {
 	ASSERT(entity);
-	ASSERT(entity->kind == ENTITY_STATIC);
-	Com_Value value = entity->en_static.value;
-	ASSERT(entity->en_static.declaration || (value.type != COM_VALUE_NONE && value.type != COM_VALUE_AST && value.type != COM_VALUE_RESOLVING));
+	ASSERT(entity->value.type != COM_VALUE_NONE);
+	ASSERT(entity->value.type != COM_VALUE_ERROR);
+	ASSERT(entity->scope);
+
+	Com_Value value = entity->value;
+
 	if (value.type == COM_VALUE_RESOLVING)
 	{
-		Com_Status status = checker_report(entity->scope->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->en_static.declaration->site, "cyclic static definition involving '%s'", atom_data(entity->name));
+		Com_Status status = checker_report(checker->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, ERROR_ERROR, entity->declaration->site, "cyclic static definition involving '%s'", atom_data(entity->name));
 		value = com_value_error(status);
 	}
 	else if (value.type == COM_VALUE_AST)
 	{
 		Ast expr = value.ast;
-		ASSERT(expr || !"Error: internal error, unresolved entity missing expression to resolve");
-		if (expr->kind == AST_FUNCTION)
-		{
-			entity->en_static.value = (Com_Value) {.type = COM_VALUE_FUNCTION, .function = expr};
-		}
-		else
-		{
-			entity->en_static.value.type = COM_VALUE_RESOLVING;
-		}
+		ASSERT(expr);
 
-		// Note, we can lazily resolve entities from different sources
-		Scope *previous_source_scope = checker->source_scope;
-		Scope *previous_active_scope = checker->active_scope;
-		Scope *previous_static_boundary = checker->static_boundary;
-
-		Com_Source *source = entity->scope->source;
-		ASSERT(source);
-		ASSERT(source->scope);
-		checker->source_scope = source->scope;
-		checker->active_scope = entity->scope;
-		checker->static_boundary = entity->scope;
+		entity->value.type = COM_VALUE_RESOLVING;
 
 		value = check_expr(checker, expr);
 
-		checker->source_scope = previous_source_scope;
-		checker->active_scope = previous_active_scope;
-		checker->static_boundary = previous_static_boundary;
-
-		if (value.type == COM_VALUE_NONE)
-		{
-			Com_Status status = checker_report(source, ELF_ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
+		if (value.type == COM_VALUE_NONE) {
+			Com_Status status = checker_report(checker->source, ELF_ERROR_INVALID_STATIC_EXPRESSION, ERROR_ERROR, expr->site, "static definition '%s' does not resolve to a static value", atom_data(entity->name));
 			value = com_value_error(status);
 		}
-		entity->en_static.value = value;
+		entity->value = value;
 	}
 	return value;
 }
 
-static Com_Status resolve_source_scope_lazily(Checker *checker, Com_Source *source, Scope **result)
+static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
 {
-	Compiler *compiler = source->compiler;
-	ASSERT(result);
-	*result = 0;
-	ASSERT(source);
-	ASSERT(source->name);
-	ASSERT(source->path);
-	ASSERT(source->ast);
-	ASSERT(source->ast->kind == AST_FUNCTION);
-	ASSERT(!source->ast->function.parent);
-	ASSERT(source->ast->function.body->kind == AST_BLOCK_STAT);
-	if (source->scope)
-	{
-		*result = source->scope;
-		return COM_STATUS_OK;
-	}
-	source->scope = scope_create(compiler->arena, checker->globals, source->ast, source);
-	if (!source->scope)
-	{
-		return checker_out_of_memory(source, source->ast->site);
-	}
-	Com_Status status = declare_statics(checker, source->scope, source->ast->function.body->block);
-	if (status == COM_STATUS_OK) {
-		*result = source->scope;
-	}
-	return status;
-}
+	ASSERT(entity->value.type == COM_VALUE_LOCAL);
+	Ir local = entity->value.local.storage;
+	ASSERT(local);
+	ASSERT(local->kind == IR_LOCAL);
+	ASSERT(local->ir_local.owner);
+	ASSERT(function);
+	ASSERT(function->parent || !function->first_capture);
 
-static i32 find_parameter_by_name(Ast_Array params, Atom *name)
-{
-	for (u32 i = 0; i < params.count; ++i)
-	{
-		Ast param = params.items[i];
-		ASSERT(param);
-		ASSERT(param->kind == AST_DECL_STAT);
-		ASSERT(param->decl.name);
-		ASSERT(param->decl.name->kind == AST_IDENT);
-		ASSERT(param->decl.name->identifier);
-		if (param->decl.name->identifier == name) {
-			return i;
+	if (local->ir_local.owner == function) {
+		return ir_new_load(emitter, site, local);
+	}
+
+	for (IrCapture *capture = function->first_capture; capture; capture = capture->next) {
+		if (capture->entity == entity) {
+			return ir_new_load_capture(emitter, site, capture);
 		}
 	}
-	return -1;
+
+	ASSERT(function->capture_count < 255);
+
+	IrFunction *parent = function->parent;
+	if (!parent)
+	{
+		ir_report_error(emitter, ELF_ERROR_LOWERING, site, "local '%s' cannot be captured from an unrelated function", atom_data(entity->name));
+		return ERROR_IR;
+	}
+
+	Ir parent_capture = ir_emit_capture(emitter, parent, entity, site);
+	if (ir_is_error(parent_capture)) {
+		return ERROR_IR;
+	}
+
+	IrCapture *capture = arena_push_zero(emitter->module->arena, sizeof(*capture), _Alignof(IrCapture));
+	capture->entity = entity;
+	capture->target = parent_capture;
+	capture->slot = function->capture_count ++;
+	if (function->last_capture) {
+		function->last_capture->next = capture;
+	}
+	else {
+		function->first_capture = capture;
+	}
+	function->last_capture = capture;
+	entity->referenced = true;
+	return ir_new_load_capture(emitter, site, capture);
 }
 
-// TOOD(RJ): imagine writing an interpreter for an interpreter ...
+static Ir ir_emit_entity(IrEmitter *emitter, SourceSite site, Entity *entity)
+{
+	ASSERT(entity);
+	entity->referenced = true;
+
+	Com_Value value = entity->value;
+	switch (value.type)
+	{
+		case COM_VALUE_IR: {
+			return value.ir;
+		}
+		case COM_VALUE_LOCAL:
+		{
+			if (!value.local.storage)
+			{
+				ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "local entity '%s' has no storage", atom_data(entity->name));
+				return ERROR_IR;
+			}
+			return ir_emit_capture(emitter, emitter->function, entity, site);
+		}
+		case COM_VALUE_NUMBER: {
+			return ir_new_num(emitter, site, value.number);
+		}
+		case COM_VALUE_INTEGER: {
+			return ir_new_int(emitter, site, value.integer);
+		}
+		case COM_VALUE_STRING: {
+			return ir_new_atom(emitter, site, value.string);
+		}
+		case COM_VALUE_FUNCTION: {
+			return ir_new_function_ref(emitter, site, value.ir_function);
+		}
+		case COM_VALUE_NATIVE_FUNCTION: {
+			return ir_new_native_function(emitter, site, value.native_function_index);
+		}
+		case COM_VALUE_EXPORTS:
+		{
+			ir_report_error(emitter, ELF_ERROR_LOWERING, site, "source namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
+			return ERROR_IR;
+		}
+		case COM_VALUE_SCOPE:
+		{
+			ir_report_error(emitter, ELF_ERROR_LOWERING, site, "host namespace '%s' cannot be used as a runtime value", atom_data(entity->name));
+			return ERROR_IR;
+		}
+		case COM_VALUE_ERROR: {
+			return ERROR_IR;
+		}
+		case COM_VALUE_NONE:
+		case COM_VALUE_AST:
+		case COM_VALUE_RESOLVING:
+		default:
+		{
+			ir_report_error(emitter, ELF_ERROR_INTERNAL, site, "static entity '%s' has invalid value type '%s'", atom_data(entity->name), com_value_type_name(value.type));
+			return ERROR_IR;
+		}
+	}
+}
+
+static b32 ir_mark_entity_assigned(IrEmitter *emitter, Ast destination)
+{
+	if (!destination || destination->kind != AST_IDENT) {
+		return true;
+	}
+	Entity *entity = destination->entity;
+	ASSERT(entity);
+	if (entity_is_constant(entity))
+	{
+		ir_report_error(emitter, ELF_ERROR_LOWERING, destination->site, "'%s' is constant and cannot be assigned", atom_data(destination->atom));
+		return false;
+	}
+	if (entity->value.type == COM_VALUE_LOCAL) {
+		entity->value.local.assigned = true;
+	}
+	return true;
+}
+
+static IrKind ir_kind_from_ast_kind(Ast_Kind kind)
+{
+	switch (kind)
+	{
+		case AST_AND:              return IR_AND;
+		case AST_OR:               return IR_OR;
+		case AST_NIL_OR:           return IR_NIL_OR;
+		case AST_ADD:              return IR_ADD;
+		case AST_SUB:              return IR_SUB;
+		case AST_MUL:              return IR_MUL;
+		case AST_DIV:              return IR_DIV;
+		case AST_POW:              return IR_POW;
+		case AST_MOD:              return IR_MOD;
+		case AST_EQ:               return IR_EQ;
+		case AST_NOT_EQ:           return IR_NOT_EQ;
+		case AST_LESS_THAN:        return IR_LESS_THAN;
+		case AST_LESS_THAN_EQ:     return IR_LESS_THAN_EQ;
+		case AST_SHIFT_LEFT:       return IR_SHIFT_LEFT;
+		case AST_SHIFT_RIGHT:      return IR_SHIFT_RIGHT;
+		case AST_BITWISE_AND:      return IR_BITWISE_AND;
+		case AST_BITWISE_OR:       return IR_BITWISE_OR;
+		case AST_BITWISE_XOR:      return IR_BITWISE_XOR;
+		case AST_BITWISE_NOT:      return IR_BITWISE_NOT;
+		default:                   return IR_NONE;
+	}
+}
+
+static IrKind ir_kind_from_compound_assign_ast_kind(Ast_Kind kind)
+{
+	switch (kind)
+	{
+		case AST_ADD_ASSIGN: return IR_ADD;
+		case AST_SUB_ASSIGN: return IR_SUB;
+		case AST_MUL_ASSIGN: return IR_MUL;
+		case AST_DIV_ASSIGN: return IR_DIV;
+		case AST_MOD_ASSIGN: return IR_MOD;
+		case AST_XOR_ASSIGN: return IR_BITWISE_XOR;
+		case AST_SHL_ASSIGN: return IR_SHIFT_LEFT;
+		case AST_SHR_ASSIGN: return IR_SHIFT_RIGHT;
+		default:             return IR_NONE;
+	}
+}
+
+static b32 ast_is_call(Ast expr)
+{
+	return expr && expr->kind == AST_CALL;
+}
+
+static Com_Value check_entity(Checker *checker, SourceSite site, Entity *entity)
+{
+	ASSERT(checker);
+	ASSERT(checker->emitter);
+	ASSERT(entity);
+
+	Com_Value value = ensure_entity_value(checker, entity);
+	if (value.type == COM_VALUE_ERROR) {
+		return value;
+	}
+	if (value.type == COM_VALUE_SCOPE || value.type == COM_VALUE_EXPORTS || value.type == COM_VALUE_TYPE || value.type == COM_VALUE_TYPE_RULE) {
+		return value;
+	}
+
+	Ir ir = ir_emit_entity(checker->emitter, site, entity);
+	if (ir_is_error(ir)) {
+		return com_value_error(ir_status(ir));
+	}
+	return com_value_ir(ir);
+}
+
+static Ir check_ir(Checker *checker, Ast expr)
+{
+	Com_Value value = check_expr(checker, expr);
+	if (value.type == COM_VALUE_ERROR) {
+		return ir_from_status(value.status);
+	}
+	if (value.type != COM_VALUE_IR)
+	{
+		ir_report_error(checker->emitter, ELF_ERROR_LOWERING, expr->site, "compiler value '%s' cannot be used as a runtime value", com_value_type_name(value.type));
+		return ERROR_IR;
+	}
+	return value.ir;
+}
+
 static Com_Value check_expr(Checker *checker, Ast expr)
 {
-	Com_Value value = {COM_VALUE_NONE};
 	ASSERT(expr);
+	IrEmitter *emitter = checker->emitter;
+	Com_Value value = {COM_VALUE_NONE};
 
 	switch (expr->kind)
 	{
 		case AST_NONE:
-		case AST_ERROR:
-		case AST_RECURSE:
 		case AST_ELLIPSIS:
 		{
 		}
 		break;
 
+		case AST_ERROR:
+		{
+			value = com_value_error(ast_status(expr));
+		}
+		break;
+
+		case AST_RECURSE:
+		{
+			ASSERT(checker->function);
+			value = com_value_ir(ir_new_recurse(emitter, expr->site));
+		}
+		break;
+
 		case AST_NIL_LITERAL:
 		{
-			value.type = COM_VALUE_NIL;
+			value = com_value_ir(ir_new_nil(emitter, expr->site));
 		}
 		break;
 
 		case AST_INTEGER_LITERAL:
 		{
-			value.type = COM_VALUE_INTEGER;
-			value.integer = expr->integer_value;
+			value = com_value_ir(ir_new_int(emitter, expr->site, expr->integer_value));
 		}
 		break;
 
 		case AST_NUMBER_LITERAL:
 		{
-			value.type = COM_VALUE_NUMBER;
-			value.number = expr->number_value;
+			value = com_value_ir(ir_new_num(emitter, expr->site, expr->number_value));
 		}
 		break;
 
 		case AST_STRING_LITERAL:
 		{
-			value.type = COM_VALUE_STRING;
-			value.string = expr->string_value;
+			value = com_value_ir(ir_new_atom(emitter, expr->site, expr->string_value));
 		}
 		break;
 
 		case AST_FUNCTION:
 		{
-
-			/* Check for missing function bodies */
-			if (!expr->function.body) {
-				Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_MISSING_FUNCTION_BODY, ERROR_ERROR, expr->site, "missing function body");
-				value = com_value_error(status);
-				break;
-			}
-
-			Scope *scope = 0;
-			Com_Status status = push_scope(checker, expr, &scope);
-			if (status != COM_STATUS_OK) {
-				value = com_value_error(status);
-				break;
-			}
-			Ast outer_function = checker->current_function;
-			checker->current_function = expr;
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->function.params.count; ++ i)
+			IrFunction *function = expr->function.ir;
+			if (!function)
 			{
-				Ast param = expr->function.params.items[i];
-				ASSERT(param);
-				ASSERT(param->kind == AST_DECL_STAT);
-				ASSERT(!param->decl.type || param->decl.type->kind == AST_IDENT);
-
-				if (param->decl.type)
-				{
-					Com_Value param_value = check_expr(checker, param->decl.type);
-					if (param_value.type == COM_VALUE_ERROR) {
-						value = param_value;
-						break;
-					}
-					else if (param_value.type != COM_VALUE_TYPE) {
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_NOT_A_TYPE, ERROR_ERROR, param->decl.type->site, "expression does not evaluate to a type");
-						value = com_value_error(status);
-						break;
-					}
-				}
-
-				if (param->decl.expr)
-				{
-					Com_Value param_value = check_expr(checker, param->decl.expr);
-					if (param_value.type == COM_VALUE_ERROR) {
-						value = param_value;
-					}
-				}
-
-				Ast name = param->decl.name;
-				ASSERT(name);
-				ASSERT(name->kind == AST_IDENT);
-				ASSERT(name->atom);
-				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name->identifier, name->site);
-				if (entity_is_error(entity))
-				{
-					value = com_value_error(entity->status);
-				}
-				else
-				{
-					entity->en_local.declaration = param;
-					name->entity = entity;
-				}
-			}
-			if (value.type != COM_VALUE_ERROR) {
-				status = check_stat(checker, expr->function.body);
+				function = ir_reserve_function(checker->source, checker->module, checker->function, expr);
+				Com_Status status = check_function(checker, function);
 				if (status != COM_STATUS_OK) {
 					value = com_value_error(status);
+					break;
 				}
 			}
-			checker->current_function = outer_function;
-			pop_scope(checker, scope);
-
-			if (value.type != COM_VALUE_ERROR) {
-				value.type = COM_VALUE_FUNCTION;
-				value.function = expr;
-			}
+			value = com_value_ir(ir_new_function_ref(emitter, expr->site, function));
 		}
 		break;
 
 		case AST_IMPORT:
 		{
-			if (!expr->import.target)
-			{
-				Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_IMPORT, ERROR_ERROR, expr->site, "import '%s' was not resolved to a source", atom_data(expr->import.path));
+			ASSERT(expr->import.target);
+			Com_Status status = check_source(checker->module, expr->import.target);
+			if (status != COM_STATUS_OK) {
 				value = com_value_error(status);
 			}
-			else
-			{
+			else {
+				ASSERT(expr->import.target->scope);
 				value.type = COM_VALUE_EXPORTS;
-				Com_Status status = resolve_source_scope_lazily(checker, expr->import.target, &value.exports);
-				if (status != COM_STATUS_OK) {
-					value = com_value_error(status);
-				}
+				value.exports = expr->import.target->scope;
 			}
 		}
 		break;
@@ -414,38 +577,18 @@ static Com_Value check_expr(Checker *checker, Ast expr)
 		case AST_IDENT:
 		{
 			Atom *name = expr->identifier;
-
-			Entity *entity = scope_find(checker->active_scope, checker->static_boundary, name);
-			if (entity && entity->kind == ENTITY_LOCAL)
-			{
-				Ast entity_function = entity->en_local.function;
-				for (Ast function = checker->current_function; function && function != entity_function; function = function->function.parent)
-				{
-					if (function->is_static)
-					{
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->site, "static function definitions cannot capture locals");
-						value = com_value_error(status);
-						break;
-					}
-				}
-				if (value.type == COM_VALUE_ERROR)
-				{
-					break;
-				}
+			Entity *entity = expr->entity;
+			if (!entity) {
+				entity = scope_find(checker->active_scope, name);
 			}
-
 			if (!entity)
 			{
-				Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_UNDECLARED_IDENTIFIER, ERROR_ERROR, expr->site, "undeclared identifier '%s'", atom_data(name));
+				Com_Status status = checker_report(checker->source, ELF_ERROR_UNDECLARED_IDENTIFIER, ERROR_ERROR, expr->site, "undeclared identifier '%s'", atom_data(name));
 				value = com_value_error(status);
+				break;
 			}
-			if (value.type != COM_VALUE_ERROR)
-			{
-				expr->entity = entity;
-				if (entity->kind == ENTITY_STATIC) {
-					value = resolve_static_entity(checker, entity);
-				}
-			}
+			expr->entity = entity;
+			value = check_entity(checker, expr->site, entity);
 		}
 		break;
 
@@ -453,69 +596,1283 @@ static Com_Value check_expr(Checker *checker, Ast expr)
 		{
 			ASSERT(expr->binary.x);
 			ASSERT(expr->binary.y);
-			Com_Value left_value = check_expr(checker, expr->binary.x);
-			if (left_value.type == COM_VALUE_ERROR)
-			{
-				value = left_value;
+
+			Com_Value left = check_expr(checker, expr->binary.x);
+			if (left.type == COM_VALUE_ERROR) {
+				value = left;
+				break;
 			}
-			else if (left_value.type == COM_VALUE_SCOPE)
+
+			if (left.type == COM_VALUE_SCOPE)
 			{
 				ASSERT(expr->binary.y->kind == AST_IDENT || expr->binary.y->kind == AST_STRING_LITERAL);
 				ASSERT(expr->binary.y->atom);
-				Entity *entity = scope_find_current(left_value.scope, expr->binary.y->atom);
+				Entity *entity = scope_find_current(left.scope, expr->binary.y->atom);
 				if (!entity)
 				{
-					Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "host namespace has no member named '%s'", atom_data(expr->binary.y->atom));
+					Com_Status status = checker_report(checker->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "host namespace has no member named '%s'", atom_data(expr->binary.y->atom));
 					value = com_value_error(status);
+					break;
 				}
-				else
+				ASSERT(entity->value.type != COM_VALUE_LOCAL);
+				expr->entity = entity;
+				value = check_entity(checker, expr->site, entity);
+				break;
+			}
+
+			if (left.type == COM_VALUE_EXPORTS)
+			{
+				ASSERT(expr->binary.y->kind == AST_IDENT || expr->binary.y->kind == AST_STRING_LITERAL);
+				ASSERT(expr->binary.y->atom);
+				Entity *entity = scope_find_current(left.exports, expr->binary.y->atom);
+				if (!entity)
 				{
-					ASSERT(entity->kind == ENTITY_STATIC);
-					ASSERT(!entity->en_static.declaration);
-					value = entity->en_static.value;
+					Com_Status status = checker_report(checker->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left.exports->source->name), atom_data(expr->binary.y->atom));
+					value = com_value_error(status);
+					break;
+				}
+				if (!entity_is_exported(entity))
+				{
+					Com_Status status = checker_report(checker->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left.exports->source->name));
+					value = com_value_error(status);
+					break;
+				}
+				expr->entity = entity;
+				value = check_entity(checker, expr->site, entity);
+				if (value.type != COM_VALUE_ERROR)
+				{
 					entity->referenced = true;
-					expr->entity = entity;
 				}
+				break;
 			}
-			else if (left_value.type == COM_VALUE_EXPORTS)
-			{
-				ASSERT(expr->binary.y);
-				ASSERT(expr->binary.y->kind == AST_IDENT || expr->binary.y->kind == AST_STRING_LITERAL);
-				ASSERT(expr->binary.y->atom);
-				Entity *entity = scope_find_current(left_value.exports, expr->binary.y->atom);
-				if (!entity)
-				{
-					Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "source '%s' has no static declaration named '%s'", atom_data(left_value.exports->source->name), atom_data(expr->binary.y->atom));
-					value = com_value_error(status);
-				}
-				else if (!entity_is_exported(entity))
-				{
-					Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_STATIC_LOOKUP, ERROR_ERROR, expr->binary.y->site, "static declaration '%s' is private to source '%s'", atom_data(entity->name), atom_data(left_value.exports->source->name));
-					value = com_value_error(status);
-				}
-				else
-				{
-					value = resolve_static_entity(checker, entity);
-					if (value.type != COM_VALUE_ERROR) {
-						entity->referenced = true;
-						expr->entity = entity;
-					}
-				}
+
+			ASSERT(left.type == COM_VALUE_IR);
+			Com_Value right = check_expr(checker, expr->binary.y);
+			if (right.type == COM_VALUE_ERROR) {
+				value = right;
+				break;
 			}
+			ASSERT(right.type == COM_VALUE_IR);
+			value = com_value_ir(ir_new_binary(emitter, expr->site, IR_FIELD, left.ir, right.ir));
 		}
 		break;
 
 		case AST_BITWISE_NOT:
+		{
+			Ir operand = check_ir(checker, expr->unary);
+			value = ir_is_error(operand) ? com_value_error(ir_status(operand)) : com_value_ir(ir_new_unary(emitter, expr->site, IR_BITWISE_NOT, operand));
+		}
+		break;
+
 		case AST_MEASURE:
+		{
+			Ir operand = check_ir(checker, expr->unary);
+			value = ir_is_error(operand) ? com_value_error(ir_status(operand)) : com_value_ir(ir_new_measure(emitter, expr->site, operand));
+		}
+		break;
+
 		case AST_GET_MEM:
 		{
-			ASSERT(expr->unary);
-			Com_Value operand = check_expr(checker, expr->unary);
+			Ir operand = check_ir(checker, expr->unary);
+			if (ir_is_error(operand)) {
+				value = com_value_error(ir_status(operand));
+			}
+			else if (operand->kind != IR_LOAD)
+			{
+				ir_report_error(emitter, ELF_ERROR_LOWERING, expr->site, "#get_mem expects a local or parameter expression");
+				value = com_value_error(COM_STATUS_REPORTED);
+			}
+			else {
+				value = com_value_ir(ir_new_get_mem(emitter, expr->site, operand));
+			}
+		}
+		break;
+
+		case AST_META_FIELD:
+		case AST_INDEX:
+		case AST_GREATER_THAN:
+		case AST_GREATER_THAN_EQ:
+		case AST_AND:
+		case AST_OR:
+		case AST_ADD:
+		case AST_SUB:
+		case AST_MUL:
+		case AST_DIV:
+		case AST_POW:
+		case AST_MOD:
+		case AST_EQ:
+		case AST_NOT_EQ:
+		case AST_LESS_THAN:
+		case AST_LESS_THAN_EQ:
+		case AST_NIL_OR:
+		case AST_SHIFT_LEFT:
+		case AST_SHIFT_RIGHT:
+		case AST_BITWISE_AND:
+		case AST_BITWISE_OR:
+		case AST_BITWISE_XOR:
+		{
+			Ir x = check_ir(checker, expr->binary.x);
+			if (ir_is_error(x)) {
+				value = com_value_error(ir_status(x));
+				break;
+			}
+			Ir y = check_ir(checker, expr->binary.y);
+			if (ir_is_error(y)) {
+				value = com_value_error(ir_status(y));
+				break;
+			}
+
+			if (expr->kind == AST_META_FIELD) {
+				value = com_value_ir(ir_new_binary(emitter, expr->site, IR_META_FIELD, x, y));
+			}
+			else if (expr->kind == AST_INDEX) {
+				value = com_value_ir(ir_new_index(emitter, expr->site, x, y));
+			}
+			else if (expr->kind == AST_GREATER_THAN) {
+				value = com_value_ir(ir_new_binary(emitter, expr->site, IR_LESS_THAN, y, x));
+			}
+			else if (expr->kind == AST_GREATER_THAN_EQ) {
+				value = com_value_ir(ir_new_binary(emitter, expr->site, IR_LESS_THAN_EQ, y, x));
+			}
+			else {
+				value = com_value_ir(ir_new_binary(emitter, expr->site, ir_kind_from_ast_kind(expr->kind), x, y));
+			}
+		}
+		break;
+
+		case AST_NIL_AND:
+		case AST_COMMA_EXPR:
+		case AST_RANGE_INDEX:
+		{
+			Com_Value operand = check_expr(checker, expr->binary.x);
+			if (operand.type != COM_VALUE_ERROR) {
+				operand = check_expr(checker, expr->binary.y);
+			}
 			if (operand.type == COM_VALUE_ERROR) {
 				value = operand;
 			}
 		}
 		break;
+
+		case AST_RANGE:
+		{
+			if (expr->binary.x)
+			{
+				value = check_expr(checker, expr->binary.x);
+				if (value.type == COM_VALUE_ERROR) {
+					break;
+				}
+			}
+			if (expr->binary.y) {
+				value = check_expr(checker, expr->binary.y);
+			}
+			if (value.type != COM_VALUE_ERROR) {
+				value = (Com_Value) {COM_VALUE_NONE};
+			}
+		}
+		break;
+
+		case AST_INTERPOLATED_STRING:
+		{
+			if (!expr->interpolated_string.count)
+			{
+				ir_report_error(emitter, ELF_ERROR_INTERNAL, expr->site, "interpolated string has no parts");
+				value = com_value_error(COM_STATUS_REPORTED);
+				break;
+			}
+
+			Ir ir = 0;
+			for (u32 i = 0; i < expr->interpolated_string.count; ++ i)
+			{
+				Ast part = expr->interpolated_string.items[i];
+				if (!part)
+				{
+					ir_report_error(emitter, ELF_ERROR_INTERNAL, expr->site, "interpolated string part %u is missing", i);
+					value = com_value_error(COM_STATUS_REPORTED);
+					break;
+				}
+				Ir part_ir = check_ir(checker, part);
+				if (ir_is_error(part_ir))
+				{
+					value = com_value_error(ir_status(part_ir));
+					break;
+				}
+				ir = ir ? ir_new_binary(emitter, part->site, IR_ADD, ir, part_ir) : part_ir;
+			}
+			if (value.type != COM_VALUE_ERROR) {
+				value = com_value_ir(ir);
+			}
+		}
+		break;
+
+		case AST_CALL:
+		{
+			Com_Value target = check_expr(checker, expr->call.expr);
+			if (target.type == COM_VALUE_ERROR) {
+				value = target;
+				break;
+			}
+
+			ASSERT(target.type == COM_VALUE_IR);
+			Ir target_ir = target.ir;
+			Ast_Array args = expr->call.args;
+			IrArray ir_args = ir_array_alloc(emitter, args.count);
+
+			for (u32 i = 0; i < args.count; ++ i)
+			{
+				Ast argument = args.items[i];
+				ASSERT(argument);
+				if (argument->kind == AST_NAMED_ARGUMENT)
+				{
+					Com_Status status = checker_report(checker->source, ELF_ERROR_NOT_IMPLEMENTED, ERROR_ERROR, argument->site, "named arguments are not supported");
+					value = com_value_error(status);
+					break;
+				}
+
+				ir_args.items[i] = check_ir(checker, argument);
+				if (ir_is_error(ir_args.items[i]))
+				{
+					value = com_value_error(ir_status(ir_args.items[i]));
+					break;
+				}
+			}
+
+			if (value.type == COM_VALUE_ERROR) {
+				break;
+			}
+			value = com_value_ir(ir_new_call(emitter, expr->site, target_ir, ir_args));
+		}
+		break;
+
+		case AST_TUPLE:
+		{
+			IrArray items = ir_array_alloc(emitter, expr->tuple.count);
+			for (u32 i = 0; i < expr->tuple.count; ++ i)
+			{
+				ASSERT(expr->tuple.items[i]);
+				items.items[i] = check_ir(checker, expr->tuple.items[i]);
+				if (ir_is_error(items.items[i]))
+				{
+					value = com_value_error(ir_status(items.items[i]));
+					break;
+				}
+			}
+			if (value.type != COM_VALUE_ERROR) {
+				value = com_value_ir(ir_new_tuple(emitter, expr->site, items));
+			}
+		}
+		break;
+
+		case AST_TABLE:
+		{
+			IrQueue items = ir_queue_begin(emitter);
+			Ir local = ir_new_local(emitter, expr->site, ir_new_table(emitter, expr->site));
+			ir_queue_push(&items, local);
+
+			for (u32 i = 0; i < expr->table.count; ++ i)
+			{
+				Ast entry = expr->table.items[i];
+				ASSERT(entry);
+				ASSERT(entry->kind == AST_TABLE_ENTRY);
+				ASSERT(entry->table_entry.key);
+				Ir item = check_ir(checker, entry->table_entry.value);
+				if (ir_is_error(item))
+				{
+					value = com_value_error(ir_status(item));
+					break;
+				}
+				Ir key = check_ir(checker, entry->table_entry.key);
+				if (ir_is_error(key))
+				{
+					value = com_value_error(ir_status(key));
+					break;
+				}
+				Ir table = ir_new_load(emitter, entry->site, local);
+				Ir field = ir_new_binary(emitter, entry->site, IR_FIELD, table, key);
+				ir_queue_push(&items, ir_new_store(emitter, entry->site, field, item));
+			}
+
+			IrArray stats = ir_queue_end(&items);
+			if (value.type != COM_VALUE_ERROR)
+			{
+				Ir result = ir_new_load(emitter, expr->site, local);
+				value = com_value_ir(ir_new_expr_block(emitter, expr->site, stats, result));
+			}
+		}
+		break;
+
+		case AST_ARRAY:
+		{
+			IrQueue items = ir_queue_begin(emitter);
+			Ir local = ir_new_local(emitter, expr->site, ir_new_array(emitter, expr->site));
+			ir_queue_push(&items, local);
+			for (u32 i = 0; i < expr->array.count; ++ i)
+			{
+				Ir item = check_ir(checker, expr->array.items[i]);
+				if (ir_is_error(item))
+				{
+					value = com_value_error(ir_status(item));
+					break;
+				}
+				Ir array = ir_new_load(emitter, expr->site, local);
+				ir_queue_push(&items, ir_new_array_add(emitter, expr->array.items[i]->site, array, item));
+			}
+
+			IrArray stats = ir_queue_end(&items);
+			if (value.type != COM_VALUE_ERROR)
+			{
+				Ir result = ir_new_load(emitter, expr->site, local);
+				value = com_value_ir(ir_new_expr_block(emitter, expr->site, stats, result));
+			}
+		}
+		break;
+
+		case AST_TABLE_ENTRY:
+		{
+			ir_report_error(emitter, ELF_ERROR_INTERNAL, expr->site, "table entries are only valid inside table literals");
+			value = com_value_error(COM_STATUS_REPORTED);
+		}
+		break;
+
+		default:
+		{
+			Com_Status status = checker_report(checker->source, ELF_ERROR_INTERNAL, ERROR_ERROR, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
+			value = com_value_error(status);
+		}
+		break;
+	}
+	return value;
+}
+
+static Ir check_block(Checker *checker, Ast stat)
+{
+	ASSERT(checker);
+	ASSERT(stat);
+
+	Scope *scope = 0;
+	if (stat->kind == AST_BLOCK_STAT) {
+		scope = enter_scope(checker, stat);
+	}
+
+	IrEmitter *emitter = checker->emitter;
+	IrQueue queue = ir_queue_begin(emitter);
+	IrDefer *defer_scope = ir_defer_begin(emitter);
+	Com_Status status = COM_STATUS_OK;
+
+	if (stat->kind == AST_BLOCK_STAT)
+	{
+		for (u32 i = 0; i < stat->block.count; ++ i)
+		{
+			status = check_stat(checker, &queue, stat->block.items[i]);
+			if (status != COM_STATUS_OK) {
+				break;
+			}
+		}
+	}
+	else {
+		status = check_stat(checker, &queue, stat);
+	}
+
+	if (status == COM_STATUS_OK) {
+		ir_defer_emit(emitter, &queue, emitter->defer_scope_start);
+	}
+	ir_defer_end(emitter, defer_scope);
+
+	IrArray stats = ir_queue_end(&queue);
+	if (scope) {
+		pop_scope(checker, scope);
+	}
+	if (status != COM_STATUS_OK) {
+		return ir_from_status(status);
+	}
+	return ir_new_block(emitter, stat->site, stats);
+}
+
+static Ir check_for(Checker *checker, Ast stat)
+{
+	ASSERT(stat->kind == AST_FOR);
+
+	IrEmitter *emitter = checker->emitter;
+	Scope *scope = enter_scope(checker, stat);
+	IrQueue block_items = ir_queue_begin(emitter);
+
+	Com_Status status = check_stat(checker, &block_items, stat->for_stat.init);
+	if (status != COM_STATUS_OK) {
+		ir_queue_end(&block_items);
+		pop_scope(checker, scope);
+		return ir_from_status(status);
+	}
+
+	Ir pred = check_ir(checker, stat->for_stat.pred);
+	if (ir_is_error(pred))
+	{
+		ir_queue_end(&block_items);
+		pop_scope(checker, scope);
+		return pred;
+	}
+
+	Ir step = check_block(checker, stat->for_stat.step);
+	if (ir_is_error(step))
+	{
+		ir_queue_end(&block_items);
+		pop_scope(checker, scope);
+		return step;
+	}
+
+	Ir condition_label = ir_new_label(emitter, stat->site);
+	Ir continue_label = ir_new_label(emitter, stat->for_stat.step->site);
+	Ir break_label = ir_new_label(emitter, stat->site);
+
+	IrLoopFrame loop_frame = {};
+	loop_frame.continue_label = continue_label;
+	loop_frame.break_label = break_label;
+	loop_frame.defer_start = emitter->defer;
+	ir_loop_push(emitter, &loop_frame);
+	Ir body = check_block(checker, stat->for_stat.body);
+	ir_loop_pop(emitter, &loop_frame);
+	if (ir_is_error(body))
+	{
+		ir_queue_end(&block_items);
+		pop_scope(checker, scope);
+		return body;
+	}
+
+	Ir exit_jump = ir_new_jump_if_false(emitter, stat->for_stat.pred->site, pred, break_label);
+	IrQueue loop_items = ir_queue_begin(emitter);
+	ir_queue_push(&loop_items, condition_label);
+	ir_queue_push(&loop_items, exit_jump);
+	ir_queue_push(&loop_items, body);
+	ir_queue_push(&loop_items, continue_label);
+	ir_queue_push(&loop_items, step);
+	ir_queue_push(&loop_items, ir_new_jump(emitter, stat->site, condition_label));
+	ir_queue_push(&loop_items, break_label);
+	IrArray loop_stats = ir_queue_end(&loop_items);
+	ir_queue_push(&block_items, ir_new_block(emitter, stat->site, loop_stats));
+
+	IrArray stats = ir_queue_end(&block_items);
+	Ir result = ir_new_block(emitter, stat->site, stats);
+	pop_scope(checker, scope);
+	return result;
+}
+
+static Ir check_range_for(Checker *checker, Ast stat)
+{
+	ASSERT(stat->kind == AST_FOR_RANGE);
+
+	Ast decl = stat->for_range_stat.decl;
+	ASSERT(decl);
+	ASSERT(decl->kind == AST_DECL_STAT);
+	Ast name_tuple = decl->decl.name;
+	ASSERT(name_tuple);
+	ASSERT(name_tuple->kind == AST_TUPLE);
+	ASSERT(name_tuple->tuple.count);
+	Ast expr_tuple = decl->decl.expr;
+	ASSERT(expr_tuple);
+	ASSERT(expr_tuple->kind == AST_TUPLE);
+	ASSERT(expr_tuple->tuple.count == 1);
+
+	Ast range_expr = expr_tuple->tuple.items[0];
+	Ast collection_expr = 0;
+	Ast range = range_expr;
+	if (range_expr->kind == AST_RANGE_INDEX)
+	{
+		collection_expr = range_expr->binary.x;
+		range = range_expr->binary.y;
+	}
+	if (!range || range->kind != AST_RANGE) {
+		return ir_from_status(checker_report(checker->source, ELF_ERROR_INTERNAL, ERROR_ERROR, stat->site, "invalid range for-loop expression"));
+	}
+
+	IrEmitter *emitter = checker->emitter;
+	Scope *scope = enter_scope(checker, stat);
+
+	Ir collection_local = 0;
+	if (collection_expr)
+	{
+		Ir collection = check_ir(checker, collection_expr);
+		if (ir_is_error(collection)) {
+			pop_scope(checker, scope);
+			return collection;
+		}
+		collection_local = ir_new_local(emitter, collection_expr->site, collection);
+	}
+
+	Ast range_start_expr = range->binary.x;
+	Ast range_end_expr = range->binary.y;
+	SourceSite range_start_site = range_start_expr ? range_start_expr->site : range->site;
+	SourceSite range_end_site = range_end_expr ? range_end_expr->site : range->site;
+	Ir range_start = range_start_expr ? check_ir(checker, range_start_expr) : ir_new_int(emitter, range_start_site, 0);
+	if (ir_is_error(range_start)) {
+		pop_scope(checker, scope);
+		return range_start;
+	}
+
+	Ir range_end = 0;
+	if (range_end_expr) {
+		range_end = check_ir(checker, range_end_expr);
+	}
+	else if (collection_local) {
+		range_end = ir_new_measure(emitter, range_end_site, ir_new_load(emitter, range_end_site, collection_local));
+	}
+	else
+	{
+		pop_scope(checker, scope);
+		return ir_from_status(checker_report(checker->source, ELF_ERROR_LOWERING, ERROR_ERROR, range->site, "an omitted range end requires an indexed collection"));
+	}
+	if (ir_is_error(range_end)) {
+		pop_scope(checker, scope);
+		return range_end;
+	}
+
+	u32 nvars = name_tuple->tuple.count;
+	IrArray var_locals = ir_array_alloc(emitter, nvars);
+	Com_Status status = COM_STATUS_OK;
+	for (u32 i = 0; i < nvars; ++ i)
+	{
+		Ast name = name_tuple->tuple.items[i];
+		if (!name || name->kind != AST_IDENT) {
+			status = checker_report(checker->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, name_tuple->site, "declaration name must be an identifier");
+			break;
+		}
+
+		Ir local = ir_new_local(emitter, name->site, 0);
+		var_locals.items[i] = local;
+		Entity_Tags tags = decl->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+		Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, (Com_Value) { .type = COM_VALUE_LOCAL, .local = { .ir_function = checker->function, .storage = local } });
+		if (entity_is_error(entity)) {
+			status = entity_status(entity);
+			break;
+		}
+		entity->declaration = decl;
+		name->entity = entity;
+	}
+	if (status != COM_STATUS_OK)
+	{
+		pop_scope(checker, scope);
+		return ir_from_status(status);
+	}
+
+	Ir iterator_local = ir_new_local(emitter, range_start_site, range_start);
+	Ir range_end_local = ir_new_local(emitter, range_end_site, range_end);
+	Ast first_name = name_tuple->tuple.items[0];
+	Ir start_label = ir_new_label(emitter, stat->site);
+	Ir continue_label = ir_new_label(emitter, first_name->site);
+	Ir break_label = ir_new_label(emitter, stat->site);
+
+	IrLoopFrame loop_frame = {};
+	loop_frame.continue_label = continue_label;
+	loop_frame.break_label = break_label;
+	loop_frame.defer_start = emitter->defer;
+	ir_loop_push(emitter, &loop_frame);
+	Ir body = check_block(checker, stat->for_range_stat.body);
+	ir_loop_pop(emitter, &loop_frame);
+	if (ir_is_error(body))
+	{
+		pop_scope(checker, scope);
+		return body;
+	}
+
+	Ir iterator_load = ir_new_load(emitter, first_name->site, iterator_local);
+	Ir end_load = ir_new_load(emitter, range_end_site, range_end_local);
+	Ir pred = ir_new_binary(emitter, range->site, IR_LESS_THAN, iterator_load, end_load);
+	Ir exit_jump = ir_new_jump_if_false(emitter, range->site, pred, break_label);
+
+	IrQueue loop_items = ir_queue_begin(emitter);
+	ir_queue_push(&loop_items, start_label);
+	ir_queue_push(&loop_items, exit_jump);
+	for (u32 i = 0; i < nvars; ++ i)
+	{
+		Ast name = name_tuple->tuple.items[i];
+		Ir value = ir_new_load(emitter, name->site, iterator_local);
+		if (i != 0) {
+			value = ir_new_binary(emitter, name->site, IR_ADD, value, ir_new_int(emitter, name->site, i));
+		}
+		if (collection_local) {
+			value = ir_new_index(emitter, name->site, ir_new_load(emitter, name->site, collection_local), value);
+		}
+		ir_queue_push(&loop_items, ir_new_store(emitter, name->site, var_locals.items[i], value));
+	}
+
+	Ir next_value = ir_new_binary(emitter, first_name->site, IR_ADD, ir_new_load(emitter, first_name->site, iterator_local), ir_new_int(emitter, first_name->site, nvars));
+	Ir increment = ir_new_store(emitter, first_name->site, iterator_local, next_value);
+	ir_queue_push(&loop_items, body);
+	ir_queue_push(&loop_items, continue_label);
+	ir_queue_push(&loop_items, increment);
+	ir_queue_push(&loop_items, ir_new_jump(emitter, first_name->site, start_label));
+	ir_queue_push(&loop_items, break_label);
+	Ir loop = ir_new_block(emitter, stat->site, ir_queue_end(&loop_items));
+
+	IrQueue block_items = ir_queue_begin(emitter);
+	if (collection_local) {
+		ir_queue_push(&block_items, collection_local);
+	}
+	ir_queue_push(&block_items, iterator_local);
+	ir_queue_push(&block_items, range_end_local);
+	for (u32 i = 0; i < nvars; ++ i) {
+		ir_queue_push(&block_items, var_locals.items[i]);
+	}
+	ir_queue_push(&block_items, loop);
+	Ir result = ir_new_block(emitter, stat->site, ir_queue_end(&block_items));
+	pop_scope(checker, scope);
+	return result;
+}
+
+static Ir save_lvalue(IrEmitter *emitter, IrQueue *items, Ir ir)
+{
+	ASSERT(ir);
+	if (ir->kind != IR_FIELD && ir->kind != IR_INDEX) {
+		return ir;
+	}
+
+	Ir receiver = ir_new_local(emitter, ir->ir_binary.x->site, ir->ir_binary.x);
+	ir_queue_push(items, receiver);
+	Ir x = ir_new_load(emitter, ir->ir_binary.x->site, receiver);
+	Ir y = ir->ir_binary.y;
+	if (ir->kind == IR_INDEX || y->kind != IR_ATOM)
+	{
+		Ir key = ir_new_local(emitter, y->site, y);
+		ir_queue_push(items, key);
+		y = ir_new_load(emitter, y->site, key);
+	}
+	return ir->kind == IR_INDEX ? ir_new_index(emitter, ir->site, x, y) : ir_new_binary(emitter, ir->site, IR_FIELD, x, y);
+}
+
+static Com_Status check_stat(Checker *checker, IrQueue *items, Ast stat)
+{
+	ASSERT(checker);
+	ASSERT(items);
+	ASSERT(stat);
+	ASSERT(checker->active_scope);
+	IrEmitter *emitter = checker->emitter;
+
+	switch (stat->kind)
+	{
+		case AST_NONE:
+		case AST_ERROR:
+		case AST_STATIC_DECL:
+		{
+			return COM_STATUS_OK;
+		}
+
+		case AST_IMPORT:
+		{
+			return com_value_status(check_expr(checker, stat));
+		}
+
+		case AST_BLOCK_STAT:
+		{
+			Ir block = check_block(checker, stat);
+			if (ir_is_error(block)) {
+				return ir_status(block);
+			}
+			ir_queue_push(items, block);
+			return COM_STATUS_OK;
+		}
+
+		case AST_DECL_STAT:
+		{
+			Ast names = stat->decl.name;
+			ASSERT(names);
+			ASSERT(names->kind == AST_TUPLE);
+			Ast exprs = stat->decl.expr;
+			ASSERT(exprs);
+			ASSERT(exprs->kind == AST_TUPLE);
+
+			if (stat->decl.type)
+			{
+				Com_Status status = com_value_status(check_expr(checker, stat->decl.type));
+				if (status != COM_STATUS_OK) {
+					return status;
+				}
+			}
+
+			for (u32 i = 0; i < exprs->tuple.count; ++ i)
+			{
+				Ast expr = exprs->tuple.items[i];
+				if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
+				{
+					ir_report_error(emitter, ELF_ERROR_LOWERING, expr->site, "range expressions cannot be used as declaration values; use a range for loop");
+					return COM_STATUS_REPORTED;
+				}
+			}
+
+			Ir expr_ir = check_ir(checker, exprs);
+			if (ir_is_error(expr_ir)) {
+				return ir_status(expr_ir);
+			}
+			ASSERT(expr_ir->kind == IR_TUPLE);
+
+			for (u32 i = 0; i < names->tuple.count; ++ i)
+			{
+				Ast name = names->tuple.items[i];
+				if (!name || name->kind != AST_IDENT) {
+					return checker_report(checker->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, names->site, "declaration name must be an identifier");
+				}
+
+				Entity_Tags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+				Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, (Com_Value) { .type = COM_VALUE_LOCAL, .local = { .ir_function = checker->function } });
+				if (entity_is_error(entity)) {
+					return entity_status(entity);
+				}
+				entity->declaration = stat;
+				name->entity = entity;
+			}
+
+			u32 count = names->tuple.count;
+			if (count > 1 && exprs->tuple.count == 1 && ast_is_call(exprs->tuple.items[0]))
+			{
+				IrArray locals = ir_array_alloc(emitter, count);
+				for (u32 i = 0; i < count; ++ i)
+				{
+					Ast name = names->tuple.items[i];
+					locals.items[i] = ir_new_local(emitter, name->site, 0);
+					name->entity->value.local.storage = locals.items[i];
+				}
+				ir_queue_push(items, ir_new_multi_local(emitter, exprs->site, expr_ir->ir_tuple.items[0], locals));
+				return COM_STATUS_OK;
+			}
+
+			for (u32 i = 0; i < count; ++ i)
+			{
+				Ast name = names->tuple.items[i];
+				Ir value = i < expr_ir->ir_tuple.count ? expr_ir->ir_tuple.items[i] : ir_new_nil(emitter, name->site);
+				Ir local = ir_new_local(emitter, name->site, value);
+				ir_queue_push(items, local);
+				name->entity->value.local.storage = local;
+			}
+			return COM_STATUS_OK;
+		}
+
+		case AST_IF:
+		{
+			Ir pred = check_ir(checker, stat->if_stat.pred);
+			if (ir_is_error(pred)) {
+				return ir_status(pred);
+			}
+
+			Ir true_clause = check_block(checker, stat->if_stat.true_clause);
+			if (ir_is_error(true_clause)) {
+				return ir_status(true_clause);
+			}
+
+			Ir else_clause = 0;
+			if (stat->if_stat.else_clause)
+			{
+				else_clause = check_block(checker, stat->if_stat.else_clause);
+				if (ir_is_error(else_clause)) {
+					return ir_status(else_clause);
+				}
+			}
+
+			ir_queue_push(items, ir_new_if(emitter, stat->site, pred, true_clause, else_clause));
+			return COM_STATUS_OK;
+		}
+
+		case AST_WHILE:
+		{
+			Ir pred = check_ir(checker, stat->while_stat.pred);
+			if (ir_is_error(pred)) {
+				return ir_status(pred);
+			}
+
+			Ir start_label = ir_new_label(emitter, stat->site);
+			Ir break_label = ir_new_label(emitter, stat->site);
+			IrLoopFrame loop_frame = {};
+			loop_frame.continue_label = start_label;
+			loop_frame.break_label = break_label;
+			loop_frame.defer_start = emitter->defer;
+			ir_loop_push(emitter, &loop_frame);
+			Ir body = check_block(checker, stat->while_stat.body);
+			ir_loop_pop(emitter, &loop_frame);
+			if (ir_is_error(body)) {
+				return ir_status(body);
+			}
+
+			IrQueue loop_items = ir_queue_begin(emitter);
+			ir_queue_push(&loop_items, start_label);
+			ir_queue_push(&loop_items, ir_new_jump_if_false(emitter, stat->while_stat.pred->site, pred, break_label));
+			ir_queue_push(&loop_items, body);
+			ir_queue_push(&loop_items, ir_new_jump(emitter, stat->site, start_label));
+			ir_queue_push(&loop_items, break_label);
+			ir_queue_push(items, ir_new_block(emitter, stat->site, ir_queue_end(&loop_items)));
+			return COM_STATUS_OK;
+		}
+
+		case AST_FOR:
+		{
+			Ir loop = check_for(checker, stat);
+			if (ir_is_error(loop)) {
+				return ir_status(loop);
+			}
+			ir_queue_push(items, loop);
+			return COM_STATUS_OK;
+		}
+
+		case AST_FOR_RANGE:
+		{
+			Ir loop = check_range_for(checker, stat);
+			if (ir_is_error(loop)) {
+				return ir_status(loop);
+			}
+			ir_queue_push(items, loop);
+			return COM_STATUS_OK;
+		}
+
+		case AST_DEFER_STAT:
+		{
+			Ir deferred = check_block(checker, stat->defer_stat.body);
+			if (ir_is_error(deferred)) {
+				return ir_status(deferred);
+			}
+			ir_defer_push_ir(emitter, deferred);
+			return COM_STATUS_OK;
+		}
+
+		case AST_RETURN:
+		{
+			Ast expr = stat->return_stat.expr;
+			Ir expr_ir = expr ? check_ir(checker, expr) : 0;
+			if (ir_is_error(expr_ir)) {
+				return ir_status(expr_ir);
+			}
+
+			if (expr_ir && emitter->defer)
+			{
+				ASSERT(expr_ir->kind == IR_TUPLE);
+				IrArray tuple = ir_array_alloc(emitter, expr_ir->ir_tuple.count);
+				for (u32 i = 0; i < expr_ir->ir_tuple.count; ++ i)
+				{
+					Ir local = ir_new_local(emitter, stat->site, expr_ir->ir_tuple.items[i]);
+					ir_queue_push(items, local);
+					tuple.items[i] = ir_new_load(emitter, stat->site, local);
+				}
+				expr_ir = ir_new_tuple(emitter, stat->site, tuple);
+			}
+			ir_defer_emit(emitter, items, 0);
+			ir_queue_push(items, ir_new_return(emitter, stat->site, expr_ir));
+			return COM_STATUS_OK;
+		}
+
+		case AST_BREAK:
+		case AST_CONTINUE:
+		{
+			Ast expr = stat->kind == AST_BREAK ? stat->break_stat.expr : stat->continue_stat.expr;
+			if (expr)
+			{
+				Com_Status status = com_value_status(check_expr(checker, expr));
+				if (status != COM_STATUS_OK) {
+					return status;
+				}
+			}
+
+			IrLoopFrame loop = ir_loop_current(emitter, stat->site);
+			Ir label = stat->kind == AST_BREAK ? loop.break_label : loop.continue_label;
+			if (!label) {
+				ir_queue_push(items, ERROR_IR);
+				return COM_STATUS_REPORTED;
+			}
+			ir_defer_emit(emitter, items, loop.defer_start);
+			ir_queue_push(items, ir_new_jump(emitter, stat->site, label));
+			return COM_STATUS_OK;
+		}
+
+		case AST_ADD_ASSIGN:
+		case AST_SUB_ASSIGN:
+		case AST_MUL_ASSIGN:
+		case AST_DIV_ASSIGN:
+		case AST_MOD_ASSIGN:
+		case AST_XOR_ASSIGN:
+		case AST_SHL_ASSIGN:
+		case AST_SHR_ASSIGN:
+		case AST_NIL_ASSIGN:
+		case AST_ASSIGN:
+		{
+			Ast dest_tuple = stat->binary.x;
+			ASSERT(dest_tuple);
+			ASSERT(dest_tuple->kind == AST_TUPLE);
+			Ast expr_tuple = stat->binary.y;
+			ASSERT(expr_tuple);
+			ASSERT(expr_tuple->kind == AST_TUPLE);
+
+			Com_Value dest_value = check_expr(checker, dest_tuple);
+			Com_Status status = com_value_status(dest_value);
+			if (status != COM_STATUS_OK) {
+				return status;
+			}
+			// TODO(RJ): why doesn't this just take the value!?
+			status = check_assign_dest(checker, dest_tuple);
+			if (status != COM_STATUS_OK) {
+				return status;
+			}
+
+			Com_Value expr_value = check_expr(checker, expr_tuple);
+			if (expr_value.type == COM_VALUE_ERROR) {
+				return com_value_status(expr_value);
+			}
+			ASSERT(expr_value.type == COM_VALUE_IR);
+
+			Ir dest_tuple_ir = dest_value.ir;
+			Ir expr_tuple_ir = expr_value.ir;
+			ASSERT(dest_tuple_ir->kind == IR_TUPLE);
+			ASSERT(expr_tuple_ir->kind == IR_TUPLE);
+
+			if (stat->kind != AST_ASSIGN && stat->kind != AST_NIL_ASSIGN)
+			{
+				if (dest_tuple_ir->ir_tuple.count != 1 || expr_tuple_ir->ir_tuple.count != 1) {
+					return checker_report(checker->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "compound assignment requires one destination and one value");
+				}
+
+				Ast dest_ast = dest_tuple->tuple.items[0];
+				if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+					ir_queue_push(items, ERROR_IR);
+					return COM_STATUS_OK;
+				}
+				Ir dest = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[0]);
+				IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
+				ASSERT(op != IR_NONE);
+				Ir value = ir_new_binary(emitter, stat->site, op, dest, expr_tuple_ir->ir_tuple.items[0]);
+				Ir target = dest->kind == IR_LOAD ? dest->ir_load.local : dest;
+				ir_queue_push(items, ir_new_store(emitter, stat->site, target, value));
+				return COM_STATUS_OK;
+			}
+
+			if (stat->kind == AST_NIL_ASSIGN)
+			{
+				if (dest_tuple->tuple.count != expr_tuple->tuple.count) {
+					return checker_report(checker->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "nil assignment requires one value for each destination");
+				}
+				for (u32 i = 0; i < dest_tuple->tuple.count; ++ i)
+				{
+					Ast dest_ast = dest_tuple->tuple.items[i];
+					if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+						ir_queue_push(items, ERROR_IR);
+						continue;
+					}
+					Ir dest_ir = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[i]);
+					Ir pred = ir_new_binary(emitter, stat->site, IR_EQ, dest_ir, ir_new_nil(emitter, dest_ast->site));
+					Ir destination = dest_ir->kind == IR_LOAD ? dest_ir->ir_load.local : dest_ir;
+					Ir store = ir_new_store(emitter, stat->site, destination, expr_tuple_ir->ir_tuple.items[i]);
+					IrQueue true_items = ir_queue_begin(emitter);
+					ir_queue_push(&true_items, store);
+					Ir true_clause = ir_new_block(emitter, stat->site, ir_queue_end(&true_items));
+					ir_queue_push(items, ir_new_if(emitter, stat->site, pred, true_clause, 0));
+				}
+				return COM_STATUS_OK;
+			}
+
+			u32 count = dest_tuple->tuple.count;
+			if (count == 1)
+			{
+				Ast dest_ast = dest_tuple->tuple.items[0];
+				if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+					ir_queue_push(items, ERROR_IR);
+					return COM_STATUS_OK;
+				}
+				Ir dest = dest_tuple_ir->ir_tuple.items[0];
+				Ir value = expr_tuple_ir->ir_tuple.count ? expr_tuple_ir->ir_tuple.items[0] : ir_new_nil(emitter, dest_ast->site);
+				if (dest->kind == IR_LOAD) {
+					dest = dest->ir_load.local;
+				}
+				ir_queue_push(items, ir_new_store(emitter, stat->site, dest, value));
+				return COM_STATUS_OK;
+			}
+
+			IrArray locals = ir_array_alloc(emitter, count);
+			if (expr_tuple->tuple.count == 1 && ast_is_call(expr_tuple->tuple.items[0]))
+			{
+				Ast expr = expr_tuple->tuple.items[0];
+				for (u32 i = 0; i < count; ++ i) {
+					locals.items[i] = ir_new_local(emitter, expr->site, 0);
+				}
+				ir_queue_push(items, ir_new_multi_local(emitter, expr->site, expr_tuple_ir->ir_tuple.items[0], locals));
+			}
+			else
+			{
+				for (u32 i = 0; i < count; ++ i)
+				{
+					SourceSite site = stat->site;
+					Ir value = ir_new_nil(emitter, site);
+					if (i < expr_tuple->tuple.count)
+					{
+						Ast expr = expr_tuple->tuple.items[i];
+						site = expr->site;
+						value = expr_tuple_ir->ir_tuple.items[i];
+					}
+					locals.items[i] = ir_new_local(emitter, site, value);
+					ir_queue_push(items, locals.items[i]);
+				}
+			}
+
+			for (u32 i = 0; i < count; ++ i)
+			{
+				Ast dest_ast = dest_tuple->tuple.items[i];
+				if (!ir_mark_entity_assigned(emitter, dest_ast)) {
+					ir_queue_push(items, ERROR_IR);
+					continue;
+				}
+				Ir dest = dest_tuple_ir->ir_tuple.items[i];
+				if (dest->kind == IR_LOAD) {
+					dest = dest->ir_load.local;
+				}
+				Ir value = ir_new_load(emitter, locals.items[i]->site, locals.items[i]);
+				ir_queue_push(items, ir_new_store(emitter, stat->site, dest, value));
+			}
+			return COM_STATUS_OK;
+		}
+
+		case AST_TUPLE:
+		{
+			for (u32 i = 0; i < stat->tuple.count; ++ i)
+			{
+				Ast expr = stat->tuple.items[i];
+				Com_Value value = check_expr(checker, expr);
+				if (value.type == COM_VALUE_ERROR) {
+					return value.status;
+				}
+				if (expr->kind != AST_IMPORT)
+				{
+					ASSERT(value.type == COM_VALUE_IR);
+					ir_queue_push(items, value.ir);
+				}
+			}
+			return COM_STATUS_OK;
+		}
+
+		default:
+		{
+			Ir ir = check_ir(checker, stat);
+			if (ir_is_error(ir)) {
+				return ir_status(ir);
+			}
+			ir_queue_push(items, ir);
+			return COM_STATUS_OK;
+		}
+	}
+}
+
+static Com_Status check_function(Checker *outer, IrFunction *function)
+{
+	ASSERT(outer);
+	ASSERT(function);
+	ASSERT(function->ast);
+	ASSERT(function->ast->kind == AST_FUNCTION);
+	ASSERT(function->ast->function.ir == function);
+
+	Ast expr = function->ast;
+	Ast_Array params = expr->function.params;
+	Ast body = expr->function.body;
+
+	if (!body) {
+		return checker_report(outer->source, ELF_ERROR_MISSING_FUNCTION_BODY, ERROR_ERROR, expr->site, "missing function body");
+	}
+
+	IrEmitter emitter = {};
+	emitter.module = outer->module;
+	emitter.function = function;
+	emitter.ir_stack_size = 4096;
+	emitter.ir_stack = arena_push_zero(emitter.module->arena, sizeof(*emitter.ir_stack) * emitter.ir_stack_size, _Alignof(Ir));
+	if (!emitter.ir_stack) {
+		return checker_out_of_memory(outer->source, expr->site);
+	}
+
+	IrArray ir_params = ir_array_alloc(&emitter, params.count);
+	function->params = ir_params;
+
+	Checker checker = {};
+	checker.module = outer->module;
+	checker.emitter = &emitter;
+	checker.source = outer->source;
+	checker.function = function;
+	checker.active_scope = outer->active_scope;
+
+	Scope *scope = enter_scope(&checker, expr);
+
+	Com_Status status = COM_STATUS_OK;
+	for (u32 i = 0; i < params.count; ++ i)
+	{
+		Ast param = params.items[i];
+		ASSERT(param);
+		ASSERT(param->kind == AST_DECL_STAT);
+
+		Ast name = param->decl.name;
+		Ast type = param->decl.type;
+		Ast expr = param->decl.expr;
+
+		ASSERT(name);
+		ASSERT(name->kind == AST_IDENT);
+		ASSERT(name->atom);
+		ASSERT(!type || type->kind == AST_IDENT);
+		ASSERT(!name->entity);
+		if (expr)
+		{
+			status = checker_report(checker.source, ELF_ERROR_NOT_IMPLEMENTED, ERROR_ERROR, expr->site, "default arguments are not supported");
+			break;
+		}
+
+		if (type)
+		{
+			Com_Value value = check_expr(&checker, type);
+			if (value.type == COM_VALUE_ERROR) {
+				status = value.status;
+				break;
+			}
+
+			if (value.type != COM_VALUE_TYPE) {
+				status = checker_report(checker.source, ELF_ERROR_NOT_A_TYPE, ERROR_ERROR, type->site, "expression does not evaluate to a type");
+				break;
+			}
+		}
+
+		Ir ir_param = ir_new_local(&emitter, name->site, 0);
+		ir_params.items[i] = ir_param;
+
+		// TODO(RJ): we don't need to refetch this ...
+		if (type) {
+			ir_param->type_rule = type->entity->value.com_type->rule;
+		}
+
+		// TODO(RJ): dedicated builder
+		Com_Value v_param = { .type = COM_VALUE_LOCAL, .local = { .ir_function = function, .storage = ir_param }};
+
+		Entity_Tags tags = param->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+		Entity *entity = declare_entity(checker.active_scope, name->site, name->identifier, tags, v_param);
+		if (entity_is_error(entity)) {
+			status = entity_status(entity);
+			break;
+		}
+
+		entity->declaration = param;
+		name->entity = entity;
+	}
+
+	if (status == COM_STATUS_OK)
+	{
+		function->body = check_block(&checker, body);
+		if (ir_is_error(function->body)) {
+			status = ir_status(function->body);
+		}
+	}
+	pop_scope(&checker, scope);
+	return status;
+}
+
+static Com_Status prepare_scope(Checker *checker, Scope *scope, Ast_Array stats)
+{
+	for (u32 i = 0; i < stats.count; ++ i)
+	{
+		Ast declaration = stats.items[i];
+		if (declaration->kind != AST_STATIC_DECL) {
+			continue;
+		}
+
+		Ast name = declaration->static_decl.name;
+		Ast expr = declaration->static_decl.expr;
+		ASSERT(name);
+		ASSERT(name->kind == AST_IDENT);
+		ASSERT(name->atom);
+		ASSERT(!name->entity);
+		ASSERT(expr);
+
+		Entity_Tags tags = ENTITY_TAG_STATIC | ENTITY_TAG_CONSTANT;
+		if (declaration->static_decl.exported) {
+			tags |= ENTITY_TAG_EXPORTED;
+		}
+		Entity *entity = declare_entity(scope, name->site, name->atom, tags, (Com_Value) { .type = COM_VALUE_AST, .ast = expr });
+		if (entity_is_error(entity)) {
+			return entity_status(entity);
+		}
+		entity->declaration = declaration;
+		name->entity = entity;
+	}
+
+	for (u32 i = 0; i < stats.count; ++ i)
+	{
+		Ast declaration = stats.items[i];
+		if (declaration->kind != AST_STATIC_DECL || declaration->static_decl.expr->kind != AST_FUNCTION) {
+			continue;
+		}
+
+		Ast name = declaration->static_decl.name;
+		Ast expr = declaration->static_decl.expr;
+		ASSERT(name->entity);
+		ASSERT(name->entity->declaration == declaration);
+
+		IrFunction *function = ir_reserve_function(checker->source, checker->module, 0, expr);
+		name->entity->value = (Com_Value) { .type = COM_VALUE_FUNCTION, .ir_function = function };
+	}
+	return COM_STATUS_OK;
+}
+
+static Com_Status check_static_functions(Checker *checker, Ast_Array stats)
+{
+	for (u32 i = 0; i < stats.count; ++ i)
+	{
+		Ast declaration = stats.items[i];
+		if (declaration->kind != AST_STATIC_DECL || declaration->static_decl.expr->kind != AST_FUNCTION) {
+			continue;
+		}
+
+		Ast function = declaration->static_decl.expr;
+		ASSERT(function->function.ir);
+		Com_Status status = check_function(checker, function->function.ir);
+		if (status != COM_STATUS_OK) {
+			return status;
+		}
+	}
+	return COM_STATUS_OK;
+}
+
+static Com_Status prepare_ast_array(Checker *checker, Ast_Array array)
+{
+	for (u32 i = 0; i < array.count; ++ i)
+	{
+		Com_Status status = prepare_ast(checker, array.items[i]);
+		if (status != COM_STATUS_OK) {
+			return status;
+		}
+	}
+	return COM_STATUS_OK;
+}
+
+static Com_Status prepare_ast(Checker *checker, Ast ast)
+{
+	if (!ast) {
+		return COM_STATUS_OK;
+	}
+
+	switch (ast->kind)
+	{
+		case AST_NONE:
+		case AST_ERROR:
+		case AST_IDENT:
+		case AST_NUMBER_LITERAL:
+		case AST_INTEGER_LITERAL:
+		case AST_STRING_LITERAL:
+		case AST_RECURSE:
+		case AST_NIL_LITERAL:
+		case AST_ELLIPSIS:
+		{
+			return COM_STATUS_OK;
+		}
+
+		case AST_IMPORT:
+		{
+			Com_Status status = check_source(checker->module, ast->import.target);
+			if (status != COM_STATUS_OK) {
+				return status;
+			}
+			else {
+				ASSERT(ast->import.target->scope);
+				return status;
+			}
+		}
+
+		case AST_BITWISE_NOT:
+		case AST_MEASURE:
+		case AST_GET_MEM:
+		{
+			return prepare_ast(checker, ast->unary);
+		}
 
 		case AST_AND:
 		case AST_OR:
@@ -538,396 +1895,6 @@ static Com_Value check_expr(Checker *checker, Ast expr)
 		case AST_BITWISE_AND:
 		case AST_BITWISE_OR:
 		case AST_BITWISE_XOR:
-		case AST_INDEX:
-		case AST_COMMA_EXPR:
-		case AST_RANGE_INDEX:
-		{
-			ASSERT(expr->binary.x);
-			ASSERT(expr->binary.y);
-			Com_Value operand = check_expr(checker, expr->binary.x);
-			if (operand.type != COM_VALUE_ERROR) {
-				operand = check_expr(checker, expr->binary.y);
-			}
-			if (operand.type == COM_VALUE_ERROR) {
-				value = operand;
-			}
-		}
-		break;
-
-		case AST_RANGE:
-		{
-			Com_Value operand = {COM_VALUE_NONE};
-			if (expr->binary.x)
-			{
-				operand = check_expr(checker, expr->binary.x);
-			}
-			if (operand.type != COM_VALUE_ERROR && expr->binary.y)
-			{
-				operand = check_expr(checker, expr->binary.y);
-			}
-			if (operand.type == COM_VALUE_ERROR) {
-				value = operand;
-			}
-		}
-		break;
-
-		case AST_META_FIELD:
-		{
-			ASSERT(expr->binary.x);
-			ASSERT(expr->binary.y);
-			Com_Value operand = check_expr(checker, expr->binary.x);
-			if (operand.type == COM_VALUE_ERROR) {
-				value = operand;
-			}
-		}
-		break;
-
-		case AST_INTERPOLATED_STRING:
-		{
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->interpolated_string.count; ++i)
-			{
-				Com_Value item = check_expr(checker, expr->interpolated_string.items[i]);
-				if (item.type == COM_VALUE_ERROR) {
-					value = item;
-				}
-			}
-		}
-		break;
-
-		case AST_CALL:
-		{
-			Com_Value target = check_expr(checker, expr->call.expr);
-			if (target.type == COM_VALUE_ERROR) {
-				value = target;
-				break;
-			}
-
-			Ast_Array args = expr->call.args;
-
-			u32 bind_slot = 0;
-			b32 require_named_arguments = 0;
-
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < args.count; ++i)
-			{
-				ASSERT(args.items[i]);
-				Ast argument = args.items[i];
-				Ast argument_expr = argument;
-				u32 argument_slot = bind_slot;
-
-				if (argument->kind == AST_NAMED_ARGUMENT)
-				{
-					require_named_arguments = true;
-
-					Ast argument_name = argument->named_argument.name;
-					ASSERT(argument_name);
-					ASSERT(argument_name->kind == AST_IDENT);
-					ASSERT(argument_name->identifier != 0);
-					ASSERT(argument->named_argument.expr);
-
-					if (target.type != COM_VALUE_FUNCTION)
-					{
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_NAMED_ARGUMENT_TARGET, ERROR_ERROR, argument->site, "named args require a statically known function");
-						value = com_value_error(status);
-						break;
-					}
-					ASSERT(target.function);
-
-					i32 named_slot = find_parameter_by_name(target.function->function.params, argument_name->identifier);
-					if (named_slot < 0)
-					{
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_UNKNOWN_NAMED_ARGUMENT, ERROR_ERROR, argument_name->site, "function has no parameter named '%s'", atom_data(argument_name->identifier));
-						value = com_value_error(status);
-						break;
-					}
-					argument_slot = (u32)named_slot;
-
-					b32 duplicate = false;
-					for (u32 prior_index = 0; !duplicate && prior_index < i; ++ prior_index) {
-						duplicate = args.items[prior_index]->param_slot == argument_slot;
-					}
-					if (duplicate)
-					{
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_DUPLICATE_ARGUMENT, ERROR_ERROR, argument->site, "parameter '%s' was specified more than once", atom_data(argument_name->identifier));
-						value = com_value_error(status);
-						break;
-					}
-					if (argument_slot < bind_slot)
-					{
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "named argument '%s' does not follow parameter order", atom_data(argument_name->identifier));
-						value = com_value_error(status);
-						break;
-					}
-					argument_expr = argument->named_argument.expr;
-				}
-				else
-				{
-					if (require_named_arguments)
-					{
-						Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_ARGUMENT_ORDER, ERROR_ERROR, argument->site, "positional args must come before named args");
-						value = com_value_error(status);
-						break;
-					}
-				}
-
-				Com_Value item = check_expr(checker, argument_expr);
-				if (item.type == COM_VALUE_ERROR) {
-					value = item;
-					break;
-				}
-
-				argument->param_slot = argument_slot;
-				bind_slot = argument_slot + 1;
-			}
-		}
-		break;
-
-		case AST_TUPLE:
-		{
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->tuple.count; ++i)
-			{
-				Com_Value item = check_expr(checker, expr->tuple.items[i]);
-				if (item.type == COM_VALUE_ERROR) {
-					value = item;
-				}
-			}
-		}
-		break;
-
-		case AST_TABLE:
-		{
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->table.count; ++i)
-			{
-				Com_Value item = check_expr(checker, expr->table.items[i]);
-				if (item.type == COM_VALUE_ERROR) {
-					value = item;
-				}
-			}
-		}
-		break;
-
-		case AST_ARRAY:
-		{
-			for (u32 i = 0; value.type != COM_VALUE_ERROR && i < expr->array.count; ++i)
-			{
-				Com_Value item = check_expr(checker, expr->array.items[i]);
-				if (item.type == COM_VALUE_ERROR) {
-					value = item;
-				}
-			}
-		}
-		break;
-
-		case AST_TABLE_ENTRY:
-		{
-			ASSERT(expr->table_entry.key);
-			ASSERT(expr->table_entry.value);
-			Com_Value item = check_expr(checker, expr->table_entry.key);
-			if (item.type != COM_VALUE_ERROR) {
-				item = check_expr(checker, expr->table_entry.value);
-			}
-			if (item.type == COM_VALUE_ERROR) {
-				value = item;
-			}
-		}
-		break;
-
-		default:
-		{
-			Com_Status status = checker_report(checker->source_scope->source, ELF_ERROR_INTERNAL, ERROR_ERROR, expr->site, "'%s' is not an expression", ast_type_name(expr->kind));
-			value = com_value_error(status);
-		}
-		break;
-	}
-	return value;
-}
-
-static Com_Status check_block_stat(Checker *checker, Ast stat)
-{
-	Scope *static_scope = 0;
-	Com_Status status = push_scope(checker, stat, &static_scope);
-	if (status == COM_STATUS_OK)
-	{
-		status = declare_statics(checker, static_scope, stat->block);
-		if (status == COM_STATUS_OK)
-		{
-			Scope *local_scope = 0;
-			status = push_scope(checker, stat, &local_scope);
-			if (status == COM_STATUS_OK)
-			{
-				for (u32 i = 0; i < stat->block.count; ++i)
-				{
-					status = check_stat(checker, stat->block.items[i]);
-					if (status != COM_STATUS_OK) break;
-				}
-			}
-			pop_scope(checker, local_scope);
-		}
-		pop_scope(checker, static_scope);
-	}
-	return status;
-}
-
-static Com_Status check_stat(Checker *checker, Ast stat)
-{
-	ASSERT(stat);
-	ASSERT(checker->active_scope);
-	ASSERT(checker->source_scope);
-	Com_Status status = COM_STATUS_OK;
-	Com_Value value = {0};
-
-	switch (stat->kind)
-	{
-		case AST_NONE:
-		case AST_ERROR:
-		{
-		}
-		break;
-
-		case AST_BLOCK_STAT:
-		{
-			status = check_block_stat(checker, stat);
-		}
-		break;
-
-		case AST_DECL_STAT:
-		{
-			Ast names = ast_ensure_kind(stat->decl.name, AST_TUPLE);
-			if (stat->decl.type)
-			{
-				value = check_expr(checker, stat->decl.type);
-				status = com_value_status(value);
-			}
-			ASSERT(stat->decl.expr);
-			if (status == COM_STATUS_OK)
-			{
-				value = check_expr(checker, stat->decl.expr);
-				status = com_value_status(value);
-			}
-			for (u32 i = 0; status == COM_STATUS_OK && i < names->tuple.count; ++ i)
-			{
-				Ast name = ast_ensure_kind(names->tuple.items[i], AST_IDENT);
-				if (ast_is_error(name))
-				{
-					status = checker_report(checker->source_scope->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, names->tuple.items[i]->site, "declaration name must be an identifier");
-					break;
-				}
-				ASSERT(!name->entity);
-				Entity *entity = declare_entity(checker, checker->active_scope, ENTITY_LOCAL, name->identifier, name->site);
-				status = entity_is_error(entity) ? entity->status : COM_STATUS_OK;
-				if (status == COM_STATUS_OK) {
-					entity->en_local.declaration = stat;
-					name->entity = entity;
-				}
-			}
-		}
-		break;
-
-		case AST_STATIC_DECL:
-		{
-			// NOTE(RJ): lazily resolved !
-		}
-		break;
-
-		case AST_IF:
-		{
-			value = check_expr(checker, stat->if_stat.pred);
-			status = com_value_status(value);
-			if (status == COM_STATUS_OK && stat->if_stat.true_clause) {
-				status = check_stat(checker, stat->if_stat.true_clause);
-			}
-			if (status == COM_STATUS_OK && stat->if_stat.else_clause) {
-				status = check_stat(checker, stat->if_stat.else_clause);
-			}
-			if (status == COM_STATUS_OK && stat->if_stat.then_clause) {
-				status = check_stat(checker, stat->if_stat.then_clause);
-			}
-		}
-		break;
-
-		case AST_DEFER_STAT:
-		{
-			status = check_stat(checker, stat->defer_stat.body);
-		}
-		break;
-
-		case AST_WHILE:
-		{
-			value = check_expr(checker, stat->while_stat.pred);
-			status = com_value_status(value);
-			if (status == COM_STATUS_OK) {
-				status = check_stat(checker, stat->while_stat.body);
-			}
-		}
-		break;
-
-		case AST_FOR:
-		{
-			Scope *scope = 0;
-			status = push_scope(checker, stat, &scope);
-			if (status == COM_STATUS_OK)
-			{
-				status = check_stat(checker, stat->for_stat.init);
-				if (status == COM_STATUS_OK)
-				{
-					value = check_expr(checker, stat->for_stat.pred);
-					status = com_value_status(value);
-				}
-				if (status == COM_STATUS_OK) {
-					status = check_stat(checker, stat->for_stat.step);
-				}
-				if (status == COM_STATUS_OK) {
-					status = check_stat(checker, stat->for_stat.body);
-				}
-				pop_scope(checker, scope);
-			}
-		}
-		break;
-
-		case AST_FOR_RANGE:
-		{
-			Scope *scope = 0;
-			status = push_scope(checker, stat, &scope);
-			if (status == COM_STATUS_OK)
-			{
-				status = check_stat(checker, stat->for_range_stat.decl);
-				if (status == COM_STATUS_OK) {
-					status = check_stat(checker, stat->for_range_stat.body);
-				}
-				pop_scope(checker, scope);
-			}
-		}
-		break;
-
-		case AST_RETURN:
-		{
-			if (stat->return_stat.expr)
-			{
-				value = check_expr(checker, stat->return_stat.expr);
-				status = com_value_status(value);
-			}
-		}
-		break;
-
-		case AST_BREAK:
-		{
-			if (stat->break_stat.expr)
-			{
-				value = check_expr(checker, stat->break_stat.expr);
-				status = com_value_status(value);
-			}
-		}
-		break;
-
-		case AST_CONTINUE:
-		{
-			if (stat->continue_stat.expr)
-			{
-				value = check_expr(checker, stat->continue_stat.expr);
-				status = com_value_status(value);
-			}
-		}
-		break;
-
 		case AST_ADD_ASSIGN:
 		case AST_SUB_ASSIGN:
 		case AST_MUL_ASSIGN:
@@ -938,27 +1905,241 @@ static Com_Status check_stat(Checker *checker, Ast stat)
 		case AST_SHR_ASSIGN:
 		case AST_NIL_ASSIGN:
 		case AST_ASSIGN:
+		case AST_INDEX:
+		case AST_FIELD:
+		case AST_META_FIELD:
+		case AST_COMMA_EXPR:
+		case AST_RANGE:
+		case AST_RANGE_INDEX:
 		{
-			ASSERT(stat->binary.x);
-			ASSERT(stat->binary.y);
-			value = check_expr(checker, stat->binary.x);
-			status = com_value_status(value);
-			if (status == COM_STATUS_OK) {
-				status = check_assign_dest(checker, stat->binary.x);
-			}
-			if (status == COM_STATUS_OK) {
-				value = check_expr(checker, stat->binary.y);
-				status = com_value_status(value);
-			}
+			Com_Status status = prepare_ast(checker, ast->binary.x);
+			return status == COM_STATUS_OK ? prepare_ast(checker, ast->binary.y) : status;
 		}
-		break;
+
+		case AST_INTERPOLATED_STRING:
+		{
+			return prepare_ast_array(checker, ast->interpolated_string);
+		}
+
+		case AST_CALL:
+		{
+			Com_Status status = prepare_ast(checker, ast->call.expr);
+			return status == COM_STATUS_OK ? prepare_ast_array(checker, ast->call.args) : status;
+		}
+
+		case AST_NAMED_ARGUMENT:
+		{
+			Com_Status status = prepare_ast(checker, ast->named_argument.name);
+			return status == COM_STATUS_OK ? prepare_ast(checker, ast->named_argument.expr) : status;
+		}
+
+		case AST_TUPLE:
+		{
+			return prepare_ast_array(checker, ast->tuple);
+		}
+
+		case AST_TABLE:
+		{
+			return prepare_ast_array(checker, ast->table);
+		}
+
+		case AST_ARRAY:
+		{
+			return prepare_ast_array(checker, ast->array);
+		}
+
+		case AST_TABLE_ENTRY:
+		{
+			Com_Status status = prepare_ast(checker, ast->table_entry.key);
+			return status == COM_STATUS_OK ? prepare_ast(checker, ast->table_entry.value) : status;
+		}
+
+		case AST_FUNCTION:
+		{
+			Scope *scope = push_scope(checker, ast);
+			if (!scope) {
+				return COM_STATUS_REPORTED;
+			}
+
+			Com_Status status = prepare_ast_array(checker, ast->function.params);
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->function.body);
+			}
+			pop_scope(checker, scope);
+			return status;
+		}
+
+		case AST_DECL_STAT:
+		{
+			Com_Status status = prepare_ast(checker, ast->decl.name);
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->decl.type);
+			}
+			return status == COM_STATUS_OK ? prepare_ast(checker, ast->decl.expr) : status;
+		}
+
+		case AST_STATIC_DECL:
+		{
+			return prepare_ast(checker, ast->static_decl.expr);
+		}
+
+		case AST_BLOCK_STAT:
+		{
+			Scope *scope = push_scope(checker, ast);
+			if (!scope) {
+				return COM_STATUS_REPORTED;
+			}
+
+			Com_Status status = prepare_scope(checker, scope, ast->block);
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast_array(checker, ast->block);
+			}
+			if (status == COM_STATUS_OK) {
+				status = check_static_functions(checker, ast->block);
+			}
+			pop_scope(checker, scope);
+			return status;
+		}
+
+		case AST_IF:
+		{
+			Com_Status status = prepare_ast(checker, ast->if_stat.pred);
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->if_stat.true_clause);
+			}
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->if_stat.else_clause);
+			}
+			return status == COM_STATUS_OK ? prepare_ast(checker, ast->if_stat.then_clause) : status;
+		}
+
+		case AST_DEFER_STAT:
+		{
+			return prepare_ast(checker, ast->defer_stat.body);
+		}
+
+		case AST_WHILE:
+		{
+			Com_Status status = prepare_ast(checker, ast->while_stat.pred);
+			return status == COM_STATUS_OK ? prepare_ast(checker, ast->while_stat.body) : status;
+		}
+
+		case AST_FOR:
+		{
+			Scope *scope = push_scope(checker, ast);
+			if (!scope) {
+				return COM_STATUS_REPORTED;
+			}
+
+			Com_Status status = prepare_ast(checker, ast->for_stat.init);
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->for_stat.pred);
+			}
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->for_stat.step);
+			}
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->for_stat.body);
+			}
+			pop_scope(checker, scope);
+			return status;
+		}
+
+		case AST_FOR_RANGE:
+		{
+			Scope *scope = push_scope(checker, ast);
+			if (!scope) {
+				return COM_STATUS_REPORTED;
+			}
+
+			Com_Status status = prepare_ast(checker, ast->for_range_stat.decl);
+			if (status == COM_STATUS_OK) {
+				status = prepare_ast(checker, ast->for_range_stat.body);
+			}
+			pop_scope(checker, scope);
+			return status;
+		}
+
+		case AST_RETURN:
+		{
+			return prepare_ast(checker, ast->return_stat.expr);
+		}
+
+		case AST_BREAK:
+		{
+			return prepare_ast(checker, ast->break_stat.expr);
+		}
+
+		case AST_CONTINUE:
+		{
+			return prepare_ast(checker, ast->continue_stat.expr);
+		}
 
 		default:
 		{
-			value = check_expr(checker, stat);
-			status = com_value_status(value);
+			ASSERT(0);
+			return COM_STATUS_REPORTED;
 		}
-		break;
 	}
+}
+
+static Com_Status check_source(IrModule *module, Com_Source *source)
+{
+	ASSERT(source);
+	if (source->state == COM_SOURCE_CHECKED || source->state == COM_SOURCE_CHECKING) {
+		return COM_STATUS_OK;
+	}
+	source->state = COM_SOURCE_CHECKING;
+	Compiler *compiler = source->compiler;
+	ASSERT(compiler);
+	ASSERT(compiler->globals);
+	Ast root = source->ast;
+	ASSERT(root);
+	ASSERT(root->kind == AST_FUNCTION);
+	ASSERT(!root->function.parent);
+	ASSERT(root->function.body);
+	ASSERT(root->function.body->kind == AST_BLOCK_STAT);
+
+	Checker checker = {};
+	checker.module = module;
+	checker.source = source;
+	checker.active_scope = compiler->globals;
+
+	IrFunction *function = ir_reserve_function(source, module, 0, root);
+	Scope *function_scope = push_scope(&checker, root);
+	if (!function_scope) {
+		return COM_STATUS_REPORTED;
+	}
+
+	Com_Status status = prepare_ast_array(&checker, root->function.params);
+	Scope *source_scope = 0;
+	if (status == COM_STATUS_OK)
+	{
+		source_scope = push_scope(&checker, root->function.body);
+		if (!source_scope) {
+			status = COM_STATUS_REPORTED;
+		}
+	}
+	if (status == COM_STATUS_OK)
+	{
+		ASSERT(!source->scope);
+		source->scope = source_scope;
+		status = prepare_scope(&checker, source_scope, root->function.body->block);
+	}
+	if (status == COM_STATUS_OK) {
+		status = prepare_ast_array(&checker, root->function.body->block);
+	}
+	if (status == COM_STATUS_OK) {
+		status = check_static_functions(&checker, root->function.body->block);
+	}
+	if (source_scope) {
+		pop_scope(&checker, source_scope);
+	}
+	pop_scope(&checker, function_scope);
+	if (status != COM_STATUS_OK) {
+		return status;
+	}
+	status = check_function(&checker, function);
+	source->state = COM_SOURCE_CHECKED;
 	return status;
 }

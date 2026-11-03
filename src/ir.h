@@ -2,10 +2,16 @@
 // See Copyright Notice In elf.h
 //
 
-typedef struct Atom Atom;
-typedef struct Ast_T Ast_T;
-typedef struct Com_Source Com_Source;
-typedef Ast_T *Ast;
+typedef struct IrNode IrNode;
+typedef IrNode *Ir;
+typedef struct IrEmitter IrEmitter;
+typedef struct IrDefer IrDefer;
+typedef struct IrLoopFrame IrLoopFrame;
+typedef struct IrModule IrModule;
+typedef struct IrCapture IrCapture;
+typedef struct IrFunction IrFunction;
+
+
 
 #define NO_SLOT (-1)
 
@@ -143,8 +149,36 @@ static inline const char *ir_kind_name(IrKind kind)
 	return names[kind];
 }
 
-typedef struct IrNode IrNode;
-typedef IrNode *Ir;
+struct IrDefer
+{
+	IrDefer *previous;
+	Ir       ir;
+};
+
+struct IrLoopFrame
+{
+	IrLoopFrame *parent;
+	Ir           continue_label;
+	Ir           break_label;
+	IrDefer     *defer_start;
+};
+
+// Note, this is the state needed to to lower one IrFunction ... but we also use it for allocating IrNodes ...
+// which is a bit odd ...
+struct IrEmitter
+{
+	IrModule    *module;
+	IrFunction  *function;
+
+	IrDefer     *defer;
+	IrDefer     *defer_scope_start;
+	IrLoopFrame *loop;
+	// Todo, when revisiting this again, reuse the ir stack for the entire process
+	// not just per function ...
+	u32          ir_stack_size;
+	u32          ir_stack_index;
+	Ir          *ir_stack;
+};
 
 typedef struct
 {
@@ -153,7 +187,14 @@ typedef struct
 }
 IrArray;
 
-typedef struct IrCapture IrCapture;
+typedef struct
+{
+	IrEmitter *emitter;
+	u32        start;
+	u32        count;
+}
+IrQueue;
+
 struct IrCapture
 {
 	IrCapture     *next;
@@ -162,9 +203,8 @@ struct IrCapture
 	u32            slot;
 };
 
-// Note, IrFunctions are allocated separately from regular IR nodes, an actual IR_FUNCTION refers
-// to this structure directly ...
-typedef struct IrFunction IrFunction;
+#define IR_FUNCTION_INDEX_INVALID ((u32)-1)
+
 struct IrFunction
 {
 	IrFunction *next;
@@ -173,16 +213,14 @@ struct IrFunction
 	Com_Source *source;
 	SourceSite  site;
 	b32         variadic;
-	u32         param_count;
 	Ir          body;
-	Ir         *params;
+	IrArray     params;
 	IrCapture  *first_capture;
 	IrCapture  *last_capture;
 	u32         capture_count;
 	u32         index;
 };
 
-typedef struct IrModule IrModule;
 struct IrModule
 {
 	Arena       *arena;
@@ -199,7 +237,8 @@ struct IrNode
 
 	union
 	{
-		u32      native_function_index;
+		Com_Status status;
+		u32        native_function_index;
 		IrCapture *ir_load_capture;
 
 		struct
@@ -308,18 +347,33 @@ struct IrNode
 };
 
 
-static IrNode ir_error_sentinel =
-{
-	.kind = IR_ERROR,
-};
+static IrNode ir_error_sentinel;
+static IrNode ir_oom_sentinel;
 
-#define ERROR_IR (&ir_error_sentinel)
+#define ERROR_IR     (&ir_error_sentinel)
+#define ERROR_OOM_IR (&ir_oom_sentinel)
+
+static inline Ir ir_from_status(Com_Status status)
+{
+	switch (status)
+	{
+		case COM_STATUS_REPORTED: return ERROR_IR;
+		case COM_STATUS_OOM:      return ERROR_OOM_IR;
+		default: ASSERT(0);       return ERROR_IR;
+	}
+}
 
 static inline b32 ir_is_error(Ir ir)
 {
-	return ir == ERROR_IR;
+	return ir && ir->kind == IR_ERROR;
 }
 
-#define IR_FUNCTION_INDEX_INVALID ((u32)-1)
+static inline Com_Status ir_status(Ir ir)
+{
+	ASSERT(ir_is_error(ir));
+	ASSERT(ir->status != COM_STATUS_OK);
+	return ir->status;
+}
+
 
 
