@@ -1761,8 +1761,7 @@ static Com_Status prepare_scope(IrEmitter *checker, Scope *scope, Ast_Array stat
 		name->entity = entity;
 		if (expr->kind == AST_FUNCTION)
 		{
-			IrFunction *func = ir_reserve_function(checker->source, checker->module, 0, expr);
-			entity->value = com_value_ir(ir_new_function_ref(checker, expr->site, func));
+			ir_reserve_function(checker->source, checker->module, 0, expr);
 		}
 
 		Compiler *compiler = checker->source->compiler;
@@ -2115,29 +2114,30 @@ static Com_Status eval_statics(IrModule *module, Compiler *compiler)
 		ASSERT(entity->tags & ENTITY_TAG_STATIC);
 		ASSERT(entity->declaration);
 		ASSERT(entity->declaration->kind == AST_STATIC_DECL);
-		if (entity->value.type != COM_VALUE_IR || entity->value.ir->kind != IR_FUNCTION_REF) {
-			continue;
-		}
 
 		IrEmitter checker = {};
 		checker.module = module;
 		checker.source = entity->scope->source;
 		checker.active_scope = entity->scope;
 
-		Com_Status status = check_function(&checker, entity->value.ir->func);
-		if (status != COM_STATUS_OK) {
-			return status;
+		if (entity->value.type != COM_VALUE_AST) {
+			continue;
+		}
+
+		entity->value = check_expr(&checker, entity->value.ast);
+		if (entity->value.type == COM_VALUE_ERROR) {
+			return entity->value.status;
 		}
 	}
 	return COM_STATUS_OK;
 }
 
-static Com_Status check(IrModule *module, Compiler *compiler)
+static Com_Status check(IrModule *module, Compiler *com)
 {
 	ASSERT(module);
-	ASSERT(compiler);
+	ASSERT(com);
 
-	for (Com_Source *current = compiler->first_source; current; current = current->next)
+	for (Com_Source *current = com->first_source; current; current = current->next)
 	{
 		Com_Status status = prepare_source(module, current);
 		if (status != COM_STATUS_OK) {
@@ -2146,13 +2146,13 @@ static Com_Status check(IrModule *module, Compiler *compiler)
 	}
 
 	{
-		Com_Status status = eval_statics(module, compiler);
+		Com_Status status = eval_statics(module, com);
 		if (status != COM_STATUS_OK) {
 			return status;
 		}
 	}
 
-	for (Com_Source *current = compiler->first_source; current; current = current->next)
+	for (Com_Source *current = com->first_source; current; current = current->next)
 	{
 		ASSERT(current->state == COM_SOURCE_PREPARED);
 		ASSERT(current->ast->function.ir);
@@ -2160,7 +2160,7 @@ static Com_Status check(IrModule *module, Compiler *compiler)
 		IrEmitter checker = {};
 		checker.module = module;
 		checker.source = current;
-		checker.active_scope = compiler->globals;
+		checker.active_scope = com->globals;
 
 		Com_Status status = check_function(&checker, current->ast->function.ir);
 		current->state = COM_SOURCE_CHECKED;
