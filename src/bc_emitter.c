@@ -19,14 +19,6 @@ typedef struct
 }
 BcRef;
 
-typedef struct
-{
-	elf_Prototype *proto;
-	IrFunction    *func;
-	u32            slot;
-}
-BcPatch;
-
 typedef struct BcEmitter BcEmitter;
 struct BcEmitter
 {
@@ -1175,12 +1167,24 @@ static void install_function(BcEmitter *emitter, IrFunction *function)
 	function->proto = prototype;
 }
 
-static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
+static elf_Prototype *bc_emit_func(elf_State *target, IrModule *module, IrFunction *function)
 {
-	ASSERT(emitter);
+	ASSERT(target);
+	ASSERT(module);
 	ASSERT(function);
-	ASSERT(!function->ast || function->ast->function.params.count == function->params.count);
 
+	if (function->proto) {
+		return function->proto;
+	}
+
+	u64 arena_checkpoint = arena_mark(module->arena);
+	BcEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(BcEmitter));
+	emitter->target = target;
+	emitter->arena = module->arena;
+	emitter->bytecode_capacity = 1 << 13;
+	emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
+
+	ASSERT(!function->ast || function->ast->function.params.count == function->params.count);
 	emitter->stack_size = 1;
 	emitter->stack_top = 1;
 	for (u32 i = 0; i < function->params.count; ++i)
@@ -1206,6 +1210,17 @@ static void bc_emit_func(BcEmitter *emitter, IrFunction *function)
 	}
 	patch_jumps(emitter);
 	install_function(emitter, function);
+
+	for (u32 i = 0; i < emitter->nrefs; ++i)
+	{
+		BcRef ref = emitter->refs[i];
+		elf_Prototype *proto = bc_emit_func(target, module, ref.func);
+		ASSERT(ref.slot < function->proto->nconsts);
+		function->proto->consts[ref.slot] = proto_value(proto);
+	}
+
+	arena_restore(module->arena, arena_checkpoint);
+	return function->proto;
 }
 
 static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
@@ -1216,39 +1231,13 @@ static elf_Prototype *bc_emit_module(elf_State *target, IrModule *module)
 	ASSERT(module->last_function);
 	ASSERT(!module->last_function->next);
 
-	Scratch scratch = scratch_begin_excluding(module->arena);
-	BcPatch *patches = 0;
-	u32 npatches = 0;
-	u32 xpatches = 0;
-
 	u32 emitted_function_count = 0;
 	for (IrFunction *function = module->first_function; function; function = function->next)
 	{
-		u64 arena_checkpoint = arena_mark(module->arena);
-		BcEmitter *emitter = arena_push_zero(module->arena, sizeof(*emitter), _Alignof(BcEmitter));
-		emitter->target = target;
-		emitter->arena = module->arena;
-		emitter->bytecode_capacity = 1 << 13;
-		emitter->bytecode = arena_push_zero(emitter->arena, sizeof(*emitter->bytecode) * emitter->bytecode_capacity, _Alignof(Bytecode));
-		bc_emit_func(emitter, function);
-
-		patches = grow_emitter_array(scratch.arena, patches, npatches, &xpatches, npatches + emitter->nrefs, sizeof(*patches));
-		for (u32 i = 0; i < emitter->nrefs; ++i) {
-			patches[npatches++] = (BcPatch) { .proto = function->proto, .func = emitter->refs[i].func, .slot = emitter->refs[i].slot };
-		}
-
-		arena_restore(module->arena, arena_checkpoint);
+		bc_emit_func(target, module, function);
 		emitted_function_count += 1;
 	}
 	ASSERT(emitted_function_count == module->function_count);
 
-	for (u32 i = 0; i < npatches; ++i)
-	{
-		BcPatch patch = patches[i];
-		ASSERT(patch.func->proto);
-		ASSERT(patch.slot < patch.proto->nconsts);
-		patch.proto->consts[patch.slot] = proto_value(patch.func->proto);
-	}
-	scratch_end(scratch);
 	return module->first_function->proto;
 }
