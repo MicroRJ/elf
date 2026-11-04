@@ -118,10 +118,10 @@ static Ir check_ir(IrEmitter *emitter, Ast expr);
 static Ir check_block(IrEmitter *emitter, Ast stat);
 static Ir check_for(IrEmitter *emitter, Ast stat);
 static Ir check_range_for(IrEmitter *emitter, Ast stat);
-static Com_Status prepare_func(IrEmitter *emitter, IrFunction *func);
-static Com_Status prepare_ast(IrEmitter *emitter, Ast ast);
-static Com_Status prepare_ast_array(IrEmitter *emitter, Ast_Array array);
-static Com_Status prepare_scope(IrEmitter *emitter, Scope *scope, Ast_Array stats);
+static Com_Status prepare_func(IrModule *mod, Com_Source *source, Scope *parent_scope, IrFunction *func);
+static Com_Status prepare_ast(IrModule *mod, Com_Source *source, Scope *scope, IrFunction *func, Ast ast);
+static Com_Status prepare_ast_array(IrModule *mod, Com_Source *source, Scope *scope, IrFunction *func, Ast_Array array);
+static Com_Status prepare_scope(Com_Source *source, Scope *scope, Ast_Array stats);
 static Com_Status check_function(IrEmitter *emitter, IrFunction *function);
 
 static Com_Value com_value_error(Com_Status status)
@@ -217,21 +217,20 @@ static Com_Status check_assign_dest(IrEmitter *emitter, Ast dest)
 	return COM_STATUS_OK;
 }
 
-static Scope *push_scope(IrEmitter *emitter, Ast owner)
+static Scope *push_scope(Com_Source *source, Scope *parent, Ast owner)
 {
-	ASSERT(emitter);
-	ASSERT(emitter->active_scope);
+	ASSERT(source);
+	ASSERT(parent);
 	ASSERT(owner);
-	ASSERT(!emitter->active_scope->source || emitter->active_scope->source == emitter->source);
-	Scope *scope = scope_create(emitter->active_scope->arena, emitter->active_scope, owner, emitter->source);
+	ASSERT(!parent->source || parent->source == source);
+	Scope *scope = scope_create(parent->arena, parent, owner, source);
 	if (!scope)
 	{
-		checker_out_of_memory(emitter->source, owner->site);
+		checker_out_of_memory(source, owner->site);
 		return 0;
 	}
 	ASSERT(!owner->scope);
 	owner->scope = scope;
-	emitter->active_scope = scope;
 	return scope;
 }
 
@@ -1763,7 +1762,7 @@ static Com_Status check_function(IrEmitter *outer, IrFunction *function)
 	return status;
 }
 
-static Com_Status prepare_scope(IrEmitter *checker, Scope *scope, Ast_Array stats)
+static Com_Status prepare_scope(Com_Source *source, Scope *scope, Ast_Array stats)
 {
 	for (u32 i = 0; i < stats.count; ++ i)
 	{
@@ -1791,18 +1790,18 @@ static Com_Status prepare_scope(IrEmitter *checker, Scope *scope, Ast_Array stat
 		entity->declaration = declaration;
 		name->entity = entity;
 
-		Compiler *compiler = checker->source->compiler;
+		Compiler *compiler = source->compiler;
 		entity->next_in_compiler = compiler->entities;
 		compiler->entities = entity;
 	}
 	return COM_STATUS_OK;
 }
 
-static Com_Status prepare_ast_array(IrEmitter *checker, Ast_Array array)
+static Com_Status prepare_ast_array(IrModule *mod, Com_Source *source, Scope *scope, IrFunction *func, Ast_Array array)
 {
 	for (u32 i = 0; i < array.count; ++ i)
 	{
-		Com_Status status = prepare_ast(checker, array.items[i]);
+		Com_Status status = prepare_ast(mod, source, scope, func, array.items[i]);
 		if (status != COM_STATUS_OK) {
 			return status;
 		}
@@ -1810,34 +1809,28 @@ static Com_Status prepare_ast_array(IrEmitter *checker, Ast_Array array)
 	return COM_STATUS_OK;
 }
 
-static Com_Status prepare_func(IrEmitter *checker, IrFunction *func)
+static Com_Status prepare_func(IrModule *mod, Com_Source *source, Scope *parent_scope, IrFunction *func)
 {
 	ASSERT(func);
+	ASSERT(func->source == source);
 	ASSERT(func->ast);
 	ASSERT(func->ast->kind == AST_FUNCTION);
 	ASSERT(func->ast->function.ir == func);
 
-	IrFunction *outer = checker->function;
-	checker->function = func;
-
 	Ast ast = func->ast;
-	Scope *scope = push_scope(checker, ast);
-	if (!scope)
-	{
-		checker->function = outer;
+	Scope *scope = push_scope(source, parent_scope, ast);
+	if (!scope) {
 		return COM_STATUS_REPORTED;
 	}
 
-	Com_Status status = prepare_ast_array(checker, ast->function.params);
+	Com_Status status = prepare_ast_array(mod, source, scope, func, ast->function.params);
 	if (status == COM_STATUS_OK) {
-		status = prepare_ast(checker, ast->function.body);
+		status = prepare_ast(mod, source, scope, func, ast->function.body);
 	}
-	pop_scope(checker, scope);
-	checker->function = outer;
 	return status;
 }
 
-static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
+static Com_Status prepare_ast(IrModule *mod, Com_Source *source, Scope *scope, IrFunction *func, Ast ast)
 {
 	if (!ast) {
 		return COM_STATUS_OK;
@@ -1868,7 +1861,7 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 		case AST_MEASURE:
 		case AST_GET_MEM:
 		{
-			return prepare_ast(checker, ast->unary);
+			return prepare_ast(mod, source, scope, func, ast->unary);
 		}
 
 		case AST_AND:
@@ -1909,62 +1902,62 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 		case AST_RANGE:
 		case AST_RANGE_INDEX:
 		{
-			Com_Status status = prepare_ast(checker, ast->binary.x);
-			return status == COM_STATUS_OK ? prepare_ast(checker, ast->binary.y) : status;
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->binary.x);
+			return status == COM_STATUS_OK ? prepare_ast(mod, source, scope, func, ast->binary.y) : status;
 		}
 
 		case AST_INTERPOLATED_STRING:
 		{
-			return prepare_ast_array(checker, ast->interpolated_string);
+			return prepare_ast_array(mod, source, scope, func, ast->interpolated_string);
 		}
 
 		case AST_CALL:
 		{
-			Com_Status status = prepare_ast(checker, ast->call.expr);
-			return status == COM_STATUS_OK ? prepare_ast_array(checker, ast->call.args) : status;
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->call.expr);
+			return status == COM_STATUS_OK ? prepare_ast_array(mod, source, scope, func, ast->call.args) : status;
 		}
 
 		case AST_NAMED_ARGUMENT:
 		{
-			Com_Status status = prepare_ast(checker, ast->named_argument.name);
-			return status == COM_STATUS_OK ? prepare_ast(checker, ast->named_argument.expr) : status;
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->named_argument.name);
+			return status == COM_STATUS_OK ? prepare_ast(mod, source, scope, func, ast->named_argument.expr) : status;
 		}
 
 		case AST_TUPLE:
 		{
-			return prepare_ast_array(checker, ast->tuple);
+			return prepare_ast_array(mod, source, scope, func, ast->tuple);
 		}
 
 		case AST_TABLE:
 		{
-			return prepare_ast_array(checker, ast->table);
+			return prepare_ast_array(mod, source, scope, func, ast->table);
 		}
 
 		case AST_ARRAY:
 		{
-			return prepare_ast_array(checker, ast->array);
+			return prepare_ast_array(mod, source, scope, func, ast->array);
 		}
 
 		case AST_TABLE_ENTRY:
 		{
-			Com_Status status = prepare_ast(checker, ast->table_entry.key);
-			return status == COM_STATUS_OK ? prepare_ast(checker, ast->table_entry.value) : status;
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->table_entry.key);
+			return status == COM_STATUS_OK ? prepare_ast(mod, source, scope, func, ast->table_entry.value) : status;
 		}
 
 		case AST_FUNCTION:
 		{
 			ASSERT(!ast->function.ir);
-			IrFunction *func = ir_reserve_function(checker->source, checker->module, checker->function, ast);
-			return prepare_func(checker, func);
+			IrFunction *inner = ir_reserve_function(source, mod, func, ast);
+			return prepare_func(mod, source, scope, inner);
 		}
 
 		case AST_DECL_STAT:
 		{
-			Com_Status status = prepare_ast(checker, ast->decl.name);
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->decl.name);
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->decl.type);
+				status = prepare_ast(mod, source, scope, func, ast->decl.type);
 			}
-			return status == COM_STATUS_OK ? prepare_ast(checker, ast->decl.expr) : status;
+			return status == COM_STATUS_OK ? prepare_ast(mod, source, scope, func, ast->decl.expr) : status;
 		}
 
 		case AST_STATIC_DECL:
@@ -1980,100 +1973,97 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 				ASSERT(name->entity->value.ast == expr);
 				ASSERT(!expr->function.ir);
 
-				IrFunction *func = ir_reserve_function(checker->source, checker->module, 0, expr);
-				name->entity->value = com_value_ir(ir_new_function_ref(checker->module, expr->site, func));
-				return prepare_func(checker, func);
+				IrFunction *static_func = ir_reserve_function(source, mod, 0, expr);
+				name->entity->value = com_value_ir(ir_new_function_ref(mod, expr->site, static_func));
+				return prepare_func(mod, source, scope, static_func);
 			}
-			return prepare_ast(checker, expr);
+			return prepare_ast(mod, source, scope, func, expr);
 		}
 
 		case AST_BLOCK_STAT:
 		{
-			Scope *scope = push_scope(checker, ast);
-			if (!scope) {
+			Scope *child_scope = push_scope(source, scope, ast);
+			if (!child_scope) {
 				return COM_STATUS_REPORTED;
 			}
 
-			Com_Status status = prepare_scope(checker, scope, ast->block);
+			Com_Status status = prepare_scope(source, child_scope, ast->block);
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast_array(checker, ast->block);
+				status = prepare_ast_array(mod, source, child_scope, func, ast->block);
 			}
-			pop_scope(checker, scope);
 			return status;
 		}
 
 		case AST_IF:
 		{
-			Com_Status status = prepare_ast(checker, ast->if_stat.pred);
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->if_stat.pred);
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->if_stat.true_clause);
+				status = prepare_ast(mod, source, scope, func, ast->if_stat.true_clause);
 			}
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->if_stat.else_clause);
+				status = prepare_ast(mod, source, scope, func, ast->if_stat.else_clause);
 			}
-			return status == COM_STATUS_OK ? prepare_ast(checker, ast->if_stat.then_clause) : status;
+			return status == COM_STATUS_OK ? prepare_ast(mod, source, scope, func, ast->if_stat.then_clause) : status;
 		}
 
 		case AST_DEFER_STAT:
 		{
-			return prepare_ast(checker, ast->defer_stat.body);
+			return prepare_ast(mod, source, scope, func, ast->defer_stat.body);
 		}
 
 		case AST_WHILE:
 		{
-			Com_Status status = prepare_ast(checker, ast->while_stat.pred);
-			return status == COM_STATUS_OK ? prepare_ast(checker, ast->while_stat.body) : status;
+			Com_Status status = prepare_ast(mod, source, scope, func, ast->while_stat.pred);
+			return status == COM_STATUS_OK ? prepare_ast(mod, source, scope, func, ast->while_stat.body) : status;
 		}
 
 		case AST_FOR:
 		{
-			Scope *scope = push_scope(checker, ast);
-			if (!scope) {
+			Scope *child_scope = push_scope(source, scope, ast);
+			if (!child_scope) {
 				return COM_STATUS_REPORTED;
 			}
 
-			Com_Status status = prepare_ast(checker, ast->for_stat.init);
+			Com_Status status = prepare_ast(mod, source, child_scope, func, ast->for_stat.init);
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->for_stat.pred);
+				status = prepare_ast(mod, source, child_scope, func, ast->for_stat.pred);
 			}
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->for_stat.step);
+				status = prepare_ast(mod, source, child_scope, func, ast->for_stat.step);
 			}
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->for_stat.body);
+				status = prepare_ast(mod, source, child_scope, func, ast->for_stat.body);
 			}
-			pop_scope(checker, scope);
 			return status;
 		}
 
 		case AST_FOR_RANGE:
 		{
-			Scope *scope = push_scope(checker, ast);
-			if (!scope) {
+			Scope *child_scope = push_scope(source, scope, ast);
+			if (!child_scope) {
 				return COM_STATUS_REPORTED;
 			}
 
-			Com_Status status = prepare_ast(checker, ast->for_range_stat.decl);
+			Com_Status status = prepare_ast(mod, source, child_scope, func, ast->for_range_stat.decl);
 			if (status == COM_STATUS_OK) {
-				status = prepare_ast(checker, ast->for_range_stat.body);
+				status = prepare_ast(mod, source, child_scope, func, ast->for_range_stat.body);
 			}
-			pop_scope(checker, scope);
 			return status;
 		}
 
 		case AST_RETURN:
 		{
-			return prepare_ast(checker, ast->return_stat.expr);
+			return prepare_ast(mod, source, scope, func, ast->return_stat.expr);
 		}
 
 		case AST_BREAK:
 		{
-			return prepare_ast(checker, ast->break_stat.expr);
+			return prepare_ast(mod, source, scope, func, ast->break_stat.expr);
 		}
 
 		case AST_CONTINUE:
 		{
-			return prepare_ast(checker, ast->continue_stat.expr);
+			return prepare_ast(mod, source, scope, func, ast->continue_stat.expr);
 		}
 
 		default:
@@ -2084,7 +2074,7 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 	}
 }
 
-static Com_Status prepare_source(IrModule *module, Com_Source *source)
+static Com_Status prepare_source(IrModule *mod, Com_Source *source)
 {
 	ASSERT(source);
 	if (source->state >= COM_SOURCE_PREPARED) {
@@ -2103,22 +2093,17 @@ static Com_Status prepare_source(IrModule *module, Com_Source *source)
 	ASSERT(root->function.body);
 	ASSERT(root->function.body->kind == AST_BLOCK_STAT);
 
-	IrEmitter checker = {};
-	checker.module = module;
-	checker.source = source;
-	checker.active_scope = compiler->globals;
-
-	checker.function = ir_reserve_function(source, module, 0, root);
-	Scope *function_scope = push_scope(&checker, root);
+	IrFunction *func = ir_reserve_function(source, mod, 0, root);
+	Scope *function_scope = push_scope(source, compiler->globals, root);
 	if (!function_scope) {
 		return COM_STATUS_REPORTED;
 	}
 
-	Com_Status status = prepare_ast_array(&checker, root->function.params);
+	Com_Status status = prepare_ast_array(mod, source, function_scope, func, root->function.params);
 	Scope *source_scope = 0;
 	if (status == COM_STATUS_OK)
 	{
-		source_scope = push_scope(&checker, root->function.body);
+		source_scope = push_scope(source, function_scope, root->function.body);
 		if (!source_scope) {
 			status = COM_STATUS_REPORTED;
 		}
@@ -2127,15 +2112,11 @@ static Com_Status prepare_source(IrModule *module, Com_Source *source)
 	{
 		ASSERT(!source->scope);
 		source->scope = source_scope;
-		status = prepare_scope(&checker, source_scope, root->function.body->block);
+		status = prepare_scope(source, source_scope, root->function.body->block);
 	}
 	if (status == COM_STATUS_OK) {
-		status = prepare_ast_array(&checker, root->function.body->block);
+		status = prepare_ast_array(mod, source, source_scope, func, root->function.body->block);
 	}
-	if (source_scope) {
-		pop_scope(&checker, source_scope);
-	}
-	pop_scope(&checker, function_scope);
 	if (status == COM_STATUS_OK) {
 		source->state = COM_SOURCE_PREPARED;
 	}
