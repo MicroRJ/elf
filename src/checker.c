@@ -150,25 +150,25 @@ static Ir ir_from_value(IrEmitter *emitter, SourceSite site, elf_Value value)
 	switch (value.type)
 	{
 		case ELF_VALUE_TYPE_NIL: {
-			return ir_new_nil(emitter, site);
+			return ir_new_nil(emitter->module, site);
 		}
 		case ELF_VALUE_TYPE_INTEGER: {
-			return ir_new_int(emitter, site, value_as_integer(value));
+			return ir_new_int(emitter->module, site, value_as_integer(value));
 		}
 		case ELF_VALUE_TYPE_NUMBER: {
-			return ir_new_num(emitter, site, value_as_number(value));
+			return ir_new_num(emitter->module, site, value_as_number(value));
 		}
 		case ELF_VALUE_TYPE_STRING:
 		{
 			elf_String *string = value_as_string(value);
 			Atom *atom = atom_from_data_size(emitter->source->compiler->atoms, elf_string_data(string), elf_string_size(string));
-			return atom ? ir_new_atom(emitter, site, atom) : ERROR_OOM_IR;
+			return atom ? ir_new_atom(emitter->module, site, atom) : ERROR_OOM_IR;
 		}
 		case ELF_VALUE_TYPE_TABLE: {
-			return ir_new_tab_ref(emitter, site, value_as_table(value));
+			return ir_new_tab_ref(emitter->module, site, value_as_table(value));
 		}
 		case ELF_VALUE_TYPE_ARRAY: {
-			return ir_new_arr_ref(emitter, site, value_as_array(value));
+			return ir_new_arr_ref(emitter->module, site, value_as_array(value));
 		}
 		default: {
 			ASSERT(!"unsupported static result type");
@@ -286,7 +286,7 @@ static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *enti
 	ASSERT(function->parent || !function->ncaps);
 
 	if (local->ir_local.owner == function) {
-		return ir_new_load(emitter, site, local);
+		return ir_new_load(emitter->module, site, local);
 	}
 
 	u32 capture = 0;
@@ -321,7 +321,7 @@ static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *enti
 		function->caps[function->ncaps++] = (IrCapture) { .local = local, .target = target };
 	}
 
-	return ir_new_capture_ref(emitter, site, capture);
+	return ir_new_capture_ref(emitter->module, site, capture);
 }
 
 static b32 ir_mark_entity_assigned(IrEmitter *emitter, Ast destination)
@@ -457,22 +457,22 @@ static Com_Value check_entity(IrEmitter *checker, SourceSite site, Entity *entit
 		break;
 
 		case COM_VALUE_NUMBER: {
-			ir = ir_new_num(checker, site, value.number);
+			ir = ir_new_num(checker->module, site, value.number);
 		}
 		break;
 
 		case COM_VALUE_INTEGER: {
-			ir = ir_new_int(checker, site, value.integer);
+			ir = ir_new_int(checker->module, site, value.integer);
 		}
 		break;
 
 		case COM_VALUE_STRING: {
-			ir = ir_new_atom(checker, site, value.string);
+			ir = ir_new_atom(checker->module, site, value.string);
 		}
 		break;
 
 		case COM_VALUE_NATIVE_FUNCTION: {
-			ir = ir_new_native_function(checker, site, value.native_function_index);
+			ir = ir_new_native_function(checker->module, site, value.native_function_index);
 		}
 		break;
 
@@ -535,31 +535,31 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 		case AST_RECURSE:
 		{
 			ASSERT(checker->function);
-			value = com_value_ir(ir_new_recurse(emitter, expr->site));
+			value = com_value_ir(ir_new_recurse(emitter->module, expr->site));
 		}
 		break;
 
 		case AST_NIL_LITERAL:
 		{
-			value = com_value_ir(ir_new_nil(emitter, expr->site));
+			value = com_value_ir(ir_new_nil(emitter->module, expr->site));
 		}
 		break;
 
 		case AST_INTEGER_LITERAL:
 		{
-			value = com_value_ir(ir_new_int(emitter, expr->site, expr->integer_value));
+			value = com_value_ir(ir_new_int(emitter->module, expr->site, expr->integer_value));
 		}
 		break;
 
 		case AST_NUMBER_LITERAL:
 		{
-			value = com_value_ir(ir_new_num(emitter, expr->site, expr->number_value));
+			value = com_value_ir(ir_new_num(emitter->module, expr->site, expr->number_value));
 		}
 		break;
 
 		case AST_STRING_LITERAL:
 		{
-			value = com_value_ir(ir_new_atom(emitter, expr->site, expr->string_value));
+			value = com_value_ir(ir_new_atom(emitter->module, expr->site, expr->string_value));
 		}
 		break;
 
@@ -572,7 +572,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 				value = com_value_error(status);
 				break;
 			}
-			value = com_value_ir(ir_new_function_ref(emitter, expr->site, function));
+			value = com_value_ir(ir_new_function_ref(emitter->module, expr->site, function));
 		}
 		break;
 
@@ -665,21 +665,21 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 				break;
 			}
 			ASSERT(right.type == COM_VALUE_IR);
-			value = com_value_ir(ir_new_binary(emitter, expr->site, IR_FIELD, left.ir, right.ir));
+			value = com_value_ir(ir_new_binary(emitter->module, expr->site, IR_FIELD, left.ir, right.ir));
 		}
 		break;
 
 		case AST_BITWISE_NOT:
 		{
 			Ir operand = check_ir(checker, expr->unary);
-			value = ir_is_error(operand) ? com_value_error(ir_status(operand)) : com_value_ir(ir_new_unary(emitter, expr->site, IR_BITWISE_NOT, operand));
+			value = ir_is_error(operand) ? com_value_error(ir_status(operand)) : com_value_ir(ir_new_unary(emitter->module, expr->site, IR_BITWISE_NOT, operand));
 		}
 		break;
 
 		case AST_MEASURE:
 		{
 			Ir operand = check_ir(checker, expr->unary);
-			value = ir_is_error(operand) ? com_value_error(ir_status(operand)) : com_value_ir(ir_new_measure(emitter, expr->site, operand));
+			value = ir_is_error(operand) ? com_value_error(ir_status(operand)) : com_value_ir(ir_new_measure(emitter->module, expr->site, operand));
 		}
 		break;
 
@@ -695,7 +695,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 				value = com_value_error(COM_STATUS_REPORTED);
 			}
 			else {
-				value = com_value_ir(ir_new_get_mem(emitter, expr->site, operand));
+				value = com_value_ir(ir_new_get_mem(emitter->module, expr->site, operand));
 			}
 		}
 		break;
@@ -735,19 +735,19 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 			}
 
 			if (expr->kind == AST_META_FIELD) {
-				value = com_value_ir(ir_new_binary(emitter, expr->site, IR_META_FIELD, x, y));
+				value = com_value_ir(ir_new_binary(emitter->module, expr->site, IR_META_FIELD, x, y));
 			}
 			else if (expr->kind == AST_INDEX) {
-				value = com_value_ir(ir_new_index(emitter, expr->site, x, y));
+				value = com_value_ir(ir_new_index(emitter->module, expr->site, x, y));
 			}
 			else if (expr->kind == AST_GREATER_THAN) {
-				value = com_value_ir(ir_new_binary(emitter, expr->site, IR_LESS_THAN, y, x));
+				value = com_value_ir(ir_new_binary(emitter->module, expr->site, IR_LESS_THAN, y, x));
 			}
 			else if (expr->kind == AST_GREATER_THAN_EQ) {
-				value = com_value_ir(ir_new_binary(emitter, expr->site, IR_LESS_THAN_EQ, y, x));
+				value = com_value_ir(ir_new_binary(emitter->module, expr->site, IR_LESS_THAN_EQ, y, x));
 			}
 			else {
-				value = com_value_ir(ir_new_binary(emitter, expr->site, ir_kind_from_ast_kind(expr->kind), x, y));
+				value = com_value_ir(ir_new_binary(emitter->module, expr->site, ir_kind_from_ast_kind(expr->kind), x, y));
 			}
 		}
 		break;
@@ -809,7 +809,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 					value = com_value_error(ir_status(part_ir));
 					break;
 				}
-				ir = ir ? ir_new_binary(emitter, part->site, IR_ADD, ir, part_ir) : part_ir;
+				ir = ir ? ir_new_binary(emitter->module, part->site, IR_ADD, ir, part_ir) : part_ir;
 			}
 			if (value.type != COM_VALUE_ERROR) {
 				value = com_value_ir(ir);
@@ -852,7 +852,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 			if (value.type == COM_VALUE_ERROR) {
 				break;
 			}
-			value = com_value_ir(ir_new_call(emitter, expr->site, target_ir, ir_args));
+			value = com_value_ir(ir_new_call(emitter->module, expr->site, target_ir, ir_args));
 		}
 		break;
 
@@ -870,7 +870,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 				}
 			}
 			if (value.type != COM_VALUE_ERROR) {
-				value = com_value_ir(ir_new_tuple(emitter, expr->site, items));
+				value = com_value_ir(ir_new_tuple(emitter->module, expr->site, items));
 			}
 		}
 		break;
@@ -878,7 +878,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 		case AST_TABLE:
 		{
 			IrQueue items = ir_queue_begin(emitter);
-			Ir local = ir_new_local(emitter, expr->site, ir_new_tab(emitter, expr->site));
+			Ir local = ir_new_local(emitter->module, emitter->function, expr->site, ir_new_tab(emitter->module, expr->site));
 			ir_queue_push(&items, local);
 
 			for (u32 i = 0; i < expr->table.count; ++ i)
@@ -899,16 +899,16 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 					value = com_value_error(ir_status(key));
 					break;
 				}
-				Ir table = ir_new_load(emitter, entry->site, local);
-				Ir field = ir_new_binary(emitter, entry->site, IR_FIELD, table, key);
-				ir_queue_push(&items, ir_new_store(emitter, entry->site, field, item));
+				Ir table = ir_new_load(emitter->module, entry->site, local);
+				Ir field = ir_new_binary(emitter->module, entry->site, IR_FIELD, table, key);
+				ir_queue_push(&items, ir_new_store(emitter->module, entry->site, field, item));
 			}
 
 			IrArray stats = ir_queue_end(&items);
 			if (value.type != COM_VALUE_ERROR)
 			{
-				Ir result = ir_new_load(emitter, expr->site, local);
-				value = com_value_ir(ir_new_expr_block(emitter, expr->site, stats, result));
+				Ir result = ir_new_load(emitter->module, expr->site, local);
+				value = com_value_ir(ir_new_expr_block(emitter->module, expr->site, stats, result));
 			}
 		}
 		break;
@@ -916,7 +916,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 		case AST_ARRAY:
 		{
 			IrQueue items = ir_queue_begin(emitter);
-			Ir local = ir_new_local(emitter, expr->site, ir_new_arr(emitter, expr->site));
+			Ir local = ir_new_local(emitter->module, emitter->function, expr->site, ir_new_arr(emitter->module, expr->site));
 			ir_queue_push(&items, local);
 			for (u32 i = 0; i < expr->array.count; ++ i)
 			{
@@ -926,15 +926,15 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 					value = com_value_error(ir_status(item));
 					break;
 				}
-				Ir array = ir_new_load(emitter, expr->site, local);
-				ir_queue_push(&items, ir_new_array_add(emitter, expr->array.items[i]->site, array, item));
+				Ir array = ir_new_load(emitter->module, expr->site, local);
+				ir_queue_push(&items, ir_new_array_add(emitter->module, expr->array.items[i]->site, array, item));
 			}
 
 			IrArray stats = ir_queue_end(&items);
 			if (value.type != COM_VALUE_ERROR)
 			{
-				Ir result = ir_new_load(emitter, expr->site, local);
-				value = com_value_ir(ir_new_expr_block(emitter, expr->site, stats, result));
+				Ir result = ir_new_load(emitter->module, expr->site, local);
+				value = com_value_ir(ir_new_expr_block(emitter->module, expr->site, stats, result));
 			}
 		}
 		break;
@@ -997,7 +997,7 @@ static Ir check_block(IrEmitter *checker, Ast stat)
 	if (status != COM_STATUS_OK) {
 		return ir_from_status(status);
 	}
-	return ir_new_block(emitter, stat->site, stats);
+	return ir_new_block(emitter->module, stat->site, stats);
 }
 
 static Ir check_for(IrEmitter *checker, Ast stat)
@@ -1031,9 +1031,9 @@ static Ir check_for(IrEmitter *checker, Ast stat)
 		return step;
 	}
 
-	Ir condition_label = ir_new_label(emitter, stat->site);
-	Ir continue_label = ir_new_label(emitter, stat->for_stat.step->site);
-	Ir break_label = ir_new_label(emitter, stat->site);
+	Ir condition_label = ir_new_label(emitter->module, stat->site);
+	Ir continue_label = ir_new_label(emitter->module, stat->for_stat.step->site);
+	Ir break_label = ir_new_label(emitter->module, stat->site);
 
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
@@ -1049,20 +1049,20 @@ static Ir check_for(IrEmitter *checker, Ast stat)
 		return body;
 	}
 
-	Ir exit_jump = ir_new_jump_if_false(emitter, stat->for_stat.pred->site, pred, break_label);
+	Ir exit_jump = ir_new_jump_if_false(emitter->module, stat->for_stat.pred->site, pred, break_label);
 	IrQueue loop_items = ir_queue_begin(emitter);
 	ir_queue_push(&loop_items, condition_label);
 	ir_queue_push(&loop_items, exit_jump);
 	ir_queue_push(&loop_items, body);
 	ir_queue_push(&loop_items, continue_label);
 	ir_queue_push(&loop_items, step);
-	ir_queue_push(&loop_items, ir_new_jump(emitter, stat->site, condition_label));
+	ir_queue_push(&loop_items, ir_new_jump(emitter->module, stat->site, condition_label));
 	ir_queue_push(&loop_items, break_label);
 	IrArray loop_stats = ir_queue_end(&loop_items);
-	ir_queue_push(&block_items, ir_new_block(emitter, stat->site, loop_stats));
+	ir_queue_push(&block_items, ir_new_block(emitter->module, stat->site, loop_stats));
 
 	IrArray stats = ir_queue_end(&block_items);
-	Ir result = ir_new_block(emitter, stat->site, stats);
+	Ir result = ir_new_block(emitter->module, stat->site, stats);
 	pop_scope(checker, scope);
 	return result;
 }
@@ -1106,14 +1106,14 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 			pop_scope(checker, scope);
 			return collection;
 		}
-		collection_local = ir_new_local(emitter, collection_expr->site, collection);
+		collection_local = ir_new_local(emitter->module, emitter->function, collection_expr->site, collection);
 	}
 
 	Ast range_start_expr = range->binary.x;
 	Ast range_end_expr = range->binary.y;
 	SourceSite range_start_site = range_start_expr ? range_start_expr->site : range->site;
 	SourceSite range_end_site = range_end_expr ? range_end_expr->site : range->site;
-	Ir range_start = range_start_expr ? check_ir(checker, range_start_expr) : ir_new_int(emitter, range_start_site, 0);
+	Ir range_start = range_start_expr ? check_ir(checker, range_start_expr) : ir_new_int(emitter->module, range_start_site, 0);
 	if (ir_is_error(range_start)) {
 		pop_scope(checker, scope);
 		return range_start;
@@ -1124,7 +1124,7 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 		range_end = check_ir(checker, range_end_expr);
 	}
 	else if (collection_local) {
-		range_end = ir_new_measure(emitter, range_end_site, ir_new_load(emitter, range_end_site, collection_local));
+		range_end = ir_new_measure(emitter->module, range_end_site, ir_new_load(emitter->module, range_end_site, collection_local));
 	}
 	else
 	{
@@ -1147,7 +1147,7 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 			break;
 		}
 
-		Ir local = ir_new_local(emitter, name->site, 0);
+		Ir local = ir_new_local(emitter->module, emitter->function, name->site, 0);
 		var_locals.items[i] = local;
 		Entity_Tags tags = decl->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
 		Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, (Com_Value) { .type = COM_VALUE_LOCAL, .local = { .ir_function = checker->function, .storage = local } });
@@ -1164,12 +1164,12 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 		return ir_from_status(status);
 	}
 
-	Ir iterator_local = ir_new_local(emitter, range_start_site, range_start);
-	Ir range_end_local = ir_new_local(emitter, range_end_site, range_end);
+	Ir iterator_local = ir_new_local(emitter->module, emitter->function, range_start_site, range_start);
+	Ir range_end_local = ir_new_local(emitter->module, emitter->function, range_end_site, range_end);
 	Ast first_name = name_tuple->tuple.items[0];
-	Ir start_label = ir_new_label(emitter, stat->site);
-	Ir continue_label = ir_new_label(emitter, first_name->site);
-	Ir break_label = ir_new_label(emitter, stat->site);
+	Ir start_label = ir_new_label(emitter->module, stat->site);
+	Ir continue_label = ir_new_label(emitter->module, first_name->site);
+	Ir break_label = ir_new_label(emitter->module, stat->site);
 
 	IrLoopFrame loop_frame = {};
 	loop_frame.continue_label = continue_label;
@@ -1184,10 +1184,10 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 		return body;
 	}
 
-	Ir iterator_load = ir_new_load(emitter, first_name->site, iterator_local);
-	Ir end_load = ir_new_load(emitter, range_end_site, range_end_local);
-	Ir pred = ir_new_binary(emitter, range->site, IR_LESS_THAN, iterator_load, end_load);
-	Ir exit_jump = ir_new_jump_if_false(emitter, range->site, pred, break_label);
+	Ir iterator_load = ir_new_load(emitter->module, first_name->site, iterator_local);
+	Ir end_load = ir_new_load(emitter->module, range_end_site, range_end_local);
+	Ir pred = ir_new_binary(emitter->module, range->site, IR_LESS_THAN, iterator_load, end_load);
+	Ir exit_jump = ir_new_jump_if_false(emitter->module, range->site, pred, break_label);
 
 	IrQueue loop_items = ir_queue_begin(emitter);
 	ir_queue_push(&loop_items, start_label);
@@ -1195,24 +1195,24 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 	for (u32 i = 0; i < nvars; ++ i)
 	{
 		Ast name = name_tuple->tuple.items[i];
-		Ir value = ir_new_load(emitter, name->site, iterator_local);
+		Ir value = ir_new_load(emitter->module, name->site, iterator_local);
 		if (i != 0) {
-			value = ir_new_binary(emitter, name->site, IR_ADD, value, ir_new_int(emitter, name->site, i));
+			value = ir_new_binary(emitter->module, name->site, IR_ADD, value, ir_new_int(emitter->module, name->site, i));
 		}
 		if (collection_local) {
-			value = ir_new_index(emitter, name->site, ir_new_load(emitter, name->site, collection_local), value);
+			value = ir_new_index(emitter->module, name->site, ir_new_load(emitter->module, name->site, collection_local), value);
 		}
-		ir_queue_push(&loop_items, ir_new_store(emitter, name->site, var_locals.items[i], value));
+		ir_queue_push(&loop_items, ir_new_store(emitter->module, name->site, var_locals.items[i], value));
 	}
 
-	Ir next_value = ir_new_binary(emitter, first_name->site, IR_ADD, ir_new_load(emitter, first_name->site, iterator_local), ir_new_int(emitter, first_name->site, nvars));
-	Ir increment = ir_new_store(emitter, first_name->site, iterator_local, next_value);
+	Ir next_value = ir_new_binary(emitter->module, first_name->site, IR_ADD, ir_new_load(emitter->module, first_name->site, iterator_local), ir_new_int(emitter->module, first_name->site, nvars));
+	Ir increment = ir_new_store(emitter->module, first_name->site, iterator_local, next_value);
 	ir_queue_push(&loop_items, body);
 	ir_queue_push(&loop_items, continue_label);
 	ir_queue_push(&loop_items, increment);
-	ir_queue_push(&loop_items, ir_new_jump(emitter, first_name->site, start_label));
+	ir_queue_push(&loop_items, ir_new_jump(emitter->module, first_name->site, start_label));
 	ir_queue_push(&loop_items, break_label);
-	Ir loop = ir_new_block(emitter, stat->site, ir_queue_end(&loop_items));
+	Ir loop = ir_new_block(emitter->module, stat->site, ir_queue_end(&loop_items));
 
 	IrQueue block_items = ir_queue_begin(emitter);
 	if (collection_local) {
@@ -1224,7 +1224,7 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 		ir_queue_push(&block_items, var_locals.items[i]);
 	}
 	ir_queue_push(&block_items, loop);
-	Ir result = ir_new_block(emitter, stat->site, ir_queue_end(&block_items));
+	Ir result = ir_new_block(emitter->module, stat->site, ir_queue_end(&block_items));
 	pop_scope(checker, scope);
 	return result;
 }
@@ -1236,17 +1236,17 @@ static Ir save_lvalue(IrEmitter *emitter, IrQueue *items, Ir ir)
 		return ir;
 	}
 
-	Ir receiver = ir_new_local(emitter, ir->ir_binary.x->site, ir->ir_binary.x);
+	Ir receiver = ir_new_local(emitter->module, emitter->function, ir->ir_binary.x->site, ir->ir_binary.x);
 	ir_queue_push(items, receiver);
-	Ir x = ir_new_load(emitter, ir->ir_binary.x->site, receiver);
+	Ir x = ir_new_load(emitter->module, ir->ir_binary.x->site, receiver);
 	Ir y = ir->ir_binary.y;
 	if (ir->kind == IR_INDEX || y->kind != IR_ATOM)
 	{
-		Ir key = ir_new_local(emitter, y->site, y);
+		Ir key = ir_new_local(emitter->module, emitter->function, y->site, y);
 		ir_queue_push(items, key);
-		y = ir_new_load(emitter, y->site, key);
+		y = ir_new_load(emitter->module, y->site, key);
 	}
-	return ir->kind == IR_INDEX ? ir_new_index(emitter, ir->site, x, y) : ir_new_binary(emitter, ir->site, IR_FIELD, x, y);
+	return ir->kind == IR_INDEX ? ir_new_index(emitter->module, ir->site, x, y) : ir_new_binary(emitter->module, ir->site, IR_FIELD, x, y);
 }
 
 static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
@@ -1337,18 +1337,18 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				for (u32 i = 0; i < count; ++ i)
 				{
 					Ast name = names->tuple.items[i];
-					locals.items[i] = ir_new_local(emitter, name->site, 0);
+					locals.items[i] = ir_new_local(emitter->module, emitter->function, name->site, 0);
 					name->entity->value.local.storage = locals.items[i];
 				}
-				ir_queue_push(items, ir_new_multi_local(emitter, exprs->site, expr_ir->ir_tuple.items[0], locals));
+				ir_queue_push(items, ir_new_multi_local(emitter->module, exprs->site, expr_ir->ir_tuple.items[0], locals));
 				return COM_STATUS_OK;
 			}
 
 			for (u32 i = 0; i < count; ++ i)
 			{
 				Ast name = names->tuple.items[i];
-				Ir value = i < expr_ir->ir_tuple.count ? expr_ir->ir_tuple.items[i] : ir_new_nil(emitter, name->site);
-				Ir local = ir_new_local(emitter, name->site, value);
+				Ir value = i < expr_ir->ir_tuple.count ? expr_ir->ir_tuple.items[i] : ir_new_nil(emitter->module, name->site);
+				Ir local = ir_new_local(emitter->module, emitter->function, name->site, value);
 				ir_queue_push(items, local);
 				name->entity->value.local.storage = local;
 			}
@@ -1376,7 +1376,7 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				}
 			}
 
-			ir_queue_push(items, ir_new_if(emitter, stat->site, pred, true_clause, else_clause));
+			ir_queue_push(items, ir_new_if(emitter->module, stat->site, pred, true_clause, else_clause));
 			return COM_STATUS_OK;
 		}
 
@@ -1387,8 +1387,8 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				return ir_status(pred);
 			}
 
-			Ir start_label = ir_new_label(emitter, stat->site);
-			Ir break_label = ir_new_label(emitter, stat->site);
+			Ir start_label = ir_new_label(emitter->module, stat->site);
+			Ir break_label = ir_new_label(emitter->module, stat->site);
 			IrLoopFrame loop_frame = {};
 			loop_frame.continue_label = start_label;
 			loop_frame.break_label = break_label;
@@ -1402,11 +1402,11 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 
 			IrQueue loop_items = ir_queue_begin(emitter);
 			ir_queue_push(&loop_items, start_label);
-			ir_queue_push(&loop_items, ir_new_jump_if_false(emitter, stat->while_stat.pred->site, pred, break_label));
+			ir_queue_push(&loop_items, ir_new_jump_if_false(emitter->module, stat->while_stat.pred->site, pred, break_label));
 			ir_queue_push(&loop_items, body);
-			ir_queue_push(&loop_items, ir_new_jump(emitter, stat->site, start_label));
+			ir_queue_push(&loop_items, ir_new_jump(emitter->module, stat->site, start_label));
 			ir_queue_push(&loop_items, break_label);
-			ir_queue_push(items, ir_new_block(emitter, stat->site, ir_queue_end(&loop_items)));
+			ir_queue_push(items, ir_new_block(emitter->module, stat->site, ir_queue_end(&loop_items)));
 			return COM_STATUS_OK;
 		}
 
@@ -1454,14 +1454,14 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				IrArray tuple = ir_array_alloc(emitter, expr_ir->ir_tuple.count);
 				for (u32 i = 0; i < expr_ir->ir_tuple.count; ++ i)
 				{
-					Ir local = ir_new_local(emitter, stat->site, expr_ir->ir_tuple.items[i]);
+					Ir local = ir_new_local(emitter->module, emitter->function, stat->site, expr_ir->ir_tuple.items[i]);
 					ir_queue_push(items, local);
-					tuple.items[i] = ir_new_load(emitter, stat->site, local);
+					tuple.items[i] = ir_new_load(emitter->module, stat->site, local);
 				}
-				expr_ir = ir_new_tuple(emitter, stat->site, tuple);
+				expr_ir = ir_new_tuple(emitter->module, stat->site, tuple);
 			}
 			ir_defer_emit(emitter, items, 0);
-			ir_queue_push(items, ir_new_return(emitter, stat->site, expr_ir));
+			ir_queue_push(items, ir_new_return(emitter->module, stat->site, expr_ir));
 			return COM_STATUS_OK;
 		}
 
@@ -1484,7 +1484,7 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				return COM_STATUS_REPORTED;
 			}
 			ir_defer_emit(emitter, items, loop.defer_start);
-			ir_queue_push(items, ir_new_jump(emitter, stat->site, label));
+			ir_queue_push(items, ir_new_jump(emitter->module, stat->site, label));
 			return COM_STATUS_OK;
 		}
 
@@ -1542,9 +1542,9 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				Ir dest = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[0]);
 				IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
 				ASSERT(op != IR_NONE);
-				Ir value = ir_new_binary(emitter, stat->site, op, dest, expr_tuple_ir->ir_tuple.items[0]);
+				Ir value = ir_new_binary(emitter->module, stat->site, op, dest, expr_tuple_ir->ir_tuple.items[0]);
 				Ir target = dest->kind == IR_LOAD ? dest->ir_load.local : dest;
-				ir_queue_push(items, ir_new_store(emitter, stat->site, target, value));
+				ir_queue_push(items, ir_new_store(emitter->module, stat->site, target, value));
 				return COM_STATUS_OK;
 			}
 
@@ -1561,13 +1561,13 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 						continue;
 					}
 					Ir dest_ir = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[i]);
-					Ir pred = ir_new_binary(emitter, stat->site, IR_EQ, dest_ir, ir_new_nil(emitter, dest_ast->site));
+					Ir pred = ir_new_binary(emitter->module, stat->site, IR_EQ, dest_ir, ir_new_nil(emitter->module, dest_ast->site));
 					Ir destination = dest_ir->kind == IR_LOAD ? dest_ir->ir_load.local : dest_ir;
-					Ir store = ir_new_store(emitter, stat->site, destination, expr_tuple_ir->ir_tuple.items[i]);
+					Ir store = ir_new_store(emitter->module, stat->site, destination, expr_tuple_ir->ir_tuple.items[i]);
 					IrQueue true_items = ir_queue_begin(emitter);
 					ir_queue_push(&true_items, store);
-					Ir true_clause = ir_new_block(emitter, stat->site, ir_queue_end(&true_items));
-					ir_queue_push(items, ir_new_if(emitter, stat->site, pred, true_clause, 0));
+					Ir true_clause = ir_new_block(emitter->module, stat->site, ir_queue_end(&true_items));
+					ir_queue_push(items, ir_new_if(emitter->module, stat->site, pred, true_clause, 0));
 				}
 				return COM_STATUS_OK;
 			}
@@ -1581,11 +1581,11 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 					return COM_STATUS_OK;
 				}
 				Ir dest = dest_tuple_ir->ir_tuple.items[0];
-				Ir value = expr_tuple_ir->ir_tuple.count ? expr_tuple_ir->ir_tuple.items[0] : ir_new_nil(emitter, dest_ast->site);
+				Ir value = expr_tuple_ir->ir_tuple.count ? expr_tuple_ir->ir_tuple.items[0] : ir_new_nil(emitter->module, dest_ast->site);
 				if (dest->kind == IR_LOAD) {
 					dest = dest->ir_load.local;
 				}
-				ir_queue_push(items, ir_new_store(emitter, stat->site, dest, value));
+				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
 				return COM_STATUS_OK;
 			}
 
@@ -1594,23 +1594,23 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 			{
 				Ast expr = expr_tuple->tuple.items[0];
 				for (u32 i = 0; i < count; ++ i) {
-					locals.items[i] = ir_new_local(emitter, expr->site, 0);
+					locals.items[i] = ir_new_local(emitter->module, emitter->function, expr->site, 0);
 				}
-				ir_queue_push(items, ir_new_multi_local(emitter, expr->site, expr_tuple_ir->ir_tuple.items[0], locals));
+				ir_queue_push(items, ir_new_multi_local(emitter->module, expr->site, expr_tuple_ir->ir_tuple.items[0], locals));
 			}
 			else
 			{
 				for (u32 i = 0; i < count; ++ i)
 				{
 					SourceSite site = stat->site;
-					Ir value = ir_new_nil(emitter, site);
+					Ir value = ir_new_nil(emitter->module, site);
 					if (i < expr_tuple->tuple.count)
 					{
 						Ast expr = expr_tuple->tuple.items[i];
 						site = expr->site;
 						value = expr_tuple_ir->ir_tuple.items[i];
 					}
-					locals.items[i] = ir_new_local(emitter, site, value);
+					locals.items[i] = ir_new_local(emitter->module, emitter->function, site, value);
 					ir_queue_push(items, locals.items[i]);
 				}
 			}
@@ -1626,8 +1626,8 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				if (dest->kind == IR_LOAD) {
 					dest = dest->ir_load.local;
 				}
-				Ir value = ir_new_load(emitter, locals.items[i]->site, locals.items[i]);
-				ir_queue_push(items, ir_new_store(emitter, stat->site, dest, value));
+				Ir value = ir_new_load(emitter->module, locals.items[i]->site, locals.items[i]);
+				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
 			}
 			return COM_STATUS_OK;
 		}
@@ -1730,7 +1730,7 @@ static Com_Status check_function(IrEmitter *outer, IrFunction *function)
 			}
 		}
 
-		Ir ir_param = ir_new_local(&emitter, name->site, 0);
+		Ir ir_param = ir_new_local(emitter.module, emitter.function, name->site, 0);
 		ir_params.items[i] = ir_param;
 
 		// TODO(RJ): we don't need to refetch this ...
@@ -1790,11 +1790,6 @@ static Com_Status prepare_scope(IrEmitter *checker, Scope *scope, Ast_Array stat
 		}
 		entity->declaration = declaration;
 		name->entity = entity;
-		if (expr->kind == AST_FUNCTION)
-		{
-			IrFunction *function = ir_reserve_function(checker->source, checker->module, 0, expr);
-			entity->value = com_value_ir(ir_new_function_ref(checker, expr->site, function));
-		}
 
 		Compiler *compiler = checker->source->compiler;
 		entity->next_in_compiler = compiler->entities;
@@ -1978,8 +1973,16 @@ static Com_Status prepare_ast(IrEmitter *checker, Ast ast)
 			ASSERT(expr);
 			if (expr->kind == AST_FUNCTION)
 			{
-				ASSERT(expr->function.ir);
-				return prepare_func(checker, expr->function.ir);
+				Ast name = ast->static_decl.name;
+				ASSERT(name);
+				ASSERT(name->entity);
+				ASSERT(name->entity->value.type == COM_VALUE_AST);
+				ASSERT(name->entity->value.ast == expr);
+				ASSERT(!expr->function.ir);
+
+				IrFunction *func = ir_reserve_function(checker->source, checker->module, 0, expr);
+				name->entity->value = com_value_ir(ir_new_function_ref(checker->module, expr->site, func));
+				return prepare_func(checker, func);
 			}
 			return prepare_ast(checker, expr);
 		}
@@ -2169,7 +2172,7 @@ static Ir eval_static(elf_State *state, IrModule *module, Com_Source *source, Ir
 	IrFunction eval = {};
 	eval.source = source;
 	eval.site = ir->site;
-	eval.body = ir_new_return(&emitter, ir->site, ir);
+	eval.body = ir_new_return(emitter.module, ir->site, ir);
 
 	elf_Prototype *proto = bc_emit_func(state, module, &eval);
 	push_value(state, proto_value(proto));

@@ -170,8 +170,8 @@ struct IrLoopFrame
 struct IrEmitter
 {
 	IrModule    *module;
-	IrFunction  *function;
 	Com_Source  *source;
+	IrFunction  *function;
 	struct Scope *active_scope;
 
 	IrDefer     *defer;

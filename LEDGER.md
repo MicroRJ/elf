@@ -16,3 +16,11 @@
 - Made every `IR_LOCAL` record its owning `IrFunction`. Capture resolution now follows IR-local ownership and the IR parent tree instead of comparing AST functions.
 - Deferred sharing the temporary IR stack across function emitters. The current implementation remains simple and correct but allocates a 4096-entry stack per function.
 - Verified all 173 tests and the optimized build.
+
+## 2026-11-03
+
+- Merged semantic checking with IR construction and split static scope preparation from static evaluation.
+- Made static definitions resolve uniformly to IR values and added compile-time execution for nontrivial static expressions.
+- Made prototypes GC objects with prototype-local function references, runtime reachability, unified constant storage, and collection at explicit VM safe points.
+- Made bytecode emission incremental and deferred function-reference interning and patching to the bytecode emitter.
+- Made IR function and capture references symmetric, and made raw IR node constructors depend on their owning module instead of temporary `IrEmitter` scratch state.
