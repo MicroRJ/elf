@@ -1,3 +1,219 @@
+### Values
+
+A value is the primary unit of data in elf, everything
+that the elf virtual machine interacts with is stored
+or wrapped in a value.
+
+Value types include but are not limited to:
+
+- nil: special value type meaning absence of
+
+- int: 64 bit signed integer
+
+- num: 64 bit floating point number
+
+- nat: native elf function pointer
+
+- str: references core string object
+
+- err: references core error object
+- arr: references core array object
+- tab: references core table object
+- fun: references core function object
+- cls: references core closure object
+
+- custom: references custom object
+
+### Objects
+
+A core object receives first class VM support,
+these include but are not limited to:
+
+- str: immutable interned string object
+- err: error object
+- arr: dynamic typeless array object
+- tab: dynamic any to any map object
+- fun: function object
+- cls: closure object
+
+### VM
+
+The VM supports dynamic and direct dispatch.
+
+```c
+
+add(x: str, y: any) => add(x, str(y))
+add(x: str, y: str) => x + y
+
+add(x: int, y: num) => add(num(x), y)
+add(x: num, y: int) => add(x, num(y))
+add(x: int, y: int) => x + y
+add(x: num, y: num) => x + y
+
+sub(x: int, y: num) => sub(num(x), y)
+sub(x: num, y: int) => sub(x, num(y))
+sub(x: int, y: int) => x - y
+sub(x: num, y: num) => x - y
+
+div(x: int, y: num) => div(num(x), y)
+div(x: num, y: int) => div(x, num(y))
+div(x: int, y: int) => x / y
+div(x: num, y: num) => x / y
+
+mul(x: int, y: num) => mul(num(x), y)
+mul(x: num, y: int) => mul(x, num(y))
+mul(x: int, y: int) => x * y
+mul(x: num, y: num) => x * y
+
+```
+
+### Strings
+
+The string object is meant to store relatively small pieces of text.
+All strings are interned on creation and are immutable thereon.
+
+A string currently serves two purposes, byte storage as well as
+content identity.
+
+Some API's return a string object when a buffer is more suitable.
+Buffers are currently not as standardized.
+
+There currently isn't a practical way to address string and buffer
+contents efficiently and conveniently.
+
+For instance, one may want to split a string or buffer into lines.
+One would have to implement the same functionality for both object
+types.
+Same goes for searching, patching, and any other operation.
+
+
+
+### Functions
+
+`elf` uses functions as the primary standalone unit of execution.
+
+A function is a self-contained GC object.
+
+It contains instructions and values.
+
+A function may contain additional resources for
+rich runtime diagnostics.
+
+The contents of a function object are typically read-only.
+
+### Closures
+
+A closure allows you to capture locals implicitly.
+
+```c
+	x := 0
+
+	fun() { y := x }
+
+```
+
+The slots where the captured values live are not reassignable.
+Though this may change in the future.
+
+If you wish to capture mutable state, do so with a wrapper
+object, such as a table.
+
+```c
+	state := { x = 0 }
+
+	fun() { state.x = 10 }
+
+```
+
+Attempting to reassign a capture results in a
+compiler error.
+
+
+### Declarations
+
+A declaration creates an entity, associating a name with an entity-value (ev)
+(not a VM value).
+
+An ev may be a local value, or some other static value.
+
+A declaration may be reassignable or not.
+
+You can declare a local using `:=` or `::=` and a static using `::`.
+
+Two colons `::` means not reassignable, a `=` means it's a
+local otherwise it's static.
+
+Local declarations are invisible to static declarations as a consequence
+of being processed prior to locals.
+
+```c
+	x := 0
+
+	// error: undeclared identifier 'x'
+	FOO :: x
+```
+
+Same names still conflict because they are within the same scope, the local
+FOO is blamed for redeclaring static 'FOO'.
+
+```c
+	FOO := 0
+
+	FOO :: 10
+```
+
+A static value refers to any value that isn't a local. A value in this case
+does not refer to a VM value, but instead a value sourced by the compiler.
+
+
+### Evaluation
+
+`elf` supports compile time execution.
+
+Which allows you to execute code prior to generating the rest.
+
+```c
+	message :: elf.fs.read_text_file("hello_world_message.txt")
+
+	elf.printl(message)
+```
+
+In the example above, `::` declares a `static` entity, forcing the compiler
+to evaluate its expression prior to generating the rest of the of code.
+
+Once the expression is evaluated, the result is cached and the code is
+effectively discarded.
+
+The final code only references the resulting values.
+
+All static expressions across all imports are evaluated right at compilation time.
+
+```c
+	foo := fun() {
+		read_something :: elf.fs.read_text_file("hello_world_message.txt")
+	}
+```
+
+
+
+### Closures
+
+A closure is created automatically when a function accesses locals from
+the parent function.
+
+Note that statically evaluated functions cannot capture runtime state.
+
+Captured values are not reassignable.
+
+```c
+
+
+
+	// compile time error: x, y, z are undefined
+	static_foo ::  fun() => print(x, ", ", y, ", ", z)
+```
+
+
 ### This not It
 
 One of the oldest quirks of elf, is the implicit this parameter, which is always there whether you want it or not,

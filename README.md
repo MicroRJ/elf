@@ -1,8 +1,20 @@
 # elf
 
 
-### TODAY's TODO's
--
+### CHANGELOG
+- GC allocation is non-collecting, GC check is explicit
+- Prototypes are self contained
+- Constants are now just regular values for now to simplify things, if performance matters
+reconsider, thus far no significant regressions beyond benchmark noise.
+
+### TODO
+
+- Imports should check the entire file not just the imported functions and ensure no top level runtime
+statements are found.
+
+- Closure reassignment is not even checked anymore
+
+- Unused entity warnings are not emitted anymore
 
 
 ### ROADMAP

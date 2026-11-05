@@ -24,3 +24,11 @@
 - Made prototypes GC objects with prototype-local function references, runtime reachability, unified constant storage, and collection at explicit VM safe points.
 - Made bytecode emission incremental and deferred function-reference interning and patching to the bytecode emitter.
 - Made IR function and capture references symmetric, and made raw IR node constructors depend on their owning module instead of temporary `IrEmitter` scratch state.
+
+## 2026-11-04
+
+- Separated AST scope preparation from temporary IR emitter state and made its source, scope, and function context explicit.
+- Defined the current value, declaration, compile-time execution, and immutable-capture model in the language notes.
+- Made assignment validation reject immutable and captured bindings before store lowering while preserving mutation through captured objects.
+- Added non-fatal diagnostics when declarations shadow names in parent scopes.
+- Kept the optimized build passing. The full test run still reaches stale checker assertions and their existing access violation; expected-failure script coverage and unreferenced-entity warnings remain follow-up work.
