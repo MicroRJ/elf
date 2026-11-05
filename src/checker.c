@@ -327,6 +327,9 @@ static Entity *declare_entity(Scope *scope, SourceSite site, Atom *name, Entity_
 	}
 
 	entity->value = value;
+	Compiler *compiler = scope->source->compiler;
+	entity->next_in_compiler = compiler->entities;
+	compiler->entities = entity;
 	return entity;
 }
 
@@ -470,8 +473,6 @@ static Com_Value check_entity(IrEmitter *checker, SourceSite site, Entity *entit
 	if (value.type == COM_VALUE_SCOPE || value.type == COM_VALUE_EXPORTS || value.type == COM_VALUE_TYPE || value.type == COM_VALUE_TYPE_RULE) {
 		return value;
 	}
-
-	entity->referenced = true;
 
 	Ir ir = 0;
 	switch (value.type)
@@ -637,6 +638,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 				break;
 			}
 			expr->entity = entity;
+			entity->referenced = true;
 			value = check_entity(checker, expr->site, entity);
 		}
 		break;
@@ -665,6 +667,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 				}
 				ASSERT(entity->value.type != COM_VALUE_LOCAL);
 				expr->entity = entity;
+				entity->referenced = true;
 				value = check_entity(checker, expr->site, entity);
 				break;
 			}
@@ -687,11 +690,8 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 					break;
 				}
 				expr->entity = entity;
+				entity->referenced = true;
 				value = check_entity(checker, expr->site, entity);
-				if (value.type != COM_VALUE_ERROR)
-				{
-					entity->referenced = true;
-				}
 				break;
 			}
 
@@ -1803,10 +1803,6 @@ static Com_Status prepare_scope(Com_Source *source, Scope *scope, Ast_Array stat
 		}
 		entity->declaration = declaration;
 		name->entity = entity;
-
-		Compiler *compiler = source->compiler;
-		entity->next_in_compiler = compiler->entities;
-		compiler->entities = entity;
 	}
 	return COM_STATUS_OK;
 }
@@ -2218,6 +2214,23 @@ static Com_Status eval_statics(IrModule *module, Compiler *compiler)
 	return COM_STATUS_OK;
 }
 
+static Com_Status check_unreferenced(Compiler *compiler)
+{
+	for (Entity *entity = compiler->entities; entity; entity = entity->next_in_compiler)
+	{
+		if (entity->referenced || entity_is_exported(entity)) {
+			continue;
+		}
+		ASSERT(entity->declaration);
+		ASSERT(entity->scope->source);
+		Com_Status status = checker_warn(entity->scope->source, ELF_ERROR_UNREFERENCED_ENTITY, entity->declaration->site, "declaration of '%s' is never referenced", atom_data(entity->name));
+		if (status != COM_STATUS_OK) {
+			return status;
+		}
+	}
+	return COM_STATUS_OK;
+}
+
 static Com_Status check(IrModule *module, Compiler *com)
 {
 	ASSERT(module);
@@ -2254,5 +2267,5 @@ static Com_Status check(IrModule *module, Compiler *com)
 			return status;
 		}
 	}
-	return COM_STATUS_OK;
+	return check_unreferenced(com);
 }
