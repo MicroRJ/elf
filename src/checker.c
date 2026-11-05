@@ -218,22 +218,40 @@ static Ir check_assign_dest(IrEmitter *emitter, Ast dest)
 		return ir_new_tuple(emitter->module, dest->site, items);
 	}
 
-	Com_Value value = check_expr(emitter, dest);
-	if (value.type == COM_VALUE_ERROR) {
-		return ir_from_status(value.status);
-	}
-
 	if (dest->kind == AST_IDENT)
 	{
 		Entity *entity = dest->entity;
-		ASSERT(entity);
+		if (!entity) {
+			entity = scope_find(emitter->active_scope, dest->identifier);
+		}
+		if (!entity) {
+			return ir_from_status(checker_report(emitter->source, ELF_ERROR_UNDECLARED_IDENTIFIER, ERROR_ERROR, dest->site, "undeclared identifier '%s'", atom_data(dest->identifier)));
+		}
+		dest->entity = entity;
+		entity->referenced = true;
 		if (entity_is_constant(entity))
 		{
 			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "'%s' is read-only", atom_data(dest->identifier));
 			return ir_from_status(status);
 		}
+		if (entity->value.type != COM_VALUE_IR || entity->value.ir->kind != IR_LOCAL)
+		{
+			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "'%s' is not assignable", atom_data(dest->identifier));
+			return ir_from_status(status);
+		}
+		Ir local = entity->value.ir;
+		if (local->ir_local.owner != emitter->function)
+		{
+			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "captured binding '%s' is read-only", atom_data(dest->identifier));
+			return ir_from_status(status);
+		}
+		return local;
 	}
 
+	Com_Value value = check_expr(emitter, dest);
+	if (value.type == COM_VALUE_ERROR) {
+		return ir_from_status(value.status);
+	}
 	if (value.type != COM_VALUE_IR)
 	{
 		Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "expression is not assignable");
@@ -241,23 +259,6 @@ static Ir check_assign_dest(IrEmitter *emitter, Ast dest)
 	}
 
 	Ir ir = value.ir;
-	if (dest->kind == AST_IDENT)
-	{
-		Entity *entity = dest->entity;
-		if (ir->kind == IR_CAPTURE_REF)
-		{
-			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "captured binding '%s' is read-only", atom_data(dest->identifier));
-			return ir_from_status(status);
-		}
-		if (ir->kind != IR_LOAD)
-		{
-			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "'%s' is not assignable", atom_data(dest->identifier));
-			return ir_from_status(status);
-		}
-		ASSERT(entity->value.type == COM_VALUE_LOCAL);
-		entity->value.local.assigned = true;
-		return ir;
-	}
 	if (ir->kind == IR_FIELD || ir->kind == IR_INDEX) {
 		return ir;
 	}
@@ -335,9 +336,8 @@ static Entity *declare_entity(Scope *scope, SourceSite site, Atom *name, Entity_
 
 static Ir ir_emit_capture(IrEmitter *emitter, IrFunction *function, Entity *entity, SourceSite site)
 {
-	ASSERT(entity->value.type == COM_VALUE_LOCAL);
-	Ir local = entity->value.local.storage;
-	ASSERT(local);
+	ASSERT(entity->value.type == COM_VALUE_IR);
+	Ir local = entity->value.ir;
 	ASSERT(local->kind == IR_LOCAL);
 	ASSERT(local->ir_local.owner);
 	ASSERT(function);
@@ -477,20 +477,9 @@ static Com_Value check_entity(IrEmitter *checker, SourceSite site, Entity *entit
 	Ir ir = 0;
 	switch (value.type)
 	{
-		case COM_VALUE_IR: {
-			ir = value.ir;
-		}
-		break;
-
-		case COM_VALUE_LOCAL:
+		case COM_VALUE_IR:
 		{
-			if (!value.local.storage)
-			{
-				ir_report_error(checker, ELF_ERROR_INTERNAL, site, "local entity '%s' has no storage", atom_data(entity->name));
-				ir = ERROR_IR;
-				break;
-			}
-			ir = ir_emit_capture(checker, checker->function, entity, site);
+			ir = value.ir->kind == IR_LOCAL ? ir_emit_capture(checker, checker->function, entity, site) : value.ir;
 		}
 		break;
 
@@ -665,7 +654,7 @@ static Com_Value check_expr(IrEmitter *checker, Ast expr)
 					value = com_value_error(status);
 					break;
 				}
-				ASSERT(entity->value.type != COM_VALUE_LOCAL);
+				ASSERT(entity->value.type != COM_VALUE_IR || entity->value.ir->kind != IR_LOCAL);
 				expr->entity = entity;
 				entity->referenced = true;
 				value = check_entity(checker, expr->site, entity);
@@ -1187,7 +1176,7 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 		Ir local = ir_new_local(emitter->module, emitter->function, name->site, 0);
 		var_locals.items[i] = local;
 		Entity_Tags tags = decl->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
-		Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, (Com_Value) { .type = COM_VALUE_LOCAL, .local = { .ir_function = checker->function, .storage = local } });
+		Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, com_value_ir(local));
 		if (entity_is_error(entity)) {
 			status = entity_status(entity);
 			break;
@@ -1351,15 +1340,21 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 			}
 			ASSERT(expr_ir->kind == IR_TUPLE);
 
-			for (u32 i = 0; i < names->tuple.count; ++ i)
+			u32 count = names->tuple.count;
+			IrArray locals = ir_array_alloc(emitter, count);
+			b32 multi_call = count > 1 && exprs->tuple.count == 1 && exprs->tuple.items[0] && exprs->tuple.items[0]->kind == AST_CALL;
+			for (u32 i = 0; i < count; ++ i)
 			{
 				Ast name = names->tuple.items[i];
 				if (!name || name->kind != AST_IDENT) {
 					return checker_report(checker->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, names->site, "declaration name must be an identifier");
 				}
 
+				Ir value = multi_call ? 0 : (i < expr_ir->ir_tuple.count ? expr_ir->ir_tuple.items[i] : ir_new_nil(emitter->module, name->site));
+				Ir local = ir_new_local(emitter->module, emitter->function, name->site, value);
+				locals.items[i] = local;
 				Entity_Tags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
-				Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, (Com_Value) { .type = COM_VALUE_LOCAL, .local = { .ir_function = checker->function } });
+				Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, com_value_ir(local));
 				if (entity_is_error(entity)) {
 					return entity_status(entity);
 				}
@@ -1367,27 +1362,15 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				name->entity = entity;
 			}
 
-			u32 count = names->tuple.count;
-			if (count > 1 && exprs->tuple.count == 1 && exprs->tuple.items[0] && exprs->tuple.items[0]->kind == AST_CALL)
+			if (multi_call)
 			{
-				IrArray locals = ir_array_alloc(emitter, count);
-				for (u32 i = 0; i < count; ++ i)
-				{
-					Ast name = names->tuple.items[i];
-					locals.items[i] = ir_new_local(emitter->module, emitter->function, name->site, 0);
-					name->entity->value.local.storage = locals.items[i];
-				}
 				ir_queue_push(items, ir_new_multi_local(emitter->module, exprs->site, expr_ir->ir_tuple.items[0], locals));
 				return COM_STATUS_OK;
 			}
 
 			for (u32 i = 0; i < count; ++ i)
 			{
-				Ast name = names->tuple.items[i];
-				Ir value = i < expr_ir->ir_tuple.count ? expr_ir->ir_tuple.items[i] : ir_new_nil(emitter->module, name->site);
-				Ir local = ir_new_local(emitter->module, emitter->function, name->site, value);
-				ir_queue_push(items, local);
-				name->entity->value.local.storage = local;
+				ir_queue_push(items, locals.items[i]);
 			}
 			return COM_STATUS_OK;
 		}
@@ -1565,12 +1548,13 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 					return checker_report(checker->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "compound assignment requires one destination and one value");
 				}
 
+				Ast dest_ast = dest_tuple->tuple.items[0];
 				Ir dest = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[0]);
+				Ir current = dest->kind == IR_LOCAL ? ir_new_load(emitter->module, dest_ast->site, dest) : dest;
 				IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
 				ASSERT(op != IR_NONE);
-				Ir value = ir_new_binary(emitter->module, stat->site, op, dest, expr_tuple_ir->ir_tuple.items[0]);
-				Ir target = dest->kind == IR_LOAD ? dest->ir_load.local : dest;
-				ir_queue_push(items, ir_new_store(emitter->module, stat->site, target, value));
+				Ir value = ir_new_binary(emitter->module, stat->site, op, current, expr_tuple_ir->ir_tuple.items[0]);
+				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
 				return COM_STATUS_OK;
 			}
 
@@ -1583,9 +1567,9 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				{
 					Ast dest_ast = dest_tuple->tuple.items[i];
 					Ir dest_ir = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[i]);
-					Ir pred = ir_new_binary(emitter->module, stat->site, IR_EQ, dest_ir, ir_new_nil(emitter->module, dest_ast->site));
-					Ir destination = dest_ir->kind == IR_LOAD ? dest_ir->ir_load.local : dest_ir;
-					Ir store = ir_new_store(emitter->module, stat->site, destination, expr_tuple_ir->ir_tuple.items[i]);
+					Ir current = dest_ir->kind == IR_LOCAL ? ir_new_load(emitter->module, dest_ast->site, dest_ir) : dest_ir;
+					Ir pred = ir_new_binary(emitter->module, stat->site, IR_EQ, current, ir_new_nil(emitter->module, dest_ast->site));
+					Ir store = ir_new_store(emitter->module, stat->site, dest_ir, expr_tuple_ir->ir_tuple.items[i]);
 					IrQueue true_items = ir_queue_begin(emitter);
 					ir_queue_push(&true_items, store);
 					Ir true_clause = ir_new_block(emitter->module, stat->site, ir_queue_end(&true_items));
@@ -1600,9 +1584,6 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				Ast dest_ast = dest_tuple->tuple.items[0];
 				Ir dest = dest_tuple_ir->ir_tuple.items[0];
 				Ir value = expr_tuple_ir->ir_tuple.count ? expr_tuple_ir->ir_tuple.items[0] : ir_new_nil(emitter->module, dest_ast->site);
-				if (dest->kind == IR_LOAD) {
-					dest = dest->ir_load.local;
-				}
 				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
 				return COM_STATUS_OK;
 			}
@@ -1636,9 +1617,6 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 			for (u32 i = 0; i < count; ++ i)
 			{
 				Ir dest = dest_tuple_ir->ir_tuple.items[i];
-				if (dest->kind == IR_LOAD) {
-					dest = dest->ir_load.local;
-				}
 				Ir value = ir_new_load(emitter->module, locals.items[i]->site, locals.items[i]);
 				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
 			}
@@ -1752,7 +1730,7 @@ static Com_Status check_function(IrEmitter *outer, IrFunction *function)
 		}
 
 		// TODO(RJ): dedicated builder
-		Com_Value v_param = { .type = COM_VALUE_LOCAL, .local = { .ir_function = function, .storage = ir_param }};
+		Com_Value v_param = com_value_ir(ir_param);
 
 		Entity_Tags tags = param->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
 		Entity *entity = declare_entity(emitter.active_scope, name->site, name->identifier, tags, v_param);

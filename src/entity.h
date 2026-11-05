@@ -20,7 +20,6 @@ Com_Type;
 	X(ERROR,           "error")           \
 	X(TYPE,            "type")            \
 	X(TYPE_RULE,       "type_rule")       \
-	X(LOCAL,           "local")           \
 	X(IR,              "ir")              \
 	X(AST,             "ast")             \
 	X(RESOLVING,       "resolving")       \
@@ -70,14 +69,6 @@ typedef struct
 		Scope        *exports;
 		Scope        *scope;
 		u32           native_function_index;
-		struct
-		{
-			struct Ast_T  *function;
-			IrFunction    *ir_function;
-			struct IrNode *storage;
-			b32            assigned;
-		}
-		local;
 	};
 }
 Com_Value;
