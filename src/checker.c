@@ -1417,6 +1417,113 @@ static Com_Status lower_assign(IrEmitter *emitter, IrQueue *items, Ast stat)
 	return COM_STATUS_OK;
 }
 
+static Com_Status lower_decl(IrEmitter *emitter, IrQueue *items, Ast stat)
+{
+	Ast names = stat->decl.name;
+	ASSERT(names);
+	ASSERT(names->kind == AST_TUPLE);
+	Ast exprs = stat->decl.expr;
+	ASSERT(exprs);
+	ASSERT(exprs->kind == AST_TUPLE);
+	u32 nnames = names->tuple.count;
+	u32 nexprs = exprs->tuple.count;
+
+	for (u32 i = 0; i < nnames; ++ i)
+	{
+		Ast name = names->tuple.items[i];
+		if (!name || name->kind != AST_IDENT) {
+			return checker_report(emitter->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, names->site, "declaration name must be an identifier");
+		}
+	}
+
+	if (nexprs > nnames) {
+		return checker_report(emitter->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, stat->site, "declaration has more values than names");
+	}
+
+	b32 multi_call = nexprs < nnames;
+	if (multi_call)
+	{
+		Ast final_expr = nexprs ? exprs->tuple.items[nexprs - 1] : 0;
+		if (!final_expr || final_expr->kind != AST_CALL) {
+			return checker_report(emitter->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, stat->site, "declaration requires one value for each name or a final function call");
+		}
+	}
+
+	if (stat->decl.type)
+	{
+		Com_Status status = com_value_status(check_expr(emitter, stat->decl.type));
+		if (status != COM_STATUS_OK) {
+			return status;
+		}
+	}
+
+	for (u32 i = 0; i < nexprs; ++ i)
+	{
+		Ast expr = exprs->tuple.items[i];
+		if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
+		{
+			ir_report_error(emitter, ELF_ERROR_LOWERING, expr->site, "range expressions cannot be used as declaration values; use a range for loop");
+			return COM_STATUS_REPORTED;
+		}
+	}
+
+	if (nnames == 1 && nexprs == 1)
+	{
+		Ast name = names->tuple.items[0];
+		Ir value = check_ir(emitter, exprs->tuple.items[0]);
+		if (ir_is_error(value)) {
+			return ir_status(value);
+		}
+
+		Ir local = ir_new_local(emitter->module, emitter->function, name->site, value);
+		Entity_Tags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+		Entity *entity = declare_entity(emitter->active_scope, name->site, name->identifier, tags, com_value_ir(local));
+		if (entity_is_error(entity)) {
+			return entity_status(entity);
+		}
+		entity->declaration = stat;
+		name->entity = entity;
+		ir_queue_push(items, local);
+		return COM_STATUS_OK;
+	}
+
+	IrArray values = ir_array_alloc(emitter, nexprs);
+	for (u32 i = 0; i < values.count; ++ i)
+	{
+		values.items[i] = check_ir(emitter, exprs->tuple.items[i]);
+		if (ir_is_error(values.items[i])) {
+			return ir_status(values.items[i]);
+		}
+	}
+
+	IrArray locals = ir_array_alloc(emitter, nnames);
+	u32 nfixed = multi_call ? nexprs - 1 : nexprs;
+	Entity_Tags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
+	for (u32 i = 0; i < locals.count; ++ i)
+	{
+		Ast name = names->tuple.items[i];
+		Ir value = i < nfixed ? values.items[i] : 0;
+		Ir local = ir_new_local(emitter->module, emitter->function, name->site, value);
+		locals.items[i] = local;
+		Entity *entity = declare_entity(emitter->active_scope, name->site, name->identifier, tags, com_value_ir(local));
+		if (entity_is_error(entity)) {
+			return entity_status(entity);
+		}
+		entity->declaration = stat;
+		name->entity = entity;
+	}
+
+	for (u32 i = 0; i < nfixed; ++ i) {
+		ir_queue_push(items, locals.items[i]);
+	}
+	if (multi_call)
+	{
+		IrArray results = { .items = locals.items + nfixed, .count = locals.count - nfixed };
+		ir_queue_push(items, ir_new_multi_local(emitter->module, exprs->site, values.items[nfixed], results));
+	}
+	return COM_STATUS_OK;
+}
+
 static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 {
 	ASSERT(checker);
@@ -1451,70 +1558,7 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 
 		case AST_DECL_STAT:
 		{
-			Ast names = stat->decl.name;
-			ASSERT(names);
-			ASSERT(names->kind == AST_TUPLE);
-			Ast exprs = stat->decl.expr;
-			ASSERT(exprs);
-			ASSERT(exprs->kind == AST_TUPLE);
-
-			if (stat->decl.type)
-			{
-				Com_Status status = com_value_status(check_expr(checker, stat->decl.type));
-				if (status != COM_STATUS_OK) {
-					return status;
-				}
-			}
-
-			for (u32 i = 0; i < exprs->tuple.count; ++ i)
-			{
-				Ast expr = exprs->tuple.items[i];
-				if (expr && (expr->kind == AST_RANGE || expr->kind == AST_RANGE_INDEX))
-				{
-					ir_report_error(emitter, ELF_ERROR_LOWERING, expr->site, "range expressions cannot be used as declaration values; use a range for loop");
-					return COM_STATUS_REPORTED;
-				}
-			}
-
-			Ir expr_ir = check_ir(checker, exprs);
-			if (ir_is_error(expr_ir)) {
-				return ir_status(expr_ir);
-			}
-			ASSERT(expr_ir->kind == IR_TUPLE);
-
-			u32 count = names->tuple.count;
-			IrArray locals = ir_array_alloc(emitter, count);
-			b32 multi_call = count > 1 && exprs->tuple.count == 1 && exprs->tuple.items[0] && exprs->tuple.items[0]->kind == AST_CALL;
-			for (u32 i = 0; i < count; ++ i)
-			{
-				Ast name = names->tuple.items[i];
-				if (!name || name->kind != AST_IDENT) {
-					return checker_report(checker->source, ELF_ERROR_INVALID_DECLARATION, ERROR_ERROR, names->site, "declaration name must be an identifier");
-				}
-
-				Ir value = multi_call ? 0 : (i < expr_ir->ir_tuple.count ? expr_ir->ir_tuple.items[i] : ir_new_nil(emitter->module, name->site));
-				Ir local = ir_new_local(emitter->module, emitter->function, name->site, value);
-				locals.items[i] = local;
-				Entity_Tags tags = stat->decl.constant ? ENTITY_TAG_CONSTANT : ENTITY_TAG_NONE;
-				Entity *entity = declare_entity(checker->active_scope, name->site, name->identifier, tags, com_value_ir(local));
-				if (entity_is_error(entity)) {
-					return entity_status(entity);
-				}
-				entity->declaration = stat;
-				name->entity = entity;
-			}
-
-			if (multi_call)
-			{
-				ir_queue_push(items, ir_new_multi_local(emitter->module, exprs->site, expr_ir->ir_tuple.items[0], locals));
-				return COM_STATUS_OK;
-			}
-
-			for (u32 i = 0; i < count; ++ i)
-			{
-				ir_queue_push(items, locals.items[i]);
-			}
-			return COM_STATUS_OK;
+			return lower_decl(emitter, items, stat);
 		}
 
 		case AST_IF:
