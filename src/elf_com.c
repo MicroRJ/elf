@@ -567,7 +567,7 @@ static elf_Prototype *compile(elf_State *target, elf_SymTable *symbols, Arena *a
 	}
 
 	elf_Value *root_checkpoint = target->stack_top;
-	if (check(&ir_module, com) != COM_STATUS_OK) {
+	if (lower_sources(&ir_module, com) != COM_STATUS_OK) {
 		target->stack_top = root_checkpoint;
 		log_report(com);
 		return 0;

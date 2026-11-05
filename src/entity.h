@@ -60,7 +60,7 @@ typedef struct
 	{
 		Com_Status    status;
 		Ir            ir;
-		struct Ast_T *ast;
+		Ast           ast;
 		// Todo, rename to type
 		Com_Type     *com_type;
 		f64           number;
@@ -97,7 +97,7 @@ struct Entity
 
 	struct Atom    *name;
 	Scope          *scope;
-	struct Ast_T   *declaration;
+	Ast             declaration;
 	Com_Value       value;
 	b32             referenced;
 };
@@ -129,21 +129,32 @@ static inline Com_Status entity_status(const Entity *entity)
 	return entity->status;
 }
 
-static b32 entity_is_constant(const Entity *entity);
-static b32 entity_is_exported(const Entity *entity);
+static inline b32 entity_is_constant(const Entity *entity)
+{
+	ASSERT(entity);
+	ASSERT(!entity_is_error(entity));
+	return (entity->tags & ENTITY_TAG_CONSTANT) != 0;
+}
+
+static inline b32 entity_is_exported(const Entity *entity)
+{
+	ASSERT(entity);
+	ASSERT(!entity_is_error(entity));
+	return (entity->tags & ENTITY_TAG_EXPORTED) != 0;
+}
 
 struct Scope
 {
 	Arena          *arena;
 	Scope          *parent;
-	struct Ast_T   *owner;
+	Ast             owner;
 	Com_Source     *source;
 	Entity        **entities;
 	u32             count;
 	u32             capacity;
 };
 
-static Scope *scope_create(Arena *arena, Scope *parent, struct Ast_T *owner, Com_Source *source);
+static Scope *scope_create(Arena *arena, Scope *parent, Ast owner, Com_Source *source);
 static Entity *scope_find_current(Scope *scope, struct Atom *name);
 static Entity *scope_find(Scope *scope, struct Atom *name);
 #endif

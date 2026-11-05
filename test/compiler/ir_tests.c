@@ -29,7 +29,7 @@ static IrTestResult ir_test_lower_source(elf_State *state, Arena *arena, const c
 	{
 		result.module = arena_push_zero(arena, sizeof(*result.module), _Alignof(IrModule));
 		ir_module_init(result.module, arena);
-		if (check(result.module, result.compiler) != COM_STATUS_OK) {
+		if (lower_sources(result.module, result.compiler) != COM_STATUS_OK) {
 			result.module = 0;
 		}
 	}
