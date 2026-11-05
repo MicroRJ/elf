@@ -20,6 +20,7 @@ Com_Type;
 	X(ERROR,           "error")           \
 	X(TYPE,            "type")            \
 	X(TYPE_RULE,       "type_rule")       \
+	X(FUNCTION,        "function")        \
 	X(IR,              "ir")              \
 	X(AST,             "ast")             \
 	X(RESOLVING,       "resolving")       \
@@ -59,6 +60,7 @@ typedef struct
 	union
 	{
 		Com_Status    status;
+		IrFunction   *function;
 		Ir            ir;
 		Ast           ast;
 		// Todo, rename to type

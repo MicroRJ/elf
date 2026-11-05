@@ -128,6 +128,12 @@ static Com_Value value_ir(Ir ir)
 	return (Com_Value) { .type = COM_VALUE_IR, .ir = ir };
 }
 
+static Com_Value value_function(IrFunction *function)
+{
+	ASSERT(function);
+	return (Com_Value) { .type = COM_VALUE_FUNCTION, .function = function };
+}
+
 static Com_Value value_ast(Ast ast)
 {
 	ASSERT(ast);
@@ -413,6 +419,7 @@ static Com_Value resolve_entity(IrEmitter *emitter, SourceSite site, Entity *ent
 		case COM_VALUE_EXPORTS:
 		case COM_VALUE_TYPE:
 		case COM_VALUE_TYPE_RULE:
+		case COM_VALUE_FUNCTION:
 		{
 			return value;
 		}
@@ -451,6 +458,9 @@ static Ir require_ir(IrEmitter *emitter, SourceSite site, Com_Value value)
 {
 	if (value.type == COM_VALUE_ERROR) {
 		return ir_from_status(value.status);
+	}
+	if (value.type == COM_VALUE_FUNCTION) {
+		return ir_new_function_ref(emitter->module, site, value.function);
 	}
 	if (value.type != COM_VALUE_IR)
 	{
@@ -524,7 +534,7 @@ static Com_Value resolve_expr(IrEmitter *emitter, Ast expr)
 				value = value_error(status);
 				break;
 			}
-			value = value_ir(ir_new_function_ref(emitter->module, expr->site, function));
+			value = value_function(function);
 		}
 		break;
 
@@ -2045,7 +2055,7 @@ static Com_Status prepare_ast(IrModule *mod, Com_Source *source, Scope *scope, I
 				ASSERT(!expr->function.ir);
 
 				IrFunction *static_func = ir_reserve_function(source, mod, 0, expr);
-				name->entity->value = value_ir(ir_new_function_ref(mod, expr->site, static_func));
+				name->entity->value = value_function(static_func);
 				return prepare_func(mod, source, scope, static_func);
 			}
 			return prepare_ast(mod, source, scope, func, expr);
@@ -2247,15 +2257,14 @@ static Com_Status eval_statics(IrModule *mod, Compiler *com)
 
 		if (expr->kind == AST_FUNCTION)
 		{
-			ASSERT(entity->value.type == COM_VALUE_IR);
-			ASSERT(entity->value.ir->kind == IR_FUNCTION_REF);
+			ASSERT(entity->value.type == COM_VALUE_FUNCTION);
 
 			IrEmitter emitter = {};
 			emitter.module = mod;
 			emitter.source = entity->scope->source;
 			emitter.active_scope = entity->scope;
 
-			Com_Status status = lower_func(&emitter, entity->value.ir->func);
+			Com_Status status = lower_func(&emitter, entity->value.function);
 			if (status != COM_STATUS_OK) {
 				return status;
 			}
