@@ -186,6 +186,15 @@ static Com_Status checker_report(Com_Source *source, elf_ErrorCode error, ErrorS
 	return reported ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
+static Com_Status checker_warn(Com_Source *source, elf_ErrorCode warning, SourceSite site, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	b32 reported = reportv(source, warning, ERROR_WARNING, ERROR_PHASE_CHECKER, site, format, args);
+	va_end(args);
+	return reported ? COM_STATUS_OK : COM_STATUS_OOM;
+}
+
 // TODO(RJ): why the fuck are we routing out of memory errors to the fucking diagnostics system!
 static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 {
@@ -307,6 +316,14 @@ static Entity *declare_entity(Scope *scope, SourceSite site, Atom *name, Entity_
 	{
 		Com_Status status = checker_report(scope->source, ELF_ERROR_DUPLICATE_DECLARATION, ERROR_ERROR, site, "'%s' is already declared in this scope", atom_data(name));
 		return entity_from_status(status);
+	}
+
+	if (scope->parent && scope_find(scope->parent, name))
+	{
+		Com_Status status = checker_warn(scope->source, ELF_ERROR_SHADOWED_ENTITY, site, "declaration of '%s' shadows an outer declaration", atom_data(name));
+		if (status != COM_STATUS_OK) {
+			return entity_from_status(status);
+		}
 	}
 
 	entity->value = value;
@@ -1468,6 +1485,7 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 				return ir_status(expr_ir);
 			}
 
+			/* revisit this because it might actually be unnecessary */
 			if (expr_ir && emitter->defer)
 			{
 				ASSERT(expr_ir->kind == IR_TUPLE);
