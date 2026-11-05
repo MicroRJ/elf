@@ -263,6 +263,7 @@ static Entity *declare_entity(Scope *scope, SourceSite site, Atom *name, Entity_
 		}
 	}
 
+	entity->site = site;
 	entity->value = value;
 	Compiler *compiler = scope->source->compiler;
 	entity->next_in_compiler = compiler->entities;
@@ -376,9 +377,8 @@ static Com_Value resolve_entity(IrEmitter *emitter, SourceSite site, Entity *ent
 		case COM_VALUE_RESOLVING:
 		{
 			ASSERT(entity->tags & ENTITY_TAG_STATIC);
-			ASSERT(entity->declaration);
 			ASSERT(entity->scope->source);
-			Com_Status status = checker_error(entity->scope->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, entity->declaration->site, "cyclic static definition involving '%s'", atom_data(entity->name));
+			Com_Status status = checker_error(entity->scope->source, ELF_ERROR_CYCLIC_STATIC_DEFINITION, entity->site, "cyclic static definition involving '%s'", atom_data(entity->name));
 			value = value_error(status);
 			entity->value = value;
 			return value;
@@ -387,7 +387,6 @@ static Com_Value resolve_entity(IrEmitter *emitter, SourceSite site, Entity *ent
 		case COM_VALUE_AST:
 		{
 			ASSERT(entity->tags & ENTITY_TAG_STATIC);
-			ASSERT(entity->declaration);
 			ASSERT(entity->scope->source);
 			Ast expr = value.ast;
 			ASSERT(expr);
@@ -1115,7 +1114,6 @@ static Ir lower_range_for(IrEmitter *emitter, Ast stat)
 			status = entity_status(entity);
 			break;
 		}
-		entity->declaration = decl;
 		name->entity = entity;
 	}
 	if (status != COM_STATUS_OK)
@@ -1480,7 +1478,6 @@ static Com_Status lower_decl(IrEmitter *emitter, IrQueue *items, Ast stat)
 		if (entity_is_error(entity)) {
 			return entity_status(entity);
 		}
-		entity->declaration = stat;
 		name->entity = entity;
 		ir_queue_push(items, local);
 		return COM_STATUS_OK;
@@ -1508,7 +1505,6 @@ static Com_Status lower_decl(IrEmitter *emitter, IrQueue *items, Ast stat)
 		if (entity_is_error(entity)) {
 			return entity_status(entity);
 		}
-		entity->declaration = stat;
 		name->entity = entity;
 	}
 
@@ -1832,7 +1828,6 @@ static Com_Status lower_func(IrEmitter *parent, IrFunction *func)
 			break;
 		}
 
-		entity->declaration = param;
 		name->entity = entity;
 	}
 
@@ -1872,7 +1867,6 @@ static Com_Status declare_statics(Com_Source *source, Scope *scope, Ast_Array st
 		if (entity_is_error(entity)) {
 			return entity_status(entity);
 		}
-		entity->declaration = declaration;
 		name->entity = entity;
 	}
 	return COM_STATUS_OK;
@@ -2250,35 +2244,21 @@ static Com_Status eval_statics(IrModule *mod, Compiler *com)
 	for (Entity *entity = com->entities; entity; entity = entity->next_in_compiler)
 	{
 		ASSERT(entity->tags & ENTITY_TAG_STATIC);
-		ASSERT(entity->declaration);
-		ASSERT(entity->declaration->kind == AST_STATIC_DECL);
-		Ast expr = entity->declaration->static_decl.expr;
-		ASSERT(expr);
-
-		if (expr->kind == AST_FUNCTION)
-		{
-			ASSERT(entity->value.type == COM_VALUE_FUNCTION);
-
-			IrEmitter emitter = {};
-			emitter.module = mod;
-			emitter.source = entity->scope->source;
-			emitter.active_scope = entity->scope;
-
-			Com_Status status = lower_func(&emitter, entity->value.function);
-			if (status != COM_STATUS_OK) {
-				return status;
-			}
-			continue;
-		}
-
 		IrEmitter emitter = {};
 		emitter.module = mod;
 		emitter.source = entity->scope->source;
 		emitter.active_scope = entity->scope;
 
-		Com_Value value = resolve_entity(&emitter, expr->site, entity);
+		Com_Value value = resolve_entity(&emitter, entity->site, entity);
 		if (value.type == COM_VALUE_ERROR) {
 			return value.status;
+		}
+		if (value.type == COM_VALUE_FUNCTION && !value.function->body)
+		{
+			Com_Status status = lower_func(&emitter, value.function);
+			if (status != COM_STATUS_OK) {
+				return status;
+			}
 		}
 	}
 	return COM_STATUS_OK;
@@ -2291,9 +2271,8 @@ static Com_Status warn_unreferenced(Compiler *com)
 		if (entity->referenced || entity_is_exported(entity)) {
 			continue;
 		}
-		ASSERT(entity->declaration);
 		ASSERT(entity->scope->source);
-		Com_Status status = checker_warn(entity->scope->source, ELF_ERROR_UNREFERENCED_ENTITY, entity->declaration->site, "declaration of '%s' is never referenced", atom_data(entity->name));
+		Com_Status status = checker_warn(entity->scope->source, ELF_ERROR_UNREFERENCED_ENTITY, entity->site, "declaration of '%s' is never referenced", atom_data(entity->name));
 		if (status != COM_STATUS_OK) {
 			return status;
 		}

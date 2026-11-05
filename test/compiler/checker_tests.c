@@ -194,7 +194,7 @@ static void test_checker_declares_local_after_initializer(void)
 	Ast initializer = declaration ? checker_test_tuple_item(declaration->decl.expr, 0, AST_IDENT, "checker finds local initializer") : 0;
 	Entity *local = name ? name->entity : 0;
 	Entity *prior = initializer ? initializer->entity : 0;
-	if (!local || local->value.type != COM_VALUE_IR || local->value.ir->kind != IR_LOCAL || !prior || !prior->declaration || prior->declaration->kind != AST_STATIC_DECL || local == prior) {
+	if (!local || local->value.type != COM_VALUE_IR || local->value.ir->kind != IR_LOCAL || !prior || !(prior->tags & ENTITY_TAG_STATIC) || local == prior) {
 		test_fail("checker resolves initializer before declaring local names");
 	}
 	Ast return_expr = return_stat ? checker_test_single_expression(return_stat->return_stat.expr, AST_IDENT, "checker finds local return expression") : 0;
@@ -273,13 +273,13 @@ static void test_checker_attaches_function_entities(void)
 	Ast inner_return = inner_body && inner_body->kind == AST_BLOCK_STAT && inner_body->block.count ? inner_body->block.items[0] : 0;
 	Entity *parameter_entity = parameter_name ? parameter_name->entity : 0;
 	Entity *local_entity = local_name ? local_name->entity : 0;
-	if (!parameter_entity || parameter_entity->value.type != COM_VALUE_IR || parameter_entity->value.ir->kind != IR_LOCAL || parameter_entity->declaration != parameter || parameter_entity->value.ir->ir_local.owner != outer_function->function.ir) {
+	if (!parameter_entity || parameter_entity->value.type != COM_VALUE_IR || parameter_entity->value.ir->kind != IR_LOCAL || parameter_entity->value.ir->ir_local.owner != outer_function->function.ir) {
 		test_fail("checker attaches parameter entity to owning function");
 	}
 	if (!parameter_use || parameter_use->entity != parameter_entity) {
 		test_fail("checker resolves function parameter use");
 	}
-	if (!local_entity || local_entity->value.type != COM_VALUE_IR || local_entity->value.ir->kind != IR_LOCAL || local_entity->declaration != local_decl || local_entity->value.ir->ir_local.owner != outer_function->function.ir) {
+	if (!local_entity || local_entity->value.type != COM_VALUE_IR || local_entity->value.ir->kind != IR_LOCAL || local_entity->value.ir->ir_local.owner != outer_function->function.ir) {
 		test_fail("checker records local owner function");
 	}
 	Ast inner_return_expr = inner_return && inner_return->kind == AST_RETURN ? checker_test_single_expression(inner_return->return_stat.expr, AST_IDENT, "checker finds captured local use") : 0;

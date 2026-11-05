@@ -99,7 +99,7 @@ struct Entity
 
 	struct Atom    *name;
 	Scope          *scope;
-	Ast             declaration;
+	SourceSite      site;
 	Com_Value       value;
 	b32             referenced;
 };

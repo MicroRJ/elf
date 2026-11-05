@@ -125,7 +125,7 @@ static Com_Status inject_symbol_table(Compiler *compiler, Scope *scope, Com_Sour
 	Entity *existing = scope_find_current(scope, name);
 	if (existing)
 	{
-		if (existing->declaration || existing->value.type != COM_VALUE_SCOPE)
+		if (existing->value.type != COM_VALUE_SCOPE)
 		{
 			return report_symbol(source, field, ELF_ERROR_DUPLICATE_DECLARATION, "uses an existing value as a namespace");
 		}
