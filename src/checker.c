@@ -201,71 +201,6 @@ static Com_Status checker_out_of_memory(Com_Source *source, SourceSite site)
 	return report(source, ELF_ERROR_OUT_OF_MEMORY, ERROR_FATAL, ERROR_PHASE_CHECKER, site, "out of memory during semantic analysis") ? COM_STATUS_REPORTED : COM_STATUS_OOM;
 }
 
-static Ir check_assign_dest(IrEmitter *emitter, Ast dest)
-{
-	ASSERT(emitter);
-	ASSERT(dest);
-	if (dest->kind == AST_TUPLE)
-	{
-		IrArray items = ir_array_alloc(emitter, dest->tuple.count);
-		for (u32 i = 0; i < dest->tuple.count; ++i)
-		{
-			items.items[i] = check_assign_dest(emitter, dest->tuple.items[i]);
-			if (ir_is_error(items.items[i])) {
-				return items.items[i];
-			}
-		}
-		return ir_new_tuple(emitter->module, dest->site, items);
-	}
-
-	if (dest->kind == AST_IDENT)
-	{
-		Entity *entity = dest->entity;
-		if (!entity) {
-			entity = scope_find(emitter->active_scope, dest->identifier);
-		}
-		if (!entity) {
-			return ir_from_status(checker_report(emitter->source, ELF_ERROR_UNDECLARED_IDENTIFIER, ERROR_ERROR, dest->site, "undeclared identifier '%s'", atom_data(dest->identifier)));
-		}
-		dest->entity = entity;
-		entity->referenced = true;
-		if (entity_is_constant(entity))
-		{
-			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "'%s' is read-only", atom_data(dest->identifier));
-			return ir_from_status(status);
-		}
-		if (entity->value.type != COM_VALUE_IR || entity->value.ir->kind != IR_LOCAL)
-		{
-			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "'%s' is not assignable", atom_data(dest->identifier));
-			return ir_from_status(status);
-		}
-		Ir local = entity->value.ir;
-		if (local->ir_local.owner != emitter->function)
-		{
-			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "captured binding '%s' is read-only", atom_data(dest->identifier));
-			return ir_from_status(status);
-		}
-		return local;
-	}
-
-	Com_Value value = check_expr(emitter, dest);
-	if (value.type == COM_VALUE_ERROR) {
-		return ir_from_status(value.status);
-	}
-	if (value.type != COM_VALUE_IR)
-	{
-		Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "expression is not assignable");
-		return ir_from_status(status);
-	}
-
-	Ir ir = value.ir;
-	if (ir->kind == IR_FIELD || ir->kind == IR_INDEX) {
-		return ir;
-	}
-	Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, dest->site, "expression is not assignable");
-	return ir_from_status(status);
-}
-
 static Scope *push_scope(Com_Source *source, Scope *parent, Ast owner)
 {
 	ASSERT(source);
@@ -1255,7 +1190,60 @@ static Ir check_range_for(IrEmitter *checker, Ast stat)
 	return result;
 }
 
-static Ir save_lvalue(IrEmitter *emitter, IrQueue *items, Ir ir)
+static Ir lower_lvalue(IrEmitter *emitter, Ast expr)
+{
+	ASSERT(emitter);
+	ASSERT(expr);
+
+	if (expr->kind == AST_IDENT)
+	{
+		Entity *entity = expr->entity;
+		if (!entity) {
+			entity = scope_find(emitter->active_scope, expr->identifier);
+		}
+		if (!entity) {
+			return ir_from_status(checker_report(emitter->source, ELF_ERROR_UNDECLARED_IDENTIFIER, ERROR_ERROR, expr->site, "undeclared identifier '%s'", atom_data(expr->identifier)));
+		}
+		expr->entity = entity;
+		entity->referenced = true;
+		if (entity_is_constant(entity))
+		{
+			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, expr->site, "'%s' is read-only", atom_data(expr->identifier));
+			return ir_from_status(status);
+		}
+		if (entity->value.type != COM_VALUE_IR || entity->value.ir->kind != IR_LOCAL)
+		{
+			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, expr->site, "'%s' is not assignable", atom_data(expr->identifier));
+			return ir_from_status(status);
+		}
+		Ir local = entity->value.ir;
+		if (local->ir_local.owner != emitter->function)
+		{
+			Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, expr->site, "captured binding '%s' is read-only", atom_data(expr->identifier));
+			return ir_from_status(status);
+		}
+		return local;
+	}
+
+	Com_Value value = check_expr(emitter, expr);
+	if (value.type == COM_VALUE_ERROR) {
+		return ir_from_status(value.status);
+	}
+	if (value.type != COM_VALUE_IR)
+	{
+		Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, expr->site, "expression is not assignable");
+		return ir_from_status(status);
+	}
+
+	Ir ir = value.ir;
+	if (ir->kind == IR_FIELD || ir->kind == IR_INDEX) {
+		return ir;
+	}
+	Com_Status status = checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, expr->site, "expression is not assignable");
+	return ir_from_status(status);
+}
+
+static Ir stabilize_lvalue(IrEmitter *emitter, IrQueue *items, Ir ir)
 {
 	ASSERT(ir);
 	if (ir->kind != IR_FIELD && ir->kind != IR_INDEX) {
@@ -1273,6 +1261,160 @@ static Ir save_lvalue(IrEmitter *emitter, IrQueue *items, Ir ir)
 		y = ir_new_load(emitter->module, y->site, key);
 	}
 	return ir->kind == IR_INDEX ? ir_new_index(emitter->module, ir->site, x, y) : ir_new_binary(emitter->module, ir->site, IR_FIELD, x, y);
+}
+
+static Com_Status lower_compound_assign(IrEmitter *emitter, IrQueue *items, Ast stat)
+{
+	Ast dest_tuple = stat->binary.x;
+	ASSERT(dest_tuple);
+	ASSERT(dest_tuple->kind == AST_TUPLE);
+	Ast expr_tuple = stat->binary.y;
+	ASSERT(expr_tuple);
+	ASSERT(expr_tuple->kind == AST_TUPLE);
+
+	if (dest_tuple->tuple.count != 1 || expr_tuple->tuple.count != 1) {
+		return checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "compound assignment requires one destination and one value");
+	}
+
+	Ast dest_ast = dest_tuple->tuple.items[0];
+	Ir dest = lower_lvalue(emitter, dest_ast);
+	if (ir_is_error(dest)) {
+		return ir_status(dest);
+	}
+
+	Ir value = check_ir(emitter, expr_tuple->tuple.items[0]);
+	if (ir_is_error(value)) {
+		return ir_status(value);
+	}
+
+	dest = stabilize_lvalue(emitter, items, dest);
+	Ir current = dest->kind == IR_LOCAL ? ir_new_load(emitter->module, dest_ast->site, dest) : dest;
+	IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
+	ASSERT(op != IR_NONE);
+	Ir result = ir_new_binary(emitter->module, stat->site, op, current, value);
+	ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, result));
+	return COM_STATUS_OK;
+}
+
+static Com_Status lower_nil_assign(IrEmitter *emitter, IrQueue *items, Ast stat)
+{
+	Ast dest_tuple = stat->binary.x;
+	ASSERT(dest_tuple);
+	ASSERT(dest_tuple->kind == AST_TUPLE);
+	Ast expr_tuple = stat->binary.y;
+	ASSERT(expr_tuple);
+	ASSERT(expr_tuple->kind == AST_TUPLE);
+
+	if (dest_tuple->tuple.count != expr_tuple->tuple.count) {
+		return checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "nil assignment requires one value for each destination");
+	}
+
+	for (u32 i = 0; i < dest_tuple->tuple.count; ++ i)
+	{
+		Ast dest_ast = dest_tuple->tuple.items[i];
+		Ir dest = lower_lvalue(emitter, dest_ast);
+		if (ir_is_error(dest)) {
+			return ir_status(dest);
+		}
+
+		Ir value = check_ir(emitter, expr_tuple->tuple.items[i]);
+		if (ir_is_error(value)) {
+			return ir_status(value);
+		}
+
+		dest = stabilize_lvalue(emitter, items, dest);
+		Ir current = dest->kind == IR_LOCAL ? ir_new_load(emitter->module, dest_ast->site, dest) : dest;
+		Ir pred = ir_new_binary(emitter->module, stat->site, IR_EQ, current, ir_new_nil(emitter->module, dest_ast->site));
+		Ir store = ir_new_store(emitter->module, stat->site, dest, value);
+		IrQueue true_items = ir_queue_begin(emitter);
+		ir_queue_push(&true_items, store);
+		Ir true_clause = ir_new_block(emitter->module, stat->site, ir_queue_end(&true_items));
+		ir_queue_push(items, ir_new_if(emitter->module, stat->site, pred, true_clause, 0));
+	}
+	return COM_STATUS_OK;
+}
+
+static Com_Status lower_assign(IrEmitter *emitter, IrQueue *items, Ast stat)
+{
+	Ast dest_tuple = stat->binary.x;
+	ASSERT(dest_tuple);
+	ASSERT(dest_tuple->kind == AST_TUPLE);
+	Ast expr_tuple = stat->binary.y;
+	ASSERT(expr_tuple);
+	ASSERT(expr_tuple->kind == AST_TUPLE);
+	u32 ndests = dest_tuple->tuple.count;
+	u32 nexprs = expr_tuple->tuple.count;
+
+	if (ndests == 1 && nexprs == 1)
+	{
+		Ir dest = lower_lvalue(emitter, dest_tuple->tuple.items[0]);
+		if (ir_is_error(dest)) {
+			return ir_status(dest);
+		}
+		Ir value = check_ir(emitter, expr_tuple->tuple.items[0]);
+		if (ir_is_error(value)) {
+			return ir_status(value);
+		}
+		ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
+		return COM_STATUS_OK;
+	}
+
+	if (nexprs > ndests) {
+		return checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "assignment has more values than destinations");
+	}
+
+	b32 multi_call = nexprs < ndests;
+	if (multi_call)
+	{
+		Ast final_expr = nexprs ? expr_tuple->tuple.items[nexprs - 1] : 0;
+		if (!final_expr || final_expr->kind != AST_CALL) {
+			return checker_report(emitter->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "assignment requires one value for each destination or a final function call");
+		}
+	}
+
+	IrArray dests = ir_array_alloc(emitter, ndests);
+	for (u32 i = 0; i < dests.count; ++ i)
+	{
+		dests.items[i] = lower_lvalue(emitter, dest_tuple->tuple.items[i]);
+		if (ir_is_error(dests.items[i])) {
+			return ir_status(dests.items[i]);
+		}
+	}
+
+	IrArray locals = ir_array_alloc(emitter, ndests);
+	u32 nfixed = multi_call ? nexprs - 1 : nexprs;
+	for (u32 i = 0; i < nfixed; ++ i)
+	{
+		Ast expr = expr_tuple->tuple.items[i];
+		Ir value = check_ir(emitter, expr);
+		if (ir_is_error(value)) {
+			return ir_status(value);
+		}
+		locals.items[i] = ir_new_local(emitter->module, emitter->function, expr->site, value);
+		ir_queue_push(items, locals.items[i]);
+	}
+
+	if (multi_call)
+	{
+		Ast expr = expr_tuple->tuple.items[nfixed];
+		Ir value = check_ir(emitter, expr);
+		if (ir_is_error(value)) {
+			return ir_status(value);
+		}
+
+		for (u32 i = nfixed; i < locals.count; ++ i) {
+			locals.items[i] = ir_new_local(emitter->module, emitter->function, expr->site, 0);
+		}
+		IrArray results = { .items = locals.items + nfixed, .count = locals.count - nfixed };
+		ir_queue_push(items, ir_new_multi_local(emitter->module, expr->site, value, results));
+	}
+
+	for (u32 i = 0; i < dests.count; ++ i)
+	{
+		Ir value = ir_new_load(emitter->module, locals.items[i]->site, locals.items[i]);
+		ir_queue_push(items, ir_new_store(emitter->module, stat->site, dests.items[i], value));
+	}
+	return COM_STATUS_OK;
 }
 
 static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
@@ -1517,110 +1659,18 @@ static Com_Status check_stat(IrEmitter *checker, IrQueue *items, Ast stat)
 		case AST_XOR_ASSIGN:
 		case AST_SHL_ASSIGN:
 		case AST_SHR_ASSIGN:
+		{
+			return lower_compound_assign(emitter, items, stat);
+		}
+
 		case AST_NIL_ASSIGN:
+		{
+			return lower_nil_assign(emitter, items, stat);
+		}
+
 		case AST_ASSIGN:
 		{
-			Ast dest_tuple = stat->binary.x;
-			ASSERT(dest_tuple);
-			ASSERT(dest_tuple->kind == AST_TUPLE);
-			Ast expr_tuple = stat->binary.y;
-			ASSERT(expr_tuple);
-			ASSERT(expr_tuple->kind == AST_TUPLE);
-
-			Ir dest_tuple_ir = check_assign_dest(checker, dest_tuple);
-			if (ir_is_error(dest_tuple_ir)) {
-				return ir_status(dest_tuple_ir);
-			}
-			ASSERT(dest_tuple_ir->kind == IR_TUPLE);
-
-			Com_Value expr_value = check_expr(checker, expr_tuple);
-			if (expr_value.type == COM_VALUE_ERROR) {
-				return com_value_status(expr_value);
-			}
-			ASSERT(expr_value.type == COM_VALUE_IR);
-
-			Ir expr_tuple_ir = expr_value.ir;
-			ASSERT(expr_tuple_ir->kind == IR_TUPLE);
-
-			if (stat->kind != AST_ASSIGN && stat->kind != AST_NIL_ASSIGN)
-			{
-				if (dest_tuple_ir->ir_tuple.count != 1 || expr_tuple_ir->ir_tuple.count != 1) {
-					return checker_report(checker->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "compound assignment requires one destination and one value");
-				}
-
-				Ast dest_ast = dest_tuple->tuple.items[0];
-				Ir dest = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[0]);
-				Ir current = dest->kind == IR_LOCAL ? ir_new_load(emitter->module, dest_ast->site, dest) : dest;
-				IrKind op = ir_kind_from_compound_assign_ast_kind(stat->kind);
-				ASSERT(op != IR_NONE);
-				Ir value = ir_new_binary(emitter->module, stat->site, op, current, expr_tuple_ir->ir_tuple.items[0]);
-				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
-				return COM_STATUS_OK;
-			}
-
-			if (stat->kind == AST_NIL_ASSIGN)
-			{
-				if (dest_tuple->tuple.count != expr_tuple->tuple.count) {
-					return checker_report(checker->source, ELF_ERROR_INVALID_ASSIGNMENT, ERROR_ERROR, stat->site, "nil assignment requires one value for each destination");
-				}
-				for (u32 i = 0; i < dest_tuple->tuple.count; ++ i)
-				{
-					Ast dest_ast = dest_tuple->tuple.items[i];
-					Ir dest_ir = save_lvalue(emitter, items, dest_tuple_ir->ir_tuple.items[i]);
-					Ir current = dest_ir->kind == IR_LOCAL ? ir_new_load(emitter->module, dest_ast->site, dest_ir) : dest_ir;
-					Ir pred = ir_new_binary(emitter->module, stat->site, IR_EQ, current, ir_new_nil(emitter->module, dest_ast->site));
-					Ir store = ir_new_store(emitter->module, stat->site, dest_ir, expr_tuple_ir->ir_tuple.items[i]);
-					IrQueue true_items = ir_queue_begin(emitter);
-					ir_queue_push(&true_items, store);
-					Ir true_clause = ir_new_block(emitter->module, stat->site, ir_queue_end(&true_items));
-					ir_queue_push(items, ir_new_if(emitter->module, stat->site, pred, true_clause, 0));
-				}
-				return COM_STATUS_OK;
-			}
-
-			u32 count = dest_tuple->tuple.count;
-			if (count == 1)
-			{
-				Ast dest_ast = dest_tuple->tuple.items[0];
-				Ir dest = dest_tuple_ir->ir_tuple.items[0];
-				Ir value = expr_tuple_ir->ir_tuple.count ? expr_tuple_ir->ir_tuple.items[0] : ir_new_nil(emitter->module, dest_ast->site);
-				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
-				return COM_STATUS_OK;
-			}
-
-			IrArray locals = ir_array_alloc(emitter, count);
-			if (expr_tuple->tuple.count == 1 && expr_tuple->tuple.items[0] && expr_tuple->tuple.items[0]->kind == AST_CALL)
-			{
-				Ast expr = expr_tuple->tuple.items[0];
-				for (u32 i = 0; i < count; ++ i) {
-					locals.items[i] = ir_new_local(emitter->module, emitter->function, expr->site, 0);
-				}
-				ir_queue_push(items, ir_new_multi_local(emitter->module, expr->site, expr_tuple_ir->ir_tuple.items[0], locals));
-			}
-			else
-			{
-				for (u32 i = 0; i < count; ++ i)
-				{
-					SourceSite site = stat->site;
-					Ir value = ir_new_nil(emitter->module, site);
-					if (i < expr_tuple->tuple.count)
-					{
-						Ast expr = expr_tuple->tuple.items[i];
-						site = expr->site;
-						value = expr_tuple_ir->ir_tuple.items[i];
-					}
-					locals.items[i] = ir_new_local(emitter->module, emitter->function, site, value);
-					ir_queue_push(items, locals.items[i]);
-				}
-			}
-
-			for (u32 i = 0; i < count; ++ i)
-			{
-				Ir dest = dest_tuple_ir->ir_tuple.items[i];
-				Ir value = ir_new_load(emitter->module, locals.items[i]->site, locals.items[i]);
-				ir_queue_push(items, ir_new_store(emitter->module, stat->site, dest, value));
-			}
-			return COM_STATUS_OK;
+			return lower_assign(emitter, items, stat);
 		}
 
 		case AST_TUPLE:
