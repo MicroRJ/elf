@@ -32,3 +32,13 @@
 - Made assignment validation reject immutable and captured bindings before store lowering while preserving mutation through captured objects.
 - Added non-fatal diagnostics when declarations shadow names in parent scopes.
 - Kept the optimized build passing. The full test run still reaches stale checker assertions and their existing access violation; expected-failure script coverage and unreferenced-entity warnings remain follow-up work.
+
+## 2026-11-05
+
+- Added unreferenced-entity warnings.
+- Represented local entity values directly as IR and restored the distinction between local storage definitions and loads from that storage.
+- Simplified assignment and declaration lowering, including direct one-to-one stores and explicit multi-result call handling.
+- Contracted checker value resolution and removed entity declaration backpointers.
+- Separated function definitions from function-reference IR nodes.
+- Established the next goal: make IR a complete, independently verifiable boundary. Each function should own a structured block body; blocks should encode local-storage lifetime; parameters and local definitions should have explicit contracts; captures should be valid from the block hierarchy; and finalized IR should not depend on AST, entity, or prototype attachments.
+- First step next session: lower every runtime-valued static expression inside an ordinary isolated `IrFunction`, then use that ownership model to tighten function, block, local, and capture construction.
